@@ -62,6 +62,36 @@ describe("notes command wrappers", () => {
     expect(invoke).toHaveBeenCalledWith("plugin:notes|note_update", { noteId: "id", plaintext: "body" });
   });
 
+  it("noteUpdate passes the expected-base hash when given one (MYND-617 task 11)", async () => {
+    // The gap this closes was never task-specific: without the parameter,
+    // EVERY mobile note write was a blind overwrite of whatever was on disk,
+    // which on a note the user is not looking at discards an edit sync had
+    // just pulled.
+    await noteUpdate("id", "body", "a".repeat(64));
+    expect(invoke).toHaveBeenCalledWith("plugin:notes|note_update", {
+      noteId: "id",
+      plaintext: "body",
+      expectedBaseHashHex: "a".repeat(64),
+    });
+  });
+
+  it("noteUpdate omits the key entirely when no hash is given", async () => {
+    // Omitting keeps legacy last-write-wins, so every existing caller behaves
+    // exactly as before — the parameter is additive, not a behaviour change.
+    await noteUpdate("id", "body");
+    const args = invoke.mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect("expectedBaseHashHex" in args).toBe(false);
+  });
+
+  it("a mismatched hash rejects rather than overwriting", async () => {
+    // The backend answers `{kind:"BaseMismatch"}`; the wrapper must propagate
+    // it rather than swallowing it into a success.
+    invoke.mockRejectedValueOnce({ kind: "BaseMismatch" });
+    await expect(noteUpdate("id", "body", "b".repeat(64))).rejects.toMatchObject({
+      kind: "BaseMismatch",
+    });
+  });
+
   it("noteDelete → plugin:notes|note_delete { noteId }", async () => {
     await noteDelete("id");
     expect(invoke).toHaveBeenCalledWith("plugin:notes|note_delete", { noteId: "id" });

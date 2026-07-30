@@ -131,6 +131,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // `permissions/prefs/default.toml` or the ACL resolver fails closed.
             commands::set_editor_toolbar_order,
             commands::set_editor_toolbar_hidden,
+            commands::set_reminders_enabled,
+            commands::set_reminder_horizon_days,
         ])
         .build()
 }

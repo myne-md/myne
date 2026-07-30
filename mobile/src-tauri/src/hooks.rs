@@ -67,6 +67,12 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     fn reclaim_stray_attachment_blobs<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
     }
+    // Owed like its siblings: the unlock-time reference-graph rebuild (MYND-171,
+    // desktop `myne#143`) is not dispatched on mobile yet, and the RAM graph is
+    // populated lazily on save regardless. No-op; never blocks an unlock.
+    fn hydrate_attachment_refs<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
     fn persist_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
     }

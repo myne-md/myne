@@ -55,6 +55,15 @@ fn main() {
                     "set_device_name",
                     "device_platform",
                     "vault_set_label",
+                    // MYND-619 task 8: the two device-local reminder fields the
+                    // desktop feature defined. Consumed here, not redefined —
+                    // the struct, codec, sync classification and core setters
+                    // are already shared through `myne-core`; what mobile was
+                    // missing was purely the three registration sites (this
+                    // list, the permission file, the invoke_handler), and a
+                    // command absent from any of them fails CLOSED at runtime.
+                    "set_reminders_enabled",
+                    "set_reminder_horizon_days",
                 ]),
             )
             .plugin(
@@ -126,6 +135,7 @@ fn main() {
                     "vault_indices_property_keys",
                     "vault_indices_persist",
                     "vault_indices_hydrate",
+                    "vault_indices_tasks",
                 ]),
             )
             .plugin(

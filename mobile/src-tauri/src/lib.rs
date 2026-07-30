@@ -129,6 +129,16 @@ pub fn run() {
         // registers the command surface but returns Unsupported (SYNC-46; Android
         // decode is MYND-465).
         .plugin(tauri_plugin_qr_scan::init())
+        // MYND-619: the task-reminder scheduler. Four WebView-facing commands
+        // (`schedule` / `cancel` / `cancel_all` / `list_pending`) under the
+        // deny-by-default `reminders:default` capability, bridging to the
+        // in-repo Swift (iOS) and Kotlin (Android) halves. It is a TRANSPORT —
+        // which reminders should be registered is decided by the pure TS core
+        // above the seam — and it carries only an opaque identifier plus a local
+        // instant, never task text or a note identifier (`threat-model.md` §7).
+        // On the macOS dev host it registers the command surface but returns
+        // Unsupported; the desktop client has its own native adapters.
+        .plugin(tauri_plugin_reminders::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())

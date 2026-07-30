@@ -4,8 +4,10 @@
 // auto-dismisses. The drain itself lives in `lib/shareImport.ts`; this component
 // only listens for its result event and renders the confirmation.
 //
-// NOTE: the copy is literal English pending the mobile-i18n catalogs
-// (MYND-485); move to `t("shareImport.toast.*")` when that lands.
+// NOTE: the copy here (and the "Open library" button label) is still literal
+// English. The mobile-i18n catalogs (MYND-485) have since landed; moving these
+// strings to `t("shareImport.toast.*")` is owed but tracked separately — it is
+// not part of the MYND-640 visibility fix.
 
 import { useEffect, useState } from "react";
 import { Toast } from "../../components";
@@ -22,8 +24,15 @@ function labelFor(imported: ImportedShare[]): string | null {
 }
 
 /** Listens for the share-drain result and shows a bottom-centered toast. Mount
- *  once inside the post-unlock shell (EditorFlow). */
-export function ShareImportToast() {
+ *  once inside the post-unlock shell (EditorFlow).
+ *
+ *  MYND-640: the toast is the ONLY thing that tells a user their share arrived —
+ *  the drain files it into the attachment library, which is not where they were
+ *  looking — and it used to be `pointerEvents: "none"`, so it could not be
+ *  tapped. A share therefore ended as a sentence that vanished after a few
+ *  seconds, and the file was somewhere the user had no reason to open. Given
+ *  `onOpenLibrary`, the toast becomes the way there. */
+export function ShareImportToast({ onOpenLibrary }: { onOpenLibrary?: () => void }) {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,10 +64,46 @@ export function ShareImportToast() {
         display: "flex",
         justifyContent: "center",
         zIndex: 50,
+        // This wrapper is a full-width fixed band; keep it click-through so its
+        // transparent left/right regions never swallow taps meant for the
+        // TabBar/FormatBar beneath it (a handler-less div with pointerEvents:
+        // "auto" still captures clicks — transparency is not pass-through). Only
+        // the inner button re-enables pointer events; see its style below.
         pointerEvents: "none",
       }}
     >
-      <Toast>{message}</Toast>
+      {onOpenLibrary === undefined ? (
+        <Toast>{message}</Toast>
+      ) : (
+        /* A button, not a div with a handler: this is the route to the file, so
+           it has to be reachable by keyboard and announced as actionable. */
+        <button
+          type="button"
+          aria-label="Open library"
+          onClick={() => {
+            setMessage(null);
+            onOpenLibrary();
+          }}
+          data-testid="share-import-toast-open"
+          style={{
+            // Re-enable pointer events on JUST the pill. The wrapper stays
+            // click-through (pointerEvents: "none" above), so the nav bar behind
+            // the toast's transparent side regions still receives taps while the
+            // pill itself remains tappable — a child overrides the parent's
+            // "none". When onOpenLibrary is undefined there is no button at all,
+            // so nothing is tappable: same inert result, no side-band regression.
+            pointerEvents: "auto",
+            border: 0,
+            padding: 0,
+            background: "transparent",
+            cursor: "pointer",
+            font: "inherit",
+            textAlign: "inherit",
+          }}
+        >
+          <Toast>{message}</Toast>
+        </button>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@
 // camelCase both ways.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { LineTask } from "../dialect/visitors/lineTasks";
 import type { PropertyEntry } from "@myne/editor/host/notes/propertyTyping";
 import type { StoredProperty } from "@myne/editor/host/notes/queryEngine";
 
@@ -48,6 +49,12 @@ export interface IndexRecord {
    *  the `property` filter leaf. Previously always `[]` — a saved view could
    *  only filter by tag/folder/search on mobile; now it reaches parity. */
   properties: PropertyEntry[];
+  /** The note's line-tasks (MYND-612), typed by the shared dialect extractor.
+   *  Same story as `properties` above: the field existed on the Rust side from
+   *  the start but no client filled it, so every mobile task surface — the
+   *  Tasks tab, the note-scoped panel, and the reminder scheduler that reads
+   *  the same index — listed nothing at all. */
+  tasks: LineTask[];
 }
 
 /** Replace-semantics upsert of a note's index contribution. */
@@ -60,6 +67,9 @@ export function vaultIndicesApply(r: IndexRecord): Promise<void> {
     wikilinks: r.wikilinks,
     tags: r.tags,
     properties: r.properties,
+    // Sent unconditionally, `[]` included: apply replaces the whole record, so
+    // a note whose last task was deleted must overwrite the stored vector.
+    tasks: r.tasks,
   });
 }
 
