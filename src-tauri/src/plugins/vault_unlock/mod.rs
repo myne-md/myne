@@ -91,6 +91,7 @@ mod desktop_tests {
                 tags: Vec::new(),
                 properties: Vec::new(),
                 block_anchors: Vec::new(),
+                tasks: Vec::new(),
             },
         );
         assert_eq!(

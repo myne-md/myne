@@ -37,6 +37,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
 import type { TFunction } from "i18next";
 import { Icon } from "../components/primitives/Icon";
 import { MyneMark } from "../components/primitives/MyneMark";
@@ -378,6 +379,14 @@ export function VaultPicker({ onSelect, onCreateAnother,
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
   // Subscribe to the shared 30s tick so the row timestamps stay live.
   useTick();
+
+  // MYND-628 — re-show the window after an idle-lock hid it. This screen is a
+  // locked boot surface exactly like `Unlock`, and at TWO OR MORE vaults it is
+  // the one the post-lock reload actually lands on (`initialStageFromProbe`
+  // routes ≥2 vaults to `picker`, SYNC-7a). Only `Unlock` carried the reveal,
+  // so every multi-vault user lost the window on every idle auto-lock and had
+  // to click the dock icon or relaunch to get it back.
+  useRevealAfterIdleLock();
 
   useEffect(() => {
     let cancelled = false;

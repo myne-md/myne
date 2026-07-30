@@ -115,7 +115,7 @@
       "title": "添付ファイル",
       "transcribeDone": "文字起こしが完了しました。",
       "transcribeFailed": "文字起こしに失敗しました。もう一度お試しください。",
-      "transcribeNoModel": "設定 → Labs → AI で文字起こしモデルを選択してください。",
+      "transcribeNoModel": "設定 → Developer → AI で文字起こしモデルを選択してください。",
       "transcribeStarted": "文字起こし中…",
       "typeFilter": {
         "all": "すべての種類",
@@ -730,11 +730,11 @@
           "deletedLabel": "削除済み"
         },
         "transcribe": {
-          "disabledReason": "文字起こしするには 設定 → Labs → AI でAIを有効にしてください。",
+          "disabledReason": "文字起こしするには 設定 → Developer → AI でAIを有効にしてください。",
           "failed": "文字起こしに失敗しました。もう一度お試しください。",
           "heading": "文字起こし",
           "insert": "文字起こしをノートに挿入",
-          "noModelHint": "設定 → Labs → AI で文字起こしモデルを選択してください。",
+          "noModelHint": "設定 → Developer → AI で文字起こしモデルを選択してください。",
           "progress": "文字起こし中…",
           "stop": "停止"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "AIのためにノートを準備しています — しばらくお待ちください。",
           "insert": "ノートに挿入",
           "noAnswer": "回答がありません — 言い換えてみてください。",
-          "noModelHint": "モデルが選択されていません。開始するには 設定 → Labs → AI で選択してください。",
-          "offHint": "ローカルAIはオフです。設定 → Labs → AI でオンにしてください。",
+          "noModelHint": "モデルが選択されていません。開始するには 設定 → Developer → AI で選択してください。",
+          "offHint": "ローカルAIはオフです。設定 → Developer → AI でオンにしてください。",
           "send": "送信",
           "statusGettingReady": "準備中…",
           "statusNoModel": "モデルなし",
@@ -2012,6 +2012,8 @@
       "changelogButton": "変更履歴を表示…",
       "changelogHelper": "バージョンごとのリリースノート。MYND-119の実装時に表示されます。",
       "changelogLabel": "変更履歴",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "プレアルファ · ドキュメントはCC-BY-4.0 · フェーズ1リリースでアプリケーションコードはAGPL-3.0。",
       "licenseLabel": "ライセンス",
       "tagline": "プレアルファ · フェーズ1デスクトップクライアント",
@@ -2341,7 +2343,6 @@
       "pendingHint": "近日公開"
     },
     "ai": {
-      "betaBadge": "ベータ",
       "disclosureToggle": "これはどのように機能しますか？",
       "enableHelper": "あなたが用意したモデルを完全にデバイス上で実行します。実験的機能で、デフォルトはオフです。",
       "enableLabel": "ローカルAIを有効化",
@@ -2434,7 +2435,7 @@
     "shell": {
       "closeLabel": "設定を閉じる",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "設定パネル",
       "panels": {

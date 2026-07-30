@@ -13,6 +13,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { Switch } from "../primitives/Switch";
 import { ControlBlock } from "./ControlBlock";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
@@ -28,18 +29,6 @@ import {
   setActiveSpellLanguages,
 } from "../../lib/spell";
 import { setSpellConfig } from "../../editor/decorations/spell";
-
-const TOGGLE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "6px 12px",
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-2)",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  alignSelf: "flex-start",
-};
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -152,17 +141,12 @@ export function SpellSettings() {
         label={t("settings.spell.label")}
         helper={t("settings.spell.helper")}
         control={
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enabled}
-            aria-label={t("settings.spell.label")}
-            data-testid="settings.spell-check"
-            onClick={() => void toggleEnabled(!enabled)}
-            style={TOGGLE_STYLE}
-          >
-            {enabled ? t("settings.spell.on") : t("settings.spell.off")}
-          </button>
+          <Switch
+            checked={enabled}
+            onChange={() => void toggleEnabled(!enabled)}
+            ariaLabel={t("settings.spell.label")}
+            testId="settings.spell-check"
+          />
         }
       />
 

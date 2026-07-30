@@ -233,6 +233,93 @@ impl BlockAnchor {
     }
 }
 
+/// One line-task extracted from a note body (MYND-612).
+///
+/// **Every metadata field is an OPAQUE verbatim source substring.** Rust stores
+/// them and returns them; it performs no date parsing, no comparison, and no
+/// arithmetic on any of them. The dialect layer owns the typing (§3.8.3), TS
+/// extracts (the single dialect source, exactly as `BlockAnchor` does), and a
+/// second Rust-side interpretation would be a second type authority — the drift
+/// `markdown-dialect.md` §3.6.4 exists to prevent. A field that does not parse
+/// TS-side arrives here verbatim just the same, because this layer cannot tell
+/// the difference and must not try.
+///
+/// The note id is deliberately **not** a field: records live under their note's
+/// UUID in the index map, exactly as `BlockAnchor` does, so carrying it per row
+/// would duplicate it into every task in the `MYI1` payload. The query layer
+/// re-attaches it when it flattens records into result rows.
+///
+/// serde camelCase (TS sends camelCase).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRecord {
+    /// Zero-based index of the task's line within the note body — the locator
+    /// half of the record, with the note id supplied by the map key.
+    pub line_index: u32,
+    /// The task's source line, verbatim and unmodified. Uppercase `[X]` markers
+    /// and non-canonical spacing survive here untouched (§6 C1).
+    pub raw_line: String,
+    /// Whether the checkbox is checked. Derived TS-side from the marker so the
+    /// query layer never has to re-read `raw_line` — re-parsing it here would be
+    /// the interpretation this struct exists to avoid.
+    pub completed: bool,
+    /// Set when the source line exceeded the raw-line cap and `raw_line` is
+    /// therefore truncated (MYND-612 task 5). The record is still stored and
+    /// still served — dropping it would make the task vanish from every surface
+    /// — but the raw line is the authority for the pre-write verification, so a
+    /// truncated one makes the task **unwritable**, and writers refuse on this
+    /// flag rather than attempting a write they cannot verify.
+    #[serde(default)]
+    pub oversized: bool,
+    /// `due`, verbatim. Opaque.
+    pub due: Option<String>,
+    /// `repeat`, verbatim. Opaque.
+    pub repeat: Option<String>,
+    /// `done`, verbatim. Opaque.
+    pub done: Option<String>,
+    /// `priority`, verbatim. Opaque.
+    pub priority: Option<String>,
+    /// `remind`, verbatim. Opaque.
+    pub remind: Option<String>,
+}
+
+impl TaskRecord {
+    fn zeroize_in_place(&mut self) {
+        self.raw_line.zeroize();
+        for field in [
+            self.due.as_mut(),
+            self.repeat.as_mut(),
+            self.done.as_mut(),
+            self.priority.as_mut(),
+            self.remind.as_mut(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            field.zeroize();
+        }
+    }
+}
+
+/// One vault-wide line-task row (MYND-612): which note carries it (id + display
+/// title + folder, so a surface can render provenance without a second lookup)
+/// plus the record itself. The flat row shape [`VaultIndicesState::all_tasks`]
+/// returns — the note id lives here rather than on `TaskRecord`, so it is stored
+/// once per note and re-attached once per query, mirroring `VaultBlockAnchor`.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultTask {
+    /// The note's UUID.
+    pub note_id: String,
+    /// The note's display title, if any.
+    pub note_title: Option<String>,
+    /// The note's `folder:` (trailing-slash form), or `None` at the root.
+    pub note_folder: Option<String>,
+    /// The stored record, verbatim. Rust interprets none of its fields.
+    #[serde(flatten)]
+    pub task: TaskRecord,
+}
+
 /// One resolved vault-wide block anchor for the `[[^^` picker (MYND-382): which
 /// note carries it (id + display title) plus the block id + preview. The flat
 /// row shape [`VaultIndicesState::all_block_anchors`] returns to the picker.
@@ -290,6 +377,15 @@ pub struct NoteRecord {
     /// rebuild-on-format-change.
     #[serde(default)]
     pub block_anchors: Vec<BlockAnchor>,
+    /// Line-tasks in this note (MYND-612). Trailing + `#[serde(default)]` for the
+    /// same reason `block_anchors` is: a client that sends none — mobile, which
+    /// has its own extractor, or an older desktop build — deserializes to empty
+    /// and the invoke argument stays wire-compatible in both directions. The
+    /// postcard SNAPSHOT is non-self-describing, so a pre-612 `vault.indices`
+    /// blob fails to decode and the load path falls to a full TS rebuild
+    /// (§9.8.4) — the intended rebuild-on-format-change.
+    #[serde(default)]
+    pub tasks: Vec<TaskRecord>,
 }
 
 impl NoteRecord {
@@ -320,6 +416,10 @@ impl NoteRecord {
             anchor.zeroize_in_place();
         }
         self.block_anchors.clear();
+        for task in self.tasks.iter_mut() {
+            task.zeroize_in_place();
+        }
+        self.tasks.clear();
     }
 }
 
@@ -516,6 +616,38 @@ impl VaultIndicesState {
                     note_folder: record.folder.clone(),
                     block_id: anchor.block_id.clone(),
                     preview: anchor.preview.clone(),
+                });
+            }
+        }
+        out
+    }
+
+    /// Every line-task in the vault, each tagged with its note (MYND-612).
+    ///
+    /// Deliberately **unparameterized**: it returns the whole list and does no
+    /// filtering, sorting, or date comparison. A parameterized accessor would
+    /// require Rust to compare dates, and once that door opens the next request
+    /// is sorting and the one after is tag filtering — at which point the type
+    /// authority has quietly moved out of the dialect layer. Filtering belongs
+    /// to the surfaces; this is a dump.
+    ///
+    /// Iteration stops once `max` is reached, exactly as the block-anchor dump
+    /// does, so the traversal bound is explicit.
+    pub fn all_tasks(&self, max: usize) -> Vec<VaultTask> {
+        let Ok(idx) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for (id, record) in idx.notes.iter() {
+            for task in &record.tasks {
+                if out.len() >= max {
+                    return out;
+                }
+                out.push(VaultTask {
+                    note_id: id.clone(),
+                    note_title: record.title.clone(),
+                    note_folder: record.folder.clone(),
+                    task: task.clone(),
                 });
             }
         }
@@ -1138,5 +1270,99 @@ mod tests {
         assert_eq!(state.all_block_anchors(1000).len(), 5);
         state.clear();
         assert!(state.all_block_anchors(1000).is_empty());
+    }
+
+    // --- MYND-612: line-task records -------------------------------------
+
+    fn task(line_index: u32, due: Option<&str>) -> TaskRecord {
+        TaskRecord {
+            line_index,
+            raw_line: format!("- [ ] task on line {line_index}"),
+            completed: false,
+            oversized: false,
+            due: due.map(str::to_string),
+            repeat: None,
+            done: None,
+            priority: None,
+            remind: None,
+        }
+    }
+
+    #[test]
+    fn task_fields_are_stored_verbatim_including_values_rust_cannot_parse() {
+        // The contract is that Rust interprets NOTHING. Values that are not
+        // valid dates at all — a half-written one, an offset-bearing one, a
+        // recurrence phrase, an emoji-form leftover — must survive byte-identical,
+        // because this layer cannot tell a typed value from an untyped one and
+        // must not try. If anything here ever starts parsing, this test breaks.
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.tasks = vec![TaskRecord {
+            line_index: 3,
+            raw_line: "- [X] ship it ✅ 2026-07-27 🔁 every 3 days".to_string(),
+            completed: true,
+            oversized: false,
+            due: Some("2026-02-31".to_string()),
+            repeat: Some("every 3 days".to_string()),
+            done: Some("2026-07-27".to_string()),
+            priority: Some("not-a-real-priority".to_string()),
+            remind: Some("2026-08-01T10:00:00+03:00".to_string()),
+        }];
+        state.apply("note-a", a.clone());
+
+        let stored = state.note_record("note-a").expect("record present");
+        assert_eq!(stored.tasks, a.tasks, "every field round-trips verbatim");
+        assert_eq!(stored.tasks[0].due.as_deref(), Some("2026-02-31"));
+        assert_eq!(
+            stored.tasks[0].remind.as_deref(),
+            Some("2026-08-01T10:00:00+03:00"),
+            "an offset is neither stripped nor normalized here"
+        );
+        assert_eq!(
+            stored.tasks[0].raw_line,
+            "- [X] ship it ✅ 2026-07-27 🔁 every 3 days"
+        );
+    }
+
+    #[test]
+    fn a_record_from_a_client_that_sends_no_tasks_is_empty_not_an_error() {
+        // Mobile has its own extractor and an older desktop build has none; both
+        // must keep working against this command. `#[serde(default)]` plus the
+        // `Option` invoke argument is what makes the wire compatible both ways.
+        let json = r#"{"title":"Alpha","folder":null,"title_key":null,"edges":[],"tags":[],"properties":[]}"#;
+        let parsed: NoteRecord = serde_json::from_str(json).expect("deserializes without tasks");
+        assert!(parsed.tasks.is_empty());
+        assert!(parsed.block_anchors.is_empty());
+    }
+
+    #[test]
+    fn tasks_are_wiped_on_every_clear_path() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.tasks = vec![task(1, Some("2026-08-01")), task(2, None)];
+        state.apply("note-a", a);
+        assert_eq!(state.note_record("note-a").expect("present").tasks.len(), 2);
+
+        state.clear();
+        assert!(
+            state.note_record("note-a").is_none(),
+            "lock clears the record carrying the tasks"
+        );
+    }
+
+    #[test]
+    fn re_applying_a_note_replaces_its_tasks_rather_than_appending() {
+        let state = VaultIndicesState::default();
+        let mut first = rec("Alpha", None);
+        first.tasks = vec![task(1, Some("2026-08-01")), task(2, None)];
+        state.apply("note-a", first);
+
+        let mut second = rec("Alpha", None);
+        second.tasks = vec![task(9, Some("2026-09-09"))];
+        state.apply("note-a", second);
+
+        let stored = state.note_record("note-a").expect("present");
+        assert_eq!(stored.tasks.len(), 1, "replace semantics, not append");
+        assert_eq!(stored.tasks[0].line_index, 9);
     }
 }

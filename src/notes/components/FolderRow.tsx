@@ -16,18 +16,19 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { FolderNode } from "../folderTree";
-import { ColorDot } from "./ColorDot";
+import { labelColorVar } from "../decorations";
 import { FolderGlyph } from "./FolderGlyph";
 import { Icon } from "../../components/primitives/Icon";
 import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
-import { TreeRails } from "./TreeRails";
 
 const INDENT_PER_LEVEL = 18;
 // Left inset of a top-level folder icon. Kept small so the folder glyph sits
 // close to the sidebar edge (just past the section eyebrow) rather than looking
 // indented, and so its center (BASE_PADDING_LEFT + iconSize/2 = 8 + 8.5 = 16.5)
 // lines up with the descending indent rail (`TreeRails.RAIL_X0`).
-const BASE_PADDING_LEFT = 8;
+// Re-exported so note rows can start in the same column as sibling folders
+// (MYND-622) instead of carrying their own, smaller base offset.
+export const BASE_PADDING_LEFT = 8;
 
 const rowBaseStyle: CSSProperties = {
   display: "flex",
@@ -192,7 +193,8 @@ function FolderIconGlyph({
 
 // Open/closed folder glyphs stacked and cross-faded on `open` so the icon
 // transitions smoothly rather than snapping (an SVG path swap can't tween).
-function FolderIcon({ open }: { open: boolean }) {
+function FolderIcon({ open, colorSlot }: { open: boolean; colorSlot?: string }) {
+  const tint = colorSlot ? labelColorVar(colorSlot) : undefined;
   return (
     <span
       style={{ position: "relative", width: 17, height: 17, flexShrink: 0 }}
@@ -200,11 +202,19 @@ function FolderIcon({ open }: { open: boolean }) {
     >
       <FolderIconGlyph
         open={false}
-        style={{ ...folderGlyphSvgStyle, opacity: open ? 0 : 1 }}
+        style={{
+          ...folderGlyphSvgStyle,
+          opacity: open ? 0 : 1,
+          ...(tint ? { color: tint } : {}),
+        }}
       />
       <FolderIconGlyph
         open={true}
-        style={{ ...folderGlyphSvgStyle, opacity: open ? 1 : 0 }}
+        style={{
+          ...folderGlyphSvgStyle,
+          opacity: open ? 1 : 0,
+          ...(tint ? { color: tint } : {}),
+        }}
       />
     </span>
   );
@@ -232,6 +242,9 @@ export type FolderRowProps = {
   onDragTarget?: (key: string | null) => void;
   /** A note (or notes) dropped onto this folder. */
   onDropNote?: (folderPath: string) => void;
+  /** OS files dropped onto this folder (MYND-629) — markdown becomes notes
+   *  filed here; the handler owns filtering and the result summary. */
+  onDropFiles?: (folderPath: string, files: File[]) => void;
   /** This folder row started being dragged (folder reorder). */
   onDragStartFolder?: (e: ReactDragEvent, node: FolderNode) => void;
   /** A folder is hovering over this row at `place` (reorder indicator). */
@@ -276,6 +289,7 @@ export function FolderRow({
   onContextMenu,
   onDragTarget,
   onDropNote,
+  onDropFiles,
   onDragStartFolder,
   onFolderReorderOver,
   onFolderReorderLeave,
@@ -350,6 +364,16 @@ export function FolderRow({
       onDragStart={(e) => onDragStartFolder?.(e, node)}
       onDragEnd={onDragEnd}
       onDragOver={(e) => {
+        // MYND-629: files dragged in from the OS. `dragKind` is null (no
+        // in-app drag started), and the payload is only inspectable as
+        // `types` during dragover — `files` is empty until drop, by spec.
+        if (dragKind === null && e.dataTransfer.types.includes("Files")) {
+          if (!onDropFiles) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          onDragTarget?.(node.key);
+          return;
+        }
         if (dragKind === "folder") {
           // Folder drag → reorder among sibling folders (2-edge).
           if (!onFolderReorderOver) return;
@@ -378,6 +402,11 @@ export function FolderRow({
       }}
       onDrop={(e) => {
         e.preventDefault();
+        if (dragKind === null && e.dataTransfer.files.length > 0) {
+          onDragTarget?.(null);
+          onDropFiles?.(node.path, Array.from(e.dataTransfer.files));
+          return;
+        }
         if (dragKind === "folder") {
           onFolderReorderDrop?.(node, dragEdge(e));
           return;
@@ -393,16 +422,29 @@ export function FolderRow({
       data-folder-path={node.path}
       title={node.path}
     >
-      <TreeRails depth={depth} />
       {reorderPlace && (
         <div style={insertionLineStyle(reorderPlace)} aria-hidden="true" />
       )}
-      {iconName ? (
-        <FolderGlyph name={iconName} size={17} style={{ color: "var(--fg-3)" }} />
-      ) : (
-        <FolderIcon open={expanded} />
-      )}
-      <ColorDot slot={colorSlot} style={{ marginRight: 1 }} />
+      {/* MYND-627: a colour tints the row's OWN icon rather than adding a
+          separate dot beside it. The dot cost a fixed slice of horizontal
+          width on every coloured row -- painful in a narrow sidebar and worse
+          on mobile -- to say something the icon that is already there can say
+          for free. The title text stays in the ink ramp either way, so the
+          PRODUCT.md rule that colour never tints prose still holds. */}
+      {/* `data-color-slot` stays the machine-readable marker for the row's
+          colour even though the paint moved from a dot onto the icon — E2E and
+          the component tests locate colour by it. */}
+      <span data-color-slot={colorSlot} style={{ display: "inline-flex", flexShrink: 0 }}>
+        {iconName ? (
+          <FolderGlyph
+            name={iconName}
+            size={17}
+            style={{ color: colorSlot ? labelColorVar(colorSlot) : "var(--fg-3)" }}
+          />
+        ) : (
+          <FolderIcon open={expanded} colorSlot={colorSlot} />
+        )}
+      </span>
       {renaming ? (
         <input
           ref={inputRef}
@@ -457,8 +499,14 @@ export function FolderRow({
                   onCreateFolderNote(node.path);
                 }}
               >
+                {/* Icon only (MYND-622). This used to carry a "folder note"
+                    text label, which meant every folder the pointer crossed
+                    grew a word — noisy on a tree you are scanning rather than
+                    reading, and inconsistent with the has-a-folder-note state
+                    next door, which is already icon-only. The `title` +
+                    `aria-label` still name the action on dwell and to a screen
+                    reader, so nothing is lost but the constant flicker. */}
                 <Icon name="book-open" size={13} />
-                <span>{t("notes.folderRow.folderNote")}</span>
               </button>
             )
           )}

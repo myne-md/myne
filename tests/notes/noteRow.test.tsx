@@ -70,12 +70,12 @@ describe("NoteRow — title rendering branches", () => {
     ).toBeTruthy();
   });
 
-  it("renders the color dot when a colorSlot is provided", () => {
+  it("marks the row with its colour slot when one is provided", () => {
     const { container } = renderRow({ colorSlot: "rose" });
     expect(container.querySelector('[data-color-slot="rose"]')).toBeTruthy();
   });
 
-  it("renders no color dot when colorSlot is omitted", () => {
+  it("carries no colour marker when colorSlot is omitted", () => {
     const { container } = renderRow();
     expect(container.querySelector("[data-color-slot]")).toBeNull();
   });

@@ -23,6 +23,7 @@
 // inside a folded fence un-folds (MYND-175).
 
 import { syntaxTree } from "@codemirror/language";
+import { TASK_QUERY_INFO } from "./task-query-block";
 import {
   type EditorState,
   type Extension,
@@ -341,6 +342,16 @@ export function buildCodeBlockDecorations(
       if (
         mInfo !== null &&
         doc.sliceString(mInfo.from, mInfo.to).trim().toLowerCase() === "mermaid"
+      ) {
+        return false;
+      }
+
+      // Task-query blocks (MYND-617) render as a live list, not as a code card
+      // — the same one-line skip, for the same reason: two block-replaces over
+      // one range collide.
+      if (
+        mInfo !== null &&
+        doc.sliceString(mInfo.from, mInfo.to).trim().toLowerCase() === TASK_QUERY_INFO
       ) {
         return false;
       }

@@ -11,7 +11,7 @@
 // `design-notes.md` taxonomy entry superseding the 2026-05-08 5-panel lock.
 // Disk-first + no in-flight gating, matching the other Editor-panel controls.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { Input } from "../primitives/Input";
@@ -24,6 +24,10 @@ import {
   setDailyTemplate,
 } from "../../lib/prefs";
 import { listTemplates, type TitleRecord } from "../../notes";
+import {
+  listFolderPaths,
+  type FolderPathOption,
+} from "../../notes/listFolderPaths";
 import {
   DEFAULT_DAILY_DATE_FORMAT,
   DEFAULT_DAILY_FOLDER,
@@ -48,10 +52,25 @@ function templateName(rec: TitleRecord): string {
 export function DailyNotesSettings() {
   const { t } = useTranslation();
   const [folder, setFolder] = useState("");
+  const [folderPaths, setFolderPaths] = useState<FolderPathOption[]>([]);
   const [format, setFormat] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [templates, setTemplates] = useState<TitleRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listFolderPaths()
+      .then((paths) => {
+        if (!cancelled) setFolderPaths(paths);
+      })
+      .catch(() => {
+        // Locked vault / read failure — the free-text fallback still renders.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +97,12 @@ export function DailyNotesSettings() {
   }, []);
 
   async function persistFolder() {
-    const value = folder.trim();
+    await persistFolderValue(folder);
+  }
+
+  /** Persist an explicit value — the picker commits on change, not on blur. */
+  async function persistFolderValue(raw: string) {
+    const value = raw.trim();
     if (value === "") return; // empty → leave the default (None ≡ Daily/)
     setError(null);
     try {
@@ -110,6 +134,16 @@ export function DailyNotesSettings() {
     }
   }
 
+  // The default folder is always offerable even when no note is filed there yet
+  // (a fresh vault has no `Daily/` until the first daily note is written).
+  const folderOptions: SelectOption<string>[] = useMemo(() => {
+    const opts = folderPaths.map((f) => ({ value: f.path, label: f.label }));
+    if (!opts.some((o) => o.value === DEFAULT_DAILY_FOLDER)) {
+      opts.unshift({ value: DEFAULT_DAILY_FOLDER, label: DEFAULT_DAILY_FOLDER });
+    }
+    return opts;
+  }, [folderPaths]);
+
   const templateOptions: SelectOption<string>[] = [
     { value: BLANK_TEMPLATE, label: t("settings.dailyNotes.blankTemplate") },
     ...templates.map((rec) => ({ value: rec.noteUuid, label: templateName(rec) })),
@@ -123,13 +157,41 @@ export function DailyNotesSettings() {
           default: DEFAULT_DAILY_FOLDER,
         })}
         control={
-          <Input
-            value={folder}
-            placeholder={DEFAULT_DAILY_FOLDER}
-            onChange={(e) => setFolder(e.target.value)}
-            onBlur={() => void persistFolder()}
-            aria-label={t("settings.dailyNotes.folderLabel")}
-          />
+          /* MYND-624: pick an existing folder instead of typing its path.
+             The pref itself has always been here; the control was a bare text
+             field, so getting it right meant knowing the canonical
+             trailing-slash form and spelling it from memory, and a typo
+             silently filed daily notes somewhere new. The free-text input
+             stays as the fallback for a vault with no folders yet, where a
+             one-option dropdown would be worse than a field. Filing dailies
+             into a folder that does not exist yet means creating it once in
+             the sidebar first -- the trade for not being able to typo the
+             path. */
+          folderPaths.length > 0 ? (
+            <SearchableSelect
+              options={folderOptions}
+              selected={[folder === "" ? DEFAULT_DAILY_FOLDER : folder]}
+              onChange={(next) => {
+                const chosen = next[0];
+                if (chosen === undefined) return;
+                setFolder(chosen);
+                void persistFolderValue(chosen);
+              }}
+              aria-label={t("settings.dailyNotes.folderLabel")}
+              testId="settings.daily-folder-select"
+              searchPlaceholder={t("settings.dailyNotes.searchPlaceholder")}
+              emptyText={t("settings.dailyNotes.searchEmpty")}
+            />
+          ) : (
+            <Input
+              value={folder}
+              placeholder={DEFAULT_DAILY_FOLDER}
+              onChange={(e) => setFolder(e.target.value)}
+              onBlur={() => void persistFolder()}
+              aria-label={t("settings.dailyNotes.folderLabel")}
+              data-testid="settings.daily-folder-input"
+            />
+          )
         }
       />
       <ControlBlock

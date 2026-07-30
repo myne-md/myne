@@ -22,7 +22,7 @@ export function FilesPanel() {
       <NewNoteLocationSettings />
 
       {/* Whether attachment text extraction reads images and scanned PDFs
-          (MYND-441). Lives here rather than under Labs because OCR is search
+          (MYND-441). Lives here rather than under Developer because OCR is search
           correctness, not an AI feature — it ships on by default. */}
       <AttachmentOcrSettings />
     </div>

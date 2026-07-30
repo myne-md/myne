@@ -271,6 +271,17 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     PrefsView {
         // ---- shared: scalar-LWW -----------------------------------------
         archive_disabled: lww!("archive_disabled", archive_disabled),
+        // MYND-613 — Shared/ScalarLww, unlike its lexicographic neighbour
+        // `show_note_timestamps`, which is DeviceLocal.
+        // Device-local (MYND-618): whether a machine shows reminders, and how
+        // far ahead it registers them, are properties of THAT machine — so the
+        // local value wins outright rather than merging.
+        reminders_enabled: local.reminders_enabled,
+        reminder_horizon_days: local.reminder_horizon_days,
+        show_task_marker: lww!("show_task_marker", show_task_marker),
+        // MYND-592: shared for the same reason as `show_task_marker` — wanting
+        // speech-to-text is taste, not device capability.
+        transcription_enabled: lww!("transcription_enabled", transcription_enabled),
         daily_date_format: lww!("daily_date_format", daily_date_format),
         daily_folder: lww!("daily_folder", daily_folder),
         daily_template: lww!("daily_template", daily_template),
@@ -335,6 +346,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         cli_enabled: local.cli_enabled,
         cli_rate_limit_disabled: local.cli_rate_limit_disabled,
         custom_theme: local.custom_theme.clone(),
+        // developer-mode (MYND-593): device-local like `ai_enabled` — it gates
+        // a device-local model-path override, so a synced flag would read "on"
+        // on a device with no override behind it.
+        developer_mode: local.developer_mode,
         editor_content_width: local.editor_content_width.clone(),
         editor_default_view_mode: local.editor_default_view_mode.clone(),
         editor_focus_dim_inactive: local.editor_focus_dim_inactive,
@@ -782,6 +797,29 @@ mod tests {
         let merged = merge_prefs(&local, &remote);
         assert_eq!(merged.label.as_deref(), Some("Synced"));
         assert_eq!(merged.theme, None);
+    }
+
+    #[test]
+    fn developer_mode_is_device_local_local_wins_both_sides() {
+        // MYND-593: developer_mode gates a device-local model-path override,
+        // so — like ai_enabled / attachment_ocr_enabled — the local value
+        // must survive the merge regardless of which side is "on".
+        assert_eq!(classify("developer_mode"), Some(PrefClass::DeviceLocal));
+
+        let off = PrefsView::default();
+        let on = PrefsView {
+            developer_mode: true,
+            ..PrefsView::default()
+        };
+
+        assert!(
+            !merge_prefs(&off, &on).developer_mode,
+            "local off must stay off"
+        );
+        assert!(
+            merge_prefs(&on, &off).developer_mode,
+            "local on must stay on"
+        );
     }
 
     #[test]
