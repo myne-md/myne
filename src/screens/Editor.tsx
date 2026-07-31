@@ -223,7 +223,7 @@ import {
 import { setActiveWorkspace, setCustomTheme, setFavorites } from "../lib/prefs";
 import { promptForText } from "../lib/promptForText";
 import { QuickPicker, type QuickPickItem } from "../components/QuickPicker";
-import { listCustomThemes, readCustomTheme } from "../lib/themes";
+import { listCustomThemes } from "../lib/themes";
 import { applyCustomTheme } from "../lib/theme";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
@@ -2827,9 +2827,13 @@ function CommandPaletteHost({
       // path).
       onApplyCustomTheme: () => {
         void (async () => {
-          // The picker lists names only; the palette each entry carries is read
-          // back on pick (below) rather than held in the closure.
-          const items: QuickPickItem[] = (await listCustomThemes()).map(({ name }) => ({
+          // Each entry already carries its palette — MYND-486 makes the single
+          // `vault.themes` blob decrypt every palette to answer a list at all,
+          // so hold them by name and apply the picked one directly instead of
+          // buying it back with a second full decrypt via `readCustomTheme`.
+          const entries = await listCustomThemes();
+          const palettes = new Map(entries.map((e) => [e.name, e.palette]));
+          const items: QuickPickItem[] = entries.map(({ name }) => ({
             id: name,
             label: name,
           }));
@@ -2840,7 +2844,8 @@ function CommandPaletteHost({
             items,
             onPick: (name) => {
               void (async () => {
-                const palette = await readCustomTheme(name);
+                const palette = palettes.get(name);
+                if (palette === undefined) return;
                 await setCustomTheme(name);
                 applyCustomTheme(palette);
               })().catch(() => {});
