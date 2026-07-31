@@ -506,6 +506,14 @@ pub fn run() {
             // keeps a default install byte-for-byte the direct-sync client it
             // is today. The `RunEvent` arm below is the app-quit teardown.
             let tor_gate = myne_core::plugins::sync::proxy::ProxyGate::new();
+            // MYND-650 task 4: publish the gate to the sync transport. The
+            // transport is built deep in the engine by `build_transport`, at
+            // call sites that have no business knowing what Tor is, so the gate
+            // travels by installation rather than by parameter — and because
+            // this is the same cell the supervisor writes, the toggle re-routes
+            // the next connection without any transport being rebuilt or any
+            // endpoint being re-enrolled.
+            myne_core::plugins::sync::proxy::install(tor_gate.clone());
             app.manage(tor_gate.clone());
             app.manage(std::sync::Arc::new(tor_sidecar::TorSidecar::new(tor_gate)));
             // ext-foundation-handoff task 6: the host↔app relay listener. Binds
