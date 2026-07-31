@@ -307,16 +307,18 @@ export interface PrefsView {
    */
   favorites: string[];
   /**
-   * Unified manual sidebar order across the single interleaved file-tree
-   * (MYND-183, superseding `note_order` + `folder_order`) — a flat,
-   * heterogeneous list of note UUIDs and canonical trailing-slash folder paths
-   * (discriminated by the trailing `/`). Each container sorts its own children
-   * (sub-folders + notes, freely interleaved) by their index here; unlisted
-   * children fall back to recency / folded name. Order is the payload — the
-   * backend preserves it verbatim. Absent in pre-reorder vaults → defaults to
-   * `[]`.
+   * Unified manual sidebar order (MYND-183 + MYND-596) — a **container-keyed
+   * map**, superseding the flat list. Each key is a container: `""` for the tree
+   * root, or a folded folder key (`FolderNode.key`); each value is that
+   * container's children in manual order — a heterogeneous sequence of note UUIDs
+   * and child folder DISPLAY paths (trailing `/`), freely interleaved. Each
+   * container is reordered and synced independently (MYND-596 per-container LWW),
+   * so a reorder in one folder never clobbers another's order. Order within a
+   * value is the payload — the backend preserves it verbatim; unlisted children
+   * fall back to recency / folded name. Absent in pre-reorder vaults → the Rust
+   * decoder defaults it to `{}`. Mirrors Rust `BTreeMap<String, Vec<String>>`.
    */
-  item_order: string[];
+  item_order: Record<string, string[]>;
   /**
    * Editor three-pane layout (sidebar widths + collapsed flags, MYND-137).
    * `null` when the user never customized the layout — the field is omitted
@@ -619,16 +621,16 @@ export async function setAutoLockTimeout(seconds: number): Promise<void> {
 }
 
 /**
- * Persist the full item_order sequence — the unified manual sidebar order
- * across the interleaved file-tree (a heterogeneous list of note UUIDs +
- * canonical folder paths, MYND-183, superseding `setNoteOrder`/`setFolderOrder`).
- * The caller passes the entire desired order; v0.1 single-device writes it
- * verbatim (the backend preserves element order — the sequence IS the payload,
- * unlike the sorted+deduped `deliberate_folders`). No native side-effect; a
- * rejected promise means the disk write failed and the caller's optimistic UI
- * must revert.
+ * Persist the full item_order MAP — the unified manual sidebar order, keyed by
+ * container (`""` = tree root, else a folded folder key; MYND-183 + MYND-596).
+ * The caller passes the entire desired map; the backend preserves each
+ * container's sequence verbatim (the order IS the payload, unlike the
+ * sorted+deduped `deliberate_folders`) and merges per-container on sync. No
+ * native side-effect; a rejected promise means the disk write failed and the
+ * caller's optimistic UI must revert. The IPC payload key (`order`) matches the
+ * Rust command's `order: BTreeMap<String, Vec<String>>` parameter.
  */
-export async function setItemOrder(order: string[]): Promise<void> {
+export async function setItemOrder(order: Record<string, string[]>): Promise<void> {
   await invoke<void>("plugin:prefs|set_item_order", { order });
 }
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
+import { ReorderRow } from "./ReorderRow";
 
 /** Long-press action sheet for a FOLDER row (MYND-480) — the folder-level twin
  *  of `NoteRowActionsSheet`, same visual language + interaction. Actions align
@@ -16,6 +17,7 @@ export function FolderActionsSheet({
   onDecorate,
   onArchive,
   onTrash,
+  reorder,
 }: {
   name: string;
   onClose: () => void;
@@ -30,6 +32,9 @@ export function FolderActionsSheet({
   onDecorate: () => void;
   onArchive: () => void;
   onTrash: () => void;
+  /** Move-up/move-down within the folder's PARENT container (MYND-596). Absent
+   *  outside the plain notes tree (where `item_order` is the active ordering). */
+  reorder?: { key: string; canUp: boolean; canDown: boolean; onUp: () => void; onDown: () => void };
 }) {
   const { t } = useTranslation();
   // Logical groups (create / edit / destructive) split by a heavier separator —
@@ -58,6 +63,16 @@ export function FolderActionsSheet({
           {row(t("notes.list.icon"), onDecorate, { testId: "notes.folder-icon-action" })}
           {row(t("notes.list.color"), onDecorate, { testId: "notes.folder-color-action" })}
           {row(t("notes.list.archiveFolder"), onArchive)}
+          {reorder && (
+            <ReorderRow
+              canUp={reorder.canUp}
+              canDown={reorder.canDown}
+              onUp={reorder.onUp}
+              onDown={reorder.onDown}
+              upTestId={`notes.folder-move-up-${reorder.key}`}
+              downTestId={`notes.folder-move-down-${reorder.key}`}
+            />
+          )}
           {sep}
           {row(t("notes.list.deleteFolderConfirm"), onTrash, { danger: true, groupTop: true })}
         </>

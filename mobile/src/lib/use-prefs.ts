@@ -40,7 +40,7 @@ export const DEFAULT_PREFS: PrefsView = {
   daily_folder: null,
   daily_template: null,
   favorites: [],
-  item_order: [],
+  item_order: {},
   editor_layout: null,
   editor_content_width: null,
   editor_default_view_mode: null,
