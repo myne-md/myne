@@ -2,8 +2,9 @@
 // snapshots (MYND-97). A modal overlay (reusing the `<DeleteConfirmModal>`
 // backdrop envelope, like `<TrashPanel>`) scoped to ONE note: a left list of the
 // note's snapshots (newest-first, with relative age + size), a right pane that
-// previews the selected snapshot with a minimal added/removed line-diff against
-// the current note, and a confirmed Restore.
+// previews the selected snapshot as a diff against the current note (shared
+// `<DiffView>` over the `@myne/dialect` core, word-level within a changed
+// line), and a confirmed Restore.
 //
 // Copy discipline (SYNC-4): the term is "snapshot", never "backup"/"export";
 // encryption is shown typographically ("Encrypted · 12s ago"), not with a
@@ -32,7 +33,8 @@ import {
 } from "../snapshots";
 import type { SnapshotError, SnapshotMeta } from "../../types/snapshot-error";
 import { BACKDROP_STYLE } from "./DeleteConfirmModal";
-import { changedLineCount, lineDiff, type DiffLine } from "../../dialect";
+import { changedLineCount, diffWithSegments, type DiffLine } from "../../dialect";
+import { DiffView } from "./DiffView";
 import { formatRelativeTime } from "./relativeTime";
 
 const PANEL_STYLE: CSSProperties = {
@@ -131,26 +133,13 @@ const DETAIL_BAR_STYLE: CSSProperties = {
   borderBottom: "1px solid var(--line-1)",
 };
 
-const DIFF_STYLE: CSSProperties = {
+// The preview region; `<DiffView>` is the scrolling child inside it.
+const PREVIEW_STYLE: CSSProperties = {
   flex: 1,
-  overflow: "auto",
-  margin: 0,
-  padding: "var(--space-3) var(--space-5)",
-  fontFamily: "var(--font-mono)",
-  fontSize: 12,
-  lineHeight: 1.5,
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-word",
+  minHeight: 0,
+  display: "flex",
+  flexDirection: "column",
 };
-
-const DIFF_LINE_BASE: CSSProperties = { display: "block" };
-const DIFF_ADD_STYLE: CSSProperties = { ...DIFF_LINE_BASE, color: "var(--accent)" };
-const DIFF_DEL_STYLE: CSSProperties = {
-  ...DIFF_LINE_BASE,
-  color: "var(--fg-3)",
-  textDecoration: "line-through",
-};
-const DIFF_SAME_STYLE: CSSProperties = { ...DIFF_LINE_BASE, color: "var(--fg-2)" };
 
 const EMPTY_STATE_STYLE: CSSProperties = {
   margin: "auto",
@@ -349,7 +338,7 @@ export function SnapshotsPanel({
 
   const diff: DiffLine[] | null = useMemo(() => {
     if (preview === null) return null;
-    return lineDiff(preview, current);
+    return diffWithSegments(preview, current);
   }, [preview, current]);
 
   if (!open || noteId === null) return null;
@@ -451,23 +440,9 @@ export function SnapshotsPanel({
                       {t("notes.snapshots.restoreCta")}
                     </button>
                   </div>
-                  <pre style={DIFF_STYLE} data-testid="snapshots.preview">
-                    {diff?.map((d, idx) => (
-                      <span
-                        key={idx}
-                        style={
-                          d.type === "add"
-                            ? DIFF_ADD_STYLE
-                            : d.type === "del"
-                              ? DIFF_DEL_STYLE
-                              : DIFF_SAME_STYLE
-                        }
-                      >
-                        {d.type === "add" ? "+ " : d.type === "del" ? "− " : "  "}
-                        {d.text}
-                      </span>
-                    ))}
-                  </pre>
+                  <div style={PREVIEW_STYLE} data-testid="snapshots.preview">
+                    <DiffView diff={diff ?? []} mode="unified" />
+                  </div>
                 </>
               )}
             </div>
