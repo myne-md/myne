@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
-import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner } from "../../components";
+import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet } from "../../components";
 import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { applyTheme } from "../../platform/theme";
@@ -22,6 +22,7 @@ import { usePlatform } from "../../platform/PlatformContext";
 import { vaultExportMarkdown, defaultExportDestination } from "../../lib/export";
 import { shareFile } from "../../lib/share";
 import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
+import { listCustomThemes, type CustomThemeEntry } from "../../lib/themes";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { useHiddenHomeTiles, setHomeTileHidden } from "../../lib/home-tiles";
@@ -759,6 +760,38 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   }, []);
   useEffect(() => refreshQuStatus(), [refreshQuStatus]);
 
+  // ── Custom themes (read-only consumer of vault.themes, MYND-598) ───────────
+  // Palettes are VAULT CONTENT that sync already delivers here; the phone lists
+  // and applies them but never authors one, so there is no import/export/delete
+  // affordance to build. Read ONCE when the Appearance panel opens — deliberately
+  // NOT live-refreshed from the sync-changed event this app already listens to:
+  // the panel is a seconds-long visit, and re-reading mid-visit would let rows
+  // shift (or the selected row vanish) under the user's finger for no benefit.
+  const [customThemes, setCustomThemes] = useState<CustomThemeEntry[]>([]);
+  useEffect(() => {
+    if (panel !== "appearance" || !HAS_TAURI) return;
+    let cancelled = false;
+    void listCustomThemes()
+      .then((entries) => {
+        if (cancelled) return;
+        // The host hands these back in `BTreeMap` order — UTF-8 byte order, which
+        // sorts "Şafak" after "Zed". Theme names are user-authored, so collate in
+        // the reader's locale rather than the store's byte order (desktop's
+        // `CustomThemesSection` does the same, for the same reason).
+        setCustomThemes([...entries].sort((a, b) => a.name.localeCompare(b.name)));
+      })
+      // A cosmetic palette is not load-bearing: the host already collapses every
+      // recoverable read failure to the empty store (§ 9.21.4), so the only way
+      // here is a locked slot — which this panel cannot be open under. Render the
+      // block empty rather than an error the user has no action to take about.
+      .catch(() => {
+        if (!cancelled) setCustomThemes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [panel]);
+
   // ── Vault prefs (Appearance / Editor / Privacy) ────────────────────────────
   const { prefs } = usePrefs();
   // Home quick-action tile visibility toggles (MYND-479, Appearance panel).
@@ -1227,6 +1260,64 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                   );
                 })}
               </div>
+            </div>
+            {/* Custom themes — always rendered, including when empty. The helper
+                line is the ONLY place in the product that states the read-only
+                scope to the user, and hiding the block on an empty list would
+                turn "you have installed none" into "sync looks broken". */}
+            <div
+              data-testid="settings.custom-themes"
+              style={{ padding: "12px 14px", border: "1px solid var(--line-1)", borderRadius: 10, background: "var(--bg-1)" }}
+            >
+              <div style={{ fontSize: 16, color: "var(--fg-1)" }}>{t("settings.customThemes.label")}</div>
+              <div style={{ marginTop: 6, fontSize: 12, color: "var(--fg-3)", lineHeight: 1.4 }}>
+                {t("settings.customThemes.readOnlyHelper")}
+              </div>
+              {customThemes.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+                  {customThemes.map((entry) => {
+                    const on = eff.custom_theme === entry.name;
+                    return (
+                      <div
+                        key={entry.name}
+                        data-testid="settings.custom-theme-row"
+                        data-theme-name={entry.name}
+                        data-selected={on ? "true" : "false"}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          minHeight: 44,
+                          padding: "8px 10px",
+                          borderRadius: 8,
+                          background: on ? "var(--accent-soft)" : "var(--bg-2)",
+                          border: on ? "1px solid var(--accent)" : "1px solid var(--line-1)",
+                        }}
+                      >
+                        <ThemeChiplet palette={entry.palette} testId="settings.custom-theme-swatch" />
+                        <span
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: 15,
+                            color: "var(--fg-1)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {entry.name}
+                        </span>
+                        {on && (
+                          <span style={{ flex: "none", fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
+                            {t("settings.customThemes.appliedBadge")}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <LanguageBlock />
             <SegmentBlock

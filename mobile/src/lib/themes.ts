@@ -33,8 +33,12 @@ export interface CustomThemeEntry {
 
 /**
  * List every live custom theme in the unlocked vault's `vault.themes` store —
- * name + palette each, in name order (the host's `BTreeMap` iteration; no
- * client-side re-sort needed). ONE decrypt covers the whole list.
+ * name + palette each. ONE decrypt covers the whole list.
+ *
+ * Order is the host's `BTreeMap` iteration, i.e. UTF-8 BYTE order — which sorts
+ * "Zed" before "amber" and "Şafak" after both. Theme names are user-authored, so
+ * a surface that lists them collates in the reader's locale (`localeCompare`)
+ * rather than showing them in the store's byte order, exactly as desktop does.
  *
  * Returns `[]` for a vault that has no themes, and also for any recoverable
  * read failure (file absent / truncated / AEAD-fail / parse-fail): the host
