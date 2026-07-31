@@ -1,2 +1,0 @@
-# Placeholder so tauri.conf.json resource paths resolve in CI.
-# Real model files are provisioned at release time, not committed (large, gitignored elsewhere).
