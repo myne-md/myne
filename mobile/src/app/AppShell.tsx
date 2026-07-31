@@ -11,6 +11,7 @@ import { listVaults } from "../lib/vault-list";
 import { probeSlotKind } from "../lib/vault-slot-kind";
 import { lockVault } from "../lib/vault-unlock";
 import { HAS_TAURI } from "../lib/app-window";
+import { clearCustomTheme, paintSelectedCustomTheme } from "../lib/customTheme";
 
 import { WelcomeFlow } from "./flows/WelcomeFlow";
 import { JoinFlow } from "./flows/JoinFlow";
@@ -34,29 +35,60 @@ const ACTIVE_SLOT = "active-slot";
  */
 export function AppShell() {
   const [stage, setStage] = useState<Stage | null>(null);
+  // The stage `dispatch` reduces from. It mirrors `stage` and is written
+  // SYNCHRONOUSLY by `enterStage` — which the functional `setStage(prev => …)`
+  // form cannot be, because entering the editor is awaited (the custom palette
+  // is painted first), so the reducer's "previous" has to be readable outside
+  // React's render cycle. Every write to `stage` goes through `enterStage`, so
+  // the two never diverge.
+  const stageRef = useRef<Stage | null>(null);
   const probed = useRef(false);
   // Fresh-device sync-join overlay. Rendered full-screen WHILE the stage stays
   // `welcome` (the wired `welcome.join-success` arm lands the editor from there,
   // MYND-424) — an out-of-band local toggle, like recover's out-of-band entry.
   const [showJoin, setShowJoin] = useState(false);
 
+  /**
+   * Land a stage — the single writer of `stage` and its ref mirror.
+   *
+   * **Every entry into the editor stage paints the vault's selected custom
+   * palette first** (MYND-598), so the editor's first frame already wears it.
+   * The gate lives here rather than on the unlock handler because `stage.ts`
+   * reaches `{name:"editor"}` from four transitions — `unlock.success`,
+   * `recover.complete-success`, `welcome.join-success` and
+   * `create-vault.auto-unlock-success` — plus `initialStageFromProbe`'s
+   * already-`Unlocked` short-circuit (a WebView reload over a live Rust slot).
+   * Recovery in particular opens an EXISTING vault, which can carry both a
+   * `custom_theme` selection and the themes it names. One gate covers all of
+   * them, including the next route somebody adds.
+   *
+   * Non-editor stages never reach the `await`, so they still land
+   * synchronously — the palette read is the only thing that ever defers a
+   * transition.
+   */
+  const enterStage = useCallback(async (next: Stage | null) => {
+    if (next?.name === "editor") await paintSelectedCustomTheme();
+    stageRef.current = next;
+    setStage(next);
+  }, []);
+
   const boot = useCallback(async () => {
     if (!HAS_TAURI) {
       // Browser dev (pnpm dev, no Tauri host) — no IPC available. Land on
       // welcome so the flows are navigable; real IPC needs `pnpm tauri dev`.
-      setStage({ name: "welcome" });
+      await enterStage({ name: "welcome" });
       return;
     }
     try {
       const [vaultList, slot] = await Promise.all([listVaults(), probeSlotKind()]);
       const slotMap: SlotMap = { [ACTIVE_SLOT]: slot };
-      setStage(initialStageFromProbe(vaultList, slotMap));
+      await enterStage(initialStageFromProbe(vaultList, slotMap));
     } catch {
       // Probe transport failure — fail-closed to welcome (the user can still
       // create/restore; a real vault would surface on the next probe).
-      setStage({ name: "welcome" });
+      await enterStage({ name: "welcome" });
     }
-  }, []);
+  }, [enterStage]);
 
   useEffect(() => {
     if (probed.current) return;
@@ -64,15 +96,24 @@ export function AppShell() {
     void boot();
   }, [boot]);
 
-  const dispatch = useCallback((action: Action) => {
-    setStage((prev) => (prev ? transition(prev, action) : prev));
-  }, []);
+  const dispatch = useCallback(
+    (action: Action) => {
+      const prev = stageRef.current;
+      if (prev === null) return;
+      const next = transition(prev, action);
+      // `transition` returns `prev` unchanged for an illegal pair; re-landing it
+      // would re-run the editor paint for a transition that did not happen.
+      if (next === prev) return;
+      void enterStage(next);
+    },
+    [enterStage],
+  );
 
   /** Out-of-band re-probe (back-from-create, restore-backup exit). */
   const reprobe = useCallback(() => {
-    setStage(null);
+    void enterStage(null);
     void boot();
-  }, [boot]);
+  }, [boot, enterStage]);
 
   if (stage === null) {
     return (
@@ -135,6 +176,9 @@ export function AppShell() {
             vaultId={stage.vaultId}
             suspicionReason={stage.suspicionReason}
             fromPicker={stage.fromPicker}
+            // All three unlock routes — password, PIN, biometric — land here.
+            // The custom palette is painted before the editor stage lands; that
+            // is `enterStage`'s job, for every route rather than this one.
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onBackToPicker={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
@@ -158,6 +202,8 @@ export function AppShell() {
       return (
         <EditorFlow
           vaultId={stage.vaultId}
+          // The palette revert rides `lockVault()` with the other per-vault
+          // teardowns, so every route through the lock inherits it (MYND-598).
           onLock={async () => {
             await lockVault().catch(() => {});
             dispatch({ type: "editor.lock" });
@@ -167,7 +213,12 @@ export function AppShell() {
             await lockVault().catch(() => {});
             dispatch({ type: "editor.switch-vault", vaultId });
           }}
-          onDeleteVaultSuccess={() => dispatch({ type: "editor.delete-vault-success" })}
+          // Vault deletion is the one exit that does NOT go through `lockVault`
+          // (the slot is gone, not locked), so it reverts the palette itself.
+          onDeleteVaultSuccess={() => {
+            clearCustomTheme();
+            dispatch({ type: "editor.delete-vault-success" });
+          }}
         />
       );
 

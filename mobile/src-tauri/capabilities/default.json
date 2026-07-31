@@ -20,6 +20,7 @@
     "share-import:default",
     "vault-indices:default",
     "graph-layout:default",
+    "themes:default",
     "workspace:default",
     "search:default",
     "snapshots:default",
