@@ -11,6 +11,7 @@ import { invoke } from "../../platform/core";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
+import { FingerprintConfirm } from "./FingerprintConfirm";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 // Aliased: the component already has a `setDeviceName` React state setter.
@@ -430,48 +431,47 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
           testId="join.password-input"
         />
 
-        {/* Revealed only once the backend refuses for want of it — see the
-            state declaration for why this is typed in rather than confirmed. */}
-        {confirmNeeded && (
-          <div style={FIELD}>
-            <label style={LABEL} htmlFor={`${baseId}-fingerprint`}>
-              {t("sync.join.confirmFingerprintLabel")}
-            </label>
-            <Input
-              id={`${baseId}-fingerprint`}
-              value={expectedFingerprint}
-              onChange={(e) => setExpectedFingerprint(e.target.value)}
-              placeholder={t("sync.join.confirmFingerprintPlaceholder")}
-              autoComplete="off"
-              spellCheck={false}
-              style={{ fontFamily: "var(--font-mono)" }}
-              data-testid="join.expected-fingerprint-input"
-            />
-          </div>
-        )}
-
         {error && <DestructiveBanner testId="join.error">{error}</DestructiveBanner>}
 
-        <div style={ROW}>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={busy}
-            style={btn(false, busy)}
-            data-testid="join.cancel"
-          >
-            {t("sync.join.cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!canSubmit}
-            style={btn(true, !canSubmit)}
-            data-testid="join.submit"
-          >
-            {busy ? t("sync.join.submitting") : t("sync.join.submit")}
-          </button>
-        </div>
+        {/* Revealed only once the backend refuses for want of it — see the
+            state declaration for why this is typed in rather than confirmed.
+            While it is open it carries the retry AND the abort, so the footer
+            below stands down: two "Add device" buttons on one card would be a
+            choice between identical actions at the exact moment this screen is
+            asking the user to slow down. Declining costs nothing to undo —
+            the refused join wrote no endpoint, no pin and no vault container. */}
+        {confirmNeeded ? (
+          <FingerprintConfirm
+            value={expectedFingerprint}
+            onChange={setExpectedFingerprint}
+            onConfirm={submit}
+            onDecline={onCancel}
+            confirmLabel={busy ? t("sync.join.submitting") : t("sync.join.submit")}
+            confirmDisabled={!canSubmit}
+            testIdPrefix="join"
+          />
+        ) : (
+          <div style={ROW}>
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={busy}
+              style={btn(false, busy)}
+              data-testid="join.cancel"
+            >
+              {t("sync.join.cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!canSubmit}
+              style={btn(true, !canSubmit)}
+              data-testid="join.submit"
+            >
+              {busy ? t("sync.join.submitting") : t("sync.join.submit")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

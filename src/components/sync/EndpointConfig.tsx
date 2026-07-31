@@ -8,6 +8,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
+import { FingerprintConfirm } from "./FingerprintConfirm";
 
 /**
  * Mirrors `myne_core::plugins::sync::config::PinSource` (`snake_case` on the
@@ -100,7 +101,9 @@ export function EndpointConfig() {
   // captured value: over Tor the first handshake accepts any certificate, and
   // showing the captured fingerprint first would anchor the user on whatever an
   // exit node chose to serve. The backend never returns it on the mismatch path
-  // for the same reason (`core/src/plugins/sync/pin_confirm.rs`).
+  // for the same reason (`core/src/plugins/sync/pin_confirm.rs`). The gate's own
+  // copy, echo and confirm/decline pair live in `FingerprintConfirm`, shared
+  // with the join modal so the two enrollment doors cannot drift.
   const [expectedFingerprint, setExpectedFingerprint] = useState("");
   const [confirmNeeded, setConfirmNeeded] = useState(false);
   // Where the pin came from (SYNC-43): `static` (pre-vetted hosted cert) vs
@@ -183,6 +186,16 @@ export function EndpointConfig() {
       .finally(() => setBusy(false));
   };
 
+  // Decline: back out of an enrollment the user cannot verify. The refused
+  // attempt wrote nothing — no endpoint, no pin (`pin_confirm`'s contract) — so
+  // this only has to clear the screen and say so plainly, rather than leave the
+  // user wondering whether a half-configured server is now trusted.
+  const decline = () => {
+    setConfirmNeeded(false);
+    setExpectedFingerprint("");
+    setMsg(t("sync.endpoint.confirmFingerprintDeclined"));
+  };
+
   return (
     <div
       style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
@@ -199,15 +212,21 @@ export function EndpointConfig() {
           style={INPUT}
           data-testid="sync.endpoint-input"
         />
-        <button
-          type="button"
-          onClick={connect}
-          disabled={busy}
-          style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
-          data-testid="sync.endpoint-connect"
-        >
-          {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
-        </button>
+        {/* While the gate is open the retry lives inside it, next to the
+            decline — two buttons that both mean "connect" would leave the user
+            picking between identical actions at the one moment this screen is
+            asking them to be careful. */}
+        {!confirmNeeded && (
+          <button
+            type="button"
+            onClick={connect}
+            disabled={busy}
+            style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
+            data-testid="sync.endpoint-connect"
+          >
+            {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+          </button>
+        )}
       </div>
       {msg && (
         <p style={HELP} data-testid="sync.endpoint-msg">
@@ -217,31 +236,15 @@ export function EndpointConfig() {
       {/* Revealed only once the backend refuses for want of it — see the state
           declaration for why this is an input rather than a confirm button. */}
       {confirmNeeded && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-1)",
-          }}
-        >
-          <label
-            style={{ ...HELP, color: "var(--fg-2)" }}
-            htmlFor="sync-expected-fingerprint"
-          >
-            {t("sync.endpoint.confirmFingerprintLabel")}
-          </label>
-          <input
-            id="sync-expected-fingerprint"
-            value={expectedFingerprint}
-            onChange={(e) => setExpectedFingerprint(e.target.value)}
-            placeholder={t("sync.endpoint.confirmFingerprintPlaceholder")}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoComplete="off"
-            style={{ ...INPUT, fontFamily: "var(--font-mono)" }}
-            data-testid="sync.expected-fingerprint-input"
-          />
-        </div>
+        <FingerprintConfirm
+          value={expectedFingerprint}
+          onChange={setExpectedFingerprint}
+          onConfirm={connect}
+          onDecline={decline}
+          confirmLabel={busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+          confirmDisabled={busy}
+          testIdPrefix="sync"
+        />
       )}
       {/* The pin note renders whenever a SOURCE is known — it used to be
           nested inside the fingerprint block, which meant the browser's
