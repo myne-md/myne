@@ -35,7 +35,12 @@ import {
 } from "./platform/filePicker";
 import { warmAttachmentUrls } from "./platform/attachments";
 import { has } from "./platform/capabilities";
-import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor";
+// Import from the `./host` sub-entry, NOT the package barrel: the barrel
+// re-exports CMEditor + myneExtensions (the whole CodeMirror graph), and pulling
+// setEditorHost through it drags that graph into the first-load bundle even
+// though this boot-time seam install needs none of it. host.ts is CodeMirror-free
+// at runtime (its only `@codemirror/*` reference is an `import type`).
+import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/host";
 import i18n from "./i18n";
 import { tagTree, isMediaTarget } from "./notes/vaultIndices";
 import {

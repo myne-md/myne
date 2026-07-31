@@ -55,7 +55,10 @@ async function loadHost(absent: string[]): Promise<Record<string, unknown>> {
   vi.doMock("../../src/platform/capabilities", () => ({
     has: (cap: string) => !absent.includes(cap),
   }));
-  vi.doMock("@myne/editor", () => ({
+  // editor-host imports setEditorHost from the `./host` sub-entry (not the
+  // barrel) so the CodeMirror graph stays out of the first-load bundle — mock
+  // the same specifier it actually imports.
+  vi.doMock("@myne/editor/host", () => ({
     setEditorHost: (host: Record<string, unknown>) => {
       installed = host;
     },

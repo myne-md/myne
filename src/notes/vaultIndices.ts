@@ -8,7 +8,11 @@
 // second resolver, so chip-vs-panel resolution can never diverge.
 
 import { invoke } from "../platform/core";
-import { extractBlockAnchors } from "@myne/editor";
+// Sub-entry, not the barrel: `@myne/editor` re-exports CMEditor + myneExtensions,
+// and this module is on the boot path (editor-host → vaultIndices), so a barrel
+// import would drag the whole CodeMirror graph into the first-load bundle.
+// wikilink/anchor is CodeMirror-free (it only depends on @myne/dialect).
+import { extractBlockAnchors } from "@myne/editor/wikilink/anchor";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { parse } from "../dialect/parse";
 import { extractLineTasks, type LineTask } from "../dialect/visitors/lineTasks";
