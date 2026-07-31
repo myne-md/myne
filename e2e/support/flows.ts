@@ -274,12 +274,6 @@ export async function openSettings(
   }
 }
 
-/** Enable the local-AI master switch via Settings → AI → toggle, then close
- *  the modal. The switch is off by default (opt-in, SYNC-12); the `ai.*`
- *  editor extensions (ghost-text, slash) compose only when it is on, so callers
- *  that drive those flows enable AI BEFORE opening the target note. Reflects the
- *  persisted pref via `aria-checked` on the `role="switch"` element. Requires the
- *  `local-inference`(-stub) build — the AI settings tab is absent otherwise. */
 /** Set the speech-to-text switch via Settings → Transcription, then close the
  *  modal (MYND-592). Idempotent: it clicks only when the switch is not already
  *  in the wanted state, so a caller can assert the DEFAULT (on) without a
@@ -306,7 +300,39 @@ export async function setTranscriptionEnabled(
   await closeSettings(session);
 }
 
+/** Turn Developer mode on via Settings → About, then close the modal
+ *  (MYND-593). Idempotent — it clicks only when the switch is off.
+ *
+ *  This is a PRECONDITION for reaching the AI panel at all: `SettingsModal`
+ *  FILTERS the `ai` entry out of the rail while `developer_mode` is off, so
+ *  `settings.tab-ai` does not exist and any flow that opens it waits out its
+ *  timeout instead of failing with a useful message. */
+export async function enableDeveloperMode(session: Session): Promise<void> {
+  await openSettings(session, "about");
+  const toggle = await session.byTestId("about.developer-mode-toggle");
+  if ((await toggle.attribute("aria-checked")) !== "true") await toggle.click();
+  await session.waitUntil(
+    async () =>
+      (await (await session.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
+      "true"
+        ? true
+        : null,
+    { label: "developer_mode toggled on", timeoutMs: 10_000 },
+  );
+  await closeSettings(session);
+}
+
+/** Enable the local-AI master switch via Settings → AI → toggle, then close
+ *  the modal. The switch is off by default (opt-in, SYNC-12); the `ai.*`
+ *  editor extensions (ghost-text, slash) compose only when it is on, so callers
+ *  that drive those flows enable AI BEFORE opening the target note. Reflects the
+ *  persisted pref via `aria-checked` on the `role="switch"` element. Requires the
+ *  `local-inference`(-stub) build — the AI settings tab is absent otherwise.
+ *
+ *  Enables Developer mode first: since MYND-593 the AI panel lives in the
+ *  developer group and is filtered out of the rail without it. */
 export async function enableAi(session: Session): Promise<void> {
+  await enableDeveloperMode(session);
   await openSettings(session, "ai");
   await session.byTestId("settings.ai-panel");
   await (await session.byTestId("ai.enable-toggle")).click();
@@ -316,6 +342,28 @@ export async function enableAi(session: Session): Promise<void> {
         ? true
         : null,
     { label: "ai_enabled toggled on", timeoutMs: 10_000 },
+  );
+  await closeSettings(session);
+}
+
+/** Set the auto-tag sub-switch via Settings → AI → toggle, then close the modal
+ *  (MYND-651). Off by default, and the host re-reads BOTH it and `ai_enabled`
+ *  before any model touch — so a caller that wants the inline suggestion band
+ *  must have called {@link enableAi} first. Idempotent (clicks only when the
+ *  switch is not already in the wanted state); the toggle renders disabled while
+ *  `ai_enabled` is off, so an out-of-order call would silently do nothing. */
+export async function setAutoTagEnabled(session: Session, enabled: boolean): Promise<void> {
+  const want = enabled ? "true" : "false";
+  await openSettings(session, "ai");
+  await session.byTestId("settings.ai-panel");
+  const toggle = await session.byTestId("ai.auto-tag-toggle");
+  if ((await toggle.attribute("aria-checked")) !== want) await toggle.click();
+  await session.waitUntil(
+    async () =>
+      (await (await session.byTestId("ai.auto-tag-toggle")).attribute("aria-checked")) === want
+        ? true
+        : null,
+    { label: `auto_tag_enabled = ${want}`, timeoutMs: 10_000 },
   );
   await closeSettings(session);
 }
