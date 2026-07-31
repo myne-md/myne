@@ -70,24 +70,39 @@ pub enum ModelRole {
     /// Speech-to-text model (`transcribe`) — Whisper, voice-to-text MYND-550
     /// (SYNC-V3). Side-loaded + swappable independently of the other two.
     Transcription,
+    /// Tag-suggestion model (auto-tag, MYND-651) — **bundled-only**. Unlike the
+    /// three roles above it has no marker file, no picker, and no IPC role
+    /// string: the weights are the first-party GGUF at
+    /// [`BUNDLED_TAG_MODEL_SUBPATH`] and nothing else can take their place. That
+    /// is not an omission but the documented gate — `threat-model.md` §7 states
+    /// auto-tag has "no override picker, so it never re-enters the
+    /// untrusted-input case at all", and a user-selectable path would walk that
+    /// back. The `None`s below and [`ModelRole::parse`] refusing `"tag"` are what
+    /// make the sentence true in code rather than only in prose.
+    TagSuggestion,
 }
 
 impl ModelRole {
-    /// Marker file name (under `models/`) recording this role's chosen path.
-    fn marker_file_name(self) -> &'static str {
+    /// Marker file name (under `models/`) recording this role's chosen path, or
+    /// `None` for a bundled-only role that has no user-selectable path at all.
+    fn marker_file_name(self) -> Option<&'static str> {
         match self {
-            ModelRole::Generation => "generation.path",
-            ModelRole::Embedding => "embedding.path",
-            ModelRole::Transcription => "transcription.path",
+            ModelRole::Generation => Some("generation.path"),
+            ModelRole::Embedding => Some("embedding.path"),
+            ModelRole::Transcription => Some("transcription.path"),
+            ModelRole::TagSuggestion => None,
         }
     }
 
     /// Which hash-marker file (if any) records this role's model SHA-256.
     /// `Generation` has none (it does not key a persisted index); `Embedding`
     /// keys `vault.embeddings`, `Transcription` keys the transcript `MYE1` cache.
+    /// `TagSuggestion` has none either — tag suggestions are RAM-only, so no
+    /// persisted artefact keys on the model's identity (`decisions.md`
+    /// 2026-07-31).
     fn hash_marker_file_name(self) -> Option<&'static str> {
         match self {
-            ModelRole::Generation => None,
+            ModelRole::Generation | ModelRole::TagSuggestion => None,
             ModelRole::Embedding => Some(EMBEDDING_HASH_MARKER),
             ModelRole::Transcription => Some(TRANSCRIPTION_HASH_MARKER),
         }
@@ -95,7 +110,9 @@ impl ModelRole {
 
     /// Parse the IPC role string (`"generation"` / `"embedding"` /
     /// `"transcription"`) — the command layer's only re-entry point for a
-    /// UI-supplied role.
+    /// UI-supplied role. There is deliberately **no** string for
+    /// [`ModelRole::TagSuggestion`]: the bundled tag model is not selectable, so
+    /// no IPC caller can name it.
     pub fn parse(s: &str) -> Option<ModelRole> {
         match s {
             "generation" => Some(ModelRole::Generation),
@@ -116,7 +133,8 @@ pub enum ModelStoreError {
     #[error("model path is inside the vault tree")]
     InsideVaultTree,
     /// The IPC role string was not `"generation"` / `"embedding"` (a UI/codegen
-    /// bug, not user-facing input).
+    /// bug, not user-facing input), or the role names a **bundled-only** model
+    /// that has no user-selectable path ([`ModelRole::TagSuggestion`]).
     #[error("unknown model role")]
     InvalidRole,
     /// An IO failure resolving/creating the models directory or reading/
@@ -293,6 +311,13 @@ pub fn set_selected_model(
     role: ModelRole,
     model_path: &Path,
 ) -> Result<PathBuf, ModelStoreError> {
+    // A bundled-only role has no selectable path — refuse BEFORE touching the
+    // filesystem so a rejected pick records nothing anywhere. This is the
+    // "no override picker" gate of `threat-model.md` §7, enforced at the one
+    // function that could otherwise create one.
+    let Some(marker_name) = role.marker_file_name() else {
+        return Err(ModelStoreError::InvalidRole);
+    };
     let accepted = ensure_outside_vault_tree(base, model_path)?;
     let dir = ensure_models_dir(base)?;
     // Roles with a hash marker (Embedding / Transcription) record the file's
@@ -306,7 +331,7 @@ pub fn set_selected_model(
             embedding_hash_marker_body(&hash, stat).as_bytes(),
         )?;
     }
-    let marker = dir.join(role.marker_file_name());
+    let marker = dir.join(marker_name);
     std::fs::write(&marker, accepted.to_string_lossy().as_bytes())?;
     Ok(accepted)
 }
@@ -341,8 +366,15 @@ pub fn selected_embedding_model_hash(base: &Path) -> Result<Option<[u8; 32]>, Mo
 }
 
 /// Read back the recorded model path for `role`, or `None` if none is set.
+///
+/// A **bundled-only** role ([`ModelRole::TagSuggestion`]) has no marker file, so
+/// this is always `Ok(None)` for it — an override cannot exist even if a stray
+/// file of some other name is dropped into `models/`.
 pub fn selected_model(base: &Path, role: ModelRole) -> Result<Option<PathBuf>, ModelStoreError> {
-    let marker = models_dir_from_base(base).join(role.marker_file_name());
+    let Some(marker_name) = role.marker_file_name() else {
+        return Ok(None);
+    };
+    let marker = models_dir_from_base(base).join(marker_name);
     match std::fs::read_to_string(&marker) {
         Ok(s) => {
             let trimmed = s.trim();
@@ -364,13 +396,39 @@ pub fn selected_model(base: &Path, role: ModelRole) -> Result<Option<PathBuf>, M
 /// stays side-load. A quantized `whisper-base` GGUF (Apache-2.0; `LICENSING.md`).
 pub const BUNDLED_TRANSCRIPTION_SUBPATH: [&str; 3] = ["models", "whisper", "model.gguf"];
 
+/// Path components (under the Tauri `resource_dir`) of the **bundled** auto-tag
+/// task-model (MYND-651; `decisions.md` 2026-07-31 "Auto-tag runs on a bundled
+/// task-model and renders inline"): `<resource_dir>/models/tag/model.gguf`, with
+/// a sibling `tokenizer.json` (the `load_tag` layout). A quantized
+/// Qwen2.5-0.5B-Instruct GGUF (Apache-2.0; `LICENSING.md`) — the same Qwen2
+/// architecture family the generation role loads, which is why it needs no new
+/// runtime. Desktop-only, and unlike transcription there is **no** picker
+/// override: this path is the only tag model there is.
+pub const BUNDLED_TAG_MODEL_SUBPATH: [&str; 3] = ["models", "tag", "model.gguf"];
+
 /// The bundled default transcription model path IFF it is actually present on
 /// disk. Returns `None` when no model ships (an `--no-default-features` AI-free
 /// build, or a checkout whose LFS model blob was not fetched) so resolution
 /// degrades cleanly to side-load-only — never a phantom path that fails to load.
 pub fn bundled_transcription_model(resource_dir: &Path) -> Option<PathBuf> {
+    bundled_model(resource_dir, BUNDLED_TRANSCRIPTION_SUBPATH)
+}
+
+/// The bundled auto-tag model path IFF it is actually present on disk (MYND-651).
+/// `None` on an `--no-default-features` AI-free build or a checkout whose LFS
+/// blob was not fetched — and because there is no override to fall back to, that
+/// `None` is simply "no auto-tag on this build": the engine answers `NotReady`
+/// and the feature stays absent rather than half-working.
+pub fn bundled_tag_model(resource_dir: &Path) -> Option<PathBuf> {
+    bundled_model(resource_dir, BUNDLED_TAG_MODEL_SUBPATH)
+}
+
+/// Resolve one bundled model subpath under `resource_dir`, `None` unless the
+/// file is really there. Shared by the transcription + tag resolvers so
+/// "present-or-nothing" cannot drift between them.
+fn bundled_model(resource_dir: &Path, subpath: [&str; 3]) -> Option<PathBuf> {
     let mut p = resource_dir.to_path_buf();
-    for c in BUNDLED_TRANSCRIPTION_SUBPATH {
+    for c in subpath {
         p.push(c);
     }
     p.is_file().then_some(p)
@@ -606,6 +664,77 @@ mod tests {
             .kind(),
             "io"
         );
+    }
+
+    #[test]
+    fn tag_role_is_bundled_only_and_has_no_selectable_path() {
+        // `threat-model.md` §7 states auto-tag has "no override picker, so it
+        // never re-enters the untrusted-input case at all". These four
+        // assertions are what make that a property of the code: no IPC role
+        // string reaches the role, no marker can be written for it, and reading
+        // one back is unconditionally `None`.
+        let tmp = ScopedTempDir::new("local-inf-tag-bundled-only").expect("scoped tempdir");
+        let base = tmp.path();
+
+        // 1. No IPC re-entry point — the command layer cannot name the role.
+        assert_eq!(ModelRole::parse("tag"), None);
+        assert_eq!(ModelRole::parse("tag-suggestion"), None);
+
+        // 2. Writing a pick is refused, with no filesystem side effect.
+        let dl = base.join("downloads");
+        std::fs::create_dir_all(&dl).unwrap();
+        let model = dl.join("attacker-qwen.gguf");
+        std::fs::write(&model, b"not really a model").unwrap();
+        assert_eq!(
+            set_selected_model(base, ModelRole::TagSuggestion, &model),
+            Err(ModelStoreError::InvalidRole)
+        );
+        assert!(
+            !models_dir_from_base(base).exists(),
+            "a refused pick must not even create the models dir"
+        );
+
+        // 3. Reading back is always `None`, even next to a real generation pick.
+        set_selected_model(base, ModelRole::Generation, &model).expect("generation is selectable");
+        assert!(selected_model(base, ModelRole::Generation)
+            .unwrap()
+            .is_some());
+        assert_eq!(
+            selected_model(base, ModelRole::TagSuggestion).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn bundled_tag_model_resolves_only_when_the_blob_is_present() {
+        let tmp = ScopedTempDir::new("local-inf-tag-bundled").expect("scoped tempdir");
+        let rd = tmp.path();
+
+        // Nothing bundled (AI-free build / unfetched LFS blob) → no phantom path.
+        assert_eq!(bundled_tag_model(rd), None);
+
+        // The whisper blob alone must NOT satisfy the tag resolver: a copy-paste
+        // of the transcription subpath would silently load Whisper weights into
+        // the tag role, which loads-or-fails far away from the mistake.
+        let whisper = rd.join("models").join("whisper");
+        std::fs::create_dir_all(&whisper).unwrap();
+        std::fs::write(whisper.join("model.gguf"), b"whisper-bytes").unwrap();
+        assert_eq!(bundled_tag_model(rd), None);
+        assert!(bundled_transcription_model(rd).is_some());
+
+        // Present → the documented `models/tag/model.gguf` path, and the two
+        // resolvers stay distinct.
+        let tag = rd.join("models").join("tag");
+        std::fs::create_dir_all(&tag).unwrap();
+        let blob = tag.join("model.gguf");
+        std::fs::write(&blob, b"tag-bytes").unwrap();
+        assert_eq!(bundled_tag_model(rd), Some(blob));
+        assert_ne!(bundled_tag_model(rd), bundled_transcription_model(rd));
+
+        // A directory at the blob's path is not a model.
+        let tmp2 = ScopedTempDir::new("local-inf-tag-bundled-dir").expect("scoped tempdir");
+        std::fs::create_dir_all(tmp2.path().join("models").join("tag").join("model.gguf")).unwrap();
+        assert_eq!(bundled_tag_model(tmp2.path()), None);
     }
 
     #[test]

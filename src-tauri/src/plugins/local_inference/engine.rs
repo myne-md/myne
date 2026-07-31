@@ -122,6 +122,30 @@ pub trait Engine: Send + Sync {
         self.infer_streaming(&prompt, on_token)
     }
 
+    /// One-shot completion for `prompt` on the **dedicated bundled tag model**
+    /// (auto-tag, MYND-651) rather than the side-loaded generation model. Same
+    /// blocking prompt-in/text-out contract as [`Engine::infer`] — the caller
+    /// still owns building the prompt (it holds the vault's tag vocabulary) and
+    /// parsing the candidate list out of the reply.
+    ///
+    /// It is a separate method, not an `infer` parameter, because *which model*
+    /// is the whole point: the tag role loads a first-party GGUF that ships
+    /// inside the signed build and has no picker override, so a user who never
+    /// side-loaded a generation model still gets suggestions, and a user who did
+    /// does not get tag quality that varies with their pick.
+    ///
+    /// The prompt embeds note content — **never logged** (DENY-list), like every
+    /// other string on this trait.
+    ///
+    /// Default: [`EngineError::NotReady`] — an engine with no tag model has no
+    /// tag path. The Candle engine and [`StubEngine`] override this.
+    // Consumed by the gated `suggest_tags` command (MYND-651 task 4); nothing in
+    // a non-test build calls it until that lands.
+    #[allow(dead_code)]
+    fn infer_tags(&self, _prompt: &str) -> Result<String, EngineError> {
+        Err(EngineError::NotReady)
+    }
+
     /// Drop any lazily-cached loaded model so the next `infer`/`embed` re-reads
     /// from disk. Called after the user picks a new model file
     /// (`set_model_path`) so a swap takes effect without an app restart —
@@ -209,6 +233,15 @@ impl Engine for StubEngine {
             }
         }
         Ok(emitted)
+    }
+
+    fn infer_tags(&self, _prompt: &str) -> Result<String, EngineError> {
+        // A fixed comma list in the shape a real tag model replies in, so the
+        // frontend's `parseTagCandidates` + the E2E scenario get deterministic
+        // chips without a model in the repo. `stub-tag` is a legal tag token AND
+        // identifies the stub, so a test can assert the value came through the
+        // trait against the stub rather than a real completion.
+        Ok("stub-tag, meeting, notes".to_string())
     }
 
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
@@ -362,6 +395,39 @@ mod tests {
         assert!(segments.len() > 1, "expected multiple segment emissions");
         assert_eq!(segments.concat(), full);
         assert_eq!(full, engine.transcribe(&pcm).unwrap());
+    }
+
+    #[test]
+    fn stub_infer_tags_returns_a_parseable_comma_list() {
+        let engine: &dyn Engine = &StubEngine;
+        let out = engine
+            .infer_tags("Suggest tags for: my note")
+            .expect("stub infer_tags never fails");
+        // Deterministic, and in the comma-list shape the frontend parses.
+        assert_eq!(out, engine.infer_tags("a different prompt").unwrap());
+        let tags: Vec<&str> = out.split(',').map(str::trim).collect();
+        assert_eq!(tags, ["stub-tag", "meeting", "notes"]);
+        // Not the generation path — a caller must not be able to confuse the two.
+        assert!(!out.contains("stub-infer"));
+    }
+
+    #[test]
+    fn default_infer_tags_is_not_ready() {
+        // An engine that overrides nothing (generation/embedding-only, e.g. an
+        // AI build with no bundled tag weights) has no tag path: the trait
+        // default returns NotReady rather than falling back to `infer`, which
+        // would silently answer with the WRONG model.
+        struct BareEngine;
+        impl Engine for BareEngine {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                Ok("generation output".to_string())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                Ok(Vec::new())
+            }
+        }
+        let engine: &dyn Engine = &BareEngine;
+        assert_eq!(engine.infer_tags("prompt"), Err(EngineError::NotReady));
     }
 
     #[test]
