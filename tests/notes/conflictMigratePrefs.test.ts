@@ -13,7 +13,7 @@ const OTHER = "33333333-3333-3333-3333-333333333333";
 describe("migrateNoteUuidInPrefs", () => {
   it("swaps the source uuid to the target in favorites, preserving membership", () => {
     const r = migrateNoteUuidInPrefs(
-      { favorites: [OTHER, ORIG], itemOrder: [] },
+      { favorites: [OTHER, ORIG], itemOrder: {} },
       ORIG,
       COPY,
     );
@@ -21,39 +21,59 @@ describe("migrateNoteUuidInPrefs", () => {
     expect(r.changed).toBe(true);
   });
 
-  it("swaps the source uuid in item_order preserving its index, leaving folders untouched", () => {
+  it("swaps the source uuid in its item_order container preserving its index, leaving folders untouched", () => {
     const r = migrateNoteUuidInPrefs(
-      { favorites: [], itemOrder: [OTHER, "Projects/", ORIG, "Archive/"] },
+      { favorites: [], itemOrder: { "": [OTHER, "Projects/", ORIG, "Archive/"] } },
       ORIG,
       COPY,
     );
     // Index 2 (ORIG) becomes COPY; folder paths and other notes keep position.
-    expect(r.itemOrder).toEqual([OTHER, "Projects/", COPY, "Archive/"]);
+    expect(r.itemOrder).toEqual({ "": [OTHER, "Projects/", COPY, "Archive/"] });
     expect(r.changed).toBe(true);
   });
 
-  it("is a no-op when the source uuid is absent from both lists", () => {
+  it("swaps the uuid inside a folder container and leaves OTHER containers untouched (MYND-596)", () => {
     const r = migrateNoteUuidInPrefs(
-      { favorites: [OTHER], itemOrder: [OTHER, "Projects/"] },
+      {
+        favorites: [],
+        itemOrder: {
+          "": [OTHER, "Projects/"], // root container — does NOT hold ORIG
+          "projects/": [ORIG, "Projects/Sub/"], // the container ORIG lives in
+        },
+      },
+      ORIG,
+      COPY,
+    );
+    // Only the container holding ORIG is rewritten; the root sequence is verbatim.
+    expect(r.itemOrder).toEqual({
+      "": [OTHER, "Projects/"],
+      "projects/": [COPY, "Projects/Sub/"],
+    });
+    expect(r.changed).toBe(true);
+  });
+
+  it("is a no-op when the source uuid is absent from favorites and every container", () => {
+    const r = migrateNoteUuidInPrefs(
+      { favorites: [OTHER], itemOrder: { "": [OTHER, "Projects/"] } },
       ORIG,
       COPY,
     );
     expect(r.favorites).toEqual([OTHER]);
-    expect(r.itemOrder).toEqual([OTHER, "Projects/"]);
+    expect(r.itemOrder).toEqual({ "": [OTHER, "Projects/"] });
     expect(r.changed).toBe(false);
   });
 
-  it("does not duplicate the target when it already appears, keeping the source's slot", () => {
+  it("does not duplicate the target within a container, keeping the source's slot", () => {
     const r = migrateNoteUuidInPrefs(
-      { favorites: [COPY, OTHER, ORIG], itemOrder: [COPY, ORIG] },
+      { favorites: [COPY, OTHER, ORIG], itemOrder: { "": [COPY, ORIG] } },
       ORIG,
       COPY,
     );
     // Pre-existing COPY dropped; migrated slot (where ORIG was) holds COPY once.
     expect(r.favorites).toEqual([OTHER, COPY]);
     expect(r.favorites.filter((x) => x === COPY)).toHaveLength(1);
-    expect(r.itemOrder).toEqual([COPY]);
-    expect(r.itemOrder.filter((x) => x === COPY)).toHaveLength(1);
+    expect(r.itemOrder).toEqual({ "": [COPY] });
+    expect(r.itemOrder[""]!.filter((x) => x === COPY)).toHaveLength(1);
     expect(r.changed).toBe(true);
   });
 });

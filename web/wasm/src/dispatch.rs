@@ -2349,7 +2349,9 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
             struct Args {
-                order: Vec<String>,
+                // MYND-596: container-keyed map (container path → child sequence),
+                // not a flat list.
+                order: std::collections::BTreeMap<String, Vec<String>>,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,

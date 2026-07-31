@@ -23,6 +23,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  uuidv7Ms,
+  buildRankMap,
+  type NoteId,
+} from "@myne/editor/host/notes/itemOrder";
 import { createNote } from "./createNote";
 import { createDrawing } from "./createDrawing";
 import { isNoteFolderArchived } from "./archivedFolders";
@@ -64,7 +69,11 @@ import {
   vaultIndicesRemove,
 } from "./vaultIndices";
 
-export type NoteId = string;
+// `NoteId`, `uuidv7Ms` and `buildRankMap` moved to the shared
+// `@myne/editor/host/notes/itemOrder` module (MYND-596); re-exported here so the
+// many desktop consumers that import them from `sidebarState` keep working.
+export { uuidv7Ms, buildRankMap };
+export type { NoteId };
 
 export type SidebarState = {
   selectedId: NoteId | null;
@@ -612,22 +621,6 @@ export function clearMultiSelection(state: SidebarState): SidebarState {
 }
 
 /**
- * UUIDv7 first-48-bit unix-ms decoder. Per `protocol.md` §9.1 the
- * file name IS the UUIDv7; the leak of "approximate creation time"
- * is already accepted, so deriving a sort key + a display fallback
- * from it is free. Returns `null` for non-UUIDv7-shaped input or
- * epoch-zero results; sort callers map `null` to `0` via `?? 0`,
- * display callers (`<NoteRow>`) treat `null` as "no subtitle date".
- */
-export function uuidv7Ms(id: NoteId): number | null {
-  if (id.length !== 36) return null;
-  const hex = id.replace(/-/g, "");
-  if (hex.length !== 32) return null;
-  const ms = parseInt(hex.substring(0, 12), 16);
-  return Number.isFinite(ms) && ms > 0 ? ms : null;
-}
-
-/**
  * Sort comparator for batch IDs in sidebar render order.
  *
  * When a manual `orderRank` map (note_id → index, derived from the
@@ -640,22 +633,6 @@ export function uuidv7Ms(id: NoteId): number | null {
  * 2026-05-07 "User-meaningful timestamp storage path" sort key + 2026-05-15
  * MYND-82 grill Q1, extended with the manual-reorder primary key.
  */
-/**
- * Build the `id → index` rank map a manual-order sequence (note_order /
- * folder_order) feeds into {@link sortBatchIds}'s `orderRank` (and the folder
- * comparator). First occurrence wins — defensive against accidental duplicates.
- */
-export function buildRankMap<K extends string>(
-  order: readonly K[],
-): Map<K, number> {
-  const m = new Map<K, number>();
-  for (let i = 0; i < order.length; i++) {
-    const k = order[i]!;
-    if (!m.has(k)) m.set(k, i);
-  }
-  return m;
-}
-
 export function sortBatchIds(
   ids: readonly NoteId[],
   cache: ReadonlyMap<NoteId, TitleRecord>,
