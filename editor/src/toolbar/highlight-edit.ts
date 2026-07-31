@@ -13,12 +13,7 @@
 
 import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import { HIGHLIGHT_CLASSES } from "../html/sanitize";
-
-// Only an allowlisted colour is an editable colored highlight — matching what
-// colored-highlight.ts paints and what the sanitizer keeps (MYND-637). An unknown
-// `hl-*` in the buffer is not treated as one.
-const HL_SET: ReadonlySet<string> = new Set(HIGHLIGHT_CLASSES);
+import { MARK_HL_RE, isOwnedHighlightClass } from "../html/sanitize";
 
 /** A highlight that fully contains the current selection. `color` is an `hl-*`
  *  token — `hl-yellow` for a `==` highlight, `hl-<name>` for a `<mark>`. */
@@ -31,7 +26,15 @@ export interface EnclosingHighlight {
   innerTo: number; // just past the highlighted text
 }
 
-const MARK_RE = /<mark class="(hl-[a-z-]+)">([\s\S]*?)<\/mark>/gi;
+/** The source markers that wrap text in `color` — `==` for yellow, `<mark …>`
+ *  otherwise. The SINGLE source for both the toolbar's create swatches and the
+ *  in-place edit path below; storage stays the settled `hl-*` form (MYND-285). */
+export function highlightMarkers(color: string): readonly [string, string] {
+  return color === "hl-yellow"
+    ? ["==", "=="]
+    : [`<mark class="${color}">`, "</mark>"];
+}
+
 const EQ_RE = /==(.+?)==/g; // single-line, non-greedy; `.` excludes newlines
 
 /** The highlight enclosing selection `[from, to]`, or null. A `<mark>` is
@@ -46,24 +49,24 @@ export function detectEnclosingHighlight(
   if (to > line.to) return null; // spans lines — out of scope, fall back to create
   const base = line.from;
   const text = state.doc.sliceString(line.from, line.to);
+  const contains = (start: number, end: number): boolean =>
+    start <= from && end >= to;
 
-  MARK_RE.lastIndex = 0;
+  MARK_HL_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
-  while ((m = MARK_RE.exec(text)) !== null) {
+  while ((m = MARK_HL_RE.exec(text)) !== null) {
     const color = m[1].toLowerCase();
-    if (!HL_SET.has(color)) continue; // unknown class — not an editable highlight
+    if (!isOwnedHighlightClass(color)) continue; // unknown class — not editable
     const start = base + m.index;
     const end = start + m[0].length;
-    if (start <= from && end >= to) {
-      const innerFrom = start + m[0].indexOf(">") + 1;
-      const innerTo = end - "</mark>".length;
+    if (contains(start, end)) {
       return {
         kind: "mark",
         color,
         outerFrom: start,
         outerTo: end,
-        innerFrom,
-        innerTo,
+        innerFrom: start + m[0].indexOf(">") + 1,
+        innerTo: end - "</mark>".length,
       };
     }
   }
@@ -72,7 +75,7 @@ export function detectEnclosingHighlight(
   while ((m = EQ_RE.exec(text)) !== null) {
     const start = base + m.index;
     const end = start + m[0].length;
-    if (start <= from && end >= to) {
+    if (contains(start, end)) {
       return {
         kind: "eq",
         color: "hl-yellow",
@@ -86,13 +89,10 @@ export function detectEnclosingHighlight(
   return null;
 }
 
-/** The source bytes wrapping `inner` in the given colour — the byte-identical
- *  counterpart of the toolbar's create swatches (`==` for yellow, `<mark …>`
- *  otherwise). Storage stays the settled `hl-*` form. */
+/** The source bytes wrapping `inner` in the given colour. */
 function wrapInColor(color: string, inner: string): string {
-  return color === "hl-yellow"
-    ? `==${inner}==`
-    : `<mark class="${color}">${inner}</mark>`;
+  const [open, close] = highlightMarkers(color);
+  return `${open}${inner}${close}`;
 }
 
 /** Rewrite the enclosing highlight to `targetColor`. Choosing the CURRENT colour

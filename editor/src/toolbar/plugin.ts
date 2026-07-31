@@ -16,7 +16,11 @@ import {
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
 import { wrapCommand, applyHeadingLevel, currentHeadingLevel } from "./commands";
-import { detectEnclosingHighlight, applyHighlightEdit } from "./highlight-edit";
+import {
+  detectEnclosingHighlight,
+  applyHighlightEdit,
+  highlightMarkers,
+} from "./highlight-edit";
 import { isSelectionInCode } from "../code-context";
 import { rangeOverlapsAttachmentEmbed } from "../decorations/attachment-embed";
 import i18n from "@myne/editor/i18n";
@@ -98,25 +102,25 @@ function makeExportImageIcon(): SVGElement {
 }
 
 // Multi-color highlight palette (decisions.md 2026-06-15). Yellow is the
-// DEFAULT: it emits `==…==` (byte-identical to the pre-color behaviour, MYND-156)
-// and is what a plain click on the "H" button applies. The other four wrap the
-// selection in `<mark class="hl-…">…</mark>` — standard, portable embedded HTML
-// constrained to this closed `hl-*` set at the sanitizer (see sanitize.ts
-// HIGHLIGHT_CLASSES). The `cssVar` paints each swatch's preview square.
+// DEFAULT: a plain click on the "H" button applies it. Each swatch's markers
+// (`==…==` for yellow, `<mark class="hl-…">…</mark>` otherwise — portable embedded
+// HTML constrained to the closed `hl-*` set at the sanitizer) come from the shared
+// `highlightMarkers` (highlight-edit.ts), NOT stored here, so the create and edit
+// paths cannot drift. The `cssVar` paints each swatch's preview square.
 const HIGHLIGHT_SWATCHES = [
-  { id: "hl-yellow", labelKey: "editor.toolbar.highlight.yellow", cssVar: "--highlight", open: "==", close: "==" },
-  { id: "hl-green", labelKey: "editor.toolbar.highlight.green", cssVar: "--highlight-green", open: '<mark class="hl-green">', close: "</mark>" },
-  { id: "hl-blue", labelKey: "editor.toolbar.highlight.blue", cssVar: "--highlight-blue", open: '<mark class="hl-blue">', close: "</mark>" },
-  { id: "hl-pink", labelKey: "editor.toolbar.highlight.pink", cssVar: "--highlight-pink", open: '<mark class="hl-pink">', close: "</mark>" },
-  { id: "hl-purple", labelKey: "editor.toolbar.highlight.purple", cssVar: "--highlight-purple", open: '<mark class="hl-purple">', close: "</mark>" },
-  { id: "hl-orange", labelKey: "editor.toolbar.highlight.orange", cssVar: "--highlight-orange", open: '<mark class="hl-orange">', close: "</mark>" },
-  { id: "hl-red", labelKey: "editor.toolbar.highlight.red", cssVar: "--highlight-red", open: '<mark class="hl-red">', close: "</mark>" },
-  { id: "hl-teal", labelKey: "editor.toolbar.highlight.teal", cssVar: "--highlight-teal", open: '<mark class="hl-teal">', close: "</mark>" },
-  { id: "hl-cyan", labelKey: "editor.toolbar.highlight.cyan", cssVar: "--highlight-cyan", open: '<mark class="hl-cyan">', close: "</mark>" },
-  { id: "hl-lime", labelKey: "editor.toolbar.highlight.lime", cssVar: "--highlight-lime", open: '<mark class="hl-lime">', close: "</mark>" },
-  { id: "hl-brown", labelKey: "editor.toolbar.highlight.brown", cssVar: "--highlight-brown", open: '<mark class="hl-brown">', close: "</mark>" },
-  { id: "hl-grey", labelKey: "editor.toolbar.highlight.grey", cssVar: "--highlight-grey", open: '<mark class="hl-grey">', close: "</mark>" },
-  { id: "hl-indigo", labelKey: "editor.toolbar.highlight.indigo", cssVar: "--highlight-indigo", open: '<mark class="hl-indigo">', close: "</mark>" },
+  { id: "hl-yellow", labelKey: "editor.toolbar.highlight.yellow", cssVar: "--highlight" },
+  { id: "hl-green", labelKey: "editor.toolbar.highlight.green", cssVar: "--highlight-green" },
+  { id: "hl-blue", labelKey: "editor.toolbar.highlight.blue", cssVar: "--highlight-blue" },
+  { id: "hl-pink", labelKey: "editor.toolbar.highlight.pink", cssVar: "--highlight-pink" },
+  { id: "hl-purple", labelKey: "editor.toolbar.highlight.purple", cssVar: "--highlight-purple" },
+  { id: "hl-orange", labelKey: "editor.toolbar.highlight.orange", cssVar: "--highlight-orange" },
+  { id: "hl-red", labelKey: "editor.toolbar.highlight.red", cssVar: "--highlight-red" },
+  { id: "hl-teal", labelKey: "editor.toolbar.highlight.teal", cssVar: "--highlight-teal" },
+  { id: "hl-cyan", labelKey: "editor.toolbar.highlight.cyan", cssVar: "--highlight-cyan" },
+  { id: "hl-lime", labelKey: "editor.toolbar.highlight.lime", cssVar: "--highlight-lime" },
+  { id: "hl-brown", labelKey: "editor.toolbar.highlight.brown", cssVar: "--highlight-brown" },
+  { id: "hl-grey", labelKey: "editor.toolbar.highlight.grey", cssVar: "--highlight-grey" },
+  { id: "hl-indigo", labelKey: "editor.toolbar.highlight.indigo", cssVar: "--highlight-indigo" },
 ] as const;
 
 
@@ -517,8 +521,9 @@ class ToolbarView implements PluginValue {
 
     const range = this.view.state.selection.main;
     const enc = detectEnclosingHighlight(this.view.state, range.from, range.to);
-    const cssVarFor = (color: string): string =>
-      HIGHLIGHT_SWATCHES.find((s) => s.id === color)?.cssVar ?? "--highlight";
+    const activeCssVar = enc
+      ? (HIGHLIGHT_SWATCHES.find((s) => s.id === enc.color)?.cssVar ?? "--highlight")
+      : "--highlight";
 
     // Main button: create yellow, or — when editing an existing highlight — show
     // its colour and remove it on click (toggle-off, like an active Bold button).
@@ -528,7 +533,7 @@ class ToolbarView implements PluginValue {
     mainBtn.setAttribute("data-testid", "toolbar.highlight");
     const swatch = document.createElement("span");
     swatch.textContent = "H";
-    swatch.style.backgroundColor = `var(${enc ? cssVarFor(enc.color) : "--highlight"}, #f3e7c4)`;
+    swatch.style.backgroundColor = `var(${activeCssVar}, #f3e7c4)`;
     swatch.style.padding = "0 3px";
     swatch.style.borderRadius = "2px";
     swatch.style.color = "var(--fg-1)";
@@ -581,9 +586,9 @@ class ToolbarView implements PluginValue {
           e.preventDefault();
           this.openDropdown = null;
           // Editing → recolour in place (choosing the active colour removes it);
-          // creating → wrap the selection.
+          // creating → wrap the selection in this colour's markers.
           if (enc) applyHighlightEdit(this.view, enc, sw.id);
-          else wrapCommand(sw.open, sw.close)(this.view);
+          else wrapCommand(...highlightMarkers(sw.id))(this.view);
         });
         drop.appendChild(square);
       }

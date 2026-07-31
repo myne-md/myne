@@ -270,10 +270,9 @@ export const myneTheme = EditorView.theme({
   ".cm-highlight.cm-hl-brown": { backgroundColor: "var(--highlight-brown, #e3d9cd)" },
   ".cm-highlight.cm-hl-grey": { backgroundColor: "var(--highlight-grey, #dedcd8)" },
   ".cm-highlight.cm-hl-indigo": { backgroundColor: "var(--highlight-indigo, #d6d8ee)" },
-  // The `==` skin colored-highlight.ts reveals on cursor. It renders INSIDE the
-  // painted `.cm-highlight` span, so wash + ink inherit — identical to a yellow
-  // `==text==`. Declared as a stable hook; no override needed.
-  ".cm-hl-eq": { color: "inherit" },
+  // The `==` skin colored-highlight.ts reveals on cursor needs no rule of its own:
+  // it renders inside the painted `.cm-highlight` span, so wash + ink inherit —
+  // identical to a yellow `==text==`. The `cm-hl-eq` class stays as a DOM hook.
 
   // Embedded HTML (MYND-209) — the sanitized element keeps its real tag; style
   // <mark>/<kbd> to match the dialect. <sub>/<sup>/<abbr> use native rendering.

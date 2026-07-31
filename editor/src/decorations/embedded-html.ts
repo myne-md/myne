@@ -37,16 +37,16 @@ import {
 } from "./cursor-aware";
 import { treeChanged } from "./plugin-factory";
 import {
-  HIGHLIGHT_CLASSES,
+  isOwnedHighlightClass,
   loadPurifier,
   type Purifier,
   SANITIZE_CONFIG,
 } from "../html/sanitize";
 
-// MYND-637: colored highlights whose class is in this allowlist are owned by
-// colored-highlight.ts (clean `==` reveal). An UNKNOWN `hl-*` class stays here so
-// the sanitizer drops it — the allowlist is the single partition line.
-const OWNED_HL_SET: ReadonlySet<string> = new Set(HIGHLIGHT_CLASSES);
+// MYND-637: an allowlisted colored highlight is owned by colored-highlight.ts
+// (clean `==` reveal); an UNKNOWN `hl-*` class stays here so the sanitizer drops
+// it. `isOwnedHighlightClass` (sanitize.ts) is the single partition line; this
+// anchored probe just pulls the class off an already-isolated inline-HTML match.
 const MARK_HL_CLASS_RE = /^<mark class="(hl-[a-z-]+)">/i;
 
 export const setPurifier = StateEffect.define<Purifier>();
@@ -112,8 +112,8 @@ function buildInlineHtml(view: EditorView): DecorationSet {
       // by colored-highlight.ts (clean `==` reveal, never raw HTML). Skip it here
       // so it isn't double-decorated; an unknown `hl-*` (and every other inline
       // element) stays on this path so the sanitizer still governs it.
-      const hlClass = m[0].match(MARK_HL_CLASS_RE)?.[1]?.toLowerCase();
-      if (hlClass !== undefined && OWNED_HL_SET.has(hlClass)) continue;
+      const hlClass = m[0].match(MARK_HL_CLASS_RE)?.[1];
+      if (hlClass !== undefined && isOwnedHighlightClass(hlClass)) continue;
       const start = from + m.index;
       const end = start + m[0].length;
       if (isInsideRange(view, start, end)) continue; // reveal raw on-cursor
