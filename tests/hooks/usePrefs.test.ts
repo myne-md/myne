@@ -53,7 +53,7 @@ function view(over: Record<string, unknown> = {}) {
     daily_folder: null,
     daily_template: null,
     favorites: [],
-    item_order: [],
+    item_order: {},
     editor_layout: null,
     editor_content_width: null,
     editor_font_family: null,

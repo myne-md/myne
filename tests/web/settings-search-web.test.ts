@@ -32,6 +32,7 @@ const WEB_ABSENT = [
   "phraseRecovery",
   "vaultExport",
   "spellCheck",
+  "torRouting",
 ];
 
 async function load(absent: string[]) {
@@ -112,12 +113,18 @@ describe("the drift half", () => {
   });
 
   it("tags every entry whose panel is itself capability-gated", async () => {
-    // The `ai` panel is filtered out of the rail entirely (task 27). An `ai.*`
-    // entry with no tag would therefore name a panel that does not exist on this
+    // The `ai` panel is filtered out of the rail entirely (task 27), and the
+    // `network` panel likewise wherever `torRouting` is absent (MYND-650). An
+    // entry in either with no tag would name a panel that does not exist on this
     // client — a navigation into nothing, which is worse than a hidden control.
+    const PANEL_CAPABILITY: Record<string, string> = {
+      ai: "localAi",
+      network: "torRouting",
+    };
     const { SETTINGS_SEARCH_INDEX } = await load([]);
     for (const e of SETTINGS_SEARCH_INDEX) {
-      if (e.panelId === "ai") expect(e.capability, `entry ${e.id}`).toBe("localAi");
+      const required = PANEL_CAPABILITY[e.panelId];
+      if (required) expect(e.capability, `entry ${e.id}`).toBe(required);
     }
   });
 });

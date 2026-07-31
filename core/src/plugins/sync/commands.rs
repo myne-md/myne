@@ -116,8 +116,6 @@ pub async fn sync_decode_join_qr(
     decode_join_qr_view(&scanned, now_unix)
 }
 
-use super::to_hex as hex_lower;
-
 /// Re-exported: both moved to `config` with the endpoint cores (task 84), where
 /// the pin policy belongs beside the config it reads.
 pub(crate) use super::config::config_pins;
@@ -143,10 +141,18 @@ pub use super::config::EndpointPinInfo;
 /// `rustls_transport` — host-only, with no browser equivalent (a page never sees
 /// the certificate). Everything after that — URL policy, persistence, derived
 /// pin source — is `config::set_endpoint`, shared with the web dispatch.
+///
+/// `confirmed_fingerprint` is the fingerprint the user obtained **out-of-band**
+/// from their server. It is optional on the clearnet (the shipped TOFU bargain
+/// is unchanged) and **mandatory in Tor mode**, where the first handshake goes
+/// through an exit node that is in a position to serve its own certificate —
+/// see `super::pin_confirm`. A mismatch aborts with nothing written: no
+/// endpoint, no pin.
 #[tauri::command]
 pub async fn sync_set_endpoint<R: Runtime>(
     app: AppHandle<R>,
     endpoint_url: Option<String>,
+    confirmed_fingerprint: Option<String>,
 ) -> Result<EndpointPinInfo, SyncConfigError> {
     let cert_pin_hex = match endpoint_url.as_deref() {
         Some(url) => {
@@ -156,16 +162,13 @@ pub async fn sync_set_endpoint<R: Runtime>(
             let (scheme, host, port) =
                 super::http_transport::parse_endpoint(url).ok_or(SyncConfigError::InvalidUrl)?;
             if scheme == "https" {
-                // Reach the server once, accept-and-record its cert, pin it.
-                let pin = tokio::task::spawn_blocking(move || {
-                    super::rustls_transport::tofu_fetch_pin(&host, port)
-                })
-                .await
-                .map_err(|_| SyncConfigError::Io {
-                    io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
-                })?
-                .map_err(|_| SyncConfigError::InvalidUrl)?; // couldn't reach / handshake
-                Some(hex_lower(&pin))
+                // Reach the server once, accept-and-record its cert, pin it —
+                // subject to the out-of-band compare in Tor mode.
+                Some(
+                    super::pin_confirm::capture_pin(host, port, confirmed_fingerprint.as_deref())
+                        .await
+                        .map_err(SyncConfigError::from)?,
+                )
             } else {
                 None // loopback http: no TLS, nothing to pin
             }
@@ -754,6 +757,12 @@ pub use super::enroll::JoinResult;
 /// freshly-MINTED vault id (desktop holds many vaults, so collision-freedom
 /// costs a disk scan) and `can_pin: true` (only a host can complete a TLS
 /// handshake and read the leaf certificate).
+///
+/// `confirmed_fingerprint` is the out-of-band value the user obtained from
+/// their server — optional on the clearnet, mandatory in Tor mode
+/// (`super::pin_confirm`, MYND-650 task 5). A join that omits it in Tor mode,
+/// or supplies one the server does not match, aborts having written nothing:
+/// no endpoint, no pin, no vault container.
 #[tauri::command]
 pub async fn sync_join_account<R: Runtime>(
     app: AppHandle<R>,
@@ -761,6 +770,7 @@ pub async fn sync_join_account<R: Runtime>(
     server_url: String,
     account_number: String,
     password: String,
+    confirmed_fingerprint: Option<String>,
 ) -> Result<JoinResult, SyncDeviceError> {
     let base = app
         .path()
@@ -775,9 +785,12 @@ pub async fn sync_join_account<R: Runtime>(
             vault_id,
             can_pin: true,
         },
-        server_url,
-        account_number,
-        password,
+        super::enroll::JoinRequest {
+            server_url,
+            account_number,
+            password,
+            confirmed_fingerprint,
+        },
     )
     .await
 }

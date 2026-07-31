@@ -64,7 +64,7 @@ pub enum SourceFormat {
 }
 
 /// The extracted-text payload, serialized (postcard) into the `MYE1` blob
-/// plaintext (`extractor_version 0x02`, § 9.15.2).
+/// plaintext (current `extractor_version 0x03`, § 9.15.2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExtractedText {
     pub status: ExtractStatus,
@@ -76,17 +76,23 @@ pub struct ExtractedText {
     /// Set when extraction hit [`MAX_EXTRACTED_TEXT_LEN`].
     pub truncated: bool,
     /// SHA-256 of the model that produced this payload, for cache-invalidation
-    /// on a model swap (voice-to-text, MYND-551; `extractor_version 0x02`).
-    /// `None` for a deterministic extractor (PDF/DOCX/text — output is
-    /// model-independent); `Some` for a [`SourceFormat::Audio`] ASR transcript.
+    /// on a model swap (voice-to-text, MYND-551; added at `extractor_version
+    /// 0x02`, still carried at the current `0x03`).
+    /// `None` for a deterministic or bundled extractor (PDF/DOCX/text, and the
+    /// bundled image-OCR weights — output is model-swap-invalidated by the
+    /// `extractor_version` byte instead); `Some` for a [`SourceFormat::Audio`]
+    /// ASR transcript, whose model IS user-swappable.
     /// Lives in the inner payload, NOT the AAD — mirrors the `vault.embeddings`
     /// model-identity rule (§ 9.17.2): a model swap invalidates cached
     /// transcripts via a payload-side comparison ([`ExtractedText::is_model_stale`]),
     /// while the crypto framing (AAD) stays model-agnostic. Because the
-    /// `extractor_version` header byte (bumped `0x01`→`0x02`) is checked and
-    /// AAD-bound BEFORE any payload decode, only `0x02` blobs are ever parsed
-    /// with this trailing field present — an old `0x01` blob is rejected at the
-    /// header and never reaches this struct.
+    /// `extractor_version` header byte is checked and AAD-bound BEFORE any
+    /// payload decode, a blob at a stale generation is rejected at the header and
+    /// never reaches this struct, so this field always has the current
+    /// generation's shape. Note the byte is a single **global** generation
+    /// counter, not a per-format one: audio transcripts are distinguished by
+    /// `source_format == Audio` + this `model_hash`, NOT by a distinct
+    /// `extractor_version`.
     pub model_hash: Option<[u8; 32]>,
 }
 

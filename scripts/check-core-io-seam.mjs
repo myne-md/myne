@@ -71,6 +71,15 @@ const ALLOWED = new Map([
     "core/src/plugins/sync/sim.rs",
     "test-only (`#![cfg(test)]`) and native by construction — it spawns a real `myne-server` process",
   ],
+  // Same shape as `sim.rs`: never compiled outside `test`, and what it reads is
+  // this repository's own source tree (`env!("CARGO_MANIFEST_DIR")`) in order to
+  // assert that no new outbound socket appeared in the sync transport
+  // (MYND-650 task 4). A source-scanning guard has nothing to route through the
+  // vault seam — there is no vault involved, and no browser build to break.
+  [
+    "core/src/plugins/sync/no_bypass.rs",
+    "test-only (`#[cfg(all(test, not(wasm32)))]`) — it scans this crate's own source, not vault data",
+  ],
 
   // ── not yet migrated — each names the task that removes it ─────────────────
   ["core/src/paths.rs", "task 12 (path helpers that stat)"],

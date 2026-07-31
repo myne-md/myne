@@ -141,6 +141,19 @@ pub enum SyncConfigError {
     /// The on-disk config file failed to parse as JSON.
     #[error("sync-config.json parse failed")]
     Parse,
+    /// Tor routing is on and no expected certificate fingerprint was supplied
+    /// (MYND-650 task 5). The UI must ask for the fingerprint the user obtained
+    /// out-of-band from their server and retry. **Nothing was written** — the
+    /// endpoint is not configured and no pin was stored.
+    #[error("a certificate fingerprint must be confirmed out-of-band over Tor")]
+    PinConfirmationRequired,
+    /// The certificate the server served is not the one the user confirmed
+    /// (MYND-650 task 5) — a typo, or somebody between this device and the
+    /// server. **Nothing was written**, and the captured fingerprint is
+    /// deliberately not reported: handing it back would let a user paste the
+    /// attacker's value and retry (`pin_confirm`'s module doc).
+    #[error("the server certificate does not match the confirmed fingerprint")]
+    FingerprintMismatch,
 }
 
 /// The storage seam's closed error, straight through (phase3-web-client task 86).
@@ -152,6 +165,31 @@ pub enum SyncConfigError {
 impl From<IoFailureKind> for SyncConfigError {
     fn from(io_error_kind: IoFailureKind) -> Self {
         SyncConfigError::Io { io_error_kind }
+    }
+}
+
+/// The fingerprint gate's refusals, projected onto this command's enum
+/// (MYND-650 task 5).
+///
+/// A `From` impl rather than a `match` at the call site, and the twin of
+/// [`super::devices::SyncDeviceError`]'s: the two enrollment doors must answer
+/// the same refusal the same way, and an impl per target enum is what makes a
+/// new `PinConfirmError` variant a compile error in one place each instead of a
+/// silently-unhandled arm at N call sites.
+///
+/// Host-only, because `pin_confirm` is: the gate exists for the one handshake
+/// that accepts any certificate, and a browser tab does not make that handshake.
+#[cfg(not(target_arch = "wasm32"))]
+impl From<super::pin_confirm::PinConfirmError> for SyncConfigError {
+    fn from(e: super::pin_confirm::PinConfirmError) -> Self {
+        use super::pin_confirm::PinConfirmError as P;
+        match e {
+            P::ConfirmationRequired => SyncConfigError::PinConfirmationRequired,
+            P::FingerprintMismatch => SyncConfigError::FingerprintMismatch,
+            // Couldn't reach / handshake — the pre-task-5 answer, kept so an
+            // unreachable server still reads as a URL problem to the existing UI.
+            P::Transport => SyncConfigError::InvalidUrl,
+        }
     }
 }
 
@@ -190,11 +228,6 @@ fn parse_scheme_host(url: &str) -> Option<(&str, &str)> {
     Some((scheme, host))
 }
 
-/// True for a loopback host where plain `http` is permitted.
-fn is_loopback_host(host: &str) -> bool {
-    matches!(host, "127.0.0.1" | "localhost" | "::1")
-}
-
 /// `<app_config_dir>/sync-config.json`.
 ///
 /// **Moved here from the host-gated `commands.rs`** (phase3-web-client task 84)
@@ -214,7 +247,32 @@ pub async fn config_path_from_host(
         io_error_kind: IoFailureKind::Other,
     })?;
     io.create_dir_all(&dir).await?;
-    Ok(dir.join("sync-config.json"))
+    Ok(config_file_in(&dir))
+}
+
+/// The same path, **without** creating the directory — for callers that only
+/// read (MYND-650: the Tor posture command).
+///
+/// [`config_path_from_host`] creates `app_config_dir` because every one of its
+/// callers is about to write there. A read-only caller must not: a posture
+/// query that creates a directory as a side effect is a surprise, it makes the
+/// permission description that says so false, and it buys nothing —
+/// [`read_config`] already answers "unconfigured" for an absent file, and an
+/// absent directory is just a stronger form of absent.
+///
+/// One helper names the file for both, so the reader cannot drift from the
+/// writer.
+pub fn config_path_for_read(
+    host: &dyn crate::host::HostCtx,
+) -> Result<std::path::PathBuf, SyncConfigError> {
+    let dir = host.app_config_dir().map_err(|_| SyncConfigError::Io {
+        io_error_kind: IoFailureKind::Other,
+    })?;
+    Ok(config_file_in(&dir))
+}
+
+fn config_file_in(dir: &std::path::Path) -> std::path::PathBuf {
+    dir.join("sync-config.json")
 }
 
 /// The endpoint config plus the DERIVED pin source (SYNC-43) — not persisted;
@@ -342,11 +400,17 @@ pub fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
 
 /// Validate an endpoint URL per the A4/TB5 policy. `https` is always allowed;
 /// `http` is allowed only for a loopback host (local E2E / dev server).
+///
+/// "Loopback" is [`super::http_transport::is_loopback`] — the one predicate,
+/// shared with the transport's own scheme dispatch and with the Tor-routing
+/// exemption ([`super::proxy::host_is_tor_exempt`]). Three copies of a
+/// three-name `matches!` is three chances for the rules to disagree about which
+/// hosts may be reached in the clear.
 pub fn validate_endpoint_url(url: &str) -> Result<(), SyncConfigError> {
     let (scheme, host) = parse_scheme_host(url).ok_or(SyncConfigError::InvalidUrl)?;
     match scheme {
         "https" => Ok(()),
-        "http" if is_loopback_host(host) => Ok(()),
+        "http" if super::http_transport::is_loopback(host) => Ok(()),
         "http" => Err(SyncConfigError::InsecureScheme),
         _ => Err(SyncConfigError::InvalidUrl),
     }

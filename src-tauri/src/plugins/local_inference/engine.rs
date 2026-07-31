@@ -194,11 +194,13 @@ pub trait Engine: Send + Sync {
     /// `pcm` is decrypted audio (AS1-class) — **never logged** (DENY-list); the
     /// returned transcript is likewise content and is never logged.
     ///
-    /// Default: [`EngineError::NotReady`] — an engine with no ASR model (a
-    /// generation/embedding-only build) has no transcription path. The real
-    /// Candle-Whisper impl and the [`StubEngine`] override this.
+    /// Default: [`EngineError::NoModel`] — an engine with no ASR model (a
+    /// generation/embedding-only build) has no transcription path, which is the
+    /// "no model available" case (MYND-591: the transcribe path never returns
+    /// the generic `NotReady`). The real Candle-Whisper impl and the
+    /// [`StubEngine`] override this.
     fn transcribe(&self, _pcm: &[f32]) -> Result<String, EngineError> {
-        Err(EngineError::NotReady)
+        Err(EngineError::NoModel)
     }
 
     /// Streaming transcription (SYNC-V5): emits each newly-decoded ~30 s
@@ -527,9 +529,10 @@ mod tests {
     }
 
     #[test]
-    fn default_transcribe_is_not_ready() {
+    fn default_transcribe_is_no_model() {
         // An engine that overrides nothing (generation/embedding-only) has no
-        // ASR path: the trait default returns NotReady rather than panicking.
+        // ASR path: the trait default returns NoModel (the "no model available"
+        // cause, MYND-591) rather than panicking or the generic NotReady.
         struct BareEngine;
         impl Engine for BareEngine {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
@@ -540,6 +543,6 @@ mod tests {
             }
         }
         let engine: &dyn Engine = &BareEngine;
-        assert_eq!(engine.transcribe(&[0.0; 8]), Err(EngineError::NotReady));
+        assert_eq!(engine.transcribe(&[0.0; 8]), Err(EngineError::NoModel));
     }
 }

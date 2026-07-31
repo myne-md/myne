@@ -262,6 +262,7 @@ export type SettingsTab =
   | "appearance"
   | "storage"
   | "ai"
+  | "network"
   | "transcription"
   | "about";
 
@@ -327,29 +328,30 @@ export async function setTranscriptionEnabled(
   });
 }
 
-/** Turn Developer mode on via Settings → About (MYND-593).
+/**
+ * Turn Developer mode on via Settings → About and wait for the Developer rail
+ * group to appear. Leaves the Settings modal OPEN on the About tab, because
+ * every caller's next move is a rail click into one of the panels the group just
+ * revealed (`settings.tab-ai`, `settings.tab-network`, …).
  *
- *  This is a PRECONDITION for reaching the AI panel at all: `SettingsModal`
- *  FILTERS the `ai` entry out of the rail while `developer_mode` is off, so
- *  `settings.tab-ai` does not exist and any flow that opens it waits out its
- *  timeout instead of failing with a useful message. */
+ * Immediate effect, no dialog — the About toggle writes the `developer_mode`
+ * pref and the rail is filtered from it, so the group's presence is the
+ * assertion that the flip took.
+ */
 export async function enableDeveloperMode(session: Session): Promise<void> {
-  await setSettingsSwitch(session, {
-    tab: "about",
-    toggleTestId: "about.developer-mode-toggle",
-    enabled: true,
-    label: "developer_mode",
-  });
+  await openSettings(session, "about");
+  await (await session.byTestId("about.developer-mode-toggle")).click();
+  await session.waitUntil(
+    async () =>
+      (await (await session.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
+      "true"
+        ? true
+        : null,
+    { label: "developer_mode toggled on", timeoutMs: 10_000 },
+  );
+  await session.waitForElement(testIdSelector("settings.developer-group"));
 }
 
-/** Enable the local-AI master switch via Settings → AI. The switch is off by
- *  default (opt-in, SYNC-12); the `ai.*` editor extensions (ghost-text, slash)
- *  compose only when it is on, so callers that drive those flows enable AI
- *  BEFORE opening the target note. Requires the `local-inference`(-stub) build —
- *  the AI settings tab is absent otherwise.
- *
- *  Enables Developer mode first: since MYND-593 the AI panel lives in the
- *  developer group and is filtered out of the rail without it. */
 export async function enableAi(session: Session): Promise<void> {
   await enableDeveloperMode(session);
   await setSettingsSwitch(session, {

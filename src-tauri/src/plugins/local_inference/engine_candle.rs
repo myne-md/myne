@@ -447,7 +447,7 @@ impl CandleEngine {
                         stage = "load_transcription",
                         "no transcription model — no override picked and no bundled default present"
                     );
-                    return Err(EngineError::NotReady);
+                    return Err(EngineError::NoModel);
                 }
             },
             Err(e) => {
@@ -457,7 +457,7 @@ impl CandleEngine {
                     error_kind = e.kind(),
                     "could not resolve the transcription model path"
                 );
-                return Err(EngineError::NotReady);
+                return Err(EngineError::ModelLoadFailed);
             }
         };
         tracing::info!(
@@ -468,7 +468,11 @@ impl CandleEngine {
         let config_path = Self::sibling(&model_path, "config.json");
         let tok_path = Self::sibling(&model_path, "tokenizer.json");
         let config_json = std::fs::read_to_string(&config_path).map_err(|e| {
-            io_stage_fail("load_transcription.read_config", &e, EngineError::NotReady)
+            io_stage_fail(
+                "load_transcription.read_config",
+                &e,
+                EngineError::ModelLoadFailed,
+            )
         })?;
         let config: WhisperConfig = serde_json::from_str(&config_json).map_err(|e| {
             fmt_stage_fail(
@@ -1209,22 +1213,23 @@ mod tests {
     }
 
     #[test]
-    fn transcribe_without_a_model_is_not_ready() {
-        // The real deferred-no-longer path (asr-engine task 3): with no Whisper
-        // model side-loaded, both the blocking and streaming entries return
-        // `NotReady` — never a panic, never a fabricated transcript. This is the
-        // production DEFAULT until the user picks a model.
+    fn transcribe_without_a_model_is_no_model() {
+        // With neither an override nor a bundled default, both the blocking and
+        // streaming entries return `NoModel` (MYND-591: the genuine "no model
+        // available" cause, no longer the overloaded `NotReady`) — never a
+        // panic, never a fabricated transcript. `CandleEngine::new` leaves
+        // `bundled_transcription` None, so this exercises the no-model arm.
         let tmp = ScopedTempDir::new("candle-engine-notranscribe").expect("tempdir");
         let engine = CandleEngine::new(tmp.path().to_path_buf());
         let pcm = [0.0f32; 16_000]; // 1 s of silence
-        assert_eq!(engine.transcribe(&pcm), Err(EngineError::NotReady));
+        assert_eq!(engine.transcribe(&pcm), Err(EngineError::NoModel));
 
         let mut called = false;
         let out = engine.transcribe_streaming(&pcm, &mut |_seg| {
             called = true;
             ControlFlow::Continue(())
         });
-        assert_eq!(out, Err(EngineError::NotReady));
+        assert_eq!(out, Err(EngineError::NoModel));
         assert!(
             !called,
             "no segment should be emitted without a loaded model"
@@ -1367,6 +1372,27 @@ mod tests {
             tag_prompt_head(&emoji).chars().count(),
             TAG_PROMPT_MAX_CHARS
         );
+    }
+
+    #[test]
+    fn transcribe_with_broken_model_sibling_is_model_load_failed() {
+        // A model path IS resolved (an override), but its required sibling
+        // `config.json` is missing — an incomplete/corrupt install or a bad
+        // user override. That is `ModelLoadFailed` (MYND-591), distinct from
+        // `NoModel` (nothing resolved at all). No real model needed: resolution
+        // succeeds, then the sibling read fails before any GGUF is touched.
+        let base = ScopedTempDir::new("candle-engine-badmodel-base").expect("tempdir");
+        // The override file must live OUTSIDE the vault tree (`base`), so put it
+        // in a separate temp dir with no sibling config.json alongside it.
+        let model_dir = ScopedTempDir::new("candle-engine-badmodel-file").expect("tempdir");
+        let model_path = model_dir.path().join("model.gguf");
+        std::fs::write(&model_path, b"not a real gguf").expect("write dummy model");
+        set_selected_model(base.path(), ModelRole::Transcription, &model_path)
+            .expect("record override");
+
+        let engine = CandleEngine::new(base.path().to_path_buf());
+        let pcm = [0.0f32; 16_000];
+        assert_eq!(engine.transcribe(&pcm), Err(EngineError::ModelLoadFailed));
     }
 
     #[test]
