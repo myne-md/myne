@@ -1,19 +1,5 @@
 # Bundled auto-tag model (desktop) — tag suggestion (MYND-651)
 
-> ## ⏳ Status: wired, weights pending (MYND-651)
->
-> **`model.gguf` and `tokenizer.json` are NOT in the tree.** `git ls-files` here
-> returns only `MODEL-LICENSE` and this README. Everything around the blob is
-> wired — the resource mapping in `tauri.conf.json`, the `.gitattributes` LFS
-> rule, the `load_tag` loader, the license text — but until the blob lands
-> **every real build ships without a tag model**, `infer_tags` returns
-> `NotReady`, and the tag-suggestion band never appears. Follow the recipe below
-> to produce it, then record the checkpoint revision, quantization and SHA-256
-> under *Provenance* and delete this box.
->
-> Anything written in the present tense below describes the intended shipped
-> state, not today's tree.
-
 This directory is where the **dedicated on-device tag-suggestion model** ships
 with the desktop app, so the inline tag-suggestion band works out of the box
 once the user turns on AI (Settings → Developer → AI) *and* the dedicated
@@ -30,50 +16,66 @@ change second.
 
 ## What ships here
 
-| File | What | Tracking | In the tree today? |
+| File | What | Tracking | In the tree? |
 |---|---|---|---|
-| `model.gguf` | quantized Qwen2.5-0.5B-Instruct GGUF (candle format) — the tag model | **Git LFS** (`.gitattributes` `*.gguf`) | ❌ **no** — pending MYND-651 |
-| `tokenizer.json` | the Qwen2.5 tokenizer | normal git | ❌ **no** — pending MYND-651 |
+| `model.gguf` | quantized Qwen2.5-0.5B-Instruct GGUF (llama.cpp layout) — the tag model | **Git LFS** (`.gitattributes` `*.gguf`) | ✅ yes |
+| `tokenizer.json` | the Qwen2.5 tokenizer | normal git | ✅ yes |
 | `MODEL-LICENSE` | the Apache-2.0 license text for the weights | normal git | ✅ yes |
 
 The engine (`src-tauri/src/plugins/local_inference/engine_candle.rs`, `load_tag`)
-loads `model.gguf` through the **same** `Qwen2::from_gguf` path as the
-side-loaded generation model — same architecture family, so the second model
-costs no new runtime and no new dependency. If `model.gguf` is absent (an
-`--no-default-features` AI-free build, or a checkout whose LFS blob was not
-fetched) `infer_tags` returns `NotReady` and the feature is simply unavailable;
-there is no fallback to the generation model, and nothing panics.
+loads `model.gguf` through the **same** `Qwen2::from_gguf` path
+(`candle_transformers::models::quantized_qwen2`) as the side-loaded generation
+model — same architecture family, so the second model costs no new runtime and
+no new dependency. If `model.gguf` is absent (an `--no-default-features` AI-free
+build, or a checkout whose LFS blob was not fetched) `infer_tags` returns
+`NotReady` and the feature is simply unavailable; there is no fallback to the
+generation model, and nothing panics.
 
 ## Provenance (this model)
 
-- **Source:** [`Qwen/Qwen2.5-0.5B-Instruct`](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct)
-  weights + `tokenizer.json`. **License: Apache-2.0** (see `MODEL-LICENSE`;
-  attribution in the repo-root `LICENSING.md`).
-- **Quantization:** to be recorded here with the checkpoint revision and the
-  `model.gguf` **SHA-256** when the blob lands — the bundle hash a rebuilder
-  reproduces depends on these exact bytes (`threat-model.md` §6), so an
-  unpinned model file is a reproducible-build hole, not a detail.
-
-Until that bullet names a real revision + quantization + digest, the repo-root
-`LICENSING.md` tag-model row and this file both stay marked pending — see the
-status box at the top.
+- **Source:** [`Qwen/Qwen2.5-0.5B-Instruct-GGUF`](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF),
+  file `qwen2.5-0.5b-instruct-q4_k_m.gguf`, revision
+  `9217f5db79a29953eb74d5343926648285ec7e67` — the **first-party GGUF Qwen
+  publishes** for `Qwen2.5-0.5B-Instruct`. `tokenizer.json` is the matching
+  tokenizer from [`Qwen/Qwen2.5-0.5B-Instruct`](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct),
+  revision `7ae557604adf67be50417f59c2c2f167def9a775`. **License: Apache-2.0**
+  (see `MODEL-LICENSE`; attribution in the repo-root `LICENSING.md`).
+- **Quantization:** `Q4_K_M` (llama.cpp k-quant), as published by Qwen — not
+  re-quantized locally.
+- **`model.gguf` SHA-256:**
+  `74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db`
+- **Verified end-to-end** with the env-gated `#[ignore]` real-model test
+  (`infer_tags_with_a_real_model_returns_tag_text`) — it produced a short,
+  multi-item tag list from a sample note.
 
 ## Producing / updating the model
 
-candle's `from_gguf` needs a GGUF that candle's own `tensor-tools` produced — a
-llama.cpp-produced Qwen GGUF may use different tensor naming and fail to load.
+**Use a GGUF in the llama.cpp layout.** `candle_transformers`'
+`quantized_qwen2::ModelWeights::from_gguf` reads the architecture from GGUF
+**metadata** (`qwen2.block_count`, `qwen2.attention.head_count`, …) and expects
+llama.cpp tensor names (`token_embd.weight`, `blk.{i}.attn_q.weight`, …). The
+candle `tensor-tools` `quantize` example does **not** produce a loadable model
+here — it keeps the safetensors tensor names (`model.layers.{i}.…`) and writes
+**no** metadata, so `from_gguf` bails on the first missing key. (An earlier note
+in this file suggested `tensor-tools`; that recipe does not load and has been
+corrected.)
+
+The simplest correct source is the **first-party GGUF Qwen already publishes**:
 
 ```sh
-# 1. Fetch Qwen/Qwen2.5-0.5B-Instruct weights + tokenizer.json (Apache-2.0).
-# 2. Quantize to a candle GGUF. q4_k_m keeps the bundle small; q8_0 is
-#    near-lossless but roughly doubles it — pick against the bundle-size budget
-#    and record which one you used above.
-cargo run --release --example tensor-tools -- \
-    quantize model.safetensors --out-file model.gguf --quantization q4_k_m
-# 3. Keep tokenizer.json next to model.gguf.
-# 4. Verify (below), record the SHA-256, then commit via Git LFS.
-sha256sum model.gguf
+# 1. Fetch the official quantized GGUF (llama.cpp layout + full metadata).
+hf download Qwen/Qwen2.5-0.5B-Instruct-GGUF qwen2.5-0.5b-instruct-q4_k_m.gguf --local-dir .
+mv qwen2.5-0.5b-instruct-q4_k_m.gguf model.gguf
+# 2. Fetch the matching tokenizer, kept next to model.gguf.
+hf download Qwen/Qwen2.5-0.5B-Instruct tokenizer.json --local-dir .
+# 3. Record the SHA-256 + revision under Provenance above, then commit via Git LFS.
+shasum -a 256 model.gguf
 ```
+
+To roll your own instead, convert with **llama.cpp** (`convert_hf_to_gguf.py`,
+then `llama-quantize … Q4_K_M`) — its output is the same llama.cpp layout candle
+loads. Pick the quantization against the bundle-size budget (`Q4_K_M` ≈ 470 MB;
+`Q8_0` is near-lossless and larger) and record which one you used above.
 
 Verify with the env-gated `#[ignore]` test (never runs in CI):
 
