@@ -43,7 +43,7 @@ export interface OverflowMenuOptions {
  * widget DOM (its document `mousedown` listener would otherwise leak).
  */
 export function buildOverflowMenu(
-  actions: ReadonlyArray<OverflowAction>,
+  actions: ReadonlyArray<OverflowAction> | (() => ReadonlyArray<OverflowAction>),
   opts: OverflowMenuOptions,
 ): { wrap: HTMLElement; teardown: () => void } {
   const wrap = document.createElement("span");
@@ -82,7 +82,12 @@ export function buildOverflowMenu(
     menu.setAttribute("role", "menu");
     menu.setAttribute("data-testid", opts.menuTestId);
 
-    for (const action of actions) {
+    // Resolve per-open: a provider fn lets a widget re-read live editor state
+    // (e.g. the transcription facet, MYND-592) each time the menu opens rather
+    // than freezing the row set at widget `toDOM` time — the widget is not
+    // re-created when a compartment reconfigures, so a frozen list goes stale.
+    const items = typeof actions === "function" ? actions() : actions;
+    for (const action of items) {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "cm-attachment-file-card-menuitem";
