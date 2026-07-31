@@ -67,3 +67,5 @@ export type { ParseStreamItem, ParseStreamResult } from "./worker";
 // snapshot preview, the conflict-compare surface and (later) mobile.
 export { lineDiff, diffWithSegments, changedLineCount } from "./diff";
 export type { DiffLine, DiffSegment } from "./diff";
+export { normalizeForDiff, normalizeConflictPair } from "./diffNormalize";
+export type { NormalizedConflictPair } from "./diffNormalize";
