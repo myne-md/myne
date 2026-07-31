@@ -22,11 +22,14 @@ yanked = "deny"
 # Fail on any unmaintained / unsound advisory by default; add specific ignores
 # with rationale + tracking issue if absolutely necessary.
 #
-# All entries below are unmaintained-status advisories on transitive crates
+# The first block below is unmaintained-status advisories on transitive crates
 # pulled in by Tauri 2.10.x (GTK3 bindings, urlpattern → rust-unic, fxhash, etc.).
 # They have no safe upgrade path until Tauri itself migrates off them; revisit
 # when Tauri 3.x lands or when individual crates publish replacements.
 # Tracking: https://github.com/rustsec/advisory-db/issues/2414 (rust-unic)
+#
+# The arti block at the END is a different kind of entry — read its comment
+# before adding anything near it.
 ignore = [
     "RUSTSEC-2024-0370",  # proc-macro-error unmaintained (tauri build chain)
     "RUSTSEC-2024-0411",  # gtk-rs GTK3 bindings unmaintained
@@ -51,6 +54,31 @@ ignore = [
     "RUSTSEC-2026-0194",  # quick-xml DoS (quadratic duplicate-attr scan)
     "RUSTSEC-2026-0195",  # quick-xml DoS (NsReader namespace-alloc); both transitive
                           # via wry/Tauri, no upgrade path. SECURITY: drop on Tauri bump.
+
+    # ── arti / `myne-tor` sidecar (MYND-650) ──────────────────────────
+    # The ONLY *vulnerability*-class entry in this list (everything above is
+    # unmaintained-status), so it carries a reachability argument rather than an
+    # "upstream hasn't moved" one:
+    #
+    #   · The advisory is about RSA **private-key** operations leaking key bits
+    #     through timing that is observable over the network (Marvin). It does
+    #     not apply to public-key verification.
+    #   · `rsa` reaches us only as `ssh-key-fork-arti` → `tor-key-forge` — arti's
+    #     OpenSSH-format keystore *encoding*, which compiles in every key type
+    #     the ssh-key crate supports. arti's keystore holds ed25519/x25519
+    #     material; it neither generates nor operates an RSA private key, and a
+    #     Tor *client* performs no RSA private-key operation for a network peer
+    #     at all. Verify with `cargo tree -p myne-tor-sidecar -e normal -i rsa`.
+    #   · It is confined to the sidecar process: `cargo tree -p myne-desktop -e
+    #     normal -i rsa` matches nothing, so it is absent from the audited
+    #     desktop binary entirely.
+    #
+    # Drop this the moment `rsa` ships the constant-time implementation, or
+    # sooner if arti stops pulling it. If the tree-shape claim above ever stops
+    # holding (an arti bump that puts `rsa` on a live path, or anything that
+    # links the sidecar into `myne-desktop`), this ignore is no longer justified
+    # — re-argue it, don't re-date it.
+    "RUSTSEC-2023-0071",  # rsa: Marvin timing sidechannel; unreachable here (above).
 ]
 
 # ─────────────────────────────────────────────────────────────────────

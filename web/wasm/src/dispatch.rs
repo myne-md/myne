@@ -1544,9 +1544,18 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                     vault_id: myne_core::paths::web_single_vault_id(),
                     can_pin: false,
                 },
-                a.server_url,
-                a.account_number,
-                a.password,
+                myne_core::plugins::sync::enroll::JoinRequest {
+                    server_url: a.server_url,
+                    account_number: a.account_number,
+                    password: a.password,
+                    // `confirmed_fingerprint: None` — not a placeholder either.
+                    // The out-of-band compare (MYND-650 task 5) guards a TOFU
+                    // pin captured over Tor, and this client captures no pin at
+                    // all (`can_pin: false`, above) because a page never sees a
+                    // leaf certificate. Nothing to confirm, so nothing is asked.
+                    // A web user who wants Tor uses Tor Browser (task 12).
+                    confirmed_fingerprint: None,
+                },
             )
             .await
             {

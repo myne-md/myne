@@ -11,6 +11,11 @@
 //  - IntegrityAlertBanner: lit when the engine's head-verify rejects a rollback
 //    / non-extending head (a possible-tamper alert). `run_active_cycle` emits
 //    `sync://integrity-alert` when that happens (MYND-461); this subscribes to it.
+//  - TorStatusBanner: Tor mode is on and the tunnel is either coming up or
+//    down (MYND-650 task 8). The fail-closed half is the load-bearing one —
+//    the transport refuses to connect at all rather than falling back to a
+//    direct connection, so without this strip a paused sync is silent. Absent
+//    the `torRouting` capability the posture is `null` and nothing renders.
 //  - CredentialAmbiguousBanner: the meta phase refused to adopt the server's
 //    `vault.meta` because the password-side wraps differ and no baseline says
 //    which side moved (phase3-web-client task 88). NOT dismissable, unlike the
@@ -23,7 +28,9 @@ import { useTranslation } from "react-i18next";
 import { listen } from "../../platform/event";
 import { ReconcileBanner } from "./ReconcileBanner";
 import { IntegrityAlertBanner } from "./IntegrityAlertBanner";
+import { TorStatusBanner } from "./TorStatusBanner";
 import { useMaterialisationProgress } from "../../hooks/useMaterialisationProgress";
+import { useTorState } from "../../hooks/useTorState";
 
 const STACK_STYLE: CSSProperties = {
   display: "flex",
@@ -42,6 +49,10 @@ export function SyncBanners() {
   // the measured cost spans 6× across engines at the same note count, so an ETA
   // would be wrong by that factor on whichever browser the user is running.
   const materialising = useMaterialisationProgress();
+  // MYND-650 task 8. `null` on web (no `torRouting` capability) and on every
+  // desktop install until the first read resolves; only `connecting` and
+  // `unavailable` render anything.
+  const { posture: torPosture } = useTorState();
 
   // Event-driven producers (MYND-461). A reconcile occurred → show the reassuring
   // banner, re-armed, until the user dismisses it. A head-verify rejection → the
@@ -76,10 +87,16 @@ export function SyncBanners() {
 
   const showReconcile = reconcileActive && !reconcileDismissed;
   const showMaterialising = materialising !== null && materialising.active;
-  if (!showReconcile && !integrity && !credentialAmbiguous && !showMaterialising) return null;
+  const showTor = torPosture === "connecting" || torPosture === "unavailable";
+  if (!showReconcile && !integrity && !credentialAmbiguous && !showMaterialising && !showTor) {
+    return null;
+  }
 
   return (
     <div style={STACK_STYLE}>
+      {/* First in the stack: it is the only banner here that means nothing is
+          leaving the device at all. */}
+      <TorStatusBanner posture={torPosture} />
       <ReconcileBanner
         active={showReconcile}
         onDismiss={() => setReconcileDismissed(true)}

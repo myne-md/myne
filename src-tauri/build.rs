@@ -427,6 +427,15 @@ fn main() {
                 "sync_restore_quarantine",
                 "sync_delete_quarantine",
                 "sync_device_join_qr",
+                // MYND-650 task 6: the device-local Tor-routing toggle. Joins
+                // this plugin rather than opening one of its own precisely so
+                // no new capability entry is needed — the surface is the same
+                // device-local network posture the endpoint pair configures.
+                "sync_get_tor_routing",
+                "sync_set_tor_routing",
+                // MYND-650 task 8: the live posture read behind the connection
+                // states. Same plugin for the same reason.
+                "sync_get_tor_state",
             ]),
         )
         .plugin(

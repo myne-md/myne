@@ -2549,6 +2549,28 @@
       "recommendedFilesTranscription": "Needs the Whisper .gguf file + config.json + tokenizer.json in the same folder.",
       "title": "AI"
     },
+    "network": {
+      "disabledCue": "Sync is no longer routed through Tor. New connections go straight to the sync server.",
+      "errorRead": "Couldn't read the current setting. Flip the switch to set it again.",
+      "errorSave": "Couldn't save the setting. Nothing changed.",
+      "errorSidecar": "Tor routing is on, but the Tor client couldn't start. Sync is paused until it can — nothing is being sent directly.",
+      "postureActive": "Sync is going through Tor",
+      "postureConnecting": "Connecting to Tor — sync is paused",
+      "postureConnectingDetail": "This usually takes a few seconds. Nothing is being sent directly in the meantime.",
+      "postureExempt": "Sync isn't using Tor — this address points at this device",
+      "postureExemptDetail": "The sync server address you've configured names this computer, so Myne's connection to it doesn't go through a Tor circuit. If that address forwards on to a server somewhere else, Myne can't see that and can't route it. Sync is not paused.",
+      "postureHeading": "Right now",
+      "postureInactive": "Sync goes straight to the sync server",
+      "postureUnavailable": "Tor is unavailable — sync is paused",
+      "postureUnavailableDetail": "Nothing is being sent directly. Turn this setting off and on again to try starting the Tor client, or turn it off to sync without Tor.",
+      "residualExit": "The last relay in a Tor circuit — the exit node — sees which sync server you connect to. It can't read what you sync; that stays encrypted end to end.",
+      "residualMetadata": "The sync server still sees when you sync, how many blobs you push and how large they are, and how many devices you have. Tor doesn't change that.",
+      "residualPayment": "If you pay for hosted sync, the payment and your account can still be linked to you. Tor changes where the connection comes from, not the billing trail.",
+      "residualScope": "Only Myne's own sync traffic goes through Tor. Nothing else on this device does.",
+      "residualsToggle": "What this doesn't hide",
+      "torHelper": "Hides your IP address and location from the sync server, and hides which server you sync with from your network and your internet provider — they can still see this device connecting to Tor. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
+      "torLabel": "Route sync through Tor"
+    },
     "prefs": {
       "saveError": "Couldn't save preference — try again"
     },
@@ -2639,6 +2661,7 @@
         "files": "Files",
         "transcription": "Transcription",
         "hotkeys": "Hotkeys",
+        "network": "Network",
         "privacy": "Privacy",
         "storage": "Storage",
         "sync": "Sync"
@@ -2785,6 +2808,7 @@
         "vimMode": "vim modal editing normal insert visual keyboard",
         "lineSpacing": "line spacing leading height typography readability",
         "newNoteLocation": "new note location folder default where notes created",
+        "torRouting": "tor routing onion proxy network ip address location hide sync anonymity",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
         "reminders": "reminders notify notification alert task due remind",
         "screenCapture": "screen capture protection screenshot recording block privacy",
@@ -2918,6 +2942,9 @@
       "connectedPlatformTrust": "Connected over TLS. Your browser verified this server’s certificate.",
       "connecting": "Connecting…",
       "fingerprintLabel": "Server certificate fingerprint:",
+      "confirmFingerprintRequired": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server\u2019s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
+      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. Nothing was saved. Check the fingerprint you pasted \u2014 and if it is right, do not connect: something is between this device and your server.",
+      "confirmFingerprintDeclined": "Nothing was saved \u2014 this device is not connected to that server. Come back once you have its certificate fingerprint.",
       "pinStatic": "Verified against Myne’s built-in certificate.",
       "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
       "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here — the page is only allowed to talk to this one address.",
@@ -2948,6 +2975,22 @@
       "submit": "Add this device",
       "wordAria": "Word {{number}}"
     },
+    "fingerprint": {
+      "title": "Check this server’s certificate before trusting it",
+      "why": "Tor routing is on, so this first connection reaches the server through a relay run by a stranger. Until a certificate is pinned, this device would accept whatever certificate it is handed — including one that relay made up. Enter the fingerprint your server publishes and Myne compares it before pinning anything. If it does not match, nothing is saved.",
+      "label": "Expected certificate fingerprint",
+      "placeholder": "SHA-256 fingerprint from your server",
+      "echoLabel": "What you entered",
+      "echoComplete": "64 of 64 characters. Read it against your own copy before continuing.",
+      "echoProgress": "{{count}} of {{total}} characters so far.",
+      "echoInvalid": "A SHA-256 fingerprint is 64 characters, each one 0–9 or a–f. Colons, spaces and a leading “sha256:” are fine — anything else is not part of it.",
+      "helpToggle": "Where do I find this fingerprint?",
+      "helpNotOverTor": "Not through this connection. A fingerprint you fetch over the same circuit proves nothing — whatever could swap the certificate could swap that page too.",
+      "helpFromServer": "On the machine running your server: openssl x509 -noout -fingerprint -sha256 -in <your certificate file>",
+      "helpFromDevice": "On a device already connected to this account: Settings → Sync shows the same fingerprint.",
+      "helpNoFingerprint": "If you cannot get it any of those ways, this server cannot be added while Tor routing is on. You can turn Tor routing off in Settings → Network and connect directly — that shows your IP address to the server and to whoever can watch your network.",
+      "decline": "I don’t have it — cancel"
+    },
     "join": {
       "accountLabel": "Account number",
       "cancel": "Cancel",
@@ -2956,6 +2999,8 @@
       "help": "Sign in with your account number and password. This device will sync your notes once an existing device approves it. No recovery phrase needed.",
       "passwordLabel": "Password",
       "pinnedCompare": "This device pinned your server’s certificate. Check that this fingerprint matches on your other devices.",
+      "confirmFingerprintRequired": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server’s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
+      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. This device was not added and nothing was saved. Check the fingerprint you pasted — and if it is right, do not continue: something is between this device and your server.",
       "pinnedTitle": "Server certificate pinned",
       "serverLabel": "Sync server",
       "serverPlaceholder": "https://your-server.example",
@@ -3077,6 +3122,11 @@
       "conflictsNeedReview_other": "{{count}} conflicts need review",
       "catchingUp": "Catching up on sync — your notes are safe.",
       "verifyDevices": "Verify devices"
+    },
+    "tor": {
+      "connecting": "Connecting to Tor. Sync is paused until the connection is ready — nothing is being sent directly.",
+      "settingsHint": "Settings → Network",
+      "unavailable": "Tor is unavailable, so sync is paused. Nothing is being sent directly. Turn off Tor routing to sync without it."
     }
   },
   "tasks": {

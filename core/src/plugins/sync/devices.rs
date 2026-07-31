@@ -316,8 +316,38 @@ pub enum SyncDeviceError {
     /// pinned to one constant id, i.e. the web client — a desktop mints a fresh
     /// id per join and never collides.
     AccountMismatch,
+    /// Tor routing is on and the join carried no expected certificate
+    /// fingerprint (MYND-650 task 5).
+    ///
+    /// Its own variant for the same reason `AccountMismatch` is: the remedy is
+    /// different in kind. Nothing the user retypes about their account fixes
+    /// it — they have to fetch the fingerprint their server publishes and
+    /// supply it. **Nothing was written**: no endpoint, no pin, no vault.
+    PinConfirmationRequired,
+    /// The certificate served does not match the fingerprint the user
+    /// confirmed (MYND-650 task 5) — a typo, or a man in the middle, and from
+    /// here those are indistinguishable. The join aborts with nothing stored,
+    /// and the captured fingerprint is deliberately not reported
+    /// (`super::pin_confirm`'s module doc).
+    FingerprintMismatch,
     /// Internal (task join, IO).
     Internal,
+}
+
+/// The fingerprint gate's refusals, projected onto this command's enum
+/// (MYND-650 task 5) — the twin of [`super::config::SyncConfigError`]'s impl.
+/// See it for why this is a `From` rather than a `match` at the call site, and
+/// why both are host-only.
+#[cfg(not(target_arch = "wasm32"))]
+impl From<super::pin_confirm::PinConfirmError> for SyncDeviceError {
+    fn from(e: super::pin_confirm::PinConfirmError) -> Self {
+        use super::pin_confirm::PinConfirmError as P;
+        match e {
+            P::ConfirmationRequired => SyncDeviceError::PinConfirmationRequired,
+            P::FingerprintMismatch => SyncDeviceError::FingerprintMismatch,
+            P::Transport => SyncDeviceError::Transport,
+        }
+    }
 }
 
 impl SyncDeviceError {
