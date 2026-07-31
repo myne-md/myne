@@ -76,8 +76,8 @@ mod plugin {
                 let engine: Arc<dyn engine::Engine> = Arc::new(engine::StubEngine);
                 #[cfg(not(feature = "local-inference-stub"))]
                 let engine: Arc<dyn engine::Engine> = {
-                    let base = crate::paths::app_data_dir(app)
-                        .unwrap_or_else(|_| PathBuf::from("."));
+                    let base =
+                        crate::paths::app_data_dir(app).unwrap_or_else(|_| PathBuf::from("."));
                     let bundled_transcription = app
                         .path()
                         .resource_dir()

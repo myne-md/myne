@@ -124,19 +124,36 @@ impl CandleEngine {
         tracing::info!(target: "myne::ai", stage = "load_transcription", "loading transcription model (first use)…");
         let config_path = Self::sibling(&model_path, "config.json");
         let tok_path = Self::sibling(&model_path, "tokenizer.json");
-        let config_json = std::fs::read_to_string(&config_path)
-            .map_err(|e| io_stage_fail("load_transcription.read_config", &e, EngineError::NotReady))?;
+        let config_json = std::fs::read_to_string(&config_path).map_err(|e| {
+            io_stage_fail("load_transcription.read_config", &e, EngineError::NotReady)
+        })?;
         let config: WhisperConfig = serde_json::from_str(&config_json).map_err(|e| {
-            fmt_stage_fail("load_transcription.parse_config", e, EngineError::TranscriptionFailed)
+            fmt_stage_fail(
+                "load_transcription.parse_config",
+                e,
+                EngineError::TranscriptionFailed,
+            )
         })?;
         let vb = WhisperVarBuilder::from_gguf(&model_path, &self.device).map_err(|e| {
-            fmt_stage_fail("load_transcription.from_gguf", e, EngineError::TranscriptionFailed)
+            fmt_stage_fail(
+                "load_transcription.from_gguf",
+                e,
+                EngineError::TranscriptionFailed,
+            )
         })?;
         let model = Whisper::load(&vb, config.clone()).map_err(|e| {
-            fmt_stage_fail("load_transcription.build_model", e, EngineError::TranscriptionFailed)
+            fmt_stage_fail(
+                "load_transcription.build_model",
+                e,
+                EngineError::TranscriptionFailed,
+            )
         })?;
         let tokenizer = Tokenizer::from_file(&tok_path).map_err(|e| {
-            fmt_stage_fail("load_transcription.tokenizer", e, EngineError::TranscriptionFailed)
+            fmt_stage_fail(
+                "load_transcription.tokenizer",
+                e,
+                EngineError::TranscriptionFailed,
+            )
         })?;
         let tokens = WhisperTokens::resolve(&tokenizer)?;
         let mel_filters = whisper::mel_filters(config.num_mel_bins);
@@ -270,7 +287,10 @@ mod tests {
         // side-load-only rather than panicking (the model-less baseline).
         let tmp = ScopedTempDir::new("candle-tx-notready").expect("tempdir");
         let engine = CandleEngine::new(tmp.path().to_path_buf());
-        assert_eq!(engine.transcribe(&[0.0f32; 16_000]), Err(EngineError::NotReady));
+        assert_eq!(
+            engine.transcribe(&[0.0f32; 16_000]),
+            Err(EngineError::NotReady)
+        );
     }
 
     // Ported verbatim from desktop (MYND-563 task 3/5 AC): a real Whisper GGUF
@@ -316,10 +336,17 @@ mod tests {
 
         assert!(!full.trim().is_empty(), "expected non-empty transcript");
         assert!(!pieces.is_empty(), "expected at least one streamed segment");
-        assert_eq!(pieces.concat(), full, "streamed segments reconstruct the full transcript");
+        assert_eq!(
+            pieces.concat(),
+            full,
+            "streamed segments reconstruct the full transcript"
+        );
 
         let blocking = engine.transcribe(&pcm).expect("blocking transcribe");
-        assert_eq!(blocking, full, "blocking and streaming transcripts must agree");
+        assert_eq!(
+            blocking, full,
+            "blocking and streaming transcripts must agree"
+        );
 
         if let Ok(expect) = std::env::var("MYNE_TEST_TRANSCRIPTION_EXPECT") {
             assert!(
