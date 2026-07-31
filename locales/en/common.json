@@ -1014,6 +1014,11 @@
       "reorderColumn": "Reorder column",
       "reorderRow": "Reorder row"
     },
+    "tagSuggestion": {
+      "label": "Suggested tags",
+      "accept": "Add the tag {{tag}} to this note",
+      "dismiss": "Dismiss the suggested tag {{tag}}"
+    },
     "taskField": {
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",

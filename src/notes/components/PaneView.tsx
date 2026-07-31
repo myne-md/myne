@@ -60,6 +60,9 @@ import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
 import { TasksPane } from "./TasksPane";
 import { useTaskQueryResults } from "../useTaskQueryResults";
+import { useTagSuggestions } from "../useTagSuggestions";
+import { acceptTagIntoView } from "../ai/acceptTagIntoView";
+import * as capabilities from "../../platform/capabilities";
 import { toggleTaskSwallowingRefusal } from "../toggleTask";
 import type { TaskQueryRowEventDetail } from "@myne/editor/decorations/task-query-block";
 import { resolveCoverAttachmentId } from "../views/cardsView";
@@ -222,14 +225,18 @@ export function PaneView({
   // `aiEnabled` prop, which reconfigures the live AI compartment — so toggling
   // the pref, excluding the folder, or switching notes takes effect immediately
   // (no remount / reopen needed).
+  // The open note's canonical folder (`""` = vault root, and also the value for
+  // "no note open"). Both AI gates below are folder-scoped (SYNC-14), so it is
+  // resolved once rather than twice.
+  const activeNoteFolder = useMemo(
+    () =>
+      activeId !== null ? (notes.find((n) => n.noteUuid === activeId)?.folder ?? "") : "",
+    [activeId, notes],
+  );
   const aiSlashEnabled = useMemo(() => {
     if (prefs.ai_enabled !== true) return false;
-    const folder =
-      activeId !== null
-        ? (notes.find((n) => n.noteUuid === activeId)?.folder ?? "")
-        : "";
-    return !isNoteAiExcluded(folder, prefs.ai_excluded_folders);
-  }, [prefs.ai_enabled, prefs.ai_excluded_folders, activeId, notes]);
+    return !isNoteAiExcluded(activeNoteFolder, prefs.ai_excluded_folders);
+  }, [prefs.ai_enabled, prefs.ai_excluded_folders, activeNoteFolder]);
   // MYND-305: the vault-wide heading set the `[[##` autocomplete searches (built
   // lazily by reading note bodies; rebuilt on the index nonce). Empty until the
   // first async build settles — `[[##` simply finds nothing until then.
@@ -486,6 +493,39 @@ export function PaneView({
       if (task !== undefined) ws.openInFocused(task.noteId);
     },
     [resolveTaskRow, ws],
+  );
+
+  // MYND-651: the inline tag-suggestion band for this pane's note. Gated on BOTH
+  // AI switches and on the host actually having local AI — the Rust side refuses
+  // regardless (task 4), but an off feature should not be arming idle timers or
+  // building prompts that carry note text.
+  const { suggestions: tagSuggestions, dismiss: dismissTagSuggestion } = useTagSuggestions({
+    noteId: activeId,
+    body: content,
+    folder: activeNoteFolder,
+    enabled:
+      capabilities.has("localAi") &&
+      prefs.ai_enabled === true &&
+      prefs.auto_tag_enabled === true,
+    excludedFolders: prefs.ai_excluded_folders,
+  });
+
+  // A chip click → the ONE accept path (task 6). `false` means nothing was
+  // written — the note already carries the tag, or its frontmatter is a shape
+  // the writer refuses to touch — and in both cases the user's intent is already
+  // satisfied or unreachable, so the chip goes away either way and no error is
+  // surfaced.
+  const handleAcceptTagSuggestion = useCallback(
+    (detail: { tag: string }) => {
+      if (editorView !== null) acceptTagIntoView(editorView, detail.tag);
+      dismissTagSuggestion(detail.tag);
+    },
+    [editorView, dismissTagSuggestion],
+  );
+
+  const handleDismissTagSuggestion = useCallback(
+    (detail: { tag: string }) => dismissTagSuggestion(detail.tag),
+    [dismissTagSuggestion],
   );
 
   // Load / restore the active note's body on change (MYND-534). Persistent-view
@@ -971,6 +1011,15 @@ export function PaneView({
             taskQueryResults={taskQueryResults}
             onTaskQueryToggle={handleTaskQueryToggle}
             onTaskQueryOpen={handleTaskQueryOpen}
+            // MYND-651: the inline tag-suggestion band. Empty (the default, and
+            // the state of every note while auto-tag is off) renders no band at
+            // all, so an idle note is not shifted by a strip of chrome. Only the
+            // editable primary editor gets it — the reading companion below is
+            // a mirror, and a second band offering the same accept would write
+            // through this same document twice.
+            tagSuggestions={tagSuggestions}
+            onAcceptTagSuggestion={handleAcceptTagSuggestion}
+            onDismissTagSuggestion={handleDismissTagSuggestion}
             scrollAnchor={activeScrollAnchor}
             // outline-scroll-tracking: hand the live view to the pane so it can
             // watch the scroller and report the top heading to the Outline tab.
