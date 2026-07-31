@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest an idea or enhancement for the desktop client, web client, or protocol.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Myne has hard commitments it won't walk back — no email recovery, no plaintext mode, no persistent per-IP logging, and UX/marketing may never exceed the threat model. Please skim [`docs/vision.md`](https://github.com/myne-md/myne/blob/main/docs/vision.md) (anti-features) and [`docs/threat-model.md`](https://github.com/myne-md/myne/blob/main/docs/threat-model.md) before proposing anything security-adjacent.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What are you trying to do that Myne makes hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area?
+      options:
+        - Desktop client
+        - Web client
+        - Editor / markdown
+        - Sync
+        - Protocol / on-disk format
+        - Other
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: This doesn't conflict with Myne's anti-features (docs/vision.md) or exceed the threat model (docs/threat-model.md).
+          required: true
