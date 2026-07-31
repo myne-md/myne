@@ -136,6 +136,15 @@ function SectionLabel({ children, mt = 18 }: { children: ReactNode; mt?: number 
   );
 }
 
+/** The Appearance/Editor panel card — a labelled block that owns its own padding,
+ *  as opposed to `Group`, which is the flush-edged container for `Row` lists. */
+const CARD_STYLE: CSSProperties = {
+  padding: "12px 14px",
+  border: "1px solid var(--line-1)",
+  borderRadius: 10,
+  background: "var(--bg-1)",
+};
+
 function Group({ children }: { children: ReactNode }) {
   return (
     <div style={{ border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>
@@ -262,7 +271,7 @@ function SegmentBlock<T extends string | number>({
 }) {
   const active = Math.max(0, options.indexOf(value));
   return (
-    <div style={{ padding: "12px 14px", border: "1px solid var(--line-1)", borderRadius: 10, background: "var(--bg-1)" }}>
+    <div style={CARD_STYLE}>
       <div style={{ fontSize: 16, marginBottom: 10, color: "var(--fg-1)" }}>{label}</div>
       <Segmented options={labels} active={active} onChange={(i) => onPick(options[i])} />
     </div>
@@ -283,7 +292,7 @@ function LanguageBlock() {
   const active = i18n.resolvedLanguage ?? i18n.language;
   const value = SUPPORTED_CODES.includes(active) ? active : "en";
   return (
-    <div style={{ padding: "12px 14px", border: "1px solid var(--line-1)", borderRadius: 10, background: "var(--bg-1)" }}>
+    <div style={CARD_STYLE}>
       <div style={{ fontSize: 16, marginBottom: 10, color: "var(--fg-1)" }}>{t("settings.language.label")}</div>
       <select
         value={value}
@@ -312,6 +321,84 @@ function LanguageBlock() {
         ))}
       </select>
       <div style={{ marginTop: 8, fontSize: 12, color: "var(--fg-3)", lineHeight: 1.4 }}>{t("settings.language.helper")}</div>
+    </div>
+  );
+}
+
+/** Settings → Appearance → Custom themes (MYND-598). Read-only: palettes are
+ *  vault content authored on a computer, so a row is an apply control and
+ *  nothing more — there is no import/export/delete affordance to render.
+ *
+ *  Rendered ALWAYS, including with an empty list. The helper line is the only
+ *  place in the product that states the read-only scope to the user, and hiding
+ *  the block on an empty list would turn "you have installed none" into "sync
+ *  looks broken". */
+function CustomThemesBlock({
+  entries,
+  selected,
+  onPick,
+}: {
+  entries: readonly CustomThemeEntry[];
+  selected: string | null | undefined;
+  onPick: (entry: CustomThemeEntry) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div data-testid="settings.custom-themes" style={CARD_STYLE}>
+      <div style={rowLabel}>{t("settings.customThemes.label")}</div>
+      <div style={{ marginTop: 6, fontSize: 12, color: "var(--fg-3)", lineHeight: 1.4 }}>
+        {t("settings.customThemes.readOnlyHelper")}
+      </div>
+      {entries.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+          {entries.map((entry) => {
+            const on = selected === entry.name;
+            return (
+              <div
+                key={entry.name}
+                data-testid="settings.custom-theme-row"
+                data-theme-name={entry.name}
+                data-selected={on ? "true" : "false"}
+                // The row IS the apply control — a tap applies the theme,
+                // matching every other tappable row in this sheet (plain div +
+                // onClick), so the block still carries no button.
+                onClick={() => onPick(entry)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  minHeight: 44,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  background: on ? "var(--accent-soft)" : "var(--bg-2)",
+                  border: on ? "1px solid var(--accent)" : "1px solid var(--line-1)",
+                }}
+              >
+                <ThemeChiplet palette={entry.palette} testId="settings.custom-theme-swatch" />
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 15,
+                    color: "var(--fg-1)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {entry.name}
+                </span>
+                {on && (
+                  <span style={{ flex: "none", fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
+                    {t("settings.customThemes.appliedBadge")}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -773,16 +860,24 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   // ── Custom themes (read-only consumer of vault.themes, MYND-598) ───────────
   // Palettes are VAULT CONTENT that sync already delivers here; the phone lists
   // and applies them but never authors one, so there is no import/export/delete
-  // affordance to build. Read ONCE when the Appearance panel opens — deliberately
-  // NOT live-refreshed from the sync-changed event this app already listens to:
-  // the panel is a seconds-long visit, and re-reading mid-visit would let rows
-  // shift (or the selected row vanish) under the user's finger for no benefit.
+  // affordance to build. Read ONCE per sheet, the first time the Appearance
+  // panel opens — deliberately NOT live-refreshed from the sync-changed event
+  // this app already listens to: the panel is a seconds-long visit, and
+  // re-reading mid-visit would let rows shift (or the selected row vanish) under
+  // the user's finger for no benefit. The `loaded` latch is what makes drilling
+  // back into Appearance a second time free rather than another whole
+  // `vault.themes` decrypt; closing the sheet unmounts it, so a later visit is
+  // still fresh.
   const [customThemes, setCustomThemes] = useState<CustomThemeEntry[]>([]);
+  const themesLoaded = useRef(false);
   useEffect(() => {
-    if (panel !== "appearance" || !HAS_TAURI) return;
+    if (panel !== "appearance" || !HAS_TAURI || themesLoaded.current) return;
+    themesLoaded.current = true;
     let cancelled = false;
+    let settled = false;
     void listCustomThemes()
       .then((entries) => {
+        settled = true;
         if (cancelled) return;
         // The host hands these back in `BTreeMap` order — UTF-8 byte order, which
         // sorts "Şafak" after "Zed". Theme names are user-authored, so collate in
@@ -795,10 +890,14 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
       // here is a locked slot — which this panel cannot be open under. Render the
       // block empty rather than an error the user has no action to take about.
       .catch(() => {
+        settled = true;
         if (!cancelled) setCustomThemes([]);
       });
     return () => {
       cancelled = true;
+      // Left the panel before the read landed: unlatch, so coming back retries
+      // rather than showing an empty block for the rest of the sheet's life.
+      if (!settled) themesLoaded.current = false;
     };
   }, [panel]);
 
@@ -910,12 +1009,35 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     }
   }, [panel]);
 
-  function pickTheme(next: ThemeChoice) {
+  /**
+   * Apply a built-in appearance.
+   *
+   * A custom theme OVERRIDES the built-in choice, so picking a built-in one has
+   * to revert the palette as well — otherwise this tap would appear to do
+   * nothing, the custom vars still winning on every token they define.
+   *
+   * That revert is a VAULT write, so it goes disk-first, the same ordering
+   * `pickCustomTheme` uses and for the same reason: what is on screen must
+   * never contradict what `vault.prefs` names, or the next unlock paints back a
+   * theme the user just turned off. A failed clear therefore changes nothing
+   * and says so, rather than leaving the screen and the disk disagreeing.
+   *
+   * Only when there IS a selection to clear: an unconditional write would touch
+   * vault.prefs on every theme tap for no change at all — and, since nothing is
+   * awaited in that case, the common tap stays synchronous.
+   */
+  async function pickTheme(next: ThemeChoice) {
+    if (HAS_TAURI && eff.custom_theme != null) {
+      try {
+        await setCustomTheme(null);
+      } catch {
+        setToast(t("settings.saveSettingError"));
+        return;
+      }
+      bumpPrefsNonce();
+    }
     setChoice(next);
     applyThemeChoice(next);
-    // A custom theme OVERRIDES the built-in choice, so picking a built-in one
-    // has to revert the palette as well — otherwise this tap would appear to do
-    // nothing, the custom vars still winning on every token they define.
     clearCustomTheme();
     setDraft((d) => ({ ...d, custom_theme: null }));
     if (typeof localStorage !== "undefined") localStorage.setItem(THEME_STORAGE_KEY, next);
@@ -924,16 +1046,6 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     // the custom selection deliberately never joins it (see `pickCustomTheme`).
     if (HAS_TAURI) {
       void persistTheme(next === "system" ? null : (next as "light" | "dark" | "amoled")).catch(() => {});
-      // Only when there is a selection to clear: an unconditional write would
-      // touch vault.prefs on every theme tap for no change at all.
-      if (eff.custom_theme != null) {
-        void setCustomTheme(null)
-          .then(() => bumpPrefsNonce())
-          // A failed clear is worth surfacing: the screen is already on the
-          // built-in theme, but disk still names a custom one, so the next
-          // unlock would paint the palette back over it.
-          .catch(() => setToast(t("settings.saveSettingError")));
-      }
     }
   }
 
@@ -955,20 +1067,19 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
    * device is precisely what `docs/decisions.md` 2026-07-31 rules out.
    */
   async function pickCustomTheme(entry: CustomThemeEntry) {
-    if (!HAS_TAURI) {
-      // Browser-dev has no host to persist to; keep the preview interactive.
-      setDraft((d) => ({ ...d, custom_theme: entry.name }));
-      applyCustomTheme(entry.palette);
-      return;
-    }
-    try {
-      await setCustomTheme(entry.name);
-      applyCustomTheme(entry.palette);
-      setDraft((d) => ({ ...d, custom_theme: entry.name }));
+    // Browser-dev has no host to persist to; it falls straight through to the
+    // paint so the preview stays interactive.
+    if (HAS_TAURI) {
+      try {
+        await setCustomTheme(entry.name);
+      } catch {
+        setToast(t("settings.customThemes.applyError"));
+        return;
+      }
       bumpPrefsNonce();
-    } catch {
-      setToast(t("settings.customThemes.applyError"));
     }
+    applyCustomTheme(entry.palette);
+    setDraft((d) => ({ ...d, custom_theme: entry.name }));
   }
 
   // Header back button: pop one level up the drawer stack (detail → category →
@@ -1303,7 +1414,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                   return (
                     <div
                       key={c.key}
-                      onClick={() => pickTheme(c.key)}
+                      onClick={() => void pickTheme(c.key)}
                       style={{
                         flex: 1,
                         textAlign: "center",
@@ -1323,69 +1434,11 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 })}
               </div>
             </div>
-            {/* Custom themes — always rendered, including when empty. The helper
-                line is the ONLY place in the product that states the read-only
-                scope to the user, and hiding the block on an empty list would
-                turn "you have installed none" into "sync looks broken". */}
-            <div
-              data-testid="settings.custom-themes"
-              style={{ padding: "12px 14px", border: "1px solid var(--line-1)", borderRadius: 10, background: "var(--bg-1)" }}
-            >
-              <div style={{ fontSize: 16, color: "var(--fg-1)" }}>{t("settings.customThemes.label")}</div>
-              <div style={{ marginTop: 6, fontSize: 12, color: "var(--fg-3)", lineHeight: 1.4 }}>
-                {t("settings.customThemes.readOnlyHelper")}
-              </div>
-              {customThemes.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
-                  {customThemes.map((entry) => {
-                    const on = eff.custom_theme === entry.name;
-                    return (
-                      <div
-                        key={entry.name}
-                        data-testid="settings.custom-theme-row"
-                        data-theme-name={entry.name}
-                        data-selected={on ? "true" : "false"}
-                        // The row IS the apply control — a tap applies the theme,
-                        // matching every other tappable row in this sheet (plain
-                        // div + onClick), so the block still carries no button.
-                        onClick={() => void pickCustomTheme(entry)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          minHeight: 44,
-                          padding: "8px 10px",
-                          borderRadius: 8,
-                          cursor: "pointer",
-                          background: on ? "var(--accent-soft)" : "var(--bg-2)",
-                          border: on ? "1px solid var(--accent)" : "1px solid var(--line-1)",
-                        }}
-                      >
-                        <ThemeChiplet palette={entry.palette} testId="settings.custom-theme-swatch" />
-                        <span
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            fontSize: 15,
-                            color: "var(--fg-1)",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {entry.name}
-                        </span>
-                        {on && (
-                          <span style={{ flex: "none", fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
-                            {t("settings.customThemes.appliedBadge")}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <CustomThemesBlock
+              entries={customThemes}
+              selected={eff.custom_theme}
+              onPick={(entry) => void pickCustomTheme(entry)}
+            />
             <LanguageBlock />
             <SegmentBlock
               label={t("settings.typography.textSizeLabel")}

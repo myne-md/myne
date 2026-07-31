@@ -25,10 +25,25 @@
 
 import { deriveSyntaxTokensForTheme } from "@myne/syntax-theme";
 
-import type { CustomThemeEntry, ThemePalette } from "./themes";
+import { HAS_TAURI } from "./app-window";
+import { prefsRead } from "./prefs";
+import { listCustomThemes, type CustomThemeEntry, type ThemePalette } from "./themes";
 
 /** The CSS custom-property keys most recently written by `applyCustomTheme`. */
 let appliedCustomKeys: string[] = [];
+
+/**
+ * How long the unlock path waits for the two vault reads before giving up and
+ * letting the editor render under the built-in appearance.
+ *
+ * This is a deadline on the STAGE TRANSITION, not on the reads: an `invoke`
+ * that never settles has no error and no timeout of its own, and the caller
+ * awaits this before dispatching, so without a bound the user is left on the
+ * unlock screen after a successful unlock with no way forward. Generous
+ * relative to two in-process decrypts of already-open blobs — this is the
+ * hung-host case, not the slow-host one.
+ */
+const PAINT_DEADLINE_MS = 2_000;
 
 /**
  * Paint a custom-theme palette onto `:root` via the CSSOM, replacing whatever
@@ -116,4 +131,63 @@ export function resolveCustomPalette(
 ): ThemePalette | null {
   if (!selection) return null;
   return entries.find((e) => e.name === selection)?.palette ?? null;
+}
+
+/**
+ * Paint the vault's selected custom theme, on every route into the editor
+ * (MYND-598; `AppShell.enterStage` is the single caller).
+ *
+ * Both halves of the answer are vault content — the selection lives in the
+ * encrypted `vault.prefs` blob and the palette in `vault.themes` — so neither
+ * can be read a moment earlier than this, and neither is ever cached in
+ * plaintext device storage to make it possible (`docs/decisions.md` 2026-07-31).
+ * Reading here rather than at editor mount is what shrinks the window in which
+ * the wrong appearance is on screen; it does not close it, and closing it is
+ * exactly what the no-plaintext-cache rule declines to buy.
+ *
+ * The two reads are SEQUENTIAL rather than concurrent, which costs one IPC
+ * round-trip for the users who have a custom theme and saves a whole
+ * `vault.themes` decrypt — every palette in the store — for the ones who do
+ * not. That trade got better once this moved onto every editor entry rather
+ * than the unlock route alone: the common case now runs five times as often.
+ *
+ * The caller awaits this before dispatching the editor stage, so the editor
+ * never renders a frame under the built-in appearance. Failure is silent by
+ * design: a cosmetic palette is not load-bearing, the host already collapses
+ * every recoverable `vault.themes` read failure to an empty store (protocol.md
+ * §9.21.4), and a toast at unlock about a colour scheme would be noise. The
+ * built-in choice is applied at editor mount as it always has been, which is the
+ * same fall-back a selection naming a since-deleted theme lands on — and the
+ * preference is deliberately NOT rewritten in that case (see
+ * {@link resolveCustomPalette}, where the revival property is spelled out).
+ *
+ * Never rejects and never hangs — the caller's stage transition must not be
+ * held up by either failure mode, so a rejection is swallowed and a read that
+ * does not settle within {@link PAINT_DEADLINE_MS} is abandoned. Both land on
+ * the same fall-back: the built-in appearance.
+ */
+export async function paintSelectedCustomTheme(): Promise<void> {
+  if (!HAS_TAURI) return;
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const reads = (async () => {
+      const prefs = await prefsRead();
+      if (!prefs.custom_theme) return null;
+      return resolveCustomPalette(prefs.custom_theme, await listCustomThemes());
+    })();
+    // `Promise.race` attaches a handler to `reads` either way, so a rejection
+    // arriving after the deadline won is handled rather than unhandled. The
+    // deadline covers BOTH reads — it bounds the stage transition, not a call.
+    const palette = await Promise.race([
+      reads,
+      new Promise<null>((resolve) => {
+        deadline = setTimeout(() => resolve(null), PAINT_DEADLINE_MS);
+      }),
+    ]);
+    if (palette) applyCustomTheme(palette);
+  } catch {
+    /* fall back to the built-in appearance, silently */
+  } finally {
+    if (deadline !== undefined) clearTimeout(deadline);
+  }
 }

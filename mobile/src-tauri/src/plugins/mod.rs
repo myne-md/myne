@@ -49,8 +49,7 @@ pub mod snapshots;
 pub mod sync;
 // Custom themes (MYT1, §9.21): a thin re-export wrapper over
 // `myne_core::plugins::themes` exposing ONE of desktop's five commands —
-// `themes_list`. Mobile reads the palettes sync already delivers and never
-// authors them; see `themes/mod.rs` for why `themes_read` is out too.
+// `themes_list`. See `themes/mod.rs` for why the other four are out.
 pub mod themes;
 pub mod vault_change_password;
 // `vault_creation` core (commands + state + error + `init()`) lives entirely in

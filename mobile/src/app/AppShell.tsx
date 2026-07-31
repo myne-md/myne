@@ -11,9 +11,7 @@ import { listVaults } from "../lib/vault-list";
 import { probeSlotKind } from "../lib/vault-slot-kind";
 import { lockVault } from "../lib/vault-unlock";
 import { HAS_TAURI } from "../lib/app-window";
-import { prefsRead } from "../lib/prefs";
-import { listCustomThemes } from "../lib/themes";
-import { applyCustomTheme, clearCustomTheme, resolveCustomPalette } from "../lib/customTheme";
+import { clearCustomTheme, paintSelectedCustomTheme } from "../lib/customTheme";
 
 import { WelcomeFlow } from "./flows/WelcomeFlow";
 import { JoinFlow } from "./flows/JoinFlow";
@@ -30,41 +28,6 @@ import { Screen, PhoneColumn } from "../components";
 const ACTIVE_SLOT = "active-slot";
 
 /**
- * Paint the vault's selected custom theme, on the UNLOCK path (MYND-598).
- *
- * Both halves of the answer are vault content — the selection lives in the
- * encrypted `vault.prefs` blob and the palette in `vault.themes` — so neither
- * can be read a moment earlier than this, and neither is ever cached in
- * plaintext device storage to make it possible (`docs/decisions.md` 2026-07-31).
- * Reading here rather than at editor mount is what shrinks the window in which
- * the wrong appearance is on screen; it does not close it, and closing it is
- * exactly what the no-plaintext-cache rule declines to buy.
- *
- * Awaited before the editor stage is dispatched, so the editor never renders a
- * frame under the built-in appearance first. Failure is silent by design: a
- * cosmetic palette is not load-bearing, the host already collapses every
- * recoverable `vault.themes` read failure to an empty store (protocol.md
- * §9.21.4), and a toast at unlock about a colour scheme would be noise. The
- * built-in choice is applied at editor mount as it always has been, which is the
- * same fall-back a selection naming a since-deleted theme lands on.
- *
- * Never rejects — the caller's stage transition must not hang on it.
- */
-async function paintSelectedCustomTheme(): Promise<void> {
-  if (!HAS_TAURI) return;
-  try {
-    const [prefs, entries] = await Promise.all([prefsRead(), listCustomThemes()]);
-    const palette = resolveCustomPalette(prefs.custom_theme, entries);
-    // No selection, or one naming a theme this vault no longer holds: leave the
-    // root alone. The preference is deliberately NOT rewritten — see
-    // `resolveCustomPalette`, where the revival property is spelled out.
-    if (palette) applyCustomTheme(palette);
-  } catch {
-    /* fall back to the built-in appearance, silently */
-  }
-}
-
-/**
  * The real, wired mobile app — a port of the desktop App.tsx Stage machine.
  * Boots from the vault-list + active-slot probes, dispatches `transition`
  * actions, and mounts the functional flow for the current stage. The static
@@ -72,29 +35,60 @@ async function paintSelectedCustomTheme(): Promise<void> {
  */
 export function AppShell() {
   const [stage, setStage] = useState<Stage | null>(null);
+  // The stage `dispatch` reduces from. It mirrors `stage` and is written
+  // SYNCHRONOUSLY by `enterStage` — which the functional `setStage(prev => …)`
+  // form cannot be, because entering the editor is awaited (the custom palette
+  // is painted first), so the reducer's "previous" has to be readable outside
+  // React's render cycle. Every write to `stage` goes through `enterStage`, so
+  // the two never diverge.
+  const stageRef = useRef<Stage | null>(null);
   const probed = useRef(false);
   // Fresh-device sync-join overlay. Rendered full-screen WHILE the stage stays
   // `welcome` (the wired `welcome.join-success` arm lands the editor from there,
   // MYND-424) — an out-of-band local toggle, like recover's out-of-band entry.
   const [showJoin, setShowJoin] = useState(false);
 
+  /**
+   * Land a stage — the single writer of `stage` and its ref mirror.
+   *
+   * **Every entry into the editor stage paints the vault's selected custom
+   * palette first** (MYND-598), so the editor's first frame already wears it.
+   * The gate lives here rather than on the unlock handler because `stage.ts`
+   * reaches `{name:"editor"}` from four transitions — `unlock.success`,
+   * `recover.complete-success`, `welcome.join-success` and
+   * `create-vault.auto-unlock-success` — plus `initialStageFromProbe`'s
+   * already-`Unlocked` short-circuit (a WebView reload over a live Rust slot).
+   * Recovery in particular opens an EXISTING vault, which can carry both a
+   * `custom_theme` selection and the themes it names. One gate covers all of
+   * them, including the next route somebody adds.
+   *
+   * Non-editor stages never reach the `await`, so they still land
+   * synchronously — the palette read is the only thing that ever defers a
+   * transition.
+   */
+  const enterStage = useCallback(async (next: Stage | null) => {
+    if (next?.name === "editor") await paintSelectedCustomTheme();
+    stageRef.current = next;
+    setStage(next);
+  }, []);
+
   const boot = useCallback(async () => {
     if (!HAS_TAURI) {
       // Browser dev (pnpm dev, no Tauri host) — no IPC available. Land on
       // welcome so the flows are navigable; real IPC needs `pnpm tauri dev`.
-      setStage({ name: "welcome" });
+      await enterStage({ name: "welcome" });
       return;
     }
     try {
       const [vaultList, slot] = await Promise.all([listVaults(), probeSlotKind()]);
       const slotMap: SlotMap = { [ACTIVE_SLOT]: slot };
-      setStage(initialStageFromProbe(vaultList, slotMap));
+      await enterStage(initialStageFromProbe(vaultList, slotMap));
     } catch {
       // Probe transport failure — fail-closed to welcome (the user can still
       // create/restore; a real vault would surface on the next probe).
-      setStage({ name: "welcome" });
+      await enterStage({ name: "welcome" });
     }
-  }, []);
+  }, [enterStage]);
 
   useEffect(() => {
     if (probed.current) return;
@@ -102,15 +96,24 @@ export function AppShell() {
     void boot();
   }, [boot]);
 
-  const dispatch = useCallback((action: Action) => {
-    setStage((prev) => (prev ? transition(prev, action) : prev));
-  }, []);
+  const dispatch = useCallback(
+    (action: Action) => {
+      const prev = stageRef.current;
+      if (prev === null) return;
+      const next = transition(prev, action);
+      // `transition` returns `prev` unchanged for an illegal pair; re-landing it
+      // would re-run the editor paint for a transition that did not happen.
+      if (next === prev) return;
+      void enterStage(next);
+    },
+    [enterStage],
+  );
 
   /** Out-of-band re-probe (back-from-create, restore-backup exit). */
   const reprobe = useCallback(() => {
-    setStage(null);
+    void enterStage(null);
     void boot();
-  }, [boot]);
+  }, [boot, enterStage]);
 
   if (stage === null) {
     return (
@@ -173,12 +176,10 @@ export function AppShell() {
             vaultId={stage.vaultId}
             suspicionReason={stage.suspicionReason}
             fromPicker={stage.fromPicker}
-            // The custom palette is painted BEFORE the editor stage is
-            // dispatched (all three unlock routes — password, PIN, biometric —
-            // land here), so the editor's first frame already wears it.
-            onUnlocked={() => {
-              void paintSelectedCustomTheme().then(() => dispatch({ type: "unlock.success" }));
-            }}
+            // All three unlock routes — password, PIN, biometric — land here.
+            // The custom palette is painted before the editor stage lands; that
+            // is `enterStage`'s job, for every route rather than this one.
+            onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onBackToPicker={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
             onDeleteVaultSuccess={() => dispatch({ type: "unlock.delete-vault-success" })}
@@ -201,25 +202,19 @@ export function AppShell() {
       return (
         <EditorFlow
           vaultId={stage.vaultId}
-          // Every exit from the unlocked vault reverts the palette FIRST, before
-          // the lock itself is even awaited. Desktop holds "an explicit theme is
-          // on screen ⟺ the vault is unlocked" as the UI-layer image of
-          // zeroize-on-lock, and a palette says far more about vault contents
-          // than a light/dark attribute does: someone who picks up the locked
-          // phone must learn nothing from it. (The built-in `data-theme`
-          // attribute's own lock behaviour is a separate, pre-existing mobile
-          // divergence — deliberately untouched here.)
+          // The palette revert rides `lockVault()` with the other per-vault
+          // teardowns, so every route through the lock inherits it (MYND-598).
           onLock={async () => {
-            clearCustomTheme();
             await lockVault().catch(() => {});
             dispatch({ type: "editor.lock" });
           }}
           onCreateVault={() => dispatch({ type: "editor.create-vault" })}
           onSwitchVault={async (vaultId: VaultId) => {
-            clearCustomTheme();
             await lockVault().catch(() => {});
             dispatch({ type: "editor.switch-vault", vaultId });
           }}
+          // Vault deletion is the one exit that does NOT go through `lockVault`
+          // (the slot is gone, not locked), so it reverts the palette itself.
           onDeleteVaultSuccess={() => {
             clearCustomTheme();
             dispatch({ type: "editor.delete-vault-success" });

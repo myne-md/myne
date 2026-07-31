@@ -208,13 +208,10 @@ fn main() {
             )
             .plugin(
                 // Custom themes (MYT1, §9.21): shared from `myne-core`, but ONE
-                // command of desktop's five. Mobile is a read-only consumer of a
-                // store the desktop authors — `themes_read` / `themes_import` /
-                // `themes_export` / `themes_delete` are deliberately NOT
-                // registered, and must not be added here: the list surface
-                // already returns each theme's palette, so both mobile callers
-                // (the picker and the apply-at-unlock path) are served by it
-                // alone. Adding a command here without a matching entry in
+                // command of desktop's five — mobile is a read-only consumer of
+                // a store the desktop authors, and the other four must not be
+                // added here (`plugins/themes/mod.rs` says why each is out).
+                // Adding a command here without a matching entry in
                 // `permissions/themes/default.toml` is a security bug.
                 "themes",
                 tauri_build::InlinedPlugin::new().commands(&["themes_list"]),

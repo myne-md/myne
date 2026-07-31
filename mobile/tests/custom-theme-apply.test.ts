@@ -3,8 +3,10 @@
 // The mobile custom-palette applier (MYND-598) — `applyCustomTheme` /
 // `clearCustomTheme`, the CSSOM half of the read-only custom-theme consumer.
 //
-// jsdom because the whole module is a document-root mutation; there is nothing
-// to test without one. No Tauri stub is needed — this layer never invokes.
+// jsdom because the applier is a document-root mutation; there is nothing to
+// test without one. No Tauri stub is needed: the module's unlock-path
+// orchestrator (`paintSelectedCustomTheme`) is the only part that invokes, and
+// it is not exercised here — importing the IPC wrappers is inert.
 //
 // Two properties carry the weight here:
 //
