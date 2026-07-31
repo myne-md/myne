@@ -104,6 +104,12 @@ pub mod reconcile_policy;
 pub mod rustls_transport;
 #[cfg(test)]
 mod sim;
+// The SOCKS5 client half of Tor routing (MYND-650 task 3) — host-only for the
+// same reason `rustls_transport` is: it is raw TCP, which a browser tab does
+// not have. A web client that wants Tor uses Tor Browser (task 12), not an
+// in-page tunnel.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod socks5;
 pub mod state;
 // The status indicator's types + derivation, lifted out of the host-gated
 // `commands` module by task 84 so the browser reports the same states from the

@@ -489,6 +489,15 @@ mod tests {
     /// Complete ONLY a pinned TLS handshake (no app data) against `host:port`,
     /// returning `Ok(())` iff the pin verified.
     fn pinned_handshake(host: &str, port: u16, pin: [u8; 32]) -> Result<(), ()> {
+        let sock = TcpStream::connect((host, port)).map_err(|_| ())?;
+        pinned_handshake_on(sock, host, pin)
+    }
+
+    /// The same pinned handshake, on a socket the caller already opened — a
+    /// direct one above, a SOCKS5 tunnel below. Splitting it here is what lets
+    /// the tunnel test assert "rustls, unchanged" literally: both paths run
+    /// this exact function with this exact `ClientConfig`.
+    fn pinned_handshake_on(mut sock: TcpStream, host: &str, pin: [u8; 32]) -> Result<(), ()> {
         let provider = Arc::new(rustls::crypto::ring::default_provider());
         let verifier = Arc::new(PinnedVerifier {
             pins: vec![pin],
@@ -502,7 +511,6 @@ mod tests {
             .with_no_client_auth();
         let name = ServerName::try_from(host.to_string()).map_err(|_| ())?;
         let mut conn = ClientConnection::new(Arc::new(config), name).map_err(|_| ())?;
-        let mut sock = TcpStream::connect((host, port)).map_err(|_| ())?;
         while conn.is_handshaking() {
             match conn.complete_io(&mut sock) {
                 Ok((0, 0)) => break,
@@ -542,6 +550,52 @@ mod tests {
         assert!(
             pinned_handshake("localhost", port, [0u8; 32]).is_err(),
             "a wrong pin rejects the cert"
+        );
+    }
+
+    /// Tor routing (MYND-650 task 3): pinned TLS runs **unchanged** over a
+    /// SOCKS5 tunnel. The tunnel is a byte pipe, so the TLS session — and with
+    /// it the A4 pin — stays end-to-end between this device and the sync
+    /// server; a Tor exit node sees ciphertext to a hostname and nothing else.
+    ///
+    /// The reject arm is the half that matters: if the tunnel somehow
+    /// terminated TLS (a MitM proxy), the pin would not match and the
+    /// handshake would fail exactly as it does on the direct path.
+    #[test]
+    fn pinned_tls_completes_over_a_socks5_tunnel_and_still_rejects_a_wrong_pin() {
+        use super::super::socks5::connect_via_socks5;
+        use super::super::socks5::fake::{Behavior, FakeSocks5, SeenTarget};
+
+        let tls_port = spawn_tls_server(2);
+        std::thread::sleep(std::time::Duration::from_millis(100)); // let it bind
+        let proxy = FakeSocks5::spawn(2, Behavior::Splice(tls_port));
+
+        // The client asks the proxy for `localhost:443` — a name and the real
+        // service port. Where that lands is the proxy's business, which is the
+        // whole shape of routing through Tor.
+        let tunnel = connect_via_socks5(proxy.port, "localhost", 443).expect("tunnel");
+        assert!(
+            pinned_handshake_on(tunnel, "localhost", cert_pin(TEST_CERT_DER)).is_ok(),
+            "the correct pin verifies the real cert through the tunnel"
+        );
+
+        let tunnel = connect_via_socks5(proxy.port, "localhost", 443).expect("tunnel");
+        assert!(
+            pinned_handshake_on(tunnel, "localhost", [0u8; 32]).is_err(),
+            "a wrong pin must still reject — the tunnel does not weaken A4"
+        );
+
+        assert_eq!(
+            proxy.seen(),
+            vec![
+                SeenTarget {
+                    atyp: 0x03,
+                    host: "localhost".to_string(),
+                    port: 443
+                };
+                2
+            ],
+            "both connects travelled as a hostname CONNECT, not a resolved address"
         );
     }
 }
