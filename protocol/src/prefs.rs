@@ -330,7 +330,10 @@ pub struct PrefsView {
     pub auto_lock_seconds: Option<u32>,
 
     /// Active **custom theme** selection (custom-themes epic, MYND-297) — the
-    /// file-stem name of a user-authored theme under `app_config_dir/themes/`.
+    /// name of a user-authored palette, i.e. a key of the encrypted `vault.themes`
+    /// store (`MYT1`, `protocol.md` §9.21). It named a plaintext file stem under
+    /// `app_config_dir/themes/` until `decisions.md` 2026-07-16 promoted palettes
+    /// to vault content; the blob holds the palettes, this field holds the pointer.
     /// `Some(name)` takes **precedence** over [`PrefsView::theme`] (the built-in
     /// Light/Dark/System choice): when set, the host applies the custom palette
     /// and ignores `theme`. Omitted entirely from the canonical JSON when `None`,
@@ -338,10 +341,11 @@ pub struct PrefsView {
     /// `vault.prefs`. Canonical key `custom_theme` — sorts after `color_groups`
     /// (`col` < `cus`) and before the `daily_*` block (d). A
     /// **non-load-bearing** cosmetic preference (AS-low): a tampered/replayed
-    /// value can at worst select a different or absent palette (the host
-    /// validates the file + falls back to a built-in theme on any failure), so
-    /// no protective-envelope clamp. The name is `is_valid_theme_name`-constrained
-    /// host-side; this codec stores it as a free NFC string.
+    /// value can at worst select a different or absent palette (a name with no
+    /// live entry in the store falls back to the built-in `theme`, and an
+    /// unreadable store reads as empty per §9.21.4), so no protective-envelope
+    /// clamp. The name is `is_valid_theme_name`-constrained host-side; this codec
+    /// stores it as a free NFC string.
     #[serde(default)]
     pub custom_theme: Option<alloc::string::String>,
 
