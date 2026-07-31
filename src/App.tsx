@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AccountBootstrap } from "./screens/AccountBootstrap";
 import { Welcome } from "./screens/Welcome";
 import { RestoreBackup } from "./screens/RestoreBackup";
 import { CreateVault } from "./screens/CreateVault";
 import { Unlock } from "./screens/Unlock";
-import { Editor } from "./screens/Editor";
 import { VaultRecover } from "./screens/VaultRecover";
 import { VaultPicker } from "./screens/VaultPicker";
 import {
@@ -22,12 +21,18 @@ import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { isPendingApproval } from "./lib/pending-approval";
 import { switchVault } from "./lib/vault-switch";
-import { openInNoteFind } from "./editor/find/find-session";
 import { prefsRead } from "./lib/prefs";
 import { applyTheme, applyCustomTheme } from "./lib/theme";
 import { useStageRoute } from "./lib/routing";
 import { HAS_NATIVE_TITLE_BAR, dragRegionProps } from "./screens/titlebar";
 import { readCustomTheme } from "./lib/themes";
+
+// Editor (the post-unlock workspace) is the app's heaviest screen — CodeMirror,
+// the shared @myne/editor engine, and every code-block language grammar hang off
+// it, and it is only ever shown AFTER unlock. A React.lazy boundary keeps that
+// whole graph out of the first-load bundle (web bundle budget; same precedent as
+// GraphView → GraphCanvas, the app's other lazy boundary).
+const Editor = lazy(() => import("./screens/Editor").then((m) => ({ default: m.Editor })));
 
 // Synthetic key for the single-entry boot `SlotMap` (MYND-204 SYNC-4).
 // `initialStageFromProbe` routes on the slot KIND only — it scans
@@ -172,7 +177,10 @@ function App() {
       if (e.key !== "f" && e.key !== "F") return;
       if (e.shiftKey || e.altKey) return; // leave Cmd+Shift+F / Cmd+Alt+F alone
       e.preventDefault();
-      openInNoteFind();
+      // find-session pulls in @codemirror/search (+ view/state); load it on
+      // demand so it stays out of the first-load bundle. By the time a note is
+      // open the editor chunk has already imported it, so this resolves instantly.
+      void import("./editor/find/find-session").then((m) => m.openInNoteFind());
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -349,21 +357,23 @@ function App() {
         );
       case "editor":
         return (
-          <Editor
-            onResetRequested={reprobe}
-            onLock={() => dispatch({ type: "editor.lock" })}
-            onForceRelock={setStageWithSuspicion}
+          <Suspense fallback={null}>
+            <Editor
+              onResetRequested={reprobe}
+              onLock={() => dispatch({ type: "editor.lock" })}
+              onForceRelock={setStageWithSuspicion}
             // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
             // the Unlock screen's `onDeleteVaultSuccess` above. Deleting the
             // active vault from Settings leaves the slot Empty, so reprobe
             // routes by remaining count (picker at ≥2, unlock at 1, welcome
             // at 0) instead of always landing on the create screen.
-            onDeleteVaultSuccess={reprobe}
-            onSwitchVault={onSwitchVault}
-            onCreateAnother={() => dispatch({ type: "editor.create-vault" })}
-            onRestoreBackup={() => dispatch({ type: "editor.restore-backup" })}
-            switching={switching}
-          />
+              onDeleteVaultSuccess={reprobe}
+              onSwitchVault={onSwitchVault}
+              onCreateAnother={() => dispatch({ type: "editor.create-vault" })}
+              onRestoreBackup={() => dispatch({ type: "editor.restore-backup" })}
+              switching={switching}
+            />
+          </Suspense>
         );
       case "recover":
         return (
