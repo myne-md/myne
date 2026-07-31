@@ -1271,7 +1271,7 @@ pub enum PrefsBlobError {
     #[error("vault.prefs blob too short to parse a header")]
     HeaderTooShort,
     /// First 4 bytes are not `MYP1`. Either a foreign file, a
-    /// different artifact type, or a v005 (`MYP5`) blob the v0.1
+    /// different artifact type, or a next-major (`MYP5`) blob the v0.1
     /// parser refuses (§ 10.1 forward-incompatible-by-design).
     #[error("vault.prefs blob magic mismatch (expected MYP1)")]
     MagicMismatch,

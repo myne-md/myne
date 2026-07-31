@@ -24,7 +24,7 @@ Myne v0.1 adopts **GFM (GitHub-Flavored Markdown) plus a footnote extension plus
 
 - **The smallest pin that covers Myne v0.1's editor decoration commitments** (tables, task lists, footnotes, wikilinks, frontmatter).
 - **Byte-stable round-trip** with notes imported from Obsidian vaults: a note written by Obsidian, imported into Myne, and never edited inside Myne, must serialize back to the same bytes when exported. (Obsidian conventions Myne does not natively render — `> [!callout]` syntax in v0.1, `^block-id` markers — are still preserved at the byte level. See §6.)
-- **Forward-incompatible by design** with v005. v005 will pin its own dialect. Cross-major migration is out of scope per `protocol.md` §10.1; the same applies here.
+- **Forward-incompatible by design** with a later major version. A later version will pin its own dialect. Cross-major migration is out of scope per `protocol.md` §10.1; the same applies here.
 
 ## 3. Recognized syntax categories
 
@@ -134,7 +134,7 @@ Mechanics — shared across the eight dedicated-surgery fields (the seven above 
 - **The ten managed fields compose on one blob without clobbering** (per the §3.6 unknown-field-preservation rule): each writer touches only its own line, so a single note can carry any combination — e.g. `template: true` + `trashed: <ts>` simultaneously (a deleted template, restorable from Trash, re-entering the template set on restore), or `folder: Projects/` + `folder_index: true` (the visible index note of the Projects folder), or `conflict: true` + `conflict_of: <uuid>` (a keep-both copy). Setting or deleting one managed field preserves every other managed field, user-authored field, and comment byte-for-byte. The one **semantic** (not byte-level) exclusion is `archived:` ⊥ `trashed:`: the surgery composes them freely, but the archive/trash **action layer** clears one when setting the other so a note is never simultaneously archived and trashed (MYND-331).
 - Other frontmatter fields (`tags:`, user-authored fields) are preserved per the §3.6 "Unknown frontmatter fields are preserved on write" rule.
 - `created_at` is **not** stored in frontmatter — it is derived from the UUIDv7 filename's millisecond time component per [`protocol.md`](protocol.md) §9.1 (already public-accepted leak; no new commitment violation, no frontmatter write needed).
-- The set of Myne-managed canonical frontmatter fields is forward-incompatible-by-design with v005: v005 may rename, drop, or supersede `updated:` / `title:` / `folder:` / `trashed:` / `template:` / `folder_index:` / `kind:` / `archived:` / `done:` / `deleted:` / `conflict:` / `conflict_of:` per its own dialect specification.
+- The set of Myne-managed canonical frontmatter fields is forward-incompatible-by-design with a later major version: a later version may rename, drop, or supersede `updated:` / `title:` / `folder:` / `trashed:` / `template:` / `folder_index:` / `kind:` / `archived:` / `done:` / `deleted:` / `conflict:` / `conflict_of:` per its own dialect specification.
 
 Mechanics — per-field:
 
@@ -541,4 +541,4 @@ This section is informative — a future Myne client implementation may choose a
 
 ## 9. Versioning
 
-This dialect specification covers Myne v0.1 only. v005 will pin its own dialect specification with its own magic-byte and AAD-prefix scheme per [`protocol.md`](protocol.md) §10. There is no provision for in-place dialect upgrades within v0.1.
+This dialect specification covers Myne v0.1 only. A later version will pin its own dialect specification with its own magic-byte and AAD-prefix scheme per [`protocol.md`](protocol.md) §10. There is no provision for in-place dialect upgrades within v0.1.

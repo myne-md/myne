@@ -203,7 +203,7 @@ pub fn aad_note_item_key_wrap(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> 
 ///
 /// `account_number_hash` (NOT `items_key_id`) binds vault identity —
 /// `vault.prefs` lives outside the `items_key` lineage by design,
-/// preserving prefs portability across the v005 epoch-rotation
+/// preserving prefs portability across the later epoch-rotation
 /// `items_key` evolution (`decisions.md` 2026-05-27 "Vault preferences
 /// blob: root_key-derived prefs_key").
 pub fn aad_prefs_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
@@ -307,7 +307,7 @@ pub fn aad_personal_dictionary_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
 /// custom-themes blob lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob` (the KEK derives directly from `root_key` via
-/// `"myne.v0.1 custom-themes-key"`, so it survives a v005 epoch rotation).
+/// `"myne.v0.1 custom-themes-key"`, so it survives a later epoch rotation).
 /// DISTINCT from the subkey role `"custom-themes-key"`.
 pub fn aad_custom_themes_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     const ROLE_STR_CUSTOM_THEMES_BLOB: &[u8] = b"custom-themes-blob";
@@ -388,7 +388,7 @@ pub fn aad_quick_unlock_blob(account_number_hash: &[u8; 16], provider_kind: u8) 
 /// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
 /// attachment-text KEK derives directly from `root_key` via
 /// `"myne.v0.1 attachment-text-key"`, independent of the `items_key` lineage
-/// (survives a v005 epoch rotation, same rationale as prefs/search/dictionary).
+/// (survives a later epoch rotation, same rationale as prefs/search/dictionary).
 /// DISTINCT from the subkey role `"attachment-text-key"`.
 pub fn aad_attachment_text_blob(
     account_number_hash: &[u8; 16],
@@ -500,7 +500,7 @@ pub fn aad_graph_layout_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
 /// vault-indices blob lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob` (the KEK derives directly from `root_key` via
-/// `"myne.v0.1 vault-indices-key"`, so it survives a v005 epoch rotation).
+/// `"myne.v0.1 vault-indices-key"`, so it survives a later epoch rotation).
 pub fn aad_vault_indices_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     const ROLE_STR_VAULT_INDICES_BLOB: &[u8] = b"vault-indices-blob";
     let mut aad = Vec::with_capacity(
@@ -529,7 +529,7 @@ pub fn aad_vault_indices_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// vectors) is its own blob family (one magic / one KEK / one AAD role; `MYR1`
 /// ≠ `MYS1` ≠ `MYI1`). `account_number_hash` (NOT `items_key_id`) binds vault
 /// identity: the KEK derives directly from `root_key` via
-/// `"myne.v0.1 ai-embeddings-key"`, so it survives a v005 epoch rotation. The
+/// `"myne.v0.1 ai-embeddings-key"`, so it survives a later epoch rotation. The
 /// model-identity tuple that invalidates the cache on a model / dimension /
 /// chunker change is carried INSIDE the engine-opaque payload (§ 9.17.2), NOT
 /// this AAD — matching the `vault.search` `extractor_version` precedent.
@@ -627,9 +627,9 @@ pub fn aad_share_import_blob(share_id: &[u8; 16]) -> Vec<u8> {
 ///
 /// `content_type` is **hardcoded** to `"text/markdown"` in v0.1 per
 /// spec § 5.2 — encoder and decoder both bind the same constant, so
-/// any future v005 attachment type would diverge at the AAD prefix
+/// any future next-major attachment type would diverge at the AAD prefix
 /// level rather than via a parameter on this v0.1 helper. v0.1 and
-/// v005 are forward-incompatible by design (§ 10).
+/// a later major version are forward-incompatible by design (§ 10).
 pub fn aad_note_content_encrypt(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> Vec<u8> {
     const CONTENT_TYPE: &[u8] = b"text/markdown";
     let mut aad = Vec::with_capacity(
@@ -2225,7 +2225,7 @@ mod tests {
         emit_case(
             &mut dump,
             "aad_prefs_blob",
-            "AAD bound into the AEAD encryption of the vault.prefs blob (§5.2 + §9.5.3). Length-prefixed role 'prefs-blob' + account_number_hash (NOT items_key_id — prefs live outside the items_key lineage for v005 portability).",
+            "AAD bound into the AEAD encryption of the vault.prefs blob (§5.2 + §9.5.3). Length-prefixed role 'prefs-blob' + account_number_hash (NOT items_key_id — prefs live outside the items_key lineage for later portability).",
             &aad_prefs,
             &[
                 ("aad_prefix", 10),

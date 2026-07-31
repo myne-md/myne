@@ -1631,7 +1631,7 @@ mod tests {
                 // §10.1 strict-trailing: blob.len() != expected_total
                 // → Parse. v0.1 has no extension points; trailing
                 // bytes would expose a covert-channel surface for
-                // v005 metadata to ride inside a v0.1 blob. Reject.
+                // next-major metadata to ride inside a v0.1 blob. Reject.
                 let mut blob = encode_with_test_fixture(TEST_PLAINTEXT);
                 blob.push(0xAB); // append one trailing byte
                 assert_parse(&blob);
