@@ -11,6 +11,7 @@ import { headingDecorations } from "./heading";
 import { setextHeadingDecorations } from "./setext-heading";
 import { emphasisDecorations } from "./emphasis";
 import { inlineTypographyDecorations } from "./inline-typography";
+import { coloredHighlightDecorations } from "./colored-highlight";
 import { emojiDecorations } from "./emoji";
 import { embeddedHtmlDecorations } from "./embedded-html";
 import { mathDecorations } from "./math";
@@ -53,6 +54,10 @@ export function myneDecorations(): readonly Extension[] {
     // Highlight / subscript / superscript inline marks (MYND-156). Same
     // cursor-aware mark+marker-hide family as emphasis.
     inlineTypographyDecorations(),
+    // Colored highlights `<mark class="hl-*">` (MYND-637). Same hide-off-cursor /
+    // `==`-skin-on-cursor treatment as yellow `==`, so they never leak raw HTML.
+    // MUST precede embeddedHtmlDecorations(), which now EXCLUDES `hl-*` marks.
+    coloredHighlightDecorations(),
     // Emoji `:shortcode:` → glyph (MYND-156). Lazy-loaded map; unmapped stays
     // literal. Returns [field, loader, decoration].
     ...emojiDecorations(),
