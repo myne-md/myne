@@ -11,6 +11,7 @@
 
 import type { Page } from "@playwright/test";
 import type { SavedView } from "../../src/lib/prefs";
+import type { CustomThemeEntry } from "../../src/lib/themes";
 
 /** The runtime `SyncRuntimeStatus` shape (mirrors `lib/use-sync-status`). */
 export type MockSyncStatus =
@@ -166,7 +167,12 @@ export interface MockConfig {
    *  assert the UI collates them. Mobile exposes no other themes command: the
    *  four authoring/egress ones are neither registered nor ACL-granted, so
    *  there is nothing else here to mock. */
-  customThemes?: Array<{ name: string; palette: Record<string, string> }>;
+  customThemes?: CustomThemeEntry[];
+  /** Reject `plugin:prefs|set_custom_theme`. Both selection paths are
+   *  disk-first, so this is what proves a failed write leaves the SCREEN
+   *  unchanged too — the failure mode being guarded against is a phone showing
+   *  one theme while `vault.prefs` names another. */
+  customThemeWriteFails?: boolean;
   /** Canned `workspace_read` descriptor — the `vault.workspace` (MYW1) opaque
    *  JSON, or `null` for a vault that has never persisted one. The store is
    *  STATEFUL: a `workspace_write` replaces it (and is logged on
@@ -427,23 +433,20 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // registered nor granted on mobile, so on a device they REJECT. Mocking
       // them as rejections rather than leaving them to the unknown-command `[]`
       // fallback is what makes "the UI never calls one" a real assertion.
-      "plugin:themes|themes_read": () => {
-        throw "not allowed by ACL: themes_read is not granted on mobile";
-      },
-      "plugin:themes|themes_import": () => {
-        throw "not allowed by ACL: themes_import is not granted on mobile";
-      },
-      "plugin:themes|themes_export": () => {
-        throw "not allowed by ACL: themes_export is not granted on mobile";
-      },
-      "plugin:themes|themes_delete": () => {
-        throw "not allowed by ACL: themes_delete is not granted on mobile";
-      },
+      ...Object.fromEntries(
+        ["themes_read", "themes_import", "themes_export", "themes_delete"].map((cmd) => [
+          `plugin:themes|${cmd}`,
+          () => {
+            throw `not allowed by ACL: ${cmd} is not granted on mobile`;
+          },
+        ]),
+      ),
       // The custom-theme selection setter — records the write AND mutates the
       // store, so the applied row survives into the nonce-bumped re-read exactly
       // as the real setter + `bumpPrefsNonce()` round-trip does.
       "plugin:prefs|set_custom_theme": (args) => {
         const name = (args.customTheme ?? null) as string | null;
+        if (config.customThemeWriteFails) throw { kind: "IoError" };
         const w = window as unknown as { __customThemeWrites?: (string | null)[] };
         (w.__customThemeWrites ??= []).push(name);
         customTheme = name;

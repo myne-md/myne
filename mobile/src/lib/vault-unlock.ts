@@ -4,6 +4,7 @@
 // is visible at the boundary.
 
 import { invoke } from "@tauri-apps/api/core";
+import { clearCustomTheme } from "./customTheme";
 import {
   flushGraphLayoutNow,
   resetGraphLayoutOnLock,
@@ -28,10 +29,18 @@ export async function isVaultUnlocked(): Promise<boolean> {
  *  - sidebar folder-expand set → `vault.workspace` (MYND-561, MYW1). This is one
  *    of only two write seams for that blob (the other is app-background), which
  *    is what keeps its mtime from becoming an activity log.
+ *  - custom palette off the document root (MYND-598). Nothing to flush — it is a
+ *    revert, and it runs FIRST so the screen stops wearing the vault's colours
+ *    before anything is awaited. A palette says far more about vault contents
+ *    than a light/dark attribute does; someone who picks up the locked phone
+ *    must learn nothing from it (`design-notes.md` 2026-07-31). Riding
+ *    `lockVault` rather than the Lock button is the point: an exit route added
+ *    later inherits the revert instead of forgetting it.
  *
  * Every flush/reset step is best-effort; the lock itself always runs.
  */
 export async function lockVault(): Promise<void> {
+  clearCustomTheme();
   await flushGraphLayoutNow();
   resetGraphLayoutOnLock();
   await flushWorkspaceNow();

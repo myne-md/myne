@@ -14,55 +14,13 @@
 // asserted just as hard — no second read command for a palette the list already
 // handed over, and nothing about the theme in `localStorage`.
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
-
-/** Two seeded themes, given in the host's UTF-8 byte order (uppercase first) so
- *  the locale-collation assertion below is meaningful rather than incidental. */
-const SEEDED = [
-  {
-    name: "Zinc",
-    palette: {
-      "--paper": "#101014",
-      "--paper-2": "#191920",
-      "--ink-1": "#e6e6ea",
-      "--accent": "#7aa2f7",
-      "--line-1": "#2a2a33",
-    },
-  },
-  {
-    name: "amber dusk",
-    palette: {
-      "--paper": "#fdf6e3",
-      "--paper-2": "#f5ecd7",
-      "--ink-1": "#3b3228",
-      "--accent": "#b58900",
-      "--line-1": "#e0d5bb",
-    },
-  },
-];
-
-type Page = import("@playwright/test").Page;
+import { closeSheet, customThemeWrites, rootCustomProps, SEEDED_THEMES } from "../helpers";
 
 async function openAppearance(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Settings" }).first().click();
   await page.getByText("Appearance", { exact: true }).click();
-}
-
-/** Every `--*` custom property currently set on `<html>` by the CSSOM, as a
- *  `key → value` map. Reading the style attribute's own key list (rather than a
- *  computed value) is what distinguishes "the applier wrote it" from "a stylesheet
- *  happened to define it", which is the whole point of the revert assertions. */
-function rootCustomProps(page: Page): Promise<Record<string, string>> {
-  return page.evaluate(() => {
-    const s = document.documentElement.style;
-    const out: Record<string, string> = {};
-    for (let i = 0; i < s.length; i++) {
-      const key = s.item(i);
-      if (key.startsWith("--")) out[key] = s.getPropertyValue(key);
-    }
-    return out;
-  });
 }
 
 test.describe("mobile custom-themes list", () => {
@@ -82,7 +40,7 @@ test.describe("mobile custom-themes list", () => {
   });
 
   test("two themes → a row each with a real swatch, the stored one marked", async ({ page }) => {
-    await installMockIpc(page, { customThemes: SEEDED, prefs: { custom_theme: "Zinc" } });
+    await installMockIpc(page, { customThemes: SEEDED_THEMES, prefs: { custom_theme: "Zinc" } });
     await page.goto("/");
     await openAppearance(page);
 
@@ -128,28 +86,15 @@ test.describe("mobile custom-themes list", () => {
   });
 });
 
-/** Every `custom_theme` value written through `plugin:prefs|set_custom_theme`. */
-const themeWrites = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __customThemeWrites?: (string | null)[] }).__customThemeWrites ?? []);
-
 /** How many times the palette-bearing list command was called. */
 const listCalls = (page: Page) =>
   page.evaluate(() => (window as unknown as { __themesListCalls?: number }).__themesListCalls ?? 0);
-
-/** Dismiss the Settings sheet by tapping the backdrop above the card — the
- *  Sheet's only programmatic exit (no close button, and Escape is not bound).
- *  Reopening remounts the sheet, which drops the optimistic draft, so what the
- *  reopened panel marks is DISK truth rather than the write we just made. */
-async function closeSheet(page: Page): Promise<void> {
-  await page.mouse.click(195, 50);
-  await expect(page.getByTestId("sheet.card")).toHaveCount(0);
-}
 
 const row = (page: Page, name: string) => page.locator(`[data-theme-name="${name}"]`);
 
 test.describe("mobile custom-themes apply", () => {
   test("tapping a row applies that palette and persists the selection", async ({ page }) => {
-    await installMockIpc(page, { customThemes: SEEDED });
+    await installMockIpc(page, { customThemes: SEEDED_THEMES });
     await page.goto("/");
     await openAppearance(page);
 
@@ -157,7 +102,7 @@ test.describe("mobile custom-themes apply", () => {
 
     // Persisted by NAME (the palette is vault content and never leaves the vault
     // to be stored anywhere else), and marked as applied.
-    await expect.poll(() => themeWrites(page)).toEqual(["Zinc"]);
+    await expect.poll(() => customThemeWrites(page)).toEqual(["Zinc"]);
     await expect(row(page, "Zinc")).toHaveAttribute("data-selected", "true");
     await expect(row(page, "amber dusk")).toHaveAttribute("data-selected", "false");
 
@@ -194,20 +139,22 @@ test.describe("mobile custom-themes apply", () => {
   });
 
   test("picking a built-in theme clears the custom selection and its properties", async ({ page }) => {
-    await installMockIpc(page, { customThemes: SEEDED });
+    await installMockIpc(page, { customThemes: SEEDED_THEMES });
     await page.goto("/");
     await openAppearance(page);
 
     await row(page, "amber dusk").click();
-    await expect.poll(() => themeWrites(page)).toEqual(["amber dusk"]);
+    await expect.poll(() => customThemeWrites(page)).toEqual(["amber dusk"]);
     expect((await rootCustomProps(page))["--accent"]).toBe("#b58900");
 
     await page.getByText("Dark", { exact: true }).click();
 
     // The palette is gone — every custom property the applier wrote, not merely
     // the ones the built-in theme happens to redefine — and so is the selection.
-    await expect.poll(() => themeWrites(page)).toEqual(["amber dusk", null]);
-    expect(await rootCustomProps(page)).toEqual({});
+    // Polled, not read once: the clear is DISK-FIRST (`pickTheme`), so the write
+    // lands before the screen does and an immediate read would race the revert.
+    await expect.poll(() => customThemeWrites(page)).toEqual(["amber dusk", null]);
+    await expect.poll(() => rootCustomProps(page)).toEqual({});
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe("dark");
     await expect(row(page, "amber dusk")).toHaveAttribute("data-selected", "false");
 
@@ -215,5 +162,30 @@ test.describe("mobile custom-themes apply", () => {
     await closeSheet(page);
     await openAppearance(page);
     await expect(row(page, "amber dusk")).toHaveAttribute("data-selected", "false");
+  });
+
+  // The clear is disk-first for the reason this test states: the two paths must
+  // never leave the phone wearing one theme while `vault.prefs` names another,
+  // because the disagreement is invisible until the NEXT unlock paints the
+  // palette back over a built-in choice the user thought they had made.
+  test("a failed clear changes nothing — screen and disk stay in agreement", async ({ page }) => {
+    await installMockIpc(page, {
+      customThemes: SEEDED_THEMES,
+      prefs: { custom_theme: "amber dusk" },
+      customThemeWriteFails: true,
+    });
+    await page.goto("/");
+    // The boot paint already put the seeded selection on the root.
+    expect((await rootCustomProps(page))["--accent"]).toBe("#b58900");
+    await openAppearance(page);
+
+    await page.getByText("Dark", { exact: true }).click();
+
+    await expect(page.getByText("Couldn't save that setting", { exact: true })).toBeVisible();
+    // Still the custom theme, on screen and in the panel — not a half-applied
+    // built-in choice over a selection the vault still holds.
+    expect((await rootCustomProps(page))["--accent"]).toBe("#b58900");
+    await expect(row(page, "amber dusk")).toHaveAttribute("data-selected", "true");
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBeNull();
   });
 });

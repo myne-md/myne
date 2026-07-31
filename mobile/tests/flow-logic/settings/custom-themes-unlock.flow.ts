@@ -17,40 +17,17 @@
 //     synced here) falls back to the built-in choice in silence AND never writes
 //     the preference back. Not rewriting it is what preserves revival: a desktop
 //     re-add clears the tombstone and the next sync restores the theme.
+//   - The palette lands on EVERY route into the editor, not just the password
+//     one. `stage.ts` reaches `{name:"editor"}` from four transitions plus the
+//     boot probe's already-`Unlocked` short-circuit; the two covered below are
+//     the ones that can open a vault already carrying a selection — recovery
+//     from the phrase, and a WebView reload over a live Rust slot. (The other
+//     two — sync-join and create-vault auto-unlock — start from a vault with no
+//     themes yet, and ride the same single gate in `AppShell.enterStage`.)
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
-
-type Page = import("@playwright/test").Page;
-
-const SEEDED = [
-  {
-    name: "Zinc",
-    palette: {
-      "--paper": "#101014",
-      "--paper-2": "#191920",
-      "--ink-1": "#e6e6ea",
-      "--accent": "#7aa2f7",
-      "--line-1": "#2a2a33",
-    },
-  },
-];
-
-/** Every `--*` custom property the CSSOM currently carries on `<html>`, as a
- *  `key → value` map. Read off the style attribute's own key list rather than a
- *  computed value: only that distinguishes "the applier wrote it" from "a
- *  stylesheet defines it", which is the whole point of the revert assertion. */
-function rootCustomProps(page: Page): Promise<Record<string, string>> {
-  return page.evaluate(() => {
-    const s = document.documentElement.style;
-    const out: Record<string, string> = {};
-    for (let i = 0; i < s.length; i++) {
-      const key = s.item(i);
-      if (key.startsWith("--")) out[key] = s.getPropertyValue(key);
-    }
-    return out;
-  });
-}
+import { customThemeWrites, rootCustomProps, SEEDED_THEMES } from "../helpers";
 
 /**
  * Record, from before the app boots, whether the palette or the editor appeared
@@ -91,16 +68,11 @@ async function unlock(page: Page): Promise<void> {
   await page.getByTestId("unlock-submit").click();
 }
 
-/** Every `custom_theme` value written through `plugin:prefs|set_custom_theme`. */
-function customThemeWrites(page: Page): Promise<(string | null)[]> {
-  return page.evaluate(() => (window as unknown as { __customThemeWrites?: (string | null)[] }).__customThemeWrites ?? []);
-}
-
 test.describe("mobile custom-themes across the lock boundary", () => {
   test("stored selection → painted before the editor renders, gone again on lock", async ({ page }) => {
     await installMockIpc(page, {
       lockedVault: true,
-      customThemes: SEEDED,
+      customThemes: SEEDED_THEMES,
       prefs: { custom_theme: "Zinc" },
     });
     await seedBuiltInChoice(page);
@@ -140,7 +112,7 @@ test.describe("mobile custom-themes across the lock boundary", () => {
   test("selection naming a theme that is gone → built-in choice, preference untouched", async ({ page }) => {
     await installMockIpc(page, {
       lockedVault: true,
-      customThemes: SEEDED,
+      customThemes: SEEDED_THEMES,
       prefs: { custom_theme: "Solarized" },
     });
     await seedBuiltInChoice(page);
@@ -154,9 +126,8 @@ test.describe("mobile custom-themes across the lock boundary", () => {
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe("dark");
     // Silent: no toast about a colour scheme the user cannot act on.
     await expect(page.getByText("Solarized")).toHaveCount(0);
-    // And the dangling name stays on disk. Clearing it here would delete a
-    // device-local preference the user never touched, on evidence from another
-    // device, and would kill revival when the theme comes back.
+    // And the dangling name stays on disk — the revival property, spelled out
+    // in this file's header and in `resolveCustomPalette`.
     expect(await customThemeWrites(page)).toEqual([]);
 
     // Locking reverts the custom palette and ONLY the custom palette: the
@@ -169,5 +140,80 @@ test.describe("mobile custom-themes across the lock boundary", () => {
     await page.getByRole("button", { name: "Lock vault" }).click();
     await expect(page.getByTestId("unlock-submit")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe("dark");
+  });
+
+  // Recovery from the phrase opens an EXISTING vault, so it can carry both a
+  // `custom_theme` selection and the themes it names — the same state the
+  // password route lands in, reached by a different transition. It was the
+  // route the first cut of this feature missed: the editor rendered under the
+  // built-in appearance and stayed there until the next lock/unlock cycle, at
+  // which point the theme appeared with no explanation.
+  test("recovery from the phrase lands the editor already wearing the palette", async ({ page }) => {
+    await installMockIpc(page, {
+      lockedVault: true,
+      customThemes: SEEDED_THEMES,
+      prefs: { custom_theme: "Zinc" },
+    });
+    await seedBuiltInChoice(page);
+    await recordPaintOrder(page);
+    await page.goto("/");
+
+    await page.getByTestId("unlock-recovery-link").click();
+
+    // Account step (optional) → phrase grid → the non-dismissible reset. The
+    // mock accepts any 24 words; the real BIP-39 → Argon2id work is a device
+    // check (`recover/phrase-reset.flow.ts` owns the flow itself).
+    const accountContinue = page.getByRole("button", { name: "Continue" });
+    if (await accountContinue.isVisible().catch(() => false)) {
+      const inputs = page.locator("input");
+      if ((await inputs.count()) === 1) await accountContinue.click();
+    }
+    const cells = page.locator("input");
+    await expect(cells).toHaveCount(24);
+    for (let i = 0; i < 24; i++) await cells.nth(i).fill("ribbon");
+    await page.getByRole("button", { name: /^Submit/ }).click();
+
+    const pw = page.locator('input[type="password"]');
+    await expect(pw).toHaveCount(2);
+    await pw.nth(0).fill("correct horse battery staple");
+    await pw.nth(1).fill("correct horse battery staple");
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    await expect(page.getByTestId("workspace.app-header")).toBeVisible();
+
+    const applied = await rootCustomProps(page);
+    expect(applied["--paper"]).toBe("#101014");
+    expect(applied["--accent"]).toBe("#7aa2f7");
+    // Painted first, editor second — same ordering guarantee as the password
+    // route, because both go through the one gate rather than two call sites.
+    expect(await page.evaluate(() => (window as unknown as { __paintOrder: string[] }).__paintOrder)).toEqual([
+      "palette",
+      "editor",
+    ]);
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBeNull();
+  });
+
+  // The boot probe's already-`Unlocked` short-circuit: the Rust slot outlives
+  // the JS runtime, so a WebView reload (the dev loop; Android activity
+  // recreation) re-enters the editor without any unlock screen in between.
+  test("boot over a live Unlocked slot paints before the editor renders", async ({ page }) => {
+    await installMockIpc(page, {
+      customThemes: SEEDED_THEMES,
+      prefs: { custom_theme: "Zinc" },
+    });
+    await seedBuiltInChoice(page);
+    await recordPaintOrder(page);
+    await page.goto("/");
+
+    await expect(page.getByTestId("workspace.app-header")).toBeVisible();
+
+    const applied = await rootCustomProps(page);
+    expect(applied["--paper"]).toBe("#101014");
+    expect(applied["--syntax-keyword"]).toBe("var(--_syntax-keyword-dark)");
+    expect(await page.evaluate(() => (window as unknown as { __paintOrder: string[] }).__paintOrder)).toEqual([
+      "palette",
+      "editor",
+    ]);
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBeNull();
   });
 });
