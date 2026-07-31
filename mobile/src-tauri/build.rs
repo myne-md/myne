@@ -64,6 +64,11 @@ fn main() {
                     // command absent from any of them fails CLOSED at runtime.
                     "set_reminders_enabled",
                     "set_reminder_horizon_days",
+                    // MYND-563: on-device transcription opt-out (default on).
+                    // Shared core setter; registered here, in the prefs
+                    // generate_handler, and permissions/prefs/default.toml — a
+                    // command absent from any of the three fails CLOSED.
+                    "set_transcription_enabled",
                 ]),
             )
             .plugin(

@@ -139,6 +139,11 @@ export interface SavedView {
 
 export interface PrefsView {
   screen_capture_protection: boolean;
+  /** Whether on-device voice-to-text is available (MYND-563/592). Opt-OUT —
+   *  default true; a separate switch from the AI-beta `ai_enabled` opt-in
+   *  (transcription ships a bundled model and is a product feature). The
+   *  `transcribe` command re-reads this host-side before any decrypt. */
+  transcription_enabled: boolean;
   /** Whether THIS DEVICE shows task reminders (MYND-618/619). Device-local:
    *  whether a phone should be interrupted is a property of that phone, so it
    *  never syncs. Default true — an absent key reads as ENABLED, because
@@ -571,6 +576,16 @@ export async function setAttachmentCompressionEnabled(enabled: boolean): Promise
  */
 export async function setRemindersEnabled(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_reminders_enabled", { enabled });
+}
+
+/**
+ * Toggle on-device voice-to-text availability (MYND-563/592; opt-out, default
+ * on). A rejected promise means the vault.prefs disk write failed, so an
+ * optimistic UI must revert. The backend re-reads this before any decrypt, so
+ * the toggle gates the feature, never bypasses the gate.
+ */
+export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_transcription_enabled", { enabled });
 }
 
 /**

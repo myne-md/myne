@@ -179,6 +179,15 @@ export interface MockConfig {
    *  `window.__workspaceWrites`), so a test can assert a restore-after-reopen
    *  round-trip rather than just the write payload (MYND-561). */
   workspaceDescriptor?: string | null;
+  /** Canned `plugin:attachments|catalog_list` entries (MYND-563) — each a
+   *  `CatalogEntry`-shaped `{ id, filename, content_type, size }`. Defaults to
+   *  `[]`. Lets a transcription test seed an audio attachment for the
+   *  Transcribe row to appear on. */
+  catalog?: Array<{ id: string; filename: string; content_type: string; size: number }>;
+  /** How `plugin:local-inference|transcribe` behaves (MYND-563). `text` →
+   *  resolves with that transcript; `"not_ready"` / `"failed"` → rejects with
+   *  that serialized `EngineError` kind. Defaults to resolving a canned string. */
+  transcribe?: { text: string } | { error: "not_ready" | "failed" };
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -559,10 +568,24 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           deduplicated: false,
         };
       },
-      "plugin:attachments|catalog_list": () => [],
+      "plugin:attachments|catalog_list": () => config.catalog ?? [],
       "plugin:attachments|attachment_unused_list": () => [],
       "plugin:attachments|attachment_refs_apply": () => null,
       "plugin:attachments|attachment_refs_remove": () => null,
+      // On-device transcription (MYND-563). Resolves with a canned transcript by
+      // default, or rejects with a serialized `EngineError` kind so the
+      // not-ready / failed UI branches are exercised. The streaming `onSegment`
+      // channel is ignored here — the TranscribeRow renders from the resolved
+      // `done` promise, so a canned final transcript is enough for flow logic.
+      "plugin:local-inference|transcribe": () => {
+        const c = config.transcribe;
+        if (c && "error" in c) {
+          const kind = c.error === "not_ready" ? "NotReady" : "TranscriptionFailed";
+          throw { kind };
+        }
+        return c && "text" in c ? c.text : "the quick brown fox";
+      },
+      "plugin:local-inference|read_transcript": () => null,
       // ── Quick-unlock surface (per-test configurable) ──
       "plugin:quick-unlock|quick_unlock_status": () => quickUnlock,
       "plugin:quick-unlock|quick_unlock_setup_biometric": () => {
@@ -719,6 +742,21 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       transformCallback: (cb: unknown) => cb,
       // `@tauri-apps/api/event` listen() calls this; return a no-op unlisten id.
       unregisterCallback: () => undefined,
+      // `convertFileSrc(id, "attachment")` (the audio tile's `<audio src>` +
+      // image thumbnails) routes through here; without it rendering an
+      // attachment row throws. Return a deterministic fake URL — the bytes are
+      // never fetched headlessly (MYND-563: needed to render an audio row).
+      convertFileSrc: (path: string, protocol = "asset") => `${protocol}://localhost/${path}`,
+    };
+
+    // `@tauri-apps/api/event` (used by, e.g., the `attachment://` audio tile and
+    // any component that `listen()`s) routes through a SEPARATE global. Without
+    // it, an `unlisten()` on unmount throws `Cannot read properties of undefined
+    // (reading 'unregisterListener')` and blanks the surface. Stub it as no-ops
+    // so any event-using component renders headlessly (MYND-563: needed to render
+    // an audio attachment row in the Files library).
+    (window as unknown as { __TAURI_EVENT_PLUGIN_INTERNALS__: unknown }).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+      unregisterListener: () => undefined,
     };
   }, cfg);
 }

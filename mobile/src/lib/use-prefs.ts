@@ -16,6 +16,10 @@ import { usePrefsNonce } from "./prefsNonce";
  *  optional field unset (`null` / empty), timestamps shown, screen-capture off. */
 export const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: false,
+  // ENABLED, matching the Rust default (MYND-563/592; opt-out). An absent key
+  // reads as on — the transcribe command re-reads it host-side, so this default
+  // only affects UI visibility, never the gate.
+  transcription_enabled: true,
   // ENABLED, matching the Rust default (MYND-618/619). An absent key must read
   // as on: reading it as off would silently disable reminders on every existing
   // vault, which is the worst available reading of a missing value.

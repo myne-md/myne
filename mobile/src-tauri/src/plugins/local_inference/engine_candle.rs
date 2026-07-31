@@ -255,3 +255,77 @@ impl Engine for CandleEngine {
         *self.transcription.lock().unwrap_or_else(|p| p.into_inner()) = None;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::plugins::local_inference::engine::Engine as _;
+    use crate::plugins::local_inference::model_store::set_selected_model;
+    use myne_core::test_support::ScopedTempDir;
+    use std::ops::ControlFlow;
+
+    #[test]
+    fn transcribe_without_a_model_is_not_ready() {
+        // No override picked and no bundled model → the engine degrades to
+        // side-load-only rather than panicking (the model-less baseline).
+        let tmp = ScopedTempDir::new("candle-tx-notready").expect("tempdir");
+        let engine = CandleEngine::new(tmp.path().to_path_buf());
+        assert_eq!(engine.transcribe(&[0.0f32; 16_000]), Err(EngineError::NotReady));
+    }
+
+    // Ported verbatim from desktop (MYND-563 task 3/5 AC): a real Whisper GGUF
+    // must transcribe a 16 kHz-mono WAV near-verbatim. Env-gated + #[ignore] so
+    // it never runs in CI; the release-verification step. Invoke:
+    //   MYNE_TEST_TRANSCRIPTION_MODEL=<path>.gguf \
+    //   MYNE_TEST_TRANSCRIPTION_AUDIO=<path>.wav \
+    //   MYNE_TEST_TRANSCRIPTION_EXPECT=fox \
+    //   cargo test -p myne-mobile --features local-inference \
+    //       transcribe_with_a_real_model_streams_a_transcript -- --ignored --nocapture
+    #[test]
+    #[ignore = "needs a side-loaded Whisper GGUF — set MYNE_TEST_TRANSCRIPTION_MODEL=<path>.gguf (siblings config.json + tokenizer.json) and MYNE_TEST_TRANSCRIPTION_AUDIO=<path>.wav (optional MYNE_TEST_TRANSCRIPTION_EXPECT=<substring>)"]
+    fn transcribe_with_a_real_model_streams_a_transcript() {
+        use crate::plugins::local_inference::audio::wav_to_mono_16k;
+        use crate::plugins::local_inference::model_store::ModelRole;
+        use std::path::Path;
+
+        let Ok(model) = std::env::var("MYNE_TEST_TRANSCRIPTION_MODEL") else {
+            eprintln!("skip: set MYNE_TEST_TRANSCRIPTION_MODEL to a Whisper GGUF (siblings config.json + tokenizer.json)");
+            return;
+        };
+        let Ok(audio) = std::env::var("MYNE_TEST_TRANSCRIPTION_AUDIO") else {
+            eprintln!("skip: set MYNE_TEST_TRANSCRIPTION_AUDIO to a .wav clip with known speech");
+            return;
+        };
+        let tmp = ScopedTempDir::new("candle-real-transcribe").expect("tempdir");
+        set_selected_model(tmp.path(), ModelRole::Transcription, Path::new(&model))
+            .expect("record transcription model");
+        eprintln!("\n=== COMPUTE DEVICE: {:?} ===\n", select_device());
+        let engine = CandleEngine::new(tmp.path().to_path_buf());
+
+        let wav = std::fs::read(&audio).expect("read audio fixture");
+        let pcm = wav_to_mono_16k(&wav).expect("decode WAV → 16 kHz mono");
+
+        let mut pieces: Vec<String> = Vec::new();
+        let full = engine
+            .transcribe_streaming(&pcm, &mut |seg| {
+                pieces.push(seg.to_string());
+                ControlFlow::Continue(())
+            })
+            .expect("transcription should succeed with a real model");
+        eprintln!("\n=== REAL TRANSCRIPT ===\n{full}\n=======================\n");
+
+        assert!(!full.trim().is_empty(), "expected non-empty transcript");
+        assert!(!pieces.is_empty(), "expected at least one streamed segment");
+        assert_eq!(pieces.concat(), full, "streamed segments reconstruct the full transcript");
+
+        let blocking = engine.transcribe(&pcm).expect("blocking transcribe");
+        assert_eq!(blocking, full, "blocking and streaming transcripts must agree");
+
+        if let Ok(expect) = std::env::var("MYNE_TEST_TRANSCRIPTION_EXPECT") {
+            assert!(
+                full.to_lowercase().contains(&expect.to_lowercase()),
+                "transcript should contain {expect:?}, got: {full}"
+            );
+        }
+    }
+}

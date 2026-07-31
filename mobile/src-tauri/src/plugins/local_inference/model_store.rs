@@ -690,4 +690,77 @@ mod tests {
         // Generation does not feed the embedding identity → no hash recorded.
         assert_eq!(selected_embedding_model_hash(base).unwrap(), None);
     }
+
+    #[test]
+    fn effective_transcription_model_is_override_else_bundled_else_none() {
+        // MYND-563 task-4 AC. Override-else-bundled resolution, degrading to
+        // side-load-only (`None` → the engine reports `NotReady`) when neither is
+        // present.
+        let tmp = ScopedTempDir::new("local-inf-tx-effective").expect("scoped tempdir");
+        let base = tmp.path();
+
+        // A stand-in bundled model file (present on disk so the engine would load
+        // it — resolution here is pure path logic, no candle involved).
+        let res = base.join("resources");
+        std::fs::create_dir_all(&res).unwrap();
+        let bundled = res.join("model.gguf");
+        std::fs::write(&bundled, b"tiny-gguf").unwrap();
+
+        // No override, no bundled → None (side-load-only).
+        assert_eq!(effective_transcription_model(base, None).unwrap(), None);
+
+        // No override, bundled present → the bundled path.
+        assert_eq!(
+            effective_transcription_model(base, Some(&bundled)).unwrap(),
+            Some(bundled.clone())
+        );
+
+        // An override wins over the bundled default.
+        let dl = base.join("downloads");
+        std::fs::create_dir_all(&dl).unwrap();
+        let override_path = dl.join("my-whisper.gguf");
+        std::fs::write(&override_path, b"override-gguf").unwrap();
+        set_selected_model(base, ModelRole::Transcription, &override_path).unwrap();
+        assert_eq!(
+            effective_transcription_model(base, Some(&bundled)).unwrap(),
+            Some(override_path)
+        );
+    }
+
+    #[test]
+    fn bundled_transcription_model_is_none_when_absent() {
+        // A resource dir with no model file → None (degrade to side-load-only,
+        // never a phantom path that fails to load). Present → Some.
+        let tmp = ScopedTempDir::new("local-inf-tx-bundled").expect("scoped tempdir");
+        let res = tmp.path().join("res");
+        std::fs::create_dir_all(res.join("models").join("whisper")).unwrap();
+        assert_eq!(bundled_transcription_model(&res), None);
+        let model = res.join("models").join("whisper").join("model.gguf");
+        std::fs::write(&model, b"tiny-gguf").unwrap();
+        assert_eq!(bundled_transcription_model(&res), Some(model));
+    }
+
+    #[test]
+    fn transcription_hash_binds_the_effective_model_and_reforces_on_swap() {
+        // The MYE1 cache-invalidation identity (SYNC-V3): the hash tracks the
+        // EFFECTIVE model (bundled when no override), and a swap re-hashes.
+        let tmp = ScopedTempDir::new("local-inf-tx-hash").expect("scoped tempdir");
+        let base = tmp.path();
+        let res = base.join("res");
+        std::fs::create_dir_all(&res).unwrap();
+        let bundled = res.join("model.gguf");
+        std::fs::write(&bundled, b"tiny-weights-v1").unwrap();
+
+        let h1 = ensure_transcription_model_hash_with_bundled(base, Some(&bundled))
+            .unwrap()
+            .unwrap();
+        let expected: [u8; 32] = Sha256::digest(b"tiny-weights-v1").into();
+        assert_eq!(h1, expected);
+
+        // Neither override nor bundled → None (not a panic).
+        assert_eq!(
+            ensure_transcription_model_hash_with_bundled(base, None).unwrap(),
+            None
+        );
+    }
 }

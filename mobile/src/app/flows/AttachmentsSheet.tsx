@@ -11,6 +11,8 @@ import { catalogList, attachmentDelete, attachmentRename, attachmentUnusedList, 
 import { attachmentSrc } from "../../lib/attachmentRef";
 import { HAS_TAURI } from "../../lib/app-window";
 import { formatBytes } from "../../lib/util";
+import { usePrefs } from "../../lib/use-prefs";
+import { startTranscription, type TranscribeError } from "../../lib/transcribe";
 import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
 import { renderPdfFirstPage } from "@myne/editor/attachments/pdf-render";
 
@@ -34,6 +36,7 @@ const openPreview = (e: CatalogEntry) => {
 export function AttachmentsSheet({
   onClose,
   onInsert,
+  onInsertText,
   variant = "sheet",
 }: {
   onClose: () => void;
@@ -41,11 +44,19 @@ export function AttachmentsSheet({
    *  attachment into the open note. Omitted for the top-level library (browse /
    *  rename / delete only). */
   onInsert?: (id: string, filename: string) => void;
+  /** When provided (in-editor context), a finished audio transcript shows an
+   *  "Insert transcript into note" action that appends the TEXT to the open note
+   *  (MYND-563). Distinct from `onInsert`, which embeds an attachment reference.
+   *  Omitted for the top-level Files library, where there is no open note. */
+  onInsertText?: (text: string) => void;
   /** `"sheet"` = floating modal (in-editor insert picker). `"page"` = full
    *  bottom-tab page (the top-level Files library). */
   variant?: "sheet" | "page";
 }) {
   const { t } = useTranslation();
+  // Transcription visibility is gated on the pref (MYND-563; the backend
+  // re-reads it host-side, so this only governs whether the action shows).
+  const { prefs } = usePrefs();
   const [entries, setEntries] = useState<CatalogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -256,7 +267,8 @@ export function AttachmentsSheet({
           </div>
         ) : (
           entries.map((e) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 4px", borderTop: "1px solid var(--line-1)" }}>
+            <div key={e.id} style={{ borderTop: "1px solid var(--line-1)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 4px" }}>
               <div
                 onClick={isAudio(e.content_type) ? undefined : () => openPreview(e)}
                 style={{ width: 44, height: 44, borderRadius: 8, background: "var(--bg-2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", cursor: previewKind(e.content_type) ? "pointer" : "default" }}
@@ -295,6 +307,10 @@ export function AttachmentsSheet({
                   <button onClick={() => void remove(e.id)} style={actionBtn("var(--danger)")}>{t("attachments.deleteDialog.delete")}</button>
                 </div>
               )}
+            </div>
+            {isAudio(e.content_type) && prefs.transcription_enabled && (
+              <TranscribeRow id={e.id} onInsertText={onInsertText} />
+            )}
             </div>
           ))
         )}
@@ -400,6 +416,78 @@ function AudioTile({ id, filename }: { id: string; filename: string }) {
         )}
       </button>
     </>
+  );
+}
+
+/** Inline transcription control under an audio row (MYND-563). Idle shows a
+ *  "Transcribe" button; running streams each segment into a live preview; done
+ *  shows the read-only transcript (`textContent`-only — never HTML) + an
+ *  "Insert transcript into note" action when an `onInsertText` sink is provided.
+ *  The transcript is AS3-Sensitive plaintext — rendered, never logged. */
+function TranscribeRow({ id, onInsertText }: { id: string; onInsertText?: (text: string) => void }) {
+  const { t } = useTranslation();
+  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [text, setText] = useState("");
+  const [errKind, setErrKind] = useState<TranscribeError["kind"] | null>(null);
+
+  const run = () => {
+    setState("running");
+    setText("");
+    setErrKind(null);
+    const { done } = startTranscription(id, (seg) => setText((prev) => prev + seg));
+    done
+      .then((full) => {
+        setText(full);
+        setState("done");
+      })
+      .catch((e: TranscribeError) => {
+        setErrKind(e.kind);
+        setState("error");
+      });
+  };
+
+  return (
+    <div style={{ padding: "0 4px 12px 56px" }} data-testid="files.transcribe-row" data-attachment-id={id}>
+      {state === "idle" && (
+        <button type="button" onClick={run} data-testid="files.transcribe-start" style={actionBtn("var(--accent)")}>
+          {t("attachments.library.menuTranscribe")}
+        </button>
+      )}
+      {state === "running" && (
+        <div style={{ fontSize: 13, color: "var(--fg-2)" }}>
+          <div style={{ color: "var(--fg-3)", marginBottom: 4 }}>{t("attachments.library.transcribeStarted")}</div>
+          {text && <div style={{ whiteSpace: "pre-wrap" }}>{text}</div>}
+        </div>
+      )}
+      {state === "done" && (
+        <div data-testid="files.transcribe-done">
+          <div style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-3)", marginBottom: 4 }}>
+            {t("editor.attachment.widget.transcribe.heading")}
+          </div>
+          <div style={{ fontSize: 14, color: "var(--fg-1)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{text}</div>
+          {onInsertText && (
+            <button
+              type="button"
+              onClick={() => onInsertText(text)}
+              data-testid="files.transcribe-insert"
+              style={{ ...actionBtn("var(--accent)"), marginTop: 6 }}
+            >
+              {t("editor.attachment.widget.transcribe.insert")}
+            </button>
+          )}
+        </div>
+      )}
+      {state === "error" && (
+        <div style={{ fontSize: 13, color: "var(--danger)" }} data-testid="files.transcribe-error">
+          {errKind === "not_ready"
+            ? t("attachments.library.transcribeNoModel")
+            : t("attachments.library.transcribeFailed")}{" "}
+          <button type="button" onClick={run} style={actionBtn("var(--accent)")}>
+            {t("attachments.library.menuTranscribe")}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
