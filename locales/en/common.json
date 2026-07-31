@@ -2549,9 +2549,17 @@
       "title": "AI"
     },
     "network": {
+      "disabledCue": "Sync is no longer routed through Tor. New connections go straight to the sync server.",
       "errorRead": "Couldn't read the current setting. Flip the switch to set it again.",
       "errorSave": "Couldn't save the setting. Nothing changed.",
       "errorSidecar": "Tor routing is on, but the Tor client couldn't start. Sync is paused until it can — nothing is being sent directly.",
+      "postureActive": "Sync is going through Tor",
+      "postureConnecting": "Connecting to Tor — sync is paused",
+      "postureConnectingDetail": "This usually takes a few seconds. Nothing is being sent directly in the meantime.",
+      "postureHeading": "Right now",
+      "postureInactive": "Sync goes straight to the sync server",
+      "postureUnavailable": "Tor is unavailable — sync is paused",
+      "postureUnavailableDetail": "Nothing is being sent directly. Sync resumes on its own if the Tor client comes back; turning this setting off syncs without Tor instead.",
       "residualExit": "The last relay in a Tor circuit — the exit node — sees which sync server you connect to. It can't read what you sync; that stays encrypted end to end.",
       "residualMetadata": "The sync server still sees when you sync, how many blobs you push and how large they are, and how many devices you have. Tor doesn't change that.",
       "residualPayment": "If you pay for hosted sync, the payment and your account can still be linked to you. Tor changes where the connection comes from, not the billing trail.",
@@ -3098,6 +3106,11 @@
       "conflictsNeedReview_other": "{{count}} conflicts need review",
       "catchingUp": "Catching up on sync — your notes are safe.",
       "verifyDevices": "Verify devices"
+    },
+    "tor": {
+      "connecting": "Connecting to Tor. Sync is paused until the connection is ready — nothing is being sent directly.",
+      "settingsHint": "Settings → Network",
+      "unavailable": "Tor is unavailable, so sync is paused. Nothing is being sent directly. Turn off Tor routing to sync without it."
     }
   },
   "tasks": {

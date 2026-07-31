@@ -62,6 +62,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             qr::sync_device_join_qr,
             tor::sync_get_tor_routing,
             tor::sync_set_tor_routing,
+            tor::sync_get_tor_state,
         ])
         .build()
 }

@@ -523,6 +523,13 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // render an "off" toggle it can never turn on.
     ("plugin:sync|sync_get_tor_routing", Class::Unsupported),
     ("plugin:sync|sync_set_tor_routing", Class::Unsupported),
+    // Task 8's posture read, refused for the same reason and with more force:
+    // it reports whether *this device's* sync egress is going through a Tor
+    // client, and a browser tab's honest answer to that is "I have no idea what
+    // this browser is doing" — Tor Browser routes the page, invisibly to the
+    // page. Answering `stopped` would read as "not protected" to a user who is
+    // in fact running the whole browser over Tor.
+    ("plugin:sync|sync_get_tor_state", Class::Unsupported),
 ];
 
 /// Classify one IPC command name.
