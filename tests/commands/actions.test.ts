@@ -31,7 +31,6 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     prefs: { developer_mode: true } as CommandContext["prefs"],
     onOpenAiChat: vi.fn(),
     onSummarizeNote: vi.fn(),
-    onSuggestTags: vi.fn(),
     onRewriteSelection: vi.fn(),
     onLock: vi.fn(async () => {}),
     onOpenSettings: vi.fn(),
@@ -96,7 +95,6 @@ describe("Command palette action registry", () => {
     expect([...COMMAND_ACTIONS].map((a) => a.id).sort()).toEqual([
       "ai.open-chat",
       "ai.rewrite-selection",
-      "ai.suggest-tags",
       "ai.summarize-note",
       "ai.toggle-enabled",
       "app.open-settings",
@@ -295,39 +293,8 @@ describe("Command palette action registry", () => {
     ).toBe("hidden");
   });
 
-  it("ai.suggest-tags needs editor + a selected note + ai_enabled; disabled when off, hidden without a note (SYNC-9/14)", () => {
-    const action = find("ai.suggest-tags");
-    const note = "n1" as CommandContext["selectedNoteId"];
-    expect(
-      action.visibility(makeContext({ stageName: "editor", selectedNoteId: note, aiEnabled: true })),
-    ).toBe("show");
-    expect(
-      action.visibility(makeContext({ stageName: "editor", selectedNoteId: note, aiEnabled: false })),
-    ).toBe("disabled");
-    expect(
-      action.visibility(makeContext({ stageName: "editor", selectedNoteId: null, aiEnabled: true })),
-    ).toBe("hidden");
-    expect(
-      action.visibility(makeContext({ stageName: "welcome", selectedNoteId: note, aiEnabled: true })),
-    ).toBe("hidden");
-    const onSuggestTags = vi.fn();
-    void action.run(makeContext({ onSuggestTags }));
-    expect(onSuggestTags).toHaveBeenCalledTimes(1);
-  });
-
-  it("ai.suggest-tags is HIDDEN while Developer mode is off, even with AI enabled + a note selected (MYND-593)", () => {
-    const action = find("ai.suggest-tags");
-    const note = "n1" as CommandContext["selectedNoteId"];
-    expect(
-      action.visibility(
-        makeContext({
-          stageName: "editor",
-          selectedNoteId: note,
-          aiEnabled: true,
-          prefs: { developer_mode: false } as CommandContext["prefs"],
-        }),
-      ),
-    ).toBe("hidden");
+  it("registers NO ai.suggest-tags action — the inline band is the only tag surface (MYND-651)", () => {
+    expect(COMMAND_ACTIONS.some((a) => a.id === "ai.suggest-tags")).toBe(false);
   });
 
   it("ai.rewrite-selection needs editor + a selected note + ai_enabled; disabled when off, hidden without a note", () => {

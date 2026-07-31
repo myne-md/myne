@@ -17,6 +17,7 @@ import type {
   WikilinkRef,
   WikilinkTargetKind,
 } from "../dialect/types";
+import { collectFrontmatterTags } from "./frontmatterTags";
 import { bumpIndexNonce } from "./indexNonce";
 import { noteRead } from "./readNote";
 import {
@@ -138,24 +139,6 @@ function precedingNonEmptyLine(body: string, from: number): string {
     if (trimmed !== "") return trimmed;
   }
   return "";
-}
-
-/** Pull frontmatter `tags:` / `tag:` values, coercing to strings. Accepts a
- *  single scalar, a YAML list, or numbers (frontmatter numeric tags are
- *  valid — §3.7.6 — unlike inline `#1984` which the parser already rejects). */
-function collectFrontmatterTags(
-  parsed: Record<string, unknown> | null,
-): string[] {
-  if (parsed === null) return [];
-  const out: string[] = [];
-  const consume = (raw: unknown): void => {
-    if (typeof raw === "string") out.push(raw);
-    else if (typeof raw === "number") out.push(String(raw));
-    else if (Array.isArray(raw)) for (const item of raw) consume(item);
-  };
-  consume(parsed["tags"]);
-  consume(parsed["tag"]);
-  return out;
 }
 
 /**

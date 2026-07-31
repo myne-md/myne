@@ -28,7 +28,7 @@ import { act, renderHook } from "@testing-library/react";
 const prefs = {
   deliberate_folders: [] as string[],
   archived_folders: [] as string[],
-  item_order: [] as string[],
+  item_order: {} as Record<string, string[]>,
   favorites: [] as string[],
   item_colors: {} as Record<string, string>,
   folder_icons: {} as Record<string, string>,
@@ -172,7 +172,7 @@ function findNode(nodes: readonly FolderNode[], key: string): FolderNode | null 
 
 beforeEach(() => {
   prefs.deliberate_folders = [];
-  prefs.item_order = [];
+  prefs.item_order = {};
   prefs.favorites = [];
   prefs.item_colors = {};
   prefs.folder_icons = {};
@@ -185,13 +185,13 @@ afterEach(() => vi.clearAllMocks());
 describe("prefs sync", () => {
   it("hydrates deliberate / itemOrder / favorites / decorations from mount-time prefs", () => {
     prefs.deliberate_folders = ["Drafts/"];
-    prefs.item_order = ["n1", "Drafts/"];
+    prefs.item_order = { "": ["n1", "Drafts/"] };
     prefs.favorites = ["n1"];
     prefs.item_colors = { n1: "rose" };
     prefs.folder_icons = { "Drafts/": "star" };
     const { result } = mount([rec("n1", null)], ["Drafts/"]);
     expect(result.current.deliberate).toEqual(["Drafts/"]);
-    expect(result.current.itemOrder).toEqual(["n1", "Drafts/"]);
+    expect(result.current.itemOrder).toEqual({ "": ["n1", "Drafts/"] });
     expect(result.current.favorites).toEqual(["n1"]);
     expect(result.current.itemColors).toEqual({ n1: "rose" });
     // Fold-on-load (MYND-562): the display-cased folder key migrates to its
@@ -663,22 +663,26 @@ describe("reorder indicators (bail-out identity)", () => {
 
 describe("reorder write (note → item_order)", () => {
   it("same-container note reorder persists a new item_order without moving the note", async () => {
-    prefs.item_order = ["n1", "n2"];
+    prefs.item_order = { "": ["n1", "n2"] };
     const { result, ctx } = mount([rec("n1", null), rec("n2", null)], []);
     act(() => result.current.onNoteDragStart(dragStartEvent(), "n1"));
     await act(async () => {
       await result.current.onNoteReorder("n2", "below");
     });
-    // Same container → no moveNote; item_order persisted with n1 after n2.
+    // Same container → no moveNote; only the root container's sequence is
+    // rewritten (n1 after n2), the rest of the map untouched (MYND-596).
     expect(moveNote).not.toHaveBeenCalled();
     expect(setItemOrder).toHaveBeenCalled();
-    const persisted = setItemOrder.mock.calls.at(-1)![0] as string[];
-    expect(persisted).toEqual(["n2", "n1"]);
+    const persisted = setItemOrder.mock.calls.at(-1)![0] as Record<
+      string,
+      string[]
+    >;
+    expect(persisted).toEqual({ "": ["n2", "n1"] });
     expect(ctx.refreshOne).not.toHaveBeenCalled();
   });
 
   it("cross-container note reorder moves the note first, then persists order", async () => {
-    prefs.item_order = ["n1", "Work/"];
+    prefs.item_order = { "": ["n1", "Work/"] };
     const { result, ctx } = mount([rec("n1", null), rec("n2", "Work/")], ["Work/"]);
     act(() => result.current.onNoteDragStart(dragStartEvent(), "n1"));
     await act(async () => {
@@ -700,15 +704,15 @@ describe("reorder write (note → item_order)", () => {
   });
 
   it("reverts item_order to recency when the persist rejects (position is soft)", async () => {
-    prefs.item_order = ["n1", "n2"];
+    prefs.item_order = { "": ["n1", "n2"] };
     setItemOrder.mockRejectedValueOnce(new Error("over cap"));
     const { result } = mount([rec("n1", null), rec("n2", null)], []);
     act(() => result.current.onNoteDragStart(dragStartEvent(), "n1"));
     await act(async () => {
       await result.current.onNoteReorder("n2", "below");
     });
-    // The optimistic order reverts to the pre-write sequence.
-    expect(result.current.itemOrder).toEqual(["n1", "n2"]);
+    // The optimistic order reverts to the pre-write map.
+    expect(result.current.itemOrder).toEqual({ "": ["n1", "n2"] });
   });
 });
 
@@ -790,7 +794,7 @@ describe("favorites", () => {
 
 describe("root drop (unfile)", () => {
   it("dropping a filed note on the root unfiles it (moveNote → null) + persists order", async () => {
-    prefs.item_order = ["Work/"];
+    prefs.item_order = { "": ["Work/"] };
     const { result, ctx } = mount([rec("n1", "Work/")], ["Work/"]);
     act(() => result.current.onNoteDragStart(dragStartEvent(), "n1"));
     await act(async () => {
@@ -802,7 +806,7 @@ describe("root drop (unfile)", () => {
   });
 
   it("dropping an already-root note on the root reorders only (no moveNote)", async () => {
-    prefs.item_order = ["n1"];
+    prefs.item_order = { "": ["n1"] };
     const { result } = mount([rec("n1", null)], []);
     act(() => result.current.onNoteDragStart(dragStartEvent(), "n1"));
     await act(async () => {

@@ -40,7 +40,7 @@ import {
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
 import { getHost } from "@myne/editor/host";
-import { startTranscription } from "../../lib/transcribe";
+import { startTranscription, type TranscribeError } from "../../lib/transcribe";
 import { usePrefs } from "../../hooks/usePrefs";
 import { showAttachmentToast } from "../../editor/attachments/toast";
 import { AttachmentSyncProgress } from "./AttachmentSyncProgress";
@@ -85,6 +85,16 @@ const SORT_OPTION_KEYS: readonly { value: SortKey; labelKey: string }[] = [
   { value: "name-asc", labelKey: "attachments.library.sort.nameAsc" },
   { value: "name-desc", labelKey: "attachments.library.sort.nameDesc" },
 ];
+
+// Toast i18n KEY per transcription-failure cause (MYND-591) — resolved with
+// `t()` at usage time (never a frozen resolved string). `"failed"` and any
+// unrecognized kind fall back to the generic failure toast at the call site.
+const TRANSCRIBE_TOAST_KEY: Readonly<Record<string, string>> = {
+  feature_off: "attachments.library.transcribeFeatureOff",
+  vault_locked: "attachments.library.transcribeVaultLocked",
+  no_model: "attachments.library.transcribeNoModelHint",
+  model_load_failed: "attachments.library.transcribeModelLoadFailed",
+};
 
 interface AttachmentsLibraryProps {
   /**
@@ -415,8 +425,8 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   // Transcribe (voice-to-text MYND-552, SYNC-V9) — routes through the SAME
   // shared helper the in-note widget uses (no divergent call path). Fire-and-
   // forget with transient feedback: the transcript lands in the searchable MYE1
-  // cache backend-side; the library has no editor to insert into. A no-model
-  // rejection points at the model picker (mirrors the widget's hint).
+  // cache backend-side; the library has no editor to insert into. Each cause
+  // (MYND-591) surfaces its own truthful toast; anything else → generic failure.
   const handleTranscribe = useCallback(
     (entry: CatalogEntry) => {
       showAttachmentToast(t("attachments.library.transcribeStarted"));
@@ -424,14 +434,8 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       run.done
         .then(() => showAttachmentToast(t("attachments.library.transcribeDone")))
         .catch((err: unknown) => {
-          const notReady =
-            err !== null && typeof err === "object" && "kind" in err &&
-            (err as { kind: unknown }).kind === "not_ready";
-          showAttachmentToast(
-            notReady
-              ? t("attachments.library.transcribeNoModel")
-              : t("attachments.library.transcribeFailed"),
-          );
+          const kind = (err as TranscribeError | null)?.kind ?? "failed";
+          showAttachmentToast(t(TRANSCRIBE_TOAST_KEY[kind] ?? "attachments.library.transcribeFailed"));
         });
     },
     [t],

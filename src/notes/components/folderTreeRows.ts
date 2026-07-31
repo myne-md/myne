@@ -7,15 +7,28 @@
 // file-tree — folderless ("unfiled") notes render at the ROOT level alongside
 // top-level folders (no separate "Vault root" section), and within every
 // container sub-folders and notes are ordered TOGETHER, freely interleaved by
-// the unified `item_order` prefs sequence. A child listed in `item_order` sorts
-// by its index; unlisted children sort after all listed ones — folders before
-// notes (folded name), then notes by recency.
+// the `item_order` sequence. MYND-596 reshape: `item_order` is a per-container
+// map (`""` = root, else a folded folder key → that container's manual
+// sequence), so each container is ranked independently. A child listed in its
+// container's sequence sorts by its index; unlisted children sort after all
+// listed ones — folders before notes (folded name), then notes by recency.
+//
+// The rank/interleave primitives (`orderContainerChildren`, `buildContainerRank`)
+// live in the shared `@myne/editor/host/notes/itemOrder` module; this file
+// re-exports them for the desktop consumers that reach them through here.
 
-import { foldSegment } from "../../dialect/folderPath";
-import { buildRankMap, uuidv7Ms, type NoteId } from "../sidebarState";
-import { itemOrderKey } from "./itemOrderReorder";
+import {
+  orderContainerChildren,
+  buildContainerRank,
+  type NoteId,
+  type ItemOrderMap,
+  type Child,
+} from "@myne/editor/host/notes/itemOrder";
 import type { TitleRecord } from "../loadNoteBatch";
 import type { FolderNode, FolderTree } from "../folderTree";
+
+export { orderContainerChildren, buildContainerRank };
+export type { Child };
 
 export type VisibleRow =
   | {
@@ -42,76 +55,14 @@ function isEmptyFolder(node: FolderNode): boolean {
 }
 
 /**
- * Build the unified `item_order` rank map — a `key → index` lookup over the
- * heterogeneous prefs sequence. A folder entry (trailing `/`) is normalized +
- * case-folded so it matches a {@link FolderNode.key}; a note entry (a UUID) is
- * kept verbatim so it matches a note id. Folded folder paths and raw UUIDs
- * never collide (a UUID carries no trailing slash). First occurrence wins —
- * defensive against accidental duplicates in the sequence.
- */
-export function buildItemRankMap(
-  itemOrder: readonly string[],
-): Map<string, number> {
-  // Fold each entry to its canonical key ([`itemOrderKey`]: folder paths →
-  // `FolderNode.key`, note UUIDs verbatim) then reuse the shared first-occurrence
-  // rank builder. Relative order is all that matters, so a (rare) malformed
-  // folder path keyed by its raw form is harmless — it matches no node.
-  return buildRankMap(itemOrder.map(itemOrderKey));
-}
-
-export type Child =
-  | { kind: "folder"; node: FolderNode }
-  | { kind: "note"; id: NoteId };
-
-/**
- * Merge a container's child folders and notes into one display-ordered list,
- * interleaved by the unified `item_order` rank. A child present in `rank` sorts
- * by its index; unlisted children sort after all listed ones — folders before
- * notes (by folded name), then notes by recency (`updatedAt` desc, UUIDv7
- * fallback). Notes not yet loaded into `cache` are dropped (windowing gate —
- * the same gate the pre-MYND-183 code applied to each note group).
- */
-export function orderContainerChildren(
-  folders: readonly FolderNode[],
-  noteIds: readonly NoteId[],
-  cache: ReadonlyMap<NoteId, TitleRecord>,
-  rank: ReadonlyMap<string, number>,
-): Child[] {
-  const children: Child[] = [
-    ...folders.map((node) => ({ kind: "folder" as const, node })),
-    ...noteIds
-      .filter((id) => cache.has(id))
-      .map((id) => ({ kind: "note" as const, id })),
-  ];
-  const MAX = Number.MAX_SAFE_INTEGER;
-  const keyOf = (c: Child): string =>
-    c.kind === "folder" ? c.node.key : c.id;
-  const noteMs = (id: NoteId): number =>
-    cache.get(id)?.updatedAt?.getTime() ?? uuidv7Ms(id) ?? 0;
-
-  children.sort((a, b) => {
-    const ra = rank.get(keyOf(a)) ?? MAX;
-    const rb = rank.get(keyOf(b)) ?? MAX;
-    if (ra !== rb) return ra - rb;
-    // Equal ranks ⇒ both unlisted (finite indices are unique per key).
-    if (a.kind === "folder" && b.kind === "folder") {
-      return foldSegment(a.node.name).localeCompare(foldSegment(b.node.name));
-    }
-    if (a.kind === "note" && b.kind === "note") {
-      return noteMs(b.id) - noteMs(a.id); // recency desc
-    }
-    // Mixed kind, both unlisted: folders before notes.
-    return a.kind === "folder" ? -1 : 1;
-  });
-  return children;
-}
-
-/**
  * Flatten `tree` into visible rows. `cache` resolves note records (and gates
  * out ids not yet loaded); `collapsed` is the set of folded folder keys
- * (ephemeral, default empty = all expanded). `itemOrder` is the unified manual
- * sidebar order (the `item_order` prefs sequence) — folders and notes within
- * each container are interleaved by their index in it.
+ * (ephemeral, default empty = all expanded). `itemOrder` is the per-container
+ * manual sidebar order (`item_order`, MYND-596) — a map keyed by container
+ * (`""` = tree root, else a folded folder key) whose values are that
+ * container's manual sequence. Each container ranks its own children
+ * independently: root by `itemOrder[""]`, a folder's children by
+ * `itemOrder[node.key]`.
  *
  * Output is folder + note rows only — folderless notes and top-level folders
  * interleave at depth 0. No section-header row is emitted: the single `"Notes"`
@@ -122,10 +73,9 @@ export function flattenVisibleRows(
   tree: FolderTree,
   cache: ReadonlyMap<NoteId, TitleRecord>,
   collapsed: ReadonlySet<string>,
-  itemOrder: readonly string[] = [],
+  itemOrder: ItemOrderMap = {},
 ): VisibleRow[] {
   const rows: VisibleRow[] = [];
-  const rank = buildItemRankMap(itemOrder);
 
   const walk = (children: readonly Child[], depth: number): void => {
     for (const child of children) {
@@ -144,15 +94,30 @@ export function flattenVisibleRows(
         empty: isEmptyFolder(node),
       });
       if (collapsedNode) continue;
+      // This folder is a container: rank its children by its own sequence.
       walk(
-        orderContainerChildren(node.children, node.noteIds, cache, rank),
+        orderContainerChildren(
+          node.children,
+          node.noteIds,
+          cache,
+          buildContainerRank(itemOrder[node.key] ?? []),
+        ),
         depth + 1,
       );
     }
   };
 
-  // Root level: top-level folders + folderless (unfiled) notes, interleaved.
-  walk(orderContainerChildren(tree.roots, tree.unfiledNoteIds, cache, rank), 0);
+  // Root level (container key `""`): top-level folders + folderless (unfiled)
+  // notes, interleaved by the root container's own sequence.
+  walk(
+    orderContainerChildren(
+      tree.roots,
+      tree.unfiledNoteIds,
+      cache,
+      buildContainerRank(itemOrder[""] ?? []),
+    ),
+    0,
+  );
 
   return rows;
 }
