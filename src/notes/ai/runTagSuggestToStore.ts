@@ -28,11 +28,15 @@ export async function runTagSuggestToStore(args: {
   dispatch({ type: "THINKING" });
   try {
     const pass = await runTagSuggestionPass({
+      // Legacy standalone-store surface, deleted by MYND-651 task 8 — kept on
+      // the generic `infer` it always used, adapted to the pass's tag-model
+      // seam (see the same note in `aiToChat.ts`).
+      noteId: "",
       noteBody: args.noteBody,
       noteFolder: args.noteFolder,
       existingTags: args.existingTags,
       excludedFolders: args.excludedFolders,
-      infer: args.infer,
+      suggest: ({ prompt }) => args.infer(prompt),
     });
     if (!isTagRunCurrent(token)) return;
     if (pass.skipped) {

@@ -148,6 +148,10 @@ const V = {
   "src/lib/ai-chat.ts": ["adapted", "Unreachable where `localAi` is absent; the editor host omits the `ai` member entirely."],
   "src/lib/ai-model-store.ts": ["adapted", "Same as ai-chat: no AI surface mounts on web."],
   "src/lib/ai-qa.ts": ["adapted", "Same as ai-chat."],
+  "src/lib/ai-tags.ts": [
+    "adapted",
+    "Same as ai-chat: the auto-tag seam is unreachable where `localAi` is absent, and its command is `Unsupported` in the dispatcher.",
+  ],
   "src/lib/aiExcludedFolders.ts": ["ported", "Pure path predicate; also read by non-AI callers."],
   "src/lib/app-window.ts": [
     "adapted",
