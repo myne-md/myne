@@ -61,14 +61,6 @@ export type CommandContext = {
    */
   onSummarizeNote: () => void;
   /**
-   * Suggest tags for the open note (auto-tag-link MYND-411). Runs the local
-   * `Engine.infer` once on the note body + existing-vocabulary hint, ranks the
-   * candidates, and renders chips in the AI Chat tab; blocked for a note in an
-   * `ai_excluded_folders` folder (SYNC-14). Gated on `editor + selectedNote +
-   * aiEnabled`.
-   */
-  onSuggestTags: () => void;
-  /**
    * Rewrite the current editor selection in place (writing-assistant MYND-410
    * `/yeniden-yaz` as a palette action — a slash trigger has no selection). Runs
    * the local `Engine.infer` on the selection and replaces it as plain markdown

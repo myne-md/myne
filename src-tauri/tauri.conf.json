@@ -73,7 +73,7 @@
         }
       }
     },
-    "externalBin": ["binaries/myne"],
+    "externalBin": ["binaries/myne", "binaries/myne-tor"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -106,7 +106,8 @@
       "resources/dictionaries/sl": "dictionaries/sl",
       "resources/dictionaries/sv": "dictionaries/sv",
       "resources/models/whisper": "models/whisper",
-      "resources/models/ocr": "models/ocr"
+      "resources/models/ocr": "models/ocr",
+      "resources/models/tag": "models/tag"
     }
   }
 }

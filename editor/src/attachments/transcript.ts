@@ -18,7 +18,7 @@
 
 import type { EditorView } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
-import { getHost, type TranscribeHandle } from "../host";
+import { getHost, type TranscribeHandle, type TranscribeErrorKind } from "../host";
 import { showAttachmentToast } from "./toast";
 import { ensureAttachmentInsertStyles } from "./styles";
 
@@ -34,19 +34,15 @@ export function __clearTranscriptStore(): void {
   transcriptStore.clear();
 }
 
-/** True when the host slot rejected because AI is off / no transcription model
- *  is side-loaded (SYNC-V3) — the caller surfaces the "select a model" hint
- *  instead of a generic failure. Robust to both the normalized `{ kind }` shape
- *  and a bare serialized-enum string. */
-function isNotReady(err: unknown): boolean {
-  const tag =
-    typeof err === "string"
-      ? err
-      : err !== null && typeof err === "object" && "kind" in err
-        ? String((err as { kind: unknown }).kind)
-        : "";
-  return tag === "not_ready" || tag === "NotReady";
-}
+/** i18n key for each actionable transcription-failure cause (MYND-591). Keyed by
+ *  the normalized {@link TranscribeErrorKind} minus `"failed"` (which is a
+ *  transient toast, not a persistent hint). */
+const HINT_KEY: Record<Exclude<TranscribeErrorKind, "failed">, string> = {
+  feature_off: "editor.attachment.widget.transcribe.cause.featureOff",
+  vault_locked: "editor.attachment.widget.transcribe.cause.vaultLocked",
+  no_model: "editor.attachment.widget.transcribe.cause.noModel",
+  model_load_failed: "editor.attachment.widget.transcribe.cause.modelLoadFailed",
+};
 
 export interface TranscriptSection {
   /** The container appended under the audio player's time row. */
@@ -149,13 +145,13 @@ export function createTranscriptSection(opts: {
     container.appendChild(wrap);
   };
 
-  // ---- "select a model" hint (AI on, no transcription model) ----------------
-  const renderHint = (): void => {
+  // ---- per-cause hint (feature off / vault locked / no model / load fail) ----
+  const renderCause = (kind: Exclude<TranscribeErrorKind, "failed">): void => {
     clear();
     const hint = document.createElement("span");
     hint.className = "cm-attachment-audio-transcript-hint";
     hint.setAttribute("data-testid", "attachment-audio.transcript-hint");
-    hint.textContent = i18n.t("editor.attachment.widget.transcribe.noModelHint");
+    hint.textContent = i18n.t(HINT_KEY[kind]);
     container.appendChild(hint);
   };
 
@@ -239,8 +235,11 @@ export function createTranscriptSection(opts: {
       .catch((err: unknown) => {
         handle = null;
         if (stopped) return; // user cancelled — no error surfaced
-        if (isNotReady(err)) {
-          renderHint();
+        const kind = (err as { kind?: TranscribeErrorKind } | null)?.kind ?? "failed";
+        if (kind !== "failed") {
+          // Actionable cause (MYND-591): a persistent inline hint naming the
+          // truthful reason (feature off / vault locked / no model / load fail).
+          renderCause(kind);
           return;
         }
         // Any other failure: a transient toast, then drop back to the prior

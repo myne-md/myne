@@ -19,9 +19,13 @@ vi.mock("../../src/editor/attachments/lightbox", () => ({
 vi.mock("../../src/editor/attachments/waveform", () => ({
   decodePeaks: vi.fn(async () => [] as number[]),
 }));
+vi.mock("../../src/editor/attachments/toast", () => ({
+  showAttachmentToast: vi.fn(),
+}));
 
 import { AttachmentAudioWidget } from "../../src/editor/attachments/widgets";
 import { __clearTranscriptStore } from "../../src/editor/attachments/transcript";
+import { showAttachmentToast } from "../../src/editor/attachments/toast";
 import { type EditorHost, getHost, setEditorHost } from "../../src/editor/host";
 import type { TranscribeHandle, TranscribeOptions } from "../../src/editor/host";
 import { AI_TRANSCRIPT_HONESTY_NOTE } from "../../src/lib/load-bearing-copy";
@@ -220,19 +224,54 @@ describe("Transcription run → progress → expander → insert", () => {
   });
 });
 
-describe("no-model + Stop", () => {
-  it("surfaces the 'select a model' hint when the run rejects not_ready (SYNC-V3)", async () => {
+describe("per-cause hint + Stop", () => {
+  const ACTIONABLE_CAUSES = [
+    { kind: "feature_off" },
+    { kind: "vault_locked" },
+    { kind: "no_model" },
+    { kind: "model_load_failed" },
+  ] as const;
+
+  it("renders a distinct, non-empty hint for each actionable cause (MYND-591)", async () => {
+    const texts: string[] = [];
+    for (const cause of ACTIONABLE_CAUSES) {
+      const { view, stub } = installHost({ aiEnabled: true, withTranscribe: true });
+      const dom = build(view);
+      openMenu(dom);
+      transcribeRow()!.click();
+      stub.reject(cause);
+      await flush();
+
+      const hint = dom.querySelector('[data-testid="attachment-audio.transcript-hint"]');
+      expect(hint, `hint for ${cause.kind}`).not.toBeNull();
+      expect(hint!.textContent, `text for ${cause.kind}`).not.toBe("");
+      // A cause hint replaces the run — no expander, no lingering progress, no toast.
+      expect(dom.querySelector('[data-testid="attachment-audio.transcript"]')).toBeNull();
+      expect(dom.querySelector('[data-testid="attachment-audio.transcript-progress"]')).toBeNull();
+      expect(showAttachmentToast).not.toHaveBeenCalled();
+      texts.push(hint!.textContent ?? "");
+
+      // Reset between iterations (afterEach only runs once for the whole test).
+      setEditorHost(baseHost);
+      document.body.innerHTML = "";
+      __clearTranscriptStore();
+      vi.mocked(showAttachmentToast).mockClear();
+    }
+    // Each cause maps to its own message — a regression that collapses them back
+    // into a single "no model" copy would fail here.
+    expect(new Set(texts).size).toBe(ACTIONABLE_CAUSES.length);
+  });
+
+  it("shows a transient toast and NO hint on a generic failure", async () => {
     const { view, stub } = installHost({ aiEnabled: true, withTranscribe: true });
     const dom = build(view);
     openMenu(dom);
     transcribeRow()!.click();
-    stub.reject({ kind: "not_ready" });
+    stub.reject({ kind: "failed" });
     await flush();
 
-    const hint = dom.querySelector('[data-testid="attachment-audio.transcript-hint"]');
-    expect(hint).not.toBeNull();
-    expect(hint!.textContent).not.toBe("");
-    // No expander, no lingering progress.
+    expect(showAttachmentToast).toHaveBeenCalledTimes(1);
+    expect(dom.querySelector('[data-testid="attachment-audio.transcript-hint"]')).toBeNull();
     expect(dom.querySelector('[data-testid="attachment-audio.transcript"]')).toBeNull();
     expect(dom.querySelector('[data-testid="attachment-audio.transcript-progress"]')).toBeNull();
   });

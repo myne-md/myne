@@ -98,7 +98,7 @@ describe("applyConflictVersion (take theirs)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.noteRead.mockResolvedValue(buildConflictCopyContent("remote body\n", ORIG));
-    mocks.prefsRead.mockResolvedValue({ favorites: [], item_order: [] });
+    mocks.prefsRead.mockResolvedValue({ favorites: [], item_order: {} });
     mocks.noteUpdate.mockResolvedValue(undefined);
     mocks.deleteNoteRouted.mockResolvedValue(undefined);
     mocks.setFavorites.mockResolvedValue(undefined);
@@ -116,14 +116,20 @@ describe("applyConflictVersion (take theirs)", () => {
   });
 
   it("migrates favorites + item_order membership from the original to the copy", async () => {
-    mocks.prefsRead.mockResolvedValue({ favorites: [ORIG], item_order: [ORIG, "Folder/"] });
+    mocks.prefsRead.mockResolvedValue({
+      favorites: [ORIG],
+      item_order: { "": [ORIG, "Folder/"] },
+    });
     await applyConflictVersion(COPY, ORIG);
     expect(mocks.setFavorites).toHaveBeenCalledWith([COPY]);
-    expect(mocks.setItemOrder).toHaveBeenCalledWith([COPY, "Folder/"]);
+    expect(mocks.setItemOrder).toHaveBeenCalledWith({ "": [COPY, "Folder/"] });
   });
 
   it("skips the prefs write when the original is in neither favorites nor item_order", async () => {
-    mocks.prefsRead.mockResolvedValue({ favorites: ["x"], item_order: ["y", "Folder/"] });
+    mocks.prefsRead.mockResolvedValue({
+      favorites: ["x"],
+      item_order: { "": ["y", "Folder/"] },
+    });
     await applyConflictVersion(COPY, ORIG);
     expect(mocks.setFavorites).not.toHaveBeenCalled();
     expect(mocks.setItemOrder).not.toHaveBeenCalled();
@@ -155,7 +161,7 @@ describe("undoConflictVersion (take-theirs undo)", () => {
         ? "---\ndeleted: 2026-06-29T00:00:00Z\ntitle: Note\n---\n\nlocal body\n"
         : "remote body\n",
     );
-    mocks.prefsRead.mockResolvedValue({ favorites: [], item_order: [] });
+    mocks.prefsRead.mockResolvedValue({ favorites: [], item_order: {} });
     mocks.noteUpdate.mockResolvedValue(undefined);
     mocks.setFavorites.mockResolvedValue(undefined);
     mocks.setItemOrder.mockResolvedValue(undefined);
@@ -183,9 +189,12 @@ describe("undoConflictVersion (take-theirs undo)", () => {
   });
 
   it("reverts the prefs migration (copy → original)", async () => {
-    mocks.prefsRead.mockResolvedValue({ favorites: [COPY], item_order: [COPY, "Folder/"] });
+    mocks.prefsRead.mockResolvedValue({
+      favorites: [COPY],
+      item_order: { "": [COPY, "Folder/"] },
+    });
     await undoConflictVersion(COPY, ORIG);
     expect(mocks.setFavorites).toHaveBeenCalledWith([ORIG]);
-    expect(mocks.setItemOrder).toHaveBeenCalledWith([ORIG, "Folder/"]);
+    expect(mocks.setItemOrder).toHaveBeenCalledWith({ "": [ORIG, "Folder/"] });
   });
 });

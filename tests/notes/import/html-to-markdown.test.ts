@@ -318,7 +318,7 @@ describe("markdown-structure injection (adversarial battery, MYND-580 review)", 
   it("rejects a scheme obfuscated past scheme-detection (fails closed)", async () => {
     // A NUL becomes U+FFFD during HTML parsing, which is not a control character —
     // the earlier "no scheme → allow" default let this through into note text.
-    const out = await md('<a href="jav ascript:alert(1)">l</a>');
+    const out = await md('<a href="jav\u0000ascript:alert(1)">l</a>');
     expect(out).toBe("l");
     expect(out).not.toContain("ascript:");
   });

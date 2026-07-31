@@ -81,16 +81,18 @@ function yamlReTypesPlainScalar(value: string): boolean {
   }
 }
 
-// Format a `title:` value. Like {@link formatYamlScalar}, but ALSO quotes a
-// value that YAML would re-type away from a string — a note title is always a
-// string, so a date-/number-/bool-shaped title (e.g. a daily note titled
-// `2026-06-07`) MUST be quoted or the reader parses it as a non-string and the
+// Format a value that MUST read back as the exact string. Like
+// {@link formatYamlScalar}, but ALSO quotes a value that YAML would re-type away
+// from a string. Two callers today, for the same reason: a note title is always
+// a string, so a date-/number-/bool-shaped title (e.g. a daily note titled
+// `2026-06-07`) must be quoted or the reader parses it as a non-string and the
 // sidebar shows "Untitled" (and daily-note idempotency breaks, since the
-// title-keyed match never finds it). Only `title:` needs this — `trashed:`
-// (RFC 3339, value-strict raw read) and `template:` (literal `true`, value-strict
-// raw read) are read without js-yaml and must stay unquoted, so they keep
-// {@link formatYamlScalar}.
-function formatYamlTitleScalar(value: string): string {
+// title-keyed match never finds it); and a frontmatter tag item (`notes/ai/
+// acceptTag.ts`) would otherwise be handed to the tag index as a number or a
+// bool and read back different, or vanish. The value-strict fields do NOT need
+// it — `trashed:` (RFC 3339) and `template:` (literal `true`) are read without
+// js-yaml and must stay unquoted, so they keep {@link formatYamlScalar}.
+export function formatYamlStringScalar(value: string): string {
   if (needsYamlQuoting(value) || yamlReTypesPlainScalar(value)) {
     const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     return `"${escaped}"`;
@@ -282,7 +284,7 @@ export function patchUpdatedField(bytes: Uint8Array, iso: string): Uint8Array {
 function applyStateATitle(source: string, value: string): string {
   return (
     FRONTMATTER_OPENER +
-    "title: " + formatYamlTitleScalar(value) + NEWLINE +
+    "title: " + formatYamlStringScalar(value) + NEWLINE +
     FRONTMATTER_DELIMITER + NEWLINE +
     NEWLINE +
     source
@@ -294,17 +296,17 @@ function applyStateBTitle(
   bodyEnd: number,
   value: string,
 ): string {
-  // `formatYamlTitleScalar` (NOT `formatYamlScalar`) — inserting a fresh
+  // `formatYamlStringScalar` (NOT `formatYamlScalar`) — inserting a fresh
   // `title:` line into an existing FM block (the common case: a note that
   // already carries `updated:` / `folder:` but no title yet) must quote a
   // value YAML would re-type away from a string, exactly like states A and C.
   // A date-shaped title (`2026-06-07`) inserted unquoted reads back as a Date
   // → "Untitled" (and breaks daily-note title-keyed matching).
-  const insert = "title: " + formatYamlTitleScalar(value) + NEWLINE;
+  const insert = "title: " + formatYamlStringScalar(value) + NEWLINE;
   return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
 }
 
-// `title:` — user-authored; `formatYamlTitleScalar` also quotes a value YAML
+// `title:` — user-authored; `formatYamlStringScalar` also quotes a value YAML
 // would re-type away from a string (a date-/int-/bool-shaped title).
 function applyStateCTitle(
   source: string,
@@ -317,7 +319,7 @@ function applyStateCTitle(
     bodyStart,
     bodyEnd,
     TITLE_KEY_RE,
-    formatYamlTitleScalar,
+    formatYamlStringScalar,
     value,
   );
 }

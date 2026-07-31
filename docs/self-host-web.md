@@ -135,6 +135,13 @@ These are yours to get right; nothing in the client can compensate:
 - **Telling your users whose code they are running**, if the instance is not
   just for you. See the first section.
 
+Two things about client addresses are worth passing on rather than assuming.
+Your origin sees them at every page load whether you log them or not, and the
+web client has no Tor switch of its own — a user who wants their network
+location hidden from both your origin and the sync server opens the client in
+Tor Browser, at a cost this repo states plainly in
+[`web-tor-browser.md`](web-tor-browser.md).
+
 ## Source obligation (AGPL-3.0)
 
 The web client is AGPL-3.0. Serving it over a network engages §13: your users

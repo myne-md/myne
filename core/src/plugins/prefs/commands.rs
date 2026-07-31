@@ -967,6 +967,78 @@ pub(crate) async fn set_transcription_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for whether automatic on-device tag suggestion
+/// runs on this vault's notes (MYND-651). Default-off, emitted on disk only
+/// when `true`, so an untouched vault stays byte-identical to a pre-feature
+/// `vault.prefs`. Shared / scalar-LWW like `transcription_enabled`: a bundled
+/// task-model, so wanting the feature is a vault-level preference rather than a
+/// device capability.
+///
+/// **Not** the enforcement point. The tag pass is gated on `ai_enabled` AND
+/// this flag, both re-read host-side before the model is touched, so a WebView
+/// that skips or forges this setter gains nothing — and in particular cannot
+/// start inference on a vault whose AI opt-in is off.
+pub async fn set_auto_tag_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_auto_tag_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_auto_tag_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_auto_tag_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_auto_tag_enabled`].
+pub(crate) async fn set_auto_tag_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.auto_tag_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "auto_tag_enabled",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for whether THIS DEVICE shows task reminders
 /// (MYND-618). Device-local: whether a given machine should be interrupted is a
 /// property of that machine, so it never syncs. Omit-when-default keeps an
@@ -2237,19 +2309,20 @@ pub(crate) async fn set_cli_rate_limit_disabled_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for the `item_order` sequence — the unified
-/// manual sidebar order across the single interleaved file-tree (a flat,
-/// heterogeneous list of note UUIDs + folder paths, MYND-183, superseding the
-/// old `note_order` + `folder_order`). Read-modify-write under the per-plugin
-/// write mutex; **no native side-effect** (same shape as
-/// `set_deliberate_folders`). The caller passes the full desired sequence; v0.1
-/// single-device writes it verbatim. Unlike `deliberate_folders`, the codec
-/// preserves element order — the sequence IS the payload
-/// (`protocol::PrefsView::item_order`).
+/// manual sidebar order across the interleaved file-tree — a **container-keyed
+/// map** (container path → ordered child sequence of note UUIDs + child folder
+/// paths, MYND-183 + MYND-596, superseding the old flat list). Read-modify-write
+/// under the per-plugin write mutex; **no native side-effect** (same shape as
+/// `set_deliberate_folders`). The caller passes the full desired map; each
+/// container's sequence is written verbatim (order IS the payload,
+/// `protocol::PrefsView::item_order`), and the central write path stamps an
+/// `item_order/<container>` LWW clock for each changed container (§10.2.1), so a
+/// reorder in one folder never clobbers a concurrent reorder in another.
 pub async fn set_item_order_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    order: Vec<String>,
+    order: std::collections::BTreeMap<String, Vec<String>>,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), PrefsWriteError> {
     let dir =
@@ -2265,7 +2338,7 @@ pub async fn set_item_order<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    order: Vec<String>,
+    order: std::collections::BTreeMap<String, Vec<String>>,
 ) -> Result<(), PrefsWriteError> {
     set_item_order_from_host(
         &TauriHost::new(app),
@@ -2282,11 +2355,16 @@ pub(crate) async fn set_item_order_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    order: Vec<String>,
+    order: std::collections::BTreeMap<String, Vec<String>>,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    let count = order.len();
+    // COUNTS only, computed before the value is moved into the closure — never
+    // the container paths / item IDs (note_id is a per-note vault-stable
+    // correlation tag, folder paths are AS3 Sensitive; see ../../CLAUDE.md
+    // "Secret-handling logging discipline").
+    let containers = order.len();
+    let items: usize = order.values().map(Vec::len).sum();
     update_prefs_with_dir(
         vault_dir,
         state,
@@ -2299,10 +2377,12 @@ pub(crate) async fn set_item_order_with_dir(
     )
     .await?;
 
-    // COUNT only — never the item IDs/paths (note_id is a per-note vault-stable
-    // correlation tag, folder paths are AS3 Sensitive; see ../../CLAUDE.md
-    // "Secret-handling logging discipline").
-    tracing::info!(event = "prefs_written", field = "item_order", count,);
+    tracing::info!(
+        event = "prefs_written",
+        field = "item_order",
+        containers,
+        items
+    );
     Ok(())
 }
 
@@ -5250,13 +5330,14 @@ mod tests {
                     deliberate_folders: Vec::new(),
                     device_names: Default::default(),
                     auto_lock_seconds: None,
+                    auto_tag_enabled: false,
                     custom_theme: None,
                     daily_date_format: None,
                     daily_folder: None,
                     daily_template: None,
                     favorites: Vec::new(),
                     field_clocks: Default::default(),
-                    item_order: Vec::new(),
+                    item_order: Default::default(),
                     keymap: Default::default(),
                     active_workspace: None,
                     archive_disabled: None,
@@ -6153,6 +6234,17 @@ mod tests {
 
     // ---- item_order / favorites setters (MYND-183) -------------------
 
+    /// A single-root-container `item_order` map (`"" → [ids…]`) — the shape a
+    /// test writes when it exercises just one container (MYND-596).
+    fn root_order<const N: usize>(
+        ids: [&str; N],
+    ) -> std::collections::BTreeMap<String, Vec<String>> {
+        std::collections::BTreeMap::from([(
+            String::new(),
+            ids.iter().map(|s| s.to_string()).collect(),
+        )])
+    }
+
     #[test]
     fn set_item_order_rejects_when_slot_empty() {
         rt().block_on(async {
@@ -6162,7 +6254,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["a", "b"]),
+                root_order(["a", "b"]),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6184,7 +6276,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["n-zzz", "Zebra/", "n-aaa"]),
+                root_order(["n-zzz", "Zebra/", "n-aaa"]),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6204,7 +6296,7 @@ mod tests {
             let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after order writes");
-            assert_eq!(view.item_order, alloc_vec(["n-zzz", "Zebra/", "n-aaa"]));
+            assert_eq!(view.item_order, root_order(["n-zzz", "Zebra/", "n-aaa"]));
             assert_eq!(view.favorites, alloc_vec(["n-zzz", "n-aaa"]));
             // The pre-existing screen_capture default is untouched.
             assert!(view.screen_capture_protection);
@@ -6215,7 +6307,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                std::collections::BTreeMap::new(),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )

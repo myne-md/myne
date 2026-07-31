@@ -185,7 +185,14 @@ pub fn parse_endpoint(url: &str) -> Option<(String, String, u16)> {
     Some((scheme.to_string(), host, port))
 }
 
-fn is_loopback(host: &str) -> bool {
+/// Does `host` name this device? The A4 endpoint policy uses it to decide where
+/// plaintext `http` is permitted, and [`super::proxy::host_is_tor_exempt`]
+/// reuses it to decide what Tor mode does not route (MYND-650 task 4) — one
+/// notion of "loopback", checked in one place, for both rules.
+///
+/// A literal string match, never a resolved address: a name that resolves to
+/// `127.0.0.1` today is still a name somebody else's DNS answers.
+pub(crate) fn is_loopback(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 

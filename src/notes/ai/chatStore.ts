@@ -15,8 +15,6 @@
 
 import { useSyncExternalStore } from "react";
 
-import type { TagSuggestion } from "./tagRanker";
-
 /** A source-note citation backing a grounded assistant answer (mirrors the Rust
  *  `SearchHit`; snake_case → camelCase at the IPC boundary). */
 export interface ChatCitation {
@@ -41,9 +39,6 @@ export interface ChatTurn {
   error: boolean;
   /** Source notes the grounded answer drew from (assistant turns; may be empty). */
   citations: ChatCitation[];
-  /** Auto-tag suggestions on an assistant "suggest tags" turn — each an explicit
-   *  accept action (SYNC-17). Empty on ordinary chat/summary turns. (task 11) */
-  tagSuggestions: TagSuggestion[];
   /** Whether this assistant turn can be inserted into the open note (summaries +
    *  any answer the user chooses to keep — SYNC-17 explicit action). (task 10) */
   insertable: boolean;
@@ -67,7 +62,6 @@ export type ChatAction =
     }
   | { type: "TOKEN"; text: string }
   | { type: "FINALIZE"; citations: ChatCitation[] }
-  | { type: "FINALIZE_TAGS"; suggestions: TagSuggestion[] }
   | { type: "FAIL" }
   | { type: "STOP" }
   | { type: "CLEARED" };
@@ -94,7 +88,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         streaming: false,
         error: false,
         citations: [],
-        tagSuggestions: [],
         insertable: false,
       };
       const assistantTurn: ChatTurn = {
@@ -104,7 +97,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         streaming: true,
         error: false,
         citations: [],
-        tagSuggestions: [],
         insertable: action.insertable,
       };
       return { turns: [...state.turns, userTurn, assistantTurn], streaming: true };
@@ -125,18 +117,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
           ...last,
           streaming: false,
           citations: action.citations,
-        }),
-        streaming: false,
-      };
-    }
-    case "FINALIZE_TAGS": {
-      const last = state.turns[state.turns.length - 1];
-      if (!last || last.role !== "assistant") return { ...state, streaming: false };
-      return {
-        turns: replaceLast(state.turns, {
-          ...last,
-          streaming: false,
-          tagSuggestions: action.suggestions,
         }),
         streaming: false,
       };
@@ -226,13 +206,6 @@ export function appendChatToken(token: number, text: string): void {
 export function finalizeChatTurn(token: number, citations: ChatCitation[]): void {
   if (!isChatRunCurrent(token)) return;
   dispatchChat({ type: "FINALIZE", citations });
-}
-
-/** Close the active assistant turn with auto-tag suggestions (task 11), iff
- *  `token` is current. */
-export function finalizeChatTags(token: number, suggestions: TagSuggestion[]): void {
-  if (!isChatRunCurrent(token)) return;
-  dispatchChat({ type: "FINALIZE_TAGS", suggestions });
 }
 
 /** Mark the active assistant turn as errored, iff `token` is current. */

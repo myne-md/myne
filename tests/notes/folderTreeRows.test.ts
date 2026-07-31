@@ -9,8 +9,8 @@
 import { describe, it, expect } from "vitest";
 import { deriveFolderTree } from "../../src/notes/folderTree";
 import {
+  buildContainerRank,
   buildFavoriteRows,
-  buildItemRankMap,
   flattenVisibleRows,
   pruneFavorites,
   toggleFavoriteList,
@@ -51,9 +51,9 @@ const kinds = (rows: VisibleRow[]) => rows.map((r) => r.kind);
 const ids = (rows: VisibleRow[]) =>
   rows.map((r) => (r.kind === "note" ? r.id : r.node.name));
 
-describe("buildItemRankMap", () => {
+describe("buildContainerRank", () => {
   it("keeps note UUIDs verbatim and case-folds folder paths", () => {
-    const m = buildItemRankMap(["n1", "Projects/", "n2"]);
+    const m = buildContainerRank(["n1", "Projects/", "n2"]);
     expect(m.get("n1")).toBe(0);
     expect(m.get("projects/")).toBe(1); // folded to match FolderNode.key
     expect(m.get("n2")).toBe(2);
@@ -61,8 +61,13 @@ describe("buildItemRankMap", () => {
   });
 
   it("first occurrence wins on duplicates", () => {
-    const m = buildItemRankMap(["a", "b", "a"]);
+    const m = buildContainerRank(["a", "b", "a"]);
     expect(m.get("a")).toBe(0);
+  });
+
+  it("defaults an absent container sequence to an empty rank", () => {
+    expect(buildContainerRank().size).toBe(0);
+    expect(buildContainerRank([]).size).toBe(0);
   });
 });
 
@@ -140,7 +145,8 @@ describe("flattenVisibleRows", () => {
       [rec("n1", null), rec("n2", null)],
       ["Apple/", "Zebra/"],
     );
-    const itemOrder = ["n1", "Apple/", "n2", "Zebra/"];
+    // Root container (`""`) sequence interleaves the loose notes and folders.
+    const itemOrder = { "": ["n1", "Apple/", "n2", "Zebra/"] };
     const rows = flattenVisibleRows(tree, cache, new Set(), itemOrder);
     expect(ids(rows)).toEqual(["n1", "Apple", "n2", "Zebra"]);
   });
@@ -150,8 +156,11 @@ describe("flattenVisibleRows", () => {
       rec("d", "Work/"), // direct note in Work
       rec("s", "Work/Sub/"), // note inside the subfolder
     ]);
-    // Default would be folders-first (Sub before d); item_order puts d first.
-    const rows = flattenVisibleRows(tree, cache, new Set(), ["d", "Work/Sub/"]);
+    // Default would be folders-first (Sub before d); the `work/` container's
+    // own sequence puts the note d before the Sub subfolder (MYND-596).
+    const rows = flattenVisibleRows(tree, cache, new Set(), {
+      "work/": ["d", "Work/Sub/"],
+    });
     expect(kinds(rows)).toEqual(["folder", "note", "folder", "note"]);
     expect(ids(rows)).toEqual(["Work", "d", "Sub", "s"]);
     expect(visibleNoteIds(rows)).toEqual(["d", "s"]);
@@ -162,7 +171,7 @@ describe("flattenVisibleRows", () => {
       rec("x", null, 100), // newest, but unlisted
       rec("y", null, 1), // oldest, but listed
     ]);
-    const rows = flattenVisibleRows(tree, cache, new Set(), ["y"]);
+    const rows = flattenVisibleRows(tree, cache, new Set(), { "": ["y"] });
     // y is listed (index 0) so it leads despite being older than x.
     expect(visibleNoteIds(rows)).toEqual(["y", "x"]);
   });

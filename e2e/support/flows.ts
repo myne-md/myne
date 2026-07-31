@@ -252,20 +252,23 @@ export async function lockAndReunlock(session: Session, password: string): Promi
 /** Open the Settings modal from the editor's gear button and wait for
  *  the dialog root. Optionally switch to a rail tab (the modal always
  *  opens on Account). */
+export type SettingsTab =
+  | "account"
+  | "privacy"
+  | "sync"
+  | "editor"
+  | "files"
+  | "hotkeys"
+  | "appearance"
+  | "storage"
+  | "ai"
+  | "network"
+  | "transcription"
+  | "about";
+
 export async function openSettings(
   session: Session,
-  tab?:
-    | "account"
-    | "privacy"
-    | "sync"
-    | "editor"
-    | "files"
-    | "hotkeys"
-    | "appearance"
-    | "storage"
-    | "ai"
-    | "transcription"
-    | "about",
+  tab?: SettingsTab,
 ): Promise<void> {
   await (await session.byTestId("editor.settings-cta")).click();
   await session.byTestId("settings.modal");
@@ -274,50 +277,105 @@ export async function openSettings(
   }
 }
 
-/** Enable the local-AI master switch via Settings → AI → toggle, then close
- *  the modal. The switch is off by default (opt-in, SYNC-12); the `ai.*`
- *  editor extensions (ghost-text, slash) compose only when it is on, so callers
- *  that drive those flows enable AI BEFORE opening the target note. Reflects the
- *  persisted pref via `aria-checked` on the `role="switch"` element. Requires the
- *  `local-inference`(-stub) build — the AI settings tab is absent otherwise. */
-/** Set the speech-to-text switch via Settings → Transcription, then close the
- *  modal (MYND-592). Idempotent: it clicks only when the switch is not already
- *  in the wanted state, so a caller can assert the DEFAULT (on) without a
- *  no-op click flipping it off. Unlike `enableAi` this is an opt-OUT — the
- *  feature is on out of the box, and the AI master switch has no bearing on it.
- */
+/** Drive one `role="switch"` in Settings to a wanted state, then close the
+ *  modal. Idempotent by construction: it clicks only when `aria-checked` is not
+ *  already what the caller asked for, so a caller can assert a DEFAULT without a
+ *  no-op click flipping it. `aria-checked` reflects the PERSISTED pref, so the
+ *  wait is a real write-landed wait, not a paint wait.
+ *
+ *  The switch helpers below are all this one call — keep it that way. A settings
+ *  toggle whose flow is hand-rolled is a flow that will re-learn the stale-handle
+ *  and idempotence lessons on its own. */
+async function setSettingsSwitch(
+  session: Session,
+  opts: {
+    tab: SettingsTab;
+    /** Waited for before the toggle, where the panel has a root of its own — it
+     *  fails on the PANEL rather than on a toggle the panel never rendered. */
+    panelTestId?: string;
+    toggleTestId: string;
+    enabled: boolean;
+    label: string;
+  },
+): Promise<void> {
+  const want = opts.enabled ? "true" : "false";
+  await openSettings(session, opts.tab);
+  if (opts.panelTestId !== undefined) await session.byTestId(opts.panelTestId);
+  // Re-fetched on every read: the handle goes stale across a panel re-render.
+  const checked = async () =>
+    await (await session.byTestId(opts.toggleTestId)).attribute("aria-checked");
+  if ((await checked()) !== want) await (await session.byTestId(opts.toggleTestId)).click();
+  await session.waitUntil(async () => ((await checked()) === want ? true : null), {
+    label: `${opts.label} = ${want}`,
+    timeoutMs: 10_000,
+  });
+  await closeSettings(session);
+}
+
+/** Set the speech-to-text switch via Settings → Transcription (MYND-592).
+ *  Unlike `enableAi` this is an opt-OUT — the feature is on out of the box, and
+ *  the AI master switch has no bearing on it. */
 export async function setTranscriptionEnabled(
   session: Session,
   enabled: boolean,
 ): Promise<void> {
-  const want = enabled ? "true" : "false";
-  await openSettings(session, "transcription");
-  await session.byTestId("settings.transcription-panel");
-  if ((await (await session.byTestId("settings.transcription")).attribute("aria-checked")) !== want) {
-    await (await session.byTestId("settings.transcription")).click();
-  }
+  await setSettingsSwitch(session, {
+    tab: "transcription",
+    panelTestId: "settings.transcription-panel",
+    toggleTestId: "settings.transcription",
+    enabled,
+    label: "transcription_enabled",
+  });
+}
+
+/**
+ * Turn Developer mode on via Settings → About and wait for the Developer rail
+ * group to appear. Leaves the Settings modal OPEN on the About tab, because
+ * every caller's next move is a rail click into one of the panels the group just
+ * revealed (`settings.tab-ai`, `settings.tab-network`, …).
+ *
+ * Immediate effect, no dialog — the About toggle writes the `developer_mode`
+ * pref and the rail is filtered from it, so the group's presence is the
+ * assertion that the flip took.
+ */
+export async function enableDeveloperMode(session: Session): Promise<void> {
+  await openSettings(session, "about");
+  await (await session.byTestId("about.developer-mode-toggle")).click();
   await session.waitUntil(
     async () =>
-      (await (await session.byTestId("settings.transcription")).attribute("aria-checked")) === want
+      (await (await session.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
+      "true"
         ? true
         : null,
-    { label: `transcription_enabled = ${want}`, timeoutMs: 10_000 },
+    { label: "developer_mode toggled on", timeoutMs: 10_000 },
   );
-  await closeSettings(session);
+  await session.waitForElement(testIdSelector("settings.developer-group"));
 }
 
 export async function enableAi(session: Session): Promise<void> {
-  await openSettings(session, "ai");
-  await session.byTestId("settings.ai-panel");
-  await (await session.byTestId("ai.enable-toggle")).click();
-  await session.waitUntil(
-    async () =>
-      (await (await session.byTestId("ai.enable-toggle")).attribute("aria-checked")) === "true"
-        ? true
-        : null,
-    { label: "ai_enabled toggled on", timeoutMs: 10_000 },
-  );
-  await closeSettings(session);
+  await enableDeveloperMode(session);
+  await setSettingsSwitch(session, {
+    tab: "ai",
+    panelTestId: "settings.ai-panel",
+    toggleTestId: "ai.enable-toggle",
+    enabled: true,
+    label: "ai_enabled",
+  });
+}
+
+/** Set the auto-tag sub-switch via Settings → AI (MYND-651). Off by default, and
+ *  the host re-reads BOTH it and `ai_enabled` before any model touch — so a
+ *  caller that wants the inline suggestion band must have called {@link enableAi}
+ *  first. The toggle renders disabled while `ai_enabled` is off, so an
+ *  out-of-order call would silently do nothing. */
+export async function setAutoTagEnabled(session: Session, enabled: boolean): Promise<void> {
+  await setSettingsSwitch(session, {
+    tab: "ai",
+    panelTestId: "settings.ai-panel",
+    toggleTestId: "ai.auto-tag-toggle",
+    enabled,
+    label: "auto_tag_enabled",
+  });
 }
 
 /** Close the Settings modal via its × button and wait for the dialog
