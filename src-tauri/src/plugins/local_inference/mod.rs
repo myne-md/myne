@@ -21,6 +21,7 @@ pub mod audio;
 pub mod cancel;
 pub mod chunker;
 pub mod commands;
+pub mod compute_priority;
 pub mod embeddings_persist;
 pub mod engine;
 pub mod engine_candle;
@@ -64,7 +65,7 @@ const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
   "identifier": "local-inference",
   "description": "On-device AI inference + retrieval + grounded Q&A commands (infer/embed/semantic_search/ask) for the main window; no core/fs/dialog/clipboard/network.",
   "windows": ["main"],
-  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
+  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-suggest-tags", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
 }"#;
 
 /// Best-effort zeroize + reset of the in-RAM AI vector store on lock teardown
@@ -106,6 +107,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::chat_stop,
             commands::transcribe,
             commands::read_transcript,
+            commands::suggest_tags,
             commands::set_model_path,
             commands::get_model_path
         ])
@@ -153,6 +155,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // `chat_stream` generation observes it; `chat_stop` and the vault-
             // lock teardown (task 12) set it.
             app.manage(cancel::CancelToken::default());
+            // Compute-lock priority register (auto-tag, MYND-651 task 4): the
+            // user-initiated commands register here for the length of their
+            // call, and the background tag pass stands down while any of them
+            // is pending. The single `compute` mutex cannot express an ordering
+            // on its own — this is that ordering.
+            app.manage(compute_priority::ComputePriority::default());
             app.add_capability(LOCAL_INFERENCE_CAPABILITY)?;
             Ok(())
         })

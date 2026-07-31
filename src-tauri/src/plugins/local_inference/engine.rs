@@ -137,12 +137,21 @@ pub trait Engine: Send + Sync {
     /// The prompt embeds note content — **never logged** (DENY-list), like every
     /// other string on this trait.
     ///
+    /// `should_continue` is the caller's LOWEST-priority yield probe (MYND-651
+    /// task 4): an implementation consults it before it queues for its compute
+    /// lock and again per generated token, and returns what it has the moment it
+    /// answers [`ControlFlow::Break`]. Auto-tag runs ambiently, so a user who
+    /// asks for a summarize mid-pass must not wait behind it. The engine stays
+    /// policy-free — it knows only "keep going?", never *why*
+    /// ([`super::compute_priority`] owns the why).
+    ///
     /// Default: [`EngineError::NotReady`] — an engine with no tag model has no
     /// tag path. The Candle engine and [`StubEngine`] override this.
-    // Consumed by the gated `suggest_tags` command (MYND-651 task 4); nothing in
-    // a non-test build calls it until that lands.
-    #[allow(dead_code)]
-    fn infer_tags(&self, _prompt: &str) -> Result<String, EngineError> {
+    fn infer_tags(
+        &self,
+        _prompt: &str,
+        _should_continue: &mut dyn FnMut() -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
         Err(EngineError::NotReady)
     }
 
@@ -235,7 +244,16 @@ impl Engine for StubEngine {
         Ok(emitted)
     }
 
-    fn infer_tags(&self, _prompt: &str) -> Result<String, EngineError> {
+    fn infer_tags(
+        &self,
+        _prompt: &str,
+        should_continue: &mut dyn FnMut() -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        // Honour the yield probe like the real engine does, so the E2E lane
+        // exercises the priority policy rather than routing around it.
+        if should_continue().is_break() {
+            return Ok(String::new());
+        }
         // A fixed comma list in the shape a real tag model replies in, so the
         // frontend's `parseTagCandidates` + the E2E scenario get deterministic
         // chips without a model in the repo. `stub-tag` is a legal tag token AND
@@ -400,15 +418,31 @@ mod tests {
     #[test]
     fn stub_infer_tags_returns_a_parseable_comma_list() {
         let engine: &dyn Engine = &StubEngine;
+        let mut go = || ControlFlow::Continue(());
         let out = engine
-            .infer_tags("Suggest tags for: my note")
+            .infer_tags("Suggest tags for: my note", &mut go)
             .expect("stub infer_tags never fails");
         // Deterministic, and in the comma-list shape the frontend parses.
-        assert_eq!(out, engine.infer_tags("a different prompt").unwrap());
+        assert_eq!(
+            out,
+            engine.infer_tags("a different prompt", &mut go).unwrap()
+        );
         let tags: Vec<&str> = out.split(',').map(str::trim).collect();
         assert_eq!(tags, ["stub-tag", "meeting", "notes"]);
         // Not the generation path — a caller must not be able to confuse the two.
         assert!(!out.contains("stub-infer"));
+    }
+
+    #[test]
+    fn stub_infer_tags_yields_before_producing_anything() {
+        // The stub is what the E2E lane drives, so it has to honour the yield
+        // probe too — otherwise the scenario would pass against a policy the
+        // production engine implements and the test build ignores.
+        let engine: &dyn Engine = &StubEngine;
+        let out = engine
+            .infer_tags("Suggest tags for: my note", &mut || ControlFlow::Break(()))
+            .expect("a yield is not a failure");
+        assert!(out.is_empty(), "yielded before generating, got: {out:?}");
     }
 
     #[test]
@@ -427,7 +461,10 @@ mod tests {
             }
         }
         let engine: &dyn Engine = &BareEngine;
-        assert_eq!(engine.infer_tags("prompt"), Err(EngineError::NotReady));
+        assert_eq!(
+            engine.infer_tags("prompt", &mut || ControlFlow::Continue(())),
+            Err(EngineError::NotReady)
+        );
     }
 
     #[test]

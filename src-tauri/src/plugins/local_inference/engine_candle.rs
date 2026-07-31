@@ -63,12 +63,6 @@ const MAX_NEW_TOKENS: usize = 512;
 /// a handful of comma-separated words; the 512-token generation cap would let a
 /// model that fails to stop hold the single `compute` lock for the whole budget,
 /// which is exactly what the tag pass is not allowed to do to interactive AI.
-// Every item below is the tag-suggestion (auto-tag, MYND-651) surface. Its
-// caller — the gated `suggest_tags` command — lands in task 4, so until then a
-// non-test build reaches none of it. Forward-declared with a narrow allow rather
-// than a module-wide one, the same way `error.rs` forward-declared the engine
-// error variants before task 6 consumed them.
-#[allow(dead_code)]
 const TAG_MAX_NEW_TOKENS: usize = 64;
 // A tag pass must never be able to hold the single `compute` lock for a
 // chat-sized budget. Checked at COMPILE time so raising it past a quarter of the
@@ -78,12 +72,10 @@ const _: () = assert!(TAG_MAX_NEW_TOKENS < MAX_NEW_TOKENS / 4);
 /// The frontend already windows the note body, but the WebView is untrusted
 /// (TB6) — this is the host-side bound, so a compromised WebView cannot hand the
 /// tag model a megabyte of text and pin the compute lock behind it.
-#[allow(dead_code)]
 const TAG_PROMPT_MAX_CHARS: usize = 8_000;
 /// The TRUSTED system instruction for the tag pass. The caller's prompt (which
 /// carries the note body and the vault's existing-tag hint) is the UNTRUSTED
 /// user turn; this line is ours and is never attacker-influenceable.
-#[allow(dead_code)]
 const TAG_SYSTEM_INSTRUCTION: &str =
     "You suggest short topical tags for a note. Reply with a lowercase, \
      comma-separated list of tags and nothing else.";
@@ -121,7 +113,6 @@ const GEN_LOAD_STAGES: GgufLoadStages = GgufLoadStages {
     tokenizer: "load_gen.tokenizer",
 };
 
-#[allow(dead_code)]
 const TAG_LOAD_STAGES: GgufLoadStages = GgufLoadStages {
     open: "load_tag.open_gguf",
     read: "load_tag.read_gguf",
@@ -233,7 +224,6 @@ pub struct CandleEngine {
     /// — the `compute` mutex is what orders the actual GPU work. Same
     /// [`LoadedGen`] shape because it IS a Qwen2 GGUF, just a smaller,
     /// first-party one.
-    #[allow(dead_code)]
     tag: Mutex<Option<LoadedGen>>,
 }
 
@@ -324,7 +314,6 @@ impl CandleEngine {
     /// this can ever load is the first-party GGUF resolved at construction.
     /// `NotReady` when no blob ships, so an AI-free build or an unfetched LFS
     /// checkout leaves the feature absent instead of broken.
-    #[allow(dead_code)]
     fn load_tag(&self) -> Result<LoadedGen, EngineError> {
         let started = Instant::now();
         let Some(model_path) = self.bundled_tag.clone() else {
@@ -832,7 +821,6 @@ fn run_infer_streaming(
 /// one), so a multi-byte grapheme at the cut cannot produce invalid UTF-8 — note
 /// content is attacker-influenceable and a CJK/emoji-heavy note is the ordinary
 /// case, not the exotic one. Pure, so the bound is testable without a model.
-#[allow(dead_code)]
 fn tag_prompt_head(prompt: &str) -> String {
     prompt.chars().take(TAG_PROMPT_MAX_CHARS).collect()
 }
@@ -1014,12 +1002,27 @@ impl Engine for CandleEngine {
         out
     }
 
-    fn infer_tags(&self, prompt: &str) -> Result<String, EngineError> {
-        // Serialize all GPU work (see `compute`), like every other role. The tag
-        // pass's LOWEST-priority yield policy is the command layer's job
-        // (MYND-651 task 4) — this lock is the Metal crash-safety invariant, and
-        // the short `TAG_MAX_NEW_TOKENS` budget is what keeps the hold brief.
+    fn infer_tags(
+        &self,
+        prompt: &str,
+        should_continue: &mut dyn FnMut() -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        // LOWEST-priority, half one (MYND-651 task 4): don't even QUEUE for the
+        // compute lock while user-initiated work is pending. A background pass
+        // blocked on `compute` is one an interactive call then has to wait
+        // behind — the mutex hands it out in whatever order it likes.
+        if should_continue().is_break() {
+            return Ok(String::new());
+        }
+        // Serialize all GPU work (see `compute`), like every other role — that
+        // lock is the Metal crash-safety invariant, not a perf knob.
         let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
+        // Half two: re-check after the wait. The model load below is the single
+        // longest hold in this whole call (a cold GGUF read), so an interactive
+        // call that arrived while we queued must not pay for it.
+        if should_continue().is_break() {
+            return Ok(String::new());
+        }
         let mut guard = self.tag.lock().unwrap_or_else(|p| p.into_inner());
         if guard.is_none() {
             *guard = Some(self.load_tag()?);
@@ -1036,8 +1039,11 @@ impl Engine for CandleEngine {
         }];
         let tokens = build_chatml_tokens(&mut loaded.tokenizer, TAG_SYSTEM_INSTRUCTION, &messages)?;
         let started = Instant::now();
+        // Half three: yield per generated token. The tag budget is short, but
+        // "short" is still a Metal-serialized hold an interactive call sits
+        // behind; breaking here drops `compute` within one token.
         let out = run_gen_streaming(loaded, tokens, TAG_MAX_NEW_TOKENS, &mut |_t| {
-            ControlFlow::Continue(())
+            should_continue()
         });
         match &out {
             Ok(s) => tracing::info!(
@@ -1225,14 +1231,14 @@ mod tests {
         let tmp = ScopedTempDir::new("candle-engine-notag").expect("tempdir");
         let engine = CandleEngine::new(tmp.path().to_path_buf());
         assert_eq!(
-            engine.infer_tags("suggest tags"),
+            engine.infer_tags("suggest tags", &mut || ControlFlow::Continue(())),
             Err(EngineError::NotReady)
         );
 
         // Explicitly attaching "no bundled model" is the same answer.
         let engine = CandleEngine::new(tmp.path().to_path_buf()).with_bundled_tag_model(None);
         assert_eq!(
-            engine.infer_tags("suggest tags"),
+            engine.infer_tags("suggest tags", &mut || ControlFlow::Continue(())),
             Err(EngineError::NotReady)
         );
     }
@@ -1253,7 +1259,7 @@ mod tests {
 
         let engine = CandleEngine::new(tmp.path().to_path_buf());
         assert_eq!(
-            engine.infer_tags("suggest tags"),
+            engine.infer_tags("suggest tags", &mut || ControlFlow::Continue(())),
             Err(EngineError::NotReady)
         );
     }
@@ -1279,7 +1285,7 @@ mod tests {
         let engine =
             CandleEngine::new(tmp.path().to_path_buf()).with_bundled_tag_model(Some(blob.clone()));
         let err = engine
-            .infer_tags("suggest tags")
+            .infer_tags("suggest tags", &mut || ControlFlow::Continue(()))
             .expect_err("an LFS pointer is not a model");
         assert!(
             matches!(err, EngineError::InferenceFailed | EngineError::NotReady),
@@ -1287,7 +1293,33 @@ mod tests {
         );
 
         // A second call re-attempts the load rather than caching a broken model.
-        assert!(engine.infer_tags("suggest tags").is_err());
+        assert!(engine
+            .infer_tags("suggest tags", &mut || ControlFlow::Continue(()))
+            .is_err());
+    }
+
+    #[test]
+    fn infer_tags_yields_before_it_ever_queues_for_the_compute_lock() {
+        // The lowest-priority policy's first half (MYND-651 task 4). The blob
+        // here is an LFS pointer, so reaching the load would produce a bounded
+        // ERROR — an `Ok("")` is therefore proof the pass stood down BEFORE the
+        // `compute` lock and before `load_tag`, not merely that it failed.
+        let tmp = ScopedTempDir::new("candle-engine-tag-yield").expect("tempdir");
+        let dir = tmp.path().join("models").join("tag");
+        std::fs::create_dir_all(&dir).unwrap();
+        let blob = dir.join("model.gguf");
+        std::fs::write(&blob, b"version https://git-lfs.github.com/spec/v1\n").unwrap();
+
+        let engine = CandleEngine::new(tmp.path().to_path_buf()).with_bundled_tag_model(Some(blob));
+        let mut probes = 0usize;
+        let out = engine
+            .infer_tags("suggest tags", &mut || {
+                probes += 1;
+                ControlFlow::Break(())
+            })
+            .expect("a yield is not a failure");
+        assert!(out.is_empty(), "yielded pass returns nothing, got {out:?}");
+        assert_eq!(probes, 1, "one probe, then stand down — no load attempted");
     }
 
     #[test]
@@ -1711,7 +1743,7 @@ mod tests {
              in four hours at 24C. Next bake is Saturday — planning a 75% hydration \
              country loaf with an overnight cold retard in the fridge.";
         let out = engine
-            .infer_tags(prompt)
+            .infer_tags(prompt, &mut || ControlFlow::Continue(()))
             .expect("tag suggestion should succeed with a real model");
         eprintln!("\n=== REAL TAG OUTPUT ===\n{out}\n=======================\n");
 
