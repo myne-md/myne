@@ -2709,6 +2709,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             insertIntoEditor(emitAttachmentEmbed(id, filename));
             setManageAttachments(false);
           }}
+          onInsertText={(text) => {
+            // A finished audio transcript inserts its TEXT into the open note
+            // (MYND-563) — distinct from onInsert, which embeds an attachment ref.
+            insertIntoEditor(text);
+            setManageAttachments(false);
+          }}
         />
       )}
 

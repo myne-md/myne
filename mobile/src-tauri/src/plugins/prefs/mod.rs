@@ -133,6 +133,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_toolbar_hidden,
             commands::set_reminders_enabled,
             commands::set_reminder_horizon_days,
+            // MYND-563: opt-out toggle for on-device transcription (default ON).
+            // Body is the SHARED `myne-core` prefs core; mobile only registers
+            // it. Must stay in lockstep with `permissions/prefs/default.toml` +
+            // build.rs or the ACL resolver fails closed.
+            commands::set_transcription_enabled,
         ])
         .build()
 }

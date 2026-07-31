@@ -48,6 +48,39 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.sha2]
 opt-level = 3
+# Candle inference (MYND-563 transcription) — same treatment as the crypto
+# crates above: keep the matmul/quantization hot paths optimized even in dev so
+# a debug build's on-device transcription isn't unusably slow.
+[profile.dev.package.gemm]
+opt-level = 3
+[profile.dev.package."gemm-f16"]
+opt-level = 3
+[profile.dev.package."gemm-f32"]
+opt-level = 3
+[profile.dev.package."gemm-common"]
+opt-level = 3
+[profile.dev.package.half]
+opt-level = 3
+[profile.dev.package."candle-core"]
+opt-level = 3
+
+[features]
+# Transcription (MYND-563) ships in the default build, gated at RUNTIME by the
+# `transcription_enabled` pref (default on) — mirrors desktop's local-inference
+# posture (AI in the default build, off by a pref, not a compile flag).
+# `--no-default-features` drops the whole candle/whisper stack for a lean build.
+default = ["local-inference"]
+local-inference = [
+    "dep:candle-core",
+    "dep:candle-nn",
+    "dep:candle-transformers",
+    "dep:tokenizers",
+]
+# E2E build knob (mirrors desktop): swap the CandleEngine for the deterministic
+# StubEngine so a Rust-driven transcription test needs no bundled model. The
+# ported engine files reference this cfg; declaring it silences the
+# unexpected-cfg warning even where nothing enables it yet.
+local-inference-stub = ["local-inference"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -126,6 +159,17 @@ unicode-normalization = { version = "0.1.25", default-features = false }
 # (`Slot::Unlocked.vault_meta_bytes_hash`). Same RustCrypto sister crate the
 # protocol crate uses.
 sha2 = { version = "0.10", default-features = false }
+
+# On-device speech-to-text (MYND-563) — Candle Whisper, feature-gated by
+# `local-inference` (see [features]). default-features=false keeps hf-hub/http
+# OUT (nothing is downloaded at runtime — the model is bundled) and Metal/CUDA
+# off (CPU baseline on mobile). iOS needs `-C target-feature=+fp16` for
+# gemm-f16's NEON half-precision matmul — set in `.cargo/config.toml`.
+# tokenizers uses the audited `onig` backend (same as desktop).
+candle-core = { version = "0.8", optional = true, default-features = false }
+candle-nn = { version = "0.8", optional = true, default-features = false }
+candle-transformers = { version = "0.8", optional = true, default-features = false }
+tokenizers = { version = "0.20", optional = true, default-features = false, features = ["onig"] }
 
 # iOS-only: Objective-C runtime access for the WKWebView keyboard-accessory-bar
 # swizzle (`ios_chrome`) and the screen-capture secure-field splice

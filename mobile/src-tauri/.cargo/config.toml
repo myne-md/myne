@@ -1,0 +1,12 @@
+# iOS needs the FEAT_FP16 target feature for candle's gemm-f16 NEON
+# half-precision matmul (`fmul v.8h`, MYND-563 transcription). The
+# aarch64-apple-ios baseline does NOT enable it, so the assembler rejects those
+# ops without this flag; every A11+ device supports fp16. macOS/Linux hosts
+# already enable fp16 by default (host builds + CI need no flag), so this is
+# scoped to the iOS targets only. `+fp16` is the stable rustc feature name
+# (`+fullfp16` also works but warns as unknown/unstable).
+[target.aarch64-apple-ios]
+rustflags = ["-C", "target-feature=+fp16"]
+
+[target.aarch64-apple-ios-sim]
+rustflags = ["-C", "target-feature=+fp16"]
