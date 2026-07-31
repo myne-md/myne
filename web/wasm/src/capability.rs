@@ -506,6 +506,30 @@ const PER_COMMAND: &[(&str, Class)] = &[
         "plugin:prefs|set_screen_capture_protection",
         Class::Unsupported,
     ),
+    // MYND-650 task 6: the device-local Tor-routing toggle. Two commands out of
+    // a plugin that otherwise ships — deliberately per-command, because `sync`
+    // itself works here and most of it is dispatched.
+    //
+    // The desktop answer to "route my sync through Tor" is a bundled Tor client
+    // spawned as a subprocess plus a SOCKS5 tunnel over a loopback TCP socket.
+    // A Worker has no subprocess to spawn, no raw socket to tunnel, and no way
+    // to point `fetch` at a proxy — so this is `Unsupported`, not `Pending`:
+    // there is no port owed. The browser's answer is Tor Browser, which routes
+    // the whole page (docs, task 12).
+    //
+    // Refusing the READ too, not just the write, is deliberate. A read that
+    // answered `{enabled: false}` would be a claim about this device's network
+    // posture made by a client that cannot have one, and a UI reading it would
+    // render an "off" toggle it can never turn on.
+    ("plugin:sync|sync_get_tor_routing", Class::Unsupported),
+    ("plugin:sync|sync_set_tor_routing", Class::Unsupported),
+    // Task 8's posture read, refused for the same reason and with more force:
+    // it reports whether *this device's* sync egress is going through a Tor
+    // client, and a browser tab's honest answer to that is "I have no idea what
+    // this browser is doing" — Tor Browser routes the page, invisibly to the
+    // page. Answering `stopped` would read as "not protected" to a user who is
+    // in fact running the whole browser over Tor.
+    ("plugin:sync|sync_get_tor_state", Class::Unsupported),
 ];
 
 /// Classify one IPC command name.

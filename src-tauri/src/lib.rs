@@ -53,6 +53,12 @@ pub use myne_core::search;
 // (mirrors the `myne_core::paths` re-export above).
 pub use myne_core::{snapshot_policy, snapshot_store};
 mod spell;
+// Host-side lifecycle for the `myne-tor` arti sidecar (MYND-650). The ONLY
+// place in this crate that starts a process with a network surface — and it
+// starts it as a *separate* process, which is what keeps arti out of
+// `myne-desktop`'s linked dependency closure and leaves the `no_egress` gate
+// scanning a tree with no networked crate in it.
+mod tor_sidecar;
 // Shared Unix-domain-socket bind (owner-only 0600, TOCTOU-closed), used by
 // both local ingresses: `clipper::relay` and `cli_bridge::socket`.
 mod uds;
@@ -469,6 +475,43 @@ pub fn run() {
             // to one flush interval; the next unlock reconciles the delta.
             // Managed state above must exist first (the timer reads it).
             plugins::notes::search_sync::spawn_periodic_flush_timer(app.handle().clone());
+            // MYND-650 task 2: the arti sidecar supervisor and the routing gate
+            // it publishes into. Managed as a pair so the transport (tasks 3/4)
+            // reads the gate without knowing the supervisor exists. The
+            // `RunEvent` arm below is the app-quit teardown.
+            //
+            // This block sits BEFORE the sync loop deliberately (task 6): the
+            // gate must be installed, and the device-local toggle restored,
+            // before anything can build a transport. A transport constructed
+            // first would read back a default gate and dial directly on a
+            // device whose user turned Tor on — a fail-open in the one window
+            // nobody would think to look at.
+            let tor_gate = myne_core::plugins::sync::proxy::ProxyGate::new();
+            // MYND-650 task 4: publish the gate to the sync transport. The
+            // transport is built deep in the engine by `build_transport`, at
+            // call sites that have no business knowing what Tor is, so the gate
+            // travels by installation rather than by parameter — and because
+            // this is the same cell the supervisor writes, the toggle re-routes
+            // the next connection without any transport being rebuilt or any
+            // endpoint being re-enrolled.
+            // A `false` here means setup ran twice in one process: the
+            // transport would keep reading the FIRST gate (routing `Direct`)
+            // while the toggle and the posture command move the one managed
+            // below. Fail-open and invisible, so it is said out loud.
+            if !myne_core::plugins::sync::proxy::install(tor_gate.clone()) {
+                tracing::error!(event = "tor_gate_already_installed");
+                debug_assert!(false, "the sync routing gate was installed twice");
+            }
+            app.manage(tor_gate.clone());
+            let tor_sidecar = std::sync::Arc::new(tor_sidecar::TorSidecar::new(tor_gate.clone()));
+            app.manage(tor_sidecar.clone());
+            // MYND-650 task 6: restore the device-local `tor_routing_enabled`
+            // toggle. A default install has no preference file, so this is a
+            // read that finds nothing and starts nothing — the client stays
+            // byte-for-byte the direct-sync client it is today. A device that
+            // shut down with Tor on comes back up with the gate closed and the
+            // sidecar starting, never with a direct connection.
+            plugins::sync::tor::restore_at_startup(app.handle(), &tor_gate, tor_sidecar);
             // MYND-424 task 9: the background sync loop (polling-default +
             // coalesced-push, decision B). Unlock-gated; no-op until a vault is
             // Unlocked AND a sync endpoint is configured + the device enrolled.
@@ -549,6 +592,24 @@ pub fn run() {
                     let _ = window.unminimize();
                     let _ = window.show();
                     let _ = window.set_focus();
+                }
+            }
+            // MYND-650 task 2: terminate the arti sidecar before the process
+            // goes away. A Tor client left holding circuits open after the app
+            // is gone is both a resource leak and a signal that Myne was
+            // running, so this fires on BOTH exit events — `ExitRequested` is
+            // skipped when the platform tears the app down directly, and
+            // `stop()` is idempotent. `Drop` on the managed state and (on
+            // Linux) `PR_SET_PDEATHSIG` are the two backstops beneath this one.
+            if matches!(
+                event,
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+            ) {
+                use tauri::Manager;
+                if let Some(sidecar) =
+                    app_handle.try_state::<std::sync::Arc<tor_sidecar::TorSidecar>>()
+                {
+                    sidecar.stop();
                 }
             }
             if let tauri::RunEvent::ExitRequested { .. } = event {

@@ -16,6 +16,8 @@ import { AttachmentsLibrary } from "../../src/components/attachments/Attachments
 import { SidebarStateProvider } from "../../src/notes/sidebarState";
 import { catalogList, type CatalogEntry } from "../../src/lib/attachments";
 import { startTranscription } from "../../src/lib/transcribe";
+import { showAttachmentToast } from "../../src/editor/attachments/toast";
+import i18n from "../../src/i18n";
 
 vi.mock("../../src/lib/attachments", () => ({
   catalogList: vi.fn(),
@@ -45,6 +47,7 @@ vi.mock("../../src/hooks/usePrefs", () => ({
 
 const mockedCatalog = vi.mocked(catalogList);
 const mockedTranscribe = vi.mocked(startTranscription);
+const mockedToast = vi.mocked(showAttachmentToast);
 
 const AUDIO: CatalogEntry = {
   id: "a".repeat(64),
@@ -120,5 +123,29 @@ describe("Attachments Library Transcribe entry (SYNC-V9)", () => {
     fireEvent.click(within(menu).getByTestId("attachments.action-transcribe"));
     expect(mockedTranscribe).toHaveBeenCalledTimes(1);
     expect(mockedTranscribe).toHaveBeenCalledWith(AUDIO.id);
+  });
+
+  // MYND-591: each normalized failure cause surfaces its own truthful toast;
+  // anything unrecognized falls back to the generic failure copy.
+  it.each([
+    ["feature_off", "attachments.library.transcribeFeatureOff"],
+    ["vault_locked", "attachments.library.transcribeVaultLocked"],
+    ["no_model", "attachments.library.transcribeNoModelHint"],
+    ["model_load_failed", "attachments.library.transcribeModelLoadFailed"],
+    ["failed", "attachments.library.transcribeFailed"],
+  ] as const)("shows the per-cause toast when the run rejects %s", async (kind, key) => {
+    transcriptionEnabled = true;
+    mockedCatalog.mockResolvedValue([AUDIO]);
+    // The mocked helper stands in for the normalized rejection the real
+    // `startTranscription` produces (a `{ kind }`-tagged TranscribeError).
+    mockedTranscribe.mockImplementation(() => ({
+      done: Promise.reject({ kind }),
+      stop: vi.fn(),
+    }));
+    renderLibrary();
+    const menu = await openMenuFor("voice.wav");
+    fireEvent.click(within(menu).getByTestId("attachments.action-transcribe"));
+
+    await waitFor(() => expect(mockedToast).toHaveBeenCalledWith(i18n.t(key)));
   });
 });

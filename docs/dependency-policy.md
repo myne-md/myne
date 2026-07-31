@@ -479,6 +479,22 @@ Six feature-level dependency admissions landed with their `decisions.md` entries
 - **Hash-pinning:** both carry `checksum` lines in the single shared workspace `Cargo.lock`; added to `cli/` and `src-tauri/` only, never `protocol/`.
 - **Network surface:** none, in either.
 
+### Desktop Tor routing (MYND-650) — `tor-sidecar/Cargo.toml` — ⚠️ LARGEST SINGLE ADMISSION, AND THE ONLY NETWORK-ORIGINATING ONE
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `arti` | **`=2.5.0`** (exact; `default-features = false`, features `tokio` + `rustls-ring` + `compression` + `harden`) | The Tor client itself, run as a standalone loopback SOCKS5 proxy binary (`myne-tor`) that the desktop spawns when the device-local Tor routing option is on | ~250 crates (the `tor-*` / `arti-client` family plus `clap`, `hickory`-free DNS-less core, `rusqlite`/`libsqlite3-sys` for the directory cache). All land in the single shared root `Cargo.lock`. | MIT OR Apache-2.0 | `decisions.md` (MYND-650, owed by task 11); task 1 |
+
+This is the one admission that does not fit "minimal direct-dependency surface" as an argument about *size*, so the argument has to be about *placement* instead:
+
+- **Nothing links it.** `myne-tor-sidecar` is a workspace member that **no other crate depends on**; the desktop *spawns* it as a subprocess. So arti and its 250 crates are absent from `cargo tree -p myne-desktop -e normal`, which is the closure both `src-tauri/scripts/ai-no-network-check.sh` and `src-tauri/src/no_egress.rs` scan. The audited binary's dependency graph is byte-for-byte what it was before this feature — verify with `cargo tree -p myne-desktop -e normal | grep -c arti` → `0`.
+- **The "can it originate a network request?" column is `yes`, on purpose, for the first time.** That is the point of the feature, and it is why the crate is confined to a separate process that never holds `root_key`, a subkey, or note plaintext (`tor-sidecar/src/main.rs`).
+- **Workspace membership is the reproducible-build argument, not a convenience.** The alternatives were arti-in-process (breaks process isolation *and* no-egress *and* minimal-deps at once), a bundled C-tor daemon (an opaque binary no lockfile covers — a direct `threat-model.md` §6 regression), or "install Tor yourself" (which is not the feature). Only the workspace-member binary puts every one of those 250 crates under the single shared `Cargo.lock` with a `checksum` line each.
+- **Why the pin is exact (`=2.5.0`) rather than `2`.** Bundling a Tor client makes Tor's security updates Myne's release responsibility, so the version must move only in a visible diff — never under a `cargo update`. The upgrade cadence owner is an open PRD question; until it is answered, the exact pin is what keeps the question from being silently answered by tooling.
+- **Feature selection is a surface decision, argued at the declaration.** `native-tls` (→ OpenSSL) is replaced by `rustls-ring`, the exact TLS stack `myne-core`'s sync transport already uses; `dns-proxy`, `onion-service-client`, `vanguards`, `bridge-client` and `pt-client` are all off. See the comment in `tor-sidecar/Cargo.toml` for the per-feature reasoning.
+- **License:** MIT OR Apache-2.0, one-way-compatible into AGPL-3.0. Because it ships as a **separate executable** rather than linked code, it is also listed in [`LICENSING.md`](../LICENSING.md) "Bundled third-party assets".
+- **Hash-pinning:** every new crate carries a `checksum` line in the single shared workspace `Cargo.lock` (TB9 anchor unchanged — still exactly one tracked lockfile).
+
 
 ## Reference
 

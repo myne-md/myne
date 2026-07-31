@@ -40,6 +40,9 @@ permissions = [
     "allow-sync-restore-quarantine",
     "allow-sync-delete-quarantine",
     "allow-sync-device-join-qr",
+    "allow-sync-get-tor-routing",
+    "allow-sync-set-tor-routing",
+    "allow-sync-get-tor-state",
 ]
 
 [[permission]]
@@ -156,3 +159,18 @@ commands.allow = ["sync_delete_quarantine"]
 identifier = "allow-sync-device-join-qr"
 description = "Allow invoking sync:sync_device_join_qr (MYND-466 — render a device-join QR for the user-pasted account number + this device's own endpoint/cert-pin. Read-only affordance: reads the endpoint config, moves no vault bytes, carries no secret in the QR — SYNC-47. The account# is a paste argument, never read from storage)."
 commands.allow = ["sync_device_join_qr"]
+
+[[permission]]
+identifier = "allow-sync-get-tor-routing"
+description = "Allow invoking sync:sync_get_tor_routing (MYND-650 — read the device-local tor_routing_enabled preference from app_config_dir/tor-routing.json; absent → off). One boolean; no vault access, no process started, reachable pre-unlock like the endpoint pair."
+commands.allow = ["sync_get_tor_routing"]
+
+[[permission]]
+identifier = "allow-sync-set-tor-routing"
+description = "Allow invoking sync:sync_set_tor_routing (MYND-650 — persist the device-local tor_routing_enabled preference, then move the sync routing gate and the arti sidecar to match: enabling closes the gate BEFORE spawning, disabling terminates the sidecar BEFORE reopening it). Starts/stops the bundled myne-tor externalBin, which is a Tor client with no access to vault bytes; no new network surface is granted to the webview, which can only ask for the two states this toggle already has. No vault access."
+commands.allow = ["sync_set_tor_routing"]
+
+[[permission]]
+identifier = "allow-sync-get-tor-state"
+description = "Allow invoking sync:sync_get_tor_state (MYND-650 — read the live routing posture: Tor mode as the sync routing gate has it, the bundled Tor client's phase (starting / ready / failed / stopped), and whether the configured endpoint is routed at all). With Tor mode off it reads an in-memory cell and touches no file. With Tor mode on it also reads the device-local endpoint config (app_config_dir/sync-config.json) to answer the third field — read-only, creating no directory, and only so the UI cannot claim a tunnel over a loopback endpoint that never enters one. Starts nothing; the loopback SOCKS port is the only payload and it names a listener on this device. This is what lets the UI say 'sync is paused' instead of implying protection while the tunnel is down. No vault access."
+commands.allow = ["sync_get_tor_state"]

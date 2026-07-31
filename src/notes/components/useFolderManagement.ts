@@ -58,7 +58,6 @@ import {
   rewriteFolderPrefix,
 } from "../decorationRewrite";
 import {
-  buildItemRankMap,
   orderContainerChildren,
   pruneFavorites,
   toggleFavoriteList,
@@ -66,8 +65,13 @@ import {
 import {
   applyReorderWrite,
   computeItemOrderAfterReorder,
+  reorderSequence,
   itemOrderKey,
 } from "./itemOrderReorder";
+import {
+  buildContainerRank,
+  containerKeyOf,
+} from "@myne/editor/host/notes/itemOrder";
 
 const DRAG_MIME = "application/x-myne-note";
 const FOLDER_DRAG_MIME = "application/x-myne-folder";
@@ -146,7 +150,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   // persist, like `deliberate`). Favorites membership/reorder wiring lands in a
   // later task; here we expose the read so the tree + Favorites section consume
   // a single source.
-  const [itemOrder, setItemOrder] = useState<string[]>([]);
+  const [itemOrder, setItemOrder] = useState<Record<string, string[]>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
   useEffect(() => {
     setItemOrder(prefs.item_order);
@@ -306,7 +310,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   // The target container's children (sub-folders + notes) in current display
   // order, as `item_order` keys (folder display path / note UUID). Reuses the
   // flatten comparator so the sidebar's render order IS the reorder baseline.
-  // `containerKey` is the folded folder key, or `""` for the root container.
+  // `containerKey` is the folded folder key, or `""` for the root container —
+  // exactly this container's key into the per-container `item_order` map
+  // (MYND-596), so only its own sequence ranks it.
   const containerChildKeys = useCallback(
     (containerKey: string): string[] => {
       const tree = treeRef.current;
@@ -315,7 +321,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       const folders = containerKey === "" ? tree.roots : (node?.children ?? []);
       const noteIds =
         containerKey === "" ? tree.unfiledNoteIds : (node?.noteIds ?? []);
-      const rank = buildItemRankMap(itemOrder);
+      const rank = buildContainerRank(itemOrder[containerKey] ?? []);
       return orderContainerChildren(folders, noteIds, ctx.cache, rank).map((c) =>
         c.kind === "folder" ? c.node.path : c.id,
       );
@@ -737,7 +743,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     const crossContainer =
       draggedRec === undefined || noteFolderKey(draggedRec.folder) !== "";
     const prevOrder = itemOrder;
-    await applyReorderWrite({
+    await applyReorderWrite<Record<string, string[]>>({
       moveFirst: crossContainer
         ? async () => {
             await moveNote(id, null);
@@ -747,6 +753,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       computeNext: () =>
         computeItemOrderAfterReorder({
           itemOrder: prevOrder,
+          container: containerKeyOf(null), // root container = ""
           containerChildKeys: containerChildKeys("").filter((k) => k !== id),
           draggedKey: id,
           targetKey: "", // no row target → appends at the root end
@@ -806,7 +813,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         const draggedRec = ctx.cache.get(noteDrag);
         if (draggedRec === undefined) return;
         const crossContainer = noteFolderKey(draggedRec.folder) !== containerKey;
-        await applyReorderWrite({
+        await applyReorderWrite<Record<string, string[]>>({
           moveFirst: crossContainer
             ? async () => {
                 await moveNote(noteDrag, containerPath);
@@ -816,6 +823,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
           computeNext: () =>
             computeItemOrderAfterReorder({
               itemOrder: prevOrder,
+              container: containerKey,
               containerChildKeys: containerChildKeys(containerKey).filter(
                 (k) => k !== noteDrag,
               ),
@@ -838,11 +846,12 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         if (noteFolderKey(folderParent(draggedNode.path)) !== containerKey) {
           return;
         }
-        await applyReorderWrite({
+        await applyReorderWrite<Record<string, string[]>>({
           moveFirst: null,
           computeNext: () =>
             computeItemOrderAfterReorder({
               itemOrder: prevOrder,
+              container: containerKey,
               containerChildKeys: containerChildKeys(containerKey).filter(
                 (k) => itemOrderKey(k) !== folderDrag,
               ),
@@ -879,7 +888,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const writeFavorites = useCallback(
     async (next: string[]) => {
       const pruned = pruneFavorites(next, ctx.cache);
-      await applyReorderWrite({
+      // Favorites stay a FLAT `string[]` (MYND-596 mapifies only `item_order`),
+      // so the generic dual-write helper is instantiated over `string[]` here.
+      await applyReorderWrite<string[]>({
         moveFirst: null,
         computeNext: () => pruned,
         prevOrder: favorites,
@@ -920,8 +931,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       setReorderTarget(null);
       setDragKind(null);
       if (draggedId === null || draggedId === targetId) return;
-      const next = computeItemOrderAfterReorder({
-        itemOrder: favorites,
+      // Favorites is a single flat sequence, so it uses the pure single-sequence
+      // reorder directly (MYND-596) rather than the container-keyed map compute.
+      const next = reorderSequence({
         containerChildKeys: favorites.filter((f) => f !== draggedId),
         draggedKey: draggedId,
         targetKey: targetId,

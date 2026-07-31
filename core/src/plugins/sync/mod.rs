@@ -74,6 +74,12 @@ pub mod integrity;
 // privacy-load-bearing answers, and a second client re-deriving them is how two
 // clients end up disclosing at two different granularities.
 pub mod loop_control;
+// The no-bypass ratchet (MYND-650 task 4): a source-level guard asserting that
+// every outbound socket in this directory is either routed through the proxy
+// gate or written down with the reason it cannot leak a source IP. Test-only —
+// it ships nothing, it just refuses to let a second socket appear unnoticed.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod no_bypass;
 pub mod orchestrator;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod poke_listener;
@@ -81,9 +87,22 @@ pub mod poke_listener;
 // 39). Three atomics rather than an event per note or a host threaded through
 // `run_sync_cycle`: the readout has to be observable DURING the loop, and the
 // loop deliberately has no host.
+// The out-of-band fingerprint compare that has to accompany a TOFU pin captured
+// over Tor (MYND-650 task 5). Host-only for the same reason `rustls_transport`
+// is — it drives that module's handshake — and the single enforcement point
+// both enrollment paths acquire a pin through.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod pin_confirm;
 pub mod prefs_classification;
 pub mod prefs_merge;
 pub mod progress;
+// Where the transport is allowed to send bytes when device-local Tor routing is
+// on (MYND-650). Shared rather than desktop-only even though only the desktop
+// host can spawn the arti sidecar: the *decision* — and specifically the
+// fail-closed refusal to ever connect directly while Tor mode is on — belongs
+// next to the transport that has to honour it, not next to the process
+// supervisor that feeds it.
+pub mod proxy;
 pub mod qr_join;
 pub mod reconcile;
 pub mod reconcile_policy;
@@ -97,12 +116,24 @@ pub mod reconcile_policy;
 pub mod rustls_transport;
 #[cfg(test)]
 mod sim;
+// The SOCKS5 client half of Tor routing (MYND-650 task 3) — host-only for the
+// same reason `rustls_transport` is: it is raw TCP, which a browser tab does
+// not have. A web client that wants Tor uses Tor Browser (task 12), not an
+// in-page tunnel.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod socks5;
 pub mod state;
 // The status indicator's types + derivation, lifted out of the host-gated
 // `commands` module by task 84 so the browser reports the same states from the
 // same code. Only the `Manager`-shaped live-status CELL stayed behind.
 pub mod status;
 pub mod token_store;
+// The device-local `tor_routing_enabled` preference (MYND-650 task 6) — the one
+// writer of `proxy::ProxyGate`'s enabled flag. Shared rather than desktop-only
+// for the same reason `proxy` is: the *rule* (what the file means, and which way
+// a corrupt one fails) belongs beside the transport that honours it, while only
+// the desktop host can act on it by spawning a sidecar.
+pub mod tor_config;
 pub mod transport;
 // Per-NOTE "not yet on the server" (phase3-web-client task 23). A sibling of
 // `status` rather than a field on it: `status` is a property of the device and

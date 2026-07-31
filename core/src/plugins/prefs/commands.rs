@@ -2309,19 +2309,20 @@ pub(crate) async fn set_cli_rate_limit_disabled_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for the `item_order` sequence — the unified
-/// manual sidebar order across the single interleaved file-tree (a flat,
-/// heterogeneous list of note UUIDs + folder paths, MYND-183, superseding the
-/// old `note_order` + `folder_order`). Read-modify-write under the per-plugin
-/// write mutex; **no native side-effect** (same shape as
-/// `set_deliberate_folders`). The caller passes the full desired sequence; v0.1
-/// single-device writes it verbatim. Unlike `deliberate_folders`, the codec
-/// preserves element order — the sequence IS the payload
-/// (`protocol::PrefsView::item_order`).
+/// manual sidebar order across the interleaved file-tree — a **container-keyed
+/// map** (container path → ordered child sequence of note UUIDs + child folder
+/// paths, MYND-183 + MYND-596, superseding the old flat list). Read-modify-write
+/// under the per-plugin write mutex; **no native side-effect** (same shape as
+/// `set_deliberate_folders`). The caller passes the full desired map; each
+/// container's sequence is written verbatim (order IS the payload,
+/// `protocol::PrefsView::item_order`), and the central write path stamps an
+/// `item_order/<container>` LWW clock for each changed container (§10.2.1), so a
+/// reorder in one folder never clobbers a concurrent reorder in another.
 pub async fn set_item_order_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    order: Vec<String>,
+    order: std::collections::BTreeMap<String, Vec<String>>,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), PrefsWriteError> {
     let dir =
@@ -2337,7 +2338,7 @@ pub async fn set_item_order<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    order: Vec<String>,
+    order: std::collections::BTreeMap<String, Vec<String>>,
 ) -> Result<(), PrefsWriteError> {
     set_item_order_from_host(
         &TauriHost::new(app),
@@ -2354,11 +2355,16 @@ pub(crate) async fn set_item_order_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    order: Vec<String>,
+    order: std::collections::BTreeMap<String, Vec<String>>,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    let count = order.len();
+    // COUNTS only, computed before the value is moved into the closure — never
+    // the container paths / item IDs (note_id is a per-note vault-stable
+    // correlation tag, folder paths are AS3 Sensitive; see ../../CLAUDE.md
+    // "Secret-handling logging discipline").
+    let containers = order.len();
+    let items: usize = order.values().map(Vec::len).sum();
     update_prefs_with_dir(
         vault_dir,
         state,
@@ -2371,10 +2377,12 @@ pub(crate) async fn set_item_order_with_dir(
     )
     .await?;
 
-    // COUNT only — never the item IDs/paths (note_id is a per-note vault-stable
-    // correlation tag, folder paths are AS3 Sensitive; see ../../CLAUDE.md
-    // "Secret-handling logging discipline").
-    tracing::info!(event = "prefs_written", field = "item_order", count,);
+    tracing::info!(
+        event = "prefs_written",
+        field = "item_order",
+        containers,
+        items
+    );
     Ok(())
 }
 
@@ -4011,17 +4019,20 @@ pub(crate) async fn set_theme_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for the `custom_theme` field (custom-themes
-/// epic, MYND-297) — the active custom-theme name (the file-stem of a theme
-/// under `app_config_dir/themes/`). `Some(name)` selects a custom theme (takes
-/// precedence over `theme` host-side); `None` clears it (the client falls back
-/// to the built-in `theme`). Read-modify-write under the per-plugin write
-/// mutex; **no native side-effect**, disk-first (same shape as [`set_theme`]).
+/// epic, MYND-297) — the active custom-theme name, i.e. a key of the encrypted
+/// `vault.themes` store (`MYT1`, `protocol.md` §9.21). It named a plaintext
+/// file stem under `app_config_dir/themes/` until `decisions.md` 2026-07-16
+/// promoted palettes to vault content; the blob holds the palettes, this field
+/// holds the pointer. `Some(name)` selects a custom theme (takes precedence
+/// over `theme` host-side); `None` clears it (the client falls back to the
+/// built-in `theme`). Read-modify-write under the per-plugin write mutex;
+/// **no native side-effect**, disk-first (same shape as [`set_theme`]).
 /// `custom_theme` is a **non-load-bearing** cosmetic preference — no
 /// protective-envelope clamp (a tampered/replayed value at worst selects a
-/// different or absent palette; the apply layer validates the file + falls back
-/// to a built-in theme on any failure). The name is `is_valid_theme_name`-
-/// constrained at the themes-plugin file boundary (MYND-297 read/delete); this
-/// setter stores the string verbatim.
+/// different or absent palette: a name with no live entry in the store falls
+/// back to the built-in `theme`, and an unreadable store reads as empty per
+/// §9.21.4). The name is `is_valid_theme_name`-constrained at the themes-plugin
+/// import boundary; this setter stores the string verbatim.
 pub async fn set_custom_theme_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -5326,7 +5337,7 @@ mod tests {
                     daily_template: None,
                     favorites: Vec::new(),
                     field_clocks: Default::default(),
-                    item_order: Vec::new(),
+                    item_order: Default::default(),
                     keymap: Default::default(),
                     active_workspace: None,
                     archive_disabled: None,
@@ -6223,6 +6234,17 @@ mod tests {
 
     // ---- item_order / favorites setters (MYND-183) -------------------
 
+    /// A single-root-container `item_order` map (`"" → [ids…]`) — the shape a
+    /// test writes when it exercises just one container (MYND-596).
+    fn root_order<const N: usize>(
+        ids: [&str; N],
+    ) -> std::collections::BTreeMap<String, Vec<String>> {
+        std::collections::BTreeMap::from([(
+            String::new(),
+            ids.iter().map(|s| s.to_string()).collect(),
+        )])
+    }
+
     #[test]
     fn set_item_order_rejects_when_slot_empty() {
         rt().block_on(async {
@@ -6232,7 +6254,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["a", "b"]),
+                root_order(["a", "b"]),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6254,7 +6276,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["n-zzz", "Zebra/", "n-aaa"]),
+                root_order(["n-zzz", "Zebra/", "n-aaa"]),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6274,7 +6296,7 @@ mod tests {
             let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after order writes");
-            assert_eq!(view.item_order, alloc_vec(["n-zzz", "Zebra/", "n-aaa"]));
+            assert_eq!(view.item_order, root_order(["n-zzz", "Zebra/", "n-aaa"]));
             assert_eq!(view.favorites, alloc_vec(["n-zzz", "n-aaa"]));
             // The pre-existing screen_capture default is untouched.
             assert!(view.screen_capture_protection);
@@ -6285,7 +6307,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                std::collections::BTreeMap::new(),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )

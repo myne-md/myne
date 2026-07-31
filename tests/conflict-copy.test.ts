@@ -16,7 +16,10 @@ function mockHost(initial: Record<string, string> = {}) {
   const notes = new Map<string, string>(Object.entries(initial));
   const calls: string[] = [];
   let nextId = 100;
-  const prefs = { favorites: ["orig"] as string[], item_order: ["a", "orig", "b"] as string[] };
+  const prefs = {
+    favorites: ["orig"] as string[],
+    item_order: { "": ["a", "orig", "b"] } as Record<string, string[]>,
+  };
   const host: ConflictCopyHost = {
     async noteRead(id) {
       calls.push(`read:${id}`);

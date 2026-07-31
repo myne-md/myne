@@ -15,6 +15,7 @@ docs/
 ├── self-host-policy.md    ← operator contract for a self-hosted sync server (normative)
 ├── self-host-web.md       ← operator contract for serving the web bundle (normative)
 ├── web-bundle-hashes.md   ← the published per-release web-bundle hash record (A15/TB11)
+├── web-tor-browser.md     ← why the web client has no Tor toggle, and what Tor Browser costs instead
 ├── spec/
 │   ├── protocol.md         ← v0.1 cryptographic protocol (at-rest format, key hierarchy)
 │   ├── account-number.md   ← Crockford base32 + Damm-32 identifier

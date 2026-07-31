@@ -22,6 +22,10 @@ pub enum SharedDiscipline {
     /// Union of keys; a key edited on both sides resolves LWW on its own
     /// `<field>/<key>` clock (e.g. `device_names/<key>`,
     /// `item_colors/<folderKey>`, `folder_icons/<folderKey>` — MYND-562).
+    /// The per-key value is LWW-on-whole, so this discipline also carries
+    /// `item_order` (MYND-596): its per-container value is a whole child
+    /// sequence rather than a scalar, and each container path races on
+    /// `item_order/<container>`.
     PerKeyMapMerge,
 }
 
@@ -151,9 +155,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "item_colors",
         PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
     ),
+    // MYND-596: promoted from SequenceLww to per-container map merge — each
+    // container path races on its own `item_order/<container>` clock, so a
+    // reorder in one folder no longer clobbers a concurrent reorder in another
+    // (the MYND-562 decoration-map fix, applied to the sidebar order).
     (
         "item_order",
-        PrefClass::Shared(SharedDiscipline::SequenceLww),
+        PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
     ),
     ("keymap", PrefClass::DeviceLocal),
     ("label", PrefClass::Shared(SharedDiscipline::ScalarLww)),
@@ -421,6 +429,22 @@ mod tests {
         assert_eq!(
             classify("folder_icons"),
             Some(PrefClass::Shared(SharedDiscipline::PerKeyMapMerge))
+        );
+        // MYND-596: item_order joined the per-key map class so concurrent
+        // reorders of DIFFERENT containers no longer clobber (was SequenceLww).
+        assert_eq!(
+            classify("item_order"),
+            Some(PrefClass::Shared(SharedDiscipline::PerKeyMapMerge))
+        );
+        // Its siblings stay whole-sequence LWW (each is a single flat list, so
+        // there is no cross-container clobber to fix).
+        assert_eq!(
+            classify("favorites"),
+            Some(PrefClass::Shared(SharedDiscipline::SequenceLww))
+        );
+        assert_eq!(
+            classify("view_order"),
+            Some(PrefClass::Shared(SharedDiscipline::SequenceLww))
         );
         // Privacy-load-bearing exclusion list syncs vault-wide.
         assert_eq!(

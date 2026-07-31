@@ -171,6 +171,7 @@ export function DecorationPopover({
       style={{ ...POPOVER_STYLE, left: position.left, top: position.top }}
       role="menu"
       aria-label={t("notes.decoration.menuLabel")}
+      data-testid="notes.decoration-popover"
     >
       <div style={SECTION_LABEL_STYLE}>{t("notes.decoration.colorSection")}</div>
       <div style={SWATCH_ROW_STYLE}>
