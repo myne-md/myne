@@ -329,6 +329,24 @@ pub struct PrefsView {
     #[serde(default)]
     pub auto_lock_seconds: Option<u32>,
 
+    /// Automatic on-device tag suggestion toggle (on-device-tag-suggestion,
+    /// MYND-651). `false` ≡ off (the default). **Omitted entirely from the
+    /// canonical JSON when `false`**, so a vault that never enabled it is
+    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
+    /// unaffected — a migration-less additive field on `MYP1`, the same
+    /// emit-only-when-`true` positive-opt-in convention as
+    /// [`PrefsView::ai_enabled`] and `cli_enabled`). Canonical key
+    /// `auto_tag_enabled` — sorts after `auto_lock_seconds` (`auto_l` <
+    /// `auto_t`), before `bar_items_order` (`a` < `b`).
+    ///
+    /// It is the SECOND half of a two-key gate: the tag pass runs only when
+    /// this AND `ai_enabled` are both on, and the host re-reads both before it
+    /// touches the model, so a tampered or replayed value cannot start
+    /// inference on a vault whose AI opt-in is off. **Non-load-bearing /
+    /// AS-low** — no protective-envelope clamp.
+    #[serde(default)]
+    pub auto_tag_enabled: bool,
+
     /// Active **custom theme** selection (custom-themes epic, MYND-297) — the
     /// name of a user-authored palette, i.e. a key of the encrypted `vault.themes`
     /// store (`MYT1`, `protocol.md` §9.21). It named a plaintext file stem under
@@ -1191,6 +1209,7 @@ impl Default for PrefsView {
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -1463,6 +1482,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"\"auto_lock_seconds\":");
         push_json_uint(&mut out, secs);
         out.push(b',');
+    }
+
+    // auto_tag_enabled (canonical key 'auto_tag_enabled' — after
+    // auto_lock_seconds ['auto_l' < 'auto_t'], before bar_items_order
+    // ['a' < 'b']). Automatic on-device tag suggestion (MYND-651). Emitted
+    // ONLY when true; omitted entirely when false (the default) so a vault
+    // that never enabled it is byte-identical to a pre-feature vault.prefs
+    // (preserves existing KAT vectors) — same discipline as ai_enabled.
+    if prefs.auto_tag_enabled {
+        out.extend_from_slice(b"\"auto_tag_enabled\":true,");
     }
 
     // bar_items_order (canonical key 'b' — after auto_lock_seconds [au < b],
@@ -2459,8 +2488,16 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // already prevents a marker from appearing inside a string value, but the
     // cursor keeps the canonical key-order discipline visible + robust).
     let mut cursor = 0usize;
-    // bar_items_order (canonical key 'b' — after auto_lock_seconds [au < b],
-    // before custom_theme [b < c], so it is the FIRST cursor-located field). A
+    // auto_tag_enabled (canonical key 'auto_tag_enabled' — after
+    // auto_lock_seconds ['auto_l' < 'auto_t'], before bar_items_order
+    // ['a' < 'b'], so it is the FIRST cursor-located field). Automatic
+    // on-device tag suggestion (MYND-651). Emitted only as `true` by the
+    // encoder; `false` is tolerated for robustness. Absent → false (the
+    // default).
+    let auto_tag_enabled =
+        parse_optional_bool_field(rest, &mut cursor, b"\"auto_tag_enabled\":")?.unwrap_or(false);
+    // bar_items_order (canonical key 'b' — after auto_tag_enabled [a < b],
+    // before custom_theme [b < c]). A
     // sequence array parsed from the monotonic cursor so a later field's key
     // marker is never matched inside its content. Absent → empty; order
     // preserved verbatim (sort/dedup is encode-side and this field is a
@@ -2742,6 +2779,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         developer_mode,
         device_names,
         auto_lock_seconds,
+        auto_tag_enabled,
         custom_theme,
         daily_date_format,
         daily_folder,
@@ -3681,6 +3719,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -3752,6 +3791,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -4143,6 +4183,7 @@ mod tests {
                 field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                auto_tag_enabled: false,
                 custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
@@ -4216,6 +4257,7 @@ mod tests {
                 field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                auto_tag_enabled: false,
                 custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
@@ -4924,6 +4966,74 @@ mod tests {
         assert!(!decoded.transcription_enabled);
     }
 
+    /// `auto_tag_enabled` (MYND-651) is a default-off positive opt-in, so it is
+    /// emitted ONLY when `true` — the `ai_enabled` / `cli_enabled` discipline.
+    /// A vault that never enabled it therefore stays byte-identical to a
+    /// pre-feature blob, which is what preserves the existing KAT vectors.
+    #[test]
+    fn auto_tag_enabled_omitted_when_false_emitted_only_when_true() {
+        let off = canonical_json_encode(&PrefsView {
+            auto_tag_enabled: false,
+            ..PrefsView::default()
+        });
+        assert!(
+            !core::str::from_utf8(&off)
+                .unwrap()
+                .contains("auto_tag_enabled"),
+            "the default must not be written"
+        );
+        assert_eq!(off, canonical_json_encode(&PrefsView::default()));
+
+        let on = canonical_json_encode(&PrefsView {
+            auto_tag_enabled: true,
+            ..PrefsView::default()
+        });
+        assert!(core::str::from_utf8(&on)
+            .unwrap()
+            .contains(r#""auto_tag_enabled":true"#));
+    }
+
+    /// The positional-decode guard for the new key. `auto_tag_enabled` sits at
+    /// the boundary between the `strip_prefix`-chained prefix fields and the
+    /// cursor-located ones (`auto_lock_seconds` < `auto_tag_enabled` <
+    /// `bar_items_order`), and a mis-ordered insertion there fails *silently* —
+    /// the decoder steps past the out-of-order key and reports it absent
+    /// (defaulted), never an error. Setting a non-default value in both
+    /// neighbours and asserting all three survive one round-trip is the only
+    /// thing that catches it.
+    #[test]
+    fn auto_tag_enabled_round_trips_between_its_canonical_neighbours() {
+        let original = PrefsView {
+            auto_lock_seconds: Some(300), // left neighbour
+            auto_tag_enabled: true,
+            bar_items_order: alloc::vec![alloc::string::String::from("view-mode")], // right neighbour
+            ai_enabled: true, // the flag the tag pass is co-gated on
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+
+        let text = core::str::from_utf8(&encoded).expect("utf-8");
+        let pos = |k: &str| text.find(k).unwrap_or_else(|| panic!("missing key {k}"));
+        assert!(pos("\"ai_enabled\"") < pos("\"auto_lock_seconds\""));
+        assert!(pos("\"auto_lock_seconds\"") < pos("\"auto_tag_enabled\""));
+        assert!(pos("\"auto_tag_enabled\"") < pos("\"bar_items_order\""));
+
+        let decoded = canonical_json_decode(&encoded).expect("decode must succeed");
+        assert!(decoded.auto_tag_enabled);
+        assert_eq!(decoded.auto_lock_seconds, Some(300));
+        assert_eq!(decoded.bar_items_order, original.bar_items_order);
+        assert!(decoded.ai_enabled);
+    }
+
+    /// A pre-MYND-651 blob decodes with the feature off — the fall-back a
+    /// decoder that does not find the key MUST apply (spec § 9.5.2).
+    #[test]
+    fn auto_tag_enabled_absent_decodes_to_false() {
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode ok");
+        assert!(!decoded.auto_tag_enabled);
+    }
+
     /// The inverse of the `ai_enabled` rule, because this pref defaults to TRUE:
     /// it is emitted only when the user turned it OFF. A vault that never
     /// touched the toggle therefore stays byte-identical to a pre-MYND-441
@@ -5590,6 +5700,7 @@ mod tests {
             keymap: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(300),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6048,6 +6159,7 @@ mod tests {
                 alloc::string::String::from("Archive/"),
             ],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6126,6 +6238,7 @@ mod tests {
                 alloc::string::String::from("b/"),
             ],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6202,6 +6315,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6277,6 +6391,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6415,6 +6530,7 @@ mod tests {
                 alloc::string::String::from("Archive/2025/"),
             ],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6509,6 +6625,7 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6595,6 +6712,7 @@ mod tests {
             theme: None,
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6754,6 +6872,7 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(900),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6858,6 +6977,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7192,6 +7312,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(300),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7267,6 +7388,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(900),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7344,6 +7466,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(0),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7489,6 +7612,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(1800),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7606,6 +7730,7 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7923,6 +8048,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -8002,6 +8128,7 @@ mod tests {
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -8345,6 +8472,7 @@ mod tests {
                 field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                auto_tag_enabled: false,
                 custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
@@ -8417,6 +8545,7 @@ mod tests {
                 field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                auto_tag_enabled: false,
                 custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
@@ -8521,6 +8650,7 @@ mod tests {
                 alloc::string::String::from("Projects/Myne/"),
             ],
             auto_lock_seconds: Some(300),
+            auto_tag_enabled: false,
             custom_theme: Some(alloc::string::String::from("solarized-dark")),
             daily_date_format: None,
             daily_folder: None,

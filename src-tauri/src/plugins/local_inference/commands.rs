@@ -23,6 +23,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -35,8 +36,10 @@ use myne_core::plugins::notes::commands::note_read_with_dir;
 use myne_core::plugins::notes::note_id::NoteId;
 
 use super::cancel::{guarded_on_token, CancelToken};
+use super::compute_priority::ComputePriority;
 use super::engine::{ChatMessage, ChatRole, Engine};
 use super::error::EngineError;
+use super::hydrate::{folder_is_excluded, folder_of};
 use super::model_store::{self, ModelRole, ModelStoreError};
 use super::rag;
 use super::retrieval::{self, ScoredChunk};
@@ -66,11 +69,22 @@ const CHAT_RELEVANCE_THRESHOLD: f32 = 0.30;
 pub async fn infer(
     prompt: String,
     state: State<'_, LocalInferenceState>,
+    priority: State<'_, ComputePriority>,
 ) -> Result<String, EngineError> {
+    // A user asked for this. Register for the whole call so a background
+    // auto-tag pass stands down rather than making the user queue behind it
+    // (MYND-651 task 4) — held across the await, dropped on every return path.
+    let _interactive = priority.interactive();
     infer_with_engine(state.engine(), prompt).await
 }
 
 /// Embedding vector for `text`.
+///
+/// Deliberately NOT registered as interactive compute: this command is the
+/// primitive the background embed-walk drives, and a walk that counted as
+/// user-initiated would starve auto-tag for the whole of a large re-index. The
+/// user-initiated embeds are the ones inside [`semantic_search`] / [`ask`] /
+/// [`chat_stream`], which register there.
 #[tauri::command]
 pub async fn embed(
     text: String,
@@ -102,7 +116,12 @@ pub async fn transcribe<R: Runtime>(
     engine_state: State<'_, LocalInferenceState>,
     vault_state: State<'_, VaultRuntimeState>,
     cancel: State<'_, CancelToken>,
+    priority: State<'_, ComputePriority>,
 ) -> Result<String, EngineError> {
+    // User-initiated compute: a background auto-tag pass yields to this and
+    // never makes it wait (MYND-651 task 4). Registered before the gate so the
+    // whole call — prefs read, decrypt, decode, ASR — is covered.
+    let _interactive = priority.interactive();
     // Host-side `transcription_enabled` gate — no engine call and no decrypt
     // when speech-to-text is off. A compromised WebView is not trusted to stop
     // calling, so this is re-read here rather than taken on the caller's word.
@@ -361,9 +380,12 @@ pub async fn semantic_search(
     k: usize,
     engine_state: State<'_, LocalInferenceState>,
     vector_state: State<'_, LocalInferenceVectorState>,
+    priority: State<'_, ComputePriority>,
 ) -> Result<Vec<SearchHit>, EngineError> {
     // First statement: bound the query plaintext to a Zeroizing wrapper.
     let query = Zeroizing::new(query);
+    // The user typed a query — auto-tag yields to it (MYND-651 task 4).
+    let _interactive = priority.interactive();
     let engine = engine_state.engine();
     // Embed off the async thread (CPU-bound); the wrapper zeroizes on drop.
     let query_vec = tokio::task::spawn_blocking(move || engine.embed(&query))
@@ -426,8 +448,12 @@ pub async fn ask<R: Runtime>(
     vault_state: State<'_, VaultRuntimeState>,
     engine_state: State<'_, LocalInferenceState>,
     vector_state: State<'_, LocalInferenceVectorState>,
+    priority: State<'_, ComputePriority>,
 ) -> Result<AskResult, EngineError> {
     let question = Zeroizing::new(question);
+    // User-initiated: covers BOTH model calls below (embed + generate), so a
+    // background auto-tag pass cannot slip between them (MYND-651 task 4).
+    let _interactive = priority.interactive();
     let engine = engine_state.engine();
 
     // 1. Embed the question off the async thread.
@@ -555,9 +581,13 @@ pub async fn chat_stream<R: Runtime>(
     engine_state: State<'_, LocalInferenceState>,
     vector_state: State<'_, LocalInferenceVectorState>,
     cancel_state: State<'_, CancelToken>,
+    priority: State<'_, ComputePriority>,
 ) -> Result<AskResult, EngineError> {
     // First statement: bound the question plaintext to a Zeroizing wrapper.
     let question = Zeroizing::new(question);
+    // User-initiated: registered for the whole turn, including the streamed
+    // generation, which is the longest compute hold in the app (MYND-651 task 4).
+    let _interactive = priority.interactive();
     let engine = engine_state.engine();
     let messages: Vec<ChatMessage> = history
         .into_iter()
@@ -663,6 +693,203 @@ pub async fn chat_stream<R: Runtime>(
 pub async fn chat_stop(cancel_state: State<'_, CancelToken>) -> Result<(), EngineError> {
     cancel_state.cancel();
     Ok(())
+}
+
+/// What the host decided about one auto-tag request (MYND-651 task 4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TagGate {
+    /// Both switches on and the note is not in an AI-excluded folder.
+    Allowed,
+    /// `ai_enabled` and/or `auto_tag_enabled` is off — the feature does not run.
+    OptedOut,
+    /// The note lives in (or under) an `ai_excluded_folders` entry (SYNC-14).
+    Excluded,
+}
+
+/// The auto-tag decision. Every input is read HERE, on the Rust side — none of
+/// it is taken on the WebView's word, because a compromised WebView is not
+/// trusted to stop calling (the same posture as [`semantic_search`]'s opt-in
+/// check and [`transcribe`]'s `transcription_enabled` re-read).
+///
+/// `ai_enabled` is the AI beta opt-in and `auto_tag_enabled` the auto-tag switch
+/// (both `vault.prefs`, §9.5.2); `folder` is the note's own `folder:` value
+/// resolved from the DECRYPTED note rather than from a caller-supplied string,
+/// and `excluded` is `ai_excluded_folders`.
+///
+/// Fail-closed by construction: the only path to [`TagGate::Allowed`] is both
+/// switches on AND the folder outside every excluded entry. A prefs blob that
+/// cannot be read decodes to defaults (§9.5.5) and both switches default OFF, so
+/// an unreadable blob refuses rather than runs — the opposite of transcription's
+/// deliberately fail-open switch, because auto-tag reads note bodies ambiently
+/// and the user never asked for it. `threat-model.md` §7 states this gate is
+/// re-read host-side before any model touch, and this is the code that makes it
+/// true.
+pub(crate) fn tag_gate(
+    ai_enabled: bool,
+    auto_tag_enabled: bool,
+    folder: &str,
+    excluded: &[String],
+) -> TagGate {
+    if !(ai_enabled && auto_tag_enabled) {
+        return TagGate::OptedOut;
+    }
+    if folder_is_excluded(folder, excluded) {
+        return TagGate::Excluded;
+    }
+    TagGate::Allowed
+}
+
+/// Suggest tags for an open note on the bundled auto-tag task-model (MYND-651).
+/// Blocking, one-shot, RAM-only: the reply is tag TEXT the frontend parses and
+/// ranks; nothing is persisted and no note is modified here (accepting a tag is
+/// the frontend's explicit `note_save`, SYNC-17).
+///
+/// Two host-side gates run before any model touch, neither of them trusting the
+/// caller ([`tag_gate`]):
+///   1. `ai_enabled` **and** `auto_tag_enabled`, re-read from `vault.prefs` —
+///      off → `NotReady`, with no decrypt and no engine call;
+///   2. the note's `ai_excluded_folders` membership, resolved from the note's
+///      OWN decrypted frontmatter (a caller-supplied folder would let a
+///      compromised WebView tag an excluded note by lying) — excluded → an empty
+///      reply, again with no engine call (SYNC-14, no explicit-action carve-out).
+///
+/// **Lowest-priority compute (task 4).** The pass never starts while a
+/// user-initiated infer/transcribe/search is pending, and yields the compute
+/// lock within a token if one arrives mid-generation; both surface as
+/// [`EngineError::Deferred`], which is "ask again later", not "no tags". Opening
+/// a note is unaffected either way — note-open decrypts a `MY01` blob and never
+/// contends for the compute lock at all.
+///
+/// DENY-list: `prompt` carries note content and is `Zeroizing`-wrapped on the
+/// first statement; neither it, the note body read for the folder, nor the tag
+/// reply is ever logged.
+#[tauri::command]
+pub async fn suggest_tags<R: Runtime>(
+    note_id: String,
+    prompt: String,
+    app: AppHandle<R>,
+    vault_state: State<'_, VaultRuntimeState>,
+    engine_state: State<'_, LocalInferenceState>,
+    priority: State<'_, ComputePriority>,
+) -> Result<String, EngineError> {
+    // First statement: bound the prompt plaintext (it embeds the note body) to a
+    // Zeroizing wrapper, so every gate's early return wipes the bytes.
+    let prompt = Zeroizing::new(prompt);
+
+    let prefs = crate::plugins::prefs::commands::prefs_read_from_host(
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+        vault_state.inner(),
+        &myne_core::vault_io::StdVaultIo,
+    )
+    .await
+    .map_err(|_| EngineError::NotReady)?;
+    // Cheap switch check first, so a vault with auto-tag off never pays a note
+    // decrypt for a feature that is not going to run. The authoritative decision
+    // is still `tag_gate` below — this is an ordering optimisation, not a second
+    // policy.
+    if !(prefs.ai_enabled && prefs.auto_tag_enabled) {
+        return Err(EngineError::NotReady);
+    }
+
+    // Resolve the note's folder from the note ITSELF via the sanctioned decrypt
+    // path. Unreadable (bad id, missing blob, locked slot) → refuse: a folder we
+    // cannot verify is one we cannot clear for AI.
+    let notes_dir = myne_core::paths::notes_dir_for(&app, vault_state.active_vault_id().await)
+        .map_err(|_| EngineError::NotReady)?;
+    let folder = {
+        let body = Zeroizing::new(
+            note_read_with_dir(
+                notes_dir,
+                vault_state.inner(),
+                note_id,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+            )
+            .await
+            .map_err(|_| EngineError::NotReady)?,
+        );
+        folder_of(&body)
+    };
+
+    suggest_tags_with_engine(
+        engine_state.engine(),
+        (*priority).clone(),
+        tag_gate(
+            prefs.ai_enabled,
+            prefs.auto_tag_enabled,
+            &folder,
+            &prefs.ai_excluded_folders,
+        ),
+        prompt,
+    )
+    .await
+}
+
+/// Testable core of [`suggest_tags`]: honour the gate, then run the tag pass
+/// under the lowest-priority compute policy. It re-checks `gate` rather than
+/// assuming its caller already acted on it, so a `TagGate` value can be threaded
+/// around without a refused note ever reaching the model by omission.
+pub(crate) async fn suggest_tags_with_engine(
+    engine: Arc<dyn Engine>,
+    priority: ComputePriority,
+    gate: TagGate,
+    prompt: Zeroizing<String>,
+) -> Result<String, EngineError> {
+    match gate {
+        TagGate::OptedOut => return Err(EngineError::NotReady),
+        // Not an error: there is simply nothing to suggest for a note the user
+        // put outside AI's reach. No model call, no engine touch.
+        TagGate::Excluded => return Ok(String::new()),
+        TagGate::Allowed => {}
+    }
+    // Pre-flight: a user-initiated call is pending, so don't even spawn the
+    // blocking pass. `Deferred` tells the caller to retry, distinctly from the
+    // empty reply above — a caller must never cache "no tags" for a note that
+    // was never actually looked at.
+    if priority.interactive_pending() {
+        return Err(EngineError::Deferred);
+    }
+    // Mid-flight: the probe breaks generation the moment a user call arrives.
+    // `yielded` records that it fired, because the engine's partial output is
+    // indistinguishable from a short-but-complete tag list.
+    let yielded = Arc::new(AtomicBool::new(false));
+    let flag = Arc::clone(&yielded);
+    let mut probe = priority.tag_yield_probe();
+    let joined = tokio::task::spawn_blocking(move || {
+        engine.infer_tags(&prompt, &mut || {
+            let flow = probe();
+            if flow.is_break() {
+                flag.store(true, Ordering::SeqCst);
+            }
+            flow
+        })
+    })
+    .await;
+    let out = unwrap_join(joined, EngineError::InferenceFailed, "suggest_tags")?;
+    if yielded.load(Ordering::SeqCst) {
+        return Err(EngineError::Deferred);
+    }
+    Ok(out)
+}
+
+/// Whether this build ships an auto-tag model (MYND-651). Cheap, synchronous,
+/// and deliberately UNGATED: the answer is a property of the binary, not of the
+/// vault — no prefs read, no note decrypt, nothing an unlocked slot is needed
+/// for. A locked or absent vault answers the same as an unlocked one.
+///
+/// The settings surface calls it so the auto-tag switch can say "this build has
+/// no tag model" instead of persisting `true` against a host that will answer
+/// [`EngineError::NotReady`] forever. The tag role is bundled-only by design
+/// (`threat-model.md` §7: no override picker), so a `false` here is not
+/// something the user can fix by side-loading — which is exactly why the UI has
+/// to say it rather than leave the user guessing.
+///
+/// This is NOT the enforcement point for anything: [`suggest_tags`] re-reads
+/// both prefs switches and the folder gate host-side regardless of what any
+/// caller learned here.
+#[tauri::command]
+pub fn tag_model_available(engine_state: State<'_, LocalInferenceState>) -> bool {
+    engine_state.engine().tag_model_available()
 }
 
 /// Record a user-picked model path for `role` device-locally (ai-ux-surface
@@ -917,6 +1144,250 @@ mod tests {
         let (texts, sources) = resolve_hit_texts(&hits, |_| Some("😀"));
         assert!(texts.is_empty(), "mid-codepoint range must be skipped");
         assert!(sources.is_empty());
+    }
+
+    /// The tag prompt used across the gate tests. Real prompts embed the note
+    /// body; nothing here is content, so nothing here is a DENY-list concern.
+    fn tag_prompt() -> Zeroizing<String> {
+        Zeroizing::new("Suggest tags for: standup notes".to_string())
+    }
+
+    #[test]
+    fn the_auto_tag_gate_is_closed_unless_both_switches_are_on() {
+        // Exhaustive over the two-key gate. The pairing is the point: a synced
+        // `auto_tag_enabled: true` arriving on a device that never opted into AI
+        // must still run nothing (the co-gate `ai_enabled` is device-local).
+        let none: [String; 0] = [];
+        assert_eq!(tag_gate(false, false, "", &none), TagGate::OptedOut);
+        assert_eq!(tag_gate(true, false, "", &none), TagGate::OptedOut);
+        assert_eq!(tag_gate(false, true, "", &none), TagGate::OptedOut);
+        assert_eq!(tag_gate(true, true, "", &none), TagGate::Allowed);
+    }
+
+    #[test]
+    fn an_ai_excluded_folder_is_refused_even_with_both_switches_on() {
+        // SYNC-14 with no explicit-action carve-out (threat-model §7): auto-tag
+        // is ambient, so an excluded note is never read by a model — not even
+        // when the user is looking right at it.
+        let excluded = vec!["Private/".to_string()];
+        assert_eq!(
+            tag_gate(true, true, "Private/", &excluded),
+            TagGate::Excluded
+        );
+        // Nested beneath an excluded folder is excluded too…
+        assert_eq!(
+            tag_gate(true, true, "Private/Journal/", &excluded),
+            TagGate::Excluded
+        );
+        // …and case/diacritic folding applies (the store's canonical matcher).
+        assert_eq!(
+            tag_gate(true, true, "private/", &excluded),
+            TagGate::Excluded
+        );
+        // A mere prefix sibling is NOT excluded.
+        assert_eq!(
+            tag_gate(true, true, "PrivateStuff/", &excluded),
+            TagGate::Allowed
+        );
+    }
+
+    #[test]
+    fn a_refused_pass_never_reaches_the_engine() {
+        // The gate has to short-circuit BEFORE any model call — an engine that
+        // panics on use is how that becomes a test rather than a claim.
+        struct PanicEngine;
+        impl Engine for PanicEngine {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                panic!("gated-off pass must not reach the engine");
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                panic!("gated-off pass must not reach the engine");
+            }
+            fn infer_tags(
+                &self,
+                _p: &str,
+                _c: &mut dyn FnMut() -> std::ops::ControlFlow<()>,
+            ) -> Result<String, EngineError> {
+                panic!("gated-off pass must not reach the engine");
+            }
+        }
+        let engine: Arc<dyn Engine> = Arc::new(PanicEngine);
+        let pri = ComputePriority::default();
+        let excluded = vec!["Private/".to_string()];
+
+        // AI off → NotReady.
+        let out = rt().block_on(suggest_tags_with_engine(
+            Arc::clone(&engine),
+            pri.clone(),
+            tag_gate(false, true, "", &excluded),
+            tag_prompt(),
+        ));
+        assert_eq!(out, Err(EngineError::NotReady));
+
+        // auto-tag off → NotReady.
+        let out = rt().block_on(suggest_tags_with_engine(
+            Arc::clone(&engine),
+            pri.clone(),
+            tag_gate(true, false, "", &excluded),
+            tag_prompt(),
+        ));
+        assert_eq!(out, Err(EngineError::NotReady));
+
+        // Excluded folder → an empty reply, not an error, and still no model.
+        let out = rt().block_on(suggest_tags_with_engine(
+            engine,
+            pri,
+            tag_gate(true, true, "Private/Journal/", &excluded),
+            tag_prompt(),
+        ));
+        assert_eq!(out, Ok(String::new()));
+    }
+
+    #[test]
+    fn an_allowed_pass_returns_the_tag_models_reply() {
+        let engine: Arc<dyn Engine> = Arc::new(StubEngine);
+        let none: [String; 0] = [];
+        let out = rt()
+            .block_on(suggest_tags_with_engine(
+                engine,
+                ComputePriority::default(),
+                tag_gate(true, true, "Work/", &none),
+                tag_prompt(),
+            ))
+            .expect("stub tag pass never fails");
+        // The TAG model's reply, not the generation model's.
+        assert_eq!(out, "stub-tag, meeting, notes");
+    }
+
+    #[test]
+    fn a_pending_user_call_defers_the_pass_before_it_spawns() {
+        // Half one of the lowest-priority policy. The engine panics on use, so
+        // `Deferred` proves the pass stood down rather than raced.
+        struct PanicEngine;
+        impl Engine for PanicEngine {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                panic!("a deferred pass must not reach the engine");
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                panic!("a deferred pass must not reach the engine");
+            }
+            fn infer_tags(
+                &self,
+                _p: &str,
+                _c: &mut dyn FnMut() -> std::ops::ControlFlow<()>,
+            ) -> Result<String, EngineError> {
+                panic!("a deferred pass must not reach the engine");
+            }
+        }
+        let pri = ComputePriority::default();
+        let engine: Arc<dyn Engine> = Arc::new(PanicEngine);
+        // A user-initiated infer/transcribe/search is in flight.
+        let user_call = pri.interactive();
+        let out = rt().block_on(suggest_tags_with_engine(
+            engine,
+            pri.clone(),
+            TagGate::Allowed,
+            tag_prompt(),
+        ));
+        assert_eq!(out, Err(EngineError::Deferred));
+
+        // Once the user's call finishes, the pass runs normally — deferral is a
+        // "later", not a permanent refusal.
+        drop(user_call);
+        let engine: Arc<dyn Engine> = Arc::new(StubEngine);
+        let out = rt().block_on(suggest_tags_with_engine(
+            engine,
+            pri,
+            TagGate::Allowed,
+            tag_prompt(),
+        ));
+        assert_eq!(out, Ok("stub-tag, meeting, notes".to_string()));
+    }
+
+    #[test]
+    fn a_user_call_arriving_mid_pass_yields_the_compute_lock() {
+        // Half two: the pass is already generating when a user asks for
+        // something. It must break out — and its partial text must NOT be
+        // returned as if it were a finished suggestion set.
+        use super::super::compute_priority::InteractiveGuard;
+        use std::ops::ControlFlow;
+        use std::sync::atomic::AtomicUsize;
+        use std::sync::Mutex;
+
+        /// Emits "tokens" up to a chat-sized budget, and stages a user-initiated
+        /// call at step 3 — deterministically, from inside the generation loop,
+        /// so the race the real world would have is not the thing under test.
+        /// Every subsequent probe must break.
+        struct GreedyEngine {
+            pri: ComputePriority,
+            steps: Arc<AtomicUsize>,
+            user_call: Mutex<Option<InteractiveGuard>>,
+        }
+        impl Engine for GreedyEngine {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                unreachable!("tag pass only")
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                unreachable!("tag pass only")
+            }
+            fn infer_tags(
+                &self,
+                _p: &str,
+                should_continue: &mut dyn FnMut() -> ControlFlow<()>,
+            ) -> Result<String, EngineError> {
+                let mut out = String::new();
+                for _ in 0..BUDGET {
+                    if should_continue().is_break() {
+                        return Ok(out);
+                    }
+                    let n = self.steps.fetch_add(1, Ordering::SeqCst) + 1;
+                    out.push_str("tag,");
+                    if n == 3 {
+                        // A user asks for a summarize mid-pass.
+                        *self.user_call.lock().unwrap() = Some(self.pri.interactive());
+                    }
+                }
+                Ok(out)
+            }
+        }
+        const BUDGET: usize = 10_000;
+
+        let pri = ComputePriority::default();
+        let steps = Arc::new(AtomicUsize::new(0));
+        let engine: Arc<dyn Engine> = Arc::new(GreedyEngine {
+            pri: pri.clone(),
+            steps: Arc::clone(&steps),
+            user_call: Mutex::new(None),
+        });
+
+        let out = rt().block_on(suggest_tags_with_engine(
+            engine,
+            pri,
+            TagGate::Allowed,
+            tag_prompt(),
+        ));
+
+        assert_eq!(
+            out,
+            Err(EngineError::Deferred),
+            "a yielded pass reports Deferred, never its partial text"
+        );
+        assert_eq!(
+            steps.load(Ordering::SeqCst),
+            3,
+            "the pass broke out on the next token, not after its full budget"
+        );
+    }
+
+    #[test]
+    fn deferred_is_a_distinct_deny_safe_error_kind() {
+        // The frontend has to tell "ask again later" apart from "no tags", and
+        // the kind label stays content-free (DENY-list).
+        assert_eq!(
+            local_inference_error_kind(&EngineError::Deferred),
+            "deferred"
+        );
+        assert_ne!(EngineError::Deferred, EngineError::NotReady);
     }
 
     #[test]

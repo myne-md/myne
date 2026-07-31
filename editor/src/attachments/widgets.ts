@@ -471,45 +471,54 @@ export class AttachmentAudioWidget extends WidgetType {
     // + insert action, mounted under the time row. Calls only the host slot.
     const transcript = createTranscriptSection({ view, id: this.id });
 
-    const actions: OverflowAction[] = [
-      // Absent, not disabled: a platform with no export destination
-      // (the web client — no API grants a page a write path) omits the
-      // item entirely rather than offering one that cannot work.
-      ...(canExportAttachment()
-        ? [
-            {
-              label: i18n.t("editor.attachment.widget.menu.export"),
-              testid: "attachment-audio.export",
-              run: () => void exportAttachment(this.id, this.filename),
-            },
-          ]
-        : []),
-      { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
-      { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
-      { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
-    ];
-    // "Transcribe" (SYNC-V7) — only when the host backs speech-to-text (desktop;
-    // mobile leaves the slot unset → row omitted) AND transcription is enabled.
-    // When it is off the row is HIDDEN, not shown-disabled (MYND-270 product
-    // tweak: no dangling affordance when the whole subsystem is off), and the
-    // Attachments Library now hides it the same way rather than greying it.
-    // When a model is not ready the run surfaces a hint instead (inside the
-    // transcript section).
-    //
-    // MYND-592: this gate was `aiSlashEnabledFacet` — the AI beta opt-in with
-    // the AI-excluded-folder rule folded in. Both were wrong here. The opt-in
-    // is for the embedding store, and a folder excluded from ambient AI
-    // *reading* says nothing about whether the user may transcribe a file they
-    // explicitly picked.
-    if (getHost().transcribe !== undefined && view.state.facet(transcriptionEnabledFacet)) {
-      actions.push({
-        label: i18n.t("editor.attachment.widget.menu.transcribe"),
-        testid: "attachment-audio.transcribe",
-        run: () => transcript.start(),
-      });
-    }
+    // Built PER menu-open (a provider fn, not a frozen array): the widget is not
+    // re-created when the transcription compartment reconfigures (CMEditor
+    // dispatches `reconfigureTranscription` on the `transcriptionEnabled` prop
+    // flip, MYND-592), so a list frozen at `toDOM` time would keep offering
+    // Transcribe after the user turned transcription off. Reading the facet here
+    // means each open reflects the live state (tr2).
+    const buildActions = (): OverflowAction[] => {
+      const actions: OverflowAction[] = [
+        // Absent, not disabled: a platform with no export destination
+        // (the web client — no API grants a page a write path) omits the
+        // item entirely rather than offering one that cannot work.
+        ...(canExportAttachment()
+          ? [
+              {
+                label: i18n.t("editor.attachment.widget.menu.export"),
+                testid: "attachment-audio.export",
+                run: () => void exportAttachment(this.id, this.filename),
+              },
+            ]
+          : []),
+        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
+        { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
+      ];
+      // "Transcribe" (SYNC-V7) — only when the host backs speech-to-text (desktop;
+      // mobile leaves the slot unset → row omitted) AND transcription is enabled.
+      // When it is off the row is HIDDEN, not shown-disabled (MYND-270 product
+      // tweak: no dangling affordance when the whole subsystem is off), and the
+      // Attachments Library now hides it the same way rather than greying it.
+      // When a model is not ready the run surfaces a hint instead (inside the
+      // transcript section).
+      //
+      // MYND-592: this gate was `aiSlashEnabledFacet` — the AI beta opt-in with
+      // the AI-excluded-folder rule folded in. Both were wrong here. The opt-in
+      // is for the embedding store, and a folder excluded from ambient AI
+      // *reading* says nothing about whether the user may transcribe a file they
+      // explicitly picked.
+      if (getHost().transcribe !== undefined && view.state.facet(transcriptionEnabledFacet)) {
+        actions.push({
+          label: i18n.t("editor.attachment.widget.menu.transcribe"),
+          testid: "attachment-audio.transcribe",
+          run: () => transcript.start(),
+        });
+      }
+      return actions;
+    };
 
-    const menu = buildOverflowMenu(actions, {
+    const menu = buildOverflowMenu(buildActions, {
       buttonTestId: "attachment-audio.menu-button",
       menuTestId: "attachment-audio.menu",
     });

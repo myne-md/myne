@@ -21,6 +21,12 @@ pub mod audio;
 pub mod cancel;
 pub mod chunker;
 pub mod commands;
+pub mod compute_priority;
+/// Threaded proof of the compute-lock priority policy (MYND-651 task 11). Its
+/// own module rather than more `#[cfg(test)]` in `commands.rs`, because it needs
+/// two runtimes and a real vault on disk — nothing the unit tests around it do.
+#[cfg(test)]
+mod compute_priority_integration;
 pub mod embeddings_persist;
 pub mod engine;
 pub mod engine_candle;
@@ -64,7 +70,7 @@ const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
   "identifier": "local-inference",
   "description": "On-device AI inference + retrieval + grounded Q&A commands (infer/embed/semantic_search/ask) for the main window; no core/fs/dialog/clipboard/network.",
   "windows": ["main"],
-  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
+  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-suggest-tags", "local-inference:allow-tag-model-available", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
 }"#;
 
 /// Best-effort zeroize + reset of the in-RAM AI vector store on lock teardown
@@ -106,6 +112,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::chat_stop,
             commands::transcribe,
             commands::read_transcript,
+            commands::suggest_tags,
+            commands::tag_model_available,
             commands::set_model_path,
             commands::get_model_path
         ])
@@ -131,14 +139,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                 // none ships (an AI-free `--no-default-features` build, or a
                 // checkout whose LFS model blob was not fetched), leaving STT
                 // side-load-only.
-                let bundled_transcription = app
-                    .path()
-                    .resource_dir()
-                    .ok()
-                    .and_then(|rd| model_store::bundled_transcription_model(&rd));
+                let resource_dir = app.path().resource_dir().ok();
+                let bundled_transcription = resource_dir
+                    .as_deref()
+                    .and_then(model_store::bundled_transcription_model);
+                // The bundled auto-tag task-model (MYND-651). Same
+                // present-or-nothing resolution, but with no side-load fallback:
+                // `None` means this build simply has no auto-tag.
+                let bundled_tag = resource_dir
+                    .as_deref()
+                    .and_then(model_store::bundled_tag_model);
                 std::sync::Arc::new(
                     engine_candle::CandleEngine::new(base)
-                        .with_bundled_transcription(bundled_transcription),
+                        .with_bundled_transcription(bundled_transcription)
+                        .with_bundled_tag_model(bundled_tag),
                 )
             };
             app.manage(state::LocalInferenceState::new(engine));
@@ -147,6 +161,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // `chat_stream` generation observes it; `chat_stop` and the vault-
             // lock teardown (task 12) set it.
             app.manage(cancel::CancelToken::default());
+            // Compute-lock priority register (auto-tag, MYND-651 task 4): the
+            // user-initiated commands register here for the length of their
+            // call, and the background tag pass stands down while any of them
+            // is pending. The single `compute` mutex cannot express an ordering
+            // on its own — this is that ordering.
+            app.manage(compute_priority::ComputePriority::default());
             app.add_capability(LOCAL_INFERENCE_CAPABILITY)?;
             Ok(())
         })

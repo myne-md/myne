@@ -134,16 +134,13 @@ import { AiChatTab } from "../notes/components/AiChatTab";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
-import { clearTagSuggest } from "../notes/ai/tagSuggestStore";
 import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
-import { runSummarizeToChat, runTagSuggestToChat } from "../notes/ai/aiToChat";
+import { runSummarizeToChat } from "../notes/ai/aiToChat";
 import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
-import { appendInlineTag } from "../notes/ai/acceptTag";
 import { infer as aiInfer, computeRewrite } from "../lib/writing-assistant";
 import { sendChat, stopChat } from "../lib/ai-chat";
 import { isNoteAiExcluded } from "../lib/aiExcludedFolders";
 import { getActiveEditorView } from "../editor/active-view";
-import { tagTree } from "../notes/vaultIndices";
 import { BacklinksTab } from "../notes/components/BacklinksTab";
 import { OutlineTab } from "../notes/components/OutlineTab";
 import { ToolbarLayoutSync } from "../notes/ToolbarLayoutSync";
@@ -2621,26 +2618,26 @@ function CommandPaletteHost({
   // mock removed on develop.)
   // Drop the ephemeral AI render stores when the editor session tears down
   // (lock / vault-switch unmounts this host) — the AS1 artifacts (summary text +
-  // tag suggestions + the chat transcript) never outlive the open vault (SYNC-8;
+  // the chat transcript) never outlive the open vault (SYNC-8;
   // conversational-ai-chat task 12: the chat transcript is RAM-only, wiped on
-  // lock. Unlike summary/tags it is vault-scoped, so it is NOT cleared on a mere
-  // note switch below — only here, on the vault teardown).
+  // lock. Unlike the summary it is vault-scoped, so it is NOT cleared on a mere
+  // note switch below — only here, on the vault teardown). Tag suggestions are
+  // not among them: the band's state is per-pane React state (MYND-651), torn
+  // down with the pane rather than through a module store.
   useEffect(
     () => () => {
       clearAiOutput();
-      clearTagSuggest();
       clearChat();
     },
     [],
   );
   // Also drop the AI render stores when the SELECTED NOTE changes (the host
   // stays mounted across a note switch, so the unmount cleanup above does not
-  // fire). Without this, note A's summary / tag chips linger — and could be
-  // inserted into note B — after switching. Bumping the run epoch (inside the
-  // clears) also drops any of A's in-flight runs so they never resolve onto B.
+  // fire). Without this, note A's summary lingers — and could be inserted into
+  // note B — after switching. Bumping the run epoch (inside the clear) also
+  // drops any of A's in-flight runs so they never resolve onto B.
   useEffect(() => {
     clearAiOutput();
-    clearTagSuggest();
   }, [ctx.selectedId]);
   // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
   // set (authoritative note_list + loadNoteBatch, not the partial sidebar cache).
@@ -2876,33 +2873,6 @@ function CommandPaletteHost({
           budget: SUMMARIZE_BUDGET_CHARS,
           infer: aiInfer,
         });
-      },
-      // Suggest tags for the focused note into the AI Chat tab (auto-tag-link
-      // tasks 2-4): reveal the tab, then run the exclusion-gated, infer-once pass
-      // over the note body + the vault's existing tag vocabulary (tagTree), and
-      // render the ranked chips. The note folder (for the excluded-folder gate)
-      // comes from the selection cache; excluded folders from prefs (SYNC-14).
-      onSuggestTags: () => {
-        revealRightPanelTab("ai-chat");
-        const view = getActiveEditorView();
-        if (view === null) return;
-        // SYNC-14 fail-closed (see onSummarizeNote): skip when the folder is
-        // unknown rather than defaulting to root.
-        if (ctx.selectedId === null) return;
-        const cached = ctx.cache.get(ctx.selectedId);
-        if (cached === undefined) return;
-        const noteFolder = cached.folder ?? "";
-        if (isNoteAiExcluded(noteFolder, aiPrefs.ai_excluded_folders)) return;
-        void (async () => {
-          const existingTags = (await tagTree()).map((n) => n.display);
-          await runTagSuggestToChat({
-            noteBody: view.state.doc.toString(),
-            noteFolder,
-            existingTags,
-            excludedFolders: aiPrefs.ai_excluded_folders,
-            infer: aiInfer,
-          });
-        })();
       },
       // Rewrite the current selection (writing-assistant `/yeniden-yaz` as a
       // palette action): resolve the selection span via the tested `computeRewrite`
@@ -3554,19 +3524,6 @@ function RightSidebar() {
               view.dispatch({
                 changes: { from: 0, to: view.state.doc.length, insert: newBody },
                 userEvent: "ai.insert",
-              });
-            }}
-            onAcceptTag={(suggestion) => {
-              // Accept a tag chip (auto-tag-link task 5, SYNC-17): append an inline
-              // `#tag` (idempotent, byte-identical) to the focused note, persisted
-              // through the normal autosave path — only on this explicit click.
-              const view = getActiveEditorView();
-              if (view === null) return;
-              const newBody = appendInlineTag(view.state.doc.toString(), suggestion.tag);
-              if (newBody === view.state.doc.toString()) return; // already present
-              view.dispatch({
-                changes: { from: 0, to: view.state.doc.length, insert: newBody },
-                userEvent: "ai.rewrite",
               });
             }}
             onSend={(m) => void sendChat(m)}

@@ -252,6 +252,28 @@ export const myneTheme = EditorView.theme({
     verticalAlign: "super",
   },
 
+  // Colored highlights (MYND-637) reuse the `.cm-highlight` base (radius / padding
+  // / ink) and override ONLY the wash, one class per colour — mirroring the
+  // `.cm-embedded-html mark.hl-*` set below, same `--highlight-*` vars + own-colour
+  // fallbacks. colored-highlight.ts paints the span `.cm-highlight cm-hl-X`, so the
+  // caret-on `==` skin (rendered inside the span) inherits the wash automatically.
+  ".cm-highlight.cm-hl-yellow": { backgroundColor: "var(--highlight, #f3e7c4)" },
+  ".cm-highlight.cm-hl-green": { backgroundColor: "var(--highlight-green, #d8e9cf)" },
+  ".cm-highlight.cm-hl-blue": { backgroundColor: "var(--highlight-blue, #d3e2ee)" },
+  ".cm-highlight.cm-hl-pink": { backgroundColor: "var(--highlight-pink, #efd8e2)" },
+  ".cm-highlight.cm-hl-purple": { backgroundColor: "var(--highlight-purple, #e2d8ee)" },
+  ".cm-highlight.cm-hl-orange": { backgroundColor: "var(--highlight-orange, #f2ddc6)" },
+  ".cm-highlight.cm-hl-red": { backgroundColor: "var(--highlight-red, #efd3d3)" },
+  ".cm-highlight.cm-hl-teal": { backgroundColor: "var(--highlight-teal, #cfe6e2)" },
+  ".cm-highlight.cm-hl-cyan": { backgroundColor: "var(--highlight-cyan, #cfe4ea)" },
+  ".cm-highlight.cm-hl-lime": { backgroundColor: "var(--highlight-lime, #e0ecc4)" },
+  ".cm-highlight.cm-hl-brown": { backgroundColor: "var(--highlight-brown, #e3d9cd)" },
+  ".cm-highlight.cm-hl-grey": { backgroundColor: "var(--highlight-grey, #dedcd8)" },
+  ".cm-highlight.cm-hl-indigo": { backgroundColor: "var(--highlight-indigo, #d6d8ee)" },
+  // The `==` skin colored-highlight.ts reveals on cursor needs no rule of its own:
+  // it renders inside the painted `.cm-highlight` span, so wash + ink inherit —
+  // identical to a yellow `==text==`. The `cm-hl-eq` class stays as a DOM hook.
+
   // Embedded HTML (MYND-209) — the sanitized element keeps its real tag; style
   // <mark>/<kbd> to match the dialect. <sub>/<sup>/<abbr> use native rendering.
   // DISCRIMINATOR (soft-tint option): render the output, marked ONLY by a faint
@@ -448,6 +470,63 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-task-query-dropped summary": { cursor: "pointer" },
   ".cm-task-query-dropped ul": { margin: "4px 0 0", paddingLeft: "18px" },
+
+  // Inline tag-suggestion band (MYND-651) — a quiet row above the note body,
+  // never a card. It appears without being asked for, so it reads as marginalia:
+  // muted label, hairline chips, no fill, no accent colour. The solid/dashed
+  // border is the whole visual vocabulary — solid means the tag already exists
+  // in the vault, dashed means accepting it grows the vocabulary.
+  ".cm-tag-suggestion-band": {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "6px",
+    margin: "4px 0 10px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    lineHeight: "1.5",
+  },
+  ".cm-tag-suggestion-label": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "11px",
+    letterSpacing: "0.02em",
+  },
+  ".cm-tag-suggestion-chip": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "2px",
+    padding: "1px 3px 1px 8px",
+    border: "1px solid var(--line-1, #d8d5cc)",
+    borderRadius: "var(--radius-1, 4px)",
+    background: "transparent",
+  },
+  ".cm-tag-suggestion-chip-new": { borderStyle: "dashed" },
+  ".cm-tag-suggestion-accept": {
+    background: "none",
+    border: "none",
+    padding: "0",
+    margin: "0",
+    color: "var(--fg-2, #4a4943)",
+    fontFamily: "inherit",
+    fontSize: "12px",
+    fontWeight: "500",
+    cursor: "pointer",
+  },
+  ".cm-tag-suggestion-dismiss": {
+    background: "none",
+    border: "none",
+    padding: "0 3px",
+    margin: "0",
+    color: "var(--fg-3, #6b6a64)",
+    fontFamily: "inherit",
+    fontSize: "12px",
+    lineHeight: "1",
+    cursor: "pointer",
+  },
+  ".cm-tag-suggestion-accept:focus-visible, .cm-tag-suggestion-dismiss:focus-visible": {
+    outline: "2px solid var(--accent)",
+    outlineOffset: "1px",
+  },
 
   // Spell-check squiggle (MYND-264, SYNC-9) — a wavy red underline driven by
   // the `--danger` design token (no hex), tracking the glyphs via

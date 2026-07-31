@@ -11,6 +11,7 @@ import { headingDecorations } from "./heading";
 import { setextHeadingDecorations } from "./setext-heading";
 import { emphasisDecorations } from "./emphasis";
 import { inlineTypographyDecorations } from "./inline-typography";
+import { coloredHighlightDecorations } from "./colored-highlight";
 import { emojiDecorations } from "./emoji";
 import { embeddedHtmlDecorations } from "./embedded-html";
 import { mathDecorations } from "./math";
@@ -36,6 +37,7 @@ import { footnoteDecorations } from "./footnote";
 import { tagChipDecorations } from "./tag-chip";
 import { taskChipDecorations } from "./task-chip";
 import { taskQueryBlockDecorations } from "./task-query-block";
+import { tagSuggestionBandDecorations } from "./tag-suggestion-band";
 import { commentDecorations } from "./comment";
 
 // SYNC-17 (MYND-200 / knowledge-graph-ux; `decisions.md` 2026-06-08 "Interactive
@@ -53,6 +55,12 @@ export function myneDecorations(): readonly Extension[] {
     // Highlight / subscript / superscript inline marks (MYND-156). Same
     // cursor-aware mark+marker-hide family as emphasis.
     inlineTypographyDecorations(),
+    // Colored highlights `<mark class="hl-*">` (MYND-637). Same hide-off-cursor /
+    // `==`-skin-on-cursor treatment as yellow `==`, so they never leak raw HTML.
+    // Partitioned from embeddedHtmlDecorations() by the shared
+    // isOwnedHighlightClass() (sanitize.ts): each owns a disjoint set of spans, so
+    // the two never both decorate one span and their order is not load-bearing.
+    coloredHighlightDecorations(),
     // Emoji `:shortcode:` → glyph (MYND-156). Lazy-loaded map; unmapped stays
     // literal. Returns [field, loader, decoration].
     ...emojiDecorations(),
@@ -97,6 +105,12 @@ export function myneDecorations(): readonly Extension[] {
     calloutDecorations(),
     horizontalRuleDecorations(),
     frontmatterDecorations(),
+    // The inline tag-suggestion band (MYND-651) — a block widget on the
+    // frontmatter/body boundary, so it belongs next to the frontmatter layer it
+    // anchors against. Absent entirely when the host has pushed no suggestions,
+    // which is the default state of every note. Inside this stack on purpose:
+    // source mode empties it, and raw markdown is what source mode promises.
+    ...tagSuggestionBandDecorations(),
     tableDecorations(),
     definitionListDecorations(),
     fencedCodeDecorations(),

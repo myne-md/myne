@@ -6,7 +6,6 @@ import {
   appendChatToken,
   clearChat,
   failChatTurn,
-  finalizeChatTags,
   finalizeChatTurn,
   getChat,
   sendChatMessage,
@@ -162,17 +161,5 @@ describe("chat store helpers + run epoch", () => {
     const turns = getChat().turns;
     expect(turns[0].insertable).toBe(false); // user turn never insertable
     expect(turns[1].insertable).toBe(true);
-  });
-
-  it("finalizeChatTags closes the turn with accept-chips and stops streaming (task 11)", () => {
-    const token = sendChatMessage("Suggest tags for this note");
-    finalizeChatTags(token, [
-      { tag: "work", isNew: false },
-      { tag: "rust", isNew: true },
-    ]);
-    const state = getChat();
-    expect(state.streaming).toBe(false);
-    expect(state.turns[1].tagSuggestions).toHaveLength(2);
-    expect(state.turns[1].tagSuggestions[1]).toEqual({ tag: "rust", isNew: true });
   });
 });

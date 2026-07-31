@@ -1,0 +1,101 @@
+name: Bug report
+description: Something in the desktop client, web client, protocol crate, or clipper host is broken.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. First, a few things:
+
+        - **Security issues do not go here.** Anything touching cryptography, key handling, recovery, sync integrity, or the reproducible-build / bundle chain goes to **security@myne.md** privately — see [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
+        - **Search first** — the bug may already be reported.
+        - Myne is local-first and end-to-end encrypted: **never paste note content, your account number, your master password, or your recovery phrase.**
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part of Myne?
+      options:
+        - Desktop — editor
+        - Desktop — vault / unlock / recovery
+        - Desktop — sync
+        - Desktop — search / spellcheck
+        - Desktop — attachments / export
+        - Web client (app.example.com or self-hosted bundle)
+        - Browser clipper handoff (native host)
+        - protocol crate / on-disk format
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version / Linux distro + display server
+      placeholder: "e.g. macOS 15.5, Windows 11 23H2, Arch Linux (Wayland)"
+  - type: input
+    id: app-version
+    attributes:
+      label: Myne version / commit
+      description: Settings > About, or the commit you built from.
+    validations:
+      required: true
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How did you install it?
+      options:
+        - Official signed bundle
+        - Arch PKGBUILD / AUR
+        - Built from source
+        - Web client (no install)
+        - Other
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots, or screen recording
+      description: Redact anything sensitive. Console / devtools output helps.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those go privately to security@myne.md).
+          required: true
+        - label: I have not included any note content, account number, password, or recovery phrase.
+          required: true

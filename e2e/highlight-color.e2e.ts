@@ -1,12 +1,14 @@
 // Multi-color highlight suite (decisions.md 2026-06-15, MYND-209/MYND-156).
 //
-// Pins the embedded-HTML highlight path end-to-end in the production binary:
-// a note authored with `<mark class="hl-green">…</mark>` renders a colored
-// `<mark>` whose `hl-green` class survived the REAL DOMPurify sanitizer (the
-// `uponSanitizeAttribute` hook registered in `loadPurifier`), an UNKNOWN class
-// (`hl-chartreuse`) is stripped and falls back to a plain `<mark>`, and the colored
-// `<mark>` bytes round-trip through the MY01 AEAD blob (lock → unlock → reopen)
-// and re-render — proving §6 C1 byte-preservation for user-authored HTML.
+// Pins the colored-highlight path end-to-end in the production binary:
+// a note authored with `<mark class="hl-green">…</mark>` renders through the
+// colored-highlight decoration (MYND-637) as a clean `.cm-highlight.cm-hl-green`
+// span — its `hl-green` class having survived the REAL DOMPurify sanitizer (the
+// `uponSanitizeAttribute` hook registered in `loadPurifier`) — while an UNKNOWN
+// class (`hl-chartreuse`) is stripped and falls back to a plain embedded-html
+// `<mark>`, and the colored `<mark>` bytes round-trip through the MY01 AEAD blob
+// (lock → unlock → reopen) and re-render — proving §6 C1 byte-preservation for
+// user-authored HTML.
 //
 // SCOPE NOTE: the toolbar swatch EMIT path (select text → caret → color square →
 // `<mark class="hl-…">` inserted) is unit-tested deterministically in
@@ -86,15 +88,18 @@ describeE2E("hc1 colored highlight renders; unknown class falls back (MYND-209)"
         await typeRaw(s, DOC);
 
         // The allowlisted color survives the real DOMPurify sanitizer + decoration.
-        await s.waitForElement(`${EDITOR} .cm-embedded-html mark.hl-green`);
+        await s.waitForElement(`${EDITOR} .cm-highlight.cm-hl-green`);
         // The off-allowlist class is stripped → no colored mark for it.
         const offList = await s.findElements(
           `${EDITOR} .cm-embedded-html mark.hl-chartreuse`,
         );
         expect(offList.length).toBe(0);
-        // …but the bare <mark> still renders (only its class was dropped).
+        // …but the bare <mark> still renders (only its class was dropped). Green
+        // now paints through the colored-highlight decoration (MYND-637), off the
+        // embedded-html path, so the only embedded-html <mark> left is the
+        // class-stripped chartreuse fallback.
         const marks = await s.findElements(`${EDITOR} .cm-embedded-html mark`);
-        expect(marks.length).toBeGreaterThanOrEqual(2);
+        expect(marks.length).toBe(1);
       },
     );
   });
@@ -114,7 +119,7 @@ describeE2E("hc2 colored highlight survives the AEAD round-trip (MYND-209, §6 C
         await createNote(s, "Kalıcı Renk");
 
         await typeRaw(s, DOC);
-        await s.waitForElement(`${EDITOR} .cm-embedded-html mark.hl-green`);
+        await s.waitForElement(`${EDITOR} .cm-highlight.cm-hl-green`);
         await waitForSaved(s);
 
         // Lock (flushes the MY01 blob) → unlock → reopen the note.
@@ -125,7 +130,7 @@ describeE2E("hc2 colored highlight survives the AEAD round-trip (MYND-209, §6 C
 
         // The colored highlight re-renders → the class bytes survived the
         // encrypted round-trip verbatim (§6 C1).
-        await s.waitForElement(`${EDITOR} .cm-embedded-html mark.hl-green`);
+        await s.waitForElement(`${EDITOR} .cm-highlight.cm-hl-green`);
       },
     );
   });
