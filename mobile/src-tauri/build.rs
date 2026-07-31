@@ -266,6 +266,20 @@ fn main() {
                     "sync_lifecycle_resume",
                     "sync_decode_join_qr",
                 ]),
+            )
+            .plugin(
+                // On-device speech-to-text (MYND-563): creates the
+                // `local-inference:` ACL namespace + auto-generates
+                // `allow-transcribe` / `allow-read-transcript`. NOT feature-gated
+                // in build.rs (unlike the desktop `CARGO_FEATURE_LOCAL_INFERENCE`
+                // gate) — the runtime capability is added only when the
+                // `local-inference` feature registers the plugin
+                // (`local_inference/mod.rs`), so a feature-off build leaves an
+                // unreferenced namespace, never a dangling grant. Lock-step this
+                // list with the `generate_handler!` in that mod.
+                "local-inference",
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["transcribe", "read_transcript"]),
             ),
     )
     .unwrap();
