@@ -4,8 +4,9 @@
 // `ai_enabled` toggle (SYNC-12), the threat-model-bounded trust affordance
 // (SYNC-16 — the load-bearing headline + a "How does this work?" disclosure), a
 // per-role side-load model picker (SYNC-1 — the user brings their own files;
-// Myne NEVER downloads them), and an `ai_excluded_folders` editor (SYNC-14, same
-// set encoding as deliberate_folders).
+// Myne NEVER downloads them), an `auto_tag_enabled` sub-toggle (MYND-651), and
+// an `ai_excluded_folders` editor (SYNC-14, same set encoding as
+// deliberate_folders).
 //
 // Model acquisition (SYNC-1/2, no-egress): Myne has no network egress path by
 // construction, so it cannot and will not fetch a model. The "Recommended
@@ -28,6 +29,7 @@ import { openUrl } from "../../platform/opener";
 import type { ModelRole } from "../../lib/ai-model-store";
 import { usePrefs } from "../../hooks/usePrefs";
 import { loadModelPath, saveModelPath } from "../../lib/ai-model-store";
+import { setAutoTagEnabled } from "../../lib/prefs";
 import {
   AI_TRUST_DISCLOSURE,
   AI_TRUST_HEADLINE,
@@ -200,6 +202,27 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
 
   const aiEnabled = prefs.ai_enabled;
 
+  // Auto-tag (MYND-651) has no `usePrefs` setter — `src/lib/prefs.ts`'s
+  // `setAutoTagEnabled` is called directly, the `transcription_enabled`
+  // precedent. So the switch keeps its own optimistic state and converges on
+  // the value `usePrefs` re-reads after the setter's nonce bump; a failed write
+  // rolls back rather than leaving the UI asserting an unsaved value.
+  const [autoTag, setAutoTag] = useState(prefs.auto_tag_enabled);
+  useEffect(() => {
+    setAutoTag(prefs.auto_tag_enabled);
+  }, [prefs.auto_tag_enabled]);
+
+  const toggleAutoTag = async (next: boolean) => {
+    const prev = autoTag;
+    setAutoTag(next);
+    try {
+      await setAutoTagEnabled(next);
+    } catch {
+      setAutoTag(prev);
+      onShowToast?.(t("settings.ai.autoTagSaveFailed"));
+    }
+  };
+
   // Load the persisted device-local model paths on open (both roles). A missing
   // command (the `local-inference` feature is off) degrades silently to no
   // persisted path — the panel stays usable.
@@ -307,6 +330,29 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
             {AI_TRUST_DISCLOSURE}
           </p>
         )}
+      </div>
+
+      {/* Auto-tag (MYND-651) — a sub-feature of the beta, so it follows the
+          enable toggle rather than sitting in Models: the tag pass runs on a
+          BUNDLED model, nothing to side-load. Disabled (not hidden) while the
+          beta is off, matching every other dependent control in this panel; the
+          host re-reads both flags before it loads a model, so this surface is
+          discovery, not enforcement. */}
+      <div style={BLOCK_STYLE} data-setting-anchor="ai.auto-tag">
+        <div style={TOGGLE_ROW_STYLE}>
+          {/* No `htmlFor`: `Switch` renders a `role="switch"` button with no id
+              (the accessible name is its `ariaLabel`), so a for-target would
+              dangle — the same shape as the models label below. */}
+          <label style={LABEL_STYLE}>{t("settings.ai.autoTagLabel")}</label>
+          <Switch
+            checked={autoTag}
+            disabled={!aiEnabled}
+            onChange={(next) => void toggleAutoTag(next)}
+            ariaLabel={t("settings.ai.autoTagLabel")}
+            testId="ai.auto-tag-toggle"
+          />
+        </div>
+        <p style={HELPER_STYLE}>{t("settings.ai.autoTagHelper")}</p>
       </div>
 
       {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended

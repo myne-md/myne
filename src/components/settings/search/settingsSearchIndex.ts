@@ -515,6 +515,16 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.aiEnable",
   },
   {
+    id: "ai.auto-tag",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.autoTagLabel",
+    descriptionKey: "settings.ai.autoTagHelper",
+    keywordsKey: "settings.search.keywords.aiAutoTag",
+    testid: "ai.auto-tag-toggle",
+  },
+  {
     id: "ai.models",
     capability: "localAi",
     developerGated: true,
