@@ -24,6 +24,9 @@
 //    fingerprint. The backend deliberately does not return it (`pin_confirm`'s
 //    module doc: handing it back lets a user paste the attacker's value and
 //    retry), and this screen must not invent an equivalent affordance.
+// 3. Declining aborts (task 9). The refused attempt wrote nothing, so backing
+//    out has to leave the screen unconfigured and say so — not leave a user
+//    guessing whether a server they could not verify is now trusted.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -105,8 +108,12 @@ describe("the endpoint screen's out-of-band fingerprint gate", () => {
     const field = await screen.findByTestId("sync.expected-fingerprint-input");
     expect(screen.queryByTestId("sync.cert-fingerprint")).toBeNull();
 
+    // The retry moves INTO the gate while it is open — one confirm, one
+    // decline, no second identical button in the URL row.
+    expect(screen.queryByTestId("sync.endpoint-connect")).toBeNull();
+
     fireEvent.change(field, { target: { value: EXPECTED } });
-    fireEvent.click(screen.getByTestId("sync.endpoint-connect"));
+    fireEvent.click(screen.getByTestId("sync.fingerprint-confirm"));
 
     await waitFor(() =>
       expect(screen.getByTestId("sync.cert-fingerprint")).toBeTruthy(),
@@ -114,6 +121,37 @@ describe("the endpoint screen's out-of-band fingerprint gate", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0].confirmedFingerprint).toBeNull();
     expect(calls[1].confirmedFingerprint).toBe(EXPECTED);
+    // Gate closed again; the ordinary Connect button is back.
+    expect(screen.queryByTestId("sync.fingerprint-gate")).toBeNull();
+    expect(screen.getByTestId("sync.endpoint-connect")).toBeTruthy();
+  });
+
+  it("declining aborts: nothing is sent, nothing is configured", async () => {
+    let setCalls = 0;
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:sync|sync_get_endpoint")
+        throw new Error("unconfigured");
+      if (cmd === "plugin:sync|sync_set_endpoint") {
+        setCalls += 1;
+        throw { kind: "PinConfirmationRequired" };
+      }
+      return undefined;
+    });
+    render(<EndpointConfig />);
+    connect();
+
+    const field = await screen.findByTestId("sync.expected-fingerprint-input");
+    fireEvent.change(field, { target: { value: "ab:cd" } });
+    fireEvent.click(screen.getByTestId("sync.fingerprint-decline"));
+
+    // The gate is gone, no second attempt was made, and the screen says the
+    // server was not configured rather than falling silent.
+    expect(screen.queryByTestId("sync.fingerprint-gate")).toBeNull();
+    expect(setCalls).toBe(1);
+    expect(screen.getByTestId("sync.endpoint-msg").textContent).toContain(
+      "Nothing was saved",
+    );
+    expect(screen.queryByTestId("sync.cert-fingerprint")).toBeNull();
   });
 
   it("never shows the captured fingerprint on the mismatch path", async () => {
