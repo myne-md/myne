@@ -35,7 +35,7 @@ pnpm tauri dev          # full Tauri dev (spawns Vite on :1420 + Rust core)
 pnpm dev                # Vite only — port fixed via strictPort, fails if 1420 is taken
 pnpm tauri build        # production desktop bundle
 
-pnpm sidecar            # build + stage the `myne` CLI sidecar for externalBin (debug)
+pnpm sidecar            # build + stage BOTH externalBin sidecars — `myne` (CLI) and `myne-tor` (arti) — debug
 pnpm sidecar:release    # same, release profile — both tauri lifecycle hooks run these
 
 pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
@@ -72,6 +72,7 @@ myne/
 ├── protocol/            ← Rust crypto crate
 ├── core/                ← myne-core: shared backend plugin cores + the host/IO/task seams; consumed by desktop, mobile AND the web wasm entry crate
 ├── cli/                 ← myne-cli: the `myne` terminal client (MYND-490). Ships as a Tauri `externalBin` sidecar INSIDE the desktop bundle (staged by scripts/build-cli-sidecar.mjs, PATH shim by src-tauri/src/cli_bridge/path_shim.rs) and drives the running, unlocked desktop over its local command socket — it never opens the vault and depends on neither myne-core nor protocol
+├── tor-sidecar/         ← myne-tor-sidecar: arti (Rust Tor) as a standalone loopback SOCKS5 proxy, shipped as a second Tauri `externalBin` sidecar (MYND-650). NOTHING links it — the desktop spawns it as a subprocess when the device-local Tor routing option is on, which is exactly what keeps arti out of `myne-desktop`'s `cargo tree -e normal` closure and leaves the no-egress gate scanning a tree with no networked crate in it
 ├── theme-validator/     ← shared custom-theme value-shape allowlist — SECURITY-LOAD-BEARING: the WebView CSP carries style-src 'unsafe-inline', so a theme value that reaches the DOM executes. Desktop themes plugin and myne-themes marketplace CI run this exact crate so the grammar cannot drift (threat-model.md "Custom-theme CSS-value surface"; MYND-508)
 ├── tests/               ← Vitest unit/component specs; tests/platform/ holds the seam contract run against every seam implementation
 ├── e2e/                 ← tauri-driver desktop E2E suite + fixture-gen crate, fixtures and harness (pnpm test:e2e)
@@ -82,7 +83,7 @@ myne/
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
 ├── pnpm-workspace.yaml  ← pnpm workspace members (dialect, editor, copy)
-├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, cli, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm)
+├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, cli, tor-sidecar, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm)
 ├── Cargo.lock           ← single shared lockfile (TB9 audit anchor)
 ├── rust-toolchain.toml  ← pinned Rust toolchain
 ├── package.json         ← pnpm + Vite + React 19 + TS toolchain

@@ -98,6 +98,10 @@ const V = {
   "src/components/settings/LanguageSelect.tsx": ["ported", "i18n only."],
   "src/components/settings/LineNumbersSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/NewNoteLocationSettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/NetworkPanel.tsx": [
+    "adapted",
+    "Never mounted: the `network` rail entry is filtered out where `torRouting` is absent, so the Tor toggle is unreachable rather than greyed. A page has no subprocess to spawn and no raw socket to tunnel; web users route the whole browser through Tor Browser instead. Ships in the bundle (one small panel), and both of its commands are `Unsupported` in the dispatcher.",
+  ],
   "src/components/settings/panel-styles.ts": ["ported", "Style constants."],
   "src/components/settings/PrivacyPanel.tsx": [
     "adapted",
@@ -148,6 +152,10 @@ const V = {
   "src/lib/ai-chat.ts": ["adapted", "Unreachable where `localAi` is absent; the editor host omits the `ai` member entirely."],
   "src/lib/ai-model-store.ts": ["adapted", "Same as ai-chat: no AI surface mounts on web."],
   "src/lib/ai-qa.ts": ["adapted", "Same as ai-chat."],
+  "src/lib/ai-tags.ts": [
+    "adapted",
+    "Same as ai-chat: the auto-tag seam is unreachable where `localAi` is absent, and its command is `Unsupported` in the dispatcher.",
+  ],
   "src/lib/aiExcludedFolders.ts": ["ported", "Pure path predicate; also read by non-AI callers."],
   "src/lib/app-window.ts": [
     "adapted",
@@ -179,6 +187,10 @@ const V = {
     "typed-unsupported",
     "The CLI door's session-state read. Reachable — the module ships and the binding is one `invoke` — and `cli-bridge` is `Unsupported` in the dispatcher, so a call that arrives by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the capability-gated Settings block.",
   ],
+  "src/lib/tor-routing.ts": [
+    "typed-unsupported",
+    "The device-local Tor-routing toggle (MYND-650). Reachable — the module ships and both bindings are one `invoke` — and both commands are `Unsupported` in the dispatcher, so a call arriving by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the `torRouting`-gated Developer Options block. The absence is a platform fact (no subprocess, no raw socket), and the browser's answer is Tor Browser.",
+  ],
   "src/lib/clipper-pairing.ts": [
     "excluded",
     "Pairing IPC; leaves with ConnectedExtensions.",
@@ -186,6 +198,10 @@ const V = {
   ],
   "src/lib/device-name.ts": ["adapted", "The `web` platform token maps to 'Browser' so a browser device is distinguishable in the list (task 69)."],
   "src/lib/deviceJoinQr.ts": ["ported", "Pure payload encoding."],
+  "src/lib/engine-error.ts": [
+    "ported",
+    "Pure shape reader over a rejection value; its AI callers are the ones the web build never reaches.",
+  ],
   "src/lib/focusable.ts": ["ported", "Pure DOM query."],
   "src/lib/icons.ts": ["ported", "Icon vocabulary."],
   "src/lib/imperative-focus-trap.ts": ["ported", "Pure DOM."],
@@ -308,6 +324,10 @@ const V = {
     "Mounts on web and reaches a seam that REFUSES it (MYND-628). Desktop idle auto-lock hides the OS window with `orderOut:` and nothing on the Rust side shows it again, so a locked boot surface has to ask; a page has no hidden window, because web auto-lock re-renders the locked surface in the same tab. `window.show` is a typed refusal rather than a no-op, and the hook's `catch` is the correct handler — so this is adapted, not excluded: it still runs, it just correctly does nothing.",
   ],
   "src/hooks/useSyncStatus.ts": ["ported", "Sync status; more load-bearing on web, where sync is required."],
+  "src/hooks/useTorState.ts": [
+    "adapted",
+    "The live Tor posture poll (MYND-650 task 8). It ships and it mounts, but it gates on the `torRouting` capability and on web that is absent, so it never invokes and reports `null` — which every consumer renders as nothing at all. Deliberately not a typed refusal in practice: a browser tab cannot tell whether the browser around it is Tor Browser, and polling a command that would answer `stopped` would let the UI claim 'not protected' about a user who is in fact fully routed.",
+  ],
   "src/lib/diagnostics.ts": [
     "ported",
     "The allowlist-built diagnostic block (task 114). Pure — no DOM, no defines — so its allowlist is testable without an environment; the reading half is `collect-diagnostics.ts`.",

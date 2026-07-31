@@ -63,3 +63,9 @@ export {
 } from "./surgery";
 export { parseStream } from "./worker";
 export type { ParseStreamItem, ParseStreamResult } from "./worker";
+// Version-comparison core (MYND-334) — the one diff implementation behind the
+// snapshot preview, the conflict-compare surface and (later) mobile.
+export { lineDiff, diffWithSegments, changedLineCount } from "./diff";
+export type { DiffLine, DiffSegment } from "./diff";
+export { normalizeForDiff, normalizeConflictPair } from "./diffNormalize";
+export type { NormalizedConflictPair } from "./diffNormalize";

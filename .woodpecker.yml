@@ -394,9 +394,15 @@ steps:
       # `test -d dist || pnpm build` still rebuilds if dist/ is somehow absent.
       # The override keeps the sidecar half of `beforeBuildCommand`
       # (cli-thin-client task 11) and only swaps the frontend half: staging the
-      # `myne` sidecar is what `bundle.externalBin` consumes, and running it here
-      # is also the only CI exercise `scripts/build-cli-sidecar.mjs` gets.
-      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"node scripts/build-cli-sidecar.mjs --profile release && (test -d dist || pnpm build)"}}'
+      # sidecars is what `bundle.externalBin` consumes, and running it here is
+      # also the only CI exercise `scripts/build-{cli,tor}-sidecar.mjs` get.
+      # BOTH sidecars, not just `myne`: `build.rs` resolves every
+      # `bundle.externalBin` entry as a resource path and PANICS on a missing
+      # one ("resource path `binaries/myne-tor-…` doesn't exist"), so dropping
+      # the arti half here fails the build outright rather than shipping a
+      # bundle without a Tor client. It costs one release build of `arti` on a
+      # cold cache; sccache pays it once.
+      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}'
       # Guard the AI-free auditable variant: `--no-default-features` drops candle
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.

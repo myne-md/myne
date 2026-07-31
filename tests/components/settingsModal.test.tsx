@@ -5,7 +5,7 @@
 // Esc / backdrop / × dismissal, and the in-flight gating contract: when the
 // AccountPanel raises `onInFlightChange(true)`, Esc / backdrop / × all become
 // no-ops. The panel children exercised here (account, privacy, editor,
-// appearance, storage, about, ai) are stubbed to trivial markers so the test
+// appearance, storage, about, ai, network) are stubbed to trivial markers so the test
 // targets the shell's routing + dismissal logic, not the panels.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,9 +14,9 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 // Capture the AccountPanel's onInFlightChange so a test can flip in-flight.
 let accountInFlight: ((busy: boolean) => void) | undefined;
 
-// Developer mode gates the AI panel/rail entry (developer-mode feature,
-// MYND-593) — controllable per test, default off (matches usePrefs'
-// DEFAULT_PREFS before the first read resolves).
+// Developer mode gates the whole Developer group — the AI panel (MYND-593) and
+// the Network/Tor panel (MYND-650) — controllable per test, default off
+// (matches usePrefs' DEFAULT_PREFS before the first read resolves).
 let developerMode = false;
 
 vi.mock("../../src/hooks/usePrefs", () => ({
@@ -49,6 +49,9 @@ vi.mock("../../src/components/settings/AboutPanel", () => ({
 }));
 vi.mock("../../src/components/settings/AiPanel", () => ({
   AiPanel: () => <div data-testid="panel.ai">ai</div>,
+}));
+vi.mock("../../src/components/settings/NetworkPanel", () => ({
+  NetworkPanel: () => <div data-testid="panel.network">network</div>,
 }));
 
 import { SettingsModal } from "../../src/components/SettingsModal";
@@ -105,7 +108,7 @@ describe("SettingsModal — tab routing", () => {
     // ArrowUp from account would wrap; reset to account first by clicking.
     fireEvent.click(screen.getByTestId("settings.tab-account"));
     fireEvent.keyDown(window, { key: "ArrowUp" });
-    // Wraps to the last VISIBLE panel — About, since the Developer group (AI)
+    // Wraps to the last VISIBLE panel — About, since the whole Developer group
     // is filtered out of the roster while the mode is off.
     expect(screen.getByTestId("panel.about")).toBeTruthy();
     expect(
@@ -115,27 +118,38 @@ describe("SettingsModal — tab routing", () => {
 });
 
 describe("SettingsModal — Developer group gating (MYND-593)", () => {
-  it("mode off: no Developer group, no AI tab", () => {
+  it("mode off: no Developer group, and neither of its tabs", () => {
     renderModal();
     expect(screen.queryByTestId("settings.developer-group")).toBeNull();
     expect(screen.queryByTestId("settings.tab-ai")).toBeNull();
+    expect(screen.queryByTestId("settings.tab-network")).toBeNull();
   });
 
-  it("mode on: Developer group and AI tab appear, and are reachable", () => {
+  it("mode on: Developer group and both its tabs appear, and are reachable", () => {
     developerMode = true;
     renderModal();
     expect(screen.getByTestId("settings.developer-group")).toBeTruthy();
     fireEvent.click(screen.getByTestId("settings.tab-ai"));
     expect(screen.getByTestId("panel.ai")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("settings.tab-network"));
+    expect(screen.getByTestId("panel.network")).toBeTruthy();
   });
 
-  it("ArrowUp wraps to AI when the Developer group is visible", () => {
+  it("the group divider renders exactly once, at the core→developer boundary", () => {
+    // With two members (MYND-650) "once" is an assertion rather than a
+    // tautology: `opensDeveloper` must fire on the first developer panel only.
+    developerMode = true;
+    renderModal();
+    expect(screen.getAllByTestId("settings.developer-group")).toHaveLength(1);
+  });
+
+  it("ArrowUp wraps to the last developer panel when the group is visible", () => {
     developerMode = true;
     renderModal();
     fireEvent.keyDown(window, { key: "ArrowUp" });
-    expect(screen.getByTestId("panel.ai")).toBeTruthy();
+    expect(screen.getByTestId("panel.network")).toBeTruthy();
     expect(
-      screen.getByTestId("settings.tab-ai").getAttribute("aria-selected"),
+      screen.getByTestId("settings.tab-network").getAttribute("aria-selected"),
     ).toBe("true");
   });
 });

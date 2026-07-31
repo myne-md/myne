@@ -37,6 +37,7 @@ import { footnoteDecorations } from "./footnote";
 import { tagChipDecorations } from "./tag-chip";
 import { taskChipDecorations } from "./task-chip";
 import { taskQueryBlockDecorations } from "./task-query-block";
+import { tagSuggestionBandDecorations } from "./tag-suggestion-band";
 import { commentDecorations } from "./comment";
 
 // SYNC-17 (MYND-200 / knowledge-graph-ux; `decisions.md` 2026-06-08 "Interactive
@@ -104,6 +105,12 @@ export function myneDecorations(): readonly Extension[] {
     calloutDecorations(),
     horizontalRuleDecorations(),
     frontmatterDecorations(),
+    // The inline tag-suggestion band (MYND-651) — a block widget on the
+    // frontmatter/body boundary, so it belongs next to the frontmatter layer it
+    // anchors against. Absent entirely when the host has pushed no suggestions,
+    // which is the default state of every note. Inside this stack on purpose:
+    // source mode empties it, and raw markdown is what source mode promises.
+    ...tagSuggestionBandDecorations(),
     tableDecorations(),
     definitionListDecorations(),
     fencedCodeDecorations(),

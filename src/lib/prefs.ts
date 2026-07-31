@@ -342,6 +342,19 @@ export interface PrefsView {
    */
   auto_lock_seconds: number | null;
   /**
+   * Whether automatic on-device tag suggestion runs on this vault's notes
+   * (MYND-651). Defaults to `false`; persisted only when `true`.
+   *
+   * The second half of a two-key gate — the tag pass runs only when this AND
+   * {@link PrefsView.ai_enabled} are on, and the host re-reads both before it
+   * touches the model, so the UI gate is discovery, not enforcement. Shared
+   * across devices (scalar LWW) like {@link PrefsView.transcription_enabled}:
+   * it gates a bundled task-model, so it is taste rather than device
+   * capability. Its co-gate stays device-local, which is what keeps a synced
+   * `true` from starting inference on a device that never opted into AI.
+   */
+  auto_tag_enabled: boolean;
+  /**
    * Active custom-theme name (custom-themes epic, MYND-297) — a key of the
    * encrypted `vault.themes` store (`MYT1`, `protocol.md` §9.21). It named a
    * plaintext file stem under `app_config_dir/themes/` until `decisions.md`
@@ -379,16 +392,19 @@ export interface PrefsView {
    */
   favorites: string[];
   /**
-   * Unified manual sidebar order across the single interleaved file-tree
-   * (MYND-183, superseding `note_order` + `folder_order`) — a flat,
-   * heterogeneous list of note UUIDs and canonical trailing-slash folder paths
-   * (discriminated by the trailing `/`). Each container sorts its own children
-   * (sub-folders + notes, freely interleaved) by their index here; unlisted
-   * children fall back to recency / folded name. Order is the payload — the
-   * backend preserves it verbatim. Absent in pre-reorder vaults → defaults to
-   * `[]`.
+   * Manual sidebar order across the single interleaved file-tree (MYND-183,
+   * superseding `note_order` + `folder_order`; MYND-596 container-keyed reshape)
+   * — a map keyed by CONTAINER (`""` for the tree root, else a folded folder key
+   * `FolderNode.key`) whose value is that container's children in manual order:
+   * a heterogeneous, order-preserving sequence of note UUIDs and canonical
+   * trailing-slash folder paths (discriminated by the trailing `/`), freely
+   * interleaved. Each container is reordered + synced independently (per-container
+   * LWW), so a reorder in one container rewrites only its own sequence. Unlisted
+   * children fall back to recency / folded name. Order within each sequence is the
+   * payload — the backend preserves it verbatim. Absent / pre-reorder vaults →
+   * defaults to `{}`.
    */
-  item_order: string[];
+  item_order: Record<string, string[]>;
   /**
    * Editor three-pane layout (sidebar widths + collapsed flags, MYND-137).
    * `null` when the user never customized the layout — the field is omitted
@@ -810,16 +826,19 @@ export async function setAutoLockTimeout(seconds: number): Promise<void> {
 }
 
 /**
- * Persist the full item_order sequence — the unified manual sidebar order
- * across the interleaved file-tree (a heterogeneous list of note UUIDs +
- * canonical folder paths, MYND-183, superseding `setNoteOrder`/`setFolderOrder`).
- * The caller passes the entire desired order; v0.1 single-device writes it
- * verbatim (the backend preserves element order — the sequence IS the payload,
- * unlike the sorted+deduped `deliberate_folders`). No native side-effect; a
- * rejected promise means the disk write failed and the caller's optimistic UI
- * must revert.
+ * Persist the full item_order map — the manual sidebar order across the
+ * interleaved file-tree, keyed by container (`""` = root, else a folded folder
+ * key) → that container's heterogeneous sequence of note UUIDs + canonical
+ * folder paths (MYND-183, superseding `setNoteOrder`/`setFolderOrder`; MYND-596
+ * container-keyed reshape — the Rust command takes a `BTreeMap`). The caller
+ * passes the entire desired map; the backend preserves each sequence's element
+ * order verbatim (the sequence IS the payload, unlike the sorted+deduped
+ * `deliberate_folders`). No native side-effect; a rejected promise means the
+ * disk write failed and the caller's optimistic UI must revert.
  */
-export async function setItemOrder(order: string[]): Promise<void> {
+export async function setItemOrder(
+  order: Record<string, string[]>,
+): Promise<void> {
   await invoke<void>("plugin:prefs|set_item_order", { order });
 }
 
@@ -1224,6 +1243,17 @@ export async function setShowTaskMarker(enabled: boolean): Promise<void> {
  */
 export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_transcription_enabled", { enabled });
+  bumpPrefsNonce();
+}
+
+/**
+ * Enable or disable automatic on-device tag suggestion for this vault
+ * (MYND-651). Default-off. Shared across devices (scalar LWW) for the same
+ * reason as transcription above; the pass is co-gated on the device-local
+ * `ai_enabled`, which the host re-reads alongside this one.
+ */
+export async function setAutoTagEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_auto_tag_enabled", { enabled });
   bumpPrefsNonce();
 }
 

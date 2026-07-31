@@ -144,6 +144,8 @@ fn main() {
                 // MISSING from this mirror — pre-existing, not introduced here.
                 "set_show_task_marker",
                 "set_transcription_enabled",
+                // MYND-651.
+                "set_auto_tag_enabled",
                 "set_reminders_enabled",
                 "set_reminder_horizon_days",
                 // developer-mode (MYND-593): named here too, though not
@@ -427,6 +429,15 @@ fn main() {
                 "sync_restore_quarantine",
                 "sync_delete_quarantine",
                 "sync_device_join_qr",
+                // MYND-650 task 6: the device-local Tor-routing toggle. Joins
+                // this plugin rather than opening one of its own precisely so
+                // no new capability entry is needed — the surface is the same
+                // device-local network posture the endpoint pair configures.
+                "sync_get_tor_routing",
+                "sync_set_tor_routing",
+                // MYND-650 task 8: the live posture read behind the connection
+                // states. Same plugin for the same reason.
+                "sync_get_tor_state",
             ]),
         )
         .plugin(
@@ -497,6 +508,8 @@ fn main() {
                 "chat_stop",
                 "transcribe",
                 "read_transcript",
+                "suggest_tags",
+                "tag_model_available",
                 "set_model_path",
                 "get_model_path",
             ]),

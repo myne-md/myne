@@ -199,7 +199,24 @@ export type Capability =
    * (`threat-model.md` §7) is about which programs on the machine can walk
    * through it. There is no browser-shaped version of that question.
    */
-  | "cliAccess";
+  | "cliAccess"
+  /**
+   * Routing this client's own sync egress through a device-local Tor proxy
+   * (MYND-650).
+   *
+   * **Absent on web, and not as a port that is owed.** The desktop client does
+   * this by spawning a bundled Tor client as a subprocess and opening a SOCKS5
+   * tunnel to it over a loopback TCP socket; a page has neither a subprocess
+   * nor a raw socket, and `fetch` cannot be told to use a proxy. There is no
+   * in-page version of the mechanism — the browser-shaped answer is Tor
+   * Browser, which routes the whole page and does it better than an app ever
+   * could from inside one.
+   *
+   * Named for the ROUTING, not for the sidecar: what the Developer Options
+   * block governs is where this device's sync traffic goes, and the arti
+   * process is an implementation detail of the desktop answer to it.
+   */
+  | "torRouting";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -240,6 +257,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   attachmentTextSearch: true,
   imageCompression: true,
   cliAccess: true,
+  torRouting: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */

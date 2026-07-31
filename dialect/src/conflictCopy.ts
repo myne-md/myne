@@ -26,12 +26,16 @@ export interface ConflictCopyHost {
   noteCreate(plaintext: string): Promise<string>;
   /** Tombstone a note via the routed/propagating delete path (recoverable). */
   deleteNoteRouted(uuid: string): Promise<void>;
-  /** Read the uuid-keyed prefs the take-theirs migration touches. */
-  prefsRead(): Promise<{ favorites: readonly string[]; item_order: readonly string[] }>;
+  /** Read the uuid-keyed prefs the take-theirs migration touches. `item_order`
+   *  is the container-keyed map (MYND-596). */
+  prefsRead(): Promise<{
+    favorites: readonly string[];
+    item_order: Readonly<Record<string, readonly string[]>>;
+  }>;
   /** Persist the favorites set. */
   setFavorites(favorites: string[]): Promise<void>;
-  /** Persist the item-order sequence. */
-  setItemOrder(itemOrder: string[]): Promise<void>;
+  /** Persist the item-order container-keyed map (MYND-596). */
+  setItemOrder(itemOrder: Record<string, string[]>): Promise<void>;
 }
 
 /**

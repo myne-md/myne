@@ -30,6 +30,7 @@ const PANEL_IDS = [
   "privacy",
   "sync",
   "ai",
+  "network",
   "editor",
   "files",
   "transcription",
@@ -148,15 +149,21 @@ describe("settings search-index — searchSettings behaviour", () => {
 });
 
 describe("settings search-index — developer-mode gate (MYND-593)", () => {
-  const AI_IDS = ["ai.enable", "ai.models", "ai.excluded-folders"];
+  const AI_IDS = ["ai.enable", "ai.auto-tag", "ai.models", "ai.excluded-folders"];
 
-  it("tags every `ai` panel entry as developer-gated", () => {
+  it("tags every developer-group panel entry as developer-gated", () => {
+    // Both members of the rail's Developer group (SettingsModal's PANELS_BASE).
+    // An untagged entry would let search navigate into a panel the rail itself
+    // refuses to show while Developer mode is off.
+    const DEVELOPER_PANELS = ["ai", "network"];
     for (const e of SETTINGS_SEARCH_INDEX) {
-      if (e.panelId === "ai") expect(e.developerGated, `entry ${e.id}`).toBe(true);
+      if (DEVELOPER_PANELS.includes(e.panelId)) {
+        expect(e.developerGated, `entry ${e.id}`).toBe(true);
+      }
     }
   });
 
-  it("mode off: the three AI entries are absent from every search, even by exact title", () => {
+  it("mode off: the AI entries are absent from every search, even by exact title", () => {
     for (const id of AI_IDS) {
       const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
       const found = searchSettings(entry.titleKey, t, false).map((r) => r.id);
@@ -167,7 +174,7 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     for (const id of AI_IDS) expect(allIds).not.toContain(id);
   });
 
-  it("mode on: the three AI entries are found again", () => {
+  it("mode on: the AI entries are found again", () => {
     const allIds = searchSettings("", t, true).map((e) => e.id);
     for (const id of AI_IDS) expect(allIds).toContain(id);
   });

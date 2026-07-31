@@ -14,8 +14,8 @@
 //!
 //! - **Supervisor** — a tokio task (spawned from both hosts' setup, like
 //!   `spawn_sync_loop`) that decides each tick whether a stream SHOULD exist
-//!   (`unlocked && !suspended && endpoint && token && !parked-on-401`) and
-//!   starts/stops the worker to match.
+//!   (`unlocked && !suspended && endpoint && token && !parked-on-401 && the
+//!   routing gate answers a route`) and starts/stops the worker to match.
 //! - **Worker** — a dedicated `std::thread` ("myne-sse"): blocking reads with a
 //!   65 s socket read-timeout (two missed 30 s server heartbeats + margin) are
 //!   the dead-connection detector; reconnects ride a jittered 1 s → 60 s
@@ -31,6 +31,28 @@
 //! - **401 → park** — a rejected token must not reconnect-spin. The worker
 //!   parks the supervisor on the failing `(endpoint, token)` identity; a
 //!   re-enroll / endpoint change (different fingerprint) un-parks it.
+//!
+//! ## The route is part of the connection's identity (MYND-650)
+//!
+//! This is the one long-lived socket in the sync tree, and a long-lived socket
+//! has a second axis the `no_bypass` ratchet cannot see: a connect that was
+//! correctly gated **when it happened** keeps carrying bytes after the gate
+//! moves. `build_transport` consults [`super::proxy`] before every connect, so
+//! a *new* stream is always routed correctly — but a stream opened before the
+//! user turned Tor on would otherwise stay open, direct to the sync server,
+//! for the life of the app: `SSE_READ_TIMEOUT` sits deliberately above the
+//! server's heartbeat cadence, so a healthy connection never times out.
+//!
+//! So the route the gate answers for this endpoint is part of
+//! [`StreamIdentity`] alongside `(endpoint, pins, token)`, and it is re-read
+//! **every** supervisor tick rather than on the 5-tick file-snapshot cadence
+//! (it is an in-memory cell, not a file). A gate that moves — the toggle, a
+//! bootstrap completing, a sidecar dying, the startup restore — is a different
+//! identity, so the live stream is torn down and the next tick reconnects
+//! through `build_transport`, which reads the gate. And a gate that *refuses*
+//! (Tor mode on, tunnel not usable) yields no identity at all, so no stream
+//! exists while the transport is fail-closed — the same answer the sync cycle
+//! gets, rather than a second opinion about it.
 
 use std::io::{BufRead, Read};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -39,6 +61,7 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Manager, Runtime};
 
+use super::proxy::{self, Route};
 use super::token_store::TokenStore as _;
 use super::transport::{SseOpenError, SseStream};
 
@@ -90,6 +113,62 @@ fn fingerprint_of(s: &ConnSnapshot) -> u64 {
     h.finish()
 }
 
+/// Everything a live stream is bound to: the `(endpoint, pins, token)`
+/// fingerprint **and** the route it was opened over. A change in either is a
+/// different stream.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct StreamIdentity {
+    fingerprint: u64,
+    route: Route,
+}
+
+/// The identity a stream for `snap` would have right now, or `None` when no
+/// stream may exist — an endpoint that does not parse, or a routing gate that
+/// refuses (Tor mode on, tunnel not usable), which is the fail-closed answer
+/// the sync cycle also gets.
+fn stream_identity(snap: &ConnSnapshot) -> Option<StreamIdentity> {
+    let (_, host, _) = super::http_transport::parse_endpoint(&snap.url)?;
+    stream_identity_over(snap, &proxy::installed_for(&host))
+}
+
+/// The identity, given the gate — the same gate `build_transport` would consult
+/// for this endpoint.
+///
+/// Split out so a test can drive a **real** [`proxy::ProxyGate`] through the
+/// lifecycle a toggle actually produces, rather than asserting against
+/// hand-built [`StreamIdentity`] literals. The process-wide installed gate is a
+/// `OnceLock`, so a test that installed one would leak its state into every
+/// other test in this binary; a gate passed by reference cannot.
+fn stream_identity_over(snap: &ConnSnapshot, gate: &proxy::ProxyGate) -> Option<StreamIdentity> {
+    Some(StreamIdentity {
+        fingerprint: fingerprint_of(snap),
+        route: gate.route().ok()?,
+    })
+}
+
+/// What the supervisor does with the worker it has, given the identity it
+/// wants. Pure, so the rule that closes the "toggled Tor under a live stream"
+/// hole is one function with a test rather than a `match` in a spawned task.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Decision {
+    /// Leave things as they are.
+    Idle,
+    /// No worker and one is wanted.
+    Spawn,
+    /// The worker must go — either nothing is wanted, or the identity moved
+    /// and the next tick reconnects under the new one.
+    Teardown,
+}
+
+fn decide(current: Option<StreamIdentity>, wanted: Option<StreamIdentity>) -> Decision {
+    match (current, wanted) {
+        (None, Some(_)) => Decision::Spawn,
+        (Some(_), None) => Decision::Teardown,
+        (Some(have), Some(want)) if have != want => Decision::Teardown,
+        _ => Decision::Idle,
+    }
+}
+
 /// Gather the live `(endpoint, pins, token)` snapshot, or `None` when any part
 /// is missing (unconfigured / locked / not enrolled). Reads the same sources as
 /// `run_active_cycle` — but NEVER claims a pending token (that is the cycle's
@@ -124,7 +203,7 @@ struct WorkerHandle {
     sock: Arc<Mutex<Option<std::net::TcpStream>>>,
     unauth: Arc<AtomicBool>,
     join: Option<std::thread::JoinHandle<()>>,
-    fingerprint: u64,
+    identity: StreamIdentity,
 }
 
 /// Signal the worker to stop and unblock its read; join it off-thread so a
@@ -144,11 +223,14 @@ fn teardown(w: Option<WorkerHandle>) {
     }
 }
 
-fn spawn_worker(snap: ConnSnapshot, signal: SsePokeSignal) -> WorkerHandle {
+fn spawn_worker(
+    snap: ConnSnapshot,
+    identity: StreamIdentity,
+    signal: SsePokeSignal,
+) -> WorkerHandle {
     let stop = Arc::new(AtomicBool::new(false));
     let sock: Arc<Mutex<Option<std::net::TcpStream>>> = Arc::new(Mutex::new(None));
     let unauth = Arc::new(AtomicBool::new(false));
-    let fingerprint = fingerprint_of(&snap);
     let (stop2, sock2, unauth2) = (stop.clone(), sock.clone(), unauth.clone());
     let join = std::thread::Builder::new()
         .name("myne-sse".into())
@@ -159,7 +241,7 @@ fn spawn_worker(snap: ConnSnapshot, signal: SsePokeSignal) -> WorkerHandle {
         sock,
         unauth,
         join,
-        fingerprint,
+        identity,
     }
 }
 
@@ -198,10 +280,11 @@ pub fn spawn_poke_supervisor<R: Runtime>(app: AppHandle<R>) {
 
             // A worker that exited on 401 parks this (endpoint, token) identity
             // — no reconnect spinning on a revoked token. A different identity
-            // (re-enroll, endpoint change) un-parks.
+            // (re-enroll, endpoint change) un-parks. Keyed on the snapshot
+            // fingerprint alone: a revoked token is revoked over every route.
             if let Some(w) = &worker {
                 if w.unauth.load(Ordering::Relaxed) {
-                    parked = Some(w.fingerprint);
+                    parked = Some(w.identity.fingerprint);
                     teardown(worker.take());
                 }
             }
@@ -210,22 +293,27 @@ pub fn spawn_poke_supervisor<R: Runtime>(app: AppHandle<R>) {
                 parked = None;
             }
 
-            let desired = unlocked && !suspended && snapshot.is_some() && parked.is_none();
-            match (&worker, desired) {
-                (None, true) => {
-                    let snap = snapshot.clone().expect("desired implies snapshot");
+            // The route term is re-read here, on EVERY tick — it is an
+            // in-memory cell, and it is what a Tor toggle moves under a stream
+            // that is otherwise healthy enough never to time out.
+            let wanted = if unlocked && !suspended && parked.is_none() {
+                snapshot.as_ref().and_then(stream_identity)
+            } else {
+                None
+            };
+            match decide(worker.as_ref().map(|w| w.identity), wanted) {
+                Decision::Spawn => {
+                    let snap = snapshot
+                        .clone()
+                        .expect("a wanted identity implies a snapshot");
+                    let identity = wanted.expect("Spawn implies a wanted identity");
                     let Some(signal) = app.try_state::<SsePokeSignal>() else {
                         continue; // host manages no signal — nothing to drive
                     };
-                    worker = Some(spawn_worker(snap, signal.inner().clone()));
+                    worker = Some(spawn_worker(snap, identity, signal.inner().clone()));
                 }
-                (Some(w), true) if fp != Some(w.fingerprint) => {
-                    // Endpoint/token rotated under a live stream → reconnect
-                    // under the new identity on the next tick.
-                    teardown(worker.take());
-                }
-                (Some(_), false) => teardown(worker.take()),
-                _ => {}
+                Decision::Teardown => teardown(worker.take()),
+                Decision::Idle => {}
             }
         }
     });
@@ -483,6 +571,226 @@ mod tests {
             d <= BACKOFF_START_MS + BACKOFF_START_MS / 4,
             "reset re-arms the start value"
         );
+    }
+
+    // --- the worker's connection identity (MYND-650) -----------------------
+
+    fn snap(url: &str) -> ConnSnapshot {
+        ConnSnapshot {
+            url: url.to_string(),
+            pins: vec![[7u8; 32]],
+            token_hex: "deadbeef".into(),
+        }
+    }
+
+    /// The identity carries the route, so a gate that moves under a live
+    /// stream is a *different* stream. This is the whole fix: `SSE_READ_TIMEOUT`
+    /// sits above the server heartbeat, so a healthy direct connection would
+    /// otherwise outlive the toggle that was supposed to tunnel it.
+    #[test]
+    fn a_moved_route_is_a_different_stream_identity() {
+        let s = snap("https://sync.myne.md");
+        let direct = StreamIdentity {
+            fingerprint: fingerprint_of(&s),
+            route: Route::Direct,
+        };
+        let tunneled = StreamIdentity {
+            route: Route::Socks5 { socks_port: 9150 },
+            ..direct
+        };
+        assert_ne!(direct, tunneled, "the route is part of the identity");
+        assert_eq!(
+            decide(Some(direct), Some(tunneled)),
+            Decision::Teardown,
+            "a live direct stream must be dropped the moment the gate says Socks5"
+        );
+        assert_eq!(
+            decide(Some(tunneled), Some(tunneled)),
+            Decision::Idle,
+            "an unchanged identity keeps its stream"
+        );
+    }
+
+    /// A refusing gate yields no identity at all — with Tor mode on and the
+    /// tunnel unusable there is no stream, which is the same fail-closed answer
+    /// `ProxyGate::route` gives the sync cycle.
+    #[test]
+    fn a_refusing_gate_yields_no_stream() {
+        let live = StreamIdentity {
+            fingerprint: 1,
+            route: Route::Direct,
+        };
+        assert_eq!(decide(Some(live), None), Decision::Teardown);
+        assert_eq!(decide(None, None), Decision::Idle);
+        assert_eq!(decide(None, Some(live)), Decision::Spawn);
+    }
+
+    /// No gate is installed in this crate's test binary, so the read-back is the
+    /// default (Tor mode off) and every endpoint routes `Direct` — which is what
+    /// keeps the listener's behaviour unchanged for every install that never
+    /// touches the toggle. An endpoint that does not parse yields nothing rather
+    /// than a worker that would reconnect-spin on `build_transport`.
+    #[test]
+    fn identity_is_direct_by_default_and_absent_for_an_unparseable_endpoint() {
+        let s = snap("https://sync.myne.md");
+        assert_eq!(
+            stream_identity(&s),
+            Some(StreamIdentity {
+                fingerprint: fingerprint_of(&s),
+                route: Route::Direct,
+            })
+        );
+        assert_eq!(stream_identity(&snap("not a url")), None);
+    }
+
+    /// The gate is the thing that moves, so drive a **real** one through the
+    /// lifecycle a toggle actually produces — off → on before the sidecar is up
+    /// → bootstrapping → ready → died → off — and assert the supervisor's
+    /// decision at every step. The tests above it reason about identities the
+    /// test built by hand; this one reasons about the object the transport
+    /// obeys, which is where the Critical lived.
+    #[test]
+    fn a_real_gate_walked_through_the_toggle_lifecycle_drives_the_decisions() {
+        use super::proxy::{ProxyGate, TorProxyState};
+
+        let s = snap("https://sync.myne.md");
+        let gate = ProxyGate::new();
+
+        // Tor mode off — today's client, and a healthy direct stream.
+        let direct = stream_identity_over(&s, &gate).expect("a direct stream exists");
+        assert_eq!(direct.route, Route::Direct);
+
+        // The user flips the toggle. `sync_set_tor_routing` closes the gate
+        // BEFORE spawning arti, so from this instant the gate refuses — and the
+        // live direct stream, which would otherwise never time out, must go.
+        gate.set_enabled(true);
+        assert_eq!(
+            stream_identity_over(&s, &gate),
+            None,
+            "a gate that refuses yields no stream at all"
+        );
+        assert_eq!(
+            decide(Some(direct), stream_identity_over(&s, &gate)),
+            Decision::Teardown,
+            "the direct stream opened before the toggle must be dropped"
+        );
+
+        gate.set_state(TorProxyState::Starting);
+        assert_eq!(
+            stream_identity_over(&s, &gate),
+            None,
+            "sync is paused while the tunnel bootstraps, and so is the stream"
+        );
+
+        // Bootstrap completes: a stream may exist again, and it is a DIFFERENT
+        // one — which is what makes the supervisor reconnect through
+        // `build_transport` instead of reusing the direct socket.
+        gate.set_state(TorProxyState::Ready { socks_port: 9150 });
+        let tunneled = stream_identity_over(&s, &gate).expect("a tunneled stream exists");
+        assert_eq!(tunneled.route, Route::Socks5 { socks_port: 9150 });
+        assert_ne!(tunneled, direct);
+        assert_eq!(decide(None, Some(tunneled)), Decision::Spawn);
+        assert_eq!(decide(Some(tunneled), Some(tunneled)), Decision::Idle);
+
+        // The sidecar dies under a live tunneled stream: fail-closed again.
+        gate.set_state(TorProxyState::Failed);
+        assert_eq!(
+            decide(Some(tunneled), stream_identity_over(&s, &gate)),
+            Decision::Teardown,
+            "a dead Tor client must not leave a stream behind"
+        );
+
+        // Toggled back off: direct again, and the identity is the original —
+        // the route term adds an axis, it does not rewrite the old one.
+        gate.set_enabled(false);
+        assert_eq!(stream_identity_over(&s, &gate), Some(direct));
+    }
+
+    /// A `Decision::Teardown` is only worth anything if it actually kills the
+    /// stream. So this drives the whole back half against a **live** SSE
+    /// connection: a real loopback server, a real `open_sse`, a real
+    /// `drain_stream` blocked on read with the production
+    /// [`SSE_READ_TIMEOUT`] — the timeout that sits deliberately above the
+    /// server's heartbeat cadence, which is exactly why a healthy direct stream
+    /// would otherwise outlive the toggle meant to tunnel it — and then the
+    /// real [`teardown`] the supervisor calls.
+    ///
+    /// `shutdown_unblocks_a_blocking_drain` below asserts that *a* shutdown
+    /// unblocks the drain; this asserts that `teardown` is what performs one, so
+    /// there is no gap between the decision and the dead socket.
+    ///
+    /// `join: None` rather than the worker's handle: the off-thread join is a
+    /// scheduling detail (it keeps a worker mid-`connect()` from stalling the
+    /// supervisor tick), and joining the drain here observes the same exit
+    /// directly rather than through `tauri::async_runtime`.
+    #[test]
+    fn teardown_kills_a_live_sse_stream_under_the_production_read_timeout() {
+        use super::super::transport::SyncTransport;
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let port = listener.local_addr().expect("local addr").port();
+        std::thread::spawn(move || {
+            let (mut sock, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 2048];
+            let _ = sock.read(&mut buf);
+            let _ = sock.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n");
+            // Then healthy and silent, holding the connection open — the state a
+            // real poke stream spends nearly all of its life in.
+            std::thread::sleep(Duration::from_secs(5));
+        });
+
+        let stream = super::super::http_transport::HttpTransport::new("127.0.0.1", port)
+            .open_sse("/sync/poke", "tok", SSE_READ_TIMEOUT)
+            .expect("open_sse");
+        let sock = Arc::new(Mutex::new(Some(
+            stream.socket.try_clone().expect("clone socket"),
+        )));
+        let stop = Arc::new(AtomicBool::new(false));
+
+        let stop_in_worker = stop.clone();
+        let drain = std::thread::spawn(move || {
+            let signal = SsePokeSignal::default();
+            drain_stream(stream.reader, stream.chunked, &stop_in_worker, &signal)
+        });
+        // Let the drain reach its blocking read before the gate moves under it.
+        std::thread::sleep(Duration::from_millis(150));
+
+        let started = std::time::Instant::now();
+        teardown(Some(WorkerHandle {
+            stop: stop.clone(),
+            sock,
+            unauth: Arc::new(AtomicBool::new(false)),
+            join: None,
+            identity: StreamIdentity {
+                fingerprint: 0,
+                route: Route::Direct,
+            },
+        }));
+        drain.join().expect("drain thread");
+
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "teardown must end the stream in milliseconds. It returned only after \
+             {:?}, which means the socket outlived the decision — and a stream \
+             opened before the routing gate moved is precisely the one that must \
+             not.",
+            started.elapsed()
+        );
+        assert!(
+            stop.load(Ordering::Relaxed),
+            "the worker is told to stop as well as having its socket pulled — the \
+             flag is what keeps it from reconnecting on its way out"
+        );
+    }
+
+    /// Endpoint/token rotation still tears the stream down — the pre-existing
+    /// behaviour the route term is layered on top of, not a replacement for.
+    #[test]
+    fn a_rotated_endpoint_or_token_is_still_a_different_stream() {
+        let a = stream_identity(&snap("https://sync.myne.md")).expect("identity");
+        let b = stream_identity(&snap("https://other.example")).expect("identity");
+        assert_ne!(a, b);
+        assert_eq!(decide(Some(a), Some(b)), Decision::Teardown);
     }
 
     #[test]

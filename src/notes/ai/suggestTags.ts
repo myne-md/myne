@@ -1,17 +1,24 @@
-// On-demand tag-suggestion pass (auto-tag-link MYND-411 tasks 2 + 3).
+// One tag-suggestion pass (auto-tag-link MYND-411 tasks 2 + 3; retargeted at the
+// dedicated tag model by on-device-tag-suggestion MYND-651 task 5).
 //
-// Orchestrates a single explicit suggestion pass: gate on `ai_excluded_folders`
-// (task 3 — an excluded note yields NO pass and the model is never invoked),
-// assemble a RAM-only prompt from the note body + an existing-vocabulary hint,
-// call sibling 1's **blocking** `Engine.infer` **once** (never `embed`, no
-// sibling-7 dependency), parse the raw output into candidate tags, and rank them
-// through the task-1 `rankTagCandidates`.
+// Orchestrates a single pass: gate on `ai_excluded_folders` (an excluded note
+// yields NO pass and the model is never invoked), assemble a RAM-only prompt
+// from the note body + an existing-vocabulary hint, call the **dedicated bundled
+// tag model** once through the injected seam (`lib/ai-tags.suggestTagsForNote`
+// in production — never the side-loaded generation model, never `embed`), parse
+// the raw output into candidate tags, and rank them through `rankTagCandidates`.
+//
+// The frontend exclusion gate is now DEFENCE IN DEPTH, not the enforcement
+// point: the host re-reads `ai_enabled` + `auto_tag_enabled` and the note's own
+// folder before it touches the model (task 4), so a compromised WebView cannot
+// reach an excluded note by lying here.
 //
 // All state is RAM-only + ephemeral — no artefact is written to disk during or
 // after the pass (SYNC-8). The pass is a plain async function with no
-// subscription/effect, so it can only fire on an explicit caller (the command/
-// button wired in task 4) — never on open/save/background.
+// subscription/effect; the idle trigger that drives it lives in
+// `tagSuggestionTrigger.ts`, so this core stays callable and testable alone.
 
+import { isDeferredTagSuggestion } from "../../lib/ai-tags";
 import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { rankTagCandidates, type TagSuggestion } from "./tagRanker";
 
@@ -50,6 +57,28 @@ export function parseTagCandidates(modelOutput: string): string[] {
 }
 
 /**
+ * The note-body head window the prompt actually carries (code-point-aware, so a
+ * surrogate pair is never split). Exported because it is also what the trigger's
+ * content hash covers: an edit BEYOND this window cannot change the model's
+ * answer, so it must not invalidate the cache. Pure.
+ *
+ * The work is bounded by the BUDGET, not by note size — the trigger calls this
+ * on every keystroke, and a code-point walk of a whole note would allocate one
+ * string per character of it to keep the first 2000.
+ */
+export function tagPromptBody(noteBody: string): string {
+  // A code point is at least one UTF-16 unit, so a body within budget in units
+  // is within it in code points — no walk needed at all.
+  if (noteBody.length <= TAG_PROMPT_BODY_CHARS) return noteBody;
+  // …and at most two, so this prefix always holds at least the whole window.
+  const head = noteBody.slice(0, TAG_PROMPT_BODY_CHARS * 2);
+  const chars = Array.from(head);
+  return chars.length > TAG_PROMPT_BODY_CHARS
+    ? chars.slice(0, TAG_PROMPT_BODY_CHARS).join("")
+    : head;
+}
+
+/**
  * Build the tag-suggestion prompt (note body head window + a reuse-existing
  * hint). RAM-only, never stored. Pure.
  */
@@ -57,11 +86,7 @@ export function buildTagPrompt(
   noteBody: string,
   existingTags: readonly string[],
 ): string {
-  const chars = Array.from(noteBody);
-  const body =
-    chars.length > TAG_PROMPT_BODY_CHARS
-      ? chars.slice(0, TAG_PROMPT_BODY_CHARS).join("")
-      : noteBody;
+  const body = tagPromptBody(noteBody);
   const hint =
     existingTags.length > 0
       ? `Prefer reusing these existing tags when relevant: ${existingTags.join(", ")}.\n\n`
@@ -81,10 +106,24 @@ export interface TagSuggestionPass {
   suggestions: TagSuggestion[];
   /** True when the note is in an excluded folder — the model was NOT invoked. */
   skipped: boolean;
+  /** True when the host stood the pass down so user-initiated work could have
+   *  the compute lock (task 4). NOT an answer: the note was never looked at, so
+   *  a caller retries later and must not cache this as "no suggestions". */
+  deferred: boolean;
 }
+
+/** The dedicated-tag-model call seam: prompt in, raw tag text out. Production
+ *  wiring is `lib/ai-tags.suggestTagsForNote`; tests inject a stub. */
+export type SuggestTagsSeam = (args: {
+  noteId: string;
+  prompt: string;
+}) => Promise<string>;
 
 /** Inputs for {@link runTagSuggestionPass}. */
 export interface TagSuggestionPassInput {
+  /** The note the pass is for. Travels to the host, which resolves the note's
+   *  real folder from its own blob rather than trusting `noteFolder`. */
+  noteId: string;
   /** The open note's decrypted body (already in RAM — no new decrypt/IPC). */
   noteBody: string;
   /** The note's canonical trailing-slash folder (`""` = vault root). */
@@ -93,24 +132,34 @@ export interface TagSuggestionPassInput {
   existingTags: readonly string[];
   /** `prefs.ai_excluded_folders` (SYNC-14). */
   excludedFolders: readonly string[];
-  /** Sibling 1's blocking `Engine.infer` (stubbed in tests). */
-  infer: (prompt: string) => Promise<string>;
+  /** The dedicated tag model (stubbed in tests). */
+  suggest: SuggestTagsSeam;
 }
 
 /**
- * Run one explicit tag-suggestion pass. Returns `{ suggestions: [], skipped:
- * true }` **without calling `infer`** when the note is in an excluded folder
- * (task 3); otherwise builds the prompt, calls `infer` exactly once, parses,
- * and ranks. No `embed`, no disk write.
+ * Run one tag-suggestion pass. Returns `{ skipped: true }` **without calling the
+ * model** when the note is in an excluded folder; returns `{ deferred: true }`
+ * when the host stood the pass down; otherwise builds the prompt, calls the tag
+ * model exactly once, parses, and ranks. A genuine engine failure propagates —
+ * only the deferral is folded into the result, because it is not a failure. No
+ * `embed`, no disk write.
  */
 export async function runTagSuggestionPass(
   input: TagSuggestionPassInput,
 ): Promise<TagSuggestionPass> {
   if (isNoteAiExcluded(input.noteFolder, input.excludedFolders)) {
-    return { suggestions: [], skipped: true };
+    return { suggestions: [], skipped: true, deferred: false };
   }
   const prompt = buildTagPrompt(input.noteBody, input.existingTags);
-  const raw = await input.infer(prompt);
+  let raw: string;
+  try {
+    raw = await input.suggest({ noteId: input.noteId, prompt });
+  } catch (err) {
+    if (isDeferredTagSuggestion(err)) {
+      return { suggestions: [], skipped: false, deferred: true };
+    }
+    throw err;
+  }
   const candidates = parseTagCandidates(raw);
   return {
     // Hard-cap the surfaced count here (the prompt only *asks* for ≤ N): an
@@ -120,5 +169,6 @@ export async function runTagSuggestionPass(
       MAX_TAG_SUGGESTIONS,
     ),
     skipped: false,
+    deferred: false,
   };
 }

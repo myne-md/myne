@@ -44,12 +44,27 @@ export interface TranscribeOptions {
   onSegment?: (segment: string) => void;
 }
 
+/** Normalized transcription-failure cause a rejected {@link TranscribeHandle}
+ *  carries (MYND-591). Mirrors `src/lib/transcribe.ts::TranscribeErrorKind`;
+ *  duplicated here because `@myne/editor` may not import the desktop `src/` tree
+ *  (the platform seam). Every value except `"failed"` is an actionable cause the
+ *  widget renders a truthful hint for; `"failed"` is a generic transient
+ *  failure. Kept in sync with the desktop normalizer, like the `"not_ready"`
+ *  literal it replaces was. */
+export type TranscribeErrorKind =
+  | "feature_off"
+  | "vault_locked"
+  | "no_model"
+  | "model_load_failed"
+  | "failed";
+
 /** A running transcription (SYNC-V5). `done` resolves with the FULL transcript
  *  when transcription completes and rejects on failure — the rejection carries a
- *  `{ kind }`-tagged error where `kind === "not_ready"` signals AI-off / no
- *  transcription model side-loaded (the widget surfaces a "select a model" hint
- *  rather than a silent failure). `stop()` cancels the in-flight run (drives the
- *  shared backend cancel; also fired on widget teardown). */
+ *  `{ kind }`-tagged error whose `kind` is a {@link TranscribeErrorKind}. The
+ *  widget renders a truthful per-cause hint for the actionable kinds (feature
+ *  off / vault locked / no model / model load failure) and a transient toast for
+ *  `"failed"`. `stop()` cancels the in-flight run (drives the shared backend
+ *  cancel; also fired on widget teardown). */
 export interface TranscribeHandle {
   readonly done: Promise<string>;
   stop: () => void;
