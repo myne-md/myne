@@ -2,9 +2,11 @@
 // snapshots (MYND-97). A modal overlay (reusing the `<DeleteConfirmModal>`
 // backdrop envelope, like `<TrashPanel>`) scoped to ONE note: a left list of the
 // note's snapshots (newest-first, with relative age + size), a right pane that
-// previews the selected snapshot as a diff against the current note (shared
-// `<DiffView>` over the `@myne/dialect` core, word-level within a changed
-// line), and a confirmed Restore.
+// previews the selected snapshot as a diff (shared `<DiffView>` over the
+// `@myne/dialect` core, word-level within a changed line), and a confirmed
+// Restore. The diff's basis is the user's choice (MYND-334): the current note
+// (the default, and the original behaviour) or the snapshot immediately older
+// than the selected one, which answers "what did this snapshot itself change?".
 //
 // Copy discipline (SYNC-4): the term is "snapshot", never "backup"/"export";
 // encryption is shown typographically ("Encrypted · 12s ago"), not with a
@@ -32,6 +34,7 @@ import {
   snapshotRestore,
 } from "../snapshots";
 import type { SnapshotError, SnapshotMeta } from "../../types/snapshot-error";
+import { Select, type SelectOption } from "../../components/primitives/Select";
 import { BACKDROP_STYLE } from "./DeleteConfirmModal";
 import { changedLineCount, diffWithSegments, type DiffLine } from "../../dialect";
 import { DiffView } from "./DiffView";
@@ -124,14 +127,27 @@ const DETAIL_STYLE: CSSProperties = {
   flexDirection: "column",
 };
 
+// Wraps: the basis selector, the change count and Restore do not all fit on one
+// line at the panel's 480px detail width, and a second row reads better than
+// three shrunken controls.
 const DETAIL_BAR_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
+  flexWrap: "wrap",
   gap: "var(--space-3)",
   padding: "var(--space-3) var(--space-5)",
   borderBottom: "1px solid var(--line-1)",
 };
+
+const DETAIL_GROUP_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  minWidth: 0,
+};
+
+const COMPARE_SELECT_STYLE: CSSProperties = { height: 26, fontSize: 11 };
 
 // The preview region; `<DiffView>` is the scrolling child inside it.
 const PREVIEW_STYLE: CSSProperties = {
@@ -216,6 +232,14 @@ function formatSnapshotError(err: unknown): string {
   }
 }
 
+/**
+ * What the selected snapshot is diffed against. `current` is the default and
+ * the pre-MYND-334 behaviour (snapshot → live note); `previous` diffs the
+ * snapshot immediately older than the selected one → the selected one, so the
+ * change the snapshot itself introduced is what shows.
+ */
+type CompareBasis = "current" | "previous";
+
 export type SnapshotsPanelProps = {
   open: boolean;
   onClose: () => void;
@@ -252,6 +276,10 @@ export function SnapshotsPanel({
   const [detailError, setDetailError] = useState<string | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [compareAgainst, setCompareAgainst] = useState<CompareBasis>("current");
+  // The older snapshot's decrypted body — only fetched in `previous` mode.
+  const [basis, setBasis] = useState<string | null>(null);
+  const [basisError, setBasisError] = useState<string | null>(null);
 
   const loadList = useCallback(async () => {
     if (noteId === null) return;
@@ -275,6 +303,7 @@ export function SnapshotsPanel({
     setPreview(null);
     setDetailError(null);
     setStatus(null);
+    setCompareAgainst("current");
     void loadList();
   }, [open, loadList]);
 
@@ -336,10 +365,53 @@ export function SnapshotsPanel({
     [onClose],
   );
 
+  // The list is newest-first, so the snapshot "before" the selected one — the
+  // one it was taken after — is the NEXT entry, not the previous one. The
+  // oldest snapshot has none, and that is a state the surface has to say out
+  // loud rather than render as an empty diff.
+  const previousUuid: string | null = useMemo(() => {
+    if (selected === null) return null;
+    const idx = snaps.findIndex((s) => s.snapshot_uuid === selected);
+    if (idx < 0) return null;
+    return snaps[idx + 1]?.snapshot_uuid ?? null;
+  }, [snaps, selected]);
+
+  // Decrypt the older snapshot on demand — `current` mode never pays for it.
+  useEffect(() => {
+    setBasis(null);
+    setBasisError(null);
+    if (compareAgainst !== "previous" || noteId === null || previousUuid === null) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const body = await snapshotPreview(noteId, previousUuid);
+        if (!cancelled) setBasis(body);
+      } catch (err) {
+        if (!cancelled) setBasisError(formatSnapshotError(err));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [compareAgainst, noteId, previousUuid]);
+
   const diff: DiffLine[] | null = useMemo(() => {
     if (preview === null) return null;
+    if (compareAgainst === "previous") {
+      return basis === null ? null : diffWithSegments(basis, preview);
+    }
     return diffWithSegments(preview, current);
-  }, [preview, current]);
+  }, [preview, current, compareAgainst, basis]);
+
+  const compareOptions: readonly SelectOption<CompareBasis>[] = useMemo(
+    () => [
+      { value: "current", label: t("notes.snapshots.compareCurrent") },
+      { value: "previous", label: t("notes.snapshots.comparePrevious") },
+    ],
+    [t],
+  );
 
   if (!open || noteId === null) return null;
 
@@ -423,25 +495,62 @@ export function SnapshotsPanel({
               ) : (
                 <>
                   <div style={DETAIL_BAR_STYLE}>
-                    <span style={ROW_META_STYLE}>
-                      {diff
-                        ? t("notes.snapshots.changeCount", {
-                            count: changedLineCount(diff),
-                          })
-                        : ""}
-                    </span>
-                    <button
-                      type="button"
-                      style={RESTORE_BTN_STYLE}
-                      data-testid="snapshots.restore"
-                      data-snapshot-id={selected}
-                      onClick={() => setConfirmRestore(selected)}
-                    >
-                      {t("notes.snapshots.restoreCta")}
-                    </button>
+                    <div style={DETAIL_GROUP_STYLE}>
+                      <span style={ROW_META_STYLE}>
+                        {t("notes.snapshots.compareAgainstLabel")}
+                      </span>
+                      <Select
+                        value={compareAgainst}
+                        options={compareOptions}
+                        onChange={setCompareAgainst}
+                        aria-label={t("notes.snapshots.compareAgainstLabel")}
+                        testId="snapshots.compare-against"
+                        style={COMPARE_SELECT_STYLE}
+                      />
+                    </div>
+                    <div style={DETAIL_GROUP_STYLE}>
+                      <span style={ROW_META_STYLE}>
+                        {diff
+                          ? t(
+                              compareAgainst === "previous"
+                                ? "notes.snapshots.changeCountPrev"
+                                : "notes.snapshots.changeCount",
+                              { count: changedLineCount(diff) },
+                            )
+                          : ""}
+                      </span>
+                      <button
+                        type="button"
+                        style={RESTORE_BTN_STYLE}
+                        data-testid="snapshots.restore"
+                        data-snapshot-id={selected}
+                        onClick={() => setConfirmRestore(selected)}
+                      >
+                        {t("notes.snapshots.restoreCta")}
+                      </button>
+                    </div>
                   </div>
-                  <div style={PREVIEW_STYLE} data-testid="snapshots.preview">
-                    <DiffView diff={diff ?? []} mode="unified" />
+                  <div
+                    style={PREVIEW_STYLE}
+                    data-testid="snapshots.preview"
+                    data-compare-against={compareAgainst}
+                  >
+                    {compareAgainst === "previous" && previousUuid === null ? (
+                      <div
+                        style={PLACEHOLDER_STYLE}
+                        data-testid="snapshots.no-previous"
+                      >
+                        {t("notes.snapshots.noPrevious")}
+                      </div>
+                    ) : basisError !== null ? (
+                      <div style={PLACEHOLDER_STYLE}>{basisError}</div>
+                    ) : diff === null ? (
+                      <div style={PLACEHOLDER_STYLE}>
+                        {t("notes.snapshots.decrypting")}
+                      </div>
+                    ) : (
+                      <DiffView diff={diff} mode="unified" />
+                    )}
                   </div>
                 </>
               )}
