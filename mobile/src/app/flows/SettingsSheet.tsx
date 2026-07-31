@@ -23,7 +23,7 @@ import { vaultExportMarkdown, defaultExportDestination } from "../../lib/export"
 import { shareFile } from "../../lib/share";
 import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
 import { listCustomThemes, type CustomThemeEntry } from "../../lib/themes";
-import { applyCustomTheme, clearCustomTheme } from "../../lib/customTheme";
+import { applyCustomTheme, clearCustomTheme, hasCustomTheme } from "../../lib/customTheme";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { useHiddenHomeTiles, setHomeTileHidden } from "../../lib/home-tiles";
@@ -93,8 +93,16 @@ function applyThemeChoice(choice: ThemeChoice): void {
 }
 
 /** Read the persisted theme choice (default "system") and apply it. Called on
- *  editor mount so a returning session respects the saved appearance. */
+ *  editor mount so a returning session respects the saved appearance.
+ *
+ *  A custom theme supersedes the built-in choice, and the unlock path paints it
+ *  BEFORE this runs (MYND-598 task 5) — so re-asserting `data-theme` here would
+ *  hand a built-in rule the specificity contest on every token the palette does
+ *  not define, seconds after the palette deliberately dropped that attribute.
+ *  When a palette is live this is a no-op; picking a built-in theme in Settings
+ *  clears the palette first (`pickTheme`), so that path still lands here. */
 export function applyStoredTheme(): void {
+  if (hasCustomTheme()) return;
   if (typeof localStorage === "undefined") return;
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
   applyThemeChoice(isThemeChoice(stored) ? stored : "system");

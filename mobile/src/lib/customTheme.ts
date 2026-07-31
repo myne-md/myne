@@ -25,7 +25,7 @@
 
 import { deriveSyntaxTokensForTheme } from "@myne/syntax-theme";
 
-import type { ThemePalette } from "./themes";
+import type { CustomThemeEntry, ThemePalette } from "./themes";
 
 /** The CSS custom-property keys most recently written by `applyCustomTheme`. */
 let appliedCustomKeys: string[] = [];
@@ -77,4 +77,43 @@ export function clearCustomTheme(): void {
   const root = document.documentElement;
   for (const key of appliedCustomKeys) root.style.removeProperty(key);
   appliedCustomKeys = [];
+}
+
+/**
+ * Is a custom palette currently painted on the root?
+ *
+ * The built-in theme applier must not re-assert `data-theme` over a live custom
+ * palette — a custom theme supersedes Light/Dark/System, and editor mount runs
+ * AFTER the unlock-path paint. This is how that ordering is kept honest without
+ * either side importing the other's state.
+ */
+export function hasCustomTheme(): boolean {
+  return appliedCustomKeys.length > 0;
+}
+
+/**
+ * Which palette, if any, the stored `custom_theme` selection resolves to against
+ * the themes this vault currently holds. `null` means "paint the built-in
+ * choice" — the answer for no selection, an empty store, and a selection whose
+ * theme is gone alike.
+ *
+ * A dangling selection is the case worth being deliberate about: it happens
+ * whenever the theme is deleted on the computer and that deletion syncs here.
+ * The caller falls back silently (no toast — nothing broke and the user has no
+ * action to take) and, importantly, **leaves the preference alone**. Rewriting
+ * it would delete a device-local preference the user never touched on evidence
+ * that arrived from another device, and it would destroy the revival property: a
+ * desktop re-add clears the deletion tombstone, so the next sync round restores
+ * the theme and this resolves again with no user action. The dangling name lives
+ * inside the encrypted prefs blob, so keeping it leaks nothing.
+ *
+ * Names are matched byte-exactly: they are `vault.themes` store keys, not
+ * display labels, and the desktop side that authored them treats them the same.
+ */
+export function resolveCustomPalette(
+  selection: string | null | undefined,
+  entries: readonly CustomThemeEntry[],
+): ThemePalette | null {
+  if (!selection) return null;
+  return entries.find((e) => e.name === selection)?.palette ?? null;
 }

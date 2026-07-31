@@ -22,7 +22,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { applyCustomTheme, clearCustomTheme } from "../src/lib/customTheme";
+import { applyCustomTheme, clearCustomTheme, hasCustomTheme, resolveCustomPalette } from "../src/lib/customTheme";
 
 const root = () => document.documentElement;
 const prop = (key: string) => root().style.getPropertyValue(key);
@@ -123,5 +123,64 @@ describe("clearCustomTheme", () => {
     clearCustomTheme();
 
     expect(prop("--kbd-inset")).toBe("12px");
+  });
+});
+
+// The unlock-path resolution rule (MYND-598 task 5). Pure on purpose: the
+// interesting behaviour is "which palette, if any" and it must be assertable
+// without a document, a host or a screen.
+//
+// Its load-bearing case is the DANGLING selection — a theme deleted on the
+// computer whose name still sits in this phone's `custom_theme` pref. The answer
+// is `null` (fall back to the built-in choice) and, crucially, the caller must
+// not "repair" the pref: a desktop re-add clears the deletion tombstone, so the
+// next sync round revives the theme and the phone paints it again with no user
+// action. Rewriting the pref here would destroy that revival property, and it
+// would delete a device-local preference the user never touched on evidence that
+// arrived from another device.
+describe("resolveCustomPalette", () => {
+  const entries = [
+    { name: "Zinc", palette: { "--paper": "#101014" } },
+    { name: "amber dusk", palette: { "--paper": "#fdf6e3" } },
+  ];
+
+  it("returns the named theme's palette", () => {
+    expect(resolveCustomPalette("amber dusk", entries)).toEqual({ "--paper": "#fdf6e3" });
+  });
+
+  it("returns null when no theme is selected", () => {
+    expect(resolveCustomPalette(null, entries)).toBeNull();
+  });
+
+  it("returns null when the selection names a theme that is gone", () => {
+    expect(resolveCustomPalette("Solarized", entries)).toBeNull();
+  });
+
+  it("returns null when the list is empty, selection or not", () => {
+    expect(resolveCustomPalette("Zinc", [])).toBeNull();
+  });
+
+  it("matches the name exactly — theme names are store keys, not labels", () => {
+    expect(resolveCustomPalette("zinc", entries)).toBeNull();
+    expect(resolveCustomPalette("Zinc ", entries)).toBeNull();
+  });
+});
+
+describe("hasCustomTheme", () => {
+  it("is false before any apply and true while a palette is on the root", () => {
+    expect(hasCustomTheme()).toBe(false);
+    applyCustomTheme({ "--paper": "#14161a" });
+    expect(hasCustomTheme()).toBe(true);
+  });
+
+  it("goes back to false once the palette is cleared", () => {
+    applyCustomTheme({ "--paper": "#14161a" });
+    clearCustomTheme();
+    expect(hasCustomTheme()).toBe(false);
+  });
+
+  it("is false for a palette that carried no `--*` key at all", () => {
+    applyCustomTheme({ name: "not a token" });
+    expect(hasCustomTheme()).toBe(false);
   });
 });
