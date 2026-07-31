@@ -99,3 +99,7 @@ export {
   undoConflictVersion,
 } from "./conflictCopy";
 export type { ConflictCopyHost } from "./conflictCopy";
+// Conflict-diff normalization (MYND-334) — managed-marker strip + `updated:`
+// suppression so a conflict compare shows the edit, not the bookkeeping.
+export { normalizeForDiff, normalizeConflictPair } from "./diffNormalize";
+export type { NormalizedConflictPair } from "./diffNormalize";
