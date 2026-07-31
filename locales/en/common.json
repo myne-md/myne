@@ -2852,6 +2852,15 @@
       "label": "Building search index…"
     },
     "conflicts": {
+      "compare": "Compare",
+      "compareClose": "Back to conflicts",
+      "compareError": "Couldn’t read these notes to compare them. Try again.",
+      "compareIdentical": "These two versions are identical.",
+      "compareLoading": "Reading both versions…",
+      "compareMine": "On this device",
+      "compareOrphan": "The note this copy came from is no longer here, so there is nothing to compare it against.",
+      "compareTheirs": "Conflicting copy",
+      "compareTitle": "Comparing “{{title}}”",
       "discard": "Discard",
       "empty": "No conflicts — your devices are in sync.",
       "groupTitle_one": "{{count}} conflicting copy of {{original}}",
