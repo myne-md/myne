@@ -22,18 +22,9 @@ import {
   EditorView,
   WidgetType,
 } from "@codemirror/view";
-import { HIGHLIGHT_CLASSES } from "../html/sanitize";
+import { MARK_HL_RE, isOwnedHighlightClass } from "../html/sanitize";
 import { isInCode, isInsideRange } from "./cursor-aware";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
-
-/** Matches a colored highlight `<mark class="hl-X">inner</mark>`, capturing the
- *  `hl-*` class token and the inner text. */
-export const MARK_HL_RE = /<mark class="(hl-[a-z-]+)">([\s\S]*?)<\/mark>/gi;
-
-/** The allowlisted colour classes this decoration owns. An UNKNOWN `hl-*` class
- *  is left to `embedded-html.ts`, whose sanitizer drops it (the XSS boundary) —
- *  so the partition between the two decorations is exactly this set. */
-const HL_SET: ReadonlySet<string> = new Set(HIGHLIGHT_CLASSES);
 
 /** The `==` skin shown at a colored highlight's tag positions ON cursor, so it
  *  reads `==text==` exactly like a yellow `==` highlight instead of raw HTML.
@@ -50,6 +41,12 @@ class EqSkinWidget extends WidgetType {
   }
 }
 
+// The two tag decorations, hoisted to module scope: a `Decoration` value is
+// position-independent (re-`.range()`'d at every span) and `EqSkinWidget` is
+// stateless, so one shared instance of each serves the whole document.
+const HIDE = Decoration.replace({}); // off-cursor: tags collapse to nothing
+const EQ_SKIN = Decoration.replace({ widget: new EqSkinWidget() }); // on-cursor
+
 function buildColoredHighlightDecorations(view: EditorView): DecorationSet {
   const decorations: Array<Range<Decoration>> = [];
   for (const { from, to } of view.visibleRanges) {
@@ -58,7 +55,7 @@ function buildColoredHighlightDecorations(view: EditorView): DecorationSet {
     let m: RegExpExecArray | null;
     while ((m = MARK_HL_RE.exec(text)) !== null) {
       const cls = m[1].toLowerCase(); // hl-blue
-      if (!HL_SET.has(cls)) continue; // unknown class → embedded-html sanitizes it
+      if (!isOwnedHighlightClass(cls)) continue; // unknown class → embedded-html sanitizes it
       const start = from + m.index;
       const end = start + m[0].length;
       if (isInCode(view.state, start)) continue; // literal inside a code span/fence
@@ -74,12 +71,9 @@ function buildColoredHighlightDecorations(view: EditorView): DecorationSet {
         Decoration.mark({ class: `cm-highlight cm-${cls}` }).range(start, end),
       );
       // Tags: hidden off-cursor; a clean `==` skin on-cursor (never raw HTML).
-      const tagDeco = (): Decoration =>
-        revealed
-          ? Decoration.replace({ widget: new EqSkinWidget() })
-          : Decoration.replace({});
-      decorations.push(tagDeco().range(start, openEnd));
-      decorations.push(tagDeco().range(closeStart, end));
+      const tagDeco = revealed ? EQ_SKIN : HIDE;
+      decorations.push(tagDeco.range(start, openEnd));
+      decorations.push(tagDeco.range(closeStart, end));
     }
   }
   const builder = new RangeSetBuilder<Decoration>();
