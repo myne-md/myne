@@ -1,10 +1,13 @@
-// Unit tests for the pure unified-`item_order` reorder computation + the
-// dual-write orchestration contract (MYND-183 Task 6).
+// Unit tests for the pure `item_order` reorder computation + the dual-write
+// orchestration contract (MYND-183; MYND-596 container-keyed reshape). The
+// desktop consumers reach these through the `./itemOrderReorder` shim, which
+// re-exports the shared `@myne/editor/host/notes/itemOrder` module.
 
 import { describe, it, expect, vi } from "vitest";
 import {
   itemOrderKey,
   computeItemOrderAfterReorder,
+  reorderSequence,
   applyReorderWrite,
 } from "../../src/notes/components/itemOrderReorder";
 
@@ -15,99 +18,172 @@ describe("itemOrderKey", () => {
   });
 });
 
-describe("computeItemOrderAfterReorder — same-container reorder", () => {
-  it("moves a note below its target within the container", () => {
-    // container children (excl. dragged "b"): ["a","c"]; drop b below a.
+describe("reorderSequence — pure single-sequence reorder (favorites + one container)", () => {
+  it("drops the dragged below its target", () => {
+    expect(
+      reorderSequence({
+        containerChildKeys: ["a", "c"],
+        draggedKey: "b",
+        targetKey: "a",
+        place: "below",
+      }),
+    ).toEqual(["a", "b", "c"]);
+  });
+
+  it("drops the dragged above its target", () => {
+    expect(
+      reorderSequence({
+        containerChildKeys: ["a", "b"],
+        draggedKey: "c",
+        targetKey: "a",
+        place: "above",
+      }),
+    ).toEqual(["c", "a", "b"]);
+  });
+
+  it("appends when the target is unlisted (targetIdx -1)", () => {
+    expect(
+      reorderSequence({
+        containerChildKeys: ["a"],
+        draggedKey: "b",
+        targetKey: "zzz-missing",
+        place: "above",
+      }),
+    ).toEqual(["a", "b"]);
+  });
+
+  it("matches folder targets by folded identity", () => {
+    expect(
+      reorderSequence({
+        containerChildKeys: ["Apple/", "n1"],
+        draggedKey: "Zebra/",
+        targetKey: "apple/", // display-variant target folds to Apple/'s key
+        place: "above",
+      }),
+    ).toEqual(["Zebra/", "Apple/", "n1"]);
+  });
+});
+
+describe("computeItemOrderAfterReorder — rewrites ONLY the named container", () => {
+  it("moves a note below its target within the root container", () => {
     const next = computeItemOrderAfterReorder({
-      itemOrder: ["a", "b", "c"],
-      containerChildKeys: ["a", "c"],
+      itemOrder: { "": ["a", "b", "c"] },
+      container: "",
+      containerChildKeys: ["a", "c"], // root children excl. dragged "b"
       draggedKey: "b",
       targetKey: "a",
       place: "below",
     });
-    expect(next).toEqual(["a", "b", "c"]);
+    expect(next).toEqual({ "": ["a", "b", "c"] });
   });
 
   it("moves a note above its target", () => {
     const next = computeItemOrderAfterReorder({
-      itemOrder: ["a", "b", "c"],
+      itemOrder: { "": ["a", "b", "c"] },
+      container: "",
       containerChildKeys: ["a", "b"],
       draggedKey: "c",
       targetKey: "a",
       place: "above",
     });
-    expect(next).toEqual(["c", "a", "b"]);
+    expect(next).toEqual({ "": ["c", "a", "b"] });
   });
-});
 
-describe("computeItemOrderAfterReorder — interleave + cross-kind", () => {
   it("interleaves a note between folders at root", () => {
-    // root children (excl. dragged note "n2"): ["n1","Apple/","Zebra/"].
     const next = computeItemOrderAfterReorder({
-      itemOrder: ["n1", "Apple/", "Zebra/"],
+      itemOrder: { "": ["n1", "Apple/", "Zebra/"] },
+      container: "",
       containerChildKeys: ["n1", "Apple/", "Zebra/"],
       draggedKey: "n2",
       targetKey: "Apple/",
       place: "below",
     });
-    expect(next).toEqual(["n1", "Apple/", "n2", "Zebra/"]);
+    expect(next).toEqual({ "": ["n1", "Apple/", "n2", "Zebra/"] });
   });
 
   it("reorders a folder relative to a folder by folded identity", () => {
     const next = computeItemOrderAfterReorder({
-      itemOrder: ["Apple/", "n1", "Zebra/"],
+      itemOrder: { "": ["Apple/", "n1", "Zebra/"] },
+      container: "",
       containerChildKeys: ["Apple/", "n1"],
       draggedKey: "Zebra/",
       targetKey: "Apple/",
       place: "above",
     });
-    expect(next).toEqual(["Zebra/", "Apple/", "n1"]);
+    expect(next).toEqual({ "": ["Zebra/", "Apple/", "n1"] });
   });
 
-  it("collapses display-form folder variants on identity (no duplicate)", () => {
-    // Global list carries 'Projects/'; the container references the folded
-    // 'projects/' — the old entry is removed, not duplicated.
+  it("replaces the container with the folded folder form (no display-variant duplicate)", () => {
+    // The container carried the display form 'Projects/'; a reorder that drags
+    // the folded 'projects/' rewrites the whole sequence, so the display variant
+    // is gone rather than duplicated.
     const next = computeItemOrderAfterReorder({
-      itemOrder: ["Projects/", "n1"],
+      itemOrder: { "": ["Projects/", "n1"] },
+      container: "",
       containerChildKeys: ["n1"],
       draggedKey: "projects/",
       targetKey: "n1",
       place: "above",
     });
-    expect(next).toEqual(["projects/", "n1"]);
-  });
-});
-
-describe("computeItemOrderAfterReorder — cross-container placement", () => {
-  it("appends the dragged note into the target container, stripping its old slot", () => {
-    // n2 was elsewhere; now moved to root, dropped below Projects/.
-    const next = computeItemOrderAfterReorder({
-      itemOrder: ["n1", "Projects/", "n2"],
-      containerChildKeys: ["n1", "Projects/"], // root children, excl. n2
-      draggedKey: "n2",
-      targetKey: "Projects/",
-      place: "below",
-    });
-    expect(next).toEqual(["n1", "Projects/", "n2"]);
+    expect(next).toEqual({ "": ["projects/", "n1"] });
   });
 
-  it("appends when the target is unlisted (targetIdx -1)", () => {
+  it("appends into the container when the target is unlisted (targetIdx -1)", () => {
     const next = computeItemOrderAfterReorder({
-      itemOrder: ["a"],
+      itemOrder: { "": ["a"] },
+      container: "",
       containerChildKeys: ["a"],
       draggedKey: "b",
       targetKey: "zzz-missing",
       place: "above",
     });
-    expect(next).toEqual(["a", "b"]);
+    expect(next).toEqual({ "": ["a", "b"] });
+  });
+
+  it("does NOT touch a sibling container's sequence (MYND-596 per-container reorder)", () => {
+    const next = computeItemOrderAfterReorder({
+      itemOrder: {
+        "": ["n1", "Projects/"],
+        "projects/": ["p1", "p2"], // another container — must pass through verbatim
+      },
+      container: "",
+      containerChildKeys: ["n1", "Projects/"],
+      draggedKey: "n2",
+      targetKey: "Projects/",
+      place: "below",
+    });
+    // Only "" is rewritten; "projects/" is byte-identical (a concurrent reorder
+    // of that container on another device is not clobbered).
+    expect(next).toEqual({
+      "": ["n1", "Projects/", "n2"],
+      "projects/": ["p1", "p2"],
+    });
+  });
+
+  it("reorders a nested container without disturbing the root", () => {
+    const next = computeItemOrderAfterReorder({
+      itemOrder: {
+        "": ["n1", "Projects/"],
+        "projects/": ["p1", "p2", "p3"],
+      },
+      container: "projects/",
+      containerChildKeys: ["p1", "p3"], // projects/ children excl. dragged p2
+      draggedKey: "p2",
+      targetKey: "p1",
+      place: "above",
+    });
+    expect(next).toEqual({
+      "": ["n1", "Projects/"],
+      "projects/": ["p2", "p1", "p3"],
+    });
   });
 });
 
-describe("applyReorderWrite — dual-write contract", () => {
+describe("applyReorderWrite — dual-write contract (generic over order type)", () => {
   it("same-container: optimistic set + persist → positioned", async () => {
     const setOrder = vi.fn();
     const persist = vi.fn().mockResolvedValue(undefined);
-    const outcome = await applyReorderWrite({
+    const outcome = await applyReorderWrite<string[]>({
       moveFirst: null,
       computeNext: () => ["a", "b"],
       prevOrder: ["b", "a"],
@@ -129,7 +205,7 @@ describe("applyReorderWrite — dual-write contract", () => {
     const persist = vi.fn(async () => {
       calls.push("persist");
     });
-    const outcome = await applyReorderWrite({
+    const outcome = await applyReorderWrite<string[]>({
       moveFirst,
       computeNext: () => ["a", "b"],
       prevOrder: ["a"],
@@ -144,7 +220,7 @@ describe("applyReorderWrite — dual-write contract", () => {
     const setOrder = vi.fn();
     const persist = vi.fn();
     const computeNext = vi.fn(() => ["a", "b"]);
-    const outcome = await applyReorderWrite({
+    const outcome = await applyReorderWrite<string[]>({
       moveFirst: async () => {
         throw new Error("moveNote failed");
       },
@@ -162,7 +238,7 @@ describe("applyReorderWrite — dual-write contract", () => {
   it("persist failure → moved-recency: order reverts to prev (position is soft)", async () => {
     const seen: string[][] = [];
     const setOrder = vi.fn((o: string[]) => seen.push(o));
-    const outcome = await applyReorderWrite({
+    const outcome = await applyReorderWrite<string[]>({
       moveFirst: async () => {},
       computeNext: () => ["a", "b", "c"],
       prevOrder: ["a", "b"],
@@ -177,5 +253,20 @@ describe("applyReorderWrite — dual-write contract", () => {
       ["a", "b", "c"],
       ["a", "b"],
     ]);
+  });
+
+  it("is generic over the map order type (item_order container map)", async () => {
+    // Proves T can be the whole container-keyed map, not just a flat list.
+    const seen: Record<string, string[]>[] = [];
+    const setOrder = vi.fn((o: Record<string, string[]>) => seen.push(o));
+    const outcome = await applyReorderWrite<Record<string, string[]>>({
+      moveFirst: null,
+      computeNext: () => ({ "": ["a", "b"] }),
+      prevOrder: { "": ["b", "a"] },
+      setOrder,
+      persist: async () => {},
+    });
+    expect(outcome).toBe("positioned");
+    expect(seen).toEqual([{ "": ["a", "b"] }]);
   });
 });

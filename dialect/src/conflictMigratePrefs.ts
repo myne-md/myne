@@ -9,9 +9,11 @@
 // the copy's, preserving position; the caller (`applyConflictVersion`) persists
 // the result via `setFavorites` / `setItemOrder`.
 //
-// `item_order` is heterogeneous (note UUIDs interleaved with trailing-slash
-// folder paths); only note-UUID entries ever match, so folder paths pass through
-// untouched.
+// `item_order` is a container-keyed map (MYND-596): each value is one
+// container's heterogeneous sequence (note UUIDs interleaved with trailing-slash
+// folder paths). The migrated note UUID lives in exactly one container, so the
+// swap is applied to every container's sequence — only note-UUID entries ever
+// match, so folder paths (and every other container) pass through untouched.
 
 /** A single uuid-keyed sequence with a note UUID swapped from→to, preserving the
  *  original's slot. A pre-existing `to` entry is dropped so the result never
@@ -32,17 +34,17 @@ function swapInSequence(
   return { list: out, changed: true };
 }
 
-/** The favorites set + item_order sequence to migrate. */
+/** The favorites set + item_order container-keyed map to migrate. */
 export interface MigratablePrefs {
   favorites: readonly string[];
-  itemOrder: readonly string[];
+  itemOrder: Readonly<Record<string, readonly string[]>>;
 }
 
 /** The migrated prefs plus whether anything actually changed (so the caller can
  *  skip the disk write entirely on a no-op). */
 export interface PrefsMigrationResult {
   favorites: string[];
-  itemOrder: string[];
+  itemOrder: Record<string, string[]>;
   changed: boolean;
 }
 
@@ -50,7 +52,9 @@ export interface PrefsMigrationResult {
  * Move a note's uuid-keyed prefs membership from `fromUuid` to `toUuid` — used by
  * take-theirs to carry the original note's favorite status and manual sidebar
  * position onto the promoted conflict copy. Position-preserving; no-op (and
- * `changed: false`) when `fromUuid` appears in neither list.
+ * `changed: false`) when `fromUuid` appears in neither the favorites list nor any
+ * `item_order` container. The swap is applied to each container's sequence
+ * independently (MYND-596), so containers the note is not in copy through unchanged.
  */
 export function migrateNoteUuidInPrefs(
   prefs: MigratablePrefs,
@@ -58,10 +62,16 @@ export function migrateNoteUuidInPrefs(
   toUuid: string,
 ): PrefsMigrationResult {
   const fav = swapInSequence(prefs.favorites, fromUuid, toUuid);
-  const ord = swapInSequence(prefs.itemOrder, fromUuid, toUuid);
+  const itemOrder: Record<string, string[]> = {};
+  let orderChanged = false;
+  for (const [container, seq] of Object.entries(prefs.itemOrder)) {
+    const swapped = swapInSequence(seq, fromUuid, toUuid);
+    itemOrder[container] = swapped.list;
+    orderChanged = orderChanged || swapped.changed;
+  }
   return {
     favorites: fav.list,
-    itemOrder: ord.list,
-    changed: fav.changed || ord.changed,
+    itemOrder,
+    changed: fav.changed || orderChanged,
   };
 }

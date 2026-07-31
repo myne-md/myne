@@ -107,21 +107,27 @@ fn tiebreak_key<T: Serialize>(value: &T) -> Vec<u8> {
     }
 }
 
-/// §10.2 per-key map merge for a string→string map (`device_names`,
-/// `item_colors`, `folder_icons`): union of keys; a key present on both sides
-/// resolves LWW on its own `<field>/<key>` clock (equal clocks →
-/// byte-lexicographically greater value). Winning per-key clocks are recorded
-/// under their namespaced names. `local_map`/`remote_map` are passed explicitly
-/// (rather than re-read off the view) so the one helper serves every per-key
-/// field; `local`/`remote` are still needed to read the per-key clocks.
-fn merge_per_key_map(
+/// §10.2 per-key map merge: union of keys; a key present on both sides resolves
+/// LWW on its own `<field>/<key>` clock (equal clocks → byte-lexicographically
+/// greater canonical value). Winning per-key clocks are recorded under their
+/// namespaced names. `local_map`/`remote_map` are passed explicitly (rather than
+/// re-read off the view) so the one helper serves every per-key field;
+/// `local`/`remote` are still needed to read the per-key clocks.
+///
+/// Generic over the value type so the SAME merge serves the string→string
+/// decoration maps (`device_names`, `item_colors`, `folder_icons`) and the
+/// string→sequence container map (`item_order`, MYND-596): the per-key value is
+/// LWW-on-whole either way — a whole color string, or a whole per-container
+/// child sequence. `V: Serialize` supplies the equal-clock tiebreak encoding
+/// via [`lww_field`].
+fn merge_per_key_map<V: Serialize + Clone + PartialEq>(
     field: &str,
     local: &PrefsView,
     remote: &PrefsView,
-    local_map: &BTreeMap<String, String>,
-    remote_map: &BTreeMap<String, String>,
+    local_map: &BTreeMap<String, V>,
+    remote_map: &BTreeMap<String, V>,
     clocks: &mut BTreeMap<String, u64>,
-) -> BTreeMap<String, String> {
+) -> BTreeMap<String, V> {
     let mut out = BTreeMap::new();
     let keys: std::collections::BTreeSet<&String> =
         local_map.keys().chain(remote_map.keys()).collect();
@@ -263,6 +269,11 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     let device_names = per_key!("device_names", device_names);
     let folder_icons = per_key!("folder_icons", folder_icons);
     let item_colors = per_key!("item_colors", item_colors);
+    // item_order (MYND-596): each container path is a key; its child sequence
+    // races on `item_order/<container>`, so a reorder in one folder never
+    // clobbers another folder's order (whole-sequence LWW dropped one — the
+    // exact loss MYND-562 fixed for the decoration maps above).
+    let item_order = per_key!("item_order", item_order);
 
     // The struct literal lists EVERY PrefsView field with no `..` — the same
     // compile-time drift lock as the classification conformance test: a new
@@ -321,7 +332,6 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         spell_languages: merge_set_union(&local.spell_languages, &remote.spell_languages),
         // ---- shared: sequence-LWW-on-whole -------------------------------
         favorites: lww!("favorites", favorites),
-        item_order: lww!("item_order", item_order),
         view_order: lww!("view_order", view_order),
         // ---- shared: whole-value LWW -------------------------------------
         // (saved_views / color_groups need their codec's canonical encoder —
@@ -353,6 +363,9 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         device_names,
         folder_icons,
         item_colors,
+        // item_order (MYND-596): per-container map merge, computed above so it
+        // borrows `clocks` once — moved here from the sequence-LWW group.
+        item_order,
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
         ai_enabled: local.ai_enabled,
@@ -624,24 +637,92 @@ mod tests {
     }
 
     #[test]
-    fn sequence_lww_replaces_whole_list() {
+    fn item_order_merges_per_container_independently() {
+        // MYND-596: item_order is a per-container map, so two devices reordering
+        // DIFFERENT containers between syncs BOTH survive (the old whole-sequence
+        // LWW dropped one). A container edited on both sides resolves LWW on its
+        // own `item_order/<container>` clock; a single-sided container is carried
+        // over verbatim. This is the MYND-562 per-key-map guarantee applied to
+        // the sidebar order.
         let mut a = PrefsView {
-            item_order: vec!["n1".into(), "n2".into()],
+            item_order: BTreeMap::from([
+                (String::new(), vec!["n1".into(), "n2".into()]),
+                ("Projects/".into(), vec!["Projects/Alpha/".into()]),
+                // Only local has an Archive/ ordering.
+                ("Archive/".into(), vec!["Archive/2024/".into()]),
+            ]),
             ..PrefsView::default()
         };
-        stamped(&mut a, "item_order", 10);
+        stamped(&mut a, "item_order/", 10); // root: newer locally
+        stamped(&mut a, "item_order/Projects/", 5); // Projects/: older locally
+        stamped(&mut a, "item_order/Archive/", 7);
+
         let mut b = PrefsView {
-            item_order: vec!["n2".into(), "n3".into(), "n1".into()],
+            item_order: BTreeMap::from([
+                (String::new(), vec!["nX".into(), "nY".into()]),
+                (
+                    "Projects/".into(),
+                    vec!["Projects/Beta/".into(), "Projects/Alpha/".into()],
+                ),
+            ]),
             ..PrefsView::default()
         };
-        stamped(&mut b, "item_order", 20);
+        stamped(&mut b, "item_order/", 8); // root: older on remote
+        stamped(&mut b, "item_order/Projects/", 20); // Projects/: newer on remote
 
         let merged = merge_prefs(&a, &b);
-        // The newer whole list — never a per-element interleave.
+        // Root container: local clock (10) > remote (8) → local order kept.
         assert_eq!(
-            merged.item_order,
-            vec!["n2".to_string(), "n3".to_string(), "n1".to_string()]
+            merged.item_order.get(""),
+            Some(&vec!["n1".to_string(), "n2".to_string()])
         );
+        // Projects/: remote clock (20) > local (5) → remote order kept, WITHOUT
+        // clobbering the root reorder above.
+        assert_eq!(
+            merged.item_order.get("Projects/"),
+            Some(&vec![
+                "Projects/Beta/".to_string(),
+                "Projects/Alpha/".to_string()
+            ])
+        );
+        // Archive/ exists only on local → carried over verbatim.
+        assert_eq!(
+            merged.item_order.get("Archive/"),
+            Some(&vec!["Archive/2024/".to_string()])
+        );
+    }
+
+    #[test]
+    fn stamping_item_order_clocks_each_changed_container() {
+        // MYND-596: the central write path stamps item_order per-CONTAINER, so
+        // the merge above can resolve each container independently. A changed
+        // root and a changed "Archive/" get distinct `item_order/<container>`
+        // clocks; an untouched "Projects/" gets none; and the bare field name is
+        // NEVER stamped (that was the old whole-sequence LWW key).
+        let before = PrefsView {
+            item_order: BTreeMap::from([
+                (String::new(), vec!["n1".into()]),
+                ("Projects/".into(), vec!["Projects/A/".into()]),
+                ("Archive/".into(), vec!["Archive/1/".into()]),
+            ]),
+            ..PrefsView::default()
+        };
+        let mut after = PrefsView {
+            item_order: BTreeMap::from([
+                (String::new(), vec!["n2".into(), "n1".into()]), // changed
+                ("Projects/".into(), vec!["Projects/A/".into()]), // unchanged
+                (
+                    "Archive/".into(),
+                    vec!["Archive/2/".into(), "Archive/1/".into()],
+                ), // changed
+            ]),
+            ..PrefsView::default()
+        };
+        stamp_changed_shared_fields(&before, &mut after, 999);
+        assert_eq!(after.field_clocks.get("item_order/"), Some(&999));
+        assert_eq!(after.field_clocks.get("item_order/Archive/"), Some(&999));
+        assert!(!after.field_clocks.contains_key("item_order/Projects/"));
+        assert!(!after.field_clocks.contains_key("item_order"));
     }
 
     #[test]
@@ -795,8 +876,8 @@ mod tests {
         stamped(&mut b, "label", 200);
         b.icon = Some("leaf".into());
         stamped(&mut b, "icon", 300); // tie → lexicographic
-        b.item_order = vec!["n9".into()];
-        stamped(&mut b, "item_order", 40);
+        b.item_order = BTreeMap::from([(String::new(), vec!["n9".into()])]);
+        stamped(&mut b, "item_order/", 40);
         b.ai_excluded_folders = vec!["Q/".into()];
         b.device_names.insert("d2".into(), "Two".into());
         stamped(&mut b, "device_names/d2", 7);

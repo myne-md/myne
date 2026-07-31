@@ -170,6 +170,10 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/bip39-recovery/v0.1/cases.json"),
         ),
         (
+            "color-group",
+            include_str!("../../myne-test-vectors/vectors/color-group/v0.1/cases.json"),
+        ),
+        (
             "ctx-aead",
             include_str!("../../myne-test-vectors/vectors/ctx-aead/v0.1/cases.json"),
         ),
@@ -5565,6 +5569,82 @@ fn saved_view_vectors() {
         assert!(
             seen.contains(kind),
             "saved-view missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn color_group_vectors() {
+    use protocol::{canonical_encode_color_groups, parse_color_groups_array, ColorGroupParseError};
+
+    let Some(raw) = cases_json("color-group") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[color-group] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "color-group");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty(), "color-group must have at least one case");
+    assert_unique_vector_ids("color-group", cases);
+
+    // Mirror of `color_group::tests::vector_error_str`. `ColorGroupParseError`
+    // is `#[non_exhaustive]`, so across the crate boundary this match needs a
+    // catch-all — a new variant lands a vector string here and in the generator.
+    fn err_str(e: &ColorGroupParseError) -> &'static str {
+        match e {
+            ColorGroupParseError::Malformed => "malformed",
+            ColorGroupParseError::MissingField => "missing_field",
+            ColorGroupParseError::WrongType => "wrong_type",
+            ColorGroupParseError::Unrepresentable => "unrepresentable",
+            other => panic!("unmapped ColorGroupParseError variant {other:?} — extend err_str"),
+        }
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        let input = hex_decode(field(case, id, "input_bytes_utf8_hex"));
+        match kind {
+            "parse_ok" => {
+                seen.insert("parse_ok");
+                let (groups, consumed) = parse_color_groups_array(&input)
+                    .unwrap_or_else(|e| panic!("[{id}] parse_ok input did not parse: {e:?}"));
+                let want_consumed = case["expected_consumed_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_consumed_len"))
+                    as usize;
+                assert_eq!(consumed, want_consumed, "[{id}] consumed-len mismatch");
+                assert_eq!(
+                    hex_encode(&canonical_encode_color_groups(&groups)),
+                    field(case, id, "expected_canonical_utf8_hex"),
+                    "[{id}] canonical re-encoding mismatch"
+                );
+            }
+            "parse_fail" => {
+                seen.insert("parse_fail");
+                let got = parse_color_groups_array(&input)
+                    .expect_err(&format!("[{id}] parse_fail input parsed Ok"));
+                assert_eq!(
+                    err_str(&got),
+                    field(case, id, "expected_error"),
+                    "[{id}] error variant mismatch"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+    for kind in ["parse_ok", "parse_fail"] {
+        assert!(
+            seen.contains(kind),
+            "color-group missing every case of case_kind '{kind}' — coverage regression"
         );
     }
 }
