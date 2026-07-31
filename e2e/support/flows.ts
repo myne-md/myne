@@ -264,6 +264,7 @@ export async function openSettings(
     | "appearance"
     | "storage"
     | "ai"
+    | "network"
     | "transcription"
     | "about",
 ): Promise<void> {
