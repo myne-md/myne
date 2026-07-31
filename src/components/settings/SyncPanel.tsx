@@ -6,7 +6,7 @@
 // directive; built against design tokens, mirroring the other Settings panels'
 // block / label / helper rhythm.
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { listen } from "../../platform/event";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
@@ -17,7 +17,15 @@ import { DeviceJoinQr } from "../sync/DeviceJoinQr";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { SyncUsageBlock } from "../sync/SyncUsageBlock";
 import { RecoveredNotes } from "../sync/RecoveredNotes";
-import { ConflictsView } from "../../notes/components/ConflictsView";
+import {
+  ConflictsView,
+  type ConflictCompare,
+} from "../../notes/components/ConflictsView";
+import {
+  diffWithSegments,
+  normalizeConflictPair,
+  normalizeForDiff,
+} from "../../dialect";
 import {
   useSelectedNote,
   conflictRecordsByOriginal,
@@ -130,11 +138,61 @@ export function SyncPanel() {
     }
   }, [ctx]);
 
+  // Compare (MYND-334): read both sides, normalize away the sync bookkeeping
+  // (`updated:` + the injected `conflict:` markers — otherwise every conflict
+  // opens on frontmatter the user never wrote), and hand the diff to the view.
+  // Reading happens here rather than in `ConflictsView` so that view stays pure.
+  const [compare, setCompare] = useState<ConflictCompare | null>(null);
+  // Opening a second comparison while the first is still reading must not let
+  // the stale resolve paint over the newer one.
+  const compareSeq = useRef(0);
+
+  const handleCompare = useCallback((copyId: string, originalUuid: string) => {
+    const seq = ++compareSeq.current;
+    setCompare({ status: "loading", copyId, originalUuid });
+    void (async () => {
+      try {
+        if (originalUuid === UNKNOWN_CONFLICT_ORIGINAL) {
+          // Orphan copy: no original survives to diff against, so show the copy
+          // itself rather than fabricating an empty left-hand side.
+          const copyText = normalizeForDiff(await noteRead(copyId));
+          if (seq === compareSeq.current) {
+            setCompare({ status: "orphan", copyId, originalUuid, copyText });
+          }
+          return;
+        }
+        const [mineRaw, theirsRaw] = await Promise.all([
+          noteRead(originalUuid),
+          noteRead(copyId),
+        ]);
+        const { mine, theirs } = normalizeConflictPair(mineRaw, theirsRaw);
+        if (seq === compareSeq.current) {
+          setCompare({
+            status: "ready",
+            copyId,
+            originalUuid,
+            diff: diffWithSegments(mine, theirs),
+          });
+        }
+      } catch {
+        if (seq === compareSeq.current) {
+          setCompare({ status: "error", copyId, originalUuid });
+        }
+      }
+    })();
+  }, []);
+
+  const handleCloseCompare = useCallback(() => {
+    compareSeq.current++;
+    setCompare(null);
+  }, []);
+
   // Keep-both: the conflict copy becomes an ordinary note (clear its
   // `conflict:` / `conflict_of:` markers, write the new version), then refresh
   // so it re-enters the live sidebar.
   const handleKeepBoth = useCallback(
     (copyId: string) => {
+      handleCloseCompare();
       void (async () => {
         try {
           const content = await noteRead(copyId);
@@ -145,13 +203,14 @@ export function SyncPanel() {
         }
       })();
     },
-    [refreshSidebar],
+    [refreshSidebar, handleCloseCompare],
   );
 
   // Discard: delete the conflict copy. Routed so that under sync it tombstones
   // (propagates + no resurrection) instead of a bare unlink.
   const handleDiscard = useCallback(
     (copyId: string) => {
+      handleCloseCompare();
       void (async () => {
         try {
           await deleteNoteRouted(copyId);
@@ -161,7 +220,7 @@ export function SyncPanel() {
         }
       })();
     },
-    [refreshSidebar],
+    [refreshSidebar, handleCloseCompare],
   );
 
   // Take theirs ("Use this version", MYND-452): promote the remote copy to the
@@ -180,6 +239,7 @@ export function SyncPanel() {
       // already suppresses the take-theirs button there, so this only guards a
       // direct/programmatic call — there's no real original to trash.
       if (originalUuid === UNKNOWN_CONFLICT_ORIGINAL) return;
+      handleCloseCompare();
       void (async () => {
         try {
           await applyConflictVersion(copyId, originalUuid);
@@ -190,7 +250,7 @@ export function SyncPanel() {
         }
       })();
     },
-    [refreshSidebar],
+    [refreshSidebar, handleCloseCompare],
   );
 
   const handleUndoTakeTheirs = useCallback(() => {
@@ -289,6 +349,9 @@ export function SyncPanel() {
           onKeepBoth={handleKeepBoth}
           onDiscard={handleDiscard}
           onTakeTheirs={handleTakeTheirs}
+          onCompare={handleCompare}
+          compare={compare}
+          onCloseCompare={handleCloseCompare}
         />
       </div>
 

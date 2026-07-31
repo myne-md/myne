@@ -9,11 +9,21 @@
 // group heading, the empty state, and that the Keep-as-separate / Discard
 // buttons fire `onKeepBoth` / `onDiscard` with the copy's note id. Pure
 // component — no IPC.
+//
+// MYND-334 task 5 adds the compare surface at the bottom of this file: the
+// Compare affordance, the split-diff takeover, and the reconcile actions living
+// inside it. The view still reads nothing — the host hands it a resolved
+// `ConflictCompare`.
 
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { ConflictsView } from "../../src/notes/components/ConflictsView";
+import {
+  ConflictsView,
+  type ConflictCompare,
+} from "../../src/notes/components/ConflictsView";
 import type { TitleRecord } from "../../src/notes/loadNoteBatch";
+import { diffWithSegments } from "../../src/dialect";
 
 afterEach(cleanup);
 
@@ -280,5 +290,199 @@ describe("ConflictsView — take theirs (Use this version)", () => {
     expect(onTakeTheirs).toHaveBeenLastCalledWith("c3", ORIG_B);
     fireEvent.click(within(rowByNote("c1")).getByTestId("conflicts.take-this"));
     expect(onTakeTheirs).toHaveBeenLastCalledWith("c1", ORIG_A);
+  });
+});
+
+// --- Compare surface (MYND-334 task 5) --------------------------------------
+//
+// The view still reads no note: the host resolves both bodies, normalizes them
+// and hands over a `ConflictCompare`. What is asserted here is the routing —
+// the Compare affordance, the surface taking over the list while open, each
+// status rendering its own honest state, and the fact that the three MYND-452
+// reconcile actions are reachable from inside the comparison with the same
+// arguments they carry in the list.
+
+/** Render helper — the four handler props are noise in every compare case. */
+function renderView(props: Partial<ComponentProps<typeof ConflictsView>>) {
+  return render(
+    <ConflictsView
+      groups={groupsOf([[ORIG_A, [copy("c1", "Alpha", ORIG_A)]]])}
+      onKeepBoth={vi.fn()}
+      onDiscard={vi.fn()}
+      onTakeTheirs={vi.fn()}
+      {...props}
+    />,
+  );
+}
+
+describe("ConflictsView — Compare affordance", () => {
+  it("offers Compare per copy only when the host can open one", () => {
+    renderView({});
+    expect(screen.queryByTestId("conflicts.compare")).toBeNull();
+    cleanup();
+
+    renderView({ onCompare: vi.fn() });
+    expect(screen.getByTestId("conflicts.compare")).toBeTruthy();
+  });
+
+  it("clicking Compare fires onCompare with the copy id + original uuid", () => {
+    const onCompare = vi.fn();
+    renderView({ onCompare });
+    fireEvent.click(screen.getByTestId("conflicts.compare"));
+    expect(onCompare).toHaveBeenCalledWith("c1", ORIG_A);
+  });
+
+  it("puts Compare first, ahead of the three decisions", () => {
+    renderView({ onCompare: vi.fn() });
+    const row = screen.getByTestId("conflicts.copy");
+    expect(
+      within(row)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("data-testid")),
+    ).toEqual([
+      "conflicts.compare",
+      "conflicts.keep-both",
+      "conflicts.discard",
+      "conflicts.take-this",
+    ]);
+  });
+});
+
+describe("ConflictsView — compare surface", () => {
+  const loading: ConflictCompare = {
+    status: "loading",
+    copyId: "c1",
+    originalUuid: ORIG_A,
+  };
+
+  function ready(mine: string, theirs: string): ConflictCompare {
+    return {
+      status: "ready",
+      copyId: "c1",
+      originalUuid: ORIG_A,
+      diff: diffWithSegments(mine, theirs),
+    };
+  }
+
+  it("takes over the surface — the grouped list is not rendered behind it", () => {
+    renderView({ compare: loading, onCompare: vi.fn() });
+    expect(screen.getByTestId("conflicts.compare-view")).toBeTruthy();
+    expect(screen.queryByTestId("conflicts.view")).toBeNull();
+    expect(screen.queryByTestId("conflicts.copy")).toBeNull();
+  });
+
+  it("names the copy it is comparing, resolved from the group records", () => {
+    renderView({ compare: loading });
+    expect(screen.getByTestId("conflicts.compare-view").textContent).toContain("Alpha");
+  });
+
+  it("says it is reading while the host resolves the bodies", () => {
+    renderView({ compare: loading });
+    expect(screen.getByTestId("conflicts.compare-loading")).toBeTruthy();
+    expect(screen.queryByTestId("diff.view")).toBeNull();
+  });
+
+  it("renders a split diff with word-level highlight once ready", () => {
+    renderView({ compare: ready("the quick brown fox", "the slow brown fox") });
+    expect(screen.getByTestId("diff.view").getAttribute("data-mode")).toBe("split");
+    expect(screen.getByTestId("diff.split")).toBeTruthy();
+
+    const del = screen
+      .getAllByTestId("diff.line")
+      .find((l) => l.getAttribute("data-type") === "del")!;
+    expect(
+      within(del)
+        .getAllByTestId("diff.segment")
+        .filter((s) => s.getAttribute("data-type") === "del")
+        .map((s) => s.textContent),
+    ).toEqual(["quick"]);
+  });
+
+  it("labels the two columns as this device vs. the conflicting copy", () => {
+    renderView({ compare: ready("old", "new") });
+    expect(
+      screen.getAllByTestId("diff.column-label").map((l) => l.textContent),
+    ).toEqual(["On this device", "Conflicting copy"]);
+  });
+
+  it("says so plainly when normalization left nothing to show", () => {
+    // What an `updated:`-only divergence collapses to after task 4's pass.
+    renderView({ compare: ready("same body", "same body") });
+    expect(screen.getByTestId("conflicts.compare-identical")).toBeTruthy();
+    expect(screen.queryByTestId("diff.split")).toBeNull();
+  });
+
+  it("surfaces a read failure without losing the decision buttons", () => {
+    renderView({ compare: { status: "error", copyId: "c1", originalUuid: ORIG_A } });
+    expect(screen.getByTestId("conflicts.compare-error")).toBeTruthy();
+    expect(screen.getByTestId("conflicts.keep-both")).toBeTruthy();
+    expect(screen.getByTestId("conflicts.discard")).toBeTruthy();
+  });
+
+  it("closes back to the list", () => {
+    const onCloseCompare = vi.fn();
+    renderView({ compare: loading, onCloseCompare });
+    fireEvent.click(screen.getByTestId("conflicts.compare-close"));
+    expect(onCloseCompare).toHaveBeenCalledTimes(1);
+  });
+
+  it("carries the three reconcile actions, wired to this copy", () => {
+    const onKeepBoth = vi.fn();
+    const onDiscard = vi.fn();
+    const onTakeTheirs = vi.fn();
+    renderView({ compare: ready("old", "new"), onKeepBoth, onDiscard, onTakeTheirs });
+
+    fireEvent.click(screen.getByTestId("conflicts.keep-both"));
+    expect(onKeepBoth).toHaveBeenCalledWith("c1");
+    fireEvent.click(screen.getByTestId("conflicts.discard"));
+    expect(onDiscard).toHaveBeenCalledWith("c1");
+    fireEvent.click(screen.getByTestId("conflicts.take-this"));
+    expect(onTakeTheirs).toHaveBeenCalledWith("c1", ORIG_A);
+  });
+});
+
+describe("ConflictsView — compare of an orphan copy", () => {
+  const ORPHAN: ConflictCompare = {
+    status: "orphan",
+    copyId: "c1",
+    originalUuid: "(unknown)",
+    copyText: "line one\nline two",
+  };
+
+  function renderOrphan() {
+    return render(
+      <ConflictsView
+        groups={groupsOf([["(unknown)", [copy("c1", "Orphan", "(unknown)")]]])}
+        onKeepBoth={vi.fn()}
+        onDiscard={vi.fn()}
+        onTakeTheirs={vi.fn()}
+        onCompare={vi.fn()}
+        compare={ORPHAN}
+        onCloseCompare={vi.fn()}
+      />,
+    );
+  }
+
+  it("shows the copy itself instead of diffing it against nothing", () => {
+    renderOrphan();
+    expect(screen.getByTestId("diff.view").getAttribute("data-mode")).toBe("unified");
+    expect(
+      screen.getAllByTestId("diff.line").map((l) => l.getAttribute("data-type")),
+    ).toEqual(["same", "same"]);
+    expect(screen.getByTestId("diff.view").textContent).toContain("line two");
+  });
+
+  it("explains why there is nothing to compare against", () => {
+    renderOrphan();
+    expect(screen.getByTestId("conflicts.compare-view").textContent).toContain(
+      "no longer here",
+    );
+  });
+
+  it("still suppresses Use-this-version — there is no original to trash", () => {
+    renderOrphan();
+    expect(screen.queryByTestId("conflicts.take-this")).toBeNull();
+    expect(screen.getByTestId("conflicts.keep-both")).toBeTruthy();
+    expect(screen.getByTestId("conflicts.discard")).toBeTruthy();
   });
 });

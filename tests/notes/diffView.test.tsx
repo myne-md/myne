@@ -87,3 +87,86 @@ describe("<DiffView> — unified mode", () => {
     expect(within(same).queryAllByTestId("diff.segment")).toHaveLength(0);
   });
 });
+
+// Split mode (MYND-334 task 5) folds the same one-column diff into aligned
+// left/right rows. What matters is the pairing — a del must face the add it was
+// refined against, and a surplus line must face an empty cell rather than
+// sliding the two columns out of step.
+describe("<DiffView> — split mode", () => {
+  /** The cells of one side, in row order. */
+  function side(which: "left" | "right"): HTMLElement[] {
+    return screen
+      .getAllByTestId("diff.line")
+      .filter((l) => l.getAttribute("data-side") === which);
+  }
+
+  it("renders the split container and tags the mode", () => {
+    render(<DiffView diff={lineDiff("a", "b")} mode="split" />);
+    expect(screen.getByTestId("diff.view").getAttribute("data-mode")).toBe("split");
+    expect(screen.getByTestId("diff.split")).toBeTruthy();
+  });
+
+  it("puts a `same` line on both sides of its row", () => {
+    render(<DiffView diff={lineDiff("keep", "keep")} mode="split" />);
+    const cells = screen.getAllByTestId("diff.line");
+    expect(cells.map((c) => c.getAttribute("data-side"))).toEqual(["left", "right"]);
+    expect(cells.map((c) => c.getAttribute("data-type"))).toEqual(["same", "same"]);
+    expect(cells.map((c) => c.textContent)).toEqual(["keep", "keep"]);
+    expect(cells.map((c) => c.getAttribute("data-index"))).toEqual(["0", "0"]);
+  });
+
+  it("faces the old line against the new one in the same row", () => {
+    render(<DiffView diff={lineDiff("keep\nold", "keep\nnew")} mode="split" />);
+    expect(side("left").map((c) => c.textContent)).toEqual(["keep", "old"]);
+    expect(side("right").map((c) => c.textContent)).toEqual(["keep", "new"]);
+    expect(side("left").map((c) => c.getAttribute("data-type"))).toEqual(["same", "del"]);
+    expect(side("right").map((c) => c.getAttribute("data-type"))).toEqual(["same", "add"]);
+  });
+
+  it("faces a surplus removal against an empty cell (columns stay aligned)", () => {
+    render(<DiffView diff={lineDiff("one\ntwo\nthree", "one\nthree")} mode="split" />);
+    const left = side("left");
+    const right = side("right");
+    expect(left).toHaveLength(right.length);
+    expect(left.map((c) => c.getAttribute("data-type"))).toEqual(["same", "del", "same"]);
+    expect(right.map((c) => c.getAttribute("data-type"))).toEqual(["same", "empty", "same"]);
+    expect(right[1]!.textContent).toBe("");
+  });
+
+  it("faces a surplus addition against an empty cell on the left", () => {
+    render(<DiffView diff={lineDiff("one", "one\ntwo")} mode="split" />);
+    expect(side("left").map((c) => c.getAttribute("data-type"))).toEqual(["same", "empty"]);
+    expect(side("right").map((c) => c.getAttribute("data-type"))).toEqual(["same", "add"]);
+  });
+
+  it("carries the word segments into the paired cells", () => {
+    render(
+      <DiffView diff={diffWithSegments("the quick brown fox", "the slow brown fox")} mode="split" />,
+    );
+    const [del] = side("left");
+    const [add] = side("right");
+    expect(within(del!).getAllByTestId("diff.segment").map((s) => s.getAttribute("data-type")))
+      .toEqual(["same", "del", "same"]);
+    expect(within(add!).getAllByTestId("diff.segment").map((s) => s.textContent))
+      .toEqual(["the ", "slow", " brown fox"]);
+  });
+
+  it("renders the column headings the host gave it, and none when it gave none", () => {
+    const { unmount } = render(
+      <DiffView diff={lineDiff("a", "b")} mode="split" leftLabel="Mine" rightLabel="Theirs" />,
+    );
+    const labels = screen.getAllByTestId("diff.column-label");
+    expect(labels.map((l) => l.getAttribute("data-side"))).toEqual(["left", "right"]);
+    expect(labels.map((l) => l.textContent)).toEqual(["Mine", "Theirs"]);
+    unmount();
+
+    render(<DiffView diff={lineDiff("a", "b")} mode="split" />);
+    expect(screen.queryAllByTestId("diff.column-label")).toHaveLength(0);
+  });
+
+  it("renders nothing but the container for an empty diff", () => {
+    render(<DiffView diff={[]} mode="split" />);
+    expect(screen.getByTestId("diff.view").textContent).toBe("");
+    expect(screen.queryAllByTestId("diff.line")).toHaveLength(0);
+  });
+});
