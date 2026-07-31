@@ -19,14 +19,18 @@ mod audio;
 #[cfg(feature = "local-inference")]
 mod cancel;
 #[cfg(feature = "local-inference")]
+#[allow(dead_code, unused_imports)] // MYND-563 transcription scaffolding not yet fully wired
 mod commands;
 #[cfg(feature = "local-inference")]
+#[allow(dead_code, unused_imports)] // MYND-563 transcription scaffolding not yet fully wired
 mod engine;
 #[cfg(feature = "local-inference")]
+#[allow(dead_code, unused_imports)] // MYND-563 transcription scaffolding not yet fully wired
 mod engine_candle;
 #[cfg(feature = "local-inference")]
 mod error;
 #[cfg(feature = "local-inference")]
+#[allow(dead_code, unused_imports)] // MYND-563 transcription scaffolding not yet fully wired
 mod model_store;
 #[cfg(feature = "local-inference")]
 mod state;
