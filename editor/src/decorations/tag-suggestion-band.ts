@@ -221,12 +221,21 @@ const tagSuggestionBandField = StateField.define<DecorationSet>({
 });
 
 function dispatchChipEvent(event: Event, view: EditorView): boolean {
+  // The extension is composed unconditionally, so these handlers are live in
+  // every note — including with auto-tag off. With no band there is nothing to
+  // hit, and Enter/Space are two of the most common keys in prose: answer from
+  // state before walking any ancestor chain.
+  if ((view.state.field(tagSuggestionsField, false)?.length ?? 0) === 0) return false;
+
   const target = event.target as HTMLElement | null;
-  const accept = target?.closest?.("[data-tag-accept]") as HTMLElement | null;
-  const dismiss = target?.closest?.("[data-tag-dismiss]") as HTMLElement | null;
-  const hit = accept ?? dismiss;
+  const hit = target?.closest?.(
+    "[data-tag-accept],[data-tag-dismiss]",
+  ) as HTMLElement | null;
   if (hit === null || hit === undefined) return false;
-  const tag = hit.getAttribute(accept !== null ? "data-tag-accept" : "data-tag-dismiss");
+  // Accept and dismiss are siblings inside a chip, never nested, so the nearest
+  // match is unambiguous.
+  const accepted = hit.hasAttribute("data-tag-accept");
+  const tag = hit.getAttribute(accepted ? "data-tag-accept" : "data-tag-dismiss");
   if (tag === null || tag === "") return false;
 
   // Without this the click lands in the document and moves the caret to the
@@ -236,7 +245,7 @@ function dispatchChipEvent(event: Event, view: EditorView): boolean {
   event.preventDefault();
   view.dom.dispatchEvent(
     new CustomEvent<TagSuggestionEventDetail>(
-      accept !== null ? TAG_SUGGESTION_ACCEPT_EVENT : TAG_SUGGESTION_DISMISS_EVENT,
+      accepted ? TAG_SUGGESTION_ACCEPT_EVENT : TAG_SUGGESTION_DISMISS_EVENT,
       { bubbles: true, detail: { tag } },
     ),
   );

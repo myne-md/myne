@@ -1063,6 +1063,15 @@ impl Engine for CandleEngine {
         out
     }
 
+    fn tag_model_available(&self) -> bool {
+        // The construction-time resolution IS the answer: `bundled_tag` is
+        // `None` exactly when no blob shipped, which is exactly when `load_tag`
+        // refuses. Deliberately does not stat the path again — this is the
+        // settings surface asking a cheap question, and `load_tag` remains the
+        // one authority on whether the file actually opens.
+        self.bundled_tag.is_some()
+    }
+
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
         // Blocking, no streaming — a no-op segment sink; the transcript is the
         // return value. Serializes GPU work like infer/embed (Metal safety).
@@ -1241,6 +1250,24 @@ mod tests {
             engine.infer_tags("suggest tags", &mut || ControlFlow::Continue(())),
             Err(EngineError::NotReady)
         );
+
+        // …and the settings surface is told the same thing, so it can disable
+        // the auto-tag switch instead of offering one that can only ever persist
+        // `true` against a host that refuses every pass.
+        assert!(!engine.tag_model_available());
+    }
+
+    #[test]
+    fn tag_model_available_tracks_the_attached_blob() {
+        // The signal is the construction-time resolution, nothing else: attaching
+        // a path flips it, and it deliberately does not stat the file (an
+        // unreadable blob is `load_tag`'s failure to report, not this probe's —
+        // and a probe that touched the disk would run on every settings open).
+        let tmp = ScopedTempDir::new("candle-engine-tagavail").expect("tempdir");
+        assert!(!CandleEngine::new(tmp.path().to_path_buf()).tag_model_available());
+        assert!(CandleEngine::new(tmp.path().to_path_buf())
+            .with_bundled_tag_model(Some(tmp.path().join("tag.gguf")))
+            .tag_model_available());
     }
 
     #[test]

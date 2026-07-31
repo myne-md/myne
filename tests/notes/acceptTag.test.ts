@@ -3,40 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   applyTagAccept,
   computeTagAcceptEdit,
-  computeTagsAfterAccept,
+  planTagAccept,
 } from "../../src/notes/ai/acceptTag";
-
-// auto-tag-link (MYND-411) task 5 — accept-write pure cores.
-describe("computeTagsAfterAccept (frontmatter tags:)", () => {
-  it("appends a genuinely-new tag", () => {
-    expect(computeTagsAfterAccept(["work"], "rust")).toEqual(["work", "rust"]);
-  });
-
-  it("is idempotent — re-accepting an existing tag does not duplicate it", () => {
-    expect(computeTagsAfterAccept(["work"], "work")).toEqual(["work"]);
-  });
-
-  it("dedupes under the fold (case/NFC) preserving existing casing", () => {
-    expect(computeTagsAfterAccept(["Work"], "work")).toEqual(["Work"]);
-    expect(computeTagsAfterAccept(["work"], "WORK")).toEqual(["work"]);
-  });
-
-  it("strips a leading '#' on the accepted tag", () => {
-    expect(computeTagsAfterAccept(["work"], "#rust")).toEqual(["work", "rust"]);
-    expect(computeTagsAfterAccept(["rust"], "#rust")).toEqual(["rust"]);
-  });
-
-  it("ignores an empty / whitespace / bare-hash accept", () => {
-    expect(computeTagsAfterAccept(["work"], "  ")).toEqual(["work"]);
-    expect(computeTagsAfterAccept(["work"], "#")).toEqual(["work"]);
-  });
-
-  it("does not mutate the input array", () => {
-    const input = ["work"];
-    computeTagsAfterAccept(input, "rust");
-    expect(input).toEqual(["work"]);
-  });
-});
 
 // on-device-tag-suggestion task 6 — the accept-to-frontmatter writer. The single
 // accept path: a chip writes into frontmatter `tags:`, never an inline `#tag`.
@@ -197,5 +165,34 @@ describe("computeTagAcceptEdit — frontmatter it refuses to touch", () => {
   it("applyTagAccept returns the document unchanged when it refuses", () => {
     const doc = "---\ntitle: [unclosed\n---\nb";
     expect(applyTagAccept(doc, "rust")).toBe(doc);
+  });
+});
+
+// The document half of the decision, split out so the suggestion band can ask
+// "would any of these chips land?" with ONE parse per keystroke instead of one
+// per chip. These assert the two things the band reads off it.
+describe("planTagAccept — the per-document half", () => {
+  it("reports what the note already claims, from both sources and folded", () => {
+    const plan = planTagAccept("---\ntags:\n  - Work\ntag: 2026\n---\n\nabout #Rust here");
+    expect(plan).not.toBeNull();
+    expect([...plan!.existingFolds].sort()).toEqual(["2026", "rust", "work"]);
+  });
+
+  it("is null exactly when the writer refuses the frontmatter", () => {
+    expect(planTagAccept("---\ntitle: [unclosed\n---\nb")).toBeNull();
+    expect(planTagAccept("---\ntags: {a: 1}\n---\nb")).toBeNull();
+    expect(planTagAccept("---\ntags: [work,\n  ops]\n---\nb")).toBeNull();
+    expect(planTagAccept("plain body")).not.toBeNull();
+  });
+
+  it("agrees with computeTagAcceptEdit — one plan, reused across tags", () => {
+    const doc = "---\ntags:\n  - work\n---\nbody";
+    const plan = planTagAccept(doc)!;
+    for (const tag of ["rust", "work", "WORK", "ops"]) {
+      const viaPlan = plan.existingFolds.has(tag.toLowerCase())
+        ? null
+        : plan.edit(tag);
+      expect(computeTagAcceptEdit(doc, tag)).toEqual(viaPlan);
+    }
   });
 });

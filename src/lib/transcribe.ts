@@ -12,6 +12,7 @@
 // string / the streamed segments — AS1-class content, never logged here.
 
 import { Channel, invoke } from "../platform/core";
+import { engineErrorTag } from "./engine-error";
 
 /** A normalized transcription failure. `kind: "not_ready"` = AI off / no
  *  transcription model side-loaded (SYNC-V3 — surface a "select a model" hint);
@@ -53,16 +54,11 @@ export function startTranscription(
   };
 }
 
-/** Map the raw IPC rejection (a serialized `EngineError` — a bare variant string
- *  like `"NotReady"`, or a `{ kind }` object) to a normalized kind. Anything not
- *  clearly not-ready degrades to `"failed"`. */
+/** Map the raw IPC rejection (a serialized `EngineError` — see
+ *  {@link engineErrorTag}) to a normalized kind. Anything not clearly not-ready
+ *  degrades to `"failed"`. */
 function normalizeTranscribeError(raw: unknown): TranscribeError {
-  const tag =
-    typeof raw === "string"
-      ? raw
-      : raw !== null && typeof raw === "object" && "kind" in raw
-        ? String((raw as { kind: unknown }).kind)
-        : "";
+  const tag = engineErrorTag(raw);
   const notReady = tag === "NotReady" || tag === "not_ready";
   return { kind: notReady ? "not_ready" : "failed" };
 }

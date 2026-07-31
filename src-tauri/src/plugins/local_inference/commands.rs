@@ -703,41 +703,37 @@ pub(crate) enum TagGate {
     Excluded,
 }
 
-/// The host-side inputs to the auto-tag decision. Every field is read HERE, on
-/// the Rust side — none of it is taken on the WebView's word, because a
-/// compromised WebView is not trusted to stop calling (the same posture as
-/// [`semantic_search`]'s opt-in check and [`transcribe`]'s `transcription_enabled`
-/// re-read).
-pub(crate) struct TagPolicy<'a> {
-    /// `vault.prefs` `ai_enabled` — the AI beta opt-in (§9.5.2).
-    pub ai_enabled: bool,
-    /// `vault.prefs` `auto_tag_enabled` — the auto-tag switch (§9.5.2). Both
-    /// must be on; `threat-model.md` §7 states this gate is re-read host-side
-    /// before any model touch, and this is the code that makes it true.
-    pub auto_tag_enabled: bool,
-    /// The note's own `folder:` frontmatter value, resolved from the DECRYPTED
-    /// note rather than from a caller-supplied string.
-    pub folder: &'a str,
-    /// `vault.prefs` `ai_excluded_folders`.
-    pub excluded: &'a [String],
-}
-
-impl TagPolicy<'_> {
-    /// Fail-closed by construction: the only path to [`TagGate::Allowed`] is
-    /// both switches on AND the folder outside every excluded entry. A prefs
-    /// blob that cannot be read decodes to defaults (§9.5.5) and both switches
-    /// default OFF, so an unreadable blob refuses rather than runs — the
-    /// opposite of transcription's deliberately fail-open switch, because
-    /// auto-tag reads note bodies ambiently and the user never asked for it.
-    pub(crate) fn decide(&self) -> TagGate {
-        if !(self.ai_enabled && self.auto_tag_enabled) {
-            return TagGate::OptedOut;
-        }
-        if folder_is_excluded(self.folder, self.excluded) {
-            return TagGate::Excluded;
-        }
-        TagGate::Allowed
+/// The auto-tag decision. Every input is read HERE, on the Rust side — none of
+/// it is taken on the WebView's word, because a compromised WebView is not
+/// trusted to stop calling (the same posture as [`semantic_search`]'s opt-in
+/// check and [`transcribe`]'s `transcription_enabled` re-read).
+///
+/// `ai_enabled` is the AI beta opt-in and `auto_tag_enabled` the auto-tag switch
+/// (both `vault.prefs`, §9.5.2); `folder` is the note's own `folder:` value
+/// resolved from the DECRYPTED note rather than from a caller-supplied string,
+/// and `excluded` is `ai_excluded_folders`.
+///
+/// Fail-closed by construction: the only path to [`TagGate::Allowed`] is both
+/// switches on AND the folder outside every excluded entry. A prefs blob that
+/// cannot be read decodes to defaults (§9.5.5) and both switches default OFF, so
+/// an unreadable blob refuses rather than runs — the opposite of transcription's
+/// deliberately fail-open switch, because auto-tag reads note bodies ambiently
+/// and the user never asked for it. `threat-model.md` §7 states this gate is
+/// re-read host-side before any model touch, and this is the code that makes it
+/// true.
+pub(crate) fn tag_gate(
+    ai_enabled: bool,
+    auto_tag_enabled: bool,
+    folder: &str,
+    excluded: &[String],
+) -> TagGate {
+    if !(ai_enabled && auto_tag_enabled) {
+        return TagGate::OptedOut;
     }
+    if folder_is_excluded(folder, excluded) {
+        return TagGate::Excluded;
+    }
+    TagGate::Allowed
 }
 
 /// Suggest tags for an open note on the bundled auto-tag task-model (MYND-651).
@@ -746,7 +742,7 @@ impl TagPolicy<'_> {
 /// the frontend's explicit `note_save`, SYNC-17).
 ///
 /// Two host-side gates run before any model touch, neither of them trusting the
-/// caller ([`TagPolicy::decide`]):
+/// caller ([`tag_gate`]):
 ///   1. `ai_enabled` **and** `auto_tag_enabled`, re-read from `vault.prefs` —
 ///      off → `NotReady`, with no decrypt and no engine call;
 ///   2. the note's `ai_excluded_folders` membership, resolved from the note's
@@ -786,8 +782,8 @@ pub async fn suggest_tags<R: Runtime>(
     .map_err(|_| EngineError::NotReady)?;
     // Cheap switch check first, so a vault with auto-tag off never pays a note
     // decrypt for a feature that is not going to run. The authoritative decision
-    // is still `TagPolicy::decide` below — this is an ordering optimisation, not
-    // a second policy.
+    // is still `tag_gate` below — this is an ordering optimisation, not a second
+    // policy.
     if !(prefs.ai_enabled && prefs.auto_tag_enabled) {
         return Err(EngineError::NotReady);
     }
@@ -812,16 +808,15 @@ pub async fn suggest_tags<R: Runtime>(
         folder_of(&body)
     };
 
-    let policy = TagPolicy {
-        ai_enabled: prefs.ai_enabled,
-        auto_tag_enabled: prefs.auto_tag_enabled,
-        folder: &folder,
-        excluded: &prefs.ai_excluded_folders,
-    };
     suggest_tags_with_engine(
         engine_state.engine(),
         (*priority).clone(),
-        policy.decide(),
+        tag_gate(
+            prefs.ai_enabled,
+            prefs.auto_tag_enabled,
+            &folder,
+            &prefs.ai_excluded_folders,
+        ),
         prompt,
     )
     .await
@@ -872,6 +867,26 @@ pub(crate) async fn suggest_tags_with_engine(
         return Err(EngineError::Deferred);
     }
     Ok(out)
+}
+
+/// Whether this build ships an auto-tag model (MYND-651). Cheap, synchronous,
+/// and deliberately UNGATED: the answer is a property of the binary, not of the
+/// vault — no prefs read, no note decrypt, nothing an unlocked slot is needed
+/// for. A locked or absent vault answers the same as an unlocked one.
+///
+/// The settings surface calls it so the auto-tag switch can say "this build has
+/// no tag model" instead of persisting `true` against a host that will answer
+/// [`EngineError::NotReady`] forever. The tag role is bundled-only by design
+/// (`threat-model.md` §7: no override picker), so a `false` here is not
+/// something the user can fix by side-loading — which is exactly why the UI has
+/// to say it rather than leave the user guessing.
+///
+/// This is NOT the enforcement point for anything: [`suggest_tags`] re-reads
+/// both prefs switches and the folder gate host-side regardless of what any
+/// caller learned here.
+#[tauri::command]
+pub fn tag_model_available(engine_state: State<'_, LocalInferenceState>) -> bool {
+    engine_state.engine().tag_model_available()
 }
 
 /// Record a user-picked model path for `role` device-locally (ai-ux-surface
@@ -1115,25 +1130,16 @@ mod tests {
         Zeroizing::new("Suggest tags for: standup notes".to_string())
     }
 
-    fn policy<'a>(ai: bool, auto: bool, folder: &'a str, excluded: &'a [String]) -> TagPolicy<'a> {
-        TagPolicy {
-            ai_enabled: ai,
-            auto_tag_enabled: auto,
-            folder,
-            excluded,
-        }
-    }
-
     #[test]
     fn the_auto_tag_gate_is_closed_unless_both_switches_are_on() {
         // Exhaustive over the two-key gate. The pairing is the point: a synced
         // `auto_tag_enabled: true` arriving on a device that never opted into AI
         // must still run nothing (the co-gate `ai_enabled` is device-local).
         let none: [String; 0] = [];
-        assert_eq!(policy(false, false, "", &none).decide(), TagGate::OptedOut);
-        assert_eq!(policy(true, false, "", &none).decide(), TagGate::OptedOut);
-        assert_eq!(policy(false, true, "", &none).decide(), TagGate::OptedOut);
-        assert_eq!(policy(true, true, "", &none).decide(), TagGate::Allowed);
+        assert_eq!(tag_gate(false, false, "", &none), TagGate::OptedOut);
+        assert_eq!(tag_gate(true, false, "", &none), TagGate::OptedOut);
+        assert_eq!(tag_gate(false, true, "", &none), TagGate::OptedOut);
+        assert_eq!(tag_gate(true, true, "", &none), TagGate::Allowed);
     }
 
     #[test]
@@ -1143,22 +1149,22 @@ mod tests {
         // when the user is looking right at it.
         let excluded = vec!["Private/".to_string()];
         assert_eq!(
-            policy(true, true, "Private/", &excluded).decide(),
+            tag_gate(true, true, "Private/", &excluded),
             TagGate::Excluded
         );
         // Nested beneath an excluded folder is excluded too…
         assert_eq!(
-            policy(true, true, "Private/Journal/", &excluded).decide(),
+            tag_gate(true, true, "Private/Journal/", &excluded),
             TagGate::Excluded
         );
         // …and case/diacritic folding applies (the store's canonical matcher).
         assert_eq!(
-            policy(true, true, "private/", &excluded).decide(),
+            tag_gate(true, true, "private/", &excluded),
             TagGate::Excluded
         );
         // A mere prefix sibling is NOT excluded.
         assert_eq!(
-            policy(true, true, "PrivateStuff/", &excluded).decide(),
+            tag_gate(true, true, "PrivateStuff/", &excluded),
             TagGate::Allowed
         );
     }
@@ -1191,7 +1197,7 @@ mod tests {
         let out = rt().block_on(suggest_tags_with_engine(
             Arc::clone(&engine),
             pri.clone(),
-            policy(false, true, "", &excluded).decide(),
+            tag_gate(false, true, "", &excluded),
             tag_prompt(),
         ));
         assert_eq!(out, Err(EngineError::NotReady));
@@ -1200,7 +1206,7 @@ mod tests {
         let out = rt().block_on(suggest_tags_with_engine(
             Arc::clone(&engine),
             pri.clone(),
-            policy(true, false, "", &excluded).decide(),
+            tag_gate(true, false, "", &excluded),
             tag_prompt(),
         ));
         assert_eq!(out, Err(EngineError::NotReady));
@@ -1209,7 +1215,7 @@ mod tests {
         let out = rt().block_on(suggest_tags_with_engine(
             engine,
             pri,
-            policy(true, true, "Private/Journal/", &excluded).decide(),
+            tag_gate(true, true, "Private/Journal/", &excluded),
             tag_prompt(),
         ));
         assert_eq!(out, Ok(String::new()));
@@ -1223,7 +1229,7 @@ mod tests {
             .block_on(suggest_tags_with_engine(
                 engine,
                 ComputePriority::default(),
-                policy(true, true, "Work/", &none).decide(),
+                tag_gate(true, true, "Work/", &none),
                 tag_prompt(),
             ))
             .expect("stub tag pass never fails");

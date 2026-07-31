@@ -1,9 +1,23 @@
 # Bundled auto-tag model (desktop) — tag suggestion (MYND-651)
 
-This directory ships the **dedicated on-device tag-suggestion model** with the
-desktop app, so the inline tag-suggestion band works out of the box once the
-user turns on AI (Settings → Developer → AI) *and* the dedicated auto-tag
-toggle. It is **desktop-only** (no Candle on web; mobile is deferred to
+> ## ⏳ Status: wired, weights pending (MYND-651)
+>
+> **`model.gguf` and `tokenizer.json` are NOT in the tree.** `git ls-files` here
+> returns only `MODEL-LICENSE` and this README. Everything around the blob is
+> wired — the resource mapping in `tauri.conf.json`, the `.gitattributes` LFS
+> rule, the `load_tag` loader, the license text — but until the blob lands
+> **every real build ships without a tag model**, `infer_tags` returns
+> `NotReady`, and the tag-suggestion band never appears. Follow the recipe below
+> to produce it, then record the checkpoint revision, quantization and SHA-256
+> under *Provenance* and delete this box.
+>
+> Anything written in the present tense below describes the intended shipped
+> state, not today's tree.
+
+This directory is where the **dedicated on-device tag-suggestion model** ships
+with the desktop app, so the inline tag-suggestion band works out of the box
+once the user turns on AI (Settings → Developer → AI) *and* the dedicated
+auto-tag toggle. It is **desktop-only** (no Candle on web; mobile is deferred to
 MYND-653).
 
 Unlike the transcription model next door, this one has **no user-override
@@ -16,11 +30,11 @@ change second.
 
 ## What ships here
 
-| File | What | Tracking |
-|---|---|---|
-| `model.gguf` | quantized Qwen2.5-0.5B-Instruct GGUF (candle format) — the tag model | **Git LFS** (`.gitattributes` `*.gguf`) |
-| `tokenizer.json` | the Qwen2.5 tokenizer | normal git |
-| `MODEL-LICENSE` | the Apache-2.0 license text for the weights | normal git |
+| File | What | Tracking | In the tree today? |
+|---|---|---|---|
+| `model.gguf` | quantized Qwen2.5-0.5B-Instruct GGUF (candle format) — the tag model | **Git LFS** (`.gitattributes` `*.gguf`) | ❌ **no** — pending MYND-651 |
+| `tokenizer.json` | the Qwen2.5 tokenizer | normal git | ❌ **no** — pending MYND-651 |
+| `MODEL-LICENSE` | the Apache-2.0 license text for the weights | normal git | ✅ yes |
 
 The engine (`src-tauri/src/plugins/local_inference/engine_candle.rs`, `load_tag`)
 loads `model.gguf` through the **same** `Qwen2::from_gguf` path as the
@@ -40,11 +54,9 @@ there is no fallback to the generation model, and nothing panics.
   reproduces depends on these exact bytes (`threat-model.md` §6), so an
   unpinned model file is a reproducible-build hole, not a detail.
 
-> **The weights blob is not in the tree yet.** Everything around it is wired —
-> the resource mapping in `tauri.conf.json`, the LFS rule, the loader, the
-> license — so dropping a `model.gguf` + `tokenizer.json` in this directory is
-> all that is left. Follow the recipe below, then replace the bullet above with
-> the real revision, quantization and SHA-256.
+Until that bullet names a real revision + quantization + digest, the repo-root
+`LICENSING.md` tag-model row and this file both stay marked pending — see the
+status box at the top.
 
 ## Producing / updating the model
 

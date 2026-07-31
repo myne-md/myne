@@ -61,12 +61,21 @@ export function parseTagCandidates(modelOutput: string): string[] {
  * surrogate pair is never split). Exported because it is also what the trigger's
  * content hash covers: an edit BEYOND this window cannot change the model's
  * answer, so it must not invalidate the cache. Pure.
+ *
+ * The work is bounded by the BUDGET, not by note size — the trigger calls this
+ * on every keystroke, and a code-point walk of a whole note would allocate one
+ * string per character of it to keep the first 2000.
  */
 export function tagPromptBody(noteBody: string): string {
-  const chars = Array.from(noteBody);
+  // A code point is at least one UTF-16 unit, so a body within budget in units
+  // is within it in code points — no walk needed at all.
+  if (noteBody.length <= TAG_PROMPT_BODY_CHARS) return noteBody;
+  // …and at most two, so this prefix always holds at least the whole window.
+  const head = noteBody.slice(0, TAG_PROMPT_BODY_CHARS * 2);
+  const chars = Array.from(head);
   return chars.length > TAG_PROMPT_BODY_CHARS
     ? chars.slice(0, TAG_PROMPT_BODY_CHARS).join("")
-    : noteBody;
+    : head;
 }
 
 /**

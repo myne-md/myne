@@ -2529,7 +2529,7 @@
     "ai": {
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
       "autoTagLabel": "Suggest tags automatically",
-      "autoTagSaveFailed": "Couldn't save the tag-suggestion setting.",
+      "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one — the switch turns on by itself in a build that includes it.",
       "disclosureToggle": "How does this work?",
       "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
       "enableLabel": "Enable local AI",
