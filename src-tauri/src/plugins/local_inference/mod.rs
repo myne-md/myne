@@ -131,14 +131,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                 // none ships (an AI-free `--no-default-features` build, or a
                 // checkout whose LFS model blob was not fetched), leaving STT
                 // side-load-only.
-                let bundled_transcription = app
-                    .path()
-                    .resource_dir()
-                    .ok()
-                    .and_then(|rd| model_store::bundled_transcription_model(&rd));
+                let resource_dir = app.path().resource_dir().ok();
+                let bundled_transcription = resource_dir
+                    .as_deref()
+                    .and_then(model_store::bundled_transcription_model);
+                // The bundled auto-tag task-model (MYND-651). Same
+                // present-or-nothing resolution, but with no side-load fallback:
+                // `None` means this build simply has no auto-tag.
+                let bundled_tag = resource_dir
+                    .as_deref()
+                    .and_then(model_store::bundled_tag_model);
                 std::sync::Arc::new(
                     engine_candle::CandleEngine::new(base)
-                        .with_bundled_transcription(bundled_transcription),
+                        .with_bundled_transcription(bundled_transcription)
+                        .with_bundled_tag_model(bundled_tag),
                 )
             };
             app.manage(state::LocalInferenceState::new(engine));
