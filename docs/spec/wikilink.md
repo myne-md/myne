@@ -278,4 +278,4 @@ The following are forbidden in v0.1; clients must reject or flag them:
 
 ## 11. Versioning
 
-This wikilink specification covers Myne v0.1 only. v005 will pin its own wikilink specification (potentially with a different syntactic form for path-vs-title disambiguation). No in-place wikilink-syntax upgrades within v0.1.
+This wikilink specification covers Myne v0.1 only. A later version will pin its own wikilink specification (potentially with a different syntactic form for path-vs-title disambiguation). No in-place wikilink-syntax upgrades within v0.1.

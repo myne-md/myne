@@ -97,21 +97,21 @@ const ROLE_STR_ATTACHMENTS_ID_HMAC: &[u8] = b"attachments-id-hmac";
 /// (MYND-166; encrypts the `vault.workspace` blob — `workspace_blob.rs`,
 /// `protocol.md` § 9.7). Load-bearing: drift silently changes the KEK.
 /// `root_key`-derived (like prefs/search), so it is `itemsKey`-independent
-/// and survives a v005 epoch rotation.
+/// and survives a later epoch rotation.
 const ROLE_STR_SESSION_STATE_KEY: &[u8] = b"session-state-key";
 
 /// Registered role string for the v0.1 personal-dictionary blob KEK
 /// (MYND-266; encrypts the `vault.dictionary` blob — `dictionary_blob.rs`,
 /// `protocol.md` § 9.13 + § 3.4). Load-bearing: drift silently changes the
 /// KEK. `root_key`-derived (like prefs/search/workspace), so it is
-/// `itemsKey`-independent and survives a v005 epoch rotation.
+/// `itemsKey`-independent and survives a later epoch rotation.
 const ROLE_STR_PERSONAL_DICT_KEY: &[u8] = b"personal-dictionary-key";
 
 /// Registered role string for the v0.1 vault-indices blob KEK
 /// (MYND-271; design MYND-31; encrypts the `vault.indices` structured-metadata
 /// index blob — `protocol.md` § 9.8 + § 3.4). Load-bearing: drift silently
 /// changes the KEK. `root_key`-derived (like prefs/search/workspace), so it is
-/// `itemsKey`-independent and survives a v005 epoch rotation. DISTINCT from
+/// `itemsKey`-independent and survives a later epoch rotation. DISTINCT from
 /// `search-index-key` — `vault.indices` (structured metadata) and `vault.search`
 /// (BM25 full-text) are separate blob families (one magic / one KEK per family).
 const ROLE_STR_VAULT_INDICES_KEY: &[u8] = b"vault-indices-key";
@@ -134,7 +134,7 @@ const ROLE_STR_SERVER_AUTH: &[u8] = b"server-auth";
 /// `attachment_text_blob.rs`, `MYE1`, `protocol.md` § 9.15 + § 3.4).
 /// Load-bearing: drift silently changes the KEK. `root_key`-derived (like
 /// prefs/search/dictionary), so it is `itemsKey`-independent and survives a
-/// v005 epoch rotation. ONE KEK serves every attachment-text blob; per-blob
+/// later epoch rotation. ONE KEK serves every attachment-text blob; per-blob
 /// separation comes from the `attachment_id` AAD binding (§ 9.15.3), not a
 /// distinct subkey. DISTINCT from the AAD role string `"attachment-text-blob"`.
 const ROLE_STR_ATTACHMENT_TEXT_KEY: &[u8] = b"attachment-text-key";
@@ -167,7 +167,7 @@ const ROLE_STR_PREFS_SYNC_ID: &[u8] = b"prefs-sync-id";
 /// (MYND-453; encrypts the `vault.embeddings` on-device AI embedding index —
 /// `embeddings_blob.rs`, `MYR1`, `protocol.md` § 9.17 + § 3.4). Load-bearing:
 /// drift silently changes the KEK. `root_key`-derived (like prefs/search/
-/// indices), so it is `itemsKey`-independent and survives a v005 epoch
+/// indices), so it is `itemsKey`-independent and survives a later epoch
 /// rotation. Only ever derived with the default-off `local-inference` feature +
 /// `ai_enabled` on. DISTINCT from the AAD role string `"ai-embeddings-blob"`.
 const ROLE_STR_AI_EMBEDDINGS_KEY: &[u8] = b"ai-embeddings-key";
@@ -176,7 +176,7 @@ const ROLE_STR_AI_EMBEDDINGS_KEY: &[u8] = b"ai-embeddings-key";
 /// (MYND-486; encrypts the `vault.themes` custom-theme palette store —
 /// `themes_blob.rs`, `MYT1`, `protocol.md` § 9.21 + § 3.4). Load-bearing:
 /// drift silently changes the KEK. `root_key`-derived (like prefs/search/
-/// dictionary), so it is `itemsKey`-independent and survives a v005 epoch
+/// dictionary), so it is `itemsKey`-independent and survives a later epoch
 /// rotation. DISTINCT from the AAD role string `"custom-themes-blob"`.
 const ROLE_STR_CUSTOM_THEMES_KEY: &[u8] = b"custom-themes-key";
 
@@ -195,7 +195,7 @@ const ROLE_STR_THEMES_SYNC_ID: &[u8] = b"themes-sync-id";
 /// `vault.graph` on-device knowledge-graph layout cache — `graph_layout_blob.rs`,
 /// `MYG1`, `protocol.md` § 9.19). Load-bearing: drift silently changes the KEK.
 /// `root_key`-derived (like prefs/search/indices/embeddings), so it is
-/// `itemsKey`-independent and survives a v005 epoch rotation. A rebuildable
+/// `itemsKey`-independent and survives a later epoch rotation. A rebuildable
 /// cache — never synced, never backed up. DISTINCT from the AAD role string
 /// `"graph-layout-blob"`.
 const ROLE_STR_GRAPH_LAYOUT_KEY: &[u8] = b"graph-layout-key";
@@ -276,7 +276,7 @@ pub enum SubkeyRole {
     /// Q&A vectors + `{note_id → content_nonce}` manifest + the model-identity
     /// tuple) under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
     /// (like prefs/search/indices), so it is `itemsKey`-independent and survives
-    /// a v005 epoch rotation. Distinct from every other blob KEK so the families
+    /// a later epoch rotation. Distinct from every other blob KEK so the families
     /// stay domain-separated; only derived with the `local-inference` feature.
     AiEmbeddingsKey,
     /// Phase 2 sync blob-id derivation for the `vault.attachments` catalog
@@ -299,7 +299,7 @@ pub enum SubkeyRole {
     /// MYND-486). Encrypts the `{theme_name → palette_map}` custom-theme
     /// store under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
     /// (like prefs/search/dictionary), so it is `itemsKey`-independent and
-    /// survives a v005 epoch rotation. Distinct from every other
+    /// survives a later epoch rotation. Distinct from every other
     /// `root_key`-derived blob KEK so every blob family is cryptographically
     /// domain-separated; distinct from the AAD role `"custom-themes-blob"`.
     CustomThemesKey,
@@ -315,7 +315,7 @@ pub enum SubkeyRole {
     /// on-device knowledge-graph layout cache (node positions + a staleness
     /// marker) under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
     /// (like prefs/search/indices/embeddings), so it is `itemsKey`-independent and
-    /// survives a v005 epoch rotation. A rebuildable cache — never synced, never
+    /// survives a later epoch rotation. A rebuildable cache — never synced, never
     /// backed up. Distinct from every other blob KEK so the families stay
     /// domain-separated.
     GraphLayoutKey,

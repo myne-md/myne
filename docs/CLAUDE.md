@@ -67,7 +67,9 @@ The order matters. Don't ship the marketing copy and "fix the threat model later
 
 ### `protocol.md` versioning
 
-v0.1 and v005 are **forward-incompatible by design**. No extension points, no algorithm-agility headers, no negotiation. Cross-major reads happen only via explicit user-initiated migration. If you find yourself wanting to add a feature flag or version negotiation: stop, you're walking back the major-version commitment. Add a new v005 spec instead.
+v0.1 and a later major version are **forward-incompatible by design**. No extension points, no algorithm-agility headers, no negotiation. Cross-major reads happen only via explicit user-initiated migration. If you find yourself wanting to add a feature flag or version negotiation: stop, you're walking back the major-version commitment. Add a new major-version spec instead.
+
+**Don't mint a codename for the next major.** In prose, features deferred to the next version read as **"later" / "a later version" / "the next major version"**; genuinely parked / speculative items read as **"icebox"** (matching the tracker's `roadmap: icebox` label). Do not invent a version string — the retired "v005" codename (`decisions.md` 2026-08-01) metastasized as a synonym for "deferred" and decorated nearly every forward-looking note. Name the next format only when it is actually being designed. The reserved magic bytes (§10.3) stay as nameless placeholders; the next major's AAD/HKDF prefixes are not pre-allocated.
 
 ### Cryptographically load-bearing identifiers
 

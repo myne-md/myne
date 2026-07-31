@@ -1,6 +1,6 @@
 # Myne Protocol Specification v0.1
 
-> **Status: draft.** Phase 1 cryptographic protocol for the Myne desktop client. Targets single-user, single-device, local-only usage. Sync server, multi-device, and sharing are explicitly out of scope for v0.1 — see §11. Forward-compatibility hooks for `appname-v005` aspirational features are documented in §10.
+> **Status: draft.** Phase 1 cryptographic protocol for the Myne desktop client. Targets single-user, single-device, local-only usage. Sync server, multi-device, and sharing are explicitly out of scope for v0.1 — see §11. Forward-compatibility hooks for a later major version's aspirational features are documented in §10.
 
 ---
 
@@ -15,7 +15,7 @@ This specification defines the **at-rest** encryption protocol for notes stored 
 - The format of an encrypted note blob on disk.
 - The BIP39 recovery-phrase derivation that wraps the root key.
 - The format of the user's account-number identifier (full details in `account-number.md`).
-- The protocol-version-byte commitment that anchors forward-compatibility for `appname-v005`.
+- The protocol-version-byte commitment that anchors forward-compatibility for a later major version.
 
 Out of scope (see §11):
 - Server-side authentication (`serverPassword` is derived in v0.1 but not transmitted).
@@ -23,9 +23,9 @@ Out of scope (see §11):
 - Multi-device device-key management (Phase 2+).
 - Inter-user sharing (Phase 4+).
 - Real-time collaborative editing (Phase 4+).
-- Post-quantum primitives (`appname-v005`).
-- Group key agreement (MLS) (`appname-v005`).
-- Key Transparency (`appname-v005`).
+- Post-quantum primitives (a later major version).
+- Group key agreement (MLS) (a later major version).
+- Key Transparency (a later major version).
 
 ### 1.2 Conventions
 
@@ -43,7 +43,7 @@ This specification is identified as **`myne-protocol-v0.1`**. The protocol versi
 
 ## 2. Cryptographic Primitives
 
-> **Conflict-points marked.** Five primitive choices below are flagged as `[DEFERRED]`: the v0.1 baseline is the prior decision in `../decisions.md`, but the user has marked these as subject to revision before v1.0 ship, with the `appname-v005` research as the alternative under consideration.
+> **Conflict-points marked.** Five primitive choices below are flagged as `[DEFERRED]`: the v0.1 baseline is the prior decision in `../decisions.md`, but the user has marked these as subject to revision before v1.0 ship, with the next major version's research as the alternative under consideration.
 
 | Role | v0.1 baseline | `[DEFERRED]` alternative under review |
 |---|---|---|
@@ -72,7 +72,7 @@ The five `[DEFERRED]` items above will be resolved in dedicated decision session
 
 ## 3. Key Hierarchy
 
-The hierarchy is structured to allow forward-compatible evolution toward `appname-v005` without breaking changes. The structural commitment is the **derive_key-with-context** pattern: every subkey is produced by `derive_key(root_key, context_string)` with a context string drawn from the registry in §3.4. New subkey roles can be added in later protocol versions by registering new context strings, with no change to the root-derivation step.
+The hierarchy is structured to allow forward-compatible evolution toward a later major version without breaking changes. The structural commitment is the **derive_key-with-context** pattern: every subkey is produced by `derive_key(root_key, context_string)` with a context string drawn from the registry in §3.4. New subkey roles can be added in later protocol versions by registering new context strings, with no change to the root-derivation step.
 
 ### 3.1 Root key generation and credential wrapping
 
@@ -80,7 +80,7 @@ The root key is the cryptographic core of the vault. It is **a 32-byte random va
 
 Two independent credentials can unlock the vault: the **master password** and the **24-word BIP-39 recovery phrase** (§7). Each credential derives a wrap key via Argon2id with its own salt; each wrap key encrypts an independent copy of the same `root_key`. Both encrypted copies live in `vault.meta` (§9.3). Either credential alone is sufficient to recover the root key. If both are lost, the data is permanently unrecoverable.
 
-This architecture also supports later credentials (e.g., a hardware-backed WebAuthn-PRF unlock in `appname-v005`) by adding a third encrypted copy of `root_key` under a third wrap key, with no change to the rest of the protocol.
+This architecture also supports later credentials (e.g., a hardware-backed WebAuthn-PRF unlock in a later major version) by adding a third encrypted copy of `root_key` under a third wrap key, with no change to the rest of the protocol.
 
 **Password path** (deriving `password_wrap_key` and the password-wrapped root key):
 
@@ -181,9 +181,9 @@ info = "myne.v0.1 " || role
 
 Where `role` is exactly the string from the registry (§3.4). The trailing space after `myne.v0.1` is part of the prefix. Both prefix and role are UTF-8 / ASCII; v0.1 uses ASCII-only role identifiers. Implementations MUST NOT add separators, length prefixes, or trailing null bytes — the `info` parameter is the literal concatenation above.
 
-#### 3.2.3 v005 forward-compatibility
+#### 3.2.3 Next-major forward-compatibility
 
-`appname-v005` will likely retain HKDF-SHA-256 because RFC 9420 MLS mandates it for the MLS key schedule; running two KDF primitives in one client doubles the audit surface for no benefit. v005 will register its own `"myne.v005 "` context prefix, so v0.1 and v005 subkey derivations cannot collide even when the same root key bytes appear.
+The next major version will likely retain HKDF-SHA-256 because RFC 9420 MLS mandates it for the MLS key schedule; running two KDF primitives in one client doubles the audit surface for no benefit. The next major version will register its own context prefix (defined by that version, not pre-allocated in v0.1), so v0.1 and next-major subkey derivations cannot collide even when the same root key bytes appear.
 
 ### 3.3 Three-level wrapping for notes
 
@@ -213,7 +213,7 @@ The three levels are:
 
 **Why three levels and not two:** when the user changes their master password, the new `root_key` produces a new `itemsKey_wrap_key`. The persistent `itemsKey` is decrypted with the old wrap key and re-encrypted under the new one — a single AEAD operation. None of the per-note `item_key` material is touched, and none of the note ciphertexts are re-encrypted. This is essential for vaults of non-trivial size.
 
-**Forward-compatibility for `appname-v005` epoch-key model.** The research roadmap (`protocol-v005-roadmap.md`, to be written) describes per-epoch `itemsKey` rotation that gives notes forward secrecy: each `EK_e` is derived for an epoch, used to wrap a generation of `item_key` material, then deleted on rotation, after which the corresponding ciphertexts become unrecoverable. To allow this evolution without a wire-format break, the v0.1 context-string registry (§3.4) reserves the prefix `"myne.v005 epoch-"` for future epoch-key derivations, and the per-note blob format (§9) carries an `itemsKey_id` field whose semantics extend cleanly from "the singleton v0.1 itemsKey" to "the v005 itemsKey for epoch e".
+**Forward-compatibility for a later major version's epoch-key model.** The research roadmap (`protocol-next-roadmap.md`, to be written) describes per-epoch `itemsKey` rotation that gives notes forward secrecy: each `EK_e` is derived for an epoch, used to wrap a generation of `item_key` material, then deleted on rotation, after which the corresponding ciphertexts become unrecoverable. To allow this evolution without a wire-format break, the v0.1 context-string registry (§3.4) reserves room for future epoch-key derivations (the concrete context prefix is defined by the next major version, not pre-allocated in v0.1), and the per-note blob format (§9) carries an `itemsKey_id` field whose semantics extend cleanly from "the singleton v0.1 itemsKey" to "the later itemsKey for epoch e".
 
 In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The reservation is purely structural.
 
@@ -226,7 +226,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 backup-key"` | Sealed-backup derivation root — **reserved, not used** | **Not used in v0.1** (demoted 2026-06-10; previously "active when user exports a backup"). The v0.1 backup format (§9.11) is a verbatim ciphertext copy with no outer encryption layer: a `root_key`-derived seal would be circular for fresh-machine restore (the credential wraps live inside the backup's own `vault.meta`) and would forbid exporting while locked. The row is retained, like `server-auth`, so the context string stays allocated; a future sealed-backup variant would activate it. See `decisions.md` 2026-06-10. |
 | `"myne.v0.1 prefs-key"` | KEK for `vault.prefs` blob (§9.5) | Active when `vault.prefs` is written. |
 | `"myne.v0.1 search-index-key"` | KEK for `vault.search` blob (§9.6) | Active when `vault.search` is written (MYND-29). |
-| `"myne.v0.1 session-state-key"` | KEK for the `vault.workspace` blob (§9.7, `MYW1`) | Active when `vault.workspace` is written (MYND-166). `root_key`-derived (itemsKey-independent), like prefs/search — so a saved pane layout survives the v005 epoch-rotation `itemsKey` evolution. Unchanged across the `0x01 → 0x02` inner-schema bump for named workspaces (§9.7.2); distinct from the AAD role string `"workspace-blob"` (§9.7.3). |
+| `"myne.v0.1 session-state-key"` | KEK for the `vault.workspace` blob (§9.7, `MYW1`) | Active when `vault.workspace` is written (MYND-166). `root_key`-derived (itemsKey-independent), like prefs/search — so a saved pane layout survives a later epoch-rotation `itemsKey` evolution. Unchanged across the `0x01 → 0x02` inner-schema bump for named workspaces (§9.7.2); distinct from the AAD role string `"workspace-blob"` (§9.7.3). |
 | `"myne.v0.1 vault-indices-key"` | KEK for `vault.indices` blob (§9.8) | Active when `vault.indices` is written (MYND-271; design MYND-31). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
 | `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
 | `"myne.v0.1 attachments-id-hmac"` | HMAC-SHA-256 key for content-addressed attachment-id derivation (§9.9) | Active when an attachment is imported. Keys the id over file plaintext; not a blob KEK. |
@@ -237,11 +237,11 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 vault-head-mac"` | HMAC-SHA-256 key for the sync **vault head** fork-consistency MAC (§9.16; full primitive in `sync-protocol.md`) — **placeholder, Phase 2** | Derived locally; **not used in Phase 1** (no sync server exists), exactly like `server-auth`. Keys the monotonic, git-like hash-DAG vault head that hardens multi-device sync against a malicious server (rollback / withholding / equivocation; TB5). The context string is **allocated now** so it stays stable and **activates when Phase 2 sync ships**. The device-local last-seen baseline (`vault.head-state`, `MYH1`, §9.16) re-verifies the head's own MAC under this **same** key — no second context. **HMAC-not-signature** is deliberate: single-user → all devices share `root_key` → a symmetric MAC suffices and stays in the closed RustCrypto primitive set (no Ed25519, no new dependency; `head_mac_key = DeriveSubkey(root_key, "vault-head-mac")`, used like `attachments-id-hmac`). See `sync-protocol.md` (MYND-416). |
 | `"myne.v0.1 catalog-sync-id"` | Reserved sync blob-id for the `vault.attachments` catalog (Phase 2 sync; `sync-protocol.md` §8.1) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls the catalog (MYND-468). The catalog is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `catalog_sync_id = DeriveSubkey(root_key, "catalog-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (it is keyed pseudorandom bytes, not a recognizable sentinel). Like `attachments-id-hmac`, this derives an *identifier*, not key material — the catalog's KEK remains `attachments-catalog-key`. |
 | `"myne.v0.1 prefs-sync-id"` | Reserved sync blob-id for `vault.prefs` (Phase 2 sync; `sync-protocol.md` §10.2.1) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.prefs` (MYND-478). Like the attachments catalog, `vault.prefs` is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `prefs_sync_id = DeriveSubkey(root_key, "prefs-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (keyed pseudorandom bytes, not a recognizable sentinel). Like `catalog-sync-id`, this derives an *identifier*, not key material — the prefs KEK remains `prefs-key`. |
-| `"myne.v0.1 custom-themes-key"` | KEK for the `vault.themes` blob (§9.21) | Active when `vault.themes` is written (MYND-486). `root_key`-derived (itemsKey-independent), like prefs/search/workspace/dictionary — so a custom-theme palette survives the v005 epoch-rotation `itemsKey` evolution. |
+| `"myne.v0.1 custom-themes-key"` | KEK for the `vault.themes` blob (§9.21) | Active when `vault.themes` is written (MYND-486). `root_key`-derived (itemsKey-independent), like prefs/search/workspace/dictionary — so a custom-theme palette survives a later epoch-rotation `itemsKey` evolution. |
 | `"myne.v0.1 themes-sync-id"` | Reserved sync blob-id for `vault.themes` (Phase 2 sync; `sync-protocol.md` §10.2.2) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.themes` (MYND-486). Like `vault.prefs` and the attachments catalog, `vault.themes` is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (keyed pseudorandom bytes, not a recognizable sentinel). Like `catalog-sync-id` / `prefs-sync-id`, this derives an *identifier*, not key material — the themes KEK remains `custom-themes-key`. |
-| (future v005 contexts) | reserved | not derived in v0.1. |
+| (future next-major contexts) | reserved | not derived in v0.1. |
 
-New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
+New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "`, and the next major version's context strings use its own prefix, which is not pre-allocated in v0.1.
 
 The **quick-unlock credential blob** (`vault.quickunlock`, §9.14) is deliberately **NOT** in this registry: its KEK is **not** a `DeriveSubkey(root_key, …)` subkey. Because the blob wraps `root_key` itself, a `root_key`-derived KEK would be circular; instead its wrap key is supplied by an external, hardware-bound provider (Apple Keychain biometric secret) or derived from a PIN (§9.14.2). The same holds for the two **device-local staging queues** — the pending-capture queue (`captures/<capture-id-hex>`, §9.18) and the share-import staging queue (`pending-shares/sealed/<share-id-hex>`, §9.20): both must be writable while the vault is locked and `root_key` is unavailable, so both are sealed under a device-local keychain/Keystore `wrap_key` rather than a registered subkey (§9.18.2, §9.20.2). What distinguishes these three is not merely the absence of a row — it is that their sealing key is supplied by an **external, device-bound provider** rather than derived from `root_key` at all. (Per-note blobs (§9.2) and attachment blobs (§9.9) have no row either, for an unrelated reason: their content keys descend from the registered `itemsKey-wrap` lineage rather than from a KEK of their own.) `vault.head-state` (§9.16) also has no row of its own, for a different reason — it is not AEAD-encrypted at all, and its integrity re-uses the registered `vault-head-mac` role. A family that *is* sealed under a `root_key`-derived KEK gets its row above in the same change that ships it.
 
@@ -389,7 +389,7 @@ AAD_ai_embeddings_blob =
 
 `AAD_wrap_items_key` is the AAD bound into the AEAD wrap of the singleton v0.1 `itemsKey` (`vault.meta` §9.3 offset 281). It is distinct from `AAD_wrap_item_key`, which binds the per-note `item_key` wrap and additionally carries the per-note UUID. The singleton `itemsKey` has no per-note UUID, so the AAD reduces accordingly.
 
-`AAD_prefs_blob` is the AAD bound into the AEAD wrap of `vault.prefs` (§9.5). The `"prefs-blob"` role string is length-prefixed UTF-8 (2-B big-endian length + 10 ASCII bytes); `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6) and binds the prefs blob to its specific vault. `items_key_id` is **not** bound — `vault.prefs` is independent of the `itemsKey` lineage because its KEK derives directly from `root_key` via `"myne.v0.1 prefs-key"` (§3.4), which preserves prefs portability across the v005 epoch-rotation `itemsKey` evolution.
+`AAD_prefs_blob` is the AAD bound into the AEAD wrap of `vault.prefs` (§9.5). The `"prefs-blob"` role string is length-prefixed UTF-8 (2-B big-endian length + 10 ASCII bytes); `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6) and binds the prefs blob to its specific vault. `items_key_id` is **not** bound — `vault.prefs` is independent of the `itemsKey` lineage because its KEK derives directly from `root_key` via `"myne.v0.1 prefs-key"` (§3.4), which preserves prefs portability across a later epoch-rotation `itemsKey` evolution.
 
 `AAD_search_index_blob` is the AAD bound into the AEAD wrap of `vault.search` (§9.6), the encrypted search-index blob. It mirrors `AAD_prefs_blob` exactly, with the role string `"search-index-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes) and the same 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the index blob to its specific vault. As with prefs, `items_key_id` is **not** bound: the search-index KEK derives directly from `root_key` via `"myne.v0.1 search-index-key"` (§3.4), independent of the `itemsKey` lineage.
 
@@ -407,7 +407,7 @@ AAD_ai_embeddings_blob =
 
 **Length-prefix encoding for variable-width AAD fields.** All length-prefixed UTF-8 fields in this section and in §3.1 — the `password-wrap` and `recovery-wrap` role strings in `AAD_password_wrap` / `AAD_recovery_wrap`, and the `content_type` field in `AAD_encrypt_content` — are encoded as a **2-byte big-endian unsigned length** followed by the UTF-8 bytes. This matches the binary-format convention elsewhere in this spec (§9.2 reads `enc_item_key_len` as 2 bytes big-endian).
 
-`content_type` in v0.1 is always `"text/markdown"`. The field is included so v005 can introduce attachments and other content types without breaking the AAD layout.
+`content_type` in v0.1 is always `"text/markdown"`. The field is included so a later version can introduce attachments and other content types without breaking the AAD layout.
 
 The `AAD_password_wrap` and `AAD_recovery_wrap` AADs (defined in §3.1) additionally carry the canonical KDF parameters block (§4.3), so any tampering with the stored Argon2id parameters invalidates the wrap.
 
@@ -517,10 +517,10 @@ Failure at step 3 means either the blob was tampered (any byte feeding the CTX c
 
 Because both AEAD operations bind their AAD per §5.2, a successful decrypt commits the encryptor to:
 
-- **Protocol version and AAD prefix.** A v005 client's `"myne.v005|"` AAD will not verify a v0.1 blob's `"myne.v0.1|"` AAD; cross-major substitution fails by construction (§10.5).
+- **Protocol version and AAD prefix.** A next-major-version client's own AAD prefix will not verify a v0.1 blob's `"myne.v0.1|"` AAD; cross-major substitution fails by construction (§10.5).
 - **itemsKey identity.** A `.myn` file from a different vault cannot be silently accepted: both AEAD AADs bind `items_key_id` and the §6.4 step-2 check additionally requires the id match the singleton recorded in `vault.meta`.
 - **Note identity.** Renaming a `.myn` file (changing the UUID in its filename) without re-encrypting fails verification — `note_uuid` is bound into both `AAD_wrap_item_key` and `AAD_encrypt_content`.
-- **Content type.** Future v005 attachment types cannot be substituted into a v0.1 blob: `content_type` is bound into `AAD_encrypt_content` and any mismatch fails the CTX commitment check.
+- **Content type.** Attachment types added in a later version cannot be substituted into a v0.1 blob: `content_type` is bound into `AAD_encrypt_content` and any mismatch fails the CTX commitment check.
 
 ### 6.6 Why two AEAD calls
 
@@ -626,7 +626,7 @@ This hash is stored in `vault.meta` (§9.3) and used as a salt component in both
 
 - Algorithmic details of Damm-32 (the 32×32 quasigroup table) → `account-number.md`.
 - Server-side anti-abuse for account-number creation (rate limiting, captchas) → out of scope for v0.1; relevant when sync server ships in Phase 2.
-- Anonymous-credential wrappers (KVAC, Privacy Pass) — `appname-v005` may layer these on top of the account number for sync-server entitlement; the account-number format itself does not change.
+- Anonymous-credential wrappers (KVAC, Privacy Pass) — a later major version may layer these on top of the account number for sync-server entitlement; the account-number format itself does not change.
 
 ## 9. On-Disk Storage Format
 
@@ -666,7 +666,7 @@ A Myne vault is a directory on the user's filesystem containing:
 - **The two device-local staging queues are not under the vault root either.** `captures/<capture-id-hex>` (§9.18) and `pending-shares/sealed/<share-id-hex>` (§9.20) live under the app data container, because both must be writable while no vault is unlocked — and, for the capture queue, before the target vault is even known.
 - File extension `.myn` (Myne Note) for per-note ciphertext blobs.
 - File extension `.meta` for vault-level metadata (the wrapped `itemsKey`, the random Argon2id salt, the protocol version, and the account number).
-- File names are the note's UUIDv7 string. UUIDs are not encrypted; they are random and reveal only "this is a note" plus a coarse creation-time bucket. (UUIDv7 chosen for natural sort order; the time component leaks a creation-time millisecond, which is accepted in v0.1; v005 may switch to UUIDv4 if even coarse leakage is unacceptable.)
+- File names are the note's UUIDv7 string. UUIDs are not encrypted; they are random and reveal only "this is a note" plus a coarse creation-time bucket. (UUIDv7 chosen for natural sort order; the time component leaks a creation-time millisecond, which is accepted in v0.1; a later version may switch to UUIDv4 if even coarse leakage is unacceptable.)
 - **Folders are virtual (MYND-144).** The `notes/` directory is **always flat** — folder hierarchy is **not** reflected on disk. A note's folder is a path string in its encrypted frontmatter (`folder:`, see [`markdown-dialect.md`](markdown-dialect.md) §3.6.1); the sidebar tree is reconstructed client-side after decryption. This keeps folder structure inside the AEAD-encrypted blob (`threat-model.md` **AS3**, Sensitive) — a filesystem adversary (A4/A7) sees only flat `<uuid>.myn` blobs, never folder names. Deliberately-created (empty) folders are carried in `vault.prefs` (§9.5.2 `deliberate_folders`), also encrypted. No on-disk-format change.
 - **Encrypted snapshots (MYND-96).** The `snapshots/` directory holds per-note version history. Each snapshot is a frozen `.myn`-format blob — the prior note plaintext re-sealed under the note's own `item_key` in the `MY01` envelope of §9.2 — so there is **no new magic byte and no §10.3 registry entry**. Files are flat (no per-note subdirectories, mirroring the `notes/` privacy posture) and named `<note-uuid>__<snapshot-uuidv7>.myn`; the snapshot's capture time is the trailing UUIDv7's time component and snapshots sort naturally. Capture is time-coalesced (≈ one per note per 5 min of active editing, plus on editor-close / vault-lock); retention is a bounded window (default ~7 days) with a safety backstop, pruned eagerly. Permanently deleting a note purges its snapshots, preserving cryptographic erase (a reused-`item_key` snapshot would otherwise be undecryptable orphan ciphertext). The metadata-leak posture is recorded in `threat-model.md` §7 and the decision in `decisions.md` 2026-06-08. No on-disk-format change to `.myn`, `vault.meta`, `vault.prefs`, or `vault.search`.
 
@@ -684,8 +684,8 @@ Offset  Size       Field                Description
                                         enc_item_key is wrapped. v0.1 uses a
                                         single itemsKey; this field is the
                                         UUIDv7 of that itemsKey, recorded in
-                                        vault.meta. v005 will use this field
-                                        to identify the epoch (§3.3).
+                                        vault.meta. A later version will use
+                                        this field to identify the epoch (§3.3).
 22      24 bytes   item_key_nonce       192-bit random nonce used to wrap
                                         item_key under itemsKey.
 46      2 bytes    enc_item_key_len     Length N of the wrapped item_key
@@ -753,8 +753,8 @@ Offset  Size       Field                       Description
                                                itemsKey_wrap_key, followed by
                                                the 32-byte CTX commitment tag.
 345     ...        future fields                Reserved for v0.1 revisions and
-                                                v005 (additional credential
-                                                wraps, epoch keys, etc.).
+                                                a later version (additional
+                                                credential wraps, epoch keys, etc.).
 ```
 
 The KDF parameter block at offset 22 is the canonical encoding referenced in §4.3 and bound into both wrap AADs (§3.1). Tampering with any parameter byte invalidates the AEAD tag on `enc_root_key_password` and `enc_root_key_recovery`.
@@ -770,7 +770,7 @@ The artefacts that leave the device under Phase-2 sync are exactly the **sync-ta
 - **Reserved bytes** — anchor for future flags without re-version.
 - **`items_key_id`, salt, nonces** — public by construction in any AEAD scheme; these are not secrets.
 - **`account_number_hash`** — required to derive the salt; revealing it gives an attacker the same precomputation difficulty as the user has, no easier.
-- **UUIDv7 file names** — note count and approximate creation times leak. v005 may switch to UUIDv4 if even this is unacceptable.
+- **UUIDv7 file names** — note count and approximate creation times leak. A later version may switch to UUIDv4 if even this is unacceptable.
 
 ### 9.5 Vault preferences blob (`vault.prefs`)
 
@@ -1062,7 +1062,7 @@ u16_be(14) || "workspace-blob"  16 bytes (length-prefixed role)
 account_number_hash            16 bytes  (vault identity, §9.3 offset 6)
 ```
 
-Total 43 bytes. `account_number_hash` (NOT `items_key_id`) binds vault identity — `session_state_key` derives directly from `root_key` via `"myne.v0.1 session-state-key"`, independent of the `items_key` lineage (so it survives v005 epoch rotation, same rationale as prefs/search).
+Total 43 bytes. `account_number_hash` (NOT `items_key_id`) binds vault identity — `session_state_key` derives directly from `root_key` via `"myne.v0.1 session-state-key"`, independent of the `items_key` lineage (so it survives a later epoch rotation, same rationale as prefs/search).
 
 #### 9.7.4 Write cadence, size cap, and fall-back semantic
 
@@ -1139,7 +1139,7 @@ AAD_vault_indices_blob =
   AAD_prefix || protocol_version (1 B) || "vault-indices-blob" || account_number_hash (16 B)
 ```
 
-`"vault-indices-blob"` is length-prefixed UTF-8 (2-B big-endian length + 18 ASCII bytes, total 20 bytes). `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6), binding the index blob to its specific vault. Total AAD length: `10 + 1 + 20 + 16 = 47 bytes`. As with `vault.prefs` / `vault.search` / `vault.workspace`, `items_key_id` is **not** bound — `vault_indices_key` derives directly from `root_key` via `"myne.v0.1 vault-indices-key"` (§3.4), independent of the `itemsKey` lineage (so it survives the v005 epoch-rotation `itemsKey` evolution, same rationale as prefs/search/workspace).
+`"vault-indices-blob"` is length-prefixed UTF-8 (2-B big-endian length + 18 ASCII bytes, total 20 bytes). `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6), binding the index blob to its specific vault. Total AAD length: `10 + 1 + 20 + 16 = 47 bytes`. As with `vault.prefs` / `vault.search` / `vault.workspace`, `items_key_id` is **not** bound — `vault_indices_key` derives directly from `root_key` via `"myne.v0.1 vault-indices-key"` (§3.4), independent of the `itemsKey` lineage (so it survives a later epoch-rotation `itemsKey` evolution, same rationale as prefs/search/workspace).
 
 #### 9.8.4 Staleness detection, incremental reconcile, and fall-to-rebuild
 
@@ -1171,7 +1171,7 @@ Offset  Size       Field                  Description
 5       1 byte     reserved               MUST be 0x00; non-zero rejects parse
 6       16 bytes   items_key_id           Identifier of the itemsKey under which
                                           enc_attachment_key is wrapped (UUIDv7,
-                                          recorded in vault.meta; v005 epoch id).
+                                          recorded in vault.meta; later epoch id).
 22      24 bytes   attachment_key_nonce   192-bit random nonce wrapping
                                           attachment_key under itemsKey.
 46      2 bytes    enc_attachment_key_len Length N of the wrapped attachment_key
@@ -1257,7 +1257,7 @@ Per-key the metadata fields are themselves emitted in canonical (lexicographic) 
 
 #### 9.10.3 AAD construction
 
-The AAD is `AAD_attachments_catalog` (§5.2), binding `account_number_hash` so the catalog is non-portable across vaults at the AEAD-verification layer, mirroring `AAD_prefs_blob`. `items_key_id` is **not** bound (the KEK derives directly from `root_key`, preserving portability across the v005 epoch-rotation `itemsKey` evolution).
+The AAD is `AAD_attachments_catalog` (§5.2), binding `account_number_hash` so the catalog is non-portable across vaults at the AEAD-verification layer, mirroring `AAD_prefs_blob`. `items_key_id` is **not** bound (the KEK derives directly from `root_key`, preserving portability across a later epoch-rotation `itemsKey` evolution).
 
 #### 9.10.4 Size cap and read semantics
 
@@ -1430,7 +1430,7 @@ satisfy `file_length == 22 + member_table_len + members_total_len`,
 `member_count` and `member_table_len` with implementation-defined ceilings sized to
 realistic vaults, bounding pre-hash allocation per the §9.5.4 discipline (the reference
 implementation pins `member_count` at 2²⁰ and the member table at 16 MiB). A v0.1 client
-MUST reject `MYB5` and any unregistered magic; a v005 client MUST refuse `MYB1` with an
+MUST reject `MYB5` and any unregistered magic; a next-major-version client MUST refuse `MYB1` with an
 explicit migration prompt (§10.4). No extension points, no negotiation (§10.1).
 
 ### 9.12 Transactional multi-note rename (the rename journal)
@@ -1568,7 +1568,7 @@ account_number_hash                       16 bytes  (vault identity, §9.3 offse
 Total 53 bytes. `account_number_hash` (NOT `items_key_id`) binds vault identity —
 `personal_dictionary_key` derives directly from `root_key` via
 `"myne.v0.1 personal-dictionary-key"`, independent of the `items_key` lineage (so it
-survives a v005 epoch rotation, same rationale as prefs/search/workspace). The subkey
+survives a later epoch rotation, same rationale as prefs/search/workspace). The subkey
 role string `"personal-dictionary-key"` is DISTINCT from the AAD role string
 `"personal-dictionary-blob"` — the same key/blob domain-separation as search.
 
@@ -1590,7 +1590,7 @@ words — it weakens no security guarantee — so it carries **no protective-env
 and inherits the documented best-effort local-prefs-replay limitation. Phase-2 sync
 conflict semantics are **union + add-wins** (AS6-safe, no wall-clock), like
 `deliberate_folders` (§9.5.2). A v0.1 client MUST reject `MYD5` and any unregistered
-magic; a v005 client MUST refuse `MYD1` (§10.4).
+magic; a next-major-version client MUST refuse `MYD1` (§10.4).
 
 ### 9.14 Quick-unlock credential blob (`vault.quickunlock`, `MYQ1`)
 
@@ -1719,8 +1719,8 @@ can satisfy the biometric prompt or read process memory — out of scope, `threa
 §5). For the PIN provider, a disk-copy attacker (**A4**) can attempt offline brute-force
 of the blob; the only defense is PIN entropy × the memory-hard Argon2id cost, so PIN-only
 quick-unlock is strictly weaker than the hardware-bound biometric path and is documented
-as such. A v0.1 client MUST reject `MYQ5` and any unregistered magic; a v005 client MUST
-refuse `MYQ1` (§10.4).
+as such. A v0.1 client MUST reject `MYQ5` and any unregistered magic; a next-major-version
+client MUST refuse `MYQ1` (§10.4).
 
 ### 9.15 Extracted-attachment-text blob (`attachments-text/<id>`, `MYE1`)
 
@@ -1881,7 +1881,7 @@ extractor_version                        1 byte   (binds the extractor generatio
 
 Total 82 bytes. `account_number_hash` (NOT `items_key_id`) binds vault identity —
 `attachment_text_key` derives directly from `root_key` via `"myne.v0.1
-attachment-text-key"`, independent of the `items_key` lineage (so it survives a v005
+attachment-text-key"`, independent of the `items_key` lineage (so it survives a later
 epoch rotation, same rationale as prefs/search/dictionary). The `attachment_id` binding
 is what makes one KEK safe across all attachment-text blobs: a blob sealed for attachment
 A fails AEAD verification if served as attachment B. Binding `extractor_version` in the
@@ -1926,7 +1926,7 @@ need for pre-existing attachments. When an attachment is permanently deleted /
 garbage-collected, its `attachments-text/<id>` blob is deleted alongside the `MYA1` blob
 and the `MYC1` catalog entry, preserving cryptographic-erase semantics (§9.9).
 
-A v0.1 client MUST reject `MYE5` and any unregistered magic; a v005 client MUST refuse
+A v0.1 client MUST reject `MYE5` and any unregistered magic; a next-major-version client MUST refuse
 `MYE1` (§10.4).
 
 ### 9.16 Device-local sync baseline (`vault.head-state`, `MYH1`)
@@ -1945,7 +1945,7 @@ offset  size       field                  description
 
 Only the **TIP** is stored — a single head record, not the chain (ancestors, when needed for a merge, are pulled and verified lazily, `sync-protocol.md` §5.4). The write cadence is **every accepted-pull and every authored-push** (after a push the device's own head becomes its new baseline; otherwise the file would lag).
 
-**Integrity, and the honest limit.** `vault.head-state` is **not** AEAD-encrypted under a KEK and carries **no §3.4 row**: its bytes are exactly the head the sync server already relays (hashes + version-vector metadata, no vault plaintext), so at-rest confidentiality would add nothing the server does not already see. Integrity against a **non-`root_key`** attacker (corruption, a tamperer without the key) is the head's **own** HMAC: on load the client recomputes `HMAC-SHA-256(DeriveSubkey(root_key, "vault-head-mac"), head_mac_input)` and MUST reject a mismatch — this re-uses the head's MAC under the same key (no new context string). What this does **not** provide is **freshness of the baseline itself**: an attacker who can both write the local disk **and** collude with a malicious server could swap the file for an *older but genuine* head (which passes its own HMAC) to make the device accept a server rollback. This is a **conjunction** beyond a pure malicious server (A1) — it requires local-disk-write (A4/A7) too — has bounded impact (stale **own** data, never forged or decrypted), and is narrowed further because the in-session baseline is monotone in RAM (`sync-protocol.md` §5.1). It is **accepted for v0.1 and documented** (`threat-model.md` §7); a hardware monotonic counter (TPM / Secure Enclave) that would close it is deferred to v005. A v0.1 client MUST reject `MYH5` and any unregistered magic; a v005 client MUST refuse `MYH1` (§10.4).
+**Integrity, and the honest limit.** `vault.head-state` is **not** AEAD-encrypted under a KEK and carries **no §3.4 row**: its bytes are exactly the head the sync server already relays (hashes + version-vector metadata, no vault plaintext), so at-rest confidentiality would add nothing the server does not already see. Integrity against a **non-`root_key`** attacker (corruption, a tamperer without the key) is the head's **own** HMAC: on load the client recomputes `HMAC-SHA-256(DeriveSubkey(root_key, "vault-head-mac"), head_mac_input)` and MUST reject a mismatch — this re-uses the head's MAC under the same key (no new context string). What this does **not** provide is **freshness of the baseline itself**: an attacker who can both write the local disk **and** collude with a malicious server could swap the file for an *older but genuine* head (which passes its own HMAC) to make the device accept a server rollback. This is a **conjunction** beyond a pure malicious server (A1) — it requires local-disk-write (A4/A7) too — has bounded impact (stale **own** data, never forged or decrypted), and is narrowed further because the in-session baseline is monotone in RAM (`sync-protocol.md` §5.1). It is **accepted for v0.1 and documented** (`threat-model.md` §7); a hardware monotonic counter (TPM / Secure Enclave) that would close it is iceboxed. A v0.1 client MUST reject `MYH5` and any unregistered magic; a next-major-version client MUST refuse `MYH1` (§10.4).
 
 ### 9.17 AI embeddings blob (`vault.embeddings`, `MYR1`)
 
@@ -2011,7 +2011,7 @@ AAD_ai_embeddings_blob =
   AAD_prefix || protocol_version (1 B) || "ai-embeddings-blob" || account_number_hash (16 B)
 ```
 
-`"ai-embeddings-blob"` is length-prefixed UTF-8 per §5.2's discipline (2-B big-endian length + 18 ASCII bytes, total 20 bytes). `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6), binding the embeddings blob to its specific vault. Total AAD length: `10 + 1 + 20 + 16 = 47 bytes`. As with `vault.prefs` / `vault.search` / `vault.indices`, `items_key_id` is **not** bound — `ai_embeddings_key` derives directly from `root_key` via `"myne.v0.1 ai-embeddings-key"` (§3.4), independent of the `itemsKey` lineage (so it survives the v005 epoch-rotation `itemsKey` evolution). The model-identity tuple is deliberately **not** part of the AAD (§9.17.2): model-swap invalidation is handled inside the engine-opaque payload, following the `vault.search` `extractor_version` precedent, keeping the AAD shape identical to every sibling blob.
+`"ai-embeddings-blob"` is length-prefixed UTF-8 per §5.2's discipline (2-B big-endian length + 18 ASCII bytes, total 20 bytes). `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6), binding the embeddings blob to its specific vault. Total AAD length: `10 + 1 + 20 + 16 = 47 bytes`. As with `vault.prefs` / `vault.search` / `vault.indices`, `items_key_id` is **not** bound — `ai_embeddings_key` derives directly from `root_key` via `"myne.v0.1 ai-embeddings-key"` (§3.4), independent of the `itemsKey` lineage (so it survives a later epoch-rotation `itemsKey` evolution). The model-identity tuple is deliberately **not** part of the AAD (§9.17.2): model-swap invalidation is handled inside the engine-opaque payload, following the `vault.search` `extractor_version` precedent, keeping the AAD shape identical to every sibling blob.
 
 #### 9.17.4 Staleness detection, incremental reconcile, and fall-to-rebuild
 
@@ -2100,7 +2100,7 @@ The plaintext is a client-serialized position map + a schema version; the codec 
 
 #### 9.19.3 AAD construction
 
-`AAD_graph_layout_blob` mirrors `AAD_workspace_blob` exactly, with the role string `"graph-layout-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes, total 19 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6). Total AAD length: `10 + 1 + 19 + 16 = 46 bytes`. As with prefs/search/workspace, `items_key_id` is **not** bound — `graph_layout_key` derives directly from `root_key` via `"myne.v0.1 graph-layout-key"` (§3.4), independent of the `itemsKey` lineage (so it survives a v005 epoch rotation).
+`AAD_graph_layout_blob` mirrors `AAD_workspace_blob` exactly, with the role string `"graph-layout-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes, total 19 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6). Total AAD length: `10 + 1 + 19 + 16 = 46 bytes`. As with prefs/search/workspace, `items_key_id` is **not** bound — `graph_layout_key` derives directly from `root_key` via `"myne.v0.1 graph-layout-key"` (§3.4), independent of the `itemsKey` lineage (so it survives a later epoch rotation).
 
 #### 9.19.4 Staleness + rebuild + residency
 
@@ -2218,13 +2218,13 @@ it is the app rendering in the default theme. This is the same class as `vault.d
 
 ### 10.1 Design principle: forward-incompatible by design
 
-> Myne protocol versions are **forward-incompatible by design**. Each major version (v0.1, v005, v006, …) is a complete, self-contained specification with distinct magic bytes, AAD domain prefix, and key-derivation contexts. Forward compatibility *within* a major version is permitted (v0.1.1 reads v0.1.0 blobs); cross-major compatibility is exclusively achieved through explicit migration. A vault encrypted under one major version cannot be opened by a client of another major version without invoking the migration procedure (§10.4). This design choice eliminates downgrade attacks by construction and permits each major version to be audited as a closed system.
+> Myne protocol versions are **forward-incompatible by design**. Each major version (v0.1, v006, …) is a complete, self-contained specification with distinct magic bytes, AAD domain prefix, and key-derivation contexts. Forward compatibility *within* a major version is permitted (v0.1.1 reads v0.1.0 blobs); cross-major compatibility is exclusively achieved through explicit migration. A vault encrypted under one major version cannot be opened by a client of another major version without invoking the migration procedure (§10.4). This design choice eliminates downgrade attacks by construction and permits each major version to be audited as a closed system.
 
 This commitment is normative. Implementations MUST refuse to parse blobs that do not match their declared major version, and MUST present a migration prompt rather than attempt automatic cross-version reads.
 
 ### 10.2 Versioning conventions
 
-- **Major versions** are identified by distinct magic bytes (`MY01`, `MYV1` for v0.1; `NT05`, `NTV5` for the future v005; etc.). They have distinct AAD prefixes (`"myne.v0.1|"`, `"myne.v005|"`) and distinct subkey context-string prefixes (`"myne.v0.1 …"`, `"myne.v005 …"`).
+- **Major versions** are identified by distinct magic bytes (`MY01`, `MYV1` for v0.1; `NT05`, `NTV5` reserved for the next major version; etc.). They have distinct AAD prefixes and distinct subkey context-string prefixes — v0.1 uses `"myne.v0.1|"` and `"myne.v0.1 …"`; the next major version defines its own, which are not pre-allocated in v0.1.
 - **Minor versions** within a major version (v0.1.0, v0.1.1, …) share magic bytes and prefixes. They MAY add fields by appending after the last reserved offset, MUST NOT change existing fields, and MUST NOT reduce any existing security guarantee. The `protocol_version` byte (currently `0x01` for v0.1) is the single integer governing minor-version compatibility within v0.1; minor revisions encode minor-version information in the reserved byte at offset 5 of the per-note and `vault.meta` headers.
 - **Patch revisions** (v0.1.1.1, …) are reserved for editorial fixes that do not change byte layout or semantics; they do not bump any byte in the file.
 
@@ -2235,11 +2235,11 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Major version | AAD prefix | Context prefix | Status |
 |---|---|---|---|
 | v0.1 | `"myne.v0.1|"` | `"myne.v0.1 …"` | This document. Active. |
-| v005 | `"myne.v005|"` | `"myne.v005 …"` | Reserved. See `protocol-v005-roadmap.md` (TBD). |
+| next major (reserved) | (defined by the next major version) | (defined by the next major version) | Reserved — its own AAD prefix and HKDF context prefix are not pre-allocated in v0.1. See `protocol-next-roadmap.md` (TBD). |
 
 **Magic-byte allocation (normative).** Each blob family has a distinct 4-byte magic. Implementations MUST reject any magic not in this table. This table is the single source of truth for magic-byte allocation — a new blob family MUST claim a free magic here before it is implemented (this discipline exists because the attachments index initially mis-claimed the already-reserved `MYI1`; see `decisions.md` 2026-06-07).
 
-| Blob / file | v0.1 magic | v005 (reserved) | Section | Owner |
+| Blob / file | v0.1 magic | next major (reserved) | Section | Owner |
 |---|---|---|---|---|
 | Per-note (`.myn`) | `MY01` | `NT05` | §9.2 | core |
 | Vault metadata (`vault.meta`) | `MYV1` | `NTV5` | §9.3 | core |
@@ -2260,47 +2260,49 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Share-import staging queue (`pending-shares/<id>`) | `MYF1` | `MYF5` | §9.20 | MYND-507 |
 | Custom-themes blob (`vault.themes`) | `MYT1` | `MYT5` | §9.21 | MYND-486 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` v005 convention. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` next-major reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` next-major convention. These reserved magic values are placeholders — the next major version finalizes them. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
 
 ### 10.4 Migration procedure (cross-major)
 
-Migration is **always explicit, always one-way, always client-side**. There is no implicit upgrade. The procedure for a v005 client encountering a v0.1 vault:
+Migration is **always explicit, always one-way, always client-side**. There is no implicit upgrade. The procedure for a next-major-version client encountering a v0.1 vault:
 
 ```
-1. Detect:        Read magic bytes of vault.meta. If "MYV1", and the client is v005:
-                  refuse to operate on the vault; surface a Migration prompt.
+1. Detect:        Read magic bytes of vault.meta. If "MYV1", and the client is
+                  the next major version: refuse to operate on the vault; surface
+                  a Migration prompt.
 2. Confirm:       User explicitly approves migration. Display: "Migrating from
-                  protocol v0.1 to v005. Recommended only after backup. Continue?"
+                  protocol v0.1 to the next major version. Recommended only after
+                  backup. Continue?"
 3. Authenticate:  User enters master password (or recovery phrase). The v0.1
                   unlock procedure runs end-to-end and yields the v0.1 root_key
                   in client memory.
-4. Re-derive:     A new v005 root_key is generated (random 32 bytes). v005's
-                  key hierarchy is built from the new root_key per the v005
-                  spec, using the user's existing password as input to v005's
-                  KDF (which may differ from v0.1's Argon2id parameters).
+4. Re-derive:     A new next-major root_key is generated (random 32 bytes). The
+                  next-major key hierarchy is built from the new root_key per the
+                  next-major spec, using the user's existing password as input to
+                  the next-major KDF (which may differ from v0.1's Argon2id params).
 5. Re-encrypt:    Each .myn file is decrypted under v0.1 keys and re-encrypted
-                  under v005 keys with v005 magic bytes. The v005 client MAY
-                  perform this lazily (per-note on first access) or eagerly
-                  (bulk migration), at the user's choice.
-6. Replace:       vault.meta is rewritten with v005 magic bytes and v005 layout,
+                  under next-major keys with next-major magic bytes. The next-major
+                  client MAY perform this lazily (per-note on first access) or
+                  eagerly (bulk migration), at the user's choice.
+6. Replace:       vault.meta is rewritten with next-major magic bytes and layout,
                   containing the new root_key wrapped under both new credentials.
                   The old vault.meta and any unmigrated .myn files MAY be retained
                   as a `legacy/` snapshot until the user confirms migration is
                   complete, then deleted with cryptographic erase semantics.
 7. Settle:        Migration is complete only when every .myn file has been
-                  re-encrypted under v005 keys. Until then, the vault is in a
+                  re-encrypted under next-major keys. Until then, the vault is in a
                   mixed state and the client MUST clearly indicate this.
 ```
 
-The migration tool is itself part of the v005 client — there is no separate "migrator" binary. v0.1 clients never produce v005 output.
+The migration tool is itself part of the next-major-version client — there is no separate "migrator" binary. v0.1 clients never produce next-major output.
 
 ### 10.5 Anti-downgrade properties
 
 Forward-incompatibility produces three structural anti-downgrade properties:
 
-1. **Magic-byte separation**: a v005 client refuses to parse `MY01` blobs except via the migration flow; a v0.1 client refuses to parse `NT05` blobs at all. There is no protocol path that silently accepts the older format.
-2. **AAD domain separation**: the AAD prefix `"myne.v0.1|"` is bound into every AEAD tag in v0.1. A v005 attacker who tries to forge a `NT05` blob with a `myne.v0.1` AAD fails AEAD verification; a v0.1 vault opened in a v005 client (during migration) carries its `myne.v0.1` AAD through to verification — the v005 client must use the v0.1 AAD format to succeed.
-3. **Context-string separation**: subkey derivations under `"myne.v0.1 …"` produce different bytes than `"myne.v005 …"` even when the same root key, primitive, and parameters are used. Cross-version key substitution is computationally infeasible.
+1. **Magic-byte separation**: a next-major-version client refuses to parse `MY01` blobs except via the migration flow; a v0.1 client refuses to parse `NT05` blobs at all. There is no protocol path that silently accepts the older format.
+2. **AAD domain separation**: the AAD prefix `"myne.v0.1|"` is bound into every AEAD tag in v0.1. A next-major-version attacker who tries to forge a `NT05` blob with a `myne.v0.1` AAD fails AEAD verification; a v0.1 vault opened in a next-major-version client (during migration) carries its `myne.v0.1` AAD through to verification — the next-major-version client must use the v0.1 AAD format to succeed.
+3. **Context-string separation**: subkey derivations under `"myne.v0.1 …"` produce different bytes than derivations under the next major version's context prefix even when the same root key, primitive, and parameters are used. Cross-version key substitution is computationally infeasible.
 
 The `protocol_version` byte is included in the AAD (§5.2) for additional defense-in-depth: even within the v0.1 family, downgrade from a future minor version (v0.1.1) to v0.1.0 by stripping a feature flag would fail AEAD verification.
 
@@ -2310,7 +2312,7 @@ To keep v0.1 a clean, auditable closed system, the following extension points ar
 
 - No capability bitfield, no feature negotiation byte, no "extension" frames. Adding capabilities later is a major-version event.
 - No algorithm-agility headers. KDF, AEAD, and primitive choices are fixed by version. Migrating algorithms means migrating major version.
-- No reserved expansion fields beyond the per-record reserved byte at offset 5. v005 is a new spec, not a v0.1 extension.
+- No reserved expansion fields beyond the per-record reserved byte at offset 5. The next major version is a new spec, not a v0.1 extension.
 
 This stance directly contradicts the "additive" approach common in older protocols (TLS 1.0–1.2, OpenPGP). The lessons from those protocols' downgrade-attack history (POODLE, FREAK, Logjam, MEGA 2022) inform this design choice.
 
@@ -2330,7 +2332,7 @@ The Phase 1 protocol derives a `server-auth` subkey (§3.4) from the user's `roo
 - Self-host operator feedback. OPAQUE adds operator-side complexity. If the Phase 1 user base shows strong self-host intent, this raises the bar for Option B.
 - Threat model evolution. If new evidence of partition-style or precomputation attacks against simple verifiers emerges between Phase 1 and Phase 2 ship, this raises the bar for Option A.
 
-**v005 commitment.** The `appname-v005` roadmap canonicalizes Option B (OPAQUE). Option A in Phase 2 is therefore at most a transitional choice; v005 migration would convert any Option-A vaults to OPAQUE.
+**Next-major commitment.** The next major version's roadmap canonicalizes Option B (OPAQUE). Option A in Phase 2 is therefore at most a transitional choice; the next major version's migration would convert any Option-A vaults to OPAQUE.
 
 This deferral is itself a protocol commitment: implementations MUST NOT assume a Phase-2 server-auth decision in v0.1 code. The `server-auth` subkey is opaque material with no defined wire-level use until Phase 2.
 
@@ -2343,15 +2345,15 @@ Items deliberately not addressed by this specification. Each entry names where i
 | Server-side authentication protocol (`serverPassword` is derived but not transmitted in v0.1) | Phase 2; mechanism deferred per §11.1 (MYND-420); server surface in `server-protocol.md` |
 | Sync wire format, conflict resolution, version vectors | Phase 2; `sync-protocol.md` §8–§11 (fork-consistency vault head §1–§7) |
 | Cross-device synchronization of `vault.prefs` (carried alongside `vault.meta` + `notes/*.myn` as the v0.1 vault-artifact trio) | Phase 2; `sync-protocol.md` §9 (taxonomy) + §10 (conflict merge) |
-| Multi-device coordination, device key management | Phase 2+; `appname-v005` adopts MLS; `protocol-v005-roadmap.md` (TBD) |
-| Inter-user note sharing, prekey bundles, per-recipient wrapping | Phase 4+; `protocol-v005-roadmap.md` (TBD) |
-| Real-time collaborative editing, CRDT integration | Phase 4+; `protocol-v005-roadmap.md` (TBD) |
-| Post-quantum primitives (ML-KEM-768 hybrid wrap, ML-DSA signatures) | `appname-v005` |
-| Group key agreement (MLS, RFC 9420) | `appname-v005` |
-| Key Transparency (CONIKS / Trillian-based identity log) | `appname-v005` |
-| OPAQUE aPAKE for server authentication | `appname-v005` |
-| OHTTP relay/gateway transport, traffic-analysis defense | `appname-v005` |
-| Anonymous credentials (KVAC, Privacy Pass) for sync entitlement | `appname-v005` |
+| Multi-device coordination, device key management | Phase 2+; the next major version adopts MLS; `protocol-next-roadmap.md` (TBD) |
+| Inter-user note sharing, prekey bundles, per-recipient wrapping | Phase 4+; `protocol-next-roadmap.md` (TBD) |
+| Real-time collaborative editing, CRDT integration | Phase 4+; `protocol-next-roadmap.md` (TBD) |
+| Post-quantum primitives (ML-KEM-768 hybrid wrap, ML-DSA signatures) | a later major version |
+| Group key agreement (MLS, RFC 9420) | a later major version |
+| Key Transparency (CONIKS / Trillian-based identity log) | a later major version |
+| OPAQUE aPAKE for server authentication | a later major version |
+| OHTTP relay/gateway transport, traffic-analysis defense | a later major version |
+| Anonymous credentials (KVAC, Privacy Pass) for sync entitlement | a later major version |
 | Plugin sandboxing, capability-scoped plugin API | Possibly never; `../vision.md` §what-myne-is-not |
 | Single-shot attachment encryption (images/SVG/PDF, ≤64 MiB) | **Ships in v0.1** — `MYA1` blob (§9.9) + `MYC1` catalog (§9.10) |
 | Chunked/streamed attachment AEAD, Merkle manifests, **large (>64 MiB) media requiring chunking/streaming** (long video/audio) | Phase 1.5 or later; future spec extension (new magic + migration, not a `MYA1` extension). Single-shot audio ≤64 MiB already ships as a `MYA1` blob (row above), and on-device speech-to-text (§9.15, MYND-270) transcribes it; only media beyond the single-shot cap is deferred here. |
@@ -2359,11 +2361,11 @@ Items deliberately not addressed by this specification. Each entry names where i
 | Bidirectional links, graph view rendering | Out of scope for the cryptographic protocol; client UI concern |
 | Mobile Argon2id parameter profile | Phase 3 mobile; this spec's baseline targets desktop-class memory. Deferred, and still open. |
 | WASM Argon2id parameter profile | **Not deferred — there is none.** The Phase 3 web client runs the v0.1 parameters **unchanged**: they are AAD-bound and read from `vault.meta` (§4.2), so a browser cannot lower them without producing a vault no other client can open. Measured browser cost is in §4.1. A client that refuses to derive because the running browser cannot afford 256 MiB is a **client behaviour**, not a parameter profile. |
-| Metadata padding (PURB, Padmé) | `appname-v005` |
-| Plausibly-deniable encryption, decoy passwords, duress codes | `appname-v005` and beyond |
-| Hardware-backed unlock (WebAuthn-PRF, SE/TPM device key) | `appname-v005` |
+| Metadata padding (PURB, Padmé) | a later major version |
+| Plausibly-deniable encryption, decoy passwords, duress codes | Icebox (a later version and beyond) |
+| Hardware-backed unlock (WebAuthn-PRF, SE/TPM device key) | a later major version |
 
-This is not a deferral wishlist. Each item is either out of scope for the v0.1 cryptographic core or out of scope for the protocol entirely (UI, indexing, etc.). Items that are deferred to `appname-v005` are documented in the research roadmap, which also captures the user's reasoning for keeping each one out of v0.1.
+This is not a deferral wishlist. Each item is either out of scope for the v0.1 cryptographic core or out of scope for the protocol entirely (UI, indexing, etc.). Items that are deferred to a later major version are documented in the research roadmap, which also captures the user's reasoning for keeping each one out of v0.1.
 
 The matching threat-model section (`../threat-model.md` §5 "NOT Protected Against") names what user-facing failure modes v0.1 does and does not defend against. This protocol spec is the architectural counterpart of that document.
 
@@ -2373,10 +2375,10 @@ A snapshot of choices made during the v0.1 draft. Mirrored to `../decisions.md`.
 
 **Resolved (v0.1)**
 
-- **Doc strategy is Option C**: ship `protocol.md` v0.1 (this document) alongside a separate `protocol-v005-roadmap.md` (to be authored from the user's research). v0.1 is the implementation target; v005 is the long-term aspirational reference.
+- **Doc strategy is Option C**: ship `protocol.md` v0.1 (this document) alongside a separate `protocol-next-roadmap.md` (to be authored from the user's research). v0.1 is the implementation target; the next major version is the long-term aspirational reference.
 - **Subkey derivation pattern: `derive_key(root_key, context_string)` with context strings drawn from a registered table (§3.4)**. Adding a new subkey role in a minor revision does not require a protocol bump. Concrete primitive (HKDF-SHA-256 vs BLAKE3 derive_key) is `[DEFERRED]`.
 - **Three-level note wrapping**: `itemsKey_wrap_key → itemsKey → item_key → plaintext`. Password rotation re-wraps a single 32-byte itemsKey; no per-note re-encryption.
-- **Forward-compat reservation for v005 epoch keys**: the context-string registry reserves the prefix `"myne.v005 epoch-"`; the `items_key_id` field in v0.1 is structurally compatible with v005's epoch identifier. No epoch rotation in v0.1.
+- **Forward-compat reservation for later epoch keys**: the context-string registry reserves room for a later version's epoch-key derivations (the concrete context prefix is defined by the next major version, not pre-allocated in v0.1); the `items_key_id` field in v0.1 is structurally compatible with a later version's epoch identifier. No epoch rotation in v0.1.
 - **On-disk binary format with magic bytes**: per-note `MY01` (`.myn`), vault metadata `MYV1` (`vault.meta`). Big-endian integers, fixed offsets, no JSON envelope.
 - **AAD construction with explicit version prefix `"myne.v0.1|"`** (TLS 1.3 §4.1.3 model). AAD includes `protocol_version`, `items_key_id`, `note_uuid`, and (for content) `content_type`. Cross-version substitution and downgrade attempts fail AEAD verification.
 - **Architectural shift: `root_key` is a 32-byte random persistent value**, not derived from the password. Password derives `password_wrap_key` via Argon2id; that wraps a copy of `root_key`. Recovery phrase derives `recovery_wrap_key` via Argon2id; that wraps a second copy of `root_key`. Either credential is sufficient to unlock; both can be rotated independently.
@@ -2388,21 +2390,21 @@ A snapshot of choices made during the v0.1 draft. Mirrored to `../decisions.md`.
 **Resolved (post-draft)**
 
 - **Argon2id parameters: middle-ground `m=256 MiB, t=3, p=2`, Argon2 1.3** (resolved 2026-04-26). Stored in `vault.meta` rather than hardcoded; bound into both wrap AADs to defeat parameter-downgrade tampering.
-- **Subkey derivation: HKDF-SHA-256 with single canonical helper** (resolved 2026-04-26). libsodium-native, MLS-aligned for v005, audit history mature. The helper-only access pattern (§3.2.1) collapses BLAKE3's "structural context binding" advantage into a codebase-level discipline at no cost.
+- **Subkey derivation: HKDF-SHA-256 with single canonical helper** (resolved 2026-04-26). libsodium-native, MLS-aligned for the next major version, audit history mature. The helper-only access pattern (§3.2.1) collapses BLAKE3's "structural context binding" advantage into a codebase-level discipline at no cost.
 - **AEAD wrapper: XChaCha20-Poly1305 + CTX commitment with SHA-256 outer hash** (resolved 2026-04-26). Defends against partitioning-oracle attacks (Len–Grubbs–Ristenpart, USENIX 2021). Tag fields grow from 16 to 32 bytes on disk. Canonical encoding `K[32] || N[24] || len(AD)[4 BE] || AD || T[16]` eliminates concatenation ambiguity (Chan & Rogaway 2022).
-- **Server-auth deliberately deferred to Phase 2 with intent declaration** (resolved 2026-04-26). v0.1 derives but does not use the `server-auth` subkey. Phase 2 will choose between Option A (simple verifier) and Option B (OPAQUE aPAKE) using criteria documented in §11.1. v005 canonicalizes OPAQUE; Option A in Phase 2 would be transitional only. This is not a decision dodge — it is a discipline of "decide at the right time, not the earliest time".
-- **Stack realignment: Tauri (Rust core) + Vite + React + TypeScript UI for desktop** (resolved 2026-04-26; UI bundler refined the same day). Supersedes the prior `../decisions.md` Electron baseline. Crypto core in Rust (libsodium bindings + RustCrypto fallback). Server remains Go. Phase 3 mobile path (RN with Rust bridge vs Tauri Mobile) deferred to Phase 3 start. Phase 3 web client's bundler is deferred to Phase 3 start; shared React components will be extracted to a `packages/ui/` workspace member when that work begins, decoupling the desktop UI bundler from the web bundler. Trade: ~1–2 month delay to Phase 1 ship for Rust ramp-up; gains: structural memory hygiene (`zeroize`/`secrecy`/`subtle` crates), smaller TCB and binary, easier reproducible builds, audit-story upgrade, native MLS/PQ primitive availability for v005, ~10× smaller direct-npm-dependency surface vs Next.js.
+- **Server-auth deliberately deferred to Phase 2 with intent declaration** (resolved 2026-04-26). v0.1 derives but does not use the `server-auth` subkey. Phase 2 will choose between Option A (simple verifier) and Option B (OPAQUE aPAKE) using criteria documented in §11.1. The next major version canonicalizes OPAQUE; Option A in Phase 2 would be transitional only. This is not a decision dodge — it is a discipline of "decide at the right time, not the earliest time".
+- **Stack realignment: Tauri (Rust core) + Vite + React + TypeScript UI for desktop** (resolved 2026-04-26; UI bundler refined the same day). Supersedes the prior `../decisions.md` Electron baseline. Crypto core in Rust (libsodium bindings + RustCrypto fallback). Server remains Go. Phase 3 mobile path (RN with Rust bridge vs Tauri Mobile) deferred to Phase 3 start. Phase 3 web client's bundler is deferred to Phase 3 start; shared React components will be extracted to a `packages/ui/` workspace member when that work begins, decoupling the desktop UI bundler from the web bundler. Trade: ~1–2 month delay to Phase 1 ship for Rust ramp-up; gains: structural memory hygiene (`zeroize`/`secrecy`/`subtle` crates), smaller TCB and binary, easier reproducible builds, audit-story upgrade, native MLS/PQ primitive availability for a later major version, ~10× smaller direct-npm-dependency surface vs Next.js.
 - **Rust-side primitives: RustCrypto stack, no libsodium bindings** (resolved 2026-04-28). Supersedes the "libsodium bindings + RustCrypto fallback" clause of the entry directly above, and the "libsodium as the single client crypto library" clause of the original Standard Notes 004 primitive baseline — both by name, in `decisions.md` 2026-04-28. Every Myne client links the `protocol/` crate on RustCrypto and none links libsodium (§2): mobile reuses the crate by path rather than binding a platform library (2026-05-01), and the web client compiles it to wasm (below). The earlier entries in this list are left standing as the record of what was believed at the time — wherever one of them says "libsodium", read §2. The Argon2id parameters, AEAD construction, HKDF-SHA-256 subkey derivation, BIP-39 phrase and X25519 are unchanged by this: only the *library implementing them* changed, and the byte-level format did not, which is why libsodium remains a valid choice for an independent implementation (§2, §5.1.4).
 
 - **Phase 3 web client: in-repo `web/` target, shared `src/` tree, wasm-compiled `protocol/` crate** (resolved 2026-07-26). Supersedes the two clauses above that deferred the web bundler and promised a `packages/ui/` extraction. Neither happened, and the architecture that replaced them is different in kind: the web client compiles the **same** `src/` tree the desktop client compiles, substituting one internal boundary — `src/platform/` — at build time, so there is no UI package to extract and no second bundler to decouple. Its cryptographic provider is this repo's `protocol/` crate compiled to `wasm32-unknown-unknown` (§2), not a JavaScript library. §4.1 carries the measured browser cost. `decisions.md` 2026-07-26 records the repo-topology, capability-set, storage, transport, E2E, origin and self-host decisions; `threat-model.md` A15/TB11 records what the served-code delivery channel gives up. **Appended, not edited in place** — the earlier entries are the record of what was believed at the time.
 
 **All deferred conflict-points resolved.** v0.1 specification is complete.
 
-Each deferred item has a v0.1 baseline that is internally consistent with this spec and a research alternative documented in `appname-v005`. Resolving any of the two does not require changes to the rest of the protocol structure — only the parameter or primitive at the named call site.
+Each deferred item has a v0.1 baseline that is internally consistent with this spec and a research alternative documented in the next major version's research roadmap. Resolving any of the two does not require changes to the rest of the protocol structure — only the parameter or primitive at the named call site.
 
 **Open risks**
 
-- **No formal verification model** (Tamarin / ProVerif) accompanies v0.1. The compensating-controls plan (`../threat-model.md` §6) is the v1.0 substitute. Formal verification is an `appname-v005` deliverable.
+- **No formal verification model** (Tamarin / ProVerif) accompanies v0.1. The compensating-controls plan (`../threat-model.md` §6) is the v1.0 substitute. Formal verification is a next-major-version deliverable.
 - **No external cryptographer review** has occurred at draft time. Plan: pre-launch informal review by at least one independent reviewer per `../threat-model.md` §6.
-- **Migration tool from v0.1 to v005 has not been written**. The §10.4 procedure describes the intent; concrete code lands when v005 work begins.
+- **Migration tool from v0.1 to the next major version has not been written**. The §10.4 procedure describes the intent; concrete code lands when next-major work begins.
 - **Mobile parameter profile** for Argon2id is not specified in v0.1; the spec assumes desktop-class memory. Phase 3 must add a profile.

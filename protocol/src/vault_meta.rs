@@ -26,7 +26,7 @@
 //! 241     16    items_key_id           UUIDv7 of singleton itemsKey
 //! 257     24    items_key_nonce
 //! 281     64    enc_items_key
-//! 345     ...   future fields          reserved for v0.1.x / v005
+//! 345     ...   future fields          reserved for v0.1.x / a later major version
 //! ```
 //!
 //! The 11-byte KDF parameter block at offset 22 is bound into both

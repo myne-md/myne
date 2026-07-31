@@ -1193,7 +1193,7 @@ mod tests {
             },
             Fail {
                 slug: "parse-fail-protocol-version-mismatch",
-                desc: "protocol_version byte at offset 4 set to 0x02. v0.1 and v005 are forward-incompatible by design: a decoder MUST reject rather than attempt a best-effort parse.",
+                desc: "protocol_version byte at offset 4 set to 0x02. v0.1 and a later major version are forward-incompatible by design: a decoder MUST reject rather than attempt a best-effort parse.",
                 kind: "parse_fail",
                 blob: bad_version.clone(),
                 expected_error: "protocol_version_mismatch",

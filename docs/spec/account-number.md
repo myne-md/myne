@@ -186,7 +186,7 @@ The 16-byte hash is stored in `vault.meta` (§9.3 of the protocol spec) and bind
 
 - Per-IP rate limiting on registration is **not viable** under the no-IP-logging commitment (`../threat-model.md` §2 AS14). Anti-abuse must be per-account or per-device-attestation.
 - Captcha at registration acceptable.
-- "No-email" model means a single attacker can churn through arbitrary numbers of free accounts. Rate-limiting per account, not per-creator, is the operational reality. Storage quotas on free accounts are the primary defense; Privacy Pass / KVAC tokens may be considered in `appname-v005`.
+- "No-email" model means a single attacker can churn through arbitrary numbers of free accounts. Rate-limiting per account, not per-creator, is the operational reality. Storage quotas on free accounts are the primary defense; Privacy Pass / KVAC tokens may be considered in a later major version.
 
 ## 9. Open issues
 
