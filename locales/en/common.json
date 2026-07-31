@@ -2527,6 +2527,9 @@
       "pendingHint": "Coming soon"
     },
     "ai": {
+      "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "autoTagLabel": "Suggest tags automatically",
+      "autoTagSaveFailed": "Couldn't save the tag-suggestion setting.",
       "disclosureToggle": "How does this work?",
       "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
       "enableLabel": "Enable local AI",
@@ -2755,6 +2758,7 @@
         "lastActiveNoteDesc": "Sync which note you had open so you can pick it up on another device."
       },
       "keywords": {
+        "aiAutoTag": "auto tag tags suggest suggestions labels ai",
         "aiEnable": "local ai on off enable disable machine learning",
         "aiExcluded": "excluded folders ignore ai privacy exclude",
         "aiModels": "models gguf download text embedding llm",

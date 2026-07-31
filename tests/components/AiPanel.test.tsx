@@ -8,24 +8,33 @@
 // / `ai-model-store` / `usePrefs` / i18n are mocked at their module boundaries.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 // Hoisted so the mock factories (which run BEFORE module-body consts init) can
 // reference these — the canonical vitest pattern for direct factory references.
-const { openUrl, openFileDialog, loadModelPath, saveModelPath } = vi.hoisted(() => ({
-  openUrl: vi.fn(() => Promise.resolve()),
-  openFileDialog: vi.fn((): Promise<string | null> => Promise.resolve(null)),
-  loadModelPath: vi.fn((): Promise<string | null> => Promise.resolve(null)),
-  saveModelPath: vi.fn((_role: string, p: string) => Promise.resolve(p)),
-}));
+const { openUrl, openFileDialog, loadModelPath, saveModelPath, setAutoTagEnabled } = vi.hoisted(
+  () => ({
+    openUrl: vi.fn(() => Promise.resolve()),
+    openFileDialog: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+    loadModelPath: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+    saveModelPath: vi.fn((_role: string, p: string) => Promise.resolve(p)),
+    setAutoTagEnabled: vi.fn((_enabled: boolean) => Promise.resolve()),
+  }),
+);
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: openFileDialog }));
 vi.mock("../../src/lib/ai-model-store", () => ({ loadModelPath, saveModelPath }));
+vi.mock("../../src/lib/prefs", () => ({ setAutoTagEnabled }));
 
 let aiEnabled = true;
+let autoTagEnabled = false;
 vi.mock("../../src/hooks/usePrefs", () => ({
   usePrefs: () => ({
-    prefs: { ai_enabled: aiEnabled, ai_excluded_folders: [] },
+    prefs: {
+      ai_enabled: aiEnabled,
+      auto_tag_enabled: autoTagEnabled,
+      ai_excluded_folders: [],
+    },
     setAiEnabled: vi.fn(),
     setAiExcludedFolders: vi.fn(),
   }),
@@ -40,10 +49,13 @@ import { AI_TRUST_HEADLINE } from "../../src/lib/load-bearing-copy";
 
 beforeEach(() => {
   aiEnabled = true;
+  autoTagEnabled = false;
   openUrl.mockClear();
   openFileDialog.mockClear();
   loadModelPath.mockClear();
   saveModelPath.mockClear();
+  setAutoTagEnabled.mockClear();
+  setAutoTagEnabled.mockResolvedValue(undefined);
 });
 afterEach(() => cleanup());
 
@@ -97,5 +109,47 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
     expect(
       (screen.getByTestId("ai.model-choose-embedding") as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+});
+
+describe("AiPanel — auto-tag toggle (MYND-651)", () => {
+  it("renders off by default and persists an ON flip", async () => {
+    render(<AiPanel />);
+    const toggle = screen.getByTestId("ai.auto-tag-toggle");
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(toggle);
+    expect(setAutoTagEnabled).toHaveBeenCalledWith(true);
+    await Promise.resolve();
+    // Optimistic: the switch reads ON before `usePrefs` re-reads from disk.
+    expect(screen.getByTestId("ai.auto-tag-toggle").getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("reflects the persisted value when it is already on", () => {
+    autoTagEnabled = true;
+    render(<AiPanel />);
+    expect(screen.getByTestId("ai.auto-tag-toggle").getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("rolls back and toasts when the write fails", async () => {
+    setAutoTagEnabled.mockRejectedValueOnce(new Error("locked"));
+    const onShowToast = vi.fn();
+    render(<AiPanel onShowToast={onShowToast} />);
+
+    fireEvent.click(screen.getByTestId("ai.auto-tag-toggle"));
+    // Never leave the UI asserting a value the vault never took.
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.auto-tag-toggle").getAttribute("aria-checked")).toBe("false"),
+    );
+    expect(onShowToast).toHaveBeenCalledWith("settings.ai.autoTagSaveFailed");
+  });
+
+  it("is non-interactive while the AI beta is off (co-gate, not a second switch)", () => {
+    aiEnabled = false;
+    render(<AiPanel />);
+    const toggle = screen.getByTestId("ai.auto-tag-toggle") as HTMLButtonElement;
+    expect(toggle.disabled).toBe(true);
+    fireEvent.click(toggle);
+    expect(setAutoTagEnabled).not.toHaveBeenCalled();
   });
 });

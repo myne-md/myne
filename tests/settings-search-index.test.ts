@@ -148,7 +148,7 @@ describe("settings search-index — searchSettings behaviour", () => {
 });
 
 describe("settings search-index — developer-mode gate (MYND-593)", () => {
-  const AI_IDS = ["ai.enable", "ai.models", "ai.excluded-folders"];
+  const AI_IDS = ["ai.enable", "ai.auto-tag", "ai.models", "ai.excluded-folders"];
 
   it("tags every `ai` panel entry as developer-gated", () => {
     for (const e of SETTINGS_SEARCH_INDEX) {
@@ -156,7 +156,7 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     }
   });
 
-  it("mode off: the three AI entries are absent from every search, even by exact title", () => {
+  it("mode off: the AI entries are absent from every search, even by exact title", () => {
     for (const id of AI_IDS) {
       const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
       const found = searchSettings(entry.titleKey, t, false).map((r) => r.id);
@@ -167,7 +167,7 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     for (const id of AI_IDS) expect(allIds).not.toContain(id);
   });
 
-  it("mode on: the three AI entries are found again", () => {
+  it("mode on: the AI entries are found again", () => {
     const allIds = searchSettings("", t, true).map((e) => e.id);
     for (const id of AI_IDS) expect(allIds).toContain(id);
   });
