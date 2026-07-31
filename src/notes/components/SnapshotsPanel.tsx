@@ -32,7 +32,7 @@ import {
 } from "../snapshots";
 import type { SnapshotError, SnapshotMeta } from "../../types/snapshot-error";
 import { BACKDROP_STYLE } from "./DeleteConfirmModal";
-import { changedLineCount, lineDiff, type DiffLine } from "../lineDiff";
+import { changedLineCount, lineDiff, type DiffLine } from "../../dialect";
 import { formatRelativeTime } from "./relativeTime";
 
 const PANEL_STYLE: CSSProperties = {

@@ -2,7 +2,7 @@
 // coarse over-cap fallback + the changed-line counter. No IPC, no jsdom.
 
 import { describe, it, expect } from "vitest";
-import { lineDiff, changedLineCount, type DiffLine } from "../../src/notes/lineDiff";
+import { lineDiff, changedLineCount, type DiffLine } from "../../src/dialect/diff";
 
 const tag = (d: DiffLine) => `${d.type}:${d.text}`;
 
