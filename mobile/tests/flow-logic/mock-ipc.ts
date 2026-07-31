@@ -209,7 +209,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       daily_folder: null,
       daily_template: null,
       favorites: [],
-      item_order: [],
+      item_order: {},
       editor_layout: null,
       editor_content_width: null,
       editor_default_view_mode: null,
@@ -300,6 +300,15 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // would never produce: the seed would keep winning and the write would look
     // like a no-op on re-read.
     let customTheme: string | null = (config.prefs?.custom_theme as string | null | undefined) ?? null;
+    // STATEFUL item_order MAP (MYND-596). The whole-map setter is written
+    // optimistically by the move-up/move-down affordance, so a reopen round-trip
+    // is only meaningful if the write survives into the next `prefs_read` —
+    // exactly like the favorites/toolbar stores above. Seeded from
+    // `config.prefs.item_order` so a test can start with a pre-existing order.
+    let itemOrder: Record<string, string[]> =
+      config.prefs?.item_order && typeof config.prefs.item_order === "object"
+        ? { ...(config.prefs.item_order as Record<string, string[]>) }
+        : {};
 
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
@@ -359,6 +368,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         editor_toolbar_order: toolbarOrder,
         editor_toolbar_hidden: toolbarHidden,
         custom_theme: customTheme,
+        item_order: itemOrder,
       }),
       // Format-bar layout setters (MYND-555): record the write AND mutate the
       // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
@@ -450,6 +460,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         const w = window as unknown as { __customThemeWrites?: (string | null)[] };
         (w.__customThemeWrites ??= []).push(name);
         customTheme = name;
+        return null;
+      },
+      // Whole-map item_order setter (MYND-596): record the write AND mutate the
+      // store, so a move-up/move-down survives into the nonce-bumped re-read and
+      // a "reopen the app" assertion sees the persisted order. Payload key is
+      // `order` (a container-keyed map), matching the Rust command's BTreeMap.
+      "plugin:prefs|set_item_order": (args) => {
+        const order = (args.order ?? {}) as Record<string, string[]>;
+        const w = window as unknown as { __itemOrderWrites?: Record<string, string[]>[] };
+        (w.__itemOrderWrites ??= []).push({ ...order });
+        itemOrder = { ...order };
         return null;
       },
       // ── Workspace-state persistence (vault.workspace MYW1 descriptor) ──
