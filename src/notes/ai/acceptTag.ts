@@ -1,19 +1,18 @@
 // Tag-accept write cores (auto-tag-link MYND-411 task 5; the frontmatter writer
 // wired up by on-device-tag-suggestion task 6). Pure helpers that compute the
-// post-accept frontmatter tag list or the post-accept body for an inline `#tag`
-// insert — byte-identical to a hand-typed tag, no new writer, no new format.
+// post-accept frontmatter tag list and the minimal document edit that lands it
+// — byte-identical to a hand-typed tag, no new writer, no new format.
 //
-// `computeTagAcceptEdit` is THE accept path for the tag-suggestion band: a chip
-// writes into frontmatter `tags:`, never an inline `#tag`. It is expressed as a
-// minimal `{from,to,insert}` edit rather than a whole-document rewrite so the
-// caller's cursor and selection survive an accept mid-typing, and so the note's
-// other bytes are provably untouched (§6 C1 byte-stability for other keys).
-// `appendInlineTag` is NOT a second accept path — it survives only as the
-// helper the (superseded) chat-tab surface used, and goes with it.
+// `computeTagAcceptEdit` is THE accept path for the tag-suggestion band, and the
+// only one: a chip writes into frontmatter `tags:`, never an inline `#tag`. It
+// is expressed as a minimal `{from,to,insert}` edit rather than a whole-document
+// rewrite so the caller's cursor and selection survive an accept mid-typing, and
+// so the note's other bytes are provably untouched (§6 C1 byte-stability for
+// other keys).
 //
-// All three are idempotent under the §3.7.8 fold (`foldSegment`) — accepting a
-// tag already present (in any case/NFC variant, in `tags:`, `tag:` or as an
-// inline `#tag`) is a no-op, so a chip can't produce a duplicate. Pure,
+// Both are idempotent under the §3.7.8 fold (`foldSegment`) — accepting a tag
+// already present (in any case/NFC variant, in `tags:`, `tag:` or as an inline
+// `#tag`) is a no-op, so a chip can't produce a duplicate. Pure,
 // model-independent.
 
 import { load as parseYaml } from "js-yaml";
@@ -49,25 +48,6 @@ export function computeTagsAfterAccept(
   const key = foldSegment(cleaned);
   const present = existingTags.some((t) => foldSegment(cleanAcceptedTag(t)) === key);
   return present ? [...existingTags] : [...existingTags, cleaned];
-}
-
-/**
- * Append an inline `#tag` to a note body, byte-identical to a hand-typed tag.
- * Idempotent under the fold: if the body already contains the tag as an inline
- * `#tag` token (whitespace/end-delimited, fold-compared) it is returned
- * unchanged. Otherwise a single ` #tag` is appended with one separating space
- * (or none if the body is empty / already ends in whitespace). Pure.
- */
-export function appendInlineTag(body: string, newTag: string): string {
-  const cleaned = cleanAcceptedTag(newTag);
-  if (cleaned.length === 0) return body;
-  const key = foldSegment(cleaned);
-
-  // Already present as an inline `#tag` token?
-  if (inlineTagFolds(body).has(key)) return body;
-
-  const sep = body.length === 0 || /\s$/u.test(body) ? "" : " ";
-  return `${body}${sep}#${cleaned}`;
 }
 
 // === the accept-to-frontmatter writer ===

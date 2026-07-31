@@ -391,9 +391,6 @@
       "aiSummarizeNote": {
         "label": "Summarize note"
       },
-      "aiSuggestTags": {
-        "label": "Suggest tags"
-      },
       "aiRewriteSelection": {
         "label": "Rewrite selection"
       },
