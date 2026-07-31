@@ -160,6 +160,13 @@ export interface MockConfig {
    *  plaintext (`{"v":1,"pos":[[id,x,y],…]}`), or `null` for a cold vault.
    *  Writes are recorded on `window.__graphLayoutWrites` (payload strings). */
   graphLayoutPayload?: string | null;
+  /** Canned `plugin:themes|themes_list` entries (MYND-598) — each `{ name,
+   *  palette }` exactly as the host's one-decrypt list surface hands them out,
+   *  in `BTreeMap` (UTF-8 byte) order, so a test can seed unsorted names and
+   *  assert the UI collates them. Mobile exposes no other themes command: the
+   *  four authoring/egress ones are neither registered nor ACL-granted, so
+   *  there is nothing else here to mock. */
+  customThemes?: Array<{ name: string; palette: Record<string, string> }>;
   /** Canned `workspace_read` descriptor — the `vault.workspace` (MYW1) opaque
    *  JSON, or `null` for a vault that has never persisted one. The store is
    *  STATEFUL: a `workspace_write` replaces it (and is logged on
@@ -399,6 +406,8 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         favorites = [...order];
         return null;
       },
+      // ── Custom themes (vault.themes MYT1, read-only on mobile) ──
+      "plugin:themes|themes_list": () => config.customThemes ?? [],
       // ── Workspace-state persistence (vault.workspace MYW1 descriptor) ──
       // MYND-561: mobile's folder-expand set rides this blob. Stateful + write
       // log, mirroring the graph-layout pair above.
