@@ -154,21 +154,74 @@ impl ServerCertVerifier for TofuVerifier {
     }
 }
 
+/// **The one place this module opens a socket** — and therefore the one place
+/// the fail-closed invariant has to hold.
+///
+/// Both socket sites in this file go through here: the transport's
+/// [`RustlsTransport::open_socket`] (which is `request` / `request_ext` /
+/// `request_bound_to_exporter` / `open_sse` and every SSE reconnect) and the
+/// one-shot enrollment handshake in [`tofu_fetch_pin`].
+///
+/// With Tor mode on and the proxy anything other than `Ready`, this returns an
+/// error **without opening a socket**. There is no direct-connect fallback:
+/// falling back would leak the user's real source IP at exactly the moment they
+/// believed they were protected (PRD story 4).
+fn open_socket_via(proxy: &ProxyGate, host: &str, port: u16) -> Result<TcpStream, TransportError> {
+    match proxy.route() {
+        Ok(Route::Direct) => TcpStream::connect((host, port)).map_err(|_| TransportError::Network),
+        // The hostname goes to the proxy as a NAME (socks5's domain-name
+        // `CONNECT`), so it is resolved inside the circuit and never by this
+        // device's resolver.
+        Ok(Route::Socks5 { socks_port }) => {
+            connect_via_socks5(socks_port, host, port).map_err(TransportError::from)
+        }
+        Err(denied) => {
+            // The bare denial reason only — never the host, the port or the
+            // proxy port (`src-tauri/CLAUDE.md` secret-handling discipline; the
+            // sync hostname is the thing Tor mode exists to keep off this
+            // device's disk and resolver).
+            tracing::warn!(
+                event = "sync_tor_fail_closed",
+                reason = ?denied,
+                "Tor routing is on and the proxy is not ready; refusing to connect"
+            );
+            Err(TransportError::Network)
+        }
+    }
+}
+
 /// TOFU-fetch the server's leaf-cert pin (SHA-256 of its DER): open ONE TLS
 /// handshake to `host:port` accepting any cert, capture the leaf, return its pin.
 /// The caller persists the pin (sync-config) + surfaces the fingerprint for the
 /// user to eye-compare across devices (defeats a per-device MitM). Blocking —
 /// call from `spawn_blocking`.
 ///
-/// **Still direct, deliberately, and owed to MYND-650 task 5.** This is a
-/// one-shot enrollment handshake that builds its own socket rather than going
-/// through [`RustlsTransport::open_socket`], so Tor mode does not route it yet.
-/// Routing it is not a mechanical change: an accept-any-certificate first
-/// handshake through a hostile exit node is exactly the MitM a Tor exit can
-/// mount, so task 5 pairs the tunnel with a mandatory out-of-band fingerprint
-/// compare before the captured pin is accepted. The no-bypass guard
-/// (`super::no_bypass`) records this site by name so it cannot be forgotten.
+/// **Routed through the proxy gate in Tor mode** (MYND-650 task 5), like every
+/// other outbound socket in this file: leaving the enrollment handshake direct
+/// would hand this device's real source IP and the sync hostname to the network
+/// at exactly the moment the user turned Tor on, and would resolve that
+/// hostname on the local resolver besides.
+///
+/// Routing it is not free, and the cost is paid elsewhere: this is the one
+/// handshake that accepts **any** certificate, and a Tor exit node is in the
+/// position to serve one. So it is deliberately NOT public policy — the two
+/// enrollment paths reach it only through [`super::pin_confirm::capture_pin`],
+/// which refuses to accept a pin in Tor mode unless the user supplied the
+/// fingerprint they obtained out-of-band and it matches what was served. Call
+/// this function directly and you get the capture without the compare.
 pub fn tofu_fetch_pin(host: &str, port: u16) -> Result<[u8; 32], TransportError> {
+    tofu_fetch_pin_via(&proxy::installed_for(host), host, port)
+}
+
+/// [`tofu_fetch_pin`] with an explicit routing gate — the same split, and the
+/// same reason, as [`RustlsTransport::with_proxy_gate`]: production reads the
+/// installed gate, a test drives one it owns rather than the process-global
+/// `OnceLock` the whole test binary shares.
+pub fn tofu_fetch_pin_via(
+    proxy: &ProxyGate,
+    host: &str,
+    port: u16,
+) -> Result<[u8; 32], TransportError> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let captured = std::sync::Arc::new(std::sync::Mutex::new(None));
     let verifier = Arc::new(TofuVerifier {
@@ -185,7 +238,7 @@ pub fn tofu_fetch_pin(host: &str, port: u16) -> Result<[u8; 32], TransportError>
         ServerName::try_from(host.to_string()).map_err(|_| TransportError::BadRequest)?;
     let mut conn =
         ClientConnection::new(Arc::new(config), server_name).map_err(|_| TransportError::Tls)?;
-    let mut sock = TcpStream::connect((host, port)).map_err(|_| TransportError::Network)?;
+    let mut sock = open_socket_via(proxy, host, port)?;
     // Drive the handshake to completion so `verify_server_cert` fires + captures.
     while conn.is_handshaking() {
         let (rd, wr) = conn
@@ -264,41 +317,17 @@ impl RustlsTransport {
         }
     }
 
-    /// **The one place this transport opens a socket** — and therefore the one
-    /// place the fail-closed invariant has to hold.
+    /// This transport's socket site: `request` / `request_ext` /
+    /// `request_bound_to_exporter` / `open_sse` all reach the network through
+    /// [`Self::connect`], which reaches it through here, so routing this one
+    /// function routes request/response, the SCRAM exporter handshake, the SSE
+    /// poke stream and every SSE reconnect at once.
     ///
-    /// `request` / `request_ext` / `request_bound_to_exporter` / `open_sse` all
-    /// reach the network through [`Self::connect`], which reaches it through
-    /// here, so routing this function routes request/response, the SCRAM
-    /// exporter handshake, the SSE poke stream and every SSE reconnect at once.
-    ///
-    /// With Tor mode on and the proxy anything other than `Ready`, this returns
-    /// an error **without opening a socket**. There is no direct-connect
-    /// fallback: falling back would leak the user's real source IP at exactly
-    /// the moment they believed they were protected (PRD story 4).
+    /// The routing decision itself is [`open_socket_via`]'s, shared with
+    /// [`tofu_fetch_pin`] — this method only supplies the gate it was built
+    /// with. It carries no exemption logic: it obeys whatever gate it holds.
     fn open_socket(&self) -> Result<TcpStream, TransportError> {
-        match self.proxy.route() {
-            Ok(Route::Direct) => TcpStream::connect((self.host.as_str(), self.port))
-                .map_err(|_| TransportError::Network),
-            // The hostname goes to the proxy as a NAME (socks5's domain-name
-            // `CONNECT`), so it is resolved inside the circuit and never by this
-            // device's resolver.
-            Ok(Route::Socks5 { socks_port }) => {
-                connect_via_socks5(socks_port, &self.host, self.port).map_err(TransportError::from)
-            }
-            Err(denied) => {
-                // The bare denial reason only — never the host, the port or the
-                // proxy port (`src-tauri/CLAUDE.md` secret-handling discipline;
-                // the sync hostname is the thing Tor mode exists to keep off
-                // this device's disk and resolver).
-                tracing::warn!(
-                    event = "sync_tor_fail_closed",
-                    reason = ?denied,
-                    "Tor routing is on and the proxy is not ready; refusing to connect"
-                );
-                Err(TransportError::Network)
-            }
-        }
+        open_socket_via(&self.proxy, &self.host, self.port)
     }
 
     /// Open a pinned TLS connection to the configured host. Read/write deadlines
@@ -461,7 +490,11 @@ impl SyncTransport for RustlsTransport {
 }
 
 #[cfg(test)]
-mod tests {
+// `pub(crate)` so `pin_confirm`'s tests can borrow the TLS server + its
+// certificate rather than standing up a second one: the pin under test IS that
+// certificate's hash, and two hand-written fixtures eventually disagree about
+// which certificate they are both serving.
+pub(crate) mod tests {
     use super::*;
 
     #[test]
@@ -519,13 +552,13 @@ mod tests {
 
     // --- real TLS round-trip: TOFU-fetch the pin, then prove pinning ----------
 
-    const TEST_CERT_DER: &[u8] = include_bytes!("test_fixtures/localhost.cert.der");
+    pub(crate) const TEST_CERT_DER: &[u8] = include_bytes!("test_fixtures/localhost.cert.der");
     const TEST_KEY_DER: &[u8] = include_bytes!("test_fixtures/localhost.key.der");
 
     /// Spawn a minimal rustls TLS server (self-signed `localhost` cert) that
     /// accepts + handshakes `n` connections on an ephemeral port. Returns the
     /// bound port.
-    fn spawn_tls_server(n: usize) -> u16 {
+    pub(crate) fn spawn_tls_server(n: usize) -> u16 {
         use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
         use rustls::{ServerConfig, ServerConnection};
         use std::net::TcpListener;
@@ -963,5 +996,104 @@ mod tests {
         // `proxy::installed_for`'s own tests pin.
         let remote = RustlsTransport::new("sync.myne.md", 443, vec![[0x11; 32]]);
         assert!(!remote.proxy.is_enabled());
+    }
+
+    // ── task 5: the enrollment handshake is routed too ───────────────────────
+
+    /// **Criterion 1.** The one-shot pin-capture handshake — the only one in
+    /// the client that accepts any certificate — travels through the proxy in
+    /// Tor mode, as a hostname `CONNECT` so the name is resolved inside the
+    /// circuit. Before task 5 this socket was direct, which meant enabling Tor
+    /// and then pointing the client at a server leaked both the sync hostname
+    /// and this device's source IP at enrollment time.
+    #[test]
+    fn the_pin_capture_handshake_travels_through_the_proxy_in_tor_mode() {
+        let server = spawn_tls_server(1);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let proxy = FakeSocks5::spawn(1, Behavior::Splice(server));
+
+        let pin = tofu_fetch_pin_via(&tor_ready(proxy.port), "localhost", 443)
+            .expect("the TOFU handshake must complete through the tunnel");
+
+        assert_eq!(
+            pin,
+            cert_pin(TEST_CERT_DER),
+            "the pin captured through the tunnel is the server's real leaf cert"
+        );
+        assert_eq!(
+            proxy.seen(),
+            vec![SeenTarget {
+                atyp: 0x03,
+                host: "localhost".to_string(),
+                port: 443,
+            }],
+            "the enrollment handshake must travel as a hostname CONNECT, not a \
+             resolved address and not a direct socket"
+        );
+    }
+
+    /// **Criterion 1, the negative half.** With Tor mode on and the proxy not
+    /// `Ready`, the pin capture fails and the server sees zero connections —
+    /// the same fail-closed rule as the data plane, and for a sharper reason:
+    /// a direct fallback here would leak the source IP *and* pin a certificate
+    /// the user never confirmed.
+    ///
+    /// The control arm at the end is what makes the zero mean something.
+    #[test]
+    fn the_pin_capture_fails_closed_with_no_direct_connection_attempt() {
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind probe");
+        let real_port = listener.local_addr().expect("addr").port();
+        let accepts = Arc::new(AtomicUsize::new(0));
+        let counter = accepts.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                if stream.is_err() {
+                    return;
+                }
+                counter.fetch_add(1, Ordering::SeqCst);
+                // Close immediately — a held socket would make the control
+                // arm's handshake block for the full SOCKET_TIMEOUT.
+            }
+        });
+
+        let dead_proxy = TcpListener::bind("127.0.0.1:0")
+            .expect("bind")
+            .local_addr()
+            .expect("addr")
+            .port();
+
+        for state in [
+            TorProxyState::Starting,
+            TorProxyState::Failed,
+            TorProxyState::Stopped,
+            TorProxyState::Ready {
+                socks_port: dead_proxy,
+            },
+        ] {
+            assert!(
+                tofu_fetch_pin_via(&tor_not_ready(state), "localhost", real_port).is_err(),
+                "{state:?}: the pin capture must fail rather than connect directly"
+            );
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        assert_eq!(
+            accepts.load(Ordering::SeqCst),
+            0,
+            "fail-closed means ZERO direct connections, enrollment included"
+        );
+
+        // Control: the probe really does observe a connection when one is made.
+        let _ = tofu_fetch_pin_via(&ProxyGate::new(), "localhost", real_port);
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        assert_eq!(
+            accepts.load(Ordering::SeqCst),
+            1,
+            "the probe must be able to see a direct connect, or the zero above \
+             is vacuous"
+        );
     }
 }

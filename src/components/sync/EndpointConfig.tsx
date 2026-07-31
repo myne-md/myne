@@ -78,12 +78,31 @@ const FP: CSSProperties = {
   wordBreak: "break-all",
 };
 
+/**
+ * The `kind` tags of `SyncConfigError` this screen has to tell apart
+ * (MYND-650 task 5). Everything else collapses into the generic "couldn't reach
+ * that server" line, as before.
+ */
+type SetEndpointErrorKind = "PinConfirmationRequired" | "FingerprintMismatch";
+
 export function EndpointConfig() {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
+  // The fingerprint the user obtained OUT-OF-BAND from their own server, and
+  // whether the backend has asked for it. It is revealed on refusal rather than
+  // rendered always, because the clearnet flow does not need it and a field
+  // nobody has to fill is a field everybody skips.
+  //
+  // Deliberately an INPUT, never a "does this look right?" confirmation of the
+  // captured value: over Tor the first handshake accepts any certificate, and
+  // showing the captured fingerprint first would anchor the user on whatever an
+  // exit node chose to serve. The backend never returns it on the mismatch path
+  // for the same reason (`core/src/plugins/sync/pin_confirm.rs`).
+  const [expectedFingerprint, setExpectedFingerprint] = useState("");
+  const [confirmNeeded, setConfirmNeeded] = useState(false);
   // Where the pin came from (SYNC-43): `static` (pre-vetted hosted cert) vs
   // `tofu` (self-host first-connect pin — the one the user eye-compares). Kept
   // distinct so a hosted endpoint is never shown as a bare TOFU pin.
@@ -124,8 +143,10 @@ export function EndpointConfig() {
       pin_source: PinSource;
     }>("plugin:sync|sync_set_endpoint", {
       endpointUrl: trimmed,
+      confirmedFingerprint: expectedFingerprint.trim() || null,
     })
       .then((r) => {
+        setConfirmNeeded(false);
         setPinSource(r.pin_source);
         if (r.fingerprint) setFingerprint(r.fingerprint);
         // Branch on the PIN SOURCE, not on whether a fingerprint came back.
@@ -142,7 +163,23 @@ export function EndpointConfig() {
           ),
         );
       })
-      .catch(() => setMsg(t("sync.endpoint.unreachable")))
+      .catch((e: unknown) => {
+        const kind = (e as { kind?: SetEndpointErrorKind } | null)?.kind;
+        // Both Tor-mode refusals wrote NOTHING — no endpoint, no pin — so the
+        // screen stays on the same form with the field revealed rather than
+        // reporting a half-configured server.
+        if (kind === "PinConfirmationRequired") {
+          setConfirmNeeded(true);
+          setMsg(t("sync.endpoint.confirmFingerprintRequired"));
+          return;
+        }
+        if (kind === "FingerprintMismatch") {
+          setConfirmNeeded(true);
+          setMsg(t("sync.endpoint.confirmFingerprintMismatch"));
+          return;
+        }
+        setMsg(t("sync.endpoint.unreachable"));
+      })
       .finally(() => setBusy(false));
   };
 
@@ -176,6 +213,35 @@ export function EndpointConfig() {
         <p style={HELP} data-testid="sync.endpoint-msg">
           {msg}
         </p>
+      )}
+      {/* Revealed only once the backend refuses for want of it — see the state
+          declaration for why this is an input rather than a confirm button. */}
+      {confirmNeeded && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-1)",
+          }}
+        >
+          <label
+            style={{ ...HELP, color: "var(--fg-2)" }}
+            htmlFor="sync-expected-fingerprint"
+          >
+            {t("sync.endpoint.confirmFingerprintLabel")}
+          </label>
+          <input
+            id="sync-expected-fingerprint"
+            value={expectedFingerprint}
+            onChange={(e) => setExpectedFingerprint(e.target.value)}
+            placeholder={t("sync.endpoint.confirmFingerprintPlaceholder")}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoComplete="off"
+            style={{ ...INPUT, fontFamily: "var(--font-mono)" }}
+            data-testid="sync.expected-fingerprint-input"
+          />
+        </div>
       )}
       {/* The pin note renders whenever a SOURCE is known — it used to be
           nested inside the fingerprint block, which meant the browser's
