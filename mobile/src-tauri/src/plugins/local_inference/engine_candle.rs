@@ -11,7 +11,7 @@
 //! the model path; a candle error `Display` can embed the path, so it goes to
 //! DEBUG only. Success logs `elapsed_ms` / `out_chars` (a count) — no content.
 
-#![cfg_attr(not(test), allow(dead_code))]
+#![allow(dead_code, unused_imports)] // MYND-563 scaffolding: unwired until tasks 6/7, dead in test builds too
 
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};

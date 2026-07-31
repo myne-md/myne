@@ -28,7 +28,7 @@
 // Every item is task-2 path/validation logic consumed by task-6 commands +
 // the tests below; nothing is reachable from a live root (init/lib.rs) until
 // task 6 wires the `#[tauri::command]`, so the non-test build sees it as dead.
-#![cfg_attr(not(test), allow(dead_code))]
+#![allow(dead_code, unused_imports)] // MYND-563 scaffolding: unwired until tasks 6/7, dead in test builds too
 
 use std::fmt::Write as _;
 use std::io::Read as _;

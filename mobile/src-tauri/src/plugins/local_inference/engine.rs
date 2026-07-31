@@ -13,7 +13,7 @@
 // chat surface (infer/embed/chat, ChatMessage, StubEngine) is present but unused
 // on this transcription-only mobile port until the UI (task 7) wires cancel. A
 // /simplify pass can strip the chat/gen surface; until then, don't warn.
-#![cfg_attr(not(test), allow(dead_code))]
+#![allow(dead_code, unused_imports)] // MYND-563 scaffolding: unwired until tasks 6/7, dead in test builds too
 
 use std::ops::ControlFlow;
 
