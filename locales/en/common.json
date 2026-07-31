@@ -2548,6 +2548,18 @@
       "recommendedFilesTranscription": "Needs the Whisper .gguf file + config.json + tokenizer.json in the same folder.",
       "title": "AI"
     },
+    "network": {
+      "errorRead": "Couldn't read the current setting. Flip the switch to set it again.",
+      "errorSave": "Couldn't save the setting. Nothing changed.",
+      "errorSidecar": "Tor routing is on, but the Tor client couldn't start. Sync is paused until it can — nothing is being sent directly.",
+      "residualExit": "The last relay in a Tor circuit — the exit node — sees which sync server you connect to. It can't read what you sync; that stays encrypted end to end.",
+      "residualMetadata": "The sync server still sees when you sync, how many blobs you push and how large they are, and how many devices you have. Tor doesn't change that.",
+      "residualPayment": "If you pay for hosted sync, the payment and your account can still be linked to you. Tor changes where the connection comes from, not the billing trail.",
+      "residualScope": "Only Myne's own sync traffic goes through Tor. Nothing else on this device does.",
+      "residualsToggle": "What this doesn't hide",
+      "torHelper": "Hides your IP address and location from the sync server and network observers. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
+      "torLabel": "Route sync through Tor"
+    },
     "prefs": {
       "saveError": "Couldn't save preference — try again"
     },
@@ -2638,6 +2650,7 @@
         "files": "Files",
         "transcription": "Transcription",
         "hotkeys": "Hotkeys",
+        "network": "Network",
         "privacy": "Privacy",
         "storage": "Storage",
         "sync": "Sync"
@@ -2784,6 +2797,7 @@
         "vimMode": "vim modal editing normal insert visual keyboard",
         "lineSpacing": "line spacing leading height typography readability",
         "newNoteLocation": "new note location folder default where notes created",
+        "torRouting": "tor routing onion proxy network ip address location hide sync anonymity",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
         "reminders": "reminders notify notification alert task due remind",
         "screenCapture": "screen capture protection screenshot recording block privacy",
