@@ -15,6 +15,7 @@ import { EditorView } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { parser } from "../../src/dialect/lezer/parser";
 import { readingModeFacet } from "@myne/editor/decorations/cursor-aware";
+import { frontmatterDecorations } from "@myne/editor/decorations/frontmatter";
 import {
   buildTagSuggestionBand,
   setTagSuggestions,
@@ -119,6 +120,25 @@ describe("anchor", () => {
     const at = tagSuggestionBandAnchor(view.state);
     expect(at).toBe(FM_DOC.indexOf("---\n\n") + "---\n".length);
     expect(view.state.doc.sliceString(0, at)).toBe("---\ntitle: Notes\n---\n");
+    teardown(view, host);
+  });
+
+  it("renders alongside the frontmatter Properties widget it anchors against", () => {
+    // The band alone cannot show this. `frontmatter.ts` REPLACES
+    // `[blockStart, blockEnd]` with a block widget, and a block decoration at
+    // `blockEnd` with a negative side sorts inside that range — CodeMirror then
+    // drops the band silently, on every note that has frontmatter (i.e. every
+    // note the app creates). Composing the two layers is the only way to see it.
+    const { view, host } = mount(FM_DOC, [frontmatterDecorations()]);
+    push(view, CHIPS);
+    expect(q(host, "editor.tag-suggestion-band")).not.toBeNull();
+    expect(all(host, "editor.tag-suggestion-chip").length).toBe(CHIPS.length);
+    // …and it really is on the far side of the frontmatter block.
+    const band = q(host, "editor.tag-suggestion-band")!;
+    const properties = host.querySelector(".cm-fm-properties")!;
+    expect(
+      properties.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     teardown(view, host);
   });
 

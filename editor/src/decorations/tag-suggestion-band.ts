@@ -191,9 +191,15 @@ export function buildTagSuggestionBand(state: EditorState): DecorationSet {
     Decoration.widget({
       widget: new TagSuggestionBandWidget(chips, at),
       block: true,
-      // Before the block that starts here, i.e. between the frontmatter and the
-      // first body line.
-      side: -1,
+      // AFTER the boundary, i.e. attached to the first body line rather than to
+      // the end of the frontmatter block. It reads the same on screen and it is
+      // the only side that renders: `frontmatter.ts` replaces
+      // `[blockStart, blockEnd]` with the Properties widget (`block: true`), and
+      // a widget at `blockEnd` with a negative side sorts INSIDE that range, so
+      // CodeMirror drops it. Nothing about the band alone shows this — it only
+      // appears once the two decorations are composed (tsb1 / the composed unit
+      // test), which is why both exist.
+      side: 1,
     }),
   );
   return builder.finish();
