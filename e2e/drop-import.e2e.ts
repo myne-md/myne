@@ -96,7 +96,7 @@ async function noteBodies(s: Session): Promise<string[]> {
   const ids = list.ok as string[];
   const out: string[] = [];
   for (const id of ids) {
-    const r = await pageSeatInvoke(s, "plugin:notes|note_read", { id }, IPC_TIMEOUT);
+    const r = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId: id }, IPC_TIMEOUT);
     expect(r.err, "note_read should succeed").toBeUndefined();
     out.push(r.ok as string);
   }

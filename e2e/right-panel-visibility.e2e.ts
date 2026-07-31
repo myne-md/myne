@@ -62,10 +62,11 @@ describeE2E("rp1 right-panel tab hide/restore persists (right-panel tabs)", () =
         await dismissImporterOffer(s);
         await createNote(s, "rp1notealfa7k2m9qx4w8e5rj0aa");
 
-        // Baseline: all four tabs are present in the strip (the AI Chat tab is
-        // always in the vocabulary — a hideable tab like any other, SYNC-15).
+        // Baseline: all five tabs are present in the strip (the Tasks tab —
+        // MYND-616 — and the AI Chat tab are always in the vocabulary, hideable
+        // tabs like any other, SYNC-15).
         await s.byTestId("editor.right-panel-tabs");
-        expect(await tabIds(s)).toEqual(["backlinks", "unlinked", "outline", "ai-chat"]);
+        expect(await tabIds(s)).toEqual(["backlinks", "unlinked", "outline", "tasks", "ai-chat"]);
 
         // Right-click the strip → the "Outline" item shows as checked (visible).
         const outlineItem = await openTabChecklistItem(s, "outline");
@@ -87,7 +88,7 @@ describeE2E("rp1 right-panel tab hide/restore persists (right-panel tabs)", () =
         await unlockToEditor(s, password);
         await dismissImporterOfferIfPresent(s);
         await s.byTestId("editor.right-panel-tabs");
-        expect(await tabIds(s)).toEqual(["backlinks", "unlinked", "ai-chat"]);
+        expect(await tabIds(s)).toEqual(["backlinks", "unlinked", "tasks", "ai-chat"]);
 
         // The reopened checklist reflects the persisted state: "Outline" unchecked.
         const outlineItemAfter = await openTabChecklistItem(s, "outline");
