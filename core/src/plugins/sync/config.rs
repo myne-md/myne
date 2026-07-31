@@ -141,6 +141,19 @@ pub enum SyncConfigError {
     /// The on-disk config file failed to parse as JSON.
     #[error("sync-config.json parse failed")]
     Parse,
+    /// Tor routing is on and no expected certificate fingerprint was supplied
+    /// (MYND-650 task 5). The UI must ask for the fingerprint the user obtained
+    /// out-of-band from their server and retry. **Nothing was written** — the
+    /// endpoint is not configured and no pin was stored.
+    #[error("a certificate fingerprint must be confirmed out-of-band over Tor")]
+    PinConfirmationRequired,
+    /// The certificate the server served is not the one the user confirmed
+    /// (MYND-650 task 5) — a typo, or somebody between this device and the
+    /// server. **Nothing was written**, and the captured fingerprint is
+    /// deliberately not reported: handing it back would let a user paste the
+    /// attacker's value and retry (`pin_confirm`'s module doc).
+    #[error("the server certificate does not match the confirmed fingerprint")]
+    FingerprintMismatch,
 }
 
 /// The storage seam's closed error, straight through (phase3-web-client task 86).

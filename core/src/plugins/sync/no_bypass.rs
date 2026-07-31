@@ -18,11 +18,27 @@
 //!
 //! ## What it scans, and what it deliberately does not
 //!
-//! Only the **production** half of each file: the scanner truncates at the
-//! first `#[cfg(test)]`, because the test code below it legitimately dials fake
-//! proxies, echo servers and probe listeners, and those are not shipped. Every
-//! `#[cfg(test)]` module in this directory sits at the end of its file, which is
-//! what makes that rule a clean cut rather than a guess.
+//! Only the **production** half of each file: the scanner removes every
+//! `#[cfg(test)]`-gated item, because test code legitimately dials fake
+//! proxies, echo servers and probe listeners, and none of it is shipped.
+//!
+//! It removes each gated item *individually* rather than truncating at the
+//! first one. The earlier rule — cut everything after the first
+//! `#[cfg(test)]` — rested on "every test module sits at the end of its file",
+//! which is not true of this directory: `enroll.rs` has test modules at three
+//! points, the first about a quarter of the way in, and `conflict.rs`,
+//! `socks5.rs` and `progress.rs` are the same shape. Under that rule the
+//! scanner silently skipped the ~1100 production lines of `enroll.rs` that
+//! follow its first test module — including, as of task 5, the join flow's
+//! pin acquisition. A guard that reads a fraction of the tree and reports
+//! "ok" is worse than no guard, because it is believed.
+//!
+//! A gated item is found by its attribute line and removed up to the line that
+//! closes it at the same indentation (`<indent>}`), which is what this tree's
+//! rustfmt output guarantees. Brace *counting* was rejected deliberately: the
+//! test bodies are full of JSON and HTTP fixtures carrying `{` inside string
+//! literals, and a miscount there would silently swallow production code —
+//! the exact failure this replaces.
 //!
 //! Comment lines are stripped before counting, so prose that *names* one of
 //! these tokens — `socks5`'s module doc explaining that it never calls
@@ -46,12 +62,15 @@ use std::path::PathBuf;
 const DIRECT_CONNECT_SITES: &[(&str, usize, &str)] = &[
     (
         "rustls_transport.rs",
-        2,
-        "1. `open_socket`'s `Route::Direct` arm — reachable only when the gate \
-         says Tor mode is off, which is the whole fail-closed decision. \
-         2. `tofu_fetch_pin` — the one-shot enrollment handshake, still direct \
-         and owed to task 5 (routing it needs the mandatory out-of-band \
-         fingerprint compare that defends against a hostile exit node).",
+        1,
+        "`open_socket_via`'s `Route::Direct` arm — reachable only when the gate \
+         says Tor mode is off, which is the whole fail-closed decision. Both \
+         socket sites in that file (the transport's `open_socket` and the \
+         one-shot enrollment handshake `tofu_fetch_pin`) share it, so there is \
+         one arm rather than one per caller. Task 5 routed the enrollment \
+         handshake and paired it with `pin_confirm`'s mandatory out-of-band \
+         fingerprint compare, which is what makes an accept-any-certificate \
+         handshake safe to send through an exit node.",
     ),
     (
         "http_transport.rs",
@@ -81,17 +100,55 @@ fn sync_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/plugins/sync")
 }
 
-/// The scannable half of `source`: everything before the first `#[cfg(test)]`,
-/// with comment lines dropped.
+/// Is `line` a `#[cfg(…)]` attribute that gates its item OUT of a production
+/// build because it is test-only?
+///
+/// `#[cfg(test)]` and `#[cfg(all(test, …))]`, but NOT
+/// `#[cfg(feature = "test-support")]` (which ships when a consumer asks for it)
+/// and not `#[cfg(not(test))]`.
+fn is_test_cfg(line: &str) -> bool {
+    let t = line.trim();
+    t.starts_with("#[cfg(")
+        && !t.contains("not(test")
+        && (t.contains("test)") || t.contains("test,"))
+}
+
+/// The scannable half of `source`: every `#[cfg(test)]`-gated item removed,
+/// then comment lines dropped.
 fn production_code(source: &str) -> String {
-    let head = match source.find("#[cfg(test)]") {
-        Some(at) => &source[..at],
-        None => source,
-    };
-    head.lines()
-        .filter(|l| !l.trim_start().starts_with("//"))
-        .collect::<Vec<_>>()
-        .join("\n")
+    let mut out: Vec<&str> = Vec::new();
+    let mut lines = source.lines().peekable();
+    while let Some(line) = lines.next() {
+        if !is_test_cfg(line) {
+            if !line.trim_start().starts_with("//") {
+                out.push(line);
+            }
+            continue;
+        }
+        // Skip any further attributes — and any comment — stacked on the same
+        // item, then the item itself: a block (`… {`) runs to its own closing
+        // brace at this indentation; anything else (`mod sim;`, a gated `use`)
+        // is one line.
+        let indent = &line[..line.len() - line.trim_start().len()];
+        let mut header = lines.next();
+        while header.is_some_and(|h| {
+            let t = h.trim_start();
+            t.starts_with("#[") || t.starts_with("//") || t.is_empty()
+        }) {
+            header = lines.next();
+        }
+        let Some(header) = header else { break };
+        if !header.trim_end().ends_with('{') {
+            continue;
+        }
+        let closer = format!("{indent}}}");
+        for body in lines.by_ref() {
+            if body == closer {
+                break;
+            }
+        }
+    }
+    out.join("\n")
 }
 
 /// Modules this directory's `mod.rs` declares under a `test` cfg — the
@@ -123,6 +180,59 @@ fn test_only_modules() -> Vec<String> {
         }
     }
     out
+}
+
+/// **The scanner's own test.** Every assertion below is only worth what this
+/// function is worth: a scanner that quietly drops production code reports
+/// "ok" forever, which is exactly how the truncate-at-the-first-`#[cfg(test)]`
+/// version hid the whole back half of `enroll.rs`.
+#[test]
+fn the_scanner_drops_test_items_and_keeps_the_production_code_after_them() {
+    let src = r#"
+fn before() { TcpStream::connect(a) }
+
+#[cfg(test)]
+// A comment between the attribute and the item — rustfmt permits it, and the
+// first version of this scanner was defeated by exactly this shape.
+mod tests {
+    fn helper() { TcpStream::connect("fake proxy") }
+    // A brace inside a string literal, which is why this is not brace-counting.
+    const BODY: &str = "{\"ok\":true}";
+}
+
+fn after() { TcpStream::connect(b) }
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod more_tests {
+    fn another() { TcpStream::connect("echo server") }
+}
+
+#[cfg(feature = "test-support")]
+pub fn ships_when_asked_for() { TcpStream::connect(c) }
+"#;
+    let out = production_code(src);
+    assert!(
+        out.contains("fn before"),
+        "code before a test module is scanned"
+    );
+    assert!(
+        out.contains("fn after"),
+        "code AFTER a test module is scanned — the bug this replaces"
+    );
+    assert!(
+        out.contains("ships_when_asked_for"),
+        "`test-support` is a shipped feature, not a test gate"
+    );
+    assert!(!out.contains("fn helper"), "the test module is dropped");
+    assert!(
+        !out.contains("fn another"),
+        "`cfg(all(test, …))` is dropped too"
+    );
+    assert_eq!(
+        count(&out, "TcpStream::connect"),
+        3,
+        "exactly the three production sites, none of the test ones"
+    );
 }
 
 /// Every shipped `<name>.rs` directly under `core/src/plugins/sync/`, with its
@@ -187,13 +297,59 @@ fn the_transports_socket_site_consults_the_routing_gate() {
         .map(|(_, s)| s)
         .expect("rustls_transport.rs");
     assert!(
-        source.contains("self.proxy.route()"),
-        "`RustlsTransport` must consult its `ProxyGate` before opening a socket"
+        source.contains("proxy.route()"),
+        "the socket site must consult a `ProxyGate` before opening a socket"
     );
     assert!(
         source.contains("connect_via_socks5"),
-        "`RustlsTransport` must have a tunneled arm, or Tor mode routes nothing"
+        "the socket site must have a tunneled arm, or Tor mode routes nothing"
     );
+    // Task 5: the enrollment handshake is not a second socket site with its own
+    // policy — it goes through the same function, so it cannot drift.
+    assert!(
+        source.contains("open_socket_via(proxy, host, port)"),
+        "`tofu_fetch_pin_via` must open its socket through the shared gated site, \
+         or an accept-any-certificate handshake goes out unrouted in Tor mode"
+    );
+    assert!(
+        source.contains("tofu_fetch_pin_via(&proxy::installed_for(host), host, port)"),
+        "`tofu_fetch_pin` must read the installed gate; a hardcoded default gate \
+         would route the enrollment handshake directly with Tor mode on"
+    );
+}
+
+/// **The pin-capture handshake is reachable only through the compare.**
+///
+/// `tofu_fetch_pin` accepts ANY certificate — it is the one handshake in the
+/// client that does. Over Tor that is the exit node's opportunity, so task 5
+/// made `pin_confirm::capture_pin` the single enforcement point: it refuses to
+/// return a pin in Tor mode unless the user supplied the fingerprint they
+/// obtained out-of-band and it matches what was served.
+///
+/// A second caller reaching for `tofu_fetch_pin` directly would get the capture
+/// without the compare, which compiles, passes every other test, and silently
+/// reinstates the MitM. So the callers are counted, the same way the sockets
+/// are.
+#[test]
+fn the_tofu_capture_is_reached_only_through_the_fingerprint_compare() {
+    for (name, source) in sync_sources() {
+        let calls = count(&source, "tofu_fetch_pin(");
+        let allowed = match name.as_str() {
+            // Its definition (`pub fn tofu_fetch_pin(`).
+            "rustls_transport.rs" => 1,
+            // The enforcement point itself.
+            "pin_confirm.rs" => 1,
+            _ => 0,
+        };
+        assert_eq!(
+            calls, allowed,
+            "{name}: expected {allowed} reference(s) to `tofu_fetch_pin`, found {calls}.\n\
+             The accept-any-certificate enrollment handshake must be reached through \
+             `pin_confirm::capture_pin`, which enforces the mandatory out-of-band \
+             fingerprint compare in Tor mode. Calling it directly captures a pin an \
+             exit node may have chosen."
+        );
+    }
 }
 
 /// No production code in the sync tree resolves a hostname locally.

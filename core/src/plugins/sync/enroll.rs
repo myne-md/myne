@@ -1005,8 +1005,18 @@ pub async fn enroll_device_from_host(
 /// Host-only by nature: it completes a TLS handshake over the raw-TLS transport
 /// and reads the leaf certificate. A page never sees one, which is why the
 /// browser arm passes `can_pin: false` and gets `None` here without calling it.
+///
+/// Goes through [`super::pin_confirm::capture_pin`] rather than reaching for
+/// `tofu_fetch_pin` itself (MYND-650 task 5): in Tor mode the handshake travels
+/// through an exit node, and an exit node can serve its own certificate to a
+/// client that has agreed to accept any. `confirmed_fingerprint` is the value
+/// the user obtained out-of-band; it is required there and optional on the
+/// clearnet.
 #[cfg(not(target_arch = "wasm32"))]
-async fn acquire_tofu_pin(url: &str) -> Result<Option<String>, SyncDeviceError> {
+async fn acquire_tofu_pin(
+    url: &str,
+    confirmed_fingerprint: Option<&str>,
+) -> Result<Option<String>, SyncDeviceError> {
     super::config::validate_endpoint_url(url).map_err(|_| SyncDeviceError::NotConfigured)?;
     let Some((scheme, host, port)) = super::http_transport::parse_endpoint(url) else {
         return Err(SyncDeviceError::NotConfigured);
@@ -1014,12 +1024,18 @@ async fn acquire_tofu_pin(url: &str) -> Result<Option<String>, SyncDeviceError> 
     if scheme != "https" {
         return Ok(None); // loopback http: no TLS, nothing to pin
     }
-    let pin =
-        crate::task::run_blocking(move || super::rustls_transport::tofu_fetch_pin(&host, port))
-            .await
-            .map_err(|_| SyncDeviceError::Internal)?
-            .map_err(|_| SyncDeviceError::Transport)?;
-    Ok(Some(super::to_hex(&pin)))
+    let pin = super::pin_confirm::capture_pin(host, port, confirmed_fingerprint)
+        .await
+        .map_err(|e| match e {
+            super::pin_confirm::PinConfirmError::ConfirmationRequired => {
+                SyncDeviceError::PinConfirmationRequired
+            }
+            super::pin_confirm::PinConfirmError::FingerprintMismatch => {
+                SyncDeviceError::FingerprintMismatch
+            }
+            super::pin_confirm::PinConfirmError::Transport => SyncDeviceError::Transport,
+        })?;
+    Ok(Some(pin))
 }
 
 /// The `wasm32` arm exists only so the `can_pin: true` branch has a body to
@@ -1027,7 +1043,10 @@ async fn acquire_tofu_pin(url: &str) -> Result<Option<String>, SyncDeviceError> 
 /// `can_pin: false`. It refuses rather than returning `None` so a future caller
 /// that flipped the flag would fail loudly instead of silently unpinned.
 #[cfg(target_arch = "wasm32")]
-async fn acquire_tofu_pin(_url: &str) -> Result<Option<String>, SyncDeviceError> {
+async fn acquire_tofu_pin(
+    _url: &str,
+    _confirmed_fingerprint: Option<&str>,
+) -> Result<Option<String>, SyncDeviceError> {
     Err(SyncDeviceError::Transport)
 }
 
@@ -1046,6 +1065,32 @@ pub struct JoinClient {
     /// browser: a page never sees the leaf cert, so the result reports
     /// `PinSource::PlatformTrustStore` instead of an empty pin.
     pub can_pin: bool,
+}
+
+/// What the USER brings to the bootstrap — the counterpart to [`JoinClient`],
+/// which carries what the *client* brings.
+///
+/// Grouped rather than passed loose because they are one idea ("which account,
+/// on which server, proved how"), and because the fourth field arrived with
+/// MYND-650 task 5 and would otherwise have pushed the join past the argument
+/// count where a reader stops being able to tell which `String` is which.
+pub struct JoinRequest {
+    /// The sync server to join through. Validated against the A4/TB5 policy
+    /// before anything reaches out.
+    pub server_url: String,
+    /// The account number, in either display or canonical form.
+    pub account_number: String,
+    /// The account password — wrapped in `Zeroizing` on arrival.
+    pub password: String,
+    /// The server-certificate fingerprint the user obtained **out-of-band**,
+    /// or `None`.
+    ///
+    /// Optional on the clearnet (the shipped TOFU bargain: first connect on
+    /// faith, eye-compare after) and **mandatory in Tor mode**, where the
+    /// accept-any-certificate first handshake travels through an exit node
+    /// that can serve its own — see [`super::pin_confirm`]. A value that does
+    /// not match what the server serves aborts the join with nothing written.
+    pub confirmed_fingerprint: Option<String>,
 }
 
 /// Outcome of joining an existing account on a fresh device.
@@ -1196,11 +1241,15 @@ pub async fn join_account_from_host(
     io: &'static dyn crate::vault_io::VaultIo,
     state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
     client: JoinClient,
-    server_url: String,
-    account_number: String,
-    password: String,
+    request: JoinRequest,
 ) -> Result<JoinResult, SyncDeviceError> {
     let JoinClient { vault_id, can_pin } = client;
+    let JoinRequest {
+        server_url,
+        account_number,
+        password,
+        confirmed_fingerprint,
+    } = request;
     let password = Zeroizing::new(password);
 
     // 1. Set + TOFU-pin the endpoint (https) before any transport use.
@@ -1211,7 +1260,7 @@ pub async fn join_account_from_host(
     // `PinSource::PlatformTrustStore` rather than an empty pin that reads as
     // unverified. Task 85's criterion asks for exactly that typed answer.
     let cert_pin_hex = if can_pin {
-        acquire_tofu_pin(&server_url).await?
+        acquire_tofu_pin(&server_url, confirmed_fingerprint.as_deref()).await?
     } else {
         None
     };
@@ -1398,4 +1447,59 @@ pub async fn join_account_from_host(
         fingerprint,
         device_id_hex,
     })
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod pin_confirmation_tests {
+    //! The enrollment half of MYND-650 task 5: the join's pin acquisition
+    //! honours the out-of-band compare.
+    //!
+    //! Testing it at [`super::acquire_tofu_pin`] rather than through
+    //! `join_account_from_host` is deliberate and is not a shortcut around the
+    //! criterion. The join is a network fetch, a bootstrap, an unlock and a
+    //! SCRAM handshake, all of which need a live server — but the pin
+    //! acquisition is its **first** step, and it propagates its error with `?`
+    //! before `config::set_endpoint` is reached. So "the fingerprint did not
+    //! match" is, structurally, "nothing was written": no endpoint URL, no
+    //! pin, no vault container. What these tests pin down is the half that
+    //! could actually regress — whether the acquisition compares at all, and
+    //! what it does when the comparison fails.
+
+    use super::super::rustls_transport::cert_pin;
+    use super::super::rustls_transport::tests::{spawn_tls_server, TEST_CERT_DER};
+    use super::super::to_hex;
+    use super::{acquire_tofu_pin, SyncDeviceError};
+
+    /// A confirmed fingerprint that is not what the server serves aborts the
+    /// acquisition — and therefore the join — with nothing pinned.
+    #[test]
+    fn a_mismatched_confirmed_fingerprint_aborts_the_join() {
+        let port = spawn_tls_server(1);
+        let url = format!("https://localhost:{port}");
+
+        let out = crate::test_support::block_on(acquire_tofu_pin(&url, Some(&"0".repeat(64))));
+        assert_eq!(out, Err(SyncDeviceError::FingerprintMismatch));
+    }
+
+    /// The matching case still returns the pin, in the canonical lowercase-hex
+    /// form the endpoint config stores — i.e. the compare is a gate on the
+    /// existing flow, not a replacement for it.
+    #[test]
+    fn a_matching_confirmed_fingerprint_yields_the_pin() {
+        let port = spawn_tls_server(1);
+        let url = format!("https://localhost:{port}");
+        let expected = to_hex(&cert_pin(TEST_CERT_DER));
+
+        let out = crate::test_support::block_on(acquire_tofu_pin(&url, Some(&expected)));
+        assert_eq!(out, Ok(Some(expected)));
+    }
+
+    /// A loopback `http` endpoint has no certificate, so there is nothing to
+    /// confirm and the confirmation policy never fires. The E2E harness and a
+    /// developer's local server keep working unchanged.
+    #[test]
+    fn a_loopback_http_endpoint_needs_no_confirmation() {
+        let out = crate::test_support::block_on(acquire_tofu_pin("http://127.0.0.1:8080", None));
+        assert_eq!(out, Ok(None));
+    }
 }

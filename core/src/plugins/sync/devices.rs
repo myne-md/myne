@@ -316,6 +316,20 @@ pub enum SyncDeviceError {
     /// pinned to one constant id, i.e. the web client — a desktop mints a fresh
     /// id per join and never collides.
     AccountMismatch,
+    /// Tor routing is on and the join carried no expected certificate
+    /// fingerprint (MYND-650 task 5).
+    ///
+    /// Its own variant for the same reason `AccountMismatch` is: the remedy is
+    /// different in kind. Nothing the user retypes about their account fixes
+    /// it — they have to fetch the fingerprint their server publishes and
+    /// supply it. **Nothing was written**: no endpoint, no pin, no vault.
+    PinConfirmationRequired,
+    /// The certificate served does not match the fingerprint the user
+    /// confirmed (MYND-650 task 5) — a typo, or a man in the middle, and from
+    /// here those are indistinguishable. The join aborts with nothing stored,
+    /// and the captured fingerprint is deliberately not reported
+    /// (`super::pin_confirm`'s module doc).
+    FingerprintMismatch,
     /// Internal (task join, IO).
     Internal,
 }

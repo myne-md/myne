@@ -87,6 +87,12 @@ pub mod poke_listener;
 // 39). Three atomics rather than an event per note or a host threaded through
 // `run_sync_cycle`: the readout has to be observable DURING the loop, and the
 // loop deliberately has no host.
+// The out-of-band fingerprint compare that has to accompany a TOFU pin captured
+// over Tor (MYND-650 task 5). Host-only for the same reason `rustls_transport`
+// is — it drives that module's handshake — and the single enforcement point
+// both enrollment paths acquire a pin through.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod pin_confirm;
 pub mod prefs_classification;
 pub mod prefs_merge;
 pub mod progress;

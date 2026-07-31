@@ -120,6 +120,21 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   // MYND-548: the id this join minted, kept so the pending path can name the
   // device once its first pull lands.
   const [joinedDeviceId, setJoinedDeviceId] = useState<string | null>(null);
+  // MYND-650 task 5: the certificate fingerprint the user obtained OUT-OF-BAND
+  // from their own server, plus whether the backend has asked for it. Required
+  // only in Tor mode, where the enrollment handshake — the one handshake that
+  // accepts any certificate — travels through an exit node that is in a
+  // position to serve its own.
+  //
+  // It is typed in BEFORE the pin is accepted, and the captured value is never
+  // shown alongside the question: "here is what we got, does it match yours?"
+  // anchors the user on whatever the attacker served, and offering the captured
+  // value on the failure path would let them paste it back. The compare below
+  // (`step === "pinned"`) is a different thing — by then the pin is already
+  // verified against this input, and that screen exists for cross-device
+  // comparison.
+  const [expectedFingerprint, setExpectedFingerprint] = useState("");
+  const [confirmNeeded, setConfirmNeeded] = useState(false);
 
   // MYND-548: this device's own name — the same hook the Settings enrollment form
   // uses, so the two doors cannot drift.
@@ -139,8 +154,10 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       serverUrl: url.trim(),
       accountNumber: account.trim(),
       password,
+      confirmedFingerprint: expectedFingerprint.trim() || null,
     })
       .then(async (res) => {
+        setConfirmNeeded(false);
         setJoinedDeviceId(res.device_id_hex);
         if (!res.pending) {
           // Self-approved (first device / recovery bootstrap): a cycle can run
@@ -167,7 +184,24 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
           setStep("pending");
         }
       })
-      .catch(() => setError(t("sync.join.error")))
+      .catch((e: unknown) => {
+        // The two Tor-mode refusals aborted the join before anything was
+        // written — no endpoint, no pin, no vault container — so the form stays
+        // put with the fingerprint field revealed. Every other failure keeps the
+        // single non-distinguishing message.
+        const kind = (e as { kind?: string } | null)?.kind;
+        if (kind === "PinConfirmationRequired") {
+          setConfirmNeeded(true);
+          setError(t("sync.join.confirmFingerprintRequired"));
+          return;
+        }
+        if (kind === "FingerprintMismatch") {
+          setConfirmNeeded(true);
+          setError(t("sync.join.confirmFingerprintMismatch"));
+          return;
+        }
+        setError(t("sync.join.error"));
+      })
       .finally(() => setBusy(false));
   };
 
@@ -395,6 +429,26 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
           onToggleShow={() => setShowPassword((s) => !s)}
           testId="join.password-input"
         />
+
+        {/* Revealed only once the backend refuses for want of it — see the
+            state declaration for why this is typed in rather than confirmed. */}
+        {confirmNeeded && (
+          <div style={FIELD}>
+            <label style={LABEL} htmlFor={`${baseId}-fingerprint`}>
+              {t("sync.join.confirmFingerprintLabel")}
+            </label>
+            <Input
+              id={`${baseId}-fingerprint`}
+              value={expectedFingerprint}
+              onChange={(e) => setExpectedFingerprint(e.target.value)}
+              placeholder={t("sync.join.confirmFingerprintPlaceholder")}
+              autoComplete="off"
+              spellCheck={false}
+              style={{ fontFamily: "var(--font-mono)" }}
+              data-testid="join.expected-fingerprint-input"
+            />
+          </div>
+        )}
 
         {error && <DestructiveBanner testId="join.error">{error}</DestructiveBanner>}
 
