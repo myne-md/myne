@@ -152,6 +152,10 @@ const V = {
   "src/lib/ai-chat.ts": ["adapted", "Unreachable where `localAi` is absent; the editor host omits the `ai` member entirely."],
   "src/lib/ai-model-store.ts": ["adapted", "Same as ai-chat: no AI surface mounts on web."],
   "src/lib/ai-qa.ts": ["adapted", "Same as ai-chat."],
+  "src/lib/ai-tags.ts": [
+    "adapted",
+    "Same as ai-chat: the auto-tag seam is unreachable where `localAi` is absent, and its command is `Unsupported` in the dispatcher.",
+  ],
   "src/lib/aiExcludedFolders.ts": ["ported", "Pure path predicate; also read by non-AI callers."],
   "src/lib/app-window.ts": [
     "adapted",
@@ -194,6 +198,10 @@ const V = {
   ],
   "src/lib/device-name.ts": ["adapted", "The `web` platform token maps to 'Browser' so a browser device is distinguishable in the list (task 69)."],
   "src/lib/deviceJoinQr.ts": ["ported", "Pure payload encoding."],
+  "src/lib/engine-error.ts": [
+    "ported",
+    "Pure shape reader over a rejection value; its AI callers are the ones the web build never reaches.",
+  ],
   "src/lib/focusable.ts": ["ported", "Pure DOM query."],
   "src/lib/icons.ts": ["ported", "Icon vocabulary."],
   "src/lib/imperative-focus-trap.ts": ["ported", "Pure DOM."],

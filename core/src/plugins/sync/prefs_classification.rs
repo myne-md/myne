@@ -74,6 +74,18 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ),
     ("attachment_ocr_enabled", PrefClass::DeviceLocal),
     ("auto_lock_seconds", PrefClass::DeviceLocal),
+    // MYND-651. **Shared**, for the same reason as `transcription_enabled` just
+    // below and deliberately unlike its co-gate `ai_enabled` (DeviceLocal):
+    // that flag is device-local because it gates a device-local model-path
+    // override, and this one gates a bundled task-model every client that ships
+    // the AI path carries. Whether the user wants automatic tag suggestions at
+    // all is taste, not capability — a device-local value would mean
+    // re-choosing it on every new device. A device without the engine still
+    // never runs the pass, because `ai_enabled` gates it independently.
+    (
+        "auto_tag_enabled",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     ("bar_items_order", PrefClass::DeviceLocal),
     ("cli_enabled", PrefClass::DeviceLocal),
     (
@@ -238,6 +250,7 @@ mod tests {
             attachment_compression_enabled: _,
             attachment_ocr_enabled: _,
             auto_lock_seconds: _,
+            auto_tag_enabled: _,
             bar_items_order: _,
             cli_enabled: _,
             cli_excluded_folders: _,
@@ -307,6 +320,7 @@ mod tests {
             "attachment_compression_enabled",
             "attachment_ocr_enabled",
             "auto_lock_seconds",
+            "auto_tag_enabled",
             "bar_items_order",
             "cli_enabled",
             "cli_excluded_folders",

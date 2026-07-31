@@ -865,24 +865,10 @@ const aiSummarizeNoteAction: CommandAction = {
   },
 };
 
-const aiSuggestTagsAction: CommandAction = {
-  id: "ai.suggest-tags",
-  get label() {
-    return i18n.t("commands.actions.aiSuggestTags.label");
-  },
-  get category() {
-    return i18n.t("commands.actions.category.ai");
-  },
-  visibility: (ctx) =>
-    ctx.stageName !== "editor" || ctx.selectedNoteId === null || !ctx.prefs.developer_mode
-      ? "hidden"
-      : ctx.aiEnabled
-        ? "show"
-        : "disabled",
-  run: (ctx) => {
-    ctx.onSuggestTags();
-  },
-};
+// There is no `ai.suggest-tags` action. Auto-tag ran as an explicit palette
+// action while its output rendered in the AI Chat tab; MYND-651 made suggestion
+// always-on in the inline band, so a "suggest tags" command would be a second
+// trigger for something the editor already does on its own.
 
 const aiRewriteSelectionAction: CommandAction = {
   id: "ai.rewrite-selection",
@@ -1308,7 +1294,6 @@ const ACTION_CAPABILITY: Readonly<Record<string, capabilities.Capability>> = Obj
   "ai.toggle-enabled": "localAi",
   "ai.open-chat": "localAi",
   "ai.summarize-note": "localAi",
-  "ai.suggest-tags": "localAi",
   "ai.rewrite-selection": "localAi",
   "app.toggle-screen-capture": "screenCaptureProtection",
   "vault.backup": "backup",
@@ -1446,7 +1431,6 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   revealVaultFolderAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,
-  aiSuggestTagsAction,
   aiRewriteSelectionAction,
 ]);
 

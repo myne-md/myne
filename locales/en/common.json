@@ -394,9 +394,6 @@
       "aiSummarizeNote": {
         "label": "Summarize note"
       },
-      "aiSuggestTags": {
-        "label": "Suggest tags"
-      },
       "aiRewriteSelection": {
         "label": "Rewrite selection"
       },
@@ -1020,6 +1017,11 @@
       "deleteRow": "Delete row",
       "reorderColumn": "Reorder column",
       "reorderRow": "Reorder row"
+    },
+    "tagSuggestion": {
+      "label": "Suggested tags",
+      "accept": "Add the tag {{tag}} to this note",
+      "dismiss": "Dismiss the suggested tag {{tag}}"
     },
     "taskField": {
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
@@ -2533,6 +2535,9 @@
       "pendingHint": "Coming soon"
     },
     "ai": {
+      "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "autoTagLabel": "Suggest tags automatically",
+      "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one — the switch turns on by itself in a build that includes it.",
       "disclosureToggle": "How does this work?",
       "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
       "enableLabel": "Enable local AI",
@@ -2784,6 +2789,7 @@
         "lastActiveNoteDesc": "Sync which note you had open so you can pick it up on another device."
       },
       "keywords": {
+        "aiAutoTag": "auto tag tags suggest suggestions labels ai",
         "aiEnable": "local ai on off enable disable machine learning",
         "aiExcluded": "excluded folders ignore ai privacy exclude",
         "aiModels": "models gguf download text embedding llm",

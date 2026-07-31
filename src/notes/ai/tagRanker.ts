@@ -33,7 +33,7 @@ export interface TagSuggestion {
  * again. This is input cleanup on the raw candidate stream, not a fold — the
  * identity fold stays `foldSegment`.
  */
-function cleanTagToken(raw: string): string {
+export function cleanTagToken(raw: string): string {
   const trimmed = raw.trim();
   const bare = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
   return bare.trim();

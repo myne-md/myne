@@ -49,46 +49,96 @@ describe("buildTagPrompt", () => {
 });
 
 describe("runTagSuggestionPass", () => {
-  it("calls infer exactly once and ranks the parsed candidates (existing-vocab first)", async () => {
-    const infer = vi.fn().mockResolvedValue("newthing, work");
+  it("calls the tag model exactly once and ranks the parsed candidates (existing-vocab first)", async () => {
+    const suggest = vi.fn().mockResolvedValue("newthing, work");
     const out = await runTagSuggestionPass({
+      noteId: "note-1",
       noteBody: "some note",
       noteFolder: "Work/",
       existingTags: ["work"],
       excludedFolders: [],
-      infer,
+      suggest,
     });
-    expect(infer).toHaveBeenCalledTimes(1);
+    expect(suggest).toHaveBeenCalledTimes(1);
+    // The note id travels with the prompt: the host re-reads the note's own
+    // folder from its blob rather than trusting a caller-supplied one (task 4).
+    expect(suggest.mock.calls[0][0].noteId).toBe("note-1");
+    expect(suggest.mock.calls[0][0].prompt).toContain("some note");
     expect(out.skipped).toBe(false);
+    expect(out.deferred).toBe(false);
     expect(out.suggestions).toEqual([
       { tag: "work", isNew: false },
       { tag: "newthing", isNew: true },
     ]);
   });
 
-  it("skips the pass and never calls infer for a note in an excluded folder", async () => {
-    const infer = vi.fn().mockResolvedValue("should-not-run");
+  it("skips the pass and never calls the model for a note in an excluded folder", async () => {
+    const suggest = vi.fn().mockResolvedValue("should-not-run");
     const out = await runTagSuggestionPass({
+      noteId: "note-1",
       noteBody: "secret",
       noteFolder: "Private/Journal/",
       existingTags: [],
       excludedFolders: ["Private/"],
-      infer,
+      suggest,
     });
-    expect(infer).not.toHaveBeenCalled();
-    expect(out).toEqual({ suggestions: [], skipped: true });
+    expect(suggest).not.toHaveBeenCalled();
+    expect(out).toEqual({ suggestions: [], skipped: true, deferred: false });
   });
 
   it("proceeds normally for a note outside any excluded folder", async () => {
-    const infer = vi.fn().mockResolvedValue("rust");
+    const suggest = vi.fn().mockResolvedValue("rust");
     const out = await runTagSuggestionPass({
+      noteId: "note-1",
       noteBody: "b",
       noteFolder: "Notes/",
       existingTags: [],
       excludedFolders: ["Private/"],
-      infer,
+      suggest,
     });
-    expect(infer).toHaveBeenCalledTimes(1);
+    expect(suggest).toHaveBeenCalledTimes(1);
     expect(out.suggestions).toEqual([{ tag: "rust", isNew: true }]);
+  });
+
+  it("reports a deferred host pass as deferred, not as an empty answer", async () => {
+    // The host stood down so user-initiated work could have the compute lock
+    // (task 4). Distinct from `Ok("")` — a caller must retry, never cache.
+    const suggest = vi.fn().mockRejectedValue({ kind: "deferred" });
+    const out = await runTagSuggestionPass({
+      noteId: "note-1",
+      noteBody: "b",
+      noteFolder: "",
+      existingTags: [],
+      excludedFolders: [],
+      suggest,
+    });
+    expect(out).toEqual({ suggestions: [], skipped: false, deferred: true });
+  });
+
+  it("treats an empty model reply as a real, cacheable empty answer", async () => {
+    const suggest = vi.fn().mockResolvedValue("");
+    const out = await runTagSuggestionPass({
+      noteId: "note-1",
+      noteBody: "b",
+      noteFolder: "",
+      existingTags: [],
+      excludedFolders: [],
+      suggest,
+    });
+    expect(out).toEqual({ suggestions: [], skipped: false, deferred: false });
+  });
+
+  it("propagates a genuine engine failure to the caller", async () => {
+    const suggest = vi.fn().mockRejectedValue({ kind: "failed" });
+    await expect(
+      runTagSuggestionPass({
+        noteId: "note-1",
+        noteBody: "b",
+        noteFolder: "",
+        existingTags: [],
+        excludedFolders: [],
+        suggest,
+      }),
+    ).rejects.toEqual({ kind: "failed" });
   });
 });

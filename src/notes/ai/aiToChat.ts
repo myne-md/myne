@@ -1,26 +1,26 @@
-// Summarize / tag-suggest → chat-transcript orchestration (conversational-ai-chat
-// tasks 10 + 11). Folds the two note-scoped AI capabilities into the single
-// conversational transcript: each runs as a user turn ("Summarize this note" /
-// "Suggest tags for this note") + an assistant turn — a text summary (with an
-// "Insert into note" action) or a set of tag accept-chips. Reuses the SAME pure
-// pipelines (`runSummarize`, `runTagSuggestionPass`) as the former
-// `runSummarizeToStore` / `runTagSuggestToStore` — only the render target moves
-// from the standalone `aiOutputStore` / `tagSuggestStore` to the chat transcript.
+// Summarize → chat-transcript orchestration (conversational-ai-chat task 10).
+// Folds the note-scoped summarize capability into the single conversational
+// transcript: a user turn ("Summarize this note") + an assistant turn carrying
+// the text summary and its "Insert into note" action. Reuses the SAME pure
+// `runSummarize` pipeline as the former `runSummarizeToStore` — only the render
+// target moves from the standalone `aiOutputStore` to the chat transcript.
+//
+// Tag suggestion used to live here too, as a second chat turn carrying accept
+// chips. MYND-651 retired that surface: tags now render in the inline
+// suggestion band at the frontmatter boundary, which is the single tag surface.
 //
 // The transcript is AS1-class RAM, dropped on lock (`clearChat`). No plaintext is
-// logged here (the summary / tags are the model's own words).
+// logged here (the summary is the model's own words).
 
 import type { EditorState } from "@codemirror/state";
 
 import {
   appendChatToken,
   failChatTurn,
-  finalizeChatTags,
   finalizeChatTurn,
   sendChatMessage,
 } from "./chatStore";
 import { runSummarize } from "./summarize";
-import { runTagSuggestionPass } from "./suggestTags";
 
 /**
  * Summarize the open note **as a chat turn** (task 10). Appends a "Summarize
@@ -46,36 +46,6 @@ export async function runSummarizeToChat(args: {
   } catch {
     // Engine error is a closed kind on the Rust side (DENY-list); the turn shows
     // its bounded error state, never the raw failure.
-    failChatTurn(token);
-  }
-}
-
-/**
- * Suggest tags for the open note **as a chat turn** (task 11). Appends a "Suggest
- * tags for this note" user turn + a streaming assistant turn, runs the
- * exclusion-gated `runTagSuggestionPass`, and finalizes the turn carrying the
- * ranked suggestions as accept-chips (each an explicit accept action, SYNC-17).
- * An excluded-folder note yields an empty (chip-less) turn, not an error.
- */
-export async function runTagSuggestToChat(args: {
-  noteBody: string;
-  noteFolder: string;
-  existingTags: readonly string[];
-  excludedFolders: readonly string[];
-  infer: (prompt: string) => Promise<string>;
-}): Promise<void> {
-  const token = sendChatMessage("Suggest tags for this note");
-  try {
-    const pass = await runTagSuggestionPass({
-      noteBody: args.noteBody,
-      noteFolder: args.noteFolder,
-      existingTags: args.existingTags,
-      excludedFolders: args.excludedFolders,
-      infer: args.infer,
-    });
-    // `skipped` (excluded folder) → finalize with no chips (empty, not an error).
-    finalizeChatTags(token, pass.skipped ? [] : pass.suggestions);
-  } catch {
     failChatTurn(token);
   }
 }
