@@ -47,6 +47,9 @@
 import { useId, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "../primitives/Button";
+import { Input } from "../primitives/Input";
+
 /** A SHA-256 fingerprint, as hex characters. */
 const FINGERPRINT_HEX_LEN = 64;
 /** Characters per group in the echo. 64 / 4 = 16 groups. */
@@ -92,6 +95,30 @@ export function readFingerprintInput(raw: string): FingerprintReading {
     hasJunk,
     complete: !hasJunk && hex.length === FINGERPRINT_HEX_LEN,
   };
+}
+
+/**
+ * The two backend refusals that open this gate, as their shared `kind` tags.
+ *
+ * `SyncConfigError` and `SyncDeviceError` are different enums, but these two
+ * variants mean the same thing on both and carry the same contract: **nothing
+ * was written** — no endpoint, no pin, no vault container — so the screen stays
+ * where it is with the field revealed, and declining costs nothing to undo.
+ */
+export type FingerprintGateRefusal = "PinConfirmationRequired" | "FingerprintMismatch";
+
+/**
+ * Does this rejection mean "the gate wants a fingerprint", and which one?
+ *
+ * One classifier for both enrollment doors (`EndpointConfig`, `JoinDeviceModal`)
+ * so the rule about which refusals reveal the gate has one home. Two independent
+ * `kind ===` chains had already drifted on type-safety within the change that
+ * added them, and a third door — or a third refusal — would have to find every
+ * copy.
+ */
+export function fingerprintGateRefusal(e: unknown): FingerprintGateRefusal | null {
+  const kind = (e as { kind?: unknown } | null)?.kind;
+  return kind === "PinConfirmationRequired" || kind === "FingerprintMismatch" ? kind : null;
 }
 
 /** Split hex into fixed-width groups for the eye-compare. */
@@ -143,17 +170,6 @@ const LABEL: CSSProperties = {
   fontWeight: 600,
 };
 
-const INPUT: CSSProperties = {
-  padding: "var(--space-2) var(--space-3)",
-  fontSize: "var(--text-sm)",
-  fontFamily: "var(--font-mono)",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-  color: "var(--fg-1)",
-  minWidth: 0,
-};
-
 const ECHO_GROUPS: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
@@ -190,22 +206,6 @@ const ACTIONS: CSSProperties = {
   justifyContent: "flex-end",
   flexWrap: "wrap",
 };
-
-function actionStyle(primary: boolean, disabled: boolean): CSSProperties {
-  return {
-    padding: "var(--space-2) var(--space-4)",
-    fontSize: "var(--text-sm)",
-    fontWeight: 500,
-    fontFamily: "var(--font-sans)",
-    borderRadius: "var(--radius-1)",
-    cursor: disabled ? "not-allowed" : "pointer",
-    border: primary ? "none" : "1px solid var(--line-1)",
-    background: primary ? "var(--accent)" : "var(--bg-2)",
-    color: primary ? "var(--accent-on)" : "var(--fg-1)",
-    opacity: disabled ? 0.6 : 1,
-    whiteSpace: "nowrap",
-  };
-}
 
 export interface FingerprintConfirmProps {
   /** The raw text the user has typed. Owned by the host, which sends it back. */
@@ -261,7 +261,11 @@ export function FingerprintConfirm({
         <label style={LABEL} htmlFor={`${baseId}-input`}>
           {t("sync.fingerprint.label")}
         </label>
-        <input
+        {/* `mono`, and the shared primitive: the focus ring is where a user
+            reading 64 hex characters finds their place again, and a hand-rolled
+            input would be the one field on this screen without one. */}
+        <Input
+          mono
           id={`${baseId}-input`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -270,7 +274,6 @@ export function FingerprintConfirm({
           autoCapitalize="off"
           autoComplete="off"
           autoCorrect="off"
-          style={INPUT}
           data-testid={`${testIdPrefix}.expected-fingerprint-input`}
         />
       </div>
@@ -305,6 +308,9 @@ export function FingerprintConfirm({
         </div>
       )}
 
+      {/* Left as a bare button: the shared `Button` primitive has no
+          text-link variant, and the panel-level disclosures elsewhere in
+          Settings are styled the same way. */}
       <button
         type="button"
         onClick={() => setHelpOpen((open) => !open)}
@@ -329,23 +335,22 @@ export function FingerprintConfirm({
       )}
 
       <div style={ACTIONS}>
-        <button
+        <Button
           type="button"
           onClick={onDecline}
-          style={actionStyle(false, false)}
           data-testid={`${testIdPrefix}.fingerprint-decline`}
         >
           {t("sync.fingerprint.decline")}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="primary"
           onClick={onConfirm}
           disabled={!canConfirm}
-          style={actionStyle(true, !canConfirm)}
           data-testid={`${testIdPrefix}.fingerprint-confirm`}
         >
           {confirmLabel}
-        </button>
+        </Button>
       </div>
     </section>
   );

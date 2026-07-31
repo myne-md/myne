@@ -46,6 +46,22 @@
 //! `mod.rs` declares under a `test` cfg are skipped entirely (the simulation
 //! harness, and this file, which has to spell the tokens out to look for them).
 //!
+//! ## The second axis: socket *lifetime* (MYND-650 review)
+//!
+//! Counting connect *sites* answers "was this socket opened through the gate".
+//! It structurally cannot answer "is it still allowed to be open" — a connect
+//! that was correctly gated when it happened keeps carrying bytes after the
+//! gate moves, and the guard sees nothing because no new site appeared. That
+//! is not a hypothetical: the SSE poke stream held a direct connection open
+//! indefinitely across a Tor toggle, because its read timeout deliberately sits
+//! above the server's heartbeat cadence so a healthy stream never times out.
+//!
+//! So [`LONG_LIVED_SOCKETS`] lists every socket in this tree that outlives the
+//! call that opened it, with what invalidates it, and
+//! [`the_long_lived_sockets_are_invalidated_by_the_routing_gate`] asserts each
+//! one still carries that invalidation. A request/response socket needs no
+//! entry: it is gone before the gate can move under it.
+//!
 //! It is a **string** scan, and that is a real limit worth stating: an alias
 //! (`use std::net::TcpStream as S;`) or a socket opened through a helper crate
 //! would slip past it. It catches the shape a bypass is actually written in —
@@ -66,7 +82,7 @@ const DIRECT_CONNECT_SITES: &[(&str, usize, &str)] = &[
         "`open_socket_via`'s `Route::Direct` arm — reachable only when the gate \
          says Tor mode is off, which is the whole fail-closed decision. Both \
          socket sites in that file (the transport's `open_socket` and the \
-         one-shot enrollment handshake `tofu_fetch_pin`) share it, so there is \
+         one-shot enrollment handshake `tofu_fetch_pin_via`) share it, so there is \
          one arm rather than one per caller. Task 5 routed the enrollment \
          handshake and paired it with `pin_confirm`'s mandatory out-of-band \
          fingerprint compare, which is what makes an accept-any-certificate \
@@ -89,6 +105,59 @@ const DIRECT_CONNECT_SITES: &[(&str, usize, &str)] = &[
          even the proxy's own address goes near a resolver.",
     ),
 ];
+
+/// Every production socket in the sync tree that OUTLIVES the call that opened
+/// it, and the tokens proving it is invalidated when the routing gate moves.
+/// `(file, what keeps it open, tokens that must ALL appear, why)`.
+///
+/// Two tokens rather than one because the tie has two halves and either can be
+/// removed on its own: the gate for *this endpoint* has to be resolved, and its
+/// answer has to end up in the identity. A refactor that kept the first and
+/// dropped the second would leave a stream whose route is decided once.
+///
+/// A file absent from this table opens no socket it keeps.
+const LONG_LIVED_SOCKETS: &[(&str, &str, &[&str], &str)] = &[(
+    "poke_listener.rs",
+    "the `/sync/poke` SSE stream — one connection per unlocked enrolled vault, \
+     held open for hours",
+    &[
+        "stream_identity_over(snap, &proxy::installed_for(&host))",
+        "route: gate.route().ok()?",
+    ],
+    "The route the gate answers for this endpoint is part of the worker's \
+     `StreamIdentity`, re-read every supervisor tick, so a Tor toggle (or a \
+     bootstrap completing, or a sidecar dying) makes the live stream a \
+     DIFFERENT identity and the supervisor tears it down. Without this term the \
+     stream survives the toggle: `SSE_READ_TIMEOUT` is deliberately above the \
+     server's heartbeat cadence, so a healthy direct connection never times out \
+     and keeps exposing the source IP while the UI reports Tor is on.",
+)];
+
+/// The keep-alive request socket in `http_transport.rs` is deliberately NOT in
+/// [`LONG_LIVED_SOCKETS`]: it is loopback-only by construction (see
+/// [`DIRECT_CONNECT_SITES`]), so there is no source IP for a moved gate to
+/// expose. `rustls_transport`'s sockets do not outlive their request.
+#[test]
+fn the_long_lived_sockets_are_invalidated_by_the_routing_gate() {
+    for (file, what, tokens, why) in LONG_LIVED_SOCKETS {
+        let source = sync_sources()
+            .into_iter()
+            .find(|(n, _)| n == file)
+            .map(|(_, s)| s)
+            .unwrap_or_else(|| panic!("{file}: listed as a long-lived socket but not scanned"));
+        for token in *tokens {
+            assert!(
+                source.contains(token),
+                "{file}: {what} no longer ties its lifetime to the routing gate.\n\
+                 Expected to find: {token}\n\
+                 Why it is load-bearing: {why}\n\
+                 A socket opened before the gate moved is invisible to the \
+                 connect-site count above — routing a NEW connection correctly is \
+                 not the same as closing an old one."
+            );
+        }
+    }
+}
 
 /// Tokens that would resolve a name on this device. The sync hostname must be
 /// resolved **inside the circuit** in Tor mode (`socks5`'s domain-name
@@ -311,31 +380,67 @@ fn the_transports_socket_site_consults_the_routing_gate() {
         "`tofu_fetch_pin_via` must open its socket through the shared gated site, \
          or an accept-any-certificate handshake goes out unrouted in Tor mode"
     );
+    // The enrollment handshake takes its gate as a PARAMETER. A convenience
+    // wrapper that resolved it here would be a second read of a cell the caller
+    // has already consulted for the confirmation policy — see `pin_confirm`.
+    assert_eq!(
+        count(&source, "proxy::installed_for"),
+        // `RustlsTransport::new` only — one gate resolved per transport built.
+        1,
+        "the only production read of the installed gate in this file is \
+         `RustlsTransport::new`. A second one means the pin-capture handshake \
+         resolves its own gate again, after `pin_confirm::capture_pin` already \
+         consulted it for the confirmation policy — a TOCTOU between the policy \
+         and the route it governs."
+    );
+}
+
+/// The pin capture's gate is snapshotted once and used for both decisions.
+///
+/// Two reads of the same cell — one for "is a confirmation required", one
+/// inside the handshake — is a window in which a user flipping the Tor toggle
+/// gets the accept-any-certificate handshake routed through an exit node under
+/// the no-confirmation-needed answer given a moment earlier.
+#[test]
+fn the_pin_capture_snapshots_one_gate_for_the_policy_and_the_route() {
+    let source = sync_sources()
+        .into_iter()
+        .find(|(n, _)| n == "pin_confirm.rs")
+        .map(|(_, s)| s)
+        .expect("pin_confirm.rs");
     assert!(
-        source.contains("tofu_fetch_pin_via(&proxy::installed_for(host), host, port)"),
-        "`tofu_fetch_pin` must read the installed gate; a hardcoded default gate \
-         would route the enrollment handshake directly with Tor mode on"
+        source.contains("let gate = proxy::installed_for(&host);")
+            && source.contains("let required = gate.is_enabled();"),
+        "`capture_pin` must read the routing gate ONCE and derive the \
+         confirmation policy from that same value"
+    );
+    assert_eq!(
+        count(&source, "proxy::installed_for"),
+        // `capture_pin`'s snapshot, plus the standalone `confirmation_required`
+        // query (which opens no socket).
+        2,
+        "each extra read of the installed gate is a TOCTOU window between the \
+         policy decision and the handshake it governs"
     );
 }
 
 /// **The pin-capture handshake is reachable only through the compare.**
 ///
-/// `tofu_fetch_pin` accepts ANY certificate — it is the one handshake in the
-/// client that does. Over Tor that is the exit node's opportunity, so task 5
-/// made `pin_confirm::capture_pin` the single enforcement point: it refuses to
-/// return a pin in Tor mode unless the user supplied the fingerprint they
+/// `tofu_fetch_pin_via` accepts ANY certificate — it is the one handshake in
+/// the client that does. Over Tor that is the exit node's opportunity, so task
+/// 5 made `pin_confirm::capture_pin` the single enforcement point: it refuses
+/// to return a pin in Tor mode unless the user supplied the fingerprint they
 /// obtained out-of-band and it matches what was served.
 ///
-/// A second caller reaching for `tofu_fetch_pin` directly would get the capture
-/// without the compare, which compiles, passes every other test, and silently
-/// reinstates the MitM. So the callers are counted, the same way the sockets
-/// are.
+/// A second caller reaching for it directly would get the capture without the
+/// compare, which compiles, passes every other test, and silently reinstates
+/// the MitM. So the callers are counted, the same way the sockets are.
 #[test]
 fn the_tofu_capture_is_reached_only_through_the_fingerprint_compare() {
     for (name, source) in sync_sources() {
-        let calls = count(&source, "tofu_fetch_pin(");
+        let calls = count(&source, "tofu_fetch_pin");
         let allowed = match name.as_str() {
-            // Its definition (`pub fn tofu_fetch_pin(`).
+            // Its definition (`pub fn tofu_fetch_pin_via(`).
             "rustls_transport.rs" => 1,
             // The enforcement point itself.
             "pin_confirm.rs" => 1,
@@ -343,7 +448,7 @@ fn the_tofu_capture_is_reached_only_through_the_fingerprint_compare() {
         };
         assert_eq!(
             calls, allowed,
-            "{name}: expected {allowed} reference(s) to `tofu_fetch_pin`, found {calls}.\n\
+            "{name}: expected {allowed} reference(s) to `tofu_fetch_pin_via`, found {calls}.\n\
              The accept-any-certificate enrollment handshake must be reached through \
              `pin_confirm::capture_pin`, which enforces the mandatory out-of-band \
              fingerprint compare in Tor mode. Calling it directly captures a pin an \

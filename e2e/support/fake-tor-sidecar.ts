@@ -11,7 +11,7 @@
 //     supervisor's liveness probe sends (`supervisor.rs::socks5_greeting_ok`);
 //   * arti's `"Sufficiently bootstrapped"` INFO line on stderr, which is the
 //     only readiness signal this build of arti exposes
-//     (`arti_cli.rs::classify_line`).
+//     (`arti_cli.rs::is_bootstrap_line`).
 //
 // Nothing in production changes. The supervisor, the phase machine, the routing
 // gate, the IPC and the UI are all the shipped ones; the only substitution is
@@ -112,7 +112,7 @@ server.on("error", (e) => {
 server.listen(port, "127.0.0.1", () => {
   // Deliberately NOT the readiness marker: the supervisor must stay in
   // \`Starting\` until the scenario writes "bootstrap". Mirrors arti's own
-  // startup chatter, which classify_line() drops.
+  // startup chatter, which is_bootstrap_line() drops.
   console.error("INFO fake-arti: Starting fake Arti on 127.0.0.1:" + port);
   poll();
 });

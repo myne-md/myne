@@ -65,6 +65,17 @@ const ATYP_IPV6: u8 = 0x04;
 /// Reply code `0x00`: succeeded.
 const REP_SUCCEEDED: u8 = 0x00;
 
+/// The method-negotiation greeting this client opens every exchange with:
+/// `VER | NMETHODS=1 | NO-AUTH`.
+///
+/// Public because the desktop supervisor's liveness probe
+/// (`src-tauri/src/tor_sidecar/supervisor.rs`) speaks exactly this much SOCKS5
+/// and nothing more — it asks "is the listener alive" without a `CONNECT`, so
+/// no circuit is built and no hostname is disclosed. Sharing the bytes and
+/// [`read_method_selection`] is what keeps the probe's idea of a healthy
+/// listener the same as the transport's.
+pub const METHOD_NEGOTIATION_GREETING: [u8; 3] = [VER, 1, METHOD_NO_AUTH];
+
 /// How long to wait for the loopback proxy to accept a TCP connection. Short
 /// on purpose: this is a process on this machine, so anything slow here is a
 /// dead or wedged sidecar, and the honest answer is an error the gate can turn
@@ -86,8 +97,11 @@ pub enum Socks5Error {
     AuthRequired,
     /// The proxy refused the `CONNECT`, carrying RFC 1928's reply code (`0x03`
     /// network unreachable, `0x04` host unreachable, `0x05` connection refused,
-    /// …). Preserved rather than flattened because the codes distinguish
-    /// "Tor could not reach the sync server" from "the circuit is broken".
+    /// …). The byte is carried for diagnosis and for the tests that pin the
+    /// decoding; it is deliberately NOT surfaced — [`TransportError`] collapses
+    /// every refusal to `Network`, because "Tor could not reach the sync server"
+    /// and "the circuit is broken" have the same remedy from the UI's side, and
+    /// a per-code message would be reporting the exit relay's opinion.
     Refused(u8),
     /// The target hostname is empty, longer than SOCKS5's 255-byte field, or
     /// carries bytes that have no business in a hostname.
@@ -135,7 +149,7 @@ pub fn connect_via_socks5(
     let _ = sock.set_read_timeout(Some(SOCKET_TIMEOUT));
     let _ = sock.set_write_timeout(Some(SOCKET_TIMEOUT));
 
-    sock.write_all(&[VER, 1, METHOD_NO_AUTH])
+    sock.write_all(&METHOD_NEGOTIATION_GREETING)
         .map_err(|_| Socks5Error::Protocol)?;
     read_method_selection(&mut sock)?;
 
@@ -169,7 +183,11 @@ pub fn encode_connect_request(host: &str, port: u16) -> Result<Vec<u8>, Socks5Er
 }
 
 /// Read the proxy's 2-byte method selection and accept only `NO AUTH`.
-fn read_method_selection(r: &mut impl Read) -> Result<(), Socks5Error> {
+///
+/// Public for the same reason [`METHOD_NEGOTIATION_GREETING`] is: the
+/// supervisor's liveness probe reads the same reply and must agree with the
+/// transport about what counts as a listener worth handing traffic to.
+pub fn read_method_selection(r: &mut impl Read) -> Result<(), Socks5Error> {
     let mut reply = [0u8; 2];
     r.read_exact(&mut reply)
         .map_err(|_| Socks5Error::Protocol)?;

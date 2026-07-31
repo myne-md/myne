@@ -334,6 +334,22 @@ pub enum SyncDeviceError {
     Internal,
 }
 
+/// The fingerprint gate's refusals, projected onto this command's enum
+/// (MYND-650 task 5) — the twin of [`super::config::SyncConfigError`]'s impl.
+/// See it for why this is a `From` rather than a `match` at the call site, and
+/// why both are host-only.
+#[cfg(not(target_arch = "wasm32"))]
+impl From<super::pin_confirm::PinConfirmError> for SyncDeviceError {
+    fn from(e: super::pin_confirm::PinConfirmError) -> Self {
+        use super::pin_confirm::PinConfirmError as P;
+        match e {
+            P::ConfirmationRequired => SyncDeviceError::PinConfirmationRequired,
+            P::FingerprintMismatch => SyncDeviceError::FingerprintMismatch,
+            P::Transport => SyncDeviceError::Transport,
+        }
+    }
+}
+
 impl SyncDeviceError {
     pub(crate) fn from_mgmt(e: DeviceMgmtError) -> Self {
         match e {

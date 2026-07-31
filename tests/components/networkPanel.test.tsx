@@ -21,9 +21,12 @@
 // 3. **The posture is not the switch.** The switch says what was asked for; the
 //    posture row says what is happening. They disagree exactly when it matters
 //    — a Tor client that failed to start leaves the preference on and the
-//    tunnel down — so the four postures are asserted to render *distinctly*,
+//    tunnel down — so the five postures are asserted to render *distinctly*,
 //    and the two paused ones are asserted to say sync is paused rather than
-//    anything that could be read as protection.
+//    anything that could be read as protection. `exempt` is the fifth: a
+//    loopback endpoint travels through no circuit whatever the process gate
+//    says, and rendering that as "active" would claim a tunnel that does not
+//    exist.
 //
 // Copy is asserted through the catalog rather than pasted, so the wording stays
 // the catalog's business — what is pinned is the bound, which no translation may
@@ -76,13 +79,15 @@ const RENDERED_KEYS = [
   "settings.network.postureActive",
   "settings.network.postureUnavailable",
   "settings.network.postureUnavailableDetail",
+  "settings.network.postureExempt",
+  "settings.network.postureExemptDetail",
   "settings.network.disabledCue",
 ];
 
 beforeEach(() => {
   // The resting posture of every install that never opted in. Tests that care
   // about a different one override it.
-  getTorState.mockResolvedValue({ enabled: false, state: { kind: "stopped" } });
+  getTorState.mockResolvedValue({ enabled: false, state: { kind: "stopped" }, exempt: false });
 });
 
 afterEach(() => {
@@ -213,12 +218,13 @@ describe("Network panel — the posture row (task 8)", () => {
     return await screen.findByTestId("settings.tor-posture");
   };
 
-  it("renders each of the four postures distinctly", async () => {
+  it("renders each of the five postures distinctly", async () => {
     const cases: Array<[TorStateView, TorPosture, string]> = [
-      [{ enabled: false, state: { kind: "stopped" } }, "inactive", "postureInactive"],
-      [{ enabled: true, state: { kind: "starting" } }, "connecting", "postureConnecting"],
-      [{ enabled: true, state: { kind: "ready" } }, "active", "postureActive"],
-      [{ enabled: true, state: { kind: "failed" } }, "unavailable", "postureUnavailable"],
+      [{ enabled: false, state: { kind: "stopped" }, exempt: false }, "inactive", "postureInactive"],
+      [{ enabled: true, state: { kind: "starting" }, exempt: false }, "connecting", "postureConnecting"],
+      [{ enabled: true, state: { kind: "ready" }, exempt: false }, "active", "postureActive"],
+      [{ enabled: true, state: { kind: "failed" }, exempt: false }, "unavailable", "postureUnavailable"],
+      [{ enabled: true, state: { kind: "ready" }, exempt: true }, "exempt", "postureExempt"],
     ];
     const seen = new Set<string>();
     for (const [view, posture, key] of cases) {
@@ -230,14 +236,67 @@ describe("Network panel — the posture row (task 8)", () => {
       seen.add(label);
       cleanup();
     }
-    expect(seen.size).toBe(4);
+    expect(seen.size).toBe(5);
+  });
+
+  /// A loopback endpoint tunnels nothing whatever the process gate says. The
+  /// bug this pins: `enabled` + a `ready` sidecar rendered "Sync is going
+  /// through Tor" over an endpoint no circuit ever touched. It must not read as
+  /// protection, and it must not read as a paused sync either — sync works.
+  it("does not claim a tunnel over a Tor-exempt endpoint", async () => {
+    const row = await mount({ enabled: true, state: { kind: "ready" }, exempt: true });
+    expect(row.getAttribute("data-posture")).toBe("exempt");
+    expect(row.textContent).not.toContain(i18n.t("settings.network.postureActive"));
+    expect(row.textContent).toContain(i18n.t("settings.network.postureExemptDetail"));
+    // The switch still shows what the user asked for; only the posture reports
+    // what is happening to their traffic.
+    expect(screen.getByTestId("settings.tor-routing").getAttribute("data-enabled")).toBe("true");
+    const exemptCopy = i18n.t("settings.network.postureExempt").toLowerCase();
+    expect(exemptCopy).not.toContain("paused");
+    for (const word of ["protected", "secure", "safe"]) {
+      expect(exemptCopy).not.toContain(word);
+    }
+  });
+
+  /// The overclaim this copy was corrected for. All the client knows is that the
+  /// endpoint's HOST STRING is `127.0.0.1` / `localhost` / `::1` — and the
+  /// realistic shape of that is not the dev server, it is an SSH or `socat`
+  /// forward to a remote host, where the traffic really does leave and there
+  /// really is something to hide; Myne just cannot route it. So the detail may
+  /// say what enters no circuit. It may not say what stays on the machine, and
+  /// it has to name the case it cannot see — a shorter version that dropped the
+  /// second sentence would read as the reassurance this test exists to block.
+  it("does not promise a Tor-exempt endpoint's traffic stays on this device", () => {
+    const detail = i18n.t("settings.network.postureExemptDetail").toLowerCase();
+    for (const overclaim of [
+      "never leaves",
+      "doesn't leave",
+      "does not leave",
+      "nothing leaves",
+      "nothing to hide",
+      "stays on this",
+    ]) {
+      expect(detail, `"${overclaim}" claims more than a loopback host string proves`).not.toContain(
+        overclaim,
+      );
+    }
+    expect(detail, "the copy must name the forward-to-elsewhere case it cannot see").toMatch(
+      /elsewhere|somewhere else|another (computer|machine|device|server)|remote/,
+    );
+  });
+
+  /// The exemption is only reported when Tor mode is ON. With it off there is
+  /// nothing to explain — direct sync is the default and `inactive` says so.
+  it("reports a loopback endpoint as inactive while Tor mode is off", async () => {
+    const row = await mount({ enabled: false, state: { kind: "stopped" }, exempt: true });
+    expect(row.getAttribute("data-posture")).toBe("inactive");
   });
 
   /// A dead Tor client and a deliberately-stopped one are the same situation
   /// for the user — sync is paused, nothing goes out direct — so they are one
   /// posture. What must never happen is either of them reading as fine.
   it("reports a stopped client under Tor mode as unavailable, not as off", async () => {
-    const row = await mount({ enabled: true, state: { kind: "stopped" } });
+    const row = await mount({ enabled: true, state: { kind: "stopped" }, exempt: false });
     expect(row.getAttribute("data-posture")).toBe("unavailable");
   });
 
@@ -245,7 +304,7 @@ describe("Network panel — the posture row (task 8)", () => {
   /// spawn failure is exactly the case where they disagree, and the row is the
   /// only place the disagreement is visible.
   it("shows sync paused while the switch sits ON after a failed start", async () => {
-    const row = await mount({ enabled: true, state: { kind: "failed" } });
+    const row = await mount({ enabled: true, state: { kind: "failed" }, exempt: false });
     expect(screen.getByTestId("settings.tor-routing").getAttribute("data-enabled")).toBe("true");
     expect(row.textContent).toContain(i18n.t("settings.network.postureUnavailable"));
     expect(row.textContent).toContain(i18n.t("settings.network.postureUnavailableDetail"));
@@ -269,14 +328,14 @@ describe("Network panel — the posture row (task 8)", () => {
 
   it("says so explicitly when the user turns Tor off", async () => {
     getTorRouting.mockResolvedValue({ enabled: true });
-    getTorState.mockResolvedValue({ enabled: true, state: { kind: "ready" } });
+    getTorState.mockResolvedValue({ enabled: true, state: { kind: "ready" }, exempt: false });
     setTorRouting.mockResolvedValueOnce({ enabled: false });
 
     render(<NetworkPanel />);
     await screen.findByTestId("settings.tor-posture");
     expect(screen.queryByTestId("settings.tor-disabled-cue")).toBeNull();
 
-    getTorState.mockResolvedValue({ enabled: false, state: { kind: "stopped" } });
+    getTorState.mockResolvedValue({ enabled: false, state: { kind: "stopped" }, exempt: false });
     fireEvent.click(screen.getByTestId("settings.tor-routing-toggle"));
 
     const cue = await screen.findByTestId("settings.tor-disabled-cue");

@@ -307,6 +307,30 @@ export async function setTranscriptionEnabled(
   await closeSettings(session);
 }
 
+/**
+ * Turn Developer mode on via Settings → About and wait for the Developer rail
+ * group to appear. Leaves the Settings modal OPEN on the About tab, because
+ * every caller's next move is a rail click into one of the panels the group just
+ * revealed (`settings.tab-ai`, `settings.tab-network`, …).
+ *
+ * Immediate effect, no dialog — the About toggle writes the `developer_mode`
+ * pref and the rail is filtered from it, so the group's presence is the
+ * assertion that the flip took.
+ */
+export async function enableDeveloperMode(session: Session): Promise<void> {
+  await openSettings(session, "about");
+  await (await session.byTestId("about.developer-mode-toggle")).click();
+  await session.waitUntil(
+    async () =>
+      (await (await session.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
+      "true"
+        ? true
+        : null,
+    { label: "developer_mode toggled on", timeoutMs: 10_000 },
+  );
+  await session.waitForElement(testIdSelector("settings.developer-group"));
+}
+
 export async function enableAi(session: Session): Promise<void> {
   await openSettings(session, "ai");
   await session.byTestId("settings.ai-panel");

@@ -42,7 +42,7 @@
 //! Sync pauses visibly (task 8's banner) and the remedy is one toggle, which
 //! rewrites the file. Loud and safe beats quiet and exposed.
 
-use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
+use crate::io_failure_kind::IoFailureKind;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use thiserror::Error;
@@ -80,14 +80,6 @@ pub enum TorConfigError {
 impl From<IoFailureKind> for TorConfigError {
     fn from(io_error_kind: IoFailureKind) -> Self {
         TorConfigError::Io { io_error_kind }
-    }
-}
-
-impl From<std::io::Error> for TorConfigError {
-    fn from(e: std::io::Error) -> Self {
-        TorConfigError::Io {
-            io_error_kind: from_io_error_kind(e.kind()),
-        }
     }
 }
 
@@ -136,35 +128,26 @@ pub async fn write_tor_routing(
     Ok(())
 }
 
-/// Read the preference through the host seam.
-pub async fn get_tor_routing(
-    host: &dyn crate::host::HostCtx,
-    io: &dyn crate::vault_io::VaultIo,
-) -> Result<TorRoutingConfig, TorConfigError> {
-    let path = tor_config_path_from_host(host, io).await?;
-    read_tor_routing(io, &path).await
-}
-
-/// Write the preference through the host seam.
-///
-/// Deliberately does **not** touch the gate or the sidecar: the caller owns the
-/// ordering between persistence and the process, and that ordering is
-/// security-relevant (`src-tauri/src/plugins/sync/tor.rs`).
-pub async fn set_tor_routing(
-    host: &dyn crate::host::HostCtx,
-    io: &dyn crate::vault_io::VaultIo,
-    enabled: bool,
-) -> Result<(), TorConfigError> {
-    let path = tor_config_path_from_host(host, io).await?;
-    write_tor_routing(io, &path, TorRoutingConfig { enabled }).await
-}
-
-/// What Tor mode should be at startup, given whatever [`read_tor_routing`]
-/// answered.
+/// What Tor mode should be, given whatever [`read_tor_routing`] answered.
 ///
 /// The one place the "a broken file fails ON" rule is written down, so it is a
 /// function with a test rather than a `match` arm somewhere in app setup. See
-/// the module doc for the argument.
+/// the module doc for the argument. **Every** reader goes through it — the
+/// startup restore and the command the Settings switch reads — because two
+/// readers with two reductions is exactly how a switch comes to say "off" about
+/// a gate that is refusing connections.
+///
+/// Note that neither reader hands it a path-resolution failure: a config
+/// directory that cannot be resolved at all is not a file somebody wrote, so it
+/// stays off (the fresh-install posture) rather than fail-closed.
+///
+/// **Every** `Err` resolves to `true`, including [`TorConfigError::Io`], and
+/// that is narrower than it looks: [`read_tor_routing`] answers an *absent*
+/// file with `Ok(default)`, so an `Io` here is a file that exists and could not
+/// be read — permissions, a bad sector, a directory in its place. That is the
+/// same situation as `Parse` and takes the same answer, for the same reason: a
+/// file is there, somebody wrote it, and the one thing that must not happen is
+/// dropping a user's Tor routing on the quiet because we could not open it.
 pub fn routing_enabled_at_startup(read: Result<TorRoutingConfig, TorConfigError>) -> bool {
     match read {
         Ok(cfg) => cfg.enabled,
@@ -278,6 +261,25 @@ mod tests {
         assert!(routing_enabled_at_startup(Err(TorConfigError::Io {
             io_error_kind: IoFailureKind::PermissionDenied
         })));
+    }
+
+    /// The premise the `Io ⇒ on` arm rests on: an ABSENT file is not an `Io`
+    /// error, it is `Ok(default)`. So the `Err` arm never sees "there is no
+    /// preference here" — only "there is one and it could not be read", which
+    /// is the same situation `Parse` describes.
+    #[test]
+    fn an_absent_file_is_not_an_io_error() {
+        crate::test_support::block_on(async {
+            let io = crate::vault_io::StdVaultIo;
+            let path = scratch("absent-is-ok");
+            std::fs::remove_file(&path).ok();
+            assert_eq!(
+                read_tor_routing(&io, &path).await,
+                Ok(TorRoutingConfig { enabled: false }),
+                "absent must reduce through the Ok arm — otherwise every fresh \
+                 install would come up fail-closed"
+            );
+        });
     }
 
     /// With the preference off, the gate a transport reads routes directly —

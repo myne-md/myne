@@ -19,6 +19,12 @@
 //!      [`permission_is_process_spawn`] (MYND-650: the bundle ships an
 //!      `externalBin` that exists to originate network traffic, and page
 //!      context must never be able to start it).
+//!   5. In-app permissions whose command **does** start a process —
+//!      [`IN_APP_PROCESS_SPAWN_PERMISSIONS`], scanned out of
+//!      `permissions/**/*.toml`. Layer 4 reads `capabilities/*.json`, which is
+//!      where a generic launch grant would appear; an ordinary command that
+//!      spawns something lives one directory over and its identifier says
+//!      nothing about it, so the two layers look at different files on purpose.
 //!
 //! `rustls` is deliberately NOT denylisted: it is the legitimate Phase-2 sync
 //! TLS transport (`decisions.md` MYND-424), not an HTTP client or telemetry
@@ -123,11 +129,20 @@ pub fn permission_is_network(perm: &str) -> bool {
 
 /// Does a capability permission string let page context spawn a process?
 ///
-/// Flags the `shell:` / `process:` namespaces and anything naming `execute`,
-/// `spawn` or `sidecar`. Clears in-app command namespaces that merely contain
-/// one of those words as a verb (`vault-unlock:allow-…`, `sync:…`), because the
-/// namespace check runs first and only these two namespaces can reach a
-/// process.
+/// Flags the `shell:` / `process:` namespaces **or** anything naming `execute`,
+/// `spawn` or `sidecar` — an OR, not a namespace check that runs first, so an
+/// in-app identifier carrying one of those words as a verb is flagged too. That
+/// is the fail-safe direction (a spurious red, never a silent pass) and it is
+/// why the in-app identifiers that trip it would have to be renamed or recorded
+/// rather than argued about.
+///
+/// **What it structurally cannot see**, and the reason
+/// [`IN_APP_PROCESS_SPAWN_PERMISSIONS`] exists beside it: an ordinary in-app
+/// command that happens to start a process. `sync:allow-sync-set-tor-routing`
+/// starts the arti sidecar and its identifier says none of these words. This
+/// predicate answers "does the ACL hand page context a *generic* process-launch
+/// surface"; it does not, and cannot, answer "does any granted command start a
+/// process".
 pub fn permission_is_process_spawn(perm: &str) -> bool {
     let p = perm.trim();
     let ns = p.split(':').next().unwrap_or("").trim();
@@ -213,6 +228,98 @@ pub fn capability_network_permissions(json_text: &str) -> Vec<String> {
 /// Process-spawn permissions found in a capability JSON file (MYND-650).
 pub fn capability_process_spawn_permissions(json_text: &str) -> Vec<String> {
     capability_permissions_matching(json_text, permission_is_process_spawn)
+}
+
+/// Words a `[[permission]]` description uses when its command starts an OS
+/// process. Matched case-insensitively against the whole block.
+///
+/// Descriptions rather than identifiers, because the identifier of an in-app
+/// command says what the command is called, not what it does —
+/// `allow-sync-set-tor-routing` starts a Tor client and contains none of these.
+/// The ACL discipline (`src-tauri/CLAUDE.md`) already requires a permission
+/// description to state its native side effects, so this reads the one field
+/// that is obliged to be honest.
+///
+/// `sidecar` is deliberately absent: `notes:allow-note-export-html-attachments`
+/// writes "relative sidecar files", which is a different word wearing the same
+/// spelling.
+const PROCESS_SPAWN_DESCRIPTION_TOKENS: &[&str] = &["externalbin", "spawn", "subprocess"];
+
+/// In-app command permissions granted to the main window whose command starts
+/// an OS process, with the argument for why granting it is not the same as
+/// granting a `shell:` permission. `(identifier, reason)`.
+///
+/// This is the ratchet [`permission_is_process_spawn`] cannot be: it reads
+/// `permissions/**/*.toml` — the file where an in-app spawn permission actually
+/// lives — instead of `capabilities/*.json`, where only a namespace-level grant
+/// would show up.
+pub const IN_APP_PROCESS_SPAWN_PERMISSIONS: &[(&str, &str)] = &[(
+    "allow-sync-set-tor-routing",
+    "MYND-650. The webview supplies ONE BOOLEAN. The executable path is \
+     resolved host-side (beside the running binary), the argv is fixed in \
+     `tor_sidecar::arti_cli`, and no part of either is user- or page-supplied — \
+     so this grants 'ask for the state the toggle already has', not 'launch a \
+     program'. A `shell:` permission is the other thing: arbitrary argv chosen \
+     by page context. Both start a process; only one lets the caller choose \
+     which.",
+)];
+
+/// Reported in place of a `[[permission]]` block that says it spawns but whose
+/// `identifier` line this scanner could not read.
+///
+/// The alternative is the one failure mode this whole gate cannot afford: a
+/// spawn permission that stops being *noticed*. Dropping such a block would
+/// leave it absent from both sides of the set-equality assertion below, which
+/// passes — quietly — in exactly the direction that matters. A sentinel is
+/// never in [`IN_APP_PROCESS_SPAWN_PERMISSIONS`], so it fails loudly instead,
+/// and it fails as a *finding* rather than a panic so the assertion's message
+/// (which names the file set it scanned) is what the reader gets.
+pub const UNREADABLE_SPAWN_IDENTIFIER: &str = "<permission block with an unreadable identifier>";
+
+/// The value of an `identifier = "…"` line, tolerating the spacing and quote
+/// style TOML allows. Returns `None` for a line that is not one.
+fn permission_identifier(trimmed: &str) -> Option<String> {
+    let rest = trimmed.strip_prefix("identifier")?.trim_start();
+    let rest = rest.strip_prefix('=')?.trim();
+    let quote = rest.chars().next().filter(|c| *c == '"' || *c == '\'')?;
+    rest.strip_prefix(quote)?
+        .strip_suffix(quote)
+        .map(str::to_string)
+}
+
+/// `[[permission]]` identifiers in a permissions TOML whose description says
+/// the command starts a process.
+pub fn manifest_process_spawn_permissions(toml_text: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut identifier: Option<String> = None;
+    let mut spawns = false;
+    let flush = |identifier: &mut Option<String>, spawns: &mut bool, found: &mut Vec<String>| {
+        let id = identifier.take();
+        if *spawns {
+            found.push(id.unwrap_or_else(|| UNREADABLE_SPAWN_IDENTIFIER.to_string()));
+        }
+        *spawns = false;
+    };
+    for line in toml_text.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[[permission]]" {
+            flush(&mut identifier, &mut spawns, &mut found);
+            continue;
+        }
+        if let Some(id) = permission_identifier(trimmed) {
+            identifier = Some(id);
+            continue;
+        }
+        let lowered = trimmed.to_ascii_lowercase();
+        if PROCESS_SPAWN_DESCRIPTION_TOKENS
+            .iter()
+            .any(|t| lowered.contains(t))
+        {
+            spawns = true;
+        }
+    }
+    flush(&mut identifier, &mut spawns, &mut found);
+    found
 }
 
 /// Permissions in a capability JSON file that satisfy `is_offending`. Walks the
@@ -402,6 +509,135 @@ mod tests {
             all_hits.is_empty(),
             "capability files grant process-spawn permissions: {all_hits:?}"
         );
+    }
+
+    /// MYND-650 review: the capability scan above looks in the file where a
+    /// *generic* process-launch grant would show up. An **in-app** command that
+    /// starts a process lives one directory over, in `permissions/`, and its
+    /// identifier says nothing about it — so that file is scanned too, and every
+    /// hit must be recorded in [`IN_APP_PROCESS_SPAWN_PERMISSIONS`] with the
+    /// argument for why granting it to page context is defensible.
+    ///
+    /// Both directions are asserted. An unrecorded permission is a decision
+    /// nobody made; a recorded one that no longer exists is a rationale
+    /// outliving its subject, which is how a table stops describing the tree.
+    #[test]
+    fn every_in_app_process_spawn_permission_is_recorded_with_its_reason() {
+        let mut found: Vec<String> = Vec::new();
+        let mut stack = vec![src_tauri_dir().join("permissions")];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("read permissions dir") {
+                let path = entry.expect("dir entry").path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                    continue;
+                }
+                let toml = std::fs::read_to_string(&path).expect("read permission file");
+                found.extend(manifest_process_spawn_permissions(&toml));
+            }
+        }
+        found.sort();
+        found.dedup();
+
+        let mut recorded: Vec<String> = IN_APP_PROCESS_SPAWN_PERMISSIONS
+            .iter()
+            .map(|(id, _)| (*id).to_string())
+            .collect();
+        recorded.sort();
+
+        assert_eq!(
+            found, recorded,
+            "the set of in-app permissions whose description says they start a \
+             process has drifted from IN_APP_PROCESS_SPAWN_PERMISSIONS.\n\
+             Found in permissions/**/*.toml: {found:?}\n\
+             Recorded here: {recorded:?}\n\
+             A new one is a decision to make now: the webview must never be able \
+             to choose WHICH program runs. Record it with that argument, or take \
+             the grant back."
+        );
+    }
+
+    /// The scanner keys on the description, not the identifier — which is the
+    /// whole point, since the identifier of an in-app command says what it is
+    /// called rather than what it does. And `sidecar` as a file-layout word must
+    /// not trip it.
+    #[test]
+    fn manifest_process_spawn_scan_reads_descriptions_not_identifiers() {
+        let toml = r#"
+[[permission]]
+identifier = "allow-quiet-launcher"
+description = "Allow invoking x:quiet_launcher (starts the bundled foo externalBin)."
+commands.allow = ["quiet_launcher"]
+
+[[permission]]
+identifier = "allow-export-sidecar-files"
+description = "Writes relative sidecar files next to the export."
+commands.allow = ["export"]
+
+[[permission]]
+identifier = "allow-plain"
+description = "Reads a preference."
+commands.allow = ["plain"]
+"#;
+        assert_eq!(
+            manifest_process_spawn_permissions(toml),
+            vec!["allow-quiet-launcher".to_string()],
+            "a description naming an externalBin is a spawn; 'sidecar files' is not"
+        );
+    }
+
+    /// TOML spells the same line more than one way, and the scanner used to
+    /// recognise exactly one of them — `identifier = "` and nothing else. Every
+    /// identifier in `permissions/` happens to be written that way today, so
+    /// this is the drift that would arrive with the next file rather than a
+    /// live bug; the point is that it would arrive silently.
+    #[test]
+    fn manifest_process_spawn_scan_reads_the_spellings_toml_allows() {
+        let toml = r#"
+[[permission]]
+identifier="allow-tight"
+description = "Starts the bundled externalBin."
+
+[[permission]]
+identifier = 'allow-single-quoted'
+description = "Spawns a subprocess."
+"#;
+        assert_eq!(
+            manifest_process_spawn_permissions(toml),
+            vec!["allow-tight".to_string(), "allow-single-quoted".to_string()]
+        );
+    }
+
+    /// The direction that matters: a block that says it spawns must never be
+    /// able to leave this scan *quietly*. Dropping it would make it absent from
+    /// both sides of the set-equality assertion — a pass — so it is reported
+    /// under a sentinel that nothing can record.
+    #[test]
+    fn a_spawning_block_with_an_unreadable_identifier_is_reported_not_dropped() {
+        let toml = r#"
+[[permission]]
+description = "Starts the bundled externalBin."
+commands.allow = ["mystery"]
+"#;
+        assert_eq!(
+            manifest_process_spawn_permissions(toml),
+            vec![UNREADABLE_SPAWN_IDENTIFIER.to_string()],
+        );
+        assert!(
+            !IN_APP_PROCESS_SPAWN_PERMISSIONS
+                .iter()
+                .any(|(id, _)| *id == UNREADABLE_SPAWN_IDENTIFIER),
+            "the sentinel must be unrecordable, or it could be silenced by \
+             adding it to the table"
+        );
+        // …and a block that spawns nothing is still nobody's business.
+        assert!(manifest_process_spawn_permissions(
+            "[[permission]]\ndescription = \"Reads a preference.\"\n"
+        )
+        .is_empty());
     }
 
     #[test]

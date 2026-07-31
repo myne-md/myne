@@ -209,14 +209,17 @@ fn open_socket_via(proxy: &ProxyGate, host: &str, port: u16) -> Result<TcpStream
 /// which refuses to accept a pin in Tor mode unless the user supplied the
 /// fingerprint they obtained out-of-band and it matches what was served. Call
 /// this function directly and you get the capture without the compare.
-pub fn tofu_fetch_pin(host: &str, port: u16) -> Result<[u8; 32], TransportError> {
-    tofu_fetch_pin_via(&proxy::installed_for(host), host, port)
-}
-
-/// [`tofu_fetch_pin`] with an explicit routing gate — the same split, and the
-/// same reason, as [`RustlsTransport::with_proxy_gate`]: production reads the
-/// installed gate, a test drives one it owns rather than the process-global
-/// `OnceLock` the whole test binary shares.
+///
+/// **The gate is a parameter, not a read.** There deliberately is no
+/// `tofu_fetch_pin(host, port)` convenience that resolves it here: the caller
+/// has already asked the same gate whether a confirmation is required, and a
+/// second read is a window in which the answer can change. A user who clicks
+/// Connect with Tor off, hits a stalled handshake and flips Tor on meanwhile
+/// would otherwise get the handshake routed through an exit node with no
+/// fingerprint compare — one gate, snapshotted once by
+/// [`super::pin_confirm::capture_pin`], closes that. It is also what lets a
+/// test drive a gate it owns rather than the process-global `OnceLock` the
+/// whole test binary shares (same split as [`RustlsTransport::with_proxy_gate`]).
 pub fn tofu_fetch_pin_via(
     proxy: &ProxyGate,
     host: &str,
@@ -282,6 +285,13 @@ impl RustlsTransport {
     /// through `build_transport`, which calls this), and none of them caches a
     /// transport across the toggle, so turning Tor mode on re-routes the next
     /// connection without re-enrollment.
+    ///
+    /// "The next connection" is the exact claim, and it is not the same as "all
+    /// traffic": a socket already open when the toggle moves is not a transport
+    /// this constructor will be asked for again. The one such socket in the tree
+    /// is the SSE poke stream, and it is closed by
+    /// `poke_listener`'s own gate term rather than by anything here
+    /// (`no_bypass::LONG_LIVED_SOCKETS`).
     pub fn new(host: impl Into<String>, port: u16, pins: Vec<[u8; 32]>) -> Self {
         let host = host.into();
         let proxy = proxy::installed_for(&host);
@@ -324,7 +334,7 @@ impl RustlsTransport {
     /// poke stream and every SSE reconnect at once.
     ///
     /// The routing decision itself is [`open_socket_via`]'s, shared with
-    /// [`tofu_fetch_pin`] — this method only supplies the gate it was built
+    /// [`tofu_fetch_pin_via`] — this method only supplies the gate it was built
     /// with. It carries no exemption logic: it obeys whatever gate it holds.
     fn open_socket(&self) -> Result<TcpStream, TransportError> {
         open_socket_via(&self.proxy, &self.host, self.port)
@@ -643,7 +653,7 @@ pub(crate) mod tests {
         std::thread::sleep(std::time::Duration::from_millis(100)); // let it bind
 
         // 1. TOFU-fetch the server's pin; it must equal the cert's SHA-256.
-        let pin = tofu_fetch_pin("localhost", port).expect("TOFU fetch");
+        let pin = tofu_fetch_pin_via(&ProxyGate::new(), "localhost", port).expect("TOFU fetch");
         assert_eq!(
             pin,
             cert_pin(TEST_CERT_DER),

@@ -46,6 +46,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use myne_core::io_failure_kind::IoFailureKind;
+use myne_core::plugins::sync::config::SyncEndpointConfig;
 use myne_core::plugins::sync::proxy::{ProxyGate, TorProxyState};
 use myne_core::plugins::sync::tor_config::{
     read_tor_routing, routing_enabled_at_startup, tor_config_path_from_host, write_tor_routing,
@@ -73,24 +74,36 @@ pub struct TorRoutingView {
 /// What is actually happening right now, as opposed to what was asked for
 /// (MYND-650 task 8).
 ///
-/// Two fields because neither one answers the question alone. `enabled` is the
-/// mode the user chose; `state` is the sidecar's phase. Only the pair
-/// distinguishes "the user turned Tor off, nothing is running" (fine, direct
-/// sync) from "Tor is on and the client is not running" (fail-closed, sync
-/// paused) — and those two are `Stopped` on the `state` side either way. The
-/// UI's posture derivation is the same one [`ProxyGate::route`] makes, which is
-/// why it is derived from the same pair rather than from a third field this
-/// command could get wrong on its own.
+/// `enabled` is the mode the user chose and `state` is the sidecar's phase, and
+/// neither answers the question alone. Only the pair distinguishes "the user
+/// turned Tor off, nothing is running" (fine, direct sync) from "Tor is on and
+/// the client is not running" (fail-closed, sync paused) — and those two are
+/// `Stopped` on the `state` side either way. The UI's posture derivation is the
+/// same one [`ProxyGate::route`] makes, which is why it is derived from the same
+/// pair rather than from a third field this command could get wrong on its own.
 ///
 /// Read from the **gate**, not from the preference file: the gate is what the
 /// transport obeys, and a startup whose sidecar failed to spawn leaves the
 /// two agreeing on `enabled` but only the gate knowing that nothing is routed.
+///
+/// `exempt` is the third fact, and it exists because the pair above is a
+/// property of the *process* while what the user is asking about is a property
+/// of their *endpoint*. [`ProxyGate`] knows nothing about the configured server,
+/// and `proxy::installed_for` hands a loopback host a fresh direct-only gate —
+/// so with a loopback endpoint and Tor on, zero bytes are tunneled while the
+/// process gate says `enabled`. Reporting that as "sync is going through Tor"
+/// is a misreport, and the realistic shape is not the dev server: it is an
+/// SSH/socat forward to a remote host, where the traffic really does leave.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct TorStateView {
     /// Tor mode as the routing gate has it.
     pub enabled: bool,
     /// The sidecar's phase.
     pub state: TorProxyState,
+    /// The configured endpoint is exempt from Tor routing (loopback), so
+    /// nothing is tunneled regardless of `enabled`. `false` when no endpoint is
+    /// configured — there is nothing to be exempt about yet.
+    pub exempt: bool,
 }
 
 /// Failure surface for the two write/read-preference commands. No `String`, no
@@ -204,8 +217,17 @@ async fn set_tor_routing_at(
 
     if enabled {
         // Gate first: from here on the transport refuses to connect at all
-        // until the sidecar reports `Ready`. There is no interval in which the
-        // preference says "Tor" and a socket may go out direct.
+        // until the sidecar reports `Ready`. No socket is OPENED direct while
+        // the preference says "Tor" — every connect consults the gate, and this
+        // line moves before anything else does.
+        //
+        // A socket already open is the other half of that sentence, and it is
+        // not this function's to close: the one long-lived socket in the tree
+        // is the SSE poke stream, and it carries the gate's route in its own
+        // connection identity, so the supervisor drops it on its next tick
+        // (`core/src/plugins/sync/poke_listener.rs`). Bounded by that tick
+        // rather than by this call, which is why it is stated here instead of
+        // being claimed away.
         gate.set_enabled(true);
         sidecar
             .start()
@@ -252,33 +274,113 @@ async fn restore_tor_routing_at(
 
 /// Read the device-local Tor-routing preference. No vault access; reachable
 /// pre-unlock like the endpoint pair.
+///
+/// Reduces the read through [`routing_enabled_at_startup`], i.e. through the
+/// SAME rule [`restore_tor_routing_at`] applied when the process came up. A
+/// present-but-unparseable file therefore reads as **on** here too, because that
+/// is what the routing gate is actually doing — reporting it as an error and
+/// leaving the switch at its `false` default would show a user "Tor is off"
+/// while the transport refuses every connection.
 #[tauri::command]
 pub async fn sync_get_tor_routing<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<TorRoutingView, TorRoutingError> {
     let host = myne_core::host::tauri_host::TauriHost::new(app.clone());
-    let cfg = myne_core::plugins::sync::tor_config::get_tor_routing(&host, &StdVaultIo).await?;
+    let path = tor_config_path_from_host(&host, &StdVaultIo).await?;
     Ok(TorRoutingView {
-        enabled: cfg.enabled,
+        enabled: routing_enabled_at_startup(read_tor_routing(&StdVaultIo, &path).await),
     })
 }
 
-/// Read the live routing posture: Tor mode plus the sidecar's phase
-/// (MYND-650 task 8).
+/// Read the live routing posture: Tor mode, the sidecar's phase, and whether
+/// the configured endpoint is routed at all (MYND-650 task 8).
 ///
-/// Infallible and cheap — two `Copy` fields behind an `RwLock` — because the UI
-/// polls it while the Network panel is open and while the fail-closed banner is
-/// on screen. It touches no file: the preference read is
-/// [`sync_get_tor_routing`], and the two answer different questions (what was
-/// asked for vs. what is running). A UI that showed the preference as if it
-/// were the posture would tell a user they are protected while a dead sidecar
-/// has sync paused.
+/// The gate half is cheap and infallible — two `Copy` fields behind an
+/// `RwLock` — because the UI polls it while the Network panel is open and while
+/// the fail-closed banner is on screen. It is deliberately not the preference
+/// read ([`sync_get_tor_routing`]): the two answer different questions (what
+/// was asked for vs. what is running), and a UI that showed the preference as
+/// if it were the posture would tell a user they are protected while a dead
+/// sidecar has sync paused.
+///
+/// The `exempt` half is what stops the mirror-image lie: the gate is
+/// process-wide and knows nothing about the endpoint, so without it a loopback
+/// endpoint renders `active` with nothing tunneled. What each non-endpoint case
+/// answers, and why, is [`endpoint_exemption`] — the three cases are separated
+/// there rather than collapsed here.
+///
+/// It costs one small config read, and that read happens **only while Tor mode
+/// is on**. That is not an optimisation: `exempt` exists to qualify a claim
+/// about a tunnel, and with Tor mode off there is no claim to qualify —
+/// `torPosture` answers `inactive` without consulting the field, and the sole
+/// TS test that feeds it `exempt: true` with `enabled: false` pins exactly
+/// that. So every install that never opts in keeps this command what its
+/// permission description says it is: an in-memory read that touches no file.
+/// The read itself resolves its path through `config_path_for_read`, which does
+/// **not** create the config directory — a posture query must not have a
+/// filesystem side effect.
 #[tauri::command]
-pub fn sync_get_tor_state(gate: State<'_, ProxyGate>) -> TorStateView {
+pub async fn sync_get_tor_state<R: Runtime>(app: AppHandle<R>) -> TorStateView {
+    // The managed gate and the installed one are the same cell (`lib.rs` hands
+    // both the value it constructed); the fallback is for a host that manages
+    // none, which reads back the default — Tor mode off.
+    let gate = app
+        .try_state::<ProxyGate>()
+        .map(|g| g.inner().clone())
+        .unwrap_or_else(myne_core::plugins::sync::proxy::installed);
+    let exempt = gate.is_enabled() && configured_endpoint_is_exempt(&app).await;
+    tor_state_view(&gate, exempt)
+}
+
+/// The view, given the gate the transport obeys and the endpoint verdict.
+fn tor_state_view(gate: &ProxyGate, exempt: bool) -> TorStateView {
     TorStateView {
         enabled: gate.is_enabled(),
         state: gate.state(),
+        exempt,
     }
+}
+
+/// Does the configured sync endpoint sit on this device (and therefore travel
+/// through no circuit)?
+///
+/// Three inputs, deliberately kept apart rather than collapsed into one
+/// `is_some_and`, because only one of them is a statement about an address:
+///
+/// * **Configured** — the endpoint decides, through the same predicate the
+///   transport uses (`proxy::endpoint_is_tor_exempt`).
+/// * **Unconfigured** (`endpoint_url: None`, which `config::read_config` also
+///   answers for an absent file) — **not** exempt. There is no address, and the
+///   `exempt` copy describes one: it would name a server the user never set.
+/// * **Unreadable** (`app_config_dir` failed, IO error, malformed JSON) —
+///   **not** exempt, and this is the case the earlier rationale here got
+///   backwards. It read `exempt` as the *smaller* protection claim, so failing
+///   to it looked conservative. It is not: `torPosture` checks `exempt` before
+///   the sidecar's phase, so it *replaces* `unavailable` — the fail-closed
+///   banner is suppressed and the panel says "Sync is not paused". Announcing
+///   that over a config nobody could read would assert a fact about an address
+///   this command never saw AND hide the paused-sync alarm in the state where
+///   sync is most certainly broken (the sync cycle reads the same file). The
+///   `active` render `false` can produce claims only what the routing gate is
+///   doing, which is true regardless of what the endpoint turns out to be.
+fn endpoint_exemption(config: Option<&SyncEndpointConfig>) -> bool {
+    let Some(cfg) = config else {
+        return false; // unreadable — see above
+    };
+    let Some(url) = cfg.endpoint_url.as_deref() else {
+        return false; // unconfigured — no address to describe
+    };
+    myne_core::plugins::sync::proxy::endpoint_is_tor_exempt(url)
+}
+
+/// [`endpoint_exemption`] against the device-local config on disk.
+async fn configured_endpoint_is_exempt<R: Runtime>(app: &AppHandle<R>) -> bool {
+    let host = myne_core::host::tauri_host::TauriHost::new(app.clone());
+    let Ok(path) = myne_core::plugins::sync::config::config_path_for_read(&host) else {
+        return endpoint_exemption(None);
+    };
+    let read = myne_core::plugins::sync::config::read_config(&StdVaultIo, &path).await;
+    endpoint_exemption(read.as_ref().ok())
 }
 
 /// Turn device-local Tor routing on or off.
@@ -640,22 +742,85 @@ mod tests {
             json(TorStateView {
                 enabled: false,
                 state: TorProxyState::Stopped,
+                exempt: false,
             }),
-            r#"{"enabled":false,"state":{"kind":"stopped"}}"#
+            r#"{"enabled":false,"state":{"kind":"stopped"},"exempt":false}"#
         );
         assert_eq!(
             json(TorStateView {
                 enabled: true,
                 state: TorProxyState::Starting,
+                exempt: false,
             }),
-            r#"{"enabled":true,"state":{"kind":"starting"}}"#
+            r#"{"enabled":true,"state":{"kind":"starting"},"exempt":false}"#
         );
         assert_eq!(
             json(TorStateView {
                 enabled: true,
                 state: TorProxyState::Ready { socks_port: 9150 },
+                exempt: false,
             }),
-            r#"{"enabled":true,"state":{"kind":"ready","socksPort":9150}}"#
+            r#"{"enabled":true,"state":{"kind":"ready","socksPort":9150},"exempt":false}"#
+        );
+    }
+
+    /// A loopback endpoint tunnels nothing, whatever the process gate says. The
+    /// view has to carry that, because `enabled` + `state` alone would render
+    /// "sync is going through Tor" over an endpoint no circuit ever touches.
+    #[test]
+    fn the_state_view_reports_a_tor_exempt_endpoint() {
+        let gate = ProxyGate::new();
+        gate.set_enabled(true);
+        gate.set_state(TorProxyState::Ready { socks_port: 9150 });
+
+        assert!(
+            !tor_state_view(&gate, false).exempt,
+            "a remote endpoint is routed"
+        );
+        let exempt = tor_state_view(&gate, true);
+        assert!(exempt.exempt);
+        assert!(
+            exempt.enabled && exempt.state == TorProxyState::Ready { socks_port: 9150 },
+            "the gate's own fields are reported unchanged — `exempt` is a third \
+             fact about the endpoint, not a rewrite of the first two"
+        );
+        assert_eq!(
+            serde_json::to_string(&exempt).unwrap(),
+            r#"{"enabled":true,"state":{"kind":"ready","socksPort":9150},"exempt":true}"#
+        );
+    }
+
+    /// The three inputs to `exempt`, each pinned with its own reason — the
+    /// point being that two of them answer `false` for reasons that are NOT
+    /// interchangeable, so a later edit cannot "simplify" one into the other.
+    ///
+    /// The unreadable case is the load-bearing one: `exempt` is checked before
+    /// the sidecar's phase, so answering it here would replace the fail-closed
+    /// `unavailable` posture with one that says sync is fine — about a config
+    /// the sync cycle cannot read either.
+    #[test]
+    fn the_exemption_verdict_separates_unconfigured_from_unreadable() {
+        let configured = |url: &str| SyncEndpointConfig {
+            endpoint_url: Some(url.to_string()),
+            cert_pin_hex: None,
+        };
+
+        assert!(
+            endpoint_exemption(Some(&configured("http://127.0.0.1:8443"))),
+            "a loopback endpoint enters no circuit"
+        );
+        assert!(
+            !endpoint_exemption(Some(&configured("https://sync.myne.md"))),
+            "a remote endpoint is routed"
+        );
+        assert!(
+            !endpoint_exemption(Some(&SyncEndpointConfig::default())),
+            "unconfigured: `exempt` copy would name a server the user never set"
+        );
+        assert!(
+            !endpoint_exemption(None),
+            "unreadable: claiming exemption would suppress the fail-closed \
+             banner and assert a fact about an address nobody read"
         );
     }
 
@@ -665,16 +830,14 @@ mod tests {
     #[test]
     fn the_state_view_reads_the_gate_the_transport_obeys() {
         let gate = ProxyGate::new();
-        let view = |g: &ProxyGate| TorStateView {
-            enabled: g.is_enabled(),
-            state: g.state(),
-        };
+        let view = |g: &ProxyGate| tor_state_view(g, false);
 
         assert_eq!(
             view(&gate),
             TorStateView {
                 enabled: false,
-                state: TorProxyState::Stopped
+                state: TorProxyState::Stopped,
+                exempt: false,
             },
             "a default install is off and running nothing"
         );
@@ -684,7 +847,8 @@ mod tests {
             view(&gate),
             TorStateView {
                 enabled: true,
-                state: TorProxyState::Stopped
+                state: TorProxyState::Stopped,
+                exempt: false,
             },
             "the toggle moves before the sidecar does — and the gate refuses \
              here, so the UI must read this as paused, never as protected"

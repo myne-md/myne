@@ -30,23 +30,15 @@ use std::path::Path;
 /// the config's own comment says so at the line that would do it.
 const BOOTSTRAP_MARKER: &str = "Sufficiently bootstrapped";
 
-/// What a line of arti's stderr told us.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ArtiSignal {
-    /// Bootstrap finished; the proxy is functional.
-    Bootstrapped,
-}
-
-/// Classify one line of the sidecar's stderr.
+/// Does this line of the sidecar's stderr mean "bootstrap finished"?
 ///
-/// Deliberately narrow: the host does not mirror arti's log stream into its
-/// own. arti logs connection targets at `info`, and re-emitting them would put
-/// the very hostnames Tor exists to hide into Myne's log sink (`src-tauri/CLAUDE.md`
-/// secret-handling discipline). Lines that are not this one signal are read,
-/// classified as `None`, and dropped.
-pub fn classify_line(line: &str) -> Option<ArtiSignal> {
+/// Deliberately narrow, and a predicate rather than a classifier: the host does
+/// not mirror arti's log stream into its own. arti logs connection targets at
+/// `info`, and re-emitting them would put the very hostnames Tor exists to hide
+/// into Myne's log sink (`src-tauri/CLAUDE.md` secret-handling discipline).
+/// Every other line is read and dropped.
+pub fn is_bootstrap_line(line: &str) -> bool {
     line.contains(BOOTSTRAP_MARKER)
-        .then_some(ArtiSignal::Bootstrapped)
 }
 
 /// The argv for `myne-tor`, minus the program itself.
@@ -127,12 +119,9 @@ mod tests {
         // tracing prefix a console subscriber puts in front of it.
         let line = "2026-07-31T12:00:00Z  INFO arti::subcommands::proxy: \
                     Sufficiently bootstrapped; proxy now functional.";
-        assert_eq!(classify_line(line), Some(ArtiSignal::Bootstrapped));
+        assert!(is_bootstrap_line(line));
         // The `socks_listen`-empty variant of the same message.
-        assert_eq!(
-            classify_line("INFO arti: Sufficiently bootstrapped."),
-            Some(ArtiSignal::Bootstrapped)
-        );
+        assert!(is_bootstrap_line("INFO arti: Sufficiently bootstrapped."));
     }
 
     #[test]
@@ -144,7 +133,7 @@ mod tests {
             "WARN tor_guardmgr: Guard is unreachable",
             "",
         ] {
-            assert_eq!(classify_line(line), None, "{line:?} is not readiness");
+            assert!(!is_bootstrap_line(line), "{line:?} is not readiness");
         }
     }
 

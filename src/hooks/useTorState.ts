@@ -23,8 +23,11 @@
 // The sidecar publishes its phase into the routing gate from a background
 // thread in the host (`src-tauri/src/tor_sidecar/supervisor.rs`); there is no
 // Tauri event for it today, so this reads. That is the same shape
-// `useSyncStatus` uses, for the same reason, and the read is cheaper than that
-// one — two `Copy` fields behind an `RwLock`, no file touched.
+// `useSyncStatus` uses, for the same reason. With Tor mode off the read is two
+// `Copy` fields behind an `RwLock` and touches no file; with Tor mode on it also
+// reads the small device-local endpoint config, because `exempt` is a property
+// of the endpoint rather than of the process gate. Both are cheap, and the
+// cadences below are set against the expensive one.
 //
 // The cadence follows the posture rather than being a single number:
 //
@@ -33,8 +36,18 @@
 //    being told about whether their traffic is protected. A slow poll there
 //    would leave "connecting…" on screen after the tunnel came up, or leave
 //    nothing on screen while sync was silently paused.
-//  - Tor mode OFF: nothing can change it but the toggle in this same app, and
-//    that path calls `refresh()`. The slow tick is a backstop, not a watch.
+//  - Tor mode OFF (and the Tor-exempt loopback endpoint, which no phase change
+//    can affect): nothing can change it but a deliberate act in this same app,
+//    and every one of those paths re-reads. That is TWO inputs, not one, and
+//    the second was missed when `exempt` was added: the toggle (which calls
+//    `refresh()`) and the sync endpoint (`sync_set_endpoint` /
+//    `sync_join_account`, whose screens call `refreshTorState()` — see
+//    `EndpointConfig.tsx` and `JoinDeviceModal.tsx`). Without that second call
+//    a user who repointed a loopback endpoint at a remote server kept reading
+//    "this address points at this device", with the fail-closed banner
+//    suppressed, until the slow tick came round. The slow tick is a backstop,
+//    not a watch — so anything that can move `exempt` owes a `refreshTorState()`
+//    on the path that moves it.
 //
 // Absent the `torRouting` capability (the web client) nothing is invoked at all
 // and the posture stays `null`. A browser tab cannot know whether the browser
@@ -75,7 +88,11 @@ function tick() {
     .then((view) => {
       const next = torPosture(view);
       publish(next);
-      schedule(next === "inactive" ? IDLE_POLL_MS : ACTIVE_POLL_MS);
+      // `exempt` joins `inactive` on the slow tick: the sidecar's phase may
+      // still be moving underneath, but none of its moves change what this
+      // endpoint's traffic is doing, so there is nothing to watch for.
+      const settled = next === "inactive" || next === "exempt";
+      schedule(settled ? IDLE_POLL_MS : ACTIVE_POLL_MS);
     })
     .catch(() => {
       // Keep the last known posture rather than inventing one. A dropped read
