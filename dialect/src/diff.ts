@@ -1,8 +1,18 @@
-// Minimal hand-rolled line diff for the snapshot preview (MYND-97, SYNC-10).
-// Added/removed/unchanged lines between two texts — NO external dependency
-// (the minimum-direct-dep / TB9 discipline; `@codemirror/merge` was rejected in
-// the file-recovery-ui grill). LCS-based, which is plenty for note-sized
-// content; a coarse fallback bounds memory for pathologically large inputs.
+// Minimal hand-rolled line diff (MYND-97, SYNC-10). Added/removed/unchanged
+// lines between two texts — NO external dependency (the minimum-direct-dep /
+// TB9 discipline; `@codemirror/merge` was rejected in the file-recovery-ui
+// grill). LCS-based, which is plenty for note-sized content; a coarse fallback
+// bounds memory for pathologically large inputs.
+//
+// Lifted out of the desktop `src/notes/lineDiff.ts` into `@myne/dialect`
+// (MYND-334, following the SYNC-45 conflict-copy precedent) so the desktop
+// snapshot panel, the desktop conflict view and the mobile client all diff
+// through one implementation instead of three drifting copies. Behaviour is
+// unchanged by the move.
+//
+// Pure text-in → diff-out: no IO, no note knowledge, no normalization (callers
+// normalize first). That keeps it trivially inside the platform-seam rule — a
+// pure string function takes zero `@tauri-apps/*` imports by construction.
 
 export type DiffLine =
   | { type: "same"; text: string }

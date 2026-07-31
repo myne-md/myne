@@ -86,6 +86,10 @@ export {
 } from "./surgery";
 export { parseStream } from "./worker";
 export type { ParseStreamItem, ParseStreamResult } from "./worker";
+// Version-comparison core (MYND-334) — the one diff implementation behind the
+// snapshot preview, the conflict-compare surface and (later) mobile.
+export { lineDiff, changedLineCount } from "./diff";
+export type { DiffLine } from "./diff";
 // Conflict-copy orchestrators (SYNC-45) — shared with mobile via injected note-IO.
 export {
   buildConflictCopyContent,
