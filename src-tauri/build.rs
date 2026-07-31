@@ -499,6 +499,7 @@ fn main() {
                 "chat_stop",
                 "transcribe",
                 "read_transcript",
+                "suggest_tags",
                 "set_model_path",
                 "get_model_path",
             ]),
