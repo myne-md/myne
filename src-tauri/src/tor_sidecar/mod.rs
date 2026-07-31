@@ -54,14 +54,6 @@
 //! to the device, not to a vault — the same reasoning that keeps the toggle out
 //! of the synced `vault.prefs` blob (task 6).
 
-// The start path is wired to a user action by task 6 (the toggle command); the
-// exit path and the shared gate are already live in `lib.rs`. Until that lands,
-// `start` and most of `StartError` are constructed only by this module's tests
-// — the same "consumed by a later task in this feature" allowance
-// `plugins::sync` carries at its module root, and the alternative would be
-// per-item attributes that then have to be found and removed one by one.
-#![allow(dead_code)]
-
 pub mod arti_cli;
 pub mod lifecycle;
 pub mod supervisor;

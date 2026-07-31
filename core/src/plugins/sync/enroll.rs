@@ -1026,15 +1026,7 @@ async fn acquire_tofu_pin(
     }
     let pin = super::pin_confirm::capture_pin(host, port, confirmed_fingerprint)
         .await
-        .map_err(|e| match e {
-            super::pin_confirm::PinConfirmError::ConfirmationRequired => {
-                SyncDeviceError::PinConfirmationRequired
-            }
-            super::pin_confirm::PinConfirmError::FingerprintMismatch => {
-                SyncDeviceError::FingerprintMismatch
-            }
-            super::pin_confirm::PinConfirmError::Transport => SyncDeviceError::Transport,
-        })?;
+        .map_err(SyncDeviceError::from)?;
     Ok(Some(pin))
 }
 

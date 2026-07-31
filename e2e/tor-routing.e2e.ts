@@ -24,7 +24,12 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import { installFakeTorSidecar, torSidecarControl } from "./support/fake-tor-sidecar";
-import { closeSettings, dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
+import {
+  closeSettings,
+  dismissImporterOffer,
+  enableDeveloperMode,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 /** Posture transitions are bounded by the panel's own 2 s poll plus a spawn or
@@ -64,17 +69,7 @@ describeE2E("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)", () =
           await dismissImporterOffer(s);
 
           // ── The panel is behind Developer mode, so turn that on first ──
-          await openSettings(s, "about");
-          await (await s.byTestId("about.developer-mode-toggle")).click();
-          await s.waitUntil(
-            async () =>
-              (await (await s.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
-              "true"
-                ? true
-                : null,
-            { label: "developer_mode toggled on", timeoutMs: 10_000 },
-          );
-          await s.waitForElement(testIdSelector("settings.developer-group"));
+          await enableDeveloperMode(s);
           await (await s.byTestId("settings.tab-network")).click();
           await s.byTestId("settings.network-panel");
 

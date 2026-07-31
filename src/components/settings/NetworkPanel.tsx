@@ -152,6 +152,9 @@ const POSTURE_DOT: Record<TorPosture, string> = {
   connecting: "var(--accent)",
   active: "var(--success)",
   unavailable: "var(--danger)",
+  // Not `--success`: nothing is tunneled. Not `--danger` either: sync works and
+  // the user has not lost anything. The muted ramp, as with `inactive`.
+  exempt: "var(--fg-3)",
 };
 
 /**
@@ -187,13 +190,15 @@ export function NetworkPanel() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Read the persisted preference on mount. A rejection is genuinely ambiguous
-  // about the running posture — the backend resolves an unreadable file to Tor
-  // mode ON at startup (`tor_config::routing_enabled_at_startup`) but a path it
-  // cannot resolve at all to OFF, and both arrive here as the same `Io` error.
-  // So the switch stays at its default position and the notice says the setting
-  // could not be read, rather than the position asserting an answer we do not
-  // have. Flipping it writes the file, which is also the remedy.
+  // Read the persisted preference on mount. The backend reduces it through the
+  // same `tor_config::routing_enabled_at_startup` rule the startup restore uses,
+  // so a present-but-corrupt file reads as ON here exactly as the routing gate
+  // has it — the switch cannot say "off" about a transport that is refusing
+  // every connection. What is left to reject is a config directory that cannot
+  // be resolved at all, which is not a file anybody wrote: the switch stays at
+  // its OFF default (the fresh-install posture, and what the backend restored)
+  // and the notice says the setting could not be read. Flipping it writes the
+  // file, which is also the remedy.
   useEffect(() => {
     let alive = true;
     getTorRouting()
@@ -280,6 +285,7 @@ export function NetworkPanel() {
                 {posture === "connecting" && t("settings.network.postureConnecting")}
                 {posture === "active" && t("settings.network.postureActive")}
                 {posture === "unavailable" && t("settings.network.postureUnavailable")}
+                {posture === "exempt" && t("settings.network.postureExempt")}
               </span>
             </div>
             {posture === "connecting" && (
@@ -287,6 +293,9 @@ export function NetworkPanel() {
             )}
             {posture === "unavailable" && (
               <p style={HELPER_STYLE}>{t("settings.network.postureUnavailableDetail")}</p>
+            )}
+            {posture === "exempt" && (
+              <p style={HELPER_STYLE}>{t("settings.network.postureExemptDetail")}</p>
             )}
           </div>
         )}

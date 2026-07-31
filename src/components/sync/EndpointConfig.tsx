@@ -8,7 +8,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
-import { FingerprintConfirm } from "./FingerprintConfirm";
+import { refreshTorState } from "../../hooks/useTorState";
+import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
 
 /**
  * Mirrors `myne_core::plugins::sync::config::PinSource` (`snake_case` on the
@@ -79,13 +80,6 @@ const FP: CSSProperties = {
   wordBreak: "break-all",
 };
 
-/**
- * The `kind` tags of `SyncConfigError` this screen has to tell apart
- * (MYND-650 task 5). Everything else collapses into the generic "couldn't reach
- * that server" line, as before.
- */
-type SetEndpointErrorKind = "PinConfirmationRequired" | "FingerprintMismatch";
-
 export function EndpointConfig() {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
@@ -151,6 +145,13 @@ export function EndpointConfig() {
       .then((r) => {
         setConfirmNeeded(false);
         setPinSource(r.pin_source);
+        // The Tor posture is endpoint-aware (MYND-650 task 8): repointing a
+        // loopback endpoint at a remote server — or the reverse — moves
+        // `exempt`, and `exempt` sits on the slow poll because the toggle used
+        // to be the only thing that could move it. Without this the Network
+        // panel keeps saying "this address points at this device", with the
+        // fail-closed banner suppressed, over the server that just replaced it.
+        refreshTorState();
         if (r.fingerprint) setFingerprint(r.fingerprint);
         // Branch on the PIN SOURCE, not on whether a fingerprint came back.
         // A browser reaches a real `https://` server and gets no fingerprint —
@@ -167,18 +168,18 @@ export function EndpointConfig() {
         );
       })
       .catch((e: unknown) => {
-        const kind = (e as { kind?: SetEndpointErrorKind } | null)?.kind;
         // Both Tor-mode refusals wrote NOTHING — no endpoint, no pin — so the
         // screen stays on the same form with the field revealed rather than
-        // reporting a half-configured server.
-        if (kind === "PinConfirmationRequired") {
+        // reporting a half-configured server. Everything else collapses into
+        // the generic "couldn't reach that server" line, as before.
+        const refusal = fingerprintGateRefusal(e);
+        if (refusal !== null) {
           setConfirmNeeded(true);
-          setMsg(t("sync.endpoint.confirmFingerprintRequired"));
-          return;
-        }
-        if (kind === "FingerprintMismatch") {
-          setConfirmNeeded(true);
-          setMsg(t("sync.endpoint.confirmFingerprintMismatch"));
+          setMsg(
+            refusal === "PinConfirmationRequired"
+              ? t("sync.endpoint.confirmFingerprintRequired")
+              : t("sync.endpoint.confirmFingerprintMismatch"),
+          );
           return;
         }
         setMsg(t("sync.endpoint.unreachable"));

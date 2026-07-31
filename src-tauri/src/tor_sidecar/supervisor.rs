@@ -12,7 +12,7 @@
 //! to two background threads per run:
 //!
 //! * the **reader** drains the child's stderr, classifies each line
-//!   ([`super::arti_cli::classify_line`]) and, on the bootstrap marker, probes
+//!   ([`super::arti_cli::is_bootstrap_line`]) and, on the bootstrap marker, probes
 //!   the SOCKS listener before publishing `Ready`. EOF on that pipe means the
 //!   process is gone, so the same thread reaps the child and reports
 //!   `ChildExited` — no separate reaper, no polling.
@@ -46,14 +46,20 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::time::{Duration, Instant};
 
 use myne_core::plugins::sync::proxy::{ProxyGate, TorProxyState};
+use myne_core::plugins::sync::socks5;
 
-use super::arti_cli::{arti_argv, arti_config_toml, classify_line, ArtiSignal};
+use super::arti_cli::{arti_argv, arti_config_toml, is_bootstrap_line};
 use super::lifecycle::{transition, Event, Phase};
 
 /// How long a bootstrap may take before the sidecar is declared failed. arti's
 /// own range is 5–30s on a warm cache; 120s leaves room for a first launch on a
 /// slow link without leaving the user staring at "connecting" indefinitely.
 const BOOTSTRAP_DEADLINE: Duration = Duration::from_secs(120);
+
+/// How often the deadline thread wakes to notice its run was superseded, so a
+/// stopped or already-bootstrapped run does not leave a thread sleeping out the
+/// remaining minutes of [`BOOTSTRAP_DEADLINE`].
+const DEADLINE_TICK: Duration = Duration::from_millis(250);
 
 /// Timeout for the loopback SOCKS5 method-negotiation probe. Loopback: a
 /// listener that cannot answer three bytes in a second is not answering.
@@ -118,8 +124,10 @@ impl TorSidecar {
         }
     }
 
-    /// The gate the transport reads. Handed out so the sync layer never needs
-    /// to know this type exists.
+    /// The gate the transport reads. Test-only: production hands the gate to
+    /// `proxy::install` and to `app.manage` from `lib.rs`, which owns the one it
+    /// constructed — nothing has to ask the supervisor for it back.
+    #[cfg(test)]
     pub fn gate(&self) -> ProxyGate {
         self.gate.clone()
     }
@@ -274,7 +282,7 @@ impl TorSidecar {
         let this = Arc::downgrade(self);
         std::thread::spawn(move || {
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                if classify_line(&line) != Some(ArtiSignal::Bootstrapped) {
+                if !is_bootstrap_line(&line) {
                     continue;
                 }
                 let Some(this) = this.upgrade() else { return };
@@ -305,7 +313,33 @@ impl TorSidecar {
         // two minutes of the deadline.
         let this: Weak<Self> = Arc::downgrade(self);
         std::thread::spawn(move || {
-            std::thread::sleep(BOOTSTRAP_DEADLINE);
+            // Sliced rather than one 120 s sleep: a toggle-off, a bootstrap
+            // completing, or a sidecar dying all supersede this run within
+            // milliseconds, and a thread that keeps sleeping for two minutes
+            // afterwards is a thread per toggle. Bounded and harmless either
+            // way — the generation check below makes a late wake a no-op — but
+            // a user flipping the switch a few times should not accumulate
+            // them.
+            let deadline = Instant::now() + BOOTSTRAP_DEADLINE;
+            loop {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                std::thread::sleep(remaining.min(DEADLINE_TICK));
+                match this.upgrade() {
+                    // Superseded (stopped, restarted) or already resolved:
+                    // there is nothing left for this run's deadline to say.
+                    Some(s)
+                        if s.generation.load(Ordering::SeqCst) != generation
+                            || s.phase() != Phase::Starting =>
+                    {
+                        return
+                    }
+                    Some(_) => {}
+                    None => return,
+                }
+            }
             let Some(this) = this.upgrade() else { return };
             if this.generation.load(Ordering::SeqCst) != generation {
                 return;
@@ -471,10 +505,12 @@ fn reap(child: &mut Child) {
 
 /// Does the loopback port answer a SOCKS5 method negotiation?
 ///
-/// The three-byte greeting (`VER=5, NMETHODS=1, NO-AUTH`) and its two-byte
-/// reply, and nothing more: no `CONNECT`, so no circuit is built and no
-/// hostname is disclosed just to answer "is the listener alive". The `CONNECT`
-/// encoding is task 3's, and lives in the shared sync core.
+/// The greeting and its two-byte reply, and nothing more: no `CONNECT`, so no
+/// circuit is built and no hostname is disclosed just to answer "is the listener
+/// alive". Both halves come from the shared sync core rather than being spelled
+/// out again here — a probe with its own opinion of a healthy listener could
+/// pass a proxy the transport then refuses, or vice versa. This function owns
+/// only the probe's *policy*: which port, and how long to wait.
 fn socks5_greeting_ok(port: u16) -> bool {
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
     let Ok(mut sock) = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT) else {
@@ -482,16 +518,8 @@ fn socks5_greeting_ok(port: u16) -> bool {
     };
     let _ = sock.set_read_timeout(Some(PROBE_TIMEOUT));
     let _ = sock.set_write_timeout(Some(PROBE_TIMEOUT));
-    if sock.write_all(&[0x05, 0x01, 0x00]).is_err() {
-        return false;
-    }
-    let mut reply = [0u8; 2];
-    if sock.read_exact(&mut reply).is_err() {
-        return false;
-    }
-    // VER=5 plus a method the client offered (0x00 = no auth). 0xFF is "no
-    // acceptable methods", which a proxy demanding auth would send.
-    reply == [0x05, 0x00]
+    sock.write_all(&socks5::METHOD_NEGOTIATION_GREETING).is_ok()
+        && socks5::read_method_selection(&mut sock).is_ok()
 }
 
 #[cfg(test)]

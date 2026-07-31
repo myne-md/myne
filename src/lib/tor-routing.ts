@@ -69,10 +69,13 @@ export async function setTorRouting(enabled: boolean): Promise<TorRoutingView> {
  * Mirrors `myne_core::plugins::sync::proxy::TorProxyState` — the bundled Tor
  * client's phase, as the routing gate has it.
  *
- * The Rust `ready` variant also carries a `socksPort`. It is deliberately NOT
- * declared here: nothing in the UI has any use for a loopback port number, and
- * a field that is not in the type is a field no component can render into the
- * DOM by accident.
+ * The Rust `ready` variant also carries a `socksPort`, and this type omits it
+ * because nothing in the UI has any use for a loopback port number. That is a
+ * narrowing of the *declared* contract, not a runtime guarantee: the backend
+ * returns its value verbatim, so the field is present on the wire and a
+ * `JSON.stringify` of the view would still show it. What the omission buys is
+ * that no component can reach it through the type — which is the point, since
+ * the port names a listener on this device rather than anything secret.
  */
 export type TorProxyState =
   | { kind: "starting" }
@@ -86,15 +89,20 @@ export interface TorStateView {
   enabled: boolean;
   /** The sidecar's phase. */
   state: TorProxyState;
+  /**
+   * The configured endpoint is exempt from Tor routing (it names this device),
+   * so nothing is tunneled regardless of {@link enabled}. `false` when no
+   * endpoint is configured.
+   */
+  exempt: boolean;
 }
 
 /**
  * What the user is actually getting right now.
  *
- * Four values, because the two that matter most are indistinguishable from
- * either field alone: `stopped` means "nothing is running", which is the
- * ordinary resting state when Tor mode is off and the fail-closed state when it
- * is on.
+ * Five values, because the ones that matter most are indistinguishable from any
+ * single field: `stopped` means "nothing is running", which is the ordinary
+ * resting state when Tor mode is off and the fail-closed state when it is on.
  *
  * - `inactive` — Tor mode is off. Sync goes directly to the server, as it
  *   always has. Not a problem, and must never be dressed as one.
@@ -105,8 +113,12 @@ export interface TorStateView {
  * - `unavailable` — Tor mode is on and the tunnel is not usable (the client
  *   failed, timed out, died, or was never started). Sync is **paused**,
  *   fail-closed. This is the state that must be unmistakable.
+ * - `exempt` — Tor mode is on, but the configured endpoint names this device,
+ *   so no circuit is involved and sync is **not** paused. Its own posture
+ *   rather than `active` (which would claim a tunnel that does not exist) and
+ *   rather than `inactive` (which would look like the toggle did not take).
  */
-export type TorPosture = "inactive" | "connecting" | "active" | "unavailable";
+export type TorPosture = "inactive" | "connecting" | "active" | "unavailable" | "exempt";
 
 /**
  * Derive the posture from the backend view.
@@ -117,9 +129,15 @@ export type TorPosture = "inactive" | "connecting" | "active" | "unavailable";
  * as it can never produce a SOCKS route. Any other mapping would put the UI and
  * the transport in disagreement about whether traffic is tunneled, and the UI
  * would be the one lying.
+ *
+ * `exempt` is checked second, and before the phase, for the same reason: the
+ * transport hands a loopback endpoint a direct-only gate no matter what the
+ * process gate says, so a `ready` sidecar tunnels nothing there. Reading the
+ * phase first would render "active" over traffic that never enters a circuit.
  */
 export function torPosture(view: TorStateView): TorPosture {
   if (!view.enabled) return "inactive";
+  if (view.exempt) return "exempt";
   switch (view.state.kind) {
     case "ready":
       return "active";
@@ -136,11 +154,16 @@ export function torPosture(view: TorStateView): TorPosture {
 }
 
 /**
- * Read the live posture. Cheap (an in-memory cell on the Rust side), infallible
- * there, and deliberately separate from {@link getTorRouting}: that one reports
- * the preference the user set, this one reports what the transport is obeying.
- * They disagree exactly when it matters — a sidecar that failed to start leaves
- * the preference on and the tunnel down.
+ * Read the live posture. Infallible on the Rust side, and deliberately separate
+ * from {@link getTorRouting}: that one reports the preference the user set, this
+ * one reports what the transport is obeying. They disagree exactly when it
+ * matters — a sidecar that failed to start leaves the preference on and the
+ * tunnel down.
+ *
+ * Cheap, with one qualification worth knowing before you poll it faster: with
+ * Tor mode off it reads an in-memory cell and nothing else, and with Tor mode on
+ * it also reads the device-local endpoint config to fill {@link
+ * TorStateView.exempt}.
  */
 export async function getTorState(): Promise<TorStateView> {
   return await invoke<TorStateView>("plugin:sync|sync_get_tor_state");

@@ -494,7 +494,14 @@ pub fn run() {
             // this is the same cell the supervisor writes, the toggle re-routes
             // the next connection without any transport being rebuilt or any
             // endpoint being re-enrolled.
-            myne_core::plugins::sync::proxy::install(tor_gate.clone());
+            // A `false` here means setup ran twice in one process: the
+            // transport would keep reading the FIRST gate (routing `Direct`)
+            // while the toggle and the posture command move the one managed
+            // below. Fail-open and invisible, so it is said out loud.
+            if !myne_core::plugins::sync::proxy::install(tor_gate.clone()) {
+                tracing::error!(event = "tor_gate_already_installed");
+                debug_assert!(false, "the sync routing gate was installed twice");
+            }
             app.manage(tor_gate.clone());
             let tor_sidecar = std::sync::Arc::new(tor_sidecar::TorSidecar::new(tor_gate.clone()));
             app.manage(tor_sidecar.clone());

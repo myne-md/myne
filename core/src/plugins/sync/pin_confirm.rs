@@ -48,10 +48,10 @@
 //! [`capture_pin`] is the **only** way the two enrollment paths acquire a TOFU
 //! pin — `commands::sync_set_endpoint` (the endpoint surface) and
 //! `enroll::acquire_tofu_pin` (the join flow). Neither calls
-//! `rustls_transport::tofu_fetch_pin` directly any more, so the policy cannot
-//! be bypassed by using the other entry point.
+//! `rustls_transport::tofu_fetch_pin_via` directly any more, so the policy
+//! cannot be bypassed by using the other entry point.
 
-use super::proxy;
+use super::proxy::{self, ProxyGate};
 
 /// Why a TOFU pin was not accepted.
 ///
@@ -108,6 +108,11 @@ pub fn normalize_fingerprint(input: &str) -> Option<String> {
 /// gate and therefore never requires confirmation — there is no exit node on a
 /// connection that does not leave the device, and a loopback `http` endpoint
 /// has no certificate at all.
+///
+/// A **query**, for a caller that wants to know whether it must ask the user
+/// for a fingerprint before it starts. [`capture_pin`] deliberately does not
+/// use it: it needs the gate itself, and asking twice is the TOCTOU described
+/// there.
 pub fn confirmation_required(host: &str) -> bool {
     proxy::installed_for(host).is_enabled()
 }
@@ -124,24 +129,37 @@ pub fn confirmation_required(host: &str) -> bool {
 ///
 /// Returns the captured pin as lowercase hex on success. Every error path has
 /// stored nothing.
+///
+/// The gate is read **once**, here, and the same value decides both the policy
+/// and the route. Reading it twice — once for "is a confirmation required",
+/// again inside the handshake — is a TOCTOU: a user who clicks Connect with Tor
+/// off, hits a stalled handshake, and flips Tor on meanwhile would get the
+/// accept-any-certificate handshake sent through an exit node under the
+/// no-confirmation-needed decision made a moment earlier. Narrow and
+/// user-initiated, but it defeats exactly the single-enforcement-point property
+/// this module is for.
 pub async fn capture_pin(
     host: String,
     port: u16,
     confirmed_fingerprint: Option<&str>,
 ) -> Result<String, PinConfirmError> {
-    let required = confirmation_required(&host);
-    capture_pin_requiring(required, host, port, confirmed_fingerprint).await
+    let gate = proxy::installed_for(&host);
+    let required = gate.is_enabled();
+    capture_pin_requiring(required, &gate, host, port, confirmed_fingerprint).await
 }
 
-/// [`capture_pin`] with the policy decision made an INPUT rather than read from
-/// the process-global gate.
+/// [`capture_pin`] with the policy decision and the routing gate made INPUTS
+/// rather than read from the process-global cell.
 ///
-/// Production goes through [`capture_pin`]; this exists so a test can drive the
-/// Tor-mode branch without installing a gate into an `OnceLock` the whole test
-/// binary shares. Same split, and same reason, as
+/// Production goes through [`capture_pin`], which derives the first from the
+/// second; they are separate parameters here so a test can drive the Tor-mode
+/// policy branch without installing a gate into the `OnceLock` the whole test
+/// binary shares, and without forcing the handshake through a proxy it would
+/// then have to stand up. Same split, and same reason, as
 /// `RustlsTransport::with_proxy_gate`.
 pub async fn capture_pin_requiring(
     confirmation_required: bool,
+    gate: &ProxyGate,
     host: String,
     port: u16,
     confirmed_fingerprint: Option<&str>,
@@ -161,8 +179,9 @@ pub async fn capture_pin_requiring(
     };
 
     let handshake_host = host.clone();
+    let handshake_gate = gate.clone();
     let captured = crate::task::run_blocking(move || {
-        super::rustls_transport::tofu_fetch_pin(&handshake_host, port)
+        super::rustls_transport::tofu_fetch_pin_via(&handshake_gate, &handshake_host, port)
     })
     .await
     .map_err(|_| PinConfirmError::Transport)?
@@ -254,6 +273,7 @@ mod tests {
     fn tor_mode_without_an_expected_fingerprint_refuses_before_the_handshake() {
         let err = crate::test_support::block_on(capture_pin_requiring(
             true,
+            &ProxyGate::new(),
             "sync.unresolvable.invalid".to_string(),
             443,
             None,
@@ -269,6 +289,7 @@ mod tests {
         for blank in ["", "   ", "\t"] {
             let err = crate::test_support::block_on(capture_pin_requiring(
                 true,
+                &ProxyGate::new(),
                 "sync.unresolvable.invalid".to_string(),
                 443,
                 Some(blank),
@@ -284,6 +305,7 @@ mod tests {
         for bad in ["not-a-fingerprint", "abc", FP.trim_end_matches('2')] {
             let err = crate::test_support::block_on(capture_pin_requiring(
                 true,
+                &ProxyGate::new(),
                 "sync.unresolvable.invalid".to_string(),
                 443,
                 Some(bad),
@@ -300,6 +322,7 @@ mod tests {
     fn tor_mode_off_proceeds_to_the_handshake_unchanged() {
         let err = crate::test_support::block_on(capture_pin_requiring(
             false,
+            &ProxyGate::new(),
             "sync.unresolvable.invalid".to_string(),
             443,
             None,
@@ -325,6 +348,7 @@ mod tests {
 
         let ok = crate::test_support::block_on(capture_pin_requiring(
             true,
+            &ProxyGate::new(),
             "localhost".to_string(),
             port,
             // Supplied in `openssl` shape to prove normalization is on the
@@ -335,6 +359,7 @@ mod tests {
 
         let wrong = crate::test_support::block_on(capture_pin_requiring(
             true,
+            &ProxyGate::new(),
             "localhost".to_string(),
             port,
             Some(&"0".repeat(64)),

@@ -1,6 +1,6 @@
 // The Tor connection banner in the editor chrome (MYND-650 task 8).
 //
-// Two states get a banner and two deliberately do not:
+// Two states get a banner and three deliberately do not:
 //
 //  - **connecting** — Tor mode is on, the client is bootstrapping, sync is
 //    paused. Shown, because the user just turned something on and sync stopping
@@ -16,6 +16,13 @@
 //  - **inactive** — nothing. Direct sync is the shipped default and the state
 //    of every install that never opted in; a banner would turn the normal case
 //    into an alarm.
+//  - **exempt** — nothing. The configured endpoint names this device, so sync
+//    is working and Myne's connection to it enters no circuit. (Whether that
+//    address forwards on somewhere else is not something this client can see —
+//    the Settings copy says so rather than promising the traffic stays home.)
+//    It is worth explaining in Settings, next to the switch that raises the
+//    question; it is not worth a strip in the editor chrome, which is reserved
+//    for a paused sync.
 //
 // **Neither banner is dismissable, and that is the point.** Both describe a
 // condition that is still true after it is dismissed — sync is paused either

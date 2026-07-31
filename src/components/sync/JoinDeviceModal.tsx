@@ -11,12 +11,13 @@ import { invoke } from "../../platform/core";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
-import { FingerprintConfirm } from "./FingerprintConfirm";
+import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 // Aliased: the component already has a `setDeviceName` React state setter.
 import { setDeviceName as persistDeviceName } from "../../lib/prefs";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
+import { refreshTorState } from "../../hooks/useTorState";
 
 interface JoinResult {
   /** The device_id this join registered (MYND-548) — used to name THIS device in
@@ -160,6 +161,12 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       .then(async (res) => {
         setConfirmNeeded(false);
         setJoinedDeviceId(res.device_id_hex);
+        // A join writes the endpoint, and the Tor posture is endpoint-aware
+        // (MYND-650 task 8): `exempt` polls slowly because only a deliberate
+        // act can move it, so every path that writes an endpoint owes this
+        // re-read. Otherwise the Network panel keeps describing whatever server
+        // was configured before the join.
+        refreshTorState();
         if (!res.pending) {
           // Self-approved (first device / recovery bootstrap): a cycle can run
           // now, so name after it — never before, or the §10.2.1 seed dies.
@@ -190,15 +197,14 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
         // written — no endpoint, no pin, no vault container — so the form stays
         // put with the fingerprint field revealed. Every other failure keeps the
         // single non-distinguishing message.
-        const kind = (e as { kind?: string } | null)?.kind;
-        if (kind === "PinConfirmationRequired") {
+        const refusal = fingerprintGateRefusal(e);
+        if (refusal !== null) {
           setConfirmNeeded(true);
-          setError(t("sync.join.confirmFingerprintRequired"));
-          return;
-        }
-        if (kind === "FingerprintMismatch") {
-          setConfirmNeeded(true);
-          setError(t("sync.join.confirmFingerprintMismatch"));
+          setError(
+            refusal === "PinConfirmationRequired"
+              ? t("sync.join.confirmFingerprintRequired")
+              : t("sync.join.confirmFingerprintMismatch"),
+          );
           return;
         }
         setError(t("sync.join.error"));

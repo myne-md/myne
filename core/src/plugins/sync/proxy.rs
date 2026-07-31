@@ -189,6 +189,15 @@ static INSTALLED: OnceLock<ProxyGate> = OnceLock::new();
 /// Publish the host's gate. Called once, from app setup, before any sync
 /// command can run. A second call is ignored (returns `false`) rather than
 /// racing.
+///
+/// **The return value is the bug canary and must not be dropped.** A second
+/// setup in one process leaves gate **A** installed — the one every transport
+/// reads, routing `Direct` — while the caller goes on to manage and toggle
+/// gate **B**. The UI would then report B's posture while the sockets obey A:
+/// silent, and in the fail-*open* direction.
+#[must_use = "a false return means a SECOND gate was installed and the transport \
+              is still reading the first one — fail-open, and silent unless the \
+              caller says so"]
 pub fn install(gate: ProxyGate) -> bool {
     INSTALLED.set(gate).is_ok()
 }
@@ -214,6 +223,23 @@ pub fn installed() -> ProxyGate {
 /// address. One notion of "loopback", checked in one place, for both rules.
 pub fn host_is_tor_exempt(host: &str) -> bool {
     super::http_transport::is_loopback(host)
+}
+
+/// Is the configured `endpoint_url` exempt from Tor routing?
+///
+/// The endpoint-shaped wrapper around [`host_is_tor_exempt`], for the surfaces
+/// that hold a URL rather than a host — the posture command in particular. An
+/// unparseable URL is **not** exempt: a string this client cannot resolve to a
+/// host is not a string it may claim names this device.
+///
+/// This is what stops the posture from reporting "sync is going through Tor"
+/// about an endpoint no byte of which is tunneled. Literal loopback traffic
+/// never leaves the machine, so that mismatch is a misreport rather than a
+/// leak — but the realistic shape is a forward to a *remote* server, where it
+/// is a misreport about traffic that does leave.
+pub fn endpoint_is_tor_exempt(endpoint_url: &str) -> bool {
+    super::http_transport::parse_endpoint(endpoint_url)
+        .is_some_and(|(_, host, _)| host_is_tor_exempt(&host))
 }
 
 /// The gate a transport for `host` must obey: the installed one, or — for a
@@ -309,6 +335,31 @@ mod tests {
                 !host_is_tor_exempt(routed),
                 "{routed:?} is a remote host and must be routed"
             );
+        }
+    }
+
+    /// The endpoint-shaped wrapper agrees with the host-shaped predicate, and
+    /// an endpoint this client cannot parse is never claimed to be local.
+    #[test]
+    fn only_a_loopback_endpoint_is_exempt_and_an_unparseable_one_is_not() {
+        for exempt in [
+            "http://127.0.0.1:8443",
+            "https://localhost:8443",
+            "http://[::1]:8443/",
+            "https://localhost",
+        ] {
+            assert!(endpoint_is_tor_exempt(exempt), "{exempt} names this device");
+        }
+        for routed in [
+            "https://sync.myne.md",
+            "https://localhost.evil.example",
+            "https://127.0.0.2:8443",
+            // Not a URL this client can resolve to a host — so not one it may
+            // claim is local.
+            "localhost:8443",
+            "",
+        ] {
+            assert!(!endpoint_is_tor_exempt(routed), "{routed:?} must be routed");
         }
     }
 

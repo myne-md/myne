@@ -167,20 +167,7 @@ pub async fn sync_set_endpoint<R: Runtime>(
                 Some(
                     super::pin_confirm::capture_pin(host, port, confirmed_fingerprint.as_deref())
                         .await
-                        .map_err(|e| match e {
-                            super::pin_confirm::PinConfirmError::ConfirmationRequired => {
-                                SyncConfigError::PinConfirmationRequired
-                            }
-                            super::pin_confirm::PinConfirmError::FingerprintMismatch => {
-                                SyncConfigError::FingerprintMismatch
-                            }
-                            // Couldn't reach / handshake — the pre-task-5 answer,
-                            // kept so an unreachable server still reads as a URL
-                            // problem to the existing UI.
-                            super::pin_confirm::PinConfirmError::Transport => {
-                                SyncConfigError::InvalidUrl
-                            }
-                        })?,
+                        .map_err(SyncConfigError::from)?,
                 )
             } else {
                 None // loopback http: no TLS, nothing to pin
