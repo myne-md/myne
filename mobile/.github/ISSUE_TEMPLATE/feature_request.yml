@@ -1,0 +1,43 @@
+name: Feature request
+description: Suggest an idea or enhancement for the mobile client.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Mobile shares the same protocol and guarantees as every other client — no email recovery, no plaintext mode. Please skim [`docs/vision.md`](https://github.com/myne-md/myne/blob/main/docs/vision.md) and [`docs/threat-model.md`](https://github.com/myne-md/myne/blob/main/docs/threat-model.md) before proposing anything security-adjacent.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Which platform(s)?
+      multiple: true
+      options:
+        - iOS
+        - Android
+        - Both
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: This doesn't conflict with Myne's anti-features (docs/vision.md) or exceed the threat model (docs/threat-model.md).
+          required: true
