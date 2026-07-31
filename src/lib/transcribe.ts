@@ -12,6 +12,7 @@
 // string / the streamed segments — AS1-class content, never logged here.
 
 import { Channel, invoke } from "../platform/core";
+import { engineErrorTag } from "./engine-error";
 
 /** Normalized transcription-failure cause (MYND-591). Each value except
  *  `"failed"` maps 1:1 to a distinct `EngineError` the transcribe command can
@@ -88,11 +89,6 @@ const CAUSE_BY_TAG: Readonly<Record<string, TranscribeErrorKind>> = {
  *  like `"NoModel"`, or a `{ kind }` object) to a normalized cause. Anything
  *  unrecognized (including `"TranscriptionFailed"`) degrades to `"failed"`. */
 export function normalizeTranscribeError(raw: unknown): TranscribeError {
-  const tag =
-    typeof raw === "string"
-      ? raw
-      : raw !== null && typeof raw === "object" && "kind" in raw
-        ? String((raw as { kind: unknown }).kind)
-        : "";
+  const tag = engineErrorTag(raw);
   return { kind: CAUSE_BY_TAG[tag] ?? "failed" };
 }

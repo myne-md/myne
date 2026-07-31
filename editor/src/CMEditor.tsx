@@ -33,6 +33,13 @@ import {
   type TaskQueryRender,
   type TaskQueryRowEventDetail,
 } from "./decorations/task-query-block";
+import {
+  setTagSuggestions,
+  TAG_SUGGESTION_ACCEPT_EVENT,
+  TAG_SUGGESTION_DISMISS_EVENT,
+  type TagSuggestionChip,
+  type TagSuggestionEventDetail,
+} from "./decorations/tag-suggestion-band";
 import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 
 /** A deep-link scroll request (MYND-305, SYNC-5): a generic anchor to scroll to
@@ -117,6 +124,22 @@ export type CMEditorProps = {
   /** MYND-617: a task-query row's source note was activated. Relayed from
    *  `myne-task-query-open` so the workspace can open that note. */
   onTaskQueryOpen?: (detail: TaskQueryRowEventDetail) => void;
+  /** MYND-651: the tag-suggestion band's chips for the open note, pushed into
+   *  the band's state field (re-mount-free) like `taskQueryResults`.
+   *
+   *  The host owns everything about these — the model call, the excluded-folder
+   *  gate, the vocabulary fold, the idle debounce — and this package renders
+   *  them and nothing more. Absent or empty means NO BAND at all (not an empty
+   *  one): a suggestion surface that is off by default must not reserve a strip
+   *  of every note. */
+  tagSuggestions?: readonly TagSuggestionChip[];
+  /** MYND-651: a suggestion chip was activated. Relayed from
+   *  `myne-tag-suggestion-accept`; the host performs the frontmatter write
+   *  (`acceptTagIntoView`) — this package never writes bytes. */
+  onAcceptTagSuggestion?: (detail: TagSuggestionEventDetail) => void;
+  /** MYND-651: a suggestion chip's × was activated. Relayed from
+   *  `myne-tag-suggestion-dismiss`; the host drops it for this note. */
+  onDismissTagSuggestion?: (detail: TagSuggestionEventDetail) => void;
   /** Called when a resolved wikilink chip is clicked (the workspace opens the
    *  target note). The chip emits a `myne-open-wikilink` event; this relays it.
    *  MYND-305: `anchor` carries the GENERIC `#heading` / `^block-id` deep-link
@@ -181,7 +204,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -194,6 +217,8 @@ export function CMEditor(props: CMEditorProps) {
   const onOpenWikilinkRef = useRef(onOpenWikilink);
   const onTaskQueryToggleRef = useRef(onTaskQueryToggle);
   const onTaskQueryOpenRef = useRef(onTaskQueryOpen);
+  const onAcceptTagSuggestionRef = useRef(onAcceptTagSuggestion);
+  const onDismissTagSuggestionRef = useRef(onDismissTagSuggestion);
   const onReadyRef = useRef(onReady);
   const onSwapReadyRef = useRef(onSwapReady);
   // MYND-534: config refs so `buildState` / `applyState` (called imperatively by
@@ -204,6 +229,7 @@ export function CMEditor(props: CMEditorProps) {
   const vaultHeadingsRef = useRef(vaultHeadings);
   const vaultBlockAnchorsRef = useRef(vaultBlockAnchors);
   const taskQueryResultsRef = useRef(taskQueryResults);
+  const tagSuggestionsRef = useRef(tagSuggestions);
   const lineNumbersRef = useRef(lineNumbers);
   const viewModeRef = useRef(viewMode);
   const readOnlyRef = useRef(readOnly);
@@ -225,6 +251,12 @@ export function CMEditor(props: CMEditorProps) {
   useEffect(() => {
     onTaskQueryOpenRef.current = onTaskQueryOpen;
   }, [onTaskQueryOpen]);
+  useEffect(() => {
+    onAcceptTagSuggestionRef.current = onAcceptTagSuggestion;
+  }, [onAcceptTagSuggestion]);
+  useEffect(() => {
+    onDismissTagSuggestionRef.current = onDismissTagSuggestion;
+  }, [onDismissTagSuggestion]);
   useEffect(() => {
     onReadyRef.current = onReady;
   }, [onReady]);
@@ -309,6 +341,13 @@ export function CMEditor(props: CMEditorProps) {
       // LOADING state until the host's next recompute.
       if (taskQueryResultsRef.current !== undefined) {
         v.dispatch({ effects: setTaskQueryResults.of(taskQueryResultsRef.current) });
+      }
+      // MYND-651: same `setState`-resets-the-field problem as the line above.
+      // Without it, switching back to a note the swap cache holds drops its band
+      // until the next idle pass — which is up to a debounce interval of a
+      // feature looking broken.
+      if (tagSuggestionsRef.current !== undefined) {
+        v.dispatch({ effects: setTagSuggestions.of(tagSuggestionsRef.current) });
       }
       // MYND-534 × MYND-313: the vim layer is a compartment too, and it is seeded
       // OFF (`vimExtension()` → `vimCompartment.of([])`), so a `setState` swap
@@ -457,6 +496,17 @@ export function CMEditor(props: CMEditorProps) {
     view.dispatch({ effects: setTaskQueryResults.of(taskQueryResults) });
   }, [taskQueryResults]);
 
+  // MYND-651: push the host's tag-suggestion chips into the band's state field
+  // (same re-mount-free pattern). `undefined` is the "this host does not drive
+  // the band" case and pushes nothing; an empty array is a real answer and
+  // clears it.
+  useEffect(() => {
+    tagSuggestionsRef.current = tagSuggestions;
+    const view = viewRef.current;
+    if (view === null || tagSuggestions === undefined) return;
+    view.dispatch({ effects: setTagSuggestions.of(tagSuggestions) });
+  }, [tagSuggestions]);
+
   // editor-line-numbers (MYND-314): push the line-number gutter toggle into the
   // view's line-number compartment whenever the `editor_line_numbers` pref
   // changes (re-mount-free reconfigure — cursor / scroll / undo preserved). The
@@ -583,6 +633,27 @@ export function CMEditor(props: CMEditorProps) {
     return () => {
       host.removeEventListener(TASK_QUERY_TOGGLE_EVENT, onToggle);
       host.removeEventListener(TASK_QUERY_OPEN_EVENT, onOpen);
+    };
+  }, []);
+
+  // MYND-651: relay the tag-suggestion band's chip events. Same shape again —
+  // the widget owns the DOM, the host owns the write into frontmatter `tags:`.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (host === null) return;
+    const onAccept = (e: Event): void => {
+      const detail = (e as CustomEvent<TagSuggestionEventDetail>).detail;
+      if (detail?.tag) onAcceptTagSuggestionRef.current?.(detail);
+    };
+    const onDismiss = (e: Event): void => {
+      const detail = (e as CustomEvent<TagSuggestionEventDetail>).detail;
+      if (detail?.tag) onDismissTagSuggestionRef.current?.(detail);
+    };
+    host.addEventListener(TAG_SUGGESTION_ACCEPT_EVENT, onAccept);
+    host.addEventListener(TAG_SUGGESTION_DISMISS_EVENT, onDismiss);
+    return () => {
+      host.removeEventListener(TAG_SUGGESTION_ACCEPT_EVENT, onAccept);
+      host.removeEventListener(TAG_SUGGESTION_DISMISS_EVENT, onDismiss);
     };
   }, []);
 

@@ -53,7 +53,27 @@ export const HIGHLIGHT_CLASSES = [
   "hl-grey",
   "hl-indigo",
 ] as const;
-const HL_SET: ReadonlySet<string> = new Set(HIGHLIGHT_CLASSES);
+
+/** The allowlist as a membership set — the single partition line between the
+ *  two colored-highlight renderers (MYND-637). An owned `hl-*` is rendered by
+ *  `decorations/colored-highlight.ts` (clean `==` reveal); anything else stays on
+ *  the `decorations/embedded-html.ts` sanitizer path. */
+export const HIGHLIGHT_CLASS_SET: ReadonlySet<string> = new Set(HIGHLIGHT_CLASSES);
+
+/** True when `cls` is an allowlisted colored-highlight class. The canonical
+ *  ownership test — shared by the two decorations and the toolbar so they cannot
+ *  drift on which spans are "colored highlights". */
+export function isOwnedHighlightClass(cls: string): boolean {
+  return HIGHLIGHT_CLASS_SET.has(cls.toLowerCase());
+}
+
+/** The canonical recognizer for a stored colored highlight
+ *  `<mark class="hl-X">inner</mark>` — captures the `hl-*` class (group 1) and the
+ *  inner text (group 2). Co-located with the allowlist (this file is the
+ *  ownership / XSS boundary) so the storage shape is defined once; a change here
+ *  keeps `colored-highlight.ts` and `toolbar/highlight-edit.ts` in lockstep. `/g`,
+ *  so every consumer resets `lastIndex` before its `exec` loop. */
+export const MARK_HL_RE = /<mark class="(hl-[a-z-]+)">([\s\S]*?)<\/mark>/gi;
 
 // Ultra-tight config (the XSS boundary). Only the elements tests.md uses; only
 // `title` (for <abbr>) plus `class` (constrained by the hook below to a single
@@ -79,7 +99,8 @@ const SANITIZE_CONFIG: Readonly<Record<string, unknown>> = {
 export function registerHighlightClassHook(purifier: Purifier): void {
   purifier.addHook("uponSanitizeAttribute", (node, data) => {
     if (data.attrName !== "class") return;
-    const ok = node.nodeName === "MARK" && HL_SET.has(data.attrValue.trim());
+    const ok =
+      node.nodeName === "MARK" && HIGHLIGHT_CLASS_SET.has(data.attrValue.trim());
     if (!ok) data.keepAttr = false;
   });
 }

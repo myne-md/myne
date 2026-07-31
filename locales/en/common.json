@@ -394,9 +394,6 @@
       "aiSummarizeNote": {
         "label": "Summarize note"
       },
-      "aiSuggestTags": {
-        "label": "Suggest tags"
-      },
       "aiRewriteSelection": {
         "label": "Rewrite selection"
       },
@@ -1021,6 +1018,11 @@
       "reorderColumn": "Reorder column",
       "reorderRow": "Reorder row"
     },
+    "tagSuggestion": {
+      "label": "Suggested tags",
+      "accept": "Add the tag {{tag}} to this note",
+      "dismiss": "Dismiss the suggested tag {{tag}}"
+    },
     "taskField": {
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
@@ -1071,7 +1073,8 @@
         "lime": "Lime",
         "brown": "Brown",
         "grey": "Grey",
-        "indigo": "Indigo"
+        "indigo": "Indigo",
+        "remove": "Remove highlight"
       },
       "urlPlaceholder": "Paste link URL"
     },
@@ -1840,7 +1843,12 @@
       "cancel": "Cancel",
       "changeCount_one": "{{count}} change since this snapshot",
       "changeCount_other": "{{count}} changes since this snapshot",
+      "changeCountPrev_one": "{{count}} change from the previous snapshot",
+      "changeCountPrev_other": "{{count}} changes from the previous snapshot",
       "close": "Close",
+      "compareAgainstLabel": "Compare against",
+      "compareCurrent": "Current note",
+      "comparePrevious": "Previous snapshot",
       "confirmBody": "Your current note will be saved as a snapshot first, so you can undo this.",
       "confirmTitle": "Restore this snapshot?",
       "decrypting": "Decrypting…",
@@ -1855,6 +1863,7 @@
       "justNow": "just now",
       "listLabel": "Snapshot list",
       "loading": "Loading…",
+      "noPrevious": "This is the earliest snapshot — there's nothing before it to compare against.",
       "restore": "Restore",
       "restoreCta": "Restore this snapshot",
       "restoredStatus": "Restored. The version you had is saved as a snapshot.",
@@ -2533,6 +2542,9 @@
       "pendingHint": "Coming soon"
     },
     "ai": {
+      "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "autoTagLabel": "Suggest tags automatically",
+      "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one — the switch turns on by itself in a build that includes it.",
       "disclosureToggle": "How does this work?",
       "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
       "enableLabel": "Enable local AI",
@@ -2784,6 +2796,7 @@
         "lastActiveNoteDesc": "Sync which note you had open so you can pick it up on another device."
       },
       "keywords": {
+        "aiAutoTag": "auto tag tags suggest suggestions labels ai",
         "aiEnable": "local ai on off enable disable machine learning",
         "aiExcluded": "excluded folders ignore ai privacy exclude",
         "aiModels": "models gguf download text embedding llm",
@@ -2883,6 +2896,15 @@
       "label": "Building search index…"
     },
     "conflicts": {
+      "compare": "Compare",
+      "compareClose": "Back to conflicts",
+      "compareError": "Couldn’t read these notes to compare them. Try again.",
+      "compareIdentical": "These two versions are identical.",
+      "compareLoading": "Reading both versions…",
+      "compareMine": "On this device",
+      "compareOrphan": "The note this copy came from is no longer here, so there is nothing to compare it against.",
+      "compareTheirs": "Conflicting copy",
+      "compareTitle": "Comparing “{{title}}”",
       "discard": "Discard",
       "empty": "No conflicts — your devices are in sync.",
       "groupTitle_one": "{{count}} conflicting copy of {{original}}",

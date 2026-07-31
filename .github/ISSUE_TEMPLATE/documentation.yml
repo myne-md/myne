@@ -1,0 +1,26 @@
+name: Documentation
+description: A spec, README, glossary entry, or guide is wrong, unclear, or missing.
+title: "[Docs]: "
+labels: [documentation]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For the specs under `docs/`, note that `docs/decisions.md` is append-only and the glossary keeps one A–Z entry per term — see [`docs/CLAUDE.md`](https://github.com/myne-md/myne/blob/main/docs/CLAUDE.md).
+  - type: input
+    id: where
+    attributes:
+      label: Which document or page?
+      placeholder: "e.g. docs/spec/protocol.md §9.14, README.md, glossary entry 'account number'"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggested fix

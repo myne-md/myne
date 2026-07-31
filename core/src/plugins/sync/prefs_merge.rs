@@ -301,6 +301,11 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // MYND-592: shared for the same reason as `show_task_marker` — wanting
         // speech-to-text is taste, not device capability.
         transcription_enabled: lww!("transcription_enabled", transcription_enabled),
+        // MYND-651: shared for the same reason again — a bundled task-model, so
+        // wanting automatic tag suggestions is taste. Its co-gate `ai_enabled`
+        // stays device-local below, which is what keeps a synced `true` from
+        // starting inference on a device that never opted into AI.
+        auto_tag_enabled: lww!("auto_tag_enabled", auto_tag_enabled),
         daily_date_format: lww!("daily_date_format", daily_date_format),
         daily_folder: lww!("daily_folder", daily_folder),
         daily_template: lww!("daily_template", daily_template),
@@ -743,6 +748,55 @@ mod tests {
         assert_eq!(merged.auto_lock_seconds, Some(30));
         // And the bogus clock entry is NOT propagated into the merged map.
         assert!(!merged.field_clocks.contains_key("auto_lock_seconds"));
+    }
+
+    /// MYND-651: `auto_tag_enabled` is Shared/ScalarLww, so the newer clock
+    /// wins and the flag DOES cross devices — the deliberate contrast with its
+    /// device-local co-gate `ai_enabled`, which does not. The pair is what makes
+    /// the classification safe: a synced `true` cannot start inference on a
+    /// device that never opted into AI.
+    #[test]
+    fn auto_tag_enabled_is_shared_lww_unlike_its_ai_enabled_co_gate() {
+        assert_eq!(
+            classify("auto_tag_enabled"),
+            Some(PrefClass::Shared(SharedDiscipline::ScalarLww))
+        );
+
+        let local = PrefsView {
+            auto_tag_enabled: false,
+            ..PrefsView::default()
+        };
+        let mut remote = PrefsView {
+            auto_tag_enabled: true,
+            // The co-gate is set on the remote too, and must NOT come with it.
+            ai_enabled: true,
+            ..PrefsView::default()
+        };
+        stamped(&mut remote, "auto_tag_enabled", u64::MAX);
+        stamped(&mut remote, "ai_enabled", u64::MAX);
+
+        let merged = merge_prefs(&local, &remote);
+        assert!(
+            merged.auto_tag_enabled,
+            "newer remote clock wins the scalar"
+        );
+        assert!(
+            !merged.ai_enabled,
+            "ai_enabled is device-local — local's off must survive"
+        );
+        assert!(!merged.field_clocks.contains_key("ai_enabled"));
+
+        // And a newer LOCAL clock keeps the local value against a set remote.
+        let mut local_off = PrefsView {
+            auto_tag_enabled: false,
+            ..PrefsView::default()
+        };
+        stamped(&mut local_off, "auto_tag_enabled", u64::MAX);
+        let remote_on = PrefsView {
+            auto_tag_enabled: true,
+            ..PrefsView::default()
+        };
+        assert!(!merge_prefs(&local_off, &remote_on).auto_tag_enabled);
     }
 
     /// myne-cli epic (MYND-490): the CLI door is a per-machine decision, so it
