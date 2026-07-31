@@ -19,6 +19,7 @@ permissions = [
   "allow-prefs-read",
   "allow-set-reminders-enabled",
   "allow-set-reminder-horizon-days",
+  "allow-set-transcription-enabled",
   "allow-set-screen-capture-protection",
   "allow-set-attachment-compression-enabled",
   "allow-set-deliberate-folders",
@@ -408,3 +409,8 @@ commands.allow = ["set_reminders_enabled"]
 identifier = "allow-set-reminder-horizon-days"
 description = "Allow invoking prefs:set_reminder_horizon_days (Slot::Unlocked-gated setter for how many days ahead this device registers reminders with the OS, MYND-618/619; None falls back to the client's built-in horizon). Optional and omitted when unset, so an untouched vault stays byte-identical. DEVICE-LOCAL for the same reason as reminders_enabled. The horizon is a PRIVACY bound before a resource one — pending reminder times leave the AEAD envelope and sit in OS-owned plaintext (threat-model.md §7), so a shorter horizon exposes less. Stored verbatim with no clamp; clamping here would silently disagree with what the settings UI showed."
 commands.allow = ["set_reminder_horizon_days"]
+
+[[permission]]
+identifier = "allow-set-transcription-enabled"
+description = "Allow invoking prefs:set_transcription_enabled (Slot::Unlocked-gated setter for whether on-device voice-to-text is available, MYND-563/592). A plain bool defaulting true (opt-OUT), omitted from the canonical encoding at its default so an untouched vault stays byte-identical. It is a SEPARATE switch from the AI-beta ai_enabled opt-in — transcription ships a bundled model and is a product feature, not part of the AI beta. Non-load-bearing: the transcribe command re-reads this host-side before any decrypt, so a tampered value can at worst enable/disable a feature, never bypass the gate. Main-window-only, same invariant as every other prefs setter."
+commands.allow = ["set_transcription_enabled"]

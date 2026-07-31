@@ -42,6 +42,7 @@ import {
   setSpellEnabled,
   setArchiveDisabled,
   setScreenCaptureProtection,
+  setTranscriptionEnabled,
   setAttachmentCompressionEnabled,
   setAutoLockTimeout,
   setVaultLabel,
@@ -1568,6 +1569,16 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 subtitle={t("settings.privacy.screenCaptureSubtitle")}
                 on={eff.screen_capture_protection}
                 onToggle={() => writePref("screen_capture_protection", !eff.screen_capture_protection, () => setScreenCaptureProtection(!eff.screen_capture_protection))}
+              />
+              {/* On-device voice-to-text (MYND-563; opt-out, default on). The
+                  transcribe command re-reads this host-side, so the toggle only
+                  governs whether the feature runs + shows. */}
+              <ToggleRow
+                title={t("settings.transcription.label")}
+                subtitle={t("settings.transcription.helper")}
+                on={eff.transcription_enabled}
+                onToggle={() => writePref("transcription_enabled", !eff.transcription_enabled, () => setTranscriptionEnabled(!eff.transcription_enabled))}
+                testId="settings.transcription-toggle"
               />
             </Group>
             <SegmentBlock
