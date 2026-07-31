@@ -252,6 +252,28 @@ export const myneTheme = EditorView.theme({
     verticalAlign: "super",
   },
 
+  // Colored highlights (MYND-637) reuse the `.cm-highlight` base (radius / padding
+  // / ink) and override ONLY the wash, one class per colour — mirroring the
+  // `.cm-embedded-html mark.hl-*` set below, same `--highlight-*` vars + own-colour
+  // fallbacks. colored-highlight.ts paints the span `.cm-highlight cm-hl-X`, so the
+  // caret-on `==` skin (rendered inside the span) inherits the wash automatically.
+  ".cm-highlight.cm-hl-yellow": { backgroundColor: "var(--highlight, #f3e7c4)" },
+  ".cm-highlight.cm-hl-green": { backgroundColor: "var(--highlight-green, #d8e9cf)" },
+  ".cm-highlight.cm-hl-blue": { backgroundColor: "var(--highlight-blue, #d3e2ee)" },
+  ".cm-highlight.cm-hl-pink": { backgroundColor: "var(--highlight-pink, #efd8e2)" },
+  ".cm-highlight.cm-hl-purple": { backgroundColor: "var(--highlight-purple, #e2d8ee)" },
+  ".cm-highlight.cm-hl-orange": { backgroundColor: "var(--highlight-orange, #f2ddc6)" },
+  ".cm-highlight.cm-hl-red": { backgroundColor: "var(--highlight-red, #efd3d3)" },
+  ".cm-highlight.cm-hl-teal": { backgroundColor: "var(--highlight-teal, #cfe6e2)" },
+  ".cm-highlight.cm-hl-cyan": { backgroundColor: "var(--highlight-cyan, #cfe4ea)" },
+  ".cm-highlight.cm-hl-lime": { backgroundColor: "var(--highlight-lime, #e0ecc4)" },
+  ".cm-highlight.cm-hl-brown": { backgroundColor: "var(--highlight-brown, #e3d9cd)" },
+  ".cm-highlight.cm-hl-grey": { backgroundColor: "var(--highlight-grey, #dedcd8)" },
+  ".cm-highlight.cm-hl-indigo": { backgroundColor: "var(--highlight-indigo, #d6d8ee)" },
+  // The `==` skin colored-highlight.ts reveals on cursor needs no rule of its own:
+  // it renders inside the painted `.cm-highlight` span, so wash + ink inherit —
+  // identical to a yellow `==text==`. The `cm-hl-eq` class stays as a DOM hook.
+
   // Embedded HTML (MYND-209) — the sanitized element keeps its real tag; style
   // <mark>/<kbd> to match the dialect. <sub>/<sup>/<abbr> use native rendering.
   // DISCRIMINATOR (soft-tint option): render the output, marked ONLY by a faint

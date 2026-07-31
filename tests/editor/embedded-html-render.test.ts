@@ -60,11 +60,13 @@ describe("inline embedded HTML", () => {
     expect(query(m, ".cm-embedded-html abbr")).not.toBeNull();
   });
 
-  it("renders a colored <mark class='hl-green'> keeping the class", () => {
+  it("hands an allowlisted colored <mark class='hl-green'> to colored-highlight (MYND-637)", () => {
+    // Allowlisted colours moved OFF the embedded-html widget onto
+    // colored-highlight.ts (clean `==` reveal, no raw HTML). See
+    // colored-highlight.test.ts for the paint/reveal assertions.
     m = withPurifier('<mark class="hl-green">pop</mark>\n');
-    const mark = query(m, ".cm-embedded-html mark");
-    expect(mark).not.toBeNull();
-    expect(mark!.classList.contains("hl-green")).toBe(true);
+    expect(query(m, ".cm-embedded-html mark")).toBeNull();
+    expect(query(m, ".cm-highlight.cm-hl-green")).not.toBeNull();
   });
 
   it("drops an unknown highlight class, rendering a plain <mark>", () => {

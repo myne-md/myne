@@ -224,12 +224,32 @@ const CSS = `
 }
 .cm-toolbar-highlight-dropdown {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+  max-width: 176px;
   background-color: var(--paper, #faf8f3);
   border: 1px solid var(--line-2, #c8c7c1);
   border-radius: var(--radius-2, 6px);
   box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
   padding: 6px;
+}
+/* MYND-637: the Remove-highlight action, shown only while editing an existing
+   highlight. Spans the swatch grid's full width on its own row. */
+.cm-toolbar-highlight-remove {
+  flex-basis: 100%;
+  margin-top: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: left;
+  color: var(--fg-2, #4a4944);
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--line-1, #e3e2dd);
+  border-radius: 0;
+  cursor: pointer;
+}
+.cm-toolbar-highlight-remove:hover {
+  color: var(--fg-1, #23221e);
 }
 .cm-toolbar-highlight-swatch {
   width: 20px;
