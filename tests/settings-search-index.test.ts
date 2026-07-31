@@ -30,6 +30,7 @@ const PANEL_IDS = [
   "privacy",
   "sync",
   "ai",
+  "network",
   "editor",
   "files",
   "transcription",
@@ -150,9 +151,15 @@ describe("settings search-index — searchSettings behaviour", () => {
 describe("settings search-index — developer-mode gate (MYND-593)", () => {
   const AI_IDS = ["ai.enable", "ai.models", "ai.excluded-folders"];
 
-  it("tags every `ai` panel entry as developer-gated", () => {
+  it("tags every developer-group panel entry as developer-gated", () => {
+    // Both members of the rail's Developer group (SettingsModal's PANELS_BASE).
+    // An untagged entry would let search navigate into a panel the rail itself
+    // refuses to show while Developer mode is off.
+    const DEVELOPER_PANELS = ["ai", "network"];
     for (const e of SETTINGS_SEARCH_INDEX) {
-      if (e.panelId === "ai") expect(e.developerGated, `entry ${e.id}`).toBe(true);
+      if (DEVELOPER_PANELS.includes(e.panelId)) {
+        expect(e.developerGated, `entry ${e.id}`).toBe(true);
+      }
     }
   });
 

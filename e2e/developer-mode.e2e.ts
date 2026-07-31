@@ -35,6 +35,7 @@ import { seedVault } from "./support/fixtures";
 import {
   closeSettings,
   dismissImporterOffer,
+  enableDeveloperMode,
   openPalette,
   openSettings,
   unlockToEditor,
@@ -104,20 +105,8 @@ describeE2E("dm1 developer-mode gating: rail + search + palette (MYND-593)", () 
         expect(offIds.includes("ai.toggle-enabled")).toBe(false);
         expect(offIds.includes("ai.open-chat")).toBe(false);
 
-        // ── Enable Developer mode from About — immediate effect, no dialog ──
-        await openSettings(s, "about");
-        await (await s.byTestId("about.developer-mode-toggle")).click();
-        await s.waitUntil(
-          async () =>
-            (await (await s.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
-            "true"
-              ? true
-              : null,
-          { label: "developer_mode toggled on", timeoutMs: 10_000 },
-        );
-
-        // ── Mode ON: Developer group appears, AI panel reachable ──
-        await s.waitForElement(testIdSelector("settings.developer-group"));
+        // ── Mode ON: enable from About, Developer group appears, AI reachable ──
+        await enableDeveloperMode(s);
         await (await s.byTestId("settings.tab-ai")).click();
         await s.byTestId("settings.ai-panel");
 

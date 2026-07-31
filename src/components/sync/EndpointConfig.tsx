@@ -8,6 +8,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
+import { refreshTorState } from "../../hooks/useTorState";
+import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
 
 /**
  * Mirrors `myne_core::plugins::sync::config::PinSource` (`snake_case` on the
@@ -84,6 +86,20 @@ export function EndpointConfig() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
+  // The fingerprint the user obtained OUT-OF-BAND from their own server, and
+  // whether the backend has asked for it. It is revealed on refusal rather than
+  // rendered always, because the clearnet flow does not need it and a field
+  // nobody has to fill is a field everybody skips.
+  //
+  // Deliberately an INPUT, never a "does this look right?" confirmation of the
+  // captured value: over Tor the first handshake accepts any certificate, and
+  // showing the captured fingerprint first would anchor the user on whatever an
+  // exit node chose to serve. The backend never returns it on the mismatch path
+  // for the same reason (`core/src/plugins/sync/pin_confirm.rs`). The gate's own
+  // copy, echo and confirm/decline pair live in `FingerprintConfirm`, shared
+  // with the join modal so the two enrollment doors cannot drift.
+  const [expectedFingerprint, setExpectedFingerprint] = useState("");
+  const [confirmNeeded, setConfirmNeeded] = useState(false);
   // Where the pin came from (SYNC-43): `static` (pre-vetted hosted cert) vs
   // `tofu` (self-host first-connect pin — the one the user eye-compares). Kept
   // distinct so a hosted endpoint is never shown as a bare TOFU pin.
@@ -124,9 +140,18 @@ export function EndpointConfig() {
       pin_source: PinSource;
     }>("plugin:sync|sync_set_endpoint", {
       endpointUrl: trimmed,
+      confirmedFingerprint: expectedFingerprint.trim() || null,
     })
       .then((r) => {
+        setConfirmNeeded(false);
         setPinSource(r.pin_source);
+        // The Tor posture is endpoint-aware (MYND-650 task 8): repointing a
+        // loopback endpoint at a remote server — or the reverse — moves
+        // `exempt`, and `exempt` sits on the slow poll because the toggle used
+        // to be the only thing that could move it. Without this the Network
+        // panel keeps saying "this address points at this device", with the
+        // fail-closed banner suppressed, over the server that just replaced it.
+        refreshTorState();
         if (r.fingerprint) setFingerprint(r.fingerprint);
         // Branch on the PIN SOURCE, not on whether a fingerprint came back.
         // A browser reaches a real `https://` server and gets no fingerprint —
@@ -142,8 +167,34 @@ export function EndpointConfig() {
           ),
         );
       })
-      .catch(() => setMsg(t("sync.endpoint.unreachable")))
+      .catch((e: unknown) => {
+        // Both Tor-mode refusals wrote NOTHING — no endpoint, no pin — so the
+        // screen stays on the same form with the field revealed rather than
+        // reporting a half-configured server. Everything else collapses into
+        // the generic "couldn't reach that server" line, as before.
+        const refusal = fingerprintGateRefusal(e);
+        if (refusal !== null) {
+          setConfirmNeeded(true);
+          setMsg(
+            refusal === "PinConfirmationRequired"
+              ? t("sync.endpoint.confirmFingerprintRequired")
+              : t("sync.endpoint.confirmFingerprintMismatch"),
+          );
+          return;
+        }
+        setMsg(t("sync.endpoint.unreachable"));
+      })
       .finally(() => setBusy(false));
+  };
+
+  // Decline: back out of an enrollment the user cannot verify. The refused
+  // attempt wrote nothing — no endpoint, no pin (`pin_confirm`'s contract) — so
+  // this only has to clear the screen and say so plainly, rather than leave the
+  // user wondering whether a half-configured server is now trusted.
+  const decline = () => {
+    setConfirmNeeded(false);
+    setExpectedFingerprint("");
+    setMsg(t("sync.endpoint.confirmFingerprintDeclined"));
   };
 
   return (
@@ -162,20 +213,39 @@ export function EndpointConfig() {
           style={INPUT}
           data-testid="sync.endpoint-input"
         />
-        <button
-          type="button"
-          onClick={connect}
-          disabled={busy}
-          style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
-          data-testid="sync.endpoint-connect"
-        >
-          {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
-        </button>
+        {/* While the gate is open the retry lives inside it, next to the
+            decline — two buttons that both mean "connect" would leave the user
+            picking between identical actions at the one moment this screen is
+            asking them to be careful. */}
+        {!confirmNeeded && (
+          <button
+            type="button"
+            onClick={connect}
+            disabled={busy}
+            style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
+            data-testid="sync.endpoint-connect"
+          >
+            {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+          </button>
+        )}
       </div>
       {msg && (
         <p style={HELP} data-testid="sync.endpoint-msg">
           {msg}
         </p>
+      )}
+      {/* Revealed only once the backend refuses for want of it — see the state
+          declaration for why this is an input rather than a confirm button. */}
+      {confirmNeeded && (
+        <FingerprintConfirm
+          value={expectedFingerprint}
+          onChange={setExpectedFingerprint}
+          onConfirm={connect}
+          onDecline={decline}
+          confirmLabel={busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+          confirmDisabled={busy}
+          testIdPrefix="sync"
+        />
       )}
       {/* The pin note renders whenever a SOURCE is known — it used to be
           nested inside the fingerprint block, which meant the browser's
