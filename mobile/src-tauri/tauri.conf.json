@@ -43,7 +43,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../../src-tauri/resources/models/ocr": "models/ocr"
+      "../../src-tauri/resources/models/ocr": "models/ocr",
+      "../../src-tauri/resources/models/whisper-tiny": "models/whisper"
     }
   }
 }

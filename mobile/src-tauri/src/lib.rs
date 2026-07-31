@@ -200,6 +200,13 @@ pub fn run() {
         // the shared-core compiled code; this crate adds only the wrapper +
         // capability entry. The scheduler/loop stays out (MYND-460).
         .plugin(plugins::sync::init())
+        // On-device speech-to-text (Whisper, MYND-563): transcription-only mobile
+        // plugin. Feature-gated by `local-inference` (default-on) — the module's
+        // `init()` is a no-op when the feature is off, so this stays an
+        // unconditional chain link. Commands (transcribe/read_transcript) must
+        // stay in lockstep with build.rs + the runtime capability in
+        // `local_inference/mod.rs` or the ACL resolver fails closed.
+        .plugin(plugins::local_inference::init())
         // MYND-169: the `attachment://<id>` async custom-URI-scheme handler.
         // A custom protocol handler is a builder-level concern (not a plugin
         // invoke handler); it decrypts the MYA1 blob in memory, re-sniffs the

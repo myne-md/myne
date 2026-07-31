@@ -23,6 +23,13 @@ pub mod export;
 // `myne_core::plugins::graph_layout` — read/write of the encrypted
 // `vault.graph` node-position cache (Class 3, never synced/backed up).
 pub mod graph_layout;
+// On-device speech-to-text (Whisper, MYND-563) — a NEW mobile plugin (not a
+// `myne-core` re-export: `local_inference` is desktop-side and `core/` must stay
+// wasm-clean, so the whisper subset is copied here). Declared unconditionally;
+// its candle/whisper internals + real `init()` are feature-gated by
+// `local-inference` (default-on), with a no-op `init()` for a
+// `--no-default-features` build (see `local_inference/mod.rs`).
+pub mod local_inference;
 pub mod notes;
 pub mod prefs;
 pub mod quick_unlock;
