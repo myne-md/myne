@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
+import { ReorderRow } from "./ReorderRow";
 
 /** Long-press action sheet for a note-list ROW (distinct from NoteActionsSheet,
  *  which acts on the open note). Star/unstar lives here — for non-favorited rows
@@ -16,6 +17,7 @@ export function NoteRowActionsSheet({
   onColor,
   onArchive,
   onTrash,
+  reorder,
 }: {
   title: string;
   favorited: boolean;
@@ -27,6 +29,9 @@ export function NoteRowActionsSheet({
   onColor: () => void;
   onArchive: () => void;
   onTrash: () => void;
+  /** Move-up/move-down within the note's folder container (MYND-596). Absent
+   *  outside the plain notes tree (where `item_order` is the active ordering). */
+  reorder?: { id: string; canUp: boolean; canDown: boolean; onUp: () => void; onDown: () => void };
 }) {
   const { t } = useTranslation();
   // Rows sit flush inside the Sheet — separated by hairlines WITHIN a logical
@@ -54,6 +59,16 @@ export function NoteRowActionsSheet({
           {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite, { groupTop: true, testId: "notes.favorite-action" })}
           {row(t("editor.noteMenu.moveToFolder"), onMove)}
           {row(t("notes.list.color"), onColor, { testId: "notes.note-color-action" })}
+          {reorder && (
+            <ReorderRow
+              canUp={reorder.canUp}
+              canDown={reorder.canDown}
+              onUp={reorder.onUp}
+              onDown={reorder.onDown}
+              upTestId={`notes.row-move-up-${reorder.id}`}
+              downTestId={`notes.row-move-down-${reorder.id}`}
+            />
+          )}
           {row(t("notes.archive.title"), onArchive)}
           {sep}
           {row(t("editor.noteMenu.moveToTrash"), onTrash, { danger: true, groupTop: true })}

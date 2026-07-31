@@ -30,7 +30,7 @@ import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
-import { setFavorites, setArchivedFolders, setDeliberateFolders, setFolderIcons, setItemColors, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
+import { setFavorites, setArchivedFolders, setDeliberateFolders, setFolderIcons, setItemColors, setItemOrder, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { useHiddenHomeTiles } from "../../lib/home-tiles";
 import { searchNotes } from "../../lib/search-notes";
@@ -52,7 +52,8 @@ import {
   unarchiveNote,
   type NoteFlags,
 } from "../../lib/note-organize";
-import { folderChildren, itemOrderRank, notesDirectlyIn, notesInSubtree } from "../../lib/folders";
+import { deriveTree, subtreeCount, orderedChildren, childOrderIndex, reorderChildOrder, notesInSubtree } from "../../lib/folders";
+import type { Child, OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
 import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expand-store";
 import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
 import { resolveTodayNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
@@ -576,6 +577,21 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     return m;
   }, [liveNotes, bodies]);
 
+  // The interleave cache (MYND-596): note id → `updatedAt`, the recency key the
+  // shared `orderContainerChildren` reads for unlisted notes. A superset (all
+  // notes) is fine — the ranker only touches the ids a container actually holds.
+  const orderCache = useMemo<Map<string, OrderedNoteRecord>>(
+    () => new Map(notes.map((n) => [n.id, { updatedAt: updatedById.get(n.id) ?? null }])),
+    [notes, updatedById],
+  );
+  // The FULL folder tree (fav/archive-unfiltered) — the reorder handlers resolve
+  // a row's true `item_order` container against it, so a nudge is relative to the
+  // note's real manual neighbours even when the fav strip hides some of them.
+  const fullTree = useMemo(
+    () => deriveTree(folderOf, prefs.deliberate_folders),
+    [folderOf, prefs.deliberate_folders],
+  );
+
   // Folder-archive (MYND-470): the synced `archived_folders` set decluttered from
   // the working tree. A note under an archived folder keeps NO note-level flag
   // (folder-archive never rewrites notes), so it sits in `liveNotes` — split those
@@ -757,6 +773,46 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     },
     [prefs.favorites],
   );
+
+  // Move-up/move-down reorder (MYND-596). Offered only in the plain notes tree —
+  // where `item_order` is the active ordering — and, for notes, never for a
+  // favorited one (it lives in the strip, ordered by `favorites`, not
+  // `item_order`). Each nudge rewrites the acted row's container sequence and
+  // persists via the whole-map `set_item_order`, then bumps the prefs nonce (the
+  // favorites-writer chokepoint) so the re-read reflects the new order.
+  const reorderableTree =
+    listView === "notes" && !activeTag && activeViewId == null && searchQuery.trim() === "";
+  const persistItemOrder = (next: Record<string, string[]> | null) => {
+    if (next && HAS_TAURI) void setItemOrder(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+  };
+  const noteReorder = (id: string) => {
+    if (!reorderableTree || favSet.has(id)) return undefined;
+    const containerPath = folderOf.get(id) ?? null;
+    const { index, count } = childOrderIndex({
+      tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: id,
+    });
+    if (index < 0) return undefined;
+    const nudge = (delta: -1 | 1) =>
+      persistItemOrder(reorderChildOrder({
+        tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: id, delta,
+      }));
+    return { id, canUp: index > 0, canDown: index < count - 1, onUp: () => nudge(-1), onDown: () => nudge(1) };
+  };
+  const folderReorder = (path: string) => {
+    if (!reorderableTree) return undefined;
+    // The folder's container is its PARENT (null for a top-level folder).
+    const anc = ancestorPaths(path);
+    const containerPath = anc.length >= 2 ? anc[anc.length - 2]! : null;
+    const { index, count } = childOrderIndex({
+      tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: path,
+    });
+    if (index < 0) return undefined;
+    const nudge = (delta: -1 | 1) =>
+      persistItemOrder(reorderChildOrder({
+        tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: path, delta,
+      }));
+    return { key: folderKey(path), canUp: index > 0, canDown: index < count - 1, onUp: () => nudge(-1), onDown: () => nudge(1) };
+  };
 
   // Honor the default-view-mode pref when entering the editor for an EXISTING
   // note: "reading" → static reading view, "source" → raw markdown in the live
@@ -1614,21 +1670,22 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           )
         : folderOf;
     const titleOf = new Map(notes.map((n) => [n.id, n.title]));
-    // Order note ids within one tree level: favourites first, then by sort mode.
-    // The default (non-A→Z) mode honors the user's manual `item_order` sequence
-    // (MYND-562 light parity with desktop), falling back to natural order for
-    // unlisted notes.
-    const noteRank = itemOrderRank(prefs.item_order);
-    const sortIds = (ids: string[]): string[] => {
-      const byTitle = (a: string, b: string) =>
-        (titleOf.get(a) ?? "").localeCompare(titleOf.get(b) ?? "");
-      const base =
-        sortMode === "az"
-          ? [...ids].sort(byTitle)
-          : sortMode === "za"
-            ? [...ids].sort((a, b) => byTitle(b, a))
-            : [...ids].sort((a, b) => noteRank(a) - noteRank(b));
-      return [...base.filter((id) => favSet.has(id)), ...base.filter((id) => !favSet.has(id))];
+    // MYND-596: folders and notes interleave in ONE display-ordered list PER
+    // container (shared `orderedChildren`) — a note can now sit above a folder,
+    // the same list desktop renders from the same synced `item_order`. The tree
+    // is derived once from the fav/archive-filtered map and walked recursively.
+    const tree = deriveTree(treeFolderOf, prefs.deliberate_folders);
+    const childName = (c: Child): string =>
+      c.kind === "folder" ? c.node.name : (titleOf.get(c.id) ?? "");
+    // A→Z / Z→A is an explicit override on top of the manual interleave: it
+    // reorders the whole child list (folders AND notes) by display name, since
+    // notes are no longer a separately-sorted group. "none" keeps the manual
+    // `item_order` interleave (folders/notes unlisted → name / recency).
+    const orderChildren = (containerPath: string | null): Child[] => {
+      const children = orderedChildren(tree, containerPath, prefs.item_order, orderCache);
+      if (sortMode === "none") return children;
+      const dir = sortMode === "az" ? 1 : -1;
+      return [...children].sort((a, b) => dir * childName(a).localeCompare(childName(b)));
     };
     // Tree emptiness (no notes in the tree map + no deliberate empty folder) is
     // cheaper than materializing the whole flattened tree just to ask its length.
@@ -1706,53 +1763,57 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     // deep headers stuck in the wrong places.
     const renderTree = (current: string | null, depth: number): ReactNode[] => {
       const out: ReactNode[] = [];
-      for (const f of folderChildren(treeFolderOf, current, prefs.deliberate_folders, prefs.item_order)) {
-        const isCollapsed = !expandedFolders.has(f.key);
-        out.push(
-          <div key={`f:${f.path}`}>
-            <div style={{ position: "sticky", top: depth * 44, zIndex: 30 - depth, background: "var(--bg-1)" }}>
-              {Array.from({ length: depth }, (_, i) => railAt(i))}
-              <FolderTreeRow
-                name={f.name}
-                count={f.count}
-                collapsed={isCollapsed}
-                indentPx={20 + depth * 18}
-                // Decorations key by the folded folder identity (MYND-562), not
-                // the display path — so they match desktop across case-variants.
-                icon={prefs.folder_icons[f.key]}
-                color={prefs.item_colors[f.key]}
-                onToggle={() => toggleFolder(f.key)}
-                onHold={() => setFolderActions({ path: f.path, name: f.name })}
-              />
-            </div>
-            {!isCollapsed && (
-              <div style={{ position: "relative" }}>
-                {railAt(depth)}
-                {renderTree(f.path, depth + 1)}
+      // ONE walk over the interleaved children — a FolderTreeRow for a folder
+      // (recursing when expanded), a NoteRow for a note, in the returned order.
+      for (const child of orderChildren(current)) {
+        if (child.kind === "folder") {
+          const f = child.node;
+          const isCollapsed = !expandedFolders.has(f.key);
+          out.push(
+            <div key={`f:${f.path}`}>
+              <div style={{ position: "sticky", top: depth * 44, zIndex: 30 - depth, background: "var(--bg-1)" }}>
+                {Array.from({ length: depth }, (_, i) => railAt(i))}
+                <FolderTreeRow
+                  name={f.name}
+                  count={subtreeCount(f)}
+                  collapsed={isCollapsed}
+                  indentPx={20 + depth * 18}
+                  // Decorations key by the folded folder identity (MYND-562), not
+                  // the display path — so they match desktop across case-variants.
+                  icon={prefs.folder_icons[f.key]}
+                  color={prefs.item_colors[f.key]}
+                  onToggle={() => toggleFolder(f.key)}
+                  onHold={() => setFolderActions({ path: f.path, name: f.name })}
+                />
               </div>
-            )}
-          </div>,
-        );
-      }
-      for (const nid of sortIds(notesDirectlyIn(treeFolderOf, current))) {
-        const n = notes.find((x) => x.id === nid);
-        if (!n) continue;
-        out.push(
-          <NoteRow
-            key={n.id}
-            entry={n}
-            last={false}
-            divider={false}
-            indent={depth * 18 + 12}
-            subtitle={subtitleFor(n.id)}
-            color={prefs.item_colors[n.id]}
-            onOpen={() => void openFromList(n.id)}
-            selected={isRegular && editing?.id === n.id}
-            onHold={() => setRowActions(n)}
-            favorited={favSet.has(n.id)}
-            onToggleFavorite={() => toggleFavorite(n.id)}
-          />,
-        );
+              {!isCollapsed && (
+                <div style={{ position: "relative" }}>
+                  {railAt(depth)}
+                  {renderTree(f.path, depth + 1)}
+                </div>
+              )}
+            </div>,
+          );
+        } else {
+          const n = notes.find((x) => x.id === child.id);
+          if (!n) continue;
+          out.push(
+            <NoteRow
+              key={n.id}
+              entry={n}
+              last={false}
+              divider={false}
+              indent={depth * 18 + 12}
+              subtitle={subtitleFor(n.id)}
+              color={prefs.item_colors[n.id]}
+              onOpen={() => void openFromList(n.id)}
+              selected={isRegular && editing?.id === n.id}
+              onHold={() => setRowActions(n)}
+              favorited={favSet.has(n.id)}
+              onToggleFavorite={() => toggleFavorite(n.id)}
+            />,
+          );
+        }
       }
       return out;
     };
@@ -2339,6 +2400,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               setRowActions(null);
               void organizeRow(trashNote, id);
             }}
+            reorder={noteReorder(rowActions.id)}
           />
         )}
 
@@ -2354,6 +2416,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onDecorate={() => openFolderDecoration(folderActions.path)}
             onArchive={() => void archiveFolderFromMenu(folderActions.path)}
             onTrash={() => void trashFolderFromMenu(folderActions.path)}
+            reorder={folderReorder(folderActions.path)}
           />
         )}
 
