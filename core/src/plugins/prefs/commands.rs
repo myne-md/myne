@@ -3939,17 +3939,20 @@ pub(crate) async fn set_theme_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for the `custom_theme` field (custom-themes
-/// epic, MYND-297) — the active custom-theme name (the file-stem of a theme
-/// under `app_config_dir/themes/`). `Some(name)` selects a custom theme (takes
-/// precedence over `theme` host-side); `None` clears it (the client falls back
-/// to the built-in `theme`). Read-modify-write under the per-plugin write
-/// mutex; **no native side-effect**, disk-first (same shape as [`set_theme`]).
+/// epic, MYND-297) — the active custom-theme name, i.e. a key of the encrypted
+/// `vault.themes` store (`MYT1`, `protocol.md` §9.21). It named a plaintext
+/// file stem under `app_config_dir/themes/` until `decisions.md` 2026-07-16
+/// promoted palettes to vault content; the blob holds the palettes, this field
+/// holds the pointer. `Some(name)` selects a custom theme (takes precedence
+/// over `theme` host-side); `None` clears it (the client falls back to the
+/// built-in `theme`). Read-modify-write under the per-plugin write mutex;
+/// **no native side-effect**, disk-first (same shape as [`set_theme`]).
 /// `custom_theme` is a **non-load-bearing** cosmetic preference — no
 /// protective-envelope clamp (a tampered/replayed value at worst selects a
-/// different or absent palette; the apply layer validates the file + falls back
-/// to a built-in theme on any failure). The name is `is_valid_theme_name`-
-/// constrained at the themes-plugin file boundary (MYND-297 read/delete); this
-/// setter stores the string verbatim.
+/// different or absent palette: a name with no live entry in the store falls
+/// back to the built-in `theme`, and an unreadable store reads as empty per
+/// §9.21.4). The name is `is_valid_theme_name`-constrained at the themes-plugin
+/// import boundary; this setter stores the string verbatim.
 pub async fn set_custom_theme_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
