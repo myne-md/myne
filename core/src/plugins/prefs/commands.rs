@@ -967,6 +967,78 @@ pub(crate) async fn set_transcription_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for whether automatic on-device tag suggestion
+/// runs on this vault's notes (MYND-651). Default-off, emitted on disk only
+/// when `true`, so an untouched vault stays byte-identical to a pre-feature
+/// `vault.prefs`. Shared / scalar-LWW like `transcription_enabled`: a bundled
+/// task-model, so wanting the feature is a vault-level preference rather than a
+/// device capability.
+///
+/// **Not** the enforcement point. The tag pass is gated on `ai_enabled` AND
+/// this flag, both re-read host-side before the model is touched, so a WebView
+/// that skips or forges this setter gains nothing — and in particular cannot
+/// start inference on a vault whose AI opt-in is off.
+pub async fn set_auto_tag_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_auto_tag_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_auto_tag_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_auto_tag_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_auto_tag_enabled`].
+pub(crate) async fn set_auto_tag_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.auto_tag_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "auto_tag_enabled",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for whether THIS DEVICE shows task reminders
 /// (MYND-618). Device-local: whether a given machine should be interrupted is a
 /// property of that machine, so it never syncs. Omit-when-default keeps an
@@ -5247,6 +5319,7 @@ mod tests {
                     deliberate_folders: Vec::new(),
                     device_names: Default::default(),
                     auto_lock_seconds: None,
+                    auto_tag_enabled: false,
                     custom_theme: None,
                     daily_date_format: None,
                     daily_folder: None,

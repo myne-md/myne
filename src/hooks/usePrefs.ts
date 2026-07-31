@@ -72,6 +72,10 @@ const DEFAULT_PREFS: PrefsView = {
   developer_mode: false,
   archived_folders: [],
   auto_lock_seconds: null,
+  // MYND-651: matches the Rust default. A default-off positive opt-in, so the
+  // optimistic pre-read value is `false` — the same polarity as `ai_enabled`,
+  // which the tag pass is independently gated on.
+  auto_tag_enabled: false,
   active_workspace: null,
   custom_theme: null,
   daily_date_format: null,
