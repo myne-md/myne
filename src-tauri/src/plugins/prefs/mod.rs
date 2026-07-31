@@ -86,6 +86,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_archive_disabled,
             commands::set_show_task_marker,
             commands::set_transcription_enabled,
+            commands::set_auto_tag_enabled,
             commands::set_reminders_enabled,
             commands::set_reminder_horizon_days,
             commands::set_editor_line_spacing,

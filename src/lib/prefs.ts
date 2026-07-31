@@ -342,6 +342,19 @@ export interface PrefsView {
    */
   auto_lock_seconds: number | null;
   /**
+   * Whether automatic on-device tag suggestion runs on this vault's notes
+   * (MYND-651). Defaults to `false`; persisted only when `true`.
+   *
+   * The second half of a two-key gate — the tag pass runs only when this AND
+   * {@link PrefsView.ai_enabled} are on, and the host re-reads both before it
+   * touches the model, so the UI gate is discovery, not enforcement. Shared
+   * across devices (scalar LWW) like {@link PrefsView.transcription_enabled}:
+   * it gates a bundled task-model, so it is taste rather than device
+   * capability. Its co-gate stays device-local, which is what keeps a synced
+   * `true` from starting inference on a device that never opted into AI.
+   */
+  auto_tag_enabled: boolean;
+  /**
    * Active custom-theme name (custom-themes epic, MYND-297) — the file-stem of a
    * user-authored theme under `app_config_dir/themes/`. A non-`null` value takes
    * **precedence** over {@link PrefsView.theme}: when set, the client applies the
@@ -1219,6 +1232,17 @@ export async function setShowTaskMarker(enabled: boolean): Promise<void> {
  */
 export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_transcription_enabled", { enabled });
+  bumpPrefsNonce();
+}
+
+/**
+ * Enable or disable automatic on-device tag suggestion for this vault
+ * (MYND-651). Default-off. Shared across devices (scalar LWW) for the same
+ * reason as transcription above; the pass is co-gated on the device-local
+ * `ai_enabled`, which the host re-reads alongside this one.
+ */
+export async function setAutoTagEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_auto_tag_enabled", { enabled });
   bumpPrefsNonce();
 }
 

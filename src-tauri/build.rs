@@ -144,6 +144,8 @@ fn main() {
                 // MISSING from this mirror — pre-existing, not introduced here.
                 "set_show_task_marker",
                 "set_transcription_enabled",
+                // MYND-651.
+                "set_auto_tag_enabled",
                 "set_reminders_enabled",
                 "set_reminder_horizon_days",
                 // developer-mode (MYND-593): named here too, though not
