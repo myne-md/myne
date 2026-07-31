@@ -15,6 +15,10 @@
 //!   2. Cargo HTTP-client / telemetry **denylist** — [`DENYLISTED_CRATES`].
 //!   3. Network-bearing **capability permission** shapes —
 //!      [`permission_is_network`].
+//!   4. Process-spawn **capability permission** shapes —
+//!      [`permission_is_process_spawn`] (MYND-650: the bundle ships an
+//!      `externalBin` that exists to originate network traffic, and page
+//!      context must never be able to start it).
 //!
 //! `rustls` is deliberately NOT denylisted: it is the legitimate Phase-2 sync
 //! TLS transport (`decisions.md` MYND-424), not an HTTP client or telemetry
@@ -71,6 +75,20 @@ pub const DENYLISTED_CRATES: &[&str] = &[
 /// Capability-permission namespace prefixes that grant a network capability.
 const NETWORK_PERMISSION_PREFIXES: &[&str] = &["http", "updater", "websocket"];
 
+/// Capability-permission namespace prefixes that would let **page context**
+/// start a process.
+///
+/// Added with the arti Tor sidecar (MYND-650): the bundle now ships an
+/// `externalBin` whose entire purpose is to originate network traffic. The host
+/// spawns it from Rust, which no capability governs — a Tauri capability grants
+/// the *webview* an IPC surface, not the host a syscall. Granting `shell:` or
+/// `process:` here would hand any script running in the page the ability to
+/// start that proxy (or anything else), which is the one way this feature could
+/// turn into the egress path the whole no-egress invariant denies. Neither
+/// namespace has ever been granted; this makes the absence enforced rather than
+/// merely true.
+const PROCESS_SPAWN_PERMISSION_PREFIXES: &[&str] = &["shell", "process"];
+
 /// Normalize a crate name for robust comparison: trim, lowercase, and treat
 /// `_`/`-` as equivalent (cargo does).
 pub fn normalize_crate(name: &str) -> String {
@@ -101,6 +119,22 @@ pub fn permission_is_network(perm: &str) -> bool {
         || p.contains("fetch")
         || p.contains("network")
         || p.contains("socket")
+}
+
+/// Does a capability permission string let page context spawn a process?
+///
+/// Flags the `shell:` / `process:` namespaces and anything naming `execute`,
+/// `spawn` or `sidecar`. Clears in-app command namespaces that merely contain
+/// one of those words as a verb (`vault-unlock:allow-…`, `sync:…`), because the
+/// namespace check runs first and only these two namespaces can reach a
+/// process.
+pub fn permission_is_process_spawn(perm: &str) -> bool {
+    let p = perm.trim();
+    let ns = p.split(':').next().unwrap_or("").trim();
+    PROCESS_SPAWN_PERMISSION_PREFIXES.contains(&ns)
+        || p.contains("execute")
+        || p.contains("spawn")
+        || p.contains("sidecar")
 }
 
 /// Extract the space-separated tokens of the `connect-src` directive from a
@@ -171,10 +205,19 @@ pub fn manifest_denied_crates(toml_text: &str) -> Vec<String> {
     found
 }
 
-/// Network-bearing permissions found in a capability JSON file. Walks the
-/// `permissions` array — both bare strings and `{ "identifier": … }` objects.
-/// Returns the offending permission identifiers.
+/// Network-bearing permissions found in a capability JSON file.
 pub fn capability_network_permissions(json_text: &str) -> Vec<String> {
+    capability_permissions_matching(json_text, permission_is_network)
+}
+
+/// Process-spawn permissions found in a capability JSON file (MYND-650).
+pub fn capability_process_spawn_permissions(json_text: &str) -> Vec<String> {
+    capability_permissions_matching(json_text, permission_is_process_spawn)
+}
+
+/// Permissions in a capability JSON file that satisfy `is_offending`. Walks the
+/// `permissions` array — both bare strings and `{ "identifier": … }` objects.
+fn capability_permissions_matching(json_text: &str, is_offending: fn(&str) -> bool) -> Vec<String> {
     let mut found = Vec::new();
     let Ok(value) = serde_json::from_str::<serde_json::Value>(json_text) else {
         // Unparseable capability JSON is not this gate's concern (tauri build
@@ -192,7 +235,7 @@ pub fn capability_network_permissions(json_text: &str) -> Vec<String> {
                 _ => None,
             };
             if let Some(ident) = ident {
-                if permission_is_network(&ident) {
+                if is_offending(&ident) {
                     found.push(ident);
                 }
             }
@@ -335,6 +378,57 @@ mod tests {
             all_hits.is_empty(),
             "capability files grant network permissions: {all_hits:?}"
         );
+    }
+
+    /// MYND-650: the bundle ships an `externalBin` that exists to originate
+    /// network traffic. The host spawns it from Rust — no capability governs
+    /// that — so the capability files must never hand the same ability to page
+    /// context.
+    #[test]
+    fn gate_current_capabilities_grant_no_process_spawn_permission() {
+        let cap_dir = src_tauri_dir().join("capabilities");
+        let mut all_hits: Vec<(String, String)> = Vec::new();
+        for entry in std::fs::read_dir(&cap_dir).expect("read capabilities dir") {
+            let path = entry.expect("dir entry").path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            let json = std::fs::read_to_string(&path).expect("read capability file");
+            for perm in capability_process_spawn_permissions(&json) {
+                all_hits.push((file_name(&path), perm));
+            }
+        }
+        assert!(
+            all_hits.is_empty(),
+            "capability files grant process-spawn permissions: {all_hits:?}"
+        );
+    }
+
+    #[test]
+    fn permission_is_process_spawn_flags_shell_and_process_clears_app_commands() {
+        assert!(permission_is_process_spawn("shell:default"));
+        assert!(permission_is_process_spawn("shell:allow-execute"));
+        assert!(permission_is_process_spawn("shell:allow-spawn"));
+        assert!(permission_is_process_spawn("process:allow-restart"));
+        assert!(permission_is_process_spawn("core:allow-execute-sidecar"));
+
+        assert!(!permission_is_process_spawn("core:default"));
+        assert!(!permission_is_process_spawn("fs:allow-write-text-file"));
+        assert!(!permission_is_process_spawn("sync:allow-sync-now"));
+        assert!(!permission_is_process_spawn("cli-bridge:default"));
+        assert!(!permission_is_process_spawn("local-inference:default"));
+    }
+
+    #[test]
+    fn negative_a_shell_execute_permission_trips_the_spawn_gate() {
+        let json = r#"{"permissions":["core:default",{"identifier":"shell:allow-execute"}]}"#;
+        assert_eq!(
+            capability_process_spawn_permissions(json),
+            vec!["shell:allow-execute".to_string()]
+        );
+        // …and it is NOT flagged by the network gate, which is why it needed
+        // its own predicate rather than a wider `permission_is_network`.
+        assert!(capability_network_permissions(json).is_empty());
     }
 
     fn file_name(p: &Path) -> String {

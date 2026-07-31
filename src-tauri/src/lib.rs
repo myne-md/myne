@@ -53,6 +53,12 @@ pub use myne_core::search;
 // (mirrors the `myne_core::paths` re-export above).
 pub use myne_core::{snapshot_policy, snapshot_store};
 mod spell;
+// Host-side lifecycle for the `myne-tor` arti sidecar (MYND-650). The ONLY
+// place in this crate that starts a process with a network surface — and it
+// starts it as a *separate* process, which is what keeps arti out of
+// `myne-desktop`'s linked dependency closure and leaves the `no_egress` gate
+// scanning a tree with no networked crate in it.
+mod tor_sidecar;
 // Shared Unix-domain-socket bind (owner-only 0600, TOCTOU-closed), used by
 // both local ingresses: `clipper::relay` and `cli_bridge::socket`.
 mod uds;
@@ -492,6 +498,16 @@ pub fn run() {
             // stream on unlocked+enrolled and parks on a revoked token.
             app.manage(plugins::sync::poke_listener::SsePokeSignal::default());
             plugins::sync::poke_listener::spawn_poke_supervisor(app.handle().clone());
+            // MYND-650 task 2: the arti sidecar supervisor and the routing gate
+            // it publishes into. Managed as a pair so the transport (tasks 3/4)
+            // reads the gate without knowing the supervisor exists. Nothing is
+            // spawned here — the sidecar starts only when the device-local
+            // `tor_routing_enabled` toggle turns on (task 6), which is what
+            // keeps a default install byte-for-byte the direct-sync client it
+            // is today. The `RunEvent` arm below is the app-quit teardown.
+            let tor_gate = myne_core::plugins::sync::proxy::ProxyGate::new();
+            app.manage(tor_gate.clone());
+            app.manage(std::sync::Arc::new(tor_sidecar::TorSidecar::new(tor_gate)));
             // ext-foundation-handoff task 6: the host↔app relay listener. Binds
             // the owner-only (0600) Unix-domain-socket under the app-data dir
             // and serves the keyless clip ingest on a background thread. The
@@ -549,6 +565,24 @@ pub fn run() {
                     let _ = window.unminimize();
                     let _ = window.show();
                     let _ = window.set_focus();
+                }
+            }
+            // MYND-650 task 2: terminate the arti sidecar before the process
+            // goes away. A Tor client left holding circuits open after the app
+            // is gone is both a resource leak and a signal that Myne was
+            // running, so this fires on BOTH exit events — `ExitRequested` is
+            // skipped when the platform tears the app down directly, and
+            // `stop()` is idempotent. `Drop` on the managed state and (on
+            // Linux) `PR_SET_PDEATHSIG` are the two backstops beneath this one.
+            if matches!(
+                event,
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+            ) {
+                use tauri::Manager;
+                if let Some(sidecar) =
+                    app_handle.try_state::<std::sync::Arc<tor_sidecar::TorSidecar>>()
+                {
+                    sidecar.stop();
                 }
             }
             if let tauri::RunEvent::ExitRequested { .. } = event {

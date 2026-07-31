@@ -84,6 +84,13 @@ pub mod poke_listener;
 pub mod prefs_classification;
 pub mod prefs_merge;
 pub mod progress;
+// Where the transport is allowed to send bytes when device-local Tor routing is
+// on (MYND-650). Shared rather than desktop-only even though only the desktop
+// host can spawn the arti sidecar: the *decision* — and specifically the
+// fail-closed refusal to ever connect directly while Tor mode is on — belongs
+// next to the transport that has to honour it, not next to the process
+// supervisor that feeds it.
+pub mod proxy;
 pub mod qr_join;
 pub mod reconcile;
 pub mod reconcile_policy;
