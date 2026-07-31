@@ -67,8 +67,12 @@ const REAP_TIMEOUT: Duration = Duration::from_secs(5);
 /// Why the sidecar could not be started.
 ///
 /// No `String` and no path: this reaches the UI (task 8), where a filesystem
-/// path would be a disclosure (`src-tauri/CLAUDE.md` DENY list).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// path would be a disclosure (`src-tauri/CLAUDE.md` DENY list). `Serialize` is
+/// what lets the task-6 toggle command report *why* a spawn failed without
+/// re-describing these four cases in a second enum; every variant is a unit, so
+/// the wire form is the bare variant name and there is no payload that could
+/// carry a path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum StartError {
     /// No `myne-tor` beside the running executable — a dev build that never
     /// ran `pnpm sidecar`, or a broken bundle.
