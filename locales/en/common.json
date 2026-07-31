@@ -2367,7 +2367,8 @@
       "importButton": "Import theme…",
       "importError": "That file isn't a valid theme. Open the reference to see the format.",
       "label": "Custom themes",
-      "readError": "Couldn't read your custom themes."
+      "readError": "Couldn't read your custom themes.",
+      "readOnlyHelper": "Custom themes are installed on your computer. Yours arrive here on their own after a sync."
     },
     "dailyNotes": {
       "blankTemplate": "Blank (no template)",
