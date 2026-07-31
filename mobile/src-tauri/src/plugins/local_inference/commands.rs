@@ -12,7 +12,7 @@
 //! searchable + re-insertable without re-transcribing; the backend NEVER writes
 //! it into a note body (insertion is the frontend's explicit MY01 action).
 
-#![cfg_attr(not(test), allow(dead_code))]
+#![allow(dead_code, unused_imports)] // MYND-563 scaffolding: unwired until tasks 6/7, dead in test builds too
 
 use std::path::Path;
 
