@@ -138,7 +138,7 @@ import { clearTagSuggest } from "../notes/ai/tagSuggestStore";
 import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
 import { runSummarizeToChat, runTagSuggestToChat } from "../notes/ai/aiToChat";
 import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
-import { appendInlineTag } from "../notes/ai/acceptTag";
+import { acceptTagIntoView } from "../notes/ai/acceptTagIntoView";
 import { infer as aiInfer, computeRewrite } from "../lib/writing-assistant";
 import { sendChat, stopChat } from "../lib/ai-chat";
 import { isNoteAiExcluded } from "../lib/aiExcludedFolders";
@@ -3552,17 +3552,14 @@ function RightSidebar() {
               });
             }}
             onAcceptTag={(suggestion) => {
-              // Accept a tag chip (auto-tag-link task 5, SYNC-17): append an inline
-              // `#tag` (idempotent, byte-identical) to the focused note, persisted
-              // through the normal autosave path — only on this explicit click.
+              // Accept a tag chip (on-device-tag-suggestion task 6, SYNC-17): add
+              // it to the focused note's frontmatter `tags:` list (idempotent,
+              // byte-identical to a hand-typed tag), persisted through the normal
+              // autosave path — only on this explicit click. The same seam the
+              // inline suggestion band accepts through.
               const view = getActiveEditorView();
               if (view === null) return;
-              const newBody = appendInlineTag(view.state.doc.toString(), suggestion.tag);
-              if (newBody === view.state.doc.toString()) return; // already present
-              view.dispatch({
-                changes: { from: 0, to: view.state.doc.length, insert: newBody },
-                userEvent: "ai.rewrite",
-              });
+              acceptTagIntoView(view, suggestion.tag);
             }}
             onSend={(m) => void sendChat(m)}
             onStop={() => {

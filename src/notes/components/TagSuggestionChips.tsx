@@ -5,8 +5,9 @@
 // that surface, not a new column. Existing-vocabulary chips and new-flagged
 // chips are visually distinguishable (border weight + a `data-is-new` marker).
 // Nothing is auto-inserted: a chip writes only on click (SYNC-17), dispatched
-// through `onAccept` (the Editor wires `computeTagsAfterAccept`/`appendInlineTag`
-// + the save — task 5). Accepted chips reflect their state and no longer fire.
+// through `onAccept` — which every mounting surface routes into the one accept
+// path, `acceptTagIntoView` → frontmatter `tags:` (on-device-tag-suggestion task
+// 6). Accepted chips reflect their state and no longer fire.
 
 import type { CSSProperties } from "react";
 
