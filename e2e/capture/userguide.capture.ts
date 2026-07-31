@@ -838,6 +838,27 @@ runner(
       );
       await safe("collapse multicursor", () => pressKey(s, ESCAPE));
 
+      // ---- Frame: tasks (a note with inline task chips) ----
+      // Bracketed task-field syntax ([due::/priority::/repeat::]) is the
+      // canonical emit form (dialect/src/taskFieldWriter.ts), rendered as the
+      // .cm-task-chip decoration (editor/src/host/notes/taskChipToken.ts).
+      await frame(
+        s,
+        "tasks",
+        "notes-and-organization/tasks",
+        "A note with checkbox tasks carrying due, priority, and repeat chips shown inline.",
+        async () => {
+          await createNoteWithBody(
+            s,
+            "Launch checklist",
+            "\n- [ ] Draft the quarterly review [due:: 2026-08-15] [priority:: high] [repeat:: every week]\n- [ ] Email the vendor [due:: 2026-08-02]\n- [x] Book the venue",
+          );
+          await settle(s, 600);
+          await s.waitForElement(".cm-task-chip", { timeoutMs: 8000 });
+          await settle(s, 400);
+        },
+      );
+
       // ---- Frame: export a note (the context-menu Export as Markdown entry) ----
       // note-export.e2e.ts: the in-app export pre-flight modal renders only for
       // attachment-bearing notes; a plain note goes to the native save dialog
@@ -951,6 +972,23 @@ runner(
       );
       // Un-favourite so the sidebar returns to its plain shape for later frames.
       await safe("un-favourite", () => rowContextAction(s, "Welcome to Myne", "favorite"));
+
+      // ---- Frame: note colours (the colour/icon decoration popover) ----
+      // NoteList.tsx menuItems id "color" opens the DecorationPopover
+      // (notes.decoration-popover) — a flat anchored menu with the colour
+      // swatch row. Dismissed with Escape so it does not block later frames.
+      await frame(
+        s,
+        "note-colors",
+        "notes-and-organization/note-colors-and-icons",
+        "The colour picker opened from a note's context menu, showing the palette of colour swatches.",
+        async () => {
+          await rowContextAction(s, "Welcome to Myne", "color");
+          await s.byTestId("notes.decoration-popover", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+      await safe("close colour popover", () => pressKey(s, ESCAPE));
 
       // ---- Frame: templates (the Manage templates modal) ----
       // templates.manage → TemplatesManager (ModalShell, aria-labelledby). The
@@ -1343,6 +1381,29 @@ runner(
         async () => {
           await (await s.byTestId("settings.tab-editor")).click();
           await s.byTestId("settings.editor-text-size", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: vim mode (the Editor panel's Vim mode toggle) ----
+      // VimModeSettings.tsx: settings.tab-editor → settings.vim-mode (a Switch,
+      // off by default). Scroll it into view so the toggle is centred.
+      await frame(
+        s,
+        "vim-mode",
+        "editor-and-writing/vim-mode",
+        "The Editor settings panel scrolled to the Vim mode toggle, which is off by default.",
+        async () => {
+          await (await s.byTestId("settings.tab-editor")).click();
+          const block = await s.byTestId("settings.vim-mode", { timeoutMs: 6000 });
+          await safe("scroll vim-mode into view", async () => {
+            await s.execute(
+              "var el = document.querySelector(arguments[0]);" +
+                "if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("settings.vim-mode")],
+            );
+          });
+          void block;
           await settle(s, 400);
         },
       );
