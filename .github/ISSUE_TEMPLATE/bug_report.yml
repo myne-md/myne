@@ -1,7 +1,7 @@
 name: Bug report
 description: Something in the desktop client, web client, protocol crate, or clipper host is broken.
 title: "[Bug]: "
-labels: [bug]
+labels: ["type: bug"]
 body:
   - type: markdown
     attributes:

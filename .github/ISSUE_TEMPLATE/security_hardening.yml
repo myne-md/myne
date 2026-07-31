@@ -1,0 +1,66 @@
+name: Security hardening / threat-model
+description: Propose a hardening for an ALREADY-DOCUMENTED residual, metadata leak, or defense-in-depth improvement. Not for undisclosed vulnerabilities.
+title: "[Hardening]: "
+labels: ["type: security", "type: enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Read this first — is your report a vulnerability or a hardening?**
+
+        - **Undisclosed or exploitable vulnerability → STOP.** Anything that lets an attacker read plaintext, forge or bypass authentication, recover keys, break the reproducible-build / bundle chain, or otherwise defeat a guarantee the threat model claims **does not go in a public issue.** Email **security@myne.md** — coordinated disclosure per [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
+        - **This form is for the other case:** improving an **already-public accepted residual** (`docs/threat-model.md` §5 "NOT Protected Against" / §7 "Known Limitations"), reducing a documented metadata leak, or adding defense-in-depth. No new attack is being disclosed — the exposure is already written down.
+
+        If you are unsure which side of the line you are on, treat it as a vulnerability and email security@myne.md. Marketing and UX may never exceed the threat model — read [`docs/threat-model.md`](https://github.com/myne-md/myne/blob/main/docs/threat-model.md) and [`docs/vision.md`](https://github.com/myne-md/myne/blob/main/docs/vision.md) before proposing.
+  - type: textarea
+    id: residual
+    attributes:
+      label: Which residual or threat does this address?
+      description: Reference the threat-model section and the adversary / asset / trust-boundary ids (e.g. "§7 blob-size leak; A4/A5 at rest; AS3").
+      placeholder: "e.g. docs/threat-model.md §7 'Blob size leaks information' — A4/A5/A7 at rest, future A13 sync observer."
+    validations:
+      required: true
+  - type: textarea
+    id: hardening
+    attributes:
+      label: Proposed hardening
+      description: What changes, and what leak/exposure it removes or narrows.
+    validations:
+      required: true
+  - type: textarea
+    id: format-impact
+    attributes:
+      label: Protocol / on-disk-format impact
+      description: Is this a major-version event? Does it change any load-bearing identifier (AAD prefix, magic byte, HKDF context, subkey role), the sync wire, or the test-vector contract? If it is purely a local/client-policy change, say so.
+      placeholder: "e.g. additive within v0.1 — padding lives inside the AEAD plaintext, reserved byte at offset 5 flags it; no magic/AAD change; new test vectors owed."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Cheaper/coarser variants, and why the deeper/v005 version is or isn't in scope.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area?
+      options:
+        - Protocol / on-disk format
+        - Cryptography / key handling
+        - Sync / server boundary
+        - Web client bundle / delivery
+        - Client app (desktop / mobile)
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: This is NOT an undisclosed or exploitable vulnerability — it hardens an already-public/documented residual or adds defense-in-depth. (An undisclosed vulnerability goes privately to security@myne.md.)
+          required: true
+        - label: This doesn't conflict with Myne's anti-features (docs/vision.md) or exceed the threat model (docs/threat-model.md).
+          required: true
