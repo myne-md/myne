@@ -1064,7 +1064,8 @@
         "lime": "Lime",
         "brown": "Brown",
         "grey": "Grey",
-        "indigo": "Indigo"
+        "indigo": "Indigo",
+        "remove": "Remove highlight"
       },
       "urlPlaceholder": "Paste link URL"
     },
