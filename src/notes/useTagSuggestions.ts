@@ -12,11 +12,13 @@
 //   1. **A tag the note already carries is not a suggestion.** After an accept
 //      the content changes, the cache entry is invalidated by construction, and
 //      the next pass legitimately proposes the same tag again — now as existing
-//      vocabulary. Filtering on `computeTagAcceptEdit(...) === null` reuses the
-//      one authority on "is this tag already here" (the §3.7.8 fold, frontmatter
-//      `tags:`/`tag:` AND inline `#tag`) rather than adding a second answer.
-//      It also hides the band on frontmatter the writer refuses to touch, which
-//      is the honest reading: a chip there would offer a write that cannot land.
+//      vocabulary. Filtering through `planTagAccept` reuses the one authority on
+//      "is this tag already here" (the §3.7.8 fold, frontmatter `tags:`/`tag:`
+//      AND inline `#tag`) rather than adding a second answer. It also hides the
+//      band on frontmatter the writer refuses to touch (a `null` plan), which is
+//      the honest reading: a chip there would offer a write that cannot land.
+//      The plan is per document, so this costs one parse per edit rather than
+//      one per chip per edit.
 //   2. **A dismissal is per note and per session.** Nothing is persisted — a
 //      dismissed tag is a RAM-only, note-scoped judgement, dropped on note
 //      switch. Persisting it would be a second on-disk artefact for a feature
@@ -29,7 +31,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TagSuggestionChip } from "@myne/editor/decorations/tag-suggestion-band";
 
 import { foldSegment } from "../dialect/folderPath";
-import { computeTagAcceptEdit } from "./ai/acceptTag";
+import { planTagAccept } from "./ai/acceptTag";
+import { cleanTagToken } from "./ai/tagRanker";
 import {
   createTagSuggestionTrigger,
   type TagSuggestionTrigger,
@@ -51,7 +54,9 @@ export interface TagSuggestionInput {
   enabled: boolean;
   /** `prefs.ai_excluded_folders` (SYNC-14). */
   excludedFolders: readonly string[];
-  /** Debounce override — the E2E lane shortens it. */
+  /** Debounce override. Not wired to any surface — it exists so this hook's own
+   *  specs need not wait out a real idle interval (the E2E lane cannot reach it:
+   *  `e2e/CLAUDE.md`'s zero-test-hooks rule). */
   debounceMs?: number;
 }
 
@@ -135,13 +140,39 @@ export function useTagSuggestions(input: TagSuggestionInput): TagSuggestionBandS
     });
   }, []);
 
-  const suggestions = useMemo(() => {
-    if (raw.length === 0) return NO_CHIPS;
-    return raw.filter(
-      (chip) =>
-        !hidden.has(foldSegment(chip.tag)) && computeTagAcceptEdit(body, chip.tag) !== null,
-    );
-  }, [raw, hidden, body]);
+  // What accepting any tag into the current document would do — one YAML parse
+  // and one inline-tag scan per edit, shared by every chip. `null` means the
+  // writer refuses this frontmatter, so no chip can land and the band is empty.
+  const plan = useMemo(() => (raw.length === 0 ? null : planTagAccept(body)), [raw, body]);
+
+  const filtered = useMemo(
+    () =>
+      plan === null
+        ? NO_CHIPS
+        : raw.filter((chip) => {
+            if (hidden.has(foldSegment(chip.tag))) return false;
+            const cleaned = cleanTagToken(chip.tag);
+            return cleaned.length > 0 && !plan.existingFolds.has(foldSegment(cleaned));
+          }),
+    [raw, hidden, plan],
+  );
+
+  // The band is pushed into CodeMirror as a state effect, so an unchanged chip
+  // list must keep its identity: `plan` is rebuilt on every keystroke, and a
+  // fresh array would dispatch a transaction (and rebuild the decoration) for
+  // every character typed in a note that has a band up.
+  //
+  // The identity is pinned by keying a memo on the chips' CONTENT, so React
+  // hands back the first array it saw for that content. Deliberately not a ref
+  // compared-and-written during render: that is a render-phase side effect, and
+  // a discarded concurrent render would leave the ref holding an array no
+  // committed render ever returned. The key is length-prefixed per tag, so no
+  // pair of distinct chip lists can serialize to the same string.
+  const chipsKey = filtered
+    .map((c) => `${c.isNew ? "+" : "-"}${c.tag.length}:${c.tag}`)
+    .join("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `chipsKey` IS `filtered`'s content
+  const suggestions = useMemo(() => filtered, [chipsKey]);
 
   return useMemo(() => ({ suggestions, dismiss }), [suggestions, dismiss]);
 }

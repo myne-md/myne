@@ -144,3 +144,37 @@ describe("dismissal", () => {
     await waitFor(() => expect(result.current.suggestions).toHaveLength(2));
   });
 });
+
+describe("referential stability", () => {
+  it("returns the SAME array while the chips are unchanged", async () => {
+    // The band is pushed into CodeMirror as a state effect, so a fresh array on
+    // every keystroke would dispatch a transaction (and rebuild the decoration)
+    // per character typed in a note that has a band up. `plan` IS rebuilt every
+    // keystroke — this is the memo that keeps that invisible.
+    const { result, rerender } = renderHook((p: Parameters<typeof useTagSuggestions>[0]) =>
+      useTagSuggestions(p),
+    { initialProps: props() });
+    await waitFor(() => expect(result.current.suggestions).toHaveLength(2));
+    const first = result.current.suggestions;
+
+    // An edit that adds body text the model was already going to answer the same
+    // way for: the pass re-runs, the chip list comes back identical.
+    rerender(props({ body: `${BODY}One more sentence.\n` }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(result.current.suggestions).toBe(first);
+
+    // A rerender with no input change at all must not churn it either.
+    rerender(props({ body: `${BODY}One more sentence.\n` }));
+    expect(result.current.suggestions).toBe(first);
+  });
+
+  it("hands back a new array as soon as the chips actually change", async () => {
+    const { result } = renderHook(() => useTagSuggestions(props()));
+    await waitFor(() => expect(result.current.suggestions).toHaveLength(2));
+    const first = result.current.suggestions;
+
+    act(() => result.current.dismiss("rust"));
+    expect(result.current.suggestions).not.toBe(first);
+    expect(result.current.suggestions.map((s) => s.tag)).toEqual(["compilers"]);
+  });
+});

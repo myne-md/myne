@@ -18,6 +18,7 @@
 // later and must NOT cache the empty answer — see the trigger's cache rule in
 // `notes/ai/tagSuggestionTrigger.ts`.
 
+import { engineErrorTag } from "./engine-error";
 import { invoke } from "../platform/core";
 
 /** Bounded failure kinds of one tag-suggestion pass. `deferred` = stood down for
@@ -66,16 +67,29 @@ export async function suggestTagsForNote(args: {
   });
 }
 
-/** Map the raw IPC rejection (a serialized `EngineError` — a bare variant string
- *  like `"Deferred"`, or a `{ kind }` object) to a normalized kind. Anything
- *  unrecognized degrades to `"failed"`. */
+/**
+ * Whether this build ships an auto-tag model at all.
+ *
+ * The tag role is bundled-only — there is no picker (`threat-model.md` §7) — so
+ * `false` is a permanent property of the build, not something the user can fix
+ * by side-loading. Settings uses it to say so instead of offering a switch that
+ * would persist `true` against a host answering `not_ready` forever.
+ *
+ * Degrades to `false` on any rejection: an AI-free `--no-default-features`
+ * build has no such command, and "the command is missing" and "no blob shipped"
+ * are the same fact from the panel's side.
+ */
+export async function tagModelAvailable(): Promise<boolean> {
+  return await invoke<boolean>("plugin:local-inference|tag_model_available").catch(
+    () => false,
+  );
+}
+
+/** Map the raw IPC rejection (a serialized `EngineError` — see
+ *  {@link engineErrorTag}) to a normalized kind. Anything unrecognized degrades
+ *  to `"failed"`. */
 function normalizeTagSuggestError(raw: unknown): TagSuggestError {
-  const tag =
-    typeof raw === "string"
-      ? raw
-      : raw !== null && typeof raw === "object" && "kind" in raw
-        ? String((raw as { kind: unknown }).kind)
-        : "";
+  const tag = engineErrorTag(raw);
   if (tag === "Deferred" || tag === "deferred") return { kind: "deferred" };
   if (tag === "NotReady" || tag === "not_ready") return { kind: "not_ready" };
   return { kind: "failed" };

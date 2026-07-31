@@ -351,7 +351,7 @@ export function PaneView({
   const openNoteTabKey = leaf.tabs
     .filter((t) => t.kind === "note")
     .map((t) => t.id)
-    .join(" ");
+    .join("\u0000");
   useEffect(() => {
     const open = new Set(
       leaf.tabs.filter((t) => t.kind === "note").map((t) => t.id),

@@ -141,14 +141,16 @@ describe("createTagSuggestionTrigger", () => {
     expect(h.suggest).toHaveBeenCalledTimes(2);
   });
 
-  it("clearCache() drops the session cache (vault lock)", async () => {
+  it("carries only the PROMPT WINDOW into a pending pass, never the whole body", async () => {
+    // The timer closure outlives the debounce and then a multi-second model
+    // call; pinning the note plaintext there is what property 2 rules out.
     const h = harness();
-    h.trigger.schedule({ noteId: "n1", noteBody: "body", noteFolder: "" });
+    const tail = "TAIL-BEYOND-THE-WINDOW";
+    const body = `${"x".repeat(TAG_PROMPT_BODY_CHARS)}${tail}`;
+    h.trigger.schedule({ noteId: "n1", noteBody: body, noteFolder: "" });
     await settle();
-    h.trigger.clearCache();
-    h.trigger.schedule({ noteId: "n1", noteBody: "body", noteFolder: "" });
-    await settle();
-    expect(h.suggest).toHaveBeenCalledTimes(2);
+    const prompt = h.suggest.mock.calls[0]![0].prompt;
+    expect(prompt).not.toContain(tail);
   });
 
   it("produces no suggestions and never calls the model for an excluded folder", async () => {

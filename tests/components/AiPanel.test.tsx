@@ -12,19 +12,25 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 // Hoisted so the mock factories (which run BEFORE module-body consts init) can
 // reference these — the canonical vitest pattern for direct factory references.
-const { openUrl, openFileDialog, loadModelPath, saveModelPath, setAutoTagEnabled } = vi.hoisted(
-  () => ({
-    openUrl: vi.fn(() => Promise.resolve()),
-    openFileDialog: vi.fn((): Promise<string | null> => Promise.resolve(null)),
-    loadModelPath: vi.fn((): Promise<string | null> => Promise.resolve(null)),
-    saveModelPath: vi.fn((_role: string, p: string) => Promise.resolve(p)),
-    setAutoTagEnabled: vi.fn((_enabled: boolean) => Promise.resolve()),
-  }),
-);
+const {
+  openUrl,
+  openFileDialog,
+  loadModelPath,
+  saveModelPath,
+  setAutoTagEnabled,
+  tagModelAvailable,
+} = vi.hoisted(() => ({
+  openUrl: vi.fn(() => Promise.resolve()),
+  openFileDialog: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+  loadModelPath: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+  saveModelPath: vi.fn((_role: string, p: string) => Promise.resolve(p)),
+  setAutoTagEnabled: vi.fn((_enabled: boolean) => Promise.resolve()),
+  tagModelAvailable: vi.fn((): Promise<boolean> => Promise.resolve(true)),
+}));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: openFileDialog }));
 vi.mock("../../src/lib/ai-model-store", () => ({ loadModelPath, saveModelPath }));
-vi.mock("../../src/lib/prefs", () => ({ setAutoTagEnabled }));
+vi.mock("../../src/lib/ai-tags", () => ({ tagModelAvailable }));
 
 let aiEnabled = true;
 let autoTagEnabled = false;
@@ -37,6 +43,7 @@ vi.mock("../../src/hooks/usePrefs", () => ({
     },
     setAiEnabled: vi.fn(),
     setAiExcludedFolders: vi.fn(),
+    setAutoTagEnabled,
   }),
 }));
 
@@ -56,6 +63,8 @@ beforeEach(() => {
   saveModelPath.mockClear();
   setAutoTagEnabled.mockClear();
   setAutoTagEnabled.mockResolvedValue(undefined);
+  tagModelAvailable.mockClear();
+  tagModelAvailable.mockResolvedValue(true);
 });
 afterEach(() => cleanup());
 
@@ -113,35 +122,26 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
 });
 
 describe("AiPanel — auto-tag toggle (MYND-651)", () => {
-  it("renders off by default and persists an ON flip", async () => {
+  // The switch renders `prefs.auto_tag_enabled` and delegates the write to
+  // `usePrefs`, which owns the optimistic-then-converge discipline (and is
+  // covered for it in `tests/hooks/usePrefs.test.ts`). What is the PANEL's to
+  // get right is that it reads and writes the right pref, and that the co-gate
+  // on `ai_enabled` holds.
+  it("renders off by default and persists an ON flip", () => {
     render(<AiPanel />);
     const toggle = screen.getByTestId("ai.auto-tag-toggle");
     expect(toggle.getAttribute("aria-checked")).toBe("false");
 
     fireEvent.click(toggle);
     expect(setAutoTagEnabled).toHaveBeenCalledWith(true);
-    await Promise.resolve();
-    // Optimistic: the switch reads ON before `usePrefs` re-reads from disk.
-    expect(screen.getByTestId("ai.auto-tag-toggle").getAttribute("aria-checked")).toBe("true");
   });
 
   it("reflects the persisted value when it is already on", () => {
     autoTagEnabled = true;
     render(<AiPanel />);
     expect(screen.getByTestId("ai.auto-tag-toggle").getAttribute("aria-checked")).toBe("true");
-  });
-
-  it("rolls back and toasts when the write fails", async () => {
-    setAutoTagEnabled.mockRejectedValueOnce(new Error("locked"));
-    const onShowToast = vi.fn();
-    render(<AiPanel onShowToast={onShowToast} />);
-
     fireEvent.click(screen.getByTestId("ai.auto-tag-toggle"));
-    // Never leave the UI asserting a value the vault never took.
-    await waitFor(() =>
-      expect(screen.getByTestId("ai.auto-tag-toggle").getAttribute("aria-checked")).toBe("false"),
-    );
-    expect(onShowToast).toHaveBeenCalledWith("settings.ai.autoTagSaveFailed");
+    expect(setAutoTagEnabled).toHaveBeenCalledWith(false);
   });
 
   it("is non-interactive while the AI beta is off (co-gate, not a second switch)", () => {
@@ -151,5 +151,48 @@ describe("AiPanel — auto-tag toggle (MYND-651)", () => {
     expect(toggle.disabled).toBe(true);
     fireEvent.click(toggle);
     expect(setAutoTagEnabled).not.toHaveBeenCalled();
+  });
+});
+
+describe("AiPanel — auto-tag on a build with no bundled tag model (MYND-651)", () => {
+  // The tag role is bundled-only (`threat-model.md` §7: no override picker), so
+  // "no model" is not something the user can fix by side-loading. An offered
+  // switch would persist `true` against a host answering `not_ready` forever,
+  // with no surface anywhere saying why — the panel has to say it.
+  it("disables the switch and states the reason once the probe answers", async () => {
+    tagModelAvailable.mockResolvedValue(false);
+    render(<AiPanel />);
+
+    // Before the probe resolves the switch must NOT flash through a disabled
+    // state — `null` is "unknown", not "unavailable".
+    expect((screen.getByTestId("ai.auto-tag-toggle") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(screen.queryByTestId("ai.auto-tag-unavailable")).toBeNull();
+
+    await screen.findByTestId("ai.auto-tag-unavailable");
+    const toggle = screen.getByTestId("ai.auto-tag-toggle") as HTMLButtonElement;
+    expect(toggle.disabled).toBe(true);
+    fireEvent.click(toggle);
+    expect(setAutoTagEnabled).not.toHaveBeenCalled();
+  });
+
+  it("probes independently of the AI beta switch, so turning AI on is not a surprise", async () => {
+    aiEnabled = false;
+    tagModelAvailable.mockResolvedValue(false);
+    render(<AiPanel />);
+    await screen.findByTestId("ai.auto-tag-unavailable");
+    expect(tagModelAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the switch offerable when a tag model does ship", async () => {
+    render(<AiPanel />);
+    await waitFor(() => expect(tagModelAvailable).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect((screen.getByTestId("ai.auto-tag-toggle") as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
+    );
+    expect(screen.queryByTestId("ai.auto-tag-unavailable")).toBeNull();
   });
 });

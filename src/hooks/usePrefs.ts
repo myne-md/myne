@@ -27,6 +27,7 @@ import {
   setAiEnabled as persistAiEnabled,
   setAiExcludedFolders as persistAiExcludedFolders,
   setAutoLockTimeout,
+  setAutoTagEnabled as persistAutoTagEnabled,
   setCliEnabled as persistCliEnabled,
   setCliExcludedFolders as persistCliExcludedFolders,
   setCliRateLimitDisabled as persistCliRateLimitDisabled,
@@ -141,6 +142,9 @@ interface UsePrefsResult {
   toggleScreenCapture: (enabled: boolean) => Promise<void>;
   /** Flip the AI opt-in toggle (optimistic; same converge-on-error pattern). */
   setAiEnabled: (enabled: boolean) => Promise<void>;
+  /** Flip the auto-tag sub-toggle (optimistic; same pattern). Co-gated on
+   *  `ai_enabled` at the surface, not here. */
+  setAutoTagEnabled: (enabled: boolean) => Promise<void>;
   /** Replace the AI excluded-folders set (optimistic; same pattern). */
   setAiExcludedFolders: (folders: string[]) => Promise<void>;
   /** Flip the Developer mode toggle (optimistic; same converge-on-error pattern). */
@@ -297,6 +301,29 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       setPrefs((p) => ({ ...p, ai_enabled: enabled }));
       try {
         await persistAiEnabled(enabled);
+      } catch {
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
+  // Auto-tag toggle (on-device-tag-suggestion MYND-651), co-gated on
+  // `ai_enabled` at the surface. Same optimistic-then-converge discipline as
+  // `setAiEnabledPref` — the rollback-to-captured-value shape this replaces is
+  // the one `toggleScreenCapture` above documents as wrong.
+  const setAutoTagEnabledPref = useCallback(
+    async (enabled: boolean) => {
+      setPrefs((p) => ({ ...p, auto_tag_enabled: enabled }));
+      try {
+        await persistAutoTagEnabled(enabled);
       } catch {
         try {
           const view = await prefsRead();
@@ -598,6 +625,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     toggleScreenCapture,
     setAiEnabled: setAiEnabledPref,
     setAiExcludedFolders: setAiExcludedFoldersPref,
+    setAutoTagEnabled: setAutoTagEnabledPref,
     setCliEnabled: setCliEnabledPref,
     setCliExcludedFolders: setCliExcludedFoldersPref,
     setCliRateLimitDisabled: setCliRateLimitDisabledPref,

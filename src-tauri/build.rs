@@ -500,6 +500,7 @@ fn main() {
                 "transcribe",
                 "read_transcript",
                 "suggest_tags",
+                "tag_model_available",
                 "set_model_path",
                 "get_model_path",
             ]),

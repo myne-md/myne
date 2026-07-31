@@ -190,6 +190,10 @@ const V = {
   ],
   "src/lib/device-name.ts": ["adapted", "The `web` platform token maps to 'Browser' so a browser device is distinguishable in the list (task 69)."],
   "src/lib/deviceJoinQr.ts": ["ported", "Pure payload encoding."],
+  "src/lib/engine-error.ts": [
+    "ported",
+    "Pure shape reader over a rejection value; its AI callers are the ones the web build never reaches.",
+  ],
   "src/lib/focusable.ts": ["ported", "Pure DOM query."],
   "src/lib/icons.ts": ["ported", "Icon vocabulary."],
   "src/lib/imperative-focus-trap.ts": ["ported", "Pure DOM."],

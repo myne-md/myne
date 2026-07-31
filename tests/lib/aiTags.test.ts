@@ -77,3 +77,31 @@ describe("suggestTagsForNote", () => {
     expect(isTagSuggestError(null)).toBe(false);
   });
 });
+
+describe("tagModelAvailable", () => {
+  it("asks the host whether this build ships a tag model", async () => {
+    invoke.mockResolvedValue(true);
+    const { tagModelAvailable } = await seam();
+
+    await expect(tagModelAvailable()).resolves.toBe(true);
+    expect(invoke).toHaveBeenCalledWith(
+      "plugin:local-inference|tag_model_available",
+      undefined,
+    );
+  });
+
+  it("reports false when the host has no bundled blob", async () => {
+    invoke.mockResolvedValue(false);
+    const { tagModelAvailable } = await seam();
+    await expect(tagModelAvailable()).resolves.toBe(false);
+  });
+
+  it("degrades a rejection to false rather than propagating it", async () => {
+    // An AI-free `--no-default-features` build has no such command at all, and
+    // "the command is missing" and "no blob shipped" are the same fact from the
+    // panel's side — either way there is no auto-tag to offer.
+    invoke.mockRejectedValue("command not found");
+    const { tagModelAvailable } = await seam();
+    await expect(tagModelAvailable()).resolves.toBe(false);
+  });
+});

@@ -155,6 +155,25 @@ pub trait Engine: Send + Sync {
         Err(EngineError::NotReady)
     }
 
+    /// Whether this build has an auto-tag model at all (MYND-651). Cheap and
+    /// synchronous — it answers from the path resolved at construction and
+    /// loads nothing.
+    ///
+    /// It exists so the settings surface can tell the truth. The tag role is
+    /// bundled-only by design (`threat-model.md` §7: no override picker), so
+    /// unlike every other role there is no side-load the user could perform to
+    /// make it work — a build that ships no blob has no auto-tag, permanently.
+    /// Without this the AI panel would offer a switch that persists `true` while
+    /// every pass answers [`EngineError::NotReady`] and no band ever appears,
+    /// with nothing anywhere saying why.
+    ///
+    /// It reveals a property of the BUILD, not of the vault: no prefs read, no
+    /// note decrypt, no gate. `false` is the safe answer for any engine that
+    /// does not override it.
+    fn tag_model_available(&self) -> bool {
+        false
+    }
+
     /// Drop any lazily-cached loaded model so the next `infer`/`embed` re-reads
     /// from disk. Called after the user picks a new model file
     /// (`set_model_path`) so a swap takes effect without an app restart —
@@ -260,6 +279,13 @@ impl Engine for StubEngine {
         // identifies the stub, so a test can assert the value came through the
         // trait against the stub rather than a real completion.
         Ok("stub-tag, meeting, notes".to_string())
+    }
+
+    fn tag_model_available(&self) -> bool {
+        // The stub IS the tag model in the E2E build, so the settings surface
+        // must show auto-tag as offerable there — otherwise the tauri-driver
+        // scenario would drive a switch this very feature had disabled.
+        true
     }
 
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
@@ -465,6 +491,39 @@ mod tests {
             engine.infer_tags("prompt", &mut || ControlFlow::Continue(())),
             Err(EngineError::NotReady)
         );
+    }
+
+    #[test]
+    fn tag_model_availability_agrees_with_the_tag_path() {
+        // The settings surface reads `tag_model_available` to decide whether to
+        // offer the auto-tag switch at all, so the two answers must not drift: an
+        // engine that reports `true` and then refuses every pass is exactly the
+        // lying control this signal exists to remove.
+        struct BareEngine;
+        impl Engine for BareEngine {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                Ok(String::new())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                Ok(Vec::new())
+            }
+        }
+        assert!(
+            !BareEngine.tag_model_available(),
+            "an engine with no tag override has no tag model"
+        );
+        assert_eq!(
+            BareEngine.infer_tags("prompt", &mut || ControlFlow::Continue(())),
+            Err(EngineError::NotReady)
+        );
+
+        assert!(
+            StubEngine.tag_model_available(),
+            "the stub IS the E2E build's tag model — the scenario drives the switch"
+        );
+        assert!(StubEngine
+            .infer_tags("prompt", &mut || ControlFlow::Continue(()))
+            .is_ok());
     }
 
     #[test]
