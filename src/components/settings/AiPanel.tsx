@@ -4,8 +4,9 @@
 // `ai_enabled` toggle (SYNC-12), the threat-model-bounded trust affordance
 // (SYNC-16 — the load-bearing headline + a "How does this work?" disclosure), a
 // per-role side-load model picker (SYNC-1 — the user brings their own files;
-// Myne NEVER downloads them), and an `ai_excluded_folders` editor (SYNC-14, same
-// set encoding as deliberate_folders).
+// Myne NEVER downloads them), an `auto_tag_enabled` sub-toggle (MYND-651), and
+// an `ai_excluded_folders` editor (SYNC-14, same set encoding as
+// deliberate_folders).
 //
 // Model acquisition (SYNC-1/2, no-egress): Myne has no network egress path by
 // construction, so it cannot and will not fetch a model. The "Recommended
@@ -28,6 +29,7 @@ import { openUrl } from "../../platform/opener";
 import type { ModelRole } from "../../lib/ai-model-store";
 import { usePrefs } from "../../hooks/usePrefs";
 import { loadModelPath, saveModelPath } from "../../lib/ai-model-store";
+import { tagModelAvailable } from "../../lib/ai-tags";
 import {
   AI_TRUST_DISCLOSURE,
   AI_TRUST_HEADLINE,
@@ -184,7 +186,8 @@ function ModelRoleBlock(props: {
 
 export function AiPanel({ onShowToast }: AiPanelProps) {
   const { t } = useTranslation();
-  const { prefs, setAiEnabled, setAiExcludedFolders } = usePrefs(onShowToast);
+  const { prefs, setAiEnabled, setAiExcludedFolders, setAutoTagEnabled } =
+    usePrefs(onShowToast);
 
   const [disclosureOpen, setDisclosureOpen] = useState(false);
   const [modelPaths, setModelPaths] = useState<Record<ModelRole, string | null>>({
@@ -192,6 +195,12 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
     embedding: null,
     transcription: null,
   });
+  // Whether this build ships the bundled auto-tag model — `null` while the
+  // (cheap, device-local) probe is in flight, so the switch never flickers
+  // through a disabled state on open. Unlike every other role there is no
+  // side-load fallback, so `false` is permanent for this build and the panel
+  // has to say so rather than offer a switch that can only ever persist `true`.
+  const [tagModel, setTagModel] = useState<boolean | null>(null);
   // Local edit buffer for the excluded-folders textarea (one folder/line); the
   // backend NFC-sorts + dedups the set on encode, so the raw lines are fine.
   const [excludedDraft, setExcludedDraft] = useState<string>(
@@ -199,6 +208,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
   );
 
   const aiEnabled = prefs.ai_enabled;
+  const autoTag = prefs.auto_tag_enabled;
 
   // Load the persisted device-local model paths on open (both roles). A missing
   // command (the `local-inference` feature is off) degrades silently to no
@@ -213,6 +223,20 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
         .catch(() => {
           /* feature off / not set — keep local state */
         });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Probe the bundled auto-tag model once, independently of `ai_enabled`: it is
+  // a fact about the build, and a user who turns the beta ON should not have to
+  // discover only then that this build has no tag model. `tagModelAvailable`
+  // swallows its own rejections, so there is no error path here.
+  useEffect(() => {
+    let alive = true;
+    void tagModelAvailable().then((ok) => {
+      if (alive) setTagModel(ok);
     });
     return () => {
       alive = false;
@@ -305,6 +329,41 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
         {disclosureOpen && (
           <p data-testid="ai.trust-disclosure" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
             {AI_TRUST_DISCLOSURE}
+          </p>
+        )}
+      </div>
+
+      {/* Auto-tag (MYND-651) — a sub-feature of the beta, so it follows the
+          enable toggle rather than sitting in Models: the tag pass runs on a
+          BUNDLED model, nothing to side-load. Disabled (not hidden) while the
+          beta is off, matching every other dependent control in this panel; the
+          host re-reads both flags before it loads a model, so this surface is
+          discovery, not enforcement.
+
+          It is ALSO disabled when the build ships no tag model, with the reason
+          spelled out — the disabled-control discipline in `src/CLAUDE.md`: a
+          real label, no "coming soon" copy, and it enables itself on the build
+          that lands the weights. Without it the switch persists `true` against
+          a host that answers `not_ready` forever and a band that never appears,
+          which is a control that lies by omission. */}
+      <div style={BLOCK_STYLE} data-setting-anchor="ai.auto-tag">
+        <div style={TOGGLE_ROW_STYLE}>
+          {/* No `htmlFor`: `Switch` renders a `role="switch"` button with no id
+              (the accessible name is its `ariaLabel`), so a for-target would
+              dangle — the same shape as the models label below. */}
+          <label style={LABEL_STYLE}>{t("settings.ai.autoTagLabel")}</label>
+          <Switch
+            checked={autoTag}
+            disabled={!aiEnabled || tagModel === false}
+            onChange={(next) => void setAutoTagEnabled(next)}
+            ariaLabel={t("settings.ai.autoTagLabel")}
+            testId="ai.auto-tag-toggle"
+          />
+        </div>
+        <p style={HELPER_STYLE}>{t("settings.ai.autoTagHelper")}</p>
+        {tagModel === false && (
+          <p data-testid="ai.auto-tag-unavailable" style={{ ...HELPER_STYLE, color: "var(--fg-2)" }}>
+            {t("settings.ai.autoTagUnavailable")}
           </p>
         )}
       </div>

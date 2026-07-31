@@ -11,11 +11,13 @@ import { invoke } from "../../platform/core";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
+import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 // Aliased: the component already has a `setDeviceName` React state setter.
 import { setDeviceName as persistDeviceName } from "../../lib/prefs";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
+import { refreshTorState } from "../../hooks/useTorState";
 
 interface JoinResult {
   /** The device_id this join registered (MYND-548) — used to name THIS device in
@@ -120,6 +122,21 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   // MYND-548: the id this join minted, kept so the pending path can name the
   // device once its first pull lands.
   const [joinedDeviceId, setJoinedDeviceId] = useState<string | null>(null);
+  // MYND-650 task 5: the certificate fingerprint the user obtained OUT-OF-BAND
+  // from their own server, plus whether the backend has asked for it. Required
+  // only in Tor mode, where the enrollment handshake — the one handshake that
+  // accepts any certificate — travels through an exit node that is in a
+  // position to serve its own.
+  //
+  // It is typed in BEFORE the pin is accepted, and the captured value is never
+  // shown alongside the question: "here is what we got, does it match yours?"
+  // anchors the user on whatever the attacker served, and offering the captured
+  // value on the failure path would let them paste it back. The compare below
+  // (`step === "pinned"`) is a different thing — by then the pin is already
+  // verified against this input, and that screen exists for cross-device
+  // comparison.
+  const [expectedFingerprint, setExpectedFingerprint] = useState("");
+  const [confirmNeeded, setConfirmNeeded] = useState(false);
 
   // MYND-548: this device's own name — the same hook the Settings enrollment form
   // uses, so the two doors cannot drift.
@@ -139,9 +156,17 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       serverUrl: url.trim(),
       accountNumber: account.trim(),
       password,
+      confirmedFingerprint: expectedFingerprint.trim() || null,
     })
       .then(async (res) => {
+        setConfirmNeeded(false);
         setJoinedDeviceId(res.device_id_hex);
+        // A join writes the endpoint, and the Tor posture is endpoint-aware
+        // (MYND-650 task 8): `exempt` polls slowly because only a deliberate
+        // act can move it, so every path that writes an endpoint owes this
+        // re-read. Otherwise the Network panel keeps describing whatever server
+        // was configured before the join.
+        refreshTorState();
         if (!res.pending) {
           // Self-approved (first device / recovery bootstrap): a cycle can run
           // now, so name after it — never before, or the §10.2.1 seed dies.
@@ -167,7 +192,23 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
           setStep("pending");
         }
       })
-      .catch(() => setError(t("sync.join.error")))
+      .catch((e: unknown) => {
+        // The two Tor-mode refusals aborted the join before anything was
+        // written — no endpoint, no pin, no vault container — so the form stays
+        // put with the fingerprint field revealed. Every other failure keeps the
+        // single non-distinguishing message.
+        const refusal = fingerprintGateRefusal(e);
+        if (refusal !== null) {
+          setConfirmNeeded(true);
+          setError(
+            refusal === "PinConfirmationRequired"
+              ? t("sync.join.confirmFingerprintRequired")
+              : t("sync.join.confirmFingerprintMismatch"),
+          );
+          return;
+        }
+        setError(t("sync.join.error"));
+      })
       .finally(() => setBusy(false));
   };
 
@@ -398,26 +439,45 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
 
         {error && <DestructiveBanner testId="join.error">{error}</DestructiveBanner>}
 
-        <div style={ROW}>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={busy}
-            style={btn(false, busy)}
-            data-testid="join.cancel"
-          >
-            {t("sync.join.cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!canSubmit}
-            style={btn(true, !canSubmit)}
-            data-testid="join.submit"
-          >
-            {busy ? t("sync.join.submitting") : t("sync.join.submit")}
-          </button>
-        </div>
+        {/* Revealed only once the backend refuses for want of it — see the
+            state declaration for why this is typed in rather than confirmed.
+            While it is open it carries the retry AND the abort, so the footer
+            below stands down: two "Add device" buttons on one card would be a
+            choice between identical actions at the exact moment this screen is
+            asking the user to slow down. Declining costs nothing to undo —
+            the refused join wrote no endpoint, no pin and no vault container. */}
+        {confirmNeeded ? (
+          <FingerprintConfirm
+            value={expectedFingerprint}
+            onChange={setExpectedFingerprint}
+            onConfirm={submit}
+            onDecline={onCancel}
+            confirmLabel={busy ? t("sync.join.submitting") : t("sync.join.submit")}
+            confirmDisabled={!canSubmit}
+            testIdPrefix="join"
+          />
+        ) : (
+          <div style={ROW}>
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={busy}
+              style={btn(false, busy)}
+              data-testid="join.cancel"
+            >
+              {t("sync.join.cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!canSubmit}
+              style={btn(true, !canSubmit)}
+              data-testid="join.submit"
+            >
+              {busy ? t("sync.join.submitting") : t("sync.join.submit")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

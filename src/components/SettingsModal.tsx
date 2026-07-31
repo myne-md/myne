@@ -48,6 +48,7 @@ import { EditorPanel } from "./settings/EditorPanel";
 import { FilesPanel } from "./settings/FilesPanel";
 import { TranscriptionPanel } from "./settings/TranscriptionPanel";
 import { HotkeysPanel } from "./settings/HotkeysPanel";
+import { NetworkPanel } from "./settings/NetworkPanel";
 import { PrivacyPanel } from "./settings/PrivacyPanel";
 import { StoragePanel } from "./settings/StoragePanel";
 import { SyncPanel } from "./settings/SyncPanel";
@@ -65,6 +66,7 @@ export type PanelId =
   | "privacy"
   | "sync"
   | "ai"
+  | "network"
   | "editor"
   | "files"
   | "transcription"
@@ -87,36 +89,43 @@ interface PanelMeta {
   labelKey: string;
   /** Rail section. Omitted → `core`. */
   group?: PanelGroup;
+  /** The capability this panel's contents need. Omitted → unconditional. An
+   *  absent capability filters the panel OUT of the rail rather than greying
+   *  it: a greyed panel is an offer the platform cannot honour. */
+  capability?: capabilities.Capability;
 }
 
-// `ai` sits LAST, in the `developer` group: Developer mode is where the user
-// leaves the path Myne vouches for (prd.md "Solution"), and local AI — user-
-// supplied weights, an in-process runtime, no isolation guarantee yet — is
-// squarely that. Keeping PANELS_BASE a single flat array preserves the
-// ArrowUp/ArrowDown cycle + `itemRefs` logic unchanged — the Developer divider
-// is a non-focusable presentation row inserted at the group edge.
+// The `developer` group sits LAST: Developer mode is where the user leaves the
+// path Myne vouches for (prd.md "Solution"), and both of its members are
+// squarely that — local AI (user-supplied weights, an in-process runtime, no
+// isolation guarantee yet) and Tor routing (MYND-650: a bundled Tor client Myne
+// does not operate, over a volunteer relay network nobody here controls).
+// Keeping PANELS_BASE a single flat array preserves the ArrowUp/ArrowDown cycle
+// + `itemRefs` logic unchanged — the Developer divider is a non-focusable
+// presentation row inserted at the group edge.
 //
-// **Capability gating (MYND-574 task 27).** `ai` is absent on web — the on-device
-// LLM needs multi-GiB weights and a CPU thread pool, neither of which a Worker
-// has. It is filtered OUT of the rail rather than rendered disabled: a greyed
-// panel is an offer the platform cannot honour, and `decisions.md` 2026-07-26
-// makes omission normative rather than a UX preference.
+// **Capability gating (MYND-574 task 27).** Both are absent on web: the
+// on-device LLM needs multi-GiB weights and a CPU thread pool, and Tor routing
+// needs a subprocess and a raw socket — neither of which a Worker has. They are
+// filtered OUT of the rail rather than rendered disabled: a greyed panel is an
+// offer the platform cannot honour, and `decisions.md` 2026-07-26 makes omission
+// normative rather than a UX preference.
 //
-// **Developer-mode gating (MYND-593).** `ai` is ALSO filtered out whenever the
-// `developer_mode` preference is off, for the same reason: the group's whole
+// **Developer-mode gating (MYND-593).** The whole group is ALSO filtered out
+// whenever the `developer_mode` preference is off, for the same reason: its
 // point is that its contents are things Myne does not vouch for, and the rail
-// must not offer a door onto that unless the user has deliberately opened it
-// in About. The predicate is `capabilities.has("localAi") && developer_mode` —
-// both gates apply, neither substitutes for the other.
+// must not offer a door onto that unless the user has deliberately opened it in
+// About. Both gates apply, neither substitutes for the other — a panel needs its
+// capability AND (if it is in this group) the preference.
 //
 // Filtering the ARRAY (rather than hiding a row at render time) is what keeps
 // the ArrowUp/ArrowDown cycle and `itemRefs` correct: a hidden-but-present entry
 // would still be a keyboard stop, which is exactly the "unreachable by menu,
-// reachable by shortcut" gap this task exists to close. Because the group has
-// exactly one member today, filtering it out also removes the group itself —
-// the divider only renders when a panel in that group survives the filter, so
-// "no Developer group" is derived rather than a second, separately-maintained
-// condition (see the `opensDeveloper` computation in the render below).
+// reachable by shortcut" gap MYND-593 exists to close. Filtering every member of
+// the group out also removes the group itself — the divider only renders when a
+// panel in that group survives the filter, so "no Developer group" is derived
+// rather than a second, separately-maintained condition (see the
+// `opensDeveloper` computation in the render below).
 const PANELS_BASE: readonly PanelMeta[] = [
   { id: "account", labelKey: "settings.shell.panels.account" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy" },
@@ -128,7 +137,18 @@ const PANELS_BASE: readonly PanelMeta[] = [
   { id: "appearance", labelKey: "settings.shell.panels.appearance" },
   { id: "storage", labelKey: "settings.shell.panels.storage" },
   { id: "about", labelKey: "settings.shell.panels.about" },
-  { id: "ai", labelKey: "settings.shell.panels.ai", group: "developer" },
+  {
+    id: "ai",
+    labelKey: "settings.shell.panels.ai",
+    group: "developer",
+    capability: "localAi",
+  },
+  {
+    id: "network",
+    labelKey: "settings.shell.panels.network",
+    group: "developer",
+    capability: "torRouting",
+  },
 ] as const satisfies readonly PanelMeta[];
 
 interface SettingsModalProps {
@@ -336,7 +356,9 @@ export function SettingsModal({
   const panels = useMemo(
     () =>
       PANELS_BASE.filter(
-        (p) => p.id !== "ai" || (capabilities.has("localAi") && prefs.developer_mode),
+        (p) =>
+          (p.capability === undefined || capabilities.has(p.capability)) &&
+          (p.group !== "developer" || prefs.developer_mode),
       ),
     [prefs.developer_mode],
   );
@@ -392,6 +414,7 @@ export function SettingsModal({
     privacy: null,
     sync: null,
     ai: null,
+    network: null,
     editor: null,
     files: null,
     transcription: null,
@@ -560,6 +583,7 @@ export function SettingsModal({
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
     sync: <SyncPanel />,
     ai: <AiPanel onShowToast={onShowToast} />,
+    network: <NetworkPanel />,
     editor: <EditorPanel />,
     files: <FilesPanel />,
     transcription: <TranscriptionPanel />,

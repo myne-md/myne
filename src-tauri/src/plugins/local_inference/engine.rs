@@ -122,6 +122,58 @@ pub trait Engine: Send + Sync {
         self.infer_streaming(&prompt, on_token)
     }
 
+    /// One-shot completion for `prompt` on the **dedicated bundled tag model**
+    /// (auto-tag, MYND-651) rather than the side-loaded generation model. Same
+    /// blocking prompt-in/text-out contract as [`Engine::infer`] — the caller
+    /// still owns building the prompt (it holds the vault's tag vocabulary) and
+    /// parsing the candidate list out of the reply.
+    ///
+    /// It is a separate method, not an `infer` parameter, because *which model*
+    /// is the whole point: the tag role loads a first-party GGUF that ships
+    /// inside the signed build and has no picker override, so a user who never
+    /// side-loaded a generation model still gets suggestions, and a user who did
+    /// does not get tag quality that varies with their pick.
+    ///
+    /// The prompt embeds note content — **never logged** (DENY-list), like every
+    /// other string on this trait.
+    ///
+    /// `should_continue` is the caller's LOWEST-priority yield probe (MYND-651
+    /// task 4): an implementation consults it before it queues for its compute
+    /// lock and again per generated token, and returns what it has the moment it
+    /// answers [`ControlFlow::Break`]. Auto-tag runs ambiently, so a user who
+    /// asks for a summarize mid-pass must not wait behind it. The engine stays
+    /// policy-free — it knows only "keep going?", never *why*
+    /// ([`super::compute_priority`] owns the why).
+    ///
+    /// Default: [`EngineError::NotReady`] — an engine with no tag model has no
+    /// tag path. The Candle engine and [`StubEngine`] override this.
+    fn infer_tags(
+        &self,
+        _prompt: &str,
+        _should_continue: &mut dyn FnMut() -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        Err(EngineError::NotReady)
+    }
+
+    /// Whether this build has an auto-tag model at all (MYND-651). Cheap and
+    /// synchronous — it answers from the path resolved at construction and
+    /// loads nothing.
+    ///
+    /// It exists so the settings surface can tell the truth. The tag role is
+    /// bundled-only by design (`threat-model.md` §7: no override picker), so
+    /// unlike every other role there is no side-load the user could perform to
+    /// make it work — a build that ships no blob has no auto-tag, permanently.
+    /// Without this the AI panel would offer a switch that persists `true` while
+    /// every pass answers [`EngineError::NotReady`] and no band ever appears,
+    /// with nothing anywhere saying why.
+    ///
+    /// It reveals a property of the BUILD, not of the vault: no prefs read, no
+    /// note decrypt, no gate. `false` is the safe answer for any engine that
+    /// does not override it.
+    fn tag_model_available(&self) -> bool {
+        false
+    }
+
     /// Drop any lazily-cached loaded model so the next `infer`/`embed` re-reads
     /// from disk. Called after the user picks a new model file
     /// (`set_model_path`) so a swap takes effect without an app restart —
@@ -142,11 +194,13 @@ pub trait Engine: Send + Sync {
     /// `pcm` is decrypted audio (AS1-class) — **never logged** (DENY-list); the
     /// returned transcript is likewise content and is never logged.
     ///
-    /// Default: [`EngineError::NotReady`] — an engine with no ASR model (a
-    /// generation/embedding-only build) has no transcription path. The real
-    /// Candle-Whisper impl and the [`StubEngine`] override this.
+    /// Default: [`EngineError::NoModel`] — an engine with no ASR model (a
+    /// generation/embedding-only build) has no transcription path, which is the
+    /// "no model available" case (MYND-591: the transcribe path never returns
+    /// the generic `NotReady`). The real Candle-Whisper impl and the
+    /// [`StubEngine`] override this.
     fn transcribe(&self, _pcm: &[f32]) -> Result<String, EngineError> {
-        Err(EngineError::NotReady)
+        Err(EngineError::NoModel)
     }
 
     /// Streaming transcription (SYNC-V5): emits each newly-decoded ~30 s
@@ -209,6 +263,31 @@ impl Engine for StubEngine {
             }
         }
         Ok(emitted)
+    }
+
+    fn infer_tags(
+        &self,
+        _prompt: &str,
+        should_continue: &mut dyn FnMut() -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        // Honour the yield probe like the real engine does, so the E2E lane
+        // exercises the priority policy rather than routing around it.
+        if should_continue().is_break() {
+            return Ok(String::new());
+        }
+        // A fixed comma list in the shape a real tag model replies in, so the
+        // frontend's `parseTagCandidates` + the E2E scenario get deterministic
+        // chips without a model in the repo. `stub-tag` is a legal tag token AND
+        // identifies the stub, so a test can assert the value came through the
+        // trait against the stub rather than a real completion.
+        Ok("stub-tag, meeting, notes".to_string())
+    }
+
+    fn tag_model_available(&self) -> bool {
+        // The stub IS the tag model in the E2E build, so the settings surface
+        // must show auto-tag as offerable there — otherwise the tauri-driver
+        // scenario would drive a switch this very feature had disabled.
+        true
     }
 
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
@@ -365,9 +444,95 @@ mod tests {
     }
 
     #[test]
-    fn default_transcribe_is_not_ready() {
+    fn stub_infer_tags_returns_a_parseable_comma_list() {
+        let engine: &dyn Engine = &StubEngine;
+        let mut go = || ControlFlow::Continue(());
+        let out = engine
+            .infer_tags("Suggest tags for: my note", &mut go)
+            .expect("stub infer_tags never fails");
+        // Deterministic, and in the comma-list shape the frontend parses.
+        assert_eq!(
+            out,
+            engine.infer_tags("a different prompt", &mut go).unwrap()
+        );
+        let tags: Vec<&str> = out.split(',').map(str::trim).collect();
+        assert_eq!(tags, ["stub-tag", "meeting", "notes"]);
+        // Not the generation path — a caller must not be able to confuse the two.
+        assert!(!out.contains("stub-infer"));
+    }
+
+    #[test]
+    fn stub_infer_tags_yields_before_producing_anything() {
+        // The stub is what the E2E lane drives, so it has to honour the yield
+        // probe too — otherwise the scenario would pass against a policy the
+        // production engine implements and the test build ignores.
+        let engine: &dyn Engine = &StubEngine;
+        let out = engine
+            .infer_tags("Suggest tags for: my note", &mut || ControlFlow::Break(()))
+            .expect("a yield is not a failure");
+        assert!(out.is_empty(), "yielded before generating, got: {out:?}");
+    }
+
+    #[test]
+    fn default_infer_tags_is_not_ready() {
+        // An engine that overrides nothing (generation/embedding-only, e.g. an
+        // AI build with no bundled tag weights) has no tag path: the trait
+        // default returns NotReady rather than falling back to `infer`, which
+        // would silently answer with the WRONG model.
+        struct BareEngine;
+        impl Engine for BareEngine {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                Ok("generation output".to_string())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                Ok(Vec::new())
+            }
+        }
+        let engine: &dyn Engine = &BareEngine;
+        assert_eq!(
+            engine.infer_tags("prompt", &mut || ControlFlow::Continue(())),
+            Err(EngineError::NotReady)
+        );
+    }
+
+    #[test]
+    fn tag_model_availability_agrees_with_the_tag_path() {
+        // The settings surface reads `tag_model_available` to decide whether to
+        // offer the auto-tag switch at all, so the two answers must not drift: an
+        // engine that reports `true` and then refuses every pass is exactly the
+        // lying control this signal exists to remove.
+        struct BareEngine;
+        impl Engine for BareEngine {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                Ok(String::new())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                Ok(Vec::new())
+            }
+        }
+        assert!(
+            !BareEngine.tag_model_available(),
+            "an engine with no tag override has no tag model"
+        );
+        assert_eq!(
+            BareEngine.infer_tags("prompt", &mut || ControlFlow::Continue(())),
+            Err(EngineError::NotReady)
+        );
+
+        assert!(
+            StubEngine.tag_model_available(),
+            "the stub IS the E2E build's tag model — the scenario drives the switch"
+        );
+        assert!(StubEngine
+            .infer_tags("prompt", &mut || ControlFlow::Continue(()))
+            .is_ok());
+    }
+
+    #[test]
+    fn default_transcribe_is_no_model() {
         // An engine that overrides nothing (generation/embedding-only) has no
-        // ASR path: the trait default returns NotReady rather than panicking.
+        // ASR path: the trait default returns NoModel (the "no model available"
+        // cause, MYND-591) rather than panicking or the generic NotReady.
         struct BareEngine;
         impl Engine for BareEngine {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
@@ -378,6 +543,6 @@ mod tests {
             }
         }
         let engine: &dyn Engine = &BareEngine;
-        assert_eq!(engine.transcribe(&[0.0; 8]), Err(EngineError::NotReady));
+        assert_eq!(engine.transcribe(&[0.0; 8]), Err(EngineError::NoModel));
     }
 }

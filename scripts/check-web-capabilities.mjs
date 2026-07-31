@@ -117,6 +117,16 @@ const CAPABILITY_BACKING = {
   // NOT here: they write ordinary `vault.prefs` fields that sync to every
   // client, and a desktop that later reads them must see what the user chose.
   cliAccess: ["cli-bridge"],
+  // MYND-650 task 6: the two toggle commands, NOT the whole `sync` plugin —
+  // sync itself ships on web and most of its surface is dispatched. The pair is
+  // singled out because what they do is spawn and stop an OS process and point
+  // a raw socket at it, which is the half a page does not have.
+  torRouting: [
+    "plugin:sync|sync_get_tor_routing",
+    "plugin:sync|sync_set_tor_routing",
+    // Task 8: the live posture read behind the connection-state UI.
+    "plugin:sync|sync_get_tor_state",
+  ],
 };
 
 const descriptor = readFileSync(DESCRIPTOR, "utf8");

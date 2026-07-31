@@ -515,6 +515,16 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.aiEnable",
   },
   {
+    id: "ai.auto-tag",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.autoTagLabel",
+    descriptionKey: "settings.ai.autoTagHelper",
+    keywordsKey: "settings.search.keywords.aiAutoTag",
+    testid: "ai.auto-tag-toggle",
+  },
+  {
     id: "ai.models",
     capability: "localAi",
     developerGated: true,
@@ -531,6 +541,21 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     titleKey: "settings.ai.excludedLabel",
     descriptionKey: "settings.ai.excludedHelper",
     keywordsKey: "settings.search.keywords.aiExcluded",
+  },
+
+  // ── Network (Developer group, MYND-650) ────────────────────────────────────
+  {
+    // The keyword string deliberately includes "anonymity": someone searching
+    // for it should land exactly here, on copy whose first sentence says Tor
+    // mode does NOT make them anonymous to Myne. Keywords are a haystack, never
+    // rendered, so this broadens the match without making the claim.
+    id: "network.tor-routing",
+    capability: "torRouting",
+    developerGated: true,
+    panelId: "network",
+    titleKey: "settings.network.torLabel",
+    descriptionKey: "settings.network.torHelper",
+    keywordsKey: "settings.search.keywords.torRouting",
   },
 ];
 

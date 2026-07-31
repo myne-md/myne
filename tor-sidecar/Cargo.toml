@@ -1,0 +1,46 @@
+[package]
+name = "myne-tor-sidecar"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+publish = false
+description = "The `myne-tor` sidecar: arti (the Rust Tor implementation) run as a standalone loopback SOCKS5 proxy, spawned by the desktop host when the device-local Tor routing option is on (MYND-650). Never linked into `myne-desktop`, never sees vault plaintext or a key."
+
+[[bin]]
+name = "myne-tor"
+path = "src/main.rs"
+
+[dependencies]
+# arti, pinned EXACT. Tor security updates become our responsibility the moment
+# we bundle a Tor client, so the version must be a deliberate, visible bump in a
+# diff rather than something a `cargo update` can move (and `= "*"` is rejected
+# outright by `src-tauri/scripts/ai-no-network-check.sh`).
+#
+# `default-features = false` and then only what a clearnet SOCKS proxy needs.
+# What is deliberately NOT enabled, and why:
+#   · `native-tls` (half of arti's `default-runtime`) — would pull OpenSSL into
+#     the tree. `rustls-ring` instead: rustls + the `ring` provider is the exact
+#     TLS stack `myne-core`'s sync transport already uses, so this adds a
+#     configuration of crates the lock already carries rather than a second TLS
+#     implementation. (`rustls-*` are `__is_nonadditive` in arti — selecting one
+#     is the choice, and enabling `default-runtime` too would undo it.)
+#   · `dns-proxy` — that feature is arti's *separate DNS listener*. Myne resolves
+#     remotely by issuing a SOCKS5 CONNECT with the domain-name address type
+#     (0x03) instead (task 3), which is what actually keeps DNS off the local
+#     resolver. Enabling a DNS listener we never connect to would only widen the
+#     sidecar's listening surface.
+#   · `onion-service-client` / `vanguards` — `.onion` sync endpoints are
+#     explicitly out of scope for this feature (PRD "Out of Scope": onion-service
+#     auth has to be reconciled with cert-pinning first).
+#   · `bridge-client` / `pt-client` — pluggable transports need external PT
+#     binaries we do not bundle, so the feature would advertise a censorship
+#     circumvention path that cannot actually run. MVP is direct-guard only.
+# Kept from upstream's default set: `harden` (secmem-proc — disables ptrace and
+# core dumps for the proxy process) and `compression` (directory documents are
+# fetched compressed; without it every bootstrap pulls several times the bytes).
+arti = { version = "=2.5.0", default-features = false, features = [
+    "tokio",
+    "rustls-ring",
+    "compression",
+    "harden",
+] }

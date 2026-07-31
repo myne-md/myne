@@ -126,6 +126,14 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // block is omitted rather than greyed. Absent by platform fact, not by
   // decision: there is nothing to port.
   "cliAccess",
+  // MYND-650 task 6. The desktop routes sync egress through a Tor client it
+  // spawns as a subprocess, reached over a loopback SOCKS5 socket. A page has
+  // neither half: no subprocess, no raw TCP, and no way to point `fetch` at a
+  // proxy. Absent by platform fact rather than by decision — there is nothing
+  // to port, and the browser already has a better answer than an in-page
+  // tunnel would be, which is Tor Browser (docs, task 12). The Developer
+  // Options block is omitted here rather than greyed.
+  "torRouting",
 ]);
 
 export function has(cap: Capability): boolean {

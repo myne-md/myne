@@ -2,7 +2,9 @@
 // 3 + 5).
 //
 // The canonical render target the AI capability siblings (note-summarization,
-// semantic-search-qa, auto-tag-link) mount their output into. Task 3 shipped
+// semantic-search-qa) mount their output into. Auto-tag used to render its
+// accept-chips here too; MYND-651 moved it to the inline suggestion band at the
+// frontmatter boundary, which is now the only tag surface. Task 3 shipped
 // the strip wiring + empty-state; task 5 adds the shared **"AI off / ready"
 // chrome** — the header status reflects the `ai_enabled` pref so a user who
 // switches to this tab with AI off sees why it's empty and where to turn it on.
@@ -22,8 +24,6 @@ import { usePrefs } from "../../hooks/usePrefs";
 import { useAiModelReady } from "../../hooks/useAiModelReady";
 import { useChat, type ChatCitation, type ChatTurn } from "../ai/chatStore";
 import { AI_CHAT_HONESTY_NOTE } from "../../lib/load-bearing-copy";
-import type { TagSuggestion } from "../ai/tagRanker";
-import { TagSuggestionChips } from "./TagSuggestionChips";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 
 const HEADER_ROW_STYLE: CSSProperties = {
@@ -38,9 +38,6 @@ export interface AiChatTabProps {
   /** Explicit "Insert into note" action for a ready summary (task 5, SYNC-17).
    *  When absent, the insert affordance is not shown. */
   onInsert?: (text: string) => void;
-  /** Explicit click-to-insert for a tag suggestion chip (auto-tag task 4/5).
-   *  When absent, chips render but are inert. */
-  onAcceptTag?: (suggestion: TagSuggestion) => void;
   /** Send a message to the conversational chat (conversational-ai-chat task 5).
    *  When wired, the transcript composer replaces the single-shot ask input.
    *  The real streaming invoke is wired by task 7. */
@@ -132,14 +129,12 @@ function ChatTurnView({
   turn,
   onOpenNote,
   titleOf,
-  onAcceptTag,
   onInsert,
   t,
 }: {
   turn: ChatTurn;
   onOpenNote?: (noteId: string, byteStart: number, byteEnd: number) => void;
   titleOf?: (noteId: string) => string | null;
-  onAcceptTag?: (suggestion: TagSuggestion) => void;
   onInsert?: (text: string) => void;
   t: (key: string) => string;
 }) {
@@ -176,18 +171,14 @@ function ChatTurnView({
       </div>
       {/* Empty finalized answer (the small model produced nothing) → a friendly
           placeholder instead of a blank bubble. */}
-      {!isUser &&
-        !turn.streaming &&
-        !turn.error &&
-        turn.text.length === 0 &&
-        turn.tagSuggestions.length === 0 && (
-          <p
-            data-testid="ai.no-answer"
-            style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", fontStyle: "italic", margin: 0 }}
-          >
-            {t("editor.chrome.rightPanel.aiChat.noAnswer")}
-          </p>
-        )}
+      {!isUser && !turn.streaming && !turn.error && turn.text.length === 0 && (
+        <p
+          data-testid="ai.no-answer"
+          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", fontStyle: "italic", margin: 0 }}
+        >
+          {t("editor.chrome.rightPanel.aiChat.noAnswer")}
+        </p>
+      )}
       {turn.error && (
         <p
           role="alert"
@@ -213,15 +204,6 @@ function ChatTurnView({
               titleOf={titleOf}
             />
           ))}
-        </div>
-      )}
-      {/* Auto-tag accept-chips folded into the turn (task 11). */}
-      {turn.tagSuggestions.length > 0 && (
-        <div data-testid="ai.turn-tags" style={{ marginTop: 6 }}>
-          <TagSuggestionChips
-            suggestions={turn.tagSuggestions}
-            onAccept={(s) => onAcceptTag?.(s)}
-          />
         </div>
       )}
       {/* Per-turn "Insert into note" for a summary answer (task 10, SYNC-17). */}
@@ -251,7 +233,6 @@ function ChatTurnView({
 
 export function AiChatTab({
   onInsert,
-  onAcceptTag,
   onSend,
   onStop,
   onOpenNote,
@@ -324,7 +305,6 @@ export function AiChatTab({
               turn={turn}
               onOpenNote={onOpenNote}
               titleOf={titleOf}
-              onAcceptTag={onAcceptTag}
               onInsert={onInsert}
               t={t}
             />

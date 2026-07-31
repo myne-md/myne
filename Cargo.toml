@@ -13,7 +13,15 @@
 # copy of the framing/wire types, deliberately not shared — see
 # `src-tauri/src/cli_bridge/dispatch.rs`'s doc comment). It joins this
 # workspace purely for the single shared `Cargo.lock` (TB9).
-members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli"]
+#
+# `tor-sidecar` (desktop Tor routing, MYND-650) is the `myne-tor` binary: arti
+# run as a standalone loopback SOCKS5 proxy. Like `cli`, it joins the workspace
+# for the shared `Cargo.lock` — but here that is the whole reproducible-build
+# argument for bundling a Tor client at all. Critically, NOTHING depends on it:
+# it is spawned as a subprocess, never linked, so arti stays outside
+# `myne-desktop`'s `cargo tree -e normal` closure and the no-egress gate keeps
+# scanning a tree with no networked crate in it.
+members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "tor-sidecar"]
 resolver = "2"
 
 # Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`

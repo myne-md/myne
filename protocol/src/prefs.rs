@@ -329,6 +329,24 @@ pub struct PrefsView {
     #[serde(default)]
     pub auto_lock_seconds: Option<u32>,
 
+    /// Automatic on-device tag suggestion toggle (on-device-tag-suggestion,
+    /// MYND-651). `false` ≡ off (the default). **Omitted entirely from the
+    /// canonical JSON when `false`**, so a vault that never enabled it is
+    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
+    /// unaffected — a migration-less additive field on `MYP1`, the same
+    /// emit-only-when-`true` positive-opt-in convention as
+    /// [`PrefsView::ai_enabled`] and `cli_enabled`). Canonical key
+    /// `auto_tag_enabled` — sorts after `auto_lock_seconds` (`auto_l` <
+    /// `auto_t`), before `bar_items_order` (`a` < `b`).
+    ///
+    /// It is the SECOND half of a two-key gate: the tag pass runs only when
+    /// this AND `ai_enabled` are both on, and the host re-reads both before it
+    /// touches the model, so a tampered or replayed value cannot start
+    /// inference on a vault whose AI opt-in is off. **Non-load-bearing /
+    /// AS-low** — no protective-envelope clamp.
+    #[serde(default)]
+    pub auto_tag_enabled: bool,
+
     /// Active **custom theme** selection (custom-themes epic, MYND-297) — the
     /// name of a user-authored palette, i.e. a key of the encrypted `vault.themes`
     /// store (`MYT1`, `protocol.md` §9.21). It named a plaintext file stem under
@@ -414,22 +432,26 @@ pub struct PrefsView {
     pub field_clocks: BTreeMap<String, u64>,
 
     /// Unified manual sidebar order across the single interleaved file-tree
-    /// (MYND-183, superseding the earlier `note_order` + `folder_order`
-    /// pair). A flat, heterogeneous, sibling-local **sequence** whose elements
-    /// are either note UUIDs or canonical trailing-slash folder display paths,
-    /// discriminated by the trailing `/`. Container membership is *structural*
-    /// (a note's container is its `folder:`; a folder's is its parent path);
-    /// this list supplies only a global rank, and each container sorts its own
-    /// children (sub-folders + notes together, freely interleaved) by their
-    /// index here, with unlisted children falling back to recency (notes) /
-    /// folded name (folders). Because the comparison is sibling-local, a single
-    /// flat list expresses recursive interleaving at every level. Order is
-    /// MEANINGFUL, so the canonical encoder preserves element order verbatim
-    /// (NFC-normalized, but NOT sorted and NOT deduped). Default empty; omitted
-    /// entirely from the canonical JSON when empty, so a vault that never
-    /// reordered is byte-identical to one without the key.
+    /// (MYND-183; MYND-596 promoted the flat sequence to a **container-keyed
+    /// map** so each sibling group merges independently — see
+    /// `sync-protocol.md` §10.2). Each key is a container path (`""` ≡ the tree
+    /// root, or a canonical trailing-slash folder display path like
+    /// `"Projects/"`); each value is that container's children in manual order —
+    /// an order-preserving **sequence** of note UUIDs and full-path child folder
+    /// display paths, freely interleaved, discriminated by the trailing `/`.
+    /// Container membership stays *structural* (a note's container is its
+    /// `folder:`; a folder's is its parent path); this map supplies only the
+    /// per-container rank, with unlisted children falling back to recency
+    /// (notes) / folded name (folders). Keys are emitted in lexicographic order
+    /// (`BTreeMap`) and NFC-normalized; each value sequence is MEANINGFUL, so the
+    /// canonical encoder preserves element order verbatim (NFC-normalized, but
+    /// NOT sorted and NOT deduped). Default empty; omitted entirely from the
+    /// canonical JSON when empty, so a vault that never reordered is
+    /// byte-identical to one without the key. Each container races on its own
+    /// `item_order/<container>` field-clock (MYND-596), so a reorder in one
+    /// folder never clobbers another's order.
     #[serde(default)]
-    pub item_order: Vec<alloc::string::String>,
+    pub item_order: BTreeMap<alloc::string::String, Vec<alloc::string::String>>,
 
     /// Active workspace slot id (MYND-308) — the id of the workspace slot the
     /// editor should restore on unlock. `None` ≡ unset → the host applies its
@@ -1179,7 +1201,7 @@ impl Default for PrefsView {
             theme: None,
             favorites: Vec::new(),
             field_clocks: Default::default(),
-            item_order: Vec::new(),
+            item_order: Default::default(),
             deliberate_folders: Vec::new(),
             developer_mode: false,
             device_names: Default::default(),
@@ -1187,6 +1209,7 @@ impl Default for PrefsView {
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -1459,6 +1482,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"\"auto_lock_seconds\":");
         push_json_uint(&mut out, secs);
         out.push(b',');
+    }
+
+    // auto_tag_enabled (canonical key 'auto_tag_enabled' — after
+    // auto_lock_seconds ['auto_l' < 'auto_t'], before bar_items_order
+    // ['a' < 'b']). Automatic on-device tag suggestion (MYND-651). Emitted
+    // ONLY when true; omitted entirely when false (the default) so a vault
+    // that never enabled it is byte-identical to a pre-feature vault.prefs
+    // (preserves existing KAT vectors) — same discipline as ai_enabled.
+    if prefs.auto_tag_enabled {
+        out.extend_from_slice(b"\"auto_tag_enabled\":true,");
     }
 
     // bar_items_order (canonical key 'b' — after auto_lock_seconds [au < b],
@@ -1818,12 +1851,20 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // item_order (canonical key 'i' — after 'f', before 's'). The unified
-    // sidebar order: a heterogeneous sequence of note UUIDs + folder paths.
-    // Same order-preserving discipline as favorites.
+    // item_order (canonical key 'i' — after 'item_colors' ['item_c' < 'item_o'],
+    // before 'keymap' [i < k]). The unified sidebar order (MYND-596): a
+    // container-keyed map — keys are container paths (`""` root / trailing-slash
+    // folder paths) in lexicographic order, each value a heterogeneous
+    // order-preserving sequence of note UUIDs + child folder paths. Unlike
+    // `keymap` the value arrays are NOT set-canonical (order is the payload);
+    // omitted entirely when the map is empty so a vault that never reordered is
+    // byte-identical to a pre-MYND-596 vault.prefs whose item_order was also
+    // empty (the pre-alpha clean-redefinition, not an MYP5 event — MYND-183 pin
+    // 4). A non-empty pre-MYND-596 flat array does NOT round-trip; v0.1 is
+    // unfrozen so no shipped vault carries one.
     if !prefs.item_order.is_empty() {
         out.extend_from_slice(b"\"item_order\":");
-        push_ordered_string_array(&mut out, &prefs.item_order);
+        push_container_keyed_order_map(&mut out, &prefs.item_order);
         out.push(b',');
     }
 
@@ -2198,6 +2239,35 @@ fn push_canonical_keymap(out: &mut Vec<u8>, map: &BTreeMap<String, Vec<String>>)
     out.push(b'}');
 }
 
+/// Append a canonical JSON object of string→string-array members (surrounding
+/// `{` / `}`, comma-joined `"key":["c1","c2"]` members) for the `item_order`
+/// container-keyed map (MYND-596). Keys (container paths) are NFC-normalized and
+/// emitted in lexicographic KEY order (collecting into a fresh [`BTreeMap`]
+/// re-sorts by the normalized key and collapses any post-NFC duplicate keys
+/// last-wins — canonical input never produces them). Each value array is a
+/// per-container **sequence**: order is the payload, so — UNLIKE
+/// [`push_canonical_keymap`]'s set-canonical chord arrays — the elements are
+/// NFC-normalized only (via [`push_ordered_string_array`]), NOT sorted and NOT
+/// deduped. An empty value array is preserved as `[]` verbatim (a container
+/// whose children were all removed but whose clock is still live). The caller
+/// omits the field entirely when the MAP is empty, so this never emits `{}`.
+fn push_container_keyed_order_map(out: &mut Vec<u8>, map: &BTreeMap<String, Vec<String>>) {
+    let normalized: BTreeMap<String, &Vec<String>> = map
+        .iter()
+        .map(|(k, seq)| (k.nfc().collect::<String>(), seq))
+        .collect();
+    out.push(b'{');
+    for (i, (k, seq)) in normalized.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        push_json_string(out, k);
+        out.push(b':');
+        push_ordered_string_array(out, seq);
+    }
+    out.push(b'}');
+}
+
 // The canonical JSON string-escaper + decimal-integer encoders moved to the
 // shared `crate::canonical_json` module (single-homed for cross-implementation
 // byte-stability across the prefs + saved_view codecs). Imported at the top.
@@ -2418,8 +2488,16 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // already prevents a marker from appearing inside a string value, but the
     // cursor keeps the canonical key-order discipline visible + robust).
     let mut cursor = 0usize;
-    // bar_items_order (canonical key 'b' — after auto_lock_seconds [au < b],
-    // before custom_theme [b < c], so it is the FIRST cursor-located field). A
+    // auto_tag_enabled (canonical key 'auto_tag_enabled' — after
+    // auto_lock_seconds ['auto_l' < 'auto_t'], before bar_items_order
+    // ['a' < 'b'], so it is the FIRST cursor-located field). Automatic
+    // on-device tag suggestion (MYND-651). Emitted only as `true` by the
+    // encoder; `false` is tolerated for robustness. Absent → false (the
+    // default).
+    let auto_tag_enabled =
+        parse_optional_bool_field(rest, &mut cursor, b"\"auto_tag_enabled\":")?.unwrap_or(false);
+    // bar_items_order (canonical key 'b' — after auto_tag_enabled [a < b],
+    // before custom_theme [b < c]). A
     // sequence array parsed from the monotonic cursor so a later field's key
     // marker is never matched inside its content. Absent → empty; order
     // preserved verbatim (sort/dedup is encode-side and this field is a
@@ -2544,7 +2622,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // marker is never matched inside a prior field's content.
     let icon = parse_optional_string_field(rest, &mut cursor, b"\"icon\":")?;
     let item_colors = parse_optional_string_map_field(rest, &mut cursor, b"\"item_colors\":")?;
-    let item_order = parse_optional_array_field(rest, &mut cursor, b"\"item_order\":")?;
+    // item_order (key 'i') — the unified sidebar order (MYND-596), a container-
+    // keyed map (container path → child sequence). Shares the string→array-map
+    // parser with `keymap`: decode is order-preserving either way (keymap's
+    // set-canonical discipline lives only in ITS encoder), so no item_order-
+    // specific parser is needed. Parsed from the same monotonic cursor so a
+    // later field's key marker is never matched inside a value array.
+    let item_order = parse_optional_string_array_map_field(rest, &mut cursor, b"\"item_order\":")?;
     // keymap (key 'k') — user keybinding overrides (MYND-304), sitting between
     // item_order (i) and label (l) in canonical order. A nested string→array-of-
     // strings object parsed from the same monotonic cursor so a later field's key
@@ -2695,6 +2779,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         developer_mode,
         device_names,
         auto_lock_seconds,
+        auto_tag_enabled,
         custom_theme,
         daily_date_format,
         daily_folder,
@@ -3629,11 +3714,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -3700,11 +3786,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -3857,7 +3944,10 @@ mod tests {
             clocks.insert(String::from(field), 1_700_000_000_000u64);
             let view = PrefsView {
                 label: Some(String::from("Keepme")),
-                item_order: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
+                item_order: BTreeMap::from([(
+                    String::from(""),
+                    alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
+                )]),
                 field_clocks: clocks.clone(),
                 ..PrefsView::default()
             };
@@ -4088,11 +4178,12 @@ mod tests {
                 item_colors: Default::default(),
                 keymap: Default::default(),
                 theme: None,
-                item_order: Vec::new(),
+                item_order: Default::default(),
                 favorites: Vec::new(),
                 field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                auto_tag_enabled: false,
                 custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
@@ -4161,11 +4252,12 @@ mod tests {
                 item_colors: Default::default(),
                 keymap: Default::default(),
                 theme: None,
-                item_order: Vec::new(),
+                item_order: Default::default(),
                 favorites: Vec::new(),
                 field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                auto_tag_enabled: false,
                 custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
@@ -4298,13 +4390,16 @@ mod tests {
     fn encode_places_label_between_item_order_and_screen_capture() {
         // Canonical key order: item_order (i) < label (l) < screen_capture (s).
         let encoded = canonical_json_encode(&PrefsView {
-            item_order: alloc::vec![alloc::string::String::from("n1")],
+            item_order: BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![alloc::string::String::from("n1")],
+            )]),
             label: Some(alloc::string::String::from("Work")),
             ..PrefsView::default()
         });
         assert_eq!(
             encoded.as_slice(),
-            br#"{"item_order":["n1"],"label":"Work","screen_capture_protection":true}"#,
+            br#"{"item_order":{"":["n1"]},"label":"Work","screen_capture_protection":true}"#,
         );
     }
 
@@ -4376,14 +4471,17 @@ mod tests {
     fn encode_places_keymap_between_item_order_and_label() {
         // Canonical key order: item_order (i) < keymap (k) < label (l).
         let encoded = canonical_json_encode(&PrefsView {
-            item_order: alloc::vec![alloc::string::String::from("n1")],
+            item_order: BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![alloc::string::String::from("n1")],
+            )]),
             keymap: keymap_of(&[("graph.show", &["Mod-Shift-g"])]),
             label: Some(alloc::string::String::from("Work")),
             ..PrefsView::default()
         });
         assert_eq!(
             encoded.as_slice(),
-            br#"{"item_order":["n1"],"keymap":{"graph.show":["Mod-Shift-g"]},"label":"Work","screen_capture_protection":true}"#,
+            br#"{"item_order":{"":["n1"]},"keymap":{"graph.show":["Mod-Shift-g"]},"label":"Work","screen_capture_protection":true}"#,
         );
     }
 
@@ -4866,6 +4964,74 @@ mod tests {
         assert!(decoded.developer_mode);
         assert!(!decoded.show_task_marker);
         assert!(!decoded.transcription_enabled);
+    }
+
+    /// `auto_tag_enabled` (MYND-651) is a default-off positive opt-in, so it is
+    /// emitted ONLY when `true` — the `ai_enabled` / `cli_enabled` discipline.
+    /// A vault that never enabled it therefore stays byte-identical to a
+    /// pre-feature blob, which is what preserves the existing KAT vectors.
+    #[test]
+    fn auto_tag_enabled_omitted_when_false_emitted_only_when_true() {
+        let off = canonical_json_encode(&PrefsView {
+            auto_tag_enabled: false,
+            ..PrefsView::default()
+        });
+        assert!(
+            !core::str::from_utf8(&off)
+                .unwrap()
+                .contains("auto_tag_enabled"),
+            "the default must not be written"
+        );
+        assert_eq!(off, canonical_json_encode(&PrefsView::default()));
+
+        let on = canonical_json_encode(&PrefsView {
+            auto_tag_enabled: true,
+            ..PrefsView::default()
+        });
+        assert!(core::str::from_utf8(&on)
+            .unwrap()
+            .contains(r#""auto_tag_enabled":true"#));
+    }
+
+    /// The positional-decode guard for the new key. `auto_tag_enabled` sits at
+    /// the boundary between the `strip_prefix`-chained prefix fields and the
+    /// cursor-located ones (`auto_lock_seconds` < `auto_tag_enabled` <
+    /// `bar_items_order`), and a mis-ordered insertion there fails *silently* —
+    /// the decoder steps past the out-of-order key and reports it absent
+    /// (defaulted), never an error. Setting a non-default value in both
+    /// neighbours and asserting all three survive one round-trip is the only
+    /// thing that catches it.
+    #[test]
+    fn auto_tag_enabled_round_trips_between_its_canonical_neighbours() {
+        let original = PrefsView {
+            auto_lock_seconds: Some(300), // left neighbour
+            auto_tag_enabled: true,
+            bar_items_order: alloc::vec![alloc::string::String::from("view-mode")], // right neighbour
+            ai_enabled: true, // the flag the tag pass is co-gated on
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+
+        let text = core::str::from_utf8(&encoded).expect("utf-8");
+        let pos = |k: &str| text.find(k).unwrap_or_else(|| panic!("missing key {k}"));
+        assert!(pos("\"ai_enabled\"") < pos("\"auto_lock_seconds\""));
+        assert!(pos("\"auto_lock_seconds\"") < pos("\"auto_tag_enabled\""));
+        assert!(pos("\"auto_tag_enabled\"") < pos("\"bar_items_order\""));
+
+        let decoded = canonical_json_decode(&encoded).expect("decode must succeed");
+        assert!(decoded.auto_tag_enabled);
+        assert_eq!(decoded.auto_lock_seconds, Some(300));
+        assert_eq!(decoded.bar_items_order, original.bar_items_order);
+        assert!(decoded.ai_enabled);
+    }
+
+    /// A pre-MYND-651 blob decodes with the feature off — the fall-back a
+    /// decoder that does not find the key MUST apply (spec § 9.5.2).
+    #[test]
+    fn auto_tag_enabled_absent_decodes_to_false() {
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode ok");
+        assert!(!decoded.auto_tag_enabled);
     }
 
     /// The inverse of the `ai_enabled` rule, because this pref defaults to TRUE:
@@ -5534,13 +5700,17 @@ mod tests {
             keymap: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(300),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
             field_clocks: Default::default(),
-            item_order: alloc::vec![alloc::string::String::from("n1")],
+            item_order: BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![alloc::string::String::from("n1")],
+            )]),
             editor_layout: Some(EditorLayout {
                 left_width: 312,
                 right_width: 288,
@@ -5583,7 +5753,7 @@ mod tests {
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
             encoded.as_slice(),
-            br#"{"auto_lock_seconds":300,"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":312,"right_collapsed":true,"right_width":288},"favorites":["f1"],"item_order":["n1"],"screen_capture_protection":true,"theme":"dark"}"#,
+            br#"{"auto_lock_seconds":300,"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":312,"right_collapsed":true,"right_width":288},"favorites":["f1"],"item_order":{"":["n1"]},"screen_capture_protection":true,"theme":"dark"}"#,
         );
     }
 
@@ -5981,7 +6151,7 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![
@@ -5989,6 +6159,7 @@ mod tests {
                 alloc::string::String::from("Archive/"),
             ],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6058,7 +6229,7 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![
@@ -6067,6 +6238,7 @@ mod tests {
                 alloc::string::String::from("b/"),
             ],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6138,11 +6310,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6213,11 +6386,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6348,7 +6522,7 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![
@@ -6356,6 +6530,7 @@ mod tests {
                 alloc::string::String::from("Archive/2025/"),
             ],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6450,6 +6625,7 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6458,11 +6634,14 @@ mod tests {
                 alloc::string::String::from("f2"),
                 alloc::string::String::from("f1"),
             ],
-            item_order: alloc::vec![
-                alloc::string::String::from("n1"),
-                alloc::string::String::from("Zebra/"),
-                alloc::string::String::from("n2"),
-            ],
+            item_order: BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![
+                    alloc::string::String::from("n1"),
+                    alloc::string::String::from("Zebra/"),
+                    alloc::string::String::from("n2"),
+                ],
+            )]),
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -6500,7 +6679,7 @@ mod tests {
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
             encoded.as_slice(),
-            br#"{"deliberate_folders":["Archive/"],"favorites":["f2","f1"],"item_order":["n1","Zebra/","n2"],"screen_capture_protection":true}"#,
+            br#"{"deliberate_folders":["Archive/"],"favorites":["f2","f1"],"item_order":{"":["n1","Zebra/","n2"]},"screen_capture_protection":true}"#,
         );
     }
 
@@ -6533,18 +6712,22 @@ mod tests {
             theme: None,
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
             favorites: Vec::new(),
             field_clocks: Default::default(),
-            item_order: alloc::vec![
-                alloc::string::String::from("zzz"),
-                alloc::string::String::from("aaa"),
-                alloc::string::String::from("mmm"),
-                alloc::string::String::from("zzz"),
-            ],
+            item_order: BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![
+                    alloc::string::String::from("zzz"),
+                    alloc::string::String::from("aaa"),
+                    alloc::string::String::from("mmm"),
+                    alloc::string::String::from("zzz"),
+                ],
+            )]),
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -6582,14 +6765,50 @@ mod tests {
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
             encoded.as_slice(),
-            br#"{"item_order":["zzz","aaa","mmm","zzz"],"screen_capture_protection":true}"#,
+            br#"{"item_order":{"":["zzz","aaa","mmm","zzz"]},"screen_capture_protection":true}"#,
         );
+    }
+
+    #[test]
+    fn item_order_multi_container_keys_lexicographic_values_ordered() {
+        // MYND-596: item_order is a container-keyed map. Container KEYS emit in
+        // lexicographic order (root "" first, then "Projects/"), independent of
+        // insertion order; each per-container VALUE sequence stays order-
+        // preserving (NOT sorted/deduped — the "Projects/" folder sits BETWEEN
+        // two notes in the root container). Round-trips verbatim.
+        let prefs = PrefsView {
+            item_order: BTreeMap::from([
+                (
+                    // Container key is the FOLDED folder key (`projects/`), not
+                    // the display path — matches the clients' `folderKey`
+                    // identity so both derive byte-identical keys (MYND-596).
+                    alloc::string::String::from("projects/"),
+                    alloc::vec![alloc::string::String::from("Projects/Myne/")],
+                ),
+                (
+                    alloc::string::String::from(""),
+                    alloc::vec![
+                        alloc::string::String::from("n2"),
+                        alloc::string::String::from("Projects/"),
+                        alloc::string::String::from("n1"),
+                    ],
+                ),
+            ]),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"item_order":{"":["n2","Projects/","n1"],"projects/":["Projects/Myne/"]},"screen_capture_protection":true}"#,
+        );
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.item_order, prefs.item_order);
     }
 
     #[test]
     fn decode_round_trips_favorites_and_item_order_preserving_sequence() {
         let parsed = canonical_json_decode(
-            br#"{"favorites":["f2","f1"],"item_order":["n1","Zebra/","n2"],"screen_capture_protection":true}"#,
+            br#"{"favorites":["f2","f1"],"item_order":{"":["n1","Zebra/","n2"]},"screen_capture_protection":true}"#,
         )
         .unwrap();
         assert_eq!(
@@ -6601,11 +6820,14 @@ mod tests {
         );
         assert_eq!(
             parsed.item_order,
-            alloc::vec![
-                alloc::string::String::from("n1"),
-                alloc::string::String::from("Zebra/"),
-                alloc::string::String::from("n2"),
-            ],
+            BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![
+                    alloc::string::String::from("n1"),
+                    alloc::string::String::from("Zebra/"),
+                    alloc::string::String::from("n2"),
+                ],
+            )]),
         );
         assert!(parsed.screen_capture_protection);
     }
@@ -6650,6 +6872,7 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(900),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -6657,11 +6880,14 @@ mod tests {
             favorites: alloc::vec![alloc::string::String::from(
                 "0190a000-0000-7000-8000-000000000002",
             )],
-            item_order: alloc::vec![
-                alloc::string::String::from("0190a000-0000-7000-8000-000000000002"),
-                alloc::string::String::from("Projects/"),
-                alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
-            ],
+            item_order: BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![
+                    alloc::string::String::from("0190a000-0000-7000-8000-000000000002"),
+                    alloc::string::String::from("Projects/"),
+                    alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
+                ],
+            )]),
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -6746,11 +6972,12 @@ mod tests {
             item_colors: map_of(&[("Projects/", "red")]),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7080,11 +7307,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(300),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7155,11 +7383,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(900),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7232,11 +7461,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(0),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7377,11 +7607,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(1800),
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7499,13 +7730,17 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
             field_clocks: Default::default(),
-            item_order: alloc::vec![alloc::string::String::from("n1")],
+            item_order: BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![alloc::string::String::from("n1")],
+            )]),
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -7542,7 +7777,7 @@ mod tests {
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
             encoded.as_slice(),
-            br#"{"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":312,"right_collapsed":true,"right_width":288},"favorites":["f1"],"item_order":["n1"],"screen_capture_protection":true}"#,
+            br#"{"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":312,"right_collapsed":true,"right_width":288},"favorites":["f1"],"item_order":{"":["n1"]},"screen_capture_protection":true}"#,
         );
     }
 
@@ -7654,7 +7889,7 @@ mod tests {
         // Full field-mix smoke: a < d < e < f < i < s all present, parsed
         // through the monotonic cursor without cross-field marker confusion.
         let parsed = canonical_json_decode(
-            br#"{"auto_lock_seconds":900,"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":320,"right_collapsed":true,"right_width":300},"favorites":["f1"],"item_order":["n2","n1"],"screen_capture_protection":false}"#,
+            br#"{"auto_lock_seconds":900,"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":320,"right_collapsed":true,"right_width":300},"favorites":["f1"],"item_order":{"":["n2","n1"]},"screen_capture_protection":false}"#,
         )
         .unwrap();
         assert_eq!(parsed.auto_lock_seconds, Some(900));
@@ -7677,10 +7912,13 @@ mod tests {
         );
         assert_eq!(
             parsed.item_order,
-            alloc::vec![
-                alloc::string::String::from("n2"),
-                alloc::string::String::from("n1"),
-            ]
+            BTreeMap::from([(
+                alloc::string::String::from(""),
+                alloc::vec![
+                    alloc::string::String::from("n2"),
+                    alloc::string::String::from("n1"),
+                ],
+            )])
         );
         assert!(!parsed.screen_capture_protection);
     }
@@ -7805,11 +8043,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -7884,11 +8123,12 @@ mod tests {
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
-            item_order: Vec::new(),
+            item_order: Default::default(),
             favorites: Vec::new(),
             field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            auto_tag_enabled: false,
             custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
@@ -8227,11 +8467,12 @@ mod tests {
                 item_colors: Default::default(),
                 keymap: Default::default(),
                 theme: None,
-                item_order: Vec::new(),
+                item_order: Default::default(),
                 favorites: Vec::new(),
                 field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                auto_tag_enabled: false,
                 custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
@@ -8299,11 +8540,12 @@ mod tests {
                 item_colors: Default::default(),
                 keymap: Default::default(),
                 theme: None,
-                item_order: Vec::new(),
+                item_order: Default::default(),
                 favorites: Vec::new(),
                 field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                auto_tag_enabled: false,
                 custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
@@ -8348,29 +8590,58 @@ mod tests {
         // the spec § 9.5.2 worked example. The canonical plaintext is COMPUTED
         // (not hardcoded) so the generator self-validates the canonical key
         // order + sequence discipline before emitting.
+        // MYND-596 + coverage backfill: this "fully-populated" case now sets
+        // every previously-unvectored field to a NON-default value, so the
+        // golden vectors exercise the canonical slot, the inverse-default emit
+        // polarity (the six default-`true` bools emitted only when `false`), and
+        // the set-vs-sequence array discipline for each. `canonical_json_encode`
+        // self-validates the key order + discipline at mint (round-trip below).
         let prefs_populated = PrefsView {
-            attachment_compression_enabled: true,
-            developer_mode: false,
-            attachment_ocr_enabled: true,
-            transcription_enabled: true,
+            // inverse-default bools (default true → emitted only when false)
+            attachment_compression_enabled: false,
+            attachment_ocr_enabled: false,
+            transcription_enabled: false,
+            show_note_timestamps: false,
+            reminders_enabled: false,
+            show_task_marker: false,
+            // positive-opt-in bools
+            developer_mode: true,
+            cli_enabled: true,
+            ai_enabled: false,
             field_clocks: Default::default(),
             screen_capture_protection: true,
-            bar_items_order: Vec::new(),
-            cli_enabled: false,
-            cli_excluded_folders: Vec::new(),
-            cli_rate_limit_disabled: None,
-            color_groups: Vec::new(),
-            ai_enabled: false,
+            // sequence array (order preserved verbatim)
+            bar_items_order: alloc::vec![
+                alloc::string::String::from("view-mode"),
+                alloc::string::String::from("tags"),
+                alloc::string::String::from("graph"),
+            ],
+            // set array (sorted + deduped)
+            cli_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
+            cli_rate_limit_disabled: Some(true),
+            // color_groups: one enabled hasTag rule — pins the canonical slot
+            // (bar_items_order < color_groups < custom_theme) inside vault.prefs;
+            // the array codec itself is pinned by the color-group category.
+            color_groups: alloc::vec![crate::color_group::ColorGroup {
+                id: alloc::string::String::from("0190a000-0000-7000-8000-000000000007"),
+                name: alloc::string::String::from("Work"),
+                color: alloc::string::String::from("moss"),
+                enabled: true,
+                filter: crate::saved_view::FilterNode::HasTag {
+                    tag: alloc::string::String::from("work"),
+                },
+            }],
             ai_excluded_folders: Vec::new(),
             archived_folders: Vec::new(),
-            show_note_timestamps: true,
-            reminders_enabled: true,
-            reminder_horizon_days: None,
-            show_task_marker: true,
+            reminder_horizon_days: Some(7),
             folder_icons: Default::default(),
             device_names: Default::default(),
-            hidden_bar_items: Vec::new(),
-            icon: None,
+            // set array (sorted + deduped) — the bottom-bar hidden set
+            hidden_bar_items: alloc::vec![
+                alloc::string::String::from("graph"),
+                alloc::string::String::from("word-count"),
+            ],
+            icon: Some(alloc::string::String::from("book")),
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -8379,19 +8650,35 @@ mod tests {
                 alloc::string::String::from("Projects/Myne/"),
             ],
             auto_lock_seconds: Some(300),
-            custom_theme: None,
+            auto_tag_enabled: false,
+            custom_theme: Some(alloc::string::String::from("solarized-dark")),
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
             favorites: alloc::vec![alloc::string::String::from(
                 "0190a000-0000-7000-8000-000000000002",
             )],
-            item_order: alloc::vec![
-                alloc::string::String::from("0190a000-0000-7000-8000-000000000002"),
-                alloc::string::String::from("Projects/Myne/"),
-                alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
-                alloc::string::String::from("Archive/2025/"),
-            ],
+            // MYND-596 container-keyed: the root container interleaves a note,
+            // the "Projects/" folder, and another note; "Projects/" then orders
+            // its own child sub-folder. Keys emit in lexicographic order
+            // ("" < "Projects/"); each value sequence is order-preserving.
+            item_order: BTreeMap::from([
+                (
+                    alloc::string::String::from(""),
+                    alloc::vec![
+                        alloc::string::String::from("0190a000-0000-7000-8000-000000000002"),
+                        alloc::string::String::from("Projects/"),
+                        alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
+                    ],
+                ),
+                (
+                    // Container key is the FOLDED folder key (`projects/`), not
+                    // the display path — matches the clients' `folderKey`
+                    // identity so both derive byte-identical keys (MYND-596).
+                    alloc::string::String::from("projects/"),
+                    alloc::vec![alloc::string::String::from("Projects/Myne/")],
+                ),
+            ]),
             active_workspace: Some(alloc::string::String::from(
                 "0190a000-0000-7000-8000-0000000000ff",
             )),
@@ -8402,31 +8689,60 @@ mod tests {
                 left_collapsed: false,
                 right_collapsed: true,
             }),
-            editor_line_numbers: None,
-            editor_content_width: None,
+            editor_line_numbers: Some(true),
+            editor_content_width: Some(alloc::string::String::from("wide")),
             editor_default_view_mode: Some(alloc::string::String::from("reading")),
             editor_focus_dim_inactive: Some(true),
             editor_focus_typewriter: Some(false),
-            editor_font_family: None,
-            editor_line_spacing: None,
-            editor_text_size: None,
-            editor_vim_mode: None,
-            label: None,
-            last_backup_at: None,
-            new_note_location: None,
-            new_note_location_folder: None,
+            editor_font_family: Some(alloc::string::String::from("sans")),
+            editor_line_spacing: Some(alloc::string::String::from("relaxed")),
+            editor_text_size: Some(alloc::string::String::from("lg")),
+            editor_vim_mode: Some(true),
+            label: Some(alloc::string::String::from("Work")),
+            last_backup_at: Some(1765432100),
+            new_note_location: Some(alloc::string::String::from("specific")),
+            new_note_location_folder: Some(alloc::string::String::from("Inbox/")),
             paired_extensions: Vec::new(),
-            right_panel_active_tab: None,
-            right_panel_hidden_tabs: Vec::new(),
-            right_panel_tab_order: Vec::new(),
-            editor_slash_hidden: Vec::new(),
-            editor_slash_order: Vec::new(),
-            editor_toolbar_hidden: Vec::new(),
-            editor_toolbar_order: Vec::new(),
-            spell_enabled: None,
-            spell_languages: Vec::new(),
-            startup_open: None,
-            startup_open_note: None,
+            right_panel_active_tab: Some(alloc::string::String::from("backlinks")),
+            // set array (sorted + deduped)
+            right_panel_hidden_tabs: alloc::vec![alloc::string::String::from("outline")],
+            // sequence array (order preserved verbatim)
+            right_panel_tab_order: alloc::vec![
+                alloc::string::String::from("backlinks"),
+                alloc::string::String::from("unlinked"),
+                alloc::string::String::from("outline"),
+            ],
+            // set arrays (sorted + deduped)
+            editor_slash_hidden: alloc::vec![
+                alloc::string::String::from("callout"),
+                alloc::string::String::from("table"),
+            ],
+            editor_toolbar_hidden: alloc::vec![
+                alloc::string::String::from("quote"),
+                alloc::string::String::from("wikilink"),
+            ],
+            // sequence arrays (order preserved verbatim)
+            editor_slash_order: alloc::vec![
+                alloc::string::String::from("h1"),
+                alloc::string::String::from("todo"),
+                alloc::string::String::from("divider"),
+            ],
+            editor_toolbar_order: alloc::vec![
+                alloc::string::String::from("bold"),
+                alloc::string::String::from("italic"),
+                alloc::string::String::from("link"),
+                alloc::string::String::from("heading"),
+            ],
+            spell_enabled: Some(true),
+            // set array (sorted + deduped)
+            spell_languages: alloc::vec![
+                alloc::string::String::from("en-US"),
+                alloc::string::String::from("tr-TR"),
+            ],
+            startup_open: Some(alloc::string::String::from("specific")),
+            startup_open_note: Some(alloc::string::String::from(
+                "0190a000-0000-7000-8000-000000000006",
+            )),
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -8579,6 +8895,31 @@ mod tests {
             hex_lower(&blob_populated)
         ));
 
+        // decrypt-populated — round-trip with encrypt-populated. Generated here
+        // (no longer hand-derived) so the expected_prefs_view can never drift
+        // from the encrypt case's PrefsView. The canonical plaintext IS valid
+        // JSON, so paste `expected_prefs_view` from `plaintext_canonical_utf8`
+        // below as the case's `expected_prefs_view` object verbatim.
+        dump.push_str("# case: decrypt-populated (round-trip with encrypt-populated)\n");
+        dump.push_str(&alloc::format!(
+            "input_blob_hex: {}\n",
+            hex_lower(&blob_populated)
+        ));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_utf8_hex: {}\n",
+            hex_lower(&canonical_populated)
+        ));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_view (canonical JSON — paste as the object verbatim): {}\n\n",
+            core::str::from_utf8(&canonical_populated).unwrap_or("<non-utf8>")
+        ));
+
         dump.push_str("# case 7/8: encrypt-themed-dark (theme=dark, MYND-110)\n");
         dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
         dump.push_str(&alloc::format!(
@@ -8656,10 +8997,13 @@ mod tests {
         // --- encrypt-labeled + decrypt-labeled -----------------------------
         let nonce_labeled: [u8; AEAD_NONCE_LEN] = [0xDD; AEAD_NONCE_LEN];
         let prefs_labeled = PrefsView {
-            item_order: alloc::vec![
-                String::from("0190a000-0000-7000-8000-000000000001"),
-                String::from("Projects/Myne/"),
-            ],
+            item_order: BTreeMap::from([(
+                String::from(""),
+                alloc::vec![
+                    String::from("0190a000-0000-7000-8000-000000000001"),
+                    String::from("Projects/Myne/"),
+                ],
+            )]),
             // NFD on purpose: 'e' + U+0301 combining acute. The encoder must
             // emit the NFC form (U+00E9, bytes c3 a9).
             label: Some(String::from("Cafe\u{301}")),
@@ -8668,7 +9012,7 @@ mod tests {
         let canonical_labeled = canonical_json_encode(&prefs_labeled);
         assert_eq!(
             canonical_labeled.as_slice(),
-            b"{\"item_order\":[\"0190a000-0000-7000-8000-000000000001\",\"Projects/Myne/\"],\"label\":\"Caf\xc3\xa9\",\"screen_capture_protection\":true}"
+            b"{\"item_order\":{\"\":[\"0190a000-0000-7000-8000-000000000001\",\"Projects/Myne/\"]},\"label\":\"Caf\xc3\xa9\",\"screen_capture_protection\":true}"
                 .as_slice(),
             "canonical plaintext must NFC-normalize the label and sort i < l < s",
         );
@@ -8770,7 +9114,7 @@ mod tests {
             hex_lower(&canonical_labeled)
         ));
         dump.push_str(
-            "expected_prefs_view: { \"item_order\": [\"0190a000-0000-7000-8000-000000000001\", \"Projects/Myne/\"], \"label\": \"Café\", \"screen_capture_protection\": true }\n\n",
+            "expected_prefs_view: { \"item_order\": { \"\": [\"0190a000-0000-7000-8000-000000000001\", \"Projects/Myne/\"] }, \"label\": \"Café\", \"screen_capture_protection\": true }\n\n",
         );
 
         dump.push_str(
@@ -9837,7 +10181,7 @@ mod tests {
         );
         keymap.insert(String::from("vault.lock"), Vec::new()); // explicit-unbind
         let prefs_keymap = PrefsView {
-            item_order: alloc::vec![String::from("n1")],
+            item_order: BTreeMap::from([(String::from(""), alloc::vec![String::from("n1")])]),
             keymap: keymap.clone(),
             label: Some(String::from("Work")),
             ..PrefsView::default()
@@ -9845,7 +10189,7 @@ mod tests {
         let canonical = canonical_json_encode(&prefs_keymap);
         assert_eq!(
             canonical.as_slice(),
-            br#"{"item_order":["n1"],"keymap":{"app.command-palette":["Mod-k","Mod-p"],"vault.lock":[]},"label":"Work","screen_capture_protection":true}"#.as_slice(),
+            br#"{"item_order":{"":["n1"]},"keymap":{"app.command-palette":["Mod-k","Mod-p"],"vault.lock":[]},"label":"Work","screen_capture_protection":true}"#.as_slice(),
             "canonical bytes must pin i<k<l<s, set-canonical chords, and the []-unbind state",
         );
         let blob_keymap =
@@ -9939,7 +10283,7 @@ mod tests {
         ));
         dump.push_str("      \"expected_prefs_view\": {\n");
         dump.push_str("        \"screen_capture_protection\": true,\n");
-        dump.push_str("        \"item_order\": [\"n1\"],\n");
+        dump.push_str("        \"item_order\": { \"\": [\"n1\"] },\n");
         dump.push_str("        \"keymap\": { \"app.command-palette\": [\"Mod-k\", \"Mod-p\"], \"vault.lock\": [] },\n");
         dump.push_str("        \"label\": \"Work\"\n");
         dump.push_str("      }\n");

@@ -9,10 +9,21 @@
 //! Sync`; a single instance backs concurrent commands under `Arc`). CPU device
 //! only (`Device::Cpu`) — no GPU/network. No model set → [`EngineError::NotReady`].
 //!
+//! Two roles are **bundled** first-party task-models instead: transcription
+//! (MYND-270) and auto-tag (`infer_tags`, MYND-651). Bundling is not
+//! downloading — the weights ship inside the signed, reproducible build, so
+//! SYNC-2 is intact (`decisions.md` 2026-07-19, 2026-07-31). Auto-tag also has
+//! no picker override at all, so it never re-enters the untrusted-model case.
+//!
 //! Side-load layout (the user picks the primary file; siblings live next to it):
 //! - generation: `<model>.gguf` + `tokenizer.json` in the same directory.
 //! - embedding: `model.safetensors` + `config.json` + `tokenizer.json` in the
 //!   same directory.
+//!
+//! Bundled layout (under the Tauri `resource_dir`, `model_store`):
+//! - transcription: `models/whisper/model.gguf` + `config.json` + `tokenizer.json`.
+//! - auto-tag: `models/tag/model.gguf` + `tokenizer.json` — a small quantized
+//!   Qwen2 GGUF loaded through the SAME path as the generation role.
 //!
 //! Secret-handling: a prompt / note text / embedding is never logged (DENY-list)
 //! — only the closed [`EngineError`] kind escapes.
@@ -48,6 +59,26 @@ use super::whisper::{self, WhisperTokens};
 /// Cap on generated tokens per `infer` — a bound so a runaway generation can't
 /// hang the blocking command.
 const MAX_NEW_TOKENS: usize = 512;
+/// Cap on generated tokens per `infer_tags` (auto-tag, MYND-651). A tag reply is
+/// a handful of comma-separated words; the 512-token generation cap would let a
+/// model that fails to stop hold the single `compute` lock for the whole budget,
+/// which is exactly what the tag pass is not allowed to do to interactive AI.
+const TAG_MAX_NEW_TOKENS: usize = 64;
+// A tag pass must never be able to hold the single `compute` lock for a
+// chat-sized budget. Checked at COMPILE time so raising it past a quarter of the
+// generation budget is a build failure, not a review catch.
+const _: () = assert!(TAG_MAX_NEW_TOKENS < MAX_NEW_TOKENS / 4);
+/// Cap on characters of the caller-supplied tag prompt actually fed to the model.
+/// The frontend already windows the note body, but the WebView is untrusted
+/// (TB6) — this is the host-side bound, so a compromised WebView cannot hand the
+/// tag model a megabyte of text and pin the compute lock behind it.
+const TAG_PROMPT_MAX_CHARS: usize = 8_000;
+/// The TRUSTED system instruction for the tag pass. The caller's prompt (which
+/// carries the note body and the vault's existing-tag hint) is the UNTRUSTED
+/// user turn; this line is ours and is never attacker-influenceable.
+const TAG_SYSTEM_INSTRUCTION: &str =
+    "You suggest short topical tags for a note. Reply with a lowercase, \
+     comma-separated list of tags and nothing else.";
 /// Deterministic sampling seed (reproducible generations).
 const SAMPLE_SEED: u64 = 299_792_458;
 /// Generation temperature (mild — coherent, lightly varied).
@@ -62,6 +93,32 @@ struct LoadedGen {
     /// The device the model + its inference tensors live on (Metal GPU or CPU).
     device: Device,
 }
+
+/// The four `stage` labels one Qwen2-GGUF load emits. Carried as a struct of
+/// `&'static str` rather than formatted per role, because a `stage` must stay a
+/// bounded static string (DENY-list, `src-tauri/CLAUDE.md`) — this is what lets
+/// the generation and tag roles share [`CandleEngine::load_qwen2_gguf`] while
+/// still logging distinguishable stages.
+struct GgufLoadStages {
+    open: &'static str,
+    read: &'static str,
+    build: &'static str,
+    tokenizer: &'static str,
+}
+
+const GEN_LOAD_STAGES: GgufLoadStages = GgufLoadStages {
+    open: "load_gen.open_gguf",
+    read: "load_gen.read_gguf",
+    build: "load_gen.from_gguf",
+    tokenizer: "load_gen.tokenizer",
+};
+
+const TAG_LOAD_STAGES: GgufLoadStages = GgufLoadStages {
+    open: "load_tag.open_gguf",
+    read: "load_tag.read_gguf",
+    build: "load_tag.from_gguf",
+    tokenizer: "load_tag.tokenizer",
+};
 
 /// A loaded embedding model + its tokenizer.
 struct LoadedEmbed {
@@ -140,6 +197,13 @@ pub struct CandleEngine {
     /// `load_transcription` when the user set no `transcription.path` override,
     /// so speech-to-text works out of the box.
     bundled_transcription: Option<PathBuf>,
+    /// The bundled auto-tag task-model shipped as a Tauri resource (MYND-651;
+    /// desktop-only), resolved once at construction — `None` when none ships
+    /// (`--no-default-features` AI-free build / unfetched LFS blob). Unlike
+    /// transcription there is no override to fall back to, so `None` means
+    /// auto-tag is simply unavailable on this build (`NotReady`), never a
+    /// half-working surface.
+    bundled_tag: Option<PathBuf>,
     /// Compute device chosen once at construction (Metal GPU on macOS, else CPU).
     device: Device,
     /// Serializes ALL GPU/compute work across `infer` + `embed`. The `gen` and
@@ -155,6 +219,12 @@ pub struct CandleEngine {
     gen: Mutex<Option<LoadedGen>>,
     embed: Mutex<Option<LoadedEmbed>>,
     transcription: Mutex<Option<LoadedTranscription>>,
+    /// The lazily-loaded tag model (auto-tag, MYND-651). Its own lock, like every
+    /// other role, so a first tag pass never serializes behind a generation load
+    /// — the `compute` mutex is what orders the actual GPU work. Same
+    /// [`LoadedGen`] shape because it IS a Qwen2 GGUF, just a smaller,
+    /// first-party one.
+    tag: Mutex<Option<LoadedGen>>,
 }
 
 impl CandleEngine {
@@ -166,11 +236,13 @@ impl CandleEngine {
         Self {
             base,
             bundled_transcription: None,
+            bundled_tag: None,
             device: select_device(),
             compute: Mutex::new(()),
             gen: Mutex::new(None),
             embed: Mutex::new(None),
             transcription: Mutex::new(None),
+            tag: Mutex::new(None),
         }
     }
 
@@ -180,6 +252,15 @@ impl CandleEngine {
     /// [`new`] are untouched.
     pub fn with_bundled_transcription(mut self, path: Option<PathBuf>) -> Self {
         self.bundled_transcription = path;
+        self
+    }
+
+    /// Attach the bundled auto-tag task-model (MYND-651), resolved from the Tauri
+    /// `resource_dir` in `super::init`. `None` leaves the engine with no tag path
+    /// at all — there is no side-load fallback by design (`threat-model.md` §7:
+    /// no override picker). Builder-style, like [`with_bundled_transcription`].
+    pub fn with_bundled_tag_model(mut self, path: Option<PathBuf>) -> Self {
+        self.bundled_tag = path;
         self
     }
 
@@ -217,24 +298,70 @@ impl CandleEngine {
             stage = "load_gen",
             "loading generation model (first use)…"
         );
-        let tok_path = Self::sibling(&model_path, "tokenizer.json");
-        let mut file = std::fs::File::open(&model_path)
-            .map_err(|e| io_stage_fail("load_gen.open_gguf", &e, EngineError::NotReady))?;
-        let content = gguf_file::Content::read(&mut file)
-            .map_err(|e| fmt_stage_fail("load_gen.read_gguf", e, EngineError::InferenceFailed))?;
-        let model = Qwen2::from_gguf(content, &mut file, &self.device)
-            .map_err(|e| fmt_stage_fail("load_gen.from_gguf", e, EngineError::InferenceFailed))?;
-        let tokenizer = Tokenizer::from_file(&tok_path)
-            .map_err(|e| fmt_stage_fail("load_gen.tokenizer", e, EngineError::InferenceFailed))?;
-        let eos = tokenizer
-            .token_to_id("<|im_end|>")
-            .or_else(|| tokenizer.token_to_id("<|endoftext|>"));
+        let loaded = self.load_qwen2_gguf(&model_path, &GEN_LOAD_STAGES)?;
         tracing::info!(
             target: "myne::ai",
             stage = "load_gen",
             elapsed_ms = started.elapsed().as_millis() as u64,
             "generation model loaded"
         );
+        Ok(loaded)
+    }
+
+    /// Lazy-load the bundled auto-tag model (MYND-651). Resolution is
+    /// **bundled-only** — there is no `selected_model` lookup because the role
+    /// has no marker (`model_store::ModelRole::TagSuggestion`), so the one path
+    /// this can ever load is the first-party GGUF resolved at construction.
+    /// `NotReady` when no blob ships, so an AI-free build or an unfetched LFS
+    /// checkout leaves the feature absent instead of broken.
+    fn load_tag(&self) -> Result<LoadedGen, EngineError> {
+        let started = Instant::now();
+        let Some(model_path) = self.bundled_tag.clone() else {
+            tracing::warn!(
+                target: "myne::ai",
+                stage = "load_tag",
+                "no auto-tag model — none bundled in this build"
+            );
+            return Err(EngineError::NotReady);
+        };
+        tracing::info!(
+            target: "myne::ai",
+            stage = "load_tag",
+            "loading auto-tag model (first use)…"
+        );
+        let loaded = self.load_qwen2_gguf(&model_path, &TAG_LOAD_STAGES)?;
+        tracing::info!(
+            target: "myne::ai",
+            stage = "load_tag",
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "auto-tag model loaded"
+        );
+        Ok(loaded)
+    }
+
+    /// Load a quantized Qwen2 GGUF + its sibling `tokenizer.json` into a
+    /// [`LoadedGen`]. Shared by the side-loaded generation role and the bundled
+    /// tag role — same architecture family, so the tag model costs no new
+    /// runtime, which is the reason that checkpoint was chosen. `stages` supplies
+    /// the per-role DENY-safe log labels. A malformed/absent file (an unfetched
+    /// LFS pointer is the common case) returns a bounded error; nothing panics.
+    fn load_qwen2_gguf(
+        &self,
+        model_path: &Path,
+        stages: &GgufLoadStages,
+    ) -> Result<LoadedGen, EngineError> {
+        let tok_path = Self::sibling(model_path, "tokenizer.json");
+        let mut file = std::fs::File::open(model_path)
+            .map_err(|e| io_stage_fail(stages.open, &e, EngineError::NotReady))?;
+        let content = gguf_file::Content::read(&mut file)
+            .map_err(|e| fmt_stage_fail(stages.read, e, EngineError::InferenceFailed))?;
+        let model = Qwen2::from_gguf(content, &mut file, &self.device)
+            .map_err(|e| fmt_stage_fail(stages.build, e, EngineError::InferenceFailed))?;
+        let tokenizer = Tokenizer::from_file(&tok_path)
+            .map_err(|e| fmt_stage_fail(stages.tokenizer, e, EngineError::InferenceFailed))?;
+        let eos = tokenizer
+            .token_to_id("<|im_end|>")
+            .or_else(|| tokenizer.token_to_id("<|endoftext|>"));
         Ok(LoadedGen {
             model,
             tokenizer,
@@ -320,7 +447,7 @@ impl CandleEngine {
                         stage = "load_transcription",
                         "no transcription model — no override picked and no bundled default present"
                     );
-                    return Err(EngineError::NotReady);
+                    return Err(EngineError::NoModel);
                 }
             },
             Err(e) => {
@@ -330,7 +457,7 @@ impl CandleEngine {
                     error_kind = e.kind(),
                     "could not resolve the transcription model path"
                 );
-                return Err(EngineError::NotReady);
+                return Err(EngineError::ModelLoadFailed);
             }
         };
         tracing::info!(
@@ -341,7 +468,11 @@ impl CandleEngine {
         let config_path = Self::sibling(&model_path, "config.json");
         let tok_path = Self::sibling(&model_path, "tokenizer.json");
         let config_json = std::fs::read_to_string(&config_path).map_err(|e| {
-            io_stage_fail("load_transcription.read_config", &e, EngineError::NotReady)
+            io_stage_fail(
+                "load_transcription.read_config",
+                &e,
+                EngineError::ModelLoadFailed,
+            )
         })?;
         let config: WhisperConfig = serde_json::from_str(&config_json).map_err(|e| {
             fmt_stage_fail(
@@ -600,9 +731,13 @@ fn build_chatml_tokens(
 /// sequence (rather than each token alone) keeps multi-byte UTF-8 / byte-level
 /// BPE boundaries intact — a partial multi-byte char simply produces no growth
 /// until its final token arrives. No token/prompt is ever logged (DENY-list).
+/// `max_new_tokens` is per-caller rather than the module constant, because the
+/// tag pass ([`TAG_MAX_NEW_TOKENS`]) must not be able to hold the compute lock
+/// for a chat-sized budget.
 fn run_gen_streaming(
     loaded: &mut LoadedGen,
     prompt_tokens: Vec<u32>,
+    max_new_tokens: usize,
     on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
 ) -> Result<String, EngineError> {
     let device = loaded.device.clone();
@@ -623,7 +758,7 @@ fn run_gen_streaming(
 
     let mut pos = 0usize;
     let mut input_tokens: Vec<u32> = prompt_tokens;
-    for _ in 0..MAX_NEW_TOKENS {
+    for _ in 0..max_new_tokens {
         let input = Tensor::new(input_tokens.as_slice(), &device)
             .map_err(|_| EngineError::InferenceFailed)?
             .unsqueeze(0)
@@ -682,7 +817,16 @@ fn run_infer_streaming(
         .encode(templated, true)
         .map_err(|e| fmt_stage_fail("infer_stream.encode", e, EngineError::InferenceFailed))?;
     let tokens: Vec<u32> = encoding.get_ids().to_vec();
-    run_gen_streaming(loaded, tokens, on_token)
+    run_gen_streaming(loaded, tokens, MAX_NEW_TOKENS, on_token)
+}
+
+/// The head window of a caller-supplied tag prompt, bounded by
+/// [`TAG_PROMPT_MAX_CHARS`]. Truncates on a **character** boundary (not a byte
+/// one), so a multi-byte grapheme at the cut cannot produce invalid UTF-8 — note
+/// content is attacker-influenceable and a CJK/emoji-heavy note is the ordinary
+/// case, not the exotic one. Pure, so the bound is testable without a model.
+fn tag_prompt_head(prompt: &str) -> String {
+    prompt.chars().take(TAG_PROMPT_MAX_CHARS).collect()
 }
 
 /// Mean-pool + L2-normalize a BERT last-hidden-state into a sentence embedding.
@@ -843,7 +987,7 @@ impl Engine for CandleEngine {
         // (trusted scaffold as control tokens; untrusted content special-off).
         let tokens = build_chatml_tokens(&mut loaded.tokenizer, system, messages)?;
         let started = Instant::now();
-        let out = run_gen_streaming(loaded, tokens, on_token);
+        let out = run_gen_streaming(loaded, tokens, MAX_NEW_TOKENS, on_token);
         match &out {
             Ok(s) => tracing::info!(
                 target: "myne::ai",
@@ -860,6 +1004,76 @@ impl Engine for CandleEngine {
             ),
         }
         out
+    }
+
+    fn infer_tags(
+        &self,
+        prompt: &str,
+        should_continue: &mut dyn FnMut() -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        // LOWEST-priority, half one (MYND-651 task 4): don't even QUEUE for the
+        // compute lock while user-initiated work is pending. A background pass
+        // blocked on `compute` is one an interactive call then has to wait
+        // behind — the mutex hands it out in whatever order it likes.
+        if should_continue().is_break() {
+            return Ok(String::new());
+        }
+        // Serialize all GPU work (see `compute`), like every other role — that
+        // lock is the Metal crash-safety invariant, not a perf knob.
+        let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
+        // Half two: re-check after the wait. The model load below is the single
+        // longest hold in this whole call (a cold GGUF read), so an interactive
+        // call that arrived while we queued must not pay for it.
+        if should_continue().is_break() {
+            return Ok(String::new());
+        }
+        let mut guard = self.tag.lock().unwrap_or_else(|p| p.into_inner());
+        if guard.is_none() {
+            *guard = Some(self.load_tag()?);
+        }
+        let loaded = guard.as_mut().expect("just loaded");
+        // Token-level ChatML framing with the Special-Token-Injection defense:
+        // the instruction is ours (trusted scaffold), the prompt carries note
+        // content (untrusted, special-token parsing off). Auto-tag reads note
+        // bodies AMBIENTLY — the user never chose to feed this text to a model —
+        // so the injection defense matters more here, not less.
+        let messages = [ChatMessage {
+            role: ChatRole::User,
+            content: tag_prompt_head(prompt),
+        }];
+        let tokens = build_chatml_tokens(&mut loaded.tokenizer, TAG_SYSTEM_INSTRUCTION, &messages)?;
+        let started = Instant::now();
+        // Half three: yield per generated token. The tag budget is short, but
+        // "short" is still a Metal-serialized hold an interactive call sits
+        // behind; breaking here drops `compute` within one token.
+        let out = run_gen_streaming(loaded, tokens, TAG_MAX_NEW_TOKENS, &mut |_t| {
+            should_continue()
+        });
+        match &out {
+            Ok(s) => tracing::info!(
+                target: "myne::ai",
+                op = "infer_tags",
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                out_chars = s.chars().count(),
+                "tag suggestion complete"
+            ),
+            Err(e) => tracing::error!(
+                target: "myne::ai",
+                op = "infer_tags",
+                error_kind = e.kind(),
+                "tag suggestion failed"
+            ),
+        }
+        out
+    }
+
+    fn tag_model_available(&self) -> bool {
+        // The construction-time resolution IS the answer: `bundled_tag` is
+        // `None` exactly when no blob shipped, which is exactly when `load_tag`
+        // refuses. Deliberately does not stat the path again — this is the
+        // settings surface asking a cheap question, and `load_tag` remains the
+        // one authority on whether the file actually opens.
+        self.bundled_tag.is_some()
     }
 
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
@@ -910,6 +1124,10 @@ impl Engine for CandleEngine {
         *self.gen.lock().unwrap_or_else(|p| p.into_inner()) = None;
         *self.embed.lock().unwrap_or_else(|p| p.into_inner()) = None;
         *self.transcription.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        // The tag model is deliberately NOT dropped: it is bundled-only, so no
+        // pick can ever change which bytes it would reload, and dropping it would
+        // pay a full reload for a swap of an unrelated role. If it ever gains a
+        // selectable path, it must join the list above.
     }
 
     fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError> {
@@ -995,26 +1213,186 @@ mod tests {
     }
 
     #[test]
-    fn transcribe_without_a_model_is_not_ready() {
-        // The real deferred-no-longer path (asr-engine task 3): with no Whisper
-        // model side-loaded, both the blocking and streaming entries return
-        // `NotReady` — never a panic, never a fabricated transcript. This is the
-        // production DEFAULT until the user picks a model.
+    fn transcribe_without_a_model_is_no_model() {
+        // With neither an override nor a bundled default, both the blocking and
+        // streaming entries return `NoModel` (MYND-591: the genuine "no model
+        // available" cause, no longer the overloaded `NotReady`) — never a
+        // panic, never a fabricated transcript. `CandleEngine::new` leaves
+        // `bundled_transcription` None, so this exercises the no-model arm.
         let tmp = ScopedTempDir::new("candle-engine-notranscribe").expect("tempdir");
         let engine = CandleEngine::new(tmp.path().to_path_buf());
         let pcm = [0.0f32; 16_000]; // 1 s of silence
-        assert_eq!(engine.transcribe(&pcm), Err(EngineError::NotReady));
+        assert_eq!(engine.transcribe(&pcm), Err(EngineError::NoModel));
 
         let mut called = false;
         let out = engine.transcribe_streaming(&pcm, &mut |_seg| {
             called = true;
             ControlFlow::Continue(())
         });
-        assert_eq!(out, Err(EngineError::NotReady));
+        assert_eq!(out, Err(EngineError::NoModel));
         assert!(
             !called,
             "no segment should be emitted without a loaded model"
         );
+    }
+
+    #[test]
+    fn infer_tags_without_a_bundled_model_is_not_ready() {
+        // The production default on a build that ships no tag weights (an
+        // `--no-default-features` AI-free build, or a checkout whose LFS blob was
+        // not fetched): `NotReady`, never a panic and never a fabricated tag
+        // list. There is no side-load fallback by design.
+        let tmp = ScopedTempDir::new("candle-engine-notag").expect("tempdir");
+        let engine = CandleEngine::new(tmp.path().to_path_buf());
+        assert_eq!(
+            engine.infer_tags("suggest tags", &mut || ControlFlow::Continue(())),
+            Err(EngineError::NotReady)
+        );
+
+        // Explicitly attaching "no bundled model" is the same answer.
+        let engine = CandleEngine::new(tmp.path().to_path_buf()).with_bundled_tag_model(None);
+        assert_eq!(
+            engine.infer_tags("suggest tags", &mut || ControlFlow::Continue(())),
+            Err(EngineError::NotReady)
+        );
+
+        // …and the settings surface is told the same thing, so it can disable
+        // the auto-tag switch instead of offering one that can only ever persist
+        // `true` against a host that refuses every pass.
+        assert!(!engine.tag_model_available());
+    }
+
+    #[test]
+    fn tag_model_available_tracks_the_attached_blob() {
+        // The signal is the construction-time resolution, nothing else: attaching
+        // a path flips it, and it deliberately does not stat the file (an
+        // unreadable blob is `load_tag`'s failure to report, not this probe's —
+        // and a probe that touched the disk would run on every settings open).
+        let tmp = ScopedTempDir::new("candle-engine-tagavail").expect("tempdir");
+        assert!(!CandleEngine::new(tmp.path().to_path_buf()).tag_model_available());
+        assert!(CandleEngine::new(tmp.path().to_path_buf())
+            .with_bundled_tag_model(Some(tmp.path().join("tag.gguf")))
+            .tag_model_available());
+    }
+
+    #[test]
+    fn infer_tags_never_falls_back_to_the_generation_model() {
+        // A generation model IS selected, a tag model is not. The tag path must
+        // still refuse rather than quietly answering with the wrong model — the
+        // whole point of the dedicated role is that tag quality does not depend
+        // on whatever the user side-loaded.
+        let tmp = ScopedTempDir::new("candle-engine-tag-nofallback").expect("tempdir");
+        let dl = tmp.path().join("downloads");
+        std::fs::create_dir_all(&dl).unwrap();
+        let gen_model = dl.join("qwen2.gguf");
+        std::fs::write(&gen_model, b"not a real gguf").unwrap();
+        set_selected_model(tmp.path(), ModelRole::Generation, &gen_model)
+            .expect("record generation model");
+
+        let engine = CandleEngine::new(tmp.path().to_path_buf());
+        assert_eq!(
+            engine.infer_tags("suggest tags", &mut || ControlFlow::Continue(())),
+            Err(EngineError::NotReady)
+        );
+    }
+
+    #[test]
+    fn infer_tags_with_unloadable_bundled_weights_fails_bounded() {
+        // The realistic bad-blob case: `git lfs` was never run, so `model.gguf`
+        // is the ~130-byte pointer TEXT file rather than weights. It IS a file
+        // (so it resolves), and candle then rejects it. The engine must surface a
+        // bounded `EngineError` — no panic, no path in the error value.
+        let tmp = ScopedTempDir::new("candle-engine-tag-lfsptr").expect("tempdir");
+        let dir = tmp.path().join("models").join("tag");
+        std::fs::create_dir_all(&dir).unwrap();
+        let blob = dir.join("model.gguf");
+        std::fs::write(
+            &blob,
+            b"version https://git-lfs.github.com/spec/v1\n\
+              oid sha256:0000000000000000000000000000000000000000000000000000000000000000\n\
+              size 352321536\n",
+        )
+        .unwrap();
+
+        let engine =
+            CandleEngine::new(tmp.path().to_path_buf()).with_bundled_tag_model(Some(blob.clone()));
+        let err = engine
+            .infer_tags("suggest tags", &mut || ControlFlow::Continue(()))
+            .expect_err("an LFS pointer is not a model");
+        assert!(
+            matches!(err, EngineError::InferenceFailed | EngineError::NotReady),
+            "expected a bounded engine error, got {err:?}"
+        );
+
+        // A second call re-attempts the load rather than caching a broken model.
+        assert!(engine
+            .infer_tags("suggest tags", &mut || ControlFlow::Continue(()))
+            .is_err());
+    }
+
+    #[test]
+    fn infer_tags_yields_before_it_ever_queues_for_the_compute_lock() {
+        // The lowest-priority policy's first half (MYND-651 task 4). The blob
+        // here is an LFS pointer, so reaching the load would produce a bounded
+        // ERROR — an `Ok("")` is therefore proof the pass stood down BEFORE the
+        // `compute` lock and before `load_tag`, not merely that it failed.
+        let tmp = ScopedTempDir::new("candle-engine-tag-yield").expect("tempdir");
+        let dir = tmp.path().join("models").join("tag");
+        std::fs::create_dir_all(&dir).unwrap();
+        let blob = dir.join("model.gguf");
+        std::fs::write(&blob, b"version https://git-lfs.github.com/spec/v1\n").unwrap();
+
+        let engine = CandleEngine::new(tmp.path().to_path_buf()).with_bundled_tag_model(Some(blob));
+        let mut probes = 0usize;
+        let out = engine
+            .infer_tags("suggest tags", &mut || {
+                probes += 1;
+                ControlFlow::Break(())
+            })
+            .expect("a yield is not a failure");
+        assert!(out.is_empty(), "yielded pass returns nothing, got {out:?}");
+        assert_eq!(probes, 1, "one probe, then stand down — no load attempted");
+    }
+
+    #[test]
+    fn tag_prompt_head_bounds_the_prompt_on_a_char_boundary() {
+        // Under the cap: unchanged.
+        assert_eq!(tag_prompt_head("short prompt"), "short prompt");
+
+        // Over the cap: exactly TAG_PROMPT_MAX_CHARS *chars* survive. Multi-byte
+        // input is the point — a byte-slice truncation here would panic or emit
+        // invalid UTF-8 on a CJK/emoji-heavy note.
+        let long: String = "汉".repeat(TAG_PROMPT_MAX_CHARS + 500);
+        let head = tag_prompt_head(&long);
+        assert_eq!(head.chars().count(), TAG_PROMPT_MAX_CHARS);
+        assert!(long.starts_with(&head));
+
+        let emoji: String = "🙂".repeat(TAG_PROMPT_MAX_CHARS + 1);
+        assert_eq!(
+            tag_prompt_head(&emoji).chars().count(),
+            TAG_PROMPT_MAX_CHARS
+        );
+    }
+
+    #[test]
+    fn transcribe_with_broken_model_sibling_is_model_load_failed() {
+        // A model path IS resolved (an override), but its required sibling
+        // `config.json` is missing — an incomplete/corrupt install or a bad
+        // user override. That is `ModelLoadFailed` (MYND-591), distinct from
+        // `NoModel` (nothing resolved at all). No real model needed: resolution
+        // succeeds, then the sibling read fails before any GGUF is touched.
+        let base = ScopedTempDir::new("candle-engine-badmodel-base").expect("tempdir");
+        // The override file must live OUTSIDE the vault tree (`base`), so put it
+        // in a separate temp dir with no sibling config.json alongside it.
+        let model_dir = ScopedTempDir::new("candle-engine-badmodel-file").expect("tempdir");
+        let model_path = model_dir.path().join("model.gguf");
+        std::fs::write(&model_path, b"not a real gguf").expect("write dummy model");
+        set_selected_model(base.path(), ModelRole::Transcription, &model_path)
+            .expect("record override");
+
+        let engine = CandleEngine::new(base.path().to_path_buf());
+        let pcm = [0.0f32; 16_000];
+        assert_eq!(engine.transcribe(&pcm), Err(EngineError::ModelLoadFailed));
     }
 
     #[test]
@@ -1392,6 +1770,55 @@ mod tests {
                 "transcript should contain {expect:?}, got: {full}"
             );
         }
+    }
+
+    #[test]
+    #[ignore = "needs the bundled tag GGUF — set MYNE_TEST_TAG_MODEL=<path>.gguf (sibling tokenizer.json)"]
+    fn infer_tags_with_a_real_model_returns_tag_text() {
+        // The with-weights half of the load path (MYND-651 task 3). Env-gated
+        // like the generation/transcription real-model tests, so it never runs in
+        // CI and never needs a model in the repo — but a dev who has run
+        // `git lfs pull` can point it straight at `resources/models/tag/model.gguf`
+        // and see the bundled model produce tags end-to-end.
+        let Ok(model) = std::env::var("MYNE_TEST_TAG_MODEL") else {
+            eprintln!("skip: set MYNE_TEST_TAG_MODEL to the tag GGUF (sibling tokenizer.json)");
+            return;
+        };
+        let tmp = ScopedTempDir::new("candle-real-tag").expect("tempdir");
+        eprintln!("\n=== COMPUTE DEVICE: {:?} ===\n", select_device());
+        let engine = CandleEngine::new(tmp.path().to_path_buf())
+            .with_bundled_tag_model(Some(PathBuf::from(&model)));
+
+        let prompt = "Suggest up to 8 topical tags for the note below, as a lowercase \
+             comma-separated list, no # prefix, no explanation.\n\n\
+             Note:\n\n\
+             Sourdough starter log. Fed 1:1:1 rye and water this morning; it doubled \
+             in four hours at 24C. Next bake is Saturday — planning a 75% hydration \
+             country loaf with an overnight cold retard in the fridge.";
+        let out = engine
+            .infer_tags(prompt, &mut || ControlFlow::Continue(()))
+            .expect("tag suggestion should succeed with a real model");
+        eprintln!("\n=== REAL TAG OUTPUT ===\n{out}\n=======================\n");
+
+        assert!(!out.trim().is_empty(), "expected non-empty tag text");
+        // The prompt asks for a list; a single unsplittable blob means the model
+        // or the framing is wrong, which is exactly what this test is for.
+        let pieces: Vec<&str> = out
+            .split([',', '\n'])
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .collect();
+        assert!(
+            pieces.len() > 1,
+            "expected a multi-item tag list, got: {out:?}"
+        );
+        // The short budget must not be the thing that stopped it mid-word for a
+        // reply this small.
+        assert!(
+            out.chars().count() < 400,
+            "tag reply should be short, got {} chars",
+            out.chars().count()
+        );
     }
 
     // Retrieval-quality eval (conversational-ai-chat tuning): index a real folder

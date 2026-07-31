@@ -24,7 +24,6 @@ vi.mock("react-i18next", () => ({
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
 import {
   appendChatToken,
-  finalizeChatTags,
   finalizeChatTurn,
   sendChatMessage,
   __resetChatForTest,
@@ -168,25 +167,12 @@ describe("AiChatTab", () => {
       expect(screen.queryByTestId("ai.insert-turn")).toBeNull();
     });
 
-    it("renders tag accept-chips on a tag turn and fires onAcceptTag on click", () => {
+    it("renders no tag chips — the chat tab is not a tag surface (MYND-651)", () => {
       const token = sendChatMessage("Suggest tags for this note");
-      finalizeChatTags(token, [
-        { tag: "work", isNew: false },
-        { tag: "rust", isNew: true },
-      ]);
-      const onAcceptTag = vi.fn();
-      render(<AiChatTab onAcceptTag={onAcceptTag} />);
-      const chips = screen.getAllByTestId("ai.tag-chip");
-      expect(chips).toHaveLength(2);
-      fireEvent.click(chips[1]);
-      expect(onAcceptTag).toHaveBeenCalledWith({ tag: "rust", isNew: true });
-    });
-
-    it("an empty tag turn (excluded folder) shows no chips", () => {
-      const token = sendChatMessage("Suggest tags for this note");
-      finalizeChatTags(token, []);
-      render(<AiChatTab onAcceptTag={vi.fn()} />);
+      finalizeChatTurn(token, []);
+      render(<AiChatTab />);
       expect(screen.queryByTestId("ai.tag-chip")).toBeNull();
+      expect(screen.queryByTestId("ai.turn-tags")).toBeNull();
     });
 
     it("shows a placeholder for an empty finalized assistant answer", () => {
