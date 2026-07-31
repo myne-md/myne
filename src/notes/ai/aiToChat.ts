@@ -67,11 +67,17 @@ export async function runTagSuggestToChat(args: {
   const token = sendChatMessage("Suggest tags for this note");
   try {
     const pass = await runTagSuggestionPass({
+      // The chat-tab tag surface is retired by MYND-651 task 8; until it is
+      // deleted it keeps running on the generic `infer` it always used, adapted
+      // to the pass's tag-model seam. It has no note id to give (the chat turn
+      // is state-scoped, not note-scoped) — the dedicated tag model is reached
+      // only through the inline band's trigger.
+      noteId: "",
       noteBody: args.noteBody,
       noteFolder: args.noteFolder,
       existingTags: args.existingTags,
       excludedFolders: args.excludedFolders,
-      infer: args.infer,
+      suggest: ({ prompt }) => args.infer(prompt),
     });
     // `skipped` (excluded folder) → finalize with no chips (empty, not an error).
     finalizeChatTags(token, pass.skipped ? [] : pass.suggestions);
