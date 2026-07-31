@@ -511,6 +511,9 @@ mod tests {
     // tells "wrong platform" from "task 2/3 has not landed".
     #[test]
     fn the_two_absence_errors_are_distinguishable() {
-        assert_ne!(Error::Unsupported.to_string(), Error::Unimplemented.to_string());
+        assert_ne!(
+            Error::Unsupported.to_string(),
+            Error::Unimplemented.to_string()
+        );
     }
 }

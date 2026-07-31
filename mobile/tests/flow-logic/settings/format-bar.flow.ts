@@ -15,6 +15,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
+import { closeSheet } from "../helpers";
 
 const NOTE_ID = "note-format-bar-1";
 const BODY = `---\ntitle: Draft\n---\n\nSome text.\n`;
@@ -25,14 +26,6 @@ async function openFormatBarPanel(page: Page): Promise<void> {
   await page.getByText("Editor", { exact: true }).click();
   await page.getByTestId("settings.format-bar-row").click();
   await expect(page.getByTestId("settings.format-bar-item-bold")).toBeVisible();
-}
-
-/** Dismiss the Settings sheet by tapping the backdrop above the card — the
- *  Sheet's only programmatic exit (it has no close button; the alternatives are a
- *  backdrop tap and a grabber drag). Escape is NOT bound. */
-async function closeSheet(page: Page): Promise<void> {
-  await page.mouse.click(195, 50);
-  await expect(page.getByTestId("sheet.card")).toHaveCount(0);
 }
 
 /** Open the note so the editor + its format bar mount. */

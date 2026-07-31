@@ -1,0 +1,25 @@
+# Permissions for the in-app `themes` Tauri plugin (mobile).
+# Picked up under the `themes:` ACL namespace only because `build.rs` declares
+# this as an `InlinedPlugin`. Capability files reference these as
+# `themes:default` (or `themes:allow-themes-list`).
+#
+# The custom-theme palettes are VAULT CONTENT (the encrypted `vault.themes`
+# `MYT1` blob, protocol.md § 9.21), NOT device-local plaintext. Mobile is a
+# READ-ONLY consumer: this file grants exactly one command, and that is the whole
+# point of the grant. Authoring (`themes_import` / `themes_delete`) and the
+# plaintext-egress read (`themes_export`) stay desktop-only, and `themes_read` is
+# unexposed because the list surface already returns every palette — a second
+# read command would ship with no caller. Adding any of them here (or to
+# `build.rs` / the plugin's `invoke_handler`) widens the mobile attack surface
+# past what the feature asked for.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the themes plugin — list only. Mobile reads custom themes and never authors them."
+permissions = ["allow-themes-list"]
+
+[[permission]]
+identifier = "allow-themes-list"
+description = "Allow invoking themes:themes_list (Slot::Unlocked-gated read of the live custom themes in the vault.themes MYT1 blob — name + palette per entry; falls back to an empty list on absence / AEAD-fail / parse-fail per protocol.md § 9.21.4)."
+commands.allow = ["themes_list"]

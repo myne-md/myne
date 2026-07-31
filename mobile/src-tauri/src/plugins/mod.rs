@@ -3,10 +3,10 @@
 //! Mirror of the desktop `src-tauri/src/plugins/` set, trimmed to the
 //! flows that compile on mobile. Each plugin is a self-contained module
 //! under `plugins/` with its own commands, state, and error type. The
-//! still-desktop-only plugins (clipper pairing, themes, workspace,
-//! importer, pdf-export, spell) are intentionally absent — mobile reuses
-//! the audited `protocol/` crate and the same secret-handling discipline,
-//! landing the rest in later phases.
+//! still-desktop-only plugins (clipper pairing, importer, pdf-export,
+//! spell) are intentionally absent — mobile reuses the audited
+//! `protocol/` crate and the same secret-handling discipline, landing the
+//! rest in later phases.
 //!
 //! `quick_unlock` (PIN path) is registered here — the core moved to
 //! `myne-core`; biometric stays desktop-only. `search` (MYS1) runs
@@ -47,6 +47,10 @@ pub mod snapshots;
 // commands. Deny-by-default `sync:default` capability; see `sync/mod.rs` for the
 // R3 transport review-debt banner.
 pub mod sync;
+// Custom themes (MYT1, §9.21): a thin re-export wrapper over
+// `myne_core::plugins::themes` exposing ONE of desktop's five commands —
+// `themes_list`. See `themes/mod.rs` for why the other four are out.
+pub mod themes;
 pub mod vault_change_password;
 // `vault_creation` core (commands + state + error + `init()`) lives entirely in
 // `myne-core` (shared with the desktop client) — there is no mobile-side

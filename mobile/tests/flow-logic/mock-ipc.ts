@@ -11,6 +11,7 @@
 
 import type { Page } from "@playwright/test";
 import type { SavedView } from "../../src/lib/prefs";
+import type { CustomThemeEntry } from "../../src/lib/themes";
 
 /** The runtime `SyncRuntimeStatus` shape (mirrors `lib/use-sync-status`). */
 export type MockSyncStatus =
@@ -160,6 +161,18 @@ export interface MockConfig {
    *  plaintext (`{"v":1,"pos":[[id,x,y],…]}`), or `null` for a cold vault.
    *  Writes are recorded on `window.__graphLayoutWrites` (payload strings). */
   graphLayoutPayload?: string | null;
+  /** Canned `plugin:themes|themes_list` entries (MYND-598) — each `{ name,
+   *  palette }` exactly as the host's one-decrypt list surface hands them out,
+   *  in `BTreeMap` (UTF-8 byte) order, so a test can seed unsorted names and
+   *  assert the UI collates them. Mobile exposes no other themes command: the
+   *  four authoring/egress ones are neither registered nor ACL-granted, so
+   *  there is nothing else here to mock. */
+  customThemes?: CustomThemeEntry[];
+  /** Reject `plugin:prefs|set_custom_theme`. Both selection paths are
+   *  disk-first, so this is what proves a failed write leaves the SCREEN
+   *  unchanged too — the failure mode being guarded against is a phone showing
+   *  one theme while `vault.prefs` names another. */
+  customThemeWriteFails?: boolean;
   /** Canned `workspace_read` descriptor — the `vault.workspace` (MYW1) opaque
    *  JSON, or `null` for a vault that has never persisted one. The store is
    *  STATEFUL: a `workspace_write` replaces it (and is logged on
@@ -281,6 +294,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       ? [...(config.prefs.editor_toolbar_hidden as string[])]
       : [];
 
+    // STATEFUL custom-theme selection (MYND-598). The Appearance rows write it
+    // and the next `prefs_read` is what marks the applied row, so a non-stateful
+    // mock would let a persistence assertion pass against behaviour the device
+    // would never produce: the seed would keep winning and the write would look
+    // like a no-op on re-read.
+    let customTheme: string | null = (config.prefs?.custom_theme as string | null | undefined) ?? null;
     // STATEFUL item_order MAP (MYND-596). The whole-map setter is written
     // optimistically by the move-up/move-down affordance, so a reopen round-trip
     // is only meaningful if the write survives into the next `prefs_read` —
@@ -348,6 +367,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         device_names: { ...deviceNames },
         editor_toolbar_order: toolbarOrder,
         editor_toolbar_hidden: toolbarHidden,
+        custom_theme: customTheme,
         item_order: itemOrder,
       }),
       // Format-bar layout setters (MYND-555): record the write AND mutate the
@@ -408,6 +428,38 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         const w = window as unknown as { __favoriteWrites?: string[][] };
         (w.__favoriteWrites ??= []).push([...order]);
         favorites = [...order];
+        return null;
+      },
+      // ── Custom themes (vault.themes MYT1, read-only on mobile) ──
+      // The call is COUNTED: the list entries already carry each palette, so a
+      // second list (or a `themes_read`) to fetch one on apply is the mistake
+      // the count exists to catch.
+      "plugin:themes|themes_list": () => {
+        const w = window as unknown as { __themesListCalls?: number };
+        w.__themesListCalls = (w.__themesListCalls ?? 0) + 1;
+        return config.customThemes ?? [];
+      },
+      // Mirror the ACL: the four authoring/egress commands are neither
+      // registered nor granted on mobile, so on a device they REJECT. Mocking
+      // them as rejections rather than leaving them to the unknown-command `[]`
+      // fallback is what makes "the UI never calls one" a real assertion.
+      ...Object.fromEntries(
+        ["themes_read", "themes_import", "themes_export", "themes_delete"].map((cmd) => [
+          `plugin:themes|${cmd}`,
+          () => {
+            throw `not allowed by ACL: ${cmd} is not granted on mobile`;
+          },
+        ]),
+      ),
+      // The custom-theme selection setter — records the write AND mutates the
+      // store, so the applied row survives into the nonce-bumped re-read exactly
+      // as the real setter + `bumpPrefsNonce()` round-trip does.
+      "plugin:prefs|set_custom_theme": (args) => {
+        const name = (args.customTheme ?? null) as string | null;
+        if (config.customThemeWriteFails) throw { kind: "IoError" };
+        const w = window as unknown as { __customThemeWrites?: (string | null)[] };
+        (w.__customThemeWrites ??= []).push(name);
+        customTheme = name;
         return null;
       },
       // Whole-map item_order setter (MYND-596): record the write AND mutate the
