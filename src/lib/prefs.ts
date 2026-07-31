@@ -342,11 +342,16 @@ export interface PrefsView {
    */
   auto_lock_seconds: number | null;
   /**
-   * Active custom-theme name (custom-themes epic, MYND-297) — the file-stem of a
-   * user-authored theme under `app_config_dir/themes/`. A non-`null` value takes
-   * **precedence** over {@link PrefsView.theme}: when set, the client applies the
-   * custom palette and ignores the built-in Light/Dark/System choice. `null` ≡ no
-   * custom theme selected (use `theme`). Serialized from Rust `Option<String>`.
+   * Active custom-theme name (custom-themes epic, MYND-297) — a key of the
+   * encrypted `vault.themes` store (`MYT1`, `protocol.md` §9.21). It named a
+   * plaintext file stem under `app_config_dir/themes/` until `decisions.md`
+   * 2026-07-16 promoted palettes to vault content; the blob holds the palettes,
+   * this field holds the pointer. A non-`null` value takes **precedence** over
+   * {@link PrefsView.theme}: when set, the client applies the custom palette and
+   * ignores the built-in Light/Dark/System choice. `null` ≡ no custom theme
+   * selected (use `theme`), and so is a name with no live entry in the store —
+   * the pointer is deliberately NOT rewritten in that case, since a re-add on
+   * another device revives the theme. Serialized from Rust `Option<String>`.
    */
   custom_theme: string | null;
   /**
