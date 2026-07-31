@@ -121,7 +121,12 @@ const CAPABILITY_BACKING = {
   // sync itself ships on web and most of its surface is dispatched. The pair is
   // singled out because what they do is spawn and stop an OS process and point
   // a raw socket at it, which is the half a page does not have.
-  torRouting: ["plugin:sync|sync_get_tor_routing", "plugin:sync|sync_set_tor_routing"],
+  torRouting: [
+    "plugin:sync|sync_get_tor_routing",
+    "plugin:sync|sync_set_tor_routing",
+    // Task 8: the live posture read behind the connection-state UI.
+    "plugin:sync|sync_get_tor_state",
+  ],
 };
 
 const descriptor = readFileSync(DESCRIPTOR, "utf8");

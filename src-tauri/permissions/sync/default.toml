@@ -42,6 +42,7 @@ permissions = [
     "allow-sync-device-join-qr",
     "allow-sync-get-tor-routing",
     "allow-sync-set-tor-routing",
+    "allow-sync-get-tor-state",
 ]
 
 [[permission]]
@@ -168,3 +169,8 @@ commands.allow = ["sync_get_tor_routing"]
 identifier = "allow-sync-set-tor-routing"
 description = "Allow invoking sync:sync_set_tor_routing (MYND-650 — persist the device-local tor_routing_enabled preference, then move the sync routing gate and the arti sidecar to match: enabling closes the gate BEFORE spawning, disabling terminates the sidecar BEFORE reopening it). Starts/stops the bundled myne-tor externalBin, which is a Tor client with no access to vault bytes; no new network surface is granted to the webview, which can only ask for the two states this toggle already has. No vault access."
 commands.allow = ["sync_set_tor_routing"]
+
+[[permission]]
+identifier = "allow-sync-get-tor-state"
+description = "Allow invoking sync:sync_get_tor_state (MYND-650 — read the live routing posture: Tor mode as the sync routing gate has it, plus the bundled Tor client's phase (starting / ready / failed / stopped)). Reads an in-memory cell, touches no file, starts nothing; the loopback SOCKS port is the only payload and it names a listener on this device. This is what lets the UI say 'sync is paused' instead of implying protection while the tunnel is down. No vault access."
+commands.allow = ["sync_get_tor_state"]

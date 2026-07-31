@@ -62,3 +62,86 @@ export async function getTorRouting(): Promise<TorRoutingView> {
 export async function setTorRouting(enabled: boolean): Promise<TorRoutingView> {
   return await invoke<TorRoutingView>("plugin:sync|sync_set_tor_routing", { enabled });
 }
+
+// ── the live posture (MYND-650 task 8) ──────────────────────────────────────
+
+/**
+ * Mirrors `myne_core::plugins::sync::proxy::TorProxyState` — the bundled Tor
+ * client's phase, as the routing gate has it.
+ *
+ * The Rust `ready` variant also carries a `socksPort`. It is deliberately NOT
+ * declared here: nothing in the UI has any use for a loopback port number, and
+ * a field that is not in the type is a field no component can render into the
+ * DOM by accident.
+ */
+export type TorProxyState =
+  | { kind: "starting" }
+  | { kind: "ready" }
+  | { kind: "failed" }
+  | { kind: "stopped" };
+
+/** Mirrors `plugins::sync::tor::TorStateView`. */
+export interface TorStateView {
+  /** Tor mode as the sync routing gate has it. */
+  enabled: boolean;
+  /** The sidecar's phase. */
+  state: TorProxyState;
+}
+
+/**
+ * What the user is actually getting right now.
+ *
+ * Four values, because the two that matter most are indistinguishable from
+ * either field alone: `stopped` means "nothing is running", which is the
+ * ordinary resting state when Tor mode is off and the fail-closed state when it
+ * is on.
+ *
+ * - `inactive` — Tor mode is off. Sync goes directly to the server, as it
+ *   always has. Not a problem, and must never be dressed as one.
+ * - `connecting` — Tor mode is on, the client is bootstrapping. Sync is
+ *   **paused**; nothing is being sent directly in the meantime.
+ * - `active` — Tor mode is on and the tunnel is up. The one state that may
+ *   read as protected.
+ * - `unavailable` — Tor mode is on and the tunnel is not usable (the client
+ *   failed, timed out, died, or was never started). Sync is **paused**,
+ *   fail-closed. This is the state that must be unmistakable.
+ */
+export type TorPosture = "inactive" | "connecting" | "active" | "unavailable";
+
+/**
+ * Derive the posture from the backend view.
+ *
+ * This is deliberately the same decision `ProxyGate::route()` makes in Rust,
+ * in the same order: `enabled` is checked first, so a stale `ready` left over
+ * from before the user turned Tor off can never render as "active" — exactly
+ * as it can never produce a SOCKS route. Any other mapping would put the UI and
+ * the transport in disagreement about whether traffic is tunneled, and the UI
+ * would be the one lying.
+ */
+export function torPosture(view: TorStateView): TorPosture {
+  if (!view.enabled) return "inactive";
+  switch (view.state.kind) {
+    case "ready":
+      return "active";
+    case "starting":
+      return "connecting";
+    // `failed` and `stopped` are one posture on purpose. They differ in how the
+    // sidecar got there, not in what the user is getting — which is a paused
+    // sync and no direct connection — and a UI that split them would be
+    // reporting our process bookkeeping rather than their situation.
+    case "failed":
+    case "stopped":
+      return "unavailable";
+  }
+}
+
+/**
+ * Read the live posture. Cheap (an in-memory cell on the Rust side), infallible
+ * there, and deliberately separate from {@link getTorRouting}: that one reports
+ * the preference the user set, this one reports what the transport is obeying.
+ * They disagree exactly when it matters — a sidecar that failed to start leaves
+ * the preference on and the tunnel down.
+ */
+export async function getTorState(): Promise<TorStateView> {
+  return await invoke<TorStateView>("plugin:sync|sync_get_tor_state");
+}

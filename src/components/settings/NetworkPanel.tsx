@@ -38,23 +38,42 @@
 // never read. What keeps it honest across locales is the threat-model entry plus
 // review, as with every other translated privacy string.
 //
-// # What this panel is NOT
+// # The switch is not the answer to "am I protected"
 //
-// It is the *preference* control. Whether traffic is actually flowing through a
-// bootstrapped Tor client right now is a different question with a different
-// answer (`TorProxyState`), and task 8 owns that indicator plus the fail-closed
-// banner. The one state this panel does surface is `SidecarStartFailed`, because
-// it is the direct outcome of the click the user just made — and it must never
+// The switch is the *preference*: what the user asked for. Whether traffic is
+// actually flowing through a bootstrapped Tor client is a different question,
+// and the two come apart in the case that matters — a Tor client that failed to
+// start leaves the preference on and the tunnel down. So the panel carries a
+// second row, the **posture** (MYND-650 task 8), read from the routing gate the
+// transport itself obeys rather than from the file on disk.
+//
+// Four postures, and the copy for each is bounded by what is true of the user's
+// data at that moment, not by our process bookkeeping:
+//
+//  - inactive — direct sync, the shipped default. Stated plainly, never as a
+//    warning: turning Tor off is a legitimate choice, not a failure.
+//  - connecting — sync PAUSED. Not "protected yet", not a spinner with no
+//    consequence named.
+//  - active — the one posture that may read as protected.
+//  - unavailable — sync PAUSED, fail-closed. The transport refuses to connect
+//    at all rather than falling back to a direct connection, and this row plus
+//    the editor-chrome banner (`TorStatusBanner`) are the only places the user
+//    can learn that. It must never read as "protected" or as a passing state.
+//
+// The `SidecarStartFailed` notice below is the click-scoped version of the same
+// condition — it says what the button the user just pressed did. It must never
 // read as "the toggle did not take": the preference IS on, and sync is paused
 // rather than routed directly (`src-tauri/src/plugins/sync/tor.rs` module doc).
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useTorState } from "../../hooks/useTorState";
 import {
   getTorRouting,
   setTorRouting,
   torRoutingErrorKind,
+  type TorPosture,
   type TorRoutingErrorKind,
 } from "../../lib/tor-routing";
 import { Switch } from "../primitives/Switch";
@@ -88,6 +107,53 @@ const RESIDUALS_STYLE: CSSProperties = {
   paddingLeft: "var(--space-4)",
 };
 
+const POSTURE_BLOCK_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  marginTop: "var(--space-3)",
+};
+
+const POSTURE_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+};
+
+const POSTURE_HEADING_STYLE: CSSProperties = {
+  ...HELPER_STYLE,
+  margin: 0,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+};
+
+const POSTURE_DOT_STYLE: CSSProperties = {
+  width: "8px",
+  height: "8px",
+  borderRadius: "var(--radius-pill)",
+  flexShrink: 0,
+};
+
+/**
+ * The dot colour per posture.
+ *
+ * `--success` is reserved for `active` — the single posture in which the tunnel
+ * is actually carrying traffic. `unavailable` is `--danger` and `connecting` is
+ * `--accent`; `inactive` is the muted `--fg-3` used everywhere else for "this
+ * feature is off", because direct sync is the default and colouring it as a
+ * fault would be dishonest in the other direction.
+ */
+const POSTURE_DOT: Record<TorPosture, string> = {
+  inactive: "var(--fg-3)",
+  connecting: "var(--accent)",
+  active: "var(--success)",
+  unavailable: "var(--danger)",
+};
+
 /**
  * Which notice is on screen. Kept as a discriminant rather than a resolved i18n
  * key so every `t()` call below stays a literal — `scripts/check-i18n.mjs` only
@@ -109,8 +175,13 @@ export function writeFailureNotice(kind: TorRoutingErrorKind | null): Notice {
 
 export function NetworkPanel() {
   const { t } = useTranslation();
+  const { posture, refresh } = useTorState();
   const [enabled, setEnabled] = useState(false);
   const [residualsOpen, setResidualsOpen] = useState(false);
+  // One-shot acknowledgement of a successful turn-OFF (PRD story 8). The
+  // posture row already says traffic goes direct, but a user who just changed
+  // their protection deserves the change itself named, not only its outcome.
+  const [justDisabled, setJustDisabled] = useState(false);
   // One notice slot: the last thing that went wrong, or nothing. Cleared at the
   // start of every attempt so a stale message never sits under a fresh result.
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -139,10 +210,12 @@ export function NetworkPanel() {
 
   const toggle = async (next: boolean) => {
     setNotice(null);
+    setJustDisabled(false);
     setBusy(true);
     try {
       const view = await setTorRouting(next);
       setEnabled(view.enabled);
+      setJustDisabled(!view.enabled);
     } catch (e) {
       setNotice(writeFailureNotice(torRoutingErrorKind(e)));
       // Re-read rather than guess which way the switch should land: on a spawn
@@ -156,6 +229,11 @@ export function NetworkPanel() {
         });
     } finally {
       setBusy(false);
+      // Ask the gate what actually happened. This runs on the failure path too
+      // — a spawn failure leaves the mode ON with nothing running, and the
+      // posture row is where that becomes visible as "sync is paused" rather
+      // than as a switch sitting in the on position with no consequence shown.
+      refresh();
     }
   };
 
@@ -180,6 +258,44 @@ export function NetworkPanel() {
         <p id="tor-routing-helper" style={HELPER_STYLE}>
           {t("settings.network.torHelper")}
         </p>
+
+        {posture !== null && (
+          // `role="status"`: the posture changes on its own (a bootstrap
+          // completing, a client dying) and a screen-reader user should hear
+          // that their sync just stopped without having to come back and look.
+          <div
+            style={POSTURE_BLOCK_STYLE}
+            role="status"
+            data-testid="settings.tor-posture"
+            data-posture={posture}
+          >
+            <p style={POSTURE_HEADING_STYLE}>{t("settings.network.postureHeading")}</p>
+            <div style={POSTURE_ROW_STYLE}>
+              <span
+                aria-hidden="true"
+                style={{ ...POSTURE_DOT_STYLE, background: POSTURE_DOT[posture] }}
+              />
+              <span data-testid="settings.tor-posture-label">
+                {posture === "inactive" && t("settings.network.postureInactive")}
+                {posture === "connecting" && t("settings.network.postureConnecting")}
+                {posture === "active" && t("settings.network.postureActive")}
+                {posture === "unavailable" && t("settings.network.postureUnavailable")}
+              </span>
+            </div>
+            {posture === "connecting" && (
+              <p style={HELPER_STYLE}>{t("settings.network.postureConnectingDetail")}</p>
+            )}
+            {posture === "unavailable" && (
+              <p style={HELPER_STYLE}>{t("settings.network.postureUnavailableDetail")}</p>
+            )}
+          </div>
+        )}
+
+        {justDisabled && (
+          <p style={HELPER_STYLE} role="status" data-testid="settings.tor-disabled-cue">
+            {t("settings.network.disabledCue")}
+          </p>
+        )}
 
         <button
           type="button"

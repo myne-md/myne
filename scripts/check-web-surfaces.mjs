@@ -316,6 +316,10 @@ const V = {
     "Mounts on web and reaches a seam that REFUSES it (MYND-628). Desktop idle auto-lock hides the OS window with `orderOut:` and nothing on the Rust side shows it again, so a locked boot surface has to ask; a page has no hidden window, because web auto-lock re-renders the locked surface in the same tab. `window.show` is a typed refusal rather than a no-op, and the hook's `catch` is the correct handler — so this is adapted, not excluded: it still runs, it just correctly does nothing.",
   ],
   "src/hooks/useSyncStatus.ts": ["ported", "Sync status; more load-bearing on web, where sync is required."],
+  "src/hooks/useTorState.ts": [
+    "adapted",
+    "The live Tor posture poll (MYND-650 task 8). It ships and it mounts, but it gates on the `torRouting` capability and on web that is absent, so it never invokes and reports `null` — which every consumer renders as nothing at all. Deliberately not a typed refusal in practice: a browser tab cannot tell whether the browser around it is Tor Browser, and polling a command that would answer `stopped` would let the UI claim 'not protected' about a user who is in fact fully routed.",
+  ],
   "src/lib/diagnostics.ts": [
     "ported",
     "The allowlist-built diagnostic block (task 114). Pure — no DOM, no defines — so its allowlist is testable without an environment; the reading half is `collect-diagnostics.ts`.",

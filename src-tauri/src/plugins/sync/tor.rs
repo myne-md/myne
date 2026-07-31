@@ -46,7 +46,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use myne_core::io_failure_kind::IoFailureKind;
-use myne_core::plugins::sync::proxy::ProxyGate;
+use myne_core::plugins::sync::proxy::{ProxyGate, TorProxyState};
 use myne_core::plugins::sync::tor_config::{
     read_tor_routing, routing_enabled_at_startup, tor_config_path_from_host, write_tor_routing,
     TorConfigError, TorRoutingConfig,
@@ -70,8 +70,31 @@ pub struct TorRoutingView {
     pub enabled: bool,
 }
 
-/// Failure surface for the two commands. No `String`, no path
-/// (`src-tauri/CLAUDE.md` DENY list).
+/// What is actually happening right now, as opposed to what was asked for
+/// (MYND-650 task 8).
+///
+/// Two fields because neither one answers the question alone. `enabled` is the
+/// mode the user chose; `state` is the sidecar's phase. Only the pair
+/// distinguishes "the user turned Tor off, nothing is running" (fine, direct
+/// sync) from "Tor is on and the client is not running" (fail-closed, sync
+/// paused) — and those two are `Stopped` on the `state` side either way. The
+/// UI's posture derivation is the same one [`ProxyGate::route`] makes, which is
+/// why it is derived from the same pair rather than from a third field this
+/// command could get wrong on its own.
+///
+/// Read from the **gate**, not from the preference file: the gate is what the
+/// transport obeys, and a startup whose sidecar failed to spawn leaves the
+/// two agreeing on `enabled` but only the gate knowing that nothing is routed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct TorStateView {
+    /// Tor mode as the routing gate has it.
+    pub enabled: bool,
+    /// The sidecar's phase.
+    pub state: TorProxyState,
+}
+
+/// Failure surface for the two write/read-preference commands. No `String`, no
+/// path (`src-tauri/CLAUDE.md` DENY list).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum TorRoutingError {
@@ -238,6 +261,24 @@ pub async fn sync_get_tor_routing<R: Runtime>(
     Ok(TorRoutingView {
         enabled: cfg.enabled,
     })
+}
+
+/// Read the live routing posture: Tor mode plus the sidecar's phase
+/// (MYND-650 task 8).
+///
+/// Infallible and cheap — two `Copy` fields behind an `RwLock` — because the UI
+/// polls it while the Network panel is open and while the fail-closed banner is
+/// on screen. It touches no file: the preference read is
+/// [`sync_get_tor_routing`], and the two answer different questions (what was
+/// asked for vs. what is running). A UI that showed the preference as if it
+/// were the posture would tell a user they are protected while a dead sidecar
+/// has sync paused.
+#[tauri::command]
+pub fn sync_get_tor_state(gate: State<'_, ProxyGate>) -> TorStateView {
+    TorStateView {
+        enabled: gate.is_enabled(),
+        state: gate.state(),
+    }
 }
 
 /// Turn device-local Tor routing on or off.
@@ -587,5 +628,74 @@ mod tests {
             serde_json::to_string(&TorRoutingView { enabled: true }).unwrap(),
             r#"{"enabled":true}"#
         );
+    }
+
+    /// The posture the UI derives from (task 8). The pair is the payload: the
+    /// same `Stopped` phase means "off, syncing directly" or "on, sync paused"
+    /// depending on `enabled`, and the UI must not confuse the two.
+    #[test]
+    fn the_state_view_carries_the_mode_and_the_phase() {
+        let json = |v: TorStateView| serde_json::to_string(&v).expect("serialize");
+        assert_eq!(
+            json(TorStateView {
+                enabled: false,
+                state: TorProxyState::Stopped,
+            }),
+            r#"{"enabled":false,"state":{"kind":"stopped"}}"#
+        );
+        assert_eq!(
+            json(TorStateView {
+                enabled: true,
+                state: TorProxyState::Starting,
+            }),
+            r#"{"enabled":true,"state":{"kind":"starting"}}"#
+        );
+        assert_eq!(
+            json(TorStateView {
+                enabled: true,
+                state: TorProxyState::Ready { socks_port: 9150 },
+            }),
+            r#"{"enabled":true,"state":{"kind":"ready","socksPort":9150}}"#
+        );
+    }
+
+    /// The view reports what the transport obeys, not what is on disk. A
+    /// startup whose sidecar failed leaves the mode on and the phase `Failed`,
+    /// and that pair is exactly the fail-closed banner's input.
+    #[test]
+    fn the_state_view_reads_the_gate_the_transport_obeys() {
+        let gate = ProxyGate::new();
+        let view = |g: &ProxyGate| TorStateView {
+            enabled: g.is_enabled(),
+            state: g.state(),
+        };
+
+        assert_eq!(
+            view(&gate),
+            TorStateView {
+                enabled: false,
+                state: TorProxyState::Stopped
+            },
+            "a default install is off and running nothing"
+        );
+
+        gate.set_enabled(true);
+        assert_eq!(
+            view(&gate),
+            TorStateView {
+                enabled: true,
+                state: TorProxyState::Stopped
+            },
+            "the toggle moves before the sidecar does — and the gate refuses \
+             here, so the UI must read this as paused, never as protected"
+        );
+        assert!(gate.route().is_err());
+
+        gate.set_state(TorProxyState::Failed);
+        assert_eq!(view(&gate).state, TorProxyState::Failed);
+        assert!(gate.route().is_err(), "still fail-closed");
+
+        gate.set_state(TorProxyState::Ready { socks_port: 9150 });
+        assert!(view(&gate).enabled && gate.route().is_ok());
     }
 }

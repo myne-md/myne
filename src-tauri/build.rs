@@ -433,6 +433,9 @@ fn main() {
                 // device-local network posture the endpoint pair configures.
                 "sync_get_tor_routing",
                 "sync_set_tor_routing",
+                // MYND-650 task 8: the live posture read behind the connection
+                // states. Same plugin for the same reason.
+                "sync_get_tor_state",
             ]),
         )
         .plugin(
