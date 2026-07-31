@@ -98,6 +98,10 @@ const V = {
   "src/components/settings/LanguageSelect.tsx": ["ported", "i18n only."],
   "src/components/settings/LineNumbersSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/NewNoteLocationSettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/NetworkPanel.tsx": [
+    "adapted",
+    "Never mounted: the `network` rail entry is filtered out where `torRouting` is absent, so the Tor toggle is unreachable rather than greyed. A page has no subprocess to spawn and no raw socket to tunnel; web users route the whole browser through Tor Browser instead. Ships in the bundle (one small panel), and both of its commands are `Unsupported` in the dispatcher.",
+  ],
   "src/components/settings/panel-styles.ts": ["ported", "Style constants."],
   "src/components/settings/PrivacyPanel.tsx": [
     "adapted",
