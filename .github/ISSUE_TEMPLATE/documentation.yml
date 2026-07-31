@@ -1,7 +1,7 @@
 name: Documentation
 description: A spec, README, glossary entry, or guide is wrong, unclear, or missing.
 title: "[Docs]: "
-labels: [documentation]
+labels: ["type: docs"]
 body:
   - type: markdown
     attributes:
