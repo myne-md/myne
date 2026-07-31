@@ -449,6 +449,63 @@ export const myneTheme = EditorView.theme({
   ".cm-task-query-dropped summary": { cursor: "pointer" },
   ".cm-task-query-dropped ul": { margin: "4px 0 0", paddingLeft: "18px" },
 
+  // Inline tag-suggestion band (MYND-651) — a quiet row above the note body,
+  // never a card. It appears without being asked for, so it reads as marginalia:
+  // muted label, hairline chips, no fill, no accent colour. The solid/dashed
+  // border is the whole visual vocabulary — solid means the tag already exists
+  // in the vault, dashed means accepting it grows the vocabulary.
+  ".cm-tag-suggestion-band": {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "6px",
+    margin: "4px 0 10px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    lineHeight: "1.5",
+  },
+  ".cm-tag-suggestion-label": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "11px",
+    letterSpacing: "0.02em",
+  },
+  ".cm-tag-suggestion-chip": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "2px",
+    padding: "1px 3px 1px 8px",
+    border: "1px solid var(--line-1, #d8d5cc)",
+    borderRadius: "var(--radius-1, 4px)",
+    background: "transparent",
+  },
+  ".cm-tag-suggestion-chip-new": { borderStyle: "dashed" },
+  ".cm-tag-suggestion-accept": {
+    background: "none",
+    border: "none",
+    padding: "0",
+    margin: "0",
+    color: "var(--fg-2, #4a4943)",
+    fontFamily: "inherit",
+    fontSize: "12px",
+    fontWeight: "500",
+    cursor: "pointer",
+  },
+  ".cm-tag-suggestion-dismiss": {
+    background: "none",
+    border: "none",
+    padding: "0 3px",
+    margin: "0",
+    color: "var(--fg-3, #6b6a64)",
+    fontFamily: "inherit",
+    fontSize: "12px",
+    lineHeight: "1",
+    cursor: "pointer",
+  },
+  ".cm-tag-suggestion-accept:focus-visible, .cm-tag-suggestion-dismiss:focus-visible": {
+    outline: "2px solid var(--accent)",
+    outlineOffset: "1px",
+  },
+
   // Spell-check squiggle (MYND-264, SYNC-9) — a wavy red underline driven by
   // the `--danger` design token (no hex), tracking the glyphs via
   // text-decoration-skip-ink. Decoration-only overlay; never mutates the buffer.

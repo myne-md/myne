@@ -61,6 +61,13 @@ pub enum EngineError {
     /// an error value or its `Display`.
     #[error("local-inference transcription failed")]
     TranscriptionFailed,
+    /// A background pass stood down so user-initiated work could have the
+    /// compute lock (auto-tag, MYND-651 task 4). NOT a failure: nothing is
+    /// wrong, the caller may simply try again later. Distinct from an empty
+    /// result so a caller cannot cache "no suggestions" for a note that was
+    /// never actually looked at.
+    #[error("local-inference pass deferred to user-initiated work")]
+    Deferred,
 }
 
 impl EngineError {
@@ -77,6 +84,7 @@ impl EngineError {
             EngineError::InferenceFailed => "inference_failed",
             EngineError::EmbeddingFailed => "embedding_failed",
             EngineError::TranscriptionFailed => "transcription_failed",
+            EngineError::Deferred => "deferred",
         }
     }
 }
