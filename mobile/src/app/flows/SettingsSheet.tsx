@@ -23,6 +23,7 @@ import { vaultExportMarkdown, defaultExportDestination } from "../../lib/export"
 import { shareFile } from "../../lib/share";
 import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
 import { listCustomThemes, type CustomThemeEntry } from "../../lib/themes";
+import { applyCustomTheme, clearCustomTheme } from "../../lib/customTheme";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { useHiddenHomeTiles, setHomeTileHidden } from "../../lib/home-tiles";
@@ -46,6 +47,7 @@ import {
   setVaultLabel,
   setEditorToolbarOrder,
   setEditorToolbarHidden,
+  setCustomTheme,
   type PrefsView,
   setRemindersEnabled,
 } from "../../lib/prefs";
@@ -903,10 +905,62 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   function pickTheme(next: ThemeChoice) {
     setChoice(next);
     applyThemeChoice(next);
+    // A custom theme OVERRIDES the built-in choice, so picking a built-in one
+    // has to revert the palette as well — otherwise this tap would appear to do
+    // nothing, the custom vars still winning on every token they define.
+    clearCustomTheme();
+    setDraft((d) => ({ ...d, custom_theme: null }));
     if (typeof localStorage !== "undefined") localStorage.setItem(THEME_STORAGE_KEY, next);
     // Persist to vault.prefs too (parity with desktop: theme survives backup /
-    // restore and rides sync). localStorage stays the pre-unlock boot cache.
-    if (HAS_TAURI) void persistTheme(next === "system" ? null : (next as "light" | "dark" | "amoled")).catch(() => {});
+    // restore and rides sync). localStorage stays the pre-unlock boot cache —
+    // the custom selection deliberately never joins it (see `pickCustomTheme`).
+    if (HAS_TAURI) {
+      void persistTheme(next === "system" ? null : (next as "light" | "dark" | "amoled")).catch(() => {});
+      // Only when there is a selection to clear: an unconditional write would
+      // touch vault.prefs on every theme tap for no change at all.
+      if (eff.custom_theme != null) {
+        void setCustomTheme(null)
+          .then(() => bumpPrefsNonce())
+          // A failed clear is worth surfacing: the screen is already on the
+          // built-in theme, but disk still names a custom one, so the next
+          // unlock would paint the palette back over it.
+          .catch(() => setToast(t("settings.saveSettingError")));
+      }
+    }
+  }
+
+  /**
+   * Apply a custom theme in one tap — no select-then-confirm step.
+   *
+   * Disk-first, exactly like desktop's `activateCustomTheme`: persist the
+   * selection, THEN paint. A crash between the two leaves the vault consistent
+   * and only the screen stale, never the reverse.
+   *
+   * The palette comes from the row's OWN list entry — `themes_list` already
+   * decrypted every palette to answer the list, so buying one back with a second
+   * read would be a whole extra decrypt for bytes we are holding. (`themes_read`
+   * is not even registered on mobile, so it is not an option to reach for.)
+   *
+   * Neither the palette nor the theme name is written to `localStorage`. That
+   * cache keeps the one job it has — the pre-unlock built-in light/dark boot
+   * choice — because a plaintext copy of a vault-content palette on a locked
+   * device is precisely what `docs/decisions.md` 2026-07-31 rules out.
+   */
+  async function pickCustomTheme(entry: CustomThemeEntry) {
+    if (!HAS_TAURI) {
+      // Browser-dev has no host to persist to; keep the preview interactive.
+      setDraft((d) => ({ ...d, custom_theme: entry.name }));
+      applyCustomTheme(entry.palette);
+      return;
+    }
+    try {
+      await setCustomTheme(entry.name);
+      applyCustomTheme(entry.palette);
+      setDraft((d) => ({ ...d, custom_theme: entry.name }));
+      bumpPrefsNonce();
+    } catch {
+      setToast(t("settings.customThemes.applyError"));
+    }
   }
 
   // Header back button: pop one level up the drawer stack (detail → category →
@@ -1283,6 +1337,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                         data-testid="settings.custom-theme-row"
                         data-theme-name={entry.name}
                         data-selected={on ? "true" : "false"}
+                        // The row IS the apply control — a tap applies the theme,
+                        // matching every other tappable row in this sheet (plain
+                        // div + onClick), so the block still carries no button.
+                        onClick={() => void pickCustomTheme(entry)}
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -1290,6 +1348,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                           minHeight: 44,
                           padding: "8px 10px",
                           borderRadius: 8,
+                          cursor: "pointer",
                           background: on ? "var(--accent-soft)" : "var(--bg-2)",
                           border: on ? "1px solid var(--accent)" : "1px solid var(--line-1)",
                         }}

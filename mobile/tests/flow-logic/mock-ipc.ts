@@ -288,6 +288,13 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       ? [...(config.prefs.editor_toolbar_hidden as string[])]
       : [];
 
+    // STATEFUL custom-theme selection (MYND-598). The Appearance rows write it
+    // and the next `prefs_read` is what marks the applied row, so a non-stateful
+    // mock would let a persistence assertion pass against behaviour the device
+    // would never produce: the seed would keep winning and the write would look
+    // like a no-op on re-read.
+    let customTheme: string | null = (config.prefs?.custom_theme as string | null | undefined) ?? null;
+
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
       // freshDevice → boot to Welcome (no vaults, Empty slot); lockedVault →
@@ -345,6 +352,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         device_names: { ...deviceNames },
         editor_toolbar_order: toolbarOrder,
         editor_toolbar_hidden: toolbarHidden,
+        custom_theme: customTheme,
       }),
       // Format-bar layout setters (MYND-555): record the write AND mutate the
       // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
@@ -407,7 +415,40 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         return null;
       },
       // ── Custom themes (vault.themes MYT1, read-only on mobile) ──
-      "plugin:themes|themes_list": () => config.customThemes ?? [],
+      // The call is COUNTED: the list entries already carry each palette, so a
+      // second list (or a `themes_read`) to fetch one on apply is the mistake
+      // the count exists to catch.
+      "plugin:themes|themes_list": () => {
+        const w = window as unknown as { __themesListCalls?: number };
+        w.__themesListCalls = (w.__themesListCalls ?? 0) + 1;
+        return config.customThemes ?? [];
+      },
+      // Mirror the ACL: the four authoring/egress commands are neither
+      // registered nor granted on mobile, so on a device they REJECT. Mocking
+      // them as rejections rather than leaving them to the unknown-command `[]`
+      // fallback is what makes "the UI never calls one" a real assertion.
+      "plugin:themes|themes_read": () => {
+        throw "not allowed by ACL: themes_read is not granted on mobile";
+      },
+      "plugin:themes|themes_import": () => {
+        throw "not allowed by ACL: themes_import is not granted on mobile";
+      },
+      "plugin:themes|themes_export": () => {
+        throw "not allowed by ACL: themes_export is not granted on mobile";
+      },
+      "plugin:themes|themes_delete": () => {
+        throw "not allowed by ACL: themes_delete is not granted on mobile";
+      },
+      // The custom-theme selection setter — records the write AND mutates the
+      // store, so the applied row survives into the nonce-bumped re-read exactly
+      // as the real setter + `bumpPrefsNonce()` round-trip does.
+      "plugin:prefs|set_custom_theme": (args) => {
+        const name = (args.customTheme ?? null) as string | null;
+        const w = window as unknown as { __customThemeWrites?: (string | null)[] };
+        (w.__customThemeWrites ??= []).push(name);
+        customTheme = name;
+        return null;
+      },
       // ── Workspace-state persistence (vault.workspace MYW1 descriptor) ──
       // MYND-561: mobile's folder-expand set rides this blob. Stateful + write
       // log, mirroring the graph-layout pair above.
