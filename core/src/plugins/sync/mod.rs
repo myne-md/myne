@@ -74,6 +74,12 @@ pub mod integrity;
 // privacy-load-bearing answers, and a second client re-deriving them is how two
 // clients end up disclosing at two different granularities.
 pub mod loop_control;
+// The no-bypass ratchet (MYND-650 task 4): a source-level guard asserting that
+// every outbound socket in this directory is either routed through the proxy
+// gate or written down with the reason it cannot leak a source IP. Test-only —
+// it ships nothing, it just refuses to let a second socket appear unnoticed.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod no_bypass;
 pub mod orchestrator;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod poke_listener;

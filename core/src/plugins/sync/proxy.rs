@@ -19,16 +19,28 @@
 //! the moment they believed they were protected — the one failure this feature
 //! exists to prevent (PRD story 4).
 //!
-//! Task 3 turns [`Route::Socks5`] into an actual SOCKS5 `CONNECT`; task 4 makes
-//! the rustls transport and the SSE poke stream consult this gate. Until then
-//! the gate is written, read by its own tests, and left `Disabled` in
-//! production — a `Disabled` gate routes exactly as the client does today.
+//! Task 3 turned [`Route::Socks5`] into an actual SOCKS5 `CONNECT`; task 4
+//! makes the rustls transport — and with it the SSE poke stream, which shares
+//! its connect path — consult this gate before every socket.
+//!
+//! ## How the transport finds the gate
+//!
+//! The host owns the gate; the transport is built deep inside the sync engine
+//! by [`super::http_transport::build_transport`], through two dozen call sites
+//! that have no business knowing what Tor is. So the host **installs** its gate
+//! once at startup ([`install`]) and the transport reads it back
+//! ([`installed_for`]) — the same shape `http_transport` already uses to let
+//! the Worker install the browser's transport, and for the same reason.
+//!
+//! A client that installs nothing (mobile, the browser, headless tests, the
+//! fixture seeders) reads back a default gate, which routes `Direct` — the
+//! behaviour those clients have today.
 //!
 //! Logging: this module emits nothing. It holds a loopback port number and a
 //! boolean, but the *state transitions* are the host's to log (and the host
 //! logs them as bare state names — see `tor_sidecar`'s module docs).
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 /// The sidecar's lifecycle state, as the host observes it.
 ///
@@ -166,6 +178,58 @@ impl ProxyGate {
     }
 }
 
+// ── the installed gate ──────────────────────────────────────────────────────
+
+/// The host's gate, published for the transport to read. `OnceLock` rather than
+/// a mutable slot because there is exactly one sidecar supervisor per process
+/// and the gate it publishes into is itself mutable — swapping the *cell* would
+/// only ever mean a second supervisor, which is a bug, not a feature.
+static INSTALLED: OnceLock<ProxyGate> = OnceLock::new();
+
+/// Publish the host's gate. Called once, from app setup, before any sync
+/// command can run. A second call is ignored (returns `false`) rather than
+/// racing.
+pub fn install(gate: ProxyGate) -> bool {
+    INSTALLED.set(gate).is_ok()
+}
+
+/// The installed gate, or a default (Tor mode off) one for a client that
+/// installs none.
+pub fn installed() -> ProxyGate {
+    INSTALLED.get().cloned().unwrap_or_default()
+}
+
+/// Is `host` exempt from Tor routing?
+///
+/// **Loopback only, and it is not a bypass**: `127.0.0.1` / `localhost` /
+/// `[::1]` name a service on this device, so a connection to one never leaves
+/// the machine and exposes no source IP to anybody. There is nothing for a
+/// circuit to hide, and arti would refuse to build one to a loopback address
+/// anyway — routing the dev server and the E2E harness through Tor would turn
+/// "Tor mode is on" into "sync is broken" for no privacy gained.
+///
+/// The predicate is deliberately the SAME one the A4 endpoint policy uses to
+/// decide where plaintext `http` is permitted ([`super::http_transport`]'s
+/// `is_loopback`): a literal string match against three names, never a resolved
+/// address. One notion of "loopback", checked in one place, for both rules.
+pub fn host_is_tor_exempt(host: &str) -> bool {
+    super::http_transport::is_loopback(host)
+}
+
+/// The gate a transport for `host` must obey: the installed one, or — for a
+/// loopback host — a fresh default gate that always routes `Direct`.
+///
+/// Returning a *gate* rather than a boolean is what keeps the transport free of
+/// an exemption branch of its own: it consults whatever gate it was handed,
+/// unconditionally, and the policy lives here.
+pub fn installed_for(host: &str) -> ProxyGate {
+    if host_is_tor_exempt(host) {
+        ProxyGate::new()
+    } else {
+        installed()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +287,48 @@ mod tests {
         assert_eq!(
             transport_side.route(),
             Ok(Route::Socks5 { socks_port: 1080 })
+        );
+    }
+
+    /// Loopback is the whole exemption list, and it is exact-match: a hostname
+    /// that merely *contains* a loopback name is a real remote host.
+    #[test]
+    fn only_the_three_loopback_names_are_exempt_from_tor_routing() {
+        for exempt in ["127.0.0.1", "localhost", "::1"] {
+            assert!(host_is_tor_exempt(exempt), "{exempt} names this device");
+        }
+        for routed in [
+            "sync.myne.md",
+            "localhost.evil.example",
+            "127.0.0.1.evil.example",
+            "127.0.0.2",
+            "example.com",
+            "",
+        ] {
+            assert!(
+                !host_is_tor_exempt(routed),
+                "{routed:?} is a remote host and must be routed"
+            );
+        }
+    }
+
+    /// A loopback transport gets a gate that routes `Direct` no matter what the
+    /// installed one says — checked here without touching the process-global,
+    /// because the exemption is a property of the host string alone.
+    #[test]
+    fn a_loopback_host_gets_a_direct_only_gate() {
+        assert_eq!(installed_for("127.0.0.1").route(), Ok(Route::Direct));
+        assert_eq!(installed_for("localhost").route(), Ok(Route::Direct));
+    }
+
+    /// With nothing installed — mobile, the browser, the fixture seeders, every
+    /// test in this crate — the gate is the direct-sync client of today.
+    #[test]
+    fn an_uninstalled_gate_routes_directly() {
+        assert_eq!(ProxyGate::default().route(), Ok(Route::Direct));
+        assert!(
+            !installed_for("sync.myne.md").is_enabled(),
+            "no test in this crate installs a gate, so the read-back is the default"
         );
     }
 
