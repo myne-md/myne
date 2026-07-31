@@ -475,6 +475,36 @@ pub fn run() {
             // to one flush interval; the next unlock reconciles the delta.
             // Managed state above must exist first (the timer reads it).
             plugins::notes::search_sync::spawn_periodic_flush_timer(app.handle().clone());
+            // MYND-650 task 2: the arti sidecar supervisor and the routing gate
+            // it publishes into. Managed as a pair so the transport (tasks 3/4)
+            // reads the gate without knowing the supervisor exists. The
+            // `RunEvent` arm below is the app-quit teardown.
+            //
+            // This block sits BEFORE the sync loop deliberately (task 6): the
+            // gate must be installed, and the device-local toggle restored,
+            // before anything can build a transport. A transport constructed
+            // first would read back a default gate and dial directly on a
+            // device whose user turned Tor on — a fail-open in the one window
+            // nobody would think to look at.
+            let tor_gate = myne_core::plugins::sync::proxy::ProxyGate::new();
+            // MYND-650 task 4: publish the gate to the sync transport. The
+            // transport is built deep in the engine by `build_transport`, at
+            // call sites that have no business knowing what Tor is, so the gate
+            // travels by installation rather than by parameter — and because
+            // this is the same cell the supervisor writes, the toggle re-routes
+            // the next connection without any transport being rebuilt or any
+            // endpoint being re-enrolled.
+            myne_core::plugins::sync::proxy::install(tor_gate.clone());
+            app.manage(tor_gate.clone());
+            let tor_sidecar = std::sync::Arc::new(tor_sidecar::TorSidecar::new(tor_gate.clone()));
+            app.manage(tor_sidecar.clone());
+            // MYND-650 task 6: restore the device-local `tor_routing_enabled`
+            // toggle. A default install has no preference file, so this is a
+            // read that finds nothing and starts nothing — the client stays
+            // byte-for-byte the direct-sync client it is today. A device that
+            // shut down with Tor on comes back up with the gate closed and the
+            // sidecar starting, never with a direct connection.
+            plugins::sync::tor::restore_at_startup(app.handle(), &tor_gate, tor_sidecar);
             // MYND-424 task 9: the background sync loop (polling-default +
             // coalesced-push, decision B). Unlock-gated; no-op until a vault is
             // Unlocked AND a sync endpoint is configured + the device enrolled.
@@ -498,24 +528,6 @@ pub fn run() {
             // stream on unlocked+enrolled and parks on a revoked token.
             app.manage(plugins::sync::poke_listener::SsePokeSignal::default());
             plugins::sync::poke_listener::spawn_poke_supervisor(app.handle().clone());
-            // MYND-650 task 2: the arti sidecar supervisor and the routing gate
-            // it publishes into. Managed as a pair so the transport (tasks 3/4)
-            // reads the gate without knowing the supervisor exists. Nothing is
-            // spawned here — the sidecar starts only when the device-local
-            // `tor_routing_enabled` toggle turns on (task 6), which is what
-            // keeps a default install byte-for-byte the direct-sync client it
-            // is today. The `RunEvent` arm below is the app-quit teardown.
-            let tor_gate = myne_core::plugins::sync::proxy::ProxyGate::new();
-            // MYND-650 task 4: publish the gate to the sync transport. The
-            // transport is built deep in the engine by `build_transport`, at
-            // call sites that have no business knowing what Tor is, so the gate
-            // travels by installation rather than by parameter — and because
-            // this is the same cell the supervisor writes, the toggle re-routes
-            // the next connection without any transport being rebuilt or any
-            // endpoint being re-enrolled.
-            myne_core::plugins::sync::proxy::install(tor_gate.clone());
-            app.manage(tor_gate.clone());
-            app.manage(std::sync::Arc::new(tor_sidecar::TorSidecar::new(tor_gate)));
             // ext-foundation-handoff task 6: the host↔app relay listener. Binds
             // the owner-only (0600) Unix-domain-socket under the app-data dir
             // and serves the keyless clip ingest on a background thread. The

@@ -128,6 +128,12 @@ pub mod state;
 // same code. Only the `Manager`-shaped live-status CELL stayed behind.
 pub mod status;
 pub mod token_store;
+// The device-local `tor_routing_enabled` preference (MYND-650 task 6) — the one
+// writer of `proxy::ProxyGate`'s enabled flag. Shared rather than desktop-only
+// for the same reason `proxy` is: the *rule* (what the file means, and which way
+// a corrupt one fails) belongs beside the transport that honours it, while only
+// the desktop host can act on it by spawning a sidecar.
+pub mod tor_config;
 pub mod transport;
 // Per-NOTE "not yet on the server" (phase3-web-client task 23). A sibling of
 // `status` rather than a field on it: `status` is a property of the device and

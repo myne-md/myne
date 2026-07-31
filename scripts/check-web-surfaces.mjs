@@ -179,6 +179,10 @@ const V = {
     "typed-unsupported",
     "The CLI door's session-state read. Reachable — the module ships and the binding is one `invoke` — and `cli-bridge` is `Unsupported` in the dispatcher, so a call that arrives by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the capability-gated Settings block.",
   ],
+  "src/lib/tor-routing.ts": [
+    "typed-unsupported",
+    "The device-local Tor-routing toggle (MYND-650). Reachable — the module ships and both bindings are one `invoke` — and both commands are `Unsupported` in the dispatcher, so a call arriving by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the `torRouting`-gated Developer Options block. The absence is a platform fact (no subprocess, no raw socket), and the browser's answer is Tor Browser.",
+  ],
   "src/lib/clipper-pairing.ts": [
     "excluded",
     "Pairing IPC; leaves with ConnectedExtensions.",
