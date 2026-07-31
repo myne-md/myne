@@ -22,6 +22,11 @@ pub mod cancel;
 pub mod chunker;
 pub mod commands;
 pub mod compute_priority;
+/// Threaded proof of the compute-lock priority policy (MYND-651 task 11). Its
+/// own module rather than more `#[cfg(test)]` in `commands.rs`, because it needs
+/// two runtimes and a real vault on disk — nothing the unit tests around it do.
+#[cfg(test)]
+mod compute_priority_integration;
 pub mod embeddings_persist;
 pub mod engine;
 pub mod engine_candle;
