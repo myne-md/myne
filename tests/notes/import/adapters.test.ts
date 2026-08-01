@@ -42,7 +42,11 @@ function fakePorts(tree: Record<string, string[]>, files: Record<string, string>
     async readDir(abs) {
       const entries = tree[abs];
       if (entries === undefined) throw new Error(`no dir ${abs}`);
-      return entries.map((n) => ({ name: n.replace(/\/$/, ""), isDir: n.endsWith("/") }));
+      return entries.map((n) => ({
+        name: n.replace(/\/$/, ""),
+        isDir: n.endsWith("/"),
+        link: null,
+      }));
     },
     async readFile(abs) {
       const f = files[abs];

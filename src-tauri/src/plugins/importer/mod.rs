@@ -14,9 +14,10 @@
 
 pub mod commands;
 pub mod error;
+pub mod hold;
 
 use tauri::plugin::{Builder, TauriPlugin};
-use tauri::Runtime;
+use tauri::{Manager, Runtime};
 
 /// Construct the `importer` plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -24,6 +25,14 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::import_read_dir,
             commands::import_read_file,
+            hold::import_set_hold,
         ])
+        .setup(|app, _api| {
+            // The auto-lock lease a running import takes (myne-md/myne#223).
+            // Managed here rather than in `lib.rs` so it stays scoped to the
+            // one plugin allowed to take it.
+            app.manage(hold::ImportHold::default());
+            Ok(())
+        })
         .build()
 }

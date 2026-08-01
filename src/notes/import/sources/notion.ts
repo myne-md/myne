@@ -41,6 +41,7 @@ import {
 } from "../notion/transform";
 import { emptyIgnoreCounts } from "../skipPredicate";
 import {
+  decideLinkedEntry,
   joinPath,
   type ImportDirEntry,
   type ImportItemRef,
@@ -48,6 +49,7 @@ import {
   type ImportPorts,
   type ImportSource,
   type LoadedItem,
+  type UnfollowedLink,
 } from "../source";
 
 type Kind = "md" | "html" | "csv";
@@ -87,6 +89,10 @@ export function createNotionSource(root: string, ports: ImportPorts): ImportSour
       const items: ImportItemRef[] = [];
       const dirs: string[] = [];
       const ignore = emptyIgnoreCounts();
+      const unfollowedLinks: UnfollowedLink[] = [];
+      // The host resolves symlinked directories for every tree walk now, so
+      // every tree walk owes the same cycle guard (myne-md/myne#223).
+      const visitedLinkTargets = new Set<string>();
       const pagePaths: string[] = [];
 
       const walk = async (relDir: string): Promise<void> => {
@@ -100,6 +106,9 @@ export function createNotionSource(root: string, ports: ImportPorts): ImportSour
           const rel = relDir.length === 0 ? entry.name : `${relDir}/${entry.name}`;
           if (entry.name.startsWith(".")) {
             ignore.hiddenIgnored++;
+            continue;
+          }
+          if (decideLinkedEntry(entry, rel, visitedLinkTargets, unfollowedLinks) === "skip") {
             continue;
           }
           if (entry.isDir) {
@@ -122,7 +131,7 @@ export function createNotionSource(root: string, ports: ImportPorts): ImportSour
       await walk("");
 
       resolution = buildResolution(pagePaths);
-      return { items, dirs, ignore };
+      return { items, dirs, ignore, unfollowedLinks };
     },
 
     async load(ref: ImportItemRef): Promise<LoadedItem> {

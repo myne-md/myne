@@ -122,6 +122,43 @@ describe("processImportedMedia — hybrid ingest + residual fallback", () => {
   });
 });
 
+// myne-md/myne#223 defect 3. A `![[…]]` embed pointing at a NOTE is not a media
+// ref: it never enters this pipeline, so it is neither ingested, nor omitted,
+// nor rewritten. The failing shape was that every non-`att:` embed matched, the
+// resolver missed, and the whole span became `<!-- omitted attachment: … -->` —
+// destroying the embed, its graph edge, and reporting it as missing media.
+describe("processImportedMedia — note embeds are not media", () => {
+  const failAll: RefImporter = async () => ({ ok: false });
+
+  it.each([
+    ["a plain note embed", "![[Meeting Notes]]\n"],
+    ["a heading anchor", "![[Meeting Notes#Agenda]]\n"],
+    ["a block anchor", "![[Meeting Notes^abc123]]\n"],
+    ["an explicit .md target", "![[Meeting Notes.md]]\n"],
+    ["a dotted note title", "![[2024.review]]\n"],
+    ["an aliased note embed", "![[Meeting Notes|Last week]]\n"],
+  ])("leaves %s byte-for-byte and counts nothing", async (_label, body) => {
+    const r = await processImportedMedia(body, failAll);
+    expect(r.body).toBe(body);
+    expect(r.body).not.toContain("<!-- omitted attachment");
+    expect(r.counts.omitted).toEqual(emptyByType());
+    expect(r.counts.ingested).toEqual(emptyByType());
+  });
+
+  it("still ingests a media embed sitting next to a note embed", async () => {
+    const body = "![[Meeting Notes]]\n\n![[a.png]]\n";
+    const r = await processImportedMedia(body, ingestExts(new Set(["png"])));
+    expect(r.body).toContain("![[Meeting Notes]]"); // untouched
+    expect(r.body).toContain("att:id-png");
+    expect(r.counts.ingested.image).toBe(1);
+    expect(r.counts.omitted.other).toBe(0);
+  });
+});
+
+function emptyByType() {
+  return { image: 0, pdf: 0, audio: 0, video: 0, other: 0 };
+}
+
 describe("applyTextRewrites", () => {
   it("applies edits back-to-front, preserving non-edited bytes", () => {
     const body = "0123456789";

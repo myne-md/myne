@@ -72,10 +72,13 @@ describe("reconstructing directories from a flat file list", () => {
     const entries = readDirFromIndex(index, "MyVault").sort((x, y) =>
       x.name.localeCompare(y.name),
     );
+    // `link` is always null on this arm: a flat file index has no symlinks to
+    // resolve, which is why the symlinked-subtree defect (myne-md/myne#223) was
+    // desktop-only.
     expect(entries).toEqual([
-      { name: "a.md", isDir: false },
-      { name: "assets", isDir: true },
-      { name: "notes", isDir: true },
+      { name: "a.md", isDir: false, link: null },
+      { name: "assets", isDir: true, link: null },
+      { name: "notes", isDir: true, link: null },
     ]);
   });
 
@@ -83,8 +86,8 @@ describe("reconstructing directories from a flat file list", () => {
     expect(
       readDirFromIndex(index, "MyVault/notes").sort((x, y) => x.name.localeCompare(y.name)),
     ).toEqual([
-      { name: "b.md", isDir: false },
-      { name: "daily", isDir: true },
+      { name: "b.md", isDir: false, link: null },
+      { name: "daily", isDir: true, link: null },
     ]);
   });
 

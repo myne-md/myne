@@ -34,8 +34,10 @@ export type EntryClass =
  * **directory**, only a `hidden-ignored` result is actionable (a dot-dir like
  * `.obsidian/` is skipped + counted); a non-dot directory is recursed into, so
  * its `non-markdown-skipped` classification is irrelevant and never tallied.
- * For a **file**, all four buckets apply. This function is name-only and pure —
- * it does not (and cannot) tell a file from a directory.
+ * For a **file**, every skip bucket applies — route it through
+ * {@link tallyEntry} rather than an inline chain, so a bucket added here cannot
+ * be forgotten there. This function is name-only and pure — it does not (and
+ * cannot) tell a file from a directory.
  */
 export function classifyEntry(name: string): EntryClass {
   if (name.startsWith(".")) return "hidden-ignored"; // rule (i) — wins
@@ -56,11 +58,12 @@ export function classifyEntry(name: string): EntryClass {
 }
 
 /**
- * The three skip-count fields this sub-feature contributes to the frozen SYNC-2
+ * The skip-count fields this sub-feature contributes to the frozen SYNC-2
  * summary DTO (owned/rendered by sub-feature 3): `.canvas` skipped (its own
- * line), non-markdown skipped, and the low-profile hidden/config transparency
- * count. `import-as-note` contributes to none of these (it is imported, counted
- * as "imported" elsewhere).
+ * line), Excalidraw drawings skipped (its own line, MYND-633), non-markdown
+ * skipped, and the low-profile hidden/config transparency count.
+ * `import-as-note` contributes to none of these (it is imported, counted as
+ * "imported" elsewhere).
  */
 export interface IgnoreCounts {
   canvasSkipped: number;
@@ -79,14 +82,47 @@ export function emptyIgnoreCounts(): IgnoreCounts {
   };
 }
 
-/** Roll a list of classifications into the three SYNC-2 count fields. */
+/**
+ * Route ONE classification into its SYNC-2 count field. Mutates `counts`.
+ *
+ * This is the single tally site, and the `switch` is exhaustive over
+ * {@link EntryClass} with a `never` default, so adding a bucket to that union
+ * is a compile error until it is counted somewhere. Every adapter walk calls
+ * this instead of writing its own `if` chain.
+ *
+ * That is not a style preference. MYND-633 added `excalidraw-skipped` to the
+ * union and to this roll-up, but the Obsidian walk carried its own inline
+ * chain ending in a catch-all `else` — so drawings were counted as hidden
+ * config entries and the dedicated summary row could never leave 0, while the
+ * spec's own tests stayed green because the function they exercised was not
+ * the function that ran (myne-md/myne#223).
+ */
+export function tallyEntry(counts: IgnoreCounts, cls: EntryClass): void {
+  switch (cls) {
+    case "import-as-note":
+      return; // imported, not skipped — counted as "imported" elsewhere
+    case "canvas-skipped":
+      counts.canvasSkipped++;
+      return;
+    case "excalidraw-skipped":
+      counts.excalidrawSkipped++;
+      return;
+    case "non-markdown-skipped":
+      counts.nonMarkdownSkipped++;
+      return;
+    case "hidden-ignored":
+      counts.hiddenIgnored++;
+      return;
+    default: {
+      const exhaustive: never = cls;
+      return exhaustive;
+    }
+  }
+}
+
+/** Roll a list of classifications into the SYNC-2 count fields. */
 export function tallyIgnore(classes: readonly EntryClass[]): IgnoreCounts {
   const counts = emptyIgnoreCounts();
-  for (const c of classes) {
-    if (c === "canvas-skipped") counts.canvasSkipped++;
-    else if (c === "excalidraw-skipped") counts.excalidrawSkipped++;
-    else if (c === "non-markdown-skipped") counts.nonMarkdownSkipped++;
-    else if (c === "hidden-ignored") counts.hiddenIgnored++;
-  }
+  for (const c of classes) tallyEntry(counts, c);
   return counts;
 }

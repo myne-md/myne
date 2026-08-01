@@ -44,7 +44,7 @@ import { createEnexSource } from "./sources/enex";
 import { buildImportReport, formatStamp } from "./report";
 import type { ImportSource, ImportSourceId } from "./source";
 import type { RefImporter } from "./media";
-import { joinPath } from "./source";
+import { decideLinkedEntry, joinPath, type UnfollowedLink } from "./source";
 import { attachmentImport } from "../../lib/attachments";
 import {
   importPicked,
@@ -53,10 +53,18 @@ import {
 } from "../../platform/filePicker";
 import type { PickedFile } from "@myne/editor";
 
+/** Rust `EntryLink` wire shape (internally tagged on `status`). */
+type RustEntryLink =
+  | { status: "followable"; target_key: string }
+  | { status: "outside" }
+  | { status: "loop" }
+  | { status: "broken" };
+
 /** Rust `ImportDirEntry` wire shape (snake_case `is_dir`). */
 interface RustDirEntry {
   name: string;
   is_dir: boolean;
+  link: RustEntryLink | null;
 }
 
 /** List a directory's entries via the read-seam, validated within `root`. */
@@ -65,12 +73,31 @@ export async function importReadDir(root: string, path: string): Promise<ImportD
     root,
     path,
   });
-  return entries.map((e) => ({ name: e.name, isDir: e.is_dir }));
+  return entries.map((e) => ({
+    name: e.name,
+    isDir: e.is_dir,
+    link:
+      e.link === null
+        ? null
+        : e.link.status === "followable"
+          ? { status: "followable", targetKey: e.link.target_key }
+          : { status: e.link.status },
+  }));
 }
 
 /** Read a file's UTF-8 source bytes via the read-seam, validated within `root`. */
 export async function importReadFile(root: string, path: string): Promise<string> {
   return await invoke<string>("plugin:importer|import_read_file", { root, path });
+}
+
+/**
+ * Take or drop the host's import lease, which DEFERS the idle auto-lock while
+ * an import runs (myne-md/myne#223). Best-effort: failing to take it means the
+ * import may be interrupted by the lock, which is the behaviour that shipped —
+ * never a reason to fail the import itself.
+ */
+export async function importSetHold(active: boolean): Promise<void> {
+  await invoke<void>("plugin:importer|import_set_hold", { active });
 }
 
 // `joinPath` is imported from the seam, not redefined: the media index below is
@@ -154,6 +181,10 @@ export function indexTree(tree: PickedTree): Map<string, PickedFile> {
  * path prefixes — so this reconstructs them. Names are de-duplicated (many files
  * share one parent) and a directory shadows a file of the same name, which
  * cannot happen in a real tree and would otherwise depend on iteration order.
+ *
+ * `link` is always `null` here: a flat file index has no symlinks to resolve —
+ * the platform already walked the tree and handed back whatever it found behind
+ * one. That is why the symlinked-subtree defect was desktop-only.
  */
 export function readDirFromIndex(
   index: ReadonlyMap<string, PickedFile>,
@@ -170,7 +201,7 @@ export function readDirFromIndex(
     const isDir = cut !== -1;
     if (isDir || !seen.has(name)) seen.set(name, isDir || (seen.get(name) ?? false));
   }
-  return [...seen].map(([name, isDir]) => ({ name, isDir }));
+  return [...seen].map(([name, isDir]) => ({ name, isDir, link: null }));
 }
 
 /**
@@ -266,6 +297,7 @@ export function createImportPorts(root: string): ImportPorts {
       }
       await setDeliberateFolders(mergeDeliberateFolders(existing, folders));
     },
+    setImportHold: (active) => importSetHold(active),
   };
 }
 
@@ -311,12 +343,21 @@ export function mediaCandidatePaths(
  * (the SYNC-10 ignore set), so `.obsidian/` assets never resolve. First match
  * wins for a duplicated basename (documented v0.1 ambiguity). Best-effort: a
  * read failure on a subtree just yields a smaller index.
+ *
+ * This is a SECOND full walk of the tree, structurally separate from the
+ * adapter's `plan()`, so it needs the symlink rules of its own — otherwise a
+ * symlinked folder's images would be unresolvable in notes the plan does now
+ * import (myne-md/myne#223). Refusals are dropped rather than collected: the
+ * plan's walk already names each one, and reporting the same link twice would
+ * double every row.
  */
 export async function buildMediaIndex(
   root: string,
   ports: ImportPorts,
 ): Promise<Map<string, string>> {
   const index = new Map<string, string>();
+  const visitedLinkTargets = new Set<string>();
+  const discardedRefusals: UnfollowedLink[] = [];
   const walk = async (relDir: string): Promise<void> => {
     let entries: ImportDirEntry[];
     try {
@@ -327,6 +368,9 @@ export async function buildMediaIndex(
     for (const e of entries) {
       if (e.name.startsWith(".")) continue;
       const rel = relDir.length === 0 ? e.name : `${relDir}/${e.name}`;
+      if (decideLinkedEntry(e, rel, visitedLinkTargets, discardedRefusals) === "skip") {
+        continue;
+      }
       if (e.isDir) {
         await walk(rel);
       } else {
@@ -365,6 +409,42 @@ export interface RunImportOptions {
   shouldCancel?: () => boolean;
 }
 
+/** Renew the host's auto-lock lease well inside its 60 s ceiling. */
+const IMPORT_HOLD_RENEW_MS = 20_000;
+
+/**
+ * Run `body` with the host's idle auto-lock DEFERRED (myne-md/myne#223).
+ *
+ * The lease lives here rather than in `engine.ts` or the modal because this is
+ * the layer that already knows which host it is talking to: `portsForTree`
+ * picks the arm, and only the desktop arm implements `setImportHold`. The
+ * engine stays host-agnostic and the modal stays a view.
+ *
+ * Every lease call is swallowed: an import that runs to completion with an
+ * un-renewed lease is exactly the behaviour that shipped before, whereas an
+ * import that FAILS because it could not defer a lock would be a new way to
+ * lose an import.
+ */
+async function withImportHold<T>(ports: ImportPorts, body: () => Promise<T>): Promise<T> {
+  const setHold = ports.setImportHold;
+  if (setHold === undefined) return body();
+
+  const renew = () => {
+    void setHold(true).catch(() => {});
+  };
+  renew();
+  const timer = setInterval(renew, IMPORT_HOLD_RENEW_MS);
+  try {
+    return await body();
+  } finally {
+    clearInterval(timer);
+    // Drop it rather than letting it lapse: the user may have walked away
+    // during a long import, and the vault should lock on the next tick rather
+    // than up to a minute later.
+    void setHold(false).catch(() => {});
+  }
+}
+
 /**
  * End-to-end vault import from a picked `root` under the given duplicate
  * `policy`: build the live identity set + the media index, then run the engine
@@ -387,11 +467,13 @@ export async function runVaultImport(
     buildMediaIndex(root, ports),
   ]);
   const importMedia = mediaImporterForTree(tree, mediaIndex);
-  return importVault(root, ports, existingIdentity, policy, {
-    onProgress: options.onProgress,
-    shouldCancel: options.shouldCancel,
-    importMedia,
-  });
+  return withImportHold(ports, () =>
+    importVault(root, ports, existingIdentity, policy, {
+      onProgress: options.onProgress,
+      shouldCancel: options.shouldCancel,
+      importMedia,
+    }),
+  );
 }
 
 /**
@@ -452,11 +534,13 @@ export async function runSourceImport(
                 },
               });
 
-  const result = await importFromSource(adapter, ports, existingIdentity, policy, {
-    onProgress: options.onProgress,
-    shouldCancel: options.shouldCancel,
-    importMedia: treeShaped ? mediaImporterForTree(tree, mediaIndex) : undefined,
-  });
+  const result = await withImportHold(ports, () =>
+    importFromSource(adapter, ports, existingIdentity, policy, {
+      onProgress: options.onProgress,
+      shouldCancel: options.shouldCancel,
+      importMedia: treeShaped ? mediaImporterForTree(tree, mediaIndex) : undefined,
+    }),
+  );
 
   // The report is written LAST, after the ingest loop, so it can name every affected
   // note — and it is created after `existingIdentity` was snapshotted, so it is never

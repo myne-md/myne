@@ -54,6 +54,7 @@ function blobSource(notes: readonly { name: string; body: string; lossy?: string
         items: notes.map((n, i) => ({ relPath: `${n.name}.md`, handle: i })),
         dirs: [],
         ignore: emptyIgnoreCounts(),
+        unfollowedLinks: [],
       };
     },
     async load(ref: ImportItemRef): Promise<LoadedItem> {
@@ -186,6 +187,7 @@ describe("Obsidian source — behaviour-preserving extraction", () => {
         return entries.map((name) => ({
           name: name.replace(/\/$/, ""),
           isDir: name.endsWith("/"),
+          link: null,
         }));
       },
       async readFile(abs) {
@@ -215,6 +217,29 @@ describe("Obsidian source — behaviour-preserving extraction", () => {
       excalidrawSkipped: 0,
       nonMarkdownSkipped: 1,
       hiddenIgnored: 1,
+    });
+  });
+
+  // myne-md/myne#223 defect 4. The walk's inline chain had no `excalidraw-skipped`
+  // arm, so drawings fell into the catch-all and inflated the hidden/config
+  // count while the dedicated summary row stayed structurally 0. Assert BOTH
+  // sides of that trade: the drawings are counted, and they no longer show up
+  // as hidden entries.
+  it("counts Excalidraw drawings in their own bucket, not as hidden entries", async () => {
+    const ports = fakePorts(
+      {
+        "/v": ["a.md", "sketch.excalidraw.md", "raw.excalidraw", ".DS_Store", "d/"],
+        "/v/d": ["nested.excalidraw.md"],
+      },
+      { "/v/a.md": "# A" },
+    );
+    const plan = await createObsidianSource("/v", ports).plan();
+    expect(plan.items.map((i) => i.relPath)).toEqual(["a.md"]);
+    expect(plan.ignore).toEqual({
+      canvasSkipped: 0,
+      excalidrawSkipped: 3,
+      nonMarkdownSkipped: 0,
+      hiddenIgnored: 1, // `.DS_Store` only — the three drawings are NOT here
     });
   });
 

@@ -36,6 +36,7 @@ export function createCsvSource(absPath: string, ports: ImportPorts): ImportSour
         items: [{ relPath: `${csvNoteTitle(absPath)}.md` }],
         dirs: [],
         ignore: emptyIgnoreCounts(),
+        unfollowedLinks: [], // no directory structure — nothing to link to
       };
     },
 

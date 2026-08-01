@@ -11,8 +11,9 @@
 // that DOES apply (the `folder:` / `title:` injections) lives in the shared
 // `mapImportedFile` seam, which the engine applies after `load()` for every source.
 
-import { classifyEntry, emptyIgnoreCounts } from "../skipPredicate";
+import { classifyEntry, emptyIgnoreCounts, tallyEntry } from "../skipPredicate";
 import {
+  decideLinkedEntry,
   joinPath,
   type ImportDirEntry,
   type ImportItemRef,
@@ -20,6 +21,7 @@ import {
   type ImportPorts,
   type ImportSource,
   type LoadedItem,
+  type UnfollowedLink,
 } from "../source";
 
 /**
@@ -32,6 +34,12 @@ import {
  * `.trash/`, `.DS_Store`), non-dot directories are recursed and recorded for
  * SYNC-4 empty-dir detection, `.md` files are queued, `.canvas` and other
  * non-markdown files go to their own skip buckets.
+ *
+ * A **symlinked** directory is walked like any other directory — the host
+ * resolves it and says so (`ImportDirEntry.link`), because `file_type()` alone
+ * reported it as a non-directory and the whole subtree under it disappeared into
+ * the "other files skipped" count (myne-md/myne#223). A link the host refuses —
+ * outside the picked root, a loop, dangling — is reported by name instead.
  */
 export function createObsidianSource(
   root: string,
@@ -44,12 +52,23 @@ export function createObsidianSource(
       const items: ImportItemRef[] = [];
       const dirs: string[] = [];
       const ignore = emptyIgnoreCounts();
+      const unfollowedLinks: UnfollowedLink[] = [];
+      // Cycle guard. The host refuses a link pointing at the listed directory
+      // or an ancestor of it (that needs no state), but it cannot see a cycle
+      // that closes across siblings — `a/x → b`, `b/y → a`. Remembering which
+      // link targets have already been entered terminates that shape too.
+      const visitedLinkTargets = new Set<string>();
 
       const walk = async (relDir: string): Promise<void> => {
         const entries: ImportDirEntry[] = await ports.readDir(joinPath(root, relDir));
         for (const entry of entries) {
           const cls = classifyEntry(entry.name);
           const rel = relDir.length === 0 ? entry.name : `${relDir}/${entry.name}`;
+          // A link the host refused — outside the picked root, a loop, dangling
+          // — is named in the report, never folded into a skip count.
+          if (decideLinkedEntry(entry, rel, visitedLinkTargets, unfollowedLinks) === "skip") {
+            continue;
+          }
           if (entry.isDir) {
             if (cls === "hidden-ignored") {
               ignore.hiddenIgnored++; // dot-dir — skipped
@@ -59,18 +78,17 @@ export function createObsidianSource(
             await walk(rel);
           } else if (cls === "import-as-note") {
             items.push({ relPath: rel });
-          } else if (cls === "canvas-skipped") {
-            ignore.canvasSkipped++;
-          } else if (cls === "non-markdown-skipped") {
-            ignore.nonMarkdownSkipped++;
           } else {
-            ignore.hiddenIgnored++; // dot-prefixed file (incl. the `.foo.md` edge)
+            // Every skip bucket routes through the ONE exhaustive tally site —
+            // an inline chain here is what let `excalidraw-skipped` fall into
+            // the hidden/config count (myne-md/myne#223).
+            tallyEntry(ignore, cls);
           }
         }
       };
       await walk("");
 
-      return { items, dirs, ignore };
+      return { items, dirs, ignore, unfollowedLinks };
     },
 
     async load(ref: ImportItemRef): Promise<LoadedItem> {

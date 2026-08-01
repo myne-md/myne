@@ -38,7 +38,12 @@ import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
 import type { IllegalSegmentFlag, PreexistingFolder } from "./mapping";
-import type { ImportResult } from "./engine";
+import type { ImportFailure, ImportResult } from "./engine";
+import type { UnfollowedLink } from "./source";
+import {
+  importFailureReason,
+  importFailureReasonKey,
+} from "../../lib/import-errors";
 import type { MediaByType } from "./media";
 import { compressionTallyMessage } from "../../editor/attachments/insert";
 import { runSourceImport } from "./ports";
@@ -238,13 +243,21 @@ export function ObsidianImportModal({
         onImported?.(r);
       })
       .catch((err) => {
-        setErrorMsg(err instanceof Error ? err.message : t("notes.import.modal.importFailed"));
+        // NOT `err instanceof Error`. A backend rejection arrives as the
+        // serialized error struct (`{kind:"NotUtf8"}`), never an `Error`, so
+        // that test always fell through to the generic string and the screen
+        // rendered the literal "Import failed." under a header already saying
+        // "Import failed" (myne-md/myne#223). Per-file read failures and a
+        // failed write no longer reach here at all — the engine returns those
+        // with their tallies — so this path is now genuinely unexpected, and
+        // the reason it carries is worth naming.
+        setErrorMsg(t(importFailureReasonKey(importFailureReason(err))));
         setPhase("error");
         // Notes may have been created before the hard failure — refresh the
         // sidebar (null = "errored, just refresh") so they don't stay hidden.
         onImported?.(null);
       });
-  }, [folder, policy, onImported, t]);
+  }, [source, folder, policy, onImported, t]);
 
   if (!open) return null;
 
@@ -349,7 +362,11 @@ export function ObsidianImportModal({
           <SummaryBody result={result} onDone={handleClose} />
         )}
         {phase === "error" && (
-          <ErrorBody message={errorMsg ?? t("notes.import.modal.importFailed")} onClose={handleClose} />
+          <ErrorBody
+            message={errorMsg ?? t("notes.import.modal.importFailed")}
+            progress={progress}
+            onClose={handleClose}
+          />
         )}
       </div>
     </div>
@@ -690,11 +707,50 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
   // (`decisions.md` 2026-07-30). `null` when nothing compressed — a notice that
   // fires when nothing happened is how a user learns to stop reading notices.
   const compressionLine = compressionTallyMessage(result.compression);
-  const needsAttention = result.illegalFlags.length + result.preexistingFolders.length;
+  const needsAttention =
+    result.illegalFlags.length +
+    result.preexistingFolders.length +
+    result.unfollowedLinks.length +
+    result.unreadable.length;
 
   return (
     <>
       <div style={BODY_STYLE}>
+        {/* A write failed and the run stopped. The notes above it landed and
+            are safe, so this is the summary with a banner rather than the
+            error screen — and it names the count, the file and the reason,
+            which is exactly what the error screen could not (#223). */}
+        {result.stopped !== null && (
+          <div
+            data-testid="import.stopped-banner"
+            style={{
+              display: "flex",
+              gap: "var(--space-2)",
+              alignItems: "flex-start",
+              border: "1px solid var(--warning)",
+              background: "var(--warning-soft)",
+              borderRadius: "var(--radius-2)",
+              padding: "var(--space-3)",
+            }}
+          >
+            <Icon name="circle-alert" size={15} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-1)" }}>
+                {t("notes.import.modal.stoppedAt", {
+                  imported: result.imported,
+                  total: result.total,
+                })}
+              </span>
+              <code style={{ ...MONO, fontSize: "var(--text-xs)", color: "var(--fg-2)", wordBreak: "break-all" }}>
+                {result.stopped.relPath}
+              </code>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
+                {t(importFailureReasonKey(result.stopped.reason))}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* hero — imported */}
         <div
           style={{
@@ -759,6 +815,8 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
           <NeedsAttention
             flags={result.illegalFlags}
             preexisting={result.preexistingFolders}
+            unfollowedLinks={result.unfollowedLinks}
+            unreadable={result.unreadable}
           />
         )}
 
@@ -849,12 +907,40 @@ function suggestName(segment: string): string {
     .trim();
 }
 
+/**
+ * Why a link was not followed. Exhaustive over the reason union with a `never`
+ * default, and returns a KEY the caller resolves — a `t()` frozen at module
+ * level would capture the boot language (`src/CLAUDE.md`).
+ */
+function unfollowedLinkDetailKey(reason: UnfollowedLink["reason"]): string {
+  switch (reason) {
+    case "outside":
+      return "notes.import.modal.unfollowedLinkOutside";
+    case "loop":
+      return "notes.import.modal.unfollowedLinkLoop";
+    case "broken":
+      return "notes.import.modal.unfollowedLinkBroken";
+    default: {
+      const exhaustive: never = reason;
+      return exhaustive;
+    }
+  }
+}
+
 function NeedsAttention({
   flags,
   preexisting,
+  unfollowedLinks,
+  unreadable,
 }: {
   flags: readonly IllegalSegmentFlag[];
   preexisting: readonly PreexistingFolder[];
+  /** Links the walk refused (myne-md/myne#223). Named here rather than counted:
+   *  what sits behind one is a subtree of unknown size, and a muted "other files
+   *  skipped 1" reads like a stray `.png`. */
+  unfollowedLinks: readonly UnfollowedLink[];
+  /** Files that could not be read. The import continued past each one. */
+  unreadable: readonly ImportFailure[];
 }) {
   const { t } = useTranslation();
   const [resolved, setResolved] = useState<Set<string>>(new Set());
@@ -882,12 +968,42 @@ function NeedsAttention({
             padding: "1px 8px",
           }}
         >
-          {flags.length + preexisting.length}
+          {flags.length + preexisting.length + unfollowedLinks.length + unreadable.length}
         </span>
       </div>
       <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
         {t("notes.import.modal.needsAttentionHelp")}
       </p>
+
+      {unfollowedLinks.map((link, i) => {
+        const key = `link-${i}`;
+        return (
+          <AttentionRow
+            key={key}
+            path={link.relPath}
+            detail={t(unfollowedLinkDetailKey(link.reason))}
+            suggestion={null}
+            resolved={resolved.has(key)}
+            onResolve={() => markResolved(key)}
+          />
+        );
+      })}
+
+      {unreadable.map((failure, i) => {
+        const key = `unreadable-${i}`;
+        return (
+          <AttentionRow
+            key={key}
+            path={failure.relPath}
+            detail={t("notes.import.modal.unreadableDetail", {
+              reason: t(importFailureReasonKey(failure.reason)),
+            })}
+            suggestion={null}
+            resolved={resolved.has(key)}
+            onResolve={() => markResolved(key)}
+          />
+        );
+      })}
 
       {flags.map((flag, i) => {
         const key = `flag-${i}`;
@@ -936,12 +1052,15 @@ function AttentionRow({
 }: {
   path: string;
   detail: string;
-  suggestion: string;
+  /** A starting-point value to copy, or `null` when the row has nothing to
+   *  offer — a link Myne could not follow is fixed in the filesystem, not by
+   *  renaming something, and an empty input invites a fix that does nothing. */
+  suggestion: string | null;
   resolved: boolean;
   onResolve: () => void;
 }) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState(suggestion);
+  const [draft, setDraft] = useState(suggestion ?? "");
   const [copied, setCopied] = useState(false);
 
   const copy = useCallback(() => {
@@ -988,6 +1107,12 @@ function AttentionRow({
         >
           <Icon name="check" size={13} /> {t("notes.import.modal.markedDone")}
         </span>
+      ) : suggestion === null ? (
+        <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
+          <Button variant="ghost" onClick={onResolve}>
+            {t("notes.import.modal.markDone")}
+          </Button>
+        </div>
       ) : (
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
           <input
@@ -1023,7 +1148,19 @@ function AttentionRow({
 
 // ---- error -------------------------------------------------------------------
 
-function ErrorBody({ message, onClose }: { message: string; onClose: () => void }) {
+function ErrorBody({
+  message,
+  progress,
+  onClose,
+}: {
+  message: string;
+  /** How far the run had got. The counter lives in `RunningBody`, which
+   *  unmounts on the phase flip — so it was computed, kept in state, and then
+   *  never shown on the one screen where it answers the user's first question
+   *  ("did any of it land?"). */
+  progress: { done: number; total: number };
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <>
@@ -1034,6 +1171,17 @@ function ErrorBody({ message, onClose }: { message: string; onClose: () => void 
             {t("notes.import.modal.errorBody")}
           </p>
         </div>
+        {progress.total > 0 && (
+          <p
+            data-testid="import.error-progress"
+            style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-2)" }}
+          >
+            {t("notes.import.modal.stoppedAt", {
+              imported: progress.done,
+              total: progress.total,
+            })}
+          </p>
+        )}
         <code
           style={{
             ...MONO,

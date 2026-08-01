@@ -265,6 +265,17 @@ async fn idle_lock_tick<R: Runtime>(app: &AppHandle<R>) {
 /// the cached timeout. Full leg-1 + leg-2 teardown (open notes may be on
 /// screen). Fail-closed + grace-flush + TOCTOU re-read.
 async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeState) {
+    // A running import DEFERS the lock (myne-md/myne#223). Deliberately a
+    // separate lease rather than a `report_activity` call: the idle clock keeps
+    // running underneath, so this postpones the decision instead of resetting
+    // it, and the very next tick after the lease lapses locks a vault whose
+    // user really did walk away. See `plugins::importer::hold`.
+    if let Some(hold) = app.try_state::<crate::plugins::importer::hold::ImportHold>() {
+        if hold.is_held() {
+            return;
+        }
+    }
+
     let timeout = Duration::from_secs(u64::from(state.auto_lock_timeout_secs()));
     // The monotonic clock comes from the host seam now (MYND-574 task 12):
     // `VaultRuntimeState` no longer owns an `Instant` baseline, because

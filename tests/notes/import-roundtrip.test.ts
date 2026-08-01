@@ -53,7 +53,11 @@ function harness(tree: Tree, root = "/v"): Harness {
       const node = resolve(tree, root, p);
       if (typeof node === "string") throw new Error("not a dir");
       return Object.entries(node).map(
-        ([name, child]): ImportDirEntry => ({ name, isDir: typeof child !== "string" }),
+        ([name, child]): ImportDirEntry => ({
+          name,
+          isDir: typeof child !== "string",
+          link: null,
+        }),
       );
     },
     async readFile(p) {

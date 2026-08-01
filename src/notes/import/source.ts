@@ -34,10 +34,65 @@
 import type { CompressionTally } from "../../editor/attachments/insert";
 import type { IgnoreCounts } from "./skipPredicate";
 
+/**
+ * What a walk may do with a symbolic link — mirrors the Rust `EntryLink`.
+ * Only the host can resolve a link, so the decision is made there.
+ *
+ * `targetKey` is an **opaque** identity for the resolved target (never a path —
+ * a filesystem path may not cross the IPC boundary). A walk keeps a visited set
+ * of these so a cycle the host cannot see from one directory listing —
+ * `a/x → b`, `b/y → a` — terminates instead of recursing forever.
+ */
+export type EntryLink =
+  | { status: "followable"; targetKey: string }
+  | { status: "outside" }
+  | { status: "loop" }
+  | { status: "broken" };
+
 /** One external directory entry — mirrors the Rust `ImportDirEntry`. */
 export interface ImportDirEntry {
   name: string;
   isDir: boolean;
+  /** `null` for an ordinary file or directory; set when the entry is a link. */
+  link: EntryLink | null;
+}
+
+/** A link the walk did not follow, named in the post-import report. */
+export interface UnfollowedLink {
+  /** Source-relative path of the link itself, for the needs-attention row. */
+  relPath: string;
+  reason: "outside" | "loop" | "broken";
+}
+
+/**
+ * Decide what a tree walk does with one entry's link, recording the refusal and
+ * maintaining the cycle guard. ONE definition, shared by every tree-shaped
+ * adapter and by the media-index walk, because the host now resolves symlinked
+ * directories for all of them: a walk that followed links without this would
+ * recurse forever on a cross-linked vault.
+ *
+ * A symlinked FILE is always visited — reading one is re-validated within-root
+ * by the read seam, and it cannot recurse.
+ */
+export function decideLinkedEntry(
+  entry: ImportDirEntry,
+  rel: string,
+  visitedLinkTargets: Set<string>,
+  unfollowedLinks: UnfollowedLink[],
+): "visit" | "skip" {
+  const link = entry.link;
+  if (link === null) return "visit";
+  if (link.status !== "followable") {
+    unfollowedLinks.push({ relPath: rel, reason: link.status });
+    return "skip";
+  }
+  if (!entry.isDir) return "visit";
+  if (visitedLinkTargets.has(link.targetKey)) {
+    unfollowedLinks.push({ relPath: rel, reason: "loop" });
+    return "skip";
+  }
+  visitedLinkTargets.add(link.targetKey);
+  return "visit";
 }
 
 /**
@@ -78,8 +133,16 @@ export interface ImportPlan {
   /** Every directory seen, for SYNC-4 empty-dir detection. Empty for sources
    *  with no directory structure. */
   dirs: string[];
-  /** SYNC-10 skip tallies (canvas / non-markdown / hidden). */
+  /** SYNC-10 skip tallies (canvas / excalidraw / non-markdown / hidden). */
   ignore: IgnoreCounts;
+  /**
+   * Symbolic links the walk did not follow — one row each in the post-import
+   * "needs attention" list. A refused link is reported BY NAME rather than
+   * counted, because what sits behind it is a subtree of unknown size and a
+   * muted "other files skipped 1" reads like a stray `.png` (myne-md/myne#223).
+   * Empty for a source with no directory structure.
+   */
+  unfollowedLinks: UnfollowedLink[];
 }
 
 /** One item's content, plus what the source could not represent. */
@@ -144,6 +207,13 @@ export interface ImportPorts extends ImportSink {
   readDir(absPath: string): Promise<ImportDirEntry[]>;
   /** Read a file's UTF-8 source bytes. */
   readFile(absPath: string): Promise<string>;
+  /**
+   * Take or drop a short lease that DEFERS the host's idle auto-lock while an
+   * import runs (myne-md/myne#223). Optional because it is a property of the
+   * HOST, not of the import: only the desktop client has an OS-idle timer the
+   * import is invisible to. Omitted, the import simply does not defer anything.
+   */
+  setImportHold?(active: boolean): Promise<void>;
 }
 
 /** One note that imported successfully but lost representable detail on the way. */

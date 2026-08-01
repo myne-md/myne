@@ -72,8 +72,8 @@ function fakePorts(tree: Record<string, ImportDirEntry[]>): ImportPorts {
   };
 }
 
-const file = (name: string): ImportDirEntry => ({ name, isDir: false });
-const dir = (name: string): ImportDirEntry => ({ name, isDir: true });
+const file = (name: string): ImportDirEntry => ({ name, isDir: false, link: null });
+const dir = (name: string): ImportDirEntry => ({ name, isDir: true, link: null });
 
 describe("buildMediaIndex", () => {
   it("recurses into subdirs and indexes files by lowercased basename", async () => {

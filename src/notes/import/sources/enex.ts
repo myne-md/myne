@@ -162,7 +162,7 @@ export function createEnexSource(
         return { relPath: `${title}.md`, handle: index };
       });
 
-      return { items, dirs: [], ignore: emptyIgnoreCounts() };
+      return { items, dirs: [], ignore: emptyIgnoreCounts(), unfollowedLinks: [] };
     },
 
     async load(ref: ImportItemRef): Promise<LoadedItem> {
