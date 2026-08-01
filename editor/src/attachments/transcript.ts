@@ -140,6 +140,12 @@ export function createTranscriptSection(opts: {
       const open = toggle.getAttribute("aria-expanded") !== "false";
       toggle.setAttribute("aria-expanded", open ? "false" : "true");
       bodyWrap.hidden = open;
+      // The inline half of the pair, for the reason `base.css` documents: this
+      // element's class carries `display: block` (theme.ts), which outranked the
+      // attribute and left `aria-expanded="false"` describing a body that was
+      // still on screen — a collapse that lied to assistive technology as well
+      // as to the eye. Clearing the value restores the stylesheet's `block`.
+      bodyWrap.style.display = open ? "none" : "";
     });
 
     container.appendChild(wrap);

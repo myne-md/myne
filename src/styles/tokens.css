@@ -664,6 +664,18 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* `hidden` means hidden — unconditionally, and that needs saying.
+   The attribute works through the UA stylesheet's `[hidden] { display: none }`,
+   and any author-origin `display` beats a UA-origin one, so an element whose
+   class sets `display` ignores the attribute with nothing to show for it. The
+   `!important` is deliberate: `hidden` asserts the element does not exist for
+   the user, which is not a preference a component may outvote.
+   `@myne/editor` carries the same rule in `base.css` (it ships to three clients,
+   each with its own copy of this file); this one covers the app shell outside
+   the editor. Caveat: `hidden="until-found"` would need `display: revert` and is
+   unused today. */
+[hidden] { display: none !important; }
+
 /* App-wide native text selection — the same theme-tuned translucent accent the
    editor uses, so selecting anywhere (sidebar, panels, and the editor when it is
    unfocused and falls back to native selection) stays readable on every theme. */

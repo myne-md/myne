@@ -18,6 +18,12 @@
 // T5 slash/toolbar/keymap, T6 theme) land in subsequent tasks and append
 // to this list.
 
+// The package's only unconditional stylesheet — one `[hidden]` reset that the
+// platform default cannot enforce on its own. Loaded here because this module is
+// what every mounted editor pulls in; the package's other sheets arrive lazily.
+// See the file's own header for why the rule exists.
+import "./base.css";
+
 import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
 import {
   defaultKeymap,

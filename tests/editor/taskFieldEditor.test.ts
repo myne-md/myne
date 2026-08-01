@@ -247,6 +247,63 @@ describe("the repeat control assembles canonical rules from choices", () => {
     const out = commitValue("every 3 days when done", () => {});
     expect(out).toBe("every 3 days when done");
   });
+
+  // Selecting a family must leave ONLY that family's controls on screen
+  // (myne-md/myne#196). This shipped broken: `syncRows()` set `hidden` and
+  // nothing happened, because `.cm-recurrence-row { display: flex }` is
+  // author-origin and outranks the UA stylesheet's `[hidden] { display: none }`.
+  // All four families' controls rendered at once, so "every 1 days" showed
+  // weekday pills and a `first`/`monday` pair underneath it.
+  //
+  // The assertion has to be on the inline `display`, not on `hidden`: this lane
+  // applies no CSS (`vitest.config.ts` sets no `css` option), so `hidden` reads
+  // `true` whether or not the row is actually off screen — which is precisely
+  // why the original defect was invisible here. The real-CSS guard is the
+  // scenario in `e2e/task-chips.e2e.ts`.
+  const FAMILY_ROW_MARKER: ReadonlyArray<readonly [string, string]> = [
+    ["interval", "editor.recurrence-count"],
+    ["weekdays", "editor.recurrence-weekdays"],
+    ["dayOfMonth", "editor.recurrence-dayofmonth"],
+    ["ordinal", "editor.recurrence-ordinal"],
+  ];
+
+  /** The family row owning `testId` — the marker element itself, or its row. */
+  function rowFor(root: HTMLElement, testId: string): HTMLElement {
+    const el = root.querySelector(`[data-testid="${testId}"]`) as HTMLElement;
+    return el.classList.contains("cm-recurrence-row")
+      ? el
+      : (el.closest(".cm-recurrence-row") as HTMLElement);
+  }
+
+  for (const [family, marker] of FAMILY_ROW_MARKER) {
+    it(`shows the ${family} row and hides the other three`, () => {
+      const anchor = anchorEl();
+      const handle = openTaskFieldEditor({
+        anchor,
+        kind: "repeat",
+        value: "every day",
+        onCommit: () => {},
+      });
+      const root = surface()!;
+      setSelect(root, "editor.task-field-input", family);
+
+      const rows = [...root.querySelectorAll(".cm-recurrence-row")] as HTMLElement[];
+      expect(rows).toHaveLength(FAMILY_ROW_MARKER.length);
+
+      const active = rowFor(root, marker);
+      expect(active.style.display).not.toBe("none");
+      expect(active.hidden).toBe(false);
+
+      for (const row of rows) {
+        if (row === active) continue;
+        expect(row.style.display).toBe("none");
+        expect(row.hidden).toBe(true);
+      }
+
+      handle.close();
+      anchor.remove();
+    });
+  }
 });
 
 describe("Escape dismisses without changing anything", () => {
