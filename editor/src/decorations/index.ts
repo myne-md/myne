@@ -25,6 +25,7 @@ import { escapeDecorations } from "./escape";
 import { hardBreakDecorations } from "./hard-break";
 import { listDecorations } from "./list";
 import { taskListDecorations } from "./task-list";
+import { taskAddAffordanceDecorations } from "./task-add-affordance";
 import { blockquoteDecorations } from "./blockquote";
 import { calloutDecorations } from "./callout";
 import { horizontalRuleDecorations } from "./horizontal-rule";
@@ -96,6 +97,11 @@ export function myneDecorations(): readonly Extension[] {
     // ordering dependency on the inline layers below: their spans come from
     // `TaskField` nodes, which no other decoration claims.
     ...taskChipDecorations(),
+    // The `+` "add task field" affordance at the end of a task line, cursor-
+    // gated. Sits with the task layers it belongs to; a point widget with no
+    // atomic-range or ordering dependency (its span is `line.to`, which no other
+    // decoration claims). Ships WITH the menu + slash entry points it drives.
+    taskAddAffordanceDecorations(),
     // Task-query blocks (MYND-617) sit next to the chips: same feature
     // family, and the fenced-code card skips this info string for them.
     ...taskQueryBlockDecorations(),

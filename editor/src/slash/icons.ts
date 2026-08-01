@@ -13,6 +13,8 @@ export type SlashIconName =
   | "alarm-clock" // Now (date + time)
   | "table" // Table
   | "check-square" // To-do list
+  | "repeat" // Repeat (task recurrence)
+  | "flag" // Priority
   | "paperclip" // Attach file
   | "mic" // Voice note
   | "link-2"; // Wiki link (a chain/connection)
@@ -86,6 +88,20 @@ export function makeSlashIcon(name: SlashIconName): SVGSVGElement {
       svg.append(
         el("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }),
         el("polyline", { points: "8 12 11 15 16 9" }),
+      );
+      break;
+    case "repeat":
+      svg.append(
+        el("path", { d: "m17 2 4 4-4 4" }),
+        el("path", { d: "M3 11v-1a4 4 0 0 1 4-4h14" }),
+        el("path", { d: "m7 22-4-4 4-4" }),
+        el("path", { d: "M21 13v1a4 4 0 0 1-4 4H3" }),
+      );
+      break;
+    case "flag":
+      svg.append(
+        el("path", { d: "M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" }),
+        el("line", { x1: "4", y1: "22", x2: "4", y2: "15" }),
       );
       break;
     case "paperclip":

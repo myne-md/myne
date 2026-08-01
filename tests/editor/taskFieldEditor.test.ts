@@ -320,4 +320,20 @@ describe("lifecycle", () => {
     handle.close();
     anchor.remove();
   });
+
+  it("anchors to a bare rect, not only an element — the slash caret path", () => {
+    // `/due` has no element to point at, only a `coordsAtPos` rectangle. The
+    // editor must position off that just as it does off a chip.
+    const handle = openTaskFieldEditor({
+      anchor: { left: 120, top: 200, right: 120, bottom: 216 },
+      kind: "due",
+      value: "2026-08-01",
+      onCommit: () => {},
+    });
+    expect(surface()).not.toBeNull();
+    expect(surface()!.style.position).toBe("fixed");
+    expect(surface()!.style.left).not.toBe("");
+    expect(surface()!.style.top).not.toBe("");
+    handle.close();
+  });
 });

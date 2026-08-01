@@ -134,3 +134,52 @@ describeE2E("tc2 chip editor dismissal leaves the value alone (MYND-614)", () =>
     );
   });
 });
+
+describeE2E("tc3 the + affordance adds a task field end to end", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("opens the add menu on a fieldless task line and lands a new field in the file", async () => {
+    let password = "";
+    await scenario(
+      "tc3-task-add-field",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Add Field Note");
+
+        // A task line carrying NO fields yet. The caret stays on it after typing,
+        // so the cursor-gated `+` affordance renders — the entry point that lets
+        // a field be added without typing `[repeat:: …]` by hand.
+        await typeIntoEditor(s, "- [ ] pay the rent", { landedText: "pay the rent" });
+        await waitForSaved(s);
+
+        // 1. The `+` affordance renders on the caret's task line.
+        await s.waitForElement(testIdSelector("editor.task-add-field"));
+
+        // 2. Activating it opens the three-way add menu.
+        await (await s.byTestId("editor.task-add-field")).click();
+        await s.waitForElement(testIdSelector("editor.task-field-menu"));
+
+        // 3. Pick "Repeat". Its editor is a CONTROL (the recurrence builder), so
+        //    it drives honestly through a number input — the same reason tc1
+        //    exercises the write path through `repeat` rather than the native
+        //    date widget. On a fieldless line this opens at the default (weekly),
+        //    so bumping the interval count to 3 and committing must APPEND a
+        //    canonical `[repeat:: every 3 weeks]` — the add path (no prior field)
+        //    writing through the very seam a chip edit uses, end to end.
+        await (await s.byTestId("editor.task-field-menu-repeat")).click();
+        await s.waitForElement(testIdSelector("editor.task-field-editor"));
+        const count = await s.byTestId("editor.recurrence-count");
+        await count.replaceText("3");
+        await (await s.byTestId("editor.task-field-commit")).click();
+        await waitForSaved(s);
+
+        await s.waitUntil(
+          async () => ((await editorText(s)).includes("[repeat:: every 3 weeks]") ? true : null),
+          { label: "added repeat rule reached the document" },
+        );
+      },
+    );
+  });
+});

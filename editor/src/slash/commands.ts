@@ -18,6 +18,10 @@ import {
 } from "@myne/editor/host/notes/localDateTime";
 import i18n from "@myne/editor/i18n";
 import { openTaskQueryBuilder } from "../task-query-builder";
+import { openTaskFieldAdd } from "../task-field-menu";
+import type { TaskFieldKind } from "../task-field-editor";
+import type { Rect } from "../positioning";
+import { isTaskLine } from "@myne/dialect/taskFieldWriter";
 import type { SlashIconName } from "./icons";
 
 export type SlashCommand = {
@@ -101,6 +105,58 @@ function insertTable(view: EditorView, triggerFrom: number, triggerTo: number): 
     selection: { anchor: tableFrom + 2 }, // first header cell content (fallback caret)
     userEvent: "slash.apply",
   });
+}
+
+/**
+ * `/due` `/repeat` `/priority`: open the task-field editor directly for one
+ * kind, adding it to the caret's task line. The kind is known, so these skip the
+ * `+` affordance's three-way menu.
+ *
+ * Reuses the one add-opener (`openTaskFieldAdd`) the menu uses, which routes
+ * through the tracked begin/apply seam — no new writer, no free-text field. Like
+ * `/task-query` / `/attach`, the trigger text is removed first so nothing is
+ * left behind; unlike them, a non-task line is auto-converted to `- [ ] ` (the
+ * `/todo` behaviour) because asking to add a due date implies a task, and a
+ * disabled command on a plain line would be a dead end.
+ */
+function openTaskFieldFromSlash(
+  view: EditorView,
+  triggerFrom: number,
+  triggerTo: number,
+  kind: TaskFieldKind,
+): void {
+  // 1. Remove the `/due…` trigger.
+  view.dispatch({
+    changes: { from: triggerFrom, to: triggerTo, insert: "" },
+    selection: { anchor: triggerFrom },
+    userEvent: "slash.apply",
+  });
+  // 2. Ensure the caret's line is a task; auto-convert prose like `/todo`.
+  const line = view.state.doc.lineAt(triggerFrom);
+  if (!isTaskLine(line.text)) {
+    view.dispatch({
+      changes: { from: line.from, to: line.from, insert: "- [ ] " },
+      userEvent: "slash.apply",
+    });
+  }
+  // 3. Anchor to the caret coordinate (no element to point at). Read AFTER the
+  //    dispatches above, since they shift positions.
+  const head = view.state.selection.main.head;
+  const lineFrom = view.state.doc.lineAt(head).from;
+  const coords = view.coordsAtPos(head);
+  const rect: Rect =
+    coords !== null
+      ? { left: coords.left, top: coords.top, right: coords.right, bottom: coords.bottom }
+      : ((): Rect => {
+          const editor = view.contentDOM.getBoundingClientRect();
+          return {
+            left: editor.left + 16,
+            top: editor.top + 16,
+            right: editor.left + 32,
+            bottom: editor.top + 32,
+          };
+        })();
+  openTaskFieldAdd(view, lineFrom, kind, rect);
 }
 
 export function slashCommands(): readonly SlashCommand[] {
@@ -230,6 +286,31 @@ export function slashCommands(): readonly SlashCommand[] {
       icon: "☐",
       svgIcon: "check-square",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "- [ ] "),
+    },
+    {
+      // `/due` `/repeat` `/priority`: add a task field to the caret line without
+      // typing the `[key:: value]` syntax. Each opens the same picker the chip
+      // opens (native date / recurrence builder / priority select). A non-task
+      // line is auto-converted to `- [ ] ` first.
+      id: "due",
+      label: i18n.t("editor.slash.due"),
+      icon: "D",
+      svgIcon: "calendar",
+      apply: (v, f, t) => openTaskFieldFromSlash(v, f, t, "due"),
+    },
+    {
+      id: "repeat",
+      label: i18n.t("editor.slash.repeat"),
+      icon: "↻",
+      svgIcon: "repeat",
+      apply: (v, f, t) => openTaskFieldFromSlash(v, f, t, "repeat"),
+    },
+    {
+      id: "priority",
+      label: i18n.t("editor.slash.priority"),
+      icon: "!",
+      svgIcon: "flag",
+      apply: (v, f, t) => openTaskFieldFromSlash(v, f, t, "priority"),
     },
     {
       // `/tasks` (MYND-617 task 10): opens the query BUILDER rather than

@@ -94,6 +94,27 @@ function stripFieldSpans(line: string, ranges: readonly ByteRange[]): string {
 }
 
 /**
+ * The list-marker + checkbox prefix of a task line. Shared by `taskDescription`
+ * (which strips it) and `isTaskLine` (which only tests for it), so the two
+ * cannot disagree about what counts as a task line — a second regex would drift
+ * the first time the marker grammar moved.
+ */
+const TASK_LINE_MARKER = /^\s*[-*+]\s*\[[ xX]\]\s*/;
+
+/**
+ * Whether `line` is a line-task: a list marker followed by a `[ ]` / `[x]`
+ * checkbox. Purely lexical — it does not look at the fields.
+ *
+ * Exported so a caller wanting to *add* a field to the caret's line (the `+`
+ * affordance and the `/due` `/repeat` `/priority` slash commands) can tell a
+ * task line from prose without restating the marker pattern, and auto-convert a
+ * non-task line the same way `/todo` does.
+ */
+export function isTaskLine(line: string): boolean {
+  return TASK_LINE_MARKER.test(line);
+}
+
+/**
  * A task line's **description**: the list marker, the checkbox and every task
  * field removed.
  *
@@ -107,7 +128,7 @@ function stripFieldSpans(line: string, ranges: readonly ByteRange[]): string {
  */
 export function taskDescription(line: string, tree?: Tree): string {
   return stripFieldSpans(line, fieldRanges(line, tree))
-    .replace(/^\s*[-*+]\s*\[[ xX]\]\s*/, "")
+    .replace(TASK_LINE_MARKER, "")
     .trim();
 }
 

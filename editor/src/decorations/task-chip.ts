@@ -142,7 +142,7 @@ const PRIORITY_WORDS: ReadonlySet<string> = new Set([
 ]);
 
 /** One chippable field occurrence: the whole node span plus what it says. */
-type ChipSpan = {
+export type ChipSpan = {
   from: number;
   to: number;
   /** Canonical kind — `due` / `repeat` / `priority`, dialect-independent. */
@@ -172,8 +172,13 @@ type ChipSpan = {
  *
  * The **single** predicate. Both the decoration builder and the atomic-range
  * provider call this with the same bounds, so their outputs cannot diverge.
+ *
+ * Also read by the add-field flow (`task-field-menu.ts`) to learn which kinds a
+ * line already carries and, for a present one, prefill the editor with its
+ * source value — so the same predicate that renders the chips decides "add" vs
+ * "edit", and no second field scanner exists.
  */
-function chipRangesIn(state: EditorState, from: number, to: number): ChipSpan[] {
+export function chipRangesIn(state: EditorState, from: number, to: number): ChipSpan[] {
   const out: ChipSpan[] = [];
   syntaxTree(state).iterate({
     from,
