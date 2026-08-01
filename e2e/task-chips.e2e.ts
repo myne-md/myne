@@ -182,11 +182,22 @@ describeE2E("tc3 the + affordance adds a task field end to end", () => {
         //     intent. Shipped broken: all four families rendered at once, so
         //     "every 1 days" showed weekday pills and a `first`/`monday` pair
         //     under it.
-        const weekdayRow = await s.byTestId("editor.recurrence-weekdays");
+        //     Measured through `execute`, not `Element.rect()`: WebDriver's Get
+        //     Element Rect refuses a `display: none` element outright
+        //     ("element not interactable"), so the very state this asserts is
+        //     the one it cannot report. Reading `getBoundingClientRect` in the
+        //     page keeps the real-CSS proof the assertion is for.
+        await s.byTestId("editor.recurrence-weekdays"); // the row exists…
         await s.waitUntil(
           async () => {
-            const box = await weekdayRow.rect();
-            return box.width === 0 && box.height === 0 ? true : null;
+            const box = await s.execute<{ width: number; height: number } | null>(
+              `const el = document.querySelector(arguments[0]);
+               if (el === null) return null;
+               const r = el.getBoundingClientRect();
+               return { width: r.width, height: r.height };`,
+              [testIdSelector("editor.recurrence-weekdays")],
+            );
+            return box !== null && box.width === 0 && box.height === 0 ? true : null;
           },
           { label: "inactive weekday-family row is collapsed, not merely hidden" },
         );
