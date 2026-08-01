@@ -145,6 +145,7 @@ export function SpellSettings() {
       />
 
       <SettingRow
+        anchorId="editor.spell-languages"
         label={t("settings.spell.languagesLabel")}
         helper={t("settings.spell.languagesHelper")}
         control={

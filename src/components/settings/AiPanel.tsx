@@ -289,6 +289,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
 
       {/* Opt-in toggle. */}
       <SettingRow
+        anchorId="ai.enable"
         label={t("settings.ai.enableLabel")}
         helper={t("settings.ai.enableHelper")}
         control={(helperId) => (
@@ -372,7 +373,12 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
           links open in the user's browser; the pickers take the downloaded
           files. Three roles: text (GGUF) + search/embedding (safetensors) +
           speech-to-text (Whisper GGUF). */}
-      <div style={BLOCK_STYLE} data-testid="ai.models-section">
+      <div
+        style={BLOCK_STYLE}
+        data-setting-anchor="ai.models"
+        data-setting-row="true"
+        data-testid="ai.models-section"
+      >
         <label style={LABEL_STYLE}>{t("settings.ai.modelsLabel")}</label>
         <p style={HELPER_STYLE}>{t("settings.ai.modelsHelper")}</p>
 
@@ -425,7 +431,11 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
       </div>
 
       {/* Excluded folders — same canonical set encoding as deliberate_folders. */}
-      <div style={BLOCK_STYLE}>
+      <div
+        style={BLOCK_STYLE}
+        data-setting-anchor="ai.excluded-folders"
+        data-setting-row="true"
+      >
         <label style={LABEL_STYLE} htmlFor="ai-excluded-folders">
           {t("settings.ai.excludedLabel")}
         </label>

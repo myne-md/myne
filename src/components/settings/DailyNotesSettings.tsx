@@ -145,6 +145,7 @@ export function DailyNotesSettings() {
   return (
     <>
       <SettingRow
+        anchorId="editor.daily-notes-folder"
         label={t("settings.dailyNotes.folderLabel")}
         helper={t("settings.dailyNotes.folderHelper", {
           default: DEFAULT_DAILY_FOLDER,
@@ -172,8 +173,8 @@ export function DailyNotesSettings() {
               }}
               aria-label={t("settings.dailyNotes.folderLabel")}
               testId="settings.daily-folder-select"
-              searchPlaceholder={t("settings.dailyNotes.searchPlaceholder")}
-              emptyText={t("settings.dailyNotes.searchEmpty")}
+              searchPlaceholder={t("settings.dailyNotes.folderSearchPlaceholder")}
+              emptyText={t("settings.dailyNotes.folderSearchEmpty")}
             />
           ) : (
             <Input
@@ -188,6 +189,7 @@ export function DailyNotesSettings() {
         }
       />
       <SettingRow
+        anchorId="editor.daily-notes-date-format"
         label={t("settings.dailyNotes.dateFormatLabel")}
         helper={t("settings.dailyNotes.dateFormatHelper", {
           default: DEFAULT_DAILY_DATE_FORMAT,
@@ -204,6 +206,7 @@ export function DailyNotesSettings() {
         }
       />
       <SettingRow
+        anchorId="editor.daily-notes-template"
         label={t("settings.dailyNotes.templateLabel")}
         helper={t("settings.dailyNotes.templateHelper")}
         error={error}

@@ -24,14 +24,15 @@
 // live. System maps to `null` (clears the field → the CSS `@media
 // prefers-color-scheme` follows the OS live).
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
+import { ControlBlock } from "./ControlBlock";
 import { LanguageSelect } from "./LanguageSelect";
 import { Button } from "../primitives/Button";
-import { Segmented } from "../primitives/Segmented";
+import { Icon } from "../primitives/Icon";
 import { Switch } from "../primitives/Switch";
-import { PANEL_ROOT_STYLE } from "./panel-styles";
+import { ERROR_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 import {
   prefsRead,
   setCustomTheme,
@@ -66,6 +67,209 @@ function segmentFor(theme: ThemeChoice | null): ThemeOption["value"] {
 /** Map a chosen segment to the wire value (`null` ≡ system). */
 function wireValue(value: ThemeOption["value"]): ThemeChoice | null {
   return value === "system" ? null : value;
+}
+
+// ---------------------------------------------------------------------------
+// Theme preview cards (MYND-206) — replace the abstract segmented control with
+// a miniature of the app painted in each theme's OWN palette, so Light / Dark /
+// Amoled / System can be COMPARED at a glance instead of picked blind and
+// switched-into to see. It keeps the exact radiogroup contract the `Segmented`
+// control had (role, the `settings.theme` group testid, per-card
+// `settings.theme-<value>` + `data-value`/`data-active` + `aria-checked`), so
+// the E2E prefs scenarios target it unchanged.
+//
+// The mockup internals are LITERAL hex, mirroring `styles/tokens.css`: each
+// card depicts a theme that is NOT the live one, so `var(--paper)` (which
+// resolves to the ACTIVE theme) would paint the same picture four times. Change
+// a ramp in tokens.css → update the matching entry here.
+interface ThemeSwatch {
+  paper: string;
+  paper2: string;
+  line: string;
+  ink: string;
+  accent: string;
+}
+
+const THEME_SWATCHES: Record<"light" | "dark" | "amoled", ThemeSwatch> = {
+  light: { paper: "#fbfbfa", paper2: "#f4f4f2", line: "#e3e2dd", ink: "#1a1a17", accent: "#2c4a7a" },
+  dark: { paper: "#121210", paper2: "#1a1a17", line: "#2c2b28", ink: "#e8e7df", accent: "#8aa4d0" },
+  amoled: { paper: "#000000", paper2: "#000000", line: "#1f1e1c", ink: "#e8e7df", accent: "#8aa4d0" },
+};
+
+const CARDS_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 10,
+};
+
+const THEME_CARD_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 7,
+  width: 132,
+  padding: 7,
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--bg-2)",
+  cursor: "pointer",
+  textAlign: "left",
+  transition:
+    "border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard)",
+};
+
+const CARD_LABEL_STYLE = (selected: boolean): CSSProperties => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 6,
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: selected ? "var(--fg-1)" : "var(--fg-2)",
+});
+
+const MOCKUP_HEIGHT = 78;
+
+/** A tiny inked bar — a stand-in for a line of text or a UI element. */
+function bar(color: string, opacity: number, width: number | string, height = 4): CSSProperties {
+  return { width, height, borderRadius: 2, background: color, opacity, flexShrink: 0 };
+}
+
+/** One theme's miniature: sidebar rail + title + two text lines + accent chip. */
+function MiniMockup({ s }: { s: ThemeSwatch }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        height: MOCKUP_HEIGHT,
+        borderRadius: "var(--radius-2)",
+        overflow: "hidden",
+        border: `1px solid ${s.line}`,
+        background: s.paper,
+      }}
+    >
+      <div
+        style={{
+          width: 34,
+          background: s.paper2,
+          borderRight: `1px solid ${s.line}`,
+          padding: 6,
+          display: "flex",
+          flexDirection: "column",
+          gap: 5,
+        }}
+      >
+        <div style={bar(s.ink, 0.4, 20)} />
+        <div style={bar(s.ink, 0.24, 16)} />
+        <div style={bar(s.ink, 0.24, 18)} />
+        <div style={bar(s.accent, 0.9, 14)} />
+      </div>
+      <div style={{ flex: 1, padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={bar(s.ink, 0.75, "60%", 5)} />
+        <div style={bar(s.ink, 0.28, "100%")} />
+        <div style={bar(s.ink, 0.28, "88%")} />
+        <div style={{ ...bar(s.accent, 1, 30, 8), marginTop: 2 }} />
+      </div>
+    </div>
+  );
+}
+
+/** The System card: a light half and a dark half, signalling "follows your OS". */
+function SystemMockup() {
+  const l = THEME_SWATCHES.light;
+  const d = THEME_SWATCHES.dark;
+  const half = (s: ThemeSwatch, rightBorder?: string): CSSProperties => ({
+    flex: 1,
+    background: s.paper,
+    padding: 7,
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    ...(rightBorder !== undefined ? { borderRight: `1px solid ${rightBorder}` } : {}),
+  });
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        height: MOCKUP_HEIGHT,
+        borderRadius: "var(--radius-2)",
+        overflow: "hidden",
+        border: "1px solid var(--line-2)",
+      }}
+    >
+      <div style={half(l, d.line)}>
+        <div style={bar(l.ink, 0.75, "72%", 5)} />
+        <div style={bar(l.ink, 0.28, "100%")} />
+        <div style={{ ...bar(l.accent, 1, 24, 7), marginTop: 2 }} />
+      </div>
+      <div style={half(d)}>
+        <div style={bar(d.ink, 0.8, "72%", 5)} />
+        <div style={bar(d.ink, 0.3, "100%")} />
+        <div style={{ ...bar(d.accent, 1, 24, 7), marginTop: 2 }} />
+      </div>
+    </div>
+  );
+}
+
+interface ThemePreviewCardsProps {
+  selected: ThemeOption["value"];
+  onChoose: (value: ThemeOption["value"]) => void;
+  ariaLabel: string;
+  optionAria: (label: string) => string;
+  labelFor: (key: string) => string;
+}
+
+/** The theme picker: one preview card per theme, a radiogroup like `Segmented`. */
+function ThemePreviewCards({
+  selected,
+  onChoose,
+  ariaLabel,
+  optionAria,
+  labelFor,
+}: ThemePreviewCardsProps) {
+  return (
+    <div role="radiogroup" aria-label={ariaLabel} data-testid="settings.theme" style={CARDS_ROW_STYLE}>
+      {THEMES.map((o) => {
+        const isSel = o.value === selected;
+        const label = labelFor(o.labelKey);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={isSel}
+            aria-label={optionAria(label)}
+            data-testid={`settings.theme-${o.value}`}
+            data-value={o.value}
+            data-active={isSel ? "true" : "false"}
+            onClick={() => {
+              if (!isSel) onChoose(o.value);
+            }}
+            style={{
+              ...THEME_CARD_STYLE,
+              borderColor: isSel ? "var(--accent)" : "var(--line-2)",
+              boxShadow: isSel ? "0 0 0 1px var(--accent)" : "none",
+            }}
+          >
+            {o.value === "system" ? <SystemMockup /> : <MiniMockup s={THEME_SWATCHES[o.value]} />}
+            <span style={CARD_LABEL_STYLE(isSel)}>
+              {label}
+              {isSel && (
+                <span style={{ color: "var(--accent)", display: "inline-flex" }}>
+                  <Icon name="check" size={13} />
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 interface AppearancePanelProps {
@@ -173,24 +377,27 @@ export function AppearancePanel({ onOpenGraph }: AppearancePanelProps = {}) {
     <div style={PANEL_ROOT_STYLE}>
       <LanguageSelect />
 
-      <SettingRow
+      <ControlBlock
+        anchorId="appearance.theme"
         label={t("settings.appearance.themeLabel")}
         helper={t("settings.appearance.themeHelper")}
-        error={error}
         control={
-          <Segmented
-            options={THEMES.map((o) => ({
-              value: o.value,
-              label: t(o.labelKey),
-            }))}
-            value={selected}
-            onChange={(value) => void choose(value as ThemeOption["value"])}
-            ariaLabel={t("settings.appearance.themeLabel")}
-            optionAriaLabel={(o) =>
-              t("settings.appearance.themeOptionAria", { label: o.label })
-            }
-            testId="settings.theme"
-          />
+          <>
+            <ThemePreviewCards
+              selected={selected}
+              onChoose={(value) => void choose(value)}
+              ariaLabel={t("settings.appearance.themeLabel")}
+              optionAria={(label) =>
+                t("settings.appearance.themeOptionAria", { label })
+              }
+              labelFor={(key) => t(key)}
+            />
+            {error != null && error !== "" && (
+              <p role="alert" style={ERROR_STYLE}>
+                {error}
+              </p>
+            )}
+          </>
         }
       />
 
