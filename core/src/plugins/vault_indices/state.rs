@@ -444,8 +444,8 @@ pub struct NoteRecord {
     /// (§9.8.4) — the intended rebuild-on-format-change.
     #[serde(default)]
     pub tasks: Vec<TaskRecord>,
-    /// Headings in this note (myne#216, the vault-wide `[[##` picker). Trailing
-    /// + `#[serde(default)]` for the same reason `block_anchors` and `tasks` are:
+    /// Headings in this note (myne#216, the vault-wide `[[##` picker). Trailing +
+    /// `#[serde(default)]` for the same reason `block_anchors` and `tasks` are:
     /// a client that sends none — mobile, or an older desktop build —
     /// deserializes to empty and the invoke argument stays wire-compatible in
     /// both directions. The postcard SNAPSHOT is non-self-describing, so a

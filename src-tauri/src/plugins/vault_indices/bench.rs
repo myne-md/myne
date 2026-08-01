@@ -137,6 +137,7 @@ fn build(n: usize) -> VaultIndicesState {
                 } else {
                     Vec::new()
                 },
+                headings: Vec::new(),
             },
         );
     }
