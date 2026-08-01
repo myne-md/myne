@@ -43,8 +43,24 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 /// Socket read/write deadline: a hung or half-dead server must fail the request
 /// instead of wedging a sync cycle forever; keep-alive reuse also needs death
-/// detection. Comfortably exceeds any legitimate response (incl. a 64 MiB blob).
-pub(crate) const SOCKET_TIMEOUT: Duration = Duration::from_secs(60);
+/// detection.
+///
+/// **It has to cover the server's WORK, not just the transfer** (myne-md/myne#222).
+/// The old 60 s was justified as "comfortably exceeds any legitimate response (incl.
+/// a 64 MiB blob)" — a transfer-time budget, and the reason a first sync of a large
+/// vault failed: the client had finished writing long before the deadline and was
+/// waiting on a server still applying blobs. A push is the one request class whose
+/// server-side cost scales with what we sent, so the deadline is paired with
+/// `orchestrator::PUSH_CHUNK_MAX_BLOBS`, which is what bounds that cost; raise one
+/// and re-read the other.
+///
+/// Deliberately still ONE constant for every request class. Per-class deadlines mean
+/// threading a `Duration` through the transport trait, `keepalive_roundtrip`, the
+/// pinned-TLS layer and the SOCKS5 dialer — a security-load-bearing surface, for a
+/// gain the chunk bound already delivers. The cost of the uniform value is that a
+/// genuinely dead server hangs one cycle for 3 min instead of 1; `loop_control`'s
+/// backoff already treats that class as transient.
+pub(crate) const SOCKET_TIMEOUT: Duration = Duration::from_secs(180);
 
 #[cfg(not(target_arch = "wasm32"))]
 /// Plain-HTTP transport, loopback-only. Holds one keep-alive connection —

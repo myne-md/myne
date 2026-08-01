@@ -1300,24 +1300,60 @@ fn manifest_entries(local: &HashMap<[u8; 16], [u8; 24]>) -> Vec<ManifestEntry> {
 /// forever — the next cycle simply re-attempts from the persisted cursor.
 const MAX_PUSH_ATTEMPTS: usize = 3;
 
-/// Run one full sync cycle against the configured server. `account_number_hash`
-/// and `device_id` are the 16-byte values captured at enrollment (the head binds
-/// the account; the VV-actor is this device). Idempotent: a no-change cycle is a
-/// cheap pull that writes nothing.
+/// Upper bound on the blobs carried by ONE `/sync/push` request (myne-md/myne#222).
 ///
-/// **409 (lost-CAS) recovery.** A push can lose a compare-and-set two ways:
-/// `BlobStale` (a blob's `base_version` fell behind the server) or `HeadStale`
-/// (another device advanced the head between our pull and our push). Either is
-/// retried with a **full-reconcile** pull (`from_cursor = 0`) so the next attempt
-/// sees the *complete* server roster + current head: a blob that advanced past our
-/// baseline but now sits OUTSIDE the normal `ChangedSince(cursor)` window is then
-/// re-detected as a conflict (excluded), and a moved head is re-pulled so we
-/// re-author a valid linear advance over it — instead of re-pushing a stale
-/// `base_version` forever, which wedges the whole atomic push batch (a single
-/// blob's CAS failure aborts the server's batch before it commits, so an innocent
-/// sibling note can never get through either). Bounded by [`MAX_PUSH_ATTEMPTS`].
-/// The device-local sync state is persisted only on a fully successful attempt, so
-/// a failed retry never leaks a half-advanced cursor onto disk.
+/// The body size is bounded by [`PUSH_CHUNK_MAX_BYTES`]; this bounds the *server-side
+/// work*, which scales with the blob COUNT rather than with bytes — the server applies
+/// blobs one at a time and re-indexes per blob (myne-md/myne-server#6). An unbounded
+/// batch is what made a 50 000-note first sync hand the server more work than any
+/// socket deadline can cover, so that nothing ever landed and nothing was ever
+/// recorded. Paired with `http_transport::SOCKET_TIMEOUT`: raise one, re-read the
+/// other.
+const PUSH_CHUNK_MAX_BLOBS: usize = 256;
+
+/// Upper bound on the inline ciphertext carried by ONE `/sync/push` request, in
+/// bytes measured BEFORE base64 (the wire body is ~4/3 of this plus ~190 B of JSON
+/// framing per blob). Keeps peak request memory bounded — `build_http_request_ext`
+/// copies the body once more on its way out, so the true ceiling is ~2× the encoded
+/// chunk regardless of vault size. A single blob above this bound still travels
+/// alone rather than being split: the AEAD unit is never chunked (`server-protocol.md`
+/// §3.2), and the per-blob cap is the server's `MaxBlobSize`, not this.
+const PUSH_CHUNK_MAX_BYTES: usize = 8 * 1024 * 1024;
+
+/// Split a push batch into request-sized chunks, in order, bounded by BOTH
+/// [`PUSH_CHUNK_MAX_BLOBS`] and [`PUSH_CHUNK_MAX_BYTES`] — a chunk closes at
+/// whichever bound trips first, and a lone blob over the byte bound still travels
+/// by itself (never split: the AEAD unit is one whole-blob tag).
+///
+/// **An empty batch yields ONE empty chunk, not zero.** The caller's push block also
+/// fires for the genesis head of an account with no local changes, and that head-only
+/// push must still be sent; returning an empty iterator here would silently skip it
+/// and leave a joining device with no head to adopt, forever.
+fn push_chunks(blobs: &[PushBlob]) -> Vec<&[PushBlob]> {
+    if blobs.is_empty() {
+        return vec![&[]];
+    }
+    let mut chunks = Vec::new();
+    let mut start = 0usize;
+    let mut bytes = 0usize;
+    for (i, b) in blobs.iter().enumerate() {
+        // Close the OPEN chunk before this blob when adding it would overrun a
+        // bound — never mid-blob, and never on an empty chunk (which is what lets
+        // an oversized lone blob through instead of looping on it).
+        if i > start
+            && (i - start >= PUSH_CHUNK_MAX_BLOBS
+                || bytes + b.ciphertext.len() > PUSH_CHUNK_MAX_BYTES)
+        {
+            chunks.push(&blobs[start..i]);
+            start = i;
+            bytes = 0;
+        }
+        bytes += b.ciphertext.len();
+    }
+    chunks.push(&blobs[start..]);
+    chunks
+}
+
 /// SHA-256 of `bytes` as lowercase hex — the `vault.meta` baseline discriminator.
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
@@ -1527,6 +1563,34 @@ pub(crate) async fn sync_meta_phase(
     MetaPhaseOutcome::Merged
 }
 
+/// Run one full sync cycle against the configured server. `account_number_hash`
+/// and `device_id` are the 16-byte values captured at enrollment (the head binds
+/// the account; the VV-actor is this device). Idempotent: a no-change cycle is a
+/// cheap pull that writes nothing.
+///
+/// **409 (lost-CAS) recovery.** A push can lose a compare-and-set two ways:
+/// `BlobStale` (a blob's `base_version` fell behind the server) or `HeadStale`
+/// (another device advanced the head between our pull and our push). Either is
+/// retried with a **full-reconcile** pull (`from_cursor = 0`) so the next attempt
+/// sees the *complete* server roster + current head: a blob that advanced past our
+/// baseline but now sits OUTSIDE the normal `ChangedSince(cursor)` window is then
+/// re-detected as a conflict (excluded), and a moved head is re-pulled so we
+/// re-author a valid linear advance over it — instead of re-pushing a stale
+/// `base_version` forever. One request is still one atomic batch (a single blob's
+/// CAS failure aborts the server's batch before it commits, so an innocent sibling
+/// in the SAME chunk cannot get through either) and every later chunk is abandoned
+/// with it — but the chunks that already landed stay landed and stay recorded, see
+/// below. Bounded by [`MAX_PUSH_ATTEMPTS`].
+///
+/// **What is persisted, and when.** The advanced cursor is written only on a fully
+/// successful attempt, so a failed retry never leaks a half-advanced cursor onto
+/// disk. A **landed push chunk** is the exception and is checkpointed inside the
+/// attempt (myne-md/myne#222): the versions the server returned are a fact about the
+/// server, and refusing to write them down is exactly what turned one timed-out
+/// first sync into an account that could never sync again. The two rules do not
+/// conflict — by the time a push runs, `pull_to_stable` has already returned a
+/// stable page, so the cursor being persisted alongside is fully advanced and
+/// consistent with what the pull wrote to disk.
 // The arguments are each a distinct, independent input to the cycle (the
 // transport, the two keys/ids, the token, the two paths, the push gate); bundling
 // them into a struct would not aid clarity at this single orchestrator entry.
@@ -2148,7 +2212,8 @@ async fn sync_cycle_attempt(
     // Notes whose remote revision is already staged as an unresolved keep-both
     // conflict (`conflicts/<id>.myn`, awaiting materialization). Their synced
     // baseline is, by construction, behind the server — so pushing them would lose
-    // the blob CAS (409 blob_stale) and wedge the whole atomic batch. They MUST stay
+    // the blob CAS (409 blob_stale), which aborts the chunk they travel in and
+    // abandons every chunk queued behind it. They MUST stay
     // excluded until `resolve_conflict` adopts the remote as the baseline; only then
     // does the untouched local edit push as a clean linear advance. This also closes
     // the cursor-window gap: a conflict first detected while the blob was in the pull
@@ -2177,8 +2242,8 @@ async fn sync_cycle_attempt(
             }
             // True conflict: this note is locally dirty AND the server advanced it
             // past our synced baseline (a concurrent remote edit). Pushing a stale
-            // base_version loses the blob CAS (BlobStale) and — because the push is
-            // one atomic batch — wedges every OTHER note too. Exclude it and record
+            // base_version loses the blob CAS (BlobStale), which aborts the chunk it
+            // travels in and abandons every chunk behind it. Exclude it and record
             // a keep-both plan; the local edit stays on disk untouched (no loss).
             if let Some(b) = synced {
                 if let Some((server_version, remote_nonce)) = server_meta.get(id) {
@@ -2207,8 +2272,9 @@ async fn sync_cycle_attempt(
             // F4 fresh-cursor probe (§11.3): a re-enrolled device (wiped sync
             // state, cursor 0 → floor-exempt, no 410/reconcile) holding a local
             // copy of a RECLAIMED record would push it at `base_version 0` —
-            // the CAS loses against the tombstone's final version and, because
-            // the batch is atomic, wedges every push forever. Probe the blob
+            // the CAS loses against the tombstone's final version and takes its
+            // whole chunk down with it, and every chunk behind it, every cycle,
+            // forever. Probe the blob
             // route first; 410 `blob_reclaimed` → quarantine + exclude. Gated
             // to baseline-less ids on cursor-0/reconcile cycles OF AN ACCOUNT
             // WITH HISTORY (`page.head` present — a virgin account cannot hold
@@ -2244,7 +2310,7 @@ async fn sync_cycle_attempt(
     }
 
     // --- detect attachment + catalog pushes (MYND-468) ---
-    // Byte-uploads happen HERE, before the single `/sync/push` batch below, so
+    // Byte-uploads happen HERE, before ANY of the `/sync/push` chunks below, so
     // any head the server accepts only ever commits attachment bytes already
     // durably stored (SYNC-5 blobs-first-then-head, extended to attachments).
     let mut attachments_pushed = 0usize;
@@ -2266,8 +2332,8 @@ async fn sync_cycle_attempt(
                 }
                 // The server advanced this id past our baseline concurrently —
                 // never keep-both for an attachment (§4.2 server-wins): skip
-                // the push (it would 409 the whole batch); the next pull
-                // adopts the server's bytes.
+                // the push (it would 409 its chunk and abandon the rest); the
+                // next pull adopts the server's bytes.
                 if let Some(b) = synced {
                     if let Some((server_version, _)) = server_meta.get(sid) {
                         if *server_version > b.version {
@@ -2458,41 +2524,70 @@ async fn sync_cycle_attempt(
         };
         let sealed = head.seal(root_key).map_err(|_| SyncCycleError::Head)?;
 
-        let outcome = engine::push(
-            transport,
-            token,
-            &to_push,
-            Some((&prev_head_id, &sealed.record)),
-        )
-        .map_err(SyncCycleError::Push)?;
+        // --- push, in bounded chunks (myne-md/myne#222) ---
+        //
+        // One `/sync/push` per chunk, and the **head rides the last one**. That is
+        // what keeps SYNC-5 blobs-first-then-head intact with no protocol change:
+        // the head the server accepts still commits only blobs it already holds,
+        // exactly as when the whole corpus travelled in one request. `engine::push`
+        // already takes `new_head: Option<…>`, so an intermediate chunk passes `None`
+        // and the server treats it as a blobs-only push.
+        //
+        // A cycle that dies partway now leaves the landed chunks landed AND recorded
+        // (the checkpoint below), so the next cycle resumes instead of re-sending
+        // everything from an empty baseline forever — the wedge in #222.
+        //
+        // `to_push` empty is NOT a no-op here: the enclosing `if` also fires for the
+        // genesis head of an account with no local changes, so the loop must run once
+        // over an empty slice to send that head-only push.
+        let chunks = push_chunks(&to_push);
+        for (i, chunk) in chunks.iter().enumerate() {
+            let is_last = i + 1 == chunks.len();
+            let outcome = engine::push(
+                transport,
+                token,
+                chunk,
+                is_last.then_some((&prev_head_id, &sealed.record)),
+            )
+            .map_err(SyncCycleError::Push)?;
 
-        for (id, ver) in &outcome.results {
-            if let Some(b) = to_push.iter().find(|b| &b.id == id) {
-                state.blobs.insert(
-                    hex(id),
-                    BlobSyncState {
-                        version: *ver,
-                        content_nonce_hex: hex(&b.content_nonce),
-                    },
-                );
+            for (id, ver) in &outcome.results {
+                if let Some(b) = chunk.iter().find(|b| &b.id == id) {
+                    state.blobs.insert(
+                        hex(id),
+                        BlobSyncState {
+                            version: *ver,
+                            content_nonce_hex: hex(&b.content_nonce),
+                        },
+                    );
+                }
             }
+            pushed += outcome.results.len();
+            head_advanced |= outcome.head_id.is_some();
+            // The prefs push landed → its shared-subset hash is the new push-gate
+            // baseline (MYND-478, §10.2.1).
+            if outcome.results.iter().any(|(id, _)| *id == prefs_id) {
+                set_prefs_gate_baseline(vault_root, prefs_phase.shared_hash.clone());
+            }
+            // The queued tombstones are now flagged on the server → drop them from the
+            // device-local queue so they aren't re-flagged every cycle.
+            let pushed_tombstones: Vec<String> = chunk
+                .iter()
+                .filter(|b| b.tombstone)
+                .map(|b| hex(&b.id))
+                .collect();
+            tombstones_pushed += pushed_tombstones.len();
+            let _ = clear_pending_tombstones(io, vault_root, &pushed_tombstones).await;
+            // Checkpoint. The versions this chunk returned are a fact about the
+            // server; a later chunk failing must not un-learn them (see the
+            // `run_sync_cycle` doc for why this does not contradict the
+            // persist-on-success rule). Propagated rather than swallowed: a device
+            // that cannot record what it just pushed is about to rebuild the #222
+            // wedge, and it should say so instead of silently looping.
+            write_sync_state(io, vault_root, state)
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
         }
-        pushed = outcome.results.len();
-        head_advanced = outcome.head_id.is_some();
-        // The prefs push landed → its shared-subset hash is the new push-gate
-        // baseline (MYND-478, §10.2.1).
-        if outcome.results.iter().any(|(id, _)| *id == prefs_id) {
-            set_prefs_gate_baseline(vault_root, prefs_phase.shared_hash.clone());
-        }
-        // The queued tombstones are now flagged on the server → drop them from the
-        // device-local queue so they aren't re-flagged every cycle.
-        let pushed_tombstones: Vec<String> = to_push
-            .iter()
-            .filter(|b| b.tombstone)
-            .map(|b| hex(&b.id))
-            .collect();
-        tombstones_pushed = pushed_tombstones.len();
-        let _ = clear_pending_tombstones(io, vault_root, &pushed_tombstones).await;
         // The attachment-tombstone queue drains only after its records landed.
         let _ = clear_pending_attachment_tombstones(io, vault_root, &pushed_att_tombstones).await;
         write_head_baseline(io, vault_root, &sealed)
@@ -2717,6 +2812,57 @@ mod tests {
                     status: 500,
                     body: Vec::new(),
                 });
+            }
+            self.inner.request(method, path, body, token)
+        }
+    }
+
+    /// Relays to a real transport while watching the `/sync/push` stream: records
+    /// one entry per push saying whether it carried a `new_head` (the wire field is
+    /// `skip_serializing_if = "Option::is_none"`, so its mere presence in the body
+    /// is the answer), and optionally kills the Nth push (1-based) with a
+    /// `TransportError::Network` — the shape a socket deadline produces mid-request,
+    /// which is the myne-md/myne#222 failure.
+    struct PushObserver {
+        inner: Box<dyn SyncTransport>,
+        /// One `carried_head` flag per observed push, in order.
+        pushes: std::sync::Mutex<Vec<bool>>,
+        /// 1-based index of the push to fail, if any.
+        fail_nth: Option<usize>,
+    }
+    impl PushObserver {
+        fn new(inner: Box<dyn SyncTransport>, fail_nth: Option<usize>) -> Self {
+            Self {
+                inner,
+                pushes: std::sync::Mutex::new(Vec::new()),
+                fail_nth,
+            }
+        }
+        /// `(number of pushes, which of them carried the head)`.
+        fn pushes(&self) -> Vec<bool> {
+            self.pushes.lock().unwrap().clone()
+        }
+    }
+    impl SyncTransport for PushObserver {
+        fn request(
+            &self,
+            method: HttpMethod,
+            path: &str,
+            body: &[u8],
+            token: Option<&str>,
+        ) -> Result<TransportResponse, TransportError> {
+            if path == "/sync/push" {
+                let n = {
+                    let mut seen = self.pushes.lock().unwrap();
+                    let carried_head = body
+                        .windows(b"\"new_head\"".len())
+                        .any(|w| w == b"\"new_head\"");
+                    seen.push(carried_head);
+                    seen.len()
+                };
+                if self.fail_nth == Some(n) {
+                    return Err(TransportError::Network);
+                }
             }
             self.inner.request(method, path, body, token)
         }
@@ -4436,6 +4582,336 @@ mod tests {
 
         std::fs::remove_dir_all(&dir_a).ok();
         std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// A corpus larger than one push chunk travels as several `/sync/push`
+    /// requests, and the head rides the LAST one (myne-md/myne#222).
+    ///
+    /// That ordering is the whole reason chunking needs no protocol change: the
+    /// head the server accepts still commits only blobs it already holds, which is
+    /// SYNC-5 blobs-first-then-head (`sync-protocol.md` §5) stated over several
+    /// requests instead of one. A head on an intermediate chunk would commit a
+    /// manifest covering blobs still in flight.
+    #[test]
+    fn a_large_push_is_chunked_and_the_head_rides_the_last_chunk() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP push_chunking: server binary not found");
+            return;
+        };
+        let root_key = [0x91u8; 32];
+        let account_hash = [0x92u8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x93u8; 32];
+        let items_key_id = [0x94u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-chunk-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-chunk-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        // One more than a whole chunk, so the split is exercised and asymmetric.
+        let n = PUSH_CHUNK_MAX_BLOBS + 44;
+        for i in 0..n {
+            write_note(
+                &notes_a,
+                &items_key,
+                &items_key_id,
+                &NoteId::new_v7(),
+                format!("note {i}").as_bytes(),
+                false,
+            );
+        }
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        let obs = PushObserver::new(ta, None);
+        let push = run_cycle_legacy(
+            &obs,
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push");
+
+        assert_eq!(push.pushed, n, "every blob landed across the chunks");
+        assert!(push.head_advanced, "the head advanced exactly once");
+        assert_eq!(
+            obs.pushes(),
+            vec![false, true],
+            "two /sync/push requests, and only the LAST carried a new_head"
+        );
+
+        // The head still describes the whole corpus: a fresh device materialises
+        // every note from it, so chunking did not split the manifest.
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        let pull = run_cycle_legacy(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull");
+        assert_eq!(pull.pulled, n, "B materialised the whole corpus");
+        assert!(
+            read_sync_state(&dir_b).unwrap().corpus_complete,
+            "B's local manifest matches the head's — the head covers every chunk"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// The myne-md/myne#222 regression, in miniature: a first sync whose push dies
+    /// partway must leave the landed chunks RECORDED, so the next cycle finishes the
+    /// job instead of re-sending everything from an empty baseline forever.
+    ///
+    /// Before the fix this vault pushed once, and a transport failure there recorded
+    /// nothing at all (`sync-state.json` → `blobs: 0`) — which is exactly what was
+    /// observed on the 50 000-note vault, and why every subsequent cycle repeated the
+    /// same multi-minute round trip and failed identically.
+    #[test]
+    fn a_push_that_dies_midway_resumes_instead_of_wedging() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP push_resume: server binary not found");
+            return;
+        };
+        let root_key = [0x95u8; 32];
+        let account_hash = [0x96u8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x97u8; 32];
+        let items_key_id = [0x98u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-resume-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-resume-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        let n = PUSH_CHUNK_MAX_BLOBS + 44;
+        let mut ids = Vec::new();
+        for i in 0..n {
+            let note = NoteId::new_v7();
+            write_note(
+                &notes_a,
+                &items_key,
+                &items_key_id,
+                &note,
+                format!("note {i}").as_bytes(),
+                false,
+            );
+            ids.push(note);
+        }
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        // Kill the SECOND push below HTTP — the shape a socket deadline produces
+        // once the request body is out and the server is still working.
+        let obs = PushObserver::new(ta, Some(2));
+
+        let err = run_cycle_legacy(
+            &obs,
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect_err("the cycle fails with the second chunk");
+        assert!(
+            matches!(
+                err,
+                SyncCycleError::Push(PushError::Transport(TransportError::Network))
+            ),
+            "failed at the transport, not on a CAS: {err:?}"
+        );
+
+        let after_fail = read_sync_state(&dir_a).unwrap();
+        assert_eq!(
+            after_fail.blobs.len(),
+            PUSH_CHUNK_MAX_BLOBS,
+            "the chunk that LANDED was checkpointed (pre-fix: 0, and the account wedged)"
+        );
+        assert!(
+            std::fs::read(dir_a.join("vault.head-state")).is_err(),
+            "no head baseline: the head rides the last chunk, which never went out"
+        );
+
+        // Next cycle: only the remainder is dirty, and it converges.
+        let resumed = run_cycle_legacy(
+            &obs,
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("the retry cycle completes");
+        assert_eq!(
+            resumed.pushed,
+            n - PUSH_CHUNK_MAX_BLOBS,
+            "only the blobs that never landed were re-sent"
+        );
+        assert!(
+            resumed.head_advanced,
+            "the head landed on the resumed cycle"
+        );
+        assert_eq!(
+            read_sync_state(&dir_a).unwrap().blobs.len(),
+            n,
+            "every blob now has a baseline"
+        );
+
+        // The account is genuinely converged, not merely locally consistent.
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        let pull = run_cycle_legacy(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull");
+        assert_eq!(
+            pull.pulled, n,
+            "a fresh device materialises the whole corpus"
+        );
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &ids[0]).as_deref(),
+            Some(&b"note 0"[..])
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// A blob the server already holds at OUR revision, with no local baseline
+    /// saying so, is ADOPTED — not re-pushed at `base_version = 0`.
+    ///
+    /// **Characterization, not a new mechanism.** myne-md/myne#222 asks for this as
+    /// a fix ("a device that finds the server holding a blob whose `content_nonce`
+    /// matches its own local copy should adopt that version as its baseline"); the
+    /// §11.2 baseline reconcile above `pull_to_stable`'s roster already does it, for
+    /// every id the server reports, since MYND-426. What was missing was a test in
+    /// the state the 50 000-note vault was actually observed in — `blobs: 0`,
+    /// `cursor: 0`, no `vault.head-state`, server holding the blobs — as opposed to
+    /// `empty_baseline_self_heals_and_local_edit_pushes`, which keeps the cursor and
+    /// the head baseline and has a genuine local edit to push. Pinning it is what
+    /// stops a future change from quietly removing the property and re-opening the
+    /// wedge from the other side.
+    #[test]
+    fn an_unrecorded_landed_blob_adopts_the_server_version() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP adopt_landed_blob: server binary not found");
+            return;
+        };
+        let root_key = [0x99u8; 32];
+        let account_hash = [0x9Au8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x9Bu8; 32];
+        let items_key_id = [0x9Cu8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-adopt-A-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+
+        let note = NoteId::new_v7();
+        write_note(&notes_a, &items_key, &items_key_id, &note, b"body", false);
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_cycle_legacy(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("initial push");
+
+        // Reproduce the observed post-failure state: the server holds the blob, the
+        // device recorded nothing about it and has no head baseline either.
+        let mut st = read_sync_state(&dir_a).unwrap();
+        assert!(!st.blobs.is_empty(), "the initial push recorded a baseline");
+        st.blobs.clear();
+        st.cursor = 0;
+        write_sync_state(&dir_a, &st).unwrap();
+        std::fs::remove_file(dir_a.join("vault.head-state")).unwrap();
+
+        let obs = PushObserver::new(ta, None);
+        let summary = run_cycle_legacy(
+            &obs,
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("the recovery cycle succeeds");
+
+        assert!(
+            obs.pushes().is_empty(),
+            "nothing was pushed at all — the server's revision IS ours"
+        );
+        assert_eq!(summary.pushed, 0);
+        assert!(
+            summary.conflicts.is_empty(),
+            "an identical blob is no conflict"
+        );
+        let healed = read_sync_state(&dir_a).unwrap();
+        assert_eq!(
+            healed
+                .blobs
+                .get(&hex(note.as_uuid().as_bytes()))
+                .map(|b| b.version),
+            Some(1),
+            "the server's version became the baseline"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
     }
 
     /// An offline delete propagates to a device that was up-to-date before the
