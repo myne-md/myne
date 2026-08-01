@@ -415,13 +415,16 @@ export interface FindOptions {
 // land in <1 s alone routinely need several seconds under that load. Every
 // element-appearance/poll wait inherits this headroom, which (with the config's
 // retry: 2) is what closes the full-suite "different test flakes each run" tail.
-// A real never-appears bug still fails — just 45 s later instead of 20.
-// Raised 20 s → 45 s: under a contended CI runner (MAX_WORKFLOWS in parallel)
-// even the lock-screen / attachment-preview first paint was observed slipping
-// past 30 s, flaking a *different* mount-bound scenario each full-suite run
-// (nav1 unlock, tp1 attachment-text-preview). The headroom trades slower
-// never-appears failures for a closed flake tail.
-const DEFAULT_TIMEOUT_MS = 45_000;
+// A real never-appears bug still fails — just later. Raised 20 s → 45 s → 90 s.
+// Under the shared host's cumulative load a *different* mount-bound scenario
+// each full-suite run slips past the ceiling (nav1 unlock, tp1 attachment-text,
+// ci1/slash-datetime unlock at the tail) — a contention signature, not a logic
+// bug. 45 s closed most of the tail; 90 s absorbs the tail-of-suite boots that
+// still slipped past it, since the failure shape is always "unlock/editor never
+// painted in budget", never a wrong assertion. The headroom trades slower
+// never-appears failures for a closed flake tail; with the e2e step now
+// non-blocking (.woodpecker.yml) the slower-fail cost no longer gates anyone.
+const DEFAULT_TIMEOUT_MS = 90_000;
 const DEFAULT_INTERVAL_MS = 100;
 
 /** One WebDriver session against a running tauri-driver. */

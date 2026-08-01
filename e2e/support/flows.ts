@@ -58,13 +58,16 @@ export async function ipcOk(
 export async function unlockToEditor(
   session: Session,
   password: string,
-  timeoutMs = 45_000,
+  timeoutMs = 90_000,
 ): Promise<void> {
   // Wait for the lock screen to mount with the SAME budget as the editor below.
   // Under the full-suite's cumulative WebKitGTK load the unlock screen's first
-  // paint can slip well past the old ceilings — observed timing out even at 30s
-  // on a contended CI run (nav1) — so both waits use the raised default budget
-  // (aligned with DEFAULT_TIMEOUT_MS). Never reproduces in an isolated run.
+  // paint can slip well past the old ceilings — observed timing out at 30s then
+  // even at 45s on a contended CI run (nav1, then ci1/slash-datetime at the
+  // suite tail) — so both waits use the raised default budget (90s, aligned
+  // with DEFAULT_TIMEOUT_MS). Never reproduces in an isolated run; this is the
+  // single dominant flake shape (mount never paints), so raising it here clears
+  // the whole whack-a-mole class at once rather than one named spec at a time.
   //
   // MYND-558: the screen shows ONE credential surface. With a redeemable
   // quick-unlock the PIN owns it and the password form is behind a reveal, so
