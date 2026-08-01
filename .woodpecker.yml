@@ -740,6 +740,18 @@ steps:
       - event: [push, manual]
         branch: develop
     depends_on: [web-build]
+    environment:
+      # Force the CLASSIC builder. This box runs three Woodpecker agents sharing
+      # ONE host dockerd, so concurrent `docker build`s from different repos
+      # collide on BuildKit's single per-daemon session — "only one connection
+      # allowed", the session healthcheck fails fatally and the build dies
+      # mid-run (observed killing web-docker-build on #392/#394; MAX_WORKFLOWS=1
+      # can't help — the collision is cross-agent). The web Dockerfile uses NO
+      # BuildKit features (no RUN --mount / heredoc / COPY --link / # syntax=),
+      # so the classic builder is a drop-in with no shared session to collide on
+      # (verified working on the host's docker 29; deprecated-but-functional —
+      # revisit if a per-agent dedicated buildx builder is ever provisioned).
+      DOCKER_BUILDKIT: "0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
