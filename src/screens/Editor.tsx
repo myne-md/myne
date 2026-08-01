@@ -649,21 +649,25 @@ function EditorChrome({
     (message: string) => setToast({ message }),
     [setToast],
   );
-  /** MYND-643: copy the open note's body to the clipboard. A clipboard write
-   *  has no visible result, so success MUST toast — otherwise the button reads
-   *  as broken — and so must failure, or the user pastes stale content
-   *  believing it worked. */
-  const copyOpenNoteMarkdown = useCallback(async () => {
-    const id = ctx.selectedId;
-    if (id === null) return;
-    try {
-      const { copyNoteMarkdown } = await import("../notes/copyNoteMarkdown");
-      await copyNoteMarkdown(id);
-      setToast({ message: i18n.t("export.note.modal.copied") });
-    } catch {
-      setToast({ message: i18n.t("export.note.modal.copyFailed") });
-    }
-  }, [ctx.selectedId, setToast]);
+  /** MYND-643: copy a note's body to the clipboard. Takes the target note id
+   *  explicitly — the export modal's Copy fires for the note the pre-flight is
+   *  about, which the sidebar context-menu path raises for a note that is not
+   *  necessarily open (the ne4 defect: falling back to `ctx.selectedId` copied
+   *  nothing when nothing was open). A clipboard write has no visible result,
+   *  so success MUST toast — otherwise the button reads as broken — and so must
+   *  failure, or the user pastes stale content believing it worked. */
+  const copyNoteMarkdownById = useCallback(
+    async (id: string) => {
+      try {
+        const { copyNoteMarkdown } = await import("../notes/copyNoteMarkdown");
+        await copyNoteMarkdown(id);
+        setToast({ message: i18n.t("export.note.modal.copied") });
+      } catch {
+        setToast({ message: i18n.t("export.note.modal.copyFailed") });
+      }
+    },
+    [setToast],
+  );
 
   const showExportToast = useCallback(
     (t: ExportToast) =>
@@ -679,12 +683,13 @@ function EditorChrome({
   // context-menu and palette paths — both receive the same hooks.
   const [exportPreflight, setExportPreflight] = useState<{
     count: number;
+    noteId: string;
     resolve: (choice: AttachmentPreflightChoice | null) => void;
   } | null>(null);
   const confirmAttachments = useCallback(
-    (count: number) =>
+    (count: number, noteId: string) =>
       new Promise<AttachmentPreflightChoice | null>((resolve) => {
-        setExportPreflight({ count, resolve });
+        setExportPreflight({ count, noteId, resolve });
       }),
     [],
   );
@@ -2282,11 +2287,15 @@ function EditorChrome({
         }}
         onCopy={() => {
           // MYND-643: resolve the pre-flight as CANCELLED so the export flow
-          // stops cleanly (it must not also write a file), then copy. Resolving
-          // with a choice would run the save-dialog path we are replacing.
+          // stops cleanly (it must not also write a file), then copy the note
+          // the modal is ABOUT. It is captured from the pre-flight — NOT
+          // `ctx.selectedId`, which is null/wrong when the flow was raised from
+          // the sidebar context-menu on a note that is not open (the ne4 defect).
+          // Resolving with a choice would run the save-dialog path we replace.
+          const targetId = exportPreflight?.noteId ?? null;
           exportPreflight?.resolve(null);
           setExportPreflight(null);
-          void copyOpenNoteMarkdown();
+          if (targetId !== null) void copyNoteMarkdownById(targetId);
         }}
       />
       <NotePdfExportNotice
