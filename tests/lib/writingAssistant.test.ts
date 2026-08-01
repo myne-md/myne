@@ -36,6 +36,18 @@ describe("infer wrapper", () => {
       prompt: "some prompt",
     });
   });
+
+  // #193 — the ceiling is per-call: ghost-text asks for one, chat / `/devam`
+  // do not, and the payload for the latter must stay exactly what it was.
+  it("carries a per-call token ceiling only when one is asked for", async () => {
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue("short");
+    await infer("some prompt", { maxNewTokens: 24 });
+    expect(invokeMock).toHaveBeenCalledWith("plugin:local-inference|infer", {
+      prompt: "some prompt",
+      maxNewTokens: 24,
+    });
+  });
 });
 
 describe("buildCompletionPrompt", () => {
@@ -43,6 +55,22 @@ describe("buildCompletionPrompt", () => {
     const p = buildCompletionPrompt("The quick brown fox");
     expect(p).toContain("The quick brown fox");
     expect(p.toLowerCase()).toContain("continue");
+  });
+
+  // #193 — the length ask is per-call because BOTH the passive ghost-text and
+  // the explicit `/devam` come through this one builder.
+  it("asks for a short single-line reply under `brief`", () => {
+    const p = buildCompletionPrompt("The quick brown fox", { brief: true });
+    expect(p).toContain("The quick brown fox");
+    expect(p.toLowerCase()).toContain("one short sentence");
+    expect(p.toLowerCase()).toContain("single line");
+  });
+
+  it("leaves the unbriefed prompt exactly as `/devam` has always had it", () => {
+    const plain = buildCompletionPrompt("The quick brown fox");
+    expect(plain).toBe(buildCompletionPrompt("The quick brown fox", {}));
+    expect(plain).toContain("Reply with only the continuation text, ");
+    expect(plain.toLowerCase()).not.toContain("short sentence");
   });
 
   it("keeps only the tail window when the preceding text exceeds the budget", () => {

@@ -24,14 +24,36 @@ import { selectedRangesText } from "../editor/selectionText";
  */
 export const COMPLETION_CONTEXT_CHARS = 800;
 
+/** Per-call knobs for {@link infer}. */
+export interface InferOptions {
+  /** Generation ceiling for THIS call (issue #193). Omitted, the engine's own
+   *  budget applies. The host clamps it — this is a request, not a grant. */
+  maxNewTokens?: number;
+}
+
 /**
  * Blocking one-shot completion via sibling 1's `local-inference` plugin
  * (`Engine.infer`, SYNC-7). Thin IPC wrapper — no streaming, no fetch, no new
  * capability. Rejects if the engine errors (closed `EngineError` on the Rust
  * side); callers surface a non-blocking notice, never the raw error.
+ *
+ * The payload stays `{ prompt }` exactly when no ceiling is asked for, so the
+ * chat / `/devam` / summarize calls are byte-identical to their pre-#193 shape.
  */
-export async function infer(prompt: string): Promise<string> {
-  return await invoke<string>("plugin:local-inference|infer", { prompt });
+export async function infer(prompt: string, opts?: InferOptions): Promise<string> {
+  const payload =
+    opts?.maxNewTokens === undefined
+      ? { prompt }
+      : { prompt, maxNewTokens: opts.maxNewTokens };
+  return await invoke<string>("plugin:local-inference|infer", payload);
+}
+
+/** Per-call shape knobs for {@link buildCompletionPrompt}. */
+export interface CompletionPromptOptions {
+  /** Ask for a few words / one short sentence on a single line (issue #193).
+   *  The PASSIVE inline ghost-text sets this; the explicit `/devam` command
+   *  does not, because a deliberate "continue" is allowed to be long. */
+  brief?: boolean;
 }
 
 /**
@@ -39,17 +61,27 @@ export async function infer(prompt: string): Promise<string> {
  * + `/devam` shared core). Takes the tail window (`COMPLETION_CONTEXT_CHARS`,
  * code-point-aware so a surrogate pair is never split), wraps it in a fixed
  * continue-from-here instruction. Pure; the result is RAM-only, never stored.
+ *
+ * The length ask is per-call rather than baked in, because both surfaces share
+ * this one builder: shortening it outright would shorten `/devam` too, which is
+ * the surface long continuations are supposed to live on.
  */
-export function buildCompletionPrompt(precedingText: string): string {
+export function buildCompletionPrompt(
+  precedingText: string,
+  opts?: CompletionPromptOptions,
+): string {
   const chars = Array.from(precedingText);
   const window =
     chars.length > COMPLETION_CONTEXT_CHARS
       ? chars.slice(-COMPLETION_CONTEXT_CHARS).join("")
       : precedingText;
+  const length = opts?.brief
+    ? "Reply with at most a few words or one short sentence, on a single line, "
+    : "Reply with only the continuation text, ";
   return (
     "Continue the following note naturally from where it stops. " +
-    "Reply with only the continuation text, in the same language and style, " +
-    "no preamble.\n\n" +
+    length +
+    "in the same language and style, no preamble.\n\n" +
     window
   );
 }

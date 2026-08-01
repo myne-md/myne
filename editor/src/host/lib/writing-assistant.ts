@@ -1,12 +1,12 @@
 import type { EditorState } from "@codemirror/state";
 import { getHost } from "../../host";
-export function infer(prompt: string): Promise<string> {
+export function infer(prompt: string, opts?: { maxNewTokens?: number }): Promise<string> {
   const ai = getHost().ai;
-  return ai ? ai.infer(prompt) : Promise.resolve("");
+  return ai ? ai.infer(prompt, opts) : Promise.resolve("");
 }
-export function buildCompletionPrompt(precedingText: string): string {
+export function buildCompletionPrompt(precedingText: string, opts?: { brief?: boolean }): string {
   const ai = getHost().ai;
-  return ai ? ai.buildCompletionPrompt(precedingText) : precedingText;
+  return ai ? ai.buildCompletionPrompt(precedingText, opts) : precedingText;
 }
 export async function computeContinuation(args: { state: EditorState; infer: (p: string) => Promise<string> }): Promise<string> {
   const preceding = args.state.sliceDoc(0, args.state.selection.main.head);

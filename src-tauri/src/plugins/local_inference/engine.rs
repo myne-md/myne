@@ -72,6 +72,26 @@ pub trait Engine: Send + Sync {
     /// result — no token stream (SYNC-7).
     fn infer(&self, prompt: &str) -> Result<String, EngineError>;
 
+    /// One-shot completion with a caller-supplied generation ceiling (MYND
+    /// issue #193). Same contract as [`Engine::infer`] otherwise.
+    ///
+    /// Exists because the passive inline ghost-text wants a few words, while
+    /// chat and `/devam` want the engine's full budget — and they all ride this
+    /// one command. Generating 512 tokens to show ~15 of them is not just waste:
+    /// it holds the single `compute` lock for the whole budget, which is exactly
+    /// what [`Engine::infer_tags`] has its own ceiling to avoid.
+    ///
+    /// `max_new_tokens` arrives from the WebView and is therefore UNTRUSTED — an
+    /// implementor clamps it to its own ceiling rather than honouring it.
+    ///
+    /// Default: ignore the ceiling and run [`Engine::infer`] — correct for any
+    /// engine with no per-call bound (the stub echoes, so there is nothing to
+    /// bound). The caller trims the text it shows either way, so the default
+    /// degrades to "slower than it needed to be", never to a wrong answer.
+    fn infer_bounded(&self, prompt: &str, _max_new_tokens: usize) -> Result<String, EngineError> {
+        self.infer(prompt)
+    }
+
     /// Embedding vector for `text`. Real models return a fixed dimensionality
     /// (task 4: 384); the stub returns [`STUB_EMBED_DIM`] zeros.
     fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError>;
@@ -328,6 +348,19 @@ mod tests {
         let out = engine.infer("hello").expect("stub infer never fails");
         assert!(!out.is_empty());
         assert!(out.contains("hello"));
+    }
+
+    #[test]
+    fn default_infer_bounded_falls_back_to_infer() {
+        // The stub echoes, so there is nothing to bound — the default must still
+        // ANSWER. A default that returned an error or an empty string would make
+        // every ghost-text request on a stub-engine build (the E2E lane) silent.
+        let engine: &dyn Engine = &StubEngine;
+        assert_eq!(
+            engine.infer_bounded("hello", 24),
+            engine.infer("hello"),
+            "an engine with no per-call ceiling answers as if unbounded"
+        );
     }
 
     #[test]

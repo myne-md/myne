@@ -291,10 +291,15 @@ export interface EditorHost {
   /** Open an external URL in the OS browser (autolink click). */
   openExternal: (url: string) => void;
 
-  /** OPTIONAL — on-device AI. Omit to hide ghost-text + AI slash commands. */
+  /** OPTIONAL — on-device AI. Omit to hide ghost-text + AI slash commands.
+   *
+   *  Both per-call option bags are OPTIONAL parameters on purpose: an
+   *  implementation written against the older 1-argument shape stays assignable,
+   *  and simply gets the unbounded, non-brief behaviour rather than failing to
+   *  compile. A host that ignores them is slower and wordier, never broken. */
   ai?: {
-    infer: (prompt: string) => Promise<string>;
-    buildCompletionPrompt: (precedingText: string) => string;
+    infer: (prompt: string, opts?: { maxNewTokens?: number }) => Promise<string>;
+    buildCompletionPrompt: (precedingText: string, opts?: { brief?: boolean }) => string;
     buildTitlePrompt: (noteBody: string) => string;
   };
 
