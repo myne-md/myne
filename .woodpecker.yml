@@ -740,18 +740,6 @@ steps:
       - event: [push, manual]
         branch: develop
     depends_on: [web-build]
-    environment:
-      # Force the CLASSIC builder. This box runs three Woodpecker agents sharing
-      # ONE host dockerd, so concurrent `docker build`s from different repos
-      # collide on BuildKit's single per-daemon session — "only one connection
-      # allowed", the session healthcheck fails fatally and the build dies
-      # mid-run (observed killing web-docker-build on #392/#394; MAX_WORKFLOWS=1
-      # can't help — the collision is cross-agent). The web Dockerfile uses NO
-      # BuildKit features (no RUN --mount / heredoc / COPY --link / # syntax=),
-      # so the classic builder is a drop-in with no shared session to collide on
-      # (verified working on the host's docker 29; deprecated-but-functional —
-      # revisit if a per-agent dedicated buildx builder is ever provisioned).
-      DOCKER_BUILDKIT: "0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
@@ -759,11 +747,30 @@ steps:
       # passed in — `version.json` is what makes the deploy observable, and it
       # would otherwise read `unknown` and the smoke gate could not tell a fresh
       # deploy from a stale one.
-      - >
-        docker build -f web/container/Dockerfile
-        --build-arg MYNE_BUILD_COMMIT=$CI_COMMIT_SHA
-        --build-arg MYNE_BUILD_TIMESTAMP=$CI_COMMIT_TIMESTAMP
-        -t myne-web:$CI_COMMIT_SHA -t myne-web:prod .
+      #
+      # RETRY-ON-SESSION-CLASH. This box runs three Woodpecker agents sharing ONE
+      # host dockerd, so concurrent `docker build`s from different repos collide
+      # on BuildKit's single per-daemon session — "only one connection allowed",
+      # the session healthcheck fails fatally and the build dies mid-run (killed
+      # web-docker-build on #392/#394; MAX_WORKFLOWS=1 can't help — the clash is
+      # cross-agent). It is INTERMITTENT (only when another agent builds at the
+      # same moment), so a bounded retry with backoff clears it. DOCKER_BUILDKIT=0
+      # is NOT the escape hatch it looks like: the classic builder produces a
+      # single-manifest image that this daemon's containerd image store rejects
+      # ("failed to validate image signature: expected image index descriptor" —
+      # #395), so BuildKit is mandatory here. A per-agent dedicated buildx builder
+      # would remove the shared session entirely; retry is the low-risk stopgap.
+      - |
+        ok=0
+        for attempt in 1 2 3 4; do
+          if docker build -f web/container/Dockerfile \
+              --build-arg MYNE_BUILD_COMMIT=$CI_COMMIT_SHA \
+              --build-arg MYNE_BUILD_TIMESTAMP=$CI_COMMIT_TIMESTAMP \
+              -t myne-web:$CI_COMMIT_SHA -t myne-web:prod . ; then ok=1; break; fi
+          echo "docker build attempt $attempt failed (likely a cross-agent BuildKit session clash on the shared dockerd); retrying in 30s"
+          sleep 30
+        done
+        [ "$ok" = "1" ]
       # Gate the image BEFORE it is deployed. This is the check that would have
       # caught a container serving no CSP, no COOP and no COEP with a valid
       # config, and a `/healthz` answering 200 with the whole SPA — both shipped
