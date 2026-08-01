@@ -1,338 +1,86 @@
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+// Mobile binding for the SHARED graph renderer (myne-md/myne#200).
+//
+// What used to be here was a second renderer: ~470 lines of SVG with its own
+// node colour, radius formula, label placement, zoom clamp and gesture code —
+// which is why the two clients drew visibly different pictures of the same
+// vault. It also stopped scaling once #199 made this client render unlinked
+// notes too: one `<g>`, `<circle>` and `<text>` per note, and nothing culled at
+// fit zoom. The shared canvas batches its draw calls and culls off-screen.
+//
+// Everything left here is genuinely per-client: the worker constructor (its URL
+// has to be statically analysable by THIS bundler) and the `vault.graph` flush,
+// which on mobile carries a once-per-unlock hydration latch desktop has no
+// equivalent for. Graph SETTINGS stay at their defaults — this client has no
+// settings panel yet, and making the values cross devices is #201.
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { NoteGraph } from "../lib/wikilinks";
-import { clampK, fitTransform } from "@myne/editor/host/notes/graphCamera";
-import { runLayout } from "@myne/editor/host/notes/graphLayoutRun";
-import type { LayoutRequest } from "@myne/editor/host/notes/graphLayout";
-import {
-  isEdgeVisible,
-  isNodeVisible,
-  visibleBounds,
-  type ViewTransform,
-} from "@myne/editor/host/notes/graphCulling";
-import {
-  getGraphPosition,
-  seedInitialPosition,
-  setGraphPositions,
-} from "@myne/editor/host/notes/graphLayoutStore";
+import type { GraphModel } from "@myne/editor/host/notes/graphModel";
+import GraphCanvas from "@myne/editor/host/notes/GraphCanvas";
+import { hasGraphLayout } from "@myne/editor/host/notes/graphLayoutStore";
 import {
   ensureGraphLayoutHydrated,
   flushGraphLayoutNow,
   scheduleGraphLayoutFlush,
 } from "../lib/graph-layout-persist";
 
-/** The shared worker entry, wired here because only this client's bundler can
- *  resolve the URL (see `graph-layout.worker.ts`). */
 const makeLayoutWorker = () =>
   new Worker(new URL("../lib/graph-layout.worker.ts", import.meta.url), {
     type: "module",
   });
 
-// Render tuning that used to live in the retired mobile kernel. It survives
-// here only until the shared canvas renderer takes over.
-/** Cull margin in graph units — covers the max node radius (13) + label row. */
-const CULL_MARGIN = 48;
-/** Below this zoom, labels are hidden (zoomed-out = the calm overview). */
-const LABEL_LOD_K = 0.9;
-/** At/above this zoom, labels widen to the fine truncation. */
-const LABEL_FINE_K = 2.2;
-const LABEL_COARSE_CHARS = 14;
-const LABEL_FINE_CHARS = 28;
-
-function truncate(s: string, n: number): string {
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
-}
-
-/** A laid-out node plus the render-only fields (title drives the label, degree
- *  the radius). `fixed` pins a node to the finger while dragging. */
-type SimNode = {
-  id: string;
-  x: number;
-  y: number;
-  fixed: boolean;
-  title: string;
-  degree: number;
-};
-
-/**
- * A force-directed wikilink graph — connected notes repel, links pull them
- * together, so the layout is organic (Obsidian-style) rather than a rigid ring.
- * Nodes are DRAGGABLE (drag to rearrange, the rest reacts); a tap opens the
- * note; the background pans (one finger), pinches (two), and double-taps back
- * to fit. EVERY note in the graph model is a node, including unlinked ones —
- * an orphan is a first-class result here, not something to hide (it is how you
- * find the note you forgot to link), and the desktop graph has always shown
- * them (myne-md/myne#199). The sim cools to idle to save battery and reheats
- * whenever you touch it.
- *
- * Layout lifecycle (MYND-530 — the desktop graph rework's mobile port):
- * positions hydrate from the encrypted `vault.graph` cache (once per unlock
- * session) so a remounting tab restores the previous arrangement instead of
- * recomputing; a fully-restored layout mounts SETTLED (alpha 0 — it visibly
- * stays put); a cold vault computes its first layout off-thread via
- * `runLayout` (worker with sync fallback); positions flush back (debounced)
- * on drag-end / sim-idle / worker-apply, synchronously on unmount, and drop
- * from RAM on vault lock (`lockVault()`).
- */
-export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: string) => void }) {
+export function WikiGraph({ model, onOpen }: { model: GraphModel; onOpen: (id: string) => void }) {
   const { t } = useTranslation();
-  const graphNodes = graph.nodes;
-
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const nodesRef = useRef<SimNode[]>([]);
-  const byId = useRef<Map<string, SimNode>>(new Map());
-  const rafRef = useRef<number | null>(null);
-  const dragRef = useRef<{ id: string; moved: boolean; sx: number; sy: number } | null>(null);
-  const [, tick] = useReducer((x: number) => (x + 1) % 1_000_000, 0);
-  const [size, setSize] = useState({ w: 340, h: 480 });
-  const [measured, setMeasured] = useState(false);
-
-  // The rAF chains (sim + render) outlive any single render, so everything
-  // they touch lives in refs — a stale closure can never integrate against an
-  // old box size or edge set.
-  const sizeRef = useRef(size);
-  sizeRef.current = size;
-  const edgesRef = useRef(graph.edges);
-  edgesRef.current = graph.edges;
-
-  // Pan/zoom view transform (screen = graph * k + translate). Ref, not state:
-  // gestures mutate it and coalesce a render — no per-move React commit.
-  const viewRef = useRef<ViewTransform>({ x: 0, y: 0, k: 1 });
-  const renderRafRef = useRef<number | null>(null);
-  // Background gesture pointers (node drags never land here — the node
-  // handlers stopPropagation). pointerId → last svg-local position.
-  const svgPtrs = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const tapRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
-  const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null);
-
-  // Flow-test observability (mirrors the desktop E2E contract, SYNC-8 —
-  // bounded values only, never a note id or coordinate).
-  const layoutNonceRef = useRef(0);
-  const hydratedRef = useRef(false);
-  const settledRef = useRef(false);
-
-  // Measure the available area so the sim runs in real pixels (1 svg unit =
-  // 1px at k=1). The first real measurement opens the `measured` gate the
-  // layout effect waits behind — seeding against the default box would bake
-  // wrong geometry into the persisted layout.
-  useLayoutEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const measure = () => {
-      setSize({ w: el.clientWidth || 340, h: el.clientHeight || 480 });
-      setMeasured(true);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const idsKey = graphNodes.map((n) => n.id).join(",");
-
-  // (Re)build the simulation when the node set changes (NOT on resize —
-  // desktop parity: a rotation/box change re-renders at current positions,
-  // never re-layouts). Positions come from, in precedence order: the live sim
-  // (tab still mounted), the hydrated `vault.graph` store, or the
-  // deterministic jittered ring. The classification decides motion:
-  // fully-restored → settled at alpha 0; partially → gentle settle; cold →
-  // off-thread layout, then frozen.
+  // The shared canvas keys its layout effect on the model's IDENTITY, and this
+  // client rebuilds the model on every `bodies` change — i.e. every save. Left
+  // alone, editing a note with the graph open would tear down and re-seed the
+  // canvas on each keystroke's save. Hold the model steady until its CONTENT
+  // actually changes (the `idsKey` discipline the retired renderer used, plus
+  // titles, which drive the labels).
+  const contentKey = useMemo(
+    () =>
+      model.nodes.map((n) => `${n.id}${n.title ?? ""}`).join("") +
+      "" +
+      model.edges.map((e) => `${e.source}${e.target}`).join(""),
+    [model],
+  );
+  const stableModel = useRef(model);
+  const stableKey = useRef(contentKey);
+  if (stableKey.current !== contentKey) {
+    stableKey.current = contentKey;
+    stableModel.current = model;
+  }
+  const canvasModel = stableModel.current;
+  // Hydrate `vault.graph` before the canvas mounts, so its first layout
+  // warm-starts from the persisted arrangement instead of computing a cold one
+  // and overwriting it. The latch inside makes every later mount a no-op.
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    if (!measured) return;
     let cancelled = false;
-    layoutNonceRef.current += 1;
-
-    void (async () => {
-      await ensureGraphLayoutHydrated();
-      if (cancelled) return;
-
-      const prev = byId.current;
-      let persisted = 0;
-      const seeded = graphNodes.map((n, i) => {
-        const keep = prev.get(n.id);
-        const stored = keep ? undefined : getGraphPosition(n.id);
-        if (keep || stored) persisted += 1;
-        // Same seed function the kernel uses, in the same fixed virtual box —
-        // so the pre-layout frame and the settled layout share one geometry.
-        const p = keep ?? seedInitialPosition(stored, n.id, i, graphNodes.length);
-        const node: SimNode =
-          keep ?? { id: n.id, title: n.title, degree: n.degree, x: p.x, y: p.y, fixed: false };
-        node.degree = n.degree;
-        node.title = n.title;
-        return node;
-      });
-      nodesRef.current = seeded;
-      byId.current = new Map(seeded.map((s) => [s.id, s]));
-      hydratedRef.current = persisted > 0;
-
-      const fitAndRender = () => {
-        viewRef.current = fitTransform(nodesRef.current, sizeRef.current.w, sizeRef.current.h);
-        tick();
-      };
-
-      if (seeded.length === 0 || persisted === seeded.length) {
-        // Fully restored (or empty): the arrangement stays put — that IS the
-        // persistence feature. No layout run, no write (nothing changed).
-        settledRef.current = true;
-        fitAndRender();
-        return;
-      }
-
-      // Anything not fully restored re-runs the shared kernel, warm-started
-      // from whatever IS known. There is no live cooling sim any more: the
-      // kernel runs its bounded budget once and the result is final, which is
-      // how the desktop graph has always behaved. Paint the seeded frame first
-      // so the tab is never blank while it runs.
-      fitAndRender();
-      const req: LayoutRequest = {
-        nodes: seeded.map((n) => ({ id: n.id })),
-        edges: edgesRef.current.map((e) => ({ source: e.from, target: e.to })),
-        seed: Object.fromEntries(
-          seeded.filter((n) => getGraphPosition(n.id)).map((n) => [n.id, { x: n.x, y: n.y }]),
-        ),
-      };
-      const res = await runLayout(req, makeLayoutWorker);
-      if (cancelled) return;
-      for (const p of res.positions) {
-        const n = byId.current.get(p.id);
-        if (n && !n.fixed) {
-          n.x = p.x;
-          n.y = p.y;
-        }
-      }
-      setGraphPositions(res.positions);
-      scheduleGraphLayoutFlush();
-      settledRef.current = true;
-      fitAndRender();
-    })();
-
+    void ensureGraphLayoutHydrated().then(() => {
+      if (!cancelled) setHydrated(true);
+    });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey, measured]);
+  }, []);
 
-  /** One coalesced render for gesture-driven view changes (single rAF). */
-  function scheduleRender() {
-    if (renderRafRef.current != null) return;
-    renderRafRef.current = requestAnimationFrame(() => {
-      renderRafRef.current = null;
-      tick();
-    });
-  }
-
-  // Pointer → svg-local pixel coords.
-  function toLocal(e: { clientX: number; clientY: number }): { x: number; y: number } {
-    const r = svgRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  }
-
-  // svg-local → graph-space (inverse of screen = graph * k + translate).
-  function toGraph(p: { x: number; y: number }): { x: number; y: number } {
-    const v = viewRef.current;
-    return { x: (p.x - v.x) / v.k, y: (p.y - v.y) / v.k };
-  }
-
-  function fitToContent() {
-    viewRef.current = fitTransform(nodesRef.current, sizeRef.current.w, sizeRef.current.h);
-    scheduleRender();
-  }
-
-  // Background gestures: one pointer pans, two pinch (zoom about the
-  // midpoint), a quick double-tap refits. Ignored entirely while a node drag
-  // is active.
-  function onSvgPointerDown(ev: React.PointerEvent<SVGSVGElement>) {
-    if (dragRef.current) return;
-    svgRef.current?.setPointerCapture?.(ev.pointerId);
-    const p = toLocal(ev);
-    svgPtrs.current.set(ev.pointerId, p);
-    tapRef.current = svgPtrs.current.size === 1 ? { x: p.x, y: p.y, moved: false } : null;
-  }
-
-  function onSvgPointerMove(ev: React.PointerEvent<SVGSVGElement>) {
-    const pts = svgPtrs.current;
-    const prev = pts.get(ev.pointerId);
-    if (!prev) return;
-    const cur = toLocal(ev);
-    const v = viewRef.current;
-    if (pts.size === 1) {
-      if (tapRef.current && Math.hypot(cur.x - tapRef.current.x, cur.y - tapRef.current.y) > 8) {
-        tapRef.current.moved = true;
-      }
-      v.x += cur.x - prev.x;
-      v.y += cur.y - prev.y;
-      pts.set(ev.pointerId, cur);
-      scheduleRender();
-    } else if (pts.size === 2) {
-      tapRef.current = null;
-      const otherEntry = [...pts.entries()].find(([id]) => id !== ev.pointerId);
-      if (!otherEntry) return;
-      const other = otherEntry[1];
-      const d0 = Math.hypot(prev.x - other.x, prev.y - other.y);
-      const d1 = Math.hypot(cur.x - other.x, cur.y - other.y);
-      pts.set(ev.pointerId, cur);
-      const k2 = clampK(v.k * (d1 / Math.max(d0, 1e-6)));
-      const m0 = { x: (prev.x + other.x) / 2, y: (prev.y + other.y) / 2 };
-      const m1 = { x: (cur.x + other.x) / 2, y: (cur.y + other.y) / 2 };
-      // Zoom about the old midpoint, then pan by the midpoint's travel.
-      v.x = m0.x - ((m0.x - v.x) * k2) / v.k;
-      v.y = m0.y - ((m0.y - v.y) * k2) / v.k;
-      v.k = k2;
-      v.x += m1.x - m0.x;
-      v.y += m1.y - m0.y;
-      scheduleRender();
-    }
-  }
-
-  function onSvgPointerUp(ev: React.PointerEvent<SVGSVGElement>) {
-    const p = svgPtrs.current.get(ev.pointerId);
-    svgPtrs.current.delete(ev.pointerId);
-    svgRef.current?.releasePointerCapture?.(ev.pointerId);
-    if (!p || !tapRef.current || tapRef.current.moved) {
-      tapRef.current = null;
-      return;
-    }
-    // A clean background tap — double-tap (<300 ms, <30 px apart) refits.
-    const now = performance.now();
-    const last = lastTapRef.current;
-    if (last && now - last.t < 300 && Math.hypot(p.x - last.x, p.y - last.y) < 30) {
-      lastTapRef.current = null;
-      fitToContent();
-    } else {
-      lastTapRef.current = { t: now, x: p.x, y: p.y };
-    }
-    tapRef.current = null;
-  }
-
-  function onSvgPointerCancel(ev: React.PointerEvent<SVGSVGElement>) {
-    svgPtrs.current.delete(ev.pointerId);
-    tapRef.current = null;
-  }
-
-  // Unmount: stop both rAF chains and flush the freshest positions — the tab
-  // unmounts on every navigation, so this is the hot persistence seam. NO
-  // store write here: after a lock reset this must stay a no-op (the
-  // `hasGraphLayout()` guard inside the flush), never re-populating the store
-  // with the locked vault's positions.
-  useEffect(
-    () => () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-      if (renderRafRef.current != null) cancelAnimationFrame(renderRafRef.current);
-      void flushGraphLayoutNow();
-    },
-    [],
-  );
+  // The tab unmounts on every navigation, so this is the hot persistence seam:
+  // flush synchronously rather than leaving a drag inside the debounce window.
+  // The `hasGraphLayout()` guard inside makes a post-lock call a no-op, so it
+  // can never re-write a locked vault's positions.
+  useEffect(() => () => void flushGraphLayoutNow(), []);
 
   const paneAttrs = {
     "data-testid": "editor.graph-pane",
-    "data-node-count": graphNodes.length,
-    "data-layout-hydrated": hydratedRef.current ? "true" : "false",
-    "data-layout-nonce": String(layoutNonceRef.current),
-    "data-layout-settled": settledRef.current ? "true" : "false",
+    "data-node-count": model.nodes.length,
+    // Whether the persisted `vault.graph` held anything for this vault. The
+    // per-run observability (`data-layout-settled`, the force-relayout
+    // counters, the camera) lives on the canvas itself, where the runs happen.
+    "data-layout-hydrated": hasGraphLayout() ? "true" : "false",
   } as const;
 
-  if (graphNodes.length === 0) {
+  if (model.nodes.length === 0) {
     return (
       <div {...paneAttrs} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 44px", textAlign: "center", gap: 10 }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-1)" }}>{t("wikiGraph.emptyTitle")}</div>
@@ -343,104 +91,16 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
     );
   }
 
-  const nodes = nodesRef.current;
-  const maxDeg = Math.max(1, ...graphNodes.map((n) => n.degree));
-  const view = viewRef.current;
-  // Cull before mapping to SVG elements — off-screen notes never become DOM
-  // nodes, which is what keeps a large vault's graph responsive when zoomed in.
-  const bounds = visibleBounds(view, size.w, size.h, CULL_MARGIN);
-  const showLabels = view.k >= LABEL_LOD_K;
-  const labelChars = view.k >= LABEL_FINE_K ? LABEL_FINE_CHARS : LABEL_COARSE_CHARS;
-
   return (
     <div {...paneAttrs} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <div ref={wrapRef} style={{ flex: 1, minHeight: 0, position: "relative", touchAction: "none", overflow: "hidden" }}>
-        <svg
-          ref={svgRef}
-          width="100%"
-          height="100%"
-          viewBox={`0 0 ${size.w} ${size.h}`}
-          style={{ display: "block", touchAction: "none" }}
-          onPointerDown={onSvgPointerDown}
-          onPointerMove={onSvgPointerMove}
-          onPointerUp={onSvgPointerUp}
-          onPointerCancel={onSvgPointerCancel}
-        >
-          <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
-            {graph.edges.map((e) => {
-              const a = byId.current.get(e.from);
-              const b = byId.current.get(e.to);
-              if (!a || !b || !isEdgeVisible(a, b, bounds)) return null;
-              return (
-                <line
-                  key={`${e.from}:${e.to}`}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke="var(--line-2)"
-                  strokeWidth={1}
-                  strokeOpacity={0.8}
-                  vectorEffect="non-scaling-stroke"
-                />
-              );
-            })}
-            {nodes.map((n) => {
-              if (!isNodeVisible(n, bounds)) return null;
-              const r = 5 + (n.degree / maxDeg) * 8;
-              return (
-                <g
-                  key={n.id}
-                  style={{ cursor: "pointer", touchAction: "none" }}
-                  onPointerDown={(ev) => {
-                    ev.stopPropagation();
-                    (ev.currentTarget as SVGGElement).setPointerCapture?.(ev.pointerId);
-                    const p = toLocal(ev);
-                    dragRef.current = { id: n.id, moved: false, sx: p.x, sy: p.y };
-                    n.fixed = true;
-                  }}
-                  onPointerMove={(ev) => {
-                    const d = dragRef.current;
-                    if (!d || d.id !== n.id) return;
-                    const p = toLocal(ev);
-                    // Tap-vs-drag threshold in SCREEN px so a tap opens the
-                    // note at any zoom level.
-                    if (Math.abs(p.x - d.sx) + Math.abs(p.y - d.sy) > 4) d.moved = true;
-                    const g = toGraph(p);
-                    n.x = g.x;
-                    n.y = g.y;
-                    tick();
-                  }}
-                  onPointerUp={(ev) => {
-                    const d = dragRef.current;
-                    dragRef.current = null;
-                    n.fixed = false;
-                    if (d && !d.moved) {
-                      onOpen(n.id);
-                    } else if (d) {
-                      // Drag-end: the dragged node stays where it was put and
-                      // nothing else moves — the desktop graph's behaviour, and
-                      // now this one's. The live cooling sim that used to nudge
-                      // the neighbours went with the hand-rolled kernel.
-                      setGraphPositions(nodesRef.current.map((s) => ({ id: s.id, x: s.x, y: s.y })));
-                      scheduleGraphLayoutFlush();
-                    }
-                    (ev.currentTarget as SVGGElement).releasePointerCapture?.(ev.pointerId);
-                  }}
-                  onPointerCancel={() => { dragRef.current = null; n.fixed = false; }}
-                >
-                  <circle cx={n.x} cy={n.y} r={r} fill="var(--accent)" />
-                  {showLabels && (
-                    <text x={n.x} y={n.y + r + 12} textAnchor="middle" fontSize={10} fill="var(--fg-2)" style={{ fontFamily: "var(--font-sans)", pointerEvents: "none" }}>
-                      {truncate(n.title, labelChars)}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-          </g>
-        </svg>
-      </div>
+      {hydrated && (
+        <GraphCanvas
+          model={canvasModel}
+          makeWorker={makeLayoutWorker}
+          onPositionsChanged={scheduleGraphLayoutFlush}
+          onNodeClick={onOpen}
+        />
+      )}
     </div>
   );
 }

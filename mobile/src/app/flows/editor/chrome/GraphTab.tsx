@@ -1,13 +1,19 @@
 import { useTranslation } from "react-i18next";
-import type { NoteGraph } from "../../../../lib/wikilinks";
+import type { GraphModel } from "@myne/editor/host/notes/graphModel";
 import { WikiGraph } from "../../../../components/WikiGraph";
 
-/** Graph tab — a real wikilink graph over the loaded notes (mobile counterpart
- *  to the desktop vault-indices link layer; see lib/wikilinks.ts). */
-export function GraphTab({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: string) => void }) {
+/** Graph tab — the shared wikilink graph, rendered by the shared canvas
+ *  (myne-md/myne#200). The header counts stay: how much of the vault is
+ *  actually connected is the question the graph exists to answer. */
+export function GraphTab({ model, onOpen }: { model: GraphModel; onOpen: (id: string) => void }) {
   const { t } = useTranslation();
-  const linked = graph.nodes.filter((n) => n.degree > 0).length;
-  const links = graph.edges.length;
+  const degree = new Map<string, number>();
+  for (const e of model.edges) {
+    degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
+    degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
+  }
+  const linked = model.nodes.filter((n) => (degree.get(n.id) ?? 0) > 0).length;
+  const links = model.edges.length;
   return (
     <>
       <div style={{ flex: "none", padding: "8px 20px 0", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
@@ -18,7 +24,7 @@ export function GraphTab({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: str
           </span>
         )}
       </div>
-      <WikiGraph graph={graph} onOpen={onOpen} />
+      <WikiGraph model={model} onOpen={onOpen} />
     </>
   );
 }

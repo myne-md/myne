@@ -85,7 +85,7 @@ import { deriveTitleSnippet } from "../../lib/note-title";
 import { searchIndexReplace } from "../../lib/search";
 import { vaultIndicesApply, vaultIndicesAllEdges, vaultIndicesPropertyValues, vaultIndicesPropertyKeys, type WikilinkEdge } from "../../lib/vault-indices";
 import { extractRecord } from "../../lib/indices-extract";
-import { buildGraphFromEdges, clientEdges } from "../../lib/backend-graph";
+import { buildNoteGraphAndModel, clientEdges } from "../../lib/backend-graph";
 import { MarkdownView } from "../../components/MarkdownView";
 import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
@@ -684,10 +684,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     }
   }, [listView]);
 
-  // The wikilink graph over the RESOLVER note-set — feeds both the Graph tab
-  // and the in-editor "Linked from" backlinks.
-  const noteGraph = useMemo(
-    () => buildGraphFromEdges(resolverNotes, backendEdges ?? clientEdges(resolverNotes, bodies)),
+  // The wikilink graph over the RESOLVER note-set. The Graph tab renders the
+  // shared MODEL directly (the shared canvas takes it as-is); the in-editor
+  // "Linked from" list reads the projection. One build, both consumers.
+  const { graph: noteGraph, model: graphModel } = useMemo(
+    () => buildNoteGraphAndModel(resolverNotes, backendEdges ?? clientEdges(resolverNotes, bodies)),
     [backendEdges, resolverNotes, bodies],
   );
   // The `#tag` index over the LIVE notes — drives the notes-list tag filter.
@@ -2206,7 +2207,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           </>
         )}
 
-        {tab === "graph" && <GraphTab graph={noteGraph} onOpen={(id) => void openFromList(id)} />}
+        {tab === "graph" && <GraphTab model={graphModel} onOpen={(id) => void openFromList(id)} />}
         {tab === "files" && <AttachmentsSheet variant="page" onClose={() => setTab("notes")} />}
         {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
             Files destination above — one component serving both a full-screen
