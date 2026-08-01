@@ -596,7 +596,15 @@ fn build_chatml_prompt(prompt: &str) -> String {
 
 /// Blocking Qwen2 generation loop: encode the prompt, then greedily/temperature-
 /// sample one token at a time until EOS or the token cap.
-fn run_infer(loaded: &mut LoadedGen, prompt: &str) -> Result<String, EngineError> {
+///
+/// `max_new_tokens` is per-caller rather than the module constant, for the same
+/// reason [`run_gen_streaming`] takes one: the passive ghost-text asks for a few
+/// words and must not pay (or hold the `compute` lock) for a chat-sized budget.
+fn run_infer(
+    loaded: &mut LoadedGen,
+    prompt: &str,
+    max_new_tokens: usize,
+) -> Result<String, EngineError> {
     let device = loaded.device.clone();
     let templated = build_chatml_prompt(prompt);
     let encoding = loaded
@@ -619,7 +627,7 @@ fn run_infer(loaded: &mut LoadedGen, prompt: &str) -> Result<String, EngineError
     // Prompt pass (position 0), then one token at a time.
     let mut pos = 0usize;
     let mut input_tokens: Vec<u32> = tokens.clone();
-    for _ in 0..MAX_NEW_TOKENS {
+    for _ in 0..max_new_tokens {
         let input = Tensor::new(input_tokens.as_slice(), &device)
             .map_err(|_| EngineError::InferenceFailed)?
             .unsqueeze(0)
@@ -906,6 +914,14 @@ fn run_transcribe(
 
 impl Engine for CandleEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
+        self.infer_bounded(prompt, MAX_NEW_TOKENS)
+    }
+
+    fn infer_bounded(&self, prompt: &str, max_new_tokens: usize) -> Result<String, EngineError> {
+        // The ceiling arrives from the WebView (TB6) — clamp it to this engine's
+        // own budget rather than honouring it. Zero would generate nothing at
+        // all, which would read as "the model had no answer".
+        let capped = max_new_tokens.clamp(1, MAX_NEW_TOKENS);
         // Serialize all GPU work (see `compute`): a concurrent embed on the same
         // Metal device crashes the AGX driver. Held for the whole call.
         let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
@@ -915,12 +931,13 @@ impl Engine for CandleEngine {
         }
         let loaded = guard.as_mut().expect("just loaded");
         let started = Instant::now();
-        let out = run_infer(loaded, prompt);
+        let out = run_infer(loaded, prompt, capped);
         match &out {
             Ok(s) => tracing::info!(
                 target: "myne::ai",
                 op = "infer",
                 elapsed_ms = started.elapsed().as_millis() as u64,
+                max_new_tokens = capped,
                 out_chars = s.chars().count(),
                 "inference complete"
             ),

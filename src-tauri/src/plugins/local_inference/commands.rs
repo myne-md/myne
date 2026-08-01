@@ -65,9 +65,16 @@ pub fn local_inference_error_kind(e: &EngineError) -> &'static str {
 const CHAT_RELEVANCE_THRESHOLD: f32 = 0.30;
 
 /// One-shot completion. Blocking (no stream, SYNC-7).
+///
+/// `max_new_tokens` is the OPTIONAL per-caller generation ceiling (issue #193):
+/// the passive inline ghost-text wants a few words, chat and `/devam` want the
+/// engine's full budget, and all of them ride this one command. Omitted, the
+/// engine's own budget applies — the byte-identical pre-#193 behaviour. Supplied,
+/// the engine clamps it to that budget (the value comes from the WebView, TB6).
 #[tauri::command]
 pub async fn infer(
     prompt: String,
+    max_new_tokens: Option<usize>,
     state: State<'_, LocalInferenceState>,
     priority: State<'_, ComputePriority>,
 ) -> Result<String, EngineError> {
@@ -75,7 +82,7 @@ pub async fn infer(
     // auto-tag pass stands down rather than making the user queue behind it
     // (MYND-651 task 4) — held across the await, dropped on every return path.
     let _interactive = priority.interactive();
-    infer_with_engine(state.engine(), prompt).await
+    infer_with_engine(state.engine(), prompt, max_new_tokens).await
 }
 
 /// Embedding vector for `text`.
@@ -955,14 +962,23 @@ pub async fn get_model_path<R: Runtime>(
 }
 
 /// Testable core of [`infer`]: `Zeroizing`-wrap → `spawn_blocking` → trait.
+///
+/// `None` takes the unbounded path — the same `Engine::infer` call the command
+/// made before #193 — rather than passing a "default" ceiling this layer would
+/// then own. The engine's budget stays the engine's business.
 pub(crate) async fn infer_with_engine(
     engine: Arc<dyn Engine>,
     prompt: String,
+    max_new_tokens: Option<usize>,
 ) -> Result<String, EngineError> {
     // First statement: bound the plaintext to a Zeroizing wrapper so every
     // early return (join failure, engine error) wipes the bytes.
     let prompt = Zeroizing::new(prompt);
-    let joined = tokio::task::spawn_blocking(move || engine.infer(&prompt)).await;
+    let joined = tokio::task::spawn_blocking(move || match max_new_tokens {
+        Some(cap) => engine.infer_bounded(&prompt, cap),
+        None => engine.infer(&prompt),
+    })
+    .await;
     unwrap_join(joined, EngineError::InferenceFailed, "infer")
 }
 
@@ -1018,9 +1034,53 @@ mod tests {
     fn infer_command_core_round_trips_prompt_to_result() {
         let engine: Arc<dyn Engine> = Arc::new(StubEngine);
         let out = rt()
-            .block_on(infer_with_engine(engine, "hello".to_string()))
+            .block_on(infer_with_engine(engine, "hello".to_string(), None))
             .expect("stub infer never fails");
         assert!(out.contains("hello"));
+    }
+
+    /// Records which trait method the core reached, and with what ceiling — the
+    /// bound is invisible from the returned string otherwise, and a ceiling that
+    /// silently never arrives is exactly the #193 bug wearing a fix's shape.
+    struct RecordingEngine {
+        seen: Arc<std::sync::Mutex<Option<Option<usize>>>>,
+    }
+
+    impl Engine for RecordingEngine {
+        fn infer(&self, _prompt: &str) -> Result<String, EngineError> {
+            *self.seen.lock().expect("seen") = Some(None);
+            Ok(String::new())
+        }
+        fn infer_bounded(
+            &self,
+            _prompt: &str,
+            max_new_tokens: usize,
+        ) -> Result<String, EngineError> {
+            *self.seen.lock().expect("seen") = Some(Some(max_new_tokens));
+            Ok(String::new())
+        }
+        fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
+            unreachable!("infer routing only")
+        }
+    }
+
+    #[test]
+    fn infer_command_core_routes_a_ceiling_to_the_bounded_path() {
+        let seen = Arc::new(std::sync::Mutex::new(None));
+        let engine: Arc<dyn Engine> = Arc::new(RecordingEngine { seen: seen.clone() });
+        rt().block_on(infer_with_engine(engine, "hi".to_string(), Some(24)))
+            .expect("recording engine never fails");
+        assert_eq!(*seen.lock().expect("seen"), Some(Some(24)));
+    }
+
+    #[test]
+    fn infer_command_core_leaves_an_unbounded_call_on_the_plain_path() {
+        // The pre-#193 path must stay byte-identical for chat / `/devam`.
+        let seen = Arc::new(std::sync::Mutex::new(None));
+        let engine: Arc<dyn Engine> = Arc::new(RecordingEngine { seen: seen.clone() });
+        rt().block_on(infer_with_engine(engine, "hi".to_string(), None))
+            .expect("recording engine never fails");
+        assert_eq!(*seen.lock().expect("seen"), Some(None));
     }
 
     #[test]

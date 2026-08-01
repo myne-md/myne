@@ -17,6 +17,7 @@ import {
   ghostField,
   ghostShowing,
   setGhostSuggestion,
+  trimGhostCompletion,
 } from "../../src/editor/ai/ghostText";
 
 interface Mounted {
@@ -116,5 +117,40 @@ describe("dismiss paths", () => {
     showGhost(m.view, "xyz", 6);
     m.view.dispatch({ selection: { anchor: 0, head: 0 } });
     expect(ghostShowing(m.view)).toBe(false);
+  });
+});
+
+// #193 — a passive suggestion is a few words, not a paragraph. The token
+// ceiling is what stops the model; this is what makes the result readable, and
+// it is the half that still holds on a host that ignores the ceiling.
+describe("trimGhostCompletion", () => {
+  it("keeps only the first line", () => {
+    expect(trimGhostCompletion("first line\nsecond line\nthird")).toBe("first line");
+  });
+
+  it("cuts after the first sentence end", () => {
+    expect(trimGhostCompletion("a short tail. And a whole second one.")).toBe("a short tail.");
+  });
+
+  it("cuts on non-ASCII sentence enders too", () => {
+    expect(trimGhostCompletion("これは文です。次の文もあります。")).toBe("これは文です。");
+    expect(trimGhostCompletion("really? yes really")).toBe("really?");
+  });
+
+  it("keeps leading whitespace — it separates the ghost from the word before it", () => {
+    expect(trimGhostCompletion(" continuation")).toBe(" continuation");
+  });
+
+  it("drops trailing whitespace", () => {
+    expect(trimGhostCompletion("tail   \n")).toBe("tail");
+  });
+
+  it("passes through a completion that is already a few words", () => {
+    expect(trimGhostCompletion("brown fox")).toBe("brown fox");
+  });
+
+  it("returns empty for empty / whitespace-only output", () => {
+    expect(trimGhostCompletion("")).toBe("");
+    expect(trimGhostCompletion("   \n  ")).toBe("");
   });
 });

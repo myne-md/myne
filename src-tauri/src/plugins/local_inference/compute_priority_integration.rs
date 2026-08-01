@@ -222,7 +222,11 @@ fn a_user_infer_is_not_starved_by_a_running_tag_pass() {
     let user_pri = pri.clone();
     let user = std::thread::spawn(move || {
         let _interactive = user_pri.interactive();
-        let out = rt().block_on(infer_with_engine(user_engine, "summarize this".to_string()));
+        let out = rt().block_on(infer_with_engine(
+            user_engine,
+            "summarize this".to_string(),
+            None,
+        ));
         let _ = done_tx.send(out);
     });
 

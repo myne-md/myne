@@ -11,6 +11,8 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
 const inferMock = vi.fn();
+/** Records the option bag the trigger asks the prompt builder for (#193). */
+const promptOptsMock = vi.fn();
 // Post-extraction, ghostText calls the host bridge `infer` (getHost().ai.infer),
 // not the Tauri `invoke` directly — the IPC now lives in the desktop
 // lib/writing-assistant behind the EditorHost seam. Mock the bridge and assert
@@ -18,11 +20,16 @@ const inferMock = vi.fn();
 // the preceding text flows into the asserted prompt.
 vi.mock("@myne/editor/host/lib/writing-assistant", () => ({
   infer: (...args: unknown[]) => inferMock(...args),
-  buildCompletionPrompt: (preceding: string) => preceding,
+  buildCompletionPrompt: (preceding: string, opts?: unknown) => {
+    promptOptsMock(opts);
+    return preceding;
+  },
 }));
 
 import {
   GHOST_DEBOUNCE_MS,
+  GHOST_MAX_NEW_TOKENS,
+  ghostField,
   ghostShowing,
   ghostTextExtension,
 } from "../../src/editor/ai/ghostText";
@@ -51,6 +58,7 @@ async function flush(): Promise<void> {
 beforeEach(() => {
   vi.useFakeTimers();
   inferMock.mockReset();
+  promptOptsMock.mockReset();
 });
 afterEach(() => {
   view?.destroy();
@@ -71,8 +79,34 @@ describe("ghost trigger (debounce/cancel)", () => {
     });
     await flush();
     expect(inferMock).toHaveBeenCalledTimes(1);
-    expect(inferMock).toHaveBeenCalledWith(expect.stringContaining("Some prose"));
+    expect(inferMock).toHaveBeenCalledWith(expect.stringContaining("Some prose"), {
+      maxNewTokens: GHOST_MAX_NEW_TOKENS,
+    });
     expect(ghostShowing(view!)).toBe(true);
+  });
+
+  // #193 — the passive suggestion is a few words. The ceiling is the host's
+  // half; these two are the parts that survive a host which ignores it.
+  it("asks for the BRIEF prompt shape, not the one `/devam` uses", async () => {
+    inferMock.mockResolvedValue("x");
+    mount("Some prose");
+    view!.dispatch({
+      changes: { from: view!.state.doc.length, insert: "." },
+      selection: { anchor: view!.state.doc.length + 1 },
+    });
+    await flush();
+    expect(promptOptsMock).toHaveBeenCalledWith({ brief: true });
+  });
+
+  it("trims a paragraph reply to one line before it reaches the widget", async () => {
+    inferMock.mockResolvedValue(" a short tail. And a whole second sentence.\nPlus a paragraph.");
+    mount("Some prose");
+    view!.dispatch({
+      changes: { from: view!.state.doc.length, insert: "." },
+      selection: { anchor: view!.state.doc.length + 1 },
+    });
+    await flush();
+    expect(view!.state.field(ghostField)?.text).toBe(" a short tail.");
   });
 
   it("does not pile up calls: rapid edits reschedule a single timer", async () => {

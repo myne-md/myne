@@ -30,6 +30,44 @@ import { buildCompletionPrompt, infer } from "@myne/editor/host/lib/writing-assi
  *  spell's 120ms scan — a completion is heavier + more interruptive. */
 export const GHOST_DEBOUNCE_MS = 700;
 
+/** Generation ceiling asked of the host for ONE ghost request (issue #193).
+ *
+ *  The passive suggestion is a few words; the shared `infer` command's own
+ *  budget is 512 tokens, sized for chat. Generating 512 to show ~15 is not only
+ *  slow — the engine holds its single compute lock for the whole budget.
+ *
+ *  24 rather than the ~8 a "few words" implies: the ceiling is a hard stop, so a
+ *  tight one truncates mid-word. Ask for a little slack, then cut cleanly in
+ *  {@link trimGhostCompletion}. */
+export const GHOST_MAX_NEW_TOKENS = 24;
+
+/** Sentence terminators the trim cuts after — ASCII, the ellipsis, and the CJK
+ *  full stop / question / exclamation, since the ghost is language-agnostic. */
+const SENTENCE_END = /[.!?…。！？]/;
+
+/**
+ * Shape a raw completion into something that can sit inline after the cursor:
+ * first line only, cut after the first sentence end, no trailing whitespace.
+ * Pure.
+ *
+ * Belt to the token ceiling's braces — a bound is what stops the model, this is
+ * what makes what it produced *readable* — and the half that is backend-agnostic
+ * (it maps onto a `stop` sequence for any engine that grows one).
+ *
+ * Leading whitespace is KEPT: the widget renders at the cursor, so a completion
+ * that starts with a space is what separates it from the word before it.
+ *
+ * Not trimmed back to the last word boundary: with no truncation signal from the
+ * host, "ends mid-word" and "ends on a short word" are indistinguishable here,
+ * and cutting would eat the last word of every legitimately-short suggestion.
+ */
+export function trimGhostCompletion(raw: string): string {
+  const firstLine = raw.split("\n", 1)[0] ?? "";
+  const end = firstLine.search(SENTENCE_END);
+  const sentence = end === -1 ? firstLine : firstLine.slice(0, end + 1);
+  return sentence.replace(/\s+$/, "");
+}
+
 /** The live ghost suggestion: the model text + the doc offset it applies at. */
 export interface GhostValue {
   text: string;
@@ -160,7 +198,13 @@ const ghostTriggerPlugin = ViewPlugin.fromClass(
       if (preceding.trim().length === 0) return; // nothing to continue from
       let completion: string;
       try {
-        completion = await infer(buildCompletionPrompt(preceding));
+        // Brief prompt + short ceiling + trim (issue #193): the passive
+        // suggestion is a few words. `/devam` asks the same builder for the
+        // unbounded shape, which is where a long continuation belongs.
+        const raw = await infer(buildCompletionPrompt(preceding, { brief: true }), {
+          maxNewTokens: GHOST_MAX_NEW_TOKENS,
+        });
+        completion = trimGhostCompletion(raw);
       } catch {
         return; // engine off / error — no ghost
       }
