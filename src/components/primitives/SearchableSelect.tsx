@@ -393,6 +393,11 @@ export function SearchableSelect<T extends string>({
           <div
             ref={menuRef}
             data-testid={menuTestId}
+            // The menu is portaled out of whatever opened it, so a dialog's
+            // focus trap sees the search box below as "outside" and pulls
+            // focus back the moment it lands — leaving the box untypable.
+            // This marks the surface as belonging to its opener.
+            data-focus-trap-portal=""
             style={{
               ...MENU_STYLE,
               top: coords.top,

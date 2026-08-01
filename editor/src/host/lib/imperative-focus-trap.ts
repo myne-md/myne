@@ -32,6 +32,29 @@ export interface TrapFocusOptions {
 const activeTraps: { container: HTMLElement }[] = [];
 
 /**
+ * Marks a portalled surface — a menu or popover that a trapped dialog opened,
+ * but that React renders under `<body>` so it is not clipped by the dialog's
+ * own overflow. Focus landing in one is NOT an escape: the surface belongs to
+ * the dialog logically, just not in the DOM. The opener sets the attribute,
+ * because nothing about the node itself says which dialog owns it.
+ *
+ * Without this the containment listener fires the instant such a surface
+ * focuses anything of its own and yanks focus straight back, which is not a
+ * cosmetic difference — the surface becomes untypable. `SettingsModal` +
+ * `SearchableSelect` shipped exactly that: the language picker's search box
+ * could not receive a single keystroke (#182 fixed WHEN the box is focused;
+ * the trap then took the focus away again, so the box still never held it).
+ */
+const PORTAL_ATTR = "data-focus-trap-portal";
+
+/** Whether `target` receiving focus means focus has left `container`. */
+function escapesTrap(container: HTMLElement, target: Node | null): boolean {
+  if (target === null || container.contains(target)) return false;
+  const el = target instanceof Element ? target : target.parentElement;
+  return el === null || el.closest(`[${PORTAL_ATTR}]`) === null;
+}
+
+/**
  * Trap keyboard focus inside `container`. Returns a release function that
  * removes the listeners and (by default) restores focus to whatever was
  * focused before the trap was installed.
@@ -86,8 +109,7 @@ export function trapFocus(
 
   const onFocusIn = (e: FocusEvent) => {
     if (!isInnermost()) return;
-    const target = e.target as Node | null;
-    if (target && !container.contains(target)) {
+    if (escapesTrap(container, e.target as Node | null)) {
       (focusableWithin(container)[0] ?? container).focus();
     }
   };
