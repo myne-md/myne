@@ -132,6 +132,7 @@ export function StoragePanel({
   return (
     <div style={PANEL_ROOT_STYLE}>
       <ControlBlock
+        anchorId="storage.location"
         label={t("settings.storage.locationLabel")}
         helper={t("settings.storage.locationHelper")}
         control={
@@ -155,6 +156,7 @@ export function StoragePanel({
       />
 
       <SettingRow
+        anchorId="storage.import"
         label={t("settings.storage.importLabel")}
         helper={t("settings.storage.importHelper")}
         control={
@@ -170,6 +172,7 @@ export function StoragePanel({
       />
 
       <SettingRow
+        anchorId="storage.backup"
         label={t("settings.storage.backupLabel")}
         helper={t("settings.storage.backupHelper")}
         control={
@@ -197,6 +200,7 @@ export function StoragePanel({
       <AutomaticBackupBlock onShowToast={onShowToast} />
 
       <ControlBlock
+        anchorId="storage.export"
         label={t("settings.storage.exportLabel")}
         helper={t("settings.storage.exportHelper")}
         control={

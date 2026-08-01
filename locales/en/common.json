@@ -1649,7 +1649,7 @@
         "chooseFolder": "Choose folder…",
         "laterHint": "You can always import later from Settings → Storage.",
         "notNow": "Not now",
-        "title": "Import your Obsidian vault?"
+        "title": "Import your notes?"
       },
       "picker": {
         "intro": "Where are your notes coming from?"
@@ -2405,6 +2405,8 @@
       "folderHelper": "Where new daily notes are filed. Defaults to {{default}} — the folder is kept even when empty.",
       "folderLabel": "Daily note folder",
       "folderSaveError": "Couldn't save the daily folder. Please try again.",
+      "folderSearchEmpty": "No folders match.",
+      "folderSearchPlaceholder": "Search folders…",
       "searchEmpty": "No templates match.",
       "searchPlaceholder": "Search templates…",
       "templateHelper": "Pick a template to start each daily note from, or leave blank for an empty note titled with the date.",
@@ -2441,6 +2443,8 @@
       "newNote": {
         "folderLabel": "Folder for new notes",
         "folderPlaceholder": "e.g. Inbox/",
+        "folderSearchEmpty": "No folders match.",
+        "folderSearchPlaceholder": "Search folders…",
         "helper": "Where newly created notes are placed.",
         "label": "Default location for new notes",
         "optionCurrent": "Same folder as current note",
@@ -2791,6 +2795,13 @@
         "editing": "Editing",
         "writing": "Writing",
         "features": "Features"
+      },
+      "preview": {
+        "heading": "The quick brown fox",
+        "bullet1": "Pack my box with five dozen liquor jugs",
+        "bullet2": "How vexingly quick daft zebras jump",
+        "spellCaption": "Spell-check",
+        "spellSample": "mispelled"
       },
       "defaultView": "Default view",
       "typewriter": "Typewriter scrolling",
@@ -3295,6 +3306,8 @@
     "recoveryLink": "Forgot your password? Unlock with recovery phrase",
     "submit": "Unlock",
     "subtitle": "Enter your password to continue.",
+    "subtitlePin": "Enter your PIN to continue.",
+    "subtitleBiometric": "Confirm with Touch ID to continue.",
     "suspicion": {
       "lockedDuringChange": "Password change cancelled: vault was locked.",
       "metaChangedExternally": "Vault was modified in another session — please unlock again."

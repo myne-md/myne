@@ -66,6 +66,7 @@ export function DefaultViewModeSettings() {
 
   return (
     <SettingRow
+      anchorId="editor.view-mode"
       label={t("settings.viewMode.label")}
       helper={t("settings.viewMode.helper")}
       error={error}

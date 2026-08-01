@@ -80,6 +80,7 @@ export function SettingRow({
   return (
     <div
       style={BLOCK_STYLE}
+      data-setting-row="true"
       data-setting-anchor={anchorId}
       data-testid={testId}
       {...stateAttrs}

@@ -222,7 +222,11 @@ export function CustomThemesSection({
   }
 
   return (
-    <div style={BLOCK_STYLE}>
+    <div
+      style={BLOCK_STYLE}
+      data-setting-anchor="appearance.custom-themes"
+      data-setting-row="true"
+    >
       <span style={LABEL_STYLE}>{translate("settings.customThemes.label")}</span>
       <p style={HELPER_STYLE}>{translate("settings.customThemes.helper")}</p>
 

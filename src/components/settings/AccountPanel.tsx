@@ -203,7 +203,12 @@ const ICON_PICKER_LABEL_STYLE: CSSProperties = {
 
 const ICON_PICKER_GRID_STYLE: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(9, 1fr)",
+  // Cap each column so the square tiles stay a fixed, crisp size instead of
+  // scaling up with the (now full-window) modal — `minmax(0, 56px)` lets them
+  // shrink on a narrow surface but never balloon (#206). `justify-content:
+  // start` packs the leftover width to the right so the grid stays tidy.
+  gridTemplateColumns: "repeat(9, minmax(0, 56px))",
+  justifyContent: "start",
   gap: 6,
   alignSelf: "stretch",
 };

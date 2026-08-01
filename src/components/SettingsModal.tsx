@@ -30,6 +30,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
+import type { IconName } from "../lib/icons";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { SettingsSearch } from "./settings/search/SettingsSearch";
 import { SettingsSearchResults } from "./settings/search/SettingsSearchResults";
@@ -87,6 +88,10 @@ interface PanelMeta {
   /** i18n leaf under `settings.shell.panels.*` — resolved at render time so a
    *  language switch re-labels the rail (never frozen at module load). */
   labelKey: string;
+  /** Leading rail glyph (MYND-206), Obsidian-style. A functional-icon name from
+   *  `ICON_PATHS`; the AI panel uses `cpu` (on-device compute), never a
+   *  sparkle/magic glyph — PRODUCT.md bans hype AI framing. */
+  icon: IconName;
   /** Rail section. Omitted → `core`. */
   group?: PanelGroup;
   /** The capability this panel's contents need. Omitted → unconditional. An
@@ -127,25 +132,35 @@ interface PanelMeta {
 // rather than a second, separately-maintained condition (see the
 // `opensDeveloper` computation in the render below).
 const PANELS_BASE: readonly PanelMeta[] = [
-  { id: "account", labelKey: "settings.shell.panels.account" },
-  { id: "privacy", labelKey: "settings.shell.panels.privacy" },
-  { id: "sync", labelKey: "settings.shell.panels.sync" },
-  { id: "editor", labelKey: "settings.shell.panels.editor" },
-  { id: "files", labelKey: "settings.shell.panels.files" },
-  { id: "transcription", labelKey: "settings.shell.panels.transcription" },
-  { id: "hotkeys", labelKey: "settings.shell.panels.hotkeys" },
-  { id: "appearance", labelKey: "settings.shell.panels.appearance" },
-  { id: "storage", labelKey: "settings.shell.panels.storage" },
-  { id: "about", labelKey: "settings.shell.panels.about" },
+  { id: "account", labelKey: "settings.shell.panels.account", icon: "id-card" },
+  { id: "privacy", labelKey: "settings.shell.panels.privacy", icon: "lock" },
+  { id: "sync", labelKey: "settings.shell.panels.sync", icon: "refresh-cw" },
+  { id: "editor", labelKey: "settings.shell.panels.editor", icon: "pencil" },
+  { id: "files", labelKey: "settings.shell.panels.files", icon: "folder" },
+  {
+    id: "transcription",
+    labelKey: "settings.shell.panels.transcription",
+    icon: "mic",
+  },
+  { id: "hotkeys", labelKey: "settings.shell.panels.hotkeys", icon: "command" },
+  {
+    id: "appearance",
+    labelKey: "settings.shell.panels.appearance",
+    icon: "palette",
+  },
+  { id: "storage", labelKey: "settings.shell.panels.storage", icon: "hard-drive" },
+  { id: "about", labelKey: "settings.shell.panels.about", icon: "info" },
   {
     id: "ai",
     labelKey: "settings.shell.panels.ai",
+    icon: "cpu",
     group: "developer",
     capability: "localAi",
   },
   {
     id: "network",
     labelKey: "settings.shell.panels.network",
+    icon: "globe",
     group: "developer",
     capability: "torRouting",
   },
@@ -207,22 +222,26 @@ const BACKDROP_STYLE: CSSProperties = {
   inset: 0,
   background: "rgba(0, 0, 0, 0.4)",
   display: "flex",
-  alignItems: "center",
+  alignItems: "stretch",
   justifyContent: "center",
+  // A padded, centred card (#206). The 48px top inset clears the macOS overlay
+  // traffic lights (tauri.conf.json `trafficLightPosition` y:20) so the header
+  // never collides with them; the side/bottom insets hold the card off the
+  // window edges.
+  padding: "48px 24px 24px",
+  animation: "settings-backdrop-in var(--duration-fast) var(--ease-standard)",
   zIndex: 1000,
 };
 
+// The Settings modal is a SINGLE large card (#206) — a padded, centred surface
+// that fills most of the window up to a capped width, not a windowed↔full
+// toggle. The content INSIDE is width-capped and centred (`CONTENT_STYLE` +
+// `CONTENT_INNER_STYLE`) so controls and the vault-icon grid keep a comfortable
+// reading column instead of stretching.
 const MODAL_STYLE: CSSProperties = {
-  // 820 rather than 720 because the panels put the control beside its label
-  // (`SettingRow`). At 720 the content column was 436px — rail 220 plus two
-  // `--space-6` gutters — and the widest control the system offers is a 320px
-  // `SearchableSelect` trigger, which left the label ~100px and wrapped it in
-  // half the locales. 536px fits both. Still comfortably inside the 1100px
-  // default window.
-  width: 820,
-  maxWidth: "calc(100vw - var(--space-7))",
-  height: 600,
-  maxHeight: "calc(100vh - var(--space-7))",
+  width: "100%",
+  maxWidth: 1080,
+  height: "100%",
   background: "var(--bg-2)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-2)",
@@ -232,6 +251,7 @@ const MODAL_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   color: "var(--fg-1)",
   overflow: "hidden",
+  animation: "settings-modal-in var(--duration-base) var(--ease-standard)",
 };
 
 const HEADER_STYLE: CSSProperties = {
@@ -309,6 +329,8 @@ const RAIL_ITEM_BASE_STYLE: CSSProperties = {
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
+  // Gap between the leading panel glyph (MYND-206) and its label.
+  gap: "var(--space-3)",
 };
 
 const RAIL_ITEM_SELECTED_STYLE: CSSProperties = {
@@ -338,7 +360,19 @@ const CONTENT_STYLE: CSSProperties = {
   overflow: "auto",
   display: "flex",
   alignItems: "flex-start",
-  justifyContent: "flex-start",
+  // Centre the capped content column in the (now full-window) content area so
+  // it reads as a deliberate column rather than hugging the left edge with a
+  // huge empty gap on a wide screen (#206).
+  justifyContent: "center",
+};
+
+// Width cap for the panel content inside the full-window modal. Centred in the
+// content area, it keeps inputs, buttons and the vault-icon grid at a
+// comfortable reading width rather than stretching across the whole surface
+// (#206 — the icon grid was the worst offender at full width).
+const CONTENT_INNER_STYLE: CSSProperties = {
+  width: "100%",
+  maxWidth: 840,
 };
 
 export function SettingsModal({
@@ -499,6 +533,8 @@ export function SettingsModal({
         const nextId = currentPanels[next].id;
         setSelected(nextId);
         itemRefs.current[nextId]?.focus();
+        // Start the new panel at the top on tab change (#206).
+        if (contentRef.current !== null) contentRef.current.scrollTop = 0;
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -562,9 +598,16 @@ export function SettingsModal({
           );
         }
         if (el) {
-          el.scrollIntoView({ block: "center" });
-          el.setAttribute("data-setting-flash", "true");
-          window.setTimeout(() => el?.removeAttribute("data-setting-flash"), 1200);
+          // Flash the whole setting ROW, not just the sub-control a `testid`
+          // fallback landed on — so the highlight reads as "this setting" (#206).
+          const row =
+            (el.closest("[data-setting-row]") as HTMLElement | null) ?? el;
+          row.scrollIntoView({ block: "center" });
+          row.setAttribute("data-setting-flash", "true");
+          window.setTimeout(
+            () => row.removeAttribute("data-setting-flash"),
+            1200,
+          );
         }
       }
       setPendingScroll(null);
@@ -690,14 +733,20 @@ export function SettingsModal({
                     aria-controls={`settings-panel-${panel.id}`}
                     tabIndex={isSelected ? 0 : -1}
                     onClick={() => {
-                      // Clicking a rail tab exits search back to the panel view.
+                      // Clicking a rail tab exits search back to the panel view,
+                      // and starts the new panel at the TOP — a tab change must
+                      // not inherit the previous panel's scroll position (#206).
                       setQuery("");
                       if (panel.id !== selected) setSelected(panel.id);
+                      if (contentRef.current !== null) {
+                        contentRef.current.scrollTop = 0;
+                      }
                     }}
                     style={
                       isSelected ? RAIL_ITEM_SELECTED_STYLE : RAIL_ITEM_BASE_STYLE
                     }
                   >
+                    <Icon name={panel.icon} size={18} />
                     {t(panel.labelKey)}
                   </button>
                 </Fragment>
@@ -713,16 +762,18 @@ export function SettingsModal({
             aria-labelledby={`settings-panel-${selected}-tab`}
             style={CONTENT_STYLE}
           >
-            {searching ? (
-              <SettingsSearchResults
-                results={results}
-                query={query}
-                activeId={activeId}
-                onSelect={handleSelectResult}
-              />
-            ) : (
-              panelContent[selected]
-            )}
+            <div style={CONTENT_INNER_STYLE}>
+              {searching ? (
+                <SettingsSearchResults
+                  results={results}
+                  query={query}
+                  activeId={activeId}
+                  onSelect={handleSelectResult}
+                />
+              ) : (
+                panelContent[selected]
+              )}
+            </div>
           </div>
         </div>
       </div>
