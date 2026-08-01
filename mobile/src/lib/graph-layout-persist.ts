@@ -19,7 +19,7 @@ import {
   hasGraphLayout,
   hydrateGraphLayout,
   serializeGraphLayout,
-} from "./graph-layout-store";
+} from "@myne/editor/host/notes/graphLayoutStore";
 
 /** Read the persisted layout payload, or `null` when there is none / the slot
  *  is locked (the Rust command returns `Option<String>`). */

@@ -2,11 +2,14 @@ import { describe, it, expect } from "vitest";
 import { extractWikilinks } from "../src/lib/indices-extract";
 import { buildGraphFromEdges, clientEdges } from "../src/lib/backend-graph";
 import { buildGraphModel } from "@myne/editor/host/notes/graphModel";
+import { computeGraphLayout } from "@myne/editor/host/notes/graphLayout";
 import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 import {
   GRAPH_CONTRACT_EXPECTATION,
+  GRAPH_CONTRACT_LAYOUT_FINGERPRINT,
   GRAPH_CONTRACT_NOTES,
   GRAPH_CONTRACT_RESOLVER_NOTES,
+  graphLayoutFingerprint,
   summarizeGraphModel,
 } from "@myne/editor/host/notes/graphModelContract";
 
@@ -34,6 +37,23 @@ describe("graph model contract (mobile pipeline)", () => {
     expect(g.edges.map((e) => `${e.from}->${e.to}`).sort()).toEqual(
       GRAPH_CONTRACT_EXPECTATION.edges.map((e) => e.replace(/x\d+$/, "")),
     );
+  });
+
+  it("lays the fixture out to the one expected set of coordinates", () => {
+    // The coordinate half of the contract (myne-md/myne#200). The main repo
+    // asserts the same fingerprint from the desktop pipeline — two clients
+    // computing an identical layout with nothing synced between them is what
+    // makes `vault.graph` staying device-local survivable.
+    const model = buildGraphModel(
+      clientEdges(GRAPH_CONTRACT_RESOLVER_NOTES, bodies),
+      GRAPH_CONTRACT_RESOLVER_NOTES,
+    );
+    const { positions } = computeGraphLayout({
+      nodes: model.nodes.map((n) => ({ id: n.id })),
+      edges: model.edges.map((e) => ({ source: e.source, target: e.target })),
+      seed: {},
+    });
+    expect(graphLayoutFingerprint(positions)).toBe(GRAPH_CONTRACT_LAYOUT_FINGERPRINT);
   });
 
   it("keeps unlinked notes as degree-0 nodes rather than dropping them", () => {

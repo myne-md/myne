@@ -1,50 +1,58 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { NoteGraph } from "../lib/wikilinks";
-import {
-  ALPHA_DECAY,
-  ALPHA_MIN,
-  CULL_MARGIN,
-  fitTransform,
-  K_MAX,
-  K_MIN,
-  LABEL_COARSE_CHARS,
-  LABEL_FINE_CHARS,
-  LABEL_FINE_K,
-  LABEL_LOD_K,
-  ringSeed,
-  stepForces,
-  type KernelNode,
-  type LayoutRequest,
-} from "../lib/graph-layout-kernel";
-import { runLayout } from "../lib/graph-layout-run";
+import { clampK, fitTransform } from "@myne/editor/host/notes/graphCamera";
+import { runLayout } from "@myne/editor/host/notes/graphLayoutRun";
+import type { LayoutRequest } from "@myne/editor/host/notes/graphLayout";
 import {
   isEdgeVisible,
   isNodeVisible,
   visibleBounds,
   type ViewTransform,
-} from "../lib/graph-culling";
+} from "@myne/editor/host/notes/graphCulling";
 import {
   getGraphPosition,
+  seedInitialPosition,
   setGraphPositions,
-} from "../lib/graph-layout-store";
+} from "@myne/editor/host/notes/graphLayoutStore";
 import {
   ensureGraphLayoutHydrated,
   flushGraphLayoutNow,
   scheduleGraphLayoutFlush,
 } from "../lib/graph-layout-persist";
 
+/** The shared worker entry, wired here because only this client's bundler can
+ *  resolve the URL (see `graph-layout.worker.ts`). */
+const makeLayoutWorker = () =>
+  new Worker(new URL("../lib/graph-layout.worker.ts", import.meta.url), {
+    type: "module",
+  });
+
+// Render tuning that used to live in the retired mobile kernel. It survives
+// here only until the shared canvas renderer takes over.
+/** Cull margin in graph units — covers the max node radius (13) + label row. */
+const CULL_MARGIN = 48;
+/** Below this zoom, labels are hidden (zoomed-out = the calm overview). */
+const LABEL_LOD_K = 0.9;
+/** At/above this zoom, labels widen to the fine truncation. */
+const LABEL_FINE_K = 2.2;
+const LABEL_COARSE_CHARS = 14;
+const LABEL_FINE_CHARS = 28;
+
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
-function clampK(k: number): number {
-  return Math.max(K_MIN, Math.min(K_MAX, k));
-}
-
-/** A kernel node + the render-only fields (title drives the label, degree the
- *  radius). The force pass mutates the kernel fields in place. */
-type SimNode = KernelNode & { title: string; degree: number };
+/** A laid-out node plus the render-only fields (title drives the label, degree
+ *  the radius). `fixed` pins a node to the finger while dragging. */
+type SimNode = {
+  id: string;
+  x: number;
+  y: number;
+  fixed: boolean;
+  title: string;
+  degree: number;
+};
 
 /**
  * A force-directed wikilink graph — connected notes repel, links pull them
@@ -74,7 +82,6 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
   const svgRef = useRef<SVGSVGElement>(null);
   const nodesRef = useRef<SimNode[]>([]);
   const byId = useRef<Map<string, SimNode>>(new Map());
-  const alphaRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const dragRef = useRef<{ id: string; moved: boolean; sx: number; sy: number } | null>(null);
   const [, tick] = useReducer((x: number) => (x + 1) % 1_000_000, 0);
@@ -140,17 +147,17 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
       await ensureGraphLayoutHydrated();
       if (cancelled) return;
 
-      const { w, h } = sizeRef.current;
       const prev = byId.current;
       let persisted = 0;
       const seeded = graphNodes.map((n, i) => {
         const keep = prev.get(n.id);
         const stored = keep ? undefined : getGraphPosition(n.id);
         if (keep || stored) persisted += 1;
-        const p = keep ?? stored ?? ringSeed(n.id, i, graphNodes.length, w, h);
+        // Same seed function the kernel uses, in the same fixed virtual box —
+        // so the pre-layout frame and the settled layout share one geometry.
+        const p = keep ?? seedInitialPosition(stored, n.id, i, graphNodes.length);
         const node: SimNode =
-          keep ??
-          ({ id: n.id, title: n.title, degree: n.degree, x: p.x, y: p.y, vx: 0, vy: 0, fixed: false } as SimNode);
+          keep ?? { id: n.id, title: n.title, degree: n.degree, x: p.x, y: p.y, fixed: false };
         node.degree = n.degree;
         node.title = n.title;
         return node;
@@ -166,81 +173,45 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
 
       if (seeded.length === 0 || persisted === seeded.length) {
         // Fully restored (or empty): the arrangement stays put — that IS the
-        // persistence feature. No sim, no write (nothing changed).
-        alphaRef.current = 0;
+        // persistence feature. No layout run, no write (nothing changed).
         settledRef.current = true;
         fitAndRender();
-      } else if (persisted > 0) {
-        // Partial: warm-started nodes keep their place, fresh nodes settle in.
-        fitAndRender();
-        reheat(0.3);
-      } else {
-        // Cold: paint the deterministic ring immediately (never a blank
-        // frame), compute the real layout off-thread, then stay frozen — the
-        // kernel already ran to convergence.
-        fitAndRender();
-        const req: LayoutRequest = {
-          nodes: seeded.map((n) => ({ id: n.id })),
-          edges: edgesRef.current.map((e) => ({ source: e.from, target: e.to, weight: 1 })),
-          seed: {},
-          width: w,
-          height: h,
-        };
-        const res = await runLayout(req);
-        if (cancelled) return;
-        for (const p of res.positions) {
-          const n = byId.current.get(p.id);
-          if (n && !n.fixed) {
-            n.x = p.x;
-            n.y = p.y;
-            n.vx = 0;
-            n.vy = 0;
-          }
-        }
-        setGraphPositions(res.positions);
-        scheduleGraphLayoutFlush();
-        alphaRef.current = 0;
-        settledRef.current = true;
-        fitAndRender();
+        return;
       }
+
+      // Anything not fully restored re-runs the shared kernel, warm-started
+      // from whatever IS known. There is no live cooling sim any more: the
+      // kernel runs its bounded budget once and the result is final, which is
+      // how the desktop graph has always behaved. Paint the seeded frame first
+      // so the tab is never blank while it runs.
+      fitAndRender();
+      const req: LayoutRequest = {
+        nodes: seeded.map((n) => ({ id: n.id })),
+        edges: edgesRef.current.map((e) => ({ source: e.from, target: e.to })),
+        seed: Object.fromEntries(
+          seeded.filter((n) => getGraphPosition(n.id)).map((n) => [n.id, { x: n.x, y: n.y }]),
+        ),
+      };
+      const res = await runLayout(req, makeLayoutWorker);
+      if (cancelled) return;
+      for (const p of res.positions) {
+        const n = byId.current.get(p.id);
+        if (n && !n.fixed) {
+          n.x = p.x;
+          n.y = p.y;
+        }
+      }
+      setGraphPositions(res.positions);
+      scheduleGraphLayoutFlush();
+      settledRef.current = true;
+      fitAndRender();
     })();
 
     return () => {
       cancelled = true;
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idsKey, measured]);
-
-  function reheat(a: number) {
-    alphaRef.current = Math.max(alphaRef.current, a);
-    settledRef.current = false;
-    if (rafRef.current == null) rafRef.current = requestAnimationFrame(step);
-  }
-
-  function step() {
-    const nodes = nodesRef.current;
-    const { w, h } = sizeRef.current;
-    let alpha = alphaRef.current;
-
-    stepForces(nodes, byId.current, edgesRef.current, alpha, w / 2, h / 2);
-
-    alpha *= ALPHA_DECAY;
-    alphaRef.current = alpha;
-    if (alpha > ALPHA_MIN || dragRef.current) {
-      tick();
-      rafRef.current = requestAnimationFrame(step);
-    } else {
-      // Sim idle: the cooled arrangement is the authoritative one — persist it
-      // (the drag-end write only captured positions mid-settle).
-      rafRef.current = null;
-      settledRef.current = true;
-      setGraphPositions(nodes.map((n) => ({ id: n.id, x: n.x, y: n.y })));
-      scheduleGraphLayoutFlush();
-      tick();
-    }
-  }
 
   /** One coalesced render for gesture-driven view changes (single rAF). */
   function scheduleRender() {
@@ -427,7 +398,6 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
                     const p = toLocal(ev);
                     dragRef.current = { id: n.id, moved: false, sx: p.x, sy: p.y };
                     n.fixed = true;
-                    reheat(0.5);
                   }}
                   onPointerMove={(ev) => {
                     const d = dragRef.current;
@@ -439,20 +409,19 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
                     const g = toGraph(p);
                     n.x = g.x;
                     n.y = g.y;
-                    n.vx = 0;
-                    n.vy = 0;
-                    reheat(0.35);
+                    tick();
                   }}
                   onPointerUp={(ev) => {
                     const d = dragRef.current;
                     dragRef.current = null;
                     n.fixed = false;
-                    reheat(0.25);
                     if (d && !d.moved) {
                       onOpen(n.id);
                     } else if (d) {
-                      // Drag-end with movement: persist the rearrangement
-                      // (the sim-idle write will refine it as things settle).
+                      // Drag-end: the dragged node stays where it was put and
+                      // nothing else moves — the desktop graph's behaviour, and
+                      // now this one's. The live cooling sim that used to nudge
+                      // the neighbours went with the hand-rolled kernel.
                       setGraphPositions(nodesRef.current.map((s) => ({ id: s.id, x: s.x, y: s.y })));
                       scheduleGraphLayoutFlush();
                     }

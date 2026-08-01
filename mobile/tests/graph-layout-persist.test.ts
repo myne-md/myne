@@ -19,7 +19,7 @@ import {
   getGraphPosition,
   hasGraphLayout,
   setGraphPositions,
-} from "../src/lib/graph-layout-store";
+} from "@myne/editor/host/notes/graphLayoutStore";
 
 beforeEach(() => {
   vi.useFakeTimers();
