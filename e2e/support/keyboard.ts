@@ -14,6 +14,10 @@ import type { Session } from "./webdriver";
 /** W3C WebDriver key code points (https://www.w3.org/TR/webdriver2/#keyboard-actions). */
 export const KEY = {
   TAB: String.fromCharCode(0xe004),
+  /** Erases the character BEFORE the caret — the key macOS labels "delete",
+   *  and the one a user reaches for to erase text. Distinct from `DELETE`
+   *  below, which is forward-delete. */
+  BACKSPACE: String.fromCharCode(0xe003),
   ENTER: String.fromCharCode(0xe007),
   ESCAPE: String.fromCharCode(0xe00c),
   SPACE: String.fromCharCode(0xe00d),

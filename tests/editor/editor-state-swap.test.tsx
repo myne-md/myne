@@ -67,4 +67,39 @@ describe("CMEditor persistent-view swap API", () => {
     undo(view);
     expect(view.state.doc.toString()).toBe("base");
   });
+
+  it("the host re-converging on a swapped-in doc is a no-op for the mirror", () => {
+    // MYND-534 × myne#167 interop. A swap moves the doc imperatively, outside
+    // the controlled `value`; the host then catches up with
+    // `setContent(doc)` (PaneView's note-switch path). That re-converge must
+    // stay a no-op — it carries no baseline, so it would otherwise be treated
+    // as authoritative and re-dispatched over a doc that already holds it.
+    let view: EditorView | null = null;
+    let api: EditorSwapApi | null = null;
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <CMEditor
+        value="note A"
+        onChange={onChange}
+        onReady={(v) => {
+          if (v) view = v;
+        }}
+        onSwapReady={(a) => {
+          if (a) api = a;
+        }}
+      />,
+    );
+    if (view === null || api === null) throw new Error("no view + swap API");
+    const live = view as EditorView;
+    const swap = api as EditorSwapApi;
+
+    swap.applyState(swap.buildState("note B"));
+    expect(live.state.doc.toString()).toBe("note B");
+    onChange.mockClear();
+
+    rerender(<CMEditor value="note B" onChange={onChange} />);
+
+    expect(live.state.doc.toString()).toBe("note B");
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
