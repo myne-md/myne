@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import * as capabilities from "../../platform/capabilities";
+import { isMacPlatform } from "../../commands/chord";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import {
@@ -76,6 +77,13 @@ export function QuickUnlockSettings() {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Runtime availability gate (#214). Touch ID is offered only where it can
+  // actually work: macOS (the only desktop OS with a provider — Linux/Windows
+  // return `HardwareUnavailable`), and NOT once an enrollment attempt has proven
+  // it unusable (an unsigned build → `errSecMissingEntitlement`, no hardware, or
+  // a biometric set change). Retrying cannot succeed until the build is signed,
+  // so a button that just errors again would be a lie.
+  const [biometricUnavailable, setBiometricUnavailable] = useState(false);
 
   // Fetch current status on mount. In a non-Tauri context (dev/tests) invoke
   // rejects — treat that as "not configured / unavailable", never throw.
@@ -126,6 +134,11 @@ export function QuickUnlockSettings() {
       await refresh();
     } catch (e) {
       setError(errorMessage(e));
+      // Enrollment proved biometric can't work here — hide the affordance for the
+      // session rather than keep offering a button that only errors (#214).
+      if (isQuickUnlockError(e) && e.kind === "HardwareUnavailable") {
+        setBiometricUnavailable(true);
+      }
     } finally {
       setBusy(false);
     }
@@ -208,16 +221,18 @@ export function QuickUnlockSettings() {
                 "genuinely portable: Argon2id + three files under one vault
                 root, no OS secret involved" (`core-wasm-assessment.md`), which
                 is why the two are separate capabilities rather than one. */}
-            {capabilities.has("biometricQuickUnlock") && (
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() => void onSetupBiometric()}
-                data-testid="settings.quick-unlock-setup-biometric"
-              >
-                {t("settings.quickUnlock.useTouchId")}
-              </Button>
-            )}
+            {capabilities.has("biometricQuickUnlock") &&
+              isMacPlatform() &&
+              !biometricUnavailable && (
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void onSetupBiometric()}
+                  data-testid="settings.quick-unlock-setup-biometric"
+                >
+                  {t("settings.quickUnlock.useTouchId")}
+                </Button>
+              )}
           </div>
           <p style={HELPER_STYLE}>
             {t("settings.quickUnlock.setupHelper")}

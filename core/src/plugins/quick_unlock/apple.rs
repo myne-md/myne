@@ -98,10 +98,7 @@ impl QuickUnlockProvider for AppleBiometricProvider {
         options.set_access_control(access_control);
         // Store the wrap key behind the biometric gate.
         security_framework::passwords::set_generic_password_options(wrap_key.as_slice(), options)
-            .map_err(|e| {
-            log_keychain_err("store", &e);
-            ProviderError::Backend
-        })?;
+            .map_err(map_store_error)?;
 
         Ok(ProviderSecret {
             wrap_key,
@@ -161,6 +158,22 @@ fn log_keychain_err(op: &'static str, e: &security_framework::base::Error) {
         errsec_code = e.code(),
         "Apple Keychain operation failed"
     );
+}
+
+/// Map a Keychain error from `create` (store). The dominant failure on an
+/// UNSIGNED build is `errSecMissingEntitlement`: a biometric-gated item needs the
+/// `keychain-access-groups` entitlement on a signed binary, which `tauri dev`
+/// (and an unsigned `tauri build`) lacks. Surfacing it as `HardwareUnavailable`
+/// rather than the opaque `Backend` is what lets Settings say "Touch ID isn't
+/// available in this build" and hide the affordance, instead of a generic
+/// "something went wrong" that reads as "Touch ID is broken" (#214). Anything
+/// else → `Backend`, with the OSStatus code logged for the hardware review.
+fn map_store_error(e: security_framework::base::Error) -> ProviderError {
+    log_keychain_err("store", &e);
+    match e.code() {
+        ERR_SEC_MISSING_ENTITLEMENT => ProviderError::HardwareUnavailable,
+        _ => ProviderError::Backend,
+    }
 }
 
 /// Map a Keychain error (from `retrieve`) to the coarse provider error, logging
