@@ -18,7 +18,6 @@
 import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
-import { BRAND_TINT, BrandMark } from "./brandMarks";
 import {
   IMPORT_SOURCES,
   IMPORT_SOURCE_ORDER,
@@ -48,16 +47,6 @@ const CARD_BASE: CSSProperties = {
   cursor: "pointer",
   width: "100%",
   transition: "border-color 120ms ease, background 120ms ease",
-};
-
-const TILE: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 32,
-  height: 32,
-  borderRadius: "var(--radius-1)",
-  flex: "0 0 auto",
 };
 
 const NAME: CSSProperties = {
@@ -112,7 +101,6 @@ export function ImportSourcePicker({ onPick, onCancel }: ImportSourcePickerProps
         <div style={GRID} role="list">
           {IMPORT_SOURCE_ORDER.map((id) => {
             const spec = IMPORT_SOURCES[id];
-            const tint = BRAND_TINT[id];
             const active = hovered === id;
             return (
               <button
@@ -132,9 +120,9 @@ export function ImportSourcePicker({ onPick, onCancel }: ImportSourcePickerProps
                 data-testid="import.source-row"
                 data-source={id}
               >
-                <span style={{ ...TILE, background: tint.bg, color: tint.fg }}>
-                  <BrandMark source={id} />
-                </span>
+                {/* Text-only, no brand marks — reproducing third-party logos
+                    (even simplified) is a trademark grey area; nominative use of
+                    the NAME is safe (#183). */}
                 <span style={{ minWidth: 0 }}>
                   <span style={NAME}>{t(spec.labelKey)}</span>
                   <span style={SHORT} data-testid="import.source-short">
