@@ -1017,6 +1017,24 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // myne#216. Dispatched rather than left to the plugin default, because
+        // the `[[##` picker ALREADY works on this client — it was fed by
+        // `note_read` over every note, which is dispatched. Routing the headings
+        // through the index without porting this arm would not defer a feature,
+        // it would REMOVE one.
+        "plugin:vault-indices|vault_indices_headings" => {
+            use myne_core::plugins::vault_indices::commands::vault_indices_headings_from_host;
+            match vault_indices_headings_from_host(
+                crate::session::state(),
+                crate::session::indices(),
+            )
+            .await
+            {
+                Ok(v) => Outcome::ok(&v),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         "plugin:vault-indices|vault_indices_orphans" => {
             use myne_core::plugins::vault_indices::commands::vault_indices_orphans_from_host;
             match vault_indices_orphans_from_host(

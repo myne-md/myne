@@ -236,6 +236,8 @@ fn main() {
                 // registered in the handler list and in default.toml but is
                 // MISSING from this mirror — pre-existing, not introduced here.
                 "vault_indices_tasks",
+                // myne#216 — the vault-wide heading dump behind `[[##`.
+                "vault_indices_headings",
                 "vault_indices_backlink_candidates",
                 "vault_indices_by_tag",
                 "vault_indices_tag_tree",

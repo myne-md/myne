@@ -69,6 +69,26 @@ export type BlockAnchorEntry = {
   preview: string;
 };
 
+/** One heading — TS mirror of the Rust `HeadingEntry` (myne#216). Text + level
+ *  only; the byte offsets `headingSections` also produces serve FOLDING, which
+ *  runs against the open note's own parse and needs no vault-wide copy.
+ *  serde camelCase. */
+export type HeadingEntry = {
+  text: string;
+  level: number;
+};
+
+/** One vault-wide heading row — TS mirror of the Rust `VaultHeadingRow`
+ *  (myne#216). Deliberately carries no note title/folder: the consumer joins
+ *  against the resident note-set anyway (that join is where trashed/template
+ *  exclusion lives), and a second copy here would go stale between a rename and
+ *  the re-apply that follows it. */
+export type VaultHeadingRow = {
+  noteId: string;
+  text: string;
+  level: number;
+};
+
 /** Max characters of block text kept as the picker preview line. */
 const BLOCK_ANCHOR_PREVIEW_CAP = 120;
 
@@ -144,6 +164,7 @@ export async function vaultIndicesApply(
   properties: ReadonlyArray<PropertyEntry>,
   blockAnchors: ReadonlyArray<BlockAnchorEntry>,
   tasks: ReadonlyArray<LineTask>,
+  headings: ReadonlyArray<HeadingEntry>,
 ): Promise<void> {
   await invoke<void>("plugin:vault-indices|vault_indices_apply", {
     noteId,
@@ -165,6 +186,10 @@ export async function vaultIndicesApply(
     // field would rely on Rust's `unwrap_or_default()` meaning the same thing.
     // Saying it explicitly keeps the wire honest about what this client knows.
     tasks,
+    // myne#216: the note's headings, for the vault-wide `[[##` picker. Sent
+    // unconditionally for the same replace-semantics reason as `tasks` — a note
+    // whose last heading was just deleted must overwrite the stored vector.
+    headings,
   });
   // SYNC-5: bump the index-changed nonce AFTER the slice updated (single
   // post-mutation chokepoint) so reader surfaces re-query.
@@ -216,6 +241,16 @@ export type VaultBlockAnchor = {
 export async function vaultBlockAnchors(): Promise<VaultBlockAnchor[]> {
   return await invoke<VaultBlockAnchor[]>(
     "plugin:vault-indices|vault_indices_block_anchors",
+  );
+}
+
+/** Every heading in the vault as `{noteId, text, level}` (myne#216) — the one
+ *  query behind the `[[##` picker, replacing a read-and-parse of every note.
+ *  Trash-blind: the caller joins against the resident note-set, which is where
+ *  trashed/template exclusion lives for every surface. */
+export async function vaultHeadings(): Promise<VaultHeadingRow[]> {
+  return await invoke<VaultHeadingRow[]>(
+    "plugin:vault-indices|vault_indices_headings",
   );
 }
 
@@ -323,6 +358,12 @@ export async function reindexNoteFromBody(
       // It owns its own exclusions (frontmatter, drawing-class notes, the raw
       // cap), so nothing here filters what it returns.
       extractLineTasks(body),
+      // myne#216: headings for the vault-wide `[[##` picker. Unlike the two
+      // extractors above this adds NO parse — `parse()` already enumerated them
+      // (with the frontmatter guard applied), so this is a map over a result
+      // that is already in hand. That is the whole reason the picker can stop
+      // re-reading every note in the vault on every index change.
+      parsed.headings.map((h) => ({ text: h.text, level: h.level })),
     );
   } catch {
     // Best-effort — self-healed by a later apply / the next reconcile.

@@ -17,8 +17,8 @@
 use super::error::VaultIndicesError;
 use super::persist::{decode_snapshot, encode_snapshot, reconcile_delta};
 use super::state::{
-    BlockAnchor, CandidateEdge, NoteRecord, PropertyEntry, TagEntry, TagTreeNode, TaskRecord,
-    VaultBlockAnchor, VaultIndicesState, VaultTask, WikilinkEdge,
+    BlockAnchor, CandidateEdge, HeadingEntry, NoteRecord, PropertyEntry, TagEntry, TagTreeNode,
+    TaskRecord, VaultBlockAnchor, VaultHeadingRow, VaultIndicesState, VaultTask, WikilinkEdge,
 };
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
@@ -58,6 +58,7 @@ pub async fn vault_indices_apply_from_host(
     // extractor, or an older desktop build) is `None` → `[]`, so the wire shape
     // stays compatible in both directions.
     tasks: Option<Vec<TaskRecord>>,
+    headings: Option<Vec<HeadingEntry>>,
     runtime: &VaultRuntimeState,
     indices: &VaultIndicesState,
 ) -> Result<(), VaultIndicesError> {
@@ -82,6 +83,10 @@ pub async fn vault_indices_apply_from_host(
             // them; it parses no date and compares nothing — §3.8.3 typing
             // belongs to the dialect layer, TS-side.
             tasks: tasks.unwrap_or_default(),
+            // myne#216: the note's headings, for the vault-wide `[[##` picker.
+            // Unlike the two fields above, TS reads these off the parse it
+            // already ran — no additional extraction pass.
+            headings: headings.unwrap_or_default(),
         },
     );
     Ok(())
@@ -111,6 +116,8 @@ pub async fn vault_indices_apply(
     // MYND-612: line-tasks TS extracted, same `Option` wire-compat shape as
     // `block_anchors`.
     tasks: Option<Vec<TaskRecord>>,
+    // myne#216: the note's headings, same `Option` wire-compat shape again.
+    headings: Option<Vec<HeadingEntry>>,
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<(), VaultIndicesError> {
@@ -124,6 +131,7 @@ pub async fn vault_indices_apply(
         properties,
         block_anchors,
         tasks,
+        headings,
         runtime.inner(),
         indices.inner(),
     )
@@ -194,6 +202,46 @@ pub async fn vault_indices_block_anchors(
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<VaultBlockAnchor>, VaultIndicesError> {
     vault_indices_block_anchors_from_host(runtime.inner(), indices.inner()).await
+}
+
+/// Defensive ceiling on a whole-vault heading dump (myne#216). Headings are far
+/// denser than block anchors — every note has some — so this is sized against a
+/// large vault (~200k notes) rather than the sparse case, and still only bounds
+/// a pathological payload.
+const MAX_HEADINGS: usize = 1_000_000;
+
+/// Every heading across the vault (myne#216) — `{note_id, text, level}` per
+/// heading, for the `[[##` vault-wide heading picker.
+///
+/// **This exists to replace a full-vault read.** The picker's set was previously
+/// derived by re-reading and re-parsing every note body on each index change,
+/// i.e. work proportional to the vault on every autosave. The headings now ride
+/// the `apply` that autosave already performs, and this is the one query that
+/// serves them.
+///
+/// Rows are trash-blind, like every accessor here: the caller joins against the
+/// resident note-set, which is the single place trashed/template exclusion lives
+/// (`resolverNotes.ts`). Rejected with [`VaultIndicesError::SlotNotUnlocked`]
+/// when no vault is unlocked (the index is plaintext-derived RAM, unlocked-only).
+pub async fn vault_indices_headings_from_host(
+    runtime: &VaultRuntimeState,
+    indices: &VaultIndicesState,
+) -> Result<Vec<VaultHeadingRow>, VaultIndicesError> {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
+        return Err(VaultIndicesError::SlotNotUnlocked);
+    }
+    Ok(indices.all_headings(MAX_HEADINGS))
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_indices_headings(
+    runtime: State<'_, VaultRuntimeState>,
+    indices: State<'_, VaultIndicesState>,
+) -> Result<Vec<VaultHeadingRow>, VaultIndicesError> {
+    vault_indices_headings_from_host(runtime.inner(), indices.inner()).await
 }
 
 /// Defensive ceiling on a whole-vault task dump, parallel to the block-anchor
