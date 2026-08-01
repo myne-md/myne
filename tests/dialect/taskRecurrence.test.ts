@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  canRecur,
   matchesMaterializedOccurrence,
   planNextOccurrence,
   planSkippedOccurrence,
@@ -76,6 +77,60 @@ describe("planNextOccurrence", () => {
     );
     expect(out).toContain("Buy **milk** & eggs");
     expect(out).toMatch(/^ {2}\* \[ \]/); // indentation and bullet style preserved
+  });
+});
+
+describe("canRecur", () => {
+  // The predicate the chip layer asks before deciding a rule "types"
+  // (myne#197). Parseable and evaluable are different questions, and asking
+  // only the first is what let an anchorless rule render as a confident chip.
+
+  it("accepts a readable rule with a due date", () => {
+    expect(canRecur("- [ ] pay rent [due:: 2026-07-01] [repeat:: every month]")).toBe(true);
+  });
+
+  it("accepts a reminder as the anchor when there is no due date", () => {
+    // "remind me Tuesday to call my mother" — a pure reminder still recurs, so
+    // it must still chip.
+    expect(canRecur("- [ ] call mother [remind:: 2026-07-01] [repeat:: every week]")).toBe(true);
+  });
+
+  it("rejects a rule with no anchor at all", () => {
+    expect(canRecur("- [ ] shower [repeat:: every day]")).toBe(false);
+  });
+
+  it("rejects a rule outside the vocabulary even when anchored", () => {
+    expect(canRecur("- [ ] x [due:: 2026-07-01] [repeat:: every fortnight]")).toBe(false);
+  });
+
+  it("rejects a line carrying no repeat field", () => {
+    expect(canRecur("- [ ] one-off [due:: 2026-07-01]")).toBe(false);
+    expect(canRecur("just some prose")).toBe(false);
+  });
+
+  it("rejects an anchor whose date does not parse", () => {
+    // Present-but-unreadable is not an anchor: `advancePair` would drop it and
+    // the rule would silently produce nothing.
+    expect(canRecur("- [ ] x [due:: whenever] [repeat:: every month]")).toBe(false);
+  });
+
+  it("agrees with planNextOccurrence on every case, so the two cannot drift", () => {
+    // `canRecur` deliberately takes no `today` — a display layer must not read a
+    // clock — which means it re-states the conditions the date computation
+    // applies. This pins them together.
+    const today = TODAY;
+    for (const line of [
+      "- [ ] pay rent [due:: 2026-07-01] [repeat:: every month]",
+      "- [ ] call mother [remind:: 2026-07-01] [repeat:: every week]",
+      "- [ ] shower [repeat:: every day]",
+      "- [ ] x [due:: 2026-07-01] [repeat:: every fortnight]",
+      "- [ ] x [due:: whenever] [repeat:: every month]",
+      "- [ ] one-off [due:: 2026-07-01]",
+      "- [ ] x [due:: 2026-07-01] [remind:: 2026-06-29] [repeat:: every 3 days when done]",
+      "plain prose",
+    ]) {
+      expect(canRecur(line)).toBe(planNextOccurrence(line, today) !== null);
+    }
   });
 });
 

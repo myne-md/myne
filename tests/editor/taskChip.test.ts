@@ -170,14 +170,17 @@ describe("widget identity includes the source position", () => {
 });
 
 describe("recurrence and priority chips (task 4)", () => {
+  // Each fixture here carries a `due` date, because a repeat rule with nothing
+  // to repeat FROM is not a working rule and no longer chips (myne#197). The
+  // anchorless case has its own describe block below.
   it("chips a repeat field in both dialects", () => {
-    const bracketed = mount("- [ ] water plants [repeat:: every 3 days]\n");
+    const bracketed = mount("- [ ] water plants [due:: 2026-08-01] [repeat:: every 3 days]\n");
     expect(
       bracketed.host.querySelector('[data-testid="editor.task-chip-repeat"]')?.textContent,
     ).toBe("every 3 days");
     teardown(bracketed.view, bracketed.host);
 
-    const emoji = mount("- [ ] water plants 🔁 every 3 days\n");
+    const emoji = mount("- [ ] water plants [due:: 2026-08-01] 🔁 every 3 days\n");
     expect(
       emoji.host.querySelector('[data-testid="editor.task-chip-repeat"]')?.textContent,
     ).toBe("every 3 days");
@@ -689,23 +692,91 @@ describe("unrecognized recurrence rule (MYND-615 task 10)", () => {
       "last day of every month",
       "every 3 days when done",
     ]) {
-      const { view, host } = mount(`- [ ] x [repeat:: ${rule}]\n`);
+      const { view, host } = mount(`- [ ] x [due:: 2026-08-01] [repeat:: ${rule}]\n`);
       expect(host.querySelectorAll('[data-testid="editor.task-chip-repeat"]').length).toBe(1);
       teardown(view, host);
     }
   });
 });
 
+describe("anchorless recurrence rule (myne#197)", () => {
+  // A rule with no date to repeat FROM parses perfectly and then does nothing.
+  // That is the same data-loss-shaped silence the unrecognized-rule state exists
+  // to prevent — it simply was not covered, because the chip layer asked whether
+  // the vocabulary could PARSE the rule rather than whether the rule could be
+  // EVALUATED on this line.
+
+  it("does not chip — the rule is readable but not workable", () => {
+    const { view, host } = mount("- [ ] shower [repeat:: every day]\n");
+    expect(host.querySelectorAll('[data-testid="editor.task-chip-repeat"]').length).toBe(0);
+    const flagged = host.querySelector('[data-testid="editor.task-field-invalid-repeat"]');
+    expect(flagged).not.toBeNull();
+    expect(flagged!.classList.contains("cm-task-field-invalid")).toBe(true);
+    teardown(view, host);
+  });
+
+  it("says the rule needs a date, not that the rule is wrong", () => {
+    // The two failures call for different actions: an unreadable rule gets
+    // corrected, an anchorless one gets a date. Telling the user to fix a rule
+    // that is already correct would send them the wrong way.
+    const { view, host } = mount("- [ ] shower [repeat:: every day]\n");
+    const flagged = host.querySelector('[data-testid="editor.task-field-invalid-repeat"]');
+    expect(flagged!.getAttribute("title")).toBe(i18n.t("editor.taskField.repeatNoAnchor"));
+    teardown(view, host);
+  });
+
+  it("still blames the RULE when the rule is also unreadable", () => {
+    const { view, host } = mount("- [ ] shower [repeat:: every fortnight]\n");
+    const flagged = host.querySelector('[data-testid="editor.task-field-invalid-repeat"]');
+    expect(flagged!.getAttribute("title")).toBe(i18n.t("editor.taskField.invalidRepeat"));
+    teardown(view, host);
+  });
+
+  it("chips again as soon as the line gains an anchor", () => {
+    // The verdict is a property of the RECORD, so it follows the record.
+    const { view, host } = mount("- [ ] shower [due:: 2026-08-01] [repeat:: every day]\n");
+    expect(host.querySelectorAll('[data-testid="editor.task-chip-repeat"]').length).toBe(1);
+    expect(host.querySelectorAll('[data-testid="editor.task-field-invalid-repeat"]').length).toBe(
+      0,
+    );
+    teardown(view, host);
+  });
+
+  it("accepts a reminder as the anchor", () => {
+    // A pure reminder still recurs (decisions.md 2026-07-30: the anchor is
+    // `due`, else `remind`), so it must still chip.
+    const { view, host } = mount("- [ ] call mother [remind:: 2026-08-01] [repeat:: every week]\n");
+    expect(host.querySelectorAll('[data-testid="editor.task-chip-repeat"]').length).toBe(1);
+    teardown(view, host);
+  });
+
+  it("stays reachable and byte-exact, so the user can fix it", () => {
+    const raw = "- [ ] shower [repeat:: every day]\n";
+    const { view, host } = mount(raw);
+    let atomic = 0;
+    view.state.facet(EditorView.atomicRanges).forEach((f) => {
+      const iter = f(view).iter();
+      while (iter.value !== null) {
+        atomic++;
+        iter.next();
+      }
+    });
+    expect(atomic).toBe(0);
+    expect(view.state.doc.toString()).toBe(raw);
+    teardown(view, host);
+  });
+});
+
 describe("recurrence rules display localized over canonical storage (task 11)", () => {
   it("renders the rule through the catalogue, not the stored bytes", () => {
-    const { view, host } = mount("- [ ] x [repeat:: every 3 days]\n");
+    const { view, host } = mount("- [ ] x [due:: 2026-08-01] [repeat:: every 3 days]\n");
     const chip = host.querySelector('[data-testid="editor.task-chip-repeat"]');
     expect(chip!.textContent).toBe(i18n.t("recurrence.everyN.day", { count: 3 }));
     teardown(view, host);
   });
 
   it("translates weekday and ordinal names individually", () => {
-    const { view, host } = mount("- [ ] x [repeat:: last friday of every month]\n");
+    const { view, host } = mount("- [ ] x [due:: 2026-08-01] [repeat:: last friday of every month]\n");
     const chip = host.querySelector('[data-testid="editor.task-chip-repeat"]');
     expect(chip!.textContent).toBe(
       i18n.t("recurrence.ordinalOfMonth", {
@@ -717,7 +788,7 @@ describe("recurrence rules display localized over canonical storage (task 11)", 
   });
 
   it("shows the anchoring mode rather than dropping it", () => {
-    const { view, host } = mount("- [ ] x [repeat:: every 3 days when done]\n");
+    const { view, host } = mount("- [ ] x [due:: 2026-08-01] [repeat:: every 3 days when done]\n");
     const chip = host.querySelector('[data-testid="editor.task-chip-repeat"]');
     expect(chip!.textContent).toContain(
       i18n.t("recurrence.whenDone", { rule: "" }).replace(/^,?\s*/, "").trim(),
@@ -741,7 +812,7 @@ describe("recurrence rules display localized over canonical storage (task 11)", 
   };
 
   it("switching language changes the display and NOT the file", async () => {
-    const doc = "- [ ] x [repeat:: every week]\n";
+    const doc = "- [ ] x [due:: 2026-08-01] [repeat:: every week]\n";
     const en = mount(doc);
     const english = en.host.querySelector('[data-testid="editor.task-chip-repeat"]')!.textContent;
     expect(english).toBe("every week");
@@ -761,7 +832,7 @@ describe("recurrence rules display localized over canonical storage (task 11)", 
 
   it("the chip hands the SOURCE value to the editor, never the localized label", async () => {
     await useTurkish();
-    const { view, host } = mount("- [ ] x [repeat:: every week]\n");
+    const { view, host } = mount("- [ ] x [due:: 2026-08-01] [repeat:: every week]\n");
     const chip = host.querySelector('[data-testid="editor.task-chip-repeat"]') as HTMLElement;
     expect(chip.textContent).toBe("her hafta");
 

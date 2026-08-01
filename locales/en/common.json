@@ -1036,6 +1036,7 @@
       "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
       "menuEdit": "Edit {{field}}",
       "menuTitle": "Add field",
+      "repeatNoAnchor": "This task has no date to repeat from, so it won't repeat. Add a due date to start it.",
       "save": "Save",
       "skipOccurrence": "Skip this occurrence",
       "title": {
