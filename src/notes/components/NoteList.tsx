@@ -2629,6 +2629,8 @@ function PopulatedList({
           x={moveTarget.x}
           y={moveTarget.y}
           items={moveMenuItems}
+          searchable
+          searchPlaceholder={t("commands.picker.moveNotePlaceholder")}
           onClose={() => setMoveTarget(null)}
         />
       )}
