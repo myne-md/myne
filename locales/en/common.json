@@ -967,8 +967,11 @@
       "unreferenced": "unreferenced"
     },
     "frontmatter": {
+      "addListItem": "Add item…",
+      "addListItemAriaLabel": "Add item to {{key}}",
       "addProperty": "+ Add property",
       "propertiesLabel": "Properties",
+      "removeListItemAriaLabel": "Remove {{item}}",
       "titleAriaLabel": "Note title",
       "titlePlaceholder": "Untitled"
     },

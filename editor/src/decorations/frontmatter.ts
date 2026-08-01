@@ -5,9 +5,12 @@
 // `^([key]):[ \t]*(value)$` line as an editable row (icon + key label +
 // text input). The Properties widget is ALWAYS shown when frontmatter
 // exists — there is no cursor-aware reveal escape hatch in v1; users
-// edit via the inputs + the "+ Add property" button. Multi-line /
-// nested YAML survives in the source byte-stably but is not surfaced
-// in the widget — those values land in a follow-up typed-values PRD.
+// edit via the inputs + the "+ Add property" button. A top-level key whose
+// value is a YAML SEQUENCE (block `key:\n  - a` or flow `key: [a, b]`) is
+// rendered as removable chips + an add-item field (`renderSequenceRow`), so an
+// AI-accepted `tags:` block is no longer shown as an empty text input. Deeper
+// nested YAML (mappings, block scalars, anchors) still survives byte-stably in
+// the source without a widget affordance.
 //
 // Block-level decoration: CodeMirror 6 requires `Decoration.replace`
 // with `block: true` to be provided through a `StateField`, not a
@@ -29,9 +32,18 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { formatYamlScalar } from "@myne/dialect";
+import { foldSegment } from "@myne/dialect/folderPath";
+import { formatYamlStringScalar } from "@myne/dialect/surgery";
+import {
+  planSequenceItemInsert,
+  planSequenceItemRemove,
+} from "@myne/dialect/frontmatterSequence";
 import { cachedLocateFrontmatter } from "../frontmatter-cache";
 import {
+  parseProperties,
   parseSimpleProperties,
+  type PropertyRow,
+  type SequenceProperty,
   type SimpleProperty,
 } from "../frontmatter-properties";
 import i18n from "@myne/editor/i18n";
@@ -55,7 +67,7 @@ function displayYamlScalar(raw: string): string {
 }
 
 class PropertiesWidget extends WidgetType {
-  constructor(private readonly properties: readonly SimpleProperty[]) {
+  constructor(private readonly properties: readonly PropertyRow[]) {
     super();
   }
 
@@ -64,7 +76,17 @@ class PropertiesWidget extends WidgetType {
     for (let i = 0; i < this.properties.length; i++) {
       const a = this.properties[i]!;
       const b = other.properties[i]!;
-      if (a.key !== b.key || a.value !== b.value) return false;
+      if (a.kind !== b.kind || a.key !== b.key) return false;
+      if (a.kind === "scalar") {
+        if (b.kind !== "scalar" || a.value !== b.value) return false;
+      } else {
+        if (b.kind !== "sequence" || a.items.length !== b.items.length) {
+          return false;
+        }
+        for (let j = 0; j < a.items.length; j++) {
+          if (a.items[j] !== b.items[j]) return false;
+        }
+      }
     }
     return true;
   }
@@ -93,7 +115,11 @@ class PropertiesWidget extends WidgetType {
       // `title` is surfaced by the promoted field above — don't repeat it
       // as a generic key/value row.
       if (prop.key === "title") continue;
-      list.appendChild(this.renderRow(view, prop));
+      list.appendChild(
+        prop.kind === "sequence"
+          ? this.renderSequenceRow(view, prop)
+          : this.renderRow(view, prop),
+      );
     }
 
     const addBtn = document.createElement("button");
@@ -120,7 +146,10 @@ class PropertiesWidget extends WidgetType {
   }
 
   private renderTitleField(view: EditorView): HTMLElement {
-    const titleProp = this.properties.find((p) => p.key === "title");
+    const titleProp = this.properties.find(
+      (p): p is Extract<PropertyRow, { kind: "scalar" }> =>
+        p.kind === "scalar" && p.key === "title",
+    );
     const displayValue =
       titleProp === undefined ? "" : displayYamlScalar(titleProp.value);
 
@@ -149,23 +178,25 @@ class PropertiesWidget extends WidgetType {
     return input;
   }
 
-  private renderRow(view: EditorView, prop: SimpleProperty): HTMLElement {
-    const row = document.createElement("div");
-    row.className = "cm-fm-properties-row";
-
+  /** The drag-handle glyph shared by every row (visual only). */
+  private makeIcon(): HTMLElement {
     const icon = document.createElement("span");
     icon.className = "cm-fm-properties-icon";
     icon.textContent = "≡";
-    row.appendChild(icon);
+    return icon;
+  }
 
+  /** The editable key input, shared by scalar and sequence rows. Commit /
+   *  Enter / Escape behaviour is identical — the value cell is what differs. */
+  private makeKeyInput(view: EditorView, key: string): HTMLInputElement {
     const keyInput = document.createElement("input");
     keyInput.type = "text";
     keyInput.className = "cm-fm-properties-key";
-    keyInput.value = prop.key;
+    keyInput.value = key;
     keyInput.spellcheck = false;
     keyInput.autocomplete = "off";
     keyInput.addEventListener("change", () => {
-      this.commitKey(view, prop.key, keyInput.value);
+      this.commitKey(view, key, keyInput.value);
     });
     keyInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -173,11 +204,18 @@ class PropertiesWidget extends WidgetType {
         keyInput.blur();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        keyInput.value = prop.key;
+        keyInput.value = key;
         keyInput.blur();
       }
     });
-    row.appendChild(keyInput);
+    return keyInput;
+  }
+
+  private renderRow(view: EditorView, prop: SimpleProperty): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "cm-fm-properties-row";
+    row.appendChild(this.makeIcon());
+    row.appendChild(this.makeKeyInput(view, prop.key));
 
     const valueInput = document.createElement("input");
     valueInput.type = "text";
@@ -201,6 +239,164 @@ class PropertiesWidget extends WidgetType {
     row.appendChild(valueInput);
 
     return row;
+  }
+
+  /** A sequence-valued key: editable key + a chip list (each item removable)
+   *  plus an add-item field. The value cell is one flex container, so — like the
+   *  scalar row — it contributes exactly the third grid column. */
+  private renderSequenceRow(
+    view: EditorView,
+    prop: SequenceProperty,
+  ): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "cm-fm-properties-row";
+    row.appendChild(this.makeIcon());
+    row.appendChild(this.makeKeyInput(view, prop.key));
+
+    const cell = document.createElement("div");
+    cell.className = "cm-fm-properties-tags";
+
+    for (const item of prop.items) {
+      cell.appendChild(this.renderChip(view, prop.key, item));
+    }
+
+    const addInput = document.createElement("input");
+    addInput.type = "text";
+    addInput.className = "cm-fm-properties-tag-input";
+    addInput.dataset.key = prop.key;
+    addInput.setAttribute("data-testid", "editor.frontmatter-tag-input");
+    addInput.spellcheck = false;
+    addInput.autocomplete = "off";
+    addInput.placeholder = i18n.t("editor.frontmatter.addListItem");
+    addInput.setAttribute(
+      "aria-label",
+      i18n.t("editor.frontmatter.addListItemAriaLabel", { key: prop.key }),
+    );
+    const commitAdd = () =>
+      this.commitAddItem(view, prop.key, prop.items, addInput);
+    addInput.addEventListener("change", commitAdd);
+    addInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commitAdd();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        addInput.value = "";
+        addInput.blur();
+      }
+    });
+    cell.appendChild(addInput);
+
+    row.appendChild(cell);
+    return row;
+  }
+
+  /** One removable chip for a sequence item. Uses `mousedown` + preventDefault
+   *  (like "+ Add property") so the click never blurs a sibling field or moves
+   *  the editor selection before the remove edit dispatches. */
+  private renderChip(
+    view: EditorView,
+    key: string,
+    item: string,
+  ): HTMLElement {
+    const chip = document.createElement("span");
+    chip.className = "cm-fm-properties-tag";
+    chip.setAttribute("data-testid", "editor.frontmatter-tag");
+
+    const label = document.createElement("span");
+    label.className = "cm-fm-properties-tag-label";
+    label.textContent = item;
+    chip.appendChild(label);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "cm-fm-properties-tag-remove";
+    remove.setAttribute("data-testid", "editor.frontmatter-tag-remove");
+    remove.setAttribute(
+      "aria-label",
+      i18n.t("editor.frontmatter.removeListItemAriaLabel", { item }),
+    );
+    remove.textContent = "×";
+    remove.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      this.commitRemoveItem(view, key, item);
+    });
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  /**
+   * Append the typed item to `key`'s sequence. De-duplicates within the list
+   * under the case-fold identity (so `Rust` + `rust` don't both appear), strips
+   * a single leading `#` (a user may type `#tag`), and formats the item so it
+   * reads back as the exact string it was typed as. No-op on empty / duplicate /
+   * a frontmatter shape the writer refuses.
+   */
+  private commitAddItem(
+    view: EditorView,
+    key: string,
+    items: readonly string[],
+    input: HTMLInputElement,
+  ): void {
+    const raw = input.value.trim();
+    if (raw === "") return;
+    const cleaned = (raw.startsWith("#") ? raw.slice(1) : raw).trim();
+    if (cleaned === "") {
+      input.value = "";
+      return;
+    }
+    const existing = new Set(items.map((i) => foldSegment(i)));
+    if (existing.has(foldSegment(cleaned))) {
+      input.value = ""; // already present under the fold — no duplicate
+      return;
+    }
+    const plan = planSequenceItemInsert(view.state.doc.toString(), key);
+    if (plan === null) {
+      input.value = "";
+      return;
+    }
+    const edit = plan(formatYamlStringScalar(cleaned));
+    view.dispatch({
+      changes: { from: edit.from, to: edit.to, insert: edit.insert },
+      userEvent: "frontmatter.add-list-item",
+    });
+    this.refocusAddInput(view, key);
+  }
+
+  /** Remove the chip whose folded value matches `item` from `key`'s sequence. */
+  private commitRemoveItem(
+    view: EditorView,
+    key: string,
+    item: string,
+  ): void {
+    const edit = planSequenceItemRemove(
+      view.state.doc.toString(),
+      key,
+      foldSegment(item),
+    );
+    if (edit === null) return;
+    view.dispatch({
+      changes: { from: edit.from, to: edit.to, insert: edit.insert },
+      userEvent: "frontmatter.remove-list-item",
+    });
+  }
+
+  /** After an add, the widget DOM is rebuilt (item count changed → `eq()` is
+   *  false) and the add-input is destroyed; land focus on the fresh one for the
+   *  same key so several items can be typed in a row. Same requestAnimationFrame
+   *  deferral as `addProperty`. */
+  private refocusAddInput(view: EditorView, key: string): void {
+    requestAnimationFrame(() => {
+      const inputs = view.dom.querySelectorAll<HTMLInputElement>(
+        ".cm-fm-properties-tag-input",
+      );
+      for (const input of inputs) {
+        if (input.dataset.key === key) {
+          input.focus();
+          break;
+        }
+      }
+    });
   }
 
   private commitKey(view: EditorView, oldKey: string, nextKeyRaw: string): void {
@@ -336,7 +532,7 @@ function buildFrontmatterDecorations(
   const doc = state.doc;
   const range = cachedLocateFrontmatter(doc);
   if (range === null) return Decoration.none;
-  const props = parseSimpleProperties(doc.toString(), range);
+  const props = parseProperties(doc.toString(), range);
   // A note that is ONLY frontmatter (the block reaches the end of the doc)
   // would otherwise have its closing `---\n` line break consumed by the
   // block-replace decoration — that swallows the empty body line below it, so

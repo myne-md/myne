@@ -1,16 +1,20 @@
-// Simple-property parser for the frontmatter Properties widget.
+// Property parser for the frontmatter Properties widget.
 //
-// Walks the YAML body (between the line-1-anchored `---` delimiters) and
-// extracts each line of shape `^([key]):[ \t]*(value)$`. Multi-line values,
-// nested objects, sequences, anchors — all skipped: those land in the
-// "raw YAML" escape hatch, not the Properties widget.
+// `parseSimpleProperties` walks the YAML body (between the line-1-anchored `---`
+// delimiters) and extracts each SCALAR line of shape `^([key]):[ \t]*(value)$`,
+// with the byte ranges the widget's in-place value/key rewrites need. Multi-line
+// values, nested objects, anchors are skipped here.
 //
-// Per the v1 grill addendum, the Properties UI ships **text-only** —
-// every value is rendered as a plain text input, no date picker / list
-// editor / link picker. The UI displays the key + its current literal
-// value; commit on blur or Enter rewrites the value range in the source.
+// `parseProperties` layers list handling on top: a top-level key whose YAML
+// value is a SEQUENCE (block `key:\n  - a` or flow `key: [a, b]`) is surfaced as
+// a `sequence` row — the Properties widget renders its items as removable chips
+// plus an add-item field — instead of the empty text input the scalar walk would
+// (wrongly) show for it. Nested-map / block-scalar / anchor values still skip.
+// (The old "sequences are skipped, text-only" grill addendum is superseded for
+// top-level list keys; scalar rows remain plain text inputs.)
 
 import type { FrontmatterRange } from "@myne/dialect/lezer/frontmatter";
+import { readFrontmatterSequences } from "@myne/dialect/frontmatterSequence";
 
 export type SimpleProperty = {
   key: string;
@@ -60,4 +64,43 @@ export function parseSimpleProperties(
     cursor = lineEnd + 1;
   }
   return out;
+}
+
+/** A top-level frontmatter key whose value is a YAML sequence (block or flow).
+ *  The Properties widget renders `items` as removable chips + an add-item field
+ *  rather than a scalar text input. `items` are the decoded (quote-stripped)
+ *  display values, in document order. */
+export interface SequenceProperty {
+  key: string;
+  items: string[];
+  /** Absolute position of the key line's first byte (for in-place rename). */
+  lineFrom: number;
+}
+
+/** One rendered Properties row: a scalar (editable key + value text input) or a
+ *  sequence (editable key + chip list). Discriminated by `kind`. */
+export type PropertyRow =
+  | ({ kind: "scalar" } & SimpleProperty)
+  | ({ kind: "sequence" } & SequenceProperty);
+
+/**
+ * Ordered rows for the Properties widget. Scalar keys keep their byte ranges
+ * (for in-place value rewrites); a top-level key whose YAML value is an array is
+ * upgraded to a `sequence` row carrying its decoded items. Source order is the
+ * scalar walk's order (a block sequence's `- item` lines don't produce their own
+ * rows — they don't match the scalar line regex — so the key appears once).
+ */
+export function parseProperties(
+  source: string,
+  range: FrontmatterRange,
+): PropertyRow[] {
+  const scalars = parseSimpleProperties(source, range);
+  const sequences = readFrontmatterSequences(source);
+  return scalars.map((p) => {
+    const items = sequences?.get(p.key);
+    if (items !== undefined) {
+      return { kind: "sequence", key: p.key, items, lineFrom: p.lineFrom };
+    }
+    return { kind: "scalar", ...p };
+  });
 }
