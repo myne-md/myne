@@ -221,6 +221,32 @@ describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
     );
   });
 
+  it("2 vaults: picker's Add-this-device opens the join modal", async () => {
+    // Vault-count precondition: 2. The regression guard for myne#221 — the
+    // join modal used to be mounted on the welcome screen alone, which boot
+    // routing reaches ONLY at zero vaults. So from the moment this screen can
+    // appear at all, joining an existing account had no route: the workaround
+    // was deleting every vault on the machine.
+    await scenario(
+      "sm-picker-join-entry",
+      {
+        seed: (appDataDir) => {
+          seedVault(appDataDir, { password: PASSWORD_A });
+          seedVault(appDataDir, { password: PASSWORD_B });
+        },
+      },
+      async (app) => {
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        await (await app.session.byTestId("picker.join-cta")).click();
+        // Nothing is unlocked on the picker, so the modal opens over it
+        // directly — no teardown hop (contrast the switcher entry below).
+        await app.session.byTestId("join.modal", { timeoutMs: 10_000 });
+        await app.session.byTestId("join.account-input");
+        await app.session.byTestId("picker.root");
+      },
+    );
+  });
+
   it("2 vaults, one corrupted: picker shows both; fail-closed surfaces only after selection", async () => {
     // Vault-count precondition: 2 (one garbage vault.meta — lists as
     // Exists since `is_well_formed` checks presence, not parse; the
@@ -533,6 +559,43 @@ describeE2E("in-app switcher transitions (MYND-127 task 5)", () => {
         await (await app.session.byTestId("switcher.chip")).click();
         await (await app.session.byTestId("switcher.create-cta")).click();
         await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+      },
+    );
+  });
+
+  it("editor → account-chip Add-this-device locks the vault, then opens the join modal", async () => {
+    // Vault-count precondition: 2 (any unlocked editor). The second half of
+    // myne#221, and the teardown is the part worth pinning: `sync_join_account`
+    // bootstraps AND unlocks a DIFFERENT vault, and SYNC-1 zeroizes the active
+    // one on the way — so the modal must not open over a mounted editor, which
+    // would leave it sitting on plaintext whose keys are gone for the whole
+    // `join.pending` wait. The entry therefore flushes + `vault_lock()`s and
+    // routes to the just-locked vault's unlock screen first.
+    let a!: SeededVault;
+    await scenario(
+      "sm-switcher-join-entry",
+      {
+        seed: (appDataDir) => {
+          a = seedVault(appDataDir, { password: PASSWORD_A });
+          seedVault(appDataDir, { password: PASSWORD_B });
+        },
+      },
+      async (app) => {
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        await selectPickerRow(app.session, a.vaultId);
+        await unlockToEditor(app.session, PASSWORD_A);
+        await dismissImporterOffer(app.session);
+
+        await (await app.session.byTestId("switcher.chip")).click();
+        await (await app.session.byTestId("switcher.join-cta")).click();
+
+        // The editor is gone and A is locked: its unlock form is what the
+        // modal sits over, still vault-addressed so cancelling lands the user
+        // somewhere they can simply retype the password.
+        const form = await app.session.byTestId("unlock.form", { timeoutMs: 15_000 });
+        expect(await form.attribute("data-vault-id")).toBe(a.vaultId);
+        await app.session.byTestId("unlock.password-input");
+        await app.session.byTestId("join.modal", { timeoutMs: 10_000 });
       },
     );
   });

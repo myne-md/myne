@@ -382,6 +382,19 @@ interface EditorProps {
    */
   onCreateAnother?: () => void;
   /**
+   * Open the device-join modal from the switcher dropdown's "Add this device to
+   * an account" footer (myne#221). App.tsx tears this vault down first — flush +
+   * `vault_lock()` + `editor.lock` — and opens the modal it mounts globally over
+   * the resulting unlock screen, because `sync_join_account` unlocks a DIFFERENT
+   * vault and SYNC-1 zeroizes this one on the way.
+   *
+   * Optional and capability-gated by App.tsx: a client that holds one container
+   * per origin cannot bootstrap a second vault, and an unavailable affordance is
+   * omitted rather than disabled. Absence hides that one row, not the switcher —
+   * so it is deliberately NOT part of `SidebarVaultSwitcher`'s null gate.
+   */
+  onJoinDevice?: () => void;
+  /**
    * True while a switch's `vault_lock()` IPC is in flight (the brief
    * "switching…" window during which the prior vault flushes + tears down).
    * The account-chip dropdown (task 5) reads it to disable the chip + show the
@@ -406,6 +419,7 @@ export function Editor({
   onDeleteVaultSuccess,
   onSwitchVault,
   onCreateAnother,
+  onJoinDevice,
   switching = false,
 }: EditorProps) {
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
@@ -575,6 +589,7 @@ export function Editor({
           onDeleteVaultSuccess={onDeleteVaultSuccess}
           onSwitchVault={onSwitchVault}
           onCreateAnother={onCreateAnother}
+          onJoinDevice={onJoinDevice}
           switching={switching}
           settingsOpen={settingsOpen}
           onRestoreBackup={onRestoreBackup}
@@ -608,6 +623,7 @@ type EditorChromeProps = {
   onDeleteVaultSuccess: () => void;
   onSwitchVault?: (targetVaultId: VaultId) => void;
   onCreateAnother?: () => void;
+  onJoinDevice?: () => void;
   switching: boolean;
   settingsOpen: boolean;
   onRestoreBackup: () => void;
@@ -622,6 +638,7 @@ function EditorChrome({
   onDeleteVaultSuccess,
   onSwitchVault,
   onCreateAnother,
+  onJoinDevice,
   switching,
   settingsOpen,
   onRestoreBackup,
@@ -1763,6 +1780,7 @@ function EditorChrome({
               <SidebarVaultSwitcher
                 onSwitchVault={onSwitchVault}
                 onCreateAnother={onCreateAnother}
+                onJoinDevice={onJoinDevice}
                 switching={switching}
               />
               <NotesSidebarList
@@ -2395,12 +2413,17 @@ const RIGHT_CLEARANCE = RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
 function SidebarVaultSwitcher({
   onSwitchVault,
   onCreateAnother,
+  onJoinDevice,
   switching,
 }: {
   onSwitchVault?: (targetVaultId: VaultId) => void;
   onCreateAnother?: () => void;
+  onJoinDevice?: () => void;
   switching: boolean;
 }) {
+  // `onJoinDevice` is deliberately absent from this gate: it is capability-
+  // gated (myne#221), and a client that cannot hold a second vault must lose
+  // that one footer row, not the whole switcher.
   if (onSwitchVault === undefined || onCreateAnother === undefined) return null;
   return (
     <div
@@ -2416,6 +2439,7 @@ function SidebarVaultSwitcher({
       <VaultSwitcher
         onSwitchVault={onSwitchVault}
         onCreateAnother={onCreateAnother}
+        onJoinDevice={onJoinDevice}
         switching={switching}
       />
     </div>

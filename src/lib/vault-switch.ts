@@ -19,6 +19,10 @@
 // the SOLE `Unlocked` slot — the prior vault is fully torn down (keys +
 // search index + VaultIndices + attachment-refs), not merely re-pointed.
 //
+// `leaveActiveVault` is the first half on its own, exported because the
+// device-join door in the account-chip switcher (myne#221) needs the same
+// teardown without a switch target — see its docstring.
+//
 // No confirm-discard dialog: `vault_lock()`'s `flushIfDirty` already
 // persists any unsaved edit before the keys zeroize (the canonical
 // flush-on-lock, `decisions.md` 2026-05-07 — the same one the editor Lock
@@ -53,6 +57,51 @@ export interface SwitchVaultDeps {
 }
 
 /**
+ * Leave the active (sole `Unlocked`) vault: flush what this side owns, then
+ * fire the param-less `vault_lock()` (four-surface teardown + `flushIfDirty`,
+ * SYNC-8) and clear the module-level session-ignore spell set.
+ *
+ * Split out of [`switchVault`] because a switch is not the only exit that has
+ * to tear the active vault down before another one unlocks. The device-join
+ * door reached from the editor's account-chip switcher (myne#221) is the other:
+ * `sync_join_account` bootstraps AND unlocks a different vault, and SYNC-1
+ * (`set_unlocked_locking_others`) zeroizes this one on the way — so the editor
+ * has to be gone before the join runs, exactly as it is before a switch.
+ *
+ * Best-effort on the lock's error path, for the reason [`switchVault`]'s
+ * docstring gives: the backend teardown runs zeroize-before-anything, so the
+ * caller routes onward regardless.
+ */
+export async function leaveActiveVault(deps: {
+  onSavingChange: (saving: boolean) => void;
+}): Promise<void> {
+  const { onSavingChange } = deps;
+  onSavingChange(true);
+  try {
+    // Persist the current graph layout to the ACTIVE (still-unlocked) vault
+    // before locking it — this path bypasses the Editor graceful-teardown trio,
+    // so it needs its own flush (best-effort, mirrors the trio's flushes).
+    await flushGraphLayoutNow();
+    // Param-less lock = "lock the sole unlocked (active) vault" (SYNC-8).
+    // Its `flushIfDirty` covers unsaved edits — no confirm-discard dialog.
+    await lockVault();
+  } catch (err) {
+    // Best-effort: the caller routes on anyway (see docstring). Surface to the
+    // dev console so a genuinely broken lock IPC isn't silent.
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn("[leaveActiveVault] vault_lock rejected; routing on anyway:", err);
+    }
+  } finally {
+    onSavingChange(false);
+  }
+  // Vault change: clear the editor's module-level session-ignore spell set so
+  // "ignore this session" words from the prior vault don't suppress squiggles in
+  // the target vault.
+  resetSessionIgnored();
+}
+
+/**
  * Switch from the active (sole `Unlocked`) vault to `targetVaultId`:
  * lock the current vault (param-less `vault_lock()` — four-surface teardown
  * + `flushIfDirty`), then route to the target's unlock screen via the
@@ -76,29 +125,7 @@ export async function switchVault(
   deps: SwitchVaultDeps,
 ): Promise<void> {
   const { onSavingChange, dispatch } = deps;
-  onSavingChange(true);
-  try {
-    // Persist the current graph layout to the ACTIVE (still-unlocked) vault
-    // before locking it — this path bypasses the Editor graceful-teardown trio,
-    // so it needs its own flush (best-effort, mirrors the trio's flushes).
-    await flushGraphLayoutNow();
-    // Param-less lock = "lock the sole unlocked (active) vault" (SYNC-8).
-    // Its `flushIfDirty` covers unsaved edits — no confirm-discard dialog.
-    await lockVault();
-  } catch (err) {
-    // Best-effort: route to the target anyway (see docstring). Surface to
-    // the dev console so a genuinely broken lock IPC isn't silent.
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.warn("[switchVault] vault_lock rejected; routing to target anyway:", err);
-    }
-  } finally {
-    onSavingChange(false);
-  }
-  // Vault change: clear the editor's module-level session-ignore spell set so
-  // "ignore this session" words from the prior vault don't suppress squiggles in
-  // the target vault.
-  resetSessionIgnored();
+  await leaveActiveVault({ onSavingChange });
 
   // Route to the target's unlock screen carrying its VaultId (SYNC-6). The
   // password entry + vault-addressed unlock IPC happen on the Unlock screen.

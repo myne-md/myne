@@ -11,9 +11,12 @@
 //
 // So the screen is unreachable here. This file is what makes it ABSENT as well,
 // which is the bar the rest of this feature holds: unreachable is a claim about
-// routing, absent is a property of the artefact. It also keeps the create CTA,
-// the join-device modal and the fresh-install restore door out of a bundle
-// where none of the three can be honoured.
+// routing, absent is a property of the artefact. It also keeps the create CTA
+// and the fresh-install restore door out of a bundle where neither can be
+// honoured. (The join-device modal used to come out with them, because this
+// screen was its only host; since myne#221 it is mounted globally by `App.tsx`,
+// and `web/src/components/sync/JoinDeviceModal.tsx` excludes it in its own
+// right rather than as a side effect of this file.)
 //
 // It renders a sentence rather than nothing for the same reason its siblings do:
 // a blank render would make a routing bug look like a broken build.

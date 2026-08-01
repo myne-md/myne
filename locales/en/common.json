@@ -3508,6 +3508,7 @@
   "vaultPicker": {
     "createAnother": "Create another vault",
     "heading": "Choose a vault",
+    "joinDevice": "Add this device to an account",
     "loading": "Loading your vaults…",
     "noneLoaded": "No vaults could be loaded right now.",
     "openedRelative": "opened {{rel}}",
@@ -3564,6 +3565,7 @@
   "vaultSwitcher": {
     "chipFallback": "Vault",
     "createAnother": "Create another vault",
+    "joinDevice": "Add this device to an account",
     "switching": "switching…",
     "switchVaultLabel": "Switch vault",
     "vaultFallback": "Vault {{n}}"
@@ -3572,6 +3574,7 @@
     "createCta": "Create new vault",
     "headlineLine1": "Encrypted markdown notes.",
     "headlineLine2": "No email at signup.",
+    "joinCta": "Add this device to an account",
     "repairResidue": {
       "cancel": "Cancel",
       "cleaningUp": "Cleaning up…",

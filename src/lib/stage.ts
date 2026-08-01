@@ -428,6 +428,30 @@ export type Action =
    * until an existing device approves). `vaultId` is the joined vault's id.
    */
   | { type: "welcome.join-success"; vaultId?: VaultId }
+  /**
+   * picker → editor (myne#221). The SAME join as `welcome.join-success`, from
+   * the ≥2-vault picker's "add this device to an account" affordance. A second
+   * action rather than one join action legal from several stages, because that
+   * is how this table already models a shared destination — `picker.create-vault`
+   * / `editor.create-vault`, and four separate `*.restore-backup` entries.
+   *
+   * Nothing is unlocked on the picker, so unlike the switcher entry below this
+   * one needs no teardown before the join runs.
+   */
+  | { type: "picker.join-success"; vaultId?: VaultId }
+  /**
+   * unlock → editor (myne#221). The join reached from the EDITOR's account-chip
+   * switcher — which lands here rather than dispatching from `editor` because
+   * the switcher entry tears the active vault down FIRST (`leaveActiveVault` →
+   * `editor.lock`) and opens the modal over the resulting unlock screen.
+   *
+   * That teardown is not tidiness: `sync_join_account` bootstraps AND unlocks a
+   * different vault, and SYNC-1 (`set_unlocked_locking_others`) zeroizes the
+   * previous one. A modal left over a mounted editor would therefore sit on
+   * plaintext whose keys are already gone — for the whole `join.pending` wait,
+   * which lasts until another device approves.
+   */
+  | { type: "unlock.join-success"; vaultId?: VaultId }
   /** picker → restore-backup ("restore an additional vault", SYNC-5 KeepBoth door). */
   | { type: "picker.restore-backup" }
   /**
@@ -514,6 +538,12 @@ export function transition(prev: Stage, action: Action): Stage {
           // disagrees with the actual slot at IPC time, the recover
           // screen reducer collapses the mismatch silently per Q4.
           return { name: "recover", subStep: "password-reset" };
+        case "unlock.join-success":
+          // The switcher's join door (myne#221). It routed HERE first — flush +
+          // `vault_lock()` + `editor.lock` — so the join ran with no vault
+          // mounted; now the joined vault is the sole `Unlocked` slot and the
+          // editor entry is vault-addressed, exactly like the welcome path.
+          return { name: "editor", vaultId: action.vaultId };
         case "unlock.back-to-picker":
           // Return to the ≥2-vault picker. Reached only when the unlock was
           // entered via `picker.select-vault` (the back affordance is gated on
@@ -621,6 +651,11 @@ export function transition(prev: Stage, action: Action): Stage {
         case "picker.create-vault":
           // "Create another" affordance → existing vault-creation flow.
           return { name: "create-vault" };
+        case "picker.join-success":
+          // The picker's join door (myne#221) — the same landing as the welcome
+          // one: `sync_join_account` already bootstrapped and unlocked the
+          // vault, so the editor entry is direct and vault-addressed.
+          return { name: "editor", vaultId: action.vaultId };
         default:
           return rejectIllegal(prev, action);
       }
@@ -878,7 +913,13 @@ const LEGAL: Record<string, Stage["name"]> = {
   // `restore-backup.*` exit arms exist by design (same posture as
   // back-from-create).
   "welcome|welcome.restore-backup": "restore-backup",
+  // The three device-join doors (MYND-424 welcome; myne#221 picker + switcher).
+  // One action per SOURCE stage, as with `*.create-vault` / `*.restore-backup`.
+  // The switcher's is keyed on `unlock` because that entry locks the active
+  // vault and routes there before the join runs.
   "welcome|welcome.join-success": "editor",
+  "picker|picker.join-success": "editor",
+  "unlock|unlock.join-success": "editor",
   "picker|picker.restore-backup": "restore-backup",
   "unlock|unlock.restore-backup": "restore-backup",
   "editor|editor.restore-backup": "restore-backup",
@@ -935,6 +976,8 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
 
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "welcome.join-success" },
+  { type: "picker.join-success" },
+  { type: "unlock.join-success" },
   { type: "create-vault.start" },
   { type: "create-vault.commit-success" },
   { type: "create-vault.auto-unlock-success" },
