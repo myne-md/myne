@@ -71,6 +71,16 @@ export default defineConfig(async () => ({
       // ~0.7s of typecheck. Exact specifier, no wildcard — `../src/lib/` is full
       // of modules that would drag `@tauri-apps/*` in.
       { find: /^@myne\/reminder-schedule$/, replacement: sib("../src/lib/reminderSchedule.ts") },
+      // The ENROL GATE (myne-md/myne-mobile#38) — whether "Add this device" is
+      // a real action for this device, or dead UI that mints a second device
+      // registration. Desktop fixed it once (MYND-635) and this client, which
+      // keeps its own tree, went on offering the row to an already-syncing
+      // phone: the exact failure mode a hand-ported condition has. It reads a
+      // `sync_status` state tag, which is `myne-core`'s answer and therefore
+      // identical on both clients by construction.
+      // Safe to alias out of Tauri-coupled `../src/lib/`: the module has NO
+      // imports at all.
+      { find: /^@myne\/enroll-gate$/, replacement: sib("../src/lib/enroll-gate.ts") },
       // The custom-theme SYNTAX DERIVATION (MYND-598). Shared for the same
       // reason as the reminder core: it encodes a readability rule both clients
       // must answer identically — which of the 12 `--syntax-*` roles a custom
