@@ -23,12 +23,18 @@ import {
   setGraphPositions,
 } from "../graphLayoutStore";
 import { resolveNodeRadius } from "../graphSettings";
-import type {
-  LayoutRequest,
-  LayoutResponse,
-} from "../graphLayoutProtocol";
+import type { LayoutRequest } from "../graphLayoutProtocol";
+import { runLayout } from "@myne/editor/host/notes/graphLayoutRun";
+import { clampK, fitTransform } from "@myne/editor/host/notes/graphCamera";
 import { isEdgeVisible, isNodeVisible, visibleBounds } from "../graphCulling";
 import { scheduleGraphLayoutFlush } from "../graphLayoutPersist";
+
+/** The shared worker entry, wired here because only this client's bundler can
+ *  resolve the URL (see `graphLayout.worker.ts`). */
+const makeLayoutWorker = () =>
+  new Worker(new URL("../graphLayout.worker.ts", import.meta.url), {
+    type: "module",
+  });
 
 type SimNode = GraphNode & { x: number; y: number };
 type SimLink = { source: SimNode; target: SimNode; weight: number };
@@ -224,12 +230,16 @@ export default function GraphCanvas({
 
     // Node objects for render/hit-test. WARM-START from the layout store: a
     // node keeps its last position (continuity, no re-scatter); a brand-new
-    // node seeds at center + jitter until the worker settles it. Uses the
-    // cached CSS box (no second getBoundingClientRect).
-    const cx = cssW / 2;
-    const cy = cssH / 2;
-    const nodes: SimNode[] = model.nodes.map((n) => {
-      const p = seedInitialPosition(getGraphPosition(n.id), cx, cy, cssW, cssH);
+    // node seeds onto the deterministic ring until the layout settles it. The
+    // seed runs in the kernel's fixed virtual box, NOT the canvas box — the
+    // camera below is what maps that geometry onto this screen.
+    const nodes: SimNode[] = model.nodes.map((n, index) => {
+      const p = seedInitialPosition(
+        getGraphPosition(n.id),
+        n.id,
+        index,
+        model.nodes.length,
+      );
       return { ...n, x: p.x, y: p.y };
     });
     const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -266,12 +276,27 @@ export default function GraphCanvas({
     // compute the settled layout OFF the main thread. The worker cannot call
     // Tauri IPC, so it only receives this already-resolved model + seed.
     let raf = 0;
-    const worker = new Worker(
-      new URL("../graphLayout.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-    worker.onmessage = (e: MessageEvent<LayoutResponse>) => {
-      const pos = new Map(e.data.positions.map((p) => [p.id, p]));
+    let layoutCancelled = false;
+    const nodeIds = model.nodes.map((n) => n.id);
+    void runLayout(
+      {
+        nodes: nodeIds.map((id) => ({ id })),
+        edges: model.edges.map((e) => ({ source: e.source, target: e.target })),
+        seed: seedPositions(nodeIds),
+        // Current force settings at build time — a LIVE change to one of them
+        // is handled by the separate `[forceCenterStrength, ...]` effect below,
+        // not by re-running this effect (which would recreate the whole sim).
+        forces: {
+          centerStrength: forceCenterStrength,
+          repelStrength: forceRepelStrength,
+          linkStrength: forceLinkStrength,
+          linkDistance: forceLinkDistance,
+        },
+      } satisfies LayoutRequest,
+      makeLayoutWorker,
+    ).then((res) => {
+      if (layoutCancelled) return;
+      const pos = new Map(res.positions.map((p) => [p.id, p]));
       for (const n of nodesRef.current) {
         const p = pos.get(n.id);
         if (p !== undefined) {
@@ -279,27 +304,11 @@ export default function GraphCanvas({
           n.y = p.y;
         }
       }
-      setGraphPositions(e.data.positions); // persist for warm-start next open
+      setGraphPositions(res.positions); // persist for warm-start next open
       scheduleGraphLayoutFlush(); // debounced flush to the encrypted vault.graph
+      fitToContent();
       schedule();
-    };
-    const nodeIds = model.nodes.map((n) => n.id);
-    worker.postMessage({
-      nodes: nodeIds.map((id) => ({ id })),
-      edges: model.edges,
-      seed: seedPositions(nodeIds),
-      width: cssW,
-      height: cssH,
-      // Current force settings at build time — a LIVE change to one of them
-      // is handled by the separate `[forceCenterStrength, ...]` effect below,
-      // not by re-running this effect (which would recreate the whole sim).
-      forces: {
-        centerStrength: forceCenterStrength,
-        repelStrength: forceRepelStrength,
-        linkStrength: forceLinkStrength,
-        linkDistance: forceLinkDistance,
-      },
-    } satisfies LayoutRequest);
+    });
 
     // Cull bookkeeping reused across frames (reset per render, never
     // re-allocated) and filled ONLY when its LOD consumer is active — so an
@@ -433,6 +442,16 @@ export default function GraphCanvas({
       if (raf === 0) raf = requestAnimationFrame(render);
     };
     scheduleRef.current = schedule;
+    // Frame the laid-out cloud. Not cosmetic: the layout is computed in a fixed
+    // virtual box (`LAYOUT_BOX`) so every client produces identical geometry,
+    // which means the camera — not the geometry — is what adapts to this
+    // window. Run on mount (warm-start positions) and again when a fresh layout
+    // lands. It also fixes the old failure where a layout persisted under a
+    // different window size opened off-screen with no way back.
+    const fitToContent = () => {
+      viewRef.current = fitTransform(nodesRef.current, cssW, cssH);
+    };
+    fitToContent();
     schedule();
 
     // Convert a client point to graph (pre-transform) coordinates.
@@ -533,7 +552,9 @@ export default function GraphCanvas({
       const cx = e.clientX - r.left;
       const cy = e.clientY - r.top;
       const factor = Math.exp(-e.deltaY * 0.001);
-      const k2 = Math.min(8, Math.max(0.15, v.k * factor));
+      // Shared clamp: the floor has to be low enough for `fitTransform` to fit
+      // a large vault's cloud into a small box, which the old 0.15 fought.
+      const k2 = clampK(v.k * factor);
       // Zoom toward the cursor.
       v.x = cx - (cx - v.x) * (k2 / v.k);
       v.y = cy - (cy - v.y) * (k2 / v.k);
@@ -575,7 +596,10 @@ export default function GraphCanvas({
 
     return () => {
       scheduleRef.current = null;
-      worker.terminate();
+      // `runLayout` owns the worker's lifetime (it terminates on message or
+      // error); this only stops a late result from writing into a torn-down
+      // node array.
+      layoutCancelled = true;
       if (raf !== 0) cancelAnimationFrame(raf);
       cancelPendingClick();
       canvas.removeEventListener("pointerdown", onPointerDown);
@@ -630,15 +654,25 @@ export default function GraphCanvas({
     const edges = linksRef.current.map((l) => ({
       source: l.source.id,
       target: l.target.id,
-      weight: l.weight,
     }));
-    const size = sizeRef.current;
-    const worker = new Worker(
-      new URL("../graphLayout.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-    worker.onmessage = (e: MessageEvent<LayoutResponse>) => {
-      const pos = new Map(e.data.positions.map((p) => [p.id, p]));
+    let cancelled = false;
+    setForceRelayoutSeeded(Object.keys(seed).length);
+    void runLayout(
+      {
+        nodes: nodes.map((n) => ({ id: n.id })),
+        edges,
+        seed,
+        forces: {
+          centerStrength: forceCenterStrength,
+          repelStrength: forceRepelStrength,
+          linkStrength: forceLinkStrength,
+          linkDistance: forceLinkDistance,
+        },
+      } satisfies LayoutRequest,
+      makeLayoutWorker,
+    ).then((res) => {
+      if (cancelled) return;
+      const pos = new Map(res.positions.map((p) => [p.id, p]));
       for (const n of nodesRef.current) {
         const p = pos.get(n.id);
         if (p !== undefined) {
@@ -646,32 +680,16 @@ export default function GraphCanvas({
           n.y = p.y;
         }
       }
-      setGraphPositions(e.data.positions);
+      setGraphPositions(res.positions);
       scheduleGraphLayoutFlush();
       scheduleRef.current?.();
-      worker.terminate();
       setForceRelayoutRuns((n) => n + 1);
-    };
-    setForceRelayoutSeeded(Object.keys(seed).length);
-    worker.postMessage({
-      nodes: nodes.map((n) => ({ id: n.id })),
-      edges,
-      seed,
-      width: size.width,
-      height: size.height,
-      forces: {
-        centerStrength: forceCenterStrength,
-        repelStrength: forceRepelStrength,
-        linkStrength: forceLinkStrength,
-        linkDistance: forceLinkDistance,
-      },
-    } satisfies LayoutRequest);
-    // Bounded by construction (the worker runs its fixed tick budget once and
-    // posts back one message) — no perpetual loop. If the effect re-fires
-    // before that message arrives (a rapid slider drag), the cleanup below
-    // terminates the stale worker first.
+    });
+    // Bounded by construction (the kernel runs its fixed tick budget once and
+    // resolves) — no perpetual loop. If the effect re-fires before that
+    // resolves (a rapid slider drag), the stale result is dropped below.
     return () => {
-      worker.terminate();
+      cancelled = true;
     };
   }, [forceCenterStrength, forceRepelStrength, forceLinkStrength, forceLinkDistance]);
 

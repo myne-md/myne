@@ -1,22 +1,32 @@
-// The pure layout kernel that runs inside the graph layout Web Worker
-// (Phase A4). Exercised directly (no Worker) — it is a pure function of its
-// request except the jitter given to un-seeded nodes.
+// The shared, deterministic layout kernel (myne-md/myne#200). Exercised
+// directly (no Worker) — it is a pure function of its request, including the
+// cold-start seed, which is the property the whole cross-client parity story
+// rests on.
 
 import { describe, it, expect } from "vitest";
 import {
   computeGraphLayout,
+  LAYOUT_BOX,
   type LayoutRequest,
 } from "../../src/notes/graphLayoutProtocol";
 
 const seededReq: LayoutRequest = {
   nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
   edges: [
-    { source: "a", target: "b", weight: 1 },
-    { source: "b", target: "c", weight: 1 },
+    { source: "a", target: "b" },
+    { source: "b", target: "c" },
   ],
   seed: { a: { x: 10, y: 10 }, b: { x: 120, y: 20 }, c: { x: 30, y: 230 } },
-  width: 800,
-  height: 600,
+};
+
+const coldReq: LayoutRequest = {
+  nodes: [{ id: "n1" }, { id: "n2" }, { id: "n3" }, { id: "n4" }],
+  edges: [
+    { source: "n1", target: "n2" },
+    { source: "n2", target: "n3" },
+    { source: "n3", target: "n4" },
+  ],
+  seed: {},
 };
 
 describe("computeGraphLayout", () => {
@@ -34,8 +44,6 @@ describe("computeGraphLayout", () => {
       nodes: [{ id: "lonely" }],
       edges: [],
       seed: {},
-      width: 400,
-      height: 400,
     });
     expect(positions.length).toBe(1);
     expect(Number.isFinite(positions[0]!.x)).toBe(true);
@@ -44,12 +52,12 @@ describe("computeGraphLayout", () => {
   it("ignores an edge whose endpoint is not in the node-set", () => {
     const { positions } = computeGraphLayout({
       ...seededReq,
-      edges: [{ source: "a", target: "ghost", weight: 1 }],
+      edges: [{ source: "a", target: "ghost" }],
     });
     expect(positions.length).toBe(3); // no throw, dangling edge dropped
   });
 
-  it("omitting `forces` matches the pre-task-6 fixed constants explicitly passed", () => {
+  it("omitting `forces` matches the fixed constants explicitly passed", () => {
     const withoutForces = computeGraphLayout(seededReq);
     const withDefaultForces = computeGraphLayout({
       ...seededReq,
@@ -59,12 +67,12 @@ describe("computeGraphLayout", () => {
   });
 
   it("warm-starts: a seeded node keeps its exact place when no force pulls it", () => {
-    // The warm-start half of task 6's force contract, isolated from the physics:
+    // The warm-start half of the force contract, isolated from the physics:
     // with every force inert, the kernel must return the seed VERBATIM. A cold
-    // start would hand back `seedInitialPosition`'s center + full-box jitter
-    // instead — which is exactly what re-scattering (the "flashbang") looks
-    // like. The complementary half, "a live force re-run seeds every node it is
-    // about to lay out", is E2E-observable as `data-force-relayout-seeded`.
+    // start would hand back the deterministic ring instead — which is exactly
+    // what re-scattering (the "flashbang") looks like. The complementary half,
+    // "a live force re-run seeds every node it is about to lay out", is
+    // E2E-observable as `data-force-relayout-seeded`.
     const { positions } = computeGraphLayout({
       ...seededReq,
       forces: { centerStrength: 0, repelStrength: 0, linkStrength: 0, linkDistance: 60 },
@@ -96,5 +104,48 @@ describe("computeGraphLayout", () => {
       return Math.max(...xs) - Math.min(...xs);
     };
     expect(spread(loose.positions)).toBeGreaterThan(spread(tight.positions));
+  });
+});
+
+// The properties that let two clients agree on a layout without ever exchanging
+// one. Each maps to a hazard named in the kernel's header.
+describe("determinism", () => {
+  it("a cold run is reproducible — no Math.random anywhere in the seed", () => {
+    expect(computeGraphLayout(coldReq).positions).toEqual(
+      computeGraphLayout(coldReq).positions,
+    );
+  });
+
+  it("is independent of the caller's node and edge order", () => {
+    // The note cache iterates in whatever order it happens to hold, and both
+    // the force accumulation and the quadtree's insertion order depend on it —
+    // so the kernel sorts before it simulates.
+    const shuffled: LayoutRequest = {
+      nodes: [...coldReq.nodes].reverse(),
+      edges: [...coldReq.edges].reverse(),
+      seed: {},
+    };
+    expect(computeGraphLayout(shuffled).positions).toEqual(
+      computeGraphLayout(coldReq).positions,
+    );
+  });
+
+  it("lays out in the fixed virtual box, not any viewport", () => {
+    // A cold layout centres on LAYOUT_BOX/2 whatever the screen: the camera is
+    // what adapts to a window, not the geometry.
+    const { positions } = computeGraphLayout(coldReq);
+    const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+    const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+    expect(cx).toBeCloseTo(LAYOUT_BOX / 2, 0);
+    expect(cy).toBeCloseTo(LAYOUT_BOX / 2, 0);
+  });
+
+  it("gives two different ids two different ring slots", () => {
+    // The retired mobile ring keyed its jitter on the first and last char
+    // modulo 37, which collides constantly over UUIDs; this one hashes the
+    // whole id.
+    const { positions } = computeGraphLayout(coldReq);
+    const distinct = new Set(positions.map((p) => `${p.x},${p.y}`));
+    expect(distinct.size).toBe(positions.length);
   });
 });
