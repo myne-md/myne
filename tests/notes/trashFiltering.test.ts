@@ -107,13 +107,13 @@ describe("folder-tree exclusion + restore re-inclusion", () => {
 
   it("a folder holding only a trashed note disappears from the tree", () => {
     const trashed = cacheOf([rec("n1", "Solo/", TS)]);
-    const tree = deriveFolderTree(records(trashed), []);
+    const tree = deriveFolderTree(records(trashed), [], []);
     expect(tree.roots.some((node) => node.path === "Solo/")).toBe(false);
   });
 
   it("the same folder resurrects once the note is restored (marker cleared)", () => {
     const restored = cacheOf([rec("n1", "Solo/", null)]);
-    const tree = deriveFolderTree(records(restored), []);
+    const tree = deriveFolderTree(records(restored), [], []);
     const solo = tree.roots.find((node) => node.path === "Solo/");
     expect(solo?.noteIds).toEqual(["n1"]);
   });
@@ -123,7 +123,7 @@ describe("folder-tree exclusion + restore re-inclusion", () => {
       rec("keep", "Shared/", null),
       rec("gone", "Shared/", TS),
     ]);
-    const tree = deriveFolderTree(records(mixed), []);
+    const tree = deriveFolderTree(records(mixed), [], []);
     const shared = tree.roots.find((node) => node.path === "Shared/");
     expect(shared?.noteIds).toEqual(["keep"]);
   });

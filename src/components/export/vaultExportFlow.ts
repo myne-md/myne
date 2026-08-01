@@ -81,7 +81,9 @@ export function collectFolderOptions(
   for (const r of records) {
     if (r.trashed === null) live.push({ noteUuid: r.noteUuid, folder: r.folder });
   }
-  const tree = deriveFolderTree(live, []);
+  // `[]` for both sets is deliberate: an export carries the whole vault, so an
+  // archived folder is INCLUDED (archive is a working-set filter, not a deletion).
+  const tree = deriveFolderTree(live, [], []);
   const out: string[] = [];
   const walk = (nodes: readonly FolderNode[]) => {
     for (const n of nodes) {

@@ -32,7 +32,6 @@ import {
 } from "../sidebarState";
 import {
   archivedFolderKeys,
-  filterVisibleDeliberate,
   isNoteFolderArchived,
   topLevelArchivedFolders,
 } from "../archivedFolders";
@@ -839,9 +838,10 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           folder: r.folder,
           folderIndex: r.folderIndex,
         })),
-        filterVisibleDeliberate(fm.deliberate, archivedKeys),
+        fm.deliberate,
+        fm.archivedFolders,
       ),
-    [live, fm.deliberate, archivedKeys],
+    [live, fm.deliberate, fm.archivedFolders],
   );
   // Keep the handlers' tree reference current (delete-emptiness, case-merge).
   fm.treeRef.current = tree;

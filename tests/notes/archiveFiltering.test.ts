@@ -21,7 +21,6 @@ import { resolverNotesFromCache } from "../../src/notes/resolverNotes";
 import { deriveFolderTree } from "../../src/notes/folderTree";
 import {
   archivedFolderKeys,
-  filterVisibleDeliberate,
 } from "../../src/notes/archivedFolders";
 import {
   buildFavoriteRows,
@@ -146,6 +145,7 @@ describe("folder-tree exclusion", () => {
         ).values(),
       ],
       [],
+      [],
     );
     const ids = JSON.stringify(tree);
     expect(ids).toContain("live");
@@ -191,7 +191,8 @@ describe("folder-archive — working-set exclusion vs resolver retention", () =>
         noteUuid: r.noteUuid,
         folder: r.folder,
       })),
-      filterVisibleDeliberate(["Projects/", "Other/"], keys),
+      ["Projects/", "Other/"],
+      ["Projects/"],
     );
     const json = JSON.stringify(tree);
     expect(json).toContain("Other/");

@@ -138,6 +138,7 @@ function mount(records: TitleRecord[], deliberate: string[] = [], ctxOver = {}) 
   const tree = deriveFolderTree(
     records.map((n) => ({ noteUuid: n.noteUuid, folder: n.folder })),
     deliberate,
+    [],
   );
   act(() => {
     r.result.current.treeRef.current = tree;

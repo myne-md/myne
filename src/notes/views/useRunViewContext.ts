@@ -13,7 +13,7 @@
 
 import { useMemo } from "react";
 import { usePrefs } from "../../hooks/usePrefs";
-import { archivedFolderKeys, filterVisibleDeliberate } from "../archivedFolders";
+import { archivedFolderKeys } from "../archivedFolders";
 import { deriveFolderTree } from "../folderTree";
 import { liveCache, sortBatchIds, useSelectedNote } from "../sidebarState";
 import { searchNotes } from "../searchNotes";
@@ -39,8 +39,8 @@ export function useRunViewContext(): RunViewContext {
 
   // The folder tree (each live note's `folder:` ∪ deliberate_folders) backs the
   // subtree-inclusive `inFolder` resolver — same derivation the sidebar uses.
-  // Archived deliberate folders are filtered so they don't re-surface as empty
-  // `inFolder` targets after `liveCache` strips their notes.
+  // `deriveFolderTree` applies the folder-archive filter itself, so an archived
+  // folder can't re-surface as an empty `inFolder` target.
   const tree = useMemo(
     () =>
       deriveFolderTree(
@@ -48,9 +48,10 @@ export function useRunViewContext(): RunViewContext {
           noteUuid: r.noteUuid,
           folder: r.folder,
         })),
-        filterVisibleDeliberate(prefs.deliberate_folders, archivedKeys),
+        prefs.deliberate_folders,
+        prefs.archived_folders,
       ),
-    [live, prefs.deliberate_folders, archivedKeys],
+    [live, prefs.deliberate_folders, prefs.archived_folders],
   );
 
   return useMemo<RunViewContext>(() => {
