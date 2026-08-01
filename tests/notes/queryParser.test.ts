@@ -10,6 +10,7 @@ import type { FilterNode } from "../../src/notes/queryEngine";
 import { parseQuery, queryHasOperators } from "../../src/notes/queryParser";
 
 const search = (query: string): FilterNode => ({ kind: "search", query });
+const phrase = (p: string): FilterNode => ({ kind: "phrase", phrase: p });
 
 describe("parseQuery — bare terms & implicit AND", () => {
   it("a single bare word is a search leaf", () => {
@@ -165,27 +166,46 @@ describe("parseQuery — OR & grouping (MYND-307)", () => {
   });
 });
 
-describe("parseQuery — quoted phrases", () => {
-  it('"exact phrase" → search with the phrase, quotes stripped', () => {
-    expect(parseQuery('"release notes"')).toEqual(search("release notes"));
+describe("parseQuery — quoted phrases (#208 adjacency)", () => {
+  it('"exact phrase" → a phrase leaf (enforced adjacency), not AND-of-terms', () => {
+    expect(parseQuery('"release notes"')).toEqual(phrase("release notes"));
   });
 
-  it("a quoted operator value keeps its inner whitespace", () => {
+  it("a quoted operator value keeps its inner whitespace (still a tag leaf)", () => {
     expect(parseQuery('tag:"my tag"')).toEqual({ kind: "hasTag", tag: "my tag" });
   });
 
   it("a phrase composes under AND with a bare term", () => {
     expect(parseQuery('rust "async runtime"')).toEqual({
       kind: "and",
-      children: [search("rust"), search("async runtime")],
+      children: [search("rust"), phrase("async runtime")],
     });
   });
 });
 
+describe("parseQuery — section: / regex (#207/#208 Slice B)", () => {
+  it("section: → a heading-match leaf", () => {
+    expect(parseQuery("section:Intro")).toEqual({
+      kind: "sectionMatch",
+      query: "Intro",
+    });
+  });
+  it("/regex/ → a regex leaf with the inner pattern", () => {
+    expect(parseQuery("/foo.*bar/")).toEqual({ kind: "regex", source: "foo.*bar" });
+  });
+  it("path:/foo is a folder leaf, not a regex (prefix wins)", () => {
+    expect(parseQuery("path:/foo")).toEqual({ kind: "inFolder", path: "/foo" });
+  });
+  it("a lone slash / and empty // stay literal text", () => {
+    expect(parseQuery("/")).toEqual(search("/"));
+    expect(parseQuery("//")).toEqual(search("//"));
+  });
+});
+
 describe("parseQuery — malformed input never throws", () => {
-  it("an unterminated quote degrades to a literal search", () => {
+  it("an unterminated quote still becomes a phrase leaf, not a throw", () => {
     expect(() => parseQuery('"foo bar')).not.toThrow();
-    expect(parseQuery('"foo bar')).toEqual(search("foo bar"));
+    expect(parseQuery('"foo bar')).toEqual(phrase("foo bar"));
   });
 
   it("an unterminated paren still parses its contents", () => {

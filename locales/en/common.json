@@ -222,7 +222,16 @@
     "matchedInAttachmentTitle": "The query matched inside a file embedded in this note",
     "matchedInBody": "↳ matched in body",
     "noMatches": "No matches",
-    "searchPlaceholder": "Search notes or run a command — Esc to dismiss",
+    "operatorHint": "Tab to complete",
+    "operators": {
+      "tag": "Notes with a tag",
+      "path": "Notes in a folder",
+      "file": "Match the note title",
+      "section": "Notes with a heading",
+      "task": "Notes with a task",
+      "content": "Full-text in the body"
+    },
+    "searchPlaceholder": "Search notes or run a command — try tag: · path: · task:",
     "sectionCommands": "Commands",
     "sectionNotes": "Notes",
     "untitledNote": "Untitled"

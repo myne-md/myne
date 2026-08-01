@@ -29,7 +29,7 @@ import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS, fuzzyFilter } from "../commands";
 import { Icon } from "./primitives/Icon";
 import { useFocusTrap } from "../hooks/useFocusTrap";
-import { formatChord } from "../commands/chord";
+import { Keycaps } from "./primitives/Keycaps";
 import type {
   ActionVisibility,
   CommandAction,
@@ -46,6 +46,15 @@ import { noteRead } from "../notes/readNote";
 import { requestRevealMatch } from "../notes/views/revealMatchSignal";
 import { parseQuery, queryHasOperators } from "../notes/queryParser";
 import { runOperatorSearch } from "../notes/searchQuery";
+import {
+  completeOperator,
+  completeValue,
+  searchOperatorSuggestions,
+  searchValueSuggestions,
+} from "../notes/searchSuggest";
+import { tagTree } from "../notes/vaultIndices";
+import { tagRows } from "../notes/tagBrowser";
+import { listFolderPaths } from "../notes/listFolderPaths";
 import { useRunViewContext } from "../notes/views/useRunViewContext";
 import type { NoteMatchedIn, NoteSearchResult } from "../types/note-search-result";
 
@@ -96,6 +105,47 @@ const LIST_STYLE: CSSProperties = {
   flex: 1,
   overflowY: "auto",
   padding: 6,
+};
+
+// Operator autocomplete strip (#207/#208 discoverability) — sits between the
+// input and the results, shown while a partial operator is being typed. Tab
+// completes the first (highlighted) one; a click completes any.
+const SUGGEST_LIST_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  padding: "6px 6px 8px",
+  borderBottom: "1px solid var(--line-1)",
+};
+const SUGGEST_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: 8,
+  padding: "6px 10px",
+  border: 0,
+  borderRadius: "var(--radius-1, 3px)",
+  cursor: "pointer",
+  textAlign: "left",
+  width: "100%",
+  fontFamily: "var(--font-sans)",
+};
+const SUGGEST_OP_STYLE: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-sm)",
+  color: "var(--accent)",
+  fontWeight: 600,
+};
+const SUGGEST_HINT_STYLE: CSSProperties = {
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-3)",
+  flex: 1,
+};
+const SUGGEST_KEY_STYLE: CSSProperties = {
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-1, 3px)",
+  padding: "0 4px",
 };
 
 const ROW_STYLE: CSSProperties = {
@@ -251,6 +301,9 @@ export function CommandPalette({
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  // Highlighted autocomplete suggestion (#207/#208). Arrows move it while the
+  // suggestion strip is open; Enter/Tab complete it.
+  const [suggestIndex, setSuggestIndex] = useState(0);
   // Backend full-text results for the NOTES section (MYND-40). Populated by the
   // search effect below; empty while the query is empty.
   const [noteHits, setNoteHits] = useState<NoteSearchResult[]>([]);
@@ -258,6 +311,10 @@ export function CommandPalette({
   // the index stores no body text, so each snippet is a `note_read` decrypt of a
   // VISIBLE result, generation-guarded by the effect's `cancelled` flag).
   const [snippets, setSnippets] = useState<Map<string, MatchSnippet>>(new Map());
+  // Value-suggestion pools for the operator autocomplete (#207/#208): tag names
+  // (for `tag:`) and folder paths (for `path:`), fetched once per open.
+  const [tagPool, setTagPool] = useState<string[]>([]);
+  const [folderPool, setFolderPool] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
   // The scrollable results container — used to keep the keyboard-selected row in
   // view as arrow nav walks past the fold (without it, the highlight can move to
@@ -293,6 +350,34 @@ export function CommandPalette({
     [viewCtx],
   );
 
+  // Operator + value autocomplete (#207/#208). A partial operator token surfaces
+  // the matching operators (`tag:`, `path:`…); a `<op>:<partial>` token surfaces
+  // matching tag/folder VALUES. Both complete on Tab / click. Empty for a
+  // plain-text query — no clutter on the common case.
+  const suggestions = useMemo<
+    Array<{ key: string; display: string; hint: string | undefined; next: string }>
+  >(() => {
+    const ops = searchOperatorSuggestions(query);
+    if (ops.length > 0) {
+      return ops.map((o) => ({
+        key: `op:${o.op}`,
+        display: `${o.op}:`,
+        hint: t(o.hintKey),
+        next: completeOperator(query, o.op),
+      }));
+    }
+    const vals = searchValueSuggestions(query, { tags: tagPool, folders: folderPool });
+    if (vals !== null) {
+      return vals.values.map((v) => ({
+        key: `val:${vals.op}:${v}`,
+        display: `${vals.op}:${v}`,
+        hint: undefined,
+        next: completeValue(query, vals.op, v),
+      }));
+    }
+    return [];
+  }, [query, tagPool, folderPool, t]);
+
   // Reset state every time the palette opens.
   useEffect(() => {
     if (open) {
@@ -302,6 +387,29 @@ export function CommandPalette({
       // Focus input on next tick (after mount + portal append).
       requestAnimationFrame(() => inputRef.current?.focus());
     }
+  }, [open]);
+
+  // Fetch the value-suggestion pools (tags + folders) once per open. Best-effort:
+  // a locked vault / IO failure just leaves the pools empty — operator-NAME
+  // suggestions still work, only the value dropdown goes quiet (#207/#208).
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void tagTree().then(
+      (nodes) => {
+        if (!cancelled) setTagPool(tagRows(nodes).map((r) => r.display));
+      },
+      () => {},
+    );
+    void listFolderPaths().then(
+      (fs) => {
+        if (!cancelled) setFolderPool(fs.map((f) => f.path));
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   // Dispatch one backend full-text search for `q`, applying its result ONLY if
@@ -534,6 +642,36 @@ export function CommandPalette({
         close();
         return;
       }
+      // While the autocomplete strip is open (#207/#208), Arrow/Tab/Enter drive
+      // the SUGGESTIONS, not the results below — the user is picking an operator
+      // or a tag/folder value. Enter on a no-op completion (the token already IS
+      // the value) falls through to run the search instead.
+      if (suggestions.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSuggestIndex((i) => (i + 1) % suggestions.length);
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSuggestIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+          return;
+        }
+        const active = suggestions[Math.min(suggestIndex, suggestions.length - 1)];
+        if (e.key === "Tab") {
+          e.preventDefault();
+          setQuery(active.next);
+          setSuggestIndex(0);
+          return;
+        }
+        if (e.key === "Enter" && active.next !== query) {
+          e.preventDefault();
+          setQuery(active.next);
+          setSuggestIndex(0);
+          return;
+        }
+        // Enter on a no-op completion falls through to run the highlighted result.
+      }
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setSelectedIndex((i) => (rows.length === 0 ? 0 : (i + 1) % rows.length));
@@ -556,7 +694,7 @@ export function CommandPalette({
         return;
       }
     },
-    [rows, selectedIndex, runRow, close, flushNoteSearch],
+    [rows, selectedIndex, runRow, close, flushNoteSearch, suggestions, suggestIndex, query],
   );
 
   const onBackdropClick = useCallback(
@@ -589,6 +727,7 @@ export function CommandPalette({
           onChange={(e) => {
             setQuery(e.target.value);
             setSelectedIndex(0);
+            setSuggestIndex(0);
           }}
           onKeyDown={onKeyDown}
           placeholder={t("commandPalette.searchPlaceholder")}
@@ -599,6 +738,44 @@ export function CommandPalette({
           spellCheck={false}
           data-testid="palette.input"
         />
+        {suggestions.length > 0 && (
+          <div style={SUGGEST_LIST_STYLE} data-testid="palette.operator-suggestions">
+            {suggestions.map((s, i) => {
+              const active = i === Math.min(suggestIndex, suggestions.length - 1);
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  style={{
+                    ...SUGGEST_ROW_STYLE,
+                    background: active ? "var(--paper-3)" : "transparent",
+                  }}
+                  data-testid="palette.operator-suggestion"
+                  data-active={active ? "true" : "false"}
+                  onMouseEnter={() => setSuggestIndex(i)}
+                  // onMouseDown, not onClick: fires before the input blurs, so the
+                  // caret + query survive the completion.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setQuery(s.next);
+                    setSuggestIndex(0);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  <span style={SUGGEST_OP_STYLE}>{s.display}</span>
+                  {s.hint !== undefined && (
+                    <span style={SUGGEST_HINT_STYLE}>{s.hint}</span>
+                  )}
+                  {active && (
+                    <span style={{ ...SUGGEST_KEY_STYLE, marginLeft: "auto" }}>
+                      {t("commandPalette.operatorHint")}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div style={LIST_STYLE} role="listbox" ref={listRef}>
           {rows.length === 0 ? (
             <div style={EMPTY_STYLE}>{t("commandPalette.noMatches")}</div>
@@ -664,14 +841,15 @@ function renderRow(
     snippet !== undefined
       ? { ...baseStyle, flexDirection: "column" as const, alignItems: "stretch" as const, gap: 3 }
       : baseStyle;
-  // Keystroke hint for an enabled action row: derive from the command's default
-  // binding via the shared formatChord util (SYNC-3), with the hand-typed `kbd`
-  // literal as a fallback only — so the hint can't drift from the canonical chord.
-  const actionHint =
-    row.kind === "action" && !isDisabled
-      ? row.action.defaultBinding
-        ? formatChord(row.action.defaultBinding)
-        : row.action.kbd
+  // Keystroke hint for an enabled action row. The canonical binding renders as
+  // keycaps (SYNC-3, #184 — legible per-key caps, not a cramped mono run); the
+  // hand-typed `kbd` literal is a text fallback only, for the rare action with no
+  // `defaultBinding` chord.
+  const actionBinding =
+    row.kind === "action" && !isDisabled ? row.action.defaultBinding : undefined;
+  const kbdFallback =
+    row.kind === "action" && !isDisabled && actionBinding === undefined
+      ? row.action.kbd
       : undefined;
   return (
     <div
@@ -698,7 +876,8 @@ function renderRow(
           {isDisabled && row.action.disabledHint !== undefined && (
             <span style={HINT_STYLE}>{row.action.disabledHint}</span>
           )}
-          {actionHint !== undefined && <span style={HINT_STYLE}>{actionHint}</span>}
+          {actionBinding !== undefined && <Keycaps chord={actionBinding} />}
+          {kbdFallback !== undefined && <span style={HINT_STYLE}>{kbdFallback}</span>}
         </>
       ) : (
         <>

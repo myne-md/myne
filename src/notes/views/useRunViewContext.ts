@@ -18,8 +18,46 @@ import { deriveFolderTree } from "../folderTree";
 import { liveCache, sortBatchIds, useSelectedNote } from "../sidebarState";
 import { searchNotes } from "../searchNotes";
 import { noteIdsWithTask } from "../taskIndex";
-import { byTag, vaultIndicesPropertyValues } from "../vaultIndices";
+import { byTag, vaultHeadings, vaultIndicesPropertyValues } from "../vaultIndices";
+import { noteRead } from "../readNote";
 import { folderSubtreeNoteIds, type RunViewContext } from "../queryEngine";
+
+// Bounds for the two content-reading leaves (#208). A phrase check reads only the
+// BM25 candidates (already narrow); a regex scans the live set, so it is capped
+// harder and recency-ordered — a huge vault scans its most-recent slice, never
+// every note on every keystroke.
+const PHRASE_SCAN_CAP = 60;
+const REGEX_SCAN_CAP = 150;
+const READ_CONCURRENCY = 8;
+
+/** Lowercase + collapse runs of whitespace to one space — the normalization for
+ *  exact-phrase adjacency: `"release   notes"` matches "Release Notes". */
+function normalizePhrase(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** Concurrency-limited, order-preserving async map — so a phrase/regex scan
+ *  reads at most `limit` notes at once instead of firing hundreds of parallel
+ *  `note_read` decrypts. */
+async function mapLimit<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+  );
+  return out;
+}
 
 export function useRunViewContext(): RunViewContext {
   const { cache } = useSelectedNote();
@@ -73,6 +111,57 @@ export function useRunViewContext(): RunViewContext {
         },
         // `task:` — notes with a task item (optionally matching the query text).
         hasTask: (query) => noteIdsWithTask(query),
+        // `section:` — notes with a HEADING matching the query (case-insensitive
+        // substring), from the RAM heading index. No note read (#207).
+        sectionMatch: async (query) => {
+          const needle = query.toLowerCase();
+          const rows = await vaultHeadings();
+          const ids = new Set<string>();
+          for (const row of rows) {
+            if (row.text.toLowerCase().includes(needle)) ids.add(row.noteId);
+          }
+          return [...ids];
+        },
+        // `"exact phrase"` — BM25 gives candidates with all the words; a bounded
+        // content read then keeps only those where they are ADJACENT (#208).
+        // Rank order preserved (the palette ranks the survivors).
+        phrase: async (phrase) => {
+          const needle = normalizePhrase(phrase);
+          if (needle === "") return [];
+          const hits = await searchNotes(phrase);
+          const candidates = hits.map((h) => h.note_id).slice(0, PHRASE_SCAN_CAP);
+          const ok = await mapLimit(candidates, READ_CONCURRENCY, async (id) => {
+            try {
+              return normalizePhrase(await noteRead(id)).includes(needle);
+            } catch {
+              return false;
+            }
+          });
+          return candidates.filter((_, i) => ok[i]);
+        },
+        // `/regex/` — a linear scan of title + content against the pattern
+        // (case-insensitive), bounded + recency-ordered so a large vault scans its
+        // most-recent slice rather than every note (#208). An invalid pattern
+        // matches nothing (the search box must not throw on a half-typed regex).
+        regex: async (source) => {
+          let re: RegExp;
+          try {
+            re = new RegExp(source, "i");
+          } catch {
+            return [];
+          }
+          const ids = sortBatchIds([...live.keys()], live).slice(0, REGEX_SCAN_CAP);
+          const ok = await mapLimit(ids, READ_CONCURRENCY, async (id) => {
+            const title = live.get(id)?.title;
+            if (title != null && re.test(title)) return true;
+            try {
+              return re.test(await noteRead(id));
+            } catch {
+              return false;
+            }
+          });
+          return ids.filter((_, i) => ok[i]);
+        },
         propertyValues: (key) => vaultIndicesPropertyValues(key),
       },
       rowFor: (id) => {
