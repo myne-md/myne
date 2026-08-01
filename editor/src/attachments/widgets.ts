@@ -50,15 +50,28 @@ export type TombstoneKind = "deleted" | "broken";
 // --- resolved raster / SVG -------------------------------------------------
 
 export class AttachmentImageWidget extends WidgetType {
+  /** The object URL resolved at BUILD time. `eq()` is keyed on it so that when
+   *  the host warms this id on web (pending placeholder → real blob URL, #211)
+   *  the rebuilt widget is NOT eq() to the old one and CM re-renders the `<img>`
+   *  against the warmed URL. Desktop's `attachment://` URL is a pure function of
+   *  the id, so eq() is unchanged there. `attachmentUrl` is host-safe (falls back
+   *  to the canonical literal when no host is installed — vitest/jsdom). */
+  private readonly url: string;
+
   constructor(
     private readonly id: string,
     private readonly filename: string,
   ) {
     super();
+    this.url = attachmentUrl(id);
   }
 
   eq(other: AttachmentImageWidget): boolean {
-    return other.id === this.id && other.filename === this.filename;
+    return (
+      other.id === this.id &&
+      other.filename === this.filename &&
+      other.url === this.url
+    );
   }
 
   toDOM(): HTMLElement {
@@ -67,7 +80,7 @@ export class AttachmentImageWidget extends WidgetType {
     frame.setAttribute("role", "img");
     frame.setAttribute("aria-label", this.filename);
 
-    const url = attachmentUrl(this.id);
+    const url = this.url;
 
     // Clean progress chip ("Loading…") until the first decrypt+decode paints —
     // NOT the struck/tombstone style. Removed once the <img> fires `load`.
@@ -118,15 +131,25 @@ export class AttachmentImageWidget extends WidgetType {
 // --- resolved PDF (pdf.js first page, icon fallback) -----------------------
 
 export class AttachmentPdfWidget extends WidgetType {
+  /** Build-time object URL — see AttachmentImageWidget.url (#211): keys eq() so a
+   *  post-warm rebuild re-renders against the resolved URL on web; no-op on
+   *  desktop. */
+  private readonly url: string;
+
   constructor(
     private readonly id: string,
     private readonly filename: string,
   ) {
     super();
+    this.url = attachmentUrl(id);
   }
 
   eq(other: AttachmentPdfWidget): boolean {
-    return other.id === this.id && other.filename === this.filename;
+    return (
+      other.id === this.id &&
+      other.filename === this.filename &&
+      other.url === this.url
+    );
   }
 
   toDOM(): HTMLElement {
@@ -395,16 +418,25 @@ export class AttachmentFileCardWidget extends WidgetType {
  */
 export class AttachmentAudioWidget extends WidgetType {
   private teardown: (() => void) | null = null;
+  /** Build-time object URL — see AttachmentImageWidget.url (#211): keys eq() so a
+   *  post-warm rebuild re-renders against the resolved URL on web; no-op on
+   *  desktop. */
+  private readonly url: string;
 
   constructor(
     private readonly id: string,
     private readonly filename: string,
   ) {
     super();
+    this.url = attachmentUrl(id);
   }
 
   eq(other: AttachmentAudioWidget): boolean {
-    return other.id === this.id && other.filename === this.filename;
+    return (
+      other.id === this.id &&
+      other.filename === this.filename &&
+      other.url === this.url
+    );
   }
 
   toDOM(view: EditorView): HTMLElement {
