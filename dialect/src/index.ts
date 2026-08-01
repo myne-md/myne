@@ -63,6 +63,14 @@ export {
 } from "./surgery";
 export { parseStream } from "./worker";
 export type { ParseStreamItem, ParseStreamResult } from "./worker";
+// Frontmatter block/flow-sequence editing core — the key-parameterized engine
+// shared by the AI tag-accept path and the editor's frontmatter chip widget.
+export {
+  readFrontmatterSequences,
+  planSequenceItemInsert,
+  planSequenceItemRemove,
+} from "./frontmatterSequence";
+export type { SourceEdit } from "./frontmatterSequence";
 // Version-comparison core (MYND-334) — the one diff implementation behind the
 // snapshot preview, the conflict-compare surface and (later) mobile.
 export { lineDiff, diffWithSegments, changedLineCount } from "./diff";

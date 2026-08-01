@@ -234,3 +234,79 @@ describe("frontmatter widget: input keyboard behaviour", () => {
     expect(m.view.state.doc.toString()).toBe(before);
   });
 });
+
+describe("frontmatter widget: sequence (tags) chips", () => {
+  const chips = (mm: Mounted) =>
+    Array.from(mm.host.querySelectorAll<HTMLElement>(".cm-fm-properties-tag"));
+  const chipLabels = (mm: Mounted) =>
+    chips(mm).map(
+      (c) => c.querySelector(".cm-fm-properties-tag-label")!.textContent,
+    );
+  const removeButtons = (mm: Mounted) =>
+    Array.from(
+      mm.host.querySelectorAll<HTMLButtonElement>(".cm-fm-properties-tag-remove"),
+    );
+  const addTagInput = (mm: Mounted) =>
+    mm.host.querySelector<HTMLInputElement>(".cm-fm-properties-tag-input")!;
+  const mousedown = (el: HTMLElement) =>
+    el.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+
+  it("renders a block sequence as chips, not an empty text input", () => {
+    m = mount("---\ntags:\n  - work\n  - ops\n---\nbody\n");
+    expect(chipLabels(m)).toEqual(["work", "ops"]);
+    // the regression: a sequence key must NOT render a scalar value input
+    expect(valueInputs(m)).toHaveLength(0);
+  });
+
+  it("renders a flow sequence as chips too", () => {
+    m = mount("---\ntags: [work, ops]\n---\nbody\n");
+    expect(chipLabels(m)).toEqual(["work", "ops"]);
+  });
+
+  it("adds a tag via the add-item field (byte-stable block append)", () => {
+    m = mount("---\ntags:\n  - work\n---\nbody\n");
+    fire(addTagInput(m), "rust");
+    expect(m.view.state.doc.toString()).toBe(
+      "---\ntags:\n  - work\n  - rust\n---\nbody\n",
+    );
+  });
+
+  it("appends to a flow sequence in its own style", () => {
+    m = mount("---\ntags: [work]\n---\nbody\n");
+    fire(addTagInput(m), "rust");
+    expect(m.view.state.doc.toString()).toBe(
+      "---\ntags: [work, rust]\n---\nbody\n",
+    );
+  });
+
+  it("ignores a duplicate under the case-fold identity (no write)", () => {
+    m = mount("---\ntags:\n  - Work\n---\nbody\n");
+    const before = m.view.state.doc.toString();
+    fire(addTagInput(m), "work");
+    expect(m.view.state.doc.toString()).toBe(before);
+  });
+
+  it("strips a leading `#` from a typed tag", () => {
+    m = mount("---\ntags:\n  - work\n---\nbody\n");
+    fire(addTagInput(m), "#rust");
+    expect(m.view.state.doc.toString()).toBe(
+      "---\ntags:\n  - work\n  - rust\n---\nbody\n",
+    );
+  });
+
+  it("removes a tag chip via its × button", () => {
+    m = mount("---\ntags:\n  - work\n  - ops\n---\nbody\n");
+    mousedown(removeButtons(m)[0]!); // remove "work"
+    expect(m.view.state.doc.toString()).toBe(
+      "---\ntags:\n  - ops\n---\nbody\n",
+    );
+  });
+
+  it("collapses the key line when the last chip is removed", () => {
+    m = mount("---\ntags:\n  - only\ntitle: N\n---\nbody\n");
+    mousedown(removeButtons(m)[0]!);
+    expect(m.view.state.doc.toString()).toBe("---\ntitle: N\n---\nbody\n");
+  });
+});

@@ -22,19 +22,12 @@
 
 import { load as parseYaml } from "js-yaml";
 
-import {
-  FRONTMATTER_DELIMITER,
-  FRONTMATTER_OPENER,
-  NEWLINE,
-  locateFrontmatter,
-} from "../../dialect/lezer/frontmatter";
+import { locateFrontmatter } from "../../dialect/lezer/frontmatter";
 import { formatYamlStringScalar } from "../../dialect/surgery";
 import { foldSegment } from "../../dialect/folderPath";
+import { planSequenceItemInsert } from "../../dialect/frontmatterSequence";
 import { collectFrontmatterTags } from "../frontmatterTags";
 import { cleanTagToken } from "./tagRanker";
-
-/** The item indent a synthesized / promoted block sequence is written with. */
-const ITEM_INDENT = "  ";
 
 /** Inline `#tag` tokens, folded. Delimited by start/whitespace on the left and
  *  the token charset on the right — the same shape the lezer tagger recognizes. */
@@ -47,7 +40,8 @@ function inlineTagFolds(body: string): Set<string> {
 }
 
 /** A minimal replacement over the note plaintext — the shape CM6's
- *  `changes: {from, to, insert}` takes directly. */
+ *  `changes: {from, to, insert}` takes directly. Structurally identical to
+ *  `@myne/dialect`'s `SourceEdit` (the shared sequence engine's return shape). */
 export interface TagAcceptEdit {
   /** Start offset in the note plaintext. */
   readonly from: number;
@@ -55,28 +49,6 @@ export interface TagAcceptEdit {
   readonly to: number;
   /** Replacement text. */
   readonly insert: string;
-}
-
-/** A top-level (zero-indent) `tags:` key line. An indented one belongs to a
- *  nested mapping and is none of our business. */
-const TAGS_KEY_RE = /^tags[ \t]*:[ \t]*(.*)$/;
-/** A block-sequence item line, at any indent. */
-const SEQ_ITEM_RE = /^([ \t]*)-([ \t].*)?$/;
-
-/** Split a trailing ` # comment` off a YAML value portion. A quoted value is
- *  returned whole (a `#` inside quotes is data, not a comment). */
-function splitComment(value: string): { value: string; comment: string } {
-  if (value.startsWith("#")) return { value: "", comment: value };
-  if (value.startsWith('"') || value.startsWith("'")) return { value, comment: "" };
-  const m = /^(.*?)([ \t]+#.*)$/.exec(value);
-  return m === null ? { value, comment: "" } : { value: m[1]!, comment: m[2]! };
-}
-
-/** Byte offset of line `index` within a `"\n"`-split line list. */
-function lineOffset(lines: readonly string[], index: number): number {
-  let offset = 0;
-  for (let i = 0; i < index; i += 1) offset += lines[i]!.length + NEWLINE.length;
-  return offset;
 }
 
 /**
@@ -102,11 +74,14 @@ export interface TagAcceptPlan {
  * `tags:` value that is a mapping / block scalar / multi-line flow sequence.
  * Mangling those would lose user data, so the accept is dropped instead.
  *
- * The plan reaches the right shape with the smallest edit: synthesizing a whole
- * `---\ntags:\n  - x\n---\n\n` block for a note with no frontmatter, adding a
- * `tags:` key to a block that lacks one, appending an item to an existing block
- * or flow sequence in that sequence's own style, or promoting a lone scalar to a
- * two-item block sequence. Pure.
+ * The edit shape — synthesizing a whole `---\ntags:\n  - x\n---\n\n` block for a
+ * note with no frontmatter, adding a `tags:` key to a block that lacks one,
+ * appending an item to an existing block or flow sequence in that sequence's own
+ * style, or promoting a lone scalar to a two-item block sequence — is the shared,
+ * key-parameterized engine ({@link planSequenceItemInsert} for `tags`). This
+ * function adds the tag-specific dedup half on top: the folded set the note
+ * already claims, from frontmatter `tags:`/`tag:` (§3.7.6) AND inline `#tag` in
+ * the body. Pure.
  */
 export function planTagAccept(doc: string): TagAcceptPlan | null {
   const fm = locateFrontmatter(doc);
@@ -129,105 +104,13 @@ export function planTagAccept(doc: string): TagAcceptPlan | null {
     existingFolds.add(fold);
   }
 
-  // State A — no frontmatter block at all: synthesize one.
-  if (fm === null) {
-    return {
-      existingFolds,
-      edit: (item) => ({
-        from: 0,
-        to: 0,
-        insert:
-          FRONTMATTER_OPENER +
-          "tags:" + NEWLINE +
-          ITEM_INDENT + "- " + item + NEWLINE +
-          FRONTMATTER_DELIMITER + NEWLINE +
-          NEWLINE,
-      }),
-    };
-  }
+  // Where and how an item lands in `tags:` is the shared engine, which returns
+  // null for the frontmatter shapes this writer refuses (mapping / block scalar
+  // / multi-line flow).
+  const edit = planSequenceItemInsert(doc, "tags");
+  if (edit === null) return null;
 
-  const bodyStart = fm.bodyStart;
-  const bodyEnd = fm.bodyEnd;
-  const lines = doc.substring(bodyStart, bodyEnd).split(NEWLINE);
-  const keyIndex = lines.findIndex((l) => TAGS_KEY_RE.test(l));
-
-  // State B — a block with no top-level `tags:` key: append the key at its end.
-  if (keyIndex === -1) {
-    return {
-      existingFolds,
-      edit: (item) => ({
-        from: bodyEnd,
-        to: bodyEnd,
-        insert: "tags:" + NEWLINE + ITEM_INDENT + "- " + item + NEWLINE,
-      }),
-    };
-  }
-
-  const keyLine = lines[keyIndex]!;
-  const { value, comment } = splitComment(TAGS_KEY_RE.exec(keyLine)![1]!);
-  const trimmed = value.trim();
-  const keyFrom = bodyStart + lineOffset(lines, keyIndex);
-
-  // State C1 — a flow sequence on the key line: `tags: [a, b]` → `[a, b, x]`.
-  if (trimmed.startsWith("[")) {
-    const close = trimmed.lastIndexOf("]");
-    if (close !== trimmed.length - 1) return null; // multi-line flow — refuse
-    const head = trimmed.slice(0, close).replace(/[ \t]+$/, "");
-    const separator = head.slice(1).trim() === "" ? "" : ", ";
-    return {
-      existingFolds,
-      edit: (item) => ({
-        from: keyFrom,
-        to: keyFrom + keyLine.length,
-        insert: "tags: " + head + separator + item + "]" + comment,
-      }),
-    };
-  }
-
-  // A mapping or a block scalar under `tags:` — refuse rather than mangle.
-  if (trimmed.startsWith("{") || trimmed.startsWith("|") || trimmed.startsWith(">")) {
-    return null;
-  }
-
-  // State C2 — a scalar on the key line: promote it to a block sequence, keeping
-  // the existing value's own bytes as the first item.
-  if (trimmed !== "") {
-    return {
-      existingFolds,
-      edit: (item) => ({
-        from: keyFrom,
-        to: keyFrom + keyLine.length,
-        insert:
-          "tags:" + comment + NEWLINE +
-          ITEM_INDENT + "- " + trimmed + NEWLINE +
-          ITEM_INDENT + "- " + item,
-      }),
-    };
-  }
-
-  // State C3 — an empty value: a block sequence follows, or nothing does.
-  let lastItem = -1;
-  let itemIndent = ITEM_INDENT;
-  for (let i = keyIndex + 1; i < lines.length; i += 1) {
-    const seq = SEQ_ITEM_RE.exec(lines[i]!);
-    if (seq !== null) {
-      if (lastItem === -1) itemIndent = seq[1]!;
-      else if (seq[1] !== itemIndent) break; // a nested sequence — stop here
-      lastItem = i;
-      continue;
-    }
-    // A more-indented non-item line under `tags:` is a nested mapping or a
-    // continuation: refuse rather than guess.
-    if (lastItem === -1 && /^[ \t]+\S/.test(lines[i]!)) return null;
-    break;
-  }
-  const anchor = lastItem === -1 ? keyIndex : lastItem;
-  const from = bodyStart + lineOffset(lines, anchor) + lines[anchor]!.length;
-  const indent = itemIndent;
-  return {
-    existingFolds,
-    edit: (item) => ({ from, to: from, insert: NEWLINE + indent + "- " + item }),
-  };
+  return { existingFolds, edit };
 }
 
 /**

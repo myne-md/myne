@@ -454,6 +454,86 @@ const CSS = `
   background: var(--paper-2, #f3f1eb);
   color: var(--fg-1);
 }
+/* Sequence-valued key (e.g. the tags field): the value cell is one wrapping flex
+   row of removable chips plus a trailing add-item field. Chip look mirrors the
+   shared tag-pill token (tagPillToken.ts) so a frontmatter tag reads like the
+   inline hashtag chip and the tag-browser pill. */
+.cm-fm-properties-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+}
+.cm-fm-properties-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 8px;
+  background: var(--paper-2, #f3f1eb);
+  border: 1px solid var(--line-1, #e3e2dd);
+  border-radius: var(--radius-pill, 999px);
+  color: var(--fg-1);
+  font-size: 0.857em;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.cm-fm-properties-tag-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 22ch;
+}
+.cm-fm-properties-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg-3);
+  font-family: var(--font-sans);
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: var(--radius-1, 3px);
+}
+.cm-fm-properties-tag-remove:hover {
+  color: var(--danger, #8a2a23);
+}
+.cm-fm-properties-tag-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cm-fm-properties-tag-input {
+  flex: 1 1 6ch;
+  min-width: 6ch;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  outline: 0;
+  outline-style: none;
+  box-shadow: none;
+  font-family: var(--font-sans);
+  font-size: 0.929em;
+  color: var(--fg-1);
+  padding: 4px 6px;
+  border-radius: var(--radius-1, 3px);
+}
+.cm-fm-properties-tag-input::placeholder {
+  color: var(--fg-3);
+}
+.cm-fm-properties-tag-input:hover,
+.cm-fm-properties-tag-input:focus,
+.cm-fm-properties-tag-input:focus-visible {
+  outline: 0 !important;
+  outline-style: none !important;
+  box-shadow: none !important;
+  background: var(--paper-2, #f3f1eb);
+}
 
 /* In-note find bar (MYND-175). Docked CM panel chrome, NOT a floating popover:
    it reflows the editor so it never occludes the current match, so it carries a
