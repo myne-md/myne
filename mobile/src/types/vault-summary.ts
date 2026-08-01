@@ -43,6 +43,13 @@ export type VaultSummaryStatus = { kind: "Exists" } | { kind: "Corrupted" };
  *   decrypted from `vault.prefs` into a RAM cache). Until the RAM label cache
  *   lands (sub-feature 4) this is **always `null`** — the picker shows a
  *   neutral fallback ("Vault N") for never-unlocked-this-session vaults.
+ * - `icon`: the label's twin (vault-icons) — the curated switcher glyph name,
+ *   `Some` ONLY for a this-session-unlocked vault (decrypted from `vault.prefs`
+ *   into the per-session RAM icon cache). Since SYNC-1 allows exactly one
+ *   `Unlocked` slot, at most ONE row in a list ever carries a glyph; every other
+ *   row is `null` and renders the neutral wordmark. That is SYNC-3 correctness
+ *   (the glyph is encrypted-only — you cannot know it without `prefs_key`), not
+ *   a missing feature.
  * - `last_unlock`: epoch-ms of the last successful unlock from the registry
  *   cache, or `null` for a vault never unlocked.
  *
@@ -52,6 +59,7 @@ export type VaultSummary = {
   id: string;
   status: VaultSummaryStatus;
   label: string | null;
+  icon: string | null;
   last_unlock: number | null;
 };
 

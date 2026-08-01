@@ -521,6 +521,21 @@ export interface PrefsView {
    */
   label: string | null;
   /**
+   * Per-vault decorative icon (vault-icons) — the curated stroke-glyph name the
+   * in-app vault switcher shows beside this vault's name, replacing the default
+   * `M` wordmark. `null` ≡ no icon → the switcher shows the neutral `M`
+   * fallback. Drawn from the curated folder-icon glyph set (`FOLDER_ICON_NAMES`
+   * in `@myne/decorations/folderIcons`, shared with desktop so an assigned name
+   * resolves to the same glyph on both clients); an unknown name is ignored at
+   * render, NOT normalized away on read — the field is `Shared(ScalarLww)`, so
+   * rewriting an unrecognized value would clobber a newer client's choice on the
+   * next merge. Twin of {@link PrefsView.label}: lives encrypted-only inside
+   * `vault.prefs` (SYNC-3), decrypted into a per-session RAM cache on unlock.
+   * Absent in vaults with no icon → the Rust decoder defaults it to `null`.
+   * Serialized from Rust `Option<String>` (null | string).
+   */
+  icon: string | null;
+  /**
    * Saved-view definitions (MYND-273) — authored filter/sort/group projections.
    * Authored content (survives an index rebuild + vault restore), persisted in
    * `vault.prefs` (SYNC-6). The backend encodes the array sorted by view id;
@@ -918,6 +933,21 @@ export async function devicePlatform(): Promise<string> {
  */
 export async function setVaultLabel(label: string | null): Promise<void> {
   await invoke<void>("plugin:prefs|vault_set_label", { label });
+}
+
+/**
+ * Set (or clear) the active vault's decorative icon (vault-icons) — the curated
+ * glyph the in-app vault switcher shows beside the vault name. Pass a
+ * `FOLDER_ICON_NAMES` member to set it, or `null` to clear it back to the
+ * neutral `M` wordmark. The exact twin of {@link setVaultLabel}: **unlock-gated**
+ * (the write needs the active vault's `prefs_key`), backend atomic-writes
+ * `vault.prefs` disk-first with no native side-effect, then refreshes the
+ * per-session RAM icon cache so `vault_list` reflects the change immediately.
+ * Like every other mobile prefs setter it does not self-notify — the caller
+ * bumps the prefs nonce (`writePref` in the Settings sheet does both).
+ */
+export async function setVaultIcon(icon: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|vault_set_icon", { icon });
 }
 
 /**

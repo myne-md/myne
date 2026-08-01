@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Icon, MyneMark, LIST_TOP } from "../../../components";
+import { Icon, VaultMark, LIST_TOP } from "../../../components";
 
 /** Expanded-only workspace sidebar (the WS-01 iPad three-pane reference:
  *  sidebar 248 / list 316 / editor flex — `src/ipad/index.tsx`). It absorbs the
@@ -62,6 +62,7 @@ function GroupLabel({ children }: { children: ReactNode }) {
 
 export function SidebarPane({
   label,
+  icon,
   tab,
   listView,
   onAllNotes,
@@ -79,6 +80,7 @@ export function SidebarPane({
   onSettings,
 }: {
   label: string;
+  icon: string | null;
   tab: "notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates";
   listView: "notes" | "archive" | "trash";
   onAllNotes: () => void;
@@ -118,7 +120,7 @@ export function SidebarPane({
         onClick={onSwitcher}
         style={{ display: "flex", alignItems: "center", gap: 7, border: "none", background: "transparent", padding: "4px 10px 10px", cursor: "pointer", minWidth: 0 }}
       >
-        <MyneMark size={22} radius={4} />
+        <VaultMark icon={icon} size={22} radius={4} testId="sidebar.vault-mark" />
         <span style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
         <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
           <path d="M2 4l4 4 4-4" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />

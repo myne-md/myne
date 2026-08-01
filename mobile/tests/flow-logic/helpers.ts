@@ -122,3 +122,13 @@ export function customThemeWrites(page: Page): Promise<(string | null)[]> {
     () => (window as unknown as { __customThemeWrites?: (string | null)[] }).__customThemeWrites ?? [],
   );
 }
+
+/** Every `icon` value written through `plugin:prefs|vault_set_icon` (vault-icons,
+ *  recorded by the mock IPC layer). `null` entries are the clear-to-wordmark
+ *  writes. Asserting on this is what proves the real command fired rather than
+ *  the mock's unknown-command catch-all. */
+export function vaultIconWrites(page: Page): Promise<(string | null)[]> {
+  return page.evaluate(
+    () => (window as unknown as { __vaultIconWrites?: (string | null)[] }).__vaultIconWrites ?? [],
+  );
+}

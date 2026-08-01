@@ -67,6 +67,7 @@ export const DEFAULT_PREFS: PrefsView = {
   editor_toolbar_hidden: [],
   item_colors: {},
   label: null,
+  icon: null,
   saved_views: [],
   view_order: [],
 };
