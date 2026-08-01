@@ -15,7 +15,6 @@
 
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
-import { useLastActiveNotePref } from "../../hooks/useLastActiveNotePref";
 import { has } from "../../platform/capabilities";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
@@ -187,8 +186,6 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
     setCliExcludedFolders,
     setCliRateLimitDisabled,
   } = usePrefs(onShowToast);
-  const { enabled: lastActiveNote, setEnabled: setLastActiveNote } =
-    useLastActiveNotePref();
   return (
     <div style={PANEL_ROOT_STYLE}>
       <ToggleRow
@@ -201,15 +198,6 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           void toggleScreenCapture(next);
         }}
         anchorId="privacy.screen-capture"
-      />
-      <ToggleRow
-        label="Continue where you left off"
-        ariaLabel="Continue where you left off"
-        ariaDescribedBy="last-active-note-helper"
-        helper="Sync which note you had open so you can pick it up on another device. Off by default — only the note is shared, never your scroll position or open tabs."
-        checked={lastActiveNote}
-        onToggle={setLastActiveNote}
-        testId="settings.last-active-note-toggle"
       />
       <AutoLockRow
         seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}

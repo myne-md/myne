@@ -2800,10 +2800,6 @@
       "ariaLabel": "Search settings",
       "empty": "No settings match “{{query}}”.",
       "resultsLabel": "Search results",
-      "extra": {
-        "lastActiveNoteTitle": "Continue where you left off",
-        "lastActiveNoteDesc": "Sync which note you had open so you can pick it up on another device."
-      },
       "keywords": {
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
         "aiEnable": "local ai on off enable disable machine learning",
@@ -2831,7 +2827,6 @@
         "hotkeys": "hotkeys keyboard shortcuts keybindings keymap chords bindings",
         "import": "import notes obsidian notion evernote enex html csv migrate migration bring",
         "language": "language locale interface translation ui",
-        "lastActiveNote": "continue where you left off last note resume sync open",
         "license": "license agpl open source legal",
         "lineNumbers": "line numbers gutter editor display",
         "vimMode": "vim modal editing normal insert visual keyboard",
