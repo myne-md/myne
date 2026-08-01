@@ -20,10 +20,12 @@
 
 import {
   EditorSelection,
+  EditorState,
   type Extension,
   type Range,
   RangeSetBuilder,
   StateField,
+  type Text,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -526,21 +528,24 @@ class PropertiesWidget extends WidgetType {
   }
 }
 
-function buildFrontmatterDecorations(
-  state: { doc: Parameters<typeof cachedLocateFrontmatter>[0] },
-): DecorationSet {
-  const doc = state.doc;
+/**
+ * The last document offset the frontmatter Properties block occupies — i.e. the
+ * FIRST offset a caret/selection is allowed to reach. `null` when the doc has no
+ * frontmatter. Both the block-replace decoration and the selection guard derive
+ * their boundary from this one function so they cannot disagree.
+ *
+ * A note that is ONLY frontmatter (the block reaches the end of the doc) would
+ * otherwise have its closing `---\n` line break consumed by the block-replace
+ * decoration — that swallows the empty body line below it, so there is NO
+ * editable line and the user can't click to start writing (the
+ * frontmatter-only-note bug). Stop one char short of that trailing newline,
+ * leaving the final empty line as a live caret target. (The no-trailing-newline
+ * variant `---\n…\n---` has no line to expose; `emptyBodyClickHandler` creates
+ * one on demand.)
+ */
+function frontmatterBoundary(doc: Text): number | null {
   const range = cachedLocateFrontmatter(doc);
-  if (range === null) return Decoration.none;
-  const props = parseProperties(doc.toString(), range);
-  // A note that is ONLY frontmatter (the block reaches the end of the doc)
-  // would otherwise have its closing `---\n` line break consumed by the
-  // block-replace decoration — that swallows the empty body line below it, so
-  // there is NO editable line and the user can't click to start writing (the
-  // frontmatter-only-note bug). Stop the decoration one char short of that
-  // trailing newline, leaving the final empty line as a live caret target.
-  // (The no-trailing-newline variant `---\n…\n---` has no line to expose; the
-  // emptyBodyClickHandler below creates one on demand.)
+  if (range === null) return null;
   let blockEnd = range.blockEnd;
   if (
     blockEnd === doc.length &&
@@ -549,6 +554,46 @@ function buildFrontmatterDecorations(
   ) {
     blockEnd -= 1;
   }
+  return blockEnd;
+}
+
+/**
+ * The first offset the CARET is allowed to occupy — the block boundary, advanced
+ * past any BLANK lines that immediately follow the closing `---`.
+ *
+ * A caret cannot render correctly on a blank line right after the block widget:
+ * `coordsAtPos` has no element to measure on either side of it and falls back to
+ * the block's own rect, so `drawSelection` paints a full-height caret at the
+ * panel's edge (MYND-608 / #209 — confirmed in-app: caret at a blank first body
+ * line resolved to the panel rect). Landing the caret on the first line WITH
+ * content gives `coordsAtPos` something to measure, so it renders in the body.
+ * Blank lines stay in the document (byte-preserved); they are just skipped as a
+ * caret target. Falls back to the last line if the whole body is blank, so there
+ * is always a valid target.
+ */
+function frontmatterCaretFloor(doc: Text): number | null {
+  const boundary = frontmatterBoundary(doc);
+  if (boundary === null) return null;
+  let pos = boundary;
+  while (pos < doc.length) {
+    const line = doc.lineAt(pos);
+    // First line with content, or the last line (all-blank body) — stop here.
+    if (line.text.trim().length !== 0 || line.number >= doc.lines) {
+      return line.from;
+    }
+    pos = line.to + 1; // start of the next line
+  }
+  return Math.min(pos, doc.length);
+}
+
+function buildFrontmatterDecorations(
+  state: { doc: Parameters<typeof cachedLocateFrontmatter>[0] },
+): DecorationSet {
+  const doc = state.doc;
+  const range = cachedLocateFrontmatter(doc);
+  if (range === null) return Decoration.none;
+  const props = parseProperties(doc.toString(), range);
+  const blockEnd = frontmatterBoundary(doc) ?? range.blockEnd;
   const decorations: Array<Range<Decoration>> = [
     Decoration.replace({
       widget: new PropertiesWidget(props),
@@ -646,6 +691,63 @@ function emptyBodyClickHandler(): Extension {
   });
 }
 
+/**
+ * Keep the caret and every selection endpoint at or after the first body offset,
+ * so the frontmatter Properties block is wholly unreachable (MYND-608 / #209).
+ *
+ * `atomicRanges` (registered by `frontmatterField`) stops cursor MOTION and
+ * Backspace from stepping THROUGH the block, but CM still permits two things it
+ * does not: a caret parked at the block's outer boundary — offset 0, which
+ * renders visually at the TOP of the Properties panel, so ArrowUp from the body
+ * lands the caret "in" the panel — and a selection (or select-all) that spans
+ * the whole block, which `drawSelection` then paints as a band up across the
+ * panel. Both were still reproducible on the desktop build. Clamping the
+ * document selection to `>= boundary` closes both: the frontmatter can no longer
+ * hold the caret, and a body selection stops cleanly at the top of the body
+ * instead of swallowing the block.
+ *
+ * This constrains the CM DOCUMENT selection only. The widget's own `<input>`
+ * fields keep their independent text cursor (they are form controls, unaffected
+ * by the editor selection), so editing frontmatter through the widget is
+ * untouched. Transactions that carry no explicit selection (e.g. a value edit
+ * dispatched by the widget) are left alone.
+ */
+function frontmatterSelectionGuard(): Extension {
+  return EditorState.transactionFilter.of((tr) => {
+    if (tr.selection === undefined) return tr;
+    const boundary = frontmatterCaretFloor(tr.newDoc);
+    if (boundary === null || boundary === 0) return tr;
+    let changed = false;
+    const ranges = tr.selection.ranges.map((r) => {
+      const anchor = r.anchor < boundary ? boundary : r.anchor;
+      const head = r.head < boundary ? boundary : r.head;
+      if (anchor === r.anchor && head === r.head) return r;
+      changed = true;
+      // The boundary sits immediately AFTER the block widget. A caret there must
+      // associate FORWARD (assoc = 1) so CM renders it at the start of the body
+      // line. With the default backward association `coordsAtPos` resolves the
+      // position to the block's trailing edge, drawing a full-height caret at the
+      // block's right side — which reads as "the caret is in the Properties
+      // panel" even though the offset is already the first body offset.
+      return anchor === head
+        ? EditorSelection.cursor(head, 1)
+        : EditorSelection.range(anchor, head);
+    });
+    if (!changed) return tr;
+    return [
+      tr,
+      {
+        selection: EditorSelection.create(ranges, tr.selection.mainIndex),
+        sequential: true,
+      },
+    ];
+  });
+}
+
 export function frontmatterDecorations(): Extension {
-  return [frontmatterField, emptyBodyClickHandler()];
+  return [
+    frontmatterField,
+    frontmatterSelectionGuard(),
+    emptyBodyClickHandler(),
+  ];
 }
