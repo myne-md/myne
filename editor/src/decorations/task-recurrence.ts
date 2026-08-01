@@ -1,5 +1,5 @@
 // Materialize the next occurrence when a recurring task is ticked
-// (MYND-615, tasks 7 and 9).
+// (MYND-615, tasks 7 and 9; wired to the checkbox by myne#198).
 //
 // **One transaction carries both changes** — the marker flip and the inserted
 // next occurrence — so a single undo restores the original state. Two dispatches
@@ -12,77 +12,36 @@
 //
 // The insertion is a **splice**, not a re-serialization of the note, so an
 // imported file's untouched bytes stay untouched (§6 C1).
+//
+// The line arithmetic itself lives in `@myne/dialect/taskRecurrence`, not here:
+// the Tasks panel writes through `src/notes/taskWriteCore.ts` against a note
+// that is usually not open in any pane, so it has no `EditorView` to pass. What
+// remains in this file is the CodeMirror half — reading the marker, and turning
+// a planned change into one transaction.
 
 import type { EditorView } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
-import { parseTaskFields, type TaskFields } from "@myne/dialect/taskFields";
-import { planTaskFieldWrite, serializeTaskFields } from "@myne/dialect/taskFieldWriter";
+import { serializeTaskFields } from "@myne/dialect/taskFieldWriter";
 import {
-  describeRecurrenceRule,
-  parseRecurrenceSpec,
-  type RecurrenceSpec,
-} from "@myne/dialect/recurrence";
-import {
-  advancePair,
-  formatCivilDate,
-  parseCivilDate,
-  type CivilDate,
-} from "@myne/dialect/civilDate";
+  matchesMaterializedOccurrence,
+  planNextOccurrence,
+  planSkippedOccurrence,
+} from "@myne/dialect/taskRecurrence";
+import { describeRecurrenceRule, type RecurrenceSpec } from "@myne/dialect/recurrence";
+import { todayCivilDate, type CivilDate } from "@myne/dialect/civilDate";
 
 /** Today, as a civil date. Injected in tests; there is no hidden clock. */
 export type Clock = () => CivilDate;
 
-export const systemClock: Clock = () => {
-  const now = new Date();
-  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
-};
+export const systemClock: Clock = todayCivilDate;
 
-/** The next-occurrence line for a completed recurring task, or null. */
-export function nextOccurrenceLine(line: string, today: CivilDate): string | null {
-  const fields = parseTaskFields(line);
-  if (fields.repeat === undefined) return null;
-
-  const spec = parseRecurrenceSpec(fields.repeat);
-  // An unrecognized rule materializes nothing — it must look unread rather than
-  // silently behaving as some default (MYND-615 task 10 surfaces that state).
-  if (!spec.ok) return null;
-
-  const due = fields.due === undefined ? undefined : parseCivilDate(fields.due.date);
-  const remind = fields.remind === undefined ? undefined : parseCivilDate(fields.remind.date);
-  const advanced = advancePair(spec.spec, {
-    due: due ?? undefined,
-    remind: remind ?? undefined,
-    today,
-  });
-  if (advanced.due === undefined && advanced.remind === undefined) return null;
-
-  // The new occurrence carries the same rule and the advanced dates, and NO
-  // completion field — it has not happened yet.
-  const next: TaskFields = {
-    ...fields,
-    done: undefined,
-    due:
-      advanced.due === undefined
-        ? undefined
-        : { date: formatCivilDate(advanced.due), ...(fields.due?.time === undefined ? {} : { time: fields.due.time }) },
-    remind:
-      advanced.remind === undefined
-        ? undefined
-        : {
-            date: formatCivilDate(advanced.remind),
-            ...(fields.remind?.time === undefined ? {} : { time: fields.remind.time }),
-          },
-  };
-
-  // Rebuild through the single writer seam: description text preserved, fields
-  // re-emitted in Myne's form.
-  const edit = planTaskFieldWrite(line, next);
-  const rebuilt =
-    edit === null ? line : line.slice(0, edit.range.start) + edit.text + line.slice(edit.range.end);
-
-  // The new line is unticked regardless of the source marker's case.
-  return rebuilt.replace(/^(\s*[-*+]\s*)\[[xX]\]/, "$1[ ]");
-}
+/**
+ * The next-occurrence line for a completed recurring task, or null.
+ *
+ * Kept as a named export because it is this module's published surface; the
+ * computation is the dialect's.
+ */
+export const nextOccurrenceLine = planNextOccurrence;
 
 /**
  * Tick a recurring task and materialize its next occurrence in ONE transaction.
@@ -99,7 +58,7 @@ export function completeRecurringTask(
   const marker = view.state.doc.sliceString(markerFrom, markerFrom + 3);
   if (marker !== "[ ]") return false; // only the unticked→ticked edge materializes
 
-  const occurrence = nextOccurrenceLine(line.text, clock());
+  const occurrence = planNextOccurrence(line.text, clock());
   if (occurrence === null) return false;
 
   view.dispatch({
@@ -119,12 +78,10 @@ export function completeRecurringTask(
  * (MYND-615 task 9), **in the same transaction as the un-tick**.
  *
  * Deleting user file content on a heuristic fails rarely but fails
- * unrecoverably, so the removal happens only when SIX conditions all hold: the
- * next line is a task, its description matches exactly, its dates equal what this
- * function would have computed, its other fields match, it is unticked, and it
- * carries no completion field. Single-step reversibility — one undo restores
- * both halves — is what brings the residual risk down to acceptable. It is still
- * a heuristic and should be treated as one.
+ * unrecoverably, so the removal happens only when SIX conditions all hold —
+ * `matchesMaterializedOccurrence` is where they are checked. Single-step
+ * reversibility — one undo restores both halves — is what brings the residual
+ * risk down to acceptable. It is still a heuristic and should be treated as one.
  */
 export function uncompleteRecurringTask(
   view: EditorView,
@@ -138,19 +95,8 @@ export function uncompleteRecurringTask(
   if (line.number >= view.state.doc.lines) return false;
   const nextLine = view.state.doc.line(line.number + 1);
 
-  // What this line WOULD have produced, recomputed rather than remembered.
-  const expected = nextOccurrenceLine(line.text.replace(/\[[xX]\]/, "[ ]"), clock());
-  if (expected === null) return false;
-
-  const isOrphan =
-    nextLine.text === expected &&
-    /^\s*[-*+]\s*\[ \]/.test(nextLine.text) &&
-    parseTaskFields(nextLine.text).done === undefined;
-
-  if (!isOrphan) {
-    // Leave it alone — an orphan we cannot positively identify is user content.
-    return false;
-  }
+  // An orphan we cannot positively identify is user content — leave it alone.
+  if (!matchesMaterializedOccurrence(line.text, nextLine.text, clock())) return false;
 
   view.dispatch({
     changes: [
@@ -206,17 +152,26 @@ export function recurrenceLabel(spec: RecurrenceSpec): string {
 }
 
 /**
+ * Whether this line's current occurrence can be skipped.
+ *
+ * The `+` menu asks before offering the affordance, because the test that
+ * matters is not "does this line carry a repeat field" but "can this rule
+ * actually be evaluated on this line" — an unreadable rule, or one with no
+ * anchor date, must not be offered an action that would silently do nothing.
+ */
+export function canSkipOccurrence(line: string, clock: Clock = systemClock): boolean {
+  return planSkippedOccurrence(line, clock()) !== null;
+}
+
+/**
  * Skip the current occurrence (MYND-615 task 8).
  *
  * The same date computation as completion, with **two differences**: it writes no
  * completion field, and it updates the existing line **in place** rather than
- * adding one.
+ * adding one. Both follow from what skipping means — "this occurrence did not
+ * happen and will not".
  *
- * Both follow from what skipping means — "this occurrence did not happen and will
- * not". Leaving a ticked marker would be a lie, and leaving a record of the skip
- * would be per-occurrence history, which the epic rejected. In
- * completion-anchored mode skip computes from today, since there is no completion
- * to anchor on.
+ * `markerFrom` locates the line; any position on it will do.
  */
 export function skipOccurrence(
   view: EditorView,
@@ -224,46 +179,7 @@ export function skipOccurrence(
   clock: Clock = systemClock,
 ): boolean {
   const line = view.state.doc.lineAt(markerFrom);
-  const fields = parseTaskFields(line.text);
-  if (fields.repeat === undefined) return false;
-
-  const spec = parseRecurrenceSpec(fields.repeat);
-  if (!spec.ok) return false;
-
-  const today = clock();
-  const due = fields.due === undefined ? undefined : parseCivilDate(fields.due.date);
-  const remind = fields.remind === undefined ? undefined : parseCivilDate(fields.remind.date);
-  const advanced = advancePair(spec.spec, {
-    due: due ?? undefined,
-    remind: remind ?? undefined,
-    today,
-    // In completion-anchored mode there is no completion, so skip counts from
-    // today — the only defensible anchor for an occurrence that did not happen.
-    completedOn: today,
-  });
-  if (advanced.due === undefined && advanced.remind === undefined) return false;
-
-  const next: TaskFields = {
-    ...fields,
-    // No completion field: the occurrence did not happen.
-    done: undefined,
-    due:
-      advanced.due === undefined
-        ? undefined
-        : {
-            date: formatCivilDate(advanced.due),
-            ...(fields.due?.time === undefined ? {} : { time: fields.due.time }),
-          },
-    remind:
-      advanced.remind === undefined
-        ? undefined
-        : {
-            date: formatCivilDate(advanced.remind),
-            ...(fields.remind?.time === undefined ? {} : { time: fields.remind.time }),
-          },
-  };
-
-  const edit = planTaskFieldWrite(line.text, next);
+  const edit = planSkippedOccurrence(line.text, clock());
   if (edit === null) return false;
 
   view.dispatch({

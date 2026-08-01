@@ -10,7 +10,7 @@
 // adds an absent field and edits a present one; and the slash commands add a
 // field, auto-converting a non-task line first.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { slashCommands } from "../../src/editor/slash/commands";
 import {
@@ -81,14 +81,14 @@ describe("the + affordance appears only on the caret's task line", () => {
   });
 });
 
-describe("the + menu adds an absent field and edits a present one", () => {
-  function openMenu(doc: string): void {
-    m = mount(doc);
-    focusAt(m, 5);
-    cleanup.push(installTaskChipEditor());
-    addButton().dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-  }
+function openMenu(doc: string): void {
+  m = mount(doc);
+  focusAt(m, 5);
+  cleanup.push(installTaskChipEditor());
+  addButton().dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+}
 
+describe("the + menu adds an absent field and edits a present one", () => {
   it("opens the three-way menu on activation", () => {
     openMenu("- [ ] pay the rent\n");
     expect(document.querySelector('[data-testid="editor.task-field-menu"]')).not.toBeNull();
@@ -115,6 +115,59 @@ describe("the + menu adds an absent field and edits a present one", () => {
     (fieldInput() as HTMLInputElement).value = "2026-09-09";
     commit();
     expect(m!.view.state.doc.toString()).toContain("[due:: 2026-09-09]");
+  });
+});
+
+describe("the + menu's skip row (myne#198)", () => {
+  // Skip advances from today, so the date is pinned — the menu reads the system
+  // clock because that is what production does.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 28, 12, 0, 0)); // 2026-07-28, local
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const skipRow = () => document.querySelector('[data-testid="editor.task-field-menu-skip"]');
+
+  it("offers skip on a line whose rule can actually be advanced", () => {
+    openMenu("- [ ] water plants [due:: 2026-07-01] [repeat:: every 3 days]\n");
+    expect(skipRow()).not.toBeNull();
+  });
+
+  it("does not offer it on a task with no repeat rule", () => {
+    openMenu("- [ ] pay the rent [due:: 2026-08-01]\n");
+    expect(skipRow()).toBeNull();
+  });
+
+  it("does not offer it for a rule Myne cannot read", () => {
+    // The test is "can this occurrence be skipped", not "is there a repeat
+    // field" — an action that would silently do nothing is exactly the failure
+    // the chip layer forbids itself.
+    openMenu("- [ ] x [due:: 2026-07-01] [repeat:: every fortnight]\n");
+    expect(skipRow()).toBeNull();
+  });
+
+  it("does not offer it when the rule has no anchor date (myne#197's case)", () => {
+    openMenu("- [ ] shower [repeat:: every day]\n");
+    expect(skipRow()).toBeNull();
+  });
+
+  it("advances the line IN PLACE, adding no line and no completion field", () => {
+    openMenu("- [ ] water plants [due:: 2026-07-01] [repeat:: every 3 days]\n");
+    (skipRow() as HTMLElement).click();
+
+    const text = m!.view.state.doc.toString();
+    expect(text.split("\n").length).toBe(2); // one task line + the trailing newline
+    expect(text).toContain("[repeat:: every 3 days]");
+    expect(text).not.toContain("[due:: 2026-07-01]");
+    expect(text).not.toContain("done::");
+    expect(text).toMatch(/^- \[ \]/); // still unticked: it did not happen
+  });
+
+  it("closes the menu on skip", () => {
+    openMenu("- [ ] water plants [due:: 2026-07-01] [repeat:: every 3 days]\n");
+    (skipRow() as HTMLElement).click();
+    expect(document.querySelector('[data-testid="editor.task-field-menu"]')).toBeNull();
   });
 });
 

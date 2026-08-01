@@ -328,3 +328,12 @@
   outline: 2px solid var(--accent, #2c4a7a);
   outline-offset: -1px;
 }
+
+/* Divides the value-editing rows from the skip ACTION below them — the two are
+   categorically different and a flat list would read as four of the same kind.
+   Negative inline margin so the rule spans the surface's padding. */
+.cm-task-field-menu-sep {
+  height: 1px;
+  margin: 4px -6px;
+  background: var(--line-1, #e3e2dd);
+}
