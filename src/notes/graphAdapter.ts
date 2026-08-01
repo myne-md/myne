@@ -1,9 +1,13 @@
-// Graph-data adapter (SYNC-9, knowledge-graph-ux / MYND-197). Turns the
-// vault-indices query surface (the bulk edge dump / per-note `forward`) into a
-// render-ready `{nodes, edges}` model + an induced-neighborhood query, consumed
-// by the graph-view panel (whole vault) and local-graph (neighborhood). The
-// pure transform is unit-testable without the running app; resolution reuses
-// the SINGLE `resolveWikilink` (no second resolver, never Rust to_lowercase).
+// Graph-data adapter (SYNC-9, knowledge-graph-ux / MYND-197). The IPC half of
+// the graph: it fetches edges (the bulk dump / per-note `forward`/`backlinks`)
+// and hands them to the SHARED, pure model builder in
+// `@myne/editor/host/notes/graphModel` (#199), which both clients now use — so
+// desktop and mobile derive the same nodes and edges from the same vault.
+//
+// The pure transform (`buildGraphModel`, `inducedNeighborhood`, `subgraphModel`,
+// `isolatedModel`) lives there and is re-exported here, so every existing import
+// site keeps working. Resolution reuses the SINGLE `resolveWikilink` (no second
+// resolver, never Rust to_lowercase).
 
 import {
   buildResolverIndex,
@@ -11,141 +15,24 @@ import {
   type ResolverNote,
 } from "./resolveWikilink";
 import {
-  backlinks,
-  forward,
-  resolveEdges,
-  vaultIndicesAllEdges,
-  type WikilinkEdge,
-} from "./vaultIndices";
+  buildGraphModel,
+  type GraphDirection,
+  type GraphEdge,
+  type GraphModel,
+  type GraphNode,
+} from "./graphModel";
+import { backlinks, forward, vaultIndicesAllEdges } from "./vaultIndices";
 
-/** A graph node — one note. `title` is the render label (null = untitled). */
-export type GraphNode = { id: string; title: string | null };
-
-/** A weighted directed graph edge: `weight` = how many resolved occurrences
- *  collapsed into this source→target pair. */
-export type GraphEdge = { source: string; target: string; weight: number };
-
-export type GraphModel = { nodes: GraphNode[]; edges: GraphEdge[] };
-
-/** BFS direction for {@link inducedNeighborhood}. */
-export type GraphDirection = "out" | "in" | "both";
-
-/**
- * Build the whole-vault graph model from the bulk edge dump + the resident
- * note-set. Nodes = every live note (orphans appear as isolated nodes). Edges =
- * resolved cross-note references — plain/alias/anchor/blockref/embed all resolve
- * to the target NOTE (so an `![[Note]]` embed or `[[Note#h]]` anchor counts as
- * an edge, no false orphans). Broken links contribute no edge; self-loops are
- * dropped; per-occurrence duplicates collapse to one weighted edge. Pure.
- */
-export function buildGraphModel(
-  allEdges: ReadonlyArray<readonly [string, ReadonlyArray<WikilinkEdge>]>,
-  notes: ReadonlyArray<ResolverNote>,
-): GraphModel {
-  const nodes: GraphNode[] = notes.map((n) => ({
-    id: n.noteUuid,
-    title: n.title,
-  }));
-  const live = new Set(notes.map((n) => n.noteUuid));
-  // Build the resolver index ONCE for the whole dump: turns each link's
-  // resolution from an O(notes) scan into an O(1) lookup, so the whole-vault
-  // build is O(edges) instead of O(edges × notes) (SYNC-11 scale fix).
-  const index = buildResolverIndex(notes);
-  const weights = new Map<string, GraphEdge>();
-  for (const [source, edges] of allEdges) {
-    if (!live.has(source)) continue; // a dumped note not in the live set (trashed)
-    for (const link of resolveEdges(edges, notes, index)) {
-      if (link.resolution.status !== "resolved") continue; // broken → no edge
-      const target = link.resolution.noteUuid;
-      if (target === source) continue; // self-loop → not a graph edge
-      const key = `${source}\u0000${target}`;
-      const existing = weights.get(key);
-      if (existing) existing.weight += 1;
-      else weights.set(key, { source, target, weight: 1 });
-    }
-  }
-  return { nodes, edges: [...weights.values()] };
-}
-
-/**
- * The induced neighborhood subgraph around `seed`: BFS up to `depth` hops along
- * edges in `direction`, then the INDUCED subgraph — ALL edges among the reached
- * node-set, not just the BFS-tree edges. The visual graph's value over a list is
- * structure (clusters, triangles), which lives in the induced (inter-neighbor)
- * edges (SYNC-9 grill-#5 precision). Pure.
- */
-export function inducedNeighborhood(
-  model: GraphModel,
-  seed: string,
-  depth: 1 | 2,
-  direction: GraphDirection,
-): GraphModel {
-  const reached = new Set<string>([seed]);
-  let frontier = new Set<string>([seed]);
-  for (let hop = 0; hop < depth; hop += 1) {
-    const next = new Set<string>();
-    for (const edge of model.edges) {
-      if (
-        (direction === "out" || direction === "both") &&
-        frontier.has(edge.source) &&
-        !reached.has(edge.target)
-      ) {
-        next.add(edge.target);
-      }
-      if (
-        (direction === "in" || direction === "both") &&
-        frontier.has(edge.target) &&
-        !reached.has(edge.source)
-      ) {
-        next.add(edge.source);
-      }
-    }
-    for (const id of next) reached.add(id);
-    frontier = next;
-    if (frontier.size === 0) break;
-  }
-  return {
-    nodes: model.nodes.filter((n) => reached.has(n.id)),
-    edges: model.edges.filter(
-      (e) => reached.has(e.source) && reached.has(e.target),
-    ),
-  };
-}
-
-/**
- * Induced subgraph over a node-id subset — keep the nodes in `keepIds` and ONLY
- * the edges among them (the tag-filter path: feed the tag's note-set to the one
- * renderer; "filters ARE the degradation mechanism", SYNC-16). Pure.
- */
-export function subgraphModel(
-  model: GraphModel,
-  keepIds: ReadonlySet<string>,
-): GraphModel {
-  return {
-    nodes: model.nodes.filter((n) => keepIds.has(n.id)),
-    edges: model.edges.filter(
-      (e) => keepIds.has(e.source) && keepIds.has(e.target),
-    ),
-  };
-}
-
-/**
- * A nodes-only model of the given isolated notes (the orphans-only view,
- * SYNC-13) — N isolated points, no edges, no force layout needed (the cheapest
- * graph view; works at any vault size from the degree-0 index query). Pure.
- */
-export function isolatedModel(
-  ids: ReadonlyArray<string>,
-  notes: ReadonlyArray<ResolverNote>,
-): GraphModel {
-  const idSet = new Set(ids);
-  return {
-    nodes: notes
-      .filter((n) => idSet.has(n.noteUuid))
-      .map((n) => ({ id: n.noteUuid, title: n.title })),
-    edges: [],
-  };
-}
+export {
+  buildGraphModel,
+  inducedNeighborhood,
+  isolatedModel,
+  subgraphModel,
+  type GraphDirection,
+  type GraphEdge,
+  type GraphModel,
+  type GraphNode,
+} from "./graphModel";
 
 /**
  * Whole-vault graph for the graph-view panel — dump + build the ENTIRE vault,
