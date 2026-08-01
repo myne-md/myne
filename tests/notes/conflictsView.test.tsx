@@ -229,7 +229,7 @@ describe("ConflictsView — take theirs (Use this version)", () => {
     expect(onTakeTheirs).toHaveBeenCalledTimes(1);
   });
 
-  it("renders the three actions in order: Keep-as-separate · Discard · Use this version (rightmost)", () => {
+  it("renders the three actions in order: Discard (ghost/danger) · Keep-as-separate · Use this version (primary, rightmost)", () => {
     const groups = groupsOf([[ORIG_A, [copy("c1", "Alpha", ORIG_A)]]]);
     render(
       <ConflictsView
@@ -244,8 +244,8 @@ describe("ConflictsView — take theirs (Use this version)", () => {
       .getAllByRole("button")
       .map((b) => b.getAttribute("data-testid"));
     expect(testIds).toEqual([
-      "conflicts.keep-both",
       "conflicts.discard",
+      "conflicts.keep-both",
       "conflicts.take-this",
     ]);
   });
@@ -341,8 +341,8 @@ describe("ConflictsView — Compare affordance", () => {
         .map((b) => b.getAttribute("data-testid")),
     ).toEqual([
       "conflicts.compare",
-      "conflicts.keep-both",
       "conflicts.discard",
+      "conflicts.keep-both",
       "conflicts.take-this",
     ]);
   });

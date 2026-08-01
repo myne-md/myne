@@ -20,6 +20,7 @@ import {
   cursorCharLeft,
   cursorCharRight,
   deleteCharBackward,
+  selectAll,
   selectCharLeft,
 } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -213,9 +214,21 @@ function fmAtomicRange(view: EditorView): { from: number; to: number } {
   return out;
 }
 
-const FM_DOC = "---\nfolder: work/\nupdated: 2026-01-01\n---\n\nbody text";
+const FM_DOC = "---\nfolder: work/\nupdated: 2026-01-01\n---\nbody text";
+// Same, but with a BLANK line between the closing `---` and the body — the case
+// that reproduced in-app: the caret clamped onto that blank line rendered at the
+// block's edge (coordsAtPos fell back to the panel rect). The caret floor must
+// skip it and land on the first line with content.
+const FM_DOC_BLANK =
+  "---\nfolder: work/\nupdated: 2026-01-01\n---\n\nbody text";
 
-describe("Frontmatter Properties atomic-range (MYND-608)", () => {
+// MYND-608 / #209: atomicRanges alone still let the caret park at the block's
+// outer edge (offset 0 — visually the TOP of the Properties panel, so ArrowUp
+// landed "in" the panel) and let a selection span the whole block (drawSelection
+// painted a band up across the panel). A selection guard now clamps every caret/
+// selection endpoint to the first body offset (`to`), so the frontmatter is
+// wholly unreachable. `to` is the boundary; the YAML lives at [0, to).
+describe("Frontmatter Properties selection guard (MYND-608 / #209)", () => {
   let mounted: Mounted | null = null;
   beforeEach(() => {
     mounted = null;
@@ -224,33 +237,47 @@ describe("Frontmatter Properties atomic-range (MYND-608)", () => {
     if (mounted !== null) teardown(mounted);
   });
 
-  it("FM1: ArrowRight at the block's left edge jumps past the whole block", () => {
-    mounted = mountFm(FM_DOC, 0);
+  it("FM1: a caret dispatched inside the hidden YAML is clamped to the first body offset", () => {
+    mounted = mountFm(FM_DOC, FM_DOC.length);
     const { from, to } = fmAtomicRange(mounted.view);
-    mounted.view.dispatch({ selection: { anchor: from } });
-    cursorCharRight(mounted.view);
+    const insideYaml = Math.floor((from + to) / 2);
+    mounted.view.dispatch({ selection: { anchor: insideYaml } });
+    expect(mounted.view.state.selection.main.head).toBe(to);
+    expect(mounted.view.state.selection.main.empty).toBe(true);
+    // The clamped caret associates FORWARD so it renders at the body line start,
+    // not at the block widget's trailing (right) edge.
+    expect(mounted.view.state.selection.main.assoc).toBe(1);
+  });
+
+  it("FM2: ArrowLeft at the top of the body cannot move the caret into the panel", () => {
+    mounted = mountFm(FM_DOC, FM_DOC.length);
+    const { to } = fmAtomicRange(mounted.view);
+    mounted.view.dispatch({ selection: { anchor: to } }); // start of the body
+    cursorCharLeft(mounted.view);
     expect(mounted.view.state.selection.main.head).toBe(to);
   });
 
-  it("FM2: ArrowLeft at the block's right edge jumps back over the whole block", () => {
-    mounted = mountFm(FM_DOC, 0);
-    const { from, to } = fmAtomicRange(mounted.view);
-    mounted.view.dispatch({ selection: { anchor: to } });
-    cursorCharLeft(mounted.view);
-    expect(mounted.view.state.selection.main.head).toBe(from);
-  });
-
-  it("FM3: selection extension into the block snaps to its outer boundary (no partial-YAML selection)", () => {
-    mounted = mountFm(FM_DOC, 0);
-    const { from, to } = fmAtomicRange(mounted.view);
+  it("FM3: shift-ArrowLeft at the top of the body selects nothing into the frontmatter", () => {
+    mounted = mountFm(FM_DOC, FM_DOC.length);
+    const { to } = fmAtomicRange(mounted.view);
     mounted.view.dispatch({ selection: { anchor: to } });
     selectCharLeft(mounted.view);
-    expect(mounted.view.state.selection.main.head).toBe(from);
-    expect(mounted.view.state.selection.main.anchor).toBe(to);
+    expect(mounted.view.state.selection.main.empty).toBe(true);
+    expect(mounted.view.state.selection.main.head).toBe(to);
   });
 
-  it("FM4: Backspace at the block boundary deletes the WHOLE block, never a single char into the YAML", () => {
-    mounted = mountFm(FM_DOC, 0);
+  it("FM4: select-all excludes the frontmatter block (body only)", () => {
+    mounted = mountFm(FM_DOC, FM_DOC.length);
+    const { to } = fmAtomicRange(mounted.view);
+    selectAll(mounted.view);
+    expect(mounted.view.state.selection.main.from).toBe(to);
+    expect(mounted.view.state.selection.main.to).toBe(
+      mounted.view.state.doc.length,
+    );
+  });
+
+  it("FM5: Backspace at the top of the body removes the frontmatter as a unit, never a partial char", () => {
+    mounted = mountFm(FM_DOC, FM_DOC.length);
     const { to } = fmAtomicRange(mounted.view);
     mounted.view.dispatch({ selection: { anchor: to } });
     deleteCharBackward(mounted.view);
@@ -262,7 +289,7 @@ describe("Frontmatter Properties atomic-range (MYND-608)", () => {
     expect(after).toContain("body text");
   });
 
-  it("FM5: the widget + its inputs and add button still render with atomicRanges present", () => {
+  it("FM6: the widget + its inputs and add button still render with the guard present", () => {
     mounted = mountFm(FM_DOC, FM_DOC.length);
     const panel = mounted.host.querySelector(".cm-fm-properties");
     expect(panel, "Properties panel renders").not.toBeNull();
@@ -271,5 +298,18 @@ describe("Frontmatter Properties atomic-range (MYND-608)", () => {
       panel!.querySelector(".cm-fm-properties-add"),
       "the + Add property button renders",
     ).not.toBeNull();
+  });
+
+  it("FM7: the caret floor skips a blank line right after the frontmatter, landing on the first body line", () => {
+    mounted = mountFm(FM_DOC_BLANK, FM_DOC_BLANK.length);
+    const blankLine = mounted.view.state.doc.line(5); // the empty line after ---
+    const bodyLine = mounted.view.state.doc.line(6); // "body text"
+    expect(blankLine.text).toBe("");
+    expect(bodyLine.text).toBe("body text");
+    // Try to land the caret on the blank line — it must snap forward to the body
+    // line (where the caret can render), never onto the blank line at the block edge.
+    mounted.view.dispatch({ selection: { anchor: blankLine.from } });
+    expect(mounted.view.state.selection.main.head).toBe(bodyLine.from);
+    expect(mounted.view.state.selection.main.empty).toBe(true);
   });
 });
