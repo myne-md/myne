@@ -34,7 +34,14 @@ import { byTag } from "./vaultIndices";
 
 const EMPTY_RESULTS: ReadonlyMap<string, TaskQueryRender> = new Map();
 
-/** Project an index record into the flat, inert row shape the widget renders. */
+/**
+ * Project an index record into the flat, inert row shape the widget renders.
+ *
+ * `due` is spread on `== null` for the same reason `TaskListPanel.toRowData`
+ * does: `TaskQueryRow.due` is declared optional, and the widget prints whatever
+ * it is handed (`task-query-block.ts`), so a wire `null` copied through here
+ * renders the literal text "null" rather than no date at all.
+ */
 function toQueryRow(task: VaultTask): TaskQueryRow {
   return {
     key: taskRowKey(task),
@@ -42,7 +49,7 @@ function toQueryRow(task: VaultTask): TaskQueryRow {
     text: task.lineIndex === null ? (task.noteTitle ?? "") : taskDescription(task.rawLine),
     completed: task.completed,
     noteTitle: task.noteTitle,
-    ...(task.due === undefined ? {} : { due: task.due }),
+    ...(task.due == null ? {} : { due: task.due }),
     ...(task.oversized ? { oversized: true } : {}),
   };
 }

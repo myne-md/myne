@@ -114,7 +114,12 @@ export function parseLocalInstant(at: string): Date {
  * Excluded, each for its own reason:
  *   - **completed tasks** — the work is done; a reminder would be noise;
  *   - **tasks with no `remind`** — a due date is not a request to be nudged,
- *     and treating it as one would notify a user who never asked;
+ *     and treating it as one would notify a user who never asked. Tested
+ *     `== null`, not `=== undefined`: the `MYI1` row serializes `Option<String>`
+ *     as `null`, and this module is reached by clients that hand their fetch's
+ *     rows straight in, so a strict-undefined check lets a `null` through to
+ *     `instantOf`'s `raw.split(…)` — a throw inside a background pass, which
+ *     surfaces as an unhandled rejection rather than as anything a user sees;
  *   - **instants in the past** — the moment has gone; firing late is worse
  *     than not firing, because it reads as the reminder being wrong;
  *   - **instants beyond the horizon** — see the privacy bound above.
@@ -131,7 +136,7 @@ export function targetReminders(
   const out: PendingReminder[] = [];
   for (const task of tasks) {
     if (task.completed) continue;
-    if (task.remind === undefined) continue;
+    if (task.remind == null) continue;
     const at = instantOf(task.remind);
     if (at <= from || at > to) continue;
     out.push({ id: reminderId(task), at });

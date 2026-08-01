@@ -58,9 +58,9 @@ describe("the date axis", () => {
 
   it("treats a wire `null` as undated rather than crashing on `.slice`", () => {
     // The `MYI1` row serializes `Option<String>` as `null`, not an absent key. A
-    // client that skips the `taskIndex.ts` `fromWire()` sanitizer (mobile) hands
-    // that null straight here — `=== undefined` would miss it and `.slice` a
-    // non-string, which is the iOS Tasks-tab crash. `== null` catches both.
+    // client that skips the `taskWire.ts` `fromWire()` decoder hands that null
+    // straight here — `=== undefined` would miss it and `.slice` a non-string,
+    // which is the iOS Tasks-tab crash. `== null` catches both.
     const wireNull = task({ due: null, remind: null } as unknown as Partial<VaultTask>);
     expect(taskDate(wireNull)).toBeUndefined();
     expect(matchesFilter(wireNull, "today", TODAY)).toBe(false);
@@ -168,6 +168,17 @@ describe("sort", () => {
       task({ noteId: "a", due: "2026-07-01" }),
     ]);
     expect(sorted.map((t) => t.noteId)).toEqual(["a", "b", "c"]);
+  });
+
+  it("files a wire-`null` task last, the same as a genuinely undated one", () => {
+    // Reaches `taskDate` from inside the comparator rather than directly — a
+    // path the axis test above does not exercise, and the one that runs on every
+    // surface before a row is ever rendered.
+    const sorted = sortTasks([
+      task({ noteId: "c", due: null, remind: null } as unknown as Partial<VaultTask>),
+      task({ noteId: "a", due: "2026-07-01" }),
+    ]);
+    expect(sorted.map((t) => t.noteId)).toEqual(["a", "c"]);
   });
 
   it("breaks a date tie by priority, most urgent first", () => {

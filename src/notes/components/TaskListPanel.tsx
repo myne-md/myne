@@ -56,7 +56,16 @@ export type TaskListPanelProps = {
 
 const NO_TAGS: readonly string[] = [];
 
-/** Project an index record into what a row needs. */
+/**
+ * Project an index record into what a row needs.
+ *
+ * The optional strings are spread on `== null`, not `=== undefined`: this is the
+ * projection boundary, `TaskRowData` promises optional-or-absent, and a client
+ * whose fetch skipped the `taskWire.ts` decoder hands a wire `null` down here.
+ * `=== undefined` would copy it into the row verbatim, which is the crash the
+ * row's own guard then has to survive. `lineIndex` keeps `=== null` deliberately
+ * — there it is the note-task discriminator, not an absent value.
+ */
 function toRowData(task: VaultTask): TaskRowData {
   return {
     key: taskRowKey(task),
@@ -64,10 +73,10 @@ function toRowData(task: VaultTask): TaskRowData {
     text: task.lineIndex === null ? (task.noteTitle ?? "") : taskDescription(task.rawLine),
     completed: task.completed,
     noteTitle: task.noteTitle,
-    ...(task.due === undefined ? {} : { due: task.due }),
-    ...(task.remind === undefined ? {} : { remind: task.remind }),
-    ...(task.repeat === undefined ? {} : { repeat: task.repeat }),
-    ...(task.priority === undefined ? {} : { priority: task.priority }),
+    ...(task.due == null ? {} : { due: task.due }),
+    ...(task.remind == null ? {} : { remind: task.remind }),
+    ...(task.repeat == null ? {} : { repeat: task.repeat }),
+    ...(task.priority == null ? {} : { priority: task.priority }),
     ...(task.oversized ? { oversized: true } : {}),
   };
 }

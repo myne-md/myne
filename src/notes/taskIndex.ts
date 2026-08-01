@@ -17,6 +17,7 @@ import { archivedFolderKeys } from "./archivedFolders";
 import { useIndexNonce } from "./indexNonce";
 import type { TitleRecord } from "./loadNoteBatch";
 import { liveCache, useSelectedNote, type NoteId } from "./sidebarState";
+import { fromWire, type VaultTaskWire } from "./taskWire";
 import { TASK_KIND_VALUE } from "../dialect";
 import { usePrefs } from "../hooks/usePrefs";
 
@@ -48,41 +49,10 @@ export type VaultTask = {
   remind?: string;
 };
 
-/**
- * The wire shape, which is NOT the shape above: Rust's `Option<String>` fields
- * serialize as `null`, not as an absent key — `TaskRecord` deliberately carries
- * no `skip_serializing_if`, because the same struct is the on-disk `MYI1`
- * payload and dropping keys there would be a format change.
- *
- * So the boundary has to convert, and it is the only place that should have to.
- * `VaultTask` promises optional-or-absent, and consumers write the check that
- * promise invites — `remind === undefined` in the reminder scheduler,
- * `raw === undefined` in the date axis. A `null` walks straight through both
- * and reaches `.split(…)` / `.slice(…)` on a non-string. That is not
- * hypothetical: it is what this index started doing the moment it stopped
- * returning an empty list (MYND-644), and it surfaced as a repeating
- * unhandled rejection rather than as anything a surface could show.
- */
-type VaultTaskWire = Omit<VaultTask, "due" | "repeat" | "done" | "priority" | "remind"> & {
-  due?: string | null;
-  repeat?: string | null;
-  done?: string | null;
-  priority?: string | null;
-  remind?: string | null;
-};
-
-/** Drop the wire's `null`s so the typed shape above is true of every row. */
-function fromWire(row: VaultTaskWire): VaultTask {
-  const { due, repeat, done, priority, remind, ...rest } = row;
-  return {
-    ...rest,
-    ...(due == null ? {} : { due }),
-    ...(repeat == null ? {} : { repeat }),
-    ...(done == null ? {} : { done }),
-    ...(priority == null ? {} : { priority }),
-    ...(remind == null ? {} : { remind }),
-  };
-}
+// The wire shape and its decoder live in `./taskWire`, not here: the conversion
+// is every client's obligation, and this module is Tauri- and React-coupled, so
+// a client with its own host cannot reach it. See that file for why the nulls
+// exist and why they cannot be removed on the Rust side.
 
 const EMPTY: readonly VaultTask[] = Object.freeze([]);
 

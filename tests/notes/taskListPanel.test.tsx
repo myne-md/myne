@@ -184,6 +184,34 @@ describe("rows", () => {
     cleanup();
   });
 
+  it("renders an undated task whose dates arrived as wire `null` (the All filter)", () => {
+    // The reported crash, at the layer that caused it (myne-md/myne-mobile#36).
+    // `all` is deliberately the filter here and not an incidental choice: it is
+    // the ONLY one that reaches a row without passing the null-safe `taskDate`
+    // first (`matchesFilter` short-circuits on it), so it is the only filter an
+    // undated task appears under — and therefore the only one that ever handed
+    // `TaskRow` a `null` to slice.
+    const { host, cleanup } = render(
+      panel({
+        filter: "all",
+        tasks: [
+          task({
+            due: null,
+            remind: null,
+            repeat: null,
+            priority: null,
+            rawLine: "- [ ] buy bread",
+          } as unknown as Partial<VaultTask>),
+        ],
+      }),
+    );
+    expect(q(host, "tasks.row.text")?.textContent).toBe("buy bread");
+    // The projection strips the nulls rather than copying them into the row, so
+    // there is no date chip — not an empty one.
+    expect(all(host, "tasks.row.due")).toHaveLength(0);
+    cleanup();
+  });
+
   it("reports a toggle with the INDEX record, not the row projection", () => {
     // The writer needs `rawLine` and `lineIndex` to verify and patch; the row
     // projection carries neither.
