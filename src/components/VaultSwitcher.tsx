@@ -15,7 +15,10 @@
 // orchestration: param-less `vault_lock()` → route to the target's unlock
 // screen) and shows the transient "switching…" caption on that row; selecting
 // the active vault is a no-op. A footer routes to vault creation
-// ("Create another vault" → `onCreateAnother` → `editor.create-vault`).
+// ("Create another vault" → `onCreateAnother` → `editor.create-vault`) and,
+// beside it, to the device-join modal ("Add this device to an account" →
+// `onJoinDevice`, myne#221 — the door that was previously offered on the
+// welcome screen alone, i.e. only while the machine held no vault at all).
 //
 // The whole switcher hides when fewer than two vaults exist (nothing to switch
 // to — the create path is still reachable from the command palette / picker).
@@ -54,6 +57,18 @@ interface VaultSwitcherProps {
    * flow (the same target as the picker's "Create another" affordance).
    */
   onCreateAnother: () => void;
+  /**
+   * Open the device-join modal from the dropdown's "Add this device to an
+   * account" footer (myne#221). App.tsx tears the active vault down first —
+   * flush + `vault_lock()` + `editor.lock` — and opens the modal over the
+   * resulting unlock screen, because the join unlocks a DIFFERENT vault and
+   * SYNC-1 zeroizes this one on the way.
+   *
+   * Optional, and omitted rather than disabled where a client cannot hold a
+   * second vault container (`decisions.md` 2026-07-26). Absence hides this one
+   * row, not the switcher.
+   */
+  onJoinDevice?: () => void;
   /**
    * True while a switch's `vault_lock()` IPC is in flight (the "switching…"
    * window). Disables the chip + marks the most-recently-selected row.
@@ -261,6 +276,7 @@ const FOOTER_STYLE: CSSProperties = {
 export function VaultSwitcher({
   onSwitchVault,
   onCreateAnother,
+  onJoinDevice,
   switching,
 }: VaultSwitcherProps) {
   const { t } = useTranslation();
@@ -575,6 +591,22 @@ export function VaultSwitcher({
             <Icon name="plus" size={16} style={{ flexShrink: 0 }} />
             <span>{t("vaultSwitcher.createAnother")}</span>
           </button>
+
+          {onJoinDevice !== undefined && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onJoinDevice();
+              }}
+              style={FOOTER_STYLE}
+              data-testid="switcher.join-cta"
+            >
+              <Icon name="link" size={16} style={{ flexShrink: 0 }} />
+              <span>{t("vaultSwitcher.joinDevice")}</span>
+            </button>
+          )}
         </div>
       )}
     </div>

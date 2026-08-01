@@ -4,7 +4,8 @@
 // dropdown. Covers the conditional render gates (hide at zero vaults, chip
 // label real-vs-fallback), the dropdown open/list, the active-row no-op vs
 // non-active switch (onSwitchVault + per-row "switching…" pending caption), the
-// "Create another vault" footer, and Esc-to-dismiss. `listVaults` is the only
+// "Create another vault" footer, the optional "Add this device to an account"
+// footer beside it (myne#221), and Esc-to-dismiss. `listVaults` is the only
 // IPC boundary mocked; `orderByLastUnlock` keeps its real ordering.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -218,6 +219,31 @@ describe("VaultSwitcher — dropdown", () => {
     const cta = await screen.findByTestId("switcher.create-cta");
     fireEvent.click(cta);
     expect(props.onCreateAnother).toHaveBeenCalledTimes(1);
+  });
+
+  // myne#221 — the device-join door. It was mounted on the welcome screen
+  // alone, which boot routing reaches only at ZERO vaults, so the switcher is
+  // one of the two surfaces that had no way back to it.
+  it("the join-device footer fires onJoinDevice and closes the dropdown", async () => {
+    const onJoinDevice = vi.fn();
+    renderSwitcher(TWO, { onJoinDevice });
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    fireEvent.click(await screen.findByTestId("switcher.join-cta"));
+    expect(onJoinDevice).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByTestId("switcher.join-cta")).toBeNull(), {
+      timeout: 1000,
+    });
+  });
+
+  // Absent, not disabled: a client that cannot hold a second vault container
+  // gets no callback from App.tsx, and must lose the ROW — not the switcher.
+  it("omits the join row when no callback is wired, keeping create reachable", async () => {
+    renderSwitcher(TWO);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    await screen.findByTestId("switcher.create-cta");
+    expect(screen.queryByTestId("switcher.join-cta")).toBeNull();
   });
 
   it("Escape closes the open dropdown", async () => {

@@ -17,10 +17,12 @@ import {
   type VaultId,
 } from "./lib/stage";
 import { PairingDialog } from "./components/PairingDialog";
+import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
+import { has } from "./platform/capabilities";
 import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { isPendingApproval } from "./lib/pending-approval";
-import { switchVault } from "./lib/vault-switch";
+import { leaveActiveVault, switchVault } from "./lib/vault-switch";
 import { prefsRead } from "./lib/prefs";
 import { applyTheme, applyCustomTheme } from "./lib/theme";
 import { useStageRoute } from "./lib/routing";
@@ -62,6 +64,22 @@ function App() {
   // so the state is visible even before the dropdown lands. No confirm-
   // discard dialog — `vault_lock()`'s flush covers unsaved edits.
   const [switching, setSwitching] = useState(false);
+
+  // "Add this device to an account" — the `JoinDeviceModal` overlay (myne#221).
+  //
+  // App-level rather than per-screen because three stages offer the same door
+  // and the modal is one flow: welcome (the first-run entry, MYND-424), the
+  // ≥2-vault picker, and the editor's account-chip switcher. It used to be
+  // mounted only inside `Welcome`, and `initialStageFromProbe` produces
+  // `welcome` only at ZERO vaults — so the first vault a user created closed
+  // the join door for good, with deleting every vault as the sole way back.
+  //
+  // Kept OUT of the Stage union deliberately: it is a modal over whatever is
+  // showing, not a screen, and each entry's landing differs (see `onJoined`).
+  // Same shape as the globally-mounted `<PairingDialog />` below — and, like it,
+  // substituted away in the web build, where the join door is `AccountBootstrap`
+  // and an origin holds exactly one container.
+  const [joinOpen, setJoinOpen] = useState(false);
 
   // Boot-time multi-vault probe pair (MYND-204 SYNC-4): `vault_list`
   // (disk enumeration) + `vault_slot_kind(None)` (the active runtime
@@ -260,6 +278,53 @@ function App() {
     void switchVault(targetVaultId, { onSavingChange: setSwitching, dispatch });
   };
 
+  // The switcher's device-join door (myne#221). Unlike the welcome and picker
+  // entries this one runs with a vault OPEN, and the join cannot leave it that
+  // way: `sync_join_account` bootstraps AND unlocks a different vault, and
+  // SYNC-1 (`set_unlocked_locking_others`) zeroizes the active one on the way.
+  // A modal left over a mounted editor would therefore sit on plaintext whose
+  // keys are already gone — for the whole `join.pending` wait, which lasts
+  // until another device approves.
+  //
+  // So it takes the same lock-then-route shape as a vault switch: flush +
+  // `vault_lock()` behind the existing "saving…" overlay, route to the
+  // just-locked vault's unlock screen, and open the modal over THAT. Cancelling
+  // therefore lands somewhere coherent (retype the password), and success
+  // dispatches `unlock.join-success`.
+  const onJoinDeviceFromEditor = () => {
+    void (async () => {
+      await leaveActiveVault({ onSavingChange: setSwitching });
+      dispatch({ type: "editor.lock" });
+      setJoinOpen(true);
+    })();
+  };
+
+  // Where a completed join lands, per the stage that opened the modal. One
+  // action per source (the convention `*.create-vault` and `*.restore-backup`
+  // already follow), each producing a vault-addressed `editor` stage — the
+  // vault is already unlocked by `sync_join_account`, so there is no unlock hop.
+  //
+  // The default arm cannot be reached by any of the three doors; it reprobes
+  // rather than dropping the user somewhere stale if a future entry forgets to
+  // add its action.
+  const onJoined = (vaultId: string) => {
+    setJoinOpen(false);
+    const id = vaultId as VaultId;
+    switch (stage.name) {
+      case "welcome":
+        dispatch({ type: "welcome.join-success", vaultId: id });
+        return;
+      case "picker":
+        dispatch({ type: "picker.join-success", vaultId: id });
+        return;
+      case "unlock":
+        dispatch({ type: "unlock.join-success", vaultId: id });
+        return;
+      default:
+        void reprobe();
+    }
+  };
+
   const screen = (() => {
     switch (stage.name) {
       case "account-entry":
@@ -294,12 +359,10 @@ function App() {
           <Welcome
             onCreateVault={() => dispatch({ type: "create-vault.start" })}
             onRestoreBackup={() => dispatch({ type: "welcome.restore-backup" })}
-            onJoined={(vaultId) =>
-              dispatch({
-                type: "welcome.join-success",
-                vaultId: vaultId as VaultId,
-              })
-            }
+            // The modal itself is mounted below, over every stage (myne#221) —
+            // this screen only opens it. Nothing is unlocked here, so unlike the
+            // switcher entry there is nothing to tear down first.
+            onJoinDevice={() => setJoinOpen(true)}
           />
         );
       case "create-vault":
@@ -370,6 +433,13 @@ function App() {
               onDeleteVaultSuccess={reprobe}
               onSwitchVault={onSwitchVault}
               onCreateAnother={() => dispatch({ type: "editor.create-vault" })}
+              // "Add this device to an account" in the switcher dropdown
+              // (myne#221). Capability-gated here rather than in the switcher so
+              // the descriptor is consulted once: a client that holds exactly
+              // one container per origin cannot bootstrap a second vault, and
+              // an absent capability is OMITTED, never greyed out
+              // (`decisions.md` 2026-07-26).
+              onJoinDevice={has("vaultCreation") ? onJoinDeviceFromEditor : undefined}
               onRestoreBackup={() => dispatch({ type: "editor.restore-backup" })}
               switching={switching}
             />
@@ -403,6 +473,11 @@ function App() {
             onSelect={(vaultId) => dispatch({ type: "picker.select-vault", vaultId })}
             onCreateAnother={() => dispatch({ type: "picker.create-vault" })}
             onRestoreBackup={() => dispatch({ type: "picker.restore-backup" })}
+            // "Add this device to an account" (myne#221) — the door that was
+            // previously welcome-only, i.e. unreachable the moment a vault
+            // existed. Picking a row never unlocked anything, so the modal opens
+            // straight over the picker.
+            onJoinDevice={() => setJoinOpen(true)}
           />
         );
       case "restore-backup":
@@ -446,6 +521,11 @@ function App() {
           surfaces over whatever stage is showing; renders nothing unless the
           core has a pending pairing session. */}
       <PairingDialog />
+      {/* "Add this device to an account" (MYND-424; myne#221 opened it to the
+          picker + switcher). Mounted here, over whatever stage is showing,
+          because three stages offer the same door and each lands differently —
+          see `onJoined` above. The web build substitutes the module away. */}
+      {joinOpen && <JoinDeviceModal onCancel={() => setJoinOpen(false)} onJoined={onJoined} />}
       {/* The browser-extension clip dispatch listener (desktop-ingest, MYND-442,
           TB10) is NOT mounted here. It lives inside `Editor.tsx` — within the
           workspace providers — so the success notice's "view" affordance can

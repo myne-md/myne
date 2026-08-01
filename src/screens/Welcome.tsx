@@ -1,21 +1,23 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
-import { JoinDeviceModal } from "../components/sync/JoinDeviceModal";
 
 interface WelcomeProps {
   onCreateVault: () => void;
   /** Fresh-install restore door (MYND-56; the user-guide UX contract). */
   onRestoreBackup: () => void;
-  /** Device-join succeeded (vault bootstrapped + unlocked) → editor (MYND-424). */
-  onJoined: (vaultId: string) => void;
+  /**
+   * Open the device-join modal (MYND-424). The modal itself is mounted by
+   * App.tsx over every stage since myne#221 — this screen was its only host,
+   * and `welcome` is produced only at ZERO vaults, so the first vault a user
+   * created made the join door unreachable.
+   */
+  onJoinDevice: () => void;
 }
 
-export function Welcome({ onCreateVault, onRestoreBackup, onJoined }: WelcomeProps) {
+export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: WelcomeProps) {
   const { t } = useTranslation();
-  const [joinOpen, setJoinOpen] = useState(false);
   return (
     <div
       data-testid="welcome.root"
@@ -105,10 +107,10 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoined }: WelcomePro
           </Button>
           <Button
             variant="secondary"
-            onClick={() => setJoinOpen(true)}
+            onClick={onJoinDevice}
             data-testid="welcome.join-cta"
           >
-            Add this device to an account
+            {t("welcome.joinCta")}
           </Button>
         </div>
 
@@ -116,16 +118,6 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoined }: WelcomePro
           v0.1 pre-alpha
         </div>
       </div>
-
-      {joinOpen && (
-        <JoinDeviceModal
-          onCancel={() => setJoinOpen(false)}
-          onJoined={(vaultId) => {
-            setJoinOpen(false);
-            onJoined(vaultId);
-          }}
-        />
-      )}
     </div>
   );
 }

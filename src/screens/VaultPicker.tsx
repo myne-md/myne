@@ -9,7 +9,9 @@
 // Each row → `onSelect(vaultId)` (App.tsx dispatches
 // `picker.select-vault{vaultId}` → unlock screen for that vault; the
 // vaultId-targeted unlock IPC lives in task 7). A "create another"
-// affordance → `onCreateAnother()` (→ `picker.create-vault` → create-vault).
+// affordance → `onCreateAnother()` (→ `picker.create-vault` → create-vault),
+// and beside it "add this device to an account" → `onJoinDevice()` (myne#221),
+// which opens the `JoinDeviceModal` App.tsx mounts globally.
 //
 // **Pre-unlock enumeration policy (SYNC-7 / SYNC-3).** Rows show the real
 // label ONLY when `vault_list()` returns one (`label !== null`, cached from
@@ -54,6 +56,14 @@ interface VaultPickerProps {
   onRestoreBackup: () => void;
   /** "Create another" → App dispatches `picker.create-vault` → create-vault. */
   onCreateAnother: () => void;
+  /**
+   * "Add this device to an account" → App opens the `JoinDeviceModal` it mounts
+   * globally (myne#221). The picker previously offered creation only, and the
+   * modal's sole host was the welcome screen — which boot routing produces only
+   * at ZERO vaults, so joining an existing account became unreachable the
+   * moment this screen could appear at all.
+   */
+  onJoinDevice: () => void;
 }
 
 // `loading` until the `vault_list()` IPC resolves; `loaded` carries the
@@ -297,13 +307,18 @@ function PickerActionLink({
 
 /** The divider + picker actions — shared by loaded + failed. "Restore from
  *  backup" sits next to "Create another vault" (SYNC-5 KeepBoth door:
- *  restoring an additional vault must not require unlocking one first). */
+ *  restoring an additional vault must not require unlocking one first), and
+ *  "Add this device to an account" beside both (myne#221: the join door has to
+ *  be offered wherever creation is, or it is reachable on a fresh machine and
+ *  nowhere else). */
 function CreateAnother({
   onClick,
   onRestoreBackup,
+  onJoinDevice,
 }: {
   onClick: () => void;
   onRestoreBackup: () => void;
+  onJoinDevice: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -314,6 +329,12 @@ function CreateAnother({
         icon="plus"
         label={t("vaultPicker.createAnother")}
         testId="picker.create-cta"
+      />
+      <PickerActionLink
+        onClick={onJoinDevice}
+        icon="link"
+        label={t("vaultPicker.joinDevice")}
+        testId="picker.join-cta"
       />
       <PickerActionLink
         onClick={onRestoreBackup}
@@ -374,7 +395,7 @@ function lastUnlockText(lastUnlock: number | null, t: TFunction): string {
 }
 
 export function VaultPicker({ onSelect, onCreateAnother,
-  onRestoreBackup }: VaultPickerProps) {
+  onRestoreBackup, onJoinDevice }: VaultPickerProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
   // Subscribe to the shared 30s tick so the row timestamps stay live.
@@ -433,7 +454,11 @@ export function VaultPicker({ onSelect, onCreateAnother,
     return (
       <PickerCard>
         <p style={SUBLINE_STYLE}>{t("vaultPicker.noneLoaded")}</p>
-        <CreateAnother onClick={onCreateAnother} onRestoreBackup={onRestoreBackup} />
+        <CreateAnother
+          onClick={onCreateAnother}
+          onRestoreBackup={onRestoreBackup}
+          onJoinDevice={onJoinDevice}
+        />
       </PickerCard>
     );
   }
@@ -452,7 +477,11 @@ export function VaultPicker({ onSelect, onCreateAnother,
           />
         ))}
       </div>
-      <CreateAnother onClick={onCreateAnother} onRestoreBackup={onRestoreBackup} />
+      <CreateAnother
+        onClick={onCreateAnother}
+        onRestoreBackup={onRestoreBackup}
+        onJoinDevice={onJoinDevice}
+      />
     </PickerCard>
   );
 }

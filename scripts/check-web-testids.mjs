@@ -46,6 +46,7 @@ const SHARED_WEB_ONLY = [
  */
 const RENDERS_NOTHING = new Set([
   join("web", "src", "components", "PairingDialog.tsx"),
+  join("web", "src", "components", "sync", "JoinDeviceModal.tsx"),
   join("web", "src", "components", "settings", "ConnectedExtensions.tsx"),
   join("web", "src", "components", "backup", "BackupExportModal.tsx"),
   join("web", "src", "screens", "EnrollPhraseCredential.tsx"),

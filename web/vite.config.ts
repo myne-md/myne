@@ -124,6 +124,23 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "components",
     "PairingDialog",
   ),
+  // Globally mounted by `App.tsx` for the same reason and with the same
+  // consequence (myne#221). The device-join modal used to be reachable only
+  // from `Welcome`, so substituting that screen kept it out of the bundle as a
+  // side effect — which the welcome stub's own comment relied on. Hoisting the
+  // mount so the picker and the account-chip switcher can open it too removes
+  // that accident, and this entry replaces it with a stated exclusion: a browser
+  // holds one container per origin under a constant vault id (task 85), so there
+  // is no second vault to bootstrap, and the join a browser DOES perform is
+  // `AccountBootstrap`.
+  [path.join(repoRoot, "src", "components", "sync", "JoinDeviceModal")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "components",
+    "sync",
+    "JoinDeviceModal",
+  ),
   // Rendered behind `has("clipper")` already, but the IMPORT still shipped the
   // block and `src/lib/clipper-pairing.ts` with it (task 96).
   [path.join(repoRoot, "src", "components", "settings", "ConnectedExtensions")]: path.join(
