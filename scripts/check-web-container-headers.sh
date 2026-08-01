@@ -31,6 +31,13 @@ cd "$(dirname "$0")/.."
 IMAGE="${MYNE_WEB_IMAGE:-myne-web-headers-test}"
 PORT=18098
 SYNC_ORIGIN="https://sync.example.org"
+# In CI this script runs INSIDE the web-docker-build step container, whose
+# 127.0.0.1 is its own netns — a published host port is unreachable from it
+# ("the container never answered"). When MYNE_WEB_TEST_NETWORK is set, attach
+# the probe container to that same docker network instead and reach it by name
+# through docker's embedded DNS. Unset (local dev, running on the host) keeps
+# the published-port + localhost path.
+NET="${MYNE_WEB_TEST_NETWORK:-}"
 
 if [ "${1:-}" != "--no-build" ]; then
   echo "building the web container ..."
@@ -38,12 +45,19 @@ if [ "${1:-}" != "--no-build" ]; then
     echo "FAIL: image build failed"; exit 1; }
 fi
 
-CID=$(docker run -d --rm -p "$PORT:8080" \
-  -e MYNE_SYNC_ORIGIN="$SYNC_ORIGIN" "$IMAGE") || {
-  echo "FAIL: container did not start"; exit 1; }
+if [ -n "$NET" ]; then
+  CNAME="myne-web-headers-$$"
+  CID=$(docker run -d --rm --network "$NET" --name "$CNAME" \
+    -e MYNE_SYNC_ORIGIN="$SYNC_ORIGIN" "$IMAGE") || {
+    echo "FAIL: container did not start"; exit 1; }
+  BASE="http://$CNAME:8080"
+else
+  CID=$(docker run -d --rm -p "$PORT:8080" \
+    -e MYNE_SYNC_ORIGIN="$SYNC_ORIGIN" "$IMAGE") || {
+    echo "FAIL: container did not start"; exit 1; }
+  BASE="http://127.0.0.1:$PORT"
+fi
 trap 'docker rm -f "$CID" >/dev/null 2>&1 || true' EXIT
-
-BASE="http://127.0.0.1:$PORT"
 
 up=0
 for _ in $(seq 1 60); do
