@@ -57,6 +57,7 @@ import i18n from "@myne/editor/i18n";
 import { parseTaskFields, parseTaskInstant, type TaskFields } from "@myne/dialect/taskFields";
 import { planTaskFieldWrite } from "@myne/dialect/taskFieldWriter";
 import { parseRecurrenceSpec } from "@myne/dialect/recurrence";
+import { canRecur } from "@myne/dialect/taskRecurrence";
 
 /**
  * Which fields get a chip, and what each is called.
@@ -93,16 +94,27 @@ const PRIORITY_EMOJI_LABEL: ReadonlyMap<string, string> = new Map([
  * date parser and never a second rule grammar here (§3.6.4's
  * consume-never-redefine rule).
  *
- * `repeat` types iff the closed recurrence vocabulary reads it (MYND-615 task
- * 10). This is the one field where a false "types" is not merely cosmetic: a
- * rule Myne cannot read must LOOK unread, because the silent alternative is
+ * `repeat` types iff the closed recurrence vocabulary reads it AND the line it
+ * sits on carries an anchor date to advance from (MYND-615 task 10; myne#197).
+ * This is the one field where a false "types" is not merely cosmetic: a rule
+ * Myne cannot read must LOOK unread, because the silent alternative is
  * data-loss-shaped — the user believes the task repeats, completes it, nothing
  * appears, and they find out by missing something months later.
+ *
+ * The **line** is what makes the second half possible. Asking only whether the
+ * vocabulary can *parse* the rule was the gap: `[repeat:: every day]` with no
+ * date parses perfectly and then does nothing at all, which is exactly the
+ * failure the paragraph above describes — it just wasn't covered, because the
+ * question was about the value rather than about the record.
  */
-function valueTypes(kind: "due" | "repeat" | "priority", value: string): boolean {
+function valueTypes(
+  kind: "due" | "repeat" | "priority",
+  value: string,
+  lineText: string,
+): boolean {
   if (kind === "due") return parseTaskInstant(value) !== null;
   if (kind === "priority") return PRIORITY_WORDS.has(value.toLowerCase());
-  return parseRecurrenceSpec(value).ok;
+  return parseRecurrenceSpec(value).ok && canRecur(lineText);
 }
 
 /**
@@ -112,12 +124,30 @@ function valueTypes(kind: "due" | "repeat" | "priority", value: string): boolean
  * consequence is the part the user cannot infer: an unreadable `repeat` means
  * the task will not repeat, which is precisely the surprise this state exists
  * to prevent.
+ *
+ * `repeat` has **two** ways to not work and they call for different actions, so
+ * they get different hints: a rule outside the vocabulary is corrected, a rule
+ * with no anchor date needs one added. Resolved here rather than at the
+ * decoration site so the chip scanner is the only thing that decides what an
+ * untyped field means.
  */
 const INVALID_HINT_KEY: Readonly<Record<"due" | "repeat" | "priority", string>> = {
   due: "editor.taskField.invalidDue",
   repeat: "editor.taskField.invalidRepeat",
   priority: "editor.taskField.invalidPriority",
 };
+
+/** The hint for a field that did NOT type. Only meaningful in that case. */
+function invalidHintKey(kind: "due" | "repeat" | "priority", value: string): string {
+  // Reaching here means the field failed to type. For `repeat` that leaves two
+  // possibilities, and if the vocabulary DOES read the rule then the failure was
+  // the anchor — saying "Myne doesn't recognise this rule" would send the user
+  // to fix a rule that is already correct.
+  if (kind === "repeat" && parseRecurrenceSpec(value).ok) {
+    return "editor.taskField.repeatNoAnchor";
+  }
+  return INVALID_HINT_KEY[kind];
+}
 
 /**
  * What a chip DISPLAYS, given the source bytes it stands for.
@@ -165,6 +195,12 @@ export type ChipSpan = {
    * chip — never a blank chip, and never a silently corrected value.
    */
   typed: boolean;
+  /**
+   * The i18n key of the hint to show while {@link typed} is false, naming both
+   * what Myne could not read and what follows from it. Meaningless — and unread
+   * — when the value typed.
+   */
+  hintKey: string;
 };
 
 /**
@@ -198,7 +234,10 @@ export function chipRangesIn(state: EditorState, from: number, to: number): Chip
       const emojiValue = PRIORITY_EMOJI_LABEL.get(folded);
       const source = emojiValue ?? value;
       if (source === "") return false;
-      const typed = emojiValue !== undefined || valueTypes(kind, value);
+      // The LINE, not just the value: `repeat` types only if it can be evaluated
+      // where it sits, which depends on the other fields beside it (myne#197).
+      const lineText = state.doc.lineAt(node.from).text;
+      const typed = emojiValue !== undefined || valueTypes(kind, value, lineText);
       out.push({
         from: node.from,
         to: node.to,
@@ -206,6 +245,7 @@ export function chipRangesIn(state: EditorState, from: number, to: number): Chip
         value: source,
         label: displayLabel(kind, source, typed),
         typed,
+        hintKey: typed ? "" : invalidHintKey(kind, value),
       });
       return false;
     },
@@ -288,7 +328,7 @@ function buildTaskChipDecorations(view: EditorView): DecorationSet {
             class: "cm-task-field-invalid",
             attributes: {
               "data-testid": `editor.task-field-invalid-${span.kind}`,
-              title: i18n.t(INVALID_HINT_KEY[span.kind]),
+              title: i18n.t(span.hintKey),
             },
           }).range(span.from, span.to),
         );

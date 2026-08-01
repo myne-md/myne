@@ -116,6 +116,19 @@ describe("the + menu adds an absent field and edits a present one", () => {
     commit();
     expect(m!.view.state.doc.toString()).toContain("[due:: 2026-09-09]");
   });
+
+  it("still offers both rows on an anchorless repeat rule (myne#197)", () => {
+    // The rule renders as unread there, which is the point — but the menu is
+    // the way OUT of that state, so it must keep offering the repeat row (to
+    // edit the rule) and the due row (to give it a date). It keys on which
+    // fields the line carries, not on whether they typed, and this pins that.
+    openMenu("- [ ] shower [repeat:: every day]\n");
+    expect(menuRow("repeat")).not.toBeNull();
+    expect(menuRow("due")).not.toBeNull();
+    menuRow("repeat").click();
+    // Prefilled with the SOURCE value, so opening it does not clobber the rule.
+    expect((fieldInput() as HTMLSelectElement).value).toBe("interval");
+  });
 });
 
 describe("the + menu's skip row (myne#198)", () => {

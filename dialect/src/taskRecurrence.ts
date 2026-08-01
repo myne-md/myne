@@ -28,6 +28,34 @@ import {
 } from "./civilDate";
 
 /**
+ * Whether `line`'s recurrence rule can actually be evaluated on this line
+ * (myne#197).
+ *
+ * Three conditions: the line carries a `repeat` field, the closed vocabulary
+ * reads the rule, and there is an anchor date to advance from (`due`, else
+ * `remind`). **No `today` parameter** — none of the three depends on the
+ * calendar, and a display layer asking this question must not read a clock.
+ *
+ * It exists because *parseable* and *evaluable* are different questions and the
+ * chip layer was asking the first one while promising the second. A rule with no
+ * anchor parses perfectly and then does nothing, which is the data-loss-shaped
+ * silence `decorations/task-chip.ts` forbids itself.
+ *
+ * It reads the same three conditions `advancedFields` does. They stay separate
+ * functions — one is a predicate, the other computes dates — but a test pins
+ * their equivalence, so they cannot drift apart quietly.
+ */
+export function canRecur(line: string): boolean {
+  const fields = parseTaskFields(line);
+  if (fields.repeat === undefined) return false;
+  if (!parseRecurrenceSpec(fields.repeat).ok) return false;
+
+  const due = fields.due === undefined ? null : parseCivilDate(fields.due.date);
+  const remind = fields.remind === undefined ? null : parseCivilDate(fields.remind.date);
+  return due !== null || remind !== null;
+}
+
+/**
  * The advanced field set for `line`, or null when the rule cannot be evaluated.
  *
  * Null covers three distinct declines that share one answer — no rule, a rule

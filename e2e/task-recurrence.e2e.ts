@@ -15,6 +15,10 @@
 // date until it is strictly after today, so a near-term date would make the
 // expected result depend on the day the suite runs. `2030-01-15 + every month`
 // is one step for the next few years.
+//
+// `rc3` covers the other half of the same promise (myne#197): a rule that CANNOT
+// run must say so. Together they mean a recurring task either works or is
+// visibly marked as not working — never confidently rendered and inert.
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
@@ -123,6 +127,39 @@ describeE2E("rc2 skipping an occurrence advances the line in place", () => {
         expect(await taskCount(s)).toBe(1);
 
         await waitForSaved(s);
+      },
+    );
+  });
+});
+
+describeE2E("rc3 an anchorless repeat rule is shown as unread (myne#197)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("renders no chip, flags the field, and leaves the rule's bytes in place", async () => {
+    let password = "";
+    await scenario(
+      "rc3-task-recurrence-anchorless",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Anchorless Note");
+
+        // A rule the vocabulary reads perfectly, on a line with no date to
+        // repeat from. It parses; it can never run.
+        await typeIntoEditor(s, "- [ ] shower [repeat:: every day]", {
+          landedText: "shower",
+        });
+        await waitForSaved(s);
+
+        // Flagged rather than chipped — the state the user has to be able to
+        // see, since the alternative is finding out months later.
+        await s.waitForElement(testIdSelector("editor.task-field-invalid-repeat"));
+        expect((await s.byTestIdAll("editor.task-chip-repeat")).length).toBe(0);
+
+        // And the bytes are untouched: a mark decoration, so the raw rule stays
+        // visible and the caret can get in to fix it.
+        expect(await editorText(s)).toContain("[repeat:: every day]");
       },
     );
   });
