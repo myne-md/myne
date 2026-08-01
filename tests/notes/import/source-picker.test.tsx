@@ -101,14 +101,17 @@ describe("ImportSourcePicker", () => {
     expect(screen.queryAllByTestId("import.source-survives")).toHaveLength(0);
   });
 
-  it("renders a distinct brand mark per source", () => {
+  it("renders sources as text only, with no brand marks (#183)", () => {
+    // Reproducing third-party brand marks (even simplified) is a trademark grey
+    // area; nominative use of the NAME is fine. So each card is text-only — the
+    // localized source name, no brand-derived SVG imagery.
     render(<ImportSourcePicker onPick={() => {}} onCancel={() => {}} />);
-    const svgs = screen
-      .getAllByTestId("import.source-row")
-      .map((r) => r.querySelector("svg")?.innerHTML ?? "");
-    expect(svgs.filter((h) => h.length > 0)).toHaveLength(IMPORT_SOURCE_ORDER.length);
-    // Distinct markup per source — a shared placeholder glyph would defeat the point.
-    expect(new Set(svgs).size).toBe(IMPORT_SOURCE_ORDER.length);
+    const rows = screen.getAllByTestId("import.source-row");
+    expect(rows).toHaveLength(IMPORT_SOURCE_ORDER.length);
+    for (const row of rows) {
+      expect(row.querySelector("svg")).toBeNull();
+      expect((row.textContent ?? "").trim().length).toBeGreaterThan(0);
+    }
   });
 
   it("reports the chosen source", () => {

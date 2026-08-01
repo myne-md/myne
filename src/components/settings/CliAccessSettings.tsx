@@ -249,6 +249,7 @@ export function CliAccessSettings({
       <div
         style={BLOCK_STYLE}
         data-setting-anchor="privacy.cli-excluded-folders"
+        data-setting-row="true"
         data-testid="settings.cli-exclusions"
         // A COUNT, never the names: this attribute exists so an E2E scenario can
         // see that its typed exclusion registered, and a folder name in a

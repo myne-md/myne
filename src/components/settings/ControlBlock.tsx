@@ -35,7 +35,7 @@ export function ControlBlock({
   testId,
 }: ControlBlockProps) {
   return (
-    <div style={BLOCK_STYLE} data-setting-anchor={anchorId} data-testid={testId}>
+    <div style={BLOCK_STYLE} data-setting-row="true" data-setting-anchor={anchorId} data-testid={testId}>
       <span style={LABEL_STYLE}>{label}</span>
       {control}
       <p style={HELPER_STYLE}>{helper}</p>

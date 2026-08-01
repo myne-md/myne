@@ -2012,7 +2012,10 @@ function EditorChrome({
         onForceRelock={onForceRelock}
         onDeleteVaultSuccess={onDeleteVaultSuccess}
         onImportObsidian={() => {
-          setSettingsOpen(false);
+          // Keep Settings open BEHIND the importer (both are z-1000 modals and
+          // the importer renders later in the DOM, so it layers on top). Closing
+          // the importer returns to Settings rather than dumping to the editor
+          // (#206 — "actions like import notes close off the settings pane").
           setImporterOpen(true);
         }}
         onOpenGraph={() => {

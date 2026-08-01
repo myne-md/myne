@@ -8,7 +8,7 @@
 // `toWire`), keeping an explicitly-default vault byte-identical to an untouched
 // one. The presets + their CSS mapping are single-homed in `editor/typography.ts`.
 
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   prefsRead,
@@ -28,49 +28,17 @@ import {
   lineSpacingKey,
   textSizeKey,
   toWire,
-  typographyStyleFromKeys,
   type TypographyOption,
 } from "../../editor/typography";
 import { Segmented } from "../primitives/Segmented";
 import { ERROR_STYLE } from "./panel-styles";
 import { SettingRow } from "./SettingRow";
 
-const PREVIEW_WRAP_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-2)",
-};
-
-const PREVIEW_CAPTION_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-xs)",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  color: "var(--fg-3)",
-};
-
-// Mirrors the editor's own paper + rule so the specimen reads as a slice of the
-// note surface rather than a settings widget.
-const PREVIEW_FRAME_STYLE: CSSProperties = {
-  background: "var(--paper-1, var(--bg-1))",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-4)",
-  overflow: "hidden",
-};
-
-const PREVIEW_TEXT_STYLE: CSSProperties = {
-  margin: 0,
-  color: "var(--fg-1)",
-  fontSize: "var(--editor-text-size)",
-  lineHeight: "var(--editor-line-spacing)",
-  fontFamily: "var(--editor-font-family)",
-};
-
 type FieldKey = "textSize" | "lineSpacing" | "contentWidth" | "fontFamily";
 
 interface RowSpec {
   field: FieldKey;
+  anchorId: string;
   testId: string;
   // i18n KEYS, not resolved labels — resolved with `t(...)` at render time so a
   // language switch re-labels the rows (a module-scope resolved string would
@@ -85,6 +53,7 @@ interface RowSpec {
 const ROWS: readonly RowSpec[] = [
   {
     field: "textSize",
+    anchorId: "editor.text-size",
     testId: "settings.editor-text-size",
     labelKey: "settings.typography.textSizeLabel",
     helperKey: "settings.typography.textSizeHelper",
@@ -94,6 +63,7 @@ const ROWS: readonly RowSpec[] = [
   },
   {
     field: "lineSpacing",
+    anchorId: "editor.line-spacing",
     testId: "settings.editor-line-spacing",
     labelKey: "settings.typography.lineSpacingLabel",
     helperKey: "settings.typography.lineSpacingHelper",
@@ -103,6 +73,7 @@ const ROWS: readonly RowSpec[] = [
   },
   {
     field: "contentWidth",
+    anchorId: "editor.content-width",
     testId: "settings.editor-content-width",
     labelKey: "settings.typography.contentWidthLabel",
     helperKey: "settings.typography.contentWidthHelper",
@@ -112,6 +83,7 @@ const ROWS: readonly RowSpec[] = [
   },
   {
     field: "fontFamily",
+    anchorId: "editor.font",
     testId: "settings.editor-font-family",
     labelKey: "settings.typography.fontLabel",
     helperKey: "settings.typography.fontHelper",
@@ -176,6 +148,7 @@ export function TypographySettings() {
         return (
           <Fragment key={row.field}>
             <SettingRow
+              anchorId={row.anchorId}
               label={label}
               helper={t(row.helperKey)}
               control={
@@ -191,20 +164,11 @@ export function TypographySettings() {
           </Fragment>
         );
       })}
-      {/* MYND-624: a live specimen of the four presets above. Typography is the
-          setting whose effect is hardest to hold in your head -- "relaxed" line
-          spacing and "wide" content width mean nothing until you see them, and
-          the editor is behind a modal while you are choosing. Resolved through
-          the SAME `typographyStyleFromKeys` the editor uses, so the preview
-          cannot claim something the note will not do. */}
-      <div style={PREVIEW_WRAP_STYLE} data-testid="settings.typography-preview">
-        <span style={PREVIEW_CAPTION_STYLE}>{t("settings.typography.previewLabel")}</span>
-        <div style={PREVIEW_FRAME_STYLE}>
-          <p style={{ ...typographyStyleFromKeys(sel), ...PREVIEW_TEXT_STYLE }}>
-            {t("settings.typography.previewBody")}
-          </p>
-        </div>
-      </div>
+      {/* The live specimen moved to the Editor tab's sticky preview column
+          (`EditorSettingsPreview` in `EditorPanel.tsx`) so it stays visible while
+          you scroll ALL the editor controls, not just typography. Same
+          `typographyStyleFromKeys` path, so it still cannot claim something the
+          note will not do. */}
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}
     </>
   );

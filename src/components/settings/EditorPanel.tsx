@@ -11,8 +11,16 @@
 // Appearance. This panel is a thin composition shell — the persistence logic
 // lives in the two child components.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  contentWidthKey,
+  fontFamilyKey,
+  lineSpacingKey,
+  textSizeKey,
+  typographyStyleFromKeys,
+} from "../../editor/typography";
+import { asViewMode } from "../../editor/view-mode";
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
 import { VimModeSettings } from "./VimModeSettings";
@@ -27,6 +35,227 @@ import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
 import { usePrefs } from "../../hooks/usePrefs";
 
+// Two-column layout: the controls scroll on the left, a live preview sticks on
+// the right. Only the Editor tab carries a preview — it is the one tab whose
+// settings (type size, line spacing, font) have an effect you cannot picture
+// without seeing it, and the editor itself is hidden behind the modal while you
+// choose. No other Settings tab needs one.
+const EDITOR_LAYOUT_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  gap: "var(--space-6)",
+  alignItems: "flex-start",
+};
+const CONTROLS_COL_STYLE: CSSProperties = {
+  ...PANEL_ROOT_STYLE,
+  flex: "1 1 auto",
+  minWidth: 0,
+};
+const PREVIEW_COL_STYLE: CSSProperties = {
+  flex: "0 0 264px",
+  width: 264,
+  position: "sticky",
+  top: 0,
+  alignSelf: "flex-start",
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+};
+const PREVIEW_CAPTION_STYLE: CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--fg-3)",
+};
+// Mirrors the editor's own paper + rule so the specimen reads as a slice of the
+// note surface rather than a settings widget.
+const PREVIEW_FRAME_STYLE: CSSProperties = {
+  background: "var(--paper-1, var(--bg-1))",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-4)",
+  overflow: "hidden",
+};
+// All three read the SAME `--editor-*` custom properties the real editor reads
+// (set on the wrapper by `typographyStyleFromKeys`), so the specimen cannot show
+// something a note will not.
+const SAMPLE_HEADING_STYLE: CSSProperties = {
+  margin: "0 0 var(--space-2)",
+  color: "var(--fg-1)",
+  fontFamily: "var(--editor-font-family)",
+  fontSize: "calc(var(--editor-text-size) * 1.5)",
+  lineHeight: "var(--editor-line-spacing)",
+  fontWeight: 600,
+};
+const SAMPLE_BODY_STYLE: CSSProperties = {
+  margin: "0 0 var(--space-2)",
+  color: "var(--fg-1)",
+  fontFamily: "var(--editor-font-family)",
+  fontSize: "var(--editor-text-size)",
+  lineHeight: "var(--editor-line-spacing)",
+};
+// One "line" row: the line-numbers gutter (when on) + the block content. The
+// gutter number pins to the block's first line (matching how an editor numbers a
+// wrapped soft-line: one number at top, no number on the wrapped rows).
+const LINE_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  gap: "var(--space-2)",
+  alignItems: "flex-start",
+};
+const GUTTER_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  minWidth: "1.6em",
+  textAlign: "right",
+  color: "var(--fg-3)",
+  fontFamily: "var(--font-mono)",
+  fontSize: "calc(var(--editor-text-size) * 0.85)",
+  lineHeight: "var(--editor-line-spacing)",
+  userSelect: "none",
+  opacity: 0.7,
+};
+// The faint markdown markers shown in Live view (# before a heading, - before a
+// bullet) and the • bullet glyph shown in Reading view.
+const MARKER_STYLE: CSSProperties = { color: "var(--fg-3)", opacity: 0.65 };
+const SOURCE_LINE_STYLE: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "calc(var(--editor-text-size) * 0.92)",
+  lineHeight: "var(--editor-line-spacing)",
+  color: "var(--fg-1)",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+};
+// Spell-check demo, shown only when spell-check is on: the editor's own wavy-red
+// underline (`.cm-spell-error` in `editor/src/theme.ts`) on a misspelled word.
+const SPELL_DEMO_STYLE: CSSProperties = {
+  marginTop: "var(--space-3)",
+  paddingTop: "var(--space-2)",
+  borderTop: "1px solid var(--line-1)",
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+const SPELL_SQUIGGLE_STYLE: CSSProperties = {
+  textDecoration: "underline wavy var(--danger, #8a2a23)",
+  color: "var(--fg-1)",
+  fontFamily: "var(--editor-font-family)",
+  fontSize: "var(--text-sm)",
+};
+
+// Live typography specimen for the Editor tab. Reads prefs via its own
+// `usePrefs` — the typography setters (and line-numbers / view-mode / spell
+// toggles) bump the prefs nonce, which every `usePrefs` instance subscribes to
+// and re-reads on, so the specimen updates as the user changes a control (same
+// path the live editor updates through). It reflects the four typography
+// presets PLUS line numbers, the default view mode (Live markers / Reading /
+// Source), and spell-check.
+function EditorSettingsPreview() {
+  const { t } = useTranslation();
+  const { prefs } = usePrefs();
+  const typo = typographyStyleFromKeys({
+    textSize: textSizeKey(prefs),
+    lineSpacing: lineSpacingKey(prefs),
+    contentWidth: contentWidthKey(prefs),
+    fontFamily: fontFamilyKey(prefs),
+  });
+  const lineNumbers = prefs.editor_line_numbers === true;
+  const mode = asViewMode(prefs.editor_default_view_mode);
+  const spell = prefs.spell_enabled === true;
+
+  const heading = t("settings.editor.preview.heading");
+  const body = t("settings.typography.previewBody");
+  const bullets = [
+    t("settings.editor.preview.bullet1"),
+    t("settings.editor.preview.bullet2"),
+  ];
+  const modeLabelKey =
+    mode === "reading"
+      ? "settings.viewMode.optionReading"
+      : mode === "source"
+        ? "settings.viewMode.optionSource"
+        : "settings.viewMode.optionLive";
+
+  // Wrap a rendered block with the gutter when line numbers are on.
+  const numbered = (n: number, content: ReactNode): ReactNode =>
+    lineNumbers ? (
+      <div style={LINE_ROW_STYLE}>
+        <span style={GUTTER_STYLE}>{n}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>{content}</div>
+      </div>
+    ) : (
+      content
+    );
+
+  let bodyEl: ReactNode;
+  if (mode === "source") {
+    // Raw markdown, mono — what Source view shows.
+    const src = [`# ${heading}`, "", body, "", `- ${bullets[0]}`, `- ${bullets[1]}`];
+    bodyEl = (
+      <div>
+        {src.map((ln, i) => (
+          <div key={i} style={LINE_ROW_STYLE}>
+            {lineNumbers && <span style={GUTTER_STYLE}>{i + 1}</span>}
+            <span style={{ ...SOURCE_LINE_STYLE, flex: 1 }}>{ln || " "}</span>
+          </div>
+        ))}
+      </div>
+    );
+  } else {
+    // Rendered. Live view surfaces the markdown markers faintly; Reading hides
+    // them and shows a • bullet glyph instead.
+    const live = mode === "live";
+    const bulletMark = live ? "- " : "• ";
+    bodyEl = (
+      <>
+        {numbered(
+          1,
+          <h4 style={SAMPLE_HEADING_STYLE}>
+            {live && <span style={MARKER_STYLE}># </span>}
+            {heading}
+          </h4>,
+        )}
+        {numbered(2, <p style={SAMPLE_BODY_STYLE}>{body}</p>)}
+        {numbered(
+          3,
+          <p style={SAMPLE_BODY_STYLE}>
+            <span style={MARKER_STYLE}>{bulletMark}</span>
+            {bullets[0]}
+          </p>,
+        )}
+        {numbered(
+          4,
+          <p style={{ ...SAMPLE_BODY_STYLE, marginBottom: 0 }}>
+            <span style={MARKER_STYLE}>{bulletMark}</span>
+            {bullets[1]}
+          </p>,
+        )}
+      </>
+    );
+  }
+
+  return (
+    <aside style={PREVIEW_COL_STYLE} data-testid="settings.editor-preview">
+      <span style={PREVIEW_CAPTION_STYLE}>
+        {t("settings.typography.previewLabel")} · {t(modeLabelKey)}
+      </span>
+      <div style={PREVIEW_FRAME_STYLE}>
+        <div style={{ ...typo }}>{bodyEl}</div>
+        {spell && (
+          <div style={SPELL_DEMO_STYLE} data-testid="settings.editor-preview-spell">
+            <span style={PREVIEW_CAPTION_STYLE}>
+              {t("settings.editor.preview.spellCaption")}
+            </span>
+            <span style={SPELL_SQUIGGLE_STYLE}>
+              {t("settings.editor.preview.spellSample")}
+            </span>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 export function EditorPanel() {
   const { t } = useTranslation();
   // Task reminders (MYND-618) read their pref here and echo the toggle locally:
@@ -39,7 +268,8 @@ export function EditorPanel() {
   }, [prefs.reminders_enabled]);
 
   return (
-    <div style={PANEL_ROOT_STYLE}>
+    <div style={EDITOR_LAYOUT_STYLE}>
+      <div style={CONTROLS_COL_STYLE}>
       {/* MYND-624: grouped rather than run together. The order within each group
           is unchanged; only the seams are new. */}
       <SettingsSection
@@ -107,6 +337,8 @@ export function EditorPanel() {
             every archived note and hides the archive controls. */}
         <ArchiveSettings />
       </SettingsSection>
+      </div>
+      <EditorSettingsPreview />
     </div>
   );
 }

@@ -1025,6 +1025,29 @@ a:focus-visible,
   [data-setting-flash="true"] { animation: none; }
 }
 
+/* Settings modal entrance (#206) — the modal used to pop in instantly, which
+   read as a jump-cut. The backdrop fades and the card rises + settles. */
+@keyframes settings-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes settings-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="settings.modal"],
+  [data-testid="settings.modal"] > * { animation: none !important; }
+}
+
+/* Hotkeys remove-binding × (#184 part A) — faint until hovered/focused, so the
+   keycap reads as the chord and the × as a distinct, discoverable control. */
+[data-testid="hotkeys.remove-binding"]:hover,
+[data-testid="hotkeys.remove-binding"]:focus-visible {
+  color: var(--fg-1);
+  background: var(--paper-3);
+}
+
 /* Settings search input (MYND-536) — suppress the WebView's native focus ring on
    the inner <input>; focus is shown on the wrapper (accent border + soft ring).
    `:focus-visible` can't be reached from the component's inline styles. */

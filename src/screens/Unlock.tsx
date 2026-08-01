@@ -631,7 +631,18 @@ export function Unlock({
       )}
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
       <h1 style={CARD_TITLE_STYLE}>{t("unlock.title")}</h1>
-      <p style={CARD_BODY_STYLE}>{t("unlock.subtitle")}</p>
+      {/* Method-aware subtitle: the PIN / Touch ID surface must not tell the user
+          to "enter your password" (MYND — the primary surface is not a password
+          when quick-unlock owns the screen). */}
+      <p style={CARD_BODY_STYLE}>
+        {t(
+          surface === "quick"
+            ? quickMethod === "biometric"
+              ? "unlock.subtitleBiometric"
+              : "unlock.subtitlePin"
+            : "unlock.subtitle",
+        )}
+      </p>
       {/* Quick-unlock (PIN / Touch ID) — the primary surface when the probe
           above says it is redeemable and the user hasn't opted out (MYND-329,
           MYND-558). The password escape hatch sits one click below it:

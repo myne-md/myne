@@ -27,6 +27,7 @@ import { servedBuildInfo, type BuildInfo } from "../../platform/build-info";
 import { openUrl } from "../../platform/opener";
 import { usePrefs } from "../../hooks/usePrefs";
 import { Button } from "../primitives/Button";
+import { MyneMark } from "../primitives/MyneMark";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
 import {
@@ -80,8 +81,19 @@ const LICENSE_BODY_STYLE: CSSProperties = {
   margin: 0,
 };
 
-function Block({ children }: { children: ReactNode }) {
-  return <div style={BLOCK_STYLE}>{children}</div>;
+function Block({
+  children,
+  ...rest
+}: {
+  children: ReactNode;
+  "data-setting-anchor"?: string;
+  "data-setting-row"?: string;
+}) {
+  return (
+    <div style={BLOCK_STYLE} {...rest}>
+      {children}
+    </div>
+  );
 }
 
 function handleThreatModelClick() {
@@ -126,11 +138,16 @@ export function AboutPanel() {
   return (
     <div style={PANEL_ROOT_STYLE}>
       <Block>
-        <h3 style={VERSION_TITLE_STYLE}>Myne {__APP_VERSION__}</h3>
-        <p style={VERSION_SUBTITLE_STYLE}>{t("settings.about.tagline")}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+          <MyneMark size={44} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <h3 style={VERSION_TITLE_STYLE}>Myne {__APP_VERSION__}</h3>
+            <p style={VERSION_SUBTITLE_STYLE}>{t("settings.about.tagline")}</p>
+          </div>
+        </div>
       </Block>
 
-      <Block>
+      <Block data-setting-anchor="about.build-channel" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
         <p style={VALUE_STYLE}>{buildChannelLabel}</p>
       </Block>
@@ -150,7 +167,7 @@ export function AboutPanel() {
         )}
       </Block>
 
-      <Block>
+      <Block data-setting-anchor="about.threat-model" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("settings.about.threatModelLabel")}</span>
         <button
           type="button"
@@ -163,7 +180,7 @@ export function AboutPanel() {
         <p style={HELPER_STYLE}>{t("settings.about.threatModelHelper")}</p>
       </Block>
 
-      <Block>
+      <Block data-setting-anchor="about.license" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("settings.about.licenseLabel")}</span>
         <p style={LICENSE_BODY_STYLE}>{t("settings.about.licenseBody")}</p>
       </Block>
@@ -195,7 +212,7 @@ export function AboutPanel() {
         )}
       />
 
-      <Block>
+      <Block data-setting-anchor="about.changelog" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("settings.about.changelogLabel")}</span>
         <div>
           <Button variant="secondary" disabled>

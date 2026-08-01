@@ -260,7 +260,7 @@ export function SyncPanel() {
 
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
-      <div style={BLOCK_STYLE}>
+      <div style={BLOCK_STYLE} data-setting-anchor="sync.server" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.server.label")}</span>
         <EndpointConfig />
         <p style={HELPER_STYLE}>
@@ -272,7 +272,7 @@ export function SyncPanel() {
         </p>
       </div>
 
-      <div style={BLOCK_STYLE}>
+      <div style={BLOCK_STYLE} data-setting-anchor="sync.status" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>
         <SyncStatusIndicator />
         <BuildingIndexState building={buildingIndex} />
@@ -288,7 +288,7 @@ export function SyncPanel() {
       )}
 
       {showEnroll && (
-        <div style={BLOCK_STYLE}>
+        <div style={BLOCK_STYLE} data-setting-anchor="sync.add-device" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>
             {t("sync.panel.addDevice.label")}
           </span>
@@ -318,7 +318,7 @@ export function SyncPanel() {
         </div>
       )}
 
-      <div style={BLOCK_STYLE}>
+      <div style={BLOCK_STYLE} data-setting-anchor="sync.devices" data-setting-row="true">
         <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
         <DeviceManagementPanel hook={devicesHook} />
       </div>
@@ -330,7 +330,7 @@ export function SyncPanel() {
         </div>
       )}
 
-      <div style={BLOCK_STYLE}>
+      <div style={BLOCK_STYLE} data-setting-anchor="sync.conflicts" data-setting-row="true">
         <span style={SECTION_TITLE_STYLE}>
           {t("sync.panel.conflicts.label")}
         </span>
@@ -346,7 +346,7 @@ export function SyncPanel() {
         />
       </div>
 
-      <div style={BLOCK_STYLE}>
+      <div style={BLOCK_STYLE} data-setting-anchor="sync.recovered" data-setting-row="true">
         <span style={SECTION_TITLE_STYLE}>
           {t("sync.panel.recovered.label")}
         </span>
