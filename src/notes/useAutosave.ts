@@ -22,7 +22,13 @@
 //
 // Latest-wins gate: if a save is in flight when another fire is due,
 // the in-flight completes first; a single follow-up save then runs
-// with the latest body. No IPC thrashing.
+// with the latest body. No IPC thrashing. The gate reads `latestBodyRef`,
+// which is written during RENDER rather than from an effect — an
+// effect-written mirror is one commit stale exactly while a keystroke waits
+// for its passive-effect flush, which is when a save's IPC most often
+// resolves (myne#167). The save echo is a compare-and-swap on top of that
+// (`SavedBodyPatch`), so adoption stays correct even where the ref does not
+// help.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isBaseMismatchError } from "../types/note-update-error";
@@ -50,6 +56,18 @@ export type UseAutosaveReturn = {
   /** Adopt an externally-reloaded body as loaded content (not a user edit).
    *  Caller must ensure the buffer is clean first. See the impl docstring. */
   acceptReloadedBody: (reloadedBody: string) => void;
+  /** Synchronous "this buffer holds work a caller must not clobber": a save is
+   *  in flight, the buffer is dirty, or the live body differs from what the
+   *  hook believes is on disk.
+   *
+   *  Exists because `status` is React STATE set from a passive effect, so an
+   *  async continuation (the out-of-band reload's `await noteRead`) can read
+   *  `saved`/`clean` for a buffer the user has already typed into and then
+   *  overwrite those keystrokes with disk bytes (myne#167's second head).
+   *  Every value read here is a ref, and `latestBodyRef` is written during
+   *  render — so this answers for the buffer as it is NOW, not as it was one
+   *  commit ago. */
+  hasPendingWork: () => boolean;
 };
 
 /**
@@ -71,11 +89,39 @@ export type SaveFn = (
 
 const DEFAULT_SAVE_FN: SaveFn = saveNote;
 
+/**
+ * How a completed save hands its stamped body back to the buffer.
+ *
+ * NOT a plain value — an UPDATER the caller passes straight to its own
+ * `setContent`. `Dispatch<SetStateAction<string>>` is assignable to this, so
+ * `useAutosave(…, setContent)` still reads exactly as it did.
+ *
+ * Handing back a value was myne#167. A save's IPC can resolve in the task slot
+ * between a keystroke's commit and React's passive-effect flush, so the body a
+ * save was fired with can be one keystroke stale by the time its echo lands.
+ * `onSaved(patchedBody)` → `setContent(patchedBody)` then rewrote the buffer
+ * from that stale snapshot — the keystroke was gone, and because the rewritten
+ * body equalled `savedBodyRef` the hook settled `clean` on a buffer it had just
+ * corrupted, so the loss reached disk too.
+ *
+ * As an updater, React resolves `prev` against the LATEST queued state — the
+ * keystroke's own `setContent`, which is already enqueued (and, in a discrete
+ * event, already committed) — so the stamped body is adopted only while the
+ * buffer is still exactly what was saved, and refused otherwise. That rests on
+ * React's ordering guarantee for queued updates rather than on an argument
+ * about when passive effects run.
+ *
+ * Refusal is not a loss: disk holds `patchedBody` either way, `savedBodyRef` is
+ * baselined to it, and the pending keystroke re-saves on the next γ1 with a
+ * fresh `updated:` stamp (`saveNote` re-stamps unconditionally).
+ */
+export type SavedBodyPatch = (prevBody: string) => string;
+
 export function useAutosave(
   noteId: string | null,
   body: string,
   saveImpl: SaveFn = DEFAULT_SAVE_FN,
-  onSaved?: (patchedBody: string) => void,
+  onSaved?: (applyPatch: SavedBodyPatch) => void,
   onBaseMismatch?: (staleBufferBody: string) => Promise<void>,
   // §11.3 expected-base guard toggle. The guard exists to catch a SYNC
   // pull-apply landing under the editor between the last save and the next
@@ -95,8 +141,26 @@ export function useAutosave(
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef<Promise<void> | null>(null);
-  /** Latest body at any time — used by latest-wins gate + retry. */
+  /** Latest body at any time — used by the latest-wins gate, `retry`, the
+   *  BaseMismatch handoff and the unmount flush.
+   *
+   *  Written during RENDER, not from an effect (myne#167). An effect-written
+   *  mirror is one commit stale for the whole window between a keystroke's
+   *  (synchronous, discrete-lane) commit and React's passive-effect flush —
+   *  and a save's IPC resolution routinely lands in that window. The
+   *  latest-wins gate would then read a pre-keystroke body, conclude "the user
+   *  hasn't typed", and mark the buffer clean while it holds unsaved
+   *  keystrokes. Same pattern as `onBaseMismatchRef` below, and PaneView's
+   *  `autosaveRef`.
+   *
+   *  Deliberate trade-off: a render React later ABANDONS also writes here.
+   *  React restarts an abandoned render from the root with the newest state, so
+   *  the last write before any commit is the committed one; the only exposure
+   *  is a `fireSave` continuation landing inside the abandon→restart slice,
+   *  whose worst case is one extra follow-up save of a body React was about to
+   *  render anyway. Never a lost keystroke. */
   const latestBodyRef = useRef<string>(body);
+  latestBodyRef.current = body;
   /** True if the latest body has unsaved changes (idle/max timer armed
    *  OR error state holds an un-flushed body). */
   const dirtyRef = useRef<boolean>(false);
@@ -113,6 +177,12 @@ export function useAutosave(
    *  `autosaveRef` pattern PaneView already uses in the other direction). */
   const onBaseMismatchRef = useRef(onBaseMismatch);
   onBaseMismatchRef.current = onBaseMismatch;
+  /** Latest `onSaved` sink — read through a ref at fire time for the same
+   *  reason as `onBaseMismatchRef` above: `fireSave` is memoized on
+   *  `[clearTimers, saveImpl, guardEnabled]`, so a directly-closed-over
+   *  `onSaved` would be the one captured at first render. */
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
 
   const clearTimers = useCallback(() => {
     if (idleTimerRef.current !== null) {
@@ -125,10 +195,6 @@ export function useAutosave(
     }
   }, []);
 
-  // Keep refs in sync with props.
-  useEffect(() => {
-    latestBodyRef.current = body;
-  }, [body]);
   useEffect(() => {
     const prevId = noteIdRef.current;
     noteIdRef.current = noteId;
@@ -189,7 +255,18 @@ export function useAutosave(
           // Schedule the follow-up immediately (no idle wait — we
           // already paid the latency once; the user expects continued
           // saving).
-          savedBodyRef.current = bodyAtFire;
+          //
+          // What is ON DISK is what the IPC actually wrote — the PATCHED body
+          // (`saveNote` stamps `updated:` and returns the stamped bytes), never
+          // the pre-patch `bodyAtFire`. `savedBodyRef` is the §11.3
+          // expected-base source, so recording `bodyAtFire` here declares a base
+          // the disk does not hold: the follow-up save is rejected
+          // `BaseMismatch` and `onBaseMismatch` mints a conflict copy for a note
+          // only this editor ever touched. Latent while this branch almost never
+          // ran; load-bearing now that the latest-wins gate above reads a
+          // render-synchronous ref and so trips whenever the user types through
+          // a save.
+          savedBodyRef.current = patchedBody;
           setStatus({ status: "saving" });
           inFlightRef.current = null;
           dirtyRef.current = true;
@@ -197,14 +274,21 @@ export function useAutosave(
           void fireSave();
           return;
         }
-        // User hasn't typed since save fired → mirror the patched body
-        // back so the editor's local content reflects the fresh
-        // `updated:` timestamp without a close-reopen reload.
-        // `savedBodyRef.current` is set to the PATCHED body so the
-        // subsequent body-change effect (when the parent calls
-        // `setContent(patchedBody)`) sees `body === savedBodyRef.current`
-        // → routes to the "revert to last-saved" clean branch (no
-        // re-fire loop).
+        // The gate above says the user hasn't typed since the save fired →
+        // offer the patched body back so the editor's local content reflects
+        // the fresh `updated:` timestamp without a close-reopen reload. The
+        // offer is a compare-and-swap (see the `onSaved` call below), because
+        // this gate reads a ref and the buffer is React state: `latestBodyRef`
+        // is render-synchronous, but the CAS is what makes the adoption correct
+        // without depending on that at all.
+        //
+        // `savedBodyRef.current` is set to the PATCHED body — what the IPC
+        // actually wrote — so the subsequent body-change effect (when the
+        // parent adopts it) sees `body === savedBodyRef.current` → routes to
+        // the "revert to last-saved" clean branch (no re-fire loop). When the
+        // CAS instead REFUSES, that same effect sees a body that differs from
+        // it, re-marks the buffer dirty and re-arms γ1 — so the keystroke that
+        // caused the refusal is saved on the next cycle.
         savedBodyRef.current = patchedBody;
         dirtyRef.current = false;
         setStatus({ status: "saved", at: new Date() });
@@ -212,8 +296,13 @@ export function useAutosave(
         // the body is already in V8). Best-effort, fire-and-forget so a
         // VaultIndices hiccup never affects the save status.
         void reindexNoteFromBody(id, patchedBody);
-        if (onSaved !== undefined && patchedBody !== bodyAtFire) {
-          onSaved(patchedBody);
+        const onSavedNow = onSavedRef.current;
+        if (onSavedNow !== undefined && patchedBody !== bodyAtFire) {
+          // Compare-and-swap, not a bare set (myne#167): the ONLY buffer this
+          // stamped body may replace is the one it was derived from. See the
+          // `SavedBodyPatch` docstring for why the gate above is not enough on
+          // its own.
+          onSavedNow((prev) => (prev === bodyAtFire ? patchedBody : prev));
         }
       } catch (err) {
         // §11.3 BaseMismatch → local keep-both, awaited INSIDE the catch:
@@ -309,6 +398,10 @@ export function useAutosave(
       dirtyRef.current = false;
       hasEditedRef.current = true;
       savedBodyRef.current = reloadedBody;
+      // Bridge only: the next render's write to `latestBodyRef` is
+      // authoritative. Every caller batches `setContent(reloadedBody)` with
+      // this call, so that render carries the same body — this line just
+      // covers the gap until it commits.
       latestBodyRef.current = reloadedBody;
       setStatus({ status: "clean" });
     },
@@ -333,6 +426,20 @@ export function useAutosave(
     if (inFlightRef.current !== null) return;
     void fireSave();
   }, [fireSave]);
+
+  // Ref-only, so it is correct inside an async continuation where `status`
+  // (React state, set from a passive effect) still reads `saved`/`clean` for a
+  // buffer the user has already typed into. The third disjunct is what catches
+  // that case: `latestBodyRef` is render-written, `savedBodyRef` is what the
+  // last IPC actually put on disk.
+  const hasPendingWork = useCallback(
+    () =>
+      inFlightRef.current !== null ||
+      dirtyRef.current ||
+      (savedBodyRef.current !== null &&
+        latestBodyRef.current !== savedBodyRef.current),
+    [],
+  );
 
   // Hold the latest `saveImpl` in a ref so the unmount cleanup sees
   // the current impl, not the one captured at first render.
@@ -371,7 +478,7 @@ export function useAutosave(
   }, []);
 
   return useMemo(
-    () => ({ status, retry, flushIfDirty, acceptReloadedBody }),
-    [status, retry, flushIfDirty, acceptReloadedBody],
+    () => ({ status, retry, flushIfDirty, acceptReloadedBody, hasPendingWork }),
+    [status, retry, flushIfDirty, acceptReloadedBody, hasPendingWork],
   );
 }

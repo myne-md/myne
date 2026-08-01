@@ -43,7 +43,7 @@ import { useVaultBlockAnchors } from "../useVaultBlockAnchors";
 import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
-import { useAutosave, type SaveStatus } from "../useAutosave";
+import { useAutosave, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
 import { computeDocStats, statsOfPlain, type DocStats } from "../documentStats";
 import {
   itemKey,
@@ -321,7 +321,37 @@ export function PaneView({
       ? scrollAnchor
       : null;
 
-  const [content, setContent] = useState<string>("");
+  // The pane's buffer. `text` is the note body; `base` is the doc text `text`
+  // was DERIVED from, and it is set by exactly ONE producer — the autosave
+  // `updated:` patch echo (`handleSaveEcho` below). Every other producer is
+  // authoritative (disk load, swap restore, out-of-band reload, keep-both
+  // adopt, drawing scene write, the editor's own `onChange`) and leaves it
+  // undefined, which the `setContent` wrapper guarantees BY CONSTRUCTION —
+  // forgetting to clear a stale baseline is not possible, because the only way
+  // to set one is the dedicated setter. `base` flows to `<CMEditor valueBase>`,
+  // which refuses an echo the buffer has already moved past (myne#167).
+  const [buffer, setBuffer] = useState<{ text: string; base?: string }>({
+    text: "",
+  });
+  const content = buffer.text;
+  const setContent = useCallback(
+    (next: string | ((prev: string) => string)) => {
+      setBuffer((prev) => ({
+        text: typeof next === "function" ? next(prev.text) : next,
+      }));
+    },
+    [],
+  );
+  // The save echo, as a compare-and-swap: `useAutosave` hands down an updater
+  // that returns `prev` unchanged when the buffer has moved on, so an adoption
+  // is exactly the case where `prev` IS the text the patch was derived from —
+  // which makes it the correct `valueBase` to hand the editor.
+  const handleSaveEcho = useCallback((applyPatch: SavedBodyPatch) => {
+    setBuffer((prev) => {
+      const next = applyPatch(prev.text);
+      return next === prev.text ? prev : { text: next, base: prev.text };
+    });
+  }, []);
   const [loading, setLoading] = useState<boolean>(false);
 
   // Persistent-view swap (MYND-534). One long-lived CMEditor per pane; on a
@@ -683,7 +713,7 @@ export function PaneView({
     loading ? null : activeId,
     content,
     undefined,
-    setContent,
+    handleSaveEcho,
     onBaseMismatch,
     syncGuardEnabled,
   );
@@ -698,6 +728,13 @@ export function PaneView({
   // render). Read through the ref at fire time.
   const autosaveRef = useRef(autosave);
   autosaveRef.current = autosave;
+  // The pane's live buffer, readable from an async continuation. Written during
+  // RENDER for the same reason `useAutosave`'s `latestBodyRef` is: an
+  // effect-written mirror is one commit stale exactly while a keystroke's
+  // commit waits for its passive-effect flush, which is when the out-of-band
+  // reload below is most likely to resolve.
+  const contentRef = useRef(content);
+  contentRef.current = content;
 
   // Re-sync this pane's body when the open note's `.myn` changed out of band —
   // a rename (MYND-140), a snapshot restore, OR a sync pull (`sync://changed` →
@@ -726,8 +763,14 @@ export function PaneView({
     // OUR on-disk version (it skips a locally-dirty blob on pull), so reloading
     // would either resurrect stale bytes or discard the user's work. Leave the
     // dirty buffer alone; its edit pushes on the next sync.
-    const st = autosaveRef.current.status.status;
-    if (st === "editing" || st === "saving" || st === "error") return;
+    //
+    // `hasPendingWork()` and NOT `status` (myne#167): `status` is React state
+    // written from a passive effect, so it still reads `saved`/`clean` for a
+    // whole scheduler slice after the user has typed — long enough for this
+    // reload to resolve inside it and overwrite those keystrokes with disk
+    // bytes. The predicate reads refs only.
+    if (autosaveRef.current.hasPendingWork()) return;
+    const before = contentRef.current;
     let cancelled = false;
     void (async () => {
       try {
@@ -736,15 +779,16 @@ export function PaneView({
         // Re-check dirtiness AFTER the await: typing may have started while the
         // read was in flight, and re-baselining now would clobber those keys
         // with the just-read (already-stale) bytes.
-        const st2 = autosaveRef.current.status.status;
-        if (st2 === "editing" || st2 === "saving" || st2 === "error") return;
+        if (autosaveRef.current.hasPendingWork()) return;
         // Re-baseline autosave to the reloaded body BEFORE swapping it in, so the
         // content change registers as freshly-loaded content, not a user edit.
         // Without this, a sync-pulled reload looks locally-dirty and the next
         // sync stages a spurious keep-both conflict for a note the user never
         // touched (the false-conflict bug, sync Bug 1).
         autosaveRef.current.acceptReloadedBody(body);
-        setContent((prev) => (prev === body ? prev : body));
+        // Compare-and-swap, not a bare set: the ONLY buffer these disk bytes may
+        // replace is the one the guard above was answered for.
+        setContent((prev) => (prev === before ? body : prev));
       } catch {
         /* re-sync failure is non-fatal */
       }
@@ -999,6 +1043,9 @@ export function PaneView({
         <div style={{ minWidth: 0, flex: companionVisible ? 1 : undefined }}>
           <CMEditor
             value={content}
+            // Set only by the autosave `updated:` echo; undefined for every
+            // authoritative writer, so those still apply unconditionally.
+            valueBase={buffer.base}
             onChange={setContent}
             onBlur={handleBlur}
             onSelectionChange={handleSelectionChange}
@@ -1069,6 +1116,10 @@ export function PaneView({
           >
             <CMEditor
               value={content}
+              // Deliberately NO `valueBase`: this mirror holds no local edits,
+              // so it must adopt every value unconditionally. Handing it the
+              // primary's baseline would make it silently skip `updated:`
+              // stamps whenever the primary's buffer had moved on.
               onChange={NOOP_ON_CHANGE}
               noteSet={notes}
               vaultHeadings={vaultHeadings}
@@ -1102,6 +1153,9 @@ export function PaneView({
     leaf.tabs.length,
     loading,
     content,
+    // Paired with `content` on the primary editor: a `valueBase` left behind by
+    // a stale memo would describe a `value` that is no longer rendered.
+    buffer.base,
     handleBlur,
     handleSelectionChange,
     notes,

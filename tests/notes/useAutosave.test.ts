@@ -293,12 +293,19 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     expect(saveImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("onSaved callback fires with patched body when user hasn't typed since save", async () => {
+  it("onSaved hands back an updater that adopts the patch only on the body it was derived from", async () => {
     // Simulates the frontmatter `updated:` injection: saveImpl receives
     // body "v1" and returns the patched body "v1-patched" (timestamp
     // injected). The hook mirrors this back via `onSaved` so the editor's
     // local content reflects the patch — fixes the bug where frontmatter
     // only updated on close-reopen.
+    //
+    // `onSaved` receives an UPDATER, not a value (myne#167). The latest-wins
+    // gate above it reads a ref; this updater is what makes the adoption
+    // correct without depending on the ref being current, because React
+    // resolves `prev` against the latest queued state. Asserting both branches
+    // of it here is the timing-free proof of the fix: no scheduler
+    // choreography, no race, just the function the hook handed out.
     const saveImpl = vi.fn(
       (_id: string, body: string) => Promise.resolve(body + "-patched"),
     );
@@ -315,7 +322,14 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     });
 
     expect(saveImpl).toHaveBeenCalledTimes(1);
-    expect(onSaved).toHaveBeenCalledWith("v1-patched");
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    const applyPatch = onSaved.mock.calls[0]![0] as (prev: string) => string;
+    // Buffer still exactly what was saved → adopt the stamped body.
+    expect(applyPatch("v1")).toBe("v1-patched");
+    // Buffer moved on (a keystroke landed inside the save's IPC window) →
+    // refuse it. Applying "v1-patched" here would delete that keystroke, which
+    // is myne#167.
+    expect(applyPatch("v1 and one more char")).toBe("v1 and one more char");
   });
 
   it("onSaved does NOT fire when user typed during save (latest-wins)", async () => {
@@ -354,7 +368,84 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
       await second.promise;
     });
     expect(onSaved).toHaveBeenCalledTimes(1);
-    expect(onSaved).toHaveBeenCalledWith("v2-patched");
+    const applyPatch = onSaved.mock.calls[0]![0] as (prev: string) => string;
+    expect(applyPatch("v2")).toBe("v2-patched");
+  });
+
+  it("the follow-up save declares the base the FIRST save actually wrote", async () => {
+    // `savedBodyRef` is the §11.3 expected-base source. The first save wrote
+    // the PATCHED body to disk (`saveNote` stamps `updated:` and returns the
+    // stamped bytes), so the follow-up must declare that — not the pre-patch
+    // body it was fired with. Declaring the pre-patch body names a base the
+    // disk does not hold: the follow-up is rejected `BaseMismatch` and the
+    // keep-both handler mints a conflict copy for a note only this editor ever
+    // touched. Latent while the latest-wins branch almost never ran; the
+    // render-written `latestBodyRef` makes it the common path.
+    const first = defer();
+    const second = defer();
+    const saveImpl = vi
+      .fn<
+        (
+          id: string,
+          body: string,
+          expectedBaseHashHex?: string,
+        ) => Promise<string>
+      >()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+
+    const { rerender } = renderHook(
+      ({ body }: { body: string }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "v0" } },
+    );
+
+    rerender({ body: "v1" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    // The user types while the first save is in flight, then it resolves.
+    rerender({ body: "v2" });
+    await act(async () => {
+      first.resolve("v1-patched");
+      await first.promise;
+    });
+
+    expect(saveImpl).toHaveBeenCalledTimes(2);
+    expect(saveImpl).toHaveBeenNthCalledWith(2, "note-1", "v2", "h:v1-patched");
+
+    await act(async () => {
+      second.resolve("v2-patched");
+      await second.promise;
+    });
+  });
+
+  it("hasPendingWork() is true for a buffer whose keystroke has not reached disk", async () => {
+    // The predicate the out-of-band reload gates on. It must answer for the
+    // buffer as it is NOW — `status` is React state written from a passive
+    // effect, so it still reads `saved` for a whole scheduler slice after the
+    // user has typed, which is long enough for a `noteRead` to resolve inside
+    // it and overwrite those keystrokes with disk bytes.
+    const saveImpl = vi.fn(
+      (_id: string, body: string) => Promise.resolve(body + "-patched"),
+    );
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "v0" } },
+    );
+
+    rerender({ body: "v1" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    // Save settled: disk holds "v1-patched", and that is what the buffer would
+    // hold once the echo is adopted.
+    rerender({ body: "v1-patched" });
+    expect(result.current.hasPendingWork()).toBe(false);
+
+    // One keystroke. `latestBodyRef` is written during render, so the predicate
+    // is already true — before any effect for this body has run.
+    rerender({ body: "v1-patched!" });
+    expect(result.current.hasPendingWork()).toBe(true);
   });
 
   it("onSaved is NOT called when patched body equals pre-patch body (no-op patch)", async () => {

@@ -110,6 +110,10 @@ function LoadedNoteBuffer({
   const [content, setContent] = useState(initialContent);
   // `setContent` doubles as the autosave `onSaved` sink so a frontmatter
   // `updated:` patch mirrors back into the buffer without a close-reopen.
+  // `onSaved` hands down an UPDATER (`SavedBodyPatch`), which a `useState`
+  // setter takes as-is — so the compare-and-swap that refuses an echo the
+  // buffer has already moved past (myne#167) applies here too, with no wiring
+  // of its own to get wrong.
   const { status, retry } = useAutosave(noteId, content, saveImpl, setContent);
   return <>{render({ noteId, active, content, setContent, status, retry })}</>;
 }
