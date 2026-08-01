@@ -195,3 +195,78 @@ describe("stacked traps — release order and staleness (MYND-567)", () => {
     live.remove();
   });
 });
+
+describe("portalled surfaces opened by a trapped dialog (#182)", () => {
+  // A menu/popover a trapped dialog opens is rendered under <body> to escape
+  // the dialog's overflow, so `container.contains()` calls it an escape and the
+  // containment listener yanks focus back the instant the surface focuses
+  // anything of its own. That is not cosmetic: the surface becomes untypable.
+  // Shipped exactly that way — the Settings language picker's search box could
+  // not take a single keystroke, and the E2E scenario failed on send-keys with
+  // "Element is not focusable".
+  function portalledSurface(marked: boolean): {
+    surface: HTMLDivElement;
+    input: HTMLInputElement;
+  } {
+    const surface = document.createElement("div");
+    if (marked) surface.setAttribute("data-focus-trap-portal", "");
+    const input = document.createElement("input");
+    surface.appendChild(input);
+    document.body.appendChild(surface);
+    return { surface, input };
+  }
+
+  it("keeps focus in a marked portal instead of pulling it back", () => {
+    const dialog = document.createElement("div");
+    const dialogBtn = document.createElement("button");
+    dialog.appendChild(dialogBtn);
+    document.body.appendChild(dialog);
+    const release = trapFocus(dialog);
+    expect(document.activeElement).toBe(dialogBtn);
+
+    const { surface, input } = portalledSurface(true);
+    input.focus();
+    expect(document.activeElement).toBe(input);
+
+    release();
+    surface.remove();
+    dialog.remove();
+  });
+
+  it("still pulls focus back from an UNMARKED node outside the dialog", () => {
+    // The marker is opt-in: containment is unchanged for everything else.
+    const dialog = document.createElement("div");
+    const dialogBtn = document.createElement("button");
+    dialog.appendChild(dialogBtn);
+    document.body.appendChild(dialog);
+    const release = trapFocus(dialog);
+
+    const { surface, input } = portalledSurface(false);
+    input.focus();
+    expect(document.activeElement).toBe(dialogBtn);
+
+    release();
+    surface.remove();
+    dialog.remove();
+  });
+
+  it("covers a descendant of the marked surface, not just its root", () => {
+    const dialog = document.createElement("div");
+    dialog.appendChild(document.createElement("button"));
+    document.body.appendChild(dialog);
+    const release = trapFocus(dialog);
+
+    const { surface } = portalledSurface(true);
+    const nested = document.createElement("div");
+    const deepInput = document.createElement("input");
+    nested.appendChild(deepInput);
+    surface.appendChild(nested);
+
+    deepInput.focus();
+    expect(document.activeElement).toBe(deepInput);
+
+    release();
+    surface.remove();
+    dialog.remove();
+  });
+});
