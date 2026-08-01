@@ -119,9 +119,10 @@ Most of `scripts/` is not tooling — it is the machine-checked half of the rule
 | `check-web-container-headers.sh` | the container actually *serves* its security headers and operational endpoints (config being right is not the same as its effect being right) | CI `web-docker-build` |
 | `web-smoke.sh` | post-deploy, against the public TLS origin: the right commit shipped and the right sync origin is wired | CI `web-smoke` |
 | `check-icons.mjs` | icon variants exist at the right dimensions, `bundle.icon` is coherent, no Tauri-default icon hashes survive, master SVG hash pinned | CI `e2e` |
+| `check-macos-dmg.mjs` | a built `.dmg` really carries its install chrome — `Applications` drop target, background art *applied* (not merely copied), branded volume icon *flagged* (not merely written). Config being right is not the same as the artifact being right: v0.1.0's DMG was hand-rolled with `hdiutil` and shipped bare (#194/#195) | by hand, per release (macOS-only; skips elsewhere) |
 | `src-tauri/scripts/ai-no-network-check.sh` | the on-device AI path has no network surface (a standing anti-feature) | CI `ai-no-network` |
 
-Not gated anywhere and run by hand: `check-web-no-ip-logging.sh` (asserts the web container logs no client IP — the "no persistent server-side IP logging" commitment; a page load on that origin is a vault opening). The rest of `scripts/` is tooling, not gates: `build-wasm.sh`, `emit-web-version.mjs`, the `e2e-*.sh` runners, `bench-web.mjs`, `browser-vectors.sh`, `capture-userguide.sh`, `clipper-dev-install.sh`, `penpot-diff.sh`.
+Not gated anywhere and run by hand: `check-web-no-ip-logging.sh` (asserts the web container logs no client IP — the "no persistent server-side IP logging" commitment; a page load on that origin is a vault opening) and `check-macos-dmg.mjs` (needs a built artifact and a Mac to mount it; the Linux runner has neither, so it belongs to the release runbook rather than the pipeline). The rest of `scripts/` is tooling, not gates: `build-wasm.sh`, `emit-web-version.mjs`, the `e2e-*.sh` runners, `bench-web.mjs`, `browser-vectors.sh`, `capture-userguide.sh`, `clipper-dev-install.sh`, `penpot-diff.sh`.
 
 ## The spec is the source of truth
 
