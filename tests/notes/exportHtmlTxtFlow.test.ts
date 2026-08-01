@@ -135,8 +135,9 @@ describe("runNoteHtmlExportFlow — images opted in", () => {
       getBody: async () => BODY_IMAGE,
     });
 
-    // One image ref → the modal is asked with the count.
-    expect(confirmAttachments).toHaveBeenCalledWith(1);
+    // One image ref → the modal is asked with the count AND the note id
+    // (MYND-643: so the modal's Copy targets this note, not the open one).
+    expect(confirmAttachments).toHaveBeenCalledWith(1, NOTE_ID);
     // Modal showed the egress sentence, so the dialog title is omitted.
     expect(saveMock.mock.calls[0]![0]).not.toHaveProperty("title");
     expect(invokeMock).toHaveBeenCalledWith(

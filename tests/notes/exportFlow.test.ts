@@ -235,7 +235,7 @@ describe("runNoteExportFlow — pre-flight attachments gating (task 3)", () => {
       confirmAttachments,
       getBody: async () => BODY_WITH_ATTACHMENTS,
     });
-    expect(confirmAttachments).toHaveBeenCalledWith(2);
+    expect(confirmAttachments).toHaveBeenCalledWith(2, NOTE_ID);
   });
 
   it("modal shown → dialog title omitted (the sentence was already said once at the decision point)", async () => {
@@ -274,7 +274,7 @@ describe("runNoteExportFlow — pre-flight attachments gating (task 3)", () => {
     expect(invokeMock).toHaveBeenCalledWith("plugin:notes|note_read", {
       noteId: NOTE_ID,
     });
-    expect(confirmAttachments).toHaveBeenCalledWith(2);
+    expect(confirmAttachments).toHaveBeenCalledWith(2, NOTE_ID);
   });
 
   it("modal cancel = free exit: no dialog, no export IPC, no toast", async () => {

@@ -123,8 +123,14 @@ export interface NoteExportUiHooks {
   /** Toast sink — both success and mapped-error copy go through it. */
   showToast: (toast: ExportToast) => void;
   /** Ask the "Include N attachments" question (count > 0 guaranteed).
-   *  Resolves the user's choice, or `null` on cancel — a free exit. */
-  confirmAttachments: (count: number) => Promise<AttachmentPreflightChoice | null>;
+   *  `noteId` is the note the pre-flight is ABOUT, so the modal's Copy
+   *  button can target it (MYND-643: the sidebar context-menu path exports
+   *  a note that is not necessarily open, so it must not fall back to the
+   *  selected note). Resolves the user's choice, or `null` on cancel. */
+  confirmAttachments: (
+    count: number,
+    noteId: string,
+  ) => Promise<AttachmentPreflightChoice | null>;
   /** PDF flow (MYND-255): show the pre-export exclusion notice for the
    *  attachments the projection cannot include (non-empty guaranteed).
    *  Resolves `true` to continue to the save dialog, `false` on cancel
@@ -204,7 +210,10 @@ export interface NoteExportFlowOptions {
    * entirely (no body read) and the export is note-only — the inert
    * degrade for isolated renders without the Editor's modal mount.
    */
-  confirmAttachments?: (count: number) => Promise<AttachmentPreflightChoice | null>;
+  confirmAttachments?: (
+    count: number,
+    noteId: string,
+  ) => Promise<AttachmentPreflightChoice | null>;
   /** Egress-disclosure hook, used only on the download path. Absent → the
    *  download REFUSES rather than shipping plaintext with nothing said; see
    *  {@link deliverWithDisclosure}. */
@@ -266,7 +275,7 @@ export async function runNoteExportFlow({
     if (count > 0) {
       // The pre-flight modal renders EXPORT_PLAIN_MARKDOWN_SENTENCE.
       egressSentenceShown = true;
-      const choice = await confirmAttachments(count);
+      const choice = await confirmAttachments(count, noteId);
       if (choice === null) return; // cancelled — free exit, nothing invoked
       includeAttachments = choice.includeAttachments;
     }
@@ -508,7 +517,10 @@ export interface NoteHtmlExportFlowOptions {
    * (images as in-app-only `attachment://` refs) — the inert degrade for
    * isolated renders without the Editor's modal mount.
    */
-  confirmAttachments?: (count: number) => Promise<AttachmentPreflightChoice | null>;
+  confirmAttachments?: (
+    count: number,
+    noteId: string,
+  ) => Promise<AttachmentPreflightChoice | null>;
   /** Egress-disclosure hook, used only on the download path. */
   confirmEgress?: (sentence: string) => Promise<boolean>;
   /** Note-body provider (default: the `note_read` IPC). The body is the
@@ -614,7 +626,7 @@ export async function runNoteHtmlExportFlow({
     if (count > 0) {
       // The pre-flight modal renders EXPORT_PLAIN_HTML_SENTENCE.
       egressSentenceShown = true;
-      const choice = await confirmAttachments(count);
+      const choice = await confirmAttachments(count, noteId);
       if (choice === null) return; // cancelled — free exit, nothing invoked
       includeAttachments = choice.includeAttachments;
     }
