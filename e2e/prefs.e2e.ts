@@ -494,11 +494,11 @@ describeE2E("pf5 editor typography round-trip (editor-typography)", () => {
 // The scenario deliberately does NOT switch language: doing so would re-label
 // every subsequent assertion in the run. It proves the control opens, filters,
 // and offers the languages — the parts the migration could have broken.
-describeE2E("PF6 the interface-language picker is the app's own dropdown (#182)", () => {
+describeE2E("pf7 the interface-language picker is the app's own dropdown (#182)", () => {
   it("opens a searchable menu of languages rather than an OS popup", async () => {
     let password = "";
     await scenario(
-      "pf6-language-picker",
+      "pf7-language-picker",
       { seed: (dir) => void (password = seedVault(dir).password) },
       async (app) => {
         const s = app.session;
@@ -522,11 +522,26 @@ describeE2E("PF6 the interface-language picker is the app's own dropdown (#182)"
         await trigger.click();
         await s.byTestId("settings.language-select-menu", { timeoutMs: 10_000 });
 
+        // The full roster renders before any filtering — the menu is the whole
+        // language list, not a truncated one.
+        await s.waitUntil(
+          async () =>
+            (await s.byTestIdAll("settings.language-select-option")).length === 24 || null,
+          { label: "the menu lists every supported language" },
+        );
+
         // The search box is the whole reason this control is `SearchableSelect`
         // rather than `Select`: 24 languages is past the point where scanning
         // an unfiltered list is reasonable.
+        //
+        // Typing straight in, with no click first, is the assertion — the
+        // primitive focuses this box when the menu mounts, and until the fix
+        // that shipped with this scenario it did not: the focus effect ran a
+        // render before the portal existed, so the FIRST open of any of these
+        // controls swallowed everything the user typed. That surfaced here as
+        // `Element is not focusable` on send-keys. A `click()` first would
+        // paper over it and is why this scenario does not do one.
         const search = await s.byTestId("settings.language-select-search");
-        await search.click();
         await search.sendKeys("Deu");
         await s.waitUntil(
           async () =>
