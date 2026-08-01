@@ -30,7 +30,7 @@
 // imported here as a side effect.
 
 import "./task-surfaces.css";
-import { computePosition } from "./positioning";
+import { computePosition, type Rect } from "./positioning";
 import { openModal } from "./host/lib/imperative-modal";
 import i18n from "@myne/editor/i18n";
 import {
@@ -51,8 +51,13 @@ export type TaskFieldKind = "due" | "repeat" | "priority";
 export const PRIORITY_VALUES = ["highest", "high", "medium", "low", "lowest"] as const;
 
 export type TaskFieldEditorOptions = {
-  /** The chip element the editor is anchored to. */
-  anchor: HTMLElement;
+  /**
+   * What the editor is anchored to. A chip / `+` button (an element) or a bare
+   * viewport rectangle — the slash commands have no element to point at, only a
+   * caret coordinate from `view.coordsAtPos`. Positioning reads only the rect,
+   * so both are equivalent here.
+   */
+  anchor: HTMLElement | Rect;
   kind: TaskFieldKind;
   /** Current value, as written in the source. */
   value: string;
@@ -420,8 +425,11 @@ export function openTaskFieldEditor(
   modal.backdrop.appendChild(surface);
 
   // Position after mounting so the surface has measurable dimensions. The
-  // positioner owns the viewport clamp and the above/below flip.
-  const rect = anchor.getBoundingClientRect();
+  // positioner owns the viewport clamp and the above/below flip. An element
+  // anchor is measured live; a bare rect (the slash caret coordinate) is used
+  // as-is.
+  const rect =
+    anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor;
   const placed = computePosition({
     anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
     surfaceWidth: surface.offsetWidth || 240,

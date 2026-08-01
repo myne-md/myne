@@ -10,7 +10,11 @@
 
 import { describe, expect, it } from "vitest";
 import { parseTaskFields } from "../../src/dialect/taskFields";
-import { planTaskFieldWrite, serializeTaskFields } from "../../src/dialect/taskFieldWriter";
+import {
+  isTaskLine,
+  planTaskFieldWrite,
+  serializeTaskFields,
+} from "../../src/dialect/taskFieldWriter";
 
 /** Apply a planned edit to a line, the way a caller's transaction would. */
 function applyPlan(line: string, next: Parameters<typeof planTaskFieldWrite>[1]): string {
@@ -18,6 +22,23 @@ function applyPlan(line: string, next: Parameters<typeof planTaskFieldWrite>[1])
   if (edit === null) return line;
   return line.slice(0, edit.range.start) + edit.text + line.slice(edit.range.end);
 }
+
+describe("isTaskLine", () => {
+  it("recognizes a task line in either checkbox state, any marker, indented", () => {
+    expect(isTaskLine("- [ ] pay the rent")).toBe(true);
+    expect(isTaskLine("- [x] done")).toBe(true);
+    expect(isTaskLine("- [X] done")).toBe(true);
+    expect(isTaskLine("  * [ ] indented")).toBe(true);
+    expect(isTaskLine("+ [ ] plus marker")).toBe(true);
+  });
+
+  it("rejects prose, a plain bullet, and a heading — the add-field guard", () => {
+    expect(isTaskLine("just prose")).toBe(false);
+    expect(isTaskLine("- a bullet, no checkbox")).toBe(false);
+    expect(isTaskLine("# heading")).toBe(false);
+    expect(isTaskLine("")).toBe(false);
+  });
+});
 
 describe("serialization form", () => {
   it("emits the bracketed form with Myne's key names", () => {

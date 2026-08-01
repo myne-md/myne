@@ -984,6 +984,7 @@
       "date": "Date",
       "day": "Day",
       "divider": "Divider",
+      "due": "Due date",
       "heading1": "Heading 1",
       "heading2": "Heading 2",
       "heading3": "Heading 3",
@@ -993,7 +994,9 @@
       "link": "Link",
       "now": "Now",
       "numberedList": "Numbered list",
+      "priority": "Priority",
       "quote": "Quote",
+      "repeat": "Repeat",
       "table": "Table",
       "taskQuery": "Task list",
       "time": "Time",
@@ -1024,9 +1027,12 @@
       "dismiss": "Dismiss the suggested tag {{tag}}"
     },
     "taskField": {
+      "addAffordance": "Add task field",
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
       "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
+      "menuEdit": "Edit {{field}}",
+      "menuTitle": "Add field",
       "save": "Save",
       "title": {
         "due": "Due date",

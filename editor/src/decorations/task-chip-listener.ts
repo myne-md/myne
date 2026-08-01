@@ -22,12 +22,14 @@
 
 import { EditorView } from "@codemirror/view";
 import { openTaskFieldEditor } from "../task-field-editor";
+import { openTaskFieldMenu } from "../task-field-menu";
 import {
   applyTaskFieldEdit,
   beginTaskFieldEdit,
   TASK_CHIP_EVENT,
   type TaskChipEventDetail,
 } from "./task-chip";
+import { TASK_ADD_EVENT, type TaskAddEventDetail } from "./task-add-affordance";
 
 /**
  * Install the chip → field-editor listener on `window`. Returns an unsubscribe
@@ -68,6 +70,25 @@ export function installTaskChipEditor(): () => void {
     });
   };
 
+  // The `+` affordance (task-add-affordance.ts) dispatches this; open the
+  // three-way add-field menu anchored to the button. Recovered from the DOM the
+  // same way as the chip, so a `+` in any pane resolves against its own editor.
+  const onOpenAdd = (e: Event): void => {
+    const detail = (e as CustomEvent<TaskAddEventDetail>).detail;
+    const target = e.target as HTMLElement | null;
+    const anchor = target?.closest?.("[data-task-add]") as HTMLElement | null;
+    if (detail === undefined || anchor === null || anchor === undefined) return;
+
+    const view = EditorView.findFromDOM(anchor);
+    if (view === null) return;
+
+    openTaskFieldMenu({ view, anchor, lineFrom: detail.lineFrom });
+  };
+
   window.addEventListener(TASK_CHIP_EVENT, onOpenChip);
-  return () => window.removeEventListener(TASK_CHIP_EVENT, onOpenChip);
+  window.addEventListener(TASK_ADD_EVENT, onOpenAdd);
+  return () => {
+    window.removeEventListener(TASK_CHIP_EVENT, onOpenChip);
+    window.removeEventListener(TASK_ADD_EVENT, onOpenAdd);
+  };
 }
