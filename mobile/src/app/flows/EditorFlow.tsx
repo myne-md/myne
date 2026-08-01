@@ -556,6 +556,36 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     return m;
   }, [notes, bodies]);
   const liveNotes = useMemo(() => notes.filter((n) => isLiveNote(noteFlags.get(n.id)!)), [notes, noteFlags]);
+  // The note-set every RESOLVER surface runs against (graph, backlinks, the
+  // vault-indices sweep) — desktop's `resolverCache` rule, verbatim
+  // (`src/notes/sidebarState.tsx`): trashed / soft-deleted / template /
+  // conflict-copy out, **archived IN**. An archived note is hidden from the
+  // working-set list but must still resolve as a link target and appear in the
+  // graph, which is the two-axis split desktop settled on and this client used
+  // to get wrong by reusing `liveNotes` here (myne-md/myne#199).
+  // `folderIndex` is false for every note: mobile has no folder-note
+  // designation UI, the same value `deriveTree` already passes.
+  const resolverNotes = useMemo(
+    () =>
+      notes
+        .filter((n) => {
+          const f = noteFlags.get(n.id);
+          return (
+            f !== undefined &&
+            f.trashed === null &&
+            f.deleted === null &&
+            !f.template &&
+            !f.conflict
+          );
+        })
+        .map((n) => ({
+          noteUuid: n.id,
+          title: n.title || null,
+          folder: readNoteFolder(bodies.get(n.id) ?? ""),
+          folderIndex: false,
+        })),
+    [notes, noteFlags, bodies],
+  );
   const trashedNotes = useMemo(() => notes.filter((n) => noteFlags.get(n.id)?.trashed != null), [notes, noteFlags]);
   const archivedNotes = useMemo(
     () => notes.filter((n) => noteFlags.get(n.id)?.archived != null && noteFlags.get(n.id)?.trashed == null),
@@ -654,11 +684,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     }
   }, [listView]);
 
-  // The wikilink graph over the LIVE notes — feeds both the Graph tab and the
-  // in-editor "Linked from" backlinks.
+  // The wikilink graph over the RESOLVER note-set — feeds both the Graph tab
+  // and the in-editor "Linked from" backlinks.
   const noteGraph = useMemo(
-    () => buildGraphFromEdges(liveNotes, backendEdges ?? clientEdges(liveNotes, bodies)),
-    [backendEdges, liveNotes, bodies],
+    () => buildGraphFromEdges(resolverNotes, backendEdges ?? clientEdges(resolverNotes, bodies)),
+    [backendEdges, resolverNotes, bodies],
   );
   // The `#tag` index over the LIVE notes — drives the notes-list tag filter.
   const tagIndex = useMemo(() => buildTagIndex(liveNotes, bodies), [liveNotes, bodies]);
@@ -894,8 +924,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       void (async () => {
         try {
           await Promise.all(
-            liveNotes.map((n) =>
-              vaultIndicesApply(extractRecord(n.id, n.title, folderOf.get(n.id) ?? null, bodies.get(n.id) ?? "")),
+            resolverNotes.map((n) =>
+              vaultIndicesApply(
+                extractRecord(n.noteUuid, n.title ?? "", n.folder, bodies.get(n.noteUuid) ?? ""),
+              ),
             ),
           );
           const edges = await vaultIndicesAllEdges();
@@ -909,7 +941,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [liveNotes, bodies, folderOf]);
+  }, [resolverNotes, bodies]);
 
   // In-memory note store for browser-dev (no Tauri host). The real backend
   // owns persistence under `pnpm tauri dev`; this keeps `pnpm dev` demoable.

@@ -1,64 +1,31 @@
 // Extract a note's vault-indices contribution TS-side (the sweep that feeds the
-// backend `vault_indices_apply`). Wikilink edges + folded tags + the note's own
-// folded title-key, all folded with `foldSegment` (Turkish-correct) — the same
-// model the backend index resolves against.
+// backend `vault_indices_apply`). Wikilink edges come from the SHARED extractor
+// (`@myne/editor/host/notes/graphModel`) over the shared dialect parse tree, so
+// this client and desktop agree on what a link is and what it points at
+// (myne-md/myne#199). Tags + the note's own folded title-key stay folded with
+// `foldSegment` (Turkish-correct) — the same model the backend index resolves
+// against.
 
 import { foldSegment } from "../dialect/folderPath";
-import { locateFrontmatter } from "../dialect/lezer/frontmatter";
+import { parse } from "../dialect/parse";
 import { extractLineTasks } from "../dialect/visitors/lineTasks";
 import { extractProperties } from "@myne/editor/host/notes/propertyTyping";
+import { extractWikilinkEdges } from "@myne/editor/host/notes/graphModel";
 import { parseTags } from "./tags";
 import type { WikilinkEdge, TagEntry, IndexRecord } from "./vault-indices";
 
-const enc = new TextEncoder();
-
-// `[[Target]]` / `![[Target|alias]]`, target may carry `#anchor` / `^block`.
-const WIKILINK_RE = /(!?)\[\[([^\]\n]+?)\]\]/g;
-
-/** Outbound wikilink edges (attachment `att:` embeds excluded — not note links).
- *  Matches arrive in ascending order, so byte offsets are accumulated with a
- *  running cursor (one linear encode pass, not a full re-encode per match). */
+/**
+ * Outbound wikilink edges for a note body.
+ *
+ * The former mobile-local regex is gone. It scanned the RAW body, so a
+ * `[[Link]]` inside a fenced code block or in frontmatter became a real edge,
+ * and it folded its title-key from the WHOLE target, so `[[Folder/Note]]` and
+ * `[[Note.md]]` matched nothing. The shared extractor walks the parse tree
+ * (exclusion zones are structural) and folds only the title component, which is
+ * what lets the shared resolver disambiguate a collision by folder.
+ */
 export function extractWikilinks(body: string): WikilinkEdge[] {
-  const out: WikilinkEdge[] = [];
-  let charCursor = 0;
-  let byteCursor = 0;
-  for (let m = WIKILINK_RE.exec(body); m !== null; m = WIKILINK_RE.exec(body)) {
-    const embed = m[1] === "!";
-    const inner = m[2];
-    const pipe = inner.indexOf("|");
-    const alias = pipe >= 0 ? inner.slice(pipe + 1).trim() || null : null;
-    let ref = (pipe >= 0 ? inner.slice(0, pipe) : inner).trim();
-    if (ref.startsWith("att:")) continue;
-    let anchor: string | null = null;
-    let blockId: string | null = null;
-    const caret = ref.indexOf("^");
-    if (caret >= 0) {
-      blockId = ref.slice(caret + 1).trim() || null;
-      ref = ref.slice(0, caret);
-    }
-    const hash = ref.indexOf("#");
-    if (hash >= 0) {
-      anchor = ref.slice(hash + 1).trim() || null;
-      ref = ref.slice(0, hash);
-    }
-    const target = ref.trim();
-    if (!target) continue;
-    byteCursor += enc.encode(body.slice(charCursor, m.index)).length;
-    charCursor = m.index;
-    const byteStart = byteCursor;
-    out.push({
-      target,
-      targetKind: "title",
-      titleKey: foldSegment(target),
-      anchor,
-      blockId,
-      alias,
-      embed,
-      byteStart,
-      byteEnd: byteStart + enc.encode(m[0]).length,
-    });
-  }
-  return out;
+  return extractWikilinkEdges(parse(body).wikilinks);
 }
 
 /** Folded tags (deduped by folded key). */
@@ -74,34 +41,30 @@ export function extractTagEntries(body: string): TagEntry[] {
   return out;
 }
 
-/** The raw frontmatter YAML (between the line-1 `---` delimiters) of a note, or
- *  `null` when there is no frontmatter block — the input `extractProperties`
- *  re-parses under CORE_SCHEMA. */
-function rawFrontmatter(body: string): string | null {
-  const fm = locateFrontmatter(body);
-  return fm === null ? null : body.slice(fm.bodyStart, fm.bodyEnd);
-}
-
 /** Full apply payload for one note. `title` is the display title (fm or first
  *  line); `body` is the raw note plaintext (frontmatter + body). */
 export function extractRecord(noteId: string, title: string, folder: string | null, body: string): IndexRecord {
+  // ONE parse per note, feeding both the wikilink edges and the frontmatter
+  // block `extractProperties` re-parses. This file used to walk the body twice
+  // over (a `locateFrontmatter` parse plus the regex scan), so routing the
+  // wikilinks through the shared tree-based extractor costs nothing here.
+  const parsed = parse(body);
   return {
     noteId,
     title: title || null,
     folder,
     titleKey: title ? foldSegment(title) : null,
-    wikilinks: extractWikilinks(body),
+    wikilinks: extractWikilinkEdges(parsed.wikilinks),
     tags: extractTagEntries(body),
     // §3.6.4 typed frontmatter properties — the same coercion desktop's
     // `reindexNoteFromBody` feeds the index, so a saved view's groupBy / sort /
     // columns / property-filter resolve identically on both clients.
-    properties: extractProperties(rawFrontmatter(body)),
-    // MYND-612: line-tasks, from the SHARED dialect extractor rather than a
-    // mobile regex like the wikilink/tag ones above. A second recognizer would
-    // drift from the first — the field grammar reads three dialects and the
-    // parse tree is what keeps code blocks, wikilink interiors and frontmatter
-    // structurally out. This is mobile's first lezer parse on the save path;
-    // the cost is one pass over a note-sized string.
+    properties: extractProperties(parsed.frontmatter.raw),
+    // MYND-612: line-tasks, from the SHARED dialect extractor — like the
+    // wikilink edges above. A second recognizer would drift from the first: the
+    // field grammar reads three dialects and the parse tree is what keeps code
+    // blocks, wikilink interiors and frontmatter structurally out. It owns its
+    // own exclusions, so nothing here filters what it returns.
     tasks: extractLineTasks(body),
   };
 }

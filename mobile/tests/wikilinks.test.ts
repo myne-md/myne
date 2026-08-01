@@ -1,6 +1,49 @@
 import { describe, it, expect } from "vitest";
 import { extractWikilinks } from "../src/lib/indices-extract";
 import { buildGraphFromEdges, clientEdges } from "../src/lib/backend-graph";
+import { buildGraphModel } from "@myne/editor/host/notes/graphModel";
+import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
+import {
+  GRAPH_CONTRACT_EXPECTATION,
+  GRAPH_CONTRACT_NOTES,
+  GRAPH_CONTRACT_RESOLVER_NOTES,
+  summarizeGraphModel,
+} from "@myne/editor/host/notes/graphModelContract";
+
+// The mobile half of the cross-client graph-model contract (myne-md/myne#199).
+// The same fixture runs through the desktop pipeline in the main repo's
+// `tests/notes/graphModel.test.ts`; the two agreeing IS the parity guarantee.
+describe("graph model contract (mobile pipeline)", () => {
+  const bodies = new Map(GRAPH_CONTRACT_NOTES.map((n) => [n.noteUuid, n.body]));
+
+  it("builds the one expected model from the shared fixture", () => {
+    const model = buildGraphModel(
+      clientEdges(GRAPH_CONTRACT_RESOLVER_NOTES, bodies),
+      GRAPH_CONTRACT_RESOLVER_NOTES,
+    );
+    expect(summarizeGraphModel(model)).toEqual(GRAPH_CONTRACT_EXPECTATION);
+  });
+
+  it("projects the model onto NoteGraph without losing a node or an edge", () => {
+    const g = buildGraphFromEdges(
+      GRAPH_CONTRACT_RESOLVER_NOTES,
+      clientEdges(GRAPH_CONTRACT_RESOLVER_NOTES, bodies),
+    );
+    expect(g.nodes.map((n) => n.id).sort()).toEqual(GRAPH_CONTRACT_EXPECTATION.nodes);
+    // One `from→to` pair per model edge, weights collapsed away.
+    expect(g.edges.map((e) => `${e.from}->${e.to}`).sort()).toEqual(
+      GRAPH_CONTRACT_EXPECTATION.edges.map((e) => e.replace(/x\d+$/, "")),
+    );
+  });
+
+  it("keeps unlinked notes as degree-0 nodes rather than dropping them", () => {
+    const g = buildGraphFromEdges(
+      GRAPH_CONTRACT_RESOLVER_NOTES,
+      clientEdges(GRAPH_CONTRACT_RESOLVER_NOTES, bodies),
+    );
+    expect(g.nodes.find((n) => n.id === "n-orphan")?.degree).toBe(0);
+  });
+});
 
 describe("extractWikilinks()", () => {
   const targets = (body: string) => extractWikilinks(body).map((e) => e.target);
@@ -9,33 +52,51 @@ describe("extractWikilinks()", () => {
     expect(targets("see [[Alpha]] and [[Beta|b]]")).toEqual(["Alpha", "Beta"]);
   });
 
-  it("trims targets and ignores empty ones", () => {
-    expect(targets("[[  Gamma  ]] [[]] [[|x]]")).toEqual(["Gamma"]);
-  });
-
-  it("does not match a link spanning a newline", () => {
-    expect(targets("[[a\nb]]")).toEqual([]);
-  });
-
-  it("excludes attachment (att:) embeds — not note links", () => {
-    expect(targets(`text ![[att:${"a".repeat(64)}|c.png]] [[Note]]`)).toEqual(["Note"]);
-  });
-
-  it("splits #anchor / ^block / |alias and folds the title-key", () => {
-    const [e] = extractWikilinks("[[Área#Heading^blk|Alias]]");
+  it("splits #anchor and |alias, and folds the title-key", () => {
+    const [e] = extractWikilinks("[[Área#Heading|Alias]]");
     expect(e.target).toBe("Área");
     expect(e.anchor).toBe("Heading");
-    expect(e.blockId).toBe("blk");
     expect(e.alias).toBe("Alias");
     expect(e.titleKey).toBe("área"); // NFC + fold
+  });
+
+  it("splits ^blockId", () => {
+    // The retired mobile regex also accepted a COMBINED `#heading^block`
+    // target and split it into both fields. `wikilink.md` §2.1 defines the two
+    // forms separately and the shared grammar reads `#Heading^blk` as one
+    // heading — the regex was inventing a form the spec does not have.
+    const [e] = extractWikilinks("[[Área^blk]]");
+    expect(e.blockId).toBe("blk");
+    expect(e.anchor).toBe(null);
+  });
+
+  it("folds the TITLE component of a path-form target, not the whole target", () => {
+    // The regex extractor folded `work/report`, which matched no note title —
+    // which is why `[[Work/Report]]` produced no edge on this client.
+    const [e] = extractWikilinks("[[Work/Report]]");
+    expect(e.titleKey).toBe("report");
+    expect(e.targetKind).toBe("vault-path");
+  });
+
+  it("strips exactly one trailing .md when deriving the title-key", () => {
+    expect(extractWikilinks("[[Report.md]]")[0].titleKey).toBe("report");
+  });
+
+  it("ignores links inside frontmatter and fenced code blocks", () => {
+    const body = ["---", 'a: "[[Ghost]]"', "---", "", "```", "[[Ghost]]", "```", "", "[[Real]]"].join("\n");
+    expect(targets(body)).toEqual(["Real"]);
+  });
+
+  it("excludes media embeds but keeps note embeds", () => {
+    expect(targets("![[diagram.png]] and ![[Note]]")).toEqual(["Note"]);
   });
 });
 
 describe("buildGraphFromEdges() over clientEdges()", () => {
-  const notes = [
-    { id: "1", title: "Alpha" },
-    { id: "2", title: "Beta" },
-    { id: "3", title: "Gamma" },
+  const notes: ResolverNote[] = [
+    { noteUuid: "1", title: "Alpha", folder: null },
+    { noteUuid: "2", title: "Beta", folder: null },
+    { noteUuid: "3", title: "Gamma", folder: null },
   ];
   const graph = (bodies: Map<string, string>) => buildGraphFromEdges(notes, clientEdges(notes, bodies));
 

@@ -1,9 +1,19 @@
-// Build a NoteGraph from vault-indices edges. The single graph builder for both
-// paths: the backend `all_edges` dump when available, else client-extracted
-// edges (`clientEdges`) — both fold titles/targets with the Turkish-correct
-// `foldSegment`, so the fallback resolves links identically to the backend.
+// Project the SHARED graph model onto mobile's `NoteGraph` shape.
+//
+// This file used to answer "what does this link point at" itself — a flat
+// `titleKey → first matching note` lookup that disagreed with desktop on
+// path-form links, `.md` links and title collisions (myne-md/myne#199). That
+// answer now comes from `buildGraphModel`, which resolves through the single
+// `resolveWikilink`; all that is left here is the projection to the shape
+// mobile's UI consumes (`degree` for node sizing, `backlinks`/`forward` for the
+// in-editor link lists).
+//
+// Both edge sources still work: the backend `all_edges` dump when the index has
+// been swept, else client-extracted edges (`clientEdges`) — and both now come
+// out of the same shared extractor, so the fallback resolves identically.
 
-import { foldSegment } from "../dialect/folderPath";
+import { buildGraphModel } from "@myne/editor/host/notes/graphModel";
+import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 import { pushMap } from "./util";
 import { extractWikilinks } from "./indices-extract";
 import type { NoteGraph, GraphEdge } from "./wikilinks";
@@ -12,46 +22,36 @@ import type { WikilinkEdge } from "./vault-indices";
 /** Client-extracted edge dump (same shape as the backend `all_edges`), for the
  *  no-Tauri / pre-sweep fallback. */
 export function clientEdges(
-  notes: readonly { id: string }[],
+  notes: readonly ResolverNote[],
   bodies: Map<string, string>,
 ): [string, WikilinkEdge[]][] {
-  return notes.map((n) => [n.id, extractWikilinks(bodies.get(n.id) ?? "")]);
+  return notes.map((n) => [n.noteUuid, extractWikilinks(bodies.get(n.noteUuid) ?? "")]);
 }
 
 export function buildGraphFromEdges(
-  notes: readonly { id: string; title: string }[],
+  notes: readonly ResolverNote[],
   allEdges: readonly [string, WikilinkEdge[]][],
 ): NoteGraph {
-  const titleKeyToId = new Map<string, string>();
-  for (const n of notes) {
-    const key = n.title ? foldSegment(n.title) : "";
-    if (key && !titleKeyToId.has(key)) titleKeyToId.set(key, n.id);
-  }
+  const model = buildGraphModel(allEdges, notes);
 
   const forward = new Map<string, string[]>();
   const backlinks = new Map<string, string[]>();
-  const edges: GraphEdge[] = [];
-  const seen = new Set<string>();
-
-  for (const [source, es] of allEdges) {
-    for (const e of es) {
-      const toId = titleKeyToId.get(e.titleKey);
-      if (!toId || toId === source) continue;
-      const dk = `${source} ${toId}`;
-      if (seen.has(dk)) continue;
-      seen.add(dk);
-      edges.push({ from: source, to: toId });
-      pushMap(forward, source, toId);
-      pushMap(backlinks, toId, source);
-    }
-  }
-
   const degree = new Map<string, number>();
-  for (const e of edges) {
-    degree.set(e.from, (degree.get(e.from) ?? 0) + 1);
-    degree.set(e.to, (degree.get(e.to) ?? 0) + 1);
+  const edges: GraphEdge[] = [];
+  for (const e of model.edges) {
+    edges.push({ from: e.source, to: e.target });
+    pushMap(forward, e.source, e.target);
+    pushMap(backlinks, e.target, e.source);
+    // One resolved source→target pair counts once per endpoint, however many
+    // occurrences collapsed into it (the model carries the count as `weight`).
+    degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
+    degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
   }
 
-  const nodes = notes.map((n) => ({ id: n.id, title: n.title, degree: degree.get(n.id) ?? 0 }));
+  const nodes = model.nodes.map((n) => ({
+    id: n.id,
+    title: n.title ?? "",
+    degree: degree.get(n.id) ?? 0,
+  }));
   return { nodes, edges, backlinks, forward };
 }

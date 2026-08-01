@@ -7,10 +7,14 @@
 // the surfaces mobile has no backend for yet (AI, spell, voice) — those slots
 // are optional in the EditorHost contract, so leaving them off simply keeps the
 // corresponding editor affordances inert. `t()` delegates to the shared
-// react-i18next runtime (`@myne/i18n`, MYND-485); `isMediaTarget`, `tagTree`,
-// and `openExternal` are built here since mobile has no direct equivalent.
+// react-i18next runtime (`@myne/i18n`, MYND-485); `tagTree` and `openExternal`
+// are built here since mobile has no direct equivalent. `isMediaTarget` is the
+// SHARED predicate (myne-md/myne#199) — it used to be a hand-copied extension
+// list here, which is the shape that lets desktop add an extension and this
+// client silently keep treating that embed as a note link.
 
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/host";
+import { isMediaTarget } from "@myne/editor/host/notes/graphModel";
 import i18n from "@myne/i18n";
 import { documentDir, join } from "@tauri-apps/api/path";
 import {
@@ -23,18 +27,6 @@ import { attachmentSrc } from "./lib/attachmentRef";
 import { prefsRead } from "./lib/prefs";
 import { currentEditorTagTree } from "./lib/editor-tag-bridge";
 import { requestVoiceRecording } from "./lib/voice-record-bridge";
-
-// ── isMediaTarget: pure extension check (faithful copy of the desktop
-//    src/notes/vaultIndices.ts::MEDIA_EXTENSIONS list).
-const MEDIA_EXTENSIONS = [
-  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico",
-  ".pdf", ".mp3", ".m4a", ".wav", ".ogg", ".mp4", ".webm", ".mov",
-];
-function isMediaTarget(target: string): boolean {
-  const lastSegment = target.split("/").pop() ?? target;
-  const lower = lastSegment.toLowerCase();
-  return MEDIA_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
 
 const host: EditorHost = {
   // Delegate to the shared react-i18next runtime (MYND-485) — replaces the
