@@ -38,7 +38,7 @@ describe("folder tree — structure", () => {
     ["4", "A/B/"],
     ["5", "C/"],
   ]);
-  const tree = deriveTree(folderOf);
+  const tree = deriveTree(folderOf, [], []);
 
   it("root: immediate child folders with subtree counts", () => {
     const { folders, noteIds } = containerNodes(tree, null);
@@ -84,7 +84,7 @@ describe("folder tree — MYND-562 shared derivation", () => {
       ["1", "personal/"],
       ["2", "PERSONAL/"],
     ]);
-    const folders = containerNodes(deriveTree(fo), null).folders;
+    const folders = containerNodes(deriveTree(fo, [], []), null).folders;
     expect(folders).toHaveLength(1);
     expect(folders[0]!.path).toBe("PERSONAL/"); // lexicographic-min display
     expect(folders[0]!.key).toBe("personal/"); // folded identity — the decoration key
@@ -93,8 +93,8 @@ describe("folder tree — MYND-562 shared derivation", () => {
 
   it("surfaces deliberate (empty) folders no note lives in", () => {
     const fo = new Map<string, string | null>([["1", null]]); // only a root note
-    expect(containerNodes(deriveTree(fo), null).folders).toEqual([]); // invisible…
-    const folders = containerNodes(deriveTree(fo, ["Ideas/"]), null).folders; // …persists
+    expect(containerNodes(deriveTree(fo, [], []), null).folders).toEqual([]); // invisible…
+    const folders = containerNodes(deriveTree(fo, ["Ideas/"], []), null).folders; // …persists
     expect(folders.map((f) => f.name)).toEqual(["Ideas"]);
     expect(folders[0]!.key).toBe("ideas/");
     expect(subtreeCount(folders[0]!)).toBe(0);
@@ -108,7 +108,7 @@ describe("interleave — MYND-596 full desktop parity", () => {
       ["nb", null],
       ["p1", "Projects/"],
     ]);
-    const tree = deriveTree(fo);
+    const tree = deriveTree(fo, [], []);
     // item_order for the ROOT container ("") lists a note, then a folder, then a note.
     const order = { "": ["na", "Projects/", "nb"] };
     const children = orderedChildren(tree, null, order, cacheOf(["na", "nb"]));
@@ -124,7 +124,7 @@ describe("interleave — MYND-596 full desktop parity", () => {
       ["p1", "Beta/"],
       ["p2", "Alpha/"],
     ]);
-    const tree = deriveTree(fo);
+    const tree = deriveTree(fo, [], []);
     const cache = new Map<string, OrderedNoteRecord>([
       ["z", { updatedAt: new Date(2000) }], // more recent
       ["a", { updatedAt: new Date(1000) }],
@@ -138,7 +138,7 @@ describe("interleave — MYND-596 full desktop parity", () => {
       ["x", "Sub/"],
       ["y", "Sub/"],
     ]);
-    const tree = deriveTree(fo);
+    const tree = deriveTree(fo, [], []);
     // The container key is the FOLDED folder key ("sub/"), value in display terms.
     const order = { "sub/": ["y", "x"] };
     expect(orderedChildKeys(tree, "Sub/", order, cacheOf(["x", "y"]))).toEqual(["y", "x"]);
@@ -153,7 +153,7 @@ describe("reorder — MYND-596 container-keyed map", () => {
       ["x", "Sub/"],
       ["y", "Sub/"],
     ]);
-    const tree = deriveTree(fo);
+    const tree = deriveTree(fo, [], []);
     const cache = cacheOf(["na", "nb", "x", "y"]);
     // Container key is the FOLDED folder key ("sub/"); the entries are note UUIDs.
     const order = { "": ["na", "nb"], "sub/": ["x", "y"] };
@@ -174,7 +174,7 @@ describe("reorder — MYND-596 container-keyed map", () => {
       ["nc", null],
       ["x", "Sub/"],
     ]);
-    const tree = deriveTree(fo);
+    const tree = deriveTree(fo, [], []);
     const cache = cacheOf(["na", "nb", "nc", "x"]);
     const next = reorderChildOrder({
       tree, itemOrder: { "": ["na", "nb", "nc"] }, cache, containerPath: null, rowKey: "nc", delta: -1,
@@ -189,7 +189,7 @@ describe("reorder — MYND-596 container-keyed map", () => {
       ["2", "Mango/"],
       ["3", "Zebra/"],
     ]);
-    const tree = deriveTree(fo);
+    const tree = deriveTree(fo, [], []);
     const cache = new Map<string, OrderedNoteRecord>();
     // No item_order → name order Apple, Mango, Zebra.
     expect(orderedChildKeys(tree, null, {}, cache)).toEqual(["Apple/", "Mango/", "Zebra/"]);
@@ -205,7 +205,7 @@ describe("reorder — MYND-596 container-keyed map", () => {
       ["1", "Apple/"],
       ["2", "Mango/"],
     ]);
-    const tree = deriveTree(fo);
+    const tree = deriveTree(fo, [], []);
     const cache = new Map<string, OrderedNoteRecord>();
     const first = childOrderIndex({ tree, itemOrder: {}, cache, containerPath: null, rowKey: "Apple/" });
     expect(first).toEqual({ index: 0, count: 2 });

@@ -10,6 +10,7 @@ import {
   removeFolderFromArchive,
   collectSubtreeNoteIds,
 } from "../src/lib/archivedFolders";
+import { deriveTree } from "../src/lib/folders";
 
 describe("archivedFolderKeys", () => {
   it("folds, dedups, and drops empties", () => {
@@ -63,6 +64,49 @@ describe("removeFolderFromArchive", () => {
   it("leaves the set unchanged for a non-member / root path", () => {
     expect(removeFolderFromArchive(["A/"], "B/")).toEqual(["A/"]);
     expect(removeFolderFromArchive(["A/"], "")).toEqual(["A/"]);
+  });
+});
+
+// The regression this file could not have caught before: it tested only the pure
+// helpers, and the defect was that the TREE never consulted them
+// (myne-md/myne-mobile#39). Mobile archived a folder's notes but kept the folder
+// itself as an empty shell, because `filterVisibleDeliberate` was never ported and
+// the derivation got the raw deliberate set. These drive `deriveTree` — the
+// wrapper the app actually calls.
+describe("deriveTree — an archived folder leaves the tree entirely", () => {
+  const rootPaths = (t: ReturnType<typeof deriveTree>) =>
+    t.roots.map((r) => r.path).sort();
+
+  it("removes an archived folder that is also deliberate", () => {
+    const fo = new Map<string, string | null>([["n1", "Projects/"]]);
+    expect(rootPaths(deriveTree(fo, ["Projects/"], ["Projects/"]))).toEqual([]);
+  });
+
+  it("removes the folder even when a deliberate DESCENDANT would rebuild it", () => {
+    // Ancestors are materialized from the leaf, so a deliberate `Projects/Myne/`
+    // used to re-create `Projects/` right after it was archived.
+    const fo = new Map<string, string | null>();
+    expect(rootPaths(deriveTree(fo, ["Projects/Myne/"], ["Projects/"]))).toEqual(
+      [],
+    );
+  });
+
+  it("keeps a name-prefix sibling (`ProjectsX/`)", () => {
+    const fo = new Map<string, string | null>([
+      ["n1", "Projects/"],
+      ["n2", "ProjectsX/"],
+    ]);
+    expect(rootPaths(deriveTree(fo, [], ["Projects/"]))).toEqual(["ProjectsX/"]);
+  });
+
+  it("restoring the folder brings it back (prefs-only, notes untouched)", () => {
+    const fo = new Map<string, string | null>([["n1", "Projects/"]]);
+    const archived = ["Projects/"];
+    expect(rootPaths(deriveTree(fo, ["Projects/"], archived))).toEqual([]);
+    const restored = removeFolderFromArchive(archived, "Projects/");
+    expect(rootPaths(deriveTree(fo, ["Projects/"], restored))).toEqual([
+      "Projects/",
+    ]);
   });
 });
 
