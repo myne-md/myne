@@ -12,6 +12,7 @@ import type { DiffLine } from "../../dialect";
 import type { TitleRecord } from "../loadNoteBatch";
 import { UNKNOWN_CONFLICT_ORIGINAL } from "../sidebarState";
 import { DiffView } from "./DiffView";
+import { Button } from "../../components/primitives/Button";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -43,17 +44,21 @@ const ROW: CSSProperties = {
   color: "var(--fg-1)",
 };
 
-const ACTIONS: CSSProperties = { display: "flex", gap: "var(--space-1)" };
-
-const BTN: CSSProperties = {
-  padding: "var(--space-1) var(--space-2)",
-  fontSize: "var(--text-sm)",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-  cursor: "pointer",
-  color: "var(--fg-1)",
+// The reconcile actions read as ONE calm cluster, not four equal boxes: a filled
+// primary ("Use this version"), an outlined secondary ("Keep as separate"), and
+// two low-emphasis ghost actions ("Compare" to inspect, "Discard" in danger
+// tone). `flex-wrap` lets the cluster drop to a second line on a narrow panel
+// rather than overflow. (MYND-427 / #203 — was four identical flat buttons.)
+const ACTIONS: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+  gap: "var(--space-2)",
 };
+
+// Ghost + danger tone for the one destructive action, so it stays low-emphasis
+// (not a filled red button) but still reads as "this removes something".
+const DISCARD_BTN: CSSProperties = { color: "var(--danger)" };
 
 const EMPTY: CSSProperties = {
   color: "var(--fg-3)",
@@ -185,31 +190,32 @@ function ConflictActions({
   const { t } = useTranslation();
   return (
     <>
-      <button
+      <Button
         type="button"
-        style={BTN}
-        onClick={() => onKeepBoth(copyId)}
-        data-testid="conflicts.keep-both"
-      >
-        {t("sync.conflicts.keepAsSeparate")}
-      </button>
-      <button
-        type="button"
-        style={BTN}
+        variant="ghost"
+        style={DISCARD_BTN}
         onClick={() => onDiscard(copyId)}
         data-testid="conflicts.discard"
       >
         {t("sync.conflicts.discard")}
-      </button>
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => onKeepBoth(copyId)}
+        data-testid="conflicts.keep-both"
+      >
+        {t("sync.conflicts.keepAsSeparate")}
+      </Button>
       {originalUuid !== UNKNOWN_CONFLICT_ORIGINAL && (
-        <button
+        <Button
           type="button"
-          style={BTN}
+          variant="primary"
           onClick={() => onTakeTheirs(copyId, originalUuid)}
           data-testid="conflicts.take-this"
         >
           {t("sync.conflicts.useThisVersion")}
-        </button>
+        </Button>
       )}
     </>
   );
@@ -244,14 +250,14 @@ function CompareSurface({
           {t("sync.conflicts.compareTitle", { title })}
         </span>
         {onCloseCompare !== undefined && (
-          <button
+          <Button
             type="button"
-            style={BTN}
+            variant="ghost"
             onClick={onCloseCompare}
             data-testid="conflicts.compare-close"
           >
             {t("sync.conflicts.compareClose")}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -353,14 +359,14 @@ export function ConflictsView({
               <span>{displayTitle(c)}</span>
               <div style={ACTIONS}>
                 {onCompare !== undefined && (
-                  <button
+                  <Button
                     type="button"
-                    style={BTN}
+                    variant="ghost"
                     onClick={() => onCompare(c.noteUuid, originalUuid)}
                     data-testid="conflicts.compare"
                   >
                     {t("sync.conflicts.compare")}
-                  </button>
+                  </Button>
                 )}
                 <ConflictActions
                   copyId={c.noteUuid}
