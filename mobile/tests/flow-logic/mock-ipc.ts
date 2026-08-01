@@ -231,6 +231,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       archive_disabled: null,
       theme: null,
       folder_icons: {},
+      icon: null,
       hidden_bar_items: [],
       bar_items_order: [],
       right_panel_active_tab: null,
@@ -309,6 +310,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // would never produce: the seed would keep winning and the write would look
     // like a no-op on re-read.
     let customTheme: string | null = (config.prefs?.custom_theme as string | null | undefined) ?? null;
+    // STATEFUL vault icon (vault-icons). Same argument as custom_theme above,
+    // with one extra reason: the catch-all at the bottom of this table resolves
+    // an UNMOCKED command to `[]`, so without a real handler + store a picker
+    // test would pass against its own optimistic draft and prove nothing.
+    let vaultIcon: string | null = (config.prefs?.icon as string | null | undefined) ?? null;
     // STATEFUL item_order MAP (MYND-596). The whole-map setter is written
     // optimistically by the move-up/move-down affordance, so a reopen round-trip
     // is only meaningful if the write survives into the next `prefs_read` —
@@ -327,12 +333,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:vault-unlock|vault_list": () => {
         if (config.freshDevice) return [];
         if (config.corruptedVault) return [{ id: "flow-vault", status: { kind: "Corrupted" } }];
+        // `icon: null` on both rows is STRUCTURAL, not a shortcut: multiVault
+        // boots to the pre-unlock picker, and the icon is encrypted-only
+        // (SYNC-3), so no vault can have a glyph in the RAM cache there.
         if (config.multiVault)
           return [
-            { id: "vault-personal", status: { kind: "Exists" }, label: "Personal", last_unlock: 0 },
-            { id: "vault-work", status: { kind: "Exists" }, label: "Work", last_unlock: null },
+            { id: "vault-personal", status: { kind: "Exists" }, label: "Personal", icon: null, last_unlock: 0 },
+            { id: "vault-work", status: { kind: "Exists" }, label: "Work", icon: null, last_unlock: null },
           ];
-        return [{ id: "flow-vault", status: { kind: "Exists" } }];
+        // The default branch IS the unlocked vault, so it projects the stateful
+        // icon store — the honest model of the per-session RAM icon cache.
+        return [{ id: "flow-vault", status: { kind: "Exists" }, icon: vaultIcon }];
       },
       "plugin:vault-unlock|vault_slot_kind": () =>
         config.freshDevice || config.lockedVault || config.corruptedVault || config.multiVault ? "Empty" : "Unlocked",
@@ -378,6 +389,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         editor_toolbar_hidden: toolbarHidden,
         custom_theme: customTheme,
         item_order: itemOrder,
+        icon: vaultIcon,
       }),
       // Format-bar layout setters (MYND-555): record the write AND mutate the
       // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
@@ -469,6 +481,18 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         const w = window as unknown as { __customThemeWrites?: (string | null)[] };
         (w.__customThemeWrites ??= []).push(name);
         customTheme = name;
+        return null;
+      },
+      // The vault-icon setter (vault-icons) — records the write AND mutates the
+      // store, so the chosen glyph survives into the nonce-bumped re-read and a
+      // sheet-remount assertion sees disk truth rather than the optimistic draft
+      // it just dropped. Payload key is the bare `icon` (single-word field, so
+      // camelCase is a no-op on every transport).
+      "plugin:prefs|vault_set_icon": (args) => {
+        const name = (args.icon ?? null) as string | null;
+        const w = window as unknown as { __vaultIconWrites?: (string | null)[] };
+        (w.__vaultIconWrites ??= []).push(name);
+        vaultIcon = name;
         return null;
       },
       // Whole-map item_order setter (MYND-596): record the write AND mutate the

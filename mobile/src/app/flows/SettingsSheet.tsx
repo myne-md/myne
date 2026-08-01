@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
-import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet } from "../../components";
+import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
+import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
 import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { applyTheme } from "../../platform/theme";
@@ -46,6 +47,7 @@ import {
   setAttachmentCompressionEnabled,
   setAutoLockTimeout,
   setVaultLabel,
+  setVaultIcon,
   setEditorToolbarOrder,
   setEditorToolbarHidden,
   setCustomTheme,
@@ -191,6 +193,30 @@ function RowChevron() {
     </svg>
   );
 }
+
+/* Vault-icon picker grid (vault-icons). Geometry deliberately mirrors the
+   folder-icon picker in `DecorationSheet` so the app's two icon grids read as
+   one system; the objects are copied rather than imported so a settings panel
+   never reaches into an editor sheet. */
+const ICON_GRID_STYLE: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(6, 1fr)",
+  gap: 6,
+};
+
+const ICON_BTN_STYLE: CSSProperties = {
+  width: "100%",
+  aspectRatio: "1 / 1",
+  padding: 0,
+  borderRadius: 10,
+  border: "1px solid transparent",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "transparent",
+  color: "var(--fg-2)",
+};
 
 function FieldLabel({ children, mt }: { children: ReactNode; mt: number }) {
   return (
@@ -1093,6 +1119,19 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     setPanel((p) => PANEL_PARENT[p]);
   }
 
+  /** Persist the vault icon (vault-icons). `null` clears back to the wordmark.
+   *  Goes through `writePref`, not the `submitRename` shape below it: writePref
+   *  reflects optimistically, bumps the prefs nonce on success so the header and
+   *  sidebar marks re-read, and reverts THIS key with a toast on failure — which
+   *  is why no in-flight/disabled state is needed. Re-picking the active glyph is
+   *  a no-op. An unrecognized stored name matches no cell and is left alone: the
+   *  field is Shared(ScalarLww), so normalizing it here would clobber a newer
+   *  client's choice on the next merge. */
+  const selectIcon = (name: string | null) => {
+    if (name === eff.icon) return;
+    writePref("icon", name, () => setVaultIcon(name));
+  };
+
   async function submitRename() {
     const label = renameText.trim();
     try {
@@ -1402,6 +1441,47 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 <RowChevron />
               </Row>
             </Group>
+
+            {/* Vault icon (vault-icons) — the switcher/header glyph. Inline
+                rather than a drill-down panel: it is a one-tap terminal choice
+                with instant read-back, unlike the rename below it, which needs a
+                field, a keyboard and an explicit save. Same control as desktop's
+                Account panel, so the two settings screens stay diff-able. */}
+            <FieldLabel mt={18}>{t("settings.account.vaultIconLabel")}</FieldLabel>
+            <div
+              role="radiogroup"
+              aria-label={t("settings.account.vaultIconLabel")}
+              data-testid="settings.icon-picker"
+              style={ICON_GRID_STYLE}
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={eff.icon === null}
+                aria-label={t("settings.account.vaultIconDefault")}
+                data-testid="settings.icon-option"
+                data-icon-name="default"
+                onClick={() => selectIcon(null)}
+                style={{ ...ICON_BTN_STYLE, borderColor: eff.icon === null ? "var(--accent)" : "var(--line-2)" }}
+              >
+                <MyneMark size={22} radius={4} />
+              </button>
+              {FOLDER_ICON_NAMES.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="radio"
+                  aria-checked={eff.icon === name}
+                  aria-label={name}
+                  data-testid="settings.icon-option"
+                  data-icon-name={name}
+                  onClick={() => selectIcon(name)}
+                  style={{ ...ICON_BTN_STYLE, borderColor: eff.icon === name ? "var(--accent)" : "transparent" }}
+                >
+                  <FolderGlyph name={name} size={22} />
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

@@ -1044,9 +1044,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         if (cancelled) return;
         setVaults("ok" in res ? orderByLastUnlock(res.ok) : []);
       } else {
+        // `icon: "book"` on the active row is deliberate: browser-dev is the only
+        // surface where the VaultMark glyph branch can be seen without a device.
         setVaults([
-          { id: vaultId ?? "dev-personal", status: { kind: "Exists" }, label: "Personal", last_unlock: Date.now() },
-          { id: "dev-work", status: { kind: "Exists" }, label: "Work", last_unlock: Date.now() - 86_400_000 },
+          { id: vaultId ?? "dev-personal", status: { kind: "Exists" }, label: "Personal", icon: "book", last_unlock: Date.now() },
+          { id: "dev-work", status: { kind: "Exists" }, label: "Work", icon: null, last_unlock: Date.now() - 86_400_000 },
         ]);
       }
     })();
@@ -1826,6 +1828,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         {chrome.header && tab !== "templates" && (
           <AppHeader
             label={vaultDisplayLabel(prefs.label)}
+            icon={prefs.icon}
             onSwitcher={() => setSwitcherOpen(true)}
             onPalette={() => setPaletteOpen(true)}
             onSettings={() => setSettingsOpen(true)}
@@ -2886,6 +2889,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           >
           <SidebarPane
             label={vaultDisplayLabel(prefs.label)}
+            icon={prefs.icon}
             tab={tab}
             listView={listView}
             onAllNotes={() => { setTab("notes"); setListView("notes"); setActiveTag(null); setActiveViewId(null); }}

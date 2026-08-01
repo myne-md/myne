@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
 import { LABEL_SLOTS, labelSlotName, labelColorVar } from "@myne/decorations";
 import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
-import { FolderGlyph } from "../decorations/FolderGlyph";
+import { FolderGlyph } from "../../../../components";
 
 /** Bottom-sheet color-label + folder-icon picker (MYND-516) — the mobile twin
  *  of the desktop anchored `DecorationPopover`. A note's sheet shows the 6-swatch

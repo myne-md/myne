@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Icon, MyneMark, Sheet } from "../../../../components";
+import { Icon, Sheet, VaultMark } from "../../../../components";
 import { vaultDisplayLabel } from "../../../../lib/vault-label";
 import type { VaultSummary } from "../../../../types/vault-summary";
 
@@ -37,6 +37,8 @@ export function VaultSwitcher({
           return (
             <div
               key={v.id}
+              data-testid="switcher.vault-row"
+              data-vault-id={v.id}
               onClick={() => onSelect(v.id)}
               style={{
                 display: "flex",
@@ -47,7 +49,11 @@ export function VaultSwitcher({
                 cursor: "pointer",
               }}
             >
-              <MyneMark size={22} radius={4} />
+              {/* At most ONE row ever shows a glyph: the icon is encrypted-only
+                  (SYNC-3) and the RAM cache holds it for the sole Unlocked vault
+                  (SYNC-1), so every other row's wordmark is correctness, not a
+                  missing feature. */}
+              <VaultMark icon={v.icon} size={22} radius={4} testId="switcher.vault-mark" />
               <span style={{ flex: 1, fontSize: 16, color: "var(--fg-1)" }}>{vaultDisplayLabel(v.label)}</span>
               {active && <Icon name="check" size={18} color="var(--accent)" strokeWidth={2} />}
             </div>

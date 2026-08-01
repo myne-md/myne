@@ -28,18 +28,24 @@ const DOT_PALETTE = [
   "var(--label-stone)",
 ];
 
-/** Browser-dev (no Tauri host) demo data so the picker is navigable under `pnpm dev`. */
+/** Browser-dev (no Tauri host) demo data so the picker is navigable under `pnpm dev`.
+ *  `icon` is always `null` here for the same reason it is on the real wire: this
+ *  screen is PRE-unlock, so no vault has a decrypted glyph in the RAM icon cache
+ *  (SYNC-3). The rows stay on the positional dot below — a vault-icon mark here
+ *  would render as N identical wordmarks and read as a broken feature. */
 const PLACEHOLDER_VAULTS: VaultSummary[] = [
   {
     id: "00000000-0000-7000-8000-000000000001",
     status: { kind: "Exists" },
     label: "Personal",
+    icon: null,
     last_unlock: Date.now() - 2 * 60 * 1000,
   },
   {
     id: "00000000-0000-7000-8000-000000000002",
     status: { kind: "Exists" },
     label: "Work",
+    icon: null,
     last_unlock: Date.now() - 26 * 60 * 60 * 1000,
   },
 ];

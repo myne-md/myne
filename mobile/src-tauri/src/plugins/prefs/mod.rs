@@ -114,6 +114,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_device_name,
             commands::device_platform,
             commands::vault_set_label,
+            // vault-icons: the label's twin — the switcher's decorative glyph
+            // name. Shared `myne-core` body; mobile only registers it. Same
+            // three-site lockstep as every other prefs setter.
+            commands::vault_set_icon,
             commands::set_spell_enabled,
             commands::set_spell_languages,
             commands::set_show_note_timestamps,

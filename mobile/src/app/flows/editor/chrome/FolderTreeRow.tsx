@@ -1,4 +1,4 @@
-import { FolderGlyph } from "../decorations/FolderGlyph";
+import { FolderGlyph } from "../../../../components";
 import { ColorDot } from "../decorations/ColorDot";
 import { useHold } from "./useHold";
 
