@@ -11,6 +11,7 @@
     "./drawing": "./src/drawing/index.ts",
     "./host/notes/propertyFormat": "./src/host/notes/propertyFormat.tsx",
     "./host/notes/TaskRow": "./src/host/notes/TaskRow.tsx",
+    "./host/notes/GraphCanvas": "./src/host/notes/GraphCanvas.tsx",
     "./*": "./src/*.ts"
   },
   "dependencies": {

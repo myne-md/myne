@@ -15,12 +15,16 @@ import {
 } from "../../src/notes/graphSettings";
 
 describe("graphSettings", () => {
-  it("defaults match the pre-feature fixed rendering/layout constants", () => {
+  it("defaults are the one shared appearance/layout spec", () => {
+    // `nodeSizeStrength` is the one that is NOT the desktop pre-feature
+    // constant: 0.8 spans 5–13px under the degree cap of 10, which is the
+    // range the mobile renderer hardcoded before the clients converged on one
+    // (myne-md/myne#200). Everything else still matches what desktop shipped.
     expect(DEFAULT_GRAPH_SETTINGS).toEqual({
       showArrows: true,
       labelFadeZoom: 1.4,
       nodeSize: 5,
-      nodeSizeStrength: 0,
+      nodeSizeStrength: 0.8,
       lineThickness: 1,
       forceCenterStrength: 1,
       forceRepelStrength: 120,

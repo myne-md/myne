@@ -289,11 +289,20 @@ describeE2E("gs2 appearance controls preview live and never re-run the layout", 
         await dismissImporterOffer(s);
 
         const { pane, canvas } = await openSettledGraph(s);
-        const settled = await waitForCanvasQuiet(s, "initial layout");
+        await waitForCanvasQuiet(s, "initial layout");
         expect(await canvas.attribute("data-force-relayout-count")).toBe("0");
 
         await openSettingsPanel(s);
         expect(await pane.attribute("data-layout-nonce")).toBe("1");
+
+        // Establish the baseline the ink comparison below needs: labels OFF.
+        // It used to come for free — the graph opened at 1:1, under the 1.4
+        // default fade threshold — but the camera now fits to content, and on
+        // a small fixture that means zooming IN to the 1.5 cap, which is above
+        // the threshold (myne-md/myne#200). Push the threshold out of reach
+        // instead of depending on the opening zoom.
+        await slideToEnd(s, "editor.graph-settings-label-fade", "max");
+        const settled = await waitForCanvasQuiet(s, "labels off baseline");
 
         // Each control, driven to the end of its track. Order is deliberate:
         // every one of these can only ADD ink (labels that were hidden below
