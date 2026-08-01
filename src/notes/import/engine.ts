@@ -42,7 +42,12 @@ import type {
   ImportSink,
   ImportSource,
   LossyNote,
+  UnfollowedLink,
 } from "./source";
+import {
+  importFailureReason,
+  type ImportFailureReason,
+} from "../../lib/import-errors";
 import {
   mapImportedFile,
   type IllegalSegmentFlag,
@@ -90,12 +95,41 @@ export interface BaseImportTally {
   droppedPropertiesDisplay: number;
 }
 
+/** One file the import could not take, and why. */
+export interface ImportFailure {
+  /** The source-relative path, so the report can name it. */
+  relPath: string;
+  reason: ImportFailureReason;
+}
+
 export interface ImportResult {
   imported: number;
   skippedExisting: number;
   illegalFlags: IllegalSegmentFlag[];
   preexistingFolders: PreexistingFolder[];
   ignore: IgnoreCounts;
+  /**
+   * Symbolic links the walk did not follow, named one row each (SYNC-2 needs
+   * attention). Empty for a source with no directory structure.
+   */
+  unfollowedLinks: UnfollowedLink[];
+  /**
+   * Files that could not be READ, skipped so the rest of the import proceeds.
+   * This is the contract `importer/error.rs` has always documented for
+   * `NotUtf8` ("the TS engine flags/skips it") and never had a consumer for:
+   * one legacy-encoded `.md` used to end the whole run (myne-md/myne#223).
+   */
+  unreadable: ImportFailure[];
+  /**
+   * The WRITE that stopped the run, or `null` if it ran to completion.
+   *
+   * Asymmetric with `unreadable` on purpose. A read failure is about one file
+   * and the next file is probably fine; a write failure is systemic — a full
+   * disk, a vault that just locked — and retrying it 49 999 more times is the
+   * wrong answer. So the run stops, and the result is still RETURNED with
+   * everything it managed, rather than thrown away with the counts.
+   */
+  stopped: ImportFailure | null;
   /** Media ingested vs omitted, by type (SYNC-7 / SYNC-2); zeros if no media importer. */
   media: MediaCounts;
   /** How many ingested images ingest-time compression shrank, and by how much.
@@ -155,7 +189,7 @@ export async function importFromSource(
 ): Promise<ImportResult> {
   // ----- Stage 1: plan (descriptors only, never note content) -----
   const plan = await source.plan();
-  const { items, dirs: allDirs, ignore } = plan;
+  const { items, dirs: allDirs, ignore, unfollowedLinks } = plan;
 
   // ----- Stage 2: serial ingest (D3 — one item's markdown live at a time) -----
   const total = items.length;
@@ -166,9 +200,11 @@ export async function importFromSource(
   const media: MediaCounts = { ingested: emptyMediaByType(), omitted: emptyMediaByType() };
   let compression: CompressionTally = emptyCompressionTally();
   const lossyNotes: LossyNote[] = [];
+  const unreadable: ImportFailure[] = [];
   let imported = 0;
   let skippedExisting = 0;
   let cancelled: number | null = null;
+  let stopped: ImportFailure | null = null;
 
   for (let i = 0; i < items.length; i++) {
     if (options.shouldCancel?.()) {
@@ -177,7 +213,18 @@ export async function importFromSource(
     }
     const ref = items[i]!;
     const rel = ref.relPath;
-    const loaded = await source.load(ref);
+    // A file that cannot be read is flagged and skipped, never fatal. Before
+    // this guard the await was bare, so a single unreadable file threw out of
+    // the loop and took every accumulated tally with it — the counts live here
+    // as locals and only become an `ImportResult` at the return below.
+    let loaded;
+    try {
+      loaded = await source.load(ref);
+    } catch (err) {
+      unreadable.push({ relPath: rel, reason: importFailureReason(err) });
+      options.onProgress?.(i + 1, total);
+      continue;
+    }
     // Folded HERE rather than in the created-note branch below, because a source
     // that ingests inside `load()` (Evernote's inline base64 resources) has
     // already stored and already compressed those bytes by the time dedup gets a
@@ -215,7 +262,16 @@ export async function importFromSource(
         addByType(media.omitted, m.counts.omitted);
         compression = addCompressionTally(compression, m.compression);
       }
-      await sink.createNote(plaintext);
+      try {
+        await sink.createNote(plaintext);
+      } catch (err) {
+        // Systemic, not per-file: stop, but keep (and return) everything that
+        // already landed. Deliberately NOT folded into `cancelled` — that field
+        // drives a row labelled "Cancelled", and the user did not cancel. The
+        // summary banner reads the stopping point off `stopped` + `imported`.
+        stopped = { relPath: rel, reason: importFailureReason(err) };
+        break;
+      }
       imported++;
       noteFolders.push(folder); // empty-dir collection stays path-derived
       seen.add(noteIdentityKey(identityFolder, mapped.readTimeTitle));
@@ -234,9 +290,18 @@ export async function importFromSource(
   }
 
   // ----- SYNC-4: one deliberate-folders write for empty source dirs -----
+  // Guarded like the import-report write in `ports.ts`: this runs AFTER every
+  // note has landed, so failing the whole import here would report failure for
+  // an import that fully succeeded. Preserving empty folders is fidelity, not
+  // content.
   const deliberate = collectDeliberateImportFolders(allDirs, noteFolders);
+  let emptyFoldersPreserved = deliberate.length;
   if (deliberate.length > 0) {
-    await sink.setDeliberateFolders(deliberate);
+    try {
+      await sink.setDeliberateFolders(deliberate);
+    } catch {
+      emptyFoldersPreserved = 0;
+    }
   }
 
   return {
@@ -245,9 +310,12 @@ export async function importFromSource(
     illegalFlags,
     preexistingFolders,
     ignore,
+    unfollowedLinks,
+    unreadable,
+    stopped,
     media,
     compression,
-    emptyFoldersPreserved: deliberate.length,
+    emptyFoldersPreserved,
     cancelled,
     total,
     lossyNotes,

@@ -37,6 +37,7 @@ import { dismissImporterOffer, pageSeatInvoke, unlockToEditor } from "./support/
 interface DirEntry {
   name: string;
   is_dir: boolean;
+  link: { status: string; target_key?: string } | null;
 }
 
 /** Build a small Obsidian-shaped source tree; returns its absolute root. */
@@ -187,3 +188,90 @@ async function pageSeatSafeRead(
     30_000,
   );
 }
+
+// myne-md/myne#223 defect 1. `DirEntry::file_type()` does not follow symlinks,
+// so a symlinked FOLDER reported `is_dir: false`, the TS walk classified it by
+// NAME, and its whole subtree was silently absent from the import behind a
+// muted "other files skipped 1". The host now resolves the link and says what
+// it is; a Rust unit test pins the classifier, and this pins that the verdict
+// actually crosses production IPC in that shape.
+describeE2E("irs2 importer read-seam resolves symlinks (myne-md/myne#223)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("reports a symlinked folder as a folder and names each refusal", async () => {
+    let password = "";
+    await scenario(
+      "irs2-symlink-seam",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        const root = path.join(app.dataHome, "importer-symlink-fixture");
+        const real = path.join(root, "Real");
+        const outside = path.join(app.dataHome, "outside-tree");
+        fs.mkdirSync(real, { recursive: true });
+        fs.mkdirSync(outside, { recursive: true });
+        fs.writeFileSync(path.join(real, "Nested.md"), "# Nested\n", "utf8");
+        fs.writeFileSync(path.join(root, "target.md"), "# Target\n", "utf8");
+
+        try {
+          fs.symlinkSync(real, path.join(root, "External"));
+          fs.symlinkSync(outside, path.join(root, "Elsewhere"));
+          fs.symlinkSync(root, path.join(real, "BackToRoot"));
+          fs.symlinkSync(path.join(root, "target.md"), path.join(root, "alias.md"));
+          fs.symlinkSync(path.join(app.dataHome, "gone-forever"), path.join(root, "dangling"));
+        } catch (e) {
+          // Symlink creation can be unavailable (permissions). Skip rather than
+          // fail on the platform — irs1 already covers the seam's refusals.
+          if ((e as NodeJS.ErrnoException).code !== "EPERM") throw e;
+          return;
+        }
+
+        const listed = await pageSeatInvoke(
+          s,
+          "plugin:importer|import_read_dir",
+          { root, path: root },
+          30_000,
+        );
+        if (listed.err !== undefined) {
+          throw new Error("read_dir failed: " + JSON.stringify(listed.err));
+        }
+        const byName = new Map((listed.ok as DirEntry[]).map((e) => [e.name, e]));
+
+        // The headline: a symlinked folder walks as a folder.
+        expect(byName.get("External")?.is_dir).toBe(true);
+        expect(byName.get("External")?.link?.status).toBe("followable");
+        // The identity the walk's cycle guard keys on — opaque, never a path.
+        const key = byName.get("External")?.link?.target_key ?? "";
+        expect(key).toHaveLength(32);
+        expect(key.includes("/")).toBe(false);
+
+        // A symlinked FILE resolves too, and is not a directory.
+        expect(byName.get("alias.md")?.is_dir).toBe(false);
+        expect(byName.get("alias.md")?.link?.status).toBe("followable");
+
+        // The refusals are each NAMED rather than folded into a skip bucket.
+        expect(byName.get("Elsewhere")?.link?.status).toBe("outside");
+        expect(byName.get("Elsewhere")?.is_dir).toBe(false);
+        expect(byName.get("dangling")?.link?.status).toBe("broken");
+
+        // A link back to an ancestor is a loop — decided against the directory
+        // being listed, so it only shows up one level down.
+        const nested = await pageSeatInvoke(
+          s,
+          "plugin:importer|import_read_dir",
+          { root, path: real },
+          30_000,
+        );
+        const nestedByName = new Map((nested.ok as DirEntry[]).map((e) => [e.name, e]));
+        expect(nestedByName.get("BackToRoot")?.link?.status).toBe("loop");
+        expect(nestedByName.get("BackToRoot")?.is_dir).toBe(false);
+
+        // An ordinary entry carries no link at all — the common path is untouched.
+        expect(byName.get("target.md")?.link).toBeNull();
+        expect(nestedByName.get("Nested.md")?.link).toBeNull();
+      },
+    );
+  });
+});

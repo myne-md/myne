@@ -138,4 +138,29 @@ describe("mapImportedFile — pre-existing folder: is preserved, never overwritt
       derivedFromPath: "Projects/Sub/",
     });
   });
+
+  // myne-md/myne#223 defect 6. "Equals" is `folderKey` — the same identity the
+  // engine's dedup and the folder tree use — not raw string equality. Each of
+  // these files lands in the derived folder and merges into the same tree node,
+  // so a needs-attention row would name something the user cannot fix.
+  it.each([
+    ["missing trailing slash", "Projects/Sub"],
+    ["upper case", "PROJECTS/SUB/"],
+    ["mixed case, no trailing slash", "projects/sub"],
+    ["duplicate and leading slashes", "/Projects//Sub///"],
+  ])("suppresses the flag for a folder: differing only by %s", (_label, value) => {
+    const body = `---\nfolder: ${value}\ntitle: note\n---\n\nbody\n`;
+    const r = mapImportedFile("Projects/Sub/note.md", body);
+    expect(r.preexistingFolder).toBeNull();
+    expect(r.plaintext).toContain(`folder: ${value}`); // still preserved verbatim (C1)
+  });
+
+  it("still flags a folder: that differs by more than folder identity", () => {
+    const body = "---\nfolder: projects/other\ntitle: note\n---\n\nbody\n";
+    const r = mapImportedFile("Projects/Sub/note.md", body);
+    expect(r.preexistingFolder).toEqual({
+      existing: "projects/other",
+      derivedFromPath: "Projects/Sub/",
+    });
+  });
 });

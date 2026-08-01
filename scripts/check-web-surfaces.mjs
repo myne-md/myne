@@ -357,6 +357,10 @@ const V = {
     "ported",
     "Is this failure the storage running out (task 91)? Asks the closed `IoFailureKind`, not a browser-specific check, so a desktop full disk gets the same answer — the OPFS backend already maps `QuotaExceededError` onto `NoSpace` at the seam.",
   ],
+  "src/lib/import-errors.ts": [
+    "ported",
+    "Why an import stopped, or why one file did not come across (myne-md/myne#223). Shared because the cause is the seam's own closed error set, not the host's: both clients reject with the serialized backend value rather than an `Error`, so both need the same classification to say anything more useful than 'Import failed.'",
+  ],
   "src/hooks/useMaterialisationProgress.ts": [
     "ported",
     "First-sync materialisation progress (task 39). Most load-bearing on web: a browser's first run materialises the WHOLE vault, measured at 1.9-9.4 s for 3 000 notes and 4.8-29.9 s at 10 000 depending on engine — a spinner over that is the thing this replaces.",

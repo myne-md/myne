@@ -28,6 +28,7 @@
 
 import { parseFrontmatter } from "../../dialect/visitors/frontmatter";
 import {
+  folderKey,
   isLegalSegment,
   isLegalPathLength,
   utf8ByteLength,
@@ -113,11 +114,22 @@ export function mapImportedFile(
   // Equality suppression (SYNC-8, export-suite): a file whose own `folder:`
   // already equals the path-derived folder needs no attention — flagging it
   // would mark every note of a re-imported Myne export tree.
+  //
+  // "Equals" is `folderKey` — normalize + NFC + case-fold — because that is
+  // Myne's ONE folder identity, and the two neighbouring paths in this feature
+  // already use it: the engine keys dedup on `noteIdentityKey` → `folderKey`,
+  // and the folder tree keys nodes on `foldSegment`. A raw string comparison
+  // here made those three disagree, and flagged rows the user cannot act on:
+  // `folder: Sub` (no trailing slash), `folder: SUB/` (case) and
+  // `_import//folder///Sub//` (duplicate slashes) are all the SAME folder as
+  // the derived `Sub/`, filed there correctly, merged into one tree node. A
+  // needs-attention list carrying rows with nothing to fix teaches users to
+  // dismiss it (myne-md/myne#223).
   const existingFolder = hasPreexistingFolder
     ? String((fm as Record<string, unknown>)["folder"])
     : null;
   const preexistingFolder: PreexistingFolder | null =
-    existingFolder !== null && existingFolder !== folder
+    existingFolder !== null && folderKey(existingFolder) !== folderKey(folder)
       ? { existing: existingFolder, derivedFromPath: folder }
       : null;
 

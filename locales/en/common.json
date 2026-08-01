@@ -1642,7 +1642,18 @@
         "keepsLabel": "What comes across",
         "losesLabel": "What doesn't",
         "changeSource": "Change source",
-        "statExcalidrawSkipped": "Excalidraw drawings skipped"
+        "statExcalidrawSkipped": "Excalidraw drawings skipped",
+        "unfollowedLinkOutside": "This is a shortcut to a folder outside the one you picked, so Myne didn't follow it. Move or copy that folder inside your vault and import again.",
+        "unfollowedLinkLoop": "This shortcut points back into a folder Myne was already inside, so following it would go round forever. Nothing under it was missed.",
+        "unfollowedLinkBroken": "This shortcut doesn't lead anywhere — whatever it pointed at has been moved or deleted.",
+        "unreadableDetail": "Skipped — {{reason}} The rest of the import carried on.",
+        "stoppedAt": "{{imported}} of {{total}} notes were imported before this stopped. They're in your vault and safe to keep.",
+        "reasonNotUtf8": "Myne couldn't read this file as text. It's probably saved in an older encoding, or it isn't a text file at all.",
+        "reasonPathRejected": "Myne couldn't reach this file inside the folder you picked.",
+        "reasonPermissionDenied": "Myne wasn't allowed to read this file.",
+        "reasonNotFound": "This file was gone by the time Myne reached it.",
+        "reasonNoSpace": "This device ran out of space.",
+        "reasonUnknown": "Myne couldn't say why."
       },
       "offer": {
         "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported — nothing leaves this device, and your original files stay exactly where they are.",

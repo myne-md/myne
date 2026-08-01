@@ -16,6 +16,7 @@ description = "Default permission set for the importer read-seam plugin."
 permissions = [
     "allow-import-read-dir",
     "allow-import-read-file",
+    "allow-import-set-hold",
 ]
 
 [[permission]]
@@ -27,3 +28,8 @@ commands.allow = ["import_read_dir"]
 identifier = "allow-import-read-file"
 description = "Allow invoking importer:import_read_file (read the UTF-8 source bytes of a file within the user-picked import root; path validated within-root; plaintext wrapped in Zeroizing and dropped per the Plaintext-IPC pattern, never written to disk)."
 commands.allow = ["import_read_file"]
+
+[[permission]]
+identifier = "allow-import-set-hold"
+description = "Allow invoking importer:import_set_hold (take or drop a 60-second renewable lease that DEFERS the idle auto-lock while an import is running). It does not touch the idle clock, so idle keeps accumulating and the vault locks as soon as the lease lapses — an import postpones the lock, it cannot cancel one."
+commands.allow = ["import_set_hold"]

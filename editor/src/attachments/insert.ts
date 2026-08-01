@@ -20,6 +20,7 @@
 import { getHost } from "../host";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
+import { isMediaTarget } from "@myne/editor/host/notes/graphModel";
 import { formatBytes, typeLabel } from "@myne/editor/host/components/attachments/format";
 
 /** The success payload of `attachment_import` (mirrors Rust
@@ -395,6 +396,11 @@ export interface ImportedImageRef {
 // `![[ target ]]` where target is NOT already an `att:` ref. Captures an
 // optional `|alias`. Non-att embeds only — a form-C embed is left untouched.
 const WIKILINK_EMBED_RE = /!\[\[(?!att:)([^\]|]+?)(?:\|([^\]]*))?\]\]/g;
+// The bare link target: the dialect's wikilink parser splits `#heading` and
+// `^block-id` off the target, and this raw-text regex does not, so strip the
+// first anchor marker before asking whether the target names media. First `#`
+// or `^` wins, matching `dialect/src/lezer/wikilink.ts`.
+const EMBED_ANCHOR_RE = /[#^]/;
 // `![alt](path)` markdown image. Captures alt + path. Excludes URLs with a
 // scheme (http:, https:, data:, attachment:) — those are not local files.
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
@@ -411,6 +417,23 @@ function isUrlLike(dest: string): boolean {
  * in document order. Form-C embeds (`![[att:…]]`) and URL-bearing markdown
  * images are excluded (nothing to convert). Pure; the convert command feeds
  * the result into the diff preview.
+ *
+ * A `![[…]]` embed whose target does NOT name media is a **note embed**, and
+ * it is excluded here — it is not an image ref, so there is nothing to import
+ * and nothing to rewrite. Myne treats `![[Note]]` as first class everywhere
+ * else (`extractWikilinkEdges` keeps it as a graph edge flagged `embed`,
+ * rename propagation rewrites inside it, `markdown-dialect.md` §3.5 lists the
+ * form), and this was the one path with no concept of a note target: the
+ * media pipeline resolved `Meeting Notes` against the media index, missed,
+ * and replaced the whole span with `<!-- omitted attachment: … -->` — losing
+ * the embed and its graph edge, and reporting it as missing media
+ * (myne-md/myne#223). Discrimination is `isMediaTarget`'s whitelist, the same
+ * one the graph model uses, so a dotted note title (`![[2024.review]]`) is
+ * not false-excluded and a hand-typed `![[Note.md]]` reads as the note it is.
+ *
+ * The `![alt](path)` arm keeps taking any local path: markdown-image syntax
+ * is unambiguously a media form, and gating it on the whitelist would drop
+ * legitimate images with unlisted extensions.
  */
 export function findImportedImageRefs(body: string): readonly ImportedImageRef[] {
   const out: ImportedImageRef[] = [];
@@ -420,6 +443,9 @@ export function findImportedImageRefs(body: string): readonly ImportedImageRef[]
   while ((m = WIKILINK_EMBED_RE.exec(body)) !== null) {
     const target = m[1].trim();
     if (target === "") continue;
+    const anchor = target.search(EMBED_ANCHOR_RE);
+    const bare = anchor === -1 ? target : target.slice(0, anchor);
+    if (!isMediaTarget(bare)) continue; // note embed — left byte-for-byte alone
     out.push({
       kind: "wikilink-embed",
       from: m.index,
