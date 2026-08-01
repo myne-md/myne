@@ -35,6 +35,7 @@ import {
   AI_TRUST_HEADLINE,
 } from "../../lib/load-bearing-copy";
 import { Switch } from "../primitives/Switch";
+import { SettingRow } from "./SettingRow";
 import {
   BLOCK_STYLE,
   FOLDER_TEXTAREA_STYLE,
@@ -287,20 +288,19 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
       <h3 style={TITLE_STYLE}>{t("settings.ai.title")}</h3>
 
       {/* Opt-in toggle. */}
-      <div style={BLOCK_STYLE}>
-        <div style={TOGGLE_ROW_STYLE}>
-          <label style={LABEL_STYLE} htmlFor="ai-enable-toggle">
-            {t("settings.ai.enableLabel")}
-          </label>
+      <SettingRow
+        label={t("settings.ai.enableLabel")}
+        helper={t("settings.ai.enableHelper")}
+        control={(helperId) => (
           <Switch
             checked={aiEnabled}
             onChange={(next) => void setAiEnabled(next)}
             ariaLabel={t("settings.ai.enableLabel")}
+            ariaDescribedBy={helperId}
             testId="ai.enable-toggle"
           />
-        </div>
-        <p style={HELPER_STYLE}>{t("settings.ai.enableHelper")}</p>
-      </div>
+        )}
+      />
 
       {/* Trust affordance — load-bearing copy, rendered verbatim (SYNC-16). */}
       <div style={BLOCK_STYLE}>
@@ -346,27 +346,27 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
           that lands the weights. Without it the switch persists `true` against
           a host that answers `not_ready` forever and a band that never appears,
           which is a control that lies by omission. */}
-      <div style={BLOCK_STYLE} data-setting-anchor="ai.auto-tag">
-        <div style={TOGGLE_ROW_STYLE}>
-          {/* No `htmlFor`: `Switch` renders a `role="switch"` button with no id
-              (the accessible name is its `ariaLabel`), so a for-target would
-              dangle — the same shape as the models label below. */}
-          <label style={LABEL_STYLE}>{t("settings.ai.autoTagLabel")}</label>
+      <SettingRow
+        anchorId="ai.auto-tag"
+        label={t("settings.ai.autoTagLabel")}
+        helper={t("settings.ai.autoTagHelper")}
+        control={(helperId) => (
           <Switch
             checked={autoTag}
             disabled={!aiEnabled || tagModel === false}
             onChange={(next) => void setAutoTagEnabled(next)}
             ariaLabel={t("settings.ai.autoTagLabel")}
+            ariaDescribedBy={helperId}
             testId="ai.auto-tag-toggle"
           />
-        </div>
-        <p style={HELPER_STYLE}>{t("settings.ai.autoTagHelper")}</p>
+        )}
+      >
         {tagModel === false && (
           <p data-testid="ai.auto-tag-unavailable" style={{ ...HELPER_STYLE, color: "var(--fg-2)" }}>
             {t("settings.ai.autoTagUnavailable")}
           </p>
         )}
-      </div>
+      </SettingRow>
 
       {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended
           links open in the user's browser; the pickers take the downloaded

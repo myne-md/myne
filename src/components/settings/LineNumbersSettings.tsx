@@ -8,18 +8,11 @@
 // nonce, so the open editor (its own `usePrefs`) re-reads and reconfigures its
 // line-number compartment live (no remount).
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { prefsRead, setEditorLineNumbers } from "../../lib/prefs";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 export function LineNumbersSettings() {
   const { t } = useTranslation();
@@ -55,20 +48,19 @@ export function LineNumbersSettings() {
   }
 
   return (
-    <>
-      <ControlBlock
-        label={t("settings.lineNumbers.label")}
-        helper={t("settings.lineNumbers.helper")}
-        control={
-          <Switch
-            checked={enabled}
-            onChange={() => toggle(!enabled)}
-            ariaLabel={t("settings.lineNumbers.label")}
-            testId="settings.line-numbers"
-          />
-        }
-      />
-      {error !== null && <p style={ERROR_STYLE}>{error}</p>}
-    </>
+    <SettingRow
+      label={t("settings.lineNumbers.label")}
+      helper={t("settings.lineNumbers.helper")}
+      error={error}
+      control={(helperId) => (
+        <Switch
+          checked={enabled}
+          onChange={() => toggle(!enabled)}
+          ariaLabel={t("settings.lineNumbers.label")}
+          ariaDescribedBy={helperId}
+          testId="settings.line-numbers"
+        />
+      )}
+    />
   );
 }

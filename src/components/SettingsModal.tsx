@@ -213,7 +213,13 @@ const BACKDROP_STYLE: CSSProperties = {
 };
 
 const MODAL_STYLE: CSSProperties = {
-  width: 720,
+  // 820 rather than 720 because the panels put the control beside its label
+  // (`SettingRow`). At 720 the content column was 436px — rail 220 plus two
+  // `--space-6` gutters — and the widest control the system offers is a 320px
+  // `SearchableSelect` trigger, which left the label ~100px and wrapped it in
+  // half the locales. 536px fits both. Still comfortably inside the 1100px
+  // default window.
+  width: 820,
   maxWidth: "calc(100vw - var(--space-7))",
   height: 600,
   maxHeight: "calc(100vh - var(--space-7))",

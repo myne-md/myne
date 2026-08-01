@@ -18,6 +18,7 @@ import { openPath } from "../../platform/opener";
 import { Button } from "../primitives/Button";
 import { AutomaticBackupBlock } from "./AutomaticBackupBlock";
 import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 
 // Module-scope memoized resolution. The vault path doesn't change
@@ -60,12 +61,6 @@ const PATH_DISPLAY_STYLE: CSSProperties = {
   userSelect: "text",
   WebkitUserSelect: "text",
   wordBreak: "break-all",
-};
-
-const BACKUP_BUTTON_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  gap: "var(--space-2)",
 };
 
 // Export block (MYND-211): row body + right-aligned action, per the
@@ -159,28 +154,26 @@ export function StoragePanel({
         }
       />
 
-      <ControlBlock
+      <SettingRow
         label={t("settings.storage.importLabel")}
         helper={t("settings.storage.importHelper")}
         control={
-          <div style={BACKUP_BUTTON_ROW_STYLE}>
-            <Button
-              variant="secondary"
-              onClick={onImportObsidian}
-              disabled={onImportObsidian === undefined}
-              data-testid="storage.import"
-            >
-              {t("settings.storage.importObsidian")}
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            onClick={onImportObsidian}
+            disabled={onImportObsidian === undefined}
+            data-testid="storage.import"
+          >
+            {t("settings.storage.importObsidian")}
+          </Button>
         }
       />
 
-      <ControlBlock
+      <SettingRow
         label={t("settings.storage.backupLabel")}
         helper={t("settings.storage.backupHelper")}
         control={
-          <div style={BACKUP_BUTTON_ROW_STYLE}>
+          <>
             <Button
               variant="secondary"
               onClick={onBackupVault}
@@ -197,7 +190,7 @@ export function StoragePanel({
             >
               {t("settings.storage.restoreBackup")}
             </Button>
-          </div>
+          </>
         }
       />
 

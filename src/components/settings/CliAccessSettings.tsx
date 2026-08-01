@@ -50,12 +50,12 @@ import {
   type CliAccessState,
 } from "../../lib/cli-access";
 import { Switch } from "../primitives/Switch";
+import { SettingRow } from "./SettingRow";
 import {
   BLOCK_STYLE,
   FOLDER_TEXTAREA_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
-  TOGGLE_ROW_STYLE,
 } from "./panel-styles";
 
 // The one `export PATH=…` line the user adds themselves. Mono + selectable;
@@ -201,27 +201,26 @@ export function CliAccessSettings({
 
   return (
     <>
-      <div
-        style={BLOCK_STYLE}
-        data-setting-anchor="privacy.cli-access"
-        data-testid="settings.cli-access"
-        data-enabled={String(enabled)}
-      >
-        <div style={TOGGLE_ROW_STYLE}>
-          <span style={LABEL_STYLE}>{t("settings.cliAccess.label")}</span>
+      <SettingRow
+        anchorId="privacy.cli-access"
+        testId="settings.cli-access"
+        stateAttrs={{ "data-enabled": String(enabled) }}
+        label={t("settings.cliAccess.label")}
+        helper={
+          enabled
+            ? t("settings.cliAccess.helperOn")
+            : t("settings.cliAccess.helperOff")
+        }
+        control={(helperId) => (
           <Switch
             checked={enabled}
             onChange={onSetEnabled}
             ariaLabel={t("settings.cliAccess.label")}
-            ariaDescribedBy="cli-access-helper"
+            ariaDescribedBy={helperId}
             testId="settings.cli-access-toggle"
           />
-        </div>
-        <p id="cli-access-helper" style={HELPER_STYLE}>
-          {enabled
-            ? t("settings.cliAccess.helperOn")
-            : t("settings.cliAccess.helperOff")}
-        </p>
+        )}
+      >
         {enabled && (
           <p style={HELPER_STYLE} data-testid="settings.cli-access-last-used">
             {lastUsedLabel(state.lastUsedSecsAgo, t)}
@@ -242,7 +241,7 @@ export function CliAccessSettings({
             </code>
           </div>
         )}
-      </div>
+      </SettingRow>
 
       {/* Exclusions stay editable with the door shut, on purpose: configuring
           them first and opening the door second is the safer order, and
@@ -277,29 +276,25 @@ export function CliAccessSettings({
         <p style={HELPER_STYLE}>{t("settings.cliAccess.excludedHelper")}</p>
       </div>
 
-      <div
-        style={BLOCK_STYLE}
-        data-setting-anchor="privacy.cli-rate-limit"
-        data-testid="settings.cli-rate-limit"
+      <SettingRow
+        anchorId="privacy.cli-rate-limit"
+        testId="settings.cli-rate-limit"
         // `null` (unset) and `false` both mean "the limit applies", which is why
         // this reflects the tri-state as the same boolean the Switch shows
         // rather than stringifying the raw prop.
-        data-limit-removed={String(rateLimitDisabled === true)}
-      >
-        <div style={TOGGLE_ROW_STYLE}>
-          <span style={LABEL_STYLE}>{t("settings.cliAccess.rateLimitLabel")}</span>
+        stateAttrs={{ "data-limit-removed": String(rateLimitDisabled === true) }}
+        label={t("settings.cliAccess.rateLimitLabel")}
+        helper={t("settings.cliAccess.rateLimitHelper")}
+        control={(helperId) => (
           <Switch
             checked={rateLimitDisabled === true}
             onChange={onSetRateLimitDisabled}
             ariaLabel={t("settings.cliAccess.rateLimitLabel")}
-            ariaDescribedBy="cli-rate-limit-helper"
+            ariaDescribedBy={helperId}
             testId="settings.cli-rate-limit-toggle"
           />
-        </div>
-        <p id="cli-rate-limit-helper" style={HELPER_STYLE}>
-          {t("settings.cliAccess.rateLimitHelper")}
-        </p>
-      </div>
+        )}
+      />
     </>
   );
 }

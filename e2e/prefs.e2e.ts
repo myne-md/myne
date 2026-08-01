@@ -23,6 +23,7 @@ import {
   createNote,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
+  ESCAPE_KEY,
   openSettings,
   selectPickerRow,
   switchToVault,
@@ -476,6 +477,77 @@ describeE2E("pf5 editor typography round-trip (editor-typography)", () => {
         await s.waitUntil(() => readsBack("settings.editor-font-family-sans"), {
           label: "font-family reads back sans",
         });
+      },
+    );
+  });
+});
+
+// The interface-language picker is the ONE Settings control that does not
+// touch `vault.prefs`: language must work pre-unlock, so it routes through
+// localStorage + `i18n.changeLanguage` (`LanguageSelect.tsx`). It lands here
+// anyway because it is a Settings control and this is the Settings-control
+// suite — and because myne-md/myne#182 moved it off the last native `<select>`
+// in the dialog onto `SearchableSelect`, which changed how it is DRIVEN: a
+// portal menu with a search box, not an OS popup. That is exactly the kind of
+// change a component test cannot see and a real WebView can.
+//
+// The scenario deliberately does NOT switch language: doing so would re-label
+// every subsequent assertion in the run. It proves the control opens, filters,
+// and offers the languages — the parts the migration could have broken.
+describeE2E("PF6 the interface-language picker is the app's own dropdown (#182)", () => {
+  it("opens a searchable menu of languages rather than an OS popup", async () => {
+    let password = "";
+    await scenario(
+      "pf6-language-picker",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        await openSettings(s, "appearance");
+
+        // The trigger summarises the active language. English is the fixture
+        // default, so that is what it must read before anything is clicked.
+        const trigger = await s.byTestId("settings.language-select");
+        if (!(await trigger.textContent()).includes("English")) {
+          throw new Error(
+            `language trigger did not summarise the active language: ${await trigger.textContent()}`,
+          );
+        }
+
+        // Opening portals the menu to <body> — above the modal's own layer.
+        // If the migration had left it behind the backdrop this is where it
+        // would show up, because the option below would be unclickable.
+        await trigger.click();
+        await s.byTestId("settings.language-select-menu", { timeoutMs: 10_000 });
+
+        // The search box is the whole reason this control is `SearchableSelect`
+        // rather than `Select`: 24 languages is past the point where scanning
+        // an unfiltered list is reasonable.
+        const search = await s.byTestId("settings.language-select-search");
+        await search.click();
+        await search.sendKeys("Deu");
+        await s.waitUntil(
+          async () =>
+            (await s.byTestIdAll("settings.language-select-option")).length === 1 || null,
+          { label: "search narrows the language list to one match" },
+        );
+        const [match] = await s.byTestIdAll("settings.language-select-option");
+        if (match === undefined || !(await match.textContent()).includes("Deutsch")) {
+          throw new Error("the filtered option was not the expected German entry");
+        }
+
+        // Esc closes without choosing — the language stays English, so the
+        // rest of the suite (and this scenario's own teardown) reads the same
+        // strings it always did.
+        await search.sendKeys(ESCAPE_KEY);
+        await s.waitForGone(testIdSelector("settings.language-select-menu"));
+        if (!(await (await s.byTestId("settings.language-select")).textContent()).includes("English")) {
+          throw new Error("dismissing the menu changed the active language");
+        }
+
+        await closeSettings(s);
       },
     );
   });

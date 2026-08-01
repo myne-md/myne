@@ -5,9 +5,9 @@
 // actual startup behaviour is applied in Editor.tsx's restore effect — this
 // panel only writes the preference.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import { Select, type SelectOption } from "../primitives/Select";
 import {
@@ -18,13 +18,6 @@ import {
 } from "../../lib/prefs";
 import { noteList, loadNoteBatch, type TitleRecord } from "../../notes";
 import i18n from "../../i18n";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 function noteName(rec: TitleRecord): string {
   return rec.title?.trim() || i18n.t("settings.files.startup.untitledNote");
@@ -107,39 +100,35 @@ export function StartupOpenSettings() {
   }
 
   return (
-    <ControlBlock
+    <SettingRow
       label={t("settings.files.startup.label")}
       helper={t("settings.files.startup.helper")}
+      error={error}
       control={
-        <div>
-          <Select
-            value={mode}
-            options={modeOptions}
-            onChange={(next) => void chooseMode(next)}
-            aria-label={t("settings.files.startup.label")}
-            testId="settings.startup-open-select"
-          />
-          {mode === "specific" && (
-            <div style={{ marginTop: "var(--space-2)" }}>
-              <SearchableSelect
-                options={noteOptions}
-                selected={noteId === null ? [] : [noteId]}
-                onChange={(next) => void chooseNote(next[0] ?? null)}
-                aria-label={t("settings.files.startup.noteLabel")}
-                testId="settings.startup-open-note-select"
-                placeholder={t("settings.files.startup.notePlaceholder")}
-                searchPlaceholder={t("settings.files.startup.searchPlaceholder")}
-                emptyText={t("settings.files.startup.searchEmpty")}
-              />
-            </div>
-          )}
-          {error && (
-            <p role="alert" style={ERROR_STYLE}>
-              {error}
-            </p>
-          )}
-        </div>
+        <Select
+          value={mode}
+          options={modeOptions}
+          onChange={(next) => void chooseMode(next)}
+          aria-label={t("settings.files.startup.label")}
+          testId="settings.startup-open-select"
+        />
       }
-    />
+    >
+      {/* The note picker only exists for "a specific note", and it is a
+          full-width control in its own right — so it sits under the row
+          rather than beside the label. */}
+      {mode === "specific" && (
+        <SearchableSelect
+          options={noteOptions}
+          selected={noteId === null ? [] : [noteId]}
+          onChange={(next) => void chooseNote(next[0] ?? null)}
+          aria-label={t("settings.files.startup.noteLabel")}
+          testId="settings.startup-open-note-select"
+          placeholder={t("settings.files.startup.notePlaceholder")}
+          searchPlaceholder={t("settings.files.startup.searchPlaceholder")}
+          emptyText={t("settings.files.startup.searchEmpty")}
+        />
+      )}
+    </SettingRow>
   );
 }

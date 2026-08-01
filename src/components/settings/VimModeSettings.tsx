@@ -15,16 +15,9 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { prefsRead, setEditorVimMode } from "../../lib/prefs";
 import { chordPolicyActive } from "../../editor/vim-chords";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 const CAVEAT_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -67,19 +60,20 @@ export function VimModeSettings() {
   }
 
   return (
-    <>
-      <ControlBlock
-        label={t("settings.vimMode.label")}
-        helper={t("settings.vimMode.helper")}
-        control={
-          <Switch
-            checked={enabled}
-            onChange={() => toggle(!enabled)}
-            ariaLabel={t("settings.vimMode.label")}
-            testId="settings.vim-mode"
-          />
-        }
-      />
+    <SettingRow
+      label={t("settings.vimMode.label")}
+      helper={t("settings.vimMode.helper")}
+      error={error}
+      control={(helperId) => (
+        <Switch
+          checked={enabled}
+          onChange={() => toggle(!enabled)}
+          ariaLabel={t("settings.vimMode.label")}
+          ariaDescribedBy={helperId}
+          testId="settings.vim-mode"
+        />
+      )}
+    >
       {/* The caveat is only true where `Mod` resolves to Ctrl; on macOS vim
           keeps its full Ctrl grammar, so showing it there would be a lie. */}
       {enabled && chordPolicyActive() && (
@@ -87,7 +81,6 @@ export function VimModeSettings() {
           {t("settings.vimMode.chordCaveat")}
         </p>
       )}
-      {error !== null && <p style={ERROR_STYLE}>{error}</p>}
-    </>
+    </SettingRow>
   );
 }

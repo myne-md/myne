@@ -15,9 +15,11 @@
 // registration can only happen inside an unlocked session — and turns it from a
 // surprise into a stated property. Factual, not alarming.
 
-import { useCallback, useMemo, useState, type CSSProperties, type ReactElement } from "react";
+import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
+import { SettingRow } from "./SettingRow";
+import { HELPER_STYLE } from "./panel-styles";
 import {
   REMINDER_IN_APP_ONLY_SENTENCE,
   REMINDER_OS_DISCLOSURE_SENTENCE,
@@ -26,22 +28,6 @@ import { setReminderHorizonDays, setRemindersEnabled } from "../../lib/prefs";
 import { showsInAppOnlyLimitation } from "../../lib/reminderPlatform";
 import { REMINDER_HORIZON_DAYS } from "../../lib/reminderSchedule";
 import { shiftDay, todayLocal } from "../../notes/taskFilters";
-
-const BLOCK_STYLE: CSSProperties = { marginBottom: 20 };
-const ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-};
-const LABEL_STYLE: CSSProperties = { fontSize: 14, color: "var(--fg-1)" };
-const HELPER_STYLE: CSSProperties = {
-  margin: "6px 0 0",
-  fontSize: 12,
-  lineHeight: 1.5,
-  color: "var(--fg-3)",
-};
-const ERROR_STYLE: CSSProperties = { margin: "6px 0 0", fontSize: 12, color: "var(--danger)" };
 
 export type ReminderSettingsProps = {
   enabled: boolean;
@@ -91,50 +77,36 @@ export function ReminderSettings({
   );
 
   return (
-    <div data-testid="settings.reminders">
-      <div style={BLOCK_STYLE}>
-        <div style={ROW_STYLE}>
-          <span style={LABEL_STYLE}>{t("settings.reminders.label")}</span>
-          <Switch
-            checked={enabled}
-            onChange={(next) => void toggleEnabled(next)}
-            ariaLabel={t("settings.reminders.aria")}
-            ariaDescribedBy="reminders-disclosure"
-            testId="settings.reminders-toggle"
-          />
-        </div>
-        {/* Load-bearing: rendered verbatim, never translated.
-
-            Which sentence the user sees follows what this build can actually do.
-            While reminders are in-app only, NOTHING leaves the encrypted vault —
-            there is no OS registration to store times in — so the disclosure of
-            that cost would be describing a leak that does not exist. The
-            limitation is stated instead, and the disclosure returns on the change
-            that makes it true. */}
-        {inAppOnly ? (
-          <p
-            id="reminders-disclosure"
-            style={HELPER_STYLE}
-            data-testid="settings.reminders.in-app-only"
-          >
-            {REMINDER_IN_APP_ONLY_SENTENCE}
-          </p>
-        ) : (
-          <p
-            id="reminders-disclosure"
-            style={HELPER_STYLE}
-            data-testid="settings.reminders.disclosure"
-          >
-            {REMINDER_OS_DISCLOSURE_SENTENCE}
-          </p>
-        )}
-        {error !== null && (
-          <p role="alert" style={ERROR_STYLE}>
-            {error}
-          </p>
-        )}
-      </div>
-
+    <SettingRow
+      testId="settings.reminders"
+      label={t("settings.reminders.label")}
+      // Load-bearing: rendered verbatim, never translated.
+      //
+      // Which sentence the user sees follows what this build can actually do.
+      // While reminders are in-app only, NOTHING leaves the encrypted vault —
+      // there is no OS registration to store times in — so the disclosure of
+      // that cost would be describing a leak that does not exist. The
+      // limitation is stated instead, and the disclosure returns on the change
+      // that makes it true.
+      helper={
+        inAppOnly ? REMINDER_IN_APP_ONLY_SENTENCE : REMINDER_OS_DISCLOSURE_SENTENCE
+      }
+      helperTestId={
+        inAppOnly
+          ? "settings.reminders.in-app-only"
+          : "settings.reminders.disclosure"
+      }
+      error={error}
+      control={(helperId) => (
+        <Switch
+          checked={enabled}
+          onChange={(next) => void toggleEnabled(next)}
+          ariaLabel={t("settings.reminders.aria")}
+          ariaDescribedBy={helperId}
+          testId="settings.reminders-toggle"
+        />
+      )}
+    >
       {/* The horizon line (task 13) belongs to the OS tier and is gated with it.
           A registration horizon is only something the user can observe when the
           operating system holds the registration; while reminders fire from the
@@ -146,7 +118,7 @@ export function ReminderSettings({
           {t("settings.reminders.horizon", { date: through })}
         </p>
       )}
-    </div>
+    </SettingRow>
   );
 }
 

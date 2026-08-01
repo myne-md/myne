@@ -25,18 +25,11 @@ import { isQuickUnlockError } from "../../types/quick-unlock-error";
 import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
 import { Switch } from "../primitives/Switch";
-import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
+import { SettingRow } from "./SettingRow";
+import { HELPER_STYLE } from "./panel-styles";
 
 /** Minimum PIN length — mirrors the Rust `pin::MIN_PIN_LEN`. */
 const MIN_PIN_LEN = 6;
-
-const ROW_STYLE = {
-  display: "flex",
-  flexDirection: "row" as const,
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-3)",
-};
 
 const SETUP_STYLE = {
   display: "flex",
@@ -155,9 +148,21 @@ export function QuickUnlockSettings() {
   const pinValid = /^\d+$/.test(pin) && pin.length >= MIN_PIN_LEN;
 
   return (
-    <div style={BLOCK_STYLE} data-testid="settings.quick-unlock">
-      <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>{t("settings.quickUnlock.title")}</span>
+    <SettingRow
+      testId="settings.quick-unlock"
+      label={t("settings.quickUnlock.title")}
+      helperTestId="settings.quick-unlock-status"
+      helper={
+        configured
+          ? t("settings.quickUnlock.helperConfigured", {
+              method:
+                status?.method === "biometric"
+                  ? t("settings.quickUnlock.methodTouchId")
+                  : t("settings.quickUnlock.methodPin"),
+            })
+          : t("settings.quickUnlock.helperNotConfigured")
+      }
+      control={(helperId) => (
         <Switch
           checked={configured || showPinSetup}
           onChange={(next) => {
@@ -170,21 +175,11 @@ export function QuickUnlockSettings() {
             }
           }}
           ariaLabel={t("settings.quickUnlock.title")}
-          ariaDescribedBy="quick-unlock-helper"
+          ariaDescribedBy={helperId}
           testId="settings.quick-unlock-toggle"
         />
-      </div>
-      <p id="quick-unlock-helper" style={HELPER_STYLE} data-testid="settings.quick-unlock-status">
-        {configured
-          ? t("settings.quickUnlock.helperConfigured", {
-              method:
-                status?.method === "biometric"
-                  ? t("settings.quickUnlock.methodTouchId")
-                  : t("settings.quickUnlock.methodPin"),
-            })
-          : t("settings.quickUnlock.helperNotConfigured")}
-      </p>
-
+      )}
+    >
       {!configured && showPinSetup && (
         <div style={SETUP_STYLE}>
           <Input
@@ -235,6 +230,6 @@ export function QuickUnlockSettings() {
           {error}
         </p>
       )}
-    </div>
+    </SettingRow>
   );
 }

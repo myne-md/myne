@@ -3,10 +3,16 @@
 // encrypted `vault.prefs` blob — language is a device-local UI preference that
 // must work pre-unlock, so it routes through `setLanguage` (localStorage +
 // `i18n.changeLanguage`). See `src/i18n/config.ts`.
+//
+// The control is `SearchableSelect`, the same primitive Editor → spell uses for
+// its own "Languages" picker — the two used to be a custom dropdown and an
+// OS-native `<select>` respectively, which made one word name two
+// different-looking controls. 24 languages is past the point where a plain
+// `Select` is comfortable, so the search box earns its place.
 
-import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
+import { SearchableSelect } from "../primitives/SearchableSelect";
 import { setLanguage } from "../../i18n";
 import {
   SUPPORTED_CODES,
@@ -14,45 +20,39 @@ import {
   type LanguageCode,
 } from "../../i18n/config";
 
-const SELECT_STYLE: CSSProperties = {
-  alignSelf: "flex-start",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-2) var(--space-3)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  cursor: "pointer",
-};
+// The option labels are the languages' own endonyms, already in their own
+// script — they are NOT translated, so they come straight from the config
+// rather than through `t()`.
+const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((l) => ({
+  value: l.code,
+  label: l.label,
+}));
 
 export function LanguageSelect() {
   const { t, i18n } = useTranslation();
   // `resolvedLanguage` is the actually-active locale after fallback (e.g. a
   // regional `tr-TR` resolves to `tr`); guard against an unsupported value so
-  // the <select> always has a matching <option>.
+  // the trigger always summarises a real option.
   const active = i18n.resolvedLanguage ?? i18n.language;
   const value = SUPPORTED_CODES.includes(active) ? active : "en";
 
   return (
-    <ControlBlock
+    <SettingRow
       label={t("settings.language.label")}
       helper={t("settings.language.helper")}
+      anchorId="appearance.language"
       control={
-        <select
-          value={value}
-          onChange={(e) => setLanguage(e.currentTarget.value as LanguageCode)}
-          style={SELECT_STYLE}
+        <SearchableSelect
+          options={LANGUAGE_OPTIONS}
+          selected={[value as LanguageCode]}
+          onChange={(next) => {
+            const chosen = next[0];
+            if (chosen === undefined) return;
+            setLanguage(chosen);
+          }}
           aria-label={t("settings.language.label")}
-          data-testid="settings.language-select"
-        >
-          {SUPPORTED_LANGUAGES.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.label}
-            </option>
-          ))}
-        </select>
+          testId="settings.language-select"
+        />
       }
     />
   );

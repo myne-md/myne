@@ -9,6 +9,7 @@
 import { useEffect, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
+import { ERROR_STYLE } from "./panel-styles";
 import { prefsRead, setEditorToolbarHidden, setEditorToolbarOrder } from "../../lib/prefs";
 import { resolveBarOrder, reorderByDrop } from "../../notes/barItemsOrder";
 import {
@@ -98,13 +99,6 @@ const ARROW_DISABLED_STYLE: CSSProperties = {
   opacity: 0.35,
   cursor: "default",
 };
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
-
 export function ToolbarCustomizeSettings() {
   const { t } = useTranslation();
   const [order, setOrder] = useState<string[]>([...EDITOR_TOOLBAR_DEFAULT_ORDER]);

@@ -14,19 +14,12 @@
 // persisted value host-side before it decrypts anything, so a WebView that
 // forges or skips the setter gains nothing.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { Switch } from "../primitives/Switch";
 import { prefsRead, setTranscriptionEnabled } from "../../lib/prefs";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 export function TranscriptionPanel() {
   const { t } = useTranslation();
@@ -65,19 +58,20 @@ export function TranscriptionPanel() {
 
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.transcription-panel">
-      <ControlBlock
+      <SettingRow
         label={t("settings.transcription.label")}
         helper={t("settings.transcription.helper")}
-        control={
+        error={error}
+        control={(helperId) => (
           <Switch
             checked={enabled}
             onChange={(next) => void toggle(next)}
             ariaLabel={t("settings.transcription.label")}
+            ariaDescribedBy={helperId}
             testId="settings.transcription"
           />
-        }
+        )}
       />
-      {error !== null && <p style={ERROR_STYLE}>{error}</p>}
     </div>
   );
 }

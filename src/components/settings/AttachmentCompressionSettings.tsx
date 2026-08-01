@@ -23,19 +23,12 @@
 // Default state is ON, not off: starting from `false` and correcting after
 // the disk read would flash the wrong answer for effectively every vault.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { Switch } from "../primitives/Switch";
 import { has } from "../../platform/capabilities";
 import { prefsRead, setAttachmentCompressionEnabled } from "../../lib/prefs";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 export function AttachmentCompressionSettings() {
   const { t } = useTranslation();
@@ -74,20 +67,19 @@ export function AttachmentCompressionSettings() {
     : t("settings.attachmentCompression.helperScopeNotHere");
 
   return (
-    <>
-      <ControlBlock
-        label={t("settings.attachmentCompression.label")}
-        helper={`${t("settings.attachmentCompression.helper")} ${scope}`}
-        control={
-          <Switch
-            checked={enabled}
-            onChange={(next) => void toggle(next)}
-            ariaLabel={t("settings.attachmentCompression.label")}
-            testId="settings.attachment-compression"
-          />
-        }
-      />
-      {error !== null && <p style={ERROR_STYLE}>{error}</p>}
-    </>
+    <SettingRow
+      label={t("settings.attachmentCompression.label")}
+      helper={`${t("settings.attachmentCompression.helper")} ${scope}`}
+      error={error}
+      control={(helperId) => (
+        <Switch
+          checked={enabled}
+          onChange={(next) => void toggle(next)}
+          ariaLabel={t("settings.attachmentCompression.label")}
+          ariaDescribedBy={helperId}
+          testId="settings.attachment-compression"
+        />
+      )}
+    />
   );
 }

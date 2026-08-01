@@ -11,13 +11,13 @@
 // languages (TR deferred, SYNC-12); the picker lists exactly the manifest, so
 // adding a bundled language surfaces here with no edit.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
-import { BLOCK_STYLE, LABEL_STYLE, HELPER_STYLE } from "./panel-styles";
+import { ERROR_STYLE } from "./panel-styles";
 import {
   prefsRead,
   setSpellEnabled,
@@ -29,13 +29,6 @@ import {
   setActiveSpellLanguages,
 } from "../../lib/spell";
 import { setSpellConfig } from "../../editor/decorations/spell";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 /** Human label (native endonym) for a BCP-47 tag. Falls back to the raw tag for
  *  any future bundled language without an entry here. */
@@ -137,40 +130,40 @@ export function SpellSettings() {
 
   return (
     <>
-      <ControlBlock
+      <SettingRow
         label={t("settings.spell.label")}
         helper={t("settings.spell.helper")}
-        control={
+        control={(helperId) => (
           <Switch
             checked={enabled}
             onChange={() => void toggleEnabled(!enabled)}
             ariaLabel={t("settings.spell.label")}
+            ariaDescribedBy={helperId}
             testId="settings.spell-check"
+          />
+        )}
+      />
+
+      <SettingRow
+        label={t("settings.spell.languagesLabel")}
+        helper={t("settings.spell.languagesHelper")}
+        control={
+          <SearchableSelect
+            multiple
+            options={LANG_OPTIONS}
+            selected={active}
+            onChange={(next) => void setLanguages(next)}
+            disabled={!enabled}
+            aria-label={t("settings.spell.languagesAriaLabel")}
+            testId="settings.spell-language-select"
+            placeholder={t("settings.spell.languagesPlaceholder")}
+            searchPlaceholder={t("settings.spell.languagesSearchPlaceholder")}
+            emptyText={t("settings.spell.languagesSearchEmpty")}
           />
         }
       />
 
-      <div style={BLOCK_STYLE}>
-        <span style={LABEL_STYLE} id="spell-langs-label">
-          {t("settings.spell.languagesLabel")}
-        </span>
-        <SearchableSelect
-          multiple
-          options={LANG_OPTIONS}
-          selected={active}
-          onChange={(next) => void setLanguages(next)}
-          disabled={!enabled}
-          aria-label={t("settings.spell.languagesAriaLabel")}
-          testId="settings.spell-language-select"
-          placeholder={t("settings.spell.languagesPlaceholder")}
-          searchPlaceholder={t("settings.spell.languagesSearchPlaceholder")}
-          emptyText={t("settings.spell.languagesSearchEmpty")}
-        />
-        <p style={HELPER_STYLE}>
-          {t("settings.spell.languagesHelper")}
-        </p>
-      </div>
-
+      {/* Either the toggle or the language set can set this. */}
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}
     </>
   );

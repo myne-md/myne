@@ -19,7 +19,7 @@ import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
 import { Button } from "../primitives/Button";
 import { ThemeChiplet } from "../primitives/ThemeChiplet";
-import { LABEL_STYLE, HELPER_STYLE, BLOCK_STYLE } from "./panel-styles";
+import { BLOCK_STYLE, ERROR_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 import {
   listCustomThemes,
   readCustomTheme,
@@ -35,13 +35,6 @@ import { applyCustomTheme, applyTheme } from "../../lib/theme";
 import { describeImportError } from "../../lib/theme-errors";
 import { saveJsonAsFile } from "../../lib/secret-export";
 import { exportedBasename } from "../../notes/exportFlow";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 const LIST_STYLE: CSSProperties = {
   display: "flex",

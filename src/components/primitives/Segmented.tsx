@@ -34,6 +34,10 @@ interface SegmentedProps {
   onChange: (value: string) => void;
   /** Accessible group name. */
   ariaLabel: string;
+  /** Per-segment accessible name. Defaults to the segment's own label; supply
+   *  this where the caption alone reads oddly out of context (the theme picker
+   *  announces "Switch to the Dark theme", not "Dark"). */
+  optionAriaLabel?: (option: SegmentedOption) => string;
   /** Root `data-testid`; segments derive `${testId}-${option.value}`. */
   testId?: string;
 }
@@ -94,6 +98,7 @@ export function Segmented({
   value,
   onChange,
   ariaLabel,
+  optionAriaLabel,
   testId,
 }: SegmentedProps) {
   const segmentRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -128,7 +133,7 @@ export function Segmented({
               type="button"
               role="radio"
               aria-checked={selected}
-              aria-label={o.label}
+              aria-label={optionAriaLabel ? optionAriaLabel(o) : o.label}
               data-testid={testId ? `${testId}-${o.value}` : undefined}
               data-value={o.value}
               data-active={selected ? "true" : "false"}

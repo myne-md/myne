@@ -14,10 +14,10 @@
 // Default state is ON, not off: starting from `false` and correcting after the
 // disk read would flash the wrong answer for effectively every vault.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { listen } from "../../platform/event";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { HELPER_STYLE } from "./panel-styles";
 import { Switch } from "../primitives/Switch";
 import {
@@ -26,13 +26,6 @@ import {
   setAttachmentOcrEnabled,
   type OcrBacklogProgress,
 } from "../../lib/prefs";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 export function AttachmentOcrSettings() {
   const { t } = useTranslation();
@@ -82,25 +75,25 @@ export function AttachmentOcrSettings() {
   }
 
   return (
-    <>
-      <ControlBlock
-        label={t("settings.attachmentOcr.label")}
-        helper={t("settings.attachmentOcr.helper")}
-        control={
-          <Switch
-            checked={enabled}
-            onChange={(next) => void toggle(next)}
-            ariaLabel={t("settings.attachmentOcr.label")}
-            testId="settings.attachment-ocr"
-          />
-        }
-      />
+    <SettingRow
+      label={t("settings.attachmentOcr.label")}
+      helper={t("settings.attachmentOcr.helper")}
+      error={error}
+      control={(helperId) => (
+        <Switch
+          checked={enabled}
+          onChange={(next) => void toggle(next)}
+          ariaLabel={t("settings.attachmentOcr.label")}
+          ariaDescribedBy={helperId}
+          testId="settings.attachment-ocr"
+        />
+      )}
+    >
       {remaining > 0 && (
         <p style={HELPER_STYLE} data-testid="settings.attachment-ocr-progress">
           {t("settings.attachmentOcr.processing", { count: remaining })}
         </p>
       )}
-      {error !== null && <p style={ERROR_STYLE}>{error}</p>}
-    </>
+    </SettingRow>
   );
 }

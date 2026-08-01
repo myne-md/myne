@@ -21,13 +21,8 @@ import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { CliAccessSettings } from "./CliAccessSettings";
 import { QuickUnlockSettings } from "./QuickUnlockSettings";
-import {
-  BLOCK_STYLE,
-  HELPER_STYLE,
-  LABEL_STYLE,
-  PANEL_ROOT_STYLE,
-  TOGGLE_ROW_STYLE,
-} from "./panel-styles";
+import { SettingRow } from "./SettingRow";
+import { PANEL_ROOT_STYLE } from "./panel-styles";
 
 // MYND-160 grill Q2.1 disclosure: when the user toggles off, the
 // helper text MUST disclose the off-after-unlock semantic so a
@@ -45,55 +40,6 @@ function screenCaptureHelperText(
     return t("settings.privacy.screenCaptureHelperOn");
   }
   return t("settings.privacy.screenCaptureHelperOff");
-}
-
-interface ToggleRowProps {
-  label: string;
-  ariaLabel: string;
-  helper: string;
-  ariaDescribedBy: string;
-  checked: boolean;
-  /**
-   * When omitted, the toggle is rendered as a disabled placeholder
-   * (no `onClick`, `aria-disabled=true`, dimmed visuals). When
-   * supplied, the toggle is interactive — `aria-disabled` is omitted,
-   * cursor is `pointer`, click fires the callback.
-   */
-  onToggle?: (next: boolean) => void;
-  /** Optional `data-testid` forwarded to the Switch for E2E targeting. */
-  testId?: string;
-  /** Optional settings-search anchor (MYND-536) on the block root, so a search
-   *  result can scroll this row into view and flash it. */
-  anchorId?: string;
-}
-
-function ToggleRow({
-  label,
-  ariaLabel,
-  helper,
-  ariaDescribedBy,
-  checked,
-  onToggle,
-  testId,
-  anchorId,
-}: ToggleRowProps) {
-  return (
-    <div style={BLOCK_STYLE} data-setting-anchor={anchorId}>
-      <div style={TOGGLE_ROW_STYLE}>
-        <span style={LABEL_STYLE}>{label}</span>
-        <Switch
-          checked={checked}
-          onChange={onToggle}
-          ariaLabel={ariaLabel}
-          ariaDescribedBy={ariaDescribedBy}
-          testId={testId}
-        />
-      </div>
-      <p id={ariaDescribedBy} style={HELPER_STYLE}>
-        {helper}
-      </p>
-    </div>
-  );
 }
 
 // MYND-121 auto-lock-on-idle timeout selector. Options sit within the backend
@@ -139,11 +85,10 @@ interface AutoLockRowProps {
 function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
   const { t } = useTranslation();
   return (
-    <div style={BLOCK_STYLE}>
-      <div style={TOGGLE_ROW_STYLE}>
-        <span style={LABEL_STYLE} id="auto-lock-label">
-          {t("settings.privacy.autoLockLabel")}
-        </span>
+    <SettingRow
+      label={t("settings.privacy.autoLockLabel")}
+      helper={t("settings.privacy.autoLockHelper")}
+      control={
         <SearchableSelect
           options={AUTO_LOCK_SELECT_OPTIONS}
           selected={[String(seconds)]}
@@ -156,11 +101,8 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
           searchPlaceholder={t("settings.privacy.autoLockSearchPlaceholder")}
           emptyText={t("settings.privacy.autoLockSearchEmpty")}
         />
-      </div>
-      <p id="auto-lock-helper" style={HELPER_STYLE}>
-        {t("settings.privacy.autoLockHelper")}
-      </p>
-    </div>
+      }
+    />
   );
 }
 
@@ -188,16 +130,20 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   } = usePrefs(onShowToast);
   return (
     <div style={PANEL_ROOT_STYLE}>
-      <ToggleRow
+      <SettingRow
         label={t("settings.privacy.screenCaptureLabel")}
-        ariaLabel={t("settings.privacy.screenCaptureLabel")}
-        ariaDescribedBy="screen-capture-protection-helper"
         helper={screenCaptureHelperText(prefs.screen_capture_protection, t)}
-        checked={prefs.screen_capture_protection}
-        onToggle={(next) => {
-          void toggleScreenCapture(next);
-        }}
         anchorId="privacy.screen-capture"
+        control={(helperId) => (
+          <Switch
+            checked={prefs.screen_capture_protection}
+            onChange={(next) => {
+              void toggleScreenCapture(next);
+            }}
+            ariaLabel={t("settings.privacy.screenCaptureLabel")}
+            ariaDescribedBy={helperId}
+          />
+        )}
       />
       <AutoLockRow
         seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}
