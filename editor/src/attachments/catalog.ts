@@ -146,10 +146,14 @@ const catalogLoaderPlugin = ViewPlugin.fromClass(
       }
       if (this.destroyed) return;
       // The decorations were built against the pre-warm answers, so they have to
-      // be rebuilt — dispatching the catalog we already hold is the cheapest
-      // repaint that invalidates them without touching the document.
+      // be rebuilt. Re-dispatching the SAME map reference was inert: the embed
+      // plugin rebuilds only when `catalogField`'s VALUE changes, so the widgets
+      // kept their pre-warm (placeholder) URLs and never repainted (#211). Copy
+      // the map so the field reference genuinely changes — same content, new
+      // identity — which flips `catalogChanged` and rebuilds the embeds against
+      // the now-resolved object URLs.
       const current = view.state.field(catalogField, false);
-      if (current != null) view.dispatch({ effects: setCatalog.of(current) });
+      if (current != null) view.dispatch({ effects: setCatalog.of(new Map(current)) });
     }
 
     destroy() {

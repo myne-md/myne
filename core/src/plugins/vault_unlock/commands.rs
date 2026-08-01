@@ -304,6 +304,24 @@ pub(crate) async fn run_post_unlock_pipeline(
     // surface is unchanged** — the user's unlock succeeds regardless.
     apply_persisted_prefs(host, state, hooks, io).await;
 
+    // ---- MYND-649: rebuild the attachment reference graph ---------------
+    //
+    // The "used in N notes" graph is RAM-only: it is zeroized on every lock and
+    // was only ever written by `attachment_refs_apply` when a note is SAVED. So
+    // after any app start every attachment reported "used in 0 notes" until its
+    // referencing note happened to be re-saved. It has no disk form to reload
+    // (unlike vault.indices/MYI1), so the rebuild reads the notes. Run it here,
+    // AWAITED and BEFORE the search hydrate: it is the cheaper walk and the
+    // attachment library can be opened the moment the editor mounts, so a
+    // detached rebuild would race it and paint zeros that then silently change.
+    // The core is fail-closed (a partial walk aborts rather than installing an
+    // under-reporting graph — under-reporting is what would make a delete
+    // warning lie about which notes it breaks) and best-effort like the hydrates
+    // below (it never blocks the unlock). No-op where the client keeps no graph:
+    // the web client has none (its `zeroize_attachment_refs` revokes blob URLs
+    // instead), and a no-plugin/headless build inherits the `NoopHooks` no-op.
+    hooks.hydrate_attachment_refs(state).await;
+
     // ---- MYND-29 Task 7: hydrate the search index ----------------------
     //
     // Load `vault.search` (fast path) + incrementally reconcile against the

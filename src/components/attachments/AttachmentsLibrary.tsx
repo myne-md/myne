@@ -461,10 +461,17 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     [entries, refresh],
   );
 
-  const openDeleteDialog = useCallback(async (entry: CatalogEntry) => {
-    const noteIds = await referencingNotes(entry.id);
-    setDeleteTarget({ entry, noteIds });
-  }, []);
+  const openDeleteDialog = useCallback(
+    async (entry: CatalogEntry) => {
+      // Warn only about notes the user actually sees — a conflict copy that
+      // embeds the attachment is not a separate note to the user (#212).
+      const noteIds = (await referencingNotes(entry.id)).filter((id) =>
+        isLiveReferencingNote(ctx.cache, id),
+      );
+      setDeleteTarget({ entry, noteIds });
+    },
+    [ctx.cache],
+  );
 
   const handleDeleteConfirm = useCallback(async () => {
     if (deleteTarget === null) return;
@@ -943,6 +950,27 @@ function RenameInput({
  * note-ids are still fetched locally per-tile (cheap reconcile query) — only
  * the open/closed flag is lifted.
  */
+/** A referencing-note id counts toward "used in N notes" (and the delete
+ *  warning's list) only if it is a note the user actually sees. Excludes
+ *  conflict copies — which otherwise list the same note title once per copy
+ *  (#212) — plus trashed / deleted / archived / template records, matching
+ *  `liveCache`'s per-record predicate. An id absent from the title cache is
+ *  dropped as unknown. */
+function isLiveReferencingNote(
+  cache: ReadonlyMap<NoteId, import("../../notes/loadNoteBatch").TitleRecord>,
+  id: string,
+): boolean {
+  const r = cache.get(id as NoteId);
+  return (
+    r !== undefined &&
+    r.conflict !== true &&
+    r.trashed == null &&
+    r.deleted == null &&
+    r.archived == null &&
+    r.template !== true
+  );
+}
+
 function UsedInNotes({
   attachmentId,
   cache,
@@ -972,7 +1000,13 @@ function UsedInNotes({
     };
   }, [attachmentId]);
 
-  const n = noteIds?.length ?? 0;
+  // Count/list only the notes the user actually sees: conflict copies otherwise
+  // show the same note title once per copy (#212). Loading (null) is preserved.
+  const liveNoteIds =
+    noteIds === null
+      ? null
+      : noteIds.filter((id) => isLiveReferencingNote(cache, id));
+  const n = liveNoteIds?.length ?? 0;
   return (
     <div style={{ position: "relative" }}>
       <button
@@ -1000,9 +1034,9 @@ function UsedInNotes({
           ? t("attachments.library.usedInLoading")
           : t("attachments.library.usedInCount", { count: n })}
       </button>
-      {open && noteIds !== null && (
+      {open && liveNoteIds !== null && (
         <UsedInNotesPopover
-          noteIds={noteIds}
+          noteIds={liveNoteIds}
           cache={cache}
           onJump={onJump}
           onClose={onClose}
