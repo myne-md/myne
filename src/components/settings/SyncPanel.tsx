@@ -45,6 +45,7 @@ import { useDevices } from "../../hooks/useDevices";
 import { useAccountStatus } from "../../hooks/useAccountStatus";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
+import { canAddThisDevice } from "../../lib/enroll-gate";
 import {
   PANEL_ROOT_STYLE,
   BLOCK_STYLE,
@@ -71,26 +72,10 @@ export function SyncPanel() {
   // the route — self-hosted or older — in which case the block is simply not
   // rendered: no error, no hosted-only concept, no upsell.
   const { status: accountStatus } = useAccountStatus();
-  // "Add a device" enrolls THIS device into an account; once this device is an
-  // approved member it can never be re-added, so the form is dead UI — hide it.
-  // It stays visible while not-yet-a-member (never enrolled, pending approval,
-  // or removed-elsewhere/reset), so re-adding after a reset still works. Hidden
-  // until enrollment is positively known, to avoid flashing the form for an
-  // already-enrolled device on the first poll.
-  const enrolledHere = (devicesHook.devices ?? []).some(
-    (d) => d.is_current && d.approved && !d.retired,
-  );
-  const enrollmentKnown =
-    devicesHook.devices !== null || devicesHook.error !== null;
-  // A device AWAITING APPROVAL must not be offered the enrol form (MYND-635).
-  //
-  // It reads as unenrolled from here and always will: a pending device holds no
-  // token, so the roster call fails `NotEnrolled` and `enrolledHere` can never
-  // become true. The form was therefore shown to exactly the person it cannot
-  // help — and using it does real harm, because enrolling mints a FRESH
-  // `device_id` and leaves a second pending record behind. Repeat that a few
-  // times and the account accumulates devices nobody can identify, each needing
-  // its own approval, while the one the user is sitting at still waits.
+  // Whether this device may be enrolled at all is `canAddThisDevice`, shared
+  // with mobile (`src/lib/enroll-gate.ts`, myne-md/myne-mobile#38) — the gate
+  // was fixed here in MYND-635 and mobile, which keeps its own tree, kept
+  // showing the row to an already-syncing phone. One predicate, three clients.
   //
   // `sync_status` is the arbiter rather than the roster, and that is the point:
   // the roster is the thing a pending device cannot read, so asking it "am I
@@ -99,7 +84,13 @@ export function SyncPanel() {
   // round trip.
   const { status: syncStatus } = useSyncStatus();
   const awaitingApproval = syncStatus?.state === "pending";
-  const showEnroll = enrollmentKnown && !enrolledHere && !awaitingApproval;
+  const showEnroll = canAddThisDevice(syncStatus?.state);
+  // Still roster-derived, because it asks something status cannot: the QR
+  // invite is only meaningful for a device the ACCOUNT lists as an approved
+  // member, and only the roster knows that.
+  const enrolledHere = (devicesHook.devices ?? []).some(
+    (d) => d.is_current && d.approved && !d.retired,
+  );
 
   // Cold-start "building search index…" state. Producer: the MYND-426 engine
   // re-derives vault.search/vault.indices after a full-reconcile or a fresh
@@ -318,7 +309,7 @@ export function SyncPanel() {
           the load-bearing list from those exported constants and fails if one
           appears as a catalog value, precisely so this sentence cannot acquire
           24 machine-filled variants. */}
-      {enrollmentKnown && !enrolledHere && awaitingApproval && (
+      {awaitingApproval && (
         <div style={BLOCK_STYLE} data-testid="sync.panel.awaiting-approval">
           <span style={SECTION_TITLE_STYLE}>
             {t("sync.panel.awaitingApproval.label")}

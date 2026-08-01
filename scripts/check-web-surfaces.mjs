@@ -198,6 +198,10 @@ const V = {
   ],
   "src/lib/device-name.ts": ["adapted", "The `web` platform token maps to 'Browser' so a browser device is distinguishable in the list (task 69)."],
   "src/lib/deviceJoinQr.ts": ["ported", "Pure payload encoding."],
+  "src/lib/enroll-gate.ts": [
+    "ported",
+    "Pure predicate over the `sync_status` state tag, shared with mobile by source alias; `sync_status` is dispatched on web, so the enrol gate answers there too.",
+  ],
   "src/lib/engine-error.ts": [
     "ported",
     "Pure shape reader over a rejection value; its AI callers are the ones the web build never reaches.",

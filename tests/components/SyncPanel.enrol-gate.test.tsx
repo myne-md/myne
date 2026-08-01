@@ -120,6 +120,20 @@ describe("the enrol gate, for a device that cannot read the roster", () => {
     });
   });
 
+  it("withholds it from a device that already holds a token", async () => {
+    // The roster still rejects here, exactly as in every case above — so this
+    // is the assertion that the ENROLLED case is now answered by status too,
+    // not by `enrolledHere`. It is also the case mobile got wrong
+    // (myne-md/myne-mobile#38): an already-syncing device shown "Add this
+    // device", where pressing it mints a second registration.
+    mountWith("idle");
+    await waitFor(() => {
+      expect(screen.getByTestId("sync.device-management")).toBeTruthy();
+    });
+    expect(screen.queryByText("Add a device")).toBeNull();
+    expect(screen.queryByTestId("sync.panel.awaiting-approval")).toBeNull();
+  });
+
   it("the roster failure alone does not decide it", async () => {
     // Both cases above see the SAME roster rejection. If the gate were still
     // reading only the roster, the two would render identically — so this
