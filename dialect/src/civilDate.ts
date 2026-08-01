@@ -271,6 +271,21 @@ export function advancePair(
   return { due: nextAnchor, remind: addDays(args.remind, shift) };
 }
 
+/**
+ * Today in the device's local timezone.
+ *
+ * The one place a clock is read, so every recurrence caller shares it rather
+ * than growing its own `new Date()`. It is still passed as a value everywhere
+ * downstream — nothing in this module reads it implicitly, because a hidden
+ * clock is untestable and, on a date boundary, non-deterministic.
+ *
+ * Local rather than UTC deliberately: a task due "today" means the user's today.
+ */
+export function todayCivilDate(): CivilDate {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+}
+
 /** Whole days from `a` to `b` (negative when `b` precedes `a`). */
 export function daysBetween(a: CivilDate, b: CivilDate): number {
   const ms =

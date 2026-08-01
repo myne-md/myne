@@ -6,6 +6,13 @@
 //
 // Click handler dispatches a CM6 transaction toggling the source `[ ]` ↔ `[x]`
 // so undo/redo treats it as a single step.
+//
+// A **recurring** task takes a different path first (myne#198): ticking one
+// materializes its next occurrence and un-ticking one removes the occurrence it
+// materialized, each as a single transaction carrying both changes. The
+// recurrence functions decline (`false`) on any line that is not a recurring
+// task, which is what leaves the ordinary flip below as the fallback rather than
+// as a branch this file has to decide between.
 
 import { syntaxTree } from "@codemirror/language";
 import { type Extension, type Range, RangeSetBuilder } from "@codemirror/state";
@@ -16,6 +23,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { makeDocOnlyDecorationPlugin } from "./plugin-factory";
+import { completeRecurringTask, uncompleteRecurringTask } from "./task-recurrence";
 
 class TaskCheckboxWidget extends WidgetType {
   constructor(
@@ -57,9 +65,24 @@ class TaskCheckboxWidget extends WidgetType {
     span.style.cursor = "pointer";
 
     const toggle = (): void => {
+      // Resolve the marker position live from the DOM rather than trusting the
+      // closure: if CM6 reused this widget's DOM, the captured `markerFrom`
+      // could be stale and the toggle would rewrite the wrong range. Read the
+      // current 3-char marker (`[ ]` / `[x]`) at that position and flip it.
       const from = view.posAtDOM(span);
       const current = view.state.doc.sliceString(from, from + 3);
       if (current !== "[ ]" && current !== "[x]" && current !== "[X]") return;
+
+      // The recurring paths go first, and each carries the marker flip itself —
+      // so a materialization and its flip ride ONE transaction and one undo
+      // restores both. Both decline on a line that is not a recurring task,
+      // leaving the plain flip below.
+      if (current === "[ ]") {
+        if (completeRecurringTask(view, from)) return;
+      } else if (uncompleteRecurringTask(view, from)) {
+        return;
+      }
+
       const next = current === "[ ]" ? "[x]" : "[ ]";
       view.dispatch({
         changes: { from, to: from + 3, insert: next },
@@ -78,18 +101,7 @@ class TaskCheckboxWidget extends WidgetType {
 
     span.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      // Resolve the marker position live from the DOM rather than trusting the
-      // closure: if CM6 reused this widget's DOM, the captured `markerFrom`
-      // could be stale and the toggle would rewrite the wrong range. Read the
-      // current 3-char marker (`[ ]` / `[x]`) at that position and flip it.
-      const from = view.posAtDOM(span);
-      const current = view.state.doc.sliceString(from, from + 3);
-      if (current !== "[ ]" && current !== "[x]" && current !== "[X]") return;
-      const next = current === "[ ]" ? "[x]" : "[ ]";
-      view.dispatch({
-        changes: { from, to: from + 3, insert: next },
-        userEvent: "task.toggle",
-      });
+      toggle();
     });
     return span;
   }

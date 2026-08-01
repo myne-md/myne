@@ -10,16 +10,23 @@
 //
 // The sequence is the load-bearing part, which is exactly why it must not exist
 // twice: flush dirty panes, verify the stored raw line still matches disk,
-// flip the marker, write with the content hash, and only then announce. Every
-// step is there because of a specific way a task write goes wrong, and two
-// copies would drift on whichever step a reader thought was incidental.
+// flip the marker (carrying a recurring task's next occurrence with it), write
+// with the content hash, and only then announce. Every step is there because of
+// a specific way a task write goes wrong, and two copies would drift on
+// whichever step a reader thought was incidental.
 //
 // Nothing here imports IO. `sha256Hex` is a pure hash, `isBaseMismatchError` is
-// a type guard, and `VaultTask` is a type — so this module resolves from any
-// client without pulling a platform in.
+// a type guard, `VaultTask` is a type, and the dialect helpers are line
+// arithmetic — so this module resolves from any client without pulling a
+// platform in.
 
 import { sha256Hex } from "./baseHash";
 import { isBaseMismatchError } from "../types/note-update-error";
+import { todayCivilDate, type CivilDate } from "../dialect/civilDate";
+import {
+  matchesMaterializedOccurrence,
+  planNextOccurrence,
+} from "../dialect/taskRecurrence";
 import type { VaultTask } from "./taskIndex";
 
 // Re-exported so a consumer needs only this module — `taskIndex.ts` itself is
@@ -86,13 +93,24 @@ export class TaskWriteRefused extends Error {
  * Optional-with-a-default is what made the original untransportable: a default
  * is an eager import. Every client names its own.
  */
-export type RequiredTaskWriteIo = Required<Omit<TaskWriteDeps, "flushDirtyPanes">> & {
+export type RequiredTaskWriteIo = Required<
+  Omit<TaskWriteDeps, "flushDirtyPanes" | "today">
+> & {
   flushDirtyPanes?: () => Promise<void>;
+  today?: () => CivilDate;
 };
 
 export type TaskWriteDeps = {
   /** Flush every pane with unsaved keystrokes. Omitted in tests. */
   flushDirtyPanes?: () => Promise<void>;
+  /**
+   * Today, for advancing a recurring task. Omitted → the system clock.
+   *
+   * Deliberately NOT part of the required set: every client already names its
+   * own IO for the other members, and making this one mandatory would break
+   * each of them for a value they have no opinion about.
+   */
+  today?: () => CivilDate;
   readNote?: (noteId: string) => Promise<string>;
   writeNote?: (noteId: string, body: string, baseHashHex: string) => Promise<unknown>;
   completeNoteTask?: (noteId: string) => Promise<void>;
@@ -135,6 +153,50 @@ export function flipMarker(line: string, completed: boolean): string | null {
 }
 
 /**
+ * Materialize or un-materialize a recurring task's next occurrence, in place.
+ *
+ * The mirror of what the editor's checkbox does (`@myne/editor`'s
+ * `completeRecurringTask` / `uncompleteRecurringTask`) — same computation, same
+ * conditions, applied to a line array instead of a CodeMirror document, because
+ * a task ticked from a list is usually in a note no pane has open. Both surfaces
+ * call the same dialect functions, so neither can drift from the other.
+ *
+ * `sourceLine` is the line as it stood BEFORE the marker flip: materialization
+ * reads the unticked line, and orphan detection recomputes from the ticked one.
+ *
+ * Line-count changes are safe here because the whole body is re-joined and
+ * written as one note, and the index is rebuilt from what was written — nothing
+ * downstream holds a line number across this call.
+ *
+ * A CRLF note's lines each end in a stray `\r` after the `\n` split. It is
+ * stripped before the arithmetic and restored after, so a materialized
+ * occurrence carries the file's own line ending rather than introducing a second
+ * one — the same care `flipMarker` takes by slicing rather than rebuilding.
+ */
+function applyRecurrence(
+  lines: string[],
+  lineIndex: number,
+  sourceLine: string,
+  completed: boolean,
+  today: CivilDate,
+): void {
+  const cr = sourceLine.endsWith("\r") ? "\r" : "";
+  const source = cr === "" ? sourceLine : sourceLine.slice(0, -1);
+
+  if (completed) {
+    const occurrence = planNextOccurrence(source, today);
+    if (occurrence !== null) lines.splice(lineIndex + 1, 0, `${occurrence}${cr}`);
+    return;
+  }
+
+  const successor = lines[lineIndex + 1];
+  if (successor === undefined) return;
+  // An occurrence we cannot positively identify is user content — leave it.
+  if (!matchesMaterializedOccurrence(source, successor.replace(/\r$/, ""), today)) return;
+  lines.splice(lineIndex + 1, 1);
+}
+
+/**
  * Complete or un-complete `task`. The one write path for every task surface.
  *
  * Rejects with {@link TaskWriteRefused} when the record cannot be written
@@ -153,6 +215,7 @@ export async function writeTaskCompletion(
     uncompleteNoteTask,
     announce,
     createConflictCopy,
+    today,
   } = io;
 
   // Flush BEFORE anything reads. A pane holding unsaved keystrokes has a newer
@@ -190,6 +253,10 @@ export async function writeTaskCompletion(
   if (next === current) return; // already in the requested state — no write
 
   lines[task.lineIndex] = next;
+  // A recurring task carries its next occurrence with it, in the SAME write —
+  // one note body, one hash guard, one snapshot. Reads `current`, the line as it
+  // stood before the flip.
+  applyRecurrence(lines, task.lineIndex, current, completed, (today ?? todayCivilDate)());
   const body = lines.join("\n");
 
   // The content-hash guard: if a sync pull-apply raced this write, the backend

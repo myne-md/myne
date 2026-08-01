@@ -25,7 +25,9 @@ import {
   applyTaskFieldEdit,
   beginTaskFieldEdit,
   chipRangesIn,
+  type TaskFieldEditHandle,
 } from "./decorations/task-chip";
+import { canSkipOccurrence, skipOccurrence } from "./decorations/task-recurrence";
 import i18n from "@myne/editor/i18n";
 
 /** Menu order — the same stable order the writer serializes in. */
@@ -80,6 +82,15 @@ export function openTaskFieldAdd(
  * reuses the seam. The menu is an anchored popover, not a blocking dialog, so it
  * uses the transparent-backdrop `openModal` shape `task-field-editor.ts` uses,
  * getting focus-trap + Esc + backdrop-click dismissal for free.
+ *
+ * A **skip** row joins the three when the caret's line carries a recurrence rule
+ * that can actually be advanced (myne#198). It sits below a separator because it
+ * is categorically different from its neighbours: the other rows open an editor
+ * to change a value, this one performs an action and closes. The test for
+ * showing it is deliberately "can this occurrence be skipped", not "does this
+ * line carry a repeat field" — offering an action that would silently do nothing
+ * on an unreadable or anchorless rule is the same failure the chip layer forbids
+ * itself in `decorations/task-chip.ts`.
  */
 export function openTaskFieldMenu(opts: {
   view: EditorView;
@@ -93,6 +104,11 @@ export function openTaskFieldMenu(opts: {
     present.add(span.kind);
   }
 
+  // Set when the skip row is offered — see its own comment below for why the
+  // line has to be tracked while the menu sits open. Ended on dismissal too, so
+  // an abandoned menu leaves no tracking behind.
+  let skipTracked: TaskFieldEditHandle | null = null;
+
   const modal = openModal({
     backdropStyle: {
       position: "fixed",
@@ -100,7 +116,10 @@ export function openTaskFieldMenu(opts: {
       background: "transparent",
       zIndex: "2147483000",
     },
-    onDismiss: () => modal.close(),
+    onDismiss: () => {
+      skipTracked?.end();
+      modal.close();
+    },
   });
 
   const surface = document.createElement("div");
@@ -129,6 +148,42 @@ export function openTaskFieldMenu(opts: {
       const rect = row.getBoundingClientRect();
       modal.close();
       openTaskFieldAdd(view, lineFrom, kind, rect);
+    });
+    if (firstRow === null) firstRow = row;
+    surface.appendChild(row);
+  }
+
+  if (canSkipOccurrence(line.text)) {
+    // Track the line for as long as the menu is open — the same stale-offset
+    // protection `openTaskFieldAdd` needs, for the same reason: a background
+    // autosave rewrites the frontmatter stamp about a second after any edit,
+    // and a menu is easily open for longer than that. Tracking must begin HERE
+    // rather than on click, since by click time the offsets have already moved.
+    // If the line is deleted while the menu is open, `current()` goes null and
+    // the skip declines rather than guessing.
+    skipTracked = beginTaskFieldEdit(view, {
+      from: line.from,
+      to: line.to,
+      kind: "repeat",
+    });
+
+    const separator = document.createElement("div");
+    separator.className = "cm-task-field-menu-sep";
+    separator.setAttribute("role", "separator");
+    surface.appendChild(separator);
+
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "cm-task-field-menu-row";
+    row.setAttribute("role", "menuitem");
+    row.setAttribute("data-testid", "editor.task-field-menu-skip");
+    row.textContent = i18n.t("editor.taskField.skipOccurrence");
+    row.addEventListener("click", () => {
+      const span = skipTracked?.current() ?? null;
+      skipTracked?.end();
+      skipTracked = null;
+      modal.close();
+      if (span !== null) skipOccurrence(view, span.from);
     });
     if (firstRow === null) firstRow = row;
     surface.appendChild(row);

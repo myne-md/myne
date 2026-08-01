@@ -1037,6 +1037,7 @@
       "menuEdit": "Edit {{field}}",
       "menuTitle": "Add field",
       "save": "Save",
+      "skipOccurrence": "Skip this occurrence",
       "title": {
         "due": "Due date",
         "repeat": "Repeat",

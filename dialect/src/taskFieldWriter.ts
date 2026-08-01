@@ -90,7 +90,18 @@ function stripFieldSpans(line: string, ranges: readonly ByteRange[]): string {
     cursor = r.end;
   }
   out += line.slice(cursor);
-  return out.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+$/, "");
+  // Collapsing runs of whitespace repairs the doubled separators that removing
+  // a field span leaves behind — but the LEADING run is not a separator, it is
+  // the list indentation, and collapsing it moves a sub-task up a level. Split
+  // it off, collapse the rest.
+  const indent = /^[ \t]*/.exec(out)![0];
+  return (
+    indent +
+    out
+      .slice(indent.length)
+      .replace(/[ \t]{2,}/g, " ")
+      .replace(/[ \t]+$/, "")
+  );
 }
 
 /**

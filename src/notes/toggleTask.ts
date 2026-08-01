@@ -111,6 +111,10 @@ export async function setTaskCompleted(
     uncompleteNoteTask: deps.uncompleteNoteTask ?? uncompleteNote,
     announce: deps.announce ?? announceWrite,
     createConflictCopy: deps.createConflictCopy ?? createConflictCopyImpl,
+    // Passed through rather than defaulted: the writer falls back to the system
+    // clock itself, and a default here would be a second place to change the
+    // day a recurring task advances from.
+    today: deps.today,
   });
 }
 
