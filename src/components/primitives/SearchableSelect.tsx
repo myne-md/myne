@@ -228,10 +228,19 @@ export function SearchableSelect<T extends string>({
     return () => unregister(close);
   }, [open, close]);
 
-  // Move focus into the search box on open so typing filters immediately.
+  // Move focus into the search box so typing filters immediately.
+  //
+  // Gated on `coords`, not on `open` alone: the menu is only portaled once the
+  // anchoring `useLayoutEffect` below has measured the trigger, which happens
+  // AFTER the render that flipped `open`. On that first render `searchRef` is
+  // still null and a focus keyed to `[open]` silently no-ops — so the very
+  // first open of any of these controls left focus wherever it was and typing
+  // went nowhere. It looked like it worked because `coords` is never cleared
+  // on close: every subsequent open re-rendered the portal immediately with
+  // the stale measurement, and only the first one was broken.
   useEffect(() => {
-    if (open) searchRef.current?.focus();
-  }, [open]);
+    if (open && coords !== null) searchRef.current?.focus();
+  }, [open, coords]);
 
   // Keep the active row in range as the filter narrows the list.
   useEffect(() => {
