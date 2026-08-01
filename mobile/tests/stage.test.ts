@@ -35,6 +35,32 @@ describe("transition()", () => {
     // editor.lock is not legal from welcome → unchanged
     expect(transition(prev, { type: "editor.lock" })).toBe(prev);
   });
+
+  // myne-mobile#40 — the join door exists on three surfaces, so all three
+  // `*.join-success` arms have to reach the joined vault's editor. Only
+  // `welcome`'s did, which is what made joining unreachable once a vault existed.
+  it("advances picker → editor on picker.join-success, carrying the joined vault id", () => {
+    expect(transition({ name: "picker" }, { type: "picker.join-success", vaultId: "v-joined" })).toEqual({
+      name: "editor",
+      vaultId: "v-joined",
+    });
+  });
+
+  it("re-addresses the editor at the joined vault on editor.join-success", () => {
+    // The stage NAME is unchanged, so this is the one legal pair the dev-only
+    // cross-product harness cannot distinguish from a rejected transition — the
+    // swapped payload is the whole point and is asserted only here.
+    const prev = { name: "editor", vaultId: "v-old" } as const;
+    const next = transition(prev, { type: "editor.join-success", vaultId: "v-joined" });
+    expect(next).toEqual({ name: "editor", vaultId: "v-joined" });
+    expect(next).not.toBe(prev); // a new object → AppShell's `next === prev` guard lets it through
+  });
+
+  it("keeps each join-success action scoped to the stage that owns its door", () => {
+    const prev = { name: "welcome" } as const;
+    expect(transition(prev, { type: "picker.join-success", vaultId: "v-joined" })).toBe(prev);
+    expect(transition(prev, { type: "editor.join-success", vaultId: "v-joined" })).toBe(prev);
+  });
 });
 
 describe("initialStageFromProbe()", () => {

@@ -28,6 +28,21 @@ import { Screen, PhoneColumn } from "../components";
 const ACTIVE_SLOT = "active-slot";
 
 /**
+ * Which stage a join was launched from → the action its success dispatches
+ * (myne-mobile#40). A lookup rather than a `${from}.join-success` template so
+ * the three action names stay greppable and the mapping is checked by the
+ * `Action` union rather than by contextual template-literal inference.
+ */
+const JOIN_SUCCESS = {
+  welcome: "welcome.join-success",
+  picker: "picker.join-success",
+  editor: "editor.join-success",
+} as const;
+
+/** The stages that offer a door into `JoinFlow` (keys of `JOIN_SUCCESS`). */
+type JoinEntry = keyof typeof JOIN_SUCCESS;
+
+/**
  * The real, wired mobile app — a port of the desktop App.tsx Stage machine.
  * Boots from the vault-list + active-slot probes, dispatches `transition`
  * actions, and mounts the functional flow for the current stage. The static
@@ -43,10 +58,13 @@ export function AppShell() {
   // the two never diverge.
   const stageRef = useRef<Stage | null>(null);
   const probed = useRef(false);
-  // Fresh-device sync-join overlay. Rendered full-screen WHILE the stage stays
-  // `welcome` (the wired `welcome.join-success` arm lands the editor from there,
-  // MYND-424) — an out-of-band local toggle, like recover's out-of-band entry.
-  const [showJoin, setShowJoin] = useState(false);
+  // Sync-join overlay. Rendered full-screen WHILE the stage stays put; the
+  // matching `*.join-success` arm lands the editor from there (MYND-424) — an
+  // out-of-band local toggle, like recover's out-of-band entry. The value is the
+  // stage the join was launched FROM, not a boolean: the door exists on three
+  // surfaces (welcome, picker, the editor's vault switcher — myne-mobile#40) and
+  // each dispatches its own success action. `null` = no join in flight.
+  const [joinFrom, setJoinFrom] = useState<JoinEntry | null>(null);
 
   /**
    * Land a stage — the single writer of `stage` and its ref mirror.
@@ -54,8 +72,8 @@ export function AppShell() {
    * **Every entry into the editor stage paints the vault's selected custom
    * palette first** (MYND-598), so the editor's first frame already wears it.
    * The gate lives here rather than on the unlock handler because `stage.ts`
-   * reaches `{name:"editor"}` from four transitions — `unlock.success`,
-   * `recover.complete-success`, `welcome.join-success` and
+   * reaches `{name:"editor"}` from six transitions — `unlock.success`,
+   * `recover.complete-success`, the three `*.join-success` arms and
    * `create-vault.auto-unlock-success` — plus `initialStageFromProbe`'s
    * already-`Unlocked` short-circuit (a WebView reload over a live Rust slot).
    * Recovery in particular opens an EXISTING vault, which can carry both a
@@ -125,32 +143,45 @@ export function AppShell() {
     );
   }
 
+  // The join flow runs full-screen while the stage underneath stays put; on a
+  // successful bootstrap it dispatches that stage's `*.join-success` arm →
+  // editor, addressed at the joined vault.
+  //
+  // It sits ABOVE the switch because the door is not a Welcome-only affordance
+  // (myne-mobile#40): scoping the overlay to `case "welcome"` made joining an
+  // existing account unreachable the moment the device held any vault, since
+  // `initialStageFromProbe` only produces `welcome` at zero vaults.
+  //
+  // Cancel closes the overlay back to the stage it was opened from. It is
+  // deliberately NOT `reprobe()`, tempting as the back-from-create precedent is:
+  // the SAS-mismatch exit calls `syncResetLocal()`, which clears this device's
+  // enrollment but never touches `vault.meta` (see the command's doc in
+  // `core/src/plugins/sync/commands.rs`), so a re-probe would route the user
+  // straight into the editor of the vault they had just rejected.
+  if (joinFrom !== null) {
+    return (
+      <PhoneColumn>
+        <JoinFlow
+          onComplete={(vaultId) => {
+            setJoinFrom(null);
+            dispatch({ type: JOIN_SUCCESS[joinFrom], vaultId });
+          }}
+          onCancel={() => setJoinFrom(null)}
+        />
+      </PhoneColumn>
+    );
+  }
+
   // Every stage except the editor renders inside <PhoneColumn> — on tablets the
   // single-column flows stay a centered phone-width column (no-op on phones);
   // the editor is the adaptive multi-pane surface and fills the window.
   switch (stage.name) {
     case "welcome":
-      // The join flow runs full-screen while the stage is still `welcome`; on a
-      // successful bootstrap it dispatches the wired `welcome.join-success` →
-      // editor. Cancel just closes the overlay back to Welcome.
-      if (showJoin) {
-        return (
-          <PhoneColumn>
-            <JoinFlow
-              onComplete={(vaultId) => {
-                setShowJoin(false);
-                dispatch({ type: "welcome.join-success", vaultId });
-              }}
-              onCancel={() => setShowJoin(false)}
-            />
-          </PhoneColumn>
-        );
-      }
       return (
         <PhoneColumn>
           <WelcomeFlow
             onCreate={() => dispatch({ type: "create-vault.start" })}
-            onJoin={() => setShowJoin(true)}
+            onJoin={() => setJoinFrom("welcome")}
           />
         </PhoneColumn>
       );
@@ -209,6 +240,11 @@ export function AppShell() {
             dispatch({ type: "editor.lock" });
           }}
           onCreateVault={() => dispatch({ type: "editor.create-vault" })}
+          // Not preceded by `lockVault()`, unlike `onSwitchVault`: the join
+          // flow's own `sync_join_account` unlocks the vault it bootstraps,
+          // which evicts this one at the IPC layer (SYNC-1) — the same posture
+          // `onCreateVault` takes toward the create → auto-unlock chain.
+          onJoinAccount={() => setJoinFrom("editor")}
           onSwitchVault={async (vaultId: VaultId) => {
             await lockVault().catch(() => {});
             dispatch({ type: "editor.switch-vault", vaultId });
@@ -228,6 +264,7 @@ export function AppShell() {
           <PickerFlow
             onSelect={(vaultId: VaultId) => dispatch({ type: "picker.select-vault", vaultId })}
             onCreate={() => dispatch({ type: "picker.create-vault" })}
+            onJoin={() => setJoinFrom("picker")}
           />
         </PhoneColumn>
       );

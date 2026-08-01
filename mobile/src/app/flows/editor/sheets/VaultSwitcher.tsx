@@ -1,7 +1,27 @@
 import { useTranslation } from "react-i18next";
+import type { CSSProperties } from "react";
 import { Icon, Sheet, VaultMark } from "../../../../components";
 import { vaultDisplayLabel } from "../../../../lib/vault-label";
 import type { VaultSummary } from "../../../../types/vault-summary";
+
+/** The sheet's footer actions (create / join) — one outlined row each. */
+const sheetAction: CSSProperties = {
+  marginTop: 12,
+  width: "100%",
+  height: 48,
+  border: "1px solid var(--line-2)",
+  borderRadius: 10,
+  background: "transparent",
+  color: "var(--accent)",
+  fontFamily: "var(--font-sans)",
+  fontSize: 15,
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+};
 
 /** Vault switcher sheet (the "Personal ▾" chevron's target). */
 export function VaultSwitcher({
@@ -9,12 +29,15 @@ export function VaultSwitcher({
   activeId,
   onSelect,
   onCreate,
+  onJoin,
   onClose,
 }: {
   vaults: VaultSummary[];
   activeId?: string;
   onSelect: (id: string) => void;
   onCreate: () => void;
+  /** Enter the sync-join flow — the second door, next to create (myne-mobile#40). */
+  onJoin: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -60,28 +83,16 @@ export function VaultSwitcher({
           );
         })}
       </div>
-      <button
-        onClick={onCreate}
-        style={{
-          marginTop: 12,
-          width: "100%",
-          height: 48,
-          border: "1px solid var(--line-2)",
-          borderRadius: 10,
-          background: "transparent",
-          color: "var(--accent)",
-          fontFamily: "var(--font-sans)",
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-        }}
-      >
+      {/* Both doors, not just create (myne-mobile#40): this sheet and the vault
+          picker are the only surfaces a device with vaults ever sees, so a
+          create-only footer strands "connect to my account" entirely. */}
+      <button onClick={onCreate} style={sheetAction}>
         <Icon name="plus" size={18} color="var(--accent)" strokeWidth={2} />
         {t("welcome.createCta")}
+      </button>
+      <button onClick={onJoin} style={sheetAction} data-testid="switcher.join-account">
+        <Icon name="link" size={18} color="var(--accent)" strokeWidth={2} />
+        {t("welcome.connect")}
       </button>
         </>
       )}
