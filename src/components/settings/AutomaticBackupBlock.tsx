@@ -29,7 +29,7 @@ import {
   type ScheduleSettings,
 } from "../../lib/backup-schedule";
 import { resolveActiveVaultId } from "../../lib/vault-list";
-import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
+import { SettingRow } from "./SettingRow";
 
 // Interval option values paired with their i18n label keys. Labels are
 // resolved at render time (`t(...)`) — storing resolved strings at module
@@ -42,14 +42,6 @@ const INTERVAL_OPTION_KEYS: readonly {
   { value: "daily", labelKey: "settings.autoBackup.intervalDaily" },
   { value: "weekly", labelKey: "settings.autoBackup.intervalWeekly" },
 ];
-
-const ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-2)",
-};
 
 const FOLDER_STYLE_BASE: CSSProperties = {
   flex: 1,
@@ -191,80 +183,92 @@ export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps 
   const status = statusText(config);
 
   return (
-    <div style={BLOCK_STYLE} data-testid="settings.auto-backup">
-      <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE} id="auto-backup-label">
-          {t("settings.autoBackup.title")}
-        </span>
+    <SettingRow
+      testId="settings.auto-backup"
+      label={t("settings.autoBackup.title")}
+      helper={t("settings.autoBackup.helper")}
+      control={(helperId) => (
         <Switch
           checked={config.enabled}
           onChange={(enabled) => commit({ ...config, enabled })}
           ariaLabel={t("settings.autoBackup.title")}
-          ariaDescribedBy="auto-backup-helper"
+          ariaDescribedBy={helperId}
           testId="settings.auto-backup-toggle"
         />
-      </div>
-
-      <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>{t("settings.autoBackup.frequency")}</span>
-        <SearchableSelect
-          options={intervalOptions}
-          selected={[config.interval]}
-          onChange={(next) => {
-            const interval = next[0] as BackupInterval;
-            commit({ ...config, interval });
-          }}
-          aria-label={t("settings.autoBackup.frequencyAriaLabel")}
-          testId="settings.auto-backup-interval"
-          searchPlaceholder={t("settings.autoBackup.searchPlaceholder")}
-          emptyText={t("settings.autoBackup.searchEmpty")}
-        />
-      </div>
-
-      <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>{t("settings.autoBackup.backupFolder")}</span>
-        <Button
-          variant="secondary"
-          onClick={() => void chooseFolder()}
-          data-testid="settings.auto-backup-folder"
-        >
-          {t("settings.autoBackup.chooseFolder")}
-        </Button>
-      </div>
-      {config.targetFolder ? (
-        <code style={FOLDER_DISPLAY_STYLE} title={config.targetFolder} data-testid="settings.auto-backup-folder-path">
-          {config.targetFolder}
-        </code>
-      ) : (
-        <span style={FOLDER_PLACEHOLDER_STYLE}>
-          {t("settings.autoBackup.noFolderChosen")}
-        </span>
       )}
+    >
+      {/* The three knobs the toggle governs. Nested rows rather than siblings
+          of the block, so the whole schedule reads as one setting. */}
+      <SettingRow
+        label={t("settings.autoBackup.frequency")}
+        control={
+          <SearchableSelect
+            options={intervalOptions}
+            selected={[config.interval]}
+            onChange={(next) => {
+              const interval = next[0] as BackupInterval;
+              commit({ ...config, interval });
+            }}
+            aria-label={t("settings.autoBackup.frequencyAriaLabel")}
+            testId="settings.auto-backup-interval"
+            searchPlaceholder={t("settings.autoBackup.searchPlaceholder")}
+            emptyText={t("settings.autoBackup.searchEmpty")}
+          />
+        }
+      />
 
-      <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>{t("settings.autoBackup.keepLast")}</span>
-        <Input
-          type="number"
-          min={1}
-          max={365}
-          value={config.retentionN}
-          style={RETENTION_INPUT_STYLE}
-          data-testid="settings.auto-backup-retention"
-          onChange={(e) => {
-            const n = Number(e.currentTarget.value);
-            if (!Number.isInteger(n) || n < 1) return; // ignore empty/invalid mid-type
-            commit({ ...config, retentionN: n });
-          }}
-        />
-      </div>
+      <SettingRow
+        label={t("settings.autoBackup.backupFolder")}
+        control={
+          <Button
+            variant="secondary"
+            onClick={() => void chooseFolder()}
+            data-testid="settings.auto-backup-folder"
+          >
+            {t("settings.autoBackup.chooseFolder")}
+          </Button>
+        }
+      >
+        {config.targetFolder ? (
+          <code
+            style={FOLDER_DISPLAY_STYLE}
+            title={config.targetFolder}
+            data-testid="settings.auto-backup-folder-path"
+          >
+            {config.targetFolder}
+          </code>
+        ) : (
+          <span style={FOLDER_PLACEHOLDER_STYLE}>
+            {t("settings.autoBackup.noFolderChosen")}
+          </span>
+        )}
+      </SettingRow>
 
-      <p id="auto-backup-status" style={{ ...STATUS_BASE_STYLE, color: status.tone }} data-testid="settings.auto-backup-status">
+      <SettingRow
+        label={t("settings.autoBackup.keepLast")}
+        control={
+          <Input
+            type="number"
+            min={1}
+            max={365}
+            value={config.retentionN}
+            style={RETENTION_INPUT_STYLE}
+            data-testid="settings.auto-backup-retention"
+            onChange={(e) => {
+              const n = Number(e.currentTarget.value);
+              if (!Number.isInteger(n) || n < 1) return; // ignore empty/invalid mid-type
+              commit({ ...config, retentionN: n });
+            }}
+          />
+        }
+      />
+
+      <p
+        style={{ ...STATUS_BASE_STYLE, color: status.tone }}
+        data-testid="settings.auto-backup-status"
+      >
         {status.text}
       </p>
-
-      <p id="auto-backup-helper" style={HELPER_STYLE}>
-        {t("settings.autoBackup.helper")}
-      </p>
-    </div>
+    </SettingRow>
   );
 }

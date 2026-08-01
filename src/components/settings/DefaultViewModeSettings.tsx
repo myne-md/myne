@@ -9,9 +9,9 @@
 // omit-when-default). The setter bumps the prefs nonce, so a newly-opened tab
 // picks up the new default (open tabs keep their per-tab mode).
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { Segmented } from "../primitives/Segmented";
 import { prefsRead, setEditorDefaultViewMode } from "../../lib/prefs";
 import { asViewMode, type ViewMode } from "../../editor/view-mode";
@@ -24,13 +24,6 @@ const OPTION_KEYS = [
   { value: "reading", labelKey: "settings.viewMode.optionReading" },
   { value: "source", labelKey: "settings.viewMode.optionSource" },
 ] as const;
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 export function DefaultViewModeSettings() {
   const { t } = useTranslation();
@@ -72,21 +65,19 @@ export function DefaultViewModeSettings() {
   }));
 
   return (
-    <>
-      <ControlBlock
-        label={t("settings.viewMode.label")}
-        helper={t("settings.viewMode.helper")}
-        control={
-          <Segmented
-            options={options}
-            value={mode}
-            onChange={(v) => void choose(v as ViewMode)}
-            ariaLabel={t("settings.viewMode.label")}
-            testId="settings.default-view-mode"
-          />
-        }
-      />
-      {error !== null && <p style={ERROR_STYLE}>{error}</p>}
-    </>
+    <SettingRow
+      label={t("settings.viewMode.label")}
+      helper={t("settings.viewMode.helper")}
+      error={error}
+      control={
+        <Segmented
+          options={options}
+          value={mode}
+          onChange={(v) => void choose(v as ViewMode)}
+          ariaLabel={t("settings.viewMode.label")}
+          testId="settings.default-view-mode"
+        />
+      }
+    />
   );
 }

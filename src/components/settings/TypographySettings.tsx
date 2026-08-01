@@ -32,7 +32,8 @@ import {
   type TypographyOption,
 } from "../../editor/typography";
 import { Segmented } from "../primitives/Segmented";
-import { ControlBlock } from "./ControlBlock";
+import { ERROR_STYLE } from "./panel-styles";
+import { SettingRow } from "./SettingRow";
 
 const PREVIEW_WRAP_STYLE: CSSProperties = {
   display: "flex",
@@ -64,13 +65,6 @@ const PREVIEW_TEXT_STYLE: CSSProperties = {
   fontSize: "var(--editor-text-size)",
   lineHeight: "var(--editor-line-spacing)",
   fontFamily: "var(--editor-font-family)",
-};
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
 };
 
 type FieldKey = "textSize" | "lineSpacing" | "contentWidth" | "fontFamily";
@@ -181,7 +175,7 @@ export function TypographySettings() {
         const options = row.options.map((o) => ({ value: o.value, label: t(o.label) }));
         return (
           <Fragment key={row.field}>
-            <ControlBlock
+            <SettingRow
               label={label}
               helper={t(row.helperKey)}
               control={

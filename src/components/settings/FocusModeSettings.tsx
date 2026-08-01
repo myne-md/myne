@@ -8,22 +8,16 @@
 // ⇧⌘F toggle (ephemeral, not a pref). The setters bump the prefs nonce so an open
 // editor re-reads and reconfigures its focus extensions live (no remount).
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
+import { ERROR_STYLE } from "./panel-styles";
 import {
   prefsRead,
   setEditorFocusTypewriter,
   setEditorFocusDimInactive,
 } from "../../lib/prefs";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 export function FocusModeSettings() {
   const { t } = useTranslation();
@@ -74,30 +68,33 @@ export function FocusModeSettings() {
 
   return (
     <>
-      <ControlBlock
+      <SettingRow
         label={t("settings.focusMode.typewriterLabel")}
         helper={t("settings.focusMode.typewriterHelper")}
-        control={
+        control={(helperId) => (
           <Switch
             checked={typewriter}
             onChange={() => toggleTypewriter(!typewriter)}
             ariaLabel={t("settings.focusMode.typewriterAria")}
+            ariaDescribedBy={helperId}
             testId="settings.focus-typewriter"
           />
-        }
+        )}
       />
-      <ControlBlock
+      <SettingRow
         label={t("settings.focusMode.dimLabel")}
         helper={t("settings.focusMode.dimHelper")}
-        control={
+        control={(helperId) => (
           <Switch
             checked={dim}
             onChange={() => toggleDim(!dim)}
             ariaLabel={t("settings.focusMode.dimAria")}
+            ariaDescribedBy={helperId}
             testId="settings.focus-dim"
           />
-        }
+        )}
       />
+      {/* Either toggle sets this, so it sits outside both rows. */}
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}
     </>
   );

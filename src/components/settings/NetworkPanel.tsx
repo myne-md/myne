@@ -77,13 +77,8 @@ import {
   type TorRoutingErrorKind,
 } from "../../lib/tor-routing";
 import { Switch } from "../primitives/Switch";
-import {
-  BLOCK_STYLE,
-  HELPER_STYLE,
-  LABEL_STYLE,
-  PANEL_ROOT_STYLE,
-  TOGGLE_ROW_STYLE,
-} from "./panel-styles";
+import { SettingRow } from "./SettingRow";
+import { HELPER_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 
 const DISCLOSURE_BUTTON_STYLE: CSSProperties = {
   alignSelf: "flex-start",
@@ -244,26 +239,22 @@ export function NetworkPanel() {
 
   return (
     <div data-testid="settings.network-panel" style={PANEL_ROOT_STYLE}>
-      <div
-        style={BLOCK_STYLE}
-        data-setting-anchor="network.tor-routing"
-        data-testid="settings.tor-routing"
-        data-enabled={String(enabled)}
-      >
-        <div style={TOGGLE_ROW_STYLE}>
-          <span style={LABEL_STYLE}>{t("settings.network.torLabel")}</span>
+      <SettingRow
+        anchorId="network.tor-routing"
+        testId="settings.tor-routing"
+        stateAttrs={{ "data-enabled": String(enabled) }}
+        label={t("settings.network.torLabel")}
+        helper={t("settings.network.torHelper")}
+        control={(helperId) => (
           <Switch
             checked={enabled}
             onChange={busy ? undefined : (next) => void toggle(next)}
             ariaLabel={t("settings.network.torLabel")}
-            ariaDescribedBy="tor-routing-helper"
+            ariaDescribedBy={helperId}
             testId="settings.tor-routing-toggle"
           />
-        </div>
-        <p id="tor-routing-helper" style={HELPER_STYLE}>
-          {t("settings.network.torHelper")}
-        </p>
-
+        )}
+      >
         {posture !== null && (
           // `role="status"`: the posture changes on its own (a bootstrap
           // completing, a client dying) and a screen-reader user should hear
@@ -332,7 +323,7 @@ export function NetworkPanel() {
             {notice === "sidecar" && t("settings.network.errorSidecar")}
           </p>
         )}
-      </div>
+      </SettingRow>
     </div>
   );
 }

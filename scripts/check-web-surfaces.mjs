@@ -75,6 +75,10 @@ const V = {
     "Never rendered: PrivacyPanel gates the block on `cliAccess`, which is absent on web, so the whole terminal-access surface is omitted rather than greyed. Ships in the bundle (it is one small component inside a panel that does ship) but nothing on this client mounts it, and its one command is `Unsupported` in the dispatcher.",
   ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
+  "src/components/settings/SettingRow.tsx": [
+    "ported",
+    "Layout primitive — the canonical label-left / control-right settings row. Presentational: it composes panel-styles and renders its caller's control, with no host call and no capability of its own.",
+  ],
   "src/components/settings/CustomThemesSection.tsx": [
     "adapted",
     "Ships; import goes through the file-picker seam and export through the download seam (task 45).",

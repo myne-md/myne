@@ -27,6 +27,7 @@ import { openUrl } from "../../platform/opener";
 import { usePrefs } from "../../hooks/usePrefs";
 import { Button } from "../primitives/Button";
 import { Switch } from "../primitives/Switch";
+import { SettingRow } from "./SettingRow";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
@@ -76,14 +77,6 @@ const LICENSE_BODY_STYLE: CSSProperties = {
   lineHeight: "var(--leading-normal)",
   color: "var(--fg-2)",
   margin: 0,
-};
-
-const TOGGLE_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-3)",
 };
 
 function Block({ children }: { children: ReactNode }) {
@@ -183,25 +176,21 @@ export function AboutPanel() {
       </Block>
 
       {developerGroupHasMembers && (
-        <Block>
-          <div style={TOGGLE_ROW_STYLE}>
-            <span style={LABEL_STYLE}>
-              {t("settings.about.developerModeLabel")}
-            </span>
+        <SettingRow
+          label={t("settings.about.developerModeLabel")}
+          helper={t("settings.about.developerModeHelper")}
+          control={(helperId) => (
             <Switch
               checked={prefs.developer_mode}
               onChange={(next) => {
                 void setDeveloperMode(next);
               }}
               ariaLabel={t("settings.about.developerModeLabel")}
-              ariaDescribedBy="developer-mode-helper"
+              ariaDescribedBy={helperId}
               testId="about.developer-mode-toggle"
             />
-          </div>
-          <p id="developer-mode-helper" style={HELPER_STYLE}>
-            {t("settings.about.developerModeHelper")}
-          </p>
-        </Block>
+          )}
+        />
       )}
 
       <Block>

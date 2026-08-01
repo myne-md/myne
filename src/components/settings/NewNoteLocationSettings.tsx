@@ -6,9 +6,9 @@
 // discipline). The resolved location is applied at note-creation time in
 // sidebarState.createAndStartRename — this panel only writes the preference.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { Input } from "../primitives/Input";
 import { Select, type SelectOption } from "../primitives/Select";
 import {
@@ -18,13 +18,6 @@ import {
   type NewNoteLocation,
 } from "../../lib/prefs";
 import { normalizeFolderPath } from "../../dialect/folderPath";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 export function NewNoteLocationSettings() {
   const { t } = useTranslation();
@@ -77,37 +70,31 @@ export function NewNoteLocationSettings() {
   }
 
   return (
-    <ControlBlock
+    <SettingRow
       label={t("settings.files.newNote.label")}
       helper={t("settings.files.newNote.helper")}
+      error={error}
       control={
-        <div>
-          <Select
-            value={mode}
-            options={options}
-            onChange={(next) => void chooseMode(next)}
-            aria-label={t("settings.files.newNote.label")}
-            testId="settings.new-note-location-select"
-          />
-          {mode === "specific" && (
-            <div style={{ marginTop: "var(--space-2)" }}>
-              <Input
-                value={folder}
-                placeholder={t("settings.files.newNote.folderPlaceholder")}
-                onChange={(e) => setFolder(e.target.value)}
-                onBlur={() => void persist("specific", folder)}
-                aria-label={t("settings.files.newNote.folderLabel")}
-                data-testid="settings.new-note-location-folder-input"
-              />
-            </div>
-          )}
-          {error && (
-            <p role="alert" style={ERROR_STYLE}>
-              {error}
-            </p>
-          )}
-        </div>
+        <Select
+          value={mode}
+          options={options}
+          onChange={(next) => void chooseMode(next)}
+          aria-label={t("settings.files.newNote.label")}
+          testId="settings.new-note-location-select"
+        />
       }
-    />
+    >
+      {/* Only for "a specific folder", and a path field wants the full width. */}
+      {mode === "specific" && (
+        <Input
+          value={folder}
+          placeholder={t("settings.files.newNote.folderPlaceholder")}
+          onChange={(e) => setFolder(e.target.value)}
+          onBlur={() => void persist("specific", folder)}
+          aria-label={t("settings.files.newNote.folderLabel")}
+          data-testid="settings.new-note-location-folder-input"
+        />
+      )}
+    </SettingRow>
   );
 }

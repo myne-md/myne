@@ -24,26 +24,14 @@
 // live. System maps to `null` (clears the field → the CSS `@media
 // prefers-color-scheme` follows the OS live).
 
-import {
-  Fragment,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { LanguageSelect } from "./LanguageSelect";
 import { Button } from "../primitives/Button";
+import { Segmented } from "../primitives/Segmented";
 import { Switch } from "../primitives/Switch";
-import {
-  BLOCK_STYLE,
-  HELPER_STYLE,
-  LABEL_STYLE,
-  PANEL_ROOT_STYLE,
-  TOGGLE_ROW_STYLE,
-} from "./panel-styles";
+import { PANEL_ROOT_STYLE } from "./panel-styles";
 import {
   prefsRead,
   setCustomTheme,
@@ -54,68 +42,6 @@ import {
 } from "../../lib/prefs";
 import { applyTheme } from "../../lib/theme";
 import { CustomThemesSection } from "./CustomThemesSection";
-
-// Label + switch on one row, helper below — mirrors PrivacyPanel's toggle shape.
-const SEGMENTED_STYLE: CSSProperties = {
-  position: "relative",
-  display: "inline-flex",
-  flexDirection: "row",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  overflow: "hidden",
-  alignSelf: "flex-start",
-};
-
-// The selection fill is a single sliding pill behind the segments — it
-// translates/resizes to the active segment instead of each segment toggling its
-// own background, so the selection appears to glide between options. Dividers
-// and labels sit above it (higher z-index) so they stay crisp as it passes.
-const SEGMENT_THUMB_STYLE: CSSProperties = {
-  position: "absolute",
-  top: 0,
-  bottom: 0,
-  left: 0,
-  background: "var(--paper-3)",
-  zIndex: 0,
-  pointerEvents: "none",
-  transition:
-    "transform var(--duration-base) var(--ease-standard), width var(--duration-base) var(--ease-standard)",
-};
-
-const SEGMENT_BASE_STYLE: CSSProperties = {
-  position: "relative",
-  zIndex: 1,
-  border: 0,
-  background: "transparent",
-  padding: "6px 16px",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--fg-2)",
-  cursor: "pointer",
-  minWidth: 80,
-  transition: "color var(--duration-fast) var(--ease-standard)",
-};
-
-const SEGMENT_SELECTED_STYLE: CSSProperties = {
-  ...SEGMENT_BASE_STYLE,
-  color: "var(--fg-1)",
-};
-
-const SEGMENT_DIVIDER_STYLE: CSSProperties = {
-  position: "relative",
-  zIndex: 1,
-  width: 1,
-  background: "var(--line-2)",
-  alignSelf: "stretch",
-};
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 // `value: "system"` maps to a `null` theme on the wire (clears the field).
 // `labelKey` holds the i18n key (resolved at render, not import) so a language
@@ -174,21 +100,6 @@ export function AppearancePanel({ onOpenGraph }: AppearancePanelProps = {}) {
   // pref's own omit-when-default polarity.
   const [showTaskMarkerState, setShowTaskMarkerState] = useState(true);
   const [markerError, setMarkerError] = useState<string | null>(null);
-
-  // Sliding-pill geometry: measured from the active segment's box so the fill
-  // can glide to it (segments have unequal widths — "System" is wider than
-  // "Light"). Measured in useLayoutEffect (pre-paint) so the initial position
-  // lands with no first-render flash; re-measured whenever the selection moves.
-  const segmentRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const [thumb, setThumb] = useState<{ left: number; width: number }>({
-    left: 0,
-    width: 0,
-  });
-
-  useLayoutEffect(() => {
-    const el = segmentRefs.current[THEMES.findIndex((t) => t.value === selected)];
-    if (el) setThumb({ left: el.offsetLeft, width: el.offsetWidth });
-  }, [selected]);
 
   useEffect(() => {
     let cancelled = false;
@@ -262,103 +173,58 @@ export function AppearancePanel({ onOpenGraph }: AppearancePanelProps = {}) {
     <div style={PANEL_ROOT_STYLE}>
       <LanguageSelect />
 
-      <ControlBlock
+      <SettingRow
         label={t("settings.appearance.themeLabel")}
         helper={t("settings.appearance.themeHelper")}
+        error={error}
         control={
-          <div>
-            <div
-              role="radiogroup"
-              aria-label={t("settings.appearance.themeLabel")}
-              style={SEGMENTED_STYLE}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  ...SEGMENT_THUMB_STYLE,
-                  width: thumb.width,
-                  transform: `translateX(${thumb.left}px)`,
-                }}
-              />
-              {THEMES.map((opt, idx) => (
-                <Fragment key={opt.value}>
-                  {idx > 0 && (
-                    <span aria-hidden="true" style={SEGMENT_DIVIDER_STYLE} />
-                  )}
-                  <button
-                    ref={(el) => {
-                      segmentRefs.current[idx] = el;
-                    }}
-                    type="button"
-                    role="radio"
-                    aria-checked={opt.value === selected}
-                    aria-label={t("settings.appearance.themeOptionAria", {
-                      label: t(opt.labelKey),
-                    })}
-                    data-testid={`settings.theme-${opt.value}`}
-                    onClick={() => void choose(opt.value)}
-                    style={
-                      opt.value === selected
-                        ? SEGMENT_SELECTED_STYLE
-                        : SEGMENT_BASE_STYLE
-                    }
-                  >
-                    {t(opt.labelKey)}
-                  </button>
-                </Fragment>
-              ))}
-            </div>
-            {error && (
-              <p role="alert" style={ERROR_STYLE}>
-                {error}
-              </p>
-            )}
-          </div>
+          <Segmented
+            options={THEMES.map((o) => ({
+              value: o.value,
+              label: t(o.labelKey),
+            }))}
+            value={selected}
+            onChange={(value) => void choose(value as ThemeOption["value"])}
+            ariaLabel={t("settings.appearance.themeLabel")}
+            optionAriaLabel={(o) =>
+              t("settings.appearance.themeOptionAria", { label: o.label })
+            }
+            testId="settings.theme"
+          />
         }
       />
 
-      <div style={BLOCK_STYLE}>
-        <div style={TOGGLE_ROW_STYLE}>
-          <span style={LABEL_STYLE}>{t("settings.appearance.showEditTimesLabel")}</span>
+      <SettingRow
+        label={t("settings.appearance.showEditTimesLabel")}
+        helper={t("settings.appearance.showEditTimesHelper")}
+        error={tsError}
+        control={(helperId) => (
           <Switch
             checked={showTimestamps}
             onChange={(next) => void toggleTimestamps(next)}
             ariaLabel={t("settings.appearance.showEditTimesAria")}
-            ariaDescribedBy="note-timestamps-helper"
+            ariaDescribedBy={helperId}
             testId="settings.note-timestamps-toggle"
           />
-        </div>
-        <p id="note-timestamps-helper" style={HELPER_STYLE}>
-          {t("settings.appearance.showEditTimesHelper")}
-        </p>
-        {tsError && (
-          <p role="alert" style={ERROR_STYLE}>
-            {tsError}
-          </p>
         )}
-      </div>
+      />
 
-      <div style={BLOCK_STYLE}>
-        <div style={TOGGLE_ROW_STYLE}>
-          <span style={LABEL_STYLE}>{t("settings.appearance.taskMarkerLabel")}</span>
+      <SettingRow
+        label={t("settings.appearance.taskMarkerLabel")}
+        helper={t("settings.appearance.taskMarkerHelper")}
+        error={markerError}
+        control={(helperId) => (
           <Switch
             checked={showTaskMarkerState}
             onChange={(next) => void toggleTaskMarker(next)}
             ariaLabel={t("settings.appearance.taskMarkerAria")}
-            ariaDescribedBy="task-marker-helper"
+            ariaDescribedBy={helperId}
             testId="settings.task-marker-toggle"
           />
-        </div>
-        <p id="task-marker-helper" style={HELPER_STYLE}>
-          {t("settings.appearance.taskMarkerHelper")}
-        </p>
-        {markerError && (
-          <p role="alert" style={ERROR_STYLE}>
-            {markerError}
-          </p>
         )}
-      </div>
-      <ControlBlock
+      />
+
+      <SettingRow
         label={t("settings.appearance.graphSettingsLabel")}
         helper={t("settings.appearance.graphSettingsHelper")}
         control={

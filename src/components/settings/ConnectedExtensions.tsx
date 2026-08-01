@@ -16,7 +16,7 @@
 // The list/Revoke wrappers are mocked in tests; in a non-Tauri context (dev)
 // `invoke` rejects — treat that as "no connected extensions", never throw.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getClipperInstallStatus,
@@ -34,30 +34,10 @@ import {
 } from "../../lib/load-bearing-copy";
 import { Button } from "../primitives/Button";
 import { Switch } from "../primitives/Switch";
+import { SettingRow } from "./SettingRow";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 import { BrowserIcon, browserLabel } from "./browser-icons";
 import i18n from "../../i18n";
-
-const INSTALL_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-3)",
-};
-
-const INSTALL_TEXT_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  minWidth: 0,
-};
-
-const INSTALL_ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 const ROW_STYLE = {
   display: "flex",
@@ -198,25 +178,22 @@ export function ConnectedExtensions() {
 
   return (
     <>
-      <div
-        style={BLOCK_STYLE}
-        data-testid="settings.clipper-install"
-        data-enabled={String(installEnabled)}
-      >
-        <div style={INSTALL_ROW_STYLE}>
-          <div style={INSTALL_TEXT_STYLE}>
-            <span style={LABEL_STYLE}>{t("settings.clipperInstall.label")}</span>
-            <p style={HELPER_STYLE}>{t("settings.clipperInstall.helper")}</p>
-          </div>
+      <SettingRow
+        testId="settings.clipper-install"
+        stateAttrs={{ "data-enabled": String(installEnabled) }}
+        label={t("settings.clipperInstall.label")}
+        helper={t("settings.clipperInstall.helper")}
+        error={installError}
+        control={(helperId) => (
           <Switch
             checked={installEnabled}
             onChange={installBusy ? undefined : (next) => void onToggleInstall(next)}
             testId="settings.clipper-install-toggle"
             ariaLabel={t("settings.clipperInstall.label")}
+            ariaDescribedBy={helperId}
           />
-        </div>
-        {installError !== null && <p style={INSTALL_ERROR_STYLE}>{installError}</p>}
-      </div>
+        )}
+      />
 
       <div style={BLOCK_STYLE} data-testid="settings.connected-extensions">
         <span style={LABEL_STYLE}>{CONNECTED_EXTENSIONS_TITLE}</span>

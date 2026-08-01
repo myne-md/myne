@@ -11,9 +11,9 @@
 // `docs/decisions.md` taxonomy entry superseding the 2026-05-08 5-panel lock.
 // Disk-first + no in-flight gating, matching the other Editor-panel controls.
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import { Input } from "../primitives/Input";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
@@ -37,13 +37,6 @@ import i18n from "../../i18n";
 // The "blank" sentinel option value — distinct from any note UUID; maps to a
 // null `daily_template` pref (an empty note titled with the date).
 const BLANK_TEMPLATE = "";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 function templateName(rec: TitleRecord): string {
   return rec.title?.trim() || i18n.t("settings.dailyNotes.untitledTemplate");
@@ -151,7 +144,7 @@ export function DailyNotesSettings() {
 
   return (
     <>
-      <ControlBlock
+      <SettingRow
         label={t("settings.dailyNotes.folderLabel")}
         helper={t("settings.dailyNotes.folderHelper", {
           default: DEFAULT_DAILY_FOLDER,
@@ -194,7 +187,7 @@ export function DailyNotesSettings() {
           )
         }
       />
-      <ControlBlock
+      <SettingRow
         label={t("settings.dailyNotes.dateFormatLabel")}
         helper={t("settings.dailyNotes.dateFormatHelper", {
           default: DEFAULT_DAILY_DATE_FORMAT,
@@ -210,26 +203,20 @@ export function DailyNotesSettings() {
           />
         }
       />
-      <ControlBlock
+      <SettingRow
         label={t("settings.dailyNotes.templateLabel")}
         helper={t("settings.dailyNotes.templateHelper")}
+        error={error}
         control={
-          <div>
-            <SearchableSelect
-              options={templateOptions}
-              selected={[templateId ?? BLANK_TEMPLATE]}
-              onChange={(next) => void chooseTemplate(next[0] ?? BLANK_TEMPLATE)}
-              aria-label={t("settings.dailyNotes.templateLabel")}
-              testId="settings.daily-template-select"
-              searchPlaceholder={t("settings.dailyNotes.searchPlaceholder")}
-              emptyText={t("settings.dailyNotes.searchEmpty")}
-            />
-            {error && (
-              <p role="alert" style={ERROR_STYLE}>
-                {error}
-              </p>
-            )}
-          </div>
+          <SearchableSelect
+            options={templateOptions}
+            selected={[templateId ?? BLANK_TEMPLATE]}
+            onChange={(next) => void chooseTemplate(next[0] ?? BLANK_TEMPLATE)}
+            aria-label={t("settings.dailyNotes.templateLabel")}
+            testId="settings.daily-template-select"
+            searchPlaceholder={t("settings.dailyNotes.searchPlaceholder")}
+            emptyText={t("settings.dailyNotes.searchEmpty")}
+          />
         }
       />
     </>

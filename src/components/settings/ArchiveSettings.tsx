@@ -15,23 +15,16 @@
 // is persisted. The setter bumps the prefs nonce, so the sidebar (its own
 // `usePrefs`) re-reads and shows/hides the Archive button live (no remount).
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
 import {
   prefsRead,
   setArchiveDisabled,
   setArchivedFolders,
 } from "../../lib/prefs";
 import { archivedRecords, useSelectedNote } from "../../notes/sidebarState";
-
-const ERROR_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-};
 
 export function ArchiveSettings() {
   const { t } = useTranslation();
@@ -85,20 +78,19 @@ export function ArchiveSettings() {
   }
 
   return (
-    <>
-      <ControlBlock
-        label={t("settings.archive.label")}
-        helper={t("settings.archive.helper")}
-        control={
-          <Switch
-            checked={enabled}
-            onChange={() => toggle(!enabled)}
-            ariaLabel={t("settings.archive.label")}
-            testId="settings.archive-disabled"
-          />
-        }
-      />
-      {error !== null && <p style={ERROR_STYLE}>{error}</p>}
-    </>
+    <SettingRow
+      label={t("settings.archive.label")}
+      helper={t("settings.archive.helper")}
+      error={error}
+      control={(helperId) => (
+        <Switch
+          checked={enabled}
+          onChange={() => toggle(!enabled)}
+          ariaLabel={t("settings.archive.label")}
+          ariaDescribedBy={helperId}
+          testId="settings.archive-disabled"
+        />
+      )}
+    />
   );
 }
