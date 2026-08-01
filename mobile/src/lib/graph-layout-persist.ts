@@ -32,26 +32,34 @@ export async function graphLayoutWrite(payload: string): Promise<void> {
   await invoke("plugin:graph-layout|graph_layout_write", { payload });
 }
 
-/** Once-per-unlock-session hydration latch (cleared by
- *  {@link resetGraphLayoutOnLock}). */
-let hydratedThisSession = false;
+/** The in-flight (or completed) once-per-unlock-session hydration, cleared by
+ *  {@link resetGraphLayoutOnLock}. A PROMISE rather than a boolean, and that is
+ *  load-bearing: a boolean latch has to be set before the `await`, so a second
+ *  caller arriving while the read is still in flight sees "already hydrated"
+ *  and returns against an empty store. React StrictMode's double-invoked mount
+ *  effect is exactly that second caller, so the graph could mount, decide it
+ *  had no persisted layout, and recompute one over the top of the layout that
+ *  was still being read (myne-md/myne#200). Sharing the promise makes every
+ *  concurrent caller await the same work. */
+let hydration: Promise<void> | null = null;
 
 /**
  * Hydrate the in-memory store from `vault.graph` ONCE per unlock session;
- * subsequent calls (every graph-tab remount) are store-served no-ops. Returns
- * whether the store holds any positions afterwards — the mount's
- * full/partial/cold classification input. Best-effort: a locked slot / absent
- * blob / decode-fail resolves to "empty store → recompute" (§9.19.4).
+ * subsequent calls (every graph-tab remount) are store-served no-ops, and
+ * concurrent ones share the first call's work. Returns whether the store holds
+ * any positions afterwards — the mount's full/partial/cold classification
+ * input. Best-effort: a locked slot / absent blob / decode-fail resolves to
+ * "empty store → recompute" (§9.19.4).
  */
 export async function ensureGraphLayoutHydrated(): Promise<boolean> {
-  if (!hydratedThisSession) {
-    hydratedThisSession = true;
+  hydration ??= (async () => {
     try {
       hydrateGraphLayout(await graphLayoutRead());
     } catch {
       hydrateGraphLayout(null); // clear on failure too
     }
-  }
+  })();
+  await hydration;
   return hasGraphLayout();
 }
 
@@ -110,7 +118,7 @@ export function resetGraphLayoutOnLock(): void {
     flushTimer = null;
   }
   clearGraphLayout();
-  hydratedThisSession = false;
+  hydration = null;
 }
 
 /** Test-only reset of the module latch/timer. */
@@ -119,5 +127,5 @@ export function __resetGraphLayoutPersistForTest(): void {
     clearTimeout(flushTimer);
     flushTimer = null;
   }
-  hydratedThisSession = false;
+  hydration = null;
 }

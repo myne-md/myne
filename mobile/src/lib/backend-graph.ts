@@ -12,7 +12,7 @@
 // been swept, else client-extracted edges (`clientEdges`) — and both now come
 // out of the same shared extractor, so the fallback resolves identically.
 
-import { buildGraphModel } from "@myne/editor/host/notes/graphModel";
+import { buildGraphModel, type GraphModel } from "@myne/editor/host/notes/graphModel";
 import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 import { pushMap } from "./util";
 import { extractWikilinks } from "./indices-extract";
@@ -28,12 +28,26 @@ export function clientEdges(
   return notes.map((n) => [n.noteUuid, extractWikilinks(bodies.get(n.noteUuid) ?? "")]);
 }
 
+/** The shared model plus mobile's projection of it, from one build. The Graph
+ *  tab renders the MODEL (the shared canvas takes it directly); the in-editor
+ *  link lists read the projection. Returning both keeps the O(N+E) build from
+ *  running twice per note-set change. */
+export function buildNoteGraphAndModel(
+  notes: readonly ResolverNote[],
+  allEdges: readonly [string, WikilinkEdge[]][],
+): { graph: NoteGraph; model: GraphModel } {
+  const model = buildGraphModel(allEdges, notes);
+  return { graph: projectToNoteGraph(model), model };
+}
+
 export function buildGraphFromEdges(
   notes: readonly ResolverNote[],
   allEdges: readonly [string, WikilinkEdge[]][],
 ): NoteGraph {
-  const model = buildGraphModel(allEdges, notes);
+  return projectToNoteGraph(buildGraphModel(allEdges, notes));
+}
 
+function projectToNoteGraph(model: GraphModel): NoteGraph {
   const forward = new Map<string, string[]>();
   const backlinks = new Map<string, string[]>();
   const degree = new Map<string, number>();
