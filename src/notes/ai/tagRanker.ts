@@ -28,14 +28,36 @@ export interface TagSuggestion {
 }
 
 /**
- * Clean a raw tag token before folding: trim, then strip a single leading `#`
- * (a model may emit `#tag` while the vault index stores bare `tag`) and trim
- * again. This is input cleanup on the raw candidate stream, not a fold — the
- * identity fold stays `foldSegment`.
+ * Clean a raw tag token before folding: drop the JSON/list punctuation a model
+ * wraps tags in, then strip a single leading `#` (a model may emit `#tag` while
+ * the vault index stores bare `tag`). This is input cleanup on the raw
+ * candidate stream, not a fold — the identity fold stays `foldSegment`, and
+ * `foldSegment` is only NFC + lowercase, so anything left here survives into
+ * BOTH the chip's display text and its identity key.
+ *
+ * The two strips, in this order:
+ *
+ * 1. **Square brackets anywhere**, not just at the edges. A model that answers
+ *    in JSON (`["python", "web"]`) is split on commas upstream, which scatters
+ *    one array across pieces — `["python`, `web"]` — so an edge-only rule would
+ *    miss half of them.
+ * 2. **Edge quotes as a RUN, without requiring a matching pair.** Same reason:
+ *    the comma split leaves the opening quote on one piece and the closing
+ *    quote on another, so a wrapping-pair rule would leave `web"` behind. Only
+ *    the edges are touched, so an internal apostrophe (`don't`) is kept.
+ *
+ * Both run BEFORE the `#` strip, so a quoted hashtag (`"#ml"`) reduces to
+ * exactly what a bare one does.
+ *
+ * Consequence worth naming: this also cleans the EXISTING vocabulary, which is
+ * run through here too. A stored tag that somehow carries a bracket or quote
+ * therefore displays (and is accepted) without it. Those characters are not
+ * part of a tag either way, so collapsing them is the wanted answer.
  */
 export function cleanTagToken(raw: string): string {
-  const trimmed = raw.trim();
-  const bare = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
+  const unbracketed = raw.replace(/[[\]]/g, "").trim();
+  const unquoted = unbracketed.replace(/^["'`“”‘’]+|["'`“”‘’]+$/g, "").trim();
+  const bare = unquoted.startsWith("#") ? unquoted.slice(1) : unquoted;
   return bare.trim();
 }
 

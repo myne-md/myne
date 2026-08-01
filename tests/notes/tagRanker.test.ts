@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { rankTagCandidates } from "../../src/notes/ai/tagRanker";
+import { cleanTagToken, rankTagCandidates } from "../../src/notes/ai/tagRanker";
 
 // auto-tag-link (MYND-411) task 1 — the pure ranker + folded-vocabulary bias.
 describe("rankTagCandidates", () => {
@@ -64,5 +64,70 @@ describe("rankTagCandidates", () => {
 
   it("returns an empty list when there are no candidates", () => {
     expect(rankTagCandidates(["work"], [])).toEqual([]);
+  });
+
+  it("cleans JSON-array residue left by the comma split into plain tags (#192)", () => {
+    // `["python", "web"]` reaches the ranker as two pieces, each carrying one
+    // half of the array's punctuation.
+    const out = rankTagCandidates([], ['["python"', ' "web"]']);
+    expect(out).toEqual([
+      { tag: "python", isNew: true },
+      { tag: "web", isNew: true },
+    ]);
+  });
+
+  it("folds a bracketed candidate onto the existing tag instead of suggesting a twin (#192)", () => {
+    // The whole point of stripping in cleanTagToken rather than at display: a
+    // bracketed token used to miss the fold and offer a duplicate as new.
+    const out = rankTagCandidates(["python"], ["[Python]"]);
+    expect(out).toEqual([{ tag: "python", isNew: false }]);
+  });
+
+  it("folds a quoted hashtag exactly like a bare one (#192)", () => {
+    const out = rankTagCandidates(["ml"], ['"#ml"']);
+    expect(out).toEqual([{ tag: "ml", isNew: false }]);
+  });
+
+  it("drops candidates that are nothing but punctuation (#192)", () => {
+    const out = rankTagCandidates([], ["[]", '"', "[ ]", "''", "real"]);
+    expect(out).toEqual([{ tag: "real", isNew: true }]);
+  });
+});
+
+// #192 — the single place both the chip's display text and the fold key come
+// from, so every strip below is load-bearing twice.
+describe("cleanTagToken", () => {
+  it("strips square brackets wherever they appear", () => {
+    expect(cleanTagToken("[python]")).toBe("python");
+    expect(cleanTagToken('["python')).toBe("python");
+    expect(cleanTagToken('web"]')).toBe("web");
+  });
+
+  it("strips edge quotes without requiring a matching pair", () => {
+    expect(cleanTagToken('"python"')).toBe("python");
+    expect(cleanTagToken('web"')).toBe("web");
+    expect(cleanTagToken("'rust'")).toBe("rust");
+    expect(cleanTagToken("“ml”")).toBe("ml");
+  });
+
+  it("keeps an internal apostrophe", () => {
+    expect(cleanTagToken("don't")).toBe("don't");
+    expect(cleanTagToken("'don't'")).toBe("don't");
+  });
+
+  it("strips quotes before the '#' so a quoted hashtag reduces like a bare one", () => {
+    expect(cleanTagToken('"#ml"')).toBe("ml");
+    expect(cleanTagToken("#ml")).toBe("ml");
+  });
+
+  it("reduces a punctuation-only token to the empty string", () => {
+    expect(cleanTagToken("[]")).toBe("");
+    expect(cleanTagToken('"')).toBe("");
+    expect(cleanTagToken("[ ]")).toBe("");
+  });
+
+  it("leaves an ordinary tag untouched", () => {
+    expect(cleanTagToken("machine-learning")).toBe("machine-learning");
+    expect(cleanTagToken("  3d-printing  ")).toBe("3d-printing");
   });
 });
