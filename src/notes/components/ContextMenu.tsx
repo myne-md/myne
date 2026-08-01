@@ -59,12 +59,25 @@ export type ContextMenuProps = {
   y: number;
   items: ContextMenuItem[];
   onClose: () => void;
+  /** Render a filter box pinned at the top and match items by label — for a long
+   *  list like the "Move to…" folder tree of a deep vault (#205). Default off, so
+   *  short menus (rename / delete) are unchanged. */
+  searchable?: boolean;
+  /** Placeholder for the filter box (only when `searchable`). */
+  searchPlaceholder?: string;
 };
 
 const MENU_STYLE: CSSProperties = {
   position: "fixed",
   zIndex: 1000,
   minWidth: 140,
+  // Bound the height and scroll inside: a long menu — the "Move to…" folder
+  // tree of a deep vault — otherwise runs off the bottom of the viewport with no
+  // way to reach the folders past the edge (#205). Short menus (rename/delete)
+  // never approach the cap, so they are unaffected. The edge-clamp below measures
+  // the capped height, so positioning still keeps the whole menu on screen.
+  maxHeight: "min(70vh, 560px)",
+  overflowY: "auto",
   background: "var(--paper)",
   border: "1px solid var(--line-2)",
   borderRadius: 6,
@@ -100,13 +113,46 @@ const DIVIDER_STYLE: CSSProperties = {
   border: 0,
 };
 
-export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
+// The filter box at the top of the "Move to…" menu (#205). Deliberately NOT
+// sticky — it scrolls with the list, so no list row can ever paint through it,
+// and since typing filters the list short there is rarely anything to scroll
+// past. Opaque `--paper` background top and bottom so it never reads as
+// transparent against the rows.
+const SEARCH_INPUT_STYLE: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  appearance: "none",
+  WebkitAppearance: "none",
+  border: 0,
+  borderBottom: "1px solid var(--line-1)",
+  background: "var(--paper)",
+  outline: "none",
+  fontFamily: "inherit",
+  fontSize: 13,
+  color: "var(--fg-1)",
+  padding: "6px 10px",
+  marginBottom: 4,
+};
+
+export function ContextMenu({
+  x,
+  y,
+  items,
+  onClose,
+  searchable = false,
+  searchPlaceholder,
+}: ContextMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number }>({
     left: x,
     top: y,
   });
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const visibleItems =
+    q === "" ? items : items.filter((it) => it.label.toLowerCase().includes(q));
 
   // Viewport-edge clamp: after first paint, measure the menu's actual
   // size and shift left/up if it would overflow the viewport.
@@ -148,10 +194,14 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   // item on open so arrow-key navigation (handled on the container below) has a
   // starting point; Enter/Space activate via the native <button> semantics.
   useEffect(() => {
-    ref.current
-      ?.querySelector<HTMLButtonElement>('[role^="menuitem"]')
-      ?.focus();
-  }, []);
+    if (searchable) {
+      inputRef.current?.focus();
+    } else {
+      ref.current
+        ?.querySelector<HTMLButtonElement>('[role^="menuitem"]')
+        ?.focus();
+    }
+  }, [searchable]);
 
   const handleSelect = useCallback(
     (item: ContextMenuItem) => {
@@ -187,7 +237,30 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         its[next]?.focus();
       }}
     >
-      {items.map((item, i) => {
+      {searchable && (
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
+          data-testid="notes.context-menu-search"
+          autoComplete="off"
+          spellCheck={false}
+          style={SEARCH_INPUT_STYLE}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter commits the first (top) match; Arrow keys fall through to the
+            // container handler above, which moves focus into the list.
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const first = visibleItems[0];
+              if (first !== undefined) handleSelect(first);
+            }
+          }}
+        />
+      )}
+      {visibleItems.map((item, i) => {
         const isHovering = hoverId === item.id;
         const baseStyle = item.destructive
           ? ITEM_STYLE_DESTRUCTIVE
@@ -199,7 +272,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
           ? { ...baseStyle, background: hoverBg }
           : baseStyle;
         // Divider before an item that opens a new logical group.
-        const showDivider = i > 0 && item.group !== items[i - 1]?.group;
+        const showDivider = i > 0 && item.group !== visibleItems[i - 1]?.group;
         return (
           <Fragment key={item.id}>
             {showDivider && <div style={DIVIDER_STYLE} role="separator" />}

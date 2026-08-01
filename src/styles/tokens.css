@@ -1036,3 +1036,13 @@ a:focus-visible,
   -webkit-appearance: none;
   appearance: none;
 }
+
+/* Move-to folder filter (#205) — the box is auto-focused when the menu opens, so
+   the global :focus-visible ring is redundant noise around it. Suppress it;
+   inline styles can't reach :focus-visible. */
+[data-testid="notes.context-menu-search"],
+[data-testid="notes.context-menu-search"]:focus,
+[data-testid="notes.context-menu-search"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
