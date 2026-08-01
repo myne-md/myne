@@ -52,6 +52,13 @@ const CONFIRM_BOX: CSSProperties = {
 const ROW: CSSProperties = {
   display: "flex",
   alignItems: "center",
+  // The remove-confirmation is rendered as a `flexBasis: 100%` child of this
+  // row; without `flex-wrap` it cannot drop to its own line and instead gets
+  // squeezed in beside the name + actions, overflowing and colliding with the
+  // row (MYND-425 / #204). Wrapping lets it settle on a full-width line beneath
+  // the row content. Rows with no confirmation open are unaffected (two children
+  // that already fit on one line).
+  flexWrap: "wrap",
   justifyContent: "space-between",
   gap: "var(--space-3)",
   padding: "var(--space-2) var(--space-3)",
