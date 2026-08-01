@@ -76,6 +76,25 @@ describe("everything the row must show", () => {
     expect(byTestId(host, "task-row.due")).toBeNull();
     cleanup();
   });
+
+  it("treats a wire `null` date as undated — no chip, and no crash", () => {
+    // `TaskRowData` promises optional-or-absent, but the `MYI1` row serializes
+    // `Option<String>` as `null`, so a client whose fetch skipped the
+    // `taskWire.ts` decoder hands one down. `undefined ?? null` is `null`, which
+    // a `=== undefined` guard misses — the row then slices a non-string and
+    // takes the whole subtree down (myne-md/myne-mobile#36). Rendering at all is
+    // half of what this asserts.
+    const { host, cleanup } = render(
+      <TaskRow
+        task={{ ...TASK, due: null, remind: null } as unknown as TaskRowData}
+        scope="vault"
+        today={TODAY}
+      />,
+    );
+    expect(byTestId(host, "task-row.text")?.textContent).toBe("pay the rent");
+    expect(byTestId(host, "task-row.due")).toBeNull();
+    cleanup();
+  });
 });
 
 describe("scope decides context, not the caller", () => {
@@ -158,6 +177,22 @@ describe("canon rules are constraints", () => {
       <TaskRow task={{ ...TASK, due: TODAY }} scope="vault" today={TODAY} />,
     );
     expect(byTestId(host, "task-row.due")?.getAttribute("data-overdue")).toBeNull();
+    cleanup();
+  });
+
+  it("a wire-`null` date is not overdue — the guard answers false, it does not throw", () => {
+    // The undated rule and the null rule have to agree: a row with no date is
+    // not late, and a row whose date arrived as `null` has no date. Asserted on
+    // the whole row rather than on the chip, because the chip is absent and an
+    // `?.` on it would pass whatever the row did.
+    const { host, cleanup } = render(
+      <TaskRow
+        task={{ ...TASK, due: null, remind: null } as unknown as TaskRowData}
+        scope="vault"
+        today={TODAY}
+      />,
+    );
+    expect(host.querySelector("[data-overdue]")).toBeNull();
     cleanup();
   });
 });

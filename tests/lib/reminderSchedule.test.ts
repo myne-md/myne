@@ -61,6 +61,21 @@ describe("the target set", () => {
     expect(targetReminders([task({ due: "2026-07-30" })], NOW)).toEqual([]);
   });
 
+  it("drops a task whose reminder arrived as a wire `null`, without throwing", () => {
+    // Same shape as the undated case above, different failure. `VaultTask` says
+    // `remind?: string`, but the `MYI1` row serializes `Option<String>` as
+    // `null`, and this module is aliased into a client that hands its fetch's
+    // rows in directly — so a `=== undefined` guard let the null through to
+    // `instantOf`'s `raw.split(…)`. Inside a background pass that surfaces as an
+    // unhandled rejection, which is why the mixed case is asserted too: the
+    // throw would take the valid registration down with it.
+    const wireNull = task({ remind: null } as unknown as Partial<VaultTask>);
+    expect(targetReminders([wireNull], NOW)).toEqual([]);
+    expect(
+      targetReminders([wireNull, task({ noteId: "n2", remind: "2026-07-30 09:00" })], NOW),
+    ).toEqual([{ id: "myne.reminder.n2.0", at: "2026-07-30T09:00" }]);
+  });
+
   it("drops an instant already past", () => {
     // Firing late reads as the reminder being wrong, which is worse than
     // not firing at all.

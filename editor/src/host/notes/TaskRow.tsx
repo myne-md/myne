@@ -88,9 +88,18 @@ export type TaskRowProps = {
  * of every dated view — which is the case `remind` being absolute exists to
  * support ("remind me Tuesday to call my mother"). The same axis is used by the
  * filter predicates; this function is display-side only and does not define it.
+ *
+ * Normalizes here rather than at each consumer. `TaskRowData` promises
+ * optional-or-absent, but the `MYI1` row serializes `Option<String>` as `null`,
+ * so a client whose boundary skipped the `taskWire.ts` decoder hands one down —
+ * and `undefined ?? null` is `null`, which `=== undefined` misses. Both
+ * consumers then break differently: `isOverdue` slices a non-string (the iOS
+ * Tasks-tab crash), and the render guard emits an empty date chip. One `== null`
+ * on the axis closes both, and any third consumer.
  */
 function rowDate(task: TaskRowData): string | undefined {
-  return task.due ?? task.remind;
+  const raw = task.due ?? task.remind;
+  return raw == null ? undefined : raw;
 }
 
 /**
