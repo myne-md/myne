@@ -735,19 +735,25 @@ steps:
   # not reliably fire the push webhook, and a deploy that only fires on an event
   # the mirror sometimes swallows is a deploy nobody can trigger.
   web-docker-build:
-    # CLI pinned to the `docker` library's current major so it MATCHES the host
-    # daemon (29.x). The prior `docker:28-cli` was a CLI-28-vs-daemon-29 skew,
-    # and BuildKit's session healthcheck in the 28 CLI fails fatally against a 29
-    # daemon mid-build — "only one connection allowed" — killing the longest RUN
-    # (the vite bundle build) on #392/#394/#396. Not cross-agent contention: the
-    # healthcheck races the build's OWN single session, so a retry could not
-    # clear it and MAX_WORKFLOWS is irrelevant. Aligning the CLI major removes
-    # the skew.
+    # CLI pinned to the docker library's current major to match the host daemon
+    # (29.x). The old docker:28-cli only logged benign BuildKit session-
+    # healthcheck noise ("only one connection allowed") against the 29 daemon —
+    # a red herring, never the actual failure (see the network note below).
     image: docker:cli
     when: &web-deploy
       - event: [push, manual]
         branch: develop
     depends_on: [web-build]
+    environment:
+      # THE actual cause of every web-docker-build failure (#392–#396, hidden
+      # until the full step log was read past its truncation): the header-check
+      # gate below runs INSIDE this step container, and reaching a probe
+      # container via a published host port + curl 127.0.0.1 cannot cross the
+      # netns boundary — "the container never answered". Hand the script this
+      # step's own docker network so it attaches the probe to that network and
+      # reaches it BY NAME through docker's embedded DNS instead. Must equal the
+      # agent's WOODPECKER_BACKEND_DOCKER_NETWORK.
+      MYNE_WEB_TEST_NETWORK: woodpecker-workflows
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
@@ -755,25 +761,11 @@ steps:
       # passed in — `version.json` is what makes the deploy observable, and it
       # would otherwise read `unknown` and the smoke gate could not tell a fresh
       # deploy from a stale one.
-      #
-      # The real cause of the mid-build death was the CLI/daemon version skew
-      # fixed by the `image:` change above, NOT contention. This bounded retry
-      # stays as a cheap residual net for any transient BuildKit session hiccup
-      # (4 attempts, 30s backoff). Note DOCKER_BUILDKIT=0 is NOT an escape hatch:
-      # the classic builder emits a single-manifest image this daemon's
-      # containerd image store rejects ("failed to validate image signature:
-      # expected image index descriptor" — #395), so BuildKit is mandatory here.
-      - |
-        ok=0
-        for attempt in 1 2 3 4; do
-          if docker build -f web/container/Dockerfile \
-              --build-arg MYNE_BUILD_COMMIT=$CI_COMMIT_SHA \
-              --build-arg MYNE_BUILD_TIMESTAMP=$CI_COMMIT_TIMESTAMP \
-              -t myne-web:$CI_COMMIT_SHA -t myne-web:prod . ; then ok=1; break; fi
-          echo "docker build attempt $attempt failed (likely a cross-agent BuildKit session clash on the shared dockerd); retrying in 30s"
-          sleep 30
-        done
-        [ "$ok" = "1" ]
+      - >
+        docker build -f web/container/Dockerfile
+        --build-arg MYNE_BUILD_COMMIT=$CI_COMMIT_SHA
+        --build-arg MYNE_BUILD_TIMESTAMP=$CI_COMMIT_TIMESTAMP
+        -t myne-web:$CI_COMMIT_SHA -t myne-web:prod .
       # Gate the image BEFORE it is deployed. This is the check that would have
       # caught a container serving no CSP, no COOP and no COEP with a valid
       # config, and a `/healthz` answering 200 with the whole SPA — both shipped
