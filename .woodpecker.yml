@@ -735,7 +735,15 @@ steps:
   # not reliably fire the push webhook, and a deploy that only fires on an event
   # the mirror sometimes swallows is a deploy nobody can trigger.
   web-docker-build:
-    image: docker:28-cli
+    # CLI pinned to the `docker` library's current major so it MATCHES the host
+    # daemon (29.x). The prior `docker:28-cli` was a CLI-28-vs-daemon-29 skew,
+    # and BuildKit's session healthcheck in the 28 CLI fails fatally against a 29
+    # daemon mid-build — "only one connection allowed" — killing the longest RUN
+    # (the vite bundle build) on #392/#394/#396. Not cross-agent contention: the
+    # healthcheck races the build's OWN single session, so a retry could not
+    # clear it and MAX_WORKFLOWS is irrelevant. Aligning the CLI major removes
+    # the skew.
+    image: docker:cli
     when: &web-deploy
       - event: [push, manual]
         branch: develop
@@ -748,18 +756,13 @@ steps:
       # would otherwise read `unknown` and the smoke gate could not tell a fresh
       # deploy from a stale one.
       #
-      # RETRY-ON-SESSION-CLASH. This box runs three Woodpecker agents sharing ONE
-      # host dockerd, so concurrent `docker build`s from different repos collide
-      # on BuildKit's single per-daemon session — "only one connection allowed",
-      # the session healthcheck fails fatally and the build dies mid-run (killed
-      # web-docker-build on #392/#394; MAX_WORKFLOWS=1 can't help — the clash is
-      # cross-agent). It is INTERMITTENT (only when another agent builds at the
-      # same moment), so a bounded retry with backoff clears it. DOCKER_BUILDKIT=0
-      # is NOT the escape hatch it looks like: the classic builder produces a
-      # single-manifest image that this daemon's containerd image store rejects
-      # ("failed to validate image signature: expected image index descriptor" —
-      # #395), so BuildKit is mandatory here. A per-agent dedicated buildx builder
-      # would remove the shared session entirely; retry is the low-risk stopgap.
+      # The real cause of the mid-build death was the CLI/daemon version skew
+      # fixed by the `image:` change above, NOT contention. This bounded retry
+      # stays as a cheap residual net for any transient BuildKit session hiccup
+      # (4 attempts, 30s backoff). Note DOCKER_BUILDKIT=0 is NOT an escape hatch:
+      # the classic builder emits a single-manifest image this daemon's
+      # containerd image store rejects ("failed to validate image signature:
+      # expected image index descriptor" — #395), so BuildKit is mandatory here.
       - |
         ok=0
         for attempt in 1 2 3 4; do
