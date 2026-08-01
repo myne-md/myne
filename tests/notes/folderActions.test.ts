@@ -24,7 +24,7 @@ afterEach(() => setDeliberateFoldersMock.mockReset());
 const tree = (
   notes: Array<{ noteUuid: string; folder: string | null }>,
   deliberate: string[] = [],
-) => deriveFolderTree(notes, deliberate);
+) => deriveFolderTree(notes, deliberate, []);
 
 describe("planFolderDelete — collects the subtree's notes (no longer blocks)", () => {
   it("collects a direct note", () => {

@@ -121,13 +121,13 @@ describe("folder-tree exclusion + convert-back re-inclusion", () => {
 
   it("a folder holding only a template disappears from the tree", () => {
     const tmpl = cacheOf([rec("t1", "Solo/", null, true)]);
-    const tree = deriveFolderTree(records(tmpl), []);
+    const tree = deriveFolderTree(records(tmpl), [], []);
     expect(tree.roots.some((node) => node.path === "Solo/")).toBe(false);
   });
 
   it("the same folder resurrects once the template is converted back to a note", () => {
     const converted = cacheOf([rec("t1", "Solo/", null, false)]);
-    const tree = deriveFolderTree(records(converted), []);
+    const tree = deriveFolderTree(records(converted), [], []);
     const solo = tree.roots.find((node) => node.path === "Solo/");
     expect(solo?.noteIds).toEqual(["t1"]);
   });
@@ -137,7 +137,7 @@ describe("folder-tree exclusion + convert-back re-inclusion", () => {
       rec("keep", "Shared/", null, false),
       rec("tmpl", "Shared/", null, true),
     ]);
-    const tree = deriveFolderTree(records(mixed), []);
+    const tree = deriveFolderTree(records(mixed), [], []);
     const shared = tree.roots.find((node) => node.path === "Shared/");
     expect(shared?.noteIds).toEqual(["keep"]);
   });

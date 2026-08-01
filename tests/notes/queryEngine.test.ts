@@ -166,6 +166,7 @@ describe("folderSubtreeNoteIds — subtree-inclusive folder aggregation (task 2)
       { noteUuid: "t", folder: "Çalışma/" }, // Turkish-fold case
     ],
     [],
+    [],
   );
 
   it("aggregates the folder PLUS all descendants (not exact-only)", () => {

@@ -29,17 +29,17 @@ function find(nodes: FolderNode[], path: string): FolderNode | undefined {
 
 describe("deriveFolderTree — basics", () => {
   it("returns empty tree for empty inputs", () => {
-    expect(deriveFolderTree([], [])).toEqual({ roots: [], unfiledNoteIds: [] });
+    expect(deriveFolderTree([], [], [])).toEqual({ roots: [], unfiledNoteIds: [] });
   });
 
   it("puts a note with no folder in the unfiled bucket", () => {
-    const tree = deriveFolderTree([note("n1", null)], []);
+    const tree = deriveFolderTree([note("n1", null)], [], []);
     expect(tree.unfiledNoteIds).toEqual(["n1"]);
     expect(tree.roots).toEqual([]);
   });
 
   it("creates a single top-level folder with its note", () => {
-    const tree = deriveFolderTree([note("n1", "Projects/")], []);
+    const tree = deriveFolderTree([note("n1", "Projects/")], [], []);
     expect(tree.roots).toHaveLength(1);
     const root = tree.roots[0]!;
     expect(root.path).toBe("Projects/");
@@ -52,7 +52,7 @@ describe("deriveFolderTree — basics", () => {
 
 describe("deriveFolderTree — ancestor expansion", () => {
   it("creates ancestor nodes for a nested folder", () => {
-    const tree = deriveFolderTree([note("n1", "Projects/Myne/")], []);
+    const tree = deriveFolderTree([note("n1", "Projects/Myne/")], [], []);
     const projects = find(tree.roots, "Projects/");
     const myne = find(tree.roots, "Projects/Myne/");
     expect(projects).toBeDefined();
@@ -75,7 +75,7 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
   ) => ({ noteUuid, folder, folderIndex });
 
   it("leaves indexNoteId null and no conflict for a folder with no flagged note", () => {
-    const tree = deriveFolderTree([note("n1", "Projects/")], []);
+    const tree = deriveFolderTree([note("n1", "Projects/")], [], []);
     const root = tree.roots[0]!;
     expect(root.indexNoteId).toBeNull();
     expect(root.indexConflictIds).toEqual([]);
@@ -84,6 +84,7 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
   it("identifies the single flagged note as the folder's index", () => {
     const tree = deriveFolderTree(
       [idxNote("n1", "Projects/", true), note("n2", "Projects/")],
+      [],
       [],
     );
     const root = tree.roots[0]!;
@@ -95,6 +96,7 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
     const tree = deriveFolderTree(
       [note("a-note", "Projects/"), idxNote("z-index", "Projects/", true)],
       [],
+      [],
     );
     const root = tree.roots[0]!;
     // z-index is the index note → hidden from noteIds (opened by double-click).
@@ -104,7 +106,7 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
   });
 
   it("a folder whose only note is its index note has empty noteIds but a set indexNoteId", () => {
-    const tree = deriveFolderTree([idxNote("only", "Solo/", true)], []);
+    const tree = deriveFolderTree([idxNote("only", "Solo/", true)], [], []);
     const root = find(tree.roots, "Solo/")!;
     expect(root.indexNoteId).toBe("only");
     expect(root.noteIds).toEqual([]);
@@ -118,6 +120,7 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
         idxNote("n-c", "Projects/", true),
       ],
       [],
+      [],
     );
     const root = tree.roots[0]!;
     expect(root.indexNoteId).toBe("n-a");
@@ -129,7 +132,7 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
   });
 
   it("does not treat a root/unfiled note's folder_index flag as an index", () => {
-    const tree = deriveFolderTree([idxNote("n1", null, true)], []);
+    const tree = deriveFolderTree([idxNote("n1", null, true)], [], []);
     expect(tree.unfiledNoteIds).toEqual(["n1"]);
     expect(tree.roots).toEqual([]);
   });
@@ -139,6 +142,7 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
     const tree = deriveFolderTree(
       [idxNote("n1", "Work/", true), note("n2", "Projects/")],
       ["Projects/"],
+      [],
     );
     expect(find(tree.roots, "Work/")!.indexNoteId).toBe("n1");
     expect(find(tree.roots, "Projects/")!.indexNoteId).toBeNull();
@@ -147,7 +151,7 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
 
 describe("deriveFolderTree — union + dedup", () => {
   it("merges a note folder and a deliberate folder into one node", () => {
-    const tree = deriveFolderTree([note("n1", "Projects/")], ["Projects/"]);
+    const tree = deriveFolderTree([note("n1", "Projects/")], ["Projects/"], []);
     expect(tree.roots).toHaveLength(1);
     expect(tree.roots[0]!.deliberate).toBe(true);
     expect(tree.roots[0]!.noteIds).toEqual(["n1"]);
@@ -156,6 +160,7 @@ describe("deriveFolderTree — union + dedup", () => {
   it("collapses case-only-distinct folders to one node (lex-min display)", () => {
     const tree = deriveFolderTree(
       [note("n1", "Projects/"), note("n2", "projects/")],
+      [],
       [],
     );
     expect(tree.roots).toHaveLength(1);
@@ -166,7 +171,7 @@ describe("deriveFolderTree — union + dedup", () => {
   });
 
   it("lets the deliberate-set form win the display-case tiebreak", () => {
-    const tree = deriveFolderTree([note("n1", "Projects/")], ["projects/"]);
+    const tree = deriveFolderTree([note("n1", "Projects/")], ["projects/"], []);
     expect(tree.roots).toHaveLength(1);
     const root = tree.roots[0]!;
     expect(root.path).toBe("projects/"); // deliberate form wins over lex-min
@@ -178,11 +183,11 @@ describe("deriveFolderTree — union + dedup", () => {
 describe("deriveFolderTree — implicit vanish vs deliberate persist", () => {
   it("does not include an implicit folder once no note carries it", () => {
     // No records, no deliberate entries → folder is gone.
-    expect(deriveFolderTree([], []).roots).toEqual([]);
+    expect(deriveFolderTree([], [], []).roots).toEqual([]);
   });
 
   it("keeps an empty deliberate folder", () => {
-    const tree = deriveFolderTree([], ["Empty/"]);
+    const tree = deriveFolderTree([], ["Empty/"], []);
     expect(tree.roots).toHaveLength(1);
     expect(tree.roots[0]!.path).toBe("Empty/");
     expect(tree.roots[0]!.deliberate).toBe(true);
@@ -190,7 +195,7 @@ describe("deriveFolderTree — implicit vanish vs deliberate persist", () => {
   });
 
   it("expands a deliberate nested path; only the leaf is deliberate", () => {
-    const tree = deriveFolderTree([], ["Projects/Myne/Sub/"]);
+    const tree = deriveFolderTree([], ["Projects/Myne/Sub/"], []);
     const projects = find(tree.roots, "Projects/");
     const myne = find(tree.roots, "Projects/Myne/");
     const sub = find(tree.roots, "Projects/Myne/Sub/");
@@ -207,6 +212,7 @@ describe("deriveFolderTree — sibling sort", () => {
   it("sorts sibling folders by folded name", () => {
     const tree = deriveFolderTree(
       [note("n1", "Beta/"), note("n2", "Alpha/")],
+      [],
       [],
     );
     expect(tree.roots.map((r) => r.path)).toEqual(["Alpha/", "Beta/"]);

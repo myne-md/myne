@@ -14,6 +14,11 @@ import {
   foldSegment,
   normalizeFolderPath,
 } from "@myne/dialect/folderPath";
+import {
+  archivedFolderKeys,
+  filterVisibleDeliberate,
+  isNoteFolderArchived,
+} from "./archivedFolders";
 
 /** A folder node in the derived sidebar tree. */
 export interface FolderNode {
@@ -96,17 +101,34 @@ export function pickIndexNote(claimantUuids: readonly string[]): string | null {
 }
 
 /**
- * Build the folder tree from notes (each carrying a normalized-or-raw `folder:`)
- * and the deliberate_folders set. Folder values are normalized + ancestor-
- * expanded; nodes are deduped by folded identity; the display form is chosen
- * deterministically (deliberate wins, else lexicographic-min).
+ * Build the folder tree from notes (each carrying a normalized-or-raw `folder:`),
+ * the deliberate_folders set and the archived_folders set. Folder values are
+ * normalized + ancestor-expanded; nodes are deduped by folded identity; the
+ * display form is chosen deterministically (deliberate wins, else
+ * lexicographic-min).
+ *
+ * `archivedFolders` is REQUIRED, and the folder-archive filter is applied HERE
+ * rather than by the caller (myne-md/myne-mobile#39). Hiding an archived folder
+ * takes two steps that must agree — drop its notes, and drop its deliberate entry
+ * so it can't re-surface as an empty node — and leaving either to the caller made
+ * it a step a client could forget. It was forgotten: mobile derived the tree from
+ * the raw deliberate set, so archived folders survived as empty shells while
+ * desktop hid them from the same synced prefs. A filtered `string[]` and an
+ * unfiltered one are the same type, so nothing caught it. Passing the set makes
+ * the requirement a compile error instead of a silent wrong answer; a caller that
+ * genuinely wants archived folders INCLUDED (vault export) passes `[]` and says so
+ * by doing it.
  */
 export function deriveFolderTree(
   notes: ReadonlyArray<NoteLike>,
   deliberateFolders: ReadonlyArray<string>,
+  archivedFolders: ReadonlyArray<string>,
 ): FolderTree {
   const byKey = new Map<string, Builder>();
   const unfiledNoteIds: string[] = [];
+  // Folded once for the whole derivation; empty set → both helpers early-return,
+  // so an unarchived vault pays nothing.
+  const archivedKeys = archivedFolderKeys(archivedFolders);
 
   const ensure = (path: string): Builder => {
     const key = foldSegment(path);
@@ -153,12 +175,16 @@ export function deriveFolderTree(
       unfiledNoteIds.push(n.noteUuid);
       continue;
     }
+    // Skipped BEFORE `register`, not after: registering would materialize the
+    // folder (and its ancestors) as nodes, so an archived subtree would keep its
+    // folder rows even with every note filtered out of them.
+    if (isNoteFolderArchived(norm, archivedKeys)) continue;
     const leaf = register(norm, false);
     leaf.noteIds.push(n.noteUuid);
     if (n.folderIndex === true) leaf.indexClaimantIds.push(n.noteUuid);
   }
 
-  for (const raw of deliberateFolders) {
+  for (const raw of filterVisibleDeliberate(deliberateFolders, archivedKeys)) {
     const norm = normalizeFolderPath(raw);
     if (norm === null) continue;
     register(norm, true);

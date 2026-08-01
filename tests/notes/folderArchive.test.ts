@@ -46,6 +46,7 @@ function treeOf(records: TitleRecord[]): FolderTree {
   return deriveFolderTree(
     records.map((r) => ({ noteUuid: r.noteUuid, folder: r.folder })),
     [],
+    [],
   );
 }
 
@@ -87,6 +88,77 @@ describe("filterVisibleDeliberate", () => {
     expect(
       filterVisibleDeliberate(["Projects/", "Projects/Myne/", "Other/"], keys),
     ).toEqual(["Other/"]);
+  });
+});
+
+// The contract that replaced "the caller remembers to filter"
+// (myne-md/myne-mobile#39). Before this, hiding an archived folder took two
+// caller-side steps and mobile only did one, so archived folders survived as
+// empty shells there while desktop hid them from the same synced prefs. These
+// assert the derivation itself, not the helpers it is built from.
+describe("deriveFolderTree — folder-archive is applied inside", () => {
+  const notes = (paths: Array<[string, string | null]>) =>
+    paths.map(([noteUuid, folder]) => ({ noteUuid, folder }));
+
+  it("leaves no node for an archived folder that is also deliberate", () => {
+    const tree = deriveFolderTree(
+      notes([["n1", "Projects/"]]),
+      ["Projects/"],
+      ["Projects/"],
+    );
+    expect(tree.roots).toEqual([]);
+  });
+
+  it("drops an archived folder's notes without materializing its folder", () => {
+    // The note is skipped BEFORE registration — registering it would create the
+    // folder node (and its ancestors) even with an empty `noteIds`.
+    const tree = deriveFolderTree(
+      notes([
+        ["keep", "Other/"],
+        ["gone", "Projects/Deep/"],
+      ]),
+      [],
+      ["Projects/"],
+    );
+    expect(tree.roots.map((r) => r.path)).toEqual(["Other/"]);
+  });
+
+  it("a deliberate DESCENDANT cannot resurrect an archived ancestor", () => {
+    // The second trigger: `register` materializes ancestors, so a deliberate
+    // `Projects/Myne/` would re-create `Projects/` after `Projects/` was archived.
+    const tree = deriveFolderTree([], ["Projects/Myne/"], ["Projects/"]);
+    expect(tree.roots).toEqual([]);
+  });
+
+  it("is sibling-prefix safe — `ProjectsX/` survives archiving `Projects/`", () => {
+    const tree = deriveFolderTree(
+      notes([["n1", "ProjectsX/"]]),
+      ["ProjectsX/"],
+      ["Projects/"],
+    );
+    expect(tree.roots.map((r) => r.path)).toEqual(["ProjectsX/"]);
+  });
+
+  it("folds case/diacritics like the rest of the folder identity", () => {
+    const tree = deriveFolderTree(notes([["n1", "projects/myne/"]]), [], [
+      "Projects/",
+    ]);
+    expect(tree.roots).toEqual([]);
+  });
+
+  it("an empty archived set changes nothing (the unarchived-vault path)", () => {
+    const tree = deriveFolderTree(notes([["n1", "Projects/"]]), ["Other/"], []);
+    expect(tree.roots.map((r) => r.path).sort()).toEqual([
+      "Other/",
+      "Projects/",
+    ]);
+  });
+
+  it("keeps archived folders when the caller passes `[]` on purpose (export)", () => {
+    // `vaultExportFlow` exports the whole vault: archive is a working-set
+    // filter, not a deletion, so passing `[]` must still yield the folder.
+    const tree = deriveFolderTree(notes([["n1", "Projects/"]]), [], []);
+    expect(tree.roots.map((r) => r.path)).toEqual(["Projects/"]);
   });
 });
 

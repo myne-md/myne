@@ -43,6 +43,7 @@ function build(records: TitleRecord[], deliberate: string[] = []) {
       folderIndex: r.folderIndex,
     })),
     deliberate,
+    [],
   );
   return { cache, tree };
 }
