@@ -32,7 +32,16 @@ export interface GraphSettings {
   nodeSize: number;
   /** How strongly a note's connection count (degree) grows its radius beyond
    *  `nodeSize` — `0` (off, every node the same size) to `1` (max). Default
-   *  `0`: pre-feature rendering had no degree-based sizing. */
+   *  `0.8`, which with the `MAX_DEGREE_FOR_SIZE` cap of 10 spans 5–13px: the
+   *  range the mobile renderer hardcoded before the two clients converged on
+   *  one (myne-md/myne#200). A hub note reading bigger than a leaf is most of
+   *  what makes a graph legible, and the desktop default of `0` was inherited
+   *  from a version that had no sizing at all rather than chosen.
+   *
+   *  Migration wrinkle, stated rather than buried: the field is
+   *  omit-when-default, so a user who deliberately set "no scaling" persisted
+   *  NOTHING, and now decodes to `0.8`. Device-local and cosmetic — the
+   *  control is one slider away — but it is a silent re-interpretation. */
   nodeSizeStrength: number;
   /** Edge line-width multiplier. Default `1` matches the pre-feature fixed
    *  `1 / v.k` stroke width. */
@@ -58,7 +67,7 @@ export const DEFAULT_GRAPH_SETTINGS: Readonly<GraphSettings> = {
   showArrows: true,
   labelFadeZoom: 1.4,
   nodeSize: 5,
-  nodeSizeStrength: 0,
+  nodeSizeStrength: 0.8,
   lineThickness: 1,
   forceCenterStrength: 1,
   forceRepelStrength: 120,
