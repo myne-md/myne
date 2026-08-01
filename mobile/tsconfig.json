@@ -28,6 +28,7 @@
       "@myne/i18n": ["../src/i18n/index.ts"],
       "@myne/i18n/*": ["../src/i18n/*"],
       "@myne/reminder-schedule": ["../src/lib/reminderSchedule.ts"],
+      "@myne/enroll-gate": ["../src/lib/enroll-gate.ts"],
       "@myne/syntax-theme": ["../src/lib/syntaxTheme.ts"],
       "@myne/task-panel": ["../src/notes/components/TaskListPanel.tsx"],
       "@myne/task-filters": ["../src/notes/taskFilters.ts"],

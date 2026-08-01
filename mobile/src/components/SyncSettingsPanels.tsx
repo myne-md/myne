@@ -40,6 +40,7 @@ import {
   REMOVE_DEVICE_CONFIRM,
   REMOVE_DEVICE_DISCLOSURE,
 } from "../lib/load-bearing-copy";
+import { canAddThisDevice } from "@myne/enroll-gate";
 import { Banner, Segmented } from "./index";
 
 const HAS_TAURI = "__TAURI_INTERNALS__" in window;
@@ -216,6 +217,15 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
   // than promise a sync that can't run (mirrors the old SY-08 detail sheet).
   const canSyncNow =
     status?.state !== "disabled" && status?.state !== "not_enrolled" && status?.state !== "pending";
+  // "Add this device" is the enrol entry point for a device that is not a
+  // member — and dead UI for one that is. It used to render unconditionally, so
+  // an already-syncing phone was invited to enrol again; `sync_enroll` mints a
+  // FRESH `device_id`, so doing that strands a second registration nobody can
+  // identify rather than no-op'ing (myne-md/myne-mobile#38). The predicate is
+  // the main repo's `@myne/enroll-gate`, shared with desktop and web so this
+  // rule cannot be fixed in one client and missed in another again — which is
+  // exactly how this bug reached a dogfood device.
+  const showAdd = canAddThisDevice(status?.state);
 
   useEffect(() => {
     if (!HAS_TAURI) return;
@@ -310,15 +320,30 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
 
       <SectionLabel>{t("sync.panel.devices.label")}</SectionLabel>
       <Group>
-        <Row first onClick={onOpenEnroll} testId="sync.settings.add-device">
-          <span style={rowLabel}>{t("sync.enroll.submit")}</span>
-          <RowChevron />
-        </Row>
-        <Row onClick={onOpenDevices} testId="sync.settings.devices">
+        {showAdd && (
+          <Row first onClick={onOpenEnroll} testId="sync.settings.add-device">
+            <span style={rowLabel}>{t("sync.enroll.submit")}</span>
+            <RowChevron />
+          </Row>
+        )}
+        <Row first={!showAdd} onClick={onOpenDevices} testId="sync.settings.devices">
           <span style={rowLabel}>{t("sync.devices.yourDevices")}</span>
           <RowChevron />
         </Row>
       </Group>
+      {/* What the row is replaced BY while this device waits — stating the
+          situation rather than offering an action, because there is no action
+          to take here: approval happens on another device, and the only button
+          this screen could honestly show would create a second pending record.
+          Desktop renders the same sentence for the same reason (MYND-635).
+
+          `ENROLL_PENDING_NOTICE` verbatim, not an i18n key: the load-bearing
+          copy is byte-identical across clients by construction (SYNC-42). */}
+      {status?.state === "pending" && (
+        <p style={NOTICE} data-testid="sync.settings.awaiting-approval">
+          {ENROLL_PENDING_NOTICE}
+        </p>
+      )}
 
       <p style={{ ...HELP, marginTop: 16 }}>{t("sync.settings.hubHelp")}</p>
     </div>

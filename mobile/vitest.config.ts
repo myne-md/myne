@@ -35,6 +35,9 @@ export default defineConfig({
       // vite.config.ts, which carries the rationale for sharing rather than
       // copying it.
       { find: /^@myne\/reminder-schedule$/, replacement: sib("../src/lib/reminderSchedule.ts") },
+      // The shared enrol gate (myne-md/myne-mobile#38) — mirror of
+      // vite.config.ts, which carries the rationale for sharing it.
+      { find: /^@myne\/enroll-gate$/, replacement: sib("../src/lib/enroll-gate.ts") },
       // The custom-theme syntax derivation (MYND-598) — mirror of
       // vite.config.ts, which carries the rationale for sharing it.
       { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
