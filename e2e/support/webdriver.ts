@@ -415,16 +415,18 @@ export interface FindOptions {
 // land in <1 s alone routinely need several seconds under that load. Every
 // element-appearance/poll wait inherits this headroom, which (with the config's
 // retry: 2) is what closes the full-suite "different test flakes each run" tail.
-// A real never-appears bug still fails — just later. Raised 20 s → 45 s → 90 s.
-// Under the shared host's cumulative load a *different* mount-bound scenario
-// each full-suite run slips past the ceiling (nav1 unlock, tp1 attachment-text,
-// ci1/slash-datetime unlock at the tail) — a contention signature, not a logic
-// bug. 45 s closed most of the tail; 90 s absorbs the tail-of-suite boots that
-// still slipped past it, since the failure shape is always "unlock/editor never
-// painted in budget", never a wrong assertion. The headroom trades slower
-// never-appears failures for a closed flake tail; with the e2e step now
-// non-blocking (.woodpecker.yml) the slower-fail cost no longer gates anyone.
-const DEFAULT_TIMEOUT_MS = 90_000;
+// A real never-appears bug still fails — just later. Raised 20 s → 45 s. (A
+// 90 s experiment was REVERTED: it did not make the tail-contention scenarios
+// pass — the failure shape is a host too loaded to paint in budget, not a small
+// margin — it only tripled their fail time, bloating the suite to ~46 min and
+// tripping the 60-min Woodpecker pipeline timeout, which Canceled the whole run
+// mid-e2e. The real fixes are elsewhere: the e2e step is now non-blocking
+// (.woodpecker.yml) so a tail flake no longer gates, the repo timeout is raised
+// to 120 min for headroom, and the durable cure is the boot-cost work. With
+// e2e non-blocking a FAST fail is preferable, so 45 s stays.) 45 s already
+// closed most of the tail (nav1 unlock, tp1 attachment-text); the rest is the
+// quarantine set + the boot-cost debt.
+const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_INTERVAL_MS = 100;
 
 /** One WebDriver session against a running tauri-driver. */
