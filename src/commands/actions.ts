@@ -81,7 +81,13 @@ const toggleVimModeAction: CommandAction = {
   get category() {
     return i18n.t("commands.actions.category.editor");
   },
-  visibility: editorOnly,
+  // Developer-mode gated (#181), for the reason the AI actions below are:
+  // Settings hides the vim toggle while the mode is off, and a palette entry
+  // that still flips it would reopen the door the gate just closed. Developer
+  // mode covers three surfaces at once — the rail, settings search and this
+  // registry — and one of them left open makes the other two decorative.
+  // Hidden, not disabled: the action does not exist for a default user.
+  visibility: (ctx) => (ctx.stageName === "editor" && ctx.prefs.developer_mode ? "show" : "hidden"),
   run: (ctx) => {
     void setEditorVimMode(!(ctx.prefs.editor_vim_mode ?? false));
   },

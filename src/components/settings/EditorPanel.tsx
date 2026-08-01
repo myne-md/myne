@@ -60,8 +60,15 @@ export function EditorPanel() {
       >
         {/* Vim keyboard mode (vim-keyboard-mode, MYND-313) — optional modal
             editing; off by default. The engine is only downloaded when this is
-            turned on. */}
-        <VimModeSettings />
+            turned on.
+
+            Behind Developer mode (#181), the same setting-level gate the CLI
+            block in PrivacyPanel carries: a power-user editing affordance kept
+            out of the default Settings surface. It stays in Editor rather than
+            moving to a Developer panel so "where's my vim setting?" still lands
+            where the topic lives. Hiding is not disabling — an already-enabled
+            keymap keeps running when the mode goes back off. */}
+        {prefs.developer_mode && <VimModeSettings />}
         {/* Default view mode (reading-source-modes, MYND-299) — Live/Reading/
             Source a note opens in; per-tab override via ⇧⌘E. */}
         <DefaultViewModeSettings />

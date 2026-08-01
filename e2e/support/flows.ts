@@ -344,15 +344,33 @@ export async function setTranscriptionEnabled(
  */
 export async function enableDeveloperMode(session: Session): Promise<void> {
   await openSettings(session, "about");
-  await (await session.byTestId("about.developer-mode-toggle")).click();
-  await session.waitUntil(
-    async () =>
-      (await (await session.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
-      "true"
-        ? true
-        : null,
-    { label: "developer_mode toggled on", timeoutMs: 10_000 },
-  );
+  await enableDeveloperModeInSettings(session);
+}
+
+/**
+ * {@link enableDeveloperMode} for a caller that ALREADY has Settings open —
+ * it reaches About by the rail instead of the gear, because clicking the gear
+ * a second time is not an "open" (the modal is a toggle, and the backdrop is
+ * over the button). The user-guide capture walks the rail tab by tab and needs
+ * exactly this shape.
+ *
+ * Idempotent, on the `setSettingsSwitch` discipline: click only when the toggle
+ * is not already where we want it. Since #181 put the CLI block and the vim
+ * toggle behind this gate, several scenarios reach it more than once (vm1 sets
+ * vim on and then off) — an unconditional click would turn the mode back OFF on
+ * the second call and hang on the wait below.
+ */
+export async function enableDeveloperModeInSettings(session: Session): Promise<void> {
+  await (await session.byTestId("settings.tab-about")).click();
+  const checked = async () =>
+    await (await session.byTestId("about.developer-mode-toggle")).attribute("aria-checked");
+  if ((await checked()) !== "true") {
+    await (await session.byTestId("about.developer-mode-toggle")).click();
+  }
+  await session.waitUntil(async () => ((await checked()) === "true" ? true : null), {
+    label: "developer_mode toggled on",
+    timeoutMs: 10_000,
+  });
   await session.waitForElement(testIdSelector("settings.developer-group"));
 }
 

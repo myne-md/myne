@@ -19,6 +19,13 @@
 //         is the scenario that would leak note content across a lock without an
 //         explicit reset.
 //
+//   vm4 — hiding is not disabling (#181): the toggle now lives behind Developer
+//         mode, and turning that mode back off takes the CONTROL away while the
+//         keymap keeps running. The inverse — a visibility switch that silently
+//         reverts the editor — is the surprise the issue rejected by name, and
+//         nothing but a real keystroke after the control is gone can prove it
+//         did not happen.
+//
 // Mode is read from `data-vim-mode` on the editor root — the same attribute the
 // bottom-bar indicator renders from, so asserting it also proves the indicator's
 // data source is live.
@@ -32,6 +39,7 @@ import {
   closeSettings,
   createNote,
   dismissImporterOffer,
+  enableDeveloperMode,
   lockAndReunlock,
   openSettings,
   typeIntoEditor,
@@ -53,9 +61,15 @@ async function vimMode(session: Session): Promise<string | null> {
   return await el.attribute("data-vim-mode");
 }
 
-/** Flip the Settings → Editor vim toggle and close the modal. */
+/** Flip the Settings → Editor vim toggle and close the modal.
+ *
+ *  Developer mode first (#181): the toggle is hidden — absent from the DOM,
+ *  not disabled — while the mode is off. `enableDeveloperMode` is idempotent
+ *  and leaves Settings open on About, so callers that flip vim twice (vm1) get
+ *  the rail click rather than a second modal open. */
 async function setVimMode(session: Session, on: boolean): Promise<void> {
-  await openSettings(session, "editor");
+  await enableDeveloperMode(session);
+  await (await session.byTestId("settings.tab-editor")).click();
   const toggle = await session.byTestId("settings.vim-mode");
   const checked = (await toggle.attribute("aria-checked")) === "true";
   if (checked !== on) await toggle.click();
@@ -227,3 +241,60 @@ async function noteText(session: Session): Promise<string> {
   if (!content) throw new Error("editor content not found");
   return await content.text();
 }
+
+describeE2E("vm4 hiding the vim toggle does not turn vim off (#181)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("turning Developer mode back off removes the control but leaves the editor modal", async () => {
+    let password = "";
+    await scenario(
+      "vm4-hidden-not-disabled",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditorAndNote(s, password, "vm4notealfa7k2m9qx4w8e5rj0dd");
+
+        await setVimMode(s, true);
+        await s.waitUntil(async () => ((await vimMode(s)) === "normal" ? true : null), {
+          label: "editor reports normal mode after enabling vim",
+        });
+
+        // Hide the gate again. `developer_mode` governs the CONTROL, never the
+        // keymap — a visibility switch that also disabled the feature would be
+        // the "surprise loss" the issue rejected.
+        await openSettings(s, "about");
+        await (await s.byTestId("about.developer-mode-toggle")).click();
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
+            "false"
+              ? true
+              : null,
+          { label: "developer_mode toggled off", timeoutMs: 10_000 },
+        );
+
+        // The control is gone from Editor, while the section around it stays.
+        await (await s.byTestId("settings.tab-editor")).click();
+        await s.byTestId("settings.section.editor-editing");
+        expect((await s.byTestIdAll("settings.vim-mode")).length).toBe(0);
+        await closeSettings(s);
+
+        // …and the editor is still modal. Asserted through a real keystroke as
+        // well as the attribute: `l` moves the cursor in normal mode instead of
+        // inserting the letter, which is the behaviour a user would notice
+        // vanishing.
+        await s.waitUntil(async () => ((await vimMode(s)) === "normal" ? true : null), {
+          label: "editor still modal after the control was hidden",
+        });
+        await s.byTestId("editor.vim-mode");
+        await sendEditorKeys(s, "i");
+        await s.waitUntil(async () => ((await vimMode(s)) === "insert" ? true : null), {
+          label: "vim still answers keystrokes with the control hidden",
+        });
+        await sendEditorKeys(s, ESCAPE_KEY);
+        await s.waitUntil(async () => ((await vimMode(s)) === "normal" ? true : null), {
+          label: "Escape returns to normal with the control hidden",
+        });
+      },
+    );
+  });
+});

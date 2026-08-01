@@ -37,7 +37,10 @@ const ASSESSMENT = join(
 // `typed-unsupported` — reachable, and its backend answers a typed refusal.
 const V = {
   // ── src/components/settings ─────────────────────────────────────────────
-  "src/components/settings/AboutPanel.tsx": ["ported", "Build identity and links; no host call."],
+  "src/components/settings/AboutPanel.tsx": [
+    "ported",
+    "Build identity and links; no host call. Carries the Developer mode toggle, which since #181 renders here too — it used to be withheld on a `localAi`-less capability set, which on web left the mode's other members (the Vim row) unreachable.",
+  ],
   "src/components/settings/AccountPanel.tsx": [
     "adapted",
     "Ships; the clipper block is capability-gated AND its module is substituted, and vault delete is task 72's open decision.",
@@ -72,7 +75,7 @@ const V = {
   ],
   "src/components/settings/CliAccessSettings.tsx": [
     "adapted",
-    "Never rendered: PrivacyPanel gates the block on `cliAccess`, which is absent on web, so the whole terminal-access surface is omitted rather than greyed. Ships in the bundle (it is one small component inside a panel that does ship) but nothing on this client mounts it, and its one command is `Unsupported` in the dispatcher.",
+    "Never rendered: PrivacyPanel gates the block on `cliAccess`, which is absent on web, so the whole terminal-access surface is omitted rather than greyed. Ships in the bundle (it is one small component inside a panel that does ship) but nothing on this client mounts it, and its one command is `Unsupported` in the dispatcher. The panel adds a second, independent gate on the `developer_mode` preference (#181), which changes nothing here — the capability gate already omits the block on every web build.",
   ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
   "src/components/settings/SettingRow.tsx": [
@@ -87,7 +90,7 @@ const V = {
   "src/components/settings/DefaultViewModeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/EditorPanel.tsx": [
     "adapted",
-    "Ships; the spell-check rows are filtered from search and the controls are omitted where `spellCheck` is absent.",
+    "Ships; the spell-check rows are filtered from search and the controls are omitted where `spellCheck` is absent. The Vim row is additionally gated on the `developer_mode` preference (#181) — a runtime toggle rather than a capability, so it behaves identically on both clients.",
   ],
   "src/components/settings/FilesPanel.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/TranscriptionPanel.tsx": [
@@ -109,7 +112,7 @@ const V = {
   "src/components/settings/panel-styles.ts": ["ported", "Style constants."],
   "src/components/settings/PrivacyPanel.tsx": [
     "adapted",
-    "Ships; the screen-capture toggle and quick-unlock block are capability-gated, and both are filtered from search.",
+    "Ships; the screen-capture toggle and quick-unlock block are capability-gated, and both are filtered from search. The CLI block carries a `developer_mode` gate on top of its capability gate (#181); on web the capability half already decides it.",
   ],
   "src/components/settings/QuickUnlockSettings.tsx": [
     "adapted",
@@ -136,7 +139,10 @@ const V = {
   "src/components/settings/SyncPanel.tsx": ["ported", "Sync is required on web, so this panel is more load-bearing here than on desktop."],
   "src/components/settings/ToolbarCustomizeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/TypographySettings.tsx": ["ported", "Prefs-backed."],
-  "src/components/settings/VimModeSettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/VimModeSettings.tsx": [
+    "ported",
+    "Prefs-backed. Mounted only while `developer_mode` is on since #181 — the same condition on both clients, so still `ported` rather than `adapted`: nothing about the component differs here, only whether EditorPanel renders it.",
+  ],
   "src/components/settings/search/matchSettings.ts": ["ported", "Pure matching."],
   "src/components/settings/search/resultsGrouping.ts": ["ported", "Pure grouping."],
   "src/components/settings/search/searchSettings.ts": [

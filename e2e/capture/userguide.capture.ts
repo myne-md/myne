@@ -41,6 +41,7 @@ import { seedVault } from "./../support/fixtures";
 import {
   closeSettings,
   dismissImporterOffer,
+  enableDeveloperModeInSettings,
   pageSeatInvoke,
   runPaletteAction,
   unlockToEditor,
@@ -1387,13 +1388,20 @@ runner(
 
       // ---- Frame: vim mode (the Editor panel's Vim mode toggle) ----
       // VimModeSettings.tsx: settings.tab-editor → settings.vim-mode (a Switch,
-      // off by default). Scroll it into view so the toggle is centred.
+      // off by default). Since #181 the row only renders while Developer mode
+      // is on, so the frame turns that on first — which is also what the guide
+      // has to tell the reader, hence the caption. Settings is already open at
+      // this point in the walk, so this uses the rail-only variant rather than
+      // the one that goes through the gear. Deliberately NOT turned back off
+      // afterwards: the frames that follow (hotkeys, appearance, …) are
+      // unaffected by it, and re-hiding would only add a rail round-trip.
       await frame(
         s,
         "vim-mode",
         "editor-and-writing/vim-mode",
-        "The Editor settings panel scrolled to the Vim mode toggle, which is off by default.",
+        "The Editor settings panel scrolled to the Vim mode toggle, which is off by default and appears once Developer mode is on.",
         async () => {
+          await enableDeveloperModeInSettings(s);
           await (await s.byTestId("settings.tab-editor")).click();
           const block = await s.byTestId("settings.vim-mode", { timeoutMs: 6000 });
           await safe("scroll vim-mode into view", async () => {

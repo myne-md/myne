@@ -156,8 +156,18 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           `cliAccess` is absent rather than greyed out: a browser tab cannot host
           a terminal's Unix socket, and the sidecar it would talk to is a file
           inside a desktop bundle (`decisions.md` 2026-07-26 "Web capability
-          set" makes omission normative). */}
-      {has("cliAccess") && (
+          set" makes omission normative).
+
+          Behind Developer mode as well (#181): the block opens the unlocked
+          vault to an EXTERNAL terminal process over the local command socket —
+          a separate trust boundary, and Myne does not vouch for what walks
+          through it. That is the Developer group's whole membership test, so
+          this belongs behind the same deliberate door as AI and Tor even
+          though it keeps its home in Privacy. The gate HIDES, it does not
+          disable: turning Developer mode back off leaves an enabled socket
+          serving, exactly as it leaves `ai_enabled` set — the off switch for
+          the feature is its own control. */}
+      {prefs.developer_mode && has("cliAccess") && (
         <CliAccessSettings
           enabled={prefs.cli_enabled}
           excludedFolders={prefs.cli_excluded_folders}

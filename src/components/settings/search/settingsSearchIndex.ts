@@ -128,10 +128,16 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   // CLI terminal access (MYND-490). All three carry `cliAccess`: the block is
   // omitted where the capability is absent, so an ungated entry would navigate
-  // to an anchor that was never rendered.
+  // to an anchor that was never rendered. All three ALSO carry
+  // `developerGated` (#181) — PrivacyPanel now renders the block only while
+  // Developer mode is on, and the two gates are independent, so the entry
+  // needs both to stay in step with its control. The first developer-gated
+  // entries in a `core` panel: the flag has never meant "lives in the
+  // Developer rail group", only "hidden while the mode is off".
   {
     id: "privacy.cli-access",
     capability: "cliAccess",
+    developerGated: true,
     panelId: "privacy",
     titleKey: "settings.cliAccess.label",
     descriptionKey: "settings.cliAccess.helperOff",
@@ -140,6 +146,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "privacy.cli-excluded-folders",
     capability: "cliAccess",
+    developerGated: true,
     panelId: "privacy",
     titleKey: "settings.cliAccess.excludedLabel",
     descriptionKey: "settings.cliAccess.excludedHelper",
@@ -148,6 +155,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "privacy.cli-rate-limit",
     capability: "cliAccess",
+    developerGated: true,
     panelId: "privacy",
     titleKey: "settings.cliAccess.rateLimitLabel",
     descriptionKey: "settings.cliAccess.rateLimitHelper",
@@ -231,7 +239,12 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.lineNumbers",
   },
   {
+    // Developer-gated (#181), like the CLI trio above and for the same
+    // reason: EditorPanel renders the toggle only while Developer mode is on.
+    // No `capability` — vim ships on every client, so this entry's gate is
+    // the runtime one alone.
     id: "editor.vim-mode",
+    developerGated: true,
     panelId: "editor",
     testid: "settings.vim-mode",
     titleKey: "settings.vimMode.label",

@@ -2,10 +2,9 @@
 //
 // Component tests for `src/components/settings/AboutPanel.tsx`'s Developer
 // mode toggle (developer-mode feature, MYND-593, task 6). Focus: the toggle
-// reflects `prefs.developer_mode`, calls `setDeveloperMode` on click, and is
-// hidden entirely when the Developer group has no capability-eligible member
-// (mirrors SettingsModal's own emptiness test) — regardless of the toggle's
-// own current value, since this control is what sets that value.
+// reflects `prefs.developer_mode`, calls `setDeveloperMode` on click, and
+// renders on every client — including the web-shaped capability set, which
+// used to hide it (#181).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -82,9 +81,22 @@ describe("AboutPanel — Developer mode toggle", () => {
     expect(setDeveloperMode).toHaveBeenCalledWith(false);
   });
 
-  it("is absent when the Developer group has no capability-eligible member (web-shaped capability set)", () => {
+  it("still renders on a web-shaped capability set, where the Developer rail group is empty", () => {
+    // The inverse of this used to hold: no `localAi` meant no toggle, on the
+    // theory that a gate with nothing behind it should not be offered. #181
+    // broke that theory — the mode now also hides settings inside core panels
+    // (the Vim toggle), and those ship on every client. Withholding the switch
+    // here would strand them, since `developer_mode` is device-local and so
+    // cannot arrive by sync from a desktop that has one.
     localAiCapable = false;
     render(<AboutPanel />);
-    expect(screen.queryByTestId("about.developer-mode-toggle")).toBeNull();
+    expect(screen.getByTestId("about.developer-mode-toggle")).toBeTruthy();
+  });
+
+  it("is still operable on a web-shaped capability set", () => {
+    localAiCapable = false;
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.developer-mode-toggle"));
+    expect(setDeveloperMode).toHaveBeenCalledWith(true);
   });
 });

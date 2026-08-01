@@ -350,6 +350,30 @@ describe("Command palette action registry", () => {
     ).toBe("hidden");
   });
 
+  it("editor.toggle-vim-mode requires editor stage + Developer mode; hidden otherwise (#181)", () => {
+    // Settings hides the vim toggle while the mode is off; leaving the palette
+    // entry reachable would let a keystroke flip a setting the UI no longer
+    // offers — the same hole the AI actions above are gated to close.
+    const action = find("editor.toggle-vim-mode");
+    expect(action.visibility(makeContext({ stageName: "editor" }))).toBe("show");
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "editor",
+          prefs: { developer_mode: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "welcome",
+          prefs: { developer_mode: true } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+  });
+
   it("views.show is editor-only and dispatches to onShowViews (MYND-274)", () => {
     expect(find("views.show").visibility(makeContext({ stageName: "editor" }))).toBe(
       "show",

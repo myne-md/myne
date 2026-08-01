@@ -7,7 +7,7 @@
 // binary as a real child process talking to it over the real Unix socket.
 // Everything below the socket already has dense unit coverage on both sides
 // (`cli_bridge::*` on the desktop, `cli/src/*` plus `cli/tests/` on the CLI);
-// what NO unit test can reach is the part these five scenarios own — that the
+// what NO unit test can reach is the part these six scenarios own — that the
 // UI toggle a user actually clicks moves the socket a script actually connects
 // to, and that the exit code a script branches on is the one the running app
 // produces.
@@ -27,6 +27,12 @@
 //   cli5 — EXCLUDED: a note in an excluded folder is absent from `list`, from
 //          `search`, and from `show` (which answers `not_found`, the same
 //          reply an unknown id gets), while an in-scope sibling stays visible.
+//   cli6 — HIDDEN IS NOT DISABLED (#181): the Terminal-access block now lives
+//          behind Developer mode, and turning that mode back off must take the
+//          CONTROL away without touching the DOOR. Its own toggle is the only
+//          thing that closes the socket — the alternative (a visibility switch
+//          that silently revokes an external client's access) is the surprise
+//          the issue rejected by name.
 //
 // # Why the CLI is spawned with `XDG_DATA_HOME` and that is NOT a test hook
 //
@@ -48,7 +54,7 @@
 // stdout, deliberately: printing a note is the feature. The needles below are
 // in-source scenario constants, the accepted exception.
 //
-// Vault-count precondition: 1 (weak KDF) for all five scenarios.
+// Vault-count precondition: 1 (weak KDF) for all six scenarios.
 
 import { spawnSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
@@ -62,6 +68,7 @@ import {
   closeSettings,
   createNote,
   dismissImporterOffer,
+  enableDeveloperMode,
   openSettings,
   typeIntoEditor,
   unlockToEditor,
@@ -240,12 +247,18 @@ async function waitToggleReflects(session: Session, expected: "true" | "false"):
   );
 }
 
-/** Settings → Privacy → flip Terminal access on, then close Settings. Leaves
- *  the caller to wait on the door itself: the toggle's reflected attribute is
- *  optimistic (see `CliAccessSettings.tsx`), so it proves the click landed,
- *  never that `vault.prefs` was written. */
+/** Settings → Developer mode → Privacy → flip Terminal access on, then close
+ *  Settings. Leaves the caller to wait on the door itself: the toggle's
+ *  reflected attribute is optimistic (see `CliAccessSettings.tsx`), so it
+ *  proves the click landed, never that `vault.prefs` was written.
+ *
+ *  Developer mode first (#181): the Terminal-access block is hidden while the
+ *  mode is off, so the block is not merely unclicked here — it is not in the
+ *  DOM. `enableDeveloperMode` leaves Settings open on About, hence the rail
+ *  click rather than a second `openSettings`. */
 async function enableCliAccess(session: Session): Promise<void> {
-  await openSettings(session, "privacy");
+  await enableDeveloperMode(session);
+  await (await session.byTestId("settings.tab-privacy")).click();
   await session.byTestId("settings.cli-access");
   await (await session.byTestId("settings.cli-access-toggle")).click();
   await waitToggleReflects(session, "true");
@@ -540,6 +553,59 @@ describeE2E("cli5 an excluded folder is absent from every CLI answer (MYND-490)"
         const unknown = runCli(app, ["--json", "show", "not-a-real-note-id"]);
         expect(unknown.code).toBe(show.code);
         expect(envelope(unknown).error?.kind).toBe(envelope(show).error?.kind);
+      },
+    );
+  });
+});
+
+describeE2E("cli6 hiding the Terminal-access control does not close the door (#181)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("turning Developer mode back off removes the block but leaves the socket serving", async () => {
+    let password = "";
+    await scenario(
+      "cli6-hidden-not-disabled",
+      {
+        seed: (dir) => {
+          password = seedVault(dir).password;
+        },
+      },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await waitForDoor(app, "D");
+
+        // Developer mode on, Terminal access on, door open — the cli1 baseline.
+        await enableCliAccess(s);
+        await waitForDoor(app, "O");
+
+        // Now hide the group again. `developer_mode` is a VISIBILITY switch:
+        // the control it governs disappears, the preference it does not govern
+        // (`cli_enabled`) is untouched.
+        await openSettings(s, "about");
+        await (await s.byTestId("about.developer-mode-toggle")).click();
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
+            "false"
+              ? true
+              : null,
+          { label: "developer_mode toggled off", timeoutMs: 10_000 },
+        );
+
+        // The control is gone from Privacy…
+        await (await s.byTestId("settings.tab-privacy")).click();
+        await s.byTestId("settings.auto-lock-select");
+        expect((await s.byTestIdAll("settings.cli-access")).length).toBe(0);
+        await closeSettings(s);
+
+        // …and the door is still open. Asserted through the marker AND a real
+        // command: the marker alone would only prove the supervisor's view of
+        // `vault.prefs`, not that a terminal can still walk through.
+        await waitForDoor(app, "O");
+        const run = runCli(app, ["--json", "list"]);
+        expect(run.code).toBe(EXIT.OK);
+        expect(envelope(run).ok).toBe(true);
       },
     );
   });
