@@ -16,11 +16,7 @@ import { extractBlockAnchors } from "@myne/editor/wikilink/anchor";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { parse } from "../dialect/parse";
 import { extractLineTasks, type LineTask } from "../dialect/visitors/lineTasks";
-import type {
-  ParseResult,
-  WikilinkRef,
-  WikilinkTargetKind,
-} from "../dialect/types";
+import type { ParseResult, WikilinkRef } from "../dialect/types";
 import { collectFrontmatterTags } from "./frontmatterTags";
 import { bumpIndexNonce } from "./indexNonce";
 import { noteRead } from "./readNote";
@@ -30,64 +26,32 @@ import {
 } from "./attachmentRefs";
 import {
   liveIdSet,
-  parseTarget,
   resolveWikilink,
   type ResolverIndex,
   type ResolverNote,
   type WikilinkResolution,
 } from "./resolveWikilink";
+import {
+  edgeToRef,
+  extractWikilinkEdges,
+  resolveEdges,
+  type ForwardLink,
+  type WikilinkEdge,
+} from "./graphModel";
 import { extractProperties, type PropertyEntry } from "./propertyTyping";
 import type { StoredProperty } from "./queryEngine";
 
-/**
- * One per-occurrence outbound wikilink edge — the TS mirror of the Rust
- * `WikilinkEdge` (serde camelCase both ways). Title-keyed (Model-2): no
- * resolved UUID; resolution runs TS-side at query time.
- */
-export type WikilinkEdge = {
-  target: string;
-  targetKind: WikilinkTargetKind;
-  /** Folded title-key of the target (§3.7.8 fold) — the backlink bucket
-   *  key, computed here so Rust never folds (no Turkish divergence). */
-  titleKey: string;
-  anchor: string | null;
-  blockId: string | null;
-  alias: string | null;
-  embed: boolean;
-  byteStart: number;
-  byteEnd: number;
-};
-
-/**
- * Known attachment/media extensions. An `![[…]]` embed whose target ends
- * with one of these is a media embed (E2) — excluded from BOTH the note
- * graph and broken-links. A WHITELIST, not "any non-`.md`", so dotted
- * note titles (`[[2024.review]]`, `[[v0.1]]`) are NOT false-excluded.
- */
-const MEDIA_EXTENSIONS = [
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".webp",
-  ".svg",
-  ".bmp",
-  ".ico",
-  ".pdf",
-  ".mp3",
-  ".m4a",
-  ".wav",
-  ".ogg",
-  ".mp4",
-  ".webm",
-  ".mov",
-];
-
-export function isMediaTarget(target: string): boolean {
-  const lastSegment = target.split("/").pop() ?? target;
-  const lower = lastSegment.toLowerCase();
-  return MEDIA_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
+// The pure graph model — edge extraction, resolution and the `{nodes, edges}`
+// build — moved to the shared `@myne/editor/host/notes/graphModel` (#199) so
+// both clients answer "what does this link point at" once. Re-exported here so
+// every existing import site keeps working; THIS module stays the IPC surface.
+export {
+  isMediaTarget,
+  extractWikilinkEdges,
+  resolveEdges,
+  type WikilinkEdge,
+  type ForwardLink,
+} from "./graphModel";
 
 /** A note tag — TS mirror of the Rust `TagEntry` (N2): the exact folded
  *  tag is the canonical key, with the note's original casing for display. */
@@ -167,38 +131,6 @@ export function extractTags(parsed: ParseResult): TagEntry[] {
   for (const t of parsed.inlineTags) push(t.tag);
   for (const ft of collectFrontmatterTags(parsed.frontmatter.parsed)) push(ft);
   return out;
-}
-
-/**
- * Build the per-occurrence edge list from a note's parsed wikilinks.
- * Classification: `![[image.png]]`-style attachment embeds are skipped
- * (E2 — not note edges, kept out of broken-links); `![[Note]]` note
- * embeds become edges flagged `embed`; anchors/aliases/byte ranges are
- * carried verbatim. self-links are kept (the UI filters them).
- */
-export function extractWikilinkEdges(
-  wikilinks: ReadonlyArray<WikilinkRef>,
-): WikilinkEdge[] {
-  const edges: WikilinkEdge[] = [];
-  for (const w of wikilinks) {
-    if (w.embed && isMediaTarget(w.target)) {
-      continue; // attachment embed — owned by the future media pipeline
-    }
-    edges.push({
-      target: w.target,
-      targetKind: w.targetKind,
-      // Fold the parsed title via the SAME parse the resolver uses, so the
-      // bucket key matches a note's own folded title-key (single source).
-      titleKey: foldSegment(parseTarget(w).title),
-      anchor: w.heading,
-      blockId: w.blockId,
-      alias: w.alias,
-      embed: w.embed,
-      byteStart: w.byteRange.start,
-      byteEnd: w.byteRange.end,
-    });
-  }
-  return edges;
 }
 
 /** Upsert a note's index contribution (title + folder + wikilink edges + tags
@@ -454,27 +386,6 @@ export async function hydrateVaultIndicesOnUnlock(
   }
 }
 
-/** A note's outbound link with its resolution (resolved or broken). */
-export type ForwardLink = {
-  edge: WikilinkEdge;
-  resolution: WikilinkResolution;
-};
-
-/** Reconstruct a `WikilinkRef` from a stored edge so the single resolver
- *  can resolve it (plain-B — exactly the render-time resolution path). */
-function edgeToRef(edge: WikilinkEdge): WikilinkRef {
-  return {
-    raw: `[[${edge.target}]]`,
-    byteRange: { start: edge.byteStart, end: edge.byteEnd },
-    embed: edge.embed,
-    target: edge.target,
-    targetKind: edge.targetKind,
-    alias: edge.alias,
-    heading: edge.anchor,
-    blockId: edge.blockId,
-  };
-}
-
 /**
  * Forward links of a note (`forward(id)` query). Fetches the raw edges
  * from Rust, then resolves each against the resident note-set via the
@@ -490,23 +401,6 @@ export async function forward(
     { noteId },
   );
   return resolveEdges(edges, notes, index);
-}
-
-/**
- * Resolve a batch of raw edges against the resident note-set via the SINGLE
- * resolver (the render-time path) — the shared core of `forward()` and the
- * graph adapter's whole-vault build (so the bulk dump resolves identically to
- * the per-note query; no second resolver). Pure (no IPC).
- */
-export function resolveEdges(
-  edges: ReadonlyArray<WikilinkEdge>,
-  notes: ReadonlyArray<ResolverNote>,
-  index?: ResolverIndex,
-): ForwardLink[] {
-  return edges.map((edge) => ({
-    edge,
-    resolution: resolveWikilink(edgeToRef(edge), notes, index),
-  }));
 }
 
 /** One backlink source note + its occurrences pointing at the queried
