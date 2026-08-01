@@ -107,7 +107,7 @@ steps:
     commands:
       - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
       - cargo install --locked cargo-deny
-      - cd src-tauri && cargo deny check
+      - cd src-tauri && cargo deny check --config ../../myne-main/deny.toml  # reuse main repo advisory/license rules (provisioned by cargo-checks)
 
   # ── Frontend build (tsc typecheck + vite bundle) ──────────────────────────
   pnpm-build:
