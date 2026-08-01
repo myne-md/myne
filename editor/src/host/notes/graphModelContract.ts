@@ -20,6 +20,7 @@
 // notes are resolver-visible) is asserted by that client's own specs.
 
 import type { GraphModel } from "./graphModel";
+import type { LaidOutNode } from "./graphLayout";
 import type { ResolverNote } from "./resolveWikilink";
 
 /** A fixture note: the resolver's view of it plus the raw body its client
@@ -152,6 +153,41 @@ export function summarizeGraphModel(model: GraphModel): GraphModelSummary {
  *   one (weight 2).
  * - `n-orphan` and `n-ghost` are nodes with no edges.
  */
+/**
+ * A layout's exact identity, as one comparable string (myne-md/myne#200).
+ *
+ * Deliberately UNROUNDED. The claim the deterministic kernel makes is
+ * bit-identity — same inputs, same coordinates, on any engine — and rounding
+ * here would hide exactly the failure this exists to catch. If this ever
+ * mismatches between two clients or two CI architectures, an engine has broken
+ * the assumption in `graphLayout.ts` (most likely a transcendental sneaking
+ * into the hot path). Investigate it; do not add tolerance.
+ */
+export function graphLayoutFingerprint(
+  positions: ReadonlyArray<LaidOutNode>,
+): string {
+  return [...positions]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((p) => `${p.id}:${p.x},${p.y}`)
+    .join("|");
+}
+
+/** The cold layout of {@link GRAPH_CONTRACT_NOTES} under the default forces,
+ *  with an empty seed. Regenerate deliberately if the forces or the tick budget
+ *  change — a diff here means every existing layout moves. */
+export const GRAPH_CONTRACT_LAYOUT_FINGERPRINT =
+  "n-alpha:837.685896041578,252.59004517910725|" +
+  "n-archived:739.8887235161133,260.2663750907585|" +
+  "n-beta:792.0719671360154,298.99863845430923|" +
+  "n-fence:830.5289814871309,351.364501182955|" +
+  "n-folder-linker:480.9719359426908,511.205687044647|" +
+  "n-ghost:624.9981736187366,886.3784122364578|" +
+  "n-linker:176.53312848654602,489.5369931848552|" +
+  "n-orphan:112.86554254530718,836.6797711202418|" +
+  "n-personal-report:144.6774245203641,545.6521779675257|" +
+  "n-projects-index:521.1379308128686,560.8889131555088|" +
+  "n-work-report:238.6258848097196,506.4350233046903";
+
 export const GRAPH_CONTRACT_EXPECTATION: GraphModelSummary = {
   nodes: [
     "n-alpha",

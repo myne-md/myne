@@ -11,10 +11,13 @@ import {
   extractWikilinkEdges,
   type WikilinkEdge,
 } from "../../src/notes/graphModel";
+import { computeGraphLayout } from "../../src/notes/graphLayoutProtocol";
 import {
   GRAPH_CONTRACT_EXPECTATION,
+  GRAPH_CONTRACT_LAYOUT_FINGERPRINT,
   GRAPH_CONTRACT_NOTES,
   GRAPH_CONTRACT_RESOLVER_NOTES,
+  graphLayoutFingerprint,
   summarizeGraphModel,
 } from "@myne/editor/host/notes/graphModelContract";
 
@@ -42,5 +45,19 @@ describe("graph model contract (desktop pipeline)", () => {
   it("never turns a link inside an exclusion zone into an edge", () => {
     const model = buildGraphModel(desktopEdgeDump(), GRAPH_CONTRACT_RESOLVER_NOTES);
     expect(model.edges.some((e) => e.target === "n-ghost")).toBe(false);
+  });
+
+  it("lays the fixture out to the one expected set of coordinates", () => {
+    // The coordinate half of the contract (myne-md/myne#200). The same
+    // assertion runs in myne-mobile against the same fixture — two clients
+    // computing the identical layout, with nothing synced between them, is
+    // what makes `vault.graph` staying device-local survivable.
+    const model = buildGraphModel(desktopEdgeDump(), GRAPH_CONTRACT_RESOLVER_NOTES);
+    const { positions } = computeGraphLayout({
+      nodes: model.nodes.map((n) => ({ id: n.id })),
+      edges: model.edges.map((e) => ({ source: e.source, target: e.target })),
+      seed: {},
+    });
+    expect(graphLayoutFingerprint(positions)).toBe(GRAPH_CONTRACT_LAYOUT_FINGERPRINT);
   });
 });
