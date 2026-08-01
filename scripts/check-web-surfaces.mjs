@@ -313,7 +313,6 @@ const V = {
     "adapted",
     "Answers the Fullscreen API on web — the seam's `isFullscreen` is `document.fullscreenElement !== null`, which is the question the caller is asking.",
   ],
-  "src/hooks/useLastActiveNotePref.ts": ["ported", "Prefs-backed."],
   "src/hooks/usePrefs.ts": ["ported", "The shared prefs hook."],
   "src/hooks/useReminderScheduler.ts": [
     "adapted",

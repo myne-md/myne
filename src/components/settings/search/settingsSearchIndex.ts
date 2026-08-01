@@ -110,16 +110,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.screenCapture",
   },
   {
-    // The "Continue where you left off" toggle renders inline English (no
-    // `settings.*` key today); give search a dedicated translatable pair.
-    id: "privacy.last-active-note",
-    panelId: "privacy",
-    testid: "settings.last-active-note-toggle",
-    titleKey: "settings.search.extra.lastActiveNoteTitle",
-    descriptionKey: "settings.search.extra.lastActiveNoteDesc",
-    keywordsKey: "settings.search.keywords.lastActiveNote",
-  },
-  {
     id: "privacy.auto-lock",
     panelId: "privacy",
     testid: "settings.auto-lock-select",
