@@ -1,52 +1,30 @@
-// Folder-archive predicate + set helpers (MYND-470, mobile). Port of the
-// desktop `src/notes/archivedFolders.ts` pure logic — folders archived as a UNIT
-// via the `prefs.archived_folders` set (the folder-level twin of the per-note
-// `archived:` marker). Notes are NOT rewritten; a folder is archived by adding
-// its canonical trailing-slash path to the set, so an archived folder's whole
-// subtree drops out of the working-set tree while the notes stay live (still
-// resolvable as backlink / graph / tag / search targets — archive ≠ trash).
+// Folder-archive helpers (MYND-470, mobile) — the mobile-side surface of the
+// `prefs.archived_folders` set (folders archived as a UNIT; the folder-level twin
+// of the per-note `archived:` marker). Notes are NOT rewritten; a folder is
+// archived by adding its canonical trailing-slash path to the set, so an archived
+// folder's whole subtree drops out of the working-set tree while the notes stay
+// live (still resolvable as backlink / graph / tag / search targets — archive ≠
+// trash).
 //
-// The set holds canonical trailing-slash folder paths (NFC-normalized, sorted,
-// deduped by the shared Rust codec). A note is folder-archived when its folder
-// equals OR is nested under any archived folder — the trailing slash makes the
-// nesting check a plain prefix test that can't false-match a sibling whose name
-// merely starts with the archived name (`Projects/` archives `Projects/Myne/`
-// but NOT `ProjectsX/`). All folding goes through `folderKey` (NFC + case-fold),
-// the same identity the folder tree (`folders.ts`) uses.
+// The predicate + set-fold helpers are no longer ported here: they live in the
+// SHARED layer (`@myne/editor/host/notes/archivedFolders`) and `deriveFolderTree`
+// applies them itself (myne-md/myne-mobile#39). This file used to carry hand-copies
+// of them and, crucially, NOT a copy of `filterVisibleDeliberate` — so mobile hid
+// an archived folder's notes but kept the folder itself as an empty shell, while
+// desktop hid both from the same synced prefs. Re-exporting rather than re-porting
+// is what keeps that from happening again.
+//
+// What remains defined below is genuinely mobile-shaped: the Archive view's
+// top-level fold, its restore planner, and a subtree gather over mobile's
+// note→folder map (desktop reads its `TitleRecord` cache instead).
 
 import { folderKey } from "../dialect/folderPath";
 
-/**
- * Fold a raw `archived_folders` set into canonical folded keys (trailing-slash,
- * NFC + case-fold), dropping empties + duplicates. The queryable form consumed
- * by {@link isNoteFolderArchived} (compute once per set, reuse across notes).
- */
-export function archivedFolderKeys(archivedFolders: readonly string[]): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const f of archivedFolders) {
-    const key = folderKey(f);
-    if (key.length === 0 || seen.has(key)) continue;
-    seen.add(key);
-    out.push(key);
-  }
-  return out;
-}
-
-/**
- * Whether a note living in `noteFolder` is folder-archived by the pre-folded
- * `archivedKeys` (from {@link archivedFolderKeys}). `noteFolder` is a canonical
- * trailing-slash path or `null` for the vault root (root is never archivable).
- */
-export function isNoteFolderArchived(
-  noteFolder: string | null,
-  archivedKeys: readonly string[],
-): boolean {
-  if (archivedKeys.length === 0) return false;
-  const key = folderKey(noteFolder);
-  if (key.length === 0) return false; // root — never under an archived folder
-  return archivedKeys.some((ak) => key.startsWith(ak));
-}
+export {
+  archivedFolderKeys,
+  filterVisibleDeliberate,
+  isNoteFolderArchived,
+} from "@myne/editor/host/notes/archivedFolders";
 
 /**
  * The top-level archived folders (original canonical paths) for the Archive

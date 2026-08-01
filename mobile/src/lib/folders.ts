@@ -32,18 +32,25 @@ import {
 import { folderKey } from "../dialect/folderPath";
 
 /** Build the shared canonical folder tree from the note→folder map + the
- *  deliberate (empty-folder) set. `folderIndex` is `false` for every note —
- *  mobile has no folder-note designation UI, so no index-note hiding. */
+ *  deliberate (empty-folder) set + the archived (`prefs.archived_folders`) set.
+ *  `folderIndex` is `false` for every note — mobile has no folder-note
+ *  designation UI, so no index-note hiding.
+ *
+ *  Both sets are REQUIRED, deliberately (myne-md/myne-mobile#39). This wrapper
+ *  used to default `deliberate` to `[]`, and defaulting `archived` the same way
+ *  would just move the forgettable step up one level — which is the exact shape
+ *  of the bug this parameter exists to prevent. */
 export function deriveTree(
   folderOf: Map<string, string | null>,
-  deliberate: string[] = [],
+  deliberate: string[],
+  archived: string[],
 ): FolderTree {
   const notes = Array.from(folderOf, ([noteUuid, folder]) => ({
     noteUuid,
     folder,
     folderIndex: false,
   }));
-  return deriveFolderTree(notes, deliberate);
+  return deriveFolderTree(notes, deliberate, archived);
 }
 
 /** Notes at-or-below this folder (subtree count), the count shown on a folder row. */

@@ -60,6 +60,7 @@ import { resolveTodayNote, createNoteFromTemplate, createBlankNamedNote } from "
 import { normalizeFolderPath, ancestorPaths, foldSegment, folderKey } from "../../dialect/folderPath";
 import {
   archivedFolderKeys,
+  filterVisibleDeliberate,
   isNoteFolderArchived,
   topLevelArchivedFolders,
   removeFolderFromArchive,
@@ -587,8 +588,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // The FULL folder tree (fav/archive-unfiltered) — the reorder handlers resolve
   // a row's true `item_order` container against it, so a nudge is relative to the
   // note's real manual neighbours even when the fav strip hides some of them.
+  // `[]` for the archived set is deliberate and load-bearing here: this tree
+  // exists to resolve a row's TRUE container, so it must keep the folders the
+  // working-set tree hides.
   const fullTree = useMemo(
-    () => deriveTree(folderOf, prefs.deliberate_folders),
+    () => deriveTree(folderOf, prefs.deliberate_folders, []),
     [folderOf, prefs.deliberate_folders],
   );
 
@@ -615,6 +619,17 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const workingNotes = useMemo(
     () => (folderArchivedOf.size === 0 ? liveNotes : liveNotes.filter((n) => !folderArchivedOf.has(n.id))),
     [liveNotes, folderArchivedOf],
+  );
+  // The note→folder map with folder-archived notes removed — the map every
+  // working-set query resolves against (desktop's `liveCache(cache, archivedKeys)`
+  // equivalent). The unfiltered `folderOf` stays for the Archive view, which is
+  // the one surface that must still see them.
+  const workingFolderOf = useMemo(
+    () =>
+      folderArchivedOf.size === 0
+        ? folderOf
+        : new Map([...folderOf].filter(([id]) => !folderArchivedOf.has(id))),
+    [folderOf, folderArchivedOf],
   );
   // Top-level archived folders (nested ones fold under their ancestor) for the
   // Archive view's folder rows.
@@ -698,7 +713,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // no view is active. `runView` never throws (locked vault → empty groups).
   const viewCtx = useMemo<RunViewContext | null>(() => {
     if (!activeView) return null;
-    const liveIds = new Set(liveNotes.map((n) => n.id));
+    // The working set, NOT `liveNotes`: a folder-archived note carries no
+    // note-level marker, so it stays in `liveNotes` and a saved view would list
+    // notes the tree has hidden (myne-md/myne-mobile#39). Desktop intersects
+    // through `liveCache(cache, archivedKeys)` for the same reason.
+    const liveIds = new Set(workingNotes.map((n) => n.id));
     const titleById = new Map(notes.map((n) => [n.id, n.title]));
     return {
       liveIds,
@@ -706,8 +725,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         // The shared engine passes the raw tag; mobile's tag index is keyed by
         // the folded form (the desktop `byTag` folds internally), so fold here.
         hasTag: async (tag) => tagIndex.byTag.get(foldSegment(tag)) ?? [],
-        inFolder: async (path) => notesInSubtree(folderOf, path),
-        search: async (query) => searchNotes(query, liveNotes, bodies).map((h) => h.id),
+        inFolder: async (path) => notesInSubtree(workingFolderOf, path),
+        search: async (query) => searchNotes(query, workingNotes, bodies).map((h) => h.id),
         propertyValues: (key) => vaultIndicesPropertyValues(key),
       },
       rowFor: (id) => ({
@@ -719,7 +738,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         return [...ids].sort((a, b) => at(b) - at(a));
       },
     };
-  }, [activeView, liveNotes, notes, tagIndex, folderOf, bodies, updatedById]);
+  }, [
+    activeView,
+    workingNotes,
+    notes,
+    tagIndex,
+    folderOf,
+    workingFolderOf,
+    bodies,
+    updatedById,
+  ]);
 
   const [viewResult, setViewResult] = useState<ViewResult | null>(null);
   useEffect(() => {
@@ -1676,7 +1704,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     // container (shared `orderedChildren`) — a note can now sit above a folder,
     // the same list desktop renders from the same synced `item_order`. The tree
     // is derived once from the fav/archive-filtered map and walked recursively.
-    const tree = deriveTree(treeFolderOf, prefs.deliberate_folders);
+    const tree = deriveTree(
+      treeFolderOf,
+      prefs.deliberate_folders,
+      prefs.archived_folders,
+    );
     const childName = (c: Child): string =>
       c.kind === "folder" ? c.node.name : (titleOf.get(c.id) ?? "");
     // A→Z / Z→A is an explicit override on top of the manual interleave: it
@@ -1689,9 +1721,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       const dir = sortMode === "az" ? 1 : -1;
       return [...children].sort((a, b) => dir * childName(a).localeCompare(childName(b)));
     };
-    // Tree emptiness (no notes in the tree map + no deliberate empty folder) is
-    // cheaper than materializing the whole flattened tree just to ask its length.
-    const treeEmpty = treeFolderOf.size === 0 && prefs.deliberate_folders.length === 0;
+    // Tree emptiness (no notes in the tree map + no VISIBLE deliberate empty
+    // folder) is cheaper than materializing the whole flattened tree just to ask
+    // its length. The deliberate set is archive-filtered for the same reason the
+    // tree is: an archived empty folder renders nothing, so counting it would
+    // report a non-empty tree with no rows in it.
+    const treeEmpty =
+      treeFolderOf.size === 0 &&
+      filterVisibleDeliberate(prefs.deliberate_folders, archivedKeys).length === 0;
 
     const archiveDrillKey = archiveFolder !== null ? folderKey(archiveFolder) : "";
     const filtered =
