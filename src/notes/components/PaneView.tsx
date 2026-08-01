@@ -36,7 +36,7 @@ import { setActiveHeading } from "../views/activeHeadingSignal";
 import { createNote } from "../createNote";
 import { createDrawing } from "../createDrawing";
 import { useSelectedNote, type NoteId } from "../sidebarState";
-import { useResolverNotes } from "../resolverNotes";
+import { useLiveResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
 import { useVaultHeadings } from "../useVaultHeadings";
 import { useVaultBlockAnchors } from "../useVaultBlockAnchors";
@@ -211,14 +211,14 @@ export function PaneView({
   // of the note editor — the same first-class-tab pattern the graph established.
   const isTasks = leaf.activeTab?.kind === "tasks";
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
-  // chips resolve (broken-link styling + hover R1). Re-feed a fresh reference on
-  // every SYNC-5 index-change nonce so a note created/renamed/loaded elsewhere
-  // re-resolves the chips live — `useResolverNotes` alone only changes on a cache
-  // ref change, which can miss the async post-unlock index populate (the "linked
-  // but looks broken on reload" case).
-  const liveNotes = useResolverNotes();
+  // chips resolve (broken-link styling + hover R1). The hook re-evaluates on
+  // every SYNC-5 index-change nonce — so a note created/renamed/loaded elsewhere
+  // re-resolves the chips live, including through the async post-unlock index
+  // populate the cache reference alone can miss — but hands back a fresh
+  // reference only when the set actually changed, so an unrelated bump no longer
+  // reconfigures this pane's editor (myne#217).
+  const notes = useLiveResolverNotes();
   const indexNonce = useIndexNonce();
-  const notes = useMemo(() => liveNotes.slice(), [liveNotes, indexNonce]);
   // writing-assistant task 6 / SYNC-14: the AI surface (slash `/devam`,
   // `/başlık` + inline ghost-text) is enabled only when `ai_enabled` AND the
   // open note is not in an `ai_excluded_folders` folder. This flows to CMEditor's
