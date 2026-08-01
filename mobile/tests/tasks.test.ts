@@ -82,6 +82,28 @@ describe("the vault-wide fetch", () => {
     invoke.mockRejectedValueOnce(new Error("locked"));
     expect(await vaultTasks()).toEqual([]);
   });
+
+  it("decodes the wire's nulls away, so no surface ever sees one", async () => {
+    // The command answers with the WIRE shape: Rust's `Option<String>` fields
+    // arrive as `null`, not as absent keys, and cannot stop doing so (the same
+    // struct is the on-disk `MYI1` payload). `VaultTask` promises
+    // optional-or-absent, every shared consumer writes the check that promise
+    // invites, and casting the rows here instead of decoding them is what made
+    // that promise false on this client — the Tasks tab crashed on `.slice` of a
+    // null under the All filter (myne-md/myne-mobile#36).
+    invoke.mockResolvedValueOnce([
+      { ...lineTask(), due: null, remind: null, repeat: null, priority: null, done: null },
+    ]);
+    const [row] = await vaultTasks();
+    for (const key of ["due", "remind", "repeat", "priority", "done"] as const) {
+      expect(row?.[key], `${key} must not be null`).toBeUndefined();
+      expect(Object.hasOwn(row!, key), `${key} must be absent, not present-undefined`).toBe(false);
+    }
+    // The nulls the decoder must NOT touch: the locator is the note-task
+    // discriminator, and an untitled note legitimately has no title.
+    expect(row?.lineIndex).toBe(1);
+    expect(row?.noteFolder).toBeNull();
+  });
 });
 
 describe("the write goes through the shared sequence, with mobile IO", () => {
@@ -178,6 +200,20 @@ describe("nothing about tasks is implemented twice", () => {
     }
   });
 
+  it("decodes the wire shape through the shared decoder, and does not cast it away", () => {
+    const source = data();
+    expect(source).toContain('from "@myne/task-wire"');
+    // A local copy of the conversion would drift the day `TaskRecord` gains a
+    // sixth `Option<String>` field, and the failure is a null reaching `.slice`
+    // on a surface, not a type error anyone would see first.
+    expect(source, "mobile must not restate the decoder").not.toContain("function fromWire");
+    // The regression itself, pinned as a string: `invoke<VaultTask[]>` is not a
+    // shortcut, it is an assertion about the rows that is false.
+    expect(source, "the fetch must not cast the wire shape away").not.toContain(
+      "invoke<VaultTask[]>",
+    );
+  });
+
   it("wires both scopes through one component", () => {
     const source = surface();
     expect(source).toContain('{ kind: "vault" }');
@@ -195,6 +231,7 @@ describe("nothing about tasks is implemented twice", () => {
       "@myne/task-filters",
       "@myne/task-scope",
       "@myne/task-write",
+      "@myne/task-wire",
       "@myne/note-completion",
     ];
     for (const file of ["../tsconfig.json", "../vite.config.ts", "../vitest.config.ts"]) {

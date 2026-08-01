@@ -41,6 +41,9 @@ export default defineConfig({
       // The custom-theme syntax derivation (MYND-598) — mirror of
       // vite.config.ts, which carries the rationale for sharing it.
       { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
+      // The task index's wire decoder (myne-md/myne-mobile#36) — mirror of
+      // vite.config.ts, which carries the rationale for sharing it.
+      { find: /^@myne\/task-wire$/, replacement: sib("../src/notes/taskWire.ts") },
       { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
       { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
       { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },

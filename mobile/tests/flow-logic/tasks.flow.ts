@@ -16,7 +16,14 @@ import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "./mock-ipc";
 
 /** Two notes, four tasks — enough that a vault-wide list is visibly wider than
- *  a note-scoped one, which is the distinction under test. */
+ *  a note-scoped one, which is the distinction under test.
+ *
+ *  The undated rows spell their absent fields as `null` rather than omitting the
+ *  keys, because that is what `vault_indices_tasks` actually answers with: Rust's
+ *  `Option<String>` serializes as `null`, and the struct cannot gain a
+ *  `skip_serializing_if` (it is also the on-disk `MYI1` payload). A fixture that
+ *  omitted them would be testing a shape the app never receives — and did, until
+ *  the All filter crashed on it (myne-md/myne-mobile#36). */
 const TASKS = [
   {
     noteId: "note-a",
@@ -36,6 +43,11 @@ const TASKS = [
     rawLine: "- [ ] buy bread",
     completed: false,
     oversized: false,
+    due: null,
+    remind: null,
+    repeat: null,
+    priority: null,
+    done: null,
   },
   {
     noteId: "note-b",
@@ -55,6 +67,11 @@ const TASKS = [
     rawLine: "- [ ] chase the reply",
     completed: false,
     oversized: false,
+    due: null,
+    remind: null,
+    repeat: null,
+    priority: null,
+    done: null,
   },
 ];
 
@@ -95,6 +112,29 @@ test.describe("mobile task surfaces", () => {
     // is two lines on a phone.
     await expect(page.getByText("Groceries").first()).toBeVisible();
     await expect(page.getByText("Work").first()).toBeVisible();
+  });
+
+  test("a task the index reports with null dates renders, undated", async ({ page }) => {
+    // The one tier that runs the real chain in a browser: the mobile fetch, the
+    // shared panel, the shared row. The desktop cannot reproduce this at all —
+    // it decodes at its own boundary — so if this surface is going to regress,
+    // it regresses here or nowhere (myne-md/myne-mobile#36).
+    //
+    // "All" is not an incidental choice: it is the only filter that shows an
+    // undated task, because every other one drops it before a row is built. So
+    // it is the only filter that ever handed the row a null to slice.
+    await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
+    await page.goto("/");
+    await openTasksDestination(page);
+    await showAll(page);
+
+    // Present, not merely un-crashed: the whole point of All is that undated
+    // work appears somewhere.
+    await expect(page.getByText("buy bread")).toBeVisible();
+    await expect(page.getByText("chase the reply")).toBeVisible();
+    // …and the dated rows still render alongside them, so a fix that dropped
+    // every null-bearing row would not pass either.
+    await expect(page.getByText("buy milk")).toBeVisible();
   });
 
   test("the four filters are there, with the overdue count on its own", async ({ page }) => {

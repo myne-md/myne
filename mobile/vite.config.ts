@@ -92,6 +92,18 @@ export default defineConfig(async () => ({
       // imports at all — pure functions over a `Record<string, string>`, no DOM,
       // no host calls. Exact specifier, no wildcard (same reasoning as above).
       { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
+      // The task index's WIRE DECODER (myne-md/myne-mobile#36). Shared because
+      // the null-vs-absent conversion is not a local preference: it is a
+      // statement about how the Rust `TaskRecord` serializes, which it cannot
+      // stop doing (the same struct is the on-disk `MYI1` payload, so a
+      // `skip_serializing_if` would be a format change). A hand-copy drifts the
+      // day a sixth `Option<String>` field is added, and the failure is a null
+      // reaching `.slice`/`.split` on a surface, not a type error.
+      // Safe to alias out of `../src/notes/`, which is full of Tauri-coupled
+      // modules: this one's ONLY import is `import type`, so after erasure it
+      // has no imports at all. Exact specifier, no wildcard (same reasoning as
+      // above).
+      { find: /^@myne\/task-wire$/, replacement: sib("../src/notes/taskWire.ts") },
       { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
       { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
       { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },

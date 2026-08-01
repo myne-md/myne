@@ -10,6 +10,7 @@
 //   `@myne/task-scope`      folder-AND-tags scoping
 //   `@myne/task-write`      the write sequence, with its IO required
 //   `@myne/note-completion` the note-task `done:` rules
+//   `@myne/task-wire`       the `MYI1` row's null→absent conversion
 //
 // The one thing mobile owns is the fetch. `vault_indices_tasks` returns the
 // whole vault's tasks with **no filtering, sorting or date comparison done in
@@ -23,6 +24,7 @@ import {
   type NoteCompletionIo,
 } from "@myne/note-completion";
 import { writeTaskCompletion, type VaultTask } from "@myne/task-write";
+import { fromWire, type VaultTaskWire } from "@myne/task-wire";
 import { HAS_TAURI } from "./app-window";
 import { noteRead, noteUpdate } from "./notes";
 import { createConflictCopy } from "./conflictCopy";
@@ -41,11 +43,18 @@ const completionIo: NoteCompletionIo = {
  * Inert without a host so browser dev and the flow tier render an empty list
  * rather than throwing — a task surface that crashes when the backend is absent
  * would make every unrelated flow spec depend on this one.
+ *
+ * Decoded through `fromWire`, never cast: the command answers with the wire
+ * shape, whose `Option<String>` fields arrive as `null`. Casting those rows to
+ * `VaultTask[]` would not be skipping a formality, it would be asserting
+ * something false about them — and the surfaces that believed the assertion
+ * crashed on it (myne-md/myne-mobile#36).
  */
 export async function vaultTasks(): Promise<readonly VaultTask[]> {
   if (!HAS_TAURI) return [];
   try {
-    return await invoke<VaultTask[]>("plugin:vault-indices|vault_indices_tasks");
+    const rows = await invoke<VaultTaskWire[]>("plugin:vault-indices|vault_indices_tasks");
+    return rows.map(fromWire);
   } catch {
     // A locked vault or an index that has not hydrated yet. Empty is the honest
     // answer; the next read after unlock returns the real list.
