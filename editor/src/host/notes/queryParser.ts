@@ -13,20 +13,39 @@
 //   factor  := "-" factor                   //   literal term). Implicit AND.
 //            | "(" or ")"
 //            | term
-//   term    := prefix ":" value | phrase | word
-//   prefix  ∈ { tag, path, content, file, task }   (unknown prefix → literal text)
-//   phrase  := '"' … '"'                     // exactness tightens in Slice B
+//   term    := prefix ":" value | phrase | regex | word
+//   prefix  ∈ { tag, path, content, file, task, section }  (unknown → literal)
+//   phrase  := '"' … '"'                     // ENFORCED adjacency (Slice B)
+//   regex   := '/' … '/'                      // /pattern/ linear scan (Slice B)
 //
-// Slice B (line:/section:/regex, exact-phrase adjacency) is a deferred follow-up
-// (see the feature PRD). This parser is total: malformed input (unterminated
-// quote/paren, dangling "-", unknown prefix) degrades to literal text and never
-// throws — a search box must not reject a keystroke.
+// Slice B landed (#207/#208): `section:` (heading match), exact-phrase adjacency
+// (a bare `"…"` is now a `phrase` leaf, not AND-of-terms), and `/regex/`.
+// `line:` is deliberately NOT an operator — there is no line concept for a
+// cross-note search, so it stays literal text and is never offered by the
+// autocomplete. This parser is total: malformed input (unterminated quote/paren,
+// dangling "-", unknown prefix) degrades to literal text and never throws — a
+// search box must not reject a keystroke.
 
 import type { FilterNode } from "./queryEngine";
 
 /** Field operators backed by a cheap index/indices leaf (Slice A). An unknown
- *  prefix (`foo:`) is NOT here and parses as literal text. */
-const KNOWN_OPERATORS = new Set(["tag", "path", "content", "file", "task"]);
+ *  prefix (`foo:`) is NOT here and parses as literal text. Exported so the
+ *  palette autocomplete (`src/notes/searchSuggest.ts`) offers exactly the
+ *  operators the parser routes — never one that would silently fall back to
+ *  literal text. */
+export const KNOWN_OPERATORS = new Set([
+  "tag",
+  "path",
+  "content",
+  "file",
+  "task",
+  "section",
+]);
+
+/** A bare `/regex/` term (Slice B, #208): a `/`-delimited run with a non-empty
+ *  body. `path:/foo` never reaches here (the `path:` prefix is matched first);
+ *  `http://x` does not match (no leading `/`). */
+const REGEX_TERM = /^\/(.+)\/$/;
 
 type Token =
   | { readonly t: "lparen" }
@@ -119,13 +138,29 @@ function termToNode(raw: string): FilterNode {
         case "path":
           return value === "" ? literalSearch(raw) : { kind: "inFolder", path: value };
         case "file":
+          // `file:` is a TITLE match, not a filename glob — a Myne note has no
+          // user-facing filename (the file is `<uuid>.myn`; the name is the
+          // DERIVED title, its first heading). Title-match is therefore the
+          // correct and only meaning (#207 file: decision).
           return value === "" ? literalSearch(raw) : { kind: "titleMatch", query: value };
         case "content":
           return value === "" ? literalSearch(raw) : { kind: "search", query: value };
+        case "section":
+          return value === "" ? literalSearch(raw) : { kind: "sectionMatch", query: value };
       }
     }
-    // Unknown prefix (`http://…`, `foo:bar`) → literal, quotes-aware.
+    // Unknown prefix (`http://…`, `foo:bar`) → falls through to the bare-term
+    // handling below (phrase / regex / literal), quotes-aware.
   }
+  // Bare quoted term → a PHRASE leaf (word adjacency, #208), not the plain
+  // `search` leaf that would tokenize to an unordered AND-of-terms.
+  if (raw.startsWith('"')) {
+    const phrase = unquote(raw);
+    return phrase === "" ? { kind: "all" } : { kind: "phrase", phrase };
+  }
+  // Bare `/regex/` term → a REGEX leaf (#208).
+  const rx = REGEX_TERM.exec(raw);
+  if (rx) return { kind: "regex", source: rx[1] };
   return literalSearch(raw);
 }
 
@@ -240,6 +275,7 @@ export function queryHasOperators(input: string): boolean {
     const { raw } = tok;
     if (raw.startsWith("-")) return true; // negation
     if (raw.includes('"')) return true; // phrase
+    if (REGEX_TERM.test(raw)) return true; // /regex/
     const colon = raw.indexOf(":");
     if (colon > 0 && KNOWN_OPERATORS.has(raw.slice(0, colon).toLowerCase())) {
       return true; // field operator

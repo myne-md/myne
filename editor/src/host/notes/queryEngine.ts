@@ -62,6 +62,17 @@ export type FilterLeaf =
   // `query`, only tasks whose text matches. Backed by the `vault_indices_tasks`
   // index (no new Rust command — the note-id set is derived TS-side).
   | { readonly kind: "hasTask"; readonly query?: string }
+  // `section:` operator (#207, Slice B). Notes with a HEADING whose text matches
+  // `query` (case-insensitive substring). Backed by the vault heading index
+  // (`vaultHeadings`) — RAM-resident, no note read.
+  | { readonly kind: "sectionMatch"; readonly query: string }
+  // `"exact phrase"` (#208, Slice B). Enforces word ADJACENCY, which the plain
+  // `search` leaf loses (it tokenizes to AND-of-terms). Resolved by BM25
+  // candidates → a content substring post-filter (bounded read).
+  | { readonly kind: "phrase"; readonly phrase: string }
+  // `/regex/` (#208, Slice B). A linear scan of note title + content against the
+  // pattern (case-insensitive). Bounded — see the resolver.
+  | { readonly kind: "regex"; readonly source: string }
   | {
       readonly kind: "property";
       readonly key: string;
@@ -97,6 +108,15 @@ export type LeafResolvers = {
   readonly hasTask?: (
     query: string | undefined,
   ) => Promise<ReadonlyArray<string>>;
+  /** `section:` — notes with a heading matching the query. Optional (palette-
+   *  only, like `titleMatch`/`hasTask`). */
+  readonly sectionMatch?: (query: string) => Promise<ReadonlyArray<string>>;
+  /** `"exact phrase"` — notes whose content contains the adjacent phrase.
+   *  Optional (palette-only). */
+  readonly phrase?: (phrase: string) => Promise<ReadonlyArray<string>>;
+  /** `/regex/` — notes whose title/content matches the pattern. Optional
+   *  (palette-only). */
+  readonly regex?: (source: string) => Promise<ReadonlyArray<string>>;
   /** Every note carrying property `key`, as `[noteId, storedProperty]` — the
    *  #1 by-key accessor (`vault_indices_property_values`). The engine compares
    *  each value type-awarely; it never re-types. */
@@ -145,6 +165,18 @@ export async function evaluateFilter(
       );
     case "hasTask":
       return ((await resolvers.hasTask?.(node.query)) ?? []).filter((id) =>
+        liveIds.has(id),
+      );
+    case "sectionMatch":
+      return ((await resolvers.sectionMatch?.(node.query)) ?? []).filter((id) =>
+        liveIds.has(id),
+      );
+    case "phrase":
+      return ((await resolvers.phrase?.(node.phrase)) ?? []).filter((id) =>
+        liveIds.has(id),
+      );
+    case "regex":
+      return ((await resolvers.regex?.(node.source)) ?? []).filter((id) =>
         liveIds.has(id),
       );
     case "property": {

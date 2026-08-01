@@ -38,6 +38,9 @@ function resolvers(
     search: vi.fn(async (query: string) => searches[query] ?? []),
     titleMatch: vi.fn(async (query: string) => searches[query] ?? []),
     hasTask: vi.fn(async () => []),
+    sectionMatch: vi.fn(async (query: string) => searches[query] ?? []),
+    phrase: vi.fn(async (p: string) => searches[p] ?? []),
+    regex: vi.fn(async (s: string) => searches[s] ?? []),
     propertyValues: vi.fn(async (key: string) => props[key] ?? []),
   };
 }
@@ -75,6 +78,35 @@ describe("evaluateFilter — leaves + live-set gate", () => {
     const r = resolvers({}, { rust: ["b", "trash1", "d"] });
     const out = await evaluateFilter({ kind: "search", query: "rust" }, LIVE, r);
     expect(sorted(out)).toEqual(["b", "d"]);
+  });
+
+  it("Slice B leaves (section/phrase/regex) route to their resolver, live-gated", async () => {
+    const r = resolvers({}, {
+      Intro: ["a", "trash1"],
+      "release notes": ["b", "trash1"],
+      "foo.*": ["c", "d", "trash1"],
+    });
+    expect(
+      sorted(await evaluateFilter({ kind: "sectionMatch", query: "Intro" }, LIVE, r)),
+    ).toEqual(["a"]);
+    expect(
+      sorted(await evaluateFilter({ kind: "phrase", phrase: "release notes" }, LIVE, r)),
+    ).toEqual(["b"]);
+    expect(
+      sorted(await evaluateFilter({ kind: "regex", source: "foo.*" }, LIVE, r)),
+    ).toEqual(["c", "d"]);
+  });
+
+  it("an absent optional resolver yields no matches (never throws)", async () => {
+    const bare: LeafResolvers = {
+      hasTag: async () => [],
+      inFolder: async () => [],
+      search: async () => [],
+      propertyValues: async () => [],
+    };
+    expect(await evaluateFilter({ kind: "sectionMatch", query: "x" }, LIVE, bare)).toEqual([]);
+    expect(await evaluateFilter({ kind: "phrase", phrase: "x" }, LIVE, bare)).toEqual([]);
+    expect(await evaluateFilter({ kind: "regex", source: "x" }, LIVE, bare)).toEqual([]);
   });
 });
 
