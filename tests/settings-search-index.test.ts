@@ -179,6 +179,55 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     for (const id of AI_IDS) expect(allIds).toContain(id);
   });
 
+  // #181: the CLI trio and the vim toggle are developer-gated while living in
+  // `core` panels — the first entries of that shape. Their controls are hidden
+  // by a panel-internal render condition rather than by the rail dropping a
+  // whole panel, so a missed tag here would leave search scrolling to an anchor
+  // that was never rendered: the exact failure `developerGated` exists to stop.
+  const CORE_PANEL_GATED_IDS = [
+    "privacy.cli-access",
+    "privacy.cli-excluded-folders",
+    "privacy.cli-rate-limit",
+    "editor.vim-mode",
+  ];
+
+  it("tags the CLI and vim entries as developer-gated without moving them out of their panels", () => {
+    for (const id of CORE_PANEL_GATED_IDS) {
+      const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id);
+      expect(entry, `entry ${id}`).toBeDefined();
+      expect(entry!.developerGated, `entry ${id}`).toBe(true);
+      // Still owned by the core panel its control renders in — gating is
+      // orthogonal to the rail group, and the whole point of #181's approach
+      // is that each setting keeps its topical home.
+      expect(["privacy", "editor"]).toContain(entry!.panelId);
+    }
+  });
+
+  it("keeps the CLI trio's capability tag alongside the developer gate", () => {
+    // Two independent axes (`settingsSearchIndex.ts` docstring): a static
+    // per-build capability descriptor and a runtime user toggle. Dropping the
+    // capability half would make the entries searchable on web, where the
+    // block is absent by platform fact rather than by preference.
+    for (const id of CORE_PANEL_GATED_IDS.filter((i) => i.startsWith("privacy.cli"))) {
+      expect(SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!.capability).toBe("cliAccess");
+    }
+  });
+
+  it("mode off: the CLI and vim entries are absent from every search, even by exact title", () => {
+    for (const id of CORE_PANEL_GATED_IDS) {
+      const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
+      const found = searchSettings(entry.titleKey, t, false).map((r) => r.id);
+      expect(found, `search for ${id}`).not.toContain(id);
+    }
+    const allIds = searchSettings("", t, false).map((e) => e.id);
+    for (const id of CORE_PANEL_GATED_IDS) expect(allIds).not.toContain(id);
+  });
+
+  it("mode on: the CLI and vim entries are found again", () => {
+    const allIds = searchSettings("", t, true).map((e) => e.id);
+    for (const id of CORE_PANEL_GATED_IDS) expect(allIds).toContain(id);
+  });
+
   it("mode off does not hide anything that isn't developer-gated", () => {
     const withGateOff = new Set(searchSettings("", t, false).map((e) => e.id));
     const withGateOn = new Set(searchSettings("", t, true).map((e) => e.id));

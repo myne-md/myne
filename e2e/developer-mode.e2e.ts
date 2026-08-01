@@ -1,6 +1,7 @@
-// Developer-mode gating suite (developer-mode feature, MYND-593). One
-// scenario, two states, driving three of the PRD's four enforcement surfaces
-// — the settings rail, the settings search index, and the command palette.
+// Developer-mode gating suite (developer-mode feature, MYND-593; extended by
+// #181). Two scenarios, each two states, driving three of the PRD's four
+// enforcement surfaces — the settings rail, the settings search index, and the
+// command palette.
 // The fourth surface, the Rust host-side gate (effective-enabled conjunction,
 // transcription fallthrough, model-path rejection), is Rust-unit-tested in
 // task 4 instead — faster, deterministic, and it needs no WebView to be
@@ -19,6 +20,20 @@
 //         (AI opt-in on, the picker's "Choose…" control enabled), the
 //         settings search surfaces the AI entry again, and the AI palette
 //         actions reappear.
+//
+//   dm2 — the SETTING-level half of the same gate (#181): the CLI-access block
+//         in Privacy and the Vim toggle in Editor are hidden while the mode is
+//         off even though their panels are not, and both come back with it.
+//         Distinct story from dm1: dm1 proves a whole rail GROUP appears and
+//         disappears, dm2 proves individual settings inside CORE panels do —
+//         the panels stay visible throughout, which is exactly what makes this
+//         a gate the rail filter cannot express.
+//
+//         What dm2 does NOT cover, because the proof lives where the machinery
+//         does: that hiding is not disabling. The CLI half is `cli6` (it needs
+//         the command-socket harness) and the vim half is `vm4` (it needs a
+//         mounted editor). Both are the acceptance criterion most likely to
+//         regress silently, so neither is folded in here.
 //
 // Stays entirely inside the Settings modal / command palette and never opens
 // a note — no CodeMirror pane mount, the suite's dominant flake source.
@@ -51,6 +66,27 @@ const AI_ONLY_QUERY = "machine learning";
  *  same helper shape as `settings-search.e2e.ts`). */
 async function typeSearch(session: Session, text: string): Promise<void> {
   await (await session.byTestId("settings.search-input")).replaceText(text);
+}
+
+/** Queries that only match the #181-gated entries' keyword strings, chosen the
+ *  same way {@link AI_ONLY_QUERY} was — distinctive multi-word phrases, so a
+ *  hit cannot come from an unrelated non-gated entry. */
+const CLI_ONLY_QUERY = "command line shell";
+const VIM_ONLY_QUERY = "modal editing";
+
+/** Type `query` into the Settings search box and return the `data-setting-id`
+ *  of every rendered result row. Reads the ids rather than asserting an empty
+ *  result list: the #181 entries live in panels that keep matching other,
+ *  ungated settings, so "no results at all" is the wrong assertion here. */
+async function searchResultIds(session: Session, query: string): Promise<string[]> {
+  await typeSearch(session, query);
+  const rows = await session.byTestIdAll("settings.search-result");
+  const ids: string[] = [];
+  for (const row of rows) {
+    const id = await row.attribute("data-setting-id");
+    if (id !== null && id !== "") ids.push(id);
+  }
+  return ids;
 }
 
 /** Open the command palette, type `query`, and return the `data-action-id`
@@ -141,6 +177,75 @@ describeE2E("dm1 developer-mode gating: rail + search + palette (MYND-593)", () 
         const onIds = await paletteActionIds(s, "ai");
         expect(onIds.includes("ai.toggle-enabled")).toBe(true);
         expect(onIds.includes("ai.open-chat")).toBe(true);
+      },
+    );
+  });
+});
+
+describeE2E("dm2 setting-level developer gating: CLI block + vim toggle (#181)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("hides the CLI block and the vim toggle inside panels that stay visible, and restores both", async () => {
+    let password = "";
+    await scenario(
+      "dm2-setting-level-gating",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        await openSettings(s, "privacy");
+        // The panel itself is present — that is the whole point of a
+        // setting-level gate, and it is what distinguishes this from dm1.
+        // Anchored on an ungated neighbour rather than a panel root, because
+        // PrivacyPanel's root carries no testid of its own.
+        await s.byTestId("settings.auto-lock-select");
+        expect((await s.byTestIdAll("settings.cli-access")).length).toBe(0);
+        expect((await s.byTestIdAll("settings.cli-exclusions")).length).toBe(0);
+        expect((await s.byTestIdAll("settings.cli-rate-limit")).length).toBe(0);
+
+        await (await s.byTestId("settings.tab-editor")).click();
+        await s.byTestId("settings.section.editor-editing");
+        expect((await s.byTestIdAll("settings.vim-mode")).length).toBe(0);
+
+        // ── Mode OFF: search finds none of the four ──
+        // A result here would scroll to an anchor that was never rendered —
+        // the exact failure `developerGated` exists to prevent.
+        const cliOff = await searchResultIds(s, CLI_ONLY_QUERY);
+        expect(cliOff).not.toContain("privacy.cli-access");
+        expect(cliOff).not.toContain("privacy.cli-excluded-folders");
+        expect(cliOff).not.toContain("privacy.cli-rate-limit");
+        const vimOff = await searchResultIds(s, VIM_ONLY_QUERY);
+        expect(vimOff).not.toContain("editor.vim-mode");
+        await closeSettings(s);
+
+        // ── Mode OFF: the vim palette action is absent ──
+        // Settings hiding the toggle while a keystroke could still flip it
+        // would make the gate decorative.
+        expect((await paletteActionIds(s, "vim")).includes("editor.toggle-vim-mode")).toBe(
+          false,
+        );
+
+        // ── Mode ON ──
+        await enableDeveloperMode(s);
+
+        await (await s.byTestId("settings.tab-privacy")).click();
+        await s.byTestId("settings.cli-access");
+        await s.byTestId("settings.cli-exclusions");
+        await s.byTestId("settings.cli-rate-limit");
+
+        await (await s.byTestId("settings.tab-editor")).click();
+        await s.byTestId("settings.vim-mode");
+
+        const cliOn = await searchResultIds(s, CLI_ONLY_QUERY);
+        expect(cliOn).toContain("privacy.cli-access");
+        expect(cliOn).toContain("privacy.cli-excluded-folders");
+        expect(cliOn).toContain("privacy.cli-rate-limit");
+        const vimOn = await searchResultIds(s, VIM_ONLY_QUERY);
+        expect(vimOn).toContain("editor.vim-mode");
+        await closeSettings(s);
+
+        expect((await paletteActionIds(s, "vim")).includes("editor.toggle-vim-mode")).toBe(true);
       },
     );
   });

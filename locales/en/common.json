@@ -2183,7 +2183,7 @@
       "changelogButton": "View changelog…",
       "changelogHelper": "Per-version notes. Will appear when MYND-119 lands.",
       "changelogLabel": "Changelog",
-      "developerModeHelper": "Turning this on lets you replace a model Myne has verified with one you supply yourself. It still runs entirely on your device and sends nothing over the network — but Myne does not vouch for what you provide.",
+      "developerModeHelper": "Shows the advanced settings Myne keeps out of the way by default: the ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again — whatever you switched on stays on, and its own control is where you switch it off.",
       "developerModeLabel": "Developer mode",
       "licenseBody": "Pre-alpha · CC-BY-4.0 docs · AGPL-3.0 application code on Phase 1 release.",
       "licenseLabel": "License",
