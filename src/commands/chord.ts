@@ -155,6 +155,23 @@ export function formatChord(chord: string, mac: boolean = isMacPlatform()): stri
 }
 
 /**
+ * Split a chord into its individual DISPLAY tokens — each modifier glyph/word and
+ * the final key label, as separate strings — so a UI can render each as its OWN
+ * uniform keycap (`[⌘][K]`) instead of one cramped run where the ⌘/⇧ glyphs
+ * render at a different weight than the letters and jam together (#184 part A).
+ * Uses the same glyph mapping as `formatChord`; on non-mac each modifier word
+ * ("Ctrl", "Shift") is its own token.
+ */
+export function chordTokens(chord: string, mac: boolean = isMacPlatform()): string[] {
+  const { mods, key: rawKey } = splitChord(normalizeChord(chord));
+  const keyLabel = KEY_GLYPHS[rawKey] ?? (rawKey.length === 1 ? rawKey.toUpperCase() : rawKey);
+  const modTokens = mac
+    ? mods.map((m) => MAC_GLYPHS[m] ?? m)
+    : mods.map((m) => (m === "Mod" ? "Ctrl" : m));
+  return [...modTokens, keyLabel];
+}
+
+/**
  * Resolve the command ids a chord triggers, given the effective keymap
  * (`command-id → chord[]`, from `effectiveKeymap`). The keymap's chords are
  * normalized for comparison, so a stored `Mod-Shift-g` matches an event-derived
