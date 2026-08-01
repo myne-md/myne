@@ -11,11 +11,11 @@
 // / SYNC-7). Visual layout is code-first against design tokens; the canonical
 // Penpot frame + visual review is a follow-up (no MCP pairing this pass).
 
-import { useMemo, useState, useEffect, useRef, type CSSProperties } from "react";
+import { Fragment, useMemo, useState, useEffect, useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import { fuzzyFilter } from "../../commands/fuzzy";
-import { formatChord } from "../../commands/chord";
+import { chordTokens, formatChord, isMacPlatform } from "../../commands/chord";
 import { captureChordFromEvent } from "../../commands/capture";
 import { conflictsFor, allConflicts, type ConflictDescriptor } from "../../commands/conflicts";
 import { effectiveChords, mergeKeymap } from "../../commands/keymap";
@@ -82,17 +82,61 @@ const CHIPS_WRAP_STYLE: CSSProperties = {
   flexWrap: "wrap",
   justifyContent: "flex-end",
 };
-const CHIP_STYLE: CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-2)",
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1, 4px)",
-  padding: "1px var(--space-2)",
+// The keycap and its remove control, grouped so the × sits OUTSIDE the <kbd>
+// instead of reading as part of the chord (#184 part A).
+const CHIP_GROUP_STYLE: CSSProperties = {
   display: "inline-flex",
-  gap: "var(--space-1)",
   alignItems: "center",
+  gap: "var(--space-1)",
+};
+// A chord renders as ONE cap PER KEY (`[⌘][K]`), not a single cramped run. The
+// old single-<kbd> chip mixed the ⌘/⇧ symbols and the letters in one mono run,
+// where the symbols rendered thinner than the letters and jammed together
+// (#184 part A). This row holds the per-key caps.
+const KEYS_ROW_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 3,
+};
+// One key cap: a fixed-height, min-width box so every token (⌘, ⇧, a letter) is
+// the SAME uniform size and centred; sans (not mono) renders the modifier glyphs
+// at a weight closer to the letters; `--paper-3` + `--line-2` + a 1px bottom edge
+// give it a legible, raised keycap look.
+const KEYCAP_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minWidth: 22,
+  height: 22,
+  padding: "0 6px",
+  boxSizing: "border-box",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: 600,
+  color: "var(--fg-1)",
+  background: "var(--paper-3)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-1, 4px)",
+  boxShadow: "0 1px 0 var(--line-2)",
+  lineHeight: 1,
+};
+// The "+" between caps on non-mac (Windows/Linux convention: `Ctrl+Shift+G`).
+// macOS uses bare glyph caps (`⌘⇧G`) with no separator.
+const PLUS_STYLE: CSSProperties = {
+  color: "var(--fg-3)",
+  fontSize: "var(--text-xs, 11px)",
+};
+// The remove control, now a sibling of the keycap. Faint by default, it brightens
+// on hover/focus (tokens.css `[data-testid="hotkeys.remove-binding"]`).
+const REMOVE_BTN_STYLE: CSSProperties = {
+  background: "none",
+  border: "none",
+  color: "var(--fg-3)",
+  cursor: "pointer",
+  fontSize: "var(--text-sm)",
+  lineHeight: 1,
+  padding: "0 3px",
+  borderRadius: "var(--radius-1, 4px)",
 };
 const NOT_SET_STYLE: CSSProperties = { fontSize: "var(--text-sm)", color: "var(--fg-3)", fontStyle: "italic" };
 const FIXED_TAG_STYLE: CSSProperties = { fontSize: "var(--text-xs, 11px)", color: "var(--fg-3)" };
@@ -239,7 +283,12 @@ export function HotkeysPanel() {
   };
 
   return (
-    <div style={PANEL_ROOT_STYLE} data-testid="hotkeys.panel">
+    <div
+      style={PANEL_ROOT_STYLE}
+      data-testid="hotkeys.panel"
+      data-setting-anchor="hotkeys.shortcuts"
+      data-setting-row="true"
+    >
       <p style={HELPER_STYLE}>{t("settings.hotkeys.helper")}</p>
       <input
         type="text"
@@ -321,29 +370,37 @@ export function HotkeysPanel() {
                       // accounted for rather than looking broken.
                       const taken = reservedChord(chord);
                       return (
-                      <kbd
-                        key={chord}
-                        style={CHIP_STYLE}
-                        data-testid={taken ? "hotkeys.binding-reserved" : undefined}
-                        data-reserved-tier={taken?.tier}
-                        title={
-                          taken
-                            ? t("settings.hotkeys.reservedBadgeTitle", {
-                                chord: formatChord(chord),
-                                action: t(`settings.hotkeys.reserved.${taken.actionKey}`),
-                              })
-                            : undefined
-                        }
-                      >
-                        {formatChord(chord)}
-                        {taken && (
-                          <span style={{ ...WARN_STYLE, marginLeft: "var(--space-1)" }}>
-                            {t("settings.hotkeys.reservedBadge")}
-                          </span>
-                        )}
+                      <span key={chord} style={CHIP_GROUP_STYLE}>
+                        <span
+                          style={KEYS_ROW_STYLE}
+                          data-testid={taken ? "hotkeys.binding-reserved" : undefined}
+                          data-reserved-tier={taken?.tier}
+                          title={
+                            taken
+                              ? t("settings.hotkeys.reservedBadgeTitle", {
+                                  chord: formatChord(chord),
+                                  action: t(`settings.hotkeys.reserved.${taken.actionKey}`),
+                                })
+                              : undefined
+                          }
+                        >
+                          {chordTokens(chord).map((tok, i) => (
+                            <Fragment key={i}>
+                              {i > 0 && !isMacPlatform() && (
+                                <span style={PLUS_STYLE}>+</span>
+                              )}
+                              <kbd style={KEYCAP_STYLE}>{tok}</kbd>
+                            </Fragment>
+                          ))}
+                          {taken && (
+                            <span style={{ ...WARN_STYLE, marginLeft: "var(--space-1)" }}>
+                              {t("settings.hotkeys.reservedBadge")}
+                            </span>
+                          )}
+                        </span>
                         {cmd.rebindable && (
                           <button
-                            style={ICON_BTN_STYLE}
+                            style={REMOVE_BTN_STYLE}
                             aria-label={t("settings.hotkeys.removeBindingAria", {
                               chord: formatChord(chord),
                             })}
@@ -353,7 +410,7 @@ export function HotkeysPanel() {
                             ×
                           </button>
                         )}
-                      </kbd>
+                      </span>
                       );
                     })}
                     {!cmd.rebindable && (
