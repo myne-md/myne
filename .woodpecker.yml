@@ -459,6 +459,19 @@ steps:
     image: rust:1.96.0-slim
     when: *code-paths
     depends_on: [cargo-test-tauri]
+    # NON-BLOCKING (temporary). The suite mount-times-out on whatever heavy
+    # scenario happens to land at the TAIL of the ~20-min serial run under the
+    # shared host's cumulative load — a contention signature (unlock/editor
+    # never paints within budget), not a logic bug, and it hits a DIFFERENT
+    # scenario each run, so quarantining named specs was whack-a-mole (6→1 but
+    # never 0). `failure: ignore` stops that flake from reddening every pipeline
+    # — downstream already runs regardless (web-build/sync-sim use optional:true)
+    # and notify-failure only fires on pipeline status:failure — while the suite
+    # keeps RUNNING and reporting so a real regression is still visible. Re-block
+    # when the boot-cost root cause lands (raise the mount budget / cut boot
+    # cost; see the e2e mount-timeout debt). Ratified gate epic e2e-testing
+    # SYNC-1 — this RELAXES the gate, it does not retire the suite.
+    failure: ignore
     environment:
       CI: "true"
     commands:
