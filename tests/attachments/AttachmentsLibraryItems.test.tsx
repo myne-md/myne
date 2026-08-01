@@ -26,6 +26,8 @@ import { SidebarStateProvider } from "../../src/notes/sidebarState";
 import { catalogList, type CatalogEntry } from "../../src/lib/attachments";
 import { referencingNotes } from "../../src/notes/attachmentRefs";
 import { showAttachmentLightbox } from "../../src/editor/attachments/lightbox";
+import type { TitleRecord } from "../../src/notes/loadNoteBatch";
+import type { NoteId } from "@myne/editor/host/notes/itemOrder";
 
 vi.mock("../../src/lib/attachments", () => ({
   catalogList: vi.fn(),
@@ -36,6 +38,22 @@ vi.mock("../../src/lib/attachments", () => ({
 vi.mock("../../src/notes/attachmentRefs", () => ({
   referencingNotes: vi.fn().mockResolvedValue(["note-1", "note-2"]),
 }));
+// #212 counts only the notes the user actually sees, reading the sidebar's
+// title cache and dropping every id absent from it. The provider fills that
+// cache from IPC, which is mocked away here — so the two referencing ids are
+// injected as live records, or the count collapses to zero and the popover
+// triggers this file asserts on never render.
+vi.mock("../../src/notes/sidebarState", async (importOriginal) => {
+  const real =
+    await importOriginal<typeof import("../../src/notes/sidebarState")>();
+  return {
+    ...real,
+    useSelectedNote: () => ({
+      ...real.useSelectedNote(),
+      cache: LIVE_TITLE_CACHE,
+    }),
+  };
+});
 vi.mock("../../src/editor/attachments/pdf-render", () => ({
   renderPdfFirstPage: vi.fn().mockReturnValue(new Promise(() => {})),
 }));
@@ -47,6 +65,31 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 const mockedCatalog = vi.mocked(catalogList);
 const mockedRefs = vi.mocked(referencingNotes);
 const mockedLightbox = vi.mocked(showAttachmentLightbox);
+
+/** A live (non-conflict, non-trashed, non-template) title-cache record. */
+function liveTitleRecord(noteUuid: string): TitleRecord {
+  return {
+    noteUuid,
+    title: noteUuid,
+    folder: null,
+    updatedAt: null,
+    trashed: null,
+    deleted: null,
+    archived: null,
+    template: false,
+    folderIndex: false,
+    conflict: false,
+    conflictOf: null,
+    hasSource: false,
+    kind: null,
+    done: null,
+  };
+}
+
+const LIVE_TITLE_CACHE = new Map<NoteId, TitleRecord>([
+  ["note-1" as NoteId, liveTitleRecord("note-1")],
+  ["note-2" as NoteId, liveTitleRecord("note-2")],
+]);
 
 const ENTRY_A: CatalogEntry = {
   id: "a".repeat(64),
