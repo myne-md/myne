@@ -42,7 +42,11 @@ export const UPCOMING_WINDOW_DAYS = 7;
  */
 export function taskDate(task: VaultTask): string | undefined {
   const raw = task.due ?? task.remind;
-  return raw === undefined ? undefined : raw.slice(0, 10);
+  // `== null` catches both undefined AND a wire `null`: the `MYI1` row serializes
+  // `Option<String>` fields as `null`, and a client that skips the `taskIndex.ts`
+  // `fromWire()` sanitizer (mobile) hands that null straight here — `=== undefined`
+  // would let it through and `.slice` a non-string (iOS Tasks-tab crash).
+  return raw == null ? undefined : raw.slice(0, 10);
 }
 
 /**
