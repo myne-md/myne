@@ -11,18 +11,13 @@ import type { LineTask } from "../dialect/visitors/lineTasks";
 import type { PropertyEntry } from "@myne/editor/host/notes/propertyTyping";
 import type { StoredProperty } from "@myne/editor/host/notes/queryEngine";
 
-/** One outbound wikilink edge — mirror of Rust `WikilinkEdge` (camelCase). */
-export interface WikilinkEdge {
-  target: string;
-  targetKind: string; // "title" | "vault-path"
-  titleKey: string; // foldSegment(target) — the backlink bucket key
-  anchor: string | null;
-  blockId: string | null;
-  alias: string | null;
-  embed: boolean;
-  byteStart: number;
-  byteEnd: number;
-}
+// One outbound wikilink edge — mirror of Rust `WikilinkEdge` (camelCase). The
+// local re-declaration is gone (myne-md/myne#199): it typed `targetKind` as a
+// bare `string` while the shared model types it as the `WikilinkTargetKind`
+// union, and a second declaration of a wire type is a second answer waiting to
+// drift. Re-exported so the IPC call sites here read unchanged.
+export type { WikilinkEdge } from "@myne/editor/host/notes/graphModel";
+import type { WikilinkEdge } from "@myne/editor/host/notes/graphModel";
 
 /** A folded tag — mirror of Rust `TagEntry`. */
 export interface TagEntry {

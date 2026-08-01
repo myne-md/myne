@@ -51,8 +51,11 @@ type SimNode = KernelNode & { title: string; degree: number };
  * together, so the layout is organic (Obsidian-style) rather than a rigid ring.
  * Nodes are DRAGGABLE (drag to rearrange, the rest reacts); a tap opens the
  * note; the background pans (one finger), pinches (two), and double-taps back
- * to fit. Notes with no links are omitted (surfaced as a count). The sim cools
- * to idle to save battery and reheats whenever you touch it.
+ * to fit. EVERY note in the graph model is a node, including unlinked ones —
+ * an orphan is a first-class result here, not something to hide (it is how you
+ * find the note you forgot to link), and the desktop graph has always shown
+ * them (myne-md/myne#199). The sim cools to idle to save battery and reheats
+ * whenever you touch it.
  *
  * Layout lifecycle (MYND-530 — the desktop graph rework's mobile port):
  * positions hydrate from the encrypted `vault.graph` cache (once per unlock
@@ -65,7 +68,7 @@ type SimNode = KernelNode & { title: string; degree: number };
  */
 export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: string) => void }) {
   const { t } = useTranslation();
-  const connected = graph.nodes.filter((n) => n.degree > 0);
+  const graphNodes = graph.nodes;
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -119,7 +122,7 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
     return () => ro.disconnect();
   }, []);
 
-  const idsKey = connected.map((n) => n.id).join(",");
+  const idsKey = graphNodes.map((n) => n.id).join(",");
 
   // (Re)build the simulation when the node set changes (NOT on resize —
   // desktop parity: a rotation/box change re-renders at current positions,
@@ -140,11 +143,11 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
       const { w, h } = sizeRef.current;
       const prev = byId.current;
       let persisted = 0;
-      const seeded = connected.map((n, i) => {
+      const seeded = graphNodes.map((n, i) => {
         const keep = prev.get(n.id);
         const stored = keep ? undefined : getGraphPosition(n.id);
         if (keep || stored) persisted += 1;
-        const p = keep ?? stored ?? ringSeed(n.id, i, connected.length, w, h);
+        const p = keep ?? stored ?? ringSeed(n.id, i, graphNodes.length, w, h);
         const node: SimNode =
           keep ??
           ({ id: n.id, title: n.title, degree: n.degree, x: p.x, y: p.y, vx: 0, vy: 0, fixed: false } as SimNode);
@@ -352,13 +355,13 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
 
   const paneAttrs = {
     "data-testid": "editor.graph-pane",
-    "data-node-count": connected.length,
+    "data-node-count": graphNodes.length,
     "data-layout-hydrated": hydratedRef.current ? "true" : "false",
     "data-layout-nonce": String(layoutNonceRef.current),
     "data-layout-settled": settledRef.current ? "true" : "false",
   } as const;
 
-  if (connected.length === 0) {
+  if (graphNodes.length === 0) {
     return (
       <div {...paneAttrs} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 44px", textAlign: "center", gap: 10 }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-1)" }}>{t("wikiGraph.emptyTitle")}</div>
@@ -370,7 +373,7 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
   }
 
   const nodes = nodesRef.current;
-  const maxDeg = Math.max(1, ...connected.map((n) => n.degree));
+  const maxDeg = Math.max(1, ...graphNodes.map((n) => n.degree));
   const view = viewRef.current;
   // Cull before mapping to SVG elements — off-screen notes never become DOM
   // nodes, which is what keeps a large vault's graph responsive when zoomed in.
