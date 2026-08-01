@@ -239,9 +239,21 @@ function buildRecurrenceControl(value: string): FieldBody {
     dayOfMonth: domRow,
     ordinal: ordinalRow,
   };
+  // `hidden` AND an inline `display`, which is belt-and-braces on purpose.
+  // `base.css`'s `[hidden]` reset is what makes the attribute bind, but these
+  // rows are the surface that proved the attribute alone is not enough: an
+  // inline declaration cannot be outvoted by any stylesheet, so the control
+  // stays correct even in a host that never loads the reset. It is also the only
+  // form the fast test lane can see — jsdom applies no CSS, so an assertion on
+  // `hidden` passes whether or not the row is actually visible.
+  //
+  // The visible state clears the inline value rather than restating `flex`, so
+  // the stylesheet keeps owning what "shown" looks like.
   function syncRows(): void {
     for (const key of Object.keys(rows) as RecurrenceFamily[]) {
-      rows[key].hidden = key !== (family.value as RecurrenceFamily);
+      const hide = key !== (family.value as RecurrenceFamily);
+      rows[key].hidden = hide;
+      rows[key].style.display = hide ? "none" : "";
     }
   }
   family.addEventListener("change", syncRows);

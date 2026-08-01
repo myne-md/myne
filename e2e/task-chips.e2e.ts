@@ -170,6 +170,27 @@ describeE2E("tc3 the + affordance adds a task field end to end", () => {
         //    writing through the very seam a chip edit uses, end to end.
         await (await s.byTestId("editor.task-field-menu-repeat")).click();
         await s.waitForElement(testIdSelector("editor.task-field-editor"));
+
+        // 3a. Only the ACTIVE family's controls may be on screen — the builder
+        //     opens on the interval family, so the weekday-family row must be
+        //     collapsed (myne-md/myne#196). This assertion exists HERE and not in
+        //     the unit lane because the defect was a cascade override — the
+        //     author-origin `.cm-recurrence-row { display: flex }` beating the UA
+        //     stylesheet's `[hidden]` rule — and jsdom applies no CSS, so a unit
+        //     test reads the attribute as set whether or not the row is visible.
+        //     A zero-area rect is real-CSS proof of collapse rather than of
+        //     intent. Shipped broken: all four families rendered at once, so
+        //     "every 1 days" showed weekday pills and a `first`/`monday` pair
+        //     under it.
+        const weekdayRow = await s.byTestId("editor.recurrence-weekdays");
+        await s.waitUntil(
+          async () => {
+            const box = await weekdayRow.rect();
+            return box.width === 0 && box.height === 0 ? true : null;
+          },
+          { label: "inactive weekday-family row is collapsed, not merely hidden" },
+        );
+
         const count = await s.byTestId("editor.recurrence-count");
         await count.replaceText("3");
         await (await s.byTestId("editor.task-field-commit")).click();

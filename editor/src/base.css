@@ -1,0 +1,32 @@
+/* Base reset for every surface the editor package renders.
+ *
+ * ONE rule, and it exists because the platform default is not enforceable.
+ *
+ * `hidden` takes effect through the user-agent stylesheet's
+ * `[hidden] { display: none }`. Any author-origin `display` declaration beats a
+ * UA-origin one — origin outranks specificity — so an element whose class sets
+ * `display` silently ignores the attribute. Two shipped surfaces hit exactly
+ * that: the recurrence builder's family rows (`.cm-recurrence-row` in
+ * `task-surfaces.css`) and the audio transcript's disclosure body
+ * (`.cm-attachment-audio-transcript-bodywrap` in `theme.ts`). In both, the code
+ * set `hidden` correctly and nothing happened. Nothing about either edit looks
+ * wrong, and no compiler or unit test can see it — the fast test lane does not
+ * process CSS at all.
+ *
+ * `!important` is the point rather than a smell: `hidden` is a semantic
+ * assertion that an element does not exist for the user, not a style preference
+ * a component may outvote. This is the idiom normalize.css and most resets use.
+ *
+ * Lives in the package, not only in a host's global sheet, because
+ * `@myne/editor` is consumed by three clients and each carries its own
+ * `tokens.css`. Imported statically from `extensions.ts` — the module every
+ * mounted editor loads — since the package's other stylesheets arrive lazily
+ * (`task-surfaces.css` on first task surface, `floating-styles.ts` on first
+ * slash menu / toolbar / find panel).
+ *
+ * CAVEAT: `hidden="until-found"` (find-in-page reveal) needs `display: revert`
+ * and is broken by this rule. Nothing in the tree uses it today; adopting it
+ * requires an explicit exception here.
+ */
+
+[hidden] { display: none !important; }
