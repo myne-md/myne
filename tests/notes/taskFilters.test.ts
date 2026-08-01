@@ -55,6 +55,17 @@ describe("the date axis", () => {
   it("is undefined for a task with neither", () => {
     expect(taskDate(task({}))).toBeUndefined();
   });
+
+  it("treats a wire `null` as undated rather than crashing on `.slice`", () => {
+    // The `MYI1` row serializes `Option<String>` as `null`, not an absent key. A
+    // client that skips the `taskIndex.ts` `fromWire()` sanitizer (mobile) hands
+    // that null straight here — `=== undefined` would miss it and `.slice` a
+    // non-string, which is the iOS Tasks-tab crash. `== null` catches both.
+    const wireNull = task({ due: null, remind: null } as unknown as Partial<VaultTask>);
+    expect(taskDate(wireNull)).toBeUndefined();
+    expect(matchesFilter(wireNull, "today", TODAY)).toBe(false);
+    expect(matchesFilter(wireNull, "all", TODAY)).toBe(true);
+  });
 });
 
 describe("today means today", () => {
