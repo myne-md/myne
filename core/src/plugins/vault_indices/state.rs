@@ -301,6 +301,41 @@ impl TaskRecord {
     }
 }
 
+/// One heading from a note body (myne#216), for the vault-wide `[[##` picker.
+///
+/// **Costs no extra parse.** TS fills this from the SAME `parse()` an `apply`
+/// already runs: `ParseResult.headings` carries level + text and has the
+/// frontmatter guard applied. Unlike `block_anchors` and `tasks` — which each
+/// re-parse — this field rides the existing tree.
+///
+/// **Text and level only.** The byte offsets `headingSections` also computes
+/// (`from` / `sectionTo`) serve heading FOLDING, which runs against the open
+/// note's own parse. A vault-wide picker needs neither, and storing them would
+/// put a second, staler copy of the open note's offsets into the `MYI1` payload.
+///
+/// The note id is deliberately **not** a field, exactly as on [`BlockAnchor`]
+/// and [`TaskRecord`]: records live under their note's UUID in the index map,
+/// and the query layer re-attaches it when it flattens records into rows.
+///
+/// serde camelCase (TS sends camelCase).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HeadingEntry {
+    /// The heading's inline text, markers and links stripped (the dialect's
+    /// `HeadingRef.text`). Plaintext-derived.
+    pub text: String,
+    /// The heading level, 1..=6 (ATX or Setext). Stored verbatim: an
+    /// out-of-range value would be the extractor's bug to fix, not this
+    /// layer's to clamp.
+    pub level: u8,
+}
+
+impl HeadingEntry {
+    fn zeroize_in_place(&mut self) {
+        self.text.zeroize();
+    }
+}
+
 /// One vault-wide line-task row (MYND-612): which note carries it (id + display
 /// title + folder, so a surface can render provenance without a second lookup)
 /// plus the record itself. The flat row shape [`VaultIndicesState::all_tasks`]
@@ -338,6 +373,29 @@ pub struct VaultBlockAnchor {
     pub block_id: String,
     /// The block's preview line (picker secondary text).
     pub preview: String,
+}
+
+/// One vault-wide heading row (myne#216): the note that carries the heading plus
+/// the heading itself. The flat row shape [`VaultIndicesState::all_headings`]
+/// returns to the `[[##` picker.
+///
+/// **Carries no `note_title` / `note_folder`**, and that is the one deliberate
+/// divergence from [`VaultBlockAnchor`] and [`VaultTask`]. This index is
+/// trash-blind — exclusion is entirely TS-side via `resolverCache`
+/// (`src/notes/resolverNotes.ts`) — so the consumer MUST join these rows against
+/// the resident note-set regardless, to drop trashed and template notes. That
+/// join already holds the note's title and folder, so a copy here would be a
+/// value the consumer discards, and one that goes stale in the window between a
+/// rename and the re-apply that follows it.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultHeadingRow {
+    /// The note carrying the heading (the join key into the resident note-set).
+    pub note_id: String,
+    /// The heading's inline text.
+    pub text: String,
+    /// The heading level, 1..=6.
+    pub level: u8,
 }
 
 /// Per-note record in the index.
@@ -386,6 +444,16 @@ pub struct NoteRecord {
     /// (§9.8.4) — the intended rebuild-on-format-change.
     #[serde(default)]
     pub tasks: Vec<TaskRecord>,
+    /// Headings in this note (myne#216, the vault-wide `[[##` picker). Trailing
+    /// + `#[serde(default)]` for the same reason `block_anchors` and `tasks` are:
+    /// a client that sends none — mobile, or an older desktop build —
+    /// deserializes to empty and the invoke argument stays wire-compatible in
+    /// both directions. The postcard SNAPSHOT is non-self-describing, so a
+    /// pre-#216 `vault.indices` blob fails to decode and the load path falls to a
+    /// full TS rebuild (§9.8.4) — the intended rebuild-on-format-change, paid
+    /// once.
+    #[serde(default)]
+    pub headings: Vec<HeadingEntry>,
 }
 
 impl NoteRecord {
@@ -420,6 +488,10 @@ impl NoteRecord {
             task.zeroize_in_place();
         }
         self.tasks.clear();
+        for heading in self.headings.iter_mut() {
+            heading.zeroize_in_place();
+        }
+        self.headings.clear();
     }
 }
 
@@ -648,6 +720,42 @@ impl VaultIndicesState {
                     note_title: record.title.clone(),
                     note_folder: record.folder.clone(),
                     task: task.clone(),
+                });
+            }
+        }
+        out
+    }
+
+    /// Every heading in the vault, tagged with the note carrying it (myne#216).
+    ///
+    /// This replaces a full-vault read: the `[[##` picker used to be fed by
+    /// re-reading and re-parsing every note body on each index change, which is
+    /// work proportional to the vault on every keystroke-triggered autosave.
+    ///
+    /// **Trash-blind, like every other accessor here.** Rows for trashed and
+    /// template notes ARE returned; the caller joins against the resident
+    /// note-set and drops them, which is where that exclusion lives for every
+    /// surface (`resolverNotes.ts`). An accessor that filtered here would be a
+    /// second opinion about what "live" means.
+    ///
+    /// Iteration stops once `max` is reached, exactly as the block-anchor and
+    /// task dumps do, so the traversal bound is explicit.
+    pub fn all_headings(&self, max: usize) -> Vec<VaultHeadingRow> {
+        let Ok(idx) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        // HashMap iteration is order-unstable; the picker sorts TS-side, exactly
+        // as it does for the block-anchor dump.
+        for (id, record) in idx.notes.iter() {
+            for heading in &record.headings {
+                if out.len() >= max {
+                    return out;
+                }
+                out.push(VaultHeadingRow {
+                    note_id: id.clone(),
+                    text: heading.text.clone(),
+                    level: heading.level,
                 });
             }
         }
@@ -1270,6 +1378,83 @@ mod tests {
         assert_eq!(state.all_block_anchors(1000).len(), 5);
         state.clear();
         assert!(state.all_block_anchors(1000).is_empty());
+    }
+
+    // ---- myne#216: vault-wide headings --------------------------------
+
+    fn heading(text: &str, level: u8) -> HeadingEntry {
+        HeadingEntry {
+            text: text.to_string(),
+            level,
+        }
+    }
+
+    #[test]
+    fn all_headings_flattens_every_note_in_document_order() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.headings = vec![heading("Goals", 1), heading("Risks", 2)];
+        state.apply("note-a", a);
+        let mut b = rec("Beta", None);
+        b.headings = vec![heading("Notes", 3)];
+        state.apply("note-b", b);
+        // A note without headings contributes none.
+        state.apply("note-c", rec("Gamma", None));
+
+        let got = state.all_headings(1000);
+        assert_eq!(got.len(), 3);
+
+        // Notes come back in hash order, but a note's own headings keep the
+        // order they were applied in — that is what lets the TS join produce a
+        // deterministic list without sorting the text.
+        let a_rows: Vec<_> = got.iter().filter(|r| r.note_id == "note-a").collect();
+        assert_eq!(a_rows.len(), 2);
+        assert_eq!(a_rows[0].text, "Goals");
+        assert_eq!(a_rows[0].level, 1);
+        assert_eq!(a_rows[1].text, "Risks");
+    }
+
+    #[test]
+    fn all_headings_are_returned_for_every_note_the_index_holds() {
+        // The accessor is trash-blind by design: exclusion lives in the TS join
+        // against the resident note-set, the single place every reader surface
+        // excludes trashed and template notes. An accessor that filtered here
+        // would be a second opinion about what "live" means.
+        let state = VaultIndicesState::default();
+        let mut trashed = rec("A trashed note", None);
+        trashed.headings = vec![heading("Still indexed", 1)];
+        state.apply("note-trashed", trashed);
+
+        assert_eq!(state.all_headings(1000).len(), 1);
+    }
+
+    #[test]
+    fn all_headings_respects_the_cap_and_clear_wipes_them() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.headings = (0..5).map(|i| heading(&format!("h{i}"), 2)).collect();
+        state.apply("note-a", a);
+        assert_eq!(state.all_headings(3).len(), 3, "defensive cap truncates");
+        assert_eq!(state.all_headings(1000).len(), 5);
+        state.clear();
+        assert!(state.all_headings(1000).is_empty());
+    }
+
+    #[test]
+    fn apply_replace_overwrites_stale_headings() {
+        // Replace semantics: a note whose headings changed must not keep the old
+        // ones, which is why the TS wrapper sends `headings` unconditionally.
+        let state = VaultIndicesState::default();
+        let mut first = rec("Alpha", None);
+        first.headings = vec![heading("Old", 1)];
+        state.apply("note-a", first);
+        let mut second = rec("Alpha", None);
+        second.headings = vec![heading("New", 2)];
+        state.apply("note-a", second);
+
+        let got = state.all_headings(1000);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].text, "New");
     }
 
     // --- MYND-612: line-task records -------------------------------------

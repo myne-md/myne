@@ -107,7 +107,7 @@ mod tests {
     use super::*;
     use crate::note_nonce::MYN_CONTENT_NONCE_LEN;
     use crate::plugins::vault_indices::state::{
-        BlockAnchor, PropertyEntry, TagEntry, TaskRecord, WikilinkEdge,
+        BlockAnchor, HeadingEntry, PropertyEntry, TagEntry, TaskRecord, WikilinkEdge,
     };
 
     const KEY: [u8; AEAD_KEY_LEN] = [0x42; AEAD_KEY_LEN];
@@ -162,6 +162,20 @@ mod tests {
                 priority: Some("high".to_string()),
                 remind: None,
             }],
+            // myne#216: headings ride the same snapshot, so the round-trip below
+            // covers them too — a postcard field that encodes but does not
+            // decode would strand the `[[##` picker on an empty set after every
+            // unlock, which no other assertion here would catch.
+            headings: vec![
+                HeadingEntry {
+                    text: "Overview".to_string(),
+                    level: 1,
+                },
+                HeadingEntry {
+                    text: "Details".to_string(),
+                    level: 2,
+                },
+            ],
         }
     }
 

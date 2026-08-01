@@ -323,6 +323,11 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:notes|note_search",
     // Task 14 — the pure in-RAM index queries plus the two storage-touching ones.
     "plugin:vault-indices|vault_indices_all_edges",
+    // myne#216 — the vault-wide heading set behind the wikilink heading picker,
+    // moved off a full-vault `note_read` sweep and onto the index. (Spelling the
+    // picker's trigger literally here would unbalance the brackets this file's
+    // coverage guard counts to find the const body.)
+    "plugin:vault-indices|vault_indices_headings",
     "plugin:vault-indices|vault_indices_orphans",
     "plugin:vault-indices|vault_indices_tag_tree",
     "plugin:vault-indices|vault_indices_property_keys",
