@@ -2641,7 +2641,7 @@
     "quickUnlock": {
       "errorCancelled": "Cancelled.",
       "errorGeneric": "Could not configure quick unlock.",
-      "errorHardwareUnavailable": "Touch ID is not available on this device.",
+      "errorHardwareUnavailable": "Touch ID isn't available in this build. It needs a signed macOS build with Touch ID enrolled.",
       "errorNotUnlocked": "Unlock the vault first.",
       "errorPinNotDigits": "PIN must be digits only.",
       "errorPinTooShort": "PIN must be at least {{count}} digits.",
