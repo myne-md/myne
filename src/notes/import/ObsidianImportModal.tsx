@@ -47,7 +47,6 @@ import {
   type ImportSourceId,
   type ImportSourceSpec,
 } from "./sourceCatalog";
-import { BRAND_TINT, BrandMark } from "./brandMarks";
 import { ImportSourcePicker } from "./ImportSourcePicker";
 
 type Phase = "pick" | "setup" | "running" | "summary" | "error";
@@ -385,24 +384,9 @@ function SetupBody({
   return (
     <>
       <div style={BODY_STYLE}>
-        {/* Chosen source, with the brand mark carried over from the picker so the
-            step reads as a continuation rather than a context switch. */}
+        {/* Chosen source — text-only, no brand mark (#183: nominative use of the
+            NAME is fine; reproducing third-party logos is a trademark grey area). */}
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 32,
-              height: 32,
-              borderRadius: "var(--radius-1)",
-              background: BRAND_TINT[spec.id].bg,
-              color: BRAND_TINT[spec.id].fg,
-              flex: "0 0 auto",
-            }}
-          >
-            <BrandMark source={spec.id} />
-          </span>
           <span
             style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}
             data-testid="import.chosen-source"
