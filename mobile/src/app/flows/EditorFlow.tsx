@@ -179,7 +179,7 @@ function entryFrom(id: string, text: string): NoteEntry {
 }
 
 
-export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
+export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<"list" | "editor">("list");
   const [tab, setTab] = useState<"notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates">("notes");
@@ -2322,6 +2322,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onCreate={() => {
               setSwitcherOpen(false);
               onCreateVault();
+            }}
+            onJoin={() => {
+              setSwitcherOpen(false);
+              onJoinAccount();
             }}
             onClose={() => setSwitcherOpen(false)}
           />

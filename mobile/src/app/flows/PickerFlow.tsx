@@ -14,8 +14,9 @@ import type { PickerFlowProps } from "./types";
  * On mount it enumerates discovered vaults (`vault_list`), orders them by
  * last-unlock (SYNC-7), and renders one row per vault. Tapping a row routes to
  * that vault's unlock screen (`onSelect(id, fromPicker=true)`); the footer
- * routes into vault creation (`onCreate`). Carries no secret material — the
- * list is the DENY-list-clean `VaultSummary` projection only.
+ * carries the same pair of doors Welcome does — vault creation (`onCreate`) and
+ * the sync-join flow (`onJoin`, myne-mobile#40). Carries no secret material —
+ * the list is the DENY-list-clean `VaultSummary` projection only.
  */
 
 /** Dot palette for labeled vaults (cycled by position); placeholder rows use a muted dot. */
@@ -180,7 +181,7 @@ function VaultRow({
   );
 }
 
-export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
+export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
   const { t } = useTranslation();
   const [vaults, setVaults] = useState<VaultSummary[] | null>(null);
   const [ioError, setIoError] = useState<string | null>(null);
@@ -248,9 +249,15 @@ export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
         )}
       </ScreenScroll>
 
+      {/* Both doors Welcome offers, not just one (myne-mobile#40): a device that
+          already holds vaults never returns to Welcome, so a picker that only
+          creates leaves "connect to my account" with no route at all. */}
       <FooterBar style={{ flexDirection: "column", padding: "14px 20px 44px" }}>
         <Button variant="secondary" style={{ height: 48, color: "var(--fg-1)" }} onClick={onCreate}>
           {t("vaultPicker.createAnother")}
+        </Button>
+        <Button variant="ghost" onClick={onJoin} data-testid="picker.join-account">
+          {t("welcome.connect")}
         </Button>
       </FooterBar>
     </Screen>

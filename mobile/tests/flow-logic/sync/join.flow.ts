@@ -131,4 +131,80 @@ test.describe("sync join flow", () => {
     await expect(page.getByTestId("sync.join.error")).toBeVisible();
     await expect(page.getByTestId("sync.join.qr-confirm")).toHaveCount(0);
   });
+
+  // ── The join door on a device that ALREADY holds vaults (myne-mobile#40) ────
+  //
+  // The regression these two cover is not inside JoinFlow — it is that nothing
+  // could reach it. `welcome` is produced only at zero vaults, so once a vault
+  // existed the flow was unreachable short of deleting every vault. Each spec
+  // asserts the entry is PRESENT and that it lands the editor, because the
+  // missing entry is the whole bug.
+
+  test("picker → Connect to my account → pending → editor", async ({ page }) => {
+    await installMockIpc(page, {
+      // ≥2 vaults with an Empty slot → boots to the picker, never to Welcome.
+      multiVault: true,
+      joinResult: {
+        vault_id: "joined-vault",
+        pending: true,
+        fingerprint: null,
+        device_id_hex: "aa11bb22cc33dd44ee55ff6677889900",
+      },
+      headFingerprint: "TYRS-N318",
+      syncStatus: { state: "pending" },
+    });
+    await page.goto("/");
+
+    await expect(page.getByText("Choose a vault")).toBeVisible();
+    await page.getByTestId("picker.join-account").click();
+    await expect(page.getByTestId("sync.join")).toBeVisible();
+
+    await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
+    await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+    await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");
+    await page.getByTestId("sync.join.submit").click();
+
+    await expect(page.getByTestId("sync.join.verify")).toBeVisible();
+    await page.getByTestId("sync.join.sas-match").click();
+
+    // picker.join-success → the joined vault's editor. Reaching it at all is the
+    // assertion: this config's slot is Empty, so nothing but the join can.
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+  });
+
+  test("vault switcher → Connect to my account → pending → editor", async ({ page }) => {
+    // Deliberately NOT `multiVault` (its Empty slot boots to the picker, so the
+    // editor and its switcher never mount) — the default config is the unlocked
+    // single vault, which is exactly the user in the bug report: one local vault,
+    // no picker, and until now no way back to the join flow.
+    await installMockIpc(page, {
+      joinResult: {
+        vault_id: "joined-vault",
+        pending: true,
+        fingerprint: null,
+        device_id_hex: "aa11bb22cc33dd44ee55ff6677889900",
+      },
+      headFingerprint: "TYRS-N318",
+      syncStatus: { state: "pending" },
+    });
+    await page.goto("/");
+
+    await page.getByTestId("workspace.vault-mark").click();
+    await expect(page.getByTestId("switcher.vault-row").first()).toBeVisible();
+    await page.getByTestId("switcher.join-account").click();
+    await expect(page.getByTestId("sync.join")).toBeVisible();
+
+    await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
+    await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+    await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");
+    await page.getByTestId("sync.join.submit").click();
+
+    await expect(page.getByTestId("sync.join.verify")).toBeVisible();
+    await page.getByTestId("sync.join.sas-match").click();
+
+    // editor.join-success re-addresses the editor at the joined vault; the sheet
+    // is gone and the main surface is back up.
+    await expect(page.getByTestId("switcher.vault-row")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+  });
 });

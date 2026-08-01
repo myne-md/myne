@@ -447,6 +447,26 @@ export type Action =
    * until an existing device approves). `vaultId` is the joined vault's id.
    */
   | { type: "welcome.join-success"; vaultId?: VaultId }
+  /**
+   * picker → editor. Same bootstrap as `welcome.join-success`, dispatched from
+   * the ≥2-vault picker's "connect to my account" footer affordance
+   * (myne-mobile#40). Sibling action rather than a second legal source for
+   * `welcome.join-success`, mirroring how `picker.create-vault` /
+   * `editor.create-vault` split the one create-vault destination — the LEGAL
+   * table below is keyed `<stage>|<action>`, so one action per door keeps the
+   * reachable set readable.
+   */
+  | { type: "picker.join-success"; vaultId?: VaultId }
+  /**
+   * editor → editor. The vault-switcher sheet's "connect to my account" door
+   * (myne-mobile#40). The stage NAME is unchanged but the payload is not: the
+   * joined vault's id replaces the previous one, so the switcher's active row,
+   * the settings sheet and every vault-addressed exit follow the vault the
+   * device actually has unlocked (`sync_join_account` unlocks the fresh vault,
+   * which evicts the previous slot under SYNC-1). `transition` returns a new
+   * object, so `AppShell.dispatch`'s `next === prev` guard does not swallow it.
+   */
+  | { type: "editor.join-success"; vaultId?: VaultId }
   /** picker → restore-backup ("restore an additional vault", SYNC-5 KeepBoth door). */
   | { type: "picker.restore-backup" }
   /**
@@ -594,6 +614,12 @@ export function transition(prev: Stage, action: Action): Stage {
           // dropdown (MYND-205 task 5) → existing vault-creation flow. Same
           // target as `picker.create-vault`, dispatched from the editor stage.
           return { name: "create-vault" };
+        case "editor.join-success":
+          // "Connect to my account" in the same switcher sheet (myne-mobile#40)
+          // bootstrapped + unlocked a SECOND vault from an existing account.
+          // Re-enter the editor addressed at the joined vault — the previous
+          // one is no longer the unlocked slot (SYNC-1).
+          return { name: "editor", vaultId: action.vaultId };
         case "editor.delete-vault-success":
           // Terminal-destructive transition (MYND-108). vault.meta is
           // gone (or partially gone in PartialDelete case); slot is
@@ -671,6 +697,13 @@ export function transition(prev: Stage, action: Action): Stage {
         case "picker.create-vault":
           // "Create another" affordance → existing vault-creation flow.
           return { name: "create-vault" };
+        case "picker.join-success":
+          // "Connect to my account", the picker's second footer affordance
+          // (myne-mobile#40) — `sync_join_account` bootstrapped + unlocked a
+          // fresh local vault, so land in its editor exactly as the Welcome
+          // door does. Nothing was unlocked when the picker was on screen, so
+          // there is no prior vault to tear down.
+          return { name: "editor", vaultId: action.vaultId };
         default:
           return rejectIllegal(prev, action);
       }
@@ -856,6 +889,13 @@ const LEGAL: Record<string, Stage["name"]> = {
   // back-from-create).
   "welcome|welcome.restore-backup": "restore-backup",
   "welcome|welcome.join-success": "editor",
+  // The same join door from the two surfaces that offer "create another vault"
+  // (myne-mobile#40). `editor|editor.join-success` is the one legal pair whose
+  // resulting `name` equals its source — the transition is real, it re-addresses
+  // the stage at the joined vault (the table tracks `name` only, so the walk
+  // below cannot tell the two apart; the payload assertion lives in the tests).
+  "picker|picker.join-success": "editor",
+  "editor|editor.join-success": "editor",
   "picker|picker.restore-backup": "restore-backup",
   "unlock|unlock.restore-backup": "restore-backup",
   "editor|editor.restore-backup": "restore-backup",
@@ -903,6 +943,10 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
 
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "welcome.join-success" },
+  // The picker / switcher join doors (myne-mobile#40). Payload-free here for the
+  // same reason `welcome.join-success` is — the walk inspects `name` only.
+  { type: "picker.join-success" },
+  { type: "editor.join-success" },
   { type: "create-vault.start" },
   { type: "create-vault.commit-success" },
   { type: "create-vault.auto-unlock-success" },

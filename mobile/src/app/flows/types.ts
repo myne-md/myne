@@ -17,8 +17,9 @@ export interface WelcomeFlowProps {
 }
 
 export interface JoinFlowProps {
-  /** Device bootstrapped + unlocked a fresh local vault from the server —
-   *  the shell maps this to `welcome.join-success` (lands in the editor). */
+  /** Device bootstrapped + unlocked a fresh local vault from the server — the
+   *  shell maps this to the `*.join-success` action of whichever stage opened
+   *  the flow (welcome / picker / editor), all of which land in the editor. */
   onComplete: (vaultId?: VaultId) => void;
   onCancel: () => void;
 }
@@ -55,6 +56,9 @@ export interface EditorFlowProps {
   vaultId?: VaultId;
   onLock: () => void;
   onCreateVault: () => void;
+  /** Enter the sync-join flow from the vault switcher — the "connect to my
+   *  account" twin of `onCreateVault` (myne-mobile#40). */
+  onJoinAccount: () => void;
   onSwitchVault: (vaultId: VaultId) => void;
   onDeleteVaultSuccess: () => void;
 }
@@ -62,6 +66,8 @@ export interface EditorFlowProps {
 export interface PickerFlowProps {
   onSelect: (vaultId: VaultId, fromPicker: boolean) => void;
   onCreate: () => void;
+  /** Enter the sync-join flow from the picker footer (myne-mobile#40). */
+  onJoin: () => void;
 }
 
 export interface RestoreBackupFlowProps {
