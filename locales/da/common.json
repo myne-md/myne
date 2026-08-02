@@ -83,9 +83,12 @@
       "colType": "Type",
       "colUsedIn": "Bruges i",
       "decrypting": "Dekrypterer vedhæftede filer…",
+      "clearSearchAriaLabel": "Ryd søgning",
+      "emptyClearSearch": "Ryd søgning",
       "emptyImportHint": "Importér en fil for at gemme den i din boks.",
       "emptyLoadError": "Kunne ikke læse kataloget over vedhæftede filer.",
       "emptyNoAttachments": "Ingen vedhæftede filer endnu.",
+      "emptyNoResultsTitle": "Ingen vedhæftede filer matcher din søgning.",
       "filterAriaLabel": "Filtrér efter type",
       "gridView": "Gittervisning",
       "import": "Importér",
@@ -98,6 +101,7 @@
       "menuPreview": "Forhåndsvis",
       "menuRename": "Omdøb",
       "menuTranscribe": "Transskribér",
+      "menuViewTranscription": "Vis transskription",
       "noMatch": "Ingen vedhæftede filer matcher din søgning.",
       "noUnusedNotice": "Ingen ubrugte vedhæftede filer at rydde op i.",
       "preview": "Forhåndsvis",
@@ -115,8 +119,14 @@
       "title": "Vedhæftede filer",
       "transcribeDone": "Transskription fuldført.",
       "transcribeFailed": "Transskription mislykkedes. Prøv igen.",
+      "transcribeFeatureOff": "Tale-til-tekst er slået fra. Slå det til under Indstillinger → Transskription.",
+      "transcribeModelLoadFailed": "Kunne ikke indlæse tale-til-tekst-modellen. Geninstallér Myne, eller tjek din egen model under Indstillinger → Developer → AI.",
+      "transcribeNoModelHint": "Tale-til-tekst-modellen mangler. En geninstallation af Myne gendanner den.",
       "transcribeNoModel": "Vælg en transskriptionsmodel under Indstillinger → Developer → AI.",
       "transcribeStarted": "Transskriberer…",
+      "transcribeVaultLocked": "Lås din boks op for at transskribere.",
+      "transcriptionModalClose": "Luk transskription",
+      "transcriptionModalTitle": "Transskription",
       "typeFilter": {
         "all": "Alle typer",
         "audio": "Lyd",
@@ -219,6 +229,15 @@
     "matchedInAttachmentTitle": "Søgningen matchede inde i en fil indlejret i denne note",
     "matchedInBody": "↳ matchet i brødtekst",
     "noMatches": "Ingen resultater",
+    "operatorHint": "Tab for at fuldføre",
+    "operators": {
+      "tag": "Noter med et tag",
+      "path": "Noter i en mappe",
+      "file": "Match notetitlen",
+      "section": "Noter med en overskrift",
+      "task": "Noter med en opgave",
+      "content": "Fritekst i brødteksten"
+    },
     "searchPlaceholder": "Søg i noter, eller kør en kommando — Esc for at lukke",
     "sectionCommands": "Kommandoer",
     "sectionNotes": "Noter",
@@ -469,6 +488,9 @@
       "showGraph": {
         "label": "Vis grafvisning…"
       },
+      "showTasks": {
+        "label": "Vis opgaver"
+      },
       "showTags": {
         "label": "Gennemse tags…"
       },
@@ -507,9 +529,11 @@
         "cycleHeadingLevel": "Skift overskriftsniveau",
         "cycleTabs": "Skift mellem faneblade",
         "deleteWorkspace": "Slet arbejdsområde",
+        "findInNote": "Find i note",
         "focusNextPane": "Fokusér næste rude",
         "focusPrevPane": "Fokusér forrige rude",
         "foldAll": "Fold alt sammen",
+        "indent": "Indryk",
         "inlineCode": "Indlejret kode",
         "insertWikilink": "Indsæt wikilink",
         "italic": "Kursiv",
@@ -517,11 +541,15 @@
         "navigateForward": "Naviger frem",
         "newNote": "Ny note",
         "openSettings": "Åbn indstillinger",
+        "outdent": "Fjern indrykning",
         "paletteToggle": "Åbn kommandopalet",
+        "redo": "Gentag",
         "renameWorkspace": "Omdøb arbejdsområde",
         "saveWorkspaceAs": "Gem arbejdsområde som",
         "selectAllScoped": "Markér alt (afgrænset)",
+        "selectNextOccurrence": "Markér næste forekomst",
         "showGraphView": "Vis grafvisning",
+        "showTasks": "Vis opgaver",
         "splitPaneDown": "Opdel rude (nedad)",
         "splitPaneRight": "Opdel rude (mod højre)",
         "switchWorkspace": "Skift arbejdsområde",
@@ -531,6 +559,7 @@
         "toggleReadingView": "Slå læsevisning til/fra",
         "toggleSourceMode": "Slå kildetilstand til/fra",
         "toggleTaskList": "Slå opgaveliste til/fra",
+        "undo": "Fortryd",
         "unfoldAll": "Fold alt ud"
       }
     },
@@ -572,6 +601,12 @@
         "renamed": "Omdøbt til {{name}}.",
         "renameFailed": "Kunne ikke omdøbe den vedhæftede fil.",
         "saveDialogFailed": "Kunne ikke åbne dialogen Gem."
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} billede komprimeret: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} billeder komprimeret: {{from}} → {{to}}",
+        "notice": "Komprimeret: {{from}} → {{to}}",
+        "noticeContainerChanged": "Komprimeret til {{format}}: {{from}} → {{to}}"
       },
       "convert": {
         "cancel": "Annullér",
@@ -649,7 +684,10 @@
         "exportAria": "Eksportér vedhæftet fil",
         "imagePreview": "Billedforhåndsvisning",
         "pdfFallback": "PDF",
-        "pdfPreview": "PDF-forhåndsvisning"
+        "pdfPreview": "PDF-forhåndsvisning",
+        "zoomIn": "Zoom ind",
+        "zoomOut": "Zoom ud",
+        "zoomReset": "Nulstil zoom"
       },
       "menu": {
         "actionsAria": "Handlinger for vedhæftet fil"
@@ -730,6 +768,12 @@
           "deletedLabel": "slettet"
         },
         "transcribe": {
+          "cause": {
+            "featureOff": "Tale-til-tekst er slået fra. Slå det til under Indstillinger → Transskription.",
+            "modelLoadFailed": "Kunne ikke indlæse tale-til-tekst-modellen. Hvis du har valgt din egen model under Indstillinger → Developer → AI, så tjek dens filer; ellers gendanner en geninstallation af Myne den indbyggede.",
+            "noModel": "Tale-til-tekst-modellen mangler. En geninstallation af Myne gendanner den.",
+            "vaultLocked": "Lås din boks op for at transskribere."
+          },
           "disabledReason": "Aktivér AI under Indstillinger → Developer → AI for at transskribere.",
           "failed": "Transskription mislykkedes. Prøv igen.",
           "heading": "Transskription",
@@ -772,6 +816,10 @@
         "linkedFrom": "Linket fra {{count}}",
         "linkedFrom_one": "Linket fra {{count}}",
         "linkedFrom_other": "Linket fra {{count}}",
+        "linksTo": "Linker til {{count}}",
+        "linksTo_one": "Linker til {{count}}",
+        "linksTo_other": "Linker til {{count}}",
+        "outgoingEmpty": "Denne note linker ikke til noget endnu.",
         "untitled": "Uden titel"
       },
       "barItems": {
@@ -889,6 +937,7 @@
           "aiChat": "AI-chat",
           "backlinks": "Tilbagelinks",
           "outline": "Disposition",
+          "tasks": "Opgaver",
           "unlinked": "Ulinkede omtaler"
         }
       },
@@ -922,9 +971,38 @@
         "toggleTitle": "Arbejdsområde: {{name}}"
       }
     },
+    "noteActions": {
+      "buttonLabel": "Notehandlinger",
+      "rename": "Omdøb",
+      "move": "Flyt til mappe…",
+      "duplicate": "Dublér",
+      "convertToTemplate": "Gør til skabelon",
+      "convertToNote": "Konvertér til note",
+      "turnedIntoTemplate": "Gjort til skabelon",
+      "convertedToNote": "Konverteret til note",
+      "versionHistory": "Versionshistorik",
+      "exportMarkdown": "Eksportér som Markdown…",
+      "exportPdf": "Eksportér som PDF…",
+      "exportHtml": "Eksportér som HTML…",
+      "exportTxt": "Eksportér som almindelig tekst…",
+      "trash": "Flyt til papirkurv"
+    },
     "codeBlock": {
       "copyCode": "Kopiér kode",
       "defaultBadge": "kode"
+    },
+    "drawingEmbed": {
+      "done": "Færdig",
+      "edit": "Redigér tegningen {{name}}",
+      "editAction": "Redigér",
+      "empty": "Tom tegning — klik for at tegne",
+      "open": "Åbn",
+      "rename": "Omdøb tegning"
+    },
+    "drawingMenu": {
+      "background": "Lærredsbaggrund",
+      "reset": "Nulstil lærred",
+      "toggleTheme": "Skift tegnetema"
     },
     "find": {
       "close": "Luk søgning",
@@ -949,8 +1027,11 @@
       "unreferenced": "uden henvisning"
     },
     "frontmatter": {
+      "addListItem": "Tilføj element…",
+      "addListItemAriaLabel": "Tilføj element til {{key}}",
       "addProperty": "+ Tilføj egenskab",
       "propertiesLabel": "Egenskaber",
+      "removeListItemAriaLabel": "Fjern {{item}}",
       "titleAriaLabel": "Notetitel",
       "titlePlaceholder": "Uden titel"
     },
@@ -966,6 +1047,8 @@
       "date": "Dato",
       "day": "Dag",
       "divider": "Skillelinje",
+      "drawing": "Tegning",
+      "due": "Forfaldsdato",
       "heading1": "Overskrift 1",
       "heading2": "Overskrift 2",
       "heading3": "Overskrift 3",
@@ -975,8 +1058,11 @@
       "link": "Link",
       "now": "Nu",
       "numberedList": "Nummereret liste",
+      "priority": "Prioritet",
       "quote": "Citat",
+      "repeat": "Gentagelse",
       "table": "Tabel",
+      "taskQuery": "Opgaveoversigt",
       "time": "Klokkeslæt",
       "todoList": "Opgaveliste",
       "voiceNote": "Talenote",
@@ -998,6 +1084,27 @@
       "deleteRow": "Slet række",
       "reorderColumn": "Flyt kolonne",
       "reorderRow": "Flyt række"
+    },
+    "tagSuggestion": {
+      "label": "Foreslåede tags",
+      "accept": "Tilføj tagget {{tag}} til denne note",
+      "dismiss": "Afvis det foreslåede tag {{tag}}"
+    },
+    "taskField": {
+      "addAffordance": "Tilføj opgavefelt",
+      "invalidDue": "Myne kan ikke læse denne dato, så den vises ikke som forfaldsdato.",
+      "invalidPriority": "Myne kan ikke læse denne prioritet. Brug highest, high, medium, low eller lowest.",
+      "invalidRepeat": "Myne genkender ikke denne gentagelsesregel, så denne opgave gentages ikke.",
+      "menuEdit": "Redigér {{field}}",
+      "menuTitle": "Tilføj felt",
+      "repeatNoAnchor": "Denne opgave har ingen dato at gentage fra, så den gentages ikke. Tilføj en forfaldsdato for at sætte den i gang.",
+      "save": "Gem",
+      "skipOccurrence": "Spring denne forekomst over",
+      "title": {
+        "due": "Forfaldsdato",
+        "repeat": "Gentagelse",
+        "priority": "Prioritet"
+      }
     },
     "toolbar": {
       "apply": "Anvend",
@@ -1030,7 +1137,16 @@
         "green": "Grøn",
         "pink": "Lyserød",
         "purple": "Lilla",
-        "yellow": "Gul"
+        "yellow": "Gul",
+        "orange": "Orange",
+        "red": "Rød",
+        "teal": "Blågrøn",
+        "cyan": "Cyan",
+        "lime": "Limegrøn",
+        "brown": "Brun",
+        "grey": "Grå",
+        "indigo": "Indigo",
+        "remove": "Fjern fremhævning"
       },
       "urlPlaceholder": "Indsæt link-URL"
     },
@@ -1375,11 +1491,17 @@
       "countEmpty": "Tom",
       "delete": "Slet",
       "deleteError": "Kunne ikke slette den note. Prøv igen.",
+      "emptyBody": "Arkiverede noter og mapper er skjult i sidepanelet, men de bevares. Gendan dem her, når du får brug for dem.",
+      "emptyTitle": "Intet arkiveret",
+      "folderDeleteBody_one": "“{{name}}” og dens {{count}} note",
+      "folderDeleteBody_other": "“{{name}}” og dens {{count}} noter",
       "emptyState": "Arkivet er tomt.",
       "folderDeleteConfirm_one": "Flyt {{count}} note til papirkurven?",
       "folderDeleteConfirm_other": "Flyt {{count}} noter til papirkurven?",
       "folderDeleteConfirmCta": "Flyt til papirkurv",
       "folderDeleteError": "Kunne ikke flytte mappens noter til papirkurven. Prøv igen.",
+      "folderDeleteTitle": "Flyt denne mappe til papirkurven?",
+      "folderDeleteWarning": "De flyttes til papirkurven — du kan gendanne dem når som helst. Permanent sletning er et separat skridt.",
       "restore": "Gendan",
       "restoreError": "Kunne ikke gendanne den note. Prøv igen.",
       "title": "Arkiv",
@@ -1469,6 +1591,24 @@
     "graph": {
       "allConnected": "Alt er forbundet — ingen isolerede noter.",
       "building": "Bygger graf…",
+      "colorGroups": {
+        "addRule": "Tilføj regel",
+        "colorSwatchTitle": "Vælg farve",
+        "deleteRuleTitle": "Slet regel",
+        "dragHandleTitle": "Træk for at ændre rækkefølge",
+        "editFilterButton": "Redigér filter…",
+        "editFilterTitle": "Redigér filter for farvegruppe",
+        "emptyBody": "Farvegrupper lader dig farve grafens knuder efter tag eller mappe — arbejdsnoter i én farve, private noter i en anden. Tilføj din første regel.",
+        "emptyTitle": "Ingen farvegrupper endnu",
+        "enableToggleAriaLabel": "Aktivér regel",
+        "filterAllNotes": "Matcher alle noter",
+        "filterConditions_one": "{{count}} betingelse",
+        "filterConditions_other": "{{count}} betingelser",
+        "heading": "Farvegrupper",
+        "moveDown": "Flyt regel ned",
+        "moveUp": "Flyt regel op",
+        "namePlaceholder": "Regel uden titel"
+      },
       "depthToggleTitle": "Skift nabolagsdybde (1 ↔ 2 spring)",
       "filterAll": "Alle",
       "filterAroundNote": "Omkring denne note",
@@ -1480,6 +1620,23 @@
       "overCap": "Denne boks er stor — grafen over hele boksen er begrænset. Filtrér efter et tag, eller vis isolerede noter for at udforske.",
       "refresh": "Opdatér",
       "refreshTitle": "Boksen ændrede sig — genopbyg grafen",
+      "settings": {
+        "appearanceHeading": "Udseende",
+        "closeTitle": "Luk",
+        "forceCenter": "Centertræk",
+        "forceLinkDistance": "Linkafstand",
+        "forceLinkStrength": "Linkstyrke",
+        "forceRepel": "Frastødning",
+        "forcesHeading": "Kræfter",
+        "labelFadeZoom": "Etiketudtoning",
+        "lineThickness": "Linjetykkelse",
+        "nodeSize": "Knudestørrelse",
+        "nodeSizeStrength": "Størrelse efter forbindelser",
+        "openTitle": "Grafindstillinger",
+        "reset": "Nulstil til standard",
+        "showArrows": "Vis retningspile",
+        "title": "Grafindstillinger"
+      },
       "tagPlaceholder": "Tag…"
     },
     "import": {
@@ -1538,6 +1695,7 @@
         "setupIntro": "Peg Myne på din eksisterende Obsidian-boksmappe. Hver Markdown-note importeres og krypteres med det samme — intet forlader denne enhed, og dine oprindelige filer røres ikke.",
         "statCancelled": "Annulleret",
         "statCanvasSkipped": ".canvas-filer sprunget over",
+        "statCompressed": "Billeder komprimeret",
         "statEmptyFoldersKept": "Tomme mapper beholdt",
         "statMedia": "Medier",
         "statOtherSkipped": "Andre filer sprunget over",
@@ -1551,7 +1709,19 @@
         "titlePick": "Importér noter",
         "keepsLabel": "Hvad der følger med",
         "losesLabel": "Hvad der ikke følger med",
-        "changeSource": "Skift kilde"
+        "changeSource": "Skift kilde",
+        "statExcalidrawSkipped": "Excalidraw-tegninger sprunget over",
+        "unfollowedLinkOutside": "Dette er en genvej til en mappe uden for den, du valgte, så Myne fulgte den ikke. Flyt eller kopiér den mappe ind i din boks, og importér igen.",
+        "unfollowedLinkLoop": "Denne genvej peger tilbage i en mappe, Myne allerede var inde i, så at følge den ville køre i ring for evigt. Intet under den blev overset.",
+        "unfollowedLinkBroken": "Denne genvej fører ingen steder hen — det, den pegede på, er blevet flyttet eller slettet.",
+        "unreadableDetail": "Sprunget over — {{reason}} Resten af importen fortsatte.",
+        "stoppedAt": "{{imported}} af {{total}} noter blev importeret, før dette stoppede. De ligger i din boks og kan trygt beholdes.",
+        "reasonNotUtf8": "Myne kunne ikke læse denne fil som tekst. Den er sandsynligvis gemt i en ældre tegnkodning, eller også er det slet ikke en tekstfil.",
+        "reasonPathRejected": "Myne kunne ikke nå denne fil inde i den mappe, du valgte.",
+        "reasonPermissionDenied": "Myne havde ikke lov til at læse denne fil.",
+        "reasonNotFound": "Denne fil var væk, da Myne nåede frem til den.",
+        "reasonNoSpace": "Denne enhed løb tør for plads.",
+        "reasonUnknown": "Myne kunne ikke sige hvorfor."
       },
       "offer": {
         "body": "Hent dine eksisterende noter ind i Myne. Hver enkelt krypteres, mens den importeres — intet forlader denne enhed, og dine oprindelige filer bliver præcis, hvor de er.",
@@ -1615,6 +1785,7 @@
       "bulkDelete": "Slet {{count}} noter",
       "bulkDelete_one": "Slet {{count}} note",
       "bulkDelete_other": "Slet {{count}} noter",
+      "moveTo": "Flyt til…",
       "bulkMove": "Flyt {{count}} noter til…",
       "bulkMove_one": "Flyt {{count}} note til…",
       "bulkMove_other": "Flyt {{count}} noter til…",
@@ -1644,6 +1815,7 @@
       "newFolder": "Ny mappe",
       "newFolderInPlaceholder": "Ny mappe i {{path}}",
       "newFolderPlaceholder": "Ny mappe",
+      "newItem": "Ny…",
       "newNote": "Ny note",
       "newNoteFromTemplate": "Ny note fra skabelon…",
       "newNoteHere": "Ny note her",
@@ -1676,12 +1848,18 @@
       "trashSingleError": "Kunne ikke flytte noten til papirkurven.",
       "undo": "Fortryd",
       "vaultRoot": "Boksens rod",
-      "viewSettingsTitle": "Visningsindstillinger"
+      "viewSettingsTitle": "Visningsindstillinger",
+      "imported_one": "Importerede 1 note til denne mappe",
+      "imported_other": "Importerede {{count}} noter til denne mappe",
+      "importedWithSkips": "Importerede {{count}} — {{skipped}} sprunget over",
+      "importNoMarkdown": "Ingen markdown-filer i det, du trak ind"
     },
     "newFromTemplate": {
       "back": "Tilbage",
       "blankNote": "Tom note",
       "createNote": "Opret note",
+      "createFirstTemplate": "Opret en skabelon",
+      "manageTemplates": "Administrér skabeloner",
       "emptyState": "Du har ikke oprettet nogen skabeloner endnu.",
       "listLabel": "Skabeloner",
       "loading": "Indlæser…",
@@ -1696,12 +1874,14 @@
       "createDrawing": "Ny tegning",
       "noNotesMatch": "Ingen noter matcher.",
       "noNotesYet": "Ingen noter endnu.",
+      "recent": "Seneste",
       "searchAriaLabel": "Søg i noter, der skal åbnes",
       "searchPlaceholder": "Søg i noter…",
       "untitled": "Uden titel"
     },
     "pane": {
       "graphTab": "Graf",
+      "tasksTab": "Opgaver",
       "loading": "Indlæser…",
       "untitledView": "Visning uden titel"
     },
@@ -1723,6 +1903,8 @@
       "loadError": "Kunne ikke indlæse denne note",
       "removeFromFavorites": "Fjern fra favoritter",
       "renameAriaLabel": "Omdøb note",
+      "taskBadgeLabel": "Denne note er en opgave",
+      "taskBadgeTitle": "Opgavenote",
       "unsyncedLabel": "Endnu ikke på serveren",
       "unsyncedTitle": "Denne notes seneste ændringer findes kun på denne enhed",
       "untitled": "Uden titel"
@@ -1755,7 +1937,12 @@
       "cancel": "Annullér",
       "changeCount_one": "{{count}} ændring siden dette øjebliksbillede",
       "changeCount_other": "{{count}} ændringer siden dette øjebliksbillede",
+      "changeCountPrev_one": "{{count}} ændring siden det forrige øjebliksbillede",
+      "changeCountPrev_other": "{{count}} ændringer siden det forrige øjebliksbillede",
       "close": "Luk",
+      "compareAgainstLabel": "Sammenlign med",
+      "compareCurrent": "Nuværende note",
+      "comparePrevious": "Forrige øjebliksbillede",
       "confirmBody": "Din nuværende note gemmes som et øjebliksbillede først, så du kan fortryde dette.",
       "confirmTitle": "Gendan dette øjebliksbillede?",
       "decrypting": "Dekrypterer…",
@@ -1770,6 +1957,7 @@
       "justNow": "lige nu",
       "listLabel": "Liste over øjebliksbilleder",
       "loading": "Indlæser…",
+      "noPrevious": "Dette er det ældste øjebliksbillede — der er intet før det at sammenligne med.",
       "restore": "Gendan",
       "restoreCta": "Gendan dette øjebliksbillede",
       "restoredStatus": "Gendannet. Den version, du havde, er gemt som et øjebliksbillede.",
@@ -1823,6 +2011,8 @@
       "emptyConfirmTitle": "Tøm papirkurv?",
       "emptyPartialFailure_one": "{{count}} note kunne ikke slettes og bliver i papirkurven.",
       "emptyPartialFailure_other": "{{count}} noter kunne ikke slettes og bliver i papirkurven.",
+      "emptyBody": "Noter, du sletter, havner her. De bliver liggende, indtil du tømmer papirkurven — du kan gendanne enhver af dem når som helst.",
+      "emptyTitle": "Papirkurven er tom",
       "emptyState": "Papirkurven er tom.",
       "purgeConfirmCta": "Slet permanent",
       "purgeConfirmTitle": "Slet permanent?",
@@ -1871,6 +2061,8 @@
         "viewSettings": "Visningsindstillinger…"
       },
       "newView": "Ny visning",
+      "noMatch": "Ingen visninger matcher din søgning.",
+      "searchPlaceholder": "Søg i visninger…",
       "table": {
         "empty": "Ingen noter matcher denne visning",
         "name": "Navn",
@@ -1967,6 +2159,71 @@
     "passwordHelper": "Aldrig gemt, aldrig sendt. Den krypterer dine nøgler på denne enhed.",
     "encryptingSubtitle": "Indpakker dine boksnøgler med din nye adgangskode."
   },
+  "recurrence": {
+    "every": {
+      "day": "hver dag",
+      "week": "hver uge",
+      "month": "hver måned",
+      "year": "hvert år"
+    },
+    "everyN": {
+      "day": "hver {{count}}. dag",
+      "week": "hver {{count}}. uge",
+      "month": "hver {{count}}. måned",
+      "year": "hvert {{count}}. år"
+    },
+    "everyWeekday": "hver {{days}}",
+    "everyWeekdays": "hver {{days}}",
+    "ordinal": {
+      "first": "første",
+      "second": "anden",
+      "third": "tredje",
+      "fourth": "fjerde",
+      "last": "sidste"
+    },
+    "ordinalOfMonth": "{{ordinal}} {{weekday}} i hver måned",
+    "dayOfMonth": "den {{day}}. i hver måned",
+    "lastDayOfMonth": "sidste dag i hver måned",
+    "weekday": {
+      "monday": "mandag",
+      "tuesday": "tirsdag",
+      "wednesday": "onsdag",
+      "thursday": "torsdag",
+      "friday": "fredag",
+      "saturday": "lørdag",
+      "sunday": "søndag"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, når den er fuldført",
+    "builder": {
+      "family": "Gentagelse",
+      "familyInterval": "Hver…",
+      "familyWeekdays": "Ugentligt på…",
+      "familyDayOfMonth": "Månedligt på en dato…",
+      "familyOrdinal": "Månedligt på en ugedag…",
+      "count": "Interval",
+      "unitLabel": "Enhed",
+      "units": {
+        "day": "dage",
+        "week": "uger",
+        "month": "måneder",
+        "year": "år"
+      },
+      "ordinal": "Position",
+      "weekday": "Ugedag",
+      "lastDay": "Sidste dag",
+      "whenDone": "Gentag fra den dato, den fuldføres",
+      "weekdayShort": {
+        "monday": "man",
+        "tuesday": "tir",
+        "wednesday": "ons",
+        "thursday": "tor",
+        "friday": "fre",
+        "saturday": "lør",
+        "sunday": "søn"
+      }
+    }
+  },
   "restore": {
     "backLabel": "Tilbage",
     "cancelLabel": "Annullér",
@@ -2015,8 +2272,8 @@
       "changelogButton": "Vis ændringslog…",
       "changelogHelper": "Noter pr. version. Vises, når MYND-119 lander.",
       "changelogLabel": "Ændringslog",
-      "developerModeHelper": "",
-      "developerModeLabel": "",
+      "developerModeHelper": "Viser de avancerede indstillinger, Myne som standard holder af vejen: dem, hvor du forlader den vej, Myne står inde for, og de værktøjer til øvede brugere, de fleste aldrig får brug for. At slå det fra skjuler dem kun igen — det, du har slået til, forbliver slået til, og det slås fra dér, hvor dets egen indstilling står.",
+      "developerModeLabel": "Udviklertilstand",
       "licenseBody": "Pre-alfa · CC-BY-4.0-dokumenter · AGPL-3.0-programkode ved fase 1-udgivelse.",
       "licenseLabel": "Licens",
       "tagline": "Pre-alfa · Fase 1 desktopklient",
@@ -2067,10 +2324,18 @@
       "changing": "Ændrer…"
     },
     "appearance": {
+      "accentHelper": "Vælg den accentfarve, der bruges i hele appen. Kun på denne enhed.",
+      "accentHexAria": "Accentfarvens hex-værdi",
+      "accentLabel": "Accentfarve",
+      "accentReset": "Nulstil til temaets standard",
       "homeQuickActions": "Hurtige handlinger på startskærmen",
       "showEditTimesAria": "Vis redigeringstidspunkter i sidepanelet",
       "showEditTimesHelper": "Vis hver notes sidste redigeringstidspunkt under titlen i sidepanelet.",
       "showEditTimesLabel": "Vis redigeringstidspunkter",
+      "taskMarkerAria": "Vis opgavemarkøren på opgavenoter",
+      "taskMarkerHelper": "Markerer de noter, du har erklæret som opgaver, i sidepanelet og på deres faneblad.",
+      "taskMarkerLabel": "Vis opgavemarkør",
+      "taskMarkerSaveError": "Kunne ikke gemme indstillingen. Prøv igen.",
       "theme": {
         "amoled": "AMOLED",
         "dark": "Mørk",
@@ -2087,7 +2352,10 @@
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "Editor-skrifttype",
-      "showEditTimesSubtitle": "Tidsstempler under hver note"
+      "showEditTimesSubtitle": "Tidsstempler under hver note",
+      "graphSettingsLabel": "Grafens udseende",
+      "graphSettingsHelper": "Knudefarver, etiketter, størrelser og layoutkræfter indstilles inde i grafen selv — åbn den, og brug tandhjulet i dens hjørne. De gemmes pr. enhed, så en ændring her følger ikke med til din telefon.",
+      "openGraph": "Åbn graf"
     },
     "archive": {
       "helper": "Lad noter blive flyttet til et arkiv, så de holdes ude af hovedlisten. Slår du dette fra, gendannes alle arkiverede noter til deres mappe, og arkivknapperne skjules.",
@@ -2095,6 +2363,18 @@
       "off": "Fra",
       "on": "Til",
       "saveError": "Kunne ikke opdatere arkiveringsindstillingen."
+    },
+    "attachmentCompression": {
+      "label": "Komprimér billeder ved import",
+      "helper": "Formindsker indsatte eller trukne billeder, før de krypteres og gemmes, så din boks, dine sikkerhedskopier og din synkronisering fylder mindre. Dette kan ikke fortrydes — den oprindelige fil beholdes ikke.",
+      "helperScopeEveryDevice": "Gælder hele boksen, på alle enheder.",
+      "helperScopeNotHere": "Gælder hele boksen, men ikke i denne browser — billeder tilføjet her gemmes præcis, som de er.",
+      "errorSaveSetting": "Kunne ikke gemme denne indstilling."
+    },
+    "transcription": {
+      "label": "Tale-til-tekst",
+      "helper": "Lav en vedhæftet lydfil om til tekst, på denne enhed. Modellen følger med Myne, og intet sendes nogen steder hen. Slår du dette fra, skjules handlingen Transskribér overalt, og appen transskriberer slet ikke.",
+      "errorSaveSetting": "Kunne ikke gemme indstillingen."
     },
     "attachmentOcr": {
       "label": "Søg inde i billeder og scannede dokumenter",
@@ -2155,6 +2435,29 @@
         "onDate": "Forbundet {{date}}"
       }
     },
+    "cliAccess": {
+      "label": "Terminaladgang",
+      "helperOff": "Fra. Kommandoen `myne` kan hverken læse eller ændre noget i denne boks.",
+      "helperOn": "Til, mens denne boks er låst op. Ethvert program, der kører under din brugerkonto, kan læse, søge i og oprette noter gennem den — Myne kan ikke skelne din terminal fra et script og tjekker intet ud over, at døren står åben. Den beder aldrig om din adgangskode, lukker i det øjeblik boksen låses, og kan ikke slette noter.",
+      "lastUsedNever": "Ikke brugt, siden denne boks blev låst op.",
+      "lastUsedJustNow": "Sidst brugt lige nu.",
+      "lastUsedMinutesAgo": "Sidst brugt for {{count}} min siden.",
+      "lastUsedMinutesAgo_one": "Sidst brugt for {{count}} min siden.",
+      "lastUsedMinutesAgo_other": "Sidst brugt for {{count}} min siden.",
+      "lastUsedHoursAgo": "Sidst brugt for {{count}} t siden.",
+      "lastUsedHoursAgo_one": "Sidst brugt for {{count}} t siden.",
+      "lastUsedHoursAgo_other": "Sidst brugt for {{count}} t siden.",
+      "lastUsedDaysAgo": "Sidst brugt for {{count}} dage siden.",
+      "lastUsedDaysAgo_one": "Sidst brugt for {{count}} dag siden.",
+      "lastUsedDaysAgo_other": "Sidst brugt for {{count}} dage siden.",
+      "notOnPathHint": "Din shell kan ikke finde `myne` endnu. Tilføj denne linje til din shell-profil, og åbn så en ny terminal:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "Mapper, terminalen aldrig ser",
+      "excludedHelper": "Én mappesti pr. linje. Noter i disse mapper udelades fra alle terminalresultater og kan ikke skrives dertil fra terminalen — de er fortsat fuldt tilgængelige i appen. Du kan angive dette, før du slår terminaladgang til.",
+      "excludedPlaceholder": "Privat/\nJournal/",
+      "rateLimitLabel": "Lad terminalen køre med fuld hastighed",
+      "rateLimitHelper": "Myne besvarer som standard højst 120 terminalkommandoer i minuttet. Det er en fartgrænse for et løbsk script, ikke en tilladelseskontrol — intet afgør, hvilket program der må spørge. Slå dette til ved arbejde i store mængder, som at sende hver eneste note gennem et andet værktøj."
+    },
     "clipperInstall": {
       "error": "Kunne ikke opdatere indstillingen for browser-clipper.",
       "helper": "Registrér native-messaging-værten, så Myne-browserudvidelsen kan sende klip til denne app. Slået til som standard; slå fra for at fjerne den.",
@@ -2164,6 +2467,7 @@
       "appliedBadge": "Anvendt",
       "apply": "Anvend",
       "applyError": "Kunne ikke anvende det tema. Prøv igen.",
+      "browseButton": "Gennemse temaer",
       "cancel": "Annullér",
       "confirm": "Bekræft",
       "delete": "Slet",
@@ -2188,7 +2492,8 @@
       "label": "Brugerdefinerede temaer",
       "openFolderButton": "Åbn temamappe",
       "openFolderError": "Kunne ikke åbne temamappen.",
-      "readError": "Kunne ikke læse din temamappe."
+      "readError": "Kunne ikke læse din temamappe.",
+      "readOnlyHelper": "Brugerdefinerede temaer installeres på din computer. Dine egne dukker op her af sig selv efter en synkronisering."
     },
     "dailyNotes": {
       "blankTemplate": "Tom (ingen skabelon)",
@@ -2198,6 +2503,8 @@
       "folderHelper": "Hvor nye daglige noter placeres. Standard er {{default}} — mappen beholdes, også når den er tom.",
       "folderLabel": "Mappe til daglige noter",
       "folderSaveError": "Kunne ikke gemme den daglige mappe. Prøv igen.",
+      "folderSearchEmpty": "Ingen mapper matcher.",
+      "folderSearchPlaceholder": "Søg i mapper…",
       "searchEmpty": "Ingen skabeloner matcher.",
       "searchPlaceholder": "Søg i skabeloner…",
       "templateHelper": "Vælg en skabelon, som hver daglig note skal starte fra, eller lad være tom for en tom note med datoen som titel.",
@@ -2234,6 +2541,8 @@
       "newNote": {
         "folderLabel": "Mappe til nye noter",
         "folderPlaceholder": "f.eks. Indbakke/",
+        "folderSearchEmpty": "Ingen mapper matcher.",
+        "folderSearchPlaceholder": "Søg i mapper…",
         "helper": "Hvor nyoprettede noter placeres.",
         "label": "Standardplacering for nye noter",
         "optionCurrent": "Samme mappe som den aktuelle note",
@@ -2329,6 +2638,10 @@
       "off": "Fra",
       "on": "Til"
     },
+    "views": {
+      "helper": "Vis punktet Visninger i sidepanelet, så du kan gemme filtrerede notelister. Fra som standard; til, hvis du allerede har visninger.",
+      "label": "Visninger"
+    },
     "vimMode": {
       "chordCaveat": "På Windows og Linux har Mynes egne genveje forrang, så de vim-genveje, der kolliderer med dem (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x), ikke er tilgængelige i editoren. Ctrl-[ virker stadig som Escape, og visual-block flyttes til Alt-v.",
       "errorSaveSetting": "Kunne ikke gemme indstillingen for vim-tilstand.",
@@ -2346,6 +2659,9 @@
       "pendingHint": "Kommer snart"
     },
     "ai": {
+      "autoTagHelper": "Når du holder pause i skrivningen, læser en lille model på din enhed noten og foreslår tags øverst i den. Intet tilføjes, før du accepterer et forslag.",
+      "autoTagLabel": "Foreslå tags automatisk",
+      "autoTagUnavailable": "Dette build leveres uden tag-modellen, så der kan ikke foreslås tags. Myne henter aldrig en — kontakten slår til af sig selv i et build, der indeholder den.",
       "disclosureToggle": "Hvordan fungerer det?",
       "enableHelper": "Kører en model, du selv leverer, helt på din enhed. Eksperimentel, slået fra som standard.",
       "enableLabel": "Aktivér lokal AI",
@@ -2369,8 +2685,41 @@
       "recommendedFilesTranscription": "Kræver Whisper .gguf-filen + config.json + tokenizer.json i samme mappe.",
       "title": "AI"
     },
+    "network": {
+      "disabledCue": "Synkronisering sendes ikke længere gennem Tor. Nye forbindelser går direkte til synkroniseringsserveren.",
+      "errorRead": "Kunne ikke læse den nuværende indstilling. Slå kontakten om for at sætte den igen.",
+      "errorSave": "Kunne ikke gemme indstillingen. Intet blev ændret.",
+      "errorSidecar": "Tor-routing er slået til, men Tor-klienten kunne ikke starte. Synkronisering er sat på pause, indtil den kan — intet sendes direkte.",
+      "postureActive": "Synkronisering går gennem Tor",
+      "postureConnecting": "Forbinder til Tor — synkronisering er sat på pause",
+      "postureConnectingDetail": "Det tager som regel et par sekunder. Imens sendes intet direkte.",
+      "postureExempt": "Synkronisering bruger ikke Tor — denne adresse peger på denne enhed",
+      "postureExemptDetail": "Den synkroniseringsserveradresse, du har angivet, navngiver denne computer, så Mynes forbindelse til den går ikke gennem et Tor-kredsløb. Hvis den adresse sender videre til en server et andet sted, kan Myne ikke se det og kan ikke route det. Synkronisering er ikke sat på pause.",
+      "postureHeading": "Lige nu",
+      "postureInactive": "Synkronisering går direkte til synkroniseringsserveren",
+      "postureUnavailable": "Tor er ikke tilgængelig — synkronisering er sat på pause",
+      "postureUnavailableDetail": "Intet sendes direkte. Slå indstillingen fra og til igen for at prøve at starte Tor-klienten, eller slå den fra for at synkronisere uden Tor.",
+      "residualExit": "Det sidste relæ i et Tor-kredsløb — exit-noden — kan se, hvilken synkroniseringsserver du forbinder til. Den kan ikke læse det, du synkroniserer; det forbliver krypteret fra ende til anden.",
+      "residualMetadata": "Synkroniseringsserveren kan stadig se, hvornår du synkroniserer, hvor mange blobs du sender op, hvor store de er, og hvor mange enheder du har. Det ændrer Tor ikke.",
+      "residualPayment": "Betaler du for hosted synkronisering, kan betalingen og din konto stadig kobles til dig. Tor ændrer, hvor forbindelsen kommer fra, ikke betalingssporet.",
+      "residualScope": "Kun Mynes egen synkroniseringstrafik går gennem Tor. Intet andet på denne enhed gør.",
+      "residualsToggle": "Hvad dette ikke skjuler",
+      "torHelper": "Skjuler din IP-adresse og din placering for synkroniseringsserveren, og skjuler for dit netværk og din internetudbyder, hvilken server du synkroniserer med — de kan stadig se, at denne enhed forbinder til Tor. Det gør dig ikke anonym over for Myne, og det skjuler ikke for serveren, hvad du synkroniserer, eller hvornår.",
+      "torLabel": "Send synkronisering gennem Tor"
+    },
     "prefs": {
       "saveError": "Kunne ikke gemme indstillingen — prøv igen"
+    },
+    "reminders": {
+      "aria": "Vis opgavepåmindelser på denne enhed",
+      "exactAllow": "Tillad",
+      "exactLabel": "Præcis timing",
+      "exactOn": "Til",
+      "horizon": "Påmindelser er registreret til og med {{date}}. Åbn Myne inden da for at holde dem i gang.",
+      "label": "Opgavepåmindelser",
+      "saveError": "Kunne ikke gemme indstillingen. Prøv igen.",
+      "showTextAria": "Vis opgavens tekst i notifikationen",
+      "showTextLabel": "Vis opgavens tekst"
     },
     "privacy": {
       "autoLockHelper": "Lås boksen efter så lang tids inaktivitet.",
@@ -2438,7 +2787,7 @@
     "shell": {
       "closeLabel": "Luk indstillinger",
       "groups": {
-        "developer": ""
+        "developer": "Developer"
       },
       "navLabel": "Indstillingspaneler",
       "panels": {
@@ -2448,7 +2797,9 @@
         "appearance": "Udseende",
         "editor": "Editor",
         "files": "Filer",
+        "transcription": "Transskription",
         "hotkeys": "Genveje",
+        "network": "Netværk",
         "privacy": "Privatliv",
         "storage": "Opbevaring",
         "sync": "Synkronisering"
@@ -2498,6 +2849,8 @@
       "lineSpacingHelper": "Lodret afstand mellem linjer.",
       "lineSpacingLabel": "Linjeafstand",
       "textSizeHelper": "Editor-tekstens basisstørrelse. Overskrifter skaleres med den.",
+      "previewLabel": "Forhåndsvisning",
+      "previewBody": "Quizdeltagerne spiste jordbær med fløde, mens cirkusklovnen Walther spillede på xylofon. Typografiindstillinger ændrer, hvordan hver note læses, så denne prøve opdateres, mens du vælger.",
       "textSizeLabel": "Tekststørrelse"
     },
     "viewMode": {
@@ -2541,6 +2894,19 @@
     "sectionOptions": "Valgmuligheder",
     "footerTagline": "myne · krypteret på denne enhed · open source",
     "editor": {
+      "sections": {
+        "text": "Tekst og visning",
+        "editing": "Redigering",
+        "writing": "Skrivning",
+        "features": "Funktioner"
+      },
+      "preview": {
+        "heading": "Den hurtige brune ræv",
+        "bullet1": "Quizdeltagerne spiste jordbær med fløde",
+        "bullet2": "Cirkusklovnen Walther spillede på xylofon",
+        "spellCaption": "Stavekontrol",
+        "spellSample": "fejlstaved"
+      },
       "defaultView": "Standardvisning",
       "typewriter": "Skrivemaskine-rulning",
       "typewriterSubtitle": "Hold markøren lodret centreret",
@@ -2556,6 +2922,7 @@
         "lastActiveNoteDesc": "Synkronisér, hvilken note du havde åben, så du kan tage den op igen på en anden enhed."
       },
       "keywords": {
+        "aiAutoTag": "automatiske tags tag foreslå forslag mærkater ai auto tag",
         "aiEnable": "lokal ai til fra aktiver deaktiver slå maskinlæring local ai",
         "aiExcluded": "ekskluderede mapper udelad ignorer ai privatliv undtagelser excluded",
         "aiModels": "modeller model gguf download tekst embedding llm hent models",
@@ -2566,6 +2933,9 @@
         "buildChannel": "build kanal version udgivelse stabil beta nightly",
         "changePassword": "skift adgangskode kodeord password passphrase ændre opdater nulstil",
         "changelog": "ændringslog changelog nyheder udgivelsesnoter nyt historik",
+        "cliAccess": "cli terminal adgang kommandolinje shell myne kommando konsol command line",
+        "cliExcludedFolders": "cli ekskluderede mapper terminal udelad skjul kommandolinje privat excluded",
+        "cliRateLimit": "cli hastighedsgrænse terminal fart begrænsning bulk tempo kommandoer i minuttet rate limit",
         "clipper": "browser clipper udvidelse web klip chrome firefox extension",
         "contentWidth": "indholdsbredde bredde kolonne læsning linjelængde content width",
         "customThemes": "brugerdefinerede temaer tema palet farver udseende importer theme",
@@ -2574,6 +2944,7 @@
         "export": "eksport eksporter markdown dekrypter almindelige filer dokumenter export",
         "focusMode": "fokustilstand fokus skrivemaskine dæmp inaktive linjer distraktionsfri focus",
         "font": "skrifttype font skrift sans serif mono typografi",
+        "graphSettings": "graf udseende fysik kræfter knuder links layout farvegrupper etiketter lærred graph",
         "hotkeys": "genveje tastatur tastaturgenveje genvejstaster hotkeys keybindings shortcuts",
         "import": "import importer noter obsidian notion evernote enex html csv migrering hent",
         "language": "sprog lokalitet grænseflade oversættelse ui language",
@@ -2583,7 +2954,9 @@
         "vimMode": "vim modal redigering normal insert visual tastatur tilstand",
         "lineSpacing": "linjeafstand afstand linjehøjde typografi læsbarhed line spacing",
         "newNoteLocation": "ny note placering mappe standard hvor oprettes noter",
+        "torRouting": "tor routing onion proxy netværk ip-adresse placering skjul synkronisering anonymitet",
         "quickUnlock": "hurtig oplåsning pin touch id biometrisk ansigt lås op",
+        "reminders": "påmindelser notifikation besked alarm opgave forfald påmind reminders",
         "realtimeSync": "realtid realtidssynkronisering synkronisering live forbindelse polling sync",
         "screenCapture": "skærmoptagelse skærmbillede beskyttelse optagelse bloker privatliv screenshot",
         "showEditTimes": "vis redigeringstidspunkter tidsstempler ændret datoer noter timestamps",
@@ -2591,6 +2964,8 @@
         "spellLanguages": "stavekontrol sprog ordbøger ord sprogvalg spell languages",
         "startupOpen": "opstart åbn standard fil start hvilken note startup",
         "attachmentOcr": "ocr billede scanning scannet pdf foto skærmbillede tekstgenkendelse søg vedhæftede filer cpu batteri",
+        "attachmentCompression": "komprimer komprimering billede formindsk nedskaler størrelse webp jpeg import indsæt boks lagerplads compression",
+        "transcription": "transskriber transskription tale stemme lyd diktering undertekst whisper optagelse lyd til tekst",
         "syncAddDevice": "tilføj enhed parring par link telefon bærbar synkronisering sync",
         "syncConflicts": "konflikter flet løs versioner synkronisering sync",
         "syncDevices": "enheder tilknyttede parrede synkronisering maskiner devices",
@@ -2648,6 +3023,15 @@
       "label": "Bygger søgeindeks…"
     },
     "conflicts": {
+      "compare": "Sammenlign",
+      "compareClose": "Tilbage til konflikter",
+      "compareError": "Kunne ikke læse disse noter for at sammenligne dem. Prøv igen.",
+      "compareIdentical": "Disse to versioner er ens.",
+      "compareLoading": "Læser begge versioner…",
+      "compareMine": "På denne enhed",
+      "compareOrphan": "Den note, denne kopi kom fra, er her ikke længere, så der er intet at sammenligne den med.",
+      "compareTheirs": "Modstridende kopi",
+      "compareTitle": "Sammenligner “{{title}}”",
       "discard": "Kassér",
       "empty": "Ingen konflikter — dine enheder er synkroniserede.",
       "groupTitle_one": "{{count}} modstridende kopi af {{original}}",
@@ -2709,11 +3093,15 @@
     },
     "endpoint": {
       "connect": "Forbind",
+      "connected": "Forbundet",
       "connectedLocal": "Forbundet (lokalt, uden TLS).",
       "connectedTls": "Forbundet. Tjek, at dette fingeraftryk stemmer overens på din anden enhed.",
       "connectedPlatformTrust": "Forbundet via TLS. Din browser har verificeret denne servers certifikat.",
       "connecting": "Forbinder…",
       "fingerprintLabel": "Fingeraftryk for servercertifikat:",
+      "confirmFingerprintRequired": "Tor-routing er slået til, så denne enhed stoler ikke på et certifikat, den ikke på forhånd har fået besked om. Hent din servers SHA-256-certifikatfingeraftryk fra serveren selv eller fra en enhed, der allerede er forbundet, og indsæt det her.",
+      "confirmFingerprintMismatch": "Det certifikat, denne server viste, er ikke det, du indtastede. Intet blev gemt. Tjek det fingeraftryk, du indsatte — og hvis det er rigtigt, så lad være med at forbinde: der er noget mellem denne enhed og din server.",
+      "confirmFingerprintDeclined": "Intet blev gemt — denne enhed er ikke forbundet til den server. Kom tilbage, når du har dens certifikatfingeraftryk.",
       "pinStatic": "Verificeret mod Mynes indbyggede certifikat.",
       "pinTofu": "Fastgjort ved første forbindelse. Sammenlign dette fingeraftryk på tværs af dine enheder.",
       "fixedOrigin": "Denne klient synkroniserer med én server, som blev fastsat, da den blev udrullet. Den kan ikke ændres herfra — siden må kun tale med netop denne adresse.",
@@ -2744,6 +3132,22 @@
       "submit": "Tilføj denne enhed",
       "wordAria": "Ord {{number}}"
     },
+    "fingerprint": {
+      "title": "Tjek denne servers certifikat, før du stoler på det",
+      "why": "Tor-routing er slået til, så denne første forbindelse når serveren gennem et relæ, som en fremmed driver. Indtil et certifikat er fastgjort, ville denne enhed tage imod hvilket som helst certifikat, den fik — også et, det relæ selv havde fundet på. Indtast det fingeraftryk, din server offentliggør, så sammenligner Myne det, før noget fastgøres. Stemmer det ikke, gemmes intet.",
+      "label": "Forventet certifikatfingeraftryk",
+      "placeholder": "SHA-256-fingeraftryk fra din server",
+      "echoLabel": "Det, du har indtastet",
+      "echoComplete": "64 ud af 64 tegn. Læs det op mod din egen kopi, før du fortsætter.",
+      "echoProgress": "{{count}} ud af {{total}} tegn indtil videre.",
+      "echoInvalid": "Et SHA-256-fingeraftryk er 64 tegn, hvert af dem 0–9 eller a–f. Koloner, mellemrum og et indledende “sha256:” er i orden — alt andet hører ikke med.",
+      "helpToggle": "Hvor finder jeg dette fingeraftryk?",
+      "helpNotOverTor": "Ikke gennem denne forbindelse. Et fingeraftryk, du henter over det samme kredsløb, beviser intet — det, der kunne bytte certifikatet, kunne også bytte den side.",
+      "helpFromServer": "På maskinen, der kører din server: openssl x509 -noout -fingerprint -sha256 -in <din certifikatfil>",
+      "helpFromDevice": "På en enhed, der allerede er forbundet til denne konto: Indstillinger → Synkronisering viser det samme fingeraftryk.",
+      "helpNoFingerprint": "Kan du ikke få fat i det på nogen af de måder, kan denne server ikke tilføjes, mens Tor-routing er slået til. Du kan slå Tor-routing fra under Indstillinger → Netværk og forbinde direkte — det viser din IP-adresse til serveren og til enhver, der kan overvåge dit netværk.",
+      "decline": "Jeg har det ikke — annullér"
+    },
     "join": {
       "accountLabel": "Kontonummer",
       "cancel": "Annullér",
@@ -2752,6 +3156,8 @@
       "help": "Log ind med dit kontonummer og din adgangskode. Denne enhed synkroniserer dine noter, så snart en eksisterende enhed godkender den. Ingen gendannelsessætning nødvendig.",
       "passwordLabel": "Adgangskode",
       "pinnedCompare": "Denne enhed fastgjorde din servers certifikat. Kontrollér, at dette fingeraftryk stemmer på dine andre enheder.",
+      "confirmFingerprintRequired": "Tor-routing er slået til, så denne enhed stoler ikke på et certifikat, den ikke på forhånd har fået besked om. Hent din servers SHA-256-certifikatfingeraftryk fra serveren selv eller fra en enhed, der allerede er forbundet, og indsæt det her.",
+      "confirmFingerprintMismatch": "Det certifikat, denne server viste, er ikke det, du indtastede. Denne enhed blev ikke tilføjet, og intet blev gemt. Tjek det fingeraftryk, du indsatte — og hvis det er rigtigt, så fortsæt ikke: der er noget mellem denne enhed og din server.",
       "pinnedTitle": "Servercertifikat fastgjort",
       "serverLabel": "Synkroniseringsserver",
       "serverPlaceholder": "https://your-server.example",
@@ -2786,6 +3192,7 @@
         "deleteConfirmTitle": "Slet denne gendannede note?",
         "deleteConfirmWarning": "Dette sletter permanent den eneste kopi, der er gemt på denne enhed. Dette kan ikke fortrydes.",
         "deleteCta": "Slet",
+        "empty": "Ingen gendannede noter.",
         "errorGeneric": "Noget gik galt. Prøv igen.",
         "helper": "Når en note, der er slettet på en anden enhed, fjernes her, beholdes dens krypterede kopi på denne enhed. Gendan en som en ny note, eller slet den permanent.",
         "label": "Gendannede noter",
@@ -2873,7 +3280,66 @@
       "conflictsNeedReview_other": "{{count}} konflikter kræver gennemgang",
       "catchingUp": "Indhenter synkronisering — dine noter er i sikkerhed.",
       "verifyDevices": "Verificér enheder"
+    },
+    "tor": {
+      "connecting": "Forbinder til Tor. Synkronisering er sat på pause, indtil forbindelsen er klar — intet sendes direkte.",
+      "settingsHint": "Indstillinger → Netværk",
+      "unavailable": "Tor er ikke tilgængelig, så synkronisering er sat på pause. Intet sendes direkte. Slå Tor-routing fra for at synkronisere uden."
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "Alle",
+      "due": "Forfald",
+      "folder": "Mappe",
+      "insert": "Indsæt",
+      "noDueDate": "Ingen forfaldsdato",
+      "priority": "Prioritet",
+      "sort": "Sortér efter",
+      "sortDue": "Forfaldsdato",
+      "sortPath": "Note",
+      "sortPriority": "Prioritet",
+      "status": "Status",
+      "statusDone": "Fuldført",
+      "statusTodo": "Ikke udført",
+      "tag": "Tag"
+    },
+    "empty": {
+      "filter": "Der er intet her lige nu. Prøv et andet filter.",
+      "rebuilding": "Læser dine noter…",
+      "scope": "Ingen opgaver i denne mappe eller under dette tag. Prøv at udvide omfanget.",
+      "vault": "Ingen opgaver endnu. Skriv “- [ ]” på en linje i en note for at lave en."
+    },
+    "filter": {
+      "all": "Alle",
+      "overdue": "Overskredet",
+      "today": "I dag",
+      "upcoming": "Kommende"
+    },
+    "noteTitle": "Opgaver i denne note",
+    "query": {
+      "dropped_one": "{{count}} udtryk, Myne ikke kunne læse",
+      "dropped_other": "{{count}} udtryk, Myne ikke kunne læse",
+      "empty": "Ingen opgaver matcher denne forespørgsel.",
+      "loading": "Læser dine noter…",
+      "refused": "Myne kunne ikke læse noget af denne forespørgsel, så den viser intet i stedet for alt.",
+      "remainder_one": "{{count}} opgave mere matchede",
+      "remainder_other": "{{count}} opgaver mere matchede"
+    },
+    "reminder": {
+      "due": "En opgavepåmindelse er forfalden."
+    },
+    "row": {
+      "completed": "Opgave, fuldført",
+      "notCompleted": "Opgave, ikke fuldført",
+      "tooLongToWrite": "Denne opgaves linje er for lang til at redigere herfra. Åbn dens note i stedet.",
+      "untitled": "Opgave uden titel"
+    },
+    "scope": {
+      "allFolders": "Alle mapper",
+      "label": "Afgræns efter"
+    },
+    "title": "Opgaver"
   },
   "templates": {
     "manager": {
@@ -2953,6 +3419,8 @@
     "recoveryLink": "Glemt din adgangskode? Lås op med gendannelsessætning",
     "submit": "Lås op",
     "subtitle": "Indtast din adgangskode for at fortsætte.",
+    "subtitlePin": "Indtast din PIN-kode for at fortsætte.",
+    "subtitleBiometric": "Bekræft med Touch ID for at fortsætte.",
     "suspicion": {
       "lockedDuringChange": "Ændring af adgangskode annulleret: boksen blev låst.",
       "metaChangedExternally": "Boksen blev ændret i en anden session — lås op igen."
@@ -3166,6 +3634,7 @@
   "vaultPicker": {
     "createAnother": "Opret en anden boks",
     "heading": "Vælg en boks",
+    "joinDevice": "Tilføj denne enhed til en konto",
     "loading": "Indlæser dine bokse…",
     "noneLoaded": "Ingen bokse kunne indlæses lige nu.",
     "openedRelative": "åbnet {{rel}}",
@@ -3222,6 +3691,7 @@
   "vaultSwitcher": {
     "chipFallback": "Boks",
     "createAnother": "Opret en anden boks",
+    "joinDevice": "Tilføj denne enhed til en konto",
     "switching": "skifter…",
     "switchVaultLabel": "Skift boks",
     "vaultFallback": "Boks {{n}}"
@@ -3230,6 +3700,7 @@
     "createCta": "Opret ny boks",
     "headlineLine1": "Krypterede markdown-noter.",
     "headlineLine2": "Ingen e-mail ved tilmelding.",
+    "joinCta": "Tilføj denne enhed til en konto",
     "repairResidue": {
       "cancel": "Annullér",
       "cleaningUp": "Rydder op…",

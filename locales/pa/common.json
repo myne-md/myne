@@ -1,1 +1,3888 @@
-{}
+{
+  "accountBootstrap": {
+    "accountMismatch": "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਹੋਰ ਖਾਤੇ ਦਾ ਵਾਲਟ ਮੌਜੂਦ ਹੈ। ਉਹੀ ਖੋਲ੍ਹੋ, ਜਾਂ ਪਹਿਲਾਂ ਸਾਈਨ ਆਊਟ ਕਰਕੇ ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਕਾਪੀ ਮਿਟਾਓ।",
+    "changeAccount": "ਕੋਈ ਹੋਰ ਖਾਤਾ ਨੰਬਰ ਵਰਤੋ",
+    "continue": "ਜਾਰੀ ਰੱਖੋ",
+    "failed": "ਉਹ ਖਾਤਾ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ। ਖਾਤਾ ਨੰਬਰ ਅਤੇ ਪਾਸਵਰਡ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "hint": "ਇਸ ਖਾਤੇ ਦਾ ਮਾਸਟਰ ਪਾਸਵਰਡ ਦਾਖਲ ਕਰੋ। Myne ਤੁਹਾਡਾ ਵਾਲਟ ਲਿਆਵੇਗਾ ਅਤੇ ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਨੂੰ ਉਸ ਉੱਤੇ ਇੱਕ ਡਿਵਾਈਸ ਵਜੋਂ ਸੈੱਟ ਕਰੇਗਾ।",
+    "noEndpoint": "Myne ਦੀ ਇਸ ਕਾਪੀ ਵਿੱਚ ਕੋਈ ਸਿੰਕ ਸਰਵਰ ਸੰਰਚਿਤ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਇਹ ਤੁਹਾਡੇ ਵਾਲਟ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਦੀ। ਜੋ ਇਸਨੂੰ ਚਲਾਉਂਦਾ ਹੈ, ਉਸ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।",
+    "passwordLabel": "ਮਾਸਟਰ ਪਾਸਵਰਡ",
+    "approversIntro": "ਇਹ ਡਿਵਾਈਸ ਇਸਨੂੰ ਮਨਜ਼ੂਰੀ ਦੇ ਸਕਦੇ ਹਨ:",
+    "noApprovers": "ਇਸ ਖਾਤੇ ਦਾ ਕੋਈ ਹੋਰ ਡਿਵਾਈਸ ਇਸ ਵੇਲੇ ਇਸਨੂੰ ਮਨਜ਼ੂਰੀ ਨਹੀਂ ਦੇ ਸਕਦਾ। ਜਿਸ ਡਿਵਾਈਸ ਕੋਲ ਪਹਿਲਾਂ ਹੀ ਪਹੁੰਚ ਹੈ, ਉਸ ਉੱਤੇ Myne ਖੋਲ੍ਹੋ, ਫਿਰ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+    "pendingTitle": "ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ",
+    "sasMatch": "ਇਹ ਮਿਲਦੇ ਹਨ — ਜਾਰੀ ਰੱਖੋ",
+    "sasMismatch": "ਇਹ ਨਹੀਂ ਮਿਲਦੇ",
+    "verifyBody": "ਜਾਰੀ ਰੱਖਣ ਤੋਂ ਪਹਿਲਾਂ ਜਾਂਚੋ ਕਿ ਇਹ ਕੋਡ ਦੋਹਾਂ ਡਿਵਾਈਸਾਂ ਉੱਤੇ ਇੱਕੋ ਜਿਹਾ ਹੈ। ਜੇ ਨਹੀਂ ਹੈ, ਤਾਂ ਰੁਕ ਜਾਓ — ਗੜਬੜ ਕਨੈਕਸ਼ਨ ਵਿੱਚ ਹੈ, ਤੁਹਾਡੇ ਪਾਸਵਰਡ ਵਿੱਚ ਨਹੀਂ।",
+    "verifyTitle": "ਇਸ ਕੋਡ ਦੀ ਤੁਲਨਾ ਕਰੋ",
+    "title": "ਆਪਣੇ ਵਾਲਟ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ",
+    "working": "ਸੈੱਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…"
+  },
+  "accountEntry": {
+    "checkFailed": "ਉਹ ਖਾਤਾ ਨੰਬਰ ਜਾਂਚਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "checking": "ਜਾਂਚ ਹੋ ਰਹੀ ਹੈ…",
+    "continue": "ਜਾਰੀ ਰੱਖੋ",
+    "hint": "ਇਹ MY-XXXX-XXXX-XXXX-XXXX-XXXX ਵਰਗਾ ਦਿਸਦਾ ਹੈ। ਇਸਦੀ ਜਾਂਚ ਇੱਥੇ ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਉੱਤੇ ਹੁੰਦੀ ਹੈ — ਹਾਲੇ ਕੁਝ ਵੀ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ।",
+    "invalid": "ਉਹ ਖਾਤਾ ਨੰਬਰ ਸਹੀ ਨਹੀਂ ਹੈ। ਇਸਨੂੰ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "title": "ਆਪਣਾ ਖਾਤਾ ਨੰਬਰ ਦਾਖਲ ਕਰੋ"
+  },
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "cleaning": "ਸਫ਼ਾਈ ਹੋ ਰਹੀ ਹੈ…",
+      "close": "ਬੰਦ ਕਰੋ",
+      "completeTitle": "ਸਫ਼ਾਈ ਪੂਰੀ ਹੋਈ",
+      "deleteCta": "{{count}} ਅਣਵਰਤੀਆਂ ਫ਼ਾਈਲਾਂ ਮਿਟਾਓ",
+      "deleteCta_one": "{{count}} ਅਣਵਰਤੀ ਫ਼ਾਈਲ ਮਿਟਾਓ",
+      "deleteCta_other": "{{count}} ਅਣਵਰਤੀਆਂ ਫ਼ਾਈਲਾਂ ਮਿਟਾਓ",
+      "corpusIncomplete": "ਪਹਿਲਾਂ ਸਿੰਕ ਪੂਰਾ ਕਰੋ — ਇਸ ਡਿਵਾਈਸ ਕੋਲ ਹਾਲੇ ਤੁਹਾਡੇ ਸਾਰੇ ਨੋਟ ਨਹੀਂ ਹਨ। ਕੁਝ ਵੀ ਨਹੀਂ ਮਿਟਾਇਆ ਗਿਆ।",
+      "error": "ਸਫ਼ਾਈ ਨਹੀਂ ਹੋ ਸਕੀ। ਕੁਝ ਨੋਟ ਸ਼ਾਇਦ ਪੜ੍ਹੇ ਨਹੀਂ ਜਾ ਸਕਦੇ — ਕੁਝ ਵੀ ਨਹੀਂ ਮਿਟਾਇਆ ਗਿਆ।",
+      "intro_one": "ਇਹ ਅਟੈਚਮੈਂਟ ਕਿਸੇ ਵੀ ਨੋਟ ਵਿੱਚ ਨਹੀਂ ਵਰਤੀ ਜਾਂਦੀ। ਇਸਨੂੰ ਮਿਟਾਉਣਾ ਪੱਕਾ ਹੈ ਅਤੇ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।",
+      "intro_other": "ਇਹ {{count}} ਅਟੈਚਮੈਂਟਾਂ ਕਿਸੇ ਵੀ ਨੋਟ ਵਿੱਚ ਨਹੀਂ ਵਰਤੀਆਂ ਜਾਂਦੀਆਂ। ਇਹਨਾਂ ਨੂੰ ਮਿਟਾਉਣਾ ਪੱਕਾ ਹੈ ਅਤੇ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।",
+      "summaryFreed": " · {{size}} ਥਾਂ ਖਾਲੀ ਹੋਈ",
+      "summaryPeriod": "।",
+      "summaryRemoved_one": "{{count}} ਅਟੈਚਮੈਂਟ ਹਟਾਈ",
+      "summaryRemoved_other": "{{count}} ਅਟੈਚਮੈਂਟਾਂ ਹਟਾਈਆਂ",
+      "summarySkipped": " · {{count}} ਛੱਡੀਆਂ ਗਈਆਂ (ਹੁਣ ਵਰਤੋਂ ਵਿੱਚ)",
+      "summarySkipped_one": " · {{count}} ਛੱਡੀ ਗਈ (ਹੁਣ ਵਰਤੋਂ ਵਿੱਚ)",
+      "summarySkipped_other": " · {{count}} ਛੱਡੀਆਂ ਗਈਆਂ (ਹੁਣ ਵਰਤੋਂ ਵਿੱਚ)",
+      "title": "ਅਣਵਰਤੀਆਂ ਅਟੈਚਮੈਂਟਾਂ ਸਾਫ਼ ਕਰੋ",
+      "willBeReclaimed": "{{size}} ਥਾਂ ਵਾਪਸ ਮਿਲੇਗੀ।"
+    },
+    "coverPicker": {
+      "close": "ਬੰਦ ਕਰੋ",
+      "dropHint": "ਕਵਰ ਵਜੋਂ ਵਰਤਣ ਲਈ ਕੋਈ ਤਸਵੀਰ ਇੱਥੇ ਛੱਡੋ।",
+      "empty": "ਇਸ ਵਾਲਟ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਤਸਵੀਰ ਨਹੀਂ ਹੈ। ਕੋਈ ਅੱਪਲੋਡ ਕਰੋ ਜਾਂ ਕੋਈ ਤਸਵੀਰ ਇੱਥੇ ਖਿੱਚ ਕੇ ਲਿਆਓ।",
+      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+      "removeCover": "ਕਵਰ ਹਟਾਓ",
+      "title": "ਕਵਰ ਤਸਵੀਰ ਚੁਣੋ",
+      "upload": "ਅੱਪਲੋਡ ਕਰੋ"
+    },
+    "deleteDialog": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "confirmPrompt": "ਇਸ ਅਟੈਚਮੈਂਟ ਨੂੰ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾਉਣਾ ਹੈ? ਇਹ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।",
+      "delete": "ਮਿਟਾਓ",
+      "deleting": "ਮਿਟਾਈ ਜਾ ਰਹੀ ਹੈ…",
+      "error": "ਅਟੈਚਮੈਂਟ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "notUsed": "ਕਿਸੇ ਵੀ ਨੋਟ ਵਿੱਚ ਨਹੀਂ ਵਰਤੀ ਜਾਂਦੀ।",
+      "stillUsed_one": "ਇਹ ਹਾਲੇ ਵੀ {{count}} ਨੋਟ ਵਿੱਚ ਵਰਤੀ ਜਾ ਰਹੀ ਹੈ। ਇਸਨੂੰ ਮਿਟਾਉਣ ਨਾਲ, ਜਿੱਥੇ ਇਹ ਜੋੜੀ ਗਈ ਸੀ ਉੱਥੇ ਸਿਰਫ਼ ਇੱਕ ਨਿਸ਼ਾਨ ਰਹਿ ਜਾਵੇਗਾ:",
+      "stillUsed_other": "ਇਹ ਹਾਲੇ ਵੀ {{count}} ਨੋਟਾਂ ਵਿੱਚ ਵਰਤੀ ਜਾ ਰਹੀ ਹੈ। ਇਸਨੂੰ ਮਿਟਾਉਣ ਨਾਲ, ਜਿੱਥੇ ਇਹ ਜੋੜੀ ਗਈ ਸੀ ਉੱਥੇ ਸਿਰਫ਼ ਇੱਕ ਨਿਸ਼ਾਨ ਰਹਿ ਜਾਵੇਗਾ:",
+      "title": "ਅਟੈਚਮੈਂਟ ਮਿਟਾਓ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "library": {
+      "actionsAriaLabel": "ਅਟੈਚਮੈਂਟ ਕਾਰਵਾਈਆਂ",
+      "actionsTitle": "ਕਾਰਵਾਈਆਂ",
+      "checkUnusedFailedNotice": "ਅਣਵਰਤੀਆਂ ਅਟੈਚਮੈਂਟਾਂ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "corpusIncompleteNotice": "ਪਹਿਲਾਂ ਸਿੰਕ ਪੂਰਾ ਕਰੋ — ਇਸ ਡਿਵਾਈਸ ਕੋਲ ਹਾਲੇ ਤੁਹਾਡੇ ਸਾਰੇ ਨੋਟ ਨਹੀਂ ਹਨ, ਇਸ ਲਈ ਇਹ ਨਹੀਂ ਦੱਸ ਸਕਦਾ ਕਿ ਕਿਹੜੀਆਂ ਅਟੈਚਮੈਂਟਾਂ ਅਣਵਰਤੀਆਂ ਹਨ।",
+      "checking": "ਜਾਂਚ ਹੋ ਰਹੀ ਹੈ…",
+      "cleanUnused": "ਅਣਵਰਤੀਆਂ ਸਾਫ਼ ਕਰੋ",
+      "cleanUnusedTitle": "ਕਿਸੇ ਵੀ ਨੋਟ ਵਿੱਚ ਨਾ ਵਰਤੀਆਂ ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਓ",
+      "colCreated": "ਬਣਾਈ ਗਈ",
+      "colName": "ਨਾਂ",
+      "colSize": "ਆਕਾਰ",
+      "colType": "ਕਿਸਮ",
+      "colUsedIn": "ਵਰਤੋਂ ਵਿੱਚ",
+      "decrypting": "ਅਟੈਚਮੈਂਟਾਂ ਡੀਕ੍ਰਿਪਟ ਹੋ ਰਹੀਆਂ ਹਨ…",
+      "clearSearchAriaLabel": "ਖੋਜ ਸਾਫ਼ ਕਰੋ",
+      "emptyClearSearch": "ਖੋਜ ਸਾਫ਼ ਕਰੋ",
+      "emptyImportHint": "ਕੋਈ ਫ਼ਾਈਲ ਆਪਣੇ ਵਾਲਟ ਵਿੱਚ ਰੱਖਣ ਲਈ ਇੰਪੋਰਟ ਕਰੋ।",
+      "emptyLoadError": "ਅਟੈਚਮੈਂਟ ਕੈਟਾਲਾਗ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "emptyNoAttachments": "ਹਾਲੇ ਕੋਈ ਅਟੈਚਮੈਂਟ ਨਹੀਂ ਹੈ।",
+      "emptyNoResultsTitle": "ਤੁਹਾਡੀ ਖੋਜ ਨਾਲ ਕੋਈ ਅਟੈਚਮੈਂਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ।",
+      "filterAriaLabel": "ਕਿਸਮ ਅਨੁਸਾਰ ਫਿਲਟਰ ਕਰੋ",
+      "gridView": "ਗਰਿੱਡ ਦ੍ਰਿਸ਼",
+      "import": "ਇੰਪੋਰਟ",
+      "importDialogTitle": "ਅਟੈਚਮੈਂਟ ਇੰਪੋਰਟ ਕਰੋ",
+      "importFile": "ਫ਼ਾਈਲ ਇੰਪੋਰਟ ਕਰੋ",
+      "importing": "ਇੰਪੋਰਟ ਹੋ ਰਹੀ ਹੈ…",
+      "listView": "ਸੂਚੀ ਦ੍ਰਿਸ਼",
+      "menuDelete": "ਮਿਟਾਓ",
+      "menuExport": "ਐਕਸਪੋਰਟ",
+      "menuPreview": "ਝਲਕ",
+      "menuRename": "ਨਾਂ ਬਦਲੋ",
+      "menuTranscribe": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਕਰੋ",
+      "menuViewTranscription": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਵੇਖੋ",
+      "noMatch": "ਤੁਹਾਡੀ ਖੋਜ ਨਾਲ ਕੋਈ ਅਟੈਚਮੈਂਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ।",
+      "noUnusedNotice": "ਸਾਫ਼ ਕਰਨ ਲਈ ਕੋਈ ਅਣਵਰਤੀ ਅਟੈਚਮੈਂਟ ਨਹੀਂ ਹੈ।",
+      "preview": "ਝਲਕ",
+      "previewAttachment": "ਅਟੈਚਮੈਂਟ ਦੀ ਝਲਕ",
+      "searchAriaLabel": "ਫ਼ਾਈਲ-ਨਾਂ ਨਾਲ ਅਟੈਚਮੈਂਟਾਂ ਖੋਜੋ",
+      "searchPlaceholder": "ਫ਼ਾਈਲ-ਨਾਂ ਨਾਲ ਖੋਜੋ",
+      "sort": {
+        "createdAsc": "ਪੁਰਾਣੀਆਂ ਪਹਿਲਾਂ",
+        "createdDesc": "ਨਵੀਆਂ ਪਹਿਲਾਂ",
+        "nameAsc": "ਨਾਂ A–Z",
+        "nameDesc": "ਨਾਂ Z–A"
+      },
+      "sortAriaLabel": "ਅਟੈਚਮੈਂਟਾਂ ਲੜੀਬੱਧ ਕਰੋ",
+      "supportedFilesFilter": "ਸਮਰਥਿਤ ਫ਼ਾਈਲਾਂ",
+      "title": "ਅਟੈਚਮੈਂਟਾਂ",
+      "transcribeDone": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਪੂਰੀ ਹੋਈ।",
+      "transcribeFailed": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਅਸਫਲ ਰਹੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "transcribeFeatureOff": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਬੰਦ ਹੈ। ਇਸਨੂੰ ਸੈਟਿੰਗਾਂ → ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਵਿੱਚ ਚਾਲੂ ਕਰੋ।",
+      "transcribeModelLoadFailed": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। Myne ਦੁਬਾਰਾ ਇੰਸਟਾਲ ਕਰੋ, ਜਾਂ ਸੈਟਿੰਗਾਂ → ਡਿਵੈਲਪਰ → AI ਵਿੱਚ ਆਪਣਾ ਕਸਟਮ ਮਾਡਲ ਜਾਂਚੋ।",
+      "transcribeNoModelHint": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਮਾਡਲ ਮੌਜੂਦ ਨਹੀਂ ਹੈ। Myne ਦੁਬਾਰਾ ਇੰਸਟਾਲ ਕਰਨ ਨਾਲ ਇਹ ਵਾਪਸ ਆ ਜਾਂਦਾ ਹੈ।",
+      "transcribeStarted": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਹੋ ਰਿਹਾ ਹੈ…",
+      "transcribeVaultLocked": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਕਰਨ ਲਈ ਆਪਣਾ ਵਾਲਟ ਅਨਲਾਕ ਕਰੋ।",
+      "transcriptionModalClose": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਬੰਦ ਕਰੋ",
+      "transcriptionModalTitle": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ",
+      "typeFilter": {
+        "all": "ਸਾਰੀਆਂ ਕਿਸਮਾਂ",
+        "audio": "ਆਡੀਓ",
+        "image": "ਤਸਵੀਰਾਂ",
+        "other": "ਹੋਰ",
+        "pdf": "PDF"
+      },
+      "usedInCount_one": "{{count}} ਨੋਟ ਵਿੱਚ ਵਰਤੀ ਗਈ",
+      "usedInCount_other": "{{count}} ਨੋਟਾਂ ਵਿੱਚ ਵਰਤੀ ਗਈ",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "ਆਡੀਓ: {{filename}}",
+      "file": "ਫ਼ਾਈਲ",
+      "pause": "ਰੋਕੋ",
+      "pdfDocument": "PDF ਦਸਤਾਵੇਜ਼",
+      "pdfFirstPage": "PDF ਦਾ ਪਹਿਲਾ ਪੰਨਾ",
+      "play": "ਚਲਾਓ"
+    },
+    "usedInNotesPopover": {
+      "empty": "ਕਿਸੇ ਵੀ ਨੋਟ ਵਿੱਚ ਨਹੀਂ ਵਰਤੀ ਜਾਂਦੀ।",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "needsApp": "ਅਟੈਚਮੈਂਟ ਸਫ਼ਾਈ ਲਈ ਐਪ ਦੀ ਲੋੜ ਹੈ।",
+    "noUnused": "ਕੋਈ ਅਣਵਰਤੀ ਅਟੈਚਮੈਂਟ ਨਹੀਂ — ਹਰ ਫ਼ਾਈਲ ਕਿਤੇ ਨਾ ਕਿਤੇ ਵਰਤੀ ਜਾ ਰਹੀ ਹੈ।",
+    "scanError": "ਅਣਵਰਤੀਆਂ ਅਟੈਚਮੈਂਟਾਂ ਲਈ ਸਕੈਨ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "erasedToast_one": "{{count}} ਅਣਵਰਤੀ ਫ਼ਾਈਲ ਮਿਟਾਈ ਗਈ।",
+    "erasedToast_other": "{{count}} ਅਣਵਰਤੀਆਂ ਫ਼ਾਈਲਾਂ ਮਿਟਾਈਆਂ ਗਈਆਂ।",
+    "eraseError": "ਅਣਵਰਤੀਆਂ ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਈਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ।",
+    "readError": "ਅਟੈਚਮੈਂਟਾਂ ਪੜ੍ਹੀਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ।",
+    "needAppPreview": "ਅਟੈਚਮੈਂਟਾਂ ਲਈ ਐਪ ਦੀ ਲੋੜ ਹੈ (ਬ੍ਰਾਊਜ਼ਰ ਝਲਕ ਦੀ ਨਹੀਂ)।",
+    "tooLarge": "ਉਹ ਫ਼ਾਈਲ ਬਹੁਤ ਵੱਡੀ ਹੈ (ਵੱਧ ਤੋਂ ਵੱਧ 64 MB)।",
+    "unsupported": "ਸਿਰਫ਼ ਤਸਵੀਰਾਂ ਅਤੇ PDF ਹੀ ਨੱਥੀ ਕੀਤੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
+    "addError": "ਉਹ ਫ਼ਾਈਲ ਸ਼ਾਮਲ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
+    "deleteError": "ਉਹ ਅਟੈਚਮੈਂਟ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ।",
+    "renameError": "ਉਸ ਅਟੈਚਮੈਂਟ ਦਾ ਨਾਂ ਨਹੀਂ ਬਦਲਿਆ ਜਾ ਸਕਿਆ।",
+    "unusedSummary_one": "{{count}} ਅਟੈਚਮੈਂਟ ਦਾ ਕਿਸੇ ਵੀ ਨੋਟ ਵਿੱਚ ਹਵਾਲਾ ਨਹੀਂ ਹੈ ({{size}})। ਮਿਟਾਉਣਾ ਪੱਕਾ ਕ੍ਰਿਪਟੋਗ੍ਰਾਫ਼ਿਕ ਹਟਾਉਣਾ ਹੈ — ਕੋਈ ਰੱਦੀ ਨਹੀਂ ਹੁੰਦੀ।",
+    "unusedSummary_other": "{{count}} ਅਟੈਚਮੈਂਟਾਂ ਦਾ ਕਿਸੇ ਵੀ ਨੋਟ ਵਿੱਚ ਹਵਾਲਾ ਨਹੀਂ ਹੈ ({{size}})। ਮਿਟਾਉਣਾ ਪੱਕਾ ਕ੍ਰਿਪਟੋਗ੍ਰਾਫ਼ਿਕ ਹਟਾਉਣਾ ਹੈ — ਕੋਈ ਰੱਦੀ ਨਹੀਂ ਹੁੰਦੀ।",
+    "eraseCta_one": "{{count}} ਅਣਵਰਤੀ ਫ਼ਾਈਲ ਮਿਟਾਓ",
+    "eraseCta_other": "{{count}} ਅਣਵਰਤੀਆਂ ਫ਼ਾਈਲਾਂ ਮਿਟਾਓ",
+    "emptyState": "ਹਾਲੇ ਕੋਈ ਅਟੈਚਮੈਂਟ ਨਹੀਂ ਹੈ। ਤਸਵੀਰ ਜਾਂ PDF ਜੋੜਨ ਲਈ ਅੱਪਲੋਡ ਦਬਾਓ।",
+    "insert": "ਸ਼ਾਮਲ ਕਰੋ",
+    "pauseLabel": "{{filename}} ਰੋਕੋ",
+    "playLabel": "{{filename}} ਚਲਾਓ"
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "ਵਾਲਟ ਦੀ ਕੋਈ ਹੋਰ ਕਾਰਵਾਈ ਚੱਲ ਰਹੀ ਹੈ। ਉਸਦੇ ਪੂਰਾ ਹੋਣ ਦੀ ਉਡੀਕ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "cancelled": "ਬੈਕਅੱਪ ਰੱਦ ਕੀਤਾ ਗਿਆ। ਪਿੱਛੇ ਕੋਈ ਫ਼ਾਈਲ ਨਹੀਂ ਛੱਡੀ ਗਈ।",
+        "invalidDestination": "ਉਹ ਮੰਜ਼ਿਲ ਫੋਲਡਰ ਵਰਤਣਯੋਗ ਨਹੀਂ ਹੈ।",
+        "ioGeneric": "ਬੈਕਅੱਪ ਫ਼ਾਈਲ ਲਿਖੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
+        "ioNoSpace": "ਮੰਜ਼ਿਲ ਉੱਤੇ ਲੋੜੀਂਦੀ ਥਾਂ ਨਹੀਂ ਹੈ।",
+        "ioPermissionDenied": "ਮੰਜ਼ਿਲ ਉੱਤੇ ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+        "joinFailure": "ਬੈਕਅੱਪ ਅਚਾਨਕ ਅਸਫਲ ਰਿਹਾ। ਪਿੱਛੇ ਕੋਈ ਫ਼ਾਈਲ ਨਹੀਂ ਛੱਡੀ ਗਈ।",
+        "memberTooLarge": "ਇਸ ਵਾਲਟ ਵਿਚਲੀ ਇੱਕ ਫ਼ਾਈਲ ਬੈਕਅੱਪ ਫਾਰਮੈਟ ਦੀ ਹੱਦ ਤੋਂ ਵੱਡੀ ਹੈ।",
+        "vaultNotFound": "ਬੈਕਅੱਪ ਲਈ ਕੋਈ ਵਾਲਟ ਨਹੀਂ ਮਿਲਿਆ।",
+        "verifyFailed": "ਲਿਖਿਆ ਗਿਆ ਬੈਕਅੱਪ ਤਸਦੀਕ ਨਹੀਂ ਹੋਇਆ, ਇਸ ਲਈ ਉਸਨੂੰ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ — ਜੇ ਇਹ ਫਿਰ ਹੋਵੇ ਤਾਂ ਕਿਸੇ ਹੋਰ ਮੀਡੀਆ ਉੱਤੇ।"
+      },
+      "restore": {
+        "authOperationInProgress": "ਵਾਲਟ ਦੀ ਕੋਈ ਹੋਰ ਕਾਰਵਾਈ ਚੱਲ ਰਹੀ ਹੈ। ਉਸਦੇ ਪੂਰਾ ਹੋਣ ਦੀ ਉਡੀਕ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "cancelled": "ਬਹਾਲੀ ਰੱਦ ਕੀਤੀ ਗਈ। ਕੁਝ ਵੀ ਨਹੀਂ ਬਦਲਿਆ ਗਿਆ।",
+        "damagedBackup": "ਬੈਕਅੱਪ ਫ਼ਾਈਲ ਖ਼ਰਾਬ ਹੈ।",
+        "futureVersionBackup": "ਇਹ ਬੈਕਅੱਪ Myne ਦੇ ਕਿਸੇ ਨਵੇਂ ਵਰਜ਼ਨ ਨਾਲ ਬਣਾਇਆ ਗਿਆ ਸੀ। Myne ਅੱਪਡੇਟ ਕਰੋ, ਫਿਰ ਇਸਨੂੰ ਬਹਾਲ ਕਰੋ।",
+        "invalidVaultMeta": "ਇਸ ਬੈਕਅੱਪ ਦਾ ਵਾਲਟ ਮੈਟਾਡਾਟਾ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ, ਇਸ ਲਈ ਇਸਨੂੰ ਬਹਾਲ ਕਰਨ ਨਾਲ ਚੱਲਦਾ ਵਾਲਟ ਨਹੀਂ ਬਣ ਸਕਦਾ ਸੀ।",
+        "ioGeneric": "ਬੈਕਅੱਪ ਫ਼ਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
+        "ioPermissionDenied": "ਬੈਕਅੱਪ ਫ਼ਾਈਲ ਪੜ੍ਹਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+        "joinFailure": "ਬਹਾਲੀ ਅਚਾਨਕ ਅਸਫਲ ਰਹੀ। ਕੁਝ ਵੀ ਨਹੀਂ ਬਦਲਿਆ ਗਿਆ।",
+        "missingVaultMeta": "ਇਸ ਬੈਕਅੱਪ ਵਿੱਚ ਵਾਲਟ ਮੈਟਾਡਾਟਾ ਨਹੀਂ ਹੈ ਅਤੇ ਇਸਨੂੰ ਬਹਾਲ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
+        "notABackupFile": "ਇਹ ਫ਼ਾਈਲ Myne ਬੈਕਅੱਪ ਨਹੀਂ ਹੈ।",
+        "vaultAlreadyExists": "ਇਸ ਬੈਕਅੱਪ ਦਾ ਵਾਲਟ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ।"
+      }
+    },
+    "export": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "close": "ਬੰਦ ਕਰੋ",
+      "copying": "{{total}} ਵਿੱਚੋਂ {{done}} ਕਾਪੀ ਹੋ ਰਹੀਆਂ ਹਨ…",
+      "preparing": "ਤਿਆਰੀ ਹੋ ਰਹੀ ਹੈ…",
+      "successToast": "ਬੈਕਅੱਪ ਤਸਦੀਕ ਹੋ ਕੇ ਸੁਰੱਖਿਅਤ ਹੋ ਗਿਆ।",
+      "title": "ਵਾਲਟ ਦਾ ਬੈਕਅੱਪ ਲਓ",
+      "verifying": "{{total}} ਵਿੱਚੋਂ {{done}} ਦੀ ਤਸਦੀਕ ਹੋ ਰਹੀ ਹੈ…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "ਸਵੀਕਾਰ ਕਰੋ",
+      "close": "ਬੰਦ ਕਰੋ",
+      "codeAriaLabel": "ਪੇਅਰਿੰਗ ਕੋਡ",
+      "intro": "ਪੁਸ਼ਟੀ ਕਰੋ ਕਿ ਇਹ ਕੋਡ ਐਕਸਟੈਂਸ਼ਨ ਵਿੱਚ ਦਿਖਾਏ ਕੋਡ ਨਾਲ ਮਿਲਦਾ ਹੈ, ਫਿਰ ਜੋੜਨ ਲਈ ਸਵੀਕਾਰ ਕਰੋ।",
+      "reject": "ਅਸਵੀਕਾਰ ਕਰੋ",
+      "rejected": "ਪੇਅਰਿੰਗ ਅਸਵੀਕਾਰ ਕੀਤੀ ਗਈ।",
+      "title": "ਇੱਕ ਬ੍ਰਾਊਜ਼ਰ ਐਕਸਟੈਂਸ਼ਨ ਜੁੜਨਾ ਚਾਹੁੰਦੀ ਹੈ"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "ਆਰਕਾਈਵ",
+    "archivedBadgeTitle": "ਆਰਕਾਈਵ ਕੀਤਾ",
+    "dialogLabel": "ਕਮਾਂਡ ਪੈਲੇਟ",
+    "matchedInAttachment": "ਅਟੈਚਮੈਂਟ ਵਿੱਚ",
+    "matchedInAttachmentTitle": "ਖੋਜ ਇਸ ਨੋਟ ਵਿੱਚ ਜੋੜੀ ਫ਼ਾਈਲ ਦੇ ਅੰਦਰ ਮਿਲੀ",
+    "matchedInBody": "↳ ਮੁੱਖ ਲਿਖਤ ਵਿੱਚ ਮਿਲਿਆ",
+    "noMatches": "ਕੋਈ ਮੇਲ ਨਹੀਂ",
+    "operatorHint": "ਪੂਰਾ ਕਰਨ ਲਈ Tab",
+    "operators": {
+      "tag": "ਟੈਗ ਵਾਲੇ ਨੋਟ",
+      "path": "ਫੋਲਡਰ ਵਿਚਲੇ ਨੋਟ",
+      "file": "ਨੋਟ ਦੇ ਨਾਂ ਨਾਲ ਮੇਲ",
+      "section": "ਸਿਰਲੇਖ ਵਾਲੇ ਨੋਟ",
+      "task": "ਟਾਸਕ ਵਾਲੇ ਨੋਟ",
+      "content": "ਮੁੱਖ ਲਿਖਤ ਵਿੱਚ ਪੂਰੀ-ਲਿਖਤ ਖੋਜ"
+    },
+    "searchPlaceholder": "ਨੋਟ ਖੋਜੋ ਜਾਂ ਕਮਾਂਡ ਚਲਾਓ — tag: · path: · task: ਅਜ਼ਮਾਓ",
+    "sectionCommands": "ਕਮਾਂਡਾਂ",
+    "sectionNotes": "ਨੋਟ",
+    "untitledNote": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "ਵਾਲਟ ਦਾ ਬੈਕਅੱਪ ਲਓ…"
+      },
+      "category": {
+        "ai": "AI",
+        "app": "ਐਪ",
+        "appearance": "ਦਿੱਖ",
+        "editor": "ਸੰਪਾਦਕ",
+        "notes": "ਨੋਟ",
+        "vault": "ਵਾਲਟ",
+        "view": "ਦ੍ਰਿਸ਼"
+      },
+      "aiOpenChat": {
+        "label": "AI ਚੈਟ ਖੋਲ੍ਹੋ"
+      },
+      "toggleLineNumbers": {
+        "label": "ਲਾਈਨ ਨੰਬਰ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleVimMode": {
+        "label": "Vim ਕੀਬੋਰਡ ਮੋਡ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleSpellCheck": {
+        "label": "ਸ਼ਬਦ-ਜੋੜ ਜਾਂਚ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleTypewriter": {
+        "label": "ਟਾਈਪਰਾਈਟਰ ਸਕ੍ਰੋਲਿੰਗ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleDimInactive": {
+        "label": "ਅਕਿਰਿਆਸ਼ੀਲ ਲਾਈਨਾਂ ਮੱਧਮ ਕਰਨਾ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleEditorFont": {
+        "label": "ਸੰਪਾਦਕ ਫੌਂਟ ਟੌਗਲ ਕਰੋ (mono / sans)"
+      },
+      "cycleTextSize": {
+        "label": "ਸੰਪਾਦਕ ਲਿਖਤ ਦਾ ਆਕਾਰ ਵਾਰੋ-ਵਾਰੀ ਬਦਲੋ"
+      },
+      "cycleContentWidth": {
+        "label": "ਸੰਪਾਦਕ ਸਮੱਗਰੀ ਦੀ ਚੌੜਾਈ ਵਾਰੋ-ਵਾਰੀ ਬਦਲੋ"
+      },
+      "cycleDefaultViewMode": {
+        "label": "ਮੂਲ ਦ੍ਰਿਸ਼ ਮੋਡ ਵਾਰੋ-ਵਾਰੀ ਬਦਲੋ"
+      },
+      "toggleTimestamps": {
+        "label": "ਸਾਈਡਬਾਰ ਵਿੱਚ ਨੋਟ ਦਾ ਸਮਾਂ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleArchiving": {
+        "label": "ਨੋਟ ਆਰਕਾਈਵ ਕਰਨਾ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleAiEnabled": {
+        "label": "AI ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਟੌਗਲ ਕਰੋ (ਬੀਟਾ)"
+      },
+      "toggleScreenCapture": {
+        "label": "ਸਕਰੀਨ-ਕੈਪਚਰ ਸੁਰੱਖਿਆ ਟੌਗਲ ਕਰੋ"
+      },
+      "cycleTheme": {
+        "label": "ਥੀਮ ਵਾਰੋ-ਵਾਰੀ ਬਦਲੋ"
+      },
+      "themeLight": {
+        "label": "ਥੀਮ: ਹਲਕਾ"
+      },
+      "themeDark": {
+        "label": "ਥੀਮ: ਗੂੜ੍ਹਾ"
+      },
+      "themeAmoled": {
+        "label": "ਥੀਮ: AMOLED"
+      },
+      "themeSystem": {
+        "label": "ਥੀਮ: ਸਿਸਟਮ ਅਨੁਸਾਰ"
+      },
+      "applyCustomTheme": {
+        "label": "ਕਸਟਮ ਥੀਮ ਲਾਗੂ ਕਰੋ…"
+      },
+      "splitRight": {
+        "label": "ਪੈਨ ਸੱਜੇ ਪਾਸੇ ਵੰਡੋ"
+      },
+      "splitDown": {
+        "label": "ਪੈਨ ਹੇਠਾਂ ਵੰਡੋ"
+      },
+      "closePane": {
+        "label": "ਪੈਨ ਬੰਦ ਕਰੋ"
+      },
+      "closeTab": {
+        "label": "ਟੈਬ ਬੰਦ ਕਰੋ"
+      },
+      "nextTab": {
+        "label": "ਅਗਲੀ ਟੈਬ"
+      },
+      "prevTab": {
+        "label": "ਪਿਛਲੀ ਟੈਬ"
+      },
+      "focusNextPane": {
+        "label": "ਅਗਲੇ ਪੈਨ ਉੱਤੇ ਫੋਕਸ"
+      },
+      "focusPrevPane": {
+        "label": "ਪਿਛਲੇ ਪੈਨ ਉੱਤੇ ਫੋਕਸ"
+      },
+      "goBack": {
+        "label": "ਪਿੱਛੇ ਜਾਓ"
+      },
+      "goForward": {
+        "label": "ਅੱਗੇ ਜਾਓ"
+      },
+      "togglePreview": {
+        "label": "ਨਾਲੋ-ਨਾਲ ਝਲਕ ਟੌਗਲ ਕਰੋ"
+      },
+      "findInNote": {
+        "label": "ਨੋਟ ਵਿੱਚ ਲੱਭੋ"
+      },
+      "findReplace": {
+        "label": "ਨੋਟ ਵਿੱਚ ਲੱਭੋ ਅਤੇ ਬਦਲੋ"
+      },
+      "newNote": {
+        "label": "ਨਵਾਂ ਨੋਟ"
+      },
+      "duplicateNote": {
+        "label": "ਨੋਟ ਦੀ ਨਕਲ ਬਣਾਓ"
+      },
+      "archiveNote": {
+        "label": "ਨੋਟ ਆਰਕਾਈਵ ਕਰੋ"
+      },
+      "renameNote": {
+        "label": "ਨੋਟ ਦਾ ਨਾਂ ਬਦਲੋ"
+      },
+      "trashNote": {
+        "label": "ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਭੇਜੋ"
+      },
+      "toggleFavorite": {
+        "label": "ਮਨਪਸੰਦ ਟੌਗਲ ਕਰੋ"
+      },
+      "moveNote": {
+        "label": "ਨੋਟ ਨੂੰ ਫੋਲਡਰ ਵਿੱਚ ਭੇਜੋ…"
+      },
+      "emptyTrash": {
+        "label": "ਰੱਦੀ ਖਾਲੀ ਕਰੋ"
+      },
+      "showBacklinks": {
+        "label": "ਬੈਕਲਿੰਕ ਦਿਖਾਓ"
+      },
+      "showOutline": {
+        "label": "ਰੂਪ-ਰੇਖਾ ਦਿਖਾਓ"
+      },
+      "showUnlinked": {
+        "label": "ਬਿਨਾਂ ਲਿੰਕ ਵਾਲੇ ਜ਼ਿਕਰ ਦਿਖਾਓ"
+      },
+      "newFolder": {
+        "label": "ਨਵਾਂ ਫੋਲਡਰ"
+      },
+      "openTrash": {
+        "label": "ਰੱਦੀ ਖੋਲ੍ਹੋ"
+      },
+      "openArchive": {
+        "label": "ਆਰਕਾਈਵ ਖੋਲ੍ਹੋ"
+      },
+      "cycleHeading": {
+        "label": "ਸਿਰਲੇਖ ਦਾ ਪੱਧਰ ਵਾਰੋ-ਵਾਰੀ ਬਦਲੋ"
+      },
+      "restoreBackup": {
+        "label": "ਬੈਕਅੱਪ ਤੋਂ ਵਾਲਟ ਬਹਾਲ ਕਰੋ…"
+      },
+      "revealVaultFolder": {
+        "label": "ਵਾਲਟ ਫੋਲਡਰ ਫ਼ਾਈਲ ਮੈਨੇਜਰ ਵਿੱਚ ਵਿਖਾਓ"
+      },
+      "aiSummarizeNote": {
+        "label": "ਨੋਟ ਦਾ ਸਾਰ ਬਣਾਓ"
+      },
+      "aiRewriteSelection": {
+        "label": "ਚੁਣੀ ਲਿਖਤ ਮੁੜ ਲਿਖੋ"
+      },
+      "convertWikilinks": {
+        "label": "ਇਸ ਨੋਟ ਵਿੱਚ ਇੰਪੋਰਟ ਕੀਤੇ ਵਿਕੀਲਿੰਕ ਬਦਲੋ…"
+      },
+      "deleteWorkspace": {
+        "label": "ਵਰਕਸਪੇਸ ਮਿਟਾਓ…"
+      },
+      "exportNoteHtml": {
+        "label": "ਨੋਟ HTML ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…"
+      },
+      "exportSelectionImage": {
+        "label": "ਚੁਣੀ ਲਿਖਤ ਤਸਵੀਰ ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+        "saved": "ਚੁਣੀ ਲਿਖਤ ਤਸਵੀਰ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਹੋ ਗਈ।",
+        "noSelection": "ਪਹਿਲਾਂ ਕੁਝ ਲਿਖਤ ਚੁਣੋ, ਫਿਰ ਇਸਨੂੰ ਤਸਵੀਰ ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ।",
+        "failed": "ਚੁਣੀ ਲਿਖਤ ਤਸਵੀਰ ਵਜੋਂ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋ ਸਕੀ।"
+      },
+      "exportNoteMarkdown": {
+        "label": "ਨੋਟ Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…"
+      },
+      "exportNotePdf": {
+        "label": "ਨੋਟ PDF ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…"
+      },
+      "exportNoteTxt": {
+        "label": "ਨੋਟ ਸਾਦੀ ਲਿਖਤ ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…"
+      },
+      "exportVaultMarkdown": {
+        "label": "ਵਾਲਟ Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…"
+      },
+      "foldAll": {
+        "label": "ਸਭ ਸਮੇਟੋ"
+      },
+      "importBaseView": {
+        "label": ".base ਦ੍ਰਿਸ਼ ਇੰਪੋਰਟ ਕਰੋ…"
+      },
+      "importObsidian": {
+        "label": "ਨੋਟ ਇੰਪੋਰਟ ਕਰੋ…"
+      },
+      "lockVault": {
+        "label": "ਵਾਲਟ ਲਾਕ ਕਰੋ"
+      },
+      "manageTemplates": {
+        "label": "ਟੈਂਪਲੇਟਾਂ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ…"
+      },
+      "newNoteFromTemplate": {
+        "label": "ਟੈਂਪਲੇਟ ਤੋਂ ਨਵਾਂ ਨੋਟ…"
+      },
+      "openAttachments": {
+        "label": "ਅਟੈਚਮੈਂਟਾਂ ਖੋਲ੍ਹੋ…"
+      },
+      "openSettings": {
+        "label": "ਸੈਟਿੰਗਾਂ ਖੋਲ੍ਹੋ…"
+      },
+      "openSnapshots": {
+        "label": "ਸਨੈਪਸ਼ਾਟ…"
+      },
+      "openTodayNote": {
+        "label": "ਅੱਜ ਦਾ ਨੋਟ ਖੋਲ੍ਹੋ"
+      },
+      "randomNote": {
+        "label": "ਬੇਤਰਤੀਬ ਨੋਟ ਖੋਲ੍ਹੋ"
+      },
+      "renameWorkspace": {
+        "label": "ਵਰਕਸਪੇਸ ਦਾ ਨਾਂ ਬਦਲੋ…"
+      },
+      "saveWorkspaceAs": {
+        "label": "ਵਰਕਸਪੇਸ ਇਸ ਨਾਂ ਨਾਲ ਸੁਰੱਖਿਅਤ ਕਰੋ…"
+      },
+      "showGraph": {
+        "label": "ਗ੍ਰਾਫ਼ ਦ੍ਰਿਸ਼ ਦਿਖਾਓ…"
+      },
+      "showTasks": {
+        "label": "ਟਾਸਕ ਦਿਖਾਓ"
+      },
+      "showTags": {
+        "label": "ਟੈਗ ਵੇਖੋ…"
+      },
+      "showViews": {
+        "label": "ਦ੍ਰਿਸ਼ ਵੇਖੋ…"
+      },
+      "switchWorkspace": {
+        "label": "ਵਰਕਸਪੇਸ ਬਦਲੋ…"
+      },
+      "toggleFocus": {
+        "label": "ਫੋਕਸ ਮੋਡ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleLeftSidebar": {
+        "label": "ਨੋਟ ਸਾਈਡਬਾਰ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleReading": {
+        "label": "ਪੜ੍ਹਨ ਦ੍ਰਿਸ਼ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleRightSidebar": {
+        "label": "ਬੈਕਲਿੰਕ ਸਾਈਡਬਾਰ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleSource": {
+        "label": "ਸਰੋਤ ਮੋਡ ਟੌਗਲ ਕਰੋ"
+      },
+      "toggleStackedTabs": {
+        "label": "ਸਟੈਕ ਕੀਤੀਆਂ ਟੈਬਾਂ ਟੌਗਲ ਕਰੋ"
+      },
+      "unfoldAll": {
+        "label": "ਸਭ ਫੈਲਾਓ"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "ਗੂੜ੍ਹਾ",
+        "closeTab": "ਟੈਬ ਬੰਦ ਕਰੋ",
+        "cycleHeadingLevel": "ਸਿਰਲੇਖ ਦਾ ਪੱਧਰ ਵਾਰੋ-ਵਾਰੀ ਬਦਲੋ",
+        "cycleTabs": "ਟੈਬਾਂ ਵਾਰੋ-ਵਾਰੀ ਬਦਲੋ",
+        "deleteWorkspace": "ਵਰਕਸਪੇਸ ਮਿਟਾਓ",
+        "findInNote": "ਨੋਟ ਵਿੱਚ ਲੱਭੋ",
+        "focusNextPane": "ਅਗਲੇ ਪੈਨ ਉੱਤੇ ਫੋਕਸ",
+        "focusPrevPane": "ਪਿਛਲੇ ਪੈਨ ਉੱਤੇ ਫੋਕਸ",
+        "foldAll": "ਸਭ ਸਮੇਟੋ",
+        "indent": "ਇੰਡੈਂਟ ਵਧਾਓ",
+        "inlineCode": "ਇਨਲਾਈਨ ਕੋਡ",
+        "insertWikilink": "ਵਿਕੀਲਿੰਕ ਪਾਓ",
+        "italic": "ਤਿਰਛਾ",
+        "navigateBack": "ਪਿੱਛੇ ਜਾਓ",
+        "navigateForward": "ਅੱਗੇ ਜਾਓ",
+        "newNote": "ਨਵਾਂ ਨੋਟ",
+        "openSettings": "ਸੈਟਿੰਗਾਂ ਖੋਲ੍ਹੋ",
+        "outdent": "ਇੰਡੈਂਟ ਘਟਾਓ",
+        "paletteToggle": "ਕਮਾਂਡ ਪੈਲੇਟ ਖੋਲ੍ਹੋ",
+        "redo": "ਮੁੜ ਕਰੋ",
+        "renameWorkspace": "ਵਰਕਸਪੇਸ ਦਾ ਨਾਂ ਬਦਲੋ",
+        "saveWorkspaceAs": "ਵਰਕਸਪੇਸ ਇਸ ਨਾਂ ਨਾਲ ਸੁਰੱਖਿਅਤ ਕਰੋ",
+        "selectAllScoped": "ਸਭ ਚੁਣੋ (ਸੀਮਤ ਦਾਇਰੇ ਵਿੱਚ)",
+        "selectNextOccurrence": "ਅਗਲੀ ਮੌਜੂਦਗੀ ਚੁਣੋ",
+        "showGraphView": "ਗ੍ਰਾਫ਼ ਦ੍ਰਿਸ਼ ਦਿਖਾਓ",
+        "showTasks": "ਟਾਸਕ ਦਿਖਾਓ",
+        "splitPaneDown": "ਪੈਨ ਵੰਡੋ (ਹੇਠਾਂ)",
+        "splitPaneRight": "ਪੈਨ ਵੰਡੋ (ਸੱਜੇ)",
+        "switchWorkspace": "ਵਰਕਸਪੇਸ ਬਦਲੋ",
+        "toggleBulletList": "ਬੁਲੇਟ ਸੂਚੀ ਟੌਗਲ ਕਰੋ",
+        "toggleFocusMode": "ਫੋਕਸ ਮੋਡ ਟੌਗਲ ਕਰੋ",
+        "toggleNumberedList": "ਨੰਬਰ ਵਾਲੀ ਸੂਚੀ ਟੌਗਲ ਕਰੋ",
+        "toggleReadingView": "ਪੜ੍ਹਨ ਦ੍ਰਿਸ਼ ਟੌਗਲ ਕਰੋ",
+        "toggleSourceMode": "ਸਰੋਤ ਮੋਡ ਟੌਗਲ ਕਰੋ",
+        "toggleTaskList": "ਟਾਸਕ ਸੂਚੀ ਟੌਗਲ ਕਰੋ",
+        "undo": "ਵਾਪਸ ਲਓ",
+        "unfoldAll": "ਸਭ ਫੈਲਾਓ"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "ਕੋਈ ਮੋਡੀਫਾਇਰ ਜੋੜੋ (⌘, Ctrl, ਜਾਂ Alt) — ਇਕੱਲੀ ਕੁੰਜੀ ਸ਼ਾਰਟਕੱਟ ਨਹੀਂ ਬਣ ਸਕਦੀ।"
+    },
+    "picker": {
+      "vaultRoot": "ਵਾਲਟ ਰੂਟ",
+      "moveNoteTitle": "ਨੋਟ ਨੂੰ ਫੋਲਡਰ ਵਿੱਚ ਭੇਜੋ",
+      "moveNotePlaceholder": "ਫੋਲਡਰ ਚੁਣੋ…",
+      "noFolders": "ਹਾਲੇ ਕੋਈ ਫੋਲਡਰ ਨਹੀਂ",
+      "applyThemeTitle": "ਕਸਟਮ ਥੀਮ ਲਾਗੂ ਕਰੋ",
+      "applyThemePlaceholder": "ਥੀਮ ਚੁਣੋ…",
+      "noCustomThemes": "ਕੋਈ ਕਸਟਮ ਥੀਮ ਇੰਸਟਾਲ ਨਹੀਂ ਹੈ"
+    }
+  },
+  "common": {
+    "cancel": "ਰੱਦ ਕਰੋ",
+    "dismiss": "ਖਾਰਜ ਕਰੋ",
+    "prompt": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "confirmDefault": "ਠੀਕ ਹੈ"
+    },
+    "spinner": {
+      "loadingLabel": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ"
+    },
+    "back": "ਪਿੱਛੇ",
+    "continue": "ਜਾਰੀ ਰੱਖੋ"
+  },
+  "deviceRevoked": {
+    "cta": "ਮੁੜ ਸ਼ੁਰੂ ਕਰੋ",
+    "title": "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਨੂੰ ਤੁਹਾਡੇ ਖਾਤੇ ਤੋਂ ਹਟਾ ਦਿੱਤਾ ਗਿਆ ਸੀ"
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exported": "{{filename}} ਐਕਸਪੋਰਟ ਹੋ ਗਈ।",
+        "exportFailed": "{{filename}} ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋ ਸਕੀ।",
+        "renamed": "ਨਾਂ ਬਦਲ ਕੇ {{name}} ਕਰ ਦਿੱਤਾ।",
+        "renameFailed": "ਅਟੈਚਮੈਂਟ ਦਾ ਨਾਂ ਨਹੀਂ ਬਦਲਿਆ ਜਾ ਸਕਿਆ।",
+        "saveDialogFailed": "ਸੁਰੱਖਿਅਤ ਕਰਨ ਵਾਲਾ ਡਾਇਲਾਗ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ।"
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} ਤਸਵੀਰ ਸੰਕੁਚਿਤ ਹੋਈ: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} ਤਸਵੀਰਾਂ ਸੰਕੁਚਿਤ ਹੋਈਆਂ: {{from}} → {{to}}",
+        "notice": "ਸੰਕੁਚਿਤ ਹੋਈ: {{from}} → {{to}}",
+        "noticeContainerChanged": "{{format}} ਵਿੱਚ ਸੰਕੁਚਿਤ ਹੋਈ: {{from}} → {{to}}"
+      },
+      "convert": {
+        "cancel": "ਰੱਦ ਕਰੋ",
+        "confirm": "ਬਦਲੋ",
+        "skipped": "ਛੱਡਿਆ ਗਿਆ — {{note}}",
+        "subtitle_one": "1 ਹਵਾਲਾ ਮੁੜ ਲਿਖਿਆ ਜਾਵੇਗਾ। ਲਾਗੂ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਜਾਂਚ ਲਓ।",
+        "subtitle_other": "{{count}} ਹਵਾਲੇ ਮੁੜ ਲਿਖੇ ਜਾਣਗੇ। ਲਾਗੂ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਜਾਂਚ ਲਓ।",
+        "subtitleEmpty": "ਬਦਲਣ ਲਈ ਕੁਝ ਨਹੀਂ — ਕੋਈ ਸਰੋਤ ਫ਼ਾਈਲ ਨਹੀਂ ਮਿਲੀ।",
+        "title": "ਇੰਪੋਰਟ ਕੀਤੀਆਂ ਅਟੈਚਮੈਂਟਾਂ ਬਦਲੋ"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "ਅਟੈਚਮੈਂਟ ਸਰੋਤ"
+      },
+      "convertCore": {
+        "converted": "{{count}} ਬਦਲੀਆਂ",
+        "converted_one": "{{count}} ਬਦਲੀ",
+        "converted_other": "{{count}} ਬਦਲੀਆਂ",
+        "noneToConvert": "ਇਸ ਨੋਟ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਇੰਪੋਰਟ ਕੀਤੀ ਅਟੈਚਮੈਂਟ ਨਹੀਂ ਹੈ।",
+        "skipNote": {
+          "failed": "ਇੰਪੋਰਟ ਅਸਫਲ",
+          "locked": "ਵਾਲਟ ਲਾਕ ਹੈ",
+          "notFound": "ਸਰੋਤ ਨਹੀਂ ਮਿਲਿਆ",
+          "tooLarge": "ਬਹੁਤ ਵੱਡੀ (ਵੱਧ ਤੋਂ ਵੱਧ 64 MiB)",
+          "unsupported": "ਅਸਮਰਥਿਤ ਕਿਸਮ"
+        },
+        "skippedSuffix": " · {{count}} ਛੱਡੀਆਂ",
+        "skippedSuffix_one": " · {{count}} ਛੱਡੀ",
+        "skippedSuffix_other": " · {{count}} ਛੱਡੀਆਂ"
+      },
+      "fileKind": {
+        "generic": "ਫ਼ਾਈਲ",
+        "label": {
+          "archive": "ਆਰਕਾਈਵ",
+          "audio": "ਆਡੀਓ",
+          "cHeader": "C ਹੈੱਡਰ",
+          "cppSource": "C++ ਸਰੋਤ",
+          "cSource": "C ਸਰੋਤ",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "ਦਸਤਾਵੇਜ਼",
+          "ebook": "ਈ-ਕਿਤਾਬ",
+          "go": "Go",
+          "html": "HTML",
+          "image": "ਤਸਵੀਰ",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "ਲਾਗ ਫ਼ਾਈਲ",
+          "markdown": "Markdown",
+          "numbers": "Numbers ਸਪ੍ਰੈੱਡਸ਼ੀਟ",
+          "pages": "Pages ਦਸਤਾਵੇਜ਼",
+          "pdf": "PDF",
+          "presentation": "ਪ੍ਰਸਤੁਤੀ",
+          "python": "Python",
+          "richText": "ਰਿਚ ਟੈਕਸਟ ਦਸਤਾਵੇਜ਼",
+          "rust": "Rust",
+          "shell": "ਸ਼ੈੱਲ ਸਕ੍ਰਿਪਟ",
+          "spreadsheet": "ਸਪ੍ਰੈੱਡਸ਼ੀਟ",
+          "svg": "SVG ਤਸਵੀਰ",
+          "text": "ਲਿਖਤ ਦਸਤਾਵੇਜ਼",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "ਵੀਡੀਓ",
+          "word": "Word ਦਸਤਾਵੇਜ਼",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "{{ext}} ਫ਼ਾਈਲ"
+      },
+      "lightbox": {
+        "close": "ਝਲਕ ਬੰਦ ਕਰੋ",
+        "export": "ਐਕਸਪੋਰਟ",
+        "exportAria": "ਅਟੈਚਮੈਂਟ ਐਕਸਪੋਰਟ ਕਰੋ",
+        "imagePreview": "ਤਸਵੀਰ ਦੀ ਝਲਕ",
+        "pdfFallback": "PDF",
+        "pdfPreview": "PDF ਦੀ ਝਲਕ",
+        "zoomIn": "ਵੱਡਾ ਕਰੋ",
+        "zoomOut": "ਛੋਟਾ ਕਰੋ",
+        "zoomReset": "ਜ਼ੂਮ ਮੁੜ-ਸੈੱਟ ਕਰੋ"
+      },
+      "menu": {
+        "actionsAria": "ਅਟੈਚਮੈਂਟ ਕਾਰਵਾਈਆਂ"
+      },
+      "pdf": {
+        "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…"
+      },
+      "picker": {
+        "openFailed": "ਫ਼ਾਈਲ ਚੋਣਕਾਰ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ।"
+      },
+      "progress": {
+        "encrypting": "ਐਨਕ੍ਰਿਪਟ ਹੋ ਰਿਹਾ ਹੈ…",
+        "importing": "ਇੰਪੋਰਟ ਹੋ ਰਿਹਾ ਹੈ…",
+        "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…"
+      },
+      "recording": {
+        "barAria": "ਆਵਾਜ਼ ਨੋਟ ਰਿਕਾਰਡ ਹੋ ਰਿਹਾ ਹੈ",
+        "cancel": "ਰੱਦ ਕਰੋ",
+        "noAudio": "ਕੋਈ ਆਡੀਓ ਨਹੀਂ ਮਿਲਿਆ — ਆਪਣਾ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਜਾਂਚੋ।",
+        "saving": "ਸੁਰੱਖਿਅਤ ਹੋ ਰਿਹਾ ਹੈ…",
+        "stop": "ਰੋਕੋ"
+      },
+      "rename": {
+        "cancel": "ਰੱਦ ਕਰੋ",
+        "confirm": "ਨਾਂ ਬਦਲੋ",
+        "title": "ਅਟੈਚਮੈਂਟ ਦਾ ਨਾਂ ਬਦਲੋ"
+      },
+      "summary": {
+        "added": "{{count}} ਸ਼ਾਮਲ ਹੋਈਆਂ",
+        "added_one": "{{count}} ਸ਼ਾਮਲ ਹੋਈ",
+        "added_other": "{{count}} ਸ਼ਾਮਲ ਹੋਈਆਂ",
+        "reason": {
+          "failed": "ਅਸਫਲ",
+          "locked": "ਵਾਲਟ ਲਾਕ ਹੈ",
+          "tooLarge": "ਬਹੁਤ ਵੱਡੀ",
+          "unsupported": "ਅਸਮਰਥਿਤ ਕਿਸਮ"
+        },
+        "skipped": "{{count}} ਛੱਡੀਆਂ: {{noun}}",
+        "skipped_one": "{{count}} ਛੱਡੀ: {{noun}}",
+        "skipped_other": "{{count}} ਛੱਡੀਆਂ: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "ਇੱਕ ਰਿਕਾਰਡਿੰਗ ਪਹਿਲਾਂ ਹੀ ਚੱਲ ਰਹੀ ਹੈ।",
+          "captureFailed": "ਰਿਕਾਰਡਿੰਗ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕੀ — ਸਿਸਟਮ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਦੀ ਪਹੁੰਚ ਜਾਂਚੋ।",
+          "generic": "ਰਿਕਾਰਡਿੰਗ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕੀ।",
+          "locked": "ਆਵਾਜ਼ ਨੋਟ ਰਿਕਾਰਡ ਕਰਨ ਲਈ ਆਪਣਾ ਵਾਲਟ ਅਨਲਾਕ ਕਰੋ।",
+          "noInputDevice": "ਕੋਈ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਨਹੀਂ ਮਿਲਿਆ। ਇੱਕ ਜੋੜੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+        },
+        "stopError": {
+          "captureFailed": "ਰਿਕਾਰਡਿੰਗ ਅਸਫਲ ਰਹੀ — ਆਪਣਾ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਜਾਂਚੋ।",
+          "emptyRecording": "ਕੁਝ ਵੀ ਰਿਕਾਰਡ ਨਹੀਂ ਹੋਇਆ।",
+          "generic": "ਰਿਕਾਰਡਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।",
+          "silentRecording": "ਰਿਕਾਰਡਿੰਗ ਖ਼ਾਮੋਸ਼ ਸੀ ਅਤੇ ਰੱਦ ਕਰ ਦਿੱਤੀ ਗਈ — ਆਪਣਾ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਜਾਂਚੋ।"
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "ਰੋਕੋ",
+          "play": "ਚਲਾਓ",
+          "seek": "ਅੱਗੇ-ਪਿੱਛੇ ਕਰੋ"
+        },
+        "menu": {
+          "export": "ਐਕਸਪੋਰਟ",
+          "remove": "ਹਟਾਓ",
+          "rename": "ਨਾਂ ਬਦਲੋ",
+          "reveal": "ਲਾਇਬ੍ਰੇਰੀ ਵਿੱਚ ਵਿਖਾਓ",
+          "transcribe": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਕਰੋ"
+        },
+        "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "ਝਲਕ ਕੱਟੀ ਗਈ ਹੈ — ਪੂਰੀ ਫ਼ਾਈਲ ਲਈ ਐਕਸਪੋਰਟ ਕਰੋ।"
+        },
+        "tombstone": {
+          "brokenAria": "ਟੁੱਟਿਆ ਅਟੈਚਮੈਂਟ ਹਵਾਲਾ: {{filename}}",
+          "brokenLabel": "ਟੁੱਟਿਆ",
+          "deletedAria": "ਮਿਟਾਈ ਗਈ ਅਟੈਚਮੈਂਟ: {{filename}}",
+          "deletedLabel": "ਮਿਟਾਈ ਗਈ"
+        },
+        "transcribe": {
+          "cause": {
+            "featureOff": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਬੰਦ ਹੈ। ਇਸਨੂੰ ਸੈਟਿੰਗਾਂ → ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਵਿੱਚ ਚਾਲੂ ਕਰੋ।",
+            "modelLoadFailed": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਜੇ ਤੁਸੀਂ ਸੈਟਿੰਗਾਂ → ਡਿਵੈਲਪਰ → AI ਵਿੱਚ ਕੋਈ ਕਸਟਮ ਮਾਡਲ ਸੈੱਟ ਕੀਤਾ ਹੈ ਤਾਂ ਉਸਦੀਆਂ ਫ਼ਾਈਲਾਂ ਜਾਂਚੋ; ਨਹੀਂ ਤਾਂ Myne ਦੁਬਾਰਾ ਇੰਸਟਾਲ ਕਰਨ ਨਾਲ ਬਿਲਟ-ਇਨ ਮਾਡਲ ਵਾਪਸ ਆ ਜਾਂਦਾ ਹੈ।",
+            "noModel": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਮਾਡਲ ਮੌਜੂਦ ਨਹੀਂ ਹੈ। Myne ਦੁਬਾਰਾ ਇੰਸਟਾਲ ਕਰਨ ਨਾਲ ਇਹ ਵਾਪਸ ਆ ਜਾਂਦਾ ਹੈ।",
+            "vaultLocked": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਕਰਨ ਲਈ ਆਪਣਾ ਵਾਲਟ ਅਨਲਾਕ ਕਰੋ।"
+          },
+          "failed": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਅਸਫਲ ਰਹੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+          "heading": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ",
+          "insert": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਨੋਟ ਵਿੱਚ ਪਾਓ",
+          "progress": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਹੋ ਰਿਹਾ ਹੈ…",
+          "stop": "ਰੋਕੋ"
+        },
+        "urlImageFallback": "ਤਸਵੀਰ"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "ਧਿਆਨ ਦਿਓ",
+        "bug": "ਬੱਗ",
+        "caution": "ਸਾਵਧਾਨੀ",
+        "danger": "ਖ਼ਤਰਾ",
+        "done": "ਹੋ ਗਿਆ",
+        "error": "ਗਲਤੀ",
+        "example": "ਮਿਸਾਲ",
+        "failure": "ਅਸਫਲਤਾ",
+        "faq": "ਅਕਸਰ ਪੁੱਛੇ ਸਵਾਲ",
+        "hint": "ਸੰਕੇਤ",
+        "important": "ਜ਼ਰੂਰੀ",
+        "info": "ਜਾਣਕਾਰੀ",
+        "missing": "ਗੁੰਮ",
+        "note": "ਨੋਟ",
+        "question": "ਸਵਾਲ",
+        "quote": "ਹਵਾਲਾ",
+        "success": "ਸਫਲਤਾ",
+        "tip": "ਨੁਕਤਾ",
+        "todo": "ਕਰਨਾ ਹੈ",
+        "warning": "ਚੇਤਾਵਨੀ"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "ਆਰਕਾਈਵ",
+        "empty": "ਹਾਲੇ ਕੋਈ ਬੈਕਲਿੰਕ ਨਹੀਂ।",
+        "linkedFrom": "{{count}} ਤੋਂ ਲਿੰਕ",
+        "linkedFrom_one": "{{count}} ਤੋਂ ਲਿੰਕ",
+        "linkedFrom_other": "{{count}} ਤੋਂ ਲਿੰਕ",
+        "linksTo": "{{count}} ਨੂੰ ਲਿੰਕ",
+        "linksTo_one": "{{count}} ਨੂੰ ਲਿੰਕ",
+        "linksTo_other": "{{count}} ਨੂੰ ਲਿੰਕ",
+        "outgoingEmpty": "ਇਹ ਨੋਟ ਹਾਲੇ ਕਿਸੇ ਨੂੰ ਲਿੰਕ ਨਹੀਂ ਕਰਦਾ।",
+        "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+      },
+      "barItems": {
+        "graph": "ਗ੍ਰਾਫ਼",
+        "hide": "ਲੁਕਾਓ",
+        "lock": "ਲਾਕ",
+        "moveLeft": "ਖੱਬੇ ਭੇਜੋ",
+        "moveRight": "ਸੱਜੇ ਭੇਜੋ",
+        "saveStatus": "ਸੁਰੱਖਿਅਤ ਹੋਣ ਦੀ ਸਥਿਤੀ",
+        "settings": "ਸੈਟਿੰਗਾਂ",
+        "tags": "ਟੈਗ",
+        "viewMode": "ਦ੍ਰਿਸ਼ ਮੋਡ",
+        "views": "ਦ੍ਰਿਸ਼",
+        "vimMode": "Vim ਮੋਡ",
+        "wordCount": "ਸ਼ਬਦ ਗਿਣਤੀ",
+        "workspace": "ਵਰਕਸਪੇਸ"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} ਫਿਲਟਰ ਛੱਡੇ ਗਏ",
+        "droppedFiltersSuffix_one": " · {{count}} ਫਿਲਟਰ ਛੱਡਿਆ ਗਿਆ",
+        "droppedFiltersSuffix_other": " · {{count}} ਫਿਲਟਰ ਛੱਡੇ ਗਏ",
+        "failed": "ਇੰਪੋਰਟ ਅਸਫਲ ਰਿਹਾ।",
+        "fileFilterName": "Obsidian Base",
+        "imported": "{{count}} ਦ੍ਰਿਸ਼ ਇੰਪੋਰਟ ਹੋਏ",
+        "imported_one": "{{count}} ਦ੍ਰਿਸ਼ ਇੰਪੋਰਟ ਹੋਇਆ",
+        "imported_other": "{{count}} ਦ੍ਰਿਸ਼ ਇੰਪੋਰਟ ਹੋਏ",
+        "notValid": "ਇਹ ਸਹੀ .base ਫ਼ਾਈਲ ਨਹੀਂ ਹੈ।",
+        "skippedSuffix": " · {{count}} ਛੱਡੇ ਗਏ",
+        "skippedSuffix_one": " · {{count}} ਛੱਡਿਆ ਗਿਆ",
+        "skippedSuffix_other": " · {{count}} ਛੱਡੇ ਗਏ",
+        "stoppedAfter": "{{count}} ਦ੍ਰਿਸ਼ ਤੋਂ ਬਾਅਦ ਇੰਪੋਰਟ ਰੁਕ ਗਿਆ।",
+        "stoppedAfter_one": "{{count}} ਦ੍ਰਿਸ਼ ਤੋਂ ਬਾਅਦ ਇੰਪੋਰਟ ਰੁਕ ਗਿਆ।",
+        "stoppedAfter_other": "{{count}} ਦ੍ਰਿਸ਼ਾਂ ਤੋਂ ਬਾਅਦ ਇੰਪੋਰਟ ਰੁਕ ਗਿਆ।"
+      },
+      "bottomBar": {
+        "browseTags": "ਟੈਗ ਵੇਖੋ",
+        "browseViews": "ਦ੍ਰਿਸ਼ ਵੇਖੋ",
+        "cycleViewMode": "ਦ੍ਰਿਸ਼ ਮੋਡ ਵਾਰੋ-ਵਾਰੀ ਬਦਲੋ",
+        "docStats": {
+          "summary_one": "{{count}} ਸ਼ਬਦ · {{characters}} ਅੱਖਰ",
+          "summary_other": "{{count}} ਸ਼ਬਦ · {{characters}} ਅੱਖਰ",
+          "summarySelectionSuffix": " (ਚੁਣੇ)",
+          "title_one": "{{characters}} ਅੱਖਰ · {{words}} ਸ਼ਬਦ · {{spaces}} ਖਾਲੀ ਥਾਂਵਾਂ · {{count}} ਪੈਰਾ",
+          "title_other": "{{characters}} ਅੱਖਰ · {{words}} ਸ਼ਬਦ · {{spaces}} ਖਾਲੀ ਥਾਂਵਾਂ · {{count}} ਪੈਰੇ",
+          "titleSelectionSuffix": " (ਚੁਣੀ ਲਿਖਤ)"
+        },
+        "vimMode": {
+          "insert": "ਇਨਸਰਟ",
+          "normal": "ਨਾਰਮਲ",
+          "replace": "ਰਿਪਲੇਸ",
+          "title": "Vim ਮੋਡ — ਨਾਰਮਲ ਮੋਡ ਲਈ Esc ਦਬਾਓ",
+          "visual": "ਵਿਜ਼ੂਅਲ"
+        },
+        "graphTitle": "ਗ੍ਰਾਫ਼ (⌘⇧G)",
+        "lock": "ਲਾਕ",
+        "lockVault": "ਵਾਲਟ ਲਾਕ ਕਰੋ",
+        "openSettings": "ਸੈਟਿੰਗਾਂ ਖੋਲ੍ਹੋ",
+        "settingsTitle": "ਸੈਟਿੰਗਾਂ (⌘,)",
+        "showGraph": "ਗ੍ਰਾਫ਼ ਦ੍ਰਿਸ਼ ਦਿਖਾਓ",
+        "syncStatus": "ਸਿਰਫ਼ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ · ਸਿੰਕ ਨਹੀਂ",
+        "tagsTitle": "ਟੈਗ",
+        "togglePreview": "ਨਾਲੋ-ਨਾਲ ਝਲਕ ਟੌਗਲ ਕਰੋ",
+        "viewModeTitle": "ਦ੍ਰਿਸ਼ ਮੋਡ: {{mode}} (ਬਦਲਣ ਲਈ ਕਲਿੱਕ ਕਰੋ)",
+        "viewsTitle": "ਦ੍ਰਿਸ਼"
+      },
+      "import": {
+        "imported_one": "{{count}} ਨੋਟ ਇੰਪੋਰਟ ਹੋਇਆ{{skipped}}",
+        "imported_other": "{{count}} ਨੋਟ ਇੰਪੋਰਟ ਹੋਏ{{skipped}}",
+        "skippedSuffix": " · {{count}} ਛੱਡੇ ਗਏ",
+        "skippedSuffix_one": " · {{count}} ਛੱਡਿਆ ਗਿਆ",
+        "skippedSuffix_other": " · {{count}} ਛੱਡੇ ਗਏ"
+      },
+      "nav": {
+        "goBack": "ਪਿੱਛੇ ਜਾਓ",
+        "goForward": "ਅੱਗੇ ਜਾਓ"
+      },
+      "noNotesToOpen": "ਖੋਲ੍ਹਣ ਲਈ ਕੋਈ ਨੋਟ ਨਹੀਂ।",
+      "resizeBacklinksSidebar": "ਬੈਕਲਿੰਕ ਸਾਈਡਬਾਰ ਦਾ ਆਕਾਰ ਬਦਲੋ",
+      "resizeNotesSidebar": "ਨੋਟ ਸਾਈਡਬਾਰ ਦਾ ਆਕਾਰ ਬਦਲੋ",
+      "rightPanel": {
+        "aiChat": {
+          "askPlaceholder": "ਆਪਣੇ ਨੋਟਾਂ ਬਾਰੇ ਕੋਈ ਸਵਾਲ ਪੁੱਛੋ…",
+          "askSubmit": "ਪੁੱਛੋ",
+          "assistant": "ਸਹਾਇਕ",
+          "citations": "ਸਰੋਤ",
+          "composerPlaceholder": "ਆਪਣੇ ਨੋਟਾਂ ਨੂੰ ਸੁਨੇਹਾ ਭੇਜੋ…",
+          "empty": "AI ਦਾ ਨਤੀਜਾ — ਸਾਰ, ਜਵਾਬ ਅਤੇ ਸੁਝਾਅ — ਇੱਥੇ ਦਿਸਦਾ ਹੈ।",
+          "error": "AI ਬੇਨਤੀ ਪੂਰੀ ਨਹੀਂ ਹੋ ਸਕੀ।",
+          "errorTurn": "ਸਹਾਇਕ ਜਵਾਬ ਨਹੀਂ ਦੇ ਸਕਿਆ।",
+          "gettingReadyHint": "ਤੁਹਾਡੇ ਨੋਟ AI ਲਈ ਤਿਆਰ ਕੀਤੇ ਜਾ ਰਹੇ ਹਨ — ਇੱਕ ਪਲ।",
+          "insert": "ਨੋਟ ਵਿੱਚ ਪਾਓ",
+          "noAnswer": "ਕੋਈ ਜਵਾਬ ਨਹੀਂ — ਸਵਾਲ ਹੋਰ ਤਰੀਕੇ ਨਾਲ ਪੁੱਛੋ।",
+          "noModelHint": "ਕੋਈ ਮਾਡਲ ਨਹੀਂ ਚੁਣਿਆ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਸੈਟਿੰਗਾਂ → ਡਿਵੈਲਪਰ → AI ਵਿੱਚ ਇੱਕ ਚੁਣੋ।",
+          "offHint": "ਲੋਕਲ AI ਬੰਦ ਹੈ। ਇਸਨੂੰ ਸੈਟਿੰਗਾਂ → ਡਿਵੈਲਪਰ → AI ਵਿੱਚ ਚਾਲੂ ਕਰੋ।",
+          "send": "ਭੇਜੋ",
+          "statusGettingReady": "ਤਿਆਰੀ ਹੋ ਰਹੀ ਹੈ…",
+          "statusNoModel": "ਕੋਈ ਮਾਡਲ ਨਹੀਂ",
+          "statusOff": "ਬੰਦ",
+          "statusReady": "ਤਿਆਰ",
+          "stop": "ਰੋਕੋ",
+          "tagsThinking": "ਟੈਗ ਸੁਝਾਏ ਜਾ ਰਹੇ ਹਨ…",
+          "thinking": "AI ਸੋਚ ਰਿਹਾ ਹੈ…",
+          "truncated": "ਪਹਿਲੇ {{count}} ਅੱਖਰਾਂ ਦਾ ਸਾਰ ਬਣਾਇਆ।",
+          "you": "ਤੁਸੀਂ"
+        },
+        "allHidden": "ਸਾਰੀਆਂ ਟੈਬਾਂ ਲੁਕੀਆਂ ਹਨ — ਵਾਪਸ ਲਿਆਉਣ ਲਈ ਸੱਜਾ-ਕਲਿੱਕ ਕਰੋ।",
+        "outline": {
+          "collapse": "ਭਾਗ ਸਮੇਟੋ",
+          "empty": "ਕੋਈ ਸਿਰਲੇਖ ਨਹੀਂ",
+          "expand": "ਭਾਗ ਫੈਲਾਓ",
+          "heading": "ਰੂਪ-ਰੇਖਾ"
+        },
+        "tabs": {
+          "aiChat": "AI ਚੈਟ",
+          "backlinks": "ਲਿੰਕ",
+          "outline": "ਰੂਪ-ਰੇਖਾ",
+          "tasks": "ਟਾਸਕ",
+          "unlinked": "ਬਿਨਾਂ ਲਿੰਕ ਵਾਲੇ ਜ਼ਿਕਰ"
+        }
+      },
+      "sidebarToggle": {
+        "hideBacklinks": "ਬੈਕਲਿੰਕ ਸਾਈਡਬਾਰ ਲੁਕਾਓ",
+        "hideNotes": "ਨੋਟ ਸਾਈਡਬਾਰ ਲੁਕਾਓ",
+        "showBacklinks": "ਬੈਕਲਿੰਕ ਸਾਈਡਬਾਰ ਦਿਖਾਓ",
+        "showNotes": "ਨੋਟ ਸਾਈਡਬਾਰ ਦਿਖਾਓ"
+      },
+      "switchingOverlay": {
+        "saving": "ਸੁਰੱਖਿਅਤ ਹੋ ਰਿਹਾ ਹੈ…"
+      },
+      "viewMode": {
+        "live": "ਲਾਈਵ",
+        "reading": "ਪੜ੍ਹਨ",
+        "source": "ਸਰੋਤ"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "ਵਰਕਸਪੇਸ ਦਾ ਨਾਂ",
+        "renameConfirm": "ਨਾਂ ਬਦਲੋ",
+        "renameTitle": "ਵਰਕਸਪੇਸ ਦਾ ਨਾਂ ਬਦਲੋ",
+        "saveAsTitle": "ਵਰਕਸਪੇਸ ਇਸ ਨਾਂ ਨਾਲ ਸੁਰੱਖਿਅਤ ਕਰੋ",
+        "saveConfirm": "ਸੁਰੱਖਿਅਤ ਕਰੋ"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "ਵਰਕਸਪੇਸ",
+        "renameItemLabel": "ਵਰਕਸਪੇਸ {{name}} ਦਾ ਨਾਂ ਬਦਲੋ",
+        "renameTitle": "ਵਰਕਸਪੇਸ ਦਾ ਨਾਂ ਬਦਲੋ",
+        "saveCurrentAs": "ਮੌਜੂਦਾ ਨੂੰ ਇਸ ਨਾਂ ਨਾਲ ਸੁਰੱਖਿਅਤ ਕਰੋ…",
+        "switchLabel": "ਵਰਕਸਪੇਸ ਬਦਲੋ",
+        "toggleTitle": "ਵਰਕਸਪੇਸ: {{name}}"
+      }
+    },
+    "noteActions": {
+      "buttonLabel": "ਨੋਟ ਕਾਰਵਾਈਆਂ",
+      "rename": "ਨਾਂ ਬਦਲੋ",
+      "move": "ਫੋਲਡਰ ਵਿੱਚ ਭੇਜੋ…",
+      "duplicate": "ਨਕਲ ਬਣਾਓ",
+      "convertToTemplate": "ਟੈਂਪਲੇਟ ਬਣਾਓ",
+      "convertToNote": "ਨੋਟ ਵਿੱਚ ਬਦਲੋ",
+      "turnedIntoTemplate": "ਟੈਂਪਲੇਟ ਬਣਾ ਦਿੱਤਾ",
+      "convertedToNote": "ਨੋਟ ਵਿੱਚ ਬਦਲ ਦਿੱਤਾ",
+      "versionHistory": "ਵਰਜ਼ਨ ਇਤਿਹਾਸ",
+      "exportMarkdown": "Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+      "exportPdf": "PDF ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+      "exportHtml": "HTML ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+      "exportTxt": "ਸਾਦੀ ਲਿਖਤ ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+      "trash": "ਰੱਦੀ ਵਿੱਚ ਭੇਜੋ"
+    },
+    "codeBlock": {
+      "copyCode": "ਕੋਡ ਕਾਪੀ ਕਰੋ",
+      "defaultBadge": "ਕੋਡ"
+    },
+    "drawingEmbed": {
+      "done": "ਹੋ ਗਿਆ",
+      "edit": "ਡਰਾਇੰਗ {{name}} ਸੰਪਾਦਿਤ ਕਰੋ",
+      "editAction": "ਸੰਪਾਦਿਤ ਕਰੋ",
+      "empty": "ਖਾਲੀ ਡਰਾਇੰਗ — ਬਣਾਉਣ ਲਈ ਕਲਿੱਕ ਕਰੋ",
+      "open": "ਖੋਲ੍ਹੋ",
+      "rename": "ਡਰਾਇੰਗ ਦਾ ਨਾਂ ਬਦਲੋ"
+    },
+    "drawingMenu": {
+      "background": "ਕੈਨਵਸ ਦੀ ਪਿੱਠਭੂਮੀ",
+      "reset": "ਕੈਨਵਸ ਮੁੜ-ਸੈੱਟ ਕਰੋ",
+      "toggleTheme": "ਡਰਾਇੰਗ ਥੀਮ ਟੌਗਲ ਕਰੋ"
+    },
+    "find": {
+      "close": "ਲੱਭਣਾ ਬੰਦ ਕਰੋ",
+      "matchCase": "ਅੱਖਰ-ਆਕਾਰ ਦਾ ਧਿਆਨ ਰੱਖੋ",
+      "matchCount": "{{total}} ਵਿੱਚੋਂ {{current}}",
+      "nextMatch": "ਅਗਲਾ ਮੇਲ",
+      "noMatches": "ਕੋਈ ਮੇਲ ਨਹੀਂ",
+      "placeholder": "ਨੋਟ ਵਿੱਚ ਲੱਭੋ",
+      "previousMatch": "ਪਿਛਲਾ ਮੇਲ",
+      "replaceAll": "ਸਭ ਬਦਲੋ",
+      "replaceAllCount": "ਸਭ ਬਦਲੋ ({{total}})",
+      "replaceOne": "ਬਦਲੋ",
+      "replacePlaceholder": "ਇਸ ਨਾਲ ਬਦਲੋ",
+      "toggleReplace": "ਬਦਲਣਾ ਟੌਗਲ ਕਰੋ"
+    },
+    "folding": {
+      "clickToUnfold": "ਫੈਲਾਉਣ ਲਈ ਕਲਿੱਕ ਕਰੋ",
+      "unfold": "ਫੈਲਾਓ"
+    },
+    "footnote": {
+      "heading": "ਪਦ-ਟਿੱਪਣੀਆਂ",
+      "unreferenced": "ਬਿਨਾਂ ਹਵਾਲੇ"
+    },
+    "frontmatter": {
+      "addListItem": "ਆਈਟਮ ਜੋੜੋ…",
+      "addListItemAriaLabel": "{{key}} ਵਿੱਚ ਆਈਟਮ ਜੋੜੋ",
+      "addProperty": "+ ਵਿਸ਼ੇਸ਼ਤਾ ਜੋੜੋ",
+      "propertiesLabel": "ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ",
+      "removeListItemAriaLabel": "{{item}} ਹਟਾਓ",
+      "titleAriaLabel": "ਨੋਟ ਦਾ ਸਿਰਲੇਖ",
+      "titlePlaceholder": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "mermaid": {
+      "rendering": "ਡਾਇਗਰਾਮ ਬਣ ਰਿਹਾ ਹੈ…"
+    },
+    "slash": {
+      "aiContinue": "ਲਿਖਣਾ ਜਾਰੀ ਰੱਖੋ (AI)",
+      "aiTitle": "ਸਿਰਲੇਖ ਸੁਝਾਓ (AI)",
+      "attachFile": "ਫ਼ਾਈਲ ਨੱਥੀ ਕਰੋ",
+      "bulletList": "ਬੁਲੇਟ ਸੂਚੀ",
+      "callout": "ਕਾਲਆਊਟ",
+      "date": "ਤਾਰੀਖ਼",
+      "day": "ਦਿਨ",
+      "divider": "ਵੰਡ-ਰੇਖਾ",
+      "drawing": "ਡਰਾਇੰਗ",
+      "due": "ਆਖ਼ਰੀ ਤਾਰੀਖ਼",
+      "heading1": "ਸਿਰਲੇਖ 1",
+      "heading2": "ਸਿਰਲੇਖ 2",
+      "heading3": "ਸਿਰਲੇਖ 3",
+      "heading4": "ਸਿਰਲੇਖ 4",
+      "heading5": "ਸਿਰਲੇਖ 5",
+      "heading6": "ਸਿਰਲੇਖ 6",
+      "link": "ਲਿੰਕ",
+      "now": "ਹੁਣ",
+      "numberedList": "ਨੰਬਰ ਵਾਲੀ ਸੂਚੀ",
+      "priority": "ਤਰਜੀਹ",
+      "quote": "ਹਵਾਲਾ",
+      "repeat": "ਦੁਹਰਾਓ",
+      "table": "ਸਾਰਣੀ",
+      "taskQuery": "ਟਾਸਕ ਸੂਚੀ",
+      "time": "ਸਮਾਂ",
+      "todoList": "ਕਰਨ-ਵਾਲੀ ਸੂਚੀ",
+      "voiceNote": "ਆਵਾਜ਼ ਨੋਟ",
+      "wikiLink": "ਵਿਕੀਲਿੰਕ"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "ਸ਼ਬਦਕੋਸ਼ ਵਿੱਚ ਜੋੜੋ",
+        "ignoreInVault": "ਇਸ ਵਾਲਟ ਵਿੱਚ ਅਣਡਿੱਠ ਕਰੋ",
+        "ignoreThisSession": "ਇਸ ਸੈਸ਼ਨ ਲਈ ਅਣਡਿੱਠ ਕਰੋ",
+        "noSuggestions": "ਕੋਈ ਸੁਝਾਅ ਨਹੀਂ"
+      }
+    },
+    "table": {
+      "addColumn": "ਸੱਜੇ ਪਾਸੇ ਕਾਲਮ ਜੋੜੋ",
+      "addRow": "ਹੇਠਾਂ ਕਤਾਰ ਜੋੜੋ",
+      "cellAriaLabel": "ਸਾਰਣੀ ਦਾ ਖਾਨਾ",
+      "deleteColumn": "ਕਾਲਮ ਮਿਟਾਓ",
+      "deleteRow": "ਕਤਾਰ ਮਿਟਾਓ",
+      "reorderColumn": "ਕਾਲਮ ਦੀ ਤਰਤੀਬ ਬਦਲੋ",
+      "reorderRow": "ਕਤਾਰ ਦੀ ਤਰਤੀਬ ਬਦਲੋ"
+    },
+    "tagSuggestion": {
+      "label": "ਸੁਝਾਏ ਟੈਗ",
+      "accept": "ਇਸ ਨੋਟ ਵਿੱਚ ਟੈਗ {{tag}} ਜੋੜੋ",
+      "dismiss": "ਸੁਝਾਇਆ ਟੈਗ {{tag}} ਖਾਰਜ ਕਰੋ"
+    },
+    "taskField": {
+      "addAffordance": "ਟਾਸਕ ਖੇਤਰ ਜੋੜੋ",
+      "invalidDue": "Myne ਇਹ ਤਾਰੀਖ਼ ਨਹੀਂ ਪੜ੍ਹ ਸਕਦਾ, ਇਸ ਲਈ ਇਹ ਆਖ਼ਰੀ ਤਾਰੀਖ਼ ਵਜੋਂ ਨਹੀਂ ਦਿਖਾਈ ਜਾਂਦੀ।",
+      "invalidPriority": "Myne ਇਹ ਤਰਜੀਹ ਨਹੀਂ ਪੜ੍ਹ ਸਕਦਾ। highest, high, medium, low ਜਾਂ lowest ਵਰਤੋ।",
+      "invalidRepeat": "Myne ਇਸ ਦੁਹਰਾਓ ਨਿਯਮ ਨੂੰ ਨਹੀਂ ਪਛਾਣਦਾ, ਇਸ ਲਈ ਇਹ ਟਾਸਕ ਦੁਹਰਾਇਆ ਨਹੀਂ ਜਾਵੇਗਾ।",
+      "menuEdit": "{{field}} ਸੰਪਾਦਿਤ ਕਰੋ",
+      "menuTitle": "ਖੇਤਰ ਜੋੜੋ",
+      "repeatNoAnchor": "ਇਸ ਟਾਸਕ ਕੋਲ ਦੁਹਰਾਉਣ ਲਈ ਕੋਈ ਤਾਰੀਖ਼ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਇਹ ਦੁਹਰਾਇਆ ਨਹੀਂ ਜਾਵੇਗਾ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਆਖ਼ਰੀ ਤਾਰੀਖ਼ ਜੋੜੋ।",
+      "save": "ਸੁਰੱਖਿਅਤ ਕਰੋ",
+      "skipOccurrence": "ਇਹ ਵਾਰੀ ਛੱਡੋ",
+      "title": {
+        "due": "ਆਖ਼ਰੀ ਤਾਰੀਖ਼",
+        "repeat": "ਦੁਹਰਾਓ",
+        "priority": "ਤਰਜੀਹ"
+      }
+    },
+    "toolbar": {
+      "apply": "ਲਾਗੂ ਕਰੋ",
+      "exportImageTitle": "ਚੁਣੀ ਲਿਖਤ ਤਸਵੀਰ ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ",
+      "customize": {
+        "bold": "ਗੂੜ੍ਹਾ",
+        "bulletList": "ਬੁਲੇਟ ਸੂਚੀ",
+        "checklist": "ਜਾਂਚ-ਸੂਚੀ",
+        "code": "ਕੋਡ",
+        "heading": "ਸਿਰਲੇਖ",
+        "highlight": "ਹਾਈਲਾਈਟ",
+        "italic": "ਤਿਰਛਾ",
+        "link": "ਲਿੰਕ",
+        "numberedList": "ਨੰਬਰ ਵਾਲੀ ਸੂਚੀ",
+        "quote": "ਹਵਾਲਾ",
+        "strike": "ਕੱਟਿਆ ਹੋਇਆ",
+        "wikilink": "ਵਿਕੀਲਿੰਕ"
+      },
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "ਪੈਰਾ"
+      },
+      "highlight": {
+        "blue": "ਨੀਲਾ",
+        "green": "ਹਰਾ",
+        "pink": "ਗੁਲਾਬੀ",
+        "purple": "ਜਾਮਨੀ",
+        "yellow": "ਪੀਲਾ",
+        "orange": "ਸੰਤਰੀ",
+        "red": "ਲਾਲ",
+        "teal": "ਟੀਲ",
+        "cyan": "ਸਿਆਨ",
+        "lime": "ਨਿੰਬੂਈ",
+        "brown": "ਭੂਰਾ",
+        "grey": "ਸਲੇਟੀ",
+        "indigo": "ਨੀਲ",
+        "remove": "ਹਾਈਲਾਈਟ ਹਟਾਓ"
+      },
+      "urlPlaceholder": "ਲਿੰਕ URL ਚੇਪੋ"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "ਪੂਰੀ",
+        "narrow": "ਤੰਗ",
+        "normal": "ਸਧਾਰਨ",
+        "wide": "ਚੌੜੀ"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "ਸਧਾਰਨ",
+        "relaxed": "ਖੁੱਲ੍ਹੀ",
+        "tight": "ਸੰਘਣੀ"
+      },
+      "textSize": {
+        "lg": "ਵੱਡਾ",
+        "md": "ਮੂਲ",
+        "sm": "ਛੋਟਾ",
+        "xl": "ਬਹੁਤ ਵੱਡਾ"
+      }
+    },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ — Myne ਨੋਟ ਖੋਲ੍ਹਦਾ ਹੈ, ਫ਼ਾਈਲਾਂ ਨਹੀਂ। ਕਮਾਂਡ ਪੈਲੇਟ ਜਾਂ ਸਾਈਡਬਾਰ ਵਰਤੋ।",
+          "map": "Myne ਵਿੱਚ ਕਸਟਮ ਕੁੰਜੀ-ਮੈਪਿੰਗ ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ। ਸ਼ਾਰਟਕੱਟ ਸੈਟਿੰਗਾਂ → ਹੌਟਕੀਜ਼ ਵਿੱਚ ਸੈੱਟ ਹੁੰਦੇ ਹਨ।",
+          "set": "`:set` ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ — Myne ਵਿੱਚ ਕੋਈ vim ਵਿਕਲਪ ਨਹੀਂ ਹਨ। ਸੰਪਾਦਕ ਦੀਆਂ ਤਰਜੀਹਾਂ ਸੈਟਿੰਗਾਂ → ਸੰਪਾਦਕ ਵਿੱਚ ਹਨ।",
+          "source": "`:source` ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ। Myne ਵਿੱਚ ਜਾਣ-ਬੁੱਝ ਕੇ ਕੋਈ ਕਾਨਫ਼ਿਗ-ਸਕ੍ਰਿਪਟ ਸਤਹ ਨਹੀਂ ਹੈ।",
+          "unsupported": "ਇਹ ਕਮਾਂਡ Myne ਵਿੱਚ ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ।"
+        },
+        "substitute": {
+          "malformed": "ਉਹ ਬਦਲਾਅ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਉਮੀਦ ਸੀ :s/pattern/replacement/",
+          "refused": "ਉਹ ਪੈਟਰਨ ਸਿਰਫ਼-vim ਸੰਟੈਕਸ ({{what}}) ਵਰਤਦਾ ਹੈ, ਜਿਸਦਾ Myne ਦੀ ਖੋਜ ਸਮਰਥਨ ਨਹੀਂ ਕਰਦੀ। ਕੁਝ ਵੀ ਨਹੀਂ ਬਦਲਿਆ ਗਿਆ।"
+        },
+        "writeFailed": "ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+        "written": "ਸੁਰੱਖਿਅਤ ਹੋ ਗਿਆ।"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "ਇੰਬੈੱਡ: {{label}}"
+      },
+      "convert": {
+        "cancel": "ਰੱਦ ਕਰੋ",
+        "choiceClause_one": " · {{count}} ਲਈ ਚੋਣ ਕਰਨੀ ਪਵੇਗੀ।",
+        "choiceClause_other": " · {{count}} ਲਈ ਚੋਣ ਕਰਨੀ ਪਵੇਗੀ।",
+        "chooseTarget": "ਨਿਸ਼ਾਨਾ ਚੁਣੋ…",
+        "convert": "ਬਦਲੋ",
+        "convertedToast_one": "{{count}} ਵਿਕੀਲਿੰਕ ਬਦਲਿਆ",
+        "convertedToast_other": "{{count}} ਵਿਕੀਲਿੰਕ ਬਦਲੇ",
+        "noneToConvert": "ਇਸ ਨੋਟ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਇੰਪੋਰਟ ਕੀਤਾ ਵਿਕੀਲਿੰਕ ਨਹੀਂ ਹੈ।",
+        "nothingToConvert": "ਬਦਲਣ ਲਈ ਕੁਝ ਨਹੀਂ — ਕੋਈ ਵੀ ਇੰਪੋਰਟ ਕੀਤਾ ਵਿਕੀਲਿੰਕ ਹੱਲ ਨਹੀਂ ਹੁੰਦਾ।",
+        "rewriteCount_one": "{{count}} ਲਿੰਕ ਮੁੜ ਲਿਖਿਆ ਜਾਵੇਗਾ",
+        "rewriteCount_other": "{{count}} ਲਿੰਕ ਮੁੜ ਲਿਖੇ ਜਾਣਗੇ",
+        "skipped": "ਛੱਡਿਆ ਗਿਆ — {{reason}}",
+        "title": "ਇਸ ਨੋਟ ਵਿੱਚ ਇੰਪੋਰਟ ਕੀਤੇ ਵਿਕੀਲਿੰਕ ਬਦਲੋ"
+      },
+      "convertCore": {
+        "noMatch": "ਕੋਈ ਮੇਲ ਨਹੀਂ"
+      }
+    },
+    "flow": {
+      "loadFailed": "ਤੁਹਾਡੇ ਨੋਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
+      "openFailed": "ਇਹ ਨੋਟ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ।",
+      "saveFailed": "ਇਹ ਨੋਟ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "moveFailed": "ਇਹ ਨੋਟ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "openTodayFailed": "ਅੱਜ ਦਾ ਨੋਟ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ।",
+      "exportFailed": "ਇਹ ਨੋਟ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "attachNeedsApp": "ਅਟੈਚਮੈਂਟਾਂ ਲਈ ਐਪ ਦੀ ਲੋੜ ਹੈ (ਬ੍ਰਾਊਜ਼ਰ ਝਲਕ ਦੀ ਨਹੀਂ)।",
+      "attachTooLarge": "ਉਹ ਫ਼ਾਈਲ ਬਹੁਤ ਵੱਡੀ ਹੈ (ਵੱਧ ਤੋਂ ਵੱਧ 64 MB)।",
+      "attachUnsupported": "ਸਿਰਫ਼ ਤਸਵੀਰਾਂ ਅਤੇ PDF ਹੀ ਨੱਥੀ ਕੀਤੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
+      "attachFailed": "ਉਹ ਫ਼ਾਈਲ ਨੱਥੀ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "archiveFailed": "ਇਹ ਨੋਟ ਆਰਕਾਈਵ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "trashFailed": "ਇਹ ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਸਕਿਆ।"
+    },
+    "nav": {
+      "dailyNote": "ਰੋਜ਼ਾਨਾ ਨੋਟ",
+      "openToday": "ਅੱਜ ਦਾ ਖੋਲ੍ਹੋ",
+      "allNotes": "ਸਾਰੇ ਨੋਟ"
+    },
+    "list": {
+      "searchPlaceholder": "ਨੋਟ ਖੋਜੋ",
+      "clearSearch": "ਖੋਜ ਸਾਫ਼ ਕਰੋ",
+      "viewNoteCount_one": "“{{name}}” ਵਿੱਚ {{count}} ਨੋਟ",
+      "viewNoteCount_other": "“{{name}}” ਵਿੱਚ {{count}} ਨੋਟ",
+      "edit": "ਸੰਪਾਦਿਤ ਕਰੋ",
+      "trashEmpty": "ਰੱਦੀ ਖਾਲੀ ਹੈ",
+      "archiveEmpty": "ਕੋਈ ਆਰਕਾਈਵ ਕੀਤਾ ਨੋਟ ਨਹੀਂ",
+      "noMatchingNotes": "ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਨੋਟ ਨਹੀਂ",
+      "noNotesYet": "ਹਾਲੇ ਕੋਈ ਨੋਟ ਨਹੀਂ",
+      "noMatchBody": "“{{name}}” ਨਾਲ ਕੁਝ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ। ਸਾਰੇ ਨੋਟ ਵੇਖਣ ਲਈ ਦ੍ਰਿਸ਼ ਸੰਪਾਦਿਤ ਕਰੋ ਜਾਂ ਹਟਾਓ।",
+      "emptyBody": "ਆਪਣਾ ਪਹਿਲਾ ਨੋਟ ਲਿਖਣ ਲਈ “ਨਵਾਂ ਨੋਟ” ਦਬਾਓ। ਸਭ ਕੁਝ ਸਟੋਰ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਐਨਕ੍ਰਿਪਟ ਹੁੰਦਾ ਹੈ।",
+      "unarchive": "ਆਰਕਾਈਵ ਤੋਂ ਵਾਪਸ ਲਿਆਓ"
+    },
+    "filterSheet": {
+      "title": "ਫਿਲਟਰ",
+      "status": "ਸਥਿਤੀ"
+    },
+    "sortSheet": {
+      "title": "ਲੜੀਬੱਧ",
+      "manual": "ਹੱਥੀਂ ਤਰਤੀਬ",
+      "titleAsc": "ਸਿਰਲੇਖ · A → Z",
+      "titleDesc": "ਸਿਰਲੇਖ · Z → A"
+    },
+    "noteMenu": {
+      "emptyNote": "ਖਾਲੀ ਨੋਟ",
+      "wordCount_one": "{{count}} ਸ਼ਬਦ · {{minutes}} ਮਿੰਟ ਪੜ੍ਹਨ ਲਈ",
+      "wordCount_other": "{{count}} ਸ਼ਬਦ · {{minutes}} ਮਿੰਟ ਪੜ੍ਹਨ ਲਈ",
+      "moveToFolder": "ਫੋਲਡਰ ਵਿੱਚ ਭੇਜੋ…",
+      "moveToTrash": "ਰੱਦੀ ਵਿੱਚ ਭੇਜੋ",
+      "copied": "ਕਾਪੀ ਹੋ ਗਿਆ ✓",
+      "copyToClipboard": "ਕਲਿੱਪਬੋਰਡ ਵਿੱਚ ਕਾਪੀ ਕਰੋ",
+      "versionHistory": "ਵਰਜ਼ਨ ਇਤਿਹਾਸ"
+    },
+    "purge": {
+      "body": "ਇਹ ਨੋਟ ਨੂੰ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਪੱਕੇ ਤੌਰ 'ਤੇ ਹਟਾ ਦਿੰਦਾ ਹੈ। ਇਹ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।"
+    },
+    "move": {
+      "title": "ਫੋਲਡਰ ਵਿੱਚ ਭੇਜੋ",
+      "body": "ਫੋਲਡਰ ਦਾ ਰਾਹ ਲਿਖੋ (ਜਿਵੇਂ Projects/Myne)। ਵਾਲਟ ਰੂਟ ਲਈ ਖਾਲੀ ਛੱਡੋ।",
+      "placeholder": "Projects/Myne",
+      "confirm": "ਭੇਜੋ"
+    },
+    "sidebar": {
+      "browse": "ਵੇਖੋ"
+    },
+    "emptyDetail": {
+      "title": "ਕੋਈ ਨੋਟ ਚੁਣੋ",
+      "body": "ਸੂਚੀ ਵਿੱਚੋਂ ਕੋਈ ਨੋਟ ਚੁਣੋ, ਜਾਂ ਨਵਾਂ ਸ਼ੁਰੂ ਕਰੋ।"
+    },
+    "readingBar": {
+      "editNote": "ਨੋਟ ਸੰਪਾਦਿਤ ਕਰੋ",
+      "edit": "ਸੰਪਾਦਿਤ ਕਰੋ"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} ਲਿੰਕ ਕੀਤਾ ਨੋਟ",
+      "linkedNotes_other": "{{count}} ਲਿੰਕ ਕੀਤੇ ਨੋਟ",
+      "links_one": "{{count}} ਲਿੰਕ",
+      "links_other": "{{count}} ਲਿੰਕ"
+    },
+    "formatBar": {
+      "redo": "ਮੁੜ ਕਰੋ",
+      "attachFile": "ਨਵੀਂ ਫ਼ਾਈਲ ਨੱਥੀ ਕਰੋ",
+      "insertFromLibrary": "ਲਾਇਬ੍ਰੇਰੀ ਤੋਂ ਪਾਓ",
+      "recordVoiceNote": "ਆਵਾਜ਼ ਨੋਟ ਰਿਕਾਰਡ ਕਰੋ",
+      "showLivePreview": "ਲਾਈਵ ਝਲਕ ਦਿਖਾਓ",
+      "showRawMarkdown": "ਕੱਚਾ Markdown ਦਿਖਾਓ",
+      "hideKeyboard": "ਕੀਬੋਰਡ ਲੁਕਾਓ"
+    },
+    "topBar": {
+      "backToNotes": "ਨੋਟਾਂ ਉੱਤੇ ਵਾਪਸ",
+      "noteDetails": "ਨੋਟ ਦੇ ਵੇਰਵੇ",
+      "noteActions": "ਨੋਟ ਕਾਰਵਾਈਆਂ"
+    },
+    "noteContext": {
+      "collapsePanel": "ਪੈਨਲ ਸਮੇਟੋ",
+      "unlinkedCount_one": "ਬਿਨਾਂ ਲਿੰਕ ਵਾਲਾ ਜ਼ਿਕਰ {{count}}",
+      "unlinkedCount_other": "ਬਿਨਾਂ ਲਿੰਕ ਵਾਲੇ ਜ਼ਿਕਰ {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "ਕਾਰਡ",
+      "typeList": "ਸੂਚੀ",
+      "emptyState": "ਹਾਲੇ ਕੋਈ ਸੁਰੱਖਿਅਤ ਦ੍ਰਿਸ਼ ਨਹੀਂ। ਟੈਗ, ਫੋਲਡਰ ਜਾਂ ਲਿਖਤ ਨਾਲ ਆਪਣੇ ਨੋਟ ਫਿਲਟਰ ਕਰਨ ਲਈ ਇੱਕ ਬਣਾਓ।",
+      "editView": "ਦ੍ਰਿਸ਼ ਸੰਪਾਦਿਤ ਕਰੋ"
+    },
+    "sheet": {
+      "done": "ਹੋ ਗਿਆ"
+    },
+    "vaultSwitcher": {
+      "title": "ਵਾਲਟ"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "ਕੋਈ ਟੈਗ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+      "notesCount_one": "ਨੋਟ · {{count}}",
+      "notesCount_other": "ਨੋਟ · {{count}}"
+    },
+    "untitledNote": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਨੋਟ",
+    "commandPalette": {
+      "searchPlaceholder": "ਨੋਟ ਖੋਜੋ ਜਾਂ ਕਮਾਂਡ ਚਲਾਓ…",
+      "noMatches": "ਕੋਈ ਕਮਾਂਡ ਜਾਂ ਨੋਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।"
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "ਨੋਟ",
+      "errors": {
+        "attachmentCorrupt": "ਇਸ ਨੋਟ ਵਿੱਚ ਵਰਤੀ ਇੱਕ ਅਟੈਚਮੈਂਟ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "attachmentMissing": "ਇਸ ਨੋਟ ਵਿੱਚ ਵਰਤੀ ਇੱਕ ਅਟੈਚਮੈਂਟ ਗੁੰਮ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "cannotDecrypt": "ਇਹ ਨੋਟ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+        "destinationUnusable": "ਉਹ ਮੰਜ਼ਿਲ ਫੋਲਡਰ ਵਰਤਣਯੋਗ ਨਹੀਂ ਹੈ।",
+        "fallback": "ਐਕਸਪੋਰਟ ਅਚਾਨਕ ਅਸਫਲ ਰਿਹਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "invalidAttachmentCatalog": "ਵਾਲਟ ਦਾ ਅਟੈਚਮੈਂਟ ਕੈਟਾਲਾਗ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "invalidNoteFilename": "ਉਹ ਫ਼ਾਈਲ-ਨਾਂ ਵਰਤਣਯੋਗ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "invalidNoteId": "ਇਸ ਨੋਟ ਦੀ ਪਛਾਣ ਨਹੀਂ ਹੋ ਸਕੀ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "invalidPlaintextEncoding": "ਇਸ ਨੋਟ ਦੀ ਸਮੱਗਰੀ ਖ਼ਰਾਬ ਲੱਗਦੀ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ। ਇਸਨੂੰ ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ।",
+        "ioNoSpace": "ਮੰਜ਼ਿਲ ਉੱਤੇ ਲੋੜੀਂਦੀ ਥਾਂ ਨਹੀਂ ਹੈ।",
+        "ioPermissionDenied": "ਮੰਜ਼ਿਲ ਉੱਤੇ ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+        "ioWriteDefault": "ਐਕਸਪੋਰਟ ਕੀਤੀ ਫ਼ਾਈਲ ਲਿਖੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
+        "noteNotFound": "ਇਹ ਨੋਟ ਹੁਣ ਮੌਜੂਦ ਨਹੀਂ ਹੈ — ਸ਼ਾਇਦ ਇਸਨੂੰ ਮਿਟਾ ਦਿੱਤਾ ਗਿਆ ਹੈ।",
+        "pdfCaptureFailed": "PDF ਬਣਾਈ ਨਹੀਂ ਜਾ ਸਕੀ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "pdfExportInProgress": "ਇੱਕ PDF ਐਕਸਪੋਰਟ ਪਹਿਲਾਂ ਹੀ ਚੱਲ ਰਿਹਾ ਹੈ। ਉਸਦੇ ਪੂਰਾ ਹੋਣ ਦੀ ਉਡੀਕ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "pdfPayloadMissing": "ਐਕਸਪੋਰਟ ਵਿਚਾਲੇ ਰੁਕ ਗਿਆ — ਜੇ ਵਾਲਟ ਲਾਕ ਹੋ ਗਿਆ ਸੀ ਤਾਂ ਉਸਨੂੰ ਅਨਲਾਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "pdfRenderTimeout": "ਨੋਟ ਬਣਨ ਵਿੱਚ ਬਹੁਤ ਸਮਾਂ ਲੱਗਾ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "pdfWindowCreateFailed": "ਐਕਸਪੋਰਟ ਵਿੰਡੋ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕੀ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "targetExists": "ਉਸ ਨਾਂ ਦੀ ਫ਼ਾਈਲ ਮੰਜ਼ਿਲ ਉੱਤੇ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ।",
+        "vaultLocked": "ਵਾਲਟ ਲਾਕ ਹੈ। ਇਸਨੂੰ ਅਨਲਾਕ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      },
+      "flow": {
+        "couldNotRead": "ਇਹ ਨੋਟ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+        "exportedTo": "{{filename}} ਵਿੱਚ ਐਕਸਪੋਰਟ ਹੋਇਆ",
+        "exportedToWithAttachments_one": "{{filename}} + {{count}} ਅਟੈਚਮੈਂਟ ਵਿੱਚ ਐਕਸਪੋਰਟ ਹੋਇਆ",
+        "exportedToWithAttachments_other": "{{filename}} + {{count}} ਅਟੈਚਮੈਂਟਾਂ ਵਿੱਚ ਐਕਸਪੋਰਟ ਹੋਇਆ",
+        "exportedToWithImages_one": "{{filename}} + {{count}} ਤਸਵੀਰ ਵਿੱਚ ਐਕਸਪੋਰਟ ਹੋਇਆ",
+        "exportedToWithImages_other": "{{filename}} + {{count}} ਤਸਵੀਰਾਂ ਵਿੱਚ ਐਕਸਪੋਰਟ ਹੋਇਆ",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "ਸਾਦੀ ਲਿਖਤ",
+        "showInFolder": "ਫੋਲਡਰ ਵਿੱਚ ਵਿਖਾਓ"
+      },
+      "modal": {
+        "cancel": "ਰੱਦ ਕਰੋ",
+        "export": "ਐਕਸਪੋਰਟ…",
+        "includeAttachments_one": "{{count}} ਅਟੈਚਮੈਂਟ ਸ਼ਾਮਲ ਕਰੋ",
+        "includeAttachments_other": "{{count}} ਅਟੈਚਮੈਂਟਾਂ ਸ਼ਾਮਲ ਕਰੋ",
+        "title": "Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ",
+        "copyLabel": "ਨੋਟ ਦੀ ਲਿਖਤ ਕਲਿੱਪਬੋਰਡ ਵਿੱਚ ਕਾਪੀ ਕਰੋ",
+        "copied": "ਨੋਟ ਦੀ ਲਿਖਤ ਕਾਪੀ ਹੋ ਗਈ",
+        "copyFailed": "ਨੋਟ ਦੀ ਲਿਖਤ ਕਾਪੀ ਨਹੀਂ ਹੋ ਸਕੀ"
+      }
+    },
+    "egress": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "confirm": "ਡਾਊਨਲੋਡ ਕਰੋ",
+      "title": "ਇਹ ਫ਼ਾਈਲ ਡਾਊਨਲੋਡ ਕਰੋ"
+    },
+    "pdf": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "continue": "ਜਾਰੀ ਰੱਖੋ…",
+      "title": "PDF ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "ਚੁਣੋ ਕਿ ਐਕਸਪੋਰਟ ਕਿੱਥੇ ਰੱਖਣਾ ਹੈ",
+      "errors": {
+        "attachmentCorrupt": "ਕਿਸੇ ਨੋਟ ਵਿੱਚ ਵਰਤੀ ਇੱਕ ਅਟੈਚਮੈਂਟ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "attachmentMissing": "ਕਿਸੇ ਨੋਟ ਵਿੱਚ ਵਰਤੀ ਇੱਕ ਅਟੈਚਮੈਂਟ ਗੁੰਮ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "authOperationInProgress": "ਵਾਲਟ ਦੀ ਕੋਈ ਹੋਰ ਕਾਰਵਾਈ ਚੱਲ ਰਹੀ ਹੈ। ਉਸਦੇ ਪੂਰਾ ਹੋਣ ਦੀ ਉਡੀਕ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "cancelled": "ਐਕਸਪੋਰਟ ਰੱਦ ਕੀਤਾ ਗਿਆ। ਮੰਜ਼ਿਲ ਉੱਤੇ ਕੁਝ ਨਹੀਂ ਛੱਡਿਆ ਗਿਆ।",
+        "cannotDecrypt": "ਇੱਕ ਨੋਟ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "destinationAlreadyExists": "ਉਸ ਥਾਂ ਉੱਤੇ ਪਹਿਲਾਂ ਹੀ ਕੁਝ ਮੌਜੂਦ ਹੈ। ਐਕਸਪੋਰਟ ਲਈ ਕੋਈ ਨਵੀਂ ਥਾਂ ਚੁਣੋ।",
+        "destinationNotAllowed": "ਉਹ ਥਾਂ Myne ਦੇ ਆਪਣੇ ਸਟੋਰੇਜ ਦੇ ਅੰਦਰ ਹੈ। ਇਸ ਤੋਂ ਬਾਹਰ ਕੋਈ ਫੋਲਡਰ ਚੁਣੋ।",
+        "invalidPlaintextEncoding": "ਕਿਸੇ ਨੋਟ ਦੀ ਸਮੱਗਰੀ ਖ਼ਰਾਬ ਲੱਗਦੀ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ। ਇਸਨੂੰ ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ।",
+        "invalidVaultMeta": "ਵਾਲਟ ਦਾ ਮੈਟਾਡਾਟਾ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋਇਆ।",
+        "ioWriteDefault": "ਐਕਸਪੋਰਟ ਲਿਖਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+        "joinFailure": "ਐਕਸਪੋਰਟ ਅਚਾਨਕ ਅਸਫਲ ਰਿਹਾ। ਮੰਜ਼ਿਲ ਉੱਤੇ ਕੁਝ ਨਹੀਂ ਛੱਡਿਆ ਗਿਆ।",
+        "vaultLocked": "ਵਾਲਟ ਲਾਕ ਹੈ। ਇਸਨੂੰ ਅਨਲਾਕ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "vaultNotFound": "ਐਕਸਪੋਰਟ ਕਰਨ ਲਈ ਕੋਈ ਵਾਲਟ ਨਹੀਂ ਮਿਲਿਆ।"
+      },
+      "flow": {
+        "countAttachments_one": "{{count}} ਅਟੈਚਮੈਂਟ",
+        "countAttachments_other": "{{count}} ਅਟੈਚਮੈਂਟਾਂ",
+        "countFolders_one": "{{count}} ਫੋਲਡਰ",
+        "countFolders_other": "{{count}} ਫੋਲਡਰ",
+        "countNotes_one": "{{count}} ਨੋਟ",
+        "countNotes_other": "{{count}} ਨੋਟ",
+        "exclusionsHistory": "ਵਰਜ਼ਨ ਇਤਿਹਾਸ ਸ਼ਾਮਲ ਨਹੀਂ ਹੈ।",
+        "exclusionsTrashed_one": "ਰੱਦੀ ਵਿਚਲਾ {{count}} ਨੋਟ ਸ਼ਾਮਲ ਨਹੀਂ ਹੈ।",
+        "exclusionsTrashed_other": "ਰੱਦੀ ਵਿਚਲੇ {{count}} ਨੋਟ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ।",
+        "exclusionsTrashedAndHistory_one": "ਰੱਦੀ ਵਿਚਲਾ {{count}} ਨੋਟ ਅਤੇ ਵਰਜ਼ਨ ਇਤਿਹਾਸ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ।",
+        "exclusionsTrashedAndHistory_other": "ਰੱਦੀ ਵਿਚਲੇ {{count}} ਨੋਟ ਅਤੇ ਵਰਜ਼ਨ ਇਤਿਹਾਸ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ।",
+        "phaseAttachments": "ਅਟੈਚਮੈਂਟਾਂ",
+        "phaseNotes": "ਨੋਟ",
+        "preparing": "ਤਿਆਰੀ ਹੋ ਰਹੀ ਹੈ…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "ਰੱਦ ਕਰੋ",
+        "cancelling": "ਰੱਦ ਹੋ ਰਿਹਾ ਹੈ…",
+        "title": "ਐਕਸਪੋਰਟ ਹੋ ਰਿਹਾ ਹੈ…"
+      },
+      "setup": {
+        "cancel": "ਰੱਦ ਕਰੋ",
+        "choose": "ਚੁਣੋ…",
+        "chooseFolder": "ਕੋਈ ਫੋਲਡਰ ਚੁਣੋ…",
+        "destinationLabel": "ਮੰਜ਼ਿਲ",
+        "export": "ਐਕਸਪੋਰਟ…",
+        "folderSelectAriaLabel": "ਐਕਸਪੋਰਟ ਕਰਨ ਵਾਲਾ ਫੋਲਡਰ",
+        "noFolderChosen": "ਕੋਈ ਫੋਲਡਰ ਨਹੀਂ ਚੁਣਿਆ",
+        "noFoldersInVault": "ਇਸ ਵਾਲਟ ਵਿੱਚ ਕੋਈ ਫੋਲਡਰ ਨਹੀਂ",
+        "scopeFolder": "ਇੱਕ ਫੋਲਡਰ",
+        "scopeLabel": "ਦਾਇਰਾ",
+        "scopeWhole": "ਪੂਰਾ ਵਾਲਟ",
+        "title": "ਵਾਲਟ Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ"
+      },
+      "summary": {
+        "done": "ਹੋ ਗਿਆ",
+        "showInFolder": "ਫੋਲਡਰ ਵਿੱਚ ਵਿਖਾਓ",
+        "title": "ਐਕਸਪੋਰਟ ਪੂਰਾ ਹੋਇਆ"
+      }
+    }
+  },
+  "failClosed": {
+    "exit": {
+      "quit": "ਐਪ ਬੰਦ ਕਰੋ",
+      "reload": "ਮੁੜ ਲੋਡ ਕਰੋ"
+    },
+    "corrupted": {
+      "body": "ਜੇ ਤੁਹਾਡੇ ਕੋਲ ਬੈਕਅੱਪ ਹੈ ਤਾਂ ਤੁਸੀਂ ਉਸਨੂੰ ਬਹਾਲ ਕਰ ਸਕਦੇ ਹੋ — ਤੁਹਾਡੀਆਂ ਮੌਜੂਦਾ ਫ਼ਾਈਲਾਂ ਨੂੰ ਹੱਥ ਨਹੀਂ ਲਾਇਆ ਜਾਂਦਾ; ਬੈਕਅੱਪ ਪਹਿਲਾਂ ਵੱਖਰੇ ਵਾਲਟ ਵਜੋਂ ਬਹਾਲ ਹੁੰਦਾ ਹੈ।",
+      "cta": "ਐਪ ਬੰਦ ਕਰੋ",
+      "title": "ਵਾਲਟ ਫ਼ਾਈਲ ਖ਼ਰਾਬ ਹੈ।"
+    },
+    "invalidState": {
+      "body": "ਕਿਰਪਾ ਕਰਕੇ ਮੁੜ ਸ਼ੁਰੂ ਕਰੋ।",
+      "cta": "ਲਾਕ",
+      "title": "ਅਣਕਿਆਸੀ ਸਥਿਤੀ।"
+    },
+    "ioError": {
+      "body": "ਇਹ ਡਿਸਕ ਜਾਂ ਫ਼ਾਈਲ-ਸਿਸਟਮ ਦੀ ਗਲਤੀ ਹੋ ਸਕਦੀ ਹੈ।",
+      "cta": "ਐਪ ਬੰਦ ਕਰੋ",
+      "title": "ਵਾਲਟ ਫ਼ਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ।"
+    },
+    "permissionDenied": {
+      "body": "ਫ਼ਾਈਲ ਦੀਆਂ ਇਜਾਜ਼ਤਾਂ ਜਾਂਚੋ।",
+      "cta": "ਐਪ ਬੰਦ ਕਰੋ",
+      "title": "ਵਾਲਟ ਫ਼ਾਈਲ ਤੱਕ ਪਹੁੰਚ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।"
+    },
+    "copyDiagnostics": "ਡਾਇਗਨੌਸਟਿਕਸ ਕਾਪੀ ਕਰੋ",
+    "diagnosticsCopied": "ਕਾਪੀ ਹੋ ਗਿਆ",
+    "restoreFromBackup": "ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ…"
+  },
+  "notes": {
+    "archive": {
+      "close": "ਬੰਦ ਕਰੋ",
+      "count_one": "{{count}} ਨੋਟ",
+      "count_other": "{{count}} ਨੋਟ",
+      "delete": "ਮਿਟਾਓ",
+      "deleteError": "ਉਹ ਨੋਟ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "emptyBody": "ਆਰਕਾਈਵ ਕੀਤੇ ਨੋਟ ਅਤੇ ਫੋਲਡਰ ਸਾਈਡਬਾਰ ਵਿੱਚ ਨਹੀਂ ਦਿਸਦੇ, ਪਰ ਸੁਰੱਖਿਅਤ ਰਹਿੰਦੇ ਹਨ। ਜਦੋਂ ਵੀ ਲੋੜ ਹੋਵੇ, ਇੱਥੋਂ ਬਹਾਲ ਕਰ ਲਓ।",
+      "emptyTitle": "ਕੁਝ ਵੀ ਆਰਕਾਈਵ ਨਹੀਂ ਕੀਤਾ",
+      "folderDeleteBody_one": "“{{name}}” ਅਤੇ ਇਸਦਾ {{count}} ਨੋਟ",
+      "folderDeleteBody_other": "“{{name}}” ਅਤੇ ਇਸਦੇ {{count}} ਨੋਟ",
+      "folderDeleteConfirmCta": "ਰੱਦੀ ਵਿੱਚ ਭੇਜੋ",
+      "folderDeleteError": "ਉਸ ਫੋਲਡਰ ਦੇ ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਨਹੀਂ ਭੇਜੇ ਜਾ ਸਕੇ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "folderDeleteTitle": "ਇਸ ਫੋਲਡਰ ਨੂੰ ਰੱਦੀ ਵਿੱਚ ਭੇਜਣਾ ਹੈ?",
+      "folderDeleteWarning": "ਇਹ ਰੱਦੀ ਵਿੱਚ ਜਾਂਦੇ ਹਨ — ਕਿਸੇ ਵੀ ਵੇਲੇ ਬਹਾਲ ਕਰ ਸਕਦੇ ਹੋ। ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾਉਣਾ ਵੱਖਰਾ ਕਦਮ ਹੈ।",
+      "restore": "ਬਹਾਲ ਕਰੋ",
+      "restoreError": "ਉਹ ਨੋਟ ਬਹਾਲ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "title": "ਆਰਕਾਈਵ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "cardMenu": {
+      "copyLink": "ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
+      "open": "ਖੋਲ੍ਹੋ",
+      "openInNewTab": "ਨਵੀਂ ਟੈਬ ਵਿੱਚ ਖੋਲ੍ਹੋ",
+      "revealInFolder": "ਫੋਲਡਰ ਵਿੱਚ ਵਿਖਾਓ"
+    },
+    "colorLabels": {
+      "clay": "ਮਿੱਟੀ",
+      "moss": "ਕਾਈ",
+      "ochre": "ਗੇਰੂ",
+      "plum": "ਆਲੂਬੁਖ਼ਾਰਾ",
+      "slate": "ਸਲੇਟ",
+      "stone": "ਪੱਥਰ"
+    },
+    "decoration": {
+      "colorSection": "ਰੰਗ",
+      "default": "ਮੂਲ",
+      "defaultFolderIcon": "ਮੂਲ ਫੋਲਡਰ ਆਈਕਨ",
+      "iconSection": "ਆਈਕਨ",
+      "menuLabel": "ਰੰਗ ਲੇਬਲ",
+      "noColor": "ਕੋਈ ਰੰਗ ਨਹੀਂ",
+      "none": "ਕੋਈ ਨਹੀਂ"
+    },
+    "deleteConfirm": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "delete": "ਮਿਟਾਓ",
+      "title": "ਇਹ ਨੋਟ ਮਿਟਾਉਣਾ ਹੈ?",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ",
+      "warning": "ਇਹ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।"
+    },
+    "filterBuilder": {
+      "addCondition": "ਸ਼ਰਤ ਜੋੜੋ",
+      "addFilterGroup": "ਫਿਲਟਰ ਸਮੂਹ ਜੋੜੋ",
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "combinator": {
+        "all": "ਸਾਰੀਆਂ",
+        "any": "ਕੋਈ ਵੀ"
+      },
+      "match": "ਮੇਲ ਕਰੋ",
+      "negate": {
+        "is": "ਹੈ",
+        "isNot": "ਨਹੀਂ ਹੈ"
+      },
+      "noConditions": "ਹਾਲੇ ਕੋਈ ਸ਼ਰਤ ਨਹੀਂ — ਇਹ ਦ੍ਰਿਸ਼ ਸਾਰੇ ਪੰਨੇ ਦਿਖਾਉਂਦਾ ਹੈ।",
+      "noteCount_one": "{{count}} ਨੋਟ",
+      "noteCount_other": "{{count}} ਨੋਟ",
+      "of": "ਵਿੱਚੋਂ:",
+      "ofTheGroups": "ਸਮੂਹਾਂ ਵਿੱਚੋਂ:",
+      "op": {
+        "contains": "ਸ਼ਾਮਲ ਹੈ"
+      },
+      "propertyValuePlaceholder": "ਮੁੱਲ",
+      "removeCondition": "ਸ਼ਰਤ ਹਟਾਓ",
+      "replaceFilter": "ਫਿਲਟਰ ਬਦਲੋ",
+      "save": "ਸੰਭਾਲੋ",
+      "searchTextPlaceholder": "ਖੋਜ ਲਿਖਤ",
+      "selectFolderPlaceholder": "ਫੋਲਡਰ ਚੁਣੋ…",
+      "selectPropertyPlaceholder": "ਵਿਸ਼ੇਸ਼ਤਾ ਚੁਣੋ…",
+      "selectTagPlaceholder": "ਟੈਗ ਚੁਣੋ…",
+      "type": {
+        "folder": "ਫੋਲਡਰ",
+        "property": "ਵਿਸ਼ੇਸ਼ਤਾ",
+        "search": "ਖੋਜ",
+        "tag": "ਟੈਗ"
+      },
+      "unrepresentable": "ਇਹ ਫਿਲਟਰ ਕਿਸੇ ਉੱਨਤ ਸੰਪਾਦਕ ਨਾਲ ਬਣਾਇਆ ਗਿਆ ਸੀ ਅਤੇ ਇੱਥੇ ਸੰਪਾਦਿਤ ਨਹੀਂ ਹੋ ਸਕਦਾ।",
+      "unresolved": "ਅਣਸੁਲਝਿਆ"
+    },
+    "folderManagement": {
+      "illegalSegment": "ਫੋਲਡਰ ਦੇ ਨਾਂ ਵਿੱਚ / \\ | # ^ [ ] ਨਹੀਂ ਹੋ ਸਕਦੇ, ਅਤੇ ਇਹ ਸਪੇਸ ਨਾਲ ਸ਼ੁਰੂ ਜਾਂ ਖ਼ਤਮ ਨਹੀਂ ਹੋ ਸਕਦਾ।",
+      "tooLong": "ਉਹ ਫੋਲਡਰ ਰਸਤਾ ਬਹੁਤ ਲੰਮਾ ਹੈ।"
+    },
+    "folderNote": {
+      "defaultTitle": "ਤਤਕਰਾ"
+    },
+    "folderRow": {
+      "createFolderNote": "ਫੋਲਡਰ ਨੋਟ ਬਣਾਓ",
+      "empty": "ਖਾਲੀ",
+      "folderNote": "ਫੋਲਡਰ ਨੋਟ",
+      "openFolderNote": "ਫੋਲਡਰ ਨੋਟ ਖੋਲ੍ਹੋ"
+    },
+    "graph": {
+      "allConnected": "ਸਭ ਕੁਝ ਜੁੜਿਆ ਹੋਇਆ ਹੈ — ਕੋਈ ਇਕੱਲਾ ਨੋਟ ਨਹੀਂ।",
+      "building": "ਗ੍ਰਾਫ਼ ਬਣ ਰਿਹਾ ਹੈ…",
+      "colorGroups": {
+        "addRule": "ਨਿਯਮ ਜੋੜੋ",
+        "colorSwatchTitle": "ਰੰਗ ਚੁਣੋ",
+        "deleteRuleTitle": "ਨਿਯਮ ਮਿਟਾਓ",
+        "dragHandleTitle": "ਕ੍ਰਮ ਬਦਲਣ ਲਈ ਖਿੱਚੋ",
+        "editFilterButton": "ਫਿਲਟਰ ਸੰਪਾਦਿਤ ਕਰੋ…",
+        "editFilterTitle": "ਰੰਗ-ਸਮੂਹ ਦਾ ਫਿਲਟਰ ਸੰਪਾਦਿਤ ਕਰੋ",
+        "emptyBody": "ਰੰਗ ਸਮੂਹਾਂ ਨਾਲ ਤੁਸੀਂ ਗ੍ਰਾਫ਼ ਦੇ ਨੋਡਾਂ ਨੂੰ ਟੈਗ ਜਾਂ ਫੋਲਡਰ ਅਨੁਸਾਰ ਰੰਗ ਦੇ ਸਕਦੇ ਹੋ — ਕੰਮ ਦੇ ਨੋਟ ਇੱਕ ਰੰਗ ਵਿੱਚ, ਨਿੱਜੀ ਨੋਟ ਦੂਜੇ ਵਿੱਚ। ਆਪਣਾ ਪਹਿਲਾ ਨਿਯਮ ਜੋੜੋ।",
+        "emptyTitle": "ਹਾਲੇ ਕੋਈ ਰੰਗ ਸਮੂਹ ਨਹੀਂ",
+        "enableToggleAriaLabel": "ਨਿਯਮ ਚਾਲੂ ਕਰੋ",
+        "filterAllNotes": "ਹਰ ਨੋਟ ਨਾਲ ਮੇਲ ਖਾਂਦਾ ਹੈ",
+        "filterConditions_one": "{{count}} ਸ਼ਰਤ",
+        "filterConditions_other": "{{count}} ਸ਼ਰਤਾਂ",
+        "heading": "ਰੰਗ ਸਮੂਹ",
+        "moveDown": "ਨਿਯਮ ਹੇਠਾਂ ਲਿਜਾਓ",
+        "moveUp": "ਨਿਯਮ ਉੱਤੇ ਲਿਜਾਓ",
+        "namePlaceholder": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਨਿਯਮ"
+      },
+      "depthToggleTitle": "ਗੁਆਂਢ ਦੀ ਡੂੰਘਾਈ ਟੌਗਲ ਕਰੋ (1 ↔ 2 ਪੜਾਅ)",
+      "filterAll": "ਸਾਰੇ",
+      "filterAroundNote": "ਇਸ ਨੋਟ ਦੇ ਆਲੇ-ਦੁਆਲੇ",
+      "filterByTag": "ਟੈਗ ਅਨੁਸਾਰ ਫਿਲਟਰ ਕਰੋ",
+      "filterIsolated": "ਇਕੱਲੇ",
+      "hop": "{{depth}} ਪੜਾਅ",
+      "loading": "ਗ੍ਰਾਫ਼ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+      "noNotes": "ਹਾਲੇ ਗ੍ਰਾਫ਼ ਬਣਾਉਣ ਲਈ ਕੋਈ ਨੋਟ ਨਹੀਂ ਹੈ।",
+      "refresh": "ਤਾਜ਼ਾ ਕਰੋ",
+      "refreshTitle": "ਵਾਲਟ ਬਦਲ ਗਿਆ ਹੈ — ਗ੍ਰਾਫ਼ ਮੁੜ ਬਣਾਓ",
+      "settings": {
+        "appearanceHeading": "ਦਿੱਖ",
+        "closeTitle": "ਬੰਦ ਕਰੋ",
+        "forceCenter": "ਕੇਂਦਰ ਵੱਲ ਖਿੱਚ",
+        "forceLinkDistance": "ਲਿੰਕ ਦੀ ਦੂਰੀ",
+        "forceLinkStrength": "ਲਿੰਕ ਦੀ ਤਾਕਤ",
+        "forceRepel": "ਧੱਕਾ",
+        "forcesHeading": "ਬਲ",
+        "labelFadeZoom": "ਲੇਬਲ ਦਾ ਫਿੱਕਾਪਣ",
+        "lineThickness": "ਲਕੀਰ ਦੀ ਮੋਟਾਈ",
+        "nodeSize": "ਨੋਡ ਦਾ ਆਕਾਰ",
+        "nodeSizeStrength": "ਕਨੈਕਸ਼ਨਾਂ ਅਨੁਸਾਰ ਆਕਾਰ",
+        "openTitle": "ਗ੍ਰਾਫ਼ ਸੈਟਿੰਗਾਂ",
+        "reset": "ਮੂਲ ਮੁੱਲਾਂ ਉੱਤੇ ਮੁੜ ਸੈੱਟ ਕਰੋ",
+        "showArrows": "ਦਿਸ਼ਾ ਦੇ ਤੀਰ ਦਿਖਾਓ",
+        "title": "ਗ੍ਰਾਫ਼ ਸੈਟਿੰਗਾਂ"
+      },
+      "tagPlaceholder": "ਟੈਗ…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਦ੍ਰਿਸ਼"
+      },
+      "modal": {
+        "cancel": "ਰੱਦ ਕਰੋ",
+        "cancelledNotImported": "{{count}} ਇੰਪੋਰਟ ਨਹੀਂ ਹੋਏ",
+        "cancelledNotImported_one": "{{count}} ਇੰਪੋਰਟ ਨਹੀਂ ਹੋਇਆ",
+        "cancelledNotImported_other": "{{count}} ਇੰਪੋਰਟ ਨਹੀਂ ਹੋਏ",
+        "cancelling": "ਰੱਦ ਹੋ ਰਿਹਾ ਹੈ…",
+        "chooseFolder": "ਫੋਲਡਰ ਚੁਣੋ…",
+        "close": "ਬੰਦ ਕਰੋ",
+        "closeAriaLabel": "ਬੰਦ ਕਰੋ",
+        "copied": "ਕਾਪੀ ਹੋ ਗਿਆ",
+        "copy": "ਕਾਪੀ ਕਰੋ",
+        "done": "ਹੋ ਗਿਆ",
+        "errorBody": "ਇੰਪੋਰਟ ਪੂਰਾ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਜੋ ਨੋਟ ਪਹਿਲਾਂ ਹੀ ਇੰਪੋਰਟ ਹੋ ਚੁੱਕੇ ਸਨ, ਉਹ ਰੱਖ ਲਏ ਗਏ ਹਨ — ਉਹਨਾਂ ਨੂੰ ਰੱਖਣਾ ਜਾਂ ਮਿਟਾਉਣਾ, ਦੋਵੇਂ ਸੁਰੱਖਿਅਤ ਹਨ।",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}।",
+        "flagKindFolder": "ਫੋਲਡਰ",
+        "flagKindTitle": "ਸਿਰਲੇਖ",
+        "folderPickerTitle": "ਆਪਣਾ Obsidian ਵਾਲਟ ਫੋਲਡਰ ਚੁਣੋ",
+        "hiddenIgnoredPrefix_one": "{{count}} ਕਾਨਫ਼ਿਗ / ਲੁਕੀ ਆਈਟਮ ਅਣਡਿੱਠ ਕੀਤੀ ਗਈ (ਜਿਵੇਂ ",
+        "hiddenIgnoredPrefix_other": "{{count}} ਕਾਨਫ਼ਿਗ / ਲੁਕੀਆਂ ਆਈਟਮਾਂ ਅਣਡਿੱਠ ਕੀਤੀਆਂ ਗਈਆਂ (ਜਿਵੇਂ ",
+        "hiddenIgnoredSuffix": ", ਡਾਟ-ਫ਼ਾਈਲਾਂ)।",
+        "ifNoteExistsLabel": "ਜੇ ਨੋਟ ਪਹਿਲਾਂ ਤੋਂ ਮੌਜੂਦ ਹੋਵੇ",
+        "import": "ਇੰਪੋਰਟ",
+        "importFailed": "ਇੰਪੋਰਟ ਅਸਫਲ ਰਿਹਾ।",
+        "importing": "ਤੁਹਾਡਾ ਵਾਲਟ ਇੰਪੋਰਟ ਹੋ ਰਿਹਾ ਹੈ…",
+        "markDone": "ਹੋ ਗਿਆ ਵਜੋਂ ਨਿਸ਼ਾਨ ਲਾਓ",
+        "markedDone": "ਹੋ ਗਿਆ ਵਜੋਂ ਨਿਸ਼ਾਨ ਲੱਗਾ",
+        "mediaImported": "{{count}} ਇੰਪੋਰਟ ਹੋਈਆਂ",
+        "mediaImported_one": "{{count}} ਇੰਪੋਰਟ ਹੋਈ",
+        "mediaImported_other": "{{count}} ਇੰਪੋਰਟ ਹੋਈਆਂ",
+        "mediaOmittedSuffix": " · {{count}} ਛੱਡੀਆਂ ਗਈਆਂ",
+        "mediaOmittedSuffix_one": " · {{count}} ਛੱਡੀ ਗਈ",
+        "mediaOmittedSuffix_other": " · {{count}} ਛੱਡੀਆਂ ਗਈਆਂ",
+        "needsAttention": "ਧਿਆਨ ਦੀ ਲੋੜ",
+        "needsAttentionHelp": "ਇਹ ਨੋਟ ਬਿਨਾਂ ਬਦਲਾਅ ਇੰਪੋਰਟ ਹੋਏ ਹਨ। ਸੁਝਾਏ ਸੁਧਾਰ ਸਿਰਫ਼ ਸ਼ੁਰੂਆਤੀ ਬਿੰਦੂ ਹਨ — ਕੋਈ ਇੱਕ ਕਾਪੀ ਕਰੋ, ਫਿਰ ਨੋਟ ਖੋਲ੍ਹ ਕੇ ਉਸਦਾ ਨਾਂ ਬਦਲੋ।",
+        "noFolderChosen": "ਕੋਈ ਫੋਲਡਰ ਨਹੀਂ ਚੁਣਿਆ",
+        "notesImported_one": "ਨੋਟ ਇੰਪੋਰਟ ਹੋਇਆ",
+        "notesImported_other": "ਨੋਟ ਇੰਪੋਰਟ ਹੋਏ",
+        "policyCopyHint": "ਮੌਜੂਦਾ ਨੋਟ ਦੇ ਨਾਲ-ਨਾਲ ਇਸਨੂੰ ਵੀ ਲੈ ਆਓ।",
+        "policyCopyLabel": "ਕਾਪੀ ਵਜੋਂ ਇੰਪੋਰਟ ਕਰੋ",
+        "policySkipHint": "ਸਿਫ਼ਾਰਸ਼ੀ — ਇੰਪੋਰਟ ਦੁਬਾਰਾ ਚਲਾਉਣ ਨਾਲ ਨਾ ਨਕਲਾਂ ਬਣਦੀਆਂ ਹਨ, ਨਾ ਕੁਝ ਉੱਤੇ ਲਿਖਿਆ ਜਾਂਦਾ ਹੈ।",
+        "policySkipLabel": "ਇਸਨੂੰ ਛੱਡ ਦਿਓ",
+        "preexistingDetail": "ਇਸ ਨੋਟ ਦਾ ਆਪਣਾ ਫੋਲਡਰ ਪਹਿਲਾਂ ਹੀ ਸੀ: “{{existing}}”, ਜਿਸਨੂੰ Myne ਨੇ ਰੱਖ ਲਿਆ — ਇਹ ਫੋਲਡਰ ਡਿਸਕ ਉੱਤੇ ਇਸਦੀ ਥਾਂ ਤੋਂ ਵੱਖਰਾ ਹੋ ਸਕਦਾ ਹੈ।",
+        "preparing": "ਤਿਆਰੀ ਹੋ ਰਹੀ ਹੈ…",
+        "progressNotes": " ਨੋਟ",
+        "progressOf": " / ",
+        "reasonIllegalChar": "ਵਿੱਚ ਅਜਿਹਾ ਅੱਖਰ ਹੈ ਜੋ Myne ਨਾਂ ਵਿੱਚ ਨਹੀਂ ਵਰਤ ਸਕਦਾ",
+        "reasonPathTooLong": "ਦਾ ਫੋਲਡਰ + ਸਿਰਲੇਖ ਵਾਲਾ ਰਸਤਾ ਬਹੁਤ ਲੰਮਾ ਹੈ",
+        "reasonSegmentTooLong": "ਦਾ ਨਾਂ Myne ਦੀ ਹੱਦ ਤੋਂ ਲੰਮਾ ਹੈ",
+        "scanning": "ਤੁਹਾਡਾ ਵਾਲਟ ਸਕੈਨ ਹੋ ਰਿਹਾ ਹੈ…",
+        "setupIntro": "Myne ਤੁਹਾਡੇ ਨੋਟ ਇੱਥੇ ਹੀ ਇੰਪੋਰਟ ਕਰਕੇ ਐਨਕ੍ਰਿਪਟ ਕਰਦਾ ਹੈ — ਕੁਝ ਵੀ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਨਹੀਂ ਜਾਂਦਾ, ਅਤੇ ਤੁਹਾਡੀਆਂ ਅਸਲ ਫ਼ਾਈਲਾਂ ਕਦੇ ਨਹੀਂ ਬਦਲੀਆਂ ਜਾਂਦੀਆਂ।",
+        "statCancelled": "ਰੱਦ ਕੀਤਾ",
+        "statCanvasSkipped": ".canvas ਫ਼ਾਈਲਾਂ ਛੱਡੀਆਂ",
+        "statCompressed": "ਸੰਕੁਚਿਤ ਕੀਤੀਆਂ ਤਸਵੀਰਾਂ",
+        "statEmptyFoldersKept": "ਰੱਖੇ ਗਏ ਖਾਲੀ ਫੋਲਡਰ",
+        "statMedia": "ਮੀਡੀਆ",
+        "statOtherSkipped": "ਹੋਰ ਫ਼ਾਈਲਾਂ ਛੱਡੀਆਂ",
+        "statSkipped": "ਛੱਡੇ ਗਏ (ਪਹਿਲਾਂ ਤੋਂ ਮੌਜੂਦ)",
+        "suggestedNameAriaLabel": "ਸੁਝਾਇਆ ਨਾਂ",
+        "titleComplete": "ਇੰਪੋਰਟ ਪੂਰਾ ਹੋਇਆ",
+        "titleFailed": "ਇੰਪੋਰਟ ਅਸਫਲ ਰਿਹਾ",
+        "titleSetup": "ਨੋਟ ਇੰਪੋਰਟ ਕਰੋ",
+        "vaultFolderLabel": "ਵਾਲਟ ਫੋਲਡਰ",
+        "vaultRoot": "(ਵਾਲਟ ਰੂਟ)",
+        "titlePick": "ਨੋਟ ਇੰਪੋਰਟ ਕਰੋ",
+        "keepsLabel": "ਕੀ ਨਾਲ ਆਉਂਦਾ ਹੈ",
+        "losesLabel": "ਕੀ ਨਹੀਂ ਆਉਂਦਾ",
+        "changeSource": "ਸਰੋਤ ਬਦਲੋ",
+        "statExcalidrawSkipped": "Excalidraw ਡਰਾਇੰਗਾਂ ਛੱਡੀਆਂ",
+        "unfollowedLinkOutside": "ਇਹ ਤੁਹਾਡੇ ਚੁਣੇ ਫੋਲਡਰ ਤੋਂ ਬਾਹਰਲੇ ਕਿਸੇ ਫੋਲਡਰ ਦਾ ਸ਼ਾਰਟਕੱਟ ਹੈ, ਇਸ ਲਈ Myne ਨੇ ਇਸਦਾ ਪਿੱਛਾ ਨਹੀਂ ਕੀਤਾ। ਉਸ ਫੋਲਡਰ ਨੂੰ ਆਪਣੇ ਵਾਲਟ ਦੇ ਅੰਦਰ ਲਿਜਾਓ ਜਾਂ ਕਾਪੀ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਇੰਪੋਰਟ ਕਰੋ।",
+        "unfollowedLinkLoop": "ਇਹ ਸ਼ਾਰਟਕੱਟ ਵਾਪਸ ਉਸੇ ਫੋਲਡਰ ਵੱਲ ਇਸ਼ਾਰਾ ਕਰਦਾ ਹੈ ਜਿਸ ਵਿੱਚ Myne ਪਹਿਲਾਂ ਹੀ ਸੀ, ਇਸ ਲਈ ਇਸਦਾ ਪਿੱਛਾ ਕਰਨਾ ਕਦੇ ਨਾ ਮੁੱਕਣ ਵਾਲਾ ਚੱਕਰ ਬਣ ਜਾਂਦਾ। ਇਸਦੇ ਹੇਠਾਂ ਕੁਝ ਵੀ ਨਹੀਂ ਛੁੱਟਿਆ।",
+        "unfollowedLinkBroken": "ਇਹ ਸ਼ਾਰਟਕੱਟ ਕਿਤੇ ਨਹੀਂ ਲੈ ਜਾਂਦਾ — ਜਿਸ ਵੱਲ ਇਹ ਇਸ਼ਾਰਾ ਕਰਦਾ ਸੀ, ਉਹ ਹਿਲਾ ਦਿੱਤਾ ਜਾਂ ਮਿਟਾ ਦਿੱਤਾ ਗਿਆ ਹੈ।",
+        "unreadableDetail": "ਛੱਡ ਦਿੱਤੀ ਗਈ — {{reason}} ਬਾਕੀ ਇੰਪੋਰਟ ਜਾਰੀ ਰਿਹਾ।",
+        "stoppedAt": "ਇਹ ਰੁਕਣ ਤੋਂ ਪਹਿਲਾਂ {{total}} ਵਿੱਚੋਂ {{imported}} ਨੋਟ ਇੰਪੋਰਟ ਹੋ ਚੁੱਕੇ ਸਨ। ਉਹ ਤੁਹਾਡੇ ਵਾਲਟ ਵਿੱਚ ਹਨ ਅਤੇ ਸੁਰੱਖਿਅਤ ਹਨ।",
+        "reasonNotUtf8": "Myne ਇਸ ਫ਼ਾਈਲ ਨੂੰ ਲਿਖਤ ਵਜੋਂ ਪੜ੍ਹ ਨਹੀਂ ਸਕਿਆ। ਇਹ ਸ਼ਾਇਦ ਕਿਸੇ ਪੁਰਾਣੀ ਏਨਕੋਡਿੰਗ ਵਿੱਚ ਸੰਭਾਲੀ ਗਈ ਹੈ, ਜਾਂ ਇਹ ਲਿਖਤ ਫ਼ਾਈਲ ਹੈ ਹੀ ਨਹੀਂ।",
+        "reasonPathRejected": "Myne ਤੁਹਾਡੇ ਚੁਣੇ ਫੋਲਡਰ ਦੇ ਅੰਦਰ ਇਸ ਫ਼ਾਈਲ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ।",
+        "reasonPermissionDenied": "Myne ਨੂੰ ਇਹ ਫ਼ਾਈਲ ਪੜ੍ਹਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਸੀ।",
+        "reasonNotFound": "Myne ਦੇ ਪਹੁੰਚਣ ਤੱਕ ਇਹ ਫ਼ਾਈਲ ਜਾ ਚੁੱਕੀ ਸੀ।",
+        "reasonNoSpace": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਥਾਂ ਮੁੱਕ ਗਈ।",
+        "reasonUnknown": "Myne ਕਾਰਨ ਨਹੀਂ ਦੱਸ ਸਕਿਆ।"
+      },
+      "offer": {
+        "body": "ਆਪਣੇ ਮੌਜੂਦਾ ਨੋਟ Myne ਵਿੱਚ ਲੈ ਆਓ। ਹਰ ਇੱਕ ਇੰਪੋਰਟ ਹੁੰਦੇ ਸਮੇਂ ਹੀ ਐਨਕ੍ਰਿਪਟ ਹੋ ਜਾਂਦਾ ਹੈ — ਕੁਝ ਵੀ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਨਹੀਂ ਜਾਂਦਾ, ਅਤੇ ਤੁਹਾਡੀਆਂ ਅਸਲ ਫ਼ਾਈਲਾਂ ਜਿੱਥੇ ਹਨ ਉੱਥੇ ਹੀ ਰਹਿੰਦੀਆਂ ਹਨ।",
+        "chooseFolder": "ਫੋਲਡਰ ਚੁਣੋ…",
+        "laterHint": "ਤੁਸੀਂ ਬਾਅਦ ਵਿੱਚ ਵੀ ਸੈਟਿੰਗਾਂ → ਸਟੋਰੇਜ ਤੋਂ ਇੰਪੋਰਟ ਕਰ ਸਕਦੇ ਹੋ।",
+        "notNow": "ਹੁਣ ਨਹੀਂ",
+        "title": "ਆਪਣੇ ਨੋਟ ਇੰਪੋਰਟ ਕਰਨੇ ਹਨ?"
+      },
+      "picker": {
+        "intro": "ਤੁਹਾਡੇ ਨੋਟ ਕਿੱਥੋਂ ਆ ਰਹੇ ਹਨ?"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "ਆਪਣਾ Obsidian ਵਾਲਟ ਫੋਲਡਰ ਚੁਣੋ",
+          "survives": "ਨਾਲ ਆਉਂਦਾ ਹੈ: Markdown, frontmatter, [[wikilinks]], ਫੋਲਡਰ ਢਾਂਚਾ, ਅਟੈਚਮੈਂਟਾਂ।",
+          "loses": "ਪਿੱਛੇ ਰਹਿ ਜਾਂਦਾ ਹੈ: canvas ਫ਼ਾਈਲਾਂ, ਅਤੇ ਜੋ ਕੁਝ ਵੀ Markdown ਨੋਟ ਨਹੀਂ ਹੈ।",
+          "short": "Markdown ਨੋਟਾਂ ਵਾਲਾ ਵਾਲਟ ਫੋਲਡਰ"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "ਆਪਣਾ ਅਨਜ਼ਿੱਪ ਕੀਤਾ Notion ਐਕਸਪੋਰਟ ਫੋਲਡਰ ਚੁਣੋ",
+          "survives": "ਨਾਲ ਆਉਂਦਾ ਹੈ: ਪੰਨੇ, ਫੋਲਡਰ ਢਾਂਚਾ, ਪੰਨੇ ਦੀਆਂ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਖੇਤਰਾਂ ਵਜੋਂ, ਅਤੇ ਅੰਦਰੂਨੀ ਲਿੰਕ ਵਿਕੀਲਿੰਕਾਂ ਵਜੋਂ। ਹਰ ਡਾਟਾਬੇਸ ਵੀ ਇੱਕ ਸਾਰਣੀ ਨੋਟ ਵਜੋਂ ਆਉਂਦਾ ਹੈ ਜੋ ਆਪਣੀਆਂ ਕਤਾਰਾਂ ਨਾਲ ਜੁੜਿਆ ਹੁੰਦਾ ਹੈ।",
+          "loses": "ਪਹਿਲਾਂ ਐਕਸਪੋਰਟ ਅਨਜ਼ਿੱਪ ਕਰੋ — Myne ਫੋਲਡਰ ਪੜ੍ਹਦਾ ਹੈ, .zip ਨਹੀਂ। ਟੌਗਲ, ਕਾਲਆਊਟ ਅਤੇ ਰੰਗੀਨ ਲਿਖਤ ਦਾ ਕੋਈ ਬਰਾਬਰ ਦਾ ਰੂਪ ਨਹੀਂ ਹੈ ਅਤੇ ਇਹ ਇੰਪੋਰਟ ਰਿਪੋਰਟ ਵਿੱਚ ਦਰਜ ਹੁੰਦੇ ਹਨ।",
+          "short": "ਇੱਕ ਅਨਜ਼ਿੱਪ ਕੀਤਾ ਐਕਸਪੋਰਟ ਫੋਲਡਰ"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "ਆਪਣੀ Evernote .enex ਫ਼ਾਈਲ ਚੁਣੋ",
+          "survives": "ਨਾਲ ਆਉਂਦਾ ਹੈ: ਫ਼ਾਈਲ ਦਾ ਹਰ ਨੋਟ, ਸਰੂਪਣ, ਅਤੇ ਅਟੈਚਮੈਂਟਾਂ। ਐਨਕ੍ਰਿਪਟ ਕੀਤੇ ਹਿੱਸੇ ਲਿਖਤ ਵਜੋਂ ਸੰਭਾਲੇ ਜਾਂਦੇ ਹਨ, ਜਿਨ੍ਹਾਂ ਨੂੰ ਤੁਸੀਂ Evernote ਵਿੱਚ ਹਾਲੇ ਵੀ ਡੀਕ੍ਰਿਪਟ ਕਰ ਸਕਦੇ ਹੋ।",
+          "loses": "ਪਿੱਛੇ ਰਹਿ ਜਾਂਦਾ ਹੈ: ਯਾਦ-ਦਹਾਨੀਆਂ ਅਤੇ ਨੋਟ ਦਾ ਇਤਿਹਾਸ। ਬਹੁਤ ਵੱਡੇ ਐਕਸਪੋਰਟ ਜੋਖਮ ਲੈਣ ਦੀ ਥਾਂ ਨਾਮਨਜ਼ੂਰ ਕਰ ਦਿੱਤੇ ਜਾਂਦੇ ਹਨ — ਜੇ ਇੰਝ ਹੋਵੇ ਤਾਂ ਐਕਸਪੋਰਟ ਨੂੰ ਵੰਡ ਲਓ।",
+          "short": "ਇੱਕ ਇਕੱਲੀ .enex ਐਕਸਪੋਰਟ ਫ਼ਾਈਲ"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "HTML ਫ਼ਾਈਲਾਂ ਵਾਲਾ ਫੋਲਡਰ ਚੁਣੋ",
+          "survives": "ਨਾਲ ਆਉਂਦਾ ਹੈ: ਸਿਰਲੇਖ, ਸੂਚੀਆਂ, ਸਾਰਣੀਆਂ, ਲਿੰਕ, ਕੋਡ ਅਤੇ ਜ਼ੋਰ।",
+          "loses": "ਪਿੱਛੇ ਰਹਿ ਜਾਂਦਾ ਹੈ: ਸ਼ੈਲੀ, ਸਕ੍ਰਿਪਟਾਂ ਅਤੇ ਏਮਬੈੱਡ। ਦੂਰ-ਦੁਰਾਡੇ ਦੀਆਂ ਤਸਵੀਰਾਂ ਲਿੰਕ ਹੀ ਰਹਿੰਦੀਆਂ ਹਨ ਅਤੇ ਕਦੇ ਡਾਊਨਲੋਡ ਨਹੀਂ ਹੁੰਦੀਆਂ।",
+          "short": "ਸੰਭਾਲੇ ਵੈੱਬ ਪੰਨਿਆਂ ਵਾਲਾ ਫੋਲਡਰ"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "ਆਪਣੀ .csv ਫ਼ਾਈਲ ਚੁਣੋ",
+          "survives": "ਇਹ ਸਾਰਣੀ ਵਾਲਾ ਇੱਕ ਹੀ ਨੋਟ ਬਣ ਜਾਂਦੀ ਹੈ।",
+          "loses": "ਇਹ ਇੱਕ ਨੋਟ ਹੈ, ਪ੍ਰਤੀ ਕਤਾਰ ਇੱਕ ਨੋਟ ਨਹੀਂ — Myne ਡਾਟਾਬੇਸ ਨਹੀਂ ਹੈ। ਬਹੁਤ ਚੌੜੀਆਂ ਜਾਂ ਬਹੁਤ ਲੰਮੀਆਂ ਫ਼ਾਈਲਾਂ ਛਾਂਟ ਦਿੱਤੀਆਂ ਜਾਂਦੀਆਂ ਹਨ, ਅਤੇ ਇੰਪੋਰਟ ਰਿਪੋਰਟ ਦੱਸਦੀ ਹੈ ਕਿ ਕਿੰਨੀਆਂ।",
+          "short": "ਇੱਕ ਸਪ੍ਰੈੱਡਸ਼ੀਟ ਫ਼ਾਈਲ"
+        }
+      }
+    },
+    "list": {
+      "addToFavorites": "ਮਨਪਸੰਦ ਵਿੱਚ ਸ਼ਾਮਲ ਕਰੋ",
+      "archive": "ਆਰਕਾਈਵ",
+      "archiveBulkError": "ਨੋਟ ਆਰਕਾਈਵ ਨਹੀਂ ਹੋ ਸਕੇ।",
+      "archiveFolder": "ਫੋਲਡਰ ਆਰਕਾਈਵ ਕਰੋ",
+      "archiveNote": "ਆਰਕਾਈਵ",
+      "archiveSingleError": "ਨੋਟ ਆਰਕਾਈਵ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "attachments": "ਅਟੈਚਮੈਂਟਾਂ",
+      "bulkArchive": "{{count}} ਨੋਟ ਆਰਕਾਈਵ ਕਰੋ",
+      "bulkArchive_one": "{{count}} ਨੋਟ ਆਰਕਾਈਵ ਕਰੋ",
+      "bulkArchive_other": "{{count}} ਨੋਟ ਆਰਕਾਈਵ ਕਰੋ",
+      "bulkDelete": "{{count}} ਨੋਟ ਮਿਟਾਓ",
+      "bulkDelete_one": "{{count}} ਨੋਟ ਮਿਟਾਓ",
+      "bulkDelete_other": "{{count}} ਨੋਟ ਮਿਟਾਓ",
+      "moveTo": "ਇੱਥੇ ਭੇਜੋ…",
+      "bulkMove": "{{count}} ਨੋਟ ਇੱਥੇ ਭੇਜੋ…",
+      "bulkMove_one": "{{count}} ਨੋਟ ਇੱਥੇ ਭੇਜੋ…",
+      "bulkMove_other": "{{count}} ਨੋਟ ਇੱਥੇ ਭੇਜੋ…",
+      "caseMergeBody": "“{{name}}” ਨਾਂ ਦਾ ਫੋਲਡਰ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ। ਇਹ ਆਪਸ ਵਿੱਚ ਰਲ ਜਾਣਗੇ — ਵੱਖਰੇ ਰੱਖਣ ਲਈ ਕਿਸੇ ਇੱਕ ਦਾ ਨਾਂ ਬਦਲਣਾ ਹੈ?",
+      "color": "ਰੰਗ…",
+      "createFirstNote": "+ ਆਪਣਾ ਪਹਿਲਾ ਨੋਟ ਬਣਾਓ",
+      "createFolderNote": "ਫੋਲਡਰ ਨੋਟ ਬਣਾਓ",
+      "customize": "ਆਪਣੇ ਮੁਤਾਬਕ ਢਾਲੋ…",
+      "delete": "ਮਿਟਾਓ",
+      "deleteFolderBody_one": "“{{name}}” ਅਤੇ ਇਸਦਾ {{count}} ਨੋਟ",
+      "deleteFolderBody_other": "“{{name}}” ਅਤੇ ਇਸਦੇ {{count}} ਨੋਟ",
+      "deleteFolderConfirm": "ਫੋਲਡਰ ਮਿਟਾਓ",
+      "deleteFolderTitle": "ਇਹ ਫੋਲਡਰ ਮਿਟਾਉਣਾ ਹੈ?",
+      "deleteFolderWarning": "ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਚਲੇ ਜਾਂਦੇ ਹਨ — ਬਾਅਦ ਵਿੱਚ ਬਹਾਲ ਕਰ ਸਕਦੇ ਹੋ।",
+      "duplicate": "ਨਕਲ ਬਣਾਓ",
+      "editFilterTitle": "ਫਿਲਟਰ ਸੰਪਾਦਿਤ ਕਰੋ",
+      "emptyState": "ਹਾਲੇ ਕੋਈ ਨੋਟ ਨਹੀਂ ਹੈ।",
+      "exportHtml": "HTML ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+      "exportMarkdown": "Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+      "exportPdf": "PDF ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+      "exportTxt": "ਸਾਦੀ ਲਿਖਤ ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
+      "favoritesHeading": "ਮਨਪਸੰਦ",
+      "icon": "ਆਈਕਨ…",
+      "mergeAnyway": "ਫਿਰ ਵੀ ਰਲਾਓ",
+      "newDrawingHere": "ਇੱਥੇ ਨਵੀਂ ਡਰਾਇੰਗ",
+      "newDrawingMenu": "ਨਵੀਂ ਡਰਾਇੰਗ",
+      "newFolder": "ਨਵਾਂ ਫੋਲਡਰ",
+      "newFolderInPlaceholder": "{{path}} ਵਿੱਚ ਨਵਾਂ ਫੋਲਡਰ",
+      "newFolderPlaceholder": "ਨਵਾਂ ਫੋਲਡਰ",
+      "newItem": "ਨਵਾਂ…",
+      "newNote": "ਨਵਾਂ ਨੋਟ",
+      "newNoteFromTemplate": "ਟੈਂਪਲੇਟ ਤੋਂ ਨਵਾਂ ਨੋਟ…",
+      "newNoteHere": "ਇੱਥੇ ਨਵਾਂ ਨੋਟ",
+      "newNoteMenu": "ਨਵਾਂ ਨੋਟ",
+      "newNoteShortcut": "ਨਵਾਂ ਨੋਟ (⌘N)",
+      "newSubfolder": "ਨਵਾਂ ਉਪ-ਫੋਲਡਰ",
+      "newViewTitle": "ਨਵਾਂ ਦ੍ਰਿਸ਼",
+      "noteMovedToTrash": "ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਭੇਜ ਦਿੱਤਾ",
+      "notesHeading": "ਨੋਟ",
+      "notesMovedToTrash_one": "{{count}} ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਭੇਜਿਆ",
+      "notesMovedToTrash_other": "{{count}} ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਭੇਜੇ",
+      "openArchive": "ਆਰਕਾਈਵ ਖੋਲ੍ਹੋ",
+      "openAttachments": "ਅਟੈਚਮੈਂਟਾਂ ਖੋਲ੍ਹੋ",
+      "openFolderNote": "ਫੋਲਡਰ ਨੋਟ ਖੋਲ੍ਹੋ",
+      "openInNewTab": "ਨਵੀਂ ਟੈਬ ਵਿੱਚ ਖੋਲ੍ਹੋ",
+      "openToSide": "ਨਾਲ ਵਾਲੇ ਪਾਸੇ ਖੋਲ੍ਹੋ",
+      "openTrash": "ਰੱਦੀ ਖੋਲ੍ਹੋ",
+      "removeFolderNote": "ਫੋਲਡਰ ਨੋਟ ਹਟਾਓ",
+      "removeFromFavorites": "ਮਨਪਸੰਦ ਵਿੱਚੋਂ ਹਟਾਓ",
+      "rename": "ਨਾਂ ਬਦਲੋ",
+      "setAsFolderNote": "ਫੋਲਡਰ ਨੋਟ ਵਜੋਂ ਸੈੱਟ ਕਰੋ",
+      "trash": "ਰੱਦੀ",
+      "trashBulkError": "ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਨਹੀਂ ਭੇਜੇ ਜਾ ਸਕੇ।",
+      "trashConfirmBulkBody_one": "{{count}} ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਭੇਜਿਆ ਜਾਵੇਗਾ।",
+      "trashConfirmBulkBody_other": "{{count}} ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਭੇਜੇ ਜਾਣਗੇ।",
+      "trashConfirmBulkWarning": "ਤੁਸੀਂ ਇਹਨਾਂ ਨੂੰ ਬਾਅਦ ਵਿੱਚ ਰੱਦੀ ਵਿੱਚੋਂ ਬਹਾਲ ਕਰ ਸਕਦੇ ਹੋ।",
+      "trashConfirmConfirm": "ਰੱਦੀ ਵਿੱਚ ਭੇਜੋ",
+      "trashConfirmTitle": "ਰੱਦੀ ਵਿੱਚ ਭੇਜਣਾ ਹੈ?",
+      "trashConfirmWarning": "ਤੁਸੀਂ ਇਸਨੂੰ ਬਾਅਦ ਵਿੱਚ ਰੱਦੀ ਵਿੱਚੋਂ ਬਹਾਲ ਕਰ ਸਕਦੇ ਹੋ।",
+      "trashSingleError": "ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਸਕਿਆ।",
+      "undo": "ਵਾਪਸ ਲਓ",
+      "vaultRoot": "ਵਾਲਟ ਰੂਟ",
+      "viewSettingsTitle": "ਦ੍ਰਿਸ਼ ਸੈਟਿੰਗਾਂ",
+      "imported_one": "ਇਸ ਫੋਲਡਰ ਵਿੱਚ 1 ਨੋਟ ਇੰਪੋਰਟ ਹੋਇਆ",
+      "imported_other": "ਇਸ ਫੋਲਡਰ ਵਿੱਚ {{count}} ਨੋਟ ਇੰਪੋਰਟ ਹੋਏ",
+      "importedWithSkips": "{{count}} ਇੰਪੋਰਟ ਹੋਏ — {{skipped}} ਛੱਡੇ ਗਏ",
+      "importNoMarkdown": "ਉਸ ਵਿੱਚ ਕੋਈ markdown ਫ਼ਾਈਲ ਨਹੀਂ ਸੀ"
+    },
+    "newFromTemplate": {
+      "back": "ਪਿੱਛੇ",
+      "blankNote": "ਖਾਲੀ ਨੋਟ",
+      "createNote": "ਨੋਟ ਬਣਾਓ",
+      "createFirstTemplate": "ਟੈਂਪਲੇਟ ਬਣਾਓ",
+      "manageTemplates": "ਟੈਂਪਲੇਟਾਂ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ",
+      "emptyState": "ਤੁਸੀਂ ਹਾਲੇ ਕੋਈ ਟੈਂਪਲੇਟ ਨਹੀਂ ਬਣਾਇਆ।",
+      "listLabel": "ਟੈਂਪਲੇਟਾਂ",
+      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+      "nameLabel": "ਨੋਟ ਦਾ ਨਾਂ (“{{templateName}}” ਤੋਂ)",
+      "namePlaceholder": "ਬਿਨਾਂ ਸਿਰਲੇਖ",
+      "nameStepTitle": "ਇਸ ਨੋਟ ਦਾ ਨਾਂ ਰੱਖੋ",
+      "pickStepTitle": "ਟੈਂਪਲੇਟ ਤੋਂ ਨਵਾਂ ਨੋਟ",
+      "untitledTemplate": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਟੈਂਪਲੇਟ"
+    },
+    "newTab": {
+      "createNote": "ਨਵਾਂ ਨੋਟ ਬਣਾਓ",
+      "createDrawing": "ਨਵੀਂ ਡਰਾਇੰਗ",
+      "noNotesMatch": "ਕੋਈ ਨੋਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+      "noNotesYet": "ਹਾਲੇ ਕੋਈ ਨੋਟ ਨਹੀਂ ਹੈ।",
+      "recent": "ਹਾਲੀਆ",
+      "searchAriaLabel": "ਖੋਲ੍ਹਣ ਲਈ ਨੋਟ ਖੋਜੋ",
+      "searchPlaceholder": "ਨੋਟ ਖੋਜੋ…",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "pane": {
+      "graphTab": "ਗ੍ਰਾਫ਼",
+      "tasksTab": "ਕੰਮ",
+      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+      "untitledView": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਦ੍ਰਿਸ਼"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} ਦਿਨ ਪਹਿਲਾਂ",
+      "hoursAgo": "{{h}} ਘੰਟੇ ਪਹਿਲਾਂ",
+      "justNow": "ਹੁਣੇ",
+      "minutesAgo": "{{m}} ਮਿੰਟ ਪਹਿਲਾਂ",
+      "oneWeekAgo": "1 ਹਫ਼ਤਾ ਪਹਿਲਾਂ",
+      "weeksAgo": "{{w}} ਹਫ਼ਤੇ ਪਹਿਲਾਂ",
+      "yesterday": "ਕੱਲ੍ਹ"
+    },
+    "row": {
+      "addToFavorites": "ਮਨਪਸੰਦ ਵਿੱਚ ਸ਼ਾਮਲ ਕਰੋ",
+      "folderIndexBadgeLabel": "ਫੋਲਡਰ ਨੋਟ",
+      "folderIndexBadgeTitle": "ਫੋਲਡਰ ਨੋਟ — ਇਸ ਫੋਲਡਰ ਦਾ ਤਤਕਰਾ",
+      "folderIndexConflictLabel": "ਫੋਲਡਰ ਕੋਲ ਪਹਿਲਾਂ ਹੀ ਤਤਕਰਾ ਨੋਟ ਹੈ",
+      "folderIndexConflictTitle": "ਇਸ ਫੋਲਡਰ ਕੋਲ ਪਹਿਲਾਂ ਹੀ ਤਤਕਰਾ ਨੋਟ ਹੈ",
+      "loadError": "ਇਹ ਨੋਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
+      "removeFromFavorites": "ਮਨਪਸੰਦ ਵਿੱਚੋਂ ਹਟਾਓ",
+      "renameAriaLabel": "ਨੋਟ ਦਾ ਨਾਂ ਬਦਲੋ",
+      "taskBadgeLabel": "ਇਹ ਨੋਟ ਇੱਕ ਕੰਮ ਹੈ",
+      "taskBadgeTitle": "ਕੰਮ ਵਾਲਾ ਨੋਟ",
+      "unsyncedLabel": "ਹਾਲੇ ਸਰਵਰ ਉੱਤੇ ਨਹੀਂ",
+      "unsyncedTitle": "ਇਸ ਨੋਟ ਦੇ ਸਭ ਤੋਂ ਨਵੇਂ ਬਦਲਾਅ ਸਿਰਫ਼ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਹਨ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "savedView": {
+      "defaultName": "ਫਿਲਟਰ ਕੀਤਾ ਦ੍ਰਿਸ਼"
+    },
+    "saveStatus": {
+      "conflict": "ਸੰਪਾਦਨ ਦਾ ਟਕਰਾਅ ਸੁਲਝਾਇਆ ਜਾ ਰਿਹਾ ਹੈ…",
+      "conflictTitle": "ਇਹ ਨੋਟ ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ ਉੱਤੇ ਬਦਲਿਆ ਗਿਆ — ਦੋਵੇਂ ਰੂਪ ਰੱਖੇ ਜਾ ਰਹੇ ਹਨ",
+      "editing": "ਸੰਪਾਦਨ",
+      "editingEllipsis": "ਸੰਪਾਦਨ…",
+      "editingTitle": "ਸੰਪਾਦਨ — ਆਪੇ-ਸੰਭਾਲ ਤਿਆਰ ਹੈ",
+      "justNow": "ਹੁਣੇ",
+      "retry": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+      "saved": "ਸੰਭਾਲਿਆ ਗਿਆ",
+      "savedRelative": "{{rel}} ਸੰਭਾਲਿਆ ਗਿਆ",
+      "saveFailed": "ਸੰਭਾਲਿਆ ਨਹੀਂ ਗਿਆ",
+      "saveFailedTitle": "ਸੰਭਾਲਿਆ ਨਹੀਂ ਗਿਆ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ ਦਬਾਓ",
+      "storageFull": "ਸਟੋਰੇਜ ਭਰੀ ਹੋਈ ਹੈ",
+      "storageFullTitle": "ਇਹ ਨੋਟ ਸੰਭਾਲਣ ਲਈ ਥਾਂ ਨਹੀਂ ਬਚੀ। ਥਾਂ ਖਾਲੀ ਕਰੋ (ਜਾਂ ਕੁਝ ਅਟੈਚਮੈਂਟਾਂ ਹਟਾਓ), ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ। ਜਦੋਂ ਤੱਕ ਇਹ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾਂਦਾ, ਇਹ ਸੰਪਾਦਨ ਸਿਰਫ਼ ਇਸ ਵਿੰਡੋ ਵਿੱਚ ਹੈ — ਸਰਵਰ ਉੱਤੇ ਵੀ ਨਹੀਂ ਹੈ।",
+      "saving": "ਸੰਭਾਲਿਆ ਜਾ ਰਿਹਾ ਹੈ",
+      "savingEllipsis": "ਸੰਭਾਲਿਆ ਜਾ ਰਿਹਾ ਹੈ…"
+    },
+    "snapshotFailed": {
+      "dismiss": "ਹਟਾਓ",
+      "message": "ਸਨੈਪਸ਼ਾਟ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ — ਤੁਹਾਡਾ ਨੋਟ ਸੰਭਾਲਿਆ ਗਿਆ ਹੈ, ਪਰ ਇਸਦਾ ਸੰਸਕਰਣ ਇਤਿਹਾਸ ਅਧੂਰਾ ਹੋ ਸਕਦਾ ਹੈ (ਡਿਸਕ ਭਰੀ ਹੋ ਸਕਦੀ ਹੈ)।"
+    },
+    "snapshots": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "changeCount_one": "ਇਸ ਸਨੈਪਸ਼ਾਟ ਤੋਂ ਬਾਅਦ {{count}} ਬਦਲਾਅ",
+      "changeCount_other": "ਇਸ ਸਨੈਪਸ਼ਾਟ ਤੋਂ ਬਾਅਦ {{count}} ਬਦਲਾਅ",
+      "changeCountPrev_one": "ਪਿਛਲੇ ਸਨੈਪਸ਼ਾਟ ਤੋਂ {{count}} ਬਦਲਾਅ",
+      "changeCountPrev_other": "ਪਿਛਲੇ ਸਨੈਪਸ਼ਾਟ ਤੋਂ {{count}} ਬਦਲਾਅ",
+      "close": "ਬੰਦ ਕਰੋ",
+      "compareAgainstLabel": "ਕਿਸ ਨਾਲ ਤੁਲਨਾ ਕਰਨੀ ਹੈ",
+      "compareCurrent": "ਮੌਜੂਦਾ ਨੋਟ",
+      "comparePrevious": "ਪਿਛਲਾ ਸਨੈਪਸ਼ਾਟ",
+      "confirmBody": "ਤੁਹਾਡਾ ਮੌਜੂਦਾ ਨੋਟ ਪਹਿਲਾਂ ਸਨੈਪਸ਼ਾਟ ਵਜੋਂ ਸੰਭਾਲਿਆ ਜਾਵੇਗਾ, ਤਾਂ ਜੋ ਤੁਸੀਂ ਇਹ ਵਾਪਸ ਲੈ ਸਕੋ।",
+      "confirmTitle": "ਇਹ ਸਨੈਪਸ਼ਾਟ ਬਹਾਲ ਕਰਨਾ ਹੈ?",
+      "decrypting": "ਡੀਕ੍ਰਿਪਟ ਹੋ ਰਿਹਾ ਹੈ…",
+      "emptyState": "ਹਾਲੇ ਕੋਈ ਸਨੈਪਸ਼ਾਟ ਨਹੀਂ। ਸੰਪਾਦਨ ਦੌਰਾਨ ਸਨੈਪਸ਼ਾਟ ਆਪਣੇ-ਆਪ ਸੰਭਾਲੇ ਜਾਂਦੇ ਹਨ ਅਤੇ ਲਗਭਗ 7 ਦਿਨ ਰੱਖੇ ਜਾਂਦੇ ਹਨ। ਇਹ ਐਨਕ੍ਰਿਪਟ ਕੀਤੇ ਹੁੰਦੇ ਹਨ, ਅਤੇ ਨੋਟ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾਏ ਜਾਣ ਉੱਤੇ ਖ਼ਤਮ ਹੋ ਜਾਂਦੇ ਹਨ।",
+      "encryptedSize": "ਐਨਕ੍ਰਿਪਟ ਕੀਤਾ · {{size}}",
+      "errorCannotDecrypt": "ਇਹ ਸਨੈਪਸ਼ਾਟ ਡੀਕ੍ਰਿਪਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "errorGeneric": "ਕੁਝ ਗੜਬੜ ਹੋ ਗਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "errorIo": "ਡਿਸਕ ਦੀ ਗੜਬੜ ਹੋਈ — ਡਿਸਕ ਭਰੀ ਹੋ ਸਕਦੀ ਹੈ ਜਾਂ ਉਸ ਉੱਤੇ ਲਿਖਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ।",
+      "errorNotFound": "ਉਹ ਸਨੈਪਸ਼ਾਟ ਹੁਣ ਮੌਜੂਦ ਨਹੀਂ ਹੈ।",
+      "errorStorageAccess": "ਵਾਲਟ ਦੀ ਸਨੈਪਸ਼ਾਟ ਸਟੋਰੇਜ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "errorVaultLocked": "ਵਾਲਟ ਲਾਕ ਹੈ। ਸਨੈਪਸ਼ਾਟ ਵੇਖਣ ਲਈ ਇਸਨੂੰ ਅਨਲਾਕ ਕਰੋ।",
+      "justNow": "ਹੁਣੇ",
+      "listLabel": "ਸਨੈਪਸ਼ਾਟ ਸੂਚੀ",
+      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+      "noPrevious": "ਇਹ ਸਭ ਤੋਂ ਪੁਰਾਣਾ ਸਨੈਪਸ਼ਾਟ ਹੈ — ਇਸ ਤੋਂ ਪਹਿਲਾਂ ਤੁਲਨਾ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ ਹੈ।",
+      "restore": "ਬਹਾਲ ਕਰੋ",
+      "restoreCta": "ਇਹ ਸਨੈਪਸ਼ਾਟ ਬਹਾਲ ਕਰੋ",
+      "restoredStatus": "ਬਹਾਲ ਹੋ ਗਿਆ। ਤੁਹਾਡੇ ਕੋਲ ਜੋ ਰੂਪ ਸੀ, ਉਹ ਸਨੈਪਸ਼ਾਟ ਵਜੋਂ ਸੰਭਾਲ ਲਿਆ ਗਿਆ ਹੈ।",
+      "selectPlaceholder": "ਕੋਈ ਸਨੈਪਸ਼ਾਟ ਚੁਣੋ ਤਾਂ ਜੋ ਉਸ ਤੋਂ ਬਾਅਦ ਦੇ ਬਦਲਾਅ ਦੀ ਝਲਕ ਦਿਸੇ।",
+      "title": "ਸਨੈਪਸ਼ਾਟ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "tabStrip": {
+      "closeNewTab": "ਨਵੀਂ ਟੈਬ ਬੰਦ ਕਰੋ",
+      "closeTab": "{{title}} ਬੰਦ ਕਰੋ",
+      "newTab": "ਨਵੀਂ ਟੈਬ",
+      "openNotes": "ਖੁੱਲ੍ਹੇ ਨੋਟ",
+      "pin": "ਪਿੰਨ ਕਰੋ",
+      "pinned": "ਪਿੰਨ ਕੀਤੀ",
+      "pinnedTitle": "ਪਿੰਨ ਕੀਤੀ — ਬੰਦ ਕਰਨ ਲਈ ਪਿੰਨ ਹਟਾਓ",
+      "unpin": "ਪਿੰਨ ਹਟਾਓ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "tagBrowser": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "clear": "ਸਾਫ਼ ਕਰੋ",
+      "combineTagsWith": "ਟੈਗ ਜੋੜਨ ਦਾ ਤਰੀਕਾ",
+      "filtering": "ਫਿਲਟਰ ਹੋ ਰਿਹਾ ਹੈ…",
+      "modeAll": "ਸਾਰੇ",
+      "modeAny": "ਕੋਈ ਵੀ",
+      "noNotesForFilter": "ਇਸ ਫਿਲਟਰ ਲਈ ਕੋਈ ਨੋਟ ਨਹੀਂ।",
+      "noTagsMatch": "“{{query}}” ਨਾਲ ਕੋਈ ਟੈਗ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+      "noTagsYet": "ਹਾਲੇ ਕੋਈ ਟੈਗ ਨਹੀਂ ਹੈ।",
+      "noteCount_one": "{{count}} ਨੋਟ",
+      "noteCount_other": "{{count}} ਨੋਟ",
+      "notes": "ਨੋਟ",
+      "pickTag": "ਫਿਲਟਰ ਕਰਨ ਲਈ ਕੋਈ ਟੈਗ ਚੁਣੋ।",
+      "save": "ਸੰਭਾਲੋ",
+      "saveAsView": "ਦ੍ਰਿਸ਼ ਵਜੋਂ ਸੰਭਾਲੋ",
+      "searchPlaceholder": "ਟੈਗ ਖੋਜੋ…",
+      "title": "ਟੈਗ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ",
+      "viewNamePlaceholder": "ਦ੍ਰਿਸ਼ ਦਾ ਨਾਂ"
+    },
+    "trash": {
+      "close": "ਬੰਦ ਕਰੋ",
+      "count_one": "{{count}} ਨੋਟ",
+      "count_other": "{{count}} ਨੋਟ",
+      "delete": "ਮਿਟਾਓ",
+      "deleteError": "ਉਹ ਨੋਟ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "empty": "ਰੱਦੀ ਖਾਲੀ ਕਰੋ",
+      "emptyConfirmBody_one": "{{count}} ਨੋਟ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾਇਆ ਜਾਵੇਗਾ।",
+      "emptyConfirmBody_other": "{{count}} ਨੋਟ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾਏ ਜਾਣਗੇ।",
+      "emptyConfirmCta": "ਰੱਦੀ ਖਾਲੀ ਕਰੋ",
+      "emptyConfirmTitle": "ਰੱਦੀ ਖਾਲੀ ਕਰਨੀ ਹੈ?",
+      "emptyPartialFailure_one": "{{count}} ਨੋਟ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ ਅਤੇ ਰੱਦੀ ਵਿੱਚ ਹੀ ਹੈ।",
+      "emptyPartialFailure_other": "{{count}} ਨੋਟ ਮਿਟਾਏ ਨਹੀਂ ਜਾ ਸਕੇ ਅਤੇ ਰੱਦੀ ਵਿੱਚ ਹੀ ਹਨ।",
+      "emptyBody": "ਤੁਹਾਡੇ ਮਿਟਾਏ ਨੋਟ ਇੱਥੇ ਆਉਂਦੇ ਹਨ। ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਰੱਦੀ ਖਾਲੀ ਨਹੀਂ ਕਰਦੇ, ਇਹ ਇੱਥੇ ਰਹਿੰਦੇ ਹਨ — ਕਿਸੇ ਨੂੰ ਵੀ ਕਿਸੇ ਵੀ ਵੇਲੇ ਬਹਾਲ ਕਰ ਸਕਦੇ ਹੋ।",
+      "emptyTitle": "ਰੱਦੀ ਖਾਲੀ ਹੈ",
+      "purgeConfirmCta": "ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾਓ",
+      "purgeConfirmTitle": "ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾਉਣਾ ਹੈ?",
+      "restore": "ਬਹਾਲ ਕਰੋ",
+      "restoreError": "ਉਹ ਨੋਟ ਬਹਾਲ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "title": "ਰੱਦੀ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "unlinkedMentions": {
+      "empty": "ਕੋਈ ਬਿਨਾਂ-ਲਿੰਕ ਜ਼ਿਕਰ ਨਹੀਂ।",
+      "heading": "ਬਿਨਾਂ-ਲਿੰਕ ਜ਼ਿਕਰ",
+      "link": "ਲਿੰਕ ਕਰੋ",
+      "linkTooltip": "ਇਸ ਜ਼ਿਕਰ ਨੂੰ {{title}} ਨਾਲ ਲਿੰਕ ਕਰੋ",
+      "refresh": "ਜ਼ਿਕਰ ਬਦਲੇ ਹੋ ਸਕਦੇ ਹਨ — ਤਾਜ਼ਾ ਕਰੋ",
+      "searching": "ਖੋਜ ਹੋ ਰਹੀ ਹੈ…",
+      "thisNote": "ਇਹ ਨੋਟ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "ਕਵਰ ਬਦਲੋ",
+        "changeCoverImage": "ਕਵਰ ਤਸਵੀਰ ਬਦਲੋ",
+        "empty": "ਇਸ ਦ੍ਰਿਸ਼ ਨਾਲ ਕੋਈ ਨੋਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
+        "noValue": "ਕੋਈ ਮੁੱਲ ਨਹੀਂ",
+        "setCover": "ਕਵਰ ਸੈੱਟ ਕਰੋ",
+        "setCoverImage": "ਕਵਰ ਤਸਵੀਰ ਸੈੱਟ ਕਰੋ",
+        "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+      },
+      "collapseViews": "ਦ੍ਰਿਸ਼ ਸਮੇਟੋ",
+      "empty": "ਹਾਲੇ ਕੋਈ ਦ੍ਰਿਸ਼ ਨਹੀਂ। ਮੌਜੂਦਾ ਨੋਟ ਸੂਚੀ ਨੂੰ ਦ੍ਰਿਸ਼ ਵਜੋਂ ਸੰਭਾਲੋ।",
+      "expandViews": "ਦ੍ਰਿਸ਼ ਫੈਲਾਓ",
+      "heading": "ਦ੍ਰਿਸ਼",
+      "host": {
+        "unsupported": "ਇਸ ਕਿਸਮ ਦਾ ਦ੍ਰਿਸ਼ ਕਿਸੇ ਅਗਲੇ ਅੱਪਡੇਟ ਵਿੱਚ ਆਵੇਗਾ।"
+      },
+      "list": {
+        "empty": "ਇਸ ਦ੍ਰਿਸ਼ ਨਾਲ ਕੋਈ ਨੋਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
+        "noValue": "ਕੋਈ ਮੁੱਲ ਨਹੀਂ"
+      },
+      "menu": {
+        "deleteView": "ਦ੍ਰਿਸ਼ ਮਿਟਾਓ",
+        "editFilter": "ਫਿਲਟਰ ਸੰਪਾਦਿਤ ਕਰੋ…",
+        "moveDown": "ਹੇਠਾਂ ਲਿਜਾਓ",
+        "moveUp": "ਉੱਤੇ ਲਿਜਾਓ",
+        "rename": "ਨਾਂ ਬਦਲੋ",
+        "viewSettings": "ਦ੍ਰਿਸ਼ ਸੈਟਿੰਗਾਂ…"
+      },
+      "newView": "ਨਵਾਂ ਦ੍ਰਿਸ਼",
+      "noMatch": "ਤੁਹਾਡੀ ਖੋਜ ਨਾਲ ਕੋਈ ਦ੍ਰਿਸ਼ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+      "searchPlaceholder": "ਦ੍ਰਿਸ਼ ਖੋਜੋ…",
+      "table": {
+        "empty": "ਇਸ ਦ੍ਰਿਸ਼ ਨਾਲ ਕੋਈ ਨੋਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
+        "name": "ਨਾਂ",
+        "noValue": "ਕੋਈ ਮੁੱਲ ਨਹੀਂ"
+      },
+      "untitledView": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਦ੍ਰਿਸ਼"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "ਮੂਲ (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (ਵਰਗ)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (ਚੌੜਾ)"
+      },
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "cardSize": "ਕਾਰਡ ਦਾ ਆਕਾਰ",
+      "cardSizeValue": "{{size}} px",
+      "columns": "ਕਾਲਮ",
+      "columnsEmpty": "ਕੋਈ ਵਿਸ਼ੇਸ਼ਤਾ ਨਹੀਂ ਮਿਲੀ",
+      "columnsHint": "frontmatter ਦੀਆਂ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਕਾਲਮਾਂ ਵਜੋਂ (ਸਾਰਣੀ) ਜਾਂ ਵੇਰਵੇ ਦੀ ਲਾਈਨ ਵਜੋਂ (ਸੂਚੀ / ਕਾਰਡ) ਦਿਖਾਈਆਂ ਜਾਂਦੀਆਂ ਹਨ।",
+      "columnsPlaceholder": "ਕਾਲਮ ਜੋੜੋ…",
+      "coverImageHint": "ਉਹ frontmatter ਵਿਸ਼ੇਸ਼ਤਾ ਜਿਸਦਾ ਮੁੱਲ ਤਸਵੀਰ ਹੈ — ਹਰ ਕਾਰਡ ਦੇ ਕਵਰ ਵਜੋਂ ਦਿਖਾਈ ਜਾਂਦੀ ਹੈ। ਕਵਰ ਨਾ ਚਾਹੀਦਾ ਹੋਵੇ ਤਾਂ ਖਾਲੀ ਛੱਡੋ।",
+      "coverImagePlaceholder": "ਜਿਵੇਂ cover",
+      "coverImageProperty": "ਕਵਰ ਤਸਵੀਰ ਵਿਸ਼ੇਸ਼ਤਾ",
+      "groupBy": "ਸਮੂਹ ਬਣਾਓ",
+      "imageAspectRatio": "ਤਸਵੀਰ ਦਾ ਆਕਾਰ ਅਨੁਪਾਤ",
+      "propertyNone": "ਕੋਈ ਨਹੀਂ",
+      "reset": "ਮੁੜ ਸੈੱਟ ਕਰੋ",
+      "save": "ਸੰਭਾਲੋ",
+      "sortAsc": "ਵਧਦੇ ਕ੍ਰਮ ਵਿੱਚ",
+      "sortBy": "ਕ੍ਰਮਬੱਧ ਕਰੋ",
+      "sortDesc": "ਘਟਦੇ ਕ੍ਰਮ ਵਿੱਚ",
+      "sortDirection": "ਕ੍ਰਮ ਦੀ ਦਿਸ਼ਾ",
+      "viewType": "ਦ੍ਰਿਸ਼ ਦੀ ਕਿਸਮ",
+      "viewTypeCards": "ਕਾਰਡ",
+      "viewTypeList": "ਸੂਚੀ",
+      "viewTypeTable": "ਸਾਰਣੀ"
+    },
+    "welcome": {
+      "body": "Myne ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ — ਸੋਚਣ ਅਤੇ ਲਿਖਣ ਲਈ ਤੁਹਾਡੀ ਨਿੱਜੀ ਥਾਂ।\n\nਜੋ ਵੀ ਤੁਸੀਂ ਇੱਥੇ ਸੰਭਾਲਦੇ ਹੋ, ਉਹ ਐਨਕ੍ਰਿਪਟ ਹੁੰਦਾ ਹੈ ਅਤੇ ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਉੱਤੇ ਹੀ ਰਹਿੰਦਾ ਹੈ। ਤੁਹਾਡਾ **ਪਾਸਵਰਡ** ਅਤੇ **ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼** ਹੀ ਇਸਦੀਆਂ ਇੱਕੋ-ਇੱਕ ਚਾਬੀਆਂ ਹਨ, ਇਸ ਲਈ ਇਹਨਾਂ ਨੂੰ ਕਿਸੇ ਸੁਰੱਖਿਅਤ ਥਾਂ ਰੱਖੋ। ਜੇ ਦੋਵੇਂ ਕਦੇ ਗੁਆਚ ਗਏ, ਤਾਂ ਤੁਹਾਡੇ ਨੋਟ ਕੋਈ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਸਕਦਾ, ਅਸੀਂ ਵੀ ਨਹੀਂ।\n\nਇਹ ਵੀ ਇੱਕ ਆਮ ਨੋਟ ਹੀ ਹੈ, ਸੋ ਇਸਨੂੰ ਆਪਣਾ ਬਣਾ ਲਓ। ਜਦੋਂ ਚਾਹੋ ਇਸਨੂੰ ਸੰਪਾਦਿਤ ਕਰੋ, ਨਾਂ ਬਦਲੋ ਜਾਂ ਮਿਟਾ ਦਿਓ, ਅਤੇ ਜਿਵੇਂ-ਜਿਵੇਂ ਤੁਹਾਡੇ ਵਿਚਾਰ ਵਧਣ, ਨਵੇਂ ਨੋਟ ਜੋੜਦੇ ਜਾਓ।\n\nਸਾਨੂੰ ਖੁਸ਼ੀ ਹੈ ਕਿ ਤੁਸੀਂ ਇੱਥੇ ਹੋ। Myne ਬਾਰੇ ਹੋਰ ਜਾਣਨ ਲਈ https://myne.md ਵੇਖੋ\n",
+      "title": "Myne ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ"
+    },
+    "workspace": {
+      "defaultSlotName": "ਮੂਲ"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "ਮਜ਼ਬੂਤੀ ਜਾਂਚੀ ਜਾ ਰਹੀ ਹੈ…",
+      "confirmLabel": "ਮਾਸਟਰ ਪਾਸਵਰਡ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
+      "defaultEmptyCaption": "ਇਹ Argon2id (m=256 MiB, t=3, p=2) ਲਈ ਇਨਪੁੱਟ ਵਜੋਂ ਵਰਤਿਆ ਜਾਂਦਾ ਹੈ। ਅਜਿਹਾ ਚੁਣੋ ਜੋ ਤੁਹਾਨੂੰ ਯਾਦ ਰਹੇ; ਇਸਨੂੰ ਮੁੜ-ਸੈੱਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
+      "mismatch": "ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ।",
+      "passwordLabel": "ਮਾਸਟਰ ਪਾਸਵਰਡ",
+      "suggestPassword": "ਪਾਸਵਰਡ ਸੁਝਾਓ",
+      "tooShort": "ਘੱਟੋ-ਘੱਟ {{n}} ਅੱਖਰ ਵਰਤੋ।"
+    },
+    "input": {
+      "hide": "ਪਾਸਵਰਡ ਲੁਕਾਓ",
+      "show": "ਪਾਸਵਰਡ ਦਿਖਾਓ"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "ਕੋਈ ਮੇਲ ਨਹੀਂ।",
+      "placeholder": "ਚੁਣੋ…",
+      "searchPlaceholder": "ਖੋਜੋ…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "ਰਿਕਵਰੀ ਰੱਦ ਕੀਤੀ ਗਈ: ਵਾਲਟ ਲਾਕ ਹੋ ਗਿਆ ਸੀ।",
+      "operationInProgress": "ਕਾਰਵਾਈ ਚੱਲ ਰਹੀ ਹੈ। ਉਡੀਕ ਕਰੋ।",
+      "unexpected": "ਅਣਕਿਆਸੀ ਗੜਬੜ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "vaultNotFound": "ਵਾਲਟ ਫ਼ਾਈਲ ਨਹੀਂ ਮਿਲੀ। ਐਪ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰੋ।"
+    },
+    "vaultUnreadable": "ਵਾਲਟ ਫ਼ਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ। ਕਿਸੇ ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ।",
+    "genericError": "ਕੁਝ ਗੜਬੜ ਹੋ ਗਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "weakPassword": "ਪਾਸਵਰਡ ਘੱਟੋ-ਘੱਟ {{min}} ਅੱਖਰਾਂ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।",
+    "setPasswordError": "ਤੁਹਾਡਾ ਨਵਾਂ ਪਾਸਵਰਡ ਸੈੱਟ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "passwordMismatch": "ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ।",
+    "decryptingSubtitle": "Argon2id ਨਾਲ ਤੁਹਾਡੇ ਵਾਲਟ ਦੀਆਂ ਚਾਬੀਆਂ ਮੁੜ ਬਣਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ। ਇਸ ਵਿੱਚ ਕੁਝ ਸਕਿੰਟ ਲੱਗਦੇ ਹਨ।",
+    "restoreVaultHeader": "ਵਾਲਟ ਬਹਾਲ ਕਰੋ",
+    "accountTitle": "ਆਪਣਾ ਖਾਤਾ ਨੰਬਰ ਦਾਖਲ ਕਰੋ",
+    "accountLead": "ਇਹ ਉੱਥੇ ਮਿਲੇਗਾ ਜਿੱਥੇ ਤੁਸੀਂ ਆਪਣਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਸੰਭਾਲਿਆ ਸੀ। ਇਹ ਦੱਸਦਾ ਹੈ ਕਿ ਕਿਹੜਾ ਵਾਲਟ ਬਹਾਲ ਕਰਨਾ ਹੈ।",
+    "accountInvalid": "ਗ਼ਲਤ ਖਾਤਾ ਨੰਬਰ — ਜਾਂਚ ਕੇ ਦੁਬਾਰਾ ਦਾਖਲ ਕਰੋ।",
+    "accountOptionalHint": "ਤੁਹਾਡੇ ਕੋਲ ਨਹੀਂ ਹੈ? ਇਸਨੂੰ ਖਾਲੀ ਛੱਡ ਕੇ ਅੱਗੇ ਵਧੋ — ਤੁਹਾਡਾ 24-ਸ਼ਬਦਾਂ ਵਾਲਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਹੀ ਕਾਫ਼ੀ ਹੈ।",
+    "paste": "ਪੇਸਟ ਕਰੋ",
+    "phraseGridHint": "ਹਰ ਸ਼ਬਦ ਟਾਈਪ ਕਰੋ, ਜਾਂ ਸਾਰੇ 24 ਇੱਕੋ ਵਾਰ ਪੇਸਟ ਕਰਕੇ ਗਰਿੱਡ ਭਰੋ।",
+    "submitProgress": "ਭੇਜੋ · {{total}} ਵਿੱਚੋਂ {{filled}}",
+    "newPasswordTitle": "ਨਵਾਂ ਪਾਸਵਰਡ ਚੁਣੋ",
+    "newPasswordLead": "ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਉਹੀ ਰਹਿੰਦਾ ਹੈ। ਇਹ ਇਸ ਡਿਵਾਈਸ ਲਈ ਪਾਸਵਰਡ ਸੈੱਟ ਕਰਦਾ ਹੈ।",
+    "confirmPasswordLabel": "ਪਾਸਵਰਡ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
+    "passwordHelper": "ਨਾ ਕਦੇ ਸੰਭਾਲਿਆ ਜਾਂਦਾ ਹੈ, ਨਾ ਕਦੇ ਭੇਜਿਆ ਜਾਂਦਾ ਹੈ। ਇਹ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਤੁਹਾਡੀਆਂ ਚਾਬੀਆਂ ਐਨਕ੍ਰਿਪਟ ਕਰਦਾ ਹੈ।",
+    "encryptingSubtitle": "ਤੁਹਾਡੀਆਂ ਵਾਲਟ ਚਾਬੀਆਂ ਨਵੇਂ ਪਾਸਵਰਡ ਨਾਲ ਲਪੇਟੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।"
+  },
+  "recurrence": {
+    "every": {
+      "day": "ਹਰ ਰੋਜ਼",
+      "week": "ਹਰ ਹਫ਼ਤੇ",
+      "month": "ਹਰ ਮਹੀਨੇ",
+      "year": "ਹਰ ਸਾਲ"
+    },
+    "everyN": {
+      "day": "ਹਰ {{count}} ਦਿਨ ਬਾਅਦ",
+      "week": "ਹਰ {{count}} ਹਫ਼ਤੇ ਬਾਅਦ",
+      "month": "ਹਰ {{count}} ਮਹੀਨੇ ਬਾਅਦ",
+      "year": "ਹਰ {{count}} ਸਾਲ ਬਾਅਦ"
+    },
+    "everyWeekday": "ਹਰ {{days}}",
+    "everyWeekdays": "ਹਰ {{days}}",
+    "ordinal": {
+      "first": "ਪਹਿਲਾ",
+      "second": "ਦੂਜਾ",
+      "third": "ਤੀਜਾ",
+      "fourth": "ਚੌਥਾ",
+      "last": "ਆਖ਼ਰੀ"
+    },
+    "ordinalOfMonth": "ਹਰ ਮਹੀਨੇ ਦਾ {{ordinal}} {{weekday}}",
+    "dayOfMonth": "ਹਰ ਮਹੀਨੇ ਦੀ {{day}} ਤਾਰੀਖ਼",
+    "lastDayOfMonth": "ਹਰ ਮਹੀਨੇ ਦਾ ਆਖ਼ਰੀ ਦਿਨ",
+    "weekday": {
+      "monday": "ਸੋਮਵਾਰ",
+      "tuesday": "ਮੰਗਲਵਾਰ",
+      "wednesday": "ਬੁੱਧਵਾਰ",
+      "thursday": "ਵੀਰਵਾਰ",
+      "friday": "ਸ਼ੁੱਕਰਵਾਰ",
+      "saturday": "ਸ਼ਨੀਵਾਰ",
+      "sunday": "ਐਤਵਾਰ"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, ਪੂਰਾ ਹੋਣ 'ਤੇ",
+    "builder": {
+      "family": "ਦੁਹਰਾਓ",
+      "familyInterval": "ਹਰ…",
+      "familyWeekdays": "ਹਫ਼ਤਾਵਾਰ, ਇਸ ਦਿਨ…",
+      "familyDayOfMonth": "ਮਹੀਨਾਵਾਰ, ਇਸ ਤਾਰੀਖ਼…",
+      "familyOrdinal": "ਮਹੀਨਾਵਾਰ, ਇਸ ਵਾਰ…",
+      "count": "ਵਕਫ਼ਾ",
+      "unitLabel": "ਇਕਾਈ",
+      "units": {
+        "day": "ਦਿਨ",
+        "week": "ਹਫ਼ਤੇ",
+        "month": "ਮਹੀਨੇ",
+        "year": "ਸਾਲ"
+      },
+      "ordinal": "ਸਥਾਨ",
+      "weekday": "ਵਾਰ",
+      "lastDay": "ਆਖ਼ਰੀ ਦਿਨ",
+      "whenDone": "ਪੂਰਾ ਹੋਣ ਦੀ ਤਾਰੀਖ਼ ਤੋਂ ਦੁਹਰਾਓ",
+      "weekdayShort": {
+        "monday": "ਸੋਮ",
+        "tuesday": "ਮੰਗਲ",
+        "wednesday": "ਬੁੱਧ",
+        "thursday": "ਵੀਰ",
+        "friday": "ਸ਼ੁੱਕਰ",
+        "saturday": "ਸ਼ਨੀ",
+        "sunday": "ਐਤ"
+      }
+    }
+  },
+  "restore": {
+    "backLabel": "ਪਿੱਛੇ",
+    "cancelLabel": "ਰੱਦ ਕਰੋ",
+    "collision": {
+      "body": "ਇਸ ਬੈਕਅੱਪ ਵਾਲਾ ਵਾਲਟ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ। ਤੁਸੀਂ ਦੋਵੇਂ ਰੱਖ ਸਕਦੇ ਹੋ — ਬਹਾਲ ਕੀਤੀ ਕਾਪੀ ਤੁਹਾਡੀ ਵਾਲਟ ਸੂਚੀ ਵਿੱਚ ਵੱਖਰੇ ਵਾਲਟ ਵਜੋਂ ਦਿਸੇਗੀ — ਜਾਂ ਹੁਣੇ ਬਹਾਲ ਕਰਕੇ ਮੌਜੂਦਾ ਵਾਲਟ ਨੂੰ ਵਾਲਟ ਸੂਚੀ ਵਿੱਚੋਂ ਆਪ ਹਟਾ ਸਕਦੇ ਹੋ (ਹਟਾਉਣ ਲਈ DELETE ਟਾਈਪ ਕਰਨਾ ਪੈਂਦਾ ਹੈ, ਅਤੇ ਇਹ ਤਾਂ ਹੀ ਸਮਝਦਾਰੀ ਹੈ ਜਦੋਂ ਤੁਸੀਂ ਪੱਕਾ ਕਰ ਲਵੋ ਕਿ ਬਹਾਲ ਕੀਤਾ ਵਾਲਟ ਖੁੱਲ੍ਹਦਾ ਹੈ)।",
+      "keepBoth": "ਦੋਵੇਂ ਰੱਖੋ",
+      "replaceExisting": "ਬਹਾਲ ਕਰੋ, ਫਿਰ ਮੌਜੂਦਾ ਬਦਲੋ…"
+    },
+    "damaged": {
+      "body": "ਬੈਕਅੱਪ ਫ਼ਾਈਲ ਖ਼ਰਾਬ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਵੀ ਬਹਾਲ ਨਹੀਂ ਹੋਇਆ। ਜੇ ਤੁਹਾਡੇ ਕੋਲ ਇਹੀ ਇੱਕੋ ਕਾਪੀ ਹੈ, ਤਾਂ ਬਚਾਅ ਰਾਹੀਂ ਸਹੀ-ਸਲਾਮਤ ਨੋਟ ਬਹਾਲ ਕੀਤੇ ਜਾ ਸਕਦੇ ਹਨ ਅਤੇ ਜੋ ਪੜ੍ਹੇ ਨਹੀਂ ਗਏ ਉਹਨਾਂ ਦੀ ਪੂਰੀ ਸੂਚੀ ਮਿਲ ਸਕਦੀ ਹੈ — ਨਤੀਜੇ ਉੱਤੇ ਹਮੇਸ਼ਾ ਅਧੂਰੀ ਬਹਾਲੀ ਦਾ ਨਿਸ਼ਾਨ ਲੱਗਦਾ ਹੈ।",
+      "close": "ਬੰਦ ਕਰੋ",
+      "salvage": "ਸਹੀ-ਸਲਾਮਤ ਨੋਟ ਬਚਾਓ…"
+    },
+    "error": {
+      "tryAnotherFile": "ਕੋਈ ਹੋਰ ਫ਼ਾਈਲ ਅਜ਼ਮਾਓ"
+    },
+    "pick": {
+      "body": "ਕੋਈ <code>.myne-backup</code> ਫ਼ਾਈਲ ਚੁਣੋ। ਕੁਝ ਵੀ ਬਹਾਲ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਬੈਕਅੱਪ ਦੀ ਤਸਦੀਕ ਹੁੰਦੀ ਹੈ; ਬਹਾਲ ਕੀਤਾ ਵਾਲਟ ਉਸੇ ਵਾਲਟ ਦੇ ਪਾਸਵਰਡ ਜਾਂ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਨਾਲ ਖੁੱਲ੍ਹਦਾ ਹੈ — ਬਿਲਕੁਲ ਅਨਲਾਕ ਵਾਂਗ।",
+      "chooseFile": "ਬੈਕਅੱਪ ਫ਼ਾਈਲ ਚੁਣੋ…",
+      "corruptedSuffix": "ਤੁਹਾਡੇ ਮੌਜੂਦਾ ਵਾਲਟ ਨੂੰ ਹੱਥ ਨਹੀਂ ਲਾਇਆ ਜਾਂਦਾ: ਬੈਕਅੱਪ ਪਹਿਲਾਂ ਵੱਖਰੇ ਵਾਲਟ ਵਜੋਂ ਬਹਾਲ ਹੁੰਦਾ ਹੈ।"
+    },
+    "summary": {
+      "attachments": "ਅਟੈਚਮੈਂਟਾਂ: {{n}}",
+      "collidedNote": "ਇਸ ਵਾਲਟ ਦੀ ਪਹਿਲਾਂ ਵਾਲੀ ਕਾਪੀ ਹਾਲੇ ਵੀ ਤੁਹਾਡੀ ਵਾਲਟ ਸੂਚੀ ਵਿੱਚ ਹੈ। ਜਦੋਂ ਤੁਸੀਂ ਪੱਕਾ ਕਰ ਲਵੋ ਕਿ ਬਹਾਲ ਕੀਤਾ ਵਾਲਟ ਖੁੱਲ੍ਹਦਾ ਹੈ, ਤਾਂ ਪੁਰਾਣੀ ਨੂੰ ਵਾਲਟ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾ ਸਕਦੇ ਹੋ (ਇਹ ਤੁਹਾਨੂੰ DELETE ਟਾਈਪ ਕਰਨ ਲਈ ਕਹੇਗਾ)।",
+      "notes": "ਨੋਟ: {{n}}",
+      "openVaultList": "ਵਾਲਟ ਸੂਚੀ ਖੋਲ੍ਹੋ",
+      "partialHeader_one": "ਅਧੂਰਾ ਬਹਾਲ ਹੋਇਆ — {{count}} ਆਈਟਮ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
+      "partialHeader_other": "ਅਧੂਰਾ ਬਹਾਲ ਹੋਇਆ — {{count}} ਆਈਟਮਾਂ ਪੜ੍ਹੀਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ।",
+      "restored": "ਵਾਲਟ ਬਹਾਲ ਹੋ ਗਿਆ।",
+      "versionHistory": "ਸੰਸਕਰਣ ਇਤਿਹਾਸ ਦੀਆਂ ਇੰਦਰਾਜਾਂ: {{n}}"
+    },
+    "title": "ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ",
+    "working": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "restoringProgress": "ਬਹਾਲ ਹੋ ਰਿਹਾ ਹੈ… {{total}} ਵਿੱਚੋਂ {{done}}",
+      "verifying": "ਬੈਕਅੱਪ ਦੀ ਤਸਦੀਕ ਹੋ ਰਹੀ ਹੈ…",
+      "verifyingProgress": "ਬੈਕਅੱਪ ਦੀ ਤਸਦੀਕ ਹੋ ਰਹੀ ਹੈ… {{total}} ਵਿੱਚੋਂ {{done}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "ਡਿਵੈਲਪਮੈਂਟ ਬਿਲਡ",
+      "buildLabel": "ਬਿਲਡ",
+      "buildChannelLabel": "ਬਿਲਡ ਚੈਨਲ",
+      "buildChannelStable": "ਸਥਿਰ",
+      "changelogButton": "ਬਦਲਾਅ-ਸੂਚੀ ਵੇਖੋ…",
+      "changelogHelper": "ਹਰ ਵਰਜ਼ਨ ਦੇ ਨੋਟ। MYND-119 ਆਉਣ ਉੱਤੇ ਦਿਸਣਗੇ।",
+      "changelogLabel": "ਬਦਲਾਅ-ਸੂਚੀ",
+      "developerModeHelper": "ਉਹ ਉੱਨਤ ਸੈਟਿੰਗਾਂ ਦਿਖਾਉਂਦਾ ਹੈ ਜੋ Myne ਮੂਲ ਰੂਪ ਵਿੱਚ ਲਾਂਭੇ ਰੱਖਦਾ ਹੈ: ਉਹ ਜਿੱਥੇ ਤੁਸੀਂ ਉਸ ਰਾਹ ਤੋਂ ਹਟ ਜਾਂਦੇ ਹੋ ਜਿਸਦੀ Myne ਜ਼ਿੰਮੇਵਾਰੀ ਲੈਂਦਾ ਹੈ, ਅਤੇ ਉਹ ਪਾਵਰ-ਯੂਜ਼ਰ ਸੰਦ ਜਿਨ੍ਹਾਂ ਦੀ ਬਹੁਤਿਆਂ ਨੂੰ ਕਦੇ ਲੋੜ ਨਹੀਂ ਪੈਂਦੀ। ਇਸਨੂੰ ਬੰਦ ਕਰਨ ਨਾਲ ਇਹ ਸਿਰਫ਼ ਦੁਬਾਰਾ ਲੁਕ ਜਾਂਦੀਆਂ ਹਨ — ਜੋ ਤੁਸੀਂ ਚਾਲੂ ਕੀਤਾ ਸੀ ਉਹ ਚਾਲੂ ਹੀ ਰਹਿੰਦਾ ਹੈ, ਅਤੇ ਉਸਨੂੰ ਬੰਦ ਕਰਨ ਵਾਲਾ ਕੰਟਰੋਲ ਆਪਣੀ ਥਾਂ ਉੱਤੇ ਹੀ ਹੈ।",
+      "developerModeLabel": "ਡਿਵੈਲਪਰ ਮੋਡ",
+      "licenseBody": "ਪ੍ਰੀ-ਅਲਫ਼ਾ · CC-BY-4.0 ਦਸਤਾਵੇਜ਼ · ਫੇਜ਼ 1 ਰਿਲੀਜ਼ ਉੱਤੇ AGPL-3.0 ਐਪਲੀਕੇਸ਼ਨ ਕੋਡ।",
+      "licenseLabel": "ਲਾਇਸੰਸ",
+      "tagline": "ਪ੍ਰੀ-ਅਲਫ਼ਾ · ਫੇਜ਼ 1 ਡੈਸਕਟਾਪ ਕਲਾਇੰਟ",
+      "threatModelHelper": "ਜਨਤਕ ਖ਼ਤਰਾ-ਮਾਡਲ ਦਸਤਾਵੇਜ਼ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਖੋਲ੍ਹੋ।",
+      "threatModelLabel": "ਖ਼ਤਰਾ ਮਾਡਲ",
+      "version": "ਵਰਜ਼ਨ",
+      "dev": "ਡਿਵ"
+    },
+    "account": {
+      "changePasswordButton": "ਪਾਸਵਰਡ ਬਦਲੋ",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "ਮੌਜੂਦਾ ਪਾਸਵਰਡ ਗ਼ਲਤ ਹੈ ਜਾਂ ਵਾਲਟ ਫ਼ਾਈਲ ਖ਼ਰਾਬ ਹੈ।",
+        "ioError": "ਡਿਸਕ ਗੜਬੜ, ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "joinFailure": "ਕੁਝ ਗ਼ਲਤ ਹੋ ਗਿਆ, ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "samePasswordRejected": "ਨਵਾਂ ਪਾਸਵਰਡ ਮੌਜੂਦਾ ਪਾਸਵਰਡ ਨਾਲ ਮਿਲਦਾ ਹੈ।",
+        "serverAckPending": "ਤੁਹਾਡਾ ਨਵਾਂ ਪਾਸਵਰਡ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਕੰਮ ਕਰਦਾ ਹੈ, ਪਰ Myne ਇਸਨੂੰ ਸੁਰੱਖਿਅਤ ਕਰਨ ਲਈ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ। ਜਦ ਤੱਕ ਇਹ ਨਹੀਂ ਹੁੰਦਾ, ਤੁਹਾਡੇ ਬਾਕੀ ਡਿਵਾਈਸ ਹਾਲੇ ਵੀ ਪੁਰਾਣੇ ਪਾਸਵਰਡ ਦੀ ਉਮੀਦ ਕਰਦੇ ਹਨ — ਅਤੇ ਜੇ ਉਸ ਤੋਂ ਪਹਿਲਾਂ ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਕਾਪੀ ਮਿਟਾ ਦਿੱਤੀ ਗਈ, ਤਾਂ ਇਹ ਬਦਲਾਅ ਗੁਆਚ ਜਾਵੇਗਾ। ਇਹ ਆਪਣੇ ਆਪ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਦਾ ਰਹੇਗਾ।",
+        "weakNewPassword": "ਨਵਾਂ ਪਾਸਵਰਡ ਘੱਟੋ-ਘੱਟ 12 ਅੱਖਰਾਂ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।"
+      },
+      "changePasswordHeading": "ਪਾਸਵਰਡ ਬਦਲੋ",
+      "changePasswordHelper": "ਵਾਲਟ ਉਹੀ ਰੱਖਦੇ ਹੋਏ ਆਪਣਾ ਮਾਸਟਰ ਪਾਸਵਰਡ ਬਦਲੋ। ਰਿਕਵਰੀ ਵਾਕੰਸ਼ ਉਹੀ ਰਹਿੰਦਾ ਹੈ।",
+      "dangerZoneHeading": "ਖ਼ਤਰੇ ਵਾਲਾ ਖੇਤਰ",
+      "dangerZoneHelper": "ਇਹ ਵਾਲਟ ਅਤੇ ਸਾਰੇ ਨੋਟ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾ ਦਿੰਦਾ ਹੈ। ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ। ਰਿਕਵਰੀ ਵਾਕੰਸ਼ ਵਾਲਟ ਬਹਾਲ ਨਹੀਂ ਕਰੇਗਾ।",
+      "localEraseHeading": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ",
+      "localEraseHelper": "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਤੋਂ ਤੁਹਾਡੇ ਵਾਲਟ ਦੀ Myne ਵਾਲੀ ਕਾਪੀ ਮਿਟਾਓ। ਤੁਹਾਡਾ ਖਾਤਾ ਅਤੇ ਪਹਿਲਾਂ ਸਿੰਕ ਹੋ ਚੁੱਕਾ ਸਭ ਕੁਝ ਸਰਵਰ ਉੱਤੇ ਰਹਿੰਦਾ ਹੈ।",
+      "localEraseButton": "ਸਾਈਨ ਆਊਟ ਕਰੋ ਅਤੇ ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਕਾਪੀ ਮਿਟਾਓ…",
+      "deleteVaultButton": "ਵਾਲਟ ਮਿਟਾਓ…",
+      "vaultLabelEyebrow": "ਵਾਲਟ ਦਾ ਲੇਬਲ",
+      "vaultLabelHelper": "ਇਸ ਵਾਲਟ ਦਾ ਨਾਂ, ਜੋ ਐਪ ਦੇ ਸਵਿੱਚਰ ਵਿੱਚ ਦਿਸਦਾ ਹੈ। ਵਾਲਟ ਦੇ ਅੰਦਰ ਇਨਕ੍ਰਿਪਟ ਕਰਕੇ ਰੱਖਿਆ ਜਾਂਦਾ ਹੈ; ਸਾਦੀ ਲਿਖਤ ਵਿੱਚ ਕਦੇ ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਨਹੀਂ ਜਾਂਦਾ।",
+      "vaultLabelPlaceholder": "ਲੇਬਲ ਜੋੜੋ…",
+      "vaultLabelSave": "ਸੁਰੱਖਿਅਤ ਕਰੋ",
+      "vaultIconLabel": "ਆਈਕਨ",
+      "vaultIconDefault": "ਮੂਲ (ਵਰਡਮਾਰਕ)",
+      "renamedToast": "ਵਾਲਟ ਦਾ ਨਾਂ ਬਦਲ ਗਿਆ",
+      "renameError": "ਵਾਲਟ ਦਾ ਨਾਂ ਨਹੀਂ ਬਦਲਿਆ ਜਾ ਸਕਿਆ",
+      "newPasswordMismatch": "ਨਵੇਂ ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ।",
+      "samePassword": "ਨਵਾਂ ਪਾਸਵਰਡ ਮੌਜੂਦਾ ਪਾਸਵਰਡ ਵਰਗਾ ਹੀ ਹੈ।",
+      "passwordChangedToast": "ਪਾਸਵਰਡ ਬਦਲ ਗਿਆ",
+      "vaultUnreadable": "ਵਾਲਟ ਫ਼ਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ। ਕਿਸੇ ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ।",
+      "genericChangeError": "ਕੁਝ ਗ਼ਲਤ ਹੋ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "renameHelper": "ਵਾਲਟ ਸਵਿੱਚਰ ਵਿੱਚ ਦਿਸਦਾ ਹੈ। ਇਸ ਵਾਲਟ ਦੇ ਅੰਦਰ ਇਨਕ੍ਰਿਪਟ ਕਰਕੇ ਰੱਖਿਆ ਜਾਂਦਾ ਹੈ; ਹਟਾਉਣ ਲਈ ਖਾਲੀ ਛੱਡੋ।",
+      "newPasswordPlaceholder": "ਘੱਟੋ-ਘੱਟ 12 ਅੱਖਰ",
+      "reenterNewPassword": "ਨਵਾਂ ਪਾਸਵਰਡ ਦੁਬਾਰਾ ਦਾਖਲ ਕਰੋ",
+      "changePasswordFootnote": "ਇਸ ਨਾਲ ਤੇਜ਼ ਅਨਲਾਕ ਰੱਦ ਹੋ ਜਾਂਦਾ ਹੈ। ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕੰਸ਼ ਨਹੀਂ ਬਦਲਦਾ।",
+      "changing": "ਬਦਲਿਆ ਜਾ ਰਿਹਾ ਹੈ…"
+    },
+    "appearance": {
+      "accentHelper": "ਐਪ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਐਕਸੈਂਟ ਰੰਗ ਚੁਣੋ। ਸਿਰਫ਼ ਇਸ ਡਿਵਾਈਸ ਲਈ।",
+      "accentHexAria": "ਐਕਸੈਂਟ ਰੰਗ ਦਾ hex ਮੁੱਲ",
+      "accentLabel": "ਐਕਸੈਂਟ ਰੰਗ",
+      "accentReset": "ਥੀਮ ਦੇ ਮੂਲ ਉੱਤੇ ਰੀਸੈੱਟ ਕਰੋ",
+      "homeQuickActions": "ਹੋਮ ਦੀਆਂ ਤੇਜ਼ ਕਾਰਵਾਈਆਂ",
+      "showEditTimesAria": "ਸਾਈਡਬਾਰ ਵਿੱਚ ਸੋਧ ਦਾ ਸਮਾਂ ਦਿਖਾਓ",
+      "showEditTimesHelper": "ਸਾਈਡਬਾਰ ਵਿੱਚ ਹਰ ਨੋਟ ਦੇ ਸਿਰਲੇਖ ਹੇਠਾਂ ਉਸਦੀ ਆਖ਼ਰੀ ਸੋਧ ਦਾ ਸਮਾਂ ਦਿਖਾਓ।",
+      "showEditTimesLabel": "ਸੋਧ ਦਾ ਸਮਾਂ ਦਿਖਾਓ",
+      "taskMarkerAria": "ਟਾਸਕ ਨੋਟਾਂ ਉੱਤੇ ਟਾਸਕ ਨਿਸ਼ਾਨ ਦਿਖਾਓ",
+      "taskMarkerHelper": "ਜਿਨ੍ਹਾਂ ਨੋਟਾਂ ਨੂੰ ਤੁਸੀਂ ਟਾਸਕ ਐਲਾਨਿਆ ਹੈ, ਉਹਨਾਂ ਨੂੰ ਸਾਈਡਬਾਰ ਵਿੱਚ ਅਤੇ ਉਹਨਾਂ ਦੀ ਟੈਬ ਉੱਤੇ ਨਿਸ਼ਾਨਬੱਧ ਕਰਦਾ ਹੈ।",
+      "taskMarkerLabel": "ਟਾਸਕ ਨਿਸ਼ਾਨ ਦਿਖਾਓ",
+      "taskMarkerSaveError": "ਉਹ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "ਗੂੜ੍ਹਾ",
+        "light": "ਹਲਕਾ",
+        "system": "ਸਿਸਟਮ"
+      },
+      "themeHelper": "ਹਲਕੇ ਅਤੇ ਗੂੜ੍ਹੇ ਥੀਮ ਵਿਚਕਾਰ ਬਦਲੋ, ਜਾਂ ਸਿਸਟਮ ਦੀ ਪਸੰਦ ਅਪਣਾਓ।",
+      "themeLabel": "ਥੀਮ",
+      "themeOptionAria": "{{label}} ਥੀਮ",
+      "themeSaveError": "ਥੀਮ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "timestampsSaveError": "ਪਸੰਦ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "ਸੰਪਾਦਕ ਫੌਂਟ",
+      "showEditTimesSubtitle": "ਹਰ ਨੋਟ ਹੇਠਾਂ ਸਮਾਂ",
+      "graphSettingsLabel": "ਗ੍ਰਾਫ਼ ਦੀ ਦਿੱਖ",
+      "graphSettingsHelper": "ਨੋਡ ਦੇ ਰੰਗ, ਲੇਬਲ, ਆਕਾਰ ਅਤੇ ਲੇਆਉਟ ਦੇ ਬਲ ਗ੍ਰਾਫ਼ ਦੇ ਅੰਦਰ ਹੀ ਤੈਅ ਹੁੰਦੇ ਹਨ — ਇਸਨੂੰ ਖੋਲ੍ਹੋ ਅਤੇ ਕੋਨੇ ਵਿਚਲਾ ਗੇਅਰ ਵਰਤੋ। ਇਹ ਹਰ ਡਿਵਾਈਸ ਲਈ ਵੱਖਰੇ ਰੱਖੇ ਜਾਂਦੇ ਹਨ, ਇਸ ਲਈ ਇੱਥੇ ਕੀਤਾ ਬਦਲਾਅ ਤੁਹਾਡੇ ਫ਼ੋਨ ਤੱਕ ਨਹੀਂ ਜਾਂਦਾ।",
+      "openGraph": "ਗ੍ਰਾਫ਼ ਖੋਲ੍ਹੋ"
+    },
+    "archive": {
+      "helper": "ਨੋਟਾਂ ਨੂੰ ਆਰਕਾਈਵ ਵਿੱਚ ਭੇਜਣ ਦਿਓ, ਜੋ ਮੁੱਖ ਸੂਚੀ ਤੋਂ ਬਾਹਰ ਰਹਿੰਦੇ ਹਨ। ਇਸਨੂੰ ਬੰਦ ਕਰਨ ਨਾਲ ਹਰ ਆਰਕਾਈਵ ਕੀਤਾ ਨੋਟ ਆਪਣੇ ਫੋਲਡਰ ਵਿੱਚ ਵਾਪਸ ਆ ਜਾਂਦਾ ਹੈ ਅਤੇ ਆਰਕਾਈਵ ਕੰਟਰੋਲ ਲੁਕ ਜਾਂਦੇ ਹਨ।",
+      "label": "ਆਰਕਾਈਵ ਕਰਨਾ",
+      "off": "ਬੰਦ",
+      "on": "ਚਾਲੂ",
+      "saveError": "ਆਰਕਾਈਵ ਸੈਟਿੰਗ ਅੱਪਡੇਟ ਨਹੀਂ ਹੋ ਸਕੀ।"
+    },
+    "attachmentCompression": {
+      "label": "ਇੰਪੋਰਟ ਵੇਲੇ ਤਸਵੀਰਾਂ ਸੰਕੁਚਿਤ ਕਰੋ",
+      "helper": "ਚਿਪਕਾਈਆਂ ਜਾਂ ਖਿੱਚ ਕੇ ਛੱਡੀਆਂ ਤਸਵੀਰਾਂ ਨੂੰ ਇਨਕ੍ਰਿਪਟ ਹੋ ਕੇ ਸਾਂਭੇ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਛੋਟਾ ਕਰਦਾ ਹੈ, ਤਾਂ ਜੋ ਤੁਹਾਡਾ ਵਾਲਟ, ਬੈਕਅੱਪ ਅਤੇ ਸਿੰਕ ਛੋਟੇ ਰਹਿਣ। ਇਹ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ — ਅਸਲ ਫ਼ਾਈਲ ਨਹੀਂ ਰੱਖੀ ਜਾਂਦੀ।",
+      "helperScopeEveryDevice": "ਪੂਰੇ ਵਾਲਟ ਉੱਤੇ, ਹਰ ਡਿਵਾਈਸ ਉੱਤੇ ਲਾਗੂ ਹੁੰਦਾ ਹੈ।",
+      "helperScopeNotHere": "ਪੂਰੇ ਵਾਲਟ ਉੱਤੇ ਲਾਗੂ ਹੁੰਦਾ ਹੈ, ਪਰ ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਨਹੀਂ — ਇੱਥੇ ਜੋੜੀਆਂ ਤਸਵੀਰਾਂ ਜਿਵੇਂ ਦੀਆਂ ਤਿਵੇਂ ਸਾਂਭੀਆਂ ਜਾਂਦੀਆਂ ਹਨ।",
+      "errorSaveSetting": "ਇਹ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।"
+    },
+    "transcription": {
+      "label": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ",
+      "helper": "ਕਿਸੇ ਆਡੀਓ ਅਟੈਚਮੈਂਟ ਨੂੰ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਮਾਡਲ Myne ਨਾਲ ਹੀ ਆਉਂਦਾ ਹੈ ਅਤੇ ਕੁਝ ਵੀ ਕਿਤੇ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ। ਇਸਨੂੰ ਬੰਦ ਕਰਨ ਨਾਲ ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਕਾਰਵਾਈ ਹਰ ਥਾਂ ਲੁਕ ਜਾਂਦੀ ਹੈ ਅਤੇ ਐਪ ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਕਰਨਾ ਬਿਲਕੁਲ ਬੰਦ ਕਰ ਦਿੰਦਾ ਹੈ।",
+      "errorSaveSetting": "ਉਹ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।"
+    },
+    "attachmentOcr": {
+      "label": "ਤਸਵੀਰਾਂ ਅਤੇ ਸਕੈਨ ਕੀਤੇ ਦਸਤਾਵੇਜ਼ਾਂ ਦੇ ਅੰਦਰ ਖੋਜੋ",
+      "helper": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਤਸਵੀਰ ਅਟੈਚਮੈਂਟਾਂ ਅਤੇ ਸਕੈਨ ਕੀਤੇ PDF ਵਿੱਚੋਂ ਲਿਖਤ ਪੜ੍ਹਦਾ ਹੈ, ਤਾਂ ਜੋ ਖੋਜ ਉਹਨਾਂ ਨੂੰ ਉਹਨਾਂ ਦੀ ਸਮੱਗਰੀ ਨਾਲ ਲੱਭ ਸਕੇ। ਕੁਝ ਵੀ ਅੱਪਲੋਡ ਨਹੀਂ ਹੁੰਦਾ। ਇਸਨੂੰ ਬੰਦ ਕਰਨ ਨਾਲ ਪਿਛੋਕੜ ਵਿਚਲਾ ਕੱਢਣ ਦਾ ਕੰਮ ਰੁਕ ਜਾਂਦਾ ਹੈ; ਪਹਿਲਾਂ ਕੱਢੀ ਲਿਖਤ ਰਹਿੰਦੀ ਹੈ।",
+      "errorSaveSetting": "ਇਹ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "processing_one": "1 ਅਟੈਚਮੈਂਟ ਪੜ੍ਹੀ ਜਾ ਰਹੀ ਹੈ…",
+      "processing_other": "{{count}} ਅਟੈਚਮੈਂਟਾਂ ਪੜ੍ਹੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ…"
+    },
+    "autoBackup": {
+      "backupFolder": "ਬੈਕਅੱਪ ਫੋਲਡਰ",
+      "chooseFolder": "ਫੋਲਡਰ ਚੁਣੋ…",
+      "chooseFolderDialogTitle": "ਆਪਣੇ-ਆਪ ਬੈਕਅੱਪ ਲਈ ਫੋਲਡਰ ਚੁਣੋ",
+      "frequency": "ਬਾਰੰਬਾਰਤਾ",
+      "frequencyAriaLabel": "ਬੈਕਅੱਪ ਦੀ ਬਾਰੰਬਾਰਤਾ",
+      "helper": "ਐਪ ਖੁੱਲ੍ਹੀ ਅਤੇ ਵਾਲਟ ਅਨਲਾਕ ਹੋਣ ਵੇਲੇ, ਸਮਾਂ-ਸਾਰਣੀ ਅਨੁਸਾਰ ਕਿਸੇ ਫੋਲਡਰ ਵਿੱਚ ਇਨਕ੍ਰਿਪਟ ਕੀਤੀ .myne-backup ਲਿਖੋ। ਬੈਕਅੱਪ ਤੁਹਾਡੇ ਵਾਲਟ ਜਿੰਨੇ ਹੀ ਇਨਕ੍ਰਿਪਟ ਰਹਿੰਦੇ ਹਨ; Myne ਸਭ ਤੋਂ ਨਵੇਂ ਕੁਝ ਹੀ ਰੱਖਦਾ ਹੈ ਅਤੇ ਕਦੇ ਕੁਝ ਵੀ ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਨਹੀਂ ਭੇਜਦਾ।",
+      "intervalDaily": "ਰੋਜ਼ਾਨਾ",
+      "intervalEveryUnlock": "ਹਰ ਅਨਲਾਕ ਉੱਤੇ",
+      "intervalWeekly": "ਹਫ਼ਤਾਵਾਰ",
+      "keepLast": "ਆਖ਼ਰੀ ਰੱਖੋ",
+      "noFolderChosen": "ਹਾਲੇ ਕੋਈ ਫੋਲਡਰ ਨਹੀਂ ਚੁਣਿਆ।",
+      "saveFailedToast": "ਬੈਕਅੱਪ ਸੈਟਿੰਗਾਂ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+      "searchEmpty": "ਕੋਈ ਮੇਲ ਨਹੀਂ।",
+      "searchPlaceholder": "ਖੋਜੋ…",
+      "statusFailed": "ਆਪਣੇ-ਆਪ ਬੈਕਅੱਪ ਅਸਫਲ ਰਿਹਾ — {{stamp}}",
+      "statusLastBackup": "ਆਖ਼ਰੀ ਬੈਕਅੱਪ: {{stamp}}",
+      "statusNever": "ਹਾਲੇ ਕੋਈ ਆਪਣੇ-ਆਪ ਬੈਕਅੱਪ ਨਹੀਂ ਹੋਇਆ।",
+      "title": "ਆਪਣੇ-ਆਪ ਬੈਕਅੱਪ"
+    },
+    "changePassword": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "checkingStrength": "ਮਜ਼ਬੂਤੀ ਜਾਂਚੀ ਜਾ ਰਹੀ ਹੈ…",
+      "confirmLabel": "ਨਵੇਂ ਪਾਸਵਰਡ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
+      "currentLabel": "ਮੌਜੂਦਾ ਪਾਸਵਰਡ",
+      "mismatch": "ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ।",
+      "newLabel": "ਨਵਾਂ ਪਾਸਵਰਡ",
+      "submit": "ਪਾਸਵਰਡ ਬਦਲੋ",
+      "submitting": "ਪਾਸਵਰਡ ਬਦਲਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+      "title": "ਪਾਸਵਰਡ ਬਦਲੋ",
+      "tooShort": "ਘੱਟੋ-ਘੱਟ {{n}} ਅੱਖਰ ਵਰਤੋ।"
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "ਬ੍ਰਾਊਜ਼ਰ ਐਕਸਟੈਂਸ਼ਨ"
+      },
+      "when": {
+        "bare": "ਜੁੜਿਆ",
+        "daysAgo_one": "{{count}} ਦਿਨ ਪਹਿਲਾਂ ਜੁੜਿਆ",
+        "daysAgo_other": "{{count}} ਦਿਨ ਪਹਿਲਾਂ ਜੁੜਿਆ",
+        "hoursAgo": "{{count}} ਘੰਟੇ ਪਹਿਲਾਂ ਜੁੜਿਆ",
+        "hoursAgo_one": "{{count}} ਘੰਟਾ ਪਹਿਲਾਂ ਜੁੜਿਆ",
+        "hoursAgo_other": "{{count}} ਘੰਟੇ ਪਹਿਲਾਂ ਜੁੜਿਆ",
+        "justNow": "ਹੁਣੇ ਜੁੜਿਆ",
+        "minutesAgo": "{{count}} ਮਿੰਟ ਪਹਿਲਾਂ ਜੁੜਿਆ",
+        "minutesAgo_one": "{{count}} ਮਿੰਟ ਪਹਿਲਾਂ ਜੁੜਿਆ",
+        "minutesAgo_other": "{{count}} ਮਿੰਟ ਪਹਿਲਾਂ ਜੁੜਿਆ",
+        "onDate": "{{date}} ਨੂੰ ਜੁੜਿਆ"
+      }
+    },
+    "cliAccess": {
+      "label": "ਟਰਮੀਨਲ ਪਹੁੰਚ",
+      "helperOff": "ਬੰਦ। `myne` ਕਮਾਂਡ ਇਸ ਵਾਲਟ ਵਿੱਚ ਕੁਝ ਵੀ ਪੜ੍ਹ ਜਾਂ ਬਦਲ ਨਹੀਂ ਸਕਦੀ।",
+      "helperOn": "ਜਦੋਂ ਤੱਕ ਇਹ ਵਾਲਟ ਅਨਲਾਕ ਹੈ, ਚਾਲੂ। ਤੁਹਾਡੇ ਖਾਤੇ ਹੇਠ ਚੱਲਦਾ ਕੋਈ ਵੀ ਪ੍ਰੋਗਰਾਮ ਇਸ ਰਾਹੀਂ ਨੋਟ ਪੜ੍ਹ, ਖੋਜ ਅਤੇ ਬਣਾ ਸਕਦਾ ਹੈ — Myne ਤੁਹਾਡੇ ਟਰਮੀਨਲ ਅਤੇ ਕਿਸੇ ਸਕ੍ਰਿਪਟ ਵਿੱਚ ਫ਼ਰਕ ਨਹੀਂ ਦੱਸ ਸਕਦਾ, ਅਤੇ ਦਰਵਾਜ਼ਾ ਖੁੱਲ੍ਹਾ ਹੋਣ ਤੋਂ ਵੱਧ ਕੁਝ ਨਹੀਂ ਜਾਂਚਦਾ। ਇਹ ਕਦੇ ਤੁਹਾਡਾ ਪਾਸਵਰਡ ਨਹੀਂ ਮੰਗਦੀ, ਵਾਲਟ ਲਾਕ ਹੁੰਦੇ ਹੀ ਬੰਦ ਹੋ ਜਾਂਦੀ ਹੈ, ਅਤੇ ਨੋਟ ਮਿਟਾ ਨਹੀਂ ਸਕਦੀ।",
+      "lastUsedNever": "ਇਹ ਵਾਲਟ ਅਨਲਾਕ ਹੋਣ ਤੋਂ ਬਾਅਦ ਵਰਤੀ ਨਹੀਂ ਗਈ।",
+      "lastUsedJustNow": "ਹੁਣੇ ਵਰਤੀ ਗਈ।",
+      "lastUsedMinutesAgo": "{{count}} ਮਿੰਟ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "lastUsedMinutesAgo_one": "{{count}} ਮਿੰਟ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "lastUsedMinutesAgo_other": "{{count}} ਮਿੰਟ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "lastUsedHoursAgo": "{{count}} ਘੰਟੇ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "lastUsedHoursAgo_one": "{{count}} ਘੰਟਾ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "lastUsedHoursAgo_other": "{{count}} ਘੰਟੇ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "lastUsedDaysAgo": "{{count}} ਦਿਨ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "lastUsedDaysAgo_one": "{{count}} ਦਿਨ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "lastUsedDaysAgo_other": "{{count}} ਦਿਨ ਪਹਿਲਾਂ ਵਰਤੀ ਗਈ।",
+      "notOnPathHint": "ਤੁਹਾਡਾ ਸ਼ੈੱਲ ਹਾਲੇ `myne` ਨਹੀਂ ਲੱਭ ਸਕਦਾ। ਇਹ ਲਾਈਨ ਆਪਣੀ ਸ਼ੈੱਲ ਪ੍ਰੋਫ਼ਾਈਲ ਵਿੱਚ ਜੋੜੋ, ਫਿਰ ਨਵਾਂ ਟਰਮੀਨਲ ਖੋਲ੍ਹੋ:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "ਉਹ ਫੋਲਡਰ ਜੋ ਟਰਮੀਨਲ ਕਦੇ ਨਹੀਂ ਵੇਖਦਾ",
+      "excludedHelper": "ਹਰ ਲਾਈਨ ਉੱਤੇ ਇੱਕ ਫੋਲਡਰ ਪਾਥ। ਇਹਨਾਂ ਫੋਲਡਰਾਂ ਵਿਚਲੇ ਨੋਟ ਹਰ ਟਰਮੀਨਲ ਨਤੀਜੇ ਤੋਂ ਬਾਹਰ ਰਹਿੰਦੇ ਹਨ ਅਤੇ ਟਰਮੀਨਲ ਤੋਂ ਉੱਥੇ ਲਿਖਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ — ਐਪ ਵਿੱਚ ਉਹ ਪੂਰੀ ਤਰ੍ਹਾਂ ਉਪਲਬਧ ਰਹਿੰਦੇ ਹਨ। ਤੁਸੀਂ ਇਹ ਟਰਮੀਨਲ ਪਹੁੰਚ ਚਾਲੂ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਵੀ ਤੈਅ ਕਰ ਸਕਦੇ ਹੋ।",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "rateLimitLabel": "ਟਰਮੀਨਲ ਨੂੰ ਪੂਰੀ ਰਫ਼ਤਾਰ ਉੱਤੇ ਚੱਲਣ ਦਿਓ",
+      "rateLimitHelper": "Myne ਮੂਲ ਰੂਪ ਵਿੱਚ ਪ੍ਰਤੀ ਮਿੰਟ ਵੱਧ ਤੋਂ ਵੱਧ 120 ਟਰਮੀਨਲ ਕਮਾਂਡਾਂ ਦਾ ਜਵਾਬ ਦਿੰਦਾ ਹੈ। ਇਹ ਬੇਕਾਬੂ ਸਕ੍ਰਿਪਟ ਉੱਤੇ ਰਫ਼ਤਾਰ ਦੀ ਹੱਦ ਹੈ, ਇਜਾਜ਼ਤ ਦੀ ਜਾਂਚ ਨਹੀਂ — ਕੁਝ ਵੀ ਇਹ ਤੈਅ ਨਹੀਂ ਕਰਦਾ ਕਿ ਕਿਹੜਾ ਪ੍ਰੋਗਰਾਮ ਪੁੱਛ ਸਕਦਾ ਹੈ। ਵੱਡੇ ਕੰਮਾਂ ਲਈ ਇਸਨੂੰ ਚਾਲੂ ਕਰੋ, ਜਿਵੇਂ ਹਰ ਨੋਟ ਨੂੰ ਕਿਸੇ ਹੋਰ ਸੰਦ ਵਿੱਚੋਂ ਲੰਘਾਉਣਾ।"
+    },
+    "clipperInstall": {
+      "error": "ਬ੍ਰਾਊਜ਼ਰ ਕਲਿੱਪਰ ਸੈਟਿੰਗ ਅੱਪਡੇਟ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "helper": "ਨੇਟਿਵ-ਮੈਸੇਜਿੰਗ ਹੋਸਟ ਰਜਿਸਟਰ ਕਰੋ ਤਾਂ ਜੋ Myne ਬ੍ਰਾਊਜ਼ਰ ਐਕਸਟੈਂਸ਼ਨ ਇਸ ਐਪ ਨੂੰ ਕਲਿੱਪ ਭੇਜ ਸਕੇ। ਮੂਲ ਰੂਪ ਵਿੱਚ ਚਾਲੂ; ਹਟਾਉਣ ਲਈ ਬੰਦ ਕਰੋ।",
+      "label": "ਬ੍ਰਾਊਜ਼ਰ ਕਲਿੱਪਰ"
+    },
+    "customThemes": {
+      "appliedBadge": "ਲਾਗੂ",
+      "apply": "ਲਾਗੂ ਕਰੋ",
+      "applyError": "ਉਹ ਥੀਮ ਲਾਗੂ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "browseButton": "ਥੀਮ ਵੇਖੋ",
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "confirm": "ਪੁਸ਼ਟੀ ਕਰੋ",
+      "delete": "ਮਿਟਾਓ",
+      "deleteError": "ਉਹ ਥੀਮ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "empty": "ਹਾਲੇ ਕੋਈ ਕਸਟਮ ਥੀਮ ਨਹੀਂ ਹੈ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਕੋਈ ਥੀਮ ਫ਼ਾਈਲ ਇੰਪੋਰਟ ਕਰੋ।",
+      "error": {
+        "aColorFallback": "ਇੱਕ ਰੰਗ",
+        "invalidFile": "ਗ਼ਲਤ ਥੀਮ ਫ਼ਾਈਲ।",
+        "invalidName": "ਅਸੁਰੱਖਿਅਤ ਥੀਮ ਨਾਂ",
+        "invalidValue": "{{key}} ਲਈ ਗ਼ਲਤ ਮੁੱਲ",
+        "invalidValueWithLine": "{{key}} ਲਈ ਗ਼ਲਤ ਮੁੱਲ (ਲਾਈਨ {{line}})",
+        "missingKey": "ਲੋੜੀਂਦਾ ਰੰਗ {{key}} ਗੁੰਮ ਹੈ",
+        "parseError": "ਜਾਇਜ਼ JSON ਨਹੀਂ",
+        "parseErrorWithLine": "ਜਾਇਜ਼ JSON ਨਹੀਂ (ਲਾਈਨ {{line}})"
+      },
+      "export": "ਐਕਸਪੋਰਟ",
+      "exportError": "ਉਹ ਥੀਮ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "fileFilterName": "Myne ਥੀਮ",
+      "helper": "ਆਪਣਾ ਰੰਗ-ਪੱਟਾ ਵਰਤੋ। ਥੀਮ ਵਰਤੋਂ ਤੋਂ ਪਹਿਲਾਂ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਜਾਂਚੇ ਜਾਂਦੇ ਹਨ — ਕੁਝ ਵੀ ਅੱਪਲੋਡ ਨਹੀਂ ਹੁੰਦਾ।",
+      "importButton": "ਥੀਮ ਇੰਪੋਰਟ ਕਰੋ…",
+      "importError": "ਉਹ ਫ਼ਾਈਲ ਜਾਇਜ਼ ਥੀਮ ਨਹੀਂ ਹੈ। ਫਾਰਮੈਟ ਵੇਖਣ ਲਈ ਹਵਾਲਾ ਖੋਲ੍ਹੋ।",
+      "label": "ਕਸਟਮ ਥੀਮ",
+      "readError": "ਤੁਹਾਡੇ ਕਸਟਮ ਥੀਮ ਪੜ੍ਹੇ ਨਹੀਂ ਜਾ ਸਕੇ।",
+      "readOnlyHelper": "ਕਸਟਮ ਥੀਮ ਤੁਹਾਡੇ ਕੰਪਿਊਟਰ ਉੱਤੇ ਇੰਸਟਾਲ ਹੁੰਦੇ ਹਨ। ਤੁਹਾਡੇ ਵਾਲੇ ਸਿੰਕ ਤੋਂ ਬਾਅਦ ਆਪਣੇ ਆਪ ਇੱਥੇ ਆ ਜਾਂਦੇ ਹਨ।"
+    },
+    "dailyNotes": {
+      "blankTemplate": "ਖਾਲੀ (ਕੋਈ ਟੈਂਪਲੇਟ ਨਹੀਂ)",
+      "dateFormatHelper": "ਹਰ ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਸਿਰਲੇਖ। YYYY, MM, DD ਸਮਰਥਿਤ ਹਨ। ਮੂਲ {{default}} ਹੈ।",
+      "dateFormatLabel": "ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਮਿਤੀ ਫਾਰਮੈਟ",
+      "dateFormatSaveError": "ਮਿਤੀ ਫਾਰਮੈਟ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "folderHelper": "ਨਵੇਂ ਰੋਜ਼ਾਨਾ ਨੋਟ ਕਿੱਥੇ ਰੱਖੇ ਜਾਂਦੇ ਹਨ। ਮੂਲ {{default}} ਹੈ — ਫੋਲਡਰ ਖਾਲੀ ਹੋਣ ਉੱਤੇ ਵੀ ਰੱਖਿਆ ਜਾਂਦਾ ਹੈ।",
+      "folderLabel": "ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਫੋਲਡਰ",
+      "folderSaveError": "ਰੋਜ਼ਾਨਾ ਫੋਲਡਰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "folderSearchEmpty": "ਕੋਈ ਫੋਲਡਰ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+      "folderSearchPlaceholder": "ਫੋਲਡਰ ਖੋਜੋ…",
+      "searchEmpty": "ਕੋਈ ਟੈਂਪਲੇਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+      "searchPlaceholder": "ਟੈਂਪਲੇਟ ਖੋਜੋ…",
+      "templateHelper": "ਹਰ ਰੋਜ਼ਾਨਾ ਨੋਟ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਕੋਈ ਟੈਂਪਲੇਟ ਚੁਣੋ, ਜਾਂ ਮਿਤੀ ਵਾਲੇ ਸਿਰਲੇਖ ਵਾਲੇ ਖਾਲੀ ਨੋਟ ਲਈ ਖਾਲੀ ਛੱਡੋ।",
+      "templateLabel": "ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਟੈਂਪਲੇਟ",
+      "templateSaveError": "ਰੋਜ਼ਾਨਾ ਟੈਂਪਲੇਟ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "untitledTemplate": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਟੈਂਪਲੇਟ"
+    },
+    "deleteVault": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "caseSensitiveHint": "ਅੱਖਰਾਂ ਦਾ ਆਕਾਰ ਮਾਇਨੇ ਰੱਖਦਾ ਹੈ। ਮਿਟਾਉਣਾ ਚਾਲੂ ਕਰਨ ਲਈ ਸ਼ਬਦ ਬਿਲਕੁਲ ਉਵੇਂ ਹੀ ਲਿਖੋ।",
+      "continue": "ਜਾਰੀ ਰੱਖੋ",
+      "copyPrimary": "ਇਹ ਇਸ ਵਾਲਟ ਅਤੇ ਇਸਦੇ ਹਰ ਨੋਟ ਨੂੰ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾ ਦਿੰਦਾ ਹੈ। ਇਹ ਕਾਰਵਾਈ ਵਾਪਸ ਨਹੀਂ ਲਈ ਜਾ ਸਕਦੀ, ਅਤੇ ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕੰਸ਼ ਇਹ ਡਾਟਾ ਬਹਾਲ ਨਹੀਂ ਕਰੇਗਾ।",
+      "copySecondary": "ਫ਼ਾਈਲਾਂ ਹਟਾਏ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਵਾਲਟ ਦੀਆਂ ਕੁੰਜੀਆਂ ਮੈਮਰੀ ਵਿੱਚੋਂ ਸਿਫ਼ਰ ਕਰ ਦਿੱਤੀਆਂ ਜਾਂਦੀਆਂ ਹਨ; ਡਿਸਕ ਉੱਤੇ ਬਚਿਆ ਕੋਈ ਵੀ ਬੇਸਹਾਰਾ ਸਾਈਫ਼ਰਟੈਕਸਟ ਨਾ-ਮੁੜਨਯੋਗ Argon2id-ਲਪੇਟਿਆ ਕੂੜਾ ਹੀ ਰਹਿੰਦਾ ਹੈ।",
+      "eyebrow": "ਵਾਪਸ ਨਹੀਂ ਹੋ ਸਕਦਾ",
+      "heading": "ਵਾਲਟ ਮਿਟਾਓ",
+      "ioFailBody": "ਮਿਟਾਉਣ ਲਈ ਵਾਲਟ ਫ਼ਾਈਲਾਂ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋ ਸਕੀ। ਵਾਲਟ ਦੀਆਂ ਕੁੰਜੀਆਂ ਪਹਿਲਾਂ ਹੀ ਮੈਮਰੀ ਵਿੱਚੋਂ ਸਿਫ਼ਰ ਕਰ ਦਿੱਤੀਆਂ ਗਈਆਂ ਹਨ; ਡਿਸਕ ਉੱਤੇ ਬਚਿਆ ਕੋਈ ਵੀ ਵਾਲਟ ਡਾਟਾ ਨਾ-ਮੁੜਨਯੋਗ Argon2id-ਲਪੇਟਿਆ ਕੂੜਾ ਹੈ।",
+      "ioFailTitle": "ਮਿਟਾਉਣ ਦੌਰਾਨ ਡਿਸਕ ਗੜਬੜ",
+      "localEraseHeading": "ਸਾਈਨ ਆਊਟ ਕਰੋ ਅਤੇ ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਕਾਪੀ ਮਿਟਾਓ",
+      "localEraseEyebrow": "ਸਿਰਫ਼ ਇਹ ਬ੍ਰਾਊਜ਼ਰ",
+      "localEraseSubmit": "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਕਾਪੀ ਮਿਟਾਓ",
+      "localEraseSubmitInFlight": "ਮਿਟਾਈ ਜਾ ਰਹੀ ਹੈ…",
+      "partialFailBody_one": "{{count}} ਫ਼ਾਈਲ ਡਿਸਕ ਤੋਂ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ। ਵਾਲਟ ਦੀਆਂ ਕੁੰਜੀਆਂ ਪਹਿਲਾਂ ਹੀ ਮੈਮਰੀ ਵਿੱਚੋਂ ਸਿਫ਼ਰ ਕਰ ਦਿੱਤੀਆਂ ਗਈਆਂ ਹਨ, ਇਸ ਲਈ ਬਚਿਆ ਕੋਈ ਵੀ ਬੇਸਹਾਰਾ ਸਾਈਫ਼ਰਟੈਕਸਟ ਨਾ-ਮੁੜਨਯੋਗ Argon2id-ਲਪੇਟਿਆ ਕੂੜਾ ਹੈ।",
+      "partialFailBody_other": "{{count}} ਫ਼ਾਈਲਾਂ ਡਿਸਕ ਤੋਂ ਮਿਟਾਈਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ। ਵਾਲਟ ਦੀਆਂ ਕੁੰਜੀਆਂ ਪਹਿਲਾਂ ਹੀ ਮੈਮਰੀ ਵਿੱਚੋਂ ਸਿਫ਼ਰ ਕਰ ਦਿੱਤੀਆਂ ਗਈਆਂ ਹਨ, ਇਸ ਲਈ ਬਚਿਆ ਕੋਈ ਵੀ ਬੇਸਹਾਰਾ ਸਾਈਫ਼ਰਟੈਕਸਟ ਨਾ-ਮੁੜਨਯੋਗ Argon2id-ਲਪੇਟਿਆ ਕੂੜਾ ਹੈ।",
+      "partialFailTitle": "ਵਾਲਟ ਮਿਟਾਉਣਾ ਅੰਸ਼ਕ ਤੌਰ 'ਤੇ ਅਸਫਲ ਰਿਹਾ",
+      "submit": "ਵਾਲਟ ਮਿਟਾਓ",
+      "submitInFlight": "ਵਾਲਟ ਮਿਟਾਇਆ ਜਾ ਰਿਹਾ ਹੈ…",
+      "typeToConfirmLabel": "ਪੁਸ਼ਟੀ ਲਈ DELETE ਲਿਖੋ",
+      "vaultPath": "ਵਾਲਟ ਪਾਥ: {{path}}",
+      "deleteError": "ਵਾਲਟ ਪੂਰੀ ਤਰ੍ਹਾਂ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "warning": "ਇਹ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਇਸ ਵਾਲਟ ਅਤੇ ਇਸਦੇ ਸਾਰੇ ਨੋਟ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾ ਦਿੰਦਾ ਹੈ। ਇਹ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।",
+      "deleteButton": "ਇਹ ਵਾਲਟ ਮਿਟਾਓ"
+    },
+    "files": {
+      "newNote": {
+        "folderLabel": "ਨਵੇਂ ਨੋਟਾਂ ਲਈ ਫੋਲਡਰ",
+        "folderPlaceholder": "ਜਿਵੇਂ Inbox/",
+        "folderSearchEmpty": "ਕੋਈ ਫੋਲਡਰ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+        "folderSearchPlaceholder": "ਫੋਲਡਰ ਖੋਜੋ…",
+        "helper": "ਨਵੇਂ ਬਣਾਏ ਨੋਟ ਕਿੱਥੇ ਰੱਖੇ ਜਾਂਦੇ ਹਨ।",
+        "label": "ਨਵੇਂ ਨੋਟਾਂ ਲਈ ਮੂਲ ਥਾਂ",
+        "optionCurrent": "ਮੌਜੂਦਾ ਨੋਟ ਵਾਲਾ ਹੀ ਫੋਲਡਰ",
+        "optionRoot": "ਵਾਲਟ ਫੋਲਡਰ",
+        "optionSpecific": "ਹੇਠਾਂ ਦੱਸੇ ਫੋਲਡਰ ਵਿੱਚ",
+        "saveError": "ਨਵੇਂ-ਨੋਟ ਦੀ ਥਾਂ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।"
+      },
+      "startup": {
+        "helper": "ਚੁਣੋ ਕਿ ਐਪ ਸ਼ੁਰੂ ਹੋਣ ਉੱਤੇ ਕਿਹੜੀ ਫ਼ਾਈਲ ਖੁੱਲ੍ਹੇ।",
+        "label": "ਖੋਲ੍ਹਣ ਲਈ ਮੂਲ ਫ਼ਾਈਲ",
+        "noteLabel": "ਸ਼ੁਰੂ ਹੋਣ ਉੱਤੇ ਖੋਲ੍ਹਣ ਵਾਲਾ ਨੋਟ",
+        "notePlaceholder": "ਨੋਟ ਚੁਣੋ…",
+        "optionEmpty": "ਨਵਾਂ ਨੋਟ",
+        "optionLast": "ਆਖ਼ਰੀ ਖੁੱਲ੍ਹਿਆ",
+        "optionSpecific": "ਖ਼ਾਸ ਨੋਟ",
+        "saveError": "ਸ਼ੁਰੂਆਤ ਵਾਲੀ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।",
+        "searchEmpty": "ਕੋਈ ਨੋਟ ਨਹੀਂ ਮਿਲਿਆ।",
+        "searchPlaceholder": "ਨੋਟ ਖੋਜੋ…",
+        "untitledNote": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
+      }
+    },
+    "focusMode": {
+      "dimAria": "ਅਕਿਰਿਆਸ਼ੀਲ ਲਾਈਨਾਂ ਮੱਧਮ ਕਰੋ",
+      "dimHelper": "ਫੋਕਸ ਮੋਡ (⇧⌘F) ਵਿੱਚ, ਜਿਸ ਲਾਈਨ ਨੂੰ ਤੁਸੀਂ ਸੋਧ ਰਹੇ ਹੋ ਉਸ ਤੋਂ ਬਿਨਾਂ ਹਰ ਲਾਈਨ ਮੱਧਮ ਕਰੋ।",
+      "dimLabel": "ਫੋਕਸ ਮੋਡ · ਅਕਿਰਿਆਸ਼ੀਲ ਲਾਈਨਾਂ ਮੱਧਮ",
+      "off": "ਬੰਦ",
+      "on": "ਚਾਲੂ",
+      "saveError": "ਫੋਕਸ-ਮੋਡ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "typewriterAria": "ਟਾਈਪਰਾਈਟਰ ਸਕ੍ਰੋਲ",
+      "typewriterHelper": "ਫੋਕਸ ਮੋਡ (⇧⌘F) ਵਿੱਚ, ਟਾਈਪ ਕਰਦੇ ਸਮੇਂ ਸਰਗਰਮ ਲਾਈਨ ਨੂੰ ਲੰਬਕਾਰੀ ਵਿਚਕਾਰ ਰੱਖੋ।",
+      "typewriterLabel": "ਫੋਕਸ ਮੋਡ · ਟਾਈਪਰਾਈਟਰ ਸਕ੍ਰੋਲ"
+    },
+    "hotkeys": {
+      "addBindingAria": "{{command}} ਲਈ ਸ਼ਾਰਟਕੱਟ ਜੋੜੋ",
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "capturePrompt": "ਕੋਈ ਕੁੰਜੀ ਦਬਾਓ…",
+      "conflictIndicator": "⚠ ਟਕਰਾਅ",
+      "conflictTitle": "{{commands}} ਵੀ ਇਹੀ ਵਰਤਦਾ ਹੈ",
+      "fixed": "ਸਥਿਰ",
+      "group": {
+        "editorFormatting": "ਸੰਪਾਦਕ ਫਾਰਮੈਟਿੰਗ",
+        "general": "ਆਮ",
+        "navigation": "ਨੈਵੀਗੇਸ਼ਨ",
+        "notes": "ਨੋਟ",
+        "panesTabs": "ਪੈਨ ਅਤੇ ਟੈਬਾਂ",
+        "view": "ਦ੍ਰਿਸ਼"
+      },
+      "helper": "ਕੀਬੋਰਡ ਸ਼ਾਰਟਕੱਟ ਵੇਖੋ ਅਤੇ ਬਦਲੋ। ਸਿਰਫ਼ ਟੈਬ-ਚੱਕਰ ਵਾਲਾ ਸ਼ਾਰਟਕੱਟ (Ctrl+Tab) ਸਥਿਰ ਹੈ।",
+      "notSet": "ਸੈੱਟ ਨਹੀਂ",
+      "removeBindingAria": "{{chord}} ਹਟਾਓ",
+      "reserved": {
+        "bookmarkPage": "ਪੰਨਾ ਬੁੱਕਮਾਰਕ ਕਰਦਾ ਹੈ",
+        "closeTab": "ਟੈਬ ਬੰਦ ਕਰਦਾ ਹੈ",
+        "closeWindow": "ਵਿੰਡੋ ਬੰਦ ਕਰਦਾ ਹੈ",
+        "cycleTabs": "ਟੈਬਾਂ ਵਿਚਕਾਰ ਘੁੰਮਦਾ ਹੈ",
+        "focusAddressBar": "ਪਤਾ-ਪੱਟੀ ਉੱਤੇ ਫੋਕਸ ਕਰਦਾ ਹੈ",
+        "hideApplication": "ਬ੍ਰਾਊਜ਼ਰ ਲੁਕਾਉਂਦਾ ਹੈ",
+        "inspectElement": "ਐਲੀਮੈਂਟ ਇੰਸਪੈਕਟਰ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "minimiseWindow": "ਵਿੰਡੋ ਛੋਟੀ ਕਰਦਾ ਹੈ",
+        "newPrivateWindow": "ਨਿੱਜੀ ਵਿੰਡੋ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "newTab": "ਨਵੀਂ ਟੈਬ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "newWindow": "ਨਵੀਂ ਵਿੰਡੋ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "openBookmarks": "ਬੁੱਕਮਾਰਕ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "openDevTools": "ਡਿਵੈਲਪਰ ਟੂਲ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "openExtensions": "ਐਕਸਟੈਂਸ਼ਨਾਂ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "openFile": "ਫ਼ਾਈਲ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "openHistory": "ਇਤਿਹਾਸ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "quit": "ਬ੍ਰਾਊਜ਼ਰ ਬੰਦ ਕਰਦਾ ਹੈ",
+        "reopenTab": "ਆਖ਼ਰੀ ਬੰਦ ਕੀਤੀ ਟੈਬ ਦੁਬਾਰਾ ਖੋਲ੍ਹਦਾ ਹੈ",
+        "switchTab": "ਟੈਬਾਂ ਬਦਲਦਾ ਹੈ",
+        "toggleFullscreen": "ਪੂਰੀ ਸਕਰੀਨ ਟੌਗਲ ਕਰਦਾ ਹੈ"
+      },
+      "reservedBadge": "ਇੱਥੇ ਉਪਲਬਧ ਨਹੀਂ",
+      "reservedBadgeTitle": "ਤੁਹਾਡਾ ਬ੍ਰਾਊਜ਼ਰ {{chord}} ਨਾਲ {{action}}, ਇਸ ਲਈ ਇਹ ਕਦੇ Myne ਤੱਕ ਨਹੀਂ ਪਹੁੰਚਦਾ। ਡੈਸਕਟਾਪ ਐਪ ਵਿੱਚ ਇਹ ਸ਼ਾਰਟਕੱਟ ਹਾਲੇ ਵੀ ਕੰਮ ਕਰਦਾ ਹੈ।",
+      "reservedRefused": "{{chord}} ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਰ ਦਾ ਹੈ — ਇਹ {{action}}। ਕੋਈ ਹੋਰ ਸ਼ਾਰਟਕੱਟ ਚੁਣੋ; ਤੁਹਾਡੇ ਡੈਸਕਟਾਪ ਸ਼ਾਰਟਕੱਟ ਨਹੀਂ ਬਦਲੇ।",
+      "reservedUnreliable": "{{chord}} ਸ਼ਾਇਦ Myne ਤੱਕ ਨਾ ਪਹੁੰਚੇ — ਕੁਝ ਬ੍ਰਾਊਜ਼ਰਾਂ ਵਿੱਚ ਇਹ {{action}}। ਫਿਰ ਵੀ ਜੋੜ ਦਿੱਤਾ ਗਿਆ।",
+      "resetAll": "ਸਾਰੇ ਸ਼ਾਰਟਕੱਟ ਰੀਸੈੱਟ ਕਰੋ…",
+      "resetAllConfirm": "ਹਰ ਕਸਟਮ ਸ਼ਾਰਟਕੱਟ ਨੂੰ ਉਸਦੇ ਮੂਲ ਉੱਤੇ ਰੀਸੈੱਟ ਕਰਨਾ ਹੈ?",
+      "resetAllYes": "ਸਭ ਰੀਸੈੱਟ ਕਰੋ",
+      "restoreDefaultAria": "{{command}} ਲਈ ਮੂਲ ਬਹਾਲ ਕਰੋ",
+      "searchAriaLabel": "ਸ਼ਾਰਟਕੱਟ ਖੋਜੋ",
+      "searchPlaceholder": "ਸ਼ਾਰਟਕੱਟ ਖੋਜੋ…",
+      "warnAlreadyUsed": "{{commands}} ਪਹਿਲਾਂ ਹੀ ਇਹ ਵਰਤਦਾ ਹੈ — ਫਿਰ ਵੀ ਜੋੜ ਦਿੱਤਾ ਗਿਆ।"
+    },
+    "language": {
+      "helper": "ਐਪ ਦੀ ਪ੍ਰਦਰਸ਼ਨ ਭਾਸ਼ਾ ਚੁਣੋ।",
+      "label": "ਭਾਸ਼ਾ"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "ਲਾਈਨ-ਨੰਬਰ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "helper": "ਸੰਪਾਦਕ ਵਿੱਚ ਲਾਈਨ-ਨੰਬਰ ਵਾਲੀ ਪੱਟੀ ਦਿਖਾਓ। ਹਰ ਲਾਈਨ ਲਈ ਇੱਕ ਨੰਬਰ; ਮੂਲ ਰੂਪ ਵਿੱਚ ਬੰਦ।",
+      "label": "ਲਾਈਨ ਨੰਬਰ",
+      "off": "ਬੰਦ",
+      "on": "ਚਾਲੂ"
+    },
+    "views": {
+      "helper": "ਫਿਲਟਰ ਕੀਤੀਆਂ ਨੋਟ ਸੂਚੀਆਂ ਸੁਰੱਖਿਅਤ ਕਰਨ ਲਈ ਸਾਈਡਬਾਰ ਵਿੱਚ ਦ੍ਰਿਸ਼ ਦਾ ਇੰਦਰਾਜ਼ ਦਿਖਾਓ। ਮੂਲ ਰੂਪ ਵਿੱਚ ਬੰਦ; ਜੇ ਤੁਹਾਡੇ ਕੋਲ ਪਹਿਲਾਂ ਹੀ ਦ੍ਰਿਸ਼ ਹਨ ਤਾਂ ਚਾਲੂ।",
+      "label": "ਦ੍ਰਿਸ਼"
+    },
+    "vimMode": {
+      "chordCaveat": "Windows ਅਤੇ Linux ਉੱਤੇ Myne ਦੇ ਆਪਣੇ ਸ਼ਾਰਟਕੱਟਾਂ ਨੂੰ ਪਹਿਲ ਮਿਲਦੀ ਹੈ, ਇਸ ਲਈ ਉਹਨਾਂ ਨਾਲ ਟਕਰਾਉਣ ਵਾਲੇ vim ਸ਼ਾਰਟਕੱਟ (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) ਸੰਪਾਦਕ ਵਿੱਚ ਉਪਲਬਧ ਨਹੀਂ ਹਨ। Ctrl-[ ਹਾਲੇ ਵੀ Escape ਵਜੋਂ ਕੰਮ ਕਰਦਾ ਹੈ, ਅਤੇ visual-block Alt-v ਉੱਤੇ ਚਲਾ ਜਾਂਦਾ ਹੈ।",
+      "errorSaveSetting": "vim-ਮੋਡ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "helper": "ਸੰਪਾਦਕ ਵਿੱਚ vim ਕੁੰਜੀਆਂ ਵਰਤੋ: normal, insert ਅਤੇ visual ਮੋਡ, ਆਮ motion ਅਤੇ operator ਸਮੇਤ। ਮੂਲ ਰੂਪ ਵਿੱਚ ਬੰਦ। ਇਹ ਚਾਲੂ ਹੋਣ ਉੱਤੇ ਨੋਟ ਸਰੋਤ ਦ੍ਰਿਸ਼ ਵਿੱਚ ਖੁੱਲ੍ਹਦੇ ਹਨ।",
+      "label": "Vim ਕੀਬੋਰਡ ਮੋਡ",
+      "off": "ਬੰਦ",
+      "on": "ਚਾਲੂ"
+    },
+    "toolbarCustomize": {
+      "errorSave": "ਟੂਲਬਾਰ ਲੇਆਉਟ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "helper": "ਚੁਣੋ ਕਿ ਚੋਣ ਵਾਲੀ ਟੂਲਬਾਰ ਉੱਤੇ ਕਿਹੜੇ ਫਾਰਮੈਟਿੰਗ ਬਟਨ ਦਿਸਣ, ਅਤੇ ਉਹਨਾਂ ਦਾ ਕ੍ਰਮ।",
+      "label": "ਟੂਲਬਾਰ ਬਟਨ",
+      "moveDown": "ਹੇਠਾਂ ਲਿਜਾਓ",
+      "moveUp": "ਉੱਤੇ ਲਿਜਾਓ",
+      "pendingHint": "ਜਲਦੀ ਆ ਰਿਹਾ ਹੈ"
+    },
+    "ai": {
+      "autoTagHelper": "ਜਦੋਂ ਤੁਸੀਂ ਟਾਈਪ ਕਰਨਾ ਰੋਕਦੇ ਹੋ, ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਉੱਤੇ ਇੱਕ ਛੋਟਾ ਮਾਡਲ ਨੋਟ ਪੜ੍ਹਦਾ ਹੈ ਅਤੇ ਇਸਦੇ ਉੱਤੇ ਟੈਗ ਸੁਝਾਉਂਦਾ ਹੈ। ਜਦ ਤੱਕ ਤੁਸੀਂ ਕੋਈ ਸੁਝਾਅ ਸਵੀਕਾਰ ਨਹੀਂ ਕਰਦੇ, ਕੁਝ ਵੀ ਨਹੀਂ ਜੁੜਦਾ।",
+      "autoTagLabel": "ਟੈਗ ਆਪਣੇ-ਆਪ ਸੁਝਾਓ",
+      "autoTagUnavailable": "ਇਸ ਬਿਲਡ ਵਿੱਚ ਟੈਗ ਮਾਡਲ ਨਹੀਂ ਆਉਂਦਾ, ਇਸ ਲਈ ਕੋਈ ਟੈਗ ਨਹੀਂ ਸੁਝਾਏ ਜਾ ਸਕਦੇ। Myne ਕਦੇ ਕੋਈ ਮਾਡਲ ਡਾਊਨਲੋਡ ਨਹੀਂ ਕਰਦਾ — ਜਿਸ ਬਿਲਡ ਵਿੱਚ ਇਹ ਸ਼ਾਮਲ ਹੋਵੇ, ਉੱਥੇ ਇਹ ਸਵਿੱਚ ਆਪਣੇ ਆਪ ਚਾਲੂ ਹੋ ਜਾਂਦਾ ਹੈ।",
+      "disclosureToggle": "ਇਹ ਕਿਵੇਂ ਕੰਮ ਕਰਦਾ ਹੈ?",
+      "enableHelper": "ਤੁਹਾਡਾ ਦਿੱਤਾ ਮਾਡਲ ਪੂਰੀ ਤਰ੍ਹਾਂ ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਉੱਤੇ ਚਲਾਉਂਦਾ ਹੈ। ਪ੍ਰਯੋਗਾਤਮਕ, ਮੂਲ ਰੂਪ ਵਿੱਚ ਬੰਦ।",
+      "enableLabel": "ਲੋਕਲ AI ਚਾਲੂ ਕਰੋ",
+      "excludedHelper": "ਇਹਨਾਂ ਫੋਲਡਰਾਂ ਵਿਚਲੇ ਨੋਟ AI ਕਦੇ ਨਹੀਂ ਪੜ੍ਹਦਾ ਜਾਂ ਇੰਡੈਕਸ ਨਹੀਂ ਕਰਦਾ। ਹਰ ਲਾਈਨ ਉੱਤੇ ਇੱਕ ਫੋਲਡਰ ਪਾਥ।",
+      "excludedLabel": "ਬਾਹਰ ਰੱਖੇ ਫੋਲਡਰ",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "modelChoose": "ਫ਼ਾਈਲ ਚੁਣੋ…",
+      "modelEmbeddingLabel": "ਖੋਜ ਮਾਡਲ — ਅਰਥ-ਆਧਾਰਿਤ ਖੋਜ ਅਤੇ ਸਵਾਲ-ਜਵਾਬ",
+      "modelFilter": {
+        "gguf": "GGUF ਮਾਡਲ",
+        "safetensors": "Safetensors ਮਾਡਲ"
+      },
+      "modelGenerationLabel": "ਲਿਖਤ ਮਾਡਲ — ਚੈਟ, ਸਾਰ, ਲਿਖਾਈ",
+      "modelNone": "ਕੋਈ ਫ਼ਾਈਲ ਨਹੀਂ ਚੁਣੀ",
+      "modelSaveFailed": "ਮਾਡਲ ਦਾ ਪਾਥ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ (ਇਹ ਤੁਹਾਡੇ ਵਾਲਟ ਤੋਂ ਬਾਹਰ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ)।",
+      "modelTranscriptionLabel": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਮਾਡਲ (ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ)",
+      "modelsHelper": "Myne ਕਦੇ ਮਾਡਲ ਡਾਊਨਲੋਡ ਨਹੀਂ ਕਰਦਾ — ਇਸਦਾ ਮਤਲਬ ਨੈੱਟਵਰਕ ਉੱਤੇ ਡਾਟਾ ਭੇਜਣਾ ਹੁੰਦਾ। ਕੋਈ ਲਿੰਕ ਖੋਲ੍ਹ ਕੇ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਮਾਡਲ ਲਵੋ, ਫਿਰ ਡਾਊਨਲੋਡ ਕੀਤੀਆਂ ਫ਼ਾਈਲਾਂ ਇੱਥੇ ਚੁਣੋ। ਸਭ ਕੁਝ ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਉੱਤੇ ਚੱਲਦਾ ਹੈ।",
+      "modelsLabel": "ਮਾਡਲ",
+      "recommendedFilesEmbedding": "ਇੱਕੋ ਫੋਲਡਰ ਵਿੱਚ model.safetensors + config.json + tokenizer.json ਚਾਹੀਦੇ ਹਨ।",
+      "recommendedFilesGeneration": "ਇੱਕੋ ਫੋਲਡਰ ਵਿੱਚ .gguf ਫ਼ਾਈਲ + tokenizer.json ਚਾਹੀਦੇ ਹਨ।",
+      "recommendedFilesTranscription": "ਇੱਕੋ ਫੋਲਡਰ ਵਿੱਚ Whisper .gguf ਫ਼ਾਈਲ + config.json + tokenizer.json ਚਾਹੀਦੇ ਹਨ।",
+      "title": "AI"
+    },
+    "network": {
+      "disabledCue": "ਸਿੰਕ ਹੁਣ Tor ਰਾਹੀਂ ਨਹੀਂ ਜਾਂਦਾ। ਨਵੇਂ ਕਨੈਕਸ਼ਨ ਸਿੱਧੇ ਸਿੰਕ ਸਰਵਰ ਨੂੰ ਜਾਂਦੇ ਹਨ।",
+      "errorRead": "ਮੌਜੂਦਾ ਸੈਟਿੰਗ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ। ਇਸਨੂੰ ਦੁਬਾਰਾ ਤੈਅ ਕਰਨ ਲਈ ਸਵਿੱਚ ਬਦਲੋ।",
+      "errorSave": "ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ। ਕੁਝ ਨਹੀਂ ਬਦਲਿਆ।",
+      "errorSidecar": "Tor ਰਾਊਟਿੰਗ ਚਾਲੂ ਹੈ, ਪਰ Tor ਕਲਾਇੰਟ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਜਦ ਤੱਕ ਇਹ ਸ਼ੁਰੂ ਨਹੀਂ ਹੁੰਦਾ, ਸਿੰਕ ਰੁਕਿਆ ਹੋਇਆ ਹੈ — ਕੁਝ ਵੀ ਸਿੱਧਾ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਰਿਹਾ।",
+      "postureActive": "ਸਿੰਕ Tor ਰਾਹੀਂ ਜਾ ਰਿਹਾ ਹੈ",
+      "postureConnecting": "Tor ਨਾਲ ਜੁੜਿਆ ਜਾ ਰਿਹਾ ਹੈ — ਸਿੰਕ ਰੁਕਿਆ ਹੋਇਆ ਹੈ",
+      "postureConnectingDetail": "ਆਮ ਤੌਰ 'ਤੇ ਇਸ ਵਿੱਚ ਕੁਝ ਸਕਿੰਟ ਲੱਗਦੇ ਹਨ। ਇਸ ਦੌਰਾਨ ਕੁਝ ਵੀ ਸਿੱਧਾ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਰਿਹਾ।",
+      "postureExempt": "ਸਿੰਕ Tor ਨਹੀਂ ਵਰਤ ਰਿਹਾ — ਇਹ ਪਤਾ ਇਸੇ ਡਿਵਾਈਸ ਵੱਲ ਇਸ਼ਾਰਾ ਕਰਦਾ ਹੈ",
+      "postureExemptDetail": "ਤੁਸੀਂ ਜੋ ਸਿੰਕ ਸਰਵਰ ਪਤਾ ਸੰਰਚਿਤ ਕੀਤਾ ਹੈ ਉਹ ਇਸੇ ਕੰਪਿਊਟਰ ਦਾ ਨਾਂ ਲੈਂਦਾ ਹੈ, ਇਸ ਲਈ Myne ਦਾ ਉਸ ਨਾਲ ਕਨੈਕਸ਼ਨ ਕਿਸੇ Tor ਸਰਕਟ ਰਾਹੀਂ ਨਹੀਂ ਜਾਂਦਾ। ਜੇ ਉਹ ਪਤਾ ਅੱਗੇ ਕਿਸੇ ਹੋਰ ਥਾਂ ਦੇ ਸਰਵਰ ਨੂੰ ਭੇਜਦਾ ਹੈ, ਤਾਂ Myne ਇਹ ਵੇਖ ਨਹੀਂ ਸਕਦਾ ਅਤੇ ਨਾ ਹੀ ਉਸਨੂੰ ਰਾਊਟ ਕਰ ਸਕਦਾ ਹੈ। ਸਿੰਕ ਰੁਕਿਆ ਹੋਇਆ ਨਹੀਂ ਹੈ।",
+      "postureHeading": "ਇਸ ਵੇਲੇ",
+      "postureInactive": "ਸਿੰਕ ਸਿੱਧਾ ਸਿੰਕ ਸਰਵਰ ਨੂੰ ਜਾਂਦਾ ਹੈ",
+      "postureUnavailable": "Tor ਉਪਲਬਧ ਨਹੀਂ — ਸਿੰਕ ਰੁਕਿਆ ਹੋਇਆ ਹੈ",
+      "postureUnavailableDetail": "ਕੁਝ ਵੀ ਸਿੱਧਾ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਰਿਹਾ। Tor ਕਲਾਇੰਟ ਸ਼ੁਰੂ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਲਈ ਇਹ ਸੈਟਿੰਗ ਬੰਦ ਕਰਕੇ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰੋ, ਜਾਂ Tor ਤੋਂ ਬਿਨਾਂ ਸਿੰਕ ਕਰਨ ਲਈ ਇਸਨੂੰ ਬੰਦ ਕਰ ਦਿਓ।",
+      "residualExit": "Tor ਸਰਕਟ ਦਾ ਆਖ਼ਰੀ ਰੀਲੇਅ — ਐਗਜ਼ਿਟ ਨੋਡ — ਵੇਖਦਾ ਹੈ ਕਿ ਤੁਸੀਂ ਕਿਹੜੇ ਸਿੰਕ ਸਰਵਰ ਨਾਲ ਜੁੜਦੇ ਹੋ। ਉਹ ਪੜ੍ਹ ਨਹੀਂ ਸਕਦਾ ਕਿ ਤੁਸੀਂ ਕੀ ਸਿੰਕ ਕਰਦੇ ਹੋ; ਉਹ ਸਿਰੇ ਤੋਂ ਸਿਰੇ ਤੱਕ ਇਨਕ੍ਰਿਪਟ ਰਹਿੰਦਾ ਹੈ।",
+      "residualMetadata": "ਸਿੰਕ ਸਰਵਰ ਹਾਲੇ ਵੀ ਵੇਖਦਾ ਹੈ ਕਿ ਤੁਸੀਂ ਕਦੋਂ ਸਿੰਕ ਕਰਦੇ ਹੋ, ਕਿੰਨੇ ਬਲੌਬ ਭੇਜਦੇ ਹੋ ਅਤੇ ਉਹ ਕਿੰਨੇ ਵੱਡੇ ਹਨ, ਅਤੇ ਤੁਹਾਡੇ ਕੋਲ ਕਿੰਨੇ ਡਿਵਾਈਸ ਹਨ। Tor ਇਹ ਨਹੀਂ ਬਦਲਦਾ।",
+      "residualPayment": "ਜੇ ਤੁਸੀਂ ਹੋਸਟ ਕੀਤੇ ਸਿੰਕ ਲਈ ਭੁਗਤਾਨ ਕਰਦੇ ਹੋ, ਤਾਂ ਭੁਗਤਾਨ ਅਤੇ ਤੁਹਾਡਾ ਖਾਤਾ ਹਾਲੇ ਵੀ ਤੁਹਾਡੇ ਨਾਲ ਜੋੜੇ ਜਾ ਸਕਦੇ ਹਨ। Tor ਇਹ ਬਦਲਦਾ ਹੈ ਕਿ ਕਨੈਕਸ਼ਨ ਕਿੱਥੋਂ ਆਉਂਦਾ ਹੈ, ਬਿਲਿੰਗ ਦੀ ਪੈੜ ਨਹੀਂ।",
+      "residualScope": "ਸਿਰਫ਼ Myne ਦੀ ਆਪਣੀ ਸਿੰਕ ਟ੍ਰੈਫ਼ਿਕ Tor ਰਾਹੀਂ ਜਾਂਦੀ ਹੈ। ਇਸ ਡਿਵਾਈਸ ਦਾ ਹੋਰ ਕੁਝ ਨਹੀਂ।",
+      "residualsToggle": "ਇਹ ਕੀ ਨਹੀਂ ਲੁਕਾਉਂਦਾ",
+      "torHelper": "ਸਿੰਕ ਸਰਵਰ ਤੋਂ ਤੁਹਾਡਾ IP ਪਤਾ ਅਤੇ ਟਿਕਾਣਾ ਲੁਕਾਉਂਦਾ ਹੈ, ਅਤੇ ਤੁਹਾਡੇ ਨੈੱਟਵਰਕ ਅਤੇ ਇੰਟਰਨੈੱਟ ਪ੍ਰਦਾਤਾ ਤੋਂ ਲੁਕਾਉਂਦਾ ਹੈ ਕਿ ਤੁਸੀਂ ਕਿਹੜੇ ਸਰਵਰ ਨਾਲ ਸਿੰਕ ਕਰਦੇ ਹੋ — ਉਹ ਹਾਲੇ ਵੀ ਵੇਖ ਸਕਦੇ ਹਨ ਕਿ ਇਹ ਡਿਵਾਈਸ Tor ਨਾਲ ਜੁੜ ਰਿਹਾ ਹੈ। ਇਹ ਤੁਹਾਨੂੰ Myne ਲਈ ਗੁਮਨਾਮ ਨਹੀਂ ਬਣਾਉਂਦਾ, ਅਤੇ ਸਰਵਰ ਤੋਂ ਇਹ ਨਹੀਂ ਲੁਕਾਉਂਦਾ ਕਿ ਤੁਸੀਂ ਕੀ ਜਾਂ ਕਦੋਂ ਸਿੰਕ ਕਰਦੇ ਹੋ।",
+      "torLabel": "ਸਿੰਕ Tor ਰਾਹੀਂ ਭੇਜੋ"
+    },
+    "prefs": {
+      "saveError": "ਪਸੰਦ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
+    },
+    "reminders": {
+      "aria": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਟਾਸਕ ਯਾਦ-ਦਹਾਨੀਆਂ ਦਿਖਾਓ",
+      "exactAllow": "ਇਜਾਜ਼ਤ ਦਿਓ",
+      "exactLabel": "ਸਹੀ ਸਮਾਂ",
+      "exactOn": "ਚਾਲੂ",
+      "horizon": "ਯਾਦ-ਦਹਾਨੀਆਂ {{date}} ਤੱਕ ਰਜਿਸਟਰ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਜਾਰੀ ਰੱਖਣ ਲਈ ਉਸ ਤੋਂ ਪਹਿਲਾਂ Myne ਖੋਲ੍ਹੋ।",
+      "label": "ਟਾਸਕ ਯਾਦ-ਦਹਾਨੀਆਂ",
+      "saveError": "ਉਹ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "showTextAria": "ਸੂਚਨਾ ਵਿੱਚ ਟਾਸਕ ਦੀ ਲਿਖਤ ਦਿਖਾਓ",
+      "showTextLabel": "ਟਾਸਕ ਦੀ ਲਿਖਤ ਦਿਖਾਓ"
+    },
+    "privacy": {
+      "autoLockHelper": "ਇੰਨੀ ਦੇਰ ਬਿਨਾਂ ਵਰਤੋਂ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਵਾਲਟ ਲਾਕ ਕਰੋ।",
+      "autoLockLabel": "ਆਪਣੇ-ਆਪ ਲਾਕ",
+      "autoLockSearchEmpty": "ਕੋਈ ਮਿਆਦ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ।",
+      "autoLockSearchPlaceholder": "ਮਿਆਦਾਂ ਖੋਜੋ…",
+      "screenCaptureHelperOff": "ਅਨਲਾਕ ਤੋਂ ਪਹਿਲਾਂ ਸੁਰੱਖਿਆ ਹਮੇਸ਼ਾ ਲਾਗੂ ਰਹਿੰਦੀ ਹੈ। ਅਨਲਾਕ ਤੋਂ ਬਾਅਦ ਇਹ ਪਸੰਦ ਲਾਗੂ ਹੁੰਦੀ ਹੈ।",
+      "screenCaptureHelperOn": "macOS ਅਤੇ Windows 10 (ਮਈ 2020 ਅੱਪਡੇਟ ਜਾਂ ਬਾਅਦ) ਉੱਤੇ ਸਰਗਰਮ। Linux ਸਮਰਥਨ ਕਿਸੇ ਅਗਲੀ ਰਿਲੀਜ਼ ਵਿੱਚ।",
+      "screenCaptureLabel": "ਸਕਰੀਨ-ਕੈਪਚਰ ਸੁਰੱਖਿਆ",
+      "screenCaptureSubtitle": "ਸਕਰੀਨਸ਼ਾਟ ਅਤੇ ਸਕਰੀਨ ਰਿਕਾਰਡਿੰਗ ਰੋਕੋ",
+      "screenshotBlocked": "ਸਕਰੀਨ ਸੁਰੱਖਿਆ ਚਾਲੂ ਹੈ — Myne ਦੇ ਸਕਰੀਨਸ਼ਾਟ ਖਾਲੀ ਆਉਂਦੇ ਹਨ।",
+      "autoLockAfter": "ਇੰਨੇ ਸਮੇਂ ਬਾਅਦ ਆਪਣੇ-ਆਪ ਲਾਕ",
+      "autoLock1m": "1 ਮਿੰ",
+      "autoLock5m": "5 ਮਿੰ",
+      "autoLock15m": "15 ਮਿੰ",
+      "autoLock30m": "30 ਮਿੰ",
+      "autoLock1h": "1 ਘੰ",
+      "quickUnlockSubtitleAndroid": "ਆਪਣੇ-ਆਪ ਲਾਕ ਹੋਣ ਤੋਂ ਬਾਅਦ PIN ਨਾਲ ਦੁਬਾਰਾ ਦਾਖਲ ਹੋਵੋ",
+      "quickUnlockSubtitle": "ਆਪਣੇ-ਆਪ ਲਾਕ ਹੋਣ ਤੋਂ ਬਾਅਦ {{method}} ਜਾਂ PIN ਨਾਲ ਦੁਬਾਰਾ ਦਾਖਲ ਹੋਵੋ"
+    },
+    "quickUnlock": {
+      "errorCancelled": "ਰੱਦ ਕੀਤਾ ਗਿਆ।",
+      "errorGeneric": "ਤੇਜ਼ ਅਨਲਾਕ ਸੰਰਚਿਤ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "errorHardwareUnavailable": "ਇਸ ਬਿਲਡ ਵਿੱਚ Touch ID ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸ ਲਈ Touch ID ਦਰਜ ਕੀਤਾ ਹੋਇਆ, ਦਸਤਖ਼ਤ ਕੀਤਾ macOS ਬਿਲਡ ਚਾਹੀਦਾ ਹੈ।",
+      "errorNotUnlocked": "ਪਹਿਲਾਂ ਵਾਲਟ ਅਨਲਾਕ ਕਰੋ।",
+      "errorPinNotDigits": "PIN ਵਿੱਚ ਸਿਰਫ਼ ਅੰਕ ਹੋਣੇ ਚਾਹੀਦੇ ਹਨ।",
+      "errorPinTooShort": "PIN ਘੱਟੋ-ਘੱਟ {{count}} ਅੰਕਾਂ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।",
+      "errorPinTooShort_one": "PIN ਘੱਟੋ-ਘੱਟ {{count}} ਅੰਕ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।",
+      "errorPinTooShort_other": "PIN ਘੱਟੋ-ਘੱਟ {{count}} ਅੰਕਾਂ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।",
+      "helperConfigured": "{{method}} ਰਾਹੀਂ ਸੰਰਚਿਤ। ਆਪਣੇ-ਆਪ ਲਾਕ ਹੋਣ ਤੋਂ ਬਾਅਦ ਦੁਬਾਰਾ ਦਾਖਲ ਹੋਣ ਵੇਲੇ ਮਾਸਟਰ ਪਾਸਵਰਡ ਛੱਡ ਦਿੱਤਾ ਜਾਂਦਾ ਹੈ। ਮੁੜ-ਸ਼ੁਰੂ ਤੋਂ ਬਾਅਦ ਮਾਸਟਰ ਪਾਸਵਰਡ ਹਾਲੇ ਵੀ ਜ਼ਰੂਰੀ ਹੈ।",
+      "helperNotConfigured": "ਆਪਣੇ-ਆਪ ਲਾਕ ਹੋਣ ਤੋਂ ਬਾਅਦ ਪੂਰੇ ਮਾਸਟਰ ਪਾਸਵਰਡ ਦੀ ਥਾਂ PIN ਜਾਂ Touch ID ਨਾਲ ਦੁਬਾਰਾ ਦਾਖਲ ਹੋਵੋ। ਇਹ ਇਨਕ੍ਰਿਪਟ ਕੀਤੇ ਵਾਲਟ ਉੱਤੇ ਸਿਰਫ਼ ਸਹੂਲਤ ਹੈ — ਮੁੜ-ਸ਼ੁਰੂ ਤੋਂ ਬਾਅਦ ਮਾਸਟਰ ਪਾਸਵਰਡ ਜ਼ਰੂਰੀ ਰਹਿੰਦਾ ਹੈ।",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "ਤੇਜ਼-ਅਨਲਾਕ PIN",
+      "pinPlaceholder": "PIN (ਘੱਟੋ-ਘੱਟ {{count}} ਅੰਕ)",
+      "pinPlaceholder_one": "PIN (ਘੱਟੋ-ਘੱਟ {{count}} ਅੰਕ)",
+      "pinPlaceholder_other": "PIN (ਘੱਟੋ-ਘੱਟ {{count}} ਅੰਕ)",
+      "setPin": "PIN ਸੈੱਟ ਕਰੋ",
+      "setupHelper": "Touch ID ਸਿਰਫ਼ macOS ਲਈ ਹੈ ਅਤੇ ਇਸ ਵੇਲੇ ਪ੍ਰਯੋਗਾਤਮਕ ਹੈ (ਹਾਰਡਵੇਅਰ ਤਸਦੀਕ ਬਾਕੀ)। PIN ਹਰ ਥਾਂ ਕੰਮ ਕਰਦਾ ਹੈ।",
+      "title": "ਤੇਜ਼ ਅਨਲਾਕ",
+      "useTouchId": "Touch ID ਵਰਤੋ",
+      "pinTooShort": "PIN ਘੱਟੋ-ਘੱਟ 6 ਅੰਕਾਂ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।",
+      "pinMismatch": "PIN ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ।",
+      "pinOnToast": "PIN ਤੇਜ਼ ਅਨਲਾਕ ਚਾਲੂ ਹੈ",
+      "setupError": "ਤੇਜ਼ ਅਨਲਾਕ ਸੈੱਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "turnedOffToast": "ਤੇਜ਼ ਅਨਲਾਕ ਬੰਦ ਕਰ ਦਿੱਤਾ",
+      "turnOffError": "ਤੇਜ਼ ਅਨਲਾਕ ਬੰਦ ਨਹੀਂ ਹੋ ਸਕਿਆ",
+      "biometricOnToast": "{{method}} ਤੇਜ਼ ਅਨਲਾਕ ਚਾਲੂ ਹੈ",
+      "biometricUnavailable": "{{method}} ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "warningBanner": "ਸਿਰਫ਼ ਸਹੂਲਤ ਵਾਲਾ ਦਰਵਾਜ਼ਾ। ਮੁੜ-ਸ਼ੁਰੂ ਤੋਂ ਬਾਅਦ ਤੁਹਾਡਾ ਪਾਸਵਰਡ ਹਾਲੇ ਵੀ ਜ਼ਰੂਰੀ ਹੈ।",
+      "biometricToggleSubtitle": "ਆਪਣੇ-ਆਪ ਲਾਕ ਹੋਣ ਤੋਂ ਬਾਅਦ {{method}} ਨਾਲ ਅਨਲਾਕ ਕਰੋ",
+      "pinOnLead": "PIN ਤੇਜ਼ ਅਨਲਾਕ ",
+      "pinOnEmphasis": "ਚਾਲੂ",
+      "pinOnRest": " ਹੈ। ਵਾਲਟ ਦੇ ਆਪਣੇ-ਆਪ ਲਾਕ ਹੋਣ ਤੋਂ ਬਾਅਦ ਤੁਸੀਂ ਪੂਰੇ ਪਾਸਵਰਡ ਦੀ ਥਾਂ ਆਪਣੇ PIN ਨਾਲ ਦੁਬਾਰਾ ਦਾਖਲ ਹੋ ਸਕਦੇ ਹੋ — ਸਿਰਫ਼ ਇਸ ਐਪ ਸੈਸ਼ਨ ਲਈ। ਠੰਢੀ ਸ਼ੁਰੂਆਤ ਲਈ ਹਮੇਸ਼ਾ ਪੂਰਾ ਪਾਸਵਰਡ ਲੋੜੀਂਦਾ ਹੈ।",
+      "turnOffPin": "PIN ਬੰਦ ਕਰੋ",
+      "pinSetupHelper": "ਆਪਣੇ-ਆਪ ਲਾਕ ਹੋਣ ਤੋਂ ਬਾਅਦ ਤੇਜ਼ੀ ਨਾਲ ਦੁਬਾਰਾ ਅਨਲਾਕ ਕਰਨ ਲਈ 6+ ਅੰਕਾਂ ਦਾ PIN ਸੈੱਟ ਕਰੋ। PIN ਇੱਕ ਡਿਵਾਈਸ-ਲੋਕਲ ਕੁੰਜੀ ਨੂੰ ਲਪੇਟਦਾ ਹੈ — ਇਹ ਕਦੇ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਨਹੀਂ ਜਾਂਦਾ ਅਤੇ ਤੁਹਾਡੇ ਰਿਕਵਰੀ ਵਾਕੰਸ਼ ਨੂੰ ਕਦੇ ਨਹੀਂ ਛੂੰਹਦਾ।",
+      "pinReplacesBiometric": " PIN ਸੈੱਟ ਕਰਨ ਨਾਲ {{method}} ਅਨਲਾਕ ਦੀ ਥਾਂ ਲੈ ਲਈ ਜਾਂਦੀ ਹੈ।",
+      "pinPlaceholder6": "ਘੱਟੋ-ਘੱਟ 6 ਅੰਕ",
+      "confirmPin": "PIN ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
+      "reenterPin": "PIN ਦੁਬਾਰਾ ਦਾਖਲ ਕਰੋ",
+      "setupButton": "ਤੇਜ਼ ਅਨਲਾਕ ਸੈੱਟ ਕਰੋ"
+    },
+    "shell": {
+      "closeLabel": "ਸੈਟਿੰਗਾਂ ਬੰਦ ਕਰੋ",
+      "groups": {
+        "developer": "ਡਿਵੈਲਪਰ"
+      },
+      "navLabel": "ਸੈਟਿੰਗ ਪੈਨਲ",
+      "panels": {
+        "about": "ਬਾਰੇ",
+        "account": "ਖਾਤਾ",
+        "ai": "AI",
+        "appearance": "ਦਿੱਖ",
+        "editor": "ਸੰਪਾਦਕ",
+        "files": "ਫ਼ਾਈਲਾਂ",
+        "transcription": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ",
+        "hotkeys": "ਸ਼ਾਰਟਕੱਟ",
+        "network": "ਨੈੱਟਵਰਕ",
+        "privacy": "ਨਿੱਜਤਾ",
+        "storage": "ਸਟੋਰੇਜ",
+        "sync": "ਸਿੰਕ"
+      },
+      "passwordUpdatedToast": "ਪਾਸਵਰਡ ਅੱਪਡੇਟ ਹੋ ਗਿਆ",
+      "title": "ਸੈਟਿੰਗਾਂ"
+    },
+    "spell": {
+      "errorSaveLanguages": "ਸ਼ਬਦ-ਜੋੜ ਜਾਂਚ ਦੀਆਂ ਭਾਸ਼ਾਵਾਂ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+      "errorSaveSetting": "ਸ਼ਬਦ-ਜੋੜ ਜਾਂਚ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "helper": "ਟਾਈਪ ਕਰਦੇ ਸਮੇਂ ਗ਼ਲਤ ਸ਼ਬਦ-ਜੋੜਾਂ ਹੇਠਾਂ ਲਕੀਰ ਖਿੱਚੋ। ਪੂਰੀ ਤਰ੍ਹਾਂ ਆਫ਼ਲਾਈਨ — ਤੁਹਾਡੇ ਨੋਟ ਕਦੇ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਨਹੀਂ ਜਾਂਦੇ।",
+      "label": "ਸ਼ਬਦ-ਜੋੜ ਜਾਂਚ",
+      "languagesAriaLabel": "ਸ਼ਬਦ-ਜੋੜ ਜਾਂਚ ਦੀਆਂ ਭਾਸ਼ਾਵਾਂ",
+      "languagesHelper": "ਕੋਈ ਸ਼ਬਦ ਸਹੀ ਮੰਨਿਆ ਜਾਂਦਾ ਹੈ ਜੇ ਉਹ ਚੁਣੀ ਗਈ ਕਿਸੇ ਵੀ ਭਾਸ਼ਾ ਵਿੱਚ ਜਾਇਜ਼ ਹੋਵੇ — ਹੋਰ ਭਾਸ਼ਾ ਦੇ ਨੋਟਾਂ ਵਿੱਚ ਅੰਗਰੇਜ਼ੀ ਸ਼ਬਦ ਰਲਾਉਣ ਲਈ ਸੌਖਾ।",
+      "languagesLabel": "ਭਾਸ਼ਾਵਾਂ",
+      "languagesPlaceholder": "ਭਾਸ਼ਾਵਾਂ ਚੁਣੋ…",
+      "languagesSearchEmpty": "ਕੋਈ ਭਾਸ਼ਾ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ।",
+      "languagesSearchPlaceholder": "ਭਾਸ਼ਾਵਾਂ ਖੋਜੋ…",
+      "off": "ਬੰਦ",
+      "on": "ਚਾਲੂ"
+    },
+    "storage": {
+      "backupHelper": "ਬੈਕਅੱਪ ਤੁਹਾਡੇ ਵਾਲਟ ਜਿੰਨੇ ਹੀ ਇਨਕ੍ਰਿਪਟ ਰਹਿੰਦੇ ਹਨ, ਇੱਕੋ ਤਸਦੀਕ ਕੀਤੀ .myne-backup ਫ਼ਾਈਲ ਵਿੱਚ। ਬਹਾਲੀ ਉਸ ਵਾਲਟ ਦੇ ਪਾਸਵਰਡ ਜਾਂ ਰਿਕਵਰੀ ਵਾਕੰਸ਼ ਨਾਲ ਹੁੰਦੀ ਹੈ — ਬਿਲਕੁਲ ਅਨਲਾਕ ਵਾਂਗ।",
+      "backupLabel": "ਬੈਕਅੱਪ",
+      "backUpVault": "ਵਾਲਟ ਦਾ ਬੈਕਅੱਪ ਲਓ…",
+      "exportAction": "ਐਕਸਪੋਰਟ…",
+      "exportBody": "ਵਾਲਟ Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ",
+      "exportHelper": "ਸਾਦਾ markdown ਰੁੱਖ — ਇਨਕ੍ਰਿਪਟ ਨਹੀਂ।",
+      "exportLabel": "ਐਕਸਪੋਰਟ",
+      "importHelper": "Obsidian, Notion, Evernote, HTML ਫ਼ਾਈਲਾਂ ਜਾਂ CSV ਤੋਂ ਨੋਟ ਲਿਆਓ। ਸਭ ਕੁਝ ਉਸੇ ਵੇਲੇ ਇੰਪੋਰਟ ਹੋ ਕੇ ਇਨਕ੍ਰਿਪਟ ਹੋ ਜਾਂਦਾ ਹੈ; ਤੁਹਾਡੀਆਂ ਅਸਲ ਫ਼ਾਈਲਾਂ ਨੂੰ ਹੱਥ ਨਹੀਂ ਲੱਗਦਾ।",
+      "importLabel": "ਇੰਪੋਰਟ",
+      "importObsidian": "ਨੋਟ ਇੰਪੋਰਟ ਕਰੋ…",
+      "locationHelper": "ਹਰ ਵਾਲਟ ਇਸ ਪਾਥ ਹੇਠ ਇਨਕ੍ਰਿਪਟ ਕੀਤੀਆਂ ਫ਼ਾਈਲਾਂ ਦਾ ਇੱਕ ਫੋਲਡਰ ਹੈ। ਹੱਥੀਂ ਕਾਪੀਆਂ ਦੀ ਥਾਂ ਹੇਠਲਾ ਬੈਕਅੱਪ ਬਟਨ ਵਰਤੋ — ਇਹ ਲਿਖੀ ਗਈ ਫ਼ਾਈਲ ਦੀ ਤਸਦੀਕ ਕਰਦਾ ਹੈ।",
+      "locationLabel": "ਵਾਲਟ ਦੀ ਥਾਂ",
+      "openInFiles": "ਫ਼ਾਈਲਾਂ ਵਿੱਚ ਖੋਲ੍ਹੋ",
+      "webLocationHelper": "ਤੁਹਾਡੇ ਨੋਟ ਇਸ ਸਾਈਟ ਲਈ ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਸਟੋਰੇਜ ਵਿੱਚ ਰਹਿੰਦੇ ਹਨ, ਜਿਸਦਾ ਪ੍ਰਬੰਧ ਬ੍ਰਾਊਜ਼ਰ ਕਰਦਾ ਹੈ — ਖੋਲ੍ਹਣ ਲਈ ਕੋਈ ਫੋਲਡਰ ਨਹੀਂ ਹੈ। ਇਸ ਸਾਈਟ ਦਾ ਡਾਟਾ ਮਿਟਾਉਣ ਨਾਲ ਲੋਕਲ ਕਾਪੀ ਹਟ ਜਾਂਦੀ ਹੈ; ਕਿਉਂਕਿ ਇਹ ਕਲਾਇੰਟ ਸਿੰਕ ਕਰਦਾ ਹੈ, ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨ ਉੱਤੇ ਉਹ ਵਾਪਸ ਡਾਊਨਲੋਡ ਹੋ ਜਾਂਦੀ ਹੈ।",
+      "webLocationLabel": "ਤੁਹਾਡੇ ਨੋਟ ਕਿੱਥੇ ਸਾਂਭੇ ਜਾਂਦੇ ਹਨ",
+      "pathUnavailable": "ਪਾਥ ਉਪਲਬਧ ਨਹੀਂ",
+      "restoreBackup": "ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ…"
+    },
+    "typography": {
+      "contentWidthHelper": "ਸੰਪਾਦਨ ਕਾਲਮ ਦੀ ਵੱਧ ਤੋਂ ਵੱਧ ਚੌੜਾਈ। ਪੂਰਾ ਚੁਣਨ ਨਾਲ ਲਿਖਤ ਸਾਰੇ ਪੈਨ ਵਿੱਚ ਫੈਲ ਜਾਂਦੀ ਹੈ।",
+      "contentWidthLabel": "ਸਮੱਗਰੀ ਦੀ ਚੌੜਾਈ",
+      "errorSave": "ਪਸੰਦ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "fontHelper": "ਮੋਨੋਸਪੇਸ ਜਾਂ ਅਨੁਪਾਤਕ (sans-serif) ਲਿਖਤ।",
+      "fontLabel": "ਫੌਂਟ",
+      "lineSpacingHelper": "ਲਾਈਨਾਂ ਵਿਚਕਾਰ ਲੰਬਕਾਰੀ ਥਾਂ।",
+      "lineSpacingLabel": "ਲਾਈਨ ਵਿੱਥ",
+      "textSizeHelper": "ਸੰਪਾਦਕ ਦੀ ਲਿਖਤ ਦਾ ਮੂਲ ਆਕਾਰ। ਸਿਰਲੇਖ ਇਸੇ ਨਾਲ ਵੱਡੇ-ਛੋਟੇ ਹੁੰਦੇ ਹਨ।",
+      "previewLabel": "ਝਲਕ",
+      "previewBody": "ਤੇਜ਼ ਭੂਰੀ ਲੂੰਬੜੀ ਆਲਸੀ ਕੁੱਤੇ ਉੱਤੋਂ ਛਾਲ ਮਾਰਦੀ ਹੈ। ਟਾਈਪੋਗ੍ਰਾਫ਼ੀ ਸੈਟਿੰਗਾਂ ਬਦਲਦੀਆਂ ਹਨ ਕਿ ਹਰ ਨੋਟ ਕਿਵੇਂ ਪੜ੍ਹਿਆ ਜਾਂਦਾ ਹੈ, ਇਸ ਲਈ ਤੁਹਾਡੀ ਚੋਣ ਨਾਲ ਇਹ ਨਮੂਨਾ ਵੀ ਬਦਲਦਾ ਰਹਿੰਦਾ ਹੈ।",
+      "textSizeLabel": "ਲਿਖਤ ਦਾ ਆਕਾਰ"
+    },
+    "viewMode": {
+      "errorSave": "ਮੂਲ ਦ੍ਰਿਸ਼ ਮੋਡ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "helper": "ਨੋਟ ਕਿਵੇਂ ਖੁੱਲ੍ਹਦਾ ਹੈ: ਲਾਈਵ ਝਲਕ (ਮੂਲ), ਸਿਰਫ਼-ਪੜ੍ਹਨ ਵਾਲਾ ਪੜ੍ਹਨ ਦ੍ਰਿਸ਼, ਜਾਂ ਕੱਚਾ ਸਰੋਤ। ⇧⌘E ਨਾਲ ਕਿਸੇ ਨੋਟ ਲਈ ਬਦਲੋ।",
+      "label": "ਮੂਲ ਦ੍ਰਿਸ਼ ਮੋਡ",
+      "optionLive": "ਲਾਈਵ ਝਲਕ",
+      "optionReading": "ਪੜ੍ਹਨਾ",
+      "optionSource": "ਸਰੋਤ"
+    },
+    "strength": {
+      "weak": "ਕਮਜ਼ੋਰ",
+      "fair": "ਠੀਕ-ਠਾਕ",
+      "good": "ਚੰਗਾ",
+      "strong": "ਮਜ਼ਬੂਤ"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "ਸੈੱਟ ਨਹੀਂ ਕੀਤਾ",
+        "offline": "ਆਫ਼ਲਾਈਨ",
+        "conflicts_one": "{{count}} ਟਕਰਾਅ",
+        "conflicts_other": "{{count}} ਟਕਰਾਅ"
+      }
+    },
+    "data": {
+      "exported_one": "{{count}} ਨੋਟ ਐਕਸਪੋਰਟ ਹੋਇਆ → {{label}}",
+      "exported_other": "{{count}} ਨੋਟ ਐਕਸਪੋਰਟ ਹੋਏ → {{label}}",
+      "exportNeedsApp": "ਐਕਸਪੋਰਟ ਲਈ ਐਪ ਦੀ ਲੋੜ ਹੈ (ਬ੍ਰਾਊਜ਼ਰ ਝਲਕ ਦੀ ਨਹੀਂ)।",
+      "exportFailed": "ਵਾਲਟ ਐਕਸਪੋਰਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "exportToMarkdown": "Markdown ਵਿੱਚ ਐਕਸਪੋਰਟ ਕਰੋ",
+      "exportToMarkdownSubtitle": "ਹਰ ਨੋਟ ਡੀਕ੍ਰਿਪਟ ਕਰਕੇ Documents ਵਿੱਚ ਸਾਦੇ ਫੋਲਡਰ ਵਿੱਚ ਪਾਓ"
+    },
+    "saveSettingError": "ਉਹ ਸੈਟਿੰਗ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ",
+    "panelTitle": {
+      "privacy": "ਨਿੱਜਤਾ ਅਤੇ ਸੁਰੱਖਿਆ",
+      "data": "ਡਾਟਾ",
+      "vaultName": "ਵਾਲਟ ਦਾ ਨਾਂ",
+      "approveDevice": "ਡਿਵਾਈਸ ਮਨਜ਼ੂਰ ਕਰੋ"
+    },
+    "done": "ਹੋ ਗਿਆ",
+    "sectionOptions": "ਵਿਕਲਪ",
+    "footerTagline": "myne · ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਇਨਕ੍ਰਿਪਟ · ਓਪਨ ਸੋਰਸ",
+    "editor": {
+      "sections": {
+        "text": "ਲਿਖਤ ਅਤੇ ਦਿੱਖ",
+        "editing": "ਸੰਪਾਦਨ",
+        "writing": "ਲਿਖਾਈ",
+        "features": "ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ"
+      },
+      "preview": {
+        "heading": "ਤੇਜ਼ ਭੂਰੀ ਲੂੰਬੜੀ",
+        "bullet1": "ਮੇਰਾ ਡੱਬਾ ਪੰਜ ਦਰਜਨ ਸ਼ੀਸ਼ੀਆਂ ਨਾਲ ਭਰ ਦਿਓ",
+        "bullet2": "ਹੈਰਾਨੀ ਹੈ ਕਿ ਜ਼ੈਬਰੇ ਕਿੰਨੀ ਫੁਰਤੀ ਨਾਲ ਛਾਲ ਮਾਰਦੇ ਹਨ",
+        "spellCaption": "ਸ਼ਬਦ-ਜੋੜ ਜਾਂਚ",
+        "spellSample": "ਗਲਤਜੋੜ"
+      },
+      "defaultView": "ਮੂਲ ਦ੍ਰਿਸ਼",
+      "typewriter": "ਟਾਈਪਰਾਈਟਰ ਸਕ੍ਰੋਲਿੰਗ",
+      "typewriterSubtitle": "ਕਰਸਰ ਨੂੰ ਲੰਬਕਾਰੀ ਵਿਚਕਾਰ ਰੱਖੋ",
+      "enableArchiving": "ਆਰਕਾਈਵ ਕਰਨਾ ਚਾਲੂ ਕਰੋ"
+    },
+    "search": {
+      "placeholder": "ਸੈਟਿੰਗਾਂ ਖੋਜੋ…",
+      "ariaLabel": "ਸੈਟਿੰਗਾਂ ਖੋਜੋ",
+      "empty": "“{{query}}” ਨਾਲ ਕੋਈ ਸੈਟਿੰਗ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ।",
+      "resultsLabel": "ਖੋਜ ਨਤੀਜੇ",
+      "keywords": {
+        "aiAutoTag": "ਆਟੋ ਟੈਗ ਟੈਗ ਸੁਝਾਅ ਸੁਝਾਓ ਲੇਬਲ AI",
+        "aiEnable": "ਲੋਕਲ AI ਚਾਲੂ ਬੰਦ ਸਮਰੱਥ ਅਸਮਰੱਥ ਮਸ਼ੀਨ ਲਰਨਿੰਗ",
+        "aiExcluded": "ਬਾਹਰ ਰੱਖੇ ਫੋਲਡਰ ਅਣਡਿੱਠ AI ਨਿੱਜਤਾ ਬਾਹਰ",
+        "aiModels": "ਮਾਡਲ GGUF ਡਾਊਨਲੋਡ ਲਿਖਤ ਏਮਬੈਡਿੰਗ LLM",
+        "archive": "ਆਰਕਾਈਵ ਆਰਕਾਈਵ ਕਰਨਾ ਲੁਕਾਓ ਬਹਾਲ ਨੋਟ",
+        "autoBackup": "ਆਪਣੇ-ਆਪ ਬੈਕਅੱਪ ਸਮਾਂ-ਸਾਰਣੀ ਬਾਰੰਬਾਰਤਾ ਸੰਭਾਲ ਫੋਲਡਰ",
+        "autoLock": "ਆਪਣੇ-ਆਪ ਲਾਕ ਸਮਾਂ ਸੁਸਤੀ ਟਾਈਮਰ ਬਿਨਾਂ ਵਰਤੋਂ ਸੈਸ਼ਨ",
+        "backup": "ਬੈਕਅੱਪ ਐਕਸਪੋਰਟ .myne-backup ਬਹਾਲ ਸੁਰੱਖਿਅਤ ਕਾਪੀ",
+        "buildChannel": "ਬਿਲਡ ਚੈਨਲ ਵਰਜ਼ਨ ਰਿਲੀਜ਼ ਸਥਿਰ ਬੀਟਾ ਨਾਈਟਲੀ",
+        "changePassword": "ਪਾਸਵਰਡ ਬਦਲੋ ਪਾਸਫ੍ਰੇਜ਼ ਪਛਾਣ ਅੱਪਡੇਟ ਰੀਸੈੱਟ",
+        "changelog": "ਬਦਲਾਅ-ਸੂਚੀ ਰਿਲੀਜ਼ ਨੋਟ ਨਵਾਂ ਕੀ ਹੈ ਇਤਿਹਾਸ",
+        "cliAccess": "CLI ਟਰਮੀਨਲ ਪਹੁੰਚ ਕਮਾਂਡ ਲਾਈਨ ਸ਼ੈੱਲ myne ਕਮਾਂਡ ਕੰਸੋਲ",
+        "cliExcludedFolders": "CLI ਬਾਹਰ ਰੱਖੇ ਫੋਲਡਰ ਟਰਮੀਨਲ ਲੁਕਾਓ ਕਮਾਂਡ ਲਾਈਨ ਨਿੱਜੀ",
+        "cliRateLimit": "CLI ਰਫ਼ਤਾਰ ਹੱਦ ਟਰਮੀਨਲ ਗਤੀ ਥ੍ਰੌਟਲ ਵੱਡਾ ਕੰਮ ਪ੍ਰਤੀ ਮਿੰਟ ਕਮਾਂਡਾਂ",
+        "clipper": "ਬ੍ਰਾਊਜ਼ਰ ਕਲਿੱਪਰ ਐਕਸਟੈਂਸ਼ਨ ਵੈੱਬ ਕੈਪਚਰ Chrome Firefox",
+        "contentWidth": "ਸਮੱਗਰੀ ਚੌੜਾਈ ਕਾਲਮ ਪੜ੍ਹਨਾ ਲਾਈਨ ਲੰਬਾਈ",
+        "customThemes": "ਕਸਟਮ ਥੀਮ ਰੰਗ-ਪੱਟਾ ਰੰਗ ਦਿੱਖ ਇੰਪੋਰਟ ਥੀਮ",
+        "dailyNotes": "ਰੋਜ਼ਾਨਾ ਨੋਟ ਜਰਨਲ ਮਿਤੀ ਟੈਂਪਲੇਟ ਫੋਲਡਰ ਡਾਇਰੀ",
+        "dangerZone": "ਖ਼ਤਰੇ ਵਾਲਾ ਖੇਤਰ ਵਾਲਟ ਮਿਟਾਓ ਹਟਾਓ ਖ਼ਤਮ",
+        "export": "ਐਕਸਪੋਰਟ Markdown ਡੀਕ੍ਰਿਪਟ ਸਾਦੀਆਂ ਫ਼ਾਈਲਾਂ ਦਸਤਾਵੇਜ਼",
+        "focusMode": "ਫੋਕਸ ਮੋਡ ਟਾਈਪਰਾਈਟਰ ਮੱਧਮ ਅਕਿਰਿਆਸ਼ੀਲ ਲਾਈਨਾਂ ਬਿਨਾਂ ਧਿਆਨ-ਭਟਕਾਅ",
+        "font": "ਫੌਂਟ ਟਾਈਪਫੇਸ ਪਰਿਵਾਰ sans serif mono ਟਾਈਪੋਗ੍ਰਾਫ਼ੀ",
+        "graphSettings": "ਗ੍ਰਾਫ਼ ਦਿੱਖ ਭੌਤਿਕੀ ਬਲ ਨੋਡ ਲਿੰਕ ਲੇਆਉਟ ਰੰਗ ਸਮੂਹ ਲੇਬਲ ਕੈਨਵਸ",
+        "hotkeys": "ਸ਼ਾਰਟਕੱਟ ਕੀਬੋਰਡ ਹੌਟਕੀ ਕੀਮੈਪ ਬਾਈਂਡਿੰਗ",
+        "import": "ਇੰਪੋਰਟ ਨੋਟ Obsidian Notion Evernote enex HTML CSV ਪਰਵਾਸ ਲਿਆਓ",
+        "language": "ਭਾਸ਼ਾ ਲੋਕੇਲ ਇੰਟਰਫੇਸ ਅਨੁਵਾਦ UI",
+        "license": "ਲਾਇਸੰਸ AGPL ਓਪਨ ਸੋਰਸ ਕਾਨੂੰਨੀ",
+        "lineNumbers": "ਲਾਈਨ ਨੰਬਰ ਪੱਟੀ ਸੰਪਾਦਕ ਦਿੱਖ",
+        "vimMode": "vim ਮੋਡਲ ਸੰਪਾਦਨ normal insert visual ਕੀਬੋਰਡ",
+        "lineSpacing": "ਲਾਈਨ ਵਿੱਥ ਉਚਾਈ ਟਾਈਪੋਗ੍ਰਾਫ਼ੀ ਪੜ੍ਹਨਯੋਗਤਾ",
+        "newNoteLocation": "ਨਵਾਂ ਨੋਟ ਥਾਂ ਫੋਲਡਰ ਮੂਲ ਕਿੱਥੇ ਨੋਟ ਬਣਦੇ",
+        "torRouting": "Tor ਰਾਊਟਿੰਗ ਪਿਆਜ਼ ਪ੍ਰੌਕਸੀ ਨੈੱਟਵਰਕ IP ਪਤਾ ਟਿਕਾਣਾ ਲੁਕਾਓ ਸਿੰਕ ਗੁਮਨਾਮੀ",
+        "quickUnlock": "ਤੇਜ਼ ਅਨਲਾਕ PIN Touch ID ਬਾਇਓਮੈਟ੍ਰਿਕ ਚਿਹਰਾ ਅਨਲਾਕ",
+        "reminders": "ਯਾਦ-ਦਹਾਨੀਆਂ ਸੂਚਨਾ ਚੇਤਾਵਨੀ ਟਾਸਕ ਮਿਆਦ ਯਾਦ",
+        "screenCapture": "ਸਕਰੀਨ ਕੈਪਚਰ ਸੁਰੱਖਿਆ ਸਕਰੀਨਸ਼ਾਟ ਰਿਕਾਰਡਿੰਗ ਰੋਕੋ ਨਿੱਜਤਾ",
+        "showEditTimes": "ਸੋਧ ਦਾ ਸਮਾਂ ਦਿਖਾਓ ਮਿਤੀਆਂ ਨੋਟ",
+        "spell": "ਸ਼ਬਦ-ਜੋੜ ਜਾਂਚ ਸ਼ਬਦਕੋਸ਼ ਆਟੋਕਰੈਕਟ",
+        "spellLanguages": "ਸ਼ਬਦ-ਜੋੜ ਭਾਸ਼ਾਵਾਂ ਸ਼ਬਦਕੋਸ਼ ਲੋਕੇਲ ਸ਼ਬਦ",
+        "startupOpen": "ਸ਼ੁਰੂਆਤ ਖੋਲ੍ਹੋ ਮੂਲ ਫ਼ਾਈਲ ਲਾਂਚ ਕਿਹੜਾ ਨੋਟ",
+        "attachmentOcr": "OCR ਤਸਵੀਰ ਸਕੈਨ PDF ਫ਼ੋਟੋ ਸਕਰੀਨਸ਼ਾਟ ਲਿਖਤ ਪਛਾਣ ਅਟੈਚਮੈਂਟਾਂ ਵਿੱਚ ਖੋਜ CPU ਬੈਟਰੀ",
+        "attachmentCompression": "ਸੰਕੁਚਿਤ ਸੰਕੁਚਨ ਤਸਵੀਰ ਛੋਟਾ ਆਕਾਰ webp jpeg ਇੰਪੋਰਟ ਚਿਪਕਾਓ ਵਾਲਟ ਆਕਾਰ ਸਟੋਰੇਜ",
+        "transcription": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਬੋਲੀ ਆਵਾਜ਼ ਆਡੀਓ ਸ਼ਰੁਤਲੇਖ ਸਬਟਾਈਟਲ Whisper ਰਿਕਾਰਡਿੰਗ ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ",
+        "syncAddDevice": "ਡਿਵਾਈਸ ਜੋੜੋ ਪੇਅਰ ਲਿੰਕ ਫ਼ੋਨ ਲੈਪਟਾਪ ਸਿੰਕ",
+        "syncConflicts": "ਟਕਰਾਅ ਮਿਲਾਓ ਹੱਲ ਵਰਜ਼ਨ ਸਿੰਕ",
+        "syncDevices": "ਡਿਵਾਈਸ ਜੁੜੇ ਪੇਅਰ ਕੀਤੇ ਸਿੰਕ ਮਸ਼ੀਨਾਂ",
+        "syncRecovered": "ਮੁੜ ਮਿਲੇ ਨੋਟ ਬਹਾਲ ਸਿੰਕ",
+        "syncServer": "ਸਿੰਕ ਸਰਵਰ ਹੋਸਟ ਸਵੈ-ਹੋਸਟ ਐਂਡਪੁਆਇੰਟ URL",
+        "syncStatus": "ਸਿੰਕ ਸਥਿਤੀ ਕਨੈਕਸ਼ਨ ਹਾਲਤ ਅੱਪ-ਟੂ-ਡੇਟ",
+        "textSize": "ਲਿਖਤ ਆਕਾਰ ਫੌਂਟ ਆਕਾਰ ਜ਼ੂਮ ਪੜ੍ਹਨਯੋਗਤਾ",
+        "theme": "ਥੀਮ ਗੂੜ੍ਹਾ ਹਲਕਾ ਮੋਡ ਦਿੱਖ ਰੰਗ ਸਕੀਮ AMOLED ਸਿਸਟਮ",
+        "threatModel": "ਖ਼ਤਰਾ ਮਾਡਲ ਸੁਰੱਖਿਆ ਵਿਰੋਧੀ ਸੰਪਤੀਆਂ ਭਰੋਸਾ",
+        "toolbar": "ਟੂਲਬਾਰ ਬਟਨ ਫਾਰਮੈਟਿੰਗ ਤੈਰਦੀ ਚੋਣ ਕਸਟਮਾਈਜ਼",
+        "vaultIcon": "ਵਾਲਟ ਆਈਕਨ ਅਵਤਾਰ ਤਸਵੀਰ ਚਿੰਨ੍ਹ",
+        "vaultLabel": "ਵਾਲਟ ਲੇਬਲ ਨਾਂ ਬਦਲੋ ਸਿਰਲੇਖ",
+        "vaultLocation": "ਵਾਲਟ ਥਾਂ ਪਾਥ ਫੋਲਡਰ ਡਿਸਕ ਉੱਤੇ ਕਿੱਥੇ",
+        "viewMode": "ਮੂਲ ਦ੍ਰਿਸ਼ ਮੋਡ ਲਾਈਵ ਪੜ੍ਹਨਾ ਸਰੋਤ ਝਲਕ"
+      }
+    }
+  },
+  "storageLost": {
+    "allSynced": "ਕੁਝ ਨਹੀਂ ਗੁਆਚਿਆ — ਇੱਥੋਂ ਦਾ ਹਰ ਨੋਟ ਪਹਿਲਾਂ ਹੀ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਚੁੱਕਾ ਸੀ।",
+    "evicted": {
+      "body": "ਥਾਂ ਖਾਲੀ ਕਰਨ ਲਈ ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਰ ਨੇ ਇਸ ਸਾਈਟ ਦੀ ਸਟੋਰੇਜ ਮਿਟਾ ਦਿੱਤੀ। ਕੁਝ ਵੀ ਖ਼ਰਾਬ ਨਹੀਂ ਹੋਇਆ ਅਤੇ ਸਰਵਰ ਉੱਤੇ ਕੁਝ ਵੀ ਨਹੀਂ ਮਿਟਿਆ — ਜੋ ਸਿੰਕ ਹੋ ਚੁੱਕਾ ਸੀ ਉਹ ਸਭ ਹਾਲੇ ਵੀ ਉੱਥੇ ਹੈ।",
+      "title": "ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਰ ਨੇ ਇਸ ਵਾਲਟ ਦੀ ਲੋਕਲ ਕਾਪੀ ਮਿਟਾ ਦਿੱਤੀ"
+    },
+    "lockCta": "ਲਾਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+    "reDownloadCta": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਦੁਬਾਰਾ ਸੈੱਟ ਕਰੋ",
+    "reEnrolNotice": "ਦੁਬਾਰਾ ਸੈੱਟ ਕਰਨ ਨਾਲ ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਨਵੇਂ ਡਿਵਾਈਸ ਵਜੋਂ ਦਰਜ ਹੁੰਦਾ ਹੈ, ਇਸ ਲਈ ਸਿੰਕ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਇਹ ਤੁਹਾਡੇ ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ ਦੀ ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ ਕਰੇਗਾ।",
+    "unopenable": {
+      "body": "ਇਸ ਵਾਲਟ ਦੀ ਲੋਕਲ ਕਾਪੀ ਹੁਣ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ। ਸਰਵਰ ਉੱਤੇ ਕਿਸੇ ਚੀਜ਼ ਉੱਤੇ ਅਸਰ ਨਹੀਂ ਪਿਆ — ਇੱਥੋਂ ਦੀ ਕਾਪੀ ਇੱਕ ਕੈਸ਼ ਹੈ, ਅਤੇ ਇਸਨੂੰ ਬਦਲਿਆ ਜਾ ਸਕਦਾ ਹੈ।",
+      "title": "ਇਸ ਵਾਲਟ ਦੀ ਲੋਕਲ ਕਾਪੀ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ"
+    },
+    "unsyncedIntro": "{{count}} ਨੋਟ ਹਾਲੇ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚਿਆ ਸੀ। ਉਹ ਚਲਾ ਗਿਆ — ਇਹੀ ਇਕਲੌਤੀ ਕਾਪੀ ਸੀ:",
+    "unsyncedIntro_one": "{{count}} ਨੋਟ ਹਾਲੇ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚਿਆ ਸੀ। ਉਹ ਚਲਾ ਗਿਆ — ਇਹੀ ਇਕਲੌਤੀ ਕਾਪੀ ਸੀ:",
+    "unsyncedIntro_other": "{{count}} ਨੋਟ ਹਾਲੇ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚੇ ਸਨ। ਉਹ ਚਲੇ ਗਏ — ਇਹੀ ਇਕਲੌਤੀ ਕਾਪੀ ਸੀ:",
+    "unsyncedOverflow": "…ਅਤੇ {{count}} ਹੋਰ।",
+    "unsyncedOverflow_one": "…ਅਤੇ {{count}} ਹੋਰ।",
+    "unsyncedOverflow_other": "…ਅਤੇ {{count}} ਹੋਰ।"
+  },
+  "sync": {
+    "materialising": "ਤੁਹਾਡੇ ਨੋਟ ਡਾਊਨਲੋਡ ਹੋ ਰਹੇ ਹਨ — {{total}} ਵਿੱਚੋਂ {{done}}। ਤੁਸੀਂ ਕੰਮ ਸ਼ੁਰੂ ਕਰ ਸਕਦੇ ਹੋ; ਬਾਕੀ ਆਉਂਦੇ ਹੀ ਦਿਸਣ ਲੱਗਣਗੇ।",
+    "credentialAmbiguous": "ਹੋ ਸਕਦਾ ਹੈ ਤੁਹਾਡਾ ਪਾਸਵਰਡ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਅਤੇ ਕਿਸੇ ਹੋਰ ਉੱਤੇ ਵੀ ਬਦਲਿਆ ਹੋਵੇ, ਅਤੇ Myne ਦੱਸ ਨਹੀਂ ਸਕਦਾ ਕਿ ਕਿਹੜਾ ਨਵਾਂ ਹੈ — ਇਸ ਲਈ ਇਸਨੇ ਕੁਝ ਵੀ ਨਹੀਂ ਬਦਲਿਆ। ਇਸਨੂੰ ਸੁਲਝਾਉਣ ਲਈ ਉਸ ਡਿਵਾਈਸ ਉੱਤੇ ਸਾਈਨ ਇਨ ਕਰੋ ਜਿਸ ਕੋਲ ਪਹਿਲਾਂ ਹੀ ਪਹੁੰਚ ਹੈ।",
+    "attachments": {
+      "aria": {
+        "downloading": "{{name}} ਡਾਊਨਲੋਡ ਹੋ ਰਹੀ ਹੈ",
+        "uploading": "{{name}} ਅੱਪਲੋਡ ਹੋ ਰਹੀ ਹੈ"
+      },
+      "empty": "ਕੋਈ ਤਬਾਦਲਾ ਨਹੀਂ ਚੱਲ ਰਿਹਾ।",
+      "heading": "ਅਟੈਚਮੈਂਟ ਸਿੰਕ",
+      "status": {
+        "done": "ਹੋ ਗਿਆ",
+        "failedWillRetry": "ਅਸਫਲ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਹੋਵੇਗੀ",
+        "paused": "ਰੋਕਿਆ ਗਿਆ"
+      }
+    },
+    "buildingIndex": {
+      "label": "ਖੋਜ ਸੂਚਕਾਂਕ ਬਣ ਰਿਹਾ ਹੈ…"
+    },
+    "conflicts": {
+      "compare": "ਤੁਲਨਾ ਕਰੋ",
+      "compareClose": "ਟਕਰਾਵਾਂ ਉੱਤੇ ਵਾਪਸ",
+      "compareError": "ਤੁਲਨਾ ਲਈ ਇਹ ਨੋਟ ਪੜ੍ਹੇ ਨਹੀਂ ਜਾ ਸਕੇ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "compareIdentical": "ਇਹ ਦੋਵੇਂ ਵਰਜ਼ਨ ਇੱਕੋ ਜਿਹੇ ਹਨ।",
+      "compareLoading": "ਦੋਵੇਂ ਵਰਜ਼ਨ ਪੜ੍ਹੇ ਜਾ ਰਹੇ ਹਨ…",
+      "compareMine": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ",
+      "compareOrphan": "ਜਿਸ ਨੋਟ ਤੋਂ ਇਹ ਕਾਪੀ ਆਈ ਸੀ ਉਹ ਹੁਣ ਇੱਥੇ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਤੁਲਨਾ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ ਹੈ।",
+      "compareTheirs": "ਟਕਰਾਅ ਵਾਲੀ ਕਾਪੀ",
+      "compareTitle": "“{{title}}” ਦੀ ਤੁਲਨਾ",
+      "discard": "ਰੱਦ ਕਰੋ",
+      "empty": "ਕੋਈ ਟਕਰਾਅ ਨਹੀਂ — ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਸਿੰਕ ਵਿੱਚ ਹਨ।",
+      "groupTitle_one": "{{original}} ਦੀ {{count}} ਟਕਰਾਅ ਵਾਲੀ ਕਾਪੀ",
+      "groupTitle_other": "{{original}} ਦੀਆਂ {{count}} ਟਕਰਾਅ ਵਾਲੀਆਂ ਕਾਪੀਆਂ",
+      "keepAsSeparate": "ਵੱਖਰੀ ਰੱਖੋ",
+      "tookTheirsToast": "ਸਥਾਨਕ ਵਰਜ਼ਨ ਰੱਦੀ ਵਿੱਚ ਭੇਜ ਦਿੱਤਾ।",
+      "tookTheirsUndo": "ਵਾਪਸ ਲਓ",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ ({{hex}})",
+      "useThisVersion": "ਇਹੀ ਵਰਜ਼ਨ ਵਰਤੋ"
+    },
+    "deviceJoinQr": {
+      "accountLabel": "ਖਾਤਾ ਨੰਬਰ",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "QR ਨਹੀਂ ਬਣ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "generate": "QR ਬਣਾਓ",
+      "hint": "ਆਪਣਾ ਖਾਤਾ ਨੰਬਰ ਚਿਪਕਾਓ ਤਾਂ ਜੋ ਇੱਕ QR ਬਣੇ ਜਿਸਨੂੰ ਤੁਹਾਡਾ ਫ਼ੋਨ ਸਕੈਨ ਕਰ ਸਕੇ — ਇਹ ਸਰਵਰ ਅਤੇ ਖਾਤਾ ਨੰਬਰ ਆਪੇ ਭਰ ਦਿੰਦਾ ਹੈ।",
+      "invalidAccount": "ਇਹ ਸਹੀ ਖਾਤਾ ਨੰਬਰ ਨਹੀਂ ਲੱਗਦਾ।",
+      "notConfigured": "ਪਹਿਲਾਂ ਸਿੰਕ ਸਰਵਰ ਸੰਰਚਿਤ ਕਰੋ, ਫਿਰ QR ਬਣਾਓ।",
+      "scanWithApp": "iOS ਐਪ ਨਾਲ ਸਕੈਨ ਕਰੋ",
+      "title": "QR ਨਾਲ ਡਿਵਾਈਸ ਜੋੜੋ"
+    },
+    "devices": {
+      "approve": "ਮਨਜ਼ੂਰ ਕਰੋ",
+      "awaitingApproval_one": "{{count}} ਡਿਵਾਈਸ ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ ਵਿੱਚ",
+      "awaitingApproval_other": "{{count}} ਡਿਵਾਈਸ ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ ਵਿੱਚ",
+      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+      "noDevices": "ਹਾਲੇ ਕੋਈ ਡਿਵਾਈਸ ਸਿੰਕ ਨਹੀਂ ਹੋਇਆ।",
+      "notEnrolled": "ਇਹ ਡਿਵਾਈਸ ਹਾਲੇ ਜੁੜਿਆ ਨਹੀਂ ਹੈ। ਜੇ ਤੁਸੀਂ ਇਸਨੂੰ ਹੁਣੇ ਜੋੜਿਆ ਹੈ ਤਾਂ ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ ਤੋਂ ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ ਕਰੋ; ਨਹੀਂ ਤਾਂ ਉੱਪਰ ਦਿੱਤੇ “ਡਿਵਾਈਸ ਜੋੜੋ” ਫਾਰਮ ਨਾਲ ਜੋੜੋ।",
+      "platform": {
+        "android": "Android ਫ਼ੋਨ",
+        "androidTablet": "Android ਟੈਬਲੇਟ",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux PC",
+        "macos": "Mac",
+        "unknown": "ਇਹ ਡਿਵਾਈਸ",
+        "web": "ਬ੍ਰਾਊਜ਼ਰ",
+        "windows": "Windows PC"
+      },
+      "remove": "ਹਟਾਓ",
+      "removedElsewhere": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ ਤੋਂ ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚੋਂ ਹਟਾ ਦਿੱਤਾ ਗਿਆ ਸੀ।",
+      "rename": "ਨਾਂ ਬਦਲੋ",
+      "renameFailed": "ਉਹ ਨਾਂ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "renameLabel": "ਡਿਵਾਈਸ ਦਾ ਨਾਂ",
+      "resetAndReAdd": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਰੀਸੈੱਟ ਕਰਕੇ ਦੁਬਾਰਾ ਜੋੜੋ",
+      "resetSyncOnThisDevice": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਸਿੰਕ ਰੀਸੈੱਟ ਕਰੋ",
+      "shortName": "ਡਿਵਾਈਸ {{hex}}",
+      "syncedHere": "ਇੱਥੇ ਸਿੰਕ ਹੋਇਆ",
+      "thisDevice": "ਇਹ ਡਿਵਾਈਸ",
+      "transportHint": "ਜੇ ਸਰਵਰ ਬਦਲ ਗਿਆ ਹੈ ਜਾਂ ਉਸਦਾ ਸਰਟੀਫਿਕੇਟ ਬਦਲਿਆ ਹੈ, ਤਾਂ ਉੱਪਰ “ਸਿੰਕ ਸਰਵਰ” ਹੇਠ ਸਰਵਰ URL ਦੁਬਾਰਾ ਦਾਖਲ ਕਰਕੇ ਉਸ ਉੱਤੇ ਮੁੜ ਭਰੋਸਾ ਬਣਾਓ।",
+      "unreachable": "ਸਿੰਕ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋਈ ({{error}})।",
+      "verifyBody": "ਜਾਂਚੋ ਕਿ ਜਿਸ ਡਿਵਾਈਸ ਨੂੰ ਤੁਸੀਂ ਹੁਣੇ ਮਨਜ਼ੂਰੀ ਦਿੱਤੀ ਹੈ, ਉਸ ਉੱਤੇ ਇਹੀ ਕੋਡ ਦਿਸਦਾ ਹੈ। ਜੇ ਮਿਲਦਾ ਹੈ ਤਾਂ ਉਹ ਤੁਹਾਡੇ ਖਾਤੇ ਉੱਤੇ ਹੈ। ਜੇ ਨਹੀਂ ਮਿਲਦਾ, ਤਾਂ ਡਿਵਾਈਸ ਹਟਾ ਦਿਓ।",
+      "verifyMatch": "ਇਹ ਮਿਲਦੇ ਹਨ",
+      "verifyMismatch": "ਇਹ ਨਹੀਂ ਮਿਲਦੇ",
+      "verifyPending": "ਨਵਾਂ ਡਿਵਾਈਸ ਆਪਣਾ ਪਹਿਲਾ ਸਿੰਕ ਪੂਰਾ ਕਰ ਲਵੇ, ਤਾਂ ਇਹ ਕੋਡ ਦਿਸੇਗਾ।",
+      "verifySyncing": "ਸਿੰਕ ਹੋ ਰਿਹਾ ਹੈ…",
+      "verifyTitle": "ਨਵਾਂ ਡਿਵਾਈਸ ਤਸਦੀਕ ਕਰੋ",
+      "yourDevices": "ਤੁਹਾਡੇ ਡਿਵਾਈਸ"
+    },
+    "endpoint": {
+      "connect": "ਜੋੜੋ",
+      "connected": "ਜੁੜ ਗਿਆ",
+      "connectedLocal": "ਜੁੜ ਗਿਆ (ਸਥਾਨਕ, TLS ਤੋਂ ਬਿਨਾਂ)।",
+      "connectedTls": "ਜੁੜ ਗਿਆ। ਜਾਂਚੋ ਕਿ ਇਹ ਫਿੰਗਰਪ੍ਰਿੰਟ ਤੁਹਾਡੇ ਦੂਜੇ ਡਿਵਾਈਸ ਉੱਤੇ ਵੀ ਇਹੀ ਹੈ।",
+      "connectedPlatformTrust": "TLS ਉੱਤੇ ਜੁੜ ਗਿਆ। ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਰ ਨੇ ਇਸ ਸਰਵਰ ਦਾ ਸਰਟੀਫਿਕੇਟ ਤਸਦੀਕ ਕੀਤਾ ਹੈ।",
+      "connecting": "ਜੁੜ ਰਿਹਾ ਹੈ…",
+      "fingerprintLabel": "ਸਰਵਰ ਸਰਟੀਫਿਕੇਟ ਫਿੰਗਰਪ੍ਰਿੰਟ:",
+      "confirmFingerprintRequired": "Tor ਰਾਊਟਿੰਗ ਚਾਲੂ ਹੈ, ਇਸ ਲਈ ਇਹ ਡਿਵਾਈਸ ਕਿਸੇ ਅਜਿਹੇ ਸਰਟੀਫਿਕੇਟ ਉੱਤੇ ਭਰੋਸਾ ਨਹੀਂ ਕਰੇਗਾ ਜਿਸਦੀ ਉਸਨੂੰ ਪਹਿਲਾਂ ਦੱਸ ਨਹੀਂ ਦਿੱਤੀ ਗਈ। ਆਪਣੇ ਸਰਵਰ ਦਾ SHA-256 ਸਰਟੀਫਿਕੇਟ ਫਿੰਗਰਪ੍ਰਿੰਟ ਸਰਵਰ ਤੋਂ ਹੀ ਜਾਂ ਕਿਸੇ ਪਹਿਲਾਂ ਤੋਂ ਜੁੜੇ ਡਿਵਾਈਸ ਤੋਂ ਲਵੋ, ਫਿਰ ਇੱਥੇ ਚਿਪਕਾਓ।",
+      "confirmFingerprintMismatch": "ਇਸ ਸਰਵਰ ਨੇ ਜੋ ਸਰਟੀਫਿਕੇਟ ਪੇਸ਼ ਕੀਤਾ, ਉਹ ਉਹ ਨਹੀਂ ਜੋ ਤੁਸੀਂ ਦਾਖਲ ਕੀਤਾ ਸੀ। ਕੁਝ ਵੀ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋਇਆ। ਜੋ ਫਿੰਗਰਪ੍ਰਿੰਟ ਤੁਸੀਂ ਚਿਪਕਾਇਆ ਸੀ ਉਸਨੂੰ ਜਾਂਚੋ — ਅਤੇ ਜੇ ਉਹ ਸਹੀ ਹੈ ਤਾਂ ਨਾ ਜੁੜੋ: ਇਸ ਡਿਵਾਈਸ ਅਤੇ ਤੁਹਾਡੇ ਸਰਵਰ ਵਿਚਕਾਰ ਕੋਈ ਹੈ।",
+      "confirmFingerprintDeclined": "ਕੁਝ ਵੀ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋਇਆ — ਇਹ ਡਿਵਾਈਸ ਉਸ ਸਰਵਰ ਨਾਲ ਨਹੀਂ ਜੁੜਿਆ। ਜਦੋਂ ਤੁਹਾਡੇ ਕੋਲ ਉਸਦਾ ਸਰਟੀਫਿਕੇਟ ਫਿੰਗਰਪ੍ਰਿੰਟ ਹੋਵੇ, ਤਦ ਵਾਪਸ ਆਓ।",
+      "pinStatic": "Myne ਦੇ ਅੰਦਰੂਨੀ ਸਰਟੀਫਿਕੇਟ ਨਾਲ ਤਸਦੀਕ ਹੋਇਆ।",
+      "pinTofu": "ਪਹਿਲੀ ਵਾਰ ਜੁੜਨ ਉੱਤੇ ਪਿੰਨ ਕੀਤਾ ਗਿਆ। ਇਸ ਫਿੰਗਰਪ੍ਰਿੰਟ ਦੀ ਆਪਣੇ ਸਾਰੇ ਡਿਵਾਈਸਾਂ ਉੱਤੇ ਤੁਲਨਾ ਕਰੋ।",
+      "fixedOrigin": "ਇਹ ਕਲਾਇੰਟ ਇੱਕੋ ਸਰਵਰ ਨਾਲ ਸਿੰਕ ਹੁੰਦਾ ਹੈ, ਜੋ ਇਸਦੇ ਤੈਨਾਤ ਹੋਣ ਵੇਲੇ ਤੈਅ ਹੋਇਆ ਸੀ। ਇਸਨੂੰ ਇੱਥੋਂ ਬਦਲਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ — ਇਸ ਪੰਨੇ ਨੂੰ ਸਿਰਫ਼ ਇਸੇ ਇੱਕ ਪਤੇ ਨਾਲ ਗੱਲ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਹੈ।",
+      "fixedOriginNone": "ਇਸ ਤੈਨਾਤੀ ਲਈ ਕੋਈ ਸਿੰਕ ਸਰਵਰ ਸੰਰਚਿਤ ਨਹੀਂ ਹੈ।",
+      "pinPlatformTrust": "ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਰ ਦੇ ਸਰਟੀਫਿਕੇਟ ਭੰਡਾਰ ਨਾਲ ਤਸਦੀਕ ਹੋਇਆ। ਇਹ ਕਲਾਇੰਟ ਆਪ ਸਰਟੀਫਿਕੇਟ ਪਿੰਨ ਨਹੀਂ ਕਰ ਸਕਦਾ।",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "ਉਸ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋਈ — URL ਜਾਂਚੋ ਅਤੇ ਵੇਖੋ ਕਿ ਉਹ ਚੱਲ ਰਿਹਾ ਹੈ।"
+    },
+    "enroll": {
+      "accountNumberLabel": "ਖਾਤਾ ਨੰਬਰ",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "ਜੁੜ ਰਿਹਾ ਹੈ…",
+      "credentialTypeAria": "ਪ੍ਰਮਾਣ ਦੀ ਕਿਸਮ",
+      "deviceNameHelp": "ਤੁਹਾਡੀ ਡਿਵਾਈਸ ਸੂਚੀ ਵਿੱਚ ਦਿਸਦਾ ਹੈ। ਤੁਸੀਂ ਇਸਨੂੰ ਬਾਅਦ ਵਿੱਚ ਬਦਲ ਸਕਦੇ ਹੋ।",
+      "deviceNameLabel": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਨਾਂ ਦਿਓ",
+      "error": {
+        "notConfigured": "ਇਹ ਡਿਵਾਈਸ ਜੋੜਨ ਤੋਂ ਪਹਿਲਾਂ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਸਿੰਕ ਸਰਵਰ ਤੈਅ ਕਰੋ।",
+        "transport": "ਸਿੰਕ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋਈ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      },
+      "mode": {
+        "password": "ਪਾਸਵਰਡ",
+        "recovery": "ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼"
+      },
+      "passwordLabel": "ਪਾਸਵਰਡ",
+      "recoveryPhraseHint": "ਆਪਣਾ 24-ਸ਼ਬਦੀ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਦਾਖਲ ਕਰੋ।",
+      "recoveryPhraseLabel": "ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼",
+      "signInWith": "ਇਸ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ",
+      "submit": "ਇਹ ਡਿਵਾਈਸ ਜੋੜੋ",
+      "wordAria": "ਸ਼ਬਦ {{number}}"
+    },
+    "fingerprint": {
+      "title": "ਭਰੋਸਾ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਇਸ ਸਰਵਰ ਦਾ ਸਰਟੀਫਿਕੇਟ ਜਾਂਚੋ",
+      "why": "Tor ਰਾਊਟਿੰਗ ਚਾਲੂ ਹੈ, ਇਸ ਲਈ ਇਹ ਪਹਿਲਾ ਕਨੈਕਸ਼ਨ ਕਿਸੇ ਓਪਰੇ ਵੱਲੋਂ ਚਲਾਏ ਰੀਲੇਅ ਰਾਹੀਂ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚਦਾ ਹੈ। ਜਦ ਤੱਕ ਕੋਈ ਸਰਟੀਫਿਕੇਟ ਪਿੰਨ ਨਹੀਂ ਹੁੰਦਾ, ਇਹ ਡਿਵਾਈਸ ਜੋ ਵੀ ਸਰਟੀਫਿਕੇਟ ਦਿੱਤਾ ਜਾਵੇ ਉਸਨੂੰ ਮੰਨ ਲਵੇਗਾ — ਉਹ ਵੀ ਜੋ ਉਸ ਰੀਲੇਅ ਨੇ ਆਪ ਘੜਿਆ ਹੋਵੇ। ਜੋ ਫਿੰਗਰਪ੍ਰਿੰਟ ਤੁਹਾਡਾ ਸਰਵਰ ਪ੍ਰਕਾਸ਼ਿਤ ਕਰਦਾ ਹੈ ਉਹ ਦਾਖਲ ਕਰੋ, ਅਤੇ Myne ਕੁਝ ਵੀ ਪਿੰਨ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਉਸ ਦੀ ਤੁਲਨਾ ਕਰੇਗਾ। ਜੇ ਮੇਲ ਨਾ ਖਾਵੇ, ਤਾਂ ਕੁਝ ਵੀ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੁੰਦਾ।",
+      "label": "ਸੰਭਾਵਿਤ ਸਰਟੀਫਿਕੇਟ ਫਿੰਗਰਪ੍ਰਿੰਟ",
+      "placeholder": "ਤੁਹਾਡੇ ਸਰਵਰ ਦਾ SHA-256 ਫਿੰਗਰਪ੍ਰਿੰਟ",
+      "echoLabel": "ਜੋ ਤੁਸੀਂ ਦਾਖਲ ਕੀਤਾ",
+      "echoComplete": "64 ਵਿੱਚੋਂ 64 ਅੱਖਰ। ਅੱਗੇ ਵਧਣ ਤੋਂ ਪਹਿਲਾਂ ਇਸਨੂੰ ਆਪਣੀ ਕਾਪੀ ਨਾਲ ਪੜ੍ਹ ਕੇ ਮਿਲਾਓ।",
+      "echoProgress": "ਹੁਣ ਤੱਕ {{total}} ਵਿੱਚੋਂ {{count}} ਅੱਖਰ।",
+      "echoInvalid": "SHA-256 ਫਿੰਗਰਪ੍ਰਿੰਟ 64 ਅੱਖਰਾਂ ਦਾ ਹੁੰਦਾ ਹੈ, ਹਰ ਅੱਖਰ 0–9 ਜਾਂ a–f। ਕੌਲਨ, ਖਾਲੀ ਥਾਂ ਅਤੇ ਸ਼ੁਰੂ ਵਿੱਚ “sha256:” ਚੱਲ ਜਾਂਦੇ ਹਨ — ਬਾਕੀ ਕੁਝ ਵੀ ਇਸਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ।",
+      "helpToggle": "ਇਹ ਫਿੰਗਰਪ੍ਰਿੰਟ ਮੈਨੂੰ ਕਿੱਥੋਂ ਮਿਲੇਗਾ?",
+      "helpNotOverTor": "ਇਸੇ ਕਨੈਕਸ਼ਨ ਰਾਹੀਂ ਨਹੀਂ। ਉਸੇ ਸਰਕਟ ਉੱਤੇ ਲਿਆ ਫਿੰਗਰਪ੍ਰਿੰਟ ਕੁਝ ਸਾਬਤ ਨਹੀਂ ਕਰਦਾ — ਜੋ ਸਰਟੀਫਿਕੇਟ ਬਦਲ ਸਕਦਾ ਹੈ, ਉਹ ਉਸ ਪੰਨੇ ਨੂੰ ਵੀ ਬਦਲ ਸਕਦਾ ਹੈ।",
+      "helpFromServer": "ਆਪਣਾ ਸਰਵਰ ਚਲਾਉਣ ਵਾਲੀ ਮਸ਼ੀਨ ਉੱਤੇ: openssl x509 -noout -fingerprint -sha256 -in <ਤੁਹਾਡੀ ਸਰਟੀਫਿਕੇਟ ਫ਼ਾਈਲ>",
+      "helpFromDevice": "ਇਸ ਖਾਤੇ ਨਾਲ ਪਹਿਲਾਂ ਤੋਂ ਜੁੜੇ ਡਿਵਾਈਸ ਉੱਤੇ: ਸੈਟਿੰਗਾਂ → ਸਿੰਕ ਵਿੱਚ ਇਹੀ ਫਿੰਗਰਪ੍ਰਿੰਟ ਦਿਸਦਾ ਹੈ।",
+      "helpNoFingerprint": "ਜੇ ਤੁਹਾਨੂੰ ਇਹਨਾਂ ਵਿੱਚੋਂ ਕਿਸੇ ਵੀ ਤਰੀਕੇ ਨਾਲ ਇਹ ਨਹੀਂ ਮਿਲਦਾ, ਤਾਂ Tor ਰਾਊਟਿੰਗ ਚਾਲੂ ਹੁੰਦਿਆਂ ਇਹ ਸਰਵਰ ਜੋੜਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ। ਤੁਸੀਂ ਸੈਟਿੰਗਾਂ → ਨੈੱਟਵਰਕ ਵਿੱਚ Tor ਰਾਊਟਿੰਗ ਬੰਦ ਕਰਕੇ ਸਿੱਧਾ ਜੁੜ ਸਕਦੇ ਹੋ — ਇਸ ਨਾਲ ਤੁਹਾਡਾ IP ਪਤਾ ਸਰਵਰ ਨੂੰ ਅਤੇ ਤੁਹਾਡੇ ਨੈੱਟਵਰਕ ਨੂੰ ਵੇਖ ਸਕਣ ਵਾਲੇ ਹਰ ਕਿਸੇ ਨੂੰ ਦਿਸ ਜਾਂਦਾ ਹੈ।",
+      "decline": "ਮੇਰੇ ਕੋਲ ਇਹ ਨਹੀਂ ਹੈ — ਰੱਦ ਕਰੋ"
+    },
+    "join": {
+      "accountLabel": "ਖਾਤਾ ਨੰਬਰ",
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "continue": "ਜਾਰੀ ਰੱਖੋ",
+      "error": "ਇਹ ਡਿਵਾਈਸ ਜੋੜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਸਰਵਰ URL, ਖਾਤਾ ਨੰਬਰ ਅਤੇ ਪਾਸਵਰਡ ਜਾਂਚੋ — ਅਤੇ ਇਹ ਵੀ ਕਿ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਹੈ।",
+      "help": "ਆਪਣੇ ਖਾਤਾ ਨੰਬਰ ਅਤੇ ਪਾਸਵਰਡ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ। ਜਦੋਂ ਕੋਈ ਮੌਜੂਦਾ ਡਿਵਾਈਸ ਇਸਨੂੰ ਮਨਜ਼ੂਰੀ ਦੇ ਦੇਵੇਗਾ, ਇਹ ਡਿਵਾਈਸ ਤੁਹਾਡੇ ਨੋਟ ਸਿੰਕ ਕਰ ਲਵੇਗਾ। ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਦੀ ਲੋੜ ਨਹੀਂ।",
+      "passwordLabel": "ਪਾਸਵਰਡ",
+      "pinnedCompare": "ਇਸ ਡਿਵਾਈਸ ਨੇ ਤੁਹਾਡੇ ਸਰਵਰ ਦਾ ਸਰਟੀਫਿਕੇਟ ਪਿੰਨ ਕਰ ਲਿਆ। ਜਾਂਚੋ ਕਿ ਇਹ ਫਿੰਗਰਪ੍ਰਿੰਟ ਤੁਹਾਡੇ ਦੂਜੇ ਡਿਵਾਈਸਾਂ ਉੱਤੇ ਵੀ ਇਹੀ ਹੈ।",
+      "confirmFingerprintRequired": "Tor ਰਾਊਟਿੰਗ ਚਾਲੂ ਹੈ, ਇਸ ਲਈ ਇਹ ਡਿਵਾਈਸ ਕਿਸੇ ਅਜਿਹੇ ਸਰਟੀਫਿਕੇਟ ਉੱਤੇ ਭਰੋਸਾ ਨਹੀਂ ਕਰੇਗਾ ਜਿਸਦੀ ਉਸਨੂੰ ਪਹਿਲਾਂ ਦੱਸ ਨਹੀਂ ਦਿੱਤੀ ਗਈ। ਆਪਣੇ ਸਰਵਰ ਦਾ SHA-256 ਸਰਟੀਫਿਕੇਟ ਫਿੰਗਰਪ੍ਰਿੰਟ ਸਰਵਰ ਤੋਂ ਹੀ ਜਾਂ ਕਿਸੇ ਪਹਿਲਾਂ ਤੋਂ ਜੁੜੇ ਡਿਵਾਈਸ ਤੋਂ ਲਵੋ, ਫਿਰ ਇੱਥੇ ਚਿਪਕਾਓ।",
+      "confirmFingerprintMismatch": "ਇਸ ਸਰਵਰ ਨੇ ਜੋ ਸਰਟੀਫਿਕੇਟ ਪੇਸ਼ ਕੀਤਾ, ਉਹ ਉਹ ਨਹੀਂ ਜੋ ਤੁਸੀਂ ਦਾਖਲ ਕੀਤਾ ਸੀ। ਇਹ ਡਿਵਾਈਸ ਜੋੜਿਆ ਨਹੀਂ ਗਿਆ ਅਤੇ ਕੁਝ ਵੀ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋਇਆ। ਜੋ ਫਿੰਗਰਪ੍ਰਿੰਟ ਤੁਸੀਂ ਚਿਪਕਾਇਆ ਸੀ ਉਸਨੂੰ ਜਾਂਚੋ — ਅਤੇ ਜੇ ਉਹ ਸਹੀ ਹੈ ਤਾਂ ਅੱਗੇ ਨਾ ਵਧੋ: ਇਸ ਡਿਵਾਈਸ ਅਤੇ ਤੁਹਾਡੇ ਸਰਵਰ ਵਿਚਕਾਰ ਕੋਈ ਹੈ।",
+      "pinnedTitle": "ਸਰਵਰ ਸਰਟੀਫਿਕੇਟ ਪਿੰਨ ਹੋ ਗਿਆ",
+      "serverLabel": "ਸਿੰਕ ਸਰਵਰ",
+      "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "ਇਹ ਮਿਲਦੇ ਹਨ — ਜਾਰੀ ਰੱਖੋ",
+      "sasMismatch": "ਇਹ ਨਹੀਂ ਮਿਲਦੇ — ਇਹ ਡਿਵਾਈਸ ਹਟਾਓ",
+      "submit": "ਡਿਵਾਈਸ ਜੋੜੋ",
+      "submitting": "ਜੋੜਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+      "title": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਖਾਤੇ ਨਾਲ ਜੋੜੋ",
+      "verifyBody": "ਜਾਂਚੋ ਕਿ ਇਹ ਕੋਡ ਉਸ ਡਿਵਾਈਸ ਵਾਲੇ ਕੋਡ ਨਾਲ ਮਿਲਦਾ ਹੈ ਜਿਸ ਤੋਂ ਤੁਸੀਂ ਮਨਜ਼ੂਰੀ ਦਿੱਤੀ ਸੀ।",
+      "verifyTitle": "ਇਹ ਡਿਵਾਈਸ ਤਸਦੀਕ ਕਰੋ",
+      "waitingHint": "ਇਹ ਵਿੰਡੋ ਖੁੱਲ੍ਹੀ ਰੱਖੋ — ਮਨਜ਼ੂਰੀ ਮਿਲਦਿਆਂ ਹੀ ਇੱਥੇ ਇੱਕ ਤਸਦੀਕ ਕੋਡ ਦਿਸੇਗਾ, ਜਿਸਦੀ ਤੁਲਨਾ ਤੁਸੀਂ ਆਪਣੇ ਦੂਜੇ ਡਿਵਾਈਸ ਨਾਲ ਕਰ ਸਕੋਗੇ।",
+      "waitingTitle": "ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "ਨਵੇਂ ਡਿਵਾਈਸ ਉੱਤੇ ਆਪਣੇ ਖਾਤਾ ਨੰਬਰ ਅਤੇ ਪਾਸਵਰਡ ਜਾਂ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ। ਡਿਵਾਈਸ ਉਦੋਂ ਤੱਕ ਬਕਾਇਆ ਰਹਿੰਦਾ ਹੈ ਜਦੋਂ ਤੱਕ ਕੋਈ ਮੌਜੂਦਾ ਡਿਵਾਈਸ ਇਸਨੂੰ ਮਨਜ਼ੂਰੀ ਨਹੀਂ ਦਿੰਦਾ।",
+        "label": "ਡਿਵਾਈਸ ਜੋੜੋ"
+      },
+      "awaitingApproval": {
+        "label": "ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ"
+      },
+      "conflicts": {
+        "helper": "ਜਦੋਂ ਇੱਕੋ ਨੋਟ ਦੋ ਡਿਵਾਈਸਾਂ ਉੱਤੇ ਇੱਕੋ ਵੇਲੇ ਸੰਪਾਦਿਤ ਹੁੰਦਾ ਹੈ, ਤਾਂ Myne ਦੋਵੇਂ ਕਾਪੀਆਂ ਰੱਖ ਲੈਂਦਾ ਹੈ ਤਾਂ ਜੋ ਕੁਝ ਗੁਆਚੇ ਨਾ। ਉਹਨਾਂ ਨੂੰ ਇੱਥੇ ਸੁਲਝਾਓ।",
+        "label": "ਟਕਰਾਅ"
+      },
+      "devices": {
+        "label": "ਡਿਵਾਈਸ"
+      },
+      "recovered": {
+        "close": "ਬੰਦ ਕਰੋ",
+        "decrypting": "ਡੀਕ੍ਰਿਪਟ ਹੋ ਰਿਹਾ ਹੈ…",
+        "deleteConfirmTitle": "ਇਹ ਮੁੜ-ਪ੍ਰਾਪਤ ਨੋਟ ਮਿਟਾਉਣਾ ਹੈ?",
+        "deleteConfirmWarning": "ਇਹ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਰੱਖੀ ਇੱਕੋ-ਇੱਕ ਕਾਪੀ ਨੂੰ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾ ਦਿੰਦਾ ਹੈ। ਇਹ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।",
+        "deleteCta": "ਮਿਟਾਓ",
+        "empty": "ਕੋਈ ਮੁੜ-ਪ੍ਰਾਪਤ ਨੋਟ ਨਹੀਂ।",
+        "errorGeneric": "ਕੁਝ ਗ਼ਲਤ ਹੋ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "helper": "ਜਦੋਂ ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ ਉੱਤੇ ਮਿਟਾਇਆ ਨੋਟ ਇੱਥੋਂ ਵੀ ਹਟਦਾ ਹੈ, ਤਾਂ ਉਸਦੀ ਐਨਕ੍ਰਿਪਟਡ ਕਾਪੀ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਰੱਖੀ ਜਾਂਦੀ ਹੈ। ਕਿਸੇ ਨੂੰ ਨਵੇਂ ਨੋਟ ਵਜੋਂ ਬਹਾਲ ਕਰੋ, ਜਾਂ ਪੱਕੇ ਤੌਰ 'ਤੇ ਮਿਟਾ ਦਿਓ।",
+        "label": "ਮੁੜ-ਪ੍ਰਾਪਤ ਨੋਟ",
+        "previewCta": "ਝਲਕ",
+        "previewTitle": "ਮੁੜ-ਪ੍ਰਾਪਤ ਨੋਟ",
+        "restoreCta": "ਬਹਾਲ ਕਰੋ"
+      },
+      "server": {
+        "helper": "ਹਰ ਡਿਵਾਈਸ ਉੱਤੇ ਉਹੀ ਸਰਵਰ URL ਦਾਖਲ ਕਰੋ। ਸਵੈ-ਹੋਸਟ ਕੀਤੇ ਸਰਵਰ ਲਈ ਉਸਦਾ <1>https://</1> ਪਤਾ ਵਰਤੋ; ਜਾਂਚੋ ਕਿ ਸਰਟੀਫਿਕੇਟ ਫਿੰਗਰਪ੍ਰਿੰਟ ਤੁਹਾਡੇ ਸਾਰੇ ਡਿਵਾਈਸਾਂ ਉੱਤੇ ਮਿਲਦਾ ਹੈ।",
+        "label": "ਸਿੰਕ ਸਰਵਰ"
+      },
+      "status": {
+        "helper": "Myne ਤੁਹਾਡੇ ਐਨਕ੍ਰਿਪਟਡ ਨੋਟ ਤੁਹਾਡੇ ਡਿਵਾਈਸਾਂ ਵਿਚਕਾਰ ਸਿੰਕ ਕਰਦਾ ਹੈ। ਸਰਵਰ ਸਿਰਫ਼ ਉਹ ਸਾਈਫਰਟੈਕਸਟ ਰੱਖਦਾ ਹੈ ਜੋ ਉਹ ਪੜ੍ਹ ਨਹੀਂ ਸਕਦਾ।",
+        "label": "ਸਿੰਕ ਸਥਿਤੀ"
+      },
+      "usage": {
+        "helper": "ਇਹ ਖਾਤਾ ਸਰਵਰ ਉੱਤੇ ਕਿੰਨਾ ਐਨਕ੍ਰਿਪਟਡ ਡਾਟਾ ਰੱਖਦਾ ਹੈ, ਅਤੇ ਕਿੰਨੇ ਡਿਵਾਈਸ ਸਾਈਨ ਇਨ ਹਨ।",
+        "label": "ਸਟੋਰੇਜ ਅਤੇ ਡਿਵਾਈਸ"
+      }
+    },
+    "reconcile": {
+      "message": "ਇਹ ਡਿਵਾਈਸ ਕੁਝ ਸਮਾਂ ਆਫ਼ਲਾਈਨ ਰਿਹਾ — ਸਿੰਕ ਪੂਰਾ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ। ਤੁਹਾਡੇ ਨੋਟ ਸੁਰੱਖਿਅਤ ਹਨ।"
+    },
+    "recovered": {
+      "restoredToast": "ਨਵੇਂ ਨੋਟ ਵਜੋਂ ਬਹਾਲ ਹੋ ਗਿਆ।"
+    },
+    "status": {
+      "awaitingApproval": "ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ",
+      "conflicts_one": "{{count}} ਟਕਰਾਅ ਵੇਖਣ ਲਈ",
+      "conflicts_other": "{{count}} ਟਕਰਾਅ ਵੇਖਣ ਲਈ",
+      "error": "ਸਿੰਕ ਗ਼ਲਤੀ",
+      "errorAuth": "ਸਿੰਕ ਸਾਈਨ-ਇਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ",
+      "errorFrozen": "ਖਾਤਾ ਜਮ੍ਹਾਂ ਕੀਤਾ ਗਿਆ — ਅੱਪਲੋਡ ਰੋਕੇ ਗਏ",
+      "errorDeviceRevoked": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਤੁਹਾਡੇ ਖਾਤੇ ਤੋਂ ਹਟਾ ਦਿੱਤਾ ਗਿਆ ਸੀ",
+      "errorStorageFull": "ਸਟੋਰੇਜ ਭਰ ਗਈ — ਸਿੰਕ ਰੋਕਿਆ ਗਿਆ",
+      "errorQuota": "ਸਟੋਰੇਜ ਭਰ ਗਈ — ਅੱਪਲੋਡ ਰੋਕੇ ਗਏ",
+      "errorRateLimited": "ਸਿੰਕ ਦੀ ਰਫ਼ਤਾਰ ਸੀਮਤ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਹੋ ਰਹੀ ਹੈ",
+      "errorTooLarge": "ਇੱਕ ਫ਼ਾਈਲ ਅੱਪਲੋਡ ਕਰਨ ਲਈ ਬਹੁਤ ਵੱਡੀ ਹੈ",
+      "loading": "ਸਿੰਕ ਸਥਿਤੀ…",
+      "notEnrolled": "ਦਰਜ ਨਹੀਂ",
+      "off": "ਸਿੰਕ ਬੰਦ",
+      "synced": "ਸਿੰਕ ਹੋ ਗਿਆ",
+      "syncing": "ਸਿੰਕ ਹੋ ਰਿਹਾ ਹੈ…",
+      "syncNow": "ਹੁਣੇ ਸਿੰਕ ਕਰੋ"
+    },
+    "usage": {
+      "devices": "ਡਿਵਾਈਸ",
+      "frozen": "ਇਹ ਖਾਤਾ ਜਮ੍ਹਾਂ ਕੀਤਾ ਗਿਆ ਹੈ। ਨਵੀਆਂ ਤਬਦੀਲੀਆਂ ਅੱਪਲੋਡ ਨਹੀਂ ਹੋ ਸਕਦੀਆਂ; ਤੁਹਾਡੇ ਨੋਟ ਫਿਰ ਵੀ ਡਾਊਨਲੋਡ ਹੁੰਦੇ ਰਹਿਣਗੇ।",
+      "ofTotal": "{{total}} ਵਿੱਚੋਂ {{used}}",
+      "storage": "ਸਟੋਰੇਜ"
+    },
+    "settings": {
+      "serverSection": "ਸਰਵਰ",
+      "serverNotSet": "ਤੈਅ ਨਹੀਂ",
+      "statusLabel": "ਸਥਿਤੀ",
+      "hubHelp": "ਸਿੰਕ ਤੁਹਾਡੇ ਨੋਟ ਸਾਰੇ ਡਿਵਾਈਸਾਂ ਉੱਤੇ ਤਾਜ਼ਾ ਰੱਖਦਾ ਹੈ। ਭੇਜਣ ਤੋਂ ਪਹਿਲਾਂ ਸਭ ਕੁਝ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਐਨਕ੍ਰਿਪਟ ਹੁੰਦਾ ਹੈ — ਸਰਵਰ ਤੁਹਾਡੇ ਨੋਟ ਕਦੇ ਨਹੀਂ ਵੇਖਦਾ।",
+      "connectedTls": "TLS ਉੱਤੇ ਜੁੜ ਗਿਆ।",
+      "connectedLocal": "ਤੁਹਾਡੇ ਸਥਾਨਕ ਨੈੱਟਵਰਕ ਉੱਤੇ ਜੁੜ ਗਿਆ।",
+      "connectError": "ਉਸ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋਈ। ਪਤਾ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "serverAddressLabel": "ਸਰਵਰ ਦਾ ਪਤਾ",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "ਸਰਟੀਫਿਕੇਟ ਫਿੰਗਰਪ੍ਰਿੰਟ",
+      "fingerprintCompare": "ਜਿਸ ਡਿਵਾਈਸ ਉੱਤੇ ਤੁਸੀਂ ਪਹਿਲਾਂ ਹੀ ਭਰੋਸਾ ਕਰਦੇ ਹੋ, ਉਸਦੀ ਇਸੇ ਸਕਰੀਨ ਨਾਲ ਇਸਦੀ ਤੁਲਨਾ ਕਰੋ — ਇਹ ਮਿਲਣੇ ਚਾਹੀਦੇ ਹਨ।",
+      "pinStatic": "ਇਸ ਸਰਵਰ ਦੇ ਜਾਣੇ-ਪਛਾਣੇ ਸਰਟੀਫਿਕੇਟ ਨਾਲ ਤਸਦੀਕ ਹੋਇਆ।",
+      "pinTofu": "ਪਹਿਲੀ ਵਾਰ ਜੁੜਨ ਉੱਤੇ ਪਿੰਨ ਕੀਤਾ ਗਿਆ। ਪੁਸ਼ਟੀ ਲਈ ਇਸਦੀ ਆਪਣੇ ਡਿਵਾਈਸਾਂ ਵਿਚਕਾਰ ਤੁਲਨਾ ਕਰੋ।",
+      "enrollNotConfigured": "ਪਹਿਲਾਂ ਸਿੰਕ ਸਰਵਰ ਸੈੱਟ ਕਰੋ, ਫਿਰ ਇਹ ਡਿਵਾਈਸ ਜੋੜੋ।",
+      "enrollTransport": "ਸਿੰਕ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋਈ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "accountNumberHint": "ਇਹ ਨੰਬਰ ਦੁਬਾਰਾ ਜਾਂਚੋ — ਇਹ ਸਹੀ ਨਹੀਂ ਲੱਗਦਾ।",
+      "passwordPlaceholder": "ਤੁਹਾਡਾ ਵਾਲਟ ਪਾਸਵਰਡ",
+      "recoveryPhraseHint": "ਆਪਣੇ 24 ਸ਼ਬਦ ਲਿਖੋ ਜਾਂ ਚਿਪਕਾਓ। ਚਿਪਕਾਉਣ ਨਾਲ ਖਾਨੇ ਕ੍ਰਮ ਵਿੱਚ ਭਰ ਜਾਂਦੇ ਹਨ।",
+      "verifyBody": "ਜਾਂਚੋ ਕਿ ਜਿਸ ਡਿਵਾਈਸ ਨੂੰ ਤੁਸੀਂ ਹੁਣੇ ਮਨਜ਼ੂਰੀ ਦਿੱਤੀ ਹੈ, ਉਸ ਉੱਤੇ ਇਹੀ ਕੋਡ ਦਿਸਦਾ ਹੈ। ਜੇ ਮਿਲਦਾ ਹੈ ਤਾਂ ਉਹ ਤੁਹਾਡੇ ਖਾਤੇ ਉੱਤੇ ਹੈ। ਜੇ ਨਹੀਂ ਮਿਲਦਾ, ਤਾਂ ਡਿਵਾਈਸ ਹਟਾ ਦਿਓ।",
+      "sasMismatch": "ਇਹ ਨਹੀਂ ਮਿਲਦੇ",
+      "removeDeviceButton": "ਡਿਵਾਈਸ ਹਟਾਓ",
+      "keepDevice": "ਇਸਨੂੰ ਰਹਿਣ ਦਿਓ",
+      "notEnrolledHelp": "ਇਹ ਡਿਵਾਈਸ ਹਾਲੇ ਸਿੰਕ ਨਹੀਂ ਹੋ ਰਿਹਾ। ਆਪਣੇ ਡਿਵਾਈਸ ਵੇਖਣ ਲਈ ਇਸਨੂੰ ਪਿਛਲੀ ਸਕਰੀਨ ਤੋਂ ਜੋੜੋ।",
+      "unauthenticated": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਪਹੁੰਚ ਰੱਦ ਕਰ ਦਿੱਤੀ ਗਈ, ਸ਼ਾਇਦ ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ ਤੋਂ ਹਟਾਇਆ ਗਿਆ।",
+      "transportError": "ਸਿੰਕ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋਈ। ਜੇ ਸਰਵਰ ਬਦਲ ਗਿਆ ਹੈ ਜਾਂ ਉਸਦਾ ਸਰਟੀਫਿਕੇਟ ਬਦਲਿਆ ਹੈ, ਤਾਂ ਸਿੰਕ ਸਰਵਰ ਸਕਰੀਨ ਤੋਂ ਇਸਨੂੰ ਮੁੜ ਜੋੜੋ।",
+      "retiredSelf": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ ਤੋਂ ਹਟਾ ਦਿੱਤਾ ਗਿਆ ਸੀ।",
+      "resetAndAddAgain": "ਰੀਸੈੱਟ ਕਰਕੇ ਦੁਬਾਰਾ ਜੋੜੋ",
+      "noDevices": "ਹਾਲੇ ਕੋਈ ਡਿਵਾਈਸ ਨਹੀਂ।",
+      "syncingHere": "ਇੱਥੇ ਸਿੰਕ ਹੋ ਰਿਹਾ ਹੈ"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} ਟਕਰਾਅ ਵੇਖਣ ਦੀ ਲੋੜ ਹੈ",
+      "conflictsNeedReview_other": "{{count}} ਟਕਰਾਅ ਵੇਖਣ ਦੀ ਲੋੜ ਹੈ",
+      "catchingUp": "ਸਿੰਕ ਪੂਰਾ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ — ਤੁਹਾਡੇ ਨੋਟ ਸੁਰੱਖਿਅਤ ਹਨ।",
+      "verifyDevices": "ਡਿਵਾਈਸ ਤਸਦੀਕ ਕਰੋ"
+    },
+    "tor": {
+      "connecting": "Tor ਨਾਲ ਜੁੜਿਆ ਜਾ ਰਿਹਾ ਹੈ। ਕਨੈਕਸ਼ਨ ਤਿਆਰ ਹੋਣ ਤੱਕ ਸਿੰਕ ਰੋਕਿਆ ਹੋਇਆ ਹੈ — ਸਿੱਧਾ ਕੁਝ ਵੀ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਰਿਹਾ।",
+      "settingsHint": "ਸੈਟਿੰਗਾਂ → ਨੈੱਟਵਰਕ",
+      "unavailable": "Tor ਉਪਲਬਧ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਸਿੰਕ ਰੋਕਿਆ ਹੋਇਆ ਹੈ। ਸਿੱਧਾ ਕੁਝ ਵੀ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਰਿਹਾ। ਇਸ ਤੋਂ ਬਿਨਾਂ ਸਿੰਕ ਕਰਨ ਲਈ Tor ਰਾਊਟਿੰਗ ਬੰਦ ਕਰੋ।"
+    }
+  },
+  "tasks": {
+    "builder": {
+      "any": "ਕੋਈ ਵੀ",
+      "due": "ਮਿਆਦ",
+      "folder": "ਫੋਲਡਰ",
+      "insert": "ਪਾਓ",
+      "noDueDate": "ਕੋਈ ਮਿਆਦ ਨਹੀਂ",
+      "priority": "ਤਰਜੀਹ",
+      "sort": "ਇਸ ਅਨੁਸਾਰ ਲੜੀਬੱਧ",
+      "sortDue": "ਮਿਆਦ ਦੀ ਤਾਰੀਖ਼",
+      "sortPath": "ਨੋਟ",
+      "sortPriority": "ਤਰਜੀਹ",
+      "status": "ਸਥਿਤੀ",
+      "statusDone": "ਪੂਰੇ ਹੋਏ",
+      "statusTodo": "ਬਾਕੀ",
+      "tag": "ਟੈਗ"
+    },
+    "empty": {
+      "filter": "ਇਸ ਵੇਲੇ ਇੱਥੇ ਕੁਝ ਨਹੀਂ। ਕੋਈ ਹੋਰ ਫਿਲਟਰ ਅਜ਼ਮਾਓ।",
+      "rebuilding": "ਤੁਹਾਡੇ ਨੋਟ ਪੜ੍ਹੇ ਜਾ ਰਹੇ ਹਨ…",
+      "scope": "ਇਸ ਫੋਲਡਰ ਜਾਂ ਟੈਗ ਵਿੱਚ ਕੋਈ ਟਾਸਕ ਨਹੀਂ। ਦਾਇਰਾ ਵਧਾ ਕੇ ਵੇਖੋ।",
+      "vault": "ਹਾਲੇ ਕੋਈ ਟਾਸਕ ਨਹੀਂ। ਬਣਾਉਣ ਲਈ ਕਿਸੇ ਵੀ ਨੋਟ ਦੀ ਇੱਕ ਲਾਈਨ ਉੱਤੇ “- [ ]” ਲਿਖੋ।"
+    },
+    "filter": {
+      "all": "ਸਾਰੇ",
+      "overdue": "ਮਿਆਦ ਲੰਘੀ",
+      "today": "ਅੱਜ",
+      "upcoming": "ਆਉਣ ਵਾਲੇ"
+    },
+    "noteTitle": "ਇਸ ਨੋਟ ਵਿਚਲੇ ਟਾਸਕ",
+    "query": {
+      "dropped_one": "{{count}} ਧਾਰਾ Myne ਪੜ੍ਹ ਨਹੀਂ ਸਕਿਆ",
+      "dropped_other": "{{count}} ਧਾਰਾਵਾਂ Myne ਪੜ੍ਹ ਨਹੀਂ ਸਕਿਆ",
+      "empty": "ਇਸ ਸਵਾਲ ਨਾਲ ਕੋਈ ਟਾਸਕ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+      "loading": "ਤੁਹਾਡੇ ਨੋਟ ਪੜ੍ਹੇ ਜਾ ਰਹੇ ਹਨ…",
+      "refused": "Myne ਇਸ ਸਵਾਲ ਦਾ ਕੋਈ ਹਿੱਸਾ ਨਹੀਂ ਪੜ੍ਹ ਸਕਿਆ, ਇਸ ਲਈ ਸਭ ਕੁਝ ਵਿਖਾਉਣ ਦੀ ਬਜਾਏ ਇਹ ਕੁਝ ਨਹੀਂ ਵਿਖਾ ਰਿਹਾ।",
+      "remainder_one": "{{count}} ਹੋਰ ਟਾਸਕ ਮੇਲ ਖਾਂਦਾ ਹੈ",
+      "remainder_other": "{{count}} ਹੋਰ ਟਾਸਕ ਮੇਲ ਖਾਂਦੇ ਹਨ"
+    },
+    "reminder": {
+      "due": "ਇੱਕ ਟਾਸਕ ਦੀ ਯਾਦ-ਦਹਾਨੀ ਦਾ ਸਮਾਂ ਹੋ ਗਿਆ ਹੈ।"
+    },
+    "row": {
+      "completed": "ਟਾਸਕ, ਪੂਰਾ ਹੋਇਆ",
+      "notCompleted": "ਟਾਸਕ, ਪੂਰਾ ਨਹੀਂ ਹੋਇਆ",
+      "tooLongToWrite": "ਇਸ ਟਾਸਕ ਦੀ ਲਾਈਨ ਇੱਥੋਂ ਸੰਪਾਦਿਤ ਕਰਨ ਲਈ ਬਹੁਤ ਲੰਬੀ ਹੈ। ਇਸ ਦੀ ਥਾਂ ਇਸਦਾ ਨੋਟ ਖੋਲ੍ਹੋ।",
+      "untitled": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਟਾਸਕ"
+    },
+    "scope": {
+      "allFolders": "ਸਾਰੇ ਫੋਲਡਰ",
+      "label": "ਇਸ ਨਾਲ ਸੀਮਤ ਕਰੋ"
+    },
+    "title": "ਟਾਸਕ"
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "ਟੈਂਪਲੇਟ ਬੰਦ ਕਰੋ",
+      "deleteRowLabel": "ਟੈਂਪਲੇਟ {{name}} ਮਿਟਾਓ (ਰੱਦੀ ਵਿੱਚ ਭੇਜੋ)",
+      "editTemplateLabel": "ਟੈਂਪਲੇਟ {{name}} ਸੰਪਾਦਿਤ ਕਰੋ",
+      "emptyBody": "ਨੋਟ ਦਾ ਢਾਂਚਾ ਮੁੜ ਵਰਤਣ ਲਈ ਟੈਂਪਲੇਟ ਬਣਾਓ — ਮੀਟਿੰਗ ਨੋਟ, ਰੋਜ਼ਾਨਾ ਲੌਗ, ਪੜ੍ਹਨ ਦਾ ਨੋਟ। ਨਵਾਂ ਨੋਟ ਬਣਾਉਂਦੇ ਵੇਲੇ ਇੱਕ ਚੁਣੋ।",
+      "emptyTitle": "ਹਾਲੇ ਕੋਈ ਟੈਂਪਲੇਟ ਨਹੀਂ",
+      "listLabel": "ਟੈਂਪਲੇਟ",
+      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+      "newTemplate": "ਨਵਾਂ ਟੈਂਪਲੇਟ",
+      "newTemplateName": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਟੈਂਪਲੇਟ",
+      "removeFromTemplates": "ਟੈਂਪਲੇਟਾਂ ਵਿੱਚੋਂ ਹਟਾਓ",
+      "removeRowLabel": "{{name}} ਨੂੰ ਟੈਂਪਲੇਟਾਂ ਵਿੱਚੋਂ ਹਟਾਓ (ਨੋਟ ਰਹਿ ਜਾਂਦਾ ਹੈ)",
+      "title": "ਨੋਟ ਟੈਂਪਲੇਟ"
+    },
+    "emptyBefore": "ਹਾਲੇ ਕੋਈ ਟੈਂਪਲੇਟ ਨਹੀਂ। ਦਬਾਓ ",
+    "newAction": "ਨਵਾਂ",
+    "emptyAfter": " ਤਾਂ ਜੋ ਮੁੜ-ਵਰਤਣਯੋਗ ਨੋਟ ਟੈਂਪਲੇਟ ਬਣੇ — ਫਿਰ ਉਸ ਤੋਂ ਨੋਟ ਸ਼ੁਰੂ ਕਰੋ (ਅਤੇ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਇੱਕ ਨੂੰ ਆਪਣਾ ਰੋਜ਼ਾਨਾ-ਨੋਟ ਟੈਂਪਲੇਟ ਚੁਣੋ)।",
+    "use": "ਵਰਤੋ",
+    "edit": "ਸੰਪਾਦਿਤ ਕਰੋ",
+    "deleteConfirm": "ਇਹ ਟੈਂਪਲੇਟ ਮਿਟਾਉਣਾ ਹੈ?",
+    "convertToNote": "ਨੋਟ ਵਿੱਚ ਬਦਲੋ"
+  },
+  "themeInstall": {
+    "apply": "ਥੀਮ ਲਾਗੂ ਕਰੋ",
+    "applying": "ਲਾਗੂ ਹੋ ਰਿਹਾ ਹੈ…",
+    "byAuthor": "ਇਹ ਲਿੰਕ ਕਹਿੰਦਾ ਹੈ ਕਿ ਇਹ {{author}} ਵੱਲੋਂ ਹੈ",
+    "cancel": "ਰੱਦ ਕਰੋ",
+    "close": "ਬੰਦ ਕਰੋ",
+    "collision": {
+      "keepBoth": "ਦੋਵੇਂ ਰੱਖੋ — “{{name}}” ਵਜੋਂ ਇੰਸਟਾਲ ਕਰੋ",
+      "question": "ਤੁਹਾਡੇ ਕੋਲ ਪਹਿਲਾਂ ਹੀ “{{name}}” ਨਾਂ ਦਾ ਥੀਮ ਹੈ।",
+      "replace": "“{{name}}” ਦੀ ਥਾਂ ਲਓ"
+    },
+    "error": {
+      "importFailed": "ਉਹ ਥੀਮ ਇੰਸਟਾਲ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕੁਝ ਵੀ ਨਹੀਂ ਬਦਲਿਆ ਗਿਆ।",
+      "installedNotActivated": "“{{name}}” ਇੰਸਟਾਲ ਤਾਂ ਹੋ ਗਿਆ, ਪਰ ਚਾਲੂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਤੁਸੀਂ ਇਸਨੂੰ ਸੈਟਿੰਗਾਂ → ਦਿੱਖ ਵਿੱਚੋਂ ਲਾਗੂ ਕਰ ਸਕਦੇ ਹੋ।",
+      "invalidName": "ਉਹ ਲਿੰਕ ਇਹ ਨਹੀਂ ਦੱਸਦਾ ਕਿ ਉਹ ਕਿਹੜਾ ਥੀਮ ਇੰਸਟਾਲ ਕਰਨਾ ਚਾਹੁੰਦਾ ਹੈ।",
+      "listUnavailable": "ਤੁਹਾਡੇ ਮੌਜੂਦਾ ਥੀਮ ਪੜ੍ਹੇ ਨਹੀਂ ਜਾ ਸਕੇ, ਇਸ ਲਈ ਇਸਨੂੰ ਹੁਣੇ ਸੁਰੱਖਿਅਤ ਢੰਗ ਨਾਲ ਇੰਸਟਾਲ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਇਸਨੂੰ ਬੰਦ ਕਰੋ ਅਤੇ ਲਿੰਕ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ।",
+      "malformedPayload": "ਉਸ ਲਿੰਕ ਦਾ ਥੀਮ ਡਾਟਾ ਖ਼ਰਾਬ ਜਾਂ ਅਧੂਰਾ ਹੈ।",
+      "nothingWritten": "ਤੁਹਾਡੇ ਵਾਲਟ ਵਿੱਚ ਕੁਝ ਵੀ ਨਹੀਂ ਲਿਖਿਆ ਗਿਆ।",
+      "payloadTooLarge": "ਉਸ ਲਿੰਕ ਦਾ ਥੀਮ ਡਾਟਾ ਥੀਮ ਹੋਣ ਲਈ ਬਹੁਤ ਵੱਡਾ ਹੈ।",
+      "unsupportedVersion": "ਉਹ ਲਿੰਕ Myne ਦੇ ਕਿਸੇ ਨਵੇਂ ਵਰਜ਼ਨ ਲਈ ਬਣਿਆ ਸੀ। Myne ਅੱਪਡੇਟ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    },
+    "errorTitle": "ਉਹ ਥੀਮ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
+    "helper": "ਥੀਮ ਸਿਰਫ਼ ਰੰਗਾਂ ਦੀ ਤਖ਼ਤੀ ਹੁੰਦੇ ਹਨ, ਕੋਡ ਨਹੀਂ। Myne ਇਸਨੂੰ ਵਰਤਣ ਤੋਂ ਪਹਿਲਾਂ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਜਾਂਚਦਾ ਹੈ — ਕੁਝ ਵੀ ਅੱਪਲੋਡ ਨਹੀਂ ਹੁੰਦਾ।",
+    "question": "ਕੀ ਤੁਸੀਂ ਇਹ ਥੀਮ ਵਰਤਣਾ ਚਾਹੁੰਦੇ ਹੋ?",
+    "title": "ਥੀਮ ਇੰਸਟਾਲ ਕਰੋ"
+  },
+  "unlock": {
+    "backToPicker": "ਕੋਈ ਹੋਰ ਵਾਲਟ ਚੁਣੋ",
+    "continue": "ਜਾਰੀ ਰੱਖੋ",
+    "decrypting": "ਡੀਕ੍ਰਿਪਟ ਹੋ ਰਿਹਾ ਹੈ…",
+    "deleteLink": "ਪਾਸਵਰਡ ਅਤੇ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਦੋਵੇਂ ਗੁਆਚ ਗਏ? ਵਾਲਟ ਮਿਟਾ ਕੇ ਨਵੇਂ ਸਿਰਿਓਂ ਸ਼ੁਰੂ ਕਰੋ",
+    "errors": {
+      "alreadyUnlocked": "ਵਾਲਟ ਪਹਿਲਾਂ ਹੀ ਅਨਲਾਕ ਹੈ।",
+      "inProgress": "ਕਾਰਵਾਈ ਚੱਲ ਰਹੀ ਹੈ।",
+      "kdfMemoryExceedsHost": "ਇਸ ਵਾਲਟ ਨੂੰ ਖੋਲ੍ਹਣ ਲਈ {{required}} MiB ਮੈਮਰੀ ਚਾਹੀਦੀ ਹੈ — ਜਿੰਨੀ ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਦੇ ਸਕਦਾ ਹੈ ({{available}} MiB) ਉਸ ਤੋਂ ਵੱਧ। ਵਾਲਟ ਠੀਕ ਹੈ; ਇਸਨੂੰ Myne ਡੈਸਕਟਾਪ ਐਪ ਵਿੱਚ ਖੋਲ੍ਹੋ।",
+      "unexpected": "ਅਣਕਿਆਸੀ ਗ਼ਲਤੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "vaultNotFound": "ਵਾਲਟ ਫ਼ਾਈਲ ਨਹੀਂ ਮਿਲੀ। ਐਪ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰੋ।"
+    },
+    "passwordLabel": "ਪਾਸਵਰਡ",
+    "passwordPlaceholder": "ਪਾਸਵਰਡ",
+    "quickUnlock": {
+      "failed": "ਤਤਕਾਲ ਅਨਲਾਕ ਅਸਫਲ ਰਿਹਾ। ਆਪਣਾ ਪਾਸਵਰਡ ਵਰਤੋ।",
+      "pinAriaLabel": "ਤਤਕਾਲ-ਅਨਲਾਕ PIN",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "PIN ਨਾਲ ਅਨਲਾਕ ਕਰੋ",
+      "unlockWithTouchId": "Touch ID ਨਾਲ ਅਨਲਾਕ ਕਰੋ",
+      "wrongCredential": "ਗ਼ਲਤ। {{remaining}} ਕੋਸ਼ਿਸ਼ਾਂ ਬਾਕੀ।"
+    },
+    "recoveryInterruptedBanner": "ਰਿਕਵਰੀ ਦੀ ਪ੍ਰਕਿਰਿਆ ਵਿਚਾਲੇ ਰੁਕ ਗਈ ਸੀ। ਪਹਿਲਾਂ ਨਵਾਂ ਪਾਸਵਰਡ ਤੈਅ ਕਰੋ।",
+    "recoveryInterruptedBody": "ਪਹਿਲਾਂ ਨਵਾਂ ਪਾਸਵਰਡ ਤੈਅ ਕਰੋ, ਫਿਰ ਆਪਣਾ ਵਾਲਟ ਮੁੜ ਸੀਲ ਕਰੋ।",
+    "recoveryInterruptedTitle": "ਰਿਕਵਰੀ ਦੀ ਪ੍ਰਕਿਰਿਆ ਵਿਚਾਲੇ ਰੁਕ ਗਈ ਸੀ।",
+    "recoveryLink": "ਪਾਸਵਰਡ ਭੁੱਲ ਗਏ? ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਨਾਲ ਅਨਲਾਕ ਕਰੋ",
+    "submit": "ਅਨਲਾਕ ਕਰੋ",
+    "subtitle": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣਾ ਪਾਸਵਰਡ ਦਾਖਲ ਕਰੋ।",
+    "subtitlePin": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣਾ PIN ਦਾਖਲ ਕਰੋ।",
+    "subtitleBiometric": "ਜਾਰੀ ਰੱਖਣ ਲਈ Touch ID ਨਾਲ ਪੁਸ਼ਟੀ ਕਰੋ।",
+    "suspicion": {
+      "lockedDuringChange": "ਪਾਸਵਰਡ ਬਦਲਣਾ ਰੱਦ ਹੋਇਆ: ਵਾਲਟ ਲਾਕ ਹੋ ਗਿਆ ਸੀ।",
+      "metaChangedExternally": "ਵਾਲਟ ਕਿਸੇ ਹੋਰ ਸੈਸ਼ਨ ਵਿੱਚ ਬਦਲਿਆ ਗਿਆ — ਦੁਬਾਰਾ ਅਨਲਾਕ ਕਰੋ।"
+    },
+    "title": "ਆਪਣਾ ਵਾਲਟ ਅਨਲਾਕ ਕਰੋ।",
+    "vaultUnreadable": "ਵਾਲਟ ਫ਼ਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ। ਕਿਸੇ ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ।",
+    "unlockFailedGeneric": "ਅਨਲਾਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "biometricTooManyAttempts": "{{biometric}} ਦੀਆਂ ਬਹੁਤ ਸਾਰੀਆਂ ਕੋਸ਼ਿਸ਼ਾਂ ਹੋ ਗਈਆਂ। ਆਪਣਾ ਪਾਸਵਰਡ ਵਰਤੋ।",
+    "pinIncorrect_one": "ਗ਼ਲਤ PIN। {{count}} ਕੋਸ਼ਿਸ਼ ਬਾਕੀ।",
+    "pinIncorrect_other": "ਗ਼ਲਤ PIN। {{count}} ਕੋਸ਼ਿਸ਼ਾਂ ਬਾਕੀ।",
+    "pinTooManyAttempts": "PIN ਦੀਆਂ ਬਹੁਤ ਸਾਰੀਆਂ ਕੋਸ਼ਿਸ਼ਾਂ ਹੋ ਗਈਆਂ। ਆਪਣਾ ਪਾਸਵਰਡ ਵਰਤੋ।",
+    "pinFailedGeneric": "PIN ਨਾਲ ਅਨਲਾਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਪਾਸਵਰਡ ਵਰਤੋ।",
+    "corruptedHeading": "ਵਾਲਟ ਫ਼ਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ",
+    "ioErrorHeading": "ਇਹ ਵਾਲਟ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ",
+    "blockingTitle": "ਅਨਲਾਕ ਹੋ ਰਿਹਾ ਹੈ",
+    "blockingSubtitle": "ਤੁਹਾਡੀਆਂ ਕੁੰਜੀਆਂ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਡੀਕ੍ਰਿਪਟ ਹੋ ਰਹੀਆਂ ਹਨ।",
+    "eyebrow": "ਵਾਲਟ ਅਨਲਾਕ ਕਰੋ",
+    "vaultTitleFallback": "ਤੁਹਾਡਾ ਵਾਲਟ",
+    "unlockWithBiometric": "{{biometric}} ਨਾਲ ਅਨਲਾਕ ਕਰੋ",
+    "biometricFailed": "{{biometric}} ਪੁਸ਼ਟੀ ਨਹੀਂ ਕਰ ਸਕਿਆ ਕਿ ਇਹ ਤੁਸੀਂ ਹੋ",
+    "touchToUnlock": "ਅਨਲਾਕ ਕਰਨ ਲਈ ਛੂਹੋ",
+    "lookToUnlock": "ਅਨਲਾਕ ਕਰਨ ਲਈ ਵੇਖੋ",
+    "biometricRetryHint": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ, ਜਾਂ ਆਪਣੇ ਪਾਸਵਰਡ ਨਾਲ ਅਨਲਾਕ ਕਰੋ।",
+    "tryBiometricAgain": "{{biometric}} ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ",
+    "usePasswordInstead": "ਇਸਦੀ ਥਾਂ ਪਾਸਵਰਡ ਵਰਤੋ",
+    "useBiometricInstead": "ਇਸਦੀ ਥਾਂ {{biometric}} ਵਰਤੋ",
+    "unlockWithPinInstead": "ਇਸਦੀ ਥਾਂ PIN ਨਾਲ ਅਨਲਾਕ ਕਰੋ",
+    "useRecoveryPhrase": "ਆਪਣਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਵਰਤੋ",
+    "deleteConfirmTitle": "ਇਹ ਵਾਲਟ ਮਿਟਾਉਣਾ ਹੈ?",
+    "deletePartialError": "ਕੁਝ ਫ਼ਾਈਲਾਂ ਹਟਾਈਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ। ਇਹ ਵਾਲਟ ਹੁਣ ਵਰਤਣਯੋਗ ਨਹੀਂ ਰਿਹਾ — ਨਵੇਂ ਸਿਰਿਓਂ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਅੱਗੇ ਵਧੋ।",
+    "failClosedEyebrow": "ਵਾਲਟ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਦਾ",
+    "restoreHint": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਕਿਸੇ ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ।"
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "ਵਾਲਟ ਫ਼ਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ।",
+      "notFound": "ਵਾਲਟ ਫ਼ਾਈਲ ਨਹੀਂ ਮਿਲੀ। ਐਪ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰੋ।",
+      "permissionDenied": "ਵਾਲਟ ਫ਼ਾਈਲ ਤੱਕ ਪਹੁੰਚ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ। ਫ਼ਾਈਲ ਦੀਆਂ ਇਜਾਜ਼ਤਾਂ ਜਾਂਚੋ।"
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "ਮੈਂ ਆਪਣਾ ਖਾਤਾ ਨੰਬਰ ਉੱਥੇ ਸੁਰੱਖਿਅਤ ਕਰ ਲਿਆ ਹੈ ਜਿੱਥੋਂ ਬਾਅਦ ਵਿੱਚ ਮਿਲ ਜਾਵੇਗਾ।",
+      "back": "ਪਿੱਛੇ",
+      "commit": "ਵਾਲਟ ਬਣਾਓ",
+      "committing": "ਸੁਰੱਖਿਅਤ ਹੋ ਰਿਹਾ ਹੈ…",
+      "copied": "ਕਾਪੀ ਹੋ ਗਿਆ",
+      "copy": "ਕਾਪੀ ਕਰੋ",
+      "eyebrow": "ਪੜਾਅ 4/4 — ਖਾਤਾ ਨੰਬਰ",
+      "heading": "ਆਪਣਾ ਖਾਤਾ ਨੰਬਰ ਸੰਭਾਲੋ।",
+      "intro": "ਇਹ ਤੁਹਾਡਾ ਬੇਅਰਰ ਟੋਕਨ ਹੈ — ਇਸਨੂੰ ਨਕਦੀ ਵਾਂਗ ਸਮਝੋ।",
+      "saveAsFile": "ਫ਼ਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ",
+      "shownOnceBody": "ਹੁਣੇ ਸੰਭਾਲੋ — Myne ਇਸਨੂੰ ਤੁਹਾਡੇ ਲਈ ਮੁੜ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ। ਬਾਅਦ ਵਿੱਚ ਸਿੰਕ ਲਈ ਰਜਿਸਟਰ ਕਰਨ ਵਾਸਤੇ ਇਹ ਲਾਜ਼ਮੀ ਹੈ।",
+      "shownOnceEmphasis": "ਇਹ ਸਿਰਫ਼ ਇੱਕ ਵਾਰ ਦਿਖਾਇਆ ਜਾਂਦਾ ਹੈ।"
+    },
+    "briefing": {
+      "back": "ਪਿੱਛੇ",
+      "continue": "ਵਾਲਟ ਬਣਾਉਣ ਵੱਲ ਵਧੋ",
+      "eyebrow": "ਆਪਣਾ ਵਾਲਟ ਬਣਾਉਣ ਤੋਂ ਪਹਿਲਾਂ",
+      "heading": "ਆਪਣਾ ਵਾਲਟ ਬਣਾਉਣ ਤੋਂ ਪਹਿਲਾਂ",
+      "intro": "Myne ਤੁਹਾਡੇ ਨੋਟ ਇਸ ਤਰ੍ਹਾਂ ਐਨਕ੍ਰਿਪਟ ਕਰਦਾ ਹੈ ਕਿ ਸਿਰਫ਼ ਤੁਸੀਂ ਹੀ ਉਹਨਾਂ ਨੂੰ ਖੋਲ੍ਹ ਸਕੋ। ਇਸ ਵਿੱਚੋਂ ਤਿੰਨ ਗੱਲਾਂ ਨਿਕਲਦੀਆਂ ਹਨ — ਇਹਨਾਂ ਨੂੰ ਪੜ੍ਹੋ, ਫਿਰ ਅੱਗੇ ਵਧੋ।",
+      "statements": {
+        "no-email": {
+          "ackLabel": "ਮੈਂ ਸਮਝਦਾ/ਸਮਝਦੀ ਹਾਂ ਕਿ ਈਮੇਲ ਰਾਹੀਂ ਰਿਕਵਰੀ ਨਹੀਂ ਹੈ।",
+          "statement": "ਈਮੇਲ ਰਾਹੀਂ ਰਿਕਵਰੀ ਨਹੀਂ ਹੈ। ਕਦੇ ਵੀ ਨਹੀਂ ਹੋਵੇਗੀ।",
+          "why": "ਅਸੀਂ ਤੁਹਾਡੀ ਈਮੇਲ ਕਦੇ ਨਹੀਂ ਮੰਗਦੇ, ਇਸ ਲਈ ਨਾ ਕੋਈ ਰੀਸੈੱਟ ਲਿੰਕ ਹੈ ਅਤੇ ਨਾ ਹੀ ਕੋਈ ਖਾਤਾ ਜਿਸਨੂੰ ਸਹਾਇਤਾ ਟੀਮ ਖੋਲ੍ਹ ਸਕੇ। ਇਹ ਕੋਈ ਘਟਦੀ ਵਿਸ਼ੇਸ਼ਤਾ ਨਹੀਂ — ਇਹੀ ਗਾਰੰਟੀ ਹੈ। ਈਮੇਲ ਰਿਕਵਰੀ ਦਾ ਮਤਲਬ ਹੁੰਦਾ ਕਿ ਅਸੀਂ ਤੁਹਾਡੇ ਨੋਟ ਪੜ੍ਹ ਸਕਦੇ, ਅਤੇ Myne ਇਸ ਤਰ੍ਹਾਂ ਬਣਿਆ ਹੈ ਕਿ ਅਸੀਂ ਨਹੀਂ ਪੜ੍ਹ ਸਕਦੇ।"
+        },
+        "no-store": {
+          "ackLabel": "ਮੈਂ ਸਮਝਦਾ/ਸਮਝਦੀ ਹਾਂ ਕਿ Myne ਮੇਰਾ ਪਾਸਵਰਡ ਮੁੜ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ।",
+          "statement": "ਤੁਹਾਡਾ ਪਾਸਵਰਡ ਤੁਹਾਡਾ ਵਾਲਟ ਖੋਲ੍ਹਦਾ ਹੈ। ਅਸੀਂ ਇਸਨੂੰ ਨਹੀਂ ਰੱਖਦੇ।",
+          "why": "ਤੁਹਾਡਾ ਪਾਸਵਰਡ ਉਸ ਕੁੰਜੀ ਦਾ ਇਨਪੁੱਟ ਹੈ ਜੋ ਤੁਹਾਡੇ ਨੋਟ ਡੀਕ੍ਰਿਪਟ ਕਰਦੀ ਹੈ। ਇਹ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਕਦੇ ਬਾਹਰ ਨਹੀਂ ਜਾਂਦਾ, ਅਤੇ ਸਾਡੇ ਸਰਵਰਾਂ ਉੱਤੇ ਕੋਈ ਚੀਜ਼ ਇਸਨੂੰ ਦੁਬਾਰਾ ਨਹੀਂ ਬਣਾ ਸਕਦੀ। ਇਹੀ ਗੱਲ ਤੁਹਾਡੇ ਨੋਟ ਨਿੱਜੀ ਰੱਖਦੀ ਹੈ — ਅਤੇ ਇਸੇ ਕਰਕੇ ਅਸੀਂ ਇਸਨੂੰ ਤੁਹਾਡੇ ਲਈ ਰੀਸੈੱਟ ਨਹੀਂ ਕਰ ਸਕਦੇ।"
+        },
+        "phrase-backup": {
+          "ackLabel": "ਮੈਂ ਸਮਝਦਾ/ਸਮਝਦੀ ਹਾਂ ਕਿ ਮੇਰਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਹੀ ਇੱਕੋ-ਇੱਕ ਬੈਕਅੱਪ ਹੈ।",
+          "statement": "ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਹੀ ਤੁਹਾਡਾ ਇੱਕੋ-ਇੱਕ ਬੈਕਅੱਪ ਹੈ।",
+          "why": "ਜੇ ਤੁਸੀਂ ਆਪਣਾ ਪਾਸਵਰਡ ਭੁੱਲ ਜਾਂਦੇ ਹੋ, ਤਾਂ 24-ਸ਼ਬਦੀ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਹੀ ਵਾਪਸ ਅੰਦਰ ਆਉਣ ਦਾ ਇੱਕੋ ਰਾਹ ਹੈ। {{lostBothSecrets}} ਵਾਕਾਂਸ਼ ਲਿਖ ਕੇ ਕਿਸੇ ਸੁਰੱਖਿਅਤ ਥਾਂ ਰੱਖੋ।"
+        }
+      },
+      "why": "ਕਿਉਂ?"
+    },
+    "confirm": {
+      "back": "ਪਿੱਛੇ",
+      "continue": "ਜਾਰੀ ਰੱਖੋ",
+      "eyebrow": "ਪੜਾਅ 3/4 — ਵਾਕਾਂਸ਼ ਦੀ ਪੁਸ਼ਟੀ",
+      "heading": "ਆਪਣੇ ਵਾਕਾਂਸ਼ ਦੇ ਚਾਰ ਸ਼ਬਦ ਮੁੜ ਲਿਖੋ।",
+      "intro": "ਇਹ ਪੱਕਾ ਕਰਨ ਲਈ ਕਿ ਤੁਸੀਂ ਇਸਨੂੰ ਸੰਭਾਲ ਲਿਆ ਹੈ, ਅਸੀਂ ਕੁਝ ਖ਼ਾਸ ਥਾਵਾਂ ਦੇ ਸ਼ਬਦ ਪੁੱਛਾਂਗੇ।",
+      "mismatch": "ਸ਼ਬਦ #{{pos}} ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
+      "wordAtPosition": "ਥਾਂ {{pos}} ਦਾ ਸ਼ਬਦ"
+    },
+    "encrypting": {
+      "caption": "ਇਸ ਵਿੱਚ ਥੋੜ੍ਹਾ ਸਮਾਂ ਲੱਗਦਾ ਹੈ।",
+      "footerHint": "ਜੇ ਇਸ ਵਿੱਚ 30 ਸਕਿੰਟ ਤੋਂ ਵੱਧ ਲੱਗੇ, ਤਾਂ ਵਿੰਡੋ ਬੰਦ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "heading": "ਤੁਹਾਡਾ ਵਾਲਟ ਐਨਕ੍ਰਿਪਟ ਹੋ ਰਿਹਾ ਹੈ"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਖਾਤਾ ਨੰਬਰ ਗ਼ਲਤ ਹੈ"
+      },
+      "aeadFailure": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਐਨਕ੍ਰਿਪਸ਼ਨ ਅਸਫਲ ਰਹੀ"
+      },
+      "csprng": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਸੁਰੱਖਿਅਤ ਬੇਤਰਤੀਬ ਡਾਟਾ ਨਹੀਂ ਬਣ ਸਕਿਆ"
+      },
+      "invalidPassword": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਗ਼ਲਤ ਪਾਸਵਰਡ"
+      },
+      "invalidVaultMeta": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਵਾਲਟ ਫਾਰਮੈਟ ਦੀ ਗ਼ਲਤੀ"
+      },
+      "ioOther": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਵਾਲਟ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ"
+      },
+      "joinFailure": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਕੁਝ ਗ਼ਲਤ ਹੋ ਗਿਆ"
+      },
+      "kdfFailure": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ। ਜੇ ਇਹ ਵਾਰ-ਵਾਰ ਹੋਵੇ, ਤਾਂ ਸ਼ਾਇਦ ਤੁਹਾਡੇ ਸਿਸਟਮ ਵਿੱਚ ਮੈਮਰੀ ਘੱਟ ਹੈ।",
+        "title": "ਐਨਕ੍ਰਿਪਸ਼ਨ ਸੈੱਟ ਨਹੀਂ ਹੋ ਸਕੀ"
+      },
+      "noSpace": {
+        "body": "ਡਿਸਕ ਵਿੱਚ ਥਾਂ ਖਾਲੀ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਡਿਸਕ ਵਿੱਚ ਲੋੜੀਂਦੀ ਥਾਂ ਨਹੀਂ"
+      },
+      "notFound": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਵਾਲਟ ਫੋਲਡਰ ਗ਼ੈਰ-ਹਾਜ਼ਰ ਹੈ"
+      },
+      "passwordTooShort": {
+        "body": "ਘੱਟੋ-ਘੱਟ 12 ਅੱਖਰ ਵਰਤੋ।",
+        "title": "ਪਾਸਵਰਡ ਬਹੁਤ ਛੋਟਾ ਹੈ"
+      },
+      "permissionDenied": {
+        "body": "ਯਕੀਨੀ ਬਣਾਓ ਕਿ Myne ਕੋਲ ਤੁਹਾਡੇ ਐਪਲੀਕੇਸ਼ਨ ਡਾਟਾ ਫੋਲਡਰ ਵਿੱਚ ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ ਹੈ।",
+        "title": "ਵਾਲਟ ਫੋਲਡਰ ਵਿੱਚ ਲਿਖਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
+      },
+      "sessionExpired": {
+        "body": "ਤੁਹਾਡੀ ਸੁਰੱਖਿਆ ਲਈ, ਵਾਲਟ ਬਣਾਉਣ ਦਾ ਸਮਾਂ 10 ਮਿੰਟਾਂ ਬਾਅਦ ਪੁੱਗ ਜਾਂਦਾ ਹੈ। ਨਵੇਂ ਸਿਰਿਓਂ ਸ਼ੁਰੂ ਕਰੋ।",
+        "title": "ਸੈਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ"
+      },
+      "sessionNotFound": {
+        "body": "ਸ਼ੁਰੂ ਤੋਂ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ।",
+        "title": "ਸੈਸ਼ਨ ਨਹੀਂ ਮਿਲਿਆ"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Myne ਦੀਆਂ ਹੋਰ ਵਿੰਡੋਜ਼ ਬੰਦ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਇੱਕੋ ਵੇਲੇ ਬਹੁਤ ਸਾਰੇ ਵਾਲਟ ਬਣ ਰਹੇ ਹਨ"
+      },
+      "vaultArtifactsPresent": {
+        "body": "ਨਵਾਂ ਵਾਲਟ ਨਹੀਂ ਬਣ ਸਕਦਾ ਕਿਉਂਕਿ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਪਹਿਲਾਂ ਹੀ ਵਾਲਟ ਡਾਟਾ ਮੌਜੂਦ ਹੈ। ਐਪ ਬੰਦ ਕਰਕੇ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰੋ — ਸ਼ੁਰੂਆਤੀ ਸਕਰੀਨ ਤੁਹਾਨੂੰ ਅਨਲਾਕ ਵੱਲ ਲੈ ਜਾਵੇਗੀ।",
+        "title": "ਵਾਲਟ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ"
+      },
+      "vaultBusyAuth": {
+        "body": "ਵਾਲਟ ਦੀ ਕੋਈ ਹੋਰ ਕਾਰਵਾਈ ਚੱਲ ਰਹੀ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਵਾਲਟ ਰੁੱਝਿਆ ਹੋਇਆ ਹੈ"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "ਰੱਦ ਕਰੋ",
+        "message": "ਬੰਦ ਕਰਨ ਨਾਲ ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਰੱਦ ਹੋ ਜਾਵੇਗਾ। ਬੰਦ ਕਰਨਾ ਜਾਰੀ ਰੱਖਣਾ ਹੈ?",
+        "okLabel": "ਫਿਰ ਵੀ ਬੰਦ ਕਰੋ",
+        "title": "ਵਾਲਟ ਬਣਾਉਣਾ ਛੱਡਣਾ ਹੈ?"
+      },
+      "genericError": {
+        "body": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "title": "ਕੁਝ ਗ਼ਲਤ ਹੋ ਗਿਆ"
+      }
+    },
+    "password": {
+      "back": "ਪਿੱਛੇ",
+      "eyebrow": "ਪੜਾਅ 1/4 — ਮਾਸਟਰ ਪਾਸਵਰਡ",
+      "heading": "ਵਾਲਟ ਬਣਾਓ",
+      "helperLead": "Myne ਤੁਹਾਡਾ ਪਾਸਵਰਡ ਜਾਂ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਨਹੀਂ ਰੱਖਦਾ।",
+      "submit": "ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਬਣਾਓ"
+    },
+    "phrase": {
+      "back": "ਪਿੱਛੇ",
+      "continue": "ਮੈਂ ਇਹ ਸੰਭਾਲ ਲਿਆ — ਵਾਕਾਂਸ਼ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
+      "copy": "ਕਾਪੀ ਕਰੋ",
+      "eyebrow": "ਪੜਾਅ 2/4 — ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼",
+      "heading": "ਇਹ 24 ਸ਼ਬਦ ਲਿਖ ਲਵੋ।",
+      "intro": "ਇਹ ਵਾਕਾਂਸ਼, ਤੁਹਾਡੇ ਪਾਸਵਰਡ ਨਾਲ ਮਿਲ ਕੇ, ਤੁਹਾਡਾ ਵਾਲਟ ਮੁੜ ਪ੍ਰਾਪਤ ਕਰਨ ਦਾ ਇੱਕੋ ਰਾਹ ਹੈ। ਇਸਨੂੰ ਆਫ਼ਲਾਈਨ ਰੱਖੋ — ਕਾਗਜ਼, ਪਾਸਵਰਡ ਮੈਨੇਜਰ, ਹਾਰਡਵੇਅਰ ਵਾਲਿਟ। ਇਸਨੂੰ ਨਕਦੀ ਵਾਂਗ ਸਮਝੋ।",
+      "reveal": "ਵਾਕਾਂਸ਼ ਵਿਖਾਓ",
+      "saveAsFile": "ਫ਼ਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ"
+    },
+    "ready": {
+      "backedUp": "ਬੈਕਅੱਪ ਹੋ ਗਿਆ ✓",
+      "backingUp": "ਬੈਕਅੱਪ ਹੋ ਰਿਹਾ ਹੈ…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "ਬੈਕਅੱਪ ਪੂਰਾ ਨਹੀਂ ਹੋਇਆ — ਪਿੱਛੇ ਕੋਈ ਫ਼ਾਈਲ ਨਹੀਂ ਛੱਡੀ ਗਈ। ਤੁਸੀਂ ਸੈਟਿੰਗਾਂ → ਸਟੋਰੇਜ ਵਿੱਚੋਂ ਕਦੇ ਵੀ ਬੈਕਅੱਪ ਲੈ ਸਕਦੇ ਹੋ।",
+      "backupFilterName": "Myne ਬੈਕਅੱਪ",
+      "backUpNow": "ਇਸ ਵਾਲਟ ਦਾ ਬੈਕਅੱਪ ਹੁਣੇ ਲਓ",
+      "body": "Myne ਨੇ ਤੁਹਾਡਾ ਵਾਲਟ ਤੁਹਾਡੇ ਐਪਲੀਕੇਸ਼ਨ ਡਾਟਾ ਫੋਲਡਰ ਵਿੱਚ ਲਿਖ ਦਿੱਤਾ ਹੈ। ਤੁਹਾਡਾ ਮਾਸਟਰ ਪਾਸਵਰਡ ਅਤੇ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਹੀ ਵਾਪਸ ਅੰਦਰ ਆਉਣ ਦਾ ਇੱਕੋ ਰਾਹ ਹਨ — ਪੱਕਾ ਕਰੋ ਕਿ ਦੋਵੇਂ ਕਿਸੇ ਸੁਰੱਖਿਅਤ ਥਾਂ ਸੰਭਾਲੇ ਹੋਏ ਹਨ।",
+      "decrypting": "ਡੀਕ੍ਰਿਪਟ ਹੋ ਰਿਹਾ ਹੈ…",
+      "done": "ਹੋ ਗਿਆ",
+      "heading": "ਤੁਹਾਡਾ ਵਾਲਟ ਤਿਆਰ ਹੈ।",
+      "showFolder": "ਵਾਲਟ ਫੋਲਡਰ ਵਿਖਾਓ"
+    },
+    "sessionLost": {
+      "startOver": "ਨਵੇਂ ਸਿਰਿਓਂ ਸ਼ੁਰੂ ਕਰੋ"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "ਇੱਕ ਹੋਰ ਵਾਲਟ ਬਣਾਓ",
+    "heading": "ਵਾਲਟ ਚੁਣੋ",
+    "joinDevice": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਖਾਤੇ ਨਾਲ ਜੋੜੋ",
+    "loading": "ਤੁਹਾਡੇ ਵਾਲਟ ਲੋਡ ਹੋ ਰਹੇ ਹਨ…",
+    "noneLoaded": "ਇਸ ਵੇਲੇ ਕੋਈ ਵੀ ਵਾਲਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "openedRelative": "{{rel}} ਖੋਲ੍ਹਿਆ ਗਿਆ",
+    "restoreFromBackup": "ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ",
+    "subline": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਤੁਹਾਡੇ ਇੱਕ ਤੋਂ ਵੱਧ ਵਾਲਟ ਹਨ। ਅਨਲਾਕ ਕਰਨ ਲਈ ਇੱਕ ਚੁਣੋ।",
+    "vaultFallback": "ਵਾਲਟ {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "ਇਸ ਵਿੱਚ ਥੋੜ੍ਹਾ ਸਮਾਂ ਲੱਗਦਾ ਹੈ।",
+      "eyebrow": "ਰਿਕਵਰੀ · ਡੀਕ੍ਰਿਪਸ਼ਨ",
+      "footerHint": "ਜੇ ਇਸ ਵਿੱਚ 30 ਸਕਿੰਟ ਤੋਂ ਵੱਧ ਲੱਗੇ, ਤਾਂ ਵਿੰਡੋ ਬੰਦ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "heading": "ਤੁਹਾਡਾ ਵਾਲਟ ਡੀਕ੍ਰਿਪਟ ਹੋ ਰਿਹਾ ਹੈ",
+      "subCaption": "ਕੰਮ ਚੱਲ ਰਿਹਾ ਹੈ… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "ਰਿਕਵਰੀ ਰੱਦ ਹੋਈ: ਵਾਲਟ ਲਾਕ ਹੋ ਗਿਆ ਸੀ।",
+        "operationInProgress": "ਕਾਰਵਾਈ ਚੱਲ ਰਹੀ ਹੈ। ਉਡੀਕ ਕਰੋ।",
+        "unexpected": "ਅਣਕਿਆਸੀ ਗ਼ਲਤੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "weakPassword": "ਨਵਾਂ ਪਾਸਵਰਡ ਘੱਟੋ-ਘੱਟ 12 ਅੱਖਰਾਂ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।"
+      },
+      "eyebrow": "ਰਿਕਵਰੀ · ਨਵਾਂ ਪਾਸਵਰਡ",
+      "helperBody": "ਤੁਹਾਡੇ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਨਾਲ ਖੋਲ੍ਹਿਆ ਗਿਆ। ਤੁਹਾਡਾ ਪੁਰਾਣਾ ਪਾਸਵਰਡ ਹੁਣ ਕੰਮ ਨਹੀਂ ਕਰਦਾ — ਹੁਣੇ ਨਵਾਂ ਮਾਸਟਰ ਪਾਸਵਰਡ ਤੈਅ ਕਰੋ।",
+      "helperEmphasis": "ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਉਹੀ ਰਹਿੰਦਾ ਹੈ।",
+      "submit": "ਨਵਾਂ ਪਾਸਵਰਡ ਤੈਅ ਕਰੋ",
+      "title": "ਨਵਾਂ ਮਾਸਟਰ ਪਾਸਵਰਡ ਤੈਅ ਕਰੋ"
+    },
+    "phrase": {
+      "back": "← ਪਿੱਛੇ",
+      "body": "ਆਪਣਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਦਾਖਲ ਕਰੋ। 24 BIP-39 ਸ਼ਬਦ।",
+      "cellLabel": "ਸ਼ਬਦ {{index}}",
+      "deleteLink": "ਵਾਲਟ ਮਿਟਾ ਕੇ ਨਵੇਂ ਸਿਰਿਓਂ ਸ਼ੁਰੂ ਕਰੋ",
+      "eyebrow": "ਰਿਕਵਰੀ",
+      "submit": "ਅਨਲਾਕ ਕਰੋ",
+      "title": "ਆਪਣਾ ਵਾਲਟ ਮੁੜ ਪ੍ਰਾਪਤ ਕਰੋ।"
+    },
+    "select": {
+      "accountInvalid": "ਖਾਤਾ ਨੰਬਰ ਗ਼ਲਤ ਹੈ। ਜਾਂਚ ਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "accountLabel": "ਖਾਤਾ ਨੰਬਰ (ਵਿਕਲਪਿਕ)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (ਵਿਕਲਪਿਕ)",
+      "body": "ਉਹ ਵਾਲਟ ਚੁਣੋ ਜਿਸਨੂੰ ਤੁਸੀਂ ਆਪਣੇ 24-ਸ਼ਬਦੀ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਨਾਲ ਮੁੜ ਪ੍ਰਾਪਤ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ। ਸਿੱਧਾ ਉਸ ਤੱਕ ਪਹੁੰਚਣ ਲਈ ਤੁਸੀਂ ਆਪਣਾ ਖਾਤਾ ਨੰਬਰ ਵੀ ਲਿਖ ਸਕਦੇ ਹੋ।",
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "checking": "ਜਾਂਚ ਹੋ ਰਹੀ ਹੈ…",
+      "loadFailed": "ਇਸ ਵੇਲੇ ਕੋਈ ਵੀ ਵਾਲਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "loading": "ਤੁਹਾਡੇ ਵਾਲਟ ਲੋਡ ਹੋ ਰਹੇ ਹਨ…",
+      "openedRelative": "{{rel}} ਖੋਲ੍ਹਿਆ ਗਿਆ",
+      "or": "ਜਾਂ",
+      "title": "ਮੁੜ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਵਾਲਟ ਚੁਣੋ",
+      "useAccountNumber": "ਖਾਤਾ ਨੰਬਰ ਵਰਤੋ",
+      "vaultFallback": "ਵਾਲਟ {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "ਵਾਲਟ",
+    "createAnother": "ਇੱਕ ਹੋਰ ਵਾਲਟ ਬਣਾਓ",
+    "joinDevice": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਖਾਤੇ ਨਾਲ ਜੋੜੋ",
+    "switching": "ਬਦਲਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+    "switchVaultLabel": "ਵਾਲਟ ਬਦਲੋ",
+    "vaultFallback": "ਵਾਲਟ {{n}}"
+  },
+  "welcome": {
+    "createCta": "ਨਵਾਂ ਵਾਲਟ ਬਣਾਓ",
+    "headlineLine1": "ਐਨਕ੍ਰਿਪਟਡ Markdown ਨੋਟ।",
+    "headlineLine2": "ਸਾਈਨ-ਅੱਪ ਉੱਤੇ ਈਮੇਲ ਨਹੀਂ।",
+    "joinCta": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਖਾਤੇ ਨਾਲ ਜੋੜੋ",
+    "repairResidue": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "cleaningUp": "ਸਫ਼ਾਈ ਹੋ ਰਹੀ ਹੈ…",
+      "cleanUp": "ਸਾਫ਼ ਕਰੋ",
+      "confirmBody_one": "{{count}} ਫ਼ਾਈਲ ਹਟਾਈ ਜਾਵੇਗੀ। ਉਹ ਪਹਿਲਾਂ ਹੀ ਪੜ੍ਹਨਯੋਗ ਨਹੀਂ; ਮੁੜ ਪ੍ਰਾਪਤ ਹੋਣ ਵਾਲਾ ਕੁਝ ਨਹੀਂ ਗੁਆਚਦਾ।",
+      "confirmBody_other": "{{count}} ਫ਼ਾਈਲਾਂ ਹਟਾਈਆਂ ਜਾਣਗੀਆਂ। ਉਹ ਪਹਿਲਾਂ ਹੀ ਪੜ੍ਹਨਯੋਗ ਨਹੀਂ; ਮੁੜ ਪ੍ਰਾਪਤ ਹੋਣ ਵਾਲਾ ਕੁਝ ਨਹੀਂ ਗੁਆਚਦਾ।",
+      "confirmTitle": "ਬਚੀਆਂ ਫ਼ਾਈਲਾਂ ਸਾਫ਼ ਕਰਨੀਆਂ ਹਨ?",
+      "doneBody_one": "{{count}} ਬਚੀ ਫ਼ਾਈਲ ਹਟਾ ਦਿੱਤੀ। ਤੁਸੀਂ ਹੁਣ ਨਵਾਂ ਵਾਲਟ ਬਣਾ ਸਕਦੇ ਹੋ।",
+      "doneBody_other": "{{count}} ਬਚੀਆਂ ਫ਼ਾਈਲਾਂ ਹਟਾ ਦਿੱਤੀਆਂ। ਤੁਸੀਂ ਹੁਣ ਨਵਾਂ ਵਾਲਟ ਬਣਾ ਸਕਦੇ ਹੋ।",
+      "doneTitle": "ਸਫ਼ਾਈ ਹੋ ਗਈ",
+      "errorBody": "ਕੁਝ ਗ਼ਲਤ ਹੋ ਗਿਆ। ਐਪ ਬੰਦ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "errorTitle": "ਸਫ਼ਾਈ ਅਸਫਲ ਰਹੀ",
+      "foundBody_one": "ਪਿਛਲੀ ਅਧੂਰੀ ਰਹੀ ਮਿਟਾਉਣ ਦੀ ਕਾਰਵਾਈ ਤੋਂ {{count}} ਬਚੀ ਫ਼ਾਈਲ। ਉਹ ਪਹਿਲਾਂ ਹੀ ਪੜ੍ਹਨਯੋਗ ਨਹੀਂ — ਮੁੜ ਪ੍ਰਾਪਤ ਹੋਣ ਵਾਲਾ ਕੁਝ ਨਹੀਂ ਗੁਆਚੇਗਾ।",
+      "foundBody_other": "ਪਿਛਲੀ ਅਧੂਰੀ ਰਹੀ ਮਿਟਾਉਣ ਦੀ ਕਾਰਵਾਈ ਤੋਂ {{count}} ਬਚੀਆਂ ਫ਼ਾਈਲਾਂ। ਉਹ ਪਹਿਲਾਂ ਹੀ ਪੜ੍ਹਨਯੋਗ ਨਹੀਂ — ਮੁੜ ਪ੍ਰਾਪਤ ਹੋਣ ਵਾਲਾ ਕੁਝ ਨਹੀਂ ਗੁਆਚੇਗਾ।",
+      "foundTitle": "ਅਧੂਰੀ ਮਿਟਾਉਣ ਦੀ ਕਾਰਵਾਈ ਤੋਂ ਬਚੀਆਂ ਫ਼ਾਈਲਾਂ",
+      "partialBody_one": "{{count}} ਫ਼ਾਈਲ ਸ਼ਾਇਦ ਕਿਸੇ ਹੋਰ ਐਪ (ਐਂਟੀਵਾਇਰਸ, ਫ਼ਾਈਲ ਸਿੰਕ, ਜਾਂ ਖੋਜ ਸੂਚਕਾਂਕ) ਵੱਲੋਂ ਲਾਕ ਕੀਤੀ ਹੋਈ ਹੈ। ਐਪ ਬੰਦ ਕਰਕੇ ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ, ਜਾਂ ਵਾਲਟ ਫੋਲਡਰ ਆਪ ਹੱਥੀਂ ਹਟਾਓ।",
+      "partialBody_other": "{{count}} ਫ਼ਾਈਲਾਂ ਸ਼ਾਇਦ ਕਿਸੇ ਹੋਰ ਐਪ (ਐਂਟੀਵਾਇਰਸ, ਫ਼ਾਈਲ ਸਿੰਕ, ਜਾਂ ਖੋਜ ਸੂਚਕਾਂਕ) ਵੱਲੋਂ ਲਾਕ ਕੀਤੀਆਂ ਹੋਈਆਂ ਹਨ। ਐਪ ਬੰਦ ਕਰਕੇ ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ, ਜਾਂ ਵਾਲਟ ਫੋਲਡਰ ਆਪ ਹੱਥੀਂ ਹਟਾਓ।",
+      "partialTitle": "ਕੁਝ ਫ਼ਾਈਲਾਂ ਹਟਾਈਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ"
+    },
+    "restoreCta": "ਬੈਕਅੱਪ ਤੋਂ ਬਹਾਲ ਕਰੋ",
+    "subtitle": "ਤੁਹਾਡੇ ਨੋਟ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਇੱਥੇ ਹੀ ਐਨਕ੍ਰਿਪਟ ਹੁੰਦੇ ਹਨ। ਸਰਵਰ ਸਿਰਫ਼ ਸਾਈਫਰਟੈਕਸਟ ਰੱਖਦਾ ਹੈ।",
+    "repairCleanedUp_one": "{{count}} ਬਚੀ ਫ਼ਾਈਲ ਸਾਫ਼ ਕਰ ਦਿੱਤੀ।",
+    "repairCleanedUp_other": "{{count}} ਬਚੀਆਂ ਫ਼ਾਈਲਾਂ ਸਾਫ਼ ਕਰ ਦਿੱਤੀਆਂ।",
+    "repairFailed": "ਸਫ਼ਾਈ ਪੂਰੀ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "heroLine1": "ਨੋਟ ਜੋ",
+    "heroLine2": "ਸਿਰਫ਼ ਤੁਹਾਡੇ ਹਨ,",
+    "heroLine3": "ਹੋਰ ਕਿਸੇ ਦੇ ਨਹੀਂ।",
+    "lede": "Markdown, ਜੋ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਇੱਥੇ ਹੀ ਐਨਕ੍ਰਿਪਟ ਹੁੰਦਾ ਹੈ। ਖਾਤੇ ਲਈ ਕੋਈ ਈਮੇਲ ਨਹੀਂ। ਕੋਈ ਸਰਵਰ ਇੱਕ ਸ਼ਬਦ ਵੀ ਨਹੀਂ ਪੜ੍ਹ ਸਕਦਾ।",
+    "residueBanner": "ਵਿਚਾਲੇ ਰੁਕੀ ਮਿਟਾਉਣ ਦੀ ਕਾਰਵਾਈ ਤੋਂ ਬਚੀਆਂ ਫ਼ਾਈਲਾਂ ({{n}})। ਵਾਲਟ ਬਣਾਉਣ ਤੋਂ ਪਹਿਲਾਂ ਇਹਨਾਂ ਨੂੰ ਸਾਫ਼ ਕਰੋ।",
+    "cleanUpFiles": "ਬਚੀਆਂ ਫ਼ਾਈਲਾਂ ਸਾਫ਼ ਕਰੋ",
+    "create": "ਵਾਲਟ ਬਣਾਓ",
+    "connect": "ਮੇਰੇ ਖਾਤੇ ਨਾਲ ਜੁੜੋ"
+  },
+  "wikiGraph": {
+    "emptyTitle": "ਹਾਲੇ ਕੋਈ ਲਿੰਕ ਨਹੀਂ",
+    "emptyBodyBefore": "ਨੋਟ ਆਪਸ ਵਿੱਚ ਜੋੜਨ ਲਈ ਆਪਣੀ ਲਿਖਤ ਵਿੱਚ ",
+    "emptyBodyAfter": " ਲਿਖੋ। ਜੁੜੇ ਹੋਏ ਨੋਟ ਇੱਥੇ ਗ੍ਰਾਫ਼ ਵਜੋਂ ਦਿਸਦੇ ਹਨ।"
+  },
+  "markdown": {
+    "attachmentFallback": "ਅਟੈਚਮੈਂਟ",
+    "nothingToPreview": "ਹਾਲੇ ਝਲਕ ਲਈ ਕੁਝ ਨਹੀਂ।"
+  },
+  "conflicts": {
+    "empty": "ਵੇਖਣ ਲਈ ਕੋਈ ਟਕਰਾਅ ਨਹੀਂ — ਤੁਹਾਡੇ ਨੋਟ ਸਿੰਕ ਵਿੱਚ ਹਨ।",
+    "groupTitle_one": "{{count}} ਟਕਰਾਅ ਵਾਲੀ ਕਾਪੀ",
+    "groupTitle_other": "{{count}} ਟਕਰਾਅ ਵਾਲੀਆਂ ਕਾਪੀਆਂ",
+    "groupTitleOfNote": " — ਨੋਟ {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "ਇਹ ਦ੍ਰਿਸ਼ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "deleteError": "ਇਹ ਦ੍ਰਿਸ਼ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "editView": "ਦ੍ਰਿਸ਼ ਸੰਪਾਦਿਤ ਕਰੋ",
+    "condition": {
+      "search": "ਲਿਖਤ"
+    },
+    "containsPlaceholder": "ਇਸ ਵਿੱਚ ਹੈ…",
+    "tagPlaceholder": "ਟੈਗ",
+    "folderPlaceholder": "ਫੋਲਡਰ/",
+    "propertyKeyPlaceholder": "ਵਿਸ਼ੇਸ਼ਤਾ ਦੀ ਕੁੰਜੀ",
+    "addCondition": "+ ਸ਼ਰਤ ਜੋੜੋ",
+    "createView": "ਦ੍ਰਿਸ਼ ਬਣਾਓ"
+  },
+  "snapshots": {
+    "today": "ਅੱਜ {{time}}",
+    "readError": "ਵਰਜ਼ਨ ਇਤਿਹਾਸ ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+    "decryptError": "ਉਹ ਵਰਜ਼ਨ ਡੀਕ੍ਰਿਪਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "restoreError": "ਉਹ ਵਰਜ਼ਨ ਬਹਾਲ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "title": "ਵਰਜ਼ਨ ਇਤਿਹਾਸ",
+    "emptyState": "ਹਾਲੇ ਕੋਈ ਪੁਰਾਣਾ ਵਰਜ਼ਨ ਨਹੀਂ। ਤੁਹਾਡੇ ਸੰਪਾਦਨ ਦੌਰਾਨ ਸਨੈਪਸ਼ਾਟ ਆਪੇ ਲਏ ਜਾਂਦੇ ਹਨ।",
+    "hide": "ਲੁਕਾਓ",
+    "empty": "(ਖਾਲੀ)",
+    "restoreThisVersion": "ਇਹੀ ਵਰਜ਼ਨ ਬਹਾਲ ਕਰੋ"
+  },
+  "restoreBackup": {
+    "title": "ਮੋਬਾਈਲ ਉੱਤੇ ਹਾਲੇ ਉਪਲਬਧ ਨਹੀਂ",
+    "body": "ਬੈਕਅੱਪ ਫ਼ਾਈਲ ਤੋਂ ਬਹਾਲੀ ਮੋਬਾਈਲ ਉੱਤੇ ਹਾਲੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ — ਵਾਲਟ ਬਣਾਓ ਜਾਂ ਆਪਣੇ ਵਾਕਾਂਸ਼ ਨਾਲ ਮੁੜ ਪ੍ਰਾਪਤ ਕਰੋ।"
+  },
+  "recording": {
+    "deniedTitle": "ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਦੀ ਪਹੁੰਚ ਬੰਦ ਹੈ",
+    "errorTitle": "ਰਿਕਾਰਡਿੰਗ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕੀ",
+    "deniedBody": "ਆਵਾਜ਼ੀ ਨੋਟ ਰਿਕਾਰਡ ਕਰਨ ਲਈ, ਸੈਟਿੰਗਾਂ › Myne › ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਵਿੱਚ Myne ਲਈ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਦੀ ਪਹੁੰਚ ਦਿਓ।",
+    "noDeviceBody": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਕੋਈ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਨਹੀਂ ਮਿਲਿਆ।",
+    "emptyBody": "ਉਹ ਰਿਕਾਰਡਿੰਗ ਖਾਲੀ ਸੀ — ਕੁਝ ਵੀ ਰਿਕਾਰਡ ਨਹੀਂ ਹੋਇਆ।",
+    "genericBody": "ਰਿਕਾਰਡਿੰਗ ਦੌਰਾਨ ਕੁਝ ਗ਼ਲਤ ਹੋ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "stopAria": "ਰਿਕਾਰਡਿੰਗ ਰੋਕੋ"
+  },
+  "picker": {
+    "neverOpened": "ਕਦੇ ਨਹੀਂ ਖੋਲ੍ਹਿਆ",
+    "openedJustNow": "ਹੁਣੇ ਖੋਲ੍ਹਿਆ",
+    "openedMinuteAgo": "ਇੱਕ ਮਿੰਟ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedMinutesAgo_one": "{{count}} ਮਿੰਟ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedMinutesAgo_other": "{{count}} ਮਿੰਟ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedHourAgo": "ਇੱਕ ਘੰਟਾ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedHoursAgo_one": "{{count}} ਘੰਟਾ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedHoursAgo_other": "{{count}} ਘੰਟੇ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedYesterday": "ਕੱਲ੍ਹ ਖੋਲ੍ਹਿਆ",
+    "openedDaysAgo_one": "{{count}} ਦਿਨ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedDaysAgo_other": "{{count}} ਦਿਨ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedLastWeek": "ਪਿਛਲੇ ਹਫ਼ਤੇ ਖੋਲ੍ਹਿਆ",
+    "openedWeeksAgo_one": "{{count}} ਹਫ਼ਤਾ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedWeeksAgo_other": "{{count}} ਹਫ਼ਤੇ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedLastMonth": "ਪਿਛਲੇ ਮਹੀਨੇ ਖੋਲ੍ਹਿਆ",
+    "openedMonthsAgo_one": "{{count}} ਮਹੀਨਾ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedMonthsAgo_other": "{{count}} ਮਹੀਨੇ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedLastYear": "ਪਿਛਲੇ ਸਾਲ ਖੋਲ੍ਹਿਆ",
+    "openedYearsAgo_one": "{{count}} ਸਾਲ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "openedYearsAgo_other": "{{count}} ਸਾਲ ਪਹਿਲਾਂ ਖੋਲ੍ਹਿਆ",
+    "corruptedBadge": "ਖ਼ਰਾਬ"
+  },
+  "join": {
+    "transportError": "ਉਸ ਸਿੰਕ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋਈ। ਪਤਾ ਅਤੇ ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "passwordPlaceholder": "ਤੁਹਾਡਾ ਵਾਲਟ ਪਾਸਵਰਡ",
+    "waitingHint": "ਇਹ ਸਕਰੀਨ ਖੁੱਲ੍ਹੀ ਰੱਖੋ — ਮਨਜ਼ੂਰੀ ਮਿਲਦਿਆਂ ਹੀ ਇੱਥੇ ਇੱਕ ਤਸਦੀਕ ਕੋਡ ਦਿਸੇਗਾ, ਜਿਸਦੀ ਤੁਲਨਾ ਤੁਸੀਂ ਆਪਣੇ ਦੂਜੇ ਡਿਵਾਈਸ ਨਾਲ ਕਰ ਸਕੋਗੇ।",
+    "verifyBody": "ਜਾਂਚੋ ਕਿ ਇਹ ਕੋਡ ਉਹੀ ਹੈ ਜੋ ਉਸ ਡਿਵਾਈਸ ਉੱਤੇ ਦਿਸ ਰਿਹਾ ਹੈ ਜਿਸ ਤੋਂ ਤੁਸੀਂ ਮਨਜ਼ੂਰੀ ਦਿੱਤੀ ਸੀ।",
+    "removing": "ਹਟਾਇਆ ਜਾ ਰਿਹਾ ਹੈ…",
+    "sasMismatch": "ਇਹ ਨਹੀਂ ਮਿਲਦੇ — ਇਹ ਡਿਵਾਈਸ ਹਟਾਓ",
+    "title": "ਆਪਣੇ ਖਾਤੇ ਨਾਲ ਜੁੜੋ",
+    "lead": "ਆਪਣੇ ਨੋਟ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਲਿਆਉਣ ਲਈ ਆਪਣੇ ਖਾਤੇ ਦੇ ਵੇਰਵੇ ਦਾਖਲ ਕਰੋ। ਸਭ ਕੁਝ ਸਿਰੇ-ਤੋਂ-ਸਿਰੇ ਐਨਕ੍ਰਿਪਟਡ ਰਹਿੰਦਾ ਹੈ।",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "ਇਹ ਨੰਬਰ ਦੁਬਾਰਾ ਜਾਂਚੋ — ਇਹ ਸਹੀ ਨਹੀਂ ਲੱਗਦਾ।",
+    "approvalHint": "ਤੁਹਾਡੇ ਨੋਟ ਤਦ ਦਿਸਣਗੇ ਜਦੋਂ ਤੁਸੀਂ ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਕਿਸੇ ਅਜਿਹੇ ਡਿਵਾਈਸ ਤੋਂ ਮਨਜ਼ੂਰੀ ਦੇ ਦਿਓਗੇ ਜਿਸ ਉੱਤੇ ਤੁਹਾਡਾ ਖਾਤਾ ਪਹਿਲਾਂ ਹੀ ਹੈ।",
+    "connectingSubtitle": "ਤੁਹਾਡਾ ਖਾਤਾ ਲਿਆਂਦਾ ਜਾ ਰਿਹਾ ਹੈ ਅਤੇ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਤੁਹਾਡਾ ਵਾਲਟ ਅਨਲਾਕ ਹੋ ਰਿਹਾ ਹੈ।",
+    "qr": {
+      "cancel": "ਰੱਦ ਕਰੋ",
+      "confirmAccount": "ਖਾਤਾ",
+      "confirmServer": "ਸਰਵਰ",
+      "confirmTitle": "ਇਹ ਡਿਵਾਈਸ ਜੋੜਨਾ ਹੈ?",
+      "continue": "ਜਾਰੀ ਰੱਖੋ",
+      "expired": "ਇਸ QR ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ — ਆਪਣੇ ਦੂਜੇ ਡਿਵਾਈਸ ਉੱਤੇ ਨਵਾਂ ਵਿਖਾਓ ਅਤੇ ਦੁਬਾਰਾ ਸਕੈਨ ਕਰੋ।",
+      "invalid": "ਇਹ Myne ਡਿਵਾਈਸ QR ਨਹੀਂ ਹੈ।",
+      "newerVersion": "ਇਹ QR Myne ਦੇ ਕਿਸੇ ਨਵੇਂ ਵਰਜ਼ਨ ਦਾ ਹੈ — ਐਪ ਅੱਪਡੇਟ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "pinHosted": "Myne ਵੱਲੋਂ ਹੋਸਟ ਕੀਤਾ ਸਰਵਰ",
+      "pinNone": "ਸਵੈ-ਹੋਸਟ ਕੀਤਾ ਸਰਵਰ",
+      "pinSelfHost": "ਸਰਟੀਫਿਕੇਟ ਤੁਹਾਡੇ ਭਰੋਸੇਯੋਗ ਡਿਵਾਈਸ ਤੋਂ ਪਿੰਨ ਕੀਤਾ",
+      "scan": "QR ਸਕੈਨ ਕਰੋ",
+      "scanFailed": "ਸਕੈਨ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ, ਜਾਂ ਆਪਣੇ ਵੇਰਵੇ ਹੱਥੀਂ ਦਾਖਲ ਕਰੋ।",
+      "scanUnavailable": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਸਕੈਨਿੰਗ ਉਪਲਬਧ ਨਹੀਂ ਹੈ — ਹੇਠਾਂ ਆਪਣੇ ਵੇਰਵੇ ਦਾਖਲ ਕਰੋ।"
+    }
+  },
+  "createVault": {
+    "beginWeakPassword": "ਕੋਈ ਹੋਰ ਮਜ਼ਬੂਤ ਪਾਸਵਰਡ ਚੁਣੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "beginGeneric": "ਵਾਲਟ ਬਣਾਉਣਾ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "wordNumber": "ਸ਼ਬਦ #{{position}}",
+    "commitError": "ਤੁਹਾਡਾ ਵਾਲਟ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "savedToFile": "{{label}} ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਹੋ ਗਿਆ",
+    "saveFileError": "ਫ਼ਾਈਲ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕੀ।",
+    "stepLabel": "ਵਾਲਟ ਬਣਾਓ · {{total}} ਵਿੱਚੋਂ {{current}}",
+    "briefingTitle": "ਸ਼ੁਰੂ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ",
+    "briefingLead": "Myne ਸਭ ਕੁਝ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਐਨਕ੍ਰਿਪਟ ਕਰਦਾ ਹੈ। ਇਸ ਨਿੱਜਤਾ ਨਾਲ ਇੱਕ ਜ਼ਿੰਮੇਵਾਰੀ ਆਉਂਦੀ ਹੈ ਜੋ ਸਿਰਫ਼ ਤੁਸੀਂ ਹੀ ਨਿਭਾ ਸਕਦੇ ਹੋ।",
+    "passwordTitle": "ਪਾਸਵਰਡ ਬਣਾਓ",
+    "confirmPasswordLabel": "ਪਾਸਵਰਡ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
+    "passwordHelper": "ਕਦੇ ਸਟੋਰ ਨਹੀਂ ਹੁੰਦਾ, ਕਦੇ ਭੇਜਿਆ ਨਹੀਂ ਜਾਂਦਾ। ਇਹ ਤੁਹਾਡੀਆਂ ਕੁੰਜੀਆਂ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਐਨਕ੍ਰਿਪਟ ਕਰਦਾ ਹੈ।",
+    "encryptingSubtitle": "Argon2id ਨਾਲ ਤੁਹਾਡੀ ਕੁੰਜੀ ਬਣਾਈ ਜਾ ਰਹੀ ਹੈ। ਇਸ ਵਿੱਚ ਕੁਝ ਸਕਿੰਟ ਲੱਗਦੇ ਹਨ ਅਤੇ ਇਸਨੂੰ ਵਿਚਾਲੇ ਰੋਕਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ।",
+    "phraseTitle": "ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼",
+    "phraseIntro": "ਚੌਵੀ ਸ਼ਬਦ, ਕ੍ਰਮ ਵਿੱਚ। ਇਹਨਾਂ ਨੂੰ ਕਾਗਜ਼ ਉੱਤੇ ਲਿਖ ਕੇ ਕਿਸੇ ਸੁਰੱਖਿਅਤ ਥਾਂ ਰੱਖੋ।",
+    "showSecondHalf": "ਸ਼ਬਦ 13–24 ਵਿਖਾਓ",
+    "saveToFile": "ਫ਼ਾਈਲ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਕਰੋ",
+    "writtenThemDown": "ਮੈਂ ਇਹ ਲਿਖ ਲਏ ਹਨ",
+    "typebackTitle": "ਆਪਣੇ ਵਾਕਾਂਸ਼ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
+    "typebackLead": "ਜੋ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਤੁਸੀਂ ਹੁਣੇ ਸੰਭਾਲਿਆ, ਉਸ ਵਿੱਚੋਂ ਇਹ ਚਾਰ ਸ਼ਬਦ ਦਾਖਲ ਕਰੋ।",
+    "wordMismatch": "ਸ਼ਬਦ #{{pos}} ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
+    "backToPhrase": "ਵਾਕਾਂਸ਼ ਉੱਤੇ ਵਾਪਸ",
+    "accountTitle": "ਤੁਹਾਡਾ ਖਾਤਾ ਨੰਬਰ",
+    "accountLead": "ਇਸਨੂੰ ਆਪਣੇ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਦੇ ਨਾਲ ਸੰਭਾਲੋ। ਕਿਸੇ ਨਵੇਂ ਡਿਵਾਈਸ ਉੱਤੇ ਆਪਣਾ ਵਾਲਟ ਬਹਾਲ ਕਰਨ ਲਈ ਇਹ ਚਾਹੀਦਾ ਹੋਵੇਗਾ।",
+    "accountSavedAck": "ਮੈਂ ਆਪਣਾ ਖਾਤਾ ਨੰਬਰ ਸੰਭਾਲ ਲਿਆ ਹੈ।",
+    "commit": "ਪੱਕਾ ਕਰੋ",
+    "committingTitle": "ਤੁਹਾਡਾ ਵਾਲਟ ਸੁਰੱਖਿਅਤ ਹੋ ਰਿਹਾ ਹੈ…",
+    "committingSubtitle": "ਐਨਕ੍ਰਿਪਟਡ ਵਾਲਟ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਲਿਖਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
+    "unlockingTitle": "ਅਨਲਾਕ ਹੋ ਰਿਹਾ ਹੈ…",
+    "unlockingSubtitle": "ਤੁਹਾਡਾ ਵਾਲਟ ਖੋਲ੍ਹਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
+    "readyTitle": "ਤੁਹਾਡਾ ਵਾਲਟ ਤਿਆਰ ਹੈ",
+    "readyBody": "ਇੱਥੋਂ ਅੱਗੇ ਤੁਸੀਂ ਜੋ ਵੀ ਲਿਖੋਗੇ, ਉਹ ਸਟੋਰ ਜਾਂ ਸਿੰਕ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਇਸੇ ਡਿਵਾਈਸ ਉੱਤੇ ਐਨਕ੍ਰਿਪਟ ਹੁੰਦਾ ਹੈ।",
+    "personalLabel": "ਨਿੱਜੀ",
+    "openVault": "ਵਾਲਟ ਖੋਲ੍ਹੋ",
+    "backUpNow": "ਹੁਣੇ ਬੈਕਅੱਪ ਲਓ"
+  },
+  "web": {
+    "reload": {
+      "body": "ਇਹ ਪੰਨਾ ਮੁੜ ਲੋਡ ਕਰਨ ਉੱਤੇ ਤੁਹਾਡਾ ਪਾਸਵਰਡ ਦੁਬਾਰਾ ਮੰਗਿਆ ਜਾਂਦਾ ਹੈ — ਅੰਦਰ ਆਉਣ ਦਾ ਇਸ ਤੋਂ ਤੇਜ਼ ਰਾਹ ਜਾਣ-ਬੁੱਝ ਕੇ ਨਹੀਂ ਰੱਖਿਆ ਗਿਆ। ਪੰਨਾ ਬੰਦ ਹੋਣ ਵੇਲੇ ਤੁਹਾਡਾ ਵਾਲਟ ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਐਨਕ੍ਰਿਪਟਡ ਹੀ ਰਹਿੰਦਾ ਹੈ, ਅਤੇ ਕੁੰਜੀ ਹਰ ਵਾਰ ਤੁਹਾਡੇ ਪਾਸਵਰਡ ਤੋਂ ਦੁਬਾਰਾ ਬਣਦੀ ਹੈ।",
+      "title": "ਮੁੜ ਲੋਡ ਦਾ ਮਤਲਬ ਹੈ ਪਾਸਵਰਡ ਦੁਬਾਰਾ"
+    },
+    "wall": {
+      "getNative": "ਡੈਸਕਟਾਪ ਜਾਂ ਮੋਬਾਈਲ ਲਈ Myne ਲਵੋ",
+      "noAccount": {
+        "body": "ਖਾਤੇ Myne ਡੈਸਕਟਾਪ ਜਾਂ ਮੋਬਾਈਲ ਐਪ ਵਿੱਚ ਬਣਦੇ ਹਨ, ਇੱਥੇ ਨਹੀਂ।",
+        "reason": "ਖਾਤਾ ਬਣਾਉਣ ਵੇਲੇ ਤੁਹਾਡਾ 24-ਸ਼ਬਦੀ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਬਣਦਾ ਹੈ ਅਤੇ ਤੁਹਾਨੂੰ ਇੱਕ ਵਾਰ ਦਿਖਾਇਆ ਜਾਂਦਾ ਹੈ। ਉਹ ਵਾਕਾਂਸ਼ ਵਿਖਾਉਣ ਵਾਲੀ ਚੀਜ਼ ਕਦੇ ਵੀ ਕੋਈ ਵੈੱਬ ਪੰਨਾ ਨਹੀਂ ਹੋਣੀ ਚਾਹੀਦੀ — ਜੇ ਉਹ ਉੱਥੇ ਲੀਕ ਹੋ ਜਾਵੇ, ਤਾਂ Myne ਵਿੱਚ ਕੋਈ ਵੀ ਚੀਜ਼ ਉਸਨੂੰ ਵਾਪਸ ਨਹੀਂ ਲੈ ਸਕਦੀ।",
+        "title": "ਪਹਿਲਾਂ ਤੁਹਾਨੂੰ ਖਾਤਾ ਚਾਹੀਦਾ ਹੈ"
+      },
+      "noSync": {
+        "body": "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕੋਈ ਸਿੰਕ ਸਰਵਰ ਸੰਰਚਿਤ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਇਸ ਕੋਲ ਖੋਲ੍ਹਣ ਲਈ ਕੁਝ ਨਹੀਂ ਹੈ।",
+        "reason": "ਡੈਸਕਟਾਪ ਐਪ ਦੇ ਉਲਟ, ਬ੍ਰਾਊਜ਼ਰ ਆਪਣਾ ਕੋਈ ਵਾਲਟ ਨਹੀਂ ਰੱਖਦਾ ਜਿਸ ਉੱਤੇ ਉਹ ਟੇਕ ਰੱਖ ਸਕੇ — ਇਸਦੇ ਨੋਟ ਸਿੰਕ ਤੋਂ ਹੀ ਆਉਂਦੇ ਹਨ। ਇਸਨੂੰ ਡੈਸਕਟਾਪ ਜਾਂ ਮੋਬਾਈਲ ਐਪ ਵਿੱਚ ਸੈੱਟ ਕਰੋ, ਫਿਰ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+        "title": "ਸਿੰਕ ਹਾਲੇ ਸੈੱਟ ਨਹੀਂ ਹੋਇਆ"
+      }
+    },
+    "unavailableHere": {
+      "backup": "ਐਨਕ੍ਰਿਪਟਡ ਬੈਕਅੱਪ Myne ਡੈਸਕਟਾਪ ਐਪ ਵਿੱਚ ਬਣਦੇ ਅਤੇ ਬਹਾਲ ਹੁੰਦੇ ਹਨ, ਜੋ ਬੈਕਅੱਪ ਫ਼ਾਈਲ ਤੁਹਾਡੀ ਚੁਣੀ ਥਾਂ ਲਿਖ ਸਕਦਾ ਹੈ। ਇੱਥੇ ਤੁਹਾਡੇ ਨੋਟ ਸਰਵਰ ਤੋਂ ਆਉਂਦੇ ਹਨ, ਇਸ ਲਈ ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਸਿੰਕ ਕਰਕੇ ਹੀ ਆਪਣੇ ਆਪ ਨੂੰ ਬਹਾਲ ਕਰਦਾ ਹੈ।",
+      "creation": "ਨਵੇਂ ਖਾਤੇ Myne ਡੈਸਕਟਾਪ ਐਪ ਵਿੱਚ ਬਣਦੇ ਹਨ। ਉਹ ਤੁਹਾਨੂੰ ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਵਿਖਾਉਂਦਾ ਹੈ — ਅਤੇ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਕਦੇ ਵੀ ਕਿਸੇ ਵੈੱਬ ਪੰਨੇ ਵੱਲੋਂ ਨਹੀਂ ਵਿਖਾਇਆ ਜਾਣਾ ਚਾਹੀਦਾ।",
+      "multiVault": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਇੱਕ ਖਾਤਾ ਰੱਖਦਾ ਹੈ। ਕੋਈ ਹੋਰ ਵਰਤਣ ਲਈ, ਉਸਨੂੰ Myne ਡੈਸਕਟਾਪ ਐਪ ਵਿੱਚ ਜਾਂ ਕਿਸੇ ਵੱਖਰੇ ਬ੍ਰਾਊਜ਼ਰ ਪ੍ਰੋਫਾਈਲ ਵਿੱਚ ਖੋਲ੍ਹੋ।",
+      "phraseRecovery": "ਵਾਕਾਂਸ਼ ਰਾਹੀਂ ਰਿਕਵਰੀ Myne ਡੈਸਕਟਾਪ ਐਪ ਵਿੱਚ ਹੁੰਦੀ ਹੈ। ਤੁਹਾਡਾ ਰਿਕਵਰੀ ਵਾਕਾਂਸ਼ ਕਦੇ ਵੀ ਕਿਸੇ ਵੈੱਬ ਪੰਨੇ ਵਿੱਚ ਨਹੀਂ ਲਿਖਿਆ ਜਾਣਾ ਚਾਹੀਦਾ।",
+      "title": "ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਉਪਲਬਧ ਨਹੀਂ"
+    },
+    "unsupported": {
+      "title": "Myne ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਨਹੀਂ ਚੱਲ ਸਕਦਾ",
+      "mobileTitle": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ Myne ਦੀ ਐਪ ਖੋਲ੍ਹੋ",
+      "handoff": "Myne ਦੀ ਡੈਸਕਟਾਪ ਐਪ (macOS, Windows, Linux) ਅਤੇ ਮੋਬਾਈਲ ਐਪ (iOS, Android) ਉੱਤੇ ਅਜਿਹੀ ਕੋਈ ਹੱਦ ਨਹੀਂ — ਅਤੇ ਉਹ ਚੱਲਣ ਤੋਂ ਪਹਿਲਾਂ ਆਪਣਾ ਦਸਤਖ਼ਤ ਆਪ ਤਸਦੀਕ ਕਰਦੀਆਂ ਹਨ, ਜੋ ਕੋਈ ਵੈੱਬ ਪੰਨਾ ਨਹੀਂ ਕਰ ਸਕਦਾ।",
+      "reason": {
+        "desktop-form-factor": "ਬ੍ਰਾਊਜ਼ਰ ਵਿਚਲਾ Myne ਡੈਸਕਟਾਪ ਕੰਪਿਊਟਰ ਲਈ ਬਣਿਆ ਹੈ — ਇਸਨੂੰ ਉਹ ਮੈਮਰੀ ਅਤੇ ਇਨਪੁੱਟ ਚਾਹੀਦੇ ਹਨ ਜੋ ਫ਼ੋਨ ਜਾਂ ਟੈਬਲੇਟ ਬ੍ਰਾਊਜ਼ਰ ਨਹੀਂ ਦੇ ਸਕਦਾ। ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਵੈਸੇ ਵੀ Myne ਐਪ ਬਿਹਤਰ ਕਲਾਇੰਟ ਹੈ: ਉਹ ਤੇਜ਼ ਹੈ, ਆਫ਼ਲਾਈਨ ਚੱਲਦੀ ਹੈ, ਅਤੇ ਬ੍ਰਾਊਜ਼ਰ ਵੱਲੋਂ ਆਪਣੀ ਸਟੋਰੇਜ ਸਾਫ਼ ਕਰਨ ਉੱਤੇ ਵੀ ਤੁਹਾਡੇ ਨੋਟ ਸਾਂਭ ਕੇ ਰੱਖਦੀ ਹੈ।",
+        "webassembly": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ WebAssembly ਦਾ ਸਮਰਥਨ ਨਹੀਂ ਕਰਦਾ, ਜਿਸ ਉੱਤੇ ਐਨਕ੍ਰਿਪਸ਼ਨ ਕੋਰ ਚੱਲਦਾ ਹੈ।",
+        "wasm-memory-headroom": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਉਹ ~336 MB ਮੈਮਰੀ ਰਾਖਵੀਂ ਨਹੀਂ ਕਰ ਸਕਦਾ ਜੋ ਵਾਲਟ ਦੀ ਕੁੰਜੀ-ਵਿਉਤਪਤੀ ਲਈ ਚਾਹੀਦੀ ਹੈ। ਫ਼ੋਨ ਅਤੇ ਟੈਬਲੇਟ ਬ੍ਰਾਊਜ਼ਰ ਆਮ ਤੌਰ 'ਤੇ ਨਹੀਂ ਕਰ ਸਕਦੇ; ਇਹ ਹੱਦ ਵਾਲਟ ਨੇ ਆਪ ਤੈਅ ਕੀਤੀ ਹੈ ਅਤੇ ਇੱਕ ਡਿਵਾਈਸ ਲਈ ਇਸਨੂੰ ਘਟਾਉਣ ਦਾ ਮਤਲਬ ਹੋਵੇਗਾ ਕਿ ਵਾਲਟ ਬਾਕੀ ਹਰ ਥਾਂ ਪੜ੍ਹਿਆ ਨਾ ਜਾ ਸਕੇ।",
+        "worker": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ Web Workers ਦਾ ਸਮਰਥਨ ਨਹੀਂ ਕਰਦਾ, ਜਿਨ੍ਹਾਂ ਦੇ ਅੰਦਰ ਵਾਲਟ ਦੀ ਸਟੋਰੇਜ ਅਤੇ ਐਨਕ੍ਰਿਪਸ਼ਨ ਚੱਲਦੀ ਹੈ।",
+        "opfs": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਵੈੱਬ ਐਪਾਂ ਲਈ ਨਿੱਜੀ ਸਥਾਨਕ ਸਟੋਰੇਜ ਨਹੀਂ ਦਿੰਦਾ, ਇਸ ਲਈ ਪੰਨੇ ਦੇ ਲੋਡਾਂ ਵਿਚਕਾਰ ਤੁਹਾਡਾ ਵਾਲਟ ਰੱਖਣ ਲਈ ਕੋਈ ਥਾਂ ਨਹੀਂ ਹੈ।",
+        "opfs-sync-access-handle": "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਨਿੱਜੀ ਸਥਾਨਕ ਸਟੋਰੇਜ ਵਿੱਚ ਉਹ ਸਮਕਾਲੀ ਫ਼ਾਈਲ-ਪਹੁੰਚ ਨਹੀਂ ਹੈ ਜੋ ਵਾਲਟ ਨੂੰ ਸੁਰੱਖਿਅਤ ਢੰਗ ਨਾਲ ਲਿਖਣ ਲਈ ਚਾਹੀਦੀ ਹੈ।",
+        "web-locks": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਉਸ ਲਾਕ ਦਾ ਸਮਰਥਨ ਨਹੀਂ ਕਰਦਾ ਜੋ ਦੋ ਟੈਬਾਂ ਨੂੰ ਇੱਕੋ ਵਾਲਟ ਵਿੱਚ ਇੱਕੋ ਵੇਲੇ ਲਿਖਣ ਤੋਂ ਰੋਕਦਾ ਹੈ।",
+        "crypto-getrandomvalues": "ਇਹ ਬ੍ਰਾਊਜ਼ਰ ਕ੍ਰਿਪਟੋਗ੍ਰਾਫ਼ਿਕ ਬੇਤਰਤੀਬ-ਅੰਕ ਸਰੋਤ ਨਹੀਂ ਦਿੰਦਾ।"
+      }
+    }
+  }
+}

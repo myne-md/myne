@@ -93,9 +93,12 @@
       "colType": "Typ",
       "colUsedIn": "Použito v",
       "decrypting": "Dešifrují se přílohy…",
+      "clearSearchAriaLabel": "Vymazat hledání",
+      "emptyClearSearch": "Vymazat hledání",
       "emptyImportHint": "Naimportujte soubor, aby zůstal ve vašem trezoru.",
       "emptyLoadError": "Katalog příloh se nepodařilo přečíst.",
       "emptyNoAttachments": "Zatím žádné přílohy.",
+      "emptyNoResultsTitle": "Vašemu hledání neodpovídají žádné přílohy.",
       "filterAriaLabel": "Filtrovat podle typu",
       "gridView": "Zobrazení mřížky",
       "import": "Importovat",
@@ -108,6 +111,7 @@
       "menuPreview": "Náhled",
       "menuRename": "Přejmenovat",
       "menuTranscribe": "Přepsat do textu",
+      "menuViewTranscription": "Zobrazit přepis",
       "noMatch": "Vašemu hledání neodpovídají žádné přílohy.",
       "noUnusedNotice": "Žádné nepoužité přílohy k vyčištění.",
       "preview": "Náhled",
@@ -125,8 +129,14 @@
       "title": "Přílohy",
       "transcribeDone": "Přepis dokončen.",
       "transcribeFailed": "Přepis selhal. Zkuste to prosím znovu.",
+      "transcribeFeatureOff": "Převod řeči na text je vypnutý. Zapněte ho v Nastavení → Přepis.",
+      "transcribeModelLoadFailed": "Model pro převod řeči na text se nepodařilo načíst. Přeinstalujte Myne, nebo zkontrolujte svůj vlastní model v Nastavení → Developer → AI.",
+      "transcribeNoModelHint": "Model pro převod řeči na text chybí. Přeinstalování Myne ho obnoví.",
       "transcribeNoModel": "Vyberte model pro přepis v Nastavení → Developer → AI.",
       "transcribeStarted": "Probíhá přepis…",
+      "transcribeVaultLocked": "Pro přepis odemkněte svůj trezor.",
+      "transcriptionModalClose": "Zavřít přepis",
+      "transcriptionModalTitle": "Přepis",
       "typeFilter": {
         "all": "Všechny typy",
         "audio": "Zvuk",
@@ -237,6 +247,15 @@
     "matchedInAttachmentTitle": "Dotaz odpovídá obsahu souboru vloženého v této poznámce",
     "matchedInBody": "↳ nalezeno v textu",
     "noMatches": "Žádné shody",
+    "operatorHint": "Tab pro doplnění",
+    "operators": {
+      "tag": "Poznámky se značkou",
+      "path": "Poznámky ve složce",
+      "file": "Shoda v názvu poznámky",
+      "section": "Poznámky s nadpisem",
+      "task": "Poznámky s úkolem",
+      "content": "Fulltext v textu poznámky"
+    },
     "searchPlaceholder": "Hledejte poznámky nebo spusťte příkaz — Esc pro zavření",
     "sectionCommands": "Příkazy",
     "sectionNotes": "Poznámky",
@@ -487,6 +506,9 @@
       "showGraph": {
         "label": "Zobrazit graf…"
       },
+      "showTasks": {
+        "label": "Zobrazit úkoly"
+      },
       "showTags": {
         "label": "Procházet značky…"
       },
@@ -525,9 +547,11 @@
         "cycleHeadingLevel": "Procházet úrovně nadpisu",
         "cycleTabs": "Procházet karty",
         "deleteWorkspace": "Smazat pracovní prostor",
+        "findInNote": "Najít v poznámce",
         "focusNextPane": "Přejít na další panel",
         "focusPrevPane": "Přejít na předchozí panel",
         "foldAll": "Sbalit vše",
+        "indent": "Odsadit",
         "inlineCode": "Vložený kód",
         "insertWikilink": "Vložit wikiodkaz",
         "italic": "Kurzíva",
@@ -535,11 +559,15 @@
         "navigateForward": "Přejít vpřed",
         "newNote": "Nová poznámka",
         "openSettings": "Otevřít nastavení",
+        "outdent": "Zrušit odsazení",
         "paletteToggle": "Otevřít příkazovou paletu",
+        "redo": "Znovu",
         "renameWorkspace": "Přejmenovat pracovní prostor",
         "saveWorkspaceAs": "Uložit pracovní prostor jako",
         "selectAllScoped": "Vybrat vše (v rozsahu)",
+        "selectNextOccurrence": "Vybrat další výskyt",
         "showGraphView": "Zobrazit graf",
+        "showTasks": "Zobrazit úkoly",
         "splitPaneDown": "Rozdělit panel (dolů)",
         "splitPaneRight": "Rozdělit panel (vpravo)",
         "switchWorkspace": "Přepnout pracovní prostor",
@@ -549,6 +577,7 @@
         "toggleReadingView": "Přepnout režim čtení",
         "toggleSourceMode": "Přepnout režim zdroje",
         "toggleTaskList": "Přepnout seznam úkolů",
+        "undo": "Zpět",
         "unfoldAll": "Rozbalit vše"
       }
     },
@@ -590,6 +619,14 @@
         "renamed": "Přejmenováno na {{name}}.",
         "renameFailed": "Přílohu se nepodařilo přejmenovat.",
         "saveDialogFailed": "Dialog pro uložení se nepodařilo otevřít."
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} obrázek zkomprimován: {{from}} → {{to}}",
+        "bulkNotice_few": "{{count}} obrázky zkomprimovány: {{from}} → {{to}}",
+        "bulkNotice_many": "{{count}} obrázku zkomprimováno: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} obrázků zkomprimováno: {{from}} → {{to}}",
+        "notice": "Zkomprimováno: {{from}} → {{to}}",
+        "noticeContainerChanged": "Zkomprimováno do formátu {{format}}: {{from}} → {{to}}"
       },
       "convert": {
         "cancel": "Zrušit",
@@ -673,7 +710,10 @@
         "exportAria": "Exportovat přílohu",
         "imagePreview": "Náhled obrázku",
         "pdfFallback": "PDF",
-        "pdfPreview": "Náhled PDF"
+        "pdfPreview": "Náhled PDF",
+        "zoomIn": "Přiblížit",
+        "zoomOut": "Oddálit",
+        "zoomReset": "Obnovit přiblížení"
       },
       "menu": {
         "actionsAria": "Akce s přílohou"
@@ -758,6 +798,12 @@
           "deletedLabel": "smazáno"
         },
         "transcribe": {
+          "cause": {
+            "featureOff": "Převod řeči na text je vypnutý. Zapněte ho v Nastavení → Přepis.",
+            "modelLoadFailed": "Model pro převod řeči na text se nepodařilo načíst. Pokud jste v Nastavení → Developer → AI nastavili vlastní model, zkontrolujte jeho soubory; jinak přeinstalování Myne obnoví ten vestavěný.",
+            "noModel": "Model pro převod řeči na text chybí. Přeinstalování Myne ho obnoví.",
+            "vaultLocked": "Pro přepis odemkněte svůj trezor."
+          },
           "disabledReason": "Pro přepis zapněte AI v Nastavení → Developer → AI.",
           "failed": "Přepis selhal. Zkuste to prosím znovu.",
           "heading": "Přepis",
@@ -802,6 +848,12 @@
         "linkedFrom_few": "Odkazováno z {{count}}",
         "linkedFrom_many": "Odkazováno z {{count}}",
         "linkedFrom_other": "Odkazováno z {{count}}",
+        "linksTo": "Odkazuje na {{count}}",
+        "linksTo_one": "Odkazuje na {{count}}",
+        "linksTo_few": "Odkazuje na {{count}}",
+        "linksTo_many": "Odkazuje na {{count}}",
+        "linksTo_other": "Odkazuje na {{count}}",
+        "outgoingEmpty": "Tato poznámka zatím na nic neodkazuje.",
         "untitled": "Bez názvu"
       },
       "barItems": {
@@ -935,6 +987,7 @@
           "aiChat": "AI chat",
           "backlinks": "Zpětné odkazy",
           "outline": "Osnova",
+          "tasks": "Úkoly",
           "unlinked": "Nepropojené zmínky"
         }
       },
@@ -968,9 +1021,38 @@
         "toggleTitle": "Pracovní prostor: {{name}}"
       }
     },
+    "noteActions": {
+      "buttonLabel": "Akce poznámky",
+      "rename": "Přejmenovat",
+      "move": "Přesunout do složky…",
+      "duplicate": "Duplikovat",
+      "convertToTemplate": "Změnit na šablonu",
+      "convertToNote": "Převést na poznámku",
+      "turnedIntoTemplate": "Změněno na šablonu",
+      "convertedToNote": "Převedeno na poznámku",
+      "versionHistory": "Historie verzí",
+      "exportMarkdown": "Exportovat jako Markdown…",
+      "exportPdf": "Exportovat jako PDF…",
+      "exportHtml": "Exportovat jako HTML…",
+      "exportTxt": "Exportovat jako prostý text…",
+      "trash": "Přesunout do koše"
+    },
     "codeBlock": {
       "copyCode": "Kopírovat kód",
       "defaultBadge": "kód"
+    },
+    "drawingEmbed": {
+      "done": "Hotovo",
+      "edit": "Upravit kresbu {{name}}",
+      "editAction": "Upravit",
+      "empty": "Prázdná kresba — kliknutím začnete kreslit",
+      "open": "Otevřít",
+      "rename": "Přejmenovat kresbu"
+    },
+    "drawingMenu": {
+      "background": "Pozadí plátna",
+      "reset": "Obnovit plátno",
+      "toggleTheme": "Přepnout motiv kresby"
     },
     "find": {
       "close": "Zavřít hledání",
@@ -995,8 +1077,11 @@
       "unreferenced": "bez odkazu"
     },
     "frontmatter": {
+      "addListItem": "Přidat položku…",
+      "addListItemAriaLabel": "Přidat položku do {{key}}",
       "addProperty": "+ Přidat vlastnost",
       "propertiesLabel": "Vlastnosti",
+      "removeListItemAriaLabel": "Odebrat {{item}}",
       "titleAriaLabel": "Název poznámky",
       "titlePlaceholder": "Bez názvu"
     },
@@ -1012,6 +1097,8 @@
       "date": "Datum",
       "day": "Den",
       "divider": "Oddělovač",
+      "drawing": "Kresba",
+      "due": "Termín",
       "heading1": "Nadpis 1",
       "heading2": "Nadpis 2",
       "heading3": "Nadpis 3",
@@ -1021,8 +1108,11 @@
       "link": "Odkaz",
       "now": "Teď",
       "numberedList": "Číslovaný seznam",
+      "priority": "Priorita",
       "quote": "Citát",
+      "repeat": "Opakování",
       "table": "Tabulka",
+      "taskQuery": "Přehled úkolů",
       "time": "Čas",
       "todoList": "Seznam úkolů",
       "voiceNote": "Hlasová poznámka",
@@ -1044,6 +1134,27 @@
       "deleteRow": "Smazat řádek",
       "reorderColumn": "Změnit pořadí sloupce",
       "reorderRow": "Změnit pořadí řádku"
+    },
+    "tagSuggestion": {
+      "label": "Navrhované značky",
+      "accept": "Přidat značku {{tag}} do této poznámky",
+      "dismiss": "Zamítnout navrhovanou značku {{tag}}"
+    },
+    "taskField": {
+      "addAffordance": "Přidat pole úkolu",
+      "invalidDue": "Myne nedokáže toto datum přečíst, takže se nezobrazuje jako termín.",
+      "invalidPriority": "Myne nedokáže tuto prioritu přečíst. Použijte highest, high, medium, low nebo lowest.",
+      "invalidRepeat": "Myne toto pravidlo opakování nezná, takže se tento úkol nebude opakovat.",
+      "menuEdit": "Upravit {{field}}",
+      "menuTitle": "Přidat pole",
+      "repeatNoAnchor": "Tento úkol nemá datum, od kterého by se opakoval, takže se opakovat nebude. Přidejte termín, aby se rozběhl.",
+      "save": "Uložit",
+      "skipOccurrence": "Přeskočit tento výskyt",
+      "title": {
+        "due": "Termín",
+        "repeat": "Opakování",
+        "priority": "Priorita"
+      }
     },
     "toolbar": {
       "apply": "Použít",
@@ -1076,7 +1187,16 @@
         "green": "Zelená",
         "pink": "Růžová",
         "purple": "Fialová",
-        "yellow": "Žlutá"
+        "yellow": "Žlutá",
+        "orange": "Oranžová",
+        "red": "Červená",
+        "teal": "Modrozelená",
+        "cyan": "Azurová",
+        "lime": "Limetková",
+        "brown": "Hnědá",
+        "grey": "Šedá",
+        "indigo": "Indigová",
+        "remove": "Odebrat zvýraznění"
       },
       "urlPlaceholder": "Vložte adresu URL"
     },
@@ -1457,6 +1577,12 @@
       "countEmpty": "Prázdné",
       "delete": "Smazat",
       "deleteError": "Tuto poznámku se nepodařilo smazat. Zkuste to znovu.",
+      "emptyBody": "Archivované poznámky a složky jsou v postranním panelu skryté, ale zůstávají v bezpečí. Kdykoli je budete potřebovat, obnovte je zde.",
+      "emptyTitle": "Nic v archivu",
+      "folderDeleteBody_one": "„{{name}}“ a její {{count}} poznámka",
+      "folderDeleteBody_few": "„{{name}}“ a její {{count}} poznámky",
+      "folderDeleteBody_many": "„{{name}}“ a její {{count}} poznámky",
+      "folderDeleteBody_other": "„{{name}}“ a jejích {{count}} poznámek",
       "emptyState": "Archiv je prázdný.",
       "folderDeleteConfirm_one": "Přesunout {{count}} poznámku do koše?",
       "folderDeleteConfirm_few": "Přesunout {{count}} poznámky do koše?",
@@ -1464,6 +1590,8 @@
       "folderDeleteConfirm_other": "Přesunout {{count}} poznámek do koše?",
       "folderDeleteConfirmCta": "Přesunout do koše",
       "folderDeleteError": "Poznámky této složky se nepodařilo přesunout do koše. Zkuste to znovu.",
+      "folderDeleteTitle": "Přesunout tuto složku do koše?",
+      "folderDeleteWarning": "Přesunou se do koše — kdykoli je můžete obnovit. Trvalé smazání je samostatný krok.",
       "restore": "Obnovit",
       "restoreError": "Tuto poznámku se nepodařilo obnovit. Zkuste to znovu.",
       "title": "Archiv",
@@ -1555,6 +1683,26 @@
     "graph": {
       "allConnected": "Vše je propojené — žádné izolované poznámky.",
       "building": "Sestavuje se graf…",
+      "colorGroups": {
+        "addRule": "Přidat pravidlo",
+        "colorSwatchTitle": "Vybrat barvu",
+        "deleteRuleTitle": "Smazat pravidlo",
+        "dragHandleTitle": "Přetažením změníte pořadí",
+        "editFilterButton": "Upravit filtr…",
+        "editFilterTitle": "Upravit filtr barevné skupiny",
+        "emptyBody": "Barevné skupiny umožňují obarvit uzly grafu podle značky nebo složky — pracovní poznámky jednou barvou, osobní jinou. Přidejte své první pravidlo.",
+        "emptyTitle": "Zatím žádné barevné skupiny",
+        "enableToggleAriaLabel": "Povolit pravidlo",
+        "filterAllNotes": "Odpovídá každé poznámce",
+        "filterConditions_one": "{{count}} podmínka",
+        "filterConditions_few": "{{count}} podmínky",
+        "filterConditions_many": "{{count}} podmínky",
+        "filterConditions_other": "{{count}} podmínek",
+        "heading": "Barevné skupiny",
+        "moveDown": "Posunout pravidlo dolů",
+        "moveUp": "Posunout pravidlo nahoru",
+        "namePlaceholder": "Pravidlo bez názvu"
+      },
       "depthToggleTitle": "Přepnout hloubku okolí (1 ↔ 2 skoky)",
       "filterAll": "Vše",
       "filterAroundNote": "Kolem této poznámky",
@@ -1566,6 +1714,23 @@
       "overCap": "Tento trezor je rozsáhlý — graf celého trezoru je omezený. Filtrujte podle značky nebo zobrazte izolované poznámky pro prozkoumání.",
       "refresh": "Obnovit",
       "refreshTitle": "Trezor se změnil — znovu sestavit graf",
+      "settings": {
+        "appearanceHeading": "Vzhled",
+        "closeTitle": "Zavřít",
+        "forceCenter": "Přitažlivost ke středu",
+        "forceLinkDistance": "Vzdálenost spojnic",
+        "forceLinkStrength": "Síla spojnic",
+        "forceRepel": "Odpuzování",
+        "forcesHeading": "Síly",
+        "labelFadeZoom": "Slábnutí popisků",
+        "lineThickness": "Tloušťka čar",
+        "nodeSize": "Velikost uzlů",
+        "nodeSizeStrength": "Velikost podle propojení",
+        "openTitle": "Nastavení grafu",
+        "reset": "Obnovit výchozí",
+        "showArrows": "Zobrazit šipky směru",
+        "title": "Nastavení grafu"
+      },
       "tagPlaceholder": "Značka…"
     },
     "import": {
@@ -1634,6 +1799,7 @@
         "setupIntro": "Nasměrujte Myne na svou stávající složku trezoru Obsidian. Každá poznámka v Markdownu se na místě naimportuje a zašifruje — nic neopustí toto zařízení a vaše původní soubory zůstanou nedotčené.",
         "statCancelled": "Zrušeno",
         "statCanvasSkipped": "soubory .canvas přeskočeny",
+        "statCompressed": "Obrázky zkomprimovány",
         "statEmptyFoldersKept": "Prázdné složky zachovány",
         "statMedia": "Média",
         "statOtherSkipped": "Ostatní soubory přeskočeny",
@@ -1647,7 +1813,19 @@
         "titlePick": "Importovat poznámky",
         "keepsLabel": "Co se přenese",
         "losesLabel": "Co se nepřenese",
-        "changeSource": "Změnit zdroj"
+        "changeSource": "Změnit zdroj",
+        "statExcalidrawSkipped": "Kresby Excalidraw přeskočeny",
+        "unfollowedLinkOutside": "Toto je zástupce složky mimo tu, kterou jste vybrali, takže ho Myne nenásledoval. Přesuňte nebo zkopírujte tuto složku dovnitř svého trezoru a import zopakujte.",
+        "unfollowedLinkLoop": "Tento zástupce ukazuje zpět do složky, ve které už Myne byl, takže by se jeho následování točilo donekonečna. Nic pod ním nebylo vynecháno.",
+        "unfollowedLinkBroken": "Tento zástupce nikam nevede — to, na co ukazoval, bylo přesunuto nebo smazáno.",
+        "unreadableDetail": "Přeskočeno — {{reason}} Zbytek importu pokračoval.",
+        "stoppedAt": "Než se import zastavil, naimportovalo se {{imported}} z {{total}} poznámek. Jsou ve vašem trezoru a je bezpečné je ponechat.",
+        "reasonNotUtf8": "Myne nedokázal tento soubor přečíst jako text. Pravděpodobně je uložen ve starším kódování, nebo to vůbec není textový soubor.",
+        "reasonPathRejected": "Myne se k tomuto souboru uvnitř vybrané složky nedostal.",
+        "reasonPermissionDenied": "Myne neměl oprávnění tento soubor přečíst.",
+        "reasonNotFound": "Tento soubor už tam nebyl, když se k němu Myne dostal.",
+        "reasonNoSpace": "Na tomto zařízení došlo místo.",
+        "reasonUnknown": "Myne nedokázal určit proč."
       },
       "offer": {
         "body": "Přeneste své stávající poznámky do Myne. Každá se při importu zašifruje — nic neopustí toto zařízení a vaše původní soubory zůstanou přesně tam, kde jsou.",
@@ -1715,6 +1893,7 @@
       "bulkDelete_few": "Smazat {{count}} poznámky",
       "bulkDelete_many": "Smazat {{count}} poznámky",
       "bulkDelete_other": "Smazat {{count}} poznámek",
+      "moveTo": "Přesunout do…",
       "bulkMove": "Přesunout {{count}} poznámek do…",
       "bulkMove_one": "Přesunout {{count}} poznámku do…",
       "bulkMove_few": "Přesunout {{count}} poznámky do…",
@@ -1748,6 +1927,7 @@
       "newFolder": "Nová složka",
       "newFolderInPlaceholder": "Nová složka v {{path}}",
       "newFolderPlaceholder": "Nová složka",
+      "newItem": "Nové…",
       "newNote": "Nová poznámka",
       "newNoteFromTemplate": "Nová poznámka ze šablony…",
       "newNoteHere": "Nová poznámka zde",
@@ -1784,12 +1964,20 @@
       "trashSingleError": "Poznámku se nepodařilo přesunout do koše.",
       "undo": "Vrátit zpět",
       "vaultRoot": "Kořen trezoru",
-      "viewSettingsTitle": "Nastavení zobrazení"
+      "viewSettingsTitle": "Nastavení zobrazení",
+      "imported_one": "Do této složky byla naimportována 1 poznámka",
+      "imported_few": "Do této složky byly naimportovány {{count}} poznámky",
+      "imported_many": "Do této složky bylo naimportováno {{count}} poznámky",
+      "imported_other": "Do této složky bylo naimportováno {{count}} poznámek",
+      "importedWithSkips": "Naimportováno {{count}} — {{skipped}} přeskočeno",
+      "importNoMarkdown": "V přetažených souborech nejsou žádné soubory Markdown"
     },
     "newFromTemplate": {
       "back": "Zpět",
       "blankNote": "Prázdná poznámka",
       "createNote": "Vytvořit poznámku",
+      "createFirstTemplate": "Vytvořit šablonu",
+      "manageTemplates": "Spravovat šablony",
       "emptyState": "Zatím jste nevytvořili žádné šablony.",
       "listLabel": "Šablony",
       "loading": "Načítá se…",
@@ -1804,12 +1992,14 @@
       "createDrawing": "Nová kresba",
       "noNotesMatch": "Žádné poznámky neodpovídají.",
       "noNotesYet": "Zatím žádné poznámky.",
+      "recent": "Nedávné",
       "searchAriaLabel": "Hledat poznámky k otevření",
       "searchPlaceholder": "Hledat poznámky…",
       "untitled": "Bez názvu"
     },
     "pane": {
       "graphTab": "Graf",
+      "tasksTab": "Úkoly",
       "loading": "Načítá se…",
       "untitledView": "Zobrazení bez názvu"
     },
@@ -1831,6 +2021,8 @@
       "loadError": "Tuto poznámku se nepodařilo načíst",
       "removeFromFavorites": "Odebrat z oblíbených",
       "renameAriaLabel": "Přejmenovat poznámku",
+      "taskBadgeLabel": "Tato poznámka je úkol",
+      "taskBadgeTitle": "Poznámka jako úkol",
       "unsyncedLabel": "Zatím není na serveru",
       "unsyncedTitle": "Nejnovější změny této poznámky jsou pouze na tomto zařízení",
       "untitled": "Bez názvu"
@@ -1865,7 +2057,14 @@
       "changeCount_few": "{{count}} změny od tohoto snímku",
       "changeCount_many": "{{count}} změny od tohoto snímku",
       "changeCount_other": "{{count}} změn od tohoto snímku",
+      "changeCountPrev_one": "{{count}} změna od předchozího snímku",
+      "changeCountPrev_few": "{{count}} změny od předchozího snímku",
+      "changeCountPrev_many": "{{count}} změny od předchozího snímku",
+      "changeCountPrev_other": "{{count}} změn od předchozího snímku",
       "close": "Zavřít",
+      "compareAgainstLabel": "Porovnat s",
+      "compareCurrent": "Aktuální poznámka",
+      "comparePrevious": "Předchozí snímek",
       "confirmBody": "Vaše současná poznámka se nejprve uloží jako snímek, takže tuto akci budete moci vrátit zpět.",
       "confirmTitle": "Obnovit tento snímek?",
       "decrypting": "Dešifruje se…",
@@ -1880,6 +2079,7 @@
       "justNow": "právě teď",
       "listLabel": "Seznam snímků",
       "loading": "Načítá se…",
+      "noPrevious": "Toto je nejstarší snímek — není nic před ním, s čím by se dal porovnat.",
       "restore": "Obnovit",
       "restoreCta": "Obnovit tento snímek",
       "restoredStatus": "Obnoveno. Verze, kterou jste měli, je uložena jako snímek.",
@@ -1941,6 +2141,8 @@
       "emptyPartialFailure_few": "{{count}} poznámky nebylo možné smazat a zůstávají v koši.",
       "emptyPartialFailure_many": "{{count}} poznámky nebylo možné smazat a zůstává v koši.",
       "emptyPartialFailure_other": "{{count}} poznámek nebylo možné smazat a zůstávají v koši.",
+      "emptyBody": "Poznámky, které smažete, skončí zde. Zůstanou, dokud koš nevyprázdníte — kteroukoli z nich můžete kdykoli obnovit.",
+      "emptyTitle": "Koš je prázdný",
       "emptyState": "Koš je prázdný.",
       "purgeConfirmCta": "Smazat trvale",
       "purgeConfirmTitle": "Smazat trvale?",
@@ -1989,6 +2191,8 @@
         "viewSettings": "Nastavení zobrazení…"
       },
       "newView": "Nové zobrazení",
+      "noMatch": "Vašemu hledání neodpovídají žádná zobrazení.",
+      "searchPlaceholder": "Hledat zobrazení…",
       "table": {
         "empty": "Žádné poznámky neodpovídají tomuto zobrazení",
         "name": "Název",
@@ -2085,6 +2289,71 @@
     "passwordHelper": "Nikdy se neukládá, nikdy nepřenáší. Šifruje vaše klíče na tomto zařízení.",
     "encryptingSubtitle": "Obaluji klíče vašeho trezoru novým heslem."
   },
+  "recurrence": {
+    "every": {
+      "day": "každý den",
+      "week": "každý týden",
+      "month": "každý měsíc",
+      "year": "každý rok"
+    },
+    "everyN": {
+      "day": "každých {{count}} dní",
+      "week": "každých {{count}} týdnů",
+      "month": "každých {{count}} měsíců",
+      "year": "každých {{count}} let"
+    },
+    "everyWeekday": "každý týden: {{days}}",
+    "everyWeekdays": "každý týden: {{days}}",
+    "ordinal": {
+      "first": "1.",
+      "second": "2.",
+      "third": "3.",
+      "fourth": "4.",
+      "last": "poslední"
+    },
+    "ordinalOfMonth": "{{ordinal}} {{weekday}} každého měsíce",
+    "dayOfMonth": "{{day}}. den každého měsíce",
+    "lastDayOfMonth": "poslední den každého měsíce",
+    "weekday": {
+      "monday": "pondělí",
+      "tuesday": "úterý",
+      "wednesday": "středa",
+      "thursday": "čtvrtek",
+      "friday": "pátek",
+      "saturday": "sobota",
+      "sunday": "neděle"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, po dokončení",
+    "builder": {
+      "family": "Opakování",
+      "familyInterval": "Každých…",
+      "familyWeekdays": "Týdně ve dnech…",
+      "familyDayOfMonth": "Měsíčně podle dne…",
+      "familyOrdinal": "Měsíčně podle dne týdne…",
+      "count": "Interval",
+      "unitLabel": "Jednotka",
+      "units": {
+        "day": "dní",
+        "week": "týdnů",
+        "month": "měsíců",
+        "year": "let"
+      },
+      "ordinal": "Pozice",
+      "weekday": "Den v týdnu",
+      "lastDay": "Poslední den",
+      "whenDone": "Opakovat od data dokončení",
+      "weekdayShort": {
+        "monday": "Po",
+        "tuesday": "Út",
+        "wednesday": "St",
+        "thursday": "Čt",
+        "friday": "Pá",
+        "saturday": "So",
+        "sunday": "Ne"
+      }
+    }
+  },
   "restore": {
     "backLabel": "Zpět",
     "cancelLabel": "Zrušit",
@@ -2135,8 +2404,8 @@
       "changelogButton": "Zobrazit seznam změn…",
       "changelogHelper": "Poznámky k jednotlivým verzím. Objeví se, až přistane MYND-119.",
       "changelogLabel": "Seznam změn",
-      "developerModeHelper": "",
-      "developerModeLabel": "",
+      "developerModeHelper": "Zobrazí pokročilá nastavení, která Myne ve výchozím stavu drží stranou: ta, kde opouštíte cestu, za kterou se Myne zaručuje, a nástroje pro pokročilé, které většina lidí nikdy nepotřebuje. Vypnutím se jen znovu skryjí — co jste zapnuli, zůstane zapnuté a vypnout to jde tam, kde se to zapíná.",
+      "developerModeLabel": "Režim vývojáře",
       "licenseBody": "Pre-alfa · dokumentace CC-BY-4.0 · kód aplikace AGPL-3.0 při vydání 1. fáze.",
       "licenseLabel": "Licence",
       "tagline": "Pre-alfa · desktopový klient 1. fáze",
@@ -2187,10 +2456,18 @@
       "changing": "Měním…"
     },
     "appearance": {
+      "accentHelper": "Vyberte barvu zvýraznění používanou v celé aplikaci. Pouze na tomto zařízení.",
+      "accentHexAria": "Hexadecimální hodnota barvy zvýraznění",
+      "accentLabel": "Barva zvýraznění",
+      "accentReset": "Obnovit výchozí barvu motivu",
       "homeQuickActions": "Rychlé akce na domovské obrazovce",
       "showEditTimesAria": "Zobrazit časy úprav v postranním panelu",
       "showEditTimesHelper": "Zobrazí čas poslední úpravy každé poznámky pod jejím názvem v postranním panelu.",
       "showEditTimesLabel": "Zobrazit časy úprav",
+      "taskMarkerAria": "Zobrazit označení úkolu u poznámek, které jsou úkoly",
+      "taskMarkerHelper": "Označí poznámky, které jste určili jako úkoly, v postranním panelu a na jejich kartě.",
+      "taskMarkerLabel": "Zobrazit označení úkolu",
+      "taskMarkerSaveError": "Toto nastavení se nepodařilo uložit. Zkuste to znovu.",
       "theme": {
         "amoled": "AMOLED",
         "dark": "Tmavé",
@@ -2207,7 +2484,10 @@
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "Písmo editoru",
-      "showEditTimesSubtitle": "Časové značky pod každou poznámkou"
+      "showEditTimesSubtitle": "Časové značky pod každou poznámkou",
+      "graphSettingsLabel": "Vzhled grafu",
+      "graphSettingsHelper": "Barvy uzlů, popisky, velikost a síly rozložení se nastavují přímo v grafu — otevřete ho a použijte ozubené kolo v jeho rohu. Uchovávají se pro každé zařízení zvlášť, takže se změna zde nepřenese do vašeho telefonu.",
+      "openGraph": "Otevřít graf"
     },
     "archive": {
       "helper": "Umožní přesouvat poznámky do archivu mimo hlavní seznam. Vypnutím se každá archivovaná poznámka obnoví do své složky a ovládací prvky archivu se skryjí.",
@@ -2215,6 +2495,18 @@
       "off": "Vypnuto",
       "on": "Zapnuto",
       "saveError": "Nastavení archivace se nepodařilo aktualizovat."
+    },
+    "attachmentCompression": {
+      "label": "Komprimovat obrázky při importu",
+      "helper": "Zmenší vložené nebo přetažené obrázky ještě před zašifrováním a uložením, takže váš trezor, zálohy i synchronizace zůstanou menší. Je to nevratné — původní soubor se neuchovává.",
+      "helperScopeEveryDevice": "Platí pro celý trezor, na všech zařízeních.",
+      "helperScopeNotHere": "Platí pro celý trezor, ale ne v tomto prohlížeči — obrázky přidané zde se ukládají přesně tak, jak byly vloženy.",
+      "errorSaveSetting": "Toto nastavení se nepodařilo uložit."
+    },
+    "transcription": {
+      "label": "Převod řeči na text",
+      "helper": "Převede zvukovou přílohu na text, přímo na tomto zařízení. Model je součástí Myne a nikam se nic neodesílá. Vypnutím se akce Přepsat do textu všude skryje a aplikace přestane přepisovat úplně.",
+      "errorSaveSetting": "Toto nastavení se nepodařilo uložit."
     },
     "attachmentOcr": {
       "label": "Hledat uvnitř obrázků a naskenovaných dokumentů",
@@ -2283,6 +2575,35 @@
         "onDate": "Připojeno {{date}}"
       }
     },
+    "cliAccess": {
+      "label": "Přístup z terminálu",
+      "helperOff": "Vypnuto. Příkaz `myne` nemůže v tomto trezoru nic číst ani měnit.",
+      "helperOn": "Zapnuto, dokud je tento trezor odemčený. Jakýkoli program běžící pod vaším účtem přes něj může číst, prohledávat a vytvářet poznámky — Myne nerozliší váš terminál od skriptu a nekontroluje nic kromě toho, že jsou dveře otevřené. Nikdy se neptá na vaše heslo, zavře se ve chvíli, kdy se trezor uzamkne, a nedokáže poznámky mazat.",
+      "lastUsedNever": "Od odemknutí tohoto trezoru nepoužito.",
+      "lastUsedJustNow": "Naposledy použito právě teď.",
+      "lastUsedMinutesAgo": "Naposledy použito před {{count}} min.",
+      "lastUsedMinutesAgo_one": "Naposledy použito před {{count}} min.",
+      "lastUsedMinutesAgo_few": "Naposledy použito před {{count}} min.",
+      "lastUsedMinutesAgo_many": "Naposledy použito před {{count}} min.",
+      "lastUsedMinutesAgo_other": "Naposledy použito před {{count}} min.",
+      "lastUsedHoursAgo": "Naposledy použito před {{count}} h.",
+      "lastUsedHoursAgo_one": "Naposledy použito před {{count}} h.",
+      "lastUsedHoursAgo_few": "Naposledy použito před {{count}} h.",
+      "lastUsedHoursAgo_many": "Naposledy použito před {{count}} h.",
+      "lastUsedHoursAgo_other": "Naposledy použito před {{count}} h.",
+      "lastUsedDaysAgo": "Naposledy použito před {{count}} dny.",
+      "lastUsedDaysAgo_one": "Naposledy použito před {{count}} dnem.",
+      "lastUsedDaysAgo_few": "Naposledy použito před {{count}} dny.",
+      "lastUsedDaysAgo_many": "Naposledy použito před {{count}} dne.",
+      "lastUsedDaysAgo_other": "Naposledy použito před {{count}} dny.",
+      "notOnPathHint": "Váš shell zatím `myne` nenajde. Přidejte tento řádek do profilu svého shellu a otevřete nový terminál:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "Složky, které terminál nikdy nevidí",
+      "excludedHelper": "Jedna cesta ke složce na řádek. Poznámky v těchto složkách se neobjeví v žádném výsledku z terminálu a nelze do nich z terminálu zapisovat — v aplikaci zůstávají plně dostupné. Nastavit to můžete ještě před zapnutím přístupu z terminálu.",
+      "excludedPlaceholder": "Soukromé/\nDeník/",
+      "rateLimitLabel": "Nechat terminál běžet plnou rychlostí",
+      "rateLimitHelper": "Myne ve výchozím stavu odpoví nejvýše na 120 příkazů z terminálu za minutu. Je to omezení tempa pro zdivočelý skript, ne kontrola oprávnění — nic nerozhoduje o tom, který program se smí ptát. Zapněte to pro hromadnou práci, třeba když posíláte každou poznámku rourou do jiného nástroje."
+    },
     "clipperInstall": {
       "error": "Nepodařilo se aktualizovat nastavení prohlížečového výstřižkovače.",
       "helper": "Zaregistruje hostitele nativních zpráv, aby prohlížečové rozšíření Myne mohlo odesílat výstřižky do této aplikace. Ve výchozím nastavení zapnuto; vypnutím jej odeberete.",
@@ -2292,6 +2613,7 @@
       "appliedBadge": "Použito",
       "apply": "Použít",
       "applyError": "Tento motiv se nepodařilo použít. Zkuste to prosím znovu.",
+      "browseButton": "Procházet motivy",
       "cancel": "Zrušit",
       "confirm": "Potvrdit",
       "delete": "Smazat",
@@ -2316,7 +2638,8 @@
       "label": "Vlastní motivy",
       "openFolderButton": "Otevřít složku motivů",
       "openFolderError": "Složku motivů se nepodařilo otevřít.",
-      "readError": "Vaši složku motivů se nepodařilo přečíst."
+      "readError": "Vaši složku motivů se nepodařilo přečíst.",
+      "readOnlyHelper": "Vlastní motivy se instalují na vašem počítači. Ty vaše sem dorazí samy po synchronizaci."
     },
     "dailyNotes": {
       "blankTemplate": "Prázdná (bez šablony)",
@@ -2326,6 +2649,8 @@
       "folderHelper": "Kam se ukládají nové denní poznámky. Výchozí hodnota je {{default}} — složka se zachová, i když je prázdná.",
       "folderLabel": "Složka denních poznámek",
       "folderSaveError": "Složku denních poznámek se nepodařilo uložit. Zkuste to prosím znovu.",
+      "folderSearchEmpty": "Žádné složky neodpovídají.",
+      "folderSearchPlaceholder": "Hledat složky…",
       "searchEmpty": "Žádné šablony neodpovídají.",
       "searchPlaceholder": "Hledat šablony…",
       "templateHelper": "Vyberte šablonu, ze které se má každá denní poznámka zakládat, nebo ponechte prázdné pro prázdnou poznámku pojmenovanou datem.",
@@ -2364,6 +2689,8 @@
       "newNote": {
         "folderLabel": "Složka pro nové poznámky",
         "folderPlaceholder": "např. Doručené/",
+        "folderSearchEmpty": "Žádné složky neodpovídají.",
+        "folderSearchPlaceholder": "Hledat složky…",
         "helper": "Kam se ukládají nově vytvořené poznámky.",
         "label": "Výchozí umístění pro nové poznámky",
         "optionCurrent": "Stejná složka jako aktuální poznámka",
@@ -2459,6 +2786,10 @@
       "off": "Vypnuto",
       "on": "Zapnuto"
     },
+    "views": {
+      "helper": "Zobrazí v postranním panelu položku Zobrazení pro ukládání filtrovaných seznamů poznámek. Ve výchozím stavu vypnuto; zapnuto, pokud už nějaká zobrazení máte.",
+      "label": "Zobrazení"
+    },
     "vimMode": {
       "chordCaveat": "Ve Windows a v Linuxu mají přednost vlastní zkratky Myne, takže kombinace kláves vim, které s nimi kolidují (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x), nejsou v editoru dostupné. Ctrl-[ nadále funguje jako Escape a vizuální blok se přesouvá na Alt-v.",
       "errorSaveSetting": "Nastavení režimu vim se nepodařilo uložit.",
@@ -2476,6 +2807,9 @@
       "pendingHint": "Již brzy"
     },
     "ai": {
+      "autoTagHelper": "Když přestanete psát, malý model na vašem zařízení přečte poznámku a nahoře v ní navrhne značky. Dokud návrh nepřijmete, nic se nepřidá.",
+      "autoTagLabel": "Navrhovat značky automaticky",
+      "autoTagUnavailable": "Toto sestavení neobsahuje model pro značky, takže žádné značky navrhovat nelze. Myne si ho nikdy nestáhne — v sestavení, které ho obsahuje, se přepínač zapne sám.",
       "disclosureToggle": "Jak to funguje?",
       "enableHelper": "Spouští model, který poskytnete, výhradně na vašem zařízení. Experimentální, ve výchozím nastavení vypnuto.",
       "enableLabel": "Povolit místní AI",
@@ -2499,8 +2833,41 @@
       "recommendedFilesTranscription": "Vyžaduje soubor Whisper .gguf + config.json + tokenizer.json ve stejné složce.",
       "title": "AI"
     },
+    "network": {
+      "disabledCue": "Synchronizace už se nesměruje přes Tor. Nová připojení jdou přímo na synchronizační server.",
+      "errorRead": "Aktuální nastavení se nepodařilo přečíst. Přepněte přepínač a nastavte ho znovu.",
+      "errorSave": "Nastavení se nepodařilo uložit. Nic se nezměnilo.",
+      "errorSidecar": "Směrování přes Tor je zapnuté, ale klienta Tor se nepodařilo spustit. Synchronizace je pozastavená, dokud to nepůjde — nic se neodesílá přímo.",
+      "postureActive": "Synchronizace jde přes Tor",
+      "postureConnecting": "Připojuje se k Toru — synchronizace je pozastavená",
+      "postureConnectingDetail": "Obvykle to trvá pár sekund. Mezitím se nic neodesílá přímo.",
+      "postureExempt": "Synchronizace Tor nepoužívá — tato adresa ukazuje na toto zařízení",
+      "postureExemptDetail": "Adresa synchronizačního serveru, kterou jste nastavili, označuje tento počítač, takže připojení Myne k ní nevede přes okruh Tor. Pokud tato adresa přeposílá dál na server někde jinde, Myne to nevidí a nemůže to směrovat. Synchronizace není pozastavená.",
+      "postureHeading": "Právě teď",
+      "postureInactive": "Synchronizace jde přímo na synchronizační server",
+      "postureUnavailable": "Tor není dostupný — synchronizace je pozastavená",
+      "postureUnavailableDetail": "Nic se neodesílá přímo. Vypněte a znovu zapněte toto nastavení, aby se klient Tor pokusil spustit, nebo ho vypněte a synchronizujte bez Toru.",
+      "residualExit": "Poslední uzel okruhu Tor — výstupní uzel — vidí, ke kterému synchronizačnímu serveru se připojujete. Nemůže přečíst, co synchronizujete; to zůstává šifrované od konce ke konci.",
+      "residualMetadata": "Synchronizační server stále vidí, kdy synchronizujete, kolik bloků odesíláte a jak jsou velké a kolik máte zařízení. Tor na tom nic nemění.",
+      "residualPayment": "Pokud platíte za hostovanou synchronizaci, platba i váš účet mohou být stále spojeny s vaší osobou. Tor mění to, odkud připojení přichází, ne fakturační stopu.",
+      "residualScope": "Přes Tor jde jen vlastní synchronizační provoz Myne. Nic dalšího na tomto zařízení ne.",
+      "residualsToggle": "Co to neskryje",
+      "torHelper": "Skryje vaši IP adresu a polohu před synchronizačním serverem a před vaší sítí a poskytovatelem internetu skryje, se kterým serverem synchronizujete — stále uvidí, že se toto zařízení připojuje k Toru. Nedělá vás anonymními vůči Myne a neskrývá před serverem, co ani kdy synchronizujete.",
+      "torLabel": "Směrovat synchronizaci přes Tor"
+    },
     "prefs": {
       "saveError": "Předvolbu se nepodařilo uložit — zkuste to znovu"
+    },
+    "reminders": {
+      "aria": "Zobrazovat připomínky úkolů na tomto zařízení",
+      "exactAllow": "Povolit",
+      "exactLabel": "Přesné načasování",
+      "exactOn": "Zapnuto",
+      "horizon": "Připomínky jsou zaregistrovány do {{date}}. Otevřete Myne do té doby, aby chodily dál.",
+      "label": "Připomínky úkolů",
+      "saveError": "Toto nastavení se nepodařilo uložit. Zkuste to znovu.",
+      "showTextAria": "Zobrazit text úkolu v oznámení",
+      "showTextLabel": "Zobrazit text úkolu"
     },
     "privacy": {
       "autoLockHelper": "Zamknout trezor po této době nečinnosti.",
@@ -2572,7 +2939,7 @@
     "shell": {
       "closeLabel": "Zavřít nastavení",
       "groups": {
-        "developer": ""
+        "developer": "Developer"
       },
       "navLabel": "Panely nastavení",
       "panels": {
@@ -2582,7 +2949,9 @@
         "appearance": "Vzhled",
         "editor": "Editor",
         "files": "Soubory",
+        "transcription": "Přepis",
         "hotkeys": "Klávesové zkratky",
+        "network": "Síť",
         "privacy": "Soukromí",
         "storage": "Úložiště",
         "sync": "Synchronizace"
@@ -2632,6 +3001,8 @@
       "lineSpacingHelper": "Svislý prostor mezi řádky.",
       "lineSpacingLabel": "Řádkování",
       "textSizeHelper": "Základní velikost textu editoru. Nadpisy se podle ní škálují.",
+      "previewLabel": "Náhled",
+      "previewBody": "Příliš žluťoučký kůň úpěl ďábelské ódy. Nastavení typografie mění, jak se čte každá poznámka, takže se tato ukázka mění podle vaší volby.",
       "textSizeLabel": "Velikost textu"
     },
     "viewMode": {
@@ -2679,6 +3050,19 @@
     "sectionOptions": "Možnosti",
     "footerTagline": "myne · šifrováno na tomto zařízení · open source",
     "editor": {
+      "sections": {
+        "text": "Text a zobrazení",
+        "editing": "Úpravy",
+        "writing": "Psaní",
+        "features": "Funkce"
+      },
+      "preview": {
+        "heading": "Příliš žluťoučký kůň",
+        "bullet1": "Nechť již hříšné saxofony ďáblů rozezvučí síň",
+        "bullet2": "Zvlášť zákeřný učeň s ďolíčky běží podél zóny úlů",
+        "spellCaption": "Kontrola pravopisu",
+        "spellSample": "chibně"
+      },
       "defaultView": "Výchozí zobrazení",
       "typewriter": "Posouvání jako psací stroj",
       "typewriterSubtitle": "Udržovat kurzor svisle na středu",
@@ -2694,6 +3078,7 @@
         "lastActiveNoteDesc": "Synchronizuje, kterou poznámku jste měli otevřenou, abyste mohli pokračovat na jiném zařízení."
       },
       "keywords": {
+        "aiAutoTag": "automatické značky značka návrhy navrhovat štítky popisky ai auto tag tags",
         "aiEnable": "ai umělá inteligence místní lokální zapnout vypnout povolit zakázat strojové učení local",
         "aiExcluded": "vyloučené složky výjimky ignorovat ai soukromí vyloučit excluded folders",
         "aiModels": "modely model gguf stáhnout stažení textový vektory embedding llm ai",
@@ -2704,6 +3089,9 @@
         "buildChannel": "sestavení kanál verze vydání stabilní beta noční build channel",
         "changePassword": "změna hesla změnit heslo přístupová fráze přihlašovací údaje aktualizovat reset password",
         "changelog": "seznam změn novinky poznámky k vydání historie co je nového changelog",
+        "cliAccess": "cli terminál přístup příkazová řádka shell příkaz myne konzole command line",
+        "cliExcludedFolders": "cli vyloučené složky terminál vyloučit skrýt příkazová řádka soukromé excluded folders",
+        "cliRateLimit": "cli omezení rychlosti terminál rychlost omezit hromadně tempo příkazů za minutu rate limit",
         "clipper": "výstřižkovač výstřižky prohlížeč rozšíření web zachytit clipper chrome firefox",
         "contentWidth": "šířka obsahu sloupec čtení délka řádku sazba content width",
         "customThemes": "vlastní motivy motiv paleta barvy vzhled importovat theme",
@@ -2712,6 +3100,7 @@
         "export": "export exportovat markdown dešifrovat prosté soubory dokumenty",
         "focusMode": "režim soustředění psací stroj ztlumit neaktivní řádky bez rozptýlení focus mode",
         "font": "písmo font řez rodina bezpatkové patkové mono typografie sans serif",
+        "graphSettings": "graf vzhled fyzika síly uzly odkazy rozložení barevné skupiny popisky plátno graph",
         "hotkeys": "klávesové zkratky klávesnice zkratky mapování kláves hotkeys keybindings keymap",
         "import": "import importovat poznámky obsidian notion evernote enex html csv migrace přenést převod",
         "language": "jazyk jazyky lokalizace rozhraní překlad ui locale",
@@ -2721,7 +3110,9 @@
         "vimMode": "vim modální editace normální vkládání vizuální klávesnice klávesy",
         "lineSpacing": "řádkování mezera mezi řádky výška typografie čitelnost line spacing",
         "newNoteLocation": "umístění nových poznámek složka výchozí kde se vytvářejí poznámky new note",
+        "torRouting": "tor směrování onion proxy síť ip adresa poloha skrýt synchronizace anonymita routing",
         "quickUnlock": "rychlé odemknutí pin touch id biometrie obličej odemknout face",
+        "reminders": "připomínky oznámení upozornění úkol termín připomenout notifikace reminders",
         "realtimeSync": "synchronizace v reálném čase živé připojení dotazování real time sync",
         "screenCapture": "snímání obrazovky ochrana snímek nahrávání blokovat soukromí screenshot",
         "showEditTimes": "časy úprav časové značky upraveno data poznámky zobrazit timestamps",
@@ -2729,6 +3120,8 @@
         "spellLanguages": "jazyky kontroly pravopisu slovníky lokalizace slova spell languages",
         "startupOpen": "spuštění otevřít výchozí soubor start která poznámka startup",
         "attachmentOcr": "ocr obrázek sken naskenované pdf fotka snímek obrazovky rozpoznávání textu hledání uvnitř přílohy procesor baterie",
+        "attachmentCompression": "komprimovat komprese obrázek zmenšit zmenšení změna velikosti webp jpeg import vložit velikost trezoru úložiště compression",
+        "transcription": "přepis přepsat řeč hlas zvuk diktování titulky whisper nahrávka převod řeči na text transcription",
         "syncAddDevice": "přidat zařízení spárovat propojit telefon notebook synchronizace sync",
         "syncConflicts": "konflikty konflikt sloučit vyřešit řešení verze synchronizace sync merge conflicts",
         "syncDevices": "zařízení propojená spárovaná synchronizace počítače sync devices",
@@ -2790,6 +3183,15 @@
       "label": "Sestavuje se index vyhledávání…"
     },
     "conflicts": {
+      "compare": "Porovnat",
+      "compareClose": "Zpět na konflikty",
+      "compareError": "Tyto poznámky se nepodařilo přečíst k porovnání. Zkuste to znovu.",
+      "compareIdentical": "Tyto dvě verze jsou totožné.",
+      "compareLoading": "Načítají se obě verze…",
+      "compareMine": "Na tomto zařízení",
+      "compareOrphan": "Poznámka, ze které tato kopie pochází, tu už není, takže není s čím ji porovnat.",
+      "compareTheirs": "Konfliktní kopie",
+      "compareTitle": "Porovnání „{{title}}“",
       "discard": "Zahodit",
       "empty": "Žádné konflikty — vaše zařízení jsou synchronizovaná.",
       "groupTitle_one": "{{count}} konfliktní kopie poznámky {{original}}",
@@ -2855,11 +3257,15 @@
     },
     "endpoint": {
       "connect": "Připojit",
+      "connected": "Připojeno",
       "connectedLocal": "Připojeno (místně, bez TLS).",
       "connectedTls": "Připojeno. Zkontrolujte, že se tento otisk shoduje s vaším druhým zařízením.",
       "connectedPlatformTrust": "Připojeno přes TLS. Váš prohlížeč ověřil certifikát tohoto serveru.",
       "connecting": "Připojuje se…",
       "fingerprintLabel": "Otisk certifikátu serveru:",
+      "confirmFingerprintRequired": "Směrování přes Tor je zapnuté, takže toto zařízení nebude důvěřovat certifikátu, který nemá zadaný předem. Získejte otisk certifikátu SHA-256 svého serveru přímo ze serveru nebo ze zařízení, které je už připojené, a vložte ho sem.",
+      "confirmFingerprintMismatch": "Certifikát, který tento server předložil, není ten, který jste zadali. Nic nebylo uloženo. Zkontrolujte otisk, který jste vložili — a pokud je správný, nepřipojujte se: mezi tímto zařízením a vaším serverem něco je.",
+      "confirmFingerprintDeclined": "Nic nebylo uloženo — toto zařízení není k tomu serveru připojené. Vraťte se, až budete mít otisk jeho certifikátu.",
       "pinStatic": "Ověřeno proti vestavěnému certifikátu Myne.",
       "pinTofu": "Připnuto při prvním připojení. Porovnejte tento otisk mezi svými zařízeními.",
       "fixedOrigin": "Tento klient se synchronizuje s jedním serverem, nastaveným při jeho nasazení. Odsud jej nelze změnit — stránka smí komunikovat jen s touto jedinou adresou.",
@@ -2890,6 +3296,22 @@
       "submit": "Přidat toto zařízení",
       "wordAria": "Slovo {{number}}"
     },
+    "fingerprint": {
+      "title": "Než tomuto serveru budete důvěřovat, zkontrolujte jeho certifikát",
+      "why": "Směrování přes Tor je zapnuté, takže toto první připojení dosáhne serveru přes uzel provozovaný cizím člověkem. Dokud není certifikát připnutý, přijalo by toto zařízení jakýkoli certifikát, který mu bude podán — včetně takového, který si ten uzel vymyslel. Zadejte otisk, který váš server zveřejňuje, a Myne ho porovná dřív, než cokoli připne. Pokud nesouhlasí, nic se neuloží.",
+      "label": "Očekávaný otisk certifikátu",
+      "placeholder": "Otisk SHA-256 z vašeho serveru",
+      "echoLabel": "Co jste zadali",
+      "echoComplete": "64 z 64 znaků. Než budete pokračovat, porovnejte to s vlastní kopií.",
+      "echoProgress": "Zatím {{count}} z {{total}} znaků.",
+      "echoInvalid": "Otisk SHA-256 má 64 znaků, každý z nich 0–9 nebo a–f. Dvojtečky, mezery a úvodní „sha256:“ nevadí — cokoli dalšího do něj nepatří.",
+      "helpToggle": "Kde tento otisk najdu?",
+      "helpNotOverTor": "Ne přes toto připojení. Otisk, který stáhnete přes tentýž okruh, nedokazuje nic — co by dokázalo vyměnit certifikát, vymění i tu stránku.",
+      "helpFromServer": "Na počítači, kde běží váš server: openssl x509 -noout -fingerprint -sha256 -in <soubor vašeho certifikátu>",
+      "helpFromDevice": "Na zařízení, které už je k tomuto účtu připojené: Nastavení → Synchronizace ukazuje stejný otisk.",
+      "helpNoFingerprint": "Pokud ho nemůžete získat ani jedním z těchto způsobů, nelze tento server přidat, dokud je zapnuté směrování přes Tor. Směrování přes Tor můžete vypnout v Nastavení → Síť a připojit se přímo — tím se vaše IP adresa ukáže serveru i každému, kdo vidí do vaší sítě.",
+      "decline": "Nemám ho — zrušit"
+    },
     "join": {
       "accountLabel": "Číslo účtu",
       "cancel": "Zrušit",
@@ -2898,6 +3320,8 @@
       "help": "Přihlaste se pomocí čísla účtu a hesla. Toto zařízení začne synchronizovat vaše poznámky, jakmile ho schválí některé stávající zařízení. Fráze pro obnovení není potřeba.",
       "passwordLabel": "Heslo",
       "pinnedCompare": "Toto zařízení připnulo certifikát vašeho serveru. Zkontrolujte, že se tento otisk shoduje na vašich ostatních zařízeních.",
+      "confirmFingerprintRequired": "Směrování přes Tor je zapnuté, takže toto zařízení nebude důvěřovat certifikátu, který nemá zadaný předem. Získejte otisk certifikátu SHA-256 svého serveru přímo ze serveru nebo ze zařízení, které je už připojené, a vložte ho sem.",
+      "confirmFingerprintMismatch": "Certifikát, který tento server předložil, není ten, který jste zadali. Toto zařízení nebylo přidáno a nic nebylo uloženo. Zkontrolujte otisk, který jste vložili — a pokud je správný, nepokračujte: mezi tímto zařízením a vaším serverem něco je.",
       "pinnedTitle": "Certifikát serveru připnut",
       "serverLabel": "Synchronizační server",
       "serverPlaceholder": "https://your-server.example",
@@ -2932,6 +3356,7 @@
         "deleteConfirmTitle": "Smazat tuto obnovenou poznámku?",
         "deleteConfirmWarning": "Tímto se trvale smaže jediná kopie uchovaná na tomto zařízení. Tuto akci nelze vrátit zpět.",
         "deleteCta": "Smazat",
+        "empty": "Žádné obnovené poznámky.",
         "errorGeneric": "Něco se pokazilo. Zkuste to znovu.",
         "helper": "Když se zde odstraní poznámka smazaná na jiném zařízení, její zašifrovaná kopie zůstane na tomto zařízení. Obnovte ji jako novou poznámku, nebo ji trvale smažte.",
         "label": "Obnovené poznámky",
@@ -3023,7 +3448,70 @@
       "conflictsNeedReview_other": "{{count}} konfliktů vyžaduje kontrolu",
       "catchingUp": "Doháním synchronizaci — vaše poznámky jsou v bezpečí.",
       "verifyDevices": "Ověřit zařízení"
+    },
+    "tor": {
+      "connecting": "Připojuje se k Toru. Synchronizace je pozastavená, dokud nebude připojení připravené — nic se neodesílá přímo.",
+      "settingsHint": "Nastavení → Síť",
+      "unavailable": "Tor není dostupný, takže je synchronizace pozastavená. Nic se neodesílá přímo. Chcete-li synchronizovat bez něj, vypněte směrování přes Tor."
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "Libovolné",
+      "due": "Termín",
+      "folder": "Složka",
+      "insert": "Vložit",
+      "noDueDate": "Bez termínu",
+      "priority": "Priorita",
+      "sort": "Seřadit podle",
+      "sortDue": "Termín",
+      "sortPath": "Poznámka",
+      "sortPriority": "Priorita",
+      "status": "Stav",
+      "statusDone": "Dokončeno",
+      "statusTodo": "Nedokončeno",
+      "tag": "Značka"
+    },
+    "empty": {
+      "filter": "Právě teď tu nic není. Zkuste jiný filtr.",
+      "rebuilding": "Čtou se vaše poznámky…",
+      "scope": "V této složce ani značce nejsou žádné úkoly. Zkuste rozšířit rozsah.",
+      "vault": "Zatím žádné úkoly. Napište v libovolné poznámce na řádek „- [ ]“ a vytvoříte ho."
+    },
+    "filter": {
+      "all": "Vše",
+      "overdue": "Po termínu",
+      "today": "Dnes",
+      "upcoming": "Nadcházející"
+    },
+    "noteTitle": "Úkoly v této poznámce",
+    "query": {
+      "dropped_one": "{{count}} podmínka, kterou Myne nedokázal přečíst",
+      "dropped_few": "{{count}} podmínky, které Myne nedokázal přečíst",
+      "dropped_many": "{{count}} podmínky, které Myne nedokázal přečíst",
+      "dropped_other": "{{count}} podmínek, které Myne nedokázal přečíst",
+      "empty": "Tomuto dotazu neodpovídají žádné úkoly.",
+      "loading": "Čtou se vaše poznámky…",
+      "refused": "Myne nedokázal přečíst nic z tohoto dotazu, takže raději nezobrazuje nic než všechno.",
+      "remainder_one": "Odpovídá ještě {{count}} úkol",
+      "remainder_few": "Odpovídají ještě {{count}} úkoly",
+      "remainder_many": "Odpovídá ještě {{count}} úkolu",
+      "remainder_other": "Odpovídá ještě {{count}} úkolů"
+    },
+    "reminder": {
+      "due": "Je čas na připomínku úkolu."
+    },
+    "row": {
+      "completed": "Úkol, dokončeno",
+      "notCompleted": "Úkol, nedokončeno",
+      "tooLongToWrite": "Řádek tohoto úkolu je příliš dlouhý na úpravu odsud. Otevřete raději jeho poznámku.",
+      "untitled": "Úkol bez názvu"
+    },
+    "scope": {
+      "allFolders": "Všechny složky",
+      "label": "Zúžit podle"
+    },
+    "title": "Úkoly"
   },
   "templates": {
     "manager": {
@@ -3103,6 +3591,8 @@
     "recoveryLink": "Zapomněli jste heslo? Odemknout pomocí fráze pro obnovení",
     "submit": "Odemknout",
     "subtitle": "Pro pokračování zadejte své heslo.",
+    "subtitlePin": "Pro pokračování zadejte svůj PIN.",
+    "subtitleBiometric": "Pro pokračování potvrďte pomocí Touch ID.",
     "suspicion": {
       "lockedDuringChange": "Změna hesla zrušena: trezor byl uzamčen.",
       "metaChangedExternally": "Trezor byl upraven v jiné relaci — odemkněte prosím znovu."
@@ -3318,6 +3808,7 @@
   "vaultPicker": {
     "createAnother": "Vytvořit další trezor",
     "heading": "Vyberte trezor",
+    "joinDevice": "Přidat toto zařízení k účtu",
     "loading": "Načítají se vaše trezory…",
     "noneLoaded": "Žádné trezory se teď nepodařilo načíst.",
     "openedRelative": "otevřeno {{rel}}",
@@ -3374,6 +3865,7 @@
   "vaultSwitcher": {
     "chipFallback": "Trezor",
     "createAnother": "Vytvořit další trezor",
+    "joinDevice": "Přidat toto zařízení k účtu",
     "switching": "přepíná se…",
     "switchVaultLabel": "Přepnout trezor",
     "vaultFallback": "Trezor {{n}}"
@@ -3382,6 +3874,7 @@
     "createCta": "Vytvořit nový trezor",
     "headlineLine1": "Šifrované poznámky v Markdownu.",
     "headlineLine2": "Žádný e-mail při registraci.",
+    "joinCta": "Přidat toto zařízení k účtu",
     "repairResidue": {
       "cancel": "Zrušit",
       "cleaningUp": "Uklízí se…",

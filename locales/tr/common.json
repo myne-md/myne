@@ -83,9 +83,12 @@
       "colType": "Tür",
       "colUsedIn": "Kullanıldığı yer",
       "decrypting": "Ekler çözülüyor…",
+      "clearSearchAriaLabel": "Aramayı temizle",
+      "emptyClearSearch": "Aramayı temizle",
       "emptyImportHint": "Kasanızda tutmak için bir dosya içe aktarın.",
       "emptyLoadError": "Ek kataloğu okunamadı.",
       "emptyNoAttachments": "Henüz ek yok.",
+      "emptyNoResultsTitle": "Aramanızla eşleşen ek yok.",
       "filterAriaLabel": "Türe göre filtrele",
       "gridView": "Izgara görünümü",
       "import": "İçe aktar",
@@ -98,6 +101,7 @@
       "menuPreview": "Önizle",
       "menuRename": "Yeniden adlandır",
       "menuTranscribe": "Yazıya dök",
+      "menuViewTranscription": "Metin dökümünü görüntüle",
       "noMatch": "Aramanızla eşleşen ek yok.",
       "noUnusedNotice": "Temizlenecek kullanılmayan ek yok.",
       "preview": "Önizle",
@@ -115,8 +119,14 @@
       "title": "Ekler",
       "transcribeDone": "Yazıya dökme tamamlandı.",
       "transcribeFailed": "Yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
+      "transcribeFeatureOff": "Konuşmadan metne kapalı. Ayarlar → Yazıya dökme bölümünden açın.",
+      "transcribeModelLoadFailed": "Konuşmadan metne modeli yüklenemedi. Myne’i yeniden kurun ya da Ayarlar → Geliştirici → Yapay Zeka bölümündeki özel modelinizi kontrol edin.",
+      "transcribeNoModelHint": "Konuşmadan metne modeli eksik. Myne’i yeniden kurmak onu geri getirir.",
       "transcribeNoModel": "Ayarlar → Developer → Yapay Zeka bölümünden bir yazıya dökme modeli seçin.",
       "transcribeStarted": "Yazıya dökülüyor…",
+      "transcribeVaultLocked": "Yazıya dökmek için kasanızın kilidini açın.",
+      "transcriptionModalClose": "Metin dökümünü kapat",
+      "transcriptionModalTitle": "Metin dökümü",
       "typeFilter": {
         "all": "Tüm türler",
         "audio": "Ses",
@@ -219,6 +229,15 @@
     "matchedInAttachmentTitle": "Sorgu, bu nota gömülü bir dosyanın içinde eşleşti",
     "matchedInBody": "↳ gövdede eşleşti",
     "noMatches": "Eşleşme yok",
+    "operatorHint": "Tamamlamak için Tab",
+    "operators": {
+      "tag": "Etiketi olan notlar",
+      "path": "Bir klasördeki notlar",
+      "file": "Not başlığıyla eşleş",
+      "section": "Başlığı olan notlar",
+      "task": "Görevi olan notlar",
+      "content": "Gövdede tam metin"
+    },
     "searchPlaceholder": "Notlarda ara veya bir komut çalıştır — kapatmak için Esc",
     "sectionCommands": "Komutlar",
     "sectionNotes": "Notlar",
@@ -469,6 +488,9 @@
       "showGraph": {
         "label": "Grafik görünümünü göster…"
       },
+      "showTasks": {
+        "label": "Görevleri göster"
+      },
       "showTags": {
         "label": "Etiketlere göz at…"
       },
@@ -507,9 +529,11 @@
         "cycleHeadingLevel": "Başlık düzeyini değiştir",
         "cycleTabs": "Sekmeler arasında geç",
         "deleteWorkspace": "Çalışma alanını sil",
+        "findInNote": "Notta bul",
         "focusNextPane": "Sonraki bölmeye odaklan",
         "focusPrevPane": "Önceki bölmeye odaklan",
         "foldAll": "Tümünü daralt",
+        "indent": "Girinti ekle",
         "inlineCode": "Satır içi kod",
         "insertWikilink": "Wikilink ekle",
         "italic": "İtalik",
@@ -517,11 +541,15 @@
         "navigateForward": "İleri git",
         "newNote": "Yeni not",
         "openSettings": "Ayarları aç",
+        "outdent": "Girintiyi azalt",
         "paletteToggle": "Komut paletini aç",
+        "redo": "Yinele",
         "renameWorkspace": "Çalışma alanını yeniden adlandır",
         "saveWorkspaceAs": "Çalışma alanını farklı kaydet",
         "selectAllScoped": "Tümünü seç (kapsamlı)",
+        "selectNextOccurrence": "Sonraki eşleşmeyi seç",
         "showGraphView": "Grafik görünümünü göster",
+        "showTasks": "Görevleri göster",
         "splitPaneDown": "Bölmeyi böl (aşağı)",
         "splitPaneRight": "Bölmeyi böl (sağa)",
         "switchWorkspace": "Çalışma alanı değiştir",
@@ -531,6 +559,7 @@
         "toggleReadingView": "Okuma görünümünü aç/kapat",
         "toggleSourceMode": "Kaynak modunu aç/kapat",
         "toggleTaskList": "Görev listesini aç/kapat",
+        "undo": "Geri al",
         "unfoldAll": "Tümünü genişlet"
       }
     },
@@ -572,6 +601,12 @@
         "renamed": "{{name}} olarak yeniden adlandırıldı.",
         "renameFailed": "Ek yeniden adlandırılamadı.",
         "saveDialogFailed": "Kaydetme penceresi açılamadı."
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} görsel sıkıştırıldı: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} görsel sıkıştırıldı: {{from}} → {{to}}",
+        "notice": "Sıkıştırıldı: {{from}} → {{to}}",
+        "noticeContainerChanged": "{{format}} biçimine sıkıştırıldı: {{from}} → {{to}}"
       },
       "convert": {
         "cancel": "İptal",
@@ -649,7 +684,10 @@
         "exportAria": "Eki dışa aktar",
         "imagePreview": "Görsel önizlemesi",
         "pdfFallback": "PDF",
-        "pdfPreview": "PDF önizlemesi"
+        "pdfPreview": "PDF önizlemesi",
+        "zoomIn": "Yakınlaştır",
+        "zoomOut": "Uzaklaştır",
+        "zoomReset": "Yakınlaştırmayı sıfırla"
       },
       "menu": {
         "actionsAria": "Ek işlemleri"
@@ -730,6 +768,12 @@
           "deletedLabel": "silindi"
         },
         "transcribe": {
+          "cause": {
+            "featureOff": "Konuşmadan metne kapalı. Ayarlar → Yazıya dökme bölümünden açın.",
+            "modelLoadFailed": "Konuşmadan metne modeli yüklenemedi. Ayarlar → Geliştirici → Yapay Zeka bölümünde özel bir model belirlediyseniz dosyalarını kontrol edin; aksi hâlde Myne’i yeniden kurmak yerleşik modeli geri getirir.",
+            "noModel": "Konuşmadan metne modeli eksik. Myne’i yeniden kurmak onu geri getirir.",
+            "vaultLocked": "Yazıya dökmek için kasanızın kilidini açın."
+          },
           "disabledReason": "Yazıya dökmek için Ayarlar → Developer → Yapay Zeka bölümünden yapay zekayı açın.",
           "failed": "Yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
           "heading": "Metin dökümü",
@@ -772,6 +816,10 @@
         "linkedFrom": "{{count}} yerden bağlanmış",
         "linkedFrom_one": "{{count}} yerden bağlanmış",
         "linkedFrom_other": "{{count}} yerden bağlanmış",
+        "linksTo": "{{count}} nota bağlanıyor",
+        "linksTo_one": "{{count}} nota bağlanıyor",
+        "linksTo_other": "{{count}} nota bağlanıyor",
+        "outgoingEmpty": "Bu not henüz hiçbir şeye bağlanmıyor.",
         "untitled": "Başlıksız"
       },
       "barItems": {
@@ -889,6 +937,7 @@
           "aiChat": "Yapay Zeka Sohbeti",
           "backlinks": "Geri bağlantılar",
           "outline": "Ana hat",
+          "tasks": "Görevler",
           "unlinked": "Bağlantısız sözler"
         }
       },
@@ -922,9 +971,38 @@
         "toggleTitle": "Çalışma alanı: {{name}}"
       }
     },
+    "noteActions": {
+      "buttonLabel": "Not işlemleri",
+      "rename": "Yeniden adlandır",
+      "move": "Klasöre taşı…",
+      "duplicate": "Çoğalt",
+      "convertToTemplate": "Şablona dönüştür",
+      "convertToNote": "Nota dönüştür",
+      "turnedIntoTemplate": "Şablona dönüştürüldü",
+      "convertedToNote": "Nota dönüştürüldü",
+      "versionHistory": "Sürüm geçmişi",
+      "exportMarkdown": "Markdown olarak dışa aktar…",
+      "exportPdf": "PDF olarak dışa aktar…",
+      "exportHtml": "HTML olarak dışa aktar…",
+      "exportTxt": "Düz Metin olarak dışa aktar…",
+      "trash": "Çöp Kutusu’na taşı"
+    },
     "codeBlock": {
       "copyCode": "Kodu kopyala",
       "defaultBadge": "kod"
+    },
+    "drawingEmbed": {
+      "done": "Bitti",
+      "edit": "{{name}} çizimini düzenle",
+      "editAction": "Düzenle",
+      "empty": "Boş çizim — çizmek için tıklayın",
+      "open": "Aç",
+      "rename": "Çizimi yeniden adlandır"
+    },
+    "drawingMenu": {
+      "background": "Tuval arka planı",
+      "reset": "Tuvali sıfırla",
+      "toggleTheme": "Çizim temasını değiştir"
     },
     "find": {
       "close": "Aramayı kapat",
@@ -949,8 +1027,11 @@
       "unreferenced": "referanssız"
     },
     "frontmatter": {
+      "addListItem": "Öğe ekle…",
+      "addListItemAriaLabel": "{{key}} özelliğine öğe ekle",
       "addProperty": "+ Özellik ekle",
       "propertiesLabel": "Özellikler",
+      "removeListItemAriaLabel": "{{item}} öğesini kaldır",
       "titleAriaLabel": "Not başlığı",
       "titlePlaceholder": "Başlıksız"
     },
@@ -966,6 +1047,8 @@
       "date": "Tarih",
       "day": "Gün",
       "divider": "Ayırıcı",
+      "drawing": "Çizim",
+      "due": "Son tarih",
       "heading1": "Başlık 1",
       "heading2": "Başlık 2",
       "heading3": "Başlık 3",
@@ -975,8 +1058,11 @@
       "link": "Bağlantı",
       "now": "Şimdi",
       "numberedList": "Numaralı liste",
+      "priority": "Öncelik",
       "quote": "Alıntı",
+      "repeat": "Yineleme",
       "table": "Tablo",
+      "taskQuery": "Görev listesi",
       "time": "Saat",
       "todoList": "Yapılacaklar listesi",
       "voiceNote": "Sesli not",
@@ -998,6 +1084,27 @@
       "deleteRow": "Satırı sil",
       "reorderColumn": "Sütunu yeniden sırala",
       "reorderRow": "Satırı yeniden sırala"
+    },
+    "tagSuggestion": {
+      "label": "Önerilen etiketler",
+      "accept": "{{tag}} etiketini bu nota ekle",
+      "dismiss": "Önerilen {{tag}} etiketini yoksay"
+    },
+    "taskField": {
+      "addAffordance": "Görev alanı ekle",
+      "invalidDue": "Myne bu tarihi okuyamıyor, bu yüzden son tarih olarak gösterilmiyor.",
+      "invalidPriority": "Myne bu önceliği okuyamıyor. highest, high, medium, low veya lowest kullanın.",
+      "invalidRepeat": "Myne bu yineleme kuralını tanımıyor, bu yüzden bu görev yinelenmeyecek.",
+      "menuEdit": "{{field}} düzenle",
+      "menuTitle": "Alan ekle",
+      "repeatNoAnchor": "Bu görevin yineleneceği bir tarih yok, bu yüzden yinelenmeyecek. Başlatmak için bir son tarih ekleyin.",
+      "save": "Kaydet",
+      "skipOccurrence": "Bu tekrarı atla",
+      "title": {
+        "due": "Son tarih",
+        "repeat": "Yineleme",
+        "priority": "Öncelik"
+      }
     },
     "toolbar": {
       "apply": "Uygula",
@@ -1030,7 +1137,16 @@
         "green": "Yeşil",
         "pink": "Pembe",
         "purple": "Mor",
-        "yellow": "Sarı"
+        "yellow": "Sarı",
+        "orange": "Turuncu",
+        "red": "Kırmızı",
+        "teal": "Turkuaz",
+        "cyan": "Camgöbeği",
+        "lime": "Limon yeşili",
+        "brown": "Kahverengi",
+        "grey": "Gri",
+        "indigo": "Çivit mavisi",
+        "remove": "Vurguyu kaldır"
       },
       "urlPlaceholder": "Bağlantı URL’sini yapıştır"
     },
@@ -1375,11 +1491,17 @@
       "countEmpty": "Boş",
       "delete": "Sil",
       "deleteError": "Bu not silinemedi. Tekrar deneyin.",
+      "emptyBody": "Arşivlenen notlar ve klasörler kenar çubuğunda gizlenir ama güvende tutulur. İhtiyacınız olduğunda buradan geri yükleyin.",
+      "emptyTitle": "Arşivde bir şey yok",
+      "folderDeleteBody_one": "“{{name}}” ve içindeki {{count}} not",
+      "folderDeleteBody_other": "“{{name}}” ve içindeki {{count}} not",
       "emptyState": "Arşiv boş.",
       "folderDeleteConfirm_one": "{{count}} not Çöp Kutusu'na taşınsın mı?",
       "folderDeleteConfirm_other": "{{count}} not Çöp Kutusu'na taşınsın mı?",
       "folderDeleteConfirmCta": "Çöp Kutusu'na taşı",
       "folderDeleteError": "O klasörün notları Çöp Kutusu'na taşınamadı. Tekrar deneyin.",
+      "folderDeleteTitle": "Bu klasör Çöp Kutusu’na taşınsın mı?",
+      "folderDeleteWarning": "Çöp Kutusu’na taşınırlar — istediğiniz zaman geri yükleyebilirsiniz. Kalıcı silme ayrı bir adımdır.",
       "restore": "Geri yükle",
       "restoreError": "Bu not geri yüklenemedi. Tekrar deneyin.",
       "title": "Arşiv",
@@ -1469,6 +1591,24 @@
     "graph": {
       "allConnected": "Her şey bağlı — izole not yok.",
       "building": "Grafik oluşturuluyor…",
+      "colorGroups": {
+        "addRule": "Kural ekle",
+        "colorSwatchTitle": "Renk seçin",
+        "deleteRuleTitle": "Kuralı sil",
+        "dragHandleTitle": "Yeniden sıralamak için sürükleyin",
+        "editFilterButton": "Filtreyi düzenle…",
+        "editFilterTitle": "Renk grubu filtresini düzenle",
+        "emptyBody": "Renk grupları, grafik düğümlerini etikete veya klasöre göre renklendirmenizi sağlar — iş notları bir renkte, kişisel notlar başka bir renkte. İlk kuralınızı ekleyin.",
+        "emptyTitle": "Henüz renk grubu yok",
+        "enableToggleAriaLabel": "Kuralı etkinleştir",
+        "filterAllNotes": "Her notla eşleşir",
+        "filterConditions_one": "{{count}} koşul",
+        "filterConditions_other": "{{count}} koşul",
+        "heading": "Renk grupları",
+        "moveDown": "Kuralı aşağı taşı",
+        "moveUp": "Kuralı yukarı taşı",
+        "namePlaceholder": "Başlıksız kural"
+      },
       "depthToggleTitle": "Komşuluk derinliğini değiştir (1 ↔ 2 adım)",
       "filterAll": "Tümü",
       "filterAroundNote": "Bu notun çevresinde",
@@ -1480,6 +1620,23 @@
       "overCap": "Bu kasa büyük — tüm kasa grafiği sınırlandırıldı. Keşfetmek için bir etikete filtreleyin veya izole notları gösterin.",
       "refresh": "Yenile",
       "refreshTitle": "Kasa değişti — grafiği yeniden oluştur",
+      "settings": {
+        "appearanceHeading": "Görünüm",
+        "closeTitle": "Kapat",
+        "forceCenter": "Merkez çekimi",
+        "forceLinkDistance": "Bağlantı mesafesi",
+        "forceLinkStrength": "Bağlantı gücü",
+        "forceRepel": "İtme",
+        "forcesHeading": "Kuvvetler",
+        "labelFadeZoom": "Etiket solması",
+        "lineThickness": "Çizgi kalınlığı",
+        "nodeSize": "Düğüm boyutu",
+        "nodeSizeStrength": "Bağlantıya göre boyut",
+        "openTitle": "Grafik ayarları",
+        "reset": "Varsayılanlara sıfırla",
+        "showArrows": "Yön oklarını göster",
+        "title": "Grafik ayarları"
+      },
       "tagPlaceholder": "Etiket…"
     },
     "import": {
@@ -1538,6 +1695,7 @@
         "setupIntro": "Myne’i mevcut Obsidian kasa klasörünüze yönlendirin. Her Markdown notu anında içe aktarılır ve şifrelenir — hiçbir şey bu cihazdan ayrılmaz ve özgün dosyalarınıza dokunulmaz.",
         "statCancelled": "İptal edildi",
         "statCanvasSkipped": ".canvas dosyaları atlandı",
+        "statCompressed": "Sıkıştırılan görseller",
         "statEmptyFoldersKept": "Boş klasörler korundu",
         "statMedia": "Medya",
         "statOtherSkipped": "Diğer dosyalar atlandı",
@@ -1551,7 +1709,19 @@
         "titlePick": "Notları içe aktar",
         "keepsLabel": "Neler aktarılır",
         "losesLabel": "Neler aktarılmaz",
-        "changeSource": "Kaynağı değiştir"
+        "changeSource": "Kaynağı değiştir",
+        "statExcalidrawSkipped": "Atlanan Excalidraw çizimleri",
+        "unfollowedLinkOutside": "Bu, seçtiğiniz klasörün dışındaki bir klasöre giden bir kısayol, bu yüzden Myne onu izlemedi. O klasörü kasanızın içine taşıyın ya da kopyalayın, sonra yeniden içe aktarın.",
+        "unfollowedLinkLoop": "Bu kısayol, Myne’in zaten içinde olduğu bir klasöre geri işaret ediyor; onu izlemek sonsuza dek dönüp dururdu. Altındaki hiçbir şey atlanmadı.",
+        "unfollowedLinkBroken": "Bu kısayol hiçbir yere gitmiyor — işaret ettiği şey taşınmış ya da silinmiş.",
+        "unreadableDetail": "Atlandı — {{reason}} İçe aktarmanın geri kalanı sürdü.",
+        "stoppedAt": "Bu durmadan önce {{total}} nottan {{imported}} tanesi içe aktarıldı. Kasanızdalar ve tutmak güvenli.",
+        "reasonNotUtf8": "Myne bu dosyayı metin olarak okuyamadı. Muhtemelen eski bir kodlamayla kaydedilmiş ya da hiç metin dosyası değil.",
+        "reasonPathRejected": "Myne, seçtiğiniz klasörün içinde bu dosyaya ulaşamadı.",
+        "reasonPermissionDenied": "Myne’in bu dosyayı okuma izni yoktu.",
+        "reasonNotFound": "Myne bu dosyaya ulaştığında dosya gitmişti.",
+        "reasonNoSpace": "Bu cihazda yer kalmadı.",
+        "reasonUnknown": "Myne nedenini söyleyemedi."
       },
       "offer": {
         "body": "Mevcut notlarınızı Myne’e getirin. Her biri içe aktarılırken şifrelenir — hiçbir şey bu cihazdan ayrılmaz ve özgün dosyalarınız tam olduğu yerde kalır.",
@@ -1615,6 +1785,7 @@
       "bulkDelete": "{{count}} notu sil",
       "bulkDelete_one": "{{count}} notu sil",
       "bulkDelete_other": "{{count}} notu sil",
+      "moveTo": "Şuraya taşı…",
       "bulkMove": "{{count}} notu şuraya taşı…",
       "bulkMove_one": "{{count}} notu şuraya taşı…",
       "bulkMove_other": "{{count}} notu şuraya taşı…",
@@ -1644,6 +1815,7 @@
       "newFolder": "Yeni klasör",
       "newFolderInPlaceholder": "{{path}} içinde yeni klasör",
       "newFolderPlaceholder": "Yeni klasör",
+      "newItem": "Yeni…",
       "newNote": "Yeni not",
       "newNoteFromTemplate": "Şablondan yeni not…",
       "newNoteHere": "Burada yeni not",
@@ -1676,12 +1848,18 @@
       "trashSingleError": "Not Çöp Kutusu’na taşınamadı.",
       "undo": "Geri al",
       "vaultRoot": "Kasa kökü",
-      "viewSettingsTitle": "Görünüm ayarları"
+      "viewSettingsTitle": "Görünüm ayarları",
+      "imported_one": "Bu klasöre 1 not içe aktarıldı",
+      "imported_other": "Bu klasöre {{count}} not içe aktarıldı",
+      "importedWithSkips": "{{count}} içe aktarıldı — {{skipped}} atlandı",
+      "importNoMarkdown": "Bırakılanlarda markdown dosyası yok"
     },
     "newFromTemplate": {
       "back": "Geri",
       "blankNote": "Boş not",
       "createNote": "Not oluştur",
+      "createFirstTemplate": "Şablon oluştur",
+      "manageTemplates": "Şablonları yönet",
       "emptyState": "Henüz hiç şablon oluşturmadınız.",
       "listLabel": "Şablonlar",
       "loading": "Yükleniyor…",
@@ -1696,12 +1874,14 @@
       "createDrawing": "Yeni çizim",
       "noNotesMatch": "Eşleşen not yok.",
       "noNotesYet": "Henüz not yok.",
+      "recent": "Son kullanılanlar",
       "searchAriaLabel": "Açılacak notları ara",
       "searchPlaceholder": "Notlarda ara…",
       "untitled": "Başlıksız"
     },
     "pane": {
       "graphTab": "Grafik",
+      "tasksTab": "Görevler",
       "loading": "Yükleniyor…",
       "untitledView": "Başlıksız görünüm"
     },
@@ -1723,6 +1903,8 @@
       "loadError": "Bu not yüklenemedi",
       "removeFromFavorites": "Favorilerden çıkar",
       "renameAriaLabel": "Notu yeniden adlandır",
+      "taskBadgeLabel": "Bu not bir görev",
+      "taskBadgeTitle": "Görev notu",
       "unsyncedLabel": "Henüz sunucuda değil",
       "unsyncedTitle": "Bu notun son değişiklikleri yalnızca bu cihazda",
       "untitled": "Başlıksız"
@@ -1755,7 +1937,12 @@
       "cancel": "İptal",
       "changeCount_one": "Bu anlık görüntüden bu yana {{count}} değişiklik",
       "changeCount_other": "Bu anlık görüntüden bu yana {{count}} değişiklik",
+      "changeCountPrev_one": "Önceki anlık görüntüye göre {{count}} değişiklik",
+      "changeCountPrev_other": "Önceki anlık görüntüye göre {{count}} değişiklik",
       "close": "Kapat",
+      "compareAgainstLabel": "Şununla karşılaştır",
+      "compareCurrent": "Geçerli not",
+      "comparePrevious": "Önceki anlık görüntü",
       "confirmBody": "Mevcut notunuz önce bir anlık görüntü olarak kaydedilir, böylece bunu geri alabilirsiniz.",
       "confirmTitle": "Bu anlık görüntü geri yüklensin mi?",
       "decrypting": "Şifre çözülüyor…",
@@ -1770,6 +1957,7 @@
       "justNow": "az önce",
       "listLabel": "Anlık görüntü listesi",
       "loading": "Yükleniyor…",
+      "noPrevious": "Bu en eski anlık görüntü — karşılaştırılacak daha öncesi yok.",
       "restore": "Geri yükle",
       "restoreCta": "Bu anlık görüntüyü geri yükle",
       "restoredStatus": "Geri yüklendi. Sahip olduğunuz sürüm bir anlık görüntü olarak kaydedildi.",
@@ -1823,6 +2011,8 @@
       "emptyConfirmTitle": "Çöp Kutusu boşaltılsın mı?",
       "emptyPartialFailure_one": "{{count}} not silinemedi ve Çöp Kutusu’nda kaldı.",
       "emptyPartialFailure_other": "{{count}} not silinemedi ve Çöp Kutusu’nda kaldı.",
+      "emptyBody": "Sildiğiniz notlar buraya düşer. Çöp Kutusu’nu boşaltana kadar burada kalırlar — istediğiniz zaman herhangi birini geri yükleyebilirsiniz.",
+      "emptyTitle": "Çöp Kutusu boş",
       "emptyState": "Çöp Kutusu boş.",
       "purgeConfirmCta": "Kalıcı olarak sil",
       "purgeConfirmTitle": "Kalıcı olarak silinsin mi?",
@@ -1871,6 +2061,8 @@
         "viewSettings": "Görünüm ayarları…"
       },
       "newView": "Yeni görünüm",
+      "noMatch": "Aramanızla eşleşen görünüm yok.",
+      "searchPlaceholder": "Görünümlerde ara…",
       "table": {
         "empty": "Bu görünümle eşleşen not yok",
         "name": "Ad",
@@ -1967,6 +2159,71 @@
     "passwordHelper": "Asla saklanmaz, asla iletilmez. Anahtarlarınızı bu cihazda şifreler.",
     "encryptingSubtitle": "Kasa anahtarlarınız yeni parolanızla sarmalanıyor."
   },
+  "recurrence": {
+    "every": {
+      "day": "her gün",
+      "week": "her hafta",
+      "month": "her ay",
+      "year": "her yıl"
+    },
+    "everyN": {
+      "day": "{{count}} günde bir",
+      "week": "{{count}} haftada bir",
+      "month": "{{count}} ayda bir",
+      "year": "{{count}} yılda bir"
+    },
+    "everyWeekday": "her {{days}}",
+    "everyWeekdays": "her {{days}}",
+    "ordinal": {
+      "first": "birinci",
+      "second": "ikinci",
+      "third": "üçüncü",
+      "fourth": "dördüncü",
+      "last": "son"
+    },
+    "ordinalOfMonth": "her ayın {{ordinal}} {{weekday}} günü",
+    "dayOfMonth": "her ayın {{day}}. günü",
+    "lastDayOfMonth": "her ayın son günü",
+    "weekday": {
+      "monday": "Pazartesi",
+      "tuesday": "Salı",
+      "wednesday": "Çarşamba",
+      "thursday": "Perşembe",
+      "friday": "Cuma",
+      "saturday": "Cumartesi",
+      "sunday": "Pazar"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, tamamlandığında",
+    "builder": {
+      "family": "Yineleme",
+      "familyInterval": "Her…",
+      "familyWeekdays": "Haftalık, şu günlerde…",
+      "familyDayOfMonth": "Aylık, ayın belirli bir gününde…",
+      "familyOrdinal": "Aylık, belirli bir hafta gününde…",
+      "count": "Aralık",
+      "unitLabel": "Birim",
+      "units": {
+        "day": "gün",
+        "week": "hafta",
+        "month": "ay",
+        "year": "yıl"
+      },
+      "ordinal": "Konum",
+      "weekday": "Hafta günü",
+      "lastDay": "Son gün",
+      "whenDone": "Tamamlandığı tarihten itibaren yinele",
+      "weekdayShort": {
+        "monday": "Pzt",
+        "tuesday": "Sal",
+        "wednesday": "Çar",
+        "thursday": "Per",
+        "friday": "Cum",
+        "saturday": "Cmt",
+        "sunday": "Paz"
+      }
+    }
+  },
   "restore": {
     "backLabel": "Geri",
     "cancelLabel": "İptal",
@@ -2015,8 +2272,8 @@
       "changelogButton": "Değişiklik günlüğünü görüntüle…",
       "changelogHelper": "Sürüm başına notlar. MYND-119 tamamlandığında görünecek.",
       "changelogLabel": "Değişiklik günlüğü",
-      "developerModeHelper": "",
-      "developerModeLabel": "",
+      "developerModeHelper": "Myne’in varsayılan olarak yolunuzdan çektiği gelişmiş ayarları gösterir: Myne’in güvence verdiği yoldan ayrıldığınız ayarlar ve çoğu kişinin hiç ihtiyaç duymadığı ileri düzey araçlar. Bunu kapatmak onları yalnızca yeniden gizler — açtığınız her şey açık kalır ve kapatacağınız yer o ayarın kendi denetimidir.",
+      "developerModeLabel": "Geliştirici modu",
       "licenseBody": "Pre-alpha · CC-BY-4.0 belgeler · Faz 1 sürümünde AGPL-3.0 uygulama kodu.",
       "licenseLabel": "Lisans",
       "tagline": "Pre-alpha · Faz 1 masaüstü istemcisi",
@@ -2067,10 +2324,18 @@
       "changing": "Değiştiriliyor…"
     },
     "appearance": {
+      "accentHelper": "Uygulama genelinde kullanılan vurgu rengini seçin. Yalnızca bu cihazda.",
+      "accentHexAria": "Vurgu rengi hex değeri",
+      "accentLabel": "Vurgu rengi",
+      "accentReset": "Tema varsayılanına sıfırla",
       "homeQuickActions": "Ana ekran hızlı işlemleri",
       "showEditTimesAria": "Kenar çubuğunda düzenleme zamanlarını göster",
       "showEditTimesHelper": "Her notun son düzenlenme zamanını kenar çubuğunda başlığının altında göster.",
       "showEditTimesLabel": "Düzenleme zamanlarını göster",
+      "taskMarkerAria": "Görev notlarında görev işaretini göster",
+      "taskMarkerHelper": "Görev olarak belirttiğiniz notları kenar çubuğunda ve sekmelerinde işaretler.",
+      "taskMarkerLabel": "Görev işaretini göster",
+      "taskMarkerSaveError": "O ayar kaydedilemedi. Tekrar deneyin.",
       "theme": {
         "amoled": "AMOLED",
         "dark": "Koyu",
@@ -2087,7 +2352,10 @@
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "Düzenleyici yazı tipi",
-      "showEditTimesSubtitle": "Her notun altında zaman damgaları"
+      "showEditTimesSubtitle": "Her notun altında zaman damgaları",
+      "graphSettingsLabel": "Grafik görünümü",
+      "graphSettingsHelper": "Düğüm renkleri, etiketler, boyutlandırma ve düzen kuvvetleri grafiğin kendi içinde ayarlanır — grafiği açın ve köşesindeki dişliyi kullanın. Bunlar cihaz başına tutulur, bu yüzden buradaki bir değişiklik telefonunuza geçmez.",
+      "openGraph": "Grafiği aç"
     },
     "archive": {
       "helper": "Notların, ana listeden ayrı tutulan bir Arşiv’e taşınmasına izin verin. Bunu kapatmak arşivlenmiş her notu kendi klasörüne geri yükler ve arşiv denetimlerini gizler.",
@@ -2095,6 +2363,18 @@
       "off": "Kapalı",
       "on": "Açık",
       "saveError": "Arşivleme ayarı güncellenemedi."
+    },
+    "attachmentCompression": {
+      "label": "İçe aktarırken görselleri sıkıştır",
+      "helper": "Yapıştırılan veya bırakılan görselleri, şifrelenip saklanmadan önce küçültür; böylece kasanız, yedeklemeleriniz ve eşitlemeniz daha küçük kalır. Bu geri alınamaz — özgün dosya saklanmaz.",
+      "helperScopeEveryDevice": "Tüm kasa için, her cihazda geçerlidir.",
+      "helperScopeNotHere": "Tüm kasa için geçerlidir, ancak bu tarayıcıda değil — burada eklenen görseller verildiği gibi saklanır.",
+      "errorSaveSetting": "Bu ayar kaydedilemedi."
+    },
+    "transcription": {
+      "label": "Konuşmadan metne",
+      "helper": "Bir ses ekini bu cihazda metne çevirir. Model Myne ile birlikte gelir ve hiçbir şey hiçbir yere gönderilmez. Bunu kapatmak Yazıya dök işlemini her yerde gizler ve uygulamanın yazıya dökmesini tamamen durdurur.",
+      "errorSaveSetting": "O ayar kaydedilemedi."
     },
     "attachmentOcr": {
       "label": "Görsellerin ve taranmış belgelerin içinde ara",
@@ -2155,6 +2435,29 @@
         "onDate": "{{date}} tarihinde bağlandı"
       }
     },
+    "cliAccess": {
+      "label": "Terminal erişimi",
+      "helperOff": "Kapalı. `myne` komutu bu kasadaki hiçbir şeyi okuyamaz veya değiştiremez.",
+      "helperOn": "Bu kasanın kilidi açıkken açık. Hesabınız altında çalışan herhangi bir program bunun üzerinden not okuyabilir, arayabilir ve oluşturabilir — Myne terminalinizi bir betikten ayırt edemez ve kapının açık olmasının ötesinde hiçbir şeyi denetlemez. Parolanızı asla istemez, kasa kilitlendiği anda kapanır ve not silemez.",
+      "lastUsedNever": "Bu kasanın kilidi açıldığından beri kullanılmadı.",
+      "lastUsedJustNow": "En son az önce kullanıldı.",
+      "lastUsedMinutesAgo": "En son {{count}} dk önce kullanıldı.",
+      "lastUsedMinutesAgo_one": "En son {{count}} dk önce kullanıldı.",
+      "lastUsedMinutesAgo_other": "En son {{count}} dk önce kullanıldı.",
+      "lastUsedHoursAgo": "En son {{count}} sa önce kullanıldı.",
+      "lastUsedHoursAgo_one": "En son {{count}} sa önce kullanıldı.",
+      "lastUsedHoursAgo_other": "En son {{count}} sa önce kullanıldı.",
+      "lastUsedDaysAgo": "En son {{count}} gün önce kullanıldı.",
+      "lastUsedDaysAgo_one": "En son {{count}} gün önce kullanıldı.",
+      "lastUsedDaysAgo_other": "En son {{count}} gün önce kullanıldı.",
+      "notOnPathHint": "Kabuğunuz `myne` komutunu henüz bulamıyor. Bu satırı kabuk profilinize ekleyin, sonra yeni bir terminal açın:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "Terminalin asla görmediği klasörler",
+      "excludedHelper": "Her satıra bir klasör yolu. Bu klasörlerdeki notlar hiçbir terminal sonucuna girmez ve terminalden oraya yazılamaz — uygulamada tümüyle erişilebilir kalırlar. Bunu, terminal erişimini açmadan önce de ayarlayabilirsiniz.",
+      "excludedPlaceholder": "Özel/\nGünlük/",
+      "rateLimitLabel": "Terminal tam hızda çalışsın",
+      "rateLimitHelper": "Myne varsayılan olarak dakikada en fazla 120 terminal komutunu yanıtlar. Bu, kontrolden çıkmış bir betiğe konan hız sınırıdır, bir izin denetimi değil — hangi programın sorabileceğine karar veren hiçbir şey yok. Her notu başka bir araçtan geçirmek gibi toplu işler için bunu açın."
+    },
     "clipperInstall": {
       "error": "Tarayıcı kırpıcısı ayarı güncellenemedi.",
       "helper": "Myne tarayıcı uzantısının bu uygulamaya kırpıntı gönderebilmesi için yerel mesajlaşma ana makinesini kaydeder. Varsayılan olarak açıktır; kaldırmak için kapatın.",
@@ -2164,6 +2467,7 @@
       "appliedBadge": "Uygulandı",
       "apply": "Uygula",
       "applyError": "Bu tema uygulanamadı. Lütfen tekrar deneyin.",
+      "browseButton": "Temalara göz at",
       "cancel": "İptal",
       "confirm": "Onayla",
       "delete": "Sil",
@@ -2188,7 +2492,8 @@
       "label": "Özel temalar",
       "openFolderButton": "Temalar klasörünü aç",
       "openFolderError": "Temalar klasörü açılamadı.",
-      "readError": "Temalar klasörünüz okunamadı."
+      "readError": "Temalar klasörünüz okunamadı.",
+      "readOnlyHelper": "Özel temalar bilgisayarınıza kurulur. Sizinkiler bir eşitlemeden sonra buraya kendiliğinden gelir."
     },
     "dailyNotes": {
       "blankTemplate": "Boş (şablon yok)",
@@ -2198,6 +2503,8 @@
       "folderHelper": "Yeni günlük notların kaydedildiği yer. Varsayılan: {{default}} — bu klasör boş olsa bile korunur.",
       "folderLabel": "Günlük not klasörü",
       "folderSaveError": "Günlük klasörü kaydedilemedi. Lütfen tekrar deneyin.",
+      "folderSearchEmpty": "Eşleşen klasör yok.",
+      "folderSearchPlaceholder": "Klasörlerde ara…",
       "searchEmpty": "Eşleşen şablon yok.",
       "searchPlaceholder": "Şablonlarda ara…",
       "templateHelper": "Her günlük nota başlanacak bir şablon seçin veya tarihle başlıklandırılmış boş bir not için boş bırakın.",
@@ -2234,6 +2541,8 @@
       "newNote": {
         "folderLabel": "Yeni notlar için klasör",
         "folderPlaceholder": "örn. Gelen Kutusu/",
+        "folderSearchEmpty": "Eşleşen klasör yok.",
+        "folderSearchPlaceholder": "Klasörlerde ara…",
         "helper": "Yeni oluşturulan notların yerleştirileceği yer.",
         "label": "Yeni notlar için varsayılan konum",
         "optionCurrent": "Geçerli notla aynı klasör",
@@ -2329,6 +2638,10 @@
       "off": "Kapalı",
       "on": "Açık"
     },
+    "views": {
+      "helper": "Filtrelenmiş not listelerini kaydetmek için kenar çubuğunda Görünümler girişini gösterir. Varsayılan olarak kapalı; zaten görünümleriniz varsa açık.",
+      "label": "Görünümler"
+    },
     "vimMode": {
       "chordCaveat": "Windows ve Linux’ta Myne’in kendi kısayolları önceliklidir; bu yüzden onlarla çakışan vim kısayolları (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) düzenleyicide kullanılamaz. Ctrl-[ yine Escape olarak çalışır ve visual-block Alt-v tuşuna taşınır.",
       "errorSaveSetting": "Vim modu ayarı kaydedilemedi.",
@@ -2346,6 +2659,9 @@
       "pendingHint": "Yakında"
     },
     "ai": {
+      "autoTagHelper": "Yazmaya ara verdiğinizde, cihazınızdaki küçük bir model notu okur ve notun üstünde etiketler önerir. Siz bir öneriyi kabul edene kadar hiçbir şey eklenmez.",
+      "autoTagLabel": "Etiketleri otomatik öner",
+      "autoTagUnavailable": "Bu yapı etiket modeli olmadan geliyor, bu yüzden etiket önerilemez. Myne asla model indirmez — anahtar, modeli içeren bir yapıda kendiliğinden açılır.",
       "disclosureToggle": "Bu nasıl çalışır?",
       "enableHelper": "Sağladığınız bir modeli tamamen cihazınızda çalıştırır. Deneyseldir, varsayılan olarak kapalıdır.",
       "enableLabel": "Yerel yapay zekayı etkinleştir",
@@ -2369,8 +2685,41 @@
       "recommendedFilesTranscription": "Aynı klasörde Whisper .gguf dosyası + config.json + tokenizer.json gerektirir.",
       "title": "Yapay Zeka"
     },
+    "network": {
+      "disabledCue": "Eşitleme artık Tor üzerinden yönlendirilmiyor. Yeni bağlantılar doğrudan eşitleme sunucusuna gider.",
+      "errorRead": "Geçerli ayar okunamadı. Yeniden belirlemek için anahtarı değiştirin.",
+      "errorSave": "Ayar kaydedilemedi. Hiçbir şey değişmedi.",
+      "errorSidecar": "Tor yönlendirmesi açık, ancak Tor istemcisi başlatılamadı. Başlayana kadar eşitleme duraklatıldı — hiçbir şey doğrudan gönderilmiyor.",
+      "postureActive": "Eşitleme Tor üzerinden gidiyor",
+      "postureConnecting": "Tor’a bağlanılıyor — eşitleme duraklatıldı",
+      "postureConnectingDetail": "Bu genellikle birkaç saniye sürer. Bu sırada hiçbir şey doğrudan gönderilmiyor.",
+      "postureExempt": "Eşitleme Tor kullanmıyor — bu adres bu cihazı gösteriyor",
+      "postureExemptDetail": "Yapılandırdığınız eşitleme sunucusu adresi bu bilgisayarı adlandırıyor, bu yüzden Myne’in ona bağlantısı bir Tor devresinden geçmiyor. O adres başka bir yerdeki bir sunucuya yönlendiriyorsa Myne bunu göremez ve yönlendiremez. Eşitleme duraklatılmadı.",
+      "postureHeading": "Şu anda",
+      "postureInactive": "Eşitleme doğrudan eşitleme sunucusuna gidiyor",
+      "postureUnavailable": "Tor kullanılamıyor — eşitleme duraklatıldı",
+      "postureUnavailableDetail": "Hiçbir şey doğrudan gönderilmiyor. Tor istemcisini başlatmayı denemek için bu ayarı kapatıp yeniden açın ya da Tor olmadan eşitlemek için kapalı bırakın.",
+      "residualExit": "Bir Tor devresindeki son aktarıcı — çıkış düğümü — hangi eşitleme sunucusuna bağlandığınızı görür. Eşitlediğiniz şeyi okuyamaz; o uçtan uca şifreli kalır.",
+      "residualMetadata": "Eşitleme sunucusu yine de ne zaman eşitlediğinizi, kaç blob gönderdiğinizi ve bunların ne kadar büyük olduğunu, kaç cihazınız olduğunu görür. Tor bunu değiştirmez.",
+      "residualPayment": "Barındırılan eşitleme için ödeme yapıyorsanız, ödeme ve hesabınız yine sizinle ilişkilendirilebilir. Tor, bağlantının nereden geldiğini değiştirir, faturalandırma izini değil.",
+      "residualScope": "Tor üzerinden yalnızca Myne’in kendi eşitleme trafiği gider. Bu cihazdaki başka hiçbir şey gitmez.",
+      "residualsToggle": "Bunun gizlemedikleri",
+      "torHelper": "IP adresinizi ve konumunuzu eşitleme sunucusundan gizler; hangi sunucuyla eşitlediğinizi de ağınızdan ve internet sağlayıcınızdan gizler — onlar yine de bu cihazın Tor’a bağlandığını görebilir. Sizi Myne’e karşı anonim yapmaz ve neyi ne zaman eşitlediğinizi sunucudan gizlemez.",
+      "torLabel": "Eşitlemeyi Tor üzerinden yönlendir"
+    },
     "prefs": {
       "saveError": "Tercih kaydedilemedi — tekrar deneyin"
+    },
+    "reminders": {
+      "aria": "Bu cihazda görev hatırlatıcılarını göster",
+      "exactAllow": "İzin ver",
+      "exactLabel": "Tam zamanlama",
+      "exactOn": "Açık",
+      "horizon": "Hatırlatıcılar {{date}} tarihine kadar kaydedildi. Gelmeye devam etmeleri için o tarihten önce Myne’i açın.",
+      "label": "Görev hatırlatıcıları",
+      "saveError": "O ayar kaydedilemedi. Tekrar deneyin.",
+      "showTextAria": "Bildirimde görev metnini göster",
+      "showTextLabel": "Görev metnini göster"
     },
     "privacy": {
       "autoLockHelper": "Bu kadar süre işlem yapılmazsa kasayı kilitle.",
@@ -2438,7 +2787,7 @@
     "shell": {
       "closeLabel": "Ayarları kapat",
       "groups": {
-        "developer": ""
+        "developer": "Geliştirici"
       },
       "navLabel": "Ayarlar panelleri",
       "panels": {
@@ -2448,7 +2797,9 @@
         "appearance": "Görünüm",
         "editor": "Düzenleyici",
         "files": "Dosyalar",
+        "transcription": "Yazıya dökme",
         "hotkeys": "Kısayollar",
+        "network": "Ağ",
         "privacy": "Gizlilik",
         "storage": "Depolama",
         "sync": "Eşitleme"
@@ -2498,6 +2849,8 @@
       "lineSpacingHelper": "Satırlar arasındaki dikey boşluk.",
       "lineSpacingLabel": "Satır aralığı",
       "textSizeHelper": "Düzenleyici metninin temel boyutu. Başlıklar buna göre ölçeklenir.",
+      "previewLabel": "Önizleme",
+      "previewBody": "Pijamalı hasta yağız şoföre çabucak güvendi. Tipografi ayarları her notun nasıl okunduğunu değiştirir, bu yüzden bu örnek siz seçtikçe güncellenir.",
       "textSizeLabel": "Metin boyutu"
     },
     "viewMode": {
@@ -2541,6 +2894,19 @@
     "sectionOptions": "Seçenekler",
     "footerTagline": "myne · bu cihazda şifreli · açık kaynak",
     "editor": {
+      "sections": {
+        "text": "Metin ve görünüm",
+        "editing": "Düzenleme",
+        "writing": "Yazma",
+        "features": "Özellikler"
+      },
+      "preview": {
+        "heading": "Pijamalı hasta şoför",
+        "bullet1": "Yağız şoföre çabucak güvendi",
+        "bullet2": "Zıplayan zebralar şaşırtıcı biçimde çevik",
+        "spellCaption": "Yazım denetimi",
+        "spellSample": "yanlis"
+      },
       "defaultView": "Varsayılan görünüm",
       "typewriter": "Daktilo kaydırması",
       "typewriterSubtitle": "İmleci dikey olarak ortalanmış tutar",
@@ -2556,6 +2922,7 @@
         "lastActiveNoteDesc": "Hangi notun açık olduğunu eşitleyin, böylece başka bir cihazda kaldığınız yerden devam edebilirsiniz."
       },
       "keywords": {
+        "aiAutoTag": "otomatik etiket etiketler öner öneriler etiketleme yapay zeka auto tag ai",
         "aiEnable": "yapay zeka yerel ai açık kapalı etkinleştir kapat makine öğrenmesi llm",
         "aiExcluded": "hariç tutulan klasörler yoksay dışla ai yapay zeka gizlilik",
         "aiModels": "model modeller gguf indir metin gömme embedding llm ai",
@@ -2566,6 +2933,9 @@
         "buildChannel": "yapı kanal sürüm dağıtım kararlı beta nightly build",
         "changePassword": "parola değiştir şifre kimlik bilgileri güncelle sıfırla password",
         "changelog": "değişiklik günlüğü sürüm notları yenilikler geçmiş changelog",
+        "cliAccess": "cli terminal erişim komut satırı kabuk myne komutu konsol terminal access shell",
+        "cliExcludedFolders": "cli hariç tutulan klasörler terminal dışla gizle komut satırı özel exclude",
+        "cliRateLimit": "cli hız sınırı terminal hız kısıtlama toplu tempo dakikadaki komut rate limit",
         "clipper": "tarayıcı kırpıcı uzantı web yakalama chrome firefox clipper",
         "contentWidth": "içerik genişliği sütun okuma satır uzunluğu ölçü width",
         "customThemes": "özel tema temalar palet renkler görünüm içe aktar theme",
@@ -2574,6 +2944,7 @@
         "export": "dışa aktar markdown şifre çöz düz dosyalar belgeler export",
         "focusMode": "odak modu daktilo soluklaştır etkin olmayan satırlar dikkat dağınıklığı focus",
         "font": "yazı tipi font aile sans serif mono tipografi",
+        "graphSettings": "grafik görünüm fizik kuvvetler düğümler bağlantılar düzen renk grupları etiketler tuval graph",
         "hotkeys": "kısayol kısayollar klavye tuş atamaları tuş haritası bağlama hotkeys shortcut keymap",
         "import": "içe aktar notlar obsidian notion evernote enex html csv taşı göç import",
         "language": "dil yerel ayar arayüz çeviri ui language",
@@ -2583,7 +2954,9 @@
         "vimMode": "vim modal düzenleme normal insert visual klavye kip",
         "lineSpacing": "satır aralığı satır yüksekliği tipografi okunabilirlik leading line height",
         "newNoteLocation": "yeni not konumu klasör varsayılan nerede oluşturulur new note location default",
+        "torRouting": "tor yönlendirme onion vekil sunucu ağ ip adresi konum gizle eşitleme anonimlik proxy",
         "quickUnlock": "hızlı kilit açma pin touch id biyometrik yüz parmak izi face id unlock",
+        "reminders": "hatırlatıcı hatırlatıcılar bildirim uyarı görev son tarih hatırlat reminders notify",
         "realtimeSync": "gerçek zamanlı eşitleme canlı bağlantı yoklama sync realtime live",
         "screenCapture": "ekran yakalama koruma ekran görüntüsü kayıt engelle gizlilik screenshot capture",
         "showEditTimes": "düzenleme zamanları zaman damgaları değiştirilme tarih notlar timestamps modified",
@@ -2591,6 +2964,8 @@
         "spellLanguages": "yazım dilleri sözlükler yerel ayar sözcükler spell dictionary",
         "startupOpen": "başlangıç aç varsayılan dosya açılış hangi not startup",
         "attachmentOcr": "ocr görsel tarama taranmış pdf fotoğraf ekran görüntüsü metin tanıma ek içinde ara işlemci pil scan text",
+        "attachmentCompression": "sıkıştır sıkıştırma görsel küçült ölçekle yeniden boyutlandır webp jpeg içe aktar yapıştır kasa boyut depolama compress",
+        "transcription": "yazıya dök yazıya dökme konuşma ses sesli dikte altyazı whisper kayıt sesten metne transcribe",
         "syncAddDevice": "cihaz ekle eşle bağla telefon dizüstü eşitleme sync device pair qr",
         "syncConflicts": "çakışma çakışmalar birleştir çöz sürümler eşitleme conflict merge sync",
         "syncDevices": "cihazlar bağlı eşleşmiş eşitleme makineler device sync",
@@ -2648,6 +3023,15 @@
       "label": "Arama dizini oluşturuluyor…"
     },
     "conflicts": {
+      "compare": "Karşılaştır",
+      "compareClose": "Çakışmalara dön",
+      "compareError": "Bu notlar karşılaştırmak için okunamadı. Tekrar deneyin.",
+      "compareIdentical": "Bu iki sürüm birbirinin aynısı.",
+      "compareLoading": "Her iki sürüm okunuyor…",
+      "compareMine": "Bu cihazda",
+      "compareOrphan": "Bu kopyanın geldiği not artık burada değil, bu yüzden karşılaştırılacak bir şey yok.",
+      "compareTheirs": "Çakışan kopya",
+      "compareTitle": "“{{title}}” karşılaştırılıyor",
       "discard": "Sil",
       "empty": "Çakışma yok — cihazlarınız eşitlenmiş durumda.",
       "groupTitle_one": "{{original}} için {{count}} çakışan kopya",
@@ -2709,11 +3093,15 @@
     },
     "endpoint": {
       "connect": "Bağlan",
+      "connected": "Bağlandı",
       "connectedLocal": "Bağlandı (yerel, TLS yok).",
       "connectedTls": "Bağlandı. Bu parmak izinin diğer cihazınızdakiyle eşleştiğini doğrulayın.",
       "connectedPlatformTrust": "TLS üzerinden bağlanıldı. Tarayıcınız bu sunucunun sertifikasını doğruladı.",
       "connecting": "Bağlanıyor…",
       "fingerprintLabel": "Sunucu sertifikası parmak izi:",
+      "confirmFingerprintRequired": "Tor yönlendirmesi açık, bu yüzden bu cihaz, beklemesi söylenmemiş bir sertifikaya güvenmez. Sunucunuzun SHA-256 sertifika parmak izini sunucunun kendisinden ya da zaten bağlı bir cihazdan alın, sonra buraya yapıştırın.",
+      "confirmFingerprintMismatch": "Bu sunucunun sunduğu sertifika, girdiğiniz sertifika değil. Hiçbir şey kaydedilmedi. Yapıştırdığınız parmak izini kontrol edin — doğruysa bağlanmayın: bu cihazla sunucunuz arasında bir şey var.",
+      "confirmFingerprintDeclined": "Hiçbir şey kaydedilmedi — bu cihaz o sunucuya bağlı değil. Sunucunun sertifika parmak izini edindiğinizde geri dönün.",
       "pinStatic": "Myne'nin yerleşik sertifikasına karşı doğrulandı.",
       "pinTofu": "İlk bağlantıda sabitlendi. Bu parmak izini cihazlarınız arasında karşılaştırın.",
       "fixedOrigin": "Bu istemci, dağıtımı sırasında belirlenen tek bir sunucuyla eşitlenir. Buradan değiştirilemez — sayfanın yalnızca bu tek adresle konuşmasına izin verilir.",
@@ -2744,6 +3132,22 @@
       "submit": "Bu cihazı ekle",
       "wordAria": "Sözcük {{number}}"
     },
+    "fingerprint": {
+      "title": "Güvenmeden önce bu sunucunun sertifikasını denetleyin",
+      "why": "Tor yönlendirmesi açık, bu yüzden bu ilk bağlantı sunucuya bir yabancının işlettiği bir aktarıcı üzerinden ulaşıyor. Bir sertifika sabitlenene kadar bu cihaz, kendisine verilen her sertifikayı kabul eder — o aktarıcının uydurduğu bir sertifika dahil. Sunucunuzun yayımladığı parmak izini girin; Myne herhangi bir şeyi sabitlemeden önce onu karşılaştırır. Eşleşmezse hiçbir şey kaydedilmez.",
+      "label": "Beklenen sertifika parmak izi",
+      "placeholder": "Sunucunuzdan alınan SHA-256 parmak izi",
+      "echoLabel": "Girdikleriniz",
+      "echoComplete": "64 karakterin 64’ü. Devam etmeden önce kendi kopyanızla karşılaştırarak okuyun.",
+      "echoProgress": "Şu ana kadar {{total}} karakterin {{count}} tanesi.",
+      "echoInvalid": "Bir SHA-256 parmak izi 64 karakterdir; her biri 0–9 ya da a–f. İki nokta, boşluk ve baştaki “sha256:” sorun değil — bunların dışındaki hiçbir şey parmak izinin parçası değildir.",
+      "helpToggle": "Bu parmak izini nerede bulurum?",
+      "helpNotOverTor": "Bu bağlantı üzerinden değil. Aynı devre üzerinden getirdiğiniz bir parmak izi hiçbir şey kanıtlamaz — sertifikayı değiştirebilen, o sayfayı da değiştirebilir.",
+      "helpFromServer": "Sunucunuzu çalıştıran makinede: openssl x509 -noout -fingerprint -sha256 -in <sertifika dosyanız>",
+      "helpFromDevice": "Bu hesaba zaten bağlı bir cihazda: Ayarlar → Eşitleme aynı parmak izini gösterir.",
+      "helpNoFingerprint": "Bunu bu yolların hiçbiriyle edinemiyorsanız, Tor yönlendirmesi açıkken bu sunucu eklenemez. Tor yönlendirmesini Ayarlar → Ağ bölümünden kapatıp doğrudan bağlanabilirsiniz — bu, IP adresinizi sunucuya ve ağınızı izleyebilen herkese gösterir.",
+      "decline": "Elimde yok — iptal"
+    },
     "join": {
       "accountLabel": "Hesap numarası",
       "cancel": "İptal",
@@ -2752,6 +3156,8 @@
       "help": "Hesap numaranız ve parolanızla giriş yapın. Mevcut bir cihaz onayladığında bu cihaz notlarınızı eşitlemeye başlar. Kurtarma ifadesi gerekmez.",
       "passwordLabel": "Parola",
       "pinnedCompare": "Bu cihaz, sunucunuzun sertifikasını sabitledi. Bu parmak izinin diğer cihazlarınızda eşleştiğini doğrulayın.",
+      "confirmFingerprintRequired": "Tor yönlendirmesi açık, bu yüzden bu cihaz, beklemesi söylenmemiş bir sertifikaya güvenmez. Sunucunuzun SHA-256 sertifika parmak izini sunucunun kendisinden ya da zaten bağlı bir cihazdan alın, sonra buraya yapıştırın.",
+      "confirmFingerprintMismatch": "Bu sunucunun sunduğu sertifika, girdiğiniz sertifika değil. Bu cihaz eklenmedi ve hiçbir şey kaydedilmedi. Yapıştırdığınız parmak izini kontrol edin — doğruysa devam etmeyin: bu cihazla sunucunuz arasında bir şey var.",
       "pinnedTitle": "Sunucu sertifikası sabitlendi",
       "serverLabel": "Eşitleme sunucusu",
       "serverPlaceholder": "https://your-server.example",
@@ -2786,6 +3192,7 @@
         "deleteConfirmTitle": "Bu kurtarılan not silinsin mi?",
         "deleteConfirmWarning": "Bu, bu cihazda tutulan tek kopyayı kalıcı olarak siler. Bu işlem geri alınamaz.",
         "deleteCta": "Sil",
+        "empty": "Kurtarılan not yok.",
         "errorGeneric": "Bir şeyler ters gitti. Tekrar deneyin.",
         "helper": "Başka bir cihazda silinen bir not burada da kaldırıldığında, şifreli kopyası bu cihazda saklanır. Birini yeni bir not olarak geri yükleyin ya da kalıcı olarak silin.",
         "label": "Kurtarılan notlar",
@@ -2873,7 +3280,66 @@
       "conflictsNeedReview_other": "{{count}} çakışma gözden geçirilmeli",
       "catchingUp": "Eşitleme tamamlanıyor — notlarınız güvende.",
       "verifyDevices": "Cihazları doğrula"
+    },
+    "tor": {
+      "connecting": "Tor’a bağlanılıyor. Bağlantı hazır olana kadar eşitleme duraklatıldı — hiçbir şey doğrudan gönderilmiyor.",
+      "settingsHint": "Ayarlar → Ağ",
+      "unavailable": "Tor kullanılamıyor, bu yüzden eşitleme duraklatıldı. Hiçbir şey doğrudan gönderilmiyor. Tor olmadan eşitlemek için Tor yönlendirmesini kapatın."
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "Herhangi",
+      "due": "Son tarih",
+      "folder": "Klasör",
+      "insert": "Ekle",
+      "noDueDate": "Son tarih yok",
+      "priority": "Öncelik",
+      "sort": "Sıralama ölçütü",
+      "sortDue": "Son tarih",
+      "sortPath": "Not",
+      "sortPriority": "Öncelik",
+      "status": "Durum",
+      "statusDone": "Tamamlandı",
+      "statusTodo": "Yapılmadı",
+      "tag": "Etiket"
+    },
+    "empty": {
+      "filter": "Şu anda burada bir şey yok. Başka bir filtre deneyin.",
+      "rebuilding": "Notlarınız okunuyor…",
+      "scope": "Bu klasörde veya etikette görev yok. Kapsamı genişletmeyi deneyin.",
+      "vault": "Henüz görev yok. Bir tane oluşturmak için herhangi bir nottaki bir satıra “- [ ]” yazın."
+    },
+    "filter": {
+      "all": "Tümü",
+      "overdue": "Gecikmiş",
+      "today": "Bugün",
+      "upcoming": "Yaklaşan"
+    },
+    "noteTitle": "Bu nottaki görevler",
+    "query": {
+      "dropped_one": "Myne’in okuyamadığı {{count}} ifade",
+      "dropped_other": "Myne’in okuyamadığı {{count}} ifade",
+      "empty": "Bu sorguyla eşleşen görev yok.",
+      "loading": "Notlarınız okunuyor…",
+      "refused": "Myne bu sorgunun hiçbir kısmını okuyamadı, bu yüzden her şeyi göstermek yerine hiçbir şey göstermiyor.",
+      "remainder_one": "{{count}} görev daha eşleşti",
+      "remainder_other": "{{count}} görev daha eşleşti"
+    },
+    "reminder": {
+      "due": "Bir görev hatırlatıcısının zamanı geldi."
+    },
+    "row": {
+      "completed": "Görev, tamamlandı",
+      "notCompleted": "Görev, tamamlanmadı",
+      "tooLongToWrite": "Bu görevin satırı buradan düzenlenemeyecek kadar uzun. Bunun yerine notunu açın.",
+      "untitled": "Başlıksız görev"
+    },
+    "scope": {
+      "allFolders": "Tüm klasörler",
+      "label": "Daraltma ölçütü"
+    },
+    "title": "Görevler"
   },
   "templates": {
     "manager": {
@@ -2953,6 +3419,8 @@
     "recoveryLink": "Parolanızı mı unuttunuz? Kurtarma ifadesiyle açın",
     "submit": "Kilidi aç",
     "subtitle": "Devam etmek için parolanızı girin.",
+    "subtitlePin": "Devam etmek için PIN’inizi girin.",
+    "subtitleBiometric": "Devam etmek için Touch ID ile onaylayın.",
     "suspicion": {
       "lockedDuringChange": "Parola değişikliği iptal edildi: kasa kilitliydi.",
       "metaChangedExternally": "Kasa başka bir oturumda değiştirildi — lütfen tekrar kilidini açın."
@@ -3166,6 +3634,7 @@
   "vaultPicker": {
     "createAnother": "Başka bir kasa oluştur",
     "heading": "Bir kasa seçin",
+    "joinDevice": "Bu cihazı bir hesaba ekle",
     "loading": "Kasalarınız yükleniyor…",
     "noneLoaded": "Şu anda hiçbir kasa yüklenemedi.",
     "openedRelative": "{{rel}} açıldı",
@@ -3222,6 +3691,7 @@
   "vaultSwitcher": {
     "chipFallback": "Kasa",
     "createAnother": "Başka bir kasa oluştur",
+    "joinDevice": "Bu cihazı bir hesaba ekle",
     "switching": "değiştiriliyor…",
     "switchVaultLabel": "Kasa değiştir",
     "vaultFallback": "Kasa {{n}}"
@@ -3230,6 +3700,7 @@
     "createCta": "Yeni kasa oluştur",
     "headlineLine1": "Şifreli markdown notları.",
     "headlineLine2": "Kayıtta e-posta yok.",
+    "joinCta": "Bu cihazı bir hesaba ekle",
     "repairResidue": {
       "cancel": "İptal",
       "cleaningUp": "Temizleniyor…",

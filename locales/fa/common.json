@@ -1,1 +1,3888 @@
-{}
+{
+  "accountBootstrap": {
+    "accountMismatch": "این مرورگر از قبل خزانهٔ حساب دیگری را نگه داشته است. همان را باز کنید، یا ابتدا خارج شوید و نسخهٔ این مرورگر را پاک کنید.",
+    "changeAccount": "استفاده از شمارهٔ حساب دیگر",
+    "continue": "ادامه",
+    "failed": "باز کردن آن حساب ممکن نشد. شمارهٔ حساب و گذرواژه را بررسی کنید و دوباره تلاش کنید.",
+    "hint": "گذرواژهٔ اصلی این حساب را وارد کنید. Myne خزانهٔ شما را دریافت می‌کند و این مرورگر را به‌عنوان یک دستگاه روی آن راه‌اندازی می‌کند.",
+    "noEndpoint": "برای این نسخه از Myne هیچ سرور همگام‌سازی پیکربندی نشده است، بنابراین نمی‌تواند به خزانهٔ شما دسترسی پیدا کند. با کسی که آن را اداره می‌کند تماس بگیرید.",
+    "passwordLabel": "گذرواژهٔ اصلی",
+    "approversIntro": "این دستگاه‌ها می‌توانند این یکی را تأیید کنند:",
+    "noApprovers": "در حال حاضر هیچ دستگاه دیگری روی این حساب نمی‌تواند آن را تأیید کند. Myne را روی دستگاهی که از قبل دسترسی دارد باز کنید، سپس به اینجا برگردید.",
+    "pendingTitle": "در انتظار تأیید",
+    "sasMatch": "یکسان‌اند — ادامه",
+    "sasMismatch": "یکسان نیستند",
+    "verifyBody": "پیش از ادامه بررسی کنید که این کد روی هر دو دستگاه یکسان باشد. اگر یکسان نبود، متوقف شوید — مشکل از اتصال است، نه از گذرواژهٔ شما.",
+    "verifyTitle": "این کد را مقایسه کنید",
+    "title": "ورود به خزانه",
+    "working": "در حال آماده‌سازی…"
+  },
+  "accountEntry": {
+    "checkFailed": "بررسی آن شمارهٔ حساب ممکن نشد. دوباره تلاش کنید.",
+    "checking": "در حال بررسی…",
+    "continue": "ادامه",
+    "hint": "شکل آن مانند MY-XXXX-XXXX-XXXX-XXXX-XXXX است. همین‌جا روی دستگاه شما بررسی می‌شود — هنوز چیزی ارسال نمی‌شود.",
+    "invalid": "آن شمارهٔ حساب معتبر نیست. آن را بررسی کنید و دوباره تلاش کنید.",
+    "title": "شمارهٔ حساب خود را وارد کنید"
+  },
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "انصراف",
+      "cleaning": "در حال پاک‌سازی…",
+      "close": "بستن",
+      "completeTitle": "پاک‌سازی انجام شد",
+      "deleteCta": "حذف {{count}} مورد بلااستفاده",
+      "deleteCta_one": "حذف {{count}} مورد بلااستفاده",
+      "deleteCta_other": "حذف {{count}} مورد بلااستفاده",
+      "corpusIncomplete": "ابتدا همگام‌سازی را کامل کنید — این دستگاه هنوز همهٔ یادداشت‌های شما را ندارد. چیزی حذف نشد.",
+      "error": "پاک‌سازی ممکن نشد. ممکن است برخی یادداشت‌ها خوانا نباشند — چیزی حذف نشد.",
+      "intro_one": "این پیوست در هیچ یادداشتی استفاده نشده است. حذف آن دائمی است و قابل بازگشت نیست.",
+      "intro_other": "این {{count}} پیوست در هیچ یادداشتی استفاده نشده‌اند. حذف آن‌ها دائمی است و قابل بازگشت نیست.",
+      "summaryFreed": " · {{size}} آزاد شد",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "{{count}} پیوست حذف شد",
+      "summaryRemoved_other": "{{count}} پیوست حذف شد",
+      "summarySkipped": " · {{count}} مورد نادیده گرفته شد (اکنون در استفاده است)",
+      "summarySkipped_one": " · {{count}} مورد نادیده گرفته شد (اکنون در استفاده است)",
+      "summarySkipped_other": " · {{count}} مورد نادیده گرفته شد (اکنون در استفاده است)",
+      "title": "پاک‌سازی پیوست‌های بلااستفاده",
+      "willBeReclaimed": "{{size}} آزاد خواهد شد."
+    },
+    "coverPicker": {
+      "close": "بستن",
+      "dropHint": "یک تصویر را رها کنید تا به‌عنوان جلد استفاده شود.",
+      "empty": "هنوز تصویری در این خزانه نیست. یکی بارگذاری کنید یا تصویری را به اینجا بکشید.",
+      "loading": "در حال بارگذاری…",
+      "removeCover": "حذف جلد",
+      "title": "یک تصویر جلد انتخاب کنید",
+      "upload": "بارگذاری"
+    },
+    "deleteDialog": {
+      "cancel": "انصراف",
+      "confirmPrompt": "این پیوست برای همیشه حذف شود؟ این کار قابل بازگشت نیست.",
+      "delete": "حذف",
+      "deleting": "در حال حذف…",
+      "error": "حذف پیوست ممکن نشد. دوباره تلاش کنید.",
+      "notUsed": "در هیچ یادداشتی استفاده نشده است.",
+      "stillUsed_one": "هنوز در {{count}} یادداشت استفاده می‌شود. با حذف آن، در جایی که جاسازی شده یک نشانهٔ حذف باقی می‌ماند:",
+      "stillUsed_other": "هنوز در {{count}} یادداشت استفاده می‌شود. با حذف آن، در جایی که جاسازی شده یک نشانهٔ حذف باقی می‌ماند:",
+      "title": "حذف پیوست",
+      "untitled": "بدون عنوان"
+    },
+    "library": {
+      "actionsAriaLabel": "عملیات پیوست",
+      "actionsTitle": "عملیات",
+      "checkUnusedFailedNotice": "بررسی پیوست‌های بلااستفاده ممکن نشد. دوباره تلاش کنید.",
+      "corpusIncompleteNotice": "ابتدا همگام‌سازی را کامل کنید — این دستگاه هنوز همهٔ یادداشت‌های شما را ندارد، پس نمی‌تواند تشخیص دهد کدام پیوست‌ها بلااستفاده‌اند.",
+      "checking": "در حال بررسی…",
+      "cleanUnused": "پاک‌سازی بلااستفاده‌ها",
+      "cleanUnusedTitle": "حذف پیوست‌هایی که در هیچ یادداشتی استفاده نشده‌اند",
+      "colCreated": "تاریخ ایجاد",
+      "colName": "نام",
+      "colSize": "حجم",
+      "colType": "نوع",
+      "colUsedIn": "استفاده در",
+      "decrypting": "در حال رمزگشایی پیوست‌ها…",
+      "clearSearchAriaLabel": "پاک کردن جستجو",
+      "emptyClearSearch": "پاک کردن جستجو",
+      "emptyImportHint": "یک فایل را درون‌ریزی کنید تا در خزانهٔ شما بماند.",
+      "emptyLoadError": "خواندن فهرست پیوست‌ها ممکن نشد.",
+      "emptyNoAttachments": "هنوز پیوستی نیست.",
+      "emptyNoResultsTitle": "هیچ پیوستی با جستجوی شما مطابقت ندارد.",
+      "filterAriaLabel": "فیلتر بر اساس نوع",
+      "gridView": "نمای شبکه‌ای",
+      "import": "درون‌ریزی",
+      "importDialogTitle": "درون‌ریزی پیوست",
+      "importFile": "درون‌ریزی یک فایل",
+      "importing": "در حال درون‌ریزی…",
+      "listView": "نمای فهرستی",
+      "menuDelete": "حذف",
+      "menuExport": "برون‌ریزی",
+      "menuPreview": "پیش‌نمایش",
+      "menuRename": "تغییر نام",
+      "menuTranscribe": "رونویسی",
+      "menuViewTranscription": "مشاهدهٔ رونویسی",
+      "noMatch": "هیچ پیوستی با جستجوی شما مطابقت ندارد.",
+      "noUnusedNotice": "پیوست بلااستفاده‌ای برای پاک‌سازی نیست.",
+      "preview": "پیش‌نمایش",
+      "previewAttachment": "پیش‌نمایش پیوست",
+      "searchAriaLabel": "جستجوی پیوست‌ها بر اساس نام فایل",
+      "searchPlaceholder": "جستجو بر اساس نام فایل",
+      "sort": {
+        "createdAsc": "قدیمی‌ترین اول",
+        "createdDesc": "جدیدترین اول",
+        "nameAsc": "نام الف–ی",
+        "nameDesc": "نام ی–الف"
+      },
+      "sortAriaLabel": "مرتب‌سازی پیوست‌ها",
+      "supportedFilesFilter": "فایل‌های پشتیبانی‌شده",
+      "title": "پیوست‌ها",
+      "transcribeDone": "رونویسی کامل شد.",
+      "transcribeFailed": "رونویسی ناموفق بود. دوباره تلاش کنید.",
+      "transcribeFeatureOff": "تبدیل گفتار به نوشتار خاموش است. آن را در تنظیمات → رونویسی روشن کنید.",
+      "transcribeModelLoadFailed": "بارگذاری مدل گفتار به نوشتار ممکن نشد. Myne را دوباره نصب کنید، یا مدل سفارشی خود را در تنظیمات → توسعه‌دهنده → AI بررسی کنید.",
+      "transcribeNoModelHint": "مدل گفتار به نوشتار موجود نیست. نصب دوبارهٔ Myne آن را بازمی‌گرداند.",
+      "transcribeStarted": "در حال رونویسی…",
+      "transcribeVaultLocked": "برای رونویسی، خزانهٔ خود را باز کنید.",
+      "transcriptionModalClose": "بستن رونویسی",
+      "transcriptionModalTitle": "رونویسی",
+      "typeFilter": {
+        "all": "همهٔ انواع",
+        "audio": "فایل‌های صوتی",
+        "image": "تصاویر",
+        "other": "سایر",
+        "pdf": "فایل‌های PDF"
+      },
+      "usedInCount_one": "استفاده‌شده در {{count}} یادداشت",
+      "usedInCount_other": "استفاده‌شده در {{count}} یادداشت",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "صدا: {{filename}}",
+      "file": "فایل",
+      "pause": "مکث",
+      "pdfDocument": "سند PDF",
+      "pdfFirstPage": "صفحهٔ اول PDF",
+      "play": "پخش"
+    },
+    "usedInNotesPopover": {
+      "empty": "در هیچ یادداشتی استفاده نشده است.",
+      "untitled": "بدون عنوان"
+    },
+    "needsApp": "پاک‌سازی پیوست‌ها به برنامه نیاز دارد.",
+    "noUnused": "پیوست بلااستفاده‌ای نیست — به هر فایل ارجاع داده شده است.",
+    "scanError": "پویش برای یافتن پیوست‌های بلااستفاده ممکن نشد.",
+    "erasedToast_one": "{{count}} فایل بلااستفاده پاک شد.",
+    "erasedToast_other": "{{count}} فایل بلااستفاده پاک شد.",
+    "eraseError": "پاک کردن پیوست‌های بلااستفاده ممکن نشد.",
+    "readError": "خواندن پیوست‌ها ممکن نشد.",
+    "needAppPreview": "پیوست‌ها به برنامه نیاز دارند (نه پیش‌نمایش مرورگر).",
+    "tooLarge": "آن فایل خیلی بزرگ است (حداکثر 64 مگابایت).",
+    "unsupported": "فقط تصاویر و فایل‌های PDF قابل پیوست‌اند.",
+    "addError": "افزودن آن فایل ممکن نشد.",
+    "deleteError": "حذف آن پیوست ممکن نشد.",
+    "renameError": "تغییر نام آن پیوست ممکن نشد.",
+    "unusedSummary_one": "{{count}} پیوست در هیچ یادداشتی ارجاع نشده است ({{size}}). پاک کردن یک حذف رمزنگارانهٔ دائمی است — زباله‌دانی در کار نیست.",
+    "unusedSummary_other": "{{count}} پیوست در هیچ یادداشتی ارجاع نشده‌اند ({{size}}). پاک کردن یک حذف رمزنگارانهٔ دائمی است — زباله‌دانی در کار نیست.",
+    "eraseCta_one": "پاک کردن {{count}} فایل بلااستفاده",
+    "eraseCta_other": "پاک کردن {{count}} فایل بلااستفاده",
+    "emptyState": "هنوز پیوستی نیست. برای افزودن تصویر یا PDF روی بارگذاری بزنید.",
+    "insert": "درج",
+    "pauseLabel": "مکث {{filename}}",
+    "playLabel": "پخش {{filename}}"
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "عملیات دیگری روی خزانه در جریان است. تا پایان آن صبر کنید، سپس دوباره تلاش کنید.",
+        "cancelled": "پشتیبان‌گیری لغو شد. هیچ فایلی باقی نماند.",
+        "invalidDestination": "آن پوشهٔ مقصد قابل استفاده نیست.",
+        "ioGeneric": "نوشتن فایل پشتیبان ممکن نشد.",
+        "ioNoSpace": "فضای کافی در مقصد نیست.",
+        "ioPermissionDenied": "اجازهٔ نوشتن در مقصد وجود ندارد.",
+        "joinFailure": "پشتیبان‌گیری به‌طور غیرمنتظره ناموفق بود. هیچ فایلی باقی نماند.",
+        "memberTooLarge": "یکی از فایل‌های این خزانه بزرگ‌تر از چیزی است که قالب پشتیبان اجازه می‌دهد.",
+        "vaultNotFound": "خزانه‌ای برای پشتیبان‌گیری پیدا نشد.",
+        "verifyFailed": "پشتیبان نوشته‌شده تأیید نشد، بنابراین دور انداخته شد. دوباره تلاش کنید — اگر تکرار شد، روی رسانه‌ای دیگر."
+      },
+      "restore": {
+        "authOperationInProgress": "عملیات دیگری روی خزانه در جریان است. تا پایان آن صبر کنید، سپس دوباره تلاش کنید.",
+        "cancelled": "بازیابی لغو شد. چیزی تغییر نکرد.",
+        "damagedBackup": "فایل پشتیبان آسیب دیده است.",
+        "futureVersionBackup": "این پشتیبان با نسخهٔ جدیدتری از Myne ساخته شده است. ابتدا Myne را به‌روزرسانی کنید، سپس آن را بازیابی کنید.",
+        "invalidVaultMeta": "فراداده‌های خزانه در این پشتیبان ناخوانا هستند، بنابراین بازیابی آن نمی‌توانست خزانه‌ای کارآمد بسازد.",
+        "ioGeneric": "خواندن فایل پشتیبان ممکن نشد.",
+        "ioPermissionDenied": "اجازهٔ خواندن فایل پشتیبان وجود ندارد.",
+        "joinFailure": "بازیابی به‌طور غیرمنتظره ناموفق بود. چیزی تغییر نکرد.",
+        "missingVaultMeta": "فراداده‌های خزانه در این پشتیبان وجود ندارد و نمی‌توان آن را بازیابی کرد.",
+        "notABackupFile": "این فایل یک پشتیبان Myne نیست.",
+        "vaultAlreadyExists": "خزانه‌ای از این پشتیبان از قبل روی این دستگاه وجود دارد."
+      }
+    },
+    "export": {
+      "cancel": "انصراف",
+      "close": "بستن",
+      "copying": "در حال کپی {{done}} از {{total}}…",
+      "preparing": "در حال آماده‌سازی…",
+      "successToast": "پشتیبان تأیید و ذخیره شد.",
+      "title": "پشتیبان‌گیری از خزانه",
+      "verifying": "در حال تأیید {{done}} از {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "پذیرفتن",
+      "close": "بستن",
+      "codeAriaLabel": "کد جفت‌سازی",
+      "intro": "تأیید کنید که این کد با کدی که در افزونه نشان داده می‌شود یکسان است، سپس برای جفت‌سازی روی پذیرفتن بزنید.",
+      "reject": "رد کردن",
+      "rejected": "جفت‌سازی رد شد.",
+      "title": "یک افزونهٔ مرورگر می‌خواهد متصل شود"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "بایگانی",
+    "archivedBadgeTitle": "بایگانی‌شده",
+    "dialogLabel": "پالت فرمان",
+    "matchedInAttachment": "در پیوست",
+    "matchedInAttachmentTitle": "عبارت جستجو داخل فایلی که در این یادداشت جاسازی شده مطابقت یافت",
+    "matchedInBody": "↳ مطابقت در متن",
+    "noMatches": "مطابقتی نیست",
+    "operatorHint": "Tab برای تکمیل",
+    "operators": {
+      "tag": "یادداشت‌های دارای برچسب",
+      "path": "یادداشت‌های داخل یک پوشه",
+      "file": "مطابقت با عنوان یادداشت",
+      "section": "یادداشت‌های دارای سرفصل",
+      "task": "یادداشت‌های دارای کار",
+      "content": "تمام‌متن در بدنهٔ یادداشت"
+    },
+    "searchPlaceholder": "جستجوی یادداشت‌ها یا اجرای یک فرمان — امتحان کنید tag: · path: · task:",
+    "sectionCommands": "فرمان‌ها",
+    "sectionNotes": "یادداشت‌ها",
+    "untitledNote": "بدون عنوان"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "پشتیبان‌گیری از خزانه…"
+      },
+      "category": {
+        "ai": "AI",
+        "app": "برنامه",
+        "appearance": "ظاهر",
+        "editor": "ویرایشگر",
+        "notes": "یادداشت‌ها",
+        "vault": "خزانه",
+        "view": "نما"
+      },
+      "aiOpenChat": {
+        "label": "باز کردن گفتگوی AI"
+      },
+      "toggleLineNumbers": {
+        "label": "تغییر وضعیت شماره خطوط"
+      },
+      "toggleVimMode": {
+        "label": "تغییر وضعیت حالت صفحه‌کلید Vim"
+      },
+      "toggleSpellCheck": {
+        "label": "تغییر وضعیت غلط‌یاب املایی"
+      },
+      "toggleTypewriter": {
+        "label": "تغییر وضعیت پیمایش ماشین‌تحریری"
+      },
+      "toggleDimInactive": {
+        "label": "تغییر وضعیت کم‌رنگ‌کردن خطوط غیرفعال"
+      },
+      "toggleEditorFont": {
+        "label": "تغییر قلم ویرایشگر (تک‌فاصله / بی‌سریف)"
+      },
+      "cycleTextSize": {
+        "label": "چرخش اندازهٔ متن ویرایشگر"
+      },
+      "cycleContentWidth": {
+        "label": "چرخش عرض محتوای ویرایشگر"
+      },
+      "cycleDefaultViewMode": {
+        "label": "چرخش حالت نمایش پیش‌فرض"
+      },
+      "toggleTimestamps": {
+        "label": "تغییر وضعیت زمان یادداشت‌ها در نوار کناری"
+      },
+      "toggleArchiving": {
+        "label": "تغییر وضعیت بایگانی یادداشت‌ها"
+      },
+      "toggleAiEnabled": {
+        "label": "تغییر وضعیت قابلیت‌های AI (بتا)"
+      },
+      "toggleScreenCapture": {
+        "label": "تغییر وضعیت محافظت از تصویربرداری صفحه"
+      },
+      "cycleTheme": {
+        "label": "چرخش بین پوسته‌ها"
+      },
+      "themeLight": {
+        "label": "پوسته: روشن"
+      },
+      "themeDark": {
+        "label": "پوسته: تیره"
+      },
+      "themeAmoled": {
+        "label": "پوسته: AMOLED"
+      },
+      "themeSystem": {
+        "label": "پوسته: پیروی از سیستم"
+      },
+      "applyCustomTheme": {
+        "label": "اعمال پوستهٔ سفارشی…"
+      },
+      "splitRight": {
+        "label": "تقسیم قاب به راست"
+      },
+      "splitDown": {
+        "label": "تقسیم قاب به پایین"
+      },
+      "closePane": {
+        "label": "بستن قاب"
+      },
+      "closeTab": {
+        "label": "بستن زبانه"
+      },
+      "nextTab": {
+        "label": "زبانهٔ بعدی"
+      },
+      "prevTab": {
+        "label": "زبانهٔ قبلی"
+      },
+      "focusNextPane": {
+        "label": "تمرکز روی قاب بعدی"
+      },
+      "focusPrevPane": {
+        "label": "تمرکز روی قاب قبلی"
+      },
+      "goBack": {
+        "label": "بازگشت"
+      },
+      "goForward": {
+        "label": "رفتن به جلو"
+      },
+      "togglePreview": {
+        "label": "تغییر وضعیت پیش‌نمایش کنار‌به‌کنار"
+      },
+      "findInNote": {
+        "label": "یافتن در یادداشت"
+      },
+      "findReplace": {
+        "label": "یافتن و جایگزینی در یادداشت"
+      },
+      "newNote": {
+        "label": "یادداشت جدید"
+      },
+      "duplicateNote": {
+        "label": "تکثیر یادداشت"
+      },
+      "archiveNote": {
+        "label": "بایگانی یادداشت"
+      },
+      "renameNote": {
+        "label": "تغییر نام یادداشت"
+      },
+      "trashNote": {
+        "label": "انتقال یادداشت به زباله‌دان"
+      },
+      "toggleFavorite": {
+        "label": "تغییر وضعیت علاقه‌مندی"
+      },
+      "moveNote": {
+        "label": "انتقال یادداشت به پوشه…"
+      },
+      "emptyTrash": {
+        "label": "خالی کردن زباله‌دان"
+      },
+      "showBacklinks": {
+        "label": "نمایش پیوندهای بازگشتی"
+      },
+      "showOutline": {
+        "label": "نمایش رئوس مطالب"
+      },
+      "showUnlinked": {
+        "label": "نمایش اشاره‌های بدون پیوند"
+      },
+      "newFolder": {
+        "label": "پوشهٔ جدید"
+      },
+      "openTrash": {
+        "label": "باز کردن زباله‌دان"
+      },
+      "openArchive": {
+        "label": "باز کردن بایگانی"
+      },
+      "cycleHeading": {
+        "label": "چرخش سطح سرفصل"
+      },
+      "restoreBackup": {
+        "label": "بازیابی خزانه از پشتیبان…"
+      },
+      "revealVaultFolder": {
+        "label": "نمایش پوشهٔ خزانه در مدیر فایل"
+      },
+      "aiSummarizeNote": {
+        "label": "خلاصه‌سازی یادداشت"
+      },
+      "aiRewriteSelection": {
+        "label": "بازنویسی متن انتخاب‌شده"
+      },
+      "convertWikilinks": {
+        "label": "تبدیل ویکی‌پیوندهای درون‌ریزی‌شده در این یادداشت…"
+      },
+      "deleteWorkspace": {
+        "label": "حذف فضای کاری…"
+      },
+      "exportNoteHtml": {
+        "label": "برون‌ریزی یادداشت به HTML…"
+      },
+      "exportSelectionImage": {
+        "label": "برون‌ریزی متن انتخاب‌شده به‌صورت تصویر…",
+        "saved": "متن انتخاب‌شده به‌صورت تصویر ذخیره شد.",
+        "noSelection": "ابتدا مقداری متن انتخاب کنید، سپس آن را به‌صورت تصویر برون‌ریزی کنید.",
+        "failed": "برون‌ریزی متن انتخاب‌شده به‌صورت تصویر ممکن نشد."
+      },
+      "exportNoteMarkdown": {
+        "label": "برون‌ریزی یادداشت به Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "برون‌ریزی یادداشت به PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "برون‌ریزی یادداشت به متن ساده…"
+      },
+      "exportVaultMarkdown": {
+        "label": "برون‌ریزی خزانه به Markdown…"
+      },
+      "foldAll": {
+        "label": "جمع کردن همه"
+      },
+      "importBaseView": {
+        "label": "درون‌ریزی نمای .base…"
+      },
+      "importObsidian": {
+        "label": "درون‌ریزی یادداشت‌ها…"
+      },
+      "lockVault": {
+        "label": "قفل کردن خزانه"
+      },
+      "manageTemplates": {
+        "label": "مدیریت الگوها…"
+      },
+      "newNoteFromTemplate": {
+        "label": "یادداشت جدید از الگو…"
+      },
+      "openAttachments": {
+        "label": "باز کردن پیوست‌ها…"
+      },
+      "openSettings": {
+        "label": "باز کردن تنظیمات…"
+      },
+      "openSnapshots": {
+        "label": "نسخه‌های ذخیره‌شده…"
+      },
+      "openTodayNote": {
+        "label": "باز کردن یادداشت امروز"
+      },
+      "randomNote": {
+        "label": "باز کردن یادداشت تصادفی"
+      },
+      "renameWorkspace": {
+        "label": "تغییر نام فضای کاری…"
+      },
+      "saveWorkspaceAs": {
+        "label": "ذخیرهٔ فضای کاری با نام…"
+      },
+      "showGraph": {
+        "label": "نمایش نمای گراف…"
+      },
+      "showTasks": {
+        "label": "نمایش کارها"
+      },
+      "showTags": {
+        "label": "مرور برچسب‌ها…"
+      },
+      "showViews": {
+        "label": "مرور نماها…"
+      },
+      "switchWorkspace": {
+        "label": "تعویض فضای کاری…"
+      },
+      "toggleFocus": {
+        "label": "تغییر وضعیت حالت تمرکز"
+      },
+      "toggleLeftSidebar": {
+        "label": "تغییر وضعیت نوار کناری یادداشت‌ها"
+      },
+      "toggleReading": {
+        "label": "تغییر وضعیت نمای مطالعه"
+      },
+      "toggleRightSidebar": {
+        "label": "تغییر وضعیت نوار کناری پیوندهای بازگشتی"
+      },
+      "toggleSource": {
+        "label": "تغییر وضعیت حالت منبع"
+      },
+      "toggleStackedTabs": {
+        "label": "تغییر وضعیت زبانه‌های روی‌هم"
+      },
+      "unfoldAll": {
+        "label": "باز کردن همه"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "توپر",
+        "closeTab": "بستن زبانه",
+        "cycleHeadingLevel": "چرخش سطح سرفصل",
+        "cycleTabs": "چرخش بین زبانه‌ها",
+        "deleteWorkspace": "حذف فضای کاری",
+        "findInNote": "یافتن در یادداشت",
+        "focusNextPane": "تمرکز روی قاب بعدی",
+        "focusPrevPane": "تمرکز روی قاب قبلی",
+        "foldAll": "جمع کردن همه",
+        "indent": "افزایش تورفتگی",
+        "inlineCode": "کد درون‌خطی",
+        "insertWikilink": "درج ویکی‌پیوند",
+        "italic": "مورب",
+        "navigateBack": "حرکت به عقب",
+        "navigateForward": "حرکت به جلو",
+        "newNote": "یادداشت جدید",
+        "openSettings": "باز کردن تنظیمات",
+        "outdent": "کاهش تورفتگی",
+        "paletteToggle": "باز کردن پالت فرمان",
+        "redo": "ازنو",
+        "renameWorkspace": "تغییر نام فضای کاری",
+        "saveWorkspaceAs": "ذخیرهٔ فضای کاری با نام",
+        "selectAllScoped": "انتخاب همه (محدودشده)",
+        "selectNextOccurrence": "انتخاب مورد بعدی",
+        "showGraphView": "نمایش نمای گراف",
+        "showTasks": "نمایش کارها",
+        "splitPaneDown": "تقسیم قاب (پایین)",
+        "splitPaneRight": "تقسیم قاب (راست)",
+        "switchWorkspace": "تعویض فضای کاری",
+        "toggleBulletList": "تغییر وضعیت فهرست نشانه‌دار",
+        "toggleFocusMode": "تغییر وضعیت حالت تمرکز",
+        "toggleNumberedList": "تغییر وضعیت فهرست شماره‌دار",
+        "toggleReadingView": "تغییر وضعیت نمای مطالعه",
+        "toggleSourceMode": "تغییر وضعیت حالت منبع",
+        "toggleTaskList": "تغییر وضعیت فهرست کارها",
+        "undo": "واگرد",
+        "unfoldAll": "باز کردن همه"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "یک کلید تغییردهنده اضافه کنید (⌘، Ctrl یا Alt) — یک کلید به‌تنهایی نمی‌تواند میان‌بر باشد."
+    },
+    "picker": {
+      "vaultRoot": "ریشهٔ خزانه",
+      "moveNoteTitle": "انتقال یادداشت به پوشه",
+      "moveNotePlaceholder": "یک پوشه انتخاب کنید…",
+      "noFolders": "هنوز پوشه‌ای نیست",
+      "applyThemeTitle": "اعمال پوستهٔ سفارشی",
+      "applyThemePlaceholder": "یک پوسته انتخاب کنید…",
+      "noCustomThemes": "هیچ پوستهٔ سفارشی‌ای نصب نشده است"
+    }
+  },
+  "common": {
+    "cancel": "انصراف",
+    "dismiss": "بستن",
+    "prompt": {
+      "cancel": "انصراف",
+      "confirmDefault": "تأیید"
+    },
+    "spinner": {
+      "loadingLabel": "در حال بارگذاری"
+    },
+    "back": "بازگشت",
+    "continue": "ادامه"
+  },
+  "deviceRevoked": {
+    "cta": "شروع دوباره",
+    "title": "این مرورگر از حساب شما حذف شد"
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exported": "{{filename}} برون‌ریزی شد.",
+        "exportFailed": "برون‌ریزی {{filename}} ممکن نشد.",
+        "renamed": "به {{name}} تغییر نام یافت.",
+        "renameFailed": "تغییر نام پیوست ممکن نشد.",
+        "saveDialogFailed": "باز کردن پنجرهٔ ذخیره ممکن نشد."
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} تصویر فشرده شد: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} تصویر فشرده شد: {{from}} → {{to}}",
+        "notice": "فشرده شد: {{from}} → {{to}}",
+        "noticeContainerChanged": "فشرده و به {{format}} تبدیل شد: {{from}} → {{to}}"
+      },
+      "convert": {
+        "cancel": "انصراف",
+        "confirm": "تبدیل",
+        "skipped": "نادیده گرفته شد — {{note}}",
+        "subtitle_one": "1 ارجاع بازنویسی خواهد شد. پیش از اعمال بررسی کنید.",
+        "subtitle_other": "{{count}} ارجاع بازنویسی خواهد شد. پیش از اعمال بررسی کنید.",
+        "subtitleEmpty": "چیزی برای تبدیل نیست — هیچ فایل منبعی پیدا نشد.",
+        "title": "تبدیل پیوست‌های درون‌ریزی‌شده"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "منبع پیوست"
+      },
+      "convertCore": {
+        "converted": "{{count}} مورد تبدیل شد",
+        "converted_one": "{{count}} مورد تبدیل شد",
+        "converted_other": "{{count}} مورد تبدیل شد",
+        "noneToConvert": "در این یادداشت پیوست درون‌ریزی‌شده‌ای برای تبدیل نیست.",
+        "skipNote": {
+          "failed": "درون‌ریزی ناموفق بود",
+          "locked": "خزانه قفل است",
+          "notFound": "منبع پیدا نشد",
+          "tooLarge": "خیلی بزرگ (حداکثر 64 مبی‌بایت)",
+          "unsupported": "نوع پشتیبانی‌نشده"
+        },
+        "skippedSuffix": " · {{count}} مورد نادیده گرفته شد",
+        "skippedSuffix_one": " · {{count}} مورد نادیده گرفته شد",
+        "skippedSuffix_other": " · {{count}} مورد نادیده گرفته شد"
+      },
+      "fileKind": {
+        "generic": "فایل",
+        "label": {
+          "archive": "آرشیو",
+          "audio": "صدا",
+          "cHeader": "سرایند C",
+          "cppSource": "کد منبع C++",
+          "cSource": "کد منبع C",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "سند",
+          "ebook": "کتاب الکترونیکی",
+          "go": "Go",
+          "html": "HTML",
+          "image": "تصویر",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "فایل گزارش",
+          "markdown": "Markdown",
+          "numbers": "صفحه‌گستردهٔ Numbers",
+          "pages": "سند Pages",
+          "pdf": "PDF",
+          "presentation": "ارائه",
+          "python": "Python",
+          "richText": "سند متن غنی",
+          "rust": "Rust",
+          "shell": "اسکریپت شل",
+          "spreadsheet": "صفحه‌گسترده",
+          "svg": "تصویر SVG",
+          "text": "سند متنی",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "ویدیو",
+          "word": "سند Word",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "فایل {{ext}}"
+      },
+      "lightbox": {
+        "close": "بستن پیش‌نمایش",
+        "export": "برون‌ریزی",
+        "exportAria": "برون‌ریزی پیوست",
+        "imagePreview": "پیش‌نمایش تصویر",
+        "pdfFallback": "PDF",
+        "pdfPreview": "پیش‌نمایش PDF",
+        "zoomIn": "بزرگ‌نمایی",
+        "zoomOut": "کوچک‌نمایی",
+        "zoomReset": "بازنشانی بزرگ‌نمایی"
+      },
+      "menu": {
+        "actionsAria": "عملیات پیوست"
+      },
+      "pdf": {
+        "loading": "در حال بارگذاری…"
+      },
+      "picker": {
+        "openFailed": "باز کردن انتخابگر فایل ممکن نشد."
+      },
+      "progress": {
+        "encrypting": "در حال رمزگذاری…",
+        "importing": "در حال درون‌ریزی…",
+        "loading": "در حال بارگذاری…"
+      },
+      "recording": {
+        "barAria": "ضبط یادداشت صوتی",
+        "cancel": "انصراف",
+        "noAudio": "صدایی تشخیص داده نشد — میکروفون خود را بررسی کنید.",
+        "saving": "در حال ذخیره…",
+        "stop": "توقف"
+      },
+      "rename": {
+        "cancel": "انصراف",
+        "confirm": "تغییر نام",
+        "title": "تغییر نام پیوست"
+      },
+      "summary": {
+        "added": "{{count}} مورد افزوده شد",
+        "added_one": "{{count}} مورد افزوده شد",
+        "added_other": "{{count}} مورد افزوده شد",
+        "reason": {
+          "failed": "ناموفق",
+          "locked": "خزانه قفل است",
+          "tooLarge": "خیلی بزرگ",
+          "unsupported": "نوع پشتیبانی‌نشده"
+        },
+        "skipped": "{{count}} مورد نادیده گرفته شد: {{noun}}",
+        "skipped_one": "{{count}} مورد نادیده گرفته شد: {{noun}}",
+        "skipped_other": "{{count}} مورد نادیده گرفته شد: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "یک ضبط از قبل در جریان است.",
+          "captureFailed": "شروع ضبط ممکن نشد — دسترسی به میکروفون را در تنظیمات سیستم بررسی کنید.",
+          "generic": "شروع ضبط ممکن نشد.",
+          "locked": "برای ضبط یادداشت صوتی، خزانهٔ خود را باز کنید.",
+          "noInputDevice": "میکروفونی پیدا نشد. یکی وصل کنید و دوباره تلاش کنید."
+        },
+        "stopError": {
+          "captureFailed": "ضبط ناموفق بود — میکروفون خود را بررسی کنید.",
+          "emptyRecording": "چیزی ضبط نشد.",
+          "generic": "ذخیرهٔ ضبط ممکن نشد.",
+          "silentRecording": "ضبط بی‌صدا بود و دور انداخته شد — میکروفون خود را بررسی کنید."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "مکث",
+          "play": "پخش",
+          "seek": "جابه‌جایی"
+        },
+        "menu": {
+          "export": "برون‌ریزی",
+          "remove": "حذف",
+          "rename": "تغییر نام",
+          "reveal": "نمایش در کتابخانه",
+          "transcribe": "رونویسی"
+        },
+        "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "پیش‌نمایش کوتاه شده — برای فایل کامل، برون‌ریزی کنید."
+        },
+        "tombstone": {
+          "brokenAria": "ارجاع خراب به پیوست: {{filename}}",
+          "brokenLabel": "خراب",
+          "deletedAria": "پیوست حذف‌شده: {{filename}}",
+          "deletedLabel": "حذف‌شده"
+        },
+        "transcribe": {
+          "cause": {
+            "featureOff": "تبدیل گفتار به نوشتار خاموش است. آن را در تنظیمات → رونویسی روشن کنید.",
+            "modelLoadFailed": "بارگذاری مدل گفتار به نوشتار ممکن نشد. اگر در تنظیمات → توسعه‌دهنده → AI مدل سفارشی تنظیم کرده‌اید، فایل‌های آن را بررسی کنید؛ در غیر این صورت نصب دوبارهٔ Myne مدل داخلی را بازمی‌گرداند.",
+            "noModel": "مدل گفتار به نوشتار موجود نیست. نصب دوبارهٔ Myne آن را بازمی‌گرداند.",
+            "vaultLocked": "برای رونویسی، خزانهٔ خود را باز کنید."
+          },
+          "failed": "رونویسی ناموفق بود. دوباره تلاش کنید.",
+          "heading": "متن رونویسی",
+          "insert": "درج رونویسی در یادداشت",
+          "progress": "در حال رونویسی…",
+          "stop": "توقف"
+        },
+        "urlImageFallback": "تصویر"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "توجه",
+        "bug": "اشکال",
+        "caution": "احتیاط",
+        "danger": "خطر",
+        "done": "انجام شد",
+        "error": "خطا",
+        "example": "مثال",
+        "failure": "شکست",
+        "faq": "پرسش‌های متداول",
+        "hint": "راهنمایی",
+        "important": "مهم",
+        "info": "اطلاعات",
+        "missing": "ناموجود",
+        "note": "نکته",
+        "question": "پرسش",
+        "quote": "نقل‌قول",
+        "success": "موفقیت",
+        "tip": "توصیه",
+        "todo": "برای انجام",
+        "warning": "هشدار"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "بایگانی‌شده",
+        "empty": "هنوز پیوند بازگشتی نیست.",
+        "linkedFrom": "پیوند از {{count}}",
+        "linkedFrom_one": "پیوند از {{count}}",
+        "linkedFrom_other": "پیوند از {{count}}",
+        "linksTo": "پیوند به {{count}}",
+        "linksTo_one": "پیوند به {{count}}",
+        "linksTo_other": "پیوند به {{count}}",
+        "outgoingEmpty": "این یادداشت هنوز به چیزی پیوند ندارد.",
+        "untitled": "بدون عنوان"
+      },
+      "barItems": {
+        "graph": "گراف",
+        "hide": "پنهان کردن",
+        "lock": "قفل",
+        "moveLeft": "انتقال به چپ",
+        "moveRight": "انتقال به راست",
+        "saveStatus": "وضعیت ذخیره",
+        "settings": "تنظیمات",
+        "tags": "برچسب‌ها",
+        "viewMode": "حالت نمایش",
+        "views": "نماها",
+        "vimMode": "حالت Vim",
+        "wordCount": "شمارش کلمات",
+        "workspace": "فضای کاری"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} فیلتر حذف شد",
+        "droppedFiltersSuffix_one": " · {{count}} فیلتر حذف شد",
+        "droppedFiltersSuffix_other": " · {{count}} فیلتر حذف شد",
+        "failed": "درون‌ریزی ناموفق بود.",
+        "fileFilterName": "Obsidian Base",
+        "imported": "{{count}} نما درون‌ریزی شد",
+        "imported_one": "{{count}} نما درون‌ریزی شد",
+        "imported_other": "{{count}} نما درون‌ریزی شد",
+        "notValid": "این یک فایل .base معتبر نیست.",
+        "skippedSuffix": " · {{count}} مورد نادیده گرفته شد",
+        "skippedSuffix_one": " · {{count}} مورد نادیده گرفته شد",
+        "skippedSuffix_other": " · {{count}} مورد نادیده گرفته شد",
+        "stoppedAfter": "درون‌ریزی پس از {{count}} نما متوقف شد.",
+        "stoppedAfter_one": "درون‌ریزی پس از {{count}} نما متوقف شد.",
+        "stoppedAfter_other": "درون‌ریزی پس از {{count}} نما متوقف شد."
+      },
+      "bottomBar": {
+        "browseTags": "مرور برچسب‌ها",
+        "browseViews": "مرور نماها",
+        "cycleViewMode": "چرخش حالت نمایش",
+        "docStats": {
+          "summary_one": "{{count}} کلمه · {{characters}} نویسه",
+          "summary_other": "{{count}} کلمه · {{characters}} نویسه",
+          "summarySelectionSuffix": " (انتخاب)",
+          "title_one": "{{characters}} نویسه · {{words}} کلمه · {{spaces}} فاصله · {{count}} پاراگراف",
+          "title_other": "{{characters}} نویسه · {{words}} کلمه · {{spaces}} فاصله · {{count}} پاراگراف",
+          "titleSelectionSuffix": " (متن انتخاب‌شده)"
+        },
+        "vimMode": {
+          "insert": "درج",
+          "normal": "عادی",
+          "replace": "جایگزینی",
+          "title": "حالت Vim — برای حالت عادی Esc را بزنید",
+          "visual": "بصری"
+        },
+        "graphTitle": "گراف (⌘⇧G)",
+        "lock": "قفل",
+        "lockVault": "قفل کردن خزانه",
+        "openSettings": "باز کردن تنظیمات",
+        "settingsTitle": "تنظیمات (⌘,)",
+        "showGraph": "نمایش نمای گراف",
+        "syncStatus": "فقط محلی · همگام‌سازی نشده",
+        "tagsTitle": "برچسب‌ها",
+        "togglePreview": "تغییر وضعیت پیش‌نمایش کنار‌به‌کنار",
+        "viewModeTitle": "حالت نمایش: {{mode}} (برای چرخش کلیک کنید)",
+        "viewsTitle": "نماها"
+      },
+      "import": {
+        "imported_one": "{{count}} یادداشت درون‌ریزی شد{{skipped}}",
+        "imported_other": "{{count}} یادداشت درون‌ریزی شد{{skipped}}",
+        "skippedSuffix": " · {{count}} مورد نادیده گرفته شد",
+        "skippedSuffix_one": " · {{count}} مورد نادیده گرفته شد",
+        "skippedSuffix_other": " · {{count}} مورد نادیده گرفته شد"
+      },
+      "nav": {
+        "goBack": "بازگشت",
+        "goForward": "رفتن به جلو"
+      },
+      "noNotesToOpen": "یادداشتی برای باز کردن نیست.",
+      "resizeBacklinksSidebar": "تغییر اندازهٔ نوار کناری پیوندهای بازگشتی",
+      "resizeNotesSidebar": "تغییر اندازهٔ نوار کناری یادداشت‌ها",
+      "rightPanel": {
+        "aiChat": {
+          "askPlaceholder": "دربارهٔ یادداشت‌هایتان بپرسید…",
+          "askSubmit": "پرسش",
+          "assistant": "دستیار",
+          "citations": "منابع",
+          "composerPlaceholder": "با یادداشت‌هایتان گفتگو کنید…",
+          "empty": "خروجی AI — خلاصه‌ها، پاسخ‌ها و پیشنهادها — اینجا نشان داده می‌شود.",
+          "error": "درخواست AI کامل نشد.",
+          "errorTurn": "دستیار نتوانست پاسخ دهد.",
+          "gettingReadyHint": "در حال آماده‌سازی یادداشت‌های شما برای AI — یک لحظه.",
+          "insert": "درج در یادداشت",
+          "noAnswer": "پاسخی نیست — پرسش را جور دیگری بنویسید.",
+          "noModelHint": "مدلی انتخاب نشده است. برای شروع، یکی را در تنظیمات → توسعه‌دهنده → AI انتخاب کنید.",
+          "offHint": "AI محلی خاموش است. آن را در تنظیمات → توسعه‌دهنده → AI روشن کنید.",
+          "send": "ارسال",
+          "statusGettingReady": "در حال آماده‌سازی…",
+          "statusNoModel": "بدون مدل",
+          "statusOff": "خاموش",
+          "statusReady": "آماده",
+          "stop": "توقف",
+          "tagsThinking": "در حال پیشنهاد برچسب…",
+          "thinking": "AI در حال فکر کردن است…",
+          "truncated": "{{count}} نویسهٔ نخست خلاصه شد.",
+          "you": "شما"
+        },
+        "allHidden": "همهٔ زبانه‌ها پنهان‌اند — برای بازگرداندن راست‌کلیک کنید.",
+        "outline": {
+          "collapse": "جمع کردن بخش",
+          "empty": "سرفصلی نیست",
+          "expand": "باز کردن بخش",
+          "heading": "رئوس مطالب"
+        },
+        "tabs": {
+          "aiChat": "گفتگوی AI",
+          "backlinks": "پیوندها",
+          "outline": "رئوس مطالب",
+          "tasks": "کارها",
+          "unlinked": "اشاره‌های بدون پیوند"
+        }
+      },
+      "sidebarToggle": {
+        "hideBacklinks": "پنهان کردن نوار کناری پیوندهای بازگشتی",
+        "hideNotes": "پنهان کردن نوار کناری یادداشت‌ها",
+        "showBacklinks": "نمایش نوار کناری پیوندهای بازگشتی",
+        "showNotes": "نمایش نوار کناری یادداشت‌ها"
+      },
+      "switchingOverlay": {
+        "saving": "در حال ذخیره…"
+      },
+      "viewMode": {
+        "live": "زنده",
+        "reading": "مطالعه",
+        "source": "منبع"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "نام فضای کاری",
+        "renameConfirm": "تغییر نام",
+        "renameTitle": "تغییر نام فضای کاری",
+        "saveAsTitle": "ذخیرهٔ فضای کاری با نام",
+        "saveConfirm": "ذخیره"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "فضای کاری",
+        "renameItemLabel": "تغییر نام فضای کاری {{name}}",
+        "renameTitle": "تغییر نام فضای کاری",
+        "saveCurrentAs": "ذخیرهٔ فعلی با نام…",
+        "switchLabel": "تعویض فضای کاری",
+        "toggleTitle": "فضای کاری: {{name}}"
+      }
+    },
+    "noteActions": {
+      "buttonLabel": "عملیات یادداشت",
+      "rename": "تغییر نام",
+      "move": "انتقال به پوشه…",
+      "duplicate": "تکثیر",
+      "convertToTemplate": "تبدیل به الگو",
+      "convertToNote": "تبدیل به یادداشت",
+      "turnedIntoTemplate": "به الگو تبدیل شد",
+      "convertedToNote": "به یادداشت تبدیل شد",
+      "versionHistory": "تاریخچهٔ نسخه‌ها",
+      "exportMarkdown": "برون‌ریزی به Markdown…",
+      "exportPdf": "برون‌ریزی به PDF…",
+      "exportHtml": "برون‌ریزی به HTML…",
+      "exportTxt": "برون‌ریزی به متن ساده…",
+      "trash": "انتقال به زباله‌دان"
+    },
+    "codeBlock": {
+      "copyCode": "کپی کد",
+      "defaultBadge": "کد"
+    },
+    "drawingEmbed": {
+      "done": "تمام",
+      "edit": "ویرایش نقاشی {{name}}",
+      "editAction": "ویرایش",
+      "empty": "نقاشی خالی — برای کشیدن کلیک کنید",
+      "open": "باز کردن",
+      "rename": "تغییر نام نقاشی"
+    },
+    "drawingMenu": {
+      "background": "پس‌زمینهٔ بوم",
+      "reset": "بازنشانی بوم",
+      "toggleTheme": "تغییر پوستهٔ نقاشی"
+    },
+    "find": {
+      "close": "بستن جستجو",
+      "matchCase": "تطابق حروف بزرگ و کوچک",
+      "matchCount": "{{current}} از {{total}}",
+      "nextMatch": "مورد بعدی",
+      "noMatches": "موردی یافت نشد",
+      "placeholder": "یافتن در یادداشت",
+      "previousMatch": "مورد قبلی",
+      "replaceAll": "جایگزینی همه",
+      "replaceAllCount": "جایگزینی همه ({{total}})",
+      "replaceOne": "جایگزینی",
+      "replacePlaceholder": "جایگزینی با",
+      "toggleReplace": "تغییر وضعیت جایگزینی"
+    },
+    "folding": {
+      "clickToUnfold": "برای باز کردن کلیک کنید",
+      "unfold": "باز کردن"
+    },
+    "footnote": {
+      "heading": "پانوشت‌ها",
+      "unreferenced": "بدون ارجاع"
+    },
+    "frontmatter": {
+      "addListItem": "افزودن مورد…",
+      "addListItemAriaLabel": "افزودن مورد به {{key}}",
+      "addProperty": "+ افزودن ویژگی",
+      "propertiesLabel": "ویژگی‌ها",
+      "removeListItemAriaLabel": "حذف {{item}}",
+      "titleAriaLabel": "عنوان یادداشت",
+      "titlePlaceholder": "بدون عنوان"
+    },
+    "mermaid": {
+      "rendering": "در حال رسم نمودار…"
+    },
+    "slash": {
+      "aiContinue": "ادامهٔ نوشتن (AI)",
+      "aiTitle": "پیشنهاد عنوان (AI)",
+      "attachFile": "پیوست فایل",
+      "bulletList": "فهرست نشانه‌دار",
+      "callout": "کادر تأکید",
+      "date": "تاریخ",
+      "day": "روز",
+      "divider": "جداکننده",
+      "drawing": "نقاشی",
+      "due": "سررسید",
+      "heading1": "سرفصل 1",
+      "heading2": "سرفصل 2",
+      "heading3": "سرفصل 3",
+      "heading4": "سرفصل 4",
+      "heading5": "سرفصل 5",
+      "heading6": "سرفصل 6",
+      "link": "پیوند",
+      "now": "اکنون",
+      "numberedList": "فهرست شماره‌دار",
+      "priority": "اولویت",
+      "quote": "نقل‌قول",
+      "repeat": "تکرار",
+      "table": "جدول",
+      "taskQuery": "فهرست کارها",
+      "time": "زمان",
+      "todoList": "فهرست انجام‌دادنی‌ها",
+      "voiceNote": "یادداشت صوتی",
+      "wikiLink": "ویکی‌پیوند"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "افزودن به واژه‌نامه",
+        "ignoreInVault": "نادیده گرفتن در این خزانه",
+        "ignoreThisSession": "نادیده گرفتن در این نشست",
+        "noSuggestions": "پیشنهادی نیست"
+      }
+    },
+    "table": {
+      "addColumn": "افزودن ستون در سمت راست",
+      "addRow": "افزودن سطر در پایین",
+      "cellAriaLabel": "خانهٔ جدول",
+      "deleteColumn": "حذف ستون",
+      "deleteRow": "حذف سطر",
+      "reorderColumn": "جابه‌جایی ستون",
+      "reorderRow": "جابه‌جایی سطر"
+    },
+    "tagSuggestion": {
+      "label": "برچسب‌های پیشنهادی",
+      "accept": "افزودن برچسب {{tag}} به این یادداشت",
+      "dismiss": "نادیده گرفتن برچسب پیشنهادی {{tag}}"
+    },
+    "taskField": {
+      "addAffordance": "افزودن فیلد کار",
+      "invalidDue": "Myne این تاریخ را نمی‌تواند بخواند، بنابراین به‌عنوان سررسید نشان داده نمی‌شود.",
+      "invalidPriority": "Myne این اولویت را نمی‌تواند بخواند. از highest، high، medium، low یا lowest استفاده کنید.",
+      "invalidRepeat": "Myne این قاعدهٔ تکرار را نمی‌شناسد، بنابراین این کار تکرار نمی‌شود.",
+      "menuEdit": "ویرایش {{field}}",
+      "menuTitle": "افزودن فیلد",
+      "repeatNoAnchor": "این کار تاریخی ندارد که تکرار از آن آغاز شود، بنابراین تکرار نمی‌شود. برای شروع، یک سررسید اضافه کنید.",
+      "save": "ذخیره",
+      "skipOccurrence": "نادیده گرفتن این نوبت",
+      "title": {
+        "due": "سررسید",
+        "repeat": "تکرار",
+        "priority": "اولویت"
+      }
+    },
+    "toolbar": {
+      "apply": "اعمال",
+      "exportImageTitle": "برون‌ریزی متن انتخاب‌شده به‌صورت تصویر",
+      "customize": {
+        "bold": "توپر",
+        "bulletList": "فهرست نشانه‌دار",
+        "checklist": "چک‌لیست",
+        "code": "کد",
+        "heading": "سرفصل",
+        "highlight": "برجسته‌سازی",
+        "italic": "مورب",
+        "link": "پیوند",
+        "numberedList": "فهرست شماره‌دار",
+        "quote": "نقل‌قول",
+        "strike": "خط‌خورده",
+        "wikilink": "ویکی‌پیوند"
+      },
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "پاراگراف"
+      },
+      "highlight": {
+        "blue": "آبی",
+        "green": "سبز",
+        "pink": "صورتی",
+        "purple": "بنفش",
+        "yellow": "زرد",
+        "orange": "نارنجی",
+        "red": "قرمز",
+        "teal": "سبزآبی",
+        "cyan": "فیروزه‌ای",
+        "lime": "لیمویی",
+        "brown": "قهوه‌ای",
+        "grey": "خاکستری",
+        "indigo": "نیلی",
+        "remove": "حذف برجسته‌سازی"
+      },
+      "urlPlaceholder": "نشانی پیوند را جای‌گذاری کنید"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "کامل",
+        "narrow": "باریک",
+        "normal": "عادی",
+        "wide": "پهن"
+      },
+      "font": {
+        "mono": "تک‌فاصله",
+        "sans": "بی‌سریف"
+      },
+      "lineSpacing": {
+        "normal": "عادی",
+        "relaxed": "باز",
+        "tight": "فشرده"
+      },
+      "textSize": {
+        "lg": "بزرگ",
+        "md": "پیش‌فرض",
+        "sm": "کوچک",
+        "xl": "خیلی بزرگ"
+      }
+    },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` پشتیبانی نمی‌شود — Myne یادداشت باز می‌کند، نه فایل. از پالت فرمان یا نوار کناری استفاده کنید.",
+          "map": "نگاشت کلید سفارشی در Myne پشتیبانی نمی‌شود. میان‌برها در تنظیمات → کلیدهای میان‌بر تنظیم می‌شوند.",
+          "set": "`:set` پشتیبانی نمی‌شود — Myne گزینه‌های vim ندارد. ترجیحات ویرایشگر در تنظیمات → ویرایشگر قرار دارند.",
+          "source": "`:source` پشتیبانی نمی‌شود. Myne عمداً هیچ سطح اسکریپت پیکربندی ندارد.",
+          "unsupported": "این فرمان در Myne پشتیبانی نمی‌شود."
+        },
+        "substitute": {
+          "malformed": "آن جایگزینی خوانده نشد. قالب مورد انتظار :s/pattern/replacement/ است",
+          "refused": "این الگو از نحو مخصوص vim استفاده می‌کند ({{what}}) که جستجوی Myne از آن پشتیبانی نمی‌کند. چیزی تغییر نکرد."
+        },
+        "writeFailed": "ذخیره ممکن نشد.",
+        "written": "ذخیره شد."
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "جاسازی: {{label}}"
+      },
+      "convert": {
+        "cancel": "انصراف",
+        "choiceClause_one": " · {{count}} مورد نیاز به انتخاب دارد.",
+        "choiceClause_other": " · {{count}} مورد نیاز به انتخاب دارند.",
+        "chooseTarget": "انتخاب مقصد…",
+        "convert": "تبدیل",
+        "convertedToast_one": "{{count}} ویکی‌پیوند تبدیل شد",
+        "convertedToast_other": "{{count}} ویکی‌پیوند تبدیل شد",
+        "noneToConvert": "در این یادداشت ویکی‌پیوند درون‌ریزی‌شده‌ای برای تبدیل نیست.",
+        "nothingToConvert": "چیزی برای تبدیل نیست — هیچ ویکی‌پیوند درون‌ریزی‌شده‌ای پیدا نشد.",
+        "rewriteCount_one": "{{count}} پیوند بازنویسی خواهد شد",
+        "rewriteCount_other": "{{count}} پیوند بازنویسی خواهد شد",
+        "skipped": "نادیده گرفته شد — {{reason}}",
+        "title": "تبدیل ویکی‌پیوندهای درون‌ریزی‌شده در این یادداشت"
+      },
+      "convertCore": {
+        "noMatch": "بدون تطابق"
+      }
+    },
+    "flow": {
+      "loadFailed": "بارگذاری یادداشت‌های شما ممکن نشد.",
+      "openFailed": "باز کردن این یادداشت ممکن نشد.",
+      "saveFailed": "ذخیرهٔ این یادداشت ممکن نشد.",
+      "moveFailed": "انتقال این یادداشت ممکن نشد.",
+      "openTodayFailed": "باز کردن یادداشت امروز ممکن نشد.",
+      "exportFailed": "برون‌ریزی این یادداشت ممکن نشد.",
+      "attachNeedsApp": "پیوست‌ها به برنامه نیاز دارند (نه پیش‌نمایش مرورگر).",
+      "attachTooLarge": "آن فایل خیلی بزرگ است (حداکثر 64 مگابایت).",
+      "attachUnsupported": "فقط تصاویر و فایل‌های PDF قابل پیوست‌اند.",
+      "attachFailed": "پیوست کردن آن فایل ممکن نشد.",
+      "archiveFailed": "بایگانی این یادداشت ممکن نشد.",
+      "trashFailed": "انتقال این یادداشت به زباله‌دان ممکن نشد."
+    },
+    "nav": {
+      "dailyNote": "یادداشت روزانه",
+      "openToday": "باز کردن امروز",
+      "allNotes": "همهٔ یادداشت‌ها"
+    },
+    "list": {
+      "searchPlaceholder": "جستجوی یادداشت‌ها",
+      "clearSearch": "پاک کردن جستجو",
+      "viewNoteCount_one": "{{count}} یادداشت در «{{name}}»",
+      "viewNoteCount_other": "{{count}} یادداشت در «{{name}}»",
+      "edit": "ویرایش",
+      "trashEmpty": "زباله‌دان خالی است",
+      "archiveEmpty": "یادداشت بایگانی‌شده‌ای نیست",
+      "noMatchingNotes": "یادداشت مطابقی نیست",
+      "noNotesYet": "هنوز یادداشتی نیست",
+      "noMatchBody": "چیزی با «{{name}}» مطابقت ندارد. نما را ویرایش کنید یا آن را پاک کنید تا همهٔ یادداشت‌ها را ببینید.",
+      "emptyBody": "برای نوشتن نخستین یادداشت روی «یادداشت جدید» بزنید. همه چیز پیش از ذخیره‌شدن، روی همین دستگاه رمزگذاری می‌شود.",
+      "unarchive": "خارج کردن از بایگانی"
+    },
+    "filterSheet": {
+      "title": "فیلتر",
+      "status": "وضعیت"
+    },
+    "sortSheet": {
+      "title": "مرتب‌سازی",
+      "manual": "ترتیب دستی",
+      "titleAsc": "عنوان · الف → ی",
+      "titleDesc": "عنوان · ی → الف"
+    },
+    "noteMenu": {
+      "emptyNote": "یادداشت خالی",
+      "wordCount_one": "{{count}} کلمه · {{minutes}} دقیقه مطالعه",
+      "wordCount_other": "{{count}} کلمه · {{minutes}} دقیقه مطالعه",
+      "moveToFolder": "انتقال به پوشه…",
+      "moveToTrash": "انتقال به زباله‌دان",
+      "copied": "کپی شد ✓",
+      "copyToClipboard": "کپی در بریده‌دان",
+      "versionHistory": "تاریخچهٔ نسخه‌ها"
+    },
+    "purge": {
+      "body": "این کار یادداشت را برای همیشه از این دستگاه حذف می‌کند. این کار قابل بازگشت نیست."
+    },
+    "move": {
+      "title": "انتقال به پوشه",
+      "body": "مسیر یک پوشه را بنویسید (مثلاً Projects/Myne). برای ریشهٔ خزانه خالی بگذارید.",
+      "placeholder": "Projects/Myne",
+      "confirm": "انتقال"
+    },
+    "sidebar": {
+      "browse": "مرور"
+    },
+    "emptyDetail": {
+      "title": "یک یادداشت انتخاب کنید",
+      "body": "یادداشتی را از فهرست انتخاب کنید، یا یکی تازه بسازید."
+    },
+    "readingBar": {
+      "editNote": "ویرایش یادداشت",
+      "edit": "ویرایش"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} یادداشت پیونددار",
+      "linkedNotes_other": "{{count}} یادداشت پیونددار",
+      "links_one": "{{count}} پیوند",
+      "links_other": "{{count}} پیوند"
+    },
+    "formatBar": {
+      "redo": "ازنو",
+      "attachFile": "پیوست فایل جدید",
+      "insertFromLibrary": "درج از کتابخانه",
+      "recordVoiceNote": "ضبط یادداشت صوتی",
+      "showLivePreview": "نمایش پیش‌نمایش زنده",
+      "showRawMarkdown": "نمایش Markdown خام",
+      "hideKeyboard": "پنهان کردن صفحه‌کلید"
+    },
+    "topBar": {
+      "backToNotes": "بازگشت به یادداشت‌ها",
+      "noteDetails": "جزئیات یادداشت",
+      "noteActions": "عملیات یادداشت"
+    },
+    "noteContext": {
+      "collapsePanel": "جمع کردن پنل",
+      "unlinkedCount_one": "اشارهٔ بدون پیوند {{count}}",
+      "unlinkedCount_other": "اشاره‌های بدون پیوند {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "کارتی",
+      "typeList": "فهرستی",
+      "emptyState": "هنوز نمای ذخیره‌شده‌ای نیست. یکی بسازید تا یادداشت‌هایتان را بر اساس برچسب، پوشه یا متن فیلتر کنید.",
+      "editView": "ویرایش نما"
+    },
+    "sheet": {
+      "done": "تمام"
+    },
+    "vaultSwitcher": {
+      "title": "خزانه‌ها"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "برچسبی مطابقت ندارد.",
+      "notesCount_one": "یادداشت‌ها · {{count}}",
+      "notesCount_other": "یادداشت‌ها · {{count}}"
+    },
+    "untitledNote": "یادداشت بدون عنوان",
+    "commandPalette": {
+      "searchPlaceholder": "جستجوی یادداشت‌ها یا اجرای یک فرمان…",
+      "noMatches": "هیچ فرمان یا یادداشتی مطابقت ندارد."
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "یادداشت",
+      "errors": {
+        "attachmentCorrupt": "پیوستی که این یادداشت به آن ارجاع می‌دهد خوانده نشد، بنابراین چیزی برون‌ریزی نشد.",
+        "attachmentMissing": "پیوستی که این یادداشت به آن ارجاع می‌دهد وجود ندارد، بنابراین چیزی برون‌ریزی نشد.",
+        "cannotDecrypt": "این یادداشت خوانده نشد.",
+        "destinationUnusable": "آن پوشهٔ مقصد قابل استفاده نیست.",
+        "fallback": "برون‌ریزی به‌طور غیرمنتظره ناموفق بود. دوباره تلاش کنید.",
+        "invalidAttachmentCatalog": "فهرست پیوست‌های خزانه خوانده نشد، بنابراین چیزی برون‌ریزی نشد.",
+        "invalidNoteFilename": "آن نام فایل قابل استفاده نیست، بنابراین چیزی برون‌ریزی نشد.",
+        "invalidNoteId": "این یادداشت شناسایی نشد، بنابراین چیزی برون‌ریزی نشد.",
+        "invalidPlaintextEncoding": "محتوای این یادداشت آسیب‌دیده به نظر می‌رسد، بنابراین چیزی برون‌ریزی نشد. آن را از یک پشتیبان بازیابی کنید.",
+        "ioNoSpace": "فضای کافی در مقصد نیست.",
+        "ioPermissionDenied": "اجازهٔ نوشتن در مقصد وجود ندارد.",
+        "ioWriteDefault": "نوشتن فایل برون‌ریزی‌شده ممکن نشد.",
+        "noteNotFound": "این یادداشت دیگر وجود ندارد — ممکن است حذف شده باشد.",
+        "pdfCaptureFailed": "فایل PDF ساخته نشد، بنابراین چیزی برون‌ریزی نشد.",
+        "pdfExportInProgress": "یک برون‌ریزی PDF از قبل در جریان است. تا پایان آن صبر کنید، سپس دوباره تلاش کنید.",
+        "pdfPayloadMissing": "برون‌ریزی نیمه‌کاره ماند — اگر خزانه قفل شد، آن را باز کنید و دوباره تلاش کنید.",
+        "pdfRenderTimeout": "رسم یادداشت خیلی طول کشید، بنابراین چیزی برون‌ریزی نشد.",
+        "pdfWindowCreateFailed": "پنجرهٔ برون‌ریزی باز نشد، بنابراین چیزی برون‌ریزی نشد.",
+        "targetExists": "فایلی با آن نام از قبل در مقصد وجود دارد.",
+        "vaultLocked": "خزانه قفل است. آن را باز کنید، سپس دوباره تلاش کنید."
+      },
+      "flow": {
+        "couldNotRead": "این یادداشت خوانده نشد.",
+        "exportedTo": "به {{filename}} برون‌ریزی شد",
+        "exportedToWithAttachments_one": "به {{filename}} + {{count}} پیوست برون‌ریزی شد",
+        "exportedToWithAttachments_other": "به {{filename}} + {{count}} پیوست برون‌ریزی شد",
+        "exportedToWithImages_one": "به {{filename}} + {{count}} تصویر برون‌ریزی شد",
+        "exportedToWithImages_other": "به {{filename}} + {{count}} تصویر برون‌ریزی شد",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "متن ساده",
+        "showInFolder": "نمایش در پوشه"
+      },
+      "modal": {
+        "cancel": "انصراف",
+        "export": "برون‌ریزی…",
+        "includeAttachments_one": "شامل {{count}} پیوست",
+        "includeAttachments_other": "شامل {{count}} پیوست",
+        "title": "برون‌ریزی به Markdown",
+        "copyLabel": "کپی متن یادداشت در بریده‌دان",
+        "copied": "متن یادداشت کپی شد",
+        "copyFailed": "کپی متن یادداشت ممکن نشد"
+      }
+    },
+    "egress": {
+      "cancel": "انصراف",
+      "confirm": "دانلود",
+      "title": "دانلود این فایل"
+    },
+    "pdf": {
+      "cancel": "انصراف",
+      "continue": "ادامه…",
+      "title": "برون‌ریزی به PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "محل قرار گرفتن برون‌ریزی را انتخاب کنید",
+      "errors": {
+        "attachmentCorrupt": "پیوستی که یک یادداشت به آن ارجاع می‌دهد خوانده نشد، بنابراین چیزی برون‌ریزی نشد.",
+        "attachmentMissing": "پیوستی که یک یادداشت به آن ارجاع می‌دهد وجود ندارد، بنابراین چیزی برون‌ریزی نشد.",
+        "authOperationInProgress": "عملیات دیگری روی خزانه در جریان است. تا پایان آن صبر کنید، سپس دوباره تلاش کنید.",
+        "cancelled": "برون‌ریزی لغو شد. چیزی در مقصد باقی نماند.",
+        "cannotDecrypt": "یک یادداشت خوانده نشد، بنابراین چیزی برون‌ریزی نشد.",
+        "destinationAlreadyExists": "از قبل چیزی در آن مکان وجود دارد. جای تازه‌ای برای برون‌ریزی انتخاب کنید.",
+        "destinationNotAllowed": "آن مکان درون فضای ذخیره‌سازی خود Myne است. پوشه‌ای بیرون از آن انتخاب کنید.",
+        "invalidPlaintextEncoding": "محتوای یک یادداشت آسیب‌دیده به نظر می‌رسد، بنابراین چیزی برون‌ریزی نشد. آن را از یک پشتیبان بازیابی کنید.",
+        "invalidVaultMeta": "فراداده‌های خزانه خوانده نشد، بنابراین چیزی برون‌ریزی نشد.",
+        "ioWriteDefault": "نوشتن برون‌ریزی ممکن نشد.",
+        "joinFailure": "برون‌ریزی به‌طور غیرمنتظره ناموفق بود. چیزی در مقصد باقی نماند.",
+        "vaultLocked": "خزانه قفل است. آن را باز کنید، سپس دوباره تلاش کنید.",
+        "vaultNotFound": "خزانه‌ای برای برون‌ریزی پیدا نشد."
+      },
+      "flow": {
+        "countAttachments_one": "{{count}} پیوست",
+        "countAttachments_other": "{{count}} پیوست",
+        "countFolders_one": "{{count}} پوشه",
+        "countFolders_other": "{{count}} پوشه",
+        "countNotes_one": "{{count}} یادداشت",
+        "countNotes_other": "{{count}} یادداشت",
+        "exclusionsHistory": "تاریخچهٔ نسخه‌ها شامل نمی‌شود.",
+        "exclusionsTrashed_one": "{{count}} یادداشت در زباله‌دان شامل نمی‌شود.",
+        "exclusionsTrashed_other": "{{count}} یادداشت در زباله‌دان شامل نمی‌شوند.",
+        "exclusionsTrashedAndHistory_one": "{{count}} یادداشت در زباله‌دان و تاریخچهٔ نسخه‌ها شامل نمی‌شوند.",
+        "exclusionsTrashedAndHistory_other": "{{count}} یادداشت در زباله‌دان و تاریخچهٔ نسخه‌ها شامل نمی‌شوند.",
+        "phaseAttachments": "پیوست",
+        "phaseNotes": "یادداشت",
+        "preparing": "در حال آماده‌سازی…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "انصراف",
+        "cancelling": "در حال لغو…",
+        "title": "در حال برون‌ریزی…"
+      },
+      "setup": {
+        "cancel": "انصراف",
+        "choose": "انتخاب…",
+        "chooseFolder": "یک پوشه انتخاب کنید…",
+        "destinationLabel": "مقصد",
+        "export": "برون‌ریزی…",
+        "folderSelectAriaLabel": "پوشه‌ای که برون‌ریزی می‌شود",
+        "noFolderChosen": "پوشه‌ای انتخاب نشده است",
+        "noFoldersInVault": "در این خزانه پوشه‌ای نیست",
+        "scopeFolder": "یک پوشه",
+        "scopeLabel": "دامنه",
+        "scopeWhole": "کل خزانه",
+        "title": "برون‌ریزی خزانه به Markdown"
+      },
+      "summary": {
+        "done": "تمام",
+        "showInFolder": "نمایش در پوشه",
+        "title": "برون‌ریزی کامل شد"
+      }
+    }
+  },
+  "failClosed": {
+    "exit": {
+      "quit": "بستن برنامه",
+      "reload": "بارگذاری دوباره"
+    },
+    "corrupted": {
+      "body": "اگر پشتیبان دارید، می‌توانید آن را بازیابی کنید — به فایل‌های فعلی شما دست زده نمی‌شود؛ پشتیبان ابتدا به‌عنوان خزانه‌ای جداگانه بازیابی می‌شود.",
+      "cta": "بستن برنامه",
+      "title": "فایل خزانه آسیب دیده است."
+    },
+    "invalidState": {
+      "body": "لطفاً دوباره راه‌اندازی کنید.",
+      "cta": "قفل کردن",
+      "title": "وضعیت غیرمنتظره."
+    },
+    "ioError": {
+      "body": "ممکن است خطای دیسک یا سامانهٔ فایل باشد.",
+      "cta": "بستن برنامه",
+      "title": "خواندن فایل خزانه ممکن نیست."
+    },
+    "permissionDenied": {
+      "body": "مجوزهای فایل را بررسی کنید.",
+      "cta": "بستن برنامه",
+      "title": "اجازهٔ دسترسی به فایل خزانه وجود ندارد."
+    },
+    "copyDiagnostics": "کپی اطلاعات عیب‌یابی",
+    "diagnosticsCopied": "کپی شد",
+    "restoreFromBackup": "بازیابی از پشتیبان…"
+  },
+  "notes": {
+    "archive": {
+      "close": "بستن",
+      "count_one": "{{count}} یادداشت",
+      "count_other": "{{count}} یادداشت",
+      "delete": "حذف",
+      "deleteError": "حذف آن یادداشت ممکن نشد. دوباره تلاش کنید.",
+      "emptyBody": "یادداشت‌ها و پوشه‌های بایگانی‌شده از نوار کناری پنهان می‌شوند اما محفوظ می‌مانند. هر وقت لازمشان داشتید، همین‌جا بازگردانی‌شان کنید.",
+      "emptyTitle": "چیزی بایگانی نشده است",
+      "folderDeleteBody_one": "«{{name}}» و {{count}} یادداشت آن",
+      "folderDeleteBody_other": "«{{name}}» و {{count}} یادداشت آن",
+      "folderDeleteConfirmCta": "انتقال به زباله‌دان",
+      "folderDeleteError": "انتقال یادداشت‌های آن پوشه به زباله‌دان ممکن نشد. دوباره تلاش کنید.",
+      "folderDeleteTitle": "این پوشه به زباله‌دان منتقل شود؟",
+      "folderDeleteWarning": "به زباله‌دان منتقل می‌شوند — هر وقت خواستید بازگردانی‌شان کنید. حذف دائمی گامی جداگانه است.",
+      "restore": "بازگردانی",
+      "restoreError": "بازگردانی آن یادداشت ممکن نشد. دوباره تلاش کنید.",
+      "title": "بایگانی",
+      "untitled": "بدون عنوان"
+    },
+    "cardMenu": {
+      "copyLink": "کپی پیوند",
+      "open": "باز کردن",
+      "openInNewTab": "باز کردن در زبانهٔ جدید",
+      "revealInFolder": "نمایش در پوشه"
+    },
+    "colorLabels": {
+      "clay": "آجری",
+      "moss": "خزه‌ای",
+      "ochre": "اخرایی",
+      "plum": "آلویی",
+      "slate": "سربی",
+      "stone": "سنگی"
+    },
+    "decoration": {
+      "colorSection": "رنگ",
+      "default": "پیش‌فرض",
+      "defaultFolderIcon": "نماد پیش‌فرض پوشه",
+      "iconSection": "نماد",
+      "menuLabel": "برچسب رنگی",
+      "noColor": "بدون رنگ",
+      "none": "هیچ‌کدام"
+    },
+    "deleteConfirm": {
+      "cancel": "انصراف",
+      "delete": "حذف",
+      "title": "این یادداشت حذف شود؟",
+      "untitled": "بدون عنوان",
+      "warning": "این کار قابل بازگشت نیست."
+    },
+    "filterBuilder": {
+      "addCondition": "افزودن شرط",
+      "addFilterGroup": "افزودن گروه فیلتر",
+      "cancel": "انصراف",
+      "combinator": {
+        "all": "همهٔ",
+        "any": "هر یک از"
+      },
+      "match": "مطابقت",
+      "negate": {
+        "is": "هست",
+        "isNot": "نیست"
+      },
+      "noConditions": "هنوز شرطی نیست — این نما همهٔ صفحه‌ها را نشان می‌دهد.",
+      "noteCount_one": "{{count}} یادداشت",
+      "noteCount_other": "{{count}} یادداشت",
+      "of": "موارد زیر:",
+      "ofTheGroups": "گروه‌های زیر:",
+      "op": {
+        "contains": "شامل"
+      },
+      "propertyValuePlaceholder": "مقدار",
+      "removeCondition": "حذف شرط",
+      "replaceFilter": "جایگزینی فیلتر",
+      "save": "ذخیره",
+      "searchTextPlaceholder": "متن جستجو",
+      "selectFolderPlaceholder": "یک پوشه انتخاب کنید…",
+      "selectPropertyPlaceholder": "یک ویژگی انتخاب کنید…",
+      "selectTagPlaceholder": "یک برچسب انتخاب کنید…",
+      "type": {
+        "folder": "پوشه",
+        "property": "ویژگی",
+        "search": "جستجو",
+        "tag": "برچسب"
+      },
+      "unrepresentable": "این فیلتر با یک ویرایشگر پیشرفته ساخته شده و اینجا قابل ویرایش نیست.",
+      "unresolved": "نامشخص"
+    },
+    "folderManagement": {
+      "illegalSegment": "نام پوشه نمی‌تواند شامل / \\ | # ^ [ ] باشد یا با فاصله شروع یا تمام شود.",
+      "tooLong": "آن مسیر پوشه خیلی طولانی است."
+    },
+    "folderNote": {
+      "defaultTitle": "فهرست"
+    },
+    "folderRow": {
+      "createFolderNote": "ساخت یادداشت پوشه",
+      "empty": "خالی",
+      "folderNote": "یادداشت پوشه",
+      "openFolderNote": "باز کردن یادداشت پوشه"
+    },
+    "graph": {
+      "allConnected": "همه‌چیز به هم متصل است — یادداشت منزوی‌ای نیست.",
+      "building": "در حال ساخت گراف…",
+      "colorGroups": {
+        "addRule": "افزودن قاعده",
+        "colorSwatchTitle": "انتخاب رنگ",
+        "deleteRuleTitle": "حذف قاعده",
+        "dragHandleTitle": "برای جابه‌جایی بکشید",
+        "editFilterButton": "ویرایش فیلتر…",
+        "editFilterTitle": "ویرایش فیلتر گروه رنگی",
+        "emptyBody": "گروه‌های رنگی به شما امکان می‌دهند گره‌های گراف را بر اساس برچسب یا پوشه رنگ کنید — یادداشت‌های کاری با یک رنگ، یادداشت‌های شخصی با رنگی دیگر. اولین قاعدهٔ خود را بسازید.",
+        "emptyTitle": "هنوز گروه رنگی‌ای نیست",
+        "enableToggleAriaLabel": "فعال کردن قاعده",
+        "filterAllNotes": "با همهٔ یادداشت‌ها مطابقت دارد",
+        "filterConditions_one": "{{count}} شرط",
+        "filterConditions_other": "{{count}} شرط",
+        "heading": "گروه‌های رنگی",
+        "moveDown": "انتقال قاعده به پایین",
+        "moveUp": "انتقال قاعده به بالا",
+        "namePlaceholder": "قاعدهٔ بدون عنوان"
+      },
+      "depthToggleTitle": "تغییر عمق همسایگی (1 ↔ 2 گام)",
+      "filterAll": "همه",
+      "filterAroundNote": "پیرامون این یادداشت",
+      "filterByTag": "فیلتر بر اساس برچسب",
+      "filterIsolated": "منزوی",
+      "hop": "{{depth}} گام",
+      "loading": "در حال بارگذاری گراف…",
+      "noNotes": "هنوز یادداشتی برای گراف نیست.",
+      "refresh": "به‌روزرسانی",
+      "refreshTitle": "خزانه تغییر کرد — گراف را دوباره بسازید",
+      "settings": {
+        "appearanceHeading": "ظاهر",
+        "closeTitle": "بستن",
+        "forceCenter": "کشش به مرکز",
+        "forceLinkDistance": "فاصلهٔ پیوندها",
+        "forceLinkStrength": "قدرت پیوندها",
+        "forceRepel": "دافعه",
+        "forcesHeading": "نیروها",
+        "labelFadeZoom": "محو برچسب‌ها",
+        "lineThickness": "ضخامت خطوط",
+        "nodeSize": "اندازهٔ گره",
+        "nodeSizeStrength": "اندازه بر اساس پیوندها",
+        "openTitle": "تنظیمات گراف",
+        "reset": "بازنشانی به پیش‌فرض‌ها",
+        "showArrows": "نمایش پیکان‌های جهت",
+        "title": "تنظیمات گراف"
+      },
+      "tagPlaceholder": "برچسب…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "نمای بدون عنوان"
+      },
+      "modal": {
+        "cancel": "انصراف",
+        "cancelledNotImported": "{{count}} مورد درون‌ریزی نشد",
+        "cancelledNotImported_one": "{{count}} مورد درون‌ریزی نشد",
+        "cancelledNotImported_other": "{{count}} مورد درون‌ریزی نشد",
+        "cancelling": "در حال لغو…",
+        "chooseFolder": "انتخاب پوشه…",
+        "close": "بستن",
+        "closeAriaLabel": "بستن",
+        "copied": "کپی شد",
+        "copy": "کپی",
+        "done": "انجام شد",
+        "errorBody": "درون‌ریزی نتوانست کامل شود. یادداشت‌هایی که تا اینجا درون‌ریزی شده‌اند نگه داشته شدند؛ می‌توانید نگهشان دارید یا حذفشان کنید.",
+        "flagDetail": "{{kind}} «{{segment}}» {{reason}}.",
+        "flagKindFolder": "پوشه",
+        "flagKindTitle": "عنوان",
+        "folderPickerTitle": "پوشهٔ خزانهٔ Obsidian خود را انتخاب کنید",
+        "hiddenIgnoredPrefix_one": "{{count}} مورد پیکربندی یا پنهان نادیده گرفته شد (مثلاً ",
+        "hiddenIgnoredPrefix_other": "{{count}} مورد پیکربندی یا پنهان نادیده گرفته شد (مثلاً ",
+        "hiddenIgnoredSuffix": "، فایل‌های نقطه‌ای).",
+        "ifNoteExistsLabel": "اگر یادداشتی از قبل وجود داشته باشد",
+        "import": "درون‌ریزی",
+        "importFailed": "درون‌ریزی ناموفق بود.",
+        "importing": "در حال درون‌ریزی خزانهٔ شما…",
+        "markDone": "علامت‌گذاری به‌عنوان انجام‌شده",
+        "markedDone": "انجام‌شده",
+        "mediaImported": "{{count}} مورد درون‌ریزی شد",
+        "mediaImported_one": "{{count}} مورد درون‌ریزی شد",
+        "mediaImported_other": "{{count}} مورد درون‌ریزی شد",
+        "mediaOmittedSuffix": " · {{count}} مورد کنار گذاشته شد",
+        "mediaOmittedSuffix_one": " · {{count}} مورد کنار گذاشته شد",
+        "mediaOmittedSuffix_other": " · {{count}} مورد کنار گذاشته شد",
+        "needsAttention": "نیازمند توجه",
+        "needsAttentionHelp": "این یادداشت‌ها بدون تغییر درون‌ریزی شدند. اصلاح‌های پیشنهادی فقط نقطهٔ شروع‌اند — یکی را کپی کنید، سپس هنگام باز کردن یادداشت نامش را تغییر دهید.",
+        "noFolderChosen": "پوشه‌ای انتخاب نشده است",
+        "notesImported_one": "یادداشت درون‌ریزی شد",
+        "notesImported_other": "یادداشت درون‌ریزی شد",
+        "policyCopyHint": "آن را در کنار یادداشت موجود می‌آورد.",
+        "policyCopyLabel": "درون‌ریزی به‌صورت یک رونوشت",
+        "policySkipHint": "پیشنهاد می‌شود — اجرای دوبارهٔ درون‌ریزی هرگز چیزی را تکراری یا بازنویسی نمی‌کند.",
+        "policySkipLabel": "نادیده گرفتن",
+        "preexistingDetail": "این یادداشت از قبل پوشهٔ خودش را داشت: «{{existing}}» که Myne آن را نگه داشت — ممکن است با جایی که روی دیسک قرار داشت فرق کند.",
+        "preparing": "در حال آماده‌سازی…",
+        "progressNotes": " یادداشت",
+        "progressOf": " از ",
+        "reasonIllegalChar": "نویسه‌ای دارد که Myne نمی‌تواند در نام به کار ببرد",
+        "reasonPathTooLong": "مسیر پوشه به‌علاوهٔ عنوان خیلی طولانی است",
+        "reasonSegmentTooLong": "نام از حد مجاز Myne بلندتر است",
+        "scanning": "در حال پویش خزانهٔ شما…",
+        "setupIntro": "Myne یادداشت‌های شما را همان‌جا درون‌ریزی و رمزگذاری می‌کند — چیزی از این دستگاه خارج نمی‌شود و فایل‌های اصلی شما هرگز تغییر نمی‌کنند.",
+        "statCancelled": "لغو شد",
+        "statCanvasSkipped": "فایل‌های ‎.canvas نادیده گرفته شد",
+        "statCompressed": "تصاویر فشرده‌شده",
+        "statEmptyFoldersKept": "پوشه‌های خالی نگه‌داشته‌شده",
+        "statMedia": "رسانه",
+        "statOtherSkipped": "سایر فایل‌های نادیده‌گرفته‌شده",
+        "statSkipped": "نادیده‌گرفته‌شده (از قبل موجود)",
+        "suggestedNameAriaLabel": "نام پیشنهادی",
+        "titleComplete": "درون‌ریزی کامل شد",
+        "titleFailed": "درون‌ریزی ناموفق بود",
+        "titleSetup": "درون‌ریزی یادداشت‌ها",
+        "vaultFolderLabel": "پوشهٔ خزانه",
+        "vaultRoot": "(ریشهٔ خزانه)",
+        "titlePick": "درون‌ریزی یادداشت‌ها",
+        "keepsLabel": "چه چیزی منتقل می‌شود",
+        "losesLabel": "چه چیزی منتقل نمی‌شود",
+        "changeSource": "تغییر منبع",
+        "statExcalidrawSkipped": "نقاشی‌های Excalidraw نادیده گرفته شد",
+        "unfollowedLinkOutside": "این یک میان‌بر به پوشه‌ای بیرون از پوشه‌ای است که انتخاب کردید، بنابراین Myne دنبالش نرفت. آن پوشه را به داخل خزانهٔ خود منتقل یا کپی کنید و دوباره درون‌ریزی کنید.",
+        "unfollowedLinkLoop": "این میان‌بر به پوشه‌ای برمی‌گردد که Myne از قبل داخلش بود، پس دنبال کردنش تا ابد دور می‌زد. چیزی زیر آن از قلم نیفتاد.",
+        "unfollowedLinkBroken": "این میان‌بر به جایی نمی‌رسد — هر چه به آن اشاره می‌کرد جابه‌جا یا حذف شده است.",
+        "unreadableDetail": "نادیده گرفته شد — {{reason}} بقیهٔ درون‌ریزی ادامه یافت.",
+        "stoppedAt": "پیش از توقف، {{imported}} یادداشت از {{total}} یادداشت درون‌ریزی شد. آن‌ها در خزانهٔ شما هستند و نگه‌داشتنشان بی‌خطر است.",
+        "reasonNotUtf8": "Myne نتوانست این فایل را به‌عنوان متن بخواند. احتمالاً با رمزگذاری قدیمی‌تری ذخیره شده، یا اصلاً فایل متنی نیست.",
+        "reasonPathRejected": "Myne نتوانست به این فایل داخل پوشه‌ای که انتخاب کردید برسد.",
+        "reasonPermissionDenied": "Myne اجازهٔ خواندن این فایل را نداشت.",
+        "reasonNotFound": "تا وقتی Myne به این فایل رسید، دیگر نبود.",
+        "reasonNoSpace": "فضای این دستگاه تمام شد.",
+        "reasonUnknown": "Myne نتوانست دلیلش را بگوید."
+      },
+      "offer": {
+        "body": "یادداشت‌های موجودتان را به Myne بیاورید. هر کدام همان لحظهٔ درون‌ریزی رمزگذاری می‌شود — چیزی از این دستگاه خارج نمی‌شود و فایل‌های اصلی شما دقیقاً همان‌جا که هستند می‌مانند.",
+        "chooseFolder": "انتخاب پوشه…",
+        "laterHint": "همیشه می‌توانید بعداً از تنظیمات → فضای ذخیره‌سازی درون‌ریزی کنید.",
+        "notNow": "الان نه",
+        "title": "یادداشت‌هایتان درون‌ریزی شود؟"
+      },
+      "picker": {
+        "intro": "یادداشت‌های شما از کجا می‌آیند؟"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "پوشهٔ خزانهٔ Obsidian خود را انتخاب کنید",
+          "survives": "نگه می‌دارد: Markdown، فرادادهٔ ابتدای فایل، [[wikilinks]]، ساختار پوشه‌ها، پیوست‌ها.",
+          "loses": "جا می‌گذارد: فایل‌های canvas و هر چیزی که یادداشت Markdown نباشد.",
+          "short": "یک پوشهٔ خزانه از یادداشت‌های Markdown"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "پوشهٔ برون‌ریزی Notion خود را (از حالت فشرده درآمده) انتخاب کنید",
+          "survives": "نگه می‌دارد: صفحه‌ها، ساختار پوشه‌ها، ویژگی‌های صفحه به‌صورت فیلد، و پیوندهای داخلی به‌صورت ویکی‌پیوند. هر پایگاه‌داده هم به‌صورت یک یادداشت جدولی می‌آید که به ردیف‌هایش پیوند دارد.",
+          "loses": "ابتدا برون‌ریزی را از حالت فشرده خارج کنید — Myne پوشه را می‌خواند، نه فایل .zip. بخش‌های تاشو، کادرهای برجسته و متن رنگی معادلی ندارند و در گزارش درون‌ریزی فهرست می‌شوند.",
+          "short": "یک پوشهٔ برون‌ریزی از حالت فشرده درآمده"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "فایل ‎.enex مربوط به Evernote خود را انتخاب کنید",
+          "survives": "نگه می‌دارد: همهٔ یادداشت‌های داخل فایل، قالب‌بندی و پیوست‌ها. بلوک‌های رمزگذاری‌شده به‌صورت متن حفظ می‌شوند و همچنان می‌توانید در Evernote رمزگشایی‌شان کنید.",
+          "loses": "جا می‌گذارد: یادآورها و تاریخچهٔ یادداشت. برون‌ریزی‌های خیلی بزرگ به‌جای ریسک کردن رد می‌شوند — در آن صورت برون‌ریزی را تکه‌تکه کنید.",
+          "short": "یک فایل برون‌ریزی ‎.enex"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "یک پوشه از فایل‌های HTML انتخاب کنید",
+          "survives": "نگه می‌دارد: سرفصل‌ها، فهرست‌ها، جدول‌ها، پیوندها، کد و تأکیدها.",
+          "loses": "جا می‌گذارد: شیوه‌نامه‌ها، اسکریپت‌ها و محتوای جاسازی‌شده. تصاویر راه دور به‌صورت پیوند می‌مانند و هرگز دانلود نمی‌شوند.",
+          "short": "یک پوشه از صفحه‌های وب ذخیره‌شده"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "فایل ‎.csv خود را انتخاب کنید",
+          "survives": "به یک یادداشت واحد تبدیل می‌شود که جدول را در خود دارد.",
+          "loses": "این یک یادداشت است، نه یک یادداشت برای هر ردیف — Myne پایگاه‌داده نیست. فایل‌های خیلی پهن یا خیلی بلند کوتاه می‌شوند و گزارش درون‌ریزی می‌گوید به چه اندازه.",
+          "short": "یک فایل صفحه‌گسترده"
+        }
+      }
+    },
+    "list": {
+      "addToFavorites": "افزودن به علاقه‌مندی‌ها",
+      "archive": "بایگانی",
+      "archiveBulkError": "بایگانی یادداشت‌ها ممکن نشد.",
+      "archiveFolder": "بایگانی پوشه",
+      "archiveNote": "بایگانی",
+      "archiveSingleError": "بایگانی یادداشت ممکن نشد.",
+      "attachments": "پیوست‌ها",
+      "bulkArchive": "بایگانی {{count}} یادداشت",
+      "bulkArchive_one": "بایگانی {{count}} یادداشت",
+      "bulkArchive_other": "بایگانی {{count}} یادداشت",
+      "bulkDelete": "حذف {{count}} یادداشت",
+      "bulkDelete_one": "حذف {{count}} یادداشت",
+      "bulkDelete_other": "حذف {{count}} یادداشت",
+      "moveTo": "انتقال به…",
+      "bulkMove": "انتقال {{count}} یادداشت به…",
+      "bulkMove_one": "انتقال {{count}} یادداشت به…",
+      "bulkMove_other": "انتقال {{count}} یادداشت به…",
+      "caseMergeBody": "پوشه‌ای با نام «{{name}}» از قبل وجود دارد. این‌ها ادغام می‌شوند — یکی را تغییر نام می‌دهید تا جدا بمانند؟",
+      "color": "رنگ…",
+      "createFirstNote": "+ اولین یادداشتتان را بسازید",
+      "createFolderNote": "ساخت یادداشت پوشه",
+      "customize": "سفارشی‌سازی…",
+      "delete": "حذف",
+      "deleteFolderBody_one": "«{{name}}» و {{count}} یادداشت آن",
+      "deleteFolderBody_other": "«{{name}}» و {{count}} یادداشت آن",
+      "deleteFolderConfirm": "حذف پوشه",
+      "deleteFolderTitle": "این پوشه حذف شود؟",
+      "deleteFolderWarning": "یادداشت‌ها به زباله‌دان می‌روند — بعداً می‌توانید بازگردانی‌شان کنید.",
+      "duplicate": "تکثیر",
+      "editFilterTitle": "ویرایش فیلتر",
+      "emptyState": "هنوز یادداشتی نیست.",
+      "exportHtml": "برون‌ریزی به HTML…",
+      "exportMarkdown": "برون‌ریزی به Markdown…",
+      "exportPdf": "برون‌ریزی به PDF…",
+      "exportTxt": "برون‌ریزی به متن ساده…",
+      "favoritesHeading": "علاقه‌مندی‌ها",
+      "icon": "نماد…",
+      "mergeAnyway": "به‌هرحال ادغام شود",
+      "newDrawingHere": "نقاشی جدید اینجا",
+      "newDrawingMenu": "نقاشی جدید",
+      "newFolder": "پوشهٔ جدید",
+      "newFolderInPlaceholder": "پوشهٔ جدید در {{path}}",
+      "newFolderPlaceholder": "پوشهٔ جدید",
+      "newItem": "جدید…",
+      "newNote": "یادداشت جدید",
+      "newNoteFromTemplate": "یادداشت جدید از الگو…",
+      "newNoteHere": "یادداشت جدید اینجا",
+      "newNoteMenu": "یادداشت جدید",
+      "newNoteShortcut": "یادداشت جدید (⌘N)",
+      "newSubfolder": "زیرپوشهٔ جدید",
+      "newViewTitle": "نمای جدید",
+      "noteMovedToTrash": "یادداشت به زباله‌دان منتقل شد",
+      "notesHeading": "یادداشت‌ها",
+      "notesMovedToTrash_one": "{{count}} یادداشت به زباله‌دان منتقل شد",
+      "notesMovedToTrash_other": "{{count}} یادداشت به زباله‌دان منتقل شد",
+      "openArchive": "باز کردن بایگانی",
+      "openAttachments": "باز کردن پیوست‌ها",
+      "openFolderNote": "باز کردن یادداشت پوشه",
+      "openInNewTab": "باز کردن در زبانهٔ جدید",
+      "openToSide": "باز کردن در کنار",
+      "openTrash": "باز کردن زباله‌دان",
+      "removeFolderNote": "حذف یادداشت پوشه",
+      "removeFromFavorites": "حذف از علاقه‌مندی‌ها",
+      "rename": "تغییر نام",
+      "setAsFolderNote": "تنظیم به‌عنوان یادداشت پوشه",
+      "trash": "زباله‌دان",
+      "trashBulkError": "انتقال یادداشت‌ها به زباله‌دان ممکن نشد.",
+      "trashConfirmBulkBody_one": "{{count}} یادداشت به زباله‌دان منتقل می‌شود.",
+      "trashConfirmBulkBody_other": "{{count}} یادداشت به زباله‌دان منتقل می‌شود.",
+      "trashConfirmBulkWarning": "بعداً می‌توانید آن‌ها را از زباله‌دان بازگردانی کنید.",
+      "trashConfirmConfirm": "انتقال به زباله‌دان",
+      "trashConfirmTitle": "به زباله‌دان منتقل شود؟",
+      "trashConfirmWarning": "بعداً می‌توانید آن را از زباله‌دان بازگردانی کنید.",
+      "trashSingleError": "انتقال یادداشت به زباله‌دان ممکن نشد.",
+      "undo": "واگرد",
+      "vaultRoot": "ریشهٔ خزانه",
+      "viewSettingsTitle": "تنظیمات نما",
+      "imported_one": "1 یادداشت در این پوشه درون‌ریزی شد",
+      "imported_other": "{{count}} یادداشت در این پوشه درون‌ریزی شد",
+      "importedWithSkips": "{{count}} مورد درون‌ریزی شد — {{skipped}} مورد نادیده گرفته شد",
+      "importNoMarkdown": "در موارد رهاشده هیچ فایل Markdown نبود"
+    },
+    "newFromTemplate": {
+      "back": "بازگشت",
+      "blankNote": "یادداشت خالی",
+      "createNote": "ساخت یادداشت",
+      "createFirstTemplate": "ساخت یک الگو",
+      "manageTemplates": "مدیریت الگوها",
+      "emptyState": "هنوز هیچ الگویی نساخته‌اید.",
+      "listLabel": "الگوها",
+      "loading": "در حال بارگذاری…",
+      "nameLabel": "نام یادداشت (از «{{templateName}}»)",
+      "namePlaceholder": "بدون عنوان",
+      "nameStepTitle": "برای این یادداشت نام بگذارید",
+      "pickStepTitle": "یادداشت جدید از الگو",
+      "untitledTemplate": "الگوی بدون عنوان"
+    },
+    "newTab": {
+      "createNote": "ساخت یادداشت جدید",
+      "createDrawing": "نقاشی جدید",
+      "noNotesMatch": "یادداشتی مطابقت ندارد.",
+      "noNotesYet": "هنوز یادداشتی نیست.",
+      "recent": "اخیر",
+      "searchAriaLabel": "جستجوی یادداشت‌ها برای باز کردن",
+      "searchPlaceholder": "جستجوی یادداشت‌ها…",
+      "untitled": "بدون عنوان"
+    },
+    "pane": {
+      "graphTab": "گراف",
+      "tasksTab": "کارها",
+      "loading": "در حال بارگذاری…",
+      "untitledView": "نمای بدون عنوان"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} روز پیش",
+      "hoursAgo": "{{h}} ساعت پیش",
+      "justNow": "همین حالا",
+      "minutesAgo": "{{m}} دقیقه پیش",
+      "oneWeekAgo": "1 هفته پیش",
+      "weeksAgo": "{{w}} هفته پیش",
+      "yesterday": "دیروز"
+    },
+    "row": {
+      "addToFavorites": "افزودن به علاقه‌مندی‌ها",
+      "folderIndexBadgeLabel": "یادداشت پوشه",
+      "folderIndexBadgeTitle": "یادداشت پوشه — فهرست این پوشه",
+      "folderIndexConflictLabel": "این پوشه از قبل یادداشت فهرست دارد",
+      "folderIndexConflictTitle": "این پوشه از قبل یک یادداشت فهرست دارد",
+      "loadError": "بارگذاری این یادداشت ممکن نشد",
+      "removeFromFavorites": "حذف از علاقه‌مندی‌ها",
+      "renameAriaLabel": "تغییر نام یادداشت",
+      "taskBadgeLabel": "این یادداشت یک کار است",
+      "taskBadgeTitle": "یادداشت کار",
+      "unsyncedLabel": "هنوز روی سرور نیست",
+      "unsyncedTitle": "آخرین تغییرات این یادداشت فقط روی همین دستگاه است",
+      "untitled": "بدون عنوان"
+    },
+    "savedView": {
+      "defaultName": "نمای فیلترشده"
+    },
+    "saveStatus": {
+      "conflict": "در حال حل تعارض ویرایش…",
+      "conflictTitle": "این یادداشت روی دستگاه دیگری تغییر کرد — هر دو نسخه نگه داشته می‌شوند",
+      "editing": "در حال ویرایش",
+      "editingEllipsis": "در حال ویرایش…",
+      "editingTitle": "در حال ویرایش — ذخیرهٔ خودکار آماده است",
+      "justNow": "همین حالا",
+      "retry": "تلاش دوباره",
+      "saved": "ذخیره شد",
+      "savedRelative": "ذخیره شد {{rel}}",
+      "saveFailed": "ذخیره ناموفق بود",
+      "saveFailedTitle": "ذخیره ناموفق بود — روی تلاش دوباره بزنید",
+      "storageFull": "فضا پر است",
+      "storageFullTitle": "جایی برای ذخیرهٔ این یادداشت نمانده است. فضا آزاد کنید (یا چند پیوست را حذف کنید)، سپس دوباره تلاش کنید. تا وقتی ذخیره نشود، این ویرایش فقط در همین پنجره است — روی سرور هم نیست.",
+      "saving": "در حال ذخیره",
+      "savingEllipsis": "در حال ذخیره…"
+    },
+    "snapshotFailed": {
+      "dismiss": "بستن",
+      "message": "ذخیرهٔ یک نسخه ممکن نشد — یادداشت شما ذخیره شد، اما تاریخچهٔ نسخه‌هایش ممکن است ناقص باشد (شاید دیسک پر باشد)."
+    },
+    "snapshots": {
+      "cancel": "انصراف",
+      "changeCount_one": "{{count}} تغییر از این نسخه به بعد",
+      "changeCount_other": "{{count}} تغییر از این نسخه به بعد",
+      "changeCountPrev_one": "{{count}} تغییر نسبت به نسخهٔ قبلی",
+      "changeCountPrev_other": "{{count}} تغییر نسبت به نسخهٔ قبلی",
+      "close": "بستن",
+      "compareAgainstLabel": "مقایسه با",
+      "compareCurrent": "یادداشت فعلی",
+      "comparePrevious": "نسخهٔ ذخیره‌شدهٔ قبلی",
+      "confirmBody": "یادداشت فعلی شما ابتدا به‌عنوان یک نسخهٔ ذخیره‌شده نگه داشته می‌شود، پس می‌توانید این کار را برگردانید.",
+      "confirmTitle": "این نسخه بازگردانی شود؟",
+      "decrypting": "در حال رمزگشایی…",
+      "emptyState": "هنوز نسخهٔ ذخیره‌شده‌ای نیست. نسخه‌ها هنگام ویرایش به‌طور خودکار ذخیره می‌شوند و حدود 7 روز نگه داشته می‌شوند. رمزگذاری‌شده‌اند و با حذف دائمی یادداشت از بین می‌روند.",
+      "encryptedSize": "رمزگذاری‌شده · {{size}}",
+      "errorCannotDecrypt": "رمزگشایی این نسخه ممکن نشد.",
+      "errorGeneric": "مشکلی پیش آمد. دوباره تلاش کنید.",
+      "errorIo": "خطای دیسک رخ داد — ممکن است دیسک پر یا غیرقابل‌نوشتن باشد.",
+      "errorNotFound": "آن نسخه دیگر در دسترس نیست.",
+      "errorStorageAccess": "دسترسی به فضای ذخیره‌سازی نسخه‌های خزانه ممکن نشد.",
+      "errorVaultLocked": "خزانه قفل است. برای دیدن نسخه‌ها قفلش را باز کنید.",
+      "justNow": "همین حالا",
+      "listLabel": "فهرست نسخه‌های ذخیره‌شده",
+      "loading": "در حال بارگذاری…",
+      "noPrevious": "این قدیمی‌ترین نسخه است — چیزی پیش از آن برای مقایسه نیست.",
+      "restore": "بازگردانی",
+      "restoreCta": "بازگردانی این نسخه",
+      "restoredStatus": "بازگردانی شد. نسخه‌ای که داشتید به‌عنوان یک نسخهٔ ذخیره‌شده نگه داشته شد.",
+      "selectPlaceholder": "یک نسخه انتخاب کنید تا تغییرات از آن زمان به بعد را ببینید.",
+      "title": "نسخه‌های ذخیره‌شده",
+      "untitled": "بدون عنوان"
+    },
+    "tabStrip": {
+      "closeNewTab": "بستن زبانهٔ جدید",
+      "closeTab": "بستن {{title}}",
+      "newTab": "زبانهٔ جدید",
+      "openNotes": "یادداشت‌های باز",
+      "pin": "سنجاق کردن",
+      "pinned": "سنجاق‌شده",
+      "pinnedTitle": "سنجاق‌شده — برای بستن، سنجاق را بردارید",
+      "unpin": "برداشتن سنجاق",
+      "untitled": "بدون عنوان"
+    },
+    "tagBrowser": {
+      "cancel": "انصراف",
+      "clear": "پاک کردن",
+      "combineTagsWith": "ترکیب برچسب‌ها با",
+      "filtering": "در حال فیلتر کردن…",
+      "modeAll": "همه",
+      "modeAny": "هر یک",
+      "noNotesForFilter": "یادداشتی برای این فیلتر نیست.",
+      "noTagsMatch": "هیچ برچسبی با «{{query}}» مطابقت ندارد.",
+      "noTagsYet": "هنوز برچسبی نیست.",
+      "noteCount_one": "{{count}} یادداشت",
+      "noteCount_other": "{{count}} یادداشت",
+      "notes": "یادداشت‌ها",
+      "pickTag": "برای فیلتر کردن یک برچسب انتخاب کنید.",
+      "save": "ذخیره",
+      "saveAsView": "ذخیره به‌عنوان نما",
+      "searchPlaceholder": "جستجوی برچسب‌ها…",
+      "title": "برچسب‌ها",
+      "untitled": "بدون عنوان",
+      "viewNamePlaceholder": "نام نما"
+    },
+    "trash": {
+      "close": "بستن",
+      "count_one": "{{count}} یادداشت",
+      "count_other": "{{count}} یادداشت",
+      "delete": "حذف",
+      "deleteError": "حذف آن یادداشت ممکن نشد. دوباره تلاش کنید.",
+      "empty": "خالی کردن زباله‌دان",
+      "emptyConfirmBody_one": "{{count}} یادداشت برای همیشه حذف می‌شود.",
+      "emptyConfirmBody_other": "{{count}} یادداشت برای همیشه حذف می‌شود.",
+      "emptyConfirmCta": "خالی کردن زباله‌دان",
+      "emptyConfirmTitle": "زباله‌دان خالی شود؟",
+      "emptyPartialFailure_one": "{{count}} یادداشت حذف نشد و در زباله‌دان باقی ماند.",
+      "emptyPartialFailure_other": "{{count}} یادداشت حذف نشد و در زباله‌دان باقی ماند.",
+      "emptyBody": "یادداشت‌هایی که حذف می‌کنید اینجا می‌آیند. تا وقتی زباله‌دان را خالی نکنید می‌مانند — هر کدام را هر وقت خواستید می‌توانید بازگردانی کنید.",
+      "emptyTitle": "زباله‌دان خالی است",
+      "purgeConfirmCta": "حذف دائمی",
+      "purgeConfirmTitle": "برای همیشه حذف شود؟",
+      "restore": "بازگردانی",
+      "restoreError": "بازگردانی آن یادداشت ممکن نشد. دوباره تلاش کنید.",
+      "title": "زباله‌دان",
+      "untitled": "بدون عنوان"
+    },
+    "unlinkedMentions": {
+      "empty": "اشارهٔ بدون پیوندی نیست.",
+      "heading": "اشاره‌های بدون پیوند",
+      "link": "پیوند دادن",
+      "linkTooltip": "پیوند دادن این اشاره به {{title}}",
+      "refresh": "ممکن است اشاره‌ها تغییر کرده باشند — به‌روزرسانی کنید",
+      "searching": "در حال جستجو…",
+      "thisNote": "این یادداشت",
+      "untitled": "بدون عنوان"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "تغییر جلد",
+        "changeCoverImage": "تغییر تصویر جلد",
+        "empty": "هیچ یادداشتی با این نما مطابقت ندارد",
+        "noValue": "بدون مقدار",
+        "setCover": "تعیین جلد",
+        "setCoverImage": "تعیین تصویر جلد",
+        "untitled": "بدون عنوان"
+      },
+      "collapseViews": "جمع کردن نماها",
+      "empty": "هنوز نمایی نیست. فهرست یادداشت‌های فعلی را به‌عنوان یک نما ذخیره کنید.",
+      "expandViews": "باز کردن نماها",
+      "heading": "نماها",
+      "host": {
+        "unsupported": "این نوع نما در به‌روزرسانی بعدی می‌آید."
+      },
+      "list": {
+        "empty": "هیچ یادداشتی با این نما مطابقت ندارد",
+        "noValue": "بدون مقدار"
+      },
+      "menu": {
+        "deleteView": "حذف نما",
+        "editFilter": "ویرایش فیلتر…",
+        "moveDown": "انتقال به پایین",
+        "moveUp": "انتقال به بالا",
+        "rename": "تغییر نام",
+        "viewSettings": "تنظیمات نما…"
+      },
+      "newView": "نمای جدید",
+      "noMatch": "هیچ نمایی با جستجوی شما مطابقت ندارد.",
+      "searchPlaceholder": "جستجوی نماها…",
+      "table": {
+        "empty": "هیچ یادداشتی با این نما مطابقت ندارد",
+        "name": "نام",
+        "noValue": "بدون مقدار"
+      },
+      "untitledView": "نمای بدون عنوان"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "پیش‌فرض (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (مربع)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (عریض)"
+      },
+      "cancel": "انصراف",
+      "cardSize": "اندازهٔ کارت",
+      "cardSizeValue": "{{size}} پیکسل",
+      "columns": "ستون‌ها",
+      "columnsEmpty": "ویژگی‌ای پیدا نشد",
+      "columnsHint": "ویژگی‌های فرادادهٔ ابتدای فایل که به‌صورت ستون (جدول) یا یک خط جزئیات (فهرست / کارت‌ها) نشان داده می‌شوند.",
+      "columnsPlaceholder": "افزودن ستون…",
+      "coverImageHint": "ویژگی فرادادهٔ ابتدای فایل که مقدارش یک تصویر است — به‌عنوان جلد هر کارت نشان داده می‌شود. برای نداشتن جلد خالی بگذارید.",
+      "coverImagePlaceholder": "مثلاً cover",
+      "coverImageProperty": "ویژگی تصویر جلد",
+      "groupBy": "گروه‌بندی بر اساس",
+      "imageAspectRatio": "نسبت ابعاد تصویر",
+      "propertyNone": "هیچ‌کدام",
+      "reset": "بازنشانی",
+      "save": "ذخیره",
+      "sortAsc": "صعودی",
+      "sortBy": "مرتب‌سازی بر اساس",
+      "sortDesc": "نزولی",
+      "sortDirection": "جهت مرتب‌سازی",
+      "viewType": "نوع نما",
+      "viewTypeCards": "کارت‌ها",
+      "viewTypeList": "فهرست",
+      "viewTypeTable": "جدول"
+    },
+    "welcome": {
+      "body": "به Myne خوش آمدید، فضای خصوصی شما برای فکر کردن و نوشتن.\n\nهر چه اینجا ذخیره کنید رمزگذاری می‌شود و روی دستگاه شما می‌ماند. **گذرواژه** و **عبارت بازیابی** شما تنها کلیدهای آن هستند، پس آن‌ها را جایی امن نگه دارید. اگر هر دو گم شوند، هیچ‌کس نمی‌تواند یادداشت‌های شما را برگرداند، حتی ما.\n\nاین فقط یک یادداشت معمولی است، پس آن را از آنِ خود کنید. هر وقت خواستید ویرایشش کنید، نامش را عوض کنید یا حذفش کنید، و هرچه ایده‌هایتان بیشتر می‌شود یادداشت‌های تازه بیفزایید.\n\nخوشحالیم که اینجایید. برای دانستن بیشتر دربارهٔ Myne به https://myne.md سر بزنید\n",
+      "title": "به Myne خوش آمدید"
+    },
+    "workspace": {
+      "defaultSlotName": "پیش‌فرض"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "در حال بررسی قدرت…",
+      "confirmLabel": "تأیید گذرواژهٔ اصلی",
+      "defaultEmptyCaption": "به‌عنوان ورودی Argon2id استفاده می‌شود (m=256 MiB، t=3، p=2). چیزی انتخاب کنید که به‌خاطر بسپارید؛ امکان بازنشانی آن نیست.",
+      "mismatch": "گذرواژه‌ها یکسان نیستند.",
+      "passwordLabel": "گذرواژهٔ اصلی",
+      "suggestPassword": "پیشنهاد گذرواژه",
+      "tooShort": "حداقل {{n}} نویسه استفاده کنید."
+    },
+    "input": {
+      "hide": "پنهان کردن گذرواژه",
+      "show": "نمایش گذرواژه"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "مطابقتی نیست.",
+      "placeholder": "انتخاب…",
+      "searchPlaceholder": "جستجو…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "بازیابی لغو شد: خزانه قفل شد.",
+      "operationInProgress": "عملیاتی در جریان است. لطفاً صبر کنید.",
+      "unexpected": "خطای غیرمنتظره. لطفاً دوباره تلاش کنید.",
+      "vaultNotFound": "فایل خزانه پیدا نشد. لطفاً برنامه را دوباره اجرا کنید."
+    },
+    "vaultUnreadable": "فایل خزانه خوانا نیست. از یک پشتیبان بازیابی کنید.",
+    "genericError": "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.",
+    "weakPassword": "گذرواژه باید حداقل {{min}} نویسه باشد.",
+    "setPasswordError": "تنظیم گذرواژهٔ جدید ممکن نشد. لطفاً دوباره تلاش کنید.",
+    "passwordMismatch": "گذرواژه‌ها یکسان نیستند.",
+    "decryptingSubtitle": "در حال بازسازی کلیدهای خزانهٔ شما با Argon2id. این کار چند ثانیه طول می‌کشد.",
+    "restoreVaultHeader": "بازیابی یک خزانه",
+    "accountTitle": "شمارهٔ حساب خود را وارد کنید",
+    "accountLead": "آن را همان‌جا که عبارت بازیابی‌تان را ذخیره کرده‌اید پیدا کنید. مشخص می‌کند کدام خزانه باید بازیابی شود.",
+    "accountInvalid": "شمارهٔ حساب نامعتبر است — بررسی و دوباره وارد کنید.",
+    "accountOptionalHint": "آن را ندارید؟ اینجا را خالی بگذارید و ادامه دهید — عبارت بازیابی 24 کلمه‌ای شما کافی است.",
+    "paste": "چسباندن",
+    "phraseGridHint": "هر کلمه را تایپ کنید، یا هر 24 کلمه را یک‌جا بچسبانید تا جدول پر شود.",
+    "submitProgress": "ثبت · {{filled}} از {{total}}",
+    "newPasswordTitle": "یک گذرواژهٔ جدید انتخاب کنید",
+    "newPasswordLead": "عبارت بازیابی شما همان می‌ماند. این کار گذرواژهٔ این دستگاه را تعیین می‌کند.",
+    "confirmPasswordLabel": "تأیید گذرواژه",
+    "passwordHelper": "هرگز ذخیره یا ارسال نمی‌شود. کلیدهای شما را روی همین دستگاه رمزگذاری می‌کند.",
+    "encryptingSubtitle": "در حال بسته‌بندی کلیدهای خزانهٔ شما با گذرواژهٔ جدید."
+  },
+  "recurrence": {
+    "every": {
+      "day": "هر روز",
+      "week": "هر هفته",
+      "month": "هر ماه",
+      "year": "هر سال"
+    },
+    "everyN": {
+      "day": "هر {{count}} روز",
+      "week": "هر {{count}} هفته",
+      "month": "هر {{count}} ماه",
+      "year": "هر {{count}} سال"
+    },
+    "everyWeekday": "هر {{days}}",
+    "everyWeekdays": "هر {{days}}",
+    "ordinal": {
+      "first": "اول",
+      "second": "دوم",
+      "third": "سوم",
+      "fourth": "چهارم",
+      "last": "آخر"
+    },
+    "ordinalOfMonth": "{{weekday}} {{ordinal}} هر ماه",
+    "dayOfMonth": "روز {{day}} هر ماه",
+    "lastDayOfMonth": "آخرین روز هر ماه",
+    "weekday": {
+      "monday": "دوشنبه",
+      "tuesday": "سه‌شنبه",
+      "wednesday": "چهارشنبه",
+      "thursday": "پنجشنبه",
+      "friday": "جمعه",
+      "saturday": "شنبه",
+      "sunday": "یکشنبه"
+    },
+    "weekdaySeparator": "، ",
+    "whenDone": "{{rule}}، از زمان انجام",
+    "builder": {
+      "family": "تکرار",
+      "familyInterval": "هر…",
+      "familyWeekdays": "هفتگی در…",
+      "familyDayOfMonth": "ماهانه در یک روز…",
+      "familyOrdinal": "ماهانه در یک روز هفته…",
+      "count": "بازه",
+      "unitLabel": "واحد",
+      "units": {
+        "day": "روز",
+        "week": "هفته",
+        "month": "ماه",
+        "year": "سال"
+      },
+      "ordinal": "جایگاه",
+      "weekday": "روز هفته",
+      "lastDay": "آخرین روز",
+      "whenDone": "تکرار از تاریخی که انجام می‌شود",
+      "weekdayShort": {
+        "monday": "۲ش",
+        "tuesday": "۳ش",
+        "wednesday": "۴ش",
+        "thursday": "۵ش",
+        "friday": "ج",
+        "saturday": "ش",
+        "sunday": "۱ش"
+      }
+    }
+  },
+  "restore": {
+    "backLabel": "بازگشت",
+    "cancelLabel": "انصراف",
+    "collision": {
+      "body": "خزانه‌ای از این پشتیبان از قبل روی این دستگاه وجود دارد. می‌توانید هر دو را نگه دارید — نسخهٔ بازیابی‌شده به‌صورت یک خزانهٔ جداگانه در فهرست خزانه‌هایتان ظاهر می‌شود — یا همین حالا بازیابی کنید و بعد خودتان خزانهٔ موجود را از فهرست خزانه‌ها حذف کنید (برای حذف باید DELETE را تایپ کنید، و این کار فقط پس از اطمینان از باز شدن خزانهٔ بازیابی‌شده معنا دارد).",
+      "keepBoth": "نگه‌داشتن هر دو",
+      "replaceExisting": "بازیابی، سپس جایگزینی مورد موجود…"
+    },
+    "damaged": {
+      "body": "فایل پشتیبان آسیب دیده است، بنابراین چیزی بازیابی نشد. اگر این تنها نسخه‌ای است که دارید، نجات می‌تواند یادداشت‌های سالم را بازیابی کند و دقیقاً فهرست کند چه چیزی خوانده نشد — نتیجه همیشه به‌عنوان بازیابی ناقص برچسب می‌خورد.",
+      "close": "بستن",
+      "salvage": "نجات یادداشت‌های سالم…"
+    },
+    "error": {
+      "tryAnotherFile": "فایل دیگری را امتحان کنید"
+    },
+    "pick": {
+      "body": "یک فایل <code>.myne-backup</code> انتخاب کنید. پشتیبان پیش از بازیابی هر چیزی تأیید می‌شود؛ خزانهٔ بازیابی‌شده با گذرواژه یا عبارت بازیابی همان خزانه باز می‌شود — دقیقاً مثل باز کردن قفل.",
+      "chooseFile": "انتخاب فایل پشتیبان…",
+      "corruptedSuffix": "خزانهٔ فعلی شما دست‌نخورده می‌ماند: پشتیبان ابتدا به‌صورت یک خزانهٔ جداگانه بازیابی می‌شود."
+    },
+    "summary": {
+      "attachments": "پیوست‌ها: {{n}}",
+      "collidedNote": "نسخهٔ قبلی این خزانه هنوز در فهرست خزانه‌های شماست. وقتی مطمئن شدید خزانهٔ بازیابی‌شده باز می‌شود، می‌توانید نسخهٔ قدیمی را از فهرست خزانه‌ها حذف کنید (از شما خواسته می‌شود DELETE را تایپ کنید).",
+      "notes": "یادداشت‌ها: {{n}}",
+      "openVaultList": "باز کردن فهرست خزانه‌ها",
+      "partialHeader_one": "به‌طور ناقص بازیابی شد — {{count}} مورد خوانده نشد.",
+      "partialHeader_other": "به‌طور ناقص بازیابی شد — {{count}} مورد خوانده نشد.",
+      "restored": "خزانه بازیابی شد.",
+      "versionHistory": "مدخل‌های تاریخچهٔ نسخه‌ها: {{n}}"
+    },
+    "title": "بازیابی از پشتیبان",
+    "working": {
+      "cancel": "انصراف",
+      "restoringProgress": "در حال بازیابی… {{done}} از {{total}}",
+      "verifying": "در حال تأیید پشتیبان…",
+      "verifyingProgress": "در حال تأیید پشتیبان… {{done}} از {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "ساخت توسعه‌ای",
+      "buildLabel": "ساخت",
+      "buildChannelLabel": "کانال ساخت",
+      "buildChannelStable": "پایدار",
+      "changelogButton": "مشاهدهٔ فهرست تغییرات…",
+      "changelogHelper": "یادداشت‌های هر نسخه. با رسیدن MYND-119 نمایان می‌شود.",
+      "changelogLabel": "فهرست تغییرات",
+      "developerModeHelper": "تنظیمات پیشرفته‌ای را نشان می‌دهد که Myne به‌طور پیش‌فرض از سر راه کنار می‌گذارد: آن‌هایی که با آن‌ها از مسیری که Myne ضمانتش می‌کند بیرون می‌روید، و ابزارهای حرفه‌ای که بیشتر مردم هرگز به آن‌ها نیاز ندارند. خاموش کردن آن فقط دوباره پنهانشان می‌کند — هرچه روشن کرده‌اید روشن می‌ماند و باید از کنترل خودش خاموشش کنید.",
+      "developerModeLabel": "حالت توسعه‌دهنده",
+      "licenseBody": "پیش‌آلفا · مستندات CC-BY-4.0 · کد برنامه AGPL-3.0 در انتشار فاز ۱.",
+      "licenseLabel": "پروانه",
+      "tagline": "پیش‌آلفا · کارخواه رومیزی فاز ۱",
+      "threatModelHelper": "سند عمومی مدل تهدید را در مرورگرتان باز کنید.",
+      "threatModelLabel": "مدل تهدید",
+      "version": "نسخه",
+      "dev": "توسعه"
+    },
+    "account": {
+      "changePasswordButton": "تغییر گذرواژه",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "گذرواژهٔ فعلی نادرست است یا فایل خزانه آسیب دیده است.",
+        "ioError": "خطای دیسک، دوباره تلاش کنید.",
+        "joinFailure": "مشکلی پیش آمد، دوباره تلاش کنید.",
+        "samePasswordRejected": "گذرواژهٔ جدید با گذرواژهٔ فعلی یکسان است.",
+        "serverAckPending": "گذرواژهٔ جدید شما روی این دستگاه کار می‌کند، اما Myne نتوانست برای ذخیرهٔ آن به سرور برسد. تا آن زمان، دستگاه‌های دیگر شما هنوز گذرواژهٔ قدیمی را انتظار دارند — و اگر نسخهٔ این مرورگر پیش از آن پاک شود، این تغییر از دست می‌رود. به‌طور خودکار دوباره تلاش می‌شود.",
+        "weakNewPassword": "گذرواژهٔ جدید باید دست‌کم ۱۲ نویسه باشد."
+      },
+      "changePasswordHeading": "تغییر گذرواژه",
+      "changePasswordHelper": "گذرواژهٔ اصلی خود را با نگه داشتن همان خزانه عوض کنید. عبارت بازیابی تغییر نمی‌کند.",
+      "dangerZoneHeading": "منطقهٔ خطر",
+      "dangerZoneHelper": "این خزانه و همهٔ یادداشت‌ها را برای همیشه حذف می‌کند. قابل بازگشت نیست. عبارت بازیابی هم خزانه را برنمی‌گرداند.",
+      "localEraseHeading": "این مرورگر",
+      "localEraseHelper": "نسخهٔ خزانهٔ شما را که Myne در این مرورگر نگه داشته پاک می‌کند. حساب شما و هر چیزی که از قبل همگام شده روی سرور می‌ماند.",
+      "localEraseButton": "خروج و پاک کردن نسخهٔ این مرورگر…",
+      "deleteVaultButton": "حذف خزانه…",
+      "vaultLabelEyebrow": "برچسب خزانه",
+      "vaultLabelHelper": "نامی برای این خزانه که در جابه‌جاگر درون برنامه دیده می‌شود. رمزگذاری‌شده داخل خزانه ذخیره می‌شود؛ هرگز به‌صورت متن ساده از دستگاه شما خارج نمی‌شود.",
+      "vaultLabelPlaceholder": "یک برچسب بیفزایید…",
+      "vaultLabelSave": "ذخیره",
+      "vaultIconLabel": "نماد",
+      "vaultIconDefault": "پیش‌فرض (نشان‌واژه)",
+      "renamedToast": "نام خزانه تغییر کرد",
+      "renameError": "تغییر نام خزانه ممکن نشد",
+      "newPasswordMismatch": "گذرواژه‌های جدید یکسان نیستند.",
+      "samePassword": "گذرواژهٔ جدید با گذرواژهٔ فعلی یکسان است.",
+      "passwordChangedToast": "گذرواژه تغییر کرد",
+      "vaultUnreadable": "فایل خزانه ناخوانا است. از یک پشتیبان بازیابی کنید.",
+      "genericChangeError": "مشکلی پیش آمد. دوباره تلاش کنید.",
+      "renameHelper": "در جابه‌جاگر خزانه دیده می‌شود. رمزگذاری‌شده داخل همین خزانه ذخیره می‌شود؛ برای پاک کردن، خالی بگذارید.",
+      "newPasswordPlaceholder": "دست‌کم ۱۲ نویسه",
+      "reenterNewPassword": "گذرواژهٔ جدید را دوباره وارد کنید",
+      "changePasswordFootnote": "این کار باز کردن سریع را باطل می‌کند. عبارت بازیابی شما تغییر نمی‌کند.",
+      "changing": "در حال تغییر…"
+    },
+    "appearance": {
+      "accentHelper": "رنگ تأکیدی که در سراسر برنامه استفاده می‌شود را انتخاب کنید. فقط روی این دستگاه.",
+      "accentHexAria": "مقدار هگز رنگ تأکید",
+      "accentLabel": "رنگ تأکید",
+      "accentReset": "بازنشانی به پیش‌فرض پوسته",
+      "homeQuickActions": "کنش‌های سریع خانه",
+      "showEditTimesAria": "نمایش زمان ویرایش در نوار کناری",
+      "showEditTimesHelper": "زمان آخرین ویرایش هر یادداشت را زیر عنوانش در نوار کناری نشان می‌دهد.",
+      "showEditTimesLabel": "نمایش زمان ویرایش",
+      "taskMarkerAria": "نمایش نشانگر کار روی یادداشت‌های کاری",
+      "taskMarkerHelper": "یادداشت‌هایی را که به‌عنوان کار تعیین کرده‌اید، در نوار کناری و روی زبانه‌شان نشانه‌گذاری می‌کند.",
+      "taskMarkerLabel": "نمایش نشانگر کار",
+      "taskMarkerSaveError": "ذخیرهٔ آن تنظیم ممکن نشد. دوباره تلاش کنید.",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "تیره",
+        "light": "روشن",
+        "system": "سیستم"
+      },
+      "themeHelper": "بین پوستهٔ روشن و تیره جابه‌جا شوید، یا از ترجیح سیستم پیروی کنید.",
+      "themeLabel": "پوسته",
+      "themeOptionAria": "پوستهٔ {{label}}",
+      "themeSaveError": "ذخیرهٔ پوسته ممکن نشد. دوباره تلاش کنید.",
+      "timestampsSaveError": "ذخیرهٔ ترجیح ممکن نشد. دوباره تلاش کنید.",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "قلم ویرایشگر",
+      "showEditTimesSubtitle": "زمان زیر هر یادداشت",
+      "graphSettingsLabel": "ظاهر گراف",
+      "graphSettingsHelper": "رنگ گره‌ها، برچسب‌ها، اندازه و نیروهای چیدمان داخل خود گراف تنظیم می‌شوند — آن را باز کنید و از چرخ‌دنده گوشه‌اش استفاده کنید. این تنظیمات برای هر دستگاه جداگانه نگه داشته می‌شوند، پس تغییری که اینجا بدهید به گوشی شما نمی‌رسد.",
+      "openGraph": "باز کردن گراف"
+    },
+    "archive": {
+      "helper": "امکان انتقال یادداشت‌ها به بایگانی را فراهم می‌کند تا از فهرست اصلی بیرون بمانند. با خاموش کردن آن، هر یادداشت بایگانی‌شده به پوشهٔ خودش برمی‌گردد و کنترل‌های بایگانی پنهان می‌شوند.",
+      "label": "بایگانی",
+      "off": "خاموش",
+      "on": "روشن",
+      "saveError": "به‌روزرسانی تنظیم بایگانی ممکن نشد."
+    },
+    "attachmentCompression": {
+      "label": "فشرده‌سازی تصاویر هنگام درون‌ریزی",
+      "helper": "تصاویری را که می‌چسبانید یا رها می‌کنید، پیش از رمزگذاری و ذخیره کوچک می‌کند تا خزانه، پشتیبان‌ها و همگام‌سازی شما سبک‌تر بماند. این کار قابل بازگشت نیست — فایل اصلی نگه داشته نمی‌شود.",
+      "helperScopeEveryDevice": "برای کل خزانه و روی همهٔ دستگاه‌ها اعمال می‌شود.",
+      "helperScopeNotHere": "برای کل خزانه اعمال می‌شود، اما نه در این مرورگر — تصاویری که اینجا افزوده می‌شوند دقیقاً همان‌طور که هستند ذخیره می‌شوند.",
+      "errorSaveSetting": "ذخیرهٔ این تنظیم ممکن نشد."
+    },
+    "transcription": {
+      "label": "گفتار به نوشتار",
+      "helper": "یک پیوست صوتی را روی همین دستگاه به متن تبدیل می‌کند. مدل همراه Myne عرضه می‌شود و چیزی به جایی فرستاده نمی‌شود. خاموش کردن آن کنش رونویسی را همه‌جا پنهان می‌کند و برنامه را به‌کلی از رونویسی بازمی‌دارد.",
+      "errorSaveSetting": "ذخیرهٔ آن تنظیم ممکن نشد."
+    },
+    "attachmentOcr": {
+      "label": "جستجو درون تصاویر و اسناد پویش‌شده",
+      "helper": "متن را روی همین دستگاه از پیوست‌های تصویری و PDFهای پویش‌شده بیرون می‌کشد تا جستجو بتواند آن‌ها را از روی محتوایشان پیدا کند. چیزی بارگذاری نمی‌شود. خاموش کردن آن استخراج پس‌زمینه را متوقف می‌کند؛ متنی که پیش‌تر استخراج شده نگه داشته می‌شود.",
+      "errorSaveSetting": "ذخیرهٔ این تنظیم ممکن نشد.",
+      "processing_one": "در حال خواندن ۱ پیوست…",
+      "processing_other": "در حال خواندن {{count}} پیوست…"
+    },
+    "autoBackup": {
+      "backupFolder": "پوشهٔ پشتیبان",
+      "chooseFolder": "انتخاب پوشه…",
+      "chooseFolderDialogTitle": "یک پوشه برای پشتیبان‌گیری خودکار انتخاب کنید",
+      "frequency": "بسامد",
+      "frequencyAriaLabel": "بسامد پشتیبان‌گیری",
+      "helper": "در حالی که برنامه باز و خزانه بازشده است، طبق زمان‌بندی یک فایل رمزگذاری‌شدهٔ ‎.myne-backup در پوشه‌ای می‌نویسد. پشتیبان‌ها دقیقاً به‌اندازهٔ خزانهٔ شما رمزگذاری‌شده می‌مانند؛ Myne چند مورد آخر را نگه می‌دارد و هرگز چیزی را از دستگاه شما بیرون نمی‌فرستد.",
+      "intervalDaily": "روزانه",
+      "intervalEveryUnlock": "هر بار باز شدن",
+      "intervalWeekly": "هفتگی",
+      "keepLast": "نگه داشتن آخرین",
+      "noFolderChosen": "هنوز پوشه‌ای انتخاب نشده است.",
+      "saveFailedToast": "ذخیرهٔ تنظیمات پشتیبان‌گیری ممکن نشد.",
+      "searchEmpty": "مطابقتی نیست.",
+      "searchPlaceholder": "جستجو…",
+      "statusFailed": "پشتیبان‌گیری خودکار ناموفق بود — {{stamp}}",
+      "statusLastBackup": "آخرین پشتیبان: {{stamp}}",
+      "statusNever": "هنوز پشتیبان‌گیری خودکاری انجام نشده است.",
+      "title": "پشتیبان‌گیری خودکار"
+    },
+    "changePassword": {
+      "cancel": "انصراف",
+      "checkingStrength": "در حال بررسی استحکام…",
+      "confirmLabel": "تأیید گذرواژهٔ جدید",
+      "currentLabel": "گذرواژهٔ فعلی",
+      "mismatch": "گذرواژه‌ها یکسان نیستند.",
+      "newLabel": "گذرواژهٔ جدید",
+      "submit": "تغییر گذرواژه",
+      "submitting": "در حال تغییر گذرواژه…",
+      "title": "تغییر گذرواژه",
+      "tooShort": "دست‌کم {{n}} نویسه استفاده کنید."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "افزونهٔ مرورگر"
+      },
+      "when": {
+        "bare": "متصل شد",
+        "daysAgo_one": "{{count}} روز پیش متصل شد",
+        "daysAgo_other": "{{count}} روز پیش متصل شد",
+        "hoursAgo": "{{count}} ساعت پیش متصل شد",
+        "hoursAgo_one": "{{count}} ساعت پیش متصل شد",
+        "hoursAgo_other": "{{count}} ساعت پیش متصل شد",
+        "justNow": "همین حالا متصل شد",
+        "minutesAgo": "{{count}} دقیقه پیش متصل شد",
+        "minutesAgo_one": "{{count}} دقیقه پیش متصل شد",
+        "minutesAgo_other": "{{count}} دقیقه پیش متصل شد",
+        "onDate": "متصل شد در {{date}}"
+      }
+    },
+    "cliAccess": {
+      "label": "دسترسی پایانه",
+      "helperOff": "خاموش. فرمان `myne` نمی‌تواند چیزی را در این خزانه بخواند یا تغییر دهد.",
+      "helperOn": "تا وقتی این خزانه باز است، روشن. هر برنامه‌ای که با حساب کاربری شما اجرا شود می‌تواند از این راه یادداشت‌ها را بخواند، جستجو کند و بسازد — Myne نمی‌تواند پایانهٔ شما را از یک اسکریپت تشخیص دهد و جز باز بودن در، چیزی را بررسی نمی‌کند. هرگز گذرواژه نمی‌خواهد، به‌محض قفل شدن خزانه بسته می‌شود و نمی‌تواند یادداشتی را حذف کند.",
+      "lastUsedNever": "از زمان باز شدن این خزانه استفاده نشده است.",
+      "lastUsedJustNow": "همین حالا استفاده شد.",
+      "lastUsedMinutesAgo": "{{count}} دقیقه پیش استفاده شد.",
+      "lastUsedMinutesAgo_one": "{{count}} دقیقه پیش استفاده شد.",
+      "lastUsedMinutesAgo_other": "{{count}} دقیقه پیش استفاده شد.",
+      "lastUsedHoursAgo": "{{count}} ساعت پیش استفاده شد.",
+      "lastUsedHoursAgo_one": "{{count}} ساعت پیش استفاده شد.",
+      "lastUsedHoursAgo_other": "{{count}} ساعت پیش استفاده شد.",
+      "lastUsedDaysAgo": "{{count}} روز پیش استفاده شد.",
+      "lastUsedDaysAgo_one": "{{count}} روز پیش استفاده شد.",
+      "lastUsedDaysAgo_other": "{{count}} روز پیش استفاده شد.",
+      "notOnPathHint": "پوستهٔ شما هنوز `myne` را پیدا نمی‌کند. این خط را به پروفایل پوسته‌تان بیفزایید، سپس یک پایانهٔ تازه باز کنید:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "پوشه‌هایی که پایانه هرگز نمی‌بیند",
+      "excludedHelper": "در هر خط یک مسیر پوشه. یادداشت‌های داخل این پوشه‌ها از هر نتیجهٔ پایانه کنار گذاشته می‌شوند و از پایانه نمی‌توان در آن‌ها نوشت — در برنامه به‌طور کامل در دسترس می‌مانند. این را می‌توانید پیش از روشن کردن دسترسی پایانه تنظیم کنید.",
+      "excludedPlaceholder": "خصوصی/\nدفتر روزانه/",
+      "rateLimitLabel": "اجازه دهید پایانه با تمام سرعت کار کند",
+      "rateLimitHelper": "Myne به‌طور پیش‌فرض حداکثر ۱۲۰ فرمان پایانه در دقیقه را پاسخ می‌دهد. این یک محدودیت سرعت برای اسکریپت از کنترل خارج‌شده است، نه بررسی مجوز — هیچ چیز تصمیم نمی‌گیرد کدام برنامه اجازهٔ پرسیدن دارد. برای کارهای انبوه، مثل عبور دادن همهٔ یادداشت‌ها از یک ابزار دیگر، این را روشن کنید."
+    },
+    "clipperInstall": {
+      "error": "به‌روزرسانی تنظیم کلیپر مرورگر ممکن نشد.",
+      "helper": "میزبان پیام‌رسانی بومی را ثبت می‌کند تا افزونهٔ مرورگر Myne بتواند بریده‌ها را به این برنامه بفرستد. به‌طور پیش‌فرض روشن است؛ برای حذف آن خاموش کنید.",
+      "label": "کلیپر مرورگر"
+    },
+    "customThemes": {
+      "appliedBadge": "اعمال‌شده",
+      "apply": "اعمال",
+      "applyError": "اعمال آن پوسته ممکن نشد. دوباره تلاش کنید.",
+      "browseButton": "مرور پوسته‌ها",
+      "cancel": "انصراف",
+      "confirm": "تأیید",
+      "delete": "حذف",
+      "deleteError": "حذف آن پوسته ممکن نشد. دوباره تلاش کنید.",
+      "empty": "هنوز پوستهٔ سفارشی‌ای نیست. برای شروع یک فایل پوسته درون‌ریزی کنید.",
+      "error": {
+        "aColorFallback": "یک رنگ",
+        "invalidFile": "فایل پوستهٔ نامعتبر.",
+        "invalidName": "نام پوستهٔ ناامن",
+        "invalidValue": "مقدار نامعتبر برای {{key}}",
+        "invalidValueWithLine": "مقدار نامعتبر برای {{key}} (خط {{line}})",
+        "missingKey": "رنگ لازم {{key}} وجود ندارد",
+        "parseError": "JSON معتبر نیست",
+        "parseErrorWithLine": "JSON معتبر نیست (خط {{line}})"
+      },
+      "export": "برون‌ریزی",
+      "exportError": "برون‌ریزی آن پوسته ممکن نشد. دوباره تلاش کنید.",
+      "fileFilterName": "پوستهٔ Myne",
+      "helper": "از پالت رنگی خودتان استفاده کنید. پوسته‌ها پیش از استفاده روی همین دستگاه اعتبارسنجی می‌شوند — چیزی بارگذاری نمی‌شود.",
+      "importButton": "درون‌ریزی پوسته…",
+      "importError": "آن فایل یک پوستهٔ معتبر نیست. برای دیدن قالب، مرجع را باز کنید.",
+      "label": "پوسته‌های سفارشی",
+      "readError": "خواندن پوسته‌های سفارشی شما ممکن نشد.",
+      "readOnlyHelper": "پوسته‌های سفارشی روی رایانهٔ شما نصب می‌شوند. پوسته‌های شما پس از یک همگام‌سازی خودبه‌خود اینجا می‌آیند."
+    },
+    "dailyNotes": {
+      "blankTemplate": "خالی (بدون الگو)",
+      "dateFormatHelper": "عنوان هر یادداشت روزانه. از YYYY، MM و DD پشتیبانی می‌کند. پیش‌فرض {{default}} است.",
+      "dateFormatLabel": "قالب تاریخ یادداشت روزانه",
+      "dateFormatSaveError": "ذخیرهٔ قالب تاریخ ممکن نشد. دوباره تلاش کنید.",
+      "folderHelper": "جایی که یادداشت‌های روزانهٔ جدید بایگانی می‌شوند. پیش‌فرض {{default}} است — این پوشه حتی وقتی خالی باشد نگه داشته می‌شود.",
+      "folderLabel": "پوشهٔ یادداشت روزانه",
+      "folderSaveError": "ذخیرهٔ پوشهٔ روزانه ممکن نشد. دوباره تلاش کنید.",
+      "folderSearchEmpty": "هیچ پوشه‌ای مطابقت ندارد.",
+      "folderSearchPlaceholder": "جستجوی پوشه‌ها…",
+      "searchEmpty": "هیچ الگویی مطابقت ندارد.",
+      "searchPlaceholder": "جستجوی الگوها…",
+      "templateHelper": "الگویی انتخاب کنید که هر یادداشت روزانه از آن آغاز شود، یا خالی بگذارید تا یادداشتی خالی با عنوان تاریخ ساخته شود.",
+      "templateLabel": "الگوی یادداشت روزانه",
+      "templateSaveError": "ذخیرهٔ الگوی روزانه ممکن نشد. دوباره تلاش کنید.",
+      "untitledTemplate": "الگوی بدون عنوان"
+    },
+    "deleteVault": {
+      "cancel": "انصراف",
+      "caseSensitiveHint": "به بزرگی و کوچکی حروف حساس است. برای فعال شدن حذف، واژه را دقیقاً تایپ کنید.",
+      "continue": "ادامه",
+      "copyPrimary": "این کار این خزانه و هر یادداشت داخل آن را برای همیشه حذف می‌کند. قابل بازگشت نیست و عبارت بازیابی شما داده‌ها را برنمی‌گرداند.",
+      "copySecondary": "کلیدهای خزانه پیش از حذف پیوند فایل‌ها از حافظه صفر می‌شوند؛ هر متن رمزشدهٔ بی‌صاحبی که روی دیسک بماند، آشغالی غیرقابل‌بازیابی و پیچیده در Argon2id است.",
+      "eyebrow": "برگشت‌ناپذیر",
+      "heading": "حذف خزانه",
+      "ioFailBody": "دسترسی به فایل‌های خزانه برای حذف ممکن نشد. کلیدهای خزانه از پیش از حافظه صفر شده‌اند؛ هر دادهٔ خزانه که روی دیسک بماند آشغالی غیرقابل‌بازیابی و پیچیده در Argon2id است.",
+      "ioFailTitle": "خطای دیسک هنگام حذف",
+      "localEraseHeading": "خروج و پاک کردن نسخهٔ این مرورگر",
+      "localEraseEyebrow": "فقط این مرورگر",
+      "localEraseSubmit": "پاک کردن نسخهٔ این مرورگر",
+      "localEraseSubmitInFlight": "در حال پاک کردن…",
+      "partialFailBody_one": "{{count}} فایل از دیسک حذف نشد. کلیدهای خزانه از پیش از حافظه صفر شده‌اند، پس هر متن رمزشدهٔ بی‌صاحبی که مانده آشغالی غیرقابل‌بازیابی و پیچیده در Argon2id است.",
+      "partialFailBody_other": "{{count}} فایل از دیسک حذف نشد. کلیدهای خزانه از پیش از حافظه صفر شده‌اند، پس هر متن رمزشدهٔ بی‌صاحبی که مانده آشغالی غیرقابل‌بازیابی و پیچیده در Argon2id است.",
+      "partialFailTitle": "حذف خزانه به‌طور جزئی ناموفق بود",
+      "submit": "حذف خزانه",
+      "submitInFlight": "در حال حذف خزانه…",
+      "typeToConfirmLabel": "برای تأیید DELETE را تایپ کنید",
+      "vaultPath": "مسیر خزانه: {{path}}",
+      "deleteError": "حذف کامل خزانه ممکن نشد. دوباره تلاش کنید.",
+      "warning": "این کار این خزانه و همهٔ یادداشت‌های آن را برای همیشه از این دستگاه حذف می‌کند. قابل بازگشت نیست.",
+      "deleteButton": "حذف این خزانه"
+    },
+    "files": {
+      "newNote": {
+        "folderLabel": "پوشهٔ یادداشت‌های جدید",
+        "folderPlaceholder": "برای نمونه Inbox/",
+        "folderSearchEmpty": "هیچ پوشه‌ای مطابقت ندارد.",
+        "folderSearchPlaceholder": "جستجوی پوشه‌ها…",
+        "helper": "جایی که یادداشت‌های تازه‌ساخته‌شده قرار می‌گیرند.",
+        "label": "محل پیش‌فرض یادداشت‌های جدید",
+        "optionCurrent": "همان پوشهٔ یادداشت فعلی",
+        "optionRoot": "پوشهٔ خزانه",
+        "optionSpecific": "در پوشه‌ای که پایین مشخص شده",
+        "saveError": "ذخیرهٔ محل یادداشت جدید ممکن نشد."
+      },
+      "startup": {
+        "helper": "انتخاب کنید هنگام شروع برنامه کدام فایل باز شود.",
+        "label": "فایل پیش‌فرض برای باز کردن",
+        "noteLabel": "یادداشتی که هنگام شروع باز شود",
+        "notePlaceholder": "یک یادداشت انتخاب کنید…",
+        "optionEmpty": "یادداشت جدید",
+        "optionLast": "آخرین بازشده",
+        "optionSpecific": "یادداشت مشخص",
+        "saveError": "ذخیرهٔ تنظیم شروع ممکن نشد.",
+        "searchEmpty": "یادداشتی پیدا نشد.",
+        "searchPlaceholder": "جستجوی یادداشت‌ها…",
+        "untitledNote": "بدون عنوان"
+      }
+    },
+    "focusMode": {
+      "dimAria": "کم‌رنگ کردن خطوط غیرفعال",
+      "dimHelper": "در حالت تمرکز (⇧⌘F)، همهٔ خطوط جز خطی که در حال ویرایش آن هستید کم‌رنگ می‌شوند.",
+      "dimLabel": "حالت تمرکز · کم‌رنگ کردن خطوط غیرفعال",
+      "off": "خاموش",
+      "on": "روشن",
+      "saveError": "ذخیرهٔ تنظیم حالت تمرکز ممکن نشد.",
+      "typewriterAria": "پیمایش ماشین‌تحریری",
+      "typewriterHelper": "در حالت تمرکز (⇧⌘F)، خط فعال هنگام تایپ به‌صورت عمودی در مرکز می‌ماند.",
+      "typewriterLabel": "حالت تمرکز · پیمایش ماشین‌تحریری"
+    },
+    "hotkeys": {
+      "addBindingAria": "افزودن میان‌بر برای {{command}}",
+      "cancel": "انصراف",
+      "capturePrompt": "یک کلید بزنید…",
+      "conflictIndicator": "⚠ تداخل",
+      "conflictTitle": "{{commands}} هم از آن استفاده می‌کند",
+      "fixed": "ثابت",
+      "group": {
+        "editorFormatting": "قالب‌بندی ویرایشگر",
+        "general": "عمومی",
+        "navigation": "پیمایش",
+        "notes": "یادداشت‌ها",
+        "panesTabs": "قاب‌ها و زبانه‌ها",
+        "view": "نما"
+      },
+      "helper": "میان‌برهای صفحه‌کلید را ببینید و تغییر دهید. فقط میان‌بر چرخش زبانه‌ها (Ctrl+Tab) ثابت است.",
+      "notSet": "تنظیم نشده",
+      "removeBindingAria": "حذف {{chord}}",
+      "reserved": {
+        "bookmarkPage": "صفحه را نشانک می‌کند",
+        "closeTab": "زبانه را می‌بندد",
+        "closeWindow": "پنجره را می‌بندد",
+        "cycleTabs": "بین زبانه‌ها جابه‌جا می‌شود",
+        "focusAddressBar": "روی نوار نشانی تمرکز می‌کند",
+        "hideApplication": "مرورگر را پنهان می‌کند",
+        "inspectElement": "بازرس عنصر را باز می‌کند",
+        "minimiseWindow": "پنجره را کمینه می‌کند",
+        "newPrivateWindow": "یک پنجرهٔ ناشناس باز می‌کند",
+        "newTab": "یک زبانهٔ جدید باز می‌کند",
+        "newWindow": "یک پنجرهٔ جدید باز می‌کند",
+        "openBookmarks": "نشانک‌ها را باز می‌کند",
+        "openDevTools": "ابزارهای توسعه‌دهنده را باز می‌کند",
+        "openExtensions": "افزونه‌ها را باز می‌کند",
+        "openFile": "یک فایل باز می‌کند",
+        "openHistory": "تاریخچه را باز می‌کند",
+        "quit": "از مرورگر خارج می‌شود",
+        "reopenTab": "آخرین زبانهٔ بسته‌شده را دوباره باز می‌کند",
+        "switchTab": "زبانه را عوض می‌کند",
+        "toggleFullscreen": "تمام‌صفحه را تغییر وضعیت می‌دهد"
+      },
+      "reservedBadge": "اینجا در دسترس نیست",
+      "reservedBadgeTitle": "مرورگر شما با {{chord}} {{action}}، بنابراین هرگز به Myne نمی‌رسد. این میان‌بر همچنان در برنامهٔ رومیزی کار می‌کند.",
+      "reservedRefused": "{{chord}} متعلق به مرورگر شماست — {{action}}. میان‌بر دیگری انتخاب کنید؛ میان‌برهای رومیزی شما تغییر نکرده‌اند.",
+      "reservedUnreliable": "ممکن است {{chord}} به Myne نرسد — در برخی مرورگرها {{action}}. با این حال افزوده شد.",
+      "resetAll": "بازنشانی همهٔ میان‌برها…",
+      "resetAllConfirm": "همهٔ میان‌برهای سفارشی به پیش‌فرضشان بازنشانی شوند؟",
+      "resetAllYes": "بازنشانی همه",
+      "restoreDefaultAria": "بازگرداندن پیش‌فرض برای {{command}}",
+      "searchAriaLabel": "جستجوی میان‌برها",
+      "searchPlaceholder": "جستجوی میان‌برها…",
+      "warnAlreadyUsed": "{{commands}} از پیش از آن استفاده می‌کند — با این حال افزوده شد."
+    },
+    "language": {
+      "helper": "زبان نمایش برنامه را انتخاب کنید.",
+      "label": "زبان"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "ذخیرهٔ تنظیم شماره خطوط ممکن نشد.",
+      "helper": "ستون شماره خط را در ویرایشگر نشان می‌دهد. برای هر خط یک شماره؛ به‌طور پیش‌فرض خاموش است.",
+      "label": "شماره خطوط",
+      "off": "خاموش",
+      "on": "روشن"
+    },
+    "views": {
+      "helper": "ورودی نماها را در نوار کناری نشان می‌دهد تا فهرست‌های فیلترشدهٔ یادداشت‌ها را ذخیره کنید. به‌طور پیش‌فرض خاموش است؛ اگر از قبل نما داشته باشید، روشن.",
+      "label": "نماها"
+    },
+    "vimMode": {
+      "chordCaveat": "در ویندوز و لینوکس، میان‌برهای خود Myne اولویت دارند، پس کلیدهای ترکیبی vim که با آن‌ها تداخل دارند (Ctrl-a، Ctrl-b، Ctrl-d، Ctrl-e، Ctrl-f، Ctrl-i، Ctrl-p، Ctrl-t، Ctrl-v، Ctrl-w، Ctrl-x) در ویرایشگر در دسترس نیستند. Ctrl-[ همچنان مانند Escape کار می‌کند و انتخاب بلوکی به Alt-v منتقل می‌شود.",
+      "errorSaveSetting": "ذخیرهٔ تنظیم حالت vim ممکن نشد.",
+      "helper": "از کلیدهای vim در ویرایشگر استفاده کنید: حالت‌های normal، insert و visual، با حرکت‌ها و عملگرهای معمول. به‌طور پیش‌فرض خاموش است. تا وقتی روشن باشد، یادداشت‌ها در نمای منبع باز می‌شوند.",
+      "label": "حالت صفحه‌کلید Vim",
+      "off": "خاموش",
+      "on": "روشن"
+    },
+    "toolbarCustomize": {
+      "errorSave": "ذخیرهٔ چیدمان نوار ابزار ممکن نشد.",
+      "helper": "انتخاب کنید کدام دکمه‌های قالب‌بندی روی نوار ابزار انتخاب دیده شوند و به چه ترتیبی.",
+      "label": "دکمه‌های نوار ابزار",
+      "moveDown": "انتقال به پایین",
+      "moveUp": "انتقال به بالا",
+      "pendingHint": "به‌زودی"
+    },
+    "ai": {
+      "autoTagHelper": "وقتی تایپ را متوقف می‌کنید، مدلی کوچک روی دستگاه شما یادداشت را می‌خواند و در بالای آن برچسب پیشنهاد می‌دهد. تا وقتی پیشنهادی را نپذیرید، چیزی افزوده نمی‌شود.",
+      "autoTagLabel": "پیشنهاد خودکار برچسب",
+      "autoTagUnavailable": "این ساخت بدون مدل برچسب عرضه شده است، پس برچسبی پیشنهاد نمی‌شود. Myne هرگز مدلی دانلود نمی‌کند — این کلید در ساختی که مدل را همراه دارد خودبه‌خود روشن می‌شود.",
+      "disclosureToggle": "این چطور کار می‌کند؟",
+      "enableHelper": "مدلی را که خودتان فراهم می‌کنید کاملاً روی دستگاه شما اجرا می‌کند. آزمایشی، به‌طور پیش‌فرض خاموش.",
+      "enableLabel": "فعال کردن AI محلی",
+      "excludedHelper": "یادداشت‌های داخل این پوشه‌ها هرگز توسط AI خوانده یا نمایه نمی‌شوند. در هر خط یک مسیر پوشه.",
+      "excludedLabel": "پوشه‌های مستثنا",
+      "excludedPlaceholder": "خصوصی/\nدفتر روزانه/",
+      "modelChoose": "انتخاب فایل…",
+      "modelEmbeddingLabel": "مدل جستجو — جستجوی معنایی و پرسش‌وپاسخ",
+      "modelFilter": {
+        "gguf": "مدل GGUF",
+        "safetensors": "مدل Safetensors"
+      },
+      "modelGenerationLabel": "مدل متن — گفتگو، خلاصه و نوشتن",
+      "modelNone": "فایلی انتخاب نشده است",
+      "modelSaveFailed": "ذخیرهٔ مسیر مدل ممکن نشد (باید بیرون از خزانهٔ شما باشد).",
+      "modelTranscriptionLabel": "مدل گفتار به نوشتار (رونویسی)",
+      "modelsHelper": "Myne هرگز مدلی دانلود نمی‌کند — این یعنی فرستادن داده روی شبکه. برای گرفتن یک مدل، پیوندی را در مرورگرتان باز کنید، سپس فایل‌های دانلودشده را اینجا انتخاب کنید. همه چیز روی دستگاه شما اجرا می‌شود.",
+      "modelsLabel": "مدل‌ها",
+      "recommendedFilesEmbedding": "به model.safetensors + config.json + tokenizer.json در یک پوشه نیاز دارد.",
+      "recommendedFilesGeneration": "به فایل ‎.gguf + tokenizer.json در همان پوشه نیاز دارد.",
+      "recommendedFilesTranscription": "به فایل ‎.gguf ویسپر + config.json + tokenizer.json در همان پوشه نیاز دارد.",
+      "title": "AI"
+    },
+    "network": {
+      "disabledCue": "همگام‌سازی دیگر از Tor عبور نمی‌کند. اتصال‌های جدید مستقیم به سرور همگام‌سازی می‌روند.",
+      "errorRead": "خواندن تنظیم فعلی ممکن نشد. برای تنظیم دوبارهٔ آن، کلید را جابه‌جا کنید.",
+      "errorSave": "ذخیرهٔ تنظیم ممکن نشد. چیزی تغییر نکرد.",
+      "errorSidecar": "مسیریابی Tor روشن است، اما کارخواه Tor نتوانست شروع شود. همگام‌سازی تا زمان شروع آن متوقف است — چیزی مستقیم فرستاده نمی‌شود.",
+      "postureActive": "همگام‌سازی از Tor عبور می‌کند",
+      "postureConnecting": "در حال اتصال به Tor — همگام‌سازی متوقف است",
+      "postureConnectingDetail": "این معمولاً چند ثانیه طول می‌کشد. در این فاصله چیزی مستقیم فرستاده نمی‌شود.",
+      "postureExempt": "همگام‌سازی از Tor استفاده نمی‌کند — این نشانی به همین دستگاه اشاره دارد",
+      "postureExemptDetail": "نشانی سرور همگام‌سازی که پیکربندی کرده‌اید همین رایانه را نام می‌برد، پس اتصال Myne به آن از مدار Tor عبور نمی‌کند. اگر آن نشانی به سروری در جای دیگر بازفرست شود، Myne نمی‌تواند آن را ببیند و نمی‌تواند مسیریابی‌اش کند. همگام‌سازی متوقف نیست.",
+      "postureHeading": "هم‌اکنون",
+      "postureInactive": "همگام‌سازی مستقیم به سرور همگام‌سازی می‌رود",
+      "postureUnavailable": "Tor در دسترس نیست — همگام‌سازی متوقف است",
+      "postureUnavailableDetail": "چیزی مستقیم فرستاده نمی‌شود. برای تلاش دوباره جهت شروع کارخواه Tor، این تنظیم را خاموش و روشن کنید، یا برای همگام‌سازی بدون Tor آن را خاموش کنید.",
+      "residualExit": "آخرین بازپخش‌کننده در یک مدار Tor — گره خروجی — می‌بیند به کدام سرور همگام‌سازی وصل می‌شوید. نمی‌تواند بخواند چه چیزی همگام می‌کنید؛ آن سرتاسر رمزگذاری‌شده می‌ماند.",
+      "residualMetadata": "سرور همگام‌سازی همچنان می‌بیند چه زمانی همگام می‌کنید، چند بلاب می‌فرستید و چقدر بزرگ‌اند، و چند دستگاه دارید. Tor این را تغییر نمی‌دهد.",
+      "residualPayment": "اگر بابت همگام‌سازی میزبانی‌شده پول بپردازید، پرداخت و حساب شما همچنان می‌توانند به شما پیوند بخورند. Tor محل آمدن اتصال را عوض می‌کند، نه ردّ صورت‌حساب را.",
+      "residualScope": "فقط ترافیک همگام‌سازی خود Myne از Tor عبور می‌کند. هیچ چیز دیگری روی این دستگاه چنین نمی‌کند.",
+      "residualsToggle": "چه چیزی را پنهان نمی‌کند",
+      "torHelper": "نشانی IP و موقعیت شما را از سرور همگام‌سازی پنهان می‌کند، و پنهان می‌کند که با کدام سرور همگام می‌شوید از شبکه و ارائه‌دهندهٔ اینترنت شما — آن‌ها همچنان می‌بینند که این دستگاه به Tor وصل می‌شود. این کار شما را برای Myne ناشناس نمی‌کند و آنچه یا زمانی که همگام می‌کنید را از سرور پنهان نمی‌کند.",
+      "torLabel": "عبور دادن همگام‌سازی از Tor"
+    },
+    "prefs": {
+      "saveError": "ذخیرهٔ ترجیح ممکن نشد — دوباره تلاش کنید"
+    },
+    "reminders": {
+      "aria": "نمایش یادآورهای کار روی این دستگاه",
+      "exactAllow": "اجازه دادن",
+      "exactLabel": "زمان‌بندی دقیق",
+      "exactOn": "روشن",
+      "horizon": "یادآورها تا {{date}} ثبت شده‌اند. پیش از آن Myne را باز کنید تا ادامه پیدا کنند.",
+      "label": "یادآورهای کار",
+      "saveError": "ذخیرهٔ آن تنظیم ممکن نشد. دوباره تلاش کنید.",
+      "showTextAria": "نمایش متن کار در اعلان",
+      "showTextLabel": "نمایش متن کار"
+    },
+    "privacy": {
+      "autoLockHelper": "خزانه را پس از این مدت بی‌کاری قفل کن.",
+      "autoLockLabel": "قفل خودکار",
+      "autoLockSearchEmpty": "هیچ مدتی مطابقت ندارد.",
+      "autoLockSearchPlaceholder": "جستجوی مدت‌ها…",
+      "screenCaptureHelperOff": "محافظت همیشه پیش از باز شدن اعمال می‌شود. پس از باز شدن، از این ترجیح پیروی می‌کند.",
+      "screenCaptureHelperOn": "روی macOS و ویندوز ۱۰ (به‌روزرسانی می ۲۰۲۰ یا جدیدتر) فعال است. پشتیبانی از لینوکس در نسخه‌ای آینده می‌آید.",
+      "screenCaptureLabel": "محافظت از تصویربرداری صفحه",
+      "screenCaptureSubtitle": "جلوگیری از عکس و ضبط صفحه",
+      "screenshotBlocked": "محافظت از صفحه روشن است — عکس‌های صفحه از Myne خالی درمی‌آیند.",
+      "autoLockAfter": "قفل خودکار پس از",
+      "autoLock1m": "۱ دقیقه",
+      "autoLock5m": "۵ دقیقه",
+      "autoLock15m": "۱۵ دقیقه",
+      "autoLock30m": "۳۰ دقیقه",
+      "autoLock1h": "۱ ساعت",
+      "quickUnlockSubtitleAndroid": "ورود دوباره با PIN پس از قفل خودکار",
+      "quickUnlockSubtitle": "ورود دوباره با {{method}} یا یک PIN پس از قفل خودکار"
+    },
+    "quickUnlock": {
+      "errorCancelled": "لغو شد.",
+      "errorGeneric": "پیکربندی باز کردن سریع ممکن نشد.",
+      "errorHardwareUnavailable": "Touch ID در این ساخت در دسترس نیست. به یک ساخت امضاشدهٔ macOS با Touch ID ثبت‌شده نیاز دارد.",
+      "errorNotUnlocked": "ابتدا خزانه را باز کنید.",
+      "errorPinNotDigits": "PIN باید فقط رقم باشد.",
+      "errorPinTooShort": "PIN باید دست‌کم {{count}} رقم باشد.",
+      "errorPinTooShort_one": "PIN باید دست‌کم {{count}} رقم باشد.",
+      "errorPinTooShort_other": "PIN باید دست‌کم {{count}} رقم باشد.",
+      "helperConfigured": "از طریق {{method}} پیکربندی شده است. ورود دوباره پس از قفل خودکار، گذرواژهٔ اصلی را رد می‌کند. پس از راه‌اندازی دوباره همچنان گذرواژهٔ اصلی لازم است.",
+      "helperNotConfigured": "پس از قفل خودکار به‌جای گذرواژهٔ اصلی کامل، با یک PIN یا Touch ID دوباره وارد شوید. این فقط یک راحتی روی خزانهٔ رمزگذاری‌شده است — پس از راه‌اندازی دوباره، گذرواژهٔ اصلی همچنان لازم است.",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "PIN باز کردن سریع",
+      "pinPlaceholder": "PIN (دست‌کم {{count}} رقم)",
+      "pinPlaceholder_one": "PIN (دست‌کم {{count}} رقم)",
+      "pinPlaceholder_other": "PIN (دست‌کم {{count}} رقم)",
+      "setPin": "تعیین PIN",
+      "setupHelper": "Touch ID فقط روی macOS است و در حال حاضر آزمایشی است (در انتظار تأیید سخت‌افزاری). PIN همه‌جا کار می‌کند.",
+      "title": "باز کردن سریع",
+      "useTouchId": "استفاده از Touch ID",
+      "pinTooShort": "PIN باید دست‌کم ۶ رقم باشد.",
+      "pinMismatch": "PINها یکسان نیستند.",
+      "pinOnToast": "باز کردن سریع با PIN روشن است",
+      "setupError": "راه‌اندازی باز کردن سریع ممکن نشد.",
+      "turnedOffToast": "باز کردن سریع خاموش شد",
+      "turnOffError": "خاموش کردن باز کردن سریع ممکن نشد",
+      "biometricOnToast": "باز کردن سریع با {{method}} روشن است",
+      "biometricUnavailable": "{{method}} روی این دستگاه در دسترس نیست.",
+      "warningBanner": "فقط یک درِ راحتی است. پس از راه‌اندازی دوباره همچنان گذرواژهٔ شما لازم است.",
+      "biometricToggleSubtitle": "باز کردن با {{method}} پس از قفل خودکار",
+      "pinOnLead": "باز کردن سریع با PIN ",
+      "pinOnEmphasis": "روشن است",
+      "pinOnRest": ". پس از قفل خودکار خزانه می‌توانید به‌جای گذرواژهٔ کامل با PIN خود دوباره وارد شوید — فقط در همین نشست برنامه. شروع سرد همیشه گذرواژهٔ کامل را می‌خواهد.",
+      "turnOffPin": "خاموش کردن PIN",
+      "pinSetupHelper": "یک PIN دست‌کم ۶ رقمی تعیین کنید تا پس از قفل خودکار سریع باز کنید. این PIN کلیدی محلی روی همین دستگاه را می‌پیچد — هرگز از این دستگاه بیرون نمی‌رود و هرگز به عبارت بازیابی شما دست نمی‌زند.",
+      "pinReplacesBiometric": " تعیین یک PIN جایگزین باز کردن با {{method}} می‌شود.",
+      "pinPlaceholder6": "دست‌کم ۶ رقم",
+      "confirmPin": "تأیید PIN",
+      "reenterPin": "PIN را دوباره وارد کنید",
+      "setupButton": "راه‌اندازی باز کردن سریع"
+    },
+    "shell": {
+      "closeLabel": "بستن تنظیمات",
+      "groups": {
+        "developer": "توسعه‌دهنده"
+      },
+      "navLabel": "پنل‌های تنظیمات",
+      "panels": {
+        "about": "درباره",
+        "account": "حساب",
+        "ai": "AI",
+        "appearance": "ظاهر",
+        "editor": "ویرایشگر",
+        "files": "فایل‌ها",
+        "transcription": "رونویسی",
+        "hotkeys": "میان‌برها",
+        "network": "شبکه",
+        "privacy": "حریم خصوصی",
+        "storage": "ذخیره‌سازی",
+        "sync": "همگام‌سازی"
+      },
+      "passwordUpdatedToast": "گذرواژه به‌روزرسانی شد",
+      "title": "تنظیمات"
+    },
+    "spell": {
+      "errorSaveLanguages": "ذخیرهٔ زبان‌های غلط‌یاب املایی ممکن نشد.",
+      "errorSaveSetting": "ذخیرهٔ تنظیم غلط‌یاب املایی ممکن نشد.",
+      "helper": "واژه‌های غلط را همان‌طور که تایپ می‌کنید زیرخط می‌زند. کاملاً برون‌خط — یادداشت‌های شما هرگز از دستگاه بیرون نمی‌روند.",
+      "label": "غلط‌یاب املایی",
+      "languagesAriaLabel": "زبان‌های غلط‌یاب املایی",
+      "languagesHelper": "یک واژه درست است اگر در هر یک از زبان‌های انتخاب‌شده معتبر باشد — برای آمیختن اصطلاح‌های انگلیسی در یادداشت‌های زبان‌های دیگر کاربردی است.",
+      "languagesLabel": "زبان‌ها",
+      "languagesPlaceholder": "زبان‌ها را انتخاب کنید…",
+      "languagesSearchEmpty": "هیچ زبانی مطابقت ندارد.",
+      "languagesSearchPlaceholder": "جستجوی زبان‌ها…",
+      "off": "خاموش",
+      "on": "روشن"
+    },
+    "storage": {
+      "backupHelper": "پشتیبان‌ها دقیقاً به‌اندازهٔ خزانهٔ شما رمزگذاری‌شده می‌مانند، در یک فایل ‎.myne-backup تأییدشده. بازیابی با گذرواژه یا عبارت بازیابی همان خزانه کار می‌کند — درست مانند باز کردن.",
+      "backupLabel": "پشتیبان",
+      "backUpVault": "پشتیبان‌گیری از خزانه…",
+      "exportAction": "برون‌ریزی…",
+      "exportBody": "برون‌ریزی خزانه به‌صورت Markdown",
+      "exportHelper": "درخت markdown ساده — رمزگذاری‌نشده.",
+      "exportLabel": "برون‌ریزی",
+      "importHelper": "یادداشت‌ها را از Obsidian، Notion، Evernote، فایل‌های HTML یا یک CSV بیاورید. همه چیز همان‌جا درون‌ریزی و رمزگذاری می‌شود؛ فایل‌های اصلی شما دست‌نخورده می‌مانند.",
+      "importLabel": "درون‌ریزی",
+      "importObsidian": "درون‌ریزی یادداشت‌ها…",
+      "locationHelper": "هر خزانه پوشه‌ای از فایل‌های رمزگذاری‌شده زیر این مسیر است. به‌جای کپی دستی، دکمهٔ پشتیبان پایین را ترجیح دهید — فایل نوشته‌شده را تأیید می‌کند.",
+      "locationLabel": "محل خزانه",
+      "openInFiles": "باز کردن در مدیر فایل",
+      "webLocationHelper": "یادداشت‌های شما در فضای ذخیره‌سازی این مرورگر برای این سایت زندگی می‌کنند و مرورگر آن را مدیریت می‌کند — پوشه‌ای برای باز کردن وجود ندارد. پاک کردن دادهٔ این سایت نسخهٔ محلی را حذف می‌کند؛ چون این کارخواه همگام می‌شود، ورود دوباره آن را برمی‌گرداند.",
+      "webLocationLabel": "یادداشت‌های شما کجا ذخیره می‌شوند",
+      "pathUnavailable": "مسیر در دسترس نیست",
+      "restoreBackup": "بازیابی از پشتیبان…"
+    },
+    "typography": {
+      "contentWidthHelper": "بیشینهٔ عرض ستون ویرایش. «کامل» می‌گذارد متن تمام قاب را بگیرد.",
+      "contentWidthLabel": "عرض محتوا",
+      "errorSave": "ذخیرهٔ ترجیح ممکن نشد. دوباره تلاش کنید.",
+      "fontHelper": "متن تک‌فاصله یا متناسب (بی‌سریف).",
+      "fontLabel": "قلم",
+      "lineSpacingHelper": "فاصلهٔ عمودی میان خطوط.",
+      "lineSpacingLabel": "فاصلهٔ خطوط",
+      "textSizeHelper": "اندازهٔ پایهٔ متن ویرایشگر. سرفصل‌ها با آن مقیاس می‌گیرند.",
+      "previewLabel": "پیش‌نمایش",
+      "previewBody": "روباه قهوه‌ای چابک از روی سگ تنبل می‌پرد. تنظیمات حروف‌نگاری خوانده شدن هر یادداشت را تغییر می‌دهد، پس این نمونه همراه انتخاب شما به‌روز می‌شود.",
+      "textSizeLabel": "اندازهٔ متن"
+    },
+    "viewMode": {
+      "errorSave": "ذخیرهٔ حالت نمایش پیش‌فرض ممکن نشد.",
+      "helper": "یادداشت چگونه باز شود: پیش‌نمایش زنده (پیش‌فرض)، مطالعهٔ فقط‌خواندنی، یا منبع خام. با ⇧⌘E یک یادداشت را تغییر وضعیت دهید.",
+      "label": "حالت نمایش پیش‌فرض",
+      "optionLive": "پیش‌نمایش زنده",
+      "optionReading": "مطالعه",
+      "optionSource": "منبع"
+    },
+    "strength": {
+      "weak": "ضعیف",
+      "fair": "متوسط",
+      "good": "خوب",
+      "strong": "قوی"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "راه‌اندازی نشده",
+        "offline": "برون‌خط",
+        "conflicts_one": "{{count}} تعارض",
+        "conflicts_other": "{{count}} تعارض"
+      }
+    },
+    "data": {
+      "exported_one": "{{count}} یادداشت برون‌ریزی شد → {{label}}",
+      "exported_other": "{{count}} یادداشت برون‌ریزی شد → {{label}}",
+      "exportNeedsApp": "برون‌ریزی به برنامه نیاز دارد (نه پیش‌نمایش مرورگر).",
+      "exportFailed": "برون‌ریزی خزانه ممکن نشد.",
+      "exportToMarkdown": "برون‌ریزی به Markdown",
+      "exportToMarkdownSubtitle": "رمزگشایی هر یادداشت در پوشه‌ای ساده در Documents"
+    },
+    "saveSettingError": "ذخیرهٔ آن تنظیم ممکن نشد",
+    "panelTitle": {
+      "privacy": "حریم خصوصی و امنیت",
+      "data": "داده",
+      "vaultName": "نام خزانه",
+      "approveDevice": "تأیید دستگاه"
+    },
+    "done": "انجام شد",
+    "sectionOptions": "گزینه‌ها",
+    "footerTagline": "myne · رمزگذاری‌شده روی همین دستگاه · متن‌باز",
+    "editor": {
+      "sections": {
+        "text": "متن و نمایش",
+        "editing": "ویرایش",
+        "writing": "نوشتن",
+        "features": "قابلیت‌ها"
+      },
+      "preview": {
+        "heading": "روباه قهوه‌ای چابک",
+        "bullet1": "هر پنج شنبه شبی که بارید، ژاله‌ها ضخیم شد",
+        "bullet2": "چقدر گورخرهای گیج با شتاب می‌جهند",
+        "spellCaption": "غلط‌یاب املایی",
+        "spellSample": "اشتباح"
+      },
+      "defaultView": "نمای پیش‌فرض",
+      "typewriter": "پیمایش ماشین‌تحریری",
+      "typewriterSubtitle": "نگه داشتن مکان‌نما در مرکز عمودی",
+      "enableArchiving": "فعال کردن بایگانی"
+    },
+    "search": {
+      "placeholder": "جستجوی تنظیمات…",
+      "ariaLabel": "جستجوی تنظیمات",
+      "empty": "هیچ تنظیمی با «{{query}}» مطابقت ندارد.",
+      "resultsLabel": "نتایج جستجو",
+      "keywords": {
+        "aiAutoTag": "برچسب خودکار برچسب‌ها پیشنهاد پیشنهادها ai",
+        "aiEnable": "ai محلی روشن خاموش فعال غیرفعال یادگیری ماشین",
+        "aiExcluded": "پوشه‌های مستثنا نادیده ai حریم خصوصی استثنا",
+        "aiModels": "مدل‌ها gguf دانلود متن تعبیه llm",
+        "archive": "بایگانی بایگانی‌کردن پنهان بازیابی یادداشت‌ها",
+        "autoBackup": "پشتیبان‌گیری خودکار زمان‌بندی بسامد نگهداری پوشه",
+        "autoLock": "قفل خودکار مهلت بی‌کاری زمان‌سنج نشست",
+        "backup": "پشتیبان برون‌ریزی ‎.myne-backup بازیابی ذخیره کپی",
+        "buildChannel": "کانال ساخت نسخه انتشار پایدار بتا شبانه",
+        "changePassword": "تغییر گذرواژه عبارت عبور اعتبارنامه به‌روزرسانی بازنشانی",
+        "changelog": "فهرست تغییرات یادداشت انتشار چه چیزی تازه است تاریخچه",
+        "cliAccess": "cli پایانه دسترسی خط فرمان پوسته فرمان myne کنسول",
+        "cliExcludedFolders": "cli پوشه‌های مستثنا پایانه استثنا پنهان خط فرمان خصوصی",
+        "cliRateLimit": "cli محدودیت نرخ پایانه سرعت گلوگاه انبوه فرمان در دقیقه",
+        "clipper": "کلیپر مرورگر افزونه ضبط وب chrome firefox",
+        "contentWidth": "عرض محتوا ستون مطالعه طول خط",
+        "customThemes": "پوسته‌های سفارشی پالت رنگ ظاهر درون‌ریزی پوسته",
+        "dailyNotes": "یادداشت روزانه دفتر روزانه تاریخ الگو پوشه",
+        "dangerZone": "منطقهٔ خطر حذف خزانه نابودی پاک کردن",
+        "export": "برون‌ریزی markdown رمزگشایی فایل ساده اسناد",
+        "focusMode": "حالت تمرکز ماشین‌تحریری کم‌رنگ خطوط غیرفعال بدون حواس‌پرتی",
+        "font": "قلم حروف خانواده بی‌سریف سریف تک‌فاصله حروف‌نگاری",
+        "graphSettings": "ظاهر گراف فیزیک نیروها گره‌ها پیوندها چیدمان رنگ گروه‌ها برچسب‌ها بوم",
+        "hotkeys": "میان‌برها صفحه‌کلید کلیدهای ترکیبی نقشه کلید",
+        "import": "درون‌ریزی یادداشت‌ها obsidian notion evernote enex html csv مهاجرت آوردن",
+        "language": "زبان محلی رابط ترجمه",
+        "license": "پروانه agpl متن‌باز حقوقی",
+        "lineNumbers": "شماره خطوط ستون کناری ویرایشگر نمایش",
+        "vimMode": "vim ویرایش حالتی normal insert visual صفحه‌کلید",
+        "lineSpacing": "فاصلهٔ خطوط ارتفاع حروف‌نگاری خوانایی",
+        "newNoteLocation": "محل یادداشت جدید پوشه پیش‌فرض کجا ساخته می‌شود",
+        "torRouting": "tor مسیریابی onion پروکسی شبکه نشانی ip موقعیت پنهان همگام‌سازی گمنامی",
+        "quickUnlock": "باز کردن سریع pin touch id زیست‌سنجی چهره",
+        "reminders": "یادآور اعلان هشدار کار سررسید یادآوری",
+        "screenCapture": "تصویربرداری صفحه محافظت عکس صفحه ضبط مسدود حریم خصوصی",
+        "showEditTimes": "نمایش زمان ویرایش زمان‌ها تغییر تاریخ یادداشت‌ها",
+        "spell": "غلط‌یاب املا واژه‌نامه تصحیح خودکار",
+        "spellLanguages": "زبان‌های غلط‌یاب واژه‌نامه‌ها محلی واژه‌ها",
+        "startupOpen": "شروع باز کردن فایل پیش‌فرض راه‌اندازی کدام یادداشت",
+        "attachmentOcr": "ocr تصویر پویش pdf پویش‌شده عکس عکس صفحه تشخیص متن جستجو درون پیوست‌ها پردازنده باتری",
+        "attachmentCompression": "فشرده‌سازی فشرده تصویر کوچک کردن تغییر اندازه webp jpeg درون‌ریزی چسباندن حجم خزانه ذخیره‌سازی",
+        "transcription": "رونویسی گفتار صدا صوت دیکته زیرنویس whisper ضبط صدا به متن",
+        "syncAddDevice": "افزودن دستگاه جفت‌سازی پیوند گوشی لپ‌تاپ همگام‌سازی",
+        "syncConflicts": "تعارض‌ها ادغام حل نسخه‌ها همگام‌سازی",
+        "syncDevices": "دستگاه‌ها پیوندخورده جفت‌شده همگام‌سازی رایانه‌ها",
+        "syncRecovered": "یادداشت‌های بازیابی‌شده بازگردانی همگام‌سازی نجات",
+        "syncServer": "سرور همگام‌سازی میزبان خودمیزبان نشانی url",
+        "syncStatus": "وضعیت همگام‌سازی اتصال حالت به‌روز",
+        "textSize": "اندازهٔ متن اندازهٔ قلم بزرگ‌نمایی مقیاس خوانایی",
+        "theme": "پوسته تیره روشن حالت ظاهر طرح رنگ amoled سیستم",
+        "threatModel": "مدل تهدید امنیت مهاجمان دارایی‌ها اعتماد",
+        "toolbar": "نوار ابزار دکمه‌ها قالب‌بندی شناور انتخاب سفارشی‌سازی",
+        "vaultIcon": "نماد خزانه آواتار تصویر نشانه",
+        "vaultLabel": "برچسب خزانه نام تغییر نام عنوان",
+        "vaultLocation": "محل خزانه مسیر پوشه روی دیسک کجا ذخیره",
+        "viewMode": "حالت نمایش پیش‌فرض زنده مطالعه منبع پیش‌نمایش"
+      }
+    }
+  },
+  "storageLost": {
+    "allSynced": "چیزی از دست نرفت — هر یادداشتی که اینجا بود پیش‌تر به سرور رسیده بود.",
+    "evicted": {
+      "body": "مرورگر شما فضای ذخیره‌سازی این سایت را برای آزاد کردن جا پاک کرد. چیزی آسیب ندیده و چیزی روی سرور حذف نشده است — هر چه همگام شده بود هنوز آنجاست.",
+      "title": "مرورگر شما نسخهٔ محلی این خزانه را پاک کرد"
+    },
+    "lockCta": "قفل کن و دوباره تلاش کن",
+    "reDownloadCta": "این مرورگر را دوباره راه‌اندازی کنید",
+    "reEnrolNotice": "راه‌اندازی دوباره، این مرورگر را به‌عنوان یک دستگاه جدید ثبت می‌کند، پس پیش از آنکه بتواند همگام شود منتظر تأیید یکی از دستگاه‌های دیگر شما می‌ماند.",
+    "unopenable": {
+      "body": "نسخهٔ محلی این خزانه دیگر خوانده نمی‌شود. چیزی روی سرور تحت تأثیر نیست — نسخهٔ اینجا یک انباره است و می‌توان جایگزینش کرد.",
+      "title": "نسخهٔ محلی این خزانه خوانده نمی‌شود"
+    },
+    "unsyncedIntro": "{{count}} یادداشت هنوز به سرور نرسیده بود. از دست رفت — این تنها نسخه بود:",
+    "unsyncedIntro_one": "{{count}} یادداشت هنوز به سرور نرسیده بود. از دست رفت — این تنها نسخه بود:",
+    "unsyncedIntro_other": "{{count}} یادداشت هنوز به سرور نرسیده بودند. از دست رفتند — این تنها نسخه بود:",
+    "unsyncedOverflow": "…و {{count}} مورد دیگر.",
+    "unsyncedOverflow_one": "…و {{count}} مورد دیگر.",
+    "unsyncedOverflow_other": "…و {{count}} مورد دیگر."
+  },
+  "sync": {
+    "materialising": "در حال دریافت یادداشت‌های شما — {{done}} از {{total}}. می‌توانید شروع به کار کنید؛ بقیه به‌محض رسیدن نمایان می‌شوند.",
+    "credentialAmbiguous": "ممکن است گذرواژهٔ شما هم روی این دستگاه و هم روی دستگاهی دیگر عوض شده باشد و Myne نمی‌تواند تشخیص دهد کدام جدیدتر است — پس چیزی را تغییر نداده است. برای رفع آن، از دستگاهی که از قبل دسترسی دارد وارد شوید.",
+    "attachments": {
+      "aria": {
+        "downloading": "در حال دریافت {{name}}",
+        "uploading": "در حال ارسال {{name}}"
+      },
+      "empty": "انتقالی در جریان نیست.",
+      "heading": "همگام‌سازی پیوست‌ها",
+      "status": {
+        "done": "انجام شد",
+        "failedWillRetry": "ناموفق — دوباره تلاش می‌شود",
+        "paused": "متوقف‌شده"
+      }
+    },
+    "buildingIndex": {
+      "label": "در حال ساخت نمایهٔ جستجو…"
+    },
+    "conflicts": {
+      "compare": "مقایسه",
+      "compareClose": "بازگشت به تعارض‌ها",
+      "compareError": "خواندن این یادداشت‌ها برای مقایسه ممکن نشد. دوباره تلاش کنید.",
+      "compareIdentical": "این دو نسخه یکسان‌اند.",
+      "compareLoading": "در حال خواندن هر دو نسخه…",
+      "compareMine": "روی این دستگاه",
+      "compareOrphan": "یادداشتی که این نسخه از آن آمده دیگر اینجا نیست، پس چیزی برای مقایسه با آن وجود ندارد.",
+      "compareTheirs": "نسخهٔ متعارض",
+      "compareTitle": "مقایسهٔ «{{title}}»",
+      "discard": "دور انداختن",
+      "empty": "تعارضی نیست — دستگاه‌های شما همگام‌اند.",
+      "groupTitle_one": "{{count}} نسخهٔ متعارض از {{original}}",
+      "groupTitle_other": "{{count}} نسخهٔ متعارض از {{original}}",
+      "keepAsSeparate": "نگه‌داشتن به‌صورت جداگانه",
+      "tookTheirsToast": "نسخهٔ محلی به زباله‌دان منتقل شد.",
+      "tookTheirsUndo": "واگرد",
+      "untitled": "بدون عنوان ({{hex}})",
+      "useThisVersion": "استفاده از این نسخه"
+    },
+    "deviceJoinQr": {
+      "accountLabel": "شمارهٔ حساب",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "ساخت QR ممکن نشد. دوباره تلاش کنید.",
+      "generate": "ساخت QR",
+      "hint": "شمارهٔ حساب خود را بچسبانید تا QR‌ای ساخته شود که تلفن شما بتواند اسکن کند — سرور و شمارهٔ حساب را برای شما پر می‌کند.",
+      "invalidAccount": "این به شمارهٔ حساب معتبر شباهت ندارد.",
+      "notConfigured": "ابتدا یک سرور همگام‌سازی پیکربندی کنید، سپس QR بسازید.",
+      "scanWithApp": "با برنامهٔ iOS اسکن کنید",
+      "title": "افزودن دستگاه با QR"
+    },
+    "devices": {
+      "approve": "تأیید",
+      "awaitingApproval_one": "{{count}} دستگاه در انتظار تأیید",
+      "awaitingApproval_other": "{{count}} دستگاه در انتظار تأیید",
+      "loading": "در حال بارگذاری…",
+      "noDevices": "هنوز هیچ دستگاهی همگام نشده است.",
+      "notEnrolled": "این دستگاه هنوز متصل نیست. اگر همین حالا آن را افزوده‌اید، منتظر تأیید از دستگاهی دیگر بمانید؛ در غیر این صورت آن را با فرم «افزودن دستگاه» بالا اضافه کنید.",
+      "platform": {
+        "android": "تلفن Android",
+        "androidTablet": "تبلت Android",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "رایانهٔ Linux",
+        "macos": "Mac",
+        "unknown": "این دستگاه",
+        "web": "مرورگر",
+        "windows": "رایانهٔ Windows"
+      },
+      "remove": "حذف",
+      "removedElsewhere": "این دستگاه از حساب شما روی دستگاهی دیگر حذف شد.",
+      "rename": "تغییر نام",
+      "renameFailed": "ذخیرهٔ آن نام ممکن نشد. دوباره تلاش کنید.",
+      "renameLabel": "نام دستگاه",
+      "resetAndReAdd": "بازنشانی و افزودن دوبارهٔ این دستگاه",
+      "resetSyncOnThisDevice": "بازنشانی همگام‌سازی روی این دستگاه",
+      "shortName": "دستگاه {{hex}}",
+      "syncedHere": "همگام‌شده در اینجا",
+      "thisDevice": "این دستگاه",
+      "transportHint": "اگر سرور جابه‌جا شده یا گواهی آن تغییر کرده است، نشانی سرور را در «سرور همگام‌سازی» بالا دوباره وارد کنید تا دوباره مورد اعتماد شود.",
+      "unreachable": "دسترسی به همگام‌سازی ممکن نشد ({{error}}).",
+      "verifyBody": "بررسی کنید که همین کد روی دستگاهی که تازه تأیید کردید نمایش داده شود. اگر یکسان بود، آن دستگاه روی حساب شماست. اگر نبود، دستگاه را حذف کنید.",
+      "verifyMatch": "یکسان‌اند",
+      "verifyMismatch": "یکسان نیستند",
+      "verifyPending": "این کد پس از پایان نخستین همگام‌سازی دستگاه جدید نمایان می‌شود.",
+      "verifySyncing": "در حال همگام‌سازی…",
+      "verifyTitle": "تأیید دستگاه جدید",
+      "yourDevices": "دستگاه‌های شما"
+    },
+    "endpoint": {
+      "connect": "اتصال",
+      "connected": "متصل",
+      "connectedLocal": "متصل (محلی، بدون TLS).",
+      "connectedTls": "متصل. بررسی کنید که این اثر انگشت روی دستگاه دیگر شما یکسان باشد.",
+      "connectedPlatformTrust": "از طریق TLS متصل شد. مرورگر شما گواهی این سرور را تأیید کرد.",
+      "connecting": "در حال اتصال…",
+      "fingerprintLabel": "اثر انگشت گواهی سرور:",
+      "confirmFingerprintRequired": "مسیریابی Tor روشن است، بنابراین این دستگاه به گواهی‌ای که از پیش به آن گفته نشده اعتماد نمی‌کند. اثر انگشت SHA-256 گواهی سرورتان را از خود سرور یا از دستگاهی که از قبل متصل است بگیرید، سپس آن را اینجا بچسبانید.",
+      "confirmFingerprintMismatch": "گواهی‌ای که این سرور ارائه کرد همانی نیست که وارد کردید. چیزی ذخیره نشد. اثر انگشتی را که چسبانده‌اید بررسی کنید — و اگر درست است، متصل نشوید: چیزی میان این دستگاه و سرور شما قرار دارد.",
+      "confirmFingerprintDeclined": "چیزی ذخیره نشد — این دستگاه به آن سرور متصل نیست. وقتی اثر انگشت گواهی آن را داشتید برگردید.",
+      "pinStatic": "در برابر گواهی داخلی Myne تأیید شد.",
+      "pinTofu": "در نخستین اتصال پین شد. این اثر انگشت را میان دستگاه‌هایتان مقایسه کنید.",
+      "fixedOrigin": "این کلاینت با یک سرور همگام می‌شود که هنگام استقرار تعیین شده است. از اینجا قابل تغییر نیست — این صفحه فقط اجازه دارد با همین یک نشانی ارتباط بگیرد.",
+      "fixedOriginNone": "برای این استقرار هیچ سرور همگام‌سازی پیکربندی نشده است.",
+      "pinPlatformTrust": "با انبار گواهی مرورگر شما تأیید شد. این کلاینت خودش نمی‌تواند گواهی را پین کند.",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "دسترسی به آن سرور ممکن نشد — نشانی و در حال اجرا بودن آن را بررسی کنید."
+    },
+    "enroll": {
+      "accountNumberLabel": "شمارهٔ حساب",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "در حال اتصال…",
+      "credentialTypeAria": "نوع اعتبارنامه",
+      "deviceNameHelp": "در فهرست دستگاه‌های شما نمایش داده می‌شود. بعداً می‌توانید آن را تغییر دهید.",
+      "deviceNameLabel": "نامی برای این دستگاه بگذارید",
+      "error": {
+        "notConfigured": "پیش از افزودن این دستگاه، یک سرور همگام‌سازی در تنظیمات تعیین کنید.",
+        "transport": "دسترسی به سرور همگام‌سازی ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
+      },
+      "mode": {
+        "password": "گذرواژه",
+        "recovery": "عبارت بازیابی"
+      },
+      "passwordLabel": "گذرواژه",
+      "recoveryPhraseHint": "عبارت بازیابی 24 کلمه‌ای خود را وارد کنید.",
+      "recoveryPhraseLabel": "عبارت بازیابی",
+      "signInWith": "ورود با",
+      "submit": "افزودن این دستگاه",
+      "wordAria": "کلمهٔ {{number}}"
+    },
+    "fingerprint": {
+      "title": "پیش از اعتماد، گواهی این سرور را بررسی کنید",
+      "why": "مسیریابی Tor روشن است، بنابراین این نخستین اتصال از راه بازپخشی می‌گذرد که غریبه‌ای آن را اداره می‌کند. تا وقتی گواهی‌ای پین نشده باشد، این دستگاه هر گواهی‌ای را که به آن داده شود می‌پذیرد — از جمله گواهی‌ای که همان بازپخش ساخته باشد. اثر انگشتی را که سرور شما منتشر می‌کند وارد کنید تا Myne پیش از پین کردن چیزی آن را مقایسه کند. اگر یکسان نبود، چیزی ذخیره نمی‌شود.",
+      "label": "اثر انگشت گواهی مورد انتظار",
+      "placeholder": "اثر انگشت SHA-256 از سرور شما",
+      "echoLabel": "آنچه وارد کرده‌اید",
+      "echoComplete": "64 از 64 نویسه. پیش از ادامه، آن را با نسخهٔ خودتان مقابله کنید.",
+      "echoProgress": "تاکنون {{count}} از {{total}} نویسه.",
+      "echoInvalid": "اثر انگشت SHA-256 شامل 64 نویسه است و هر نویسه 0–9 یا a–f. دونقطه، فاصله و «sha256:» در ابتدا اشکالی ندارد — هر چیز دیگری بخشی از آن نیست.",
+      "helpToggle": "این اثر انگشت را کجا پیدا کنم؟",
+      "helpNotOverTor": "نه از راه همین اتصال. اثر انگشتی که روی همان مدار دریافت کنید چیزی را ثابت نمی‌کند — هر چیزی که بتواند گواهی را عوض کند، می‌تواند آن صفحه را هم عوض کند.",
+      "helpFromServer": "روی ماشینی که سرور شما را اجرا می‌کند: openssl x509 -noout -fingerprint -sha256 -in <فایل گواهی شما>",
+      "helpFromDevice": "روی دستگاهی که از قبل به این حساب متصل است: تنظیمات → همگام‌سازی همان اثر انگشت را نشان می‌دهد.",
+      "helpNoFingerprint": "اگر از هیچ‌کدام از این راه‌ها نتوانستید آن را به دست آورید، تا وقتی مسیریابی Tor روشن است این سرور را نمی‌توان افزود. می‌توانید مسیریابی Tor را در تنظیمات → شبکه خاموش کنید و مستقیم متصل شوید — این کار نشانی IP شما را به سرور و به هر کسی که بتواند شبکهٔ شما را ببیند نشان می‌دهد.",
+      "decline": "آن را ندارم — انصراف"
+    },
+    "join": {
+      "accountLabel": "شمارهٔ حساب",
+      "cancel": "انصراف",
+      "continue": "ادامه",
+      "error": "افزودن این دستگاه ممکن نشد. نشانی سرور، شمارهٔ حساب و گذرواژه را بررسی کنید — و اینکه سرور در دسترس باشد.",
+      "help": "با شمارهٔ حساب و گذرواژهٔ خود وارد شوید. این دستگاه پس از تأیید یک دستگاه موجود، یادداشت‌های شما را همگام می‌کند. به عبارت بازیابی نیازی نیست.",
+      "passwordLabel": "گذرواژه",
+      "pinnedCompare": "این دستگاه گواهی سرور شما را پین کرد. بررسی کنید که این اثر انگشت روی دستگاه‌های دیگرتان یکسان باشد.",
+      "confirmFingerprintRequired": "مسیریابی Tor روشن است، بنابراین این دستگاه به گواهی‌ای که از پیش به آن گفته نشده اعتماد نمی‌کند. اثر انگشت SHA-256 گواهی سرورتان را از خود سرور یا از دستگاهی که از قبل متصل است بگیرید، سپس آن را اینجا بچسبانید.",
+      "confirmFingerprintMismatch": "گواهی‌ای که این سرور ارائه کرد همانی نیست که وارد کردید. این دستگاه افزوده نشد و چیزی ذخیره نشد. اثر انگشتی را که چسبانده‌اید بررسی کنید — و اگر درست است، ادامه ندهید: چیزی میان این دستگاه و سرور شما قرار دارد.",
+      "pinnedTitle": "گواهی سرور پین شد",
+      "serverLabel": "سرور همگام‌سازی",
+      "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "یکسان‌اند — ادامه",
+      "sasMismatch": "یکسان نیستند — این دستگاه را حذف کنید",
+      "submit": "افزودن دستگاه",
+      "submitting": "در حال افزودن…",
+      "title": "افزودن این دستگاه به یک حساب",
+      "verifyBody": "بررسی کنید که این کد با کد روی دستگاهی که از آن تأیید کردید یکسان باشد.",
+      "verifyTitle": "تأیید این دستگاه",
+      "waitingHint": "این پنجره را باز نگه دارید — پس از تأیید، کد تأییدی اینجا نمایان می‌شود تا با دستگاه دیگرتان مقایسه کنید.",
+      "waitingTitle": "در انتظار تأیید"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "روی دستگاه جدید با شمارهٔ حساب و گذرواژه یا عبارت بازیابی خود وارد شوید. هر دستگاه تا زمانی که دستگاهی موجود آن را تأیید کند در حالت انتظار می‌ماند.",
+        "label": "افزودن دستگاه"
+      },
+      "awaitingApproval": {
+        "label": "در انتظار تأیید"
+      },
+      "conflicts": {
+        "helper": "وقتی یک یادداشت هم‌زمان روی دو دستگاه ویرایش شود، Myne هر دو نسخه را نگه می‌دارد تا چیزی از دست نرود. آن‌ها را اینجا حل کنید.",
+        "label": "تعارض‌ها"
+      },
+      "devices": {
+        "label": "دستگاه‌ها"
+      },
+      "recovered": {
+        "close": "بستن",
+        "decrypting": "در حال رمزگشایی…",
+        "deleteConfirmTitle": "این یادداشت بازیابی‌شده حذف شود؟",
+        "deleteConfirmWarning": "این کار تنها نسخهٔ نگه‌داشته‌شده روی این دستگاه را برای همیشه حذف می‌کند. این کار قابل بازگشت نیست.",
+        "deleteCta": "حذف",
+        "empty": "یادداشت بازیابی‌شده‌ای نیست.",
+        "errorGeneric": "چیزی درست پیش نرفت. دوباره تلاش کنید.",
+        "helper": "وقتی یادداشتی که روی دستگاه دیگری حذف شده اینجا هم برداشته شود، نسخهٔ رمزگذاری‌شدهٔ آن روی این دستگاه نگه داشته می‌شود. یکی را به‌عنوان یادداشت جدید بازگردانید، یا برای همیشه حذفش کنید.",
+        "label": "یادداشت‌های بازیابی‌شده",
+        "previewCta": "پیش‌نمایش",
+        "previewTitle": "یادداشت بازیابی‌شده",
+        "restoreCta": "بازگرداندن"
+      },
+      "server": {
+        "helper": "همان نشانی سرور را روی هر دستگاه وارد کنید. برای سرور خودمیزبان از نشانی <1>https://</1> آن استفاده کنید؛ بررسی کنید که اثر انگشت گواهی روی همهٔ دستگاه‌هایتان یکسان باشد.",
+        "label": "سرور همگام‌سازی"
+      },
+      "status": {
+        "helper": "Myne یادداشت‌های رمزگذاری‌شدهٔ شما را میان دستگاه‌هایتان همگام می‌کند. سرور فقط متن رمزی‌ای را ذخیره می‌کند که نمی‌تواند بخواند.",
+        "label": "وضعیت همگام‌سازی"
+      },
+      "usage": {
+        "helper": "این حساب چه حجمی از دادهٔ رمزگذاری‌شده را روی سرور ذخیره می‌کند و چند دستگاه وارد شده‌اند.",
+        "label": "فضای ذخیره‌سازی و دستگاه‌ها"
+      }
+    },
+    "reconcile": {
+      "message": "این دستگاه مدتی آفلاین بود — در حال جبران همگام‌سازی. یادداشت‌های شما سالم‌اند."
+    },
+    "recovered": {
+      "restoredToast": "به‌عنوان یادداشت جدید بازگردانده شد."
+    },
+    "status": {
+      "awaitingApproval": "در انتظار تأیید",
+      "conflicts_one": "{{count}} تعارض برای بررسی",
+      "conflicts_other": "{{count}} تعارض برای بررسی",
+      "error": "خطای همگام‌سازی",
+      "errorAuth": "ورود همگام‌سازی منقضی شد",
+      "errorFrozen": "حساب مسدود است — بارگذاری‌ها متوقف شد",
+      "errorDeviceRevoked": "این دستگاه از حساب شما حذف شد",
+      "errorStorageFull": "فضای ذخیره‌سازی پر است — همگام‌سازی متوقف شد",
+      "errorQuota": "فضای ذخیره‌سازی پر است — بارگذاری‌ها متوقف شد",
+      "errorRateLimited": "همگام‌سازی محدود شد — در حال تلاش دوباره",
+      "errorTooLarge": "یک فایل برای بارگذاری خیلی بزرگ است",
+      "loading": "وضعیت همگام‌سازی…",
+      "notEnrolled": "ثبت‌نشده",
+      "off": "همگام‌سازی خاموش",
+      "synced": "همگام شد",
+      "syncing": "در حال همگام‌سازی…",
+      "syncNow": "همگام‌سازی اکنون"
+    },
+    "usage": {
+      "devices": "دستگاه‌ها",
+      "frozen": "این حساب مسدود است. تغییرات جدید بارگذاری نمی‌شوند؛ یادداشت‌های شما همچنان دریافت می‌شوند.",
+      "ofTotal": "{{used}} از {{total}}",
+      "storage": "فضای ذخیره‌سازی"
+    },
+    "settings": {
+      "serverSection": "سرور",
+      "serverNotSet": "تعیین‌نشده",
+      "statusLabel": "وضعیت",
+      "hubHelp": "همگام‌سازی یادداشت‌های شما را روی همهٔ دستگاه‌ها به‌روز نگه می‌دارد. همه چیز پیش از ارسال روی این دستگاه رمزگذاری می‌شود — سرور هرگز یادداشت‌های شما را نمی‌بیند.",
+      "connectedTls": "از طریق TLS متصل شد.",
+      "connectedLocal": "روی شبکهٔ محلی شما متصل شد.",
+      "connectError": "دسترسی به آن سرور ممکن نشد. نشانی را بررسی کنید و دوباره تلاش کنید.",
+      "serverAddressLabel": "نشانی سرور",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "اثر انگشت گواهی",
+      "fingerprintCompare": "این را با همین صفحه روی دستگاهی که از قبل به آن اعتماد دارید مقایسه کنید — باید یکسان باشند.",
+      "pinStatic": "در برابر گواهی شناخته‌شدهٔ این سرور تأیید شد.",
+      "pinTofu": "در نخستین اتصال پین شد. برای اطمینان آن را میان دستگاه‌هایتان مقایسه کنید.",
+      "enrollNotConfigured": "ابتدا یک سرور همگام‌سازی راه‌اندازی کنید، سپس این دستگاه را اضافه کنید.",
+      "enrollTransport": "دسترسی به سرور همگام‌سازی ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "accountNumberHint": "این شماره را دوباره بررسی کنید — درست به نظر نمی‌رسد.",
+      "passwordPlaceholder": "گذرواژهٔ خزانهٔ شما",
+      "recoveryPhraseHint": "24 کلمهٔ خود را وارد یا بچسبانید. چسباندن، خانه‌ها را به ترتیب پر می‌کند.",
+      "verifyBody": "بررسی کنید که همین کد روی دستگاهی که تازه تأیید کردید نمایش داده شود. اگر یکسان بود، آن دستگاه روی حساب شماست. اگر نبود، دستگاه را حذف کنید.",
+      "sasMismatch": "یکسان نیستند",
+      "removeDeviceButton": "حذف دستگاه",
+      "keepDevice": "نگه‌داشتن",
+      "notEnrolledHelp": "این دستگاه هنوز همگام نمی‌شود. آن را از صفحهٔ قبل اضافه کنید تا دستگاه‌هایتان را ببینید.",
+      "unauthenticated": "دسترسی این دستگاه لغو شد؛ احتمالاً از دستگاهی دیگر حذف شده است.",
+      "transportError": "دسترسی به سرور همگام‌سازی ممکن نشد. اگر سرور جابه‌جا شده یا گواهی آن تغییر کرده است، از صفحهٔ سرور همگام‌سازی دوباره متصلش کنید.",
+      "retiredSelf": "این دستگاه از دستگاهی دیگر حذف شد.",
+      "resetAndAddAgain": "بازنشانی و افزودن دوباره",
+      "noDevices": "هنوز دستگاهی نیست.",
+      "syncingHere": "همگام‌سازی در اینجا"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} تعارض نیاز به بررسی دارد",
+      "conflictsNeedReview_other": "{{count}} تعارض نیاز به بررسی دارد",
+      "catchingUp": "در حال جبران همگام‌سازی — یادداشت‌های شما سالم‌اند.",
+      "verifyDevices": "تأیید دستگاه‌ها"
+    },
+    "tor": {
+      "connecting": "در حال اتصال به Tor. همگام‌سازی تا آماده شدن اتصال متوقف است — چیزی مستقیم ارسال نمی‌شود.",
+      "settingsHint": "تنظیمات → شبکه",
+      "unavailable": "Tor در دسترس نیست، بنابراین همگام‌سازی متوقف است. چیزی مستقیم ارسال نمی‌شود. برای همگام‌سازی بدون آن، مسیریابی Tor را خاموش کنید."
+    }
+  },
+  "tasks": {
+    "builder": {
+      "any": "هر کدام",
+      "due": "سررسید",
+      "folder": "پوشه",
+      "insert": "درج",
+      "noDueDate": "بدون سررسید",
+      "priority": "اولویت",
+      "sort": "مرتب‌سازی بر اساس",
+      "sortDue": "تاریخ سررسید",
+      "sortPath": "یادداشت",
+      "sortPriority": "اولویت",
+      "status": "وضعیت",
+      "statusDone": "انجام‌شده",
+      "statusTodo": "انجام‌نشده",
+      "tag": "برچسب"
+    },
+    "empty": {
+      "filter": "همین حالا چیزی اینجا نیست. فیلتر دیگری را امتحان کنید.",
+      "rebuilding": "در حال خواندن یادداشت‌های شما…",
+      "scope": "در این پوشه یا برچسب کاری نیست. دامنه را گسترده‌تر کنید.",
+      "vault": "هنوز کاری نیست. برای ساختن یکی، در هر یادداشتی روی یک خط «- [ ]» بنویسید."
+    },
+    "filter": {
+      "all": "همه",
+      "overdue": "گذشته از موعد",
+      "today": "امروز",
+      "upcoming": "پیش رو"
+    },
+    "noteTitle": "کارهای این یادداشت",
+    "query": {
+      "dropped_one": "{{count}} شرط که Myne نتوانست بخواند",
+      "dropped_other": "{{count}} شرط که Myne نتوانست بخواند",
+      "empty": "هیچ کاری با این پرس‌وجو مطابقت ندارد.",
+      "loading": "در حال خواندن یادداشت‌های شما…",
+      "refused": "Myne نتوانست هیچ بخشی از این پرس‌وجو را بخواند، بنابراین به‌جای نمایش همه چیز، چیزی نشان نمی‌دهد.",
+      "remainder_one": "{{count}} کار دیگر هم مطابقت داشت",
+      "remainder_other": "{{count}} کار دیگر هم مطابقت داشت"
+    },
+    "reminder": {
+      "due": "یک یادآور کار سررسید شده است."
+    },
+    "row": {
+      "completed": "کار، انجام‌شده",
+      "notCompleted": "کار، انجام‌نشده",
+      "tooLongToWrite": "خط این کار برای ویرایش از اینجا خیلی بلند است. به‌جایش یادداشت آن را باز کنید.",
+      "untitled": "کار بدون عنوان"
+    },
+    "scope": {
+      "allFolders": "همهٔ پوشه‌ها",
+      "label": "محدود کردن بر اساس"
+    },
+    "title": "کارها"
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "بستن الگوها",
+      "deleteRowLabel": "حذف الگوی {{name}} (انتقال به زباله‌دان)",
+      "editTemplateLabel": "ویرایش الگوی {{name}}",
+      "emptyBody": "الگویی بسازید تا اسکلت یک یادداشت را دوباره به کار ببرید — یادداشت جلسه، دفترچهٔ روزانه، یادداشت مطالعه. هنگام ساخت یادداشت جدید یکی را انتخاب کنید.",
+      "emptyTitle": "هنوز الگویی نیست",
+      "listLabel": "الگوها",
+      "loading": "در حال بارگذاری…",
+      "newTemplate": "الگوی جدید",
+      "newTemplateName": "الگوی بدون عنوان",
+      "removeFromTemplates": "برداشتن از الگوها",
+      "removeRowLabel": "برداشتن {{name}} از الگوها (یادداشت باقی می‌ماند)",
+      "title": "الگوهای یادداشت"
+    },
+    "emptyBefore": "هنوز الگویی نیست. روی ",
+    "newAction": "جدید",
+    "emptyAfter": " بزنید تا یک الگوی یادداشت قابل استفادهٔ دوباره بسازید — سپس یادداشت‌ها را از آن شروع کنید (و یکی را در تنظیمات به‌عنوان الگوی یادداشت روزانهٔ خود انتخاب کنید).",
+    "use": "استفاده",
+    "edit": "ویرایش",
+    "deleteConfirm": "این الگو حذف شود؟",
+    "convertToNote": "تبدیل به یادداشت"
+  },
+  "themeInstall": {
+    "apply": "اعمال پوسته",
+    "applying": "در حال اعمال…",
+    "byAuthor": "این پیوند می‌گوید ساختهٔ {{author}} است",
+    "cancel": "انصراف",
+    "close": "بستن",
+    "collision": {
+      "keepBoth": "نگه‌داشتن هر دو — نصب با نام «{{name}}»",
+      "question": "شما از قبل پوسته‌ای به نام «{{name}}» دارید.",
+      "replace": "جایگزینی «{{name}}»"
+    },
+    "error": {
+      "importFailed": "نصب آن پوسته ممکن نشد. چیزی تغییر نکرد.",
+      "installedNotActivated": "«{{name}}» نصب شد، اما روشن نشد. می‌توانید آن را از تنظیمات → ظاهر اعمال کنید.",
+      "invalidName": "آن پیوند نام پوسته‌ای را که می‌خواهد نصب کند مشخص نمی‌کند.",
+      "listUnavailable": "خواندن پوسته‌های موجود شما ممکن نشد، بنابراین این پوسته اکنون نمی‌تواند با اطمینان نصب شود. این را ببندید و پیوند را دوباره امتحان کنید.",
+      "malformedPayload": "دادهٔ پوستهٔ آن پیوند آسیب‌دیده یا ناقص است.",
+      "nothingWritten": "چیزی در خزانهٔ شما نوشته نشد.",
+      "payloadTooLarge": "دادهٔ پوستهٔ آن پیوند برای یک پوسته خیلی بزرگ است.",
+      "unsupportedVersion": "آن پیوند برای نسخهٔ جدیدتری از Myne ساخته شده است. ابتدا Myne را به‌روزرسانی کنید، سپس دوباره تلاش کنید."
+    },
+    "errorTitle": "خواندن آن پوسته ممکن نشد",
+    "helper": "پوسته‌ها یک پالت رنگ‌اند، نه کد. Myne این یکی را پیش از استفاده روی همین دستگاه اعتبارسنجی می‌کند — چیزی بارگذاری نمی‌شود.",
+    "question": "می‌خواهید از این پوسته استفاده کنید؟",
+    "title": "نصب پوسته"
+  },
+  "unlock": {
+    "backToPicker": "انتخاب خزانه‌ای دیگر",
+    "continue": "ادامه",
+    "decrypting": "در حال رمزگشایی…",
+    "deleteLink": "هم گذرواژه و هم عبارت بازیابی را گم کرده‌اید؟ خزانه را حذف کنید و از نو شروع کنید",
+    "errors": {
+      "alreadyUnlocked": "خزانه از قبل باز است.",
+      "inProgress": "عملیاتی در جریان است.",
+      "kdfMemoryExceedsHost": "این خزانه برای باز شدن به {{required}} مگابایت حافظه نیاز دارد — بیش از آنچه این مرورگر می‌تواند بدهد ({{available}} مگابایت). خزانه سالم است؛ آن را در برنامهٔ رومیزی Myne باز کنید.",
+      "unexpected": "خطای غیرمنتظره. دوباره تلاش کنید.",
+      "vaultNotFound": "فایل خزانه پیدا نشد. برنامه را دوباره اجرا کنید."
+    },
+    "passwordLabel": "گذرواژه",
+    "passwordPlaceholder": "گذرواژه",
+    "quickUnlock": {
+      "failed": "باز کردن سریع ناموفق بود. از گذرواژهٔ خود استفاده کنید.",
+      "pinAriaLabel": "PIN باز کردن سریع",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "باز کردن با PIN",
+      "unlockWithTouchId": "باز کردن با Touch ID",
+      "wrongCredential": "نادرست است. {{remaining}} تلاش باقی مانده است."
+    },
+    "recoveryInterruptedBanner": "روند بازیابی نیمه‌کاره ماند. ابتدا گذرواژهٔ جدیدی تعیین کنید.",
+    "recoveryInterruptedBody": "ابتدا گذرواژهٔ جدیدی تعیین کنید، سپس خزانهٔ خود را دوباره مهر و موم کنید.",
+    "recoveryInterruptedTitle": "روند بازیابی نیمه‌کاره ماند.",
+    "recoveryLink": "گذرواژه را فراموش کرده‌اید؟ با عبارت بازیابی باز کنید",
+    "submit": "باز کردن",
+    "subtitle": "برای ادامه گذرواژهٔ خود را وارد کنید.",
+    "subtitlePin": "برای ادامه PIN خود را وارد کنید.",
+    "subtitleBiometric": "برای ادامه با Touch ID تأیید کنید.",
+    "suspicion": {
+      "lockedDuringChange": "تغییر گذرواژه لغو شد: خزانه قفل شد.",
+      "metaChangedExternally": "خزانه در نشست دیگری تغییر کرد — دوباره بازش کنید."
+    },
+    "title": "خزانهٔ خود را باز کنید.",
+    "vaultUnreadable": "فایل خزانه ناخوانا است. از یک پشتیبان بازیابی کنید.",
+    "unlockFailedGeneric": "باز کردن ممکن نشد. دوباره تلاش کنید.",
+    "biometricTooManyAttempts": "تلاش‌های {{biometric}} بیش از حد بود. از گذرواژهٔ خود استفاده کنید.",
+    "pinIncorrect_one": "PIN نادرست است. {{count}} تلاش باقی مانده.",
+    "pinIncorrect_other": "PIN نادرست است. {{count}} تلاش باقی مانده.",
+    "pinTooManyAttempts": "تلاش‌های PIN بیش از حد بود. از گذرواژهٔ خود استفاده کنید.",
+    "pinFailedGeneric": "باز کردن با PIN ممکن نشد. از گذرواژهٔ خود استفاده کنید.",
+    "corruptedHeading": "فایل خزانه ناخوانا است",
+    "ioErrorHeading": "خواندن این خزانه ممکن نیست",
+    "blockingTitle": "در حال باز کردن",
+    "blockingSubtitle": "در حال رمزگشایی کلیدهای شما روی این دستگاه.",
+    "eyebrow": "باز کردن خزانه",
+    "vaultTitleFallback": "خزانهٔ شما",
+    "unlockWithBiometric": "باز کردن با {{biometric}}",
+    "biometricFailed": "{{biometric}} نتوانست هویت شما را تأیید کند",
+    "touchToUnlock": "برای باز کردن لمس کنید",
+    "lookToUnlock": "برای باز کردن نگاه کنید",
+    "biometricRetryHint": "دوباره تلاش کنید، یا با گذرواژهٔ خود باز کنید.",
+    "tryBiometricAgain": "دوباره {{biometric}} را امتحان کنید",
+    "usePasswordInstead": "به‌جایش از گذرواژه استفاده کنید",
+    "useBiometricInstead": "به‌جایش از {{biometric}} استفاده کنید",
+    "unlockWithPinInstead": "به‌جایش با PIN باز کنید",
+    "useRecoveryPhrase": "از عبارت بازیابی خود استفاده کنید",
+    "deleteConfirmTitle": "این خزانه حذف شود؟",
+    "deletePartialError": "برخی فایل‌ها حذف نشدند. این خزانه دیگر قابل استفاده نیست — برای شروع دوباره ادامه دهید.",
+    "failClosedEyebrow": "باز کردن خزانه ممکن نیست",
+    "restoreHint": "برای ادامه از یک پشتیبان بازیابی کنید."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "خواندن فایل خزانه ممکن نیست.",
+      "notFound": "فایل خزانه پیدا نشد. برنامه را دوباره اجرا کنید.",
+      "permissionDenied": "اجازهٔ دسترسی به فایل خزانه وجود ندارد. مجوزهای فایل را بررسی کنید."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "شمارهٔ حسابم را جایی ذخیره کرده‌ام که بعداً پیدایش کنم.",
+      "back": "بازگشت",
+      "commit": "ساخت خزانه",
+      "committing": "در حال ذخیره…",
+      "copied": "کپی شد",
+      "copy": "کپی",
+      "eyebrow": "گام 4 از 4 — شمارهٔ حساب",
+      "heading": "شمارهٔ حساب خود را ذخیره کنید.",
+      "intro": "این توکن حامل شماست — مثل پول نقد با آن رفتار کنید.",
+      "saveAsFile": "ذخیره به‌صورت فایل",
+      "shownOnceBody": "همین حالا ذخیره‌اش کنید — Myne نمی‌تواند آن را برایتان بازیابی کند. برای ثبت‌نام همگام‌سازی در آینده لازم است.",
+      "shownOnceEmphasis": "این فقط یک بار نشان داده می‌شود."
+    },
+    "briefing": {
+      "back": "بازگشت",
+      "continue": "ادامه به ساخت خزانه",
+      "eyebrow": "پیش از ساخت خزانه",
+      "heading": "پیش از ساخت خزانه",
+      "intro": "Myne یادداشت‌های شما را چنان رمزگذاری می‌کند که فقط خودتان بتوانید بازشان کنید. سه چیز از این نتیجه می‌شود — آن‌ها را بخوانید، سپس ادامه دهید.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "می‌دانم که بازیابی با ایمیل وجود ندارد.",
+          "statement": "بازیابی با ایمیل وجود ندارد. هرگز هم نخواهد بود.",
+          "why": "ما هرگز ایمیل شما را نمی‌خواهیم، پس نه پیوند بازنشانی هست و نه حسابی که پشتیبانی بتواند بازش کند. این یک قابلیت جامانده نیست — همان تضمین است. بازیابی با ایمیل یعنی ما می‌توانستیم یادداشت‌های شما را بخوانیم، و Myne طوری ساخته شده که نتوانیم."
+        },
+        "no-store": {
+          "ackLabel": "می‌دانم که Myne نمی‌تواند گذرواژهٔ مرا بازیابی کند.",
+          "statement": "گذرواژهٔ شما خزانه‌تان را باز می‌کند. ما آن را ذخیره نمی‌کنیم.",
+          "why": "گذرواژهٔ شما ورودی کلیدی است که یادداشت‌هایتان را رمزگشایی می‌کند. هرگز از این دستگاه بیرون نمی‌رود و هیچ چیز روی سرورهای ما نمی‌تواند آن را بازتولید کند. همین است که یادداشت‌های شما را خصوصی نگه می‌دارد — و همین است که ما نمی‌توانیم آن را برایتان بازنشانی کنیم."
+        },
+        "phrase-backup": {
+          "ackLabel": "می‌دانم که عبارت بازیابی من تنها پشتیبان است.",
+          "statement": "عبارت بازیابی شما تنها پشتیبان شماست.",
+          "why": "اگر گذرواژه‌تان را فراموش کنید، عبارت بازیابی 24 کلمه‌ای تنها راه بازگشت است. {{lostBothSecrets}} عبارت را بنویسید و جایی امن نگه دارید."
+        }
+      },
+      "why": "چرا؟"
+    },
+    "confirm": {
+      "back": "بازگشت",
+      "continue": "ادامه",
+      "eyebrow": "گام 3 از 4 — تأیید عبارت",
+      "heading": "چهار کلمه از عبارت خود را دوباره تایپ کنید.",
+      "intro": "برای اطمینان از اینکه آن را ذخیره کرده‌اید، جایگاه‌های مشخصی را می‌پرسیم.",
+      "mismatch": "با کلمهٔ #{{pos}} یکسان نیست.",
+      "wordAtPosition": "کلمهٔ جایگاه {{pos}}"
+    },
+    "encrypting": {
+      "caption": "این کار کمی طول می‌کشد.",
+      "footerHint": "اگر بیش از 30 ثانیه طول کشید، پنجره را ببندید و دوباره تلاش کنید.",
+      "heading": "در حال رمزگذاری خزانهٔ شما"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "دوباره تلاش کنید.",
+        "title": "شمارهٔ حساب نامعتبر است"
+      },
+      "aeadFailure": {
+        "body": "دوباره تلاش کنید.",
+        "title": "رمزگذاری ناموفق بود"
+      },
+      "csprng": {
+        "body": "دوباره تلاش کنید.",
+        "title": "تولید دادهٔ تصادفی امن ممکن نشد"
+      },
+      "invalidPassword": {
+        "body": "دوباره تلاش کنید.",
+        "title": "گذرواژهٔ نامعتبر"
+      },
+      "invalidVaultMeta": {
+        "body": "دوباره تلاش کنید.",
+        "title": "خطای قالب خزانه"
+      },
+      "ioOther": {
+        "body": "دوباره تلاش کنید.",
+        "title": "ذخیرهٔ خزانه ممکن نشد"
+      },
+      "joinFailure": {
+        "body": "دوباره تلاش کنید.",
+        "title": "چیزی درست پیش نرفت"
+      },
+      "kdfFailure": {
+        "body": "دوباره تلاش کنید. اگر تکرار شد، ممکن است حافظهٔ سیستم شما کم باشد.",
+        "title": "راه‌اندازی رمزگذاری ممکن نشد"
+      },
+      "noSpace": {
+        "body": "فضای دیسک را آزاد کنید و دوباره تلاش کنید.",
+        "title": "فضای دیسک کافی نیست"
+      },
+      "notFound": {
+        "body": "دوباره تلاش کنید.",
+        "title": "پوشهٔ خزانه وجود ندارد"
+      },
+      "passwordTooShort": {
+        "body": "دست‌کم 12 نویسه استفاده کنید.",
+        "title": "گذرواژه خیلی کوتاه است"
+      },
+      "permissionDenied": {
+        "body": "مطمئن شوید Myne اجازهٔ نوشتن در پوشهٔ دادهٔ برنامه را دارد.",
+        "title": "نوشتن در پوشهٔ خزانه ممکن نشد"
+      },
+      "sessionExpired": {
+        "body": "برای امنیت شما، ساخت خزانه پس از 10 دقیقه منقضی می‌شود. از نو شروع کنید.",
+        "title": "نشست منقضی شد"
+      },
+      "sessionNotFound": {
+        "body": "از ابتدا شروع کنید.",
+        "title": "نشست پیدا نشد"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "پنجره‌های دیگر Myne را ببندید و دوباره تلاش کنید.",
+        "title": "ساخت هم‌زمان خزانه بیش از حد است"
+      },
+      "vaultArtifactsPresent": {
+        "body": "خزانهٔ جدیدی ساخته نمی‌شود، چون دادهٔ خزانه از قبل روی این دستگاه وجود دارد. برنامه را ببندید و دوباره اجرا کنید — صفحهٔ شروع شما را به روند باز کردن هدایت می‌کند.",
+        "title": "خزانه از قبل وجود دارد"
+      },
+      "vaultBusyAuth": {
+        "body": "عملیات دیگری روی خزانه در جریان است. لحظه‌ای دیگر دوباره تلاش کنید.",
+        "title": "خزانه مشغول است"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "انصراف",
+        "message": "با بستن، عبارت بازیابی شما دور انداخته می‌شود. بستن ادامه یابد؟",
+        "okLabel": "به‌هرحال ببند",
+        "title": "ساخت خزانه رها شود؟"
+      },
+      "genericError": {
+        "body": "دوباره تلاش کنید.",
+        "title": "چیزی درست پیش نرفت"
+      }
+    },
+    "password": {
+      "back": "بازگشت",
+      "eyebrow": "گام 1 از 4 — گذرواژهٔ اصلی",
+      "heading": "ساخت خزانه",
+      "helperLead": "Myne گذرواژه یا عبارت بازیابی شما را ذخیره نمی‌کند.",
+      "submit": "تولید عبارت بازیابی"
+    },
+    "phrase": {
+      "back": "بازگشت",
+      "continue": "ذخیره‌اش کردم — تأیید عبارت",
+      "copy": "کپی",
+      "eyebrow": "گام 2 از 4 — عبارت بازیابی",
+      "heading": "این 24 کلمه را یادداشت کنید.",
+      "intro": "این عبارت به همراه گذرواژهٔ شما تنها راه بازیابی خزانه‌تان است. آن را آفلاین نگه دارید — کاغذ، مدیر گذرواژه، کیف‌پول سخت‌افزاری. مثل پول نقد با آن رفتار کنید.",
+      "reveal": "نمایش عبارت",
+      "saveAsFile": "ذخیره به‌صورت فایل"
+    },
+    "ready": {
+      "backedUp": "پشتیبان گرفته شد ✓",
+      "backingUp": "در حال پشتیبان‌گیری…",
+      "backupDefaultFilename": "پشتیبان Myne.myne-backup",
+      "backupError": "پشتیبان‌گیری کامل نشد — فایلی باقی نماند. هر زمان می‌توانید از تنظیمات → ذخیره‌سازی پشتیبان بگیرید.",
+      "backupFilterName": "پشتیبان Myne",
+      "backUpNow": "همین حالا از این خزانه پشتیبان بگیرید",
+      "body": "Myne خزانهٔ شما را در پوشهٔ دادهٔ برنامه نوشت. گذرواژهٔ اصلی و عبارت بازیابی شما تنها راه بازگشت‌اند — مطمئن شوید هر دو جایی امن ذخیره شده‌اند.",
+      "decrypting": "در حال رمزگشایی…",
+      "done": "انجام شد",
+      "heading": "خزانهٔ شما آماده است.",
+      "showFolder": "نمایش پوشهٔ خزانه"
+    },
+    "sessionLost": {
+      "startOver": "شروع دوباره"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "ساخت خزانهٔ دیگر",
+    "heading": "یک خزانه انتخاب کنید",
+    "joinDevice": "افزودن این دستگاه به یک حساب",
+    "loading": "در حال بارگذاری خزانه‌های شما…",
+    "noneLoaded": "هیچ خزانه‌ای همین حالا بارگذاری نشد.",
+    "openedRelative": "باز شده {{rel}}",
+    "restoreFromBackup": "بازیابی از پشتیبان",
+    "subline": "روی این دستگاه بیش از یک خزانه دارید. یکی را برای باز کردن انتخاب کنید.",
+    "vaultFallback": "خزانهٔ {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "این کار کمی طول می‌کشد.",
+      "eyebrow": "بازیابی · رمزگشایی",
+      "footerHint": "اگر بیش از 30 ثانیه طول کشید، پنجره را ببندید و دوباره تلاش کنید.",
+      "heading": "در حال رمزگشایی خزانهٔ شما",
+      "subCaption": "در حال کار… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "بازیابی لغو شد: خزانه قفل شد.",
+        "operationInProgress": "عملیاتی در جریان است. لطفاً صبر کنید.",
+        "unexpected": "خطای غیرمنتظره. دوباره تلاش کنید.",
+        "weakPassword": "گذرواژهٔ جدید باید دست‌کم 12 نویسه باشد."
+      },
+      "eyebrow": "بازیابی · گذرواژهٔ جدید",
+      "helperBody": "با عبارت بازیابی شما باز شد. گذرواژهٔ قدیمی دیگر کار نمی‌کند — همین حالا گذرواژهٔ اصلی جدیدی تعیین کنید.",
+      "helperEmphasis": "عبارت بازیابی شما همان می‌ماند.",
+      "submit": "تعیین گذرواژهٔ جدید",
+      "title": "گذرواژهٔ اصلی جدیدی تعیین کنید"
+    },
+    "phrase": {
+      "back": "← بازگشت",
+      "body": "عبارت بازیابی خود را وارد کنید. 24 کلمهٔ BIP-39.",
+      "cellLabel": "کلمهٔ {{index}}",
+      "deleteLink": "حذف خزانه و شروع دوباره",
+      "eyebrow": "بازیابی",
+      "submit": "باز کردن",
+      "title": "خزانهٔ خود را بازیابی کنید."
+    },
+    "select": {
+      "accountInvalid": "شمارهٔ حساب نامعتبر است. بررسی کنید و دوباره تلاش کنید.",
+      "accountLabel": "شمارهٔ حساب (اختیاری)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (اختیاری)",
+      "body": "خزانه‌ای را که می‌خواهید با عبارت بازیابی 24 کلمه‌ای بازیابی کنید انتخاب کنید. همچنین می‌توانید شمارهٔ حساب خود را تایپ کنید تا مستقیم به آن بروید.",
+      "cancel": "انصراف",
+      "checking": "در حال بررسی…",
+      "loadFailed": "هیچ خزانه‌ای همین حالا بارگذاری نشد.",
+      "loading": "در حال بارگذاری خزانه‌های شما…",
+      "openedRelative": "باز شده {{rel}}",
+      "or": "یا",
+      "title": "خزانه‌ای برای بازیابی انتخاب کنید",
+      "useAccountNumber": "استفاده از شمارهٔ حساب",
+      "vaultFallback": "خزانهٔ {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "خزانه",
+    "createAnother": "ساخت خزانهٔ دیگر",
+    "joinDevice": "افزودن این دستگاه به یک حساب",
+    "switching": "در حال تعویض…",
+    "switchVaultLabel": "تعویض خزانه",
+    "vaultFallback": "خزانهٔ {{n}}"
+  },
+  "welcome": {
+    "createCta": "ساخت خزانهٔ جدید",
+    "headlineLine1": "یادداشت‌های Markdown رمزگذاری‌شده.",
+    "headlineLine2": "بدون ایمیل هنگام ثبت‌نام.",
+    "joinCta": "افزودن این دستگاه به یک حساب",
+    "repairResidue": {
+      "cancel": "انصراف",
+      "cleaningUp": "در حال پاک‌سازی…",
+      "cleanUp": "پاک‌سازی",
+      "confirmBody_one": "{{count}} فایل حذف خواهد شد. آن‌ها همین حالا هم ناخوانا هستند؛ چیز قابل بازیابی‌ای از دست نمی‌رود.",
+      "confirmBody_other": "{{count}} فایل حذف خواهند شد. آن‌ها همین حالا هم ناخوانا هستند؛ چیز قابل بازیابی‌ای از دست نمی‌رود.",
+      "confirmTitle": "فایل‌های باقی‌مانده پاک‌سازی شوند؟",
+      "doneBody_one": "{{count}} فایل باقی‌مانده حذف شد. حالا می‌توانید خزانهٔ جدیدی بسازید.",
+      "doneBody_other": "{{count}} فایل باقی‌مانده حذف شد. حالا می‌توانید خزانهٔ جدیدی بسازید.",
+      "doneTitle": "پاک‌سازی شد",
+      "errorBody": "چیزی درست پیش نرفت. برنامه را ببندید و دوباره تلاش کنید.",
+      "errorTitle": "پاک‌سازی ناموفق بود",
+      "foundBody_one": "{{count}} فایل باقی‌مانده از حذفی که ناتمام ماند. آن‌ها همین حالا هم ناخوانا هستند — چیز قابل بازیابی‌ای از دست نمی‌دهید.",
+      "foundBody_other": "{{count}} فایل باقی‌مانده از حذفی که ناتمام ماند. آن‌ها همین حالا هم ناخوانا هستند — چیز قابل بازیابی‌ای از دست نمی‌دهید.",
+      "foundTitle": "فایل‌های باقی‌مانده از حذفی ناتمام",
+      "partialBody_one": "{{count}} فایل ممکن است توسط برنامهٔ دیگری قفل شده باشد (ضدویروس، همگام‌سازی فایل، یا نمایه‌سازی جستجو). برنامه را ببندید و کمی بعد دوباره تلاش کنید، یا پوشهٔ خزانه را دستی حذف کنید.",
+      "partialBody_other": "{{count}} فایل ممکن است توسط برنامهٔ دیگری قفل شده باشند (ضدویروس، همگام‌سازی فایل، یا نمایه‌سازی جستجو). برنامه را ببندید و کمی بعد دوباره تلاش کنید، یا پوشهٔ خزانه را دستی حذف کنید.",
+      "partialTitle": "برخی فایل‌ها حذف نشدند"
+    },
+    "restoreCta": "بازیابی از پشتیبان",
+    "subtitle": "یادداشت‌های شما پیش از خروج از این دستگاه، روی همین دستگاه رمزگذاری می‌شوند. سرور فقط متن رمزی را ذخیره می‌کند.",
+    "repairCleanedUp_one": "{{count}} فایل باقی‌مانده پاک‌سازی شد.",
+    "repairCleanedUp_other": "{{count}} فایل باقی‌مانده پاک‌سازی شد.",
+    "repairFailed": "پاک‌سازی به پایان نرسید. دوباره تلاش کنید.",
+    "heroLine1": "یادداشت‌هایی که",
+    "heroLine2": "به هیچ‌کس جز شما",
+    "heroLine3": "تعلق ندارند.",
+    "lede": "Markdown، رمزگذاری‌شده روی همین دستگاه پیش از آنکه از آن خارج شود. بدون ایمیل حساب. بدون سروری که بتواند حتی یک کلمه را بخواند.",
+    "residueBanner": "فایل‌های باقی‌مانده از حذفی نیمه‌کاره ({{n}}). پیش از ساخت خزانه آن‌ها را پاک‌سازی کنید.",
+    "cleanUpFiles": "پاک‌سازی فایل‌های باقی‌مانده",
+    "create": "ساخت یک خزانه",
+    "connect": "اتصال به حساب من"
+  },
+  "wikiGraph": {
+    "emptyTitle": "هنوز پیوندی نیست",
+    "emptyBodyBefore": "یادداشت‌ها را با نوشتن ",
+    "emptyBodyAfter": " در متن خود به هم وصل کنید. یادداشت‌های پیونددار اینجا به‌صورت گراف نمایان می‌شوند."
+  },
+  "markdown": {
+    "attachmentFallback": "پیوست",
+    "nothingToPreview": "هنوز چیزی برای پیش‌نمایش نیست."
+  },
+  "conflicts": {
+    "empty": "تعارضی برای بررسی نیست — یادداشت‌های شما همگام‌اند.",
+    "groupTitle_one": "{{count}} نسخهٔ متعارض",
+    "groupTitle_other": "{{count}} نسخهٔ متعارض",
+    "groupTitleOfNote": " از یادداشت {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "ذخیرهٔ این نما ممکن نشد. دوباره تلاش کنید.",
+    "deleteError": "حذف این نما ممکن نشد. دوباره تلاش کنید.",
+    "editView": "ویرایش نما",
+    "condition": {
+      "search": "متن"
+    },
+    "containsPlaceholder": "شامل…",
+    "tagPlaceholder": "برچسب",
+    "folderPlaceholder": "پوشه/",
+    "propertyKeyPlaceholder": "کلید ویژگی",
+    "addCondition": "+ افزودن شرط",
+    "createView": "ساخت نما"
+  },
+  "snapshots": {
+    "today": "امروز {{time}}",
+    "readError": "خواندن تاریخچهٔ نسخه‌ها ممکن نشد.",
+    "decryptError": "رمزگشایی آن نسخه ممکن نشد.",
+    "restoreError": "بازگرداندن آن نسخه ممکن نشد.",
+    "title": "تاریخچهٔ نسخه‌ها",
+    "emptyState": "هنوز نسخهٔ قدیمی‌تری نیست. نسخه‌های ذخیره‌شده هنگام ویرایش به‌طور خودکار گرفته می‌شوند.",
+    "hide": "پنهان کردن",
+    "empty": "(خالی)",
+    "restoreThisVersion": "بازگرداندن این نسخه"
+  },
+  "restoreBackup": {
+    "title": "هنوز روی موبایل در دسترس نیست",
+    "body": "بازیابی از فایل پشتیبان هنوز روی موبایل در دسترس نیست — خزانه‌ای بسازید یا با عبارت بازیابی خود بازیابی کنید."
+  },
+  "recording": {
+    "deniedTitle": "دسترسی به میکروفون خاموش است",
+    "errorTitle": "شروع ضبط ممکن نشد",
+    "deniedBody": "برای ضبط یادداشت صوتی، دسترسی به میکروفون را برای Myne در تنظیمات › Myne › میکروفون اجازه دهید.",
+    "noDeviceBody": "روی این دستگاه میکروفونی پیدا نشد.",
+    "emptyBody": "آن ضبط خالی بود — چیزی ثبت نشد.",
+    "genericBody": "هنگام ضبط چیزی درست پیش نرفت. دوباره تلاش کنید.",
+    "stopAria": "توقف ضبط"
+  },
+  "picker": {
+    "neverOpened": "هرگز باز نشده",
+    "openedJustNow": "همین حالا باز شد",
+    "openedMinuteAgo": "یک دقیقه پیش باز شد",
+    "openedMinutesAgo_one": "{{count}} دقیقه پیش باز شد",
+    "openedMinutesAgo_other": "{{count}} دقیقه پیش باز شد",
+    "openedHourAgo": "یک ساعت پیش باز شد",
+    "openedHoursAgo_one": "{{count}} ساعت پیش باز شد",
+    "openedHoursAgo_other": "{{count}} ساعت پیش باز شد",
+    "openedYesterday": "دیروز باز شد",
+    "openedDaysAgo_one": "{{count}} روز پیش باز شد",
+    "openedDaysAgo_other": "{{count}} روز پیش باز شد",
+    "openedLastWeek": "هفتهٔ گذشته باز شد",
+    "openedWeeksAgo_one": "{{count}} هفته پیش باز شد",
+    "openedWeeksAgo_other": "{{count}} هفته پیش باز شد",
+    "openedLastMonth": "ماه گذشته باز شد",
+    "openedMonthsAgo_one": "{{count}} ماه پیش باز شد",
+    "openedMonthsAgo_other": "{{count}} ماه پیش باز شد",
+    "openedLastYear": "سال گذشته باز شد",
+    "openedYearsAgo_one": "{{count}} سال پیش باز شد",
+    "openedYearsAgo_other": "{{count}} سال پیش باز شد",
+    "corruptedBadge": "خراب"
+  },
+  "join": {
+    "transportError": "دسترسی به آن سرور همگام‌سازی ممکن نشد. نشانی و اتصال خود را بررسی کنید، سپس دوباره تلاش کنید.",
+    "passwordPlaceholder": "گذرواژهٔ خزانهٔ شما",
+    "waitingHint": "این صفحه را باز نگه دارید — پس از تأیید، کد تأییدی اینجا نمایان می‌شود تا با دستگاه دیگرتان مقایسه کنید.",
+    "verifyBody": "بررسی کنید که این کد همان کدی باشد که روی دستگاهی که از آن تأیید کردید نشان داده شده است.",
+    "removing": "در حال حذف…",
+    "sasMismatch": "یکسان نیستند — این دستگاه را حذف کنید",
+    "title": "اتصال به حساب شما",
+    "lead": "برای آوردن یادداشت‌هایتان به این دستگاه، مشخصات حساب خود را وارد کنید. همه چیز سرتاسر رمزگذاری‌شده می‌ماند.",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "این شماره را دوباره بررسی کنید — درست به نظر نمی‌رسد.",
+    "approvalHint": "یادداشت‌های شما پس از آنکه این دستگاه را از دستگاهی که از قبل حسابتان را دارد تأیید کنید، نمایان می‌شوند.",
+    "connectingSubtitle": "در حال دریافت حساب شما و باز کردن خزانه‌تان روی این دستگاه.",
+    "qr": {
+      "cancel": "انصراف",
+      "confirmAccount": "حساب",
+      "confirmServer": "سرور",
+      "confirmTitle": "این دستگاه افزوده شود؟",
+      "continue": "ادامه",
+      "expired": "این QR منقضی شده است — روی دستگاه دیگرتان یکی تازه نشان دهید و دوباره اسکن کنید.",
+      "invalid": "این یک QR دستگاه Myne نیست.",
+      "newerVersion": "این QR از نسخهٔ جدیدتری از Myne است — برنامه را به‌روزرسانی کنید و دوباره تلاش کنید.",
+      "pinHosted": "سرور میزبانی‌شده توسط Myne",
+      "pinNone": "سرور خودمیزبان",
+      "pinSelfHost": "گواهی از دستگاه مورد اعتماد شما پین شد",
+      "scan": "اسکن QR",
+      "scanFailed": "اسکن ممکن نشد. دوباره تلاش کنید، یا مشخصات خود را دستی وارد کنید.",
+      "scanUnavailable": "اسکن روی این دستگاه در دسترس نیست — مشخصات خود را پایین وارد کنید."
+    }
+  },
+  "createVault": {
+    "beginWeakPassword": "گذرواژهٔ قوی‌تری انتخاب کنید و دوباره تلاش کنید.",
+    "beginGeneric": "شروع ساخت خزانه ممکن نشد. دوباره تلاش کنید.",
+    "wordNumber": "کلمهٔ #{{position}}",
+    "commitError": "ذخیرهٔ خزانهٔ شما ممکن نشد. دوباره تلاش کنید.",
+    "savedToFile": "در {{label}} ذخیره شد",
+    "saveFileError": "ذخیرهٔ فایل ممکن نشد.",
+    "stepLabel": "ساخت یک خزانه · {{current}} از {{total}}",
+    "briefingTitle": "پیش از آنکه شروع کنیم",
+    "briefingLead": "Myne همه چیز را روی این دستگاه رمزگذاری می‌کند. این حریم خصوصی مسئولیتی به همراه دارد که فقط شما می‌توانید بر دوش بگیرید.",
+    "passwordTitle": "یک گذرواژه بسازید",
+    "confirmPasswordLabel": "تأیید گذرواژه",
+    "passwordHelper": "هرگز ذخیره نمی‌شود، هرگز ارسال نمی‌شود. کلیدهای شما را روی این دستگاه رمزگذاری می‌کند.",
+    "encryptingSubtitle": "در حال استخراج کلید شما با Argon2id. این کار چند ثانیه طول می‌کشد و قابل قطع کردن نیست.",
+    "phraseTitle": "عبارت بازیابی شما",
+    "phraseIntro": "بیست و چهار کلمه، به ترتیب. آن‌ها را روی کاغذ بنویسید و جایی امن نگه دارید.",
+    "showSecondHalf": "نمایش کلمه‌های 13–24",
+    "saveToFile": "ذخیره در فایل",
+    "writtenThemDown": "آن‌ها را نوشته‌ام",
+    "typebackTitle": "عبارت خود را تأیید کنید",
+    "typebackLead": "این چهار کلمه را از عبارت بازیابی‌ای که تازه ذخیره کردید وارد کنید.",
+    "wordMismatch": "با کلمهٔ #{{pos}} یکسان نیست",
+    "backToPhrase": "بازگشت به عبارت",
+    "accountTitle": "شمارهٔ حساب شما",
+    "accountLead": "این را کنار عبارت بازیابی خود ذخیره کنید. برای بازگرداندن خزانه‌تان روی دستگاهی جدید به آن نیاز دارید.",
+    "accountSavedAck": "شمارهٔ حسابم را ذخیره کرده‌ام.",
+    "commit": "ثبت",
+    "committingTitle": "در حال ذخیرهٔ خزانهٔ شما…",
+    "committingSubtitle": "در حال نوشتن خزانهٔ رمزگذاری‌شده روی این دستگاه.",
+    "unlockingTitle": "در حال باز کردن…",
+    "unlockingSubtitle": "در حال باز کردن خزانهٔ شما.",
+    "readyTitle": "خزانهٔ شما آماده است",
+    "readyBody": "هر چه از این پس بنویسید، پیش از ذخیره یا همگام‌سازی روی این دستگاه رمزگذاری می‌شود.",
+    "personalLabel": "شخصی",
+    "openVault": "باز کردن خزانه",
+    "backUpNow": "همین حالا پشتیبان بگیرید"
+  },
+  "web": {
+    "reload": {
+      "body": "بارگذاری دوبارهٔ این صفحه، گذرواژهٔ شما را دوباره می‌خواهد — و این عمدی است، راه سریع‌تری برای ورود نیست. خزانهٔ شما تا وقتی صفحه بسته است روی این دستگاه رمزگذاری‌شده می‌ماند و کلید هر بار از گذرواژهٔ شما دوباره ساخته می‌شود.",
+      "title": "بارگذاری دوباره یعنی وارد کردن دوبارهٔ گذرواژه"
+    },
+    "wall": {
+      "getNative": "دریافت Myne برای رومیزی یا موبایل",
+      "noAccount": {
+        "body": "حساب‌ها در برنامهٔ رومیزی یا موبایل Myne ساخته می‌شوند، نه اینجا.",
+        "reason": "ساخت حساب، عبارت بازیابی 24 کلمه‌ای شما را تولید می‌کند و یک بار نشانتان می‌دهد. یک صفحهٔ وب هرگز نباید چیزی باشد که آن عبارت را به شما نشان می‌دهد — اگر آنجا نشت کند، هیچ چیز در Myne نمی‌تواند آن را پس بگیرد.",
+        "title": "ابتدا به یک حساب نیاز دارید"
+      },
+      "noSync": {
+        "body": "این مرورگر هیچ سرور همگام‌سازی پیکربندی‌شده‌ای ندارد، پس چیزی برای باز کردن نیست.",
+        "reason": "برخلاف برنامهٔ رومیزی، مرورگر خزانهٔ مستقلی برای تکیه کردن ندارد — یادداشت‌هایش از همگام‌سازی می‌آیند. آن را در برنامهٔ رومیزی یا موبایل راه‌اندازی کنید، سپس به اینجا برگردید.",
+        "title": "همگام‌سازی هنوز راه‌اندازی نشده است"
+      }
+    },
+    "unavailableHere": {
+      "backup": "پشتیبان‌های رمزگذاری‌شده در برنامهٔ رومیزی Myne گرفته و بازیابی می‌شوند، چون می‌تواند فایل پشتیبان را هرجا که بخواهید بنویسد. یادداشت‌های شما اینجا از سرور می‌آیند، پس این مرورگر خودش را با همگام‌سازی بازیابی می‌کند.",
+      "creation": "حساب‌های جدید در برنامهٔ رومیزی Myne ساخته می‌شوند. آنجا عبارت بازیابی شما نشان داده می‌شود — و عبارت بازیابی هرگز نباید در یک صفحهٔ وب نشان داده شود.",
+      "multiVault": "این مرورگر یک حساب را نگه می‌دارد. برای استفاده از حسابی دیگر، آن را در برنامهٔ رومیزی Myne یا در نمایهٔ مرورگر دیگری باز کنید.",
+      "phraseRecovery": "بازیابی با عبارت در برنامهٔ رومیزی Myne انجام می‌شود. عبارت بازیابی شما هرگز نباید در یک صفحهٔ وب تایپ شود.",
+      "title": "در مرورگر در دسترس نیست"
+    },
+    "unsupported": {
+      "title": "Myne نمی‌تواند در این مرورگر اجرا شود",
+      "mobileTitle": "برنامهٔ Myne را روی این دستگاه باز کنید",
+      "handoff": "برنامهٔ رومیزی Myne (macOS، Windows، Linux) و برنامهٔ موبایل (iOS، Android) چنین محدودیتی ندارند — و پیش از اجرا امضای خودشان را تأیید می‌کنند، کاری که یک صفحهٔ وب نمی‌تواند بکند.",
+      "reason": {
+        "desktop-form-factor": "Myne در مرورگر برای رایانهٔ رومیزی ساخته شده است — به حافظه و ورودی‌ای نیاز دارد که مرورگر تلفن یا تبلت نمی‌تواند بدهد. روی این دستگاه به‌هرحال برنامهٔ Myne کلاینت بهتری است: سریع‌تر است، آفلاین کار می‌کند و وقتی مرورگر فضای ذخیره‌سازی‌اش را پاک کند یادداشت‌های شما را نگه می‌دارد.",
+        "webassembly": "این مرورگر از WebAssembly پشتیبانی نمی‌کند، که هستهٔ رمزگذاری روی آن اجرا می‌شود.",
+        "wasm-memory-headroom": "این مرورگر نمی‌تواند حدود 336 مگابایت حافظه‌ای را که استخراج کلید خزانه نیاز دارد رزرو کند. مرورگرهای تلفن و تبلت معمولاً نمی‌توانند؛ آن حد را خود خزانه تعیین می‌کند و بدون ناخوانا کردن خزانه در همه‌جای دیگر نمی‌توان آن را برای یک دستگاه پایین آورد.",
+        "worker": "این مرورگر از Web Worker‌ها پشتیبانی نمی‌کند، که ذخیره‌سازی و رمزگذاری خزانه درون آن‌ها اجرا می‌شود.",
+        "opfs": "این مرورگر فضای ذخیره‌سازی محلی خصوصی برای برنامه‌های وب فراهم نمی‌کند، پس جایی برای نگه‌داشتن خزانهٔ شما میان بارگذاری‌های صفحه نیست.",
+        "opfs-sync-access-handle": "فضای ذخیره‌سازی محلی خصوصی این مرورگر، دسترسی همگام به فایل را که خزانه برای نوشتن ایمن نیاز دارد ندارد.",
+        "web-locks": "این مرورگر از قفلی که مانع نوشتن هم‌زمان دو زبانه در یک خزانه می‌شود پشتیبانی نمی‌کند.",
+        "crypto-getrandomvalues": "این مرورگر منبع تولید عدد تصادفی رمزنگارانه فراهم نمی‌کند."
+      }
+    }
+  }
+}

@@ -83,9 +83,12 @@
       "colType": "種類",
       "colUsedIn": "使用先",
       "decrypting": "添付ファイルを復号中…",
+      "clearSearchAriaLabel": "検索をクリア",
+      "emptyClearSearch": "検索をクリア",
       "emptyImportHint": "ファイルをインポートして保管庫に保存します。",
       "emptyLoadError": "添付ファイルのカタログを読み取れませんでした。",
       "emptyNoAttachments": "添付ファイルはまだありません。",
+      "emptyNoResultsTitle": "検索に一致する添付ファイルはありません。",
       "filterAriaLabel": "種類で絞り込み",
       "gridView": "グリッド表示",
       "import": "インポート",
@@ -98,6 +101,7 @@
       "menuPreview": "プレビュー",
       "menuRename": "名前を変更",
       "menuTranscribe": "文字起こし",
+      "menuViewTranscription": "文字起こしを表示",
       "noMatch": "検索に一致する添付ファイルはありません。",
       "noUnusedNotice": "整理する未使用の添付ファイルはありません。",
       "preview": "プレビュー",
@@ -115,8 +119,14 @@
       "title": "添付ファイル",
       "transcribeDone": "文字起こしが完了しました。",
       "transcribeFailed": "文字起こしに失敗しました。もう一度お試しください。",
+      "transcribeFeatureOff": "文字起こしはオフです。設定 → 文字起こし でオンにしてください。",
+      "transcribeModelLoadFailed": "文字起こしモデルを読み込めませんでした。Myneを再インストールするか、設定 → 開発者 → AI でカスタムモデルを確認してください。",
+      "transcribeNoModelHint": "文字起こしモデルが見つかりません。Myneを再インストールすると復元されます。",
       "transcribeNoModel": "設定 → Developer → AI で文字起こしモデルを選択してください。",
       "transcribeStarted": "文字起こし中…",
+      "transcribeVaultLocked": "文字起こしするには保管庫のロックを解除してください。",
+      "transcriptionModalClose": "文字起こしを閉じる",
+      "transcriptionModalTitle": "文字起こし",
       "typeFilter": {
         "all": "すべての種類",
         "audio": "オーディオ",
@@ -219,6 +229,15 @@
     "matchedInAttachmentTitle": "このノートに埋め込まれたファイル内でクエリが一致しました",
     "matchedInBody": "↳ 本文で一致",
     "noMatches": "一致なし",
+    "operatorHint": "Tabで補完",
+    "operators": {
+      "tag": "タグの付いたノート",
+      "path": "フォルダ内のノート",
+      "file": "ノートのタイトルで一致",
+      "section": "見出しのあるノート",
+      "task": "タスクのあるノート",
+      "content": "本文の全文検索"
+    },
     "searchPlaceholder": "ノートを検索するかコマンドを実行 — Escで閉じる",
     "sectionCommands": "コマンド",
     "sectionNotes": "ノート",
@@ -469,6 +488,9 @@
       "showGraph": {
         "label": "グラフビューを表示…"
       },
+      "showTasks": {
+        "label": "タスクを表示"
+      },
       "showTags": {
         "label": "タグを参照…"
       },
@@ -507,9 +529,11 @@
         "cycleHeadingLevel": "見出しレベルを循環",
         "cycleTabs": "タブを循環",
         "deleteWorkspace": "ワークスペースを削除",
+        "findInNote": "ノート内を検索",
         "focusNextPane": "次のペインにフォーカス",
         "focusPrevPane": "前のペインにフォーカス",
         "foldAll": "すべて折りたたむ",
+        "indent": "インデント",
         "inlineCode": "インラインコード",
         "insertWikilink": "Wikiリンクを挿入",
         "italic": "斜体",
@@ -517,11 +541,15 @@
         "navigateForward": "進む",
         "newNote": "新規ノート",
         "openSettings": "設定を開く",
+        "outdent": "インデント解除",
         "paletteToggle": "コマンドパレットを開く",
+        "redo": "やり直し",
         "renameWorkspace": "ワークスペースの名前を変更",
         "saveWorkspaceAs": "ワークスペースに名前を付けて保存",
         "selectAllScoped": "すべて選択（スコープ内）",
+        "selectNextOccurrence": "次の出現箇所を選択",
         "showGraphView": "グラフビューを表示",
+        "showTasks": "タスクを表示",
         "splitPaneDown": "ペインを分割（下）",
         "splitPaneRight": "ペインを分割（右）",
         "switchWorkspace": "ワークスペースを切り替え",
@@ -531,6 +559,7 @@
         "toggleReadingView": "読み取りビューを切り替え",
         "toggleSourceMode": "ソースモードを切り替え",
         "toggleTaskList": "タスクリストを切り替え",
+        "undo": "元に戻す",
         "unfoldAll": "すべて展開"
       }
     },
@@ -572,6 +601,12 @@
         "renamed": "{{name}}に名前を変更しました。",
         "renameFailed": "添付ファイルの名前を変更できませんでした。",
         "saveDialogFailed": "保存ダイアログを開けませんでした。"
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}}件の画像を圧縮しました：{{from}} → {{to}}",
+        "bulkNotice_other": "{{count}}件の画像を圧縮しました：{{from}} → {{to}}",
+        "notice": "圧縮しました：{{from}} → {{to}}",
+        "noticeContainerChanged": "{{format}}に圧縮しました：{{from}} → {{to}}"
       },
       "convert": {
         "cancel": "キャンセル",
@@ -649,7 +684,10 @@
         "exportAria": "添付ファイルをエクスポート",
         "imagePreview": "画像プレビュー",
         "pdfFallback": "PDF",
-        "pdfPreview": "PDFプレビュー"
+        "pdfPreview": "PDFプレビュー",
+        "zoomIn": "拡大",
+        "zoomOut": "縮小",
+        "zoomReset": "ズームをリセット"
       },
       "menu": {
         "actionsAria": "添付ファイルの操作"
@@ -730,6 +768,12 @@
           "deletedLabel": "削除済み"
         },
         "transcribe": {
+          "cause": {
+            "featureOff": "文字起こしはオフです。設定 → 文字起こし でオンにしてください。",
+            "modelLoadFailed": "文字起こしモデルを読み込めませんでした。設定 → 開発者 → AI でカスタムモデルを指定している場合は、そのファイルを確認してください。指定していない場合は、Myneを再インストールすると組み込みのモデルが復元されます。",
+            "noModel": "文字起こしモデルが見つかりません。Myneを再インストールすると復元されます。",
+            "vaultLocked": "文字起こしするには保管庫のロックを解除してください。"
+          },
           "disabledReason": "文字起こしするには 設定 → Developer → AI でAIを有効にしてください。",
           "failed": "文字起こしに失敗しました。もう一度お試しください。",
           "heading": "文字起こし",
@@ -772,6 +816,10 @@
         "linkedFrom": "{{count}}件からリンク",
         "linkedFrom_one": "{{count}}件からリンク",
         "linkedFrom_other": "{{count}}件からリンク",
+        "linksTo": "{{count}}件にリンク",
+        "linksTo_one": "{{count}}件にリンク",
+        "linksTo_other": "{{count}}件にリンク",
+        "outgoingEmpty": "このノートはまだ何にもリンクしていません。",
         "untitled": "無題"
       },
       "barItems": {
@@ -889,6 +937,7 @@
           "aiChat": "AIチャット",
           "backlinks": "バックリンク",
           "outline": "アウトライン",
+          "tasks": "タスク",
           "unlinked": "未リンクのメンション"
         }
       },
@@ -922,9 +971,38 @@
         "toggleTitle": "ワークスペース：{{name}}"
       }
     },
+    "noteActions": {
+      "buttonLabel": "ノートの操作",
+      "rename": "名前を変更",
+      "move": "フォルダに移動…",
+      "duplicate": "複製",
+      "convertToTemplate": "テンプレートにする",
+      "convertToNote": "ノートに変換",
+      "turnedIntoTemplate": "テンプレートにしました",
+      "convertedToNote": "ノートに変換しました",
+      "versionHistory": "バージョン履歴",
+      "exportMarkdown": "Markdownとしてエクスポート…",
+      "exportPdf": "PDFとしてエクスポート…",
+      "exportHtml": "HTMLとしてエクスポート…",
+      "exportTxt": "プレーンテキストとしてエクスポート…",
+      "trash": "ゴミ箱に移動"
+    },
     "codeBlock": {
       "copyCode": "コードをコピー",
       "defaultBadge": "コード"
+    },
+    "drawingEmbed": {
+      "done": "完了",
+      "edit": "ドローイング{{name}}を編集",
+      "editAction": "編集",
+      "empty": "空のドローイング — クリックして描画",
+      "open": "開く",
+      "rename": "ドローイングの名前を変更"
+    },
+    "drawingMenu": {
+      "background": "キャンバスの背景",
+      "reset": "キャンバスをリセット",
+      "toggleTheme": "ドローイングのテーマを切り替え"
     },
     "find": {
       "close": "検索を閉じる",
@@ -949,8 +1027,11 @@
       "unreferenced": "未参照"
     },
     "frontmatter": {
+      "addListItem": "項目を追加…",
+      "addListItemAriaLabel": "{{key}}に項目を追加",
       "addProperty": "+ プロパティを追加",
       "propertiesLabel": "プロパティ",
+      "removeListItemAriaLabel": "{{item}}を削除",
       "titleAriaLabel": "ノートのタイトル",
       "titlePlaceholder": "無題"
     },
@@ -966,6 +1047,8 @@
       "date": "日付",
       "day": "曜日",
       "divider": "区切り線",
+      "drawing": "ドローイング",
+      "due": "期限",
       "heading1": "見出し1",
       "heading2": "見出し2",
       "heading3": "見出し3",
@@ -975,8 +1058,11 @@
       "link": "リンク",
       "now": "現在時刻",
       "numberedList": "番号付きリスト",
+      "priority": "優先度",
       "quote": "引用",
+      "repeat": "繰り返し",
       "table": "表",
+      "taskQuery": "タスクリスト",
       "time": "時刻",
       "todoList": "To-Doリスト",
       "voiceNote": "ボイスノート",
@@ -998,6 +1084,27 @@
       "deleteRow": "行を削除",
       "reorderColumn": "列を並べ替え",
       "reorderRow": "行を並べ替え"
+    },
+    "tagSuggestion": {
+      "label": "提案されたタグ",
+      "accept": "タグ{{tag}}をこのノートに追加",
+      "dismiss": "提案されたタグ{{tag}}を却下"
+    },
+    "taskField": {
+      "addAffordance": "タスクフィールドを追加",
+      "invalidDue": "Myneはこの日付を読み取れないため、期限としては表示されません。",
+      "invalidPriority": "Myneはこの優先度を読み取れません。highest、high、medium、low、lowestのいずれかを使用してください。",
+      "invalidRepeat": "Myneはこの繰り返しルールを認識できないため、このタスクは繰り返されません。",
+      "menuEdit": "{{field}}を編集",
+      "menuTitle": "フィールドを追加",
+      "repeatNoAnchor": "このタスクには繰り返しの起点となる日付がないため、繰り返されません。期限を追加すると開始します。",
+      "save": "保存",
+      "skipOccurrence": "今回をスキップ",
+      "title": {
+        "due": "期限",
+        "repeat": "繰り返し",
+        "priority": "優先度"
+      }
     },
     "toolbar": {
       "apply": "適用",
@@ -1030,7 +1137,16 @@
         "green": "緑",
         "pink": "ピンク",
         "purple": "紫",
-        "yellow": "黄"
+        "yellow": "黄",
+        "orange": "オレンジ",
+        "red": "赤",
+        "teal": "ティール",
+        "cyan": "シアン",
+        "lime": "ライム",
+        "brown": "茶",
+        "grey": "グレー",
+        "indigo": "インディゴ",
+        "remove": "ハイライトを削除"
       },
       "urlPlaceholder": "リンクURLを貼り付け"
     },
@@ -1375,11 +1491,17 @@
       "countEmpty": "空",
       "delete": "削除",
       "deleteError": "そのノートを削除できませんでした。もう一度お試しください。",
+      "emptyBody": "アーカイブしたノートとフォルダはサイドバーには表示されませんが、そのまま保管されています。必要になったら、ここから復元してください。",
+      "emptyTitle": "アーカイブされたものはありません",
+      "folderDeleteBody_one": "「{{name}}」とその中のノート{{count}}件",
+      "folderDeleteBody_other": "「{{name}}」とその中のノート{{count}}件",
       "emptyState": "アーカイブは空です。",
       "folderDeleteConfirm_one": "ノート{{count}}件をゴミ箱に移動しますか？",
       "folderDeleteConfirm_other": "ノート{{count}}件をゴミ箱に移動しますか？",
       "folderDeleteConfirmCta": "ゴミ箱に移動",
       "folderDeleteError": "そのフォルダのノートをゴミ箱に移動できませんでした。もう一度お試しください。",
+      "folderDeleteTitle": "このフォルダをゴミ箱に移動しますか？",
+      "folderDeleteWarning": "ノートはゴミ箱に移動します — いつでも復元できます。完全な削除は別の操作です。",
       "restore": "復元",
       "restoreError": "そのノートを復元できませんでした。もう一度お試しください。",
       "title": "アーカイブ",
@@ -1469,6 +1591,24 @@
     "graph": {
       "allConnected": "すべてつながっています — 孤立したノートはありません。",
       "building": "グラフを構築中…",
+      "colorGroups": {
+        "addRule": "ルールを追加",
+        "colorSwatchTitle": "色を選択",
+        "deleteRuleTitle": "ルールを削除",
+        "dragHandleTitle": "ドラッグして並べ替え",
+        "editFilterButton": "フィルタを編集…",
+        "editFilterTitle": "カラーグループのフィルタを編集",
+        "emptyBody": "カラーグループを使うと、グラフのノードをタグやフォルダごとに色分けできます — 仕事のノートは1色、個人のノートは別の色に。最初のルールを追加してください。",
+        "emptyTitle": "カラーグループはまだありません",
+        "enableToggleAriaLabel": "ルールを有効化",
+        "filterAllNotes": "すべてのノートに一致",
+        "filterConditions_one": "条件{{count}}件",
+        "filterConditions_other": "条件{{count}}件",
+        "heading": "カラーグループ",
+        "moveDown": "ルールを下に移動",
+        "moveUp": "ルールを上に移動",
+        "namePlaceholder": "無題のルール"
+      },
       "depthToggleTitle": "近傍の深さを切り替え（1 ↔ 2ホップ）",
       "filterAll": "すべて",
       "filterAroundNote": "このノートの周辺",
@@ -1480,6 +1620,23 @@
       "overCap": "この保管庫は大きいため、保管庫全体のグラフは上限が設けられています。タグで絞り込むか、孤立したノートを表示して探索してください。",
       "refresh": "更新",
       "refreshTitle": "保管庫が変更されました — グラフを再構築",
+      "settings": {
+        "appearanceHeading": "外観",
+        "closeTitle": "閉じる",
+        "forceCenter": "中心への引力",
+        "forceLinkDistance": "リンクの距離",
+        "forceLinkStrength": "リンクの強さ",
+        "forceRepel": "反発力",
+        "forcesHeading": "力",
+        "labelFadeZoom": "ラベルのフェード",
+        "lineThickness": "線の太さ",
+        "nodeSize": "ノードのサイズ",
+        "nodeSizeStrength": "接続数でサイズを変える",
+        "openTitle": "グラフ設定",
+        "reset": "デフォルトに戻す",
+        "showArrows": "方向の矢印を表示",
+        "title": "グラフ設定"
+      },
       "tagPlaceholder": "タグ…"
     },
     "import": {
@@ -1538,6 +1695,7 @@
         "setupIntro": "既存のObsidian保管庫フォルダをMyneに指定してください。すべてのMarkdownノートはその場でインポートされ暗号化されます — このデバイスから何も送信されず、元のファイルはそのまま残ります。",
         "statCancelled": "キャンセル済み",
         "statCanvasSkipped": ".canvasファイルをスキップ",
+        "statCompressed": "圧縮した画像",
         "statEmptyFoldersKept": "空のフォルダを保持",
         "statMedia": "メディア",
         "statOtherSkipped": "その他のファイルをスキップ",
@@ -1551,7 +1709,19 @@
         "titlePick": "ノートをインポート",
         "keepsLabel": "引き継がれるもの",
         "losesLabel": "引き継がれないもの",
-        "changeSource": "インポート元を変更"
+        "changeSource": "インポート元を変更",
+        "statExcalidrawSkipped": "Excalidrawのドローイングをスキップ",
+        "unfollowedLinkOutside": "これは選択したフォルダの外にあるフォルダへのショートカットのため、Myneはたどりませんでした。そのフォルダを保管庫の中に移動またはコピーして、もう一度インポートしてください。",
+        "unfollowedLinkLoop": "このショートカットは、Myneがすでに入っていたフォルダを指しています。たどると同じ場所を延々と巡ることになります。その配下で見落とされたものはありません。",
+        "unfollowedLinkBroken": "このショートカットはどこにもつながっていません — 指していたものは移動または削除されています。",
+        "unreadableDetail": "スキップしました — {{reason}} インポートの残りはそのまま続行しました。",
+        "stoppedAt": "停止するまでに{{total}}件中{{imported}}件のノートがインポートされました。保管庫の中にあり、そのまま残しておいて問題ありません。",
+        "reasonNotUtf8": "Myneはこのファイルをテキストとして読み取れませんでした。古いエンコーディングで保存されているか、そもそもテキストファイルではない可能性があります。",
+        "reasonPathRejected": "Myneは、選択したフォルダの中でこのファイルにアクセスできませんでした。",
+        "reasonPermissionDenied": "Myneにはこのファイルを読み取る権限がありませんでした。",
+        "reasonNotFound": "Myneが到達したときには、このファイルはすでにありませんでした。",
+        "reasonNoSpace": "このデバイスの空き容量がなくなりました。",
+        "reasonUnknown": "Myneには理由を特定できませんでした。"
       },
       "offer": {
         "body": "既存のノートをMyneに取り込みましょう。インポート時にそれぞれが暗号化されます — このデバイスから何も送信されず、元のファイルはそのままの場所に残ります。",
@@ -1615,6 +1785,7 @@
       "bulkDelete": "{{count}}件のノートを削除",
       "bulkDelete_one": "ノート{{count}}件を削除",
       "bulkDelete_other": "ノート{{count}}件を削除",
+      "moveTo": "移動…",
       "bulkMove": "{{count}}件のノートを移動…",
       "bulkMove_one": "ノート{{count}}件を移動…",
       "bulkMove_other": "ノート{{count}}件を移動…",
@@ -1644,6 +1815,7 @@
       "newFolder": "新規フォルダ",
       "newFolderInPlaceholder": "{{path}}内に新規フォルダ",
       "newFolderPlaceholder": "新規フォルダ",
+      "newItem": "新規…",
       "newNote": "新規ノート",
       "newNoteFromTemplate": "テンプレートから新規ノート…",
       "newNoteHere": "ここに新規ノート",
@@ -1676,12 +1848,18 @@
       "trashSingleError": "ノートをゴミ箱に移動できませんでした。",
       "undo": "元に戻す",
       "vaultRoot": "保管庫のルート",
-      "viewSettingsTitle": "ビュー設定"
+      "viewSettingsTitle": "ビュー設定",
+      "imported_one": "このフォルダにノートを1件インポートしました",
+      "imported_other": "このフォルダに{{count}}件のノートをインポートしました",
+      "importedWithSkips": "{{count}}件をインポート — {{skipped}}件をスキップ",
+      "importNoMarkdown": "ドロップされたものにMarkdownファイルはありません"
     },
     "newFromTemplate": {
       "back": "戻る",
       "blankNote": "空のノート",
       "createNote": "ノートを作成",
+      "createFirstTemplate": "テンプレートを作成",
+      "manageTemplates": "テンプレートを管理",
       "emptyState": "テンプレートはまだ作成されていません。",
       "listLabel": "テンプレート",
       "loading": "読み込み中…",
@@ -1696,12 +1874,14 @@
       "createDrawing": "新規ドローイング",
       "noNotesMatch": "一致するノートはありません。",
       "noNotesYet": "ノートはまだありません。",
+      "recent": "最近",
       "searchAriaLabel": "開くノートを検索",
       "searchPlaceholder": "ノートを検索…",
       "untitled": "無題"
     },
     "pane": {
       "graphTab": "グラフ",
+      "tasksTab": "タスク",
       "loading": "読み込み中…",
       "untitledView": "無題のビュー"
     },
@@ -1723,6 +1903,8 @@
       "loadError": "このノートを読み込めませんでした",
       "removeFromFavorites": "お気に入りから削除",
       "renameAriaLabel": "ノートの名前を変更",
+      "taskBadgeLabel": "このノートはタスクです",
+      "taskBadgeTitle": "タスクノート",
       "unsyncedLabel": "サーバー未同期",
       "unsyncedTitle": "このノートの最新の変更はこのデバイスにのみあります",
       "untitled": "無題"
@@ -1755,7 +1937,12 @@
       "cancel": "キャンセル",
       "changeCount_one": "このスナップショット以降の変更{{count}}件",
       "changeCount_other": "このスナップショット以降に{{count}}件の変更",
+      "changeCountPrev_one": "前のスナップショットからの変更{{count}}件",
+      "changeCountPrev_other": "前のスナップショットからの変更{{count}}件",
       "close": "閉じる",
+      "compareAgainstLabel": "比較対象",
+      "compareCurrent": "現在のノート",
+      "comparePrevious": "前のスナップショット",
       "confirmBody": "現在のノートはまずスナップショットとして保存されるため、この操作は元に戻せます。",
       "confirmTitle": "このスナップショットを復元しますか？",
       "decrypting": "復号中…",
@@ -1770,6 +1957,7 @@
       "justNow": "たった今",
       "listLabel": "スナップショット一覧",
       "loading": "読み込み中…",
+      "noPrevious": "これは最も古いスナップショットです — 比較できる前のバージョンはありません。",
       "restore": "復元",
       "restoreCta": "このスナップショットを復元",
       "restoredStatus": "復元しました。直前のバージョンはスナップショットとして保存されています。",
@@ -1823,6 +2011,8 @@
       "emptyConfirmTitle": "ゴミ箱を空にしますか？",
       "emptyPartialFailure_one": "ノート{{count}}件を削除できず、ゴミ箱に残っています。",
       "emptyPartialFailure_other": "{{count}}件のノートを削除できず、ゴミ箱に残っています。",
+      "emptyBody": "削除したノートはここに入ります。ゴミ箱を空にするまで残り、いつでも復元できます。",
+      "emptyTitle": "ゴミ箱は空です",
       "emptyState": "ゴミ箱は空です。",
       "purgeConfirmCta": "完全に削除",
       "purgeConfirmTitle": "完全に削除しますか？",
@@ -1871,6 +2061,8 @@
         "viewSettings": "ビュー設定…"
       },
       "newView": "新規ビュー",
+      "noMatch": "検索に一致するビューはありません。",
+      "searchPlaceholder": "ビューを検索…",
       "table": {
         "empty": "このビューに一致するノートはありません",
         "name": "名前",
@@ -1967,6 +2159,71 @@
     "passwordHelper": "保存も送信もされません。このデバイス上であなたの鍵を暗号化します。",
     "encryptingSubtitle": "新しいパスワードでボールトの鍵をラップしています。"
   },
+  "recurrence": {
+    "every": {
+      "day": "毎日",
+      "week": "毎週",
+      "month": "毎月",
+      "year": "毎年"
+    },
+    "everyN": {
+      "day": "{{count}}日ごと",
+      "week": "{{count}}週間ごと",
+      "month": "{{count}}か月ごと",
+      "year": "{{count}}年ごと"
+    },
+    "everyWeekday": "毎週{{days}}",
+    "everyWeekdays": "毎週{{days}}",
+    "ordinal": {
+      "first": "第1",
+      "second": "第2",
+      "third": "第3",
+      "fourth": "第4",
+      "last": "最終"
+    },
+    "ordinalOfMonth": "毎月{{ordinal}}{{weekday}}",
+    "dayOfMonth": "毎月{{day}}日",
+    "lastDayOfMonth": "毎月末日",
+    "weekday": {
+      "monday": "月曜日",
+      "tuesday": "火曜日",
+      "wednesday": "水曜日",
+      "thursday": "木曜日",
+      "friday": "金曜日",
+      "saturday": "土曜日",
+      "sunday": "日曜日"
+    },
+    "weekdaySeparator": "、",
+    "whenDone": "{{rule}}（完了した日から）",
+    "builder": {
+      "family": "繰り返し",
+      "familyInterval": "一定の間隔で…",
+      "familyWeekdays": "毎週、曜日を指定…",
+      "familyDayOfMonth": "毎月、日付を指定…",
+      "familyOrdinal": "毎月、曜日を指定…",
+      "count": "間隔",
+      "unitLabel": "単位",
+      "units": {
+        "day": "日",
+        "week": "週間",
+        "month": "か月",
+        "year": "年"
+      },
+      "ordinal": "位置",
+      "weekday": "曜日",
+      "lastDay": "末日",
+      "whenDone": "完了した日を起点に繰り返す",
+      "weekdayShort": {
+        "monday": "月",
+        "tuesday": "火",
+        "wednesday": "水",
+        "thursday": "木",
+        "friday": "金",
+        "saturday": "土",
+        "sunday": "日"
+      }
+    }
+  },
   "restore": {
     "backLabel": "戻る",
     "cancelLabel": "キャンセル",
@@ -2015,8 +2272,8 @@
       "changelogButton": "変更履歴を表示…",
       "changelogHelper": "バージョンごとのリリースノート。MYND-119の実装時に表示されます。",
       "changelogLabel": "変更履歴",
-      "developerModeHelper": "",
-      "developerModeLabel": "",
+      "developerModeHelper": "Myneが既定では表に出さない詳細設定を表示します。Myneが動作を保証する経路から外れる設定と、ほとんどの人には不要な上級者向けのツールです。オフにしてもそれらが再び隠れるだけで、オンにしたものはオンのまま残ります。解除はそれぞれの設定項目で行ってください。",
+      "developerModeLabel": "開発者モード",
       "licenseBody": "プレアルファ · ドキュメントはCC-BY-4.0 · フェーズ1リリースでアプリケーションコードはAGPL-3.0。",
       "licenseLabel": "ライセンス",
       "tagline": "プレアルファ · フェーズ1デスクトップクライアント",
@@ -2067,10 +2324,18 @@
       "changing": "変更中…"
     },
     "appearance": {
+      "accentHelper": "アプリ全体で使うアクセントカラーを選びます。このデバイスのみに適用されます。",
+      "accentHexAria": "アクセントカラーの16進数値",
+      "accentLabel": "アクセントカラー",
+      "accentReset": "テーマの既定値に戻す",
       "homeQuickActions": "ホームのクイック操作",
       "showEditTimesAria": "サイドバーに編集時刻を表示",
       "showEditTimesHelper": "各ノートの最終編集時刻を、サイドバーのタイトルの下に表示します。",
       "showEditTimesLabel": "編集時刻を表示",
+      "taskMarkerAria": "タスクノートにタスクマーカーを表示",
+      "taskMarkerHelper": "タスクとして宣言したノートに、サイドバーとそのタブ上で目印を付けます。",
+      "taskMarkerLabel": "タスクマーカーを表示",
+      "taskMarkerSaveError": "設定を保存できませんでした。もう一度お試しください。",
       "theme": {
         "amoled": "AMOLED",
         "dark": "ダーク",
@@ -2087,7 +2352,10 @@
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "エディタフォント",
-      "showEditTimesSubtitle": "各ノートの下にタイムスタンプ"
+      "showEditTimesSubtitle": "各ノートの下にタイムスタンプ",
+      "graphSettingsLabel": "グラフの外観",
+      "graphSettingsHelper": "ノードの色、ラベル、サイズ、レイアウトの力はグラフの中で設定します — グラフを開いて、隅にある歯車を使ってください。設定はデバイスごとに保持されるため、ここでの変更がスマートフォンに引き継がれることはありません。",
+      "openGraph": "グラフを開く"
     },
     "archive": {
       "helper": "ノートをアーカイブに移動して、メインの一覧から外しておけるようにします。これをオフにすると、アーカイブ済みのノートがすべて元のフォルダに戻り、アーカイブ機能が非表示になります。",
@@ -2095,6 +2363,18 @@
       "off": "オフ",
       "on": "オン",
       "saveError": "アーカイブ設定を更新できませんでした。"
+    },
+    "attachmentCompression": {
+      "label": "インポート時に画像を圧縮",
+      "helper": "貼り付けたりドロップしたりした画像を、暗号化して保存する前に縮小します。保管庫、バックアップ、同期のサイズを小さく保てます。この処理は元に戻せません — 元のファイルは保持されません。",
+      "helperScopeEveryDevice": "保管庫全体に、すべてのデバイスで適用されます。",
+      "helperScopeNotHere": "保管庫全体に適用されますが、このブラウザでは適用されません — ここで追加した画像はそのままの形で保存されます。",
+      "errorSaveSetting": "この設定を保存できませんでした。"
+    },
+    "transcription": {
+      "label": "文字起こし",
+      "helper": "オーディオの添付ファイルを、このデバイス上でテキストに変換します。モデルはMyneに同梱されており、どこにも送信されません。オフにすると文字起こしの操作がすべて非表示になり、アプリは一切文字起こしを行わなくなります。",
+      "errorSaveSetting": "設定を保存できませんでした。"
     },
     "attachmentOcr": {
       "label": "画像やスキャンした文書の中を検索",
@@ -2155,6 +2435,29 @@
         "onDate": "{{date}}に接続"
       }
     },
+    "cliAccess": {
+      "label": "ターミナルからのアクセス",
+      "helperOff": "オフです。`myne`コマンドは、この保管庫の中身を読み取ることも変更することもできません。",
+      "helperOn": "この保管庫のロックが解除されている間はオンです。あなたのアカウントで動作するどのプログラムも、これを通じてノートを読み取り、検索し、作成できます — Myneにはあなたのターミナルとスクリプトの区別が付かず、扉が開いているかどうか以外は何も確認しません。パスワードを求めることはなく、保管庫がロックされた瞬間に閉じ、ノートを削除することはできません。",
+      "lastUsedNever": "この保管庫のロックを解除してから使用されていません。",
+      "lastUsedJustNow": "最終使用：たった今。",
+      "lastUsedMinutesAgo": "最終使用：{{count}}分前。",
+      "lastUsedMinutesAgo_one": "最終使用：{{count}}分前。",
+      "lastUsedMinutesAgo_other": "最終使用：{{count}}分前。",
+      "lastUsedHoursAgo": "最終使用：{{count}}時間前。",
+      "lastUsedHoursAgo_one": "最終使用：{{count}}時間前。",
+      "lastUsedHoursAgo_other": "最終使用：{{count}}時間前。",
+      "lastUsedDaysAgo": "最終使用：{{count}}日前。",
+      "lastUsedDaysAgo_one": "最終使用：{{count}}日前。",
+      "lastUsedDaysAgo_other": "最終使用：{{count}}日前。",
+      "notOnPathHint": "シェルはまだ`myne`を見つけられません。次の行をシェルのプロファイルに追加してから、新しいターミナルを開いてください:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "ターミナルからは見えないフォルダ",
+      "excludedHelper": "1行につき1つのフォルダパス。これらのフォルダ内のノートは、ターミナルのどの結果にも含まれず、ターミナルから書き込むこともできません — アプリ内では変わらず利用できます。ターミナルからのアクセスをオンにする前に設定できます。",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "rateLimitLabel": "ターミナルを全速力で実行させる",
+      "rateLimitHelper": "Myneは既定で1分あたり最大120件のターミナルコマンドに応答します。これは暴走したスクリプトに対する速度の制限であって、権限の確認ではありません — どのプログラムが要求してよいかを判断するものは何もありません。すべてのノートを別のツールに通すような一括処理を行うときにオンにしてください。"
+    },
     "clipperInstall": {
       "error": "ブラウザクリッパーの設定を更新できませんでした。",
       "helper": "Myneブラウザ拡張機能がこのアプリにクリップを送信できるよう、ネイティブメッセージングホストを登録します。デフォルトでオン。オフにすると削除されます。",
@@ -2164,6 +2467,7 @@
       "appliedBadge": "適用中",
       "apply": "適用",
       "applyError": "そのテーマを適用できませんでした。もう一度お試しください。",
+      "browseButton": "テーマを参照",
       "cancel": "キャンセル",
       "confirm": "確定",
       "delete": "削除",
@@ -2188,7 +2492,8 @@
       "label": "カスタムテーマ",
       "openFolderButton": "テーマフォルダを開く",
       "openFolderError": "テーマフォルダを開けませんでした。",
-      "readError": "テーマフォルダを読み取れませんでした。"
+      "readError": "テーマフォルダを読み取れませんでした。",
+      "readOnlyHelper": "カスタムテーマはお使いのコンピューターにインストールされます。あなたのテーマは、同期後にここへ自動的に表示されます。"
     },
     "dailyNotes": {
       "blankTemplate": "空白（テンプレートなし）",
@@ -2198,6 +2503,8 @@
       "folderHelper": "新しいデイリーノートが保存される場所。デフォルトは{{default}}です — フォルダは空でも保持されます。",
       "folderLabel": "デイリーノートのフォルダ",
       "folderSaveError": "デイリーノートのフォルダを保存できませんでした。もう一度お試しください。",
+      "folderSearchEmpty": "一致するフォルダはありません。",
+      "folderSearchPlaceholder": "フォルダを検索…",
       "searchEmpty": "一致するテンプレートはありません。",
       "searchPlaceholder": "テンプレートを検索…",
       "templateHelper": "各デイリーノートの起点にするテンプレートを選ぶか、空白のままにして日付をタイトルにした空のノートを作成します。",
@@ -2234,6 +2541,8 @@
       "newNote": {
         "folderLabel": "新規ノートのフォルダ",
         "folderPlaceholder": "例: Inbox/",
+        "folderSearchEmpty": "一致するフォルダはありません。",
+        "folderSearchPlaceholder": "フォルダを検索…",
         "helper": "新しく作成されたノートが配置される場所。",
         "label": "新規ノートのデフォルトの場所",
         "optionCurrent": "現在のノートと同じフォルダ",
@@ -2329,6 +2638,10 @@
       "off": "オフ",
       "on": "オン"
     },
+    "views": {
+      "helper": "絞り込んだノート一覧を保存するための「ビュー」の項目を、サイドバーに表示します。既定ではオフですが、すでにビューがある場合はオンになります。",
+      "label": "ビュー"
+    },
     "vimMode": {
       "chordCaveat": "WindowsとLinuxではMyne自身のショートカットが優先されるため、それらと競合するvimのキー（Ctrl-a、Ctrl-b、Ctrl-d、Ctrl-e、Ctrl-f、Ctrl-i、Ctrl-p、Ctrl-t、Ctrl-v、Ctrl-w、Ctrl-x）はエディタでは使用できません。Ctrl-[ は引き続きEscapeとして機能し、ビジュアルブロックはAlt-vに移ります。",
       "errorSaveSetting": "Vimモードの設定を保存できませんでした。",
@@ -2346,6 +2659,9 @@
       "pendingHint": "近日公開"
     },
     "ai": {
+      "autoTagHelper": "入力の手が止まると、このデバイス上の小さなモデルがノートを読み、その先頭にタグを提案します。提案を受け入れるまで、何も追加されません。",
+      "autoTagLabel": "タグを自動で提案",
+      "autoTagUnavailable": "このビルドにはタグ用のモデルが同梱されていないため、タグを提案できません。Myneがモデルをダウンロードすることはありません — 同梱されたビルドでは、このスイッチが自動的にオンになります。",
       "disclosureToggle": "これはどのように機能しますか？",
       "enableHelper": "あなたが用意したモデルを完全にデバイス上で実行します。実験的機能で、デフォルトはオフです。",
       "enableLabel": "ローカルAIを有効化",
@@ -2369,8 +2685,41 @@
       "recommendedFilesTranscription": "Whisperの .gguf ファイル + config.json + tokenizer.json が同じフォルダに必要です。",
       "title": "AI"
     },
+    "network": {
+      "disabledCue": "同期はTor経由ではなくなりました。新しい接続は同期サーバーに直接つながります。",
+      "errorRead": "現在の設定を読み取れませんでした。スイッチを切り替えて設定し直してください。",
+      "errorSave": "設定を保存できませんでした。何も変更されていません。",
+      "errorSidecar": "Torルーティングはオンですが、Torクライアントを起動できませんでした。起動できるまで同期は一時停止します — 直接送信されているものはありません。",
+      "postureActive": "同期はTorを経由しています",
+      "postureConnecting": "Torに接続中 — 同期は一時停止しています",
+      "postureConnectingDetail": "通常は数秒で完了します。その間、直接送信されるものはありません。",
+      "postureExempt": "同期はTorを使用していません — このアドレスはこのデバイスを指しています",
+      "postureExemptDetail": "設定した同期サーバーのアドレスはこのコンピューター自身を指しているため、Myneからの接続はTorの回線を通りません。そのアドレスが別の場所にあるサーバーへ転送している場合、Myneにはそれを知る手段がなく、経路を制御することもできません。同期は一時停止していません。",
+      "postureHeading": "現在の状態",
+      "postureInactive": "同期は同期サーバーに直接つながります",
+      "postureUnavailable": "Torを利用できません — 同期は一時停止しています",
+      "postureUnavailableDetail": "直接送信されているものはありません。この設定をオフにしてからもう一度オンにすると、Torクライアントの起動を試みます。Torなしで同期する場合はオフのままにしてください。",
+      "residualExit": "Tor回線の最後のリレー（出口ノード）には、あなたがどの同期サーバーに接続しているかが見えます。同期している内容を読むことはできません — 内容はエンドツーエンドで暗号化されたままです。",
+      "residualMetadata": "同期サーバーには、いつ同期したか、いくつのブロブをどれだけの大きさで送信したか、デバイスが何台あるかが引き続き見えます。Torはそれを変えません。",
+      "residualPayment": "ホスト型の同期に料金を支払っている場合、その支払いとアカウントは引き続きあなたに結び付けられます。Torが変えるのは接続元であって、請求の記録ではありません。",
+      "residualScope": "Torを通るのは、Myne自身の同期通信だけです。このデバイス上の他の通信は通りません。",
+      "residualsToggle": "これで隠せないもの",
+      "torHelper": "同期サーバーからあなたのIPアドレスと所在地を隠し、どのサーバーと同期しているかをあなたのネットワークとインターネット接続事業者から隠します — ただし、このデバイスがTorに接続していること自体は見えます。Myneに対して匿名になるわけではなく、何をいつ同期したかをサーバーから隠すものでもありません。",
+      "torLabel": "同期をTor経由にする"
+    },
     "prefs": {
       "saveError": "設定を保存できませんでした — もう一度お試しください"
+    },
+    "reminders": {
+      "aria": "このデバイスでタスクのリマインダーを表示",
+      "exactAllow": "許可",
+      "exactLabel": "正確な時刻",
+      "exactOn": "オン",
+      "horizon": "リマインダーは{{date}}まで登録されています。それまでにMyneを開くと、以降も通知が続きます。",
+      "label": "タスクのリマインダー",
+      "saveError": "設定を保存できませんでした。もう一度お試しください。",
+      "showTextAria": "通知にタスクの本文を表示",
+      "showTextLabel": "タスクの本文を表示"
     },
     "privacy": {
       "autoLockHelper": "この時間操作がないと、保管庫をロックします。",
@@ -2438,7 +2787,7 @@
     "shell": {
       "closeLabel": "設定を閉じる",
       "groups": {
-        "developer": ""
+        "developer": "開発者"
       },
       "navLabel": "設定パネル",
       "panels": {
@@ -2448,7 +2797,9 @@
         "appearance": "外観",
         "editor": "エディタ",
         "files": "ファイル",
+        "transcription": "文字起こし",
         "hotkeys": "ホットキー",
+        "network": "ネットワーク",
         "privacy": "プライバシー",
         "storage": "ストレージ",
         "sync": "同期"
@@ -2498,6 +2849,8 @@
       "lineSpacingHelper": "行と行の間の縦方向の間隔。",
       "lineSpacingLabel": "行間",
       "textSizeHelper": "エディタテキストの基準サイズ。見出しはこれに応じて拡大します。",
+      "previewLabel": "プレビュー",
+      "previewBody": "いろはにほへと ちりぬるを わかよたれそ つねならむ。タイポグラフィの設定はすべてのノートの読みやすさに関わるため、選ぶたびにこのサンプルが更新されます。",
       "textSizeLabel": "文字サイズ"
     },
     "viewMode": {
@@ -2541,6 +2894,19 @@
     "sectionOptions": "オプション",
     "footerTagline": "myne · このデバイス上で暗号化 · オープンソース",
     "editor": {
+      "sections": {
+        "text": "テキストと表示",
+        "editing": "編集",
+        "writing": "執筆",
+        "features": "機能"
+      },
+      "preview": {
+        "heading": "いろはにほへと ちりぬるを",
+        "bullet1": "わかよたれそ つねならむ",
+        "bullet2": "うゐのおくやま けふこえて",
+        "spellCaption": "スペルチェック",
+        "spellSample": "つずり"
+      },
       "defaultView": "デフォルトのビュー",
       "typewriter": "タイプライタースクロール",
       "typewriterSubtitle": "キャレットを垂直方向の中央に保つ",
@@ -2556,6 +2922,7 @@
         "lastActiveNoteDesc": "開いていたノートを同期して、別のデバイスで続きから作業できるようにします。"
       },
       "keywords": {
+        "aiAutoTag": "自動タグ タグ 提案 ラベル ai auto tag tags suggest suggestions labels",
         "aiEnable": "ai ローカルai 有効 無効 オン オフ 機械学習 local ai enable disable machine learning",
         "aiExcluded": "除外 除外フォルダ フォルダ 無視 プライバシー ai excluded folders ignore exclude privacy",
         "aiModels": "モデル gguf ダウンロード テキスト 埋め込み ai llm models download embedding",
@@ -2566,6 +2933,9 @@
         "buildChannel": "ビルド チャネル バージョン リリース 安定版 ベータ build channel version release stable beta nightly",
         "changePassword": "パスワード変更 パスワード 変更 パスフレーズ 認証情報 更新 リセット change password passphrase credentials update reset",
         "changelog": "変更履歴 更新履歴 リリースノート 新機能 履歴 changelog release notes what is new history",
+        "cliAccess": "cli ターミナル アクセス コマンドライン シェル myneコマンド コンソール terminal access command line shell console",
+        "cliExcludedFolders": "cli 除外フォルダ ターミナル 除外 非表示 コマンドライン プライベート excluded folders terminal exclude hide command line private",
+        "cliRateLimit": "cli レート制限 ターミナル 速度 制限 一括処理 ペース 毎分のコマンド数 rate limit terminal speed throttle bulk pace commands per minute",
         "clipper": "クリッパー ブラウザ 拡張機能 ウェブクリップ 取り込み browser clipper extension web capture chrome firefox",
         "contentWidth": "コンテンツ幅 幅 段組み 読みやすさ 行長 content width column reading measure line length",
         "customThemes": "カスタムテーマ テーマ パレット 配色 色 外観 インポート custom themes palette colors appearance import",
@@ -2574,6 +2944,7 @@
         "export": "エクスポート 書き出し 復号 平文 ファイル 文書 export markdown decrypt plain files documents",
         "focusMode": "フォーカスモード 集中 タイプライター 減光 非アクティブ行 focus mode typewriter dim inactive lines distraction free",
         "font": "フォント 書体 等幅 サンセリフ 明朝 タイポグラフィ font typeface family sans serif mono typography",
+        "graphSettings": "グラフ 外観 物理 力 ノード リンク レイアウト カラーグループ ラベル キャンバス graph appearance physics forces nodes links layout color groups labels canvas",
         "hotkeys": "ホットキー ショートカット キーボード キー割り当て キーバインド hotkeys keyboard shortcuts keybindings keymap chords bindings",
         "import": "インポート 取り込み 移行 ノート obsidian notion evernote enex html csv import migrate migration bring",
         "language": "言語 表示言語 ロケール 翻訳 インターフェース language locale interface translation ui",
@@ -2583,7 +2954,9 @@
         "vimMode": "vim ノーマル 挿入 ビジュアル 置換 モーダル編集 キーボード modal editing normal insert visual keyboard",
         "lineSpacing": "行間 行送り 行の高さ タイポグラフィ 読みやすさ line spacing leading height typography readability",
         "newNoteLocation": "新規ノート 保存先 場所 フォルダ デフォルト new note location folder default where created",
+        "torRouting": "tor ルーティング onion プロキシ ネットワーク ipアドレス 所在地 隠す 同期 匿名性 routing proxy network ip address location hide sync anonymity",
         "quickUnlock": "クイックロック解除 ロック解除 pin 生体認証 指紋 顔認証 touch id quick unlock biometric face",
+        "reminders": "リマインダー 通知 お知らせ アラート タスク 期限 reminders notify notification alert task due remind",
         "realtimeSync": "リアルタイム同期 同期 リアルタイム 接続 ライブ real time sync live connection presence polling",
         "screenCapture": "画面キャプチャ スクリーンショット 画面録画 保護 ブロック プライバシー screen capture protection screenshot recording block",
         "showEditTimes": "編集時刻 タイムスタンプ 更新日時 日付 表示 show edit times timestamps modified dates notes",
@@ -2591,6 +2964,8 @@
         "spellLanguages": "スペルチェック 言語 辞書 ロケール 単語 spell languages dictionaries locale words",
         "startupOpen": "起動 起動時 開く デフォルト ファイル ノート startup open default file launch boot which note",
         "attachmentOcr": "ocr 画像 スキャン pdf 写真 スクリーンショット 文字認識 テキスト抽出 添付ファイル 検索 cpu バッテリー image scan scanned photo screenshot text recognition attachments battery",
+        "attachmentCompression": "圧縮 画像 縮小 リサイズ webp jpeg インポート 貼り付け 保管庫のサイズ ストレージ compress compression image shrink downscale resize import paste vault size storage",
+        "transcription": "文字起こし 音声認識 音声 オーディオ 書き起こし 口述 字幕 whisper 録音 音声からテキスト transcribe transcription speech voice audio dictation subtitle recording sound to text",
         "syncAddDevice": "デバイス追加 追加 ペアリング 連携 スマホ 同期 add device pair link phone laptop sync",
         "syncConflicts": "競合 解消 マージ バージョン 同期 conflicts merge resolve versions sync",
         "syncDevices": "デバイス 端末 連携 ペアリング 同期 devices linked paired sync machines",
@@ -2648,6 +3023,15 @@
       "label": "検索インデックスを構築中…"
     },
     "conflicts": {
+      "compare": "比較",
+      "compareClose": "競合一覧に戻る",
+      "compareError": "比較するためにこれらのノートを読み取れませんでした。もう一度お試しください。",
+      "compareIdentical": "この2つのバージョンは同一です。",
+      "compareLoading": "両方のバージョンを読み込み中…",
+      "compareMine": "このデバイス",
+      "compareOrphan": "このコピーの元になったノートはもう存在しないため、比較する対象がありません。",
+      "compareTheirs": "競合するコピー",
+      "compareTitle": "「{{title}}」を比較",
       "discard": "破棄",
       "empty": "競合はありません — デバイス間で同期がとれています。",
       "groupTitle_one": "{{original}}の競合するコピー{{count}}件",
@@ -2709,11 +3093,15 @@
     },
     "endpoint": {
       "connect": "接続",
+      "connected": "接続済み",
       "connectedLocal": "接続済み（ローカル、TLSなし）。",
       "connectedTls": "接続しました。このフィンガープリントが他のデバイスと一致することを確認してください。",
       "connectedPlatformTrust": "TLS経由で接続しました。このサーバーの証明書はお使いのブラウザが検証しました。",
       "connecting": "接続中…",
       "fingerprintLabel": "サーバー証明書のフィンガープリント：",
+      "confirmFingerprintRequired": "Torルーティングがオンのため、このデバイスは事前に指定されていない証明書を信頼しません。サーバー自身か、すでに接続済みのデバイスからSHA-256証明書フィンガープリントを取得し、ここに貼り付けてください。",
+      "confirmFingerprintMismatch": "このサーバーが提示した証明書は、入力されたものと一致しません。何も保存されていません。貼り付けたフィンガープリントを確認してください。それが正しい場合は接続しないでください — このデバイスとサーバーの間に何かが入り込んでいます。",
+      "confirmFingerprintDeclined": "何も保存されていません — このデバイスはそのサーバーに接続されていません。証明書のフィンガープリントを入手してから、もう一度お試しください。",
       "pinStatic": "Myneの組み込み証明書に対して検証済み。",
       "pinTofu": "初回接続時にピン留めされました。このフィンガープリントをあなたのデバイス間で比較してください。",
       "fixedOrigin": "このクライアントは、デプロイ時に設定された1つのサーバーと同期します。ここから変更することはできません — このページはこの1つのアドレスとしか通信できません。",
@@ -2744,6 +3132,22 @@
       "submit": "このデバイスを追加",
       "wordAria": "{{number}}語目"
     },
+    "fingerprint": {
+      "title": "信頼する前に、このサーバーの証明書を確認してください",
+      "why": "Torルーティングがオンのため、この最初の接続は見知らぬ人が運用するリレーを経由してサーバーに届きます。証明書がピン留めされるまで、このデバイスは渡された証明書をそのまま受け入れてしまいます — そのリレーが作り上げた証明書であってもです。サーバーが公開しているフィンガープリントを入力すれば、Myneはピン留めの前に照合します。一致しない場合、何も保存されません。",
+      "label": "想定される証明書のフィンガープリント",
+      "placeholder": "サーバーのSHA-256フィンガープリント",
+      "echoLabel": "入力した内容",
+      "echoComplete": "64文字中64文字です。続ける前に、手元の控えと読み合わせてください。",
+      "echoProgress": "現在{{total}}文字中{{count}}文字です。",
+      "echoInvalid": "SHA-256のフィンガープリントは64文字で、各文字は0〜9またはa〜fです。コロン、空白、先頭の「sha256:」は問題ありません — それ以外はフィンガープリントの一部ではありません。",
+      "helpToggle": "このフィンガープリントはどこで確認できますか？",
+      "helpNotOverTor": "この接続経由では確認できません。同じ回線で取得したフィンガープリントは何も証明しません — 証明書をすり替えられるものは、そのページもすり替えられます。",
+      "helpFromServer": "サーバーを動かしているマシンで: openssl x509 -noout -fingerprint -sha256 -in <証明書ファイル>",
+      "helpFromDevice": "このアカウントにすでに接続されているデバイスで: 設定 → 同期 に同じフィンガープリントが表示されます。",
+      "helpNoFingerprint": "どの方法でも入手できない場合、Torルーティングがオンの間はこのサーバーを追加できません。設定 → ネットワーク でTorルーティングをオフにして直接接続することもできますが、その場合はサーバーと、あなたのネットワークを見られる相手にIPアドレスが見えます。",
+      "decline": "持っていない — キャンセル"
+    },
     "join": {
       "accountLabel": "アカウント番号",
       "cancel": "キャンセル",
@@ -2752,6 +3156,8 @@
       "help": "アカウント番号とパスワードでサインインしてください。既存のデバイスが承認すると、このデバイスでノートが同期されます。復元フレーズは必要ありません。",
       "passwordLabel": "パスワード",
       "pinnedCompare": "このデバイスはサーバーの証明書をピン留めしました。このフィンガープリントが他のデバイスと一致することを確認してください。",
+      "confirmFingerprintRequired": "Torルーティングがオンのため、このデバイスは事前に指定されていない証明書を信頼しません。サーバー自身か、すでに接続済みのデバイスからSHA-256証明書フィンガープリントを取得し、ここに貼り付けてください。",
+      "confirmFingerprintMismatch": "このサーバーが提示した証明書は、入力されたものと一致しません。このデバイスは追加されず、何も保存されていません。貼り付けたフィンガープリントを確認してください。それが正しい場合は続行しないでください — このデバイスとサーバーの間に何かが入り込んでいます。",
       "pinnedTitle": "サーバー証明書をピン留めしました",
       "serverLabel": "同期サーバー",
       "serverPlaceholder": "https://your-server.example",
@@ -2786,6 +3192,7 @@
         "deleteConfirmTitle": "この復元されたノートを削除しますか？",
         "deleteConfirmWarning": "このデバイスに保持されている唯一のコピーを完全に削除します。元に戻せません。",
         "deleteCta": "削除",
+        "empty": "復元されたノートはありません。",
         "errorGeneric": "問題が発生しました。もう一度お試しください。",
         "helper": "別のデバイスで削除されたノートがここでも削除されるとき、その暗号化されたコピーはこのデバイスに保持されます。新しいノートとして復元するか、完全に削除してください。",
         "label": "復元されたノート",
@@ -2873,7 +3280,66 @@
       "conflictsNeedReview_other": "{{count}}件の競合の確認が必要です",
       "catchingUp": "同期に追いついています — あなたのノートは安全です。",
       "verifyDevices": "デバイスを確認"
+    },
+    "tor": {
+      "connecting": "Torに接続中です。接続が整うまで同期は一時停止します — 直接送信されているものはありません。",
+      "settingsHint": "設定 → ネットワーク",
+      "unavailable": "Torを利用できないため、同期は一時停止しています。直接送信されているものはありません。Torなしで同期するには、Torルーティングをオフにしてください。"
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "指定なし",
+      "due": "期限",
+      "folder": "フォルダ",
+      "insert": "挿入",
+      "noDueDate": "期限なし",
+      "priority": "優先度",
+      "sort": "並べ替え",
+      "sortDue": "期限",
+      "sortPath": "ノート",
+      "sortPriority": "優先度",
+      "status": "状態",
+      "statusDone": "完了",
+      "statusTodo": "未完了",
+      "tag": "タグ"
+    },
+    "empty": {
+      "filter": "今は何もありません。別のフィルタを試してください。",
+      "rebuilding": "ノートを読み込み中…",
+      "scope": "このフォルダまたはタグにタスクはありません。範囲を広げてみてください。",
+      "vault": "タスクはまだありません。いずれかのノートの行に「- [ ]」と書くと作成できます。"
+    },
+    "filter": {
+      "all": "すべて",
+      "overdue": "期限切れ",
+      "today": "今日",
+      "upcoming": "今後"
+    },
+    "noteTitle": "このノート内のタスク",
+    "query": {
+      "dropped_one": "Myneが読み取れなかった条件{{count}}件",
+      "dropped_other": "Myneが読み取れなかった条件{{count}}件",
+      "empty": "このクエリに一致するタスクはありません。",
+      "loading": "ノートを読み込み中…",
+      "refused": "Myneはこのクエリをまったく読み取れなかったため、すべてを表示するのではなく何も表示していません。",
+      "remainder_one": "さらに{{count}}件のタスクが一致しました",
+      "remainder_other": "さらに{{count}}件のタスクが一致しました"
+    },
+    "reminder": {
+      "due": "タスクのリマインダーの時刻です。"
+    },
+    "row": {
+      "completed": "タスク、完了",
+      "notCompleted": "タスク、未完了",
+      "tooLongToWrite": "このタスクの行は長すぎて、ここからは編集できません。ノートを開いて編集してください。",
+      "untitled": "無題のタスク"
+    },
+    "scope": {
+      "allFolders": "すべてのフォルダ",
+      "label": "絞り込み"
+    },
+    "title": "タスク"
   },
   "templates": {
     "manager": {
@@ -2953,6 +3419,8 @@
     "recoveryLink": "パスワードをお忘れですか？復元フレーズでロック解除",
     "submit": "ロック解除",
     "subtitle": "続けるにはパスワードを入力してください。",
+    "subtitlePin": "続けるにはPINを入力してください。",
+    "subtitleBiometric": "続けるにはTouch IDで確認してください。",
     "suspicion": {
       "lockedDuringChange": "パスワードの変更をキャンセルしました：保管庫がロックされました。",
       "metaChangedExternally": "保管庫が別のセッションで変更されました — もう一度ロックを解除してください。"
@@ -3166,6 +3634,7 @@
   "vaultPicker": {
     "createAnother": "別の保管庫を作成",
     "heading": "保管庫を選択",
+    "joinDevice": "このデバイスをアカウントに追加",
     "loading": "保管庫を読み込み中…",
     "noneLoaded": "現在、保管庫を読み込めませんでした。",
     "openedRelative": "{{rel}}に開きました",
@@ -3222,6 +3691,7 @@
   "vaultSwitcher": {
     "chipFallback": "保管庫",
     "createAnother": "別の保管庫を作成",
+    "joinDevice": "このデバイスをアカウントに追加",
     "switching": "切り替え中…",
     "switchVaultLabel": "保管庫を切り替え",
     "vaultFallback": "保管庫{{n}}"
@@ -3230,6 +3700,7 @@
     "createCta": "新しい保管庫を作成",
     "headlineLine1": "暗号化されたMarkdownノート。",
     "headlineLine2": "登録時にメール不要。",
+    "joinCta": "このデバイスをアカウントに追加",
     "repairResidue": {
       "cancel": "キャンセル",
       "cleaningUp": "クリーンアップ中…",

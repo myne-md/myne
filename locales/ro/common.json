@@ -88,9 +88,12 @@
       "colType": "Tip",
       "colUsedIn": "Folosit în",
       "decrypting": "Se decriptează atașamentele…",
+      "clearSearchAriaLabel": "Șterge căutarea",
+      "emptyClearSearch": "Șterge căutarea",
       "emptyImportHint": "Importă un fișier pentru a-l păstra în seif.",
       "emptyLoadError": "Catalogul de atașamente nu a putut fi citit.",
       "emptyNoAttachments": "Niciun atașament încă.",
+      "emptyNoResultsTitle": "Niciun atașament nu corespunde căutării tale.",
       "filterAriaLabel": "Filtrează după tip",
       "gridView": "Vizualizare grilă",
       "import": "Importă",
@@ -103,6 +106,7 @@
       "menuPreview": "Previzualizează",
       "menuRename": "Redenumește",
       "menuTranscribe": "Transcrie",
+      "menuViewTranscription": "Vezi transcrierea",
       "noMatch": "Niciun atașament nu corespunde căutării tale.",
       "noUnusedNotice": "Niciun atașament neutilizat de curățat.",
       "preview": "Previzualizare",
@@ -120,8 +124,14 @@
       "title": "Atașamente",
       "transcribeDone": "Transcriere finalizată.",
       "transcribeFailed": "Transcrierea a eșuat. Te rugăm să încerci din nou.",
+      "transcribeFeatureOff": "Funcția vorbire în text este dezactivată. Activeaz-o din Setări → Transcriere.",
+      "transcribeModelLoadFailed": "Modelul de transcriere nu a putut fi încărcat. Reinstalează Myne sau verifică modelul personalizat din Setări → Developer → AI.",
+      "transcribeNoModelHint": "Modelul de transcriere lipsește. Reinstalarea aplicației Myne îl restaurează.",
       "transcribeNoModel": "Selectează un model de transcriere din Setări → Developer → AI.",
       "transcribeStarted": "Se transcrie…",
+      "transcribeVaultLocked": "Deblochează-ți seiful pentru a transcrie.",
+      "transcriptionModalClose": "Închide transcrierea",
+      "transcriptionModalTitle": "Transcriere",
       "typeFilter": {
         "all": "Toate tipurile",
         "audio": "Audio",
@@ -228,6 +238,15 @@
     "matchedInAttachmentTitle": "Interogarea s-a potrivit în interiorul unui fișier încorporat în această notă",
     "matchedInBody": "↳ găsit în conținut",
     "noMatches": "Niciun rezultat",
+    "operatorHint": "Tab pentru completare",
+    "operators": {
+      "tag": "Note cu o etichetă",
+      "path": "Note dintr-un folder",
+      "file": "Potrivire după titlul notei",
+      "section": "Note cu un titlu",
+      "task": "Note cu o sarcină",
+      "content": "Text integral în conținut"
+    },
     "searchPlaceholder": "Caută note sau execută o comandă — Esc pentru a închide",
     "sectionCommands": "Comenzi",
     "sectionNotes": "Note",
@@ -478,6 +497,9 @@
       "showGraph": {
         "label": "Afișează vizualizarea grafică…"
       },
+      "showTasks": {
+        "label": "Afișează sarcinile"
+      },
       "showTags": {
         "label": "Răsfoiește etichetele…"
       },
@@ -516,9 +538,11 @@
         "cycleHeadingLevel": "Parcurge nivelurile de titlu",
         "cycleTabs": "Parcurge filele",
         "deleteWorkspace": "Șterge spațiul de lucru",
+        "findInNote": "Caută în notă",
         "focusNextPane": "Focalizează panoul următor",
         "focusPrevPane": "Focalizează panoul anterior",
         "foldAll": "Pliază tot",
+        "indent": "Indentează",
         "inlineCode": "Cod în linie",
         "insertWikilink": "Inserează wikilink",
         "italic": "Cursiv",
@@ -526,11 +550,15 @@
         "navigateForward": "Navighează înainte",
         "newNote": "Notă nouă",
         "openSettings": "Deschide setările",
+        "outdent": "Redu indentarea",
         "paletteToggle": "Deschide paleta de comenzi",
+        "redo": "Refă",
         "renameWorkspace": "Redenumește spațiul de lucru",
         "saveWorkspaceAs": "Salvează spațiul de lucru ca",
         "selectAllScoped": "Selectează tot (în context)",
+        "selectNextOccurrence": "Selectează următoarea apariție",
         "showGraphView": "Afișează vizualizarea grafică",
+        "showTasks": "Afișează sarcinile",
         "splitPaneDown": "Împarte panoul (jos)",
         "splitPaneRight": "Împarte panoul (dreapta)",
         "switchWorkspace": "Schimbă spațiul de lucru",
@@ -540,6 +568,7 @@
         "toggleReadingView": "Comută vizualizarea de citire",
         "toggleSourceMode": "Comută modul sursă",
         "toggleTaskList": "Comută lista de sarcini",
+        "undo": "Anulează",
         "unfoldAll": "Depliază tot"
       }
     },
@@ -581,6 +610,13 @@
         "renamed": "Redenumit în {{name}}.",
         "renameFailed": "Atașamentul nu a putut fi redenumit.",
         "saveDialogFailed": "Fereastra de salvare nu a putut fi deschisă."
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} imagine comprimată: {{from}} → {{to}}",
+        "bulkNotice_few": "{{count}} imagini comprimate: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} de imagini comprimate: {{from}} → {{to}}",
+        "notice": "Comprimat: {{from}} → {{to}}",
+        "noticeContainerChanged": "Comprimat în {{format}}: {{from}} → {{to}}"
       },
       "convert": {
         "cancel": "Anulează",
@@ -661,7 +697,10 @@
         "exportAria": "Exportă atașamentul",
         "imagePreview": "Previzualizare imagine",
         "pdfFallback": "PDF",
-        "pdfPreview": "Previzualizare PDF"
+        "pdfPreview": "Previzualizare PDF",
+        "zoomIn": "Mărește",
+        "zoomOut": "Micșorează",
+        "zoomReset": "Resetează zoomul"
       },
       "menu": {
         "actionsAria": "Acțiuni pentru atașament"
@@ -744,6 +783,12 @@
           "deletedLabel": "șters"
         },
         "transcribe": {
+          "cause": {
+            "featureOff": "Funcția vorbire în text este dezactivată. Activeaz-o din Setări → Transcriere.",
+            "modelLoadFailed": "Modelul de transcriere nu a putut fi încărcat. Dacă ai setat un model personalizat din Setări → Developer → AI, verifică-i fișierele; altfel, reinstalarea aplicației Myne îl restaurează pe cel integrat.",
+            "noModel": "Modelul de transcriere lipsește. Reinstalarea aplicației Myne îl restaurează.",
+            "vaultLocked": "Deblochează-ți seiful pentru a transcrie."
+          },
           "disabledReason": "Activează AI din Setări → Developer → AI pentru a transcrie.",
           "failed": "Transcrierea a eșuat. Te rugăm să încerci din nou.",
           "heading": "Transcriere",
@@ -787,6 +832,11 @@
         "linkedFrom_one": "Legat din {{count}}",
         "linkedFrom_few": "Legat din {{count}}",
         "linkedFrom_other": "Legat din {{count}}",
+        "linksTo": "Leagă către {{count}}",
+        "linksTo_one": "Leagă către {{count}}",
+        "linksTo_few": "Leagă către {{count}}",
+        "linksTo_other": "Leagă către {{count}}",
+        "outgoingEmpty": "Această notă nu leagă încă nimic.",
         "untitled": "Fără titlu"
       },
       "barItems": {
@@ -912,6 +962,7 @@
           "aiChat": "Chat AI",
           "backlinks": "Linkuri inverse",
           "outline": "Cuprins",
+          "tasks": "Sarcini",
           "unlinked": "Mențiuni nelegate"
         }
       },
@@ -945,9 +996,38 @@
         "toggleTitle": "Spațiu de lucru: {{name}}"
       }
     },
+    "noteActions": {
+      "buttonLabel": "Acțiuni pentru notă",
+      "rename": "Redenumește",
+      "move": "Mută în dosar…",
+      "duplicate": "Duplică",
+      "convertToTemplate": "Transformă în șablon",
+      "convertToNote": "Convertește în notă",
+      "turnedIntoTemplate": "Transformată în șablon",
+      "convertedToNote": "Convertită în notă",
+      "versionHistory": "Istoricul versiunilor",
+      "exportMarkdown": "Exportă ca Markdown…",
+      "exportPdf": "Exportă ca PDF…",
+      "exportHtml": "Exportă ca HTML…",
+      "exportTxt": "Exportă ca text simplu…",
+      "trash": "Mută în Coș"
+    },
     "codeBlock": {
       "copyCode": "Copiază codul",
       "defaultBadge": "cod"
+    },
+    "drawingEmbed": {
+      "done": "Gata",
+      "edit": "Editează desenul {{name}}",
+      "editAction": "Editează",
+      "empty": "Desen gol — apasă pentru a desena",
+      "open": "Deschide",
+      "rename": "Redenumește desenul"
+    },
+    "drawingMenu": {
+      "background": "Fundalul planșei",
+      "reset": "Resetează planșa",
+      "toggleTheme": "Comută tema desenului"
     },
     "find": {
       "close": "Închide căutarea",
@@ -972,8 +1052,11 @@
       "unreferenced": "nereferențiat"
     },
     "frontmatter": {
+      "addListItem": "Adaugă element…",
+      "addListItemAriaLabel": "Adaugă element la {{key}}",
       "addProperty": "+ Adaugă proprietate",
       "propertiesLabel": "Proprietăți",
+      "removeListItemAriaLabel": "Elimină {{item}}",
       "titleAriaLabel": "Titlul notei",
       "titlePlaceholder": "Fără titlu"
     },
@@ -989,6 +1072,8 @@
       "date": "Dată",
       "day": "Zi",
       "divider": "Separator",
+      "drawing": "Desen",
+      "due": "Dată limită",
       "heading1": "Titlu 1",
       "heading2": "Titlu 2",
       "heading3": "Titlu 3",
@@ -998,8 +1083,11 @@
       "link": "Legătură",
       "now": "Acum",
       "numberedList": "Listă numerotată",
+      "priority": "Prioritate",
       "quote": "Citat",
+      "repeat": "Repetare",
       "table": "Tabel",
+      "taskQuery": "Interogare de sarcini",
       "time": "Oră",
       "todoList": "Listă de sarcini",
       "voiceNote": "Notă vocală",
@@ -1021,6 +1109,27 @@
       "deleteRow": "Șterge rândul",
       "reorderColumn": "Reordonează coloana",
       "reorderRow": "Reordonează rândul"
+    },
+    "tagSuggestion": {
+      "label": "Etichete sugerate",
+      "accept": "Adaugă eticheta {{tag}} la această notă",
+      "dismiss": "Respinge eticheta sugerată {{tag}}"
+    },
+    "taskField": {
+      "addAffordance": "Adaugă un câmp de sarcină",
+      "invalidDue": "Myne nu poate citi această dată, așa că nu este afișată ca dată limită.",
+      "invalidPriority": "Myne nu poate citi această prioritate. Folosește highest, high, medium, low sau lowest.",
+      "invalidRepeat": "Myne nu recunoaște această regulă de repetare, așa că sarcina nu se va repeta.",
+      "menuEdit": "Editează {{field}}",
+      "menuTitle": "Adaugă câmp",
+      "repeatNoAnchor": "Această sarcină nu are o dată de la care să se repete, așa că nu se va repeta. Adaugă o dată limită pentru a o porni.",
+      "save": "Salvează",
+      "skipOccurrence": "Omite această apariție",
+      "title": {
+        "due": "Dată limită",
+        "repeat": "Repetare",
+        "priority": "Prioritate"
+      }
     },
     "toolbar": {
       "apply": "Aplică",
@@ -1053,7 +1162,16 @@
         "green": "Verde",
         "pink": "Roz",
         "purple": "Mov",
-        "yellow": "Galben"
+        "yellow": "Galben",
+        "orange": "Portocaliu",
+        "red": "Roșu",
+        "teal": "Turcoaz",
+        "cyan": "Cyan",
+        "lime": "Lime",
+        "brown": "Maro",
+        "grey": "Gri",
+        "indigo": "Indigo",
+        "remove": "Elimină evidențierea"
       },
       "urlPlaceholder": "Lipește adresa URL"
     },
@@ -1416,12 +1534,19 @@
       "countEmpty": "Gol",
       "delete": "Șterge",
       "deleteError": "Acea notă nu a putut fi ștearsă. Încearcă din nou.",
+      "emptyBody": "Notele și folderele arhivate sunt ascunse din bara laterală, dar păstrate în siguranță. Restaurează-le de aici oricând ai nevoie de ele.",
+      "emptyTitle": "Nimic arhivat",
+      "folderDeleteBody_one": "„{{name}}” și {{count}} notă a sa",
+      "folderDeleteBody_few": "„{{name}}” și cele {{count}} note ale sale",
+      "folderDeleteBody_other": "„{{name}}” și cele {{count}} de note ale sale",
       "emptyState": "Arhiva este goală.",
       "folderDeleteConfirm_one": "Muți {{count}} notă în Coș?",
       "folderDeleteConfirm_few": "Muți {{count}} note în Coș?",
       "folderDeleteConfirm_other": "Muți {{count}} note în Coș?",
       "folderDeleteConfirmCta": "Mută în Coș",
       "folderDeleteError": "Notele din acel dosar nu au putut fi mutate în Coș. Încearcă din nou.",
+      "folderDeleteTitle": "Muți acest folder în Coș?",
+      "folderDeleteWarning": "Se mută în Coș — le poți restaura oricând. Ștergerea definitivă este un pas separat.",
       "restore": "Restaurează",
       "restoreError": "Acea notă nu a putut fi restaurată. Încearcă din nou.",
       "title": "Arhivă",
@@ -1512,6 +1637,25 @@
     "graph": {
       "allConnected": "Totul este conectat — nicio notă izolată.",
       "building": "Se construiește graficul…",
+      "colorGroups": {
+        "addRule": "Adaugă regulă",
+        "colorSwatchTitle": "Alege culoarea",
+        "deleteRuleTitle": "Șterge regula",
+        "dragHandleTitle": "Trage pentru a reordona",
+        "editFilterButton": "Editează filtrul…",
+        "editFilterTitle": "Editează filtrul grupului de culori",
+        "emptyBody": "Grupurile de culori îți permit să colorezi nodurile graficului după etichetă sau folder — notele de lucru într-o culoare, cele personale în alta. Adaugă prima ta regulă.",
+        "emptyTitle": "Niciun grup de culori încă",
+        "enableToggleAriaLabel": "Activează regula",
+        "filterAllNotes": "Corespunde tuturor notelor",
+        "filterConditions_one": "{{count}} condiție",
+        "filterConditions_few": "{{count}} condiții",
+        "filterConditions_other": "{{count}} de condiții",
+        "heading": "Grupuri de culori",
+        "moveDown": "Mută regula în jos",
+        "moveUp": "Mută regula în sus",
+        "namePlaceholder": "Regulă fără titlu"
+      },
       "depthToggleTitle": "Comută adâncimea vecinătății (1 ↔ 2 salturi)",
       "filterAll": "Toate",
       "filterAroundNote": "În jurul acestei note",
@@ -1523,6 +1667,23 @@
       "overCap": "Acest seif este mare — graficul întregului seif este limitat. Filtrează după o etichetă sau arată notele izolate pentru a explora.",
       "refresh": "Reîmprospătează",
       "refreshTitle": "Seiful s-a schimbat — reconstruiește graficul",
+      "settings": {
+        "appearanceHeading": "Aspect",
+        "closeTitle": "Închide",
+        "forceCenter": "Atracție spre centru",
+        "forceLinkDistance": "Lungimea legăturilor",
+        "forceLinkStrength": "Forța legăturilor",
+        "forceRepel": "Respingere",
+        "forcesHeading": "Forțe",
+        "labelFadeZoom": "Estomparea etichetelor",
+        "lineThickness": "Grosimea liniilor",
+        "nodeSize": "Dimensiunea nodurilor",
+        "nodeSizeStrength": "Dimensiune după conexiuni",
+        "openTitle": "Setări grafic",
+        "reset": "Revino la valorile implicite",
+        "showArrows": "Arată săgețile de direcție",
+        "title": "Setări grafic"
+      },
       "tagPlaceholder": "Etichetă…"
     },
     "import": {
@@ -1586,6 +1747,7 @@
         "setupIntro": "Indică-i lui Myne folderul seifului tău Obsidian existent. Fiecare notă Markdown este importată și criptată pe loc — nimic nu părăsește acest dispozitiv, iar fișierele tale originale rămân neatinse.",
         "statCancelled": "Anulat",
         "statCanvasSkipped": "fișiere .canvas omise",
+        "statCompressed": "Imagini comprimate",
         "statEmptyFoldersKept": "Foldere goale păstrate",
         "statMedia": "Media",
         "statOtherSkipped": "Alte fișiere omise",
@@ -1599,7 +1761,19 @@
         "titlePick": "Importă note",
         "keepsLabel": "Ce se păstrează",
         "losesLabel": "Ce nu se păstrează",
-        "changeSource": "Schimbă sursa"
+        "changeSource": "Schimbă sursa",
+        "statExcalidrawSkipped": "Desene Excalidraw omise",
+        "unfollowedLinkOutside": "Aceasta este o scurtătură către un folder din afara celui pe care l-ai ales, așa că Myne nu a urmat-o. Mută sau copiază acel folder în interiorul seifului tău și importă din nou.",
+        "unfollowedLinkLoop": "Această scurtătură trimite înapoi într-un folder în care Myne se afla deja, așa că urmarea ei ar merge la nesfârșit. Nimic din ce se afla sub ea nu a fost omis.",
+        "unfollowedLinkBroken": "Această scurtătură nu duce nicăieri — ținta ei a fost mutată sau ștearsă.",
+        "unreadableDetail": "Omis — {{reason}} Restul importului a continuat.",
+        "stoppedAt": "{{imported}} din {{total}} note au fost importate înainte ca importul să se oprească. Sunt în seiful tău și pot fi păstrate în siguranță.",
+        "reasonNotUtf8": "Myne nu a putut citi acest fișier ca text. Probabil este salvat într-o codificare mai veche sau nu este deloc un fișier text.",
+        "reasonPathRejected": "Myne nu a putut ajunge la acest fișier în folderul pe care l-ai ales.",
+        "reasonPermissionDenied": "Myne nu a avut permisiunea de a citi acest fișier.",
+        "reasonNotFound": "Acest fișier dispăruse până să ajungă Myne la el.",
+        "reasonNoSpace": "Acest dispozitiv a rămas fără spațiu.",
+        "reasonUnknown": "Myne nu a putut spune de ce."
       },
       "offer": {
         "body": "Adu-ți notele existente în Myne. Fiecare este criptată pe măsură ce este importată — nimic nu părăsește acest dispozitiv, iar fișierele tale originale rămân exact unde sunt.",
@@ -1665,6 +1839,7 @@
       "bulkDelete_one": "Șterge {{count}} notă",
       "bulkDelete_few": "Șterge {{count}} note",
       "bulkDelete_other": "Șterge {{count}} de note",
+      "moveTo": "Mută în…",
       "bulkMove": "Mută {{count}} note în…",
       "bulkMove_one": "Mută {{count}} notă în…",
       "bulkMove_few": "Mută {{count}} note în…",
@@ -1696,6 +1871,7 @@
       "newFolder": "Folder nou",
       "newFolderInPlaceholder": "Folder nou în {{path}}",
       "newFolderPlaceholder": "Folder nou",
+      "newItem": "Nou…",
       "newNote": "Notă nouă",
       "newNoteFromTemplate": "Notă nouă din șablon…",
       "newNoteHere": "Notă nouă aici",
@@ -1730,12 +1906,19 @@
       "trashSingleError": "Nota nu a putut fi mutată în Coșul de gunoi.",
       "undo": "Anulează",
       "vaultRoot": "Rădăcina seifului",
-      "viewSettingsTitle": "Setări de vizualizare"
+      "viewSettingsTitle": "Setări de vizualizare",
+      "imported_one": "1 notă importată în acest folder",
+      "imported_few": "{{count}} note importate în acest folder",
+      "imported_other": "{{count}} de note importate în acest folder",
+      "importedWithSkips": "{{count}} importate — {{skipped}} omise",
+      "importNoMarkdown": "Niciun fișier markdown în ce ai tras aici"
     },
     "newFromTemplate": {
       "back": "Înapoi",
       "blankNote": "Notă goală",
       "createNote": "Creează nota",
+      "createFirstTemplate": "Creează un șablon",
+      "manageTemplates": "Gestionează șabloanele",
       "emptyState": "Nu ai creat încă niciun șablon.",
       "listLabel": "Șabloane",
       "loading": "Se încarcă…",
@@ -1750,12 +1933,14 @@
       "createDrawing": "Desen nou",
       "noNotesMatch": "Nicio notă nu corespunde.",
       "noNotesYet": "Nicio notă încă.",
+      "recent": "Recente",
       "searchAriaLabel": "Caută note de deschis",
       "searchPlaceholder": "Caută note…",
       "untitled": "Fără titlu"
     },
     "pane": {
       "graphTab": "Grafic",
+      "tasksTab": "Sarcini",
       "loading": "Se încarcă…",
       "untitledView": "Vizualizare fără titlu"
     },
@@ -1777,6 +1962,8 @@
       "loadError": "Această notă nu a putut fi încărcată",
       "removeFromFavorites": "Elimină din favorite",
       "renameAriaLabel": "Redenumește nota",
+      "taskBadgeLabel": "Această notă este o sarcină",
+      "taskBadgeTitle": "Notă de sarcină",
       "unsyncedLabel": "Încă nu este pe server",
       "unsyncedTitle": "Ultimele modificări ale acestei note sunt doar pe acest dispozitiv",
       "untitled": "Fără titlu"
@@ -1810,7 +1997,13 @@
       "changeCount_one": "{{count}} modificare de la acest instantaneu",
       "changeCount_few": "{{count}} modificări de la acest instantaneu",
       "changeCount_other": "{{count}} de modificări de la acest instantaneu",
+      "changeCountPrev_one": "{{count}} modificare față de instantaneul anterior",
+      "changeCountPrev_few": "{{count}} modificări față de instantaneul anterior",
+      "changeCountPrev_other": "{{count}} de modificări față de instantaneul anterior",
       "close": "Închide",
+      "compareAgainstLabel": "Compară cu",
+      "compareCurrent": "Nota curentă",
+      "comparePrevious": "Instantaneul anterior",
       "confirmBody": "Nota ta curentă va fi salvată mai întâi ca instantaneu, ca să poți anula această acțiune.",
       "confirmTitle": "Restaurezi acest instantaneu?",
       "decrypting": "Se decriptează…",
@@ -1825,6 +2018,7 @@
       "justNow": "chiar acum",
       "listLabel": "Lista de instantanee",
       "loading": "Se încarcă…",
+      "noPrevious": "Acesta este cel mai vechi instantaneu — nu există nimic înaintea lui cu care să fie comparat.",
       "restore": "Restaurează",
       "restoreCta": "Restaurează acest instantaneu",
       "restoredStatus": "Restaurat. Versiunea pe care o aveai este salvată ca instantaneu.",
@@ -1882,6 +2076,8 @@
       "emptyPartialFailure_one": "{{count}} notă nu a putut fi ștearsă și rămâne în coșul de gunoi.",
       "emptyPartialFailure_few": "{{count}} note nu au putut fi șterse și rămân în coșul de gunoi.",
       "emptyPartialFailure_other": "{{count}} de note nu au putut fi șterse și rămân în coșul de gunoi.",
+      "emptyBody": "Notele pe care le ștergi ajung aici. Rămân până când golești coșul — poți restaura oricare dintre ele oricând.",
+      "emptyTitle": "Coșul este gol",
       "emptyState": "Coșul de gunoi este gol.",
       "purgeConfirmCta": "Șterge definitiv",
       "purgeConfirmTitle": "Ștergi definitiv?",
@@ -1930,6 +2126,8 @@
         "viewSettings": "Setări de vizualizare…"
       },
       "newView": "Vizualizare nouă",
+      "noMatch": "Nicio vizualizare nu corespunde căutării tale.",
+      "searchPlaceholder": "Caută vizualizări…",
       "table": {
         "empty": "Nicio notă nu corespunde acestei vizualizări",
         "name": "Nume",
@@ -2026,6 +2224,71 @@
     "passwordHelper": "Niciodată stocată, niciodată transmisă. Îți criptează cheile pe acest dispozitiv.",
     "encryptingSubtitle": "Se împachetează cheile seifului tău cu noua parolă."
   },
+  "recurrence": {
+    "every": {
+      "day": "în fiecare zi",
+      "week": "în fiecare săptămână",
+      "month": "în fiecare lună",
+      "year": "în fiecare an"
+    },
+    "everyN": {
+      "day": "la fiecare {{count}} zile",
+      "week": "la fiecare {{count}} săptămâni",
+      "month": "la fiecare {{count}} luni",
+      "year": "la fiecare {{count}} ani"
+    },
+    "everyWeekday": "în fiecare {{days}}",
+    "everyWeekdays": "în fiecare {{days}}",
+    "ordinal": {
+      "first": "prima",
+      "second": "a doua",
+      "third": "a treia",
+      "fourth": "a patra",
+      "last": "ultima"
+    },
+    "ordinalOfMonth": "{{ordinal}} {{weekday}} din fiecare lună",
+    "dayOfMonth": "ziua {{day}} din fiecare lună",
+    "lastDayOfMonth": "ultima zi din fiecare lună",
+    "weekday": {
+      "monday": "luni",
+      "tuesday": "marți",
+      "wednesday": "miercuri",
+      "thursday": "joi",
+      "friday": "vineri",
+      "saturday": "sâmbătă",
+      "sunday": "duminică"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, după finalizare",
+    "builder": {
+      "family": "Repetare",
+      "familyInterval": "La fiecare…",
+      "familyWeekdays": "Săptămânal în…",
+      "familyDayOfMonth": "Lunar, într-o zi…",
+      "familyOrdinal": "Lunar, într-o zi a săptămânii…",
+      "count": "Interval",
+      "unitLabel": "Unitate",
+      "units": {
+        "day": "zile",
+        "week": "săptămâni",
+        "month": "luni",
+        "year": "ani"
+      },
+      "ordinal": "Poziție",
+      "weekday": "Zi a săptămânii",
+      "lastDay": "Ultima zi",
+      "whenDone": "Repetă de la data finalizării",
+      "weekdayShort": {
+        "monday": "Lun",
+        "tuesday": "Mar",
+        "wednesday": "Mie",
+        "thursday": "Joi",
+        "friday": "Vin",
+        "saturday": "Sâm",
+        "sunday": "Dum"
+      }
+    }
+  },
   "restore": {
     "backLabel": "Înapoi",
     "cancelLabel": "Anulează",
@@ -2075,8 +2338,8 @@
       "changelogButton": "Vezi jurnalul de modificări…",
       "changelogHelper": "Note pentru fiecare versiune. Vor apărea când va fi disponibil MYND-119.",
       "changelogLabel": "Jurnal de modificări",
-      "developerModeHelper": "",
-      "developerModeLabel": "",
+      "developerModeHelper": "Arată setările avansate pe care Myne le ține deoparte în mod implicit: cele prin care ieși de pe drumul garantat de Myne și uneltele pentru utilizatori avansați de care majoritatea oamenilor nu au niciodată nevoie. Dezactivarea lor doar le ascunde la loc — ce ai pornit rămâne pornit, iar propriul lui comutator este locul de unde îl oprești.",
+      "developerModeLabel": "Mod dezvoltator",
       "licenseBody": "Pre-alfa · documentație CC-BY-4.0 · cod de aplicație AGPL-3.0 la lansarea Fazei 1.",
       "licenseLabel": "Licență",
       "tagline": "Pre-alfa · Client desktop Faza 1",
@@ -2127,10 +2390,18 @@
       "changing": "Se schimbă…"
     },
     "appearance": {
+      "accentHelper": "Alege culoarea de accent folosită în toată aplicația. Doar pe acest dispozitiv.",
+      "accentHexAria": "Valoarea hex a culorii de accent",
+      "accentLabel": "Culoare de accent",
+      "accentReset": "Revino la valoarea implicită a temei",
       "homeQuickActions": "Acțiuni rapide pe ecranul principal",
       "showEditTimesAria": "Arată orele de editare în bara laterală",
       "showEditTimesHelper": "Afișează ora ultimei editări a fiecărei note sub titlul ei în bara laterală.",
       "showEditTimesLabel": "Arată orele de editare",
+      "taskMarkerAria": "Arată marcajul de sarcină pe notele de sarcină",
+      "taskMarkerHelper": "Marchează în bara laterală și pe fila lor notele pe care le-ai declarat ca sarcini.",
+      "taskMarkerLabel": "Arată marcajul de sarcină",
+      "taskMarkerSaveError": "Acea setare nu a putut fi salvată. Încearcă din nou.",
       "theme": {
         "amoled": "AMOLED",
         "dark": "Întunecat",
@@ -2147,7 +2418,10 @@
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "Fontul editorului",
-      "showEditTimesSubtitle": "Marcaje de timp sub fiecare notă"
+      "showEditTimesSubtitle": "Marcaje de timp sub fiecare notă",
+      "graphSettingsLabel": "Aspectul graficului",
+      "graphSettingsHelper": "Culorile nodurilor, etichetele, dimensionarea și forțele de aranjare se setează chiar în interiorul graficului — deschide-l și folosește rotița din colțul lui. Sunt păstrate per dispozitiv, așa că o schimbare făcută aici nu te urmează pe telefon.",
+      "openGraph": "Deschide graficul"
     },
     "archive": {
       "helper": "Permite mutarea notelor într-o Arhivă, ținută în afara listei principale. Dezactivarea acestei opțiuni readuce fiecare notă arhivată în folderul ei și ascunde controalele arhivei.",
@@ -2155,6 +2429,18 @@
       "off": "Dezactivat",
       "on": "Activat",
       "saveError": "Setarea de arhivare nu a putut fi actualizată."
+    },
+    "attachmentCompression": {
+      "label": "Comprimă imaginile la import",
+      "helper": "Micșorează imaginile lipite sau plasate înainte ca ele să fie criptate și stocate, astfel încât seiful, copiile de rezervă și sincronizarea să rămână mai mici. Este ireversibil — fișierul original nu este păstrat.",
+      "helperScopeEveryDevice": "Se aplică întregului seif, pe fiecare dispozitiv.",
+      "helperScopeNotHere": "Se aplică întregului seif, dar nu în acest browser — imaginile adăugate aici sunt stocate exact așa cum sunt date.",
+      "errorSaveSetting": "Această setare nu a putut fi salvată."
+    },
+    "transcription": {
+      "label": "Vorbire în text",
+      "helper": "Transformă un atașament audio în text, pe acest dispozitiv. Modelul vine odată cu Myne și nimic nu este trimis nicăieri. Dezactivarea ascunde acțiunea Transcrie peste tot și oprește complet transcrierea în aplicație.",
+      "errorSaveSetting": "Acea setare nu a putut fi salvată."
     },
     "attachmentOcr": {
       "label": "Caută în imagini și în documente scanate",
@@ -2219,6 +2505,32 @@
         "onDate": "Conectat la {{date}}"
       }
     },
+    "cliAccess": {
+      "label": "Acces din terminal",
+      "helperOff": "Dezactivat. Comanda `myne` nu poate citi și nu poate schimba nimic din acest seif.",
+      "helperOn": "Activ cât timp acest seif este deblocat. Orice program care rulează sub contul tău poate citi, căuta și crea note prin el — Myne nu poate deosebi terminalul tău de un script și nu verifică nimic dincolo de faptul că ușa este deschisă. Nu cere niciodată parola, se închide în momentul în care seiful se blochează și nu poate șterge note.",
+      "lastUsedNever": "Nefolosit de când acest seif a fost deblocat.",
+      "lastUsedJustNow": "Folosit ultima dată chiar acum.",
+      "lastUsedMinutesAgo": "Folosit ultima dată acum {{count}} min.",
+      "lastUsedMinutesAgo_one": "Folosit ultima dată acum {{count}} min.",
+      "lastUsedMinutesAgo_few": "Folosit ultima dată acum {{count}} min.",
+      "lastUsedMinutesAgo_other": "Folosit ultima dată acum {{count}} min.",
+      "lastUsedHoursAgo": "Folosit ultima dată acum {{count}} h.",
+      "lastUsedHoursAgo_one": "Folosit ultima dată acum {{count}} h.",
+      "lastUsedHoursAgo_few": "Folosit ultima dată acum {{count}} h.",
+      "lastUsedHoursAgo_other": "Folosit ultima dată acum {{count}} h.",
+      "lastUsedDaysAgo": "Folosit ultima dată acum {{count}} zile.",
+      "lastUsedDaysAgo_one": "Folosit ultima dată acum {{count}} zi.",
+      "lastUsedDaysAgo_few": "Folosit ultima dată acum {{count}} zile.",
+      "lastUsedDaysAgo_other": "Folosit ultima dată acum {{count}} de zile.",
+      "notOnPathHint": "Shell-ul tău nu găsește încă `myne`. Adaugă această linie în profilul shell-ului tău, apoi deschide un terminal nou:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "Foldere pe care terminalul nu le vede niciodată",
+      "excludedHelper": "O cale de folder pe linie. Notele din aceste foldere sunt lăsate în afara oricărui rezultat din terminal și nu pot fi scrise acolo din terminal — rămân pe deplin disponibile în aplicație. Poți seta asta înainte de a activa accesul din terminal.",
+      "excludedPlaceholder": "Privat/\nJurnal/",
+      "rateLimitLabel": "Lasă terminalul să meargă la viteză maximă",
+      "rateLimitHelper": "În mod implicit, Myne răspunde la cel mult 120 de comenzi de terminal pe minut. Este o limită de ritm pentru un script scăpat de sub control, nu o verificare de permisiuni — nimic nu decide ce program are voie să întrebe. Activează asta pentru lucrul în masă, de exemplu pentru a trece fiecare notă printr-o altă unealtă."
+    },
     "clipperInstall": {
       "error": "Setarea clipperului de browser nu a putut fi actualizată.",
       "helper": "Înregistrează gazda de mesagerie nativă pentru ca extensia de browser Myne să poată trimite fragmente către această aplicație. Activat implicit; dezactivează pentru a-l elimina.",
@@ -2228,6 +2540,7 @@
       "appliedBadge": "Aplicată",
       "apply": "Aplică",
       "applyError": "Acea temă nu a putut fi aplicată. Te rugăm să încerci din nou.",
+      "browseButton": "Răsfoiește teme",
       "cancel": "Anulează",
       "confirm": "Confirmă",
       "delete": "Șterge",
@@ -2252,7 +2565,8 @@
       "label": "Teme personalizate",
       "openFolderButton": "Deschide folderul de teme",
       "openFolderError": "Folderul de teme nu a putut fi deschis.",
-      "readError": "Folderul tău de teme nu a putut fi citit."
+      "readError": "Folderul tău de teme nu a putut fi citit.",
+      "readOnlyHelper": "Temele personalizate se instalează pe computerul tău. Ale tale ajung aici singure după o sincronizare."
     },
     "dailyNotes": {
       "blankTemplate": "Gol (fără șablon)",
@@ -2262,6 +2576,8 @@
       "folderHelper": "Unde sunt salvate notele zilnice noi. Implicit este {{default}} — folderul este păstrat chiar și când e gol.",
       "folderLabel": "Folderul notelor zilnice",
       "folderSaveError": "Folderul zilnic nu a putut fi salvat. Te rugăm să încerci din nou.",
+      "folderSearchEmpty": "Niciun folder nu corespunde.",
+      "folderSearchPlaceholder": "Caută foldere…",
       "searchEmpty": "Niciun șablon nu corespunde.",
       "searchPlaceholder": "Caută șabloane…",
       "templateHelper": "Alege un șablon de la care să pornească fiecare notă zilnică sau lasă gol pentru o notă goală cu titlul format din dată.",
@@ -2299,6 +2615,8 @@
       "newNote": {
         "folderLabel": "Dosar pentru notele noi",
         "folderPlaceholder": "de ex. Inbox/",
+        "folderSearchEmpty": "Niciun folder nu corespunde.",
+        "folderSearchPlaceholder": "Caută foldere…",
         "helper": "Unde sunt plasate notele nou create.",
         "label": "Locație implicită pentru notele noi",
         "optionCurrent": "Același dosar ca nota curentă",
@@ -2394,6 +2712,10 @@
       "off": "Dezactivat",
       "on": "Activat"
     },
+    "views": {
+      "helper": "Arată intrarea Vizualizări în bara laterală, pentru a salva liste filtrate de note. Dezactivat implicit; activat dacă ai deja vizualizări.",
+      "label": "Vizualizări"
+    },
     "vimMode": {
       "chordCaveat": "Pe Windows și Linux, scurtăturile proprii ale Myne au prioritate, așa că acele combinații de taste vim care intră în conflict cu ele (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) nu sunt disponibile în editor. Ctrl-[ funcționează în continuare ca Escape, iar visual-block trece pe Alt-v.",
       "errorSaveSetting": "Setarea modului vim nu a putut fi salvată.",
@@ -2411,6 +2733,9 @@
       "pendingHint": "În curând"
     },
     "ai": {
+      "autoTagHelper": "Când te oprești din scris, un model mic de pe dispozitivul tău citește nota și sugerează etichete în partea de sus a ei. Nimic nu este adăugat până când nu accepți o sugestie.",
+      "autoTagLabel": "Sugerează etichete automat",
+      "autoTagUnavailable": "Această versiune nu include modelul de etichetare, așa că nu pot fi sugerate etichete. Myne nu descarcă niciodată unul — comutatorul se activează singur într-o versiune care îl include.",
       "disclosureToggle": "Cum funcționează?",
       "enableHelper": "Rulează un model furnizat de tine în întregime pe dispozitivul tău. Experimental, dezactivat implicit.",
       "enableLabel": "Activează AI local",
@@ -2434,8 +2759,41 @@
       "recommendedFilesTranscription": "Necesită fișierul Whisper .gguf + config.json + tokenizer.json în același dosar.",
       "title": "AI"
     },
+    "network": {
+      "disabledCue": "Sincronizarea nu mai este rutată prin Tor. Conexiunile noi merg direct la serverul de sincronizare.",
+      "errorRead": "Setarea curentă nu a putut fi citită. Comută butonul pentru a o seta din nou.",
+      "errorSave": "Setarea nu a putut fi salvată. Nimic nu s-a schimbat.",
+      "errorSidecar": "Rutarea prin Tor este activă, dar clientul Tor nu a putut porni. Sincronizarea este în pauză până când poate — nimic nu este trimis direct.",
+      "postureActive": "Sincronizarea trece prin Tor",
+      "postureConnecting": "Se conectează la Tor — sincronizarea este în pauză",
+      "postureConnectingDetail": "De obicei durează câteva secunde. Între timp, nimic nu este trimis direct.",
+      "postureExempt": "Sincronizarea nu folosește Tor — această adresă indică spre acest dispozitiv",
+      "postureExemptDetail": "Adresa serverului de sincronizare pe care ai configurat-o numește acest computer, așa că legătura lui Myne cu ea nu trece printr-un circuit Tor. Dacă acea adresă redirecționează mai departe către un server din altă parte, Myne nu poate vedea asta și nu o poate ruta. Sincronizarea nu este în pauză.",
+      "postureHeading": "Chiar acum",
+      "postureInactive": "Sincronizarea merge direct la serverul de sincronizare",
+      "postureUnavailable": "Tor nu este disponibil — sincronizarea este în pauză",
+      "postureUnavailableDetail": "Nimic nu este trimis direct. Dezactivează și reactivează această setare pentru a încerca pornirea clientului Tor sau dezactiveaz-o pentru a sincroniza fără Tor.",
+      "residualExit": "Ultimul releu dintr-un circuit Tor — nodul de ieșire — vede cu ce server de sincronizare te conectezi. Nu poate citi ce sincronizezi; asta rămâne criptat cap la cap.",
+      "residualMetadata": "Serverul de sincronizare vede în continuare când sincronizezi, câte blocuri criptate trimiți și cât de mari sunt și câte dispozitive ai. Tor nu schimbă asta.",
+      "residualPayment": "Dacă plătești pentru sincronizarea găzduită, plata și contul tău pot fi în continuare legate de tine. Tor schimbă de unde vine conexiunea, nu urma lăsată de facturare.",
+      "residualScope": "Doar traficul de sincronizare al lui Myne trece prin Tor. Nimic altceva de pe acest dispozitiv nu o face.",
+      "residualsToggle": "Ce nu ascunde asta",
+      "torHelper": "Îți ascunde adresa IP și locația față de serverul de sincronizare și ascunde cu ce server sincronizezi față de rețeaua ta și de furnizorul tău de internet — ei pot vedea în continuare acest dispozitiv conectându-se la Tor. Nu te face anonim față de Myne și nu ascunde față de server ce sincronizezi sau când.",
+      "torLabel": "Rutează sincronizarea prin Tor"
+    },
     "prefs": {
       "saveError": "Preferința nu a putut fi salvată — încearcă din nou"
+    },
+    "reminders": {
+      "aria": "Arată mementourile pentru sarcini pe acest dispozitiv",
+      "exactAllow": "Permite",
+      "exactLabel": "Moment exact",
+      "exactOn": "Activat",
+      "horizon": "Mementourile sunt înregistrate până la {{date}}. Deschide Myne înainte de acea dată pentru ca ele să continue.",
+      "label": "Mementouri pentru sarcini",
+      "saveError": "Acea setare nu a putut fi salvată. Încearcă din nou.",
+      "showTextAria": "Arată textul sarcinii în notificare",
+      "showTextLabel": "Arată textul sarcinii"
     },
     "privacy": {
       "autoLockHelper": "Blochează seiful după atâta inactivitate.",
@@ -2505,7 +2863,7 @@
     "shell": {
       "closeLabel": "Închide setările",
       "groups": {
-        "developer": ""
+        "developer": "Developer"
       },
       "navLabel": "Panouri de setări",
       "panels": {
@@ -2515,7 +2873,9 @@
         "appearance": "Aspect",
         "editor": "Editor",
         "files": "Fișiere",
+        "transcription": "Transcriere",
         "hotkeys": "Scurtături",
+        "network": "Rețea",
         "privacy": "Confidențialitate",
         "storage": "Stocare",
         "sync": "Sincronizare"
@@ -2565,6 +2925,8 @@
       "lineSpacingHelper": "Spațiul vertical dintre linii.",
       "lineSpacingLabel": "Spațiere între linii",
       "textSizeHelper": "Dimensiunea de bază a textului din editor. Titlurile se scalează odată cu ea.",
+      "previewLabel": "Previzualizare",
+      "previewBody": "Vulpea maro și iute sare peste câinele leneș. Setările de tipografie schimbă felul în care se citește fiecare notă, așa că acest exemplu se actualizează pe măsură ce alegi.",
       "textSizeLabel": "Dimensiunea textului"
     },
     "viewMode": {
@@ -2610,6 +2972,19 @@
     "sectionOptions": "Opțiuni",
     "footerTagline": "myne · criptat pe acest dispozitiv · sursă deschisă",
     "editor": {
+      "sections": {
+        "text": "Text și afișare",
+        "editing": "Editare",
+        "writing": "Scriere",
+        "features": "Funcții"
+      },
+      "preview": {
+        "heading": "Vulpea maro și iute",
+        "bullet1": "Îmi împachetez cutia cu cinci duzini de sticle",
+        "bullet2": "Ce iute și năucitor sar zebrele zănatice",
+        "spellCaption": "Verificare ortografică",
+        "spellSample": "greșală"
+      },
       "defaultView": "Vizualizare implicită",
       "typewriter": "Derulare tip mașină de scris",
       "typewriterSubtitle": "Menține cursorul centrat vertical",
@@ -2625,6 +3000,7 @@
         "lastActiveNoteDesc": "Sincronizează ce notă aveai deschisă, ca să o poți relua pe alt dispozitiv."
       },
       "keywords": {
+        "aiAutoTag": "etichete automate etichetare sugestii sugerează etichetă ai auto tag",
         "aiEnable": "ai local activează dezactivează pornit oprit inteligență artificială învățare automată on off",
         "aiExcluded": "dosare excluse foldere excludere exclude ignoră ai confidențialitate",
         "aiModels": "modele model gguf descărcare text încorporare embedding llm",
@@ -2635,6 +3011,9 @@
         "buildChannel": "canal de versiuni compilare versiune lansare stabil beta nightly build",
         "changePassword": "schimbă parola parolă frază credențiale actualizare resetare change password",
         "changelog": "jurnal de modificări noutăți versiuni istoric changelog",
+        "cliAccess": "cli terminal acces linie de comandă shell comanda myne consolă command line",
+        "cliExcludedFolders": "cli foldere excluse terminal exclude ascunde linie de comandă privat excluded folders",
+        "cliRateLimit": "cli limită de rată terminal viteză limitare în masă ritm comenzi pe minut rate limit",
         "clipper": "clipper de browser extensie web captură chrome firefox",
         "contentWidth": "lățimea conținutului coloană citire lungimea rândului măsură width",
         "customThemes": "teme personalizate paletă culori aspect import temă theme",
@@ -2643,6 +3022,7 @@
         "export": "export exportă markdown decriptare fișiere simple documente",
         "focusMode": "mod de concentrare mașină de scris estompare rânduri inactive fără distrageri focus",
         "font": "font familie de litere sans serif mono tipografie caractere",
+        "graphSettings": "grafic aspect fizică forțe noduri legături aranjare grupuri de culori etichete planșă graph",
         "hotkeys": "scurtături taste tastatură combinații de taste comenzi rapide hotkeys keybindings",
         "import": "import importă note obsidian notion evernote enex html csv migrare importare mutare",
         "language": "limbă limba interfață traducere localizare ui",
@@ -2652,7 +3032,9 @@
         "vimMode": "vim editare modală normal insert visual tastatură taste",
         "lineSpacing": "spațiere între rânduri interlinie înălțime tipografie lizibilitate",
         "newNoteLocation": "locația notelor noi folder implicit unde se creează notele",
+        "torRouting": "tor rutare onion proxy rețea adresă ip locație ascunde sincronizare anonimat",
         "quickUnlock": "deblocare rapidă pin touch id biometric amprentă față unlock",
+        "reminders": "mementouri notificare alertă sarcină termen amintește reminders",
         "realtimeSync": "sincronizare în timp real live conexiune prezență interogare realtime sync",
         "screenCapture": "captură de ecran protecție înregistrare blocare confidențialitate screenshot",
         "showEditTimes": "ore de editare marcaje de timp modificat date note timestamps",
@@ -2660,6 +3042,8 @@
         "spellLanguages": "limbi de verificare ortografică dicționare cuvinte localizare spell",
         "startupOpen": "pornire deschidere fișier implicit lansare care notă startup",
         "attachmentOcr": "ocr imagine scanare scanat pdf fotografie captură de ecran recunoaștere text căutare în atașamente procesor baterie",
+        "attachmentCompression": "comprimă compresie imagine micșorează redimensionare webp jpeg import lipire dimensiunea seifului stocare",
+        "transcription": "transcrie transcriere vorbire voce audio dictare subtitrare whisper înregistrare sunet în text",
         "syncAddDevice": "adaugă dispozitiv asociere conectare telefon laptop sincronizare sync",
         "syncConflicts": "conflicte îmbinare rezolvare versiuni sincronizare sync",
         "syncDevices": "dispozitive conectate asociate sincronizare aparate sync",
@@ -2719,6 +3103,15 @@
       "label": "Se construiește indexul de căutare…"
     },
     "conflicts": {
+      "compare": "Compară",
+      "compareClose": "Înapoi la conflicte",
+      "compareError": "Aceste note nu au putut fi citite pentru a fi comparate. Încearcă din nou.",
+      "compareIdentical": "Aceste două versiuni sunt identice.",
+      "compareLoading": "Se citesc ambele versiuni…",
+      "compareMine": "Pe acest dispozitiv",
+      "compareOrphan": "Nota din care provine această copie nu mai există, așa că nu are cu ce să fie comparată.",
+      "compareTheirs": "Copie aflată în conflict",
+      "compareTitle": "Se compară „{{title}}”",
       "discard": "Renunță",
       "empty": "Niciun conflict — dispozitivele tale sunt sincronizate.",
       "groupTitle_one": "{{count}} copie a {{original}} aflată în conflict",
@@ -2782,11 +3175,15 @@
     },
     "endpoint": {
       "connect": "Conectează",
+      "connected": "Conectat",
       "connectedLocal": "Conectat (local, fără TLS).",
       "connectedTls": "Conectat. Verifică dacă această amprentă corespunde pe celălalt dispozitiv.",
       "connectedPlatformTrust": "Conectat prin TLS. Browserul tău a verificat certificatul acestui server.",
       "connecting": "Se conectează…",
       "fingerprintLabel": "Amprenta certificatului serverului:",
+      "confirmFingerprintRequired": "Rutarea prin Tor este activă, așa că acest dispozitiv nu va avea încredere într-un certificat pe care nu i s-a spus să îl aștepte. Obține amprenta SHA-256 a certificatului serverului tău de la serverul însuși sau de la un dispozitiv deja conectat, apoi lipește-o aici.",
+      "confirmFingerprintMismatch": "Certificatul prezentat de acest server nu este cel pe care l-ai introdus. Nimic nu a fost salvat. Verifică amprenta pe care ai lipit-o — iar dacă este corectă, nu te conecta: ceva se află între acest dispozitiv și serverul tău.",
+      "confirmFingerprintDeclined": "Nimic nu a fost salvat — acest dispozitiv nu este conectat la acel server. Revino după ce ai amprenta certificatului lui.",
       "pinStatic": "Verificat cu certificatul integrat al Myne.",
       "pinTofu": "Fixat la prima conectare. Compară această amprentă pe toate dispozitivele tale.",
       "fixedOrigin": "Acest client se sincronizează cu un singur server, stabilit la implementarea lui. Nu poate fi schimbat de aici — pagina are voie să comunice doar cu această adresă.",
@@ -2817,6 +3214,22 @@
       "submit": "Adaugă acest dispozitiv",
       "wordAria": "Cuvântul {{number}}"
     },
+    "fingerprint": {
+      "title": "Verifică certificatul acestui server înainte de a avea încredere în el",
+      "why": "Rutarea prin Tor este activă, așa că această primă conexiune ajunge la server printr-un releu administrat de un necunoscut. Până când un certificat este fixat, acest dispozitiv ar accepta orice certificat i se dă — inclusiv unul inventat de acel releu. Introdu amprenta pe care o publică serverul tău, iar Myne o compară înainte de a fixa ceva. Dacă nu se potrivește, nimic nu este salvat.",
+      "label": "Amprenta de certificat așteptată",
+      "placeholder": "Amprenta SHA-256 de la serverul tău",
+      "echoLabel": "Ce ai introdus",
+      "echoComplete": "64 din 64 de caractere. Verific-o față de propria ta copie înainte de a continua.",
+      "echoProgress": "{{count}} din {{total}} caractere până acum.",
+      "echoInvalid": "O amprentă SHA-256 are 64 de caractere, fiecare între 0–9 sau a–f. Două puncte, spațiile și un „sha256:” la început sunt în regulă — orice altceva nu face parte din ea.",
+      "helpToggle": "Unde găsesc această amprentă?",
+      "helpNotOverTor": "Nu prin această conexiune. O amprentă pe care o obții prin același circuit nu dovedește nimic — ce ar putea înlocui certificatul ar putea înlocui și acea pagină.",
+      "helpFromServer": "Pe mașina pe care rulează serverul tău: openssl x509 -noout -fingerprint -sha256 -in <fișierul tău de certificat>",
+      "helpFromDevice": "Pe un dispozitiv deja conectat la acest cont: Setări → Sincronizare arată aceeași amprentă.",
+      "helpNoFingerprint": "Dacă nu o poți obține în niciunul dintre aceste feluri, acest server nu poate fi adăugat cât timp rutarea prin Tor este activă. Poți dezactiva rutarea prin Tor din Setări → Rețea și te poți conecta direct — asta arată adresa ta IP serverului și oricui poate urmări rețeaua ta.",
+      "decline": "Nu o am — anulează"
+    },
     "join": {
       "accountLabel": "Număr de cont",
       "cancel": "Anulează",
@@ -2825,6 +3238,8 @@
       "help": "Conectează-te cu numărul de cont și parola ta. Acest dispozitiv îți va sincroniza notele după ce un dispozitiv existent îl aprobă. Nu este nevoie de fraza de recuperare.",
       "passwordLabel": "Parolă",
       "pinnedCompare": "Acest dispozitiv a fixat certificatul serverului tău. Verifică dacă această amprentă se potrivește pe celelalte dispozitive ale tale.",
+      "confirmFingerprintRequired": "Rutarea prin Tor este activă, așa că acest dispozitiv nu va avea încredere într-un certificat pe care nu i s-a spus să îl aștepte. Obține amprenta SHA-256 a certificatului serverului tău de la serverul însuși sau de la un dispozitiv deja conectat, apoi lipește-o aici.",
+      "confirmFingerprintMismatch": "Certificatul prezentat de acest server nu este cel pe care l-ai introdus. Acest dispozitiv nu a fost adăugat și nimic nu a fost salvat. Verifică amprenta pe care ai lipit-o — iar dacă este corectă, nu continua: ceva se află între acest dispozitiv și serverul tău.",
       "pinnedTitle": "Certificatul serverului a fost fixat",
       "serverLabel": "Server de sincronizare",
       "serverPlaceholder": "https://your-server.example",
@@ -2859,6 +3274,7 @@
         "deleteConfirmTitle": "Ștergi această notă recuperată?",
         "deleteConfirmWarning": "Aceasta șterge definitiv singura copie păstrată pe acest dispozitiv. Acțiunea nu poate fi anulată.",
         "deleteCta": "Șterge",
+        "empty": "Nicio notă recuperată.",
         "errorGeneric": "Ceva nu a mers bine. Încearcă din nou.",
         "helper": "Când o notă ștearsă pe alt dispozitiv este eliminată și aici, copia ei criptată este păstrată pe acest dispozitiv. Restaurează una ca notă nouă sau șterge-o definitiv.",
         "label": "Note recuperate",
@@ -2948,7 +3364,68 @@
       "conflictsNeedReview_other": "{{count}} conflicte necesită revizuire",
       "catchingUp": "Se recuperează sincronizarea — notele tale sunt în siguranță.",
       "verifyDevices": "Verifică dispozitivele"
+    },
+    "tor": {
+      "connecting": "Se conectează la Tor. Sincronizarea este în pauză până când conexiunea este gata — nimic nu este trimis direct.",
+      "settingsHint": "Setări → Rețea",
+      "unavailable": "Tor nu este disponibil, așa că sincronizarea este în pauză. Nimic nu este trimis direct. Dezactivează rutarea prin Tor pentru a sincroniza fără el."
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "Oricare",
+      "due": "Termen",
+      "folder": "Folder",
+      "insert": "Inserează",
+      "noDueDate": "Fără dată limită",
+      "priority": "Prioritate",
+      "sort": "Sortează după",
+      "sortDue": "Dată limită",
+      "sortPath": "Notă",
+      "sortPriority": "Prioritate",
+      "status": "Stare",
+      "statusDone": "Finalizate",
+      "statusTodo": "Nefinalizate",
+      "tag": "Etichetă"
+    },
+    "empty": {
+      "filter": "Nimic aici deocamdată. Încearcă alt filtru.",
+      "rebuilding": "Se citesc notele tale…",
+      "scope": "Nicio sarcină în acest folder sau în această etichetă. Încearcă să lărgești domeniul.",
+      "vault": "Nicio sarcină încă. Scrie „- [ ]” pe o linie în orice notă pentru a crea una."
+    },
+    "filter": {
+      "all": "Toate",
+      "overdue": "Întârziate",
+      "today": "Astăzi",
+      "upcoming": "Următoare"
+    },
+    "noteTitle": "Sarcini din această notă",
+    "query": {
+      "dropped_one": "{{count}} clauză pe care Myne nu a putut-o citi",
+      "dropped_few": "{{count}} clauze pe care Myne nu le-a putut citi",
+      "dropped_other": "{{count}} de clauze pe care Myne nu le-a putut citi",
+      "empty": "Nicio sarcină nu corespunde acestei interogări.",
+      "loading": "Se citesc notele tale…",
+      "refused": "Myne nu a putut citi nimic din această interogare, așa că nu afișează nimic în loc să afișeze tot.",
+      "remainder_one": "încă {{count}} sarcină s-a potrivit",
+      "remainder_few": "încă {{count}} sarcini s-au potrivit",
+      "remainder_other": "încă {{count}} de sarcini s-au potrivit"
+    },
+    "reminder": {
+      "due": "A sosit un memento pentru o sarcină."
+    },
+    "row": {
+      "completed": "Sarcină, finalizată",
+      "notCompleted": "Sarcină, nefinalizată",
+      "tooLongToWrite": "Linia acestei sarcini este prea lungă pentru a fi editată de aici. Deschide în schimb nota ei.",
+      "untitled": "Sarcină fără titlu"
+    },
+    "scope": {
+      "allFolders": "Toate folderele",
+      "label": "Restrânge după"
+    },
+    "title": "Sarcini"
   },
   "templates": {
     "manager": {
@@ -3028,6 +3505,8 @@
     "recoveryLink": "Ți-ai uitat parola? Deblochează cu fraza de recuperare",
     "submit": "Deblochează",
     "subtitle": "Introdu parola pentru a continua.",
+    "subtitlePin": "Introdu PIN-ul pentru a continua.",
+    "subtitleBiometric": "Confirmă cu Touch ID pentru a continua.",
     "suspicion": {
       "lockedDuringChange": "Schimbarea parolei anulată: seiful a fost blocat.",
       "metaChangedExternally": "Seiful a fost modificat în altă sesiune — te rugăm să deblochezi din nou."
@@ -3242,6 +3721,7 @@
   "vaultPicker": {
     "createAnother": "Creează un alt seif",
     "heading": "Alege un seif",
+    "joinDevice": "Adaugă acest dispozitiv la un cont",
     "loading": "Se încarcă seifurile tale…",
     "noneLoaded": "Niciun seif nu a putut fi încărcat momentan.",
     "openedRelative": "deschis {{rel}}",
@@ -3298,6 +3778,7 @@
   "vaultSwitcher": {
     "chipFallback": "Seif",
     "createAnother": "Creează un alt seif",
+    "joinDevice": "Adaugă acest dispozitiv la un cont",
     "switching": "se schimbă…",
     "switchVaultLabel": "Schimbă seiful",
     "vaultFallback": "Seif {{n}}"
@@ -3306,6 +3787,7 @@
     "createCta": "Creează un seif nou",
     "headlineLine1": "Note Markdown criptate.",
     "headlineLine2": "Fără e-mail la înscriere.",
+    "joinCta": "Adaugă acest dispozitiv la un cont",
     "repairResidue": {
       "cancel": "Anulează",
       "cleaningUp": "Se curăță…",

@@ -1,1 +1,3888 @@
-{}
+{
+  "accountBootstrap": {
+    "accountMismatch": "เบราว์เซอร์นี้มีห้องนิรภัยของบัญชีอื่นอยู่แล้ว เปิดบัญชีนั้น หรือออกจากระบบแล้วลบสำเนาในเบราว์เซอร์นี้ก่อน",
+    "changeAccount": "ใช้หมายเลขบัญชีอื่น",
+    "continue": "ดำเนินการต่อ",
+    "failed": "เปิดบัญชีนั้นไม่ได้ ตรวจสอบหมายเลขบัญชีและรหัสผ่าน แล้วลองอีกครั้ง",
+    "hint": "ป้อนรหัสผ่านหลักของบัญชีนี้ Myne จะดึงห้องนิรภัยของคุณมาและตั้งค่าเบราว์เซอร์นี้เป็นอุปกรณ์หนึ่งในบัญชี",
+    "noEndpoint": "Myne ชุดนี้ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์ซิงค์ จึงเข้าถึงห้องนิรภัยของคุณไม่ได้ ติดต่อผู้ที่ดูแลระบบนี้",
+    "passwordLabel": "รหัสผ่านหลัก",
+    "approversIntro": "อุปกรณ์เหล่านี้อนุมัติเครื่องนี้ได้:",
+    "noApprovers": "ตอนนี้ไม่มีอุปกรณ์อื่นในบัญชีนี้ที่อนุมัติได้ เปิด Myne บนอุปกรณ์ที่เข้าถึงบัญชีได้อยู่แล้ว แล้วกลับมาที่นี่",
+    "pendingTitle": "กำลังรอการอนุมัติ",
+    "sasMatch": "ตรงกัน — ดำเนินการต่อ",
+    "sasMismatch": "ไม่ตรงกัน",
+    "verifyBody": "ตรวจสอบว่ารหัสนี้ตรงกันทั้งสองอุปกรณ์ก่อนดำเนินการต่อ ถ้าไม่ตรงกันให้หยุด — ปัญหาอยู่ที่การเชื่อมต่อ ไม่ใช่ที่รหัสผ่านของคุณ",
+    "verifyTitle": "เปรียบเทียบรหัสนี้",
+    "title": "ลงชื่อเข้าใช้ห้องนิรภัยของคุณ",
+    "working": "กำลังตั้งค่า…"
+  },
+  "accountEntry": {
+    "checkFailed": "ตรวจสอบหมายเลขบัญชีนั้นไม่ได้ ลองอีกครั้ง",
+    "checking": "กำลังตรวจสอบ…",
+    "continue": "ดำเนินการต่อ",
+    "hint": "รูปแบบจะเป็น MY-XXXX-XXXX-XXXX-XXXX-XXXX ตรวจสอบบนอุปกรณ์ของคุณที่นี่ — ยังไม่มีการส่งข้อมูลออกไป",
+    "invalid": "หมายเลขบัญชีนั้นไม่ถูกต้อง ตรวจสอบแล้วลองอีกครั้ง",
+    "title": "ป้อนหมายเลขบัญชีของคุณ"
+  },
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "ยกเลิก",
+      "cleaning": "กำลังล้าง…",
+      "close": "ปิด",
+      "completeTitle": "ล้างเสร็จแล้ว",
+      "deleteCta": "ลบ {{count}} รายการที่ไม่ได้ใช้",
+      "deleteCta_one": "ลบ {{count}} รายการที่ไม่ได้ใช้",
+      "deleteCta_other": "ลบ {{count}} รายการที่ไม่ได้ใช้",
+      "corpusIncomplete": "ซิงค์ให้เสร็จก่อน — อุปกรณ์นี้ยังมีโน้ตของคุณไม่ครบ ยังไม่มีอะไรถูกลบ",
+      "error": "ล้างไม่สำเร็จ โน้ตบางรายการอาจอ่านไม่ได้ — ยังไม่มีอะไรถูกลบ",
+      "intro_one": "ไฟล์แนบนี้ไม่ได้ถูกใช้ในโน้ตใดเลย การลบเป็นการถาวรและย้อนกลับไม่ได้",
+      "intro_other": "ไฟล์แนบ {{count}} รายการนี้ไม่ได้ถูกใช้ในโน้ตใดเลย การลบเป็นการถาวรและย้อนกลับไม่ได้",
+      "summaryFreed": " · คืนพื้นที่ {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "ลบไฟล์แนบไปแล้ว {{count}} รายการ",
+      "summaryRemoved_other": "ลบไฟล์แนบไปแล้ว {{count}} รายการ",
+      "summarySkipped": " · ข้าม {{count}} รายการ (กำลังใช้งานอยู่)",
+      "summarySkipped_one": " · ข้าม {{count}} รายการ (กำลังใช้งานอยู่)",
+      "summarySkipped_other": " · ข้าม {{count}} รายการ (กำลังใช้งานอยู่)",
+      "title": "ล้างไฟล์แนบที่ไม่ได้ใช้",
+      "willBeReclaimed": "จะได้พื้นที่คืน {{size}}"
+    },
+    "coverPicker": {
+      "close": "ปิด",
+      "dropHint": "วางรูปภาพเพื่อใช้เป็นภาพหน้าปก",
+      "empty": "ยังไม่มีรูปภาพในห้องนิรภัยนี้ อัปโหลดหรือลากรูปภาพมาวางที่นี่",
+      "loading": "กำลังโหลด…",
+      "removeCover": "เอาภาพหน้าปกออก",
+      "title": "เลือกภาพหน้าปก",
+      "upload": "อัปโหลด"
+    },
+    "deleteDialog": {
+      "cancel": "ยกเลิก",
+      "confirmPrompt": "ลบไฟล์แนบนี้อย่างถาวรหรือไม่ การกระทำนี้ย้อนกลับไม่ได้",
+      "delete": "ลบ",
+      "deleting": "กำลังลบ…",
+      "error": "ลบไฟล์แนบไม่ได้ ลองอีกครั้ง",
+      "notUsed": "ไม่ได้ถูกใช้ในโน้ตใดเลย",
+      "stillUsed_one": "ยังถูกใช้อยู่ในโน้ต {{count}} รายการ การลบจะทิ้งร่องรอยไว้ตรงจุดที่ฝังไฟล์ไว้:",
+      "stillUsed_other": "ยังถูกใช้อยู่ในโน้ต {{count}} รายการ การลบจะทิ้งร่องรอยไว้ตรงจุดที่ฝังไฟล์ไว้:",
+      "title": "ลบไฟล์แนบ",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "library": {
+      "actionsAriaLabel": "การดำเนินการกับไฟล์แนบ",
+      "actionsTitle": "การดำเนินการ",
+      "checkUnusedFailedNotice": "ตรวจหาไฟล์แนบที่ไม่ได้ใช้ไม่สำเร็จ ลองอีกครั้ง",
+      "corpusIncompleteNotice": "ซิงค์ให้เสร็จก่อน — อุปกรณ์นี้ยังมีโน้ตของคุณไม่ครบ จึงบอกไม่ได้ว่าไฟล์แนบใดไม่ได้ใช้",
+      "checking": "กำลังตรวจสอบ…",
+      "cleanUnused": "ล้างที่ไม่ได้ใช้",
+      "cleanUnusedTitle": "ลบไฟล์แนบที่ไม่ได้ถูกใช้ในโน้ตใดเลย",
+      "colCreated": "สร้างเมื่อ",
+      "colName": "ชื่อ",
+      "colSize": "ขนาด",
+      "colType": "ประเภท",
+      "colUsedIn": "ใช้ใน",
+      "decrypting": "กำลังถอดรหัสไฟล์แนบ…",
+      "clearSearchAriaLabel": "ล้างการค้นหา",
+      "emptyClearSearch": "ล้างการค้นหา",
+      "emptyImportHint": "นำเข้าไฟล์เพื่อเก็บไว้ในห้องนิรภัยของคุณ",
+      "emptyLoadError": "อ่านแคตตาล็อกไฟล์แนบไม่ได้",
+      "emptyNoAttachments": "ยังไม่มีไฟล์แนบ",
+      "emptyNoResultsTitle": "ไม่มีไฟล์แนบที่ตรงกับการค้นหา",
+      "filterAriaLabel": "กรองตามประเภท",
+      "gridView": "มุมมองตาราง",
+      "import": "นำเข้า",
+      "importDialogTitle": "นำเข้าไฟล์แนบ",
+      "importFile": "นำเข้าไฟล์",
+      "importing": "กำลังนำเข้า…",
+      "listView": "มุมมองรายการ",
+      "menuDelete": "ลบ",
+      "menuExport": "ส่งออก",
+      "menuPreview": "ดูตัวอย่าง",
+      "menuRename": "เปลี่ยนชื่อ",
+      "menuTranscribe": "ถอดเสียง",
+      "menuViewTranscription": "ดูข้อความถอดเสียง",
+      "noMatch": "ไม่มีไฟล์แนบที่ตรงกับการค้นหา",
+      "noUnusedNotice": "ไม่มีไฟล์แนบที่ไม่ได้ใช้ให้ล้าง",
+      "preview": "ดูตัวอย่าง",
+      "previewAttachment": "ดูตัวอย่างไฟล์แนบ",
+      "searchAriaLabel": "ค้นหาไฟล์แนบตามชื่อไฟล์",
+      "searchPlaceholder": "ค้นหาตามชื่อไฟล์",
+      "sort": {
+        "createdAsc": "เก่าสุดก่อน",
+        "createdDesc": "ใหม่สุดก่อน",
+        "nameAsc": "ชื่อ A–Z",
+        "nameDesc": "ชื่อ Z–A"
+      },
+      "sortAriaLabel": "เรียงลำดับไฟล์แนบ",
+      "supportedFilesFilter": "ไฟล์ที่รองรับ",
+      "title": "ไฟล์แนบ",
+      "transcribeDone": "ถอดเสียงเสร็จแล้ว",
+      "transcribeFailed": "ถอดเสียงไม่สำเร็จ โปรดลองอีกครั้ง",
+      "transcribeFeatureOff": "การแปลงเสียงเป็นข้อความปิดอยู่ เปิดได้ที่ การตั้งค่า → การถอดเสียง",
+      "transcribeModelLoadFailed": "โหลดโมเดลแปลงเสียงเป็นข้อความไม่ได้ ติดตั้ง Myne ใหม่ หรือตรวจสอบโมเดลที่กำหนดเองใน การตั้งค่า → นักพัฒนา → AI",
+      "transcribeNoModelHint": "ไม่พบโมเดลแปลงเสียงเป็นข้อความ ติดตั้ง Myne ใหม่จะได้โมเดลกลับคืนมา",
+      "transcribeStarted": "กำลังถอดเสียง…",
+      "transcribeVaultLocked": "ปลดล็อกห้องนิรภัยของคุณก่อนจึงจะถอดเสียงได้",
+      "transcriptionModalClose": "ปิดข้อความถอดเสียง",
+      "transcriptionModalTitle": "การถอดเสียง",
+      "typeFilter": {
+        "all": "ทุกประเภท",
+        "audio": "เสียง",
+        "image": "รูปภาพ",
+        "other": "อื่น ๆ",
+        "pdf": "PDF"
+      },
+      "usedInCount_one": "ใช้ในโน้ต {{count}} รายการ",
+      "usedInCount_other": "ใช้ในโน้ต {{count}} รายการ",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "เสียง: {{filename}}",
+      "file": "ไฟล์",
+      "pause": "หยุดชั่วคราว",
+      "pdfDocument": "เอกสาร PDF",
+      "pdfFirstPage": "หน้าแรกของ PDF",
+      "play": "เล่น"
+    },
+    "usedInNotesPopover": {
+      "empty": "ไม่ได้ถูกใช้ในโน้ตใดเลย",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "needsApp": "การล้างไฟล์แนบต้องใช้แอป",
+    "noUnused": "ไม่มีไฟล์แนบที่ไม่ได้ใช้ — ทุกไฟล์ถูกอ้างอิงอยู่",
+    "scanError": "สแกนหาไฟล์แนบที่ไม่ได้ใช้ไม่สำเร็จ",
+    "erasedToast_one": "ลบไฟล์ที่ไม่ได้ใช้ถาวรแล้ว {{count}} ไฟล์",
+    "erasedToast_other": "ลบไฟล์ที่ไม่ได้ใช้ถาวรแล้ว {{count}} ไฟล์",
+    "eraseError": "ลบไฟล์แนบที่ไม่ได้ใช้อย่างถาวรไม่สำเร็จ",
+    "readError": "อ่านไฟล์แนบไม่ได้",
+    "needAppPreview": "ไฟล์แนบต้องใช้แอป (ไม่ใช่การแสดงตัวอย่างในเบราว์เซอร์)",
+    "tooLarge": "ไฟล์นั้นใหญ่เกินไป (สูงสุด 64 MB)",
+    "unsupported": "แนบได้เฉพาะรูปภาพและ PDF เท่านั้น",
+    "addError": "เพิ่มไฟล์นั้นไม่ได้",
+    "deleteError": "ลบไฟล์แนบนั้นไม่ได้",
+    "renameError": "เปลี่ยนชื่อไฟล์แนบนั้นไม่ได้",
+    "unusedSummary_one": "ไฟล์แนบ {{count}} รายการไม่ถูกอ้างอิงในโน้ตใดเลย ({{size}}) การลบถาวรเป็นการลบเชิงรหัสลับที่ย้อนกลับไม่ได้ — ไม่มีถังขยะ",
+    "unusedSummary_other": "ไฟล์แนบ {{count}} รายการไม่ถูกอ้างอิงในโน้ตใดเลย ({{size}}) การลบถาวรเป็นการลบเชิงรหัสลับที่ย้อนกลับไม่ได้ — ไม่มีถังขยะ",
+    "eraseCta_one": "ลบไฟล์ที่ไม่ได้ใช้ถาวร {{count}} ไฟล์",
+    "eraseCta_other": "ลบไฟล์ที่ไม่ได้ใช้ถาวร {{count}} ไฟล์",
+    "emptyState": "ยังไม่มีไฟล์แนบ แตะ อัปโหลด เพื่อเพิ่มรูปภาพหรือ PDF",
+    "insert": "แทรก",
+    "pauseLabel": "หยุด {{filename}} ชั่วคราว",
+    "playLabel": "เล่น {{filename}}"
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "มีการทำงานกับห้องนิรภัยอื่นค้างอยู่ รอให้เสร็จก่อนแล้วลองอีกครั้ง",
+        "cancelled": "ยกเลิกการสำรองข้อมูลแล้ว ไม่มีไฟล์ตกค้าง",
+        "invalidDestination": "โฟลเดอร์ปลายทางนั้นใช้งานไม่ได้",
+        "ioGeneric": "เขียนไฟล์สำรองข้อมูลไม่ได้",
+        "ioNoSpace": "พื้นที่ที่ปลายทางไม่พอ",
+        "ioPermissionDenied": "ไม่มีสิทธิ์เขียนที่ปลายทาง",
+        "joinFailure": "การสำรองข้อมูลล้มเหลวโดยไม่คาดคิด ไม่มีไฟล์ตกค้าง",
+        "memberTooLarge": "มีไฟล์ในห้องนิรภัยนี้ใหญ่เกินกว่าที่รูปแบบไฟล์สำรองข้อมูลรองรับ",
+        "vaultNotFound": "ไม่พบห้องนิรภัยที่จะสำรองข้อมูล",
+        "verifyFailed": "ไฟล์สำรองข้อมูลที่เขียนไว้ตรวจสอบไม่ผ่าน จึงถูกทิ้งไป ลองอีกครั้ง — ถ้ายังเป็นซ้ำ ให้เปลี่ยนไปใช้สื่อบันทึกอื่น"
+      },
+      "restore": {
+        "authOperationInProgress": "มีการทำงานกับห้องนิรภัยอื่นค้างอยู่ รอให้เสร็จก่อนแล้วลองอีกครั้ง",
+        "cancelled": "ยกเลิกการกู้คืนแล้ว ไม่มีอะไรเปลี่ยนแปลง",
+        "damagedBackup": "ไฟล์สำรองข้อมูลเสียหาย",
+        "futureVersionBackup": "ไฟล์สำรองข้อมูลนี้สร้างจาก Myne รุ่นที่ใหม่กว่า อัปเดต Myne ก่อน แล้วจึงกู้คืน",
+        "invalidVaultMeta": "ข้อมูลกำกับห้องนิรภัยของไฟล์สำรองนี้อ่านไม่ได้ การกู้คืนจึงไม่ได้ห้องนิรภัยที่ใช้งานได้",
+        "ioGeneric": "อ่านไฟล์สำรองข้อมูลไม่ได้",
+        "ioPermissionDenied": "ไม่มีสิทธิ์อ่านไฟล์สำรองข้อมูล",
+        "joinFailure": "การกู้คืนล้มเหลวโดยไม่คาดคิด ไม่มีอะไรเปลี่ยนแปลง",
+        "missingVaultMeta": "ไฟล์สำรองนี้ไม่มีข้อมูลกำกับห้องนิรภัย จึงกู้คืนไม่ได้",
+        "notABackupFile": "ไฟล์นี้ไม่ใช่ไฟล์สำรองข้อมูลของ Myne",
+        "vaultAlreadyExists": "มีห้องนิรภัยจากไฟล์สำรองนี้อยู่บนอุปกรณ์นี้แล้ว"
+      }
+    },
+    "export": {
+      "cancel": "ยกเลิก",
+      "close": "ปิด",
+      "copying": "กำลังคัดลอก {{done}} จาก {{total}}…",
+      "preparing": "กำลังเตรียม…",
+      "successToast": "ตรวจสอบและบันทึกไฟล์สำรองข้อมูลแล้ว",
+      "title": "สำรองข้อมูลห้องนิรภัย",
+      "verifying": "กำลังตรวจสอบ {{done}} จาก {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "ยอมรับ",
+      "close": "ปิด",
+      "codeAriaLabel": "รหัสจับคู่",
+      "intro": "ยืนยันว่ารหัสนี้ตรงกับรหัสที่แสดงในส่วนขยาย แล้วกด ยอมรับ เพื่อจับคู่",
+      "reject": "ปฏิเสธ",
+      "rejected": "ปฏิเสธการจับคู่แล้ว",
+      "title": "ส่วนขยายเบราว์เซอร์ต้องการเชื่อมต่อ"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "เก็บถาวร",
+    "archivedBadgeTitle": "เก็บถาวรแล้ว",
+    "dialogLabel": "แผงคำสั่ง",
+    "matchedInAttachment": "ในไฟล์แนบ",
+    "matchedInAttachmentTitle": "คำค้นตรงกับข้อความในไฟล์ที่ฝังอยู่ในโน้ตนี้",
+    "matchedInBody": "↳ ตรงกับเนื้อหา",
+    "noMatches": "ไม่พบรายการที่ตรงกัน",
+    "operatorHint": "กด Tab เพื่อเติมให้ครบ",
+    "operators": {
+      "tag": "โน้ตที่มีแท็ก",
+      "path": "โน้ตในโฟลเดอร์",
+      "file": "ค้นจากชื่อโน้ต",
+      "section": "โน้ตที่มีหัวข้อ",
+      "task": "โน้ตที่มีงาน",
+      "content": "ค้นข้อความเต็มในเนื้อหา"
+    },
+    "searchPlaceholder": "ค้นหาโน้ตหรือเรียกใช้คำสั่ง — ลอง tag: · path: · task:",
+    "sectionCommands": "คำสั่ง",
+    "sectionNotes": "โน้ต",
+    "untitledNote": "ไม่มีชื่อ"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "สำรองข้อมูลห้องนิรภัย…"
+      },
+      "category": {
+        "ai": "AI",
+        "app": "แอป",
+        "appearance": "รูปลักษณ์",
+        "editor": "ตัวแก้ไข",
+        "notes": "โน้ต",
+        "vault": "ห้องนิรภัย",
+        "view": "มุมมอง"
+      },
+      "aiOpenChat": {
+        "label": "เปิดแชท AI"
+      },
+      "toggleLineNumbers": {
+        "label": "สลับหมายเลขบรรทัด"
+      },
+      "toggleVimMode": {
+        "label": "สลับโหมดแป้นพิมพ์ Vim"
+      },
+      "toggleSpellCheck": {
+        "label": "สลับการตรวจการสะกด"
+      },
+      "toggleTypewriter": {
+        "label": "สลับการเลื่อนแบบพิมพ์ดีด"
+      },
+      "toggleDimInactive": {
+        "label": "สลับการหรี่บรรทัดที่ไม่ได้ใช้งาน"
+      },
+      "toggleEditorFont": {
+        "label": "สลับฟอนต์ตัวแก้ไข (โมโน / ซานส์)"
+      },
+      "cycleTextSize": {
+        "label": "วนขนาดตัวอักษรในตัวแก้ไข"
+      },
+      "cycleContentWidth": {
+        "label": "วนความกว้างเนื้อหาในตัวแก้ไข"
+      },
+      "cycleDefaultViewMode": {
+        "label": "วนโหมดมุมมองเริ่มต้น"
+      },
+      "toggleTimestamps": {
+        "label": "สลับเวลาของโน้ตในแถบข้าง"
+      },
+      "toggleArchiving": {
+        "label": "สลับการเก็บโน้ตถาวร"
+      },
+      "toggleAiEnabled": {
+        "label": "สลับฟีเจอร์ AI (เบต้า)"
+      },
+      "toggleScreenCapture": {
+        "label": "สลับการป้องกันการจับภาพหน้าจอ"
+      },
+      "cycleTheme": {
+        "label": "วนธีม"
+      },
+      "themeLight": {
+        "label": "ธีม: สว่าง"
+      },
+      "themeDark": {
+        "label": "ธีม: มืด"
+      },
+      "themeAmoled": {
+        "label": "ธีม: AMOLED"
+      },
+      "themeSystem": {
+        "label": "ธีม: ตามระบบ"
+      },
+      "applyCustomTheme": {
+        "label": "ใช้ธีมที่กำหนดเอง…"
+      },
+      "splitRight": {
+        "label": "แยกบานหน้าต่างไปทางขวา"
+      },
+      "splitDown": {
+        "label": "แยกบานหน้าต่างลงด้านล่าง"
+      },
+      "closePane": {
+        "label": "ปิดบานหน้าต่าง"
+      },
+      "closeTab": {
+        "label": "ปิดแท็บ"
+      },
+      "nextTab": {
+        "label": "แท็บถัดไป"
+      },
+      "prevTab": {
+        "label": "แท็บก่อนหน้า"
+      },
+      "focusNextPane": {
+        "label": "โฟกัสบานหน้าต่างถัดไป"
+      },
+      "focusPrevPane": {
+        "label": "โฟกัสบานหน้าต่างก่อนหน้า"
+      },
+      "goBack": {
+        "label": "ย้อนกลับ"
+      },
+      "goForward": {
+        "label": "ไปข้างหน้า"
+      },
+      "togglePreview": {
+        "label": "สลับการแสดงตัวอย่างเคียงข้าง"
+      },
+      "findInNote": {
+        "label": "ค้นหาในโน้ต"
+      },
+      "findReplace": {
+        "label": "ค้นหาและแทนที่ในโน้ต"
+      },
+      "newNote": {
+        "label": "โน้ตใหม่"
+      },
+      "duplicateNote": {
+        "label": "ทำสำเนาโน้ต"
+      },
+      "archiveNote": {
+        "label": "เก็บโน้ตเข้าที่เก็บถาวร"
+      },
+      "renameNote": {
+        "label": "เปลี่ยนชื่อโน้ต"
+      },
+      "trashNote": {
+        "label": "ย้ายโน้ตไปถังขยะ"
+      },
+      "toggleFavorite": {
+        "label": "สลับรายการโปรด"
+      },
+      "moveNote": {
+        "label": "ย้ายโน้ตไปโฟลเดอร์…"
+      },
+      "emptyTrash": {
+        "label": "ล้างถังขยะ"
+      },
+      "showBacklinks": {
+        "label": "แสดงลิงก์ย้อนกลับ"
+      },
+      "showOutline": {
+        "label": "แสดงโครงร่าง"
+      },
+      "showUnlinked": {
+        "label": "แสดงการกล่าวถึงที่ยังไม่ได้ลิงก์"
+      },
+      "newFolder": {
+        "label": "โฟลเดอร์ใหม่"
+      },
+      "openTrash": {
+        "label": "เปิดถังขยะ"
+      },
+      "openArchive": {
+        "label": "เปิดที่เก็บถาวร"
+      },
+      "cycleHeading": {
+        "label": "วนระดับหัวข้อ"
+      },
+      "restoreBackup": {
+        "label": "กู้คืนห้องนิรภัยจากไฟล์สำรอง…"
+      },
+      "revealVaultFolder": {
+        "label": "แสดงโฟลเดอร์ห้องนิรภัยในตัวจัดการไฟล์"
+      },
+      "aiSummarizeNote": {
+        "label": "สรุปโน้ต"
+      },
+      "aiRewriteSelection": {
+        "label": "เขียนข้อความที่เลือกใหม่"
+      },
+      "convertWikilinks": {
+        "label": "แปลงวิกิลิงก์ที่นำเข้าในโน้ตนี้…"
+      },
+      "deleteWorkspace": {
+        "label": "ลบพื้นที่ทำงาน…"
+      },
+      "exportNoteHtml": {
+        "label": "ส่งออกโน้ตเป็น HTML…"
+      },
+      "exportSelectionImage": {
+        "label": "ส่งออกข้อความที่เลือกเป็นรูปภาพ…",
+        "saved": "บันทึกข้อความที่เลือกเป็นรูปภาพแล้ว",
+        "noSelection": "เลือกข้อความก่อน แล้วจึงส่งออกเป็นรูปภาพ",
+        "failed": "ส่งออกข้อความที่เลือกเป็นรูปภาพไม่ได้"
+      },
+      "exportNoteMarkdown": {
+        "label": "ส่งออกโน้ตเป็น Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "ส่งออกโน้ตเป็น PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "ส่งออกโน้ตเป็นข้อความล้วน…"
+      },
+      "exportVaultMarkdown": {
+        "label": "ส่งออกห้องนิรภัยเป็น Markdown…"
+      },
+      "foldAll": {
+        "label": "ยุบทั้งหมด"
+      },
+      "importBaseView": {
+        "label": "นำเข้ามุมมอง .base…"
+      },
+      "importObsidian": {
+        "label": "นำเข้าโน้ต…"
+      },
+      "lockVault": {
+        "label": "ล็อกห้องนิรภัย"
+      },
+      "manageTemplates": {
+        "label": "จัดการเทมเพลต…"
+      },
+      "newNoteFromTemplate": {
+        "label": "โน้ตใหม่จากเทมเพลต…"
+      },
+      "openAttachments": {
+        "label": "เปิดไฟล์แนบ…"
+      },
+      "openSettings": {
+        "label": "เปิดการตั้งค่า…"
+      },
+      "openSnapshots": {
+        "label": "สแนปช็อต…"
+      },
+      "openTodayNote": {
+        "label": "เปิดโน้ตของวันนี้"
+      },
+      "randomNote": {
+        "label": "เปิดโน้ตแบบสุ่ม"
+      },
+      "renameWorkspace": {
+        "label": "เปลี่ยนชื่อพื้นที่ทำงาน…"
+      },
+      "saveWorkspaceAs": {
+        "label": "บันทึกพื้นที่ทำงานเป็น…"
+      },
+      "showGraph": {
+        "label": "แสดงมุมมองกราฟ…"
+      },
+      "showTasks": {
+        "label": "แสดงงาน"
+      },
+      "showTags": {
+        "label": "เรียกดูแท็ก…"
+      },
+      "showViews": {
+        "label": "เรียกดูมุมมอง…"
+      },
+      "switchWorkspace": {
+        "label": "สลับพื้นที่ทำงาน…"
+      },
+      "toggleFocus": {
+        "label": "สลับโหมดโฟกัส"
+      },
+      "toggleLeftSidebar": {
+        "label": "สลับแถบข้างรายการโน้ต"
+      },
+      "toggleReading": {
+        "label": "สลับมุมมองอ่าน"
+      },
+      "toggleRightSidebar": {
+        "label": "สลับแถบข้างลิงก์ย้อนกลับ"
+      },
+      "toggleSource": {
+        "label": "สลับโหมดซอร์ส"
+      },
+      "toggleStackedTabs": {
+        "label": "สลับแท็บแบบซ้อน"
+      },
+      "unfoldAll": {
+        "label": "ขยายทั้งหมด"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "ตัวหนา",
+        "closeTab": "ปิดแท็บ",
+        "cycleHeadingLevel": "วนระดับหัวข้อ",
+        "cycleTabs": "วนแท็บ",
+        "deleteWorkspace": "ลบพื้นที่ทำงาน",
+        "findInNote": "ค้นหาในโน้ต",
+        "focusNextPane": "โฟกัสบานหน้าต่างถัดไป",
+        "focusPrevPane": "โฟกัสบานหน้าต่างก่อนหน้า",
+        "foldAll": "ยุบทั้งหมด",
+        "indent": "เพิ่มระยะย่อหน้า",
+        "inlineCode": "โค้ดในบรรทัด",
+        "insertWikilink": "แทรกวิกิลิงก์",
+        "italic": "ตัวเอียง",
+        "navigateBack": "ย้อนกลับ",
+        "navigateForward": "ไปข้างหน้า",
+        "newNote": "โน้ตใหม่",
+        "openSettings": "เปิดการตั้งค่า",
+        "outdent": "ลดระยะย่อหน้า",
+        "paletteToggle": "เปิดแผงคำสั่ง",
+        "redo": "ทำซ้ำ",
+        "renameWorkspace": "เปลี่ยนชื่อพื้นที่ทำงาน",
+        "saveWorkspaceAs": "บันทึกพื้นที่ทำงานเป็น",
+        "selectAllScoped": "เลือกทั้งหมด (ในขอบเขต)",
+        "selectNextOccurrence": "เลือกรายการถัดไปที่ตรงกัน",
+        "showGraphView": "แสดงมุมมองกราฟ",
+        "showTasks": "แสดงงาน",
+        "splitPaneDown": "แยกบานหน้าต่าง (ลง)",
+        "splitPaneRight": "แยกบานหน้าต่าง (ขวา)",
+        "switchWorkspace": "สลับพื้นที่ทำงาน",
+        "toggleBulletList": "สลับรายการหัวข้อย่อย",
+        "toggleFocusMode": "สลับโหมดโฟกัส",
+        "toggleNumberedList": "สลับรายการลำดับเลข",
+        "toggleReadingView": "สลับมุมมองอ่าน",
+        "toggleSourceMode": "สลับโหมดซอร์ส",
+        "toggleTaskList": "สลับรายการงาน",
+        "undo": "เลิกทำ",
+        "unfoldAll": "ขยายทั้งหมด"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "ต้องมีปุ่มปรับร่วมด้วย (⌘, Ctrl หรือ Alt) — ปุ่มเดี่ยว ๆ ใช้เป็นคีย์ลัดไม่ได้"
+    },
+    "picker": {
+      "vaultRoot": "รากของห้องนิรภัย",
+      "moveNoteTitle": "ย้ายโน้ตไปโฟลเดอร์",
+      "moveNotePlaceholder": "เลือกโฟลเดอร์…",
+      "noFolders": "ยังไม่มีโฟลเดอร์",
+      "applyThemeTitle": "ใช้ธีมที่กำหนดเอง",
+      "applyThemePlaceholder": "เลือกธีม…",
+      "noCustomThemes": "ยังไม่ได้ติดตั้งธีมที่กำหนดเอง"
+    }
+  },
+  "common": {
+    "cancel": "ยกเลิก",
+    "dismiss": "ปิด",
+    "prompt": {
+      "cancel": "ยกเลิก",
+      "confirmDefault": "ตกลง"
+    },
+    "spinner": {
+      "loadingLabel": "กำลังโหลด"
+    },
+    "back": "ย้อนกลับ",
+    "continue": "ดำเนินการต่อ"
+  },
+  "deviceRevoked": {
+    "cta": "เริ่มใหม่",
+    "title": "เบราว์เซอร์นี้ถูกนำออกจากบัญชีของคุณแล้ว"
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exported": "ส่งออก {{filename}} แล้ว",
+        "exportFailed": "ส่งออก {{filename}} ไม่ได้",
+        "renamed": "เปลี่ยนชื่อเป็น {{name}} แล้ว",
+        "renameFailed": "เปลี่ยนชื่อไฟล์แนบไม่ได้",
+        "saveDialogFailed": "เปิดกล่องโต้ตอบบันทึกไม่ได้"
+      },
+      "compression": {
+        "bulkNotice_one": "บีบอัดรูปภาพแล้ว {{count}} รูป: {{from}} → {{to}}",
+        "bulkNotice_other": "บีบอัดรูปภาพแล้ว {{count}} รูป: {{from}} → {{to}}",
+        "notice": "บีบอัดแล้ว: {{from}} → {{to}}",
+        "noticeContainerChanged": "บีบอัดเป็น {{format}}: {{from}} → {{to}}"
+      },
+      "convert": {
+        "cancel": "ยกเลิก",
+        "confirm": "แปลง",
+        "skipped": "ข้าม — {{note}}",
+        "subtitle_one": "จะมีการเขียนการอ้างอิงใหม่ 1 รายการ ตรวจสอบก่อนยืนยัน",
+        "subtitle_other": "จะมีการเขียนการอ้างอิงใหม่ {{count}} รายการ ตรวจสอบก่อนยืนยัน",
+        "subtitleEmpty": "ไม่มีอะไรให้แปลง — ไม่พบไฟล์ต้นทาง",
+        "title": "แปลงไฟล์แนบที่นำเข้า"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "ต้นทางไฟล์แนบ"
+      },
+      "convertCore": {
+        "converted": "แปลงแล้ว {{count}} รายการ",
+        "converted_one": "แปลงแล้ว {{count}} รายการ",
+        "converted_other": "แปลงแล้ว {{count}} รายการ",
+        "noneToConvert": "ไม่มีไฟล์แนบที่นำเข้าให้แปลงในโน้ตนี้",
+        "skipNote": {
+          "failed": "นำเข้าไม่สำเร็จ",
+          "locked": "ห้องนิรภัยถูกล็อก",
+          "notFound": "ไม่พบไฟล์ต้นทาง",
+          "tooLarge": "ใหญ่เกินไป (สูงสุด 64 MiB)",
+          "unsupported": "ประเภทไฟล์ที่ไม่รองรับ"
+        },
+        "skippedSuffix": " · ข้าม {{count}} รายการ",
+        "skippedSuffix_one": " · ข้าม {{count}} รายการ",
+        "skippedSuffix_other": " · ข้าม {{count}} รายการ"
+      },
+      "fileKind": {
+        "generic": "ไฟล์",
+        "label": {
+          "archive": "ไฟล์บีบอัด",
+          "audio": "เสียง",
+          "cHeader": "ส่วนหัว C",
+          "cppSource": "ซอร์ส C++",
+          "cSource": "ซอร์ส C",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "เอกสาร",
+          "ebook": "อีบุ๊ก",
+          "go": "Go",
+          "html": "HTML",
+          "image": "รูปภาพ",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "ไฟล์บันทึก",
+          "markdown": "Markdown",
+          "numbers": "สเปรดชีต Numbers",
+          "pages": "เอกสาร Pages",
+          "pdf": "PDF",
+          "presentation": "งานนำเสนอ",
+          "python": "Python",
+          "richText": "เอกสารข้อความจัดรูปแบบ",
+          "rust": "Rust",
+          "shell": "สคริปต์เชลล์",
+          "spreadsheet": "สเปรดชีต",
+          "svg": "รูปภาพ SVG",
+          "text": "เอกสารข้อความ",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "วิดีโอ",
+          "word": "เอกสาร Word",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "ไฟล์ {{ext}}"
+      },
+      "lightbox": {
+        "close": "ปิดตัวอย่าง",
+        "export": "ส่งออก",
+        "exportAria": "ส่งออกไฟล์แนบ",
+        "imagePreview": "ตัวอย่างรูปภาพ",
+        "pdfFallback": "PDF",
+        "pdfPreview": "ตัวอย่าง PDF",
+        "zoomIn": "ขยาย",
+        "zoomOut": "ย่อ",
+        "zoomReset": "รีเซ็ตการซูม"
+      },
+      "menu": {
+        "actionsAria": "การดำเนินการกับไฟล์แนบ"
+      },
+      "pdf": {
+        "loading": "กำลังโหลด…"
+      },
+      "picker": {
+        "openFailed": "เปิดตัวเลือกไฟล์ไม่ได้"
+      },
+      "progress": {
+        "encrypting": "กำลังเข้ารหัส…",
+        "importing": "กำลังนำเข้า…",
+        "loading": "กำลังโหลด…"
+      },
+      "recording": {
+        "barAria": "กำลังบันทึกโน้ตเสียง",
+        "cancel": "ยกเลิก",
+        "noAudio": "ตรวจไม่พบเสียง — ตรวจสอบไมโครโฟนของคุณ",
+        "saving": "กำลังบันทึก…",
+        "stop": "หยุด"
+      },
+      "rename": {
+        "cancel": "ยกเลิก",
+        "confirm": "เปลี่ยนชื่อ",
+        "title": "เปลี่ยนชื่อไฟล์แนบ"
+      },
+      "summary": {
+        "added": "เพิ่มแล้ว {{count}} รายการ",
+        "added_one": "เพิ่มแล้ว {{count}} รายการ",
+        "added_other": "เพิ่มแล้ว {{count}} รายการ",
+        "reason": {
+          "failed": "ไม่สำเร็จ",
+          "locked": "ห้องนิรภัยถูกล็อก",
+          "tooLarge": "ใหญ่เกินไป",
+          "unsupported": "ประเภทไฟล์ที่ไม่รองรับ"
+        },
+        "skipped": "ข้าม {{count}} รายการ: {{noun}}",
+        "skipped_one": "ข้าม {{count}} รายการ: {{noun}}",
+        "skipped_other": "ข้าม {{count}} รายการ: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "กำลังบันทึกเสียงอยู่แล้ว",
+          "captureFailed": "เริ่มบันทึกเสียงไม่ได้ — ตรวจสอบสิทธิ์เข้าถึงไมโครโฟนในการตั้งค่าระบบ",
+          "generic": "เริ่มบันทึกเสียงไม่ได้",
+          "locked": "ปลดล็อกห้องนิรภัยของคุณก่อนจึงจะบันทึกโน้ตเสียงได้",
+          "noInputDevice": "ไม่พบไมโครโฟน เชื่อมต่อไมโครโฟนแล้วลองอีกครั้ง"
+        },
+        "stopError": {
+          "captureFailed": "บันทึกเสียงไม่สำเร็จ — ตรวจสอบไมโครโฟนของคุณ",
+          "emptyRecording": "ไม่มีการบันทึกเสียงใด ๆ",
+          "generic": "บันทึกไฟล์เสียงไม่ได้",
+          "silentRecording": "การบันทึกเงียบจึงถูกทิ้งไป — ตรวจสอบไมโครโฟนของคุณ"
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "หยุดชั่วคราว",
+          "play": "เล่น",
+          "seek": "เลื่อนตำแหน่ง"
+        },
+        "menu": {
+          "export": "ส่งออก",
+          "remove": "เอาออก",
+          "rename": "เปลี่ยนชื่อ",
+          "reveal": "แสดงในคลังไฟล์แนบ",
+          "transcribe": "ถอดเสียง"
+        },
+        "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "ตัวอย่างถูกตัดให้สั้นลง — ส่งออกเพื่อดูไฟล์เต็ม"
+        },
+        "tombstone": {
+          "brokenAria": "การอ้างอิงไฟล์แนบเสีย: {{filename}}",
+          "brokenLabel": "เสีย",
+          "deletedAria": "ไฟล์แนบที่ถูกลบ: {{filename}}",
+          "deletedLabel": "ถูกลบแล้ว"
+        },
+        "transcribe": {
+          "cause": {
+            "featureOff": "การแปลงเสียงเป็นข้อความปิดอยู่ เปิดได้ที่ การตั้งค่า → การถอดเสียง",
+            "modelLoadFailed": "โหลดโมเดลแปลงเสียงเป็นข้อความไม่ได้ ถ้าคุณตั้งโมเดลที่กำหนดเองไว้ใน การตั้งค่า → นักพัฒนา → AI ให้ตรวจสอบไฟล์ของโมเดลนั้น มิฉะนั้นการติดตั้ง Myne ใหม่จะได้โมเดลที่มากับแอปกลับคืนมา",
+            "noModel": "ไม่พบโมเดลแปลงเสียงเป็นข้อความ ติดตั้ง Myne ใหม่จะได้โมเดลกลับคืนมา",
+            "vaultLocked": "ปลดล็อกห้องนิรภัยของคุณก่อนจึงจะถอดเสียงได้"
+          },
+          "failed": "ถอดเสียงไม่สำเร็จ โปรดลองอีกครั้ง",
+          "heading": "ข้อความถอดเสียง",
+          "insert": "แทรกข้อความถอดเสียงลงในโน้ต",
+          "progress": "กำลังถอดเสียง…",
+          "stop": "หยุด"
+        },
+        "urlImageFallback": "รูปภาพ"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "ข้อควรสนใจ",
+        "bug": "บั๊ก",
+        "caution": "ข้อควรระวัง",
+        "danger": "อันตราย",
+        "done": "เสร็จแล้ว",
+        "error": "ข้อผิดพลาด",
+        "example": "ตัวอย่าง",
+        "failure": "ล้มเหลว",
+        "faq": "คำถามที่พบบ่อย",
+        "hint": "คำใบ้",
+        "important": "สำคัญ",
+        "info": "ข้อมูล",
+        "missing": "ขาดหาย",
+        "note": "หมายเหตุ",
+        "question": "คำถาม",
+        "quote": "คำพูดอ้างอิง",
+        "success": "สำเร็จ",
+        "tip": "เคล็ดลับ",
+        "todo": "สิ่งที่ต้องทำ",
+        "warning": "คำเตือน"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "เก็บถาวร",
+        "empty": "ยังไม่มีลิงก์ย้อนกลับ",
+        "linkedFrom": "ลิงก์มาจาก {{count}}",
+        "linkedFrom_one": "ลิงก์มาจาก {{count}}",
+        "linkedFrom_other": "ลิงก์มาจาก {{count}}",
+        "linksTo": "ลิงก์ไปยัง {{count}}",
+        "linksTo_one": "ลิงก์ไปยัง {{count}}",
+        "linksTo_other": "ลิงก์ไปยัง {{count}}",
+        "outgoingEmpty": "โน้ตนี้ยังไม่ได้ลิงก์ไปที่ใด",
+        "untitled": "ไม่มีชื่อ"
+      },
+      "barItems": {
+        "graph": "กราฟ",
+        "hide": "ซ่อน",
+        "lock": "ล็อก",
+        "moveLeft": "ย้ายไปทางซ้าย",
+        "moveRight": "ย้ายไปทางขวา",
+        "saveStatus": "สถานะการบันทึก",
+        "settings": "การตั้งค่า",
+        "tags": "แท็ก",
+        "viewMode": "โหมดมุมมอง",
+        "views": "มุมมอง",
+        "vimMode": "โหมด Vim",
+        "wordCount": "จำนวนคำ",
+        "workspace": "พื้นที่ทำงาน"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix": " · ตัดตัวกรองออก {{count}} รายการ",
+        "droppedFiltersSuffix_one": " · ตัดตัวกรองออก {{count}} รายการ",
+        "droppedFiltersSuffix_other": " · ตัดตัวกรองออก {{count}} รายการ",
+        "failed": "นำเข้าไม่สำเร็จ",
+        "fileFilterName": "Obsidian Base",
+        "imported": "นำเข้ามุมมองแล้ว {{count}} รายการ",
+        "imported_one": "นำเข้ามุมมองแล้ว {{count}} รายการ",
+        "imported_other": "นำเข้ามุมมองแล้ว {{count}} รายการ",
+        "notValid": "ไม่ใช่ไฟล์ .base ที่ถูกต้อง",
+        "skippedSuffix": " · ข้าม {{count}} รายการ",
+        "skippedSuffix_one": " · ข้าม {{count}} รายการ",
+        "skippedSuffix_other": " · ข้าม {{count}} รายการ",
+        "stoppedAfter": "หยุดการนำเข้าหลังจาก {{count}} มุมมอง",
+        "stoppedAfter_one": "หยุดการนำเข้าหลังจาก {{count}} มุมมอง",
+        "stoppedAfter_other": "หยุดการนำเข้าหลังจาก {{count}} มุมมอง"
+      },
+      "bottomBar": {
+        "browseTags": "เรียกดูแท็ก",
+        "browseViews": "เรียกดูมุมมอง",
+        "cycleViewMode": "วนโหมดมุมมอง",
+        "docStats": {
+          "summary_one": "{{count}} คำ · {{characters}} อักขระ",
+          "summary_other": "{{count}} คำ · {{characters}} อักขระ",
+          "summarySelectionSuffix": " (ที่เลือก)",
+          "title_one": "{{characters}} อักขระ · {{words}} คำ · {{spaces}} ช่องว่าง · {{count}} ย่อหน้า",
+          "title_other": "{{characters}} อักขระ · {{words}} คำ · {{spaces}} ช่องว่าง · {{count}} ย่อหน้า",
+          "titleSelectionSuffix": " (ส่วนที่เลือก)"
+        },
+        "vimMode": {
+          "insert": "แทรก",
+          "normal": "ปกติ",
+          "replace": "แทนที่",
+          "title": "โหมด Vim — กด Esc เพื่อกลับสู่โหมดปกติ",
+          "visual": "วิชวล"
+        },
+        "graphTitle": "กราฟ (⌘⇧G)",
+        "lock": "ล็อก",
+        "lockVault": "ล็อกห้องนิรภัย",
+        "openSettings": "เปิดการตั้งค่า",
+        "settingsTitle": "การตั้งค่า (⌘,)",
+        "showGraph": "แสดงมุมมองกราฟ",
+        "syncStatus": "เฉพาะในเครื่อง · ไม่ได้ซิงค์",
+        "tagsTitle": "แท็ก",
+        "togglePreview": "สลับการแสดงตัวอย่างเคียงข้าง",
+        "viewModeTitle": "โหมดมุมมอง: {{mode}} (คลิกเพื่อวน)",
+        "viewsTitle": "มุมมอง"
+      },
+      "import": {
+        "imported_one": "นำเข้าโน้ตแล้ว {{count}} รายการ{{skipped}}",
+        "imported_other": "นำเข้าโน้ตแล้ว {{count}} รายการ{{skipped}}",
+        "skippedSuffix": " · ข้าม {{count}} รายการ",
+        "skippedSuffix_one": " · ข้าม {{count}} รายการ",
+        "skippedSuffix_other": " · ข้าม {{count}} รายการ"
+      },
+      "nav": {
+        "goBack": "ย้อนกลับ",
+        "goForward": "ไปข้างหน้า"
+      },
+      "noNotesToOpen": "ไม่มีโน้ตให้เปิด",
+      "resizeBacklinksSidebar": "ปรับขนาดแถบข้างลิงก์ย้อนกลับ",
+      "resizeNotesSidebar": "ปรับขนาดแถบข้างรายการโน้ต",
+      "rightPanel": {
+        "aiChat": {
+          "askPlaceholder": "ถามคำถามเกี่ยวกับโน้ตของคุณ…",
+          "askSubmit": "ถาม",
+          "assistant": "ผู้ช่วย",
+          "citations": "แหล่งที่มา",
+          "composerPlaceholder": "ส่งข้อความถึงโน้ตของคุณ…",
+          "empty": "ผลลัพธ์จาก AI — บทสรุป คำตอบ และข้อเสนอแนะ — จะแสดงที่นี่",
+          "error": "ทำคำขอ AI ให้เสร็จไม่ได้",
+          "errorTurn": "ผู้ช่วยตอบไม่ได้",
+          "gettingReadyHint": "กำลังเตรียมโน้ตของคุณสำหรับ AI — รอสักครู่",
+          "insert": "แทรกลงในโน้ต",
+          "noAnswer": "ไม่มีคำตอบ — ลองถามใหม่ด้วยคำอื่น",
+          "noModelHint": "ยังไม่ได้เลือกโมเดล เลือกโมเดลที่ การตั้งค่า → นักพัฒนา → AI เพื่อเริ่มใช้งาน",
+          "offHint": "AI ในเครื่องปิดอยู่ เปิดได้ที่ การตั้งค่า → นักพัฒนา → AI",
+          "send": "ส่ง",
+          "statusGettingReady": "กำลังเตรียม…",
+          "statusNoModel": "ไม่มีโมเดล",
+          "statusOff": "ปิด",
+          "statusReady": "พร้อม",
+          "stop": "หยุด",
+          "tagsThinking": "กำลังแนะนำแท็ก…",
+          "thinking": "AI กำลังคิด…",
+          "truncated": "สรุปจาก {{count}} อักขระแรก",
+          "you": "คุณ"
+        },
+        "allHidden": "แท็บทั้งหมดถูกซ่อนอยู่ — คลิกขวาเพื่อเรียกคืน",
+        "outline": {
+          "collapse": "ยุบส่วน",
+          "empty": "ไม่มีหัวข้อ",
+          "expand": "ขยายส่วน",
+          "heading": "โครงร่าง"
+        },
+        "tabs": {
+          "aiChat": "แชท AI",
+          "backlinks": "ลิงก์",
+          "outline": "โครงร่าง",
+          "tasks": "งาน",
+          "unlinked": "การกล่าวถึงที่ยังไม่ได้ลิงก์"
+        }
+      },
+      "sidebarToggle": {
+        "hideBacklinks": "ซ่อนแถบข้างลิงก์ย้อนกลับ",
+        "hideNotes": "ซ่อนแถบข้างรายการโน้ต",
+        "showBacklinks": "แสดงแถบข้างลิงก์ย้อนกลับ",
+        "showNotes": "แสดงแถบข้างรายการโน้ต"
+      },
+      "switchingOverlay": {
+        "saving": "กำลังบันทึก…"
+      },
+      "viewMode": {
+        "live": "สด",
+        "reading": "อ่าน",
+        "source": "ซอร์ส"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "ชื่อพื้นที่ทำงาน",
+        "renameConfirm": "เปลี่ยนชื่อ",
+        "renameTitle": "เปลี่ยนชื่อพื้นที่ทำงาน",
+        "saveAsTitle": "บันทึกพื้นที่ทำงานเป็น",
+        "saveConfirm": "บันทึก"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "พื้นที่ทำงาน",
+        "renameItemLabel": "เปลี่ยนชื่อพื้นที่ทำงาน {{name}}",
+        "renameTitle": "เปลี่ยนชื่อพื้นที่ทำงาน",
+        "saveCurrentAs": "บันทึกพื้นที่ปัจจุบันเป็น…",
+        "switchLabel": "สลับพื้นที่ทำงาน",
+        "toggleTitle": "พื้นที่ทำงาน: {{name}}"
+      }
+    },
+    "noteActions": {
+      "buttonLabel": "การดำเนินการกับโน้ต",
+      "rename": "เปลี่ยนชื่อ",
+      "move": "ย้ายไปโฟลเดอร์…",
+      "duplicate": "ทำสำเนา",
+      "convertToTemplate": "เปลี่ยนเป็นเทมเพลต",
+      "convertToNote": "แปลงเป็นโน้ต",
+      "turnedIntoTemplate": "เปลี่ยนเป็นเทมเพลตแล้ว",
+      "convertedToNote": "แปลงเป็นโน้ตแล้ว",
+      "versionHistory": "ประวัติเวอร์ชัน",
+      "exportMarkdown": "ส่งออกเป็น Markdown…",
+      "exportPdf": "ส่งออกเป็น PDF…",
+      "exportHtml": "ส่งออกเป็น HTML…",
+      "exportTxt": "ส่งออกเป็นข้อความล้วน…",
+      "trash": "ย้ายไปถังขยะ"
+    },
+    "codeBlock": {
+      "copyCode": "คัดลอกโค้ด",
+      "defaultBadge": "โค้ด"
+    },
+    "drawingEmbed": {
+      "done": "เสร็จสิ้น",
+      "edit": "แก้ไขภาพวาด {{name}}",
+      "editAction": "แก้ไข",
+      "empty": "ภาพวาดว่างเปล่า — คลิกเพื่อวาด",
+      "open": "เปิด",
+      "rename": "เปลี่ยนชื่อภาพวาด"
+    },
+    "drawingMenu": {
+      "background": "พื้นหลังผืนผ้าใบ",
+      "reset": "รีเซ็ตผืนผ้าใบ",
+      "toggleTheme": "สลับธีมภาพวาด"
+    },
+    "find": {
+      "close": "ปิดการค้นหา",
+      "matchCase": "ตรงตามตัวพิมพ์เล็ก-ใหญ่",
+      "matchCount": "{{current}} จาก {{total}}",
+      "nextMatch": "รายการถัดไปที่ตรงกัน",
+      "noMatches": "ไม่พบรายการที่ตรงกัน",
+      "placeholder": "ค้นหาในโน้ต",
+      "previousMatch": "รายการก่อนหน้าที่ตรงกัน",
+      "replaceAll": "แทนที่ทั้งหมด",
+      "replaceAllCount": "แทนที่ทั้งหมด ({{total}})",
+      "replaceOne": "แทนที่",
+      "replacePlaceholder": "แทนที่ด้วย",
+      "toggleReplace": "สลับการแทนที่"
+    },
+    "folding": {
+      "clickToUnfold": "คลิกเพื่อขยาย",
+      "unfold": "ขยาย"
+    },
+    "footnote": {
+      "heading": "เชิงอรรถ",
+      "unreferenced": "ไม่มีการอ้างอิง"
+    },
+    "frontmatter": {
+      "addListItem": "เพิ่มรายการ…",
+      "addListItemAriaLabel": "เพิ่มรายการใน {{key}}",
+      "addProperty": "+ เพิ่มคุณสมบัติ",
+      "propertiesLabel": "คุณสมบัติ",
+      "removeListItemAriaLabel": "เอา {{item}} ออก",
+      "titleAriaLabel": "ชื่อโน้ต",
+      "titlePlaceholder": "ไม่มีชื่อ"
+    },
+    "mermaid": {
+      "rendering": "กำลังเรนเดอร์ไดอะแกรม…"
+    },
+    "slash": {
+      "aiContinue": "เขียนต่อ (AI)",
+      "aiTitle": "แนะนำชื่อเรื่อง (AI)",
+      "attachFile": "แนบไฟล์",
+      "bulletList": "รายการหัวข้อย่อย",
+      "callout": "กล่องข้อความเน้น",
+      "date": "วันที่",
+      "day": "วัน",
+      "divider": "เส้นคั่น",
+      "drawing": "ภาพวาด",
+      "due": "วันครบกำหนด",
+      "heading1": "หัวข้อ 1",
+      "heading2": "หัวข้อ 2",
+      "heading3": "หัวข้อ 3",
+      "heading4": "หัวข้อ 4",
+      "heading5": "หัวข้อ 5",
+      "heading6": "หัวข้อ 6",
+      "link": "ลิงก์",
+      "now": "ตอนนี้",
+      "numberedList": "รายการลำดับเลข",
+      "priority": "ความสำคัญ",
+      "quote": "คำพูดอ้างอิง",
+      "repeat": "การทำซ้ำ",
+      "table": "ตาราง",
+      "taskQuery": "รายการงาน",
+      "time": "เวลา",
+      "todoList": "รายการสิ่งที่ต้องทำ",
+      "voiceNote": "โน้ตเสียง",
+      "wikiLink": "วิกิลิงก์"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "เพิ่มลงในพจนานุกรม",
+        "ignoreInVault": "ละเว้นในห้องนิรภัยนี้",
+        "ignoreThisSession": "ละเว้นในเซสชันนี้",
+        "noSuggestions": "ไม่มีคำแนะนำ"
+      }
+    },
+    "table": {
+      "addColumn": "เพิ่มคอลัมน์ทางขวา",
+      "addRow": "เพิ่มแถวด้านล่าง",
+      "cellAriaLabel": "เซลล์ตาราง",
+      "deleteColumn": "ลบคอลัมน์",
+      "deleteRow": "ลบแถว",
+      "reorderColumn": "จัดลำดับคอลัมน์ใหม่",
+      "reorderRow": "จัดลำดับแถวใหม่"
+    },
+    "tagSuggestion": {
+      "label": "แท็กที่แนะนำ",
+      "accept": "เพิ่มแท็ก {{tag}} ลงในโน้ตนี้",
+      "dismiss": "ปิดแท็กที่แนะนำ {{tag}}"
+    },
+    "taskField": {
+      "addAffordance": "เพิ่มฟิลด์ของงาน",
+      "invalidDue": "Myne อ่านวันที่นี้ไม่ได้ จึงไม่แสดงเป็นวันครบกำหนด",
+      "invalidPriority": "Myne อ่านระดับความสำคัญนี้ไม่ได้ ใช้ highest, high, medium, low หรือ lowest",
+      "invalidRepeat": "Myne ไม่รู้จักกฎการทำซ้ำนี้ งานนี้จึงจะไม่ทำซ้ำ",
+      "menuEdit": "แก้ไข {{field}}",
+      "menuTitle": "เพิ่มฟิลด์",
+      "repeatNoAnchor": "งานนี้ไม่มีวันที่ให้เริ่มทำซ้ำ จึงจะไม่ทำซ้ำ เพิ่มวันครบกำหนดเพื่อเริ่มต้น",
+      "save": "บันทึก",
+      "skipOccurrence": "ข้ามรอบนี้",
+      "title": {
+        "due": "วันครบกำหนด",
+        "repeat": "การทำซ้ำ",
+        "priority": "ความสำคัญ"
+      }
+    },
+    "toolbar": {
+      "apply": "ใช้",
+      "exportImageTitle": "ส่งออกข้อความที่เลือกเป็นรูปภาพ",
+      "customize": {
+        "bold": "ตัวหนา",
+        "bulletList": "รายการหัวข้อย่อย",
+        "checklist": "รายการตรวจสอบ",
+        "code": "โค้ด",
+        "heading": "หัวข้อ",
+        "highlight": "ไฮไลต์",
+        "italic": "ตัวเอียง",
+        "link": "ลิงก์",
+        "numberedList": "รายการลำดับเลข",
+        "quote": "คำพูดอ้างอิง",
+        "strike": "ขีดฆ่า",
+        "wikilink": "วิกิลิงก์"
+      },
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "ย่อหน้า"
+      },
+      "highlight": {
+        "blue": "น้ำเงิน",
+        "green": "เขียว",
+        "pink": "ชมพู",
+        "purple": "ม่วง",
+        "yellow": "เหลือง",
+        "orange": "ส้ม",
+        "red": "แดง",
+        "teal": "เขียวหัวเป็ด",
+        "cyan": "ฟ้าอมเขียว",
+        "lime": "เขียวมะนาว",
+        "brown": "น้ำตาล",
+        "grey": "เทา",
+        "indigo": "คราม",
+        "remove": "เอาไฮไลต์ออก"
+      },
+      "urlPlaceholder": "วาง URL ของลิงก์"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "เต็ม",
+        "narrow": "แคบ",
+        "normal": "ปกติ",
+        "wide": "กว้าง"
+      },
+      "font": {
+        "mono": "โมโน",
+        "sans": "ซานส์"
+      },
+      "lineSpacing": {
+        "normal": "ปกติ",
+        "relaxed": "โปร่ง",
+        "tight": "แน่น"
+      },
+      "textSize": {
+        "lg": "ใหญ่",
+        "md": "ค่าเริ่มต้น",
+        "sm": "เล็ก",
+        "xl": "ใหญ่พิเศษ"
+      }
+    },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` ไม่รองรับ — Myne เปิดโน้ต ไม่ใช่ไฟล์ ใช้แผงคำสั่งหรือแถบข้างแทน",
+          "map": "Myne ไม่รองรับการกำหนดปุ่มเอง ตั้งค่าคีย์ลัดได้ที่ การตั้งค่า → คีย์ลัด",
+          "set": "`:set` ไม่รองรับ — Myne ไม่มีตัวเลือกแบบ vim การตั้งค่าตัวแก้ไขอยู่ที่ การตั้งค่า → ตัวแก้ไข",
+          "source": "`:source` ไม่รองรับ Myne จงใจไม่มีช่องทางสคริปต์ตั้งค่า",
+          "unsupported": "Myne ไม่รองรับคำสั่งนั้น"
+        },
+        "substitute": {
+          "malformed": "อ่านคำสั่งแทนที่นั้นไม่ได้ รูปแบบที่ต้องการคือ :s/pattern/replacement/",
+          "refused": "รูปแบบนั้นใช้ไวยากรณ์เฉพาะของ vim ({{what}}) ซึ่งการค้นหาของ Myne ไม่รองรับ ไม่มีอะไรเปลี่ยนแปลง"
+        },
+        "writeFailed": "บันทึกไม่ได้",
+        "written": "บันทึกแล้ว"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "ฝัง: {{label}}"
+      },
+      "convert": {
+        "cancel": "ยกเลิก",
+        "choiceClause_one": " · {{count}} รายการต้องเลือกเป้าหมาย",
+        "choiceClause_other": " · {{count}} รายการต้องเลือกเป้าหมาย",
+        "chooseTarget": "เลือกเป้าหมาย…",
+        "convert": "แปลง",
+        "convertedToast_one": "แปลงวิกิลิงก์แล้ว {{count}} รายการ",
+        "convertedToast_other": "แปลงวิกิลิงก์แล้ว {{count}} รายการ",
+        "noneToConvert": "ไม่มีวิกิลิงก์ที่นำเข้าให้แปลงในโน้ตนี้",
+        "nothingToConvert": "ไม่มีอะไรให้แปลง — ไม่มีวิกิลิงก์ที่นำเข้าที่ชี้ไปยังโน้ตใดได้",
+        "rewriteCount_one": "จะมีการเขียนลิงก์ใหม่ {{count}} รายการ",
+        "rewriteCount_other": "จะมีการเขียนลิงก์ใหม่ {{count}} รายการ",
+        "skipped": "ข้าม — {{reason}}",
+        "title": "แปลงวิกิลิงก์ที่นำเข้าในโน้ตนี้"
+      },
+      "convertCore": {
+        "noMatch": "ไม่พบรายการที่ตรงกัน"
+      }
+    },
+    "flow": {
+      "loadFailed": "โหลดโน้ตของคุณไม่ได้",
+      "openFailed": "เปิดโน้ตนี้ไม่ได้",
+      "saveFailed": "บันทึกโน้ตนี้ไม่ได้",
+      "moveFailed": "ย้ายโน้ตนี้ไม่ได้",
+      "openTodayFailed": "เปิดโน้ตของวันนี้ไม่ได้",
+      "exportFailed": "ส่งออกโน้ตนี้ไม่ได้",
+      "attachNeedsApp": "ไฟล์แนบต้องใช้แอป (ไม่ใช่การแสดงตัวอย่างในเบราว์เซอร์)",
+      "attachTooLarge": "ไฟล์นั้นใหญ่เกินไป (สูงสุด 64 MB)",
+      "attachUnsupported": "แนบได้เฉพาะรูปภาพและ PDF เท่านั้น",
+      "attachFailed": "แนบไฟล์นั้นไม่ได้",
+      "archiveFailed": "เก็บโน้ตนี้เข้าที่เก็บถาวรไม่ได้",
+      "trashFailed": "ย้ายโน้ตนี้ไปถังขยะไม่ได้"
+    },
+    "nav": {
+      "dailyNote": "โน้ตประจำวัน",
+      "openToday": "เปิดของวันนี้",
+      "allNotes": "โน้ตทั้งหมด"
+    },
+    "list": {
+      "searchPlaceholder": "ค้นหาโน้ต",
+      "clearSearch": "ล้างการค้นหา",
+      "viewNoteCount_one": "โน้ต {{count}} รายการใน “{{name}}”",
+      "viewNoteCount_other": "โน้ต {{count}} รายการใน “{{name}}”",
+      "edit": "แก้ไข",
+      "trashEmpty": "ถังขยะว่างเปล่า",
+      "archiveEmpty": "ไม่มีโน้ตที่เก็บถาวรไว้",
+      "noMatchingNotes": "ไม่มีโน้ตที่ตรงกัน",
+      "noNotesYet": "ยังไม่มีโน้ต",
+      "noMatchBody": "ไม่มีอะไรตรงกับ “{{name}}” แก้ไขมุมมองหรือล้างมุมมองเพื่อดูโน้ตทั้งหมด",
+      "emptyBody": "แตะ “โน้ตใหม่” เพื่อเขียนโน้ตแรกของคุณ ทุกอย่างถูกเข้ารหัสบนอุปกรณ์นี้ก่อนถูกจัดเก็บ",
+      "unarchive": "นำออกจากที่เก็บถาวร"
+    },
+    "filterSheet": {
+      "title": "ตัวกรอง",
+      "status": "สถานะ"
+    },
+    "sortSheet": {
+      "title": "เรียงลำดับ",
+      "manual": "ลำดับที่กำหนดเอง",
+      "titleAsc": "ชื่อ · A → Z",
+      "titleDesc": "ชื่อ · Z → A"
+    },
+    "noteMenu": {
+      "emptyNote": "โน้ตว่าง",
+      "wordCount_one": "{{count}} คำ · อ่าน {{minutes}} นาที",
+      "wordCount_other": "{{count}} คำ · อ่าน {{minutes}} นาที",
+      "moveToFolder": "ย้ายไปโฟลเดอร์…",
+      "moveToTrash": "ย้ายไปถังขยะ",
+      "copied": "คัดลอกแล้ว ✓",
+      "copyToClipboard": "คัดลอกไปยังคลิปบอร์ด",
+      "versionHistory": "ประวัติเวอร์ชัน"
+    },
+    "purge": {
+      "body": "การกระทำนี้จะลบโน้ตออกจากอุปกรณ์นี้อย่างถาวร และย้อนกลับไม่ได้"
+    },
+    "move": {
+      "title": "ย้ายไปโฟลเดอร์",
+      "body": "พิมพ์เส้นทางโฟลเดอร์ (เช่น Projects/Myne) เว้นว่างไว้เพื่อใช้รากของห้องนิรภัย",
+      "placeholder": "Projects/Myne",
+      "confirm": "ย้าย"
+    },
+    "sidebar": {
+      "browse": "เรียกดู"
+    },
+    "emptyDetail": {
+      "title": "เลือกโน้ต",
+      "body": "เลือกโน้ตจากรายการ หรือเริ่มโน้ตใหม่"
+    },
+    "readingBar": {
+      "editNote": "แก้ไขโน้ต",
+      "edit": "แก้ไข"
+    },
+    "graphTab": {
+      "linkedNotes_one": "โน้ตที่เชื่อมโยง {{count}} รายการ",
+      "linkedNotes_other": "โน้ตที่เชื่อมโยง {{count}} รายการ",
+      "links_one": "ลิงก์ {{count}} รายการ",
+      "links_other": "ลิงก์ {{count}} รายการ"
+    },
+    "formatBar": {
+      "redo": "ทำซ้ำ",
+      "attachFile": "แนบไฟล์ใหม่",
+      "insertFromLibrary": "แทรกจากคลังไฟล์แนบ",
+      "recordVoiceNote": "บันทึกโน้ตเสียง",
+      "showLivePreview": "แสดงตัวอย่างแบบสด",
+      "showRawMarkdown": "แสดง Markdown ดิบ",
+      "hideKeyboard": "ซ่อนแป้นพิมพ์"
+    },
+    "topBar": {
+      "backToNotes": "กลับไปที่โน้ต",
+      "noteDetails": "รายละเอียดโน้ต",
+      "noteActions": "การดำเนินการกับโน้ต"
+    },
+    "noteContext": {
+      "collapsePanel": "ยุบแผง",
+      "unlinkedCount_one": "การกล่าวถึงที่ยังไม่ได้ลิงก์ {{count}}",
+      "unlinkedCount_other": "การกล่าวถึงที่ยังไม่ได้ลิงก์ {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "การ์ด",
+      "typeList": "รายการ",
+      "emptyState": "ยังไม่มีมุมมองที่บันทึกไว้ สร้างมุมมองเพื่อกรองโน้ตตามแท็ก โฟลเดอร์ หรือข้อความ",
+      "editView": "แก้ไขมุมมอง"
+    },
+    "sheet": {
+      "done": "เสร็จสิ้น"
+    },
+    "vaultSwitcher": {
+      "title": "ห้องนิรภัย"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "ไม่มีแท็กที่ตรงกัน",
+      "notesCount_one": "โน้ต · {{count}}",
+      "notesCount_other": "โน้ต · {{count}}"
+    },
+    "untitledNote": "โน้ตไม่มีชื่อ",
+    "commandPalette": {
+      "searchPlaceholder": "ค้นหาโน้ตหรือเรียกใช้คำสั่ง…",
+      "noMatches": "ไม่มีคำสั่งหรือโน้ตที่ตรงกัน"
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "โน้ต",
+      "errors": {
+        "attachmentCorrupt": "ไฟล์แนบที่โน้ตนี้อ้างอิงอ่านไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "attachmentMissing": "ไฟล์แนบที่โน้ตนี้อ้างอิงหายไป จึงไม่มีอะไรถูกส่งออก",
+        "cannotDecrypt": "อ่านโน้ตนี้ไม่ได้",
+        "destinationUnusable": "โฟลเดอร์ปลายทางนั้นใช้งานไม่ได้",
+        "fallback": "การส่งออกล้มเหลวโดยไม่คาดคิด ลองอีกครั้ง",
+        "invalidAttachmentCatalog": "อ่านแคตตาล็อกไฟล์แนบของห้องนิรภัยไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "invalidNoteFilename": "ชื่อไฟล์นั้นใช้งานไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "invalidNoteId": "ระบุโน้ตนี้ไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "invalidPlaintextEncoding": "เนื้อหาของโน้ตนี้ดูเสียหาย จึงไม่มีอะไรถูกส่งออก กู้คืนจากไฟล์สำรองข้อมูล",
+        "ioNoSpace": "พื้นที่ที่ปลายทางไม่พอ",
+        "ioPermissionDenied": "ไม่มีสิทธิ์เขียนที่ปลายทาง",
+        "ioWriteDefault": "เขียนไฟล์ที่ส่งออกไม่ได้",
+        "noteNotFound": "โน้ตนี้ไม่มีอยู่แล้ว — อาจถูกลบไปแล้ว",
+        "pdfCaptureFailed": "สร้าง PDF ไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "pdfExportInProgress": "มีการส่งออก PDF ทำงานอยู่แล้ว รอให้เสร็จก่อนแล้วลองอีกครั้ง",
+        "pdfPayloadMissing": "การส่งออกถูกขัดจังหวะ — ถ้าห้องนิรภัยล็อกไป ให้ปลดล็อกแล้วลองอีกครั้ง",
+        "pdfRenderTimeout": "โน้ตใช้เวลาเรนเดอร์นานเกินไป จึงไม่มีอะไรถูกส่งออก",
+        "pdfWindowCreateFailed": "เปิดหน้าต่างส่งออกไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "targetExists": "มีไฟล์ชื่อนั้นอยู่ที่ปลายทางแล้ว",
+        "vaultLocked": "ห้องนิรภัยถูกล็อกอยู่ ปลดล็อกแล้วลองอีกครั้ง"
+      },
+      "flow": {
+        "couldNotRead": "อ่านโน้ตนี้ไม่ได้",
+        "exportedTo": "ส่งออกไปยัง {{filename}} แล้ว",
+        "exportedToWithAttachments_one": "ส่งออกไปยัง {{filename}} + ไฟล์แนบ {{count}} รายการ",
+        "exportedToWithAttachments_other": "ส่งออกไปยัง {{filename}} + ไฟล์แนบ {{count}} รายการ",
+        "exportedToWithImages_one": "ส่งออกไปยัง {{filename}} + รูปภาพ {{count}} รูป",
+        "exportedToWithImages_other": "ส่งออกไปยัง {{filename}} + รูปภาพ {{count}} รูป",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "ข้อความล้วน",
+        "showInFolder": "แสดงในโฟลเดอร์"
+      },
+      "modal": {
+        "cancel": "ยกเลิก",
+        "export": "ส่งออก…",
+        "includeAttachments_one": "รวมไฟล์แนบ {{count}} รายการ",
+        "includeAttachments_other": "รวมไฟล์แนบ {{count}} รายการ",
+        "title": "ส่งออกเป็น Markdown",
+        "copyLabel": "คัดลอกข้อความโน้ตไปยังคลิปบอร์ด",
+        "copied": "คัดลอกข้อความโน้ตแล้ว",
+        "copyFailed": "คัดลอกข้อความโน้ตไม่ได้"
+      }
+    },
+    "egress": {
+      "cancel": "ยกเลิก",
+      "confirm": "ดาวน์โหลด",
+      "title": "ดาวน์โหลดไฟล์นี้"
+    },
+    "pdf": {
+      "cancel": "ยกเลิก",
+      "continue": "ดำเนินการต่อ…",
+      "title": "ส่งออกเป็น PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "เลือกที่เก็บไฟล์ที่ส่งออก",
+      "errors": {
+        "attachmentCorrupt": "ไฟล์แนบที่โน้ตหนึ่งอ้างอิงอ่านไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "attachmentMissing": "ไฟล์แนบที่โน้ตหนึ่งอ้างอิงหายไป จึงไม่มีอะไรถูกส่งออก",
+        "authOperationInProgress": "มีการทำงานกับห้องนิรภัยอื่นค้างอยู่ รอให้เสร็จก่อนแล้วลองอีกครั้ง",
+        "cancelled": "ยกเลิกการส่งออกแล้ว ไม่มีไฟล์ตกค้างที่ปลายทาง",
+        "cannotDecrypt": "มีโน้ตที่อ่านไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "destinationAlreadyExists": "มีบางอย่างอยู่ที่ตำแหน่งนั้นแล้ว เลือกตำแหน่งใหม่สำหรับการส่งออก",
+        "destinationNotAllowed": "ตำแหน่งนั้นอยู่ในพื้นที่จัดเก็บของ Myne เอง เลือกโฟลเดอร์นอกพื้นที่นั้น",
+        "invalidPlaintextEncoding": "เนื้อหาของโน้ตหนึ่งดูเสียหาย จึงไม่มีอะไรถูกส่งออก กู้คืนจากไฟล์สำรองข้อมูล",
+        "invalidVaultMeta": "อ่านข้อมูลกำกับห้องนิรภัยไม่ได้ จึงไม่มีอะไรถูกส่งออก",
+        "ioWriteDefault": "เขียนไฟล์ที่ส่งออกไม่ได้",
+        "joinFailure": "การส่งออกล้มเหลวโดยไม่คาดคิด ไม่มีไฟล์ตกค้างที่ปลายทาง",
+        "vaultLocked": "ห้องนิรภัยถูกล็อกอยู่ ปลดล็อกแล้วลองอีกครั้ง",
+        "vaultNotFound": "ไม่พบห้องนิรภัยที่จะส่งออก"
+      },
+      "flow": {
+        "countAttachments_one": "ไฟล์แนบ {{count}} รายการ",
+        "countAttachments_other": "ไฟล์แนบ {{count}} รายการ",
+        "countFolders_one": "โฟลเดอร์ {{count}} รายการ",
+        "countFolders_other": "โฟลเดอร์ {{count}} รายการ",
+        "countNotes_one": "โน้ต {{count}} รายการ",
+        "countNotes_other": "โน้ต {{count}} รายการ",
+        "exclusionsHistory": "ไม่รวมประวัติเวอร์ชัน",
+        "exclusionsTrashed_one": "ไม่รวมโน้ตในถังขยะ {{count}} รายการ",
+        "exclusionsTrashed_other": "ไม่รวมโน้ตในถังขยะ {{count}} รายการ",
+        "exclusionsTrashedAndHistory_one": "ไม่รวมโน้ตในถังขยะ {{count}} รายการ และไม่รวมประวัติเวอร์ชัน",
+        "exclusionsTrashedAndHistory_other": "ไม่รวมโน้ตในถังขยะ {{count}} รายการ และไม่รวมประวัติเวอร์ชัน",
+        "phaseAttachments": "ไฟล์แนบ",
+        "phaseNotes": "โน้ต",
+        "preparing": "กำลังเตรียม…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "ยกเลิก",
+        "cancelling": "กำลังยกเลิก…",
+        "title": "กำลังส่งออก…"
+      },
+      "setup": {
+        "cancel": "ยกเลิก",
+        "choose": "เลือก…",
+        "chooseFolder": "เลือกโฟลเดอร์…",
+        "destinationLabel": "ปลายทาง",
+        "export": "ส่งออก…",
+        "folderSelectAriaLabel": "โฟลเดอร์ที่จะส่งออก",
+        "noFolderChosen": "ยังไม่ได้เลือกโฟลเดอร์",
+        "noFoldersInVault": "ไม่มีโฟลเดอร์ในห้องนิรภัยนี้",
+        "scopeFolder": "โฟลเดอร์เดียว",
+        "scopeLabel": "ขอบเขต",
+        "scopeWhole": "ทั้งห้องนิรภัย",
+        "title": "ส่งออกห้องนิรภัยเป็น Markdown"
+      },
+      "summary": {
+        "done": "เสร็จสิ้น",
+        "showInFolder": "แสดงในโฟลเดอร์",
+        "title": "ส่งออกเสร็จสมบูรณ์"
+      }
+    }
+  },
+  "failClosed": {
+    "exit": {
+      "quit": "ปิดแอป",
+      "reload": "โหลดใหม่"
+    },
+    "corrupted": {
+      "body": "ถ้าคุณมีไฟล์สำรองข้อมูล คุณกู้คืนได้ — ไฟล์ปัจจุบันของคุณจะไม่ถูกแตะต้อง ไฟล์สำรองจะถูกกู้คืนเป็นห้องนิรภัยแยกต่างหากก่อน",
+      "cta": "ปิดแอป",
+      "title": "ไฟล์ห้องนิรภัยเสียหาย"
+    },
+    "invalidState": {
+      "body": "โปรดเริ่มโปรแกรมใหม่",
+      "cta": "ล็อก",
+      "title": "สถานะที่ไม่คาดคิด"
+    },
+    "ioError": {
+      "body": "อาจเป็นข้อผิดพลาดของดิสก์หรือระบบไฟล์",
+      "cta": "ปิดแอป",
+      "title": "อ่านไฟล์ห้องนิรภัยไม่ได้"
+    },
+    "permissionDenied": {
+      "body": "ตรวจสอบสิทธิ์ของไฟล์",
+      "cta": "ปิดแอป",
+      "title": "ไม่มีสิทธิ์เข้าถึงไฟล์ห้องนิรภัย"
+    },
+    "copyDiagnostics": "คัดลอกข้อมูลวินิจฉัย",
+    "diagnosticsCopied": "คัดลอกแล้ว",
+    "restoreFromBackup": "กู้คืนจากไฟล์สำรองข้อมูล…"
+  },
+  "notes": {
+    "archive": {
+      "close": "ปิด",
+      "count_one": "โน้ต {{count}} รายการ",
+      "count_other": "โน้ต {{count}} รายการ",
+      "delete": "ลบ",
+      "deleteError": "ลบโน้ตนั้นไม่ได้ ลองอีกครั้ง",
+      "emptyBody": "โน้ตและโฟลเดอร์ที่เก็บถาวรจะถูกซ่อนจากแถบข้าง แต่ยังถูกเก็บไว้อย่างปลอดภัย กู้คืนได้ที่นี่เมื่อคุณต้องการใช้",
+      "emptyTitle": "ไม่มีรายการที่เก็บถาวร",
+      "folderDeleteBody_one": "“{{name}}” และโน้ต {{count}} รายการในนั้น",
+      "folderDeleteBody_other": "“{{name}}” และโน้ต {{count}} รายการในนั้น",
+      "folderDeleteConfirmCta": "ย้ายไปถังขยะ",
+      "folderDeleteError": "ย้ายโน้ตในโฟลเดอร์นั้นไปถังขยะไม่ได้ ลองอีกครั้ง",
+      "folderDeleteTitle": "ย้ายโฟลเดอร์นี้ไปถังขยะหรือไม่",
+      "folderDeleteWarning": "รายการจะถูกย้ายไปถังขยะ — กู้คืนได้ทุกเมื่อ การลบถาวรเป็นอีกขั้นตอนหนึ่งต่างหาก",
+      "restore": "กู้คืน",
+      "restoreError": "กู้คืนโน้ตนั้นไม่ได้ ลองอีกครั้ง",
+      "title": "ที่เก็บถาวร",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "cardMenu": {
+      "copyLink": "คัดลอกลิงก์",
+      "open": "เปิด",
+      "openInNewTab": "เปิดในแท็บใหม่",
+      "revealInFolder": "แสดงในโฟลเดอร์"
+    },
+    "colorLabels": {
+      "clay": "ดินเผา",
+      "moss": "เขียวมอส",
+      "ochre": "เหลืองดินเทศ",
+      "plum": "ม่วงพลัม",
+      "slate": "เทาชนวน",
+      "stone": "เทาหิน"
+    },
+    "decoration": {
+      "colorSection": "สี",
+      "default": "ค่าเริ่มต้น",
+      "defaultFolderIcon": "ไอคอนโฟลเดอร์เริ่มต้น",
+      "iconSection": "ไอคอน",
+      "menuLabel": "ป้ายสี",
+      "noColor": "ไม่มีสี",
+      "none": "ไม่มี"
+    },
+    "deleteConfirm": {
+      "cancel": "ยกเลิก",
+      "delete": "ลบ",
+      "title": "ลบโน้ตนี้หรือไม่",
+      "untitled": "ไม่มีชื่อ",
+      "warning": "การกระทำนี้ย้อนกลับไม่ได้"
+    },
+    "filterBuilder": {
+      "addCondition": "เพิ่มเงื่อนไข",
+      "addFilterGroup": "เพิ่มกลุ่มตัวกรอง",
+      "cancel": "ยกเลิก",
+      "combinator": {
+        "all": "ทั้งหมด",
+        "any": "ข้อใดข้อหนึ่ง"
+      },
+      "match": "ตรงกับ",
+      "negate": {
+        "is": "เป็น",
+        "isNot": "ไม่เป็น"
+      },
+      "noConditions": "ยังไม่มีเงื่อนไข — มุมมองนี้จะแสดงทุกหน้า",
+      "noteCount_one": "โน้ต {{count}} รายการ",
+      "noteCount_other": "โน้ต {{count}} รายการ",
+      "of": "ของ:",
+      "ofTheGroups": "ของกลุ่ม:",
+      "op": {
+        "contains": "มีคำว่า"
+      },
+      "propertyValuePlaceholder": "ค่า",
+      "removeCondition": "ลบเงื่อนไข",
+      "replaceFilter": "แทนที่ตัวกรอง",
+      "save": "บันทึก",
+      "searchTextPlaceholder": "ข้อความค้นหา",
+      "selectFolderPlaceholder": "เลือกโฟลเดอร์…",
+      "selectPropertyPlaceholder": "เลือกคุณสมบัติ…",
+      "selectTagPlaceholder": "เลือกแท็ก…",
+      "type": {
+        "folder": "โฟลเดอร์",
+        "property": "คุณสมบัติ",
+        "search": "ค้นหา",
+        "tag": "แท็ก"
+      },
+      "unrepresentable": "ตัวกรองนี้สร้างด้วยตัวแก้ไขขั้นสูง จึงแก้ไขที่นี่ไม่ได้",
+      "unresolved": "ยังไม่ระบุ"
+    },
+    "folderManagement": {
+      "illegalSegment": "ชื่อโฟลเดอร์ต้องไม่มี / \\ | # ^ [ ] และต้องไม่ขึ้นต้นหรือลงท้ายด้วยช่องว่าง",
+      "tooLong": "เส้นทางโฟลเดอร์นั้นยาวเกินไป"
+    },
+    "folderNote": {
+      "defaultTitle": "ดัชนี"
+    },
+    "folderRow": {
+      "createFolderNote": "สร้างโน้ตประจำโฟลเดอร์",
+      "empty": "ว่าง",
+      "folderNote": "โน้ตประจำโฟลเดอร์",
+      "openFolderNote": "เปิดโน้ตประจำโฟลเดอร์"
+    },
+    "graph": {
+      "allConnected": "ทุกอย่างเชื่อมโยงกันหมด — ไม่มีโน้ตที่โดดเดี่ยว",
+      "building": "กำลังสร้างกราฟ…",
+      "colorGroups": {
+        "addRule": "เพิ่มกฎ",
+        "colorSwatchTitle": "เลือกสี",
+        "deleteRuleTitle": "ลบกฎ",
+        "dragHandleTitle": "ลากเพื่อจัดลำดับ",
+        "editFilterButton": "แก้ไขตัวกรอง…",
+        "editFilterTitle": "แก้ไขตัวกรองของกลุ่มสี",
+        "emptyBody": "กลุ่มสีช่วยให้คุณกำหนดสีให้โหนดในกราฟตามแท็กหรือโฟลเดอร์ — โน้ตงานสีหนึ่ง โน้ตส่วนตัวอีกสีหนึ่ง เพิ่มกฎแรกของคุณได้เลย",
+        "emptyTitle": "ยังไม่มีกลุ่มสี",
+        "enableToggleAriaLabel": "เปิดใช้กฎ",
+        "filterAllNotes": "ตรงกับทุกโน้ต",
+        "filterConditions_one": "เงื่อนไข {{count}} ข้อ",
+        "filterConditions_other": "เงื่อนไข {{count}} ข้อ",
+        "heading": "กลุ่มสี",
+        "moveDown": "ย้ายกฎลง",
+        "moveUp": "ย้ายกฎขึ้น",
+        "namePlaceholder": "กฎที่ไม่มีชื่อ"
+      },
+      "depthToggleTitle": "สลับความลึกของย่านใกล้เคียง (1 ↔ 2 ขั้น)",
+      "filterAll": "ทั้งหมด",
+      "filterAroundNote": "รอบโน้ตนี้",
+      "filterByTag": "กรองตามแท็ก",
+      "filterIsolated": "โดดเดี่ยว",
+      "hop": "{{depth}} ขั้น",
+      "loading": "กำลังโหลดกราฟ…",
+      "noNotes": "ยังไม่มีโน้ตให้แสดงเป็นกราฟ",
+      "refresh": "รีเฟรช",
+      "refreshTitle": "ห้องนิรภัยมีการเปลี่ยนแปลง — สร้างกราฟใหม่",
+      "settings": {
+        "appearanceHeading": "รูปลักษณ์",
+        "closeTitle": "ปิด",
+        "forceCenter": "แรงดึงเข้าศูนย์กลาง",
+        "forceLinkDistance": "ระยะห่างของเส้นเชื่อม",
+        "forceLinkStrength": "ความแรงของเส้นเชื่อม",
+        "forceRepel": "แรงผลัก",
+        "forcesHeading": "แรง",
+        "labelFadeZoom": "การจางของป้ายชื่อ",
+        "lineThickness": "ความหนาของเส้น",
+        "nodeSize": "ขนาดโหนด",
+        "nodeSizeStrength": "ขนาดตามจำนวนการเชื่อมโยง",
+        "openTitle": "การตั้งค่ากราฟ",
+        "reset": "คืนค่าเริ่มต้น",
+        "showArrows": "แสดงลูกศรบอกทิศทาง",
+        "title": "การตั้งค่ากราฟ"
+      },
+      "tagPlaceholder": "แท็ก…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "มุมมองที่ไม่มีชื่อ"
+      },
+      "modal": {
+        "cancel": "ยกเลิก",
+        "cancelledNotImported": "ไม่ได้นำเข้า {{count}} รายการ",
+        "cancelledNotImported_one": "ไม่ได้นำเข้า {{count}} รายการ",
+        "cancelledNotImported_other": "ไม่ได้นำเข้า {{count}} รายการ",
+        "cancelling": "กำลังยกเลิก…",
+        "chooseFolder": "เลือกโฟลเดอร์…",
+        "close": "ปิด",
+        "closeAriaLabel": "ปิด",
+        "copied": "คัดลอกแล้ว",
+        "copy": "คัดลอก",
+        "done": "เสร็จสิ้น",
+        "errorBody": "การนำเข้าทำไม่สำเร็จ โน้ตที่นำเข้าไปแล้วยังอยู่ครบ จะเก็บไว้หรือลบทิ้งก็ได้",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}",
+        "flagKindFolder": "โฟลเดอร์",
+        "flagKindTitle": "ชื่อเรื่อง",
+        "folderPickerTitle": "เลือกโฟลเดอร์ห้องนิรภัย Obsidian ของคุณ",
+        "hiddenIgnoredPrefix_one": "ข้ามรายการตั้งค่า / รายการที่ซ่อนไว้ {{count}} รายการ (เช่น ",
+        "hiddenIgnoredPrefix_other": "ข้ามรายการตั้งค่า / รายการที่ซ่อนไว้ {{count}} รายการ (เช่น ",
+        "hiddenIgnoredSuffix": ", ไฟล์ที่ขึ้นต้นด้วยจุด)",
+        "ifNoteExistsLabel": "ถ้ามีโน้ตนั้นอยู่แล้ว",
+        "import": "นำเข้า",
+        "importFailed": "นำเข้าไม่สำเร็จ",
+        "importing": "กำลังนำเข้าห้องนิรภัยของคุณ…",
+        "markDone": "ทำเครื่องหมายว่าเสร็จ",
+        "markedDone": "ทำเครื่องหมายว่าเสร็จแล้ว",
+        "mediaImported": "นำเข้าแล้ว {{count}} รายการ",
+        "mediaImported_one": "นำเข้าแล้ว {{count}} รายการ",
+        "mediaImported_other": "นำเข้าแล้ว {{count}} รายการ",
+        "mediaOmittedSuffix": " · ข้ามไป {{count}} รายการ",
+        "mediaOmittedSuffix_one": " · ข้ามไป {{count}} รายการ",
+        "mediaOmittedSuffix_other": " · ข้ามไป {{count}} รายการ",
+        "needsAttention": "ต้องตรวจสอบ",
+        "needsAttentionHelp": "โน้ตเหล่านี้ถูกนำเข้ามาโดยไม่เปลี่ยนแปลง ชื่อที่แนะนำเป็นเพียงจุดตั้งต้น — คัดลอกไปสักชื่อ แล้วเปลี่ยนชื่อโน้ตตอนที่คุณเปิดขึ้นมา",
+        "noFolderChosen": "ยังไม่ได้เลือกโฟลเดอร์",
+        "notesImported_one": "โน้ตที่นำเข้า",
+        "notesImported_other": "โน้ตที่นำเข้า",
+        "policyCopyHint": "นำเข้ามาไว้ควบคู่กับโน้ตเดิม",
+        "policyCopyLabel": "นำเข้าเป็นสำเนา",
+        "policySkipHint": "แนะนำ — การนำเข้าซ้ำจะไม่สร้างรายการซ้ำและไม่เขียนทับ",
+        "policySkipLabel": "ข้ามไป",
+        "preexistingDetail": "โน้ตนี้มีโฟลเดอร์ของตัวเองอยู่แล้ว: “{{existing}}” ซึ่ง Myne เก็บไว้ตามเดิม — โฟลเดอร์อาจต่างจากตำแหน่งที่ไฟล์วางอยู่บนดิสก์",
+        "preparing": "กำลังเตรียม…",
+        "progressNotes": " โน้ต",
+        "progressOf": " จาก ",
+        "reasonIllegalChar": "มีอักขระที่ Myne ใช้ในชื่อไม่ได้",
+        "reasonPathTooLong": "เส้นทางโฟลเดอร์ + ชื่อเรื่องยาวเกินไป",
+        "reasonSegmentTooLong": "ชื่อยาวเกินกว่าที่ Myne อนุญาต",
+        "scanning": "กำลังสแกนห้องนิรภัยของคุณ…",
+        "setupIntro": "Myne นำเข้าและเข้ารหัสโน้ตของคุณทันทีบนเครื่องนี้ — ไม่มีข้อมูลใดออกจากอุปกรณ์ และไฟล์ต้นฉบับของคุณไม่ถูกแก้ไข",
+        "statCancelled": "ยกเลิกแล้ว",
+        "statCanvasSkipped": "ข้ามไฟล์ .canvas",
+        "statCompressed": "รูปภาพที่บีบอัด",
+        "statEmptyFoldersKept": "โฟลเดอร์ว่างที่เก็บไว้",
+        "statMedia": "สื่อ",
+        "statOtherSkipped": "ไฟล์อื่นที่ข้ามไป",
+        "statSkipped": "ข้ามไป (มีอยู่แล้ว)",
+        "suggestedNameAriaLabel": "ชื่อที่แนะนำ",
+        "titleComplete": "นำเข้าเสร็จแล้ว",
+        "titleFailed": "นำเข้าไม่สำเร็จ",
+        "titleSetup": "นำเข้าโน้ต",
+        "vaultFolderLabel": "โฟลเดอร์ห้องนิรภัย",
+        "vaultRoot": "(รากของห้องนิรภัย)",
+        "titlePick": "นำเข้าโน้ต",
+        "keepsLabel": "สิ่งที่นำมาด้วย",
+        "losesLabel": "สิ่งที่ไม่ได้นำมา",
+        "changeSource": "เปลี่ยนแหล่งที่มา",
+        "statExcalidrawSkipped": "ข้ามภาพวาด Excalidraw",
+        "unfollowedLinkOutside": "นี่คือทางลัดไปยังโฟลเดอร์นอกโฟลเดอร์ที่คุณเลือก Myne จึงไม่ตามเข้าไป ย้ายหรือคัดลอกโฟลเดอร์นั้นเข้ามาไว้ในห้องนิรภัยของคุณ แล้วนำเข้าอีกครั้ง",
+        "unfollowedLinkLoop": "ทางลัดนี้ชี้กลับไปยังโฟลเดอร์ที่ Myne เข้าไปแล้ว การตามเข้าไปจะวนไม่รู้จบ ไม่มีอะไรใต้ทางลัดนี้ที่ตกหล่น",
+        "unfollowedLinkBroken": "ทางลัดนี้ไม่ได้ชี้ไปที่ใด — สิ่งที่มันเคยชี้ไปถูกย้ายหรือลบไปแล้ว",
+        "unreadableDetail": "ข้ามไป — {{reason}} การนำเข้าส่วนที่เหลือดำเนินต่อไป",
+        "stoppedAt": "นำเข้าโน้ตไปแล้ว {{imported}} จาก {{total}} รายการก่อนที่การนำเข้าจะหยุดลง โน้ตเหล่านั้นอยู่ในห้องนิรภัยของคุณและเก็บไว้ได้อย่างปลอดภัย",
+        "reasonNotUtf8": "Myne อ่านไฟล์นี้เป็นข้อความไม่ได้ ไฟล์นี้อาจถูกบันทึกด้วยการเข้ารหัสอักขระแบบเก่า หรือไม่ใช่ไฟล์ข้อความเลย",
+        "reasonPathRejected": "Myne เข้าถึงไฟล์นี้ภายในโฟลเดอร์ที่คุณเลือกไม่ได้",
+        "reasonPermissionDenied": "Myne ไม่ได้รับอนุญาตให้อ่านไฟล์นี้",
+        "reasonNotFound": "ไฟล์นี้หายไปก่อนที่ Myne จะเข้าถึง",
+        "reasonNoSpace": "อุปกรณ์นี้มีพื้นที่ไม่พอ",
+        "reasonUnknown": "Myne ระบุสาเหตุไม่ได้"
+      },
+      "offer": {
+        "body": "นำโน้ตที่คุณมีอยู่เข้ามาใน Myne แต่ละรายการจะถูกเข้ารหัสตอนนำเข้า — ไม่มีข้อมูลใดออกจากอุปกรณ์นี้ และไฟล์ต้นฉบับของคุณยังอยู่ที่เดิมทุกประการ",
+        "chooseFolder": "เลือกโฟลเดอร์…",
+        "laterHint": "คุณนำเข้าภายหลังได้เสมอที่ การตั้งค่า → ที่เก็บข้อมูล",
+        "notNow": "ยังไม่ตอนนี้",
+        "title": "นำเข้าโน้ตของคุณหรือไม่"
+      },
+      "picker": {
+        "intro": "โน้ตของคุณมาจากที่ใด"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "เลือกโฟลเดอร์ห้องนิรภัย Obsidian ของคุณ",
+          "survives": "เก็บไว้: Markdown, frontmatter, [[wikilinks]], โครงสร้างโฟลเดอร์ และไฟล์แนบ",
+          "loses": "ไม่ได้นำมา: ไฟล์ canvas และทุกอย่างที่ไม่ใช่โน้ต Markdown",
+          "short": "โฟลเดอร์ห้องนิรภัยที่มีโน้ต Markdown"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "เลือกโฟลเดอร์ export ของ Notion ที่แตกไฟล์แล้ว",
+          "survives": "เก็บไว้: หน้า โครงสร้างโฟลเดอร์ คุณสมบัติของหน้าในรูปแบบฟิลด์ และลิงก์ภายในในรูปแบบวิกิลิงก์ ฐานข้อมูลแต่ละชุดจะมาเป็นโน้ตตารางที่ลิงก์ไปยังแถวของมันด้วย",
+          "loses": "แตกไฟล์ export ก่อน — Myne อ่านจากโฟลเดอร์ ไม่ใช่จากไฟล์ .zip ส่วนโทเกิล คอลเอาต์ และข้อความสี ไม่มีสิ่งเทียบเท่าและจะถูกระบุไว้ในรายงานการนำเข้า",
+          "short": "โฟลเดอร์ export ที่แตกไฟล์แล้ว"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "เลือกไฟล์ .enex ของ Evernote",
+          "survives": "เก็บไว้: ทุกโน้ตในไฟล์ การจัดรูปแบบ และไฟล์แนบ ส่วนบล็อกที่เข้ารหัสไว้จะถูกเก็บเป็นข้อความที่คุณยังถอดรหัสได้ใน Evernote",
+          "loses": "ไม่ได้นำมา: การเตือนและประวัติของโน้ต ไฟล์ export ที่ใหญ่มากจะถูกปฏิเสธแทนที่จะเสี่ยง — ถ้าเจอกรณีนี้ให้แบ่ง export ออกเป็นหลายไฟล์",
+          "short": "ไฟล์ export .enex ไฟล์เดียว"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "เลือกโฟลเดอร์ที่มีไฟล์ HTML",
+          "survives": "เก็บไว้: หัวข้อ รายการ ตาราง ลิงก์ โค้ด และการเน้นข้อความ",
+          "loses": "ไม่ได้นำมา: สไตล์ สคริปต์ และเนื้อหาฝัง รูปภาพจากภายนอกจะคงไว้เป็นลิงก์และไม่ถูกดาวน์โหลด",
+          "short": "โฟลเดอร์ของหน้าเว็บที่บันทึกไว้"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "เลือกไฟล์ .csv ของคุณ",
+          "survives": "จะกลายเป็นโน้ตเดียวที่บรรจุตารางไว้",
+          "loses": "ได้โน้ตเดียว ไม่ใช่หนึ่งโน้ตต่อหนึ่งแถว — Myne ไม่ใช่ฐานข้อมูล ไฟล์ที่กว้างมากหรือยาวมากจะถูกตัดทอน และรายงานการนำเข้าจะบอกว่าตัดไปเท่าใด",
+          "short": "ไฟล์สเปรดชีตหนึ่งไฟล์"
+        }
+      }
+    },
+    "list": {
+      "addToFavorites": "เพิ่มในรายการโปรด",
+      "archive": "เก็บถาวร",
+      "archiveBulkError": "เก็บโน้ตเข้าที่เก็บถาวรไม่ได้",
+      "archiveFolder": "เก็บโฟลเดอร์เข้าที่เก็บถาวร",
+      "archiveNote": "เก็บถาวร",
+      "archiveSingleError": "เก็บโน้ตเข้าที่เก็บถาวรไม่ได้",
+      "attachments": "ไฟล์แนบ",
+      "bulkArchive": "เก็บโน้ต {{count}} รายการเข้าที่เก็บถาวร",
+      "bulkArchive_one": "เก็บโน้ต {{count}} รายการเข้าที่เก็บถาวร",
+      "bulkArchive_other": "เก็บโน้ต {{count}} รายการเข้าที่เก็บถาวร",
+      "bulkDelete": "ลบโน้ต {{count}} รายการ",
+      "bulkDelete_one": "ลบโน้ต {{count}} รายการ",
+      "bulkDelete_other": "ลบโน้ต {{count}} รายการ",
+      "moveTo": "ย้ายไป…",
+      "bulkMove": "ย้ายโน้ต {{count}} รายการไป…",
+      "bulkMove_one": "ย้ายโน้ต {{count}} รายการไป…",
+      "bulkMove_other": "ย้ายโน้ต {{count}} รายการไป…",
+      "caseMergeBody": "มีโฟลเดอร์ชื่อ “{{name}}” อยู่แล้ว ทั้งสองจะถูกรวมเข้าด้วยกัน — เปลี่ยนชื่ออันหนึ่งเพื่อแยกไว้ต่างหากหรือไม่",
+      "color": "สี…",
+      "createFirstNote": "+ สร้างโน้ตแรกของคุณ",
+      "createFolderNote": "สร้างโน้ตประจำโฟลเดอร์",
+      "customize": "ปรับแต่ง…",
+      "delete": "ลบ",
+      "deleteFolderBody_one": "“{{name}}” และโน้ต {{count}} รายการในนั้น",
+      "deleteFolderBody_other": "“{{name}}” และโน้ต {{count}} รายการในนั้น",
+      "deleteFolderConfirm": "ลบโฟลเดอร์",
+      "deleteFolderTitle": "ลบโฟลเดอร์นี้หรือไม่",
+      "deleteFolderWarning": "โน้ตจะถูกย้ายไปถังขยะ — คุณกู้คืนได้ภายหลัง",
+      "duplicate": "ทำสำเนา",
+      "editFilterTitle": "แก้ไขตัวกรอง",
+      "emptyState": "ยังไม่มีโน้ต",
+      "exportHtml": "ส่งออกเป็น HTML…",
+      "exportMarkdown": "ส่งออกเป็น Markdown…",
+      "exportPdf": "ส่งออกเป็น PDF…",
+      "exportTxt": "ส่งออกเป็นข้อความล้วน…",
+      "favoritesHeading": "รายการโปรด",
+      "icon": "ไอคอน…",
+      "mergeAnyway": "รวมต่อไป",
+      "newDrawingHere": "ภาพวาดใหม่ที่นี่",
+      "newDrawingMenu": "ภาพวาดใหม่",
+      "newFolder": "โฟลเดอร์ใหม่",
+      "newFolderInPlaceholder": "โฟลเดอร์ใหม่ใน {{path}}",
+      "newFolderPlaceholder": "โฟลเดอร์ใหม่",
+      "newItem": "สร้างใหม่…",
+      "newNote": "โน้ตใหม่",
+      "newNoteFromTemplate": "โน้ตใหม่จากเทมเพลต…",
+      "newNoteHere": "โน้ตใหม่ที่นี่",
+      "newNoteMenu": "โน้ตใหม่",
+      "newNoteShortcut": "โน้ตใหม่ (⌘N)",
+      "newSubfolder": "โฟลเดอร์ย่อยใหม่",
+      "newViewTitle": "มุมมองใหม่",
+      "noteMovedToTrash": "ย้ายโน้ตไปถังขยะแล้ว",
+      "notesHeading": "โน้ต",
+      "notesMovedToTrash_one": "ย้ายโน้ต {{count}} รายการไปถังขยะแล้ว",
+      "notesMovedToTrash_other": "ย้ายโน้ต {{count}} รายการไปถังขยะแล้ว",
+      "openArchive": "เปิดที่เก็บถาวร",
+      "openAttachments": "เปิดไฟล์แนบ",
+      "openFolderNote": "เปิดโน้ตประจำโฟลเดอร์",
+      "openInNewTab": "เปิดในแท็บใหม่",
+      "openToSide": "เปิดด้านข้าง",
+      "openTrash": "เปิดถังขยะ",
+      "removeFolderNote": "เอาโน้ตประจำโฟลเดอร์ออก",
+      "removeFromFavorites": "เอาออกจากรายการโปรด",
+      "rename": "เปลี่ยนชื่อ",
+      "setAsFolderNote": "ตั้งเป็นโน้ตประจำโฟลเดอร์",
+      "trash": "ถังขยะ",
+      "trashBulkError": "ย้ายโน้ตไปถังขยะไม่ได้",
+      "trashConfirmBulkBody_one": "โน้ต {{count}} รายการจะถูกย้ายไปถังขยะ",
+      "trashConfirmBulkBody_other": "โน้ต {{count}} รายการจะถูกย้ายไปถังขยะ",
+      "trashConfirmBulkWarning": "คุณกู้คืนจากถังขยะได้ภายหลัง",
+      "trashConfirmConfirm": "ย้ายไปถังขยะ",
+      "trashConfirmTitle": "ย้ายไปถังขยะหรือไม่",
+      "trashConfirmWarning": "คุณกู้คืนจากถังขยะได้ภายหลัง",
+      "trashSingleError": "ย้ายโน้ตไปถังขยะไม่ได้",
+      "undo": "เลิกทำ",
+      "vaultRoot": "รากของห้องนิรภัย",
+      "viewSettingsTitle": "การตั้งค่ามุมมอง",
+      "imported_one": "นำเข้าโน้ต 1 รายการมาไว้ในโฟลเดอร์นี้",
+      "imported_other": "นำเข้าโน้ต {{count}} รายการมาไว้ในโฟลเดอร์นี้",
+      "importedWithSkips": "นำเข้าแล้ว {{count}} — ข้ามไป {{skipped}}",
+      "importNoMarkdown": "ไม่มีไฟล์ markdown ในรายการที่วางลงมา"
+    },
+    "newFromTemplate": {
+      "back": "ย้อนกลับ",
+      "blankNote": "โน้ตเปล่า",
+      "createNote": "สร้างโน้ต",
+      "createFirstTemplate": "สร้างเทมเพลต",
+      "manageTemplates": "จัดการเทมเพลต",
+      "emptyState": "คุณยังไม่ได้สร้างเทมเพลตใดเลย",
+      "listLabel": "เทมเพลต",
+      "loading": "กำลังโหลด…",
+      "nameLabel": "ชื่อของโน้ต (จาก “{{templateName}}”)",
+      "namePlaceholder": "ไม่มีชื่อ",
+      "nameStepTitle": "ตั้งชื่อโน้ตนี้",
+      "pickStepTitle": "โน้ตใหม่จากเทมเพลต",
+      "untitledTemplate": "เทมเพลตที่ไม่มีชื่อ"
+    },
+    "newTab": {
+      "createNote": "สร้างโน้ตใหม่",
+      "createDrawing": "ภาพวาดใหม่",
+      "noNotesMatch": "ไม่มีโน้ตที่ตรงกัน",
+      "noNotesYet": "ยังไม่มีโน้ต",
+      "recent": "ล่าสุด",
+      "searchAriaLabel": "ค้นหาโน้ตเพื่อเปิด",
+      "searchPlaceholder": "ค้นหาโน้ต…",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "pane": {
+      "graphTab": "กราฟ",
+      "tasksTab": "งาน",
+      "loading": "กำลังโหลด…",
+      "untitledView": "มุมมองที่ไม่มีชื่อ"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} วันที่แล้ว",
+      "hoursAgo": "{{h}} ชม. ที่แล้ว",
+      "justNow": "เมื่อสักครู่",
+      "minutesAgo": "{{m}} นาทีที่แล้ว",
+      "oneWeekAgo": "1 สัปดาห์ที่แล้ว",
+      "weeksAgo": "{{w}} สัปดาห์ที่แล้ว",
+      "yesterday": "เมื่อวาน"
+    },
+    "row": {
+      "addToFavorites": "เพิ่มในรายการโปรด",
+      "folderIndexBadgeLabel": "โน้ตประจำโฟลเดอร์",
+      "folderIndexBadgeTitle": "โน้ตประจำโฟลเดอร์ — ดัชนีของโฟลเดอร์นี้",
+      "folderIndexConflictLabel": "โฟลเดอร์นี้มีโน้ตดัชนีอยู่แล้ว",
+      "folderIndexConflictTitle": "โฟลเดอร์นี้มีโน้ตดัชนีอยู่แล้ว",
+      "loadError": "โหลดโน้ตนี้ไม่ได้",
+      "removeFromFavorites": "เอาออกจากรายการโปรด",
+      "renameAriaLabel": "เปลี่ยนชื่อโน้ต",
+      "taskBadgeLabel": "โน้ตนี้เป็นงาน",
+      "taskBadgeTitle": "โน้ตงาน",
+      "unsyncedLabel": "ยังไม่อยู่บนเซิร์ฟเวอร์",
+      "unsyncedTitle": "การเปลี่ยนแปลงล่าสุดของโน้ตนี้อยู่บนอุปกรณ์นี้เท่านั้น",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "savedView": {
+      "defaultName": "มุมมองที่กรองแล้ว"
+    },
+    "saveStatus": {
+      "conflict": "กำลังแก้ความขัดแย้งของการแก้ไข…",
+      "conflictTitle": "โน้ตนี้ถูกแก้ไขบนอุปกรณ์อื่น — กำลังเก็บไว้ทั้งสองเวอร์ชัน",
+      "editing": "กำลังแก้ไข",
+      "editingEllipsis": "กำลังแก้ไข…",
+      "editingTitle": "กำลังแก้ไข — การบันทึกอัตโนมัติพร้อมทำงาน",
+      "justNow": "เมื่อสักครู่",
+      "retry": "ลองใหม่",
+      "saved": "บันทึกแล้ว",
+      "savedRelative": "บันทึกแล้ว {{rel}}",
+      "saveFailed": "บันทึกไม่สำเร็จ",
+      "saveFailedTitle": "บันทึกไม่สำเร็จ — คลิก ลองใหม่",
+      "storageFull": "พื้นที่เก็บข้อมูลเต็ม",
+      "storageFullTitle": "ไม่มีพื้นที่เหลือให้บันทึกโน้ตนี้ เพิ่มพื้นที่ว่าง (หรือลบไฟล์แนบบางส่วน) แล้วลองใหม่ จนกว่าจะบันทึกได้ การแก้ไขนี้อยู่ในหน้าต่างนี้เท่านั้น และยังไม่อยู่บนเซิร์ฟเวอร์เช่นกัน",
+      "saving": "กำลังบันทึก",
+      "savingEllipsis": "กำลังบันทึก…"
+    },
+    "snapshotFailed": {
+      "dismiss": "ปิด",
+      "message": "บันทึกสแนปช็อตไม่ได้ — โน้ตของคุณถูกบันทึกแล้ว แต่ประวัติเวอร์ชันอาจไม่ครบ (ดิสก์อาจเต็ม)"
+    },
+    "snapshots": {
+      "cancel": "ยกเลิก",
+      "changeCount_one": "เปลี่ยนแปลง {{count}} ครั้งนับจากสแนปช็อตนี้",
+      "changeCount_other": "เปลี่ยนแปลง {{count}} ครั้งนับจากสแนปช็อตนี้",
+      "changeCountPrev_one": "เปลี่ยนแปลง {{count}} ครั้งจากสแนปช็อตก่อนหน้า",
+      "changeCountPrev_other": "เปลี่ยนแปลง {{count}} ครั้งจากสแนปช็อตก่อนหน้า",
+      "close": "ปิด",
+      "compareAgainstLabel": "เปรียบเทียบกับ",
+      "compareCurrent": "โน้ตปัจจุบัน",
+      "comparePrevious": "สแนปช็อตก่อนหน้า",
+      "confirmBody": "โน้ตปัจจุบันของคุณจะถูกบันทึกเป็นสแนปช็อตไว้ก่อน คุณจึงย้อนกลับได้",
+      "confirmTitle": "กู้คืนสแนปช็อตนี้หรือไม่",
+      "decrypting": "กำลังถอดรหัส…",
+      "emptyState": "ยังไม่มีสแนปช็อต ระบบจะบันทึกสแนปช็อตอัตโนมัติขณะที่คุณแก้ไข และเก็บไว้ประมาณ 7 วัน สแนปช็อตถูกเข้ารหัสไว้ และจะหายไปเมื่อโน้ตถูกลบอย่างถาวร",
+      "encryptedSize": "เข้ารหัสแล้ว · {{size}}",
+      "errorCannotDecrypt": "ถอดรหัสสแนปช็อตนี้ไม่ได้",
+      "errorGeneric": "เกิดข้อผิดพลาด ลองอีกครั้ง",
+      "errorIo": "เกิดข้อผิดพลาดกับดิสก์ — ดิสก์อาจเต็มหรือเขียนไม่ได้",
+      "errorNotFound": "ไม่มีสแนปช็อตนั้นแล้ว",
+      "errorStorageAccess": "เข้าถึงที่เก็บสแนปช็อตของห้องนิรภัยไม่ได้",
+      "errorVaultLocked": "ห้องนิรภัยถูกล็อกอยู่ ปลดล็อกเพื่อดูสแนปช็อต",
+      "justNow": "เมื่อสักครู่",
+      "listLabel": "รายการสแนปช็อต",
+      "loading": "กำลังโหลด…",
+      "noPrevious": "นี่คือสแนปช็อตแรกสุด — ไม่มีรายการก่อนหน้าให้เปรียบเทียบ",
+      "restore": "กู้คืน",
+      "restoreCta": "กู้คืนสแนปช็อตนี้",
+      "restoredStatus": "กู้คืนแล้ว เวอร์ชันที่คุณมีอยู่ถูกบันทึกเป็นสแนปช็อตไว้",
+      "selectPlaceholder": "เลือกสแนปช็อตเพื่อดูว่ามีอะไรเปลี่ยนไปนับจากตอนนั้น",
+      "title": "สแนปช็อต",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "tabStrip": {
+      "closeNewTab": "ปิดแท็บใหม่",
+      "closeTab": "ปิด {{title}}",
+      "newTab": "แท็บใหม่",
+      "openNotes": "โน้ตที่เปิดอยู่",
+      "pin": "ปักหมุด",
+      "pinned": "ปักหมุดแล้ว",
+      "pinnedTitle": "ปักหมุดอยู่ — เอาหมุดออกก่อนจึงจะปิดได้",
+      "unpin": "เอาหมุดออก",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "tagBrowser": {
+      "cancel": "ยกเลิก",
+      "clear": "ล้าง",
+      "combineTagsWith": "รวมแท็กด้วย",
+      "filtering": "กำลังกรอง…",
+      "modeAll": "ทั้งหมด",
+      "modeAny": "ข้อใดข้อหนึ่ง",
+      "noNotesForFilter": "ไม่มีโน้ตสำหรับตัวกรองนี้",
+      "noTagsMatch": "ไม่มีแท็กที่ตรงกับ “{{query}}”",
+      "noTagsYet": "ยังไม่มีแท็ก",
+      "noteCount_one": "โน้ต {{count}} รายการ",
+      "noteCount_other": "โน้ต {{count}} รายการ",
+      "notes": "โน้ต",
+      "pickTag": "เลือกแท็กเพื่อกรอง",
+      "save": "บันทึก",
+      "saveAsView": "บันทึกเป็นมุมมอง",
+      "searchPlaceholder": "ค้นหาแท็ก…",
+      "title": "แท็ก",
+      "untitled": "ไม่มีชื่อ",
+      "viewNamePlaceholder": "ชื่อมุมมอง"
+    },
+    "trash": {
+      "close": "ปิด",
+      "count_one": "โน้ต {{count}} รายการ",
+      "count_other": "โน้ต {{count}} รายการ",
+      "delete": "ลบ",
+      "deleteError": "ลบโน้ตนั้นไม่ได้ ลองอีกครั้ง",
+      "empty": "ล้างถังขยะ",
+      "emptyConfirmBody_one": "โน้ต {{count}} รายการจะถูกลบอย่างถาวร",
+      "emptyConfirmBody_other": "โน้ต {{count}} รายการจะถูกลบอย่างถาวร",
+      "emptyConfirmCta": "ล้างถังขยะ",
+      "emptyConfirmTitle": "ล้างถังขยะหรือไม่",
+      "emptyPartialFailure_one": "โน้ต {{count}} รายการลบไม่ได้และยังอยู่ในถังขยะ",
+      "emptyPartialFailure_other": "โน้ต {{count}} รายการลบไม่ได้และยังอยู่ในถังขยะ",
+      "emptyBody": "โน้ตที่คุณลบจะมาอยู่ที่นี่ และอยู่จนกว่าคุณจะล้างถังขยะ — คุณกู้คืนรายการใดก็ได้ทุกเมื่อ",
+      "emptyTitle": "ถังขยะว่างเปล่า",
+      "purgeConfirmCta": "ลบอย่างถาวร",
+      "purgeConfirmTitle": "ลบอย่างถาวรหรือไม่",
+      "restore": "กู้คืน",
+      "restoreError": "กู้คืนโน้ตนั้นไม่ได้ ลองอีกครั้ง",
+      "title": "ถังขยะ",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "unlinkedMentions": {
+      "empty": "ไม่มีการกล่าวถึงที่ยังไม่ได้ลิงก์",
+      "heading": "การกล่าวถึงที่ยังไม่ได้ลิงก์",
+      "link": "ลิงก์",
+      "linkTooltip": "ลิงก์การกล่าวถึงนี้ไปยัง {{title}}",
+      "refresh": "การกล่าวถึงอาจเปลี่ยนไป — รีเฟรช",
+      "searching": "กำลังค้นหา…",
+      "thisNote": "โน้ตนี้",
+      "untitled": "ไม่มีชื่อ"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "เปลี่ยนภาพหน้าปก",
+        "changeCoverImage": "เปลี่ยนภาพหน้าปก",
+        "empty": "ไม่มีโน้ตที่ตรงกับมุมมองนี้",
+        "noValue": "ไม่มีค่า",
+        "setCover": "ตั้งภาพหน้าปก",
+        "setCoverImage": "ตั้งภาพหน้าปก",
+        "untitled": "ไม่มีชื่อ"
+      },
+      "collapseViews": "ยุบมุมมอง",
+      "empty": "ยังไม่มีมุมมอง บันทึกรายการโน้ตปัจจุบันเป็นมุมมองได้",
+      "expandViews": "ขยายมุมมอง",
+      "heading": "มุมมอง",
+      "host": {
+        "unsupported": "มุมมองประเภทนี้จะมาในอัปเดตครั้งถัดไป"
+      },
+      "list": {
+        "empty": "ไม่มีโน้ตที่ตรงกับมุมมองนี้",
+        "noValue": "ไม่มีค่า"
+      },
+      "menu": {
+        "deleteView": "ลบมุมมอง",
+        "editFilter": "แก้ไขตัวกรอง…",
+        "moveDown": "ย้ายลง",
+        "moveUp": "ย้ายขึ้น",
+        "rename": "เปลี่ยนชื่อ",
+        "viewSettings": "การตั้งค่ามุมมอง…"
+      },
+      "newView": "มุมมองใหม่",
+      "noMatch": "ไม่มีมุมมองที่ตรงกับการค้นหาของคุณ",
+      "searchPlaceholder": "ค้นหามุมมอง…",
+      "table": {
+        "empty": "ไม่มีโน้ตที่ตรงกับมุมมองนี้",
+        "name": "ชื่อ",
+        "noValue": "ไม่มีค่า"
+      },
+      "untitledView": "มุมมองที่ไม่มีชื่อ"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "ค่าเริ่มต้น (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (จัตุรัส)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (กว้าง)"
+      },
+      "cancel": "ยกเลิก",
+      "cardSize": "ขนาดการ์ด",
+      "cardSizeValue": "{{size}} px",
+      "columns": "คอลัมน์",
+      "columnsEmpty": "ไม่พบคุณสมบัติ",
+      "columnsHint": "คุณสมบัติใน frontmatter ที่แสดงเป็นคอลัมน์ (ตาราง) หรือเป็นบรรทัดรายละเอียด (รายการ / การ์ด)",
+      "columnsPlaceholder": "เพิ่มคอลัมน์…",
+      "coverImageHint": "คุณสมบัติใน frontmatter ที่มีค่าเป็นรูปภาพ — จะแสดงเป็นภาพหน้าปกของแต่ละการ์ด เว้นว่างไว้ถ้าไม่ต้องการภาพหน้าปก",
+      "coverImagePlaceholder": "เช่น cover",
+      "coverImageProperty": "คุณสมบัติภาพหน้าปก",
+      "groupBy": "จัดกลุ่มตาม",
+      "imageAspectRatio": "อัตราส่วนภาพ",
+      "propertyNone": "ไม่มี",
+      "reset": "รีเซ็ต",
+      "save": "บันทึก",
+      "sortAsc": "จากน้อยไปมาก",
+      "sortBy": "เรียงตาม",
+      "sortDesc": "จากมากไปน้อย",
+      "sortDirection": "ทิศทางการเรียง",
+      "viewType": "ประเภทมุมมอง",
+      "viewTypeCards": "การ์ด",
+      "viewTypeList": "รายการ",
+      "viewTypeTable": "ตาราง"
+    },
+    "welcome": {
+      "body": "ยินดีต้อนรับสู่ Myne พื้นที่ส่วนตัวสำหรับคิดและเขียนของคุณ\n\nทุกสิ่งที่คุณบันทึกไว้ที่นี่ถูกเข้ารหัสและอยู่บนอุปกรณ์ของคุณ **รหัสผ่าน** และ **วลีกู้คืน** ของคุณคือกุญแจเพียงสองอย่างที่เปิดมันได้ จึงควรเก็บไว้ในที่ปลอดภัย ถ้าทั้งสองอย่างสูญหายไป จะไม่มีใครกู้โน้ตของคุณคืนได้ แม้แต่เราเอง\n\nนี่เป็นเพียงโน้ตธรรมดา ทำให้เป็นของคุณได้เลย แก้ไข เปลี่ยนชื่อ หรือลบทิ้งเมื่อใดก็ได้ และเพิ่มโน้ตใหม่ไปเรื่อย ๆ ตามความคิดที่งอกงามขึ้น\n\nเราดีใจที่คุณมาที่นี่ ดูข้อมูลเพิ่มเติมเกี่ยวกับ Myne ได้ที่ https://myne.md\n",
+      "title": "ยินดีต้อนรับสู่ Myne"
+    },
+    "workspace": {
+      "defaultSlotName": "ค่าเริ่มต้น"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "กำลังตรวจสอบความแข็งแรง…",
+      "confirmLabel": "ยืนยันรหัสผ่านหลัก",
+      "defaultEmptyCaption": "ใช้เป็นอินพุตของ Argon2id (m=256 MiB, t=3, p=2) เลือกรหัสผ่านที่คุณจำได้ เพราะรีเซ็ตไม่ได้",
+      "mismatch": "รหัสผ่านไม่ตรงกัน",
+      "passwordLabel": "รหัสผ่านหลัก",
+      "suggestPassword": "แนะนำรหัสผ่าน",
+      "tooShort": "ใช้อย่างน้อย {{n}} ตัวอักษร"
+    },
+    "input": {
+      "hide": "ซ่อนรหัสผ่าน",
+      "show": "แสดงรหัสผ่าน"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "ไม่พบรายการที่ตรงกัน",
+      "placeholder": "เลือก…",
+      "searchPlaceholder": "ค้นหา…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "ยกเลิกการกู้คืน: ห้องนิรภัยถูกล็อก",
+      "operationInProgress": "มีการทำงานค้างอยู่ โปรดรอสักครู่",
+      "unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด โปรดลองอีกครั้ง",
+      "vaultNotFound": "ไม่พบไฟล์ห้องนิรภัย โปรดเริ่มแอปใหม่"
+    },
+    "vaultUnreadable": "ไฟล์ห้องนิรภัยอ่านไม่ได้ กู้คืนจากไฟล์สำรองข้อมูล",
+    "genericError": "เกิดข้อผิดพลาด โปรดลองอีกครั้ง",
+    "weakPassword": "รหัสผ่านต้องมีอย่างน้อย {{min}} ตัวอักษร",
+    "setPasswordError": "ตั้งรหัสผ่านใหม่ของคุณไม่ได้ โปรดลองอีกครั้ง",
+    "passwordMismatch": "รหัสผ่านไม่ตรงกัน",
+    "decryptingSubtitle": "กำลังสร้างกุญแจของห้องนิรภัยขึ้นใหม่ด้วย Argon2id ใช้เวลาสองสามวินาที",
+    "restoreVaultHeader": "กู้คืนห้องนิรภัย",
+    "accountTitle": "ป้อนหมายเลขบัญชีของคุณ",
+    "accountLead": "ดูได้จากที่ที่คุณเก็บวลีกู้คืนไว้ หมายเลขนี้ระบุว่าจะกู้คืนห้องนิรภัยใด",
+    "accountInvalid": "หมายเลขบัญชีไม่ถูกต้อง — โปรดตรวจสอบแล้วป้อนใหม่",
+    "accountOptionalHint": "ไม่มีหมายเลขใช่ไหม เว้นว่างไว้แล้วดำเนินการต่อได้ — วลีกู้คืน 24 คำก็เพียงพอแล้ว",
+    "paste": "วาง",
+    "phraseGridHint": "พิมพ์ทีละคำ หรือวางทั้ง 24 คำพร้อมกันเพื่อเติมลงในตาราง",
+    "submitProgress": "ส่ง · {{filled}} จาก {{total}}",
+    "newPasswordTitle": "เลือกรหัสผ่านใหม่",
+    "newPasswordLead": "วลีกู้คืนของคุณยังคงเดิม ขั้นตอนนี้ตั้งรหัสผ่านสำหรับอุปกรณ์นี้",
+    "confirmPasswordLabel": "ยืนยันรหัสผ่าน",
+    "passwordHelper": "ไม่ถูกจัดเก็บและไม่ถูกส่งออกไปไหน ใช้เข้ารหัสกุญแจของคุณบนอุปกรณ์นี้",
+    "encryptingSubtitle": "กำลังห่อกุญแจของห้องนิรภัยด้วยรหัสผ่านใหม่ของคุณ"
+  },
+  "recurrence": {
+    "every": {
+      "day": "ทุกวัน",
+      "week": "ทุกสัปดาห์",
+      "month": "ทุกเดือน",
+      "year": "ทุกปี"
+    },
+    "everyN": {
+      "day": "ทุก {{count}} วัน",
+      "week": "ทุก {{count}} สัปดาห์",
+      "month": "ทุก {{count}} เดือน",
+      "year": "ทุก {{count}} ปี"
+    },
+    "everyWeekday": "ทุก{{days}}",
+    "everyWeekdays": "ทุก{{days}}",
+    "ordinal": {
+      "first": "แรก",
+      "second": "ที่สอง",
+      "third": "ที่สาม",
+      "fourth": "ที่สี่",
+      "last": "สุดท้าย"
+    },
+    "ordinalOfMonth": "{{weekday}}{{ordinal}}ของทุกเดือน",
+    "dayOfMonth": "วันที่ {{day}} ของทุกเดือน",
+    "lastDayOfMonth": "วันสุดท้ายของทุกเดือน",
+    "weekday": {
+      "monday": "วันจันทร์",
+      "tuesday": "วันอังคาร",
+      "wednesday": "วันพุธ",
+      "thursday": "วันพฤหัสบดี",
+      "friday": "วันศุกร์",
+      "saturday": "วันเสาร์",
+      "sunday": "วันอาทิตย์"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}} เมื่อทำเสร็จ",
+    "builder": {
+      "family": "ทำซ้ำ",
+      "familyInterval": "ทุก…",
+      "familyWeekdays": "รายสัปดาห์ในวัน…",
+      "familyDayOfMonth": "รายเดือนตามวันที่…",
+      "familyOrdinal": "รายเดือนตามวันในสัปดาห์…",
+      "count": "ช่วงห่าง",
+      "unitLabel": "หน่วย",
+      "units": {
+        "day": "วัน",
+        "week": "สัปดาห์",
+        "month": "เดือน",
+        "year": "ปี"
+      },
+      "ordinal": "ลำดับที่",
+      "weekday": "วันในสัปดาห์",
+      "lastDay": "วันสุดท้าย",
+      "whenDone": "ทำซ้ำนับจากวันที่ทำเสร็จ",
+      "weekdayShort": {
+        "monday": "จ.",
+        "tuesday": "อ.",
+        "wednesday": "พ.",
+        "thursday": "พฤ.",
+        "friday": "ศ.",
+        "saturday": "ส.",
+        "sunday": "อา."
+      }
+    }
+  },
+  "restore": {
+    "backLabel": "ย้อนกลับ",
+    "cancelLabel": "ยกเลิก",
+    "collision": {
+      "body": "มีห้องนิรภัยจากไฟล์สำรองนี้อยู่บนอุปกรณ์นี้แล้ว คุณจะเก็บไว้ทั้งสองก็ได้ — สำเนาที่กู้คืนจะปรากฏเป็นห้องนิรภัยแยกต่างหากในรายการห้องนิรภัยของคุณ — หรือจะกู้คืนตอนนี้แล้วค่อยเอาห้องนิรภัยเดิมออกจากรายการด้วยตัวเองก็ได้ (การเอาออกจะให้คุณพิมพ์ DELETE และควรทำหลังจากยืนยันแล้วว่าห้องนิรภัยที่กู้คืนเปิดได้)",
+      "keepBoth": "เก็บไว้ทั้งสอง",
+      "replaceExisting": "กู้คืน แล้วแทนที่ของเดิม…"
+    },
+    "damaged": {
+      "body": "ไฟล์สำรองข้อมูลเสียหาย จึงยังไม่มีอะไรถูกกู้คืน ถ้านี่เป็นสำเนาเดียวที่คุณมี การกู้ซากจะกู้โน้ตที่ยังสมบูรณ์กลับมาได้ และแจกแจงว่าอะไรบ้างที่อ่านไม่ได้ — ผลลัพธ์จะถูกระบุว่าเป็นการกู้คืนบางส่วนเสมอ",
+      "close": "ปิด",
+      "salvage": "กู้ซากโน้ตที่ยังสมบูรณ์…"
+    },
+    "error": {
+      "tryAnotherFile": "ลองไฟล์อื่น"
+    },
+    "pick": {
+      "body": "เลือกไฟล์ <code>.myne-backup</code> ระบบจะตรวจสอบไฟล์สำรองก่อนกู้คืนสิ่งใด ห้องนิรภัยที่กู้คืนจะปลดล็อกด้วยรหัสผ่านหรือวลีกู้คืนของห้องนิรภัยนั้น — เหมือนการปลดล็อกตามปกติทุกประการ",
+      "chooseFile": "เลือกไฟล์สำรองข้อมูล…",
+      "corruptedSuffix": "ห้องนิรภัยปัจจุบันของคุณจะไม่ถูกแตะต้อง: ไฟล์สำรองจะถูกกู้คืนเป็นห้องนิรภัยแยกต่างหากก่อน"
+    },
+    "summary": {
+      "attachments": "ไฟล์แนบ: {{n}}",
+      "collidedNote": "สำเนาเดิมของห้องนิรภัยนี้ยังอยู่ในรายการห้องนิรภัยของคุณ เมื่อยืนยันแล้วว่าห้องนิรภัยที่กู้คืนเปิดได้ คุณจะเอาของเดิมออกจากรายการได้ (ระบบจะให้คุณพิมพ์ DELETE)",
+      "notes": "โน้ต: {{n}}",
+      "openVaultList": "เปิดรายการห้องนิรภัย",
+      "partialHeader_one": "กู้คืนได้บางส่วน — อ่าน {{count}} รายการไม่ได้",
+      "partialHeader_other": "กู้คืนได้บางส่วน — อ่าน {{count}} รายการไม่ได้",
+      "restored": "กู้คืนห้องนิรภัยแล้ว",
+      "versionHistory": "รายการประวัติเวอร์ชัน: {{n}}"
+    },
+    "title": "กู้คืนจากไฟล์สำรองข้อมูล",
+    "working": {
+      "cancel": "ยกเลิก",
+      "restoringProgress": "กำลังกู้คืน… {{done}} จาก {{total}}",
+      "verifying": "กำลังตรวจสอบไฟล์สำรอง…",
+      "verifyingProgress": "กำลังตรวจสอบไฟล์สำรอง… {{done}} จาก {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "รุ่นสำหรับพัฒนา",
+      "buildLabel": "บิลด์",
+      "buildChannelLabel": "ช่องทางบิลด์",
+      "buildChannelStable": "เสถียร",
+      "changelogButton": "ดูบันทึกการเปลี่ยนแปลง…",
+      "changelogHelper": "บันทึกแยกตามเวอร์ชัน จะปรากฏเมื่อ MYND-119 พร้อมใช้งาน",
+      "changelogLabel": "บันทึกการเปลี่ยนแปลง",
+      "developerModeHelper": "แสดงการตั้งค่าขั้นสูงที่ Myne ซ่อนไว้ตามค่าเริ่มต้น: ส่วนที่คุณออกจากเส้นทางที่ Myne รับรอง และเครื่องมือสำหรับผู้ใช้ขั้นสูงที่คนส่วนใหญ่ไม่ต้องใช้ การปิดโหมดนี้เพียงซ่อนมันอีกครั้ง — สิ่งที่คุณเปิดไว้ยังคงเปิดอยู่ และต้องไปปิดที่ตัวควบคุมของมันเอง",
+      "developerModeLabel": "โหมดนักพัฒนา",
+      "licenseBody": "ก่อนอัลฟา · เอกสาร CC-BY-4.0 · โค้ดแอปพลิเคชัน AGPL-3.0 เมื่อออกเฟส 1",
+      "licenseLabel": "สัญญาอนุญาต",
+      "tagline": "ก่อนอัลฟา · ไคลเอนต์เดสก์ท็อปเฟส 1",
+      "threatModelHelper": "เปิดเอกสารแบบจำลองภัยคุกคามฉบับสาธารณะในเบราว์เซอร์ของคุณ",
+      "threatModelLabel": "แบบจำลองภัยคุกคาม",
+      "version": "เวอร์ชัน",
+      "dev": "เดฟ"
+    },
+    "account": {
+      "changePasswordButton": "เปลี่ยนรหัสผ่าน",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "รหัสผ่านปัจจุบันไม่ถูกต้อง หรือไฟล์ห้องนิรภัยเสียหาย",
+        "ioError": "ดิสก์มีปัญหา โปรดลองอีกครั้ง",
+        "joinFailure": "เกิดข้อผิดพลาดบางอย่าง โปรดลองอีกครั้ง",
+        "samePasswordRejected": "รหัสผ่านใหม่ตรงกับรหัสผ่านปัจจุบัน",
+        "serverAckPending": "รหัสผ่านใหม่ใช้ได้บนอุปกรณ์นี้ แต่ Myne ติดต่อเซิร์ฟเวอร์เพื่อบันทึกไม่ได้ จนกว่าจะบันทึกได้ อุปกรณ์อื่นของคุณจะยังใช้รหัสผ่านเดิม — และถ้าสำเนาในเบราว์เซอร์นี้ถูกล้างก่อนหน้านั้น การเปลี่ยนแปลงจะสูญหาย ระบบจะลองใหม่ให้อัตโนมัติ",
+        "weakNewPassword": "รหัสผ่านใหม่ต้องมีอย่างน้อย 12 ตัวอักษร"
+      },
+      "changePasswordHeading": "เปลี่ยนรหัสผ่าน",
+      "changePasswordHelper": "เปลี่ยนรหัสผ่านหลักโดยยังใช้ห้องนิรภัยเดิม วลีกู้คืนไม่เปลี่ยน",
+      "dangerZoneHeading": "โซนอันตราย",
+      "dangerZoneHelper": "ลบห้องนิรภัยนี้และโน้ตทั้งหมดอย่างถาวร ย้อนกลับไม่ได้ วลีกู้คืนจะไม่สามารถกู้ห้องนิรภัยคืนมาได้",
+      "localEraseHeading": "เบราว์เซอร์นี้",
+      "localEraseHelper": "ลบสำเนาห้องนิรภัยที่ Myne เก็บไว้ในเบราว์เซอร์นี้ บัญชีของคุณและทุกอย่างที่ซิงค์ไปแล้วยังอยู่บนเซิร์ฟเวอร์",
+      "localEraseButton": "ออกจากระบบและลบสำเนาในเบราว์เซอร์นี้…",
+      "deleteVaultButton": "ลบห้องนิรภัย…",
+      "vaultLabelEyebrow": "ป้ายชื่อห้องนิรภัย",
+      "vaultLabelHelper": "ชื่อของห้องนิรภัยนี้ที่แสดงในตัวสลับห้องนิรภัยในแอป เก็บแบบเข้ารหัสไว้ในห้องนิรภัย ไม่เคยออกจากอุปกรณ์ของคุณเป็นข้อความล้วน",
+      "vaultLabelPlaceholder": "เพิ่มป้ายชื่อ…",
+      "vaultLabelSave": "บันทึก",
+      "vaultIconLabel": "ไอคอน",
+      "vaultIconDefault": "ค่าเริ่มต้น (เวิร์ดมาร์ก)",
+      "renamedToast": "เปลี่ยนชื่อห้องนิรภัยแล้ว",
+      "renameError": "เปลี่ยนชื่อห้องนิรภัยไม่ได้",
+      "newPasswordMismatch": "รหัสผ่านใหม่ไม่ตรงกัน",
+      "samePassword": "รหัสผ่านใหม่เหมือนกับรหัสผ่านปัจจุบัน",
+      "passwordChangedToast": "เปลี่ยนรหัสผ่านแล้ว",
+      "vaultUnreadable": "ไฟล์ห้องนิรภัยอ่านไม่ได้ กู้คืนจากไฟล์สำรองข้อมูล",
+      "genericChangeError": "เกิดข้อผิดพลาดบางอย่าง โปรดลองอีกครั้ง",
+      "renameHelper": "แสดงในตัวสลับห้องนิรภัย เก็บแบบเข้ารหัสไว้ในห้องนิรภัยนี้ เว้นว่างเพื่อล้างค่า",
+      "newPasswordPlaceholder": "อย่างน้อย 12 ตัวอักษร",
+      "reenterNewPassword": "ป้อนรหัสผ่านใหม่อีกครั้ง",
+      "changePasswordFootnote": "การทำเช่นนี้จะยกเลิกการปลดล็อกด่วน วลีกู้คืนของคุณไม่เปลี่ยน",
+      "changing": "กำลังเปลี่ยน…"
+    },
+    "appearance": {
+      "accentHelper": "เลือกสีเน้นที่ใช้ทั่วทั้งแอป เฉพาะอุปกรณ์นี้",
+      "accentHexAria": "ค่าเลขฐานสิบหกของสีเน้น",
+      "accentLabel": "สีเน้น",
+      "accentReset": "คืนค่าเป็นสีเริ่มต้นของธีม",
+      "homeQuickActions": "การดำเนินการด่วนบนหน้าแรก",
+      "showEditTimesAria": "แสดงเวลาที่แก้ไขในแถบข้าง",
+      "showEditTimesHelper": "แสดงเวลาที่แก้ไขล่าสุดของโน้ตแต่ละรายการใต้ชื่อในแถบข้าง",
+      "showEditTimesLabel": "แสดงเวลาที่แก้ไข",
+      "taskMarkerAria": "แสดงเครื่องหมายงานบนโน้ตที่เป็นงาน",
+      "taskMarkerHelper": "ทำเครื่องหมายโน้ตที่คุณกำหนดให้เป็นงาน ทั้งในแถบข้างและบนแท็บของโน้ตนั้น",
+      "taskMarkerLabel": "แสดงเครื่องหมายงาน",
+      "taskMarkerSaveError": "บันทึกการตั้งค่านั้นไม่ได้ ลองอีกครั้ง",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "มืด",
+        "light": "สว่าง",
+        "system": "ตามระบบ"
+      },
+      "themeHelper": "สลับระหว่างธีมสว่างและมืด หรือใช้ตามค่าของระบบ",
+      "themeLabel": "ธีม",
+      "themeOptionAria": "ธีม{{label}}",
+      "themeSaveError": "บันทึกธีมไม่ได้ โปรดลองอีกครั้ง",
+      "timestampsSaveError": "บันทึกค่าที่ตั้งไว้ไม่ได้ โปรดลองอีกครั้ง",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "ฟอนต์ตัวแก้ไข",
+      "showEditTimesSubtitle": "เวลาใต้โน้ตแต่ละรายการ",
+      "graphSettingsLabel": "รูปลักษณ์ของกราฟ",
+      "graphSettingsHelper": "สีของโหนด ป้ายกำกับ ขนาด และแรงจัดวางตั้งค่าได้ในกราฟเอง — เปิดกราฟแล้วใช้ปุ่มเฟืองที่มุม ค่าเหล่านี้เก็บแยกตามอุปกรณ์ การเปลี่ยนที่นี่จึงไม่ตามไปที่โทรศัพท์ของคุณ",
+      "openGraph": "เปิดกราฟ"
+    },
+    "archive": {
+      "helper": "อนุญาตให้ย้ายโน้ตไปยังที่เก็บถาวร เพื่อเก็บไว้นอกรายการหลัก การปิดตัวเลือกนี้จะคืนโน้ตที่เก็บถาวรทุกรายการกลับไปยังโฟลเดอร์เดิม และซ่อนตัวควบคุมการเก็บถาวร",
+      "label": "การเก็บถาวร",
+      "off": "ปิด",
+      "on": "เปิด",
+      "saveError": "อัปเดตการตั้งค่าการเก็บถาวรไม่ได้"
+    },
+    "attachmentCompression": {
+      "label": "บีบอัดรูปภาพเมื่อนำเข้า",
+      "helper": "ย่อขนาดรูปภาพที่วางหรือลากเข้ามา ก่อนเข้ารหัสและจัดเก็บ เพื่อให้ห้องนิรภัย ไฟล์สำรองข้อมูล และการซิงค์ของคุณเล็กลง การทำเช่นนี้ย้อนกลับไม่ได้ — ไฟล์ต้นฉบับจะไม่ถูกเก็บไว้",
+      "helperScopeEveryDevice": "มีผลกับทั้งห้องนิรภัย บนทุกอุปกรณ์",
+      "helperScopeNotHere": "มีผลกับทั้งห้องนิรภัย แต่ไม่มีผลในเบราว์เซอร์นี้ — รูปภาพที่เพิ่มที่นี่จะถูกเก็บตามต้นฉบับ",
+      "errorSaveSetting": "บันทึกการตั้งค่านี้ไม่ได้"
+    },
+    "transcription": {
+      "label": "การแปลงเสียงเป็นข้อความ",
+      "helper": "แปลงไฟล์แนบที่เป็นเสียงให้เป็นข้อความบนอุปกรณ์นี้ โมเดลมาพร้อมกับ Myne และไม่มีการส่งอะไรออกไป การปิดตัวเลือกนี้จะซ่อนคำสั่งถอดเสียงทุกที่ และหยุดไม่ให้แอปถอดเสียงเลย",
+      "errorSaveSetting": "บันทึกการตั้งค่านั้นไม่ได้"
+    },
+    "attachmentOcr": {
+      "label": "ค้นหาข้อความในรูปภาพและเอกสารสแกน",
+      "helper": "อ่านข้อความจากไฟล์แนบที่เป็นรูปภาพและ PDF ที่สแกนมา บนอุปกรณ์นี้ เพื่อให้ค้นหาจากเนื้อหาได้ ไม่มีการอัปโหลดอะไร การปิดตัวเลือกนี้จะหยุดการอ่านที่ทำอยู่เบื้องหลัง ข้อความที่อ่านไว้แล้วจะยังคงอยู่",
+      "errorSaveSetting": "บันทึกการตั้งค่านี้ไม่ได้",
+      "processing_one": "กำลังอ่านไฟล์แนบ 1 รายการ…",
+      "processing_other": "กำลังอ่านไฟล์แนบ {{count}} รายการ…"
+    },
+    "autoBackup": {
+      "backupFolder": "โฟลเดอร์สำรองข้อมูล",
+      "chooseFolder": "เลือกโฟลเดอร์…",
+      "chooseFolderDialogTitle": "เลือกโฟลเดอร์สำหรับการสำรองข้อมูลอัตโนมัติ",
+      "frequency": "ความถี่",
+      "frequencyAriaLabel": "ความถี่การสำรองข้อมูล",
+      "helper": "เขียนไฟล์ .myne-backup ที่เข้ารหัสไว้ลงโฟลเดอร์ตามกำหนดเวลา ขณะที่แอปเปิดอยู่และห้องนิรภัยปลดล็อกอยู่ ไฟล์สำรองข้อมูลเข้ารหัสเท่ากับห้องนิรภัยของคุณ Myne เก็บไฟล์ล่าสุดไว้ไม่กี่ไฟล์ และไม่เคยส่งอะไรออกจากอุปกรณ์ของคุณ",
+      "intervalDaily": "ทุกวัน",
+      "intervalEveryUnlock": "ทุกครั้งที่ปลดล็อก",
+      "intervalWeekly": "ทุกสัปดาห์",
+      "keepLast": "เก็บล่าสุด",
+      "noFolderChosen": "ยังไม่ได้เลือกโฟลเดอร์",
+      "saveFailedToast": "บันทึกการตั้งค่าการสำรองข้อมูลไม่ได้",
+      "searchEmpty": "ไม่พบรายการที่ตรงกัน",
+      "searchPlaceholder": "ค้นหา…",
+      "statusFailed": "การสำรองข้อมูลอัตโนมัติล้มเหลว — {{stamp}}",
+      "statusLastBackup": "สำรองข้อมูลล่าสุด: {{stamp}}",
+      "statusNever": "ยังไม่มีการสำรองข้อมูลอัตโนมัติ",
+      "title": "การสำรองข้อมูลอัตโนมัติ"
+    },
+    "changePassword": {
+      "cancel": "ยกเลิก",
+      "checkingStrength": "กำลังตรวจสอบความแข็งแรง…",
+      "confirmLabel": "ยืนยันรหัสผ่านใหม่",
+      "currentLabel": "รหัสผ่านปัจจุบัน",
+      "mismatch": "รหัสผ่านไม่ตรงกัน",
+      "newLabel": "รหัสผ่านใหม่",
+      "submit": "เปลี่ยนรหัสผ่าน",
+      "submitting": "กำลังเปลี่ยนรหัสผ่าน…",
+      "title": "เปลี่ยนรหัสผ่าน",
+      "tooShort": "ใช้อย่างน้อย {{n}} ตัวอักษร"
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "ส่วนขยายเบราว์เซอร์"
+      },
+      "when": {
+        "bare": "เชื่อมต่อแล้ว",
+        "daysAgo_one": "เชื่อมต่อเมื่อ {{count}} วันก่อน",
+        "daysAgo_other": "เชื่อมต่อเมื่อ {{count}} วันก่อน",
+        "hoursAgo": "เชื่อมต่อเมื่อ {{count}} ชม. ก่อน",
+        "hoursAgo_one": "เชื่อมต่อเมื่อ {{count}} ชม. ก่อน",
+        "hoursAgo_other": "เชื่อมต่อเมื่อ {{count}} ชม. ก่อน",
+        "justNow": "เชื่อมต่อเมื่อสักครู่",
+        "minutesAgo": "เชื่อมต่อเมื่อ {{count}} นาทีก่อน",
+        "minutesAgo_one": "เชื่อมต่อเมื่อ {{count}} นาทีก่อน",
+        "minutesAgo_other": "เชื่อมต่อเมื่อ {{count}} นาทีก่อน",
+        "onDate": "เชื่อมต่อเมื่อ {{date}}"
+      }
+    },
+    "cliAccess": {
+      "label": "การเข้าถึงจากเทอร์มินัล",
+      "helperOff": "ปิดอยู่ คำสั่ง `myne` อ่านหรือเปลี่ยนแปลงอะไรในห้องนิรภัยนี้ไม่ได้",
+      "helperOn": "เปิดอยู่ขณะที่ห้องนิรภัยนี้ปลดล็อก โปรแกรมใดก็ตามที่ทำงานภายใต้บัญชีผู้ใช้ของคุณสามารถอ่าน ค้นหา และสร้างโน้ตผ่านช่องทางนี้ได้ — Myne แยกไม่ออกว่าเป็นเทอร์มินัลของคุณหรือสคริปต์ และไม่ตรวจสอบอะไรนอกจากว่าประตูเปิดอยู่ ช่องทางนี้ไม่เคยถามรหัสผ่านของคุณ ปิดทันทีที่ห้องนิรภัยล็อก และลบโน้ตไม่ได้",
+      "lastUsedNever": "ยังไม่ได้ใช้นับตั้งแต่ปลดล็อกห้องนิรภัยนี้",
+      "lastUsedJustNow": "ใช้ล่าสุดเมื่อสักครู่",
+      "lastUsedMinutesAgo": "ใช้ล่าสุดเมื่อ {{count}} นาทีก่อน",
+      "lastUsedMinutesAgo_one": "ใช้ล่าสุดเมื่อ {{count}} นาทีก่อน",
+      "lastUsedMinutesAgo_other": "ใช้ล่าสุดเมื่อ {{count}} นาทีก่อน",
+      "lastUsedHoursAgo": "ใช้ล่าสุดเมื่อ {{count}} ชม. ก่อน",
+      "lastUsedHoursAgo_one": "ใช้ล่าสุดเมื่อ {{count}} ชม. ก่อน",
+      "lastUsedHoursAgo_other": "ใช้ล่าสุดเมื่อ {{count}} ชม. ก่อน",
+      "lastUsedDaysAgo": "ใช้ล่าสุดเมื่อ {{count}} วันก่อน",
+      "lastUsedDaysAgo_one": "ใช้ล่าสุดเมื่อ {{count}} วันก่อน",
+      "lastUsedDaysAgo_other": "ใช้ล่าสุดเมื่อ {{count}} วันก่อน",
+      "notOnPathHint": "เชลล์ของคุณยังหา `myne` ไม่เจอ เพิ่มบรรทัดนี้ลงในโปรไฟล์เชลล์ของคุณ แล้วเปิดเทอร์มินัลใหม่:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "โฟลเดอร์ที่เทอร์มินัลไม่เห็นเลย",
+      "excludedHelper": "หนึ่งเส้นทางโฟลเดอร์ต่อหนึ่งบรรทัด โน้ตในโฟลเดอร์เหล่านี้จะไม่ปรากฏในผลลัพธ์ใด ๆ ของเทอร์มินัล และเขียนลงไปจากเทอร์มินัลไม่ได้ — แต่ยังใช้งานได้เต็มที่ในแอป คุณตั้งค่านี้ก่อนเปิดการเข้าถึงจากเทอร์มินัลได้",
+      "excludedPlaceholder": "ส่วนตัว/\nบันทึกประจำวัน/",
+      "rateLimitLabel": "ให้เทอร์มินัลทำงานเต็มความเร็ว",
+      "rateLimitHelper": "ตามค่าเริ่มต้น Myne ตอบคำสั่งจากเทอร์มินัลได้มากที่สุด 120 คำสั่งต่อนาที นั่นเป็นการจำกัดจังหวะของสคริปต์ที่หลุดการควบคุม ไม่ใช่การตรวจสอบสิทธิ์ — ไม่มีอะไรตัดสินว่าโปรแกรมใดมีสิทธิ์ถาม เปิดตัวเลือกนี้เมื่อต้องทำงานจำนวนมาก เช่น ส่งโน้ตทุกรายการผ่านเครื่องมืออื่น"
+    },
+    "clipperInstall": {
+      "error": "อัปเดตการตั้งค่าตัวคลิปหน้าเว็บไม่ได้",
+      "helper": "ลงทะเบียนโฮสต์ native-messaging เพื่อให้ส่วนขยายเบราว์เซอร์ของ Myne ส่งคลิปมายังแอปนี้ได้ เปิดอยู่ตามค่าเริ่มต้น ปิดเพื่อเอาออก",
+      "label": "ตัวคลิปหน้าเว็บ"
+    },
+    "customThemes": {
+      "appliedBadge": "ใช้อยู่",
+      "apply": "ใช้",
+      "applyError": "ใช้ธีมนั้นไม่ได้ โปรดลองอีกครั้ง",
+      "browseButton": "เรียกดูธีม",
+      "cancel": "ยกเลิก",
+      "confirm": "ยืนยัน",
+      "delete": "ลบ",
+      "deleteError": "ลบธีมนั้นไม่ได้ โปรดลองอีกครั้ง",
+      "empty": "ยังไม่มีธีมที่กำหนดเอง นำเข้าไฟล์ธีมเพื่อเริ่มต้น",
+      "error": {
+        "aColorFallback": "สีหนึ่ง",
+        "invalidFile": "ไฟล์ธีมไม่ถูกต้อง",
+        "invalidName": "ชื่อธีมไม่ปลอดภัย",
+        "invalidValue": "ค่าไม่ถูกต้องสำหรับ {{key}}",
+        "invalidValueWithLine": "ค่าไม่ถูกต้องสำหรับ {{key}} (บรรทัด {{line}})",
+        "missingKey": "ขาดสีที่จำเป็น {{key}}",
+        "parseError": "ไม่ใช่ JSON ที่ถูกต้อง",
+        "parseErrorWithLine": "ไม่ใช่ JSON ที่ถูกต้อง (บรรทัด {{line}})"
+      },
+      "export": "ส่งออก",
+      "exportError": "ส่งออกธีมนั้นไม่ได้ โปรดลองอีกครั้ง",
+      "fileFilterName": "ธีม Myne",
+      "helper": "ใช้ชุดสีของคุณเอง ธีมจะถูกตรวจสอบบนอุปกรณ์นี้ก่อนใช้งาน — ไม่มีการอัปโหลดอะไร",
+      "importButton": "นำเข้าธีม…",
+      "importError": "ไฟล์นั้นไม่ใช่ธีมที่ถูกต้อง เปิดเอกสารอ้างอิงเพื่อดูรูปแบบ",
+      "label": "ธีมที่กำหนดเอง",
+      "readError": "อ่านธีมที่กำหนดเองของคุณไม่ได้",
+      "readOnlyHelper": "ธีมที่กำหนดเองติดตั้งอยู่บนคอมพิวเตอร์ของคุณ ธีมของคุณจะมาปรากฏที่นี่เองหลังการซิงค์"
+    },
+    "dailyNotes": {
+      "blankTemplate": "ว่างเปล่า (ไม่ใช้เทมเพลต)",
+      "dateFormatHelper": "ชื่อของโน้ตประจำวันแต่ละรายการ รองรับ YYYY, MM, DD ค่าเริ่มต้นคือ {{default}}",
+      "dateFormatLabel": "รูปแบบวันที่ของโน้ตประจำวัน",
+      "dateFormatSaveError": "บันทึกรูปแบบวันที่ไม่ได้ โปรดลองอีกครั้ง",
+      "folderHelper": "ที่ที่จัดเก็บโน้ตประจำวันใหม่ ค่าเริ่มต้นคือ {{default}} — โฟลเดอร์นี้จะถูกเก็บไว้แม้ว่างเปล่า",
+      "folderLabel": "โฟลเดอร์โน้ตประจำวัน",
+      "folderSaveError": "บันทึกโฟลเดอร์ประจำวันไม่ได้ โปรดลองอีกครั้ง",
+      "folderSearchEmpty": "ไม่มีโฟลเดอร์ที่ตรงกัน",
+      "folderSearchPlaceholder": "ค้นหาโฟลเดอร์…",
+      "searchEmpty": "ไม่มีเทมเพลตที่ตรงกัน",
+      "searchPlaceholder": "ค้นหาเทมเพลต…",
+      "templateHelper": "เลือกเทมเพลตที่จะใช้เริ่มโน้ตประจำวันแต่ละรายการ หรือเว้นว่างไว้เพื่อได้โน้ตเปล่าที่ตั้งชื่อด้วยวันที่",
+      "templateLabel": "เทมเพลตโน้ตประจำวัน",
+      "templateSaveError": "บันทึกเทมเพลตประจำวันไม่ได้ โปรดลองอีกครั้ง",
+      "untitledTemplate": "เทมเพลตไม่มีชื่อ"
+    },
+    "deleteVault": {
+      "cancel": "ยกเลิก",
+      "caseSensitiveHint": "ตัวพิมพ์เล็กใหญ่มีผล พิมพ์คำให้ตรงเป๊ะเพื่อเปิดใช้การลบ",
+      "continue": "ดำเนินการต่อ",
+      "copyPrimary": "การกระทำนี้ลบห้องนิรภัยนี้และโน้ตทุกรายการในนั้นอย่างถาวร ย้อนกลับไม่ได้ และวลีกู้คืนของคุณจะไม่สามารถกู้ข้อมูลคืนมาได้",
+      "copySecondary": "กุญแจของห้องนิรภัยจะถูกล้างออกจากหน่วยความจำก่อนที่ไฟล์จะถูกลบ ไซเฟอร์เท็กซ์ที่ตกค้างอยู่บนดิสก์จะเป็นข้อมูลขยะที่ห่อด้วย Argon2id ซึ่งกู้คืนไม่ได้",
+      "eyebrow": "ย้อนกลับไม่ได้",
+      "heading": "ลบห้องนิรภัย",
+      "ioFailBody": "เข้าถึงไฟล์ห้องนิรภัยเพื่อลบไม่ได้ กุญแจของห้องนิรภัยถูกล้างออกจากหน่วยความจำแล้ว ข้อมูลห้องนิรภัยที่ยังเหลืออยู่บนดิสก์เป็นข้อมูลขยะที่ห่อด้วย Argon2id ซึ่งกู้คืนไม่ได้",
+      "ioFailTitle": "ดิสก์มีปัญหาระหว่างลบ",
+      "localEraseHeading": "ออกจากระบบและลบสำเนาในเบราว์เซอร์นี้",
+      "localEraseEyebrow": "เฉพาะเบราว์เซอร์นี้",
+      "localEraseSubmit": "ลบสำเนาในเบราว์เซอร์นี้",
+      "localEraseSubmitInFlight": "กำลังลบ…",
+      "partialFailBody_one": "ลบไฟล์ {{count}} รายการออกจากดิสก์ไม่ได้ กุญแจของห้องนิรภัยถูกล้างออกจากหน่วยความจำแล้ว ไซเฟอร์เท็กซ์ที่ตกค้างจึงเป็นข้อมูลขยะที่ห่อด้วย Argon2id ซึ่งกู้คืนไม่ได้",
+      "partialFailBody_other": "ลบไฟล์ {{count}} รายการออกจากดิสก์ไม่ได้ กุญแจของห้องนิรภัยถูกล้างออกจากหน่วยความจำแล้ว ไซเฟอร์เท็กซ์ที่ตกค้างจึงเป็นข้อมูลขยะที่ห่อด้วย Argon2id ซึ่งกู้คืนไม่ได้",
+      "partialFailTitle": "การลบห้องนิรภัยล้มเหลวบางส่วน",
+      "submit": "ลบห้องนิรภัย",
+      "submitInFlight": "กำลังลบห้องนิรภัย…",
+      "typeToConfirmLabel": "พิมพ์ DELETE เพื่อยืนยัน",
+      "vaultPath": "เส้นทางห้องนิรภัย: {{path}}",
+      "deleteError": "ลบห้องนิรภัยจนหมดไม่ได้ โปรดลองอีกครั้ง",
+      "warning": "การกระทำนี้ลบห้องนิรภัยนี้และโน้ตทั้งหมดออกจากอุปกรณ์นี้อย่างถาวร ย้อนกลับไม่ได้",
+      "deleteButton": "ลบห้องนิรภัยนี้"
+    },
+    "files": {
+      "newNote": {
+        "folderLabel": "โฟลเดอร์สำหรับโน้ตใหม่",
+        "folderPlaceholder": "เช่น กล่องขาเข้า/",
+        "folderSearchEmpty": "ไม่มีโฟลเดอร์ที่ตรงกัน",
+        "folderSearchPlaceholder": "ค้นหาโฟลเดอร์…",
+        "helper": "ที่ที่จะวางโน้ตที่สร้างใหม่",
+        "label": "ตำแหน่งเริ่มต้นของโน้ตใหม่",
+        "optionCurrent": "โฟลเดอร์เดียวกับโน้ตปัจจุบัน",
+        "optionRoot": "โฟลเดอร์ห้องนิรภัย",
+        "optionSpecific": "ในโฟลเดอร์ที่ระบุด้านล่าง",
+        "saveError": "บันทึกตำแหน่งของโน้ตใหม่ไม่ได้"
+      },
+      "startup": {
+        "helper": "เลือกไฟล์ที่จะเปิดเมื่อแอปเริ่มทำงาน",
+        "label": "ไฟล์ที่จะเปิดเป็นค่าเริ่มต้น",
+        "noteLabel": "โน้ตที่จะเปิดตอนเริ่มแอป",
+        "notePlaceholder": "เลือกโน้ต…",
+        "optionEmpty": "โน้ตใหม่",
+        "optionLast": "ที่เปิดล่าสุด",
+        "optionSpecific": "โน้ตที่ระบุ",
+        "saveError": "บันทึกการตั้งค่าตอนเริ่มแอปไม่ได้",
+        "searchEmpty": "ไม่พบโน้ต",
+        "searchPlaceholder": "ค้นหาโน้ต…",
+        "untitledNote": "ไม่มีชื่อ"
+      }
+    },
+    "focusMode": {
+      "dimAria": "หรี่บรรทัดที่ไม่ได้ใช้งาน",
+      "dimHelper": "ในโหมดโฟกัส (⇧⌘F) จะหรี่ทุกบรรทัดยกเว้นบรรทัดที่คุณกำลังแก้ไข",
+      "dimLabel": "โหมดโฟกัส · หรี่บรรทัดที่ไม่ได้ใช้งาน",
+      "off": "ปิด",
+      "on": "เปิด",
+      "saveError": "บันทึกการตั้งค่าโหมดโฟกัสไม่ได้",
+      "typewriterAria": "การเลื่อนแบบพิมพ์ดีด",
+      "typewriterHelper": "ในโหมดโฟกัส (⇧⌘F) จะให้บรรทัดที่กำลังพิมพ์อยู่กึ่งกลางแนวตั้งเสมอ",
+      "typewriterLabel": "โหมดโฟกัส · การเลื่อนแบบพิมพ์ดีด"
+    },
+    "hotkeys": {
+      "addBindingAria": "เพิ่มคีย์ลัดสำหรับ {{command}}",
+      "cancel": "ยกเลิก",
+      "capturePrompt": "กดปุ่ม…",
+      "conflictIndicator": "⚠ ขัดแย้ง",
+      "conflictTitle": "ใช้โดย {{commands}} ด้วย",
+      "fixed": "ตายตัว",
+      "group": {
+        "editorFormatting": "การจัดรูปแบบในตัวแก้ไข",
+        "general": "ทั่วไป",
+        "navigation": "การนำทาง",
+        "notes": "โน้ต",
+        "panesTabs": "บานหน้าต่างและแท็บ",
+        "view": "มุมมอง"
+      },
+      "helper": "ดูและเปลี่ยนคีย์ลัดแป้นพิมพ์ มีเพียงคีย์ลัดวนแท็บ (Ctrl+Tab) เท่านั้นที่ตายตัว",
+      "notSet": "ยังไม่ได้ตั้ง",
+      "removeBindingAria": "เอา {{chord}} ออก",
+      "reserved": {
+        "bookmarkPage": "บุ๊กมาร์กหน้าเว็บ",
+        "closeTab": "ปิดแท็บ",
+        "closeWindow": "ปิดหน้าต่าง",
+        "cycleTabs": "สลับไปมาระหว่างแท็บ",
+        "focusAddressBar": "โฟกัสแถบที่อยู่",
+        "hideApplication": "ซ่อนเบราว์เซอร์",
+        "inspectElement": "เปิดตัวตรวจสอบเอลิเมนต์",
+        "minimiseWindow": "ย่อหน้าต่าง",
+        "newPrivateWindow": "เปิดหน้าต่างส่วนตัว",
+        "newTab": "เปิดแท็บใหม่",
+        "newWindow": "เปิดหน้าต่างใหม่",
+        "openBookmarks": "เปิดบุ๊กมาร์ก",
+        "openDevTools": "เปิดเครื่องมือนักพัฒนา",
+        "openExtensions": "เปิดส่วนขยาย",
+        "openFile": "เปิดไฟล์",
+        "openHistory": "เปิดประวัติ",
+        "quit": "ออกจากเบราว์เซอร์",
+        "reopenTab": "เปิดแท็บที่ปิดล่าสุดขึ้นมาใหม่",
+        "switchTab": "สลับแท็บ",
+        "toggleFullscreen": "สลับโหมดเต็มหน้าจอ"
+      },
+      "reservedBadge": "ใช้ที่นี่ไม่ได้",
+      "reservedBadgeTitle": "เบราว์เซอร์ของคุณใช้ {{chord}} เพื่อ{{action}} คีย์ลัดนี้จึงไม่ถึง Myne แต่ยังใช้ได้ในแอปเดสก์ท็อป",
+      "reservedRefused": "{{chord}} เป็นของเบราว์เซอร์ของคุณ — มันจะ{{action}} เลือกคีย์ลัดอื่น คีย์ลัดบนเดสก์ท็อปของคุณไม่เปลี่ยน",
+      "reservedUnreliable": "{{chord}} อาจไม่ถึง Myne — ในบางเบราว์เซอร์มันจะ{{action}} เพิ่มให้แล้ว",
+      "resetAll": "รีเซ็ตคีย์ลัดทั้งหมด…",
+      "resetAllConfirm": "รีเซ็ตคีย์ลัดที่กำหนดเองทุกรายการกลับเป็นค่าเริ่มต้นหรือไม่",
+      "resetAllYes": "รีเซ็ตทั้งหมด",
+      "restoreDefaultAria": "คืนค่าเริ่มต้นสำหรับ {{command}}",
+      "searchAriaLabel": "ค้นหาคีย์ลัด",
+      "searchPlaceholder": "ค้นหาคีย์ลัด…",
+      "warnAlreadyUsed": "ใช้อยู่แล้วโดย {{commands}} — เพิ่มให้แล้ว"
+    },
+    "language": {
+      "helper": "เลือกภาษาที่ใช้แสดงผลในแอป",
+      "label": "ภาษา"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "บันทึกการตั้งค่าหมายเลขบรรทัดไม่ได้",
+      "helper": "แสดงแถบหมายเลขบรรทัดในตัวแก้ไข หนึ่งหมายเลขต่อหนึ่งบรรทัด ปิดอยู่ตามค่าเริ่มต้น",
+      "label": "หมายเลขบรรทัด",
+      "off": "ปิด",
+      "on": "เปิด"
+    },
+    "views": {
+      "helper": "แสดงรายการ มุมมอง ในแถบข้าง สำหรับบันทึกรายการโน้ตที่กรองไว้ ปิดอยู่ตามค่าเริ่มต้น และเปิดอยู่ถ้าคุณมีมุมมองอยู่แล้ว",
+      "label": "มุมมอง"
+    },
+    "vimMode": {
+      "chordCaveat": "บน Windows และ Linux คีย์ลัดของ Myne เองมาก่อน คอร์ดของ vim ที่ชนกัน (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) จึงใช้ในตัวแก้ไขไม่ได้ Ctrl-[ ยังทำงานเป็น Escape และ visual-block ย้ายไปที่ Alt-v",
+      "errorSaveSetting": "บันทึกการตั้งค่าโหมด vim ไม่ได้",
+      "helper": "ใช้ปุ่มแบบ vim ในตัวแก้ไข: โหมด normal, insert และ visual พร้อม motion และ operator ตามปกติ ปิดอยู่ตามค่าเริ่มต้น ขณะเปิดใช้ โน้ตจะเปิดในมุมมองซอร์ส",
+      "label": "โหมดแป้นพิมพ์ Vim",
+      "off": "ปิด",
+      "on": "เปิด"
+    },
+    "toolbarCustomize": {
+      "errorSave": "บันทึกการจัดวางแถบเครื่องมือไม่ได้",
+      "helper": "เลือกว่าจะให้ปุ่มจัดรูปแบบใดปรากฏบนแถบเครื่องมือของข้อความที่เลือก และเรียงลำดับอย่างไร",
+      "label": "ปุ่มบนแถบเครื่องมือ",
+      "moveDown": "เลื่อนลง",
+      "moveUp": "เลื่อนขึ้น",
+      "pendingHint": "เร็ว ๆ นี้"
+    },
+    "ai": {
+      "autoTagHelper": "เมื่อคุณหยุดพิมพ์ โมเดลขนาดเล็กบนอุปกรณ์ของคุณจะอ่านโน้ตและเสนอแท็กไว้ด้านบนของโน้ต ไม่มีอะไรถูกเพิ่มจนกว่าคุณจะยอมรับข้อเสนอ",
+      "autoTagLabel": "เสนอแท็กอัตโนมัติ",
+      "autoTagUnavailable": "บิลด์นี้ไม่ได้มาพร้อมโมเดลแท็ก จึงเสนอแท็กไม่ได้ Myne ไม่เคยดาวน์โหลดโมเดล — สวิตช์นี้จะเปิดเองในบิลด์ที่มีโมเดลมาด้วย",
+      "disclosureToggle": "ทำงานอย่างไร",
+      "enableHelper": "รันโมเดลที่คุณจัดหามาเองทั้งหมดบนอุปกรณ์ของคุณ อยู่ในขั้นทดลอง ปิดอยู่ตามค่าเริ่มต้น",
+      "enableLabel": "เปิดใช้ AI บนเครื่อง",
+      "excludedHelper": "โน้ตในโฟลเดอร์เหล่านี้จะไม่ถูก AI อ่านหรือทำดัชนีเลย หนึ่งเส้นทางโฟลเดอร์ต่อหนึ่งบรรทัด",
+      "excludedLabel": "โฟลเดอร์ที่ยกเว้น",
+      "excludedPlaceholder": "ส่วนตัว/\nบันทึกประจำวัน/",
+      "modelChoose": "เลือกไฟล์…",
+      "modelEmbeddingLabel": "โมเดลค้นหา — การค้นหาเชิงความหมายและถาม-ตอบ",
+      "modelFilter": {
+        "gguf": "โมเดล GGUF",
+        "safetensors": "โมเดล Safetensors"
+      },
+      "modelGenerationLabel": "โมเดลข้อความ — แชท สรุป และเขียน",
+      "modelNone": "ยังไม่ได้เลือกไฟล์",
+      "modelSaveFailed": "บันทึกเส้นทางโมเดลไม่ได้ (ต้องอยู่นอกห้องนิรภัยของคุณ)",
+      "modelTranscriptionLabel": "โมเดลแปลงเสียงเป็นข้อความ (การถอดเสียง)",
+      "modelsHelper": "Myne ไม่เคยดาวน์โหลดโมเดล — การดาวน์โหลดหมายถึงการส่งข้อมูลผ่านเครือข่าย เปิดลิงก์เพื่อดาวน์โหลดในเบราว์เซอร์ของคุณ แล้วจึงเลือกไฟล์ที่ดาวน์โหลดมาที่นี่ ทุกอย่างทำงานบนอุปกรณ์ของคุณ",
+      "modelsLabel": "โมเดล",
+      "recommendedFilesEmbedding": "ต้องมี model.safetensors + config.json + tokenizer.json อยู่ในโฟลเดอร์เดียวกัน",
+      "recommendedFilesGeneration": "ต้องมีไฟล์ .gguf + tokenizer.json อยู่ในโฟลเดอร์เดียวกัน",
+      "recommendedFilesTranscription": "ต้องมีไฟล์ Whisper .gguf + config.json + tokenizer.json อยู่ในโฟลเดอร์เดียวกัน",
+      "title": "AI"
+    },
+    "network": {
+      "disabledCue": "การซิงค์ไม่ได้ส่งผ่าน Tor อีกต่อไป การเชื่อมต่อใหม่จะไปยังเซิร์ฟเวอร์ซิงค์โดยตรง",
+      "errorRead": "อ่านการตั้งค่าปัจจุบันไม่ได้ สลับสวิตช์เพื่อตั้งค่าอีกครั้ง",
+      "errorSave": "บันทึกการตั้งค่าไม่ได้ ไม่มีอะไรเปลี่ยนแปลง",
+      "errorSidecar": "การส่งผ่าน Tor เปิดอยู่ แต่ไคลเอนต์ Tor เริ่มทำงานไม่ได้ การซิงค์จะหยุดไว้จนกว่าจะเริ่มได้ — ไม่มีการส่งอะไรโดยตรง",
+      "postureActive": "การซิงค์กำลังผ่าน Tor",
+      "postureConnecting": "กำลังเชื่อมต่อ Tor — การซิงค์หยุดไว้ชั่วคราว",
+      "postureConnectingDetail": "โดยปกติใช้เวลาไม่กี่วินาที ระหว่างนี้ไม่มีการส่งอะไรโดยตรง",
+      "postureExempt": "การซิงค์ไม่ได้ใช้ Tor — ที่อยู่นี้ชี้มาที่อุปกรณ์เครื่องนี้",
+      "postureExemptDetail": "ที่อยู่เซิร์ฟเวอร์ซิงค์ที่คุณตั้งไว้ชี้มาที่คอมพิวเตอร์เครื่องนี้ การเชื่อมต่อของ Myne ไปยังที่อยู่นั้นจึงไม่ผ่านวงจร Tor ถ้าที่อยู่นั้นส่งต่อไปยังเซิร์ฟเวอร์ที่อื่น Myne มองไม่เห็นและจัดเส้นทางให้ไม่ได้ การซิงค์ไม่ได้ถูกหยุดไว้",
+      "postureHeading": "ตอนนี้",
+      "postureInactive": "การซิงค์ไปยังเซิร์ฟเวอร์ซิงค์โดยตรง",
+      "postureUnavailable": "Tor ใช้งานไม่ได้ — การซิงค์หยุดไว้",
+      "postureUnavailableDetail": "ไม่มีการส่งอะไรโดยตรง ปิดแล้วเปิดการตั้งค่านี้ใหม่เพื่อลองเริ่มไคลเอนต์ Tor หรือปิดไว้เพื่อซิงค์โดยไม่ผ่าน Tor",
+      "residualExit": "รีเลย์สุดท้ายในวงจร Tor — โหนดทางออก — เห็นว่าคุณเชื่อมต่อกับเซิร์ฟเวอร์ซิงค์ใด แต่อ่านสิ่งที่คุณซิงค์ไม่ได้ ข้อมูลนั้นถูกเข้ารหัสแบบต้นทางถึงปลายทางไว้",
+      "residualMetadata": "เซิร์ฟเวอร์ซิงค์ยังเห็นว่าคุณซิงค์เมื่อใด คุณส่งบล็อบกี่ก้อนและใหญ่เท่าใด และคุณมีอุปกรณ์กี่เครื่อง Tor ไม่ได้เปลี่ยนเรื่องนี้",
+      "residualPayment": "ถ้าคุณจ่ายค่าบริการซิงค์แบบโฮสต์ การชำระเงินและบัญชีของคุณยังเชื่อมโยงถึงตัวคุณได้ Tor เปลี่ยนแค่ว่าการเชื่อมต่อมาจากที่ใด ไม่ได้เปลี่ยนร่องรอยการเรียกเก็บเงิน",
+      "residualScope": "เฉพาะการรับส่งข้อมูลซิงค์ของ Myne เท่านั้นที่ผ่าน Tor อย่างอื่นบนอุปกรณ์นี้ไม่ผ่าน",
+      "residualsToggle": "สิ่งที่วิธีนี้ไม่ได้ปกปิด",
+      "torHelper": "ซ่อนที่อยู่ IP และตำแหน่งของคุณจากเซิร์ฟเวอร์ซิงค์ และซ่อนว่าคุณซิงค์กับเซิร์ฟเวอร์ใดจากเครือข่ายและผู้ให้บริการอินเทอร์เน็ตของคุณ — พวกเขายังเห็นได้ว่าอุปกรณ์นี้เชื่อมต่อกับ Tor วิธีนี้ไม่ได้ทำให้คุณนิรนามต่อ Myne และไม่ได้ซ่อนจากเซิร์ฟเวอร์ว่าคุณซิงค์อะไรหรือเมื่อใด",
+      "torLabel": "ส่งการซิงค์ผ่าน Tor"
+    },
+    "prefs": {
+      "saveError": "บันทึกค่าที่ตั้งไว้ไม่ได้ — ลองอีกครั้ง"
+    },
+    "reminders": {
+      "aria": "แสดงการเตือนงานบนอุปกรณ์นี้",
+      "exactAllow": "อนุญาต",
+      "exactLabel": "เวลาที่แม่นยำ",
+      "exactOn": "เปิด",
+      "horizon": "การเตือนถูกลงทะเบียนไว้ถึง {{date}} เปิด Myne ก่อนถึงตอนนั้นเพื่อให้การเตือนดำเนินต่อไป",
+      "label": "การเตือนงาน",
+      "saveError": "บันทึกการตั้งค่านั้นไม่ได้ ลองอีกครั้ง",
+      "showTextAria": "แสดงข้อความของงานในการแจ้งเตือน",
+      "showTextLabel": "แสดงข้อความของงาน"
+    },
+    "privacy": {
+      "autoLockHelper": "ล็อกห้องนิรภัยหลังไม่มีการใช้งานนานเท่านี้",
+      "autoLockLabel": "ล็อกอัตโนมัติ",
+      "autoLockSearchEmpty": "ไม่มีช่วงเวลาที่ตรงกัน",
+      "autoLockSearchPlaceholder": "ค้นหาช่วงเวลา…",
+      "screenCaptureHelperOff": "การป้องกันมีผลเสมอก่อนปลดล็อก หลังปลดล็อกจะเป็นไปตามค่าที่ตั้งไว้นี้",
+      "screenCaptureHelperOn": "ใช้งานได้บน macOS และ Windows 10 (May 2020 Update ขึ้นไป) การรองรับ Linux จะมาในรุ่นถัดไป",
+      "screenCaptureLabel": "การป้องกันการจับภาพหน้าจอ",
+      "screenCaptureSubtitle": "บล็อกภาพหน้าจอและการบันทึกหน้าจอ",
+      "screenshotBlocked": "การป้องกันหน้าจอเปิดอยู่ — ภาพหน้าจอของ Myne จะออกมาว่างเปล่า",
+      "autoLockAfter": "ล็อกอัตโนมัติหลังจาก",
+      "autoLock1m": "1 นาที",
+      "autoLock5m": "5 นาที",
+      "autoLock15m": "15 นาที",
+      "autoLock30m": "30 นาที",
+      "autoLock1h": "1 ชม.",
+      "quickUnlockSubtitleAndroid": "เข้าใหม่ด้วย PIN หลังล็อกอัตโนมัติ",
+      "quickUnlockSubtitle": "เข้าใหม่ด้วย {{method}} หรือ PIN หลังล็อกอัตโนมัติ"
+    },
+    "quickUnlock": {
+      "errorCancelled": "ยกเลิกแล้ว",
+      "errorGeneric": "ตั้งค่าการปลดล็อกด่วนไม่ได้",
+      "errorHardwareUnavailable": "Touch ID ใช้ไม่ได้ในบิลด์นี้ ต้องใช้บิลด์ macOS ที่มีลายเซ็นและลงทะเบียน Touch ID ไว้แล้ว",
+      "errorNotUnlocked": "ปลดล็อกห้องนิรภัยก่อน",
+      "errorPinNotDigits": "PIN ต้องเป็นตัวเลขเท่านั้น",
+      "errorPinTooShort": "PIN ต้องมีอย่างน้อย {{count}} หลัก",
+      "errorPinTooShort_one": "PIN ต้องมีอย่างน้อย {{count}} หลัก",
+      "errorPinTooShort_other": "PIN ต้องมีอย่างน้อย {{count}} หลัก",
+      "helperConfigured": "ตั้งค่าไว้ด้วย {{method}} การเข้าใหม่หลังล็อกอัตโนมัติจะข้ามรหัสผ่านหลัก แต่หลังเริ่มแอปใหม่ยังต้องใช้รหัสผ่านหลัก",
+      "helperNotConfigured": "เข้าใหม่หลังล็อกอัตโนมัติด้วย PIN หรือ Touch ID แทนรหัสผ่านหลักเต็ม ๆ นี่เป็นเพียงความสะดวกที่วางทับห้องนิรภัยที่เข้ารหัสไว้ — หลังเริ่มแอปใหม่ยังต้องใช้รหัสผ่านหลักเสมอ",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "PIN สำหรับปลดล็อกด่วน",
+      "pinPlaceholder": "PIN (อย่างน้อย {{count}} หลัก)",
+      "pinPlaceholder_one": "PIN (อย่างน้อย {{count}} หลัก)",
+      "pinPlaceholder_other": "PIN (อย่างน้อย {{count}} หลัก)",
+      "setPin": "ตั้ง PIN",
+      "setupHelper": "Touch ID ใช้ได้เฉพาะบน macOS และยังอยู่ในขั้นทดลอง (รอการยืนยันกับฮาร์ดแวร์) ส่วน PIN ใช้ได้ทุกที่",
+      "title": "การปลดล็อกด่วน",
+      "useTouchId": "ใช้ Touch ID",
+      "pinTooShort": "PIN ต้องมีอย่างน้อย 6 หลัก",
+      "pinMismatch": "PIN ไม่ตรงกัน",
+      "pinOnToast": "การปลดล็อกด่วนด้วย PIN เปิดอยู่",
+      "setupError": "ตั้งค่าการปลดล็อกด่วนไม่ได้",
+      "turnedOffToast": "ปิดการปลดล็อกด่วนแล้ว",
+      "turnOffError": "ปิดการปลดล็อกด่วนไม่ได้",
+      "biometricOnToast": "การปลดล็อกด่วนด้วย {{method}} เปิดอยู่",
+      "biometricUnavailable": "{{method}} ใช้บนอุปกรณ์นี้ไม่ได้",
+      "warningBanner": "เป็นเพียงประตูเพื่อความสะดวก หลังเริ่มแอปใหม่ยังต้องใช้รหัสผ่านของคุณ",
+      "biometricToggleSubtitle": "ปลดล็อกด้วย {{method}} หลังล็อกอัตโนมัติ",
+      "pinOnLead": "การปลดล็อกด่วนด้วย PIN ",
+      "pinOnEmphasis": "เปิดอยู่",
+      "pinOnRest": " หลังจากห้องนิรภัยล็อกอัตโนมัติ คุณเข้าใหม่ด้วย PIN แทนรหัสผ่านเต็มได้ — เฉพาะเซสชันนี้ของแอปเท่านั้น การเปิดแอปขึ้นมาใหม่ต้องใช้รหัสผ่านเต็มเสมอ",
+      "turnOffPin": "ปิด PIN",
+      "pinSetupHelper": "ตั้ง PIN 6 หลักขึ้นไปเพื่อปลดล็อกใหม่ได้เร็วหลังล็อกอัตโนมัติ PIN จะห่อกุญแจที่อยู่เฉพาะบนอุปกรณ์นี้ — ไม่เคยออกจากอุปกรณ์นี้ และไม่แตะต้องวลีกู้คืนของคุณ",
+      "pinReplacesBiometric": " การตั้ง PIN จะแทนที่การปลดล็อกด้วย {{method}}",
+      "pinPlaceholder6": "อย่างน้อย 6 หลัก",
+      "confirmPin": "ยืนยัน PIN",
+      "reenterPin": "ป้อน PIN อีกครั้ง",
+      "setupButton": "ตั้งค่าการปลดล็อกด่วน"
+    },
+    "shell": {
+      "closeLabel": "ปิดการตั้งค่า",
+      "groups": {
+        "developer": "นักพัฒนา"
+      },
+      "navLabel": "แผงการตั้งค่า",
+      "panels": {
+        "about": "เกี่ยวกับ",
+        "account": "บัญชี",
+        "ai": "AI",
+        "appearance": "รูปลักษณ์",
+        "editor": "ตัวแก้ไข",
+        "files": "ไฟล์",
+        "transcription": "การถอดเสียง",
+        "hotkeys": "คีย์ลัด",
+        "network": "เครือข่าย",
+        "privacy": "ความเป็นส่วนตัว",
+        "storage": "ที่จัดเก็บ",
+        "sync": "ซิงค์"
+      },
+      "passwordUpdatedToast": "อัปเดตรหัสผ่านแล้ว",
+      "title": "การตั้งค่า"
+    },
+    "spell": {
+      "errorSaveLanguages": "บันทึกภาษาสำหรับตรวจการสะกดไม่ได้",
+      "errorSaveSetting": "บันทึกการตั้งค่าการตรวจการสะกดไม่ได้",
+      "helper": "ขีดเส้นใต้คำที่สะกดผิดขณะพิมพ์ ทำงานออฟไลน์ทั้งหมด — โน้ตของคุณไม่ออกจากอุปกรณ์",
+      "label": "การตรวจการสะกด",
+      "languagesAriaLabel": "ภาษาสำหรับตรวจการสะกด",
+      "languagesHelper": "คำจะถือว่าถูกต้องถ้าใช้ได้ในภาษาใดภาษาหนึ่งที่เลือกไว้ — สะดวกเมื่อผสมคำภาษาอังกฤษเข้าไปในโน้ตภาษาอื่น",
+      "languagesLabel": "ภาษา",
+      "languagesPlaceholder": "เลือกภาษา…",
+      "languagesSearchEmpty": "ไม่มีภาษาที่ตรงกัน",
+      "languagesSearchPlaceholder": "ค้นหาภาษา…",
+      "off": "ปิด",
+      "on": "เปิด"
+    },
+    "storage": {
+      "backupHelper": "ไฟล์สำรองข้อมูลเข้ารหัสเท่ากับห้องนิรภัยของคุณพอดี รวมอยู่ในไฟล์ .myne-backup ไฟล์เดียวที่ผ่านการตรวจสอบ การกู้คืนใช้รหัสผ่านหรือวลีกู้คืนของห้องนิรภัยนั้น — เหมือนตอนปลดล็อกทุกประการ",
+      "backupLabel": "การสำรองข้อมูล",
+      "backUpVault": "สำรองข้อมูลห้องนิรภัย…",
+      "exportAction": "ส่งออก…",
+      "exportBody": "ส่งออกห้องนิรภัยเป็น Markdown",
+      "exportHelper": "ต้นไม้ไฟล์ markdown ธรรมดา — ไม่ได้เข้ารหัส",
+      "exportLabel": "การส่งออก",
+      "importHelper": "นำโน้ตเข้ามาจาก Obsidian, Notion, Evernote, ไฟล์ HTML หรือ CSV ทุกอย่างถูกนำเข้าและเข้ารหัสทันที ไฟล์ต้นฉบับของคุณไม่ถูกแตะต้อง",
+      "importLabel": "การนำเข้า",
+      "importObsidian": "นำเข้าโน้ต…",
+      "locationHelper": "ห้องนิรภัยแต่ละแห่งคือโฟลเดอร์ของไฟล์ที่เข้ารหัสไว้ใต้เส้นทางนี้ ใช้ปุ่มสำรองข้อมูลด้านล่างแทนการคัดลอกด้วยมือ เพราะมันตรวจสอบไฟล์ที่เขียนออกมาให้ด้วย",
+      "locationLabel": "ตำแหน่งห้องนิรภัย",
+      "openInFiles": "เปิดในตัวจัดการไฟล์",
+      "webLocationHelper": "โน้ตของคุณอยู่ในที่จัดเก็บของเบราว์เซอร์นี้สำหรับเว็บไซต์นี้ ซึ่งเบราว์เซอร์เป็นผู้ดูแล จึงไม่มีโฟลเดอร์ให้เปิด การล้างข้อมูลของเว็บไซต์นี้จะลบสำเนาในเครื่อง แต่เพราะไคลเอนต์นี้ซิงค์ การลงชื่อเข้าใช้อีกครั้งจะดาวน์โหลดกลับมา",
+      "webLocationLabel": "ที่ที่เก็บโน้ตของคุณ",
+      "pathUnavailable": "ไม่มีเส้นทาง",
+      "restoreBackup": "กู้คืนจากไฟล์สำรองข้อมูล…"
+    },
+    "typography": {
+      "contentWidthHelper": "ความกว้างสูงสุดของคอลัมน์ที่ใช้แก้ไข แบบเต็มจะให้ข้อความกินพื้นที่ทั้งบานหน้าต่าง",
+      "contentWidthLabel": "ความกว้างเนื้อหา",
+      "errorSave": "บันทึกค่าที่ตั้งไว้ไม่ได้ โปรดลองอีกครั้ง",
+      "fontHelper": "ข้อความแบบความกว้างคงที่ (โมโน) หรือแบบสัดส่วน (ซานส์เซอริฟ)",
+      "fontLabel": "ฟอนต์",
+      "lineSpacingHelper": "ระยะห่างแนวตั้งระหว่างบรรทัด",
+      "lineSpacingLabel": "ระยะห่างบรรทัด",
+      "textSizeHelper": "ขนาดพื้นฐานของข้อความในตัวแก้ไข หัวข้อจะปรับขนาดตาม",
+      "previewLabel": "ตัวอย่าง",
+      "previewBody": "เป็นมนุษย์สุดประเสริฐเลิศคุณค่า กว่าบรรดาฝูงสัตว์เดรัจฉาน การตั้งค่าตัวอักษรเปลี่ยนวิธีที่โน้ตทุกรายการอ่านออกมา ตัวอย่างนี้จึงเปลี่ยนตามที่คุณเลือก",
+      "textSizeLabel": "ขนาดตัวอักษร"
+    },
+    "viewMode": {
+      "errorSave": "บันทึกโหมดมุมมองเริ่มต้นไม่ได้",
+      "helper": "วิธีที่โน้ตเปิดขึ้น: ตัวอย่างสด (ค่าเริ่มต้น), มุมมองอ่านอย่างเดียว หรือซอร์สดิบ สลับโน้ตด้วย ⇧⌘E",
+      "label": "โหมดมุมมองเริ่มต้น",
+      "optionLive": "ตัวอย่างสด",
+      "optionReading": "อ่าน",
+      "optionSource": "ซอร์ส"
+    },
+    "strength": {
+      "weak": "อ่อน",
+      "fair": "พอใช้",
+      "good": "ดี",
+      "strong": "แข็งแรง"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "ยังไม่ได้ตั้งค่า",
+        "offline": "ออฟไลน์",
+        "conflicts_one": "ขัดแย้ง {{count}} รายการ",
+        "conflicts_other": "ขัดแย้ง {{count}} รายการ"
+      }
+    },
+    "data": {
+      "exported_one": "ส่งออกโน้ต {{count}} รายการ → {{label}}",
+      "exported_other": "ส่งออกโน้ต {{count}} รายการ → {{label}}",
+      "exportNeedsApp": "การส่งออกต้องใช้แอป (ไม่ใช่การแสดงตัวอย่างในเบราว์เซอร์)",
+      "exportFailed": "ส่งออกห้องนิรภัยไม่ได้",
+      "exportToMarkdown": "ส่งออกเป็น Markdown",
+      "exportToMarkdownSubtitle": "ถอดรหัสโน้ตทุกรายการไปยังโฟลเดอร์ธรรมดาใน Documents"
+    },
+    "saveSettingError": "บันทึกการตั้งค่านั้นไม่ได้",
+    "panelTitle": {
+      "privacy": "ความเป็นส่วนตัวและความปลอดภัย",
+      "data": "ข้อมูล",
+      "vaultName": "ชื่อห้องนิรภัย",
+      "approveDevice": "อนุมัติอุปกรณ์"
+    },
+    "done": "เสร็จสิ้น",
+    "sectionOptions": "ตัวเลือก",
+    "footerTagline": "myne · เข้ารหัสบนอุปกรณ์นี้ · โอเพนซอร์ส",
+    "editor": {
+      "sections": {
+        "text": "ข้อความและการแสดงผล",
+        "editing": "การแก้ไข",
+        "writing": "การเขียน",
+        "features": "ความสามารถ"
+      },
+      "preview": {
+        "heading": "เป็นมนุษย์สุดประเสริฐเลิศคุณค่า",
+        "bullet1": "กว่าบรรดาฝูงสัตว์เดรัจฉาน",
+        "bullet2": "จงฝ่าฟันพัฒนาวิชาการ",
+        "spellCaption": "การตรวจการสะกด",
+        "spellSample": "สะกดผืด"
+      },
+      "defaultView": "มุมมองเริ่มต้น",
+      "typewriter": "การเลื่อนแบบพิมพ์ดีด",
+      "typewriterSubtitle": "ให้เคอร์เซอร์อยู่กึ่งกลางแนวตั้ง",
+      "enableArchiving": "เปิดใช้การเก็บถาวร"
+    },
+    "search": {
+      "placeholder": "ค้นหาการตั้งค่า…",
+      "ariaLabel": "ค้นหาการตั้งค่า",
+      "empty": "ไม่มีการตั้งค่าที่ตรงกับ “{{query}}”",
+      "resultsLabel": "ผลการค้นหา",
+      "keywords": {
+        "aiAutoTag": "แท็กอัตโนมัติ แท็ก เสนอแท็ก ป้ายกำกับ ai auto tag",
+        "aiEnable": "ai บนเครื่อง เปิด ปิด เปิดใช้ ปิดใช้ แมชชีนเลิร์นนิง local ai",
+        "aiExcluded": "โฟลเดอร์ที่ยกเว้น ยกเว้น ละเว้น ai ความเป็นส่วนตัว excluded folders",
+        "aiModels": "โมเดล gguf ดาวน์โหลด ข้อความ เอ็มเบดดิง llm models",
+        "archive": "ที่เก็บถาวร เก็บถาวร ซ่อน คืนค่า โน้ต archive",
+        "autoBackup": "สำรองข้อมูลอัตโนมัติ กำหนดเวลา ความถี่ การเก็บรักษา โฟลเดอร์ backup",
+        "autoLock": "ล็อกอัตโนมัติ หมดเวลา ไม่มีการใช้งาน ตัวจับเวลา เซสชัน auto lock",
+        "backup": "สำรองข้อมูล ส่งออก .myne-backup กู้คืน บันทึก สำเนา backup",
+        "buildChannel": "ช่องทางบิลด์ เวอร์ชัน รุ่น เสถียร เบต้า build channel stable nightly",
+        "changePassword": "เปลี่ยนรหัสผ่าน รหัสผ่าน วลีรหัสผ่าน อัปเดต รีเซ็ต change password",
+        "changelog": "บันทึกการเปลี่ยนแปลง หมายเหตุรุ่น มีอะไรใหม่ ประวัติ changelog",
+        "cliAccess": "cli เทอร์มินัล การเข้าถึง บรรทัดคำสั่ง เชลล์ คำสั่ง myne คอนโซล terminal",
+        "cliExcludedFolders": "cli โฟลเดอร์ที่ยกเว้น เทอร์มินัล ยกเว้น ซ่อน บรรทัดคำสั่ง ส่วนตัว terminal",
+        "cliRateLimit": "cli จำกัดอัตรา เทอร์มินัล ความเร็ว จำกัด งานจำนวนมาก คำสั่งต่อนาที rate limit",
+        "clipper": "ตัวคลิปหน้าเว็บ ส่วนขยาย เบราว์เซอร์ บันทึกหน้าเว็บ chrome firefox clipper",
+        "contentWidth": "ความกว้างเนื้อหา คอลัมน์ การอ่าน ความยาวบรรทัด content width",
+        "customThemes": "ธีมที่กำหนดเอง ชุดสี สี รูปลักษณ์ นำเข้าธีม custom themes",
+        "dailyNotes": "โน้ตประจำวัน บันทึกประจำวัน วันที่ เทมเพลต โฟลเดอร์ ไดอารี่ daily notes",
+        "dangerZone": "โซนอันตราย ลบห้องนิรภัย ทำลาย เอาออก ล้าง danger zone",
+        "export": "ส่งออก markdown ถอดรหัส ไฟล์ธรรมดา เอกสาร export",
+        "focusMode": "โหมดโฟกัส พิมพ์ดีด หรี่บรรทัดที่ไม่ได้ใช้งาน ปราศจากสิ่งรบกวน focus mode",
+        "font": "ฟอนต์ แบบอักษร ตระกูลฟอนต์ ซานส์ เซอริฟ โมโน ตัวอักษร font",
+        "graphSettings": "รูปลักษณ์กราฟ ฟิสิกส์ แรง โหนด ลิงก์ การจัดวาง กลุ่มสี ป้ายกำกับ ผืนผ้าใบ graph",
+        "hotkeys": "คีย์ลัด แป้นพิมพ์ ทางลัด การผูกปุ่ม คอร์ด hotkeys shortcuts",
+        "import": "นำเข้าโน้ต obsidian notion evernote enex html csv ย้ายข้อมูล import",
+        "language": "ภาษา โลแคล ส่วนติดต่อ การแปล ui language",
+        "license": "สัญญาอนุญาต agpl โอเพนซอร์ส กฎหมาย license",
+        "lineNumbers": "หมายเลขบรรทัด แถบตัวเลข ตัวแก้ไข การแสดงผล line numbers",
+        "vimMode": "vim โหมด การแก้ไข normal insert visual แป้นพิมพ์",
+        "lineSpacing": "ระยะห่างบรรทัด ความสูงบรรทัด ตัวอักษร การอ่าน line spacing",
+        "newNoteLocation": "ตำแหน่งโน้ตใหม่ โฟลเดอร์ ค่าเริ่มต้น ที่สร้างโน้ต new note location",
+        "torRouting": "tor การจัดเส้นทาง onion พร็อกซี เครือข่าย ที่อยู่ ip ตำแหน่ง ซ่อน ซิงค์ นิรนาม",
+        "quickUnlock": "ปลดล็อกด่วน pin touch id ไบโอเมตริก ใบหน้า quick unlock",
+        "reminders": "การเตือน แจ้งเตือน การแจ้งเตือน งาน ครบกำหนด reminders",
+        "screenCapture": "การจับภาพหน้าจอ ป้องกัน ภาพหน้าจอ บันทึกหน้าจอ บล็อก ความเป็นส่วนตัว screen capture",
+        "showEditTimes": "แสดงเวลาที่แก้ไข เวลา วันที่แก้ไข โน้ต edit times",
+        "spell": "ตรวจการสะกด การสะกด พจนานุกรม แก้อัตโนมัติ spell check",
+        "spellLanguages": "ภาษาตรวจการสะกด พจนานุกรม โลแคล คำ spell languages",
+        "startupOpen": "เริ่มแอป เปิด ไฟล์เริ่มต้น เปิดโน้ตใด startup",
+        "attachmentOcr": "ocr รูปภาพ สแกน pdf ภาพถ่าย ภาพหน้าจอ รู้จำข้อความ ค้นหาในไฟล์แนบ ซีพียู แบตเตอรี่",
+        "attachmentCompression": "บีบอัด การบีบอัด รูปภาพ ย่อขนาด webp jpeg นำเข้า วาง ขนาดห้องนิรภัย ที่จัดเก็บ",
+        "transcription": "ถอดเสียง การถอดเสียง คำพูด เสียง การบอกจด คำบรรยาย whisper บันทึกเสียง เสียงเป็นข้อความ",
+        "syncAddDevice": "เพิ่มอุปกรณ์ จับคู่ เชื่อม โทรศัพท์ แล็ปท็อป ซิงค์",
+        "syncConflicts": "ข้อขัดแย้ง ผสาน แก้ไข เวอร์ชัน ซิงค์",
+        "syncDevices": "อุปกรณ์ ที่เชื่อมไว้ จับคู่แล้ว ซิงค์ เครื่อง",
+        "syncRecovered": "โน้ตที่กู้คืนมา กู้คืน ซิงค์ กอบกู้",
+        "syncServer": "เซิร์ฟเวอร์ซิงค์ โฮสต์ โฮสต์เอง ปลายทาง url",
+        "syncStatus": "สถานะซิงค์ การเชื่อมต่อ สถานะ เป็นปัจจุบัน",
+        "textSize": "ขนาดตัวอักษร ขนาดฟอนต์ ซูม สเกล การอ่าน text size",
+        "theme": "ธีม มืด สว่าง โหมด รูปลักษณ์ ชุดสี amoled ระบบ theme",
+        "threatModel": "แบบจำลองภัยคุกคาม ความปลอดภัย ผู้ไม่ประสงค์ดี สินทรัพย์ ความเชื่อถือ threat model",
+        "toolbar": "แถบเครื่องมือ ปุ่ม การจัดรูปแบบ ลอย ข้อความที่เลือก ปรับแต่ง toolbar",
+        "vaultIcon": "ไอคอนห้องนิรภัย อวาตาร์ รูปภาพ สัญลักษณ์",
+        "vaultLabel": "ป้ายชื่อห้องนิรภัย ชื่อ เปลี่ยนชื่อ",
+        "vaultLocation": "ตำแหน่งห้องนิรภัย เส้นทาง โฟลเดอร์ บนดิสก์ ที่จัดเก็บ",
+        "viewMode": "โหมดมุมมองเริ่มต้น สด อ่าน ซอร์ส ตัวอย่าง"
+      }
+    }
+  },
+  "storageLost": {
+    "allSynced": "ไม่มีอะไรสูญหาย — โน้ตทุกรายการที่นี่ไปถึงเซิร์ฟเวอร์แล้ว",
+    "evicted": {
+      "body": "เบราว์เซอร์ของคุณล้างที่จัดเก็บของเว็บไซต์นี้เพื่อคืนพื้นที่ ไม่มีอะไรเสียหายและไม่มีอะไรถูกลบบนเซิร์ฟเวอร์ — ทุกอย่างที่ซิงค์ไปแล้วยังอยู่ครบ",
+      "title": "เบราว์เซอร์ของคุณล้างสำเนาในเครื่องของห้องนิรภัยนี้"
+    },
+    "lockCta": "ล็อกแล้วลองอีกครั้ง",
+    "reDownloadCta": "ตั้งค่าเบราว์เซอร์นี้ใหม่",
+    "reEnrolNotice": "การตั้งค่าใหม่จะลงทะเบียนเบราว์เซอร์นี้เป็นอุปกรณ์ใหม่ จึงต้องรอการอนุมัติจากอุปกรณ์อื่นของคุณก่อนจึงจะซิงค์ได้",
+    "unopenable": {
+      "body": "สำเนาในเครื่องของห้องนิรภัยนี้อ่านไม่ได้อีกต่อไป ข้อมูลบนเซิร์ฟเวอร์ไม่ได้รับผลกระทบ — สำเนาที่นี่เป็นแคช และสร้างทดแทนได้",
+      "title": "อ่านสำเนาในเครื่องของห้องนิรภัยนี้ไม่ได้"
+    },
+    "unsyncedIntro": "โน้ต {{count}} รายการยังไปไม่ถึงเซิร์ฟเวอร์ และหายไปแล้ว — นี่เป็นสำเนาเดียวที่มี:",
+    "unsyncedIntro_one": "โน้ต {{count}} รายการยังไปไม่ถึงเซิร์ฟเวอร์ และหายไปแล้ว — นี่เป็นสำเนาเดียวที่มี:",
+    "unsyncedIntro_other": "โน้ต {{count}} รายการยังไปไม่ถึงเซิร์ฟเวอร์ และหายไปแล้ว — นี่เป็นสำเนาเดียวที่มี:",
+    "unsyncedOverflow": "…และอีก {{count}} รายการ",
+    "unsyncedOverflow_one": "…และอีก {{count}} รายการ",
+    "unsyncedOverflow_other": "…และอีก {{count}} รายการ"
+  },
+  "sync": {
+    "materialising": "กำลังดาวน์โหลดโน้ตของคุณ — {{done}} จาก {{total}} คุณเริ่มทำงานได้เลย ส่วนที่เหลือจะทยอยปรากฏขึ้นเมื่อมาถึง",
+    "credentialAmbiguous": "รหัสผ่านของคุณอาจถูกเปลี่ยนทั้งบนอุปกรณ์นี้และบนอีกเครื่องหนึ่ง และ Myne บอกไม่ได้ว่าอันไหนใหม่กว่า จึงยังไม่ได้เปลี่ยนอะไรเลย ลงชื่อเข้าใช้บนอุปกรณ์ที่เข้าถึงบัญชีได้อยู่แล้วเพื่อจัดการเรื่องนี้",
+    "attachments": {
+      "aria": {
+        "downloading": "กำลังดาวน์โหลด {{name}}",
+        "uploading": "กำลังอัปโหลด {{name}}"
+      },
+      "empty": "ไม่มีการถ่ายโอนที่กำลังดำเนินอยู่",
+      "heading": "การซิงค์ไฟล์แนบ",
+      "status": {
+        "done": "เสร็จแล้ว",
+        "failedWillRetry": "ล้มเหลว — จะลองใหม่",
+        "paused": "หยุดชั่วคราว"
+      }
+    },
+    "buildingIndex": {
+      "label": "กำลังสร้างดัชนีการค้นหา…"
+    },
+    "conflicts": {
+      "compare": "เปรียบเทียบ",
+      "compareClose": "กลับไปที่ข้อขัดแย้ง",
+      "compareError": "อ่านโน้ตเหล่านี้เพื่อเปรียบเทียบไม่ได้ ลองอีกครั้ง",
+      "compareIdentical": "ทั้งสองรุ่นนี้เหมือนกันทุกประการ",
+      "compareLoading": "กำลังอ่านทั้งสองรุ่น…",
+      "compareMine": "บนอุปกรณ์นี้",
+      "compareOrphan": "โน้ตต้นทางของสำเนานี้ไม่อยู่ที่นี่แล้ว จึงไม่มีอะไรให้เปรียบเทียบด้วย",
+      "compareTheirs": "สำเนาที่ขัดแย้ง",
+      "compareTitle": "กำลังเปรียบเทียบ “{{title}}”",
+      "discard": "ทิ้ง",
+      "empty": "ไม่มีข้อขัดแย้ง — อุปกรณ์ของคุณซิงค์ตรงกันแล้ว",
+      "groupTitle_one": "สำเนาที่ขัดแย้ง {{count}} รายการของ {{original}}",
+      "groupTitle_other": "สำเนาที่ขัดแย้ง {{count}} รายการของ {{original}}",
+      "keepAsSeparate": "เก็บเป็นโน้ตแยก",
+      "tookTheirsToast": "ย้ายรุ่นในเครื่องไปถังขยะแล้ว",
+      "tookTheirsUndo": "เลิกทำ",
+      "untitled": "ไม่มีชื่อ ({{hex}})",
+      "useThisVersion": "ใช้รุ่นนี้"
+    },
+    "deviceJoinQr": {
+      "accountLabel": "หมายเลขบัญชี",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "สร้าง QR ไม่ได้ โปรดลองอีกครั้ง",
+      "generate": "สร้าง QR",
+      "hint": "วางหมายเลขบัญชีของคุณเพื่อสร้าง QR ให้โทรศัพท์สแกน — ระบบจะเติมเซิร์ฟเวอร์และหมายเลขบัญชีให้คุณเอง",
+      "invalidAccount": "นั่นดูไม่เหมือนหมายเลขบัญชีที่ถูกต้อง",
+      "notConfigured": "ตั้งค่าเซิร์ฟเวอร์ซิงค์ก่อน แล้วจึงสร้าง QR",
+      "scanWithApp": "สแกนด้วยแอป iOS",
+      "title": "เพิ่มอุปกรณ์ด้วย QR"
+    },
+    "devices": {
+      "approve": "อนุมัติ",
+      "awaitingApproval_one": "อุปกรณ์ {{count}} เครื่องรอการอนุมัติ",
+      "awaitingApproval_other": "อุปกรณ์ {{count}} เครื่องรอการอนุมัติ",
+      "loading": "กำลังโหลด…",
+      "noDevices": "ยังไม่มีอุปกรณ์ที่ซิงค์",
+      "notEnrolled": "อุปกรณ์นี้ยังไม่ได้เชื่อมต่อ ถ้าคุณเพิ่งเพิ่มเข้ามา ให้รอการอนุมัติจากอุปกรณ์อื่น มิฉะนั้นให้เพิ่มด้วยแบบฟอร์ม “เพิ่มอุปกรณ์” ด้านบน",
+      "platform": {
+        "android": "โทรศัพท์ Android",
+        "androidTablet": "แท็บเล็ต Android",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "พีซี Linux",
+        "macos": "Mac",
+        "unknown": "อุปกรณ์นี้",
+        "web": "เบราว์เซอร์",
+        "windows": "พีซี Windows"
+      },
+      "remove": "นำออก",
+      "removedElsewhere": "อุปกรณ์นี้ถูกนำออกจากบัญชีของคุณบนอุปกรณ์อื่น",
+      "rename": "เปลี่ยนชื่อ",
+      "renameFailed": "บันทึกชื่อนั้นไม่ได้ ลองอีกครั้ง",
+      "renameLabel": "ชื่ออุปกรณ์",
+      "resetAndReAdd": "รีเซ็ตแล้วเพิ่มอุปกรณ์นี้ใหม่",
+      "resetSyncOnThisDevice": "รีเซ็ตการซิงค์บนอุปกรณ์นี้",
+      "shortName": "อุปกรณ์ {{hex}}",
+      "syncedHere": "ซิงค์ที่นี่",
+      "thisDevice": "อุปกรณ์นี้",
+      "transportHint": "ถ้าเซิร์ฟเวอร์ย้ายที่หรือใบรับรองเปลี่ยนไป ให้ป้อน URL ของเซิร์ฟเวอร์อีกครั้งที่ “เซิร์ฟเวอร์ซิงค์” ด้านบนเพื่อเชื่อถือใหม่",
+      "unreachable": "เข้าถึงการซิงค์ไม่ได้ ({{error}})",
+      "verifyBody": "ตรวจสอบว่ารหัสเดียวกันนี้ปรากฏบนอุปกรณ์ที่คุณเพิ่งอนุมัติ ถ้าตรงกัน แสดงว่าอยู่ในบัญชีของคุณ ถ้าไม่ตรงกัน ให้นำอุปกรณ์นั้นออก",
+      "verifyMatch": "ตรงกัน",
+      "verifyMismatch": "ไม่ตรงกัน",
+      "verifyPending": "รหัสนี้จะปรากฏเมื่ออุปกรณ์ใหม่ซิงค์ครั้งแรกเสร็จ",
+      "verifySyncing": "กำลังซิงค์…",
+      "verifyTitle": "ยืนยันอุปกรณ์ใหม่",
+      "yourDevices": "อุปกรณ์ของคุณ"
+    },
+    "endpoint": {
+      "connect": "เชื่อมต่อ",
+      "connected": "เชื่อมต่อแล้ว",
+      "connectedLocal": "เชื่อมต่อแล้ว (ในเครื่อง ไม่มี TLS)",
+      "connectedTls": "เชื่อมต่อแล้ว ตรวจสอบว่าลายนิ้วมือนี้ตรงกันบนอุปกรณ์อีกเครื่องของคุณ",
+      "connectedPlatformTrust": "เชื่อมต่อผ่าน TLS แล้ว เบราว์เซอร์ของคุณได้ตรวจสอบใบรับรองของเซิร์ฟเวอร์นี้แล้ว",
+      "connecting": "กำลังเชื่อมต่อ…",
+      "fingerprintLabel": "ลายนิ้วมือใบรับรองของเซิร์ฟเวอร์:",
+      "confirmFingerprintRequired": "การกำหนดเส้นทางผ่าน Tor เปิดอยู่ อุปกรณ์นี้จึงจะไม่เชื่อถือใบรับรองที่ไม่ได้ระบุไว้ล่วงหน้า ขอลายนิ้วมือใบรับรอง SHA-256 ของเซิร์ฟเวอร์จากตัวเซิร์ฟเวอร์เอง หรือจากอุปกรณ์ที่เชื่อมต่ออยู่แล้ว จากนั้นวางไว้ที่นี่",
+      "confirmFingerprintMismatch": "ใบรับรองที่เซิร์ฟเวอร์นี้แสดงไม่ใช่ใบที่คุณป้อน จึงไม่มีการบันทึกอะไรทั้งสิ้น ตรวจสอบลายนิ้วมือที่คุณวางไว้ — และถ้ามันถูกต้อง อย่าเชื่อมต่อ: มีบางอย่างคั่นอยู่ระหว่างอุปกรณ์นี้กับเซิร์ฟเวอร์ของคุณ",
+      "confirmFingerprintDeclined": "ไม่มีการบันทึกอะไร — อุปกรณ์นี้ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์นั้น กลับมาอีกครั้งเมื่อคุณมีลายนิ้วมือใบรับรองของมันแล้ว",
+      "pinStatic": "ตรวจสอบกับใบรับรองที่มาพร้อมกับ Myne แล้ว",
+      "pinTofu": "ปักหมุดไว้ตั้งแต่การเชื่อมต่อครั้งแรก เปรียบเทียบลายนิ้วมือนี้ระหว่างอุปกรณ์ของคุณ",
+      "fixedOrigin": "ไคลเอนต์นี้ซิงค์กับเซิร์ฟเวอร์เดียวที่กำหนดไว้ตอนติดตั้ง เปลี่ยนจากที่นี่ไม่ได้ — หน้านี้ได้รับอนุญาตให้ติดต่อกับที่อยู่นี้เท่านั้น",
+      "fixedOriginNone": "การติดตั้งนี้ไม่ได้ตั้งค่าเซิร์ฟเวอร์ซิงค์ไว้",
+      "pinPlatformTrust": "ตรวจสอบโดยคลังใบรับรองของเบราว์เซอร์คุณ ไคลเอนต์นี้ปักหมุดใบรับรองเองไม่ได้",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "เข้าถึงเซิร์ฟเวอร์นั้นไม่ได้ — ตรวจสอบ URL และว่าเซิร์ฟเวอร์กำลังทำงานอยู่"
+    },
+    "enroll": {
+      "accountNumberLabel": "หมายเลขบัญชี",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "กำลังเชื่อมต่อ…",
+      "credentialTypeAria": "ประเภทข้อมูลรับรอง",
+      "deviceNameHelp": "แสดงในรายการอุปกรณ์ของคุณ เปลี่ยนภายหลังได้",
+      "deviceNameLabel": "ตั้งชื่ออุปกรณ์นี้",
+      "error": {
+        "notConfigured": "ตั้งค่าเซิร์ฟเวอร์ซิงค์ในการตั้งค่าก่อนเพิ่มอุปกรณ์นี้",
+        "transport": "เข้าถึงเซิร์ฟเวอร์ซิงค์ไม่ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง"
+      },
+      "mode": {
+        "password": "รหัสผ่าน",
+        "recovery": "วลีกู้คืน"
+      },
+      "passwordLabel": "รหัสผ่าน",
+      "recoveryPhraseHint": "ป้อนวลีกู้คืน 24 คำของคุณ",
+      "recoveryPhraseLabel": "วลีกู้คืน",
+      "signInWith": "ลงชื่อเข้าใช้ด้วย",
+      "submit": "เพิ่มอุปกรณ์นี้",
+      "wordAria": "คำที่ {{number}}"
+    },
+    "fingerprint": {
+      "title": "ตรวจสอบใบรับรองของเซิร์ฟเวอร์นี้ก่อนเชื่อถือ",
+      "why": "การกำหนดเส้นทางผ่าน Tor เปิดอยู่ การเชื่อมต่อครั้งแรกนี้จึงไปถึงเซิร์ฟเวอร์ผ่านรีเลย์ที่คนแปลกหน้าดูแลอยู่ ตราบใดที่ยังไม่ได้ปักหมุดใบรับรอง อุปกรณ์นี้จะรับใบรับรองใดก็ตามที่ถูกยื่นมาให้ — รวมถึงใบที่รีเลย์นั้นกุขึ้นมาเอง ป้อนลายนิ้วมือที่เซิร์ฟเวอร์ของคุณประกาศไว้ แล้ว Myne จะเทียบก่อนปักหมุดสิ่งใด ถ้าไม่ตรงกัน จะไม่มีการบันทึกอะไรเลย",
+      "label": "ลายนิ้วมือใบรับรองที่คาดไว้",
+      "placeholder": "ลายนิ้วมือ SHA-256 จากเซิร์ฟเวอร์ของคุณ",
+      "echoLabel": "สิ่งที่คุณป้อน",
+      "echoComplete": "64 จาก 64 อักขระ อ่านเทียบกับสำเนาของคุณเองก่อนดำเนินการต่อ",
+      "echoProgress": "{{count}} จาก {{total}} อักขระแล้ว",
+      "echoInvalid": "ลายนิ้วมือ SHA-256 มี 64 อักขระ แต่ละตัวเป็น 0–9 หรือ a–f ทวิภาค ช่องว่าง และ “sha256:” ที่นำหน้าใช้ได้ — นอกจากนั้นไม่ใช่ส่วนหนึ่งของมัน",
+      "helpToggle": "หาลายนิ้วมือนี้ได้จากที่ไหน",
+      "helpNotOverTor": "ไม่ใช่ผ่านการเชื่อมต่อนี้ ลายนิ้วมือที่คุณดึงมาผ่านวงจรเดียวกันพิสูจน์อะไรไม่ได้ — สิ่งที่สลับใบรับรองได้ ก็สลับหน้านั้นได้เช่นกัน",
+      "helpFromServer": "บนเครื่องที่รันเซิร์ฟเวอร์ของคุณ: openssl x509 -noout -fingerprint -sha256 -in <ไฟล์ใบรับรองของคุณ>",
+      "helpFromDevice": "บนอุปกรณ์ที่เชื่อมต่อกับบัญชีนี้อยู่แล้ว: การตั้งค่า → ซิงค์ จะแสดงลายนิ้วมือเดียวกัน",
+      "helpNoFingerprint": "ถ้าคุณหามันด้วยวิธีเหล่านั้นไม่ได้เลย จะเพิ่มเซิร์ฟเวอร์นี้ไม่ได้ขณะที่การกำหนดเส้นทางผ่าน Tor เปิดอยู่ คุณปิดการกำหนดเส้นทางผ่าน Tor ได้ที่ การตั้งค่า → เครือข่าย แล้วเชื่อมต่อโดยตรง — วิธีนั้นจะเปิดเผยที่อยู่ IP ของคุณต่อเซิร์ฟเวอร์และต่อผู้ที่เฝ้าดูเครือข่ายของคุณได้",
+      "decline": "ฉันไม่มี — ยกเลิก"
+    },
+    "join": {
+      "accountLabel": "หมายเลขบัญชี",
+      "cancel": "ยกเลิก",
+      "continue": "ดำเนินการต่อ",
+      "error": "เพิ่มอุปกรณ์นี้ไม่ได้ ตรวจสอบ URL ของเซิร์ฟเวอร์ หมายเลขบัญชี และรหัสผ่าน — และว่าเซิร์ฟเวอร์เข้าถึงได้",
+      "help": "ลงชื่อเข้าใช้ด้วยหมายเลขบัญชีและรหัสผ่านของคุณ อุปกรณ์นี้จะซิงค์โน้ตของคุณเมื่ออุปกรณ์เดิมอนุมัติแล้ว ไม่ต้องใช้วลีกู้คืน",
+      "passwordLabel": "รหัสผ่าน",
+      "pinnedCompare": "อุปกรณ์นี้ได้ปักหมุดใบรับรองของเซิร์ฟเวอร์คุณแล้ว ตรวจสอบว่าลายนิ้วมือนี้ตรงกันบนอุปกรณ์อื่นของคุณ",
+      "confirmFingerprintRequired": "การกำหนดเส้นทางผ่าน Tor เปิดอยู่ อุปกรณ์นี้จึงจะไม่เชื่อถือใบรับรองที่ไม่ได้ระบุไว้ล่วงหน้า ขอลายนิ้วมือใบรับรอง SHA-256 ของเซิร์ฟเวอร์จากตัวเซิร์ฟเวอร์เอง หรือจากอุปกรณ์ที่เชื่อมต่ออยู่แล้ว จากนั้นวางไว้ที่นี่",
+      "confirmFingerprintMismatch": "ใบรับรองที่เซิร์ฟเวอร์นี้แสดงไม่ใช่ใบที่คุณป้อน อุปกรณ์นี้ยังไม่ถูกเพิ่มและไม่มีการบันทึกอะไรทั้งสิ้น ตรวจสอบลายนิ้วมือที่คุณวางไว้ — และถ้ามันถูกต้อง อย่าดำเนินการต่อ: มีบางอย่างคั่นอยู่ระหว่างอุปกรณ์นี้กับเซิร์ฟเวอร์ของคุณ",
+      "pinnedTitle": "ปักหมุดใบรับรองของเซิร์ฟเวอร์แล้ว",
+      "serverLabel": "เซิร์ฟเวอร์ซิงค์",
+      "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "ตรงกัน — ดำเนินการต่อ",
+      "sasMismatch": "ไม่ตรงกัน — นำอุปกรณ์นี้ออก",
+      "submit": "เพิ่มอุปกรณ์",
+      "submitting": "กำลังเพิ่ม…",
+      "title": "เพิ่มอุปกรณ์นี้เข้าบัญชี",
+      "verifyBody": "ตรวจสอบว่ารหัสนี้ตรงกับรหัสบนอุปกรณ์ที่คุณใช้อนุมัติ",
+      "verifyTitle": "ยืนยันอุปกรณ์นี้",
+      "waitingHint": "เปิดหน้าต่างนี้ทิ้งไว้ — เมื่อได้รับอนุมัติแล้ว รหัสยืนยันจะปรากฏที่นี่ให้เทียบกับอุปกรณ์อีกเครื่องของคุณ",
+      "waitingTitle": "กำลังรอการอนุมัติ"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "ลงชื่อเข้าใช้บนอุปกรณ์ใหม่ด้วยหมายเลขบัญชีและรหัสผ่านหรือวลีกู้คืนของคุณ อุปกรณ์จะอยู่ในสถานะรอจนกว่าอุปกรณ์เดิมจะอนุมัติ",
+        "label": "เพิ่มอุปกรณ์"
+      },
+      "awaitingApproval": {
+        "label": "รอการอนุมัติ"
+      },
+      "conflicts": {
+        "helper": "เมื่อโน้ตเดียวกันถูกแก้ไขบนสองอุปกรณ์พร้อมกัน Myne จะเก็บทั้งสองสำเนาไว้เพื่อไม่ให้อะไรสูญหาย จัดการได้ที่นี่",
+        "label": "ข้อขัดแย้ง"
+      },
+      "devices": {
+        "label": "อุปกรณ์"
+      },
+      "recovered": {
+        "close": "ปิด",
+        "decrypting": "กำลังถอดรหัส…",
+        "deleteConfirmTitle": "ลบโน้ตที่กู้คืนมานี้หรือไม่",
+        "deleteConfirmWarning": "การกระทำนี้จะลบสำเนาเดียวที่เก็บไว้บนอุปกรณ์นี้อย่างถาวร และย้อนกลับไม่ได้",
+        "deleteCta": "ลบ",
+        "empty": "ไม่มีโน้ตที่กู้คืนมา",
+        "errorGeneric": "เกิดข้อผิดพลาดบางอย่าง ลองอีกครั้ง",
+        "helper": "เมื่อโน้ตที่ถูกลบบนอุปกรณ์อื่นถูกนำออกจากที่นี่ สำเนาที่เข้ารหัสของมันจะถูกเก็บไว้บนอุปกรณ์นี้ กู้คืนเป็นโน้ตใหม่ หรือลบทิ้งอย่างถาวร",
+        "label": "โน้ตที่กู้คืนมา",
+        "previewCta": "ดูตัวอย่าง",
+        "previewTitle": "โน้ตที่กู้คืนมา",
+        "restoreCta": "กู้คืน"
+      },
+      "server": {
+        "helper": "ป้อน URL ของเซิร์ฟเวอร์เดียวกันบนทุกอุปกรณ์ สำหรับเซิร์ฟเวอร์ที่โฮสต์เอง ให้ใช้ที่อยู่ <1>https://</1> ของมัน และตรวจสอบว่าลายนิ้วมือใบรับรองตรงกันทุกอุปกรณ์",
+        "label": "เซิร์ฟเวอร์ซิงค์"
+      },
+      "status": {
+        "helper": "Myne ซิงค์โน้ตที่เข้ารหัสของคุณระหว่างอุปกรณ์ต่าง ๆ เซิร์ฟเวอร์เก็บไว้เพียงข้อความเข้ารหัสที่มันอ่านไม่ได้",
+        "label": "สถานะการซิงค์"
+      },
+      "usage": {
+        "helper": "บัญชีนี้เก็บข้อมูลที่เข้ารหัสไว้บนเซิร์ฟเวอร์มากแค่ไหน และมีอุปกรณ์กี่เครื่องที่ลงชื่อเข้าใช้อยู่",
+        "label": "ที่เก็บข้อมูลและอุปกรณ์"
+      }
+    },
+    "reconcile": {
+      "message": "อุปกรณ์นี้ออฟไลน์อยู่พักหนึ่ง — กำลังซิงค์ให้ทัน โน้ตของคุณปลอดภัยดี"
+    },
+    "recovered": {
+      "restoredToast": "กู้คืนเป็นโน้ตใหม่แล้ว"
+    },
+    "status": {
+      "awaitingApproval": "รอการอนุมัติ",
+      "conflicts_one": "มีข้อขัดแย้ง {{count}} รายการให้ตรวจสอบ",
+      "conflicts_other": "มีข้อขัดแย้ง {{count}} รายการให้ตรวจสอบ",
+      "error": "การซิงค์ผิดพลาด",
+      "errorAuth": "การลงชื่อเข้าใช้สำหรับซิงค์หมดอายุ",
+      "errorFrozen": "บัญชีถูกระงับ — หยุดการอัปโหลดชั่วคราว",
+      "errorDeviceRevoked": "อุปกรณ์นี้ถูกนำออกจากบัญชีของคุณแล้ว",
+      "errorStorageFull": "ที่เก็บข้อมูลเต็ม — หยุดการซิงค์ชั่วคราว",
+      "errorQuota": "ที่เก็บข้อมูลเต็ม — หยุดการอัปโหลดชั่วคราว",
+      "errorRateLimited": "การซิงค์ถูกจำกัดอัตรา — กำลังลองใหม่",
+      "errorTooLarge": "มีไฟล์ใหญ่เกินกว่าจะอัปโหลดได้",
+      "loading": "สถานะการซิงค์…",
+      "notEnrolled": "ยังไม่ได้ลงทะเบียน",
+      "off": "ปิดการซิงค์",
+      "synced": "ซิงค์แล้ว",
+      "syncing": "กำลังซิงค์…",
+      "syncNow": "ซิงค์เดี๋ยวนี้"
+    },
+    "usage": {
+      "devices": "อุปกรณ์",
+      "frozen": "บัญชีนี้ถูกระงับ อัปโหลดการเปลี่ยนแปลงใหม่ไม่ได้ แต่โน้ตของคุณยังดาวน์โหลดได้อยู่",
+      "ofTotal": "{{used}} จาก {{total}}",
+      "storage": "ที่เก็บข้อมูล"
+    },
+    "settings": {
+      "serverSection": "เซิร์ฟเวอร์",
+      "serverNotSet": "ยังไม่ได้ตั้งค่า",
+      "statusLabel": "สถานะ",
+      "hubHelp": "การซิงค์ทำให้โน้ตของคุณอัปเดตตรงกันทุกอุปกรณ์ ทุกอย่างถูกเข้ารหัสบนอุปกรณ์นี้ก่อนถูกส่งออกไป — เซิร์ฟเวอร์ไม่เคยเห็นโน้ตของคุณ",
+      "connectedTls": "เชื่อมต่อผ่าน TLS แล้ว",
+      "connectedLocal": "เชื่อมต่อในเครือข่ายท้องถิ่นของคุณแล้ว",
+      "connectError": "เข้าถึงเซิร์ฟเวอร์นั้นไม่ได้ ตรวจสอบที่อยู่แล้วลองอีกครั้ง",
+      "serverAddressLabel": "ที่อยู่เซิร์ฟเวอร์",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "ลายนิ้วมือใบรับรอง",
+      "fingerprintCompare": "เทียบกับหน้าจอเดียวกันบนอุปกรณ์ที่คุณเชื่อถืออยู่แล้ว — ต้องตรงกัน",
+      "pinStatic": "ตรวจสอบกับใบรับรองที่ทราบของเซิร์ฟเวอร์นี้แล้ว",
+      "pinTofu": "ปักหมุดไว้ตั้งแต่การเชื่อมต่อครั้งแรก เปรียบเทียบระหว่างอุปกรณ์ของคุณเพื่อยืนยัน",
+      "enrollNotConfigured": "ตั้งค่าเซิร์ฟเวอร์ซิงค์ก่อน แล้วจึงเพิ่มอุปกรณ์นี้",
+      "enrollTransport": "เข้าถึงเซิร์ฟเวอร์ซิงค์ไม่ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+      "accountNumberHint": "ตรวจสอบหมายเลขนี้อีกครั้ง — ดูแล้วไม่ถูกต้อง",
+      "passwordPlaceholder": "รหัสผ่านห้องนิรภัยของคุณ",
+      "recoveryPhraseHint": "ป้อนหรือวาง 24 คำของคุณ การวางจะเติมช่องตามลำดับ",
+      "verifyBody": "ตรวจสอบว่ารหัสเดียวกันนี้ปรากฏบนอุปกรณ์ที่คุณเพิ่งอนุมัติ ถ้าตรงกัน แสดงว่าอยู่ในบัญชีของคุณ ถ้าไม่ตรงกัน ให้นำอุปกรณ์นั้นออก",
+      "sasMismatch": "ไม่ตรงกัน",
+      "removeDeviceButton": "นำอุปกรณ์ออก",
+      "keepDevice": "เก็บไว้",
+      "notEnrolledHelp": "อุปกรณ์นี้ยังไม่ได้ซิงค์ เพิ่มจากหน้าจอก่อนหน้าเพื่อดูอุปกรณ์ของคุณ",
+      "unauthenticated": "สิทธิ์เข้าถึงของอุปกรณ์นี้ถูกเพิกถอน น่าจะถูกนำออกจากอุปกรณ์อื่น",
+      "transportError": "เข้าถึงเซิร์ฟเวอร์ซิงค์ไม่ได้ ถ้าเซิร์ฟเวอร์ย้ายที่หรือใบรับรองเปลี่ยนไป ให้เชื่อมต่อใหม่จากหน้าจอ เซิร์ฟเวอร์ซิงค์",
+      "retiredSelf": "อุปกรณ์นี้ถูกนำออกจากอุปกรณ์อื่น",
+      "resetAndAddAgain": "รีเซ็ตแล้วเพิ่มใหม่",
+      "noDevices": "ยังไม่มีอุปกรณ์",
+      "syncingHere": "กำลังซิงค์ที่นี่"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "มีข้อขัดแย้ง {{count}} รายการที่ต้องตรวจสอบ",
+      "conflictsNeedReview_other": "มีข้อขัดแย้ง {{count}} รายการที่ต้องตรวจสอบ",
+      "catchingUp": "กำลังซิงค์ให้ทัน — โน้ตของคุณปลอดภัยดี",
+      "verifyDevices": "ยืนยันอุปกรณ์"
+    },
+    "tor": {
+      "connecting": "กำลังเชื่อมต่อ Tor การซิงค์หยุดชั่วคราวจนกว่าการเชื่อมต่อจะพร้อม — ยังไม่มีการส่งข้อมูลออกโดยตรง",
+      "settingsHint": "การตั้งค่า → เครือข่าย",
+      "unavailable": "ใช้ Tor ไม่ได้ การซิงค์จึงหยุดชั่วคราว ไม่มีการส่งข้อมูลออกโดยตรง ปิดการกำหนดเส้นทางผ่าน Tor เพื่อซิงค์โดยไม่ผ่านมัน"
+    }
+  },
+  "tasks": {
+    "builder": {
+      "any": "ใดก็ได้",
+      "due": "กำหนดส่ง",
+      "folder": "โฟลเดอร์",
+      "insert": "แทรก",
+      "noDueDate": "ไม่มีกำหนดส่ง",
+      "priority": "ความสำคัญ",
+      "sort": "เรียงตาม",
+      "sortDue": "วันที่กำหนดส่ง",
+      "sortPath": "โน้ต",
+      "sortPriority": "ความสำคัญ",
+      "status": "สถานะ",
+      "statusDone": "เสร็จแล้ว",
+      "statusTodo": "ยังไม่เสร็จ",
+      "tag": "แท็ก"
+    },
+    "empty": {
+      "filter": "ตอนนี้ไม่มีอะไรที่นี่ ลองตัวกรองอื่น",
+      "rebuilding": "กำลังอ่านโน้ตของคุณ…",
+      "scope": "ไม่มีงานในโฟลเดอร์หรือแท็กนี้ ลองขยายขอบเขต",
+      "vault": "ยังไม่มีงาน พิมพ์ “- [ ]” ที่ต้นบรรทัดในโน้ตใดก็ได้เพื่อสร้างงานหนึ่งรายการ"
+    },
+    "filter": {
+      "all": "ทั้งหมด",
+      "overdue": "เลยกำหนด",
+      "today": "วันนี้",
+      "upcoming": "ที่จะถึง"
+    },
+    "noteTitle": "งานในโน้ตนี้",
+    "query": {
+      "dropped_one": "{{count}} เงื่อนไขที่ Myne อ่านไม่ได้",
+      "dropped_other": "{{count}} เงื่อนไขที่ Myne อ่านไม่ได้",
+      "empty": "ไม่มีงานที่ตรงกับคิวรีนี้",
+      "loading": "กำลังอ่านโน้ตของคุณ…",
+      "refused": "Myne อ่านคิวรีนี้ไม่ได้เลย จึงไม่แสดงอะไรแทนที่จะแสดงทั้งหมด",
+      "remainder_one": "มีงานที่ตรงกันอีก {{count}} รายการ",
+      "remainder_other": "มีงานที่ตรงกันอีก {{count}} รายการ"
+    },
+    "reminder": {
+      "due": "ถึงกำหนดเตือนงานแล้ว"
+    },
+    "row": {
+      "completed": "งาน, เสร็จแล้ว",
+      "notCompleted": "งาน, ยังไม่เสร็จ",
+      "tooLongToWrite": "บรรทัดของงานนี้ยาวเกินกว่าจะแก้ไขจากที่นี่ เปิดโน้ตของมันแทน",
+      "untitled": "งานไม่มีชื่อ"
+    },
+    "scope": {
+      "allFolders": "ทุกโฟลเดอร์",
+      "label": "จำกัดด้วย"
+    },
+    "title": "งาน"
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "ปิดเทมเพลต",
+      "deleteRowLabel": "ลบเทมเพลต {{name}} (ย้ายไปถังขยะ)",
+      "editTemplateLabel": "แก้ไขเทมเพลต {{name}}",
+      "emptyBody": "สร้างเทมเพลตเพื่อใช้โครงโน้ตซ้ำ — บันทึกการประชุม บันทึกประจำวัน บันทึกการอ่าน แล้วเลือกใช้ตอนสร้างโน้ตใหม่",
+      "emptyTitle": "ยังไม่มีเทมเพลต",
+      "listLabel": "เทมเพลต",
+      "loading": "กำลังโหลด…",
+      "newTemplate": "เทมเพลตใหม่",
+      "newTemplateName": "เทมเพลตไม่มีชื่อ",
+      "removeFromTemplates": "เอาออกจากเทมเพลต",
+      "removeRowLabel": "เอา {{name}} ออกจากเทมเพลต (ยังเก็บโน้ตไว้)",
+      "title": "เทมเพลตโน้ต"
+    },
+    "emptyBefore": "ยังไม่มีเทมเพลต แตะ ",
+    "newAction": "ใหม่",
+    "emptyAfter": " เพื่อสร้างเทมเพลตโน้ตที่ใช้ซ้ำได้ — แล้วเริ่มโน้ตจากมัน (และเลือกอันหนึ่งเป็นเทมเพลตโน้ตประจำวันใน การตั้งค่า)",
+    "use": "ใช้",
+    "edit": "แก้ไข",
+    "deleteConfirm": "ลบเทมเพลตนี้หรือไม่",
+    "convertToNote": "แปลงเป็นโน้ต"
+  },
+  "themeInstall": {
+    "apply": "ใช้ธีมนี้",
+    "applying": "กำลังใช้…",
+    "byAuthor": "ลิงก์นี้ระบุว่าสร้างโดย {{author}}",
+    "cancel": "ยกเลิก",
+    "close": "ปิด",
+    "collision": {
+      "keepBoth": "เก็บทั้งคู่ — ติดตั้งเป็น “{{name}}”",
+      "question": "คุณมีธีมชื่อ “{{name}}” อยู่แล้ว",
+      "replace": "แทนที่ “{{name}}”"
+    },
+    "error": {
+      "importFailed": "ติดตั้งธีมนั้นไม่ได้ ไม่มีอะไรเปลี่ยนแปลง",
+      "installedNotActivated": "ติดตั้ง “{{name}}” แล้ว แต่เปิดใช้งานไม่ได้ คุณใช้มันได้จาก การตั้งค่า → รูปลักษณ์",
+      "invalidName": "ลิงก์นั้นไม่ได้ระบุชื่อธีมที่ต้องการติดตั้ง",
+      "listUnavailable": "อ่านธีมที่คุณมีอยู่ไม่ได้ จึงติดตั้งอย่างปลอดภัยตอนนี้ไม่ได้ ปิดหน้านี้แล้วลองลิงก์อีกครั้ง",
+      "malformedPayload": "ข้อมูลธีมของลิงก์นั้นเสียหายหรือไม่ครบ",
+      "nothingWritten": "ไม่มีอะไรถูกเขียนลงห้องนิรภัยของคุณ",
+      "payloadTooLarge": "ข้อมูลธีมของลิงก์นั้นใหญ่เกินกว่าจะเป็นธีม",
+      "unsupportedVersion": "ลิงก์นั้นสร้างสำหรับ Myne รุ่นที่ใหม่กว่า อัปเดต Myne แล้วลองอีกครั้ง"
+    },
+    "errorTitle": "อ่านธีมนั้นไม่ได้",
+    "helper": "ธีมคือชุดสี ไม่ใช่โค้ด Myne ตรวจสอบธีมนี้บนอุปกรณ์นี้ก่อนใช้งาน — ไม่มีการอัปโหลดอะไรทั้งสิ้น",
+    "question": "คุณต้องการใช้ธีมนี้หรือไม่",
+    "title": "ติดตั้งธีม"
+  },
+  "unlock": {
+    "backToPicker": "เลือกห้องนิรภัยอื่น",
+    "continue": "ดำเนินการต่อ",
+    "decrypting": "กำลังถอดรหัส…",
+    "deleteLink": "ลืมทั้งรหัสผ่านและวลีกู้คืนใช่ไหม ลบห้องนิรภัยแล้วเริ่มใหม่",
+    "errors": {
+      "alreadyUnlocked": "ห้องนิรภัยถูกปลดล็อกอยู่แล้ว",
+      "inProgress": "มีการทำงานค้างอยู่",
+      "kdfMemoryExceedsHost": "ห้องนิรภัยนี้ต้องใช้หน่วยความจำ {{required}} MiB ในการเปิด ซึ่งมากกว่าที่เบราว์เซอร์นี้ให้ได้ ({{available}} MiB) ห้องนิรภัยไม่ได้เสียหาย ให้เปิดด้วยแอป Myne บนเดสก์ท็อป",
+      "unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด โปรดลองอีกครั้ง",
+      "vaultNotFound": "ไม่พบไฟล์ห้องนิรภัย โปรดเริ่มแอปใหม่"
+    },
+    "passwordLabel": "รหัสผ่าน",
+    "passwordPlaceholder": "รหัสผ่าน",
+    "quickUnlock": {
+      "failed": "ปลดล็อกด่วนไม่สำเร็จ ใช้รหัสผ่านของคุณ",
+      "pinAriaLabel": "PIN สำหรับปลดล็อกด่วน",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "ปลดล็อกด้วย PIN",
+      "unlockWithTouchId": "ปลดล็อกด้วย Touch ID",
+      "wrongCredential": "ไม่ถูกต้อง เหลืออีก {{remaining}} ครั้ง"
+    },
+    "recoveryInterruptedBanner": "ขั้นตอนการกู้คืนถูกขัดจังหวะ ตั้งรหัสผ่านใหม่ก่อน",
+    "recoveryInterruptedBody": "ตั้งรหัสผ่านใหม่ก่อน แล้วจึงผนึกห้องนิรภัยของคุณอีกครั้ง",
+    "recoveryInterruptedTitle": "ขั้นตอนการกู้คืนถูกขัดจังหวะ",
+    "recoveryLink": "ลืมรหัสผ่านใช่ไหม ปลดล็อกด้วยวลีกู้คืน",
+    "submit": "ปลดล็อก",
+    "subtitle": "ป้อนรหัสผ่านของคุณเพื่อดำเนินการต่อ",
+    "subtitlePin": "ป้อน PIN ของคุณเพื่อดำเนินการต่อ",
+    "subtitleBiometric": "ยืนยันด้วย Touch ID เพื่อดำเนินการต่อ",
+    "suspicion": {
+      "lockedDuringChange": "ยกเลิกการเปลี่ยนรหัสผ่าน: ห้องนิรภัยถูกล็อก",
+      "metaChangedExternally": "ห้องนิรภัยถูกแก้ไขในเซสชันอื่น — โปรดปลดล็อกอีกครั้ง"
+    },
+    "title": "ปลดล็อกห้องนิรภัยของคุณ",
+    "vaultUnreadable": "ไฟล์ห้องนิรภัยอ่านไม่ได้ กู้คืนจากไฟล์สำรองข้อมูล",
+    "unlockFailedGeneric": "ปลดล็อกไม่ได้ โปรดลองอีกครั้ง",
+    "biometricTooManyAttempts": "ลอง {{biometric}} หลายครั้งเกินไป ใช้รหัสผ่านของคุณ",
+    "pinIncorrect_one": "PIN ไม่ถูกต้อง เหลืออีก {{count}} ครั้ง",
+    "pinIncorrect_other": "PIN ไม่ถูกต้อง เหลืออีก {{count}} ครั้ง",
+    "pinTooManyAttempts": "ลอง PIN หลายครั้งเกินไป ใช้รหัสผ่านของคุณ",
+    "pinFailedGeneric": "ปลดล็อกด้วย PIN ไม่ได้ ใช้รหัสผ่านของคุณ",
+    "corruptedHeading": "ไฟล์ห้องนิรภัยอ่านไม่ได้",
+    "ioErrorHeading": "อ่านห้องนิรภัยนี้ไม่ได้",
+    "blockingTitle": "กำลังปลดล็อก",
+    "blockingSubtitle": "กำลังถอดรหัสกุญแจของคุณบนอุปกรณ์นี้",
+    "eyebrow": "ปลดล็อกห้องนิรภัย",
+    "vaultTitleFallback": "ห้องนิรภัยของคุณ",
+    "unlockWithBiometric": "ปลดล็อกด้วย {{biometric}}",
+    "biometricFailed": "{{biometric}} ยืนยันตัวตนของคุณไม่ได้",
+    "touchToUnlock": "แตะเพื่อปลดล็อก",
+    "lookToUnlock": "มองเพื่อปลดล็อก",
+    "biometricRetryHint": "ลองอีกครั้ง หรือปลดล็อกด้วยรหัสผ่านของคุณ",
+    "tryBiometricAgain": "ลอง {{biometric}} อีกครั้ง",
+    "usePasswordInstead": "ใช้รหัสผ่านแทน",
+    "useBiometricInstead": "ใช้ {{biometric}} แทน",
+    "unlockWithPinInstead": "ปลดล็อกด้วย PIN แทน",
+    "useRecoveryPhrase": "ใช้วลีกู้คืนของคุณ",
+    "deleteConfirmTitle": "ลบห้องนิรภัยนี้หรือไม่",
+    "deletePartialError": "ลบไฟล์บางไฟล์ไม่ได้ ห้องนิรภัยนี้ใช้งานไม่ได้อีกแล้ว — ดำเนินการต่อเพื่อเริ่มใหม่",
+    "failClosedEyebrow": "เปิดห้องนิรภัยไม่ได้",
+    "restoreHint": "กู้คืนจากไฟล์สำรองข้อมูลเพื่อดำเนินการต่อ"
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "อ่านไฟล์ห้องนิรภัยไม่ได้",
+      "notFound": "ไม่พบไฟล์ห้องนิรภัย โปรดเริ่มแอปใหม่",
+      "permissionDenied": "ไม่มีสิทธิ์เข้าถึงไฟล์ห้องนิรภัย ตรวจสอบสิทธิ์ของไฟล์"
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "ฉันได้บันทึกหมายเลขบัญชีไว้ในที่ที่หาเจอภายหลังแล้ว",
+      "back": "ย้อนกลับ",
+      "commit": "สร้างห้องนิรภัย",
+      "committing": "กำลังบันทึก…",
+      "copied": "คัดลอกแล้ว",
+      "copy": "คัดลอก",
+      "eyebrow": "ขั้นที่ 4 จาก 4 — หมายเลขบัญชี",
+      "heading": "บันทึกหมายเลขบัญชีของคุณ",
+      "intro": "นี่คือโทเคนผู้ถือของคุณ — ปฏิบัติกับมันเหมือนเงินสด",
+      "saveAsFile": "บันทึกเป็นไฟล์",
+      "shownOnceBody": "บันทึกไว้ตอนนี้ — Myne กู้คืนให้คุณไม่ได้ และคุณต้องใช้มันในการลงทะเบียนซิงค์ภายหลัง",
+      "shownOnceEmphasis": "ข้อมูลนี้แสดงเพียงครั้งเดียวเท่านั้น"
+    },
+    "briefing": {
+      "back": "ย้อนกลับ",
+      "continue": "ไปต่อที่การสร้างห้องนิรภัย",
+      "eyebrow": "ก่อนสร้างห้องนิรภัยของคุณ",
+      "heading": "ก่อนสร้างห้องนิรภัยของคุณ",
+      "intro": "Myne เข้ารหัสโน้ตของคุณเพื่อให้มีเพียงคุณเท่านั้นที่เปิดได้ สามสิ่งต่อไปนี้เป็นผลจากเรื่องนั้น — อ่านให้ครบ แล้วดำเนินการต่อ",
+      "statements": {
+        "no-email": {
+          "ackLabel": "ฉันเข้าใจว่าไม่มีการกู้คืนทางอีเมล",
+          "statement": "ไม่มีการกู้คืนทางอีเมล และจะไม่มีวันมี",
+          "why": "เราไม่เคยขออีเมลของคุณ จึงไม่มีลิงก์รีเซ็ตและไม่มีบัญชีให้ฝ่ายสนับสนุนปลดล็อก นี่ไม่ใช่ฟีเจอร์ที่ขาดไป — มันคือหลักประกัน การกู้คืนทางอีเมลจะหมายความว่าเราอ่านโน้ตของคุณได้ และ Myne ถูกสร้างมาให้เราทำแบบนั้นไม่ได้"
+        },
+        "no-store": {
+          "ackLabel": "ฉันเข้าใจว่า Myne กู้คืนรหัสผ่านของฉันไม่ได้",
+          "statement": "รหัสผ่านของคุณเป็นตัวปลดล็อกห้องนิรภัย เราไม่ได้เก็บมันไว้",
+          "why": "รหัสผ่านของคุณคือข้อมูลนำเข้าของกุญแจที่ถอดรหัสโน้ตของคุณ มันไม่เคยออกจากอุปกรณ์นี้ และไม่มีอะไรบนเซิร์ฟเวอร์ของเราที่สร้างมันขึ้นมาใหม่ได้ นั่นคือสิ่งที่ทำให้โน้ตของคุณเป็นส่วนตัว — และเป็นเหตุผลที่เรารีเซ็ตให้คุณไม่ได้"
+        },
+        "phrase-backup": {
+          "ackLabel": "ฉันเข้าใจว่าวลีกู้คืนคือข้อมูลสำรองเพียงอย่างเดียวของฉัน",
+          "statement": "วลีกู้คืนคือข้อมูลสำรองเพียงอย่างเดียวของคุณ",
+          "why": "ถ้าคุณลืมรหัสผ่าน วลีกู้คืน 24 คำคือทางเดียวที่จะกลับเข้าไปได้ {{lostBothSecrets}} จดวลีนั้นไว้และเก็บในที่ปลอดภัย"
+        }
+      },
+      "why": "ทำไม"
+    },
+    "confirm": {
+      "back": "ย้อนกลับ",
+      "continue": "ดำเนินการต่อ",
+      "eyebrow": "ขั้นที่ 3 จาก 4 — ยืนยันวลี",
+      "heading": "พิมพ์คำสี่คำจากวลีของคุณกลับมา",
+      "intro": "เราจะถามตำแหน่งที่เจาะจงเพื่อยืนยันว่าคุณบันทึกไว้แล้ว",
+      "mismatch": "ไม่ตรงกับคำที่ #{{pos}}",
+      "wordAtPosition": "คำที่ตำแหน่ง {{pos}}"
+    },
+    "encrypting": {
+      "caption": "ใช้เวลาสักครู่",
+      "footerHint": "ถ้านานเกิน 30 วินาที ให้ปิดหน้าต่างแล้วลองอีกครั้ง",
+      "heading": "กำลังเข้ารหัสห้องนิรภัยของคุณ"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "ลองอีกครั้ง",
+        "title": "หมายเลขบัญชีไม่ถูกต้อง"
+      },
+      "aeadFailure": {
+        "body": "ลองอีกครั้ง",
+        "title": "การเข้ารหัสล้มเหลว"
+      },
+      "csprng": {
+        "body": "ลองอีกครั้ง",
+        "title": "สร้างข้อมูลสุ่มที่ปลอดภัยไม่ได้"
+      },
+      "invalidPassword": {
+        "body": "ลองอีกครั้ง",
+        "title": "รหัสผ่านไม่ถูกต้อง"
+      },
+      "invalidVaultMeta": {
+        "body": "ลองอีกครั้ง",
+        "title": "รูปแบบห้องนิรภัยผิดพลาด"
+      },
+      "ioOther": {
+        "body": "ลองอีกครั้ง",
+        "title": "บันทึกห้องนิรภัยไม่ได้"
+      },
+      "joinFailure": {
+        "body": "ลองอีกครั้ง",
+        "title": "เกิดข้อผิดพลาดบางอย่าง"
+      },
+      "kdfFailure": {
+        "body": "ลองอีกครั้ง ถ้ายังเป็นซ้ำ ระบบของคุณอาจมีหน่วยความจำเหลือน้อย",
+        "title": "ตั้งค่าการเข้ารหัสไม่ได้"
+      },
+      "noSpace": {
+        "body": "เพิ่มพื้นที่ว่างในดิสก์แล้วลองอีกครั้ง",
+        "title": "พื้นที่ดิสก์ไม่พอ"
+      },
+      "notFound": {
+        "body": "ลองอีกครั้ง",
+        "title": "ไม่พบโฟลเดอร์ห้องนิรภัย"
+      },
+      "passwordTooShort": {
+        "body": "ใช้อย่างน้อย 12 อักขระ",
+        "title": "รหัสผ่านสั้นเกินไป"
+      },
+      "permissionDenied": {
+        "body": "ตรวจสอบว่า Myne มีสิทธิ์เขียนลงโฟลเดอร์ข้อมูลแอปพลิเคชันของคุณ",
+        "title": "เขียนลงโฟลเดอร์ห้องนิรภัยไม่ได้"
+      },
+      "sessionExpired": {
+        "body": "เพื่อความปลอดภัยของคุณ การสร้างห้องนิรภัยจะหมดเวลาหลัง 10 นาที เริ่มใหม่",
+        "title": "เซสชันหมดอายุ"
+      },
+      "sessionNotFound": {
+        "body": "เริ่มใหม่ตั้งแต่ต้น",
+        "title": "ไม่พบเซสชัน"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "ปิดหน้าต่าง Myne อื่นแล้วลองอีกครั้ง",
+        "title": "สร้างห้องนิรภัยพร้อมกันมากเกินไป"
+      },
+      "vaultArtifactsPresent": {
+        "body": "สร้างห้องนิรภัยใหม่ไม่ได้เพราะมีข้อมูลห้องนิรภัยอยู่บนอุปกรณ์นี้แล้ว ปิดแอปแล้วเริ่มใหม่ — หน้าจอเริ่มต้นจะพาคุณไปยังขั้นตอนการปลดล็อก",
+        "title": "มีห้องนิรภัยอยู่แล้ว"
+      },
+      "vaultBusyAuth": {
+        "body": "มีการทำงานกับห้องนิรภัยอื่นค้างอยู่ ลองอีกครั้งในอีกสักครู่",
+        "title": "ห้องนิรภัยไม่ว่าง"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "ยกเลิก",
+        "message": "การปิดจะทิ้งวลีกู้คืนของคุณ ปิดต่อไปหรือไม่",
+        "okLabel": "ปิดต่อไป",
+        "title": "ทิ้งการสร้างห้องนิรภัยหรือไม่"
+      },
+      "genericError": {
+        "body": "ลองอีกครั้ง",
+        "title": "เกิดข้อผิดพลาดบางอย่าง"
+      }
+    },
+    "password": {
+      "back": "ย้อนกลับ",
+      "eyebrow": "ขั้นที่ 1 จาก 4 — รหัสผ่านหลัก",
+      "heading": "สร้างห้องนิรภัย",
+      "helperLead": "Myne ไม่ได้เก็บรหัสผ่านหรือวลีกู้คืนของคุณ",
+      "submit": "สร้างวลีกู้คืน"
+    },
+    "phrase": {
+      "back": "ย้อนกลับ",
+      "continue": "ฉันบันทึกไว้แล้ว — ยืนยันวลี",
+      "copy": "คัดลอก",
+      "eyebrow": "ขั้นที่ 2 จาก 4 — วลีกู้คืน",
+      "heading": "จด 24 คำนี้ไว้",
+      "intro": "วลีนี้ร่วมกับรหัสผ่านของคุณ คือทางเดียวที่จะกู้คืนห้องนิรภัยได้ เก็บไว้แบบออฟไลน์ — กระดาษ ตัวจัดการรหัสผ่าน หรือฮาร์ดแวร์วอลเล็ต ปฏิบัติกับมันเหมือนเงินสด",
+      "reveal": "แสดงวลี",
+      "saveAsFile": "บันทึกเป็นไฟล์"
+    },
+    "ready": {
+      "backedUp": "สำรองข้อมูลแล้ว ✓",
+      "backingUp": "กำลังสำรองข้อมูล…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "การสำรองข้อมูลไม่เสร็จสมบูรณ์ — ไม่มีไฟล์ตกค้าง คุณสำรองข้อมูลเมื่อไรก็ได้จาก การตั้งค่า → ที่เก็บข้อมูล",
+      "backupFilterName": "ไฟล์สำรองข้อมูล Myne",
+      "backUpNow": "สำรองข้อมูลห้องนิรภัยนี้เดี๋ยวนี้",
+      "body": "Myne เขียนห้องนิรภัยของคุณลงในโฟลเดอร์ข้อมูลแอปพลิเคชันแล้ว รหัสผ่านหลักและวลีกู้คืนคือทางเดียวที่จะกลับเข้าไปได้ — ตรวจสอบให้แน่ใจว่าคุณบันทึกทั้งสองอย่างไว้ในที่ปลอดภัยแล้ว",
+      "decrypting": "กำลังถอดรหัส…",
+      "done": "เสร็จสิ้น",
+      "heading": "ห้องนิรภัยของคุณพร้อมแล้ว",
+      "showFolder": "แสดงโฟลเดอร์ห้องนิรภัย"
+    },
+    "sessionLost": {
+      "startOver": "เริ่มใหม่"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "สร้างห้องนิรภัยอีกแห่ง",
+    "heading": "เลือกห้องนิรภัย",
+    "joinDevice": "เพิ่มอุปกรณ์นี้เข้าบัญชี",
+    "loading": "กำลังโหลดห้องนิรภัยของคุณ…",
+    "noneLoaded": "ตอนนี้โหลดห้องนิรภัยไม่ได้เลย",
+    "openedRelative": "เปิดเมื่อ {{rel}}",
+    "restoreFromBackup": "กู้คืนจากไฟล์สำรองข้อมูล",
+    "subline": "คุณมีห้องนิรภัยมากกว่าหนึ่งแห่งบนอุปกรณ์นี้ เลือกหนึ่งแห่งเพื่อปลดล็อก",
+    "vaultFallback": "ห้องนิรภัย {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "ใช้เวลาสักครู่",
+      "eyebrow": "การกู้คืน · กำลังถอดรหัส",
+      "footerHint": "ถ้านานเกิน 30 วินาที ให้ปิดหน้าต่างแล้วลองอีกครั้ง",
+      "heading": "กำลังถอดรหัสห้องนิรภัยของคุณ",
+      "subCaption": "กำลังทำงาน… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "ยกเลิกการกู้คืน: ห้องนิรภัยถูกล็อก",
+        "operationInProgress": "มีการทำงานค้างอยู่ โปรดรอ",
+        "unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด โปรดลองอีกครั้ง",
+        "weakPassword": "รหัสผ่านใหม่ต้องมีอย่างน้อย 12 อักขระ"
+      },
+      "eyebrow": "การกู้คืน · รหัสผ่านใหม่",
+      "helperBody": "เปิดด้วยวลีกู้คืนของคุณแล้ว รหัสผ่านเดิมใช้ไม่ได้อีกต่อไป — ตั้งรหัสผ่านหลักใหม่ตอนนี้",
+      "helperEmphasis": "วลีกู้คืนของคุณยังคงเดิม",
+      "submit": "ตั้งรหัสผ่านใหม่",
+      "title": "ตั้งรหัสผ่านหลักใหม่"
+    },
+    "phrase": {
+      "back": "← ย้อนกลับ",
+      "body": "ป้อนวลีกู้คืนของคุณ 24 คำแบบ BIP-39",
+      "cellLabel": "คำที่ {{index}}",
+      "deleteLink": "ลบห้องนิรภัยแล้วเริ่มใหม่",
+      "eyebrow": "การกู้คืน",
+      "submit": "ปลดล็อก",
+      "title": "กู้คืนห้องนิรภัยของคุณ"
+    },
+    "select": {
+      "accountInvalid": "หมายเลขบัญชีไม่ถูกต้อง โปรดตรวจสอบแล้วลองอีกครั้ง",
+      "accountLabel": "หมายเลขบัญชี (ไม่บังคับ)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (ไม่บังคับ)",
+      "body": "เลือกห้องนิรภัยที่คุณต้องการกู้คืนด้วยวลีกู้คืน 24 คำ หรือพิมพ์หมายเลขบัญชีเพื่อข้ามไปที่มันโดยตรง",
+      "cancel": "ยกเลิก",
+      "checking": "กำลังตรวจสอบ…",
+      "loadFailed": "ตอนนี้โหลดห้องนิรภัยไม่ได้เลย",
+      "loading": "กำลังโหลดห้องนิรภัยของคุณ…",
+      "openedRelative": "เปิดเมื่อ {{rel}}",
+      "or": "หรือ",
+      "title": "เลือกห้องนิรภัยที่จะกู้คืน",
+      "useAccountNumber": "ใช้หมายเลขบัญชี",
+      "vaultFallback": "ห้องนิรภัย {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "ห้องนิรภัย",
+    "createAnother": "สร้างห้องนิรภัยอีกแห่ง",
+    "joinDevice": "เพิ่มอุปกรณ์นี้เข้าบัญชี",
+    "switching": "กำลังสลับ…",
+    "switchVaultLabel": "สลับห้องนิรภัย",
+    "vaultFallback": "ห้องนิรภัย {{n}}"
+  },
+  "welcome": {
+    "createCta": "สร้างห้องนิรภัยใหม่",
+    "headlineLine1": "โน้ต Markdown ที่เข้ารหัส",
+    "headlineLine2": "ไม่ต้องใช้อีเมลตอนสมัคร",
+    "joinCta": "เพิ่มอุปกรณ์นี้เข้าบัญชี",
+    "repairResidue": {
+      "cancel": "ยกเลิก",
+      "cleaningUp": "กำลังล้าง…",
+      "cleanUp": "ล้าง",
+      "confirmBody_one": "จะลบไฟล์ {{count}} ไฟล์ ไฟล์เหล่านั้นอ่านไม่ได้อยู่แล้ว ไม่มีอะไรที่กู้คืนได้สูญหาย",
+      "confirmBody_other": "จะลบไฟล์ {{count}} ไฟล์ ไฟล์เหล่านั้นอ่านไม่ได้อยู่แล้ว ไม่มีอะไรที่กู้คืนได้สูญหาย",
+      "confirmTitle": "ล้างไฟล์ตกค้างหรือไม่",
+      "doneBody_one": "ลบไฟล์ตกค้างไปแล้ว {{count}} ไฟล์ คุณสร้างห้องนิรภัยใหม่ได้แล้ว",
+      "doneBody_other": "ลบไฟล์ตกค้างไปแล้ว {{count}} ไฟล์ คุณสร้างห้องนิรภัยใหม่ได้แล้ว",
+      "doneTitle": "ล้างเสร็จแล้ว",
+      "errorBody": "เกิดข้อผิดพลาดบางอย่าง ปิดแอปแล้วลองอีกครั้ง",
+      "errorTitle": "การล้างล้มเหลว",
+      "foundBody_one": "ไฟล์ตกค้าง {{count}} ไฟล์จากการลบครั้งก่อนที่ทำไม่เสร็จ ไฟล์เหล่านั้นอ่านไม่ได้อยู่แล้ว — คุณจะไม่สูญเสียอะไรที่กู้คืนได้",
+      "foundBody_other": "ไฟล์ตกค้าง {{count}} ไฟล์จากการลบครั้งก่อนที่ทำไม่เสร็จ ไฟล์เหล่านั้นอ่านไม่ได้อยู่แล้ว — คุณจะไม่สูญเสียอะไรที่กู้คืนได้",
+      "foundTitle": "ไฟล์ตกค้างจากการลบที่ไม่เสร็จ",
+      "partialBody_one": "ไฟล์ {{count}} ไฟล์อาจถูกล็อกโดยแอปอื่น (โปรแกรมป้องกันไวรัส การซิงค์ไฟล์ หรือการทำดัชนีค้นหา) ปิดแอปแล้วลองอีกครั้งในอีกสักครู่ หรือลบโฟลเดอร์ห้องนิรภัยด้วยตนเอง",
+      "partialBody_other": "ไฟล์ {{count}} ไฟล์อาจถูกล็อกโดยแอปอื่น (โปรแกรมป้องกันไวรัส การซิงค์ไฟล์ หรือการทำดัชนีค้นหา) ปิดแอปแล้วลองอีกครั้งในอีกสักครู่ หรือลบโฟลเดอร์ห้องนิรภัยด้วยตนเอง",
+      "partialTitle": "ลบไฟล์บางไฟล์ไม่ได้"
+    },
+    "restoreCta": "กู้คืนจากไฟล์สำรองข้อมูล",
+    "subtitle": "โน้ตของคุณถูกเข้ารหัสบนอุปกรณ์นี้ก่อนออกจากเครื่อง เซิร์ฟเวอร์เก็บไว้เพียงข้อความเข้ารหัสเท่านั้น",
+    "repairCleanedUp_one": "ล้างไฟล์ตกค้างไปแล้ว {{count}} ไฟล์",
+    "repairCleanedUp_other": "ล้างไฟล์ตกค้างไปแล้ว {{count}} ไฟล์",
+    "repairFailed": "ล้างไม่เสร็จ โปรดลองอีกครั้ง",
+    "heroLine1": "โน้ตที่",
+    "heroLine2": "เป็นของ",
+    "heroLine3": "คุณคนเดียว",
+    "lede": "Markdown ที่เข้ารหัสบนอุปกรณ์นี้ก่อนออกจากเครื่อง ไม่มีอีเมลบัญชี ไม่มีเซิร์ฟเวอร์ที่อ่านได้แม้แต่คำเดียว",
+    "residueBanner": "มีไฟล์ตกค้างจากการลบที่ถูกขัดจังหวะ ({{n}}) ล้างออกก่อนสร้างห้องนิรภัย",
+    "cleanUpFiles": "ล้างไฟล์ตกค้าง",
+    "create": "สร้างห้องนิรภัย",
+    "connect": "เชื่อมต่อกับบัญชีของฉัน"
+  },
+  "wikiGraph": {
+    "emptyTitle": "ยังไม่มีลิงก์",
+    "emptyBodyBefore": "เชื่อมโน้ตเข้าด้วยกันด้วยการเขียน ",
+    "emptyBodyAfter": " ในข้อความของคุณ โน้ตที่ลิงก์กันจะปรากฏที่นี่เป็นกราฟ"
+  },
+  "markdown": {
+    "attachmentFallback": "ไฟล์แนบ",
+    "nothingToPreview": "ยังไม่มีอะไรให้ดูตัวอย่าง"
+  },
+  "conflicts": {
+    "empty": "ไม่มีข้อขัดแย้งให้ตรวจสอบ — โน้ตของคุณซิงค์ตรงกันแล้ว",
+    "groupTitle_one": "สำเนาที่ขัดแย้ง {{count}} รายการ",
+    "groupTitle_other": "สำเนาที่ขัดแย้ง {{count}} รายการ",
+    "groupTitleOfNote": " ของโน้ต {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "บันทึกมุมมองนี้ไม่ได้ โปรดลองอีกครั้ง",
+    "deleteError": "ลบมุมมองนี้ไม่ได้ โปรดลองอีกครั้ง",
+    "editView": "แก้ไขมุมมอง",
+    "condition": {
+      "search": "ข้อความ"
+    },
+    "containsPlaceholder": "มีคำว่า…",
+    "tagPlaceholder": "แท็ก",
+    "folderPlaceholder": "โฟลเดอร์/",
+    "propertyKeyPlaceholder": "คีย์คุณสมบัติ",
+    "addCondition": "+ เพิ่มเงื่อนไข",
+    "createView": "สร้างมุมมอง"
+  },
+  "snapshots": {
+    "today": "วันนี้ {{time}}",
+    "readError": "อ่านประวัติรุ่นไม่ได้",
+    "decryptError": "ถอดรหัสรุ่นนั้นไม่ได้",
+    "restoreError": "กู้คืนรุ่นนั้นไม่ได้",
+    "title": "ประวัติรุ่น",
+    "emptyState": "ยังไม่มีรุ่นก่อนหน้า สแนปช็อตจะถูกบันทึกอัตโนมัติขณะที่คุณแก้ไข",
+    "hide": "ซ่อน",
+    "empty": "(ว่างเปล่า)",
+    "restoreThisVersion": "กู้คืนรุ่นนี้"
+  },
+  "restoreBackup": {
+    "title": "ยังใช้บนมือถือไม่ได้",
+    "body": "การกู้คืนจากไฟล์สำรองข้อมูลยังใช้บนมือถือไม่ได้ — สร้างห้องนิรภัยหรือกู้คืนด้วยวลีของคุณ"
+  },
+  "recording": {
+    "deniedTitle": "การเข้าถึงไมโครโฟนปิดอยู่",
+    "errorTitle": "เริ่มบันทึกเสียงไม่ได้",
+    "deniedBody": "หากต้องการบันทึกโน้ตเสียง ให้อนุญาตการเข้าถึงไมโครโฟนสำหรับ Myne ใน การตั้งค่า › Myne › ไมโครโฟน",
+    "noDeviceBody": "ไม่พบไมโครโฟนบนอุปกรณ์นี้",
+    "emptyBody": "การบันทึกนั้นว่างเปล่า — ไม่มีอะไรถูกบันทึกไว้",
+    "genericBody": "เกิดข้อผิดพลาดบางอย่างขณะบันทึกเสียง โปรดลองอีกครั้ง",
+    "stopAria": "หยุดบันทึกเสียง"
+  },
+  "picker": {
+    "neverOpened": "ไม่เคยเปิด",
+    "openedJustNow": "เปิดเมื่อสักครู่",
+    "openedMinuteAgo": "เปิดเมื่อหนึ่งนาทีที่แล้ว",
+    "openedMinutesAgo_one": "เปิดเมื่อ {{count}} นาทีที่แล้ว",
+    "openedMinutesAgo_other": "เปิดเมื่อ {{count}} นาทีที่แล้ว",
+    "openedHourAgo": "เปิดเมื่อหนึ่งชั่วโมงที่แล้ว",
+    "openedHoursAgo_one": "เปิดเมื่อ {{count}} ชั่วโมงที่แล้ว",
+    "openedHoursAgo_other": "เปิดเมื่อ {{count}} ชั่วโมงที่แล้ว",
+    "openedYesterday": "เปิดเมื่อวานนี้",
+    "openedDaysAgo_one": "เปิดเมื่อ {{count}} วันที่แล้ว",
+    "openedDaysAgo_other": "เปิดเมื่อ {{count}} วันที่แล้ว",
+    "openedLastWeek": "เปิดเมื่อสัปดาห์ที่แล้ว",
+    "openedWeeksAgo_one": "เปิดเมื่อ {{count}} สัปดาห์ที่แล้ว",
+    "openedWeeksAgo_other": "เปิดเมื่อ {{count}} สัปดาห์ที่แล้ว",
+    "openedLastMonth": "เปิดเมื่อเดือนที่แล้ว",
+    "openedMonthsAgo_one": "เปิดเมื่อ {{count}} เดือนที่แล้ว",
+    "openedMonthsAgo_other": "เปิดเมื่อ {{count}} เดือนที่แล้ว",
+    "openedLastYear": "เปิดเมื่อปีที่แล้ว",
+    "openedYearsAgo_one": "เปิดเมื่อ {{count}} ปีที่แล้ว",
+    "openedYearsAgo_other": "เปิดเมื่อ {{count}} ปีที่แล้ว",
+    "corruptedBadge": "เสียหาย"
+  },
+  "join": {
+    "transportError": "เข้าถึงเซิร์ฟเวอร์ซิงค์นั้นไม่ได้ ตรวจสอบที่อยู่และการเชื่อมต่อของคุณ แล้วลองอีกครั้ง",
+    "passwordPlaceholder": "รหัสผ่านห้องนิรภัยของคุณ",
+    "waitingHint": "เปิดหน้าจอนี้ทิ้งไว้ — เมื่อได้รับอนุมัติแล้ว รหัสยืนยันจะปรากฏที่นี่ให้เทียบกับอุปกรณ์อีกเครื่องของคุณ",
+    "verifyBody": "ตรวจสอบว่ารหัสนี้เป็นรหัสเดียวกับที่แสดงบนอุปกรณ์ที่คุณใช้อนุมัติ",
+    "removing": "กำลังนำออก…",
+    "sasMismatch": "ไม่ตรงกัน — นำอุปกรณ์นี้ออก",
+    "title": "เชื่อมต่อกับบัญชีของคุณ",
+    "lead": "ป้อนรายละเอียดบัญชีของคุณเพื่อนำโน้ตมายังอุปกรณ์นี้ ทุกอย่างยังคงเข้ารหัสแบบต้นทางถึงปลายทาง",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "ตรวจสอบหมายเลขนี้อีกครั้ง — ดูแล้วไม่ถูกต้อง",
+    "approvalHint": "โน้ตของคุณจะปรากฏเมื่อคุณอนุมัติอุปกรณ์นี้จากอุปกรณ์ที่มีบัญชีของคุณอยู่แล้ว",
+    "connectingSubtitle": "กำลังดึงบัญชีของคุณและปลดล็อกห้องนิรภัยบนอุปกรณ์นี้",
+    "qr": {
+      "cancel": "ยกเลิก",
+      "confirmAccount": "บัญชี",
+      "confirmServer": "เซิร์ฟเวอร์",
+      "confirmTitle": "เพิ่มอุปกรณ์นี้หรือไม่",
+      "continue": "ดำเนินการต่อ",
+      "expired": "QR นี้หมดอายุแล้ว — แสดง QR ใหม่บนอุปกรณ์อีกเครื่องแล้วสแกนอีกครั้ง",
+      "invalid": "นั่นไม่ใช่ QR สำหรับเพิ่มอุปกรณ์ของ Myne",
+      "newerVersion": "QR นี้มาจาก Myne รุ่นที่ใหม่กว่า — อัปเดตแอปแล้วลองอีกครั้ง",
+      "pinHosted": "เซิร์ฟเวอร์ที่ Myne โฮสต์",
+      "pinNone": "เซิร์ฟเวอร์ที่โฮสต์เอง",
+      "pinSelfHost": "ปักหมุดใบรับรองจากอุปกรณ์ที่คุณเชื่อถือ",
+      "scan": "สแกน QR",
+      "scanFailed": "สแกนไม่ได้ ลองอีกครั้ง หรือป้อนรายละเอียดของคุณเอง",
+      "scanUnavailable": "อุปกรณ์นี้สแกนไม่ได้ — ป้อนรายละเอียดของคุณด้านล่าง"
+    }
+  },
+  "createVault": {
+    "beginWeakPassword": "เลือกรหัสผ่านที่แข็งแรงกว่านี้แล้วลองอีกครั้ง",
+    "beginGeneric": "เริ่มสร้างห้องนิรภัยไม่ได้ โปรดลองอีกครั้ง",
+    "wordNumber": "คำที่ #{{position}}",
+    "commitError": "บันทึกห้องนิรภัยของคุณไม่ได้ โปรดลองอีกครั้ง",
+    "savedToFile": "บันทึกไปยัง {{label}} แล้ว",
+    "saveFileError": "บันทึกไฟล์ไม่ได้",
+    "stepLabel": "สร้างห้องนิรภัย · {{current}} จาก {{total}}",
+    "briefingTitle": "ก่อนเริ่ม",
+    "briefingLead": "Myne เข้ารหัสทุกอย่างบนอุปกรณ์นี้ ความเป็นส่วนตัวนั้นมาพร้อมความรับผิดชอบที่มีเพียงคุณเท่านั้นที่แบกรับได้",
+    "passwordTitle": "สร้างรหัสผ่าน",
+    "confirmPasswordLabel": "ยืนยันรหัสผ่าน",
+    "passwordHelper": "ไม่ถูกเก็บไว้ ไม่ถูกส่งออกไป มันเข้ารหัสกุญแจของคุณบนอุปกรณ์นี้",
+    "encryptingSubtitle": "กำลังสร้างกุญแจของคุณด้วย Argon2id ใช้เวลาสองสามวินาทีและขัดจังหวะไม่ได้",
+    "phraseTitle": "วลีกู้คืนของคุณ",
+    "phraseIntro": "ยี่สิบสี่คำ เรียงตามลำดับ จดลงกระดาษและเก็บไว้ในที่ปลอดภัย",
+    "showSecondHalf": "แสดงคำที่ 13–24",
+    "saveToFile": "บันทึกลงไฟล์",
+    "writtenThemDown": "ฉันจดไว้แล้ว",
+    "typebackTitle": "ยืนยันวลีของคุณ",
+    "typebackLead": "ป้อนสี่คำนี้จากวลีกู้คืนที่คุณเพิ่งบันทึกไว้",
+    "wordMismatch": "ไม่ตรงกับคำที่ #{{pos}}",
+    "backToPhrase": "กลับไปที่วลี",
+    "accountTitle": "หมายเลขบัญชีของคุณ",
+    "accountLead": "บันทึกไว้คู่กับวลีกู้คืนของคุณ คุณจะต้องใช้มันเพื่อกู้คืนห้องนิรภัยบนอุปกรณ์ใหม่",
+    "accountSavedAck": "ฉันได้บันทึกหมายเลขบัญชีไว้แล้ว",
+    "commit": "ยืนยัน",
+    "committingTitle": "กำลังบันทึกห้องนิรภัยของคุณ…",
+    "committingSubtitle": "กำลังเขียนห้องนิรภัยที่เข้ารหัสลงบนอุปกรณ์นี้",
+    "unlockingTitle": "กำลังปลดล็อก…",
+    "unlockingSubtitle": "กำลังเปิดห้องนิรภัยของคุณ",
+    "readyTitle": "ห้องนิรภัยของคุณพร้อมแล้ว",
+    "readyBody": "ทุกอย่างที่คุณเขียนจากนี้ไปจะถูกเข้ารหัสบนอุปกรณ์นี้ก่อนถูกจัดเก็บหรือซิงค์",
+    "personalLabel": "ส่วนตัว",
+    "openVault": "เปิดห้องนิรภัย",
+    "backUpNow": "สำรองข้อมูลเดี๋ยวนี้"
+  },
+  "web": {
+    "reload": {
+      "body": "การโหลดหน้านี้ใหม่จะขอรหัสผ่านของคุณอีกครั้ง — ไม่มีทางที่เร็วกว่านี้ ซึ่งเป็นไปโดยเจตนา ห้องนิรภัยของคุณยังคงเข้ารหัสอยู่บนอุปกรณ์นี้ขณะที่หน้าปิดอยู่ และกุญแจถูกสร้างขึ้นใหม่จากรหัสผ่านของคุณทุกครั้ง",
+      "title": "การโหลดใหม่หมายถึงต้องใส่รหัสผ่านอีกครั้ง"
+    },
+    "wall": {
+      "getNative": "ดาวน์โหลด Myne สำหรับเดสก์ท็อปหรือมือถือ",
+      "noAccount": {
+        "body": "บัญชีถูกสร้างในแอป Myne บนเดสก์ท็อปหรือมือถือ ไม่ใช่ที่นี่",
+        "reason": "การสร้างบัญชีจะสร้างวลีกู้คืน 24 คำของคุณและแสดงให้คุณเห็นเพียงครั้งเดียว หน้าเว็บไม่ควรเป็นสิ่งที่แสดงวลีนั้นให้คุณ — ถ้ามันรั่วไหลที่นั่น ไม่มีอะไรใน Myne ที่จะเรียกคืนได้",
+        "title": "คุณต้องมีบัญชีก่อน"
+      },
+      "noSync": {
+        "body": "เบราว์เซอร์นี้ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์ซิงค์ จึงไม่มีอะไรให้เปิด",
+        "reason": "ต่างจากแอปบนเดสก์ท็อป เบราว์เซอร์ไม่ได้เก็บห้องนิรภัยของตัวเองไว้สำรอง — โน้ตของมันมาจากการซิงค์ ตั้งค่าในแอปบนเดสก์ท็อปหรือมือถือ แล้วกลับมาที่นี่",
+        "title": "ยังไม่ได้ตั้งค่าการซิงค์"
+      }
+    },
+    "unavailableHere": {
+      "backup": "ไฟล์สำรองข้อมูลที่เข้ารหัสถูกสร้างและกู้คืนในแอป Myne บนเดสก์ท็อป ซึ่งเขียนไฟล์สำรองไปยังที่ที่คุณเลือกได้ โน้ตของคุณที่นี่มาจากเซิร์ฟเวอร์ เบราว์เซอร์นี้จึงกู้คืนตัวเองด้วยการซิงค์",
+      "creation": "บัญชีใหม่ถูกสร้างในแอป Myne บนเดสก์ท็อป มันแสดงวลีกู้คืนให้คุณ — และวลีกู้คืนไม่ควรถูกแสดงโดยหน้าเว็บ",
+      "multiVault": "เบราว์เซอร์นี้เก็บได้บัญชีเดียว หากต้องการใช้บัญชีอื่น ให้เปิดในแอป Myne บนเดสก์ท็อปหรือในโปรไฟล์เบราว์เซอร์อื่น",
+      "phraseRecovery": "การกู้คืนด้วยวลีทำในแอป Myne บนเดสก์ท็อป วลีกู้คืนของคุณไม่ควรถูกพิมพ์ลงในหน้าเว็บ",
+      "title": "ใช้ไม่ได้ในเบราว์เซอร์"
+    },
+    "unsupported": {
+      "title": "Myne ทำงานในเบราว์เซอร์นี้ไม่ได้",
+      "mobileTitle": "เปิดแอป Myne บนอุปกรณ์นี้",
+      "handoff": "แอป Myne บนเดสก์ท็อป (macOS, Windows, Linux) และบนมือถือ (iOS, Android) ไม่มีข้อจำกัดแบบนี้ — และมันตรวจสอบลายเซ็นของตัวเองก่อนทำงาน ซึ่งหน้าเว็บทำไม่ได้",
+      "reason": {
+        "desktop-form-factor": "Myne ในเบราว์เซอร์ถูกสร้างมาสำหรับคอมพิวเตอร์เดสก์ท็อป — มันต้องการหน่วยความจำและวิธีป้อนข้อมูลที่เบราว์เซอร์บนโทรศัพท์หรือแท็บเล็ตให้ไม่ได้ บนอุปกรณ์นี้แอป Myne เป็นไคลเอนต์ที่ดีกว่าอยู่แล้ว: เร็วกว่า ใช้งานออฟไลน์ได้ และเก็บโน้ตของคุณไว้แม้เบราว์เซอร์จะล้างที่เก็บข้อมูล",
+        "webassembly": "เบราว์เซอร์นี้ไม่รองรับ WebAssembly ซึ่งเป็นสิ่งที่แกนการเข้ารหัสทำงานอยู่บนนั้น",
+        "wasm-memory-headroom": "เบราว์เซอร์นี้จองหน่วยความจำราว 336 MB ที่การสร้างกุญแจของห้องนิรภัยต้องใช้ไม่ได้ เบราว์เซอร์บนโทรศัพท์และแท็บเล็ตมักทำไม่ได้ ขีดจำกัดนั้นกำหนดโดยตัวห้องนิรภัยเอง และลดลงเพื่ออุปกรณ์เครื่องเดียวไม่ได้โดยไม่ทำให้ห้องนิรภัยอ่านไม่ได้ในที่อื่นทั้งหมด",
+        "worker": "เบราว์เซอร์นี้ไม่รองรับ Web Workers ซึ่งเป็นที่ที่ที่เก็บข้อมูลและการเข้ารหัสของห้องนิรภัยทำงานอยู่",
+        "opfs": "เบราว์เซอร์นี้ไม่มีที่เก็บข้อมูลส่วนตัวในเครื่องสำหรับเว็บแอป จึงไม่มีที่ให้เก็บห้องนิรภัยของคุณระหว่างการโหลดหน้า",
+        "opfs-sync-access-handle": "ที่เก็บข้อมูลส่วนตัวในเครื่องของเบราว์เซอร์นี้ขาดการเข้าถึงไฟล์แบบซิงโครนัสที่ห้องนิรภัยต้องใช้เพื่อเขียนอย่างปลอดภัย",
+        "web-locks": "เบราว์เซอร์นี้ไม่รองรับกลไกล็อกที่ป้องกันไม่ให้สองแท็บเขียนลงห้องนิรภัยเดียวกันพร้อมกัน",
+        "crypto-getrandomvalues": "เบราว์เซอร์นี้ไม่มีแหล่งสุ่มตัวเลขเชิงรหัสลับ"
+      }
+    }
+  }
+}
