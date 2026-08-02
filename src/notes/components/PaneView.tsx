@@ -430,6 +430,15 @@ export function PaneView({
       setActiveHeading(null);
       return;
     }
+    // Bottom-of-scroll clamp (#186): once the outer scroller is bottomed out, a
+    // heading in the final viewport can never rise to the fixed cutoff below, so
+    // the loop would leave the highlight stuck on an earlier heading. When we are
+    // at (within 1px of) max scroll, the LAST heading is the active one — this
+    // fixes both clicking a bottom heading and manually scrolling to the bottom.
+    if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1) {
+      setActiveHeading({ noteId, from: froms[froms.length - 1]! });
+      return;
+    }
     const contentTop = view.contentDOM.getBoundingClientRect().top;
     const cutoff = scroller.getBoundingClientRect().top + OUTLINE_ACTIVE_OFFSET_PX;
     const docLen = view.state.doc.length;
