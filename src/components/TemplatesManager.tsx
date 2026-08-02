@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
 import { ModalShell } from "./primitives/ModalShell";
+import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
 import {
   createTemplate,
   convertTemplateToNote,
@@ -83,6 +84,7 @@ const ROW_OPEN_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-base)",
   borderRadius: "var(--radius-1)",
+  transition: HOVER_TRANSITION,
 };
 
 const ROW_NAME_STYLE: CSSProperties = {
@@ -101,6 +103,7 @@ const REMOVE_BUTTON_STYLE: CSSProperties = {
   padding: "4px 8px",
   borderRadius: "var(--radius-1)",
   whiteSpace: "nowrap",
+  transition: HOVER_TRANSITION,
 };
 
 const DELETE_BUTTON_STYLE: CSSProperties = {
@@ -112,6 +115,7 @@ const DELETE_BUTTON_STYLE: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   borderRadius: "var(--radius-1)",
+  transition: HOVER_TRANSITION,
 };
 
 const EMPTY_STYLE: CSSProperties = {
@@ -209,7 +213,12 @@ export function TemplatesManager({
       closeLabel={t("templates.manager.closeLabel")}
     >
       <div style={TOOLBAR_STYLE}>
-        <Button variant="primary" icon="file-plus" onClick={handleNew}>
+        <Button
+          variant="primary"
+          icon="file-plus"
+          onClick={handleNew}
+          data-testid="templates.new"
+        >
           {t("templates.manager.newTemplate")}
         </Button>
       </div>
@@ -223,12 +232,17 @@ export function TemplatesManager({
           <p style={EMPTY_BODY_STYLE}>{t("templates.manager.emptyBody")}</p>
         </div>
       ) : (
-        <div role="list" aria-label={t("templates.manager.listLabel")} style={LIST_STYLE}>
+        <div
+          role="list"
+          aria-label={t("templates.manager.listLabel")}
+          style={LIST_STYLE}
+          data-testid="templates.list"
+        >
           {templates.map((rec) => {
             const id = rec.noteUuid as NoteId;
             const name = displayName(rec, newTemplateName);
             return (
-              <div key={id} role="listitem" style={ROW_STYLE}>
+              <div key={id} role="listitem" style={ROW_STYLE} data-testid="templates.row">
                 <button
                   type="button"
                   onClick={() => {
@@ -236,7 +250,9 @@ export function TemplatesManager({
                     onClose();
                   }}
                   style={ROW_OPEN_STYLE}
+                  {...hoverSurface()}
                   aria-label={t("templates.manager.editTemplateLabel", { name })}
+                  data-testid="templates.row-open"
                 >
                   <Icon
                     name="file-text"
@@ -249,7 +265,9 @@ export function TemplatesManager({
                   type="button"
                   onClick={() => afterMutation(convertTemplateToNote(id))}
                   style={REMOVE_BUTTON_STYLE}
+                  {...hoverSurface()}
                   aria-label={t("templates.manager.removeRowLabel", { name })}
+                  data-testid="templates.row-remove"
                 >
                   {t("templates.manager.removeFromTemplates")}
                 </button>
@@ -257,7 +275,9 @@ export function TemplatesManager({
                   type="button"
                   onClick={() => afterMutation(deleteTemplate(id))}
                   style={DELETE_BUTTON_STYLE}
+                  {...hoverSurface()}
                   aria-label={t("templates.manager.deleteRowLabel", { name })}
+                  data-testid="templates.row-delete"
                 >
                   <Icon name="trash-2" size={16} />
                 </button>

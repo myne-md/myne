@@ -27,6 +27,7 @@ import type { TFunction } from "i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
 import { ModalShell } from "./primitives/ModalShell";
+import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
 import { listTemplates, type NoteId, type TitleRecord } from "../notes";
 
 interface NewNoteFromTemplateModalProps {
@@ -36,6 +37,9 @@ interface NewNoteFromTemplateModalProps {
   onBlankNote: () => void;
   /** Instantiate `templateId` named `name`, then open the created note. */
   onCreateFromTemplate: (templateId: NoteId, name: string) => void;
+  /** Open the template-management surface (the visible path to authoring
+   *  templates — a picker footer entry + the zero-templates create nudge). */
+  onManageTemplates?: () => void;
 }
 
 const LIST_STYLE: CSSProperties = {
@@ -62,6 +66,14 @@ const ROW_STYLE: CSSProperties = {
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-base)",
+  transition: HOVER_TRANSITION,
+};
+
+const FOOTER_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  padding: "var(--space-2) var(--space-3) var(--space-3)",
+  borderTop: "1px solid var(--line-1)",
 };
 
 const ROW_NAME_STYLE: CSSProperties = {
@@ -127,6 +139,7 @@ export function NewNoteFromTemplateModal({
   onClose,
   onBlankNote,
   onCreateFromTemplate,
+  onManageTemplates,
 }: NewNoteFromTemplateModalProps) {
   const { t } = useTranslation();
   const [templates, setTemplates] = useState<TitleRecord[] | null>(null);
@@ -227,41 +240,87 @@ export function NewNoteFromTemplateModal({
           </div>
         </div>
       ) : templates.length === 0 ? (
-        // Zero-templates degrade — offer only the blank path, never dead-end.
+        // Zero-templates degrade — offer the blank path, and (when the manager
+        // is reachable) nudge toward authoring a first template instead of
+        // dead-ending on an empty list.
         <>
           <p style={HINT_STYLE}>{t("notes.newFromTemplate.emptyState")}</p>
-          <div style={{ padding: "var(--space-4) var(--space-5) var(--space-5)" }}>
-            <Button variant="secondary" icon="file-plus" onClick={chooseBlank}>
+          <div
+            style={{
+              display: "flex",
+              gap: "var(--space-2)",
+              padding: "var(--space-4) var(--space-5) var(--space-5)",
+            }}
+          >
+            {onManageTemplates !== undefined && (
+              <Button
+                variant="primary"
+                icon="layout-grid"
+                onClick={() => {
+                  onManageTemplates();
+                  onClose();
+                }}
+                data-testid="new-from-template.create-first"
+              >
+                {t("notes.newFromTemplate.createFirstTemplate")}
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              icon="file-plus"
+              onClick={chooseBlank}
+              data-testid="new-from-template.blank-note"
+            >
               {t("notes.newFromTemplate.blankNote")}
             </Button>
           </div>
         </>
       ) : (
-        <div
-          role="list"
-          aria-label={t("notes.newFromTemplate.listLabel")}
-          style={LIST_STYLE}
-        >
-          {templates.map((rec) => {
-            const templateName = displayName(rec, t);
-            return (
-              <button
-                key={rec.noteUuid}
-                type="button"
-                role="listitem"
-                style={ROW_STYLE}
-                onClick={() => pickTemplate(rec)}
+        <>
+          <div
+            role="list"
+            aria-label={t("notes.newFromTemplate.listLabel")}
+            style={LIST_STYLE}
+            data-testid="new-from-template.list"
+          >
+            {templates.map((rec) => {
+              const templateName = displayName(rec, t);
+              return (
+                <button
+                  key={rec.noteUuid}
+                  type="button"
+                  role="listitem"
+                  style={ROW_STYLE}
+                  {...hoverSurface()}
+                  onClick={() => pickTemplate(rec)}
+                  data-testid="new-from-template.row"
+                >
+                  <Icon
+                    name="file-text"
+                    size={16}
+                    style={{ color: "var(--fg-3)" }}
+                  />
+                  <span style={ROW_NAME_STYLE}>{templateName}</span>
+                </button>
+              );
+            })}
+          </div>
+          {onManageTemplates !== undefined && (
+            <div style={FOOTER_STYLE}>
+              <Button
+                variant="ghost"
+                icon="layout-grid"
+                onClick={() => {
+                  onManageTemplates();
+                  onClose();
+                }}
+                data-testid="new-from-template.manage"
               >
-                <Icon
-                  name="file-text"
-                  size={16}
-                  style={{ color: "var(--fg-3)" }}
-                />
-                <span style={ROW_NAME_STYLE}>{templateName}</span>
-              </button>
-            );
-          })}
-        </div>
+                {t("notes.newFromTemplate.manageTemplates")}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </ModalShell>
   );
