@@ -46,11 +46,11 @@ const CELL_STYLE: CSSProperties = {
 const NAME_CELL_STYLE: CSSProperties = {
   ...CELL_STYLE,
   position: "sticky",
-  left: 0,
+  insetInlineStart: 0,
   zIndex: 1,
   // Opaque so property cells scroll UNDER the pinned Name column.
   background: "var(--bg-1)",
-  paddingRight: 12,
+  paddingInlineEnd: 12,
   fontWeight: 600,
 };
 

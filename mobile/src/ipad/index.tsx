@@ -130,7 +130,7 @@ function WorkspaceShell() {
   return (
     <div style={{ height: "100%", display: "flex", background: "var(--bg-1)", color: "var(--fg-1)" }}>
       {/* ── SIDEBAR ─────────────────────────────────────────────── */}
-      <div style={{ width: 248, flex: "none", background: "var(--bg-2)", borderRight: "1px solid var(--line-1)", display: "flex", flexDirection: "column" }}>
+      <div style={{ width: 248, flex: "none", background: "var(--bg-2)", borderInlineEnd: "1px solid var(--line-1)", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "18px 16px 12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px solid var(--line-1)", borderRadius: 6, background: "var(--bg-1)" }}>
             <MyneMark size={18} radius={4} />
@@ -192,7 +192,7 @@ function WorkspaceShell() {
       </div>
 
       {/* ── LIST ────────────────────────────────────────────────── */}
-      <div style={{ width: 316, flex: "none", borderRight: "1px solid var(--line-1)", display: "flex", flexDirection: "column", background: "var(--bg-1)" }}>
+      <div style={{ width: 316, flex: "none", borderInlineEnd: "1px solid var(--line-1)", display: "flex", flexDirection: "column", background: "var(--bg-1)" }}>
         <div style={{ padding: "18px 18px 12px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>All notes</h1>
@@ -255,7 +255,7 @@ function WorkspaceShell() {
             </span>{" "}
             for how device keys are re-derived on re-pair.
           </p>
-          <ul style={{ margin: "14px 0 0", paddingLeft: 22, fontSize: 16, lineHeight: 1.8, maxWidth: 620 }}>
+          <ul style={{ margin: "14px 0 0", paddingInlineStart: 22, fontSize: 16, lineHeight: 1.8, maxWidth: 620 }}>
             <li>Network observer — sees timing + size only</li>
             <li>
               Malicious relay — stores{" "}
@@ -265,7 +265,7 @@ function WorkspaceShell() {
             </li>
             <li>Lost device — protected by passphrase</li>
           </ul>
-          <blockquote style={{ margin: "20px 0 0", paddingLeft: 16, borderLeft: "2px solid var(--line-2)", color: "var(--fg-2)", fontSize: 16, lineHeight: 1.65, maxWidth: 600 }}>
+          <blockquote style={{ margin: "20px 0 0", paddingInlineStart: 16, borderInlineStart: "2px solid var(--line-2)", color: "var(--fg-2)", fontSize: 16, lineHeight: 1.65, maxWidth: 600 }}>
             A note the server can read is a note someone else can read.
           </blockquote>
         </div>

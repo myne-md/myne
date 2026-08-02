@@ -86,18 +86,18 @@ export function ListRow({
         ...style,
       }}
     >
-      {leading && <div style={{ marginRight: 12, display: "flex", flexShrink: 0 }}>{leading}</div>}
+      {leading && <div style={{ marginInlineEnd: 12, display: "flex", flexShrink: 0 }}>{leading}</div>}
       <div style={{ flex: 1, minWidth: 0 }}>{title}</div>
-      {detail && <span style={{ color: "var(--fg-3)", marginRight: 6 }}>{detail}</span>}
+      {detail && <span style={{ color: "var(--fg-3)", marginInlineEnd: 6 }}>{detail}</span>}
       {trailing}
-      {chevron && <Icon name="chevron-right" size={16} color="var(--line-3)" strokeWidth={2} />}
+      {chevron && <Icon name="chevron-right" size={16} color="var(--line-3)" strokeWidth={2} flip />}
       {!isLast && (
         <div
           style={{
             position: "absolute",
             bottom: 0,
-            right: 0,
-            left: leading ? 58 : 16,
+            insetInlineEnd: 0,
+            insetInlineStart: leading ? 58 : 16,
             height: 1,
             background: "var(--line-1)",
           }}

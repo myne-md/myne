@@ -62,7 +62,7 @@ export function EditorTopBar({
     >
       {onBack && (
         <button onClick={onBack} disabled={busy} data-testid="editor.back" aria-label={t("editor.topBar.backToNotes")} style={{ ...chromeBtn, opacity: busy ? 0.5 : 1 }}>
-          <Icon name="chevron-left" size={22} color="var(--accent)" strokeWidth={2} />
+          <Icon name="chevron-left" size={22} color="var(--accent)" strokeWidth={2} flip />
         </button>
       )}
       {onToggleList && (

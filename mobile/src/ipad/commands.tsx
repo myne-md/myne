@@ -49,8 +49,8 @@ function CommandPalette() {
     <div style={{ height: "100%", position: "relative", background: "var(--bg-1)", color: "var(--fg-1)" }}>
       {/* dimmed three-pane backdrop */}
       <div style={{ height: "100%", display: "flex", filter: "brightness(0.96)" }}>
-        <div style={{ width: 60, background: "var(--bg-2)", borderRight: "1px solid var(--line-1)" }} />
-        <div style={{ width: 300, background: "var(--bg-1)", borderRight: "1px solid var(--line-1)" }} />
+        <div style={{ width: 60, background: "var(--bg-2)", borderInlineEnd: "1px solid var(--line-1)" }} />
+        <div style={{ width: 300, background: "var(--bg-1)", borderInlineEnd: "1px solid var(--line-1)" }} />
         <div style={{ flex: 1, background: "var(--bg-1)" }} />
       </div>
 
@@ -227,7 +227,7 @@ function SearchResults() {
   return (
     <div style={{ height: "100%", display: "flex", background: "var(--bg-1)", color: "var(--fg-1)" }}>
       {/* collapsed rail */}
-      <div style={{ width: 60, flex: "none", background: "var(--bg-2)", borderRight: "1px solid var(--line-1)" }} />
+      <div style={{ width: 60, flex: "none", background: "var(--bg-2)", borderInlineEnd: "1px solid var(--line-1)" }} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg-1)", minWidth: 0 }}>
         {/* search field + scope pills */}

@@ -33,6 +33,7 @@ import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
+import { isRtl } from "../../lib/util";
 import { setFavorites, setArchivedFolders, setDeliberateFolders, setFolderIcons, setItemColors, setItemOrder, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { useHiddenHomeTiles } from "../../lib/home-tiles";
@@ -225,9 +226,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     const el = tabPaneRef.current;
     if (!el || typeof el.animate !== "function") return;
     const forward = TAB_ORDER[tab] >= TAB_ORDER[prev];
+    // Under RTL a "forward" (later) tab enters from the LEFT, so flip the axis.
+    const enter = (forward ? 20 : -20) * (isRtl() ? -1 : 1);
     el.animate(
       [
-        { opacity: 0, transform: `translateX(${forward ? "20px" : "-20px"})` },
+        { opacity: 0, transform: `translateX(${enter}px)` },
         { opacity: 1, transform: "translateX(0)" },
       ],
       // `backwards` fill applies the opacity:0 first frame immediately, so there
@@ -253,9 +256,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     const el = screenRef.current;
     if (!el || typeof el.animate !== "function") return;
     const push = view === "editor"; // list → editor is "deeper"
+    // RTL flips the depth axis: a deeper screen slides in from the LEFT.
+    const enter = (push ? 34 : -34) * (isRtl() ? -1 : 1);
     el.animate(
       [
-        { opacity: 0, transform: `translateX(${push ? "34px" : "-34px"})` },
+        { opacity: 0, transform: `translateX(${enter}px)` },
         { opacity: 1, transform: "translateX(0)" },
       ],
       // `backwards` fill = no flash of the fully-opaque incoming screen before
@@ -1909,7 +1914,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
 
     // A vertical tree rail at a given ancestor level.
     const railAt = (i: number) => (
-      <div key={`r${i}`} style={{ position: "absolute", left: 20 + i * 18 + 6, top: 0, bottom: 0, width: 1, background: "var(--line-2)" }} />
+      <div key={`r${i}`} style={{ position: "absolute", insetInlineStart: 20 + i * 18 + 6, top: 0, bottom: 0, width: 1, background: "var(--line-2)" }} />
     );
     // Recursive folder-tree render with per-subtree STICKY headers. Each folder
     // header pins while ITS OWN subtree scrolls under it and un-pins once the
@@ -1996,7 +2001,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                   onClick={() => setListView("notes")}
                   style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 8 }}
                 >
-                  <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> {t("notes.list.notesHeading")}
+                  <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip /> {t("notes.list.notesHeading")}
                 </button>
               )}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -2023,6 +2028,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                   {listView === "notes" && (
                     <button
                       onClick={newNote}
+                      data-testid="notes.new-note"
                       aria-label={t("notes.list.newNote")}
                       style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, height: 36, border: "none", borderRadius: 10, background: "var(--accent)", color: "var(--accent-on)", padding: "0 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
                     >
@@ -2195,7 +2201,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                     data-testid="archive.folder-back"
                     style={{ display: "flex", alignItems: "center", gap: 6, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px 20px 12px" }}
                   >
-                    <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} />
+                    <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip />
                     {folderLabel(archiveFolder!)}
                   </button>
                 )}
@@ -2217,7 +2223,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                           type="button"
                           onClick={() => setArchiveFolder(path)}
                           data-testid="archive.folder-open"
-                          style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", padding: 0 }}
+                          style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, border: "none", background: "transparent", cursor: "pointer", textAlign: "start", padding: 0 }}
                         >
                           <Icon name="folder" size={17} color="var(--fg-2)" strokeWidth={1.7} />
                           <span style={{ fontSize: 16, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -3092,7 +3098,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                 minHeight: 0,
                 display: "flex",
                 flexDirection: "column",
-                borderRight: panesCollapsed ? "none" : "1px solid var(--line-1)",
+                borderInlineEnd: panesCollapsed ? "none" : "1px solid var(--line-1)",
                 overflow: "hidden",
                 transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1)",
               }}

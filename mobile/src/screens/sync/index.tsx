@@ -542,8 +542,8 @@ function RemoveDevice() {
       <div
         style={{
           position: "absolute",
-          left: 0,
-          right: 0,
+          insetInlineStart: 0,
+          insetInlineEnd: 0,
           bottom: 0,
           background: "var(--bg-1)",
           borderRadius: "16px 16px 0 0",

@@ -824,3 +824,18 @@ a:focus-visible,
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* -- RTL primitives (shared design canon; mirror of the desktop tokens.css) ---
+   The shared `@myne/i18n` runtime sets `document.documentElement.dir` from the
+   active locale at boot and on every language switch (RTL epic). These two
+   utilities are the code-side hooks for it:
+     • `[data-flip]` mirrors a directional glyph (back / disclosure chevrons,
+       nav arrows) so a "‹" back affordance points "›" under RTL;
+     • `.bidi-isolate` isolates a neutral inline run (code span, link, account
+       number) so an LTR token can't reorder the RTL line around it. */
+[dir="rtl"] [data-flip] {
+  transform: scaleX(-1);
+}
+.bidi-isolate {
+  unicode-bidi: isolate;
+}

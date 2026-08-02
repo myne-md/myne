@@ -116,7 +116,7 @@ function VaultRow({
         alignItems: "center",
         gap: 12,
         width: "100%",
-        textAlign: "left",
+        textAlign: "start",
         border: "1px solid var(--line-1)",
         borderRadius: 10,
         background: "var(--bg-1)",

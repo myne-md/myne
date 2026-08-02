@@ -1,5 +1,13 @@
 // Small shared helpers used across the note/graph/attachment surfaces.
 
+/** True when the document is currently laid out right-to-left. Read at call
+ *  time — never cached — because the shared `@myne/i18n` runtime flips
+ *  `document.documentElement.dir` on the in-app language switch WITHOUT a
+ *  reload, so a gesture/animation must observe the live value. */
+export function isRtl(): boolean {
+  return typeof document !== "undefined" && document.documentElement.dir === "rtl";
+}
+
 /** Append `value` to the array at `key`, creating the array on first use. */
 export function pushMap<V>(m: Map<string, V[]>, key: string, value: V): void {
   const arr = m.get(key);

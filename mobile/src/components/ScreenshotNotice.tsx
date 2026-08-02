@@ -37,7 +37,7 @@ export function ScreenshotNotice() {
   return (
     <div
       data-testid="screenshot-notice"
-      style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 12px)", left: 0, right: 0, display: "flex", justifyContent: "center", padding: "0 20px", zIndex: 2000, pointerEvents: "none" }}
+      style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 12px)", insetInlineStart: 0, insetInlineEnd: 0, display: "flex", justifyContent: "center", padding: "0 20px", zIndex: 2000, pointerEvents: "none" }}
     >
       <Toast icon="lock" style={{ maxWidth: 440, lineHeight: 1.4 }}>
         {t("settings.privacy.screenshotBlocked")}

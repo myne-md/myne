@@ -52,7 +52,7 @@ export function IOSStatusBar({ dark = false, time = "9:41" }: { dark?: boolean; 
           justifyContent: "center",
           gap: 7,
           paddingTop: 1,
-          paddingRight: 1,
+          paddingInlineEnd: 1,
         }}
       >
         <svg width="19" height="12" viewBox="0 0 19 12">

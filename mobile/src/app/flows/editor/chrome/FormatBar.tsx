@@ -189,7 +189,7 @@ export function FormatBar({
           <svg width="20" height="20" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" {...st} /><path d="M6 11a6 6 0 0 0 12 0M12 17v3" {...st} /></svg>
         </button>
       </div>
-      <button {...tap(onToggleRaw)} aria-label={rawMode ? t("editor.formatBar.showLivePreview") : t("editor.formatBar.showRawMarkdown")} style={{ ...fbtn, borderLeft: "1px solid var(--line-1)", borderRadius: 0, width: 44 }}>
+      <button {...tap(onToggleRaw)} aria-label={rawMode ? t("editor.formatBar.showLivePreview") : t("editor.formatBar.showRawMarkdown")} style={{ ...fbtn, borderInlineStart: "1px solid var(--line-1)", borderRadius: 0, width: 44 }}>
         {rawMode ? (
           // Raw/source mode → pen (you're editing the raw markdown).
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 20l4-1L18.5 8.5a2 2 0 0 0-3-3L5 16l-1 4zM14 6l3 3" stroke="var(--accent)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -198,7 +198,7 @@ export function FormatBar({
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="var(--fg-2)" strokeWidth="1.7" /><circle cx="12" cy="12" r="2.7" stroke="var(--fg-2)" strokeWidth="1.7" /></svg>
         )}
       </button>
-      <button {...run((v) => v.contentDOM.blur())} aria-label={t("editor.formatBar.hideKeyboard")} style={{ ...fbtn, borderLeft: "1px solid var(--line-1)", borderRadius: 0, width: 48 }}>
+      <button {...run((v) => v.contentDOM.blur())} aria-label={t("editor.formatBar.hideKeyboard")} style={{ ...fbtn, borderInlineStart: "1px solid var(--line-1)", borderRadius: 0, width: 48 }}>
         <svg width="22" height="22" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="11" rx="2" stroke="var(--fg-2)" strokeWidth="1.6" fill="none" /><path d="M7 7.5h.01M11 7.5h.01M15 7.5h.01M7 11h.01M11 11h.01M15 11h.01M9 20l3 -3 3 3" stroke="var(--fg-2)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
       </button>
     </div>

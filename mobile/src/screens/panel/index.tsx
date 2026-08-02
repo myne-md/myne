@@ -88,8 +88,8 @@ function PanelHost({
       <div
         style={{
           position: "absolute",
-          left: 0,
-          right: 0,
+          insetInlineStart: 0,
+          insetInlineEnd: 0,
           bottom: 0,
           height: panelHeight,
           background: "var(--bg-1)",
@@ -265,7 +265,7 @@ function OutlineRow({
         padding: `9px 4px 9px ${indent}px`,
         fontSize: size,
         color,
-        borderLeft: accentRule ? "2px solid var(--accent-soft)" : undefined,
+        borderInlineStart: accentRule ? "2px solid var(--accent-soft)" : undefined,
       }}
     >
       {children}

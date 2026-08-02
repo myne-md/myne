@@ -346,7 +346,7 @@ export function AttachmentsSheet({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flex: "none" }}>
         <span style={{ width: 90 }}>{uploadBtn("link")}</span>
         <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{title}</span>
-        <span style={{ width: 90, textAlign: "right" }}>{cleanBtn(actionLink)}</span>
+        <span style={{ width: 90, textAlign: "end" }}>{cleanBtn(actionLink)}</span>
       </div>
       {banner}
       {cleanupPanel}

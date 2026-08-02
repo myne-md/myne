@@ -227,3 +227,23 @@ existing flow test exercises real notes). Needs a desktop + phone pair on the sa
 | 9.6 | **Delete → Trash** — tap Delete on a folder row → confirm ("Move N notes to Trash?") | every note in the subtree moves to Trash (recoverable there); the folder leaves the archive |
 | 9.7 | **Nested fold** — archive `A/` and `A/B/` on desktop | only `A/` shows as a top-level row; restoring `A/` un-archives `A/B/` too |
 | 9.8 | **Loose archived notes** — individually archive a note (not folder) outside any archived folder | it still shows as a note row (with Unarchive) alongside the folder rows |
+
+## 10. RTL layout checklist (RTL epic — myne-md/myne-mobile#33)
+
+Direction follows the active locale (not a separate setting): the shared `@myne/i18n`
+runtime sets `document.documentElement.dir` from the language at boot and on every switch.
+The direction WIRING is flow-logic-tested (`tests/flow-logic/rtl.flow.ts` — `<html dir>`
+flips, the back chevron mirrors, the affordance lands inline-end); what stays a DEVICE
+check is real bidi: WKWebView / Android WebView Arabic shaping + fonts, the mirrored
+gesture feel, and per-block paragraph direction on real content. Switch via Settings →
+Appearance → Language → **العربية** (`ar`); spot-check on both platforms.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 10.1 | **Locale flip** — switch the display language to Arabic | the whole UI mirrors to RTL with no reload; switching back to English restores LTR |
+| 10.2 | **Mirrored nav** — inspect the editor top bar, list headers, settings panels | back/disclosure chevrons point toward the inline-end (their glyph flips); the back affordance sits on the RIGHT; the note-context drawer slides in from the LEFT |
+| 10.3 | **Back-gesture edge** — in the compact editor, swipe to go back | the interactive-pop gesture arms from the RIGHT screen edge and drags LEFT (mirror of LTR); a left-edge swipe no longer engages |
+| 10.4 | **MarkdownView paragraph direction** — open (Reading mode) a note mixing Arabic and Latin paragraphs, lists, and headings | each block resolves its OWN direction (`dir="auto"`): Arabic blocks right-align, Latin blocks left-align, in the same note |
+| 10.5 | **Inline isolation** — a note with a code span, a link, and an account-number-shaped run inside an Arabic paragraph | the neutral LTR runs do NOT reorder the surrounding RTL line (they are `unicode-bidi: isolate`d) |
+| 10.6 | **Editing surface bidi** — type Arabic then Latin on separate lines in the editor | per-line direction resolves correctly (shared `@myne/editor` bidi); caret + selection track the line's direction |
+| 10.7 | **Logical layout spot-check** — list-row dividers, the settings toggle knobs, unread/count badges, the table view's pinned Name column | all mirror: dividers inset from the correct side, knob ON-side flips, badges on the inline-end, the Name column pins to the RIGHT |

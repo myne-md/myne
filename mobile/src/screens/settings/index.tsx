@@ -183,7 +183,7 @@ function Toggle({ on = false }: { on?: boolean }) {
         style={{
           position: "absolute",
           top: 3,
-          left: on ? 23 : 3,
+          insetInlineStart: on ? 23 : 3,
           width: 22,
           height: 22,
           borderRadius: "50%",
@@ -336,7 +336,7 @@ function ChangePassword() {
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, letterSpacing: "0.14em", color: "var(--fg-1)" }}>
             ••••••••••
           </span>
-          <span style={{ width: 2, height: 22, background: "var(--accent)", marginLeft: 2 }} />
+          <span style={{ width: 2, height: 22, background: "var(--accent)", marginInlineStart: 2 }} />
         </div>
         <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1, display: "flex", gap: 4 }}>

@@ -155,7 +155,7 @@ function PasswordRow({
         type="button"
         onClick={onToggleReveal}
         aria-label={revealed ? t("password.input.hide") : t("password.input.show")}
-        style={{ border: "none", background: "transparent", padding: 0, marginLeft: 8, cursor: "pointer", display: "flex" }}
+        style={{ border: "none", background: "transparent", padding: 0, marginInlineStart: 8, cursor: "pointer", display: "flex" }}
       >
         <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
       </button>

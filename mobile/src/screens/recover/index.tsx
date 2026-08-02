@@ -63,7 +63,7 @@ function AccountNumberEntry() {
             >
               MY‑4F2A‑9C17‑8E2Q
             </span>
-            <span style={{ width: 2, height: 22, background: "var(--accent)", marginLeft: 2 }} />
+            <span style={{ width: 2, height: 22, background: "var(--accent)", marginInlineStart: 2 }} />
           </div>
           <div
             style={{
@@ -127,7 +127,7 @@ function WordCell({
           fontSize: 11,
           color: "var(--line-3)",
           width: 16,
-          textAlign: "right",
+          textAlign: "end",
           flexShrink: 0,
         }}
       >

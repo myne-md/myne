@@ -196,7 +196,7 @@ function PasswordField({ value, onChange, onEnter, testId }: { value: string; on
         type="button"
         onClick={() => setRevealed((r) => !r)}
         aria-label={revealed ? t("password.input.hide") : t("password.input.show")}
-        style={{ border: "none", background: "transparent", padding: 0, marginLeft: 6, cursor: "pointer", display: "flex" }}
+        style={{ border: "none", background: "transparent", padding: 0, marginInlineStart: 6, cursor: "pointer", display: "flex" }}
       >
         <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
       </button>

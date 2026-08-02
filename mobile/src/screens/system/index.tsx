@@ -511,8 +511,8 @@ function ClipperPairing() {
       <div
         style={{
           position: "absolute",
-          left: 20,
-          right: 20,
+          insetInlineStart: 20,
+          insetInlineEnd: 20,
           top: "50%",
           transform: "translateY(-50%)",
           background: "var(--bg-1)",
@@ -557,7 +557,7 @@ function ClipSaved() {
     <Screen>
       <NotesHeader />
       <div style={{ flex: 1 }} />
-      <ToastCard style={{ position: "absolute", left: 16, right: 16, bottom: 40, padding: "14px 16px" }}>
+      <ToastCard style={{ position: "absolute", insetInlineStart: 16, insetInlineEnd: 16, bottom: 40, padding: "14px 16px" }}>
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
           <path d="M3 10.5l4 4 10-10" stroke="var(--_success-dark)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

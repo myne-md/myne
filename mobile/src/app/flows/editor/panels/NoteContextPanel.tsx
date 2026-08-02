@@ -67,7 +67,7 @@ export function NoteContextPanel({
     });
   // SECTION_HEADING_STYLE (desktop sharedStyles.ts) — "LINKED FROM 0" look.
   const heading: CSSProperties = { fontSize: 11, color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 8 };
-  const linkRow: CSSProperties = { display: "flex", alignItems: "center", gap: 8, width: "100%", border: "none", background: "transparent", padding: "9px 4px", borderRadius: 8, cursor: "pointer", textAlign: "left", fontSize: 15, color: "var(--fg-1)", fontFamily: "var(--font-sans)" };
+  const linkRow: CSSProperties = { display: "flex", alignItems: "center", gap: 8, width: "100%", border: "none", background: "transparent", padding: "9px 4px", borderRadius: 8, cursor: "pointer", textAlign: "start", fontSize: 15, color: "var(--fg-1)", fontFamily: "var(--font-sans)" };
   const empty = (text: string): ReactNode => <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>{text}</div>;
   const noteRow = (n: NoteEntry): ReactNode => (
     <button key={n.id} onClick={() => onOpen(n.id)} style={linkRow}>
@@ -136,7 +136,7 @@ export function NoteContextPanel({
                     <div key={i} style={{ display: "flex", alignItems: "stretch", width: "100%" }}>
                       {/* One full-height vertical guide per ancestor level. */}
                       {Array.from({ length: Math.max(0, h.level - 1) }, (_, d) => (
-                        <span key={d} aria-hidden style={{ flexShrink: 0, width: INDENT_WIDTH, borderLeft: "1px solid var(--line-1)" }} />
+                        <span key={d} aria-hidden style={{ flexShrink: 0, width: INDENT_WIDTH, borderInlineStart: "1px solid var(--line-1)" }} />
                       ))}
                       {/* Disclosure chevron for foldable rows; spacer keeps leaf
                           labels aligned with foldable siblings. */}
@@ -161,7 +161,7 @@ export function NoteContextPanel({
                         data-heading-level={h.level}
                         onClick={() => onJump(h.index)}
                         title={h.text}
-                        style={{ flex: 1, minWidth: 0, textAlign: "left", background: "transparent", border: 0, padding: "8px 6px 8px 2px", fontSize: 15, lineHeight: 1.4, color: h.level === 1 ? "var(--fg-1)" : "var(--fg-2)", fontWeight: h.level === 1 ? 600 : 400, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--font-sans)" }}
+                        style={{ flex: 1, minWidth: 0, textAlign: "start", background: "transparent", border: 0, padding: "8px 6px 8px 2px", fontSize: 15, lineHeight: 1.4, color: h.level === 1 ? "var(--fg-1)" : "var(--fg-2)", fontWeight: h.level === 1 ? 600 : 400, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--font-sans)" }}
                       >
                         {h.text}
                       </button>

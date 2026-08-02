@@ -106,7 +106,7 @@ export function Gallery() {
           justifyContent: "space-between",
           gap: 24,
           position: "sticky",
-          left: 56,
+          insetInlineStart: 56,
           width: "calc(100vw - 112px)",
         }}
       >

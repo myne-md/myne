@@ -71,14 +71,16 @@ function renderInline(tokens: Inline[], onOpenWikilink: (target: string) => void
           </em>
         );
       case "code":
+        // Isolate the neutral code run so an LTR snippet can't reorder the RTL
+        // line around it (mirror of the desktop `.cm-inline-code`).
         return (
-          <code key={i} style={{ fontFamily: "var(--font-mono)", fontSize: "0.9em", background: "var(--bg-2)", borderRadius: 4, padding: "1px 5px" }}>
+          <code key={i} style={{ fontFamily: "var(--font-mono)", fontSize: "0.9em", background: "var(--bg-2)", borderRadius: 4, padding: "1px 5px", unicodeBidi: "isolate" }}>
             {t.text}
           </code>
         );
       case "link":
         return (
-          <span key={i} style={{ color: "var(--accent)" }}>
+          <span key={i} style={{ color: "var(--accent)", unicodeBidi: "isolate" }}>
             {t.text}
           </span>
         );
@@ -87,7 +89,7 @@ function renderInline(tokens: Inline[], onOpenWikilink: (target: string) => void
           <span
             key={i}
             onClick={() => onOpenWikilink(t.target)}
-            style={{ color: "var(--accent)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}
+            style={{ color: "var(--accent)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, unicodeBidi: "isolate" }}
           >
             {t.label}
           </span>
@@ -104,36 +106,41 @@ function renderBlock(b: Block, key: number, base: number, onOpenWikilink: (targe
   switch (b.kind) {
     case "heading": {
       const scale = [1.6, 1.4, 1.2, 1.08, 1, 0.95][b.level - 1] ?? 1;
+      // `dir="auto"` on every block container so each block resolves its own
+      // direction from its first strong character — an RTL heading right-aligns,
+      // an LTR one left-aligns, in the same note.
       return (
-        <div key={key} style={{ fontSize: Math.round(base * scale), fontWeight: 700, lineHeight: 1.3, color: "var(--fg-display)", margin: b.level <= 2 ? "18px 0 8px" : "14px 0 6px" }}>
+        <div key={key} dir="auto" style={{ fontSize: Math.round(base * scale), fontWeight: 700, lineHeight: 1.3, color: "var(--fg-display)", margin: b.level <= 2 ? "18px 0 8px" : "14px 0 6px" }}>
           {renderInline(b.content, onOpenWikilink)}
         </div>
       );
     }
     case "paragraph":
       return (
-        <p key={key} style={{ margin: "0 0 12px", lineHeight: 1.65 }}>
+        <p key={key} dir="auto" style={{ margin: "0 0 12px", lineHeight: 1.65 }}>
           {renderInline(b.content, onOpenWikilink)}
         </p>
       );
     case "code":
       return (
-        <pre key={key} style={{ margin: "0 0 12px", background: "var(--bg-2)", border: "1px solid var(--line-1)", borderRadius: 8, padding: "12px 14px", overflowX: "auto", fontFamily: "var(--font-mono)", fontSize: Math.round(base * 0.9), lineHeight: 1.5 }}>
+        <pre key={key} dir="auto" style={{ margin: "0 0 12px", background: "var(--bg-2)", border: "1px solid var(--line-1)", borderRadius: 8, padding: "12px 14px", overflowX: "auto", fontFamily: "var(--font-mono)", fontSize: Math.round(base * 0.9), lineHeight: 1.5 }}>
           {b.text}
         </pre>
       );
     case "quote":
+      // Logical inset (padding + border both on the inline-start) so the quote
+      // bar sits on the right under RTL, matching the text side.
       return (
-        <div key={key} style={{ margin: "0 0 12px", borderLeft: "3px solid var(--line-2)", padding: "2px 0 2px 14px", color: "var(--fg-2)", lineHeight: 1.6 }}>
+        <div key={key} dir="auto" style={{ margin: "0 0 12px", borderInlineStart: "3px solid var(--line-2)", paddingBlock: "2px", paddingInlineStart: 14, color: "var(--fg-2)", lineHeight: 1.6 }}>
           {renderInline(b.content, onOpenWikilink)}
         </div>
       );
     case "list": {
       const Tag = b.ordered ? "ol" : "ul";
       return (
-        <Tag key={key} style={{ margin: "0 0 12px", paddingLeft: 22, lineHeight: 1.65 }}>
+        <Tag key={key} dir="auto" style={{ margin: "0 0 12px", paddingInlineStart: 22, lineHeight: 1.65 }}>
           {b.items.map((it, j) => (
-            <li key={j} style={{ marginBottom: 4 }}>
+            <li key={j} dir="auto" style={{ marginBottom: 4 }}>
               {renderInline(it, onOpenWikilink)}
             </li>
           ))}

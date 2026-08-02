@@ -209,8 +209,8 @@ function FolderChild({ dot, name, count }: { dot: string; name: string; count: n
         alignItems: "center",
         gap: 10,
         padding: "11px 8px 11px 28px",
-        borderLeft: "1px solid var(--line-1)",
-        marginLeft: 13,
+        borderInlineStart: "1px solid var(--line-1)",
+        marginInlineStart: 13,
       }}
     >
       <span style={{ width: 9, height: 9, borderRadius: 2, background: dot }} />
@@ -540,7 +540,7 @@ function ViewSettings() {
             <span style={{ fontSize: 13, color: "var(--fg-3)" }}>S</span>
             <div style={{ flex: 1, height: 4, borderRadius: 999, background: "var(--line-1)", position: "relative" }}>
               <div
-                style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "60%", background: "var(--accent)", borderRadius: 999 }}
+                style={{ position: "absolute", insetInlineStart: 0, top: 0, bottom: 0, width: "60%", background: "var(--accent)", borderRadius: 999 }}
               />
               <div
                 style={{

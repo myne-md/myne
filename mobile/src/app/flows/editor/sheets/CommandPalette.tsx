@@ -58,7 +58,7 @@ export function CommandPalette({
   }, [q, query, notes, bodies, snippetOf]);
 
   const sectionLabel: CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-3)", padding: "12px 16px 4px" };
-  const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 11, width: "100%", border: "none", background: "transparent", padding: "10px 16px", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)" };
+  const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 11, width: "100%", border: "none", background: "transparent", padding: "10px 16px", cursor: "pointer", textAlign: "start", fontFamily: "var(--font-sans)" };
   const first = cmdMatches[0] ?? null;
 
   // Enter animation: mount closed, flip open before first paint (forced-reflow
