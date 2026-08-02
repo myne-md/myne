@@ -102,7 +102,7 @@ export function FlowHeader({
         aria-label={t("common.back")}
         style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex" }}
       >
-        <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} />
+        <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip />
       </button>
       <Eyebrow>{label}</Eyebrow>
     </div>

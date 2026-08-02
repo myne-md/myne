@@ -42,7 +42,7 @@ function NavItem({
         fontFamily: "var(--font-sans)",
         fontSize: 14,
         fontWeight: active ? 600 : 400,
-        textAlign: "left",
+        textAlign: "start",
         cursor: "pointer",
       }}
     >
@@ -109,7 +109,7 @@ export function SidebarPane({
         display: "flex",
         flexDirection: "column",
         minHeight: 0,
-        borderRight: "1px solid var(--line-1)",
+        borderInlineEnd: "1px solid var(--line-1)",
         background: "var(--bg-2)",
         padding: `${LIST_TOP} 12px 0`,
       }}

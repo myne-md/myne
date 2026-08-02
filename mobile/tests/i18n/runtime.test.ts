@@ -1,8 +1,10 @@
 // MYND-485 — the mobile i18n runtime is the desktop react-i18next runtime,
 // shared verbatim by alias (`@myne/i18n` → ../src/i18n). These tests prove the
-// alias resolves, the 24 shared catalogs load on mobile's build/test config, the
+// alias resolves, the 32 shared catalogs load on mobile's build/test config, the
 // language set is the shared desktop constant (no drift), switching works, and a
-// missing translation falls back rather than rendering blank.
+// missing translation falls back rather than rendering blank. (The roster grew
+// from 24 to 32 with the RTL epic, which added the RTL locales — ar/fa/ur — plus
+// more scripts; the count below tracks the shared constant, not a mobile copy.)
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import i18n, { setLanguage } from "@myne/i18n";
@@ -26,11 +28,13 @@ describe("mobile i18n runtime (shared desktop runtime via @myne/i18n alias)", ()
     expect(i18n.t("settings.language.label")).toBe("Language");
   });
 
-  it("shares the desktop 24-language config (no mobile copy → no drift)", () => {
+  it("shares the desktop 32-language config (no mobile copy → no drift)", () => {
     const codes = SUPPORTED_LANGUAGES.map((l) => l.code);
-    expect(SUPPORTED_LANGUAGES.length).toBe(24);
+    expect(SUPPORTED_LANGUAGES.length).toBe(32);
     expect(codes).toContain("en");
     expect(codes).toContain("tr");
+    // The RTL epic's locales are part of the shared roster mobile inherits.
+    expect(codes).toContain("ar");
     // Labels are in each language's own script (a shared-config sanity check).
     expect(SUPPORTED_LANGUAGES.find((l) => l.code === "tr")?.label).toBe("Türkçe");
   });

@@ -307,7 +307,7 @@ function DeleteVaultConfirm() {
         <UpperLabel style={{ marginTop: 16 }}>Type DELETE to confirm</UpperLabel>
         <div style={{ display: "flex", alignItems: "center", height: 50, border: "1.5px solid var(--danger)", borderRadius: 6, background: "var(--bg-1)", padding: "0 14px" }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 16, letterSpacing: "0.08em", color: "var(--fg-1)" }}>DELE</span>
-          <span style={{ width: 2, height: 20, background: "var(--danger)", marginLeft: 1 }} />
+          <span style={{ width: 2, height: 20, background: "var(--danger)", marginInlineStart: 1 }} />
         </div>
         <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
           <Button variant="secondary" full={false} style={{ flex: 1, height: 50, fontSize: 15 }}>

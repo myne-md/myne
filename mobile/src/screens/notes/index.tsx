@@ -413,7 +413,7 @@ function ReadingView() {
           Ciphertext is opaque to the server: see <WikiLink underline>[[Key rotation]]</WikiLink> for how device keys are
           re-derived on re-pair.
         </p>
-        <ul style={{ margin: "14px 0 0", paddingLeft: 20, fontSize: 16, lineHeight: 1.7, color: "var(--fg-1)" }}>
+        <ul style={{ margin: "14px 0 0", paddingInlineStart: 20, fontSize: 16, lineHeight: 1.7, color: "var(--fg-1)" }}>
           <li>Network observer — sees timing + size only</li>
           <li>
             Malicious relay — stores{" "}
@@ -435,8 +435,8 @@ function ReadingView() {
         <blockquote
           style={{
             margin: "18px 0 0",
-            paddingLeft: 14,
-            borderLeft: "2px solid var(--line-2)",
+            paddingInlineStart: 14,
+            borderInlineStart: "2px solid var(--line-2)",
             color: "var(--fg-2)",
             fontSize: 16,
             lineHeight: 1.6,

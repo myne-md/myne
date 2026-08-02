@@ -57,7 +57,7 @@ export function TemplatesSheet({
           </div>
           {confirmDelete === tpl.id ? (
             <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
-              <span style={{ fontSize: 13, color: "var(--fg-3)", marginRight: "auto" }}>{t("templates.deleteConfirm")}</span>
+              <span style={{ fontSize: 13, color: "var(--fg-3)", marginInlineEnd: "auto" }}>{t("templates.deleteConfirm")}</span>
               <button onClick={() => { setConfirmDelete(null); onDelete(tpl.id); }} style={btn("var(--danger)")}>{t("attachments.deleteDialog.delete")}</button>
               <button onClick={() => setConfirmDelete(null)} style={btn("var(--fg-3)")}>{t("common.prompt.cancel")}</button>
             </div>
@@ -86,7 +86,7 @@ export function TemplatesSheet({
               onClick={onBack}
               style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0 }}
             >
-              <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> {t("commandPalette.sectionNotes")}
+              <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip /> {t("commandPalette.sectionNotes")}
             </button>
           )}
           <div style={{ marginTop: onBack ? 14 : 0, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
@@ -104,7 +104,7 @@ export function TemplatesSheet({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none" }}>
         <span style={{ width: 72 }} />
         <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("templates.manager.listLabel")}</span>
-        <span style={{ width: 72, textAlign: "right" }}>{newAction}</span>
+        <span style={{ width: 72, textAlign: "end" }}>{newAction}</span>
       </div>
 
       <div style={{ marginTop: 12, overflowY: "auto", flex: 1, minHeight: 0 }}>{listInner}</div>

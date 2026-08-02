@@ -1,10 +1,20 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { isRtl } from "./util";
 
 /**
- * Left-edge swipe-back gesture for the compact (phone) editor screen — the
- * iOS interactive-pop feel: a touch that starts near the left screen edge and
- * moves right drags the screen with the finger; past a distance threshold (or
- * on a quick flick) it triggers `onBack`, otherwise it springs back.
+ * Inline-start-edge swipe-back gesture for the compact (phone) editor screen —
+ * the iOS interactive-pop feel: a touch that starts near the leading screen edge
+ * and moves toward the trailing edge drags the screen with the finger; past a
+ * distance threshold (or on a quick flick) it triggers `onBack`, otherwise it
+ * springs back.
+ *
+ * Direction-aware: under LTR the gesture starts at the LEFT edge and drags
+ * right; under RTL it starts at the RIGHT edge and drags left (the back
+ * affordance is on the inline-end side there). The direction is read from
+ * `document.documentElement.dir` at each touch START, so the in-app language
+ * switch (which flips `<html dir>` without a reload) is honoured on the very
+ * next gesture. All progress math below is expressed in the `sign`-normalised
+ * "toward-back" axis (`progress = sign * dx`), so a single code path serves both.
  *
  * Touch events (not pointer events) on purpose: once the horizontal intent is
  * recognized we must `preventDefault()` the moves to keep the page from
@@ -15,7 +25,7 @@ import { useEffect, useRef, type RefObject } from "react";
  * untouched (taps and vertical scrolls behave exactly as before).
  */
 
-/** Width of the left-edge strip that can start the gesture. Wide enough to be
+/** Width of the edge strip that can start the gesture. Wide enough to be
  *  forgiving on device, narrow enough to stay out of the editor's text column
  *  (compact editor content starts at 22px). */
 const EDGE_PX = 32;
@@ -61,22 +71,25 @@ export function useSwipeBack(
     let startX = 0;
     let startY = 0;
     let startT = 0;
-    let lastDx = 0;
+    let sign = 1; // +1 = LTR (drag right), -1 = RTL (drag left); set per gesture
+    let lastProgress = 0; // toward-back travel of the last move (px, ≥ 0)
     let tracking = false; // touch began in the edge strip, intent still open
     let engaged = false; // horizontal intent recognized — we own this touch
 
-    const setDx = (dx: number) => {
-      lastDx = dx;
-      el.style.transform = dx > 0 ? `translateX(${dx}px)` : "";
+    /** Paint the drag: `p` is toward-back travel (≥ 0); the visual translate is
+     *  along the trailing edge (rightward in LTR, leftward in RTL). */
+    const setProgress = (p: number) => {
+      lastProgress = p;
+      el.style.transform = p > 0 ? `translateX(${sign * p}px)` : "";
     };
 
     /** Spring back to rest (cancelled / under-threshold release). */
     const settle = () => {
-      const from = lastDx;
-      setDx(0);
+      const from = lastProgress;
+      setProgress(0);
       if (from > 0 && typeof el.animate === "function") {
         el.animate(
-          [{ transform: `translateX(${from}px)` }, { transform: "translateX(0)" }],
+          [{ transform: `translateX(${sign * from}px)` }, { transform: "translateX(0)" }],
           { duration: 200, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
         );
       }
@@ -86,11 +99,15 @@ export function useSwipeBack(
       tracking = engaged = false;
       if (e.touches.length !== 1) return;
       const t = e.touches[0];
-      if (t.clientX > EDGE_PX || insideOverlay(e.target, el)) return;
+      // Read direction fresh: the leading edge is the left under LTR, the right
+      // under RTL. A touch outside the edge strip (or on an overlay) never arms.
+      sign = isRtl() ? -1 : 1;
+      const inEdge = sign > 0 ? t.clientX <= EDGE_PX : t.clientX >= el.clientWidth - EDGE_PX;
+      if (!inEdge || insideOverlay(e.target, el)) return;
       startX = t.clientX;
       startY = t.clientY;
       startT = performance.now();
-      lastDx = 0;
+      lastProgress = 0;
       tracking = true;
     };
 
@@ -103,20 +120,20 @@ export function useSwipeBack(
         return;
       }
       const t = e.touches[0];
-      const dx = t.clientX - startX;
+      const progress = sign * (t.clientX - startX); // toward-back travel (px)
       const dy = t.clientY - startY;
       if (!engaged) {
         // Vertical wins → hand the touch back to native scrolling for good.
-        if (Math.abs(dy) > SLOP_PX && Math.abs(dy) > dx) {
+        if (Math.abs(dy) > SLOP_PX && Math.abs(dy) > progress) {
           tracking = false;
           return;
         }
-        if (!(dx > SLOP_PX && dx > Math.abs(dy) * 1.4)) return;
+        if (!(progress > SLOP_PX && progress > Math.abs(dy) * 1.4)) return;
         engaged = true;
       }
       if (e.cancelable) e.preventDefault();
       e.stopPropagation();
-      setDx(Math.max(0, dx));
+      setProgress(Math.max(0, progress));
     };
 
     const onEnd = (e: TouchEvent) => {
@@ -127,12 +144,12 @@ export function useSwipeBack(
       // No synthetic click out of a completed drag (it would tap the editor).
       if (e.cancelable) e.preventDefault();
       e.stopPropagation();
-      const dx = Math.max(0, e.changedTouches[0].clientX - startX);
-      const velocity = dx / Math.max(1, performance.now() - startT);
-      if (dx > el.clientWidth * COMMIT_FRACTION || (dx > FLICK_MIN_PX && velocity > FLICK_MIN_VELOCITY)) {
+      const progress = Math.max(0, sign * (e.changedTouches[0].clientX - startX));
+      const velocity = progress / Math.max(1, performance.now() - startT);
+      if (progress > el.clientWidth * COMMIT_FRACTION || (progress > FLICK_MIN_PX && velocity > FLICK_MIN_VELOCITY)) {
         // Clear the drag transform before navigating — the screen element is
         // reused by the list view, and the existing pop animation takes over.
-        setDx(0);
+        setProgress(0);
         backRef.current();
       } else {
         settle();

@@ -221,7 +221,7 @@ function ExportNote() {
               style={{
                 position: "absolute",
                 top: 3,
-                right: 3,
+                insetInlineEnd: 3,
                 width: 22,
                 height: 22,
                 borderRadius: "50%",

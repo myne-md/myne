@@ -101,12 +101,18 @@ export function Icon({
   color = "currentColor",
   strokeWidth = 1.8,
   style,
+  flip = false,
 }: {
   name: IconName;
   size?: number;
   color?: string;
   strokeWidth?: number;
   style?: CSSProperties;
+  /** Mirror the glyph under RTL (via `[dir="rtl"] [data-flip]` in tokens.css).
+   *  Set on DIRECTIONAL icons only — back / disclosure chevrons, nav arrows —
+   *  never on symmetric ones (search, lock, …) or ones with their own rotation
+   *  transform (the expand/collapse tree chevrons). */
+  flip?: boolean;
 }) {
   const segments = PATHS[name].split("|");
   return (
@@ -119,6 +125,7 @@ export function Icon({
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
+      data-flip={flip ? "" : undefined}
       style={{ display: "block", flexShrink: 0, ...style }}
     >
       {segments.map((d, i) => (

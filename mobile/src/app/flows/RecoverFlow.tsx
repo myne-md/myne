@@ -182,7 +182,7 @@ function WordCell({
           fontSize: 11,
           color: "var(--line-3)",
           width: 16,
-          textAlign: "right",
+          textAlign: "end",
           flexShrink: 0,
         }}
       >
@@ -261,7 +261,7 @@ function EditablePassword({
             border: "none",
             background: "transparent",
             padding: 0,
-            marginLeft: 6,
+            marginInlineStart: 6,
             cursor: "pointer",
             display: "flex",
           }}

@@ -77,8 +77,8 @@ function MenuItem({
 function SlashMenu() {
   return (
     <div style={{ height: "100%", display: "flex", background: "var(--bg-1)", color: "var(--fg-1)" }}>
-      <div style={{ width: 60, flex: "none", background: "var(--bg-2)", borderRight: "1px solid var(--line-1)" }} />
-      <div style={{ width: 280, flex: "none", background: "var(--bg-1)", borderRight: "1px solid var(--line-1)" }} />
+      <div style={{ width: 60, flex: "none", background: "var(--bg-2)", borderInlineEnd: "1px solid var(--line-1)" }} />
+      <div style={{ width: 280, flex: "none", background: "var(--bg-1)", borderInlineEnd: "1px solid var(--line-1)" }} />
       <div style={{ flex: 1, position: "relative", background: "var(--bg-1)", minWidth: 0 }}>
         <div
           style={{
@@ -105,7 +105,7 @@ function SlashMenu() {
         <div
           style={{
             position: "absolute",
-            left: 56,
+            insetInlineStart: 56,
             top: 200,
             width: 300,
             background: "var(--bg-1)",
@@ -212,8 +212,8 @@ function SlashMenu() {
 function WikilinkPicker() {
   return (
     <div style={{ height: "100%", display: "flex", background: "var(--bg-1)", color: "var(--fg-1)" }}>
-      <div style={{ width: 60, flex: "none", background: "var(--bg-2)", borderRight: "1px solid var(--line-1)" }} />
-      <div style={{ width: 280, flex: "none", background: "var(--bg-1)", borderRight: "1px solid var(--line-1)" }} />
+      <div style={{ width: 60, flex: "none", background: "var(--bg-2)", borderInlineEnd: "1px solid var(--line-1)" }} />
+      <div style={{ width: 280, flex: "none", background: "var(--bg-1)", borderInlineEnd: "1px solid var(--line-1)" }} />
       <div style={{ flex: 1, position: "relative", background: "var(--bg-1)", minWidth: 0 }}>
         <div
           style={{
@@ -240,7 +240,7 @@ function WikilinkPicker() {
         <div
           style={{
             position: "absolute",
-            left: 96,
+            insetInlineStart: 96,
             top: 150,
             width: 320,
             background: "var(--bg-1)",
@@ -321,8 +321,8 @@ function WikilinkPicker() {
 function NoteContextMenu() {
   return (
     <div style={{ height: "100%", display: "flex", background: "var(--bg-1)", color: "var(--fg-1)" }}>
-      <div style={{ width: 60, flex: "none", background: "var(--bg-2)", borderRight: "1px solid var(--line-1)" }} />
-      <div style={{ width: 316, flex: "none", position: "relative", background: "var(--bg-1)", borderRight: "1px solid var(--line-1)" }}>
+      <div style={{ width: 60, flex: "none", background: "var(--bg-2)", borderInlineEnd: "1px solid var(--line-1)" }} />
+      <div style={{ width: 316, flex: "none", position: "relative", background: "var(--bg-1)", borderInlineEnd: "1px solid var(--line-1)" }}>
         <div style={{ padding: "18px 18px 12px" }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>All notes</h1>
         </div>
@@ -341,7 +341,7 @@ function NoteContextMenu() {
         <div
           style={{
             position: "absolute",
-            left: 120,
+            insetInlineStart: 120,
             top: 150,
             width: 236,
             background: "var(--bg-1)",

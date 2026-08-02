@@ -199,7 +199,7 @@ function Editor() {
             <span style={{ color: "var(--accent)" }}>Key rotation</span>
             <span style={{ color: "var(--fg-3)" }}>]]</span> for re-pair.
             <span
-              style={{ display: "inline-block", width: 2, height: 18, background: "var(--accent)", verticalAlign: -3, marginLeft: 1 }}
+              style={{ display: "inline-block", width: 2, height: 18, background: "var(--accent)", verticalAlign: -3, marginInlineStart: 1 }}
             />
           </div>
           <div style={{ height: 10 }} />
@@ -417,7 +417,7 @@ function Graph() {
             Inbox
           </text>
         </svg>
-        <div style={{ position: "absolute", left: 20, bottom: 14, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
+        <div style={{ position: "absolute", insetInlineStart: 20, bottom: 14, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
           48 notes · 112 links
         </div>
       </div>
@@ -460,7 +460,7 @@ function Settings() {
             left={<span style={rowLabel}>Unlock with Face ID</span>}
             right={
               <div style={{ width: 48, height: 28, borderRadius: 999, background: "var(--accent)", position: "relative" }}>
-                <span style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: "50%", background: "var(--accent-on)" }} />
+                <span style={{ position: "absolute", top: 3, insetInlineEnd: 3, width: 22, height: 22, borderRadius: "50%", background: "var(--accent-on)" }} />
               </div>
             }
           />

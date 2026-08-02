@@ -650,15 +650,15 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
                     background: "var(--bg-1)",
                     border: "1px solid var(--line-1)",
                     borderRadius: 4,
-                    paddingLeft: 24,
-                    paddingRight: 6,
+                    paddingInlineStart: 24,
+                    paddingInlineEnd: 6,
                     height: 34,
                   }}
                 >
                   <span
                     style={{
                       position: "absolute",
-                      left: 6,
+                      insetInlineStart: 6,
                       fontFamily: "var(--font-mono)",
                       fontSize: 11,
                       color: "var(--fg-3)",

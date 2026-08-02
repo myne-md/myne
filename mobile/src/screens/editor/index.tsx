@@ -51,11 +51,11 @@ function CaptionBar({
 function Caret({
   height = 16,
   valign = -2,
-  marginLeft = 0,
+  marginInlineStart = 0,
 }: {
   height?: number;
   valign?: number;
-  marginLeft?: number;
+  marginInlineStart?: number;
 }) {
   return (
     <span
@@ -65,7 +65,7 @@ function Caret({
         background: "var(--accent)",
         display: "inline-block",
         verticalAlign: valign,
-        marginLeft,
+        marginInlineStart,
       }}
     />
   );
@@ -366,15 +366,15 @@ function TagAutocomplete() {
       <MenuCard>
         <MenuRow first active style={{ gap: 8 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: "var(--accent)" }}>#security</span>
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--fg-3)" }}>14</span>
+          <span style={{ marginInlineStart: "auto", fontSize: 12, color: "var(--fg-3)" }}>14</span>
         </MenuRow>
         <MenuRow style={{ gap: 8 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: "var(--fg-2)" }}>#secrets</span>
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--line-3)" }}>3</span>
+          <span style={{ marginInlineStart: "auto", fontSize: 12, color: "var(--line-3)" }}>3</span>
         </MenuRow>
         <MenuRow style={{ gap: 8 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: "var(--fg-2)" }}>#section</span>
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--line-3)" }}>1</span>
+          <span style={{ marginInlineStart: "auto", fontSize: 12, color: "var(--line-3)" }}>1</span>
         </MenuRow>
       </MenuCard>
     </Screen>
@@ -528,8 +528,8 @@ function AttachmentInsert() {
             <div
               style={{
                 position: "absolute",
-                left: 12,
-                right: 12,
+                insetInlineStart: 12,
+                insetInlineEnd: 12,
                 bottom: 12,
                 height: 5,
                 borderRadius: 999,
@@ -670,7 +670,7 @@ function SpellCorrection() {
       <div
         style={{
           position: "absolute",
-          left: 18,
+          insetInlineStart: 18,
           bottom: 120,
           background: "var(--bg-1)",
           border: "1px solid var(--line-1)",
@@ -730,8 +730,8 @@ function DecorationPopover() {
       <div
         style={{
           position: "absolute",
-          left: 18,
-          right: 18,
+          insetInlineStart: 18,
+          insetInlineEnd: 18,
           bottom: 40,
           background: "var(--bg-1)",
           border: "1px solid var(--line-1)",
@@ -889,7 +889,7 @@ function FocusMode() {
         <div style={{ color: "var(--line-2)", marginTop: 8 }}>We assume a powerful network adversary.</div>
         <div style={{ color: "var(--fg-1)", marginTop: 8 }}>
           The vault key is derived from the passphrase and never leaves the device.
-          <Caret height={18} valign={-3} marginLeft={1} />
+          <Caret height={18} valign={-3} marginInlineStart={1} />
         </div>
         <div style={{ color: "var(--line-2)", marginTop: 8 }}>Ciphertext is opaque to the relay.</div>
       </div>

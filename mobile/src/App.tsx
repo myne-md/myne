@@ -99,8 +99,8 @@ export default function App() {
         // Resolves to 0 wherever it doesn't apply. The old phone cage
         // (maxWidth 480) moved into <PhoneColumn> around the single-column
         // flows (AppShell) — the editor is adaptive (SizeClassContext).
-        paddingLeft: "env(safe-area-inset-left, 0px)",
-        paddingRight: "env(safe-area-inset-right, 0px)",
+        paddingInlineStart: "env(safe-area-inset-left, 0px)",
+        paddingInlineEnd: "env(safe-area-inset-right, 0px)",
         // Follow the visible viewport's top edge — see useViewport(). Keeps the
         // header under the notch and the footer glued to the keyboard when iOS
         // scrolls the layout viewport on input focus.

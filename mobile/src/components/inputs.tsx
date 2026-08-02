@@ -99,7 +99,7 @@ export function PasswordField({
       >
         {revealed ? value : "•".repeat(length)}
       </span>
-      {caret && <span style={{ width: 2, height: 24, background: "var(--accent)", marginLeft: 3 }} />}
+      {caret && <span style={{ width: 2, height: 24, background: "var(--accent)", marginInlineStart: 3 }} />}
       <div style={{ flex: 1 }} />
       <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
     </div>
@@ -197,7 +197,7 @@ export function RecoveryGrid({
               fontSize: 11,
               color: "var(--line-3)",
               width: 16,
-              textAlign: "right",
+              textAlign: "end",
               flexShrink: 0,
             }}
           >
@@ -275,13 +275,15 @@ export function Switch({
         style={{
           position: "absolute",
           top: 2,
-          left: on ? 22 : 2,
+          // Logical inset so the knob rests on the inline-start when off and
+          // slides to the inline-end when on — mirrored under RTL.
+          insetInlineStart: on ? 22 : 2,
           width: 27,
           height: 27,
           borderRadius: "50%",
           background: "#fff",
           boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-          transition: "left var(--duration-fast) var(--ease-standard)",
+          transition: "inset-inline-start var(--duration-fast) var(--ease-standard)",
         }}
       />
     </div>

@@ -112,7 +112,7 @@ function MaskedField({ dots, count }: { dots: number; count?: number }) {
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, letterSpacing: "0.14em", color: "var(--fg-1)" }}>
         {"•".repeat(dots)}
       </span>
-      <span style={{ width: 2, height: 24, background: "var(--accent)", marginLeft: 3 }} />
+      <span style={{ width: 2, height: 24, background: "var(--accent)", marginInlineStart: 3 }} />
       {count !== undefined && (
         <>
           <div style={{ flex: 1 }} />
@@ -403,8 +403,8 @@ function LockNow() {
         style={{
           position: "absolute",
           top: 52,
-          left: 20,
-          right: 20,
+          insetInlineStart: 20,
+          insetInlineEnd: 20,
           zIndex: 3,
           background: "var(--ink-1)",
           color: "var(--paper)",

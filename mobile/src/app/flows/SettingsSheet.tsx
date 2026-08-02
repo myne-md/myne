@@ -10,6 +10,7 @@ import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { applyTheme } from "../../platform/theme";
 import type { ThemeName } from "../../platform/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
+import { isRtl } from "../../lib/util";
 import { changePassword } from "../../lib/vault-change-password";
 import { deleteVault } from "../../lib/vault-delete";
 import {
@@ -1026,9 +1027,11 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     // Slide the content in.
     if (typeof el.animate === "function") {
       el.scrollTop = 0; // each panel is its own screen — start at the top
+      // Under RTL a "forward" (deeper) panel enters from the LEFT — flip the axis.
+      const enter = (forward ? 22 : -22) * (isRtl() ? -1 : 1);
       el.animate(
         [
-          { opacity: 0, transform: `translateX(${forward ? "22px" : "-22px"})` },
+          { opacity: 0, transform: `translateX(${enter}px)` },
           { opacity: 1, transform: "translateX(0)" },
         ],
         { duration: 200, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
@@ -1335,7 +1338,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               width: 60,
             }}
           >
-            <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} />
+            <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip />
           </button>
         )}
         <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{headerTitle}</div>
@@ -1343,7 +1346,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
           onClick={close}
           style={{
             width: 60,
-            textAlign: "right",
+            textAlign: "end",
             border: "none",
             background: "transparent",
             color: "var(--accent)",
@@ -1923,7 +1926,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
       </div>
 
       {toast && (
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 92, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+        <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, bottom: 92, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
           <Toast icon="check">{toast}</Toast>
         </div>
       )}

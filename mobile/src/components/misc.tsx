@@ -1,5 +1,6 @@
 import { type CSSProperties, type Dispatch, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type SetStateAction, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Icon, MyneMark, type IconName } from "./Icon";
+import { isRtl } from "../lib/util";
 
 /** Pill chip / tag. */
 export function Chip({
@@ -291,7 +292,7 @@ export function SidePanel({
           position: "absolute",
           top: 0,
           bottom: 0,
-          right: 0,
+          insetInlineEnd: 0,
           width: "86%",
           maxWidth: 360,
           display: "flex",
@@ -302,7 +303,9 @@ export function SidePanel({
           // notch; the shadow gives the edge without any line near the top.
           background: "var(--bg-1)",
           boxShadow: "var(--shadow-3)",
-          transform: shown ? "translateX(0)" : "translateX(100%)",
+          // The drawer hides toward its own (inline-end) edge: off to the right
+          // under LTR, off to the left under RTL where inline-end is the left.
+          transform: shown ? "translateX(0)" : `translateX(${isRtl() ? "-100%" : "100%"})`,
           transition: `transform ${SHEET_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
           willChange: "transform",
         }}

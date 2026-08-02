@@ -169,7 +169,7 @@ function BackToPickerButton({ onClick }: { onClick: () => void }) {
       style={{
         position: "absolute",
         top: "max(52px, calc(env(safe-area-inset-top) + 8px))",
-        left: 12,
+        insetInlineStart: 12,
         zIndex: 3,
         width: 44,
         height: 44,
@@ -182,7 +182,7 @@ function BackToPickerButton({ onClick }: { onClick: () => void }) {
         cursor: "pointer",
       }}
     >
-      <Icon name="chevron-left" size={20} color="var(--accent)" strokeWidth={2} />
+      <Icon name="chevron-left" size={20} color="var(--accent)" strokeWidth={2} flip />
     </button>
   );
 }
@@ -257,7 +257,7 @@ function PasswordInput({
         type="button"
         onClick={() => setRevealed((r) => !r)}
         aria-label={revealed ? t("password.input.hide") : t("password.input.show")}
-        style={{ border: "none", background: "transparent", padding: 0, marginLeft: 8, cursor: "pointer", display: "flex" }}
+        style={{ border: "none", background: "transparent", padding: 0, marginInlineStart: 8, cursor: "pointer", display: "flex" }}
       >
         <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
       </button>
