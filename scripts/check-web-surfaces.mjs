@@ -139,6 +139,7 @@ const V = {
   "src/components/settings/SyncPanel.tsx": ["ported", "Sync is required on web, so this panel is more load-bearing here than on desktop."],
   "src/components/settings/ToolbarCustomizeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/TypographySettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/ViewsSettings.tsx": ["ported", "Device-local Views feature toggle (localStorage, like the language picker); runs as written."],
   "src/components/settings/VimModeSettings.tsx": [
     "ported",
     "Prefs-backed. Mounted only while `developer_mode` is on since #181 — the same condition on both clients, so still `ported` rather than `adapted`: nothing about the component differs here, only whether EditorPanel renders it.",
@@ -158,6 +159,7 @@ const V = {
   "src/components/settings/search/foldAccents.ts": ["ported", "Pure Unicode folding."],
 
   // ── src/lib ─────────────────────────────────────────────────────────────
+  "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
   "src/lib/ai-chat.ts": ["adapted", "Unreachable where `localAi` is absent; the editor host omits the `ai` member entirely."],
   "src/lib/ai-model-store.ts": ["adapted", "Same as ai-chat: no AI surface mounts on web."],
@@ -295,6 +297,7 @@ const V = {
   "src/lib/vault-delete.ts": ["adapted", "Task 72 owns what deletion MEANS on a sync-required client; the binding itself is portable."],
   "src/lib/vault-export-errors.ts": ["ported", "Error copy shared with the note-level export that does ship."],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
+  "src/lib/viewsEnabled.ts": ["ported", "Device-local Views feature toggle helper (localStorage); runs as written."],
   "src/lib/vault-recover.ts": [
     "excluded",
     "The phrase-recovery binding; module-gated out of the wasm build too (task 12).",
