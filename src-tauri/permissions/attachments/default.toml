@@ -25,6 +25,7 @@ permissions = [
   "allow-attachment-export",
   "allow-attachment-read-text",
   "allow-attachment-read-structured",
+  "allow-attachment-read-extracted-text",
   "allow-attachment-refs-apply",
   "allow-attachment-refs-remove",
   "allow-attachment-refs-referencing",
@@ -84,6 +85,11 @@ commands.allow = ["attachment_read_text"]
 identifier = "allow-attachment-read-structured"
 description = "Allow invoking attachments:attachment_read_structured (Slot::Unlocked-gated decrypt + Rust-side parse of one docx/xlsx attachment into a SAFE structured model — a row-major grid or heading/paragraph block list; only the parsed model crosses IPC, never raw bytes or HTML, so the WebView has no XSS surface; MYND-268 Tier-2)."
 commands.allow = ["attachment_read_structured"]
+
+[[permission]]
+identifier = "allow-attachment-read-extracted-text"
+description = "Allow invoking attachments:attachment_read_extracted_text (Slot::Unlocked-gated read-back of one attachment's cached MYE1 extracted text — today the on-device voice-note transcript, protocol.md § 9.15; decrypts the device-local cache blob in Rust and crosses IPC as plaintext (same secret class as a note body) for the read-only 'View transcription' surface, returning null when no Ok extracted-text blob exists. No engine and no ai_enabled gate, so it stays available in the auditable --no-default-features build; MYND-552)."
+commands.allow = ["attachment_read_extracted_text"]
 
 [[permission]]
 identifier = "allow-attachment-refs-apply"

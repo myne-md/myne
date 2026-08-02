@@ -277,6 +277,39 @@ export async function attachmentReadText(id: string): Promise<AttachmentTextPrev
   });
 }
 
+/** Success payload of {@link attachmentReadExtractedText} — mirror of the Rust
+ *  `AttachmentExtractedText`. The decrypted MYE1 extracted-text cache entry. */
+export interface AttachmentExtractedText {
+  /** The decrypted extracted / transcribed text (Ok status, non-empty). */
+  text: string;
+  /** Producing extractor's source format, lowercased (matches `kindOf`):
+   *  "audio" | "pdf" | "docx" | "text" | "image" | "other". */
+  source_format: string;
+  /** True when the cached extraction hit the 1 MiB cap and `text` is the head. */
+  truncated: boolean;
+}
+
+/**
+ * Read one attachment's cached MYE1 extracted text (Slot::Unlocked-gated;
+ * `protocol.md` § 9.15) — today the on-device voice-note transcript the
+ * "Transcribe" action wrote to the device-local cache. Returns `null` when no
+ * Ok extracted-text blob exists for `id` (never transcribed / silence / decode
+ * miss) — that null is the "has no transcript" signal. The text decrypts in Rust
+ * RAM and crosses IPC as plaintext (note-body class) — render it read-only, never
+ * as interpreted content. Rejects with {@link AttachmentReadTextError}.
+ *
+ * Desktop-only: MYE1 is device-local and never synced, so the web client answers
+ * a typed `unsupported` (capability `attachmentTextSearch`).
+ */
+export async function attachmentReadExtractedText(
+  id: string,
+): Promise<AttachmentExtractedText | null> {
+  return await invoke<AttachmentExtractedText | null>(
+    "plugin:attachments|attachment_read_extracted_text",
+    { id },
+  );
+}
+
 /** A Tier-2 attachment parsed into a safe structured model — mirror of the Rust
  *  `StructuredContent`. A row-major grid (xlsx) or a heading/paragraph block
  *  list (docx). Only the model crosses IPC (never raw bytes / HTML). */

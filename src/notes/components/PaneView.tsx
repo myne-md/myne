@@ -896,13 +896,18 @@ export function PaneView({
   const status = autosave.status;
   useEffect(() => {
     if (!focused) return;
+    // A drawing note is an Excalidraw scene stored as fenced JSON — a word/char
+    // count over that body counts the JSON, a meaningless, confusing metric. Emit
+    // null so the bottom-bar readout hides for drawings (it renders nothing when
+    // stats are null).
+    const suppressStats = activeId === null || isDrawing;
     onReadout({
       status,
-      stats: activeId === null ? null : stats,
-      selectionStats: activeId === null ? null : selectionStats,
+      stats: suppressStats ? null : stats,
+      selectionStats: suppressStats ? null : selectionStats,
       retry,
     });
-  }, [focused, status, stats, selectionStats, activeId, retry, onReadout]);
+  }, [focused, status, stats, selectionStats, activeId, isDrawing, retry, onReadout]);
 
   const handleBlur = useCallback(() => {
     void autosave.flushIfDirty().catch(() => {});

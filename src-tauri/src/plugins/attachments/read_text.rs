@@ -12,11 +12,13 @@
 //! `src-tauri/CLAUDE.md` "Plaintext IPC across the WebView boundary".
 
 use crate::plugins::attachments::extract::{extract_docx_blocks, extract_xlsx_grid, DocxBlockKind};
+use crate::plugins::attachments::extract_types::{ExtractStatus, SourceFormat};
 use crate::plugins::attachments::scheme_core::{
     decode_attachment_plaintext, read_attachment_text, DecodeError, ReadTextOutcome, ServeKeys,
 };
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use serde::Serialize;
+use std::path::Path;
 use tauri::{Runtime, State};
 
 /// The decrypted preview text (with a truncation flag when the attachment
@@ -159,4 +161,111 @@ pub async fn attachment_read_structured<R: Runtime>(
         tracing::error!(stage = "spawn_blocking_join", error_kind = "JoinFailure");
         AttachmentReadTextError::Io
     })?
+}
+
+/// The decrypted `MYE1` extracted-text cache entry for an attachment
+/// (`protocol.md` § 9.15). Today the only producer whose output this reads back
+/// is the on-device voice-note transcription path (`SourceFormat::Audio`, written
+/// by the `local-inference` transcribe command), but the shape is format-agnostic
+/// so a future "view extracted text" affordance for PDFs/images reuses it. `text`
+/// is plaintext — same secret class as a note body, DENY-listed (never logged).
+#[derive(Serialize)]
+pub struct AttachmentExtractedText {
+    /// The cached extracted / transcribed text (only present for an `Ok`,
+    /// non-empty extraction).
+    pub text: String,
+    /// The producing extractor's source format, lowercased — `"audio"` | `"pdf"`
+    /// | `"docx"` | `"text"` | `"image"` | `"other"`. Lets the caller confirm an
+    /// audio transcript before rendering it as one.
+    pub source_format: String,
+    /// True when the extraction hit the 1 MiB cache cap and `text` holds the head.
+    pub truncated: bool,
+}
+
+/// Lowercased tag for a [`SourceFormat`], matching the frontend `kindOf` vocabulary.
+fn source_format_label(format: SourceFormat) -> &'static str {
+    match format {
+        SourceFormat::Pdf => "pdf",
+        SourceFormat::Docx => "docx",
+        SourceFormat::Text => "text",
+        SourceFormat::Other => "other",
+        SourceFormat::Audio => "audio",
+        SourceFormat::Image => "image",
+    }
+}
+
+/// Read `vault.meta`'s 16-byte `account_number_hash` — the AAD binding identity of
+/// the `MYE1` cache blob (§ 9.15.3). `None` on IO / parse failure. The bytes are a
+/// vault-stable correlation tag: used, never logged (DENY-list).
+fn read_account_number_hash(
+    vault_dir: &Path,
+) -> Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]> {
+    let bytes = std::fs::read(vault_dir.join("vault.meta")).ok()?;
+    protocol::parse_vault_meta(&bytes)
+        .map(|m| m.account_number_hash)
+        .ok()
+}
+
+/// Decrypt + decode an attachment's `MYE1` extracted-text cache, returning the
+/// `Ok`, non-empty text (else `None` on any miss — bad id, absent meta, an absent
+/// / undecryptable / stale / empty blob). Sync (runs inside `spawn_blocking`); the
+/// text is plaintext — never logged.
+fn read_cached_extracted_text(
+    vault_dir: &Path,
+    root_key: &[u8; 32],
+    id_hex: &str,
+) -> Option<AttachmentExtractedText> {
+    let attachment_id = super::commands::hex_decode_id(id_hex)?;
+    let account_number_hash = read_account_number_hash(vault_dir)?;
+    let attachment_text_key =
+        protocol::derive_subkey(root_key, protocol::SubkeyRole::AttachmentTextKey);
+    let extracted = super::text_cache::read_extracted(
+        vault_dir,
+        &attachment_text_key,
+        &account_number_hash,
+        &attachment_id,
+    )?;
+    if extracted.status != ExtractStatus::Ok || extracted.text.is_empty() {
+        return None;
+    }
+    Some(AttachmentExtractedText {
+        text: extracted.text,
+        source_format: source_format_label(extracted.source_format).to_string(),
+        truncated: extracted.truncated,
+    })
+}
+
+/// Read one attachment's cached `MYE1` extracted text (`protocol.md` § 9.15) — the
+/// read-back side of the transcription / OCR / text-extraction cache the desktop
+/// writes. `Slot::Unlocked`-gated; returns `Ok(None)` when no `Ok` extracted-text
+/// blob exists for `id` (never transcribed / silence / decode miss), which is the
+/// "has no transcript" signal the UI reads. Decrypts in Rust RAM and crosses IPC
+/// as plaintext (note-body class, DENY-listed) — the caller renders it INERT in a
+/// read-only surface, never as interpreted content. Mirrors the `Slot::Unlocked`
+/// gate + closed error surface of [`attachment_read_text`].
+///
+/// Deliberately in the `attachments` plugin, NOT `local_inference`: reading an
+/// already-produced transcript needs no engine and no `ai_enabled` gate, so it
+/// stays available in the auditable `--no-default-features` build (which drops the
+/// whole inference stack) exactly as in the default one.
+#[tauri::command]
+pub async fn attachment_read_extracted_text<R: Runtime>(
+    id: String,
+    app: tauri::AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Option<AttachmentExtractedText>, AttachmentReadTextError> {
+    let root_key = match state.peek_unlocked_root_key_clone().await {
+        Some(root_key) => root_key,
+        None => return Err(AttachmentReadTextError::Locked),
+    };
+    let vault_dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| AttachmentReadTextError::Io)?;
+    // Blob read + AEAD decrypt → CPU/IO-bound → spawn_blocking. `root_key`
+    // (Zeroizing) moves into the closure and wipes on exit.
+    tokio::task::spawn_blocking(move || read_cached_extracted_text(&vault_dir, &root_key, &id))
+        .await
+        .map_err(|_join| {
+            tracing::error!(stage = "spawn_blocking_join", error_kind = "JoinFailure");
+            AttachmentReadTextError::Io
+        })
 }

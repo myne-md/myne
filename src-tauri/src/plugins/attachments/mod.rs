@@ -118,6 +118,14 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // bytes/HTML, so no widened DOMPurify / new XSS surface. Needs its
             // own capabilities/default.json entry — verify via `pnpm tauri dev`.
             read_text::attachment_read_structured,
+            // Voice-to-text (MYND-552): read one attachment's cached MYE1
+            // extracted text — today the on-device voice-note transcript — so the
+            // library's "View transcription" action can show it. Slot::Unlocked-
+            // gated; returns Ok(None) when no transcript exists. NO ai_enabled
+            // gate and no engine, so it stays available in the auditable
+            // (--no-default-features) build. Needs its own
+            // permissions/attachments/default.toml entry.
+            read_text::attachment_read_extracted_text,
             // MYND-171: the unused-attachment query behind the "Clean
             // unused attachments" review dialog — catalog entries with zero
             // live note references, computed authoritatively (decrypts every
