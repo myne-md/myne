@@ -1,68 +1,133 @@
-// `<ViewsSection>` — the sidebar "Views" block (Saved Views #4, MYND-274,
-// tasks 3 + 6). A collapsible section peer to Favorites / Notes / Trash that
-// lists the vault's saved views; clicking a row opens that view as a workspace
-// tab (`ws.openView`). Right-click a row → rename / delete / move up / move
-// down (task 6). Sits between the Notes tree and the Attachments/Trash footer.
+// `<ViewsSection>` — the sidebar "Views" entry (Saved Views #4, MYND-274).
 //
-// Design canon: Penpot frame `screen------views--sidebar-section (MYND-274)`
-// (approved). Empty-state = a quiet discoverable hint (not an absent section).
+// A compact nav ROW styled like the Attachments / Trash / Archive footer
+// entries (icon + "Views"), with two hover-revealed controls at its right edge:
+// a create (+) button and a right-caret. Clicking the row (or the caret) opens a
+// FLYOUT to the right — a scrollable, searchable panel listing every saved view
+// — instead of cramming the whole list into the left sidebar. A view opens as a
+// workspace tab on click (`ws.openView`); right-click a row for rename / delete /
+// move / settings; inline-rename lives in the flyout too.
+//
+// Design canon: Penpot frame `screen------views--sidebar-section (MYND-274)`.
 // Leading glyph `layout-grid` (saved views render as table/cards/grid).
-//
-// Scope: rows open-on-click (task 3) + context-menu rename/delete + move-up/down
-// reorder (task 6). The view's filter/sort/group editing (builder widgets) is a
-// later follow-on; the leading "+ New view" creates a blank view (task 3/5).
 
 import {
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
-import { IconButton } from "../../components/primitives/IconButton";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
-import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import type { SavedView } from "../../lib/prefs";
 import {
   consumeRevealViews,
   useRevealViewsNonce,
 } from "../views/revealViewsSignal";
 
-const HEADER_ROW_STYLE: CSSProperties = {
+// Nav row — mirrors NoteList's FOOTER_ENTRY_STYLE so Views reads as a peer of
+// Attachments / Trash / Archive. Keep the two in step.
+const NAV_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  justifyContent: "space-between",
-  padding: "10px 14px 4px",
+  gap: "var(--space-2)",
+  width: "100%",
+  padding: "var(--space-3) var(--space-4)",
+  border: "none",
+  borderTop: "1px solid var(--line-1)",
+  background: "transparent",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  cursor: "pointer",
+  textAlign: "left",
+  boxSizing: "border-box",
+  transition: HOVER_TRANSITION,
+};
+
+const NAV_LABEL_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+// The two hover-revealed controls at the row's right edge (create + caret).
+const ROW_ACTIONS_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 2,
   flexShrink: 0,
+  transition: "opacity var(--duration-fast) var(--ease-standard)",
 };
 
-const HEADER_LEAD_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-};
-
-const CHEVRON_BUTTON_STYLE: CSSProperties = {
+const ICON_BTN_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 18,
-  height: 18,
+  width: 22,
+  height: 22,
   padding: 0,
+  flexShrink: 0,
   background: "transparent",
   border: 0,
+  borderRadius: "var(--radius-1)",
   color: "var(--fg-3)",
   cursor: "pointer",
+  transition: HOVER_TRANSITION,
 };
 
-// MYND-622: these metrics are the sidebar tree's, not this section's own.
-// Views sat in the same rail as the folder/note rows while being 2px taller,
-// sharper-cornered, inset 2px further, and gapless — small differences that
-// added up to the section reading as if it belonged to a different app. Height,
-// radius, side inset and the 3px inter-row gap are now the same values
-// `FolderRow.rowBaseStyle` / `NoteRow.rowBaseStyle` use; keep them in step.
+// Flyout — a body-level portal opening to the RIGHT of the row.
+const FLYOUT_STYLE: CSSProperties = {
+  position: "fixed",
+  width: 280,
+  maxHeight: "min(360px, calc(100vh - 16px))",
+  display: "flex",
+  flexDirection: "column",
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  boxShadow: "var(--shadow-2)",
+  zIndex: 60,
+  overflow: "hidden",
+};
+
+const SEARCH_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  padding: "var(--space-2) var(--space-3)",
+  borderBottom: "1px solid var(--line-1)",
+  color: "var(--fg-3)",
+  flexShrink: 0,
+};
+
+const SEARCH_INPUT_STYLE: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  border: 0,
+  outline: "none",
+  background: "transparent",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  color: "var(--fg-1)",
+};
+
+const LIST_STYLE: CSSProperties = {
+  overflowY: "auto",
+  padding: "var(--space-1) var(--space-1)",
+};
+
 const ROW_BASE_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -70,13 +135,11 @@ const ROW_BASE_STYLE: CSSProperties = {
   width: "100%",
   height: 30,
   padding: "0 8px",
-  margin: "0 4px",
-  marginBottom: 3,
   boxSizing: "border-box",
   borderRadius: 6,
   background: "transparent",
   border: 0,
-  color: "var(--fg-2)",
+  color: "var(--fg-1)",
   cursor: "pointer",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
@@ -97,15 +160,18 @@ const RENAME_INPUT_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   padding: "2px 4px",
-  background: "var(--bg-1)",
+  background: "var(--bg-2)",
   color: "var(--fg-1)",
-  border: "1px solid var(--accent)",
+  // Clean inline edit: soft accent halo instead of a hard border + the global
+  // focus ring (the inline boxShadow overrides `--ring`).
+  border: "1px solid transparent",
   borderRadius: 3,
   outline: "none",
+  boxShadow: "0 0 0 2px var(--accent-soft)",
 };
 
 const EMPTY_HINT_STYLE: CSSProperties = {
-  padding: "2px 16px 8px",
+  padding: "10px 12px",
   fontFamily: "var(--font-sans)",
   fontSize: 12,
   lineHeight: 1.5,
@@ -115,11 +181,12 @@ const EMPTY_HINT_STYLE: CSSProperties = {
 const viewLabel = (view: SavedView, untitled: string): string =>
   view.name.trim() === "" ? untitled : view.name;
 
-/** One saved-view row — opens on click, right-click for the action menu, or an
- *  inline rename input when this row is being renamed. */
+/** One saved-view row inside the flyout — opens on click, right-click for the
+ *  action menu, or an inline rename input when this row is being renamed. */
 function ViewRow({
   view,
   renaming,
+  active,
   onOpen,
   onContextMenu,
   onCommitRename,
@@ -127,13 +194,14 @@ function ViewRow({
 }: {
   view: SavedView;
   renaming: boolean;
+  /** This view is the one currently open in the focused pane. */
+  active: boolean;
   onOpen: (id: string) => void;
   onContextMenu: (e: ReactMouseEvent, id: string) => void;
   onCommitRename: (id: string, name: string) => void;
   onCancelRename: () => void;
 }) {
   const { t } = useTranslation();
-  const [hovering, setHovering] = useState(false);
   const label = viewLabel(view, t("notes.views.untitledView"));
 
   if (renaming) {
@@ -165,18 +233,15 @@ function ViewRow({
   return (
     <button
       type="button"
-      role="tab"
+      role="menuitem"
       data-testid="views.row"
       data-view-id={view.id}
+      data-active={active ? "true" : undefined}
       title={label}
       onClick={() => onOpen(view.id)}
       onContextMenu={(e) => onContextMenu(e, view.id)}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-      style={{
-        ...ROW_BASE_STYLE,
-        background: hovering ? "var(--paper-3)" : "transparent",
-      }}
+      {...hoverSurface()}
+      style={ROW_BASE_STYLE}
     >
       <span
         aria-hidden="true"
@@ -185,18 +250,27 @@ function ViewRow({
         <Icon name="layout-grid" size={14} />
       </span>
       <span style={ROW_LABEL_STYLE}>{label}</span>
+      {active && (
+        <span
+          aria-hidden="true"
+          style={{ display: "flex", flexShrink: 0, color: "var(--accent)" }}
+        >
+          <Icon name="check" size={14} />
+        </span>
+      )}
     </button>
   );
 }
 
 /**
- * The sidebar "Views" section. `views` is already in display order (the caller
+ * The sidebar "Views" entry. `views` is already in display order (the caller
  * applies `view_order`). `onOpenView` opens a view tab; `onNewView` creates a
  * blank view; `onRename`/`onDelete`/`onMoveView` are the task-6 management
- * dispatches (the caller persists via #3's API + refreshes). Collapse is local.
+ * dispatches (the caller persists via #3's API + refreshes).
  */
 export function ViewsSection({
   views,
+  activeViewId = null,
   onOpenView,
   onNewView,
   onEditFilter,
@@ -206,6 +280,10 @@ export function ViewsSection({
   onMoveView,
 }: {
   views: readonly SavedView[];
+  /** The view currently open in the focused pane — flagged with a checkmark in
+   *  the flyout list so it is clear which one is showing. `null` = a note (or
+   *  nothing) is focused. */
+  activeViewId?: string | null;
   onOpenView: (id: string) => void;
   onNewView: () => void;
   onEditFilter: (id: string) => void;
@@ -217,34 +295,113 @@ export function ViewsSection({
   onMoveView: (id: string, dir: -1 | 1) => void;
 }) {
   const { t } = useTranslation();
-  const [collapsed, setCollapsed] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [query, setQuery] = useState("");
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(
     null,
   );
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [highlight, setHighlight] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const flyoutRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [pos, setPos] = useState<{ left: number; bottom: number }>({
+    left: 0,
+    bottom: 0,
+  });
+  // Light open animation: mount hidden, flip on the next frame so the fade+rise
+  // transition plays (reduced-motion zeroes it globally).
+  const [visible, setVisible] = useState(false);
+
+  const openFlyout = () => {
+    setQuery("");
+    setOpen(true);
+  };
+
+  // Anchor the flyout just to the RIGHT of the row and BOTTOM-aligned to it, so
+  // it hangs off the Views row (which sits low in the sidebar) and grows upward
+  // — reading as a popover attached to the row, not floating loose.
+  useLayoutEffect(() => {
+    if (!open) {
+      setVisible(false);
+      return;
+    }
+    const el = rowRef.current;
+    if (el === null) return;
+    const r = el.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.right + 6, window.innerWidth - 280 - 8));
+    const bottom = Math.max(8, window.innerHeight - r.bottom);
+    setPos({ left, bottom });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(raf);
+  }, [open]);
+
+  // Focus the search box once the flyout is up so typing filters immediately.
+  useEffect(() => {
+    if (open) searchRef.current?.focus();
+  }, [open]);
+
+  // Outside-click / Esc close. While a row's context menu is open, ignore
+  // outside clicks (the menu is its own portal and owns its dismissal), so
+  // right-clicking a row doesn't collapse the flyout underneath it.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: globalThis.MouseEvent) => {
+      if (menu !== null) return;
+      const target = e.target as Node;
+      if (flyoutRef.current?.contains(target)) return;
+      if (rowRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const id = window.setTimeout(
+      () => document.addEventListener("mousedown", onDown),
+      0,
+    );
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, menu]);
 
   // Reveal-on-request (SYNC-7): the BottomBar `editor.views-cta` + `views.show`
-  // palette action fire `requestRevealViews()`. Whether this section was already
-  // mounted (nonce bump) or just got mounted because the click first expanded a
-  // collapsed sidebar (pending flag consumed on mount), make the click land
-  // somewhere visible — expand the section, scroll it into view, and flash a
-  // brief highlight. `consumeRevealViews()` guards against an ordinary mount /
-  // sidebar open, which leaves nothing pending and so stays inert.
+  // palette action fire `requestRevealViews()`. Open the flyout, bring the row
+  // into view, and flash it so the click always lands somewhere visible.
   const nonce = useRevealViewsNonce();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [highlight, setHighlight] = useState(false);
   useEffect(() => {
     if (!consumeRevealViews()) return;
-    setCollapsed(false);
-    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    rowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    openFlyout();
     setHighlight(true);
     const timer = setTimeout(() => setHighlight(false), 1100);
     return () => clearTimeout(timer);
   }, [nonce]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q === "") return views;
+    return views.filter((v) =>
+      viewLabel(v, t("notes.views.untitledView")).toLowerCase().includes(q),
+    );
+  }, [views, query, t]);
+
   const openMenu = (e: ReactMouseEvent, id: string) => {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, id });
+  };
+
+  const openView = (id: string) => {
+    setOpen(false);
+    onOpenView(id);
   };
 
   // "View settings…" applies to every view type now — it hosts the view_type
@@ -300,66 +457,147 @@ export function ViewsSection({
     }
   };
 
+  const actionsVisible = hovering || open;
+
   return (
-    <div
-      ref={rootRef}
-      style={{
-        flexShrink: 0,
-        borderRadius: "var(--radius-1)",
-        // Quiet flash so the reveal click always reads as "something happened",
-        // even when the section was already on-screen. Fades out via transition.
-        background: highlight ? "var(--paper-3)" : "transparent",
-        boxShadow: highlight ? "inset 0 0 0 1px var(--accent)" : "none",
-        transition: "background 220ms ease, box-shadow 220ms ease",
-      }}
-      data-testid="views.section"
-      data-revealed={highlight ? "true" : undefined}
-    >
-      <div style={HEADER_ROW_STYLE}>
-        <div style={HEADER_LEAD_STYLE}>
+    <>
+      <div
+        ref={rowRef}
+        role="button"
+        tabIndex={0}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("notes.views.heading")}
+        data-testid="views.section"
+        data-revealed={highlight ? "true" : undefined}
+        onClick={() => (open ? setOpen(false) : openFlyout())}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openFlyout();
+          }
+        }}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+        style={{
+          ...NAV_ROW_STYLE,
+          background:
+            open || highlight
+              ? "var(--paper-3)"
+              : hovering
+                ? "var(--bg-3)"
+                : "transparent",
+          boxShadow: highlight ? "inset 0 0 0 1px var(--accent)" : undefined,
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{ display: "flex", flexShrink: 0, color: "var(--fg-3)" }}
+        >
+          <Icon name="layout-grid" size={15} />
+        </span>
+        <span style={NAV_LABEL_STYLE}>{t("notes.views.heading")}</span>
+        <span
+          style={{
+            ...ROW_ACTIONS_STYLE,
+            opacity: actionsVisible ? 1 : 0,
+            pointerEvents: actionsVisible ? "auto" : "none",
+          }}
+        >
           <button
             type="button"
-            aria-label={
-              collapsed
-                ? t("notes.views.expandViews")
-                : t("notes.views.collapseViews")
-            }
-            aria-expanded={!collapsed}
-            data-testid="views.collapse-toggle"
-            onClick={() => setCollapsed((v) => !v)}
-            style={CHEVRON_BUTTON_STYLE}
+            data-testid="views.new-button"
+            aria-label={t("notes.views.newView")}
+            title={t("notes.views.newView")}
+            onClick={(e) => {
+              e.stopPropagation();
+              // Creating opens the full filter-builder modal; close the flyout so
+              // it isn't left hanging behind (and its outside-click dismissal
+              // doesn't fight the modal).
+              setOpen(false);
+              onNewView();
+            }}
+            {...hoverSurface()}
+            style={ICON_BTN_STYLE}
           >
-            <Icon name={collapsed ? "chevron-right" : "chevron-down"} size={14} />
+            <Icon name="file-plus" size={14} />
           </button>
-          <div style={SECTION_HEADING_STYLE}>{t("notes.views.heading")}</div>
-        </div>
-        <IconButton
-          icon="file-plus"
-          label={t("notes.views.newView")}
-          testId="views.new-button"
-          onClick={onNewView}
-        />
+          <button
+            type="button"
+            data-testid="views.flyout-toggle"
+            aria-label={t("notes.views.expandViews")}
+            title={t("notes.views.expandViews")}
+            onClick={(e) => {
+              e.stopPropagation();
+              open ? setOpen(false) : openFlyout();
+            }}
+            {...hoverSurface()}
+            style={ICON_BTN_STYLE}
+          >
+            <Icon name="chevron-right" size={14} />
+          </button>
+        </span>
       </div>
-      {!collapsed &&
-        (views.length === 0 ? (
-          <div style={EMPTY_HINT_STYLE} data-testid="views.empty">
-            {t("notes.views.empty")}
-          </div>
-        ) : (
-          <div>
-            {views.map((view) => (
-              <ViewRow
-                key={view.id}
-                view={view}
-                renaming={renamingId === view.id}
-                onOpen={onOpenView}
-                onContextMenu={openMenu}
-                onCommitRename={commitRename}
-                onCancelRename={() => setRenamingId(null)}
+
+      {open &&
+        createPortal(
+          <div
+            ref={flyoutRef}
+            role="menu"
+            data-testid="views.flyout"
+            style={{
+              ...FLYOUT_STYLE,
+              left: pos.left,
+              bottom: pos.bottom,
+              transformOrigin: "bottom left",
+              opacity: visible ? 1 : 0,
+              transform: visible ? "translateY(0)" : "translateY(6px)",
+              transition:
+                "opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out)",
+            }}
+          >
+            <div style={SEARCH_ROW_STYLE}>
+              <Icon name="search" size={14} />
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                placeholder={t("notes.views.searchPlaceholder")}
+                aria-label={t("notes.views.searchPlaceholder")}
+                data-testid="views.search"
+                style={SEARCH_INPUT_STYLE}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setOpen(false);
+                }}
               />
-            ))}
-          </div>
-        ))}
+            </div>
+            <div style={LIST_STYLE}>
+              {filtered.length === 0 ? (
+                <div style={EMPTY_HINT_STYLE} data-testid="views.empty">
+                  {query.trim() === ""
+                    ? t("notes.views.empty")
+                    : t("notes.views.noMatch")}
+                </div>
+              ) : (
+                filtered.map((view) => (
+                  <ViewRow
+                    key={view.id}
+                    view={view}
+                    renaming={renamingId === view.id}
+                    active={view.id === activeViewId}
+                    onOpen={openView}
+                    onContextMenu={openMenu}
+                    onCommitRename={commitRename}
+                    onCancelRename={() => setRenamingId(null)}
+                  />
+                ))
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
       {menu !== null && (
         <ContextMenu
           x={menu.x}
@@ -368,6 +606,6 @@ export function ViewsSection({
           onClose={() => setMenu(null)}
         />
       )}
-    </div>
+    </>
   );
 }
