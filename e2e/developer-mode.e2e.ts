@@ -68,10 +68,21 @@ async function typeSearch(session: Session, text: string): Promise<void> {
   await (await session.byTestId("settings.search-input")).replaceText(text);
 }
 
-/** Queries that only match the #181-gated entries' keyword strings, chosen the
- *  same way {@link AI_ONLY_QUERY} was — distinctive multi-word phrases, so a
- *  hit cannot come from an unrelated non-gated entry. */
-const CLI_ONLY_QUERY = "command line shell";
+/** Queries that only match the #181-gated entries, chosen the same way
+ *  {@link AI_ONLY_QUERY} was — a hit cannot come from an unrelated non-gated
+ *  entry.
+ *
+ *  The CLI query has to satisfy TWO properties at once, and the obvious
+ *  distinctive-phrase pick satisfies only one: it must match NOTHING outside the
+ *  gate (so the mode-OFF `not.toContain` assertions mean something) AND match
+ *  ALL THREE gated CLI rows (so the mode-ON `toContain` assertions can pass).
+ *  `"command line shell"` was CLI-only but appears verbatim in just
+ *  `settings.search.keywords.cliAccess` — the excluded-folders and rate-limit
+ *  rows never carried the word "shell", so the ON half of this scenario asserted
+ *  something the index could not produce. `"terminal"` is the token those three
+ *  keyword strings actually share, and it appears in no other entry's title,
+ *  description or keywords. */
+const CLI_ONLY_QUERY = "terminal";
 const VIM_ONLY_QUERY = "modal editing";
 
 /** Type `query` into the Settings search box and return the `data-setting-id`

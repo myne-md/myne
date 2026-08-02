@@ -205,12 +205,14 @@ export async function searchAndOpenNote(
   session: Session,
   query: string,
   noteId: string,
+  opts?: { timeoutMs?: number },
 ): Promise<void> {
   await openPalette(session);
   await (await session.byTestId("palette.input")).sendKeys(query);
   await (
     await session.waitForElement(
       testIdSelector("palette.option", { "data-kind": "note", "data-note-id": noteId }),
+      opts,
     )
   ).click();
 }

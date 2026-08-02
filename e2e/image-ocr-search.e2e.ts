@@ -153,12 +153,25 @@ describeE2E("io1 image OCR makes an embedded image searchable (MYND-441)", () =>
         await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
         await waitForSaved(s);
 
+        // These two searches carry an explicit budget because the work behind
+        // them is genuinely expensive, not because the assertion is flaky: the
+        // OCR extraction, its MYE1 cache write and the search re-index all have
+        // to land before the palette can answer. Measured uncontended, the first
+        // search alone accounts for most of this scenario's ~32 s — only ~30 %
+        // under the 45 s default, which a loaded CI runner eats (observed:
+        // 3/3 retries timing out at exactly 45 s while the same commit passed
+        // locally). A slow operation deserves a budget matched to its real cost;
+        // quarantining it would drop real OCR coverage off the merge gate.
+        const OCR_SEARCH_TIMEOUT_MS = 120_000;
+
         // 1. Base capability: a word only the pixels contain.
-        await searchAndOpenNote(s, IMAGE_WORD_EN, noteId);
+        await searchAndOpenNote(s, IMAGE_WORD_EN, noteId, { timeoutMs: OCR_SEARCH_TIMEOUT_MS });
 
         // 2. Turkish: the image reads `sirket`, the user types `şirket`. Only
         //    the index-side diacritic folding can bridge that.
-        await searchAndOpenNote(s, QUERY_TR_ACCENTED, noteId);
+        await searchAndOpenNote(s, QUERY_TR_ACCENTED, noteId, {
+          timeoutMs: OCR_SEARCH_TIMEOUT_MS,
+        });
       },
     );
   });
