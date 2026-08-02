@@ -8,8 +8,11 @@
 import type { CSSProperties } from "react";
 
 export const PANEL_STYLE: CSSProperties = {
-  width: 460,
-  maxHeight: "70vh",
+  // A touch larger than before (was 460 / 70vh) — the row list + polished empty
+  // state read cramped at the old size (#226 follow-up polish).
+  width: 560,
+  height: "min(78vh, 720px)",
+  maxHeight: "78vh",
   display: "flex",
   flexDirection: "column",
   background: "var(--paper)",
@@ -18,14 +21,63 @@ export const PANEL_STYLE: CSSProperties = {
   boxShadow: "var(--shadow-3)",
   fontFamily: "var(--font-sans)",
   overflow: "hidden",
+  // Opens with the same rise + fade as the Settings modal (reuses its keyframe)
+  // instead of popping in instantly (#226 follow-up). Reduced-motion is
+  // handled by the guard in tokens.css keyed on the panel testids.
+  animation: "settings-modal-in var(--duration-base) var(--ease-standard)",
 };
 
 export const HEADER_STYLE: CSSProperties = {
   display: "flex",
-  alignItems: "baseline",
+  alignItems: "center",
   justifyContent: "space-between",
-  padding: "var(--space-4) var(--space-5)",
+  gap: "var(--space-3)",
+  padding: "var(--space-3) var(--space-3) var(--space-3) var(--space-5)",
   borderBottom: "1px solid var(--line-1)",
+};
+
+/** Title + count group on the left of the header. */
+export const HEADER_LEFT_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: "var(--space-2)",
+  minWidth: 0,
+};
+
+/** Action cluster on the right of the header (Empty-trash + close ✕). */
+export const HEADER_RIGHT_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  flexShrink: 0,
+};
+
+/** Header close ✕ — replaces the old footer Close button (#226 follow-up:
+ *  the modal now closes from the header like Settings, and the bottom row is
+ *  gone). Ghost icon button; brightens on hover via `[data-panel-action="close"]`. */
+export const HEADER_CLOSE_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 30,
+  height: 30,
+  borderRadius: 7,
+  cursor: "pointer",
+  border: "1px solid transparent",
+  background: "transparent",
+  color: "var(--fg-3)",
+  flexShrink: 0,
+};
+
+/** Slim, conditional status line (an error / partial-failure message), shown
+ *  just under the header only when present — the footer that used to hold it is
+ *  gone. */
+export const STATUS_LINE_STYLE: CSSProperties = {
+  padding: "var(--space-2) var(--space-5)",
+  fontSize: 12,
+  color: "var(--warning)",
+  borderBottom: "1px solid var(--line-1)",
+  flexShrink: 0,
 };
 
 export const HEADER_TITLE_STYLE: CSSProperties = {
@@ -36,8 +88,35 @@ export const HEADER_TITLE_STYLE: CSSProperties = {
 };
 
 export const COUNT_STYLE: CSSProperties = {
-  fontSize: 12,
+  fontSize: 11,
+  fontWeight: 600,
   color: "var(--fg-3)",
+  background: "var(--paper-3)",
+  borderRadius: 999,
+  padding: "2px 8px",
+};
+
+// Per-row action: a ghost icon button (restore / delete). Subtle by default,
+// brightens on hover/focus (tokens.css `.note-panel-icon-btn`). Replaces the
+// always-loud text buttons ("Restore" / "Delete") the panels used to show.
+export const ROW_ACTIONS_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 2,
+  flexShrink: 0,
+};
+export const ROW_ICON_BTN_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 30,
+  height: 30,
+  borderRadius: 7,
+  cursor: "pointer",
+  border: "1px solid transparent",
+  background: "transparent",
+  color: "var(--fg-3)",
+  flexShrink: 0,
 };
 
 export const LIST_STYLE: CSSProperties = {
@@ -133,11 +212,36 @@ export const ROW_BTN_DANGER_STYLE: CSSProperties = {
   flexShrink: 0,
 };
 
+// A proper zero state (#226 follow-up): a large muted glyph, a headline,
+// and one explanatory line — instead of a single bare sentence. Shared by both
+// panels via `<PanelEmptyState>`.
 export const EMPTY_STATE_STYLE: CSSProperties = {
-  padding: "var(--space-7) var(--space-5)",
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "var(--space-3)",
+  padding: "var(--space-7) var(--space-6)",
   textAlign: "center",
+};
+export const EMPTY_ICON_STYLE: CSSProperties = {
+  color: "var(--fg-3)",
+  opacity: 0.55,
+  marginBottom: "var(--space-1)",
+};
+export const EMPTY_TITLE_STYLE: CSSProperties = {
+  fontSize: 15,
+  fontWeight: 600,
+  color: "var(--fg-2)",
+  margin: 0,
+};
+export const EMPTY_BODY_STYLE: CSSProperties = {
   fontSize: 13,
   color: "var(--fg-3)",
+  maxWidth: 340,
+  lineHeight: 1.5,
+  margin: 0,
 };
 
 export const FOOTER_STYLE: CSSProperties = {

@@ -36,29 +36,28 @@ import {
 } from "../archivedFolders";
 import { archivedRecords, useSelectedNote, type NoteId } from "../sidebarState";
 import { BACKDROP_STYLE } from "./DeleteConfirmModal";
+import { PanelEmptyState } from "./PanelEmptyState";
 import {
   AGE_STYLE,
   COUNT_STYLE,
-  EMPTY_STATE_STYLE,
-  FOOTER_STYLE,
+  HEADER_CLOSE_STYLE,
+  HEADER_LEFT_STYLE,
+  HEADER_RIGHT_STYLE,
   HEADER_STYLE,
   HEADER_TITLE_STYLE,
   LIST_STYLE,
   PANEL_STYLE,
+  ROW_ACTIONS_STYLE,
   ROW_BTN_DANGER_STYLE,
   ROW_BTN_STYLE,
   ROW_CONFIRM_STYLE,
   ROW_CONFIRM_TEXT_STYLE,
+  ROW_ICON_BTN_STYLE,
   ROW_STYLE,
   ROW_TITLE_STYLE,
-  STATUS_STYLE,
+  STATUS_LINE_STYLE,
 } from "./notePanelStyles";
 import { formatRelativeTime } from "./relativeTime";
-
-const CLOSE_BTN_STYLE: CSSProperties = {
-  ...ROW_BTN_STYLE,
-  marginLeft: "auto",
-};
 
 const FOLDER_TITLE_STYLE: CSSProperties = {
   ...ROW_TITLE_STYLE,
@@ -182,7 +181,14 @@ export function ArchivePanel({
   const count = folderRows.length + noteRows.length;
 
   return (
-    <div style={BACKDROP_STYLE} onClick={handleBackdrop} role="presentation">
+    <div
+      style={{
+        ...BACKDROP_STYLE,
+        animation: "settings-backdrop-in var(--duration-fast) var(--ease-standard)",
+      }}
+      onClick={handleBackdrop}
+      role="presentation"
+    >
       <div
         ref={dialogRef}
         style={PANEL_STYLE}
@@ -192,18 +198,37 @@ export function ArchivePanel({
         aria-labelledby="archive-panel-title"
       >
         <div style={HEADER_STYLE}>
-          <h2 id="archive-panel-title" style={HEADER_TITLE_STYLE}>
-            {t("notes.archive.title")}
-          </h2>
-          <span style={COUNT_STYLE}>
-            {count === 0
-              ? t("notes.archive.countEmpty")
-              : t("notes.archive.count", { count })}
-          </span>
+          <div style={HEADER_LEFT_STYLE}>
+            <h2 id="archive-panel-title" style={HEADER_TITLE_STYLE}>
+              {t("notes.archive.title")}
+            </h2>
+            {count > 0 && (
+              <span style={COUNT_STYLE}>{t("notes.archive.count", { count })}</span>
+            )}
+          </div>
+          <div style={HEADER_RIGHT_STYLE}>
+            <button
+              type="button"
+              style={HEADER_CLOSE_STYLE}
+              data-panel-action="close"
+              data-testid="archive.close"
+              title={t("notes.archive.close")}
+              aria-label={t("notes.archive.close")}
+              onClick={onClose}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
         </div>
+        {status !== null && <div style={STATUS_LINE_STYLE}>{status}</div>}
 
         {count === 0 ? (
-          <div style={EMPTY_STATE_STYLE}>{t("notes.archive.emptyState")}</div>
+          <PanelEmptyState
+            icon="archive"
+            title={t("notes.archive.emptyTitle")}
+            body={t("notes.archive.emptyBody")}
+            testId="archive.empty-state"
+          />
         ) : (
           <div style={LIST_STYLE}>
             {folderRows.map((path) => {
@@ -251,26 +276,32 @@ export function ArchivePanel({
                       </button>
                     </div>
                   ) : (
-                    <>
+                    <div style={ROW_ACTIONS_STYLE}>
                       <button
                         type="button"
-                        style={ROW_BTN_STYLE}
+                        style={ROW_ICON_BTN_STYLE}
+                        data-panel-action="restore"
                         data-testid="archive.folder-restore"
                         data-folder-path={path}
+                        title={t("notes.archive.restore")}
+                        aria-label={t("notes.archive.restore")}
                         onClick={() => onRestoreFolder(path)}
                       >
-                        {t("notes.archive.restore")}
+                        <Icon name="rotate-ccw" size={16} />
                       </button>
                       <button
                         type="button"
-                        style={ROW_BTN_STYLE}
+                        style={ROW_ICON_BTN_STYLE}
+                        data-panel-action="delete"
                         data-testid="archive.folder-delete"
                         data-folder-path={path}
+                        title={t("notes.archive.delete")}
+                        aria-label={t("notes.archive.delete")}
                         onClick={() => setConfirmFolder(path)}
                       >
-                        {t("notes.archive.delete")}
+                        <Icon name="trash-2" size={16} />
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
               );
@@ -290,40 +321,37 @@ export function ArchivePanel({
                     ? formatRelativeTime(new Date(r.archived))
                     : ""}
                 </span>
-                <button
-                  type="button"
-                  style={ROW_BTN_STYLE}
-                  data-testid="archive.restore"
-                  data-note-id={r.noteUuid}
-                  onClick={() => restore(r.noteUuid)}
-                >
-                  {t("notes.archive.restore")}
-                </button>
-                <button
-                  type="button"
-                  style={ROW_BTN_STYLE}
-                  data-testid="archive.delete"
-                  data-note-id={r.noteUuid}
-                  onClick={() => deleteToTrash(r.noteUuid)}
-                >
-                  {t("notes.archive.delete")}
-                </button>
+                <div style={ROW_ACTIONS_STYLE}>
+                  <button
+                    type="button"
+                    style={ROW_ICON_BTN_STYLE}
+                    data-panel-action="restore"
+                    data-testid="archive.restore"
+                    data-note-id={r.noteUuid}
+                    title={t("notes.archive.restore")}
+                    aria-label={t("notes.archive.restore")}
+                    onClick={() => restore(r.noteUuid)}
+                  >
+                    <Icon name="rotate-ccw" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    style={ROW_ICON_BTN_STYLE}
+                    data-panel-action="delete"
+                    data-testid="archive.delete"
+                    data-note-id={r.noteUuid}
+                    title={t("notes.archive.delete")}
+                    aria-label={t("notes.archive.delete")}
+                    onClick={() => deleteToTrash(r.noteUuid)}
+                  >
+                    <Icon name="trash-2" size={16} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        <div style={FOOTER_STYLE}>
-          {status !== null && <span style={STATUS_STYLE}>{status}</span>}
-          <button
-            type="button"
-            style={CLOSE_BTN_STYLE}
-            data-testid="archive.close"
-            onClick={onClose}
-          >
-            {t("notes.archive.close")}
-          </button>
-        </div>
       </div>
     </div>
   );
