@@ -12,17 +12,20 @@
 // VERIFICATION STATUS: authored to the harness conventions but NOT yet run on
 // this dev platform (macOS; the suite is Linux/tauri-driver only — `pnpm
 // test:e2e` self-skips off-platform). UPDATED for the Views flyout redesign
-// (nav row + searchable right-flyout, replacing the inline expandable section);
-// the flyout-open steps here are unverified against real WebKit. Definition of
-// done per e2e/CLAUDE.md is "green 3× in the container" (./scripts/e2e-local.sh)
-// and MUST be met before merge. The ".base import" leg is omitted (its action is
+// (nav row + searchable right-flyout, replacing the inline expandable section)
+// AND for the device-local Views feature toggle (#230): a fresh vault has 0
+// views, so the entry is HIDDEN by default and sv1 must enable it via Settings →
+// Editor before the flyout steps. sv2 pins that toggle's visibility contract on
+// its own. These steps are unverified against real WebKit. Definition of done
+// per e2e/CLAUDE.md is "green 3× in the container" (./scripts/e2e-local.sh) and
+// MUST be met before merge. The ".base import" leg is omitted (its action is
 // disabled until the importer lands, MYND-276). Run ISOLATED per the
 // full-suite-contamination note (e2e-full-suite-contamination memory).
 
-import { it } from "vitest";
+import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import { dismissImporterOffer, setViewsEnabled, unlockToEditor } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 /** Explicit WebDriver Enter key (U+E007) — named so it is VISIBLE in source
@@ -61,6 +64,11 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+
+        // A fresh vault has 0 views, so the feature toggle's back-compat default
+        // (#230) leaves the Views entry HIDDEN. Turn it on via Settings → Editor
+        // so the nav row exists to drive the rest of this flow.
+        await setViewsEnabled(s, true);
 
         // Views is a compact nav ROW; its list lives in a right-flyout opened by
         // clicking the row. Open it → empty-state hint (zero views).
@@ -150,6 +158,43 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "one view remains after delete" },
         );
+      },
+    );
+  });
+});
+
+describeE2E("sv2 Views feature toggle gates the sidebar entry (#230)", () => {
+  // Vault-count precondition: 1 (weak KDF). A fresh vault has 0 saved views, so
+  // the device-local Views toggle's back-compat default is OFF and the sidebar
+  // Views nav row must be ABSENT until the user turns it on — then absent again
+  // when turned back off (hidden, not disabled).
+  it("hides the Views entry by default and shows it once enabled", async () => {
+    let password = "";
+    await scenario(
+      "sv2-views-toggle",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // Anchor on a known sidebar control first, so "Views absent" is asserted
+        // against a MOUNTED sidebar, not a race where nothing has rendered yet.
+        await s.byTestId("notes.create");
+
+        // Default: 0 views + untouched pref → the entry is hidden.
+        expect(
+          (await s.byTestIdAll("views.section")).length,
+          "Views entry is hidden by default on a fresh vault",
+        ).toBe(0);
+
+        // Enable via Settings → Editor → the nav row appears.
+        await setViewsEnabled(s, true);
+        await s.waitForElement(testIdSelector("views.section"));
+
+        // Disable again → the row is gone (hidden, not merely inert).
+        await setViewsEnabled(s, false);
+        await s.waitForGone(testIdSelector("views.section"));
       },
     );
   });
