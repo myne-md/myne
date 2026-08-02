@@ -3388,10 +3388,25 @@ function RightSidebar() {
     () => resolveBarOrder(tabOrder, RIGHT_PANEL_DEFAULT_ORDER),
     [tabOrder],
   );
-  const visible = useMemo(() => order.filter((id) => !hidden.includes(id)), [order, hidden]);
+  // The AI Chat tab is only offered when AI is actually on (#225): with it off
+  // the tab was a dead affordance whose body just pointed the user to Settings.
+  // Gated on `ai_enabled` (the feature state), NOT `developer_mode` — turning
+  // Developer mode off must never disable a running feature (#181 cli6/vm4), and
+  // on web `ai_enabled` is always false (no localAi capability), so the tab is
+  // absent there too. Folded into `hidden` so BOTH the strip AND the active-tab
+  // resolution treat it as absent (else the active pointer could still land on a
+  // now-hidden ai-chat and show its body with no tab).
+  const effectiveHidden = useMemo(
+    () => (prefs.ai_enabled ? hidden : [...new Set([...hidden, "ai-chat"])]),
+    [hidden, prefs.ai_enabled],
+  );
+  const visible = useMemo(
+    () => order.filter((id) => !effectiveHidden.includes(id)),
+    [order, effectiveHidden],
+  );
   // Healed-on-read: a stored pointer to a now-hidden/unknown tab is reinterpreted
   // (first visible), never rewritten to disk.
-  const active = resolveActiveTab(prefs.right_panel_active_tab, order, hidden);
+  const active = resolveActiveTab(prefs.right_panel_active_tab, order, effectiveHidden);
 
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; edge: "before" | "after" } | null>(
