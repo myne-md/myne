@@ -16,7 +16,10 @@ import {
   writeSceneJson,
   isDrawingBody,
   buildDrawingNoteBytes,
+  type DrawingEmbedIo,
+  type ExcalidrawImperativeAPI,
 } from "@myne/editor/drawing";
+import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 import type { NoteListError } from "../../lib/notes";
 import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
@@ -176,6 +179,22 @@ const DEV_SEED: string[] = [
 function entryFrom(id: string, text: string): NoteEntry {
   const { title, snippet } = deriveTitleSnippet(text);
   return { id, title: title || "Untitled note", snippet };
+}
+
+/** Next unused "Drawing N" title among existing drawing notes, so an inline
+ *  `![[Drawing N]]` embed reference is unambiguous (#213). Mobile has no
+ *  ref-rewriting rename, so the created name is the one that sticks. */
+function nextMobileDrawingTitle(
+  notes: readonly NoteEntry[],
+  bodies: ReadonlyMap<string, string>,
+): string {
+  let max = 0;
+  for (const n of notes) {
+    if (!isDrawingBody(bodies.get(n.id) ?? "")) continue;
+    const m = /^Drawing (\d+)$/.exec((n.title ?? "").trim());
+    if (m !== null) max = Math.max(max, Number(m[1]));
+  }
+  return `Drawing ${max + 1}`;
 }
 
 
@@ -987,6 +1006,70 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       setLoading(false);
     }
   }, [loadEntries]);
+
+  // #213: the resolver note-set fed to the shared editor so `![[Drawing]]` embeds
+  // (and wikilink chips generally) resolve — mobile did not wire this before, so
+  // links rendered unresolved. `isDrawing` + `folder` come from the already-loaded
+  // bodies, so no extra reads.
+  const resolverNoteSet = useMemo<ResolverNote[]>(
+    () =>
+      notes.map((n) => {
+        const body = bodies.get(n.id) ?? "";
+        return {
+          noteUuid: n.id,
+          title: n.title,
+          folder: readNoteFolder(body) || null,
+          isDrawing: isDrawingBody(body),
+        };
+      }),
+    [notes, bodies],
+  );
+
+  // #213: the inline-drawing-embed IO seam. Mobile is an OPEN-FULL-SCREEN host —
+  // tapping a drawing embed opens the drawing's own screen (reusing the existing
+  // full-screen canvas) rather than a cramped inline canvas, and there is no
+  // inline rename (no ref-rewriting rename on mobile). `saveScene`/`renameDrawing`
+  // are deliberately omitted; the shared widget hides the inline canvas + makes the
+  // title static accordingly. Live deps read through a ref so the seam stays stable.
+  const drawingLiveRef = useRef({ editorText, notes, bodies, openRelated, refresh });
+  drawingLiveRef.current = { editorText, notes, bodies, openRelated, refresh };
+  const drawingIo = useMemo<DrawingEmbedIo>(
+    () => ({
+      readScene: async (id) => extractSceneJson(await noteRead(id)),
+      createSibling: async () => {
+        const live = drawingLiveRef.current;
+        const folder = readNoteFolder(live.editorText) || null;
+        const title = nextMobileDrawingTitle(live.notes, live.bodies);
+        await noteCreate(
+          new TextDecoder().decode(buildDrawingNoteBytes(title, folder)),
+        );
+        // Reload so the new drawing enters the resolver note-set and the just-
+        // inserted `![[Drawing N]]` resolves to it.
+        await live.refresh();
+        return title;
+      },
+      openNote: (id) => void drawingLiveRef.current.openRelated(id),
+    }),
+    [],
+  );
+
+  // #179: the whole-note drawing's Excalidraw API — its mobile-menu items (Theme /
+  // Canvas background / Reset) move to the ⋯ sheet since the hamburger is hidden.
+  const drawingApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const drawingActions = useMemo(
+    () => ({
+      onReset: () => drawingApiRef.current?.resetScene(),
+      onToggleTheme: () => {
+        const api = drawingApiRef.current;
+        if (api === null) return;
+        const cur = api.getAppState().theme;
+        api.updateScene({ appState: { theme: cur === "dark" ? "light" : "dark" } });
+      },
+      onSetBackground: (color: string) =>
+        drawingApiRef.current?.updateScene({ appState: { viewBackgroundColor: color } }),
+    }),
+    [],
+  );
 
   // Boot: apply the persisted theme, (dev) seed an empty vault, then load.
   useEffect(() => {
@@ -2621,6 +2704,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             key={editing?.id ?? "drawing"}
             initialSceneJson={extractSceneJson(editorText) ?? undefined}
             onSceneChange={(json) => setEditorText((prev) => writeSceneJson(prev, json))}
+            // #179: hide Excalidraw's bottom-bar hamburger (its items move to the
+            // ⋯ menu below) + capture the API to drive them. undo/redo stays.
+            mobileChrome
+            onApi={(api) => {
+              drawingApiRef.current = api;
+            }}
           />
         </div>
       ) : readingMode ? (
@@ -2663,6 +2752,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             // mobile's single formatting surface — suppress the engine's floating
             // selection toolbar so a word-select doesn't raise a second one.
             selectionToolbar={false}
+            // #213: resolve wikilinks + recognize `![[Drawing]]` embeds. Mobile is
+            // an open-full-screen host — the embed shows a thumbnail that opens the
+            // drawing on its own screen (drawingIo has openNote, no inline canvas).
+            noteSet={resolverNoteSet}
+            drawingIo={drawingIo}
             viewMode={rawMode ? "source" : "live"}
             // Regular: the WS-01 prose measure — a 620px column (+ 56px gutters)
             // centered in the detail pane. Compact keeps the phone's 18/22.
@@ -2749,6 +2843,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
           copied={copied}
           busy={editorBusy}
           onClose={() => setMoreOpen(false)}
+          // #179: for a drawing note the ⋯ menu carries the canvas actions moved
+          // out of Excalidraw's hidden mobile hamburger.
+          drawing={isDrawing ? drawingActions : undefined}
           onCopy={() => void copyNote()}
           onMove={() => {
             if (editing?.id == null) return;
