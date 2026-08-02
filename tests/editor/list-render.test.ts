@@ -45,10 +45,23 @@ describe("bullet lists", () => {
     expect(query(m, ".cm-list-item-line")).not.toBeNull();
   });
 
-  it("reveals the raw `-` marker when the cursor is on the line", () => {
+  it("keeps the bullet rendered (raw `-` NOT revealed) with the caret in the item text", () => {
+    // Marker-scoped reveal: editing the item's text keeps the disc — the raw
+    // `- ` no longer flickers back whenever the caret is anywhere on the line.
     m = mount("- item here\n");
-    focusAt(m, 3); // cursor on the list line
+    focusAt(m, 3); // caret in the text, not on the marker
+    expect(renderedText(m)).not.toContain("- item here");
+    expect(renderedText(m)).toContain("item here");
+    expect(query(m, ".cm-list-bullet")).not.toBeNull();
+  });
+
+  it("reveals the raw `-` when the caret is ON the marker", () => {
+    // Like a heading's `#`: bring the caret onto the marker itself and the raw
+    // `- ` shows for editing.
+    m = mount("- item here\n");
+    focusAt(m, 0); // caret on the marker (line start)
     expect(renderedText(m)).toContain("- item here");
+    expect(query(m, ".cm-list-bullet")).toBeNull();
   });
 });
 

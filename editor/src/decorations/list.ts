@@ -2,12 +2,13 @@
 // task 4; `decisions.md` 2026-06-08 — reverses the prior implicit
 // "lists render highlight-only" status).
 //
-// Cursor-aware, like emphasis / inline-code: OFF the marker's line, the raw
-// list marker is replaced with a rendered glyph (`-`/`*`/`+` → `•` at top level,
-// `◦` when nested; ordered `n.` stays a number but is muted) and the line gets a
-// hanging indent so wrapped lines align under the body, not the marker. ON the
-// line, the raw `- ` / `1. ` source is revealed for editing. Render-only — the
-// buffer is never mutated (§6 C1).
+// BULLET markers (`-`/`*`/`+`) render as a glyph (`•` top level, `◦` nested).
+// The disc reveals its raw `- ` ONLY when the caret sits ON the marker itself
+// (like a heading's `#`) — NOT for the whole line — so editing the item's text
+// keeps the disc instead of flickering back to raw. ORDERED markers (`1.`) stay
+// editable text: muted OFF the cursor line, un-muted (revealed) ON it. Every
+// list line gets a hanging indent so wrapped lines align under the body, not the
+// marker. Render-only — the buffer is never mutated (§6 C1).
 //
 // Task-list items (`- [ ]` / `- [x]`) are owned by `task-list.ts` (it hides the
 // `-` and renders a checkbox); this decoration SKIPS them so the two don't both
@@ -23,7 +24,7 @@ import {
   EditorView,
   WidgetType,
 } from "@codemirror/view";
-import { isCursorLine } from "./cursor-aware";
+import { isCursorLine, isInsideRange } from "./cursor-aware";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 
 // The bullet is drawn by CSS (a filled disc top-level, a hollow ring when
@@ -118,7 +119,8 @@ function hangingIndentCh(
   line: { from: number; to: number; text: string },
   markFrom: number,
   markTo: number,
-  view: EditorView,
+  /** True when the fixed-width bullet disc is what's painted (not the raw `- `). */
+  bulletRendered: boolean,
 ): number {
   const indent = leadingCols(line.text);
   const markerLen = markTo - markFrom;
@@ -126,11 +128,9 @@ function hangingIndentCh(
   const gap = trailing ? leadingCols(trailing[0]) : 0;
   const rawOffset = indent + markerLen + gap;
 
-  if (isCursorLine(view, line.from, line.to)) return rawOffset;
-
-  const marker = doc.sliceString(markFrom, markTo);
-  // Bullets render as the fixed-width widget; ordered markers keep their digits.
-  return /^[-*+]$/.test(marker) ? indent + BULLET_WIDTH_CH : rawOffset;
+  // A painted bullet is a fixed-width disc; anything else (a revealed raw marker,
+  // or an ordered number) has the body start after the source marker + gap.
+  return bulletRendered ? indent + BULLET_WIDTH_CH : rawOffset;
 }
 
 function buildListDecorations(view: EditorView): DecorationSet {
@@ -148,6 +148,14 @@ function buildListDecorations(view: EditorView): DecorationSet {
         const afterMark = doc.sliceString(node.to, Math.min(node.to + 4, line.to));
         if (isTaskItem(afterMark)) return undefined; // task-list owns it
 
+        const marker = doc.sliceString(node.from, node.to);
+        const isBullet = /^[-*+]$/.test(marker);
+        // A bullet reveals its raw `- ` ONLY when the caret sits ON the marker
+        // itself (like a heading's `#`), not for the whole line — so editing the
+        // item's text keeps the disc. Ordered markers reveal on the cursor LINE.
+        const bulletRevealed = isBullet && isInsideRange(view, node.from, node.to);
+        const bulletRendered = isBullet && !bulletRevealed;
+
         // Hanging indent on every list-item line — EXCEPT inside a blockquote,
         // where the quote bar + padding owns the line's left edge (see
         // `inBlockquote`).
@@ -162,7 +170,7 @@ function buildListDecorations(view: EditorView): DecorationSet {
         // column instead of hanging under it.
         if (!seenLines.has(line.from) && !inBlockquote(node.node)) {
           seenLines.add(line.from);
-          const offset = hangingIndentCh(doc, line, node.from, node.to, view);
+          const offset = hangingIndentCh(doc, line, node.from, node.to, bulletRendered);
           decorations.push(
             Decoration.line({
               class: "cm-list-item-line",
@@ -173,26 +181,29 @@ function buildListDecorations(view: EditorView): DecorationSet {
           );
         }
 
-        // Glyph / mute is cursor-aware: reveal the raw marker on the line.
-        if (isCursorLine(view, line.from, line.to)) return undefined;
-
-        const marker = doc.sliceString(node.from, node.to);
-        if (/^[-*+]$/.test(marker)) {
-          // Replace the marker AND its trailing whitespace with the bullet; the
-          // gap to the body is the bullet's `margin-right` (theme), so a leftover
-          // source space doesn't widen it into the "too much gap" look.
-          const rest = doc.sliceString(node.to, line.to);
-          const ws = rest.match(/^[ \t]+/);
-          const contentStart = node.to + (ws ? ws[0].length : 0);
-          decorations.push(
-            Decoration.replace({
-              widget: new ListBulletWidget(listDepth(node.node) > 0),
-            }).range(node.from, contentStart),
-          );
+        if (isBullet) {
+          // Render the disc unless the caret is on the marker (then the raw `- `
+          // shows for editing). Replace the marker AND its trailing whitespace
+          // with the bullet; the gap to the body is the bullet's `margin-right`
+          // (theme), so a leftover source space doesn't widen it.
+          if (bulletRendered) {
+            const rest = doc.sliceString(node.to, line.to);
+            const ws = rest.match(/^[ \t]+/);
+            const contentStart = node.to + (ws ? ws[0].length : 0);
+            decorations.push(
+              Decoration.replace({
+                widget: new ListBulletWidget(listDepth(node.node) > 0),
+              }).range(node.from, contentStart),
+            );
+          }
         } else if (/^\d+[.)]$/.test(marker)) {
-          decorations.push(
-            Decoration.mark({ class: "cm-list-number" }).range(node.from, node.to),
-          );
+          // Ordered numbers stay editable text — mute them OFF the cursor line,
+          // reveal (un-mute) on it.
+          if (!isCursorLine(view, line.from, line.to)) {
+            decorations.push(
+              Decoration.mark({ class: "cm-list-number" }).range(node.from, node.to),
+            );
+          }
         }
         return undefined;
       },
