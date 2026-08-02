@@ -1,6 +1,6 @@
 // MYND-485 — the mobile i18n runtime is the desktop react-i18next runtime,
 // shared verbatim by alias (`@myne/i18n` → ../src/i18n). These tests prove the
-// alias resolves, the 32 shared catalogs load on mobile's build/test config, the
+// alias resolves, the shared catalogs load on mobile's build/test config, the
 // language set is the shared desktop constant (no drift), switching works, and a
 // missing translation falls back rather than rendering blank. (The roster grew
 // from 24 to 32 with the RTL epic, which added the RTL locales — ar/fa/ur — plus
@@ -39,8 +39,13 @@ describe("mobile i18n runtime (shared desktop runtime via @myne/i18n alias)", ()
     expect(SUPPORTED_LANGUAGES.find((l) => l.code === "tr")?.label).toBe("Türkçe");
   });
 
-  it("switches the active locale via changeLanguage", async () => {
-    await i18n.changeLanguage("tr");
+  // Go through `setLanguage`, not `i18n.changeLanguage`. Catalogs other than
+  // English are lazy chunks (myne `decisions.md` 2026-08-03), so the bundle for
+  // a locale has to be installed before the switch — which is exactly what
+  // `setLanguage` does and why the UI calls it. A bare `changeLanguage` finds no
+  // `tr` bundle and resolves back to the English fallback.
+  it("switches the active locale via setLanguage", async () => {
+    await expect(setLanguage("tr")).resolves.toBe(true);
     expect(i18n.resolvedLanguage ?? i18n.language).toBe("tr");
   });
 
