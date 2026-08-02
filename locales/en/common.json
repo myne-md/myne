@@ -964,7 +964,13 @@
       "edit": "Edit drawing {{name}}",
       "editAction": "Edit",
       "empty": "Empty drawing — click to draw",
+      "open": "Open",
       "rename": "Rename drawing"
+    },
+    "drawingMenu": {
+      "background": "Canvas background",
+      "reset": "Reset canvas",
+      "toggleTheme": "Toggle drawing theme"
     },
     "find": {
       "close": "Close find",

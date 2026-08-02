@@ -9,6 +9,10 @@
 // thumbnail / boot-side-effect callers that opt in.
 export { DrawingCanvasLazy } from "./DrawingCanvasLazy";
 export type { DrawingCanvasProps } from "./DrawingCanvas";
+// #179: the Excalidraw imperative API a host drives its own drawing chrome with
+// (mobile). Type-only re-export — erased at compile, so it pulls ZERO Excalidraw
+// into the cold bundle (unlike the value re-exports the barrel deliberately omits).
+export type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 export {
   extractSceneJson,
   writeSceneJson,

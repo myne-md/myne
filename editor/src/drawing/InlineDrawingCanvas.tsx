@@ -46,7 +46,9 @@ export function InlineDrawingCanvas({
   }, [io, noteId]);
 
   // Flush any pending save on unmount (collapse / note switch) so the last edit
-  // is never lost to the debounce.
+  // is never lost to the debounce. `saveScene` is only absent on an open-full-
+  // screen host, which never mounts this inline canvas — so the `?.` is a type
+  // guard, not a live branch here.
   useEffect(() => {
     return () => {
       if (timerRef.current !== null) {
@@ -54,7 +56,7 @@ export function InlineDrawingCanvas({
         timerRef.current = null;
       }
       if (pendingRef.current !== null) {
-        void io.saveScene(noteId, pendingRef.current).catch(() => {});
+        void io.saveScene?.(noteId, pendingRef.current).catch(() => {});
         pendingRef.current = null;
       }
     };
@@ -67,7 +69,7 @@ export function InlineDrawingCanvas({
       timerRef.current = null;
       const next = pendingRef.current;
       pendingRef.current = null;
-      if (next !== null) void io.saveScene(noteId, next).catch(() => {});
+      if (next !== null) void io.saveScene?.(noteId, next).catch(() => {});
     }, SAVE_DEBOUNCE_MS);
   };
 

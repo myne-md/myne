@@ -1201,12 +1201,39 @@ export const myneTheme = EditorView.theme({
   // the widget or jumps the scroll (#213 review). Own line via `display: block`.
   ".cm-drawing-embed": {
     display: "block",
+    position: "relative",
     margin: "8px 0",
     maxWidth: "100%",
     border: "1px solid var(--line-2, #cfccc4)",
     borderRadius: "var(--radius-2, 6px)",
     overflow: "hidden",
     background: "var(--paper)",
+  },
+  // Desktop view-only chrome (#213 review): title + Edit float over the top of the
+  // drawing and appear only on hover, so a static drawing reads as the drawing.
+  ".cm-drawing-embed-hover-chrome": {
+    position: "absolute",
+    top: "0",
+    left: "0",
+    right: "0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    padding: "6px 6px 6px 10px",
+    background: "linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0))",
+    opacity: "0",
+    transition: "opacity var(--duration-fast, 120ms) var(--ease-standard, ease)",
+    pointerEvents: "none",
+  },
+  ".cm-drawing-embed:hover .cm-drawing-embed-hover-chrome, .cm-drawing-embed:focus-within .cm-drawing-embed-hover-chrome": {
+    opacity: "1",
+    pointerEvents: "auto",
+  },
+  // In the hover chrome the title sits on the dark gradient — force a light ink
+  // regardless of theme so it reads over the drawing.
+  ".cm-drawing-embed-hover-chrome .cm-drawing-embed-title-static": {
+    color: "#fff",
   },
   ".cm-drawing-embed-header": {
     display: "flex",
@@ -1243,6 +1270,20 @@ export const myneTheme = EditorView.theme({
     outline: "none",
     backgroundColor: "var(--paper-3, #ece9e2)",
     borderColor: "var(--accent, var(--line-2, #cfccc4))",
+  },
+  // Static title (a host without a ref-rewriting rename, e.g. mobile) — same look
+  // as the editable field, but plain text.
+  ".cm-drawing-embed-title-static": {
+    flex: "1",
+    minWidth: "0",
+    fontSize: "13px",
+    fontWeight: "600",
+    color: "var(--fg-1)",
+    fontFamily: "var(--font-sans)",
+    padding: "2px 6px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   // The header action — Edit (thumbnail) / Done (editing). Same box in both.
   ".cm-drawing-embed-action": {

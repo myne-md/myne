@@ -22,22 +22,35 @@ import {
 } from "@codemirror/state";
 
 /** The note-CRUD callbacks the inline drawing embed calls. Supplied by the host
- *  (desktop `PaneView`), which closes each over the current note's context. */
+ *  (desktop `PaneView`), which closes each over the current note's context.
+ *
+ *  Two host shapes: a host with `saveScene` (desktop) edits the drawing INLINE
+ *  (thumbnail ↔ live canvas); a host with `openNote` (mobile) instead opens the
+ *  drawing full-screen on tap and never mounts the cramped inline canvas. Only
+ *  `readScene` (thumbnail) + `createSibling` (`/drawing`) are always required. */
 export interface DrawingEmbedIo {
   /** Read a drawing note's scene JSON (the ```excalidraw fence body) by note id.
    *  Resolves `null` when the note is missing or carries no scene. */
   readScene: (noteId: string) => Promise<string | null>;
-  /** Persist an edited scene back into the drawing note (frontmatter + trailing
-   *  attachment-ref block preserved; `updated:` stamped). */
-  saveScene: (noteId: string, sceneJson: string) => Promise<void>;
   /** Create a new sibling drawing note in the HOST note's folder and resolve to
    *  its title — the token the `/drawing` slash command embeds as `![[title]]`. */
   createSibling: () => Promise<string>;
-  /** Rename a drawing note from the inline header. The host routes this through
-   *  the transactional rename so every `![[oldTitle]]` embed (including this one)
-   *  is rewritten to `![[newTitle]]` — otherwise the rename would orphan the
-   *  reference. */
-  renameDrawing: (noteId: string, newTitle: string) => Promise<void>;
+  /** Persist an edited scene back into the drawing note (frontmatter + trailing
+   *  attachment-ref block preserved; `updated:` stamped). Present → the embed is
+   *  editable INLINE (desktop). Absent → the embed is view-only inline (mobile
+   *  edits full-screen via `openNote`). */
+  saveScene?: (noteId: string, sceneJson: string) => Promise<void>;
+  /** Rename a drawing note from the inline header. Present → the header title is
+   *  an editable field; the host MUST route through a rename that rewrites every
+   *  `![[oldTitle]]` embed to `![[newTitle]]` (else the reference is orphaned).
+   *  Absent → the header title is static (a host with no ref-rewriting rename,
+   *  e.g. mobile, omits it rather than break the embed). */
+  renameDrawing?: (noteId: string, newTitle: string) => Promise<void>;
+  /** Open the drawing note full-screen (its own tab/screen). Present → tapping
+   *  the embed opens it there instead of the inline canvas, and the embed stays a
+   *  thumbnail (the right shape for a phone — the inline 420px canvas is cramped
+   *  and stacks chrome). Desktop omits it (inline edit). */
+  openNote?: (noteId: string) => void;
 }
 
 /** The live drawing-embed IO, or `null` on a host that does not provide it. The
