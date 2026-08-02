@@ -24,13 +24,14 @@
 // live. System maps to `null` (clears the field → the CSS `@media
 // prefers-color-scheme` follows the OS live).
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
 import { ControlBlock } from "./ControlBlock";
 import { LanguageSelect } from "./LanguageSelect";
 import { Button } from "../primitives/Button";
 import { Icon } from "../primitives/Icon";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { Switch } from "../primitives/Switch";
 import { ERROR_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 import {
@@ -42,6 +43,7 @@ import {
   type ThemeChoice,
 } from "../../lib/prefs";
 import { applyTheme } from "../../lib/theme";
+import { applyAccent, readAccent, writeAccent } from "../../lib/accentColor";
 import { CustomThemesSection } from "./CustomThemesSection";
 
 // `value: "system"` maps to a `null` theme on the wire (clears the field).
@@ -224,6 +226,216 @@ interface ThemePreviewCardsProps {
   labelFor: (key: string) => string;
 }
 
+/** A handful of ready accent hues offered in the picker popover. */
+const ACCENT_PRESETS = [
+  "#2c4a7a",
+  "#3b82f6",
+  "#0ea5e9",
+  "#14b8a6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#ec4899",
+  "#8b5cf6",
+  "#6366f1",
+] as const;
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+/** Accent-color row (device-local, `lib/accentColor.ts`): a full-color swatch
+ *  that opens a picker POPOVER (preset hues + a paste-any-hex field), plus an
+ *  icon reset that restores the theme's own accent. */
+function AccentColorRow() {
+  const { t } = useTranslation();
+  const [accent, setAccent] = useState<string | null>(() => readAccent());
+  const [open, setOpen] = useState(false);
+  const [hexDraft, setHexDraft] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  // The swatch shows the EFFECTIVE accent — the custom one, or the theme's own
+  // `--accent` (read computed) when none is set.
+  const effective =
+    accent ??
+    (getComputedStyle(document.documentElement)
+      .getPropertyValue("--accent")
+      .trim() ||
+      "#2c4a7a");
+
+  const set = (color: string | null) => {
+    writeAccent(color);
+    applyAccent(color);
+    setAccent(color);
+  };
+
+  // Outside-click / Esc close the popover.
+  useEffect(() => {
+    if (!open) return;
+    setHexDraft(effective);
+    const onDown = (e: globalThis.MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const id = window.setTimeout(
+      () => document.addEventListener("mousedown", onDown),
+      0,
+    );
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Accept a pasted/typed hex (with or without the leading '#').
+  const commitHex = (raw: string) => {
+    const v = raw.trim();
+    const hex = v.startsWith("#") ? v : `#${v}`;
+    if (HEX_RE.test(hex)) set(hex.toLowerCase());
+  };
+
+  return (
+    <SettingRow
+      anchorId="appearance.accent"
+      label={t("settings.appearance.accentLabel")}
+      helper={t("settings.appearance.accentHelper")}
+      control={
+        <div
+          ref={ref}
+          style={{ position: "relative", display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+        >
+          {accent !== null && (
+            <button
+              type="button"
+              onClick={() => set(null)}
+              aria-label={t("settings.appearance.accentReset")}
+              title={t("settings.appearance.accentReset")}
+              data-testid="settings.accent-reset"
+              {...hoverSurface()}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 26,
+                height: 26,
+                padding: 0,
+                border: 0,
+                borderRadius: "var(--radius-1)",
+                background: "transparent",
+                color: "var(--fg-3)",
+                cursor: "pointer",
+                transition: HOVER_TRANSITION,
+              }}
+            >
+              <Icon name="rotate-ccw" size={15} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={t("settings.appearance.accentLabel")}
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            data-testid="settings.accent-color"
+            style={{
+              width: 26,
+              height: 26,
+              padding: 0,
+              border: "1px solid var(--line-2)",
+              borderRadius: "50%",
+              background: effective,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          />
+          {open && (
+            <div
+              role="dialog"
+              data-testid="settings.accent-popover"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                zIndex: 1100,
+                width: 208,
+                padding: "var(--space-3)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-2)",
+                background: "var(--bg-1)",
+                border: "1px solid var(--line-1)",
+                borderRadius: "var(--radius-2)",
+                boxShadow: "var(--shadow-2)",
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(5, 1fr)",
+                  gap: "var(--space-2)",
+                }}
+              >
+                {ACCENT_PRESETS.map((c) => {
+                  const selected = effective.toLowerCase() === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-label={c}
+                      onClick={() => set(c)}
+                      data-testid="settings.accent-preset"
+                      style={{
+                        width: 24,
+                        height: 24,
+                        padding: 0,
+                        borderRadius: "50%",
+                        background: c,
+                        border: `2px solid ${selected ? "var(--fg-1)" : "transparent"}`,
+                        cursor: "pointer",
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                value={hexDraft}
+                spellCheck={false}
+                autoComplete="off"
+                placeholder="#2c4a7a"
+                aria-label={t("settings.appearance.accentHexAria")}
+                data-testid="settings.accent-hex"
+                onChange={(e) => {
+                  setHexDraft(e.target.value);
+                  commitHex(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitHex(hexDraft);
+                }}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "var(--space-2)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 13,
+                  color: "var(--fg-1)",
+                  background: "var(--bg-2)",
+                  border: "1px solid var(--line-2)",
+                  borderRadius: "var(--radius-1)",
+                  outline: "none",
+                }}
+              />
+            </div>
+          )}
+        </div>
+      }
+    />
+  );
+}
+
 /** The theme picker: one preview card per theme, a radiogroup like `Segmented`. */
 function ThemePreviewCards({
   selected,
@@ -250,6 +462,20 @@ function ThemePreviewCards({
             onClick={() => {
               if (!isSel) onChoose(o.value);
             }}
+            onMouseEnter={
+              isSel
+                ? undefined
+                : (e) => {
+                    e.currentTarget.style.borderColor = "var(--line-3)";
+                  }
+            }
+            onMouseLeave={
+              isSel
+                ? undefined
+                : (e) => {
+                    e.currentTarget.style.borderColor = "var(--line-2)";
+                  }
+            }
             style={{
               ...THEME_CARD_STYLE,
               borderColor: isSel ? "var(--accent)" : "var(--line-2)",
@@ -400,6 +626,8 @@ export function AppearancePanel({ onOpenGraph }: AppearancePanelProps = {}) {
           </>
         }
       />
+
+      <AccentColorRow />
 
       <SettingRow
         label={t("settings.appearance.showEditTimesLabel")}
