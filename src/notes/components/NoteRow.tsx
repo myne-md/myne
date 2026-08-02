@@ -320,17 +320,22 @@ const renameInputStyle: CSSProperties = {
   // box past the row edge — the "off" look). Only a small negative VERTICAL
   // margin remains, to keep the row from growing taller while renaming.
   boxSizing: "border-box",
-  border: "1px solid var(--accent)",
+  // Clean inline-edit look: no hard accent border — just a subtle fill and ONE
+  // soft accent halo, replacing the old accent-border-PLUS-global-focus-ring
+  // double outline. The inline `boxShadow` overrides the global `:focus-visible`
+  // `--ring` (inline wins), so there is a single, quiet ring.
+  border: "1px solid transparent",
   borderRadius: "var(--radius-1, 4px)",
   padding: "1px 6px",
   margin: "-2px 0",
-  background: "var(--paper)",
+  background: "var(--bg-2)",
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   fontWeight: 500,
   lineHeight: 1.35,
   outline: "none",
+  boxShadow: "0 0 0 2px var(--accent-soft)",
 };
 
 // ─── Component ────────────────────────────────────────────────────

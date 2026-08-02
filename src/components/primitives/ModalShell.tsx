@@ -61,6 +61,8 @@ const BACKDROP_STYLE: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   zIndex: 1000,
+  // Smooth entry (shared with SettingsModal). Reduced-motion zeroes it globally.
+  animation: "settings-backdrop-in var(--duration-fast) var(--ease-standard)",
 };
 
 /** Above the command palette (1500) and quick picker (1600) — for a surface
@@ -155,6 +157,8 @@ export function ModalShell({
     fontFamily: "var(--font-sans)",
     color: "var(--fg-1)",
     overflow: "hidden",
+    // Smooth entry (rise + fade), shared with SettingsModal.
+    animation: "settings-modal-in var(--duration-base) var(--ease-standard)",
   };
 
   return (

@@ -335,6 +335,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.archive.helper",
     keywordsKey: "settings.search.keywords.archive",
   },
+  {
+    id: "editor.views",
+    panelId: "editor",
+    testid: "settings.views-enabled",
+    titleKey: "settings.views.label",
+    descriptionKey: "settings.views.helper",
+  },
 
   // ── Files ──────────────────────────────────────────────────────────────────
   {
@@ -396,6 +403,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     titleKey: "settings.appearance.themeLabel",
     descriptionKey: "settings.appearance.themeHelper",
     keywordsKey: "settings.search.keywords.theme",
+  },
+  {
+    id: "appearance.accent",
+    panelId: "appearance",
+    testid: "settings.accent-color",
+    titleKey: "settings.appearance.accentLabel",
+    descriptionKey: "settings.appearance.accentHelper",
   },
   {
     id: "appearance.show-edit-times",
