@@ -20,7 +20,18 @@ const SETEXT_LEVEL_BY_NAME: Readonly<Record<string, HeadingLevel>> = {
   SetextHeading2: 2,
 };
 
-const SKIP_EXACT_NAMES: ReadonlySet<string> = new Set(["URL", "LinkTitle"]);
+// `HTMLTag` (and `HTMLBlock`): inline HTML in a heading — most commonly a
+// colored highlight, stored as `<mark class="hl-green">…</mark>` because markdown
+// `==` carries no color class (#224). Without skipping the tags, the heading
+// text leaks the raw `<mark class="hl-green">` markup into the Outline / the
+// `[[#` picker / the heading index; the wrapped text sits BETWEEN the open and
+// close tags and is preserved.
+const SKIP_EXACT_NAMES: ReadonlySet<string> = new Set([
+  "URL",
+  "LinkTitle",
+  "HTMLTag",
+  "HTMLBlock",
+]);
 
 function shouldSkip(name: string): boolean {
   return SKIP_EXACT_NAMES.has(name) || name.endsWith("Mark");

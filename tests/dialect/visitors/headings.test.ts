@@ -90,3 +90,19 @@ describe("extractHeadings — invariants", () => {
     }
   });
 });
+
+describe("extractHeadings — inline HTML in a heading (#224)", () => {
+  it("strips a colored-highlight <mark> tag, keeping the wrapped text", () => {
+    const out = extractHeadings('# <mark class="hl-green">Desktop</mark>');
+    expect(out).toHaveLength(1);
+    expect(out[0]!.text).toBe("Desktop");
+  });
+  it("keeps text around an inline tag", () => {
+    const out = extractHeadings('# A <mark class="hl-green">B</mark> C');
+    expect(out[0]!.text).toBe("A B C");
+  });
+  it("still strips a plain markdown ==highlight==", () => {
+    const out = extractHeadings("# ==Desktop==");
+    expect(out[0]!.text).toBe("Desktop");
+  });
+});
