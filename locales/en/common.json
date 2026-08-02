@@ -1432,7 +1432,6 @@
   },
   "notes": {
     "archive": {
-      "cancel": "Cancel",
       "close": "Close",
       "count_one": "{{count}} note",
       "count_other": "{{count}} notes",
@@ -1440,10 +1439,12 @@
       "deleteError": "Couldn't delete that note. Try again.",
       "emptyBody": "Archived notes and folders are hidden from the sidebar but kept safe. Restore them here whenever you need them.",
       "emptyTitle": "Nothing archived",
-      "folderDeleteConfirm_one": "Move {{count}} note to Trash?",
-      "folderDeleteConfirm_other": "Move {{count}} notes to Trash?",
+      "folderDeleteBody_one": "“{{name}}” and its {{count}} note",
+      "folderDeleteBody_other": "“{{name}}” and its {{count}} notes",
       "folderDeleteConfirmCta": "Move to Trash",
       "folderDeleteError": "Couldn't move that folder's notes to Trash. Try again.",
+      "folderDeleteTitle": "Move this folder to Trash?",
+      "folderDeleteWarning": "They move to Trash — restore them anytime. Permanent deletion is a separate step.",
       "restore": "Restore",
       "restoreError": "Couldn't restore that note. Try again.",
       "title": "Archive",

@@ -35,7 +35,7 @@ import {
   topLevelArchivedFolders,
 } from "../archivedFolders";
 import { archivedRecords, useSelectedNote, type NoteId } from "../sidebarState";
-import { BACKDROP_STYLE } from "./DeleteConfirmModal";
+import { BACKDROP_STYLE, DeleteConfirmModal } from "./DeleteConfirmModal";
 import { PanelEmptyState } from "./PanelEmptyState";
 import {
   AGE_STYLE,
@@ -48,10 +48,6 @@ import {
   LIST_STYLE,
   PANEL_STYLE,
   ROW_ACTIONS_STYLE,
-  ROW_BTN_DANGER_STYLE,
-  ROW_BTN_STYLE,
-  ROW_CONFIRM_STYLE,
-  ROW_CONFIRM_TEXT_STYLE,
   ROW_ICON_BTN_STYLE,
   ROW_STYLE,
   ROW_TITLE_STYLE,
@@ -117,14 +113,15 @@ export function ArchivePanel({
     [ctx.cache, archivedKeys],
   );
 
-  // Esc closes the panel (or dismisses an armed folder-delete confirm first).
+  // Esc closes the panel — but only when no folder-delete confirm is layered on
+  // top. While one is, the <DeleteConfirmModal> owns Esc (→ Cancel), the same
+  // split TrashPanel uses for its purge confirm.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && confirmFolder === null) {
         e.preventDefault();
-        if (confirmFolder !== null) setConfirmFolder(null);
-        else onClose();
+        onClose();
       }
     };
     document.addEventListener("keydown", onKey);
@@ -231,81 +228,47 @@ export function ArchivePanel({
           />
         ) : (
           <div style={LIST_STYLE}>
-            {folderRows.map((path) => {
-              const armed = confirmFolder === path;
-              const subtreeCount = armed
-                ? collectSubtreeNoteIdsFromCache(ctx.cache, folderKey(path))
-                    .length
-                : 0;
-              return (
-                <div
-                  key={`folder:${path}`}
-                  style={ROW_STYLE}
-                  data-testid="archive.folder-row"
-                  data-folder-path={path}
-                >
-                  <span style={FOLDER_TITLE_STYLE} title={folderLabel(path)}>
-                    <Icon name="folder" size={14} />
-                    {folderLabel(path)}
-                  </span>
-                  {armed ? (
-                    /* Armed state gets its own band rather than swapping the
-                       buttons in place — see ROW_CONFIRM_STYLE (MYND-623). */
-                    <div style={ROW_CONFIRM_STYLE}>
-                      <span style={ROW_CONFIRM_TEXT_STYLE}>
-                        {t("notes.archive.folderDeleteConfirm", {
-                          count: subtreeCount,
-                        })}
-                      </span>
-                      <button
-                        type="button"
-                        style={ROW_BTN_DANGER_STYLE}
-                        data-testid="archive.folder-delete-confirm"
-                        data-folder-path={path}
-                        onClick={confirmDeleteFolder}
-                      >
-                        {t("notes.archive.folderDeleteConfirmCta")}
-                      </button>
-                      <button
-                        type="button"
-                        style={ROW_BTN_STYLE}
-                        data-testid="archive.folder-delete-cancel"
-                        onClick={() => setConfirmFolder(null)}
-                      >
-                        {t("notes.archive.cancel")}
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={ROW_ACTIONS_STYLE}>
-                      <button
-                        type="button"
-                        style={ROW_ICON_BTN_STYLE}
-                        data-panel-action="restore"
-                        data-testid="archive.folder-restore"
-                        data-folder-path={path}
-                        title={t("notes.archive.restore")}
-                        aria-label={t("notes.archive.restore")}
-                        onClick={() => onRestoreFolder(path)}
-                      >
-                        <Icon name="rotate-ccw" size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        style={ROW_ICON_BTN_STYLE}
-                        data-panel-action="delete"
-                        data-testid="archive.folder-delete"
-                        data-folder-path={path}
-                        title={t("notes.archive.delete")}
-                        aria-label={t("notes.archive.delete")}
-                        onClick={() => setConfirmFolder(path)}
-                      >
-                        <Icon name="trash-2" size={16} />
-                      </button>
-                    </div>
-                  )}
+            {folderRows.map((path) => (
+              <div
+                key={`folder:${path}`}
+                style={ROW_STYLE}
+                data-testid="archive.folder-row"
+                data-folder-path={path}
+              >
+                <span style={FOLDER_TITLE_STYLE} title={folderLabel(path)}>
+                  <Icon name="folder" size={14} />
+                  {folderLabel(path)}
+                </span>
+                {/* Delete arms the shared <DeleteConfirmModal> (rendered below),
+                    not an inline band — #202. */}
+                <div style={ROW_ACTIONS_STYLE}>
+                  <button
+                    type="button"
+                    style={ROW_ICON_BTN_STYLE}
+                    data-panel-action="restore"
+                    data-testid="archive.folder-restore"
+                    data-folder-path={path}
+                    title={t("notes.archive.restore")}
+                    aria-label={t("notes.archive.restore")}
+                    onClick={() => onRestoreFolder(path)}
+                  >
+                    <Icon name="rotate-ccw" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    style={ROW_ICON_BTN_STYLE}
+                    data-panel-action="delete"
+                    data-testid="archive.folder-delete"
+                    data-folder-path={path}
+                    title={t("notes.archive.delete")}
+                    aria-label={t("notes.archive.delete")}
+                    onClick={() => setConfirmFolder(path)}
+                  >
+                    <Icon name="trash-2" size={16} />
+                  </button>
                 </div>
-              );
-            })}
+              </div>
+            ))}
             {noteRows.map((r) => (
               <div key={r.noteUuid} style={ROW_STYLE}>
                 <span
@@ -351,8 +314,26 @@ export function ArchivePanel({
             ))}
           </div>
         )}
-
       </div>
+
+      {confirmFolder !== null && (
+        <DeleteConfirmModal
+          title={t("notes.archive.folderDeleteTitle")}
+          body={t("notes.archive.folderDeleteBody", {
+            name: folderLabel(confirmFolder),
+            count: collectSubtreeNoteIdsFromCache(
+              ctx.cache,
+              folderKey(confirmFolder),
+            ).length,
+          })}
+          warning={t("notes.archive.folderDeleteWarning")}
+          confirmLabel={t("notes.archive.folderDeleteConfirmCta")}
+          confirmTestId="archive.folder-delete-confirm"
+          cancelTestId="archive.folder-delete-cancel"
+          onCancel={() => setConfirmFolder(null)}
+          onConfirm={confirmDeleteFolder}
+        />
+      )}
     </div>
   );
 }

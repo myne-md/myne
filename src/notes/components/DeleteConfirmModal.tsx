@@ -125,6 +125,13 @@ export type DeleteConfirmModalProps = {
    */
   confirmTestId?: string;
   /**
+   * Cancel-button `data-testid` override, symmetric with {@link confirmTestId}.
+   * Default: `"delete-confirm.cancel"`. Callers whose E2E contract names a
+   * scoped cancel id (e.g. the Archive folder-delete `archive.folder-delete-cancel`)
+   * pass it here.
+   */
+  cancelTestId?: string;
+  /**
    * Which button receives initial focus. Default `"cancel"` — the safer
    * choice for irreversible actions (folder delete, permanent purge), where a
    * stray Enter must not confirm. Pass `"confirm"` for the reversible
@@ -144,6 +151,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     warning,
     confirmLabel,
     confirmTestId,
+    cancelTestId,
     initialFocus = "cancel",
     onCancel,
     onConfirm,
@@ -228,7 +236,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
           <button
             ref={cancelRef}
             type="button"
-            data-testid="delete-confirm.cancel"
+            data-testid={cancelTestId ?? "delete-confirm.cancel"}
             onClick={onCancel}
             style={CANCEL_BUTTON_STYLE}
           >

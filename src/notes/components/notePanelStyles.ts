@@ -161,56 +161,12 @@ export const ROW_BTN_STYLE: CSSProperties = {
   flexShrink: 0,
 };
 
-/**
- * A row that has ARMED a destructive action (MYND-623).
- *
- * The confirm used to be a straight swap: the row's two buttons vanished and
- * four elements -- title, question, confirm, cancel -- competed for the same
- * width, all but the title refusing to shrink. Past a certain title length that
- * simply overflowed (MYND-595 is the same bug on the themes row), and even when
- * it fit, nothing marked the row as being in a different, dangerous state; it
- * read as the buttons having been replaced at random.
- *
- * Give the armed state a surface of its own instead: a danger-tinted band that
- * spans the row, wraps rather than overflows on a narrow panel, and reads as
- * "this row is asking you something".
- */
-export const ROW_CONFIRM_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-3)",
-  flexWrap: "wrap",
-  flex: 1,
-  minWidth: 0,
-  padding: "var(--space-2) var(--space-3)",
-  borderRadius: 6,
-  background: "color-mix(in srgb, var(--danger) 8%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--danger) 24%, transparent)",
-};
-
-/** The confirm question inside {@link ROW_CONFIRM_STYLE}. Takes the slack so
- *  the buttons stay pinned right, and wraps instead of pushing them out. */
-export const ROW_CONFIRM_TEXT_STYLE: CSSProperties = {
-  flex: "1 1 auto",
-  minWidth: 0,
-  fontSize: 12,
-  color: "var(--fg-1)",
-};
-
-/** Destructive confirm CTA — the only button in the panel that carries danger
- *  ink, so the irreversible one is never a coin-flip against Cancel. */
-export const ROW_BTN_DANGER_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 12,
-  fontWeight: 500,
-  padding: "4px 8px",
-  borderRadius: 5,
-  cursor: "pointer",
-  border: "1px solid var(--danger)",
-  background: "var(--danger)",
-  color: "var(--paper-1, #fff)",
-  flexShrink: 0,
-};
+// The Archive folder-delete armed state used to be an inline danger-tinted band
+// (ROW_CONFIRM_STYLE / ROW_CONFIRM_TEXT_STYLE / ROW_BTN_DANGER_STYLE, MYND-623).
+// #202 routed that action through the shared <DeleteConfirmModal> instead — one
+// destructive-confirm surface across the app, with a token-correct danger fill
+// (no var(--paper-1,#fff) ghost), a focus trap and Cancel-default focus — so the
+// three inline styles are gone.
 
 // A proper zero state (#226 follow-up): a large muted glyph, a headline,
 // and one explanatory line — instead of a single bare sentence. Shared by both
