@@ -238,7 +238,7 @@
       "task": "Notizen mit einer Aufgabe",
       "content": "Volltext im Notiztext"
     },
-    "searchPlaceholder": "Notizen durchsuchen oder Befehl ausführen – Esc zum Schließen",
+    "searchPlaceholder": "Notizen durchsuchen oder Befehl ausführen – probieren Sie tag: · path: · task:",
     "sectionCommands": "Befehle",
     "sectionNotes": "Notizen",
     "untitledNote": "Ohne Titel"
@@ -453,7 +453,7 @@
         "label": ".base-Ansicht importieren…"
       },
       "importObsidian": {
-        "label": "Obsidian-Tresor importieren…"
+        "label": "Notizen importieren…"
       },
       "lockVault": {
         "label": "Tresor sperren"
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "KI-Chat",
-          "backlinks": "Backlinks",
+          "backlinks": "Links",
           "outline": "Gliederung",
           "tasks": "Aufgaben",
           "unlinked": "Nicht verknüpfte Erwähnungen"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "der Pfad aus Ordner + Titel ist zu lang",
         "reasonSegmentTooLong": "der Name ist länger, als Myne erlaubt",
         "scanning": "Ihr Tresor wird gescannt…",
-        "setupIntro": "Verweisen Sie Myne auf Ihren vorhandenen Obsidian-Tresorordner. Jede Markdown-Notiz wird direkt vor Ort importiert und verschlüsselt – nichts verlässt dieses Gerät und Ihre Originaldateien bleiben unangetastet.",
+        "setupIntro": "Myne importiert und verschlüsselt Ihre Notizen direkt vor Ort – nichts verlässt dieses Gerät und Ihre Originaldateien werden nie verändert.",
         "statCancelled": "Abgebrochen",
         "statCanvasSkipped": ".canvas-Dateien übersprungen",
         "statCompressed": "Bilder komprimiert",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Vorgeschlagener Name",
         "titleComplete": "Import abgeschlossen",
         "titleFailed": "Import fehlgeschlagen",
-        "titleSetup": "Obsidian-Tresor importieren",
+        "titleSetup": "Notizen importieren",
         "vaultFolderLabel": "Tresorordner",
         "vaultRoot": "(Tresorwurzel)",
         "titlePick": "Notizen importieren",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Ordner auswählen…",
         "laterHint": "Sie können jederzeit später über Einstellungen → Speicher importieren.",
         "notNow": "Nicht jetzt",
-        "title": "Ihren Obsidian-Tresor importieren?"
+        "title": "Ihre Notizen importieren?"
       },
       "picker": {
         "intro": "Woher kommen Ihre Notizen?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "alle {{count}} Tage",
+      "day_one": "jeden {{count}} Tag",
+      "day_other": "alle {{count}} Tage",
       "week": "alle {{count}} Wochen",
+      "week_one": "jede {{count}} Woche",
+      "week_other": "alle {{count}} Wochen",
       "month": "alle {{count}} Monate",
-      "year": "alle {{count}} Jahre"
+      "month_one": "jeden {{count}} Monat",
+      "month_other": "alle {{count}} Monate",
+      "year": "alle {{count}} Jahre",
+      "year_one": "jedes {{count}} Jahr",
+      "year_other": "alle {{count}} Jahre"
     },
     "everyWeekday": "jeden {{days}}",
     "everyWeekdays": "jeden {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Bestätigen",
       "delete": "Löschen",
       "deleteError": "Dieses Design konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.",
-      "empty": "Noch keine eigenen Designs. Importieren Sie eines oder öffnen Sie den Design-Ordner und fügen Sie eine Design-Datei hinzu.",
+      "empty": "Noch keine eigenen Designs. Importieren Sie eine Design-Datei, um zu beginnen.",
       "error": {
         "aColorFallback": "eine Farbe",
         "invalidFile": "Ungültige Design-Datei.",
@@ -2492,7 +2500,7 @@
       "label": "Eigene Designs",
       "openFolderButton": "Design-Ordner öffnen",
       "openFolderError": "Der Design-Ordner konnte nicht geöffnet werden.",
-      "readError": "Ihr Design-Ordner konnte nicht gelesen werden.",
+      "readError": "Ihre eigenen Designs konnten nicht gelesen werden.",
       "readOnlyHelper": "Eigene Designs werden auf Ihrem Computer installiert. Ihre eigenen erscheinen hier nach einer Synchronisierung von selbst."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Bereiche & Tabs",
         "view": "Ansicht"
       },
-      "helper": "Tastenkürzel anzeigen und ändern. Die Editor-Formatierung und das Tab-Durchschalten-Kürzel sind fest.",
+      "helper": "Tastenkürzel anzeigen und ändern. Nur das Kürzel zum Tab-Durchschalten (Ctrl+Tab) ist fest.",
       "notSet": "Nicht festgelegt",
       "removeBindingAria": "{{chord}} entfernen",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Abgebrochen.",
       "errorGeneric": "Schnellentsperrung konnte nicht eingerichtet werden.",
-      "errorHardwareUnavailable": "Touch ID ist auf diesem Gerät nicht verfügbar.",
+      "errorHardwareUnavailable": "Touch ID ist in diesem Build nicht verfügbar. Dafür ist ein signierter macOS-Build mit eingerichtetem Touch ID nötig.",
       "errorNotUnlocked": "Entsperren Sie zuerst den Tresor.",
       "errorPinNotDigits": "Die PIN darf nur aus Ziffern bestehen.",
       "errorPinTooShort": "Die PIN muss mindestens {{count}} Ziffern haben.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Tresor als Markdown exportieren",
       "exportHelper": "Reiner Markdown-Baum – nicht verschlüsselt.",
       "exportLabel": "Exportieren",
-      "importHelper": "Holen Sie einen vorhandenen Obsidian-Tresor in Myne. Jede Markdown-Notiz wird direkt vor Ort importiert und verschlüsselt; Ihre Originaldateien bleiben unangetastet.",
+      "importHelper": "Holen Sie Notizen aus Obsidian, Notion, Evernote, HTML-Dateien oder einer CSV in Myne. Alles wird direkt vor Ort importiert und verschlüsselt; Ihre Originaldateien bleiben unangetastet.",
       "importLabel": "Importieren",
-      "importObsidian": "Obsidian-Tresor importieren…",
+      "importObsidian": "Notizen importieren…",
       "locationHelper": "Jeder Tresor ist ein Ordner mit verschlüsselten Dateien unter diesem Pfad. Bevorzugen Sie die Sicherungs-Schaltfläche unten gegenüber manuellen Kopien – sie verifiziert die geschriebene Datei.",
       "locationLabel": "Tresorspeicherort",
       "openInFiles": "In Dateien öffnen",

@@ -238,7 +238,7 @@
       "task": "含任务的笔记",
       "content": "正文全文检索"
     },
-    "searchPlaceholder": "搜索笔记或运行命令——按 Esc 关闭",
+    "searchPlaceholder": "搜索笔记或运行命令——试试 tag: · path: · task:",
     "sectionCommands": "命令",
     "sectionNotes": "笔记",
     "untitledNote": "无标题"
@@ -453,7 +453,7 @@
         "label": "导入 .base 视图…"
       },
       "importObsidian": {
-        "label": "导入 Obsidian 保险库…"
+        "label": "导入笔记…"
       },
       "lockVault": {
         "label": "锁定保险库"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "正在为 AI 准备你的笔记——请稍候。",
           "insert": "插入到笔记",
           "noAnswer": "没有答案——请尝试换个说法。",
-          "noModelHint": "未选择模型。请在设置 → Developer → AI 中选择一个以开始。",
-          "offHint": "本地 AI 已关闭。请在设置 → Developer → AI 中开启。",
+          "noModelHint": "未选择模型。请在设置 → 开发者 → AI 中选择一个以开始。",
+          "offHint": "本地 AI 已关闭。请在设置 → 开发者 → AI 中开启。",
           "send": "发送",
           "statusGettingReady": "正在准备…",
           "statusNoModel": "无模型",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "AI 聊天",
-          "backlinks": "反向链接",
+          "backlinks": "链接",
           "outline": "大纲",
           "tasks": "任务",
           "unlinked": "未链接的提及"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "文件夹 + 标题的路径太长",
         "reasonSegmentTooLong": "名称超过了 Myne 允许的长度",
         "scanning": "正在扫描你的保险库…",
-        "setupIntro": "将 Myne 指向你现有的 Obsidian 保险库文件夹。每篇 Markdown 笔记都会被导入并就地加密——没有任何内容离开本设备，你的原始文件也不会被改动。",
+        "setupIntro": "Myne 会就地导入并加密你的笔记——没有任何内容离开本设备，你的原始文件也不会被改动。",
         "statCancelled": "已取消",
         "statCanvasSkipped": "已跳过 .canvas 文件",
         "statCompressed": "已压缩的图片",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "建议名称",
         "titleComplete": "导入完成",
         "titleFailed": "导入失败",
-        "titleSetup": "导入 Obsidian 保险库",
+        "titleSetup": "导入笔记",
         "vaultFolderLabel": "保险库文件夹",
         "vaultRoot": "（保险库根目录）",
         "titlePick": "导入笔记",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "选择文件夹…",
         "laterHint": "你随时可以稍后从“设置 → 存储”导入。",
         "notNow": "暂不",
-        "title": "导入你的 Obsidian 保险库？"
+        "title": "导入你的笔记？"
       },
       "picker": {
         "intro": "你的笔记来自哪里？"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "每 {{count}} 天",
+      "day_one": "每 {{count}} 天",
+      "day_other": "每 {{count}} 天",
       "week": "每 {{count}} 周",
+      "week_one": "每 {{count}} 周",
+      "week_other": "每 {{count}} 周",
       "month": "每 {{count}} 个月",
-      "year": "每 {{count}} 年"
+      "month_one": "每 {{count}} 个月",
+      "month_other": "每 {{count}} 个月",
+      "year": "每 {{count}} 年",
+      "year_one": "每 {{count}} 年",
+      "year_other": "每 {{count}} 年"
     },
     "everyWeekday": "每{{days}}",
     "everyWeekdays": "每{{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "确认",
       "delete": "删除",
       "deleteError": "无法删除该主题。请重试。",
-      "empty": "暂无自定义主题。导入一个，或打开主题文件夹并添加主题文件。",
+      "empty": "暂无自定义主题。导入一个主题文件即可开始。",
       "error": {
         "aColorFallback": "某个颜色",
         "invalidFile": "无效的主题文件。",
@@ -2492,7 +2500,7 @@
       "label": "自定义主题",
       "openFolderButton": "打开主题文件夹",
       "openFolderError": "无法打开主题文件夹。",
-      "readError": "无法读取你的主题文件夹。",
+      "readError": "无法读取你的自定义主题。",
       "readOnlyHelper": "自定义主题安装在你的电脑上。同步之后，你的主题会自动出现在这里。"
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "窗格与标签页",
         "view": "视图"
       },
-      "helper": "查看并更改键盘快捷键。编辑器格式和标签页循环切换的快捷键是固定的。",
+      "helper": "查看并更改键盘快捷键。只有标签页循环切换的快捷键（Ctrl+Tab）是固定的。",
       "notSet": "未设置",
       "removeBindingAria": "移除 {{chord}}",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "已取消。",
       "errorGeneric": "无法配置快速解锁。",
-      "errorHardwareUnavailable": "此设备不支持 Touch ID。",
+      "errorHardwareUnavailable": "此构建版本不支持 Touch ID。它需要已签名并已录入 Touch ID 的 macOS 构建版本。",
       "errorNotUnlocked": "请先解锁保险库。",
       "errorPinNotDigits": "PIN 只能包含数字。",
       "errorPinTooShort": "PIN 至少需要 {{count}} 位数字。",
@@ -2829,9 +2837,9 @@
       "exportBody": "将保险库导出为 Markdown",
       "exportHelper": "纯 Markdown 文件树——未加密。",
       "exportLabel": "导出",
-      "importHelper": "将现有的 Obsidian 保险库导入 Myne。每篇 Markdown 笔记都会被导入并就地加密；你的原始文件不会被改动。",
+      "importHelper": "从 Obsidian、Notion、Evernote、HTML 文件或 CSV 导入笔记。所有内容都会就地导入并加密；你的原始文件不会被改动。",
       "importLabel": "导入",
-      "importObsidian": "导入 Obsidian 保险库…",
+      "importObsidian": "导入笔记…",
       "locationHelper": "每个保险库都是此路径下的一个加密文件夹。请优先使用下方的“备份”按钮，而非手动复制——它会校验所写入的文件。",
       "locationLabel": "保险库位置",
       "openInFiles": "在文件管理器中打开",

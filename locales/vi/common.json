@@ -238,7 +238,7 @@
       "task": "Ghi chú có công việc",
       "content": "Toàn văn trong nội dung"
     },
-    "searchPlaceholder": "Tìm ghi chú hoặc chạy lệnh — Esc để đóng",
+    "searchPlaceholder": "Tìm ghi chú hoặc chạy lệnh — thử tag: · path: · task:",
     "sectionCommands": "Lệnh",
     "sectionNotes": "Ghi chú",
     "untitledNote": "Không có tiêu đề"
@@ -453,7 +453,7 @@
         "label": "Nhập chế độ xem .base…"
       },
       "importObsidian": {
-        "label": "Nhập kho Obsidian…"
+        "label": "Nhập ghi chú…"
       },
       "lockVault": {
         "label": "Khóa kho"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "Đang chuẩn bị ghi chú của bạn cho AI — chờ một chút.",
           "insert": "Chèn vào ghi chú",
           "noAnswer": "Không có câu trả lời — thử diễn đạt lại.",
-          "noModelHint": "Chưa chọn mô hình. Chọn một mô hình trong Cài đặt → Developer → AI để bắt đầu.",
-          "offHint": "AI cục bộ đang tắt. Bật nó trong Cài đặt → Developer → AI.",
+          "noModelHint": "Chưa chọn mô hình. Chọn một mô hình trong Cài đặt → Nhà phát triển → AI để bắt đầu.",
+          "offHint": "AI cục bộ đang tắt. Hãy bật nó trong Cài đặt → Nhà phát triển → AI.",
           "send": "Gửi",
           "statusGettingReady": "Đang chuẩn bị…",
           "statusNoModel": "Không có mô hình",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "Trò chuyện AI",
-          "backlinks": "Liên kết ngược",
+          "backlinks": "Liên kết",
           "outline": "Dàn ý",
           "tasks": "Công việc",
           "unlinked": "Đề cập chưa liên kết"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "đường dẫn thư mục + tiêu đề quá dài",
         "reasonSegmentTooLong": "tên dài hơn mức Myne cho phép",
         "scanning": "Đang quét kho của bạn…",
-        "setupIntro": "Trỏ Myne tới thư mục kho Obsidian hiện có của bạn. Mọi ghi chú Markdown được nhập và mã hóa ngay tại chỗ — không có gì rời khỏi thiết bị này, và các tệp gốc của bạn không bị động đến.",
+        "setupIntro": "Myne nhập và mã hóa ghi chú của bạn ngay tại chỗ — không có gì rời khỏi thiết bị này, và các tệp gốc của bạn không bao giờ bị thay đổi.",
         "statCancelled": "Đã hủy",
         "statCanvasSkipped": "tệp .canvas đã bỏ qua",
         "statCompressed": "Hình ảnh đã nén",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Tên gợi ý",
         "titleComplete": "Đã nhập xong",
         "titleFailed": "Nhập thất bại",
-        "titleSetup": "Nhập kho Obsidian",
+        "titleSetup": "Nhập ghi chú",
         "vaultFolderLabel": "Thư mục kho",
         "vaultRoot": "(thư mục gốc của kho)",
         "titlePick": "Nhập ghi chú",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Chọn thư mục…",
         "laterHint": "Bạn luôn có thể nhập sau từ Cài đặt → Lưu trữ.",
         "notNow": "Không phải bây giờ",
-        "title": "Nhập kho Obsidian của bạn?"
+        "title": "Nhập ghi chú của bạn?"
       },
       "picker": {
         "intro": "Ghi chú của bạn đến từ đâu?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "mỗi {{count}} ngày",
+      "day_one": "mỗi {{count}} ngày",
+      "day_other": "mỗi {{count}} ngày",
       "week": "mỗi {{count}} tuần",
+      "week_one": "mỗi {{count}} tuần",
+      "week_other": "mỗi {{count}} tuần",
       "month": "mỗi {{count}} tháng",
-      "year": "mỗi {{count}} năm"
+      "month_one": "mỗi {{count}} tháng",
+      "month_other": "mỗi {{count}} tháng",
+      "year": "mỗi {{count}} năm",
+      "year_one": "mỗi {{count}} năm",
+      "year_other": "mỗi {{count}} năm"
     },
     "everyWeekday": "mỗi {{days}}",
     "everyWeekdays": "mỗi {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Xác nhận",
       "delete": "Xóa",
       "deleteError": "Không thể xóa giao diện đó. Vui lòng thử lại.",
-      "empty": "Chưa có giao diện tùy chỉnh nào. Hãy nhập một giao diện, hoặc mở thư mục giao diện và thêm một tệp giao diện.",
+      "empty": "Chưa có giao diện tùy chỉnh nào. Hãy nhập một tệp giao diện để bắt đầu.",
       "error": {
         "aColorFallback": "một màu",
         "invalidFile": "Tệp giao diện không hợp lệ.",
@@ -2492,7 +2500,7 @@
       "label": "Giao diện tùy chỉnh",
       "openFolderButton": "Mở thư mục giao diện",
       "openFolderError": "Không thể mở thư mục giao diện.",
-      "readError": "Không thể đọc thư mục giao diện của bạn.",
+      "readError": "Không thể đọc các giao diện tùy chỉnh của bạn.",
       "readOnlyHelper": "Giao diện tùy chỉnh được cài đặt trên máy tính của bạn. Giao diện của bạn sẽ tự xuất hiện ở đây sau một lần đồng bộ."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Khung & Thẻ",
         "view": "Xem"
       },
-      "helper": "Xem và thay đổi phím tắt. Phím tắt định dạng trình soạn thảo và phím chuyển vòng thẻ là cố định.",
+      "helper": "Xem và thay đổi phím tắt. Chỉ có phím tắt chuyển vòng thẻ (Ctrl+Tab) là cố định.",
       "notSet": "Chưa đặt",
       "removeBindingAria": "Xóa {{chord}}",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Đã hủy.",
       "errorGeneric": "Không thể thiết lập mở khóa nhanh.",
-      "errorHardwareUnavailable": "Touch ID không khả dụng trên thiết bị này.",
+      "errorHardwareUnavailable": "Touch ID không khả dụng trong bản dựng này. Nó cần một bản dựng macOS đã ký với Touch ID đã được đăng ký.",
       "errorNotUnlocked": "Hãy mở khóa kho trước.",
       "errorPinNotDigits": "Mã PIN chỉ được gồm chữ số.",
       "errorPinTooShort": "Mã PIN phải có ít nhất {{count}} chữ số.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Xuất kho dạng Markdown",
       "exportHelper": "Cây Markdown thuần — không được mã hóa.",
       "exportLabel": "Xuất",
-      "importHelper": "Đưa một kho Obsidian hiện có vào Myne. Mọi ghi chú Markdown được nhập và mã hóa ngay tại chỗ; các tệp gốc của bạn không bị động đến.",
+      "importHelper": "Đưa ghi chú vào từ Obsidian, Notion, Evernote, tệp HTML hoặc một tệp CSV. Mọi thứ được nhập và mã hóa ngay tại chỗ; các tệp gốc của bạn không bị động đến.",
       "importLabel": "Nhập",
-      "importObsidian": "Nhập kho Obsidian…",
+      "importObsidian": "Nhập ghi chú…",
       "locationHelper": "Mỗi kho là một thư mục chứa các tệp đã mã hóa nằm dưới đường dẫn này. Hãy ưu tiên nút Sao lưu bên dưới thay vì sao chép thủ công — nó xác minh tệp đã ghi.",
       "locationLabel": "Vị trí kho",
       "openInFiles": "Mở trong trình quản lý tệp",

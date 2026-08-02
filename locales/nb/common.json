@@ -238,7 +238,7 @@
       "task": "Notater med en oppgave",
       "content": "Fulltekst i brødteksten"
     },
-    "searchPlaceholder": "Søk i notater eller kjør en kommando — Esc for å lukke",
+    "searchPlaceholder": "Søk i notater eller kjør en kommando — prøv tag: · path: · task:",
     "sectionCommands": "Kommandoer",
     "sectionNotes": "Notater",
     "untitledNote": "Uten tittel"
@@ -453,7 +453,7 @@
         "label": "Importer .base-visning…"
       },
       "importObsidian": {
-        "label": "Importer Obsidian-hvelv…"
+        "label": "Importer notater…"
       },
       "lockVault": {
         "label": "Lås hvelv"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "Forbereder notatene dine for AI – et øyeblikk.",
           "insert": "Sett inn i notat",
           "noAnswer": "Ingen svar – prøv å omformulere.",
-          "noModelHint": "Ingen modell valgt. Velg en i Innstillinger → Developer → AI for å starte.",
-          "offHint": "Lokal AI er av. Slå den på i Innstillinger → Developer → AI.",
+          "noModelHint": "Ingen modell valgt. Velg en i Innstillinger → Utvikler → AI for å starte.",
+          "offHint": "Lokal AI er av. Slå den på i Innstillinger → Utvikler → AI.",
           "send": "Send",
           "statusGettingReady": "Forbereder…",
           "statusNoModel": "Ingen modell",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "AI-chat",
-          "backlinks": "Tilbakekoblinger",
+          "backlinks": "Lenker",
           "outline": "Disposisjon",
           "tasks": "Oppgaver",
           "unlinked": "Ukoblede omtaler"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "banen for mappe + tittel er for lang",
         "reasonSegmentTooLong": "navnet er lengre enn Myne tillater",
         "scanning": "Skanner hvelvet ditt…",
-        "setupIntro": "Pek Myne mot din eksisterende Obsidian-hvelvmappe. Hvert Markdown-notat importeres og krypteres på stedet — ingenting forlater denne enheten, og originalfilene dine berøres ikke.",
+        "setupIntro": "Myne importerer og krypterer notatene dine på stedet — ingenting forlater denne enheten, og originalfilene dine endres aldri.",
         "statCancelled": "Avbrutt",
         "statCanvasSkipped": ".canvas-filer hoppet over",
         "statCompressed": "Bilder komprimert",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Foreslått navn",
         "titleComplete": "Import fullført",
         "titleFailed": "Import mislyktes",
-        "titleSetup": "Importer Obsidian-hvelv",
+        "titleSetup": "Importer notater",
         "vaultFolderLabel": "Hvelvmappe",
         "vaultRoot": "(hvelvrot)",
         "titlePick": "Importer notater",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Velg mappe…",
         "laterHint": "Du kan alltid importere senere fra Innstillinger → Lagring.",
         "notNow": "Ikke nå",
-        "title": "Importere ditt Obsidian-hvelv?"
+        "title": "Importere notatene dine?"
       },
       "picker": {
         "intro": "Hvor kommer notatene dine fra?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "hver {{count}}. dag",
+      "day_one": "hver {{count}}. dag",
+      "day_other": "hver {{count}}. dag",
       "week": "hver {{count}}. uke",
+      "week_one": "hver {{count}}. uke",
+      "week_other": "hver {{count}}. uke",
       "month": "hver {{count}}. måned",
-      "year": "hvert {{count}}. år"
+      "month_one": "hver {{count}}. måned",
+      "month_other": "hver {{count}}. måned",
+      "year": "hvert {{count}}. år",
+      "year_one": "hvert {{count}}. år",
+      "year_other": "hvert {{count}}. år"
     },
     "everyWeekday": "hver {{days}}",
     "everyWeekdays": "hver {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Bekreft",
       "delete": "Slett",
       "deleteError": "Kunne ikke slette det temaet. Prøv igjen.",
-      "empty": "Ingen egendefinerte temaer ennå. Importer ett, eller åpne temamappen og legg til en temafil.",
+      "empty": "Ingen egendefinerte temaer ennå. Importer en temafil for å komme i gang.",
       "error": {
         "aColorFallback": "en farge",
         "invalidFile": "Ugyldig temafil.",
@@ -2492,7 +2500,7 @@
       "label": "Egendefinerte temaer",
       "openFolderButton": "Åpne temamappe",
       "openFolderError": "Kunne ikke åpne temamappen.",
-      "readError": "Kunne ikke lese temamappen din.",
+      "readError": "Kunne ikke lese de egendefinerte temaene dine.",
       "readOnlyHelper": "Egendefinerte temaer installeres på datamaskinen din. Dine kommer hit av seg selv etter en synkronisering."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Ruter og faner",
         "view": "Visning"
       },
-      "helper": "Vis og endre tastatursnarveier. Redigeringsformatering og fanesyklus-snarveien er faste.",
+      "helper": "Vis og endre tastatursnarveier. Bare fanesyklus-snarveien (Ctrl+Tab) er fast.",
       "notSet": "Ikke angitt",
       "removeBindingAria": "Fjern {{chord}}",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Avbrutt.",
       "errorGeneric": "Kunne ikke konfigurere rask opplåsing.",
-      "errorHardwareUnavailable": "Touch ID er ikke tilgjengelig på denne enheten.",
+      "errorHardwareUnavailable": "Touch ID er ikke tilgjengelig i dette bygget. Det krever et signert macOS-bygg der Touch ID er registrert.",
       "errorNotUnlocked": "Lås opp hvelvet først.",
       "errorPinNotDigits": "PIN-koden kan bare bestå av siffer.",
       "errorPinTooShort": "PIN-koden må være minst {{count}} sifre.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Eksporter hvelv som Markdown",
       "exportHelper": "Ren markdown-mappestruktur — ikke kryptert.",
       "exportLabel": "Eksporter",
-      "importHelper": "Hent et eksisterende Obsidian-hvelv inn i Myne. Hvert Markdown-notat importeres og krypteres på stedet; originalfilene dine berøres ikke.",
+      "importHelper": "Hent inn notater fra Obsidian, Notion, Evernote, HTML-filer eller en CSV. Alt importeres og krypteres på stedet; originalfilene dine berøres ikke.",
       "importLabel": "Importer",
-      "importObsidian": "Importer Obsidian-hvelv…",
+      "importObsidian": "Importer notater…",
       "locationHelper": "Hvert hvelv er en mappe med krypterte filer under denne banen. Foretrekk Sikkerhetskopi-knappen nedenfor fremfor manuelle kopier — den verifiserer den skrevne filen.",
       "locationLabel": "Hvelvplassering",
       "openInFiles": "Åpne i Filer",

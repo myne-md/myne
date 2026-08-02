@@ -247,7 +247,7 @@
       "task": "Note con un'attività",
       "content": "Testo completo nel corpo"
     },
-    "searchPlaceholder": "Cerca note o esegui un comando — Esc per chiudere",
+    "searchPlaceholder": "Cerca note o esegui un comando — prova tag: · path: · task:",
     "sectionCommands": "Comandi",
     "sectionNotes": "Note",
     "untitledNote": "Senza titolo"
@@ -462,7 +462,7 @@
         "label": "Importa vista .base…"
       },
       "importObsidian": {
-        "label": "Importa cassaforte Obsidian…"
+        "label": "Importa note…"
       },
       "lockVault": {
         "label": "Blocca cassaforte"
@@ -960,7 +960,7 @@
         },
         "tabs": {
           "aiChat": "Chat AI",
-          "backlinks": "Backlink",
+          "backlinks": "Collegamenti",
           "outline": "Struttura",
           "tasks": "Attività",
           "unlinked": "Menzioni non collegate"
@@ -1744,7 +1744,7 @@
         "reasonPathTooLong": "il percorso cartella + titolo è troppo lungo",
         "reasonSegmentTooLong": "il nome è più lungo di quanto Myne consenta",
         "scanning": "Scansione della tua cassaforte…",
-        "setupIntro": "Indica a Myne la cartella della tua cassaforte Obsidian esistente. Ogni nota Markdown viene importata e crittografata sul posto — nulla lascia questo dispositivo e i tuoi file originali restano intatti.",
+        "setupIntro": "Myne importa e crittografa le tue note sul posto — nulla lascia questo dispositivo e i tuoi file originali non vengono mai modificati.",
         "statCancelled": "Annullate",
         "statCanvasSkipped": "file .canvas ignorati",
         "statCompressed": "Immagini compresse",
@@ -1755,7 +1755,7 @@
         "suggestedNameAriaLabel": "Nome consigliato",
         "titleComplete": "Importazione completata",
         "titleFailed": "Importazione non riuscita",
-        "titleSetup": "Importa cassaforte Obsidian",
+        "titleSetup": "Importa note",
         "vaultFolderLabel": "Cartella della cassaforte",
         "vaultRoot": "(radice della cassaforte)",
         "titlePick": "Importa note",
@@ -1780,7 +1780,7 @@
         "chooseFolder": "Scegli cartella…",
         "laterHint": "Puoi sempre importare in seguito da Impostazioni → Archiviazione.",
         "notNow": "Non ora",
-        "title": "Importare la tua cassaforte Obsidian?"
+        "title": "Importare le tue note?"
       },
       "picker": {
         "intro": "Da dove arrivano le tue note?"
@@ -2233,9 +2233,21 @@
     },
     "everyN": {
       "day": "ogni {{count}} giorni",
+      "day_one": "ogni {{count}} giorno",
+      "day_many": "ogni {{count}} di giorni",
+      "day_other": "ogni {{count}} giorni",
       "week": "ogni {{count}} settimane",
+      "week_one": "ogni {{count}} settimana",
+      "week_many": "ogni {{count}} di settimane",
+      "week_other": "ogni {{count}} settimane",
       "month": "ogni {{count}} mesi",
-      "year": "ogni {{count}} anni"
+      "month_one": "ogni {{count}} mese",
+      "month_many": "ogni {{count}} di mesi",
+      "month_other": "ogni {{count}} mesi",
+      "year": "ogni {{count}} anni",
+      "year_one": "ogni {{count}} anno",
+      "year_many": "ogni {{count}} di anni",
+      "year_other": "ogni {{count}} anni"
     },
     "everyWeekday": "ogni {{days}}",
     "everyWeekdays": "ogni {{days}}",
@@ -2545,7 +2557,7 @@
       "confirm": "Conferma",
       "delete": "Elimina",
       "deleteError": "Impossibile eliminare quel tema. Riprova.",
-      "empty": "Ancora nessun tema personalizzato. Importane uno, oppure apri la cartella dei temi e aggiungi un file di tema.",
+      "empty": "Ancora nessun tema personalizzato. Importa un file di tema per iniziare.",
       "error": {
         "aColorFallback": "un colore",
         "invalidFile": "File del tema non valido.",
@@ -2565,7 +2577,7 @@
       "label": "Temi personalizzati",
       "openFolderButton": "Apri cartella dei temi",
       "openFolderError": "Impossibile aprire la cartella dei temi.",
-      "readError": "Impossibile leggere la cartella dei temi.",
+      "readError": "Impossibile leggere i tuoi temi personalizzati.",
       "readOnlyHelper": "I temi personalizzati si installano sul tuo computer. I tuoi arrivano qui da soli dopo una sincronizzazione."
     },
     "dailyNotes": {
@@ -2664,7 +2676,7 @@
         "panesTabs": "Riquadri e schede",
         "view": "Vista"
       },
-      "helper": "Visualizza e modifica le scorciatoie da tastiera. La formattazione dell'editor e la scorciatoia per scorrere le schede sono fisse.",
+      "helper": "Visualizza e modifica le scorciatoie da tastiera. È fissa solo la scorciatoia per scorrere le schede (Ctrl+Tab).",
       "notSet": "Non impostata",
       "removeBindingAria": "Rimuovi {{chord}}",
       "reserved": {
@@ -2819,7 +2831,7 @@
     "quickUnlock": {
       "errorCancelled": "Annullato.",
       "errorGeneric": "Impossibile configurare lo sblocco rapido.",
-      "errorHardwareUnavailable": "Touch ID non è disponibile su questo dispositivo.",
+      "errorHardwareUnavailable": "Touch ID non è disponibile in questa build. Richiede una build macOS firmata con Touch ID registrato.",
       "errorNotUnlocked": "Sblocca prima la cassaforte.",
       "errorPinNotDigits": "Il PIN deve contenere solo cifre.",
       "errorPinTooShort": "Il PIN deve contenere almeno {{count}} cifre.",
@@ -2905,9 +2917,9 @@
       "exportBody": "Esporta cassaforte come Markdown",
       "exportHelper": "Albero Markdown semplice — non crittografato.",
       "exportLabel": "Esporta",
-      "importHelper": "Porta una cassaforte Obsidian esistente in Myne. Ogni nota Markdown viene importata e crittografata sul posto; i tuoi file originali restano intatti.",
+      "importHelper": "Porta in Myne le note da Obsidian, Notion, Evernote, file HTML o un CSV. Tutto viene importato e crittografato sul posto; i tuoi file originali restano intatti.",
       "importLabel": "Importa",
-      "importObsidian": "Importa cassaforte Obsidian…",
+      "importObsidian": "Importa note…",
       "locationHelper": "Ogni cassaforte è una cartella di file crittografati sotto questo percorso. Preferisci il pulsante Backup qui sotto alle copie manuali — verifica il file scritto.",
       "locationLabel": "Posizione della cassaforte",
       "openInFiles": "Apri nei file",

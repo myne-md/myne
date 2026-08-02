@@ -238,7 +238,7 @@
       "task": "Muistiinpanot, joissa on tehtävä",
       "content": "Kokotekstihaku sisällöstä"
     },
-    "searchPlaceholder": "Etsi muistiinpanoja tai suorita komento — sulje Esc-näppäimellä",
+    "searchPlaceholder": "Etsi muistiinpanoja tai suorita komento — kokeile tag: · path: · task:",
     "sectionCommands": "Komennot",
     "sectionNotes": "Muistiinpanot",
     "untitledNote": "Nimetön"
@@ -453,7 +453,7 @@
         "label": "Tuo .base-näkymä…"
       },
       "importObsidian": {
-        "label": "Tuo Obsidian-holvi…"
+        "label": "Tuo muistiinpanoja…"
       },
       "lockVault": {
         "label": "Lukitse holvi"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "Valmistellaan muistiinpanojasi tekoälyä varten — hetki.",
           "insert": "Lisää muistiinpanoon",
           "noAnswer": "Ei vastausta — kokeile muotoilla uudelleen.",
-          "noModelHint": "Mallia ei valittu. Aloita valitsemalla malli kohdasta Asetukset → Developer → Tekoäly.",
-          "offHint": "Paikallinen tekoäly on pois päältä. Ota se käyttöön kohdasta Asetukset → Developer → Tekoäly.",
+          "noModelHint": "Mallia ei valittu. Aloita valitsemalla malli kohdasta Asetukset → Kehittäjä → Tekoäly.",
+          "offHint": "Paikallinen tekoäly on pois päältä. Ota se käyttöön kohdasta Asetukset → Kehittäjä → Tekoäly.",
           "send": "Lähetä",
           "statusGettingReady": "Valmistellaan…",
           "statusNoModel": "Ei mallia",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "Tekoälykeskustelu",
-          "backlinks": "Takaisinlinkit",
+          "backlinks": "Linkit",
           "outline": "Jäsennys",
           "tasks": "Tehtävät",
           "unlinked": "Linkittämättömät maininnat"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "kansion ja otsikon polku on liian pitkä",
         "reasonSegmentTooLong": "nimi on pidempi kuin Myne sallii",
         "scanning": "Tutkitaan holviasi…",
-        "setupIntro": "Osoita Myne olemassa olevaan Obsidian-holvin kansioosi. Jokainen Markdown-muistiinpano tuodaan ja salataan saman tien — mikään ei poistu tältä laitteelta, ja alkuperäiset tiedostosi jätetään koskemattomiksi.",
+        "setupIntro": "Myne tuo ja salaa muistiinpanosi saman tien — mikään ei poistu tältä laitteelta, eikä alkuperäisiin tiedostoihisi kosketa.",
         "statCancelled": "Peruutettu",
         "statCanvasSkipped": ".canvas-tiedostot ohitettu",
         "statCompressed": "Kuvia pakattu",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Ehdotettu nimi",
         "titleComplete": "Tuonti valmis",
         "titleFailed": "Tuonti epäonnistui",
-        "titleSetup": "Tuo Obsidian-holvi",
+        "titleSetup": "Tuo muistiinpanoja",
         "vaultFolderLabel": "Holvin kansio",
         "vaultRoot": "(holvin juuri)",
         "titlePick": "Tuo muistiinpanoja",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Valitse kansio…",
         "laterHint": "Voit aina tuoda myöhemmin kohdasta Asetukset → Tallennus.",
         "notNow": "Ei nyt",
-        "title": "Tuodaanko Obsidian-holvisi?"
+        "title": "Tuodaanko muistiinpanosi?"
       },
       "picker": {
         "intro": "Mistä muistiinpanosi tulevat?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "{{count}} päivän välein",
+      "day_one": "{{count}} päivän välein",
+      "day_other": "{{count}} päivän välein",
       "week": "{{count}} viikon välein",
+      "week_one": "{{count}} viikon välein",
+      "week_other": "{{count}} viikon välein",
       "month": "{{count}} kuukauden välein",
-      "year": "{{count}} vuoden välein"
+      "month_one": "{{count}} kuukauden välein",
+      "month_other": "{{count}} kuukauden välein",
+      "year": "{{count}} vuoden välein",
+      "year_one": "{{count}} vuoden välein",
+      "year_other": "{{count}} vuoden välein"
     },
     "everyWeekday": "joka {{days}}",
     "everyWeekdays": "joka {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Vahvista",
       "delete": "Poista",
       "deleteError": "Tuota teemaa ei voitu poistaa. Yritä uudelleen.",
-      "empty": "Ei vielä omia teemoja. Tuo teema tai avaa teemakansio ja lisää teematiedosto.",
+      "empty": "Ei vielä omia teemoja. Aloita tuomalla teematiedosto.",
       "error": {
         "aColorFallback": "väri",
         "invalidFile": "Virheellinen teematiedosto.",
@@ -2492,7 +2500,7 @@
       "label": "Omat teemat",
       "openFolderButton": "Avaa teemakansio",
       "openFolderError": "Teemakansion avaaminen ei onnistunut.",
-      "readError": "Teemakansiotasi ei voitu lukea.",
+      "readError": "Omia teemojasi ei voitu lukea.",
       "readOnlyHelper": "Omat teemat asennetaan tietokoneellasi. Sinun teemasi saapuvat tänne itsestään synkronoinnin jälkeen."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Ruudut ja välilehdet",
         "view": "Näkymä"
       },
-      "helper": "Näytä ja muuta näppäimistön pikanäppäimiä. Muokkaimen muotoilu ja välilehtien selauspikanäppäin ovat kiinteät.",
+      "helper": "Näytä ja muuta näppäimistön pikanäppäimiä. Vain välilehtien selauspikanäppäin (Ctrl+Tab) on kiinteä.",
       "notSet": "Ei asetettu",
       "removeBindingAria": "Poista {{chord}}",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Peruutettu.",
       "errorGeneric": "Pika-avausta ei voitu määrittää.",
-      "errorHardwareUnavailable": "Touch ID ei ole käytettävissä tällä laitteella.",
+      "errorHardwareUnavailable": "Touch ID ei ole käytettävissä tässä koosteessa. Se vaatii allekirjoitetun macOS-koosteen, jossa Touch ID on otettu käyttöön.",
       "errorNotUnlocked": "Avaa holvi ensin.",
       "errorPinNotDigits": "PIN-koodin on sisällettävä vain numeroita.",
       "errorPinTooShort": "PIN-koodissa on oltava vähintään {{count}} numeroa.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Vie holvi Markdown-muodossa",
       "exportHelper": "Pelkkä Markdown-puu — ei salattu.",
       "exportLabel": "Vie",
-      "importHelper": "Tuo olemassa oleva Obsidian-holvi Myneen. Jokainen Markdown-muistiinpano tuodaan ja salataan saman tien; alkuperäiset tiedostosi jätetään koskemattomiksi.",
+      "importHelper": "Tuo muistiinpanoja Obsidianista, Notionista, Evernotesta, HTML-tiedostoista tai CSV-tiedostosta. Kaikki tuodaan ja salataan saman tien; alkuperäiset tiedostosi jätetään koskemattomiksi.",
       "importLabel": "Tuo",
-      "importObsidian": "Tuo Obsidian-holvi…",
+      "importObsidian": "Tuo muistiinpanoja…",
       "locationHelper": "Jokainen holvi on kansio salattuja tiedostoja tämän polun alla. Suosi alla olevaa Varmuuskopioi-painiketta manuaalisten kopioiden sijaan — se tarkistaa kirjoitetun tiedoston.",
       "locationLabel": "Holvin sijainti",
       "openInFiles": "Avaa Finderissa",

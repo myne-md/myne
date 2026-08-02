@@ -2150,9 +2150,17 @@
     },
     "everyN": {
       "day": "हर {{count}} दिन",
+      "day_one": "हर {{count}} दिन",
+      "day_other": "हर {{count}} दिन",
       "week": "हर {{count}} हफ़्ते",
+      "week_one": "हर {{count}} हफ़्ता",
+      "week_other": "हर {{count}} हफ़्ते",
       "month": "हर {{count}} महीने",
-      "year": "हर {{count}} साल"
+      "month_one": "हर {{count}} महीना",
+      "month_other": "हर {{count}} महीने",
+      "year": "हर {{count}} साल",
+      "year_one": "हर {{count}} साल",
+      "year_other": "हर {{count}} साल"
     },
     "everyWeekday": "हर {{days}}",
     "everyWeekdays": "हर {{days}}",
@@ -3328,7 +3336,7 @@
     "newAction": "नया",
     "emptyAfter": " — दोबारा इस्तेमाल होने वाला नोट टेंप्लेट बनाने के लिए, फिर उससे नोट शुरू करें (और सेटिंग में अपने रोज़ के नोट का टेंप्लेट चुनें)।",
     "use": "इस्तेमाल करें",
-    "edit": "बदलें",
+    "edit": "संपादित करें",
     "deleteConfirm": "यह टेंप्लेट मिटाएं?",
     "convertToNote": "नोट में बदलें"
   },
@@ -3719,7 +3727,7 @@
   "viewEditor": {
     "saveError": "यह व्यू सेव नहीं हो सका। दोबारा कोशिश करें।",
     "deleteError": "यह व्यू मिटाया नहीं जा सका। दोबारा कोशिश करें।",
-    "editView": "व्यू बदलें",
+    "editView": "व्यू संपादित करें",
     "condition": {
       "search": "टेक्स्ट"
     },

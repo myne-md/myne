@@ -2150,9 +2150,17 @@
     },
     "everyN": {
       "day": "every {{count}} days",
+      "day_one": "every {{count}} day",
+      "day_other": "every {{count}} days",
       "week": "every {{count}} weeks",
+      "week_one": "every {{count}} week",
+      "week_other": "every {{count}} weeks",
       "month": "every {{count}} months",
-      "year": "every {{count}} years"
+      "month_one": "every {{count}} month",
+      "month_other": "every {{count}} months",
+      "year": "every {{count}} years",
+      "year_one": "every {{count}} year",
+      "year_other": "every {{count}} years"
     },
     "everyWeekday": "every {{days}}",
     "everyWeekdays": "every {{days}}",

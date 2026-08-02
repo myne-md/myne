@@ -238,7 +238,7 @@
       "task": "Jegyzetek feladattal",
       "content": "Teljes szöveg a törzsben"
     },
-    "searchPlaceholder": "Keress jegyzeteket vagy futtass parancsot — Esc a bezáráshoz",
+    "searchPlaceholder": "Keress jegyzeteket vagy futtass parancsot — próbáld: tag: · path: · task:",
     "sectionCommands": "Parancsok",
     "sectionNotes": "Jegyzetek",
     "untitledNote": "Névtelen"
@@ -453,7 +453,7 @@
         "label": ".base nézet importálása…"
       },
       "importObsidian": {
-        "label": "Obsidian-széf importálása…"
+        "label": "Jegyzetek importálása…"
       },
       "lockVault": {
         "label": "Széf zárolása"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "A jegyzetek előkészítése az AI számára – egy pillanat.",
           "insert": "Beszúrás a jegyzetbe",
           "noAnswer": "Nincs válasz – próbálja átfogalmazni.",
-          "noModelHint": "Nincs kiválasztott modell. Válasszon egyet a Beállítások → Developer → AI menüben a kezdéshez.",
-          "offHint": "A helyi AI ki van kapcsolva. Kapcsolja be a Beállítások → Developer → AI menüben.",
+          "noModelHint": "Nincs kiválasztott modell. Válasszon egyet a Beállítások → Fejlesztő → AI menüben a kezdéshez.",
+          "offHint": "A helyi AI ki van kapcsolva. Kapcsolja be a Beállítások → Fejlesztő → AI menüben.",
           "send": "Küldés",
           "statusGettingReady": "Előkészítés…",
           "statusNoModel": "Nincs modell",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "AI-csevegés",
-          "backlinks": "Visszahivatkozások",
+          "backlinks": "Hivatkozások",
           "outline": "Vázlat",
           "tasks": "Feladatok",
           "unlinked": "Nem hivatkozott említések"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "a mappa + cím útvonala túl hosszú",
         "reasonSegmentTooLong": "a név hosszabb, mint amennyit a Myne megenged",
         "scanning": "A széf átvizsgálása…",
-        "setupIntro": "Mutasd meg a Myne-nak a meglévő Obsidian-széfed mappáját. Minden Markdown-jegyzet a helyszínen importálódik és titkosítódik — semmi nem hagyja el ezt az eszközt, és az eredeti fájljaid érintetlenek maradnak.",
+        "setupIntro": "A Myne a helyszínen importálja és titkosítja a jegyzeteidet — semmi nem hagyja el ezt az eszközt, és az eredeti fájljaid soha nem változnak.",
         "statCancelled": "Megszakítva",
         "statCanvasSkipped": ".canvas fájlok kihagyva",
         "statCompressed": "Tömörített képek",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Javasolt név",
         "titleComplete": "Az importálás kész",
         "titleFailed": "Az importálás meghiúsult",
-        "titleSetup": "Obsidian-széf importálása",
+        "titleSetup": "Jegyzetek importálása",
         "vaultFolderLabel": "Széf mappája",
         "vaultRoot": "(széf gyökere)",
         "titlePick": "Jegyzetek importálása",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Válassz mappát…",
         "laterHint": "Később is importálhatsz a Beállítások → Tárhely menüből.",
         "notNow": "Most nem",
-        "title": "Importálod az Obsidian-széfedet?"
+        "title": "Importálod a jegyzeteidet?"
       },
       "picker": {
         "intro": "Honnan érkeznek a jegyzeteid?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "{{count}} naponta",
+      "day_one": "{{count}} naponta",
+      "day_other": "{{count}} naponta",
       "week": "{{count}} hetente",
+      "week_one": "{{count}} hetente",
+      "week_other": "{{count}} hetente",
       "month": "{{count}} havonta",
-      "year": "{{count}} évente"
+      "month_one": "{{count}} havonta",
+      "month_other": "{{count}} havonta",
+      "year": "{{count}} évente",
+      "year_one": "{{count}} évente",
+      "year_other": "{{count}} évente"
     },
     "everyWeekday": "minden {{days}}",
     "everyWeekdays": "minden {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Megerősítés",
       "delete": "Törlés",
       "deleteError": "Nem sikerült törölni ezt a témát. Kérlek, próbáld újra.",
-      "empty": "Még nincs egyéni téma. Importálj egyet, vagy nyisd meg a témák mappáját, és adj hozzá egy témafájlt.",
+      "empty": "Még nincs egyéni téma. Az induláshoz importálj egy témafájlt.",
       "error": {
         "aColorFallback": "egy szín",
         "invalidFile": "Érvénytelen témafájl.",
@@ -2492,7 +2500,7 @@
       "label": "Egyéni témák",
       "openFolderButton": "Témák mappájának megnyitása",
       "openFolderError": "Nem sikerült megnyitni a témák mappáját.",
-      "readError": "Nem sikerült beolvasni a témák mappáját.",
+      "readError": "Nem sikerült beolvasni az egyéni témáidat.",
       "readOnlyHelper": "Az egyéni témákat a számítógépeden lehet telepíteni. A tieid szinkronizálás után maguktól megjelennek itt."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Panelek és lapok",
         "view": "Nézet"
       },
-      "helper": "Billentyűparancsok megtekintése és módosítása. A szerkesztő formázási és a laplapozó gyorsbillentyűi rögzítettek.",
+      "helper": "Billentyűparancsok megtekintése és módosítása. Csak a lapok közti lépkedés gyorsbillentyűje (Ctrl+Tab) rögzített.",
       "notSet": "Nincs beállítva",
       "removeBindingAria": "{{chord}} eltávolítása",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Megszakítva.",
       "errorGeneric": "Nem sikerült beállítani a gyors feloldást.",
-      "errorHardwareUnavailable": "A Touch ID nem érhető el ezen az eszközön.",
+      "errorHardwareUnavailable": "A Touch ID nem érhető el ebben a buildben. Aláírt macOS-build szükséges hozzá, regisztrált Touch ID-val.",
       "errorNotUnlocked": "Először oldd fel a széfet.",
       "errorPinNotDigits": "A PIN csak számjegyekből állhat.",
       "errorPinTooShort": "A PIN-nek legalább {{count}} számjegyűnek kell lennie.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Széf exportálása Markdownként",
       "exportHelper": "Egyszerű markdown-fastruktúra — nincs titkosítva.",
       "exportLabel": "Exportálás",
-      "importHelper": "Hozz be egy meglévő Obsidian-széfet a Myne-ba. Minden Markdown-jegyzet a helyszínen importálódik és titkosítódik; az eredeti fájljaid érintetlenek maradnak.",
+      "importHelper": "Hozd be a jegyzeteidet: Obsidian, Notion, Evernote, HTML-fájlok vagy egy CSV. Minden a helyszínen importálódik és titkosítódik; az eredeti fájljaid érintetlenek maradnak.",
       "importLabel": "Importálás",
-      "importObsidian": "Obsidian-széf importálása…",
+      "importObsidian": "Jegyzetek importálása…",
       "locationHelper": "Minden széf titkosított fájlokat tartalmazó mappa ezen az útvonalon. A kézi másolatok helyett inkább az alábbi Biztonsági mentés gombot használd — az ellenőrzi a megírt fájlt.",
       "locationLabel": "Széf helye",
       "openInFiles": "Megnyitás a Fájlokban",

@@ -238,7 +238,7 @@
       "task": "Notities met een taak",
       "content": "Volledige tekst in de inhoud"
     },
-    "searchPlaceholder": "Zoek notities of voer een opdracht uit — Esc om te sluiten",
+    "searchPlaceholder": "Zoek notities of voer een opdracht uit — probeer tag: · path: · task:",
     "sectionCommands": "Opdrachten",
     "sectionNotes": "Notities",
     "untitledNote": "Naamloos"
@@ -453,7 +453,7 @@
         "label": ".base-weergave importeren…"
       },
       "importObsidian": {
-        "label": "Obsidian-kluis importeren…"
+        "label": "Notities importeren…"
       },
       "lockVault": {
         "label": "Kluis vergrendelen"
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "AI-chat",
-          "backlinks": "Backlinks",
+          "backlinks": "Links",
           "outline": "Overzicht",
           "tasks": "Taken",
           "unlinked": "Niet-gekoppelde vermeldingen"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "het pad van map + titel is te lang",
         "reasonSegmentTooLong": "naam is langer dan Myne toestaat",
         "scanning": "Je kluis scannen…",
-        "setupIntro": "Wijs Myne naar je bestaande Obsidian-kluismap. Elke Markdown-notitie wordt direct geïmporteerd en versleuteld — niets verlaat dit apparaat en je originele bestanden blijven onaangeroerd.",
+        "setupIntro": "Myne importeert en versleutelt je notities direct — niets verlaat dit apparaat en je originele bestanden worden nooit gewijzigd.",
         "statCancelled": "Geannuleerd",
         "statCanvasSkipped": ".canvas-bestanden overgeslagen",
         "statCompressed": "Afbeeldingen gecomprimeerd",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Voorgestelde naam",
         "titleComplete": "Import voltooid",
         "titleFailed": "Import mislukt",
-        "titleSetup": "Obsidian-kluis importeren",
+        "titleSetup": "Notities importeren",
         "vaultFolderLabel": "Kluismap",
         "vaultRoot": "(kluiswortel)",
         "titlePick": "Notities importeren",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Map kiezen…",
         "laterHint": "Je kunt later altijd importeren via Instellingen → Opslag.",
         "notNow": "Niet nu",
-        "title": "Je Obsidian-kluis importeren?"
+        "title": "Je notities importeren?"
       },
       "picker": {
         "intro": "Waar komen je notities vandaan?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "elke {{count}} dagen",
+      "day_one": "elke {{count}} dag",
+      "day_other": "elke {{count}} dagen",
       "week": "elke {{count}} weken",
+      "week_one": "elke {{count}} week",
+      "week_other": "elke {{count}} weken",
       "month": "elke {{count}} maanden",
-      "year": "elke {{count}} jaar"
+      "month_one": "elke {{count}} maand",
+      "month_other": "elke {{count}} maanden",
+      "year": "elke {{count}} jaar",
+      "year_one": "elk {{count}} jaar",
+      "year_other": "elke {{count}} jaar"
     },
     "everyWeekday": "elke {{days}}",
     "everyWeekdays": "elke {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Bevestigen",
       "delete": "Verwijderen",
       "deleteError": "Dat thema kon niet worden verwijderd. Probeer het opnieuw.",
-      "empty": "Nog geen aangepaste thema's. Importeer er een, of open de themamap en voeg een themabestand toe.",
+      "empty": "Nog geen aangepaste thema's. Importeer een themabestand om te beginnen.",
       "error": {
         "aColorFallback": "een kleur",
         "invalidFile": "Ongeldig themabestand.",
@@ -2492,7 +2500,7 @@
       "label": "Aangepaste thema's",
       "openFolderButton": "Themamap openen",
       "openFolderError": "De themamap kon niet worden geopend.",
-      "readError": "Je themamap kon niet worden gelezen.",
+      "readError": "Je aangepaste thema's konden niet worden gelezen.",
       "readOnlyHelper": "Aangepaste thema's installeer je op je computer. De jouwe verschijnen hier vanzelf na een synchronisatie."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Deelvensters & tabbladen",
         "view": "Weergave"
       },
-      "helper": "Bekijk en wijzig sneltoetsen. De editoropmaak en de sneltoets voor het doorlopen van tabbladen liggen vast.",
+      "helper": "Bekijk en wijzig sneltoetsen. Alleen de sneltoets voor het doorlopen van tabbladen (Ctrl+Tab) ligt vast.",
       "notSet": "Niet ingesteld",
       "removeBindingAria": "{{chord}} verwijderen",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Geannuleerd.",
       "errorGeneric": "Snel ontgrendelen kon niet worden ingesteld.",
-      "errorHardwareUnavailable": "Touch ID is niet beschikbaar op dit apparaat.",
+      "errorHardwareUnavailable": "Touch ID is niet beschikbaar in deze build. Daarvoor is een ondertekende macOS-build nodig waarop Touch ID is ingesteld.",
       "errorNotUnlocked": "Ontgrendel eerst de kluis.",
       "errorPinNotDigits": "De pincode mag alleen cijfers bevatten.",
       "errorPinTooShort": "De pincode moet minstens {{count}} cijfers lang zijn.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Kluis exporteren als Markdown",
       "exportHelper": "Platte Markdown-structuur — niet versleuteld.",
       "exportLabel": "Exporteren",
-      "importHelper": "Breng een bestaande Obsidian-kluis naar Myne. Elke Markdown-notitie wordt direct geïmporteerd en versleuteld; je originele bestanden blijven onaangeroerd.",
+      "importHelper": "Haal notities binnen uit Obsidian, Notion, Evernote, HTML-bestanden of een CSV. Alles wordt direct geïmporteerd en versleuteld; je originele bestanden blijven onaangeroerd.",
       "importLabel": "Importeren",
-      "importObsidian": "Obsidian-kluis importeren…",
+      "importObsidian": "Notities importeren…",
       "locationHelper": "Elke kluis is een map met versleutelde bestanden onder dit pad. Gebruik liever de knop Back-up hieronder dan handmatige kopieën — die verifieert het geschreven bestand.",
       "locationLabel": "Kluislocatie",
       "openInFiles": "Openen in Bestanden",

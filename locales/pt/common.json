@@ -247,7 +247,7 @@
       "task": "Notas com uma tarefa",
       "content": "Texto integral no corpo"
     },
-    "searchPlaceholder": "Pesquisar notas ou executar um comando — Esc para fechar",
+    "searchPlaceholder": "Pesquisar notas ou executar um comando — experimente tag: · path: · task:",
     "sectionCommands": "Comandos",
     "sectionNotes": "Notas",
     "untitledNote": "Sem título"
@@ -462,7 +462,7 @@
         "label": "Importar vista .base…"
       },
       "importObsidian": {
-        "label": "Importar cofre do Obsidian…"
+        "label": "Importar notas…"
       },
       "lockVault": {
         "label": "Bloquear cofre"
@@ -938,8 +938,8 @@
           "gettingReadyHint": "A preparar as suas notas para a IA — um momento.",
           "insert": "Inserir na nota",
           "noAnswer": "Sem resposta — tente reformular.",
-          "noModelHint": "Nenhum modelo selecionado. Escolha um em Definições → Developer → IA para começar.",
-          "offHint": "A IA local está desligada. Ligue-a em Definições → Developer → IA.",
+          "noModelHint": "Nenhum modelo selecionado. Escolha um em Definições → Programador → IA para começar.",
+          "offHint": "A IA local está desligada. Ligue-a em Definições → Programador → IA.",
           "send": "Enviar",
           "statusGettingReady": "A preparar…",
           "statusNoModel": "Sem modelo",
@@ -960,7 +960,7 @@
         },
         "tabs": {
           "aiChat": "Chat de IA",
-          "backlinks": "Backlinks",
+          "backlinks": "Ligações",
           "outline": "Estrutura",
           "tasks": "Tarefas",
           "unlinked": "Menções não vinculadas"
@@ -1744,7 +1744,7 @@
         "reasonPathTooLong": "o caminho da pasta + título é demasiado longo",
         "reasonSegmentTooLong": "o nome é mais longo do que o Myne permite",
         "scanning": "A analisar o seu cofre…",
-        "setupIntro": "Aponte o Myne para a pasta do seu cofre do Obsidian existente. Cada nota Markdown é importada e encriptada no local — nada sai deste dispositivo e os seus ficheiros originais permanecem intactos.",
+        "setupIntro": "O Myne importa e encripta as suas notas no local — nada sai deste dispositivo e os seus ficheiros originais nunca são alterados.",
         "statCancelled": "Cancelado",
         "statCanvasSkipped": "ficheiros .canvas ignorados",
         "statCompressed": "Imagens comprimidas",
@@ -1755,7 +1755,7 @@
         "suggestedNameAriaLabel": "Nome sugerido",
         "titleComplete": "Importação concluída",
         "titleFailed": "A importação falhou",
-        "titleSetup": "Importar cofre do Obsidian",
+        "titleSetup": "Importar notas",
         "vaultFolderLabel": "Pasta do cofre",
         "vaultRoot": "(raiz do cofre)",
         "titlePick": "Importar notas",
@@ -1780,7 +1780,7 @@
         "chooseFolder": "Escolher pasta…",
         "laterHint": "Pode sempre importar mais tarde a partir de Definições → Armazenamento.",
         "notNow": "Agora não",
-        "title": "Importar o seu cofre do Obsidian?"
+        "title": "Importar as suas notas?"
       },
       "picker": {
         "intro": "De onde vêm as suas notas?"
@@ -2233,9 +2233,21 @@
     },
     "everyN": {
       "day": "a cada {{count}} dias",
+      "day_one": "a cada {{count}} dia",
+      "day_many": "a cada {{count}} dias",
+      "day_other": "a cada {{count}} dias",
       "week": "a cada {{count}} semanas",
+      "week_one": "a cada {{count}} semana",
+      "week_many": "a cada {{count}} semanas",
+      "week_other": "a cada {{count}} semanas",
       "month": "a cada {{count}} meses",
-      "year": "a cada {{count}} anos"
+      "month_one": "a cada {{count}} mês",
+      "month_many": "a cada {{count}} meses",
+      "month_other": "a cada {{count}} meses",
+      "year": "a cada {{count}} anos",
+      "year_one": "a cada {{count}} ano",
+      "year_many": "a cada {{count}} anos",
+      "year_other": "a cada {{count}} anos"
     },
     "everyWeekday": "semanalmente: {{days}}",
     "everyWeekdays": "semanalmente: {{days}}",
@@ -2545,7 +2557,7 @@
       "confirm": "Confirmar",
       "delete": "Apagar",
       "deleteError": "Não foi possível apagar esse tema. Tente novamente.",
-      "empty": "Ainda não há temas personalizados. Importe um, ou abra a pasta de temas e adicione um ficheiro de tema.",
+      "empty": "Ainda não há temas personalizados. Importe um ficheiro de tema para começar.",
       "error": {
         "aColorFallback": "uma cor",
         "invalidFile": "Ficheiro de tema inválido.",
@@ -2565,7 +2577,7 @@
       "label": "Temas personalizados",
       "openFolderButton": "Abrir pasta de temas",
       "openFolderError": "Não foi possível abrir a pasta de temas.",
-      "readError": "Não foi possível ler a sua pasta de temas.",
+      "readError": "Não foi possível ler os seus temas personalizados.",
       "readOnlyHelper": "Os temas personalizados são instalados no seu computador. Os seus chegam aqui sozinhos depois de uma sincronização."
     },
     "dailyNotes": {
@@ -2664,7 +2676,7 @@
         "panesTabs": "Painéis e separadores",
         "view": "Ver"
       },
-      "helper": "Veja e altere os atalhos de teclado. A formatação do editor e o atalho de percorrer separadores são fixos.",
+      "helper": "Veja e altere os atalhos de teclado. Apenas o atalho para percorrer separadores (Ctrl+Tab) é fixo.",
       "notSet": "Não definido",
       "removeBindingAria": "Remover {{chord}}",
       "reserved": {
@@ -2819,7 +2831,7 @@
     "quickUnlock": {
       "errorCancelled": "Cancelado.",
       "errorGeneric": "Não foi possível configurar o desbloqueio rápido.",
-      "errorHardwareUnavailable": "O Touch ID não está disponível neste dispositivo.",
+      "errorHardwareUnavailable": "O Touch ID não está disponível nesta versão. É necessária uma versão assinada para macOS com o Touch ID registado.",
       "errorNotUnlocked": "Desbloqueie o cofre primeiro.",
       "errorPinNotDigits": "O PIN deve conter apenas dígitos.",
       "errorPinTooShort": "O PIN tem de ter, no mínimo, {{count}} dígitos.",
@@ -2905,9 +2917,9 @@
       "exportBody": "Exportar cofre como Markdown",
       "exportHelper": "Árvore de Markdown simples — não encriptada.",
       "exportLabel": "Exportar",
-      "importHelper": "Traga um cofre do Obsidian existente para o Myne. Cada nota Markdown é importada e encriptada no local; os seus ficheiros originais permanecem intactos.",
+      "importHelper": "Traga notas do Obsidian, do Notion, do Evernote, de ficheiros HTML ou de um CSV. Tudo é importado e encriptado no local; os seus ficheiros originais permanecem intactos.",
       "importLabel": "Importar",
-      "importObsidian": "Importar cofre do Obsidian…",
+      "importObsidian": "Importar notas…",
       "locationHelper": "Cada cofre é uma pasta de ficheiros encriptados sob este caminho. Prefira o botão Cópia de segurança abaixo em vez de cópias manuais — ele verifica o ficheiro gravado.",
       "locationLabel": "Localização do cofre",
       "openInFiles": "Abrir nos Ficheiros",

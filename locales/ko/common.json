@@ -238,7 +238,7 @@
       "task": "할 일이 있는 노트",
       "content": "본문 전문 검색"
     },
-    "searchPlaceholder": "노트를 검색하거나 명령을 실행하세요 — Esc로 닫기",
+    "searchPlaceholder": "노트를 검색하거나 명령을 실행하세요 — tag: · path: · task: 를 사용해 보세요",
     "sectionCommands": "명령",
     "sectionNotes": "노트",
     "untitledNote": "제목 없음"
@@ -453,7 +453,7 @@
         "label": ".base 뷰 가져오기…"
       },
       "importObsidian": {
-        "label": "Obsidian 보관함 가져오기…"
+        "label": "노트 가져오기…"
       },
       "lockVault": {
         "label": "보관함 잠그기"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "AI를 위해 노트를 준비하는 중 — 잠시만 기다려 주세요.",
           "insert": "노트에 삽입",
           "noAnswer": "답변이 없습니다 — 다르게 표현해 보세요.",
-          "noModelHint": "선택된 모델이 없습니다. 시작하려면 설정 → Developer → AI에서 하나를 선택하세요.",
-          "offHint": "로컬 AI가 꺼져 있습니다. 설정 → Developer → AI에서 켜세요.",
+          "noModelHint": "선택된 모델이 없습니다. 시작하려면 설정 → 개발자 → AI에서 모델을 선택하세요.",
+          "offHint": "로컬 AI가 꺼져 있습니다. 설정 → 개발자 → AI에서 켜세요.",
           "send": "보내기",
           "statusGettingReady": "준비 중…",
           "statusNoModel": "모델 없음",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "AI 채팅",
-          "backlinks": "백링크",
+          "backlinks": "링크",
           "outline": "개요",
           "tasks": "할 일",
           "unlinked": "연결되지 않은 언급"
@@ -1378,9 +1378,9 @@
         "includeAttachments_one": "첨부 파일 {{count}}개 포함",
         "includeAttachments_other": "첨부 파일 {{count}}개 포함",
         "title": "Markdown으로 내보내기",
-        "copyLabel": "메모 텍스트를 클립보드에 복사",
-        "copied": "메모 텍스트가 복사됨",
-        "copyFailed": "메모 텍스트를 복사하지 못했습니다"
+        "copyLabel": "노트 텍스트를 클립보드에 복사",
+        "copied": "노트 텍스트가 복사됨",
+        "copyFailed": "노트 텍스트를 복사하지 못했습니다"
       }
     },
     "egress": {
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "폴더와 제목을 합친 경로가 너무 깁니다",
         "reasonSegmentTooLong": "이름이 Myne가 허용하는 길이보다 깁니다",
         "scanning": "보관함을 스캔하는 중…",
-        "setupIntro": "기존 Obsidian 보관함 폴더를 Myne에 지정하세요. 모든 Markdown 노트가 그 자리에서 가져와져 암호화됩니다 — 어떤 것도 이 기기를 떠나지 않으며, 원본 파일은 그대로 유지됩니다.",
+        "setupIntro": "Myne가 노트를 그 자리에서 가져와 암호화합니다 — 어떤 것도 이 기기를 떠나지 않으며, 원본 파일은 절대 변경되지 않습니다.",
         "statCancelled": "취소됨",
         "statCanvasSkipped": ".canvas 파일 건너뜀",
         "statCompressed": "압축된 이미지",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "제안된 이름",
         "titleComplete": "가져오기 완료",
         "titleFailed": "가져오기 실패",
-        "titleSetup": "Obsidian 보관함 가져오기",
+        "titleSetup": "노트 가져오기",
         "vaultFolderLabel": "보관함 폴더",
         "vaultRoot": "(보관함 루트)",
         "titlePick": "노트 가져오기",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "폴더 선택…",
         "laterHint": "나중에 언제든지 설정 → 저장소에서 가져올 수 있습니다.",
         "notNow": "나중에",
-        "title": "Obsidian 보관함을 가져올까요?"
+        "title": "노트를 가져올까요?"
       },
       "picker": {
         "intro": "노트를 어디에서 가져오나요?"
@@ -2103,7 +2103,7 @@
       "viewTypeTable": "표"
     },
     "welcome": {
-      "body": "생각하고 글을 쓰는 나만의 공간, Myne에 오신 것을 환영합니다.\n\n여기에 저장하는 모든 것은 암호화되어 기기에만 보관됩니다. **비밀번호**와 **복구 구문**만이 그 유일한 열쇠이니 안전한 곳에 보관하세요. 둘 다 잃어버리면 저희를 포함해 누구도 노트를 되찾을 수 없습니다.\n\n이것은 평범한 노트일 뿐이니 마음껏 사용하세요. 언제든지 편집하거나 이름을 바꾸거나 삭제할 수 있고, 생각이 늘어날 때마다 새 노트를 추가하세요.\n\n함께하게 되어 기쁩니다. Myne에 대해 더 알아보려면 https://myne.md를 방문하세요.\n",
+      "body": "생각하고 글을 쓰는 나만의 공간, Myne에 오신 것을 환영합니다.\n\n여기에 저장하는 모든 것은 암호화되어 기기에만 보관됩니다. **비밀번호**와 **복구 구문**만이 그 유일한 열쇠이니 안전한 곳에 보관하세요. 둘 다 잃어버리면 저희를 포함해 누구도 노트를 되찾을 수 없습니다.\n\n이것은 평범한 노트일 뿐이니 마음껏 사용하세요. 언제든지 편집하거나 이름을 바꾸거나 삭제할 수 있고, 생각이 늘어날 때마다 새 노트를 추가하세요.\n\n함께하게 되어 기쁩니다. Myne에 대해 더 알아보려면 다음 주소를 방문하세요: https://myne.md\n",
       "title": "Myne에 오신 것을 환영합니다"
     },
     "workspace": {
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "{{count}}일마다",
+      "day_one": "{{count}}일마다",
+      "day_other": "{{count}}일마다",
       "week": "{{count}}주마다",
+      "week_one": "{{count}}주마다",
+      "week_other": "{{count}}주마다",
       "month": "{{count}}개월마다",
-      "year": "{{count}}년마다"
+      "month_one": "{{count}}개월마다",
+      "month_other": "{{count}}개월마다",
+      "year": "{{count}}년마다",
+      "year_one": "{{count}}년마다",
+      "year_other": "{{count}}년마다"
     },
     "everyWeekday": "매주 {{days}}",
     "everyWeekdays": "매주 {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "확인",
       "delete": "삭제",
       "deleteError": "해당 테마를 삭제하지 못했습니다. 다시 시도하세요.",
-      "empty": "아직 사용자 지정 테마가 없습니다. 하나를 가져오거나 테마 폴더를 열어 테마 파일을 추가하세요.",
+      "empty": "아직 사용자 지정 테마가 없습니다. 테마 파일을 가져와 시작하세요.",
       "error": {
         "aColorFallback": "색상",
         "invalidFile": "잘못된 테마 파일입니다.",
@@ -2492,7 +2500,7 @@
       "label": "사용자 지정 테마",
       "openFolderButton": "테마 폴더 열기",
       "openFolderError": "테마 폴더를 열지 못했습니다.",
-      "readError": "테마 폴더를 읽지 못했습니다.",
+      "readError": "사용자 지정 테마를 읽지 못했습니다.",
       "readOnlyHelper": "사용자 지정 테마는 컴퓨터에 설치됩니다. 사용자의 테마는 동기화 후 여기에 저절로 나타납니다."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "창 및 탭",
         "view": "보기"
       },
-      "helper": "키보드 단축키를 보고 변경합니다. 편집기 서식과 탭 순환 단축키는 고정되어 있습니다.",
+      "helper": "키보드 단축키를 보고 변경합니다. 탭 순환 단축키(Ctrl+Tab)만 고정되어 있습니다.",
       "notSet": "설정 안 됨",
       "removeBindingAria": "{{chord}} 제거",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "취소되었습니다.",
       "errorGeneric": "빠른 잠금 해제를 설정하지 못했습니다.",
-      "errorHardwareUnavailable": "이 기기에서는 Touch ID를 사용할 수 없습니다.",
+      "errorHardwareUnavailable": "이 빌드에서는 Touch ID를 사용할 수 없습니다. 서명된 macOS 빌드와 등록된 Touch ID가 필요합니다.",
       "errorNotUnlocked": "먼저 보관함을 잠금 해제하세요.",
       "errorPinNotDigits": "PIN은 숫자만 입력할 수 있습니다.",
       "errorPinTooShort": "PIN은 최소 {{count}}자리여야 합니다.",
@@ -2829,9 +2837,9 @@
       "exportBody": "보관함을 Markdown으로 내보내기",
       "exportHelper": "평문 Markdown 트리 — 암호화되지 않습니다.",
       "exportLabel": "내보내기",
-      "importHelper": "기존 Obsidian 보관함을 Myne로 가져옵니다. 모든 Markdown 노트가 그 자리에서 가져와져 암호화되며, 원본 파일은 그대로 유지됩니다.",
+      "importHelper": "Obsidian, Notion, Evernote, HTML 파일 또는 CSV에서 노트를 가져옵니다. 모든 항목은 그 자리에서 가져와져 암호화되며, 원본 파일은 그대로 유지됩니다.",
       "importLabel": "가져오기",
-      "importObsidian": "Obsidian 보관함 가져오기…",
+      "importObsidian": "노트 가져오기…",
       "locationHelper": "각 보관함은 이 경로 아래에 있는 암호화된 파일들의 폴더입니다. 수동 복사보다 아래의 [백업] 버튼을 사용하세요 — 작성된 파일을 검증합니다.",
       "locationLabel": "보관함 위치",
       "openInFiles": "파일에서 열기",

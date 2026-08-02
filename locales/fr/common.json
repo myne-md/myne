@@ -247,7 +247,7 @@
       "task": "Notes contenant une tâche",
       "content": "Texte intégral dans le corps"
     },
-    "searchPlaceholder": "Rechercher des notes ou exécuter une commande — Échap pour fermer",
+    "searchPlaceholder": "Rechercher des notes ou exécuter une commande — essayez tag: · path: · task:",
     "sectionCommands": "Commandes",
     "sectionNotes": "Notes",
     "untitledNote": "Sans titre"
@@ -462,7 +462,7 @@
         "label": "Importer une vue .base…"
       },
       "importObsidian": {
-        "label": "Importer un coffre-fort Obsidian…"
+        "label": "Importer des notes…"
       },
       "lockVault": {
         "label": "Verrouiller le coffre-fort"
@@ -938,8 +938,8 @@
           "gettingReadyHint": "Préparation de vos notes pour l'IA — un instant.",
           "insert": "Insérer dans la note",
           "noAnswer": "Aucune réponse — essayez de reformuler.",
-          "noModelHint": "Aucun modèle sélectionné. Choisissez-en un dans Réglages → Developer → IA pour commencer.",
-          "offHint": "L'IA locale est désactivée. Activez-la dans Réglages → Developer → IA.",
+          "noModelHint": "Aucun modèle sélectionné. Choisissez-en un dans Paramètres → Développeur → IA pour commencer.",
+          "offHint": "L'IA locale est désactivée. Activez-la dans Paramètres → Développeur → IA.",
           "send": "Envoyer",
           "statusGettingReady": "Préparation…",
           "statusNoModel": "Aucun modèle",
@@ -960,7 +960,7 @@
         },
         "tabs": {
           "aiChat": "Chat IA",
-          "backlinks": "Rétroliens",
+          "backlinks": "Liens",
           "outline": "Plan",
           "tasks": "Tâches",
           "unlinked": "Mentions non liées"
@@ -1744,7 +1744,7 @@
         "reasonPathTooLong": "le chemin dossier + titre est trop long",
         "reasonSegmentTooLong": "le nom dépasse la longueur autorisée par Myne",
         "scanning": "Analyse de votre coffre-fort…",
-        "setupIntro": "Indiquez à Myne le dossier de votre coffre-fort Obsidian existant. Chaque note Markdown est importée et chiffrée sur place — rien ne quitte cet appareil, et vos fichiers d'origine restent intacts.",
+        "setupIntro": "Myne importe et chiffre vos notes sur place — rien ne quitte cet appareil, et vos fichiers d'origine ne sont jamais modifiés.",
         "statCancelled": "Annulé",
         "statCanvasSkipped": "fichiers .canvas ignorés",
         "statCompressed": "Images compressées",
@@ -1755,7 +1755,7 @@
         "suggestedNameAriaLabel": "Nom suggéré",
         "titleComplete": "Importation terminée",
         "titleFailed": "L'importation a échoué",
-        "titleSetup": "Importer un coffre-fort Obsidian",
+        "titleSetup": "Importer des notes",
         "vaultFolderLabel": "Dossier du coffre-fort",
         "vaultRoot": "(racine du coffre-fort)",
         "titlePick": "Importer des notes",
@@ -1780,7 +1780,7 @@
         "chooseFolder": "Choisir un dossier…",
         "laterHint": "Vous pourrez toujours importer plus tard depuis Paramètres → Stockage.",
         "notNow": "Pas maintenant",
-        "title": "Importer votre coffre-fort Obsidian ?"
+        "title": "Importer vos notes ?"
       },
       "picker": {
         "intro": "D'où viennent vos notes ?"
@@ -2233,9 +2233,21 @@
     },
     "everyN": {
       "day": "tous les {{count}} jours",
+      "day_one": "tous les {{count}} jour",
+      "day_many": "tous les {{count}} de jours",
+      "day_other": "tous les {{count}} jours",
       "week": "toutes les {{count}} semaines",
+      "week_one": "toutes les {{count}} semaine",
+      "week_many": "toutes les {{count}} de semaines",
+      "week_other": "toutes les {{count}} semaines",
       "month": "tous les {{count}} mois",
-      "year": "tous les {{count}} ans"
+      "month_one": "tous les {{count}} mois",
+      "month_many": "tous les {{count}} de mois",
+      "month_other": "tous les {{count}} mois",
+      "year": "tous les {{count}} ans",
+      "year_one": "tous les {{count}} an",
+      "year_many": "tous les {{count}} d'ans",
+      "year_other": "tous les {{count}} ans"
     },
     "everyWeekday": "chaque {{days}}",
     "everyWeekdays": "chaque {{days}}",
@@ -2545,7 +2557,7 @@
       "confirm": "Confirmer",
       "delete": "Supprimer",
       "deleteError": "Impossible de supprimer ce thème. Veuillez réessayer.",
-      "empty": "Aucun thème personnalisé pour l'instant. Importez-en un, ou ouvrez le dossier des thèmes et ajoutez-y un fichier de thème.",
+      "empty": "Aucun thème personnalisé pour l'instant. Importez un fichier de thème pour commencer.",
       "error": {
         "aColorFallback": "une couleur",
         "invalidFile": "Fichier de thème non valide.",
@@ -2565,7 +2577,7 @@
       "label": "Thèmes personnalisés",
       "openFolderButton": "Ouvrir le dossier des thèmes",
       "openFolderError": "Impossible d'ouvrir le dossier des thèmes.",
-      "readError": "Impossible de lire votre dossier de thèmes.",
+      "readError": "Impossible de lire vos thèmes personnalisés.",
       "readOnlyHelper": "Les thèmes personnalisés s'installent sur votre ordinateur. Les vôtres arrivent ici d'eux-mêmes après une synchronisation."
     },
     "dailyNotes": {
@@ -2664,7 +2676,7 @@
         "panesTabs": "Volets et onglets",
         "view": "Affichage"
       },
-      "helper": "Consultez et modifiez les raccourcis clavier. La mise en forme de l'éditeur et le raccourci de défilement des onglets sont fixes.",
+      "helper": "Consultez et modifiez les raccourcis clavier. Seul le raccourci de défilement des onglets (Ctrl+Tab) est fixe.",
       "notSet": "Non défini",
       "removeBindingAria": "Supprimer {{chord}}",
       "reserved": {
@@ -2819,7 +2831,7 @@
     "quickUnlock": {
       "errorCancelled": "Annulé.",
       "errorGeneric": "Impossible de configurer le déverrouillage rapide.",
-      "errorHardwareUnavailable": "Touch ID n'est pas disponible sur cet appareil.",
+      "errorHardwareUnavailable": "Touch ID n'est pas disponible dans cette version. Il nécessite une version macOS signée avec Touch ID configuré.",
       "errorNotUnlocked": "Déverrouillez d'abord le coffre-fort.",
       "errorPinNotDigits": "Le code PIN ne doit contenir que des chiffres.",
       "errorPinTooShort": "Le PIN doit comporter au moins {{count}} chiffres.",
@@ -2905,9 +2917,9 @@
       "exportBody": "Exporter le coffre-fort en Markdown",
       "exportHelper": "Arborescence Markdown brute — non chiffrée.",
       "exportLabel": "Exporter",
-      "importHelper": "Importez un coffre-fort Obsidian existant dans Myne. Chaque note Markdown est importée et chiffrée sur place ; vos fichiers d'origine restent intacts.",
+      "importHelper": "Importez vos notes depuis Obsidian, Notion, Evernote, des fichiers HTML ou un CSV. Tout est importé et chiffré sur place ; vos fichiers d'origine restent intacts.",
       "importLabel": "Importer",
-      "importObsidian": "Importer un coffre-fort Obsidian…",
+      "importObsidian": "Importer des notes…",
       "locationHelper": "Chaque coffre-fort est un dossier de fichiers chiffrés sous ce chemin. Préférez le bouton Sauvegarde ci-dessous aux copies manuelles — il vérifie le fichier écrit.",
       "locationLabel": "Emplacement du coffre-fort",
       "openInFiles": "Ouvrir dans le Finder",
