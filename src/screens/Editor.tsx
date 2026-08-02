@@ -61,6 +61,11 @@ import { useUnsyncedEdits } from "../hooks/useUnsyncedEdits";
 import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
 import { Icon } from "../components/primitives/Icon";
+import { Tooltip } from "../components/primitives/Tooltip";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../components/primitives/hoverSurface";
 import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
 import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
@@ -118,6 +123,10 @@ import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
 import { ExportEgressNotice } from "../components/export/ExportEgressNotice";
 import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
 import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
+import {
+  NoteActionsMenu,
+  type NoteActionMenuItem,
+} from "../notes/components/NoteActionsMenu";
 import { dragEdgeX, insertionLineStyleX } from "../notes/components/reorderDnd";
 import {
   RIGHT_CLUSTER_DEFAULT_ORDER,
@@ -1788,8 +1797,28 @@ function EditorChrome({
                 flexShrink: 0,
                 background: "var(--paper-2)",
                 borderBottom: "1px solid var(--line-1)",
+                display: "flex",
+                alignItems: "center",
+                // Clear the floated left toggle + traffic lights when the left
+                // sidebar is collapsed (they float over this pane's top-left).
+                paddingLeft: leftCollapsed ? leftClearance : "var(--space-4)",
+                paddingRight: "var(--space-4)",
               }}
-            />
+            >
+              {/* The Attachments title rides the top clearance/tab-strip row so
+                  it reads as the surface's header, with the row's border between
+                  it and the toolbar below. */}
+              <span
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: "var(--fg-1)",
+                }}
+              >
+                {t("attachments.library.title")}
+              </span>
+            </div>
             <AttachmentsLibrary onClose={() => setCenterView("editor")} />
           </div>
         ) : (
@@ -1848,7 +1877,14 @@ function EditorChrome({
           disabled={!ws.canGoForward}
         />
       </div>
-      {centerView !== "attachments" && (
+      {/* The right panel (backlinks / outline / …) is about the OPEN note, so its
+          toggle only shows while a note is actually open — not on the new-tab
+          chooser or the attachments view. Mirror PaneView's `inNewTabState`
+          (`pendingNewTab || activeTab === null`) for the FOCUSED pane, so an open
+          "+ New tab" over existing tabs still hides it. */}
+      {centerView !== "attachments" &&
+        ws.focusedLeaf.activeTab !== null &&
+        ws.pendingNewTabPaneId !== ws.focusedPaneId && (
         <div
           style={{
             position: "absolute",
@@ -2096,6 +2132,7 @@ function EditorChrome({
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         onReopen={() => setPaletteOpen(true)}
+        centerView={centerView}
         onImportObsidian={() => {
           setPaletteOpen(false);
           setImporterOpen(true);
@@ -2364,6 +2401,7 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
   borderRadius: "var(--radius-1)",
   background: "transparent",
   color: "var(--fg-3)",
+  transition: HOVER_TRANSITION,
 };
 
 // Sidebar toggles float in the editor's top corners (the OS title-bar row),
@@ -2380,8 +2418,12 @@ const RIGHT_TOGGLE_X = 8;
  *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
 const LEFT_CONTROLS_WIDTH =
   TITLE_BAR_TOGGLE_WIDTH + 2 * (TITLE_BAR_CLUSTER_GAP + TITLE_BAR_NAV_WIDTH);
-/** Right clearance: the top-right surface must keep its content before this. */
-const RIGHT_CLEARANCE = RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
+/** Right clearance: the top-right surface must keep its content before this.
+ *  Reserves room for BOTH floated controls — the note-actions "…" menu plus the
+ *  right-sidebar toggle beside it — so a collapsed-right pane's tab strip never
+ *  slides under either. */
+const RIGHT_CLEARANCE =
+  RIGHT_TOGGLE_X + 2 * TITLE_BAR_TOGGLE_WIDTH + TITLE_BAR_CLUSTER_GAP + 8;
 
 /**
  * The Notion-style workspace switcher row at the top of the left sidebar,
@@ -2467,6 +2509,7 @@ function TitleBarToggle({
       data-testid="editor.sidebar-toggle"
       data-side={side}
       data-collapsed={collapsed ? "true" : "false"}
+      {...hoverSurface({ disabled })}
       style={{
         ...TITLE_BAR_BUTTON_BASE,
         width: TITLE_BAR_TOGGLE_WIDTH,
@@ -2509,6 +2552,7 @@ function TitleBarNavButton({
       title={label}
       data-testid={`editor.nav-${direction}`}
       data-disabled={disabled ? "true" : "false"}
+      {...hoverSurface({ disabled })}
       style={{
         ...TITLE_BAR_BUTTON_BASE,
         width: TITLE_BAR_NAV_WIDTH,
@@ -2533,6 +2577,9 @@ type CommandPaletteHostProps = {
   /** Re-open the palette — used to pop back from a QuickPicker sub-flow on
    *  cancel (Esc/backdrop), so the picker reads as stacked on top of the palette. */
   onReopen: () => void;
+  /** Which surface the center pane shows — the note-actions "…" menu hides on
+   *  the attachments view (it acts on the focused note, absent there). */
+  centerView: CenterView;
   onOpenSettings: () => void;
   onOpenAttachments: () => void;
   onManageTemplates: () => void;
@@ -2568,6 +2615,7 @@ function CommandPaletteHost({
   open,
   onClose,
   onReopen,
+  centerView,
   onOpenSettings,
   onRestoreBackup,
   onOpenAttachments,
@@ -2611,6 +2659,12 @@ function CommandPaletteHost({
     items: QuickPickItem[];
     onPick: (id: string) => void;
   } | null>(null);
+  // The QuickPicker's cancel pops back to the command palette (the picker reads
+  // as stacked on top of it). That is right for a palette-initiated picker, but
+  // the note-actions "…" menu opens the SAME move-to-folder picker while the
+  // palette is closed — so its cancel must NOT summon a palette the user never
+  // opened. Set for that one invocation path; consumed on the next picker close.
+  const suppressPaletteReopenRef = useRef(false);
   // Deferred empty-trash confirm (the palette `trash.empty` action): the
   // trashed count at request time, null when closed. A permanent purge never
   // fires straight from the palette — this renders the same count-aware
@@ -3015,6 +3069,89 @@ function CommandPaletteHost({
     (id: string) => ctx.cache.get(id)?.template === true,
     [ctx.cache],
   );
+  // The editor-chrome "…" menu (Obsidian-style). It reuses the SAME
+  // `commandCtx` note-action handlers the palette dispatches — a second surface
+  // onto one IPC path, never a second path. It only exists while a note is open
+  // in the focused pane, mirroring the right-sidebar toggle's own gate (which
+  // lives in `EditorChrome`), so the two float side by side; `centerView` is
+  // the one gate input `EditorChrome` owns, threaded in as a prop.
+  const showNoteActions =
+    centerView !== "attachments" &&
+    paletteWs.focusedLeaf.activeTab?.kind === "note" &&
+    paletteWs.pendingNewTabPaneId !== paletteWs.focusedPaneId;
+  const noteActionItems: NoteActionMenuItem[] = [
+    {
+      kind: "action",
+      action: "rename",
+      icon: "pencil",
+      label: t("editor.noteActions.rename"),
+      onSelect: commandCtx.onRenameNote,
+    },
+    {
+      kind: "action",
+      action: "move",
+      icon: "folder",
+      label: t("editor.noteActions.move"),
+      // Same handler the palette uses; flag the shared picker so its cancel
+      // won't open a command palette this surface never launched.
+      onSelect: () => {
+        suppressPaletteReopenRef.current = true;
+        commandCtx.onMoveNote();
+      },
+    },
+    {
+      kind: "action",
+      action: "duplicate",
+      icon: "copy",
+      label: t("editor.noteActions.duplicate"),
+      onSelect: commandCtx.onDuplicateNote,
+    },
+    {
+      kind: "action",
+      action: "version-history",
+      icon: "rotate-ccw",
+      label: t("editor.noteActions.versionHistory"),
+      onSelect: commandCtx.onOpenSnapshots,
+    },
+    { kind: "divider" },
+    {
+      kind: "action",
+      action: "export-markdown",
+      icon: "download",
+      label: t("editor.noteActions.exportMarkdown"),
+      onSelect: commandCtx.onExportNoteMarkdown,
+    },
+    {
+      kind: "action",
+      action: "export-pdf",
+      icon: "download",
+      label: t("editor.noteActions.exportPdf"),
+      onSelect: commandCtx.onExportNotePdf,
+    },
+    {
+      kind: "action",
+      action: "export-html",
+      icon: "download",
+      label: t("editor.noteActions.exportHtml"),
+      onSelect: commandCtx.onExportNoteHtml,
+    },
+    {
+      kind: "action",
+      action: "export-txt",
+      icon: "download",
+      label: t("editor.noteActions.exportTxt"),
+      onSelect: commandCtx.onExportNoteTxt,
+    },
+    { kind: "divider" },
+    {
+      kind: "action",
+      action: "trash",
+      icon: "trash-2",
+      label: t("editor.noteActions.trash"),
+      destructive: true,
+      onSelect: commandCtx.onTrashNote,
+    },
+  ];
   return (
     <>
       <CommandPalette
@@ -3025,6 +3162,23 @@ function CommandPaletteHost({
         isTemplate={isTemplate}
         isArchived={(id) => ctx.cache.get(id)?.archived != null}
       />
+      {showNoteActions && (
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            // Sits just left of the right-sidebar toggle (at RIGHT_TOGGLE_X),
+            // one cluster gap between them, so the two read as one group.
+            right: RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + TITLE_BAR_CLUSTER_GAP,
+            zIndex: 30,
+          }}
+        >
+          <NoteActionsMenu
+            label={t("editor.noteActions.buttonLabel")}
+            items={noteActionItems}
+          />
+        </div>
+      )}
       <QuickPicker
         open={picker !== null}
         title={picker?.title ?? ""}
@@ -3034,12 +3188,16 @@ function CommandPaletteHost({
         onPick={(id) => {
           picker?.onPick(id);
           setPicker(null);
+          suppressPaletteReopenRef.current = false;
         }}
         // Cancel (Esc / backdrop) pops back to the command palette — the picker
-        // is stacked on top of it (the palette closed when the action ran).
+        // is stacked on top of it (the palette closed when the action ran) —
+        // UNLESS the "…" menu opened it with the palette closed (see the ref).
         onClose={() => {
+          const suppress = suppressPaletteReopenRef.current;
+          suppressPaletteReopenRef.current = false;
           setPicker(null);
-          onReopen();
+          if (!suppress) onReopen();
         }}
       />
       {emptyTrashConfirm !== null && (
@@ -3457,6 +3615,7 @@ function RightSidebar() {
               data-panel-tab-id={id}
               data-active={isActive ? "true" : undefined}
               data-dragging={draggedId === id ? "true" : undefined}
+              {...hoverSurface()}
               onClick={() => void setRightPanelActiveTab(id)}
               onDragStart={(e) => {
                 setDraggedId(id);
@@ -3502,6 +3661,7 @@ function RightSidebar() {
                 color: isActive ? "var(--fg-1)" : "var(--fg-3)",
                 cursor: draggedId === id ? "grabbing" : "pointer",
                 opacity: draggedId === id ? 0.4 : 1,
+                transition: HOVER_TRANSITION,
               }}
             >
               {dropTarget?.id === id && <div style={insertionLineStyleX(dropTarget.edge)} />}
@@ -3938,6 +4098,7 @@ function BottomBar({
           title={t("editor.chrome.bottomBar.viewModeTitle", {
             mode: t(VIEW_MODE_LABEL_KEY[viewMode]),
           })}
+          {...hoverSurface()}
           style={{
             display: "flex",
             alignItems: "center",
@@ -3951,6 +4112,7 @@ function BottomBar({
             fontFamily: "var(--font-sans)",
             fontSize: 12,
             fontWeight: 500,
+            transition: HOVER_TRANSITION,
           }}
         >
           {t(VIEW_MODE_LABEL_KEY[viewMode])}
@@ -3958,58 +4120,90 @@ function BottomBar({
       ) : null,
     tags: () =>
       onShowTags ? (
-        <button
-          type="button"
-          onClick={onShowTags}
-          aria-label={t("editor.chrome.bottomBar.browseTags")}
-          data-testid="editor.tags-cta"
-          title={t("editor.chrome.bottomBar.tagsTitle")}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "4px 8px",
-            background: "transparent",
-            border: 0,
-            borderRadius: "var(--radius-1)",
-            color: "var(--fg-3)",
-            cursor: "pointer",
-          }}
-        >
-          <Icon name="hash" size={14} />
-        </button>
+        <Tooltip label={t("editor.chrome.bottomBar.tagsTitle")}>
+          <button
+            type="button"
+            onClick={onShowTags}
+            aria-label={t("editor.chrome.bottomBar.browseTags")}
+            data-testid="editor.tags-cta"
+            {...hoverSurface()}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+              transition: HOVER_TRANSITION,
+            }}
+          >
+            <Icon name="hash" size={14} />
+          </button>
+        </Tooltip>
       ) : null,
     views: () =>
       onShowViews ? (
-        <button
-          type="button"
-          onClick={onShowViews}
-          aria-label={t("editor.chrome.bottomBar.browseViews")}
-          data-testid="editor.views-cta"
-          title={t("editor.chrome.bottomBar.viewsTitle")}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "4px 8px",
-            background: "transparent",
-            border: 0,
-            borderRadius: "var(--radius-1)",
-            color: "var(--fg-3)",
-            cursor: "pointer",
-          }}
-        >
-          <Icon name="layout-grid" size={14} />
-        </button>
+        <Tooltip label={t("editor.chrome.bottomBar.viewsTitle")}>
+          <button
+            type="button"
+            onClick={onShowViews}
+            aria-label={t("editor.chrome.bottomBar.browseViews")}
+            data-testid="editor.views-cta"
+            {...hoverSurface()}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+              transition: HOVER_TRANSITION,
+            }}
+          >
+            <Icon name="layout-grid" size={14} />
+          </button>
+        </Tooltip>
       ) : null,
     graph: () =>
       onShowGraph ? (
+        <Tooltip label={t("editor.chrome.bottomBar.graphTitle")}>
+          <button
+            type="button"
+            data-testid="editor.graph-button"
+            onClick={onShowGraph}
+            aria-label={t("editor.chrome.bottomBar.showGraph")}
+            {...hoverSurface()}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+              transition: HOVER_TRANSITION,
+            }}
+          >
+            <Icon name="share-2" size={14} />
+          </button>
+        </Tooltip>
+      ) : null,
+    settings: () => (
+      <Tooltip label={t("editor.chrome.bottomBar.settingsTitle")}>
         <button
           type="button"
-          data-testid="editor.graph-button"
-          onClick={onShowGraph}
-          aria-label={t("editor.chrome.bottomBar.showGraph")}
-          title={t("editor.chrome.bottomBar.graphTitle")}
+          onClick={onOpenSettings}
+          aria-label={t("editor.chrome.bottomBar.openSettings")}
+          data-testid="editor.settings-cta"
+          {...hoverSurface()}
           style={{
             display: "flex",
             alignItems: "center",
@@ -4020,32 +4214,12 @@ function BottomBar({
             borderRadius: "var(--radius-1)",
             color: "var(--fg-3)",
             cursor: "pointer",
+            transition: HOVER_TRANSITION,
           }}
         >
-          <Icon name="share-2" size={14} />
+          <Icon name="settings" size={12} />
         </button>
-      ) : null,
-    settings: () => (
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        aria-label={t("editor.chrome.bottomBar.openSettings")}
-        data-testid="editor.settings-cta"
-        title={t("editor.chrome.bottomBar.settingsTitle")}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "4px 8px",
-          background: "transparent",
-          border: 0,
-          borderRadius: "var(--radius-1)",
-          color: "var(--fg-3)",
-          cursor: "pointer",
-        }}
-      >
-        <Icon name="settings" size={12} />
-      </button>
+      </Tooltip>
     ),
     lock: () => (
       <button
@@ -4053,6 +4227,7 @@ function BottomBar({
         onClick={handleLockClick}
         aria-label={t("editor.chrome.bottomBar.lockVault")}
         data-testid="editor.lock-cta"
+        {...hoverSurface()}
         style={{
           display: "flex",
           alignItems: "center",
@@ -4066,6 +4241,7 @@ function BottomBar({
           fontSize: 12,
           fontWeight: 500,
           cursor: "pointer",
+          transition: HOVER_TRANSITION,
         }}
       >
         <Icon name="lock" size={12} />
@@ -4171,27 +4347,30 @@ function BottomBar({
             it is never reorderable and anchors at the start of the right
             cluster. */}
         {showPreview && onTogglePreview && (
-          <button
-            type="button"
-            onClick={onTogglePreview}
-            aria-label={t("editor.chrome.bottomBar.togglePreview")}
-            aria-pressed={previewActive}
-            data-testid="editor.preview-companion-toggle"
-            title={t("editor.chrome.bottomBar.togglePreview")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "2px 6px",
-              background: "transparent",
-              border: 0,
-              borderRadius: "var(--radius-1)",
-              color: previewActive ? "var(--fg-1)" : "var(--fg-3)",
-              cursor: "pointer",
-            }}
-          >
-            <Icon name="panel-right" size={14} />
-          </button>
+          <Tooltip label={t("editor.chrome.bottomBar.togglePreview")}>
+            <button
+              type="button"
+              onClick={onTogglePreview}
+              aria-label={t("editor.chrome.bottomBar.togglePreview")}
+              aria-pressed={previewActive}
+              data-testid="editor.preview-companion-toggle"
+              {...hoverSurface()}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "2px 6px",
+                background: "transparent",
+                border: 0,
+                borderRadius: "var(--radius-1)",
+                color: previewActive ? "var(--fg-1)" : "var(--fg-3)",
+                cursor: "pointer",
+                transition: HOVER_TRANSITION,
+              }}
+            >
+              <Icon name="panel-right" size={14} />
+            </button>
+          </Tooltip>
         )}
         {rendered.map(({ id, node }) => (
           <div
@@ -4313,6 +4492,7 @@ function WorkspaceSwitcherControl({
         title={t("editor.chrome.workspaceSwitcher.toggleTitle", {
           name: activeName,
         })}
+        {...hoverSurface()}
         style={{
           display: "flex",
           alignItems: "center",
@@ -4327,6 +4507,7 @@ function WorkspaceSwitcherControl({
           fontFamily: "var(--font-sans)",
           fontSize: 12,
           fontWeight: 500,
+          transition: HOVER_TRANSITION,
         }}
       >
         <Icon name="layout-grid" size={12} />
@@ -4383,6 +4564,10 @@ function WorkspaceSwitcherControl({
                     if (!isActive) onSwitch(s.id);
                     setOpen(false);
                   }}
+                  {...hoverSurface({
+                    restBg: isActive ? "var(--paper-2)" : "transparent",
+                    hoverBg: isActive ? "var(--paper-2)" : "var(--bg-3)",
+                  })}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -4398,6 +4583,7 @@ function WorkspaceSwitcherControl({
                     cursor: "pointer",
                     fontFamily: "var(--font-sans)",
                     fontSize: 12,
+                    transition: HOVER_TRANSITION,
                   }}
                 >
                   <span style={{ width: 14, flexShrink: 0, color: "var(--fg-3)" }}>
@@ -4426,6 +4612,7 @@ function WorkspaceSwitcherControl({
                       setOpen(false);
                       onRename(s.id);
                     }}
+                    {...hoverSurface()}
                     style={{
                       flexShrink: 0,
                       display: "flex",
@@ -4437,6 +4624,7 @@ function WorkspaceSwitcherControl({
                       borderRadius: "var(--radius-1)",
                       color: "var(--fg-3)",
                       cursor: "pointer",
+                      transition: HOVER_TRANSITION,
                     }}
                   >
                     <Icon name="pencil" size={12} />
@@ -4462,6 +4650,7 @@ function WorkspaceSwitcherControl({
                   setOpen(false);
                   onSaveAs();
                 }}
+                {...hoverSurface()}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -4476,6 +4665,7 @@ function WorkspaceSwitcherControl({
                   cursor: "pointer",
                   fontFamily: "var(--font-sans)",
                   fontSize: 12,
+                  transition: HOVER_TRANSITION,
                 }}
               >
                 <span style={{ width: 14, flexShrink: 0, color: "var(--fg-3)" }}>
