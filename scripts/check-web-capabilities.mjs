@@ -84,6 +84,7 @@ const CAPABILITY_BACKING = {
   attachmentTextSearch: [
     "plugin:attachments|attachment_read_text",
     "plugin:attachments|attachment_read_structured",
+    "plugin:attachments|attachment_read_extracted_text",
   ],
   // Never had commands — the legacy layout does not exist in OPFS.
   vaultMigration: [],

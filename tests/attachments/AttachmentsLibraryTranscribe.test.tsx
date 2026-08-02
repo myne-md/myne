@@ -24,6 +24,9 @@ vi.mock("../../src/lib/attachments", () => ({
   attachmentImport: vi.fn(),
   attachmentDelete: vi.fn(),
   attachmentRename: vi.fn(),
+  // Lazy transcript probe on ⋮-menu open (View transcription). Default: no
+  // transcript, so the menu shows only "Transcribe" as these tests expect.
+  attachmentReadExtractedText: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("../../src/notes/attachmentRefs", () => ({
   referencingNotes: vi.fn().mockResolvedValue([]),

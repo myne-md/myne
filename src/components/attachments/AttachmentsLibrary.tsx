@@ -32,9 +32,11 @@ import {
   attachmentCleanUnused,
   attachmentDelete,
   attachmentImport,
+  attachmentReadExtractedText,
   attachmentRename,
   attachmentUnusedList,
   catalogList,
+  type AttachmentExtractedText,
   type CatalogEntry,
   type CleanResult,
 } from "../../lib/attachments";
@@ -50,11 +52,15 @@ import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
 import { exportAttachment } from "../../editor/attachments/fileCardActions";
 import { Icon } from "../primitives/Icon";
 import { Button } from "../primitives/Button";
+import { Tooltip } from "../primitives/Tooltip";
 import { Select, type SelectOption } from "../primitives/Select";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import type { IconName } from "../../lib/icons";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
 import { UsedInNotesPopover } from "./UsedInNotesPopover";
 import { DeleteAttachmentDialog } from "./DeleteAttachmentDialog";
 import { CleanUnusedAttachmentsDialog } from "./CleanUnusedAttachmentsDialog";
+import { TranscriptionModal } from "./TranscriptionModal";
 import {
   formatBytes,
   formatCreatedAt,
@@ -120,19 +126,11 @@ const TOOLBAR_STYLE: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   alignItems: "center",
+  justifyContent: "space-between",
   rowGap: "var(--space-2)",
   gap: "var(--space-2)",
   padding: "var(--space-2) var(--space-4)",
   borderBottom: "1px solid var(--line-1)",
-};
-
-const TITLE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 14,
-  fontWeight: 600,
-  color: "var(--fg-1)",
-  marginRight: "var(--space-2)",
-  flexShrink: 0,
 };
 
 // The search field is the ONLY flexible element — it grows to fill the row and
@@ -152,14 +150,20 @@ const SEARCH_WRAP_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
-// Trailing control cluster (filter + sort + view toggle + import). It does NOT
-// shrink and wraps to the next line as a unit when the row runs out of width.
-// Fix 5 (MYND-164): no `marginLeft: auto` push — at narrow widths that shoved
-// the wrapped cluster to the far right of line 2, leaving a lopsided gap under
-// the search. Left-aligning it instead keeps the two lines sharing the same
-// left edge. The flexible search field still grows to fill line 1, so at full
-// width the cluster sits flush right; only the *wrapped* case changes.
-const CONTROLS_GROUP_STYLE: CSSProperties = {
+// Left control cluster (search + type filter + sort + view toggle). The search
+// field is the flexible member, so the cluster grows to fill the row and the
+// whole cluster wraps as a unit when the pane narrows.
+const LEFT_CLUSTER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  flex: "1 1 320px",
+  minWidth: 0,
+};
+
+// Right control cluster (clean unused + import). It does NOT shrink and wraps to
+// the next line as a unit when the row runs out of width.
+const RIGHT_CLUSTER_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
@@ -181,6 +185,8 @@ const VIEW_TOGGLE_STYLE: CSSProperties = {
   border: "1px solid var(--line-2)",
   borderRadius: "var(--radius-2)",
   cursor: "pointer",
+  transition:
+    "background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard)",
 };
 
 const SEARCH_INPUT_STYLE: CSSProperties = {
@@ -201,17 +207,38 @@ const SEARCH_INPUT_STYLE: CSSProperties = {
   color: "var(--fg-1)",
 };
 
+// The in-field clear (×) button — appears only while the query is non-empty.
+const SEARCH_CLEAR_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 18,
+  height: 18,
+  flexShrink: 0,
+  padding: 0,
+  border: 0,
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-3)",
+  cursor: "pointer",
+  transition: HOVER_TRANSITION,
+};
+
 const SCROLL_STYLE: CSSProperties = {
   flex: 1,
   minHeight: 0,
   overflowY: "auto",
-  padding: "var(--space-4)",
+  // NO top padding: it left a band above the list's `position: sticky` header
+  // through which rows scrolled (visible bleed). The header now sticks flush at
+  // the scroll top; grid keeps its top breathing room via GRID_STYLE below.
+  padding: "0 var(--space-4) var(--space-4)",
 };
 
 const GRID_STYLE: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
   gap: "var(--space-4)",
+  paddingTop: "var(--space-4)",
 };
 
 const CENTER_MESSAGE_STYLE: CSSProperties = {
@@ -282,12 +309,20 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   // can't use `:focus-within`, so we track focus in React and light up the
   // bordered wrapper, matching `Input.tsx`'s accent border + ring treatment.
   const [searchFocused, setSearchFocused] = useState(false);
+  // Lets the search-box clear (×) button return focus to the input after wiping
+  // the query, so the user can keep typing without re-clicking the field.
+  const searchInputRef = useRef<HTMLInputElement>(null);
   // Fix 6 (MYND-164): a single shared "which attachment's used-in-notes popover
   // is open" — lifted out of each tile so opening one closes any other (only
   // one popover open at a time across the whole library).
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   // Single-open ⋮ action menu — opening one row's menu closes any other.
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+  // Cursor point when the menu was opened via right-click (else null → anchor to
+  // the ⋮ button). Reset whenever the ⋮ button is used or the menu closes.
+  const [actionMenuAt, setActionMenuAt] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   // Delete flow: the target entry + its (already-fetched) referencing notes.
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -301,6 +336,38 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   const [cleanupTarget, setCleanupTarget] = useState<CatalogEntry[] | null>(null);
   const [checkingUnused, setCheckingUnused] = useState(false);
   const [cleanNotice, setCleanNotice] = useState<string | null>(null);
+
+  // "View transcription" (voice-to-text MYND-552): lazy cache of the per-audio-
+  // attachment MYE1 read, keyed by id — `null` = probed, no Ok transcript; a
+  // value = the transcript is present + ready to view. Probed when an audio
+  // row's ⋮ menu opens (lighter than decrypting every audio blob on mount).
+  // `probedRef` dedupes in-flight probes (idempotent reads, but no need to
+  // repeat one). The modal shows the cached transcript text read-only.
+  const [transcriptById, setTranscriptById] = useState<
+    ReadonlyMap<string, AttachmentExtractedText | null>
+  >(new Map());
+  const probedTranscriptRef = useRef<Set<string>>(new Set());
+  const [transcriptModal, setTranscriptModal] = useState<{
+    filename: string;
+    text: string;
+  } | null>(null);
+
+  // Probe an audio attachment's transcript cache on demand (⋮-menu open). No-op
+  // for non-audio, and deduped so one open doesn't re-decrypt. A transient error
+  // records `null` (no affordance) but clears the dedupe so a later open retries.
+  const probeTranscript = useCallback((entry: CatalogEntry) => {
+    if (kindOf(entry.content_type) !== "audio") return;
+    if (probedTranscriptRef.current.has(entry.id)) return;
+    probedTranscriptRef.current.add(entry.id);
+    attachmentReadExtractedText(entry.id)
+      .then((res) => {
+        setTranscriptById((m) => new Map(m).set(entry.id, res));
+      })
+      .catch(() => {
+        probedTranscriptRef.current.delete(entry.id);
+        setTranscriptById((m) => new Map(m).set(entry.id, null));
+      });
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -432,7 +499,17 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       showAttachmentToast(t("attachments.library.transcribeStarted"));
       const run = startTranscription(entry.id);
       run.done
-        .then(() => showAttachmentToast(t("attachments.library.transcribeDone")))
+        .then(() => {
+          // A fresh transcript now exists — invalidate the lazy probe so the
+          // next ⋮-menu open re-reads it and offers "View transcription".
+          probedTranscriptRef.current.delete(entry.id);
+          setTranscriptById((m) => {
+            const next = new Map(m);
+            next.delete(entry.id);
+            return next;
+          });
+          showAttachmentToast(t("attachments.library.transcribeDone"));
+        })
         .catch((err: unknown) => {
           const kind = (err as TranscribeError | null)?.kind ?? "failed";
           showAttachmentToast(t(TRANSCRIBE_TOAST_KEY[kind] ?? "attachments.library.transcribeFailed"));
@@ -589,8 +666,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     renaming: renamingId === entry.id,
     cache: ctx.cache,
     popoverOpen: openPopoverId === entry.id,
-    onTogglePopover: () =>
-      setOpenPopoverId((cur) => (cur === entry.id ? null : entry.id)),
+    // Opening a used-in popover closes any open ⋮ menu (single overlay at a time).
+    onTogglePopover: () => {
+      setOpenActionMenuId(null);
+      setOpenPopoverId((cur) => (cur === entry.id ? null : entry.id));
+    },
     onClosePopover: () => setOpenPopoverId(null),
     onStartRename: () => setRenamingId(entry.id),
     onRenameCommit: (name) => void handleRenameCommit(entry.id, name),
@@ -603,14 +683,37 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     transcribable: kindOf(entry.content_type) === "audio",
     transcriptionEnabled,
     onTranscribe: () => handleTranscribe(entry),
+    // "View transcription" (MYND-552) — shown when the lazy probe found an Ok
+    // audio transcript in the device-local MYE1 cache. NOT ai_enabled-gated:
+    // reading an already-produced transcript needs no engine (and works in the
+    // auditable AI-free build), so this appears even when Transcribe is hidden.
+    hasTranscript:
+      transcriptById.get(entry.id)?.source_format === "audio",
+    onViewTranscription: () => {
+      const res = transcriptById.get(entry.id);
+      if (res) setTranscriptModal({ filename: entry.filename, text: res.text });
+    },
     // Only image/PDF open the shared lightbox preview. Audio plays inline in
     // its own tile (its own play button), and a generic ("other") file has no
     // inline preview — same fallback as the editor file-card; Preview hidden.
     previewable:
       kindOf(entry.content_type) === "image" || kindOf(entry.content_type) === "pdf",
     actionMenuOpen: openActionMenuId === entry.id,
-    onToggleActionMenu: () =>
-      setOpenActionMenuId((cur) => (cur === entry.id ? null : entry.id)),
+    // Opening a ⋮ menu closes any open used-in popover (single overlay at a time).
+    onToggleActionMenu: () => {
+      setOpenPopoverId(null);
+      setActionMenuAt(null); // ⋮-anchored, not cursor-anchored
+      // Probe the transcript cache when OPENING (not closing) this row's menu.
+      if (openActionMenuId !== entry.id) probeTranscript(entry);
+      setOpenActionMenuId((cur) => (cur === entry.id ? null : entry.id));
+    },
+    onOpenActionMenu: (at) => {
+      setOpenPopoverId(null);
+      setActionMenuAt(at);
+      probeTranscript(entry);
+      setOpenActionMenuId(entry.id);
+    },
+    actionMenuAt: openActionMenuId === entry.id ? actionMenuAt : null,
     onCloseActionMenu: () => setOpenActionMenuId(null),
   });
 
@@ -649,38 +752,61 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
         background: "var(--bg-1)",
         // Anchor the transient clean-up notice (absolute, bottom-center).
         position: "relative",
+        // Entry animation (MYND-170 polish): a subtle fade + rise so the pane
+        // settles in rather than snapping open. Zeroed under reduced-motion by
+        // the global rule in tokens.css.
+        animation: "attachments-in var(--duration-base) var(--ease-out)",
       }}
     >
+      {/* The "Attachments" title lives in the pane's top clearance/tab-strip row
+          (rendered by Editor.tsx), so the toolbar is the library's first row. */}
       <div style={TOOLBAR_STYLE}>
-        <span style={TITLE_STYLE}>{t("attachments.library.title")}</span>
-        <div
-          style={
-            searchFocused
-              ? {
-                  ...SEARCH_WRAP_STYLE,
-                  borderColor: "var(--accent)",
-                  // A single focus indicator: the accent border + an adjacent
-                  // soft halo (NO bg-1 offset gap, which read as a second ring
-                  // next to the border → the "double border").
-                  boxShadow:
-                    "0 0 0 3px var(--accent-soft, rgba(44, 74, 122, 0.22))",
-                }
-              : SEARCH_WRAP_STYLE
-          }
-        >
-          <Icon name="search" size={14} />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            placeholder={t("attachments.library.searchPlaceholder")}
-            aria-label={t("attachments.library.searchAriaLabel")}
-            style={SEARCH_INPUT_STYLE}
-          />
-        </div>
-        <div style={CONTROLS_GROUP_STYLE}>
+        <div style={LEFT_CLUSTER_STYLE}>
+          <div
+            style={
+              searchFocused
+                ? {
+                    ...SEARCH_WRAP_STYLE,
+                    borderColor: "var(--accent)",
+                    // A single focus indicator: the accent border + an adjacent
+                    // soft halo (NO bg-1 offset gap, which read as a second ring
+                    // next to the border → the "double border").
+                    boxShadow:
+                      "0 0 0 3px var(--accent-soft, rgba(44, 74, 122, 0.22))",
+                  }
+                : SEARCH_WRAP_STYLE
+            }
+          >
+            <Icon name="search" size={14} />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              placeholder={t("attachments.library.searchPlaceholder")}
+              aria-label={t("attachments.library.searchAriaLabel")}
+              style={SEARCH_INPUT_STYLE}
+            />
+            {query !== "" && (
+              <Tooltip label={t("attachments.library.clearSearchAriaLabel")}>
+                <button
+                  type="button"
+                  aria-label={t("attachments.library.clearSearchAriaLabel")}
+                  data-testid="attachments.search-clear"
+                  onClick={() => {
+                    setQuery("");
+                    searchInputRef.current?.focus();
+                  }}
+                  {...hoverSurface()}
+                  style={SEARCH_CLEAR_STYLE}
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              </Tooltip>
+            )}
+          </div>
           <Select
             value={typeFilter}
             options={typeFilterOptions}
@@ -694,26 +820,29 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
             aria-label={t("attachments.library.sortAriaLabel")}
           />
           <ViewToggleButton view={view} onToggle={() => setView((v) => (v === "grid" ? "list" : "grid"))} />
-          <Button
-            variant="secondary"
+        </div>
+        <div style={RIGHT_CLUSTER_STYLE}>
+          <ToolbarActionButton
             icon="trash-2"
+            label={
+              checkingUnused
+                ? t("attachments.library.checking")
+                : t("attachments.library.cleanUnused")
+            }
             onClick={() => void handleCleanUnused()}
             disabled={checkingUnused || importing}
-            data-testid="attachments.clean-unused-cta"
+            hoverColor="var(--danger)"
+            testId="attachments.clean-unused-cta"
             title={t("attachments.library.cleanUnusedTitle")}
-          >
-            {checkingUnused
-              ? t("attachments.library.checking")
-              : t("attachments.library.cleanUnused")}
-          </Button>
-          <Button
-            variant="secondary"
+          />
+          <ToolbarActionButton
             icon="download"
+            label={t("attachments.library.import")}
             onClick={() => void handleImport()}
             disabled={importing}
-          >
-            {importing ? t("attachments.library.importing") : t("attachments.library.import")}
-          </Button>
+            hoverColor="var(--accent)"
+            spinning={importing}
+          />
         </div>
       </div>
 
@@ -727,12 +856,19 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           <div style={CENTER_MESSAGE_STYLE}>{t("attachments.library.decrypting")}</div>
         ) : isEmpty ? (
           <EmptyState
+            mode="empty"
             loadError={loadError}
             importing={importing}
             onImport={() => void handleImport()}
           />
         ) : isNoMatch ? (
-          <div style={CENTER_MESSAGE_STYLE}>{t("attachments.library.noMatch")}</div>
+          <EmptyState
+            mode="no-results"
+            onClearSearch={() => {
+              setQuery("");
+              setTypeFilter("all");
+            }}
+          />
         ) : view === "grid" ? (
           <div style={GRID_STYLE}>
             {visible.map((entry) => (
@@ -780,6 +916,13 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           {cleanNotice}
         </div>
       )}
+
+      <TranscriptionModal
+        open={transcriptModal !== null}
+        filename={transcriptModal?.filename ?? ""}
+        text={transcriptModal?.text ?? ""}
+        onClose={() => setTranscriptModal(null)}
+      />
     </main>
   );
 }
@@ -812,10 +955,14 @@ function ViewToggleButton({
       title={label}
       style={VIEW_TOGGLE_STYLE}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--paper-2)";
+        // Deepen BOTH the fill and the border so the hover reads on a near-black
+        // surface (--bg-1 → --paper-2 alone was imperceptible).
+        e.currentTarget.style.background = "var(--bg-3)";
+        e.currentTarget.style.borderColor = "var(--line-3)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "var(--bg-1)";
+        e.currentTarget.style.borderColor = "var(--line-2)";
       }}
     >
       <Icon name={view === "grid" ? "list" : "layout-grid"} size={16} />
@@ -823,23 +970,153 @@ function ViewToggleButton({
   );
 }
 
+// ---- right-cluster action button ------------------------------------------
+
+// Matches the bordered chrome of the left-cluster controls (same border token,
+// radius, height) so the whole toolbar reads as one set. On hover it deepens its
+// background AND tints its text + icon to `hoverColor` — Clean unused → danger,
+// Import → accent. We roll our own button rather than reuse `Button` here because
+// the per-control hover TINT and the spinner-swap icon are both outside that
+// primitive's surface (its hover only deepens the background, and its `icon` prop
+// can't animate).
+const TOOLBAR_BUTTON_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  height: 30,
+  padding: "0 var(--space-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  fontWeight: 500,
+  color: "var(--fg-1)",
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  transition:
+    "background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)",
+};
+
+function ToolbarActionButton({
+  icon,
+  label,
+  onClick,
+  disabled = false,
+  hoverColor,
+  spinning = false,
+  testId,
+  title,
+}: {
+  icon: IconName;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  /** Text + icon colour on hover (e.g. `var(--danger)` / `var(--accent)`). */
+  hoverColor: string;
+  /** Swap the icon for a spinning `loader-circle` (Import in-flight). */
+  spinning?: boolean;
+  testId?: string;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      data-testid={testId}
+      title={title}
+      style={{
+        ...TOOLBAR_BUTTON_STYLE,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+      }}
+      onMouseEnter={(e) => {
+        if (disabled) return;
+        e.currentTarget.style.background = "var(--bg-3)";
+        e.currentTarget.style.color = hoverColor;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "var(--bg-1)";
+        e.currentTarget.style.color = "var(--fg-1)";
+      }}
+    >
+      {spinning ? (
+        // The span carries the rotation so the reduced-motion exemption
+        // (`data-motion="essential"`) applies — a frozen spinner reads as hung.
+        <span
+          data-motion="essential"
+          style={{
+            display: "inline-flex",
+            animation: "myne-spinner-rotate 800ms linear infinite",
+          }}
+        >
+          <Icon name="loader-circle" size={14} />
+        </span>
+      ) : (
+        <Icon name={icon} size={14} />
+      )}
+      {label}
+    </button>
+  );
+}
+
 // ---- empty state ----------------------------------------------------------
 
-function EmptyState({
-  loadError,
-  importing,
-  onImport,
-}: {
-  loadError: boolean;
-  importing: boolean;
-  onImport: () => void;
-}) {
+// Two distinct zero states share one centered layout:
+//   • "empty"      — the catalog itself is empty → paperclip + import CTA.
+//   • "no-results" — the catalog is non-empty but the active query / type filter
+//                    matches nothing → search icon + a "Clear search" reset.
+type EmptyStateProps =
+  | {
+      mode: "empty";
+      loadError: boolean;
+      importing: boolean;
+      onImport: () => void;
+    }
+  | {
+      mode: "no-results";
+      onClearSearch: () => void;
+    };
+
+function EmptyState(props: EmptyStateProps) {
   const { t } = useTranslation();
+
+  if (props.mode === "no-results") {
+    return (
+      <div style={CENTER_MESSAGE_STYLE} data-testid="attachments.empty-no-results">
+        <Icon name="search" size={40} style={{ color: "var(--fg-3)" }} />
+        <div style={{ fontSize: 14, color: "var(--fg-2)" }}>
+          {t("attachments.library.emptyNoResultsTitle")}
+        </div>
+        <button
+          type="button"
+          onClick={props.onClearSearch}
+          data-testid="attachments.empty-clear-search"
+          {...hoverSurface()}
+          style={{
+            background: "transparent",
+            border: 0,
+            padding: "var(--space-1) var(--space-2)",
+            borderRadius: "var(--radius-1)",
+            cursor: "pointer",
+            fontFamily: "var(--font-sans)",
+            fontSize: 13,
+            color: "var(--accent)",
+            transition: HOVER_TRANSITION,
+          }}
+        >
+          {t("attachments.library.emptyClearSearch")}
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div style={CENTER_MESSAGE_STYLE}>
-      <Icon name="paperclip" size={28} />
+    <div style={CENTER_MESSAGE_STYLE} data-testid="attachments.empty-no-attachments">
+      <Icon name="paperclip" size={40} style={{ color: "var(--fg-3)" }} />
       <div style={{ fontSize: 14, color: "var(--fg-2)" }}>
-        {loadError
+        {props.loadError
           ? t("attachments.library.emptyLoadError")
           : t("attachments.library.emptyNoAttachments")}
       </div>
@@ -847,10 +1124,10 @@ function EmptyState({
       <Button
         variant="secondary"
         icon="download"
-        onClick={onImport}
-        disabled={importing}
+        onClick={props.onImport}
+        disabled={props.importing}
       >
-        {importing
+        {props.importing
           ? t("attachments.library.importing")
           : t("attachments.library.importFile")}
       </Button>
@@ -888,10 +1165,22 @@ interface ItemActionProps {
   transcriptionEnabled: boolean;
   /** Start transcribing this attachment (audio only). */
   onTranscribe: () => void;
+  /** Whether an Ok audio transcript exists in the MYE1 cache (probed on menu
+   *  open) → the ⋮ menu shows "View transcription". NOT ai_enabled-gated. */
+  hasTranscript: boolean;
+  /** Open the read-only transcription modal for this attachment (MYND-552). */
+  onViewTranscription: () => void;
   /** Whether THIS row's ⋮ action menu is the one open (single-open). */
   actionMenuOpen: boolean;
   /** Toggle this row's ⋮ action menu (closing any other). */
   onToggleActionMenu: () => void;
+  /** Force-OPEN this row's ⋮ action menu at the given viewport point — bound to
+   *  right-click on the tile/row so a context-click gives the same actions at the
+   *  cursor instead of the native OS menu. */
+  onOpenActionMenu: (at: { x: number; y: number }) => void;
+  /** When the menu was opened via right-click, the cursor point to render it at;
+   *  `null` = opened via the ⋮ button (anchor to the button instead). */
+  actionMenuAt: { x: number; y: number } | null;
   /** Force-close this row's ⋮ action menu (outside-click / Esc / select). */
   onCloseActionMenu: () => void;
 }
@@ -1018,6 +1307,7 @@ function UsedInNotes({
           e.stopPropagation();
           onToggle();
         }}
+        {...hoverSurface({ disabled: n === 0 })}
         style={{
           background: "transparent",
           border: 0,
@@ -1027,6 +1317,7 @@ function UsedInNotes({
           fontSize: 12,
           color: n > 0 ? "var(--accent)" : "var(--fg-3)",
           textDecoration: n > 0 ? "underline" : "none",
+          transition: HOVER_TRANSITION,
         }}
         disabled={noteIds === null}
       >
@@ -1094,30 +1385,40 @@ function AttachmentActionMenu({
   items,
   onClose,
   anchorRef,
+  at = null,
 }: {
   items: readonly ItemMenuEntry[];
   onClose: () => void;
   anchorRef: RefObject<HTMLElement | null>;
+  /** Cursor point to open at (right-click); `null` → anchor under the ⋮ button. */
+  at?: { x: number; y: number } | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(
     null,
   );
 
-  // Anchor below the trigger, right-aligned to it (clamped into the viewport).
-  // Space-aware: flip above the trigger when there isn't room below (estimated
-  // from the item count, since the menu isn't measured until after this pass).
+  // Position at the cursor when opened via right-click; otherwise anchor below
+  // the ⋮ trigger, right-aligned to it. Either way clamp into the viewport and
+  // flip up when there isn't room below (estimated from the item count).
   useLayoutEffect(() => {
+    const width = 160;
+    const estHeight = items.length * 34 + 8;
+    if (at !== null) {
+      const openUp = at.y + estHeight + 8 > window.innerHeight;
+      const top = openUp ? Math.max(8, at.y - estHeight) : at.y;
+      const left = Math.min(at.x, window.innerWidth - width - 8);
+      setCoords({ top, left: Math.max(8, left) });
+      return;
+    }
     const el = anchorRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const width = 160;
     const left = Math.min(r.right - width, window.innerWidth - width - 8);
-    const estHeight = items.length * 34 + 8;
     const openUp = r.bottom + estHeight + 8 > window.innerHeight;
     const top = openUp ? Math.max(8, r.top - estHeight - 4) : r.bottom + 4;
     setCoords({ top, left: Math.max(8, left) });
-  }, [anchorRef, items.length]);
+  }, [anchorRef, items.length, at]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -1170,6 +1471,9 @@ function AttachmentActionMenu({
           disabled={item.disabled}
           aria-disabled={item.disabled}
           data-testid={`attachments.action-${item.id}`}
+          // hoverSurface deepens only the background; the Delete item keeps its
+          // `--danger` text colour set below.
+          {...hoverSurface({ disabled: item.disabled })}
           style={{
             ...MENU_ITEM_STYLE,
             color: item.disabled
@@ -1179,12 +1483,7 @@ function AttachmentActionMenu({
                 : "var(--fg-1)",
             cursor: item.disabled ? "default" : "pointer",
             opacity: item.disabled ? 0.6 : 1,
-          }}
-          onMouseEnter={(e) => {
-            if (!item.disabled) e.currentTarget.style.background = "var(--paper-2)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
+            transition: HOVER_TRANSITION,
           }}
           onClick={() => {
             if (item.disabled) return;
@@ -1223,6 +1522,7 @@ const MENU_TRIGGER_STYLE: CSSProperties = {
  */
 function ItemMenu({
   open,
+  at,
   onToggle,
   onClose,
   previewable,
@@ -1233,8 +1533,12 @@ function ItemMenu({
   transcribable,
   transcriptionEnabled,
   onTranscribe,
+  hasTranscript,
+  onViewTranscription,
 }: {
   open: boolean;
+  /** Cursor point to open at (right-click) or `null` to anchor to the ⋮ button. */
+  at: { x: number; y: number } | null;
   onToggle: () => void;
   onClose: () => void;
   previewable: boolean;
@@ -1245,6 +1549,8 @@ function ItemMenu({
   transcribable: boolean;
   transcriptionEnabled: boolean;
   onTranscribe: () => void;
+  hasTranscript: boolean;
+  onViewTranscription: () => void;
 }) {
   const { t } = useTranslation();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -1258,10 +1564,25 @@ function ItemMenu({
           },
         ]
       : []),
+    // "View transcription" — audio only, shown once the lazy probe found an Ok
+    // transcript in the device-local MYE1 cache. Deliberately NOT gated on
+    // `transcription_enabled`: reading an already-produced transcript needs no
+    // engine, so it stays available even with speech-to-text off (and in the
+    // auditable AI-free build). Listed above Transcribe as the primary action.
+    ...(transcribable && hasTranscript
+      ? [
+          {
+            id: "view-transcription",
+            label: t("attachments.library.menuViewTranscription"),
+            onSelect: onViewTranscription,
+          },
+        ]
+      : []),
     // Transcribe — audio only (SYNC-V9), gated on `transcription_enabled`
     // (MYND-592). HIDDEN when the feature is off (MYND-270 product tweak: no
     // dangling affordance when the subsystem is off), not disabled — the same
     // affordance policy the in-note widget uses, so the two surfaces agree.
+    // Kept even when a transcript exists, so the user can re-run it.
     ...(transcribable && transcriptionEnabled
       ? [
           {
@@ -1308,6 +1629,7 @@ function ItemMenu({
         <AttachmentActionMenu
           items={items}
           anchorRef={triggerRef}
+          at={at}
           onClose={onClose}
         />
       )}
@@ -1346,7 +1668,12 @@ function ThumbnailWithPreview({
   const previewable = kind === "image" || kind === "pdf";
   return (
     <div
-      style={{ ...THUMB_HOVER_WRAP_STYLE, cursor: previewable ? "pointer" : "default" }}
+      {...hoverSurface({ disabled: !previewable })}
+      style={{
+        ...THUMB_HOVER_WRAP_STYLE,
+        cursor: previewable ? "pointer" : "default",
+        transition: HOVER_TRANSITION,
+      }}
       data-testid={previewable ? "attachments.tile-preview-target" : undefined}
       role={previewable ? "button" : undefined}
       tabIndex={previewable ? 0 : undefined}
@@ -1382,6 +1709,7 @@ const TILE_STYLE: CSSProperties = {
   borderRadius: "var(--radius-2)",
   overflow: "hidden",
   background: "var(--bg-1)",
+  transition: "border-color var(--duration-fast) var(--ease-standard)",
 };
 
 const THUMB_BOX_STYLE: CSSProperties = {
@@ -1442,12 +1770,34 @@ function AttachmentTile({
   transcribable,
   transcriptionEnabled,
   onTranscribe,
+  hasTranscript,
+  onViewTranscription,
   actionMenuOpen,
   onToggleActionMenu,
+  onOpenActionMenu,
+  actionMenuAt,
   onCloseActionMenu,
 }: ItemActionProps) {
   return (
-    <div style={TILE_STYLE} data-testid="attachments.tile" data-id={entry.id}>
+    <div
+      style={TILE_STYLE}
+      data-testid="attachments.tile"
+      data-id={entry.id}
+      // Right-click anywhere on the card opens the same ⋮ actions AT THE CURSOR
+      // (instead of the native OS reload/inspect menu).
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onOpenActionMenu({ x: e.clientX, y: e.clientY });
+      }}
+      // Accent border on hover — the card lifts toward the pointer without a
+      // shadow (design canon: hairlines, no card shadows).
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "var(--accent)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "var(--line-1)";
+      }}
+    >
       <div style={THUMB_BOX_STYLE}>
         <ThumbnailWithPreview
           entry={entry}
@@ -1486,6 +1836,7 @@ function AttachmentTile({
           />
           <ItemMenu
             open={actionMenuOpen}
+            at={actionMenuAt}
             onToggle={onToggleActionMenu}
             onClose={onCloseActionMenu}
             previewable={previewable}
@@ -1496,6 +1847,8 @@ function AttachmentTile({
             transcribable={transcribable}
             transcriptionEnabled={transcriptionEnabled}
             onTranscribe={onTranscribe}
+            hasTranscript={hasTranscript}
+            onViewTranscription={onViewTranscription}
           />
         </div>
       </div>
@@ -1513,6 +1866,7 @@ const LIST_ROW_STYLE: CSSProperties = {
   padding: "var(--space-2) var(--space-2)",
   borderBottom: "1px solid var(--line-1)",
   minWidth: 0,
+  transition: HOVER_TRANSITION,
 };
 
 const LIST_HEADER_STYLE: CSSProperties = {
@@ -1524,6 +1878,13 @@ const LIST_HEADER_STYLE: CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   color: "var(--fg-3)",
+  // Stay put while the list scrolls: the surface background + the inherited
+  // bottom hairline keep rows from showing through, and a z-index above the rows
+  // (portalled menus/popovers sit far higher) keeps it on top.
+  position: "sticky",
+  top: 0,
+  zIndex: 1,
+  background: "var(--bg-1)",
 };
 
 function ListHeader() {
@@ -1559,12 +1920,27 @@ function AttachmentListRow({
   transcribable,
   transcriptionEnabled,
   onTranscribe,
+  hasTranscript,
+  onViewTranscription,
   actionMenuOpen,
   onToggleActionMenu,
+  onOpenActionMenu,
+  actionMenuAt,
   onCloseActionMenu,
 }: ItemActionProps) {
   return (
-    <div style={LIST_ROW_STYLE} data-testid="attachments.tile" data-id={entry.id}>
+    <div
+      style={LIST_ROW_STYLE}
+      data-testid="attachments.tile"
+      data-id={entry.id}
+      // Right-click anywhere on the row opens the same ⋮ actions AT THE CURSOR
+      // (not the native OS menu).
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onOpenActionMenu({ x: e.clientX, y: e.clientY });
+      }}
+      {...hoverSurface()}
+    >
       <div
         style={{
           width: 28,
@@ -1609,6 +1985,7 @@ function AttachmentListRow({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
         <ItemMenu
           open={actionMenuOpen}
+          at={actionMenuAt}
           onToggle={onToggleActionMenu}
           onClose={onCloseActionMenu}
           previewable={previewable}
@@ -1619,6 +1996,8 @@ function AttachmentListRow({
           transcribable={transcribable}
           transcriptionEnabled={transcriptionEnabled}
           onTranscribe={onTranscribe}
+          hasTranscript={hasTranscript}
+          onViewTranscription={onViewTranscription}
         />
       </div>
     </div>

@@ -489,6 +489,14 @@ const PER_COMMAND: &[(&str, Class)] = &[
         "plugin:attachments|attachment_read_structured",
         Class::Unsupported,
     ),
+    // The read-back of the same device-local, never-synced `MYE1` cache (§9.15)
+    // the two commands above serve — `read_extracted` is `#[cfg(not(wasm32))]`,
+    // so a browser can neither run an extraction nor read one. Same
+    // `attachmentTextSearch` capability, `Unsupported` for the same reason.
+    (
+        "plugin:attachments|attachment_read_extracted_text",
+        Class::Unsupported,
+    ),
     (
         "plugin:quick-unlock|quick_unlock_setup_biometric",
         Class::Unsupported,
