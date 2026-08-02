@@ -96,7 +96,7 @@ describe("exportAttachment", () => {
     await exportAttachment(ID, "report.docx");
     expect(pickExportDestination).toHaveBeenCalledWith("report.docx");
     expect(attachmentExport).toHaveBeenCalledWith(ID, "/out/report.docx", true);
-    expect(showAttachmentToast).toHaveBeenCalledWith("Exported report.docx.");
+    expect(showAttachmentToast).toHaveBeenCalledWith("Exported report.docx.", "success");
   });
 
   it("is a silent no-op when the destination pick is cancelled (null)", async () => {
@@ -110,14 +110,14 @@ describe("exportAttachment", () => {
     pickExportDestination.mockRejectedValue(new Error("dialog crashed"));
     await exportAttachment(ID, "x.docx");
     expect(attachmentExport).not.toHaveBeenCalled();
-    expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't open the save dialog.");
+    expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't open the save dialog.", "error");
   });
 
   it("toasts an export failure when the host write rejects", async () => {
     pickExportDestination.mockResolvedValue("/out/x.docx");
     attachmentExport.mockRejectedValue(new Error("io"));
     await exportAttachment(ID, "x.docx");
-    expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't export x.docx.");
+    expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't export x.docx.", "error");
   });
 });
 
@@ -136,7 +136,7 @@ describe("renameFileCard", () => {
     expect(attachmentRename).toHaveBeenCalledWith(ID, "new.docx");
     // The cached catalog row reflects the new name without a note reload.
     expect(view.state.field(catalogField)!.get(ID)!.filename).toBe("new.docx");
-    expect(showAttachmentToast).toHaveBeenCalledWith("Renamed to new.docx.");
+    expect(showAttachmentToast).toHaveBeenCalledWith("Renamed to new.docx.", "success");
     view.destroy();
   });
 
@@ -166,7 +166,7 @@ describe("renameFileCard", () => {
     promptForName.mockResolvedValue("new.docx");
     attachmentRename.mockRejectedValue(new Error("locked"));
     await renameFileCard(view, ID, "old.docx");
-    expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't rename the attachment.");
+    expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't rename the attachment.", "error");
     expect(view.state.field(catalogField)!.get(ID)!.filename).toBe("old.docx");
     view.destroy();
   });

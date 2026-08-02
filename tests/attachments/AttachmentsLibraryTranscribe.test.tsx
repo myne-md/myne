@@ -149,6 +149,6 @@ describe("Attachments Library Transcribe entry (SYNC-V9)", () => {
     const menu = await openMenuFor("voice.wav");
     fireEvent.click(within(menu).getByTestId("attachments.action-transcribe"));
 
-    await waitFor(() => expect(mockedToast).toHaveBeenCalledWith(i18n.t(key)));
+    await waitFor(() => expect(mockedToast).toHaveBeenCalledWith(i18n.t(key), "error"));
   });
 });

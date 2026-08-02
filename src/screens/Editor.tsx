@@ -74,7 +74,8 @@ import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
 import { AiHydrationProbe } from "../notes/components/AiHydrationProbe";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
-import { Toast, type ToastAction } from "../components/Toast";
+import { Toast, type ToastAction, type ToastVariant } from "../components/Toast";
+import { Toaster } from "../components/toast/Toaster";
 import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
@@ -612,6 +613,7 @@ export function Editor({
 type EditorToast = {
   message: string;
   action?: ToastAction;
+  variant?: ToastVariant;
 };
 
 type EditorChromeProps = {
@@ -660,7 +662,7 @@ function EditorChrome({
   // backup export, importer); the export flow goes through the structured
   // `showExportToast` below so success can carry its reveal action.
   const showToastMessage = useCallback(
-    (message: string) => setToast({ message }),
+    (message: string, variant?: ToastVariant) => setToast({ message, variant }),
     [setToast],
   );
   /** MYND-643: copy a note's body to the clipboard. Takes the target note id
@@ -675,9 +677,9 @@ function EditorChrome({
       try {
         const { copyNoteMarkdown } = await import("../notes/copyNoteMarkdown");
         await copyNoteMarkdown(id);
-        setToast({ message: i18n.t("export.note.modal.copied") });
+        setToast({ message: i18n.t("export.note.modal.copied"), variant: "success" });
       } catch {
-        setToast({ message: i18n.t("export.note.modal.copyFailed") });
+        setToast({ message: i18n.t("export.note.modal.copyFailed"), variant: "error" });
       }
     },
     [setToast],
@@ -929,7 +931,7 @@ function EditorChrome({
   const reminderNotifier = useMemo(
     () =>
       createInAppNotifier({
-        deliver: () => setToast({ message: i18n.t("tasks.reminder.due") }),
+        deliver: () => setToast({ message: i18n.t("tasks.reminder.due"), variant: "info" }),
       }),
     [setToast],
   );
@@ -1054,7 +1056,7 @@ function EditorChrome({
       setToast({ message });
     } catch (e) {
       if (e instanceof BaseParseError) {
-        setToast({ message: t("editor.chrome.baseImport.notValid") });
+        setToast({ message: t("editor.chrome.baseImport.notValid"), variant: "error" });
       } else if (e instanceof BaseImportPersistError) {
         // Count-only (SYNC-12) — never surface the failed view's name in copy.
         setToast({
@@ -1063,7 +1065,7 @@ function EditorChrome({
           }),
         });
       } else {
-        setToast({ message: t("editor.chrome.baseImport.failed") });
+        setToast({ message: t("editor.chrome.baseImport.failed"), variant: "error" });
       }
     }
   }, [setToast, t]);
@@ -1216,7 +1218,7 @@ function EditorChrome({
   // silent status line the StoragePanel reads. The schedule never auto-disables.
   useBackupScheduler((scheduleTick) => {
     if (scheduleTick.freshFailure) {
-      setToast({ message: BACKUP_SCHEDULE_FAILED_TOAST });
+      setToast({ message: BACKUP_SCHEDULE_FAILED_TOAST, variant: "error" });
     }
   });
 
@@ -2360,12 +2362,17 @@ function EditorChrome({
       <Toast
         message={toast?.message ?? null}
         action={toast?.action}
+        variant={toast?.variant}
         // Action-bearing toasts (export success "Show in folder") get the
         // soft-trash Undo precedent's 6 s window (NoteList.tsx) — 2.5 s is
         // not enough to read the message AND click the inline action.
         durationMs={toast?.action !== undefined ? 6000 : 2500}
         onDone={() => setToast(null)}
       />
+      {/* The single toast surface (#238): renders every toast from the central
+          store — this screen's, NoteList's, sync's, and the editor's imperative
+          ones — as one shared collapsed stack. Mounted exactly once. */}
+      <Toaster />
     </div>
     </CenterViewProvider>
   );

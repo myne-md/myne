@@ -1,85 +1,63 @@
-// Single-message auto-dismissing toast pinned bottom-right. Parent owns
-// the message state; setting a new message replaces the previous.
-// `role="status"` + `aria-live="polite"` so screen readers announce
-// without interrupting.
+// Headless bridge from the per-surface toast API to the central store (#238).
 //
-// Optional `action` renders an inline button (e.g. "Undo") — used by the
-// soft-trash flow's undo toast (MYND-133). Invoking the action does NOT
-// auto-dismiss; the parent clears the message in the action handler.
+// Every surface that used to render its own positioned toast still writes
+// `<Toast message={…} onDone={…} variant=… action=… />` exactly as before — but
+// this no longer draws anything. It pushes the message into the toast store, so
+// the single <Toaster> (mounted once in Editor) renders it in the shared
+// collapsed stack. That is what makes every toast — React-surface or the
+// editor's imperative one — look and stack alike, without touching a single
+// call site.
+//
+// The store owns auto-dismiss, the slide in/out, pause-on-hover and the ×; this
+// component only mirrors the owner's `message` state into and out of the store.
 
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useRef } from "react";
+import { dismissToast, toast } from "./toast/toastStore";
 
-export interface ToastAction {
-  /** Button label (e.g. "Undo"). */
-  label: string;
-  /** Invoked on click. The parent is responsible for dismissing the toast. */
-  onAction: () => void;
-}
+// Re-exported so existing importers (`import { ToastAction, ToastVariant }`)
+// keep resolving from here.
+export type { ToastActionSpec as ToastAction, ToastVariant } from "./toast/toastStore";
 
 interface ToastProps {
-  /** The message to display. When null, nothing renders. */
+  /** The message to display. When null, nothing is shown. */
   message: string | null;
-  /** Called after the auto-dismiss timeout elapses. */
+  /** Called after the toast leaves (auto-dismiss or ×). Clear owner state here. */
   onDone: () => void;
-  /** Auto-dismiss timeout in milliseconds. Default: 2500. */
+  /** Auto-dismiss timeout (ms). Default 2500; 6000 when an action is present. */
   durationMs?: number;
   /** Optional inline action button (e.g. an undo affordance). */
-  action?: ToastAction;
+  action?: { label: string; onAction: () => void };
+  /** Semantic flavour driving the icon + rail colour. Default: `neutral`. */
+  variant?: "neutral" | "success" | "error" | "info";
 }
 
-const TOAST_STYLE: CSSProperties = {
-  position: "fixed",
-  bottom: "var(--space-5)",
-  right: "var(--space-5)",
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-3)",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-4)",
-  boxShadow: "var(--shadow-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-  zIndex: 1100,
-};
+export function Toast({ message, onDone, durationMs, action, variant }: ToastProps) {
+  const idRef = useRef<number | null>(null);
+  // Read the non-message props at push time without re-pushing when their
+  // identity changes on an unrelated parent re-render.
+  const latest = useRef({ onDone, durationMs, action, variant });
+  latest.current = { onDone, durationMs, action, variant };
 
-const ACTION_STYLE: CSSProperties = {
-  background: "none",
-  border: "none",
-  padding: 0,
-  margin: 0,
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: 600,
-  color: "var(--accent, var(--fg-1))",
-  cursor: "pointer",
-  textDecoration: "underline",
-};
-
-export function Toast({ message, onDone, durationMs = 2500, action }: ToastProps) {
   useEffect(() => {
     if (message === null) return;
-    const id = window.setTimeout(onDone, durationMs);
-    return () => window.clearTimeout(id);
-  }, [message, onDone, durationMs]);
+    const { onDone: od, durationMs: d, action: a, variant: v } = latest.current;
+    idRef.current = toast({
+      message,
+      variant: v,
+      action: a,
+      durationMs: d,
+      onDismiss: od,
+    });
+    // Cleanup fires when the message changes or the owner unmounts — a
+    // bridge-initiated removal, so it is SILENT (the owner already moved on;
+    // firing onDone here would clobber a replacement message).
+    return () => {
+      if (idRef.current !== null) {
+        dismissToast(idRef.current, { silent: true });
+        idRef.current = null;
+      }
+    };
+  }, [message]);
 
-  if (message === null) return null;
-
-  return (
-    <div role="status" aria-live="polite" data-testid="editor.toast" style={TOAST_STYLE}>
-      <span>{message}</span>
-      {action !== undefined && (
-        <button
-          type="button"
-          style={ACTION_STYLE}
-          onClick={action.onAction}
-          data-testid="editor.toast-action"
-        >
-          {action.label}
-        </button>
-      )}
-    </div>
-  );
+  return null;
 }

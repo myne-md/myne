@@ -231,8 +231,8 @@ export function installExCommands(api: ExApi): void {
     const flush = host.workspace?.flushPendingSaves;
     if (flush === undefined) return;
     void flush().then(
-      () => showAttachmentToast(host.t("editor.vim.ex.written")),
-      () => showAttachmentToast(host.t("editor.vim.ex.writeFailed")),
+      () => showAttachmentToast(host.t("editor.vim.ex.written"), "success"),
+      () => showAttachmentToast(host.t("editor.vim.ex.writeFailed"), "error"),
     );
   };
   api.Vim.defineEx("write", "w", write);
@@ -270,13 +270,14 @@ export function installExCommands(api: ExApi): void {
     const p = params as { argString?: string; line?: number; lineEnd?: number };
     const parsed = parseSubstitution(p.argString ?? "");
     if (parsed === null) {
-      showAttachmentToast(host.t("editor.vim.ex.substitute.malformed"));
+      showAttachmentToast(host.t("editor.vim.ex.substitute.malformed"), "error");
       return;
     }
     const refusal = substitutionRefusal(parsed.pattern, parsed.replacement);
     if (refusal !== null) {
       showAttachmentToast(
         host.t("editor.vim.ex.substitute.refused", { what: refusal }),
+        "error",
       );
       return;
     }
@@ -287,7 +288,7 @@ export function installExCommands(api: ExApi): void {
   // clear message instead of a silent or partial effect.
   for (const { name, prefix, reasonKey } of REFUSED_EX_COMMANDS) {
     api.Vim.defineEx(name, prefix, () => {
-      showAttachmentToast(host.t(reasonKey));
+      showAttachmentToast(host.t(reasonKey), "error");
     });
   }
 }

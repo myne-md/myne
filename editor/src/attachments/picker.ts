@@ -57,7 +57,7 @@ export async function pickAndInsert(view: EditorView, insertAt?: number): Promis
   try {
     selected = await openFn();
   } catch {
-    showAttachmentToast(i18n.t("editor.attachment.picker.openFailed"));
+    showAttachmentToast(i18n.t("editor.attachment.picker.openFailed"), "error");
     return;
   }
   if (selected === null || selected.length === 0) return; // cancelled

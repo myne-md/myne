@@ -175,6 +175,7 @@ describe("startVoiceRecording", () => {
     expect(isRecording()).toBe(false);
     expect(showAttachmentToast).toHaveBeenCalledWith(
       "No microphone found. Connect one and try again.",
+      "error",
     );
     view.destroy();
   });
@@ -194,7 +195,7 @@ describe("startVoiceRecording", () => {
       voiceStart.mockRejectedValueOnce(err);
       const view = mount();
       await startVoiceRecording(view);
-      expect(showAttachmentToast).toHaveBeenCalledWith(msg);
+      expect(showAttachmentToast).toHaveBeenCalledWith(msg, "error");
       view.destroy();
     }
   });
@@ -254,6 +255,7 @@ describe("finishRecording (Stop)", () => {
     await lastBarOpts!.onStop();
     expect(showAttachmentToast).toHaveBeenCalledWith(
       "Recording was silent and discarded — check your microphone.",
+      "error",
     );
     expect(barHandle.teardown).toHaveBeenCalled();
     expect(isRecording()).toBe(false);

@@ -2830,7 +2830,7 @@ function PopulatedList({
         onDone={() => setImportToast(null)}
         durationMs={5000}
       />
-      <Toast message={trashError} onDone={() => setTrashError(null)} />
+      <Toast message={trashError} onDone={() => setTrashError(null)} variant="error" />
     </div>
   );
 }

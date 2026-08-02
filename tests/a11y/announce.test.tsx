@@ -8,15 +8,20 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { render, cleanup, screen } from "@testing-library/react";
-import { Toast } from "../../src/components/Toast";
+import { Toaster } from "../../src/components/toast/Toaster";
+import { toast, resetToasts } from "../../src/components/toast/toastStore";
 import { SuspicionBanner } from "../../src/components/SuspicionBanner";
 import { DestructiveBanner } from "../../src/components/DestructiveBanner";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  resetToasts();
+  cleanup();
+});
 
 describe("critical copy is a screen-reader live region", () => {
   it("Toast announces politely via role=status", () => {
-    render(<Toast message="Saved" onDone={() => {}} />);
+    toast({ message: "Saved" });
+    render(<Toaster />);
     const el = screen.getByRole("status");
     expect(el.getAttribute("aria-live")).toBe("polite");
   });
