@@ -25,6 +25,7 @@ import { isPendingApproval } from "./lib/pending-approval";
 import { leaveActiveVault, switchVault } from "./lib/vault-switch";
 import { prefsRead } from "./lib/prefs";
 import { applyTheme, applyCustomTheme } from "./lib/theme";
+import { applyAccent, readAccent } from "./lib/accentColor";
 import { useStageRoute } from "./lib/routing";
 import { HAS_NATIVE_TITLE_BAR, dragRegionProps } from "./screens/titlebar";
 import { readCustomTheme } from "./lib/themes";
@@ -216,8 +217,16 @@ function App() {
   useEffect(() => {
     if (stageName !== "editor") {
       applyTheme(null);
+      // A6: clear the custom accent on lock / every non-editor stage too, so the
+      // locked screen never shows the user's chosen accent (device-local UI pref
+      // applied only while unlocked — see `lib/accentColor.ts`).
+      applyAccent(null);
       return;
     }
+    // Paint the device-local accent while unlocked. In-session changes from
+    // Settings → Appearance call `applyAccent` directly; this covers the
+    // stage-transition path (unlock / vault switch).
+    applyAccent(readAccent());
     let cancelled = false;
     void prefsRead()
       .then(async (prefs) => {
@@ -395,11 +404,14 @@ function App() {
           <Unlock
             initialStatus={stage.initialStatus}
             vaultId={stage.vaultId}
-            // Back-to-picker affordance, shown only when this unlock was
-            // reached by picking a row on the ≥2-vault picker (MYND-204
-            // follow-up: the picker → unlock hop was one-way). Absent on every
-            // other entry path — there is no picker to return to.
-            onBack={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
+            // Back-to-picker affordance. Always wired (the `unlock.back-to-picker`
+            // transition is unconditional); <Unlock> itself only SHOWS the link
+            // when ≥2 vaults exist, so it also reaches the vault selector after a
+            // MANUAL lock or auto-lock — not just when the unlock was picker-
+            // reached (`fromPicker`). Previously gated on `fromPicker`, which
+            // stranded a multi-vault user on the locked vault's unlock screen with
+            // no way back to the picker.
+            onBack={() => dispatch({ type: "unlock.back-to-picker" })}
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
