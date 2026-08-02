@@ -24,39 +24,35 @@ import {
   useSelectedNote,
   type NoteId,
 } from "../sidebarState";
+import { Icon } from "../../components/primitives/Icon";
 import { BACKDROP_STYLE, DeleteConfirmModal } from "./DeleteConfirmModal";
+import { PanelEmptyState } from "./PanelEmptyState";
 import {
   AGE_STYLE,
   COUNT_STYLE,
-  EMPTY_STATE_STYLE,
-  FOOTER_STYLE,
+  HEADER_CLOSE_STYLE,
+  HEADER_LEFT_STYLE,
+  HEADER_RIGHT_STYLE,
   HEADER_STYLE,
   HEADER_TITLE_STYLE,
   LIST_STYLE,
   PANEL_STYLE,
+  ROW_ACTIONS_STYLE,
   ROW_BTN_STYLE,
+  ROW_ICON_BTN_STYLE,
   ROW_STYLE,
   ROW_TITLE_STYLE,
-  STATUS_STYLE,
+  STATUS_LINE_STYLE,
 } from "./notePanelStyles";
 import { formatRelativeTime } from "./relativeTime";
 
-// Trash-only buttons — the destructive purge / empty actions + Close. The
-// shared shell styles come from `notePanelStyles` (mirrored by ArchivePanel).
-const PURGE_BTN_STYLE: CSSProperties = {
-  ...ROW_BTN_STYLE,
-  color: "var(--warning)",
-  borderColor: "var(--line-2)",
-};
-
+// Trash-only "Empty trash" action, now in the header cluster (#226
+// follow-up: the footer row is gone, close is a header ✕). Danger-tinted so the
+// irreversible bulk purge is distinct from restore.
 const EMPTY_TRASH_BTN_STYLE: CSSProperties = {
   ...ROW_BTN_STYLE,
-  color: "var(--warning)",
-  marginLeft: "auto",
-};
-
-const CLOSE_BTN_STYLE: CSSProperties = {
-  ...ROW_BTN_STYLE,
+  color: "var(--danger)",
+  borderColor: "color-mix(in srgb, var(--danger) 40%, transparent)",
 };
 
 type Confirm =
@@ -144,7 +140,14 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
   const count = records.length;
 
   return (
-    <div style={BACKDROP_STYLE} onClick={handleBackdrop} role="presentation">
+    <div
+      style={{
+        ...BACKDROP_STYLE,
+        animation: "settings-backdrop-in var(--duration-fast) var(--ease-standard)",
+      }}
+      onClick={handleBackdrop}
+      role="presentation"
+    >
       <div
         ref={dialogRef}
         style={PANEL_STYLE}
@@ -154,18 +157,49 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
         aria-labelledby="trash-panel-title"
       >
         <div style={HEADER_STYLE}>
-          <h2 id="trash-panel-title" style={HEADER_TITLE_STYLE}>
-            {t("notes.trash.title")}
-          </h2>
-          <span style={COUNT_STYLE}>
-            {count === 0
-              ? t("notes.trash.countEmpty")
-              : t("notes.trash.count", { count })}
-          </span>
+          <div style={HEADER_LEFT_STYLE}>
+            <h2 id="trash-panel-title" style={HEADER_TITLE_STYLE}>
+              {t("notes.trash.title")}
+            </h2>
+            {count > 0 && (
+              <span style={COUNT_STYLE}>{t("notes.trash.count", { count })}</span>
+            )}
+          </div>
+          <div style={HEADER_RIGHT_STYLE}>
+            {count > 0 && (
+              <button
+                type="button"
+                style={EMPTY_TRASH_BTN_STYLE}
+                data-testid="trash.empty"
+                onClick={() =>
+                  setConfirm({ kind: "empty", ids: records.map((r) => r.noteUuid) })
+                }
+              >
+                {t("notes.trash.empty")}
+              </button>
+            )}
+            <button
+              type="button"
+              style={HEADER_CLOSE_STYLE}
+              data-panel-action="close"
+              data-testid="trash.close"
+              title={t("notes.trash.close")}
+              aria-label={t("notes.trash.close")}
+              onClick={onClose}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
         </div>
+        {status !== null && <div style={STATUS_LINE_STYLE}>{status}</div>}
 
         {count === 0 ? (
-          <div style={EMPTY_STATE_STYLE}>{t("notes.trash.emptyState")}</div>
+          <PanelEmptyState
+            icon="trash-2"
+            title={t("notes.trash.emptyTitle")}
+            body={t("notes.trash.emptyBody")}
+            testId="trash.empty-state"
+          />
         ) : (
           <div style={LIST_STYLE}>
             {records.map((r) => (
@@ -183,61 +217,43 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                     ? formatRelativeTime(new Date(r.trashed))
                     : ""}
                 </span>
-                <button
-                  type="button"
-                  style={ROW_BTN_STYLE}
-                  data-testid="trash.restore"
-                  data-note-id={r.noteUuid}
-                  onClick={() => restore(r.noteUuid)}
-                >
-                  {t("notes.trash.restore")}
-                </button>
-                <button
-                  type="button"
-                  style={PURGE_BTN_STYLE}
-                  data-testid="trash.delete"
-                  data-note-id={r.noteUuid}
-                  onClick={() =>
-                    setConfirm({
-                      kind: "single",
-                      id: r.noteUuid,
-                      title: r.title,
-                    })
-                  }
-                >
-                  {t("notes.trash.delete")}
-                </button>
+                <div style={ROW_ACTIONS_STYLE}>
+                  <button
+                    type="button"
+                    style={ROW_ICON_BTN_STYLE}
+                    data-panel-action="restore"
+                    data-testid="trash.restore"
+                    data-note-id={r.noteUuid}
+                    title={t("notes.trash.restore")}
+                    aria-label={t("notes.trash.restore")}
+                    onClick={() => restore(r.noteUuid)}
+                  >
+                    <Icon name="rotate-ccw" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    style={ROW_ICON_BTN_STYLE}
+                    data-panel-action="delete"
+                    data-testid="trash.delete"
+                    data-note-id={r.noteUuid}
+                    title={t("notes.trash.delete")}
+                    aria-label={t("notes.trash.delete")}
+                    onClick={() =>
+                      setConfirm({
+                        kind: "single",
+                        id: r.noteUuid,
+                        title: r.title,
+                      })
+                    }
+                  >
+                    <Icon name="trash-2" size={16} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        <div style={FOOTER_STYLE}>
-          {status !== null && <span style={STATUS_STYLE}>{status}</span>}
-          {count > 0 && (
-            <button
-              type="button"
-              style={EMPTY_TRASH_BTN_STYLE}
-              data-testid="trash.empty"
-              onClick={() =>
-                setConfirm({
-                  kind: "empty",
-                  ids: records.map((r) => r.noteUuid),
-                })
-              }
-            >
-              {t("notes.trash.empty")}
-            </button>
-          )}
-          <button
-            type="button"
-            style={CLOSE_BTN_STYLE}
-            data-testid="trash.close"
-            onClick={onClose}
-          >
-            {t("notes.trash.close")}
-          </button>
-        </div>
       </div>
 
       {confirm !== null && confirm.kind === "single" && (

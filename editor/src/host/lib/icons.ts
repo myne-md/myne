@@ -136,6 +136,10 @@ export const ICON_PATHS: Record<string, string> = {
   cpu: '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
   globe:
     '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  // Restore / undo (Trash + Archive panels, #226 follow-up). Lucide
+  // `rotate-ccw` — a counter-clockwise circular arrow reads as "put it back".
+  "rotate-ccw":
+    '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
 };
 
 export type IconName = keyof typeof ICON_PATHS;

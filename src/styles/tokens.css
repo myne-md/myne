@@ -1048,6 +1048,30 @@ a:focus-visible,
   background: var(--paper-3);
 }
 
+/* Trash / Archive row action buttons (#226 follow-up) — ghost icon
+   buttons that brighten on hover/focus; the delete variant tints danger so the
+   irreversible action is never a silent twin of restore. */
+[data-panel-action="restore"]:hover,
+[data-panel-action="restore"]:focus-visible,
+[data-panel-action="close"]:hover,
+[data-panel-action="close"]:focus-visible {
+  color: var(--fg-1);
+  background: var(--paper-3);
+}
+[data-panel-action="delete"]:hover,
+[data-panel-action="delete"]:focus-visible {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+/* Trash / Archive open with the Settings rise+fade (PANEL_STYLE) — honor
+   reduced-motion (#226 follow-up). */
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="trash.panel"],
+  [data-testid="archive.panel"] {
+    animation: none !important;
+  }
+}
+
 /* Settings search input (MYND-536) — suppress the WebView's native focus ring on
    the inner <input>; focus is shown on the wrapper (accent border + soft ring).
    `:focus-visible` can't be reached from the component's inline styles. */
