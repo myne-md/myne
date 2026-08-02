@@ -90,7 +90,7 @@ const MENU_STYLE: CSSProperties = {
 const ITEM_STYLE_BASE: CSSProperties = {
   display: "block",
   width: "100%",
-  textAlign: "left",
+  textAlign: "start",
   background: "transparent",
   border: 0,
   padding: "6px 10px",

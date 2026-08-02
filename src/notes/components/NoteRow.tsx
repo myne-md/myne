@@ -118,8 +118,8 @@ const rowBaseStyle: CSSProperties = {
   minHeight: 52,
   cursor: "pointer",
   borderRadius: 6,
-  marginLeft: 4,
-  marginRight: 4,
+  marginInlineStart: 4,
+  marginInlineEnd: 4,
   // Never grow past the sidebar: the flex content shrinks + the title ellipsizes
   // (rowContentStyle clips) instead of the whole pill bleeding under the editor.
   minWidth: 0,
@@ -243,7 +243,7 @@ const errorIndicatorStyle: CSSProperties = {
   height: 6,
   borderRadius: "50%",
   background: "var(--warning)",
-  marginRight: 6,
+  marginInlineEnd: 6,
   verticalAlign: "middle",
 };
 
@@ -257,7 +257,7 @@ const errorIndicatorStyle: CSSProperties = {
 const taskBadgeStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  marginLeft: 6,
+  marginInlineStart: 6,
   color: "var(--fg-3)",
   verticalAlign: "middle",
 };
@@ -265,7 +265,7 @@ const taskBadgeStyle: CSSProperties = {
 const indexBadgeStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  marginLeft: 6,
+  marginInlineStart: 6,
   color: "var(--fg-3)",
   verticalAlign: "middle",
 };
@@ -280,7 +280,7 @@ const indexConflictStyle: CSSProperties = {
   height: 6,
   borderRadius: "50%",
   background: "var(--line-3)",
-  marginLeft: 6,
+  marginInlineStart: 6,
   verticalAlign: "middle",
 };
 
@@ -307,7 +307,7 @@ const unsyncedMarkerStyle: CSSProperties = {
   borderRadius: "50%",
   border: "1px solid var(--fg-3)",
   background: "transparent",
-  marginLeft: 6,
+  marginInlineStart: 6,
   verticalAlign: "middle",
   flexShrink: 0,
 };
@@ -635,7 +635,10 @@ function TitleLine({
   }
   return (
     <div style={titleStyle}>
-      {record.title}
+      {/* `<bdi>` isolates the user-authored title's bidi + auto-directions it,
+          so a mixed-script or RTL title reads correctly and does not reorder the
+          trailing markers or the surrounding row under RTL. */}
+      <bdi>{record.title}</bdi>
       {markers}
     </div>
   );

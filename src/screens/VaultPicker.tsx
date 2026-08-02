@@ -184,7 +184,7 @@ function rowStyle(hovered: boolean): CSSProperties {
     background: hovered ? "var(--paper-3)" : "var(--paper)",
     border: `1px solid ${hovered ? "var(--line-2)" : "var(--line-1)"}`,
     cursor: "pointer",
-    textAlign: "left",
+    textAlign: "start",
     fontFamily: "var(--font-sans)",
   };
 }

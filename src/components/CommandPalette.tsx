@@ -125,7 +125,7 @@ const SUGGEST_ROW_STYLE: CSSProperties = {
   border: 0,
   borderRadius: "var(--radius-1, 3px)",
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "start",
   width: "100%",
   fontFamily: "var(--font-sans)",
 };
@@ -178,7 +178,7 @@ const CATEGORY_STYLE: CSSProperties = {
   fontSize: 11,
   color: "var(--fg-3)",
   fontWeight: 500,
-  marginRight: "auto",
+  marginInlineEnd: "auto",
 };
 
 const HINT_STYLE: CSSProperties = {
@@ -767,7 +767,7 @@ export function CommandPalette({
                     <span style={SUGGEST_HINT_STYLE}>{s.hint}</span>
                   )}
                   {active && (
-                    <span style={{ ...SUGGEST_KEY_STYLE, marginLeft: "auto" }}>
+                    <span style={{ ...SUGGEST_KEY_STYLE, marginInlineStart: "auto" }}>
                       {t("commandPalette.operatorHint")}
                     </span>
                   )}

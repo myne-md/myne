@@ -97,6 +97,10 @@ export function Switch({
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
       data-testid={testId}
+      // The knob slides along the reading axis via a pixel `translateX`, which
+      // has no notion of direction; under RTL the whole track mirrors so "off"
+      // rests on the leading (right) edge and slides left when on. (SYNC-4.)
+      data-flip=""
       onClick={interactive ? () => onChange(!checked) : undefined}
       disabled={!interactive}
       // Hover affordance: deepen the track border so the control answers "yes,

@@ -25,10 +25,10 @@ const ROW_GAP = 3;
 
 const railStyle = (x: number): CSSProperties => ({
   position: "absolute",
-  left: x,
+  insetInlineStart: x,
   top: 0,
   bottom: -ROW_GAP,
-  borderLeft: "1px solid var(--line-1)",
+  borderInlineStart: "1px solid var(--line-1)",
   pointerEvents: "none",
 });
 

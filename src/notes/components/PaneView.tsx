@@ -1174,7 +1174,7 @@ export function PaneView({
           // the primary editor above; this one never calls onChange).
           <div
             data-testid="editor.preview-companion"
-            style={{ flex: 1, minWidth: 0, borderLeft: "1px solid var(--line-1)", paddingLeft: 16 }}
+            style={{ flex: 1, minWidth: 0, borderInlineStart: "1px solid var(--line-1)", paddingInlineStart: 16 }}
           >
             <CMEditor
               value={content}

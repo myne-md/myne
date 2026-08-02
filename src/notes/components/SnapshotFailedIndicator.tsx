@@ -16,7 +16,7 @@ const AUTO_DISMISS_MS = 6000;
 
 const ROOT_STYLE: CSSProperties = {
   position: "fixed",
-  right: "var(--space-5)",
+  insetInlineEnd: "var(--space-5)",
   bottom: "var(--space-7)",
   zIndex: 50,
   maxWidth: 340,

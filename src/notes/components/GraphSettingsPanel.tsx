@@ -101,7 +101,7 @@ export function GraphSettingsPanel({
   const [open, setOpen] = useState(false);
 
   return (
-    <div style={{ position: "absolute", top: 8, right: 8, zIndex: 5 }}>
+    <div style={{ position: "absolute", top: 8, insetInlineEnd: 8, zIndex: 5 }}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -130,7 +130,7 @@ export function GraphSettingsPanel({
           style={{
             position: "absolute",
             top: 34,
-            right: 0,
+            insetInlineEnd: 0,
             width: 300,
             maxHeight: "min(70vh, 520px)",
             overflowY: "auto",

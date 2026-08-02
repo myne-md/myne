@@ -108,7 +108,7 @@ const LINE_ROW_STYLE: CSSProperties = {
 const GUTTER_STYLE: CSSProperties = {
   flex: "0 0 auto",
   minWidth: "1.6em",
-  textAlign: "right",
+  textAlign: "end",
   color: "var(--fg-3)",
   fontFamily: "var(--font-mono)",
   fontSize: "calc(var(--editor-text-size) * 0.85)",

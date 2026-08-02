@@ -138,7 +138,7 @@ const APPROVER_LIST_STYLE: CSSProperties = {
   color: "var(--fg-2)",
   fontSize: "var(--text-sm)",
   margin: "var(--space-1) 0",
-  paddingLeft: "var(--space-5)",
+  paddingInlineStart: "var(--space-5)",
 };
 
 export function AccountBootstrap({

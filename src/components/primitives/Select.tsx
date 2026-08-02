@@ -100,7 +100,7 @@ const OPTION_STYLE: CSSProperties = {
   alignItems: "center",
   gap: "var(--space-2)",
   width: "100%",
-  textAlign: "left",
+  textAlign: "start",
   padding: "var(--space-2) var(--space-3)",
   background: "transparent",
   border: 0,

@@ -92,7 +92,7 @@ const LIST_STYLE: CSSProperties = {
   width: 240,
   flexShrink: 0,
   overflowY: "auto",
-  borderRight: "1px solid var(--line-1)",
+  borderInlineEnd: "1px solid var(--line-1)",
   padding: "var(--space-2) 0",
 };
 
@@ -105,7 +105,7 @@ const ROW_STYLE: CSSProperties = {
   border: "none",
   background: "transparent",
   width: "100%",
-  textAlign: "left",
+  textAlign: "start",
   fontFamily: "var(--font-sans)",
   transition: HOVER_TRANSITION,
 };
@@ -580,7 +580,7 @@ export function SnapshotsPanel({
               restBg: "var(--paper-2)",
               hoverBg: "var(--paper-3)",
             })}
-            style={{ ...BTN_STYLE, marginLeft: "auto" }}
+            style={{ ...BTN_STYLE, marginInlineStart: "auto" }}
             onClick={onClose}
           >
             {t("notes.snapshots.close")}

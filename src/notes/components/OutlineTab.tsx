@@ -200,7 +200,7 @@ export function OutlineTab() {
                     style={{
                       flexShrink: 0,
                       width: INDENT_WIDTH,
-                      borderLeft: "1px solid var(--line-1)",
+                      borderInlineStart: "1px solid var(--line-1)",
                     }}
                   />
                 ))}
@@ -249,7 +249,7 @@ export function OutlineTab() {
                   style={{
                     flex: 1,
                     minWidth: 0,
-                    textAlign: "left",
+                    textAlign: "start",
                     background: "transparent",
                     transition: HOVER_TRANSITION,
                     border: 0,

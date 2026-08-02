@@ -78,7 +78,7 @@ const ROW_OPEN_STYLE: CSSProperties = {
   border: 0,
   padding: "0 var(--space-1)",
   height: 36,
-  textAlign: "left",
+  textAlign: "start",
   cursor: "pointer",
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",

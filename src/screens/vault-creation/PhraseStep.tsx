@@ -117,7 +117,7 @@ export function PhraseStep({
                 style={{
                   color: "var(--fg-3)",
                   minWidth: 18,
-                  textAlign: "right",
+                  textAlign: "end",
                 }}
               >
                 {i + 1}

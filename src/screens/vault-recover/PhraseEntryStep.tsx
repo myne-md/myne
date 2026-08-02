@@ -124,8 +124,8 @@ const CELL_WRAP_BASE: CSSProperties = {
   alignItems: "center",
   background: "var(--paper-1)",
   borderRadius: 2,
-  paddingLeft: 28,
-  paddingRight: 8,
+  paddingInlineStart: 28,
+  paddingInlineEnd: 8,
   height: 32,
   cursor: "text",
   transition: "border-color 80ms linear",
@@ -141,7 +141,7 @@ function cellWrapStyle(focused: boolean): CSSProperties {
 
 const CELL_NUMBER_STYLE: CSSProperties = {
   position: "absolute",
-  left: 8,
+  insetInlineStart: 8,
   top: "50%",
   transform: "translateY(-50%)",
   fontFamily: "var(--font-mono)",
@@ -195,7 +195,7 @@ const DELETE_LINK_STYLE: CSSProperties = {
   background: "transparent",
   border: 0,
   padding: 0,
-  marginLeft: "var(--space-3)",
+  marginInlineStart: "var(--space-3)",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   fontWeight: 500,

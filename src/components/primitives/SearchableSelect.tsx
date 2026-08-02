@@ -91,7 +91,7 @@ const TRIGGER_STYLE: CSSProperties = {
   borderRadius: "var(--radius-2)",
   padding: "0 var(--space-2)",
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "start",
   transition: "border-color var(--duration-fast) var(--ease-standard)",
 };
 
@@ -142,7 +142,7 @@ const OPTION_STYLE: CSSProperties = {
   alignItems: "center",
   gap: "var(--space-2)",
   width: "100%",
-  textAlign: "left",
+  textAlign: "start",
   padding: "var(--space-2) var(--space-3)",
   background: "transparent",
   border: 0,

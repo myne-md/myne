@@ -114,13 +114,13 @@ const RADIO_ROW_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   color: "var(--fg-1)",
-  textAlign: "left",
+  textAlign: "start",
 };
 
 const FOLDER_SELECT_STYLE: CSSProperties = {
   // Indent under the radio circle (14px) + gap so it aligns with the
   // "One folder" label, as in the Penpot frame.
-  marginLeft: "calc(14px + var(--space-2))",
+  marginInlineStart: "calc(14px + var(--space-2))",
   height: 32,
   fontFamily: "var(--font-sans)",
   fontSize: 13,

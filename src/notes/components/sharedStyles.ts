@@ -28,7 +28,7 @@ export const SECTION_HEADING_STYLE: CSSProperties = {
 export const SIDEBAR_CARD_STYLE: CSSProperties = {
   display: "block",
   width: "100%",
-  textAlign: "left",
+  textAlign: "start",
   background: "var(--bg-1)",
   border: "1px solid var(--line-1)",
   borderRadius: 6,

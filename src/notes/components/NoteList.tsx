@@ -332,7 +332,7 @@ const HEADER_ACTIONS_STYLE: CSSProperties = {
 const NEW_MENU_STYLE: CSSProperties = {
   position: "absolute",
   top: "calc(100% + 4px)",
-  right: 0,
+  insetInlineEnd: 0,
   minWidth: 210,
   zIndex: 40,
   background: "var(--bg-1)",
@@ -356,7 +356,7 @@ const NEW_MENU_ITEM_STYLE: CSSProperties = {
   background: "transparent",
   color: "var(--fg-1)",
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "start",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   transition: HOVER_TRANSITION,
@@ -500,7 +500,7 @@ const SIDEBAR_OUTER_STYLE: CSSProperties = {
   width: "100%",
   flex: 1,
   background: "var(--paper-2)",
-  borderRight: "1px solid var(--line-1)",
+  borderInlineEnd: "1px solid var(--line-1)",
   display: "flex",
   flexDirection: "column",
   minHeight: 0,
@@ -527,12 +527,12 @@ const FOOTER_ENTRY_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "start",
   transition: HOVER_TRANSITION,
 };
 
 const TRASH_COUNT_BADGE_STYLE: CSSProperties = {
-  marginLeft: "auto",
+  marginInlineStart: "auto",
   fontSize: 11,
   color: "var(--fg-3)",
 };
@@ -595,7 +595,7 @@ const BLOCK_NOTICE_STYLE: CSSProperties = {
   margin: "6px 10px",
   padding: "8px 10px",
   background: "var(--warning-soft, var(--paper-1))",
-  borderLeft: "2px solid var(--line-3)",
+  borderInlineStart: "2px solid var(--line-3)",
   borderRadius: 3,
   fontFamily: "var(--font-sans)",
   fontSize: 12,
@@ -1317,7 +1317,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
               style={{
                 ...FOOTER_ENTRY_STYLE,
                 borderTop: "none",
-                borderLeft: "1px solid var(--line-1)",
+                borderInlineStart: "1px solid var(--line-1)",
                 flex: 1,
                 minWidth: 0,
                 width: "auto",
@@ -2649,7 +2649,7 @@ function PopulatedList({
                     // the same depth start in the same column. Notes were missing
                     // it, which sat every note 8px left of its sibling folders and
                     // read as the tree losing its spine (MYND-622).
-                    paddingLeft:
+                    paddingInlineStart:
                       TREE_BASE_PADDING_LEFT + row.depth * NOTE_INDENT_PER_LEVEL,
                   }}
                   draggable={ctx.renamingId === null}

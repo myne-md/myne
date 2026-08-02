@@ -106,7 +106,7 @@ const btnHover = (disabled = false) =>
 // "This device" reads as an accent-soft pill with accent text (E3b) — a quiet
 // self-marker, distinct from a plain outlined chip.
 const BADGE: CSSProperties = {
-  marginLeft: "var(--space-2)",
+  marginInlineStart: "var(--space-2)",
   padding: "0 var(--space-1)",
   fontSize: "var(--text-xs)",
   fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],

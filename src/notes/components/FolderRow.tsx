@@ -35,11 +35,11 @@ const rowBaseStyle: CSSProperties = {
   alignItems: "center",
   gap: 6,
   height: 30,
-  paddingRight: 12,
+  paddingInlineEnd: 12,
   cursor: "pointer",
   borderRadius: 6,
-  marginLeft: 4,
-  marginRight: 4,
+  marginInlineStart: 4,
+  marginInlineEnd: 4,
   // Matches NoteRow: a 3px bottom gap so an active/hover folder row never butts
   // its background against an adjacent row's, keeping the interleaved tree of
   // folder + note pills uniform.
@@ -82,7 +82,7 @@ const emptyNameStyle: CSSProperties = {
 const emptyHintStyle: CSSProperties = {
   fontSize: 11,
   color: "var(--line-3)",
-  marginLeft: 4,
+  marginInlineStart: 4,
 };
 
 const renameInputStyle: CSSProperties = {
@@ -107,7 +107,7 @@ const indexAffordanceBaseStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: 4,
-  marginLeft: "auto",
+  marginInlineStart: "auto",
   flexShrink: 0,
   padding: "1px 5px",
   border: 0,
@@ -339,7 +339,7 @@ export function FolderRow({
       style={{
         ...rowBaseStyle,
         position: "relative",
-        paddingLeft,
+        paddingInlineStart: paddingLeft,
         background,
         boxShadow: dropTarget ? "inset 0 0 0 1px var(--accent)" : undefined,
       }}
@@ -461,7 +461,9 @@ export function FolderRow({
         />
       ) : (
         <>
-          <span style={empty ? emptyNameStyle : nameGrowStyle}>{node.name}</span>
+          <span style={empty ? emptyNameStyle : nameGrowStyle}>
+            <bdi>{node.name}</bdi>
+          </span>
           {empty && (
             <span style={emptyHintStyle}>{t("notes.folderRow.empty")}</span>
           )}

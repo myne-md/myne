@@ -688,6 +688,30 @@
    unfocused and falls back to native selection) stays readable on every theme. */
 ::selection { background: var(--selection-bg); }
 
+/* ── RTL / bidirectional layout (epic rtl-support) ───────────────────────────
+   Direction is driven by the active LOCALE onto `<html dir>` (see
+   `src/i18n/index.ts`). The shared UI mirrors through CSS logical properties
+   (`margin-inline-*`, `inset-inline-*`, `text-align: start|end`) authored in the
+   component inline styles; the two rules below are the parts that a logical
+   property cannot express on its own. */
+
+/* Mirror OPT-IN directional elements under RTL: the `Icon` primitive's
+   directional glyphs (chevrons, arrows, panel/disclosure carets) and a few
+   pixel-positioned controls whose knob slides along the reading axis (the
+   `Switch`), which cannot express their travel as a logical property. Each
+   opts in by emitting `data-flip`; symmetric glyphs/controls never carry it, so
+   they are never flipped, and an LTR locale pays nothing. (SYNC-4.) */
+[dir="rtl"] [data-flip] { transform: scaleX(-1); }
+
+/* Isolate a run of user-controlled or intrinsically-LTR text (note titles/tags,
+   account numbers, URLs, code) from the surrounding paragraph's bidi ordering,
+   the CSS-only way — NEVER by injecting U+200E/200F/202x control chars, which
+   the importer/theme code strips as a spoofing control (SYNC-5). Apply
+   `.bidi-isolate` to a span whose direction should be resolved on its own
+   content and not reorder its neighbours. */
+.bidi-isolate { unicode-bidi: isolate; }
+.bidi-plaintext { unicode-bidi: plaintext; }
+
 html, body, #root {
   margin: 0;
   padding: 0;

@@ -202,7 +202,7 @@ const CELL_BASE: CSSProperties = {
   wordBreak: "break-word",
 };
 
-const RIGHT_EDGE: CSSProperties = { borderLeft: "1px solid var(--line-1)" };
+const RIGHT_EDGE: CSSProperties = { borderInlineStart: "1px solid var(--line-1)" };
 
 const CELL_SAME_STYLE: CSSProperties = { ...CELL_BASE, color: "var(--fg-2)" };
 const CELL_ADD_STYLE: CSSProperties = {

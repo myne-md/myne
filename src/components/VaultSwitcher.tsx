@@ -94,7 +94,7 @@ function chipStyle(active: boolean): CSSProperties {
     border: 0,
     borderRadius: "var(--radius-2)",
     cursor: "pointer",
-    textAlign: "left",
+    textAlign: "start",
     fontFamily: "var(--font-sans)",
   };
 }
@@ -199,7 +199,7 @@ function rowStyle(state: "active" | "hover" | "rest"): CSSProperties {
     border: 0,
     borderRadius: "var(--radius-1)",
     cursor: "pointer",
-    textAlign: "left",
+    textAlign: "start",
     fontFamily: "var(--font-sans)",
   };
 }
@@ -267,7 +267,7 @@ const FOOTER_STYLE: CSSProperties = {
   border: 0,
   borderRadius: "var(--radius-1)",
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "start",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   fontWeight: 500,

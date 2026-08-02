@@ -352,7 +352,7 @@ export function HotkeysPanel() {
                     {cmd.label}
                     {conflicts[cmd.id] && (
                       <span
-                        style={{ ...WARN_STYLE, marginLeft: "var(--space-2)" }}
+                        style={{ ...WARN_STYLE, marginInlineStart: "var(--space-2)" }}
                         data-testid="hotkeys.conflict-indicator"
                         title={t("settings.hotkeys.conflictTitle", {
                           commands: conflicts[cmd.id]
@@ -401,7 +401,7 @@ export function HotkeysPanel() {
                             </Fragment>
                           ))}
                           {taken && (
-                            <span style={{ ...WARN_STYLE, marginLeft: "var(--space-1)" }}>
+                            <span style={{ ...WARN_STYLE, marginInlineStart: "var(--space-1)" }}>
                               {t("settings.hotkeys.reservedBadge")}
                             </span>
                           )}

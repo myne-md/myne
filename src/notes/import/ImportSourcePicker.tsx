@@ -43,7 +43,7 @@ const CARD_BASE: CSSProperties = {
   borderStyle: "solid",
   borderColor: "var(--line-1)",
   background: "var(--bg-2)",
-  textAlign: "left",
+  textAlign: "start",
   cursor: "pointer",
   width: "100%",
   transition: "border-color 120ms ease, background 120ms ease",
