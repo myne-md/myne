@@ -16,3 +16,7 @@ export {
 } from "./sceneContent";
 export { isDrawingBody } from "./isDrawing";
 export { buildInitialDrawingBody, buildDrawingNoteBytes } from "./drawingNote";
+// MYND-634: the inline-drawing-embed IO seam type. Excalidraw-free (only
+// @codemirror/state), so barrel-exporting it keeps the cold bundle clean; the
+// desktop host (`PaneView`) implements it with noteRead / saveNote / createDrawing.
+export type { DrawingEmbedIo } from "./embed-io";

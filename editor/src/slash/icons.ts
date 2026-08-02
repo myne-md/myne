@@ -17,7 +17,8 @@ export type SlashIconName =
   | "flag" // Priority
   | "paperclip" // Attach file
   | "mic" // Voice note
-  | "link-2"; // Wiki link (a chain/connection)
+  | "link-2" // Wiki link (a chain/connection)
+  | "pencil"; // Drawing (inline canvas)
 
 function el(tag: string, attrs: Record<string, string>): SVGElement {
   const node = document.createElementNS(SVG_NS, tag);
@@ -123,6 +124,14 @@ export function makeSlashIcon(name: SlashIconName): SVGSVGElement {
         el("path", { d: "M9 17H7A5 5 0 0 1 7 7h2" }),
         el("path", { d: "M15 7h2a5 5 0 1 1 0 10h-2" }),
         el("line", { x1: "8", y1: "12", x2: "16", y2: "12" }),
+      );
+      break;
+    case "pencil":
+      svg.append(
+        el("path", {
+          d: "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z",
+        }),
+        el("path", { d: "m15 5 4 4" }),
       );
       break;
   }

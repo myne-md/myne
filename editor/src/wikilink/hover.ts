@@ -11,7 +11,7 @@ import type { Extension } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 import { chipDisplayText, parseWikilinkParts } from "./chip-widget";
 import { readNoteSet } from "./note-set";
-import { chipHoverText } from "./resolve-chip";
+import { chipHoverText, chipKeySets, isDrawingEmbed } from "./resolve-chip";
 
 /** Walk ancestors from `node` and return the enclosing `Wikilink` node, or
  *  `null` if the position is not inside a wikilink. Exported for unit testing. */
@@ -38,13 +38,14 @@ export function wikilinkHoverTooltip(view: EditorView, pos: number): Tooltip | n
     enclosingWikilink(tree.resolveInner(pos, 1));
   if (wl === null) return null;
 
+  const notes = readNoteSet(view.state);
   const parts = parseWikilinkParts(view.state, wl.from, wl.to);
-  const text = chipHoverText(
-    chipDisplayText(parts),
-    parts,
-    readNoteSet(view.state),
-  );
-  if (text === null) return null; // embeds / empty → no tooltip
+  // A drawing embed renders as an inline thumbnail / edit-in-place canvas
+  // (drawing-embed.ts) with its own affordances — it must NOT also raise the
+  // wikilink resolution tooltip ("Embed: Drawing 1 → …/Drawing 1.md"), #213.
+  if (isDrawingEmbed(parts, chipKeySets(notes).drawings)) return null;
+  const text = chipHoverText(chipDisplayText(parts), parts, notes);
+  if (text === null) return null; // media embeds / empty → no tooltip
 
   return {
     pos: wl.from,

@@ -30,6 +30,7 @@ import type { VaultBlockAnchor } from "./wikilink/vault-block-anchors";
 import { reconfigureLineNumbers } from "./line-numbers";
 import { reconfigureVim } from "./vim";
 import { reconfigureViewMode, type ViewMode } from "./view-mode";
+import { reconfigureDrawingEmbedIo, type DrawingEmbedIo } from "./drawing/embed-io";
 import { resolveAnchorRange, type WikilinkAnchor } from "./wikilink/anchor";
 import {
   setTaskQueryResults,
@@ -193,6 +194,12 @@ export type CMEditorProps = {
    *  undo / indent / fold takes effect on the open note live. Absent → in-code
    *  defaults. */
   keymapOverrides?: Readonly<Record<string, readonly string[]>>;
+  /** MYND-634: the note-CRUD IO seam the inline `![[Drawing]]` embed uses to read
+   *  / persist a referenced drawing note's scene and to create a sibling drawing
+   *  for `/drawing`. Pushed into the drawing-embed IO facet (re-mount-free)
+   *  whenever it changes (each note switch re-closes `createSibling` over the new
+   *  folder). Absent → inline drawing embeds render inert (a legible label). */
+  drawingIo?: DrawingEmbedIo | null;
   /** reading-source-modes (MYND-299): the per-tab view mode. `live` (default) is
    *  today's live-preview; `reading` renders read-only; `source` shows raw
    *  markdown. Pushed into the view-mode compartments (re-mount-free) whenever it
@@ -235,7 +242,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, keymapOverrides, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -264,6 +271,7 @@ export function CMEditor(props: CMEditorProps) {
   const transcriptionEnabledRef = useRef(transcriptionEnabled);
   const vimModeRef = useRef(vimMode);
   const keymapOverridesRef = useRef(keymapOverrides);
+  const drawingIoRef = useRef(drawingIo);
   useEffect(() => {
     onSwapReadyRef.current = onSwapReady;
   }, [onSwapReady]);
@@ -359,6 +367,9 @@ export function CMEditor(props: CMEditorProps) {
       // mount; `setState` resets it to that seed, so re-push the CURRENT overrides
       // after a swap or a customised keymap silently reverts to defaults.
       v.dispatch({ effects: reconfigureEditorKeymap(keymapOverridesRef.current ?? {}) });
+      // MYND-634: the drawing-embed IO facet is a Compartment too — re-push the
+      // current seam after a swap so inline drawings still read/save/create.
+      v.dispatch({ effects: reconfigureDrawingEmbedIo(drawingIoRef.current ?? null) });
       if (noteSetRef.current !== undefined) {
         v.dispatch({ effects: reconfigureNoteSet(noteSetRef.current) });
       }
@@ -565,6 +576,17 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null) return;
     view.dispatch({ effects: reconfigureEditorKeymap(keymapOverrides ?? {}) });
   }, [keymapOverrides]);
+
+  // MYND-634: push the drawing-embed IO seam into its facet whenever it changes
+  // (a note switch re-closes `createSibling` over the new folder) — re-mount-free,
+  // so inline drawing thumbnails / edit-in-place keep working across note swaps.
+  // Seeded at mount, so this runs once to honour the initial seam.
+  useEffect(() => {
+    drawingIoRef.current = drawingIo;
+    const view = viewRef.current;
+    if (view === null) return;
+    view.dispatch({ effects: reconfigureDrawingEmbedIo(drawingIo ?? null) });
+  }, [drawingIo]);
 
   // reading-source-modes (MYND-299): push the per-tab view mode into the
   // view-mode compartments whenever it (or readOnly) changes — re-mount-free, so

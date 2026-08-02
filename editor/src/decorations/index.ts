@@ -19,6 +19,7 @@ import { linkDecorations } from "./link";
 import { referenceLinkDecorations } from "./reference-link";
 import { imageUrlDecorations } from "./image-url";
 import { attachmentEmbedDecorations } from "./attachment-embed";
+import { drawingEmbedDecorations } from "./drawing-embed";
 import { autolinkDecorations } from "./autolink";
 import { inlineCodeDecorations } from "./inline-code";
 import { escapeDecorations } from "./escape";
@@ -80,6 +81,11 @@ export function myneDecorations(): readonly Extension[] {
     // PDF / tombstone (MYND-164). Needs the catalog extension (added in
     // extensions.ts) for id resolution.
     ...attachmentEmbedDecorations(),
+    // Inline drawing embeds `![[Drawing]]` (kind:drawing target) → atomic inline
+    // thumbnail ↔ edit-in-place canvas (MYND-634). Deferred by the wikilink chip
+    // builder (isDrawingEmbed) so a range is never double-decorated. The active-
+    // state field + IO facet are mounted in extensions.ts (mode-independent).
+    ...drawingEmbedDecorations(),
     ...autolinkDecorations(),
     inlineCodeDecorations(),
     // Backslash-escape: hide the `\` of an `Escape` node off-cursor (MYND-208).

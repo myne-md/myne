@@ -1194,6 +1194,114 @@ export const myneTheme = EditorView.theme({
     borderStyle: "dashed",
     borderColor: "var(--line-2, #cfccc4)",
   },
+  // MYND-634 — inline drawing embed (`![[Drawing]]`). ONE frame for both states:
+  // a header (editable title + an Edit/Done button) over a same-height body — the
+  // rendered thumbnail image, or the live canvas. Identical background / width /
+  // height in both, so Edit⇄Done swaps only the button + body and never resizes
+  // the widget or jumps the scroll (#213 review). Own line via `display: block`.
+  ".cm-drawing-embed": {
+    display: "block",
+    margin: "8px 0",
+    maxWidth: "100%",
+    border: "1px solid var(--line-2, #cfccc4)",
+    borderRadius: "var(--radius-2, 6px)",
+    overflow: "hidden",
+    background: "var(--paper)",
+  },
+  ".cm-drawing-embed-header": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    padding: "4px 6px 4px 8px",
+    borderBottom: "1px solid var(--line-1, #d8d5cc)",
+    background: "var(--paper-2, #f3f1eb)",
+  },
+  // The title is an editable field (rename rewrites the `![[Title]]` reference
+  // too). `appearance: none` + explicit theme colours so it is never the white
+  // native text-input box on a dark theme (#213 review).
+  ".cm-drawing-embed-title-input": {
+    flex: "1",
+    minWidth: "0",
+    appearance: "none",
+    WebkitAppearance: "none",
+    font: "inherit",
+    fontSize: "13px",
+    fontWeight: "600",
+    color: "var(--fg-1)",
+    caretColor: "var(--fg-1)",
+    fontFamily: "var(--font-sans)",
+    backgroundColor: "transparent",
+    border: "1px solid transparent",
+    borderRadius: "var(--radius-1, 4px)",
+    padding: "2px 6px",
+  },
+  ".cm-drawing-embed-title-input:hover": {
+    backgroundColor: "var(--paper-3, #ece9e2)",
+  },
+  ".cm-drawing-embed-title-input:focus": {
+    outline: "none",
+    backgroundColor: "var(--paper-3, #ece9e2)",
+    borderColor: "var(--accent, var(--line-2, #cfccc4))",
+  },
+  // The header action — Edit (thumbnail) / Done (editing). Same box in both.
+  ".cm-drawing-embed-action": {
+    font: "inherit",
+    fontSize: "12px",
+    fontWeight: "600",
+    padding: "3px 12px",
+    borderRadius: "var(--radius-1, 4px)",
+    border: "1px solid var(--line-2, #cfccc4)",
+    background: "var(--paper)",
+    color: "var(--fg-1)",
+    cursor: "pointer",
+    flexShrink: "0",
+  },
+  ".cm-drawing-embed-action:hover": {
+    background: "var(--paper-3, #ece9e2)",
+  },
+  // Thumbnail body — SAME height as the canvas, so Edit⇄Done never resizes. Its
+  // backdrop is set inline to the live Excalidraw canvas colour (theme-matched),
+  // so the collapsed state uses the identical palette as the editor.
+  ".cm-drawing-embed-body": {
+    height: "420px",
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    cursor: "pointer",
+  },
+  ".cm-drawing-embed-body[data-empty]": {
+    color: "var(--fg-3)",
+  },
+  ".cm-drawing-embed-empty-hint": {
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    color: "var(--fg-3)",
+  },
+  ".cm-drawing-embed-empty-hint::before": {
+    content: "'✎  '",
+  },
+  ".cm-drawing-embed-img": {
+    maxWidth: "100%",
+    maxHeight: "100%",
+    objectFit: "contain",
+    display: "block",
+  },
+  // Excalidraw needs a concretely-sized parent; the inline canvas viewport.
+  ".cm-drawing-embed-canvas": {
+    position: "relative",
+    height: "420px",
+    width: "100%",
+    overflow: "hidden",
+  },
+  ".cm-drawing-embed-label": {
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    color: "var(--fg-2)",
+    padding: "8px",
+  },
   // §5.3 broken-link styling (MYND-37/83): a wikilink whose target matches no
   // note — faded foreground, italic, no underline. Same chip surface as the
   // default (background/border/radius unchanged) so only the text reads "dead".

@@ -959,6 +959,13 @@
       "copyCode": "Copy code",
       "defaultBadge": "code"
     },
+    "drawingEmbed": {
+      "done": "Done",
+      "edit": "Edit drawing {{name}}",
+      "editAction": "Edit",
+      "empty": "Empty drawing — click to draw",
+      "rename": "Rename drawing"
+    },
     "find": {
       "close": "Close find",
       "matchCase": "Match case",
@@ -1002,6 +1009,7 @@
       "date": "Date",
       "day": "Day",
       "divider": "Divider",
+      "drawing": "Drawing",
       "due": "Due date",
       "heading1": "Heading 1",
       "heading2": "Heading 2",

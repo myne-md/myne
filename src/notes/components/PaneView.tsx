@@ -28,6 +28,7 @@ import { headingSections } from "../../dialect";
 const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
+import { saveNote } from "../saveNote";
 import { handleBaseMismatch, productionBaseMismatchDeps } from "../baseMismatch";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
@@ -35,6 +36,7 @@ import { peekRevealMatch, useRevealMatchNonce } from "../views/revealMatchSignal
 import { setActiveHeading } from "../views/activeHeadingSignal";
 import { createNote } from "../createNote";
 import { createDrawing } from "../createDrawing";
+import { nextDrawingTitle } from "../drawingEmbedTitle";
 import { useSelectedNote, type NoteId } from "../sidebarState";
 import { useLiveResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
@@ -78,6 +80,7 @@ import {
   extractSceneJson,
   writeSceneJson,
   isDrawingBody,
+  type DrawingEmbedIo,
 } from "@myne/editor/drawing";
 
 export type PaneReadout = {
@@ -232,6 +235,44 @@ export function PaneView({
     () =>
       activeId !== null ? (notes.find((n) => n.noteUuid === activeId)?.folder ?? "") : "",
     [activeId, notes],
+  );
+
+  // MYND-634: the inline-drawing-embed IO seam handed to CMEditor. `readScene` /
+  // `saveScene` are note-id-parameterized (folder-independent); `createSibling`
+  // reads the CURRENT note's folder + cache through refs, so the seam OBJECT stays
+  // stable (deps `[]`) and never churns the editor's IO facet compartment.
+  const drawingIoCtxRef = useRef(ctx);
+  const drawingIoFolderRef = useRef(activeNoteFolder);
+  useEffect(() => {
+    drawingIoCtxRef.current = ctx;
+  }, [ctx]);
+  useEffect(() => {
+    drawingIoFolderRef.current = activeNoteFolder;
+  }, [activeNoteFolder]);
+  const drawingIo = useMemo<DrawingEmbedIo>(
+    () => ({
+      readScene: async (id) => extractSceneJson(await noteRead(id as NoteId)),
+      saveScene: async (id, sceneJson) => {
+        const body = await noteRead(id as NoteId);
+        await saveNote(id as NoteId, writeSceneJson(body, sceneJson));
+      },
+      createSibling: async () => {
+        const folder = drawingIoFolderRef.current === "" ? null : drawingIoFolderRef.current;
+        const title = nextDrawingTitle(drawingIoCtxRef.current.cache.values());
+        const id = await createDrawing(title, folder);
+        // Surgical refresh so the new drawing enters the resolver note-set and the
+        // just-inserted `![[Drawing N]]` resolves to it (renders as a thumbnail).
+        await drawingIoCtxRef.current.refreshOne(id as NoteId);
+        return title;
+      },
+      renameDrawing: async (id, newTitle) => {
+        // Route through the transactional rename so the `![[oldTitle]]` embed(s)
+        // are rewritten to `![[newTitle]]` — a bare title write would orphan them.
+        const body = await noteRead(id as NoteId);
+        await drawingIoCtxRef.current.commitRename(id as NoteId, body, newTitle);
+      },
+    }),
+    [],
   );
   const aiSlashEnabled = useMemo(() => {
     if (prefs.ai_enabled !== true) return false;
@@ -1110,6 +1151,9 @@ export function PaneView({
             // reconfigures its rebindable-keymap compartment live when a Hotkeys
             // rebind of an editor command lands (no remount).
             keymapOverrides={prefs.keymap}
+            // MYND-634: inline `![[Drawing]]` embeds — read/save the referenced
+            // drawing note's scene + create a sibling drawing for /drawing.
+            drawingIo={drawingIo}
             // reading-source-modes (MYND-299): per-tab live/reading/source. The
             // editor reconfigures its view-mode compartments live (no remount).
             viewMode={effectiveViewMode}
@@ -1143,6 +1187,10 @@ export function PaneView({
               taskQueryResults={taskQueryResults}
               onTaskQueryToggle={handleTaskQueryToggle}
               onTaskQueryOpen={handleTaskQueryOpen}
+              // MYND-634: render inline drawing thumbnails in the reading mirror
+              // too (reading mode never opens the edit-in-place canvas — it stays a
+              // static thumbnail — but it still needs the seam to read the scene).
+              drawingIo={drawingIo}
               readOnly
               viewMode="reading"
               style={{ width: "100%", minHeight: 360, color: "var(--fg-1)" }}
@@ -1182,6 +1230,7 @@ export function PaneView({
     handleEditorReady,
     isDrawing,
     setContent,
+    drawingIo,
   ]);
 
   return (
