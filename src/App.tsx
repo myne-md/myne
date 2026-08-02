@@ -181,24 +181,21 @@ function App() {
     [],
   );
 
-  // Window-level Cmd/Ctrl+F → in-note find (MYND-175). Single owner of the
-  // WebView's native-find suppression: preventDefault fires app-wide on every
-  // stage (the native find scans the rendered DOM — a different text than the
-  // note's canonical markdown — so it must never appear). Opening the bar is
-  // gated to an active editor view (registered only on the editor stage), so on
-  // non-editor stages the key is swallowed but opens nothing. Deliberately NOT
-  // in the CM keymap (a keymap only fires when the editor is focused, leaking
-  // native find otherwise) — this listener is the sole owner.
+  // Window-level Cmd/Ctrl+F native-find SUPPRESSION (MYND-175). This listener's
+  // sole remaining job is `preventDefault` on the literal Cmd+F, app-wide on
+  // every stage: the WebView's native find scans the rendered DOM — a different
+  // text than the note's canonical markdown — so it must never appear, and that
+  // is true regardless of what the user rebinds "Find in note" to. OPENING the
+  // find bar moved to the rebindable `find.open` engine command (#184 track C,
+  // editor stage), so this no longer imports find-session. It stays OUT of the CM
+  // keymap on purpose (a keymap only fires when the editor is focused — native
+  // find would leak everywhere else).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       if (e.key !== "f" && e.key !== "F") return;
       if (e.shiftKey || e.altKey) return; // leave Cmd+Shift+F / Cmd+Alt+F alone
       e.preventDefault();
-      // find-session pulls in @codemirror/search (+ view/state); load it on
-      // demand so it stays out of the first-load bundle. By the time a note is
-      // open the editor chunk has already imported it, so this resolves instantly.
-      void import("./editor/find/find-session").then((m) => m.openInNoteFind());
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);

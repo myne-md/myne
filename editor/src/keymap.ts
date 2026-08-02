@@ -9,6 +9,7 @@ import { EditorSelection, type Text } from "@codemirror/state";
 import { type KeyBinding, type Command } from "@codemirror/view";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { selectNextOccurrence } from "@codemirror/search";
+import { undo, redo, indentMore, indentLess } from "@codemirror/commands";
 import { toggleWrap } from "./wrap-toggle";
 // List-prefix toggles are shared with the toolbar surfaces (single source).
 import { toggleListPrefix } from "./toolbar/commands";
@@ -21,7 +22,7 @@ import { vimWantsEscape } from "./vim";
  *  `false` when there is only one range, so the keystroke falls through to other
  *  Escape handlers (close the search bar, dismiss a menu) — it never swallows a
  *  plain Escape. */
-const collapseMultiSelection: Command = (view) => {
+export const collapseMultiSelection: Command = (view) => {
   // vim-keyboard-mode (MYND-313): while vim is in insert / visual / replace,
   // Escape's first job is the mode transition — "one Escape, one job" (design
   // session Q2). Declining here lets the key fall through to the vim engine,
@@ -90,38 +91,105 @@ const selectAllScoped: Command = (view) => {
   return true;
 };
 
-export const myneKeyBindings: readonly KeyBinding[] = [
-  // Listed first so it shadows defaultKeymap's selectAll (earlier wins).
-  { key: "Mod-a", run: selectAllScoped },
-  { key: "Mod-b", run: wrapCommand("**", "**") },
-  { key: "Mod-i", run: wrapCommand("*", "*") },
-  { key: "Mod-e", run: wrapCommand("`", "`") },
-  // Cmd+K is reserved for the global command palette (MYND-86); link
-  // insertion is via the selection toolbar 🔗 button.
-  { key: "Mod-Shift-h", run: cycleHeading },
-  { key: "Mod-Shift-7", run: toggleListPrefix("1. ") },
-  { key: "Mod-Shift-8", run: toggleListPrefix("- ") },
-  { key: "Mod-Shift-m", run: toggleListPrefix("- [ ] ") },
+/** One rebindable editor command: a stable `id` (the `vault.prefs.keymap`
+ *  override key, shared verbatim with the Hotkeys catalog in
+ *  `src/commands/bindableCatalog.ts`), its in-code default chord(s), the CM6
+ *  `Command` it runs, and whether it swallows the browser default. */
+interface RebindableEditorBinding {
+  id: string;
+  defaultKeys: readonly string[];
+  run: Command;
+  preventDefault?: boolean;
+}
+
+// The editor commands the Hotkeys panel can rebind (#184 track B — previously
+// hardcoded here and marked "fixed, SYNC-9"). `id` is the SAME override key the
+// catalog uses; `buildMyneKeymap(overrides)` turns `override ?? default` into the
+// CM6 keymap the editor mounts in a Compartment (extensions.ts), so a rebind in
+// the panel takes effect live with no remount. Keys reserved for other surfaces
+// stay reserved: Cmd+K is the global palette (MYND-86), so link insert is the 🔗
+// toolbar button; Cmd+1–6 are unbound (OS/browser conflict).
+//
+// undo/redo/indent/outdent moved here from `@codemirror/commands`'
+// `historyKeymap` / `indentWithTab` so they are override-driven too. undo/redo
+// keep `preventDefault` (the browser's own undo must not also fire). The obscure
+// `Mod-u` undoSelection stays a fixed static binding in extensions.ts (never
+// listed, so nothing to rebind). `Escape` (collapseMultiSelection) is also fixed
+// — it is widget-nav, deliberately excluded from the panel (catalog grill Q2).
+const REBINDABLE_EDITOR_BINDINGS: readonly RebindableEditorBinding[] = [
+  // Listed first so Mod-a shadows defaultKeymap's selectAll (earlier wins).
+  { id: "editor.select-all", defaultKeys: ["Mod-a"], run: selectAllScoped },
+  { id: "editor.bold", defaultKeys: ["Mod-b"], run: wrapCommand("**", "**") },
+  { id: "editor.italic", defaultKeys: ["Mod-i"], run: wrapCommand("*", "*") },
+  { id: "editor.code", defaultKeys: ["Mod-e"], run: wrapCommand("`", "`") },
+  { id: "editor.cycle-heading", defaultKeys: ["Mod-Shift-h"], run: cycleHeading },
+  { id: "editor.ordered-list", defaultKeys: ["Mod-Shift-7"], run: toggleListPrefix("1. ") },
+  { id: "editor.bullet-list", defaultKeys: ["Mod-Shift-8"], run: toggleListPrefix("- ") },
+  { id: "editor.task-list", defaultKeys: ["Mod-Shift-m"], run: toggleListPrefix("- [ ] ") },
   // Cmd/Ctrl+Shift+L (MYND-38): open the `[[` note picker at the cursor.
-  { key: "Mod-Shift-l", run: openWikilinkPicker },
-  // Heading/list folding (MYND-300): collapse / expand every fold in the note.
-  // `Mod-Alt-[` / `Mod-Alt-]` are CodeMirror's own foldAll/unfoldAll chords
-  // (the Obsidian convention too) and shadow no reserved chord — Cmd+1–6,
-  // Cmd+K, Cmd+Shift+L, Cmd+Shift+H, Cmd+, are all distinct. Per-fold is the
-  // gutter click; there is intentionally NO toggle-fold-at-cursor chord
-  // (minimal keymap, PRD Out of Scope).
-  { key: "Mod-Alt-[", run: foldAll },
-  { key: "Mod-Alt-]", run: unfoldAll },
-  // Multi-cursor (MYND-306): Mod-d adds the next occurrence of the current
-  // selection to the multi-selection (the VS Code / Obsidian convention). Bound
-  // EXPLICITLY (SYNC-2) — Myne installs only `Escape` from @codemirror/search,
-  // never `searchKeymap` wholesale. `Mod-d` is confirmed free. The companion
-  // select-all-occurrences is intentionally omitted (its conventional
-  // `Mod-Shift-L` chord is the `[[` wikilink picker above).
-  { key: "Mod-d", run: selectNextOccurrence },
+  { id: "editor.wikilink", defaultKeys: ["Mod-Shift-l"], run: openWikilinkPicker },
+  // Heading/list folding (MYND-300): CodeMirror's own foldAll/unfoldAll chords
+  // (the Obsidian convention too). Per-fold is the gutter click; there is
+  // intentionally NO toggle-fold-at-cursor chord (minimal keymap, PRD OOS).
+  { id: "editor.fold-all", defaultKeys: ["Mod-Alt-["], run: foldAll },
+  { id: "editor.unfold-all", defaultKeys: ["Mod-Alt-]"], run: unfoldAll },
+  // Multi-cursor (MYND-306): Mod-d adds the next occurrence to the selection (the
+  // VS Code / Obsidian convention). Bound EXPLICITLY (SYNC-2) — Myne installs only
+  // `Escape` from @codemirror/search, never `searchKeymap` wholesale.
+  { id: "editor.select-next", defaultKeys: ["Mod-d"], run: selectNextOccurrence },
+  // History (#184): undo/redo, formerly `historyKeymap`. Two default redo chords
+  // cover both conventions (Mod-y on Win/Linux, Mod-Shift-z on macOS).
+  { id: "editor.undo", defaultKeys: ["Mod-z"], run: undo, preventDefault: true },
+  { id: "editor.redo", defaultKeys: ["Mod-y", "Mod-Shift-z"], run: redo, preventDefault: true },
+  // Indent / outdent (#184): the two halves of `@codemirror/commands`'
+  // `indentWithTab` ({key:"Tab", run:indentMore, shift:indentLess}) split into
+  // two rebindable chords — behaviour-identical, but now override-driven.
+  { id: "editor.indent", defaultKeys: ["Tab"], run: indentMore },
+  { id: "editor.outdent", defaultKeys: ["Shift-Tab"], run: indentLess },
+];
+
+/** In-code default chords keyed by id — the display defaults the Hotkeys catalog
+ *  mirrors (a drift test pins the two equal) and the seed `buildMyneKeymap` uses
+ *  when there is no override. */
+export const EDITOR_KEYMAP_DEFAULTS: Readonly<Record<string, string[]>> =
+  Object.fromEntries(REBINDABLE_EDITOR_BINDINGS.map((b) => [b.id, [...b.defaultKeys]]));
+
+/** The set of editor-command ids that are override-driven — the Hotkeys panel's
+ *  "these dispatch in the editor keymap, not the window engine" list. */
+export const EDITOR_KEYMAP_IDS: readonly string[] = REBINDABLE_EDITOR_BINDINGS.map(
+  (b) => b.id,
+);
+
+/**
+ * Build the editor's rebindable CM6 keymap from the user override map
+ * (`vault.prefs.keymap`, id → chords). Effective chords per id = `override ??
+ * default`; an override of `[]` is an explicit unbind (no KeyBinding emitted), a
+ * multi-chord value emits one KeyBinding per chord. The result seeds — and, on a
+ * keymap change, reconfigures — the editor keymap Compartment (extensions.ts).
+ */
+export function buildMyneKeymap(
+  overrides: Readonly<Record<string, readonly string[]>> = {},
+): KeyBinding[] {
+  const out: KeyBinding[] = [];
+  for (const b of REBINDABLE_EDITOR_BINDINGS) {
+    const keys = overrides[b.id] ?? b.defaultKeys;
+    for (const key of keys) {
+      out.push(
+        b.preventDefault ? { key, run: b.run, preventDefault: true } : { key, run: b.run },
+      );
+    }
+  }
+  return out;
+}
+
+// The DEFAULT editor keymap (no overrides) plus the two fixed, non-rebindable
+// bindings the panel never lists — kept as a named export because the test suite
+// and the vim keymap tests mount `keymap.of([...myneKeyBindings])` directly and
+// rely on Mod-b…Mod-d + Escape being present.
+export const myneKeyBindings: readonly KeyBinding[] = [
+  ...buildMyneKeymap(),
   // Multi-cursor (MYND-306) story 6: Escape collapses a multi-selection back to a
   // single cursor. Guarded (no-op + fall-through when already a single range) so
-  // it never shadows the search-bar/menu Escape. Listed here (before
-  // defaultKeymap in extensions.ts) so it runs while a multi-selection is live.
+  // it never shadows the search-bar/menu Escape. Fixed (widget-nav, not listed).
   { key: "Escape", run: collapseMultiSelection },
 ];

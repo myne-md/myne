@@ -23,6 +23,9 @@ import {
   closeSettings,
   unlockToEditor,
   createNote,
+  typeIntoEditor,
+  editorText,
+  waitForSaved,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
@@ -246,6 +249,78 @@ describeE2E("hk5 the command palette is a rebindable command + opens via the eng
         // (b) Ctrl+K → palette.toggle default → engine opens the palette.
         await sendCtrlChord(s, "k");
         await s.byTestId("palette.input");
+      },
+    );
+  });
+});
+
+describeE2E("hk6 editor formatting is rebindable; a rebind takes effect live (#184)", () => {
+  // Precondition: exactly 1 vault (weak KDF). #184 track B moved the editor
+  // keymap into an override-driven Compartment, so the formatting rows the panel
+  // used to mark "fixed" are now rebindable — and a rebind reconfigures the OPEN
+  // editor live (no reload). Also pins track C/D listing: find.open + editor.undo
+  // are surfaced, and Ctrl+Tab (pane.cycle-tab) is the one row that stays fixed.
+  it("panel lists the new rows + marks editor rows rebindable; a rebound bold chord bolds the selection live", async () => {
+    let password = "";
+    await scenario(
+      "hk6-editor-rebind-live",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        await openSettings(s, "hotkeys");
+        await s.byTestId("hotkeys.panel");
+        // Track C: previously-invisible shortcuts now have panel rows.
+        await s.waitForElement(rowSel("find.open"));
+        await s.waitForElement(rowSel("editor.undo"));
+        // Track B: the editor-formatting row is rebindable now …
+        await s.waitForElement(
+          testIdSelector("hotkeys.row", {
+            "data-command-id": "editor.bold",
+            "data-rebindable": "true",
+          }),
+        );
+        // … and Ctrl+Tab is the ONE row that stays fixed.
+        await s.waitForElement(
+          testIdSelector("hotkeys.row", {
+            "data-command-id": "pane.cycle-tab",
+            "data-rebindable": "false",
+          }),
+        );
+
+        // Rebind editor.bold: add Ctrl+6 as a second binding (appended).
+        await (
+          await s.waitForElement(
+            `${rowSel("editor.bold")} [data-testid="hotkeys.add-binding"]`,
+          )
+        ).click();
+        await s.byTestId("hotkeys.capture-input");
+        await sendCtrlChord(s, "6");
+        await s.waitUntil(
+          async () =>
+            (await (await s.waitForElement(rowSel("editor.bold"))).textContent()).includes(
+              "Ctrl+6",
+            )
+              ? true
+              : null,
+          { label: "editor.bold shows the new Ctrl+6 binding" },
+        );
+        await closeSettings(s);
+
+        // The rebind reconfigures the OPEN editor's keymap Compartment live — no
+        // reload. Type a word, select the body (Ctrl+A → scoped select-all), then
+        // press the freshly-bound Ctrl+6 → the selection is wrapped in **bold**.
+        await createNote(s, "Rebind Bold");
+        await typeIntoEditor(s, "boldme");
+        await waitForSaved(s);
+        await sendCtrlChord(s, "a"); // editor.select-all (scoped → body)
+        await sendCtrlChord(s, "6"); // the rebound bold chord
+        await s.waitUntil(
+          async () => ((await editorText(s)).includes("**boldme**") ? true : null),
+          { label: "rebound Ctrl+6 bolded the selection live", timeoutMs: 10_000 },
+        );
       },
     );
   });

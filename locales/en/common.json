@@ -516,9 +516,11 @@
         "cycleHeadingLevel": "Cycle heading level",
         "cycleTabs": "Cycle tabs",
         "deleteWorkspace": "Delete workspace",
+        "findInNote": "Find in note",
         "focusNextPane": "Focus next pane",
         "focusPrevPane": "Focus previous pane",
         "foldAll": "Fold all",
+        "indent": "Indent",
         "inlineCode": "Inline code",
         "insertWikilink": "Insert wikilink",
         "italic": "Italic",
@@ -526,10 +528,13 @@
         "navigateForward": "Navigate forward",
         "newNote": "New note",
         "openSettings": "Open settings",
+        "outdent": "Outdent",
         "paletteToggle": "Open command palette",
+        "redo": "Redo",
         "renameWorkspace": "Rename workspace",
         "saveWorkspaceAs": "Save workspace as",
         "selectAllScoped": "Select all (scoped)",
+        "selectNextOccurrence": "Select next occurrence",
         "showGraphView": "Show graph view",
         "showTasks": "Show tasks",
         "splitPaneDown": "Split pane (down)",
@@ -541,6 +546,7 @@
         "toggleReadingView": "Toggle reading view",
         "toggleSourceMode": "Toggle source mode",
         "toggleTaskList": "Toggle task list",
+        "undo": "Undo",
         "unfoldAll": "Unfold all"
       }
     },
@@ -2513,7 +2519,7 @@
         "panesTabs": "Panes & Tabs",
         "view": "View"
       },
-      "helper": "View and change keyboard shortcuts. Editor formatting and the tab-cycle shortcut are fixed.",
+      "helper": "View and change keyboard shortcuts. Only the tab-cycle shortcut (Ctrl+Tab) is fixed.",
       "notSet": "Not set",
       "removeBindingAria": "Remove {{chord}}",
       "reserved": {

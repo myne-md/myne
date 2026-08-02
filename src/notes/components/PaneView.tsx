@@ -1106,6 +1106,10 @@ export function PaneView({
             // editing is meaningless there — and an indicator would be actively
             // misleading. Vim is mounted only for the editable modes.
             vimMode={prefs.editor_vim_mode === true && effectiveViewMode !== "reading"}
+            // #184: the user keymap overrides (vault.prefs.keymap). The editor
+            // reconfigures its rebindable-keymap compartment live when a Hotkeys
+            // rebind of an editor command lands (no remount).
+            keymapOverrides={prefs.keymap}
             // reading-source-modes (MYND-299): per-tab live/reading/source. The
             // editor reconfigures its view-mode compartments live (no remount).
             viewMode={effectiveViewMode}

@@ -28,8 +28,7 @@ import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemir
 import {
   defaultKeymap,
   history,
-  historyKeymap,
-  indentWithTab,
+  undoSelection,
 } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
@@ -107,6 +106,30 @@ export function transcriptionSurface(enabled: boolean): Extension {
 export function reconfigureTranscription(enabled: boolean): StateEffect<unknown> {
   return transcriptionCompartment.reconfigure(transcriptionSurface(enabled));
 }
+
+// The rebindable editor keymap lives in its own Compartment (#184 track B) so a
+// Hotkeys-panel rebind of an editor command (bold, undo, indent, …) takes effect
+// LIVE — the host dispatches `reconfigureEditorKeymap(prefs.keymap)` on a
+// `vault.prefs.keymap` change, no remount, cursor/scroll/undo preserved. Seeded
+// from the current overrides at mount (an already-customised keymap applies on
+// first open).
+const editorKeymapCompartment = new Compartment();
+
+/** The rebindable editor keymap for a given override map (`vault.prefs.keymap`).
+ *  `buildMyneKeymap` resolves `override ?? default` per command id. */
+export function editorKeymapSurface(
+  overrides: Readonly<Record<string, readonly string[]>>,
+): Extension {
+  return keymap.of(buildMyneKeymap(overrides));
+}
+
+/** Reconfigure the live rebindable editor keymap (host dispatches this on a
+ *  `vault.prefs.keymap` change) — re-mount-free, like `reconfigureAi`. */
+export function reconfigureEditorKeymap(
+  overrides: Readonly<Record<string, readonly string[]>>,
+): StateEffect<unknown> {
+  return editorKeymapCompartment.reconfigure(editorKeymapSurface(overrides));
+}
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
 import { completionExtension } from "./completion";
@@ -115,7 +138,7 @@ import { myneFolding } from "./folding";
 import { findExtension } from "./find/find-extension";
 import { spellDecorations } from "./decorations/spell";
 import { spellCorrectionMenu } from "./spell/correction-menu";
-import { myneKeyBindings } from "./keymap";
+import { buildMyneKeymap, collapseMultiSelection } from "./keymap";
 import { vimExtension } from "./vim";
 import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
@@ -137,6 +160,10 @@ export function myneExtensions(opts?: {
    *  no toolbar plugin at all — no listeners, no DOM node, no measure work —
    *  rather than a CSS-hidden one that still mounts. */
   selectionToolbar?: boolean;
+  /** #184: the user keymap overrides (`vault.prefs.keymap`, id → chords) that
+   *  seed the rebindable editor keymap Compartment. Pushed live on change via
+   *  `reconfigureEditorKeymap`. Absent → in-code defaults. */
+  keymapOverrides?: Readonly<Record<string, readonly string[]>>;
 }): readonly Extension[] {
   const viewMode = opts?.viewMode ?? "live";
   const readOnly = opts?.readOnly ?? false;
@@ -263,8 +290,16 @@ export function myneExtensions(opts?: {
     // Right-click-on-squiggle correction menu (MYND-265): suggestions + add to
     // dictionary / ignore (vault / session). Surgical byte-stable corrections.
     ...spellCorrectionMenu(),
+    // The rebindable editor commands (bold, undo, indent, fold, …) — in a
+    // Compartment so a Hotkeys-panel rebind reconfigures them live (#184). FIRST,
+    // so Mod-a's scoped select-all shadows defaultKeymap's selectAll (earlier
+    // wins), exactly as the old inline `myneKeyBindings` did.
+    editorKeymapCompartment.of(editorKeymapSurface(opts?.keymapOverrides ?? {})),
     keymap.of([
-      ...myneKeyBindings,
+      // Fixed (never listed / rebindable): Escape collapses a multi-selection
+      // (widget-nav, guarded so it falls through when not multi), and Mod-u is
+      // the obscure undoSelection formerly in `historyKeymap`.
+      { key: "Escape", run: collapseMultiSelection },
       // Before defaultKeymap so Arrow Up/Down can enter a table block (which
       // CM would otherwise skip over) instead of the default vertical move.
       ...tableKeymap,
@@ -273,8 +308,7 @@ export function myneExtensions(opts?: {
       ...autoCloseFenceKeymap,
       ...closeBracketsKeymap,
       ...defaultKeymap,
-      ...historyKeymap,
-      indentWithTab,
+      { key: "Mod-u", run: undoSelection, preventDefault: true },
     ]),
     myneTheme,
     // MYND-626: Tab indents by FOUR spaces, not CodeMirror's default two.
@@ -283,8 +317,8 @@ export function myneExtensions(opts?: {
     // width every CommonMark parser accepts unambiguously for a nested item
     // under any marker, so a Myne-indented list keeps its shape when it leaves
     // the app. This is the editor-wide indent unit, so it applies to plain
-    // lists and indented code alike; `indentWithTab` (below, in the keymap)
-    // reads this facet.
+    // lists and indented code alike; the `editor.indent` chord (indentMore, in
+    // the rebindable Compartment above) reads this facet.
     indentUnit.of("    "),
     EditorView.lineWrapping,
     // Optional line-number gutter (editor-line-numbers, MYND-314), seeded OFF
