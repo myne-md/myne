@@ -372,3 +372,24 @@ describe("useWorkspace — sidebar folder-expand set (MYND-455)", () => {
     expect(result.current.workspacesSnapshot().expandedFolders).toBeUndefined();
   });
 });
+
+describe("useWorkspace — closeNoteEverywhere (#219)", () => {
+  it("removes the note from its pane (leaving the others)", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openInFocused("A"));
+    act(() => result.current.openNewTabInFocused("B"));
+    act(() => result.current.closeNoteEverywhere("A"));
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual(["B"]);
+  });
+
+  it("removes the note from EVERY pane it is open in", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openInFocused("A"));
+    act(() => result.current.openToSide("A")); // A now lives in a second pane too
+    act(() => result.current.closeNoteEverywhere("A"));
+    const anyHasA = result.current.leaves.some((l) =>
+      l.tabs.some((t) => t.id === "A"),
+    );
+    expect(anyHasA).toBe(false);
+  });
+});

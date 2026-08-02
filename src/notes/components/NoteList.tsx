@@ -1649,6 +1649,10 @@ function PopulatedList({
       setMenu(null);
       try {
         await ctx.trashWithRollback(id);
+        // Close the note's tabs in every pane (#219): it left the live tree, so
+        // no stale, still-editable buffer may remain — an autosave of it would
+        // silently write the note back out of the trash.
+        ws.closeNoteEverywhere(id);
         setUndoToast(id);
         if (wasSelected) {
           if (adjacent !== null) {
@@ -1669,7 +1673,7 @@ function PopulatedList({
         }
       }
     },
-    [ctx, navIds, t],
+    [ctx, navIds, t, ws],
   );
 
   // Archive a single note (MYND-331): optimistically pull it from the live tree
@@ -1684,6 +1688,9 @@ function PopulatedList({
       setMenu(null);
       try {
         await ctx.archiveWithRollback(id);
+        // Same as trash (#219): archiving takes the note out of the live tree, so
+        // close its tabs — a stale buffer autosaved back would drop `archived:`.
+        ws.closeNoteEverywhere(id);
         if (wasSelected) {
           if (adjacent !== null) {
             void ctx.open(adjacent).catch(() => {
@@ -1701,7 +1708,7 @@ function PopulatedList({
         }
       }
     },
-    [ctx, navIds, t],
+    [ctx, navIds, t, ws],
   );
 
   // "Undo" on the trash toast → restore the just-trashed note.
