@@ -13,7 +13,7 @@
 import { defineConfig } from "i18next-cli";
 
 export default defineConfig({
-  locales: ["en","cs","da","de","el","es","fi","fr","hu","id","it","ja","ko","nb","nl","pl","pt","ro","ru","sv","tr","uk","vi","zh"],
+  locales: ["en","ar","bn","cs","da","de","el","es","fa","fi","fr","hi","hu","id","it","ja","ko","nb","nl","pa","pl","pt","ro","ru","sv","sw","th","tr","uk","ur","vi","zh"],
   extract: {
     // Desktop client (`src/`) + the mobile client (`myne-mobile/src/`, MYND-485).
     // Both clients share these repo-root catalogs, so a single `pnpm i18n:extract`
