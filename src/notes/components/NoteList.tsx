@@ -13,6 +13,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type CSSProperties,
@@ -20,6 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { viewsEnabled, VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { noteRead } from "../readNote";
 import {
@@ -72,6 +74,7 @@ import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
 import { useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
+import type { IconName } from "../../lib/icons";
 import { ViewsSection } from "./ViewsSection";
 import { FilterBuilder, type FolderOption } from "./FilterBuilder";
 import { ViewSettings, type ViewDisplayPatch } from "./ViewSettings";
@@ -101,6 +104,10 @@ import {
   type FolderManagement,
 } from "./useFolderManagement";
 import { Icon } from "../../components/primitives/Icon";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 import { useCenterView } from "../../screens/centerView";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useUnsyncedEdits } from "../../hooks/useUnsyncedEdits";
@@ -313,12 +320,124 @@ const HEADER_BUTTON_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
-/** Right-aligned cluster holding the header's "+ Folder" / "+ New Note" buttons. */
+/** Right-aligned cluster holding the header's "+" new-item menu button. */
 const HEADER_ACTIONS_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 2,
 };
+
+// The header's single "+" button and its dropdown (New note / New note from
+// template / New folder) — replaces the former three-button cluster.
+const NEW_MENU_STYLE: CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 4px)",
+  right: 0,
+  minWidth: 210,
+  zIndex: 40,
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  boxShadow: "var(--shadow-2)",
+  padding: 4,
+  display: "flex",
+  flexDirection: "column",
+  gap: 1,
+};
+
+const NEW_MENU_ITEM_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  width: "100%",
+  padding: "8px 10px",
+  border: 0,
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-1)",
+  cursor: "pointer",
+  textAlign: "left",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  transition: HOVER_TRANSITION,
+};
+
+function NotesActionsMenu({
+  onNewFolder,
+  onCreate,
+  onNewFromTemplate,
+}: {
+  onNewFolder: () => void;
+  onCreate: () => void;
+  onNewFromTemplate?: () => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: globalThis.MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const id = window.setTimeout(
+      () => document.addEventListener("mousedown", onDown),
+      0,
+    );
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  const item = (
+    label: string,
+    testId: string,
+    icon: IconName,
+    onClick: () => void,
+  ) => (
+    <button
+      type="button"
+      role="menuitem"
+      data-testid={testId}
+      {...hoverSurface()}
+      style={NEW_MENU_ITEM_STYLE}
+      onClick={() => {
+        setOpen(false);
+        onClick();
+      }}
+    >
+      <Icon name={icon} size={14} style={{ color: "var(--fg-3)" }} />
+      {label}
+    </button>
+  );
+  return (
+    <div ref={ref} style={{ position: "relative", display: "flex" }}>
+      <IconButton
+        icon="plus"
+        label={t("notes.list.newItem")}
+        testId="notes.new-menu"
+        onClick={() => setOpen((v) => !v)}
+      />
+      {open && (
+        <div role="menu" data-testid="notes.new-menu-dropdown" style={NEW_MENU_STYLE}>
+          {item(t("notes.list.newNote"), "notes.create", "file-plus", onCreate)}
+          {onNewFromTemplate &&
+            item(
+              t("notes.list.newNoteFromTemplate"),
+              "notes.new-from-template",
+              "file-text",
+              onNewFromTemplate,
+            )}
+          {item(t("notes.list.newFolder"), "notes.new-folder", "folder-plus", onNewFolder)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Leading group: the collapse chevron + the "Notes" eyebrow, kept together
  *  so the header stays a clean two-group `space-between` row (MYND-137). */
@@ -409,6 +528,7 @@ const FOOTER_ENTRY_STYLE: CSSProperties = {
   fontSize: 13,
   cursor: "pointer",
   textAlign: "left",
+  transition: HOVER_TRANSITION,
 };
 
 const TRASH_COUNT_BADGE_STYLE: CSSProperties = {
@@ -569,6 +689,20 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     }
     return ordered;
   }, [viewsPrefs.saved_views, viewsPrefs.view_order]);
+  // Views feature toggle (device-local): the "Views" entry shows only when
+  // enabled. Effective = stored pref, else back-compat default (has any views).
+  // Re-read on the change event so the sidebar reflects the Settings toggle live.
+  const [viewsPrefNonce, bumpViewsPref] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    const onChange = () => bumpViewsPref();
+    window.addEventListener(VIEWS_ENABLED_EVENT, onChange);
+    return () => window.removeEventListener(VIEWS_ENABLED_EVENT, onChange);
+  }, []);
+  const showViews = useMemo(
+    () => viewsEnabled(orderedViews.length > 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orderedViews.length, viewsPrefNonce],
+  );
   // Filter builder (MYND-282): "+ New view" no longer creates a blank view
   // immediately — it opens the builder empty. "Edit filter…" (ViewsSection
   // context menu) reopens it seeded with an existing view's filter, parsed back
@@ -1096,16 +1230,23 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           showTimestamps={viewsPrefs.show_note_timestamps}
         />
       )}
-      <ViewsSection
-        views={orderedViews}
-        onOpenView={(id) => ws.openView(id)}
-        onNewView={handleNewView}
-        onEditFilter={handleEditFilter}
-        onViewSettings={handleViewSettings}
-        onRename={handleRenameView}
-        onDelete={handleDeleteView}
-        onMoveView={handleMoveView}
-      />
+      {showViews && (
+        <ViewsSection
+          views={orderedViews}
+          activeViewId={
+            ws.focusedLeaf.activeTab?.kind === "view"
+              ? ws.focusedLeaf.activeTab.id
+              : null
+          }
+          onOpenView={(id) => ws.openView(id)}
+          onNewView={handleNewView}
+          onEditFilter={handleEditFilter}
+          onViewSettings={handleViewSettings}
+          onRename={handleRenameView}
+          onDelete={handleDeleteView}
+          onMoveView={handleMoveView}
+        />
+      )}
       {viewSettings !== null && (
         <ViewSettings
           title={
@@ -1145,34 +1286,55 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       )}
       <div style={FOOTER_WRAP_STYLE}>
         <AttachmentsNavEntry />
-        <button
-          type="button"
-          style={FOOTER_ENTRY_STYLE}
-          data-testid="notes.trash-open"
-          onClick={() => setTrashOpen(true)}
-          title={t("notes.list.openTrash")}
-        >
-          <Icon name="trash-2" size={15} />
-          <span>{t("notes.list.trash")}</span>
-          {trashCount > 0 && (
-            <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
-          )}
-        </button>
-        {(!archiveDisabled || archiveCount > 0) && (
+        {/* Trash + Archive share ONE line to compact the footer: each takes
+            half, split by a vertical hairline. When Archive is absent, Trash
+            fills the row. The row's top hairline lives on the wrapper so the two
+            halves keep only the vertical divider between them. */}
+        <div style={{ display: "flex", borderTop: "1px solid var(--line-1)" }}>
           <button
             type="button"
-            style={FOOTER_ENTRY_STYLE}
-            data-testid="notes.archive-open"
-            onClick={() => setArchiveOpen(true)}
-            title={t("notes.list.openArchive")}
+            style={{
+              ...FOOTER_ENTRY_STYLE,
+              borderTop: "none",
+              flex: 1,
+              minWidth: 0,
+              width: "auto",
+            }}
+            {...hoverSurface()}
+            data-testid="notes.trash-open"
+            onClick={() => setTrashOpen(true)}
+            title={t("notes.list.openTrash")}
           >
-            <Icon name="archive" size={15} />
-            <span>{t("notes.list.archive")}</span>
-            {archiveCount > 0 && (
-              <span style={TRASH_COUNT_BADGE_STYLE}>{archiveCount}</span>
+            <Icon name="trash-2" size={15} />
+            <span>{t("notes.list.trash")}</span>
+            {trashCount > 0 && (
+              <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
             )}
           </button>
-        )}
+          {(!archiveDisabled || archiveCount > 0) && (
+            <button
+              type="button"
+              style={{
+                ...FOOTER_ENTRY_STYLE,
+                borderTop: "none",
+                borderLeft: "1px solid var(--line-1)",
+                flex: 1,
+                minWidth: 0,
+                width: "auto",
+              }}
+              {...hoverSurface()}
+              data-testid="notes.archive-open"
+              onClick={() => setArchiveOpen(true)}
+              title={t("notes.list.openArchive")}
+            >
+              <Icon name="archive" size={15} />
+              <span>{t("notes.list.archive")}</span>
+              {archiveCount > 0 && (
+                <span style={TRASH_COUNT_BADGE_STYLE}>{archiveCount}</span>
+              )}
+            </button>
+          )}
+        </div>
       </div>
       <TrashPanel open={trashOpen} onClose={() => setTrashOpen(false)} />
       <ArchivePanel
@@ -1203,25 +1365,11 @@ function EmptyState({
           <div style={SECTION_HEADING_STYLE}>{t("notes.list.notesHeading")}</div>
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <IconButton
-            icon="folder-plus"
-            label={t("notes.list.newFolder")}
-            testId="notes.new-folder"
-            onClick={() => fm.startNewFolder("")}
+          <NotesActionsMenu
+            onNewFolder={() => fm.startNewFolder("")}
+            onCreate={onCreate}
+            onNewFromTemplate={onNewFromTemplate}
           />
-          <IconButton
-            icon="file-plus"
-            label={t("notes.list.newNote")}
-            testId="notes.create"
-            onClick={onCreate}
-          />
-          {onNewFromTemplate && (
-            <IconButton
-              icon="chevron-down"
-              label={t("notes.list.newNoteFromTemplate")}
-              onClick={onNewFromTemplate}
-            />
-          )}
         </div>
       </div>
       {fm.newFolder !== null && (
@@ -2384,25 +2532,11 @@ function PopulatedList({
           <div style={SECTION_HEADING_STYLE}>{t("notes.list.notesHeading")}</div>
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <IconButton
-            icon="folder-plus"
-            label={t("notes.list.newFolder")}
-            testId="notes.new-folder"
-            onClick={() => fm.startNewFolder("")}
+          <NotesActionsMenu
+            onNewFolder={() => fm.startNewFolder("")}
+            onCreate={onCreate}
+            onNewFromTemplate={onNewFromTemplate}
           />
-          <IconButton
-            icon="file-plus"
-            label={t("notes.list.newNoteShortcut")}
-            testId="notes.create"
-            onClick={onCreate}
-          />
-          {onNewFromTemplate && (
-            <IconButton
-              icon="chevron-down"
-              label={t("notes.list.newNoteFromTemplate")}
-              onClick={onNewFromTemplate}
-            />
-          )}
         </div>
       </div>
       {fm.newFolder !== null && (
@@ -2721,6 +2855,10 @@ function AttachmentsNavEntry() {
         background: active ? "var(--paper-3)" : "transparent",
         fontWeight: active ? 600 : 400,
       }}
+      {...hoverSurface({
+        restBg: active ? "var(--paper-3)" : "transparent",
+        hoverBg: active ? "var(--paper-3)" : "var(--bg-3)",
+      })}
       onClick={() => setView("attachments")}
       title={t("notes.list.openAttachments")}
       aria-current={active ? "page" : undefined}

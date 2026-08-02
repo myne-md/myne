@@ -30,6 +30,7 @@ import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
 import { DailyNotesSettings } from "./DailyNotesSettings";
 import { ArchiveSettings } from "./ArchiveSettings";
+import { ViewsSettings } from "./ViewsSettings";
 import { ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
@@ -336,6 +337,9 @@ export function EditorPanel() {
         {/* Note-archive feature toggle — on by default; turning it off restores
             every archived note and hides the archive controls. */}
         <ArchiveSettings />
+        {/* Views feature toggle (device-local) — off by default; counted on when
+            the vault already has saved views. Hides the sidebar "Views" entry. */}
+        <ViewsSettings />
       </SettingsSection>
       </div>
       <EditorSettingsPreview />

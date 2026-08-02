@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 //
-// Unit tests for the sidebar "Views" section (Saved Views #4, MYND-274, task 3).
-// Covers the list/empty-state logic + the open/new dispatch (the UI subtask's
-// Vitest-coverage requirement). Pure component — no IPC.
+// Unit tests for the sidebar "Views" entry (Saved Views #4, MYND-274).
+// Views is a compact nav row; its list lives in a right-flyout opened by
+// clicking the row (or its caret). Rows / empty-state / rename all live inside
+// that flyout, so tests open it first. Pure component — no IPC.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -15,15 +16,26 @@ function view(id: string, name: string): SavedView {
   return { id, name, view_type: "cards", filters: { kind: "all" } };
 }
 
+/** Open the flyout by clicking the nav row (the primary affordance). */
+function openFlyout() {
+  fireEvent.click(screen.getByTestId("views.section"));
+}
+
 describe("ViewsSection", () => {
-  it("renders the quiet empty-state hint when there are no views", () => {
+  it("is a compact row; the list + empty-state live in the flyout", () => {
     render(<ViewsSection views={[]} onOpenView={vi.fn()} onNewView={vi.fn()} />);
+    // Collapsed by default: nothing but the row is in the DOM.
     expect(screen.getByTestId("views.section")).toBeTruthy();
+    expect(screen.queryByTestId("views.flyout")).toBeNull();
+    expect(screen.queryByTestId("views.empty")).toBeNull();
+    // Opening the flyout reveals the quiet empty-state hint.
+    openFlyout();
+    expect(screen.getByTestId("views.flyout")).toBeTruthy();
     expect(screen.getByTestId("views.empty")).toBeTruthy();
     expect(screen.queryByTestId("views.row")).toBeNull();
   });
 
-  it("renders one row per view, in the given order, with a data-view-id", () => {
+  it("renders one flyout row per view, in the given order, with a data-view-id", () => {
     render(
       <ViewsSection
         views={[view("v2", "Books"), view("v1", "Films")]}
@@ -31,6 +43,7 @@ describe("ViewsSection", () => {
         onNewView={vi.fn()}
       />,
     );
+    openFlyout();
     const rows = screen.getAllByTestId("views.row");
     expect(rows).toHaveLength(2);
     expect(rows[0]!.getAttribute("data-view-id")).toBe("v2");
@@ -39,7 +52,7 @@ describe("ViewsSection", () => {
     expect(screen.queryByTestId("views.empty")).toBeNull();
   });
 
-  it("clicking a row opens that view", () => {
+  it("clicking a flyout row opens that view", () => {
     const onOpenView = vi.fn();
     render(
       <ViewsSection
@@ -48,11 +61,12 @@ describe("ViewsSection", () => {
         onNewView={vi.fn()}
       />,
     );
+    openFlyout();
     fireEvent.click(screen.getByTestId("views.row"));
     expect(onOpenView).toHaveBeenCalledWith("v1");
   });
 
-  it("the + button triggers onNewView", () => {
+  it("the + button triggers onNewView (no flyout needed)", () => {
     const onNewView = vi.fn();
     render(
       <ViewsSection views={[]} onOpenView={vi.fn()} onNewView={onNewView} />,
@@ -61,7 +75,7 @@ describe("ViewsSection", () => {
     expect(onNewView).toHaveBeenCalledTimes(1);
   });
 
-  it("collapsing the section hides the rows", () => {
+  it("toggling the row closes the flyout", () => {
     render(
       <ViewsSection
         views={[view("v1", "Books")]}
@@ -69,9 +83,43 @@ describe("ViewsSection", () => {
         onNewView={vi.fn()}
       />,
     );
+    openFlyout();
     expect(screen.getByTestId("views.row")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("views.collapse-toggle"));
+    fireEvent.click(screen.getByTestId("views.section")); // toggle closed
     expect(screen.queryByTestId("views.row")).toBeNull();
+  });
+
+  it("filters the flyout list by the search query", () => {
+    render(
+      <ViewsSection
+        views={[view("v1", "Books"), view("v2", "Films")]}
+        onOpenView={vi.fn()}
+        onNewView={vi.fn()}
+      />,
+    );
+    openFlyout();
+    fireEvent.change(screen.getByTestId("views.search"), {
+      target: { value: "film" },
+    });
+    const rows = screen.getAllByTestId("views.row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.getAttribute("data-view-id")).toBe("v2");
+  });
+
+  it("flags the active view with data-active in the flyout", () => {
+    render(
+      <ViewsSection
+        views={[view("v1", "Books"), view("v2", "Films")]}
+        activeViewId="v2"
+        onOpenView={vi.fn()}
+        onNewView={vi.fn()}
+      />,
+    );
+    openFlyout();
+    const rows = screen.getAllByTestId("views.row");
+    const active = rows.filter((r) => r.getAttribute("data-active") === "true");
+    expect(active).toHaveLength(1);
+    expect(active[0]!.getAttribute("data-view-id")).toBe("v2");
   });
 
   it("falls back to 'Untitled view' for a blank name", () => {
@@ -82,6 +130,7 @@ describe("ViewsSection", () => {
         onNewView={vi.fn()}
       />,
     );
+    openFlyout();
     expect(screen.getByTestId("views.row").textContent).toContain(
       "Untitled view",
     );
@@ -113,6 +162,7 @@ describe("ViewsSection — management (MYND-274 task 6)", () => {
         {...handlers}
       />,
     );
+    openFlyout();
     return handlers;
   }
 
@@ -172,6 +222,7 @@ describe("ViewsSection — management (MYND-274 task 6)", () => {
         onMoveView={vi.fn()}
       />,
     );
+    openFlyout();
     openRowMenu("vl");
     const ids = screen
       .getAllByTestId("notes.context-menu-item")
