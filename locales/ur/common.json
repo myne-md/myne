@@ -1,1 +1,3888 @@
-{}
+{
+  "accountBootstrap": {
+    "accountMismatch": "اس براؤزر میں پہلے سے کسی دوسرے اکاؤنٹ کا والٹ موجود ہے۔ یا تو وہی کھولیں، یا سائن آؤٹ کر کے پہلے اس براؤزر کی نقل مٹا دیں۔",
+    "changeAccount": "کوئی دوسرا اکاؤنٹ نمبر استعمال کریں",
+    "continue": "جاری رکھیں",
+    "failed": "وہ اکاؤنٹ نہیں کھل سکا۔ اکاؤنٹ نمبر اور پاس ورڈ جانچیں، پھر دوبارہ کوشش کریں۔",
+    "hint": "اس اکاؤنٹ کا ماسٹر پاس ورڈ درج کریں۔ Myne آپ کا والٹ حاصل کرے گا اور اس براؤزر کو اس اکاؤنٹ کے ایک آلے کے طور پر ترتیب دے گا۔",
+    "noEndpoint": "Myne کی اس نقل میں کوئی مطابقت پذیری سرور ترتیب نہیں دیا گیا، اس لیے یہ آپ کے والٹ تک نہیں پہنچ سکتی۔ جو اسے چلاتا ہے اس سے رابطہ کریں۔",
+    "passwordLabel": "ماسٹر پاس ورڈ",
+    "approversIntro": "یہ آلات اس کی منظوری دے سکتے ہیں:",
+    "noApprovers": "اس وقت اس اکاؤنٹ کا کوئی دوسرا آلہ اس کی منظوری نہیں دے سکتا۔ Myne کو ایسے آلے پر کھولیں جس کے پاس پہلے سے رسائی ہے، پھر یہاں واپس آئیں۔",
+    "pendingTitle": "منظوری کا انتظار",
+    "sasMatch": "دونوں یکساں ہیں — جاری رکھیں",
+    "sasMismatch": "دونوں یکساں نہیں ہیں",
+    "verifyBody": "جاری رکھنے سے پہلے جانچیں کہ یہ کوڈ دونوں آلات پر ایک جیسا ہے۔ اگر نہیں ہے تو رک جائیں — خرابی کنکشن میں ہے، آپ کے پاس ورڈ میں نہیں۔",
+    "verifyTitle": "اس کوڈ کا موازنہ کریں",
+    "title": "اپنے والٹ میں سائن ان کریں",
+    "working": "ترتیب دیا جا رہا ہے…"
+  },
+  "accountEntry": {
+    "checkFailed": "وہ اکاؤنٹ نمبر جانچا نہیں جا سکا۔ دوبارہ کوشش کریں۔",
+    "checking": "جانچا جا رہا ہے…",
+    "continue": "جاری رکھیں",
+    "hint": "یہ MY-XXXX-XXXX-XXXX-XXXX-XXXX جیسا ہوتا ہے۔ یہیں آپ کے آلے پر جانچا جاتا ہے — ابھی کچھ نہیں بھیجا جاتا۔",
+    "invalid": "وہ اکاؤنٹ نمبر درست نہیں ہے۔ اسے جانچیں اور دوبارہ کوشش کریں۔",
+    "title": "اپنا اکاؤنٹ نمبر درج کریں"
+  },
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "منسوخ کریں",
+      "cleaning": "صفائی جاری ہے…",
+      "close": "بند کریں",
+      "completeTitle": "صفائی مکمل",
+      "deleteCta": "{{count}} غیر استعمال شدہ حذف کریں",
+      "deleteCta_one": "{{count}} غیر استعمال شدہ حذف کریں",
+      "deleteCta_other": "{{count}} غیر استعمال شدہ حذف کریں",
+      "corpusIncomplete": "پہلے مطابقت پذیری مکمل کریں — اس آلے پر ابھی آپ کے سارے نوٹس موجود نہیں۔ کچھ حذف نہیں کیا گیا۔",
+      "error": "صفائی نہیں ہو سکی۔ کچھ نوٹس ناقابلِ مطالعہ ہو سکتے ہیں — کچھ حذف نہیں کیا گیا۔",
+      "intro_one": "یہ منسلکہ کسی نوٹ میں استعمال نہیں ہو رہا۔ اسے حذف کرنا مستقل ہے اور واپس نہیں لیا جا سکتا۔",
+      "intro_other": "یہ {{count}} منسلکات کسی نوٹ میں استعمال نہیں ہو رہے۔ انہیں حذف کرنا مستقل ہے اور واپس نہیں لیا جا سکتا۔",
+      "summaryFreed": " · {{size}} جگہ خالی ہوئی",
+      "summaryPeriod": "۔",
+      "summaryRemoved_one": "{{count}} منسلکہ ہٹا دیا گیا",
+      "summaryRemoved_other": "{{count}} منسلکات ہٹا دیے گئے",
+      "summarySkipped": " · {{count}} چھوڑ دیے گئے (اب زیرِ استعمال)",
+      "summarySkipped_one": " · {{count}} چھوڑ دیا گیا (اب زیرِ استعمال)",
+      "summarySkipped_other": " · {{count}} چھوڑ دیے گئے (اب زیرِ استعمال)",
+      "title": "غیر استعمال شدہ منسلکات صاف کریں",
+      "willBeReclaimed": "{{size}} جگہ واپس مل جائے گی۔"
+    },
+    "coverPicker": {
+      "close": "بند کریں",
+      "dropHint": "کور کے طور پر استعمال کرنے کے لیے کوئی تصویر یہاں چھوڑیں۔",
+      "empty": "اس والٹ میں ابھی کوئی تصویر نہیں۔ کوئی تصویر اپ لوڈ کریں یا یہاں گھسیٹ کر لائیں۔",
+      "loading": "لوڈ ہو رہا ہے…",
+      "removeCover": "کور ہٹائیں",
+      "title": "کور تصویر منتخب کریں",
+      "upload": "اپ لوڈ"
+    },
+    "deleteDialog": {
+      "cancel": "منسوخ کریں",
+      "confirmPrompt": "یہ منسلکہ مستقل طور پر حذف کریں؟ یہ واپس نہیں لیا جا سکتا۔",
+      "delete": "حذف کریں",
+      "deleting": "حذف کیا جا رہا ہے…",
+      "error": "منسلکہ حذف نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "notUsed": "کسی نوٹ میں استعمال نہیں ہو رہا۔",
+      "stillUsed_one": "یہ اب بھی {{count}} نوٹ میں استعمال ہو رہا ہے۔ اسے حذف کرنے پر جہاں یہ شامل تھا وہاں ایک نشان باقی رہ جائے گا:",
+      "stillUsed_other": "یہ اب بھی {{count}} نوٹس میں استعمال ہو رہا ہے۔ اسے حذف کرنے پر جہاں یہ شامل تھا وہاں ایک نشان باقی رہ جائے گا:",
+      "title": "منسلکہ حذف کریں",
+      "untitled": "بلا عنوان"
+    },
+    "library": {
+      "actionsAriaLabel": "منسلکہ کے اعمال",
+      "actionsTitle": "اعمال",
+      "checkUnusedFailedNotice": "غیر استعمال شدہ منسلکات کی جانچ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+      "corpusIncompleteNotice": "پہلے مطابقت پذیری مکمل کریں — اس آلے پر ابھی آپ کے سارے نوٹس موجود نہیں، اس لیے یہ نہیں بتا سکتا کہ کون سے منسلکات غیر استعمال شدہ ہیں۔",
+      "checking": "جانچا جا رہا ہے…",
+      "cleanUnused": "غیر استعمال شدہ صاف کریں",
+      "cleanUnusedTitle": "ایسے منسلکات حذف کریں جو کسی نوٹ میں استعمال نہیں ہو رہے",
+      "colCreated": "بنایا گیا",
+      "colName": "نام",
+      "colSize": "سائز",
+      "colType": "قسم",
+      "colUsedIn": "استعمال میں",
+      "decrypting": "منسلکات ڈکرپٹ ہو رہے ہیں…",
+      "clearSearchAriaLabel": "تلاش صاف کریں",
+      "emptyClearSearch": "تلاش صاف کریں",
+      "emptyImportHint": "کوئی فائل درآمد کریں تاکہ وہ آپ کے والٹ میں محفوظ رہے۔",
+      "emptyLoadError": "منسلکات کا کیٹلاگ پڑھا نہیں جا سکا۔",
+      "emptyNoAttachments": "ابھی کوئی منسلکہ نہیں۔",
+      "emptyNoResultsTitle": "آپ کی تلاش سے کوئی منسلکہ مطابقت نہیں رکھتا۔",
+      "filterAriaLabel": "قسم کے حساب سے فلٹر کریں",
+      "gridView": "گرڈ منظر",
+      "import": "درآمد",
+      "importDialogTitle": "منسلکہ درآمد کریں",
+      "importFile": "فائل درآمد کریں",
+      "importing": "درآمد ہو رہی ہے…",
+      "listView": "فہرست منظر",
+      "menuDelete": "حذف کریں",
+      "menuExport": "برآمد",
+      "menuPreview": "پیش منظر",
+      "menuRename": "نام تبدیل کریں",
+      "menuTranscribe": "نقل نویسی کریں",
+      "menuViewTranscription": "نقل نویسی دیکھیں",
+      "noMatch": "آپ کی تلاش سے کوئی منسلکہ مطابقت نہیں رکھتا۔",
+      "noUnusedNotice": "صاف کرنے کے لیے کوئی غیر استعمال شدہ منسلکہ نہیں۔",
+      "preview": "پیش منظر",
+      "previewAttachment": "منسلکہ کا پیش منظر",
+      "searchAriaLabel": "فائل کے نام سے منسلکات تلاش کریں",
+      "searchPlaceholder": "فائل کے نام سے تلاش کریں",
+      "sort": {
+        "createdAsc": "پرانے پہلے",
+        "createdDesc": "نئے پہلے",
+        "nameAsc": "نام A–Z",
+        "nameDesc": "نام Z–A"
+      },
+      "sortAriaLabel": "منسلکات ترتیب دیں",
+      "supportedFilesFilter": "معاون فائلیں",
+      "title": "منسلکات",
+      "transcribeDone": "نقل نویسی مکمل۔",
+      "transcribeFailed": "نقل نویسی ناکام رہی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "transcribeFeatureOff": "آواز سے متن بند ہے۔ اسے ترتیبات → نقل نویسی میں آن کریں۔",
+      "transcribeModelLoadFailed": "آواز سے متن کا ماڈل لوڈ نہیں ہو سکا۔ Myne دوبارہ انسٹال کریں، یا ترتیبات → ڈیولپر → AI میں اپنا حسبِ ضرورت ماڈل جانچیں۔",
+      "transcribeNoModelHint": "آواز سے متن کا ماڈل موجود نہیں۔ Myne دوبارہ انسٹال کرنے سے یہ بحال ہو جاتا ہے۔",
+      "transcribeStarted": "نقل نویسی ہو رہی ہے…",
+      "transcribeVaultLocked": "نقل نویسی کے لیے اپنا والٹ ان لاک کریں۔",
+      "transcriptionModalClose": "نقل نویسی بند کریں",
+      "transcriptionModalTitle": "نقل نویسی",
+      "typeFilter": {
+        "all": "تمام اقسام",
+        "audio": "آڈیو",
+        "image": "تصاویر",
+        "other": "دیگر",
+        "pdf": "PDF فائلیں"
+      },
+      "usedInCount_one": "{{count}} نوٹ میں استعمال",
+      "usedInCount_other": "{{count}} نوٹس میں استعمال",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "آڈیو: {{filename}}",
+      "file": "فائل",
+      "pause": "روکیں",
+      "pdfDocument": "PDF دستاویز",
+      "pdfFirstPage": "PDF کا پہلا صفحہ",
+      "play": "چلائیں"
+    },
+    "usedInNotesPopover": {
+      "empty": "کسی نوٹ میں استعمال نہیں ہو رہا۔",
+      "untitled": "بلا عنوان"
+    },
+    "needsApp": "منسلکات کی صفائی کے لیے ایپ درکار ہے۔",
+    "noUnused": "کوئی غیر استعمال شدہ منسلکہ نہیں — ہر فائل کا حوالہ موجود ہے۔",
+    "scanError": "غیر استعمال شدہ منسلکات کے لیے اسکین نہیں ہو سکا۔",
+    "erasedToast_one": "{{count}} غیر استعمال شدہ فائل مٹا دی گئی۔",
+    "erasedToast_other": "{{count}} غیر استعمال شدہ فائلیں مٹا دی گئیں۔",
+    "eraseError": "غیر استعمال شدہ منسلکات مٹائے نہیں جا سکے۔",
+    "readError": "منسلکات پڑھے نہیں جا سکے۔",
+    "needAppPreview": "منسلکات کے لیے ایپ درکار ہے (براؤزر کا پیش منظر نہیں)۔",
+    "tooLarge": "وہ فائل بہت بڑی ہے (زیادہ سے زیادہ 64 MB)۔",
+    "unsupported": "صرف تصاویر اور PDF منسلک کیے جا سکتے ہیں۔",
+    "addError": "وہ فائل شامل نہیں ہو سکی۔",
+    "deleteError": "وہ منسلکہ حذف نہیں ہو سکا۔",
+    "renameError": "اس منسلکہ کا نام تبدیل نہیں ہو سکا۔",
+    "unusedSummary_one": "{{count}} منسلکہ کا کسی نوٹ میں حوالہ نہیں ({{size}})۔ مٹانا ایک مستقل، رمزی سطح کا حذف ہے — کوئی ردی کی ٹوکری نہیں ہوتی۔",
+    "unusedSummary_other": "{{count}} منسلکات کا کسی نوٹ میں حوالہ نہیں ({{size}})۔ مٹانا ایک مستقل، رمزی سطح کا حذف ہے — کوئی ردی کی ٹوکری نہیں ہوتی۔",
+    "eraseCta_one": "{{count}} غیر استعمال شدہ فائل مٹائیں",
+    "eraseCta_other": "{{count}} غیر استعمال شدہ فائلیں مٹائیں",
+    "emptyState": "ابھی کوئی منسلکہ نہیں۔ تصویر یا PDF شامل کرنے کے لیے اپ لوڈ پر ٹیپ کریں۔",
+    "insert": "داخل کریں",
+    "pauseLabel": "{{filename}} روکیں",
+    "playLabel": "{{filename}} چلائیں"
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "والٹ پر ایک اور کارروائی جاری ہے۔ اس کے مکمل ہونے کا انتظار کریں، پھر دوبارہ کوشش کریں۔",
+        "cancelled": "بیک اپ منسوخ ہو گیا۔ کوئی فائل پیچھے نہیں چھوڑی گئی۔",
+        "invalidDestination": "وہ منزل فولڈر قابلِ استعمال نہیں ہے۔",
+        "ioGeneric": "بیک اپ فائل لکھی نہیں جا سکی۔",
+        "ioNoSpace": "منزل پر کافی جگہ نہیں ہے۔",
+        "ioPermissionDenied": "منزل پر لکھنے کی اجازت نہیں ہے۔",
+        "joinFailure": "بیک اپ غیر متوقع طور پر ناکام ہوا۔ کوئی فائل پیچھے نہیں چھوڑی گئی۔",
+        "memberTooLarge": "اس والٹ کی ایک فائل بیک اپ فارمیٹ کی اجازت سے بڑی ہے۔",
+        "vaultNotFound": "بیک اپ کے لیے کوئی والٹ نہیں ملا۔",
+        "verifyFailed": "لکھے گئے بیک اپ کی تصدیق نہیں ہوئی، اس لیے اسے رد کر دیا گیا۔ دوبارہ کوشش کریں — اگر یہ پھر ہو تو کسی دوسرے میڈیا پر۔"
+      },
+      "restore": {
+        "authOperationInProgress": "والٹ پر ایک اور کارروائی جاری ہے۔ اس کے مکمل ہونے کا انتظار کریں، پھر دوبارہ کوشش کریں۔",
+        "cancelled": "بحالی منسوخ ہو گئی۔ کچھ تبدیل نہیں ہوا۔",
+        "damagedBackup": "بیک اپ فائل خراب ہے۔",
+        "futureVersionBackup": "یہ بیک اپ Myne کے کسی نئے ورژن سے بنایا گیا تھا۔ Myne اپ ڈیٹ کریں، پھر اسے بحال کریں۔",
+        "invalidVaultMeta": "اس بیک اپ کا والٹ میٹا ڈیٹا ناقابلِ مطالعہ ہے، اس لیے اسے بحال کرنے سے کام کرنے والا والٹ نہیں بن سکتا۔",
+        "ioGeneric": "بیک اپ فائل پڑھی نہیں جا سکی۔",
+        "ioPermissionDenied": "بیک اپ فائل پڑھنے کی اجازت نہیں ہے۔",
+        "joinFailure": "بحالی غیر متوقع طور پر ناکام ہوئی۔ کچھ تبدیل نہیں ہوا۔",
+        "missingVaultMeta": "اس بیک اپ کا والٹ میٹا ڈیٹا موجود نہیں، اس لیے اسے بحال نہیں کیا جا سکتا۔",
+        "notABackupFile": "یہ فائل Myne کا بیک اپ نہیں ہے۔",
+        "vaultAlreadyExists": "اس بیک اپ کا والٹ اس آلے پر پہلے سے موجود ہے۔"
+      }
+    },
+    "export": {
+      "cancel": "منسوخ کریں",
+      "close": "بند کریں",
+      "copying": "{{total}} میں سے {{done}} کاپی ہو رہے ہیں…",
+      "preparing": "تیاری جاری ہے…",
+      "successToast": "بیک اپ کی تصدیق ہو گئی اور وہ محفوظ ہو گیا۔",
+      "title": "والٹ کا بیک اپ لیں",
+      "verifying": "{{total}} میں سے {{done}} کی تصدیق ہو رہی ہے…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "قبول کریں",
+      "close": "بند کریں",
+      "codeAriaLabel": "جوڑنے کا کوڈ",
+      "intro": "تصدیق کریں کہ یہ کوڈ ایکسٹینشن میں دکھائے گئے کوڈ سے مطابقت رکھتا ہے، پھر جوڑنے کے لیے قبول کریں۔",
+      "reject": "مسترد کریں",
+      "rejected": "جوڑنا مسترد کر دیا گیا۔",
+      "title": "ایک براؤزر ایکسٹینشن جڑنا چاہتی ہے"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "آرکائیو",
+    "archivedBadgeTitle": "آرکائیو شدہ",
+    "dialogLabel": "کمانڈ پیلیٹ",
+    "matchedInAttachment": "منسلکہ میں",
+    "matchedInAttachmentTitle": "استفسار اس نوٹ میں شامل ایک فائل کے اندر ملا",
+    "matchedInBody": "↳ متن میں ملا",
+    "noMatches": "کوئی مماثلت نہیں",
+    "operatorHint": "مکمل کرنے کے لیے Tab",
+    "operators": {
+      "tag": "کسی ٹیگ والے نوٹس",
+      "path": "کسی فولڈر کے نوٹس",
+      "file": "نوٹ کے عنوان سے مطابقت",
+      "section": "کسی ہیڈنگ والے نوٹس",
+      "task": "کسی ٹاسک والے نوٹس",
+      "content": "متن میں مکمل تلاش"
+    },
+    "searchPlaceholder": "نوٹس تلاش کریں یا کوئی کمانڈ چلائیں — آزمائیں tag: · path: · task:",
+    "sectionCommands": "کمانڈز",
+    "sectionNotes": "نوٹس",
+    "untitledNote": "بلا عنوان"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "والٹ کا بیک اپ لیں…"
+      },
+      "category": {
+        "ai": "AI",
+        "app": "ایپ",
+        "appearance": "ظاہری شکل",
+        "editor": "ایڈیٹر",
+        "notes": "نوٹس",
+        "vault": "والٹ",
+        "view": "منظر"
+      },
+      "aiOpenChat": {
+        "label": "AI چیٹ کھولیں"
+      },
+      "toggleLineNumbers": {
+        "label": "لائن نمبر آن/آف کریں"
+      },
+      "toggleVimMode": {
+        "label": "Vim کی بورڈ موڈ آن/آف کریں"
+      },
+      "toggleSpellCheck": {
+        "label": "ہجے کی جانچ آن/آف کریں"
+      },
+      "toggleTypewriter": {
+        "label": "ٹائپ رائٹر اسکرولنگ آن/آف کریں"
+      },
+      "toggleDimInactive": {
+        "label": "غیر فعال لائنیں مدھم کرنا آن/آف کریں"
+      },
+      "toggleEditorFont": {
+        "label": "ایڈیٹر فونٹ بدلیں (mono / sans)"
+      },
+      "cycleTextSize": {
+        "label": "ایڈیٹر متن کا سائز بدلیں"
+      },
+      "cycleContentWidth": {
+        "label": "ایڈیٹر مواد کی چوڑائی بدلیں"
+      },
+      "cycleDefaultViewMode": {
+        "label": "طے شدہ منظر موڈ بدلیں"
+      },
+      "toggleTimestamps": {
+        "label": "سائیڈ بار میں نوٹ کے اوقات آن/آف کریں"
+      },
+      "toggleArchiving": {
+        "label": "نوٹ آرکائیو کرنا آن/آف کریں"
+      },
+      "toggleAiEnabled": {
+        "label": "AI خصوصیات آن/آف کریں (بیٹا)"
+      },
+      "toggleScreenCapture": {
+        "label": "اسکرین کیپچر سے تحفظ آن/آف کریں"
+      },
+      "cycleTheme": {
+        "label": "تھیم بدلیں"
+      },
+      "themeLight": {
+        "label": "تھیم: روشن"
+      },
+      "themeDark": {
+        "label": "تھیم: تاریک"
+      },
+      "themeAmoled": {
+        "label": "تھیم: AMOLED"
+      },
+      "themeSystem": {
+        "label": "تھیم: سسٹم کے مطابق"
+      },
+      "applyCustomTheme": {
+        "label": "حسبِ ضرورت تھیم لاگو کریں…"
+      },
+      "splitRight": {
+        "label": "پین دائیں طرف تقسیم کریں"
+      },
+      "splitDown": {
+        "label": "پین نیچے کی طرف تقسیم کریں"
+      },
+      "closePane": {
+        "label": "پین بند کریں"
+      },
+      "closeTab": {
+        "label": "ٹیب بند کریں"
+      },
+      "nextTab": {
+        "label": "اگلا ٹیب"
+      },
+      "prevTab": {
+        "label": "پچھلا ٹیب"
+      },
+      "focusNextPane": {
+        "label": "اگلے پین پر فوکس"
+      },
+      "focusPrevPane": {
+        "label": "پچھلے پین پر فوکس"
+      },
+      "goBack": {
+        "label": "واپس جائیں"
+      },
+      "goForward": {
+        "label": "آگے جائیں"
+      },
+      "togglePreview": {
+        "label": "ساتھ ساتھ پیش منظر آن/آف کریں"
+      },
+      "findInNote": {
+        "label": "نوٹ میں تلاش کریں"
+      },
+      "findReplace": {
+        "label": "نوٹ میں تلاش کر کے بدلیں"
+      },
+      "newNote": {
+        "label": "نیا نوٹ"
+      },
+      "duplicateNote": {
+        "label": "نوٹ کی نقل بنائیں"
+      },
+      "archiveNote": {
+        "label": "نوٹ آرکائیو کریں"
+      },
+      "renameNote": {
+        "label": "نوٹ کا نام تبدیل کریں"
+      },
+      "trashNote": {
+        "label": "نوٹ ردی میں منتقل کریں"
+      },
+      "toggleFavorite": {
+        "label": "پسندیدہ آن/آف کریں"
+      },
+      "moveNote": {
+        "label": "نوٹ فولڈر میں منتقل کریں…"
+      },
+      "emptyTrash": {
+        "label": "ردی خالی کریں"
+      },
+      "showBacklinks": {
+        "label": "بیک لنکس دکھائیں"
+      },
+      "showOutline": {
+        "label": "خاکہ دکھائیں"
+      },
+      "showUnlinked": {
+        "label": "بغیر لنک تذکرے دکھائیں"
+      },
+      "newFolder": {
+        "label": "نیا فولڈر"
+      },
+      "openTrash": {
+        "label": "ردی کھولیں"
+      },
+      "openArchive": {
+        "label": "آرکائیو کھولیں"
+      },
+      "cycleHeading": {
+        "label": "ہیڈنگ کا درجہ بدلیں"
+      },
+      "restoreBackup": {
+        "label": "بیک اپ سے والٹ بحال کریں…"
+      },
+      "revealVaultFolder": {
+        "label": "فائل مینیجر میں والٹ فولڈر دکھائیں"
+      },
+      "aiSummarizeNote": {
+        "label": "نوٹ کا خلاصہ کریں"
+      },
+      "aiRewriteSelection": {
+        "label": "منتخب متن دوبارہ لکھیں"
+      },
+      "convertWikilinks": {
+        "label": "اس نوٹ میں درآمد شدہ وکی لنکس تبدیل کریں…"
+      },
+      "deleteWorkspace": {
+        "label": "ورک اسپیس حذف کریں…"
+      },
+      "exportNoteHtml": {
+        "label": "نوٹ کو HTML کے طور پر برآمد کریں…"
+      },
+      "exportSelectionImage": {
+        "label": "منتخب متن کو تصویر کے طور پر برآمد کریں…",
+        "saved": "منتخب متن تصویر کے طور پر محفوظ ہو گیا۔",
+        "noSelection": "پہلے کچھ متن منتخب کریں، پھر اسے تصویر کے طور پر برآمد کریں۔",
+        "failed": "منتخب متن تصویر کے طور پر برآمد نہیں ہو سکا۔"
+      },
+      "exportNoteMarkdown": {
+        "label": "نوٹ کو Markdown کے طور پر برآمد کریں…"
+      },
+      "exportNotePdf": {
+        "label": "نوٹ کو PDF کے طور پر برآمد کریں…"
+      },
+      "exportNoteTxt": {
+        "label": "نوٹ کو سادہ متن کے طور پر برآمد کریں…"
+      },
+      "exportVaultMarkdown": {
+        "label": "والٹ کو Markdown کے طور پر برآمد کریں…"
+      },
+      "foldAll": {
+        "label": "سب سمیٹیں"
+      },
+      "importBaseView": {
+        "label": ".base ویو درآمد کریں…"
+      },
+      "importObsidian": {
+        "label": "نوٹس درآمد کریں…"
+      },
+      "lockVault": {
+        "label": "والٹ لاک کریں"
+      },
+      "manageTemplates": {
+        "label": "ٹیمپلیٹس کا انتظام…"
+      },
+      "newNoteFromTemplate": {
+        "label": "ٹیمپلیٹ سے نیا نوٹ…"
+      },
+      "openAttachments": {
+        "label": "منسلکات کھولیں…"
+      },
+      "openSettings": {
+        "label": "ترتیبات کھولیں…"
+      },
+      "openSnapshots": {
+        "label": "سنیپ شاٹس…"
+      },
+      "openTodayNote": {
+        "label": "آج کا نوٹ کھولیں"
+      },
+      "randomNote": {
+        "label": "بے ترتیب نوٹ کھولیں"
+      },
+      "renameWorkspace": {
+        "label": "ورک اسپیس کا نام تبدیل کریں…"
+      },
+      "saveWorkspaceAs": {
+        "label": "ورک اسپیس بطور محفوظ کریں…"
+      },
+      "showGraph": {
+        "label": "گراف منظر دکھائیں…"
+      },
+      "showTasks": {
+        "label": "ٹاسکس دکھائیں"
+      },
+      "showTags": {
+        "label": "ٹیگز دیکھیں…"
+      },
+      "showViews": {
+        "label": "ویوز دیکھیں…"
+      },
+      "switchWorkspace": {
+        "label": "ورک اسپیس بدلیں…"
+      },
+      "toggleFocus": {
+        "label": "فوکس موڈ آن/آف کریں"
+      },
+      "toggleLeftSidebar": {
+        "label": "نوٹس سائیڈ بار آن/آف کریں"
+      },
+      "toggleReading": {
+        "label": "مطالعہ منظر آن/آف کریں"
+      },
+      "toggleRightSidebar": {
+        "label": "بیک لنکس سائیڈ بار آن/آف کریں"
+      },
+      "toggleSource": {
+        "label": "سورس موڈ آن/آف کریں"
+      },
+      "toggleStackedTabs": {
+        "label": "تہ دار ٹیبس آن/آف کریں"
+      },
+      "unfoldAll": {
+        "label": "سب کھولیں"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "بولڈ",
+        "closeTab": "ٹیب بند کریں",
+        "cycleHeadingLevel": "ہیڈنگ کا درجہ بدلیں",
+        "cycleTabs": "ٹیبس بدلیں",
+        "deleteWorkspace": "ورک اسپیس حذف کریں",
+        "findInNote": "نوٹ میں تلاش کریں",
+        "focusNextPane": "اگلے پین پر فوکس",
+        "focusPrevPane": "پچھلے پین پر فوکس",
+        "foldAll": "سب سمیٹیں",
+        "indent": "انڈینٹ بڑھائیں",
+        "inlineCode": "ان لائن کوڈ",
+        "insertWikilink": "وکی لنک داخل کریں",
+        "italic": "ترچھا",
+        "navigateBack": "واپس جائیں",
+        "navigateForward": "آگے جائیں",
+        "newNote": "نیا نوٹ",
+        "openSettings": "ترتیبات کھولیں",
+        "outdent": "انڈینٹ کم کریں",
+        "paletteToggle": "کمانڈ پیلیٹ کھولیں",
+        "redo": "دوبارہ کریں",
+        "renameWorkspace": "ورک اسپیس کا نام تبدیل کریں",
+        "saveWorkspaceAs": "ورک اسپیس بطور محفوظ کریں",
+        "selectAllScoped": "سب منتخب کریں (محدود دائرے میں)",
+        "selectNextOccurrence": "اگلی موجودگی منتخب کریں",
+        "showGraphView": "گراف منظر دکھائیں",
+        "showTasks": "ٹاسکس دکھائیں",
+        "splitPaneDown": "پین تقسیم کریں (نیچے)",
+        "splitPaneRight": "پین تقسیم کریں (دائیں)",
+        "switchWorkspace": "ورک اسپیس بدلیں",
+        "toggleBulletList": "بلٹ فہرست آن/آف کریں",
+        "toggleFocusMode": "فوکس موڈ آن/آف کریں",
+        "toggleNumberedList": "نمبر شدہ فہرست آن/آف کریں",
+        "toggleReadingView": "مطالعہ منظر آن/آف کریں",
+        "toggleSourceMode": "سورس موڈ آن/آف کریں",
+        "toggleTaskList": "ٹاسک فہرست آن/آف کریں",
+        "undo": "کالعدم کریں",
+        "unfoldAll": "سب کھولیں"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "کوئی موڈیفائر شامل کریں (⌘، Ctrl، یا Alt) — تنہا کوئی کلید شارٹ کٹ نہیں بن سکتی۔"
+    },
+    "picker": {
+      "vaultRoot": "والٹ کا روٹ",
+      "moveNoteTitle": "نوٹ فولڈر میں منتقل کریں",
+      "moveNotePlaceholder": "کوئی فولڈر منتخب کریں…",
+      "noFolders": "ابھی کوئی فولڈر نہیں",
+      "applyThemeTitle": "حسبِ ضرورت تھیم لاگو کریں",
+      "applyThemePlaceholder": "کوئی تھیم منتخب کریں…",
+      "noCustomThemes": "کوئی حسبِ ضرورت تھیم انسٹال نہیں"
+    }
+  },
+  "common": {
+    "cancel": "منسوخ کریں",
+    "dismiss": "ہٹا دیں",
+    "prompt": {
+      "cancel": "منسوخ کریں",
+      "confirmDefault": "ٹھیک ہے"
+    },
+    "spinner": {
+      "loadingLabel": "لوڈ ہو رہا ہے"
+    },
+    "back": "واپس",
+    "continue": "جاری رکھیں"
+  },
+  "deviceRevoked": {
+    "cta": "دوبارہ شروع کریں",
+    "title": "اس براؤزر کو آپ کے اکاؤنٹ سے ہٹا دیا گیا"
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exported": "{{filename}} برآمد ہو گئی۔",
+        "exportFailed": "{{filename}} برآمد نہیں ہو سکی۔",
+        "renamed": "نام بدل کر {{name}} کر دیا گیا۔",
+        "renameFailed": "منسلکہ کا نام تبدیل نہیں ہو سکا۔",
+        "saveDialogFailed": "محفوظ کرنے کا ڈائیلاگ نہیں کھل سکا۔"
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} تصویر سکیڑ دی گئی: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} تصاویر سکیڑ دی گئیں: {{from}} → {{to}}",
+        "notice": "سکیڑ دی گئی: {{from}} → {{to}}",
+        "noticeContainerChanged": "{{format}} میں سکیڑ دی گئی: {{from}} → {{to}}"
+      },
+      "convert": {
+        "cancel": "منسوخ کریں",
+        "confirm": "تبدیل کریں",
+        "skipped": "چھوڑ دیا گیا — {{note}}",
+        "subtitle_one": "1 حوالہ دوبارہ لکھا جائے گا۔ لاگو کرنے سے پہلے جائزہ لیں۔",
+        "subtitle_other": "{{count}} حوالے دوبارہ لکھے جائیں گے۔ لاگو کرنے سے پہلے جائزہ لیں۔",
+        "subtitleEmpty": "تبدیل کرنے کو کچھ نہیں — کوئی سورس فائل نہیں ملی۔",
+        "title": "درآمد شدہ منسلکات تبدیل کریں"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "منسلکہ کا سورس"
+      },
+      "convertCore": {
+        "converted": "{{count}} تبدیل ہو گئے",
+        "converted_one": "{{count}} تبدیل ہو گیا",
+        "converted_other": "{{count}} تبدیل ہو گئے",
+        "noneToConvert": "اس نوٹ میں تبدیل کرنے کے لیے کوئی درآمد شدہ منسلکہ نہیں۔",
+        "skipNote": {
+          "failed": "درآمد ناکام",
+          "locked": "والٹ لاک ہے",
+          "notFound": "سورس نہیں ملا",
+          "tooLarge": "بہت بڑی (زیادہ سے زیادہ 64 MiB)",
+          "unsupported": "غیر معاون قسم"
+        },
+        "skippedSuffix": " · {{count}} چھوڑ دیے گئے",
+        "skippedSuffix_one": " · {{count}} چھوڑ دیا گیا",
+        "skippedSuffix_other": " · {{count}} چھوڑ دیے گئے"
+      },
+      "fileKind": {
+        "generic": "فائل",
+        "label": {
+          "archive": "آرکائیو",
+          "audio": "آڈیو",
+          "cHeader": "C ہیڈر",
+          "cppSource": "C++ سورس",
+          "cSource": "C سورس",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "دستاویز",
+          "ebook": "ای بک",
+          "go": "Go",
+          "html": "HTML",
+          "image": "تصویر",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "لاگ فائل",
+          "markdown": "Markdown",
+          "numbers": "Numbers اسپریڈ شیٹ",
+          "pages": "Pages دستاویز",
+          "pdf": "PDF",
+          "presentation": "پریزنٹیشن",
+          "python": "Python",
+          "richText": "رچ ٹیکسٹ دستاویز",
+          "rust": "Rust",
+          "shell": "شیل اسکرپٹ",
+          "spreadsheet": "اسپریڈ شیٹ",
+          "svg": "SVG تصویر",
+          "text": "متن دستاویز",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "ویڈیو",
+          "word": "Word دستاویز",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "{{ext}} فائل"
+      },
+      "lightbox": {
+        "close": "پیش منظر بند کریں",
+        "export": "برآمد",
+        "exportAria": "منسلکہ برآمد کریں",
+        "imagePreview": "تصویر کا پیش منظر",
+        "pdfFallback": "PDF",
+        "pdfPreview": "PDF کا پیش منظر",
+        "zoomIn": "زوم اِن",
+        "zoomOut": "زوم آؤٹ",
+        "zoomReset": "زوم ری سیٹ کریں"
+      },
+      "menu": {
+        "actionsAria": "منسلکہ کے اعمال"
+      },
+      "pdf": {
+        "loading": "لوڈ ہو رہا ہے…"
+      },
+      "picker": {
+        "openFailed": "فائل منتخب کرنے والا نہیں کھل سکا۔"
+      },
+      "progress": {
+        "encrypting": "انکرپٹ ہو رہا ہے…",
+        "importing": "درآمد ہو رہی ہے…",
+        "loading": "لوڈ ہو رہا ہے…"
+      },
+      "recording": {
+        "barAria": "صوتی نوٹ ریکارڈ ہو رہا ہے",
+        "cancel": "منسوخ کریں",
+        "noAudio": "کوئی آواز نہیں ملی — اپنا مائیکروفون جانچیں۔",
+        "saving": "محفوظ ہو رہا ہے…",
+        "stop": "روکیں"
+      },
+      "rename": {
+        "cancel": "منسوخ کریں",
+        "confirm": "نام تبدیل کریں",
+        "title": "منسلکہ کا نام تبدیل کریں"
+      },
+      "summary": {
+        "added": "{{count}} شامل ہوئے",
+        "added_one": "{{count}} شامل ہوا",
+        "added_other": "{{count}} شامل ہوئے",
+        "reason": {
+          "failed": "ناکام",
+          "locked": "والٹ لاک ہے",
+          "tooLarge": "بہت بڑی",
+          "unsupported": "غیر معاون قسم"
+        },
+        "skipped": "{{count}} چھوڑ دیے گئے: {{noun}}",
+        "skipped_one": "{{count}} چھوڑ دیا گیا: {{noun}}",
+        "skipped_other": "{{count}} چھوڑ دیے گئے: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "ایک ریکارڈنگ پہلے سے جاری ہے۔",
+          "captureFailed": "ریکارڈنگ شروع نہیں ہو سکی — سسٹم کی ترتیبات میں مائیکروفون کی رسائی جانچیں۔",
+          "generic": "ریکارڈنگ شروع نہیں ہو سکی۔",
+          "locked": "صوتی نوٹ ریکارڈ کرنے کے لیے اپنا والٹ ان لاک کریں۔",
+          "noInputDevice": "کوئی مائیکروفون نہیں ملا۔ ایک جوڑیں اور دوبارہ کوشش کریں۔"
+        },
+        "stopError": {
+          "captureFailed": "ریکارڈنگ ناکام رہی — اپنا مائیکروفون جانچیں۔",
+          "emptyRecording": "کچھ ریکارڈ نہیں ہوا۔",
+          "generic": "ریکارڈنگ محفوظ نہیں ہو سکی۔",
+          "silentRecording": "ریکارڈنگ خاموش تھی اس لیے رد کر دی گئی — اپنا مائیکروفون جانچیں۔"
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "روکیں",
+          "play": "چلائیں",
+          "seek": "آگے پیچھے کریں"
+        },
+        "menu": {
+          "export": "برآمد",
+          "remove": "ہٹائیں",
+          "rename": "نام تبدیل کریں",
+          "reveal": "لائبریری میں دکھائیں",
+          "transcribe": "نقل نویسی کریں"
+        },
+        "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "پیش منظر مختصر کر دیا گیا — مکمل فائل کے لیے برآمد کریں۔"
+        },
+        "tombstone": {
+          "brokenAria": "ٹوٹا ہوا منسلکہ حوالہ: {{filename}}",
+          "brokenLabel": "ٹوٹا ہوا",
+          "deletedAria": "حذف شدہ منسلکہ: {{filename}}",
+          "deletedLabel": "حذف شدہ"
+        },
+        "transcribe": {
+          "cause": {
+            "featureOff": "آواز سے متن بند ہے۔ اسے ترتیبات → نقل نویسی میں آن کریں۔",
+            "modelLoadFailed": "آواز سے متن کا ماڈل لوڈ نہیں ہو سکا۔ اگر آپ نے ترتیبات → ڈیولپر → AI میں کوئی حسبِ ضرورت ماڈل مقرر کیا ہے تو اس کی فائلیں جانچیں؛ ورنہ Myne دوبارہ انسٹال کرنے سے بلٹ اِن ماڈل بحال ہو جاتا ہے۔",
+            "noModel": "آواز سے متن کا ماڈل موجود نہیں۔ Myne دوبارہ انسٹال کرنے سے یہ بحال ہو جاتا ہے۔",
+            "vaultLocked": "نقل نویسی کے لیے اپنا والٹ ان لاک کریں۔"
+          },
+          "failed": "نقل نویسی ناکام رہی۔ براہِ کرم دوبارہ کوشش کریں۔",
+          "heading": "نقل",
+          "insert": "نقل نوٹ میں داخل کریں",
+          "progress": "نقل نویسی ہو رہی ہے…",
+          "stop": "روکیں"
+        },
+        "urlImageFallback": "تصویر"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "توجہ",
+        "bug": "بگ",
+        "caution": "احتیاط",
+        "danger": "خطرہ",
+        "done": "مکمل",
+        "error": "خرابی",
+        "example": "مثال",
+        "failure": "ناکامی",
+        "faq": "عمومی سوالات",
+        "hint": "اشارہ",
+        "important": "اہم",
+        "info": "معلومات",
+        "missing": "غائب",
+        "note": "نوٹ",
+        "question": "سوال",
+        "quote": "اقتباس",
+        "success": "کامیابی",
+        "tip": "مشورہ",
+        "todo": "کرنا ہے",
+        "warning": "انتباہ"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "آرکائیو شدہ",
+        "empty": "ابھی کوئی بیک لنک نہیں۔",
+        "linkedFrom": "{{count}} سے لنک",
+        "linkedFrom_one": "{{count}} سے لنک",
+        "linkedFrom_other": "{{count}} سے لنک",
+        "linksTo": "{{count}} کو لنک",
+        "linksTo_one": "{{count}} کو لنک",
+        "linksTo_other": "{{count}} کو لنک",
+        "outgoingEmpty": "یہ نوٹ ابھی کسی چیز سے لنک نہیں کرتا۔",
+        "untitled": "بلا عنوان"
+      },
+      "barItems": {
+        "graph": "گراف",
+        "hide": "چھپائیں",
+        "lock": "لاک",
+        "moveLeft": "بائیں لے جائیں",
+        "moveRight": "دائیں لے جائیں",
+        "saveStatus": "محفوظ ہونے کی حالت",
+        "settings": "ترتیبات",
+        "tags": "ٹیگز",
+        "viewMode": "منظر موڈ",
+        "views": "ویوز",
+        "vimMode": "Vim موڈ",
+        "wordCount": "الفاظ کی تعداد",
+        "workspace": "ورک اسپیس"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} فلٹر چھوڑ دیے گئے",
+        "droppedFiltersSuffix_one": " · {{count}} فلٹر چھوڑ دیا گیا",
+        "droppedFiltersSuffix_other": " · {{count}} فلٹر چھوڑ دیے گئے",
+        "failed": "درآمد ناکام ہوئی۔",
+        "fileFilterName": "Obsidian Base",
+        "imported": "{{count}} ویو درآمد ہوئے",
+        "imported_one": "{{count}} ویو درآمد ہوا",
+        "imported_other": "{{count}} ویوز درآمد ہوئے",
+        "notValid": "یہ درست .base فائل نہیں ہے۔",
+        "skippedSuffix": " · {{count}} چھوڑ دیے گئے",
+        "skippedSuffix_one": " · {{count}} چھوڑ دیا گیا",
+        "skippedSuffix_other": " · {{count}} چھوڑ دیے گئے",
+        "stoppedAfter": "{{count}} ویوز کے بعد درآمد رک گئی۔",
+        "stoppedAfter_one": "{{count}} ویو کے بعد درآمد رک گئی۔",
+        "stoppedAfter_other": "{{count}} ویوز کے بعد درآمد رک گئی۔"
+      },
+      "bottomBar": {
+        "browseTags": "ٹیگز دیکھیں",
+        "browseViews": "ویوز دیکھیں",
+        "cycleViewMode": "منظر موڈ بدلیں",
+        "docStats": {
+          "summary_one": "{{count}} لفظ · {{characters}} حروف",
+          "summary_other": "{{count}} الفاظ · {{characters}} حروف",
+          "summarySelectionSuffix": " (منتخب)",
+          "title_one": "{{characters}} حروف · {{words}} الفاظ · {{spaces}} خالی جگہیں · {{count}} پیراگراف",
+          "title_other": "{{characters}} حروف · {{words}} الفاظ · {{spaces}} خالی جگہیں · {{count}} پیراگراف",
+          "titleSelectionSuffix": " (منتخب متن)"
+        },
+        "vimMode": {
+          "insert": "انسرٹ",
+          "normal": "نارمل",
+          "replace": "ری پلیس",
+          "title": "Vim موڈ — نارمل موڈ کے لیے Esc دبائیں",
+          "visual": "وژوئل"
+        },
+        "graphTitle": "گراف (⌘⇧G)",
+        "lock": "لاک",
+        "lockVault": "والٹ لاک کریں",
+        "openSettings": "ترتیبات کھولیں",
+        "settingsTitle": "ترتیبات (⌘,)",
+        "showGraph": "گراف منظر دکھائیں",
+        "syncStatus": "صرف مقامی · مطابقت پذیر نہیں",
+        "tagsTitle": "ٹیگز",
+        "togglePreview": "ساتھ ساتھ پیش منظر آن/آف کریں",
+        "viewModeTitle": "منظر موڈ: {{mode}} (بدلنے کے لیے کلک کریں)",
+        "viewsTitle": "ویوز"
+      },
+      "import": {
+        "imported_one": "{{count}} نوٹ درآمد ہوا{{skipped}}",
+        "imported_other": "{{count}} نوٹس درآمد ہوئے{{skipped}}",
+        "skippedSuffix": " · {{count}} چھوڑ دیے گئے",
+        "skippedSuffix_one": " · {{count}} چھوڑ دیا گیا",
+        "skippedSuffix_other": " · {{count}} چھوڑ دیے گئے"
+      },
+      "nav": {
+        "goBack": "واپس جائیں",
+        "goForward": "آگے جائیں"
+      },
+      "noNotesToOpen": "کھولنے کے لیے کوئی نوٹ نہیں۔",
+      "resizeBacklinksSidebar": "بیک لنکس سائیڈ بار کا سائز بدلیں",
+      "resizeNotesSidebar": "نوٹس سائیڈ بار کا سائز بدلیں",
+      "rightPanel": {
+        "aiChat": {
+          "askPlaceholder": "اپنے نوٹس کے بارے میں کوئی سوال پوچھیں…",
+          "askSubmit": "پوچھیں",
+          "assistant": "معاون",
+          "citations": "ماخذ",
+          "composerPlaceholder": "اپنے نوٹس سے بات کریں…",
+          "empty": "AI کا نتیجہ — خلاصے، جوابات اور تجاویز — یہاں دکھائی دیتا ہے۔",
+          "error": "AI کی درخواست مکمل نہیں ہو سکی۔",
+          "errorTurn": "معاون جواب نہیں دے سکا۔",
+          "gettingReadyHint": "آپ کے نوٹس AI کے لیے تیار کیے جا رہے ہیں — ایک لمحہ۔",
+          "insert": "نوٹ میں داخل کریں",
+          "noAnswer": "کوئی جواب نہیں — سوال دوسرے الفاظ میں لکھ کر دیکھیں۔",
+          "noModelHint": "کوئی ماڈل منتخب نہیں۔ شروع کرنے کے لیے ترتیبات → ڈیولپر → AI میں کوئی ماڈل منتخب کریں۔",
+          "offHint": "مقامی AI بند ہے۔ اسے ترتیبات → ڈیولپر → AI میں آن کریں۔",
+          "send": "بھیجیں",
+          "statusGettingReady": "تیاری جاری ہے…",
+          "statusNoModel": "کوئی ماڈل نہیں",
+          "statusOff": "بند",
+          "statusReady": "تیار",
+          "stop": "روکیں",
+          "tagsThinking": "ٹیگز تجویز ہو رہے ہیں…",
+          "thinking": "AI سوچ رہا ہے…",
+          "truncated": "پہلے {{count}} حروف کا خلاصہ کیا گیا۔",
+          "you": "آپ"
+        },
+        "allHidden": "تمام ٹیبس چھپے ہوئے ہیں — بحال کرنے کے لیے دائیں کلک کریں۔",
+        "outline": {
+          "collapse": "سیکشن سمیٹیں",
+          "empty": "کوئی ہیڈنگ نہیں",
+          "expand": "سیکشن کھولیں",
+          "heading": "خاکہ"
+        },
+        "tabs": {
+          "aiChat": "AI چیٹ",
+          "backlinks": "لنکس",
+          "outline": "خاکہ",
+          "tasks": "ٹاسکس",
+          "unlinked": "بغیر لنک تذکرے"
+        }
+      },
+      "sidebarToggle": {
+        "hideBacklinks": "بیک لنکس سائیڈ بار چھپائیں",
+        "hideNotes": "نوٹس سائیڈ بار چھپائیں",
+        "showBacklinks": "بیک لنکس سائیڈ بار دکھائیں",
+        "showNotes": "نوٹس سائیڈ بار دکھائیں"
+      },
+      "switchingOverlay": {
+        "saving": "محفوظ ہو رہا ہے…"
+      },
+      "viewMode": {
+        "live": "لائیو",
+        "reading": "مطالعہ",
+        "source": "سورس"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "ورک اسپیس کا نام",
+        "renameConfirm": "نام تبدیل کریں",
+        "renameTitle": "ورک اسپیس کا نام تبدیل کریں",
+        "saveAsTitle": "ورک اسپیس بطور محفوظ کریں",
+        "saveConfirm": "محفوظ کریں"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "ورک اسپیس",
+        "renameItemLabel": "ورک اسپیس {{name}} کا نام تبدیل کریں",
+        "renameTitle": "ورک اسپیس کا نام تبدیل کریں",
+        "saveCurrentAs": "موجودہ بطور محفوظ کریں…",
+        "switchLabel": "ورک اسپیس بدلیں",
+        "toggleTitle": "ورک اسپیس: {{name}}"
+      }
+    },
+    "noteActions": {
+      "buttonLabel": "نوٹ کے اعمال",
+      "rename": "نام تبدیل کریں",
+      "move": "فولڈر میں منتقل کریں…",
+      "duplicate": "نقل بنائیں",
+      "convertToTemplate": "ٹیمپلیٹ بنائیں",
+      "convertToNote": "نوٹ میں تبدیل کریں",
+      "turnedIntoTemplate": "ٹیمپلیٹ بنا دیا گیا",
+      "convertedToNote": "نوٹ میں تبدیل ہو گیا",
+      "versionHistory": "ورژن کی تاریخ",
+      "exportMarkdown": "Markdown کے طور پر برآمد کریں…",
+      "exportPdf": "PDF کے طور پر برآمد کریں…",
+      "exportHtml": "HTML کے طور پر برآمد کریں…",
+      "exportTxt": "سادہ متن کے طور پر برآمد کریں…",
+      "trash": "ردی میں منتقل کریں"
+    },
+    "codeBlock": {
+      "copyCode": "کوڈ کاپی کریں",
+      "defaultBadge": "کوڈ"
+    },
+    "drawingEmbed": {
+      "done": "ہو گیا",
+      "edit": "ڈرائنگ {{name}} میں ترمیم کریں",
+      "editAction": "ترمیم",
+      "empty": "خالی ڈرائنگ — بنانے کے لیے کلک کریں",
+      "open": "کھولیں",
+      "rename": "ڈرائنگ کا نام تبدیل کریں"
+    },
+    "drawingMenu": {
+      "background": "کینوس کا پس منظر",
+      "reset": "کینوس ری سیٹ کریں",
+      "toggleTheme": "ڈرائنگ کی تھیم بدلیں"
+    },
+    "find": {
+      "close": "تلاش بند کریں",
+      "matchCase": "چھوٹے بڑے حروف کا لحاظ",
+      "matchCount": "{{total}} میں سے {{current}}",
+      "nextMatch": "اگلی مماثلت",
+      "noMatches": "کوئی مماثلت نہیں",
+      "placeholder": "نوٹ میں تلاش کریں",
+      "previousMatch": "پچھلی مماثلت",
+      "replaceAll": "سب بدلیں",
+      "replaceAllCount": "سب بدلیں ({{total}})",
+      "replaceOne": "بدلیں",
+      "replacePlaceholder": "اس سے بدلیں",
+      "toggleReplace": "بدلنے کا خانہ آن/آف کریں"
+    },
+    "folding": {
+      "clickToUnfold": "کھولنے کے لیے کلک کریں",
+      "unfold": "کھولیں"
+    },
+    "footnote": {
+      "heading": "حواشی",
+      "unreferenced": "بلا حوالہ"
+    },
+    "frontmatter": {
+      "addListItem": "آئٹم شامل کریں…",
+      "addListItemAriaLabel": "{{key}} میں آئٹم شامل کریں",
+      "addProperty": "+ خصوصیت شامل کریں",
+      "propertiesLabel": "خصوصیات",
+      "removeListItemAriaLabel": "{{item}} ہٹائیں",
+      "titleAriaLabel": "نوٹ کا عنوان",
+      "titlePlaceholder": "بلا عنوان"
+    },
+    "mermaid": {
+      "rendering": "ڈایاگرام بن رہا ہے…"
+    },
+    "slash": {
+      "aiContinue": "لکھنا جاری رکھیں (AI)",
+      "aiTitle": "عنوان تجویز کریں (AI)",
+      "attachFile": "فائل منسلک کریں",
+      "bulletList": "بلٹ فہرست",
+      "callout": "کال آؤٹ",
+      "date": "تاریخ",
+      "day": "دن",
+      "divider": "خطِ فاصل",
+      "drawing": "ڈرائنگ",
+      "due": "آخری تاریخ",
+      "heading1": "ہیڈنگ 1",
+      "heading2": "ہیڈنگ 2",
+      "heading3": "ہیڈنگ 3",
+      "heading4": "ہیڈنگ 4",
+      "heading5": "ہیڈنگ 5",
+      "heading6": "ہیڈنگ 6",
+      "link": "لنک",
+      "now": "ابھی",
+      "numberedList": "نمبر شدہ فہرست",
+      "priority": "ترجیح",
+      "quote": "اقتباس",
+      "repeat": "تکرار",
+      "table": "جدول",
+      "taskQuery": "ٹاسک فہرست",
+      "time": "وقت",
+      "todoList": "کرنے کے کاموں کی فہرست",
+      "voiceNote": "صوتی نوٹ",
+      "wikiLink": "وکی لنک"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "لغت میں شامل کریں",
+        "ignoreInVault": "اس والٹ میں نظر انداز کریں",
+        "ignoreThisSession": "اس سیشن میں نظر انداز کریں",
+        "noSuggestions": "کوئی تجویز نہیں"
+      }
+    },
+    "table": {
+      "addColumn": "دائیں طرف کالم شامل کریں",
+      "addRow": "نیچے قطار شامل کریں",
+      "cellAriaLabel": "جدول کا خانہ",
+      "deleteColumn": "کالم حذف کریں",
+      "deleteRow": "قطار حذف کریں",
+      "reorderColumn": "کالم کی ترتیب بدلیں",
+      "reorderRow": "قطار کی ترتیب بدلیں"
+    },
+    "tagSuggestion": {
+      "label": "تجویز کردہ ٹیگز",
+      "accept": "اس نوٹ میں ٹیگ {{tag}} شامل کریں",
+      "dismiss": "تجویز کردہ ٹیگ {{tag}} ہٹا دیں"
+    },
+    "taskField": {
+      "addAffordance": "ٹاسک فیلڈ شامل کریں",
+      "invalidDue": "Myne یہ تاریخ نہیں پڑھ سکتا، اس لیے یہ آخری تاریخ کے طور پر نہیں دکھائی جاتی۔",
+      "invalidPriority": "Myne یہ ترجیح نہیں پڑھ سکتا۔ highest، high، medium، low یا lowest استعمال کریں۔",
+      "invalidRepeat": "Myne اس تکرار کے اصول کو نہیں پہچانتا، اس لیے یہ ٹاسک دہرایا نہیں جائے گا۔",
+      "menuEdit": "{{field}} میں ترمیم کریں",
+      "menuTitle": "فیلڈ شامل کریں",
+      "repeatNoAnchor": "اس ٹاسک کے پاس دہرانے کے لیے کوئی تاریخ نہیں، اس لیے یہ دہرایا نہیں جائے گا۔ اسے شروع کرنے کے لیے آخری تاریخ شامل کریں۔",
+      "save": "محفوظ کریں",
+      "skipOccurrence": "یہ باری چھوڑ دیں",
+      "title": {
+        "due": "آخری تاریخ",
+        "repeat": "تکرار",
+        "priority": "ترجیح"
+      }
+    },
+    "toolbar": {
+      "apply": "لاگو کریں",
+      "exportImageTitle": "منتخب متن کو تصویر کے طور پر برآمد کریں",
+      "customize": {
+        "bold": "بولڈ",
+        "bulletList": "بلٹ فہرست",
+        "checklist": "چیک لسٹ",
+        "code": "کوڈ",
+        "heading": "ہیڈنگ",
+        "highlight": "نمایاں",
+        "italic": "ترچھا",
+        "link": "لنک",
+        "numberedList": "نمبر شدہ فہرست",
+        "quote": "اقتباس",
+        "strike": "خط زدہ",
+        "wikilink": "وکی لنک"
+      },
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "پیراگراف"
+      },
+      "highlight": {
+        "blue": "نیلا",
+        "green": "سبز",
+        "pink": "گلابی",
+        "purple": "جامنی",
+        "yellow": "پیلا",
+        "orange": "نارنجی",
+        "red": "سرخ",
+        "teal": "فیروزی",
+        "cyan": "آسمانی",
+        "lime": "لیموں سبز",
+        "brown": "بھورا",
+        "grey": "سرمئی",
+        "indigo": "نیل",
+        "remove": "نمایاں کرنا ہٹائیں"
+      },
+      "urlPlaceholder": "لنک کا URL چسپاں کریں"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "مکمل",
+        "narrow": "تنگ",
+        "normal": "معمول",
+        "wide": "چوڑا"
+      },
+      "font": {
+        "mono": "مونو",
+        "sans": "سینز"
+      },
+      "lineSpacing": {
+        "normal": "معمول",
+        "relaxed": "کشادہ",
+        "tight": "تنگ"
+      },
+      "textSize": {
+        "lg": "بڑا",
+        "md": "طے شدہ",
+        "sm": "چھوٹا",
+        "xl": "بہت بڑا"
+      }
+    },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` معاون نہیں ہے — Myne نوٹس کھولتا ہے، فائلیں نہیں۔ کمانڈ پیلیٹ یا سائیڈ بار استعمال کریں۔",
+          "map": "Myne میں حسبِ ضرورت کی-میپنگ معاون نہیں۔ شارٹ کٹس ترتیبات → شارٹ کٹس میں مقرر ہوتے ہیں۔",
+          "set": "`:set` معاون نہیں ہے — Myne میں کوئی vim آپشنز نہیں۔ ایڈیٹر کی ترجیحات ترتیبات → ایڈیٹر میں ہیں۔",
+          "source": "`:source` معاون نہیں ہے۔ Myne میں جان بوجھ کر کوئی کنفگ-اسکرپٹ کی سہولت نہیں رکھی گئی۔",
+          "unsupported": "یہ کمانڈ Myne میں معاون نہیں ہے۔"
+        },
+        "substitute": {
+          "malformed": "وہ تبدیلی پڑھی نہیں جا سکی۔ متوقع شکل :s/pattern/replacement/ ہے",
+          "refused": "اس پیٹرن میں صرف vim کی نحو ({{what}}) استعمال ہوئی ہے، جسے Myne کی تلاش سپورٹ نہیں کرتی۔ کچھ تبدیل نہیں ہوا۔"
+        },
+        "writeFailed": "محفوظ نہیں ہو سکا۔",
+        "written": "محفوظ ہو گیا۔"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "ایمبیڈ: {{label}}"
+      },
+      "convert": {
+        "cancel": "منسوخ کریں",
+        "choiceClause_one": " · {{count}} کے لیے انتخاب درکار ہے۔",
+        "choiceClause_other": " · {{count}} کے لیے انتخاب درکار ہے۔",
+        "chooseTarget": "ہدف منتخب کریں…",
+        "convert": "تبدیل کریں",
+        "convertedToast_one": "{{count}} وکی لنک تبدیل ہو گیا",
+        "convertedToast_other": "{{count}} وکی لنکس تبدیل ہو گئے",
+        "noneToConvert": "اس نوٹ میں تبدیل کرنے کے لیے کوئی درآمد شدہ وکی لنک نہیں۔",
+        "nothingToConvert": "تبدیل کرنے کو کچھ نہیں — کوئی درآمد شدہ وکی لنک حل نہیں ہوتا۔",
+        "rewriteCount_one": "{{count}} لنک دوبارہ لکھا جائے گا",
+        "rewriteCount_other": "{{count}} لنکس دوبارہ لکھے جائیں گے",
+        "skipped": "چھوڑ دیا گیا — {{reason}}",
+        "title": "اس نوٹ میں درآمد شدہ وکی لنکس تبدیل کریں"
+      },
+      "convertCore": {
+        "noMatch": "کوئی مماثلت نہیں"
+      }
+    },
+    "flow": {
+      "loadFailed": "آپ کے نوٹس لوڈ نہیں ہو سکے۔",
+      "openFailed": "یہ نوٹ نہیں کھل سکا۔",
+      "saveFailed": "یہ نوٹ محفوظ نہیں ہو سکا۔",
+      "moveFailed": "یہ نوٹ منتقل نہیں ہو سکا۔",
+      "openTodayFailed": "آج کا نوٹ نہیں کھل سکا۔",
+      "exportFailed": "یہ نوٹ برآمد نہیں ہو سکا۔",
+      "attachNeedsApp": "منسلکات کے لیے ایپ درکار ہے (براؤزر کا پیش منظر نہیں)۔",
+      "attachTooLarge": "وہ فائل بہت بڑی ہے (زیادہ سے زیادہ 64 MB)۔",
+      "attachUnsupported": "صرف تصاویر اور PDF منسلک کیے جا سکتے ہیں۔",
+      "attachFailed": "وہ فائل منسلک نہیں ہو سکی۔",
+      "archiveFailed": "یہ نوٹ آرکائیو نہیں ہو سکا۔",
+      "trashFailed": "یہ نوٹ ردی میں منتقل نہیں ہو سکا۔"
+    },
+    "nav": {
+      "dailyNote": "روزانہ نوٹ",
+      "openToday": "آج کا کھولیں",
+      "allNotes": "تمام نوٹس"
+    },
+    "list": {
+      "searchPlaceholder": "نوٹس تلاش کریں",
+      "clearSearch": "تلاش صاف کریں",
+      "viewNoteCount_one": "“{{name}}” میں {{count}} نوٹ",
+      "viewNoteCount_other": "“{{name}}” میں {{count}} نوٹس",
+      "edit": "ترمیم",
+      "trashEmpty": "ردی خالی ہے",
+      "archiveEmpty": "کوئی آرکائیو شدہ نوٹ نہیں",
+      "noMatchingNotes": "کوئی مماثل نوٹ نہیں",
+      "noNotesYet": "ابھی کوئی نوٹ نہیں",
+      "noMatchBody": "“{{name}}” سے کچھ مطابقت نہیں رکھتا۔ تمام نوٹس دیکھنے کے لیے ویو میں ترمیم کریں یا اسے صاف کریں۔",
+      "emptyBody": "اپنا پہلا نوٹ لکھنے کے لیے “نیا نوٹ” پر ٹیپ کریں۔ محفوظ کرنے سے پہلے ہر چیز اسی آلے پر انکرپٹ ہو جاتی ہے۔",
+      "unarchive": "آرکائیو سے واپس لائیں"
+    },
+    "filterSheet": {
+      "title": "فلٹر",
+      "status": "حالت"
+    },
+    "sortSheet": {
+      "title": "ترتیب",
+      "manual": "دستی ترتیب",
+      "titleAsc": "عنوان · A → Z",
+      "titleDesc": "عنوان · Z → A"
+    },
+    "noteMenu": {
+      "emptyNote": "خالی نوٹ",
+      "wordCount_one": "{{count}} لفظ · {{minutes}} منٹ کا مطالعہ",
+      "wordCount_other": "{{count}} الفاظ · {{minutes}} منٹ کا مطالعہ",
+      "moveToFolder": "فولڈر میں منتقل کریں…",
+      "moveToTrash": "ردی میں منتقل کریں",
+      "copied": "کاپی ہو گیا ✓",
+      "copyToClipboard": "کلپ بورڈ پر کاپی کریں",
+      "versionHistory": "ورژن کی تاریخ"
+    },
+    "purge": {
+      "body": "اس سے نوٹ ہمیشہ کے لیے اس آلے سے ہٹ جاتا ہے۔ یہ واپس نہیں لیا جا سکتا۔"
+    },
+    "move": {
+      "title": "فولڈر میں منتقل کریں",
+      "body": "فولڈر کا راستہ لکھیں (مثلاً Projects/Myne)۔ والٹ کے روٹ کے لیے خالی چھوڑ دیں۔",
+      "placeholder": "Projects/Myne",
+      "confirm": "منتقل کریں"
+    },
+    "sidebar": {
+      "browse": "براؤز کریں"
+    },
+    "emptyDetail": {
+      "title": "کوئی نوٹ منتخب کریں",
+      "body": "فہرست سے کوئی نوٹ منتخب کریں، یا نیا شروع کریں۔"
+    },
+    "readingBar": {
+      "editNote": "نوٹ میں ترمیم کریں",
+      "edit": "ترمیم"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} لنک شدہ نوٹ",
+      "linkedNotes_other": "{{count}} لنک شدہ نوٹس",
+      "links_one": "{{count}} لنک",
+      "links_other": "{{count}} لنکس"
+    },
+    "formatBar": {
+      "redo": "دوبارہ کریں",
+      "attachFile": "نئی فائل منسلک کریں",
+      "insertFromLibrary": "لائبریری سے داخل کریں",
+      "recordVoiceNote": "صوتی نوٹ ریکارڈ کریں",
+      "showLivePreview": "لائیو پیش منظر دکھائیں",
+      "showRawMarkdown": "خام Markdown دکھائیں",
+      "hideKeyboard": "کی بورڈ چھپائیں"
+    },
+    "topBar": {
+      "backToNotes": "نوٹس پر واپس",
+      "noteDetails": "نوٹ کی تفصیلات",
+      "noteActions": "نوٹ کے اعمال"
+    },
+    "noteContext": {
+      "collapsePanel": "پینل سمیٹیں",
+      "unlinkedCount_one": "بغیر لنک تذکرہ {{count}}",
+      "unlinkedCount_other": "بغیر لنک تذکرے {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "کارڈز",
+      "typeList": "فہرست",
+      "emptyState": "ابھی کوئی محفوظ ویو نہیں۔ اپنے نوٹس کو ٹیگ، فولڈر یا متن کے حساب سے چھاننے کے لیے ایک بنائیں۔",
+      "editView": "ویو میں ترمیم کریں"
+    },
+    "sheet": {
+      "done": "ہو گیا"
+    },
+    "vaultSwitcher": {
+      "title": "والٹس"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "کوئی ٹیگ مطابقت نہیں رکھتا۔",
+      "notesCount_one": "نوٹس · {{count}}",
+      "notesCount_other": "نوٹس · {{count}}"
+    },
+    "untitledNote": "بلا عنوان نوٹ",
+    "commandPalette": {
+      "searchPlaceholder": "نوٹس تلاش کریں یا کوئی کمانڈ چلائیں…",
+      "noMatches": "کوئی کمانڈ یا نوٹ مطابقت نہیں رکھتا۔"
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "نوٹ",
+      "errors": {
+        "attachmentCorrupt": "اس نوٹ میں حوالہ دیا گیا ایک منسلکہ پڑھا نہیں جا سکا، اس لیے کچھ برآمد نہیں ہوا۔",
+        "attachmentMissing": "اس نوٹ میں حوالہ دیا گیا ایک منسلکہ موجود نہیں، اس لیے کچھ برآمد نہیں ہوا۔",
+        "cannotDecrypt": "یہ نوٹ پڑھا نہیں جا سکا۔",
+        "destinationUnusable": "وہ منزل فولڈر قابلِ استعمال نہیں ہے۔",
+        "fallback": "برآمد غیر متوقع طور پر ناکام ہوئی۔ دوبارہ کوشش کریں۔",
+        "invalidAttachmentCatalog": "والٹ کا منسلکات کا کیٹلاگ پڑھا نہیں جا سکا، اس لیے کچھ برآمد نہیں ہوا۔",
+        "invalidNoteFilename": "وہ فائل کا نام قابلِ استعمال نہیں، اس لیے کچھ برآمد نہیں ہوا۔",
+        "invalidNoteId": "اس نوٹ کی شناخت نہیں ہو سکی، اس لیے کچھ برآمد نہیں ہوا۔",
+        "invalidPlaintextEncoding": "اس نوٹ کا مواد خراب لگتا ہے، اس لیے کچھ برآمد نہیں ہوا۔ اسے کسی بیک اپ سے بحال کریں۔",
+        "ioNoSpace": "منزل پر کافی جگہ نہیں ہے۔",
+        "ioPermissionDenied": "منزل پر لکھنے کی اجازت نہیں ہے۔",
+        "ioWriteDefault": "برآمد شدہ فائل لکھی نہیں جا سکی۔",
+        "noteNotFound": "یہ نوٹ اب موجود نہیں — ممکن ہے حذف ہو گیا ہو۔",
+        "pdfCaptureFailed": "PDF تیار نہیں ہو سکی، اس لیے کچھ برآمد نہیں ہوا۔",
+        "pdfExportInProgress": "ایک PDF برآمد پہلے سے جاری ہے۔ اس کے مکمل ہونے کا انتظار کریں، پھر دوبارہ کوشش کریں۔",
+        "pdfPayloadMissing": "برآمد میں خلل آیا — اگر والٹ لاک ہو گیا ہے تو اسے ان لاک کریں اور دوبارہ کوشش کریں۔",
+        "pdfRenderTimeout": "نوٹ کو تیار کرنے میں بہت وقت لگا، اس لیے کچھ برآمد نہیں ہوا۔",
+        "pdfWindowCreateFailed": "برآمد کی ونڈو نہیں کھل سکی، اس لیے کچھ برآمد نہیں ہوا۔",
+        "targetExists": "اس نام کی فائل منزل پر پہلے سے موجود ہے۔",
+        "vaultLocked": "والٹ لاک ہے۔ اسے ان لاک کریں، پھر دوبارہ کوشش کریں۔"
+      },
+      "flow": {
+        "couldNotRead": "یہ نوٹ پڑھا نہیں جا سکا۔",
+        "exportedTo": "{{filename}} میں برآمد ہو گیا",
+        "exportedToWithAttachments_one": "{{filename}} + {{count}} منسلکہ میں برآمد ہو گیا",
+        "exportedToWithAttachments_other": "{{filename}} + {{count}} منسلکات میں برآمد ہو گیا",
+        "exportedToWithImages_one": "{{filename}} + {{count}} تصویر میں برآمد ہو گیا",
+        "exportedToWithImages_other": "{{filename}} + {{count}} تصاویر میں برآمد ہو گیا",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "سادہ متن",
+        "showInFolder": "فولڈر میں دکھائیں"
+      },
+      "modal": {
+        "cancel": "منسوخ کریں",
+        "export": "برآمد کریں…",
+        "includeAttachments_one": "{{count}} منسلکہ شامل کریں",
+        "includeAttachments_other": "{{count}} منسلکات شامل کریں",
+        "title": "Markdown کے طور پر برآمد کریں",
+        "copyLabel": "نوٹ کا متن کلپ بورڈ پر کاپی کریں",
+        "copied": "نوٹ کا متن کاپی ہو گیا",
+        "copyFailed": "نوٹ کا متن کاپی نہیں ہو سکا"
+      }
+    },
+    "egress": {
+      "cancel": "منسوخ کریں",
+      "confirm": "ڈاؤن لوڈ",
+      "title": "یہ فائل ڈاؤن لوڈ کریں"
+    },
+    "pdf": {
+      "cancel": "منسوخ کریں",
+      "continue": "جاری رکھیں…",
+      "title": "PDF کے طور پر برآمد کریں"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "منتخب کریں کہ برآمد کہاں رکھی جائے",
+      "errors": {
+        "attachmentCorrupt": "کسی نوٹ میں حوالہ دیا گیا ایک منسلکہ پڑھا نہیں جا سکا، اس لیے کچھ برآمد نہیں ہوا۔",
+        "attachmentMissing": "کسی نوٹ میں حوالہ دیا گیا ایک منسلکہ موجود نہیں، اس لیے کچھ برآمد نہیں ہوا۔",
+        "authOperationInProgress": "والٹ پر ایک اور کارروائی جاری ہے۔ اس کے مکمل ہونے کا انتظار کریں، پھر دوبارہ کوشش کریں۔",
+        "cancelled": "برآمد منسوخ ہو گئی۔ منزل پر کچھ نہیں چھوڑا گیا۔",
+        "cannotDecrypt": "ایک نوٹ پڑھا نہیں جا سکا، اس لیے کچھ برآمد نہیں ہوا۔",
+        "destinationAlreadyExists": "اس مقام پر پہلے سے کچھ موجود ہے۔ برآمد کے لیے کوئی نئی جگہ منتخب کریں۔",
+        "destinationNotAllowed": "وہ مقام Myne کے اپنے اسٹوریج کے اندر ہے۔ اس سے باہر کوئی فولڈر منتخب کریں۔",
+        "invalidPlaintextEncoding": "ایک نوٹ کا مواد خراب لگتا ہے، اس لیے کچھ برآمد نہیں ہوا۔ اسے کسی بیک اپ سے بحال کریں۔",
+        "invalidVaultMeta": "والٹ کا میٹا ڈیٹا پڑھا نہیں جا سکا، اس لیے کچھ برآمد نہیں ہوا۔",
+        "ioWriteDefault": "برآمد لکھی نہیں جا سکی۔",
+        "joinFailure": "برآمد غیر متوقع طور پر ناکام ہوئی۔ منزل پر کچھ نہیں چھوڑا گیا۔",
+        "vaultLocked": "والٹ لاک ہے۔ اسے ان لاک کریں، پھر دوبارہ کوشش کریں۔",
+        "vaultNotFound": "برآمد کے لیے کوئی والٹ نہیں ملا۔"
+      },
+      "flow": {
+        "countAttachments_one": "{{count}} منسلکہ",
+        "countAttachments_other": "{{count}} منسلکات",
+        "countFolders_one": "{{count}} فولڈر",
+        "countFolders_other": "{{count}} فولڈرز",
+        "countNotes_one": "{{count}} نوٹ",
+        "countNotes_other": "{{count}} نوٹس",
+        "exclusionsHistory": "ورژن کی تاریخ شامل نہیں۔",
+        "exclusionsTrashed_one": "ردی میں پڑا {{count}} نوٹ شامل نہیں۔",
+        "exclusionsTrashed_other": "ردی میں پڑے {{count}} نوٹس شامل نہیں۔",
+        "exclusionsTrashedAndHistory_one": "ردی میں پڑا {{count}} نوٹ اور ورژن کی تاریخ شامل نہیں۔",
+        "exclusionsTrashedAndHistory_other": "ردی میں پڑے {{count}} نوٹس اور ورژن کی تاریخ شامل نہیں۔",
+        "phaseAttachments": "منسلکات",
+        "phaseNotes": "نوٹس",
+        "preparing": "تیاری جاری ہے…",
+        "runningCounts": "{{total}} میں سے {{done}} {{phase}}"
+      },
+      "running": {
+        "cancel": "منسوخ کریں",
+        "cancelling": "منسوخ ہو رہا ہے…",
+        "title": "برآمد ہو رہا ہے…"
+      },
+      "setup": {
+        "cancel": "منسوخ کریں",
+        "choose": "منتخب کریں…",
+        "chooseFolder": "کوئی فولڈر منتخب کریں…",
+        "destinationLabel": "منزل",
+        "export": "برآمد کریں…",
+        "folderSelectAriaLabel": "برآمد کرنے کا فولڈر",
+        "noFolderChosen": "کوئی فولڈر منتخب نہیں",
+        "noFoldersInVault": "اس والٹ میں کوئی فولڈر نہیں",
+        "scopeFolder": "ایک فولڈر",
+        "scopeLabel": "دائرہ",
+        "scopeWhole": "پورا والٹ",
+        "title": "والٹ کو Markdown کے طور پر برآمد کریں"
+      },
+      "summary": {
+        "done": "ہو گیا",
+        "showInFolder": "فولڈر میں دکھائیں",
+        "title": "برآمد مکمل"
+      }
+    }
+  },
+  "failClosed": {
+    "exit": {
+      "quit": "ایپ بند کریں",
+      "reload": "دوبارہ لوڈ کریں"
+    },
+    "corrupted": {
+      "body": "اگر آپ کے پاس بیک اپ ہے تو آپ اسے بحال کر سکتے ہیں — آپ کی موجودہ فائلوں کو ہاتھ نہیں لگایا جاتا؛ بیک اپ پہلے ایک الگ والٹ کے طور پر بحال ہوتا ہے۔",
+      "cta": "ایپ بند کریں",
+      "title": "والٹ فائل خراب ہے۔"
+    },
+    "invalidState": {
+      "body": "براہِ کرم دوبارہ شروع کریں۔",
+      "cta": "لاک کریں",
+      "title": "غیر متوقع حالت۔"
+    },
+    "ioError": {
+      "body": "یہ ڈسک یا فائل سسٹم کی خرابی ہو سکتی ہے۔",
+      "cta": "ایپ بند کریں",
+      "title": "والٹ فائل پڑھی نہیں جا سکتی۔"
+    },
+    "permissionDenied": {
+      "body": "فائل کی اجازتیں جانچیں۔",
+      "cta": "ایپ بند کریں",
+      "title": "والٹ فائل تک رسائی کی اجازت نہیں ہے۔"
+    },
+    "copyDiagnostics": "تشخیصی معلومات کاپی کریں",
+    "diagnosticsCopied": "کاپی ہو گیا",
+    "restoreFromBackup": "بیک اپ سے بحال کریں…"
+  },
+  "notes": {
+    "archive": {
+      "close": "بند کریں",
+      "count_one": "{{count}} نوٹ",
+      "count_other": "{{count}} نوٹس",
+      "delete": "حذف کریں",
+      "deleteError": "وہ نوٹ حذف نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "emptyBody": "آرکائیو کیے گئے نوٹس اور فولڈر سائیڈ بار میں نظر نہیں آتے لیکن محفوظ رہتے ہیں۔ جب ضرورت ہو انہیں یہاں سے بحال کر لیں۔",
+      "emptyTitle": "کچھ آرکائیو نہیں کیا گیا",
+      "folderDeleteBody_one": "“{{name}}” اور اس کا {{count}} نوٹ",
+      "folderDeleteBody_other": "“{{name}}” اور اس کے {{count}} نوٹس",
+      "folderDeleteConfirmCta": "ردی میں منتقل کریں",
+      "folderDeleteError": "اس فولڈر کے نوٹس ردی میں منتقل نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
+      "folderDeleteTitle": "یہ فولڈر ردی میں منتقل کریں؟",
+      "folderDeleteWarning": "یہ ردی میں چلے جاتے ہیں — انہیں کبھی بھی بحال کیا جا سکتا ہے۔ مستقل حذف کرنا ایک الگ مرحلہ ہے۔",
+      "restore": "بحال کریں",
+      "restoreError": "وہ نوٹ بحال نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "title": "آرکائیو",
+      "untitled": "بلا عنوان"
+    },
+    "cardMenu": {
+      "copyLink": "لنک کاپی کریں",
+      "open": "کھولیں",
+      "openInNewTab": "نئے ٹیب میں کھولیں",
+      "revealInFolder": "فولڈر میں دکھائیں"
+    },
+    "colorLabels": {
+      "clay": "مٹیالا",
+      "moss": "کائی",
+      "ochre": "گیرو",
+      "plum": "بینگنی",
+      "slate": "سلیٹی",
+      "stone": "سنگی"
+    },
+    "decoration": {
+      "colorSection": "رنگ",
+      "default": "طے شدہ",
+      "defaultFolderIcon": "طے شدہ فولڈر آئیکن",
+      "iconSection": "آئیکن",
+      "menuLabel": "رنگ کا لیبل",
+      "noColor": "کوئی رنگ نہیں",
+      "none": "کوئی نہیں"
+    },
+    "deleteConfirm": {
+      "cancel": "منسوخ کریں",
+      "delete": "حذف کریں",
+      "title": "یہ نوٹ حذف کریں؟",
+      "untitled": "بلا عنوان",
+      "warning": "یہ واپس نہیں لیا جا سکتا۔"
+    },
+    "filterBuilder": {
+      "addCondition": "شرط شامل کریں",
+      "addFilterGroup": "فلٹر گروپ شامل کریں",
+      "cancel": "منسوخ کریں",
+      "combinator": {
+        "all": "تمام",
+        "any": "کوئی بھی"
+      },
+      "match": "مطابقت",
+      "negate": {
+        "is": "ہے",
+        "isNot": "نہیں ہے"
+      },
+      "noConditions": "ابھی کوئی شرط نہیں — یہ ویو تمام صفحات دکھاتا ہے۔",
+      "noteCount_one": "{{count}} نوٹ",
+      "noteCount_other": "{{count}} نوٹس",
+      "of": "میں سے:",
+      "ofTheGroups": "گروپوں میں سے:",
+      "op": {
+        "contains": "شامل ہے"
+      },
+      "propertyValuePlaceholder": "قدر",
+      "removeCondition": "شرط ہٹائیں",
+      "replaceFilter": "فلٹر بدلیں",
+      "save": "محفوظ کریں",
+      "searchTextPlaceholder": "تلاش کا متن",
+      "selectFolderPlaceholder": "کوئی فولڈر منتخب کریں…",
+      "selectPropertyPlaceholder": "کوئی خاصیت منتخب کریں…",
+      "selectTagPlaceholder": "کوئی ٹیگ منتخب کریں…",
+      "type": {
+        "folder": "فولڈر",
+        "property": "خاصیت",
+        "search": "تلاش",
+        "tag": "ٹیگ"
+      },
+      "unrepresentable": "یہ فلٹر کسی اعلیٰ درجے کے ایڈیٹر سے بنایا گیا تھا اور یہاں اس میں ترمیم نہیں ہو سکتی۔",
+      "unresolved": "غیر حل شدہ"
+    },
+    "folderManagement": {
+      "illegalSegment": "فولڈر کے نام میں / \\ | # ^ [ ] نہیں ہو سکتے، اور نہ ہی وہ خالی جگہ سے شروع یا ختم ہو سکتا ہے۔",
+      "tooLong": "اس فولڈر کا راستہ بہت لمبا ہے۔"
+    },
+    "folderNote": {
+      "defaultTitle": "اشاریہ"
+    },
+    "folderRow": {
+      "createFolderNote": "فولڈر نوٹ بنائیں",
+      "empty": "خالی",
+      "folderNote": "فولڈر نوٹ",
+      "openFolderNote": "فولڈر نوٹ کھولیں"
+    },
+    "graph": {
+      "allConnected": "ہر چیز جڑی ہوئی ہے — کوئی الگ تھلگ نوٹ نہیں۔",
+      "building": "گراف بن رہا ہے…",
+      "colorGroups": {
+        "addRule": "قاعدہ شامل کریں",
+        "colorSwatchTitle": "رنگ منتخب کریں",
+        "deleteRuleTitle": "قاعدہ حذف کریں",
+        "dragHandleTitle": "ترتیب بدلنے کے لیے گھسیٹیں",
+        "editFilterButton": "فلٹر میں ترمیم…",
+        "editFilterTitle": "رنگ گروپ کے فلٹر میں ترمیم کریں",
+        "emptyBody": "رنگ گروپ آپ کو گراف کے نوڈز ٹیگ یا فولڈر کے حساب سے رنگنے دیتے ہیں — کام کے نوٹس ایک رنگ میں، ذاتی نوٹس دوسرے میں۔ اپنا پہلا قاعدہ شامل کریں۔",
+        "emptyTitle": "ابھی کوئی رنگ گروپ نہیں",
+        "enableToggleAriaLabel": "قاعدہ فعال کریں",
+        "filterAllNotes": "ہر نوٹ سے مطابقت رکھتا ہے",
+        "filterConditions_one": "{{count}} شرط",
+        "filterConditions_other": "{{count}} شرائط",
+        "heading": "رنگ گروپ",
+        "moveDown": "قاعدہ نیچے لے جائیں",
+        "moveUp": "قاعدہ اوپر لے جائیں",
+        "namePlaceholder": "بلا عنوان قاعدہ"
+      },
+      "depthToggleTitle": "پڑوس کی گہرائی بدلیں (1 ↔ 2 قدم)",
+      "filterAll": "تمام",
+      "filterAroundNote": "اس نوٹ کے گرد",
+      "filterByTag": "ٹیگ کے حساب سے فلٹر کریں",
+      "filterIsolated": "الگ تھلگ",
+      "hop": "{{depth}} قدم",
+      "loading": "گراف لوڈ ہو رہا ہے…",
+      "noNotes": "ابھی گراف بنانے کے لیے کوئی نوٹ نہیں۔",
+      "refresh": "تازہ کریں",
+      "refreshTitle": "والٹ بدل گیا — گراف دوبارہ بنائیں",
+      "settings": {
+        "appearanceHeading": "ظاہری شکل",
+        "closeTitle": "بند کریں",
+        "forceCenter": "مرکز کی کشش",
+        "forceLinkDistance": "لنک کا فاصلہ",
+        "forceLinkStrength": "لنک کی قوت",
+        "forceRepel": "دھکیل",
+        "forcesHeading": "قوتیں",
+        "labelFadeZoom": "لیبل کا دھندلانا",
+        "lineThickness": "لکیر کی موٹائی",
+        "nodeSize": "نوڈ کا سائز",
+        "nodeSizeStrength": "رابطوں کے حساب سے سائز",
+        "openTitle": "گراف کی ترتیبات",
+        "reset": "طے شدہ پر واپس لائیں",
+        "showArrows": "سمت کے تیر دکھائیں",
+        "title": "گراف کی ترتیبات"
+      },
+      "tagPlaceholder": "ٹیگ…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "بلا عنوان ویو"
+      },
+      "modal": {
+        "cancel": "منسوخ کریں",
+        "cancelledNotImported": "{{count}} درآمد نہیں ہوئے",
+        "cancelledNotImported_one": "{{count}} درآمد نہیں ہوا",
+        "cancelledNotImported_other": "{{count}} درآمد نہیں ہوئے",
+        "cancelling": "منسوخ کیا جا رہا ہے…",
+        "chooseFolder": "فولڈر منتخب کریں…",
+        "close": "بند کریں",
+        "closeAriaLabel": "بند کریں",
+        "copied": "کاپی ہو گیا",
+        "copy": "کاپی",
+        "done": "ہو گیا",
+        "errorBody": "درآمد مکمل نہیں ہو سکی۔ جو نوٹس پہلے ہی درآمد ہو چکے تھے وہ رکھ لیے گئے ہیں — انہیں رکھنا یا حذف کرنا دونوں محفوظ ہیں۔",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}۔",
+        "flagKindFolder": "فولڈر",
+        "flagKindTitle": "عنوان",
+        "folderPickerTitle": "اپنا Obsidian والٹ فولڈر منتخب کریں",
+        "hiddenIgnoredPrefix_one": "{{count}} کنفیگ / پوشیدہ آئٹم نظر انداز ہوا (مثلاً ",
+        "hiddenIgnoredPrefix_other": "{{count}} کنفیگ / پوشیدہ آئٹمز نظر انداز ہوئے (مثلاً ",
+        "hiddenIgnoredSuffix": "، ڈاٹ فائلیں)۔",
+        "ifNoteExistsLabel": "اگر نوٹ پہلے سے موجود ہو",
+        "import": "درآمد",
+        "importFailed": "درآمد ناکام رہی۔",
+        "importing": "آپ کا والٹ درآمد ہو رہا ہے…",
+        "markDone": "مکمل نشان زد کریں",
+        "markedDone": "مکمل نشان زد",
+        "mediaImported": "{{count}} درآمد ہوئے",
+        "mediaImported_one": "{{count}} درآمد ہوا",
+        "mediaImported_other": "{{count}} درآمد ہوئے",
+        "mediaOmittedSuffix": " · {{count}} چھوڑ دیے گئے",
+        "mediaOmittedSuffix_one": " · {{count}} چھوڑ دیا گیا",
+        "mediaOmittedSuffix_other": " · {{count}} چھوڑ دیے گئے",
+        "needsAttention": "توجہ درکار",
+        "needsAttentionHelp": "یہ نوٹس بغیر کسی تبدیلی کے درآمد ہوئے۔ تجویز کردہ درستیاں صرف نقطۂ آغاز ہیں — کوئی ایک کاپی کریں، پھر نوٹ کھول کر اس کا نام تبدیل کریں۔",
+        "noFolderChosen": "کوئی فولڈر منتخب نہیں",
+        "notesImported_one": "نوٹ درآمد ہوا",
+        "notesImported_other": "نوٹس درآمد ہوئے",
+        "policyCopyHint": "اسے موجودہ نوٹ کے ساتھ ساتھ لے آئیں۔",
+        "policyCopyLabel": "نقل کے طور پر درآمد کریں",
+        "policySkipHint": "تجویز کردہ — درآمد دوبارہ چلانے سے کبھی نقل نہیں بنتی اور نہ کچھ اوپر لکھا جاتا ہے۔",
+        "policySkipLabel": "اسے چھوڑ دیں",
+        "preexistingDetail": "اس نوٹ کا اپنا فولڈر پہلے سے موجود تھا: “{{existing}}”، جسے Myne نے رکھ لیا — یہ فولڈر ڈسک پر اس کی جگہ سے مختلف ہو سکتا ہے۔",
+        "preparing": "تیاری جاری ہے…",
+        "progressNotes": " نوٹس",
+        "progressOf": " از ",
+        "reasonIllegalChar": "میں ایسا حرف ہے جو Myne نام میں استعمال نہیں کر سکتا",
+        "reasonPathTooLong": "کا فولڈر + عنوان والا راستہ بہت لمبا ہے",
+        "reasonSegmentTooLong": "کا نام Myne کی اجازت سے زیادہ لمبا ہے",
+        "scanning": "آپ کا والٹ اسکین ہو رہا ہے…",
+        "setupIntro": "Myne آپ کے نوٹس یہیں درآمد کر کے خفیہ کر دیتا ہے — کچھ بھی اس آلے سے باہر نہیں جاتا، اور آپ کی اصل فائلیں کبھی تبدیل نہیں ہوتیں۔",
+        "statCancelled": "منسوخ شدہ",
+        "statCanvasSkipped": ".canvas فائلیں چھوڑ دی گئیں",
+        "statCompressed": "کمپریس شدہ تصاویر",
+        "statEmptyFoldersKept": "رکھے گئے خالی فولڈر",
+        "statMedia": "میڈیا",
+        "statOtherSkipped": "چھوڑی گئی دیگر فائلیں",
+        "statSkipped": "چھوڑے گئے (پہلے سے موجود)",
+        "suggestedNameAriaLabel": "تجویز کردہ نام",
+        "titleComplete": "درآمد مکمل",
+        "titleFailed": "درآمد ناکام",
+        "titleSetup": "نوٹس درآمد کریں",
+        "vaultFolderLabel": "والٹ فولڈر",
+        "vaultRoot": "(والٹ کا روٹ)",
+        "titlePick": "نوٹس درآمد کریں",
+        "keepsLabel": "کیا ساتھ آتا ہے",
+        "losesLabel": "کیا نہیں آتا",
+        "changeSource": "ماخذ بدلیں",
+        "statExcalidrawSkipped": "Excalidraw ڈرائنگ چھوڑ دی گئیں",
+        "unfollowedLinkOutside": "یہ آپ کے منتخب کردہ فولڈر سے باہر کسی فولڈر کا شارٹ کٹ ہے، اس لیے Myne نے اس کی پیروی نہیں کی۔ اس فولڈر کو اپنے والٹ کے اندر منتقل یا کاپی کریں اور دوبارہ درآمد کریں۔",
+        "unfollowedLinkLoop": "یہ شارٹ کٹ واپس اسی فولڈر کی طرف اشارہ کرتا ہے جس کے اندر Myne پہلے سے تھا، اس لیے اس کی پیروی کبھی ختم نہ ہوتی۔ اس کے نیچے کچھ بھی نہیں چھوٹا۔",
+        "unfollowedLinkBroken": "یہ شارٹ کٹ کہیں نہیں لے جاتا — جس چیز کی طرف اس کا اشارہ تھا وہ منتقل یا حذف ہو چکی ہے۔",
+        "unreadableDetail": "چھوڑ دیا گیا — {{reason}} باقی درآمد جاری رہی۔",
+        "stoppedAt": "رکنے سے پہلے {{total}} میں سے {{imported}} نوٹس درآمد ہو چکے تھے۔ وہ آپ کے والٹ میں ہیں اور انہیں رکھنا محفوظ ہے۔",
+        "reasonNotUtf8": "Myne اس فائل کو متن کے طور پر نہیں پڑھ سکا۔ یہ غالباً کسی پرانی انکوڈنگ میں محفوظ ہے، یا یہ متن کی فائل ہے ہی نہیں۔",
+        "reasonPathRejected": "Myne آپ کے منتخب کردہ فولڈر کے اندر اس فائل تک نہیں پہنچ سکا۔",
+        "reasonPermissionDenied": "Myne کو یہ فائل پڑھنے کی اجازت نہیں تھی۔",
+        "reasonNotFound": "Myne جب تک پہنچا، یہ فائل جا چکی تھی۔",
+        "reasonNoSpace": "اس آلے پر جگہ ختم ہو گئی۔",
+        "reasonUnknown": "Myne وجہ نہیں بتا سکا۔"
+      },
+      "offer": {
+        "body": "اپنے موجودہ نوٹس Myne میں لے آئیں۔ ہر نوٹ درآمد ہوتے ہی خفیہ کر دیا جاتا ہے — کچھ بھی اس آلے سے باہر نہیں جاتا، اور آپ کی اصل فائلیں جہاں ہیں وہیں رہتی ہیں۔",
+        "chooseFolder": "فولڈر منتخب کریں…",
+        "laterHint": "آپ بعد میں بھی ترتیبات → ذخیرہ سے درآمد کر سکتے ہیں۔",
+        "notNow": "ابھی نہیں",
+        "title": "اپنے نوٹس درآمد کریں؟"
+      },
+      "picker": {
+        "intro": "آپ کے نوٹس کہاں سے آ رہے ہیں؟"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "اپنا Obsidian والٹ فولڈر منتخب کریں",
+          "survives": "ساتھ آتا ہے: Markdown، فرنٹ میٹر، [[wikilinks]]، فولڈر کی ساخت، منسلکات۔",
+          "loses": "پیچھے رہ جاتا ہے: canvas فائلیں، اور ہر وہ چیز جو Markdown نوٹ نہیں۔",
+          "short": "Markdown نوٹس کا ایک والٹ فولڈر"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "اپنا ان زپ کیا ہوا Notion برآمد فولڈر منتخب کریں",
+          "survives": "ساتھ آتا ہے: صفحات، فولڈر کی ساخت، صفحے کی خصوصیات بطور فیلڈز، اور اندرونی لنکس بطور وکی لنکس۔ ہر ڈیٹابیس بھی ایک جدول نوٹ کے طور پر آتا ہے جو اپنی سطروں سے جڑا ہوتا ہے۔",
+          "loses": "پہلے برآمد شدہ فائل ان زپ کریں — Myne فولڈر پڑھتا ہے، .zip نہیں۔ ٹوگلز، کال آؤٹس اور رنگین متن کا کوئی متبادل نہیں، اور وہ درآمد کی رپورٹ میں درج ہوتے ہیں۔",
+          "short": "ان زپ کیا ہوا برآمد فولڈر"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "اپنی Evernote .enex فائل منتخب کریں",
+          "survives": "ساتھ آتا ہے: فائل کا ہر نوٹ، فارمیٹنگ، اور منسلکات۔ خفیہ بلاکس متن کے طور پر محفوظ رہتے ہیں، جنہیں آپ Evernote میں اب بھی ڈکرپٹ کر سکتے ہیں۔",
+          "loses": "پیچھے رہ جاتا ہے: یاد دہانیاں اور نوٹ کی تاریخ۔ بہت بڑی برآمد فائلیں خطرہ مول لینے کے بجائے مسترد کر دی جاتی ہیں — ایسا ہو تو برآمد کو تقسیم کر لیں۔",
+          "short": "ایک .enex برآمد فائل"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "HTML فائلوں کا فولڈر منتخب کریں",
+          "survives": "ساتھ آتا ہے: ہیڈنگز، فہرستیں، جدول، لنکس، کوڈ اور تاکید۔",
+          "loses": "پیچھے رہ جاتا ہے: اسٹائلنگ، اسکرپٹس اور ایمبیڈز۔ دور دراز کی تصاویر لنکس کے طور پر رہتی ہیں اور کبھی ڈاؤن لوڈ نہیں ہوتیں۔",
+          "short": "محفوظ کیے گئے ویب صفحات کا فولڈر"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "اپنی .csv فائل منتخب کریں",
+          "survives": "ایک ہی نوٹ بن جاتا ہے جس میں پورا جدول ہوتا ہے۔",
+          "loses": "یہ ایک نوٹ ہے، ہر سطر کا الگ نوٹ نہیں — Myne ڈیٹابیس نہیں ہے۔ بہت چوڑی یا بہت لمبی فائلیں کاٹ دی جاتی ہیں، اور درآمد کی رپورٹ بتاتی ہے کہ کتنی۔",
+          "short": "ایک اسپریڈ شیٹ فائل"
+        }
+      }
+    },
+    "list": {
+      "addToFavorites": "پسندیدہ میں شامل کریں",
+      "archive": "آرکائیو",
+      "archiveBulkError": "نوٹس آرکائیو نہیں ہو سکے۔",
+      "archiveFolder": "فولڈر آرکائیو کریں",
+      "archiveNote": "آرکائیو کریں",
+      "archiveSingleError": "نوٹ آرکائیو نہیں ہو سکا۔",
+      "attachments": "منسلکات",
+      "bulkArchive": "{{count}} نوٹس آرکائیو کریں",
+      "bulkArchive_one": "{{count}} نوٹ آرکائیو کریں",
+      "bulkArchive_other": "{{count}} نوٹس آرکائیو کریں",
+      "bulkDelete": "{{count}} نوٹس حذف کریں",
+      "bulkDelete_one": "{{count}} نوٹ حذف کریں",
+      "bulkDelete_other": "{{count}} نوٹس حذف کریں",
+      "moveTo": "منتقل کریں…",
+      "bulkMove": "{{count}} نوٹس منتقل کریں…",
+      "bulkMove_one": "{{count}} نوٹ منتقل کریں…",
+      "bulkMove_other": "{{count}} نوٹس منتقل کریں…",
+      "caseMergeBody": "“{{name}}” نام کا فولڈر پہلے سے موجود ہے۔ یہ آپس میں ضم ہو جائیں گے — انہیں الگ رکھنے کے لیے کسی ایک کا نام بدلیں؟",
+      "color": "رنگ…",
+      "createFirstNote": "+ اپنا پہلا نوٹ بنائیں",
+      "createFolderNote": "فولڈر نوٹ بنائیں",
+      "customize": "حسبِ ضرورت بنائیں…",
+      "delete": "حذف کریں",
+      "deleteFolderBody_one": "“{{name}}” اور اس کا {{count}} نوٹ",
+      "deleteFolderBody_other": "“{{name}}” اور اس کے {{count}} نوٹس",
+      "deleteFolderConfirm": "فولڈر حذف کریں",
+      "deleteFolderTitle": "یہ فولڈر حذف کریں؟",
+      "deleteFolderWarning": "نوٹس ردی میں چلے جاتے ہیں — انہیں بعد میں بحال کیا جا سکتا ہے۔",
+      "duplicate": "نقل بنائیں",
+      "editFilterTitle": "فلٹر میں ترمیم",
+      "emptyState": "ابھی کوئی نوٹ نہیں۔",
+      "exportHtml": "HTML کے طور پر برآمد کریں…",
+      "exportMarkdown": "Markdown کے طور پر برآمد کریں…",
+      "exportPdf": "PDF کے طور پر برآمد کریں…",
+      "exportTxt": "سادہ متن کے طور پر برآمد کریں…",
+      "favoritesHeading": "پسندیدہ",
+      "icon": "آئیکن…",
+      "mergeAnyway": "پھر بھی ضم کریں",
+      "newDrawingHere": "یہاں نئی ڈرائنگ",
+      "newDrawingMenu": "نئی ڈرائنگ",
+      "newFolder": "نیا فولڈر",
+      "newFolderInPlaceholder": "{{path}} میں نیا فولڈر",
+      "newFolderPlaceholder": "نیا فولڈر",
+      "newItem": "نیا…",
+      "newNote": "نیا نوٹ",
+      "newNoteFromTemplate": "ٹیمپلیٹ سے نیا نوٹ…",
+      "newNoteHere": "یہاں نیا نوٹ",
+      "newNoteMenu": "نیا نوٹ",
+      "newNoteShortcut": "نیا نوٹ (⌘N)",
+      "newSubfolder": "نیا ذیلی فولڈر",
+      "newViewTitle": "نیا ویو",
+      "noteMovedToTrash": "نوٹ ردی میں منتقل ہو گیا",
+      "notesHeading": "نوٹس",
+      "notesMovedToTrash_one": "{{count}} نوٹ ردی میں منتقل ہو گیا",
+      "notesMovedToTrash_other": "{{count}} نوٹس ردی میں منتقل ہو گئے",
+      "openArchive": "آرکائیو کھولیں",
+      "openAttachments": "منسلکات کھولیں",
+      "openFolderNote": "فولڈر نوٹ کھولیں",
+      "openInNewTab": "نئے ٹیب میں کھولیں",
+      "openToSide": "ساتھ میں کھولیں",
+      "openTrash": "ردی کھولیں",
+      "removeFolderNote": "فولڈر نوٹ ہٹائیں",
+      "removeFromFavorites": "پسندیدہ سے ہٹائیں",
+      "rename": "نام تبدیل کریں",
+      "setAsFolderNote": "بطور فولڈر نوٹ مقرر کریں",
+      "trash": "ردی",
+      "trashBulkError": "نوٹس ردی میں منتقل نہیں ہو سکے۔",
+      "trashConfirmBulkBody_one": "{{count}} نوٹ ردی میں منتقل ہو جائے گا۔",
+      "trashConfirmBulkBody_other": "{{count}} نوٹس ردی میں منتقل ہو جائیں گے۔",
+      "trashConfirmBulkWarning": "انہیں بعد میں ردی سے بحال کیا جا سکتا ہے۔",
+      "trashConfirmConfirm": "ردی میں منتقل کریں",
+      "trashConfirmTitle": "ردی میں منتقل کریں؟",
+      "trashConfirmWarning": "اسے بعد میں ردی سے بحال کیا جا سکتا ہے۔",
+      "trashSingleError": "نوٹ ردی میں منتقل نہیں ہو سکا۔",
+      "undo": "کالعدم کریں",
+      "vaultRoot": "والٹ کا روٹ",
+      "viewSettingsTitle": "ویو کی ترتیبات",
+      "imported_one": "1 نوٹ اس فولڈر میں درآمد ہوا",
+      "imported_other": "{{count}} نوٹس اس فولڈر میں درآمد ہوئے",
+      "importedWithSkips": "{{count}} درآمد ہوئے — {{skipped}} چھوڑ دیے گئے",
+      "importNoMarkdown": "اس ڈراپ میں کوئی Markdown فائل نہیں"
+    },
+    "newFromTemplate": {
+      "back": "واپس",
+      "blankNote": "خالی نوٹ",
+      "createNote": "نوٹ بنائیں",
+      "createFirstTemplate": "ٹیمپلیٹ بنائیں",
+      "manageTemplates": "ٹیمپلیٹس کا انتظام",
+      "emptyState": "آپ نے ابھی کوئی ٹیمپلیٹ نہیں بنایا۔",
+      "listLabel": "ٹیمپلیٹس",
+      "loading": "لوڈ ہو رہا ہے…",
+      "nameLabel": "نوٹ کا نام (“{{templateName}}” سے)",
+      "namePlaceholder": "بلا عنوان",
+      "nameStepTitle": "اس نوٹ کا نام رکھیں",
+      "pickStepTitle": "ٹیمپلیٹ سے نیا نوٹ",
+      "untitledTemplate": "بلا عنوان ٹیمپلیٹ"
+    },
+    "newTab": {
+      "createNote": "نیا نوٹ بنائیں",
+      "createDrawing": "نئی ڈرائنگ",
+      "noNotesMatch": "کوئی نوٹ مطابقت نہیں رکھتا۔",
+      "noNotesYet": "ابھی کوئی نوٹ نہیں۔",
+      "recent": "حالیہ",
+      "searchAriaLabel": "کھولنے کے لیے نوٹس تلاش کریں",
+      "searchPlaceholder": "نوٹس تلاش کریں…",
+      "untitled": "بلا عنوان"
+    },
+    "pane": {
+      "graphTab": "گراف",
+      "tasksTab": "ٹاسکس",
+      "loading": "لوڈ ہو رہا ہے…",
+      "untitledView": "بلا عنوان ویو"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} دن پہلے",
+      "hoursAgo": "{{h}} گھنٹے پہلے",
+      "justNow": "ابھی ابھی",
+      "minutesAgo": "{{m}} منٹ پہلے",
+      "oneWeekAgo": "1 ہفتہ پہلے",
+      "weeksAgo": "{{w}} ہفتے پہلے",
+      "yesterday": "کل"
+    },
+    "row": {
+      "addToFavorites": "پسندیدہ میں شامل کریں",
+      "folderIndexBadgeLabel": "فولڈر نوٹ",
+      "folderIndexBadgeTitle": "فولڈر نوٹ — اس فولڈر کا اشاریہ",
+      "folderIndexConflictLabel": "فولڈر میں پہلے سے ایک اشاریہ نوٹ ہے",
+      "folderIndexConflictTitle": "اس فولڈر میں پہلے سے ایک اشاریہ نوٹ موجود ہے",
+      "loadError": "یہ نوٹ لوڈ نہیں ہو سکا",
+      "removeFromFavorites": "پسندیدہ سے ہٹائیں",
+      "renameAriaLabel": "نوٹ کا نام تبدیل کریں",
+      "taskBadgeLabel": "یہ نوٹ ایک ٹاسک ہے",
+      "taskBadgeTitle": "ٹاسک نوٹ",
+      "unsyncedLabel": "ابھی سرور پر نہیں",
+      "unsyncedTitle": "اس نوٹ کی تازہ ترین تبدیلیاں صرف اسی آلے پر ہیں",
+      "untitled": "بلا عنوان"
+    },
+    "savedView": {
+      "defaultName": "فلٹر شدہ ویو"
+    },
+    "saveStatus": {
+      "conflict": "ترمیم کا تصادم حل ہو رہا ہے…",
+      "conflictTitle": "یہ نوٹ کسی دوسرے آلے پر بدلا — دونوں نسخے رکھے جا رہے ہیں",
+      "editing": "ترمیم جاری",
+      "editingEllipsis": "ترمیم جاری…",
+      "editingTitle": "ترمیم جاری — خودکار محفوظ کاری تیار ہے",
+      "justNow": "ابھی ابھی",
+      "retry": "دوبارہ کوشش",
+      "saved": "محفوظ ہو گیا",
+      "savedRelative": "{{rel}} محفوظ ہوا",
+      "saveFailed": "محفوظ نہیں ہوا",
+      "saveFailedTitle": "محفوظ نہیں ہوا — دوبارہ کوشش پر کلک کریں",
+      "storageFull": "ذخیرہ بھر گیا",
+      "storageFullTitle": "اس نوٹ کو محفوظ کرنے کے لیے جگہ باقی نہیں۔ جگہ خالی کریں (یا کچھ منسلکات ہٹائیں)، پھر دوبارہ کوشش کریں۔ جب تک یہ محفوظ نہیں ہوتا، یہ ترمیم صرف اسی ونڈو میں ہے — سرور پر بھی نہیں۔",
+      "saving": "محفوظ ہو رہا ہے",
+      "savingEllipsis": "محفوظ ہو رہا ہے…"
+    },
+    "snapshotFailed": {
+      "dismiss": "ہٹا دیں",
+      "message": "سنیپ شاٹ محفوظ نہیں ہو سکا — آپ کا نوٹ محفوظ ہے، لیکن اس کی ورژن تاریخ ادھوری ہو سکتی ہے (ڈسک بھری ہو سکتی ہے)۔"
+    },
+    "snapshots": {
+      "cancel": "منسوخ کریں",
+      "changeCount_one": "اس سنیپ شاٹ کے بعد {{count}} تبدیلی",
+      "changeCount_other": "اس سنیپ شاٹ کے بعد {{count}} تبدیلیاں",
+      "changeCountPrev_one": "پچھلے سنیپ شاٹ سے {{count}} تبدیلی",
+      "changeCountPrev_other": "پچھلے سنیپ شاٹ سے {{count}} تبدیلیاں",
+      "close": "بند کریں",
+      "compareAgainstLabel": "کس سے موازنہ",
+      "compareCurrent": "موجودہ نوٹ",
+      "comparePrevious": "پچھلا سنیپ شاٹ",
+      "confirmBody": "آپ کا موجودہ نوٹ پہلے سنیپ شاٹ کے طور پر محفوظ کر لیا جائے گا، تاکہ آپ یہ عمل واپس لے سکیں۔",
+      "confirmTitle": "یہ سنیپ شاٹ بحال کریں؟",
+      "decrypting": "ڈکرپٹ ہو رہا ہے…",
+      "emptyState": "ابھی کوئی سنیپ شاٹ نہیں۔ ترمیم کے دوران سنیپ شاٹ خودکار طور پر محفوظ ہوتے ہیں اور تقریباً 7 دن رکھے جاتے ہیں۔ یہ خفیہ ہوتے ہیں، اور نوٹ مستقل طور پر حذف ہونے پر ختم ہو جاتے ہیں۔",
+      "encryptedSize": "خفیہ · {{size}}",
+      "errorCannotDecrypt": "یہ سنیپ شاٹ ڈکرپٹ نہیں ہو سکا۔",
+      "errorGeneric": "کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔",
+      "errorIo": "ڈسک میں خرابی ہوئی — ڈسک بھری ہو سکتی ہے یا اس پر لکھا نہیں جا سکتا۔",
+      "errorNotFound": "وہ سنیپ شاٹ اب دستیاب نہیں۔",
+      "errorStorageAccess": "والٹ کے سنیپ شاٹ ذخیرے تک رسائی نہیں ہو سکی۔",
+      "errorVaultLocked": "والٹ لاک ہے۔ سنیپ شاٹس دیکھنے کے لیے اسے ان لاک کریں۔",
+      "justNow": "ابھی ابھی",
+      "listLabel": "سنیپ شاٹس کی فہرست",
+      "loading": "لوڈ ہو رہا ہے…",
+      "noPrevious": "یہ سب سے پرانا سنیپ شاٹ ہے — اس سے پہلے موازنے کے لیے کچھ نہیں۔",
+      "restore": "بحال کریں",
+      "restoreCta": "یہ سنیپ شاٹ بحال کریں",
+      "restoredStatus": "بحال ہو گیا۔ آپ کا پچھلا نسخہ سنیپ شاٹ کے طور پر محفوظ ہے۔",
+      "selectPlaceholder": "کوئی سنیپ شاٹ منتخب کریں تاکہ دیکھ سکیں کہ تب سے کیا بدلا۔",
+      "title": "سنیپ شاٹس",
+      "untitled": "بلا عنوان"
+    },
+    "tabStrip": {
+      "closeNewTab": "نیا ٹیب بند کریں",
+      "closeTab": "{{title}} بند کریں",
+      "newTab": "نیا ٹیب",
+      "openNotes": "کھلے نوٹس",
+      "pin": "پن کریں",
+      "pinned": "پن شدہ",
+      "pinnedTitle": "پن شدہ — بند کرنے کے لیے پن ہٹائیں",
+      "unpin": "پن ہٹائیں",
+      "untitled": "بلا عنوان"
+    },
+    "tagBrowser": {
+      "cancel": "منسوخ کریں",
+      "clear": "صاف کریں",
+      "combineTagsWith": "ٹیگز کو جوڑیں",
+      "filtering": "فلٹر ہو رہا ہے…",
+      "modeAll": "تمام",
+      "modeAny": "کوئی بھی",
+      "noNotesForFilter": "اس فلٹر کے لیے کوئی نوٹ نہیں۔",
+      "noTagsMatch": "“{{query}}” سے کوئی ٹیگ مطابقت نہیں رکھتا۔",
+      "noTagsYet": "ابھی کوئی ٹیگ نہیں۔",
+      "noteCount_one": "{{count}} نوٹ",
+      "noteCount_other": "{{count}} نوٹس",
+      "notes": "نوٹس",
+      "pickTag": "فلٹر کرنے کے لیے کوئی ٹیگ منتخب کریں۔",
+      "save": "محفوظ کریں",
+      "saveAsView": "بطور ویو محفوظ کریں",
+      "searchPlaceholder": "ٹیگز تلاش کریں…",
+      "title": "ٹیگز",
+      "untitled": "بلا عنوان",
+      "viewNamePlaceholder": "ویو کا نام"
+    },
+    "trash": {
+      "close": "بند کریں",
+      "count_one": "{{count}} نوٹ",
+      "count_other": "{{count}} نوٹس",
+      "delete": "حذف کریں",
+      "deleteError": "وہ نوٹ حذف نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "empty": "ردی خالی کریں",
+      "emptyConfirmBody_one": "{{count}} نوٹ مستقل طور پر حذف ہو جائے گا۔",
+      "emptyConfirmBody_other": "{{count}} نوٹس مستقل طور پر حذف ہو جائیں گے۔",
+      "emptyConfirmCta": "ردی خالی کریں",
+      "emptyConfirmTitle": "ردی خالی کریں؟",
+      "emptyPartialFailure_one": "{{count}} نوٹ حذف نہیں ہو سکا اور ردی میں موجود ہے۔",
+      "emptyPartialFailure_other": "{{count}} نوٹس حذف نہیں ہو سکے اور ردی میں موجود ہیں۔",
+      "emptyBody": "آپ جو نوٹس حذف کرتے ہیں وہ یہاں آ جاتے ہیں۔ ردی خالی کرنے تک وہ یہیں رہتے ہیں — ان میں سے کسی کو بھی کبھی بھی بحال کیا جا سکتا ہے۔",
+      "emptyTitle": "ردی خالی ہے",
+      "purgeConfirmCta": "مستقل طور پر حذف کریں",
+      "purgeConfirmTitle": "مستقل طور پر حذف کریں؟",
+      "restore": "بحال کریں",
+      "restoreError": "وہ نوٹ بحال نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "title": "ردی",
+      "untitled": "بلا عنوان"
+    },
+    "unlinkedMentions": {
+      "empty": "کوئی بغیر لنک تذکرہ نہیں۔",
+      "heading": "بغیر لنک تذکرے",
+      "link": "لنک کریں",
+      "linkTooltip": "اس تذکرے کو {{title}} سے جوڑیں",
+      "refresh": "تذکرے بدل چکے ہو سکتے ہیں — تازہ کریں",
+      "searching": "تلاش جاری…",
+      "thisNote": "یہ نوٹ",
+      "untitled": "بلا عنوان"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "کور بدلیں",
+        "changeCoverImage": "کور تصویر بدلیں",
+        "empty": "اس ویو سے کوئی نوٹ مطابقت نہیں رکھتا",
+        "noValue": "کوئی قدر نہیں",
+        "setCover": "کور مقرر کریں",
+        "setCoverImage": "کور تصویر مقرر کریں",
+        "untitled": "بلا عنوان"
+      },
+      "collapseViews": "ویوز سمیٹیں",
+      "empty": "ابھی کوئی ویو نہیں۔ موجودہ نوٹ فہرست کو ویو کے طور پر محفوظ کریں۔",
+      "expandViews": "ویوز پھیلائیں",
+      "heading": "ویوز",
+      "host": {
+        "unsupported": "اس قسم کا ویو کسی بعد کی اپ ڈیٹ میں آئے گا۔"
+      },
+      "list": {
+        "empty": "اس ویو سے کوئی نوٹ مطابقت نہیں رکھتا",
+        "noValue": "کوئی قدر نہیں"
+      },
+      "menu": {
+        "deleteView": "ویو حذف کریں",
+        "editFilter": "فلٹر میں ترمیم…",
+        "moveDown": "نیچے لے جائیں",
+        "moveUp": "اوپر لے جائیں",
+        "rename": "نام تبدیل کریں",
+        "viewSettings": "ویو کی ترتیبات…"
+      },
+      "newView": "نیا ویو",
+      "noMatch": "آپ کی تلاش سے کوئی ویو مطابقت نہیں رکھتا۔",
+      "searchPlaceholder": "ویوز تلاش کریں…",
+      "table": {
+        "empty": "اس ویو سے کوئی نوٹ مطابقت نہیں رکھتا",
+        "name": "نام",
+        "noValue": "کوئی قدر نہیں"
+      },
+      "untitledView": "بلا عنوان ویو"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "طے شدہ (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (مربع)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (چوڑا)"
+      },
+      "cancel": "منسوخ کریں",
+      "cardSize": "کارڈ کا سائز",
+      "cardSizeValue": "{{size}} px",
+      "columns": "کالم",
+      "columnsEmpty": "کوئی خاصیت نہیں ملی",
+      "columnsHint": "فرنٹ میٹر کی خصوصیات جو کالم (جدول) یا تفصیل کی سطر (فہرست / کارڈز) کے طور پر دکھائی جاتی ہیں۔",
+      "columnsPlaceholder": "کالم شامل کریں…",
+      "coverImageHint": "وہ فرنٹ میٹر خاصیت جس کی قدر کوئی تصویر ہو — ہر کارڈ کے کور کے طور پر دکھائی جاتی ہے۔ کور نہ چاہیں تو خالی چھوڑ دیں۔",
+      "coverImagePlaceholder": "مثلاً cover",
+      "coverImageProperty": "کور تصویر کی خاصیت",
+      "groupBy": "گروپ بندی",
+      "imageAspectRatio": "تصویر کا تناسب",
+      "propertyNone": "کوئی نہیں",
+      "reset": "ری سیٹ",
+      "save": "محفوظ کریں",
+      "sortAsc": "صعودی",
+      "sortBy": "ترتیب کی بنیاد",
+      "sortDesc": "نزولی",
+      "sortDirection": "ترتیب کی سمت",
+      "viewType": "ویو کی قسم",
+      "viewTypeCards": "کارڈز",
+      "viewTypeList": "فہرست",
+      "viewTypeTable": "جدول"
+    },
+    "welcome": {
+      "body": "Myne میں خوش آمدید — سوچنے اور لکھنے کی آپ کی نجی جگہ۔\n\nآپ یہاں جو کچھ محفوظ کرتے ہیں وہ خفیہ ہوتا ہے اور آپ کے آلے پر ہی رہتا ہے۔ آپ کا **پاس ورڈ** اور **بحالی فقرہ** ہی اس کی واحد کنجیاں ہیں، اس لیے انہیں کسی محفوظ جگہ رکھیں۔ اگر یہ دونوں کھو جائیں تو کوئی بھی آپ کے نوٹس واپس نہیں لا سکتا، ہم بھی نہیں۔\n\nیہ ایک عام سا نوٹ ہی ہے، اس لیے اسے اپنا بنا لیں۔ جب چاہیں اس میں ترمیم کریں، اس کا نام بدلیں یا اسے حذف کر دیں، اور اپنے خیالات بڑھنے کے ساتھ نئے نوٹس شامل کرتے جائیں۔\n\nہمیں خوشی ہے کہ آپ یہاں ہیں۔ Myne کے بارے میں مزید جاننے کے لیے https://myne.md دیکھیں۔\n",
+      "title": "Myne میں خوش آمدید"
+    },
+    "workspace": {
+      "defaultSlotName": "طے شدہ"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "مضبوطی جانچی جا رہی ہے…",
+      "confirmLabel": "ماسٹر پاس ورڈ کی تصدیق کریں",
+      "defaultEmptyCaption": "Argon2id (m=256 MiB, t=3, p=2) کے لیے بطور ان پٹ استعمال ہوتا ہے۔ ایسا کچھ چنیں جو آپ کو یاد رہے؛ اسے ری سیٹ نہیں کیا جا سکتا۔",
+      "mismatch": "پاس ورڈ آپس میں مطابقت نہیں رکھتے۔",
+      "passwordLabel": "ماسٹر پاس ورڈ",
+      "suggestPassword": "پاس ورڈ تجویز کریں",
+      "tooShort": "کم از کم {{n}} حروف استعمال کریں۔"
+    },
+    "input": {
+      "hide": "پاس ورڈ چھپائیں",
+      "show": "پاس ورڈ دکھائیں"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "کوئی مماثلت نہیں۔",
+      "placeholder": "منتخب کریں…",
+      "searchPlaceholder": "تلاش کریں…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "بحالی منسوخ ہوئی: والٹ لاک ہو گیا تھا۔",
+      "operationInProgress": "ایک کارروائی جاری ہے۔ براہِ کرم انتظار کریں۔",
+      "unexpected": "غیر متوقع خرابی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "vaultNotFound": "والٹ فائل نہیں ملی۔ براہِ کرم ایپ دوبارہ شروع کریں۔"
+    },
+    "vaultUnreadable": "والٹ فائل ناقابلِ مطالعہ ہے۔ کسی بیک اپ سے بحال کریں۔",
+    "genericError": "کچھ غلط ہو گیا۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "weakPassword": "پاس ورڈ کم از کم {{min}} حروف کا ہونا چاہیے۔",
+    "setPasswordError": "آپ کا نیا پاس ورڈ مقرر نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "passwordMismatch": "پاس ورڈ آپس میں مطابقت نہیں رکھتے۔",
+    "decryptingSubtitle": "آپ کے والٹ کی کنجیاں Argon2id سے دوبارہ بنائی جا رہی ہیں۔ اس میں چند سیکنڈ لگتے ہیں۔",
+    "restoreVaultHeader": "والٹ بحال کریں",
+    "accountTitle": "اپنا اکاؤنٹ نمبر درج کریں",
+    "accountLead": "یہ وہیں ملے گا جہاں آپ نے اپنا بحالی فقرہ محفوظ کیا تھا۔ یہ بتاتا ہے کہ کون سا والٹ بحال کرنا ہے۔",
+    "accountInvalid": "اکاؤنٹ نمبر درست نہیں — براہِ کرم جانچ کر دوبارہ درج کریں۔",
+    "accountOptionalHint": "آپ کے پاس نہیں ہے؟ اسے خالی چھوڑ کر آگے بڑھیں — آپ کا 24 الفاظ کا بحالی فقرہ ہی کافی ہے۔",
+    "paste": "پیسٹ کریں",
+    "phraseGridHint": "ہر لفظ ٹائپ کریں، یا گرڈ بھرنے کے لیے سارے 24 الفاظ ایک ساتھ پیسٹ کر دیں۔",
+    "submitProgress": "جمع کریں · {{total}} میں سے {{filled}}",
+    "newPasswordTitle": "نیا پاس ورڈ منتخب کریں",
+    "newPasswordLead": "آپ کا بحالی فقرہ وہی رہتا ہے۔ یہ اس آلے کا پاس ورڈ مقرر کرتا ہے۔",
+    "confirmPasswordLabel": "پاس ورڈ کی تصدیق کریں",
+    "passwordHelper": "کبھی محفوظ نہیں کیا جاتا، کبھی بھیجا نہیں جاتا۔ یہ اسی آلے پر آپ کی کنجیاں خفیہ کرتا ہے۔",
+    "encryptingSubtitle": "آپ کے والٹ کی کنجیاں آپ کے نئے پاس ورڈ سے لپیٹی جا رہی ہیں۔"
+  },
+  "recurrence": {
+    "every": {
+      "day": "ہر روز",
+      "week": "ہر ہفتے",
+      "month": "ہر مہینے",
+      "year": "ہر سال"
+    },
+    "everyN": {
+      "day": "ہر {{count}} دن بعد",
+      "week": "ہر {{count}} ہفتے بعد",
+      "month": "ہر {{count}} مہینے بعد",
+      "year": "ہر {{count}} سال بعد"
+    },
+    "everyWeekday": "ہر {{days}}",
+    "everyWeekdays": "ہر {{days}}",
+    "ordinal": {
+      "first": "پہلا",
+      "second": "دوسرا",
+      "third": "تیسرا",
+      "fourth": "چوتھا",
+      "last": "آخری"
+    },
+    "ordinalOfMonth": "ہر مہینے کا {{ordinal}} {{weekday}}",
+    "dayOfMonth": "ہر مہینے کی {{day}} تاریخ",
+    "lastDayOfMonth": "ہر مہینے کا آخری دن",
+    "weekday": {
+      "monday": "پیر",
+      "tuesday": "منگل",
+      "wednesday": "بدھ",
+      "thursday": "جمعرات",
+      "friday": "جمعہ",
+      "saturday": "ہفتہ",
+      "sunday": "اتوار"
+    },
+    "weekdaySeparator": "، ",
+    "whenDone": "{{rule}}، مکمل ہونے پر",
+    "builder": {
+      "family": "دہرائیں",
+      "familyInterval": "ہر…",
+      "familyWeekdays": "ہفتہ وار، ان دنوں…",
+      "familyDayOfMonth": "ماہانہ، کسی تاریخ کو…",
+      "familyOrdinal": "ماہانہ، ہفتے کے کسی دن…",
+      "count": "وقفہ",
+      "unitLabel": "اکائی",
+      "units": {
+        "day": "دن",
+        "week": "ہفتے",
+        "month": "مہینے",
+        "year": "سال"
+      },
+      "ordinal": "مقام",
+      "weekday": "ہفتے کا دن",
+      "lastDay": "آخری دن",
+      "whenDone": "مکمل ہونے کی تاریخ سے دہرائیں",
+      "weekdayShort": {
+        "monday": "پیر",
+        "tuesday": "منگل",
+        "wednesday": "بدھ",
+        "thursday": "جمعرات",
+        "friday": "جمعہ",
+        "saturday": "ہفتہ",
+        "sunday": "اتوار"
+      }
+    }
+  },
+  "restore": {
+    "backLabel": "واپس",
+    "cancelLabel": "منسوخ کریں",
+    "collision": {
+      "body": "اس بیک اپ کا والٹ اس آلے پر پہلے سے موجود ہے۔ آپ دونوں رکھ سکتے ہیں — بحال شدہ نقل آپ کی والٹ فہرست میں ایک الگ والٹ کے طور پر آئے گی — یا ابھی بحال کریں اور پھر موجودہ والٹ خود فہرست سے ہٹا دیں (ہٹانے کے لیے DELETE ٹائپ کرنا پڑتا ہے، اور یہ تبھی معنی رکھتا ہے جب آپ تصدیق کر لیں کہ بحال شدہ والٹ کھلتا ہے)۔",
+      "keepBoth": "دونوں رکھیں",
+      "replaceExisting": "بحال کریں، پھر موجودہ کی جگہ لیں…"
+    },
+    "damaged": {
+      "body": "بیک اپ فائل خراب ہے، اس لیے کچھ بحال نہیں ہوا۔ اگر آپ کے پاس یہی واحد نقل ہے تو بچاؤ کا عمل سالم نوٹس بحال کر سکتا ہے اور بالکل درج کر دیتا ہے کہ کیا نہیں پڑھا جا سکا — نتیجے پر ہمیشہ جزوی بحالی کا لیبل ہوتا ہے۔",
+      "close": "بند کریں",
+      "salvage": "سالم نوٹس بچائیں…"
+    },
+    "error": {
+      "tryAnotherFile": "کوئی اور فائل آزمائیں"
+    },
+    "pick": {
+      "body": "کوئی <code>.myne-backup</code> فائل منتخب کریں۔ کچھ بھی بحال کرنے سے پہلے بیک اپ کی تصدیق کی جاتی ہے؛ بحال شدہ والٹ اسی والٹ کے پاس ورڈ یا بحالی فقرے سے کھلتا ہے — بالکل ان لاک کی طرح۔",
+      "chooseFile": "بیک اپ فائل منتخب کریں…",
+      "corruptedSuffix": "آپ کے موجودہ والٹ کو ہاتھ نہیں لگایا جاتا: بیک اپ پہلے ایک الگ والٹ کے طور پر بحال ہوتا ہے۔"
+    },
+    "summary": {
+      "attachments": "منسلکات: {{n}}",
+      "collidedNote": "اس والٹ کی پہلے سے موجود نقل اب بھی آپ کی والٹ فہرست میں ہے۔ جب آپ تصدیق کر لیں کہ بحال شدہ والٹ کھلتا ہے، تو پرانی نقل فہرست سے ہٹا سکتے ہیں (اس کے لیے DELETE ٹائپ کرنا پڑے گا)۔",
+      "notes": "نوٹس: {{n}}",
+      "openVaultList": "والٹ فہرست کھولیں",
+      "partialHeader_one": "جزوی طور پر بحال ہوا — {{count}} آئٹم پڑھا نہیں جا سکا۔",
+      "partialHeader_other": "جزوی طور پر بحال ہوا — {{count}} آئٹمز پڑھے نہیں جا سکے۔",
+      "restored": "والٹ بحال ہو گیا۔",
+      "versionHistory": "ورژن تاریخ کے اندراجات: {{n}}"
+    },
+    "title": "بیک اپ سے بحال کریں",
+    "working": {
+      "cancel": "منسوخ کریں",
+      "restoringProgress": "بحال ہو رہا ہے… {{total}} میں سے {{done}}",
+      "verifying": "بیک اپ کی تصدیق ہو رہی ہے…",
+      "verifyingProgress": "بیک اپ کی تصدیق ہو رہی ہے… {{total}} میں سے {{done}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "ڈیولپمنٹ بلڈ",
+      "buildLabel": "بلڈ",
+      "buildChannelLabel": "بلڈ چینل",
+      "buildChannelStable": "مستحکم",
+      "changelogButton": "تبدیلیوں کی فہرست دیکھیں…",
+      "changelogHelper": "ہر ورژن کے نوٹس۔ MYND-119 آنے پر یہ ظاہر ہوں گے۔",
+      "changelogLabel": "تبدیلیوں کی فہرست",
+      "developerModeHelper": "وہ اعلیٰ ترتیبات دکھاتا ہے جنہیں Myne طے شدہ طور پر نظروں سے دور رکھتا ہے: وہ جہاں آپ اس راستے سے ہٹ جاتے ہیں جس کی Myne ضمانت دیتا ہے، اور وہ ماہرانہ اوزار جن کی زیادہ تر لوگوں کو کبھی ضرورت نہیں پڑتی۔ اسے بند کرنے سے وہ صرف دوبارہ چھپ جاتے ہیں — جو کچھ آپ نے آن کیا وہ آن ہی رہتا ہے، اور اسے بند کرنے کی جگہ اسی کا اپنا کنٹرول ہے۔",
+      "developerModeLabel": "ڈیولپر موڈ",
+      "licenseBody": "پری الفا · CC-BY-4.0 دستاویزات · فیز 1 ریلیز پر AGPL-3.0 ایپلیکیشن کوڈ۔",
+      "licenseLabel": "لائسنس",
+      "tagline": "پری الفا · فیز 1 ڈیسک ٹاپ کلائنٹ",
+      "threatModelHelper": "عوامی خطرہ ماڈل دستاویز اپنے براؤزر میں کھولیں۔",
+      "threatModelLabel": "خطرہ ماڈل",
+      "version": "ورژن",
+      "dev": "ڈیو"
+    },
+    "account": {
+      "changePasswordButton": "پاس ورڈ تبدیل کریں",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "موجودہ پاس ورڈ غلط ہے یا والٹ فائل خراب ہے۔",
+        "ioError": "ڈسک کی خرابی، براہِ کرم دوبارہ کوشش کریں۔",
+        "joinFailure": "کچھ غلط ہو گیا، براہِ کرم دوبارہ کوشش کریں۔",
+        "samePasswordRejected": "نیا پاس ورڈ موجودہ پاس ورڈ جیسا ہی ہے۔",
+        "serverAckPending": "آپ کا نیا پاس ورڈ اس آلے پر کام کرتا ہے، لیکن Myne اسے محفوظ کرنے کے لیے سرور تک نہیں پہنچ سکا۔ جب تک ایسا نہیں ہوتا، آپ کے دوسرے آلات ابھی بھی پرانا پاس ورڈ ہی مانگیں گے — اور اگر اس سے پہلے اس براؤزر کی نقل مٹا دی گئی تو یہ تبدیلی ضائع ہو جائے گی۔ یہ خود بخود دوبارہ کوشش کرتا رہے گا۔",
+        "weakNewPassword": "نیا پاس ورڈ کم از کم 12 حروف کا ہونا چاہیے۔"
+      },
+      "changePasswordHeading": "پاس ورڈ تبدیل کریں",
+      "changePasswordHelper": "وہی والٹ رکھتے ہوئے اپنا ماسٹر پاس ورڈ بدلیں۔ بحالی فقرہ وہی رہتا ہے۔",
+      "dangerZoneHeading": "خطرے کا علاقہ",
+      "dangerZoneHelper": "یہ والٹ اور تمام نوٹس مستقل طور پر حذف کریں۔ اسے واپس نہیں لیا جا سکتا۔ بحالی فقرہ اس والٹ کو بحال نہیں کرے گا۔",
+      "localEraseHeading": "یہ براؤزر",
+      "localEraseHelper": "اس براؤزر سے آپ کے والٹ کی Myne والی نقل مٹا دیں۔ آپ کا اکاؤنٹ اور جو کچھ پہلے ہی مطابقت پذیر ہو چکا ہے وہ سرور پر رہتا ہے۔",
+      "localEraseButton": "سائن آؤٹ کریں اور اس براؤزر کی نقل مٹائیں…",
+      "deleteVaultButton": "والٹ حذف کریں…",
+      "vaultLabelEyebrow": "والٹ کا لیبل",
+      "vaultLabelHelper": "اس والٹ کا نام جو ایپ کے اندر سوئچر میں دکھایا جاتا ہے۔ والٹ کے اندر خفیہ کر کے محفوظ ہوتا ہے؛ کبھی سادہ متن میں آپ کے آلے سے باہر نہیں جاتا۔",
+      "vaultLabelPlaceholder": "کوئی لیبل شامل کریں…",
+      "vaultLabelSave": "محفوظ کریں",
+      "vaultIconLabel": "آئیکن",
+      "vaultIconDefault": "طے شدہ (ورڈ مارک)",
+      "renamedToast": "والٹ کا نام تبدیل ہو گیا",
+      "renameError": "والٹ کا نام تبدیل نہیں ہو سکا",
+      "newPasswordMismatch": "نئے پاس ورڈ آپس میں نہیں ملتے۔",
+      "samePassword": "نیا پاس ورڈ موجودہ پاس ورڈ جیسا ہی ہے۔",
+      "passwordChangedToast": "پاس ورڈ تبدیل ہو گیا",
+      "vaultUnreadable": "والٹ فائل ناقابلِ مطالعہ ہے۔ کسی بیک اپ سے بحال کریں۔",
+      "genericChangeError": "کچھ غلط ہو گیا۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "renameHelper": "والٹ سوئچر میں دکھایا جاتا ہے۔ اسی والٹ کے اندر خفیہ کر کے محفوظ ہوتا ہے؛ اسے ہٹانے کے لیے خالی چھوڑ دیں۔",
+      "newPasswordPlaceholder": "کم از کم 12 حروف",
+      "reenterNewPassword": "نیا پاس ورڈ دوبارہ درج کریں",
+      "changePasswordFootnote": "اس سے فوری ان لاک منسوخ ہو جاتا ہے۔ آپ کا بحالی فقرہ تبدیل نہیں ہوتا۔",
+      "changing": "تبدیل ہو رہا ہے…"
+    },
+    "appearance": {
+      "accentHelper": "ایپ بھر میں استعمال ہونے والا ایکسنٹ رنگ منتخب کریں۔ صرف اسی آلے پر۔",
+      "accentHexAria": "ایکسنٹ رنگ کی hex قدر",
+      "accentLabel": "ایکسنٹ رنگ",
+      "accentReset": "تھیم کے طے شدہ پر واپس لائیں",
+      "homeQuickActions": "ہوم کے فوری اعمال",
+      "showEditTimesAria": "سائیڈ بار میں ترمیم کے اوقات دکھائیں",
+      "showEditTimesHelper": "سائیڈ بار میں ہر نوٹ کے عنوان کے نیچے اس کی آخری ترمیم کا وقت دکھائیں۔",
+      "showEditTimesLabel": "ترمیم کے اوقات دکھائیں",
+      "taskMarkerAria": "ٹاسک نوٹس پر ٹاسک کا نشان دکھائیں",
+      "taskMarkerHelper": "جن نوٹس کو آپ نے ٹاسک قرار دیا ہے، انہیں سائیڈ بار میں اور ان کے ٹیب پر نشان زد کرتا ہے۔",
+      "taskMarkerLabel": "ٹاسک کا نشان دکھائیں",
+      "taskMarkerSaveError": "وہ ترتیب محفوظ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "تاریک",
+        "light": "روشن",
+        "system": "سسٹم"
+      },
+      "themeHelper": "روشن اور تاریک تھیم کے درمیان بدلیں، یا سسٹم کی ترجیح کے مطابق چلیں۔",
+      "themeLabel": "تھیم",
+      "themeOptionAria": "{{label}} تھیم",
+      "themeSaveError": "تھیم محفوظ نہیں ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "timestampsSaveError": "ترجیح محفوظ نہیں ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "ایڈیٹر فونٹ",
+      "showEditTimesSubtitle": "ہر نوٹ کے نیچے اوقات",
+      "graphSettingsLabel": "گراف کی ظاہری شکل",
+      "graphSettingsHelper": "نوڈ کے رنگ، لیبل، سائز اور لے آؤٹ کی قوتیں گراف کے اندر ہی طے ہوتی ہیں — اسے کھولیں اور اس کے کونے میں موجود گیئر استعمال کریں۔ یہ ہر آلے کے لیے الگ محفوظ رہتی ہیں، اس لیے یہاں کی تبدیلی آپ کے فون تک نہیں پہنچتی۔",
+      "openGraph": "گراف کھولیں"
+    },
+    "archive": {
+      "helper": "نوٹس کو ایک آرکائیو میں منتقل ہونے دیں، جو مرکزی فہرست سے باہر رکھا جاتا ہے۔ اسے بند کرنے پر ہر آرکائیو شدہ نوٹ اپنے فولڈر میں واپس آ جاتا ہے اور آرکائیو کے کنٹرول چھپ جاتے ہیں۔",
+      "label": "آرکائیو کرنا",
+      "off": "بند",
+      "on": "آن",
+      "saveError": "آرکائیو کی ترتیب اپ ڈیٹ نہیں ہو سکی۔"
+    },
+    "attachmentCompression": {
+      "label": "درآمد کے وقت تصاویر کمپریس کریں",
+      "helper": "چسپاں یا گھسیٹ کر لائی گئی تصاویر کو خفیہ کر کے محفوظ کرنے سے پہلے چھوٹا کر دیتا ہے، تاکہ آپ کا والٹ، بیک اپ اور مطابقت پذیری چھوٹے رہیں۔ یہ ناقابلِ واپسی ہے — اصل فائل محفوظ نہیں رکھی جاتی۔",
+      "helperScopeEveryDevice": "پورے والٹ پر، ہر آلے پر لاگو ہوتا ہے۔",
+      "helperScopeNotHere": "پورے والٹ پر لاگو ہوتا ہے، مگر اس براؤزر میں نہیں — یہاں شامل کی گئی تصاویر بالکل اسی طرح محفوظ ہوتی ہیں جیسے دی گئی ہوں۔",
+      "errorSaveSetting": "یہ ترتیب محفوظ نہیں ہو سکی۔"
+    },
+    "transcription": {
+      "label": "آواز سے متن",
+      "helper": "کسی آڈیو منسلکہ کو اسی آلے پر متن میں بدلیں۔ ماڈل Myne کے ساتھ ہی آتا ہے اور کچھ کہیں نہیں بھیجا جاتا۔ اسے بند کرنے سے نقل نویسی کا عمل ہر جگہ سے چھپ جاتا ہے اور ایپ نقل نویسی بالکل بند کر دیتی ہے۔",
+      "errorSaveSetting": "وہ ترتیب محفوظ نہیں ہو سکی۔"
+    },
+    "attachmentOcr": {
+      "label": "تصاویر اور اسکین شدہ دستاویزات کے اندر تلاش کریں",
+      "helper": "اسی آلے پر تصویری منسلکات اور اسکین شدہ PDF میں سے متن پڑھتا ہے، تاکہ تلاش انہیں ان کے مواد سے ڈھونڈ سکے۔ کچھ اپ لوڈ نہیں ہوتا۔ اسے بند کرنے سے پس منظر میں چلنے والا اخراج رک جاتا ہے؛ پہلے سے نکالا گیا متن باقی رہتا ہے۔",
+      "errorSaveSetting": "یہ ترتیب محفوظ نہیں ہو سکی۔",
+      "processing_one": "1 منسلکہ پڑھا جا رہا ہے…",
+      "processing_other": "{{count}} منسلکات پڑھے جا رہے ہیں…"
+    },
+    "autoBackup": {
+      "backupFolder": "بیک اپ فولڈر",
+      "chooseFolder": "فولڈر منتخب کریں…",
+      "chooseFolderDialogTitle": "خودکار بیک اپ کے لیے فولڈر منتخب کریں",
+      "frequency": "تعدد",
+      "frequencyAriaLabel": "بیک اپ کا تعدد",
+      "helper": "ایپ کھلی اور والٹ ان لاک ہونے کی صورت میں، ایک شیڈول پر کسی فولڈر میں خفیہ کردہ .myne-backup لکھتا ہے۔ بیک اپ آپ کے والٹ جتنے ہی خفیہ رہتے ہیں؛ Myne چند تازہ ترین رکھتا ہے اور کبھی کچھ آپ کے آلے سے باہر نہیں بھیجتا۔",
+      "intervalDaily": "روزانہ",
+      "intervalEveryUnlock": "ہر ان لاک پر",
+      "intervalWeekly": "ہفتہ وار",
+      "keepLast": "آخری رکھیں",
+      "noFolderChosen": "ابھی کوئی فولڈر منتخب نہیں کیا گیا۔",
+      "saveFailedToast": "بیک اپ کی ترتیبات محفوظ نہیں ہو سکیں۔",
+      "searchEmpty": "کوئی مماثلت نہیں۔",
+      "searchPlaceholder": "تلاش کریں…",
+      "statusFailed": "خودکار بیک اپ ناکام رہا — {{stamp}}",
+      "statusLastBackup": "آخری بیک اپ: {{stamp}}",
+      "statusNever": "ابھی کوئی خودکار بیک اپ نہیں ہوا۔",
+      "title": "خودکار بیک اپ"
+    },
+    "changePassword": {
+      "cancel": "منسوخ کریں",
+      "checkingStrength": "مضبوطی جانچی جا رہی ہے…",
+      "confirmLabel": "نئے پاس ورڈ کی تصدیق کریں",
+      "currentLabel": "موجودہ پاس ورڈ",
+      "mismatch": "پاس ورڈ آپس میں نہیں ملتے۔",
+      "newLabel": "نیا پاس ورڈ",
+      "submit": "پاس ورڈ تبدیل کریں",
+      "submitting": "پاس ورڈ تبدیل ہو رہا ہے…",
+      "title": "پاس ورڈ تبدیل کریں",
+      "tooShort": "کم از کم {{n}} حروف استعمال کریں۔"
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "براؤزر ایکسٹینشن"
+      },
+      "when": {
+        "bare": "جڑا ہوا",
+        "daysAgo_one": "{{count}} دن پہلے جڑا",
+        "daysAgo_other": "{{count}} دن پہلے جڑا",
+        "hoursAgo": "{{count}} گھنٹے پہلے جڑا",
+        "hoursAgo_one": "{{count}} گھنٹہ پہلے جڑا",
+        "hoursAgo_other": "{{count}} گھنٹے پہلے جڑا",
+        "justNow": "ابھی ابھی جڑا",
+        "minutesAgo": "{{count}} منٹ پہلے جڑا",
+        "minutesAgo_one": "{{count}} منٹ پہلے جڑا",
+        "minutesAgo_other": "{{count}} منٹ پہلے جڑا",
+        "onDate": "{{date}} کو جڑا"
+      }
+    },
+    "cliAccess": {
+      "label": "ٹرمینل رسائی",
+      "helperOff": "بند۔ `myne` کمانڈ اس والٹ میں کچھ پڑھ یا بدل نہیں سکتی۔",
+      "helperOn": "جب تک یہ والٹ ان لاک ہے، آن۔ آپ کے اکاؤنٹ کے تحت چلنے والا کوئی بھی پروگرام اس کے ذریعے نوٹس پڑھ، تلاش اور بنا سکتا ہے — Myne آپ کے ٹرمینل اور کسی اسکرپٹ میں فرق نہیں کر سکتا، اور دروازہ کھلا ہونے کے علاوہ کچھ نہیں جانچتا۔ یہ کبھی آپ کا پاس ورڈ نہیں مانگتا، والٹ لاک ہوتے ہی بند ہو جاتا ہے، اور نوٹس حذف نہیں کر سکتا۔",
+      "lastUsedNever": "اس والٹ کے ان لاک ہونے کے بعد استعمال نہیں ہوا۔",
+      "lastUsedJustNow": "ابھی ابھی استعمال ہوا۔",
+      "lastUsedMinutesAgo": "{{count}} منٹ پہلے استعمال ہوا۔",
+      "lastUsedMinutesAgo_one": "{{count}} منٹ پہلے استعمال ہوا۔",
+      "lastUsedMinutesAgo_other": "{{count}} منٹ پہلے استعمال ہوا۔",
+      "lastUsedHoursAgo": "{{count}} گھنٹے پہلے استعمال ہوا۔",
+      "lastUsedHoursAgo_one": "{{count}} گھنٹہ پہلے استعمال ہوا۔",
+      "lastUsedHoursAgo_other": "{{count}} گھنٹے پہلے استعمال ہوا۔",
+      "lastUsedDaysAgo": "{{count}} دن پہلے استعمال ہوا۔",
+      "lastUsedDaysAgo_one": "{{count}} دن پہلے استعمال ہوا۔",
+      "lastUsedDaysAgo_other": "{{count}} دن پہلے استعمال ہوا۔",
+      "notOnPathHint": "آپ کا شیل ابھی `myne` نہیں ڈھونڈ پا رہا۔ یہ لائن اپنے شیل پروفائل میں شامل کریں، پھر نیا ٹرمینل کھولیں:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "وہ فولڈر جو ٹرمینل کبھی نہیں دیکھتا",
+      "excludedHelper": "ہر لائن پر ایک فولڈر کا راستہ۔ ان فولڈرز کے نوٹس ہر ٹرمینل نتیجے سے باہر رہتے ہیں اور ٹرمینل سے وہاں لکھے نہیں جا سکتے — ایپ میں یہ پوری طرح دستیاب رہتے ہیں۔ ٹرمینل رسائی آن کرنے سے پہلے بھی آپ یہ طے کر سکتے ہیں۔",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "rateLimitLabel": "ٹرمینل کو پوری رفتار سے چلنے دیں",
+      "rateLimitHelper": "Myne طے شدہ طور پر ایک منٹ میں زیادہ سے زیادہ 120 ٹرمینل کمانڈز کا جواب دیتا ہے۔ یہ بے قابو اسکرپٹ پر رفتار کی حد ہے، اجازت کی جانچ نہیں — کوئی یہ طے نہیں کرتا کہ کون سا پروگرام پوچھ سکتا ہے۔ بڑے پیمانے کے کام کے لیے اسے آن کریں، جیسے ہر نوٹ کو کسی دوسرے ٹول سے گزارنا۔"
+    },
+    "clipperInstall": {
+      "error": "براؤزر کلپر کی ترتیب اپ ڈیٹ نہیں ہو سکی۔",
+      "helper": "نیٹو-میسجنگ ہوسٹ رجسٹر کریں تاکہ Myne براؤزر ایکسٹینشن اس ایپ کو کلپ بھیج سکے۔ طے شدہ طور پر آن؛ اسے ہٹانے کے لیے بند کریں۔",
+      "label": "براؤزر کلپر"
+    },
+    "customThemes": {
+      "appliedBadge": "لاگو",
+      "apply": "لاگو کریں",
+      "applyError": "وہ تھیم لاگو نہیں ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "browseButton": "تھیمز دیکھیں",
+      "cancel": "منسوخ کریں",
+      "confirm": "تصدیق کریں",
+      "delete": "حذف کریں",
+      "deleteError": "وہ تھیم حذف نہیں ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "empty": "ابھی کوئی حسبِ ضرورت تھیم نہیں۔ شروع کرنے کے لیے کوئی تھیم فائل درآمد کریں۔",
+      "error": {
+        "aColorFallback": "ایک رنگ",
+        "invalidFile": "غیر درست تھیم فائل۔",
+        "invalidName": "غیر محفوظ تھیم کا نام",
+        "invalidValue": "{{key}} کے لیے غیر درست قدر",
+        "invalidValueWithLine": "{{key}} کے لیے غیر درست قدر (لائن {{line}})",
+        "missingKey": "مطلوبہ رنگ {{key}} موجود نہیں",
+        "parseError": "درست JSON نہیں",
+        "parseErrorWithLine": "درست JSON نہیں (لائن {{line}})"
+      },
+      "export": "برآمد",
+      "exportError": "وہ تھیم برآمد نہیں ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "fileFilterName": "Myne تھیم",
+      "helper": "اپنی رنگوں کی پٹی استعمال کریں۔ تھیمز استعمال سے پہلے اسی آلے پر جانچی جاتی ہیں — کچھ اپ لوڈ نہیں ہوتا۔",
+      "importButton": "تھیم درآمد کریں…",
+      "importError": "وہ فائل درست تھیم نہیں ہے۔ فارمیٹ دیکھنے کے لیے حوالہ کھولیں۔",
+      "label": "حسبِ ضرورت تھیمز",
+      "readError": "آپ کی حسبِ ضرورت تھیمز پڑھی نہیں جا سکیں۔",
+      "readOnlyHelper": "حسبِ ضرورت تھیمز آپ کے کمپیوٹر پر انسٹال ہوتی ہیں۔ آپ کی تھیمز مطابقت پذیری کے بعد خود بخود یہاں آ جاتی ہیں۔"
+    },
+    "dailyNotes": {
+      "blankTemplate": "خالی (کوئی ٹیمپلیٹ نہیں)",
+      "dateFormatHelper": "ہر روزانہ نوٹ کا عنوان۔ YYYY، MM، DD کی معاونت ہے۔ طے شدہ {{default}} ہے۔",
+      "dateFormatLabel": "روزانہ نوٹ کی تاریخ کا فارمیٹ",
+      "dateFormatSaveError": "تاریخ کا فارمیٹ محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "folderHelper": "نئے روزانہ نوٹس کہاں رکھے جاتے ہیں۔ طے شدہ {{default}} ہے — فولڈر خالی ہونے پر بھی باقی رہتا ہے۔",
+      "folderLabel": "روزانہ نوٹ کا فولڈر",
+      "folderSaveError": "روزانہ فولڈر محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "folderSearchEmpty": "کوئی فولڈر مطابقت نہیں رکھتا۔",
+      "folderSearchPlaceholder": "فولڈر تلاش کریں…",
+      "searchEmpty": "کوئی ٹیمپلیٹ مطابقت نہیں رکھتا۔",
+      "searchPlaceholder": "ٹیمپلیٹس تلاش کریں…",
+      "templateHelper": "ہر روزانہ نوٹ شروع کرنے کے لیے کوئی ٹیمپلیٹ منتخب کریں، یا تاریخ کے عنوان والے خالی نوٹ کے لیے اسے خالی چھوڑ دیں۔",
+      "templateLabel": "روزانہ نوٹ کا ٹیمپلیٹ",
+      "templateSaveError": "روزانہ ٹیمپلیٹ محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "untitledTemplate": "بلا عنوان ٹیمپلیٹ"
+    },
+    "deleteVault": {
+      "cancel": "منسوخ کریں",
+      "caseSensitiveHint": "حروف کی حالت اہم ہے۔ حذف فعال کرنے کے لیے لفظ بالکل ویسے ہی ٹائپ کریں۔",
+      "continue": "جاری رکھیں",
+      "copyPrimary": "یہ اس والٹ اور اس کے ہر نوٹ کو مستقل طور پر حذف کر دیتا ہے۔ اس عمل کو واپس نہیں لیا جا سکتا، اور آپ کا بحالی فقرہ اس ڈیٹا کو بحال نہیں کرے گا۔",
+      "copySecondary": "فائلیں ہٹانے سے پہلے والٹ کی کلیدیں میموری سے صفر کر دی جاتی ہیں؛ ڈسک پر باقی رہ جانے والا کوئی بھی لاوارث سائفر ٹیکسٹ ناقابلِ بازیافت، Argon2id میں لپٹا کوڑا ہی رہتا ہے۔",
+      "eyebrow": "ناقابلِ واپسی",
+      "heading": "والٹ حذف کریں",
+      "ioFailBody": "حذف کرنے کے لیے والٹ کی فائلوں تک رسائی نہیں ہو سکی۔ والٹ کی کلیدیں پہلے ہی میموری سے صفر ہو چکی ہیں؛ ڈسک پر باقی رہ جانے والا کوئی بھی والٹ ڈیٹا ناقابلِ بازیافت، Argon2id میں لپٹا کوڑا ہے۔",
+      "ioFailTitle": "حذف کے دوران ڈسک کی خرابی",
+      "localEraseHeading": "سائن آؤٹ کریں اور اس براؤزر کی نقل مٹائیں",
+      "localEraseEyebrow": "صرف یہ براؤزر",
+      "localEraseSubmit": "اس براؤزر کی نقل مٹائیں",
+      "localEraseSubmitInFlight": "مٹایا جا رہا ہے…",
+      "partialFailBody_one": "{{count}} فائل ڈسک سے حذف نہیں ہو سکی۔ والٹ کی کلیدیں پہلے ہی میموری سے صفر ہو چکی ہیں، اس لیے باقی رہ جانے والا کوئی بھی لاوارث سائفر ٹیکسٹ ناقابلِ بازیافت، Argon2id میں لپٹا کوڑا ہے۔",
+      "partialFailBody_other": "{{count}} فائلیں ڈسک سے حذف نہیں ہو سکیں۔ والٹ کی کلیدیں پہلے ہی میموری سے صفر ہو چکی ہیں، اس لیے باقی رہ جانے والا کوئی بھی لاوارث سائفر ٹیکسٹ ناقابلِ بازیافت، Argon2id میں لپٹا کوڑا ہے۔",
+      "partialFailTitle": "والٹ کا حذف جزوی طور پر ناکام رہا",
+      "submit": "والٹ حذف کریں",
+      "submitInFlight": "والٹ حذف ہو رہا ہے…",
+      "typeToConfirmLabel": "تصدیق کے لیے DELETE ٹائپ کریں",
+      "vaultPath": "والٹ کا راستہ: {{path}}",
+      "deleteError": "والٹ مکمل طور پر حذف نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "warning": "یہ اس آلے سے اس والٹ اور اس کے تمام نوٹس کو مستقل طور پر حذف کر دیتا ہے۔ اسے واپس نہیں لیا جا سکتا۔",
+      "deleteButton": "یہ والٹ حذف کریں"
+    },
+    "files": {
+      "newNote": {
+        "folderLabel": "نئے نوٹس کا فولڈر",
+        "folderPlaceholder": "مثلاً Inbox/",
+        "folderSearchEmpty": "کوئی فولڈر مطابقت نہیں رکھتا۔",
+        "folderSearchPlaceholder": "فولڈر تلاش کریں…",
+        "helper": "نئے بنائے گئے نوٹس کہاں رکھے جاتے ہیں۔",
+        "label": "نئے نوٹس کے لیے طے شدہ جگہ",
+        "optionCurrent": "موجودہ نوٹ والا ہی فولڈر",
+        "optionRoot": "والٹ فولڈر",
+        "optionSpecific": "نیچے بتائے گئے فولڈر میں",
+        "saveError": "نئے نوٹ کی جگہ محفوظ نہیں ہو سکی۔"
+      },
+      "startup": {
+        "helper": "منتخب کریں کہ ایپ شروع ہونے پر کون سی فائل کھلے۔",
+        "label": "کھولنے کے لیے طے شدہ فائل",
+        "noteLabel": "شروع ہونے پر کھلنے والا نوٹ",
+        "notePlaceholder": "کوئی نوٹ منتخب کریں…",
+        "optionEmpty": "نیا نوٹ",
+        "optionLast": "آخری بار کھلا ہوا",
+        "optionSpecific": "مخصوص نوٹ",
+        "saveError": "شروعات کی ترتیب محفوظ نہیں ہو سکی۔",
+        "searchEmpty": "کوئی نوٹ نہیں ملا۔",
+        "searchPlaceholder": "نوٹس تلاش کریں…",
+        "untitledNote": "بلا عنوان"
+      }
+    },
+    "focusMode": {
+      "dimAria": "غیر فعال لائنیں مدھم کریں",
+      "dimHelper": "فوکس موڈ (⇧⌘F) میں، جس لائن پر آپ ترمیم کر رہے ہیں اس کے علاوہ ہر لائن مدھم کریں۔",
+      "dimLabel": "فوکس موڈ · غیر فعال لائنیں مدھم کریں",
+      "off": "بند",
+      "on": "آن",
+      "saveError": "فوکس موڈ کی ترتیب محفوظ نہیں ہو سکی۔",
+      "typewriterAria": "ٹائپ رائٹر اسکرول",
+      "typewriterHelper": "فوکس موڈ (⇧⌘F) میں، ٹائپ کرتے وقت فعال لائن کو عمودی طور پر درمیان میں رکھیں۔",
+      "typewriterLabel": "فوکس موڈ · ٹائپ رائٹر اسکرول"
+    },
+    "hotkeys": {
+      "addBindingAria": "{{command}} کے لیے شارٹ کٹ شامل کریں",
+      "cancel": "منسوخ کریں",
+      "capturePrompt": "کوئی کلید دبائیں…",
+      "conflictIndicator": "⚠ تصادم",
+      "conflictTitle": "{{commands}} بھی اسے استعمال کرتے ہیں",
+      "fixed": "مقرر",
+      "group": {
+        "editorFormatting": "ایڈیٹر فارمیٹنگ",
+        "general": "عمومی",
+        "navigation": "نیویگیشن",
+        "notes": "نوٹس",
+        "panesTabs": "پین اور ٹیبس",
+        "view": "منظر"
+      },
+      "helper": "کی بورڈ شارٹ کٹس دیکھیں اور بدلیں۔ صرف ٹیب بدلنے کا شارٹ کٹ (Ctrl+Tab) مقرر ہے۔",
+      "notSet": "مقرر نہیں",
+      "removeBindingAria": "{{chord}} ہٹائیں",
+      "reserved": {
+        "bookmarkPage": "صفحہ بک مارک کرتا ہے",
+        "closeTab": "ٹیب بند کرتا ہے",
+        "closeWindow": "ونڈو بند کرتا ہے",
+        "cycleTabs": "ٹیبس کے درمیان جاتا ہے",
+        "focusAddressBar": "ایڈریس بار پر فوکس کرتا ہے",
+        "hideApplication": "براؤزر چھپاتا ہے",
+        "inspectElement": "ایلیمنٹ انسپکٹر کھولتا ہے",
+        "minimiseWindow": "ونڈو چھوٹی کرتا ہے",
+        "newPrivateWindow": "نجی ونڈو کھولتا ہے",
+        "newTab": "نیا ٹیب کھولتا ہے",
+        "newWindow": "نئی ونڈو کھولتا ہے",
+        "openBookmarks": "بک مارکس کھولتا ہے",
+        "openDevTools": "ڈیولپر ٹولز کھولتا ہے",
+        "openExtensions": "ایکسٹینشنز کھولتا ہے",
+        "openFile": "کوئی فائل کھولتا ہے",
+        "openHistory": "تاریخچہ کھولتا ہے",
+        "quit": "براؤزر بند کر دیتا ہے",
+        "reopenTab": "آخری بند کیا گیا ٹیب دوبارہ کھولتا ہے",
+        "switchTab": "ٹیب بدلتا ہے",
+        "toggleFullscreen": "پوری اسکرین آن/آف کرتا ہے"
+      },
+      "reservedBadge": "یہاں دستیاب نہیں",
+      "reservedBadgeTitle": "آپ کا براؤزر {{chord}} سے {{action}}، اس لیے یہ کبھی Myne تک نہیں پہنچتا۔ ڈیسک ٹاپ ایپ میں یہ شارٹ کٹ اب بھی کام کرتا ہے۔",
+      "reservedRefused": "{{chord}} آپ کے براؤزر کا ہے — یہ {{action}}۔ کوئی دوسرا شارٹ کٹ منتخب کریں؛ آپ کے ڈیسک ٹاپ شارٹ کٹس تبدیل نہیں ہوئے۔",
+      "reservedUnreliable": "{{chord}} شاید Myne تک نہ پہنچے — کچھ براؤزرز میں یہ {{action}}۔ پھر بھی شامل کر دیا گیا۔",
+      "resetAll": "تمام ہاٹ کیز ری سیٹ کریں…",
+      "resetAllConfirm": "ہر حسبِ ضرورت شارٹ کٹ اس کے طے شدہ پر ری سیٹ کریں؟",
+      "resetAllYes": "سب ری سیٹ کریں",
+      "restoreDefaultAria": "{{command}} کے لیے طے شدہ بحال کریں",
+      "searchAriaLabel": "شارٹ کٹس تلاش کریں",
+      "searchPlaceholder": "شارٹ کٹس تلاش کریں…",
+      "warnAlreadyUsed": "{{commands}} پہلے ہی اسے استعمال کرتے ہیں — پھر بھی شامل کر دیا گیا۔"
+    },
+    "language": {
+      "helper": "ایپ کے لیے ڈسپلے زبان منتخب کریں۔",
+      "label": "زبان"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "لائن نمبر کی ترتیب محفوظ نہیں ہو سکی۔",
+      "helper": "ایڈیٹر میں لائن نمبروں کا گٹر دکھائیں۔ ہر لائن پر ایک نمبر؛ طے شدہ طور پر بند۔",
+      "label": "لائن نمبر",
+      "off": "بند",
+      "on": "آن"
+    },
+    "views": {
+      "helper": "فلٹر شدہ نوٹ فہرستیں محفوظ کرنے کے لیے سائیڈ بار میں ویوز کا اندراج دکھائیں۔ طے شدہ طور پر بند؛ اگر آپ کے پاس پہلے سے ویوز ہیں تو آن۔",
+      "label": "ویوز"
+    },
+    "vimMode": {
+      "chordCaveat": "Windows اور Linux پر Myne کے اپنے شارٹ کٹس کو ترجیح حاصل ہے، اس لیے ان سے ٹکرانے والے vim کورڈ (Ctrl-a، Ctrl-b، Ctrl-d، Ctrl-e، Ctrl-f، Ctrl-i، Ctrl-p، Ctrl-t، Ctrl-v، Ctrl-w، Ctrl-x) ایڈیٹر میں دستیاب نہیں۔ Ctrl-[ اب بھی Escape کے طور پر کام کرتا ہے، اور ویژول بلاک Alt-v پر منتقل ہو جاتا ہے۔",
+      "errorSaveSetting": "vim موڈ کی ترتیب محفوظ نہیں ہو سکی۔",
+      "helper": "ایڈیٹر میں vim کلیدیں استعمال کریں: نارمل، انسرٹ اور ویژول موڈ، معمول کی حرکات اور آپریٹرز کے ساتھ۔ طے شدہ طور پر بند۔ یہ آن ہونے پر نوٹس سورس منظر میں کھلتے ہیں۔",
+      "label": "Vim کی بورڈ موڈ",
+      "off": "بند",
+      "on": "آن"
+    },
+    "toolbarCustomize": {
+      "errorSave": "ٹول بار کا لے آؤٹ محفوظ نہیں ہو سکا۔",
+      "helper": "منتخب کریں کہ سلیکشن ٹول بار پر کون سے فارمیٹنگ بٹن دکھائی دیں، اور ان کی ترتیب کیا ہو۔",
+      "label": "ٹول بار بٹن",
+      "moveDown": "نیچے لے جائیں",
+      "moveUp": "اوپر لے جائیں",
+      "pendingHint": "جلد آ رہا ہے"
+    },
+    "ai": {
+      "autoTagHelper": "جب آپ ٹائپ کرتے ہوئے رکتے ہیں، آپ کے آلے پر ایک چھوٹا ماڈل نوٹ پڑھ کر اس کے اوپر ٹیگ تجویز کرتا ہے۔ جب تک آپ کوئی تجویز قبول نہ کریں، کچھ شامل نہیں ہوتا۔",
+      "autoTagLabel": "خود بخود ٹیگ تجویز کریں",
+      "autoTagUnavailable": "اس بلڈ میں ٹیگ ماڈل شامل نہیں، اس لیے کوئی ٹیگ تجویز نہیں ہو سکتا۔ Myne کبھی ماڈل ڈاؤن لوڈ نہیں کرتا — جس بلڈ میں یہ شامل ہو، وہاں یہ سوئچ خود بخود آن ہو جاتا ہے۔",
+      "disclosureToggle": "یہ کیسے کام کرتا ہے؟",
+      "enableHelper": "آپ کا فراہم کردہ ماڈل مکمل طور پر آپ کے آلے پر چلاتا ہے۔ تجرباتی، طے شدہ طور پر بند۔",
+      "enableLabel": "مقامی AI فعال کریں",
+      "excludedHelper": "ان فولڈرز کے نوٹس AI کبھی نہیں پڑھتا اور نہ ہی ان کا اشاریہ بناتا ہے۔ ہر لائن پر ایک فولڈر کا راستہ۔",
+      "excludedLabel": "خارج شدہ فولڈر",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "modelChoose": "فائل منتخب کریں…",
+      "modelEmbeddingLabel": "تلاش کا ماڈل — معنوی تلاش اور سوال و جواب",
+      "modelFilter": {
+        "gguf": "GGUF ماڈل",
+        "safetensors": "Safetensors ماڈل"
+      },
+      "modelGenerationLabel": "متن کا ماڈل — چیٹ، خلاصے، لکھائی",
+      "modelNone": "کوئی فائل منتخب نہیں",
+      "modelSaveFailed": "ماڈل کا راستہ محفوظ نہیں ہو سکا (یہ آپ کے والٹ سے باہر ہونا چاہیے)۔",
+      "modelTranscriptionLabel": "آواز سے متن کا ماڈل (نقل نویسی)",
+      "modelsHelper": "Myne کبھی ماڈل ڈاؤن لوڈ نہیں کرتا — اس کا مطلب نیٹ ورک پر ڈیٹا بھیجنا ہوتا۔ کوئی ماڈل حاصل کرنے کے لیے اپنے براؤزر میں کوئی لنک کھولیں، پھر ڈاؤن لوڈ شدہ فائلیں یہاں منتخب کریں۔ سب کچھ آپ کے آلے پر چلتا ہے۔",
+      "modelsLabel": "ماڈلز",
+      "recommendedFilesEmbedding": "ایک ہی فولڈر میں model.safetensors + config.json + tokenizer.json درکار ہیں۔",
+      "recommendedFilesGeneration": "ایک ہی فولڈر میں .gguf فائل + tokenizer.json درکار ہیں۔",
+      "recommendedFilesTranscription": "ایک ہی فولڈر میں Whisper کی .gguf فائل + config.json + tokenizer.json درکار ہیں۔",
+      "title": "AI"
+    },
+    "network": {
+      "disabledCue": "مطابقت پذیری اب Tor سے نہیں گزرتی۔ نئے کنکشن سیدھے مطابقت پذیری سرور تک جاتے ہیں۔",
+      "errorRead": "موجودہ ترتیب پڑھی نہیں جا سکی۔ اسے دوبارہ طے کرنے کے لیے سوئچ بدلیں۔",
+      "errorSave": "ترتیب محفوظ نہیں ہو سکی۔ کچھ تبدیل نہیں ہوا۔",
+      "errorSidecar": "Tor روٹنگ آن ہے، لیکن Tor کلائنٹ شروع نہیں ہو سکا۔ جب تک یہ نہیں چلتا، مطابقت پذیری رکی ہوئی ہے — کچھ بھی براہِ راست نہیں بھیجا جا رہا۔",
+      "postureActive": "مطابقت پذیری Tor سے گزر رہی ہے",
+      "postureConnecting": "Tor سے جڑا جا رہا ہے — مطابقت پذیری رکی ہوئی ہے",
+      "postureConnectingDetail": "اس میں عموماً چند سیکنڈ لگتے ہیں۔ اس دوران کچھ بھی براہِ راست نہیں بھیجا جا رہا۔",
+      "postureExempt": "مطابقت پذیری Tor استعمال نہیں کر رہی — یہ پتہ اسی آلے کی طرف اشارہ کرتا ہے",
+      "postureExemptDetail": "آپ نے مطابقت پذیری سرور کا جو پتہ ترتیب دیا ہے وہ اسی کمپیوٹر کا نام لیتا ہے، اس لیے Myne کا اس سے کنکشن کسی Tor سرکٹ سے نہیں گزرتا۔ اگر وہ پتہ آگے کہیں اور موجود کسی سرور کو بھیج دیتا ہے تو Myne یہ نہیں دیکھ سکتا اور نہ اسے روٹ کر سکتا ہے۔ مطابقت پذیری رکی ہوئی نہیں ہے۔",
+      "postureHeading": "اس وقت",
+      "postureInactive": "مطابقت پذیری براہِ راست مطابقت پذیری سرور تک جاتی ہے",
+      "postureUnavailable": "Tor دستیاب نہیں — مطابقت پذیری رکی ہوئی ہے",
+      "postureUnavailableDetail": "کچھ بھی براہِ راست نہیں بھیجا جا رہا۔ Tor کلائنٹ شروع کرنے کی کوشش کے لیے یہ ترتیب بند کر کے دوبارہ آن کریں، یا Tor کے بغیر مطابقت پذیری کے لیے اسے بند رہنے دیں۔",
+      "residualExit": "Tor سرکٹ کا آخری ریلے — ایگزٹ نوڈ — دیکھتا ہے کہ آپ کس مطابقت پذیری سرور سے جڑتے ہیں۔ یہ نہیں پڑھ سکتا کہ آپ کیا مطابقت پذیر کرتے ہیں؛ وہ سرے تا سرے خفیہ رہتا ہے۔",
+      "residualMetadata": "مطابقت پذیری سرور اب بھی دیکھتا ہے کہ آپ کب مطابقت پذیری کرتے ہیں، کتنے بلاب بھیجتے ہیں اور وہ کتنے بڑے ہیں، اور آپ کے پاس کتنے آلات ہیں۔ Tor اسے تبدیل نہیں کرتا۔",
+      "residualPayment": "اگر آپ ہوسٹ شدہ مطابقت پذیری کی ادائیگی کرتے ہیں تو ادائیگی اور آپ کا اکاؤنٹ اب بھی آپ سے جوڑے جا سکتے ہیں۔ Tor یہ بدلتا ہے کہ کنکشن کہاں سے آ رہا ہے، بلنگ کا نشان نہیں۔",
+      "residualScope": "صرف Myne کی اپنی مطابقت پذیری ٹریفک Tor سے گزرتی ہے۔ اس آلے پر اور کچھ نہیں۔",
+      "residualsToggle": "یہ کیا نہیں چھپاتا",
+      "torHelper": "آپ کا IP پتہ اور مقام مطابقت پذیری سرور سے چھپاتا ہے، اور آپ کے نیٹ ورک اور انٹرنیٹ فراہم کنندہ سے یہ چھپاتا ہے کہ آپ کس سرور سے مطابقت پذیری کرتے ہیں — وہ پھر بھی دیکھ سکتے ہیں کہ یہ آلہ Tor سے جڑ رہا ہے۔ یہ آپ کو Myne کے سامنے گمنام نہیں بناتا، اور نہ سرور سے یہ چھپاتا ہے کہ آپ کیا اور کب مطابقت پذیر کرتے ہیں۔",
+      "torLabel": "مطابقت پذیری Tor سے گزاریں"
+    },
+    "prefs": {
+      "saveError": "ترجیح محفوظ نہیں ہو سکی — دوبارہ کوشش کریں"
+    },
+    "reminders": {
+      "aria": "اس آلے پر ٹاسک یاد دہانیاں دکھائیں",
+      "exactAllow": "اجازت دیں",
+      "exactLabel": "درست وقت",
+      "exactOn": "آن",
+      "horizon": "یاد دہانیاں {{date}} تک رجسٹرڈ ہیں۔ انہیں جاری رکھنے کے لیے اس سے پہلے Myne کھولیں۔",
+      "label": "ٹاسک یاد دہانیاں",
+      "saveError": "وہ ترتیب محفوظ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+      "showTextAria": "اطلاع میں ٹاسک کا متن دکھائیں",
+      "showTextLabel": "ٹاسک کا متن دکھائیں"
+    },
+    "privacy": {
+      "autoLockHelper": "اتنی بے عملی کے بعد والٹ لاک کریں۔",
+      "autoLockLabel": "خودکار لاک",
+      "autoLockSearchEmpty": "کوئی دورانیہ مطابقت نہیں رکھتا۔",
+      "autoLockSearchPlaceholder": "دورانیے تلاش کریں…",
+      "screenCaptureHelperOff": "ان لاک سے پہلے تحفظ ہمیشہ لاگو رہتا ہے۔ ان لاک کے بعد یہ اسی ترجیح کے مطابق چلتا ہے۔",
+      "screenCaptureHelperOn": "macOS اور Windows 10 (مئی 2020 اپ ڈیٹ یا اس کے بعد) پر فعال۔ Linux کی معاونت آئندہ کسی ریلیز میں آئے گی۔",
+      "screenCaptureLabel": "اسکرین کیپچر سے تحفظ",
+      "screenCaptureSubtitle": "اسکرین شاٹ اور اسکرین ریکارڈنگ روکیں",
+      "screenshotBlocked": "اسکرین تحفظ آن ہے — Myne کے اسکرین شاٹ خالی آتے ہیں۔",
+      "autoLockAfter": "اس کے بعد خودکار لاک",
+      "autoLock1m": "1 منٹ",
+      "autoLock5m": "5 منٹ",
+      "autoLock15m": "15 منٹ",
+      "autoLock30m": "30 منٹ",
+      "autoLock1h": "1 گھنٹہ",
+      "quickUnlockSubtitleAndroid": "خودکار لاک کے بعد PIN سے دوبارہ داخل ہوں",
+      "quickUnlockSubtitle": "خودکار لاک کے بعد {{method}} یا PIN سے دوبارہ داخل ہوں"
+    },
+    "quickUnlock": {
+      "errorCancelled": "منسوخ ہو گیا۔",
+      "errorGeneric": "فوری ان لاک ترتیب نہیں دیا جا سکا۔",
+      "errorHardwareUnavailable": "اس بلڈ میں Touch ID دستیاب نہیں۔ اس کے لیے دستخط شدہ macOS بلڈ اور اندراج شدہ Touch ID درکار ہے۔",
+      "errorNotUnlocked": "پہلے والٹ ان لاک کریں۔",
+      "errorPinNotDigits": "PIN صرف ہندسوں پر مشتمل ہونا چاہیے۔",
+      "errorPinTooShort": "PIN کم از کم {{count}} ہندسوں کا ہونا چاہیے۔",
+      "errorPinTooShort_one": "PIN کم از کم {{count}} ہندسے کا ہونا چاہیے۔",
+      "errorPinTooShort_other": "PIN کم از کم {{count}} ہندسوں کا ہونا چاہیے۔",
+      "helperConfigured": "{{method}} کے ذریعے ترتیب دیا گیا۔ خودکار لاک کے بعد دوبارہ داخل ہونے پر ماسٹر پاس ورڈ نہیں مانگا جاتا۔ دوبارہ شروع کرنے کے بعد ماسٹر پاس ورڈ بہرحال درکار ہے۔",
+      "helperNotConfigured": "خودکار لاک کے بعد پورے ماسٹر پاس ورڈ کے بجائے PIN یا Touch ID سے دوبارہ داخل ہوں۔ یہ خفیہ کردہ والٹ پر صرف ایک سہولت ہے — دوبارہ شروع کرنے کے بعد ماسٹر پاس ورڈ درکار رہتا ہے۔",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "فوری ان لاک کا PIN",
+      "pinPlaceholder": "PIN (کم از کم {{count}} ہندسے)",
+      "pinPlaceholder_one": "PIN (کم از کم {{count}} ہندسہ)",
+      "pinPlaceholder_other": "PIN (کم از کم {{count}} ہندسے)",
+      "setPin": "PIN مقرر کریں",
+      "setupHelper": "Touch ID صرف macOS کے لیے ہے اور فی الحال تجرباتی ہے (ہارڈ ویئر کی تصدیق باقی ہے)۔ PIN ہر جگہ کام کرتا ہے۔",
+      "title": "فوری ان لاک",
+      "useTouchId": "Touch ID استعمال کریں",
+      "pinTooShort": "PIN کم از کم 6 ہندسوں کا ہونا چاہیے۔",
+      "pinMismatch": "PIN آپس میں نہیں ملتے۔",
+      "pinOnToast": "PIN سے فوری ان لاک آن ہے",
+      "setupError": "فوری ان لاک ترتیب نہیں دیا جا سکا۔",
+      "turnedOffToast": "فوری ان لاک بند کر دیا گیا",
+      "turnOffError": "فوری ان لاک بند نہیں ہو سکا",
+      "biometricOnToast": "{{method}} سے فوری ان لاک آن ہے",
+      "biometricUnavailable": "{{method}} اس آلے پر دستیاب نہیں۔",
+      "warningBanner": "یہ صرف سہولت کا ایک دروازہ ہے۔ دوبارہ شروع کرنے کے بعد آپ کا پاس ورڈ بہرحال درکار ہے۔",
+      "biometricToggleSubtitle": "خودکار لاک کے بعد {{method}} سے ان لاک کریں",
+      "pinOnLead": "PIN سے فوری ان لاک ",
+      "pinOnEmphasis": "آن",
+      "pinOnRest": " ہے۔ والٹ کے خودکار طور پر لاک ہونے کے بعد آپ پورے پاس ورڈ کے بجائے اپنے PIN سے دوبارہ داخل ہو سکتے ہیں — صرف ایپ کے اسی سیشن میں۔ ٹھنڈے آغاز پر ہمیشہ پورا پاس ورڈ درکار ہوتا ہے۔",
+      "turnOffPin": "PIN بند کریں",
+      "pinSetupHelper": "خودکار لاک کے بعد جلدی دوبارہ ان لاک کرنے کے لیے 6 یا زیادہ ہندسوں کا PIN مقرر کریں۔ PIN ایک آلہ-مقامی کلید کو لپیٹتا ہے — یہ کبھی اس آلے سے باہر نہیں جاتا اور آپ کے بحالی فقرے کو کبھی نہیں چھوتا۔",
+      "pinReplacesBiometric": " PIN مقرر کرنے سے {{method}} ان لاک کی جگہ لے لی جاتی ہے۔",
+      "pinPlaceholder6": "کم از کم 6 ہندسے",
+      "confirmPin": "PIN کی تصدیق کریں",
+      "reenterPin": "PIN دوبارہ درج کریں",
+      "setupButton": "فوری ان لاک ترتیب دیں"
+    },
+    "shell": {
+      "closeLabel": "ترتیبات بند کریں",
+      "groups": {
+        "developer": "ڈیولپر"
+      },
+      "navLabel": "ترتیبات کے پینل",
+      "panels": {
+        "about": "تعارف",
+        "account": "اکاؤنٹ",
+        "ai": "AI",
+        "appearance": "ظاہری شکل",
+        "editor": "ایڈیٹر",
+        "files": "فائلیں",
+        "transcription": "نقل نویسی",
+        "hotkeys": "شارٹ کٹس",
+        "network": "نیٹ ورک",
+        "privacy": "رازداری",
+        "storage": "ذخیرہ",
+        "sync": "مطابقت پذیری"
+      },
+      "passwordUpdatedToast": "پاس ورڈ اپ ڈیٹ ہو گیا",
+      "title": "ترتیبات"
+    },
+    "spell": {
+      "errorSaveLanguages": "ہجے کی جانچ کی زبانیں محفوظ نہیں ہو سکیں۔",
+      "errorSaveSetting": "ہجے کی جانچ کی ترتیب محفوظ نہیں ہو سکی۔",
+      "helper": "ٹائپ کرتے وقت غلط ہجے والے الفاظ کے نیچے لکیر لگائیں۔ مکمل طور پر آف لائن — آپ کے نوٹس کبھی آلے سے باہر نہیں جاتے۔",
+      "label": "ہجے کی جانچ",
+      "languagesAriaLabel": "ہجے کی جانچ کی زبانیں",
+      "languagesHelper": "کوئی لفظ درست مانا جاتا ہے اگر وہ کسی بھی منتخب زبان میں درست ہو — دوسری زبان کے نوٹس میں انگریزی اصطلاحات ملانے کے لیے مفید۔",
+      "languagesLabel": "زبانیں",
+      "languagesPlaceholder": "زبانیں منتخب کریں…",
+      "languagesSearchEmpty": "کوئی زبان مطابقت نہیں رکھتی۔",
+      "languagesSearchPlaceholder": "زبانیں تلاش کریں…",
+      "off": "بند",
+      "on": "آن"
+    },
+    "storage": {
+      "backupHelper": "بیک اپ آپ کے والٹ جتنے ہی خفیہ رہتے ہیں، ایک ہی تصدیق شدہ .myne-backup فائل میں۔ بحالی اسی والٹ کے پاس ورڈ یا بحالی فقرے سے ہوتی ہے — بالکل ان لاک کی طرح۔",
+      "backupLabel": "بیک اپ",
+      "backUpVault": "والٹ کا بیک اپ لیں…",
+      "exportAction": "برآمد…",
+      "exportBody": "والٹ کو Markdown کے طور پر برآمد کریں",
+      "exportHelper": "سادہ markdown درخت — خفیہ نہیں۔",
+      "exportLabel": "برآمد",
+      "importHelper": "Obsidian، Notion، Evernote، HTML فائلوں یا CSV سے نوٹس لے آئیں۔ سب کچھ اسی وقت درآمد ہو کر خفیہ ہو جاتا ہے؛ آپ کی اصل فائلیں جوں کی توں رہتی ہیں۔",
+      "importLabel": "درآمد",
+      "importObsidian": "نوٹس درآمد کریں…",
+      "locationHelper": "ہر والٹ اس راستے کے نیچے خفیہ کردہ فائلوں کا ایک فولڈر ہے۔ دستی نقلوں کے بجائے نیچے دیے گئے بیک اپ بٹن کو ترجیح دیں — یہ لکھی گئی فائل کی تصدیق کرتا ہے۔",
+      "locationLabel": "والٹ کی جگہ",
+      "openInFiles": "فائل مینیجر میں کھولیں",
+      "webLocationHelper": "آپ کے نوٹس اس سائٹ کے لیے اسی براؤزر کے ذخیرے میں رہتے ہیں، جسے براؤزر خود سنبھالتا ہے — کھولنے کے لیے کوئی فولڈر نہیں ہے۔ اس سائٹ کا ڈیٹا صاف کرنے سے مقامی نقل ہٹ جاتی ہے؛ چونکہ یہ کلائنٹ مطابقت پذیری کرتا ہے، دوبارہ سائن ان کرنے پر وہ واپس ڈاؤن لوڈ ہو جاتی ہے۔",
+      "webLocationLabel": "آپ کے نوٹس کہاں محفوظ ہیں",
+      "pathUnavailable": "راستہ دستیاب نہیں",
+      "restoreBackup": "بیک اپ سے بحال کریں…"
+    },
+    "typography": {
+      "contentWidthHelper": "ترمیم کے کالم کی زیادہ سے زیادہ چوڑائی۔ مکمل کا مطلب ہے متن پورے پین تک پھیلے۔",
+      "contentWidthLabel": "مواد کی چوڑائی",
+      "errorSave": "ترجیح محفوظ نہیں ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "fontHelper": "مونو اسپیس یا متناسب (sans-serif) متن۔",
+      "fontLabel": "فونٹ",
+      "lineSpacingHelper": "لائنوں کے درمیان عمودی جگہ۔",
+      "lineSpacingLabel": "لائنوں کا فاصلہ",
+      "textSizeHelper": "ایڈیٹر متن کا بنیادی سائز۔ ہیڈنگز اسی کے ساتھ بڑھتی گھٹتی ہیں۔",
+      "previewLabel": "پیش منظر",
+      "previewBody": "چاندنی رات میں خاموش دریا کے کنارے ایک پرانا سفینہ ٹھہرا ہوا تھا۔ ٹائپوگرافی کی ترتیبات بدلتی ہیں کہ ہر نوٹ کیسا پڑھا جاتا ہے، اس لیے آپ کے انتخاب کے ساتھ یہ نمونہ بھی بدلتا رہتا ہے۔",
+      "textSizeLabel": "متن کا سائز"
+    },
+    "viewMode": {
+      "errorSave": "طے شدہ منظر موڈ محفوظ نہیں ہو سکا۔",
+      "helper": "نوٹ کیسے کھلتا ہے: لائیو پیش منظر (طے شدہ)، صرف پڑھنے کا مطالعہ منظر، یا خام سورس۔ کسی نوٹ کو ⇧⌘E سے بدلیں۔",
+      "label": "طے شدہ منظر موڈ",
+      "optionLive": "لائیو پیش منظر",
+      "optionReading": "مطالعہ",
+      "optionSource": "سورس"
+    },
+    "strength": {
+      "weak": "کمزور",
+      "fair": "معمولی",
+      "good": "اچھا",
+      "strong": "مضبوط"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "ترتیب نہیں دیا گیا",
+        "offline": "آف لائن",
+        "conflicts_one": "{{count}} تصادم",
+        "conflicts_other": "{{count}} تصادم"
+      }
+    },
+    "data": {
+      "exported_one": "{{count}} نوٹ برآمد ہوا → {{label}}",
+      "exported_other": "{{count}} نوٹس برآمد ہوئے → {{label}}",
+      "exportNeedsApp": "برآمد کے لیے ایپ درکار ہے (براؤزر کا پیش منظر نہیں)۔",
+      "exportFailed": "والٹ برآمد نہیں ہو سکا۔",
+      "exportToMarkdown": "Markdown میں برآمد کریں",
+      "exportToMarkdownSubtitle": "ہر نوٹ ڈکرپٹ کر کے Documents میں ایک سادہ فولڈر میں رکھیں"
+    },
+    "saveSettingError": "وہ ترتیب محفوظ نہیں ہو سکی",
+    "panelTitle": {
+      "privacy": "رازداری اور تحفظ",
+      "data": "ڈیٹا",
+      "vaultName": "والٹ کا نام",
+      "approveDevice": "آلے کی منظوری"
+    },
+    "done": "ہو گیا",
+    "sectionOptions": "اختیارات",
+    "footerTagline": "myne · اسی آلے پر خفیہ · اوپن سورس",
+    "editor": {
+      "sections": {
+        "text": "متن اور ڈسپلے",
+        "editing": "ترمیم",
+        "writing": "لکھائی",
+        "features": "خصوصیات"
+      },
+      "preview": {
+        "heading": "چاندنی رات کا سفر",
+        "bullet1": "میرے صندوق میں پانچ درجن صراحیاں رکھ دو",
+        "bullet2": "زیبرے کس قدر پھرتی سے چھلانگ لگاتے ہیں",
+        "spellCaption": "ہجے کی جانچ",
+        "spellSample": "غلت"
+      },
+      "defaultView": "طے شدہ منظر",
+      "typewriter": "ٹائپ رائٹر اسکرولنگ",
+      "typewriterSubtitle": "کیرٹ کو عمودی طور پر درمیان میں رکھیں",
+      "enableArchiving": "آرکائیو کرنا فعال کریں"
+    },
+    "search": {
+      "placeholder": "ترتیبات تلاش کریں…",
+      "ariaLabel": "ترتیبات تلاش کریں",
+      "empty": "“{{query}}” سے کوئی ترتیب مطابقت نہیں رکھتی۔",
+      "resultsLabel": "تلاش کے نتائج",
+      "keywords": {
+        "aiAutoTag": "آٹو ٹیگ ٹیگ ٹیگز تجویز تجاویز لیبل ai",
+        "aiEnable": "مقامی ai آن بند فعال غیر فعال مشین لرننگ",
+        "aiExcluded": "خارج شدہ فولڈر نظر انداز ai رازداری اخراج",
+        "aiModels": "ماڈل ماڈلز gguf ڈاؤن لوڈ متن ایمبیڈنگ llm",
+        "archive": "آرکائیو آرکائیو کرنا چھپانا بحال نوٹس",
+        "autoBackup": "خودکار بیک اپ شیڈول تعدد برقراری فولڈر",
+        "autoLock": "خودکار لاک ٹائم آؤٹ بے عملی لاک ٹائمر سیشن",
+        "backup": "بیک اپ برآمد .myne-backup بحالی محفوظ نقل",
+        "buildChannel": "بلڈ چینل ورژن ریلیز مستحکم بیٹا نائٹلی",
+        "changePassword": "پاس ورڈ تبدیل ماسٹر پاس ورڈ اسناد اپ ڈیٹ ری سیٹ",
+        "changelog": "تبدیلیوں کی فہرست ریلیز نوٹس نیا کیا ہے تاریخچہ",
+        "cliAccess": "cli ٹرمینل رسائی کمانڈ لائن شیل myne کمانڈ کنسول",
+        "cliExcludedFolders": "cli خارج شدہ فولڈر ٹرمینل اخراج چھپانا کمانڈ لائن نجی",
+        "cliRateLimit": "cli رفتار کی حد ٹرمینل تیزی تھروٹل بلک کمانڈ فی منٹ",
+        "clipper": "براؤزر کلپر ایکسٹینشن ویب کیپچر chrome firefox",
+        "contentWidth": "مواد کی چوڑائی کالم مطالعہ لائن کی لمبائی",
+        "customThemes": "حسبِ ضرورت تھیمز پیلیٹ رنگ ظاہری شکل تھیم درآمد",
+        "dailyNotes": "روزانہ نوٹس جرنل تاریخ ٹیمپلیٹ فولڈر ڈائری",
+        "dangerZone": "خطرے کا علاقہ والٹ حذف تباہ ہٹانا مٹانا",
+        "export": "برآمد markdown ڈکرپٹ سادہ فائلیں دستاویزات",
+        "focusMode": "فوکس موڈ ٹائپ رائٹر مدھم غیر فعال لائنیں بلا خلل",
+        "font": "فونٹ ٹائپ فیس خاندان sans serif mono ٹائپوگرافی",
+        "graphSettings": "گراف ظاہری شکل فزکس قوتیں نوڈ لنکس لے آؤٹ رنگ گروپ لیبل کینوس",
+        "hotkeys": "ہاٹ کیز کی بورڈ شارٹ کٹ کی بائنڈنگ کی میپ کورڈ",
+        "import": "درآمد نوٹس obsidian notion evernote enex html csv منتقلی ہجرت لانا",
+        "language": "زبان لوکیل انٹرفیس ترجمہ ui",
+        "license": "لائسنس agpl اوپن سورس قانونی",
+        "lineNumbers": "لائن نمبر گٹر ایڈیٹر ڈسپلے",
+        "vimMode": "vim موڈل ترمیم نارمل انسرٹ ویژول کی بورڈ",
+        "lineSpacing": "لائنوں کا فاصلہ اونچائی ٹائپوگرافی پڑھنے کی آسانی",
+        "newNoteLocation": "نیا نوٹ جگہ فولڈر طے شدہ نوٹس کہاں بنتے ہیں",
+        "torRouting": "tor روٹنگ onion پراکسی نیٹ ورک ip پتہ مقام چھپانا مطابقت پذیری گمنامی",
+        "quickUnlock": "فوری ان لاک pin touch id بایومیٹرک چہرے سے ان لاک",
+        "reminders": "یاد دہانی اطلاع نوٹیفکیشن الرٹ ٹاسک واجب",
+        "screenCapture": "اسکرین کیپچر تحفظ اسکرین شاٹ ریکارڈنگ روکنا رازداری",
+        "showEditTimes": "ترمیم کے اوقات ٹائم اسٹیمپ تبدیلی تاریخیں نوٹس",
+        "spell": "ہجے جانچ املا لغت خودکار درستی",
+        "spellLanguages": "ہجے زبانیں لغات لوکیل الفاظ",
+        "startupOpen": "شروعات کھولنا طے شدہ فائل لانچ بوٹ کون سا نوٹ",
+        "attachmentOcr": "ocr تصویر اسکین اسکین شدہ pdf تصویر اسکرین شاٹ متن کی شناخت منسلکات کے اندر تلاش cpu بیٹری",
+        "attachmentCompression": "کمپریس کمپریشن تصویر چھوٹا کرنا سائز webp jpeg درآمد چسپاں والٹ سائز ذخیرہ",
+        "transcription": "نقل نویسی آواز تقریر آڈیو املا سب ٹائٹل whisper ریکارڈنگ آواز سے متن",
+        "syncAddDevice": "آلہ شامل جوڑنا لنک فون لیپ ٹاپ مطابقت پذیری",
+        "syncConflicts": "تصادم ضم حل ورژن مطابقت پذیری",
+        "syncDevices": "آلات منسلک جڑے ہوئے مطابقت پذیری مشینیں",
+        "syncRecovered": "بازیافت شدہ نوٹس بحالی مطابقت پذیری",
+        "syncServer": "مطابقت پذیری سرور ہوسٹ خود میزبان اینڈ پوائنٹ url",
+        "syncStatus": "مطابقت پذیری حالت کنکشن اپ ٹو ڈیٹ",
+        "textSize": "متن کا سائز فونٹ سائز زوم پیمانہ پڑھنے کی آسانی",
+        "theme": "تھیم تاریک روشن موڈ ظاہری شکل رنگ سکیم amoled سسٹم",
+        "threatModel": "خطرہ ماڈل تحفظ حریف اثاثے اعتماد",
+        "toolbar": "ٹول بار بٹن فارمیٹنگ تیرتا سلیکشن حسبِ ضرورت",
+        "vaultIcon": "والٹ آئیکن اوتار تصویر علامت",
+        "vaultLabel": "والٹ لیبل نام تبدیلی عنوان",
+        "vaultLocation": "والٹ کی جگہ راستہ فولڈر ڈسک پر کہاں محفوظ",
+        "viewMode": "طے شدہ منظر موڈ لائیو مطالعہ سورس پیش منظر"
+      }
+    }
+  },
+  "storageLost": {
+    "allSynced": "کچھ ضائع نہیں ہوا — یہاں کا ہر نوٹ پہلے ہی سرور تک پہنچ چکا تھا۔",
+    "evicted": {
+      "body": "آپ کے براؤزر نے جگہ خالی کرنے کے لیے اس سائٹ کا ذخیرہ صاف کر دیا۔ کچھ خراب نہیں ہوا اور سرور پر کچھ حذف نہیں ہوا — جو کچھ مطابقت پذیر ہو چکا تھا وہ اب بھی موجود ہے۔",
+      "title": "آپ کے براؤزر نے اس والٹ کی مقامی نقل صاف کر دی"
+    },
+    "lockCta": "لاک کریں اور دوبارہ کوشش کریں",
+    "reDownloadCta": "اس براؤزر کو دوبارہ ترتیب دیں",
+    "reEnrolNotice": "دوبارہ ترتیب دینے پر یہ براؤزر ایک نئے آلے کے طور پر رجسٹر ہوتا ہے، اس لیے مطابقت پذیری سے پہلے یہ آپ کے کسی دوسرے آلے کی منظوری کا انتظار کرے گا۔",
+    "unopenable": {
+      "body": "اس والٹ کی مقامی نقل اب پڑھی نہیں جا سکتی۔ سرور پر کچھ متاثر نہیں ہوا — یہاں کی نقل ایک کیش ہے، اور اسے بدلا جا سکتا ہے۔",
+      "title": "اس والٹ کی مقامی نقل پڑھی نہیں جا سکتی"
+    },
+    "unsyncedIntro": "{{count}} نوٹ ابھی سرور تک نہیں پہنچا تھا۔ وہ جا چکا — یہی واحد نقل تھی:",
+    "unsyncedIntro_one": "{{count}} نوٹ ابھی سرور تک نہیں پہنچا تھا۔ وہ جا چکا — یہی واحد نقل تھی:",
+    "unsyncedIntro_other": "{{count}} نوٹس ابھی سرور تک نہیں پہنچے تھے۔ وہ جا چکے — یہی واحد نقل تھی:",
+    "unsyncedOverflow": "…اور {{count}} مزید۔",
+    "unsyncedOverflow_one": "…اور {{count}} مزید۔",
+    "unsyncedOverflow_other": "…اور {{count}} مزید۔"
+  },
+  "sync": {
+    "materialising": "آپ کے نوٹس ڈاؤن لوڈ ہو رہے ہیں — {{total}} میں سے {{done}}۔ آپ کام شروع کر سکتے ہیں؛ باقی آتے ہی ظاہر ہوتے جائیں گے۔",
+    "credentialAmbiguous": "ہو سکتا ہے آپ کا پاس ورڈ اس آلے پر بھی بدلا ہو اور کسی دوسرے آلے پر بھی، اور Myne یہ نہیں بتا سکتا کہ کون سا نیا ہے — اس لیے اس نے کچھ تبدیل نہیں کیا۔ اس مسئلے کو حل کرنے کے لیے ایسے آلے پر سائن ان کریں جس کے پاس پہلے سے رسائی ہے۔",
+    "attachments": {
+      "aria": {
+        "downloading": "{{name}} ڈاؤن لوڈ ہو رہی ہے",
+        "uploading": "{{name}} اپ لوڈ ہو رہی ہے"
+      },
+      "empty": "کوئی منتقلی جاری نہیں۔",
+      "heading": "منسلکات کی مطابقت پذیری",
+      "status": {
+        "done": "مکمل",
+        "failedWillRetry": "ناکام — دوبارہ کوشش ہو گی",
+        "paused": "روکا گیا"
+      }
+    },
+    "buildingIndex": {
+      "label": "تلاش کا اشاریہ بن رہا ہے…"
+    },
+    "conflicts": {
+      "compare": "موازنہ",
+      "compareClose": "تصادم پر واپس",
+      "compareError": "موازنے کے لیے یہ نوٹس پڑھے نہیں جا سکے۔ دوبارہ کوشش کریں۔",
+      "compareIdentical": "یہ دونوں نسخے بالکل ایک جیسے ہیں۔",
+      "compareLoading": "دونوں نسخے پڑھے جا رہے ہیں…",
+      "compareMine": "اس آلے پر",
+      "compareOrphan": "جس نوٹ سے یہ نقل آئی تھی وہ اب یہاں موجود نہیں، اس لیے موازنے کے لیے کچھ نہیں ہے۔",
+      "compareTheirs": "متصادم نقل",
+      "compareTitle": "“{{title}}” کا موازنہ",
+      "discard": "رد کریں",
+      "empty": "کوئی تصادم نہیں — آپ کے آلات ہم آہنگ ہیں۔",
+      "groupTitle_one": "{{original}} کی {{count}} متصادم نقل",
+      "groupTitle_other": "{{original}} کی {{count}} متصادم نقول",
+      "keepAsSeparate": "الگ نوٹ کے طور پر رکھیں",
+      "tookTheirsToast": "مقامی نسخہ ردی میں منتقل کر دیا گیا۔",
+      "tookTheirsUndo": "کالعدم کریں",
+      "untitled": "بلا عنوان ({{hex}})",
+      "useThisVersion": "یہی نسخہ استعمال کریں"
+    },
+    "deviceJoinQr": {
+      "accountLabel": "اکاؤنٹ نمبر",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "QR نہیں بن سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "generate": "QR بنائیں",
+      "hint": "اپنا اکاؤنٹ نمبر چسپاں کریں تاکہ ایسا QR بن جائے جسے آپ کا فون اسکین کر سکے — یہ سرور اور اکاؤنٹ نمبر خود بھر دیتا ہے۔",
+      "invalidAccount": "یہ درست اکاؤنٹ نمبر نہیں لگتا۔",
+      "notConfigured": "پہلے مطابقت پذیری سرور ترتیب دیں، پھر QR بنائیں۔",
+      "scanWithApp": "iOS ایپ سے اسکین کریں",
+      "title": "QR سے آلہ شامل کریں"
+    },
+    "devices": {
+      "approve": "منظوری دیں",
+      "awaitingApproval_one": "{{count}} آلہ منظوری کا منتظر",
+      "awaitingApproval_other": "{{count}} آلات منظوری کے منتظر",
+      "loading": "لوڈ ہو رہا ہے…",
+      "noDevices": "ابھی کوئی آلہ ہم آہنگ نہیں ہوا۔",
+      "notEnrolled": "یہ آلہ ابھی منسلک نہیں ہے۔ اگر آپ نے ابھی اسے شامل کیا ہے تو کسی دوسرے آلے سے منظوری کا انتظار کریں؛ ورنہ اوپر دیے گئے “آلہ شامل کریں” فارم سے اسے شامل کریں۔",
+      "platform": {
+        "android": "Android فون",
+        "androidTablet": "Android ٹیبلٹ",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux کمپیوٹر",
+        "macos": "Mac",
+        "unknown": "یہ آلہ",
+        "web": "براؤزر",
+        "windows": "Windows کمپیوٹر"
+      },
+      "remove": "ہٹائیں",
+      "removedElsewhere": "اس آلے کو کسی دوسرے آلے سے آپ کے اکاؤنٹ سے ہٹا دیا گیا تھا۔",
+      "rename": "نام تبدیل کریں",
+      "renameFailed": "وہ نام محفوظ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "renameLabel": "آلے کا نام",
+      "resetAndReAdd": "اس آلے کو ری سیٹ کر کے دوبارہ شامل کریں",
+      "resetSyncOnThisDevice": "اس آلے پر مطابقت پذیری ری سیٹ کریں",
+      "shortName": "آلہ {{hex}}",
+      "syncedHere": "یہاں ہم آہنگ",
+      "thisDevice": "یہ آلہ",
+      "transportHint": "اگر سرور منتقل ہو گیا ہو یا اس کا سرٹیفکیٹ بدل گیا ہو تو اوپر “مطابقت پذیری سرور” میں سرور کا URL دوبارہ درج کر کے اس پر دوبارہ اعتماد قائم کریں۔",
+      "unreachable": "مطابقت پذیری تک نہیں پہنچا جا سکا ({{error}})۔",
+      "verifyBody": "جانچیں کہ جس آلے کو آپ نے ابھی منظوری دی ہے اس پر بھی یہی کوڈ ظاہر ہو رہا ہے۔ اگر یہ مطابقت رکھتا ہے تو وہ آپ کے اکاؤنٹ پر ہے۔ اگر نہیں، تو اس آلے کو ہٹا دیں۔",
+      "verifyMatch": "دونوں یکساں ہیں",
+      "verifyMismatch": "دونوں یکساں نہیں ہیں",
+      "verifyPending": "یہ کوڈ اس وقت ظاہر ہوتا ہے جب نیا آلہ اپنی پہلی مطابقت پذیری مکمل کر لے۔",
+      "verifySyncing": "مطابقت پذیری جاری ہے…",
+      "verifyTitle": "نئے آلے کی تصدیق کریں",
+      "yourDevices": "آپ کے آلات"
+    },
+    "endpoint": {
+      "connect": "منسلک کریں",
+      "connected": "منسلک ہے",
+      "connectedLocal": "منسلک ہے (مقامی، TLS کے بغیر)۔",
+      "connectedTls": "منسلک ہے۔ جانچیں کہ یہ فنگر پرنٹ آپ کے دوسرے آلے پر بھی یہی ہے۔",
+      "connectedPlatformTrust": "TLS پر منسلک ہے۔ آپ کے براؤزر نے اس سرور کے سرٹیفکیٹ کی تصدیق کر لی ہے۔",
+      "connecting": "منسلک ہو رہا ہے…",
+      "fingerprintLabel": "سرور کے سرٹیفکیٹ کا فنگر پرنٹ:",
+      "confirmFingerprintRequired": "Tor روٹنگ آن ہے، اس لیے یہ آلہ کسی ایسے سرٹیفکیٹ پر اعتماد نہیں کرے گا جس کے بارے میں اسے پہلے سے نہ بتایا گیا ہو۔ اپنے سرور کا SHA-256 سرٹیفکیٹ فنگر پرنٹ خود سرور سے یا کسی پہلے سے منسلک آلے سے حاصل کریں، پھر یہاں چسپاں کریں۔",
+      "confirmFingerprintMismatch": "اس سرور نے جو سرٹیفکیٹ پیش کیا وہ وہی نہیں جو آپ نے درج کیا۔ کچھ محفوظ نہیں کیا گیا۔ چسپاں کیا گیا فنگر پرنٹ جانچیں — اور اگر وہ درست ہے تو منسلک نہ ہوں: اس آلے اور آپ کے سرور کے درمیان کوئی موجود ہے۔",
+      "confirmFingerprintDeclined": "کچھ محفوظ نہیں کیا گیا — یہ آلہ اس سرور سے منسلک نہیں ہے۔ سرٹیفکیٹ کا فنگر پرنٹ حاصل کرنے کے بعد واپس آئیں۔",
+      "pinStatic": "Myne کے اندرونی سرٹیفکیٹ کے مقابل تصدیق شدہ۔",
+      "pinTofu": "پہلے کنکشن پر پن کر دیا گیا۔ اس فنگر پرنٹ کا اپنے تمام آلات پر موازنہ کریں۔",
+      "fixedOrigin": "یہ کلائنٹ ایک ہی سرور کے ساتھ مطابقت رکھتا ہے، جو اس کی تنصیب کے وقت طے ہوا تھا۔ اسے یہاں سے تبدیل نہیں کیا جا سکتا — اس صفحے کو صرف اسی ایک پتے سے بات کرنے کی اجازت ہے۔",
+      "fixedOriginNone": "اس تنصیب کے لیے کوئی مطابقت پذیری سرور ترتیب نہیں دیا گیا۔",
+      "pinPlatformTrust": "آپ کے براؤزر کے سرٹیفکیٹ ذخیرے سے تصدیق شدہ۔ یہ کلائنٹ خود سرٹیفکیٹ پن نہیں کر سکتا۔",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "اس سرور تک نہیں پہنچا جا سکا — URL جانچیں اور یہ بھی کہ وہ چل رہا ہے۔"
+    },
+    "enroll": {
+      "accountNumberLabel": "اکاؤنٹ نمبر",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "منسلک ہو رہا ہے…",
+      "credentialTypeAria": "سند کی قسم",
+      "deviceNameHelp": "آپ کے آلات کی فہرست میں دکھایا جاتا ہے۔ آپ اسے بعد میں بدل سکتے ہیں۔",
+      "deviceNameLabel": "اس آلے کا نام رکھیں",
+      "error": {
+        "notConfigured": "اس آلے کو شامل کرنے سے پہلے ترتیبات میں مطابقت پذیری سرور طے کریں۔",
+        "transport": "مطابقت پذیری سرور تک نہیں پہنچا جا سکا۔ اپنا کنکشن جانچیں اور دوبارہ کوشش کریں۔"
+      },
+      "mode": {
+        "password": "پاس ورڈ",
+        "recovery": "بحالی فقرہ"
+      },
+      "passwordLabel": "پاس ورڈ",
+      "recoveryPhraseHint": "اپنا 24 الفاظ پر مشتمل بحالی فقرہ درج کریں۔",
+      "recoveryPhraseLabel": "بحالی فقرہ",
+      "signInWith": "اس سے سائن ان کریں",
+      "submit": "یہ آلہ شامل کریں",
+      "wordAria": "لفظ {{number}}"
+    },
+    "fingerprint": {
+      "title": "اس سرور پر اعتماد سے پہلے اس کا سرٹیفکیٹ جانچیں",
+      "why": "Tor روٹنگ آن ہے، اس لیے یہ پہلا کنکشن ایک اجنبی کے چلائے ہوئے ریلے کے ذریعے سرور تک پہنچتا ہے۔ جب تک کوئی سرٹیفکیٹ پن نہ ہو، یہ آلہ ہر وہ سرٹیفکیٹ قبول کر لے گا جو اسے دیا جائے — بشمول وہ جو اسی ریلے نے گھڑا ہو۔ اپنے سرور کا شائع کردہ فنگر پرنٹ درج کریں؛ Myne کچھ بھی پن کرنے سے پہلے اس کا موازنہ کرے گا۔ اگر مطابقت نہ ہوئی تو کچھ محفوظ نہیں کیا جائے گا۔",
+      "label": "متوقع سرٹیفکیٹ فنگر پرنٹ",
+      "placeholder": "آپ کے سرور کا SHA-256 فنگر پرنٹ",
+      "echoLabel": "آپ نے جو درج کیا",
+      "echoComplete": "64 میں سے 64 حروف۔ جاری رکھنے سے پہلے اسے اپنی نقل کے ساتھ پڑھ کر ملائیں۔",
+      "echoProgress": "اب تک {{total}} میں سے {{count}} حروف۔",
+      "echoInvalid": "SHA-256 فنگر پرنٹ 64 حروف کا ہوتا ہے، ہر حرف 0–9 یا a–f۔ کولن، خالی جگہیں اور شروع میں “sha256:” ٹھیک ہیں — اس کے علاوہ کچھ بھی اس کا حصہ نہیں۔",
+      "helpToggle": "یہ فنگر پرنٹ مجھے کہاں ملے گا؟",
+      "helpNotOverTor": "اسی کنکشن سے نہیں۔ اسی راستے سے حاصل کیا گیا فنگر پرنٹ کچھ ثابت نہیں کرتا — جو چیز سرٹیفکیٹ بدل سکتی ہے وہ اس صفحے کو بھی بدل سکتی ہے۔",
+      "helpFromServer": "اپنا سرور چلانے والی مشین پر: openssl x509 -noout -fingerprint -sha256 -in <your certificate file>",
+      "helpFromDevice": "اس اکاؤنٹ سے پہلے سے منسلک کسی آلے پر: ترتیبات → مطابقت پذیری میں یہی فنگر پرنٹ دکھایا جاتا ہے۔",
+      "helpNoFingerprint": "اگر آپ اسے ان میں سے کسی طریقے سے حاصل نہ کر سکیں تو Tor روٹنگ آن رہتے ہوئے یہ سرور شامل نہیں کیا جا سکتا۔ آپ ترتیبات → نیٹ ورک میں Tor روٹنگ بند کر کے براہِ راست منسلک ہو سکتے ہیں — اس سے آپ کا IP پتہ سرور کو اور ہر اس شخص کو نظر آئے گا جو آپ کا نیٹ ورک دیکھ سکتا ہے۔",
+      "decline": "میرے پاس نہیں ہے — منسوخ کریں"
+    },
+    "join": {
+      "accountLabel": "اکاؤنٹ نمبر",
+      "cancel": "منسوخ کریں",
+      "continue": "جاری رکھیں",
+      "error": "یہ آلہ شامل نہیں ہو سکا۔ سرور کا URL، اکاؤنٹ نمبر اور پاس ورڈ جانچیں — اور یہ بھی کہ سرور تک رسائی ہے۔",
+      "help": "اپنے اکاؤنٹ نمبر اور پاس ورڈ سے سائن ان کریں۔ کسی موجودہ آلے کی منظوری کے بعد یہ آلہ آپ کے نوٹس ہم آہنگ کر لے گا۔ بحالی فقرے کی ضرورت نہیں۔",
+      "passwordLabel": "پاس ورڈ",
+      "pinnedCompare": "اس آلے نے آپ کے سرور کا سرٹیفکیٹ پن کر لیا ہے۔ جانچیں کہ یہ فنگر پرنٹ آپ کے دوسرے آلات پر بھی یہی ہے۔",
+      "confirmFingerprintRequired": "Tor روٹنگ آن ہے، اس لیے یہ آلہ کسی ایسے سرٹیفکیٹ پر اعتماد نہیں کرے گا جس کے بارے میں اسے پہلے سے نہ بتایا گیا ہو۔ اپنے سرور کا SHA-256 سرٹیفکیٹ فنگر پرنٹ خود سرور سے یا کسی پہلے سے منسلک آلے سے حاصل کریں، پھر یہاں چسپاں کریں۔",
+      "confirmFingerprintMismatch": "اس سرور نے جو سرٹیفکیٹ پیش کیا وہ وہی نہیں جو آپ نے درج کیا۔ یہ آلہ شامل نہیں کیا گیا اور کچھ محفوظ نہیں ہوا۔ چسپاں کیا گیا فنگر پرنٹ جانچیں — اور اگر وہ درست ہے تو آگے نہ بڑھیں: اس آلے اور آپ کے سرور کے درمیان کوئی موجود ہے۔",
+      "pinnedTitle": "سرور کا سرٹیفکیٹ پن ہو گیا",
+      "serverLabel": "مطابقت پذیری سرور",
+      "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "دونوں یکساں ہیں — جاری رکھیں",
+      "sasMismatch": "دونوں یکساں نہیں ہیں — یہ آلہ ہٹا دیں",
+      "submit": "آلہ شامل کریں",
+      "submitting": "شامل کیا جا رہا ہے…",
+      "title": "اس آلے کو کسی اکاؤنٹ میں شامل کریں",
+      "verifyBody": "جانچیں کہ یہ کوڈ اس آلے پر دکھائے گئے کوڈ سے مطابقت رکھتا ہے جس سے آپ نے منظوری دی تھی۔",
+      "verifyTitle": "اس آلے کی تصدیق کریں",
+      "waitingHint": "یہ ونڈو کھلی رکھیں — منظوری ملتے ہی یہاں ایک تصدیقی کوڈ ظاہر ہو گا جس کا آپ اپنے دوسرے آلے سے موازنہ کر سکیں گے۔",
+      "waitingTitle": "منظوری کا انتظار"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "کسی نئے آلے پر اپنے اکاؤنٹ نمبر اور پاس ورڈ یا بحالی فقرے سے سائن ان کریں۔ کوئی آلہ اس وقت تک زیرِ التوا رہتا ہے جب تک کوئی موجودہ آلہ اسے منظوری نہ دے۔",
+        "label": "آلہ شامل کریں"
+      },
+      "awaitingApproval": {
+        "label": "منظوری کا انتظار"
+      },
+      "conflicts": {
+        "helper": "جب ایک ہی نوٹ دو آلات پر بیک وقت تدوین ہو، تو Myne دونوں نقول رکھ لیتا ہے تاکہ کچھ ضائع نہ ہو۔ انہیں یہاں حل کریں۔",
+        "label": "تصادم"
+      },
+      "devices": {
+        "label": "آلات"
+      },
+      "recovered": {
+        "close": "بند کریں",
+        "decrypting": "ڈکرپٹ ہو رہا ہے…",
+        "deleteConfirmTitle": "یہ بازیافت شدہ نوٹ حذف کریں؟",
+        "deleteConfirmWarning": "اس سے اس آلے پر رکھی واحد نقل مستقل طور پر حذف ہو جائے گی۔ یہ واپس نہیں لیا جا سکتا۔",
+        "deleteCta": "حذف کریں",
+        "empty": "کوئی بازیافت شدہ نوٹ نہیں۔",
+        "errorGeneric": "کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔",
+        "helper": "جب کسی دوسرے آلے پر حذف کیا گیا نوٹ یہاں سے ہٹایا جاتا ہے، تو اس کی رمزی نقل اس آلے پر رکھ لی جاتی ہے۔ کسی ایک کو نئے نوٹ کے طور پر بحال کریں، یا مستقل طور پر حذف کر دیں۔",
+        "label": "بازیافت شدہ نوٹس",
+        "previewCta": "پیش منظر",
+        "previewTitle": "بازیافت شدہ نوٹ",
+        "restoreCta": "بحال کریں"
+      },
+      "server": {
+        "helper": "ہر آلے پر یہی سرور URL درج کریں۔ خود میزبان سرور کے لیے اس کا <1>https://</1> پتہ استعمال کریں؛ جانچیں کہ سرٹیفکیٹ کا فنگر پرنٹ آپ کے تمام آلات پر یکساں ہے۔",
+        "label": "مطابقت پذیری سرور"
+      },
+      "status": {
+        "helper": "Myne آپ کے رمز شدہ نوٹس کو آپ کے آلات کے درمیان ہم آہنگ رکھتا ہے۔ سرور صرف وہ رمزی متن رکھتا ہے جسے وہ پڑھ نہیں سکتا۔",
+        "label": "مطابقت پذیری کی حالت"
+      },
+      "usage": {
+        "helper": "یہ اکاؤنٹ سرور پر کتنا رمز شدہ ڈیٹا رکھتا ہے، اور کتنے آلات سائن ان ہیں۔",
+        "label": "اسٹوریج اور آلات"
+      }
+    },
+    "reconcile": {
+      "message": "یہ آلہ کچھ دیر آف لائن رہا — مطابقت پذیری پوری کی جا رہی ہے۔ آپ کے نوٹس محفوظ ہیں۔"
+    },
+    "recovered": {
+      "restoredToast": "نئے نوٹ کے طور پر بحال کر دیا گیا۔"
+    },
+    "status": {
+      "awaitingApproval": "منظوری کا انتظار",
+      "conflicts_one": "{{count}} تصادم جائزے کے لیے",
+      "conflicts_other": "{{count}} تصادم جائزے کے لیے",
+      "error": "مطابقت پذیری میں خرابی",
+      "errorAuth": "مطابقت پذیری کا سائن ان ختم ہو گیا",
+      "errorFrozen": "اکاؤنٹ منجمد — اپ لوڈ روک دیے گئے",
+      "errorDeviceRevoked": "اس آلے کو آپ کے اکاؤنٹ سے ہٹا دیا گیا",
+      "errorStorageFull": "اسٹوریج بھر گئی — مطابقت پذیری روک دی گئی",
+      "errorQuota": "اسٹوریج بھر گئی — اپ لوڈ روک دیے گئے",
+      "errorRateLimited": "مطابقت پذیری محدود کر دی گئی — دوبارہ کوشش جاری",
+      "errorTooLarge": "ایک فائل اپ لوڈ کے لیے بہت بڑی ہے",
+      "loading": "مطابقت پذیری کی حالت…",
+      "notEnrolled": "اندراج نہیں ہوا",
+      "off": "مطابقت پذیری بند",
+      "synced": "ہم آہنگ",
+      "syncing": "مطابقت پذیری جاری ہے…",
+      "syncNow": "ابھی ہم آہنگ کریں"
+    },
+    "usage": {
+      "devices": "آلات",
+      "frozen": "یہ اکاؤنٹ منجمد ہے۔ نئی تبدیلیاں اپ لوڈ نہیں ہو سکتیں؛ آپ کے نوٹس پھر بھی ڈاؤن لوڈ ہوتے رہیں گے۔",
+      "ofTotal": "{{total}} میں سے {{used}}",
+      "storage": "اسٹوریج"
+    },
+    "settings": {
+      "serverSection": "سرور",
+      "serverNotSet": "طے نہیں",
+      "statusLabel": "حالت",
+      "hubHelp": "مطابقت پذیری آپ کے نوٹس کو تمام آلات پر تازہ رکھتی ہے۔ بھیجنے سے پہلے ہر چیز اسی آلے پر رمز کر دی جاتی ہے — سرور کبھی آپ کے نوٹس نہیں دیکھتا۔",
+      "connectedTls": "TLS پر منسلک ہے۔",
+      "connectedLocal": "آپ کے مقامی نیٹ ورک پر منسلک ہے۔",
+      "connectError": "اس سرور تک نہیں پہنچا جا سکا۔ پتہ جانچیں اور دوبارہ کوشش کریں۔",
+      "serverAddressLabel": "سرور کا پتہ",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "سرٹیفکیٹ کا فنگر پرنٹ",
+      "fingerprintCompare": "اس کا موازنہ کسی ایسے آلے کی اسی اسکرین سے کریں جس پر آپ پہلے سے اعتماد کرتے ہیں — دونوں کا یکساں ہونا ضروری ہے۔",
+      "pinStatic": "اس سرور کے معلوم سرٹیفکیٹ کے مقابل تصدیق شدہ۔",
+      "pinTofu": "پہلے کنکشن پر پن کر دیا گیا۔ تصدیق کے لیے اپنے تمام آلات پر اس کا موازنہ کریں۔",
+      "enrollNotConfigured": "پہلے مطابقت پذیری سرور ترتیب دیں، پھر یہ آلہ شامل کریں۔",
+      "enrollTransport": "مطابقت پذیری سرور تک نہیں پہنچا جا سکا۔ اپنا کنکشن جانچیں اور دوبارہ کوشش کریں۔",
+      "accountNumberHint": "یہ نمبر دوبارہ جانچیں — یہ درست نہیں لگتا۔",
+      "passwordPlaceholder": "آپ کے والٹ کا پاس ورڈ",
+      "recoveryPhraseHint": "اپنے 24 الفاظ درج کریں یا چسپاں کریں۔ چسپاں کرنے پر خانے ترتیب سے بھر جاتے ہیں۔",
+      "verifyBody": "جانچیں کہ جس آلے کو آپ نے ابھی منظوری دی ہے اس پر بھی یہی کوڈ ظاہر ہو رہا ہے۔ اگر یہ مطابقت رکھتا ہے تو وہ آپ کے اکاؤنٹ پر ہے۔ اگر نہیں، تو اس آلے کو ہٹا دیں۔",
+      "sasMismatch": "دونوں یکساں نہیں ہیں",
+      "removeDeviceButton": "آلہ ہٹائیں",
+      "keepDevice": "اسے رہنے دیں",
+      "notEnrolledHelp": "یہ آلہ ابھی ہم آہنگ نہیں ہو رہا۔ اپنے آلات دیکھنے کے لیے اسے پچھلی اسکرین سے شامل کریں۔",
+      "unauthenticated": "اس آلے کی رسائی منسوخ کر دی گئی، غالباً اسے کسی دوسرے آلے سے ہٹا دیا گیا۔",
+      "transportError": "مطابقت پذیری سرور تک نہیں پہنچا جا سکا۔ اگر سرور منتقل ہو گیا ہو یا اس کا سرٹیفکیٹ بدل گیا ہو تو اسے مطابقت پذیری سرور اسکرین سے دوبارہ منسلک کریں۔",
+      "retiredSelf": "اس آلے کو کسی دوسرے آلے سے ہٹا دیا گیا تھا۔",
+      "resetAndAddAgain": "ری سیٹ کر کے دوبارہ شامل کریں",
+      "noDevices": "ابھی کوئی آلہ نہیں۔",
+      "syncingHere": "یہاں مطابقت پذیری جاری"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} تصادم کا جائزہ درکار ہے",
+      "conflictsNeedReview_other": "{{count}} تصادم کا جائزہ درکار ہے",
+      "catchingUp": "مطابقت پذیری پوری کی جا رہی ہے — آپ کے نوٹس محفوظ ہیں۔",
+      "verifyDevices": "آلات کی تصدیق کریں"
+    },
+    "tor": {
+      "connecting": "Tor سے منسلک ہو رہا ہے۔ کنکشن تیار ہونے تک مطابقت پذیری روکی ہوئی ہے — کچھ بھی براہِ راست نہیں بھیجا جا رہا۔",
+      "settingsHint": "ترتیبات → نیٹ ورک",
+      "unavailable": "Tor دستیاب نہیں، اس لیے مطابقت پذیری روکی ہوئی ہے۔ کچھ بھی براہِ راست نہیں بھیجا جا رہا۔ اس کے بغیر ہم آہنگ کرنے کے لیے Tor روٹنگ بند کر دیں۔"
+    }
+  },
+  "tasks": {
+    "builder": {
+      "any": "کوئی بھی",
+      "due": "مقررہ",
+      "folder": "فولڈر",
+      "insert": "داخل کریں",
+      "noDueDate": "کوئی مقررہ تاریخ نہیں",
+      "priority": "ترجیح",
+      "sort": "ترتیب کی بنیاد",
+      "sortDue": "مقررہ تاریخ",
+      "sortPath": "نوٹ",
+      "sortPriority": "ترجیح",
+      "status": "حالت",
+      "statusDone": "مکمل",
+      "statusTodo": "نامکمل",
+      "tag": "ٹیگ"
+    },
+    "empty": {
+      "filter": "ابھی یہاں کچھ نہیں۔ کوئی دوسرا فلٹر آزمائیں۔",
+      "rebuilding": "آپ کے نوٹس پڑھے جا رہے ہیں…",
+      "scope": "اس فولڈر یا ٹیگ میں کوئی ٹاسک نہیں۔ دائرہ وسیع کر کے دیکھیں۔",
+      "vault": "ابھی کوئی ٹاسک نہیں۔ ٹاسک بنانے کے لیے کسی بھی نوٹ میں ایک لائن پر “- [ ]” لکھیں۔"
+    },
+    "filter": {
+      "all": "تمام",
+      "overdue": "تاخیر شدہ",
+      "today": "آج",
+      "upcoming": "آنے والے"
+    },
+    "noteTitle": "اس نوٹ کے ٹاسکس",
+    "query": {
+      "dropped_one": "{{count}} شق جو Myne نہیں پڑھ سکا",
+      "dropped_other": "{{count}} شقیں جو Myne نہیں پڑھ سکا",
+      "empty": "اس استفسار سے کوئی ٹاسک مطابقت نہیں رکھتا۔",
+      "loading": "آپ کے نوٹس پڑھے جا رہے ہیں…",
+      "refused": "Myne اس استفسار کا کوئی حصہ نہیں پڑھ سکا، اس لیے وہ سب کچھ دکھانے کے بجائے کچھ نہیں دکھا رہا۔",
+      "remainder_one": "{{count}} مزید ٹاسک مطابقت رکھتا ہے",
+      "remainder_other": "{{count}} مزید ٹاسکس مطابقت رکھتے ہیں"
+    },
+    "reminder": {
+      "due": "ایک ٹاسک کی یاد دہانی کا وقت ہو گیا۔"
+    },
+    "row": {
+      "completed": "ٹاسک، مکمل",
+      "notCompleted": "ٹاسک، نامکمل",
+      "tooLongToWrite": "اس ٹاسک کی لائن یہاں سے تدوین کے لیے بہت لمبی ہے۔ اس کے بجائے اس کا نوٹ کھولیں۔",
+      "untitled": "بلا عنوان ٹاسک"
+    },
+    "scope": {
+      "allFolders": "تمام فولڈرز",
+      "label": "محدود کریں"
+    },
+    "title": "ٹاسکس"
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "ٹیمپلیٹس بند کریں",
+      "deleteRowLabel": "ٹیمپلیٹ {{name}} حذف کریں (ردی میں منتقل کریں)",
+      "editTemplateLabel": "ٹیمپلیٹ {{name}} کی تدوین کریں",
+      "emptyBody": "نوٹ کا ڈھانچہ دوبارہ استعمال کرنے کے لیے ٹیمپلیٹ بنائیں — میٹنگ نوٹ، روزنامچہ، مطالعے کا نوٹ۔ نیا نوٹ بناتے وقت ان میں سے کوئی ایک چن لیں۔",
+      "emptyTitle": "ابھی کوئی ٹیمپلیٹ نہیں",
+      "listLabel": "ٹیمپلیٹس",
+      "loading": "لوڈ ہو رہا ہے…",
+      "newTemplate": "نیا ٹیمپلیٹ",
+      "newTemplateName": "بلا عنوان ٹیمپلیٹ",
+      "removeFromTemplates": "ٹیمپلیٹس سے ہٹائیں",
+      "removeRowLabel": "{{name}} کو ٹیمپلیٹس سے ہٹائیں (نوٹ باقی رہے گا)",
+      "title": "نوٹ ٹیمپلیٹس"
+    },
+    "emptyBefore": "ابھی کوئی ٹیمپلیٹ نہیں۔ ",
+    "newAction": "نیا",
+    "emptyAfter": " پر ٹیپ کر کے دوبارہ استعمال ہونے والا نوٹ ٹیمپلیٹ بنائیں — پھر اسی سے نوٹس شروع کریں (اور ترتیبات میں کسی ایک کو اپنا روزانہ نوٹ ٹیمپلیٹ منتخب کریں)۔",
+    "use": "استعمال کریں",
+    "edit": "تدوین",
+    "deleteConfirm": "یہ ٹیمپلیٹ حذف کریں؟",
+    "convertToNote": "نوٹ میں تبدیل کریں"
+  },
+  "themeInstall": {
+    "apply": "تھیم لاگو کریں",
+    "applying": "لاگو کیا جا رہا ہے…",
+    "byAuthor": "اس لنک کے مطابق یہ {{author}} کا بنایا ہوا ہے",
+    "cancel": "منسوخ کریں",
+    "close": "بند کریں",
+    "collision": {
+      "keepBoth": "دونوں رکھیں — “{{name}}” کے نام سے انسٹال کریں",
+      "question": "آپ کے پاس پہلے سے “{{name}}” نام کی تھیم موجود ہے۔",
+      "replace": "“{{name}}” کو بدل دیں"
+    },
+    "error": {
+      "importFailed": "وہ تھیم انسٹال نہیں ہو سکی۔ کچھ تبدیل نہیں ہوا۔",
+      "installedNotActivated": "“{{name}}” انسٹال ہو گئی، مگر آن نہیں ہو سکی۔ آپ اسے ترتیبات → ظاہری شکل سے لاگو کر سکتے ہیں۔",
+      "invalidName": "وہ لنک اس تھیم کا نام نہیں بتاتا جو وہ انسٹال کرنا چاہتا ہے۔",
+      "listUnavailable": "آپ کی موجودہ تھیمیں پڑھی نہیں جا سکیں، اس لیے یہ ابھی محفوظ طریقے سے انسٹال نہیں ہو سکتی۔ اسے بند کریں اور لنک دوبارہ آزمائیں۔",
+      "malformedPayload": "اس لنک کا تھیم ڈیٹا خراب یا نامکمل ہے۔",
+      "nothingWritten": "آپ کے والٹ میں کچھ نہیں لکھا گیا۔",
+      "payloadTooLarge": "اس لنک کا تھیم ڈیٹا اتنا بڑا ہے کہ وہ تھیم نہیں ہو سکتا۔",
+      "unsupportedVersion": "وہ لنک Myne کے کسی نئے ورژن کے لیے بنایا گیا تھا۔ Myne اپ ڈیٹ کریں، پھر دوبارہ کوشش کریں۔"
+    },
+    "errorTitle": "وہ تھیم پڑھی نہیں جا سکی",
+    "helper": "تھیمیں رنگوں کا مجموعہ ہوتی ہیں، کوڈ نہیں۔ Myne استعمال سے پہلے اسی آلے پر اس کی جانچ کرتا ہے — کچھ اپ لوڈ نہیں ہوتا۔",
+    "question": "کیا آپ یہ تھیم استعمال کرنا چاہتے ہیں؟",
+    "title": "تھیم انسٹال کریں"
+  },
+  "unlock": {
+    "backToPicker": "کوئی دوسرا والٹ منتخب کریں",
+    "continue": "جاری رکھیں",
+    "decrypting": "ڈکرپٹ ہو رہا ہے…",
+    "deleteLink": "پاس ورڈ اور بحالی فقرہ دونوں گم ہو گئے؟ والٹ حذف کر کے نئے سرے سے شروع کریں",
+    "errors": {
+      "alreadyUnlocked": "والٹ پہلے سے ان لاک ہے۔",
+      "inProgress": "ایک کارروائی جاری ہے۔",
+      "kdfMemoryExceedsHost": "اس والٹ کو کھولنے کے لیے {{required}} MiB میموری درکار ہے — اس براؤزر کی دی ہوئی مقدار ({{available}} MiB) سے زیادہ۔ والٹ ٹھیک ہے؛ اسے Myne کی ڈیسک ٹاپ ایپ میں کھولیں۔",
+      "unexpected": "غیر متوقع خرابی۔ براہِ کرم دوبارہ کوشش کریں۔",
+      "vaultNotFound": "والٹ فائل نہیں ملی۔ براہِ کرم ایپ دوبارہ چلائیں۔"
+    },
+    "passwordLabel": "پاس ورڈ",
+    "passwordPlaceholder": "پاس ورڈ",
+    "quickUnlock": {
+      "failed": "فوری ان لاک ناکام رہا۔ اپنا پاس ورڈ استعمال کریں۔",
+      "pinAriaLabel": "فوری ان لاک کا PIN",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "PIN سے ان لاک کریں",
+      "unlockWithTouchId": "Touch ID سے ان لاک کریں",
+      "wrongCredential": "غلط۔ {{remaining}} کوشش(یں) باقی۔"
+    },
+    "recoveryInterruptedBanner": "بحالی کا عمل درمیان میں رک گیا تھا۔ پہلے نیا پاس ورڈ طے کریں۔",
+    "recoveryInterruptedBody": "پہلے نیا پاس ورڈ طے کریں، پھر اپنا والٹ دوبارہ مہربند کریں۔",
+    "recoveryInterruptedTitle": "بحالی کا عمل درمیان میں رک گیا تھا۔",
+    "recoveryLink": "پاس ورڈ بھول گئے؟ بحالی فقرے سے ان لاک کریں",
+    "submit": "ان لاک کریں",
+    "subtitle": "جاری رکھنے کے لیے اپنا پاس ورڈ درج کریں۔",
+    "subtitlePin": "جاری رکھنے کے لیے اپنا PIN درج کریں۔",
+    "subtitleBiometric": "جاری رکھنے کے لیے Touch ID سے تصدیق کریں۔",
+    "suspicion": {
+      "lockedDuringChange": "پاس ورڈ کی تبدیلی منسوخ ہوئی: والٹ لاک ہو گیا تھا۔",
+      "metaChangedExternally": "والٹ کسی دوسرے سیشن میں تبدیل ہوا — براہِ کرم دوبارہ ان لاک کریں۔"
+    },
+    "title": "اپنا والٹ ان لاک کریں۔",
+    "vaultUnreadable": "والٹ فائل ناقابلِ مطالعہ ہے۔ کسی بیک اپ سے بحال کریں۔",
+    "unlockFailedGeneric": "ان لاک نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "biometricTooManyAttempts": "{{biometric}} کی بہت زیادہ کوششیں۔ اپنا پاس ورڈ استعمال کریں۔",
+    "pinIncorrect_one": "غلط PIN۔ {{count}} کوشش باقی۔",
+    "pinIncorrect_other": "غلط PIN۔ {{count}} کوششیں باقی۔",
+    "pinTooManyAttempts": "PIN کی بہت زیادہ کوششیں۔ اپنا پاس ورڈ استعمال کریں۔",
+    "pinFailedGeneric": "PIN سے ان لاک نہیں ہو سکا۔ اپنا پاس ورڈ استعمال کریں۔",
+    "corruptedHeading": "والٹ فائل ناقابلِ مطالعہ ہے",
+    "ioErrorHeading": "یہ والٹ پڑھا نہیں جا سکتا",
+    "blockingTitle": "ان لاک ہو رہا ہے",
+    "blockingSubtitle": "آپ کی کلیدیں اسی آلے پر ڈکرپٹ ہو رہی ہیں۔",
+    "eyebrow": "والٹ ان لاک کریں",
+    "vaultTitleFallback": "آپ کا والٹ",
+    "unlockWithBiometric": "{{biometric}} سے ان لاک کریں",
+    "biometricFailed": "{{biometric}} آپ کی تصدیق نہیں کر سکا",
+    "touchToUnlock": "ان لاک کرنے کے لیے چھوئیں",
+    "lookToUnlock": "ان لاک کرنے کے لیے دیکھیں",
+    "biometricRetryHint": "دوبارہ کوشش کریں، یا اپنے پاس ورڈ سے ان لاک کریں۔",
+    "tryBiometricAgain": "{{biometric}} دوبارہ آزمائیں",
+    "usePasswordInstead": "اس کے بجائے پاس ورڈ استعمال کریں",
+    "useBiometricInstead": "اس کے بجائے {{biometric}} استعمال کریں",
+    "unlockWithPinInstead": "اس کے بجائے PIN سے ان لاک کریں",
+    "useRecoveryPhrase": "اپنا بحالی فقرہ استعمال کریں",
+    "deleteConfirmTitle": "یہ والٹ حذف کریں؟",
+    "deletePartialError": "کچھ فائلیں ہٹائی نہیں جا سکیں۔ یہ والٹ اب قابلِ استعمال نہیں — نئے سرے سے شروع کرنے کے لیے جاری رکھیں۔",
+    "failClosedEyebrow": "والٹ نہیں کھل سکتا",
+    "restoreHint": "جاری رکھنے کے لیے کسی بیک اپ سے بحال کریں۔"
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "والٹ فائل پڑھی نہیں جا سکتی۔",
+      "notFound": "والٹ فائل نہیں ملی۔ براہِ کرم ایپ دوبارہ چلائیں۔",
+      "permissionDenied": "والٹ فائل تک رسائی کی اجازت نہیں۔ فائل کی اجازتیں جانچیں۔"
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "میں نے اپنا اکاؤنٹ نمبر ایسی جگہ محفوظ کر لیا ہے جہاں سے بعد میں مل جائے۔",
+      "back": "واپس",
+      "commit": "والٹ بنائیں",
+      "committing": "محفوظ کیا جا رہا ہے…",
+      "copied": "نقل ہو گیا",
+      "copy": "نقل کریں",
+      "eyebrow": "مرحلہ 4 از 4 — اکاؤنٹ نمبر",
+      "heading": "اپنا اکاؤنٹ نمبر محفوظ کریں۔",
+      "intro": "یہ آپ کا بیئرر ٹوکن ہے — اسے نقدی کی طرح سنبھالیں۔",
+      "saveAsFile": "فائل کے طور پر محفوظ کریں",
+      "shownOnceBody": "اسے ابھی محفوظ کریں — Myne اسے آپ کے لیے بحال نہیں کر سکتا۔ بعد میں مطابقت پذیری کے اندراج کے لیے یہ ضروری ہے۔",
+      "shownOnceEmphasis": "یہ صرف ایک بار دکھایا جاتا ہے۔"
+    },
+    "briefing": {
+      "back": "واپس",
+      "continue": "والٹ بنانے کی طرف بڑھیں",
+      "eyebrow": "والٹ بنانے سے پہلے",
+      "heading": "والٹ بنانے سے پہلے",
+      "intro": "Myne آپ کے نوٹس کو اس طرح رمز کرتا ہے کہ انہیں صرف آپ کھول سکیں۔ اس سے تین باتیں نکلتی ہیں — انہیں پڑھیں، پھر آگے بڑھیں۔",
+      "statements": {
+        "no-email": {
+          "ackLabel": "میں سمجھتا ہوں کہ ای میل سے بحالی کا کوئی راستہ نہیں۔",
+          "statement": "ای میل سے بحالی کا کوئی راستہ نہیں۔ کبھی نہیں ہو گا۔",
+          "why": "ہم آپ کی ای میل کبھی نہیں مانگتے، اس لیے نہ کوئی ری سیٹ لنک ہے اور نہ کوئی ایسا اکاؤنٹ جسے سپورٹ ان لاک کر سکے۔ یہ کوئی کمی نہیں — یہی ضمانت ہے۔ ای میل سے بحالی کا مطلب ہوتا کہ ہم آپ کے نوٹس پڑھ سکتے ہیں، اور Myne اس طرح بنایا گیا ہے کہ ہم نہ پڑھ سکیں۔"
+        },
+        "no-store": {
+          "ackLabel": "میں سمجھتا ہوں کہ Myne میرا پاس ورڈ بحال نہیں کر سکتا۔",
+          "statement": "آپ کا پاس ورڈ آپ کا والٹ کھولتا ہے۔ ہم اسے محفوظ نہیں کرتے۔",
+          "why": "آپ کا پاس ورڈ اس کلید کا مواد ہے جو آپ کے نوٹس ڈکرپٹ کرتی ہے۔ یہ کبھی اس آلے سے باہر نہیں جاتا، اور ہمارے سرورز پر کوئی چیز اسے دوبارہ نہیں بنا سکتی۔ یہی آپ کے نوٹس کو نجی رکھتا ہے — اور یہی وجہ ہے کہ ہم اسے آپ کے لیے ری سیٹ نہیں کر سکتے۔"
+        },
+        "phrase-backup": {
+          "ackLabel": "میں سمجھتا ہوں کہ میرا بحالی فقرہ ہی واحد بیک اپ ہے۔",
+          "statement": "آپ کا بحالی فقرہ ہی آپ کا واحد بیک اپ ہے۔",
+          "why": "اگر آپ اپنا پاس ورڈ بھول جائیں تو 24 الفاظ کا بحالی فقرہ ہی واپس اندر آنے کا واحد راستہ ہے۔ {{lostBothSecrets}} فقرہ لکھ لیں اور کسی محفوظ جگہ رکھیں۔"
+        }
+      },
+      "why": "کیوں؟"
+    },
+    "confirm": {
+      "back": "واپس",
+      "continue": "جاری رکھیں",
+      "eyebrow": "مرحلہ 3 از 4 — فقرے کی تصدیق",
+      "heading": "اپنے فقرے کے چار الفاظ دوبارہ لکھیں۔",
+      "intro": "یہ جانچنے کے لیے کہ آپ نے اسے محفوظ کر لیا ہے، ہم مخصوص مقامات کے الفاظ پوچھیں گے۔",
+      "mismatch": "لفظ #{{pos}} سے مطابقت نہیں رکھتا۔",
+      "wordAtPosition": "مقام {{pos}} کا لفظ"
+    },
+    "encrypting": {
+      "caption": "اس میں کچھ لمحے لگتے ہیں۔",
+      "footerHint": "اگر اس میں 30 سیکنڈ سے زیادہ لگیں تو ونڈو بند کر کے دوبارہ کوشش کریں۔",
+      "heading": "آپ کا والٹ رمز کیا جا رہا ہے"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "اکاؤنٹ نمبر غلط ہے"
+      },
+      "aeadFailure": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "رمز کاری ناکام رہی"
+      },
+      "csprng": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "محفوظ بے ترتیب ڈیٹا نہیں بن سکا"
+      },
+      "invalidPassword": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "پاس ورڈ غلط ہے"
+      },
+      "invalidVaultMeta": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "والٹ کے فارمیٹ میں خرابی"
+      },
+      "ioOther": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "والٹ محفوظ نہیں ہو سکا"
+      },
+      "joinFailure": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "کچھ غلط ہو گیا"
+      },
+      "kdfFailure": {
+        "body": "دوبارہ کوشش کریں۔ اگر یہ بار بار ہو تو ہو سکتا ہے آپ کے نظام میں میموری کم ہو۔",
+        "title": "رمز کاری ترتیب نہیں دی جا سکی"
+      },
+      "noSpace": {
+        "body": "ڈسک پر جگہ خالی کریں اور دوبارہ کوشش کریں۔",
+        "title": "ڈسک پر کافی جگہ نہیں"
+      },
+      "notFound": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "والٹ فولڈر موجود نہیں"
+      },
+      "passwordTooShort": {
+        "body": "کم از کم 12 حروف استعمال کریں۔",
+        "title": "پاس ورڈ بہت مختصر ہے"
+      },
+      "permissionDenied": {
+        "body": "یقینی بنائیں کہ Myne کو آپ کے ایپلیکیشن ڈیٹا فولڈر میں لکھنے کی اجازت ہے۔",
+        "title": "والٹ فولڈر میں لکھا نہیں جا سکا"
+      },
+      "sessionExpired": {
+        "body": "آپ کی حفاظت کے لیے والٹ کی تخلیق 10 منٹ بعد ختم ہو جاتی ہے۔ نئے سرے سے شروع کریں۔",
+        "title": "سیشن ختم ہو گیا"
+      },
+      "sessionNotFound": {
+        "body": "شروع سے دوبارہ آغاز کریں۔",
+        "title": "سیشن نہیں ملا"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Myne کی دوسری ونڈوز بند کریں اور دوبارہ کوشش کریں۔",
+        "title": "ایک ساتھ بہت زیادہ والٹ بنائے جا رہے ہیں"
+      },
+      "vaultArtifactsPresent": {
+        "body": "نیا والٹ نہیں بنایا جا سکتا کیونکہ اس آلے پر پہلے سے والٹ ڈیٹا موجود ہے۔ ایپ بند کر کے دوبارہ چلائیں — آغاز کی اسکرین آپ کو ان لاک کے عمل کی طرف لے جائے گی۔",
+        "title": "والٹ پہلے سے موجود ہے"
+      },
+      "vaultBusyAuth": {
+        "body": "والٹ پر ایک اور کارروائی جاری ہے۔ کچھ دیر بعد دوبارہ کوشش کریں۔",
+        "title": "والٹ مصروف ہے"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "منسوخ کریں",
+        "message": "بند کرنے پر آپ کا بحالی فقرہ ضائع ہو جائے گا۔ بند کرنا جاری رکھیں؟",
+        "okLabel": "پھر بھی بند کریں",
+        "title": "والٹ کی تخلیق ترک کریں؟"
+      },
+      "genericError": {
+        "body": "دوبارہ کوشش کریں۔",
+        "title": "کچھ غلط ہو گیا"
+      }
+    },
+    "password": {
+      "back": "واپس",
+      "eyebrow": "مرحلہ 1 از 4 — ماسٹر پاس ورڈ",
+      "heading": "والٹ بنائیں",
+      "helperLead": "Myne آپ کا پاس ورڈ یا بحالی فقرہ محفوظ نہیں کرتا۔",
+      "submit": "بحالی فقرہ بنائیں"
+    },
+    "phrase": {
+      "back": "واپس",
+      "continue": "میں نے یہ محفوظ کر لیا — فقرے کی تصدیق کریں",
+      "copy": "نقل کریں",
+      "eyebrow": "مرحلہ 2 از 4 — بحالی فقرہ",
+      "heading": "یہ 24 الفاظ لکھ لیں۔",
+      "intro": "یہ فقرہ، آپ کے پاس ورڈ کے ساتھ، آپ کے والٹ کو بحال کرنے کا واحد راستہ ہے۔ اسے آف لائن رکھیں — کاغذ، پاس ورڈ منیجر، ہارڈویئر والٹ۔ اسے نقدی کی طرح سنبھالیں۔",
+      "reveal": "فقرہ دکھائیں",
+      "saveAsFile": "فائل کے طور پر محفوظ کریں"
+    },
+    "ready": {
+      "backedUp": "بیک اپ ہو گیا ✓",
+      "backingUp": "بیک اپ ہو رہا ہے…",
+      "backupDefaultFilename": "Myne بیک اپ.myne-backup",
+      "backupError": "بیک اپ مکمل نہیں ہوا — کوئی فائل پیچھے نہیں چھوڑی گئی۔ آپ کسی بھی وقت ترتیبات → اسٹوریج سے بیک اپ لے سکتے ہیں۔",
+      "backupFilterName": "Myne بیک اپ",
+      "backUpNow": "اس والٹ کا ابھی بیک اپ لیں",
+      "body": "Myne نے آپ کا والٹ آپ کے ایپلیکیشن ڈیٹا فولڈر میں لکھ دیا ہے۔ آپ کا ماسٹر پاس ورڈ اور بحالی فقرہ ہی واپس اندر آنے کا واحد راستہ ہیں — یقینی بنائیں کہ دونوں کسی محفوظ جگہ رکھے ہوئے ہیں۔",
+      "decrypting": "ڈکرپٹ ہو رہا ہے…",
+      "done": "مکمل",
+      "heading": "آپ کا والٹ تیار ہے۔",
+      "showFolder": "والٹ فولڈر دکھائیں"
+    },
+    "sessionLost": {
+      "startOver": "نئے سرے سے شروع کریں"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "ایک اور والٹ بنائیں",
+    "heading": "کوئی والٹ منتخب کریں",
+    "joinDevice": "اس آلے کو کسی اکاؤنٹ میں شامل کریں",
+    "loading": "آپ کے والٹ لوڈ ہو رہے ہیں…",
+    "noneLoaded": "اس وقت کوئی والٹ لوڈ نہیں ہو سکا۔",
+    "openedRelative": "{{rel}} کھولا گیا",
+    "restoreFromBackup": "بیک اپ سے بحال کریں",
+    "subline": "اس آلے پر آپ کے ایک سے زیادہ والٹ ہیں۔ ان لاک کرنے کے لیے کوئی ایک چنیں۔",
+    "vaultFallback": "والٹ {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "اس میں کچھ لمحے لگتے ہیں۔",
+      "eyebrow": "بحالی · ڈکرپٹ ہو رہا ہے",
+      "footerHint": "اگر اس میں 30 سیکنڈ سے زیادہ لگیں تو ونڈو بند کر کے دوبارہ کوشش کریں۔",
+      "heading": "آپ کا والٹ ڈکرپٹ ہو رہا ہے",
+      "subCaption": "کام جاری ہے… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "بحالی منسوخ ہوئی: والٹ لاک ہو گیا تھا۔",
+        "operationInProgress": "ایک کارروائی جاری ہے۔ براہِ کرم انتظار کریں۔",
+        "unexpected": "غیر متوقع خرابی۔ براہِ کرم دوبارہ کوشش کریں۔",
+        "weakPassword": "نیا پاس ورڈ کم از کم 12 حروف کا ہونا چاہیے۔"
+      },
+      "eyebrow": "بحالی · نیا پاس ورڈ",
+      "helperBody": "آپ کے بحالی فقرے سے کھولا گیا۔ آپ کا پرانا پاس ورڈ اب کام نہیں کرتا — ابھی نیا ماسٹر پاس ورڈ طے کریں۔",
+      "helperEmphasis": "آپ کا بحالی فقرہ وہی رہتا ہے۔",
+      "submit": "نیا پاس ورڈ طے کریں",
+      "title": "نیا ماسٹر پاس ورڈ طے کریں"
+    },
+    "phrase": {
+      "back": "← واپس",
+      "body": "اپنا بحالی فقرہ درج کریں۔ 24 BIP-39 الفاظ۔",
+      "cellLabel": "لفظ {{index}}",
+      "deleteLink": "والٹ حذف کر کے نئے سرے سے شروع کریں",
+      "eyebrow": "بحالی",
+      "submit": "ان لاک کریں",
+      "title": "اپنا والٹ بحال کریں۔"
+    },
+    "select": {
+      "accountInvalid": "اکاؤنٹ نمبر غلط ہے۔ براہِ کرم جانچ کر دوبارہ کوشش کریں۔",
+      "accountLabel": "اکاؤنٹ نمبر (اختیاری)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (اختیاری)",
+      "body": "وہ والٹ منتخب کریں جسے آپ اپنے 24 الفاظ کے بحالی فقرے سے بحال کرنا چاہتے ہیں۔ آپ سیدھا اسی تک پہنچنے کے لیے اپنا اکاؤنٹ نمبر بھی لکھ سکتے ہیں۔",
+      "cancel": "منسوخ کریں",
+      "checking": "جانچا جا رہا ہے…",
+      "loadFailed": "اس وقت کوئی والٹ لوڈ نہیں ہو سکا۔",
+      "loading": "آپ کے والٹ لوڈ ہو رہے ہیں…",
+      "openedRelative": "{{rel}} کھولا گیا",
+      "or": "یا",
+      "title": "بحال کرنے کے لیے کوئی والٹ منتخب کریں",
+      "useAccountNumber": "اکاؤنٹ نمبر استعمال کریں",
+      "vaultFallback": "والٹ {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "والٹ",
+    "createAnother": "ایک اور والٹ بنائیں",
+    "joinDevice": "اس آلے کو کسی اکاؤنٹ میں شامل کریں",
+    "switching": "بدلا جا رہا ہے…",
+    "switchVaultLabel": "والٹ بدلیں",
+    "vaultFallback": "والٹ {{n}}"
+  },
+  "welcome": {
+    "createCta": "نیا والٹ بنائیں",
+    "headlineLine1": "رمز شدہ markdown نوٹس۔",
+    "headlineLine2": "سائن اپ پر کوئی ای میل نہیں۔",
+    "joinCta": "اس آلے کو کسی اکاؤنٹ میں شامل کریں",
+    "repairResidue": {
+      "cancel": "منسوخ کریں",
+      "cleaningUp": "صفائی جاری ہے…",
+      "cleanUp": "صاف کریں",
+      "confirmBody_one": "{{count}} فائل ہٹا دی جائے گی۔ وہ پہلے ہی ناقابلِ مطالعہ ہے؛ قابلِ بحالی کچھ ضائع نہیں ہوتا۔",
+      "confirmBody_other": "{{count}} فائلیں ہٹا دی جائیں گی۔ وہ پہلے ہی ناقابلِ مطالعہ ہیں؛ قابلِ بحالی کچھ ضائع نہیں ہوتا۔",
+      "confirmTitle": "بچی ہوئی فائلیں صاف کریں؟",
+      "doneBody_one": "{{count}} بچی ہوئی فائل ہٹا دی گئی۔ اب آپ نیا والٹ بنا سکتے ہیں۔",
+      "doneBody_other": "{{count}} بچی ہوئی فائلیں ہٹا دی گئیں۔ اب آپ نیا والٹ بنا سکتے ہیں۔",
+      "doneTitle": "صفائی مکمل",
+      "errorBody": "کچھ غلط ہو گیا۔ ایپ بند کر کے دوبارہ کوشش کریں۔",
+      "errorTitle": "صفائی ناکام رہی",
+      "foundBody_one": "پچھلی نامکمل حذف سے {{count}} بچی ہوئی فائل۔ وہ پہلے ہی ناقابلِ مطالعہ ہے — آپ کا قابلِ بحالی کچھ ضائع نہیں ہو گا۔",
+      "foundBody_other": "پچھلی نامکمل حذف سے {{count}} بچی ہوئی فائلیں۔ وہ پہلے ہی ناقابلِ مطالعہ ہیں — آپ کا قابلِ بحالی کچھ ضائع نہیں ہو گا۔",
+      "foundTitle": "نامکمل حذف سے بچی ہوئی فائلیں",
+      "partialBody_one": "{{count}} فائل شاید کسی دوسری ایپ نے روکی ہوئی ہے (اینٹی وائرس، فائل سنک، یا تلاش کی اشاریہ سازی)۔ ایپ بند کر کے کچھ دیر بعد دوبارہ کوشش کریں، یا والٹ فولڈر خود ہٹا دیں۔",
+      "partialBody_other": "{{count}} فائلیں شاید کسی دوسری ایپ نے روکی ہوئی ہیں (اینٹی وائرس، فائل سنک، یا تلاش کی اشاریہ سازی)۔ ایپ بند کر کے کچھ دیر بعد دوبارہ کوشش کریں، یا والٹ فولڈر خود ہٹا دیں۔",
+      "partialTitle": "کچھ فائلیں ہٹائی نہیں جا سکیں"
+    },
+    "restoreCta": "بیک اپ سے بحال کریں",
+    "subtitle": "آپ کے نوٹس اس آلے سے نکلنے سے پہلے یہیں رمز کر دیے جاتے ہیں۔ سرور صرف رمزی متن رکھتا ہے۔",
+    "repairCleanedUp_one": "{{count}} بچی ہوئی فائل صاف کر دی گئی۔",
+    "repairCleanedUp_other": "{{count}} بچی ہوئی فائلیں صاف کر دی گئیں۔",
+    "repairFailed": "صفائی مکمل نہیں ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "heroLine1": "ایسے نوٹس جو",
+    "heroLine2": "صرف آپ کے ہیں،",
+    "heroLine3": "کسی اور کے نہیں۔",
+    "lede": "Markdown، جو اس آلے سے نکلنے سے پہلے یہیں رمز ہو جاتا ہے۔ اکاؤنٹ کے لیے کوئی ای میل نہیں۔ کوئی ایسا سرور نہیں جو ایک لفظ بھی پڑھ سکے۔",
+    "residueBanner": "ادھوری حذف سے بچی ہوئی فائلیں ({{n}})۔ والٹ بنانے سے پہلے انہیں صاف کریں۔",
+    "cleanUpFiles": "بچی ہوئی فائلیں صاف کریں",
+    "create": "والٹ بنائیں",
+    "connect": "میرے اکاؤنٹ سے منسلک ہوں"
+  },
+  "wikiGraph": {
+    "emptyTitle": "ابھی کوئی لنک نہیں",
+    "emptyBodyBefore": "نوٹس کو آپس میں جوڑنے کے لیے اپنے متن میں ",
+    "emptyBodyAfter": " لکھیں۔ جڑے ہوئے نوٹس یہاں گراف کی صورت میں ظاہر ہوتے ہیں۔"
+  },
+  "markdown": {
+    "attachmentFallback": "منسلکہ",
+    "nothingToPreview": "ابھی پیش منظر کے لیے کچھ نہیں۔"
+  },
+  "conflicts": {
+    "empty": "جائزے کے لیے کوئی تصادم نہیں — آپ کے نوٹس ہم آہنگ ہیں۔",
+    "groupTitle_one": "{{count}} متصادم نقل",
+    "groupTitle_other": "{{count}} متصادم نقول",
+    "groupTitleOfNote": " — نوٹ {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "یہ ویو محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "deleteError": "یہ ویو حذف نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "editView": "ویو کی تدوین",
+    "condition": {
+      "search": "متن"
+    },
+    "containsPlaceholder": "جس میں ہو…",
+    "tagPlaceholder": "ٹیگ",
+    "folderPlaceholder": "فولڈر/",
+    "propertyKeyPlaceholder": "خاصیت کی کلید",
+    "addCondition": "+ شرط شامل کریں",
+    "createView": "ویو بنائیں"
+  },
+  "snapshots": {
+    "today": "آج {{time}}",
+    "readError": "ورژن کی تاریخ پڑھی نہیں جا سکی۔",
+    "decryptError": "وہ ورژن ڈکرپٹ نہیں ہو سکا۔",
+    "restoreError": "وہ ورژن بحال نہیں ہو سکا۔",
+    "title": "ورژن کی تاریخ",
+    "emptyState": "ابھی کوئی پرانا ورژن نہیں۔ تدوین کے دوران سنیپ شاٹس خود بخود لیے جاتے ہیں۔",
+    "hide": "چھپائیں",
+    "empty": "(خالی)",
+    "restoreThisVersion": "یہی ورژن بحال کریں"
+  },
+  "restoreBackup": {
+    "title": "موبائل پر ابھی دستیاب نہیں",
+    "body": "بیک اپ فائل سے بحالی موبائل پر ابھی دستیاب نہیں — کوئی والٹ بنائیں یا اپنے فقرے سے بحال کریں۔"
+  },
+  "recording": {
+    "deniedTitle": "مائیکروفون کی رسائی بند ہے",
+    "errorTitle": "ریکارڈنگ شروع نہیں ہو سکی",
+    "deniedBody": "صوتی نوٹ ریکارڈ کرنے کے لیے ترتیبات › Myne › مائیکروفون میں Myne کو مائیکروفون کی اجازت دیں۔",
+    "noDeviceBody": "اس آلے پر کوئی مائیکروفون نہیں ملا۔",
+    "emptyBody": "وہ ریکارڈنگ خالی تھی — کچھ محفوظ نہیں ہوا۔",
+    "genericBody": "ریکارڈنگ کے دوران کچھ غلط ہو گیا۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "stopAria": "ریکارڈنگ روکیں"
+  },
+  "picker": {
+    "neverOpened": "کبھی نہیں کھولا گیا",
+    "openedJustNow": "ابھی ابھی کھولا گیا",
+    "openedMinuteAgo": "ایک منٹ پہلے کھولا گیا",
+    "openedMinutesAgo_one": "{{count}} منٹ پہلے کھولا گیا",
+    "openedMinutesAgo_other": "{{count}} منٹ پہلے کھولا گیا",
+    "openedHourAgo": "ایک گھنٹہ پہلے کھولا گیا",
+    "openedHoursAgo_one": "{{count}} گھنٹہ پہلے کھولا گیا",
+    "openedHoursAgo_other": "{{count}} گھنٹے پہلے کھولا گیا",
+    "openedYesterday": "کل کھولا گیا",
+    "openedDaysAgo_one": "{{count}} دن پہلے کھولا گیا",
+    "openedDaysAgo_other": "{{count}} دن پہلے کھولا گیا",
+    "openedLastWeek": "پچھلے ہفتے کھولا گیا",
+    "openedWeeksAgo_one": "{{count}} ہفتہ پہلے کھولا گیا",
+    "openedWeeksAgo_other": "{{count}} ہفتے پہلے کھولا گیا",
+    "openedLastMonth": "پچھلے مہینے کھولا گیا",
+    "openedMonthsAgo_one": "{{count}} مہینہ پہلے کھولا گیا",
+    "openedMonthsAgo_other": "{{count}} مہینے پہلے کھولا گیا",
+    "openedLastYear": "پچھلے سال کھولا گیا",
+    "openedYearsAgo_one": "{{count}} سال پہلے کھولا گیا",
+    "openedYearsAgo_other": "{{count}} سال پہلے کھولا گیا",
+    "corruptedBadge": "خراب"
+  },
+  "join": {
+    "transportError": "اس مطابقت پذیری سرور تک نہیں پہنچا جا سکا۔ پتہ اور اپنا کنکشن جانچیں، پھر دوبارہ کوشش کریں۔",
+    "passwordPlaceholder": "آپ کے والٹ کا پاس ورڈ",
+    "waitingHint": "یہ اسکرین کھلی رکھیں — منظوری ملتے ہی یہاں ایک تصدیقی کوڈ ظاہر ہو گا جس کا آپ اپنے دوسرے آلے سے موازنہ کر سکیں گے۔",
+    "verifyBody": "جانچیں کہ یہ کوڈ وہی ہے جو اس آلے پر دکھایا گیا تھا جس سے آپ نے منظوری دی تھی۔",
+    "removing": "ہٹایا جا رہا ہے…",
+    "sasMismatch": "دونوں یکساں نہیں ہیں — یہ آلہ ہٹا دیں",
+    "title": "اپنے اکاؤنٹ سے منسلک ہوں",
+    "lead": "اپنے نوٹس اس آلے پر لانے کے لیے اپنے اکاؤنٹ کی تفصیلات درج کریں۔ ہر چیز سرے سے سرے تک رمز شدہ رہتی ہے۔",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "یہ نمبر دوبارہ جانچیں — یہ درست نہیں لگتا۔",
+    "approvalHint": "آپ کے نوٹس اس وقت ظاہر ہوں گے جب آپ اس آلے کو ایسے آلے سے منظوری دیں گے جس پر پہلے سے آپ کا اکاؤنٹ ہے۔",
+    "connectingSubtitle": "آپ کا اکاؤنٹ حاصل کیا جا رہا ہے اور اس آلے پر آپ کا والٹ کھولا جا رہا ہے۔",
+    "qr": {
+      "cancel": "منسوخ کریں",
+      "confirmAccount": "اکاؤنٹ",
+      "confirmServer": "سرور",
+      "confirmTitle": "یہ آلہ شامل کریں؟",
+      "continue": "جاری رکھیں",
+      "expired": "یہ QR ختم ہو چکا ہے — اپنے دوسرے آلے پر نیا QR دکھائیں اور دوبارہ اسکین کریں۔",
+      "invalid": "یہ Myne کے آلے کا QR نہیں ہے۔",
+      "newerVersion": "یہ QR Myne کے کسی نئے ورژن کا ہے — ایپ اپ ڈیٹ کریں اور دوبارہ کوشش کریں۔",
+      "pinHosted": "Myne کا میزبان سرور",
+      "pinNone": "خود میزبان سرور",
+      "pinSelfHost": "آپ کے قابلِ اعتماد آلے سے سرٹیفکیٹ پن شدہ",
+      "scan": "QR اسکین کریں",
+      "scanFailed": "اسکین نہیں ہو سکا۔ دوبارہ کوشش کریں، یا اپنی تفصیلات خود درج کریں۔",
+      "scanUnavailable": "اس آلے پر اسکیننگ دستیاب نہیں — نیچے اپنی تفصیلات درج کریں۔"
+    }
+  },
+  "createVault": {
+    "beginWeakPassword": "زیادہ مضبوط پاس ورڈ منتخب کریں اور دوبارہ کوشش کریں۔",
+    "beginGeneric": "والٹ کی تخلیق شروع نہیں ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "wordNumber": "لفظ #{{position}}",
+    "commitError": "آپ کا والٹ محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
+    "savedToFile": "{{label}} میں محفوظ ہو گیا",
+    "saveFileError": "فائل محفوظ نہیں ہو سکی۔",
+    "stepLabel": "والٹ بنائیں · {{total}} میں سے {{current}}",
+    "briefingTitle": "شروع کرنے سے پہلے",
+    "briefingLead": "Myne ہر چیز اسی آلے پر رمز کرتا ہے۔ اس نجی رکھنے کے ساتھ ایک ذمہ داری آتی ہے جو صرف آپ اٹھا سکتے ہیں۔",
+    "passwordTitle": "پاس ورڈ بنائیں",
+    "confirmPasswordLabel": "پاس ورڈ کی تصدیق کریں",
+    "passwordHelper": "کبھی محفوظ نہیں کیا جاتا، کبھی نہیں بھیجا جاتا۔ یہ آپ کی کلیدوں کو اسی آلے پر رمز کرتا ہے۔",
+    "encryptingSubtitle": "آپ کی کلید Argon2id سے اخذ کی جا رہی ہے۔ اس میں چند سیکنڈ لگتے ہیں اور اسے روکا نہیں جا سکتا۔",
+    "phraseTitle": "آپ کا بحالی فقرہ",
+    "phraseIntro": "چوبیس الفاظ، ترتیب سے۔ انہیں کاغذ پر لکھیں اور کسی محفوظ جگہ رکھیں۔",
+    "showSecondHalf": "الفاظ 13–24 دکھائیں",
+    "saveToFile": "فائل میں محفوظ کریں",
+    "writtenThemDown": "میں نے انہیں لکھ لیا ہے",
+    "typebackTitle": "اپنے فقرے کی تصدیق کریں",
+    "typebackLead": "ابھی محفوظ کیے گئے بحالی فقرے میں سے یہ چار الفاظ درج کریں۔",
+    "wordMismatch": "لفظ #{{pos}} سے مطابقت نہیں رکھتا",
+    "backToPhrase": "فقرے پر واپس",
+    "accountTitle": "آپ کا اکاؤنٹ نمبر",
+    "accountLead": "اسے اپنے بحالی فقرے کے ساتھ محفوظ کریں۔ کسی نئے آلے پر اپنا والٹ بحال کرنے کے لیے یہ درکار ہو گا۔",
+    "accountSavedAck": "میں نے اپنا اکاؤنٹ نمبر محفوظ کر لیا ہے۔",
+    "commit": "طے کریں",
+    "committingTitle": "آپ کا والٹ محفوظ ہو رہا ہے…",
+    "committingSubtitle": "رمز شدہ والٹ اس آلے پر لکھا جا رہا ہے۔",
+    "unlockingTitle": "ان لاک ہو رہا ہے…",
+    "unlockingSubtitle": "آپ کا والٹ کھولا جا رہا ہے۔",
+    "readyTitle": "آپ کا والٹ تیار ہے",
+    "readyBody": "یہاں سے آپ جو کچھ لکھیں گے وہ محفوظ یا ہم آہنگ ہونے سے پہلے اسی آلے پر رمز ہو جائے گا۔",
+    "personalLabel": "ذاتی",
+    "openVault": "والٹ کھولیں",
+    "backUpNow": "ابھی بیک اپ لیں"
+  },
+  "web": {
+    "reload": {
+      "body": "اس صفحے کو دوبارہ لوڈ کرنے پر آپ کا پاس ورڈ دوبارہ مانگا جاتا ہے — بہ لحاظِ ڈیزائن اندر آنے کا اس سے تیز کوئی راستہ نہیں۔ صفحہ بند رہنے کے دوران آپ کا والٹ اسی آلے پر رمز شدہ رہتا ہے، اور کلید ہر بار آپ کے پاس ورڈ سے دوبارہ بنتی ہے۔",
+      "title": "دوبارہ لوڈ کرنے کا مطلب پاس ورڈ دوبارہ"
+    },
+    "wall": {
+      "getNative": "ڈیسک ٹاپ یا موبائل کے لیے Myne حاصل کریں",
+      "noAccount": {
+        "body": "اکاؤنٹ Myne کی ڈیسک ٹاپ یا موبائل ایپ میں بنائے جاتے ہیں، یہاں نہیں۔",
+        "reason": "اکاؤنٹ بنانے پر آپ کا 24 الفاظ کا بحالی فقرہ تیار ہوتا ہے اور صرف ایک بار آپ کو دکھایا جاتا ہے۔ کسی ویب صفحے کو یہ فقرہ دکھانے والا نہیں ہونا چاہیے — اگر وہ وہاں افشا ہو جائے تو Myne میں کوئی چیز اسے واپس نہیں لے سکتی۔",
+        "title": "پہلے آپ کو اکاؤنٹ چاہیے"
+      },
+      "noSync": {
+        "body": "اس براؤزر میں کوئی مطابقت پذیری سرور ترتیب نہیں دیا گیا، اس لیے اس کے پاس کھولنے کو کچھ نہیں۔",
+        "reason": "ڈیسک ٹاپ ایپ کے برعکس، براؤزر اپنا کوئی والٹ نہیں رکھتا جس پر وہ انحصار کر سکے — اس کے نوٹس مطابقت پذیری سے آتے ہیں۔ اسے ڈیسک ٹاپ یا موبائل ایپ میں ترتیب دیں، پھر یہاں واپس آئیں۔",
+        "title": "مطابقت پذیری ابھی ترتیب نہیں دی گئی"
+      }
+    },
+    "unavailableHere": {
+      "backup": "رمز شدہ بیک اپ Myne کی ڈیسک ٹاپ ایپ میں بنائے اور بحال کیے جاتے ہیں، جو بیک اپ فائل آپ کی پسند کی جگہ لکھ سکتی ہے۔ یہاں آپ کے نوٹس سرور سے آتے ہیں، اس لیے یہ براؤزر خود کو مطابقت پذیری سے بحال کرتا ہے۔",
+      "creation": "نئے اکاؤنٹ Myne کی ڈیسک ٹاپ ایپ میں بنائے جاتے ہیں۔ وہ آپ کو آپ کا بحالی فقرہ دکھاتی ہے — اور بحالی فقرہ کبھی کسی ویب صفحے کو نہیں دکھانا چاہیے۔",
+      "multiVault": "یہ براؤزر ایک ہی اکاؤنٹ رکھتا ہے۔ کوئی دوسرا استعمال کرنے کے لیے اسے Myne کی ڈیسک ٹاپ ایپ میں یا کسی مختلف براؤزر پروفائل میں کھولیں۔",
+      "phraseRecovery": "فقرے سے بحالی Myne کی ڈیسک ٹاپ ایپ میں ہوتی ہے۔ آپ کا بحالی فقرہ کبھی کسی ویب صفحے میں نہیں لکھنا چاہیے۔",
+      "title": "براؤزر میں دستیاب نہیں"
+    },
+    "unsupported": {
+      "title": "Myne اس براؤزر میں نہیں چل سکتا",
+      "mobileTitle": "اس آلے پر Myne کی ایپ کھولیں",
+      "handoff": "Myne کی ڈیسک ٹاپ ایپ (macOS، Windows، Linux) اور موبائل ایپ (iOS، Android) پر ایسی کوئی حد نہیں — اور وہ چلنے سے پہلے اپنے دستخط کی خود تصدیق کرتی ہیں، جو کوئی ویب صفحہ نہیں کر سکتا۔",
+      "reason": {
+        "desktop-form-factor": "براؤزر میں Myne ڈیسک ٹاپ کمپیوٹر کے لیے بنایا گیا ہے — اسے وہ میموری اور وہ ان پٹ درکار ہے جو فون یا ٹیبلٹ کا براؤزر نہیں دے سکتا۔ اس آلے پر ویسے بھی Myne کی ایپ بہتر کلائنٹ ہے: وہ تیز ہے، آف لائن کام کرتی ہے، اور جب براؤزر اپنی اسٹوریج صاف کرتا ہے تب بھی آپ کے نوٹس رکھتی ہے۔",
+        "webassembly": "یہ براؤزر WebAssembly کی معاونت نہیں کرتا، جس پر رمز کاری کا مرکز چلتا ہے۔",
+        "wasm-memory-headroom": "یہ براؤزر تقریباً 336 MB میموری مخصوص نہیں کر سکتا جو والٹ کی کلید اخذ کرنے کے لیے درکار ہے۔ فون اور ٹیبلٹ کے براؤزر عموماً نہیں کر سکتے؛ یہ حد خود والٹ نے طے کی ہے اور کسی ایک آلے کے لیے اسے کم کرنے سے والٹ ہر جگہ ناقابلِ مطالعہ ہو جائے گا۔",
+        "worker": "یہ براؤزر Web Workers کی معاونت نہیں کرتا، جن کے اندر والٹ کی اسٹوریج اور رمز کاری چلتی ہے۔",
+        "opfs": "یہ براؤزر ویب ایپس کو نجی مقامی اسٹوریج فراہم نہیں کرتا، اس لیے صفحہ لوڈ ہونے کے درمیان آپ کا والٹ رکھنے کی کوئی جگہ نہیں۔",
+        "opfs-sync-access-handle": "اس براؤزر کی نجی مقامی اسٹوریج میں وہ ہم وقت فائل رسائی موجود نہیں جو والٹ کو محفوظ طریقے سے لکھنے کے لیے درکار ہے۔",
+        "web-locks": "یہ براؤزر اس لاک کی معاونت نہیں کرتا جو دو ٹیبس کو ایک ہی والٹ میں بیک وقت لکھنے سے روکتا ہے۔",
+        "crypto-getrandomvalues": "یہ براؤزر رمزی بے ترتیب اعداد کا ذریعہ فراہم نہیں کرتا۔"
+      }
+    }
+  }
+}

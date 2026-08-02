@@ -83,9 +83,12 @@
       "colType": "Loại",
       "colUsedIn": "Dùng trong",
       "decrypting": "Đang giải mã tệp đính kèm…",
+      "clearSearchAriaLabel": "Xóa tìm kiếm",
+      "emptyClearSearch": "Xóa tìm kiếm",
       "emptyImportHint": "Nhập một tệp để giữ nó trong kho.",
       "emptyLoadError": "Không thể đọc danh mục tệp đính kèm.",
       "emptyNoAttachments": "Chưa có tệp đính kèm nào.",
+      "emptyNoResultsTitle": "Không có tệp đính kèm nào khớp với tìm kiếm của bạn.",
       "filterAriaLabel": "Lọc theo loại",
       "gridView": "Xem dạng lưới",
       "import": "Nhập",
@@ -98,6 +101,7 @@
       "menuPreview": "Xem trước",
       "menuRename": "Đổi tên",
       "menuTranscribe": "Chép lời",
+      "menuViewTranscription": "Xem bản chép lời",
       "noMatch": "Không có tệp đính kèm nào khớp với tìm kiếm của bạn.",
       "noUnusedNotice": "Không có tệp đính kèm không dùng nào để dọn.",
       "preview": "Xem trước",
@@ -115,8 +119,14 @@
       "title": "Tệp đính kèm",
       "transcribeDone": "Đã chép lời xong.",
       "transcribeFailed": "Chép lời thất bại. Vui lòng thử lại.",
+      "transcribeFeatureOff": "Chuyển giọng nói thành văn bản đang tắt. Hãy bật nó trong Cài đặt → Chép lời.",
+      "transcribeModelLoadFailed": "Không thể tải mô hình chuyển giọng nói thành văn bản. Hãy cài đặt lại Myne, hoặc kiểm tra mô hình tùy chỉnh của bạn trong Cài đặt → Nhà phát triển → AI.",
+      "transcribeNoModelHint": "Thiếu mô hình chuyển giọng nói thành văn bản. Cài đặt lại Myne sẽ khôi phục nó.",
       "transcribeNoModel": "Chọn một mô hình chép lời trong Cài đặt → Developer → AI.",
       "transcribeStarted": "Đang chép lời…",
+      "transcribeVaultLocked": "Hãy mở khóa kho của bạn để chép lời.",
+      "transcriptionModalClose": "Đóng bản chép lời",
+      "transcriptionModalTitle": "Bản chép lời",
       "typeFilter": {
         "all": "Tất cả các loại",
         "audio": "Âm thanh",
@@ -219,6 +229,15 @@
     "matchedInAttachmentTitle": "Truy vấn khớp bên trong một tệp được nhúng trong ghi chú này",
     "matchedInBody": "↳ khớp trong nội dung",
     "noMatches": "Không có kết quả",
+    "operatorHint": "Tab để hoàn thành",
+    "operators": {
+      "tag": "Ghi chú có thẻ",
+      "path": "Ghi chú trong thư mục",
+      "file": "Khớp tiêu đề ghi chú",
+      "section": "Ghi chú có tiêu đề mục",
+      "task": "Ghi chú có công việc",
+      "content": "Toàn văn trong nội dung"
+    },
     "searchPlaceholder": "Tìm ghi chú hoặc chạy lệnh — Esc để đóng",
     "sectionCommands": "Lệnh",
     "sectionNotes": "Ghi chú",
@@ -469,6 +488,9 @@
       "showGraph": {
         "label": "Hiện chế độ xem đồ thị…"
       },
+      "showTasks": {
+        "label": "Hiện công việc"
+      },
       "showTags": {
         "label": "Duyệt thẻ…"
       },
@@ -507,9 +529,11 @@
         "cycleHeadingLevel": "Đổi vòng cấp tiêu đề",
         "cycleTabs": "Chuyển vòng các thẻ",
         "deleteWorkspace": "Xóa không gian làm việc",
+        "findInNote": "Tìm trong ghi chú",
         "focusNextPane": "Chuyển sang khung tiếp theo",
         "focusPrevPane": "Chuyển sang khung trước",
         "foldAll": "Thu gọn tất cả",
+        "indent": "Thụt lề vào",
         "inlineCode": "Mã nội dòng",
         "insertWikilink": "Chèn liên kết wiki",
         "italic": "In nghiêng",
@@ -517,11 +541,15 @@
         "navigateForward": "Tiến tới",
         "newNote": "Ghi chú mới",
         "openSettings": "Mở cài đặt",
+        "outdent": "Thụt lề ra",
         "paletteToggle": "Mở bảng lệnh",
+        "redo": "Làm lại",
         "renameWorkspace": "Đổi tên không gian làm việc",
         "saveWorkspaceAs": "Lưu không gian làm việc thành",
         "selectAllScoped": "Chọn tất cả (trong phạm vi)",
+        "selectNextOccurrence": "Chọn lần xuất hiện tiếp theo",
         "showGraphView": "Hiện chế độ xem đồ thị",
+        "showTasks": "Hiện công việc",
         "splitPaneDown": "Chia khung (xuống dưới)",
         "splitPaneRight": "Chia khung (sang phải)",
         "switchWorkspace": "Chuyển không gian làm việc",
@@ -531,6 +559,7 @@
         "toggleReadingView": "Bật/tắt chế độ đọc",
         "toggleSourceMode": "Bật/tắt chế độ nguồn",
         "toggleTaskList": "Bật/tắt danh sách công việc",
+        "undo": "Hoàn tác",
         "unfoldAll": "Mở rộng tất cả"
       }
     },
@@ -572,6 +601,12 @@
         "renamed": "Đã đổi tên thành {{name}}.",
         "renameFailed": "Không thể đổi tên tệp đính kèm.",
         "saveDialogFailed": "Không thể mở hộp thoại lưu."
+      },
+      "compression": {
+        "bulkNotice_one": "Đã nén {{count}} hình ảnh: {{from}} → {{to}}",
+        "bulkNotice_other": "Đã nén {{count}} hình ảnh: {{from}} → {{to}}",
+        "notice": "Đã nén: {{from}} → {{to}}",
+        "noticeContainerChanged": "Đã nén sang {{format}}: {{from}} → {{to}}"
       },
       "convert": {
         "cancel": "Hủy",
@@ -649,7 +684,10 @@
         "exportAria": "Xuất tệp đính kèm",
         "imagePreview": "Xem trước hình ảnh",
         "pdfFallback": "PDF",
-        "pdfPreview": "Xem trước PDF"
+        "pdfPreview": "Xem trước PDF",
+        "zoomIn": "Phóng to",
+        "zoomOut": "Thu nhỏ",
+        "zoomReset": "Đặt lại thu phóng"
       },
       "menu": {
         "actionsAria": "Thao tác với tệp đính kèm"
@@ -730,6 +768,12 @@
           "deletedLabel": "đã xóa"
         },
         "transcribe": {
+          "cause": {
+            "featureOff": "Chuyển giọng nói thành văn bản đang tắt. Hãy bật nó trong Cài đặt → Chép lời.",
+            "modelLoadFailed": "Không thể tải mô hình chuyển giọng nói thành văn bản. Nếu bạn đã đặt một mô hình tùy chỉnh trong Cài đặt → Nhà phát triển → AI, hãy kiểm tra các tệp của nó; nếu không, cài đặt lại Myne sẽ khôi phục mô hình tích hợp sẵn.",
+            "noModel": "Thiếu mô hình chuyển giọng nói thành văn bản. Cài đặt lại Myne sẽ khôi phục nó.",
+            "vaultLocked": "Hãy mở khóa kho của bạn để chép lời."
+          },
           "disabledReason": "Bật AI trong Cài đặt → Developer → AI để chép lời.",
           "failed": "Chép lời thất bại. Vui lòng thử lại.",
           "heading": "Bản chép lời",
@@ -772,6 +816,10 @@
         "linkedFrom": "Được liên kết từ {{count}}",
         "linkedFrom_one": "Được liên kết từ {{count}}",
         "linkedFrom_other": "Được liên kết từ {{count}}",
+        "linksTo": "Liên kết đến {{count}}",
+        "linksTo_one": "Liên kết đến {{count}}",
+        "linksTo_other": "Liên kết đến {{count}}",
+        "outgoingEmpty": "Ghi chú này chưa liên kết đến đâu cả.",
         "untitled": "Không có tiêu đề"
       },
       "barItems": {
@@ -889,6 +937,7 @@
           "aiChat": "Trò chuyện AI",
           "backlinks": "Liên kết ngược",
           "outline": "Dàn ý",
+          "tasks": "Công việc",
           "unlinked": "Đề cập chưa liên kết"
         }
       },
@@ -922,9 +971,38 @@
         "toggleTitle": "Không gian làm việc: {{name}}"
       }
     },
+    "noteActions": {
+      "buttonLabel": "Thao tác với ghi chú",
+      "rename": "Đổi tên",
+      "move": "Chuyển đến thư mục…",
+      "duplicate": "Nhân bản",
+      "convertToTemplate": "Biến thành mẫu",
+      "convertToNote": "Chuyển thành ghi chú",
+      "turnedIntoTemplate": "Đã biến thành mẫu",
+      "convertedToNote": "Đã chuyển thành ghi chú",
+      "versionHistory": "Lịch sử phiên bản",
+      "exportMarkdown": "Xuất dạng Markdown…",
+      "exportPdf": "Xuất dạng PDF…",
+      "exportHtml": "Xuất dạng HTML…",
+      "exportTxt": "Xuất dạng văn bản thuần…",
+      "trash": "Chuyển vào Thùng rác"
+    },
     "codeBlock": {
       "copyCode": "Sao chép mã",
       "defaultBadge": "mã"
+    },
+    "drawingEmbed": {
+      "done": "Xong",
+      "edit": "Chỉnh sửa bản vẽ {{name}}",
+      "editAction": "Chỉnh sửa",
+      "empty": "Bản vẽ trống — bấm để vẽ",
+      "open": "Mở",
+      "rename": "Đổi tên bản vẽ"
+    },
+    "drawingMenu": {
+      "background": "Nền khung vẽ",
+      "reset": "Đặt lại khung vẽ",
+      "toggleTheme": "Bật/tắt giao diện bản vẽ"
     },
     "find": {
       "close": "Đóng tìm kiếm",
@@ -949,8 +1027,11 @@
       "unreferenced": "không được tham chiếu"
     },
     "frontmatter": {
+      "addListItem": "Thêm mục…",
+      "addListItemAriaLabel": "Thêm mục vào {{key}}",
       "addProperty": "+ Thêm thuộc tính",
       "propertiesLabel": "Thuộc tính",
+      "removeListItemAriaLabel": "Xóa {{item}}",
       "titleAriaLabel": "Tiêu đề ghi chú",
       "titlePlaceholder": "Không có tiêu đề"
     },
@@ -966,6 +1047,8 @@
       "date": "Ngày",
       "day": "Thứ trong tuần",
       "divider": "Dấu phân cách",
+      "drawing": "Bản vẽ",
+      "due": "Ngày đến hạn",
       "heading1": "Tiêu đề 1",
       "heading2": "Tiêu đề 2",
       "heading3": "Tiêu đề 3",
@@ -975,8 +1058,11 @@
       "link": "Liên kết",
       "now": "Bây giờ",
       "numberedList": "Danh sách đánh số",
+      "priority": "Mức ưu tiên",
       "quote": "Trích dẫn",
+      "repeat": "Lặp lại",
       "table": "Bảng",
+      "taskQuery": "Danh sách công việc",
       "time": "Giờ",
       "todoList": "Danh sách việc cần làm",
       "voiceNote": "Ghi chú giọng nói",
@@ -998,6 +1084,27 @@
       "deleteRow": "Xóa hàng",
       "reorderColumn": "Sắp xếp lại cột",
       "reorderRow": "Sắp xếp lại hàng"
+    },
+    "tagSuggestion": {
+      "label": "Thẻ gợi ý",
+      "accept": "Thêm thẻ {{tag}} vào ghi chú này",
+      "dismiss": "Bỏ qua thẻ gợi ý {{tag}}"
+    },
+    "taskField": {
+      "addAffordance": "Thêm trường công việc",
+      "invalidDue": "Myne không đọc được ngày này, nên nó không được hiển thị như một ngày đến hạn.",
+      "invalidPriority": "Myne không đọc được mức ưu tiên này. Hãy dùng highest, high, medium, low hoặc lowest.",
+      "invalidRepeat": "Myne không nhận ra quy tắc lặp này, nên công việc này sẽ không lặp lại.",
+      "menuEdit": "Chỉnh sửa {{field}}",
+      "menuTitle": "Thêm trường",
+      "repeatNoAnchor": "Công việc này không có ngày nào để lặp lại từ đó, nên nó sẽ không lặp. Hãy thêm một ngày đến hạn để bắt đầu.",
+      "save": "Lưu",
+      "skipOccurrence": "Bỏ qua lần này",
+      "title": {
+        "due": "Ngày đến hạn",
+        "repeat": "Lặp lại",
+        "priority": "Mức ưu tiên"
+      }
     },
     "toolbar": {
       "apply": "Áp dụng",
@@ -1030,7 +1137,16 @@
         "green": "Xanh lá",
         "pink": "Hồng",
         "purple": "Tím",
-        "yellow": "Vàng"
+        "yellow": "Vàng",
+        "orange": "Cam",
+        "red": "Đỏ",
+        "teal": "Xanh mòng két",
+        "cyan": "Lục lam",
+        "lime": "Xanh chanh",
+        "brown": "Nâu",
+        "grey": "Xám",
+        "indigo": "Chàm",
+        "remove": "Bỏ tô sáng"
       },
       "urlPlaceholder": "Dán URL liên kết"
     },
@@ -1375,11 +1491,17 @@
       "countEmpty": "Trống",
       "delete": "Xóa",
       "deleteError": "Không thể xóa ghi chú đó. Hãy thử lại.",
+      "emptyBody": "Ghi chú và thư mục đã lưu trữ được ẩn khỏi thanh bên nhưng vẫn được giữ an toàn. Hãy khôi phục chúng tại đây bất cứ khi nào bạn cần.",
+      "emptyTitle": "Chưa lưu trữ gì",
+      "folderDeleteBody_one": "“{{name}}” và {{count}} ghi chú của nó",
+      "folderDeleteBody_other": "“{{name}}” và {{count}} ghi chú của nó",
       "emptyState": "Kho lưu trữ trống.",
       "folderDeleteConfirm_one": "Chuyển {{count}} ghi chú vào Thùng rác?",
       "folderDeleteConfirm_other": "Chuyển {{count}} ghi chú vào Thùng rác?",
       "folderDeleteConfirmCta": "Chuyển vào Thùng rác",
       "folderDeleteError": "Không thể chuyển ghi chú của thư mục đó vào Thùng rác. Thử lại.",
+      "folderDeleteTitle": "Chuyển thư mục này vào Thùng rác?",
+      "folderDeleteWarning": "Chúng được chuyển vào Thùng rác — bạn có thể khôi phục bất cứ lúc nào. Xóa vĩnh viễn là một bước riêng.",
       "restore": "Khôi phục",
       "restoreError": "Không thể khôi phục ghi chú đó. Hãy thử lại.",
       "title": "Lưu trữ",
@@ -1469,6 +1591,24 @@
     "graph": {
       "allConnected": "Mọi thứ đều được kết nối — không có ghi chú nào tách biệt.",
       "building": "Đang dựng đồ thị…",
+      "colorGroups": {
+        "addRule": "Thêm quy tắc",
+        "colorSwatchTitle": "Chọn màu",
+        "deleteRuleTitle": "Xóa quy tắc",
+        "dragHandleTitle": "Kéo để sắp xếp lại",
+        "editFilterButton": "Chỉnh sửa bộ lọc…",
+        "editFilterTitle": "Chỉnh sửa bộ lọc nhóm màu",
+        "emptyBody": "Nhóm màu cho phép bạn tô màu các nút đồ thị theo thẻ hoặc thư mục — ghi chú công việc một màu, ghi chú cá nhân một màu khác. Hãy thêm quy tắc đầu tiên của bạn.",
+        "emptyTitle": "Chưa có nhóm màu nào",
+        "enableToggleAriaLabel": "Bật quy tắc",
+        "filterAllNotes": "Khớp với mọi ghi chú",
+        "filterConditions_one": "{{count}} điều kiện",
+        "filterConditions_other": "{{count}} điều kiện",
+        "heading": "Nhóm màu",
+        "moveDown": "Chuyển quy tắc xuống",
+        "moveUp": "Chuyển quy tắc lên",
+        "namePlaceholder": "Quy tắc không có tiêu đề"
+      },
       "depthToggleTitle": "Bật/tắt độ sâu lân cận (1 ↔ 2 bước)",
       "filterAll": "Tất cả",
       "filterAroundNote": "Quanh ghi chú này",
@@ -1480,6 +1620,23 @@
       "overCap": "Kho này lớn — đồ thị toàn kho bị giới hạn. Hãy lọc theo thẻ hoặc hiển thị các ghi chú tách biệt để khám phá.",
       "refresh": "Làm mới",
       "refreshTitle": "Kho đã thay đổi — dựng lại đồ thị",
+      "settings": {
+        "appearanceHeading": "Giao diện",
+        "closeTitle": "Đóng",
+        "forceCenter": "Lực hút vào tâm",
+        "forceLinkDistance": "Khoảng cách liên kết",
+        "forceLinkStrength": "Độ mạnh liên kết",
+        "forceRepel": "Lực đẩy",
+        "forcesHeading": "Lực",
+        "labelFadeZoom": "Mờ dần nhãn",
+        "lineThickness": "Độ dày đường",
+        "nodeSize": "Cỡ nút",
+        "nodeSizeStrength": "Cỡ theo số kết nối",
+        "openTitle": "Cài đặt đồ thị",
+        "reset": "Đặt lại về mặc định",
+        "showArrows": "Hiện mũi tên chỉ hướng",
+        "title": "Cài đặt đồ thị"
+      },
       "tagPlaceholder": "Thẻ…"
     },
     "import": {
@@ -1538,6 +1695,7 @@
         "setupIntro": "Trỏ Myne tới thư mục kho Obsidian hiện có của bạn. Mọi ghi chú Markdown được nhập và mã hóa ngay tại chỗ — không có gì rời khỏi thiết bị này, và các tệp gốc của bạn không bị động đến.",
         "statCancelled": "Đã hủy",
         "statCanvasSkipped": "tệp .canvas đã bỏ qua",
+        "statCompressed": "Hình ảnh đã nén",
         "statEmptyFoldersKept": "Thư mục trống được giữ lại",
         "statMedia": "Tệp đa phương tiện",
         "statOtherSkipped": "Tệp khác đã bỏ qua",
@@ -1551,7 +1709,19 @@
         "titlePick": "Nhập ghi chú",
         "keepsLabel": "Những gì được giữ lại",
         "losesLabel": "Những gì bị bỏ lại",
-        "changeSource": "Đổi nguồn"
+        "changeSource": "Đổi nguồn",
+        "statExcalidrawSkipped": "Bản vẽ Excalidraw đã bỏ qua",
+        "unfollowedLinkOutside": "Đây là lối tắt tới một thư mục nằm ngoài thư mục bạn đã chọn, nên Myne không đi theo nó. Hãy chuyển hoặc sao chép thư mục đó vào bên trong kho của bạn rồi nhập lại.",
+        "unfollowedLinkLoop": "Lối tắt này trỏ ngược vào một thư mục mà Myne đã ở bên trong, nên đi theo nó sẽ lặp vòng mãi mãi. Không có gì bên dưới nó bị bỏ sót.",
+        "unfollowedLinkBroken": "Lối tắt này không dẫn đến đâu cả — thứ mà nó từng trỏ tới đã bị chuyển đi hoặc xóa.",
+        "unreadableDetail": "Đã bỏ qua — {{reason}} Phần còn lại của việc nhập vẫn tiếp tục.",
+        "stoppedAt": "{{imported}} trên {{total}} ghi chú đã được nhập trước khi việc này dừng lại. Chúng nằm trong kho của bạn và an toàn để giữ.",
+        "reasonNotUtf8": "Myne không đọc được tệp này dưới dạng văn bản. Có lẽ nó được lưu bằng một bảng mã cũ, hoặc nó không phải tệp văn bản.",
+        "reasonPathRejected": "Myne không thể truy cập tệp này bên trong thư mục bạn đã chọn.",
+        "reasonPermissionDenied": "Myne không được phép đọc tệp này.",
+        "reasonNotFound": "Tệp này đã không còn khi Myne đến nơi.",
+        "reasonNoSpace": "Thiết bị này đã hết dung lượng.",
+        "reasonUnknown": "Myne không thể nói rõ lý do."
       },
       "offer": {
         "body": "Đưa các ghi chú hiện có của bạn vào Myne. Từng ghi chú được mã hóa khi nhập — không có gì rời khỏi thiết bị này, và các tệp gốc của bạn vẫn ở nguyên vị trí.",
@@ -1615,6 +1785,7 @@
       "bulkDelete": "Xóa {{count}} ghi chú",
       "bulkDelete_one": "Xóa {{count}} ghi chú",
       "bulkDelete_other": "Xóa {{count}} ghi chú",
+      "moveTo": "Chuyển đến…",
       "bulkMove": "Di chuyển {{count}} ghi chú đến…",
       "bulkMove_one": "Di chuyển {{count}} ghi chú đến…",
       "bulkMove_other": "Di chuyển {{count}} ghi chú đến…",
@@ -1644,6 +1815,7 @@
       "newFolder": "Thư mục mới",
       "newFolderInPlaceholder": "Thư mục mới trong {{path}}",
       "newFolderPlaceholder": "Thư mục mới",
+      "newItem": "Tạo mới…",
       "newNote": "Ghi chú mới",
       "newNoteFromTemplate": "Ghi chú mới từ mẫu…",
       "newNoteHere": "Ghi chú mới tại đây",
@@ -1676,12 +1848,18 @@
       "trashSingleError": "Không thể chuyển ghi chú vào Thùng rác.",
       "undo": "Hoàn tác",
       "vaultRoot": "Thư mục gốc của kho",
-      "viewSettingsTitle": "Cài đặt chế độ xem"
+      "viewSettingsTitle": "Cài đặt chế độ xem",
+      "imported_one": "Đã nhập 1 ghi chú vào thư mục này",
+      "imported_other": "Đã nhập {{count}} ghi chú vào thư mục này",
+      "importedWithSkips": "Đã nhập {{count}} — bỏ qua {{skipped}}",
+      "importNoMarkdown": "Không có tệp markdown nào trong phần vừa thả"
     },
     "newFromTemplate": {
       "back": "Quay lại",
       "blankNote": "Ghi chú trống",
       "createNote": "Tạo ghi chú",
+      "createFirstTemplate": "Tạo một mẫu",
+      "manageTemplates": "Quản lý mẫu",
       "emptyState": "Bạn chưa tạo mẫu nào.",
       "listLabel": "Mẫu",
       "loading": "Đang tải…",
@@ -1696,12 +1874,14 @@
       "createDrawing": "Bản vẽ mới",
       "noNotesMatch": "Không có ghi chú nào khớp.",
       "noNotesYet": "Chưa có ghi chú nào.",
+      "recent": "Gần đây",
       "searchAriaLabel": "Tìm ghi chú để mở",
       "searchPlaceholder": "Tìm ghi chú…",
       "untitled": "Không có tiêu đề"
     },
     "pane": {
       "graphTab": "Đồ thị",
+      "tasksTab": "Công việc",
       "loading": "Đang tải…",
       "untitledView": "Chế độ xem không có tiêu đề"
     },
@@ -1723,6 +1903,8 @@
       "loadError": "Không thể tải ghi chú này",
       "removeFromFavorites": "Bỏ khỏi mục yêu thích",
       "renameAriaLabel": "Đổi tên ghi chú",
+      "taskBadgeLabel": "Ghi chú này là một công việc",
+      "taskBadgeTitle": "Ghi chú công việc",
       "unsyncedLabel": "Chưa có trên máy chủ",
       "unsyncedTitle": "Các thay đổi mới nhất của ghi chú này chỉ có trên thiết bị này",
       "untitled": "Không có tiêu đề"
@@ -1755,7 +1937,12 @@
       "cancel": "Hủy",
       "changeCount_one": "{{count}} thay đổi kể từ ảnh chụp này",
       "changeCount_other": "{{count}} thay đổi kể từ ảnh chụp này",
+      "changeCountPrev_one": "{{count}} thay đổi so với ảnh chụp trước",
+      "changeCountPrev_other": "{{count}} thay đổi so với ảnh chụp trước",
       "close": "Đóng",
+      "compareAgainstLabel": "So sánh với",
+      "compareCurrent": "Ghi chú hiện tại",
+      "comparePrevious": "Ảnh chụp trước",
       "confirmBody": "Ghi chú hiện tại của bạn sẽ được lưu thành một ảnh chụp trước, nên bạn có thể hoàn tác việc này.",
       "confirmTitle": "Khôi phục ảnh chụp này?",
       "decrypting": "Đang giải mã…",
@@ -1770,6 +1957,7 @@
       "justNow": "vừa xong",
       "listLabel": "Danh sách ảnh chụp",
       "loading": "Đang tải…",
+      "noPrevious": "Đây là ảnh chụp sớm nhất — không có gì trước nó để so sánh.",
       "restore": "Khôi phục",
       "restoreCta": "Khôi phục ảnh chụp này",
       "restoredStatus": "Đã khôi phục. Phiên bản bạn đang có được lưu thành một ảnh chụp.",
@@ -1823,6 +2011,8 @@
       "emptyConfirmTitle": "Dọn sạch thùng rác?",
       "emptyPartialFailure_one": "Không thể xóa {{count}} ghi chú và chúng vẫn ở trong thùng rác.",
       "emptyPartialFailure_other": "Không thể xóa {{count}} ghi chú và chúng vẫn ở trong thùng rác.",
+      "emptyBody": "Ghi chú bạn xóa sẽ nằm ở đây. Chúng ở lại cho đến khi bạn dọn sạch thùng rác — bạn có thể khôi phục bất kỳ ghi chú nào bất cứ lúc nào.",
+      "emptyTitle": "Thùng rác trống",
       "emptyState": "Thùng rác trống.",
       "purgeConfirmCta": "Xóa vĩnh viễn",
       "purgeConfirmTitle": "Xóa vĩnh viễn?",
@@ -1871,6 +2061,8 @@
         "viewSettings": "Cài đặt chế độ xem…"
       },
       "newView": "Chế độ xem mới",
+      "noMatch": "Không có chế độ xem nào khớp với tìm kiếm của bạn.",
+      "searchPlaceholder": "Tìm chế độ xem…",
       "table": {
         "empty": "Không có ghi chú nào khớp với chế độ xem này",
         "name": "Tên",
@@ -1967,6 +2159,71 @@
     "passwordHelper": "Không bao giờ được lưu, không bao giờ được truyền đi. Nó mã hóa các khóa của bạn trên thiết bị này.",
     "encryptingSubtitle": "Đang bọc các khóa kho lưu trữ của bạn bằng mật khẩu mới."
   },
+  "recurrence": {
+    "every": {
+      "day": "mỗi ngày",
+      "week": "mỗi tuần",
+      "month": "mỗi tháng",
+      "year": "mỗi năm"
+    },
+    "everyN": {
+      "day": "mỗi {{count}} ngày",
+      "week": "mỗi {{count}} tuần",
+      "month": "mỗi {{count}} tháng",
+      "year": "mỗi {{count}} năm"
+    },
+    "everyWeekday": "mỗi {{days}}",
+    "everyWeekdays": "mỗi {{days}}",
+    "ordinal": {
+      "first": "thứ nhất",
+      "second": "thứ hai",
+      "third": "thứ ba",
+      "fourth": "thứ tư",
+      "last": "cuối cùng"
+    },
+    "ordinalOfMonth": "{{weekday}} {{ordinal}} của mỗi tháng",
+    "dayOfMonth": "ngày {{day}} của mỗi tháng",
+    "lastDayOfMonth": "ngày cuối cùng của mỗi tháng",
+    "weekday": {
+      "monday": "Thứ Hai",
+      "tuesday": "Thứ Ba",
+      "wednesday": "Thứ Tư",
+      "thursday": "Thứ Năm",
+      "friday": "Thứ Sáu",
+      "saturday": "Thứ Bảy",
+      "sunday": "Chủ Nhật"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, tính từ khi hoàn thành",
+    "builder": {
+      "family": "Lặp lại",
+      "familyInterval": "Mỗi…",
+      "familyWeekdays": "Hằng tuần vào…",
+      "familyDayOfMonth": "Hằng tháng vào ngày…",
+      "familyOrdinal": "Hằng tháng vào thứ…",
+      "count": "Khoảng lặp",
+      "unitLabel": "Đơn vị",
+      "units": {
+        "day": "ngày",
+        "week": "tuần",
+        "month": "tháng",
+        "year": "năm"
+      },
+      "ordinal": "Vị trí",
+      "weekday": "Thứ",
+      "lastDay": "Ngày cuối",
+      "whenDone": "Lặp lại tính từ ngày hoàn thành",
+      "weekdayShort": {
+        "monday": "T2",
+        "tuesday": "T3",
+        "wednesday": "T4",
+        "thursday": "T5",
+        "friday": "T6",
+        "saturday": "T7",
+        "sunday": "CN"
+      }
+    }
+  },
   "restore": {
     "backLabel": "Quay lại",
     "cancelLabel": "Hủy",
@@ -2015,8 +2272,8 @@
       "changelogButton": "Xem nhật ký thay đổi…",
       "changelogHelper": "Ghi chú theo từng phiên bản. Sẽ xuất hiện khi MYND-119 hoàn thành.",
       "changelogLabel": "Nhật ký thay đổi",
-      "developerModeHelper": "",
-      "developerModeLabel": "",
+      "developerModeHelper": "Hiện các cài đặt nâng cao mà Myne mặc định giữ khuất: những cài đặt đưa bạn ra khỏi lối đi Myne bảo đảm, và các công cụ dành cho người dùng thành thạo mà hầu hết mọi người không bao giờ cần. Tắt nó chỉ ẩn chúng đi lần nữa — thứ gì bạn đã bật vẫn bật, và bạn tắt nó ở chính chỗ điều khiển của nó.",
+      "developerModeLabel": "Chế độ nhà phát triển",
       "licenseBody": "Tiền alpha · Tài liệu CC-BY-4.0 · Mã ứng dụng AGPL-3.0 khi phát hành Giai đoạn 1.",
       "licenseLabel": "Giấy phép",
       "tagline": "Tiền alpha · Trình khách máy tính Giai đoạn 1",
@@ -2067,10 +2324,18 @@
       "changing": "Đang thay đổi…"
     },
     "appearance": {
+      "accentHelper": "Chọn màu nhấn được dùng trong toàn ứng dụng. Chỉ trên thiết bị này.",
+      "accentHexAria": "Giá trị hex của màu nhấn",
+      "accentLabel": "Màu nhấn",
+      "accentReset": "Đặt lại về mặc định của giao diện",
       "homeQuickActions": "Thao tác nhanh ở màn hình chính",
       "showEditTimesAria": "Hiện thời gian chỉnh sửa trong thanh bên",
       "showEditTimesHelper": "Hiển thị thời gian chỉnh sửa gần nhất của mỗi ghi chú dưới tiêu đề của nó trong thanh bên.",
       "showEditTimesLabel": "Hiện thời gian chỉnh sửa",
+      "taskMarkerAria": "Hiện dấu công việc trên các ghi chú công việc",
+      "taskMarkerHelper": "Đánh dấu những ghi chú bạn đã khai báo là công việc trong thanh bên và trên thẻ của chúng.",
+      "taskMarkerLabel": "Hiện dấu công việc",
+      "taskMarkerSaveError": "Không thể lưu cài đặt đó. Hãy thử lại.",
       "theme": {
         "amoled": "AMOLED",
         "dark": "Tối",
@@ -2087,7 +2352,10 @@
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "Phông chữ trình soạn thảo",
-      "showEditTimesSubtitle": "Dấu thời gian dưới mỗi ghi chú"
+      "showEditTimesSubtitle": "Dấu thời gian dưới mỗi ghi chú",
+      "graphSettingsLabel": "Giao diện đồ thị",
+      "graphSettingsHelper": "Màu nút, nhãn, kích thước và các lực bố cục được đặt ngay bên trong đồ thị — hãy mở nó và dùng bánh răng ở góc. Chúng được giữ riêng cho từng thiết bị, nên một thay đổi ở đó không theo bạn sang điện thoại.",
+      "openGraph": "Mở đồ thị"
     },
     "archive": {
       "helper": "Cho phép chuyển ghi chú vào Kho lưu trữ, giữ chúng ngoài danh sách chính. Tắt tùy chọn này sẽ khôi phục mọi ghi chú đã lưu trữ về thư mục của nó và ẩn các nút điều khiển lưu trữ.",
@@ -2095,6 +2363,18 @@
       "off": "Tắt",
       "on": "Bật",
       "saveError": "Không thể cập nhật cài đặt lưu trữ."
+    },
+    "attachmentCompression": {
+      "label": "Nén hình ảnh khi nhập",
+      "helper": "Thu nhỏ hình ảnh được dán hoặc thả vào trước khi chúng được mã hóa và lưu, để kho, bản sao lưu và đồng bộ của bạn nhẹ hơn. Việc này không thể đảo ngược — tệp gốc không được giữ lại.",
+      "helperScopeEveryDevice": "Áp dụng cho toàn bộ kho, trên mọi thiết bị.",
+      "helperScopeNotHere": "Áp dụng cho toàn bộ kho, nhưng không áp dụng trong trình duyệt này — hình ảnh thêm ở đây được lưu đúng như khi đưa vào.",
+      "errorSaveSetting": "Không thể lưu cài đặt này."
+    },
+    "transcription": {
+      "label": "Chuyển giọng nói thành văn bản",
+      "helper": "Chuyển một tệp âm thanh đính kèm thành văn bản, ngay trên thiết bị này. Mô hình đi kèm Myne và không có gì được gửi đi đâu cả. Tắt tùy chọn này sẽ ẩn thao tác Chép lời ở mọi nơi và ngăn ứng dụng chép lời hoàn toàn.",
+      "errorSaveSetting": "Không thể lưu cài đặt đó."
     },
     "attachmentOcr": {
       "label": "Tìm kiếm bên trong hình ảnh và tài liệu quét",
@@ -2155,6 +2435,29 @@
         "onDate": "Đã kết nối vào {{date}}"
       }
     },
+    "cliAccess": {
+      "label": "Truy cập từ dòng lệnh",
+      "helperOff": "Đang tắt. Lệnh `myne` không thể đọc hay thay đổi bất cứ thứ gì trong kho này.",
+      "helperOn": "Đang bật khi kho này được mở khóa. Bất kỳ chương trình nào chạy dưới tài khoản của bạn đều có thể đọc, tìm và tạo ghi chú qua nó — Myne không phân biệt được cửa sổ dòng lệnh của bạn với một script, và không kiểm tra gì ngoài việc cửa đang mở. Nó không bao giờ hỏi mật khẩu của bạn, đóng ngay khi kho bị khóa, và không thể xóa ghi chú.",
+      "lastUsedNever": "Chưa dùng kể từ khi kho này được mở khóa.",
+      "lastUsedJustNow": "Vừa dùng xong.",
+      "lastUsedMinutesAgo": "Dùng lần cuối {{count}} phút trước.",
+      "lastUsedMinutesAgo_one": "Dùng lần cuối {{count}} phút trước.",
+      "lastUsedMinutesAgo_other": "Dùng lần cuối {{count}} phút trước.",
+      "lastUsedHoursAgo": "Dùng lần cuối {{count}} giờ trước.",
+      "lastUsedHoursAgo_one": "Dùng lần cuối {{count}} giờ trước.",
+      "lastUsedHoursAgo_other": "Dùng lần cuối {{count}} giờ trước.",
+      "lastUsedDaysAgo": "Dùng lần cuối {{count}} ngày trước.",
+      "lastUsedDaysAgo_one": "Dùng lần cuối {{count}} ngày trước.",
+      "lastUsedDaysAgo_other": "Dùng lần cuối {{count}} ngày trước.",
+      "notOnPathHint": "Shell của bạn chưa tìm thấy `myne`. Hãy thêm dòng này vào hồ sơ shell của bạn, rồi mở một cửa sổ dòng lệnh mới:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "Thư mục mà dòng lệnh không bao giờ thấy",
+      "excludedHelper": "Mỗi dòng một đường dẫn thư mục. Ghi chú trong các thư mục này bị loại khỏi mọi kết quả từ dòng lệnh và không thể ghi vào đó từ dòng lệnh — chúng vẫn dùng được đầy đủ trong ứng dụng. Bạn có thể đặt việc này trước khi bật truy cập từ dòng lệnh.",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "rateLimitLabel": "Cho dòng lệnh chạy hết tốc độ",
+      "rateLimitHelper": "Mặc định Myne trả lời tối đa 120 lệnh mỗi phút từ dòng lệnh. Đó là giới hạn nhịp độ dành cho một script chạy loạn, không phải một lớp kiểm tra quyền — không có gì quyết định chương trình nào được phép hỏi. Hãy bật tùy chọn này cho công việc hàng loạt, như đưa từng ghi chú qua một công cụ khác."
+    },
     "clipperInstall": {
       "error": "Không thể cập nhật cài đặt trình cắt trình duyệt.",
       "helper": "Đăng ký máy chủ nhắn tin gốc để tiện ích mở rộng trình duyệt Myne có thể gửi các đoạn cắt đến ứng dụng này. Bật theo mặc định; tắt để gỡ bỏ.",
@@ -2164,6 +2467,7 @@
       "appliedBadge": "Đang áp dụng",
       "apply": "Áp dụng",
       "applyError": "Không thể áp dụng giao diện đó. Vui lòng thử lại.",
+      "browseButton": "Duyệt giao diện",
       "cancel": "Hủy",
       "confirm": "Xác nhận",
       "delete": "Xóa",
@@ -2188,7 +2492,8 @@
       "label": "Giao diện tùy chỉnh",
       "openFolderButton": "Mở thư mục giao diện",
       "openFolderError": "Không thể mở thư mục giao diện.",
-      "readError": "Không thể đọc thư mục giao diện của bạn."
+      "readError": "Không thể đọc thư mục giao diện của bạn.",
+      "readOnlyHelper": "Giao diện tùy chỉnh được cài đặt trên máy tính của bạn. Giao diện của bạn sẽ tự xuất hiện ở đây sau một lần đồng bộ."
     },
     "dailyNotes": {
       "blankTemplate": "Trống (không có mẫu)",
@@ -2198,6 +2503,8 @@
       "folderHelper": "Nơi lưu các ghi chú hằng ngày mới. Mặc định là {{default}} — thư mục được giữ lại ngay cả khi trống.",
       "folderLabel": "Thư mục ghi chú hằng ngày",
       "folderSaveError": "Không thể lưu thư mục hằng ngày. Vui lòng thử lại.",
+      "folderSearchEmpty": "Không có thư mục nào khớp.",
+      "folderSearchPlaceholder": "Tìm thư mục…",
       "searchEmpty": "Không có mẫu nào khớp.",
       "searchPlaceholder": "Tìm mẫu…",
       "templateHelper": "Chọn một mẫu để khởi tạo mỗi ghi chú hằng ngày, hoặc để trống để có một ghi chú trống lấy ngày làm tiêu đề.",
@@ -2234,6 +2541,8 @@
       "newNote": {
         "folderLabel": "Thư mục cho ghi chú mới",
         "folderPlaceholder": "ví dụ: Inbox/",
+        "folderSearchEmpty": "Không có thư mục nào khớp.",
+        "folderSearchPlaceholder": "Tìm thư mục…",
         "helper": "Nơi đặt các ghi chú mới tạo.",
         "label": "Vị trí mặc định cho ghi chú mới",
         "optionCurrent": "Cùng thư mục với ghi chú hiện tại",
@@ -2329,6 +2638,10 @@
       "off": "Tắt",
       "on": "Bật"
     },
+    "views": {
+      "helper": "Hiện mục Chế độ xem trong thanh bên để lưu các danh sách ghi chú đã lọc. Mặc định tắt; bật nếu bạn đã có chế độ xem.",
+      "label": "Chế độ xem"
+    },
     "vimMode": {
       "chordCaveat": "Trên Windows và Linux, phím tắt riêng của Myne được ưu tiên, nên các tổ hợp vim xung đột với chúng (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) không dùng được trong trình soạn thảo. Ctrl-[ vẫn hoạt động như Escape, và visual-block chuyển sang Alt-v.",
       "errorSaveSetting": "Không thể lưu cài đặt chế độ vim.",
@@ -2346,6 +2659,9 @@
       "pendingHint": "Sắp ra mắt"
     },
     "ai": {
+      "autoTagHelper": "Khi bạn ngừng gõ, một mô hình nhỏ trên thiết bị của bạn sẽ đọc ghi chú và gợi ý thẻ ở đầu ghi chú. Không có gì được thêm vào cho đến khi bạn chấp nhận một gợi ý.",
+      "autoTagLabel": "Tự động gợi ý thẻ",
+      "autoTagUnavailable": "Bản dựng này không kèm mô hình gắn thẻ, nên không thể gợi ý thẻ nào. Myne không bao giờ tải mô hình về — công tắc sẽ tự bật trong một bản dựng có kèm mô hình.",
       "disclosureToggle": "Cách này hoạt động thế nào?",
       "enableHelper": "Chạy một mô hình do bạn cung cấp hoàn toàn trên thiết bị của bạn. Thử nghiệm, tắt theo mặc định.",
       "enableLabel": "Bật AI cục bộ",
@@ -2369,8 +2685,41 @@
       "recommendedFilesTranscription": "Cần tệp .gguf của Whisper + config.json + tokenizer.json trong cùng một thư mục.",
       "title": "AI"
     },
+    "network": {
+      "disabledCue": "Đồng bộ không còn đi qua Tor. Các kết nối mới đi thẳng tới máy chủ đồng bộ.",
+      "errorRead": "Không thể đọc cài đặt hiện tại. Hãy gạt công tắc để đặt lại.",
+      "errorSave": "Không thể lưu cài đặt. Không có gì thay đổi.",
+      "errorSidecar": "Định tuyến qua Tor đang bật, nhưng không khởi động được trình khách Tor. Đồng bộ tạm dừng cho đến khi khởi động được — không có gì đang được gửi trực tiếp.",
+      "postureActive": "Đồng bộ đang đi qua Tor",
+      "postureConnecting": "Đang kết nối tới Tor — đồng bộ tạm dừng",
+      "postureConnectingDetail": "Việc này thường mất vài giây. Trong lúc đó không có gì được gửi trực tiếp.",
+      "postureExempt": "Đồng bộ không dùng Tor — địa chỉ này trỏ về chính thiết bị này",
+      "postureExemptDetail": "Địa chỉ máy chủ đồng bộ bạn đã cấu hình trỏ tới chính máy tính này, nên kết nối của Myne tới nó không đi qua một mạch Tor. Nếu địa chỉ đó chuyển tiếp tới một máy chủ ở nơi khác, Myne không thấy được điều đó và không thể định tuyến nó. Đồng bộ không bị tạm dừng.",
+      "postureHeading": "Ngay lúc này",
+      "postureInactive": "Đồng bộ đi thẳng tới máy chủ đồng bộ",
+      "postureUnavailable": "Không dùng được Tor — đồng bộ tạm dừng",
+      "postureUnavailableDetail": "Không có gì đang được gửi trực tiếp. Hãy tắt rồi bật lại cài đặt này để thử khởi động trình khách Tor, hoặc tắt hẳn nó để đồng bộ mà không qua Tor.",
+      "residualExit": "Nút chuyển tiếp cuối cùng trong một mạch Tor — nút ra — thấy được bạn kết nối tới máy chủ đồng bộ nào. Nó không đọc được những gì bạn đồng bộ; phần đó vẫn được mã hóa đầu cuối.",
+      "residualMetadata": "Máy chủ đồng bộ vẫn thấy bạn đồng bộ khi nào, bạn đẩy lên bao nhiêu khối dữ liệu và chúng lớn cỡ nào, cùng số thiết bị bạn có. Tor không thay đổi điều đó.",
+      "residualPayment": "Nếu bạn trả tiền cho dịch vụ đồng bộ được lưu trữ sẵn, khoản thanh toán và tài khoản của bạn vẫn có thể liên kết tới bạn. Tor thay đổi nơi kết nối xuất phát, chứ không thay đổi dấu vết thanh toán.",
+      "residualScope": "Chỉ lưu lượng đồng bộ của riêng Myne đi qua Tor. Không có gì khác trên thiết bị này đi qua đó.",
+      "residualsToggle": "Điều này không che giấu những gì",
+      "torHelper": "Ẩn địa chỉ IP và vị trí của bạn khỏi máy chủ đồng bộ, và ẩn việc bạn đồng bộ với máy chủ nào khỏi mạng của bạn và nhà cung cấp Internet — họ vẫn thấy được thiết bị này kết nối tới Tor. Nó không làm bạn ẩn danh với Myne, và không giấu được khỏi máy chủ việc bạn đồng bộ cái gì hay khi nào.",
+      "torLabel": "Định tuyến đồng bộ qua Tor"
+    },
     "prefs": {
       "saveError": "Không thể lưu tùy chọn — hãy thử lại"
+    },
+    "reminders": {
+      "aria": "Hiện nhắc nhở công việc trên thiết bị này",
+      "exactAllow": "Cho phép",
+      "exactLabel": "Thời điểm chính xác",
+      "exactOn": "Bật",
+      "horizon": "Nhắc nhở đã được đăng ký đến hết {{date}}. Hãy mở Myne trước lúc đó để chúng tiếp tục.",
+      "label": "Nhắc nhở công việc",
+      "saveError": "Không thể lưu cài đặt đó. Hãy thử lại.",
+      "showTextAria": "Hiện nội dung công việc trong thông báo",
+      "showTextLabel": "Hiện nội dung công việc"
     },
     "privacy": {
       "autoLockHelper": "Khóa kho sau khoảng thời gian không hoạt động này.",
@@ -2438,7 +2787,7 @@
     "shell": {
       "closeLabel": "Đóng cài đặt",
       "groups": {
-        "developer": ""
+        "developer": "Nhà phát triển"
       },
       "navLabel": "Bảng cài đặt",
       "panels": {
@@ -2448,7 +2797,9 @@
         "appearance": "Giao diện",
         "editor": "Trình soạn thảo",
         "files": "Tệp",
+        "transcription": "Chép lời",
         "hotkeys": "Phím tắt",
+        "network": "Mạng",
         "privacy": "Quyền riêng tư",
         "storage": "Lưu trữ",
         "sync": "Đồng bộ"
@@ -2498,6 +2849,8 @@
       "lineSpacingHelper": "Khoảng cách dọc giữa các dòng.",
       "lineSpacingLabel": "Khoảng cách dòng",
       "textSizeHelper": "Cỡ cơ bản của văn bản trình soạn thảo. Tiêu đề sẽ co giãn theo.",
+      "previewLabel": "Xem trước",
+      "previewBody": "Con cáo nâu nhanh nhẹn nhảy qua con chó lười. Cài đặt kiểu chữ thay đổi cách đọc của mọi ghi chú, nên mẫu này cập nhật theo lựa chọn của bạn.",
       "textSizeLabel": "Cỡ chữ"
     },
     "viewMode": {
@@ -2541,6 +2894,19 @@
     "sectionOptions": "Tùy chọn",
     "footerTagline": "myne · mã hóa trên thiết bị này · mã nguồn mở",
     "editor": {
+      "sections": {
+        "text": "Văn bản & hiển thị",
+        "editing": "Chỉnh sửa",
+        "writing": "Viết",
+        "features": "Tính năng"
+      },
+      "preview": {
+        "heading": "Con cáo nâu nhanh nhẹn",
+        "bullet1": "Xếp vào hộp của tôi năm tá bình rượu",
+        "bullet2": "Đàn ngựa vằn ngờ nghệch nhảy nhanh đến phát bực",
+        "spellCaption": "Kiểm tra chính tả",
+        "spellSample": "sai chín tả"
+      },
       "defaultView": "Chế độ xem mặc định",
       "typewriter": "Cuộn kiểu máy đánh chữ",
       "typewriterSubtitle": "Giữ con trỏ ở giữa theo chiều dọc",
@@ -2556,6 +2922,7 @@
         "lastActiveNoteDesc": "Đồng bộ ghi chú bạn đang mở để bạn có thể tiếp tục nó trên một thiết bị khác."
       },
       "keywords": {
+        "aiAutoTag": "tự động gắn thẻ gợi ý thẻ nhãn ai auto tag suggest",
         "aiEnable": "ai cục bộ bật tắt kích hoạt học máy local ai",
         "aiExcluded": "thư mục loại trừ bỏ qua ai quyền riêng tư excluded folders",
         "aiModels": "mô hình gguf tải xuống văn bản nhúng llm models embedding",
@@ -2566,6 +2933,9 @@
         "buildChannel": "kênh phát hành phiên bản bản dựng ổn định beta nightly build",
         "changePassword": "đổi mật khẩu thay đổi cập nhật đặt lại thông tin đăng nhập password",
         "changelog": "nhật ký thay đổi có gì mới lịch sử phát hành changelog",
+        "cliAccess": "cli dòng lệnh truy cập terminal shell lệnh myne console command line",
+        "cliExcludedFolders": "cli thư mục loại trừ dòng lệnh ẩn riêng tư terminal excluded folders",
+        "cliRateLimit": "cli giới hạn tốc độ dòng lệnh điều tiết hàng loạt nhịp độ lệnh mỗi phút rate limit",
         "clipper": "trình cắt trình duyệt tiện ích mở rộng web chrome firefox clipper",
         "contentWidth": "chiều rộng nội dung cột đọc độ dài dòng width",
         "customThemes": "giao diện tùy chỉnh bảng màu màu sắc nhập theme",
@@ -2574,6 +2944,7 @@
         "export": "xuất markdown giải mã tệp thường tài liệu export",
         "focusMode": "chế độ tập trung máy đánh chữ làm mờ dòng không hoạt động focus typewriter",
         "font": "phông chữ kiểu chữ sans serif mono typography font",
+        "graphSettings": "đồ thị giao diện vật lý lực nút liên kết bố cục nhóm màu nhãn khung vẽ graph",
         "hotkeys": "phím tắt bàn phím tổ hợp gán phím hotkeys shortcuts keymap",
         "import": "nhập ghi chú obsidian notion evernote enex html csv di chuyển chuyển đổi import",
         "language": "ngôn ngữ giao diện bản dịch bản địa language ui",
@@ -2583,7 +2954,9 @@
         "vimMode": "vim chế độ bàn phím normal insert visual modal",
         "lineSpacing": "khoảng cách dòng giãn dòng chiều cao dễ đọc line spacing",
         "newNoteLocation": "vị trí ghi chú mới thư mục mặc định nơi tạo new note",
+        "torRouting": "tor định tuyến onion proxy mạng địa chỉ ip vị trí ẩn đồng bộ ẩn danh",
         "quickUnlock": "mở khóa nhanh pin touch id face id sinh trắc học khuôn mặt quick unlock",
+        "reminders": "nhắc nhở thông báo cảnh báo công việc đến hạn reminders notify",
         "realtimeSync": "đồng bộ thời gian thực kết nối trực tiếp realtime sync",
         "screenCapture": "chụp màn hình quay màn hình bảo vệ chặn quyền riêng tư screenshot",
         "showEditTimes": "hiện thời gian chỉnh sửa dấu thời gian ngày ghi chú timestamps",
@@ -2591,6 +2964,8 @@
         "spellLanguages": "ngôn ngữ chính tả từ điển từ spell languages",
         "startupOpen": "khởi động mở mặc định tệp ghi chú nào startup",
         "attachmentOcr": "ocr hình ảnh quét pdf ảnh chụp nhận dạng văn bản tệp đính kèm tìm kiếm bên trong pin cpu",
+        "attachmentCompression": "nén hình ảnh thu nhỏ giảm cỡ đổi kích thước webp jpeg nhập dán kích thước kho lưu trữ compress",
+        "transcription": "chép lời phiên âm giọng nói âm thanh đọc chính tả phụ đề whisper ghi âm chuyển giọng nói thành văn bản transcribe",
         "syncAddDevice": "thêm thiết bị ghép nối liên kết điện thoại máy tính đồng bộ sync",
         "syncConflicts": "xung đột hợp nhất giải quyết phiên bản đồng bộ sync",
         "syncDevices": "thiết bị đã liên kết ghép nối đồng bộ máy sync devices",
@@ -2648,6 +3023,15 @@
       "label": "Đang dựng chỉ mục tìm kiếm…"
     },
     "conflicts": {
+      "compare": "So sánh",
+      "compareClose": "Quay lại danh sách xung đột",
+      "compareError": "Không thể đọc các ghi chú này để so sánh. Hãy thử lại.",
+      "compareIdentical": "Hai phiên bản này giống hệt nhau.",
+      "compareLoading": "Đang đọc cả hai phiên bản…",
+      "compareMine": "Trên thiết bị này",
+      "compareOrphan": "Ghi chú mà bản sao này bắt nguồn từ đó không còn ở đây nữa, nên không có gì để so sánh với nó.",
+      "compareTheirs": "Bản xung đột",
+      "compareTitle": "Đang so sánh “{{title}}”",
       "discard": "Loại bỏ",
       "empty": "Không có xung đột — các thiết bị của bạn đã đồng bộ.",
       "groupTitle_one": "{{count}} bản xung đột của {{original}}",
@@ -2709,11 +3093,15 @@
     },
     "endpoint": {
       "connect": "Kết nối",
+      "connected": "Đã kết nối",
       "connectedLocal": "Đã kết nối (cục bộ, không có TLS).",
       "connectedTls": "Đã kết nối. Hãy kiểm tra dấu vân tay này khớp với dấu trên thiết bị kia của bạn.",
       "connectedPlatformTrust": "Đã kết nối qua TLS. Trình duyệt của bạn đã xác minh chứng chỉ của máy chủ này.",
       "connecting": "Đang kết nối…",
       "fingerprintLabel": "Dấu vân tay chứng chỉ máy chủ:",
+      "confirmFingerprintRequired": "Định tuyến qua Tor đang bật, nên thiết bị này sẽ không tin một chứng chỉ mà nó chưa được báo trước. Hãy lấy dấu vân tay chứng chỉ SHA-256 của máy chủ từ chính máy chủ hoặc từ một thiết bị đã kết nối, rồi dán vào đây.",
+      "confirmFingerprintMismatch": "Chứng chỉ mà máy chủ này đưa ra không phải chứng chỉ bạn đã nhập. Không có gì được lưu. Hãy kiểm tra dấu vân tay bạn đã dán — và nếu nó đúng, đừng kết nối: có thứ gì đó đang nằm giữa thiết bị này và máy chủ của bạn.",
+      "confirmFingerprintDeclined": "Không có gì được lưu — thiết bị này chưa kết nối với máy chủ đó. Hãy quay lại khi bạn có dấu vân tay chứng chỉ của nó.",
       "pinStatic": "Đã xác minh với chứng chỉ tích hợp sẵn của Myne.",
       "pinTofu": "Đã ghim khi kết nối lần đầu. Hãy so sánh dấu vân tay này giữa các thiết bị của bạn.",
       "fixedOrigin": "Trình khách này đồng bộ với một máy chủ duy nhất, được đặt khi triển khai. Không thể thay đổi từ đây — trang này chỉ được phép liên lạc với đúng một địa chỉ đó.",
@@ -2744,6 +3132,22 @@
       "submit": "Thêm thiết bị này",
       "wordAria": "Từ {{number}}"
     },
+    "fingerprint": {
+      "title": "Hãy kiểm tra chứng chỉ của máy chủ này trước khi tin nó",
+      "why": "Định tuyến qua Tor đang bật, nên kết nối đầu tiên này đến được máy chủ qua một nút chuyển tiếp do người lạ vận hành. Cho đến khi một chứng chỉ được ghim, thiết bị này sẽ chấp nhận bất kỳ chứng chỉ nào được đưa cho nó — kể cả chứng chỉ do nút chuyển tiếp đó bịa ra. Hãy nhập dấu vân tay mà máy chủ của bạn công bố, và Myne sẽ so sánh trước khi ghim bất cứ thứ gì. Nếu không khớp, không có gì được lưu.",
+      "label": "Dấu vân tay chứng chỉ mong đợi",
+      "placeholder": "Dấu vân tay SHA-256 từ máy chủ của bạn",
+      "echoLabel": "Những gì bạn đã nhập",
+      "echoComplete": "64 trên 64 ký tự. Hãy đọc đối chiếu với bản của chính bạn trước khi tiếp tục.",
+      "echoProgress": "{{count}} trên {{total}} ký tự cho đến giờ.",
+      "echoInvalid": "Một dấu vân tay SHA-256 gồm 64 ký tự, mỗi ký tự là 0–9 hoặc a–f. Dấu hai chấm, dấu cách và tiền tố “sha256:” đều không sao — mọi thứ khác không thuộc về nó.",
+      "helpToggle": "Tôi tìm dấu vân tay này ở đâu?",
+      "helpNotOverTor": "Không phải qua kết nối này. Một dấu vân tay bạn lấy qua cùng mạch đó không chứng minh được gì — thứ có thể tráo chứng chỉ cũng có thể tráo cả trang đó.",
+      "helpFromServer": "Trên máy đang chạy máy chủ của bạn: openssl x509 -noout -fingerprint -sha256 -in <tệp chứng chỉ của bạn>",
+      "helpFromDevice": "Trên một thiết bị đã kết nối với tài khoản này: Cài đặt → Đồng bộ hiển thị cùng dấu vân tay đó.",
+      "helpNoFingerprint": "Nếu bạn không lấy được nó bằng cách nào trong số đó, không thể thêm máy chủ này khi định tuyến qua Tor đang bật. Bạn có thể tắt định tuyến qua Tor trong Cài đặt → Mạng và kết nối trực tiếp — điều đó để lộ địa chỉ IP của bạn cho máy chủ và cho bất kỳ ai xem được mạng của bạn.",
+      "decline": "Tôi không có nó — hủy"
+    },
     "join": {
       "accountLabel": "Số tài khoản",
       "cancel": "Hủy",
@@ -2752,6 +3156,8 @@
       "help": "Đăng nhập bằng số tài khoản và mật khẩu của bạn. Thiết bị này sẽ đồng bộ ghi chú của bạn sau khi một thiết bị hiện có phê duyệt nó. Không cần cụm từ khôi phục.",
       "passwordLabel": "Mật khẩu",
       "pinnedCompare": "Thiết bị này đã ghim chứng chỉ của máy chủ của bạn. Hãy kiểm tra dấu vân tay này có khớp trên các thiết bị khác của bạn không.",
+      "confirmFingerprintRequired": "Định tuyến qua Tor đang bật, nên thiết bị này sẽ không tin một chứng chỉ mà nó chưa được báo trước. Hãy lấy dấu vân tay chứng chỉ SHA-256 của máy chủ từ chính máy chủ hoặc từ một thiết bị đã kết nối, rồi dán vào đây.",
+      "confirmFingerprintMismatch": "Chứng chỉ mà máy chủ này đưa ra không phải chứng chỉ bạn đã nhập. Thiết bị này chưa được thêm và không có gì được lưu. Hãy kiểm tra dấu vân tay bạn đã dán — và nếu nó đúng, đừng tiếp tục: có thứ gì đó đang nằm giữa thiết bị này và máy chủ của bạn.",
       "pinnedTitle": "Đã ghim chứng chỉ máy chủ",
       "serverLabel": "Máy chủ đồng bộ",
       "serverPlaceholder": "https://your-server.example",
@@ -2786,6 +3192,7 @@
         "deleteConfirmTitle": "Xóa ghi chú đã khôi phục này?",
         "deleteConfirmWarning": "Thao tác này xóa vĩnh viễn bản sao duy nhất được giữ trên thiết bị này. Không thể hoàn tác.",
         "deleteCta": "Xóa",
+        "empty": "Không có ghi chú nào được khôi phục.",
         "errorGeneric": "Đã xảy ra lỗi. Hãy thử lại.",
         "helper": "Khi một ghi chú bị xóa trên thiết bị khác được gỡ ở đây, bản sao đã mã hóa của nó vẫn được giữ trên thiết bị này. Hãy khôi phục nó thành một ghi chú mới, hoặc xóa vĩnh viễn.",
         "label": "Ghi chú đã khôi phục",
@@ -2873,7 +3280,66 @@
       "conflictsNeedReview_other": "{{count}} xung đột cần xem xét",
       "catchingUp": "Đang bắt kịp đồng bộ — ghi chú của bạn vẫn an toàn.",
       "verifyDevices": "Xác minh thiết bị"
+    },
+    "tor": {
+      "connecting": "Đang kết nối tới Tor. Đồng bộ tạm dừng cho đến khi kết nối sẵn sàng — không có gì đang được gửi trực tiếp.",
+      "settingsHint": "Cài đặt → Mạng",
+      "unavailable": "Không dùng được Tor, nên đồng bộ tạm dừng. Không có gì đang được gửi trực tiếp. Hãy tắt định tuyến qua Tor để đồng bộ mà không cần nó."
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "Bất kỳ",
+      "due": "Hạn",
+      "folder": "Thư mục",
+      "insert": "Chèn",
+      "noDueDate": "Không có hạn",
+      "priority": "Mức ưu tiên",
+      "sort": "Sắp xếp theo",
+      "sortDue": "Ngày đến hạn",
+      "sortPath": "Ghi chú",
+      "sortPriority": "Mức ưu tiên",
+      "status": "Trạng thái",
+      "statusDone": "Đã hoàn thành",
+      "statusTodo": "Chưa xong",
+      "tag": "Thẻ"
+    },
+    "empty": {
+      "filter": "Hiện chưa có gì ở đây. Hãy thử một bộ lọc khác.",
+      "rebuilding": "Đang đọc ghi chú của bạn…",
+      "scope": "Không có công việc nào trong thư mục hoặc thẻ này. Hãy thử mở rộng phạm vi.",
+      "vault": "Chưa có công việc nào. Hãy viết “- [ ]” trên một dòng trong bất kỳ ghi chú nào để tạo một công việc."
+    },
+    "filter": {
+      "all": "Tất cả",
+      "overdue": "Quá hạn",
+      "today": "Hôm nay",
+      "upcoming": "Sắp tới"
+    },
+    "noteTitle": "Công việc trong ghi chú này",
+    "query": {
+      "dropped_one": "{{count}} mệnh đề Myne không đọc được",
+      "dropped_other": "{{count}} mệnh đề Myne không đọc được",
+      "empty": "Không có công việc nào khớp với truy vấn này.",
+      "loading": "Đang đọc ghi chú của bạn…",
+      "refused": "Myne không đọc được phần nào của truy vấn này, nên nó không hiển thị gì thay vì hiển thị tất cả.",
+      "remainder_one": "{{count}} công việc khác cũng khớp",
+      "remainder_other": "{{count}} công việc khác cũng khớp"
+    },
+    "reminder": {
+      "due": "Một nhắc nhở công việc đã đến hạn."
+    },
+    "row": {
+      "completed": "Công việc, đã hoàn thành",
+      "notCompleted": "Công việc, chưa hoàn thành",
+      "tooLongToWrite": "Dòng của công việc này quá dài để chỉnh sửa từ đây. Hãy mở ghi chú của nó.",
+      "untitled": "Công việc không có tiêu đề"
+    },
+    "scope": {
+      "allFolders": "Tất cả thư mục",
+      "label": "Thu hẹp theo"
+    },
+    "title": "Công việc"
   },
   "templates": {
     "manager": {
@@ -2953,6 +3419,8 @@
     "recoveryLink": "Quên mật khẩu? Mở khóa bằng cụm từ khôi phục",
     "submit": "Mở khóa",
     "subtitle": "Nhập mật khẩu của bạn để tiếp tục.",
+    "subtitlePin": "Nhập mã PIN của bạn để tiếp tục.",
+    "subtitleBiometric": "Xác nhận bằng Touch ID để tiếp tục.",
     "suspicion": {
       "lockedDuringChange": "Đã hủy đổi mật khẩu: kho đã bị khóa.",
       "metaChangedExternally": "Kho đã bị sửa đổi ở một phiên khác — vui lòng mở khóa lại."
@@ -3166,6 +3634,7 @@
   "vaultPicker": {
     "createAnother": "Tạo một kho khác",
     "heading": "Chọn một kho",
+    "joinDevice": "Thêm thiết bị này vào một tài khoản",
     "loading": "Đang tải các kho của bạn…",
     "noneLoaded": "Hiện không thể tải kho nào.",
     "openedRelative": "đã mở {{rel}}",
@@ -3222,6 +3691,7 @@
   "vaultSwitcher": {
     "chipFallback": "Kho",
     "createAnother": "Tạo một kho khác",
+    "joinDevice": "Thêm thiết bị này vào một tài khoản",
     "switching": "đang chuyển…",
     "switchVaultLabel": "Chuyển kho",
     "vaultFallback": "Kho {{n}}"
@@ -3230,6 +3700,7 @@
     "createCta": "Tạo kho mới",
     "headlineLine1": "Ghi chú Markdown được mã hóa.",
     "headlineLine2": "Không cần email khi đăng ký.",
+    "joinCta": "Thêm thiết bị này vào một tài khoản",
     "repairResidue": {
       "cancel": "Hủy",
       "cleaningUp": "Đang dọn dẹp…",

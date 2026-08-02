@@ -27,13 +27,14 @@ Self-hosted fonts: Inter Variable + JetBrains Mono in `public/fonts/` (commit 40
 
 ## Internationalization (i18n)
 
-User-facing strings go through **react-i18next**, not hardcoded JSX. Source language is **English**; catalogs live at repo-root `locales/<lang>/common.json` and are bundled statically by `src/i18n/index.ts` (no HTTP backend). Translations are managed in self-hosted **Weblate** — see `docs/dev/i18n.md` for the full workflow and `decisions.md` 2026-06-25 for the rationale.
+User-facing strings go through **react-i18next**, not hardcoded JSX. Source language is **English**; catalogs live at repo-root `locales/<lang>/common.json` and are bundled by `src/i18n/index.ts` (no HTTP backend). Translations are managed in self-hosted **Weblate** — see `docs/dev/i18n.md` for the full workflow and `decisions.md` 2026-06-25 for the rationale.
 
 - In components: `const { t } = useTranslation();` → `t("welcome.createCta")`. Outside React: `import i18n from "src/i18n"` → `i18n.t(...)`.
-- Add a key → `pnpm i18n:extract` → fill the **English** value in `locales/en/common.json`. Never hand-edit non-English catalogs (Weblate owns them).
+- Add a key → `pnpm i18n:extract` → fill the **English** value in `locales/en/common.json`. Never hand-edit non-English catalogs (Weblate owns them; `decisions.md` 2026-08-03 is the one recorded backfill exception, and says why it is not a precedent).
+- **Catalogs load lazily** — `import.meta.glob` without `eager`, so a session fetches only English plus the active locale. 31 full translations are ~7 MB of JSON; eager put all of them in the web client's first load. `src/i18n/index.ts` uses a **top-level await** to keep `main.tsx`'s "i18n initialises before any other module body runs" ordering; do not convert it to an exported promise.
 - **Do NOT i18n load-bearing copy** (`src/lib/load-bearing-copy.ts`): its exact English wording is a privacy property and is E2E-pinned by literal equality. Render the constant verbatim in every locale.
 - **Module-level data (command catalogs, label maps, error maps): store i18n KEYS, resolve with `t()`/`i18n.t()` at the render/usage consumer — never freeze a resolved string at module top level** (it would capture the boot language and not react to a language switch). `main.tsx` imports `./i18n` first so module-level `i18n.t()` (called at usage time) resolves against loaded resources.
-- Status: **Comprehensive** — the whole desktop UI is migrated (~1700 `t()` call sites across ~150 files; the en catalog holds ~2500 leaf keys, and `locales/en/common.json` is its source of truth — don't trust a number here over a `pnpm i18n:status` run). When you add a user-facing string, add its `t()` key in the same change (`pnpm i18n:extract`, fill the English value in `locales/en/common.json`).
+- Status: **Comprehensive** — the whole desktop UI is migrated (~1670 `t()` call sites; the en catalog holds ~2914 leaf keys and **all 31 translations are at 100%**, `decisions.md` 2026-08-03 — but `locales/en/common.json` is the source of truth, so don't trust a number here over a `pnpm i18n:status` run). When you add a user-facing string, add its `t()` key in the same change (`pnpm i18n:extract`, fill the English value in `locales/en/common.json`).
 
 ## Layout
 

@@ -83,9 +83,12 @@
       "colType": "Type",
       "colUsedIn": "Gebruikt in",
       "decrypting": "Bijlagen ontsleutelen…",
+      "clearSearchAriaLabel": "Zoekopdracht wissen",
+      "emptyClearSearch": "Zoekopdracht wissen",
       "emptyImportHint": "Importeer een bestand om het in je kluis te bewaren.",
       "emptyLoadError": "De bijlagencatalogus kon niet worden gelezen.",
       "emptyNoAttachments": "Nog geen bijlagen.",
+      "emptyNoResultsTitle": "Geen bijlagen komen overeen met je zoekopdracht.",
       "filterAriaLabel": "Filteren op type",
       "gridView": "Rasterweergave",
       "import": "Importeren",
@@ -98,6 +101,7 @@
       "menuPreview": "Voorbeeld",
       "menuRename": "Hernoemen",
       "menuTranscribe": "Transcriberen",
+      "menuViewTranscription": "Transcriptie bekijken",
       "noMatch": "Geen bijlagen komen overeen met je zoekopdracht.",
       "noUnusedNotice": "Geen ongebruikte bijlagen om op te ruimen.",
       "preview": "Voorbeeld",
@@ -115,8 +119,14 @@
       "title": "Bijlagen",
       "transcribeDone": "Transcriptie voltooid.",
       "transcribeFailed": "Transcriptie mislukt. Probeer het opnieuw.",
+      "transcribeFeatureOff": "Spraak-naar-tekst staat uit. Schakel het in via Instellingen → Transcriptie.",
+      "transcribeModelLoadFailed": "Het spraak-naar-tekstmodel kon niet worden geladen. Installeer Myne opnieuw, of controleer je eigen model in Instellingen → Developer → AI.",
+      "transcribeNoModelHint": "Het spraak-naar-tekstmodel ontbreekt. Myne opnieuw installeren herstelt het.",
       "transcribeNoModel": "Selecteer een transcriptiemodel in Instellingen → Developer → AI.",
       "transcribeStarted": "Transcriberen…",
+      "transcribeVaultLocked": "Ontgrendel je kluis om te transcriberen.",
+      "transcriptionModalClose": "Transcriptie sluiten",
+      "transcriptionModalTitle": "Transcriptie",
       "typeFilter": {
         "all": "Alle types",
         "audio": "Audio",
@@ -219,6 +229,15 @@
     "matchedInAttachmentTitle": "De zoekopdracht kwam overeen in een bestand dat in deze notitie is ingesloten",
     "matchedInBody": "↳ gevonden in tekst",
     "noMatches": "Geen overeenkomsten",
+    "operatorHint": "Tab om aan te vullen",
+    "operators": {
+      "tag": "Notities met een tag",
+      "path": "Notities in een map",
+      "file": "Komt overeen met de notitietitel",
+      "section": "Notities met een kop",
+      "task": "Notities met een taak",
+      "content": "Volledige tekst in de inhoud"
+    },
     "searchPlaceholder": "Zoek notities of voer een opdracht uit — Esc om te sluiten",
     "sectionCommands": "Opdrachten",
     "sectionNotes": "Notities",
@@ -469,6 +488,9 @@
       "showGraph": {
         "label": "Grafiekweergave tonen…"
       },
+      "showTasks": {
+        "label": "Taken tonen"
+      },
       "showTags": {
         "label": "Tags doorbladeren…"
       },
@@ -507,9 +529,11 @@
         "cycleHeadingLevel": "Kopniveau doorlopen",
         "cycleTabs": "Tabbladen doorlopen",
         "deleteWorkspace": "Werkruimte verwijderen",
+        "findInNote": "Zoeken in notitie",
         "focusNextPane": "Volgend deelvenster focussen",
         "focusPrevPane": "Vorig deelvenster focussen",
         "foldAll": "Alles inklappen",
+        "indent": "Inspringen",
         "inlineCode": "Inline-code",
         "insertWikilink": "Wikilink invoegen",
         "italic": "Cursief",
@@ -517,11 +541,15 @@
         "navigateForward": "Vooruit navigeren",
         "newNote": "Nieuwe notitie",
         "openSettings": "Instellingen openen",
+        "outdent": "Uitspringen",
         "paletteToggle": "Opdrachtpalet openen",
+        "redo": "Opnieuw uitvoeren",
         "renameWorkspace": "Werkruimte hernoemen",
         "saveWorkspaceAs": "Werkruimte opslaan als",
         "selectAllScoped": "Alles selecteren (binnen bereik)",
+        "selectNextOccurrence": "Volgende voorkomen selecteren",
         "showGraphView": "Grafiekweergave tonen",
+        "showTasks": "Taken tonen",
         "splitPaneDown": "Deelvenster splitsen (omlaag)",
         "splitPaneRight": "Deelvenster splitsen (rechts)",
         "switchWorkspace": "Werkruimte wisselen",
@@ -531,6 +559,7 @@
         "toggleReadingView": "Leesweergave aan/uit",
         "toggleSourceMode": "Bronmodus aan/uit",
         "toggleTaskList": "Takenlijst aan/uit",
+        "undo": "Ongedaan maken",
         "unfoldAll": "Alles uitklappen"
       }
     },
@@ -572,6 +601,12 @@
         "renamed": "Hernoemd naar {{name}}.",
         "renameFailed": "De bijlage kon niet worden hernoemd.",
         "saveDialogFailed": "Het opslagvenster kon niet worden geopend."
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} afbeelding gecomprimeerd: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} afbeeldingen gecomprimeerd: {{from}} → {{to}}",
+        "notice": "Gecomprimeerd: {{from}} → {{to}}",
+        "noticeContainerChanged": "Gecomprimeerd naar {{format}}: {{from}} → {{to}}"
       },
       "convert": {
         "cancel": "Annuleren",
@@ -649,7 +684,10 @@
         "exportAria": "Bijlage exporteren",
         "imagePreview": "Afbeeldingsvoorbeeld",
         "pdfFallback": "PDF",
-        "pdfPreview": "PDF-voorbeeld"
+        "pdfPreview": "PDF-voorbeeld",
+        "zoomIn": "Inzoomen",
+        "zoomOut": "Uitzoomen",
+        "zoomReset": "Zoom resetten"
       },
       "menu": {
         "actionsAria": "Bijlageacties"
@@ -730,6 +768,12 @@
           "deletedLabel": "verwijderd"
         },
         "transcribe": {
+          "cause": {
+            "featureOff": "Spraak-naar-tekst staat uit. Schakel het in via Instellingen → Transcriptie.",
+            "modelLoadFailed": "Het spraak-naar-tekstmodel kon niet worden geladen. Als je een eigen model hebt ingesteld in Instellingen → Developer → AI, controleer dan de bestanden ervan; anders herstelt het opnieuw installeren van Myne het ingebouwde model.",
+            "noModel": "Het spraak-naar-tekstmodel ontbreekt. Myne opnieuw installeren herstelt het.",
+            "vaultLocked": "Ontgrendel je kluis om te transcriberen."
+          },
           "disabledReason": "Schakel AI in via Instellingen → Developer → AI om te transcriberen.",
           "failed": "Transcriptie mislukt. Probeer het opnieuw.",
           "heading": "Transcript",
@@ -772,6 +816,10 @@
         "linkedFrom": "Gelinkt vanuit {{count}}",
         "linkedFrom_one": "Gelinkt vanuit {{count}}",
         "linkedFrom_other": "Gelinkt vanuit {{count}}",
+        "linksTo": "Linkt naar {{count}}",
+        "linksTo_one": "Linkt naar {{count}}",
+        "linksTo_other": "Linkt naar {{count}}",
+        "outgoingEmpty": "Deze notitie linkt nog nergens naartoe.",
         "untitled": "Naamloos"
       },
       "barItems": {
@@ -889,6 +937,7 @@
           "aiChat": "AI-chat",
           "backlinks": "Backlinks",
           "outline": "Overzicht",
+          "tasks": "Taken",
           "unlinked": "Niet-gekoppelde vermeldingen"
         }
       },
@@ -922,9 +971,38 @@
         "toggleTitle": "Werkruimte: {{name}}"
       }
     },
+    "noteActions": {
+      "buttonLabel": "Notitieacties",
+      "rename": "Hernoemen",
+      "move": "Naar map verplaatsen…",
+      "duplicate": "Dupliceren",
+      "convertToTemplate": "Omzetten naar sjabloon",
+      "convertToNote": "Omzetten naar notitie",
+      "turnedIntoTemplate": "Omgezet naar sjabloon",
+      "convertedToNote": "Omgezet naar notitie",
+      "versionHistory": "Versiegeschiedenis",
+      "exportMarkdown": "Exporteren als Markdown…",
+      "exportPdf": "Exporteren als PDF…",
+      "exportHtml": "Exporteren als HTML…",
+      "exportTxt": "Exporteren als platte tekst…",
+      "trash": "Naar prullenbak verplaatsen"
+    },
     "codeBlock": {
       "copyCode": "Code kopiëren",
       "defaultBadge": "code"
+    },
+    "drawingEmbed": {
+      "done": "Klaar",
+      "edit": "Tekening {{name}} bewerken",
+      "editAction": "Bewerken",
+      "empty": "Lege tekening — klik om te tekenen",
+      "open": "Openen",
+      "rename": "Tekening hernoemen"
+    },
+    "drawingMenu": {
+      "background": "Canvasachtergrond",
+      "reset": "Canvas resetten",
+      "toggleTheme": "Tekenthema wisselen"
     },
     "find": {
       "close": "Zoeken sluiten",
@@ -949,8 +1027,11 @@
       "unreferenced": "niet-verwezen"
     },
     "frontmatter": {
+      "addListItem": "Item toevoegen…",
+      "addListItemAriaLabel": "Item toevoegen aan {{key}}",
       "addProperty": "+ Eigenschap toevoegen",
       "propertiesLabel": "Eigenschappen",
+      "removeListItemAriaLabel": "{{item}} verwijderen",
       "titleAriaLabel": "Notitietitel",
       "titlePlaceholder": "Naamloos"
     },
@@ -966,6 +1047,8 @@
       "date": "Datum",
       "day": "Dag",
       "divider": "Scheidingslijn",
+      "drawing": "Tekening",
+      "due": "Vervaldatum",
       "heading1": "Kop 1",
       "heading2": "Kop 2",
       "heading3": "Kop 3",
@@ -975,8 +1058,11 @@
       "link": "Link",
       "now": "Nu",
       "numberedList": "Genummerde lijst",
+      "priority": "Prioriteit",
       "quote": "Citaat",
+      "repeat": "Herhaling",
       "table": "Tabel",
+      "taskQuery": "Takenlijst",
       "time": "Tijd",
       "todoList": "Takenlijst",
       "voiceNote": "Spraaknotitie",
@@ -998,6 +1084,27 @@
       "deleteRow": "Rij verwijderen",
       "reorderColumn": "Kolom herordenen",
       "reorderRow": "Rij herordenen"
+    },
+    "tagSuggestion": {
+      "label": "Voorgestelde tags",
+      "accept": "De tag {{tag}} aan deze notitie toevoegen",
+      "dismiss": "De voorgestelde tag {{tag}} negeren"
+    },
+    "taskField": {
+      "addAffordance": "Taakveld toevoegen",
+      "invalidDue": "Myne kan deze datum niet lezen, dus die wordt niet als vervaldatum getoond.",
+      "invalidPriority": "Myne kan deze prioriteit niet lezen. Gebruik highest, high, medium, low of lowest.",
+      "invalidRepeat": "Myne herkent deze herhalingsregel niet, dus deze taak wordt niet herhaald.",
+      "menuEdit": "{{field}} bewerken",
+      "menuTitle": "Veld toevoegen",
+      "repeatNoAnchor": "Deze taak heeft geen datum om vanaf te herhalen, dus die wordt niet herhaald. Voeg een vervaldatum toe om te beginnen.",
+      "save": "Opslaan",
+      "skipOccurrence": "Deze keer overslaan",
+      "title": {
+        "due": "Vervaldatum",
+        "repeat": "Herhaling",
+        "priority": "Prioriteit"
+      }
     },
     "toolbar": {
       "apply": "Toepassen",
@@ -1030,7 +1137,16 @@
         "green": "Groen",
         "pink": "Roze",
         "purple": "Paars",
-        "yellow": "Geel"
+        "yellow": "Geel",
+        "orange": "Oranje",
+        "red": "Rood",
+        "teal": "Turkoois",
+        "cyan": "Cyaan",
+        "lime": "Limoen",
+        "brown": "Bruin",
+        "grey": "Grijs",
+        "indigo": "Indigo",
+        "remove": "Markering verwijderen"
       },
       "urlPlaceholder": "Plak link-URL"
     },
@@ -1375,11 +1491,17 @@
       "countEmpty": "Leeg",
       "delete": "Verwijderen",
       "deleteError": "Die notitie kon niet worden verwijderd. Probeer het opnieuw.",
+      "emptyBody": "Gearchiveerde notities en mappen zijn verborgen in de zijbalk, maar blijven veilig bewaard. Herstel ze hier wanneer je ze nodig hebt.",
+      "emptyTitle": "Niets gearchiveerd",
+      "folderDeleteBody_one": "“{{name}}” en de {{count}} notitie erin",
+      "folderDeleteBody_other": "“{{name}}” en de {{count}} notities erin",
       "emptyState": "Het archief is leeg.",
       "folderDeleteConfirm_one": "{{count}} notitie naar de prullenbak verplaatsen?",
       "folderDeleteConfirm_other": "{{count}} notities naar de prullenbak verplaatsen?",
       "folderDeleteConfirmCta": "Naar prullenbak verplaatsen",
       "folderDeleteError": "Kon de notities van die map niet naar de prullenbak verplaatsen. Probeer het opnieuw.",
+      "folderDeleteTitle": "Deze map naar de prullenbak verplaatsen?",
+      "folderDeleteWarning": "Ze gaan naar de prullenbak — je kunt ze altijd herstellen. Definitief verwijderen is een aparte stap.",
       "restore": "Herstellen",
       "restoreError": "Die notitie kon niet worden hersteld. Probeer het opnieuw.",
       "title": "Archief",
@@ -1469,6 +1591,24 @@
     "graph": {
       "allConnected": "Alles is verbonden — geen geïsoleerde notities.",
       "building": "Grafiek opbouwen…",
+      "colorGroups": {
+        "addRule": "Regel toevoegen",
+        "colorSwatchTitle": "Kleur kiezen",
+        "deleteRuleTitle": "Regel verwijderen",
+        "dragHandleTitle": "Sleep om te herordenen",
+        "editFilterButton": "Filter bewerken…",
+        "editFilterTitle": "Filter van kleurgroep bewerken",
+        "emptyBody": "Met kleurgroepen kun je knooppunten in de grafiek kleuren op tag of map — werknotities in de ene kleur, persoonlijke notities in een andere. Voeg je eerste regel toe.",
+        "emptyTitle": "Nog geen kleurgroepen",
+        "enableToggleAriaLabel": "Regel inschakelen",
+        "filterAllNotes": "Komt overeen met elke notitie",
+        "filterConditions_one": "{{count}} voorwaarde",
+        "filterConditions_other": "{{count}} voorwaarden",
+        "heading": "Kleurgroepen",
+        "moveDown": "Regel omlaag verplaatsen",
+        "moveUp": "Regel omhoog verplaatsen",
+        "namePlaceholder": "Naamloze regel"
+      },
       "depthToggleTitle": "Buurtdiepte wisselen (1 ↔ 2 stappen)",
       "filterAll": "Alle",
       "filterAroundNote": "Rond deze notitie",
@@ -1480,6 +1620,23 @@
       "overCap": "Deze kluis is groot — de grafiek van de hele kluis is begrensd. Filter op een tag of toon geïsoleerde notities om te verkennen.",
       "refresh": "Vernieuwen",
       "refreshTitle": "De kluis is gewijzigd — bouw de grafiek opnieuw op",
+      "settings": {
+        "appearanceHeading": "Vormgeving",
+        "closeTitle": "Sluiten",
+        "forceCenter": "Middelpuntkracht",
+        "forceLinkDistance": "Linkafstand",
+        "forceLinkStrength": "Linksterkte",
+        "forceRepel": "Afstoting",
+        "forcesHeading": "Krachten",
+        "labelFadeZoom": "Labels vervagen",
+        "lineThickness": "Lijndikte",
+        "nodeSize": "Knooppuntgrootte",
+        "nodeSizeStrength": "Grootte op basis van verbindingen",
+        "openTitle": "Grafiekinstellingen",
+        "reset": "Terugzetten naar standaard",
+        "showArrows": "Richtingspijlen tonen",
+        "title": "Grafiekinstellingen"
+      },
       "tagPlaceholder": "Tag…"
     },
     "import": {
@@ -1538,6 +1695,7 @@
         "setupIntro": "Wijs Myne naar je bestaande Obsidian-kluismap. Elke Markdown-notitie wordt direct geïmporteerd en versleuteld — niets verlaat dit apparaat en je originele bestanden blijven onaangeroerd.",
         "statCancelled": "Geannuleerd",
         "statCanvasSkipped": ".canvas-bestanden overgeslagen",
+        "statCompressed": "Afbeeldingen gecomprimeerd",
         "statEmptyFoldersKept": "Lege mappen behouden",
         "statMedia": "Media",
         "statOtherSkipped": "Overige bestanden overgeslagen",
@@ -1551,7 +1709,19 @@
         "titlePick": "Notities importeren",
         "keepsLabel": "Wat er meekomt",
         "losesLabel": "Wat niet",
-        "changeSource": "Bron wijzigen"
+        "changeSource": "Bron wijzigen",
+        "statExcalidrawSkipped": "Excalidraw-tekeningen overgeslagen",
+        "unfollowedLinkOutside": "Dit is een snelkoppeling naar een map buiten de map die je hebt gekozen, dus Myne is die niet gevolgd. Verplaats of kopieer die map naar je kluis en importeer opnieuw.",
+        "unfollowedLinkLoop": "Deze snelkoppeling wijst terug naar een map waar Myne al in zat, dus die volgen zou eindeloos rondgaan. Er is niets onder deze snelkoppeling gemist.",
+        "unfollowedLinkBroken": "Deze snelkoppeling leidt nergens heen — waar die naar verwees, is verplaatst of verwijderd.",
+        "unreadableDetail": "Overgeslagen — {{reason}} De rest van de import ging gewoon door.",
+        "stoppedAt": "{{imported}} van {{total}} notities waren geïmporteerd voordat dit stopte. Ze staan in je kluis en je kunt ze veilig houden.",
+        "reasonNotUtf8": "Myne kon dit bestand niet als tekst lezen. Het is waarschijnlijk opgeslagen in een oudere codering, of het is helemaal geen tekstbestand.",
+        "reasonPathRejected": "Myne kon dit bestand niet bereiken binnen de map die je hebt gekozen.",
+        "reasonPermissionDenied": "Myne mocht dit bestand niet lezen.",
+        "reasonNotFound": "Dit bestand was al weg tegen de tijd dat Myne erbij kwam.",
+        "reasonNoSpace": "Dit apparaat had geen ruimte meer.",
+        "reasonUnknown": "Myne kon niet zeggen waarom."
       },
       "offer": {
         "body": "Breng je bestaande notities naar Myne. Elke notitie wordt versleuteld zodra die wordt geïmporteerd — niets verlaat dit apparaat en je originele bestanden blijven precies waar ze zijn.",
@@ -1615,6 +1785,7 @@
       "bulkDelete": "{{count}} notities verwijderen",
       "bulkDelete_one": "{{count}} notitie verwijderen",
       "bulkDelete_other": "{{count}} notities verwijderen",
+      "moveTo": "Verplaatsen naar…",
       "bulkMove": "{{count}} notities verplaatsen naar…",
       "bulkMove_one": "{{count}} notitie verplaatsen naar…",
       "bulkMove_other": "{{count}} notities verplaatsen naar…",
@@ -1644,6 +1815,7 @@
       "newFolder": "Nieuwe map",
       "newFolderInPlaceholder": "Nieuwe map in {{path}}",
       "newFolderPlaceholder": "Nieuwe map",
+      "newItem": "Nieuw…",
       "newNote": "Nieuwe notitie",
       "newNoteFromTemplate": "Nieuwe notitie op basis van sjabloon…",
       "newNoteHere": "Nieuwe notitie hier",
@@ -1676,12 +1848,18 @@
       "trashSingleError": "De notitie kon niet naar de prullenbak worden verplaatst.",
       "undo": "Ongedaan maken",
       "vaultRoot": "Kluiswortel",
-      "viewSettingsTitle": "Weergave-instellingen"
+      "viewSettingsTitle": "Weergave-instellingen",
+      "imported_one": "1 notitie geïmporteerd in deze map",
+      "imported_other": "{{count}} notities geïmporteerd in deze map",
+      "importedWithSkips": "{{count}} geïmporteerd — {{skipped}} overgeslagen",
+      "importNoMarkdown": "Geen Markdown-bestanden in wat je hebt neergezet"
     },
     "newFromTemplate": {
       "back": "Terug",
       "blankNote": "Lege notitie",
       "createNote": "Notitie maken",
+      "createFirstTemplate": "Een sjabloon maken",
+      "manageTemplates": "Sjablonen beheren",
       "emptyState": "Je hebt nog geen sjablonen gemaakt.",
       "listLabel": "Sjablonen",
       "loading": "Laden…",
@@ -1696,12 +1874,14 @@
       "createDrawing": "Nieuwe tekening",
       "noNotesMatch": "Geen notities komen overeen.",
       "noNotesYet": "Nog geen notities.",
+      "recent": "Recent",
       "searchAriaLabel": "Notities zoeken om te openen",
       "searchPlaceholder": "Notities zoeken…",
       "untitled": "Naamloos"
     },
     "pane": {
       "graphTab": "Grafiek",
+      "tasksTab": "Taken",
       "loading": "Laden…",
       "untitledView": "Naamloze weergave"
     },
@@ -1723,6 +1903,8 @@
       "loadError": "Deze notitie kon niet worden geladen",
       "removeFromFavorites": "Uit favorieten verwijderen",
       "renameAriaLabel": "Notitie hernoemen",
+      "taskBadgeLabel": "Deze notitie is een taak",
+      "taskBadgeTitle": "Taaknotitie",
       "unsyncedLabel": "Nog niet op de server",
       "unsyncedTitle": "De laatste wijzigingen van deze notitie staan alleen op dit apparaat",
       "untitled": "Naamloos"
@@ -1755,7 +1937,12 @@
       "cancel": "Annuleren",
       "changeCount_one": "{{count}} wijziging sinds deze momentopname",
       "changeCount_other": "{{count}} wijzigingen sinds deze momentopname",
+      "changeCountPrev_one": "{{count}} wijziging ten opzichte van de vorige momentopname",
+      "changeCountPrev_other": "{{count}} wijzigingen ten opzichte van de vorige momentopname",
       "close": "Sluiten",
+      "compareAgainstLabel": "Vergelijken met",
+      "compareCurrent": "Huidige notitie",
+      "comparePrevious": "Vorige momentopname",
       "confirmBody": "Je huidige notitie wordt eerst als momentopname opgeslagen, zodat je dit ongedaan kunt maken.",
       "confirmTitle": "Deze momentopname herstellen?",
       "decrypting": "Ontsleutelen…",
@@ -1770,6 +1957,7 @@
       "justNow": "zojuist",
       "listLabel": "Lijst met momentopnamen",
       "loading": "Laden…",
+      "noPrevious": "Dit is de vroegste momentopname — er is niets daarvóór om mee te vergelijken.",
       "restore": "Herstellen",
       "restoreCta": "Deze momentopname herstellen",
       "restoredStatus": "Hersteld. De versie die je had, is als momentopname opgeslagen.",
@@ -1823,6 +2011,8 @@
       "emptyConfirmTitle": "Prullenbak legen?",
       "emptyPartialFailure_one": "{{count}} notitie kon niet worden verwijderd en blijft in de prullenbak.",
       "emptyPartialFailure_other": "{{count}} notities konden niet worden verwijderd en blijven in de prullenbak.",
+      "emptyBody": "Notities die je verwijdert komen hier terecht. Ze blijven staan tot je de prullenbak leegt — je kunt ze altijd herstellen.",
+      "emptyTitle": "De prullenbak is leeg",
       "emptyState": "De prullenbak is leeg.",
       "purgeConfirmCta": "Definitief verwijderen",
       "purgeConfirmTitle": "Definitief verwijderen?",
@@ -1871,6 +2061,8 @@
         "viewSettings": "Weergave-instellingen…"
       },
       "newView": "Nieuwe weergave",
+      "noMatch": "Geen weergaven komen overeen met je zoekopdracht.",
+      "searchPlaceholder": "Weergaven zoeken…",
       "table": {
         "empty": "Geen notities komen overeen met deze weergave",
         "name": "Naam",
@@ -1967,6 +2159,71 @@
     "passwordHelper": "Wordt nooit opgeslagen, nooit verzonden. Het versleutelt je sleutels op dit apparaat.",
     "encryptingSubtitle": "Je kluissleutels worden omhuld met je nieuwe wachtwoord."
   },
+  "recurrence": {
+    "every": {
+      "day": "elke dag",
+      "week": "elke week",
+      "month": "elke maand",
+      "year": "elk jaar"
+    },
+    "everyN": {
+      "day": "elke {{count}} dagen",
+      "week": "elke {{count}} weken",
+      "month": "elke {{count}} maanden",
+      "year": "elke {{count}} jaar"
+    },
+    "everyWeekday": "elke {{days}}",
+    "everyWeekdays": "elke {{days}}",
+    "ordinal": {
+      "first": "eerste",
+      "second": "tweede",
+      "third": "derde",
+      "fourth": "vierde",
+      "last": "laatste"
+    },
+    "ordinalOfMonth": "{{ordinal}} {{weekday}} van elke maand",
+    "dayOfMonth": "dag {{day}} van elke maand",
+    "lastDayOfMonth": "laatste dag van elke maand",
+    "weekday": {
+      "monday": "maandag",
+      "tuesday": "dinsdag",
+      "wednesday": "woensdag",
+      "thursday": "donderdag",
+      "friday": "vrijdag",
+      "saturday": "zaterdag",
+      "sunday": "zondag"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, na voltooiing",
+    "builder": {
+      "family": "Herhaling",
+      "familyInterval": "Elke…",
+      "familyWeekdays": "Wekelijks op…",
+      "familyDayOfMonth": "Maandelijks op een dag…",
+      "familyOrdinal": "Maandelijks op een weekdag…",
+      "count": "Interval",
+      "unitLabel": "Eenheid",
+      "units": {
+        "day": "dagen",
+        "week": "weken",
+        "month": "maanden",
+        "year": "jaar"
+      },
+      "ordinal": "Positie",
+      "weekday": "Weekdag",
+      "lastDay": "Laatste dag",
+      "whenDone": "Herhalen vanaf de datum van voltooiing",
+      "weekdayShort": {
+        "monday": "ma",
+        "tuesday": "di",
+        "wednesday": "wo",
+        "thursday": "do",
+        "friday": "vr",
+        "saturday": "za",
+        "sunday": "zo"
+      }
+    }
+  },
   "restore": {
     "backLabel": "Terug",
     "cancelLabel": "Annuleren",
@@ -2015,8 +2272,8 @@
       "changelogButton": "Wijzigingslog bekijken…",
       "changelogHelper": "Notities per versie. Verschijnt zodra MYND-119 wordt opgeleverd.",
       "changelogLabel": "Wijzigingslog",
-      "developerModeHelper": "",
-      "developerModeLabel": "",
+      "developerModeHelper": "Toont de geavanceerde instellingen die Myne standaard uit het zicht houdt: die waarbij je het pad verlaat waar Myne voor instaat, en het gereedschap voor gevorderden dat de meeste mensen nooit nodig hebben. Uitschakelen verbergt ze alleen weer — wat je hebt aangezet blijft aan, en je zet het uit bij de betreffende instelling zelf.",
+      "developerModeLabel": "Ontwikkelaarsmodus",
       "licenseBody": "Pre-alpha · CC-BY-4.0-documentatie · AGPL-3.0-toepassingscode bij de release van fase 1.",
       "licenseLabel": "Licentie",
       "tagline": "Pre-alpha · Desktopclient fase 1",
@@ -2067,10 +2324,18 @@
       "changing": "Wijzigen…"
     },
     "appearance": {
+      "accentHelper": "Kies de accentkleur die in de hele app wordt gebruikt. Alleen op dit apparaat.",
+      "accentHexAria": "Hexwaarde van accentkleur",
+      "accentLabel": "Accentkleur",
+      "accentReset": "Terugzetten naar standaard van thema",
       "homeQuickActions": "Snelle acties op startscherm",
       "showEditTimesAria": "Bewerktijden in zijbalk tonen",
       "showEditTimesHelper": "Toon de tijd van de laatste bewerking van elke notitie onder de titel in de zijbalk.",
       "showEditTimesLabel": "Bewerktijden tonen",
+      "taskMarkerAria": "De taakmarkering op taaknotities tonen",
+      "taskMarkerHelper": "Markeert notities die je als taak hebt aangemerkt, in de zijbalk en op hun tabblad.",
+      "taskMarkerLabel": "Taakmarkering tonen",
+      "taskMarkerSaveError": "Kon die instelling niet opslaan. Probeer het opnieuw.",
       "theme": {
         "amoled": "AMOLED",
         "dark": "Donker",
@@ -2087,7 +2352,10 @@
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "Editorlettertype",
-      "showEditTimesSubtitle": "Tijdstempels onder elke notitie"
+      "showEditTimesSubtitle": "Tijdstempels onder elke notitie",
+      "graphSettingsLabel": "Vormgeving van grafiek",
+      "graphSettingsHelper": "Knooppuntkleuren, labels, grootte en lay-outkrachten stel je in de grafiek zelf in — open die en gebruik het tandwiel in de hoek. Ze worden per apparaat bewaard, dus een wijziging hier volgt je niet naar je telefoon.",
+      "openGraph": "Grafiek openen"
     },
     "archive": {
       "helper": "Laat notities naar een archief verplaatsen, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar zijn map en verbergt de archiefknoppen.",
@@ -2095,6 +2363,18 @@
       "off": "Uit",
       "on": "Aan",
       "saveError": "De archiveringsinstelling kon niet worden bijgewerkt."
+    },
+    "attachmentCompression": {
+      "label": "Afbeeldingen comprimeren bij importeren",
+      "helper": "Verkleint geplakte of neergezette afbeeldingen voordat ze worden versleuteld en opgeslagen, zodat je kluis, back-ups en synchronisatie kleiner blijven. Dit is onomkeerbaar — het originele bestand wordt niet bewaard.",
+      "helperScopeEveryDevice": "Geldt voor de hele kluis, op elk apparaat.",
+      "helperScopeNotHere": "Geldt voor de hele kluis, maar niet in deze browser — afbeeldingen die je hier toevoegt, worden precies opgeslagen zoals ze zijn.",
+      "errorSaveSetting": "Kon deze instelling niet opslaan."
+    },
+    "transcription": {
+      "label": "Spraak-naar-tekst",
+      "helper": "Zet een audiobijlage om in tekst, op dit apparaat. Het model wordt met Myne meegeleverd en er wordt niets verzonden. Dit uitschakelen verbergt de actie Transcriberen overal en zorgt dat de app helemaal niet meer transcribeert.",
+      "errorSaveSetting": "Kon die instelling niet opslaan."
     },
     "attachmentOcr": {
       "label": "Zoeken in afbeeldingen en gescande documenten",
@@ -2155,6 +2435,29 @@
         "onDate": "Verbonden op {{date}}"
       }
     },
+    "cliAccess": {
+      "label": "Terminaltoegang",
+      "helperOff": "Uit. De opdracht `myne` kan niets in deze kluis lezen of wijzigen.",
+      "helperOn": "Aan zolang deze kluis ontgrendeld is. Elk programma dat onder jouw account draait, kan er notities mee lezen, doorzoeken en aanmaken — Myne kan je terminal niet van een script onderscheiden en controleert niets behalve dat de deur openstaat. Er wordt nooit om je wachtwoord gevraagd, de toegang sluit zodra de kluis vergrendelt, en notities verwijderen kan niet.",
+      "lastUsedNever": "Niet gebruikt sinds deze kluis is ontgrendeld.",
+      "lastUsedJustNow": "Zojuist voor het laatst gebruikt.",
+      "lastUsedMinutesAgo": "Laatst gebruikt {{count}} min geleden.",
+      "lastUsedMinutesAgo_one": "Laatst gebruikt {{count}} min geleden.",
+      "lastUsedMinutesAgo_other": "Laatst gebruikt {{count}} min geleden.",
+      "lastUsedHoursAgo": "Laatst gebruikt {{count}} u geleden.",
+      "lastUsedHoursAgo_one": "Laatst gebruikt {{count}} u geleden.",
+      "lastUsedHoursAgo_other": "Laatst gebruikt {{count}} u geleden.",
+      "lastUsedDaysAgo": "Laatst gebruikt {{count}} dagen geleden.",
+      "lastUsedDaysAgo_one": "Laatst gebruikt {{count}} dag geleden.",
+      "lastUsedDaysAgo_other": "Laatst gebruikt {{count}} dagen geleden.",
+      "notOnPathHint": "Je shell kan `myne` nog niet vinden. Voeg deze regel toe aan je shellprofiel en open daarna een nieuwe terminal:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "Mappen die de terminal nooit ziet",
+      "excludedHelper": "Eén mappad per regel. Notities in deze mappen blijven buiten elk terminalresultaat en kunnen daar niet vanuit de terminal worden geschreven — in de app blijven ze volledig beschikbaar. Je kunt dit instellen voordat je terminaltoegang aanzet.",
+      "excludedPlaceholder": "Privé/\nDagboek/",
+      "rateLimitLabel": "De terminal op volle snelheid laten draaien",
+      "rateLimitHelper": "Myne beantwoordt standaard hoogstens 120 terminalopdrachten per minuut. Dat is een snelheidslimiet op een op hol geslagen script, geen toegangscontrole — niets bepaalt welk programma iets mag vragen. Zet dit aan voor bulkwerk, zoals elke notitie door een ander hulpmiddel halen."
+    },
     "clipperInstall": {
       "error": "Kon de instelling voor de browserclipper niet bijwerken.",
       "helper": "Registreer de native-messaging-host zodat de Myne-browserextensie clips naar deze app kan sturen. Standaard aan; schakel uit om deze te verwijderen.",
@@ -2164,6 +2467,7 @@
       "appliedBadge": "Toegepast",
       "apply": "Toepassen",
       "applyError": "Dat thema kon niet worden toegepast. Probeer het opnieuw.",
+      "browseButton": "Thema's doorbladeren",
       "cancel": "Annuleren",
       "confirm": "Bevestigen",
       "delete": "Verwijderen",
@@ -2188,7 +2492,8 @@
       "label": "Aangepaste thema's",
       "openFolderButton": "Themamap openen",
       "openFolderError": "De themamap kon niet worden geopend.",
-      "readError": "Je themamap kon niet worden gelezen."
+      "readError": "Je themamap kon niet worden gelezen.",
+      "readOnlyHelper": "Aangepaste thema's installeer je op je computer. De jouwe verschijnen hier vanzelf na een synchronisatie."
     },
     "dailyNotes": {
       "blankTemplate": "Leeg (geen sjabloon)",
@@ -2198,6 +2503,8 @@
       "folderHelper": "Waar nieuwe dagelijkse notities worden geplaatst. Standaard {{default}} — de map blijft behouden, ook als die leeg is.",
       "folderLabel": "Map voor dagelijkse notities",
       "folderSaveError": "De dagelijkse map kon niet worden opgeslagen. Probeer het opnieuw.",
+      "folderSearchEmpty": "Geen mappen komen overeen.",
+      "folderSearchPlaceholder": "Mappen zoeken…",
       "searchEmpty": "Geen sjablonen komen overeen.",
       "searchPlaceholder": "Sjablonen zoeken…",
       "templateHelper": "Kies een sjabloon om elke dagelijkse notitie mee te beginnen, of laat leeg voor een lege notitie met de datum als titel.",
@@ -2234,6 +2541,8 @@
       "newNote": {
         "folderLabel": "Map voor nieuwe notities",
         "folderPlaceholder": "bijv. Inbox/",
+        "folderSearchEmpty": "Geen mappen komen overeen.",
+        "folderSearchPlaceholder": "Mappen zoeken…",
         "helper": "Waar nieuw aangemaakte notities worden geplaatst.",
         "label": "Standaardlocatie voor nieuwe notities",
         "optionCurrent": "Zelfde map als huidige notitie",
@@ -2329,6 +2638,10 @@
       "off": "Uit",
       "on": "Aan"
     },
+    "views": {
+      "helper": "Toon het item Weergaven in de zijbalk om gefilterde notitielijsten op te slaan. Standaard uit; aan als je al weergaven hebt.",
+      "label": "Weergaven"
+    },
     "vimMode": {
       "chordCaveat": "Op Windows en Linux hebben de eigen sneltoetsen van Myne voorrang, dus de vim-combinaties die daarmee botsen (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) zijn niet beschikbaar in de editor. Ctrl-[ werkt nog steeds als Escape, en visual-block verhuist naar Alt-v.",
       "errorSaveSetting": "De instelling voor de vim-modus kon niet worden opgeslagen.",
@@ -2346,6 +2659,9 @@
       "pendingHint": "Binnenkort beschikbaar"
     },
     "ai": {
+      "autoTagHelper": "Wanneer je even stopt met typen, leest een klein model op je apparaat de notitie en stelt bovenaan tags voor. Er wordt niets toegevoegd totdat je een suggestie accepteert.",
+      "autoTagLabel": "Tags automatisch voorstellen",
+      "autoTagUnavailable": "Deze build wordt geleverd zonder het tagmodel, dus er kunnen geen tags worden voorgesteld. Myne downloadt er nooit een — de schakelaar gaat vanzelf aan in een build die het wel bevat.",
       "disclosureToggle": "Hoe werkt dit?",
       "enableHelper": "Draait een model dat je zelf aanlevert volledig op je apparaat. Experimenteel, standaard uit.",
       "enableLabel": "Lokale AI inschakelen",
@@ -2369,8 +2685,41 @@
       "recommendedFilesTranscription": "Vereist het .gguf-bestand van Whisper + config.json + tokenizer.json in dezelfde map.",
       "title": "AI"
     },
+    "network": {
+      "disabledCue": "Synchronisatie loopt niet meer via Tor. Nieuwe verbindingen gaan rechtstreeks naar de synchronisatieserver.",
+      "errorRead": "Kon de huidige instelling niet lezen. Zet de schakelaar om om die opnieuw in te stellen.",
+      "errorSave": "Kon de instelling niet opslaan. Er is niets gewijzigd.",
+      "errorSidecar": "Tor-routering staat aan, maar de Tor-client kon niet starten. Synchronisatie is gepauzeerd totdat dat lukt — er wordt niets rechtstreeks verzonden.",
+      "postureActive": "Synchronisatie loopt via Tor",
+      "postureConnecting": "Verbinden met Tor — synchronisatie is gepauzeerd",
+      "postureConnectingDetail": "Dit duurt meestal een paar seconden. Er wordt intussen niets rechtstreeks verzonden.",
+      "postureExempt": "Synchronisatie gebruikt geen Tor — dit adres wijst naar dit apparaat",
+      "postureExemptDetail": "Het adres van de synchronisatieserver dat je hebt ingesteld, verwijst naar deze computer, dus de verbinding van Myne ermee loopt niet via een Tor-circuit. Als dat adres doorverwijst naar een server ergens anders, kan Myne dat niet zien en niet routeren. Synchronisatie is niet gepauzeerd.",
+      "postureHeading": "Op dit moment",
+      "postureInactive": "Synchronisatie gaat rechtstreeks naar de synchronisatieserver",
+      "postureUnavailable": "Tor is niet beschikbaar — synchronisatie is gepauzeerd",
+      "postureUnavailableDetail": "Er wordt niets rechtstreeks verzonden. Zet deze instelling uit en weer aan om de Tor-client te starten, of zet hem uit om zonder Tor te synchroniseren.",
+      "residualExit": "De laatste relay in een Tor-circuit — het exitknooppunt — ziet met welke synchronisatieserver je verbinding maakt. Wat je synchroniseert kan het niet lezen; dat blijft end-to-end versleuteld.",
+      "residualMetadata": "De synchronisatieserver ziet nog steeds wanneer je synchroniseert, hoeveel blobs je verstuurt en hoe groot die zijn, en hoeveel apparaten je hebt. Tor verandert daar niets aan.",
+      "residualPayment": "Als je voor gehoste synchronisatie betaalt, kunnen de betaling en je account nog steeds aan jou worden gekoppeld. Tor verandert waar de verbinding vandaan komt, niet het betalingsspoor.",
+      "residualScope": "Alleen het synchronisatieverkeer van Myne zelf loopt via Tor. Niets anders op dit apparaat.",
+      "residualsToggle": "Wat dit niet verbergt",
+      "torHelper": "Verbergt je IP-adres en locatie voor de synchronisatieserver, en verbergt voor je netwerk en je internetprovider met welke server je synchroniseert — zij kunnen nog wel zien dat dit apparaat met Tor verbindt. Het maakt je niet anoniem voor Myne, en verbergt niet voor de server wat je synchroniseert of wanneer.",
+      "torLabel": "Synchronisatie via Tor leiden"
+    },
     "prefs": {
       "saveError": "De voorkeur kon niet worden opgeslagen — probeer het opnieuw"
+    },
+    "reminders": {
+      "aria": "Taakherinneringen op dit apparaat tonen",
+      "exactAllow": "Toestaan",
+      "exactLabel": "Exacte timing",
+      "exactOn": "Aan",
+      "horizon": "Herinneringen zijn geregistreerd tot en met {{date}}. Open Myne vóór die tijd om ze te blijven ontvangen.",
+      "label": "Taakherinneringen",
+      "saveError": "Kon die instelling niet opslaan. Probeer het opnieuw.",
+      "showTextAria": "Taaktekst in de melding tonen",
+      "showTextLabel": "Taaktekst tonen"
     },
     "privacy": {
       "autoLockHelper": "Vergrendel de kluis na deze tijd van inactiviteit.",
@@ -2438,7 +2787,7 @@
     "shell": {
       "closeLabel": "Instellingen sluiten",
       "groups": {
-        "developer": ""
+        "developer": "Developer"
       },
       "navLabel": "Instellingenpanelen",
       "panels": {
@@ -2448,7 +2797,9 @@
         "appearance": "Weergave",
         "editor": "Editor",
         "files": "Bestanden",
+        "transcription": "Transcriptie",
         "hotkeys": "Sneltoetsen",
+        "network": "Netwerk",
         "privacy": "Privacy",
         "storage": "Opslag",
         "sync": "Synchronisatie"
@@ -2498,6 +2849,8 @@
       "lineSpacingHelper": "Verticale ruimte tussen regels.",
       "lineSpacingLabel": "Regelafstand",
       "textSizeHelper": "Basisgrootte van de editortekst. Koppen schalen mee.",
+      "previewLabel": "Voorbeeld",
+      "previewBody": "Pa's wijze lynx bezag vroom het fikse aquaduct. Typografie-instellingen bepalen hoe elke notitie leest, dus dit voorbeeld verandert mee terwijl je kiest.",
       "textSizeLabel": "Tekstgrootte"
     },
     "viewMode": {
@@ -2541,6 +2894,19 @@
     "sectionOptions": "Opties",
     "footerTagline": "myne · versleuteld op dit apparaat · opensource",
     "editor": {
+      "sections": {
+        "text": "Tekst en weergave",
+        "editing": "Bewerken",
+        "writing": "Schrijven",
+        "features": "Functies"
+      },
+      "preview": {
+        "heading": "Pa's wijze lynx",
+        "bullet1": "Sexy qua lijf, doch bang voor het zwempak",
+        "bullet2": "Filmquiz bracht knappe ex-yogi van de wijs",
+        "spellCaption": "Spellingcontrole",
+        "spellSample": "gebeurdt"
+      },
       "defaultView": "Standaardweergave",
       "typewriter": "Typemachine-scrollen",
       "typewriterSubtitle": "Houd de cursor verticaal gecentreerd",
@@ -2556,6 +2922,7 @@
         "lastActiveNoteDesc": "Synchroniseer welke notitie je open had staan, zodat je op een ander apparaat verder kunt."
       },
       "keywords": {
+        "aiAutoTag": "automatisch taggen tags voorstellen suggesties labels ai auto tag suggest",
         "aiEnable": "lokale ai aan uit inschakelen uitschakelen local ai machine learning kunstmatige intelligentie",
         "aiExcluded": "uitgesloten mappen negeren uitsluiten ai privacy excluded folders",
         "aiModels": "modellen model gguf downloaden tekst embedding llm models ai",
@@ -2566,6 +2933,9 @@
         "buildChannel": "buildkanaal build kanaal versie release stabiel bèta nightly",
         "changePassword": "wachtwoord wijzigen veranderen wachtwoordzin aanmeldgegevens bijwerken resetten password",
         "changelog": "wijzigingslog changelog releaseopmerkingen wat is nieuw geschiedenis versies",
+        "cliAccess": "cli terminal terminaltoegang opdrachtregel shell myne opdracht console command line",
+        "cliExcludedFolders": "cli uitgesloten mappen terminal uitsluiten verbergen opdrachtregel privé excluded folders",
+        "cliRateLimit": "cli snelheidslimiet terminal snelheid afremmen bulk tempo opdrachten per minuut rate limit",
         "clipper": "browserclipper clipper extensie web knippen vastleggen chrome firefox",
         "contentWidth": "inhoudsbreedte breedte kolom lezen regellengte content width",
         "customThemes": "aangepaste thema themas palet kleuren weergave vormgeving importeren custom themes",
@@ -2574,6 +2944,7 @@
         "export": "exporteren export markdown ontsleutelen platte bestanden documenten",
         "focusMode": "focusmodus focus typemachine dimmen inactieve regels afleidingsvrij typewriter",
         "font": "lettertype font schreefloos sans serif mono typografie",
+        "graphSettings": "grafiek vormgeving fysica krachten knooppunten links lay-out kleurgroepen labels canvas graph appearance",
         "hotkeys": "sneltoetsen toetsenbord toetscombinaties toewijzingen hotkeys keybindings keymap",
         "import": "importeren import notities obsidian notion evernote enex html csv migreren migratie overzetten",
         "language": "taal talen weergavetaal locale interface vertaling ui",
@@ -2583,7 +2954,9 @@
         "vimMode": "vim vi modaal bewerken normal insert visual toetsenbord",
         "lineSpacing": "regelafstand regels hoogte typografie leesbaarheid line spacing",
         "newNoteLocation": "nieuwe notitie locatie map standaard waar notities aangemaakt new note folder default",
+        "torRouting": "tor routering onion proxy netwerk ip-adres locatie verbergen synchronisatie anonimiteit routing",
         "quickUnlock": "snel ontgrendelen pin touch id biometrisch gezicht face unlock",
+        "reminders": "herinneringen melden melding notificatie waarschuwing taak vervaldatum herinneren reminders",
         "realtimeSync": "realtime synchronisatie live verbinding aanwezigheid polling sync",
         "screenCapture": "schermopname bescherming schermafbeelding screenshot opname blokkeren privacy",
         "showEditTimes": "bewerktijden tijdstempels gewijzigd datums notities tonen timestamps",
@@ -2591,6 +2964,8 @@
         "spellLanguages": "spelling talen taal woordenboeken locale woorden spell languages dictionary",
         "startupOpen": "opstarten openen standaard bestand starten welke notitie startup",
         "attachmentOcr": "ocr afbeelding scan gescand pdf foto schermafbeelding tekstherkenning zoeken bijlagen cpu batterij",
+        "attachmentCompression": "comprimeren compressie afbeelding verkleinen schalen formaat webp jpeg importeren plakken kluis grootte opslag compress",
+        "transcription": "transcriberen transcriptie spraak stem audio dictatie ondertiteling whisper opname geluid naar tekst speech to text",
         "syncAddDevice": "apparaat toevoegen koppelen verbinden telefoon laptop synchronisatie sync",
         "syncConflicts": "conflicten samenvoegen oplossen versies synchronisatie sync",
         "syncDevices": "apparaten gekoppeld verbonden machines synchronisatie sync",
@@ -2648,6 +3023,15 @@
       "label": "Zoekindex opbouwen…"
     },
     "conflicts": {
+      "compare": "Vergelijken",
+      "compareClose": "Terug naar conflicten",
+      "compareError": "Kon deze notities niet lezen om ze te vergelijken. Probeer het opnieuw.",
+      "compareIdentical": "Deze twee versies zijn identiek.",
+      "compareLoading": "Beide versies lezen…",
+      "compareMine": "Op dit apparaat",
+      "compareOrphan": "De notitie waar deze kopie vandaan komt bestaat niet meer, dus er is niets om mee te vergelijken.",
+      "compareTheirs": "Conflicterende kopie",
+      "compareTitle": "“{{title}}” vergelijken",
       "discard": "Weggooien",
       "empty": "Geen conflicten — je apparaten zijn gesynchroniseerd.",
       "groupTitle_one": "{{count}} conflicterende kopie van {{original}}",
@@ -2709,11 +3093,15 @@
     },
     "endpoint": {
       "connect": "Verbinden",
+      "connected": "Verbonden",
       "connectedLocal": "Verbonden (lokaal, geen TLS).",
       "connectedTls": "Verbonden. Controleer of deze vingerafdruk overeenkomt met die op je andere apparaat.",
       "connectedPlatformTrust": "Verbonden via TLS. Je browser heeft het certificaat van deze server geverifieerd.",
       "connecting": "Verbinden…",
       "fingerprintLabel": "Vingerafdruk van servercertificaat:",
+      "confirmFingerprintRequired": "Tor-routering staat aan, dus dit apparaat vertrouwt geen certificaat waarvan het niet vooraf te horen heeft gekregen dat het dat moet verwachten. Haal de SHA-256-certificaatvingerafdruk van je server op bij de server zelf of bij een apparaat dat al verbonden is, en plak die hier.",
+      "confirmFingerprintMismatch": "Het certificaat dat deze server heeft aangeboden is niet het certificaat dat je hebt ingevoerd. Er is niets opgeslagen. Controleer de vingerafdruk die je hebt geplakt — en als die klopt, maak dan geen verbinding: er zit iets tussen dit apparaat en je server.",
+      "confirmFingerprintDeclined": "Er is niets opgeslagen — dit apparaat is niet met die server verbonden. Kom terug zodra je de certificaatvingerafdruk hebt.",
       "pinStatic": "Geverifieerd aan de hand van het ingebouwde certificaat van Myne.",
       "pinTofu": "Vastgezet bij de eerste verbinding. Vergelijk deze vingerafdruk op al je apparaten.",
       "fixedOrigin": "Deze client synchroniseert met één server, vastgelegd bij het uitrollen. Die kun je hier niet wijzigen — de pagina mag alleen met dit ene adres praten.",
@@ -2744,6 +3132,22 @@
       "submit": "Dit apparaat toevoegen",
       "wordAria": "Woord {{number}}"
     },
+    "fingerprint": {
+      "title": "Controleer het certificaat van deze server voordat je het vertrouwt",
+      "why": "Tor-routering staat aan, dus deze eerste verbinding bereikt de server via een relay die door een onbekende wordt beheerd. Zolang er geen certificaat is vastgezet, zou dit apparaat elk certificaat aannemen dat het krijgt aangereikt — ook een dat die relay heeft verzonnen. Voer de vingerafdruk in die je server publiceert; Myne vergelijkt die voordat er iets wordt vastgezet. Komt hij niet overeen, dan wordt er niets opgeslagen.",
+      "label": "Verwachte certificaatvingerafdruk",
+      "placeholder": "SHA-256-vingerafdruk van je server",
+      "echoLabel": "Wat je hebt ingevoerd",
+      "echoComplete": "64 van de 64 tekens. Lees het na naast je eigen kopie voordat je doorgaat.",
+      "echoProgress": "{{count}} van de {{total}} tekens tot nu toe.",
+      "echoInvalid": "Een SHA-256-vingerafdruk bestaat uit 64 tekens, elk 0–9 of a–f. Dubbele punten, spaties en een voorafgaande “sha256:” zijn prima — al het andere hoort er niet bij.",
+      "helpToggle": "Waar vind ik deze vingerafdruk?",
+      "helpNotOverTor": "Niet via deze verbinding. Een vingerafdruk die je over hetzelfde circuit ophaalt bewijst niets — wat het certificaat kan verwisselen, kan die pagina ook verwisselen.",
+      "helpFromServer": "Op de machine waarop je server draait: openssl x509 -noout -fingerprint -sha256 -in <je certificaatbestand>",
+      "helpFromDevice": "Op een apparaat dat al met dit account verbonden is: Instellingen → Synchronisatie toont dezelfde vingerafdruk.",
+      "helpNoFingerprint": "Als je hem op geen van die manieren kunt krijgen, kan deze server niet worden toegevoegd zolang Tor-routering aanstaat. Je kunt Tor-routering uitzetten via Instellingen → Netwerk en rechtstreeks verbinden — daarmee toon je je IP-adres aan de server en aan iedereen die je netwerk kan meekijken.",
+      "decline": "Ik heb hem niet — annuleren"
+    },
     "join": {
       "accountLabel": "Accountnummer",
       "cancel": "Annuleren",
@@ -2752,6 +3156,8 @@
       "help": "Meld je aan met je accountnummer en wachtwoord. Dit apparaat synchroniseert je notities zodra een bestaand apparaat het goedkeurt. Er is geen herstelzin nodig.",
       "passwordLabel": "Wachtwoord",
       "pinnedCompare": "Dit apparaat heeft het certificaat van je server vastgezet. Controleer of deze vingerafdruk overeenkomt op je andere apparaten.",
+      "confirmFingerprintRequired": "Tor-routering staat aan, dus dit apparaat vertrouwt geen certificaat waarvan het niet vooraf te horen heeft gekregen dat het dat moet verwachten. Haal de SHA-256-certificaatvingerafdruk van je server op bij de server zelf of bij een apparaat dat al verbonden is, en plak die hier.",
+      "confirmFingerprintMismatch": "Het certificaat dat deze server heeft aangeboden is niet het certificaat dat je hebt ingevoerd. Dit apparaat is niet toegevoegd en er is niets opgeslagen. Controleer de vingerafdruk die je hebt geplakt — en als die klopt, ga dan niet verder: er zit iets tussen dit apparaat en je server.",
       "pinnedTitle": "Servercertificaat vastgezet",
       "serverLabel": "Synchronisatieserver",
       "serverPlaceholder": "https://your-server.example",
@@ -2786,6 +3192,7 @@
         "deleteConfirmTitle": "Deze herstelde notitie verwijderen?",
         "deleteConfirmWarning": "Hiermee verwijder je definitief de enige kopie die op dit apparaat wordt bewaard. Dit kan niet ongedaan worden gemaakt.",
         "deleteCta": "Verwijderen",
+        "empty": "Geen herstelde notities.",
         "errorGeneric": "Er is iets misgegaan. Probeer het opnieuw.",
         "helper": "Wanneer een notitie die op een ander apparaat is verwijderd hier ook verdwijnt, blijft de versleutelde kopie op dit apparaat bewaard. Herstel er een als nieuwe notitie, of verwijder hem definitief.",
         "label": "Herstelde notities",
@@ -2873,7 +3280,66 @@
       "conflictsNeedReview_other": "{{count}} conflicten vereisen beoordeling",
       "catchingUp": "Synchronisatie wordt bijgewerkt — je notities zijn veilig.",
       "verifyDevices": "Apparaten verifiëren"
+    },
+    "tor": {
+      "connecting": "Verbinden met Tor. Synchronisatie is gepauzeerd totdat de verbinding klaar is — er wordt niets rechtstreeks verzonden.",
+      "settingsHint": "Instellingen → Netwerk",
+      "unavailable": "Tor is niet beschikbaar, dus synchronisatie is gepauzeerd. Er wordt niets rechtstreeks verzonden. Zet Tor-routering uit om zonder Tor te synchroniseren."
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "Alle",
+      "due": "Vervaldatum",
+      "folder": "Map",
+      "insert": "Invoegen",
+      "noDueDate": "Geen vervaldatum",
+      "priority": "Prioriteit",
+      "sort": "Sorteren op",
+      "sortDue": "Vervaldatum",
+      "sortPath": "Notitie",
+      "sortPriority": "Prioriteit",
+      "status": "Status",
+      "statusDone": "Voltooid",
+      "statusTodo": "Niet voltooid",
+      "tag": "Tag"
+    },
+    "empty": {
+      "filter": "Hier staat nu niets. Probeer een ander filter.",
+      "rebuilding": "Je notities lezen…",
+      "scope": "Geen taken in deze map of tag. Probeer het bereik te verbreden.",
+      "vault": "Nog geen taken. Schrijf “- [ ]” op een regel in een notitie om er een te maken."
+    },
+    "filter": {
+      "all": "Alle",
+      "overdue": "Achterstallig",
+      "today": "Vandaag",
+      "upcoming": "Aankomend"
+    },
+    "noteTitle": "Taken in deze notitie",
+    "query": {
+      "dropped_one": "{{count}} clausule die Myne niet kon lezen",
+      "dropped_other": "{{count}} clausules die Myne niet kon lezen",
+      "empty": "Geen taken komen overeen met deze query.",
+      "loading": "Je notities lezen…",
+      "refused": "Myne kon niets van deze query lezen, dus toont hij niets in plaats van alles.",
+      "remainder_one": "Nog {{count}} taak kwam overeen",
+      "remainder_other": "Nog {{count}} taken kwamen overeen"
+    },
+    "reminder": {
+      "due": "Er staat een taakherinnering klaar."
+    },
+    "row": {
+      "completed": "Taak, voltooid",
+      "notCompleted": "Taak, niet voltooid",
+      "tooLongToWrite": "De regel van deze taak is te lang om hier te bewerken. Open in plaats daarvan de notitie ervan.",
+      "untitled": "Naamloze taak"
+    },
+    "scope": {
+      "allFolders": "Alle mappen",
+      "label": "Beperken tot"
+    },
+    "title": "Taken"
   },
   "templates": {
     "manager": {
@@ -2953,6 +3419,8 @@
     "recoveryLink": "Wachtwoord vergeten? Ontgrendel met je herstelzin",
     "submit": "Ontgrendelen",
     "subtitle": "Voer je wachtwoord in om door te gaan.",
+    "subtitlePin": "Voer je PIN in om door te gaan.",
+    "subtitleBiometric": "Bevestig met Touch ID om door te gaan.",
     "suspicion": {
       "lockedDuringChange": "Wachtwoordwijziging geannuleerd: de kluis was vergrendeld.",
       "metaChangedExternally": "De kluis is in een andere sessie gewijzigd — ontgrendel opnieuw."
@@ -3166,6 +3634,7 @@
   "vaultPicker": {
     "createAnother": "Nog een kluis aanmaken",
     "heading": "Kies een kluis",
+    "joinDevice": "Dit apparaat aan een account toevoegen",
     "loading": "Je kluizen laden…",
     "noneLoaded": "Er konden nu geen kluizen worden geladen.",
     "openedRelative": "geopend {{rel}}",
@@ -3222,6 +3691,7 @@
   "vaultSwitcher": {
     "chipFallback": "Kluis",
     "createAnother": "Nog een kluis aanmaken",
+    "joinDevice": "Dit apparaat aan een account toevoegen",
     "switching": "wisselen…",
     "switchVaultLabel": "Kluis wisselen",
     "vaultFallback": "Kluis {{n}}"
@@ -3230,6 +3700,7 @@
     "createCta": "Nieuwe kluis aanmaken",
     "headlineLine1": "Versleutelde Markdown-notities.",
     "headlineLine2": "Geen e-mail bij aanmelden.",
+    "joinCta": "Dit apparaat aan een account toevoegen",
     "repairResidue": {
       "cancel": "Annuleren",
       "cleaningUp": "Opruimen…",
