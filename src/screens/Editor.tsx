@@ -99,6 +99,8 @@ import {
   createNoteFromTemplate,
   createBlankNamedNote,
   resolveTodayNote,
+  convertNoteToTemplate,
+  convertTemplateToNote,
 } from "../notes";
 import {
   prefsRead,
@@ -2096,6 +2098,10 @@ function EditorChrome({
       <NewNoteFromTemplateModal
         open={newFromTemplateOpen}
         onClose={() => setNewFromTemplateOpen(false)}
+        onManageTemplates={() => {
+          setNewFromTemplateOpen(false);
+          setTemplatesOpen(true);
+        }}
         onBlankNote={() => {
           // Zero-templates degrade → the existing instant-blank path, unchanged.
           void ctx.createAndStartRename().catch(() => {});
@@ -2135,6 +2141,7 @@ function EditorChrome({
         onClose={() => setPaletteOpen(false)}
         onReopen={() => setPaletteOpen(true)}
         centerView={centerView}
+        setToast={setToast}
         onImportObsidian={() => {
           setPaletteOpen(false);
           setImporterOpen(true);
@@ -2616,6 +2623,9 @@ type CommandPaletteHostProps = {
   onSwitchWorkspace: () => void;
   onRenameWorkspace: () => void;
   onDeleteWorkspace: () => void;
+  /** Show a toast (with an optional undo action) — the note-actions "…" menu's
+   *  convert-to-template / convert-to-note items announce themselves through it. */
+  setToast: Dispatch<SetStateAction<EditorToast | null>>;
 };
 
 function CommandPaletteHost({
@@ -2623,6 +2633,7 @@ function CommandPaletteHost({
   onClose,
   onReopen,
   centerView,
+  setToast,
   onOpenSettings,
   onRestoreBackup,
   onOpenAttachments,
@@ -3086,6 +3097,51 @@ function CommandPaletteHost({
     centerView !== "attachments" &&
     paletteWs.focusedLeaf.activeTab?.kind === "note" &&
     paletteWs.pendingNewTabPaneId !== paletteWs.focusedPaneId;
+  // The note the "…" menu acts on (the focused-pane note the other items use).
+  // Its template flag flips the convert item between promote and demote — the
+  // dead `convertNoteToTemplate` wire (nothing called it) and the modal-only
+  // `convertTemplateToNote`, surfaced where you author.
+  const activeNoteId = ctx.selectedId;
+  const activeIsTemplate = activeNoteId !== null && isTemplate(activeNoteId);
+  // Convert with an undo toast: promoting a note to a template makes it LEAVE
+  // the sidebar (templates are inverse-visibility, hidden like trash), so the
+  // toast is what keeps it from reading as "my note vanished". Undo runs the
+  // exact inverse. `refreshOne` re-reads the flipped record so the tree settles.
+  const convertActive = (toTemplate: boolean) => {
+    if (activeNoteId === null) return;
+    const id = activeNoteId;
+    const forward = toTemplate ? convertNoteToTemplate : convertTemplateToNote;
+    const inverse = toTemplate ? convertTemplateToNote : convertNoteToTemplate;
+    // The convert wrote the `template:` flag straight to disk, out of band of the
+    // open pane's buffer. Re-read the open note (`reloadOpenNote`) so its buffer
+    // carries the new frontmatter — otherwise a later autosave would write the
+    // stale buffer back and silently revert the flag (the frontmatter-vs-buffer
+    // staleness class). Skipped for a dirty buffer, which the reload guards.
+    const settle = () => {
+      ctx.reloadOpenNote();
+      return ctx.refreshOne(id);
+    };
+    void forward(id)
+      .then(settle)
+      .then(() => {
+        setToast({
+          message: toTemplate
+            ? t("editor.noteActions.turnedIntoTemplate")
+            : t("editor.noteActions.convertedToNote"),
+          variant: "success",
+          action: {
+            label: t("notes.list.undo"),
+            onAction: () => {
+              setToast(null);
+              void inverse(id).then(settle).catch(() => {});
+            },
+          },
+        });
+      })
+      .catch(() => {
+        /* mutation failure leaves the note unchanged; no toast */
+      });
+  };
   const noteActionItems: NoteActionMenuItem[] = [
     {
       kind: "action",
@@ -3119,6 +3175,16 @@ function CommandPaletteHost({
       icon: "rotate-ccw",
       label: t("editor.noteActions.versionHistory"),
       onSelect: commandCtx.onOpenSnapshots,
+    },
+    { kind: "divider" },
+    {
+      kind: "action",
+      action: activeIsTemplate ? "convert-to-note" : "convert-to-template",
+      icon: activeIsTemplate ? "file-text" : "layout-grid",
+      label: activeIsTemplate
+        ? t("editor.noteActions.convertToNote")
+        : t("editor.noteActions.convertToTemplate"),
+      onSelect: () => convertActive(!activeIsTemplate),
     },
     { kind: "divider" },
     {
