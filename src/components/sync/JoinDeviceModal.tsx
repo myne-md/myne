@@ -18,6 +18,7 @@ import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { setDeviceName as persistDeviceName } from "../../lib/prefs";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
 import { refreshTorState } from "../../hooks/useTorState";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 
 interface JoinResult {
   /** The device_id this join registered (MYND-548) — used to name THIS device in
@@ -92,7 +93,17 @@ function btn(primary: boolean, disabled: boolean): CSSProperties {
     background: primary ? "var(--accent)" : "var(--bg-2)",
     color: primary ? "var(--accent-on)" : "var(--fg-1)",
     opacity: disabled ? 0.6 : 1,
+    transition: HOVER_TRANSITION,
   };
+}
+
+/** Hover for a `btn()`-styled control: a primary deepens `--accent` → its hover
+ *  accent; a secondary deepens `--bg-2` → `--paper-3`. Pass the same `disabled`
+ *  the button carries so a dimmed control stays inert. */
+function btnHover(primary: boolean, disabled: boolean) {
+  return primary
+    ? hoverSurface({ restBg: "var(--accent)", hoverBg: "var(--accent-hover)", disabled })
+    : hoverSurface({ restBg: "var(--bg-2)", hoverBg: "var(--paper-3)", disabled });
 }
 
 interface JoinDeviceModalProps {
@@ -284,6 +295,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
               type="button"
               onClick={() => setStep("pending")}
               style={btn(true, false)}
+              {...btnHover(true, false)}
               data-testid="join.continue"
             >
               {t("sync.join.continue")}
@@ -303,7 +315,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
           <p style={HELP}>{ENROLL_PENDING_NOTICE}</p>
           <p style={HELP}>{t("sync.join.waitingHint")}</p>
           <div style={ROW}>
-            <button type="button" onClick={onCancel} style={btn(false, false)} data-testid="join.cancel">
+            <button type="button" onClick={onCancel} style={btn(false, false)} {...btnHover(false, false)} data-testid="join.cancel">
               {t("sync.join.cancel")}
             </button>
           </div>
@@ -341,6 +353,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
               onClick={onMismatch}
               disabled={aborting}
               style={{ ...btn(false, aborting), color: "var(--danger)" }}
+              {...btnHover(false, aborting)}
               data-testid="join.sas-mismatch"
             >
               {t("sync.join.sasMismatch")}
@@ -350,6 +363,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
               onClick={() => joinedVaultId && onJoined(joinedVaultId)}
               disabled={aborting}
               style={btn(true, aborting)}
+              {...btnHover(true, aborting)}
               data-testid="join.sas-match"
             >
               {t("sync.join.sasMatch")}
@@ -463,6 +477,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
               onClick={onCancel}
               disabled={busy}
               style={btn(false, busy)}
+              {...btnHover(false, busy)}
               data-testid="join.cancel"
             >
               {t("sync.join.cancel")}
@@ -472,6 +487,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
               onClick={submit}
               disabled={!canSubmit}
               style={btn(true, !canSubmit)}
+              {...btnHover(true, !canSubmit)}
               data-testid="join.submit"
             >
               {busy ? t("sync.join.submitting") : t("sync.join.submit")}

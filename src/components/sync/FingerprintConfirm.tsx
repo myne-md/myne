@@ -190,6 +190,7 @@ const DISCLOSURE_BUTTON: CSSProperties = {
   fontSize: "var(--text-sm)",
   textDecoration: "underline",
   cursor: "pointer",
+  transition: "color var(--duration-fast) var(--ease-standard)",
 };
 
 const HELP_LIST: CSSProperties = {
@@ -317,6 +318,12 @@ export function FingerprintConfirm({
         aria-expanded={helpOpen}
         aria-controls={`${baseId}-help`}
         style={DISCLOSURE_BUTTON}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = "var(--fg-1)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = "var(--fg-2)";
+        }}
         data-testid={`${testIdPrefix}.fingerprint-help-toggle`}
       >
         {t("sync.fingerprint.helpToggle")}

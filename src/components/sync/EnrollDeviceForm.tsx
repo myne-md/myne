@@ -34,6 +34,7 @@ import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { useEnroll, type EnrollCredentialKind } from "../../hooks/useEnroll";
 import { has } from "../../platform/capabilities";
 import { EnrollPhraseCredential } from "./EnrollPhraseCredential";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 import {
   ENROLL_APPROVED_NOTICE,
   ENROLL_NON_DISTINGUISHING_BANNER,
@@ -83,6 +84,7 @@ function submitStyle(disabled: boolean): CSSProperties {
     fontSize: 13,
     fontWeight: 500,
     cursor: disabled ? "not-allowed" : "pointer",
+    transition: HOVER_TRANSITION,
   };
 }
 
@@ -294,6 +296,11 @@ export function EnrollDeviceForm() {
         onClick={handleSubmit}
         disabled={!canSubmit}
         style={submitStyle(!canSubmit)}
+        {...hoverSurface({
+          restBg: "var(--accent)",
+          hoverBg: "var(--accent-hover)",
+          disabled: !canSubmit,
+        })}
         data-testid="sync.enroll.submit"
       >
         {busy ? t("sync.enroll.connecting") : t("sync.enroll.submit")}

@@ -7,7 +7,7 @@
 // block / label / helper rhythm.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { listen } from "../../platform/event";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 import { EndpointConfig } from "../sync/EndpointConfig";
@@ -262,14 +262,9 @@ export function SyncPanel() {
     <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
       <div style={BLOCK_STYLE} data-setting-anchor="sync.server" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.server.label")}</span>
+        {/* The server helper now renders inside EndpointConfig, directly under
+            the input and before the fingerprint block (E4a). */}
         <EndpointConfig />
-        <p style={HELPER_STYLE}>
-          <Trans i18nKey="sync.panel.server.helper">
-            Enter the same server URL on every device. For a self-hosted server
-            use its <code>https://</code> address; verify the certificate
-            fingerprint matches across your devices.
-          </Trans>
-        </p>
       </div>
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.status" data-setting-row="true">
