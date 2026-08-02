@@ -247,7 +247,7 @@
       "task": "Notas con una tarea",
       "content": "Texto completo en el cuerpo"
     },
-    "searchPlaceholder": "Busca notas o ejecuta un comando — Esc para cerrar",
+    "searchPlaceholder": "Busca notas o ejecuta un comando — prueba tag: · path: · task:",
     "sectionCommands": "Comandos",
     "sectionNotes": "Notas",
     "untitledNote": "Sin título"
@@ -462,7 +462,7 @@
         "label": "Importar vista .base…"
       },
       "importObsidian": {
-        "label": "Importar bóveda de Obsidian…"
+        "label": "Importar notas…"
       },
       "lockVault": {
         "label": "Bloquear bóveda"
@@ -938,8 +938,8 @@
           "gettingReadyHint": "Preparando tus notas para la IA: un momento.",
           "insert": "Insertar en la nota",
           "noAnswer": "Sin respuesta: prueba a reformular.",
-          "noModelHint": "No hay ningún modelo seleccionado. Elige uno en Ajustes → Developer → IA para empezar.",
-          "offHint": "La IA local está desactivada. Actívala en Ajustes → Developer → IA.",
+          "noModelHint": "No hay ningún modelo seleccionado. Elige uno en Ajustes → Desarrollador → IA para empezar.",
+          "offHint": "La IA local está desactivada. Actívala en Ajustes → Desarrollador → IA.",
           "send": "Enviar",
           "statusGettingReady": "Preparando…",
           "statusNoModel": "Sin modelo",
@@ -960,7 +960,7 @@
         },
         "tabs": {
           "aiChat": "Chat de IA",
-          "backlinks": "Retroenlaces",
+          "backlinks": "Enlaces",
           "outline": "Esquema",
           "tasks": "Tareas",
           "unlinked": "Menciones sin enlazar"
@@ -1744,7 +1744,7 @@
         "reasonPathTooLong": "la ruta de carpeta + título es demasiado larga",
         "reasonSegmentTooLong": "el nombre es más largo de lo que Myne permite",
         "scanning": "Analizando tu bóveda…",
-        "setupIntro": "Indica a Myne tu carpeta de bóveda de Obsidian existente. Cada nota Markdown se importa y se cifra al instante: nada sale de este dispositivo y tus archivos originales quedan intactos.",
+        "setupIntro": "Myne importa y cifra tus notas al instante: nada sale de este dispositivo y tus archivos originales nunca se modifican.",
         "statCancelled": "Cancelado",
         "statCanvasSkipped": "archivos .canvas omitidos",
         "statCompressed": "Imágenes comprimidas",
@@ -1755,7 +1755,7 @@
         "suggestedNameAriaLabel": "Nombre sugerido",
         "titleComplete": "Importación completada",
         "titleFailed": "La importación falló",
-        "titleSetup": "Importar bóveda de Obsidian",
+        "titleSetup": "Importar notas",
         "vaultFolderLabel": "Carpeta de la bóveda",
         "vaultRoot": "(raíz de la bóveda)",
         "titlePick": "Importar notas",
@@ -1780,7 +1780,7 @@
         "chooseFolder": "Elige carpeta…",
         "laterHint": "Siempre puedes importar más tarde desde Ajustes → Almacenamiento.",
         "notNow": "Ahora no",
-        "title": "¿Importar tu bóveda de Obsidian?"
+        "title": "¿Importar tus notas?"
       },
       "picker": {
         "intro": "¿De dónde vienen tus notas?"
@@ -2233,9 +2233,21 @@
     },
     "everyN": {
       "day": "cada {{count}} días",
+      "day_one": "cada {{count}} día",
+      "day_many": "cada {{count}} de días",
+      "day_other": "cada {{count}} días",
       "week": "cada {{count}} semanas",
+      "week_one": "cada {{count}} semana",
+      "week_many": "cada {{count}} de semanas",
+      "week_other": "cada {{count}} semanas",
       "month": "cada {{count}} meses",
-      "year": "cada {{count}} años"
+      "month_one": "cada {{count}} mes",
+      "month_many": "cada {{count}} de meses",
+      "month_other": "cada {{count}} meses",
+      "year": "cada {{count}} años",
+      "year_one": "cada {{count}} año",
+      "year_many": "cada {{count}} de años",
+      "year_other": "cada {{count}} años"
     },
     "everyWeekday": "todos los {{days}}",
     "everyWeekdays": "todos los {{days}}",
@@ -2545,7 +2557,7 @@
       "confirm": "Confirmar",
       "delete": "Eliminar",
       "deleteError": "No se pudo eliminar ese tema. Inténtalo de nuevo.",
-      "empty": "Aún no hay temas personalizados. Importa uno o abre la carpeta de temas y añade un archivo de tema.",
+      "empty": "Aún no hay temas personalizados. Importa un archivo de tema para empezar.",
       "error": {
         "aColorFallback": "un color",
         "invalidFile": "Archivo de tema no válido.",
@@ -2565,7 +2577,7 @@
       "label": "Temas personalizados",
       "openFolderButton": "Abrir carpeta de temas",
       "openFolderError": "No se pudo abrir la carpeta de temas.",
-      "readError": "No se pudo leer tu carpeta de temas.",
+      "readError": "No se pudieron leer tus temas personalizados.",
       "readOnlyHelper": "Los temas personalizados se instalan en tu ordenador. Los tuyos llegan aquí por sí solos tras una sincronización."
     },
     "dailyNotes": {
@@ -2664,7 +2676,7 @@
         "panesTabs": "Paneles y pestañas",
         "view": "Vista"
       },
-      "helper": "Consulta y cambia los atajos de teclado. El formato del editor y el atajo de rotación de pestañas son fijos.",
+      "helper": "Consulta y cambia los atajos de teclado. Solo el atajo de rotación de pestañas (Ctrl+Tab) es fijo.",
       "notSet": "Sin asignar",
       "removeBindingAria": "Quitar {{chord}}",
       "reserved": {
@@ -2819,7 +2831,7 @@
     "quickUnlock": {
       "errorCancelled": "Cancelado.",
       "errorGeneric": "No se pudo configurar el desbloqueo rápido.",
-      "errorHardwareUnavailable": "Touch ID no está disponible en este dispositivo.",
+      "errorHardwareUnavailable": "Touch ID no está disponible en esta compilación. Requiere una compilación de macOS firmada y con Touch ID configurado.",
       "errorNotUnlocked": "Desbloquea primero la bóveda.",
       "errorPinNotDigits": "El PIN solo puede contener dígitos.",
       "errorPinTooShort": "El PIN debe tener al menos {{count}} dígitos.",
@@ -2905,9 +2917,9 @@
       "exportBody": "Exportar bóveda como Markdown",
       "exportHelper": "Árbol de Markdown sin formato, no cifrado.",
       "exportLabel": "Exportar",
-      "importHelper": "Lleva una bóveda de Obsidian existente a Myne. Cada nota Markdown se importa y se cifra al instante; tus archivos originales quedan intactos.",
+      "importHelper": "Trae notas desde Obsidian, Notion, Evernote, archivos HTML o un CSV. Todo se importa y se cifra al instante; tus archivos originales quedan intactos.",
       "importLabel": "Importar",
-      "importObsidian": "Importar bóveda de Obsidian…",
+      "importObsidian": "Importar notas…",
       "locationHelper": "Cada bóveda es una carpeta de archivos cifrados en esta ruta. Es preferible usar el botón Copia de seguridad de abajo en lugar de copias manuales, ya que verifica el archivo escrito.",
       "locationLabel": "Ubicación de la bóveda",
       "openInFiles": "Abrir en Archivos",

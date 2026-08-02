@@ -238,7 +238,7 @@
       "task": "Catatan dengan tugas",
       "content": "Teks lengkap di isi"
     },
-    "searchPlaceholder": "Cari catatan atau jalankan perintah — Esc untuk menutup",
+    "searchPlaceholder": "Cari catatan atau jalankan perintah — coba tag: · path: · task:",
     "sectionCommands": "Perintah",
     "sectionNotes": "Catatan",
     "untitledNote": "Tanpa judul"
@@ -453,7 +453,7 @@
         "label": "Impor tampilan .base…"
       },
       "importObsidian": {
-        "label": "Impor brankas Obsidian…"
+        "label": "Impor catatan…"
       },
       "lockVault": {
         "label": "Kunci brankas"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "Menyiapkan catatan Anda untuk AI — mohon tunggu.",
           "insert": "Sisipkan ke catatan",
           "noAnswer": "Tidak ada jawaban — coba ubah kalimatnya.",
-          "noModelHint": "Tidak ada model terpilih. Pilih satu di Setelan → Developer → AI untuk memulai.",
-          "offHint": "AI lokal mati. Nyalakan di Setelan → Developer → AI.",
+          "noModelHint": "Tidak ada model terpilih. Pilih satu di Pengaturan → Developer → AI untuk memulai.",
+          "offHint": "AI lokal mati. Nyalakan di Pengaturan → Developer → AI.",
           "send": "Kirim",
           "statusGettingReady": "Menyiapkan…",
           "statusNoModel": "Tidak ada model",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "Obrolan AI",
-          "backlinks": "Tautan balik",
+          "backlinks": "Tautan",
           "outline": "Kerangka",
           "tasks": "Tugas",
           "unlinked": "Sebutan tak tertaut"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "jalur folder + judul terlalu panjang",
         "reasonSegmentTooLong": "nama lebih panjang dari yang diizinkan Myne",
         "scanning": "Memindai brankas Anda…",
-        "setupIntro": "Arahkan Myne ke folder brankas Obsidian Anda yang sudah ada. Setiap catatan Markdown diimpor dan dienkripsi di tempat — tidak ada yang meninggalkan perangkat ini, dan berkas asli Anda dibiarkan tak tersentuh.",
+        "setupIntro": "Myne mengimpor dan mengenkripsi catatan Anda di tempat — tidak ada yang meninggalkan perangkat ini, dan berkas asli Anda tidak pernah diubah.",
         "statCancelled": "Dibatalkan",
         "statCanvasSkipped": "Berkas .canvas dilewati",
         "statCompressed": "Gambar dikompresi",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Nama yang disarankan",
         "titleComplete": "Impor selesai",
         "titleFailed": "Impor gagal",
-        "titleSetup": "Impor brankas Obsidian",
+        "titleSetup": "Impor catatan",
         "vaultFolderLabel": "Folder brankas",
         "vaultRoot": "(akar brankas)",
         "titlePick": "Impor catatan",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Pilih folder…",
         "laterHint": "Anda selalu dapat mengimpor nanti dari Pengaturan → Penyimpanan.",
         "notNow": "Tidak sekarang",
-        "title": "Impor brankas Obsidian Anda?"
+        "title": "Impor catatan Anda?"
       },
       "picker": {
         "intro": "Dari mana catatan Anda berasal?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "setiap {{count}} hari",
+      "day_one": "setiap {{count}} hari",
+      "day_other": "setiap {{count}} hari",
       "week": "setiap {{count}} minggu",
+      "week_one": "setiap {{count}} minggu",
+      "week_other": "setiap {{count}} minggu",
       "month": "setiap {{count}} bulan",
-      "year": "setiap {{count}} tahun"
+      "month_one": "setiap {{count}} bulan",
+      "month_other": "setiap {{count}} bulan",
+      "year": "setiap {{count}} tahun",
+      "year_one": "setiap {{count}} tahun",
+      "year_other": "setiap {{count}} tahun"
     },
     "everyWeekday": "setiap {{days}}",
     "everyWeekdays": "setiap {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Konfirmasi",
       "delete": "Hapus",
       "deleteError": "Tidak dapat menghapus tema itu. Silakan coba lagi.",
-      "empty": "Belum ada tema kustom. Impor satu, atau buka folder tema dan tambahkan berkas tema.",
+      "empty": "Belum ada tema kustom. Impor berkas tema untuk memulai.",
       "error": {
         "aColorFallback": "sebuah warna",
         "invalidFile": "Berkas tema tidak valid.",
@@ -2492,7 +2500,7 @@
       "label": "Tema kustom",
       "openFolderButton": "Buka folder tema",
       "openFolderError": "Tidak dapat membuka folder tema.",
-      "readError": "Tidak dapat membaca folder tema Anda.",
+      "readError": "Tidak dapat membaca tema kustom Anda.",
       "readOnlyHelper": "Tema kustom dipasang di komputer Anda. Tema Anda sampai ke sini dengan sendirinya setelah sinkronisasi."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Panel & Tab",
         "view": "Tampilan"
       },
-      "helper": "Lihat dan ubah pintasan papan ketik. Pemformatan penyunting dan pintasan putar tab bersifat tetap.",
+      "helper": "Lihat dan ubah pintasan papan ketik. Hanya pintasan putar tab (Ctrl+Tab) yang bersifat tetap.",
       "notSet": "Tidak diatur",
       "removeBindingAria": "Hapus {{chord}}",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Dibatalkan.",
       "errorGeneric": "Tidak dapat mengonfigurasi buka kunci cepat.",
-      "errorHardwareUnavailable": "Touch ID tidak tersedia di perangkat ini.",
+      "errorHardwareUnavailable": "Touch ID tidak tersedia di build ini. Diperlukan build macOS yang ditandatangani dengan Touch ID terdaftar.",
       "errorNotUnlocked": "Buka kunci brankas terlebih dahulu.",
       "errorPinNotDigits": "PIN harus berupa angka saja.",
       "errorPinTooShort": "PIN harus minimal {{count}} angka.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Ekspor brankas sebagai Markdown",
       "exportHelper": "Pohon markdown biasa — tidak dienkripsi.",
       "exportLabel": "Ekspor",
-      "importHelper": "Bawa brankas Obsidian yang sudah ada ke Myne. Setiap catatan Markdown diimpor dan dienkripsi di tempat; berkas asli Anda dibiarkan tak tersentuh.",
+      "importHelper": "Bawa catatan dari Obsidian, Notion, Evernote, berkas HTML, atau CSV. Semuanya diimpor dan dienkripsi di tempat; berkas asli Anda dibiarkan tak tersentuh.",
       "importLabel": "Impor",
-      "importObsidian": "Impor brankas Obsidian…",
+      "importObsidian": "Impor catatan…",
       "locationHelper": "Setiap brankas adalah folder berisi berkas terenkripsi di bawah jalur ini. Lebih baik gunakan tombol Cadangan di bawah daripada menyalin manual — tombol itu memverifikasi berkas yang ditulis.",
       "locationLabel": "Lokasi brankas",
       "openInFiles": "Buka di Files",

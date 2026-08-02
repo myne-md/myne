@@ -238,7 +238,7 @@
       "task": "Anteckningar med en uppgift",
       "content": "Fritext i brödtexten"
     },
-    "searchPlaceholder": "Sök anteckningar eller kör ett kommando — Esc för att stänga",
+    "searchPlaceholder": "Sök anteckningar eller kör ett kommando — prova tag: · path: · task:",
     "sectionCommands": "Kommandon",
     "sectionNotes": "Anteckningar",
     "untitledNote": "Namnlös"
@@ -453,7 +453,7 @@
         "label": "Importera .base-vy…"
       },
       "importObsidian": {
-        "label": "Importera Obsidian-valv…"
+        "label": "Importera anteckningar…"
       },
       "lockVault": {
         "label": "Lås valv"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "Förbereder dina anteckningar för AI – ett ögonblick.",
           "insert": "Infoga i anteckning",
           "noAnswer": "Inget svar – prova att formulera om.",
-          "noModelHint": "Ingen modell vald. Välj en i Inställningar → Developer → AI för att börja.",
-          "offHint": "Lokal AI är av. Slå på den i Inställningar → Developer → AI.",
+          "noModelHint": "Ingen modell vald. Välj en i Inställningar → Utvecklare → AI för att börja.",
+          "offHint": "Lokal AI är av. Slå på den i Inställningar → Utvecklare → AI.",
           "send": "Skicka",
           "statusGettingReady": "Förbereder…",
           "statusNoModel": "Ingen modell",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "AI-chatt",
-          "backlinks": "Bakåtlänkar",
+          "backlinks": "Länkar",
           "outline": "Disposition",
           "tasks": "Uppgifter",
           "unlinked": "Olänkade omnämnanden"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "sökvägen för mapp + titel är för lång",
         "reasonSegmentTooLong": "namnet är längre än vad Myne tillåter",
         "scanning": "Skannar ditt valv…",
-        "setupIntro": "Peka ut din befintliga Obsidian-valvmapp för Myne. Varje Markdown-anteckning importeras och krypteras direkt — ingenting lämnar den här enheten, och dina originalfiler lämnas orörda.",
+        "setupIntro": "Myne importerar och krypterar dina anteckningar direkt — ingenting lämnar den här enheten, och dina originalfiler ändras aldrig.",
         "statCancelled": "Avbruten",
         "statCanvasSkipped": ".canvas-filer hoppades över",
         "statCompressed": "Bilder komprimerade",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Föreslaget namn",
         "titleComplete": "Import klar",
         "titleFailed": "Importen misslyckades",
-        "titleSetup": "Importera Obsidian-valv",
+        "titleSetup": "Importera anteckningar",
         "vaultFolderLabel": "Valvmapp",
         "vaultRoot": "(valvrot)",
         "titlePick": "Importera anteckningar",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Välj mapp…",
         "laterHint": "Du kan alltid importera senare från Inställningar → Lagring.",
         "notNow": "Inte nu",
-        "title": "Importera ditt Obsidian-valv?"
+        "title": "Importera dina anteckningar?"
       },
       "picker": {
         "intro": "Var kommer dina anteckningar ifrån?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "var {{count}}:e dag",
+      "day_one": "var {{count}}:a dag",
+      "day_other": "var {{count}}:e dag",
       "week": "var {{count}}:e vecka",
+      "week_one": "var {{count}}:a vecka",
+      "week_other": "var {{count}}:e vecka",
       "month": "var {{count}}:e månad",
-      "year": "vart {{count}}:e år"
+      "month_one": "var {{count}}:a månad",
+      "month_other": "var {{count}}:e månad",
+      "year": "vart {{count}}:e år",
+      "year_one": "vart {{count}}:a år",
+      "year_other": "vart {{count}}:e år"
     },
     "everyWeekday": "varje {{days}}",
     "everyWeekdays": "varje {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Bekräfta",
       "delete": "Ta bort",
       "deleteError": "Kunde inte ta bort det temat. Försök igen.",
-      "empty": "Inga egna teman ännu. Importera ett, eller öppna temamappen och lägg till en temafil.",
+      "empty": "Inga egna teman ännu. Importera en temafil för att komma igång.",
       "error": {
         "aColorFallback": "en färg",
         "invalidFile": "Ogiltig temafil.",
@@ -2492,7 +2500,7 @@
       "label": "Egna teman",
       "openFolderButton": "Öppna temamappen",
       "openFolderError": "Kunde inte öppna temamappen.",
-      "readError": "Kunde inte läsa din temamapp.",
+      "readError": "Kunde inte läsa dina egna teman.",
       "readOnlyHelper": "Egna teman installeras på din dator. Dina dyker upp här av sig själva efter en synkronisering."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Rutor och flikar",
         "view": "Vy"
       },
-      "helper": "Visa och ändra kortkommandon. Redigerarformatering och genvägen för flikväxling är fasta.",
+      "helper": "Visa och ändra kortkommandon. Bara genvägen för flikväxling (Ctrl+Tab) är fast.",
       "notSet": "Inte angiven",
       "removeBindingAria": "Ta bort {{chord}}",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Avbruten.",
       "errorGeneric": "Kunde inte konfigurera snabb upplåsning.",
-      "errorHardwareUnavailable": "Touch ID är inte tillgängligt på den här enheten.",
+      "errorHardwareUnavailable": "Touch ID är inte tillgängligt i den här versionen. Det kräver en signerad macOS-version med registrerat Touch ID.",
       "errorNotUnlocked": "Lås upp valvet först.",
       "errorPinNotDigits": "PIN-koden får bara innehålla siffror.",
       "errorPinTooShort": "PIN-koden måste innehålla minst {{count}} siffror.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Exportera valv som Markdown",
       "exportHelper": "Vanligt markdown-träd — inte krypterat.",
       "exportLabel": "Exportera",
-      "importHelper": "Ta in ett befintligt Obsidian-valv i Myne. Varje Markdown-anteckning importeras och krypteras direkt; dina originalfiler lämnas orörda.",
+      "importHelper": "Ta in anteckningar från Obsidian, Notion, Evernote, HTML-filer eller en CSV. Allt importeras och krypteras direkt; dina originalfiler lämnas orörda.",
       "importLabel": "Importera",
-      "importObsidian": "Importera Obsidian-valv…",
+      "importObsidian": "Importera anteckningar…",
       "locationHelper": "Varje valv är en mapp med krypterade filer under den här sökvägen. Använd hellre knappen Säkerhetskopiera nedan än manuella kopior — den verifierar den skrivna filen.",
       "locationLabel": "Valvplats",
       "openInFiles": "Öppna i Filer",

@@ -238,7 +238,7 @@
       "task": "Görevi olan notlar",
       "content": "Gövdede tam metin"
     },
-    "searchPlaceholder": "Notlarda ara veya bir komut çalıştır — kapatmak için Esc",
+    "searchPlaceholder": "Notlarda ara veya bir komut çalıştır — şunları deneyin: tag: · path: · task:",
     "sectionCommands": "Komutlar",
     "sectionNotes": "Notlar",
     "untitledNote": "Başlıksız"
@@ -453,7 +453,7 @@
         "label": ".base görünümü içe aktar…"
       },
       "importObsidian": {
-        "label": "Obsidian kasasını içe aktar…"
+        "label": "Notları içe aktar…"
       },
       "lockVault": {
         "label": "Kasayı kilitle"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "Notlarınız yapay zeka için hazırlanıyor — bir dakika.",
           "insert": "Nota ekle",
           "noAnswer": "Yanıt yok — farklı ifade etmeyi deneyin.",
-          "noModelHint": "Model seçilmedi. Başlamak için Ayarlar → Developer → Yapay Zeka bölümünden bir tane seçin.",
-          "offHint": "Yerel yapay zeka kapalı. Ayarlar → Developer → Yapay Zeka bölümünden açın.",
+          "noModelHint": "Model seçilmedi. Başlamak için Ayarlar → Geliştirici → Yapay Zeka bölümünden bir tane seçin.",
+          "offHint": "Yerel yapay zeka kapalı. Ayarlar → Geliştirici → Yapay Zeka bölümünden açın.",
           "send": "Gönder",
           "statusGettingReady": "Hazırlanıyor…",
           "statusNoModel": "Model yok",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "Yapay Zeka Sohbeti",
-          "backlinks": "Geri bağlantılar",
+          "backlinks": "Bağlantılar",
           "outline": "Ana hat",
           "tasks": "Görevler",
           "unlinked": "Bağlantısız sözler"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "klasör + başlık yolu çok uzun",
         "reasonSegmentTooLong": "ad, Myne’in izin verdiğinden daha uzun",
         "scanning": "Kasanız taranıyor…",
-        "setupIntro": "Myne’i mevcut Obsidian kasa klasörünüze yönlendirin. Her Markdown notu anında içe aktarılır ve şifrelenir — hiçbir şey bu cihazdan ayrılmaz ve özgün dosyalarınıza dokunulmaz.",
+        "setupIntro": "Myne notlarınızı anında içe aktarır ve şifreler — hiçbir şey bu cihazdan ayrılmaz ve özgün dosyalarınız hiçbir zaman değiştirilmez.",
         "statCancelled": "İptal edildi",
         "statCanvasSkipped": ".canvas dosyaları atlandı",
         "statCompressed": "Sıkıştırılan görseller",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Önerilen ad",
         "titleComplete": "İçe aktarma tamamlandı",
         "titleFailed": "İçe aktarma başarısız oldu",
-        "titleSetup": "Obsidian kasasını içe aktar",
+        "titleSetup": "Notları içe aktar",
         "vaultFolderLabel": "Kasa klasörü",
         "vaultRoot": "(kasa kökü)",
         "titlePick": "Notları içe aktar",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Klasör seçin…",
         "laterHint": "Daha sonra istediğiniz zaman Ayarlar → Depolama’dan içe aktarabilirsiniz.",
         "notNow": "Şimdi değil",
-        "title": "Obsidian kasanız içe aktarılsın mı?"
+        "title": "Notlarınız içe aktarılsın mı?"
       },
       "picker": {
         "intro": "Notlarınız nereden geliyor?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "{{count}} günde bir",
+      "day_one": "{{count}} günde bir",
+      "day_other": "{{count}} günde bir",
       "week": "{{count}} haftada bir",
+      "week_one": "{{count}} haftada bir",
+      "week_other": "{{count}} haftada bir",
       "month": "{{count}} ayda bir",
-      "year": "{{count}} yılda bir"
+      "month_one": "{{count}} ayda bir",
+      "month_other": "{{count}} ayda bir",
+      "year": "{{count}} yılda bir",
+      "year_one": "{{count}} yılda bir",
+      "year_other": "{{count}} yılda bir"
     },
     "everyWeekday": "her {{days}}",
     "everyWeekdays": "her {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Onayla",
       "delete": "Sil",
       "deleteError": "Bu tema silinemedi. Lütfen tekrar deneyin.",
-      "empty": "Henüz özel tema yok. Bir tane içe aktarın ya da temalar klasörünü açıp bir tema dosyası ekleyin.",
+      "empty": "Henüz özel tema yok. Başlamak için bir tema dosyası içe aktarın.",
       "error": {
         "aColorFallback": "bir renk",
         "invalidFile": "Geçersiz tema dosyası.",
@@ -2492,7 +2500,7 @@
       "label": "Özel temalar",
       "openFolderButton": "Temalar klasörünü aç",
       "openFolderError": "Temalar klasörü açılamadı.",
-      "readError": "Temalar klasörünüz okunamadı.",
+      "readError": "Özel temalarınız okunamadı.",
       "readOnlyHelper": "Özel temalar bilgisayarınıza kurulur. Sizinkiler bir eşitlemeden sonra buraya kendiliğinden gelir."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Bölmeler ve Sekmeler",
         "view": "Görünüm"
       },
-      "helper": "Klavye kısayollarını görüntüleyin ve değiştirin. Düzenleyici biçimlendirme ve sekmeler arası geçiş kısayolu sabittir.",
+      "helper": "Klavye kısayollarını görüntüleyin ve değiştirin. Yalnızca sekmeler arası geçiş kısayolu (Ctrl+Tab) sabittir.",
       "notSet": "Ayarlanmadı",
       "removeBindingAria": "{{chord}} kısayolunu kaldır",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "İptal edildi.",
       "errorGeneric": "Hızlı kilit açma yapılandırılamadı.",
-      "errorHardwareUnavailable": "Bu cihazda Touch ID kullanılamıyor.",
+      "errorHardwareUnavailable": "Touch ID bu yapıda kullanılamıyor. Touch ID’nin kayıtlı olduğu, imzalanmış bir macOS yapısı gerekir.",
       "errorNotUnlocked": "Önce kasanın kilidini açın.",
       "errorPinNotDigits": "PIN yalnızca rakamlardan oluşmalı.",
       "errorPinTooShort": "PIN en az {{count}} rakam olmalı.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Kasayı Markdown olarak dışa aktar",
       "exportHelper": "Düz markdown ağacı — şifreli değil.",
       "exportLabel": "Dışa aktarma",
-      "importHelper": "Mevcut bir Obsidian kasasını Myne’e getirin. Her Markdown notu anında içe aktarılır ve şifrelenir; özgün dosyalarınıza dokunulmaz.",
+      "importHelper": "Notlarınızı Obsidian, Notion, Evernote, HTML dosyaları veya bir CSV’den getirin. Her şey anında içe aktarılır ve şifrelenir; özgün dosyalarınıza dokunulmaz.",
       "importLabel": "İçe aktarma",
-      "importObsidian": "Obsidian kasasını içe aktar…",
+      "importObsidian": "Notları içe aktar…",
       "locationHelper": "Her kasa, bu yol altında şifreli dosyalardan oluşan bir klasördür. Elle kopyalamak yerine aşağıdaki Yedekle düğmesini tercih edin — yazılan dosyayı doğrular.",
       "locationLabel": "Kasa konumu",
       "openInFiles": "Dosyalar’da aç",

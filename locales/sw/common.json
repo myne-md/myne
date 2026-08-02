@@ -2150,9 +2150,17 @@
     },
     "everyN": {
       "day": "kila siku {{count}}",
+      "day_one": "kila siku {{count}}",
+      "day_other": "kila siku {{count}}",
       "week": "kila wiki {{count}}",
+      "week_one": "kila wiki {{count}}",
+      "week_other": "kila wiki {{count}}",
       "month": "kila miezi {{count}}",
-      "year": "kila miaka {{count}}"
+      "month_one": "kila mwezi {{count}}",
+      "month_other": "kila miezi {{count}}",
+      "year": "kila miaka {{count}}",
+      "year_one": "kila mwaka {{count}}",
+      "year_other": "kila miaka {{count}}"
     },
     "everyWeekday": "kila {{days}}",
     "everyWeekdays": "kila {{days}}",

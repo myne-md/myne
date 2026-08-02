@@ -1,8 +1,11 @@
-// i18n runtime — react-i18next initialised with statically-bundled JSON
-// catalogs (no HTTP backend: translations ship inside the binary, so the
-// app never makes a network request to fetch UI strings — aligned with
-// Myne's no-network-by-default posture). Imported for its side effect from
-// `main.tsx` before the React tree mounts.
+// i18n runtime — react-i18next over JSON catalogs that ship inside the binary.
+// There is no HTTP backend and no translation server: nothing here reaches a
+// third party, which is the property that matters for Myne's
+// no-network-by-default posture. Non-English catalogs are separate chunks of
+// the SAME bundle, so on the web client the active one is fetched from the app's
+// own origin at boot (on desktop it is read off disk); on neither client does a
+// UI string come from anywhere but the build the user already has. Imported for
+// its side effect from `main.tsx` before the React tree mounts.
 //
 // IMPORTANT — load-bearing copy stays OUT of i18n. The non-distinguishing
 // security banners and honest-egress sentences in `src/lib/load-bearing-copy.ts`
@@ -21,34 +24,46 @@ import {
   type LanguageCode,
 } from "./config";
 
-// Glob-import every locale catalog, LAZILY — one emitted chunk per locale, and
-// only the two a session actually needs (English, plus the active language) are
-// fetched. Adding a language is still just a new `locales/<code>/common.json`
-// file plus a `SUPPORTED_LANGUAGES` entry — no edit here; the locale code comes
-// from the path.
+// ENGLISH IS STATIC; every other catalog is a lazy chunk.
 //
-// Eager was the original shape and it does not survive full catalogs: the 31
-// translations weigh ~7 MB of JSON, and eager put every one of them in the
-// entry's static graph, i.e. in the web client's FIRST LOAD (+523 KiB gzip, 37%
-// over the ratchet in `scripts/check-web-bundle-budget.mjs`). Nobody needs 30
-// languages to render one. Empty catalogs are still fine: i18next falls back to
-// English per key.
+// The split is not an optimisation detail, it is what makes the failure modes
+// survivable. English is the per-key fallback for all 30 translations, so if it
+// were fetched and the fetch failed, `t()` would return its own dotted key for
+// EVERY string — a fully-booted app rendering `unlock.submit` and
+// `welcome.createCta`, with nothing thrown, nothing logged and no fail-closed
+// screen. Importing it statically makes that state unreachable again: English
+// arrives with the entry chunk or the app does not start at all, exactly as it
+// behaved when the whole glob was eager.
+//
+// The other 30 are lazy because eager does not survive full catalogs: the
+// translations weigh ~7 MB of JSON, and eager put all of them in the entry's
+// static graph, i.e. in the web client's FIRST LOAD (1922.5 KiB gzip, 37% over
+// the ratchet in `scripts/check-web-bundle-budget.mjs`). Nobody needs 30
+// languages to render one, and a translation chunk that fails to load has a
+// correct answer available — fall back to the English that is already here.
+//
+// Adding a language is still just a new `locales/<code>/common.json` file plus a
+// `SUPPORTED_LANGUAGES` entry; the locale code comes from the glob path. Empty
+// catalogs remain fine: i18next falls back to English per key.
+import enCatalog from "../../locales/en/common.json";
+
 const catalogs = import.meta.glob<{ default: Record<string, unknown> }>(
   "../../locales/*/common.json",
 );
 
 const catalogPath = (code: string) => `../../locales/${code}/common.json`;
 
-/** The catalog for `code`, or null if there is no such file or it fails to load. */
+/** The catalog for `code`, or null if there is no such file or it fails to load.
+ *  Never called for English — see the static import above. */
 async function loadCatalog(code: string): Promise<Record<string, unknown> | null> {
   const loader = catalogs[catalogPath(code)];
   if (!loader) return null;
   try {
     return (await loader()).default;
   } catch {
-    // A chunk that will not load must not take the app down: English is bundled
-    // by the time this can happen, so the UI degrades to the fallback language
-    // rather than to a blank screen.
+    // A translation chunk that will not load must not take the app down, and it
+    // does not have to: English is in the entry chunk, so the UI degrades to the
+    // fallback language rather than to raw keys or a blank screen.
     return null;
   }
 }
@@ -102,27 +117,26 @@ applyDocumentDirection(initialLng);
 // (the setLanguage() path below, or a direct i18n.changeLanguage()).
 i18n.on("languageChanged", (lng) => applyDocumentDirection(lng));
 
-// English is always loaded — it is the per-key fallback for every other locale,
-// so a missing translation resolves rather than rendering a raw key.
-const resources: Resource = {};
-const fallbackCatalog = await loadCatalog(FALLBACK_LANGUAGE);
-if (fallbackCatalog) resources[FALLBACK_LANGUAGE] = { common: fallbackCatalog };
-if (initialLng !== FALLBACK_LANGUAGE) {
-  const initialCatalog = await loadCatalog(initialLng);
-  if (initialCatalog) resources[initialLng] = { common: initialCatalog };
-}
-
-// TOP-LEVEL AWAIT, deliberately. `main.tsx` imports this module FIRST and the
-// comment there is load-bearing: i18n must be initialised before any other
-// module body runs, because module-level `i18n.t(...)` calls (command catalogs,
-// error maps) would otherwise freeze raw keys. A module that awaits blocks the
-// evaluation of everything imported after it, which is exactly the guarantee
-// the eager version got for free — so lazy catalogs cost a chunk fetch, not the
-// ordering property. Do not "fix" this by moving the await into a promise the
-// module exports; that hands the ordering back to every caller.
-await i18n.use(initReactI18next).init({
-  resources,
-  lng: initialLng,
+// INITIALISE SYNCHRONOUSLY, with English, before anything can await.
+//
+// `main.tsx` imports this module first because module-level `i18n.t(...)` calls
+// (command catalogs, error maps) must resolve against loaded resources instead
+// of freezing raw keys. What actually delivers that is the DEPENDENCY EDGE: every
+// such module does `import i18n from "../i18n"`, so its body cannot run until
+// this one has. It is NOT delivered by the top-level await below — a synchronous
+// sibling with no edge to this module (e.g. `main.tsx`'s
+// `@myne/editor/drawing/excalidraw-asset-path`) executes while an async sibling
+// is still suspended; that is ordinary `InnerModuleEvaluation` behaviour, not a
+// quirk. Keeping `init` above the first await is what makes the edge sufficient:
+// by the time any importer's body runs, `i18n.t` answers in English at worst.
+//
+// So: do not move this init below the await, and do not rely on the await for
+// ordering. The await exists for the ACTIVE LOCALE only, and `main.tsx`'s own
+// body (the React mount) does wait for it, because a parent module does wait for
+// its async dependencies.
+i18n.use(initReactI18next).init({
+  resources: { [FALLBACK_LANGUAGE]: { common: enCatalog } } as Resource,
+  lng: FALLBACK_LANGUAGE,
   fallbackLng: FALLBACK_LANGUAGE,
   defaultNS: "common",
   ns: ["common"],
@@ -133,13 +147,32 @@ await i18n.use(initReactI18next).init({
   // fills it, rather than rendering an empty string.
   returnEmptyString: false,
   returnNull: false,
-  // The active locale's resources are resolved above, before init — no async
-  // HTTP backend, and nothing left to wait for once this module has evaluated.
-  // Suspense would never have anything to suspend on, and disabling it keeps
-  // components mountable without a Suspense boundary (and renderable in unit
-  // tests without extra setup).
+  // English is bundled and the active locale is installed below, before this
+  // module finishes evaluating — so by the time anything renders there is
+  // nothing left to wait for. Suspense would never have anything to suspend on,
+  // and disabling it keeps components mountable without a Suspense boundary
+  // (and renderable in unit tests without extra setup).
   react: { useSuspense: false },
 });
+
+// Now the active locale, if it is not the one already installed. This is the
+// module's only await, and `main.tsx` mounts React after it settles.
+if (initialLng !== FALLBACK_LANGUAGE) {
+  const initialCatalog = await loadCatalog(initialLng);
+  if (initialCatalog) {
+    i18n.addResourceBundle(initialLng, "common", initialCatalog, true, true);
+    await i18n.changeLanguage(initialLng);
+  }
+  else {
+    // The chunk failed to load. Stay on English — correct text in the wrong
+    // language is the honest degradation — and put `<html dir lang>` back in
+    // step with what is actually rendering, which the optimistic call above set
+    // to the locale we did not get. Leaving `dir="rtl"` on English text would be
+    // a worse artefact than the untranslated text itself. The stored preference
+    // is untouched, so the next launch retries.
+    applyDocumentDirection(FALLBACK_LANGUAGE);
+  }
+}
 
 export default i18n;
 
@@ -156,8 +189,16 @@ let languageSwitchSeq = 0;
  * from the UI's point of view: there is no frame in which the new language is
  * active but its strings are not loaded. Awaiting is optional — callers that
  * ignore the promise behave exactly as they did when catalogs were eager.
+ *
+ * Resolves `true` when the language actually changed, `false` when the
+ * translation chunk could not be loaded (the UI stays on the previous language)
+ * or when a later `setLanguage` superseded this one mid-fetch. The persisted
+ * preference is written FIRST and kept even on failure: the user asked for this
+ * language, a chunk fetch that failed once is likely to succeed next launch, and
+ * silently reverting their stored choice would hide the problem rather than fix
+ * it.
  */
-export async function setLanguage(code: LanguageCode): Promise<void> {
+export async function setLanguage(code: LanguageCode): Promise<boolean> {
   try {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, code);
   } catch {
@@ -167,8 +208,10 @@ export async function setLanguage(code: LanguageCode): Promise<void> {
   const seq = ++languageSwitchSeq;
   if (!i18n.hasResourceBundle(code, "common")) {
     const catalog = await loadCatalog(code);
-    if (seq !== languageSwitchSeq) return; // superseded mid-fetch
-    if (catalog) i18n.addResourceBundle(code, "common", catalog, true, true);
+    if (seq !== languageSwitchSeq) return false; // superseded mid-fetch
+    if (!catalog) return false; // chunk unavailable — stay where we are
+    i18n.addResourceBundle(code, "common", catalog, true, true);
   }
   await i18n.changeLanguage(code);
+  return true;
 }

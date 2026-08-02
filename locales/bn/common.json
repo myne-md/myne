@@ -2150,9 +2150,17 @@
     },
     "everyN": {
       "day": "প্রতি {{count}} দিনে",
+      "day_one": "প্রতি {{count}} দিনে",
+      "day_other": "প্রতি {{count}} দিনে",
       "week": "প্রতি {{count}} সপ্তাহে",
+      "week_one": "প্রতি {{count}} সপ্তাহে",
+      "week_other": "প্রতি {{count}} সপ্তাহে",
       "month": "প্রতি {{count}} মাসে",
-      "year": "প্রতি {{count}} বছরে"
+      "month_one": "প্রতি {{count}} মাসে",
+      "month_other": "প্রতি {{count}} মাসে",
+      "year": "প্রতি {{count}} বছরে",
+      "year_one": "প্রতি {{count}} বছরে",
+      "year_other": "প্রতি {{count}} বছরে"
     },
     "everyWeekday": "প্রতি {{days}}",
     "everyWeekdays": "প্রতি {{days}}",

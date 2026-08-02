@@ -1045,7 +1045,7 @@ Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **internationalization (i18n)** &nbsp; 🛠️ *Tooling*
 
-The desktop UI localization layer: `react-i18next` over bundled flat-per-namespace JSON **locale catalogs**, with **English** as the source language and per-key fallback. Catalogs ship inside the binary (no HTTP backend → no network egress for UI strings). Translated through self-hosted **Weblate**. Deliberately **excludes** load-bearing copy (`src/lib/load-bearing-copy.ts`) — those strings' exact wording is a privacy property and is E2E-pinned in English, so they render verbatim in every locale. Language is a device-local, pre-unlock preference (`localStorage` `myne.lang`), never `vault.prefs`.
+The client UI localization layer, shared by desktop, web and mobile: `react-i18next` over flat-per-namespace JSON **locale catalogs**, with **English** as the source language and per-key fallback. Catalogs ship inside the build — there is no HTTP backend and no translation server, so no UI string is ever fetched from a third party. English is a static import; the other 30 catalogs are lazy chunks of the same build, one per locale, and a session loads only the active one (`decisions.md` 2026-08-03). Translated through self-hosted **Weblate**. Deliberately **excludes** load-bearing copy (`src/lib/load-bearing-copy.ts`) — those strings' exact wording is a privacy property and is E2E-pinned in English, so they render verbatim in every locale. Language is a device-local, pre-unlock preference (`localStorage` `myne.lang`), never `vault.prefs`.
 
 Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25; `src/i18n/`.
 
@@ -1059,7 +1059,7 @@ Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **locale catalog** &nbsp; 🛠️ *Tooling*
 
-A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; every other catalog is **Weblate**-managed and must not be hand-edited in the repo (that races Weblate). New keys are added by `pnpm i18n:extract` (`i18next-cli`).
+A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are **Weblate**-managed and must not be hand-edited in the repo (that races Weblate) — with one recorded exception, the 2026-08-03 in-repo backfill that brought all 31 to 100%, which `decisions.md` explains is not a precedent. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's.
 
 Used in: `docs/dev/i18n.md`; `locales/`.
 
@@ -2445,7 +2445,7 @@ Used in: `spec/markdown-dialect.md` §3.2
 
 ### **Weblate** &nbsp; 🛠️ *Tooling*
 
-The self-hosted web translation platform at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only) that owns Myne's non-English **locale catalogs**. English source strings are authored in code and committed; Weblate reads the source, lets translators fill `tr`/`de`/`fr`, and flows translations back as commits to a dedicated push branch (merged via PR). File mask `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`.
+The self-hosted web translation platform at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only) that owns Myne's non-English **locale catalogs**. English source strings are authored in code and committed; Weblate reads the source, lets translators fill the target languages, and flows translations back as commits to a dedicated push branch (merged via PR). File mask `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`. Registration being closed with no translators enrolled is why `decisions.md` 2026-08-03 backfilled the catalogs in-repo instead; the ownership direction is unchanged.
 
 Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25.
 

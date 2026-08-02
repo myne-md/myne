@@ -2150,9 +2150,17 @@
     },
     "everyN": {
       "day": "ทุก {{count}} วัน",
+      "day_one": "ทุก {{count}} วัน",
+      "day_other": "ทุก {{count}} วัน",
       "week": "ทุก {{count}} สัปดาห์",
+      "week_one": "ทุก {{count}} สัปดาห์",
+      "week_other": "ทุก {{count}} สัปดาห์",
       "month": "ทุก {{count}} เดือน",
-      "year": "ทุก {{count}} ปี"
+      "month_one": "ทุก {{count}} เดือน",
+      "month_other": "ทุก {{count}} เดือน",
+      "year": "ทุก {{count}} ปี",
+      "year_one": "ทุก {{count}} ปี",
+      "year_other": "ทุก {{count}} ปี"
     },
     "everyWeekday": "ทุก{{days}}",
     "everyWeekdays": "ทุก{{days}}",

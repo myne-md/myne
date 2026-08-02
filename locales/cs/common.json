@@ -256,7 +256,7 @@
       "task": "Poznámky s úkolem",
       "content": "Fulltext v textu poznámky"
     },
-    "searchPlaceholder": "Hledejte poznámky nebo spusťte příkaz — Esc pro zavření",
+    "searchPlaceholder": "Hledejte poznámky nebo spusťte příkaz — zkuste tag: · path: · task:",
     "sectionCommands": "Příkazy",
     "sectionNotes": "Poznámky",
     "untitledNote": "Bez názvu"
@@ -471,7 +471,7 @@
         "label": "Importovat zobrazení .base…"
       },
       "importObsidian": {
-        "label": "Importovat trezor Obsidian…"
+        "label": "Importovat poznámky…"
       },
       "lockVault": {
         "label": "Zamknout trezor"
@@ -985,7 +985,7 @@
         },
         "tabs": {
           "aiChat": "AI chat",
-          "backlinks": "Zpětné odkazy",
+          "backlinks": "Odkazy",
           "outline": "Osnova",
           "tasks": "Úkoly",
           "unlinked": "Nepropojené zmínky"
@@ -1796,7 +1796,7 @@
         "reasonPathTooLong": "cesta složka + název je příliš dlouhá",
         "reasonSegmentTooLong": "název je delší, než Myne umožňuje",
         "scanning": "Prohledává se váš trezor…",
-        "setupIntro": "Nasměrujte Myne na svou stávající složku trezoru Obsidian. Každá poznámka v Markdownu se na místě naimportuje a zašifruje — nic neopustí toto zařízení a vaše původní soubory zůstanou nedotčené.",
+        "setupIntro": "Myne vaše poznámky naimportuje a zašifruje na místě — nic neopustí toto zařízení a vaše původní soubory se nikdy nezmění.",
         "statCancelled": "Zrušeno",
         "statCanvasSkipped": "soubory .canvas přeskočeny",
         "statCompressed": "Obrázky zkomprimovány",
@@ -1807,7 +1807,7 @@
         "suggestedNameAriaLabel": "Navrhovaný název",
         "titleComplete": "Import dokončen",
         "titleFailed": "Import selhal",
-        "titleSetup": "Importovat trezor Obsidian",
+        "titleSetup": "Importovat poznámky",
         "vaultFolderLabel": "Složka trezoru",
         "vaultRoot": "(kořen trezoru)",
         "titlePick": "Importovat poznámky",
@@ -1832,7 +1832,7 @@
         "chooseFolder": "Vyberte složku…",
         "laterHint": "Importovat můžete kdykoli později z Nastavení → Úložiště.",
         "notNow": "Teď ne",
-        "title": "Importovat váš trezor Obsidian?"
+        "title": "Importovat vaše poznámky?"
       },
       "picker": {
         "intro": "Odkud vaše poznámky pocházejí?"
@@ -2298,9 +2298,25 @@
     },
     "everyN": {
       "day": "každých {{count}} dní",
+      "day_one": "každý {{count}} den",
+      "day_few": "každé {{count}} dny",
+      "day_many": "každých {{count}} dne",
+      "day_other": "každých {{count}} dní",
       "week": "každých {{count}} týdnů",
+      "week_one": "každý {{count}} týden",
+      "week_few": "každé {{count}} týdny",
+      "week_many": "každých {{count}} týdne",
+      "week_other": "každých {{count}} týdnů",
       "month": "každých {{count}} měsíců",
-      "year": "každých {{count}} let"
+      "month_one": "každý {{count}} měsíc",
+      "month_few": "každé {{count}} měsíce",
+      "month_many": "každých {{count}} měsíce",
+      "month_other": "každých {{count}} měsíců",
+      "year": "každých {{count}} let",
+      "year_one": "každý {{count}} rok",
+      "year_few": "každé {{count}} roky",
+      "year_many": "každých {{count}} roku",
+      "year_other": "každých {{count}} let"
     },
     "everyWeekday": "každý týden: {{days}}",
     "everyWeekdays": "každý týden: {{days}}",
@@ -2618,7 +2634,7 @@
       "confirm": "Potvrdit",
       "delete": "Smazat",
       "deleteError": "Tento motiv se nepodařilo smazat. Zkuste to prosím znovu.",
-      "empty": "Zatím žádné vlastní motivy. Naimportujte nějaký nebo otevřete složku motivů a přidejte soubor motivu.",
+      "empty": "Zatím žádné vlastní motivy. Začněte naimportováním souboru motivu.",
       "error": {
         "aColorFallback": "barva",
         "invalidFile": "Neplatný soubor motivu.",
@@ -2638,7 +2654,7 @@
       "label": "Vlastní motivy",
       "openFolderButton": "Otevřít složku motivů",
       "openFolderError": "Složku motivů se nepodařilo otevřít.",
-      "readError": "Vaši složku motivů se nepodařilo přečíst.",
+      "readError": "Vaše vlastní motivy se nepodařilo přečíst.",
       "readOnlyHelper": "Vlastní motivy se instalují na vašem počítači. Ty vaše sem dorazí samy po synchronizaci."
     },
     "dailyNotes": {
@@ -2738,7 +2754,7 @@
         "panesTabs": "Panely a karty",
         "view": "Zobrazení"
       },
-      "helper": "Zobrazte a změňte klávesové zkratky. Formátování editoru a zkratka pro procházení karet jsou pevné.",
+      "helper": "Zobrazte a změňte klávesové zkratky. Pevná je pouze zkratka pro procházení karet (Ctrl+Tab).",
       "notSet": "Nenastaveno",
       "removeBindingAria": "Odebrat {{chord}}",
       "reserved": {
@@ -2893,7 +2909,7 @@
     "quickUnlock": {
       "errorCancelled": "Zrušeno.",
       "errorGeneric": "Rychlé odemknutí se nepodařilo nakonfigurovat.",
-      "errorHardwareUnavailable": "Touch ID není na tomto zařízení dostupné.",
+      "errorHardwareUnavailable": "Touch ID není v tomto sestavení dostupné. Vyžaduje podepsané sestavení pro macOS a zaregistrované Touch ID.",
       "errorNotUnlocked": "Nejprve odemkněte trezor.",
       "errorPinNotDigits": "PIN smí obsahovat pouze číslice.",
       "errorPinTooShort": "PIN musí mít alespoň {{count}} číslic.",
@@ -2981,9 +2997,9 @@
       "exportBody": "Exportovat trezor jako Markdown",
       "exportHelper": "Prostý strom Markdownu — není zašifrovaný.",
       "exportLabel": "Export",
-      "importHelper": "Přeneste existující trezor Obsidian do Myne. Každá poznámka v Markdownu se na místě naimportuje a zašifruje; vaše původní soubory zůstanou nedotčené.",
+      "importHelper": "Přeneste poznámky z aplikací Obsidian, Notion a Evernote, ze souborů HTML nebo z CSV. Vše se na místě naimportuje a zašifruje; vaše původní soubory zůstanou nedotčené.",
       "importLabel": "Import",
-      "importObsidian": "Importovat trezor Obsidian…",
+      "importObsidian": "Importovat poznámky…",
       "locationHelper": "Každý trezor je složka zašifrovaných souborů pod touto cestou. Dejte přednost tlačítku Záloha níže před ručními kopiemi — ověřuje zapsaný soubor.",
       "locationLabel": "Umístění trezoru",
       "openInFiles": "Otevřít v souborech",

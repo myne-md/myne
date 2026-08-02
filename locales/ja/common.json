@@ -238,7 +238,7 @@
       "task": "タスクのあるノート",
       "content": "本文の全文検索"
     },
-    "searchPlaceholder": "ノートを検索するかコマンドを実行 — Escで閉じる",
+    "searchPlaceholder": "ノートを検索するかコマンドを実行 — tag: · path: · task: を試す",
     "sectionCommands": "コマンド",
     "sectionNotes": "ノート",
     "untitledNote": "無題"
@@ -453,7 +453,7 @@
         "label": ".baseビューをインポート…"
       },
       "importObsidian": {
-        "label": "Obsidian保管庫をインポート…"
+        "label": "ノートをインポート…"
       },
       "lockVault": {
         "label": "保管庫をロック"
@@ -913,8 +913,8 @@
           "gettingReadyHint": "AIのためにノートを準備しています — しばらくお待ちください。",
           "insert": "ノートに挿入",
           "noAnswer": "回答がありません — 言い換えてみてください。",
-          "noModelHint": "モデルが選択されていません。開始するには 設定 → Developer → AI で選択してください。",
-          "offHint": "ローカルAIはオフです。設定 → Developer → AI でオンにしてください。",
+          "noModelHint": "モデルが選択されていません。開始するには 設定 → 開発者 → AI で選択してください。",
+          "offHint": "ローカルAIはオフです。設定 → 開発者 → AI でオンにしてください。",
           "send": "送信",
           "statusGettingReady": "準備中…",
           "statusNoModel": "モデルなし",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "AIチャット",
-          "backlinks": "バックリンク",
+          "backlinks": "リンク",
           "outline": "アウトライン",
           "tasks": "タスク",
           "unlinked": "未リンクのメンション"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "はフォルダ＋タイトルのパスが長すぎます",
         "reasonSegmentTooLong": "はMyneで許可される長さを超えています",
         "scanning": "保管庫をスキャン中…",
-        "setupIntro": "既存のObsidian保管庫フォルダをMyneに指定してください。すべてのMarkdownノートはその場でインポートされ暗号化されます — このデバイスから何も送信されず、元のファイルはそのまま残ります。",
+        "setupIntro": "Myneはノートをその場でインポートして暗号化します — このデバイスから何も送信されず、元のファイルが変更されることはありません。",
         "statCancelled": "キャンセル済み",
         "statCanvasSkipped": ".canvasファイルをスキップ",
         "statCompressed": "圧縮した画像",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "提案された名前",
         "titleComplete": "インポート完了",
         "titleFailed": "インポート失敗",
-        "titleSetup": "Obsidian保管庫をインポート",
+        "titleSetup": "ノートをインポート",
         "vaultFolderLabel": "保管庫フォルダ",
         "vaultRoot": "（保管庫のルート）",
         "titlePick": "ノートをインポート",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "フォルダを選択…",
         "laterHint": "後からいつでも、設定 → ストレージからインポートできます。",
         "notNow": "今はしない",
-        "title": "Obsidian保管庫をインポートしますか？"
+        "title": "ノートをインポートしますか？"
       },
       "picker": {
         "intro": "ノートのインポート元はどこですか？"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "{{count}}日ごと",
+      "day_one": "{{count}}日ごと",
+      "day_other": "{{count}}日ごと",
       "week": "{{count}}週間ごと",
+      "week_one": "{{count}}週間ごと",
+      "week_other": "{{count}}週間ごと",
       "month": "{{count}}か月ごと",
-      "year": "{{count}}年ごと"
+      "month_one": "{{count}}か月ごと",
+      "month_other": "{{count}}か月ごと",
+      "year": "{{count}}年ごと",
+      "year_one": "{{count}}年ごと",
+      "year_other": "{{count}}年ごと"
     },
     "everyWeekday": "毎週{{days}}",
     "everyWeekdays": "毎週{{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "確定",
       "delete": "削除",
       "deleteError": "そのテーマを削除できませんでした。もう一度お試しください。",
-      "empty": "カスタムテーマはまだありません。インポートするか、テーマフォルダを開いてテーマファイルを追加してください。",
+      "empty": "カスタムテーマはまだありません。テーマファイルをインポートして始めてください。",
       "error": {
         "aColorFallback": "色",
         "invalidFile": "無効なテーマファイルです。",
@@ -2492,7 +2500,7 @@
       "label": "カスタムテーマ",
       "openFolderButton": "テーマフォルダを開く",
       "openFolderError": "テーマフォルダを開けませんでした。",
-      "readError": "テーマフォルダを読み取れませんでした。",
+      "readError": "カスタムテーマを読み取れませんでした。",
       "readOnlyHelper": "カスタムテーマはお使いのコンピューターにインストールされます。あなたのテーマは、同期後にここへ自動的に表示されます。"
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "ペインとタブ",
         "view": "表示"
       },
-      "helper": "キーボードショートカットの表示と変更ができます。エディタの書式設定とタブ循環のショートカットは固定です。",
+      "helper": "キーボードショートカットの表示と変更ができます。固定されているのはタブ循環のショートカット（Ctrl+Tab）だけです。",
       "notSet": "未設定",
       "removeBindingAria": "{{chord}}を削除",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "キャンセルしました。",
       "errorGeneric": "クイックロック解除を設定できませんでした。",
-      "errorHardwareUnavailable": "このデバイスではTouch IDを利用できません。",
+      "errorHardwareUnavailable": "このビルドではTouch IDを利用できません。署名済みのmacOSビルドと、Touch IDの登録が必要です。",
       "errorNotUnlocked": "先に保管庫のロックを解除してください。",
       "errorPinNotDigits": "PINは数字のみで入力してください。",
       "errorPinTooShort": "PINは{{count}}桁以上にしてください。",
@@ -2829,9 +2837,9 @@
       "exportBody": "保管庫をMarkdownとしてエクスポート",
       "exportHelper": "プレーンなMarkdownのツリー — 暗号化されません。",
       "exportLabel": "エクスポート",
-      "importHelper": "既存のObsidian保管庫をMyneに取り込みます。すべてのMarkdownノートはその場でインポートされ暗号化されます。元のファイルはそのまま残ります。",
+      "importHelper": "Obsidian、Notion、Evernote、HTMLファイル、CSVからノートを取り込めます。すべてその場でインポートされ暗号化されます。元のファイルはそのまま残ります。",
       "importLabel": "インポート",
-      "importObsidian": "Obsidian保管庫をインポート…",
+      "importObsidian": "ノートをインポート…",
       "locationHelper": "各保管庫は、このパス配下にある暗号化ファイルのフォルダです。手動コピーよりも下記のバックアップボタンを優先してください — 書き込んだファイルを検証します。",
       "locationLabel": "保管庫の場所",
       "openInFiles": "ファイルで開く",

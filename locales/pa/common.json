@@ -2150,9 +2150,17 @@
     },
     "everyN": {
       "day": "ਹਰ {{count}} ਦਿਨ ਬਾਅਦ",
+      "day_one": "ਹਰ {{count}} ਦਿਨ ਬਾਅਦ",
+      "day_other": "ਹਰ {{count}} ਦਿਨਾਂ ਬਾਅਦ",
       "week": "ਹਰ {{count}} ਹਫ਼ਤੇ ਬਾਅਦ",
+      "week_one": "ਹਰ {{count}} ਹਫ਼ਤੇ ਬਾਅਦ",
+      "week_other": "ਹਰ {{count}} ਹਫ਼ਤਿਆਂ ਬਾਅਦ",
       "month": "ਹਰ {{count}} ਮਹੀਨੇ ਬਾਅਦ",
-      "year": "ਹਰ {{count}} ਸਾਲ ਬਾਅਦ"
+      "month_one": "ਹਰ {{count}} ਮਹੀਨੇ ਬਾਅਦ",
+      "month_other": "ਹਰ {{count}} ਮਹੀਨਿਆਂ ਬਾਅਦ",
+      "year": "ਹਰ {{count}} ਸਾਲ ਬਾਅਦ",
+      "year_one": "ਹਰ {{count}} ਸਾਲ ਬਾਅਦ",
+      "year_other": "ਹਰ {{count}} ਸਾਲਾਂ ਬਾਅਦ"
     },
     "everyWeekday": "ਹਰ {{days}}",
     "everyWeekdays": "ਹਰ {{days}}",

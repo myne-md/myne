@@ -238,7 +238,7 @@
       "task": "Noter med en opgave",
       "content": "Fritekst i brødteksten"
     },
-    "searchPlaceholder": "Søg i noter, eller kør en kommando — Esc for at lukke",
+    "searchPlaceholder": "Søg i noter, eller kør en kommando — prøv tag: · path: · task:",
     "sectionCommands": "Kommandoer",
     "sectionNotes": "Noter",
     "untitledNote": "Uden titel"
@@ -453,7 +453,7 @@
         "label": "Importér .base-visning…"
       },
       "importObsidian": {
-        "label": "Importér Obsidian-boks…"
+        "label": "Importér noter…"
       },
       "lockVault": {
         "label": "Lås boks"
@@ -913,7 +913,7 @@
           "gettingReadyHint": "Forbereder dine noter til AI — et øjeblik.",
           "insert": "Indsæt i note",
           "noAnswer": "Intet svar — prøv at omformulere.",
-          "noModelHint": "Ingen model valgt. Vælg en under Indstillinger → Developer → AI for at starte.",
+          "noModelHint": "Ingen model valgt. Vælg en under Indstillinger → Developer → AI for at komme i gang.",
           "offHint": "Lokal AI er slået fra. Slå den til under Indstillinger → Developer → AI.",
           "send": "Send",
           "statusGettingReady": "Forbereder…",
@@ -935,7 +935,7 @@
         },
         "tabs": {
           "aiChat": "AI-chat",
-          "backlinks": "Tilbagelinks",
+          "backlinks": "Links",
           "outline": "Disposition",
           "tasks": "Opgaver",
           "unlinked": "Ulinkede omtaler"
@@ -1692,7 +1692,7 @@
         "reasonPathTooLong": "stien med mappe + titel er for lang",
         "reasonSegmentTooLong": "navnet er længere, end Myne tillader",
         "scanning": "Scanner din boks…",
-        "setupIntro": "Peg Myne på din eksisterende Obsidian-boksmappe. Hver Markdown-note importeres og krypteres med det samme — intet forlader denne enhed, og dine oprindelige filer røres ikke.",
+        "setupIntro": "Myne importerer og krypterer dine noter med det samme — intet forlader denne enhed, og dine oprindelige filer ændres aldrig.",
         "statCancelled": "Annulleret",
         "statCanvasSkipped": ".canvas-filer sprunget over",
         "statCompressed": "Billeder komprimeret",
@@ -1703,7 +1703,7 @@
         "suggestedNameAriaLabel": "Foreslået navn",
         "titleComplete": "Import fuldført",
         "titleFailed": "Import mislykkedes",
-        "titleSetup": "Importér Obsidian-boks",
+        "titleSetup": "Importér noter",
         "vaultFolderLabel": "Boksmappe",
         "vaultRoot": "(boksens rod)",
         "titlePick": "Importér noter",
@@ -1728,7 +1728,7 @@
         "chooseFolder": "Vælg mappe…",
         "laterHint": "Du kan altid importere senere fra Indstillinger → Opbevaring.",
         "notNow": "Ikke nu",
-        "title": "Importér din Obsidian-boks?"
+        "title": "Importér dine noter?"
       },
       "picker": {
         "intro": "Hvor kommer dine noter fra?"
@@ -2168,9 +2168,17 @@
     },
     "everyN": {
       "day": "hver {{count}}. dag",
+      "day_one": "hver {{count}}. dag",
+      "day_other": "hver {{count}}. dag",
       "week": "hver {{count}}. uge",
+      "week_one": "hver {{count}}. uge",
+      "week_other": "hver {{count}}. uge",
       "month": "hver {{count}}. måned",
-      "year": "hvert {{count}}. år"
+      "month_one": "hver {{count}}. måned",
+      "month_other": "hver {{count}}. måned",
+      "year": "hvert {{count}}. år",
+      "year_one": "hvert {{count}}. år",
+      "year_other": "hvert {{count}}. år"
     },
     "everyWeekday": "hver {{days}}",
     "everyWeekdays": "hver {{days}}",
@@ -2472,7 +2480,7 @@
       "confirm": "Bekræft",
       "delete": "Slet",
       "deleteError": "Kunne ikke slette det tema. Prøv igen.",
-      "empty": "Ingen brugerdefinerede temaer endnu. Importér et, eller åbn temamappen og tilføj en temafil.",
+      "empty": "Ingen brugerdefinerede temaer endnu. Importér en temafil for at komme i gang.",
       "error": {
         "aColorFallback": "en farve",
         "invalidFile": "Ugyldig temafil.",
@@ -2492,7 +2500,7 @@
       "label": "Brugerdefinerede temaer",
       "openFolderButton": "Åbn temamappe",
       "openFolderError": "Kunne ikke åbne temamappen.",
-      "readError": "Kunne ikke læse din temamappe.",
+      "readError": "Kunne ikke læse dine brugerdefinerede temaer.",
       "readOnlyHelper": "Brugerdefinerede temaer installeres på din computer. Dine egne dukker op her af sig selv efter en synkronisering."
     },
     "dailyNotes": {
@@ -2590,7 +2598,7 @@
         "panesTabs": "Ruder og faneblade",
         "view": "Vis"
       },
-      "helper": "Se og skift tastaturgenveje. Editorformatering og genvejen til at skifte faneblad er faste.",
+      "helper": "Se og skift tastaturgenveje. Kun genvejen til at skifte mellem faneblade (Ctrl+Tab) er fast.",
       "notSet": "Ikke angivet",
       "removeBindingAria": "Fjern {{chord}}",
       "reserved": {
@@ -2745,7 +2753,7 @@
     "quickUnlock": {
       "errorCancelled": "Annulleret.",
       "errorGeneric": "Kunne ikke konfigurere hurtig oplåsning.",
-      "errorHardwareUnavailable": "Touch ID er ikke tilgængelig på denne enhed.",
+      "errorHardwareUnavailable": "Touch ID er ikke tilgængelig i dette build. Det kræver et signeret macOS-build med Touch ID registreret.",
       "errorNotUnlocked": "Lås boksen op først.",
       "errorPinNotDigits": "PIN-koden må kun bestå af cifre.",
       "errorPinTooShort": "PIN skal være mindst {{count}} cifre.",
@@ -2829,9 +2837,9 @@
       "exportBody": "Eksportér boks som Markdown",
       "exportHelper": "Almindeligt markdown-træ — ikke krypteret.",
       "exportLabel": "Eksport",
-      "importHelper": "Hent en eksisterende Obsidian-boks ind i Myne. Hver Markdown-note importeres og krypteres med det samme; dine oprindelige filer røres ikke.",
+      "importHelper": "Hent noter ind fra Obsidian, Notion, Evernote, HTML-filer eller en CSV. Alt importeres og krypteres med det samme; dine oprindelige filer røres ikke.",
       "importLabel": "Import",
-      "importObsidian": "Importér Obsidian-boks…",
+      "importObsidian": "Importér noter…",
       "locationHelper": "Hver boks er en mappe med krypterede filer under denne sti. Brug hellere knappen Sikkerhedskopi nedenfor end manuelle kopier — den verificerer den skrevne fil.",
       "locationLabel": "Boksens placering",
       "openInFiles": "Åbn i Finder",

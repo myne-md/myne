@@ -87,7 +87,7 @@ src/
 ├── dialect/             ← re-export shim into @myne/dialect (repo-root `dialect/`) — parser + template engine
 ├── clip/                ← browser-clipper ingest: envelope validation, clip assembly, host→WebView dispatch listener
 ├── pdf-export/          ← the script for the hidden PDF-export render window (MYND-255)
-├── i18n/                ← react-i18next config + static catalog bundling
+├── i18n/                ← react-i18next config; English static, other catalogs lazy chunks
 ├── styles/              ← global CSS only (`tokens.css` — see "Design tokens" above)
 ├── types/               ← shared TS types (mirrors Rust error enums)
 └── vite-env.d.ts        ← Vite client types + __APP_VERSION__ compile-time global (sourced from package.json::version, displayed by Settings → About)

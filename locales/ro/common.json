@@ -247,7 +247,7 @@
       "task": "Note cu o sarcină",
       "content": "Text integral în conținut"
     },
-    "searchPlaceholder": "Caută note sau execută o comandă — Esc pentru a închide",
+    "searchPlaceholder": "Caută note sau execută o comandă — încearcă tag: · path: · task:",
     "sectionCommands": "Comenzi",
     "sectionNotes": "Note",
     "untitledNote": "Fără titlu"
@@ -462,7 +462,7 @@
         "label": "Importă vizualizare .base…"
       },
       "importObsidian": {
-        "label": "Importă seif Obsidian…"
+        "label": "Importă note…"
       },
       "lockVault": {
         "label": "Blochează seiful"
@@ -960,7 +960,7 @@
         },
         "tabs": {
           "aiChat": "Chat AI",
-          "backlinks": "Linkuri inverse",
+          "backlinks": "Linkuri",
           "outline": "Cuprins",
           "tasks": "Sarcini",
           "unlinked": "Mențiuni nelegate"
@@ -1415,9 +1415,9 @@
         "includeAttachments_few": "Include {{count}} atașamente",
         "includeAttachments_other": "Include {{count}} de atașamente",
         "title": "Exportă ca Markdown",
-        "copyLabel": "Copiază textul notiței în clipboard",
-        "copied": "Textul notiței a fost copiat",
-        "copyFailed": "Textul notiței nu a putut fi copiat"
+        "copyLabel": "Copiază textul notei în clipboard",
+        "copied": "Textul notei a fost copiat",
+        "copyFailed": "Textul notei nu a putut fi copiat"
       }
     },
     "egress": {
@@ -1744,7 +1744,7 @@
         "reasonPathTooLong": "calea folder + titlu este prea lungă",
         "reasonSegmentTooLong": "numele este mai lung decât permite Myne",
         "scanning": "Se scanează seiful tău…",
-        "setupIntro": "Indică-i lui Myne folderul seifului tău Obsidian existent. Fiecare notă Markdown este importată și criptată pe loc — nimic nu părăsește acest dispozitiv, iar fișierele tale originale rămân neatinse.",
+        "setupIntro": "Myne îți importă și îți criptează notele pe loc — nimic nu părăsește acest dispozitiv, iar fișierele tale originale nu sunt modificate niciodată.",
         "statCancelled": "Anulat",
         "statCanvasSkipped": "fișiere .canvas omise",
         "statCompressed": "Imagini comprimate",
@@ -1755,7 +1755,7 @@
         "suggestedNameAriaLabel": "Nume sugerat",
         "titleComplete": "Import finalizat",
         "titleFailed": "Import eșuat",
-        "titleSetup": "Importă seif Obsidian",
+        "titleSetup": "Importă note",
         "vaultFolderLabel": "Folderul seifului",
         "vaultRoot": "(rădăcina seifului)",
         "titlePick": "Importă note",
@@ -1780,7 +1780,7 @@
         "chooseFolder": "Alege folder…",
         "laterHint": "Poți importa oricând mai târziu din Setări → Stocare.",
         "notNow": "Nu acum",
-        "title": "Îți imporți seiful Obsidian?"
+        "title": "Îți imporți notele?"
       },
       "picker": {
         "intro": "De unde vin notele tale?"
@@ -2233,9 +2233,21 @@
     },
     "everyN": {
       "day": "la fiecare {{count}} zile",
+      "day_one": "la fiecare {{count}} zi",
+      "day_few": "la fiecare {{count}} zile",
+      "day_other": "la fiecare {{count}} de zile",
       "week": "la fiecare {{count}} săptămâni",
+      "week_one": "la fiecare {{count}} săptămână",
+      "week_few": "la fiecare {{count}} săptămâni",
+      "week_other": "la fiecare {{count}} de săptămâni",
       "month": "la fiecare {{count}} luni",
-      "year": "la fiecare {{count}} ani"
+      "month_one": "la fiecare {{count}} lună",
+      "month_few": "la fiecare {{count}} luni",
+      "month_other": "la fiecare {{count}} de luni",
+      "year": "la fiecare {{count}} ani",
+      "year_one": "la fiecare {{count}} an",
+      "year_few": "la fiecare {{count}} ani",
+      "year_other": "la fiecare {{count}} de ani"
     },
     "everyWeekday": "în fiecare {{days}}",
     "everyWeekdays": "în fiecare {{days}}",
@@ -2545,7 +2557,7 @@
       "confirm": "Confirmă",
       "delete": "Șterge",
       "deleteError": "Acea temă nu a putut fi ștearsă. Te rugăm să încerci din nou.",
-      "empty": "Nicio temă personalizată încă. Importă una sau deschide folderul de teme și adaugă un fișier de temă.",
+      "empty": "Nicio temă personalizată încă. Importă un fișier de temă pentru a începe.",
       "error": {
         "aColorFallback": "o culoare",
         "invalidFile": "Fișier de temă nevalid.",
@@ -2565,7 +2577,7 @@
       "label": "Teme personalizate",
       "openFolderButton": "Deschide folderul de teme",
       "openFolderError": "Folderul de teme nu a putut fi deschis.",
-      "readError": "Folderul tău de teme nu a putut fi citit.",
+      "readError": "Temele tale personalizate nu au putut fi citite.",
       "readOnlyHelper": "Temele personalizate se instalează pe computerul tău. Ale tale ajung aici singure după o sincronizare."
     },
     "dailyNotes": {
@@ -2664,7 +2676,7 @@
         "panesTabs": "Panouri și file",
         "view": "Vizualizare"
       },
-      "helper": "Vezi și schimbă scurtăturile de tastatură. Formatarea în editor și scurtătura de parcurgere a filelor sunt fixe.",
+      "helper": "Vezi și schimbă scurtăturile de tastatură. Doar scurtătura de parcurgere a filelor (Ctrl+Tab) este fixă.",
       "notSet": "Nesetată",
       "removeBindingAria": "Elimină {{chord}}",
       "reserved": {
@@ -2819,7 +2831,7 @@
     "quickUnlock": {
       "errorCancelled": "Anulat.",
       "errorGeneric": "Deblocarea rapidă nu a putut fi configurată.",
-      "errorHardwareUnavailable": "Touch ID nu este disponibil pe acest dispozitiv.",
+      "errorHardwareUnavailable": "Touch ID nu este disponibil în această versiune. Necesită o versiune macOS semnată, cu Touch ID configurat.",
       "errorNotUnlocked": "Deblochează mai întâi seiful.",
       "errorPinNotDigits": "PIN-ul trebuie să conțină doar cifre.",
       "errorPinTooShort": "PIN-ul trebuie să aibă cel puțin {{count}} cifre.",
@@ -2905,9 +2917,9 @@
       "exportBody": "Exportă seiful ca Markdown",
       "exportHelper": "Arbore Markdown simplu — necriptat.",
       "exportLabel": "Export",
-      "importHelper": "Adu un seif Obsidian existent în Myne. Fiecare notă Markdown este importată și criptată pe loc; fișierele tale originale rămân neatinse.",
+      "importHelper": "Adu note din Obsidian, Notion, Evernote, fișiere HTML sau un CSV. Totul este importat și criptat pe loc; fișierele tale originale rămân neatinse.",
       "importLabel": "Import",
-      "importObsidian": "Importă seif Obsidian…",
+      "importObsidian": "Importă note…",
       "locationHelper": "Fiecare seif este un folder de fișiere criptate sub această cale. Preferă butonul Copie de rezervă de mai jos în locul copiilor manuale — el verifică fișierul scris.",
       "locationLabel": "Locația seifului",
       "openInFiles": "Deschide în Fișiere",

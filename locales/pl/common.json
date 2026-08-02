@@ -256,7 +256,7 @@
       "task": "Notatki z zadaniem",
       "content": "Pełny tekst w treści"
     },
-    "searchPlaceholder": "Szukaj notatek lub uruchom polecenie — Esc, aby zamknąć",
+    "searchPlaceholder": "Szukaj notatek lub uruchom polecenie — wypróbuj tag: · path: · task:",
     "sectionCommands": "Polecenia",
     "sectionNotes": "Notatki",
     "untitledNote": "Bez tytułu"
@@ -471,7 +471,7 @@
         "label": "Importuj widok .base…"
       },
       "importObsidian": {
-        "label": "Importuj skarbiec Obsidian…"
+        "label": "Importuj notatki…"
       },
       "lockVault": {
         "label": "Zablokuj skarbiec"
@@ -963,8 +963,8 @@
           "gettingReadyHint": "Przygotowywanie notatek dla AI — chwileczkę.",
           "insert": "Wstaw do notatki",
           "noAnswer": "Brak odpowiedzi — spróbuj przeformułować.",
-          "noModelHint": "Nie wybrano modelu. Wybierz go w Ustawienia → Developer → AI, aby rozpocząć.",
-          "offHint": "Lokalne AI jest wyłączone. Włącz je w Ustawienia → Developer → AI.",
+          "noModelHint": "Nie wybrano modelu. Wybierz go w Ustawienia → Deweloper → AI, aby rozpocząć.",
+          "offHint": "Lokalne AI jest wyłączone. Włącz je w Ustawienia → Deweloper → AI.",
           "send": "Wyślij",
           "statusGettingReady": "Przygotowywanie…",
           "statusNoModel": "Brak modelu",
@@ -985,7 +985,7 @@
         },
         "tabs": {
           "aiChat": "Czat AI",
-          "backlinks": "Linki zwrotne",
+          "backlinks": "Linki",
           "outline": "Konspekt",
           "tasks": "Zadania",
           "unlinked": "Niepowiązane wzmianki"
@@ -1453,7 +1453,7 @@
         "includeAttachments_other": "Dołącz {{count}} załączników",
         "title": "Eksportuj jako Markdown",
         "copyLabel": "Kopiuj tekst notatki do schowka",
-        "copied": "Tekst notatki skopiowany",
+        "copied": "Skopiowano tekst notatki",
         "copyFailed": "Nie udało się skopiować tekstu notatki"
       }
     },
@@ -1796,7 +1796,7 @@
         "reasonPathTooLong": "ścieżka folderu + tytuł jest za długa",
         "reasonSegmentTooLong": "nazwa jest dłuższa, niż dopuszcza Myne",
         "scanning": "Skanowanie skarbca…",
-        "setupIntro": "Wskaż Myne swój istniejący folder skarbca Obsidian. Każda notatka Markdown jest importowana i szyfrowana na miejscu — nic nie opuszcza tego urządzenia, a Twoje oryginalne pliki pozostają nietknięte.",
+        "setupIntro": "Myne importuje i szyfruje Twoje notatki na miejscu — nic nie opuszcza tego urządzenia, a Twoje oryginalne pliki nigdy nie są zmieniane.",
         "statCancelled": "Anulowano",
         "statCanvasSkipped": "pominięte pliki .canvas",
         "statCompressed": "Skompresowane obrazy",
@@ -1807,7 +1807,7 @@
         "suggestedNameAriaLabel": "Sugerowana nazwa",
         "titleComplete": "Import zakończony",
         "titleFailed": "Import nie powiódł się",
-        "titleSetup": "Importuj skarbiec Obsidian",
+        "titleSetup": "Importuj notatki",
         "vaultFolderLabel": "Folder skarbca",
         "vaultRoot": "(katalog główny skarbca)",
         "titlePick": "Importuj notatki",
@@ -1832,7 +1832,7 @@
         "chooseFolder": "Wybierz folder…",
         "laterHint": "Zawsze możesz zaimportować później z Ustawienia → Pamięć.",
         "notNow": "Nie teraz",
-        "title": "Zaimportować skarbiec Obsidian?"
+        "title": "Zaimportować notatki?"
       },
       "picker": {
         "intro": "Skąd pochodzą Twoje notatki?"
@@ -2298,9 +2298,25 @@
     },
     "everyN": {
       "day": "co {{count}} dni",
+      "day_one": "co {{count}} dzień",
+      "day_few": "co {{count}} dni",
+      "day_many": "co {{count}} dni",
+      "day_other": "co {{count}} dnia",
       "week": "co {{count}} tygodni",
+      "week_one": "co {{count}} tydzień",
+      "week_few": "co {{count}} tygodnie",
+      "week_many": "co {{count}} tygodni",
+      "week_other": "co {{count}} tygodnia",
       "month": "co {{count}} miesięcy",
-      "year": "co {{count}} lat"
+      "month_one": "co {{count}} miesiąc",
+      "month_few": "co {{count}} miesiące",
+      "month_many": "co {{count}} miesięcy",
+      "month_other": "co {{count}} miesiąca",
+      "year": "co {{count}} lat",
+      "year_one": "co {{count}} rok",
+      "year_few": "co {{count}} lata",
+      "year_many": "co {{count}} lat",
+      "year_other": "co {{count}} roku"
     },
     "everyWeekday": "co tydzień: {{days}}",
     "everyWeekdays": "co tydzień: {{days}}",
@@ -2618,7 +2634,7 @@
       "confirm": "Potwierdź",
       "delete": "Usuń",
       "deleteError": "Nie udało się usunąć tego motywu. Spróbuj ponownie.",
-      "empty": "Brak własnych motywów. Zaimportuj jeden lub otwórz folder motywów i dodaj plik motywu.",
+      "empty": "Brak własnych motywów. Zaimportuj plik motywu, aby zacząć.",
       "error": {
         "aColorFallback": "kolor",
         "invalidFile": "Nieprawidłowy plik motywu.",
@@ -2638,7 +2654,7 @@
       "label": "Własne motywy",
       "openFolderButton": "Otwórz folder motywów",
       "openFolderError": "Nie udało się otworzyć folderu motywów.",
-      "readError": "Nie udało się odczytać Twojego folderu motywów.",
+      "readError": "Nie udało się odczytać Twoich własnych motywów.",
       "readOnlyHelper": "Własne motywy instaluje się na komputerze. Twoje pojawią się tutaj same po synchronizacji."
     },
     "dailyNotes": {
@@ -2738,7 +2754,7 @@
         "panesTabs": "Panele i karty",
         "view": "Widok"
       },
-      "helper": "Wyświetl i zmień skróty klawiszowe. Formatowanie edytora oraz skrót przełączania kart są stałe.",
+      "helper": "Wyświetl i zmień skróty klawiszowe. Stały jest tylko skrót przełączania kart (Ctrl+Tab).",
       "notSet": "Nieustawiony",
       "removeBindingAria": "Usuń {{chord}}",
       "reserved": {
@@ -2893,7 +2909,7 @@
     "quickUnlock": {
       "errorCancelled": "Anulowano.",
       "errorGeneric": "Nie udało się skonfigurować szybkiego odblokowania.",
-      "errorHardwareUnavailable": "Touch ID nie jest dostępny na tym urządzeniu.",
+      "errorHardwareUnavailable": "Touch ID nie jest dostępny w tej kompilacji. Wymaga podpisanej kompilacji macOS z zarejestrowanym Touch ID.",
       "errorNotUnlocked": "Najpierw odblokuj skarbiec.",
       "errorPinNotDigits": "PIN może zawierać tylko cyfry.",
       "errorPinTooShort": "PIN musi mieć co najmniej {{count}} cyfr.",
@@ -2981,9 +2997,9 @@
       "exportBody": "Eksportuj skarbiec jako Markdown",
       "exportHelper": "Zwykłe drzewo Markdown — niezaszyfrowane.",
       "exportLabel": "Eksport",
-      "importHelper": "Przenieś istniejący skarbiec Obsidian do Myne. Każda notatka Markdown jest importowana i szyfrowana na miejscu; Twoje oryginalne pliki pozostają nietknięte.",
+      "importHelper": "Przenieś notatki z Obsidian, Notion, Evernote, plików HTML lub pliku CSV. Wszystko jest importowane i szyfrowane na miejscu; Twoje oryginalne pliki pozostają nietknięte.",
       "importLabel": "Import",
-      "importObsidian": "Importuj skarbiec Obsidian…",
+      "importObsidian": "Importuj notatki…",
       "locationHelper": "Każdy skarbiec to folder zaszyfrowanych plików pod tą ścieżką. Zamiast ręcznego kopiowania używaj przycisku Kopia zapasowa poniżej — weryfikuje on zapisany plik.",
       "locationLabel": "Lokalizacja skarbca",
       "openInFiles": "Otwórz w Plikach",
