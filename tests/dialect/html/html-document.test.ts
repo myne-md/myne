@@ -16,7 +16,8 @@ describe("standalone document shell", () => {
     expect(document).toContain('<meta charset="utf-8">');
     expect(document).toContain("<style>");
     expect(document).toContain("</style>");
-    expect(document).toContain("<body>");
+    // `dir="auto"` (RTL, #172): the body resolves direction from content.
+    expect(document).toContain('<body dir="auto">');
     expect(document.trimEnd().endsWith("</html>")).toBe(true);
     // The emitted body is embedded.
     expect(document).toContain("<h1>Hello</h1>");

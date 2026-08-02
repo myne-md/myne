@@ -166,12 +166,23 @@ export const myneTheme = EditorView.theme({
   ".cm-bold": { fontWeight: "700" },
   ".cm-italic": { fontStyle: "italic" },
   ".cm-strike": { textDecoration: "line-through" },
-  ".cm-link": { textDecoration: "underline", color: "var(--accent, #2c4a7a)" },
+  // `unicode-bidi: isolate` (RTL, myne#172): a link's own text is a neutral run
+  // as far as the surrounding paragraph's bidi ordering is concerned — isolating
+  // it stops an intrinsically-LTR URL/label from visually reordering the RTL
+  // text around it (the classic "link inside an Arabic sentence jumps" bug).
+  ".cm-link": {
+    textDecoration: "underline",
+    color: "var(--accent, #2c4a7a)",
+    unicodeBidi: "isolate",
+  },
   // Clickable autolinks / bare URLs (MYND-150 + MYND-151) carry `data-cm-url`;
   // give them a pointer cursor so the open-on-click affordance reads. Regular
   // `[text](url)` links don't carry the attribute (click reveals source).
   ".cm-link[data-cm-url]": { cursor: "pointer" },
   ".cm-inline-code": {
+    // Isolate code spans from paragraph bidi — an inline `code` run (often
+    // identifiers, numbers, an account number) must not reorder its RTL context.
+    unicodeBidi: "isolate",
     fontFamily: "var(--font-mono)",
     fontSize: "0.95em",
     backgroundColor: "var(--paper-2, #f3f1eb)",

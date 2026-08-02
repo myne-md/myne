@@ -94,7 +94,12 @@ export async function emitStandaloneHtml(
     `<title>${escapeHtml(titleText)}</title>\n` +
     `<style>\n${css}\n</style>\n` +
     "</head>\n" +
-    "<body>\n" +
+    // `dir="auto"` (RTL, myne#172): resolve the exported document's base
+    // direction from its content, and the per-block `unicode-bidi: plaintext`
+    // rule in the print stylesheet gives each block its own direction — so an
+    // RTL or mixed-direction note exports/PDFs correctly even though the shell
+    // is `lang="en"` (the export path does not carry the note's language).
+    '<body dir="auto">\n' +
     emitted.html +
     "\n</body>\n" +
     "</html>\n";
