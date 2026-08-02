@@ -24,6 +24,8 @@ import {
   DeleteConfirmModal,
 } from "../../notes/components/DeleteConfirmModal";
 import { formatRelativeTime } from "../../notes/components/relativeTime";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { Icon } from "../primitives/Icon";
 
 const LIST_STYLE: CSSProperties = {
   display: "flex",
@@ -70,7 +72,15 @@ const BTN_STYLE: CSSProperties = {
   background: "var(--paper-2)",
   color: "var(--fg-1)",
   flexShrink: 0,
+  transition: HOVER_TRANSITION,
 };
+
+/** Shared hover for the recovered-notes controls: all three row actions + the
+ *  preview-close button rest on `--paper-2` and deepen one step to `--paper-3`
+ *  (the accent/warning colour on Restore/Delete is a text colour, untouched by a
+ *  background deepen). Pass the row's `disabled` so a mid-restore row stays inert. */
+const btnHover = (disabled = false) =>
+  hoverSurface({ restBg: "var(--paper-2)", hoverBg: "var(--paper-3)", disabled });
 
 const RESTORE_BTN_STYLE: CSSProperties = {
   ...BTN_STYLE,
@@ -87,6 +97,19 @@ const ERROR_STYLE: CSSProperties = {
   fontSize: 12,
   color: "var(--warning)",
   margin: 0,
+};
+
+// Zero-state: a muted glyph over the copy so an empty section reads as
+// intentional ("nothing to recover") rather than a blank gap under the helper.
+const EMPTY_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  padding: "var(--space-5)",
+  textAlign: "center",
+  color: "var(--fg-3)",
+  fontSize: 12,
 };
 
 const PREVIEW_CARD_STYLE: CSSProperties = {
@@ -280,6 +303,7 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
                 <button
                   type="button"
                   style={BTN_STYLE}
+                  {...btnHover(rowBusy)}
                   disabled={rowBusy}
                   data-testid="sync.recovered-preview"
                   data-file-name={e.file_name}
@@ -290,6 +314,7 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
                 <button
                   type="button"
                   style={RESTORE_BTN_STYLE}
+                  {...btnHover(rowBusy)}
                   disabled={rowBusy}
                   data-testid="sync.recovered-restore"
                   data-file-name={e.file_name}
@@ -300,6 +325,7 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
                 <button
                   type="button"
                   style={DELETE_BTN_STYLE}
+                  {...btnHover(rowBusy)}
                   disabled={rowBusy}
                   data-testid="sync.recovered-delete"
                   data-file-name={e.file_name}
@@ -310,6 +336,13 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {entries.length === 0 && error === null && (
+        <div style={EMPTY_STYLE} data-testid="sync.recovered-empty">
+          <Icon name="archive" size={30} style={{ color: "var(--fg-3)" }} />
+          <span>{t("sync.panel.recovered.empty")}</span>
         </div>
       )}
 
@@ -407,6 +440,7 @@ function RecoveredPreviewModal({
           <button
             type="button"
             style={BTN_STYLE}
+            {...btnHover()}
             data-testid="sync.recovered-preview-close"
             onClick={onClose}
           >

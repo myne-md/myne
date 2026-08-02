@@ -6,6 +6,7 @@
 
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 
 const STYLE: CSSProperties = {
   display: "flex",
@@ -29,6 +30,7 @@ const DISMISS_STYLE: CSSProperties = {
   fontSize: "var(--text-lg)",
   lineHeight: 1,
   padding: "0 var(--space-1)",
+  transition: HOVER_TRANSITION,
 };
 
 interface ReconcileBannerProps {
@@ -51,6 +53,7 @@ export function ReconcileBanner({ active, onDismiss }: ReconcileBannerProps) {
           aria-label={t("common.dismiss")}
           onClick={onDismiss}
           style={DISMISS_STYLE}
+          {...hoverSurface()}
           data-testid="sync.reconcile-banner-dismiss"
         >
           ×

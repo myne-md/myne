@@ -6,10 +6,12 @@
 // TLS, so no fingerprint. Built against design tokens; no Penpot (owner directive).
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
 import { refreshTorState } from "../../hooks/useTorState";
 import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { Icon } from "../primitives/Icon";
 
 /**
  * Mirrors `myne_core::plugins::sync::config::PinSource` (`snake_case` on the
@@ -64,6 +66,7 @@ const BTN: CSSProperties = {
   borderRadius: "var(--radius-1)",
   cursor: "pointer",
   whiteSpace: "nowrap",
+  transition: HOVER_TRANSITION,
 };
 
 const HELP: CSSProperties = {
@@ -71,6 +74,38 @@ const HELP: CSSProperties = {
   color: "var(--fg-3)",
   margin: 0,
   lineHeight: "var(--leading-normal)",
+};
+
+// The fingerprint/pin lines read as ONE accent notification block, pinned at the
+// TOP of the section (right under the input) with a leading info icon — a
+// verify-this callout, not a footnote.
+const NOTE_BLOCK: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "flex-start",
+  gap: "var(--space-2)",
+  padding: "var(--space-2) var(--space-3)",
+  background: "var(--accent-soft)",
+  border: "1px solid var(--accent-soft)",
+  borderRadius: "var(--radius-2)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
+  lineHeight: "var(--leading-normal)",
+};
+
+const NOTE_LABEL: CSSProperties = {
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--accent)",
+};
+
+// The "Connected" resting state of the connect button: muted, non-accent, and
+// clearly inert (E4c) — the input matches the endpoint already in use.
+const BTN_CONNECTED: CSSProperties = {
+  ...BTN,
+  background: "var(--bg-2)",
+  color: "var(--fg-3)",
+  border: "1px solid var(--line-1)",
+  cursor: "default",
 };
 
 const FP: CSSProperties = {
@@ -83,6 +118,10 @@ const FP: CSSProperties = {
 export function EndpointConfig() {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
+  // The endpoint this device is currently connected to (loaded, or set on a
+  // successful connect). When the input still equals it, there is nothing to do
+  // and the button rests as a disabled "Connected" (E4c).
+  const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
@@ -119,7 +158,10 @@ export function EndpointConfig() {
       pin_source: PinSource;
     }>("plugin:sync|sync_get_endpoint")
       .then((c) => {
-        if (c.endpoint_url) setUrl(c.endpoint_url);
+        if (c.endpoint_url) {
+          setUrl(c.endpoint_url);
+          setConnectedUrl(c.endpoint_url);
+        }
         if (c.cert_pin_hex) setFingerprint(c.cert_pin_hex);
         setPinSource(c.pin_source);
       })
@@ -144,6 +186,7 @@ export function EndpointConfig() {
     })
       .then((r) => {
         setConfirmNeeded(false);
+        setConnectedUrl(trimmed);
         setPinSource(r.pin_source);
         // The Tor posture is endpoint-aware (MYND-650 task 8): repointing a
         // loopback endpoint at a remote server — or the reverse — moves
@@ -197,11 +240,57 @@ export function EndpointConfig() {
     setMsg(t("sync.endpoint.confirmFingerprintDeclined"));
   };
 
+  // "Connected & unedited": the input still matches the endpoint in use, so the
+  // button rests as a disabled "Connected". Editing it (or having nothing
+  // connected yet) re-enables "Connect".
+  const trimmedUrl = url.trim();
+  const isConnectedUnedited =
+    connectedUrl !== null &&
+    trimmedUrl.length > 0 &&
+    trimmedUrl === connectedUrl;
+
   return (
     <div
       style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
       data-testid="sync.endpoint-config"
     >
+      {/* Accent verify-this callout at the very TOP of the section — above the
+          input — with a leading info icon: fingerprint label + hash + pin-source
+          line. Renders whenever a SOURCE is known (the browser's "verified by
+          your certificate store" line has no fingerprint to show, so gating on
+          the source, not the fingerprint, keeps that path visible). */}
+      {(fingerprint || pinSource) && (
+        <div style={NOTE_BLOCK} data-testid="sync.pin-note">
+          <span
+            aria-hidden="true"
+            style={{ display: "flex", flexShrink: 0, color: "var(--accent)", marginTop: 1 }}
+          >
+            <Icon name="info" size={16} />
+          </span>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-1)",
+              minWidth: 0,
+            }}
+          >
+            {fingerprint && (
+              <>
+                <span style={NOTE_LABEL}>{t("sync.endpoint.fingerprintLabel")}</span>
+                <span style={FP} data-testid="sync.cert-fingerprint">
+                  {fingerprint}
+                </span>
+              </>
+            )}
+            {pinSource && (
+              <span data-testid="sync.pin-source" data-pin-source={pinSource}>
+                {t(PIN_SOURCE_COPY[pinSource])}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       <div style={ROW}>
         <input
           value={url}
@@ -217,18 +306,41 @@ export function EndpointConfig() {
             decline — two buttons that both mean "connect" would leave the user
             picking between identical actions at the one moment this screen is
             asking them to be careful. */}
-        {!confirmNeeded && (
-          <button
-            type="button"
-            onClick={connect}
-            disabled={busy}
-            style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
-            data-testid="sync.endpoint-connect"
-          >
-            {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
-          </button>
-        )}
+        {!confirmNeeded &&
+          (isConnectedUnedited ? (
+            <button
+              type="button"
+              disabled
+              style={BTN_CONNECTED}
+              data-testid="sync.endpoint-connect"
+            >
+              {t("sync.endpoint.connected")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={connect}
+              disabled={busy}
+              style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
+              {...hoverSurface({
+                restBg: "var(--accent)",
+                hoverBg: "var(--accent-hover)",
+                disabled: busy,
+              })}
+              data-testid="sync.endpoint-connect"
+            >
+              {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+            </button>
+          ))}
       </div>
+      {/* The instructional helper sits directly under the input (E4a). */}
+      <p style={HELP} data-testid="sync.endpoint-help">
+        <Trans i18nKey="sync.panel.server.helper">
+          Enter the same server URL on every device. For a self-hosted server
+          use its <code>https://</code> address; verify the certificate
+          fingerprint matches across your devices.
+        </Trans>
+      </p>
       {msg && (
         <p style={HELP} data-testid="sync.endpoint-msg">
           {msg}
@@ -246,31 +358,6 @@ export function EndpointConfig() {
           confirmDisabled={busy}
           testIdPrefix="sync"
         />
-      )}
-      {/* The pin note renders whenever a SOURCE is known — it used to be
-          nested inside the fingerprint block, which meant the browser's
-          "verified by your certificate store" line could never appear, because
-          that case has no fingerprint to show. */}
-      {(fingerprint || pinSource) && (
-        <p style={HELP}>
-          {fingerprint && (
-            <>
-              {t("sync.endpoint.fingerprintLabel")}
-              <br />
-              <span style={FP} data-testid="sync.cert-fingerprint">
-                {fingerprint}
-              </span>
-            </>
-          )}
-          {pinSource && (
-            <>
-              {fingerprint && <br />}
-              <span data-testid="sync.pin-source" data-pin-source={pinSource}>
-                {t(PIN_SOURCE_COPY[pinSource])}
-              </span>
-            </>
-          )}
-        </p>
       )}
     </div>
   );

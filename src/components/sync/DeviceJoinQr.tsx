@@ -23,6 +23,7 @@ import {
   deviceJoinQrErrorMessage,
 } from "../../lib/deviceJoinQr";
 import { svgToObjectUrl } from "../../lib/noteImageCard";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -41,7 +42,17 @@ const HINT: CSSProperties = {
   color: "var(--fg-3)",
 };
 
+// Input + "Make QR" share one line: the input grows, the button sits beside it
+// at the input's height (align-items stretch), a small gap between.
+const INPUT_ROW: CSSProperties = {
+  display: "flex",
+  alignItems: "stretch",
+  gap: "var(--space-2)",
+};
+
 const INPUT: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
   padding: "var(--space-1) var(--space-2)",
   fontSize: "var(--text-sm)",
   fontFamily: "var(--font-mono)",
@@ -58,7 +69,8 @@ const BTN: CSSProperties = {
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-1)",
   color: "var(--fg-1)",
-  alignSelf: "flex-start",
+  whiteSpace: "nowrap",
+  transition: HOVER_TRANSITION,
 };
 
 const QR_WRAP: CSSProperties = {
@@ -162,29 +174,36 @@ export function DeviceJoinQr() {
       <label style={LABEL} htmlFor="device-join-qr-account">
         {t("sync.deviceJoinQr.accountLabel")}
       </label>
-      <input
-        id="device-join-qr-account"
-        style={INPUT}
-        value={account}
-        onChange={(e) => onInput(e.target.value)}
-        placeholder={t("sync.deviceJoinQr.accountPlaceholder")}
-        autoComplete="off"
-        spellCheck={false}
-        data-testid="sync.device-join-qr.account-input"
-      />
-      <button
-        type="button"
-        style={{
-          ...BTN,
-          opacity: canGenerate ? 1 : 0.5,
-          cursor: canGenerate ? "pointer" : "default",
-        }}
-        disabled={!canGenerate}
-        onClick={() => void generate(account.trim())}
-        data-testid="sync.device-join-qr.generate"
-      >
-        {t("sync.deviceJoinQr.generate")}
-      </button>
+      <div style={INPUT_ROW}>
+        <input
+          id="device-join-qr-account"
+          style={INPUT}
+          value={account}
+          onChange={(e) => onInput(e.target.value)}
+          placeholder={t("sync.deviceJoinQr.accountPlaceholder")}
+          autoComplete="off"
+          spellCheck={false}
+          data-testid="sync.device-join-qr.account-input"
+        />
+        <button
+          type="button"
+          style={{
+            ...BTN,
+            opacity: canGenerate ? 1 : 0.5,
+            cursor: canGenerate ? "pointer" : "default",
+          }}
+          disabled={!canGenerate}
+          {...hoverSurface({
+            restBg: "var(--bg-2)",
+            hoverBg: "var(--paper-3)",
+            disabled: !canGenerate,
+          })}
+          onClick={() => void generate(account.trim())}
+          data-testid="sync.device-join-qr.generate"
+        >
+          {t("sync.deviceJoinQr.generate")}
+        </button>
+      </div>
       {error && (
         <div style={ERROR} data-testid="sync.device-join-qr.error">
           {error}

@@ -15,6 +15,7 @@ import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { useSyncStatus, type SyncStatus } from "../../hooks/useSyncStatus";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 
 const ROOT_STYLE: CSSProperties = {
   display: "flex",
@@ -45,6 +46,7 @@ const BUTTON_STYLE: CSSProperties = {
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-1)",
   cursor: "pointer",
+  transition: HOVER_TRANSITION,
 };
 
 interface Presentation {
@@ -134,6 +136,11 @@ export function SyncStatusIndicator() {
         <button
           type="button"
           style={{ ...BUTTON_STYLE, opacity: busy ? 0.6 : 1 }}
+          {...hoverSurface({
+            restBg: "var(--bg-2)",
+            hoverBg: "var(--paper-3)",
+            disabled: busy,
+          })}
           onClick={() => void syncNow()}
           disabled={busy}
           data-testid="sync.sync-now"

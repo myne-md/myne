@@ -29,11 +29,23 @@ import { type DeviceEntry, type DevicesHook } from "../../hooks/useDevices";
 import { usePrefs } from "../../hooks/usePrefs";
 import { setDeviceName } from "../../lib/prefs";
 import { DEVICE_NAME_MAX_LEN } from "../../lib/device-name";
+import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { Icon } from "../primitives/Icon";
+import { Tooltip } from "../primitives/Tooltip";
 
 const ROOT: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
+};
+
+// A section (label + its rows) and the row stack inside it both lay out as a
+// gapped column, so device rows breathe apart instead of butting their borders
+// together (E3a).
+const SECTION: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
 };
 
 const CONFIRM_BOX: CSSProperties = {
@@ -82,18 +94,50 @@ const BTN: CSSProperties = {
   borderRadius: "var(--radius-1)",
   cursor: "pointer",
   color: "var(--fg-1)",
+  transition: HOVER_TRANSITION,
 };
 
+/** Shared hover for the panel's `BTN`-based rows/actions: resting `--bg-2` deepens
+ *  one step to `--paper-3`. Pass the same `disabled` the button carries so a
+ *  dimmed control never lights up. */
+const btnHover = (disabled = false) =>
+  hoverSurface({ restBg: "var(--bg-2)", hoverBg: "var(--paper-3)", disabled });
+
+// "This device" reads as an accent-soft pill with accent text (E3b) — a quiet
+// self-marker, distinct from a plain outlined chip.
 const BADGE: CSSProperties = {
   marginLeft: "var(--space-2)",
   padding: "0 var(--space-1)",
   fontSize: "var(--text-xs)",
   fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--accent-fg, var(--fg-2))",
-  border: "1px solid var(--line-1)",
+  color: "var(--accent)",
+  background: "var(--accent-soft)",
+  border: "1px solid var(--accent-soft)",
   borderRadius: "var(--radius-1)",
   whiteSpace: "nowrap",
 };
+
+// Icon-only row actions (Rename / Remove, E3d): a 28px square with the panel's
+// resting fill so the two sit as one consistent pair.
+const ICON_BTN: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 28,
+  height: 28,
+  padding: 0,
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  cursor: "pointer",
+  color: "var(--fg-2)",
+  transition: HOVER_TRANSITION,
+};
+
+// Remove's icon turns danger on hover (background still deepens, E3c), so the
+// button also transitions colour — HOVER_TRANSITION only covers background.
+const ICON_BTN_DANGER_TRANSITION: CSSProperties["transition"] =
+  "background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)";
 
 /** The short, id-derived label — the fallback for a device nobody has named, and
  *  the ONLY label a pending device ever gets (SYNC-40: a name chosen by an
@@ -266,12 +310,13 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
           )}
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          <button type="button" style={BTN} onClick={() => setSas(null)} data-testid="sync.sas-match">
+          <button type="button" style={BTN} {...btnHover()} onClick={() => setSas(null)} data-testid="sync.sas-match">
             {t("sync.devices.verifyMatch")}
           </button>
           <button
             type="button"
             style={{ ...BTN, color: "var(--danger)" }}
+            {...btnHover(busy)}
             disabled={busy}
             onClick={() => {
               const id = sas.deviceId;
@@ -308,6 +353,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
             <button
               type="button"
               style={BTN}
+              {...btnHover(busy)}
               disabled={busy}
               onClick={() => void resetLocal()}
               data-testid="sync.reset-local"
@@ -331,6 +377,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
           <button
             type="button"
             style={BTN}
+            {...btnHover(busy)}
             disabled={busy}
             onClick={() => void resetLocal()}
             data-testid="sync.reset-local"
@@ -341,28 +388,31 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
       ) : null}
 
       {pending.length > 0 && (
-        <div data-testid="sync.pending-devices">
+        <div data-testid="sync.pending-devices" style={SECTION}>
           <div style={SECTION_LABEL}>
             {t("sync.devices.awaitingApproval", { count: pending.length })}
           </div>
-          {pending.map((d) => (
-            <div key={d.device_id_hex} style={ROW} data-testid="sync.pending-row" data-device-id={d.device_id_hex}>
-              <span>{shortName(d)}</span>
-              <button
-                type="button"
-                style={BTN}
-                disabled={busy}
-                onClick={() => void approveAndVerify(d.device_id_hex)}
-                data-testid="sync.approve-device"
-              >
-                {t("sync.devices.approve")}
-              </button>
-            </div>
-          ))}
+          <div style={SECTION}>
+            {pending.map((d) => (
+              <div key={d.device_id_hex} style={ROW} data-testid="sync.pending-row" data-device-id={d.device_id_hex}>
+                <span>{shortName(d)}</span>
+                <button
+                  type="button"
+                  style={BTN}
+                  {...btnHover(busy)}
+                  disabled={busy}
+                  onClick={() => void approveAndVerify(d.device_id_hex)}
+                  data-testid="sync.approve-device"
+                >
+                  {t("sync.devices.approve")}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <div>
+      <div style={SECTION}>
         <div style={SECTION_LABEL}>{t("sync.devices.yourDevices")}</div>
         {renameFailed && (
           <div
@@ -382,7 +432,8 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
         ) : approved.length === 0 ? (
           <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>{t("sync.devices.noDevices")}</div>
         ) : (
-          approved.map((d) => (
+          <div style={SECTION}>
+          {approved.map((d) => (
             <div key={d.device_id_hex} style={ROW} data-testid="sync.device-row" data-device-id={d.device_id_hex} data-current={d.is_current ? "true" : "false"}>
               <span style={IDENTITY_COLUMN}>
                 {renaming?.id === d.device_id_hex ? (
@@ -422,34 +473,61 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                 </span>
               </span>
               <span style={ACTIONS}>
-                {/* Rename is offered on EVERY approved row, not just this device:
-                    devices enrolled before names existed are named from whatever
-                    device the user happens to be holding. */}
-                <button
-                  type="button"
-                  style={BTN}
-                  disabled={busy || renaming !== null}
-                  onClick={() =>
-                    setRenaming({ id: d.device_id_hex, value: displayName(d, names) })
-                  }
-                  data-testid="sync.rename-device"
-                >
-                  {t("sync.devices.rename")}
-                </button>
-                {d.is_current ? (
+                {/* This device: "Synced here" reads first, THEN the rename pencil
+                    (swapped per feedback). Other devices: rename then remove. */}
+                {d.is_current && (
                   <span style={{ color: "var(--fg-3)", fontSize: "var(--text-xs)" }}>
                     {t("sync.devices.syncedHere")}
                   </span>
-                ) : (
+                )}
+                {/* Rename is offered on EVERY approved row, not just this device:
+                    devices enrolled before names existed are named from whatever
+                    device the user happens to be holding. Icon-only (E3d): the
+                    tooltip carries the label, `aria-label` the a11y name. */}
+                <Tooltip label={t("sync.devices.rename")}>
                   <button
                     type="button"
-                    style={BTN}
-                    disabled={busy}
-                    onClick={() => setConfirmRemove(d.device_id_hex)}
-                    data-testid="sync.remove-device"
+                    style={{
+                      ...ICON_BTN,
+                      opacity: busy || renaming !== null ? 0.5 : 1,
+                    }}
+                    {...btnHover(busy || renaming !== null)}
+                    disabled={busy || renaming !== null}
+                    aria-label={t("sync.devices.rename")}
+                    onClick={() =>
+                      setRenaming({ id: d.device_id_hex, value: displayName(d, names) })
+                    }
+                    data-testid="sync.rename-device"
                   >
-                    {t("sync.devices.remove")}
+                    <Icon name="pencil" size={16} />
                   </button>
+                </Tooltip>
+                {!d.is_current && (
+                  <Tooltip label={t("sync.devices.remove")}>
+                    <button
+                      type="button"
+                      style={{
+                        ...ICON_BTN,
+                        transition: ICON_BTN_DANGER_TRANSITION,
+                        opacity: busy ? 0.5 : 1,
+                      }}
+                      disabled={busy}
+                      aria-label={t("sync.devices.remove")}
+                      onMouseEnter={(e) => {
+                        if (busy) return;
+                        e.currentTarget.style.background = "var(--paper-3)";
+                        e.currentTarget.style.color = "var(--danger)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "var(--bg-2)";
+                        e.currentTarget.style.color = "var(--fg-2)";
+                      }}
+                      onClick={() => setConfirmRemove(d.device_id_hex)}
+                      data-testid="sync.remove-device"
+                    >
+                      <Icon name="trash-2" size={16} />
+                    </button>
+                  </Tooltip>
                 )}
               </span>
               {confirmRemove === d.device_id_hex && (
@@ -479,6 +557,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                     <button
                       type="button"
                       style={{ ...BTN, color: "var(--danger)" }}
+                      {...btnHover(busy)}
                       disabled={busy}
                       onClick={() => {
                         setConfirmRemove(null);
@@ -491,6 +570,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                     <button
                       type="button"
                       style={BTN}
+                      {...btnHover()}
                       onClick={() => setConfirmRemove(null)}
                       data-testid="sync.remove-confirm-cancel"
                     >
@@ -500,7 +580,8 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                 </div>
               )}
             </div>
-          ))
+          ))}
+          </div>
         )}
       </div>
     </div>
