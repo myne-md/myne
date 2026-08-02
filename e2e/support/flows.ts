@@ -332,6 +332,23 @@ export async function setTranscriptionEnabled(
   });
 }
 
+/** Toggle the device-local Views feature switch via Settings → Editor (#230).
+ *  Views is OFF by default for a fresh vault (0 views); turning it on reveals
+ *  the sidebar Views nav row. Device-local (localStorage) rather than a backend
+ *  pref, but the `<Switch>`'s `aria-checked` still reflects the landed state, so
+ *  the shared idempotent switch driver applies unchanged. */
+export async function setViewsEnabled(
+  session: Session,
+  enabled: boolean,
+): Promise<void> {
+  await setSettingsSwitch(session, {
+    tab: "editor",
+    toggleTestId: "settings.views-enabled",
+    enabled,
+    label: "views_enabled",
+  });
+}
+
 /**
  * Turn Developer mode on via Settings → About and wait for the Developer rail
  * group to appear. Leaves the Settings modal OPEN on the About tab, because

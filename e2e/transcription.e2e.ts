@@ -43,6 +43,7 @@ import {
   setTranscriptionEnabled,
   pageSeatInvoke,
   reopenNoteAfterReload,
+  runPaletteAction,
   unlockToEditor,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
@@ -152,6 +153,68 @@ aiDescribe("tr1 transcribe chain — progress → transcript → insert (transcr
           async () => ((await editorText(s)).includes(transcript.slice(0, 12)) ? true : null),
           { label: "transcript inserted into the note body", timeoutMs: 10_000 },
         );
+      },
+    );
+  });
+});
+
+aiDescribe("tr3 attachments-library transcription viewer (#231)", () => {
+  // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub
+  // build. After an audio note is transcribed via the widget (which seals the
+  // transcript into the attachment's MYE1 cache), the SAME transcript is
+  // readable from the attachments library: opening the audio tile's ⋮ menu runs
+  // the lazy `attachment_read_extracted_text` probe, which surfaces a "View
+  // transcription" row that opens the read-only TranscriptionModal.
+  it("shows a transcribed voice note's transcript in the library viewer modal", async () => {
+    let seeded: SeededVault;
+    await scenario(
+      "tr3-transcription-viewer",
+      { seed: (dir) => void (seeded = seedVault(dir, {})) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, seeded.password);
+        await dismissImporterOffer(s);
+        await createNote(s, "tr3notecharlie7k2m9qx4w8e5rj0aa");
+
+        // Record + embed a fixture audio note, then transcribe it via the widget
+        // (this is what writes the MYE1 cache the library viewer reads back).
+        const id = await recordFixtureAudio(s);
+        await embedAudioAndReopen(s, id);
+        await enableAi(s);
+        await (await s.byTestId("attachment-audio.menu-button")).click();
+        await (await s.waitForElement(testIdSelector("attachment-audio.transcribe"))).click();
+        const widgetTranscript = await (
+          await s.waitForElement(testIdSelector("attachment-audio.transcript"), {
+            timeoutMs: 20_000,
+          })
+        ).textContent();
+        expect(widgetTranscript, "the stub transcribe produced text").not.toBe("");
+
+        // Open the attachments library and the audio tile's ⋮ menu. The library
+        // menu is not the body-portaled self-closing kind (al1 clicks its rows
+        // directly), so one open is enough; "View transcription" appears once the
+        // per-attachment extracted-text probe resolves.
+        await runPaletteAction(s, "attachments.open");
+        await s.byTestId("attachments.library");
+        const tileMenu =
+          testIdSelector("attachments.tile", { "data-id": id }) +
+          " " +
+          testIdSelector("attachments.actions-trigger");
+        await (await s.waitForElement(tileMenu)).click();
+        await (
+          await s.waitForElement(testIdSelector("attachments.action-view-transcription"), {
+            timeoutMs: 20_000,
+          })
+        ).click();
+
+        // The read-only modal renders the same transcript the widget produced.
+        await s.byTestId("attachments.transcription-modal");
+        const modalText = await (await s.byTestId("attachments.transcription-text")).textContent();
+        expect(modalText, "the library viewer shows a non-empty transcript").not.toBe("");
+        expect(
+          modalText.includes(widgetTranscript.slice(0, 12)),
+          "the library transcript matches the widget's",
+        ).toBe(true);
       },
     );
   });
