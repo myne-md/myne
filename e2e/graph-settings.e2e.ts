@@ -289,7 +289,12 @@ describeE2E("gs2 appearance controls preview live and never re-run the layout", 
         await dismissImporterOffer(s);
 
         const { pane, canvas } = await openSettledGraph(s);
-        await waitForCanvasQuiet(s, "initial layout");
+        // The DEFAULT render — every appearance setting untouched. This is what
+        // reset-to-defaults has to reproduce at the end; it is NOT the same
+        // frame as the labels-off `settled` baseline captured below, and
+        // conflating the two is what made this scenario assert an impossible
+        // equality (see the reset step).
+        const defaultRender = await waitForCanvasQuiet(s, "initial layout");
         expect(await canvas.attribute("data-force-relayout-count")).toBe("0");
 
         await openSettingsPanel(s);
@@ -335,11 +340,20 @@ describeE2E("gs2 appearance controls preview live and never re-run the layout", 
         // with the layout untouched throughout, restoring the defaults must
         // restore the DEFAULT RENDER — same positions, same settings, same
         // amount of ink as the very first settled frame.
+        //
+        // That is `defaultRender`, NOT `settled`. `settled` is the labels-OFF
+        // baseline this scenario forces (fade slid to max) so the four controls
+        // below can only add ink; reset does not restore THAT, it restores the
+        // shipped defaults — fade back to 1.4, which at the fit-to-content zoom
+        // #200 introduced is below the cap, so the default frame legitimately
+        // carries label ink the baseline does not. Comparing against `settled`
+        // asked reset to reproduce a state it is not supposed to reproduce, and
+        // no amount of waiting could satisfy it.
         await (await s.byTestId("editor.graph-settings-reset")).click();
         await s.waitUntil(
           async () => {
             const cur = await inkStats(s);
-            return cur !== null && cur.n === settled.n ? true : null;
+            return cur !== null && cur.n === defaultRender.n ? true : null;
           },
           { label: "reset restores the default render", timeoutMs: 20_000 },
         );
