@@ -261,7 +261,7 @@ export type SetCoverHandler = (noteId: string) => void;
 const COVER_BUTTON_STYLE: CSSProperties = {
   position: "absolute",
   top: "var(--space-2)",
-  right: "var(--space-2)",
+  insetInlineEnd: "var(--space-2)",
   display: "inline-flex",
   alignItems: "center",
   gap: 4,

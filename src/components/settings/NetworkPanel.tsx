@@ -99,7 +99,7 @@ const RESIDUALS_STYLE: CSSProperties = {
   flexDirection: "column",
   gap: "var(--space-2)",
   margin: 0,
-  paddingLeft: "var(--space-4)",
+  paddingInlineStart: "var(--space-4)",
 };
 
 const POSTURE_BLOCK_STYLE: CSSProperties = {

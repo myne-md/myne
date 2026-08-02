@@ -100,14 +100,16 @@ describe("TableView", () => {
     expect(screen.queryByTestId("view.table-row")).toBeNull();
   });
 
-  it("pins the Name column (position:sticky, left:0)", () => {
+  it("pins the Name column (position:sticky, inset-inline-start:0)", () => {
     const result: ViewResult = {
       groups: [{ key: "", type: "none", rows: [row("n1", "Alpha")] }],
     };
     render(<TableView def={tableDef()} result={result} />);
     const name = screen.getByText("Alpha");
     expect(name.style.position).toBe("sticky");
-    expect(name.style.left).toBe("0px");
+    // Logical property (RTL migration): the pinned column anchors to the leading
+    // edge via `inset-inline-start` (= `left` in LTR).
+    expect(name.style.insetInlineStart).toBe("0px");
   });
 
   it("opens the note via the click intent matrix (plain / mod / middle)", () => {

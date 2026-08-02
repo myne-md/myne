@@ -53,7 +53,7 @@ const stripStyle: CSSProperties = {
   alignItems: "stretch",
   flexShrink: 0,
   gap: 2,
-  paddingLeft: STRIP_BASE_PADDING_LEFT,
+  paddingInlineStart: STRIP_BASE_PADDING_LEFT,
   paddingTop: 5,
   height: STRIP_HEIGHT,
   background: "var(--paper-2)",
@@ -184,8 +184,8 @@ export function TabStrip({
     <div
       style={{
         ...stripStyle,
-        paddingLeft: STRIP_BASE_PADDING_LEFT + insetLeft,
-        paddingRight: insetRight,
+        paddingInlineStart: STRIP_BASE_PADDING_LEFT + insetLeft,
+        paddingInlineEnd: insetRight,
         // The insets clear the floated window controls (traffic lights /
         // sidebar toggles / back-forward nav) when a side has no sidebar, so
         // they flip with the sidebar's collapsed state. Transition them on the
@@ -218,7 +218,7 @@ export function TabStrip({
             ? // Stacked deck (tab-modes / MYND-319): tabs overlap (negative
               // gap) and the row scrolls horizontally. Functional layout —
               // visual polish deferred (no Penpot pass this slice).
-              { ...scrollAreaStyle, gap: 0, paddingLeft: 14 }
+              { ...scrollAreaStyle, gap: 0, paddingInlineStart: 14 }
             : scrollAreaStyle
         }
         data-testid={stacked ? "editor.tab-deck" : undefined}
@@ -394,9 +394,9 @@ function Tab({
     // in the normal strip only the active tab is bordered.
     borderTop:
       active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
-    borderLeft:
+    borderInlineStart:
       active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
-    borderRight:
+    borderInlineEnd:
       active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
     background: active
       ? "var(--bg-1)"
@@ -418,7 +418,7 @@ function Tab({
     // deck; the active/hovered card lifts above the rest. Functional layout.
     ...(stacked
       ? {
-          marginLeft: stackIndex === 0 ? 0 : -16,
+          marginInlineStart: stackIndex === 0 ? 0 : -16,
           zIndex: active ? 200 : hovering ? 100 : stackIndex + 1,
           position: "relative",
           boxShadow:
@@ -505,7 +505,8 @@ function Tab({
           color: italic ? "var(--fg-3)" : undefined,
         }}
       >
-        {text}
+        {/* Isolate the user-authored tab title's direction (RTL/bidi). */}
+        <bdi>{text}</bdi>
       </span>
       {pinned ? (
         // Pinned: a static pin glyph stands in for the × — the tab is
@@ -576,8 +577,8 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
         borderTopLeftRadius: 8,
         borderTopRightRadius: 8,
         borderTop: "1px solid var(--line-1)",
-        borderLeft: "1px solid var(--line-1)",
-        borderRight: "1px solid var(--line-1)",
+        borderInlineStart: "1px solid var(--line-1)",
+        borderInlineEnd: "1px solid var(--line-1)",
         background: "var(--bg-1)",
         color: "var(--fg-2)",
         flexShrink: 0,
@@ -682,7 +683,7 @@ function OverflowMenu({
         style={{
           position: "absolute",
           top: STRIP_HEIGHT,
-          right: 0,
+          insetInlineEnd: 0,
           zIndex: 11,
           margin: 0,
           padding: 4,
@@ -719,7 +720,7 @@ function OverflowMenu({
                 style={{
                   display: "block",
                   width: "100%",
-                  textAlign: "left",
+                  textAlign: "start",
                   padding: "6px 8px",
                   border: 0,
                   borderRadius: "var(--radius-1)",
@@ -736,7 +737,7 @@ function OverflowMenu({
                   transition: HOVER_TRANSITION,
                 }}
               >
-                {text}
+                <bdi>{text}</bdi>
               </button>
             </li>
           );

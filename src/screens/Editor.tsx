@@ -1763,7 +1763,7 @@ function EditorChrome({
                   height: STRIP_HEIGHT,
                   flexShrink: 0,
                   background: "var(--paper-2)",
-                  borderRight: "1px solid var(--line-1)",
+                  borderInlineEnd: "1px solid var(--line-1)",
                 }}
               />
               <SidebarVaultSwitcher
@@ -1805,8 +1805,8 @@ function EditorChrome({
                 alignItems: "center",
                 // Clear the floated left toggle + traffic lights when the left
                 // sidebar is collapsed (they float over this pane's top-left).
-                paddingLeft: leftCollapsed ? leftClearance : "var(--space-4)",
-                paddingRight: "var(--space-4)",
+                paddingInlineStart: leftCollapsed ? leftClearance : "var(--space-4)",
+                paddingInlineEnd: "var(--space-4)",
               }}
             >
               {/* The Attachments title rides the top clearance/tab-strip row so
@@ -2469,7 +2469,7 @@ function SidebarVaultSwitcher({
         // bottom divider (it reads as a header above the Notes list directly).
         padding: "8px 8px 6px",
         background: "var(--paper-2)",
-        borderRight: "1px solid var(--line-1)",
+        borderInlineEnd: "1px solid var(--line-1)",
       }}
     >
       <VaultSwitcher
@@ -3642,7 +3642,7 @@ function RightSidebar() {
         display: "flex",
         flexDirection: "column",
         background: "var(--paper-2)",
-        borderLeft: "1px solid var(--line-1)",
+        borderInlineStart: "1px solid var(--line-1)",
       }}
     >
       {/* Tab strip — drag-reorder + right-click hide/restore (bottom-bar
@@ -4602,7 +4602,7 @@ function WorkspaceSwitcherControl({
           style={{
             position: "absolute",
             bottom: "calc(100% + 4px)",
-            right: 0,
+            insetInlineEnd: 0,
             minWidth: 200,
             maxHeight: 320,
             overflowY: "auto",
@@ -4647,7 +4647,7 @@ function WorkspaceSwitcherControl({
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
-                    textAlign: "left",
+                    textAlign: "start",
                     padding: "6px 8px",
                     background: "transparent",
                     border: 0,
@@ -4729,7 +4729,7 @@ function WorkspaceSwitcherControl({
                   alignItems: "center",
                   gap: 6,
                   width: "100%",
-                  textAlign: "left",
+                  textAlign: "start",
                   padding: "6px 8px",
                   background: "transparent",
                   border: 0,

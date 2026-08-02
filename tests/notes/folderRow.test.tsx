@@ -79,13 +79,15 @@ describe("FolderRow — disclosure + depth", () => {
     expect(row.getAttribute("data-folder-path")).toBe("Inbox/");
   });
 
-  it("indents by depth (paddingLeft = base + depth * per-level)", () => {
+  it("indents by depth (paddingInlineStart = base + depth * per-level)", () => {
     const { rerender } = renderRow({ depth: 0 });
-    const at0 = screen.getByTestId("notes.folder-row").style.paddingLeft;
+    // Logical property (RTL migration): the leading-edge indent is
+    // `padding-inline-start`, which is `padding-left` in an LTR document.
+    const at0 = screen.getByTestId("notes.folder-row").style.paddingInlineStart;
     rerender(
       <FolderRow node={node()} depth={2} collapsed={false} empty={false} onToggle={vi.fn()} />,
     );
-    const at2 = screen.getByTestId("notes.folder-row").style.paddingLeft;
+    const at2 = screen.getByTestId("notes.folder-row").style.paddingInlineStart;
     // BASE_PADDING_LEFT=8, INDENT_PER_LEVEL=18 → depth 0 = 8px, depth 2 = 44px.
     expect(at0).toBe("8px");
     expect(at2).toBe("44px");

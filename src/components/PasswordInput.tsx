@@ -151,7 +151,7 @@ export function PasswordInput({
           spellCheck={false}
           disabled={disabled}
           data-testid={testId}
-          style={{ paddingRight: 36 }}
+          style={{ paddingInlineEnd: 36 }}
         />
         <button
           type="button"
@@ -160,7 +160,7 @@ export function PasswordInput({
           disabled={disabled}
           style={{
             position: "absolute",
-            right: 8,
+            insetInlineEnd: 8,
             top: 7,
             background: "none",
             border: 0,

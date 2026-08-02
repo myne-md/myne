@@ -115,7 +115,7 @@ const THEME_CARD_STYLE: CSSProperties = {
   borderRadius: "var(--radius-2)",
   background: "var(--bg-2)",
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "start",
   transition:
     "border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard)",
 };
@@ -157,7 +157,7 @@ function MiniMockup({ s }: { s: ThemeSwatch }) {
         style={{
           width: 34,
           background: s.paper2,
-          borderRight: `1px solid ${s.line}`,
+          borderInlineEnd: `1px solid ${s.line}`,
           padding: 6,
           display: "flex",
           flexDirection: "column",
@@ -190,7 +190,7 @@ function SystemMockup() {
     display: "flex",
     flexDirection: "column",
     gap: 6,
-    ...(rightBorder !== undefined ? { borderRight: `1px solid ${rightBorder}` } : {}),
+    ...(rightBorder !== undefined ? { borderInlineEnd: `1px solid ${rightBorder}` } : {}),
   });
   return (
     <div
@@ -358,7 +358,7 @@ function AccentColorRow() {
               style={{
                 position: "absolute",
                 top: "calc(100% + 6px)",
-                right: 0,
+                insetInlineEnd: 0,
                 zIndex: 1100,
                 width: 208,
                 padding: "var(--space-3)",

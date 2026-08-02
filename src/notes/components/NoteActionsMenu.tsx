@@ -62,7 +62,7 @@ const BUTTON_STYLE: CSSProperties = {
 const MENU_STYLE: CSSProperties = {
   position: "absolute",
   top: "calc(100% + 4px)",
-  right: 0,
+  insetInlineEnd: 0,
   minWidth: 208,
   background: "var(--paper)",
   border: "1px solid var(--line-2)",
@@ -79,7 +79,7 @@ const ITEM_STYLE: CSSProperties = {
   alignItems: "center",
   gap: 8,
   width: "100%",
-  textAlign: "left",
+  textAlign: "start",
   padding: "6px 10px",
   background: "transparent",
   border: 0,

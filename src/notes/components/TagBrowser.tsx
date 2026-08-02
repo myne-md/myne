@@ -434,7 +434,7 @@ export function TagBrowser({
                   {r.title ?? t("notes.tagBrowser.untitled")}
                 </span>
                 {mode === "or" && r.matchedKeys.length > 0 && (
-                  <span style={{ display: "inline-flex", gap: 4, marginLeft: 8 }}>
+                  <span style={{ display: "inline-flex", gap: 4, marginInlineStart: 8 }}>
                     {r.matchedKeys.map((k) => (
                       <span
                         key={k}

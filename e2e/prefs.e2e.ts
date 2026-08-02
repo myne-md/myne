@@ -523,15 +523,16 @@ describeE2E("pf7 the interface-language picker is the app's own dropdown (#182)"
         await s.byTestId("settings.language-select-menu", { timeoutMs: 10_000 });
 
         // The full roster renders before any filtering — the menu is the whole
-        // language list, not a truncated one.
+        // language list, not a truncated one. (32 = the 24 base locales + the 8
+        // added by myne#176, three of them RTL.)
         await s.waitUntil(
           async () =>
-            (await s.byTestIdAll("settings.language-select-option")).length === 24 || null,
+            (await s.byTestIdAll("settings.language-select-option")).length === 32 || null,
           { label: "the menu lists every supported language" },
         );
 
         // The search box is the whole reason this control is `SearchableSelect`
-        // rather than `Select`: 24 languages is past the point where scanning
+        // rather than `Select`: 32 languages is past the point where scanning
         // an unfiltered list is reasonable.
         //
         // Typing straight in, with no click first, is the assertion — the

@@ -334,7 +334,7 @@ export function UnlinkedMentionsSection({
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      textAlign: "left",
+                      textAlign: "start",
                       background: "transparent",
                       border: "none",
                       padding: 0,

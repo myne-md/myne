@@ -31,7 +31,7 @@ const ROW_BASE_STYLE: CSSProperties = {
   flexDirection: "column",
   gap: 2,
   width: "100%",
-  textAlign: "left",
+  textAlign: "start",
   border: 0,
   background: "transparent",
   cursor: "pointer",

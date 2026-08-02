@@ -69,7 +69,7 @@ export interface StorageLostProps {
 const LIST_STYLE: CSSProperties = {
   ...CARD_BODY_STYLE,
   margin: "var(--space-2) 0",
-  paddingLeft: "var(--space-5)",
+  paddingInlineStart: "var(--space-5)",
   maxHeight: 180,
   overflowY: "auto",
 };

@@ -14,6 +14,7 @@
 import i18n, { type Resource } from "i18next";
 import { initReactI18next } from "react-i18next";
 import {
+  directionFor,
   FALLBACK_LANGUAGE,
   LANGUAGE_STORAGE_KEY,
   SUPPORTED_CODES,
@@ -58,9 +59,34 @@ function detectInitialLanguage(): LanguageCode {
   return FALLBACK_LANGUAGE;
 }
 
+/**
+ * Reflect a locale's writing direction onto the document root: `<html dir>` +
+ * `<html lang>`. This is what makes the whole shared UI mirror for RTL locales
+ * (`ar`/`ur`/`fa`) via CSS logical properties + `[dir="rtl"]` rules.
+ *
+ * Direction follows the LANGUAGE, which is device-local and rendered pre-unlock
+ * (Welcome/Unlock screens are already translated). It therefore does NOT clear
+ * on vault lock — unlike the theme, which lives in the encrypted `vault.prefs`
+ * and is zeroized on lock to avoid an A6 personalization leak. `dir` reveals
+ * nothing the already-rendered translated strings don't. (SYNC-2.)
+ */
+function applyDocumentDirection(code: string): void {
+  if (typeof document === "undefined") return; // non-DOM host (e.g. worker/tests without jsdom)
+  const root = document.documentElement;
+  root.setAttribute("dir", directionFor(code));
+  root.setAttribute("lang", code);
+}
+
+const initialLng = detectInitialLanguage();
+applyDocumentDirection(initialLng);
+
+// Keep `<html dir>` in step with any language change, however it is triggered
+// (the setLanguage() path below, or a direct i18n.changeLanguage()).
+i18n.on("languageChanged", (lng) => applyDocumentDirection(lng));
+
 void i18n.use(initReactI18next).init({
   resources,
-  lng: detectInitialLanguage(),
+  lng: initialLng,
   fallbackLng: FALLBACK_LANGUAGE,
   defaultNS: "common",
   ns: ["common"],

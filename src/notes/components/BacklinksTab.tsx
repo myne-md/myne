@@ -104,7 +104,7 @@ export function BacklinksTab() {
                 {row.sourceTitle ?? t("editor.chrome.backlinks.untitled")}
               </span>
               {row.count > 1 && (
-                <span style={{ fontSize: 12, color: "var(--fg-3)", marginLeft: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--fg-3)", marginInlineStart: 6 }}>
                   ({row.count})
                 </span>
               )}
@@ -118,7 +118,7 @@ export function BacklinksTab() {
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    marginLeft: 6,
+                    marginInlineStart: 6,
                     color: "var(--fg-3)",
                   }}
                 >
@@ -153,7 +153,7 @@ export function BacklinksTab() {
                 {row.targetTitle ?? t("editor.chrome.backlinks.untitled")}
               </span>
               {row.count > 1 && (
-                <span style={{ fontSize: 12, color: "var(--fg-3)", marginLeft: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--fg-3)", marginInlineStart: 6 }}>
                   ({row.count})
                 </span>
               )}

@@ -74,7 +74,7 @@ export function PasswordStrength({
             letterSpacing: "0.08em",
             textTransform: "uppercase",
             minWidth: 64,
-            textAlign: "right",
+            textAlign: "end",
           }}
         >
           {label}

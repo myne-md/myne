@@ -62,7 +62,7 @@ const ROW_STYLE: CSSProperties = {
   border: 0,
   borderRadius: "var(--radius-1)",
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "start",
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-base)",

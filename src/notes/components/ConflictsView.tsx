@@ -300,7 +300,7 @@ function CompareSurface({
       </div>
 
       {compare.status === "orphan" && (
-        <p style={{ ...COMPARE_NOTE, margin: 0, padding: 0, textAlign: "left" }}>
+        <p style={{ ...COMPARE_NOTE, margin: 0, padding: 0, textAlign: "start" }}>
           {t("sync.conflicts.compareOrphan")}
         </p>
       )}

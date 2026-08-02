@@ -110,7 +110,7 @@ export function StepHeading({ centered, children }: StepHeadingProps) {
         letterSpacing: "-0.015em",
         lineHeight: 1.2,
         color: "var(--fg-display)",
-        textAlign: centered ? "center" : "left",
+        textAlign: centered ? "center" : "start",
       }}
     >
       {children}

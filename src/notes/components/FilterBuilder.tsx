@@ -100,7 +100,7 @@ const FOOTER_STYLE: CSSProperties = {
 };
 
 const COUNT_STYLE: CSSProperties = {
-  marginRight: "auto",
+  marginInlineEnd: "auto",
   fontSize: 12,
   color: "var(--fg-3)",
   fontVariantNumeric: "tabular-nums",

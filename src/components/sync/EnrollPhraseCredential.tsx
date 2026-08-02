@@ -35,7 +35,7 @@ const CELL_NUMBER: CSSProperties = {
   fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   width: "1.4em",
-  textAlign: "right",
+  textAlign: "end",
   fontFamily: "var(--font-mono)",
 };
 const CELL_INPUT: CSSProperties = {

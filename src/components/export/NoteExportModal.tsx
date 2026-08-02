@@ -122,7 +122,7 @@ const SUB_LABEL_STYLE: CSSProperties = {
   color: "var(--fg-3)",
   // Indent under the checkbox (13px box + gap) so the sub-label aligns
   // with the toggle's label text, as in the Penpot frame.
-  paddingLeft: "calc(13px + var(--space-2))",
+  paddingInlineStart: "calc(13px + var(--space-2))",
 };
 
 export const FOOTER_STYLE: CSSProperties = {

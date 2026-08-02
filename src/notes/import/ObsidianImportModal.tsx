@@ -416,7 +416,7 @@ function SetupBody({
               onClick={onBack}
               data-testid="import.change-source"
               style={{
-                marginLeft: "auto",
+                marginInlineStart: "auto",
                 background: "none",
                 border: 0,
                 padding: 0,
@@ -568,7 +568,7 @@ function RadioRow({
         display: "flex",
         gap: "var(--space-3)",
         alignItems: "flex-start",
-        textAlign: "left",
+        textAlign: "start",
         background: checked ? "var(--accent-soft)" : "transparent",
         border: `1px solid ${checked ? "var(--accent)" : "var(--line-1)"}`,
         borderRadius: "var(--radius-2)",

@@ -49,7 +49,7 @@ const NAV_ROW_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "start",
   boxSizing: "border-box",
   transition: HOVER_TRANSITION,
 };
@@ -143,7 +143,7 @@ const ROW_BASE_STYLE: CSSProperties = {
   cursor: "pointer",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
-  textAlign: "left",
+  textAlign: "start",
 };
 
 const ROW_LABEL_STYLE: CSSProperties = {

@@ -46,7 +46,7 @@ const NAME_STYLE: CSSProperties = {
 
 const NOTE_LIST_STYLE: CSSProperties = {
   margin: 0,
-  paddingLeft: "var(--space-5)",
+  paddingInlineStart: "var(--space-5)",
   maxHeight: 160,
   overflowY: "auto",
   fontSize: 13,

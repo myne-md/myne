@@ -57,12 +57,12 @@ const CELL_STYLE: CSSProperties = {
 const NAME_CELL_STYLE: CSSProperties = {
   ...CELL_STYLE,
   position: "sticky",
-  left: 0,
+  insetInlineStart: 0,
   zIndex: 1,
   // Opaque so property cells scroll UNDER the pinned Name column (matches the
   // row + wrapper `--paper` fill so the occlusion is seamless).
   background: "var(--paper)",
-  paddingRight: "var(--space-3)",
+  paddingInlineEnd: "var(--space-3)",
   fontWeight: 600,
   color: "var(--fg-1)",
 };

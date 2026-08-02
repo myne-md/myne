@@ -198,7 +198,7 @@ const HELP_LIST: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-2)",
-  paddingLeft: "var(--space-4)",
+  paddingInlineStart: "var(--space-4)",
 };
 
 const ACTIONS: CSSProperties = {
