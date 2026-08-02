@@ -761,6 +761,13 @@ export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
  */
 export async function setDeveloperMode(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_developer_mode", { enabled });
+  // Bump the prefs nonce so EVERY `usePrefs` instance re-reads — not just the
+  // About panel's own. Developer mode gates three OTHER surfaces (the rail's
+  // Developer group, the Editor Vim row, the Privacy CLI row), each a separate
+  // `usePrefs` instance; without this they only converge on a remount or an
+  // incidental later prefs write, which is #220 (the "no restart" contract the
+  // SettingsModal comment already claims).
+  bumpPrefsNonce();
 }
 
 /**
