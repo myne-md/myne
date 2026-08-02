@@ -57,9 +57,17 @@ export type DrawingCanvasProps = {
   /** Called with the re-serialized scene JSON whenever the canvas changes; the
    *  host splices it into the note body and autosave (debounced) persists it. */
   onSceneChange?: (sceneJson: string) => void;
+  /** #213: center + fit the scene to the viewport on mount (Excalidraw
+   *  `scrollToContent`). The inline embed opens content-focused rather than at the
+   *  scene's saved scroll offset; the whole-note surface leaves it off (it keeps
+   *  the user's last viewport). Default false. */
+  fitContentOnMount?: boolean;
 };
 
-function parseInitialData(json: string | undefined): InitialData {
+function parseInitialData(
+  json: string | undefined,
+  fitContent: boolean,
+): InitialData {
   if (json === undefined) return undefined;
   try {
     const scene = JSON.parse(json) as Record<string, unknown>;
@@ -72,6 +80,8 @@ function parseInitialData(json: string | undefined): InitialData {
       // the app; a per-drawing theme persisted in the scene (spread last) wins.
       appState: { theme: currentAppTheme(), ...persistedAppState },
       files: scene.files ?? {},
+      // #213: open centered on the drawing rather than at its saved scroll.
+      scrollToContent: fitContent,
     } as unknown as InitialData;
   } catch {
     // A malformed scene must never crash the render — fall back to empty.
@@ -82,6 +92,7 @@ function parseInitialData(json: string | undefined): InitialData {
 export default function DrawingCanvas({
   initialSceneJson,
   onSceneChange,
+  fitContentOnMount = false,
 }: DrawingCanvasProps) {
   // Excalidraw fires onChange once on mount with the initial scene — skip that
   // no-op fire so merely OPENING a drawing doesn't dirty the buffer + autosave a
@@ -96,7 +107,7 @@ export default function DrawingCanvas({
     >
       <Excalidraw
         {...HARDENED_EXCALIDRAW_PROPS}
-        initialData={parseInitialData(initialSceneJson)}
+        initialData={parseInitialData(initialSceneJson, fitContentOnMount)}
         onChange={
           onSceneChange
             ? (elements, appState, files) => {

@@ -8,6 +8,7 @@ import type { EditorView } from "@codemirror/view";
 import { pickAndInsert } from "../attachments/picker";
 import { startVoiceRecording } from "../attachments/voiceRecord";
 import { getHost } from "../host";
+import { readDrawingEmbedIo } from "../drawing/embed-io";
 import { requestTableCellFocus } from "../decorations/table";
 import { emptyTableGrid, serializeTable } from "../decorations/table-model";
 import {
@@ -71,6 +72,25 @@ function insertAtTrigger(
     },
     userEvent: "slash.apply",
   });
+}
+
+/**
+ * Splice a `![[Title]]` drawing embed at the caret, on its OWN line so it reads
+ * as a block (the drawing-embed decoration renders it as a thumbnail/canvas
+ * block). Fired asynchronously after `/drawing` creates the sibling note, so it
+ * inserts at the live caret rather than the (stale) trigger range.
+ */
+function insertDrawingEmbed(view: EditorView, title: string): void {
+  const at = view.state.selection.main.head;
+  const line = view.state.doc.lineAt(at);
+  const before = at === line.from ? "" : "\n";
+  const text = `${before}![[${title}]]\n`;
+  view.dispatch({
+    changes: { from: at, insert: text },
+    selection: { anchor: at + text.length },
+    userEvent: "slash.apply",
+  });
+  view.focus();
 }
 
 /**
@@ -379,6 +399,33 @@ export function slashCommands(): readonly SlashCommand[] {
         const host = getHost();
         if (host.voiceRecord) host.voiceRecord(v);
         else void startVoiceRecording(v);
+      },
+    },
+    {
+      // `/drawing` (MYND-634): create a sibling drawing note in THIS note's
+      // folder and embed it inline as `![[Title]]`, which `drawing-embed.ts`
+      // renders as a thumbnail that opens an edit-in-place canvas. The trigger is
+      // removed first; creation is async (createDrawing mints a new note), so the
+      // embed is spliced in when the title resolves. Inert (trigger-clear only) on
+      // a host that does not provide the drawing IO seam.
+      id: "drawing",
+      label: i18n.t("editor.slash.drawing"),
+      icon: "✎",
+      svgIcon: "pencil",
+      apply: (v, f, t) => {
+        v.dispatch({
+          changes: { from: f, to: t, insert: "" },
+          selection: { anchor: f },
+          userEvent: "slash.apply",
+        });
+        const io = readDrawingEmbedIo(v.state);
+        if (io === null) return;
+        void io
+          .createSibling()
+          .then((title) => {
+            if (title !== "") insertDrawingEmbed(v, title);
+          })
+          .catch(() => {});
       },
     },
     {

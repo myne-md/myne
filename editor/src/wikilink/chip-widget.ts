@@ -224,11 +224,13 @@ function buildWikilinkChipDecorations(view: EditorView, ranges: ReadonlyArray<{ 
         if ((parts.target ?? "") === "") return false;
         const display = chipDisplayText(parts);
         const broken = isChipBroken(parts, presentKeys, presentFolderIndex);
-        // MYND-634: a drawing embed reads as a drawing, not as prose. This is
-        // the first consumer of the resolver's `isDrawing` flag; the full
-        // inline canvas (locked thumbnail ↔ editable surface) builds on this
-        // discrimination rather than replacing it.
+        // A drawing embed (`![[Drawing]]`, kind:drawing target) is rendered
+        // inline by `decorations/drawing-embed.ts` — a thumbnail that opens an
+        // edit-in-place canvas — NOT as a text chip. Defer the range so it is
+        // never double-decorated (#213 / MYND-634), the same way attachment
+        // embeds are deferred above.
         const drawing = isDrawingEmbed(parts, drawingKeys);
+        if (drawing) return false;
         decorations.push(
           Decoration.replace({
             widget: new WikilinkChipWidget(display, parts.isEmbed, broken, drawing),
@@ -269,21 +271,29 @@ function cachedWikilinkAtomicRanges(view: EditorView) {
   if (cached !== undefined && cached.activeFrom === activeFrom && cached.revealKey === key) {
     return cached.ranges;
   }
+  // Drawing embeds register their OWN atomic range in drawing-embed.ts (which is
+  // view-mode-gated, so source mode leaves them editable) — exclude them here too,
+  // exactly like attachment embeds.
+  const { drawings: drawingKeys } = chipKeySets(readNoteSet(view.state));
   const ranges: Array<Range<Decoration>> = [];
   tree.iterate({
     from: 0,
     to: view.state.doc.length,
     enter: (node) => {
       if (node.name === "Wikilink") {
-        // Attachment embeds register their own atomic range in attachment-embed.ts;
-        // an empty `[[]]` is plain text (§10), the `[[` picker's active node is
+        // Attachment + drawing embeds register their own atomic range; an empty
+        // `[[]]` is plain text (§10), the `[[` picker's active node is
         // raw/editable, and a link on the caret's line is lifted for editing —
         // none are atomic (the cursor edits them freely).
         if (node.from === activeFrom || isWikilinkRevealed(view, node.from, node.to)) {
           return false;
         }
         const parts = parseWikilinkParts(view.state, node.from, node.to);
-        if (!isAttachmentEmbed(parts) && (parts.target ?? "") !== "") {
+        if (
+          !isAttachmentEmbed(parts) &&
+          !isDrawingEmbed(parts, drawingKeys) &&
+          (parts.target ?? "") !== ""
+        ) {
           ranges.push(Decoration.replace({}).range(node.from, node.to));
         }
         return false;

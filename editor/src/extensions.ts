@@ -54,6 +54,8 @@ import { viewModeExtension, type ViewMode } from "./view-mode";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { noteSetExtension } from "./wikilink/note-set";
+import { drawingEmbedIoExtension } from "./drawing/embed-io";
+import { activeDrawingEmbedField } from "./decorations/drawing-embed";
 import { lineNumbersExtension } from "./line-numbers";
 import { wikilinkHoverExtension } from "./wikilink/hover";
 import { wikilinkPickerExtension } from "./wikilink/picker";
@@ -246,6 +248,12 @@ export function myneExtensions(opts?: {
     // reconfigures it from `useResolverNotes()`). MUST precede the chip + hover
     // so the facet exists when they read it.
     noteSetExtension(),
+    // Inline drawing embeds (MYND-634): the host-injected note-CRUD IO seam +
+    // the transient edit-in-place state. Mounted mode-INDEPENDENTLY (unlike the
+    // drawing-embed decoration, which is inside the view-mode stack) so the IO
+    // seam can be reconfigured and the active state survives a live↔source switch.
+    drawingEmbedIoExtension(),
+    activeDrawingEmbedField,
     ...wikilinkChipExtensions(),
     // Hover-tooltip R1 (§6.2): resolved path / "(N matches)" / "(no match)".
     wikilinkHoverExtension(),

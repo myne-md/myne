@@ -18,6 +18,16 @@ export type RenderOptions = {
   scale?: number;
   /** Transparent by default; pass a CSS color for an opaque background. */
   background?: string | null;
+  /**
+   * Render with Excalidraw's dark-mode transform so the export matches how the
+   * editor paints the scene (a scene drawn in dark mode stores dark stroke
+   * colors that the editor inverts on display; without this the export shows the
+   * raw dark strokes — a faint, near-invisible thumbnail, #213 review). The
+   * CALLER supplies this from the live app theme because a scene that matches the
+   * app default is stored themeless, so the scene JSON alone can't tell us.
+   * Falls back to the scene's persisted theme.
+   */
+  darkMode?: boolean;
 };
 
 type Scene = {
@@ -34,6 +44,13 @@ function parseScene(sceneJson: string): Scene | null {
   }
 }
 
+/** Whether to apply the dark-mode transform: explicit caller flag, else the
+ *  scene's persisted theme. */
+function useDarkMode(scene: Scene, opts: RenderOptions): boolean {
+  if (opts.darkMode !== undefined) return opts.darkMode;
+  return scene.appState?.theme === "dark";
+}
+
 /** Render a drawing scene to a PNG `Blob`. Returns null on a malformed scene. */
 export async function renderScenePng(
   sceneJson: string,
@@ -45,6 +62,7 @@ export async function renderScenePng(
     ...(scene.appState ?? {}),
     exportBackground: opts.background != null,
     viewBackgroundColor: opts.background ?? "transparent",
+    exportWithDarkMode: useDarkMode(scene, opts),
   };
   return await exportToBlob({
     elements: (scene.elements ?? []) as never,
@@ -70,6 +88,7 @@ export async function renderSceneSvg(
     ...(scene.appState ?? {}),
     exportBackground: opts.background != null,
     viewBackgroundColor: opts.background ?? "transparent",
+    exportWithDarkMode: useDarkMode(scene, opts),
   };
   return await exportToSvg({
     elements: (scene.elements ?? []) as never,
