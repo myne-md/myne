@@ -121,6 +121,18 @@ body {
   overflow-wrap: break-word;
 }
 
+/* RTL / bidi (#172): give each block its own content-derived base direction
+   (the print-export mirror of the editor's per-line dir=auto), so a mixed
+   RTL+LTR note exports with each paragraph reading in its own direction. Inline
+   code / links are isolated so an intrinsically-LTR run does not reorder an RTL
+   paragraph around it. (.note-title is an h1, already covered.) */
+h1, h2, h3, h4, h5, h6, p, li, blockquote, dt, dd, td, th {
+  unicode-bidi: plaintext;
+}
+code, a {
+  unicode-bidi: isolate;
+}
+
 /* === Title + heading scale =============================================
    .note-title is the frontmatter-projected document heading (h1.note-title);
    plain h1–h6 are the note's own headings. */

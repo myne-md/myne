@@ -51,6 +51,7 @@ import { TaskField } from "@myne/dialect/lezer/task-field";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { viewModeExtension, type ViewMode } from "./view-mode";
+import { textDirectionExtension } from "./direction";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { noteSetExtension } from "./wikilink/note-set";
@@ -254,6 +255,10 @@ export function myneExtensions(opts?: {
     // seam can be reconfigured and the active state survives a live↔source switch.
     drawingEmbedIoExtension(),
     activeDrawingEmbedField,
+    // RTL / bidi (myne#172): per-line `dir=auto` + `perLineTextDirection` so
+    // mixed RTL+LTR notes edit and render correctly. Mounted here, OUTSIDE the
+    // view-mode compartment, so raw-markdown RTL still resolves in source mode.
+    textDirectionExtension(),
     ...wikilinkChipExtensions(),
     // Hover-tooltip R1 (§6.2): resolved path / "(N matches)" / "(no match)".
     wikilinkHoverExtension(),
