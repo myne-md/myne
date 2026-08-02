@@ -180,6 +180,10 @@ export type WorkspaceApi = {
   // ── per-pane tab ops ───────────────────────────────────────────
   activateInPane: (paneId: PaneId, id: NoteId) => void;
   closeTabInPane: (paneId: PaneId, id: NoteId) => void;
+  /** Close a note's tabs in EVERY pane — used when the note leaves the live tree
+   *  (trash / archive) so no stale, still-editable buffer is left behind for an
+   *  autosave to write back and silently un-trash / un-archive it (#219). */
+  closeNoteEverywhere: (id: NoteId) => void;
   /** Drop a note onto a pane's tab strip (tab drag OR sidebar drag): an
    *  already-open note moves/reorders, a fresh one is inserted + activated. */
   dropNoteOnPane: (toPaneId: PaneId, id: NoteId, toIndex: number) => void;
@@ -403,6 +407,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     (paneId: PaneId, id: NoteId) => {
       setPending(null);
       setState((s) => closeTabOp(s, paneId, noteItem(id)));
+    },
+    [setPending],
+  );
+  // Close a note's tabs across every pane (#219). Leaf ids are stable across the
+  // fold (closeTabOp only removes a tab, never renumbers panes); a pane without
+  // the tab is a no-op, and the last-tab-of-the-only-leaf case leaves that pane
+  // tabless (the empty-editor shell) per the workspace invariant — never a crash.
+  const closeNoteEverywhere = useCallback(
+    (id: NoteId) => {
+      setPending(null);
+      setState((s) => {
+        const leafIds = collectLeaves(s.root).map((l) => l.id);
+        return leafIds.reduce(
+          (acc, paneId) => closeTabOp(acc, paneId, noteItem(id)),
+          s,
+        );
+      });
     },
     [setPending],
   );
@@ -672,6 +693,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       focusPane,
       activateInPane,
       closeTabInPane,
+      closeNoteEverywhere,
       dropNoteOnPane,
       splitPaneWithNote,
       openView,
@@ -721,6 +743,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       focusPane,
       activateInPane,
       closeTabInPane,
+      closeNoteEverywhere,
       dropNoteOnPane,
       splitPaneWithNote,
       openView,
