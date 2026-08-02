@@ -17,7 +17,12 @@ import { foldedRanges, forceParsing, syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { codeNestMarkdownExtension } from "../../src/editor/code-highlight";
 import { myneFolding } from "../../src/editor/folding";
-import { myneKeyBindings, scopedSelectAllRange } from "../../src/editor/keymap";
+import {
+  myneKeyBindings,
+  scopedSelectAllRange,
+  buildMyneKeymap,
+  EDITOR_KEYMAP_DEFAULTS,
+} from "../../src/editor/keymap";
 
 const FM = "---\ntitle: Note\nupdated: 2026-01-01\n---\nBody line one\nBody two\n";
 
@@ -232,5 +237,45 @@ describe("myneKeyBindings — Mod-a scoped select-all", () => {
     const slice = m.view.state.doc.sliceString(sel.from, sel.to);
     expect(slice).toContain("Body line one");
     expect(slice).not.toContain("title:");
+  });
+});
+
+describe("buildMyneKeymap — override-driven editor keymap (#184)", () => {
+  // Helper: the chords bound to a given command's run, identified by pointing at
+  // the SAME `run` the default keymap uses for that id's default chord.
+  function chordsRunning(km: readonly KeyBinding[], sampleDefaultKey: string): string[] {
+    const target = myneKeyBindings.find((b) => b.key === sampleDefaultKey)!.run;
+    return km.filter((b) => b.run === target).map((b) => b.key);
+  }
+
+  it("with no overrides, reproduces the in-code defaults (bold on Mod-b)", () => {
+    const km = buildMyneKeymap();
+    expect(km.some((b) => b.key === "Mod-b")).toBe(true);
+    expect(km.some((b) => b.key === "Mod-z")).toBe(true); // undo now in the set
+    expect(km.some((b) => b.key === "Tab")).toBe(true); // indent now in the set
+  });
+
+  it("an override re-points a command's chord (bold Mod-b → Mod-6)", () => {
+    const km = buildMyneKeymap({ "editor.bold": ["Mod-6"] });
+    expect(chordsRunning(km, "Mod-b")).toEqual(["Mod-6"]);
+    // the default Mod-b no longer runs bold
+    expect(km.some((b) => b.key === "Mod-b")).toBe(false);
+  });
+
+  it("an empty-array override is an explicit unbind (no KeyBinding emitted)", () => {
+    const km = buildMyneKeymap({ "editor.bold": [] });
+    expect(chordsRunning(km, "Mod-b")).toEqual([]);
+  });
+
+  it("a multi-chord override emits one KeyBinding per chord", () => {
+    const km = buildMyneKeymap({ "editor.italic": ["Mod-i", "Alt-i"] });
+    expect(chordsRunning(km, "Mod-i").sort()).toEqual(["Alt-i", "Mod-i"]);
+  });
+
+  it("EDITOR_KEYMAP_DEFAULTS covers undo/redo/indent/outdent with their chords", () => {
+    expect(EDITOR_KEYMAP_DEFAULTS["editor.undo"]).toEqual(["Mod-z"]);
+    expect(EDITOR_KEYMAP_DEFAULTS["editor.redo"]).toEqual(["Mod-y", "Mod-Shift-z"]);
+    expect(EDITOR_KEYMAP_DEFAULTS["editor.indent"]).toEqual(["Tab"]);
+    expect(EDITOR_KEYMAP_DEFAULTS["editor.outdent"]).toEqual(["Shift-Tab"]);
   });
 });

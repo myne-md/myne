@@ -4,7 +4,7 @@
 // (never in the buffer until accept), a debounced ViewPlugin fires one blocking
 // `infer` on a paused cursor and cancels any in-flight request on change, and a
 // `Prec.highest` Tab keymap accepts the suggestion **only while one is showing**
-// (otherwise it falls through to `indentWithTab`).
+// (otherwise it falls through to the rebindable `editor.indent` Tab binding).
 //
 // Design (own, no Penpot frame): the suggestion is `--fg-3` dimmed, italic,
 // non-interactive, `data-testid="ai.ghost-text"`; it sits directly after the
@@ -135,8 +135,8 @@ export function ghostShowing(view: EditorView): boolean {
 
 /** Accept the showing suggestion: insert it as plain markdown at its offset
  *  (`ai.insert`, one undo step) and clear the field. Returns `false` when none
- *  is showing so the keymap falls through to `indentWithTab`. Exported for the
- *  keymap + tests. */
+ *  is showing so the keymap falls through to the `editor.indent` Tab binding.
+ *  Exported for the keymap + tests. */
 export function acceptGhost(view: EditorView): boolean {
   const g = view.state.field(ghostField, false);
   if (g == null) return false;

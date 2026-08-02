@@ -2,15 +2,23 @@
 // (hotkeys epic, MYND-304; hotkeys-panel-view). The single source the panel (#3)
 // + rebind flow (#4) read to list/search/rebind shortcuts. Each entry carries
 // DISPLAY metadata (label, group, default chord) + a `rebindable` flag; the
-// actual dispatch lives in the engine (window commands) or CodeMirror's keymap
-// (the fixed editor-formatting rows, SYNC-9) — the catalog does not run anything.
+// actual dispatch lives in the window keybind engine (window commands) or the
+// EDITOR keymap Compartment (editor-formatting + undo/indent/select, #184) — the
+// catalog does not run anything. The editor ids here mirror
+// `@myne/editor`'s `EDITOR_KEYMAP_DEFAULTS` verbatim (a drift test pins them
+// equal), and `vault.prefs.keymap` overrides feed BOTH the window dispatcher and
+// the editor keymap builder, so a rebind of either kind takes effect with no
+// other change.
 //
 // Bindings shown are the effective ones (`override ?? default`); the override
 // comes from `vault.prefs.keymap` keyed by `id` (commands/keymap.ts). Grouping
 // is panel-local (the registry `CommandAction.category` is left untouched — grill
 // Q1). Widget-internal nav keys (modal/palette Esc/Enter/Tab/Arrows) are
-// EXCLUDED (grill Q2); Ctrl+Tab is shown as a fixed row (literal-Ctrl, not in the
-// rebindable keymap — see keybind-engine task 4).
+// EXCLUDED (grill Q2). #184 made the editor-formatting group + undo/redo/indent/
+// outdent/select-next rebindable (previously "fixed, SYNC-9"); the ONE remaining
+// fixed row is Ctrl+Tab (`pane.cycle-tab`) — a cross-platform literal-Ctrl chord
+// the `Mod`-token chord layer cannot yet distinctly represent on non-mac (its
+// dispatch stays the inline handler in Editor.tsx).
 
 import i18n from "../i18n";
 
@@ -47,9 +55,16 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   // like any other window command (was a hardcoded window listener before).
   { id: "palette.toggle", get label() { return i18n.t("commands.hotkeys.command.paletteToggle"); }, group: "General", defaultBindings: ["Mod-k", "Mod-p"], rebindable: true },
   { id: "app.open-settings", get label() { return i18n.t("commands.hotkeys.command.openSettings"); }, group: "General", defaultBindings: ["Mod-,"], rebindable: true },
+  // In-note find (MYND-175 → #184): was a hardcoded window listener with no
+  // catalog entry; now an engine command so it is listed + rebindable. App.tsx
+  // still suppresses the WebView's native Cmd+F app-wide (the engine only opens
+  // the bar on the editor stage).
+  { id: "find.open", get label() { return i18n.t("commands.hotkeys.command.findInNote"); }, group: "General", defaultBindings: ["Mod-f"], rebindable: true },
 
   // Notes
-  { id: "note.new-tab", get label() { return i18n.t("commands.hotkeys.command.newNote"); }, group: "Notes", defaultBindings: ["Mod-t"], rebindable: true },
+  // Two default chords: Mod-t (new-tab convention) + Mod-n (the OS "new" chord,
+  // formerly a separate hardcoded Cmd+N listener, folded in here — #184 C).
+  { id: "note.new-tab", get label() { return i18n.t("commands.hotkeys.command.newNote"); }, group: "Notes", defaultBindings: ["Mod-t", "Mod-n"], rebindable: true },
 
   // Panes & Tabs
   { id: "pane.close-tab", get label() { return i18n.t("commands.hotkeys.command.closeTab"); }, group: "Panes & Tabs", defaultBindings: ["Mod-w"], rebindable: true },
@@ -80,20 +95,28 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   { id: "workspace.rename", get label() { return i18n.t("commands.hotkeys.command.renameWorkspace"); }, group: "View", defaultBindings: [], rebindable: true },
   { id: "workspace.delete", get label() { return i18n.t("commands.hotkeys.command.deleteWorkspace"); }, group: "View", defaultBindings: [], rebindable: true },
 
-  // Editor formatting (CodeMirror-owned, SYNC-9 — fixed, not rebindable yet)
-  { id: "editor.bold", get label() { return i18n.t("commands.hotkeys.command.bold"); }, group: "Editor formatting", defaultBindings: ["Mod-b"], rebindable: false },
-  { id: "editor.italic", get label() { return i18n.t("commands.hotkeys.command.italic"); }, group: "Editor formatting", defaultBindings: ["Mod-i"], rebindable: false },
-  { id: "editor.code", get label() { return i18n.t("commands.hotkeys.command.inlineCode"); }, group: "Editor formatting", defaultBindings: ["Mod-e"], rebindable: false },
-  { id: "editor.cycle-heading", get label() { return i18n.t("commands.hotkeys.command.cycleHeadingLevel"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-h"], rebindable: false },
-  { id: "editor.ordered-list", get label() { return i18n.t("commands.hotkeys.command.toggleNumberedList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-7"], rebindable: false },
-  { id: "editor.bullet-list", get label() { return i18n.t("commands.hotkeys.command.toggleBulletList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-8"], rebindable: false },
-  { id: "editor.task-list", get label() { return i18n.t("commands.hotkeys.command.toggleTaskList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-m"], rebindable: false },
-  { id: "editor.wikilink", get label() { return i18n.t("commands.hotkeys.command.insertWikilink"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-l"], rebindable: false },
-  { id: "editor.select-all", get label() { return i18n.t("commands.hotkeys.command.selectAllScoped"); }, group: "Editor formatting", defaultBindings: ["Mod-a"], rebindable: false },
-  // Heading/list folding (MYND-300) — CodeMirror-owned chords, fixed like the
-  // other editor-formatting rows (SYNC-9). Per-fold is the gutter click.
-  { id: "editor.fold-all", get label() { return i18n.t("commands.hotkeys.command.foldAll"); }, group: "Editor formatting", defaultBindings: ["Mod-Alt-["], rebindable: false },
-  { id: "editor.unfold-all", get label() { return i18n.t("commands.hotkeys.command.unfoldAll"); }, group: "Editor formatting", defaultBindings: ["Mod-Alt-]"], rebindable: false },
+  // Editor formatting (#184: now REBINDABLE via the editor keymap Compartment —
+  // ids + default chords mirror @myne/editor EDITOR_KEYMAP_DEFAULTS, drift-tested).
+  { id: "editor.bold", get label() { return i18n.t("commands.hotkeys.command.bold"); }, group: "Editor formatting", defaultBindings: ["Mod-b"], rebindable: true },
+  { id: "editor.italic", get label() { return i18n.t("commands.hotkeys.command.italic"); }, group: "Editor formatting", defaultBindings: ["Mod-i"], rebindable: true },
+  { id: "editor.code", get label() { return i18n.t("commands.hotkeys.command.inlineCode"); }, group: "Editor formatting", defaultBindings: ["Mod-e"], rebindable: true },
+  { id: "editor.cycle-heading", get label() { return i18n.t("commands.hotkeys.command.cycleHeadingLevel"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-h"], rebindable: true },
+  { id: "editor.ordered-list", get label() { return i18n.t("commands.hotkeys.command.toggleNumberedList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-7"], rebindable: true },
+  { id: "editor.bullet-list", get label() { return i18n.t("commands.hotkeys.command.toggleBulletList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-8"], rebindable: true },
+  { id: "editor.task-list", get label() { return i18n.t("commands.hotkeys.command.toggleTaskList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-m"], rebindable: true },
+  { id: "editor.wikilink", get label() { return i18n.t("commands.hotkeys.command.insertWikilink"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-l"], rebindable: true },
+  { id: "editor.select-all", get label() { return i18n.t("commands.hotkeys.command.selectAllScoped"); }, group: "Editor formatting", defaultBindings: ["Mod-a"], rebindable: true },
+  // Multi-cursor (MYND-306): add the next occurrence of the selection.
+  { id: "editor.select-next", get label() { return i18n.t("commands.hotkeys.command.selectNextOccurrence"); }, group: "Editor formatting", defaultBindings: ["Mod-d"], rebindable: true },
+  // Heading/list folding (MYND-300). Per-fold is the gutter click.
+  { id: "editor.fold-all", get label() { return i18n.t("commands.hotkeys.command.foldAll"); }, group: "Editor formatting", defaultBindings: ["Mod-Alt-["], rebindable: true },
+  { id: "editor.unfold-all", get label() { return i18n.t("commands.hotkeys.command.unfoldAll"); }, group: "Editor formatting", defaultBindings: ["Mod-Alt-]"], rebindable: true },
+  // History + indentation (#184: formerly historyKeymap / indentWithTab, now
+  // override-driven). redo carries both conventions (Mod-y + Mod-Shift-z).
+  { id: "editor.undo", get label() { return i18n.t("commands.hotkeys.command.undo"); }, group: "Editor formatting", defaultBindings: ["Mod-z"], rebindable: true },
+  { id: "editor.redo", get label() { return i18n.t("commands.hotkeys.command.redo"); }, group: "Editor formatting", defaultBindings: ["Mod-y", "Mod-Shift-z"], rebindable: true },
+  { id: "editor.indent", get label() { return i18n.t("commands.hotkeys.command.indent"); }, group: "Editor formatting", defaultBindings: ["Tab"], rebindable: true },
+  { id: "editor.outdent", get label() { return i18n.t("commands.hotkeys.command.outdent"); }, group: "Editor formatting", defaultBindings: ["Shift-Tab"], rebindable: true },
 ];
 
 /** The display groups in panel order. */

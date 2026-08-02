@@ -35,12 +35,16 @@ describe("HotkeysPanel — listing", () => {
     expect(rowFor("graph.show")!.textContent).toContain("Ctrl+Shift+G");
   });
 
-  it("shows override over default; []-override → Not set; CM rows fixed", () => {
+  it("shows override over default; []-override → Not set; editor rows now rebindable, only Ctrl+Tab fixed (#184)", () => {
     keymap = { "graph.show": ["Mod-g"], "note.new-tab": [] };
     render(<HotkeysPanel />);
     expect(rowFor("graph.show")!.textContent).toContain("Ctrl+G");
     expect(within("note.new-tab", "hotkeys.binding-empty")).not.toBeNull();
-    expect(rowFor("editor.bold")!.getAttribute("data-rebindable")).toBe("false");
+    // #184 track B: editor formatting + undo/indent are rebindable now …
+    expect(rowFor("editor.bold")!.getAttribute("data-rebindable")).toBe("true");
+    expect(rowFor("editor.undo")!.getAttribute("data-rebindable")).toBe("true");
+    // … and pane.cycle-tab (Ctrl+Tab, literal-Ctrl) is the ONE remaining fixed row.
+    expect(rowFor("pane.cycle-tab")!.getAttribute("data-rebindable")).toBe("false");
   });
 
   it("fuzzy-filters by query", () => {
@@ -78,7 +82,9 @@ describe("HotkeysPanel — interactive rebind", () => {
     // ctrlKey (non-mac accelerator) → "Mod-," — collides with app.open-settings default.
     fireEvent.keyDown(within("note.new-tab", "hotkeys.capture-input")!, { key: ",", ctrlKey: true });
     expect(screen.getByTestId("hotkeys.warning").textContent).toContain("Open settings");
-    expect(setKeymapBinding).toHaveBeenCalledWith("note.new-tab", ["Mod-t", "Mod-,"]);
+    // note.new-tab default is now [Mod-t, Mod-n] (#184 folded Cmd+N in); the
+    // captured Mod-, appends to the effective set.
+    expect(setKeymapBinding).toHaveBeenCalledWith("note.new-tab", ["Mod-t", "Mod-n", "Mod-,"]);
   });
 
   it("removes a binding (→ explicit-unbind [] when last)", () => {

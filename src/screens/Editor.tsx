@@ -483,21 +483,9 @@ export function Editor({
   }
   const lostUnsyncedTitles = lostUnsyncedRef.current ?? [];
 
-  // Cmd+, (macOS) / Ctrl+, (Win/Linux) toggles the Settings modal —
-  // toggle so the same shortcut closes the modal when it's open.
-  // Listener mounts only when the editor body renders (after the
-  // mount-time slot guard passes); pre-mount keystrokes are ignored.
-  useEffect(() => {
-    if (slotPopulated !== true) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
-        e.preventDefault();
-        setSettingsOpen((s) => !s);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [slotPopulated]);
+  // Cmd/Ctrl+, (toggle Settings) now flows through the central keybind engine as
+  // the rebindable `app.open-settings` command (#184 track D) — a WorkspaceHotkeys
+  // entry wired to `setSettingsOpen`, no longer a hardcoded window listener here.
 
   if (slotPopulated === null) {
     // Loading shim — the IPC takes microseconds (single RwLock read);
@@ -842,21 +830,9 @@ function EditorChrome({
 
   // Cmd/Ctrl+Shift+G opens the whole-vault graph tab (MYND-198, SYNC-7) — the
   // third entry point alongside the command-palette action + BottomBar button.
-  // The graph is a singleton tab, so re-firing reveals the existing tab.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        e.shiftKey &&
-        (e.key === "G" || e.key === "g")
-      ) {
-        e.preventDefault();
-        ws.openGraph();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [ws]);
+  // Now the rebindable `graph.show` command routed through the keybind engine
+  // (#184 track D), a WorkspaceHotkeys entry → `ws.openGraph()`; no longer a
+  // hardcoded window listener here.
   // Editor `#tag` chip click (tag-system #3 / MYND-45): the chip decoration
   // dispatches a bubbling `myne-open-tag` event; open the tag browser seeded to
   // that tag. A single Editor-level listener (the modal is Editor-global) — no
@@ -2294,6 +2270,7 @@ function EditorChrome({
         onToggleFocus={toggleFocus}
         onExitFocus={exitFocus}
         onTogglePalette={() => setPaletteOpen((v) => !v)}
+        onToggleSettings={() => setSettingsOpen((s) => !s)}
       />
       <NoteExportModal
         open={exportPreflight !== null}
@@ -3145,22 +3122,10 @@ function SidebarBootstrap() {
 
   useNoteRoute({ active: routeReady, selectedId: ctx.selectedId, select: ctx.select });
 
-  // Global Cmd+N / Ctrl+N → create new note (T25).
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      if (e.key !== "n" && e.key !== "N") return;
-      e.preventDefault();
-      void ctx.createAndStartRename().catch((err) => {
-        if (import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.warn("[Editor] Cmd+N createNote failed:", err);
-        }
-      });
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [ctx]);
+  // Global Cmd/Ctrl+N → create new note. Folded into the rebindable
+  // `note.new-tab` command as a second default chord (Mod-t, Mod-n) so it is
+  // listed + rebindable (#184 C) — the WorkspaceHotkeys `note.new-tab` entry runs
+  // the same `createAndStartRename`; no longer a hardcoded window listener here.
 
   return null;
 }
@@ -3193,11 +3158,13 @@ function WorkspaceHotkeys({
   onToggleFocus,
   onExitFocus,
   onTogglePalette,
+  onToggleSettings,
 }: {
   focusActive: boolean;
   onToggleFocus: () => void;
   onExitFocus: () => void;
   onTogglePalette: () => void;
+  onToggleSettings: () => void;
 }) {
   const ws = useWorkspace();
   const ctx = useSelectedNote();
@@ -3258,8 +3225,25 @@ function WorkspaceHotkeys({
       // stays live inside the CM6 editor surface. The dispatcher's preventDefault
       // also suppresses the WebView's native Print dialog on Cmd+P.
       { id: "palette.toggle", scope: {}, run: () => onTogglePalette() },
+      // #184 track D — these three were hardcoded window listeners (settings,
+      // graph) or palette-only with an INERT declared chord (tasks); routing them
+      // through the engine is what makes the panel's "rebindable" mark honest and
+      // their default chords actually fire.
+      { id: "app.open-settings", scope: {}, run: () => onToggleSettings() },
+      { id: "graph.show", scope: {}, run: () => ws.openGraph() },
+      { id: "tasks.show", scope: {}, run: () => ws.openTasks() },
+      // In-note find (#184): open the docked find bar. App.tsx still owns the
+      // app-wide native-Cmd+F suppression; this only opens the bar (editor stage,
+      // stands down in plain inputs). find-session is lazy-loaded (kept out of
+      // first-load); by now the editor chunk has already imported it.
+      {
+        id: "find.open",
+        scope: {},
+        run: () =>
+          void import("../editor/find/find-session").then((m) => m.openInNoteFind()),
+      },
     ];
-  }, [ws, ctx, onToggleFocus, onTogglePalette]);
+  }, [ws, ctx, onToggleFocus, onTogglePalette, onToggleSettings]);
 
   useKeybindDispatcher({
     entries,

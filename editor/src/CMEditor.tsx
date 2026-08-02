@@ -15,7 +15,12 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { diffDoc } from "./doc-diff";
-import { myneExtensions, reconfigureAi, reconfigureTranscription } from "./extensions";
+import {
+  myneExtensions,
+  reconfigureAi,
+  reconfigureTranscription,
+  reconfigureEditorKeymap,
+} from "./extensions";
 import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
 import { reconfigureVaultHeadings } from "./wikilink/vault-headings";
@@ -182,6 +187,12 @@ export type CMEditorProps = {
    *  while preserving cursor / scroll / undo. The engine is dynamically imported
    *  on first enable, so leaving this off costs nothing at all. Defaults OFF. */
   vimMode?: boolean;
+  /** #184: the user keymap overrides (`vault.prefs.keymap`, id → chords) for the
+   *  rebindable editor commands. Pushed into the editor keymap Compartment
+   *  (re-mount-free) whenever it changes, so a Hotkeys-panel rebind of bold /
+   *  undo / indent / fold takes effect on the open note live. Absent → in-code
+   *  defaults. */
+  keymapOverrides?: Readonly<Record<string, readonly string[]>>;
   /** reading-source-modes (MYND-299): the per-tab view mode. `live` (default) is
    *  today's live-preview; `reading` renders read-only; `source` shows raw
    *  markdown. Pushed into the view-mode compartments (re-mount-free) whenever it
@@ -224,7 +235,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, keymapOverrides, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -252,6 +263,7 @@ export function CMEditor(props: CMEditorProps) {
   const aiEnabledRef = useRef(aiEnabled);
   const transcriptionEnabledRef = useRef(transcriptionEnabled);
   const vimModeRef = useRef(vimMode);
+  const keymapOverridesRef = useRef(keymapOverrides);
   useEffect(() => {
     onSwapReadyRef.current = onSwapReady;
   }, [onSwapReady]);
@@ -321,6 +333,7 @@ export function CMEditor(props: CMEditorProps) {
             readOnly: readOnlyRef.current,
             aiEnabled: aiEnabledRef.current,
             transcriptionEnabled: transcriptionEnabledRef.current,
+            keymapOverrides: keymapOverridesRef.current,
             // Mount-read, ref-free on purpose (MYND-559): a host's formatting
             // surface is a platform constant, so every state this view ever
             // builds — mount or post-swap — carries the SAME choice.
@@ -342,6 +355,10 @@ export function CMEditor(props: CMEditorProps) {
       v.dispatch({ effects: reconfigureViewMode(viewModeRef.current, readOnlyRef.current) });
       v.dispatch({ effects: reconfigureAi(aiEnabledRef.current) });
       v.dispatch({ effects: reconfigureTranscription(transcriptionEnabledRef.current) });
+      // #184: the editor keymap is a Compartment too, seeded from overrides at
+      // mount; `setState` resets it to that seed, so re-push the CURRENT overrides
+      // after a swap or a customised keymap silently reverts to defaults.
+      v.dispatch({ effects: reconfigureEditorKeymap(keymapOverridesRef.current ?? {}) });
       if (noteSetRef.current !== undefined) {
         v.dispatch({ effects: reconfigureNoteSet(noteSetRef.current) });
       }
@@ -536,6 +553,18 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null) return;
     view.dispatch({ effects: reconfigureLineNumbers(lineNumbers) });
   }, [lineNumbers]);
+
+  // #184: push the user keymap overrides into the editor keymap Compartment
+  // whenever `vault.prefs.keymap` changes — re-mount-free, so a rebind of an
+  // editor command (bold, undo, indent, fold, …) takes effect on the open note
+  // live (cursor / scroll / undo preserved). Seeded at mount, so this runs once
+  // to honour an already-customised keymap, then on every subsequent rebind.
+  useEffect(() => {
+    keymapOverridesRef.current = keymapOverrides;
+    const view = viewRef.current;
+    if (view === null) return;
+    view.dispatch({ effects: reconfigureEditorKeymap(keymapOverrides ?? {}) });
+  }, [keymapOverrides]);
 
   // reading-source-modes (MYND-299): push the per-tab view mode into the
   // view-mode compartments whenever it (or readOnly) changes — re-mount-free, so
