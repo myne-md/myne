@@ -17,7 +17,9 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
+import { openUrl } from "../../platform/opener";
 import { Button } from "../primitives/Button";
+import { Icon } from "../primitives/Icon";
 import { ThemeChiplet } from "../primitives/ThemeChiplet";
 import { BLOCK_STYLE, ERROR_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 import {
@@ -83,12 +85,6 @@ const ACTIONS_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "row",
   alignItems: "center",
-  gap: "var(--space-2)",
-};
-
-const BUTTON_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
   gap: "var(--space-2)",
 };
 
@@ -227,10 +223,16 @@ export function CustomThemesSection({
       data-setting-anchor="appearance.custom-themes"
       data-setting-row="true"
     >
-      <span style={LABEL_STYLE}>{translate("settings.customThemes.label")}</span>
-      <p style={HELPER_STYLE}>{translate("settings.customThemes.helper")}</p>
-
-      <div style={{ ...BUTTON_ROW_STYLE, marginTop: "var(--space-3)" }}>
+      {/* Title left, Import aligned to the right (like a setting-row control). */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--space-3)",
+        }}
+      >
+        <span style={LABEL_STYLE}>{translate("settings.customThemes.label")}</span>
         <Button
           variant="secondary"
           onClick={() => void importTheme()}
@@ -239,11 +241,36 @@ export function CustomThemesSection({
           {translate("settings.customThemes.importButton")}
         </Button>
       </div>
+      <p style={HELPER_STYLE}>{translate("settings.customThemes.helper")}</p>
 
       {rows.length === 0 ? (
-        <p style={EMPTY_STYLE} data-testid="settings.custom-theme-empty">
-          {translate("settings.customThemes.empty")}
-        </p>
+        <div
+          data-testid="settings.custom-theme-empty"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-6) var(--space-3)",
+            textAlign: "center",
+          }}
+        >
+          <span aria-hidden="true" style={{ display: "flex", color: "var(--fg-3)" }}>
+            <Icon name="palette" size={30} />
+          </span>
+          <p style={{ ...EMPTY_STYLE, margin: 0 }}>
+            {translate("settings.customThemes.empty")}
+          </p>
+          <Button
+            variant="ghost"
+            icon="globe"
+            style={{ color: "var(--accent)" }}
+            onClick={() => void openUrl("https://myne.md/themes/")}
+            data-testid="settings.custom-theme-browse"
+          >
+            {translate("settings.customThemes.browseButton")}
+          </Button>
+        </div>
       ) : (
         <div style={LIST_STYLE}>
           {rows.map((row) => {

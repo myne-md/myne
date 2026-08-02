@@ -88,6 +88,7 @@ import { SuspicionBanner } from "../components/SuspicionBanner";
 import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
 import { ioBanner } from "../lib/io-banner";
 import { quickUnlockStatus, type QuickUnlockMethod } from "../lib/quick-unlock";
+import { listVaults } from "../lib/vault-list";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
@@ -113,12 +114,11 @@ interface UnlockProps {
   vaultId?: VaultId;
   onUnlocked: () => void;
   /**
-   * Back-to-picker affordance. Provided by App.tsx ONLY when the unlock was
-   * reached from the ≥2-vault picker (`Stage.unlock.fromPicker`). When present,
-   * a "Choose a different vault" link renders in idle mode and dispatches
-   * `unlock.back-to-picker` → `picker`, so a mis-picked vault is recoverable.
-   * `undefined` on every other entry path (no picker to return to) → the link
-   * is not rendered.
+   * Back-to-picker affordance. App.tsx always wires this (the
+   * `unlock.back-to-picker` transition is unconditional); the link itself
+   * renders in idle mode only when ≥2 vaults exist (probed here), so it also
+   * reaches the vault selector after a MANUAL lock or auto-lock — not just a
+   * picker-reached unlock. Dispatches `unlock.back-to-picker` → `picker`.
    */
   onBack?: () => void;
   /** Cold-start recovery entry. Dispatched by the "Recovery phrase ile
@@ -407,6 +407,26 @@ export function Unlock({
     };
   }, []);
 
+  // Show the back-to-picker link whenever ≥2 vaults exist — so a manual lock or
+  // auto-lock reaches the vault selector too, not only a picker-reached unlock.
+  // Probed on mount (fresh after any lock; the picker is a meaningful
+  // destination only with another vault to switch to).
+  const [otherVaultsExist, setOtherVaultsExist] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void listVaults().then(
+      (res) => {
+        if (!cancelled) setOtherVaultsExist("ok" in res && res.ok.length >= 2);
+      },
+      () => {
+        if (!cancelled) setOtherVaultsExist(false);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // MYND-558 — which credential surface owns the screen. `available` (not
   // `configured`) is the gate: on a cold start the credential exists but the
   // spring-loaded session gate is closed, so redeeming would fail
@@ -614,11 +634,11 @@ export function Unlock({
 
   return (
     <CenteredCard>
-      {/* Back to the ≥2-vault picker — only when the screen was reached by
-          picking a row (App passes `onBack` iff `Stage.unlock.fromPicker`).
-          Suppressed during `decrypting` so an in-flight unlock isn't
-          abandoned mid-IPC. */}
-      {onBack && !decrypting && (
+      {/* Back to the vault picker — shown whenever ≥2 vaults exist (App always
+          wires `onBack`), so a manual lock / auto-lock can reach the vault
+          selector too, not just a picker-reached unlock. Suppressed during
+          `decrypting` so an in-flight unlock isn't abandoned mid-IPC. */}
+      {onBack && otherVaultsExist && !decrypting && (
         <button
           type="button"
           onClick={onBack}

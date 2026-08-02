@@ -4,14 +4,21 @@
 // lets the user search/pick an existing note or create a fresh one — the
 // "empty state window" from the design decision.
 //
+// Presented as ONE clean card (search → recent list → action rows) rather than
+// loose floating controls, so the empty tab reads as a deliberate command
+// surface (à la a command palette) instead of a bare page.
+//
 // Notes come from the in-memory sidebar cache (already loaded for the
 // vault), filtered to live notes (no trash, no templates) and ranked by
 // recency, so picking is instant with no extra IPC.
 
 import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 import { usePrefs } from "../../hooks/usePrefs";
 import { archivedFolderKeys } from "../archivedFolders";
 import { liveCache, useSelectedNote, type NoteId } from "../sidebarState";
@@ -30,23 +37,31 @@ type NewTabChooserProps = {
 };
 
 const WRAP: CSSProperties = {
-  maxWidth: 440,
+  maxWidth: 480,
   width: "100%",
-  margin: "8vh auto 0",
+  margin: "10vh auto 0",
+  padding: "0 16px",
+  boxSizing: "border-box",
+  fontFamily: "var(--font-sans)",
+};
+
+// The card — one bordered, elevated surface the whole chooser lives inside.
+const CARD: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: 12,
-  fontFamily: "var(--font-sans)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  boxShadow: "var(--shadow-2)",
+  overflow: "hidden",
 };
 
 const SEARCH_ROW: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
-  padding: "8px 10px",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  background: "var(--paper-2)",
+  padding: "11px 14px",
+  borderBottom: "1px solid var(--line-1)",
   color: "var(--fg-3)",
 };
 
@@ -54,8 +69,8 @@ const INPUT: CSSProperties = {
   flex: 1,
   border: 0,
   outline: "none",
-  // Suppress the global `input:focus-visible` ring (tokens.css) — the focus
-  // ring belongs on the whole search pill, not around the bare input.
+  // Suppress the global `input:focus-visible` ring (tokens.css) — the field is
+  // the card's header, not a standalone control.
   boxShadow: "none",
   background: "transparent",
   color: "var(--fg-1)",
@@ -63,12 +78,23 @@ const INPUT: CSSProperties = {
   fontSize: 14,
 };
 
+const SECTION_LABEL: CSSProperties = {
+  padding: "10px 14px 4px",
+  fontFamily: "var(--font-sans)",
+  fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--fg-3)",
+};
+
 const LIST: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: 2,
-  maxHeight: "40vh",
+  gap: 1,
+  maxHeight: "38vh",
   overflowY: "auto",
+  padding: "0 6px 6px",
 };
 
 const ROW: CSSProperties = {
@@ -76,7 +102,7 @@ const ROW: CSSProperties = {
   alignItems: "center",
   gap: 8,
   width: "100%",
-  padding: "8px 10px",
+  padding: "8px 8px",
   border: 0,
   borderRadius: "var(--radius-1)",
   background: "transparent",
@@ -85,12 +111,42 @@ const ROW: CSSProperties = {
   textAlign: "left",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
+  transition: HOVER_TRANSITION,
 };
 
 const EMPTY: CSSProperties = {
-  padding: "10px",
+  padding: "16px 14px",
   color: "var(--fg-3)",
   fontSize: 13,
+  textAlign: "center",
+};
+
+// The action rows at the card's foot — Create / New drawing, presented like
+// menu entries (icon + label) rather than floating buttons.
+const ACTIONS: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  borderTop: "1px solid var(--line-1)",
+  padding: 6,
+  gap: 1,
+};
+
+const ACTION_ROW: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  width: "100%",
+  padding: "9px 10px",
+  border: 0,
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-1)",
+  cursor: "pointer",
+  textAlign: "left",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  fontWeight: 500,
+  transition: HOVER_TRANSITION,
 };
 
 export function NewTabChooser({
@@ -134,84 +190,102 @@ export function NewTabChooser({
     if (cancellable && e.key === "Escape") {
       e.preventDefault();
       onCancel();
+      return;
+    }
+    // Enter opens the top result — the search doubles as go-to-file.
+    if (e.key === "Enter" && rows.length > 0) {
+      e.preventDefault();
+      onPick(rows[0]!.noteUuid);
     }
   };
 
   return (
     <div style={WRAP} onKeyDown={onKeyDown}>
-      <div
-        style={{
-          ...SEARCH_ROW,
-          ...(searchFocused
-            ? { borderColor: "var(--accent)", boxShadow: "var(--ring)" }
-            : {}),
-        }}
-      >
-        <Icon name="search" size={14} />
-        {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
-        <input
-          autoFocus
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setSearchFocused(true)}
-          onBlur={() => setSearchFocused(false)}
-          placeholder={t("notes.newTab.searchPlaceholder")}
-          spellCheck={false}
-          autoComplete="off"
-          aria-label={t("notes.newTab.searchAriaLabel")}
-          style={INPUT}
-        />
-      </div>
-      <div style={LIST}>
-        {rows.length === 0 ? (
-          <div style={EMPTY}>
-            {query.trim() === ""
-              ? t("notes.newTab.noNotesYet")
-              : t("notes.newTab.noNotesMatch")}
-          </div>
-        ) : (
-          rows.map((r) => (
-            <button
-              key={r.noteUuid}
-              type="button"
-              onClick={() => onPick(r.noteUuid)}
-              style={ROW}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--paper-3)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              <Icon name="file-text" size={13} />
-              <span
-                style={{
-                  flex: 1,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  fontStyle: r.title === null ? "italic" : "normal",
-                  color: r.title === null ? "var(--fg-3)" : undefined,
-                }}
-              >
-                {r.title ?? t("notes.newTab.untitled")}
-              </span>
-            </button>
-          ))
-        )}
-      </div>
-      <div style={{ display: "flex", gap: 8, alignSelf: "center", marginTop: 4 }}>
-        <Button variant="primary" icon="plus" onClick={onCreate}>
-          {t("notes.newTab.createNote")}
-        </Button>
-        <Button
-          variant="secondary"
-          icon="pencil"
-          onClick={onCreateDrawing}
-          data-testid="notes.newTab.create-drawing"
+      <div style={CARD}>
+        <div
+          style={{
+            ...SEARCH_ROW,
+            ...(searchFocused ? { color: "var(--accent)" } : {}),
+          }}
         >
-          {t("notes.newTab.createDrawing")}
-        </Button>
+          <Icon name="search" size={15} />
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            placeholder={t("notes.newTab.searchPlaceholder")}
+            spellCheck={false}
+            autoComplete="off"
+            aria-label={t("notes.newTab.searchAriaLabel")}
+            style={INPUT}
+          />
+        </div>
+
+        {rows.length > 0 && (
+          <div style={SECTION_LABEL}>{t("notes.newTab.recent")}</div>
+        )}
+        <div style={LIST}>
+          {rows.length === 0 ? (
+            <div style={EMPTY}>
+              {query.trim() === ""
+                ? t("notes.newTab.noNotesYet")
+                : t("notes.newTab.noNotesMatch")}
+            </div>
+          ) : (
+            rows.map((r) => (
+              <button
+                key={r.noteUuid}
+                type="button"
+                onClick={() => onPick(r.noteUuid)}
+                {...hoverSurface()}
+                style={ROW}
+              >
+                <Icon name="file-text" size={14} />
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontStyle: r.title === null ? "italic" : "normal",
+                    color: r.title === null ? "var(--fg-3)" : undefined,
+                  }}
+                >
+                  {r.title ?? t("notes.newTab.untitled")}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+
+        <div style={ACTIONS}>
+          <button
+            type="button"
+            onClick={onCreate}
+            {...hoverSurface()}
+            style={ACTION_ROW}
+          >
+            <span style={{ display: "flex", flexShrink: 0, color: "var(--accent)" }}>
+              <Icon name="plus" size={15} />
+            </span>
+            <span>{t("notes.newTab.createNote")}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onCreateDrawing}
+            data-testid="notes.newTab.create-drawing"
+            {...hoverSurface()}
+            style={ACTION_ROW}
+          >
+            <span style={{ display: "flex", flexShrink: 0, color: "var(--fg-3)" }}>
+              <Icon name="pencil" size={15} />
+            </span>
+            <span>{t("notes.newTab.createDrawing")}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
