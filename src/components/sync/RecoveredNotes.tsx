@@ -368,7 +368,7 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
         />
       )}
 
-      <Toast message={toast} onDone={() => setToast(null)} />
+      <Toast message={toast} onDone={() => setToast(null)} variant="success" />
     </>
   );
 }

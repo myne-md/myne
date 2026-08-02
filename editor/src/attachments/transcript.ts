@@ -250,7 +250,7 @@ export function createTranscriptSection(opts: {
         }
         // Any other failure: a transient toast, then drop back to the prior
         // state (cached expander if present, else empty).
-        showAttachmentToast(i18n.t("editor.attachment.widget.transcribe.failed"));
+        showAttachmentToast(i18n.t("editor.attachment.widget.transcribe.failed"), "error");
         const cached = transcriptStore.get(id);
         if (cached !== undefined) renderExpander(cached);
         else clear();

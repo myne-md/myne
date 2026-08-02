@@ -10,23 +10,11 @@
 
 const STYLE_ID = "myne-attachment-insert-styles";
 
+// NOTE: the attachment toast's styling moved to the shared `.myne-toast` rules
+// in the app's `tokens.css` (#238), so the toast looks identical to the React
+// `<Toast>`. `showAttachmentToast` still tags the node with the legacy
+// `cm-attach-toast` class as a test/hook alias, but it carries no styles here.
 const CSS = `
-.cm-attach-toast {
-  position: fixed;
-  bottom: var(--space-5, 24px);
-  right: var(--space-5, 24px);
-  max-width: 360px;
-  background-color: var(--bg-2, #f3f1eb);
-  border: 1px solid var(--line-1, #e3e2dd);
-  border-radius: var(--radius-2, 6px);
-  box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
-  padding: var(--space-3, 10px) var(--space-4, 14px);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--fg-1, #1a1a17);
-  z-index: 1100;
-}
-
 .cm-attach-diff-backdrop {
   position: fixed;
   inset: 0;

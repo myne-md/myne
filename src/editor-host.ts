@@ -65,6 +65,8 @@ import { infer, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-as
 import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/spell";
 import { startTranscription } from "./lib/transcribe";
 import { AI_TRANSCRIPT_HONESTY_NOTE } from "./lib/load-bearing-copy";
+import { setAttachmentToastSink } from "./editor/attachments/toast";
+import { toast } from "./components/toast/toastStore";
 
 const host: EditorHost = {
   t: (key, opts) => i18n.t(key, opts ?? {}),
@@ -186,3 +188,10 @@ const host: EditorHost = {
 };
 
 setEditorHost(host);
+
+// Route the editor's imperative toasts (attachment insert/convert, vim `:w`,
+// wikilink convert, palette failures) into the app's central store so they join
+// the shared <Toaster> stack instead of drawing their own separate surface (#238).
+setAttachmentToastSink((message, variant, durationMs) => {
+  toast({ message, variant, durationMs });
+});

@@ -508,11 +508,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
             next.delete(entry.id);
             return next;
           });
-          showAttachmentToast(t("attachments.library.transcribeDone"));
+          showAttachmentToast(t("attachments.library.transcribeDone"), "success");
         })
         .catch((err: unknown) => {
           const kind = (err as TranscribeError | null)?.kind ?? "failed";
-          showAttachmentToast(t(TRANSCRIBE_TOAST_KEY[kind] ?? "attachments.library.transcribeFailed"));
+          showAttachmentToast(t(TRANSCRIBE_TOAST_KEY[kind] ?? "attachments.library.transcribeFailed"), "error");
         });
     },
     [t],

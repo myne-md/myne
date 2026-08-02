@@ -214,5 +214,5 @@ export async function runWikilinkConvert(): Promise<void> {
   applyWikilinkRewrites(view, rewrites);
   view.focus();
   const n = rewrites.length;
-  showAttachmentToast(i18n.t("editor.wikilink.convert.convertedToast", { count: n }));
+  showAttachmentToast(i18n.t("editor.wikilink.convert.convertedToast", { count: n }), "success");
 }

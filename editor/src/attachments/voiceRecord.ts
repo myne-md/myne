@@ -77,7 +77,7 @@ export async function startVoiceRecording(view: EditorView): Promise<void> {
     // No capture backend on this host. `/record` is gated on the same absence
     // upstream; this is the belt for a stale keybinding.
     recording = false;
-    showAttachmentToast(startErrorMessage(undefined));
+    showAttachmentToast(startErrorMessage(undefined), "error");
     return;
   }
 
@@ -85,7 +85,7 @@ export async function startVoiceRecording(view: EditorView): Promise<void> {
     await voice.start();
   } catch (err) {
     recording = false;
-    showAttachmentToast(startErrorMessage(err));
+    showAttachmentToast(startErrorMessage(err), "error");
     return;
   }
 
@@ -116,7 +116,7 @@ async function finishRecording(view: EditorView, bar: RecordingBarHandle): Promi
     if (imported !== null) insertVoiceEmbed(view, imported);
     view.focus();
   } catch (err) {
-    showAttachmentToast(stopErrorMessage(err));
+    showAttachmentToast(stopErrorMessage(err), "error");
   } finally {
     bar.teardown();
     recording = false;

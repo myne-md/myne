@@ -35,16 +35,16 @@ export async function exportAttachment(id: string, filename: string): Promise<vo
     // entirely host-side (it never re-enters the WebView).
     dest = await pickExportDestination(filename);
   } catch {
-    showAttachmentToast(i18n.t("editor.attachment.actions.saveDialogFailed"));
+    showAttachmentToast(i18n.t("editor.attachment.actions.saveDialogFailed"), "error");
     return;
   }
   if (dest === null) return; // cancelled
   try {
     // The OS save dialog already confirmed any overwrite → overwrite = true.
     await attachmentExport(id, dest, true);
-    showAttachmentToast(i18n.t("editor.attachment.actions.exported", { filename }));
+    showAttachmentToast(i18n.t("editor.attachment.actions.exported", { filename }), "success");
   } catch {
-    showAttachmentToast(i18n.t("editor.attachment.actions.exportFailed", { filename }));
+    showAttachmentToast(i18n.t("editor.attachment.actions.exportFailed", { filename }), "error");
   }
 }
 
@@ -72,9 +72,9 @@ export async function renameFileCard(
         { id, contentType: row.contentType, filename: trimmed, size: row.size },
       ]);
     }
-    showAttachmentToast(i18n.t("editor.attachment.actions.renamed", { name: trimmed }));
+    showAttachmentToast(i18n.t("editor.attachment.actions.renamed", { name: trimmed }), "success");
   } catch {
-    showAttachmentToast(i18n.t("editor.attachment.actions.renameFailed"));
+    showAttachmentToast(i18n.t("editor.attachment.actions.renameFailed"), "error");
   }
 }
 

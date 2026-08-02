@@ -19,9 +19,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render, cleanup, screen } from "@testing-library/react";
-import { Toast } from "../../src/components/Toast";
+import { Toaster } from "../../src/components/toast/Toaster";
+import { toast, resetToasts } from "../../src/components/toast/toastStore";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  resetToasts();
+  cleanup();
+});
 
 // `process.cwd()` (repo root under vitest), not `import.meta.url` — in the jsdom
 // environment `import.meta.url` is not a file:// URL, so fileURLToPath throws.
@@ -38,7 +42,8 @@ describe("reduced-motion zeroes motion without hiding state", () => {
   });
 
   it("a status surface conveys its state by text (survives motion-zeroing)", () => {
-    render(<Toast message="Note saved" onDone={() => {}} />);
+    toast({ message: "Note saved" });
+    render(<Toaster />);
     // The state is in the text + a live region — not in the entrance animation.
     const el = screen.getByRole("status");
     expect(el.textContent).toContain("Note saved");

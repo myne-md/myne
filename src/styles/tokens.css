@@ -1110,3 +1110,147 @@ a:focus-visible,
   outline: none;
   box-shadow: none;
 }
+
+/* -- Toast (#238) -----------------------------------------------------------
+   ONE visual language for every transient notification, and ONE surface: the
+   <Toaster> (src/components/toast/Toaster.tsx) renders every toast — React
+   surfaces (via the headless <Toast> bridge) AND the editor's imperative
+   showAttachmentToast (via a registered sink) — as a single COLLAPSED STACK in
+   the bottom inline-end corner: the newest fully shown, older ones scaled down
+   and nudged up so their tops peek behind it (Sonner-style). Every toast shares
+   one fixed width, so the stack is uniform. Each card carries a leading status
+   icon, a soft variant rail on the inline-start edge, and a dismiss ×.
+
+   RTL-aware with NO dir-detection code: `inset-inline-end` anchors the stack to
+   the reading-end corner, and `--toast-off-x` (the off-screen enter/exit
+   translate) flips sign under `[dir="rtl"]`. Correct in LTR today; correct the
+   moment an RTL locale sets `<html dir="rtl">`.
+
+   Raised clear of the 26 px bottom bar: bottom = space-5 + space-6.
+
+   Motion: the global prefers-reduced-motion rule above zeroes the transitions,
+   so slide + restack are suppressed for free. Removal is ALWAYS timer-driven
+   (never transitionend) — a 0 ms transition can never strand a toast on screen. */
+.myne-toaster {
+  position: fixed;
+  bottom: calc(var(--space-5) + var(--space-6));
+  inset-inline-end: var(--space-5);
+  width: 356px;
+  max-width: calc(100vw - 2 * var(--space-5));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: 1100;
+  pointer-events: none; /* the empty area never blocks the app; rows opt back in */
+}
+.myne-toast-row {
+  position: absolute;
+  inset-inline-end: 0;
+  bottom: 0;
+  width: 100%;
+  pointer-events: auto;
+  transform-origin: center bottom;
+  --toast-off-x: 110%;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    opacity var(--duration-base) var(--ease-out);
+}
+[dir="rtl"] .myne-toast-row {
+  --toast-off-x: -110%;
+}
+
+/* Standalone/pinned single toast — the editor imperative FALLBACK used when no
+   store sink is registered (bare editor / unit tests). The store-backed path
+   uses the <Toaster> above instead. */
+.myne-toast--pinned {
+  position: fixed;
+  bottom: calc(var(--space-5) + var(--space-6));
+  inset-inline-end: var(--space-5);
+  width: 356px;
+  max-width: calc(100vw - 2 * var(--space-5));
+  z-index: 1100;
+  --toast-off-x: 110%;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    opacity var(--duration-base) var(--ease-out);
+}
+[dir="rtl"] .myne-toast--pinned {
+  --toast-off-x: -110%;
+}
+.myne-toast--pinned[data-toast-state="entering"],
+.myne-toast--pinned[data-toast-state="leaving"] {
+  opacity: 0;
+  transform: translateX(var(--toast-off-x));
+}
+
+/* The card itself — positioned by its row / pinned wrapper, so no fixed/absolute
+   here; it fills the 356 px width. */
+.myne-toast {
+  box-sizing: border-box;
+  width: 100%;
+  --toast-accent: var(--line-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-inline-start: 3px solid var(--toast-accent);
+  border-radius: var(--radius-2);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--fg-1);
+}
+
+.myne-toast__icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  color: var(--toast-accent);
+}
+.myne-toast__msg {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.myne-toast__action {
+  flex: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.myne-toast__dismiss {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-inline-start: var(--space-1);
+  background: none;
+  border: none;
+  border-radius: var(--radius-1);
+  color: var(--fg-3);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.myne-toast__dismiss:hover,
+.myne-toast__dismiss:focus-visible {
+  color: var(--fg-1);
+  background: var(--bg-3);
+}
+
+/* Variant accents — status icon colour + the inline-start rail tint. `neutral`
+   keeps the faint default rail and shows no icon. */
+.myne-toast--success { --toast-accent: var(--success); }
+.myne-toast--error   { --toast-accent: var(--danger); }
+.myne-toast--info    { --toast-accent: var(--info); }
