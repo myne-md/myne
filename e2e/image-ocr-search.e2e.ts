@@ -129,7 +129,20 @@ async function typeRaw(session: Session, text: string): Promise<void> {
   await content.sendKeys(text);
 }
 
-describeE2E("io1 image OCR makes an embedded image searchable (MYND-441)", () => {
+// QUARANTINED — runner-contention victim, not a broken assertion. It passes
+// locally (~32 s uncontended) and passed CI outright in pipeline #402; it fails
+// in the slower runs (#401 at the 45 s default, #403 after the budget was
+// raised to 120 s — three retries each, so more time does not rescue it: under
+// load the OCR → MYE1 → re-index → palette chain stops completing at all rather
+// than merely running late). Raising the budget was tried and reverted: it
+// bought nothing and burned six minutes of runner time per failure, which makes
+// contention worse for every spec after it.
+//
+// The debt is real coverage: while this is quarantined nothing on the merge gate
+// proves an OCR'd word reaches search. Un-quarantine it with the boot-cost
+// investigation the other five contention victims are also waiting on
+// (e2e/CLAUDE.md), not by nudging timeouts.
+describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("finds a note by words that exist only inside an embedded image", async () => {
     let password = "";
@@ -153,25 +166,12 @@ describeE2E("io1 image OCR makes an embedded image searchable (MYND-441)", () =>
         await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
         await waitForSaved(s);
 
-        // These two searches carry an explicit budget because the work behind
-        // them is genuinely expensive, not because the assertion is flaky: the
-        // OCR extraction, its MYE1 cache write and the search re-index all have
-        // to land before the palette can answer. Measured uncontended, the first
-        // search alone accounts for most of this scenario's ~32 s — only ~30 %
-        // under the 45 s default, which a loaded CI runner eats (observed:
-        // 3/3 retries timing out at exactly 45 s while the same commit passed
-        // locally). A slow operation deserves a budget matched to its real cost;
-        // quarantining it would drop real OCR coverage off the merge gate.
-        const OCR_SEARCH_TIMEOUT_MS = 120_000;
-
         // 1. Base capability: a word only the pixels contain.
-        await searchAndOpenNote(s, IMAGE_WORD_EN, noteId, { timeoutMs: OCR_SEARCH_TIMEOUT_MS });
+        await searchAndOpenNote(s, IMAGE_WORD_EN, noteId);
 
         // 2. Turkish: the image reads `sirket`, the user types `şirket`. Only
         //    the index-side diacritic folding can bridge that.
-        await searchAndOpenNote(s, QUERY_TR_ACCENTED, noteId, {
-          timeoutMs: OCR_SEARCH_TIMEOUT_MS,
-        });
+        await searchAndOpenNote(s, QUERY_TR_ACCENTED, noteId);
       },
     );
   });
