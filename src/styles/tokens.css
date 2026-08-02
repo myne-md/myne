@@ -109,6 +109,9 @@
 
   /* -- Color -- State ------------------------------------------------- */
   --danger:        #8a2a23;
+  /* Danger *fill* for destructive buttons — a clear red, distinct from the
+     text-tuned `--danger` (which is light on a dark theme and washes out a fill). */
+  --danger-solid:  #a8322a;
   --danger-soft:   #f5e7e5;
   --warning:       #8a6a1f;
   --warning-soft:  #f5efde;
@@ -263,6 +266,7 @@
   --_accent-on-dark:     #0b0b09;
 
   --_danger-dark:       #d99086;
+  --_danger-solid-dark: #c0392b;
   --_danger-soft-dark:  #2e1f1d;
   --_warning-dark:      #d8b76a;
   --_warning-soft-dark: #2c2618;
@@ -441,6 +445,7 @@
   --accent-on:     var(--_accent-on-dark);
 
   --danger:       var(--_danger-dark);
+  --danger-solid: var(--_danger-solid-dark);
   --danger-soft:  var(--_danger-soft-dark);
   --warning:      var(--_warning-dark);
   --warning-soft: var(--_warning-soft-dark);
@@ -522,6 +527,7 @@
   --accent-on:     var(--_accent-on-amoled);
 
   --danger:       var(--_danger-amoled);
+  --danger-solid: var(--_danger-solid-dark);
   --danger-soft:  var(--_danger-soft-amoled);
   --warning:      var(--_warning-amoled);
   --warning-soft: var(--_warning-soft-amoled);
@@ -600,6 +606,7 @@
     --accent-on:     var(--_accent-on-dark);
 
     --danger:       var(--_danger-dark);
+    --danger-solid: var(--_danger-solid-dark);
     --danger-soft:  var(--_danger-soft-dark);
     --warning:      var(--_warning-dark);
     --warning-soft: var(--_warning-soft-dark);
@@ -1040,12 +1047,22 @@ a:focus-visible,
   [data-testid="settings.modal"] > * { animation: none !important; }
 }
 
+/* Attachments library entrance (MYND-170 polish) — the full-pane view used to
+   appear instantly, which read as a jump-cut; a subtle fade + rise settles it
+   in. The global reduced-motion rule above already zeroes the duration. */
+@keyframes attachments-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Hotkeys remove-binding × (#184 part A) — faint until hovered/focused, so the
    keycap reads as the chord and the × as a distinct, discoverable control. */
 [data-testid="hotkeys.remove-binding"]:hover,
 [data-testid="hotkeys.remove-binding"]:focus-visible {
-  color: var(--fg-1);
-  background: var(--paper-3);
+  /* Removing a binding is destructive — the × goes red, over the hover
+     rectangle, so the affordance reads clearly. */
+  color: var(--danger);
+  background: var(--bg-3);
 }
 
 /* Trash / Archive row action buttons (#226 follow-up) — ghost icon

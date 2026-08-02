@@ -331,7 +331,7 @@ export function FolderRow({
   const background = dropTarget
     ? "var(--accent-soft)"
     : hovering
-      ? "var(--paper-1)"
+      ? "var(--bg-3)"
       : "transparent";
 
   return (

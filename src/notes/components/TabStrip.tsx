@@ -29,6 +29,10 @@ import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { labelColorVar } from "../decorations";
 import { Icon } from "../../components/primitives/Icon";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
@@ -257,7 +261,16 @@ export function TabStrip({
           onClick={() => setMenuOpen((v) => !v)}
           aria-expanded={menuOpen}
         >
-          <Icon name="more-horizontal" size={14} />
+          {/* Caret that flips 180° when the tab list is open (animated). */}
+          <span
+            style={{
+              display: "flex",
+              transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform var(--duration-base) var(--ease-standard)",
+            }}
+          >
+            <Icon name="chevron-down" size={14} />
+          </span>
         </StripButton>
       )}
 
@@ -520,6 +533,7 @@ function Tab({
             e.stopPropagation();
             onClose(id);
           }}
+          {...hoverSurface()}
           style={{
             display: "flex",
             alignItems: "center",
@@ -534,6 +548,7 @@ function Tab({
             color: "var(--fg-3)",
             cursor: "pointer",
             visibility: showClose ? "visible" : "hidden",
+            transition: HOVER_TRANSITION,
           }}
         >
           <Icon name="x" size={12} />
@@ -579,6 +594,7 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
           type="button"
           aria-label={t("notes.tabStrip.closeNewTab")}
           onClick={onClose}
+          {...hoverSurface()}
           style={{
             display: "flex",
             alignItems: "center",
@@ -591,6 +607,7 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
             background: "transparent",
             color: "var(--fg-3)",
             cursor: "pointer",
+            transition: HOVER_TRANSITION,
           }}
         >
           <Icon name="x" size={12} />
@@ -616,6 +633,7 @@ function StripButton({
       aria-label={label}
       title={label}
       onClick={onClick}
+      {...hoverSurface()}
       style={{
         display: "flex",
         alignItems: "center",
@@ -629,6 +647,7 @@ function StripButton({
         background: "transparent",
         color: "var(--fg-3)",
         cursor: "pointer",
+        transition: HOVER_TRANSITION,
       }}
       {...rest}
     >
@@ -691,6 +710,12 @@ function OverflowMenu({
                 role="menuitem"
                 title={text}
                 onClick={() => onPick(id)}
+                {...hoverSurface({
+                  restBg:
+                    id === activeTab ? "var(--accent-soft)" : "transparent",
+                  hoverBg:
+                    id === activeTab ? "var(--accent-soft)" : "var(--bg-3)",
+                })}
                 style={{
                   display: "block",
                   width: "100%",
@@ -708,6 +733,7 @@ function OverflowMenu({
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
+                  transition: HOVER_TRANSITION,
                 }}
               >
                 {text}

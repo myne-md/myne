@@ -36,6 +36,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
+import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
 import { FolderGlyph } from "../notes/components/FolderGlyph";
 import { FOLDER_ICON_PATHS } from "../notes/folderIcons";
 import { listVaults, orderByLastUnlock } from "../lib/vault-list";
@@ -271,6 +272,7 @@ const FOOTER_STYLE: CSSProperties = {
   fontSize: 13,
   fontWeight: 500,
   color: "var(--accent)",
+  transition: HOVER_TRANSITION,
 };
 
 export function VaultSwitcher({
@@ -585,6 +587,7 @@ export function VaultSwitcher({
               setOpen(false);
               onCreateAnother();
             }}
+            {...hoverSurface()}
             style={FOOTER_STYLE}
             data-testid="switcher.create-cta"
           >
@@ -600,6 +603,7 @@ export function VaultSwitcher({
                 setOpen(false);
                 onJoinDevice();
               }}
+              {...hoverSurface()}
               style={FOOTER_STYLE}
               data-testid="switcher.join-cta"
             >

@@ -27,6 +27,10 @@ import { requestRevealHeading } from "../views/revealHeadingSignal";
 import { useActiveHeading } from "../views/activeHeadingSignal";
 import { computeOutlineMeta } from "../outlineTree";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 
 interface OutlineEntry {
   level: number;
@@ -213,6 +217,7 @@ export function OutlineTab() {
                     )}
                     aria-expanded={!isCollapsed}
                     onClick={() => toggle(i)}
+                    {...hoverSurface()}
                     style={{
                       flexShrink: 0,
                       display: "flex",
@@ -220,6 +225,7 @@ export function OutlineTab() {
                       justifyContent: "center",
                       width: CHEVRON_WIDTH,
                       background: "transparent",
+                      transition: HOVER_TRANSITION,
                       border: 0,
                       padding: 0,
                       cursor: "pointer",
@@ -239,11 +245,13 @@ export function OutlineTab() {
                   data-active={isActive ? "true" : undefined}
                   onClick={() => requestRevealHeading(h.text)}
                   title={h.text}
+                  {...hoverSurface()}
                   style={{
                     flex: 1,
                     minWidth: 0,
                     textAlign: "left",
                     background: "transparent",
+                    transition: HOVER_TRANSITION,
                     border: 0,
                     padding: "4px 6px 4px 0",
                     fontSize: 13,

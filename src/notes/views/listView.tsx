@@ -21,6 +21,10 @@ import {
 } from "./viewLayout";
 import { ViewEmpty, ViewGroupHeading, makeViewRowHandlers } from "./viewChrome";
 import type { CardContextMenuHandler, OpenNoteHandler } from "./cardsView";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 
 const ROW_ESTIMATED_HEIGHT = 48;
 
@@ -81,7 +85,11 @@ export function ListView({
 
   const interactive = onOpenNote !== undefined;
   const rowStyle = useMemo<CSSProperties>(
-    () => ({ ...ROW_STYLE, cursor: interactive ? "pointer" : "default" }),
+    () => ({
+      ...ROW_STYLE,
+      cursor: interactive ? "pointer" : "default",
+      transition: HOVER_TRANSITION,
+    }),
     [interactive],
   );
   const rows = makeViewRowHandlers(onOpenNote, onContextMenu);
@@ -102,6 +110,7 @@ export function ListView({
         data-note-id={row.noteId}
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? -1 : undefined}
+        {...hoverSurface({ disabled: !interactive })}
         style={rowStyle}
         onClick={onOpenNote ? rows.click(row.noteId) : undefined}
         onAuxClick={onOpenNote ? rows.aux(row.noteId) : undefined}

@@ -21,7 +21,12 @@
 // constants VERBATIM (never i18n'd, E2E-pinned by literal equality); it makes
 // no absolute-privacy claim past the threat model (A7/A13 acknowledged).
 
-import { useEffect, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
 import { openUrl } from "../../platform/opener";
@@ -35,6 +40,10 @@ import {
   AI_TRUST_HEADLINE,
 } from "../../lib/load-bearing-copy";
 import { Switch } from "../primitives/Switch";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../primitives/hoverSurface";
 import { SettingRow } from "./SettingRow";
 import {
   BLOCK_STYLE,
@@ -66,6 +75,19 @@ const LINK_STYLE: CSSProperties = {
   alignItems: "center",
   gap: 4,
   alignSelf: "flex-start",
+  transition: "color var(--duration-fast) var(--ease-standard)",
+};
+
+/** Hover for an accent text link: shift to the hover-accent so the pointer-over
+ *  reads even though the link is already underlined + accent-colored (a bg block
+ *  would look wrong on inline link text). */
+const linkHover = {
+  onMouseEnter: (e: ReactMouseEvent<HTMLElement>) => {
+    e.currentTarget.style.color = "var(--accent-hover)";
+  },
+  onMouseLeave: (e: ReactMouseEvent<HTMLElement>) => {
+    e.currentTarget.style.color = "var(--accent)";
+  },
 };
 
 /**
@@ -138,6 +160,7 @@ function ModelRoleBlock(props: {
           type="button"
           data-testid={props.testIdRecommend}
           onClick={props.onOpenRecommend}
+          {...linkHover}
           style={LINK_STYLE}
         >
           {props.recommendName}
@@ -165,6 +188,11 @@ function ModelRoleBlock(props: {
           data-testid={props.testIdChoose}
           disabled={props.disabled}
           onClick={props.onChoose}
+          {...hoverSurface({
+            restBg: "var(--paper-2)",
+            hoverBg: "var(--paper-3)",
+            disabled: props.disabled,
+          })}
           style={{
             font: "inherit",
             fontSize: 13,
@@ -176,6 +204,7 @@ function ModelRoleBlock(props: {
             cursor: props.disabled ? "default" : "pointer",
             opacity: props.disabled ? 0.5 : 1,
             whiteSpace: "nowrap",
+            transition: HOVER_TRANSITION,
           }}
         >
           {props.chooseLabel}

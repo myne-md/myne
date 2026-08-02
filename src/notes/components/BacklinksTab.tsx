@@ -24,6 +24,10 @@ import { useSelectedNote } from "../sidebarState";
 import { backlinks, forward } from "../vaultIndices";
 import { useResolverNotes } from "../resolverNotes";
 import { SECTION_HEADING_STYLE, SIDEBAR_CARD_STYLE } from "./sharedStyles";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 
 export function BacklinksTab() {
   const { t } = useTranslation();
@@ -93,7 +97,8 @@ export function BacklinksTab() {
               data-testid="editor.backlink-row"
               data-source-id={row.sourceUuid}
               onClick={() => void ctx.open(row.sourceUuid)}
-              style={SIDEBAR_CARD_STYLE}
+              {...hoverSurface({ restBg: "var(--bg-1)" })}
+              style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
             >
               <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}>
                 {row.sourceTitle ?? t("editor.chrome.backlinks.untitled")}
@@ -141,7 +146,8 @@ export function BacklinksTab() {
               data-testid="editor.outgoing-link-row"
               data-target-id={row.targetUuid}
               onClick={() => void ctx.open(row.targetUuid)}
-              style={SIDEBAR_CARD_STYLE}
+              {...hoverSurface({ restBg: "var(--bg-1)" })}
+              style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
             >
               <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}>
                 {row.targetTitle ?? t("editor.chrome.backlinks.untitled")}

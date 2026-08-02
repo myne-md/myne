@@ -21,6 +21,10 @@ import { useIndexNonce } from "../indexNonce";
 import { useResolverNotes } from "../resolverNotes";
 import { liveIdSet } from "../resolveWikilink";
 import { SECTION_HEADING_STYLE, SIDEBAR_CARD_STYLE } from "./sharedStyles";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 import { useSelectedNote } from "../sidebarState";
 import { tagRows } from "../tagBrowser";
 import {
@@ -241,7 +245,16 @@ export function TagBrowser({
                 data-tag-key={r.key}
                 aria-pressed={selected.has(r.key)}
                 onClick={() => toggleSelected(r.key)}
-                style={{ ...tagPillStyle(selected.has(r.key)), cursor: "pointer" }}
+                {...hoverSurface({
+                  restBg: "var(--paper-2)",
+                  hoverBg: "var(--paper-3)",
+                  disabled: selected.has(r.key),
+                })}
+                style={{
+                  ...tagPillStyle(selected.has(r.key)),
+                  cursor: "pointer",
+                  transition: HOVER_TRANSITION,
+                }}
                 title={t("notes.tagBrowser.noteCount", { count: r.subtreeCount })}
               >
                 {`#${r.display}`}
@@ -283,6 +296,7 @@ export function TagBrowser({
                   onClick={() =>
                     setSavingName(defaultFilterViewName([...selected]))
                   }
+                  {...hoverSurface()}
                   style={{
                     fontSize: 12,
                     padding: "3px 8px",
@@ -291,6 +305,7 @@ export function TagBrowser({
                     border: 0,
                     borderRadius: "var(--radius-1)",
                     cursor: "pointer",
+                    transition: HOVER_TRANSITION,
                   }}
                 >
                   {t("notes.tagBrowser.saveAsView")}
@@ -299,6 +314,7 @@ export function TagBrowser({
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
+                {...hoverSurface()}
                 style={{
                   fontSize: 12,
                   padding: "3px 8px",
@@ -307,6 +323,7 @@ export function TagBrowser({
                   border: 0,
                   borderRadius: "var(--radius-1)",
                   cursor: "pointer",
+                  transition: HOVER_TRANSITION,
                 }}
               >
                 {t("notes.tagBrowser.clear")}
@@ -369,6 +386,7 @@ export function TagBrowser({
             <button
               type="button"
               onClick={() => setSavingName(null)}
+              {...hoverSurface()}
               style={{
                 fontSize: 12,
                 padding: "6px 10px",
@@ -376,6 +394,7 @@ export function TagBrowser({
                 color: "var(--fg-3)",
                 border: 0,
                 cursor: "pointer",
+                transition: HOVER_TRANSITION,
               }}
             >
               {t("notes.tagBrowser.cancel")}
@@ -408,7 +427,8 @@ export function TagBrowser({
                 type="button"
                 data-testid="tags.result-row"
                 onClick={() => onOpenNote(r.noteId)}
-                style={SIDEBAR_CARD_STYLE}
+                {...hoverSurface({ restBg: "var(--bg-1)" })}
+                style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
               >
                 <span style={{ fontSize: 13, fontWeight: 500, color: "var(--accent)" }}>
                   {r.title ?? t("notes.tagBrowser.untitled")}
@@ -457,6 +477,7 @@ function ModeToggle({
     border: 0,
     borderRadius: "var(--radius-1)",
     cursor: "pointer",
+    transition: HOVER_TRANSITION,
   });
   return (
     <div
@@ -476,6 +497,7 @@ function ModeToggle({
         data-testid="tags.mode-and"
         aria-pressed={mode === "and"}
         onClick={() => onChange("and")}
+        {...hoverSurface({ disabled: mode === "and" })}
         style={seg("and")}
       >
         {t("notes.tagBrowser.modeAll")}
@@ -485,6 +507,7 @@ function ModeToggle({
         data-testid="tags.mode-or"
         aria-pressed={mode === "or"}
         onClick={() => onChange("or")}
+        {...hoverSurface({ disabled: mode === "or" })}
         style={seg("or")}
       >
         {t("notes.tagBrowser.modeAny")}

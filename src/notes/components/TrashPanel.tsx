@@ -45,6 +45,10 @@ import {
   STATUS_LINE_STYLE,
 } from "./notePanelStyles";
 import { formatRelativeTime } from "./relativeTime";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 
 // Trash-only "Empty trash" action, now in the header cluster (#226
 // follow-up: the footer row is gone, close is a header ✕). Danger-tinted so the
@@ -53,6 +57,7 @@ const EMPTY_TRASH_BTN_STYLE: CSSProperties = {
   ...ROW_BTN_STYLE,
   color: "var(--danger)",
   borderColor: "color-mix(in srgb, var(--danger) 40%, transparent)",
+  transition: HOVER_TRANSITION,
 };
 
 type Confirm =
@@ -169,6 +174,10 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
             {count > 0 && (
               <button
                 type="button"
+                {...hoverSurface({
+                  restBg: "var(--paper-2)",
+                  hoverBg: "var(--paper-3)",
+                })}
                 style={EMPTY_TRASH_BTN_STYLE}
                 data-testid="trash.empty"
                 onClick={() =>

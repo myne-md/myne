@@ -30,6 +30,10 @@ import {
 } from "./viewLayout";
 import { ViewEmpty, ViewGroupHeading, makeViewRowHandlers } from "./viewChrome";
 import type { CardContextMenuHandler, OpenNoteHandler } from "./cardsView";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 
 /** The column-header pseudo-item prepended to the group stream. */
 type ColHeaderItem = { kind: "colheader"; key: string };
@@ -129,7 +133,11 @@ export function TableView({
   // them once rather than per rendered row.
   const interactive = onOpenNote !== undefined;
   const dataRowStyle = useMemo<CSSProperties>(
-    () => ({ ...gridRowStyle(template, minWidth), cursor: interactive ? "pointer" : "default" }),
+    () => ({
+      ...gridRowStyle(template, minWidth),
+      cursor: interactive ? "pointer" : "default",
+      transition: HOVER_TRANSITION,
+    }),
     [template, minWidth, interactive],
   );
   const headerRowStyle = useMemo<CSSProperties>(
@@ -167,6 +175,7 @@ export function TableView({
         data-note-id={row.noteId}
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? -1 : undefined}
+        {...hoverSurface({ restBg: "var(--paper)", disabled: !interactive })}
         style={dataRowStyle}
         onClick={onOpenNote ? rows.click(row.noteId) : undefined}
         onAuxClick={onOpenNote ? rows.aux(row.noteId) : undefined}

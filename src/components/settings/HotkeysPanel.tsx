@@ -27,6 +27,10 @@ import {
   type BindGroup,
 } from "../../commands/bindableCatalog";
 import { PANEL_ROOT_STYLE, HELPER_STYLE } from "./panel-styles";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../primitives/hoverSurface";
 import { reservedChord } from "../../platform/keyboard";
 
 const DEFAULTS = catalogDefaults();
@@ -129,7 +133,7 @@ const PLUS_STYLE: CSSProperties = {
 // The remove control, now a sibling of the keycap. Faint by default, it brightens
 // on hover/focus (tokens.css `[data-testid="hotkeys.remove-binding"]`).
 const REMOVE_BTN_STYLE: CSSProperties = {
-  background: "none",
+  background: "transparent",
   border: "none",
   color: "var(--fg-3)",
   cursor: "pointer",
@@ -137,6 +141,7 @@ const REMOVE_BTN_STYLE: CSSProperties = {
   lineHeight: 1,
   padding: "0 3px",
   borderRadius: "var(--radius-1, 4px)",
+  transition: HOVER_TRANSITION,
 };
 const NOT_SET_STYLE: CSSProperties = { fontSize: "var(--text-sm)", color: "var(--fg-3)", fontStyle: "italic" };
 const FIXED_TAG_STYLE: CSSProperties = { fontSize: "var(--text-xs, 11px)", color: "var(--fg-3)" };
@@ -147,6 +152,8 @@ const ICON_BTN_STYLE: CSSProperties = {
   cursor: "pointer",
   fontSize: "var(--text-sm)",
   padding: "0 var(--space-1)",
+  borderRadius: "var(--radius-1)",
+  transition: HOVER_TRANSITION,
 };
 const CAPTURE_INPUT_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
@@ -307,16 +314,17 @@ export function HotkeysPanel() {
       {confirmResetAll ? (
         <span style={WARN_STYLE} data-testid="hotkeys.reset-all-confirm">
           {t("settings.hotkeys.resetAllConfirm")}{" "}
-          <button style={ICON_BTN_STYLE} data-testid="hotkeys.reset-all-yes" onClick={resetAll}>
+          <button style={ICON_BTN_STYLE} {...hoverSurface()} data-testid="hotkeys.reset-all-yes" onClick={resetAll}>
             {t("settings.hotkeys.resetAllYes")}
           </button>
-          <button style={ICON_BTN_STYLE} onClick={() => setConfirmResetAll(false)}>
+          <button style={ICON_BTN_STYLE} {...hoverSurface()} onClick={() => setConfirmResetAll(false)}>
             {t("settings.hotkeys.cancel")}
           </button>
         </span>
       ) : (
         <button
           style={RESET_ALL_STYLE}
+          {...hoverSurface()}
           data-testid="hotkeys.reset-all"
           onClick={() => setConfirmResetAll(true)}
         >
@@ -405,6 +413,18 @@ export function HotkeysPanel() {
                               chord: formatChord(chord),
                             })}
                             data-testid="hotkeys.remove-binding"
+                            // Inline hover — a stylesheet `:hover` loses to this
+                            // element's own inline background/color. Removing a
+                            // binding is destructive: the × goes red over a hover
+                            // rectangle.
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "var(--bg-3)";
+                              e.currentTarget.style.color = "var(--danger)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "transparent";
+                              e.currentTarget.style.color = "var(--fg-3)";
+                            }}
                             onClick={() => removeChord(cmd, chord)}
                           >
                             ×
@@ -431,6 +451,7 @@ export function HotkeysPanel() {
                         <>
                           <button
                             style={ICON_BTN_STYLE}
+                            {...hoverSurface()}
                             data-testid="hotkeys.add-binding"
                             aria-label={t("settings.hotkeys.addBindingAria", {
                               command: cmd.label,
@@ -445,6 +466,7 @@ export function HotkeysPanel() {
                           {overridden && (
                             <button
                               style={ICON_BTN_STYLE}
+                              {...hoverSurface()}
                               data-testid="hotkeys.reset"
                               aria-label={t("settings.hotkeys.restoreDefaultAria", {
                                 command: cmd.label,
