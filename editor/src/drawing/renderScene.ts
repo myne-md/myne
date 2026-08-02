@@ -44,14 +44,19 @@ function parseScene(sceneJson: string): Scene | null {
   }
 }
 
-/** Whether to apply the dark-mode transform: explicit caller flag, else the
- *  scene's persisted theme. */
-function useDarkMode(scene: Scene, opts: RenderOptions): boolean {
-  if (opts.darkMode !== undefined) return opts.darkMode;
-  return scene.appState?.theme === "dark";
-}
+/** Excalidraw's own dark-mode DISPLAY filter (`THEME_FILTER`). We apply it as a
+ *  post-process (`applyThemeFilter`) rather than via `appState.exportWithDarkMode`
+ *  because that export flag is unreliable on this path (0.18.1) — the raw export
+ *  came back with un-inverted strokes. This is the exact transform the editor
+ *  paints the canvas with, so a filtered thumbnail matches the editor pixel-wise
+ *  (default "white" strokes → white; custom colours shift the same way they do
+ *  on-canvas). Transparent stays transparent (the filter touches RGB, not alpha),
+ *  so the dark backdrop is the body behind it, never a baked white. */
+const THEME_FILTER = "invert(93%) hue-rotate(180deg)";
 
-/** Render a drawing scene to a PNG `Blob`. Returns null on a malformed scene. */
+/** Render a drawing scene to a PNG `Blob`. Returns null on a malformed scene.
+ *  Always renders in the scene's RAW colours; dark-mode matching is the data-URI
+ *  post-filter (`renderSceneDataUri` with `darkMode`). */
 export async function renderScenePng(
   sceneJson: string,
   opts: RenderOptions = {},
@@ -62,7 +67,6 @@ export async function renderScenePng(
     ...(scene.appState ?? {}),
     exportBackground: opts.background != null,
     viewBackgroundColor: opts.background ?? "transparent",
-    exportWithDarkMode: useDarkMode(scene, opts),
   };
   return await exportToBlob({
     elements: (scene.elements ?? []) as never,
@@ -88,7 +92,6 @@ export async function renderSceneSvg(
     ...(scene.appState ?? {}),
     exportBackground: opts.background != null,
     viewBackgroundColor: opts.background ?? "transparent",
-    exportWithDarkMode: useDarkMode(scene, opts),
   };
   return await exportToSvg({
     elements: (scene.elements ?? []) as never,
@@ -98,18 +101,56 @@ export async function renderSceneSvg(
   });
 }
 
+function blobToDataUri(blob: Blob): Promise<string | null> {
+  return new Promise<string | null>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Re-draw a PNG data URI through Excalidraw's dark DISPLAY filter, so the result
+ *  looks exactly like the dark editor (default strokes → white; custom colours
+ *  shifted the same way; transparent pixels stay transparent → a dark backdrop
+ *  behind it stays dark). Returns the original URI unchanged if a canvas is not
+ *  available (no-op fallback). */
+function applyThemeFilter(dataUri: string): Promise<string | null> {
+  return new Promise<string | null>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        if (ctx === null) {
+          resolve(dataUri);
+          return;
+        }
+        ctx.filter = THEME_FILTER;
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(dataUri);
+      }
+    };
+    img.onerror = () => resolve(dataUri);
+    img.src = dataUri;
+  });
+}
+
 /** A `data:` URI PNG for in-app surfaces (thumbnail, inline embed, HTML/PDF
- *  export projection). Null on a malformed scene / render failure. */
+ *  export projection). Null on a malformed scene / render failure. With
+ *  `darkMode`, the raw render is passed through Excalidraw's dark display filter
+ *  so it matches the dark editor. */
 export async function renderSceneDataUri(
   sceneJson: string,
   opts: RenderOptions = {},
 ): Promise<string | null> {
   const blob = await renderScenePng(sceneJson, opts);
   if (blob === null) return null;
-  return await new Promise<string | null>((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
-    reader.onerror = () => resolve(null);
-    reader.readAsDataURL(blob);
-  });
+  const uri = await blobToDataUri(blob);
+  if (uri === null) return null;
+  return opts.darkMode === true ? await applyThemeFilter(uri) : uri;
 }

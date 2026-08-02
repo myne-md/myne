@@ -110,10 +110,24 @@ function sceneHasElements(sceneJson: string): boolean {
   }
 }
 
+/** The scene's OWN persisted theme, or `null` when it is themeless (matches the
+ *  app default). A drawing that deviated from the app theme stores it, and the
+ *  editor renders from that — so the thumbnail must too, or a dark-drawn scene
+ *  under a light OS renders light (the isDarkApp fallback is unreliable for a
+ *  custom theme; the persisted value is authoritative, #213 review). */
+function scenePersistedDark(sceneJson: string): boolean | null {
+  try {
+    const t = (JSON.parse(sceneJson) as { appState?: { theme?: unknown } }).appState?.theme;
+    if (t === "dark") return true;
+    if (t === "light") return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** The live app theme (mirrors DrawingCanvas's `currentAppTheme`): `data-theme`
- *  wins, else the OS preference. Drives the thumbnail's dark-mode render + its
- *  backdrop so the collapsed state uses the SAME palette as the edit canvas
- *  (#213 review). */
+ *  wins, else the OS preference. The FALLBACK when a scene is themeless. */
 function isDarkApp(): boolean {
   if (typeof document === "undefined") return true;
   const t = document.documentElement.getAttribute("data-theme");
@@ -182,11 +196,16 @@ class DrawingEmbedWidget extends WidgetType {
     return true;
   }
 
-  /** (Re)render `dom` to this widget's current state, tearing down any live
-   *  canvas root first. Keeps the node; swaps its children. Thumbnail and editing
-   *  share ONE frame + header — only the action button (Edit/Done) and the body
-   *  (image vs canvas) differ, and both bodies are the same height, so toggling is
-   *  seamless (no scroll jump) and the two states read as one widget (#213 review). */
+  /** (Re)render `dom` to this widget's current state, tearing down any live canvas
+   *  root first. Keeps the node; swaps its children.
+   *
+   *  - editing (desktop): a persistent header row (title-input + Done) over the
+   *    live canvas.
+   *  - thumbnail, open-full-screen host (mobile): a persistent header row (title +
+   *    Open) over the drawing — a phone wants the tap target obvious.
+   *  - thumbnail, inline host (desktop) VIEW-ONLY: the drawing fills the frame and
+   *    the title + Edit live in a HOVER-ONLY chrome, so a static drawing reads as
+   *    the drawing, not a titled card (#213 review). */
   private render(dom: HTMLElement, view: EditorView): void {
     unmountRoot(dom);
     while (dom.firstChild !== null) dom.removeChild(dom.firstChild);
@@ -204,16 +223,44 @@ class DrawingEmbedWidget extends WidgetType {
       dom.appendChild(label);
       return;
     }
-    dom.appendChild(this.buildHeader(view, io));
     if (this.active) {
       dom.setAttribute("data-drawing-embed-state", "editing");
       dom.setAttribute("data-drawing-embed-active", "true");
+      dom.appendChild(this.buildHeader(view, io));
       this.mountCanvas(dom, io);
-    } else {
-      dom.setAttribute("data-drawing-embed-state", "thumbnail");
-      dom.removeAttribute("data-drawing-embed-active");
-      this.renderThumbnailBody(dom, view, io);
+      return;
     }
+    dom.setAttribute("data-drawing-embed-state", "thumbnail");
+    dom.removeAttribute("data-drawing-embed-active");
+    if (io.openNote !== undefined) {
+      // Mobile: a persistent header row + the drawing; tap opens full-screen.
+      dom.appendChild(this.buildHeader(view, io));
+      this.renderThumbnailBody(dom, view, io);
+    } else {
+      // Desktop view-only: the drawing fills the frame + a hover-only chrome.
+      this.renderThumbnailBody(dom, view, io);
+      dom.appendChild(this.buildHoverChrome(view, io));
+    }
+  }
+
+  /** Desktop view-only chrome: the title + an Edit button, floating over the top
+   *  of the drawing and revealed only on hover (CSS). */
+  private buildHoverChrome(view: EditorView, io: DrawingEmbedIo): HTMLElement {
+    const chrome = document.createElement("div");
+    chrome.className = "cm-drawing-embed-hover-chrome";
+    chrome.appendChild(this.buildTitle(io));
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "cm-drawing-embed-action";
+    edit.textContent = i18n.t("editor.drawingEmbed.editAction");
+    edit.setAttribute("data-testid", "editor.drawing-embed.edit-button");
+    const noteId = this.noteId;
+    edit.addEventListener("click", (e) => {
+      e.preventDefault();
+      view.dispatch({ effects: setActiveDrawingEmbed.of(noteId) });
+    });
+    chrome.appendChild(edit);
+    return chrome;
   }
 
   /** Title-only update (a rename landed) — no canvas teardown. */
@@ -221,6 +268,8 @@ class DrawingEmbedWidget extends WidgetType {
     dom.dataset.renderedDisplay = this.display;
     const label = dom.querySelector<HTMLElement>(".cm-drawing-embed-label");
     if (label !== null) label.textContent = this.display;
+    const staticTitle = dom.querySelector<HTMLElement>(".cm-drawing-embed-title-static");
+    if (staticTitle !== null) staticTitle.textContent = this.display;
     const input = dom.querySelector<HTMLInputElement>(".cm-drawing-embed-title-input");
     // Don't clobber the field the user is actively typing a new name into.
     if (input !== null && document.activeElement !== input) input.value = this.display;
@@ -230,49 +279,29 @@ class DrawingEmbedWidget extends WidgetType {
     }
   }
 
-  /** The shared header: an editable title + the Edit (thumbnail) / Done (editing)
-   *  action button. Identical in both states bar the button. */
+  /** The shared header: the title (editable when the host can rename safely, else
+   *  static) + the action button — Open (open-full-screen host, e.g. mobile) /
+   *  Done (inline editing) / Edit (inline collapsed). */
   private buildHeader(view: EditorView, io: DrawingEmbedIo): HTMLElement {
     const header = document.createElement("div");
     header.className = "cm-drawing-embed-header";
     const noteId = this.noteId;
-    // Editable title — renaming routes through the transactional rename so the
-    // `![[Title]]` embed reference is rewritten too (#213 review).
-    const title = document.createElement("input");
-    title.type = "text";
-    title.className = "cm-drawing-embed-title-input";
-    title.setAttribute("data-testid", "editor.drawing-embed.title");
-    title.value = this.display;
-    title.setAttribute("aria-label", i18n.t("editor.drawingEmbed.rename"));
-    const original = this.display;
-    const commitRename = () => {
-      const next = title.value.trim();
-      if (next === "" || next === original) {
-        title.value = original;
-        return;
-      }
-      void io.renameDrawing(noteId, next).catch(() => {
-        title.value = original;
-      });
-    };
-    title.addEventListener("keydown", (e) => {
-      e.stopPropagation(); // keep the editor keymap out of the rename field
-      if (e.key === "Enter") {
-        e.preventDefault();
-        title.blur();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        title.value = original;
-        title.blur();
-      }
-    });
-    title.addEventListener("blur", commitRename);
-    header.appendChild(title);
+    header.appendChild(this.buildTitle(io));
 
     const action = document.createElement("button");
     action.type = "button";
     action.className = "cm-drawing-embed-action";
-    if (this.active) {
+    if (io.openNote !== undefined) {
+      // Open-full-screen host (mobile): tap opens the drawing's own screen; there
+      // is no inline canvas / Done here.
+      const open = io.openNote;
+      action.textContent = i18n.t("editor.drawingEmbed.open");
+      action.setAttribute("data-testid", "editor.drawing-embed.open-button");
+      action.addEventListener("click", (e) => {
+        e.preventDefault();
+        open(noteId);
+      });
+    } else if (this.active) {
       action.textContent = i18n.t("editor.drawingEmbed.done");
       action.setAttribute("data-testid", "editor.drawing-embed.collapse");
       action.addEventListener("click", (e) => {
@@ -291,6 +320,51 @@ class DrawingEmbedWidget extends WidgetType {
     return header;
   }
 
+  /** The title element: an editable field when the host supplies a (ref-rewriting)
+   *  `renameDrawing`, else static text (a host without a safe rename must not let
+   *  the user orphan the `![[Title]]` reference). */
+  private buildTitle(io: DrawingEmbedIo): HTMLElement {
+    if (io.renameDrawing === undefined) {
+      const label = document.createElement("span");
+      label.className = "cm-drawing-embed-title-static";
+      label.setAttribute("data-testid", "editor.drawing-embed.title");
+      label.textContent = this.display;
+      return label;
+    }
+    const rename = io.renameDrawing;
+    const noteId = this.noteId;
+    const original = this.display;
+    const title = document.createElement("input");
+    title.type = "text";
+    title.className = "cm-drawing-embed-title-input";
+    title.setAttribute("data-testid", "editor.drawing-embed.title");
+    title.value = this.display;
+    title.setAttribute("aria-label", i18n.t("editor.drawingEmbed.rename"));
+    const commitRename = () => {
+      const next = title.value.trim();
+      if (next === "" || next === original) {
+        title.value = original;
+        return;
+      }
+      void rename(noteId, next).catch(() => {
+        title.value = original;
+      });
+    };
+    title.addEventListener("keydown", (e) => {
+      e.stopPropagation(); // keep the editor keymap out of the rename field
+      if (e.key === "Enter") {
+        e.preventDefault();
+        title.blur();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        title.value = original;
+        title.blur();
+      }
+    });
+    title.addEventListener("blur", commitRename);
+    return title;
+  }
+
   /** Thumbnail body (same-size as the canvas): the rendered scene, or a clean
    *  placeholder for an empty drawing. Clicking it opens the canvas. */
   private renderThumbnailBody(container: HTMLElement, view: EditorView, io: DrawingEmbedIo): void {
@@ -300,13 +374,17 @@ class DrawingEmbedWidget extends WidgetType {
     body.setAttribute("role", "button");
     body.setAttribute("tabindex", "0");
     body.setAttribute("aria-label", i18n.t("editor.drawingEmbed.edit", { name: this.display }));
-    // Same backdrop as the live Excalidraw canvas, so collapsed ⇄ editing share
-    // one palette (#213 review).
-    const dark = isDarkApp();
+    // Same DARK backdrop as the live Excalidraw canvas (never white — #213
+    // review); the scene's own theme refines it once loaded.
     body.style.backgroundColor = canvasBackdrop();
+    const noteIdForTap = this.noteId;
+    const openFull = io.openNote;
     body.addEventListener("click", (e) => {
       e.preventDefault();
-      view.dispatch({ effects: setActiveDrawingEmbed.of(this.noteId) });
+      // Open-full-screen host (mobile) opens the drawing's own screen; an inline
+      // host mounts the canvas in place.
+      if (openFull !== undefined) openFull(noteIdForTap);
+      else view.dispatch({ effects: setActiveDrawingEmbed.of(noteIdForTap) });
     });
     container.appendChild(body);
     const noteId = this.noteId;
@@ -326,8 +404,18 @@ class DrawingEmbedWidget extends WidgetType {
         body.appendChild(hint);
         return;
       }
+      // Match the editor exactly: the scene's OWN theme (what the editor renders
+      // from) wins; else the app theme. `darkMode` makes Excalidraw render the
+      // scene the way the dark editor shows it — default strokes drawn "white"
+      // come out white — while the backdrop stays DARK (transparent PNG over the
+      // dark body), never white (#213 review).
+      const effectiveDark = scenePersistedDark(scene) ?? isDarkApp();
+      body.style.backgroundColor = effectiveDark ? "#121212" : "#ffffff";
       const { renderSceneDataUri } = await import("../drawing/renderScene");
-      const uri = await renderSceneDataUri(scene, { scale: 2, darkMode: dark }).catch(() => null);
+      const uri = await renderSceneDataUri(scene, {
+        scale: 2,
+        darkMode: effectiveDark,
+      }).catch(() => null);
       if (uri === null || !body.isConnected) return;
       const img = document.createElement("img");
       img.className = "cm-drawing-embed-img";
@@ -374,9 +462,13 @@ function buildDrawingEmbedDecorations(
   const io = readDrawingEmbedIo(state);
   const { drawings } = chipKeySets(readNoteSet(state));
   // Reading mode makes the host note read-only; an inline drawing there is a
-  // static thumbnail, never an editable canvas.
+  // static thumbnail, never an editable canvas. An open-full-screen host (mobile)
+  // never mounts the inline canvas either — tapping opens the drawing's own screen.
   const reading = state.facet(readingModeFacet);
-  const active = reading ? null : state.field(activeDrawingEmbedField, false) ?? null;
+  const active =
+    reading || io === null || io.openNote !== undefined
+      ? null
+      : state.field(activeDrawingEmbedField, false) ?? null;
   const decorations: Array<Range<Decoration>> = [];
   for (const { from, to } of ranges) {
     syntaxTree(state).iterate({

@@ -95,6 +95,19 @@
  * stacking are layout, not behaviour — `UIOptions` can remove a tool but cannot
  * tell the island to scroll.
  * --------------------------------------------------------------------------- */
+/* MYND-646 / #179 — de-duplicate the mobile chrome. On a phone Excalidraw draws a
+ * bottom bar with its MAIN-MENU hamburger (bottom-left) + undo/redo (bottom-right).
+ * The hamburger's three curated items (Theme / Canvas background / Reset) move to
+ * the host's own ⋯ menu (mobile EditorFlow), so hide the redundant trigger and
+ * reclaim the bottom-left — while KEEPING undo/redo, which has no touch-keyboard
+ * home. Scoped to `[data-mobile-chrome]` (set only by the mobile host), so desktop
+ * is untouched. Nothing is lost: the actions live in the host menu. VERSION-COUPLED
+ * to @excalidraw/excalidraw 0.18.1 — `main-menu-trigger` is an upstream testid, not
+ * a public API; a major bump must re-verify it on device. */
+.drawing-canvas-chrome[data-mobile-chrome="true"] [data-testid="main-menu-trigger"] {
+  display: none;
+}
+
 @media (pointer: coarse) {
   /* Reserve the misc-tools island's own width so the toolbar stops short of it
      instead of running underneath, and let what remains scroll rather than

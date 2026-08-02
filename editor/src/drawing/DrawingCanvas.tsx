@@ -12,6 +12,7 @@
 // different drawing remounts with the new scene (initialData is read once at
 // mount); a same-note out-of-band reload (sync-pull) still wants a live check.
 import { Excalidraw, MainMenu, serializeAsJSON } from "@excalidraw/excalidraw";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
 // Chrome curation (MYND-514): scoped hides for the Library + Help buttons and the
 // welcome screen — the elements 0.18.1 can't remove via props. Also carries the
@@ -62,6 +63,15 @@ export type DrawingCanvasProps = {
    *  scene's saved scroll offset; the whole-note surface leaves it off (it keeps
    *  the user's last viewport). Default false. */
   fitContentOnMount?: boolean;
+  /** #179: hand the host the Excalidraw imperative API on mount, so a host that
+   *  hides Excalidraw's own menu (mobile — see `mobileChrome`) can still drive the
+   *  canvas actions (theme / background / reset) from its own UI. */
+  onApi?: (api: ExcalidrawImperativeAPI) => void;
+  /** #179: mark the wrapper so `drawing-chrome.css` hides Excalidraw's mobile
+   *  bottom-bar MAIN-MENU trigger (the hamburger) — its curated items move to the
+   *  host's own menu, and undo/redo (the bar's other half, with no touch keyboard
+   *  home) stays. Desktop leaves this off. */
+  mobileChrome?: boolean;
 };
 
 function parseInitialData(
@@ -93,6 +103,8 @@ export default function DrawingCanvas({
   initialSceneJson,
   onSceneChange,
   fitContentOnMount = false,
+  onApi,
+  mobileChrome = false,
 }: DrawingCanvasProps) {
   // Excalidraw fires onChange once on mount with the initial scene — skip that
   // no-op fire so merely OPENING a drawing doesn't dirty the buffer + autosave a
@@ -104,9 +116,11 @@ export default function DrawingCanvas({
       style={WRAP_STYLE}
       className="drawing-canvas-chrome"
       data-testid="drawing.canvas"
+      data-mobile-chrome={mobileChrome ? "true" : undefined}
     >
       <Excalidraw
         {...HARDENED_EXCALIDRAW_PROPS}
+        excalidrawAPI={onApi}
         initialData={parseInitialData(initialSceneJson, fitContentOnMount)}
         onChange={
           onSceneChange
