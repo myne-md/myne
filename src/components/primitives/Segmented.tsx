@@ -19,6 +19,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { hoverSurface } from "./hoverSurface";
 
 export interface SegmentedOption {
   /** The wire value (also the `data-value` and the `${testId}-${value}` tail). */
@@ -58,7 +59,8 @@ const THUMB_STYLE: CSSProperties = {
   top: 0,
   bottom: 0,
   left: 0,
-  background: "var(--paper-3)",
+  // Selected segment reads as accent (the sliding fill behind the active label).
+  background: "var(--accent)",
   zIndex: 0,
   pointerEvents: "none",
   transition:
@@ -77,12 +79,14 @@ const SEGMENT_STYLE: CSSProperties = {
   color: "var(--fg-2)",
   cursor: "pointer",
   minWidth: 72,
-  transition: "color var(--duration-fast) var(--ease-standard)",
+  transition:
+    "color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard)",
 };
 
 const SEGMENT_SELECTED_STYLE: CSSProperties = {
   ...SEGMENT_STYLE,
-  color: "var(--fg-1)",
+  // On the accent thumb, the label switches to the on-accent ink for contrast.
+  color: "var(--accent-on)",
 };
 
 const DIVIDER_STYLE: CSSProperties = {
@@ -140,6 +144,9 @@ export function Segmented({
               onClick={() => {
                 if (!selected) onChange(o.value);
               }}
+              // Only unselected segments take a hover fill — the selected one
+              // already carries the sliding thumb behind it.
+              {...(selected ? {} : hoverSurface())}
               style={selected ? SEGMENT_SELECTED_STYLE : SEGMENT_STYLE}
             >
               {o.label}

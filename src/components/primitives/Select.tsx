@@ -75,6 +75,7 @@ const TRIGGER_STYLE: CSSProperties = {
   padding: "0 var(--space-2)",
   cursor: "pointer",
   whiteSpace: "nowrap",
+  transition: "border-color var(--duration-fast) var(--ease-standard)",
 };
 
 const MENU_STYLE: CSSProperties = {
@@ -187,15 +188,20 @@ export function Select<T extends string>({
       }
     };
     const onReflow = () => close();
+    // CAPTURE phase: a container that stops click propagation (e.g. the Settings
+    // modal content, which stops bubbling to keep backdrop-close from firing)
+    // would otherwise swallow a bubble-phase document listener, so clicking
+    // elsewhere in the modal never closed the menu. Capture fires top-down before
+    // any bubble-phase stopPropagation can run.
     const tid = setTimeout(
-      () => document.addEventListener("click", onDocClick),
+      () => document.addEventListener("click", onDocClick, true),
       0,
     );
     window.addEventListener("scroll", onReflow, true);
     window.addEventListener("resize", onReflow);
     return () => {
       clearTimeout(tid);
-      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("click", onDocClick, true);
       window.removeEventListener("scroll", onReflow, true);
       window.removeEventListener("resize", onReflow);
     };
@@ -242,6 +248,15 @@ export function Select<T extends string>({
           if (open) close();
           else openMenu();
         }}
+        // Hover affordance for the bordered trigger: deepen the border so the
+        // dropdown reads as interactive on pointer-over (an input-like control
+        // shows its hover on the border, not a fill).
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = "var(--line-3)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = "var(--line-2)";
+        }}
         onKeyDown={onTriggerKeyDown}
       >
         <span style={{ flex: 1, minWidth: 0 }}>{current?.label ?? ""}</span>
@@ -274,7 +289,7 @@ export function Select<T extends string>({
                   data-value={opt.value}
                   style={{
                     ...OPTION_STYLE,
-                    background: active ? "var(--paper-2)" : "transparent",
+                    background: active ? "var(--bg-3)" : "transparent",
                   }}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={(e) => {

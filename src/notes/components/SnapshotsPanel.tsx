@@ -39,6 +39,10 @@ import { BACKDROP_STYLE } from "./DeleteConfirmModal";
 import { changedLineCount, diffWithSegments, type DiffLine } from "../../dialect";
 import { DiffView } from "./DiffView";
 import { formatRelativeTime } from "./relativeTime";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 
 const PANEL_STYLE: CSSProperties = {
   width: 720,
@@ -103,6 +107,7 @@ const ROW_STYLE: CSSProperties = {
   width: "100%",
   textAlign: "left",
   fontFamily: "var(--font-sans)",
+  transition: HOVER_TRANSITION,
 };
 
 const ROW_SELECTED_STYLE: CSSProperties = {
@@ -196,6 +201,7 @@ const BTN_STYLE: CSSProperties = {
   background: "var(--paper-2)",
   color: "var(--fg-1)",
   flexShrink: 0,
+  transition: HOVER_TRANSITION,
 };
 
 const RESTORE_BTN_STYLE: CSSProperties = {
@@ -459,6 +465,10 @@ export function SnapshotsPanel({
                     <button
                       key={s.snapshot_uuid}
                       type="button"
+                      {...hoverSurface({
+                        restBg: isSel ? "var(--accent-soft)" : "transparent",
+                        hoverBg: isSel ? "var(--accent-soft)" : "var(--bg-3)",
+                      })}
                       style={isSel ? ROW_SELECTED_STYLE : ROW_STYLE}
                       aria-pressed={isSel}
                       data-testid="snapshots.row"
@@ -521,6 +531,10 @@ export function SnapshotsPanel({
                       </span>
                       <button
                         type="button"
+                        {...hoverSurface({
+                          restBg: "var(--paper-2)",
+                          hoverBg: "var(--paper-3)",
+                        })}
                         style={RESTORE_BTN_STYLE}
                         data-testid="snapshots.restore"
                         data-snapshot-id={selected}
@@ -562,6 +576,10 @@ export function SnapshotsPanel({
           {status !== null && <span style={STATUS_STYLE}>{status}</span>}
           <button
             type="button"
+            {...hoverSurface({
+              restBg: "var(--paper-2)",
+              hoverBg: "var(--paper-3)",
+            })}
             style={{ ...BTN_STYLE, marginLeft: "auto" }}
             onClick={onClose}
           >
@@ -662,6 +680,10 @@ function RestoreConfirm({
           <button
             ref={cancelRef}
             type="button"
+            {...hoverSurface({
+              restBg: "var(--paper-2)",
+              hoverBg: "var(--paper-3)",
+            })}
             style={BTN_STYLE}
             data-testid="snapshots.restore-cancel"
             onClick={onCancel}
@@ -670,6 +692,10 @@ function RestoreConfirm({
           </button>
           <button
             type="button"
+            {...hoverSurface({
+              restBg: "var(--paper-2)",
+              hoverBg: "var(--paper-3)",
+            })}
             style={RESTORE_BTN_STYLE}
             data-testid="snapshots.restore-confirm-cta"
             onClick={onConfirm}

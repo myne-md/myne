@@ -83,9 +83,12 @@
       "colType": "Type",
       "colUsedIn": "Used in",
       "decrypting": "Decrypting attachments…",
+      "clearSearchAriaLabel": "Clear search",
+      "emptyClearSearch": "Clear search",
       "emptyImportHint": "Import a file to keep it in your vault.",
       "emptyLoadError": "Couldn't read the attachments catalog.",
       "emptyNoAttachments": "No attachments yet.",
+      "emptyNoResultsTitle": "No attachments match your search.",
       "filterAriaLabel": "Filter by type",
       "gridView": "Grid view",
       "import": "Import",
@@ -98,6 +101,7 @@
       "menuPreview": "Preview",
       "menuRename": "Rename",
       "menuTranscribe": "Transcribe",
+      "menuViewTranscription": "View transcription",
       "noMatch": "No attachments match your search.",
       "noUnusedNotice": "No unused attachments to clean.",
       "preview": "Preview",
@@ -120,6 +124,8 @@
       "transcribeNoModelHint": "The speech-to-text model is missing. Reinstalling Myne restores it.",
       "transcribeStarted": "Transcribing…",
       "transcribeVaultLocked": "Unlock your vault to transcribe.",
+      "transcriptionModalClose": "Close transcription",
+      "transcriptionModalTitle": "Transcription",
       "typeFilter": {
         "all": "All types",
         "audio": "Audio",
@@ -955,6 +961,18 @@
         "toggleTitle": "Workspace: {{name}}"
       }
     },
+    "noteActions": {
+      "buttonLabel": "Note actions",
+      "rename": "Rename",
+      "move": "Move to folder…",
+      "duplicate": "Duplicate",
+      "versionHistory": "Version history",
+      "exportMarkdown": "Export as Markdown…",
+      "exportPdf": "Export as PDF…",
+      "exportHtml": "Export as HTML…",
+      "exportTxt": "Export as Plain Text…",
+      "trash": "Move to trash"
+    },
     "codeBlock": {
       "copyCode": "Copy code",
       "defaultBadge": "code"
@@ -1777,6 +1795,7 @@
       "newFolder": "New folder",
       "newFolderInPlaceholder": "New folder in {{path}}",
       "newFolderPlaceholder": "New folder",
+      "newItem": "New…",
       "newNote": "New note",
       "newNoteFromTemplate": "New note from template…",
       "newNoteHere": "New note here",
@@ -1833,6 +1852,7 @@
       "createDrawing": "New drawing",
       "noNotesMatch": "No notes match.",
       "noNotesYet": "No notes yet.",
+      "recent": "Recent",
       "searchAriaLabel": "Search notes to open",
       "searchPlaceholder": "Search notes…",
       "untitled": "Untitled"
@@ -2017,6 +2037,8 @@
         "viewSettings": "View settings…"
       },
       "newView": "New view",
+      "noMatch": "No views match your search.",
+      "searchPlaceholder": "Search views…",
       "table": {
         "empty": "No notes match this view",
         "name": "Name",
@@ -2274,6 +2296,10 @@
       "changing": "Changing…"
     },
     "appearance": {
+      "accentHelper": "Pick the accent color used across the app. This device only.",
+      "accentHexAria": "Accent color hex value",
+      "accentLabel": "Accent color",
+      "accentReset": "Reset to theme default",
       "homeQuickActions": "Home quick actions",
       "showEditTimesAria": "Show edit times in sidebar",
       "showEditTimesHelper": "Display each note's last-edited time beneath its title in the sidebar.",
@@ -2413,6 +2439,7 @@
       "appliedBadge": "Applied",
       "apply": "Apply",
       "applyError": "Couldn't apply that theme. Please try again.",
+      "browseButton": "Browse themes",
       "cancel": "Cancel",
       "confirm": "Confirm",
       "delete": "Delete",
@@ -2580,6 +2607,10 @@
       "label": "Line numbers",
       "off": "Off",
       "on": "On"
+    },
+    "views": {
+      "helper": "Show the Views entry in the sidebar for saving filtered note lists. Off by default; on if you already have views.",
+      "label": "Views"
     },
     "vimMode": {
       "chordCaveat": "On Windows and Linux, Myne's own shortcuts take priority, so the vim chords that collide with them (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) are not available in the editor. Ctrl-[ still works as Escape, and visual-block moves to Alt-v.",
@@ -3024,6 +3055,7 @@
     },
     "endpoint": {
       "connect": "Connect",
+      "connected": "Connected",
       "connectedLocal": "Connected (local, no TLS).",
       "connectedTls": "Connected. Check that this fingerprint matches on your other device.",
       "connectedPlatformTrust": "Connected over TLS. Your browser verified this server’s certificate.",
@@ -3122,6 +3154,7 @@
         "deleteConfirmTitle": "Delete this recovered note?",
         "deleteConfirmWarning": "This permanently deletes the only copy kept on this device. This cannot be undone.",
         "deleteCta": "Delete",
+        "empty": "No recovered notes.",
         "errorGeneric": "Something went wrong. Try again.",
         "helper": "When a note deleted on another device is removed here, its encrypted copy is kept on this device. Restore one as a new note, or delete it permanently.",
         "label": "Recovered notes",

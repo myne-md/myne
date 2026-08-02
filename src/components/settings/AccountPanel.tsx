@@ -31,7 +31,13 @@
 // or `take_and_run_blocking` slot zeroize-before-unlink (vault_delete);
 // V8 cleanup here is best-effort.
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { appDataDir, join } from "../../platform/path";
 import { Button } from "../primitives/Button";
@@ -233,6 +239,31 @@ function iconPickerButtonStyle(
     color: selected ? "var(--accent)" : "var(--ink-1)",
     cursor: disabled ? "default" : "pointer",
     opacity: disabled ? 0.6 : 1,
+    transition:
+      "background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard)",
+  };
+}
+
+/** Hover-feedback handlers for an icon-picker tile — deepen its fill + border on
+ *  pointer-over so the grid reads as pickable. No-op for the selected tile (it
+ *  already carries the accent look) or a disabled grid. */
+function iconTileHover(
+  selected: boolean,
+  disabled: boolean,
+): {
+  onMouseEnter?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
+  onMouseLeave?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
+} {
+  if (selected || disabled) return {};
+  return {
+    onMouseEnter: (e) => {
+      e.currentTarget.style.background = "var(--paper-2)";
+      e.currentTarget.style.borderColor = "var(--line-3)";
+    },
+    onMouseLeave: (e) => {
+      e.currentTarget.style.background = "var(--paper)";
+      e.currentTarget.style.borderColor = "var(--line-2)";
+    },
   };
 }
 
@@ -673,6 +704,7 @@ export function AccountPanel({
             data-icon-name="default"
             disabled={iconInFlight}
             onClick={() => handleSelectIcon(null)}
+            {...iconTileHover(savedIcon === null, iconInFlight)}
             style={iconPickerButtonStyle(savedIcon === null, iconInFlight)}
           >
             M
@@ -689,6 +721,7 @@ export function AccountPanel({
               data-icon-name={name}
               disabled={iconInFlight}
               onClick={() => handleSelectIcon(name)}
+              {...iconTileHover(savedIcon === name, iconInFlight)}
               style={iconPickerButtonStyle(savedIcon === name, iconInFlight)}
             >
               <FolderGlyph name={name} size={16} />

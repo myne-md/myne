@@ -92,6 +92,7 @@ const TRIGGER_STYLE: CSSProperties = {
   padding: "0 var(--space-2)",
   cursor: "pointer",
   textAlign: "left",
+  transition: "border-color var(--duration-fast) var(--ease-standard)",
 };
 
 const MENU_STYLE: CSSProperties = {
@@ -185,7 +186,7 @@ export function SearchableSelect<T extends string>({
   const searchRef = useRef<HTMLInputElement>(null);
   const [coords, setCoords] = useState<{
     top: number;
-    left: number;
+    right: number;
     minWidth: number;
   } | null>(null);
 
@@ -265,15 +266,17 @@ export function SearchableSelect<T extends string>({
     [multiple, options, selectedSet, onChange, close],
   );
 
-  // Anchor the menu below the trigger, left-aligned, at least as wide as it.
+  // Anchor the menu below the trigger, RIGHT-aligned to it (opens leftward) so it
+  // never spills past the right edge — the trigger usually sits on the right of a
+  // settings row / modal, where a left-aligned menu leaked off-screen.
   useLayoutEffect(() => {
     if (!open) return;
     const el = triggerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const minWidth = Math.max(220, r.width);
-    const left = Math.min(r.left, window.innerWidth - minWidth - 8);
-    setCoords({ top: r.bottom + 4, left: Math.max(8, left), minWidth });
+    const right = Math.max(8, window.innerWidth - r.right);
+    setCoords({ top: r.bottom + 4, right, minWidth });
   }, [open]);
 
   // Outside-click closes; scroll/resize close (a fixed menu would drift).
@@ -304,15 +307,18 @@ export function SearchableSelect<T extends string>({
       }
       close();
     };
+    // CAPTURE phase — see Select.tsx: a bubble-phase document listener is
+    // swallowed by a modal that stops click propagation, so clicking elsewhere
+    // in the Settings modal never closed the menu.
     const tid = setTimeout(
-      () => document.addEventListener("click", onDocClick),
+      () => document.addEventListener("click", onDocClick, true),
       0,
     );
     window.addEventListener("scroll", onReflow, true);
     window.addEventListener("resize", onReflow);
     return () => {
       clearTimeout(tid);
-      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("click", onDocClick, true);
       window.removeEventListener("scroll", onReflow, true);
       window.removeEventListener("resize", onReflow);
     };
@@ -370,6 +376,20 @@ export function SearchableSelect<T extends string>({
           if (open) close();
           else openMenu();
         }}
+        onMouseEnter={
+          disabled
+            ? undefined
+            : (e) => {
+                e.currentTarget.style.borderColor = "var(--line-3)";
+              }
+        }
+        onMouseLeave={
+          disabled
+            ? undefined
+            : (e) => {
+                e.currentTarget.style.borderColor = "var(--line-2)";
+              }
+        }
         onKeyDown={onTriggerKeyDown}
       >
         <span
@@ -401,8 +421,9 @@ export function SearchableSelect<T extends string>({
             style={{
               ...MENU_STYLE,
               top: coords.top,
-              left: coords.left,
+              right: coords.right,
               minWidth: coords.minWidth,
+              maxWidth: "min(360px, calc(100vw - 16px))",
             }}
           >
             <div style={SEARCH_ROW_STYLE}>
@@ -443,7 +464,7 @@ export function SearchableSelect<T extends string>({
                       data-active={isSelected}
                       style={{
                         ...OPTION_STYLE,
-                        background: active ? "var(--paper-2)" : "transparent",
+                        background: active ? "var(--bg-3)" : "transparent",
                       }}
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={(e) => {

@@ -99,6 +99,28 @@ export function Switch({
       data-testid={testId}
       onClick={interactive ? () => onChange(!checked) : undefined}
       disabled={!interactive}
+      // Hover affordance: deepen the track border so the control answers "yes,
+      // I'm live" on pointer-over (the design-canon hover, adapted for a toggle —
+      // a bordered control reads its hover on the border, not a fill). Restored
+      // to the resting border on leave; the transition rides TRACK_BASE_STYLE.
+      onMouseEnter={
+        interactive
+          ? (e) => {
+              e.currentTarget.style.borderColor = checked
+                ? "var(--accent)"
+                : "var(--line-3)";
+            }
+          : undefined
+      }
+      onMouseLeave={
+        interactive
+          ? (e) => {
+              e.currentTarget.style.borderColor = checked
+                ? "var(--accent-press)"
+                : "var(--line-2)";
+            }
+          : undefined
+      }
       style={trackStyle}
     >
       <span

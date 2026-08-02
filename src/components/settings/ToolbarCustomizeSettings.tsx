@@ -10,6 +10,11 @@ import { useEffect, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { ERROR_STYLE } from "./panel-styles";
+import { Icon } from "../primitives/Icon";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../primitives/hoverSurface";
 import { prefsRead, setEditorToolbarHidden, setEditorToolbarOrder } from "../../lib/prefs";
 import { resolveBarOrder, reorderByDrop } from "../../notes/barItemsOrder";
 import {
@@ -79,11 +84,39 @@ const PENDING_HINT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
   flexShrink: 0,
 };
-const CHECKBOX_STYLE: CSSProperties = {
-  // Theme the control instead of the OS default (macOS system blue) so it
-  // follows the active theme's accent (QA: the native blue was off-theme).
-  accentColor: "var(--accent)",
+// The native checkbox is kept for behaviour + a11y + the E2E testid, but visually
+// hidden (absolute, opacity 0) over a custom box so the CHECK MARK colour is
+// ours: `--accent` fill + an `--accent-on` tick. `--accent-on` is black on a
+// light accent and white on a dark one, so the tick stays readable at any accent
+// (the OS checkbox drew a fixed near-white tick that vanished on a light accent).
+const HIDDEN_INPUT_STYLE: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  margin: 0,
+  opacity: 0,
+  cursor: "pointer",
 };
+
+function checkboxBoxStyle(checked: boolean, disabled: boolean): CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 16,
+    height: 16,
+    flexShrink: 0,
+    boxSizing: "border-box",
+    borderRadius: "var(--radius-1)",
+    border: `1px solid ${checked ? "var(--accent)" : "var(--line-2)"}`,
+    background: checked ? "var(--accent)" : "transparent",
+    color: "var(--accent-on)",
+    opacity: disabled ? 0.5 : 1,
+    transition:
+      "background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard)",
+  };
+}
 const ARROW_STYLE: CSSProperties = {
   background: "transparent",
   border: 0,
@@ -92,6 +125,8 @@ const ARROW_STYLE: CSSProperties = {
   padding: "0 4px",
   fontSize: 14,
   lineHeight: 1,
+  borderRadius: "var(--radius-1)",
+  transition: HOVER_TRANSITION,
 };
 const ARROW_DISABLED_STYLE: CSSProperties = {
   ...ARROW_STYLE,
@@ -220,15 +255,27 @@ export function ToolbarCustomizeSettings() {
                     <span style={GRIP_STYLE} aria-hidden="true">
                       ⠿
                     </span>
-                    <input
-                      type="checkbox"
-                      checked={!hiddenSet.has(id)}
-                      onChange={() => toggleShown(id)}
-                      disabled={isPending}
-                      style={CHECKBOX_STYLE}
-                      data-testid="settings.toolbar-customize.toggle"
-                      data-item-id={id}
-                    />
+                    <span
+                      style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!hiddenSet.has(id)}
+                        onChange={() => toggleShown(id)}
+                        disabled={isPending}
+                        style={HIDDEN_INPUT_STYLE}
+                        data-testid="settings.toolbar-customize.toggle"
+                        data-item-id={id}
+                      />
+                      <span
+                        aria-hidden="true"
+                        style={checkboxBoxStyle(!hiddenSet.has(id), isPending)}
+                      >
+                        {!hiddenSet.has(id) && (
+                          <Icon name="check" size={12} strokeWidth={3} />
+                        )}
+                      </span>
+                    </span>
                     {t(toolbarItemLabelKey(id) ?? id)}
                     {isPending && (
                       <span style={PENDING_HINT_STYLE}>
@@ -242,6 +289,7 @@ export function ToolbarCustomizeSettings() {
                       aria-label={t("settings.toolbarCustomize.moveUp")}
                       disabled={isFirst}
                       onClick={() => move(id, -1)}
+                      {...hoverSurface({ disabled: isFirst })}
                       style={isFirst ? ARROW_DISABLED_STYLE : ARROW_STYLE}
                       data-testid="settings.toolbar-customize.move-up"
                       data-item-id={id}
@@ -253,6 +301,7 @@ export function ToolbarCustomizeSettings() {
                       aria-label={t("settings.toolbarCustomize.moveDown")}
                       disabled={isLast}
                       onClick={() => move(id, 1)}
+                      {...hoverSurface({ disabled: isLast })}
                       style={isLast ? ARROW_DISABLED_STYLE : ARROW_STYLE}
                       data-testid="settings.toolbar-customize.move-down"
                       data-item-id={id}

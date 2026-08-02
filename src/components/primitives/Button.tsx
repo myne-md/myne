@@ -48,9 +48,11 @@ const variantStyles: Record<ButtonVariant, CSSProperties> = {
     color: "var(--fg-2)",
   },
   danger: {
-    background: "var(--danger)",
+    // `--danger-solid` (a clear red fill), NOT the text-tuned `--danger` which
+    // washes out to salmon as a button background on a dark theme.
+    background: "var(--danger-solid)",
     color: "#fff",
-    borderColor: "var(--danger)",
+    borderColor: "var(--danger-solid)",
   },
 };
 
@@ -76,7 +78,11 @@ export function Button({
   } else {
     if (hover && variant === "primary") merged.background = "var(--accent-hover)";
     if (hover && (variant === "secondary" || variant === "ghost"))
-      merged.background = "var(--paper-2)";
+      // `--bg-3` (the hover ramp), not `--paper-2` — the latter is imperceptible
+      // on a near-black surface, so ghost/secondary buttons read as inert.
+      merged.background = "var(--bg-3)";
+    if (hover && variant === "danger")
+      merged.background = "color-mix(in srgb, var(--danger-solid), black 14%)";
     if (press && variant === "primary") merged.background = "var(--accent-press)";
   }
 

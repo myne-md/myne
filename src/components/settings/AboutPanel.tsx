@@ -21,7 +21,13 @@
 // Penpot canon: `🔴 screen------settings--about` (frame id
 // `9fb59646-2811-8082-8007-fd4c5a602b46`).
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { servedBuildInfo, type BuildInfo } from "../../platform/build-info";
 import { openUrl } from "../../platform/opener";
@@ -59,6 +65,17 @@ const VALUE_STYLE: CSSProperties = {
   margin: 0,
 };
 
+/** Accent text-link hover: shift to the hover-accent (an underlined accent link
+ *  needs a color change, not a background block, to register a pointer-over). */
+const linkHover = {
+  onMouseEnter: (e: ReactMouseEvent<HTMLElement>) => {
+    e.currentTarget.style.color = "var(--accent-hover)";
+  },
+  onMouseLeave: (e: ReactMouseEvent<HTMLElement>) => {
+    e.currentTarget.style.color = "var(--accent)";
+  },
+};
+
 const LINK_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--accent)",
@@ -68,6 +85,7 @@ const LINK_STYLE: CSSProperties = {
   padding: 0,
   cursor: "pointer",
   fontFamily: "inherit",
+  transition: "color var(--duration-fast) var(--ease-standard)",
   display: "inline-flex",
   alignItems: "center",
   gap: 4,
@@ -172,6 +190,7 @@ export function AboutPanel() {
         <button
           type="button"
           onClick={handleThreatModelClick}
+          {...linkHover}
           style={LINK_STYLE}
         >
           myne.md/threat-model

@@ -23,6 +23,10 @@ import { useTranslation } from "react-i18next";
 import { LABEL_SLOTS, labelSlotName, labelColorVar } from "../decorations";
 import { FOLDER_ICON_NAMES } from "../folderIcons";
 import { FolderGlyph } from "./FolderGlyph";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "../../components/primitives/hoverSurface";
 
 const POPOVER_STYLE: CSSProperties = {
   position: "fixed",
@@ -59,6 +63,7 @@ const SWATCH_BUTTON_BASE: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   background: "transparent",
+  transition: HOVER_TRANSITION,
 };
 
 const ICON_GRID_STYLE: CSSProperties = {
@@ -79,6 +84,7 @@ const ICON_BUTTON_BASE: CSSProperties = {
   justifyContent: "center",
   background: "transparent",
   color: "var(--fg-3)",
+  transition: HOVER_TRANSITION,
 };
 
 export type DecorationPopoverProps = {
@@ -181,6 +187,7 @@ export function DecorationPopover({
           aria-label={t("notes.decoration.noColor")}
           aria-pressed={color === null}
           data-color-slot="none"
+          {...hoverSurface()}
           style={{
             ...SWATCH_BUTTON_BASE,
             borderColor: color === null ? "var(--accent)" : "var(--line-2)",
@@ -197,6 +204,7 @@ export function DecorationPopover({
             aria-label={labelSlotName(slot)}
             aria-pressed={color === slot}
             data-color-slot={slot}
+            {...hoverSurface()}
             style={{
               ...SWATCH_BUTTON_BASE,
               borderColor: color === slot ? "var(--accent)" : "transparent",
@@ -226,6 +234,7 @@ export function DecorationPopover({
               aria-label={t("notes.decoration.defaultFolderIcon")}
               aria-pressed={icon.value === null}
               data-icon-name="default"
+              {...hoverSurface()}
               style={{
                 ...ICON_BUTTON_BASE,
                 borderColor:
@@ -243,6 +252,7 @@ export function DecorationPopover({
                 aria-label={name}
                 aria-pressed={icon.value === name}
                 data-icon-name={name}
+                {...hoverSurface()}
                 style={{
                   ...ICON_BUTTON_BASE,
                   color: "var(--fg-2)",

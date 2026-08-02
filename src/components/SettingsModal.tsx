@@ -30,6 +30,10 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
+import {
+  hoverSurface,
+  HOVER_TRANSITION,
+} from "./primitives/hoverSurface";
 import type { IconName } from "../lib/icons";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { SettingsSearch } from "./settings/search/SettingsSearch";
@@ -331,6 +335,7 @@ const RAIL_ITEM_BASE_STYLE: CSSProperties = {
   alignItems: "center",
   // Gap between the leading panel glyph (MYND-206) and its label.
   gap: "var(--space-3)",
+  transition: HOVER_TRANSITION,
 };
 
 const RAIL_ITEM_SELECTED_STYLE: CSSProperties = {
@@ -674,10 +679,12 @@ export function SettingsModal({
             data-testid="settings.close"
             onClick={onClose}
             disabled={childInFlight}
+            {...hoverSurface({ disabled: childInFlight })}
             style={{
               ...CLOSE_BUTTON_STYLE,
               cursor: childInFlight ? "default" : "pointer",
               opacity: childInFlight ? 0.5 : 1,
+              transition: HOVER_TRANSITION,
             }}
           >
             <Icon name="x" size={16} />
@@ -732,6 +739,12 @@ export function SettingsModal({
                     aria-selected={isSelected}
                     aria-controls={`settings-panel-${panel.id}`}
                     tabIndex={isSelected ? 0 : -1}
+                    {...hoverSurface({
+                      restBg: isSelected ? "var(--paper-3)" : "transparent",
+                      // A selected tab already reads as current; hover only needs
+                      // to answer "is this row live?" for the unselected ones.
+                      hoverBg: isSelected ? "var(--paper-3)" : "var(--bg-3)",
+                    })}
                     onClick={() => {
                       // Clicking a rail tab exits search back to the panel view,
                       // and starts the new panel at the TOP — a tab change must
