@@ -7,6 +7,10 @@
 //         its note to the live tree. The folder-level twin of the note-archive
 //         ar1 lifecycle (archive.e2e.ts) — a pure `archived_folders` prefs-set
 //         mutation, no note frontmatter written.
+//   fa2 — deleting an archived folder is gated by the shared <DeleteConfirmModal>
+//         (#202, replacing the old inline confirm band). Arm → Cancel leaves the
+//         folder in the Archive; arm → Confirm soft-trashes its subtree (the note
+//         lands in Trash) and drops the folder row from the Archive.
 //
 // All driving is real: folder create via the sidebar input, the folder context
 // menu via the W3C Actions API right-click (`contextMenuPick`). No test hooks.
@@ -100,6 +104,62 @@ describeE2E("fa1 folder-archive lifecycle (folder-archive)", () => {
         await s.waitForGone(testIdSelector("archive.folder-restore"));
         await (await s.byTestId("archive.close")).click();
         await s.byTestId("notes.folder-row");
+      },
+    );
+  });
+});
+
+describeE2E("fa2 archived-folder delete confirm (folder-archive, #202)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("arm → Cancel keeps the folder; arm → Confirm trashes the subtree", async () => {
+    const FOLDER = "Silinecek";
+    let password = "";
+    await scenario(
+      "fa2-folder-delete-confirm",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // Seed a folder with one note, then archive the folder as a unit.
+        await createNote(s, "Kok Not");
+        await createFolder(s, FOLDER);
+        await createNoteInFolder(
+          s,
+          await s.byTestId("notes.folder-row"),
+          "Klasor Notu",
+        );
+        await contextMenuPick(
+          s,
+          await s.byTestId("notes.folder-row"),
+          "folder.archive",
+        );
+        await s.waitForGone(testIdSelector("notes.folder-row"));
+
+        // Open the Archive panel; the folder shows as a single row.
+        await (await s.byTestId("notes.archive-open")).click();
+        await s.byTestId("archive.panel");
+        await s.byTestId("archive.folder-row");
+
+        // Arm the delete → the shared confirm modal appears. Cancel it → the
+        // modal is gone and the folder is untouched (still in the Archive).
+        await (await s.byTestId("archive.folder-delete")).click();
+        await s.byTestId("archive.folder-delete-confirm");
+        await (await s.byTestId("archive.folder-delete-cancel")).click();
+        await s.waitForGone(testIdSelector("archive.folder-delete-confirm"));
+        await s.byTestId("archive.folder-row");
+
+        // Arm again → Confirm → the folder row leaves the Archive.
+        await (await s.byTestId("archive.folder-delete")).click();
+        await (await s.byTestId("archive.folder-delete-confirm")).click();
+        await s.waitForGone(testIdSelector("archive.folder-row"));
+
+        // The subtree note is now in Trash (soft-trash, recoverable).
+        await (await s.byTestId("archive.close")).click();
+        await (await s.byTestId("notes.trash-open")).click();
+        await s.byTestId("trash.panel");
+        await s.byTestId("trash.restore");
       },
     );
   });
