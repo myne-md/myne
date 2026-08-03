@@ -310,10 +310,17 @@ fn temp_sibling(destination: &Path) -> PathBuf {
 /// construction (positive match only, the SYNC-3 allowlist-not-walk rule).
 fn collect_members(vault_dir: &Path) -> Result<Vec<(String, PathBuf, bool)>, BackupExportError> {
     let mut members: Vec<(String, PathBuf, bool)> = Vec::new();
+    // The list is duplicated-by-necessity against `backup_container.rs`'s
+    // classifier, which already allowlists every family below — including
+    // `vault.themes`, which this collector did not name (#256). A member the
+    // classifier accepts and the collector never offers is missing from EVERY
+    // backup, silently: the container verifies, the restore succeeds, and the
+    // custom themes are simply gone. Adding a §10.3 family owes an entry here.
     for singleton in [
         "vault.meta",
         "vault.prefs",
         "vault.dictionary",
+        "vault.themes",
         "vault.attachments",
     ] {
         let path = vault_dir.join(singleton);
@@ -470,6 +477,9 @@ mod tests {
         fs::create_dir_all(root.join("attachments")).unwrap();
         fs::write(root.join("vault.meta"), vec![0xAB; 345]).unwrap();
         fs::write(root.join("vault.prefs"), vec![0x01; 100]).unwrap();
+        // #256: a member the classifier allowlists but the collector never
+        // offered — so it was absent from every backup, silently.
+        fs::write(root.join("vault.themes"), vec![0x03; 128]).unwrap();
         fs::write(root.join("vault.attachments"), vec![0x02; 64]).unwrap();
         fs::write(root.join(format!("notes/{NOTE_A}.myn")), b"note-a").unwrap();
         fs::write(root.join(format!("notes/{NOTE_B}.myn")), vec![0xCD; 2048]).unwrap();
@@ -509,7 +519,7 @@ mod tests {
         let dest = dir.path().join("Myne backup 2026-06-10 1200.myne-backup");
 
         let summary = export_backup_with_dir(&vault, &dest).expect("export");
-        assert_eq!(summary.members, 7); // 3 singletons + 2 notes + 1 snapshot + 1 blob
+        assert_eq!(summary.members, 8); // 4 singletons + 2 notes + 1 snapshot + 1 blob
         assert_eq!(summary.notes, 2);
         assert_eq!(summary.snapshots, 1);
         assert_eq!(summary.attachments, 1);
@@ -517,8 +527,15 @@ mod tests {
 
         // The destination verifies (SYNC-4: a file that exists has verified).
         let records = crate::backup_container::read_and_verify_container(&dest).expect("verify");
-        assert_eq!(records.len(), 7);
+        assert_eq!(records.len(), 8);
         let paths: Vec<&str> = records.iter().map(|r| r.path.as_str()).collect();
+        // #256: custom themes are vault CONTENT — encrypted, synced, and not
+        // rebuildable from anything else. A verified backup that omits them
+        // restores a vault the user's themes are gone from.
+        assert!(
+            paths.contains(&"vault.themes"),
+            "a verified backup must carry the custom-theme store"
+        );
         assert!(!paths.contains(&"vault.search"));
         assert!(paths.iter().all(|p| !p.ends_with(".tmp")));
         // No temp sibling left behind.
