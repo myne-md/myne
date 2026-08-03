@@ -92,7 +92,7 @@ pub const DEFAULT_V0_1_KDF_PARAMS: KdfParams = KdfParams {
 /// Inclusive lower bound on Argon2id memory cost accepted from an untrusted
 /// `vault.meta`. 8 MiB is far below the v0.1 desktop default (256 MiB) — low
 /// enough to leave room for a future memory-constrained mobile profile
-/// (spec § 4.2) — yet ~1000× the absolute argon2 floor, blocking the
+/// (spec § 4.2.1) — yet ~1000× the absolute argon2 floor, blocking the
 /// brute-forceable `m=8 KiB` downgrade. See [`validate_kdf_params`].
 pub const MIN_KDF_M_KIB: u32 = 8 * 1024;
 /// Inclusive upper bound on Argon2id memory cost. 4 GiB is well above any
@@ -128,6 +128,11 @@ pub const MAX_KDF_P: u8 = 16;
 ///
 /// Returns [`ProtocolError::InvalidVaultMeta`] (a structural, non-credential
 /// failure) when any parameter is out of range. The default v0.1 params pass.
+///
+/// Normative source: `docs/spec/protocol.md` § 4.2.1 (accepted cost range).
+/// That clause states the floor as a `m_kib × t` area and lets a client enforce
+/// a tighter range than the spec minimum; these per-axis bounds are that
+/// tighter range, and they sit strictly inside it.
 pub fn validate_kdf_params(params: &KdfParams) -> Result<(), ProtocolError> {
     let ok = (MIN_KDF_M_KIB..=MAX_KDF_M_KIB).contains(&params.m_kib)
         && (MIN_KDF_T..=MAX_KDF_T).contains(&params.t)
