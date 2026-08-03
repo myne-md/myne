@@ -268,7 +268,11 @@ windows = "0.61"
 # (`XScreenSaverQueryInfo` equivalent) via the **pure-Rust** `x11rb` (talks
 # the X11 wire protocol over a socket — no libX11/libXss C linkage, so it
 # stays reproducible-build-clean unlike the `x11-dl` dlopen alternative).
-# `connect()` failing (Wayland-only session / no DISPLAY) → `None` →
+# A Wayland session is detected EXPLICITLY before this crate is touched (#271):
+# the original justification said `connect()` fails there, and XWayland is
+# exactly what makes that false — the connect succeeds and reports the X11
+# subsystem's idle, which grows without bound while the user works in native
+# Wayland apps. No DISPLAY / no X server still lands on `None` →
 # `auto_lock` falls back to the window-level heartbeat (fail-secure). New
 # direct dependency per the user's "all three platforms now" decision
 # (grill/feature dependency call) — `docs/dependency-policy.md` bar applies.

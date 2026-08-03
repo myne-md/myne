@@ -515,7 +515,24 @@ impl VaultRuntimeState {
         // Remove the active entry — a missing key IS empty, so removal is the
         // map analogue of replacing the singleton with `Slot::Empty`. Other
         // entries are untouched.
-        guard.remove(&id)
+        let taken = guard.remove(&id);
+        // #270: the decrypted label + icon go WITH the keys.
+        //
+        // SYNC-3 says a locked vault stops surfacing its real name, and the
+        // manual lock honoured it — but the idle path did not, so a machine
+        // left alone until auto-lock fired showed every vault's real name in
+        // the switcher on the lock screen, from the RAM cache, indefinitely.
+        // That is the exact state auto-lock exists to prevent.
+        //
+        // Evicted here rather than at the caller so every drop path inherits
+        // it: the split between "the path that remembered" and "the path that
+        // did not" is what produced the gap.
+        if taken.is_some() {
+            drop(guard);
+            self.label_cache.write().await.remove(&id);
+            self.icon_cache.write().await.remove(&id);
+        }
+        taken
     }
 
     /// TTL bail for `Slot::Recovering` (MYND-121 story 8/9): acquire the slot
@@ -654,7 +671,12 @@ impl VaultRuntimeState {
     /// resolves the sole active id, then funnels through this same primitive.
     pub async fn take(&self, id: VaultId) -> Slot {
         // Remove the entry; a missing key IS empty → `Slot::Empty`.
-        self.slots.write().await.remove(&id).unwrap_or(Slot::Empty)
+        let taken = self.slots.write().await.remove(&id).unwrap_or(Slot::Empty);
+        // #270: same eviction as the idle take. Callers that already evicted
+        // are unaffected — both removals are idempotent.
+        self.label_cache.write().await.remove(&id);
+        self.icon_cache.write().await.remove(&id);
+        taken
     }
 
     /// Take just the [`Slot::Recovering`] material, leaving `Slot::Empty`.
@@ -2200,6 +2222,63 @@ mod tests {
                 Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0x21u8; AEAD_KEY_LEN]),
                 other => panic!("expected Unlocked, got {:?}", slot_label(other)),
             }
+        });
+    }
+
+    /// #270: an idle auto-lock must drop the decrypted label + icon too.
+    ///
+    /// SYNC-3 says a locked vault stops surfacing its real name. The manual
+    /// lock honoured that; the idle path did not — so a machine left alone
+    /// until auto-lock fired kept showing every vault's real name in the
+    /// switcher, from RAM, on the lock screen. That is the exact state
+    /// auto-lock exists to produce the opposite of.
+    #[test]
+    fn an_idle_take_evicts_the_decrypted_label_and_icon() {
+        crate::test_support::block_on(async {
+            let state = VaultRuntimeState::default();
+            let id = test_vault_id();
+            state
+                .set_unlocked(id, fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .await;
+            state.set_cached_label(id, Some("Personal".into())).await;
+            state.set_cached_icon(id, Some("book".into())).await;
+
+            // Idle far past any timeout.
+            let taken = state
+                .take_unlocked_if_idle(std::time::Duration::from_millis(0), || {
+                    std::time::Duration::from_secs(3600)
+                })
+                .await;
+            assert!(taken.is_some(), "the idle take must have fired");
+            assert_eq!(
+                state.cached_label(id).await,
+                None,
+                "label must not outlive the keys"
+            );
+            assert_eq!(
+                state.cached_icon(id).await,
+                None,
+                "icon must not outlive the keys"
+            );
+        });
+    }
+
+    /// The manual path keeps the same property, now that the eviction lives in
+    /// the primitive rather than at one caller.
+    #[test]
+    fn a_manual_take_evicts_the_decrypted_label_and_icon() {
+        crate::test_support::block_on(async {
+            let state = VaultRuntimeState::default();
+            let id = test_vault_id();
+            state
+                .set_unlocked(id, fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .await;
+            state.set_cached_label(id, Some("Personal".into())).await;
+            state.set_cached_icon(id, Some("book".into())).await;
+
+            let _ = state.take(id).await;
+            assert_eq!(state.cached_label(id).await, None);
+            assert_eq!(state.cached_icon(id).await, None);
         });
     }
 

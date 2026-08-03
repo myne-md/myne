@@ -179,8 +179,30 @@ fn machine_idle() -> Option<Duration> {
     use x11rb::connection::Connection;
     use x11rb::protocol::screensaver::ConnectionExt as _;
 
-    // `connect` fails on a Wayland-only session / missing DISPLAY → None →
-    // window-level fail-secure fallback. Every step is `?`-on-error, no panic.
+    // #271: detect Wayland EXPLICITLY, before touching x11rb.
+    //
+    // The old comment claimed `connect` fails on a Wayland-only session — and
+    // that is exactly what XWayland prevents. Under a Wayland compositor with
+    // XWayland running (the default on GNOME and KDE), the connect SUCCEEDS and
+    // the screensaver extension answers about the X11 subsystem alone. A user
+    // working in native Wayland apps registers no X11 input at all, so the
+    // reported idle grows without bound while they are actively typing — and
+    // `machine_idle.unwrap_or(window_idle)` prefers this answer over the
+    // window-level clock that WOULD have been right. The result is a vault
+    // locking mid-sentence, which is the failure that teaches users to raise
+    // the timeout.
+    //
+    // The remedy is to return `None` and let the window-level heartbeat take
+    // over: strictly more eager than a correct OS idle, which is the safe
+    // direction. Pure-X11 sessions are unchanged.
+    if std::env::var_os("WAYLAND_DISPLAY").is_some()
+        || std::env::var("XDG_SESSION_TYPE").is_ok_and(|v| v.eq_ignore_ascii_case("wayland"))
+    {
+        return None;
+    }
+
+    // Every step is `?`-on-error, no panic. A failed connect (no DISPLAY, no X
+    // server) still falls back to the window-level clock.
     let (conn, screen_num) = x11rb::connect(None).ok()?;
     let root = conn.setup().roots.get(screen_num)?.root;
     let info = conn.screensaver_query_info(root).ok()?.reply().ok()?;
@@ -521,6 +543,56 @@ mod tests {
         // Wayland / unsupported platform → None → window-level (fail-secure).
         let eff = effective_idle_from(None, Duration::from_secs(120));
         assert_eq!(eff, Duration::from_secs(120));
+    }
+
+    /// #271: a Wayland session must NOT be read through the X11 screensaver.
+    ///
+    /// Under a Wayland compositor with XWayland running — the default on GNOME
+    /// and KDE — the X11 connect SUCCEEDS and the extension reports the X11
+    /// subsystem's idle alone. A user working in native Wayland apps registers
+    /// no X11 input, so that number grows without bound while they type, and
+    /// `machine_idle.unwrap_or(window_idle)` prefers it over the window clock
+    /// that would have been right. The vault locks mid-sentence.
+    ///
+    /// Asserting `None` from the environment rather than from a live session:
+    /// the detection IS the fix, and it is decidable without a display.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_wayland_session_reports_no_machine_idle() {
+        // `set_var` is unsafe on 2024 edition (process-global). This test is
+        // single-threaded over its own variables and restores them.
+        let prior_wl = std::env::var_os("WAYLAND_DISPLAY");
+        let prior_type = std::env::var_os("XDG_SESSION_TYPE");
+        unsafe {
+            std::env::set_var("WAYLAND_DISPLAY", "wayland-0");
+            std::env::remove_var("XDG_SESSION_TYPE");
+        }
+        assert_eq!(
+            machine_idle(),
+            None,
+            "a Wayland session must fall back to the window-level clock"
+        );
+
+        unsafe {
+            std::env::remove_var("WAYLAND_DISPLAY");
+            std::env::set_var("XDG_SESSION_TYPE", "Wayland");
+        }
+        assert_eq!(
+            machine_idle(),
+            None,
+            "XDG_SESSION_TYPE is the other signal, and it is case-insensitive"
+        );
+
+        unsafe {
+            match prior_wl {
+                Some(v) => std::env::set_var("WAYLAND_DISPLAY", v),
+                None => std::env::remove_var("WAYLAND_DISPLAY"),
+            }
+            match prior_type {
+                Some(v) => std::env::set_var("XDG_SESSION_TYPE", v),
+                None => std::env::remove_var("XDG_SESSION_TYPE"),
+            }
+        }
     }
 
     #[test]
