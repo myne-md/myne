@@ -44,3 +44,46 @@ describe("effectiveMobileAutoLockSecs()", () => {
     expect(effectiveMobileAutoLockSecs(3600)).toBe(3600);
   });
 });
+
+// #53: the idle clock compares TIMESTAMPS; it does not count down.
+//
+// It used to be a `setTimeout` restarted on every touch. A phone suspends
+// timers the moment the app leaves the foreground, so time spent backgrounded —
+// which is most of the time a phone is unattended, and exactly the A6 "lost or
+// stolen device" case auto-lock exists for — never counted toward the deadline.
+// The vault locked 30 seconds after the user came BACK rather than 30 seconds
+// after they left.
+//
+// Asserted over the source rather than by driving the flow: the component needs
+// a whole vault session to mount, and the property is structural — a countdown
+// that is restarted, versus a deadline that is compared.
+describe("mobile idle auto-lock is deadline-based (#53)", () => {
+  it("re-evaluates on visibilitychange rather than trusting a suspended timer", async () => {
+    const src = await import("node:fs").then((fs) =>
+      fs.readFileSync("src/app/flows/EditorFlow.tsx", "utf8"),
+    );
+    const block = src.slice(src.indexOf("// Auto-lock:"));
+    expect(
+      block.includes('document.addEventListener("visibilitychange"'),
+      "returning to the foreground is the first moment elapsed time is observable",
+    ).toBe(true);
+    expect(
+      /Date\.now\(\) - lastActivity >=/.test(block),
+      "the deadline must be a timestamp comparison",
+    ).toBe(true);
+  });
+
+  it("no longer arms a lock-after-N countdown that activity restarts", async () => {
+    const src = await import("node:fs").then((fs) =>
+      fs.readFileSync("src/app/flows/EditorFlow.tsx", "utf8"),
+    );
+    const block = src.slice(
+      src.indexOf("// Auto-lock:"),
+      src.indexOf("// Best-effort plaintext wipe on unmount."),
+    );
+    expect(
+      /setTimeout\(\(\) => onLock\(\)/.test(block),
+      "a restartable countdown is the defect",
+    ).toBe(false);
+  });
+});
