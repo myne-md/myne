@@ -104,6 +104,9 @@ afterEach(cleanup);
 
 function renderPanel(overrides: Partial<Parameters<typeof AccountPanel>[0]> = {}) {
   const props = {
+    // #250: the panel no longer resolves its own target — the vault it erases
+    // is threaded in from Settings, which got it from the Editor's stage.
+    vaultId: "v-active" as string | null,
     onChangePasswordSuccess: vi.fn(),
     onDeleteVaultSuccess: vi.fn(),
     onInFlightChange: vi.fn(),
@@ -257,10 +260,8 @@ describe("AccountPanel — delete vault", () => {
     expect(screen.queryByTestId("dvcf")).toBeNull();
   });
 
-  it("success targets the resolved active vault id + fires onDeleteVaultSuccess", async () => {
+  it("success targets the vault it was given + fires onDeleteVaultSuccess", async () => {
     const props = renderPanel();
-    // Let the on-mount listVaults() resolve so activeVaultId settles.
-    await waitFor(() => expect(listVaults).toHaveBeenCalled());
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));
@@ -290,6 +291,19 @@ describe("AccountPanel — delete vault", () => {
     expect(props.onDeleteVaultSuccess).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("dvcf.continue"));
     expect(props.onDeleteVaultSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  // #250: an unresolved target is not a reason to erase something else. The
+  // panel used to pass `undefined`, which the backend read as "the active
+  // vault" — resolved from a cache the quick-unlock path never stamped.
+  it("refuses to delete when no vault id has resolved", async () => {
+    const props = renderPanel({ vaultId: null });
+    fireEvent.click(screen.getByText("Delete vault…"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("dvcf.submit"));
+    });
+    expect(deleteVault).not.toHaveBeenCalled();
+    expect(props.onDeleteVaultSuccess).not.toHaveBeenCalled();
   });
 
   it("bug-canary reject (VaultNotUnlocked) shows no post-fail banner, no success", async () => {

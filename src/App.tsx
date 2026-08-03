@@ -431,6 +431,11 @@ function App() {
         return (
           <Suspense fallback={null}>
             <Editor
+              // #250: the authoritative target for every vault-scoped surface
+              // inside the editor. `undefined` only on the boot-probe
+              // slot-priority entry, where Editor asks the runtime slot
+              // directly rather than ordering a best-effort disk cache.
+              vaultId={stage.vaultId}
               onResetRequested={reprobe}
               onLock={() => dispatch({ type: "editor.lock" })}
               onForceRelock={setStageWithSuspicion}

@@ -57,6 +57,7 @@ import { DeviceRevoked } from "./DeviceRevoked";
 import { useSyncStatus } from "../hooks/useSyncStatus";
 import { has } from "../platform/capabilities";
 import { deleteVault } from "../lib/vault-delete";
+import { activeVaultId } from "../lib/vault-list";
 import { useUnsyncedEdits } from "../hooks/useUnsyncedEdits";
 import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
@@ -332,6 +333,18 @@ interface EditorProps {
    * The component itself only fires `vault_lock` (idempotent on
    * already-empty slot) before invoking this callback.
    */
+  /**
+   * The ACTIVE vault's id, threaded from `stage.vaultId` (#250).
+   *
+   * `undefined` only on the boot-probe slot-priority entry (a post-reload
+   * editor), where no WebView-side id exists yet — the component resolves the
+   * authoritative answer from the runtime slot in that case. Everything that
+   * targets a vault (the danger-zone delete, the backup scheduler, the Settings
+   * schedule block) reads the resolved value rather than ordering a
+   * best-effort disk cache, which is what used to name the wrong vault after a
+   * quick-unlock or a recovery.
+   */
+  vaultId?: string;
   onResetRequested?: () => void;
   /**
    * Settings → Storage "Restore from backup…" (MYND-56): routes OUT of the
@@ -424,6 +437,7 @@ interface EditorProps {
  * editor body.
  */
 export function Editor({
+  vaultId: stageVaultId,
   onResetRequested,
   onRestoreBackup,
   onLock,
@@ -437,6 +451,27 @@ export function Editor({
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<EditorToast | null>(null);
+
+  // #250 — the authoritative active-vault id for every vault-targeting surface
+  // below. Prefer the id the stage already carries; fall back to the runtime
+  // slot ONLY where the stage has none (post-reload editor entry). The old
+  // answer, `resolveActiveVaultId()`, ordered the non-authoritative
+  // `registry.json` cache — which only the password path ever stamped, so a
+  // quick-unlocked or recovered session pointed the delete at another vault.
+  const [activeId, setActiveId] = useState<string | null>(stageVaultId ?? null);
+  useEffect(() => {
+    if (stageVaultId != null) {
+      setActiveId(stageVaultId);
+      return;
+    }
+    let cancelled = false;
+    void activeVaultId().then((id) => {
+      if (!cancelled) setActiveId(id);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [stageVaultId]);
 
   const probed = useRef(false);
   useEffect(() => {
@@ -521,8 +556,11 @@ export function Editor({
           // are, so a failure part-way never leaves an unlocked session over a
           // half-erased container.
           await lockVault().catch(() => {});
-          // ONE erase (task 72), not a second implementation.
-          await deleteVault().catch(() => {});
+          // ONE erase (task 72), not a second implementation. The target is
+          // required since #250 — a lock has already emptied the slot, so the
+          // id must come from the stage-resolved value captured above, not from
+          // a post-lock probe that would answer `null`.
+          if (activeId != null) await deleteVault(activeId).catch(() => {});
         }}
         onDismiss={() => onResetRequested?.()}
       />
@@ -541,7 +579,7 @@ export function Editor({
             // path is a second thing to keep correct. A failure here is not
             // fatal — the boot probe re-routes regardless, and a browser that
             // could not erase an already-broken store has lost nothing more.
-            await deleteVault().catch(() => {});
+            if (activeId != null) await deleteVault(activeId).catch(() => {});
             onResetRequested?.();
           })();
         }}
@@ -584,6 +622,7 @@ export function Editor({
       <div style={{ display: "contents" }} data-testid="editor.root">
       <WorkspaceProvider>
         <EditorChrome
+          vaultId={activeId}
           onLock={onLock}
           onForceRelock={onForceRelock}
           onDeleteVaultSuccess={onDeleteVaultSuccess}
@@ -619,6 +658,9 @@ type EditorToast = {
 };
 
 type EditorChromeProps = {
+  /** The resolved active vault id (#250) — `null` while still resolving. Feeds
+   *  the backup scheduler and the Settings panels that target a vault. */
+  vaultId: string | null;
   onLock?: () => void;
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
   onDeleteVaultSuccess: () => void;
@@ -634,6 +676,7 @@ type EditorChromeProps = {
 };
 
 function EditorChrome({
+  vaultId,
   onLock,
   onForceRelock,
   onDeleteVaultSuccess,
@@ -1218,7 +1261,7 @@ function EditorChrome({
   // mounted). A backup must never fail silently: a fresh failure (debounced so
   // a persistent failure toasts once) surfaces the quiet alert; success is a
   // silent status line the StoragePanel reads. The schedule never auto-disables.
-  useBackupScheduler((scheduleTick) => {
+  useBackupScheduler(vaultId, (scheduleTick) => {
     if (scheduleTick.freshFailure) {
       setToast({ message: BACKUP_SCHEDULE_FAILED_TOAST, variant: "error" });
     }
@@ -2022,6 +2065,7 @@ function EditorChrome({
           />
         ))}
       <SettingsModal
+        vaultId={vaultId}
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onShowToast={showToastMessage}

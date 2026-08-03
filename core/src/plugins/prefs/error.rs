@@ -101,6 +101,16 @@ pub enum PrefsWriteError {
     #[error("vault.meta parse failed")]
     InvalidVaultMeta,
 
+    /// The write named a vault directory that is not the active (unlocked)
+    /// vault (#250). The prefs key is derived from the unlocked slot's
+    /// `root_key`, so writing it into another vault's directory produces a
+    /// blob that vault can never read — and, through `read_or_default`'s
+    /// degrade-to-defaults, quietly replaces its real settings. A caller
+    /// seeing this passed a stale "which vault is active" answer; the fix is
+    /// to thread the authoritative id, never to retry.
+    #[error("prefs write targeted a vault that is not the active one")]
+    VaultTargetMismatch,
+
     /// `protocol::encode_prefs_blob` returned an error — practically
     /// unreachable in v0.1 (PrefsView::default() and toggled-false
     /// both encode to ~35 bytes JSON, well under the 64 KiB cap), but

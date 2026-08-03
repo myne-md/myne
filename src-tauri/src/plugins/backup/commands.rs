@@ -53,26 +53,24 @@ pub struct ExportSummary {
     pub prefs_included: bool,
 }
 
-/// Export the vault at `vault_id` (explicit id, else the ACTIVE unlocked
-/// vault, else the sole-vault fallback) as a `.myne-backup` file at
-/// `destination`.
+/// Export the vault at `vault_id` — a REQUIRED target since #250 — as a
+/// `.myne-backup` file at `destination`.
+///
+/// The id used to be optional, falling back to the active slot and then to a
+/// sole-vault disk heuristic. That made the scheduled backup's target a guess:
+/// `useBackupScheduler` resolved it from the non-authoritative registry cache,
+/// and an explicit (wrong) id BEAT the runtime slot. Requiring it moves the
+/// question to the one place that can answer it — the caller holding the
+/// unlocked vault's id.
 #[tauri::command]
 pub async fn vault_export_backup<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     lifecycle_hooks: State<'_, myne_core::hooks::Hooks>,
-    vault_id: Option<String>,
+    vault_id: String,
     destination: String,
 ) -> Result<ExportSummary, BackupExportError> {
-    // Active-vault resolution (the prefs/notes/workspace pattern): the
-    // editor's "Back up vault" carries no id, and the legacy sole-vault
-    // disk heuristic mis-resolves once `vaults/<id>/` roots exist — it
-    // materialized an empty legacy dir and reported VaultNotFound for an
-    // open vault.
-    let target = match VaultId::parse_optional(vault_id.as_deref()) {
-        Some(id) => Some(id),
-        None => state.active_vault_id().await,
-    };
+    let target = Some(VaultId::parse(&vault_id).map_err(|_| BackupExportError::VaultNotFound)?);
     // Non-creating resolver (MYND-253): export reads an EXISTING vault; a
     // missing/forged target must fail the vault.meta probe below cleanly —
     // the old creating resolver materialized an empty legacy `vault/` here,

@@ -273,6 +273,34 @@ async fn update_prefs_with_dir(
 
     let _write_guard = write_mutex().lock().await;
 
+    // ---- #250: the key and the path must name the SAME vault -------------
+    //
+    // This function takes its key from the unlocked slot and its directory
+    // from the caller, and nothing compared the two. A caller holding a stale
+    // "which vault is active" answer therefore encrypted vault A's prefs under
+    // vault B's key and wrote them over vault B's real blob — and because
+    // `read_or_default` degrades an unreadable blob to `PrefsView::default()`,
+    // the read-modify-write silently replaced the other vault's settings
+    // instead of failing. Refuse rather than write.
+    //
+    // Compared as IDENTITIES, not as paths: `vault_id_from_root` is the same
+    // derivation the unlock/delete set-sites use to key the slot map, so this
+    // asks the question that matters ("is this the vault whose key I hold?")
+    // rather than a string question about two path spellings. A directory that
+    // names no vault derives the legacy sentinel — the same id a legacy vault's
+    // slot carries — so the pre-multi-vault layout keeps working unchanged.
+    if let Some(active) = state.active_vault_id().await {
+        let targeted = crate::paths::vault_id_from_root(vault_dir);
+        if targeted != active {
+            tracing::warn!(
+                event = "prefs_write_refused",
+                reason = "vault_target_mismatch",
+                "prefs write targeted a vault that is not the active one"
+            );
+            return Err(PrefsWriteError::VaultTargetMismatch);
+        }
+    }
+
     // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
     let (_slots_guard, root_key, _vmh) = state
         .hold_unlocked_root_key_and_hash()
@@ -5123,6 +5151,46 @@ mod tests {
         let token = device_platform();
         assert!(!token.is_empty());
         assert_eq!(token, std::env::consts::OS);
+    }
+
+    /// #250: the key comes from the unlocked slot and the directory comes from
+    /// the caller. A caller holding a stale "which vault is active" answer used
+    /// to encrypt this vault's prefs under that vault's key and write them over
+    /// the other vault's real blob — silently, because `read_or_default`
+    /// degrades an unreadable blob to defaults instead of failing.
+    #[test]
+    fn a_prefs_write_aimed_at_another_vault_is_refused() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            // A directory that derives a DIFFERENT VaultId than the slot holds.
+            let other = tmp
+                .path()
+                .join("vaults")
+                .join("33333333-3333-7333-8333-333333333333");
+            std::fs::create_dir_all(&other).expect("create sibling vault dir");
+            seed_real_vault_meta(&other, 0x44);
+
+            let err = vault_set_label_with_dir(
+                &other,
+                &state,
+                &noop_hooks(),
+                Some("Work".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::test_host::TestHost::new(tmp.path()),
+            )
+            .await
+            .expect_err("a write aimed at a non-active vault must be refused");
+            assert!(
+                matches!(err, PrefsWriteError::VaultTargetMismatch),
+                "expected VaultTargetMismatch, got {err:?}"
+            );
+            // And it must have written NOTHING — the refusal happens before the
+            // read-modify-write, so the other vault's blob never appears.
+            assert!(
+                !other.join("vault.prefs").exists(),
+                "the refused write must not have created the other vault's prefs blob"
+            );
+        });
     }
 
     #[test]

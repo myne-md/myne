@@ -206,20 +206,10 @@ pub async fn unlock_from_host(
         }
     }
 
-    // Stamp this vault's last-unlock time into the best-effort registry so the
-    // picker's recency ordering and the switcher's active-vault inference (both
-    // read `last_unlock`) reflect the just-opened vault — otherwise every entry
-    // stays `None` and those surfaces fall back to a creation-order tie-break.
-    // Best-effort: a failed `app_data_dir` lookup or persist degrades to stale
-    // ordering, never blocks the unlock. `target_id` is the vault just opened.
-    if let Ok(base) = host.app_data_dir() {
-        // Host clock, not `SystemTime::now()` — the latter panics on wasm32
-        // (phase3-web-client task 12). This one is genuinely WALL-clock: the
-        // picker orders by it and the value is compared across sessions, so a
-        // monotonic reading would be meaningless here.
-        crate::vault_registry::record_unlock(&base, &target_id, host.now_unix_millis());
-    }
-
+    // The last-unlock stamp used to live here, inline in the password path —
+    // which is exactly why quick-unlock and recovery never wrote it (#250). It
+    // now runs as the pipeline's first step, so every credential path stamps by
+    // construction.
     run_post_unlock_pipeline(host, state, hooks, io).await;
 
     Ok(())
@@ -257,6 +247,30 @@ pub(crate) async fn run_post_unlock_pipeline(
     hooks: &crate::hooks::Hooks,
     io: &dyn VaultIo,
 ) {
+    // ---- #250: stamp the registry's last-unlock, on EVERY credential path ----
+    //
+    // This was written inline in the password path, so quick-unlock and
+    // recovery installed an `Unlocked` slot without ever stamping. From that
+    // moment the on-disk `last_unlock` cache disagreed with the runtime slot,
+    // and three consumers read that cache to answer "which vault is active" —
+    // one of them driving the danger-zone delete. Living here means a fourth
+    // credential path inherits the stamp by calling the pipeline, the same
+    // property the rest of these steps rely on.
+    //
+    // The id comes from the runtime slot rather than a parameter: the slot IS
+    // the authority, so a caller cannot stamp a different vault than the one it
+    // just opened. Best-effort — a failed `app_data_dir` lookup or persist
+    // degrades to stale ordering and never blocks the unlock.
+    if let Some(active) = state.active_vault_id().await {
+        if let Ok(base) = host.app_data_dir() {
+            // Host clock, not `SystemTime::now()` — the latter panics on wasm32
+            // (phase3-web-client task 12). This one is genuinely WALL-clock: the
+            // picker orders by it and the value is compared across sessions, so a
+            // monotonic reading would be meaningless here.
+            crate::vault_registry::record_unlock(&base, &active, host.now_unix_millis());
+        }
+    }
+
     // ---- MYND-85: roll-forward-recover a crashed transactional rename ----
     //
     // BEFORE any resolution index is built — the inline search hydration
@@ -1135,6 +1149,28 @@ pub async fn vault_slot_kind(
     state: State<'_, VaultRuntimeState>,
 ) -> Result<SlotKind, VaultUnlockError> {
     vault_slot_kind_from_host(vault_id, state.inner()).await
+}
+
+/// The AUTHORITATIVE answer to "which vault is open" (#250).
+///
+/// Reads the runtime slot map — the thing that actually holds the keys — rather
+/// than the best-effort `registry.json` `last_unlock` cache. The TS side used
+/// to answer this question with `resolveActiveVaultId()`, which ordered that
+/// cache and took the head; the cache was only stamped by the password path, so
+/// after a quick-unlock or a recovery it named the WRONG vault, and one of its
+/// three consumers drove the danger-zone delete.
+///
+/// `None` means no vault is unlocked — a caller must treat that as "no target",
+/// never as "use whichever one looks most recent".
+pub async fn vault_active_id_from_host(state: &VaultRuntimeState) -> Option<String> {
+    state.active_vault_id().await.map(|id| id.to_string())
+}
+
+/// IPC wrapper for [`vault_active_id_from_host`].
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_active_id(state: State<'_, VaultRuntimeState>) -> Result<Option<String>, ()> {
+    Ok(vault_active_id_from_host(state.inner()).await)
 }
 
 /// Testable core of [`vault_slot_kind`]. The Tauri-command wrapper
@@ -3957,6 +3993,81 @@ mod tests {
             assert!(
                 !json.contains(base_str.as_ref()),
                 "the filesystem base path must never cross the IPC boundary"
+            );
+        });
+    }
+
+    // ---- #250: the last-unlock stamp belongs to the shared pipeline ------
+
+    /// Every credential path reaches the registry stamp by calling
+    /// [`run_post_unlock_pipeline`]. The stamp used to be written inline in the
+    /// password path, so quick-unlock and recovery installed an `Unlocked` slot
+    /// the on-disk `last_unlock` cache never learned about — and three
+    /// consumers read that cache to decide which vault is active, one of them
+    /// driving an irreversible delete. Testing the pipeline rather than each
+    /// caller is deliberate: a fourth credential path inherits the stamp by
+    /// calling the pipeline, which is the property that actually holds.
+    #[test]
+    fn post_unlock_pipeline_stamps_the_registry_for_the_active_slot() {
+        use crate::plugins::vault_unlock::state::fixture_unlocked_with_keys;
+        use crate::test_support::ScopedTempDir;
+
+        let tmp = ScopedTempDir::new("unlock-stamp").expect("temp dir");
+        let host = crate::host::test_host::TestHost::new(tmp.path());
+        let base = host.app_data_dir().expect("test host data dir");
+
+        // A discoverable vault on disk: `record_unlock` is a deliberate no-op
+        // for an id that names no `vaults/<id>/`, so without this the assertion
+        // below would pass for the wrong reason.
+        let id = test_vault_id();
+        let vault_dir = base.join("vaults").join(id.to_string());
+        std::fs::create_dir_all(&vault_dir).expect("create vault dir");
+        std::fs::write(vault_dir.join("vault.meta"), b"any vault.meta bytes")
+            .expect("seed vault.meta");
+
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(id, fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .await;
+
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            run_post_unlock_pipeline(&host, &state, &hooks, &crate::vault_io::StdVaultIo).await;
+
+            assert_eq!(
+                crate::vault_registry::load_or_rebuild_registry(&base).last_unlock_ms(&id),
+                Some(host.now_unix_millis()),
+                "the pipeline every credential path calls must stamp the active vault"
+            );
+        });
+    }
+
+    /// The stamp reads the id from the runtime slot, so a pipeline run with no
+    /// unlocked vault writes nothing — there is no "active vault" to record and
+    /// inventing one is precisely the guess #250 removes.
+    #[test]
+    fn post_unlock_pipeline_stamps_nothing_when_no_slot_is_unlocked() {
+        use crate::test_support::ScopedTempDir;
+
+        let tmp = ScopedTempDir::new("unlock-stamp-empty").expect("temp dir");
+        let host = crate::host::test_host::TestHost::new(tmp.path());
+        let base = host.app_data_dir().expect("test host data dir");
+
+        let id = test_vault_id();
+        let vault_dir = base.join("vaults").join(id.to_string());
+        std::fs::create_dir_all(&vault_dir).expect("create vault dir");
+        std::fs::write(vault_dir.join("vault.meta"), b"any vault.meta bytes")
+            .expect("seed vault.meta");
+
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            run_post_unlock_pipeline(&host, &state, &hooks, &crate::vault_io::StdVaultIo).await;
+
+            assert_eq!(
+                crate::vault_registry::load_or_rebuild_registry(&base).last_unlock_ms(&id),
+                None,
+                "no unlocked slot means no vault to stamp"
             );
         });
     }

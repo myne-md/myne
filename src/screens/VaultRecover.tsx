@@ -43,7 +43,7 @@ import { FailClosedError } from "../components/FailClosedError";
 import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
 import { ioBanner } from "../lib/io-banner";
 import type { RecoverSubStep } from "../lib/stage";
-import { listVaults } from "../lib/vault-list";
+import { listVaults, soleVaultId } from "../lib/vault-list";
 import { recoverWithPhrase } from "../lib/vault-recover";
 import {
   deleteVault,
@@ -314,7 +314,21 @@ export function VaultRecover({
         dispatch({ type: "delete-in-flight" });
         void (async () => {
           try {
-            await deleteVault();
+            // Required target since #250 — the flow already resolved which
+            // vault it is recovering; the single-vault entry that carries none
+            // falls back to the sole vault on disk. Ambiguous → refuse.
+            const target = state.vaultId ?? (await soleVaultId());
+            if (!mountedRef.current) return;
+            if (target == null) {
+              if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.warn(
+                  "[VaultRecover] vault_delete refused: ambiguous target",
+                );
+              }
+              return;
+            }
+            await deleteVault(target);
             if (!mountedRef.current) return;
             onDeleteVaultSuccess();
           } catch (raw) {

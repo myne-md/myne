@@ -136,30 +136,29 @@ pub async fn vault_delete_from_host(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     host: &dyn HostCtx,
-    vault_id: Option<String>,
+    vault_id: String,
 ) -> Result<(), VaultDeleteError> {
     // SYNC-6 explicit-id targeting (mirrors `unlock` / `recover`): the IPC layer
-    // carries a canonical hyphenated `VaultId` string. `Some(id)` resolves to
-    // `vaults/<id>/` directly (NOT the sole-vault `paths::vault_dir()` scan), so
-    // the erase hits exactly the chosen vault and never a sibling. A malformed
-    // or absent id is treated as "no explicit target → the active vault", the
-    // SYNC-1 sole-`Unlocked` vault the danger-zone delete is driven from. The
-    // slot-map key is the same `VaultId` so the per-id slot peek + keyed
-    // `take_and_run_blocking_for_id` zeroize only the targeted slot.
-    let target = VaultId::parse_optional(vault_id.as_deref());
+    // carries a canonical hyphenated `VaultId` string, and since #250 it is
+    // REQUIRED. The id resolves to `vaults/<id>/` directly (NOT the sole-vault
+    // `paths::vault_dir()` scan), so the erase hits exactly the chosen vault and
+    // never a sibling. The slot-map key is the same `VaultId`, so the per-id slot
+    // peek + keyed `take_and_run_blocking_for_id` zeroize only the targeted slot.
+    //
+    // The optional target is gone because the fallback WAS the bug: omitting the
+    // id compiled, looked correct, and silently erased whichever vault a
+    // best-effort cache happened to name — while `Unlock.tsx` and
+    // `VaultRecover.tsx` omitted it with the id sitting in scope. A malformed id
+    // is now `VaultNotFound` rather than "delete something else instead".
+    let target = VaultId::parse(&vault_id).map_err(|_| VaultDeleteError::VaultNotFound)?;
     // Non-creating resolver (MYND-253): delete destroys an EXISTING vault;
     // a stale/forged id must resolve to a path the scan below turns into
     // VaultNotFound — never materialize an empty `vaults/<bogus-id>/`.
-    let vault_dir =
-        crate::paths::vault_root_for_id_optional_from_host(host, target).map_err(|_| {
-            VaultDeleteError::Io {
-                io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
-            }
+    let vault_dir = crate::paths::vault_root_for_id_optional_from_host(host, Some(target))
+        .map_err(|_| VaultDeleteError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
         })?;
-    // Name the slot-map key: the explicit `target` when present, else the
-    // sole-vault id derived from the resolved root (same derivation as
-    // `unlock` / `recover` when no explicit id was threaded).
-    let vault_id = target.unwrap_or_else(|| crate::paths::vault_id_from_root(&vault_dir));
+    let vault_id = target;
 
     // MYND-351 Direction 2: a user-initiated delete preempts an in-flight
     // scheduled backup (which holds the shared auth permit) so the `try_acquire`
@@ -186,16 +185,17 @@ pub async fn vault_delete_via_io_from_host(
     hooks: &crate::hooks::Hooks,
     host: &dyn HostCtx,
     io: &dyn crate::vault_io::VaultIo,
-    vault_id: Option<String>,
+    vault_id: String,
 ) -> Result<(), VaultDeleteError> {
-    let target = VaultId::parse_optional(vault_id.as_deref());
-    let vault_dir =
-        crate::paths::vault_root_for_id_optional_from_host(host, target).map_err(|_| {
-            VaultDeleteError::Io {
-                io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
-            }
+    // Required target, same as the native twin (#250) — the browser reaches
+    // this through the same TS wrapper, so an optional id here would reopen the
+    // hole on the one client whose "vaults" are OPFS containers.
+    let target = VaultId::parse(&vault_id).map_err(|_| VaultDeleteError::VaultNotFound)?;
+    let vault_dir = crate::paths::vault_root_for_id_optional_from_host(host, Some(target))
+        .map_err(|_| VaultDeleteError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
         })?;
-    let vault_id = target.unwrap_or_else(|| crate::paths::vault_id_from_root(&vault_dir));
+    let vault_id = target;
 
     hooks.preempt_inflight_backup(state).await;
 
@@ -241,7 +241,7 @@ pub async fn vault_delete<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
     app: AppHandle<R>,
-    vault_id: Option<String>,
+    vault_id: String,
 ) -> Result<(), VaultDeleteError> {
     vault_delete_from_host(state.inner(), hooks.inner(), &TauriHost::new(app), vault_id).await
 }

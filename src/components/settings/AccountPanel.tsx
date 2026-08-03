@@ -45,7 +45,6 @@ import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
 import { changePassword } from "../../lib/vault-change-password";
 import { prefsRead, setVaultLabel, setVaultIcon } from "../../lib/prefs";
-import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { FolderGlyph } from "../../notes/components/FolderGlyph";
 import { FOLDER_ICON_NAMES } from "../../notes/folderIcons";
 import * as capabilities from "../../platform/capabilities";
@@ -61,6 +60,17 @@ import type { StageVaultStatus, SuspicionReason } from "../../lib/stage";
 import i18n from "../../i18n";
 
 interface AccountPanelProps {
+  /**
+   * The vault this panel acts on — REQUIRED for the danger-zone delete (#250).
+   *
+   * The panel used to resolve it itself, by ordering `vault_list()` on
+   * `last_unlock` and taking the head. That cache is stamped by the
+   * password-unlock path only, so after a quick-unlock or a recovery it named a
+   * DIFFERENT vault than the open one — and this is the surface that erases it.
+   * `null` means "not resolved yet": the delete is refused rather than aimed at
+   * a guess.
+   */
+  vaultId: string | null;
   /**
    * Fired after a successful change-password IPC. Parent
    * (SettingsModal) responds by closing the modal and emitting a
@@ -339,6 +349,7 @@ function assertNever(x: never): never {
 }
 
 export function AccountPanel({
+  vaultId,
   onChangePasswordSuccess,
   onDeleteVaultSuccess,
   onInFlightChange,
@@ -370,14 +381,6 @@ export function AccountPanel({
   const [savedIcon, setSavedIcon] = useState<string | null>(null);
   const [iconInFlight, setIconInFlight] = useState(false);
 
-  // Active vault id (MYND-205 task 7). The Settings danger-zone delete targets
-  // the vault you currently have unlocked — under SYNC-1 that's the lone
-  // `Unlocked` slot, surfaced by `vault_list()` as the most-recent `last_unlock`
-  // entry. Resolved on mount and threaded into `deleteVault(activeVaultId)` so
-  // the erase is explicitly id-targeted (SYNC-6). `null` until resolved →
-  // `deleteVault` falls back to the active vault, identical end state.
-  const [activeVaultId, setActiveVaultId] = useState<string | null>(null);
-
   // Defensive guard against state updates after unmount (e.g., the
   // parent modal closes mid-flight via a path that bypasses our
   // in-flight gating). React would warn otherwise.
@@ -402,27 +405,6 @@ export function AccountPanel({
       })
       .catch(() => {
         /* unlocked-stage read should not reject; leave the draft empty */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Resolve the active vault id (most-recent `last_unlock`) for the id-targeted
-  // danger-zone delete (task 7). Best-effort — on failure `activeVaultId` stays
-  // null and `deleteVault` falls back to the active vault.
-  useEffect(() => {
-    let cancelled = false;
-    void listVaults()
-      .then((res) => {
-        if (cancelled || !("ok" in res) || res.ok.length === 0) return;
-        // The active vault is the most-recent last-unlock (SYNC-1/7) — the head
-        // of the shared canonical ordering the picker + switcher also use.
-        const active = orderByLastUnlock(res.ok)[0];
-        setActiveVaultId(active.id);
-      })
-      .catch(() => {
-        /* leave activeVaultId null → deleteVault active-vault fallback */
       });
     return () => {
       cancelled = true;
@@ -518,9 +500,19 @@ export function AccountPanel({
       setInFlight(true);
       void (async () => {
         try {
-          // Id-targeted erase of the active vault (SYNC-6); `?? undefined`
-          // falls back to the active-vault path if the id has not resolved yet.
-          await deleteVault(activeVaultId ?? undefined);
+          // Id-targeted erase (SYNC-6), and the id is REQUIRED since #250:
+          // an unresolved target means we do not know which vault the user is
+          // looking at, and this button is irreversible. Refuse, do not guess.
+          if (vaultId == null) {
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.warn(
+                "[AccountPanel] delete refused: no resolved active vault id",
+              );
+            }
+            return;
+          }
+          await deleteVault(vaultId);
           if (!mountedRef.current) return;
           // Resolve = full success. Slot is Empty + vault dir gone.
           // Notify parent to reprobe; boot routing picks the return
