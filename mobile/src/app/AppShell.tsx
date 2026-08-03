@@ -213,7 +213,12 @@ export function AppShell() {
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onBackToPicker={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
-            onDeleteVaultSuccess={() => dispatch({ type: "unlock.delete-vault-success" })}
+            // #45: reprobe, not a hardcoded → welcome. Boot routing then picks
+            // the return surface by REMAINING vault count (picker at ≥2, unlock
+            // at 1, welcome at 0); the old arm stranded a multi-vault user on
+            // the first-run screen with every other vault hidden. The delete IPC
+            // has already resolved here, so the probe reads post-delete disk.
+            onDeleteVaultSuccess={reprobe}
           />
         </PhoneColumn>
       );
@@ -253,7 +258,7 @@ export function AppShell() {
           // (the slot is gone, not locked), so it reverts the palette itself.
           onDeleteVaultSuccess={() => {
             clearCustomTheme();
-            dispatch({ type: "editor.delete-vault-success" });
+            reprobe(); // #45 — see the unlock surface above
           }}
         />
       );

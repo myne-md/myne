@@ -46,3 +46,37 @@ describe("mobile note selection", () => {
     expect(isResolverCandidate({ archived: T })).toBe(true);
   });
 });
+
+// #45: deleting one vault must not hide the others.
+//
+// The stage machine mapped all three `*.delete-vault-success` actions straight
+// to `welcome`, so a user with three vaults who deleted one landed on the
+// first-run screen with the other two invisible — they were still on disk, and
+// the only way back was to force-quit the app. Desktop replaced the same three
+// arms with a reprobe (`03170d21`); this client kept them for seven months.
+//
+// The actions are gone entirely rather than re-pointed: routing after a delete
+// is a question about REMAINING vault count, which only the boot probe can
+// answer, and an action that encodes an answer is an answer that can go stale.
+describe("post-delete routing (#45)", () => {
+  it("has no hardcoded delete → welcome transition left", async () => {
+    const src = await import("node:fs").then((fs) =>
+      fs.readFileSync("src/lib/stage.ts", "utf8"),
+    );
+    expect(
+      /case "(?:editor|unlock|recover)\.delete-vault-success"/.test(src),
+      "a delete must reprobe, not transition to a hardcoded stage",
+    ).toBe(false);
+    expect(src).not.toContain('.delete-vault-success": "welcome"');
+  });
+
+  it("routes both delete surfaces through the shell's reprobe", async () => {
+    const shell = await import("node:fs").then((fs) =>
+      fs.readFileSync("src/app/AppShell.tsx", "utf8"),
+    );
+    // The unlock surface passes it directly; the editor surface wraps it to
+    // revert the custom palette first (the one exit that does not lock).
+    expect(shell).toContain("onDeleteVaultSuccess={reprobe}");
+    expect(shell).toContain("reprobe(); // #45");
+  });
+});

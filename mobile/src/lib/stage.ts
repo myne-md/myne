@@ -338,7 +338,6 @@ export type Action =
    * gate" + `myne-agents/features/ui-vault-delete/prd.md` §"Implementation
    * Decisions → Stage union extension".
    */
-  | { type: "editor.delete-vault-success" }
   /**
    * unlock → welcome. Terminal-destructive transition from the
    * Unlock screen's tertiary "Lost both password and recovery
@@ -354,7 +353,6 @@ export type Action =
    * semantic (vault.meta is gone, so a re-probe routes to welcome
    * regardless).
    */
-  | { type: "unlock.delete-vault-success" }
   /**
    * unlock → recover(phrase-entry). Cold-start entry: user clicked
    * the "Recovery phrase ile aç" link below the password CTA.
@@ -388,21 +386,6 @@ export type Action =
    * editor stage for vault-addressed lock/relock exits.
    */
   | { type: "recover.complete-success"; vaultId?: VaultId }
-  /**
-   * recover → welcome. Terminal-destructive transition from the
-   * Recovery phrase-entry sub-step's footer "Delete vault and start
-   * over" link (MYND-108-bis). Backend accepts via the same
-   * `Slot::Empty + vault.meta-exists` no-keys arm as
-   * `unlock.delete-vault-success`. Same MYND-108-bis rationale: the
-   * user reaching phrase-entry with lost credentials cannot complete
-   * recovery; the delete-and-restart affordance is the only in-app
-   * escape from the cul-de-sac (previously required `rm -rf` from
-   * terminal). Dispatched ONLY from the phrase-entry sub-step per
-   * `recovery-flow.md` §4.1 / §4.3 invariants (no delete affordance
-   * inside `PasswordResetStep` — chained password reset stays
-   * non-dismissible). Welcome lands as a fresh-vault entry point.
-   */
-  | { type: "recover.delete-vault-success" }
   /**
    * picker → unlock(Exists). Dispatched by the vault picker screen when
    * the user selects a vault row (MYND-204). Carries the chosen
@@ -562,17 +545,6 @@ export function transition(prev: Stage, action: Action): Stage {
         case "unlock.restore-backup":
           // Corrupted-vault repair door (decisions.md 2026-06-10 supersede).
           return { name: "restore-backup", entry: "corrupted" };
-        case "unlock.delete-vault-success":
-          // Terminal-destructive transition (MYND-108-bis lost-
-          // credentials cul-de-sac escape). Dispatched by the
-          // Unlock screen's `"delete-vault"` sub-view on
-          // vault_delete IPC Ok OR on the user's Continue click
-          // after a PartialDelete/Io banner. Backend accepts via
-          // `Slot::Empty + vault.meta-exists` (no-keys arm).
-          // See `decisions.md` 2026-05-26 entry "MYND-108-bis
-          // vault_delete extended to accept Slot::Empty + vault.
-          // meta-exists".
-          return { name: "welcome" };
         default:
           return rejectIllegal(prev, action);
       }
@@ -620,15 +592,6 @@ export function transition(prev: Stage, action: Action): Stage {
           // Re-enter the editor addressed at the joined vault — the previous
           // one is no longer the unlocked slot (SYNC-1).
           return { name: "editor", vaultId: action.vaultId };
-        case "editor.delete-vault-success":
-          // Terminal-destructive transition (MYND-108). vault.meta is
-          // gone (or partially gone in PartialDelete case); slot is
-          // Empty (zeroize fired before unlink per backend's
-          // `take_and_run_blocking` ordering). Welcome matches the
-          // boot-probe semantic (Ok(Missing) → welcome). See
-          // `decisions.md` 2026-05-26 entry "MYND-108 vault-delete-
-          // confirm gate".
-          return { name: "welcome" };
         default:
           return rejectIllegal(prev, action);
       }
@@ -652,17 +615,6 @@ export function transition(prev: Stage, action: Action): Stage {
           // site. The recovered vault's id threads onto the editor
           // stage (MYND-219 / SYNC-17).
           return { name: "editor", vaultId: action.vaultId };
-        case "recover.delete-vault-success":
-          // Terminal-destructive transition (MYND-108-bis lost-
-          // credentials cul-de-sac escape). Dispatched ONLY from
-          // the phrase-entry sub-step per `recovery-flow.md` §4.1
-          // / §4.3 invariants (PasswordResetStep stays non-
-          // dismissible). Backend accepts via `Slot::Empty +
-          // vault.meta-exists` no-keys arm (same as
-          // unlock.delete-vault-success). See `decisions.md`
-          // 2026-05-26 entry "MYND-108-bis vault_delete extended
-          // to accept Slot::Empty + vault.meta-exists".
-          return { name: "welcome" };
         default:
           return rejectIllegal(prev, action);
       }
@@ -874,13 +826,10 @@ const LEGAL: Record<string, Stage["name"]> = {
   "editor|editor.lock": "unlock",
   "editor|editor.switch-vault": "unlock",
   "editor|editor.create-vault": "create-vault",
-  "editor|editor.delete-vault-success": "welcome",
-  "unlock|unlock.delete-vault-success": "welcome",
   "unlock|unlock.start-recovery": "recover",
   "unlock|unlock.resume-recovery": "recover",
   "recover|recover.cancel": "unlock",
   "recover|recover.complete-success": "editor",
-  "recover|recover.delete-vault-success": "welcome",
   "picker|picker.select-vault": "unlock",
   "unlock|unlock.back-to-picker": "picker",
   "picker|picker.create-vault": "create-vault",
@@ -958,13 +907,10 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   // `picker.select-vault`).
   { type: "editor.switch-vault", vaultId: "00000000-0000-7000-8000-000000000000" },
   { type: "editor.create-vault" },
-  { type: "editor.delete-vault-success" },
-  { type: "unlock.delete-vault-success" },
   { type: "unlock.start-recovery" },
   { type: "unlock.resume-recovery" },
   { type: "recover.cancel" },
   { type: "recover.complete-success" },
-  { type: "recover.delete-vault-success" },
   // `picker.select-vault` carries a `vaultId`; the verification walk
   // only inspects the resulting `Stage["name"]`, so a placeholder id
   // suffices (the legality table tracks `name` only, not payload).
