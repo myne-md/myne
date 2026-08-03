@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Chuyển giọng nói thành văn bản đang tắt. Hãy bật nó trong Cài đặt → Chép lời.",
       "transcribeModelLoadFailed": "Không thể tải mô hình chuyển giọng nói thành văn bản. Hãy cài đặt lại Myne, hoặc kiểm tra mô hình tùy chỉnh của bạn trong Cài đặt → Nhà phát triển → AI.",
       "transcribeNoModelHint": "Thiếu mô hình chuyển giọng nói thành văn bản. Cài đặt lại Myne sẽ khôi phục nó.",
-      "transcribeNoModel": "Chọn một mô hình chép lời trong Cài đặt → Developer → AI.",
+      "transcribeNoModel": "Chọn một mô hình chuyển giọng nói thành văn bản trong Cài đặt → Nhà phát triển → AI.",
       "transcribeStarted": "Đang chép lời…",
       "transcribeVaultLocked": "Hãy mở khóa kho của bạn để chép lời.",
       "transcriptionModalClose": "Đóng bản chép lời",
@@ -1852,6 +1852,8 @@
       "imported_one": "Đã nhập 1 ghi chú vào thư mục này",
       "imported_other": "Đã nhập {{count}} ghi chú vào thư mục này",
       "importedWithSkips": "Đã nhập {{count}} — bỏ qua {{skipped}}",
+      "importedWithSkips_one": "Đã nhập {{count}} ghi chú — bỏ qua {{skipped}}",
+      "importedWithSkips_other": "Đã nhập {{count}} ghi chú — bỏ qua {{skipped}}",
       "importNoMarkdown": "Không có tệp markdown nào trong phần vừa thả"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Những gì bạn đã nhập",
       "echoComplete": "64 trên 64 ký tự. Hãy đọc đối chiếu với bản của chính bạn trước khi tiếp tục.",
       "echoProgress": "{{count}} trên {{total}} ký tự cho đến giờ.",
+      "echoProgress_one": "{{count}} trên {{total}} ký tự cho đến giờ.",
+      "echoProgress_other": "{{count}} trên {{total}} ký tự cho đến giờ.",
       "echoInvalid": "Một dấu vân tay SHA-256 gồm 64 ký tự, mỗi ký tự là 0–9 hoặc a–f. Dấu hai chấm, dấu cách và tiền tố “sha256:” đều không sao — mọi thứ khác không thuộc về nó.",
       "helpToggle": "Tôi tìm dấu vân tay này ở đâu?",
       "helpNotOverTor": "Không phải qua kết nối này. Một dấu vân tay bạn lấy qua cùng mạch đó không chứng minh được gì — thứ có thể tráo chứng chỉ cũng có thể tráo cả trang đó.",

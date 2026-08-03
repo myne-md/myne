@@ -127,7 +127,7 @@
       "transcribeFeatureOff": "La conversione da voce a testo è disattivata. Attivala in Impostazioni → Trascrizione.",
       "transcribeModelLoadFailed": "Impossibile caricare il modello da voce a testo. Reinstalla Myne, oppure controlla il tuo modello personalizzato in Impostazioni → Developer → AI.",
       "transcribeNoModelHint": "Il modello da voce a testo è mancante. Reinstallando Myne viene ripristinato.",
-      "transcribeNoModel": "Seleziona un modello di trascrizione in Impostazioni → Developer → AI.",
+      "transcribeNoModel": "Seleziona un modello da voce a testo in Impostazioni → Developer → AI.",
       "transcribeStarted": "Trascrizione in corso…",
       "transcribeVaultLocked": "Sblocca la cassaforte per trascrivere.",
       "transcriptionModalClose": "Chiudi la trascrizione",
@@ -1911,6 +1911,9 @@
       "imported_many": "Importate {{count}} note in questa cartella",
       "imported_other": "Importate {{count}} note in questa cartella",
       "importedWithSkips": "Importate {{count}} — {{skipped}} ignorate",
+      "importedWithSkips_one": "Importata {{count}} nota — ignorate: {{skipped}}",
+      "importedWithSkips_many": "Importate {{count}} note — ignorate: {{skipped}}",
+      "importedWithSkips_other": "Importate {{count}} note — ignorate: {{skipped}}",
       "importNoMarkdown": "Nessun file markdown in quel trascinamento"
     },
     "newFromTemplate": {
@@ -3234,6 +3237,9 @@
       "echoLabel": "Cosa hai inserito",
       "echoComplete": "64 caratteri su 64. Confrontala con la tua copia prima di continuare.",
       "echoProgress": "{{count}} caratteri su {{total}} finora.",
+      "echoProgress_one": "{{count}} carattere su {{total}} finora.",
+      "echoProgress_many": "{{count}} caratteri su {{total}} finora.",
+      "echoProgress_other": "{{count}} caratteri su {{total}} finora.",
       "echoInvalid": "Un'impronta SHA-256 è composta da 64 caratteri, ognuno da 0–9 o a–f. Due punti, spazi e un “sha256:” iniziale vanno bene — tutto il resto non ne fa parte.",
       "helpToggle": "Dove trovo questa impronta?",
       "helpNotOverTor": "Non attraverso questa connessione. Un'impronta che scarichi sullo stesso circuito non prova nulla — ciò che potrebbe sostituire il certificato potrebbe sostituire anche quella pagina.",

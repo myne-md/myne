@@ -121,6 +121,7 @@
       "transcribeFailed": "Unukuzi umeshindikana. Tafadhali jaribu tena.",
       "transcribeFeatureOff": "Ubadilishaji wa sauti kuwa maandishi umezimwa. Uwashe katika Mipangilio → Unukuzi.",
       "transcribeModelLoadFailed": "Imeshindwa kupakia modeli ya kubadilisha sauti kuwa maandishi. Sakinisha Myne upya, au kagua modeli yako maalum katika Mipangilio → Msanidi → AI.",
+      "transcribeNoModel": "Chagua modeli ya kubadilisha sauti kuwa maandishi katika Mipangilio → Msanidi → AI.",
       "transcribeNoModelHint": "Modeli ya kubadilisha sauti kuwa maandishi haipo. Kusakinisha Myne upya kunairejesha.",
       "transcribeStarted": "Inanukuu…",
       "transcribeVaultLocked": "Fungua kasha lako ili kunukuu.",
@@ -1474,6 +1475,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "Ghairi",
       "close": "Funga",
       "count_one": "dokezo {{count}}",
       "count_other": "madokezo {{count}}",
@@ -1483,6 +1485,8 @@
       "emptyTitle": "Hakuna kilichowekwa kwenye kumbukumbu",
       "folderDeleteBody_one": "“{{name}}” na dokezo lake {{count}}",
       "folderDeleteBody_other": "“{{name}}” na madokezo yake {{count}}",
+      "folderDeleteConfirm_one": "Peleka dokezo {{count}} kwenye tupio?",
+      "folderDeleteConfirm_other": "Peleka madokezo {{count}} kwenye tupio?",
       "folderDeleteConfirmCta": "Peleka kwenye tupio",
       "folderDeleteError": "Imeshindwa kupeleka madokezo ya folda hiyo kwenye tupio. Jaribu tena.",
       "folderDeleteTitle": "Peleka folda hii kwenye tupio?",
@@ -1836,6 +1840,8 @@
       "imported_one": "Imeingiza dokezo 1 kwenye folda hii",
       "imported_other": "Imeingiza madokezo {{count}} kwenye folda hii",
       "importedWithSkips": "Imeingiza {{count}} — {{skipped}} yamerukwa",
+      "importedWithSkips_one": "Imeingiza dokezo {{count}} — imeruka {{skipped}}",
+      "importedWithSkips_other": "Imeingiza madokezo {{count}} — imeruka {{skipped}}",
       "importNoMarkdown": "Hakuna mafaili ya markdown katika ulichodondosha"
     },
     "newFromTemplate": {
@@ -3116,6 +3122,8 @@
       "echoLabel": "Ulichoweka",
       "echoComplete": "Herufi 64 kati ya 64. Isome ukilinganisha na nakala yako mwenyewe kabla ya kuendelea.",
       "echoProgress": "Herufi {{count}} kati ya {{total}} hadi sasa.",
+      "echoProgress_one": "Herufi {{count}} kati ya {{total}} hadi sasa.",
+      "echoProgress_other": "Herufi {{count}} kati ya {{total}} hadi sasa.",
       "echoInvalid": "Alama ya kidole ya SHA-256 ina herufi 64, kila moja 0–9 au a–f. Nukta-pacha, nafasi na “sha256:” mwanzoni ni sawa — kingine chochote si sehemu yake.",
       "helpToggle": "Naipata wapi alama hii ya kidole?",
       "helpNotOverTor": "Si kupitia muunganisho huu. Alama ya kidole unayoipata kupitia mzunguko ule ule haithibitishi chochote — kinachoweza kubadilisha cheti kinaweza kubadilisha ukurasa huo pia.",

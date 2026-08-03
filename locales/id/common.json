@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Ucapan-ke-teks mati. Nyalakan di Pengaturan → Transkripsi.",
       "transcribeModelLoadFailed": "Tidak dapat memuat model ucapan-ke-teks. Pasang ulang Myne, atau periksa model kustom Anda di Pengaturan → Developer → AI.",
       "transcribeNoModelHint": "Model ucapan-ke-teks tidak ada. Memasang ulang Myne akan memulihkannya.",
-      "transcribeNoModel": "Pilih model transkripsi di Pengaturan → Developer → AI.",
+      "transcribeNoModel": "Pilih model ucapan-ke-teks di Pengaturan → Developer → AI.",
       "transcribeStarted": "Mentranskripsikan…",
       "transcribeVaultLocked": "Buka kunci brankas Anda untuk mentranskripsikan.",
       "transcriptionModalClose": "Tutup transkripsi",
@@ -1852,6 +1852,8 @@
       "imported_one": "1 catatan diimpor ke folder ini",
       "imported_other": "{{count}} catatan diimpor ke folder ini",
       "importedWithSkips": "{{count}} diimpor — {{skipped}} dilewati",
+      "importedWithSkips_one": "{{count}} catatan diimpor — {{skipped}} dilewati",
+      "importedWithSkips_other": "{{count}} catatan diimpor — {{skipped}} dilewati",
       "importNoMarkdown": "Tidak ada berkas markdown yang dijatuhkan"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Yang Anda masukkan",
       "echoComplete": "64 dari 64 karakter. Cocokkan dengan salinan Anda sendiri sebelum melanjutkan.",
       "echoProgress": "{{count}} dari {{total}} karakter sejauh ini.",
+      "echoProgress_one": "{{count}} dari {{total}} karakter sejauh ini.",
+      "echoProgress_other": "{{count}} dari {{total}} karakter sejauh ini.",
       "echoInvalid": "Sidik jari SHA-256 terdiri dari 64 karakter, masing-masing 0–9 atau a–f. Titik dua, spasi, dan awalan “sha256:” tidak masalah — selain itu bukan bagian darinya.",
       "helpToggle": "Di mana saya menemukan sidik jari ini?",
       "helpNotOverTor": "Bukan lewat koneksi ini. Sidik jari yang Anda ambil melalui sirkuit yang sama tidak membuktikan apa pun — apa pun yang bisa menukar sertifikatnya juga bisa menukar halaman itu.",

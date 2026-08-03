@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "语音转文字已关闭。请在设置 → 转录 中开启。",
       "transcribeModelLoadFailed": "无法加载语音转文字模型。请重新安装 Myne，或在设置 → 开发者 → AI 中检查你的自定义模型。",
       "transcribeNoModelHint": "缺少语音转文字模型。重新安装 Myne 即可恢复它。",
-      "transcribeNoModel": "请在设置 → Developer → AI 中选择一个转录模型。",
+      "transcribeNoModel": "请在设置 → 开发者 → AI 中选择语音转文字模型。",
       "transcribeStarted": "正在转录…",
       "transcribeVaultLocked": "请解锁保险库后再进行转录。",
       "transcriptionModalClose": "关闭转录",
@@ -1852,6 +1852,8 @@
       "imported_one": "已将 1 篇笔记导入此文件夹",
       "imported_other": "已将 {{count}} 篇笔记导入此文件夹",
       "importedWithSkips": "已导入 {{count}} 篇——跳过 {{skipped}} 篇",
+      "importedWithSkips_one": "已导入 {{count}} 篇笔记——跳过 {{skipped}} 篇",
+      "importedWithSkips_other": "已导入 {{count}} 篇笔记——跳过 {{skipped}} 篇",
       "importNoMarkdown": "拖放的内容中没有 Markdown 文件"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "你输入的内容",
       "echoComplete": "64 个字符中的 64 个。继续之前请与你自己的副本逐字核对。",
       "echoProgress": "目前已输入 {{total}} 个字符中的 {{count}} 个。",
+      "echoProgress_one": "目前已输入 {{total}} 个字符中的 {{count}} 个。",
+      "echoProgress_other": "目前已输入 {{total}} 个字符中的 {{count}} 个。",
       "echoInvalid": "SHA-256 指纹由 64 个字符组成，每个字符是 0–9 或 a–f。冒号、空格以及开头的“sha256:”都没有问题——其他内容都不属于指纹。",
       "helpToggle": "我到哪里去找这个指纹？",
       "helpNotOverTor": "不要通过这条连接去取。通过同一条线路取回的指纹什么也证明不了——能替换证书的一方同样能替换那个页面。",

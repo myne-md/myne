@@ -121,6 +121,7 @@
       "transcribeFailed": "Transcription failed. Please try again.",
       "transcribeFeatureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
       "transcribeModelLoadFailed": "Couldn't load the speech-to-text model. Reinstall Myne, or check your custom model in Settings → Developer → AI.",
+      "transcribeNoModel": "Select a speech-to-text model in Settings \u2192 Developer \u2192 AI.",
       "transcribeNoModelHint": "The speech-to-text model is missing. Reinstalling Myne restores it.",
       "transcribeStarted": "Transcribing…",
       "transcribeVaultLocked": "Unlock your vault to transcribe.",
@@ -1474,6 +1475,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "Cancel",
       "close": "Close",
       "count_one": "{{count}} note",
       "count_other": "{{count}} notes",
@@ -1483,6 +1485,8 @@
       "emptyTitle": "Nothing archived",
       "folderDeleteBody_one": "“{{name}}” and its {{count}} note",
       "folderDeleteBody_other": "“{{name}}” and its {{count}} notes",
+      "folderDeleteConfirm_one": "Move {{count}} note to Trash?",
+      "folderDeleteConfirm_other": "Move {{count}} notes to Trash?",
       "folderDeleteConfirmCta": "Move to Trash",
       "folderDeleteError": "Couldn't move that folder's notes to Trash. Try again.",
       "folderDeleteTitle": "Move this folder to Trash?",
@@ -1836,6 +1840,8 @@
       "imported_one": "Imported 1 note into this folder",
       "imported_other": "Imported {{count}} notes into this folder",
       "importedWithSkips": "Imported {{count}} — {{skipped}} skipped",
+      "importedWithSkips_one": "Imported {{count}} — {{skipped}} skipped",
+      "importedWithSkips_other": "Imported {{count}} — {{skipped}} skipped",
       "importNoMarkdown": "No markdown files in that drop"
     },
     "newFromTemplate": {
@@ -3116,6 +3122,8 @@
       "echoLabel": "What you entered",
       "echoComplete": "64 of 64 characters. Read it against your own copy before continuing.",
       "echoProgress": "{{count}} of {{total}} characters so far.",
+      "echoProgress_one": "{{count}} of {{total}} characters so far.",
+      "echoProgress_other": "{{count}} of {{total}} characters so far.",
       "echoInvalid": "A SHA-256 fingerprint is 64 characters, each one 0–9 or a–f. Colons, spaces and a leading “sha256:” are fine — anything else is not part of it.",
       "helpToggle": "Where do I find this fingerprint?",
       "helpNotOverTor": "Not through this connection. A fingerprint you fetch over the same circuit proves nothing — whatever could swap the certificate could swap that page too.",

@@ -127,7 +127,7 @@
       "transcribeFeatureOff": "La conversión de voz a texto está desactivada. Actívala en Ajustes → Transcripción.",
       "transcribeModelLoadFailed": "No se pudo cargar el modelo de voz a texto. Reinstala Myne o comprueba tu modelo personalizado en Ajustes → Desarrollador → IA.",
       "transcribeNoModelHint": "Falta el modelo de voz a texto. Al reinstalar Myne se restaura.",
-      "transcribeNoModel": "Selecciona un modelo de transcripción en Ajustes → Developer → IA.",
+      "transcribeNoModel": "Selecciona un modelo de voz a texto en Ajustes → Desarrollador → IA.",
       "transcribeStarted": "Transcribiendo…",
       "transcribeVaultLocked": "Desbloquea tu bóveda para transcribir.",
       "transcriptionModalClose": "Cerrar la transcripción",
@@ -1911,6 +1911,9 @@
       "imported_many": "Se importaron {{count}} de notas en esta carpeta",
       "imported_other": "Se importaron {{count}} notas en esta carpeta",
       "importedWithSkips": "Se importaron {{count}} — {{skipped}} omitidas",
+      "importedWithSkips_one": "Se importó {{count}} nota — omitidas: {{skipped}}",
+      "importedWithSkips_many": "Se importaron {{count}} de notas — omitidas: {{skipped}}",
+      "importedWithSkips_other": "Se importaron {{count}} notas — omitidas: {{skipped}}",
       "importNoMarkdown": "No hay archivos Markdown en lo que soltaste"
     },
     "newFromTemplate": {
@@ -3234,6 +3237,9 @@
       "echoLabel": "Lo que has introducido",
       "echoComplete": "64 de 64 caracteres. Compáralo con tu propia copia antes de continuar.",
       "echoProgress": "{{count}} de {{total}} caracteres hasta ahora.",
+      "echoProgress_one": "{{count}} carácter de {{total}} hasta ahora.",
+      "echoProgress_many": "{{count}} de {{total}} caracteres hasta ahora.",
+      "echoProgress_other": "{{count}} caracteres de {{total}} hasta ahora.",
       "echoInvalid": "Una huella SHA-256 tiene 64 caracteres, cada uno de 0–9 o a–f. Los dos puntos, los espacios y un “sha256:” inicial no son problema; cualquier otra cosa no forma parte de ella.",
       "helpToggle": "¿Dónde encuentro esta huella?",
       "helpNotOverTor": "No a través de esta conexión. Una huella que obtengas por el mismo circuito no demuestra nada: lo que pudiera cambiar el certificado también podría cambiar esa página.",

@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Tale-til-tekst er slået fra. Slå det til under Indstillinger → Transskription.",
       "transcribeModelLoadFailed": "Kunne ikke indlæse tale-til-tekst-modellen. Geninstallér Myne, eller tjek din egen model under Indstillinger → Developer → AI.",
       "transcribeNoModelHint": "Tale-til-tekst-modellen mangler. En geninstallation af Myne gendanner den.",
-      "transcribeNoModel": "Vælg en transskriptionsmodel under Indstillinger → Developer → AI.",
+      "transcribeNoModel": "Vælg en tale-til-tekst-model under Indstillinger → Developer → AI.",
       "transcribeStarted": "Transskriberer…",
       "transcribeVaultLocked": "Lås din boks op for at transskribere.",
       "transcriptionModalClose": "Luk transskription",
@@ -1484,7 +1484,7 @@
   },
   "notes": {
     "archive": {
-      "cancel": "Annuller",
+      "cancel": "Annullér",
       "close": "Luk",
       "count_one": "{{count}} note",
       "count_other": "{{count}} noter",
@@ -1852,6 +1852,8 @@
       "imported_one": "Importerede 1 note til denne mappe",
       "imported_other": "Importerede {{count}} noter til denne mappe",
       "importedWithSkips": "Importerede {{count}} — {{skipped}} sprunget over",
+      "importedWithSkips_one": "Importerede {{count}} note — {{skipped}} sprunget over",
+      "importedWithSkips_other": "Importerede {{count}} noter — {{skipped}} sprunget over",
       "importNoMarkdown": "Ingen markdown-filer i det, du trak ind"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Det, du har indtastet",
       "echoComplete": "64 ud af 64 tegn. Læs det op mod din egen kopi, før du fortsætter.",
       "echoProgress": "{{count}} ud af {{total}} tegn indtil videre.",
+      "echoProgress_one": "{{count}} ud af {{total}} tegn indtil videre.",
+      "echoProgress_other": "{{count}} ud af {{total}} tegn indtil videre.",
       "echoInvalid": "Et SHA-256-fingeraftryk er 64 tegn, hvert af dem 0–9 eller a–f. Koloner, mellemrum og et indledende “sha256:” er i orden — alt andet hører ikke med.",
       "helpToggle": "Hvor finder jeg dette fingeraftryk?",
       "helpNotOverTor": "Ikke gennem denne forbindelse. Et fingeraftryk, du henter over det samme kredsløb, beviser intet — det, der kunne bytte certifikatet, kunne også bytte den side.",

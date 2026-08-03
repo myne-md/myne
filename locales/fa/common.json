@@ -121,6 +121,7 @@
       "transcribeFailed": "رونویسی ناموفق بود. دوباره تلاش کنید.",
       "transcribeFeatureOff": "تبدیل گفتار به نوشتار خاموش است. آن را در تنظیمات → رونویسی روشن کنید.",
       "transcribeModelLoadFailed": "بارگذاری مدل گفتار به نوشتار ممکن نشد. Myne را دوباره نصب کنید، یا مدل سفارشی خود را در تنظیمات → توسعه‌دهنده → AI بررسی کنید.",
+      "transcribeNoModel": "یک مدل گفتار به نوشتار در تنظیمات → توسعه‌دهنده → AI انتخاب کنید.",
       "transcribeNoModelHint": "مدل گفتار به نوشتار موجود نیست. نصب دوبارهٔ Myne آن را بازمی‌گرداند.",
       "transcribeStarted": "در حال رونویسی…",
       "transcribeVaultLocked": "برای رونویسی، خزانهٔ خود را باز کنید.",
@@ -1474,6 +1475,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "انصراف",
       "close": "بستن",
       "count_one": "{{count}} یادداشت",
       "count_other": "{{count}} یادداشت",
@@ -1483,6 +1485,8 @@
       "emptyTitle": "چیزی بایگانی نشده است",
       "folderDeleteBody_one": "«{{name}}» و {{count}} یادداشت آن",
       "folderDeleteBody_other": "«{{name}}» و {{count}} یادداشت آن",
+      "folderDeleteConfirm_one": "{{count}} یادداشت به زباله‌دان منتقل شود؟",
+      "folderDeleteConfirm_other": "{{count}} یادداشت به زباله‌دان منتقل شود؟",
       "folderDeleteConfirmCta": "انتقال به زباله‌دان",
       "folderDeleteError": "انتقال یادداشت‌های آن پوشه به زباله‌دان ممکن نشد. دوباره تلاش کنید.",
       "folderDeleteTitle": "این پوشه به زباله‌دان منتقل شود؟",
@@ -1836,6 +1840,8 @@
       "imported_one": "1 یادداشت در این پوشه درون‌ریزی شد",
       "imported_other": "{{count}} یادداشت در این پوشه درون‌ریزی شد",
       "importedWithSkips": "{{count}} مورد درون‌ریزی شد — {{skipped}} مورد نادیده گرفته شد",
+      "importedWithSkips_one": "{{count}} یادداشت درون‌ریزی شد — {{skipped}} مورد نادیده گرفته شد",
+      "importedWithSkips_other": "{{count}} یادداشت درون‌ریزی شد — {{skipped}} مورد نادیده گرفته شد",
       "importNoMarkdown": "در موارد رهاشده هیچ فایل Markdown نبود"
     },
     "newFromTemplate": {
@@ -3116,6 +3122,8 @@
       "echoLabel": "آنچه وارد کرده‌اید",
       "echoComplete": "64 از 64 نویسه. پیش از ادامه، آن را با نسخهٔ خودتان مقابله کنید.",
       "echoProgress": "تاکنون {{count}} از {{total}} نویسه.",
+      "echoProgress_one": "تاکنون {{count}} از {{total}} نویسه.",
+      "echoProgress_other": "تاکنون {{count}} از {{total}} نویسه.",
       "echoInvalid": "اثر انگشت SHA-256 شامل 64 نویسه است و هر نویسه 0–9 یا a–f. دونقطه، فاصله و «sha256:» در ابتدا اشکالی ندارد — هر چیز دیگری بخشی از آن نیست.",
       "helpToggle": "این اثر انگشت را کجا پیدا کنم؟",
       "helpNotOverTor": "نه از راه همین اتصال. اثر انگشتی که روی همان مدار دریافت کنید چیزی را ثابت نمی‌کند — هر چیزی که بتواند گواهی را عوض کند، می‌تواند آن صفحه را هم عوض کند.",

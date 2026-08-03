@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Puheesta tekstiksi on pois päältä. Ota se käyttöön kohdasta Asetukset → Litterointi.",
       "transcribeModelLoadFailed": "Puheentunnistusmallia ei voitu ladata. Asenna Myne uudelleen tai tarkista oma mallisi kohdasta Asetukset → Kehittäjä → Tekoäly.",
       "transcribeNoModelHint": "Puheentunnistusmalli puuttuu. Mynen uudelleenasennus palauttaa sen.",
-      "transcribeNoModel": "Valitse litterointimalli kohdasta Asetukset → Developer → Tekoäly.",
+      "transcribeNoModel": "Valitse puheentunnistusmalli kohdasta Asetukset → Kehittäjä → Tekoäly.",
       "transcribeStarted": "Litteroidaan…",
       "transcribeVaultLocked": "Avaa holvi litteroidaksesi.",
       "transcriptionModalClose": "Sulje litteraatti",
@@ -1852,6 +1852,8 @@
       "imported_one": "Tuotiin 1 muistiinpano tähän kansioon",
       "imported_other": "Tuotiin {{count}} muistiinpanoa tähän kansioon",
       "importedWithSkips": "Tuotiin {{count}} — {{skipped}} ohitettu",
+      "importedWithSkips_one": "Tuotiin {{count}} muistiinpano — {{skipped}} ohitettu",
+      "importedWithSkips_other": "Tuotiin {{count}} muistiinpanoa — {{skipped}} ohitettu",
       "importNoMarkdown": "Pudotuksessa ei ollut Markdown-tiedostoja"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Mitä syötit",
       "echoComplete": "64 / 64 merkkiä. Lue se omaa kopiotasi vasten ennen jatkamista.",
       "echoProgress": "{{count}} / {{total}} merkkiä toistaiseksi.",
+      "echoProgress_one": "{{count}} / {{total}} merkkiä toistaiseksi.",
+      "echoProgress_other": "{{count}} / {{total}} merkkiä toistaiseksi.",
       "echoInvalid": "SHA-256-sormenjälki on 64 merkkiä, joista jokainen on 0–9 tai a–f. Kaksoispisteet, välilyönnit ja alussa oleva ”sha256:” käyvät — mikään muu ei kuulu siihen.",
       "helpToggle": "Mistä löydän tämän sormenjäljen?",
       "helpNotOverTor": "Ei tämän yhteyden kautta. Samaa piiriä pitkin haettu sormenjälki ei todista mitään — se, mikä voisi vaihtaa varmenteen, voisi vaihtaa myös tuon sivun.",

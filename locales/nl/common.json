@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Spraak-naar-tekst staat uit. Schakel het in via Instellingen → Transcriptie.",
       "transcribeModelLoadFailed": "Het spraak-naar-tekstmodel kon niet worden geladen. Installeer Myne opnieuw, of controleer je eigen model in Instellingen → Developer → AI.",
       "transcribeNoModelHint": "Het spraak-naar-tekstmodel ontbreekt. Myne opnieuw installeren herstelt het.",
-      "transcribeNoModel": "Selecteer een transcriptiemodel in Instellingen → Developer → AI.",
+      "transcribeNoModel": "Selecteer een spraak-naar-tekstmodel in Instellingen → Developer → AI.",
       "transcribeStarted": "Transcriberen…",
       "transcribeVaultLocked": "Ontgrendel je kluis om te transcriberen.",
       "transcriptionModalClose": "Transcriptie sluiten",
@@ -1852,6 +1852,8 @@
       "imported_one": "1 notitie geïmporteerd in deze map",
       "imported_other": "{{count}} notities geïmporteerd in deze map",
       "importedWithSkips": "{{count}} geïmporteerd — {{skipped}} overgeslagen",
+      "importedWithSkips_one": "{{count}} notitie geïmporteerd — {{skipped}} overgeslagen",
+      "importedWithSkips_other": "{{count}} notities geïmporteerd — {{skipped}} overgeslagen",
       "importNoMarkdown": "Geen Markdown-bestanden in wat je hebt neergezet"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Wat je hebt ingevoerd",
       "echoComplete": "64 van de 64 tekens. Lees het na naast je eigen kopie voordat je doorgaat.",
       "echoProgress": "{{count}} van de {{total}} tekens tot nu toe.",
+      "echoProgress_one": "{{count}} teken van de {{total}} tot nu toe.",
+      "echoProgress_other": "{{count}} tekens van de {{total}} tot nu toe.",
       "echoInvalid": "Een SHA-256-vingerafdruk bestaat uit 64 tekens, elk 0–9 of a–f. Dubbele punten, spaties en een voorafgaande “sha256:” zijn prima — al het andere hoort er niet bij.",
       "helpToggle": "Waar vind ik deze vingerafdruk?",
       "helpNotOverTor": "Niet via deze verbinding. Een vingerafdruk die je over hetzelfde circuit ophaalt bewijst niets — wat het certificaat kan verwisselen, kan die pagina ook verwisselen.",

@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "文字起こしはオフです。設定 → 文字起こし でオンにしてください。",
       "transcribeModelLoadFailed": "文字起こしモデルを読み込めませんでした。Myneを再インストールするか、設定 → 開発者 → AI でカスタムモデルを確認してください。",
       "transcribeNoModelHint": "文字起こしモデルが見つかりません。Myneを再インストールすると復元されます。",
-      "transcribeNoModel": "設定 → Developer → AI で文字起こしモデルを選択してください。",
+      "transcribeNoModel": "設定 → 開発者 → AI で文字起こしモデルを選択してください。",
       "transcribeStarted": "文字起こし中…",
       "transcribeVaultLocked": "文字起こしするには保管庫のロックを解除してください。",
       "transcriptionModalClose": "文字起こしを閉じる",
@@ -1852,6 +1852,8 @@
       "imported_one": "このフォルダにノートを1件インポートしました",
       "imported_other": "このフォルダに{{count}}件のノートをインポートしました",
       "importedWithSkips": "{{count}}件をインポート — {{skipped}}件をスキップ",
+      "importedWithSkips_one": "ノート{{count}}件をインポート — {{skipped}}件をスキップ",
+      "importedWithSkips_other": "ノート{{count}}件をインポート — {{skipped}}件をスキップ",
       "importNoMarkdown": "ドロップされたものにMarkdownファイルはありません"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "入力した内容",
       "echoComplete": "64文字中64文字です。続ける前に、手元の控えと読み合わせてください。",
       "echoProgress": "現在{{total}}文字中{{count}}文字です。",
+      "echoProgress_one": "現在{{total}}文字中{{count}}文字です。",
+      "echoProgress_other": "現在{{total}}文字中{{count}}文字です。",
       "echoInvalid": "SHA-256のフィンガープリントは64文字で、各文字は0〜9またはa〜fです。コロン、空白、先頭の「sha256:」は問題ありません — それ以外はフィンガープリントの一部ではありません。",
       "helpToggle": "このフィンガープリントはどこで確認できますか？",
       "helpNotOverTor": "この接続経由では確認できません。同じ回線で取得したフィンガープリントは何も証明しません — 証明書をすり替えられるものは、そのページもすり替えられます。",

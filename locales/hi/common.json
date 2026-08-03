@@ -121,6 +121,7 @@
       "transcribeFailed": "ट्रांसक्रिप्शन नहीं हो सका। दोबारा कोशिश करें।",
       "transcribeFeatureOff": "स्पीच-टु-टेक्स्ट बंद है। इसे सेटिंग → ट्रांसक्रिप्शन में चालू करें।",
       "transcribeModelLoadFailed": "स्पीच-टु-टेक्स्ट मॉडल लोड नहीं हो सका। Myne दोबारा इंस्टॉल करें, या सेटिंग → डेवलपर → AI में अपना कस्टम मॉडल जाँचें।",
+      "transcribeNoModel": "सेटिंग → डेवलपर → AI में स्पीच-टु-टेक्स्ट मॉडल चुनें।",
       "transcribeNoModelHint": "स्पीच-टु-टेक्स्ट मॉडल मौजूद नहीं है। Myne दोबारा इंस्टॉल करने पर वह वापस आ जाता है।",
       "transcribeStarted": "ट्रांसक्राइब हो रहा है…",
       "transcribeVaultLocked": "ट्रांसक्राइब करने के लिए अपना वॉल्ट अनलॉक करें।",
@@ -1474,6 +1475,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "रद्द करें",
       "close": "बंद करें",
       "count_one": "{{count}} नोट",
       "count_other": "{{count}} नोट",
@@ -1483,6 +1485,8 @@
       "emptyTitle": "कुछ भी संग्रहित नहीं",
       "folderDeleteBody_one": "“{{name}}” और उसका {{count}} नोट",
       "folderDeleteBody_other": "“{{name}}” और उसके {{count}} नोट",
+      "folderDeleteConfirm_one": "{{count}} नोट ट्रैश में डालें?",
+      "folderDeleteConfirm_other": "{{count}} नोट ट्रैश में डालें?",
       "folderDeleteConfirmCta": "ट्रैश में डालें",
       "folderDeleteError": "उस फ़ोल्डर के नोट ट्रैश में नहीं डाले जा सके। दोबारा कोशिश करें।",
       "folderDeleteTitle": "इस फ़ोल्डर को ट्रैश में डालें?",
@@ -1836,6 +1840,8 @@
       "imported_one": "इस फ़ोल्डर में 1 नोट इंपोर्ट हुआ",
       "imported_other": "इस फ़ोल्डर में {{count}} नोट इंपोर्ट हुए",
       "importedWithSkips": "{{count}} इंपोर्ट हुए — {{skipped}} छोड़े गए",
+      "importedWithSkips_one": "{{count}} नोट इंपोर्ट हुआ — {{skipped}} छोड़े गए",
+      "importedWithSkips_other": "{{count}} नोट इंपोर्ट हुए — {{skipped}} छोड़े गए",
       "importNoMarkdown": "उसमें कोई Markdown फ़ाइल नहीं थी"
     },
     "newFromTemplate": {
@@ -3116,6 +3122,8 @@
       "echoLabel": "आपने जो डाला",
       "echoComplete": "64 में से 64 वर्ण। आगे बढ़ने से पहले इसे अपनी कॉपी से मिलाकर पढ़ें।",
       "echoProgress": "अब तक {{total}} में से {{count}} वर्ण।",
+      "echoProgress_one": "अब तक {{total}} में से {{count}} वर्ण।",
+      "echoProgress_other": "अब तक {{total}} में से {{count}} वर्ण।",
       "echoInvalid": "SHA-256 फ़िंगरप्रिंट 64 वर्णों का होता है, हर वर्ण 0–9 या a–f। कोलन, स्पेस और शुरू में “sha256:” चलेगा — इसके अलावा कुछ भी उसका हिस्सा नहीं है।",
       "helpToggle": "यह फ़िंगरप्रिंट मुझे कहाँ मिलेगा?",
       "helpNotOverTor": "इसी कनेक्शन से नहीं। उसी सर्किट से लाया गया फ़िंगरप्रिंट कुछ साबित नहीं करता — जो चीज़ प्रमाणपत्र बदल सकती है, वह उस पेज को भी बदल सकती है।",

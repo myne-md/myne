@@ -121,6 +121,7 @@
       "transcribeFailed": "ถอดเสียงไม่สำเร็จ โปรดลองอีกครั้ง",
       "transcribeFeatureOff": "การแปลงเสียงเป็นข้อความปิดอยู่ เปิดได้ที่ การตั้งค่า → การถอดเสียง",
       "transcribeModelLoadFailed": "โหลดโมเดลแปลงเสียงเป็นข้อความไม่ได้ ติดตั้ง Myne ใหม่ หรือตรวจสอบโมเดลที่กำหนดเองใน การตั้งค่า → นักพัฒนา → AI",
+      "transcribeNoModel": "เลือกโมเดลแปลงเสียงเป็นข้อความใน การตั้งค่า → นักพัฒนา → AI",
       "transcribeNoModelHint": "ไม่พบโมเดลแปลงเสียงเป็นข้อความ ติดตั้ง Myne ใหม่จะได้โมเดลกลับคืนมา",
       "transcribeStarted": "กำลังถอดเสียง…",
       "transcribeVaultLocked": "ปลดล็อกห้องนิรภัยของคุณก่อนจึงจะถอดเสียงได้",
@@ -1474,6 +1475,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "ยกเลิก",
       "close": "ปิด",
       "count_one": "โน้ต {{count}} รายการ",
       "count_other": "โน้ต {{count}} รายการ",
@@ -1483,6 +1485,8 @@
       "emptyTitle": "ไม่มีรายการที่เก็บถาวร",
       "folderDeleteBody_one": "“{{name}}” และโน้ต {{count}} รายการในนั้น",
       "folderDeleteBody_other": "“{{name}}” และโน้ต {{count}} รายการในนั้น",
+      "folderDeleteConfirm_one": "ย้ายโน้ต {{count}} รายการไปถังขยะหรือไม่",
+      "folderDeleteConfirm_other": "ย้ายโน้ต {{count}} รายการไปถังขยะหรือไม่",
       "folderDeleteConfirmCta": "ย้ายไปถังขยะ",
       "folderDeleteError": "ย้ายโน้ตในโฟลเดอร์นั้นไปถังขยะไม่ได้ ลองอีกครั้ง",
       "folderDeleteTitle": "ย้ายโฟลเดอร์นี้ไปถังขยะหรือไม่",
@@ -1836,6 +1840,8 @@
       "imported_one": "นำเข้าโน้ต 1 รายการมาไว้ในโฟลเดอร์นี้",
       "imported_other": "นำเข้าโน้ต {{count}} รายการมาไว้ในโฟลเดอร์นี้",
       "importedWithSkips": "นำเข้าแล้ว {{count}} — ข้ามไป {{skipped}}",
+      "importedWithSkips_one": "นำเข้าโน้ต {{count}} รายการ — ข้ามไป {{skipped}} รายการ",
+      "importedWithSkips_other": "นำเข้าโน้ต {{count}} รายการ — ข้ามไป {{skipped}} รายการ",
       "importNoMarkdown": "ไม่มีไฟล์ markdown ในรายการที่วางลงมา"
     },
     "newFromTemplate": {
@@ -3116,6 +3122,8 @@
       "echoLabel": "สิ่งที่คุณป้อน",
       "echoComplete": "64 จาก 64 อักขระ อ่านเทียบกับสำเนาของคุณเองก่อนดำเนินการต่อ",
       "echoProgress": "{{count}} จาก {{total}} อักขระแล้ว",
+      "echoProgress_one": "{{count}} จาก {{total}} อักขระแล้ว",
+      "echoProgress_other": "{{count}} จาก {{total}} อักขระแล้ว",
       "echoInvalid": "ลายนิ้วมือ SHA-256 มี 64 อักขระ แต่ละตัวเป็น 0–9 หรือ a–f ทวิภาค ช่องว่าง และ “sha256:” ที่นำหน้าใช้ได้ — นอกจากนั้นไม่ใช่ส่วนหนึ่งของมัน",
       "helpToggle": "หาลายนิ้วมือนี้ได้จากที่ไหน",
       "helpNotOverTor": "ไม่ใช่ผ่านการเชื่อมต่อนี้ ลายนิ้วมือที่คุณดึงมาผ่านวงจรเดียวกันพิสูจน์อะไรไม่ได้ — สิ่งที่สลับใบรับรองได้ ก็สลับหน้านั้นได้เช่นกัน",
