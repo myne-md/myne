@@ -27,7 +27,10 @@ import {
 import { HAS_TAURI } from "../../lib/app-window";
 import { seedWelcomeNote } from "../../lib/welcomeNote";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
-import { saveSecretToDocuments } from "../../lib/secret-export";
+import {
+  copySecretToClipboard,
+  saveSecretToDocuments,
+} from "../../lib/secret-export";
 import type { CreateVaultFlowProps } from "./types";
 
 // Browser-dev placeholders (no Tauri host → no IPC). Let the multi-step flow
@@ -467,6 +470,18 @@ export function CreateVaultFlow({
     };
   }, [step]);
 
+  // The pending clipboard auto-clear. `copySecretToClipboard` returns a cancel
+  // its caller MUST invoke on unmount — otherwise the timer's closure keeps the
+  // account number (a bearer token) alive in the JS heap for the full 30 s.
+  const clipboardCancelRef = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      clipboardCancelRef.current?.();
+      clipboardCancelRef.current = null;
+    },
+    [],
+  );
+
   // Copy auto-reset.
   useEffect(() => {
     if (!copied) return;
@@ -536,8 +551,23 @@ export function CreateVaultFlow({
   };
 
   const copyAccount = () => {
-    void navigator.clipboard?.writeText(account).catch(() => {});
-    setCopied(true);
+    // #51: check the write, and use the SECRET copy helper so the 30-second
+    // auto-clear happens. This used to fire `navigator.clipboard.writeText`
+    // and set "Copied ✓" unconditionally — so a denied clipboard (the common
+    // case on a browser surface, and possible on iOS) told the user their
+    // once-only account number was safely copied when nothing was. It also
+    // bypassed the auto-clear, leaving a bearer token on the system clipboard
+    // indefinitely.
+    void (async () => {
+      const cancel = await copySecretToClipboard(account);
+      if (cancel === null) {
+        setFileMsg(t("vaultCreation.account.copyFailed"));
+        return;
+      }
+      clipboardCancelRef.current?.();
+      clipboardCancelRef.current = cancel;
+      setCopied(true);
+    })();
   };
 
   const saveAccountFile = () => {
