@@ -26,6 +26,10 @@
 // mechanism, as `scripts/check-web-no-phrase.mjs`.
 
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
+import {
+  partitionAssets,
+  unknownExtensionMessage,
+} from "./lib/scanned-assets.mjs";
 import { join, relative } from "node:path";
 
 const SCREENS = join("src", "screens");
@@ -157,18 +161,21 @@ export function rosterGaps(files, verdicts = VERDICTS) {
   };
 }
 
-/** Concatenated text of every JS/CSS asset in the built bundle. */
+/** Concatenated text of every served asset, fail-closed on an unclassified
+ *  extension (#273).
+ *
+ *  This read `.js`/`.css`/`.html`, so an absence MARKER present only in the
+ *  `.mjs` chunk or the `.wasm` would have read as absent — and "the marker is
+ *  gone" is exactly what this asserts. */
 function bundleText(dist = DIST) {
-  let text = "";
-  const walk = (dir) => {
-    for (const name of readdirSync(dir)) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (/\.(js|css|html)$/.test(name)) text += readFileSync(full, "utf8");
-    }
-  };
-  walk(dist);
-  return text;
+  const { scan, unknown } = partitionAssets(dist);
+  if (unknown.length > 0) {
+    console.error(unknownExtensionMessage(unknown));
+    process.exit(1);
+  }
+  // `latin1`: a `.wasm` is not valid UTF-8 and lossy decoding would mangle the
+  // ASCII runs a marker is made of.
+  return scan.map((f) => readFileSync(f, "latin1")).join("");
 }
 
 /**

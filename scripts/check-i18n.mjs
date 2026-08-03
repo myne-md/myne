@@ -31,22 +31,29 @@
 // Exits non-zero with actionable guidance on any failure.
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { presentSharedRoots } from "./lib/shared-roots.mjs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EN = join(REPO, "locales/en/common.json");
 
-// Both clients that share these catalogs, matching `i18next.config.js`'s
-// `extract.input`. Scanning `src/` alone was a real blind spot: three keys used
-// only by `myne-mobile` were absent from English for months, so an
-// English-language mobile user saw the raw dotted key while every translated
-// locale still carried the string (`decisions.md` 2026-08-03). `myne-mobile` is
-// a separately-cloned companion, so its absence is normal and skipped — this
-// tightens the check where the tree is present, it does not require it.
-const TREES = [join(REPO, "src"), join(REPO, "myne-mobile/src")].filter((d) =>
-  existsSync(d),
-);
+// Every shared tree, from the ONE roster (#273).
+//
+// This listed `src` and `myne-mobile/src` and nothing else — it predates the
+// `editor/`, `dialect/` and `copy/` packages, and never learned about them.
+// `editor/src` alone holds 226 live `i18n.t()` keys the catalog check had never
+// seen, and `i18next.config.js` shared the blind spot, so a developer following
+// the documented add-a-string procedure exactly could still ship a raw dotted
+// key. Scanning `src/` alone was the earlier version of the same gap: three
+// keys used only by `myne-mobile` were absent from English for months
+// (`decisions.md` 2026-08-03).
+//
+// `myne-mobile` is a separately-cloned companion, so its absence is normal and
+// skipped — this tightens the check where a tree is present, it does not
+// require one.
+const { present: SHARED_PRESENT, missing: SHARED_MISSING } = presentSharedRoots(REPO);
+const TREES = SHARED_PRESENT.map((rel) => join(REPO, rel));
 const PLURAL_SUFFIXES = ["_zero", "_one", "_two", "_few", "_many", "_other"];
 
 function fail(msg) {

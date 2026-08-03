@@ -27,6 +27,10 @@
 // renames identifiers but not string literals.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  partitionAssets,
+  unknownExtensionMessage,
+} from "./lib/scanned-assets.mjs";
 import { join } from "node:path";
 
 const DIST = join("web", "dist");
@@ -59,14 +63,17 @@ const MARKERS = [
   },
 ];
 
+// #273: every served byte, fail-closed on an unclassified extension. This read
+// `.js` only, so the bundle's 1.2 MB `pdf.worker.min-*.mjs` and 3.9 MB
+// `myne_web_wasm_bg-*.wasm` were never checked — by a guard whose entire premise
+// is that the phrase is ABSENT from what is served, not merely hidden.
 function jsFiles(dir) {
-  const out = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) out.push(...jsFiles(full));
-    else if (entry.endsWith(".js")) out.push(full);
+  const { scan, unknown } = partitionAssets(dir);
+  if (unknown.length > 0) {
+    console.error(unknownExtensionMessage(unknown));
+    process.exit(1);
   }
-  return out;
+  return scan;
 }
 
 let files;

@@ -19,6 +19,11 @@
 // something a human has to look at, which is the entire point.
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { relative } from "node:path";
+import {
+  partitionAssets,
+  unknownExtensionMessage,
+} from "./lib/scanned-assets.mjs";
 import { join } from "node:path";
 
 const DIST = process.argv[2] ?? "web/dist";
@@ -35,6 +40,15 @@ const DIST = process.argv[2] ?? "web/dist";
 // That is the guarantee. This list exists so that the *next* one gets read by a
 // person rather than shipped silently.
 const KNOWN = new Map([
+  // — Newly VISIBLE with #273, not newly present: the scan used to read `.js`
+  //   and `.css` only, so the bundle's 1.2 MB `pdf.worker.min-*.mjs` and 3.9 MB
+  //   `myne_web_wasm_bg-*.wasm` were never read and these four sat unrecorded
+  //   in the served tree while this script printed "all recorded". All four are
+  //   string constants, and `web/csp.ts` pins `default-src 'none'`.
+  ["http://ns.adobe.com", "pdf.js: XMP metadata NAMESPACE identifier — an XML namespace URI, never fetched"],
+  ["http://www.apache.org", "pdf.js: Apache-2.0 licence header text"],
+  ["http://www.xfa.org", "pdf.js: XFA form namespace identifier — an XML namespace URI, never fetched"],
+  ["https://docs.rs", "rust: a doc link in a panic/error string compiled into the wasm"],
   // — Excalidraw's own services. Its collaboration, library-browser and AI
   //   features point at these. Myne uses none of them: drawing notes are local
   //   and the assets are self-hosted (`excalidraw-asset-path`). CSP-blocked.
@@ -97,14 +111,24 @@ if (!existsSync(DIST)) {
 }
 
 const ORIGIN = /https?:\/\/[a-zA-Z0-9.-]+/g;
-const assets = join(DIST, "assets");
 const found = new Map();
 
-for (const file of existsSync(assets) ? readdirSync(assets) : []) {
-  if (!file.endsWith(".js") && !file.endsWith(".css")) continue;
-  const text = readFileSync(join(assets, file), "utf8");
+// #273: scan the WHOLE built tree, fail-closed on an extension nobody has
+// classified. This listed the extensions it scanned (`.js`, `.css`) and read
+// `assets/` non-recursively, so the bundle's 1.2 MB `pdf.worker.min-*.mjs` and
+// 3.9 MB `myne_web_wasm_bg-*.wasm` were never read — and four unrecorded
+// origins sat in the served tree while this printed "all recorded".
+const { scan, unknown: unclassified } = partitionAssets(DIST);
+if (unclassified.length > 0) {
+  console.error(unknownExtensionMessage(unclassified));
+  process.exit(1);
+}
+for (const file of scan) {
+  // `latin1` rather than `utf8`: a `.wasm` is not valid UTF-8, and lossy
+  // decoding would mangle exactly the ASCII runs an origin is made of.
+  const text = readFileSync(file, "latin1");
   for (const m of text.matchAll(ORIGIN)) {
-    if (!found.has(m[0])) found.set(m[0], file);
+    if (!found.has(m[0])) found.set(m[0], relative(DIST, file));
   }
 }
 

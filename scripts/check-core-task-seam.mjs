@@ -153,6 +153,23 @@ const SKIP_DIRS = new Set(["target"]);
  * the guard would keep exempting code that had become wasm-reachable, which is
  * the exact failure it exists to catch.
  */
+/**
+ * Does this attribute line gate its item to a NATIVE-ONLY build (#274)?
+ *
+ * Only those exempt. The inversion that shipped treated any mention of
+ * `target_arch = "wasm32"` as an exemption — including the bare, POSITIVE form,
+ * which is the arm that runs in the browser and therefore the one arm this
+ * guard exists to check. `core/src/plugins/attachments/commands.rs` has a live
+ * wasm-only region the guard walked straight past.
+ */
+function isNativeOnlyGate(line) {
+  if (/feature\s*=\s*"tauri-ipc"/.test(line)) return true;
+  // `not(target_arch = "wasm32")` — native-only, genuinely exempt.
+  if (/not\s*\(\s*target_arch\s*=\s*"wasm32"\s*\)/.test(line)) return true;
+  // Anything else mentioning wasm32 is a wasm-only or wasm-inclusive arm.
+  return false;
+}
+
 function gatedModulePaths(root) {
   const exempt = new Set();
   for (const file of walk(root)) {
@@ -164,7 +181,11 @@ function gatedModulePaths(root) {
       if (!m) return;
       // Look back over attributes for a tauri-ipc / non-wasm32 gate.
       for (let j = i - 1; j >= 0 && lines[j].trim().startsWith("#["); j--) {
-        if (/target_arch\s*=\s*"wasm32"/.test(lines[j]) || /feature\s*=\s*"tauri-ipc"/.test(lines[j])) {
+        // #274: only a NOT-wasm32 gate exempts. A bare
+        // `#[cfg(target_arch = "wasm32")]` is the arm that runs in the browser,
+        // which is the one this guard exists to check — treating it as an
+        // exemption skipped exactly the code that matters.
+        if (isNativeOnlyGate(lines[j])) {
           exempt.add(join(dir, m[1]));       // directory module
           exempt.add(join(dir, `${m[1]}.rs`)); // file module
           return;
@@ -218,18 +239,31 @@ for (const file of files) {
   //                               plugin's `init()` has.
   let skipping = false;
   let depth = 0;
+  let sawBrace = false;
   text.split("\n").forEach((line, i) => {
     if (
       /^\s*#\[cfg\(test\)\]/.test(line) ||
-      (/^\s*#\[cfg\(/.test(line) &&
-        (/feature\s*=\s*"tauri-ipc"/.test(line) || /target_arch\s*=\s*"wasm32"/.test(line)))
+      (/^\s*#\[cfg\(/.test(line) && isNativeOnlyGate(line))
     ) {
       skipping = true;
       depth = 0;
+      sawBrace = false;
     }
     if (skipping) {
-      depth += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
-      if (depth <= 0 && /\}/.test(line)) skipping = false;
+      const opens = (line.match(/\{/g) || []).length;
+      const closes = (line.match(/\}/g) || []).length;
+      depth += opens - closes;
+      if (opens > 0) sawBrace = true;
+      // #274: a BRACE-LESS gated item — a `type` alias, a `use`, a `mod x;` —
+      // never closes a block, so the old brace-depth exit left `skipping` true
+      // for the whole rest of the file. Everything after `core/src/hooks.rs`'s
+      // gated type aliases was silently unchecked. An item that ends in `;`
+      // before any brace opened IS the whole item.
+      if (!sawBrace && /;\s*$/.test(line) && !/^\s*#\[/.test(line)) {
+        skipping = false;
+        return;
+      }
+      if (sawBrace && depth <= 0 && closes > 0) skipping = false;
       return;
     }
     const trimmed = line.trim();

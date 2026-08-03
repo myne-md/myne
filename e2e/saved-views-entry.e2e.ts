@@ -180,7 +180,13 @@ describeE2E("sv2 Views feature toggle gates the sidebar entry (#230)", () => {
 
         // Anchor on a known sidebar control first, so "Views absent" is asserted
         // against a MOUNTED sidebar, not a race where nothing has rendered yet.
-        await s.byTestId("notes.create");
+        //
+        // #275: the `+` menu BUTTON, not one of its entries. #230 folded the
+        // new-note control into that menu, so `notes.create` renders only while
+        // the dropdown is open — waiting for it here waits for something that
+        // is not on screen, and the anchor that was meant to remove a race
+        // became a timeout.
+        await s.byTestId("notes.new-menu");
 
         // Default: 0 views + untouched pref → the entry is hidden.
         expect(
