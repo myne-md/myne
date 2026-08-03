@@ -33,7 +33,7 @@ use super::enroll::{self, EnrollPath};
 use super::token_store::TokenStore as _;
 use crate::host::{EventPayload, HostCtx};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
-use protocol::{derive_subkey, SubkeyRole, AEAD_KEY_LEN};
+use protocol::{derive_subkey, parse_vault_meta, SubkeyRole, AEAD_KEY_LEN};
 use std::sync::OnceLock;
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
@@ -150,6 +150,58 @@ pub(crate) fn sync_cycle_mutex() -> &'static Mutex<()> {
     M.get_or_init(|| Mutex::new(()))
 }
 
+/// Why a cycle cannot bind an `account_number_hash`. Two diagnoses, kept apart
+/// because they say different things about the vault: one is an unreadable file,
+/// the other is an enrolment that belongs to a different account.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum AccountHashRefusal {
+    /// `vault.meta` could not be read, or no copy of it parsed.
+    MetaUnavailable,
+    /// `sync-state.json`'s enrolled hash is not the one `vault.meta` binds —
+    /// the two describe different accounts.
+    NotThisVault,
+}
+
+/// The `account_number_hash` this cycle may bind into the three `root_key`-derived
+/// singleton AADs (`vault.attachments`, `vault.prefs`, `vault.themes`) and into the
+/// head it authors.
+///
+/// **`vault.meta` is the authority, not `sync-state.json`.** The spec says so for
+/// each of the three families (`protocol.md` §9.10.3 / §9.5.3 / §9.21.3 — "the same
+/// 16-byte field stored in `vault.meta`"), and `vault.meta`'s copy is the only one
+/// that is self-enforcing: it feeds `derive_password_wrap_key`'s salt, so a wrong
+/// value there breaks unlock loudly. `sync-state.json`'s hex is documented as two
+/// other roles entirely (head authoring identity + the SCRAM username, `state.rs`),
+/// it is written from a different source — enrolment persists the hash of the
+/// account number the user *typed*, while `root_key` comes from the meta's field —
+/// and nothing re-validates it once a token is stored.
+///
+/// So the two can drift with nothing failing first, and the damage is silent: all
+/// three families then fail their AEAD tag check on BOTH sides of the merge, read
+/// as empty, and the adopt-the-server's-bytes branch wins every cycle — local
+/// prefs / theme / catalog edits are overwritten forever, and no attachment ever
+/// materialises. Sourcing the value here and refusing on disagreement is what
+/// keeps that state from running.
+pub(crate) async fn cycle_account_number_hash(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &std::path::Path,
+    enrolled: &[u8; 16],
+) -> Result<[u8; 16], AccountHashRefusal> {
+    // `vault.meta` is a double-buffered singleton on the web store, so "read it"
+    // means "the newest copy that PARSES" — the same reader the attachments
+    // catalog uses for the same field. Desktop and mobile are unchanged by
+    // construction: `read_candidates` is a one-element list there.
+    let meta_hash = crate::singleton::open_newest(io, &dir.join("vault.meta"), |candidate| {
+        parse_vault_meta(candidate).map(|m| m.account_number_hash)
+    })
+    .await
+    .map_err(|_| AccountHashRefusal::MetaUnavailable)?;
+    if &meta_hash != enrolled {
+        return Err(AccountHashRefusal::NotThisVault);
+    }
+    Ok(meta_hash)
+}
+
 /// Gather the active vault's sync inputs (endpoint, enrollment identity, token,
 /// `root_key`) and run one [`run_sync_cycle`](super::orchestrator::run_sync_cycle)
 /// off-thread. `allow_push=false` is a poll-driven pull-only cycle (coalescing —
@@ -227,6 +279,31 @@ pub async fn run_active_cycle_from_host(
     else {
         return CycleOutcome::NotReady; // vault locked
     };
+    // The AAD identity, sourced from `vault.meta` rather than from the enrolment
+    // cache (see [`cycle_account_number_hash`]). Checked BEFORE the token block:
+    // a device whose enrolment names another account must not go on to claim a
+    // token under that account's SCRAM username either.
+    let account_number_hash = match cycle_account_number_hash(io, &dir, &account_hash).await {
+        Ok(hash) => hash,
+        Err(AccountHashRefusal::MetaUnavailable) => {
+            tracing::error!(
+                stage = "read_vault_meta",
+                "no parsable vault.meta beside the enrolled state; cycle refused"
+            );
+            return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+        }
+        Err(AccountHashRefusal::NotThisVault) => {
+            // Fail closed. The alternative — run the cycle on the meta's hash and
+            // keep authenticating as the enrolled one — would leave this vault's
+            // blobs sitting in another account's server namespace, which is worse
+            // than a stalled device that says so. The repair is re-enrolment.
+            tracing::error!(
+                stage = "account_hash_provenance",
+                "the enrolled account is not this vault's; cycle refused"
+            );
+            return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+        }
+    };
     // Token: the stored per-device token, or — for a still-pending device — one
     // claimed now if an existing device has just approved it (re-handshake under
     // the unlocked root_key). Still pending → nothing to sync this tick.
@@ -280,11 +357,15 @@ pub async fn run_active_cycle_from_host(
         // that exists for exactly that. `block_on` inside `spawn_blocking` is the
         // documented way to run async work from a blocking context, and it keeps
         // the desktop's scheduling property byte-identical across this port.
+        // `account_number_hash`, NOT the enrolment cache's `account_hash`: inside
+        // the cycle this value is AAD and head material only, and `vault.meta` is
+        // where the spec says both come from. The cached hex keeps its own two
+        // roles above (the SCRAM username in the claim, the enrolment identity).
         super::orchestrator::run_sync_cycle(
             io,
             transport.as_ref(),
             &root_key,
-            account_hash,
+            account_number_hash,
             device_id,
             &token_hex,
             &notes_dir,
@@ -492,5 +573,79 @@ pub async fn push_vault_meta_now_via_io(
             let _ = crate::plugins::sync::state::mark_vault_meta_dirty(io, &dir).await;
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! The AAD identity the cycle binds. Driven at [`cycle_account_number_hash`]
+    //! rather than through `run_active_cycle_from_host`, because everything the
+    //! rule is about — which file the hash comes from, and what happens when the
+    //! two disagree — is decided here, and the rest of the gather is a host, a
+    //! runtime slot and a live server.
+
+    use super::*;
+    use crate::test_support::{block_on, seed_real_vault_meta, ScopedTempDir};
+
+    const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
+
+    /// The account hash `seed_real_vault_meta` writes for `seed_byte`.
+    fn seeded(seed_byte: u8) -> [u8; 16] {
+        [seed_byte; 16]
+    }
+
+    #[test]
+    fn the_bound_hash_is_the_one_vault_meta_carries() {
+        block_on(async {
+            let tmp = ScopedTempDir::new("cycle-account-hash-agrees").unwrap();
+            seed_real_vault_meta(tmp.path(), 0x2A);
+
+            assert_eq!(
+                cycle_account_number_hash(&IO, tmp.path(), &seeded(0x2A)).await,
+                Ok(seeded(0x2A))
+            );
+        });
+    }
+
+    /// The drift case, and the reason this function exists: an enrolment that
+    /// names a different account must stop the cycle instead of handing that hash
+    /// to the catalog / prefs / themes AADs, where a wrong value is silent — every
+    /// local edit reverted on every cycle, and no attachment ever downloaded.
+    #[test]
+    fn an_enrolment_naming_another_account_is_refused() {
+        block_on(async {
+            let tmp = ScopedTempDir::new("cycle-account-hash-drift").unwrap();
+            seed_real_vault_meta(tmp.path(), 0x2A);
+
+            assert_eq!(
+                cycle_account_number_hash(&IO, tmp.path(), &seeded(0x99)).await,
+                Err(AccountHashRefusal::NotThisVault)
+            );
+        });
+    }
+
+    #[test]
+    fn a_missing_vault_meta_refuses_rather_than_trusting_the_cache() {
+        block_on(async {
+            let tmp = ScopedTempDir::new("cycle-account-hash-absent").unwrap();
+
+            assert_eq!(
+                cycle_account_number_hash(&IO, tmp.path(), &seeded(0x2A)).await,
+                Err(AccountHashRefusal::MetaUnavailable)
+            );
+        });
+    }
+
+    #[test]
+    fn an_unparsable_vault_meta_refuses_rather_than_trusting_the_cache() {
+        block_on(async {
+            let tmp = ScopedTempDir::new("cycle-account-hash-garbage").unwrap();
+            std::fs::write(tmp.path().join("vault.meta"), b"not a vault.meta").unwrap();
+
+            assert_eq!(
+                cycle_account_number_hash(&IO, tmp.path(), &seeded(0x2A)).await,
+                Err(AccountHashRefusal::MetaUnavailable)
+            );
+        });
     }
 }
