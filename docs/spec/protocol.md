@@ -2082,11 +2082,15 @@ AAD_pending_capture_blob =
   AAD_prefix (10 B) || protocol_version (1 B) || u16_be(20) || "pending-capture-blob" (20 B) || capture_id (16 B)
 ```
 
-Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. Binding `capture_id` — **not** a vault identity — is what makes a single device key safe across every queue entry: an attacker with write access to the queue directory cannot swap or duplicate one entry's ciphertext into another `capture_id` slot, and a tampered header `capture_id` fails AEAD (§6.4, non-distinguishing).
+Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. Binding `capture_id` — **not** a vault identity — is what makes a single device key safe across every queue entry: a tampered header `capture_id` fails AEAD (§6.4, non-distinguishing), so one entry's ciphertext cannot be re-labelled as another's.
+
+**What the binding does not cover.** The AAD binds the `capture_id` carried in the blob **header**, not the one carried in the **filename**. A sealed entry copied or renamed to a second `capture_id` filename is unaltered, so it still opens: its header and its AAD remain internally consistent. An attacker with write access to the queue directory can therefore cause one dictated capture to drain twice. Detecting that is a **reader-side** obligation, specified in §9.18.4, not a property of this construction — and §9.20.3 carries the same limit for the share-import queue.
 
 #### 9.18.4 Size cap, drain, and transient plaintext
 
 Implementations MUST reject `ciphertext_len > 16384 + 32` (16 KiB plaintext cap + 32-byte CTX tag), bounding the parser's pre-AEAD allocation — a dictated note is short. Drain is **at-least-once**: the client decrypts each entry, creates a note via the ordinary note-create path (§6.1), then deletes the entry; a crash between note-create and delete re-drains that entry into a rare duplicate note (accepted; `decisions.md` 2026-07-12).
+
+**Filename/header agreement (reader-side MUST).** Before draining an entry, the client MUST decode the filename's 32-hex `capture_id` and compare it against the `capture_id` in the blob header (§9.18.1 offset 6), and MUST skip any entry where they differ. This is the check that closes the copy-to-a-second-name duplication §9.18.3 leaves open; the AEAD cannot close it, because a copied file is unaltered and opens correctly. Two constraints on the check itself: the filename decode MUST be case-insensitive (the queue's own filename validator accepts `A-F`, so a lowercase-only decode would reject entries the writer produced), and a mismatched entry MUST be **skipped, not deleted** — its correctly-named twin is a valid drainable entry, and a delete driven by attacker-controlled filesystem state is the wrong reflex. The delete-on-failure policy applies to entries that can never decode, which is a different case.
 
 **Transient plaintext (carve-out).** The dictated text exists as plaintext in two OS-Data-Protection-only transients *before* it is sealed into `MYK1`: the watch's WatchConnectivity outbox and the phone's staging file (written by the native receiver before the Rust seal). These are short-lived, contain only not-yet-committed captures (never existing vault content), and are enumerated in [`../threat-model.md`](../threat-model.md). The watch stays crypto-free by design — encrypting the outbox would require key material on a device deliberately kept key-free (`decisions.md` 2026-07-12).
 
@@ -2147,6 +2151,8 @@ Header (49 bytes): `magic "MYF1"(4) ∥ protocol_version 0x01(1) ∥ share_id(16
 #### 9.20.4 Size cap, drain, and transient plaintext
 
 Implementations MUST reject `ciphertext_len > 67108864 + 32` (64 MiB plaintext cap + 32-byte CTX tag) before allocating. The seal drops any entry whose framed plaintext exceeds the cap (no poison-oversize entry that re-fails every drain). Drain is **at-least-once**: the client decrypts each entry, imports it via `attachment_import` (§9.9), then deletes the entry; a crash between import and delete re-drains into a content-addressed dedup hit (harmless). Landing is the active unlocked vault (as §9.18, "whichever vault unlocks first"). The queue never syncs and is never in a backup (TB2).
+
+**Filename/header agreement (reader-side MUST).** As in §9.18.4, and for the same reason: the AAD binds the `share_id` in the header, not the one in the filename, so a sealed entry copied to a second filename still opens. Before draining, the client MUST decode the filename's 32-hex `share_id` case-insensitively, compare it against the header `share_id` (§9.20.3), and **skip** — never delete — any entry where the two differ. The consequence here is milder than the capture queue's: a duplicate drain lands as a content-addressed dedup hit rather than a duplicate note. The check is specified anyway so the two device-local queues do not diverge on a property a reader of one will assume of the other.
 
 **Transient plaintext (carve-out).** The shared bytes exist as plaintext, protected only by OS Data Protection, *before* they are sealed into `MYF1`:
 

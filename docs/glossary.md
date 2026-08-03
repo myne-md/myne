@@ -1794,7 +1794,7 @@ Used in: `protocol.md` §9.20; `decisions.md` 2026-07-16
 
 ### **share_id** &nbsp; 🗝️ *Key/identifier*
 
-The 16-byte random per-entry identifier of a [share-import staging queue](#share-import-staging-queue) blob (`MYF1`, `protocol.md` §9.20.3). Its lowercase-hex form is the on-disk filename under `pending-shares/sealed/`, and it is bound into the blob's AAD (role `"share-import-blob"`) so an attacker with write access to the queue directory cannot swap or duplicate one entry's ciphertext under another entry's slot. Vault-agnostic — it binds no `account_number_hash` or `items_key_id`.
+The 16-byte random per-entry identifier of a [share-import staging queue](#share-import-staging-queue) blob (`MYF1`, `protocol.md` §9.20.3). Its lowercase-hex form is the on-disk filename under `pending-shares/sealed/`, and it is bound into the blob's AAD (role `"share-import-blob"`) so a tampered header `share_id` fails AEAD rather than silently re-labelling the entry. The binding covers the id in the *header*, not the one in the *filename* — a sealed entry copied to a second filename still opens, which is why §9.20.4 makes the filename/header comparison a reader-side MUST. Vault-agnostic — it binds no `account_number_hash` or `items_key_id`.
 
 Used in: `protocol.md` §9.20.3; `decisions.md` 2026-07-16
 

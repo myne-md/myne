@@ -109,6 +109,21 @@ pub fn take_pending_in_dir(
             Ok(b) => b,
             Err(_) => continue,
         };
+        // Filename/header agreement (`protocol.md` §9.18.4, reader-side MUST).
+        // The AAD binds the `capture_id` in the HEADER, not the one in the
+        // filename, so a sealed entry copied to a second name is unaltered and
+        // still opens — the AEAD cannot notice, and the copy would drain into a
+        // second note. Skip, never delete: the correctly-named twin is a valid
+        // drainable entry, and a delete driven by attacker-controlled
+        // filesystem state is the wrong reflex (the delete-on-failure arms
+        // below are for entries that can never decode, a different case).
+        match protocol::capture_blob::parse_capture_header(&blob) {
+            Ok(h) if hex_id_matches(&name, &h.capture_id) => {}
+            Ok(_) => continue,
+            // Unparseable header: fall through to the decode arm, which owns
+            // the poison-entry policy.
+            Err(_) => {}
+        }
         match decode_capture_blob(key, &blob) {
             Ok(pt) => match core::str::from_utf8(&pt) {
                 Ok(text) => out.push(PendingCapture {
@@ -125,6 +140,16 @@ pub fn take_pending_in_dir(
         }
     }
     Ok(out)
+}
+
+/// Does the 32-hex queue filename name the same id the blob header carries?
+///
+/// Case-INSENSITIVE on purpose: [`queue::is_capture_id`] accepts `A-F`, so a
+/// lowercase-only comparison would reject entries the queue's own filename
+/// validator produced as valid. `protocol.md` §9.18.4 states the same
+/// constraint normatively.
+fn hex_id_matches(name: &str, id: &[u8]) -> bool {
+    name.eq_ignore_ascii_case(&queue::hex_lower(id))
 }
 
 /// Delete a drained entry by its hex `capture_id`. A non-hex id is rejected
@@ -260,6 +285,56 @@ mod tests {
             "empty/oversize dropped too"
         );
         assert_eq!(queue::list_files(&sealed).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `protocol.md` §9.18.4: a sealed entry copied to a SECOND queue filename
+    /// is byte-identical and opens correctly — the AAD binds the header
+    /// `capture_id`, not the filename — so without the reader-side check the
+    /// copy drains into a duplicate note. The copy must be skipped, and the
+    /// original must still drain.
+    #[test]
+    fn a_copy_under_a_second_filename_is_skipped_not_drained() {
+        let root = tmp();
+        let staging = root.join("staging");
+        let sealed = root.join("sealed");
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::write(staging.join("a"), b"Buy oat milk").unwrap();
+        seal_staged_in_dirs(&staging, &sealed, &KEY).unwrap();
+
+        let original = queue::list_files(&sealed).into_iter().next().unwrap();
+        let forged = sealed.join("ffffffffffffffffffffffffffffffff");
+        std::fs::copy(&original, &forged).unwrap();
+
+        let pending = take_pending_in_dir(&sealed, &KEY).unwrap();
+        assert_eq!(pending.len(), 1, "the copy must not drain a second time");
+        assert_eq!(pending[0].text, "Buy oat milk");
+        // Skipped, NOT deleted: a mismatched name is not a poison entry, and
+        // deleting on attacker-controlled filesystem state is the wrong reflex.
+        assert!(forged.exists(), "the mismatched copy must be left in place");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `queue::is_capture_id` accepts `A-F`, so the filename/header comparison
+    /// must be case-insensitive or it would reject entries the queue's own
+    /// validator calls valid.
+    #[test]
+    fn an_uppercase_hex_filename_still_matches_its_header() {
+        let root = tmp();
+        let staging = root.join("staging");
+        let sealed = root.join("sealed");
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::write(staging.join("a"), b"Ring the dentist").unwrap();
+        seal_staged_in_dirs(&staging, &sealed, &KEY).unwrap();
+
+        let original = queue::list_files(&sealed).into_iter().next().unwrap();
+        let lower = original.file_name().unwrap().to_str().unwrap().to_string();
+        let upper = sealed.join(lower.to_ascii_uppercase());
+        std::fs::rename(&original, &upper).unwrap();
+
+        let pending = take_pending_in_dir(&sealed, &KEY).unwrap();
+        assert_eq!(pending.len(), 1, "uppercase filename must still drain");
+        assert_eq!(pending[0].text, "Ring the dentist");
         let _ = std::fs::remove_dir_all(&root);
     }
 

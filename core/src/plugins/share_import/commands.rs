@@ -168,6 +168,17 @@ pub fn drain_in_dir(sealed: &Path, key: &[u8; 32]) -> Result<Vec<StagedShare>, S
             Ok(b) => b,
             Err(_) => continue,
         };
+        // Filename/header agreement (`protocol.md` §9.20.4, reader-side MUST) —
+        // the twin of the pending-capture check. The AAD binds the header
+        // `share_id`, not the filename, so a copy under a second name still
+        // opens. Skip rather than delete: the correctly-named twin is valid.
+        match protocol::share_import_blob::parse_share_import_header(&blob) {
+            Ok(h) if hex_id_matches(&name, &h.share_id) => {}
+            Ok(_) => continue,
+            // Unparseable header: fall through to the decode arm, which owns
+            // the poison-entry policy.
+            Err(_) => {}
+        }
         match decode_share_import_blob(key, &blob) {
             Ok(pt) => match frame::unframe_record(&pt) {
                 Some((filename, mime, bytes)) => out.push(StagedShare {
@@ -188,6 +199,16 @@ pub fn drain_in_dir(sealed: &Path, key: &[u8; 32]) -> Result<Vec<StagedShare>, S
         }
     }
     Ok(out)
+}
+
+/// Does the 32-hex queue filename name the same id the blob header carries?
+///
+/// Case-INSENSITIVE on purpose: [`queue::is_share_id`] accepts `A-F`, so a
+/// lowercase-only comparison would reject entries the queue's own filename
+/// validator produced as valid. `protocol.md` §9.20.4 states the same
+/// constraint normatively.
+fn hex_id_matches(name: &str, id: &[u8]) -> bool {
+    name.eq_ignore_ascii_case(&queue::hex_lower(id))
 }
 
 /// Delete a drained entry by its hex `share_id`. A non-hex id is rejected
@@ -464,6 +485,45 @@ mod tests {
         let staged = drain_in_dir(&sealed, &other).unwrap();
         assert_eq!(staged.len(), 0);
         assert_eq!(queue::list_files(&sealed).len(), 0);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `protocol.md` §9.20.4, the twin of the pending-capture check: the AAD
+    /// binds the header `share_id`, not the filename, so a sealed entry copied
+    /// to a second filename opens correctly and would drain twice. Skip the
+    /// copy; leave it on disk.
+    #[test]
+    fn a_copy_under_a_second_filename_is_skipped_not_drained() {
+        let root = tmp();
+        let sealed = root.join("sealed");
+        seal_share_in_dir(&sealed, &KEY, "note.pdf", "application/pdf", b"%PDF-1.4").unwrap();
+
+        let original = queue::list_files(&sealed).into_iter().next().unwrap();
+        let forged = sealed.join("ffffffffffffffffffffffffffffffff");
+        std::fs::copy(&original, &forged).unwrap();
+
+        let staged = drain_in_dir(&sealed, &KEY).unwrap();
+        assert_eq!(staged.len(), 1, "the copy must not drain a second time");
+        assert_eq!(staged[0].filename, "note.pdf");
+        assert!(forged.exists(), "the mismatched copy must be left in place");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `queue::is_share_id` accepts `A-F`, so the comparison is case-insensitive.
+    #[test]
+    fn an_uppercase_hex_filename_still_matches_its_header() {
+        let root = tmp();
+        let sealed = root.join("sealed");
+        seal_share_in_dir(&sealed, &KEY, "s.txt", "text/plain", b"hello").unwrap();
+
+        let original = queue::list_files(&sealed).into_iter().next().unwrap();
+        let lower = original.file_name().unwrap().to_str().unwrap().to_string();
+        let upper = sealed.join(lower.to_ascii_uppercase());
+        std::fs::rename(&original, &upper).unwrap();
+
+        let staged = drain_in_dir(&sealed, &KEY).unwrap();
+        assert_eq!(staged.len(), 1, "uppercase filename must still drain");
+        assert_eq!(staged[0].filename, "s.txt");
         let _ = std::fs::remove_dir_all(&root);
     }
 
