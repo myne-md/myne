@@ -7,6 +7,7 @@ import { invoke } from "../platform/core";
 import { resetGraphLayoutOnLock } from "../notes/graphLayoutPersist";
 import { resetVimStateOnLock } from "../editor/vim";
 import { releaseAttachmentUrls } from "../platform/attachments";
+import { resetTaskIndexCache } from "../notes/taskIndex";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -30,6 +31,15 @@ export async function lockVault(): Promise<void> {
   // after a re-unlock cannot paint a revoked URL. Same category as the two calls
   // above: platform state that outlives the slot.
   releaseAttachmentUrls();
+  // The task list is the one nonce consumer that answers from MODULE state
+  // rather than refetching in its own mount effect, so unlike every other
+  // reader surface it does not self-heal on remount (myne#277). The backend
+  // wipes `VaultIndicesState` on lock; a cache keyed on a monotonic counter has
+  // to be dropped alongside the data it describes, or the next session reads a
+  // pre-lock snapshot. Same category as the three calls above: plaintext-derived
+  // state that outlives the slot. (The idle auto-lock path reloads the WebView,
+  // which clears this for free — the manual Lock button does not.)
+  resetTaskIndexCache();
   await invoke<void>("plugin:vault-unlock|lock");
 }
 
