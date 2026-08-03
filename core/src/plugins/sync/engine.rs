@@ -647,11 +647,28 @@ pub fn probe_attachment(
             Ok(Some(AttachmentProbe { uploaded, complete }))
         }
         404 => Ok(None),
-        401 => Err(if is_device_revoked(&resp.body) {
-            PushError::DeviceRevoked
-        } else {
-            PushError::Unauthenticated
-        }),
+        // #7: read the code from the HEADER on this route.
+        //
+        // This is a HEAD request. A HEAD response carries no body — Go's
+        // net/http discards what the handler writes, and this codec does not
+        // read one either — so `is_device_revoked(&resp.body)` was fed an
+        // always-empty slice and always answered `false`. The one route where
+        // the distinction decides whether a client erases its local copy was
+        // therefore the one route that could never make it.
+        //
+        // The body check stays as the fallback for a server that has not
+        // shipped the header yet: an absent code still means plain
+        // `Unauthenticated`, which is the safe direction — guessing "revoked"
+        // from silence is the outcome that cannot be undone by retrying.
+        401 => Err(
+            if resp.header("x-error-code").as_deref() == Some("device_revoked")
+                || is_device_revoked(&resp.body)
+            {
+                PushError::DeviceRevoked
+            } else {
+                PushError::Unauthenticated
+            },
+        ),
         429 => Err(PushError::RateLimited),
         _ => Err(PushError::BadResponse),
     }
