@@ -151,12 +151,15 @@ Active Phase 1 work is tracked in Plane: **plane.myne.md** (self-hosted). Lane I
 
 **The Phase 3 web client adds nothing to this table and removes nothing from it** — it runs the same `protocol/` crate compiled to wasm, reads and writes byte-identical blobs, and introduces no magic, AAD prefix, HKDF context or subkey role of its own. Its only on-disk divergence is the *container layout* around those blobs in OPFS (`decisions.md` 2026-07-26), which is not an identifier.
 
-Identifiers and constants whose change is a major-version event. Most are bound into AEAD tags or magic-byte checks; some (e.g. the account-number display prefix, the Damm-32 table) are load-bearing through account identity or presentation rather than an AEAD/magic boundary — the mechanism is noted per row:
+Identifiers and constants whose change is a major-version event. Most are bound into AEAD tags or magic-byte checks; some (e.g. the account-number display prefix, the Damm-32 table) are load-bearing through account identity or presentation rather than an AEAD/magic boundary — the mechanism is noted per row.
+
+**Read the table as a pointer, not as a registry.** The two per-role registries — subkey context strings (`protocol.md` §3.4, mirrored in code by `SubkeyRole::ALL`) and AAD role strings (§5.2) — are complete and normative *there*, and every registered role in them is a major-version-event constant. They get **one** row below instead of one row per role, so shipping a new role never owes this table an edit. That is deliberate: the per-role rows this table used to carry had fallen behind the registries while still reading as exhaustive — `itemsKey-wrap`, the KEK at the root of every note's key lineage, had no row at all — which is the failure mode a partial copy always has. Every other row below is an identifier that belongs to no registry and so has nowhere else to live:
 
 | Use site | Value |
 |---|---|
 | AAD prefix (every AEAD tag) | `"myne.v0.1\|"` (10 ASCII bytes; `protocol.md` §5.2) |
 | HKDF context-string prefix | `"myne.v0.1 "` (note trailing space; §3.2) |
+| Subkey context strings + AAD role strings (**all of them**) | Frozen registries, complete and normative in `protocol.md` §3.4 (subkey roles — `SubkeyRole::ALL` is the machine-readable mirror, and the companion vectors iterate it) and §5.2 (AAD role strings). Changing a registered role silently derives a different key or computes a different tag on every existing vault. Do not restate individual roles here. |
 | Salt domain prefix (password) | `"myne.v0.1 argon2id-password\|"` |
 | Salt domain prefix (recovery) | `"myne.v0.1 argon2id-recovery\|"` |
 | Salt domain prefix (quick-unlock PIN) | `"myne.v0.1 argon2id-quickunlock-pin\|"` (§9.14.2; PIN-derived quick-unlock wrap key) |
@@ -165,10 +168,7 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Vault prefs blob magic | `MYP1` (file `vault.prefs`; §9.5) |
 | Search-index blob magic | `MYS1` (file `vault.search`; §9.6) |
 | Workspace-state blob magic | `MYW1` (file `vault.workspace`; §9.7) |
-| Subkey role string (workspace KEK) | `"session-state-key"` (HKDF context `"myne.v0.1 session-state-key"`; §9.7.3) |
 | Vault-indices blob magic | `MYI1` (file `vault.indices`; §9.8) |
-| Subkey role string (vault-indices KEK) | `"vault-indices-key"` (HKDF context `"myne.v0.1 vault-indices-key"`; §9.8) |
-| AAD role string (vault-indices blob) | `"vault-indices-blob"` (length-prefixed; §9.8.3) |
 | Attachment blob magic | `MYA1` (files `attachments/<attachment-id-hex>`; §9.9) |
 | Attachments catalog magic | `MYC1` (file `vault.attachments`; §9.10) |
 | Vault backup container magic | `MYB1` (files `*.myne-backup`; §9.11) |
@@ -178,23 +178,9 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Device-local sync-baseline magic | `MYH1` (file `vault.head-state`; §9.16; MYND-416 — the last vault head this device accepted. **The one §10.3 family that is not AEAD-encrypted**: it wraps the sync-wire head record verbatim behind a 6-byte header, and integrity is that head's own HMAC-SHA-256 under `vault-head-mac`, re-verified on load. The wire head itself has **no magic** — it is sync-wire-only, versioned by its `head_format_version` byte, not a §10.3 family.) |
 | AI-embeddings blob magic | `MYR1` (file `vault.embeddings`; §9.17; on-device AI embedding index, written only when the runtime beta opt-in `ai_enabled` is on — AI ships in the default build, `decisions.md` 2026-07-02; a `--no-default-features` build never writes it; rebuildable cache, never synced/backed up) |
 | Custom-themes blob magic | `MYT1` (file `vault.themes`; §9.21; the singleton `{theme_name → palette}` map promoted from device-local plaintext to vault content — encrypted, synced, backed up; `decisions.md` 2026-07-16 supersedes the 2026-06-16 storage-split clause) |
-| Subkey role string (custom-themes KEK) | `"custom-themes-key"` (HKDF context `"myne.v0.1 custom-themes-key"`; §9.21.3; `root_key`-derived, itemsKey-independent) |
-| AAD role string (custom-themes blob) | `"custom-themes-blob"` (length-prefixed; §9.21.3; binds `account_number_hash`, not `items_key_id`) |
-| Subkey role string (themes sync-id) | `"themes-sync-id"` (HKDF context `"myne.v0.1 themes-sync-id"`; §3.4; Phase 2 sync — derives the reserved 16-byte sync blob-id of `vault.themes` as `DeriveSubkey(root_key, "themes-sync-id")[0..16]` (`sync-protocol.md` §10.2.2). An **identifier** derivation like `catalog-sync-id`/`prefs-sync-id`, NOT a KEK (the themes KEK stays `custom-themes-key`); changing it silently splits `vault.themes` into a second sync record on every existing account.) |
 | Pending-capture blob magic | `MYK1` (files `captures/<capture-id-hex>`; §9.18; device-local encrypted queue holding a watch-dictated note until the phone unlocks and drains it into the vault; sealed under a device-local keychain `wrap_key`, NOT `root_key`-derived; vault-agnostic — binds the per-entry `capture_id`, not `account_number_hash`; never synced/backed up) |
 | Graph-layout cache magic | `MYG1` (file `vault.graph`; §9.19; knowledge-graph layout cache — node positions + a schema-version marker; `root_key`-derived KEK, frontend-driven opaque payload like `vault.workspace`; rebuildable cache, never synced/backed up) |
 | Share-import staging queue magic | `MYF1` (MYND-507; `F` = file, a free §10.3 letter — implementer-allocated like every family magic; files `pending-shares/sealed/<share-id-hex>`; §9.20; device-local encrypted queue holding a file shared via the OS share sheet until the vault unlocks and drains it into the attachment library; sealed under a device-local keychain/Keystore `wrap_key` (service `md.myne.shareimport`), NOT `root_key`-derived; vault-agnostic — binds the per-entry `share_id`; 64 MiB cap; never synced/backed up) |
-| AAD role string (share-import blob) | `"share-import-blob"` (length-prefixed; §9.20.3; binds `share_id`; device-local, no `SubkeyRole`) |
-| Subkey role string (personal-dictionary KEK) | `"personal-dictionary-key"` (HKDF context `"myne.v0.1 personal-dictionary-key"`; §9.13.3) |
-| AAD role string (personal-dictionary blob) | `"personal-dictionary-blob"` (length-prefixed; §9.13.3) |
-| Subkey role string (attachment-text KEK) | `"attachment-text-key"` (HKDF context `"myne.v0.1 attachment-text-key"`; §9.15.3) |
-| AAD role string (attachment-text blob) | `"attachment-text-blob"` (length-prefixed; §9.15.3; AAD also binds `attachment_id` + `extractor_version`) |
-| Subkey role string (AI-embeddings KEK) | `"ai-embeddings-key"` (HKDF context `"myne.v0.1 ai-embeddings-key"`; §9.17; `root_key`-derived, itemsKey-independent) |
-| Subkey role string (graph-layout KEK) | `"graph-layout-key"` (HKDF context `"myne.v0.1 graph-layout-key"`; §9.19; `root_key`-derived, itemsKey-independent; KEK for the `vault.graph` layout cache) |
-| AAD role string (graph-layout blob) | `"graph-layout-blob"` (length-prefixed; §9.19.3; binds `account_number_hash`, like `vault.workspace`/`vault.prefs`) |
-| Subkey role string (catalog sync-id) | `"catalog-sync-id"` (HKDF context `"myne.v0.1 catalog-sync-id"`; §3.4; Phase 2 sync — derives the reserved 16-byte sync blob-id of `vault.attachments` as `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`sync-protocol.md` §8.1). An **identifier** derivation like `attachments-id-hmac`, not a KEK; changing it silently splits the catalog into a second sync record on every existing account.) |
-| Subkey role string (prefs sync-id) | `"prefs-sync-id"` (HKDF context `"myne.v0.1 prefs-sync-id"`; §3.4; Phase 2 sync — derives the reserved 16-byte sync blob-id of `vault.prefs` as `DeriveSubkey(root_key, "prefs-sync-id")[0..16]` (`sync-protocol.md` §10.2.1). An **identifier** derivation like `catalog-sync-id`, not a KEK (the prefs KEK stays `prefs-key`); changing it silently splits `vault.prefs` into a second sync record on every existing account.) |
-| AAD role string (AI-embeddings blob) | `"ai-embeddings-blob"` (length-prefixed; §9.17.3; vault-scoped like search/indices — the `{model_hash ∥ embedding_dim ∥ chunker_version}` model-identity tuple invalidates via the inner payload, NOT the AAD) |
 | Protocol identifier string | `myne-protocol-v0.1` |
 | Account-number display prefix | `MY-` + five dash-separated 4-char Crockford groups (27-char display form, `account-number.md` §2; the old `MY-XXXX-XXXX-XXXX-XXXX-X` sketch was illustrative shorthand — the last group is 4 chars, ending in the Damm-32 check char) |
 | Damm-32 quasigroup table | frozen literal, `account-number.md` §4.2 — determines which 20-char strings are valid and which check char generation emits; changing it rejects already-distributed account numbers and breaks cross-impl validity agreement |

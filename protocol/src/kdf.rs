@@ -29,9 +29,12 @@
 //! ## Argon2id parameters
 //!
 //! Parameters come from a [`KdfParams`] supplied by the caller. v0.1
-//! mandates `argon2_version = 0x13`; values other than `0x13` (or the
-//! also-published `0x10` retained as a defensive case) return
-//! [`ProtocolError::KdfFailure`]. Range checks on `m`, `t`, `p` are
+//! mandates `argon2_version = 0x13`, and `0x13` is the **only** accepted
+//! value: every other version byte — including the also-published
+//! Argon2 v1.0 `0x10` — returns [`ProtocolError::KdfFailure`]. On the
+//! read path it never reaches this check, because `parse_kdf_params`
+//! (`types.rs`) already rejects anything but `0x13` (spec §9.3).
+//! Range checks on `m`, `t`, `p` are
 //! deferred to the `argon2` crate's `Params::new` constructor — Argon2
 //! RFC 9106 minima (`m >= 8*p`, `t >= 1`, `p >= 1`) surface there.
 //!

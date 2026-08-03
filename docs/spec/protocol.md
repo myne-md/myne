@@ -647,7 +647,7 @@ This section summarizes the account-number format used by the protocol. Full gen
 
 - Alphabet: **Crockford base32** (`0123456789ABCDEFGHJKMNPQRSTVWXYZ`, excludes `I L O U`).
 - Payload: **19 random characters** (95 bits of entropy) + **1 Damm-32 check character**.
-- Display: `MY-XXXX-XXXX-XXXX-XXXX-X` — human-readable prefix `MY-` plus 4-4-4-4-1 group separators. The prefix and separators are presentation-only.
+- Display: `MY-XXXX-XXXX-XXXX-XXXX-XXXX` — human-readable prefix `MY-` plus 4-4-4-4-4 group separators, covering all 20 canonical characters (27-character display form; the final group's last character is the Damm-32 check character). The prefix and separators are presentation-only. `account-number.md` §2/§3 is normative for the display form.
 
 ### 8.2 Generation
 
@@ -714,6 +714,7 @@ A Myne vault is a directory on the user's filesystem containing:
 
 - **Only `vault.meta` and `notes/` are required.** Every other entry is created lazily, the first time the feature that owns it writes; the tree above is an index, and each `vault.*` singleton's own §9.x section is normative for its envelope, KEK, AAD, size cap, and backup/sync class. A vault missing any of them is well-formed — the reader falls back per §9.x (rebuild for a cache, empty/default for a preference blob), never a parse failure.
 - **Device-local sync bookkeeping also sits at the vault root, and is deliberately NOT a §9 blob family** (Phase 2): `sync-state.json` (this device's pull cursor + version-vector observation log, carrying the plaintext `device_id`), `pending-tombstones` and `pending-attachment-tombstones` (delete intents the server has not acknowledged yet), and `vault.meta-dirty` (an empty marker — this device changed a credential and has not pushed it). They hold no note plaintext and no key material, they are never synced and never backed up, and they carry no magic, no version byte, and no §10.3 row. The one at-rest leak recorded as an accepted residual is `sync-state.json`'s plaintext `device_id`, and [`../threat-model.md`](../threat-model.md) §7 records it **only for the web client's OPFS copy** — that bullet states native clients are unaffected. Their sync semantics are in [`sync-protocol.md`](sync-protocol.md). The endpoint configuration (`sync-config.json`) is **not** here — it is device-scoped and vault-independent, so it lives in the app config directory.
+- **`vault.quickunlock.attempts` is device-local bookkeeping too, and is the one such file that carries a leading sentinel byte.** It sits at the vault root beside `vault.quickunlock` and holds the consecutive-failed-attempt count of §9.14.4 in a 2-byte body (`sentinel (0xA7) || count_u8`). That leading byte is a **corruption sentinel, not a §10.3 blob-family magic**: the file is unencrypted, holds no key material and no user content, is never synced and never backed up, and has an explicit OUT row in the §9.11.3 allowlist. §10.3 allocates 4-byte magics to AEAD blob families; a 1-byte device-local counter is not one and MUST NOT be registered there.
 - **The two device-local staging queues are not under the vault root either.** `captures/<capture-id-hex>` (§9.18) and `pending-shares/sealed/<share-id-hex>` (§9.20) live under the app data container, because both must be writable while no vault is unlocked — and, for the capture queue, before the target vault is even known.
 - File extension `.myn` (Myne Note) for per-note ciphertext blobs.
 - File extension `.meta` for vault-level metadata (the wrapped `itemsKey`, the random Argon2id salt, the protocol version, and the account number).
@@ -1400,6 +1401,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.embeddings` | OUT | Pure rebuildable **and** model-specific cache (§9.17); re-embedded locally on the first unlock after restore (§9.17.4) — a backed-up index could be wrong on a device holding a different embedding model. Class 3 (`sync-protocol.md` §319) |
 | `vault.graph` | OUT | Pure rebuildable knowledge-graph layout cache (`MYG1`, §9.19); re-laid-out locally on the next graph open. Class 3 (`sync-protocol.md` §326) |
 | `vault.quickunlock` | OUT | Device-local credential (§9.14); wrap key is bound to *this* device's hardware (`thisDeviceOnly`), so a copy is inert elsewhere — re-set per device after restore |
+| `vault.quickunlock.attempts` | OUT | Device-local failed-attempt counter for that credential (§9.14.4); a 2-byte unencrypted `sentinel \|\| count`, meaningless on another device and re-created on demand — carrying it would only restore a stale lockout |
 | `vault.head-state` | OUT | Device-local sync baseline (`MYH1`, §9.16); a backed-up baseline would be stale on restore — the restored vault TOFU-re-bootstraps (`sync-protocol.md` §6) |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
 | `.rename-journal` (notes dir) | OUT | Empty roll-forward marker for the transactional multi-note rename (§9.12); transient WAL sentinel, never user data |
@@ -1759,6 +1761,17 @@ disabling the feature; (4) vault deletion (the blob lives in the vault directory
 **code-enforced** failed-attempt counter (the `auto_lock.rs` two-class discipline,
 `threat-model.md` §7) wipes the blob after a bounded number of consecutive failures —
 this bounds *online* guessing; it does not bound offline brute-force.
+
+The counter is **persisted**, because a per-session counter would reset on relaunch and
+bound nothing: it lives at `<vault-root>/vault.quickunlock.attempts` as a 2-byte body
+`sentinel (0xA7) || count_u8` — unencrypted, device-local, never synced and never backed
+up (§9.1; an explicit OUT row in §9.11.3). The **cap is a code constant, not a stored
+field**, and the count is clamped to it on write, so a tampered or replayed file can only
+make quick-unlock *stricter*: a wrong-length or wrong-sentinel file is read as *threshold
+reached*, and an absent file as a fresh start (correct — the blob and its counter are
+deleted together). The leading byte is a corruption sentinel and is deliberately **not** a
+§10.3 registration: §10.3 allocates 4-byte magics to AEAD blob families, and a 1-byte
+device-local counter is neither.
 
 **Threat class (distinct from the non-load-bearing prefs blobs).** `vault.quickunlock`
 is a **credential**, not a cosmetic preference: it holds a wrapped `root_key`. Its
@@ -2275,7 +2288,7 @@ it is the app rendering in the default theme. This is the same class as `vault.d
 
 ### 10.1 Design principle: forward-incompatible by design
 
-> Myne protocol versions are **forward-incompatible by design**. Each major version (v0.1, v006, …) is a complete, self-contained specification with distinct magic bytes, AAD domain prefix, and key-derivation contexts. Forward compatibility *within* a major version is permitted (v0.1.1 reads v0.1.0 blobs); cross-major compatibility is exclusively achieved through explicit migration. A vault encrypted under one major version cannot be opened by a client of another major version without invoking the migration procedure (§10.4). This design choice eliminates downgrade attacks by construction and permits each major version to be audited as a closed system.
+> Myne protocol versions are **forward-incompatible by design**. Each major version (v0.1, the next major version, …) is a complete, self-contained specification with distinct magic bytes, AAD domain prefix, and key-derivation contexts. Forward compatibility *within* a major version is permitted (v0.1.1 reads v0.1.0 blobs); cross-major compatibility is exclusively achieved through explicit migration. A vault encrypted under one major version cannot be opened by a client of another major version without invoking the migration procedure (§10.4). This design choice eliminates downgrade attacks by construction and permits each major version to be audited as a closed system.
 
 This commitment is normative. Implementations MUST refuse to parse blobs that do not match their declared major version, and MUST present a migration prompt rather than attempt automatic cross-version reads.
 
@@ -2459,7 +2472,7 @@ A snapshot of choices made during the v0.1 draft. Mirrored to `../decisions.md`.
 - **AAD construction with explicit version prefix `"myne.v0.1|"`** (TLS 1.3 §4.1.3 model). AAD includes `protocol_version`, `items_key_id`, `note_uuid`, and (for content) `content_type`. Cross-version substitution and downgrade attempts fail AEAD verification.
 - **Architectural shift: `root_key` is a 32-byte random persistent value**, not derived from the password. Password derives `password_wrap_key` via Argon2id; that wraps a copy of `root_key`. Recovery phrase derives `recovery_wrap_key` via Argon2id; that wraps a second copy of `root_key`. Either credential is sufficient to unlock; both can be rotated independently.
 - **BIP-39 phrase strengthens to `recovery_wrap_key` via Argon2id directly**, not via the BIP-39 standard PBKDF2-2048. Phrase is treated as a 256-bit-entropy encoding, not as wallet-ecosystem-compatible mnemonic.
-- **Account number format**: 20-character Crockford base32 with a Damm-32 check digit, displayed as `MY-XXXX-XXXX-XXXX-XXXX-X`. Liberal parsing: prefix optional, separators stripped, case insensitive. Canonical form is uppercase 20 chars.
+- **Account number format**: 20-character Crockford base32 with a Damm-32 check digit, displayed as `MY-XXXX-XXXX-XXXX-XXXX-XXXX` (4-4-4-4-4). Liberal parsing: prefix optional, separators stripped, case insensitive. Canonical form is uppercase 20 chars.
 - **Account-number normalization for hashing**: NFKD + trim + strip prefix/separators + uppercase + length and Damm validation. Hash is `SHA-256(canonical)[:16]`.
 - **Forward-incompatible major-version model**: each major version is a closed, complete spec with distinct magic bytes, AAD prefix, and context prefixes. Cross-major reads happen only via explicit migration. This eliminates downgrade attacks structurally and lets each version be audited independently.
 
