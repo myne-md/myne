@@ -90,21 +90,40 @@ describe("today means today", () => {
   });
 });
 
-describe("upcoming is a rolling seven days", () => {
-  it("includes today", () => {
-    expect(matchesFilter(task({ due: TODAY }), "upcoming", TODAY)).toBe(true);
+describe("upcoming is a rolling seven days starting tomorrow", () => {
+  it("EXCLUDES today — otherwise every Today item is counted twice (myne#278)", () => {
+    expect(matchesFilter(task({ due: TODAY }), "upcoming", TODAY)).toBe(false);
+  });
+
+  it("includes tomorrow, the first day of the window", () => {
+    const first = shiftDay(TODAY, 1);
+    expect(first).toBe("2026-07-29");
+    expect(matchesFilter(task({ due: first }), "upcoming", TODAY)).toBe(true);
   });
 
   it("includes the last day of the window", () => {
-    const last = shiftDay(TODAY, UPCOMING_WINDOW_DAYS - 1);
-    expect(last).toBe("2026-08-03");
+    const last = shiftDay(TODAY, UPCOMING_WINDOW_DAYS);
+    expect(last).toBe("2026-08-04");
     expect(matchesFilter(task({ due: last }), "upcoming", TODAY)).toBe(true);
   });
 
   it("excludes the day after the window — the boundary most easily got wrong", () => {
-    const past = shiftDay(TODAY, UPCOMING_WINDOW_DAYS);
-    expect(past).toBe("2026-08-04");
+    const past = shiftDay(TODAY, UPCOMING_WINDOW_DAYS + 1);
+    expect(past).toBe("2026-08-05");
     expect(matchesFilter(task({ due: past }), "upcoming", TODAY)).toBe(false);
+  });
+
+  it("partitions the dated set with its three siblings — no task on two lists", () => {
+    // The whole point of the exclusive start: today, overdue and upcoming are
+    // now mutually exclusive, so a dated task appears on exactly one of them.
+    const dates = ["2026-07-20", "2026-07-27", TODAY, "2026-07-29", "2026-08-04", "2026-08-05"];
+    for (const due of dates) {
+      const t = task({ due });
+      const hits = (["today", "upcoming", "overdue"] as const).filter((f) =>
+        matchesFilter(t, f, TODAY),
+      );
+      expect(hits.length).toBeLessThanOrEqual(1);
+    }
   });
 
   it("excludes yesterday", () => {

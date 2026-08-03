@@ -30,7 +30,7 @@ export type { VaultTask };
 export const TASK_FILTERS = ["today", "upcoming", "overdue", "all"] as const;
 export type TaskFilter = (typeof TASK_FILTERS)[number];
 
-/** How many days forward `upcoming` reaches, inclusive of today. */
+/** How many days `upcoming` spans, starting the day AFTER today (myne#278). */
 export const UPCOMING_WINDOW_DAYS = 7;
 
 /**
@@ -84,11 +84,23 @@ export function matchesFilter(task: VaultTask, filter: TaskFilter, today: string
     case "today":
       return date === today;
     case "upcoming": {
-      // A rolling window: today through today + 6, so "upcoming" is seven days
-      // INCLUDING today rather than seven days after it. The inclusive end is
-      // the boundary most likely to be got wrong, so it is pinned by test.
-      const end = shiftDay(today, UPCOMING_WINDOW_DAYS - 1);
-      return date >= today && date <= end;
+      // A rolling window starting TOMORROW: today + 1 through today + 7
+      // (myne#278). It used to include today, which put every item on the Today
+      // list a second time on the next list over — "what's coming" could not be
+      // read without mentally subtracting today, and the tab label is what
+      // creates the expectation that it does not need to be.
+      //
+      // With the exclusive start the four filters partition the dated task set
+      // cleanly: `overdue` (< today), `today` (=== today), `upcoming`
+      // (today+1 … today+7), `all` (everything, including undated). It is the
+      // same reasoning the `today` case states — TODAY MEANS TODAY, overdue
+      // items are deliberately not folded in — applied in the other direction.
+      //
+      // BOTH boundaries are the kind most easily got wrong, so both are pinned
+      // by test.
+      const start = shiftDay(today, 1);
+      const end = shiftDay(today, UPCOMING_WINDOW_DAYS);
+      return date >= start && date <= end;
     }
     case "overdue":
       // Strictly before today. A completed task is not overdue however old it
