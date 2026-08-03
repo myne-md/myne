@@ -2274,7 +2274,7 @@ This commitment is normative. Implementations MUST refuse to parse blobs that do
 ### 10.2 Versioning conventions
 
 - **Major versions** are identified by distinct magic bytes (`MY01`, `MYV1` for v0.1; `NT05`, `NTV5` reserved for the next major version; etc.). They have distinct AAD prefixes and distinct subkey context-string prefixes — v0.1 uses `"myne.v0.1|"` and `"myne.v0.1 …"`; the next major version defines its own, which are not pre-allocated in v0.1.
-- **Minor versions** within a major version (v0.1.0, v0.1.1, …) share magic bytes and prefixes. They MAY add fields by appending after the last reserved offset, MUST NOT change existing fields, and MUST NOT reduce any existing security guarantee. The `protocol_version` byte (currently `0x01` for v0.1) is the single integer governing minor-version compatibility within v0.1; minor revisions encode minor-version information in the reserved byte at offset 5 of the per-note and `vault.meta` headers.
+- **Minor versions** within a major version (v0.1.0, v0.1.1, …) share magic bytes and prefixes. They MAY add fields by appending after the last reserved offset, MUST NOT change existing fields, and MUST NOT reduce any existing security guarantee. The `protocol_version` byte (`0x01` for v0.1) identifies the **major** version and is invariant across the v0.1 family; minor revisions encode minor-version information in the reserved byte at offset 5 of the per-note and `vault.meta` headers.
 - **Patch revisions** (v0.1.1.1, …) are reserved for editorial fixes that do not change byte layout or semantics; they do not bump any byte in the file.
 
 ### 10.3 Major-version registry
@@ -2370,7 +2370,7 @@ Forward-incompatibility produces three structural anti-downgrade properties:
 2. **AAD domain separation**: the AAD prefix `"myne.v0.1|"` is bound into every AEAD tag in v0.1. A next-major-version attacker who tries to forge a `NT05` blob with a `myne.v0.1` AAD fails AEAD verification; a v0.1 vault opened in a next-major-version client (during migration) carries its `myne.v0.1` AAD through to verification — the next-major-version client must use the v0.1 AAD format to succeed.
 3. **Context-string separation**: subkey derivations under `"myne.v0.1 …"` produce different bytes than derivations under the next major version's context prefix even when the same root key, primitive, and parameters are used. Cross-version key substitution is computationally infeasible.
 
-The `protocol_version` byte is included in the AAD (§5.2) for additional defense-in-depth: even within the v0.1 family, downgrade from a future minor version (v0.1.1) to v0.1.0 by stripping a feature flag would fail AEAD verification.
+The `protocol_version` byte is included in the AAD (§5.2) for additional defense-in-depth: a blob whose version byte is altered fails AEAD verification rather than merely failing the §6.4 header check. Within the v0.1 family, the anti-downgrade property that matters is carried by `kdf_params_canonical` (§4.3), which is appended to both `AAD_password_wrap` and `AAD_recovery_wrap` (§3.1) — this is what structurally blocks a KDF-parameter downgrade, the one intra-major change §4.2 contemplates. The reserved byte at offset 5 is **not** AAD-bound in v0.1. A future minor revision that allocates it MUST NOT place a security-load-bearing flag there without binding that byte into the AADs of §3.1 and §5.2 as part of the same revision.
 
 ### 10.6 What v0.1 deliberately does NOT prepare for
 
