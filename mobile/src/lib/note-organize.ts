@@ -103,13 +103,24 @@ export interface NoteFlags {
   conflict: boolean;
 }
 
-/** A note is "live" (in the main list / resolvable) only when none of these
- *  managed flags are set — mirrors the desktop `liveCache` gate. */
-export function isLiveNote(f: NoteFlags): boolean {
-  return (
-    f.trashed === null && f.archived === null && f.deleted === null && !f.template && !f.conflict
-  );
-}
+// #260/#46: the selection predicates are SHARED now. They used to be
+// re-implemented here and as `useMemo`s in `EditorFlow`, and the two clients'
+// answers to "is this note part of the working set" drifted independently —
+// which is how `98acbcc9`'s tombstone filter reached desktop's Trash list and
+// never reached mobile's, leaving "Delete permanently" a visible no-op.
+//
+// Re-exported rather than replaced at the call sites so this module's existing
+// consumers keep their import, and so there is exactly one definition.
+export {
+  isArchivedNote,
+  isConflictCopy,
+  isListedTemplate,
+  isLiveNote,
+  isResolverCandidate,
+  isTemplateNote,
+  isTombstoned,
+  isTrashedNote,
+} from "@myne/editor/host/notes/selectors";
 
 /** Read all managed flags from raw note text (pure — for list filtering).
  *  Defensive: an unparseable note is treated as a plain live note (all flags
