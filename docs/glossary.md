@@ -1919,6 +1919,12 @@ Used in: `threat-model.md` §1 (A10)
 
 An [`MYA1`](#mya1) blob present on disk at `attachments/<attachment-id-hex>` whose id is **absent from the [`vault.attachments`](#vaultattachments) catalog** — a crash remnant from a "clean unused attachments" sweep interrupted between its catalog rewrite and the blob unlinks (the catalog-first ordering deletes the entry first). The unlock-time reconcile unlinks stray files (canonical 64-char lowercase-hex names only), but **never** a cataloged id — including a zero-reference [unused attachment](#unused-attachment) awaiting the user's explicit sweep — and skips entirely if the catalog is present-but-undecodable (no mass-delete on corruption). Distinct from an *unused* attachment, which is cataloged and user-visible. (MYND-171; `decisions.md` 2026-06-13)
 
+### **strict-trailing** &nbsp; 📋 *Protocol*
+
+The rule that a blob's **total** byte length MUST equal the length its declared layout implies, given the length fields in that blob's own header — so a blob longer than its layout rejects the parse instead of having the excess ignored. It covers every [magic-byte](#magic-bytes) family: the envelope families are exactly `header_len + ciphertext_len`, [vault.meta](#vaultmeta) is its fixed length, the backup container states the same equality as its own `file_length` equation, and `vault.head-state` ends where its wire head record ends. A parsing-discipline and cross-implementation-agreement rule, not a confidentiality or integrity claim: the per-family size caps bound the declared `ciphertext_len` rather than the total length, so without it nothing bounds a blob's length from above and two independent ports can disagree on which byte strings are valid blobs.
+
+Used in: `spec/protocol.md` §10.3.1
+
 ### **supply-chain compromise** &nbsp; ⚠️ *Threat*
 
 Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships malicious code. Myne's mitigations are hash-pinned lockfiles, minimal direct-dependency surface, dependency-review at update time, and `cargo-vet`/`cargo-audit` in CI. Status: Best-effort — cannot fully defend against a determined attacker in the dependency graph, but the Tauri/Cargo dependency tree is materially smaller than Electron/npm would be.
