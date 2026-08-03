@@ -39,7 +39,6 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { appDataDir, join } from "../../platform/path";
 import { Button } from "../primitives/Button";
 import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
@@ -52,6 +51,7 @@ import { ConnectedExtensions } from "./ConnectedExtensions";
 import {
   deleteVault,
   mapDeleteVaultError,
+  vaultDirDisplayPath,
   type DeleteVaultPartialFailContext,
   type VaultDeleteError,
 } from "../../lib/vault-delete";
@@ -536,9 +536,7 @@ export function AccountPanel({
           // no banner at all. The capability is the same one that selects the
           // copy: a client whose vault is not the only copy has no directory to
           // send anyone to either.
-          const vaultDirPath = capabilities.has("localOnlyVault")
-            ? await join(await appDataDir(), "vault")
-            : null;
+          const vaultDirPath = await vaultDirDisplayPath(vaultId);
           if (!mountedRef.current) return;
           const mapping = mapDeleteVaultError(e, vaultDirPath);
           if (mapping.kind === "partial-fail") {
