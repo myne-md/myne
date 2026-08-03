@@ -364,8 +364,19 @@ pub fn enroll(
     let server_sig = B64
         .decode(fr.server_signature_b64.as_bytes())
         .map_err(|_| EnrollError::BadResponse)?;
-    if server_sig != *expected_server_sig.borrow() {
-        return Err(EnrollError::ServerSignatureMismatch);
+    // Constant-time (`protocol.md` §5.4): this is a MAC compare and it is the
+    // client's ONLY proof that the peer holds the account's `server-auth`-
+    // derived `ServerKey` — unlike the AEAD-tag case in `change_password`,
+    // nothing else re-checks it, so a short-circuiting `!=` would be the sole
+    // gate against a rogue sync server. `ConstantTimeEq for [u8]` already
+    // yields `Choice(0)` on a length mismatch, so no separate length guard is
+    // needed; a non-decodable signature stays `BadResponse` above so the error
+    // taxonomy keeps "malformed" and "wrong" apart.
+    {
+        use subtle::ConstantTimeEq as _;
+        if !bool::from(server_sig.ct_eq(expected_server_sig.borrow().as_slice())) {
+            return Err(EnrollError::ServerSignatureMismatch);
+        }
     }
 
     let token = if fr.token_hex.is_empty() {
