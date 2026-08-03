@@ -32,7 +32,7 @@ Out of scope (see §11):
 - The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are interpreted per RFC 2119.
 - `||` denotes byte-string concatenation.
 - `[:N]` denotes truncation to the first N bytes.
-- `derive_key(root, ctx)` denotes a context-bound subkey derivation; the concrete primitive (HKDF-SHA-256 or BLAKE3 derive_key) is a deferred decision (see §2.4) but the **calling pattern is fixed in this specification**.
+- `derive_key(root, ctx)` denotes a context-bound subkey derivation; the concrete primitive is **HKDF-SHA-256**, fixed in §3.2 (resolved 2026-04-26 — see §12), and the **calling pattern is fixed in this specification**.
 - Context strings used in this specification all begin with the prefix `"myne.v0.1 "` (note: trailing space). This prefix domain-separates v0.1 from any future protocol version.
 
 ### 1.3 Protocol identifier
@@ -43,15 +43,15 @@ This specification is identified as **`myne-protocol-v0.1`**. The protocol versi
 
 ## 2. Cryptographic Primitives
 
-> **Conflict-points marked.** Five primitive choices below are flagged as `[DEFERRED]`: the v0.1 baseline is the prior decision in `../decisions.md`, but the user has marked these as subject to revision before v1.0 ship, with the next major version's research as the alternative under consideration.
+> **Conflict-points resolved.** The primitive choices below were flagged `[DEFERRED]` in the v0.1 draft: the baseline was the prior decision in `../decisions.md`, with the next major version's research as the alternative under consideration. They were resolved on 2026-04-26 and 2026-04-28 and are recorded in §12 "Resolved (post-draft)". The **baseline column carries the shipped primitive**; the second column is retained as the record of what was under review and when it was settled.
 
-| Role | v0.1 baseline | `[DEFERRED]` alternative under review |
+| Role | v0.1 baseline | `[DEFERRED]` alternative, and its resolution |
 |---|---|---|
-| KDF (password → root key) | Argon2id `m=64 MiB, t=5, p=1` (Standard Notes 004 parameters) | Argon2id `m=1 GiB, t=2, p=4` (research §2.4) |
+| KDF (password → root key) | **Argon2id `m=256 MiB (262 144 KiB), t=3, p=2`, Argon2 1.3** (§4.1) | (resolved 2026-04-26 — see §12; `m=1 GiB, t=2, p=4` from the next major version's research roadmap was the alternative under review, against the `m=64 MiB, t=5, p=1` Standard Notes 004 baseline) |
 | Subkey derivation | **HKDF-SHA-256** with registered context strings via single canonical helper (§3.2) | (resolved 2026-04-26 — see §12) |
-| AEAD | XChaCha20-Poly1305 (RFC 8439 + extended-nonce variant), 256-bit key, 192-bit random nonce | XChaCha20-Poly1305 + CTX commitment outer hash (research §2.3) |
+| AEAD | **XChaCha20-Poly1305 (RFC 8439 + extended-nonce variant) + CTX commitment, SHA-256 outer hash** (§5.1), 256-bit key, 192-bit random nonce, 32-byte tag on disk | (resolved 2026-04-26 — see §12; plain XChaCha20-Poly1305 with a 16-byte Poly1305 tag was the prior baseline, and §5.1 records why it is not shippable) |
 | Recovery phrase | BIP-39 24 words (256-bit entropy), library `bip39` (rust-bitcoin, in the `protocol/` crate) | (no alternative under review) |
-| Hashing | SHA-256 (RustCrypto `sha2` on every Myne client; libsodium / WebCrypto are byte-equivalent for an independent implementation) | BLAKE3 (research §2.4) |
+| Hashing | SHA-256 (RustCrypto `sha2` on every Myne client; libsodium / WebCrypto are byte-equivalent for an independent implementation) | BLAKE3 (resolved 2026-04-26 — see §12; it was the alternative under review in the next major version's research roadmap, and the canonical-helper discipline of §3.2.1 collapsed its structural-context-binding advantage) |
 | RNG | OS CSPRNG (RustCrypto `getrandom` on every Myne client — via `crypto.getRandomValues` behind its `custom` backend in the browser; libsodium `randombytes_buf` for an independent implementation) | (no alternative under review) |
 
 **Library.** Every Myne client runs **this repository's `protocol/` crate** on the **RustCrypto stack** — `hkdf` (RFC 5869), `argon2` (RFC 9106), `chacha20` + `poly1305` composed to XChaCha20-Poly1305 (RFC 8439 + extended-nonce variant, cross-checked against `chacha20poly1305`), `sha2`, with `subtle` for constant-time comparison, `zeroize` for memory hygiene and `getrandom` for OS CSPRNG. The crate is `#![no_std]` + `extern crate alloc;`, which is what lets all three clients link the same code:
@@ -66,7 +66,7 @@ The Go sync server implements none of this: it stores ciphertext and never deriv
 
 The `chacha20poly1305` RustCrypto crate received an NCC Group audit (Feb 2020, no significant findings); `vodozemac` (Matrix Olm/Megolm in pure Rust on RustCrypto primitives) received a Least Authority audit (Mar 2022, no significant findings); `age`/`rage` ships exclusively on RustCrypto. These audit and prod-deployment evidences anchor the audit-substitute story (`../threat-model.md` §6) for the Rust side. See `../decisions.md` "2026-04-28 — Rust-side primitives: RustCrypto stack as primary".
 
-The five `[DEFERRED]` items above will be resolved in dedicated decision sessions and recorded in `../decisions.md`. This v0.1 specification will be revised in place if any deferred decision changes the baseline.
+The `[DEFERRED]` items above were resolved on 2026-04-26 and 2026-04-28, recorded in `../decisions.md` and summarized in §12 "Resolved (post-draft)". This v0.1 specification will be revised in place if a later decision changes the baseline.
 
 ---
 
@@ -579,7 +579,7 @@ Both `item_key_nonce` and `content_nonce` are 192-bit values from the OS CSPRNG 
 
 The recovery phrase is **24 BIP-39 English words** representing 256 bits of entropy plus an 8-bit checksum (BIP-39 §3 encoding). The wordlist is the canonical English BIP-39 list.
 
-Myne uses BIP-39 only as an **encoding** for high-entropy phrases. It does **not** use BIP-39's standard PBKDF2-HMAC-SHA512 seed derivation, which uses 2048 iterations and is too weak by 2026 standards (research §3.5). Instead, the phrase string is fed directly to Argon2id as defined in §3.1 (`recovery_wrap_key` derivation).
+Myne uses BIP-39 only as an **encoding** for high-entropy phrases. It does **not** use BIP-39's standard PBKDF2-HMAC-SHA512 seed derivation, which uses 2048 iterations and is too weak by 2026 standards (the next major version's research roadmap, `protocol-next-roadmap.md`, to be written). Instead, the phrase string is fed directly to Argon2id as defined in §3.1 (`recovery_wrap_key` derivation).
 
 ### 7.2 Generation at vault creation
 
