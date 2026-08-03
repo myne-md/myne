@@ -425,6 +425,20 @@ export async function hydrateVaultIndicesOnUnlock(
   for (const id of stale) {
     await reindexNote(id);
   }
+  // SYNC-5 chokepoint bump — this IS a bulk mutation of the index slice, and it
+  // was the one mutation path that never announced itself (myne#277).
+  //
+  // The per-note bumps above only fire for notes the blob reported STALE. After
+  // a graceful lock the blob was persisted moments earlier, so nothing is stale,
+  // so nothing bumped — and the nonce did not advance across the whole
+  // lock→unlock cycle even though the index had been wiped and refilled
+  // underneath it. Readers keyed on the nonce therefore answered from a cache
+  // describing the previous session.
+  //
+  // It also closes the race that made the pane render EMPTY: this function is
+  // fire-and-forget, so a reader that fetched before it finished cached `[]`
+  // from the cleared index. With a bump at the end, that reader re-queries.
+  bumpIndexNonce();
 }
 
 /**

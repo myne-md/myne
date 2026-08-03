@@ -98,7 +98,13 @@ async function ensureFetched(nonce: number): Promise<void> {
   await inflight;
 }
 
-/** Force the next read to re-fetch. Exposed for tests and for lock teardown. */
+/**
+ * Force the next read to re-fetch.
+ *
+ * Called from `lockVault()` — the frontend lock choke point — because the
+ * backend wipes `VaultIndicesState` on lock and `cachedNonce` is module state
+ * that survives the editor unmount. Also used by tests.
+ */
 export function resetTaskIndexCache(): void {
   cache = EMPTY;
   cachedNonce = -1;
