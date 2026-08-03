@@ -590,8 +590,9 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
             struct Args {
-                #[serde(default)]
-                vault_id: Option<String>,
+                // Required since #250 — a missing id is a BadArgs refusal, not
+                // a fallback to whichever vault a cache happens to name.
+                vault_id: String,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -666,6 +667,16 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 Ok(unlocked) => Outcome::ok(&unlocked),
                 Err(e) => Outcome::error(&e),
             }
+        }
+
+        // #250: the authoritative "which vault is open" answer, read from the
+        // runtime slot map. Ported rather than declared absent because the
+        // shared tree asks this question on every client — the web container is
+        // still a vault with an id, and the delete this feeds is just as
+        // irreversible here.
+        "plugin:vault-unlock|vault_active_id" => {
+            use myne_core::plugins::vault_unlock::commands::vault_active_id_from_host;
+            Outcome::ok(&vault_active_id_from_host(crate::session::state()).await)
         }
 
         // Task 22. The BOOT probe above cannot express the condition this client

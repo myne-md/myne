@@ -79,6 +79,9 @@ const EXPORT_BODY_STYLE: CSSProperties = {
 };
 
 interface StoragePanelProps {
+  /** The active vault, threaded from Settings (#250) — the schedule block edits
+   *  THIS vault's schedule rather than the one a best-effort cache names. */
+  vaultId: string | null;
   /** Open the import flow (MYND-53; source-agnostic since MYND-586 — the flow
    *  opens on a source picker covering Obsidian / Notion / Evernote / HTML / CSV).
    *  Absent → the control is disabled (e.g. if Settings is shown outside the
@@ -98,12 +101,13 @@ interface StoragePanelProps {
 }
 
 export function StoragePanel({
+  vaultId,
   onImportObsidian,
   onBackupVault,
   onRestoreBackup,
   onExportVault,
   onShowToast,
-}: StoragePanelProps = {}) {
+}: StoragePanelProps) {
   const { t } = useTranslation();
   const [vaultPath, setVaultPath] = useState<string>(PATH_LOADING_SENTINEL);
 
@@ -197,7 +201,7 @@ export function StoragePanel({
         }
       />
 
-      <AutomaticBackupBlock onShowToast={onShowToast} />
+      <AutomaticBackupBlock vaultId={vaultId} onShowToast={onShowToast} />
 
       <ControlBlock
         anchorId="storage.export"

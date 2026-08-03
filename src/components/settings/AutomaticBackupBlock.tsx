@@ -28,7 +28,6 @@ import {
   type ScheduleConfig,
   type ScheduleSettings,
 } from "../../lib/backup-schedule";
-import { resolveActiveVaultId } from "../../lib/vault-list";
 import { SettingRow } from "./SettingRow";
 
 // Interval option values paired with their i18n label keys. Labels are
@@ -109,29 +108,41 @@ function statusText(config: ScheduleConfig): { text: string; tone: string } {
 }
 
 interface AutomaticBackupBlockProps {
+  /**
+   * The active vault whose schedule this block reads and writes (#250).
+   *
+   * Threaded in rather than resolved here: this block used to call
+   * `resolveActiveVaultId()`, which ordered the non-authoritative
+   * `registry.json` last-unlock cache. After a quick-unlock or a recovery that
+   * cache named a different vault, so the panel edited a schedule belonging to
+   * a vault the user was not looking at — and `prune_entry_files` then unlinked
+   * THAT vault's archived `.myne-backup` files. `null` while the id is still
+   * resolving; the block stays in its loading state.
+   */
+  vaultId: string | null;
   /** Toast surface for a failed settings write (rolled back to disk state). */
   onShowToast?: (message: string) => void;
 }
 
-export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps = {}) {
+export function AutomaticBackupBlock({
+  vaultId,
+  onShowToast,
+}: AutomaticBackupBlockProps) {
   const { t } = useTranslation();
-  const [vaultId, setVaultId] = useState<string | null>(null);
   const [config, setConfig] = useState<ScheduleConfig | null>(null);
 
   // Resolve interval labels at render time so a language switch re-labels them.
   const intervalOptions: SelectOption<BackupInterval>[] =
     INTERVAL_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) }));
 
-  // Resolve the active vault + load its schedule config once on mount.
+  // Load the schedule config for the vault we were given.
   useEffect(() => {
+    if (vaultId == null) return;
     let cancelled = false;
     void (async () => {
       try {
-        const id = await resolveActiveVaultId();
-        if (cancelled || id == null) return;
-        const cfg = await scheduleRead(id);
+        const cfg = await scheduleRead(vaultId);
         if (cancelled) return;
-        setVaultId(id);
         setConfig(cfg);
       } catch {
         // Best-effort: leave the block in its loading state. The scheduler
@@ -141,7 +152,7 @@ export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [vaultId]);
 
   // Optimistic write: apply locally, persist, and on failure reload the disk
   // truth + toast. Engine state (ledger/clock/status) is preserved server-side.

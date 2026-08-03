@@ -199,12 +199,17 @@ export function mapDeleteVaultError(
  *     backend paths but retained in the wire format for forward
  *     compatibility.
  */
-export async function deleteVault(vaultId?: string): Promise<void> {
-  // SYNC-6 explicit-id targeting (MYND-205): pass the chosen vault's
-  // canonical hyphenated `VaultId` string to erase exactly `vaults/<id>/`,
-  // leaving any sibling vault untouched. Omitting the id (or passing a
-  // malformed one) falls back to the active (sole `Unlocked`) vault — the
-  // SYNC-1 vault the in-vault danger-zone delete is driven from — which keeps
-  // the pre-multi-vault single-vault callers working unchanged.
+export async function deleteVault(vaultId: string): Promise<void> {
+  // SYNC-6 explicit-id targeting (MYND-205), REQUIRED since #250: pass the
+  // chosen vault's canonical hyphenated `VaultId` string to erase exactly
+  // `vaults/<id>/`, leaving any sibling vault untouched.
+  //
+  // The parameter used to be optional, falling back to "the active vault" —
+  // and that fallback was the bug. `deleteVault()` with no argument compiled
+  // and read as correct at four call sites, two of which had the id sitting in
+  // scope; on a device with ≥2 vaults it silently erased whichever vault a
+  // best-effort disk cache happened to name. Making it required moves that
+  // class of mistake to compile time, which is why the type is `string` and
+  // not `string | undefined`.
   await invoke<void>("plugin:vault-delete|vault_delete", { vaultId });
 }

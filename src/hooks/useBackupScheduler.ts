@@ -18,7 +18,6 @@ import { useEffect, useRef } from "react";
 import { has } from "../platform/capabilities";
 import { join } from "../platform/path";
 import { backupDefaultFilename, exportBackup } from "../lib/vault-backup";
-import { resolveActiveVaultId } from "../lib/vault-list";
 import {
   runScheduledBackupIfDue,
   scheduleRead,
@@ -45,12 +44,24 @@ const LIVE_DEPS: ScheduleEngineDeps = {
 
 /**
  * Drive the automatic-backup scheduler for the lifetime of the calling
- * (post-unlock) component. Optional `onTick` is invoked after each evaluation
+ * (post-unlock) component.
+ *
+ * `vaultId` is the vault to back up, and it is a REQUIRED parameter since #250
+ * — the hook used to resolve it itself, via `resolveActiveVaultId()`, which
+ * ordered the non-authoritative `registry.json` last-unlock cache. That cache
+ * was stamped by the password path only, so a quick-unlocked or recovered
+ * session scheduled its backups against a DIFFERENT vault than the open one.
+ * `null` means "not resolved yet"; the tick is skipped rather than guessed.
+ *
+ * Optional `onTick` is invoked after each evaluation
  * with the engine's outcome plus a debounced `freshFailure` flag (true only on
  * a failure that wasn't already failing) so the parent can surface a quiet,
  * non-repeating failure toast (task 5).
  */
-export function useBackupScheduler(onTick?: (tick: ScheduleTick) => void): void {
+export function useBackupScheduler(
+  vaultId: string | null,
+  onTick?: (tick: ScheduleTick) => void,
+): void {
   // Gated on the capability, at the TOP of the hook (phase3-web-client task 96).
   //
   // The Editor mounts this unconditionally, so on a client where `backup` is
@@ -72,20 +83,17 @@ export function useBackupScheduler(onTick?: (tick: ScheduleTick) => void): void 
 
   useEffect(() => {
     if (!enabled) return;
+    // No resolved target yet (a post-reload editor whose id is still in
+    // flight): do not arm. A tick with no vault has nothing to back up, and
+    // guessing one is the defect this parameter exists to remove.
+    if (vaultId == null) return;
+    const target = vaultId;
     let cancelled = false;
-    // The active vault is stable for the Editor's lifetime (SYNC-1; a switch
-    // relocks + remounts the Editor, re-running this effect), so resolve it
-    // once and cache it across ticks rather than re-querying every interval.
-    let vaultId: string | null = null;
 
     const tick = async () => {
       try {
         if (cancelled) return;
-        if (vaultId == null) {
-          vaultId = await resolveActiveVaultId();
-          if (cancelled || vaultId == null) return; // retry resolution next tick
-        }
-        const outcome = await runScheduledBackupIfDue(vaultId, new Date(), LIVE_DEPS);
+        const outcome = await runScheduledBackupIfDue(target, new Date(), LIVE_DEPS);
         if (cancelled) return;
         const freshFailure = shouldToastOutcome(prevOutcomeRef.current, outcome);
         prevOutcomeRef.current = outcome;
@@ -104,5 +112,5 @@ export function useBackupScheduler(onTick?: (tick: ScheduleTick) => void): void 
     };
     // `enabled` is a build-time constant per client, so this dependency never
     // actually changes — it is listed because it is read.
-  }, [enabled]);
+  }, [enabled, vaultId]);
 }

@@ -88,7 +88,7 @@ import { SuspicionBanner } from "../components/SuspicionBanner";
 import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
 import { ioBanner } from "../lib/io-banner";
 import { quickUnlockStatus, type QuickUnlockMethod } from "../lib/quick-unlock";
-import { listVaults } from "../lib/vault-list";
+import { listVaults, soleVaultId } from "../lib/vault-list";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
@@ -473,7 +473,21 @@ export function Unlock({
       dispatch({ type: "delete-vault-in-flight" });
       void (async () => {
         try {
-          await deleteVault();
+          // Required target since #250. The screen already holds the chosen
+          // vault's id; the single-vault entry that carries none resolves the
+          // sole vault from disk. At ≥2 vaults with no id there is no
+          // unambiguous answer — refuse rather than erase a guess.
+          const target = vaultId ?? (await soleVaultId());
+          if (!mountedRef.current) return;
+          if (target == null) {
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.warn("[Unlock] vault_delete refused: ambiguous target");
+            }
+            dispatch({ type: "delete-vault-bug-canary" });
+            return;
+          }
+          await deleteVault(target);
           if (!mountedRef.current) return;
           // Resolve = full success. Slot stayed Empty (no state change);
           // vault directory recursively removed. Parent reprobes; boot

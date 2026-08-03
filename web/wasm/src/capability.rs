@@ -163,6 +163,10 @@ pub const DISPATCHED: &[&str] = &[
     // the guard that calls it fail-closes on an IPC REJECTION, so leaving it
     // unported turned a fully working session into "Unexpected state."
     "plugin:vault-unlock|vault_is_unlocked",
+    // #250: the authoritative active-vault id, straight off the slot map. The
+    // TS side used to derive it from a best-effort disk cache; the delete it
+    // targets is irreversible on this client too.
+    "plugin:vault-unlock|vault_active_id",
     // Local account-number validation for the web first-run identity step
     // (task 30). Host-independent in the same way `device_platform` is: pure
     // over its argument, no vault, no storage, no network.

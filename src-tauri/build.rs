@@ -32,6 +32,11 @@ fn main() {
                 "vault_storage_health",
                 "vault_is_unlocked",
                 "vault_slot_kind",
+                // #250 adds `vault_active_id` — the AUTHORITATIVE "which vault
+                // is open" answer, read from the runtime slot map. It replaces
+                // the TS-side `resolveActiveVaultId()`, which ordered a
+                // best-effort disk cache only the password path ever stamped.
+                "vault_active_id",
                 // phase3-web-client task 30 adds `account_number_check` — a
                 // LOCAL, network-free well-formedness check of an account
                 // number (Crockford alphabet + length + the frozen Damm-32

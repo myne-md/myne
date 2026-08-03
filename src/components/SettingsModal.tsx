@@ -171,6 +171,14 @@ const PANELS_BASE: readonly PanelMeta[] = [
 ] as const satisfies readonly PanelMeta[];
 
 interface SettingsModalProps {
+  /**
+   * The active vault's id, threaded from Editor (#250). `null` while a
+   * post-reload editor is still resolving it. Panels that TARGET a vault (the
+   * danger-zone delete, the automatic-backup schedule) take it from here rather
+   * than re-deriving it from the best-effort last-unlock cache, which named the
+   * wrong vault after a quick-unlock or a recovery.
+   */
+  vaultId: string | null;
   open: boolean;
   onClose: () => void;
   /** Storage → "Back up vault…" (MYND-56): closes Settings, opens the
@@ -381,6 +389,7 @@ const CONTENT_INNER_STYLE: CSSProperties = {
 };
 
 export function SettingsModal({
+  vaultId,
   open,
   onClose,
   onBackupVault,
@@ -625,6 +634,7 @@ export function SettingsModal({
   const panelContent: Record<PanelId, ReactNode> = {
     account: (
       <AccountPanel
+        vaultId={vaultId}
         onChangePasswordSuccess={() => {
           onShowToast?.(t("settings.shell.passwordUpdatedToast"));
           onClose();
@@ -645,6 +655,7 @@ export function SettingsModal({
     appearance: <AppearancePanel onOpenGraph={onOpenGraph} />,
     storage: (
       <StoragePanel
+        vaultId={vaultId}
         onImportObsidian={onImportObsidian}
         onBackupVault={onBackupVault}
         onRestoreBackup={onRestoreBackup}

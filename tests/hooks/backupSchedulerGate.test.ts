@@ -16,15 +16,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 
-const resolveActiveVaultId = vi.fn(async () => "v1");
 const scheduleRead = vi.fn(async () => ({ enabled: false }));
+const runScheduledBackupIfDue = vi.fn(async () => "skipped");
 
-vi.mock("../../src/lib/vault-list", () => ({
-  resolveActiveVaultId: () => resolveActiveVaultId(),
-}));
 vi.mock("../../src/lib/backup-schedule", () => ({
   scheduleRead: () => scheduleRead(),
-  runScheduledBackupIfDue: vi.fn(async () => "skipped"),
+  runScheduledBackupIfDue: (...a: unknown[]) => runScheduledBackupIfDue(...(a as [])),
   scheduleRecordResult: vi.fn(async () => {}),
   shouldToastOutcome: () => false,
 }));
@@ -34,18 +31,18 @@ vi.mock("../../src/lib/vault-backup", () => ({
 }));
 vi.mock("../../src/platform/path", () => ({ join: async (...p: string[]) => p.join("/") }));
 
-async function mountWith(absent: string[]) {
+async function mountWith(absent: string[], vaultId: string | null = "v1") {
   vi.resetModules();
   vi.doMock("../../src/platform/capabilities", () => ({
     has: (cap: string) => !absent.includes(cap),
   }));
   const { useBackupScheduler } = await import("../../src/hooks/useBackupScheduler");
-  return renderHook(() => useBackupScheduler());
+  return renderHook(() => useBackupScheduler(vaultId));
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
-  resolveActiveVaultId.mockClear();
+  runScheduledBackupIfDue.mockClear();
   scheduleRead.mockClear();
 });
 
@@ -57,12 +54,12 @@ describe("useBackupScheduler", () => {
   it("issues NOTHING on a client with no backup capability", async () => {
     await mountWith(["backup"]);
     await vi.advanceTimersByTimeAsync(0);
-    expect(resolveActiveVaultId).not.toHaveBeenCalled();
+    expect(runScheduledBackupIfDue).not.toHaveBeenCalled();
 
     // …and not on the next tick either. The failure being prevented is a loop,
     // so one quiet render proves nothing.
     await vi.advanceTimersByTimeAsync(5 * 60_000 * 3);
-    expect(resolveActiveVaultId).not.toHaveBeenCalled();
+    expect(runScheduledBackupIfDue).not.toHaveBeenCalled();
     expect(scheduleRead).not.toHaveBeenCalled();
   });
 
@@ -71,6 +68,25 @@ describe("useBackupScheduler", () => {
     // feature everywhere.
     await mountWith([]);
     await vi.advanceTimersByTimeAsync(0);
-    expect(resolveActiveVaultId).toHaveBeenCalled();
+    expect(runScheduledBackupIfDue).toHaveBeenCalled();
+  });
+
+  // #250: the hook no longer resolves its own target. An unresolved id means
+  // the caller does not yet know which vault is open — and a scheduled export
+  // aimed at a guess is how the scheduler backed up the wrong vault after a
+  // quick-unlock. No target, no tick.
+  it("does not arm until it is given a vault to back up", async () => {
+    await mountWith([], null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(runScheduledBackupIfDue).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5 * 60_000 * 3);
+    expect(runScheduledBackupIfDue).not.toHaveBeenCalled();
+  });
+
+  it("backs up exactly the vault it was given", async () => {
+    await mountWith([], "v-explicit");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(runScheduledBackupIfDue).toHaveBeenCalled();
+    expect(runScheduledBackupIfDue.mock.calls[0]?.[0]).toBe("v-explicit");
   });
 });

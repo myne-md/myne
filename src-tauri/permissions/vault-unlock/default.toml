@@ -33,6 +33,7 @@ permissions = [
     "allow-vault-list",
     "allow-vault-is-unlocked",
     "allow-vault-slot-kind",
+    "allow-vault-active-id",
     "allow-report-user-activity",
     "allow-account-number-check",
 ]
@@ -71,6 +72,11 @@ commands.allow = ["vault_is_unlocked"]
 identifier = "allow-vault-slot-kind"
 description = "Allow invoking vault_unlock:vault_slot_kind (read-only: returns the current SlotKind variant — Empty | Recovering | Unlocked. Used by frontend boot-time + post-WebView-reload routing for the recovery flow)."
 commands.allow = ["vault_slot_kind"]
+
+[[permission]]
+identifier = "allow-vault-active-id"
+description = "Allow invoking vault_unlock:vault_active_id (read-only: the id of the vault currently Unlocked, or null. Reads the runtime slot map — the authority — rather than the best-effort registry.json last-unlock cache; no key material, no write, no network)."
+commands.allow = ["vault_active_id"]
 
 [[permission]]
 identifier = "allow-report-user-activity"
