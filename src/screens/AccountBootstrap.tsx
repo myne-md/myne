@@ -321,6 +321,36 @@ export function AccountBootstrap({
             {t("accountBootstrap.noApprovers")}
           </p>
         )}
+        {/* #269: the way out.
+            Boot re-enters this stage on every reload, the enrol-gate treats
+            `pending` as "already enrolled" and hides the form, and the Settings
+            sync panel does not render one while pending — so a device that
+            enrolled against the WRONG account, or one whose approver is gone,
+            had no route back at all. Reloading returned here; there was nothing
+            else to press.
+
+            Same handler as the SAS-mismatch escape above, deliberately: both
+            are "stop trusting this enrolment and start over", and a second
+            implementation of that is a second thing to keep correct. */}
+        <button
+          data-testid="account-bootstrap.pending-reset"
+          type="button"
+          disabled={aborting}
+          style={{ ...LINK_BUTTON_STYLE, color: "var(--danger)", marginTop: "var(--space-3)" }}
+          onClick={() => {
+            setAborting(true);
+            void invoke("plugin:sync|sync_reset_local")
+              .catch(() => {})
+              .finally(() => {
+                setAborting(false);
+                setPending(false);
+                setSas(null);
+                setAccount(null);
+              });
+          }}
+        >
+          {t("accountBootstrap.pendingStartOver")}
+        </button>
       </CenteredCard>
     );
   }
