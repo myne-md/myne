@@ -146,6 +146,7 @@ import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSec
 import { AiChatTab } from "../notes/components/AiChatTab";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
+import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
 import { runSummarizeToChat } from "../notes/ai/aiToChat";
@@ -1173,6 +1174,44 @@ function EditorChrome({
         else unlisten = handle;
       } catch {
         // Not inside Tauri (browser dev shim) → no sync events.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
+    };
+  }, []);
+
+  // #258: the `myne` CLI writes into the SAME vault this editor has open, and
+  // nothing told the editor. An open pane holds the note's body and base hash
+  // from the moment it loaded, so `myne daily --append` landed on disk and the
+  // pane's next autosave wrote its stale body straight over it. With sync OFF
+  // there is no base-hash guard to catch it, and the snapshot window hides the
+  // loss — the overwriting save coalesces with the pane's earlier ones, so the
+  // CLI's line never gets a revision of its own to restore from.
+  //
+  // Same listener shape and same handler as the sync pull above, deliberately:
+  // "someone else wrote to this vault" is one condition, and the CLI is just
+  // another writer. The pane applies its own dirty guard on reload, so this
+  // never clobbers in-flight typing.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen(CLI_NOTES_CHANGED_EVENT, () => {
+          if (cancelled) return;
+          void noteList()
+            .then((ids) => syncCtxRef.current.refreshAll(ids))
+            .then(() => syncCtxRef.current.reloadOpenNote())
+            .catch(() => {
+              /* a manual refresh catches up */
+            });
+        });
+        if (cancelled) handle();
+        else unlisten = handle;
+      } catch {
+        // Not inside Tauri (browser dev shim) → there is no CLI either.
       }
     })();
     return () => {

@@ -24,6 +24,17 @@
 
 import { invoke } from "../platform/core";
 
+/**
+ * The event the CLI bridge fires after a write lands (#258).
+ *
+ * Mirrors `CLI_NOTES_CHANGED_EVENT` in `src-tauri/src/cli_bridge/dispatch.rs`.
+ * Duplicated by hand like every other Tauri event name in this tree — nothing
+ * relates a Rust string literal to a TS listener, so the two are kept in step
+ * by review, and drift shows up as an editor that silently stops noticing CLI
+ * writes.
+ */
+export const CLI_NOTES_CHANGED_EVENT = "myne://cli-notes-changed";
+
 /** Mirrors `cli_bridge::plugin::CliAccessState` (snake_case on the wire). */
 interface CliAccessStateWire {
   last_used_secs_ago: number | null;
