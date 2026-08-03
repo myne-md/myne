@@ -38,7 +38,9 @@
 //! duration of the walk, exactly as `search_sync`'s rebuild `fetched` map does,
 //! and is dropped when the detached task ends.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
@@ -396,19 +398,93 @@ pub(crate) async fn hydrate_ai_vectors<R: Runtime>(app: &AppHandle<R>, state: &V
     });
 }
 
+/// Idle debounce for the per-save re-embed (#218).
+///
+/// Autosave fires on a 1000 ms idle debounce (`src/notes/saveNote.ts`), so
+/// continuous typing used to schedule roughly one full-note embedding pass per
+/// second — each one chunking and re-embedding the WHOLE note for a single
+/// changed character, and each one queued behind the others on the single Metal
+/// compute lock that inline ghost-text and chat also wait on.
+///
+/// What MYND-453 guarantees is that a this-session edit is searchable without a
+/// re-unlock; it does not require per-save eagerness, so the pass is coalesced
+/// onto the LAST save of a note within this window. A burst of N saves costs one
+/// embedding pass over the final body instead of N over intermediate ones.
+const REEMBED_DEBOUNCE: Duration = Duration::from_secs(5);
+
+/// Per-note generation counter backing [`REEMBED_DEBOUNCE`].
+///
+/// Keyed by note id, so two notes edited in the same window each get their own
+/// pass — the coalescing is per note, not global. Entries are consumed by the
+/// pass that claims them, so the map holds only notes with a re-embed currently
+/// pending rather than every note ever edited this session.
+fn reembed_generations() -> &'static Mutex<HashMap<String, u64>> {
+    static GENERATIONS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+    GENERATIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Register a newly-requested re-embed for `note_id` and return its generation.
+/// Bumping supersedes any pass still sitting in its debounce window.
+fn bump_reembed_generation(note_id: &str) -> u64 {
+    let mut pending = reembed_generations()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let slot = pending.entry(note_id.to_string()).or_insert(0);
+    *slot = slot.wrapping_add(1);
+    *slot
+}
+
+/// Whether the pass holding `generation` is still the newest one for `note_id`
+/// — i.e. no later save (and no delete) landed during its debounce window.
+/// Claiming consumes the entry, so exactly one pass per window does the work.
+fn claim_reembed_generation(note_id: &str, generation: u64) -> bool {
+    let mut pending = reembed_generations()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if pending.get(note_id) == Some(&generation) {
+        pending.remove(note_id);
+        true
+    } else {
+        false
+    }
+}
+
+/// Supersede any pending re-embed for `note_id` without scheduling one. Used by
+/// [`drop_one_note`] so a delete cannot be undone by a pass that was already
+/// waiting out its debounce when the delete landed.
+fn cancel_pending_reembed(note_id: &str) {
+    reembed_generations()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(note_id);
+}
+
 /// Eager per-note re-embed on save (MYND-453, task 5) — the `ai_note_changed`
 /// hook target. Detached + best-effort: re-embeds ONLY this note into the RAM
 /// vector store so a this-session create/edit is searchable without a re-unlock.
 /// The save critical path never blocks (all work is on a spawned task). The
 /// durable `vault.embeddings` blob is NOT written here — it is refreshed by the
 /// next unlock's reconcile (§9.17.4), which sees the changed `content_nonce`.
+///
+/// Coalesced onto the last save of a note within [`REEMBED_DEBOUNCE`] (#218).
 pub(crate) fn reembed_one_note<R: Runtime>(app: &AppHandle<R>, note_id: &str, body: &str) {
     let Ok(nid) = NoteId::parse(note_id) else {
         return;
     };
+    let generation = bump_reembed_generation(note_id);
+    let key = note_id.to_string();
     let app = app.clone();
     let body = body.to_string();
     tauri::async_runtime::spawn(async move {
+        // Debounce FIRST, before any vault state is touched: a superseded pass
+        // must cost nothing but the sleep. Waiting here also bounds how long the
+        // captured plaintext body stays resident after a lock — the vault-state
+        // reads below all fail closed once the slot is no longer `Unlocked`.
+        tokio::time::sleep(REEMBED_DEBOUNCE).await;
+        if !claim_reembed_generation(&key, generation) {
+            return;
+        }
+
         // Teardown-generation snapshot (see `hydrate_ai_vectors`): a lock that
         // fires mid-embed makes the publish below a no-op.
         let gen0 = app
@@ -518,6 +594,10 @@ pub(crate) fn drop_one_note<R: Runtime>(app: &AppHandle<R>, note_id: &str) {
     let Ok(nid) = NoteId::parse(note_id) else {
         return;
     };
+    // Cancel first: a re-embed scheduled by the save that preceded this delete
+    // may still be in its debounce window, and publishing it after the removal
+    // below would resurrect the deleted note's vectors (#218).
+    cancel_pending_reembed(note_id);
     if let Some(vector_state) = app.try_state::<LocalInferenceVectorState>() {
         vector_state.lock().remove_note(&nid);
     }
@@ -571,5 +651,74 @@ mod tests {
     #[test]
     fn folder_is_excluded_empty_set_excludes_nothing() {
         assert!(!folder_is_excluded("Private/", &[]));
+    }
+
+    // ---- #218: re-embed debounce generations ------------------------------
+    //
+    // The generation map is process-global, so each test uses a note id of its
+    // own rather than clearing shared state.
+
+    #[test]
+    fn a_lone_save_claims_its_own_generation() {
+        let id = "debounce-lone";
+        let generation = bump_reembed_generation(id);
+        assert!(
+            claim_reembed_generation(id, generation),
+            "an unsuperseded pass must do the work"
+        );
+    }
+
+    #[test]
+    fn a_burst_of_saves_leaves_exactly_one_pass_claiming() {
+        let id = "debounce-burst";
+        // Ten autosaves inside one debounce window.
+        let generations: Vec<u64> = (0..10).map(|_| bump_reembed_generation(id)).collect();
+        let (last, superseded) = generations.split_last().expect("ten generations");
+        for g in superseded {
+            assert!(
+                !claim_reembed_generation(id, *g),
+                "a superseded pass must not embed"
+            );
+        }
+        assert!(
+            claim_reembed_generation(id, *last),
+            "the newest pass embeds the final body"
+        );
+    }
+
+    #[test]
+    fn claiming_consumes_the_entry_so_the_map_does_not_grow() {
+        let id = "debounce-consumed";
+        let generation = bump_reembed_generation(id);
+        assert!(claim_reembed_generation(id, generation));
+        // Second claim of the same generation finds nothing.
+        assert!(!claim_reembed_generation(id, generation));
+        assert!(
+            !reembed_generations().lock().unwrap().contains_key(id),
+            "a claimed note leaves no residue in the pending map"
+        );
+    }
+
+    #[test]
+    fn coalescing_is_per_note_not_global() {
+        let (a, b) = ("debounce-note-a", "debounce-note-b");
+        let ga = bump_reembed_generation(a);
+        let gb = bump_reembed_generation(b);
+        assert!(claim_reembed_generation(a, ga));
+        assert!(
+            claim_reembed_generation(b, gb),
+            "a save to one note must not cancel another note's pending pass"
+        );
+    }
+
+    #[test]
+    fn a_delete_cancels_a_pending_reembed() {
+        let id = "debounce-deleted";
+        let generation = bump_reembed_generation(id);
+        cancel_pending_reembed(id);
+        assert!(
+            !claim_reembed_generation(id, generation),
+            "a delete must not be undone by a re-embed still in its window"
+        );
     }
 }
