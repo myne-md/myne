@@ -903,9 +903,16 @@ mod tests {
             SyncRuntimeStatus::Disabled
         );
         assert_eq!(status_from(false, true, true), SyncRuntimeStatus::Disabled);
-        // Endpoint + token → Idle (token presence dominates identity).
-        assert_eq!(status_from(true, true, false), SyncRuntimeStatus::Idle);
+        // Endpoint + token + identity → Idle.
         assert_eq!(status_from(true, true, true), SyncRuntimeStatus::Idle);
+        // #267: token presence no longer dominates identity. A token with no
+        // identity is a device that cannot sync — it reported `Idle`, the UI
+        // read that as "already enrolled", and the retry surface stayed hidden
+        // while the cycle refused to run.
+        assert_eq!(
+            status_from(true, true, false),
+            SyncRuntimeStatus::NotEnrolled
+        );
         // Endpoint + no token + persisted identity → Pending (added, awaiting approval).
         assert_eq!(status_from(true, false, true), SyncRuntimeStatus::Pending);
         // Endpoint + no token + no identity → NotEnrolled (never added).
