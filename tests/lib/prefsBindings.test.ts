@@ -4,10 +4,12 @@
 //   1. the exact `plugin:prefs|…` command name + arg-key shape (a drift trap —
 //      several setters rename the arg, e.g. setFavorites → `{ order }`,
 //      setDailyTemplate → `{ templateId }`);
-//   2. whether it bumps the prefs nonce on success. The live-refresh setters
-//      (timestamps + editor-typography) MUST bump; the plain setters MUST NOT —
-//      a regression either way silently breaks (or over-fires) cross-surface
-//      refresh.
+//   2. that it bumps the prefs nonce on success. Since #251 EVERY setter does:
+//      the bump moved into the single `writePref` write path, because as an
+//      optional second line it was forgotten in 31 of ~56 setters — favourites
+//      silently dropped (and the deletion synced), right-panel tab actions doing
+//      nothing, an AI opt-in the open editor never saw. A failed write still
+//      bumps nothing; that half is the contract optimistic UIs revert against.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -130,13 +132,21 @@ describe("command name + arg-key shape", () => {
 });
 
 describe("prefs-nonce bump discipline", () => {
-  it("plain setters do NOT bump the nonce", async () => {
+  // #251: these five are the setters that used to skip the bump. `setFavorites`
+  // is the worst of them — the sidebar's optimistic star survived, the write
+  // landed, and the open editor kept the stale list, which the next write
+  // persisted back as a DELETION that then synced to every device.
+  it("every setter bumps the nonce — the write path does it, not the caller", async () => {
     await setScreenCaptureProtection(true);
+    expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(1);
     await setAutoLockTimeout(60);
+    expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(2);
     await setFavorites(["n1"]);
+    expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(3);
     await setTheme("light");
+    expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(4);
     await setVaultLabel(null);
-    expect(bumpPrefsNonceMock).not.toHaveBeenCalled();
+    expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(5);
   });
 
   it("setShowNoteTimestamps bumps the nonce after the write", async () => {
