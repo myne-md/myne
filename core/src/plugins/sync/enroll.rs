@@ -1762,3 +1762,84 @@ mod pin_confirmation_tests {
         assert_eq!(out, Ok(None));
     }
 }
+
+/// The exporter parameters, asserted against the published cross-implementation
+/// vector rather than against the comment in the other repository.
+///
+/// `TLS_EXPORTER_LABEL` and `TLS_EXPORTER_LEN` are one half of a pair whose
+/// other half is the Go server's `scram.ExporterLabel` / `ExporterLen`. Both
+/// were commented FROZEN and both said the other must match byte-for-byte,
+/// with nothing checking either — and a third copy of the literal had already
+/// appeared in a transport test that only asserts an `Err`, so it would not
+/// have noticed a drifted value. A divergence is not a degraded handshake:
+/// each side derives different channel-binding data, the client proof fails,
+/// and no `-PLUS` handshake completes.
+///
+/// Skip-if-missing: the companion repo is cloned separately.
+#[cfg(test)]
+mod tls_exporter_vectors {
+    use super::{TLS_EXPORTER_LABEL, TLS_EXPORTER_LEN};
+
+    #[test]
+    fn exporter_parameters_match_the_published_vector() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../myne-test-vectors/vectors/tls-exporter/v0.1/cases.json");
+        let Ok(raw) = std::fs::read_to_string(&path) else {
+            eprintln!("[skip] tls-exporter vectors absent at {}", path.display());
+            return;
+        };
+
+        // Hand-parsed rather than serde-derived: this crate has no test-only
+        // JSON model for the companion, and the case shape is two fields.
+        let label_hex = field(&raw, "expected_label_utf8_hex");
+        let length = field(&raw, "expected_length");
+
+        let want_label: Vec<u8> = (0..label_hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&label_hex[i..i + 2], 16).expect("vector carries hex"))
+            .collect();
+
+        // Compared as BYTES, which is how the TLS stack compares the label and
+        // why the vector carries hex rather than a bare string.
+        assert_eq!(
+            TLS_EXPORTER_LABEL,
+            &want_label[..],
+            "TLS_EXPORTER_LABEL has drifted from the published vector"
+        );
+        assert_eq!(
+            TLS_EXPORTER_LEN,
+            length.parse::<usize>().expect("vector carries an integer"),
+            "TLS_EXPORTER_LEN has drifted from the published vector"
+        );
+    }
+
+    /// Pull one JSON scalar out of the single-case document by key. Deliberately
+    /// blunt — it panics rather than returning an Option, because a shape change
+    /// in the companion must fail the test loudly, not skip it.
+    fn field<'a>(doc: &'a str, key: &str) -> &'a str {
+        let needle = alloc_key(key);
+        let start = doc.find(&needle).expect("vector is missing a required key") + needle.len();
+        let rest = doc[start..].trim_start();
+        let rest = rest
+            .strip_prefix(':')
+            .expect("malformed vector")
+            .trim_start();
+        if let Some(inner) = rest.strip_prefix('"') {
+            let end = inner.find('"').expect("unterminated string");
+            &inner[..end]
+        } else {
+            let end = rest
+                .find(|c: char| c == ',' || c == '\n' || c == '}')
+                .expect("unterminated number");
+            rest[..end].trim()
+        }
+    }
+
+    fn alloc_key(key: &str) -> String {
+        let mut s = String::with_capacity(key.len() + 2);
+        s.push('"');
+        s.push_str(key);
+        s.push('"');
+        s
+    }
+}
