@@ -15,7 +15,7 @@ members = [
 
 [package]
 name = "myne-mobile"
-version = "0.2.0"
+version = "0.3.0"
 description = "Myne — mobile client"
 authors = ["Myne"]
 edition = "2021"
