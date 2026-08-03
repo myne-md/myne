@@ -16,7 +16,8 @@ const readCustomTheme = vi.fn();
 const exportCustomTheme = vi.fn();
 const importCustomTheme = vi.fn();
 const deleteCustomTheme = vi.fn();
-const readPickedThemeFile = vi.fn();
+const readPickedSmallText = vi.fn();
+const pickFiles = vi.fn();
 const setCustomTheme = vi.fn();
 const prefsRead = vi.fn();
 const applyCustomTheme = vi.fn();
@@ -30,7 +31,6 @@ vi.mock("../../src/lib/themes", () => ({
   exportCustomTheme: (...a: unknown[]) => exportCustomTheme(...a),
   importCustomTheme: (...a: unknown[]) => importCustomTheme(...a),
   deleteCustomTheme: (...a: unknown[]) => deleteCustomTheme(...a),
-  readPickedThemeFile: (...a: unknown[]) => readPickedThemeFile(...a),
   // Pure helper — a light real-ish impl so the row's preview chiplet renders.
   themePreview: (palette: Record<string, string>) => ({
     background: palette["--paper"] ?? "",
@@ -50,6 +50,10 @@ vi.mock("../../src/lib/theme", () => ({
 }));
 vi.mock("../../src/lib/secret-export", () => ({
   saveJsonAsFile: (...a: unknown[]) => saveJsonAsFile(...a),
+}));
+vi.mock("../../src/platform/filePicker", () => ({
+  pickFiles: (...a: unknown[]) => pickFiles(...a),
+  readPickedSmallText: (...a: unknown[]) => readPickedSmallText(...a),
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: (...a: unknown[]) => openFileDialog(...a),
@@ -79,7 +83,8 @@ beforeEach(() => {
   exportCustomTheme.mockReset().mockResolvedValue(PALETTE);
   importCustomTheme.mockReset().mockResolvedValue(undefined);
   deleteCustomTheme.mockReset().mockResolvedValue(undefined);
-  readPickedThemeFile.mockReset().mockResolvedValue(JSON.stringify(PALETTE));
+  readPickedSmallText.mockReset().mockResolvedValue(JSON.stringify(PALETTE));
+  pickFiles.mockReset().mockResolvedValue(null);
   setCustomTheme.mockReset().mockResolvedValue(undefined);
   prefsRead.mockReset().mockResolvedValue({ theme: "dark", custom_theme: null });
   applyCustomTheme.mockReset();
@@ -145,12 +150,26 @@ describe("CustomThemesSection", () => {
     await waitFor(() => expect(deleteCustomTheme).toHaveBeenCalledWith("solar"));
   });
 
-  it("Import opens the file dialog, reads the picked file, and imports it under its stem", async () => {
-    openFileDialog.mockResolvedValue("/tmp/my-theme.json");
+  // #262: through the PICKER SEAM, not `dialog.open` — the browser arm of the
+  // dialog is a typed refusal, so on web a perfectly valid theme file was
+  // reported as "not a valid theme". The name now comes off the handle's
+  // `name`, the one field both platforms carry (a browser handle has no path).
+  it("Import goes through the picker seam and imports under the file's stem", async () => {
+    const picked = { name: "my-theme.json", size: 12, mimeHint: null, handle: {} };
+    pickFiles.mockResolvedValue([picked]);
     renderSection();
     await waitFor(() => expect(listCustomThemes).toHaveBeenCalled());
     fireEvent.click(screen.getByTestId("settings.custom-theme-import"));
-    await waitFor(() => expect(readPickedThemeFile).toHaveBeenCalledWith("/tmp/my-theme.json"));
+    await waitFor(() => expect(readPickedSmallText).toHaveBeenCalledWith(picked));
     expect(importCustomTheme).toHaveBeenCalledWith("my-theme", JSON.stringify(PALETTE));
+  });
+
+  it("does nothing when the picker is cancelled", async () => {
+    pickFiles.mockResolvedValue(null);
+    renderSection();
+    await waitFor(() => expect(listCustomThemes).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("settings.custom-theme-import"));
+    await waitFor(() => expect(pickFiles).toHaveBeenCalled());
+    expect(importCustomTheme).not.toHaveBeenCalled();
   });
 });

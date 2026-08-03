@@ -16,8 +16,9 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { open as openFileDialog } from "../../platform/dialog";
 import { openUrl } from "../../platform/opener";
+import { pickFiles, readPickedSmallText } from "../../platform/filePicker";
+import type { PickedFile } from "@myne/editor";
 import { Button } from "../primitives/Button";
 import { Icon } from "../primitives/Icon";
 import { ThemeChiplet } from "../primitives/ThemeChiplet";
@@ -28,7 +29,6 @@ import {
   exportCustomTheme,
   importCustomTheme,
   deleteCustomTheme,
-  readPickedThemeFile,
   themePreview,
   type ThemePreview,
 } from "../../lib/themes";
@@ -103,9 +103,15 @@ interface ThemeRow {
 
 /** The imported theme's name: the picked file's base name minus a trailing
  *  `.json`. `exportedBasename` is the shared separator scanner (POSIX `/` and
- *  Windows `\`), so this file does not re-roll one. */
-function themeNameFromPath(absolutePath: string): string {
-  return exportedBasename(absolutePath).replace(/\.json$/i, "");
+ *  Windows `\`), so this file does not re-roll one.
+ *
+ *  Takes the seam's `PickedFile` rather than a path (#262): a browser handle
+ *  carries a `name` and no path at all, so a path-only signature is what forced
+ *  this surface to reach for the native dialog in the first place. */
+function themeNameFromPickedFile(file: PickedFile): string {
+  // `name` is the one field BOTH platforms carry: a browser handle has no path
+  // at all, and a desktop handle's name is already the base name.
+  return exportedBasename(file.name).replace(/\.json$/i, "");
 }
 
 interface CustomThemesSectionProps {
@@ -200,16 +206,20 @@ export function CustomThemesSection({
 
   async function importTheme() {
     setError(null);
-    const picked = await openFileDialog({
-      multiple: false,
-      filters: [
-        { name: translate("settings.customThemes.fileFilterName"), extensions: ["json"] },
-      ],
+    // #262: through the picker SEAM, like the export twin below. This used to
+    // call `dialog.open` directly — a typed refusal in the browser — so a user
+    // on web who picked a perfectly valid theme file was told it was not a
+    // valid theme. The seam's desktop arm is the same native dialog it always
+    // was; its web arm is an `<input type=file>`.
+    const picked = await pickFiles({
+      extensions: ["json"],
+      filterLabel: translate("settings.customThemes.fileFilterName"),
     }).catch(() => null);
-    if (typeof picked !== "string") return;
-    const name = themeNameFromPath(picked);
+    const file = picked?.[0];
+    if (file === undefined) return;
+    const name = themeNameFromPickedFile(file);
     try {
-      const paletteJson = await readPickedThemeFile(picked);
+      const paletteJson = await readPickedSmallText(file);
       await importCustomTheme(name, paletteJson);
       await refresh();
     } catch (e) {

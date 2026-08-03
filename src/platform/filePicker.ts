@@ -159,6 +159,32 @@ export async function readPickedText(file: PickedFile): Promise<string> {
 }
 
 /**
+ * Read a picked SMALL text file (a theme `.json`), on either platform (#262).
+ *
+ * Distinct from {@link readPickedText}, which desktop refuses on purpose: a
+ * general "read this path as text" would hand the WebView an unbounded read
+ * outside the root-confined seam. This one is narrow by construction — it goes
+ * through the importer's existing root-confined `import_read_file`, the same
+ * call the theme importer already used, and only its ARGUMENT shape changes.
+ *
+ * It exists because the custom-theme import was never ported: the picker was
+ * `dialog.open` (a typed refusal in the browser), so a user on web who picked a
+ * perfectly valid theme file got "not a valid theme". Its export twin branched
+ * on the capability; the import side did not.
+ */
+export async function readPickedSmallText(file: PickedFile): Promise<string> {
+  const path = pathOf(file);
+  if (path === null) {
+    // The desktop seam only ever mints path handles. Anything else means the
+    // caller crossed platforms with a value this arm cannot honour.
+    return unsupported("filePicker.readPickedSmallText");
+  }
+  const { importReadFile } = await import("../notes/import/ports");
+  const { splitExportPath } = await import("../notes/exportFlow");
+  return importReadFile(splitExportPath(path).dir, path);
+}
+
+/**
  * Import a picked file into the vault (phase3-web-client task 67).
  *
  * # Why the seam owns the IMPORT and not just the handle
