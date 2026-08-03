@@ -265,3 +265,80 @@ impl VaultLifecycleHooks for NoopHooks {
         Ok(0)
     }
 }
+
+/// Test doubles for this seam, behind the same gate as `crate::test_support`.
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_hooks {
+    use crate::plugins::vault_unlock::state::VaultRuntimeState;
+    use std::path::Path;
+
+    /// A `Hooks` that counts `bump_local_change` calls and no-ops everything
+    /// else (the snapshots test-mock pattern) — asserts the MYND-517 wiring:
+    /// a shared-pref edit opens the coalesced sync push window, a device-local
+    /// or no-op edit never does.
+    pub struct CountingHooks(pub std::sync::Arc<std::sync::atomic::AtomicU64>);
+
+    impl super::VaultLifecycleHooks for CountingHooks {
+        fn hydrate_attachment_refs<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_spell<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn reclaim_stray_attachment_blobs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> super::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn persist_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn index_note_attachments<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+            _: &'a str,
+            _: &'a str,
+            _: &'a str,
+        ) -> super::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn zeroize_search_index(&self) {}
+        fn zeroize_spell(&self) {}
+        fn zeroize_vault_indices(&self) {}
+        fn zeroize_attachment_refs(&self) {}
+        fn abort_active_recording(&self) {}
+        fn pdf_export_teardown_on_lock(&self) {}
+        fn clear_staged_descriptor(&self) {}
+        fn apply_screen_capture(&self, _: bool, _: &'static str) {}
+        fn search_upsert(&self, _: &str, _: &str, _: &str) {}
+        fn search_remove(&self, _: &str) {}
+        fn ai_note_changed(&self, _: &str, _: &str) {}
+        fn ai_note_deleted(&self, _: &str) {}
+        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
+        fn bump_local_change(&self) {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        fn emit_snapshot_write_failed(&self, _: &str) {}
+        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
+            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
+        }
+        fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
+        fn preempt_inflight_backup<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn invalidate_quick_unlock(&self, _: &Path) {}
+        fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
+            false
+        }
+        fn purge_note_snapshots(&self, _: &Path, _: &str) -> std::io::Result<usize> {
+            Ok(0)
+        }
+    }
+}

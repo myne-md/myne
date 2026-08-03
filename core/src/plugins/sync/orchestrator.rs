@@ -278,7 +278,14 @@ async fn quarantine_note(
     id: &[u8; 16],
 ) -> Result<(), SyncCycleError> {
     let src = blob_path(notes_dir, id);
-    if !src.exists() {
+    // #264: through the SEAM, like the `io.exists` ten lines below. This asked
+    // `std::path::Path::exists()`, which on wasm32 compiles and always answers
+    // `false` — OPFS is not a filesystem `Path` can see. So on the web client
+    // quarantine was a silent no-op: a note the engine had decided to remove
+    // from the live set stayed exactly where it was, and the function reported
+    // success. Two existence questions, ten lines apart, answered by two
+    // different oracles.
+    if !io.exists(&src).await.unwrap_or(false) {
         return Ok(());
     }
     let dir = quarantine_dir(vault_root);

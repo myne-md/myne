@@ -482,6 +482,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 vault_io(),
                 crate::session::state(),
+                crate::session::hooks(),
                 a.name,
                 a.palette_json,
             )
@@ -508,8 +509,14 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                     }
                 }
             };
-            match themes_delete_from_host(host_ctx(), vault_io(), crate::session::state(), a.name)
-                .await
+            match themes_delete_from_host(
+                host_ctx(),
+                vault_io(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.name,
+            )
+            .await
             {
                 Ok(()) => Outcome::ok(&()),
                 Err(e) => Outcome::error(&e),

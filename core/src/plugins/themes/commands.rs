@@ -481,6 +481,7 @@ async fn mutate_themes_with_dir(
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     mutate: impl FnOnce(&mut ThemesMap),
 ) -> Result<(), ThemesError> {
     let _write_guard = write_mutex().lock().await;
@@ -500,7 +501,22 @@ async fn mutate_themes_with_dir(
     // syncs, so the wipe would reach every device.
     let mut map = read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await?;
     mutate(&mut map);
-    write_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash, &map).await
+    write_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash, &map).await?;
+
+    // #266: open the coalesced push window, exactly as a prefs write does.
+    //
+    // `vault.themes` is a Class-1 sync member with a reserved blob id, so the
+    // cycle PULLS it every time — but the push is gated behind `allow_push`,
+    // which is driven by `dirty_since`, which only a `bump_local_change` sets.
+    // Nothing in this module called it, so a theme imported or deleted here sat
+    // unpushed until an unrelated note edit happened to open the window. On a
+    // client where that is rare the edit effectively never left the device,
+    // while the same device kept pulling the peers' copy over it.
+    //
+    // After the write, per the disk-FIRST-then-side-effect ordering contract
+    // (soft dep — a no-op if the sync plugin is unmanaged).
+    hooks.bump_local_change();
+    Ok(())
 }
 
 /// Testable core of [`themes_list`]. Tombstoned names are skipped.
@@ -541,13 +557,14 @@ pub async fn themes_import_with_dir(
     host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     name: &str,
     palette_json: &str,
 ) -> Result<(), ThemesError> {
     let parsed = validate_theme(palette_json).map_err(|error| ThemesError::Invalid { error })?;
     let vars = parsed.vars;
     let now = host.now_unix_secs();
-    mutate_themes_with_dir(io, vault_dir, state, |map| {
+    mutate_themes_with_dir(io, vault_dir, state, hooks, |map| {
         apply_import(map, name, vars, now);
     })
     .await?;
@@ -563,10 +580,11 @@ pub async fn themes_delete_with_dir(
     host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     name: &str,
 ) -> Result<(), ThemesError> {
     let now = host.now_unix_secs();
-    mutate_themes_with_dir(io, vault_dir, state, |map| {
+    mutate_themes_with_dir(io, vault_dir, state, hooks, |map| {
         apply_delete(map, name, now);
     })
     .await?;
@@ -684,11 +702,12 @@ pub async fn themes_import_from_host(
     host: &dyn HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     name: String,
     palette_json: String,
 ) -> Result<(), ThemesError> {
     let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)?;
-    themes_import_with_dir(io, host, &dir, state, &name, &palette_json).await
+    themes_import_with_dir(io, host, &dir, state, hooks, &name, &palette_json).await
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -696,6 +715,7 @@ pub async fn themes_import_from_host(
 pub async fn themes_import<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     name: String,
     palette_json: String,
 ) -> Result<(), ThemesError> {
@@ -703,6 +723,7 @@ pub async fn themes_import<R: Runtime>(
         &TauriHost::new(app),
         &crate::vault_io::StdVaultIo,
         state.inner(),
+        hooks.inner(),
         name,
         palette_json,
     )
@@ -715,10 +736,11 @@ pub async fn themes_delete_from_host(
     host: &dyn HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     name: String,
 ) -> Result<(), ThemesError> {
     let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)?;
-    themes_delete_with_dir(io, host, &dir, state, &name).await
+    themes_delete_with_dir(io, host, &dir, state, hooks, &name).await
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -726,12 +748,14 @@ pub async fn themes_delete_from_host(
 pub async fn themes_delete<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     name: String,
 ) -> Result<(), ThemesError> {
     themes_delete_from_host(
         &TauriHost::new(app),
         &crate::vault_io::StdVaultIo,
         state.inner(),
+        hooks.inner(),
         name,
     )
     .await
@@ -744,6 +768,42 @@ mod tests {
 
     const KEY: [u8; AEAD_KEY_LEN] = [0x55; AEAD_KEY_LEN];
     const HASH: [u8; VAULT_META_ACCOUNT_HASH_LEN] = [0x7c; VAULT_META_ACCOUNT_HASH_LEN];
+
+    // The same counting double the prefs plugin asserts its sync window with
+    // (#266) — one copy, so the two assertions cannot drift.
+    use crate::hooks::test_hooks::CountingHooks;
+
+    /// A vault directory with a parseable `vault.meta` plus an unlocked slot
+    /// keyed to it, so the `*_with_dir` production cores can run.
+    async fn unlocked_vault() -> (ScopedTempDir, VaultRuntimeState) {
+        use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
+        let tmp = ScopedTempDir::new("themes-sync").expect("tmp");
+        // `read_account_number_hash` only needs the blob to PARSE; every other
+        // field is filler.
+        let meta = protocol::VaultMeta {
+            account_number_hash: HASH,
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+        };
+        std::fs::write(
+            tmp.path().join("vault.meta"),
+            protocol::serialize_vault_meta(&meta),
+        )
+        .expect("seed vault.meta");
+        let state = VaultRuntimeState::default();
+        state
+            .set_unlocked(test_vault_id(), fixture_unlocked_with_keys(0x42, 0x99, 1))
+            .await;
+        (tmp, state)
+    }
 
     /// A complete, well-formed minimal-core palette JSON (every required key,
     /// valid hex values) under `name`, as a JSON string.
@@ -1197,6 +1257,56 @@ mod tests {
             read_themes_map_in_dir(tmp.path(), &KEY, &HASH).contains_key("keeper"),
             "the real themes are still there under the real key"
         );
+    }
+
+    /// #266: a theme write must open the coalesced push window.
+    ///
+    /// `vault.themes` is a Class-1 sync member with a reserved blob id, so the
+    /// cycle PULLS it every time — but the push is gated behind `allow_push`,
+    /// driven by `dirty_since`, which only `bump_local_change` sets. Nothing in
+    /// this module called it, so a theme imported here sat unpushed until an
+    /// unrelated note edit happened to open the window, while the same device
+    /// kept pulling the peers' copy over it.
+    #[test]
+    fn a_theme_write_opens_the_sync_push_window() {
+        rt().block_on(async {
+            let (tmp, state) = unlocked_vault().await;
+            let bumps = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(CountingHooks(bumps.clone()));
+
+            super::themes_import_with_dir(
+                &IO,
+                &crate::host::NoopHost,
+                tmp.path(),
+                &state,
+                &hooks,
+                "solar",
+                &valid_palette_json(),
+            )
+            .await
+            .expect("import");
+            assert_eq!(
+                bumps.load(std::sync::atomic::Ordering::Relaxed),
+                1,
+                "an import must open the push window"
+            );
+
+            super::themes_delete_with_dir(
+                &IO,
+                &crate::host::NoopHost,
+                tmp.path(),
+                &state,
+                &hooks,
+                "solar",
+            )
+            .await
+            .expect("delete");
+            assert_eq!(
+                bumps.load(std::sync::atomic::Ordering::Relaxed),
+                2,
+                "a delete writes a tombstone that peers must receive too"
+            );
+        });
     }
 
     #[test]
