@@ -1022,7 +1022,7 @@ Used in: `spec/protocol.md` §3.3, §9.2
 
 ### **itemsKey** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
-The persistent 32-byte symmetric key that wraps every `item_key` in a vault. Generated once at vault creation (random, from OS CSPRNG) and stored on disk as `enc_items_key` in `vault.meta`, wrapped under `itemsKey_wrap_key`. Re-wrapped — not regenerated — when the user changes their master password: the new `root_key`-derived `itemsKey_wrap_key` decrypts the existing `itemsKey` and re-encrypts it. None of the per-note `item_key` material is touched, and none of the note ciphertexts are re-encrypted, which is essential for vaults of non-trivial size. A later version will rotate `itemsKey` per epoch to provide forward secrecy.
+The persistent 32-byte symmetric key that wraps every `item_key` in a vault. Generated once at vault creation (random, from OS CSPRNG) and stored on disk as `enc_items_key` in `vault.meta`, wrapped under `itemsKey_wrap_key`. Unaffected by a master-password change: `itemsKey_wrap_key` is derived from `root_key`, which is random per vault rather than password-derived, so a password change rewrites only the password-side wrap of `root_key` and leaves `enc_items_key`, every per-note `item_key` and every note ciphertext byte-identical. A later version will rotate `itemsKey` per epoch to provide forward secrecy.
 
 Used in: `spec/protocol.md` §3.3, §9.3
 
