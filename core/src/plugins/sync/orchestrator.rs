@@ -789,7 +789,11 @@ fn download_attachment_backoff(
             }
         };
         let outcome = engine::download_attachment(transport, token, id, &prefix, &mut progress);
-        drop(progress);
+        // `progress` is a closure, so this is not a `Drop` — it ends the
+        // mutable borrow of `received` so the lines below can read it.
+        // Written as a scope-ending rebind rather than `drop()`, which clippy
+        // rejects on a non-`Drop` type.
+        let _ = progress;
         // Keep whatever arrived — that is the whole point of resuming.
         partial = if received.len() > prefix.len() {
             received

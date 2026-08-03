@@ -1828,9 +1828,7 @@ mod tls_exporter_vectors {
             let end = inner.find('"').expect("unterminated string");
             &inner[..end]
         } else {
-            let end = rest
-                .find(|c: char| c == ',' || c == '\n' || c == '}')
-                .expect("unterminated number");
+            let end = rest.find([',', '\n', '}']).expect("unterminated number");
             rest[..end].trim()
         }
     }
