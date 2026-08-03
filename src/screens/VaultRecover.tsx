@@ -36,7 +36,6 @@
 // A8f success. No defensive cleanup, no `beforeunload` listener.
 
 import { useEffect, useReducer, useRef } from "react";
-import { appDataDir, join } from "../platform/path";
 import i18n from "../i18n";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
@@ -48,6 +47,7 @@ import { recoverWithPhrase } from "../lib/vault-recover";
 import {
   deleteVault,
   mapDeleteVaultError,
+  vaultDirDisplayPath,
   type VaultDeleteError,
 } from "../lib/vault-delete";
 import type { VaultRecoveryError } from "../types/vault-recovery-error";
@@ -333,8 +333,9 @@ export function VaultRecover({
             onDeleteVaultSuccess();
           } catch (raw) {
             const e = raw as VaultDeleteError;
-            const base = await appDataDir();
-            const vaultDirPath = await join(base, "vault");
+            const vaultDirPath = await vaultDirDisplayPath(
+              state.vaultId ?? null,
+            );
             if (!mountedRef.current) return;
             const mapping = mapDeleteVaultError(e, vaultDirPath);
             if (mapping.kind === "partial-fail") {

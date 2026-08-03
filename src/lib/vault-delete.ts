@@ -36,6 +36,8 @@
 // MYND-108-bis.
 
 import { invoke } from "../platform/core";
+import { has as hasCapability } from "../platform/capabilities";
+import { appDataDir, join } from "../platform/path";
 import type { VaultDeleteError } from "../types/vault-delete-error";
 
 export type {
@@ -45,6 +47,37 @@ export {
   isPartialDeleteError,
   isVaultDeleteIoError,
 } from "../types/vault-delete-error";
+
+/**
+ * The on-disk directory to point a partial-delete banner at (#253).
+ *
+ * The three delete surfaces each built this by hand as
+ * `join(appDataDir(), "vault")` — the PRE-multi-vault single-vault directory,
+ * which exists on no migrated or freshly-created install. Every vault created
+ * by `vault_creation::begin` lands at `vaults/<id>/`, so the banner told a user
+ * whose delete had just left ciphertext behind to go clean up a directory that
+ * is not there. All three had the id in scope.
+ *
+ * `null` where the platform has no such path: `appDataDir` is a typed refusal
+ * in the browser seam, and an OPFS container is not somewhere a user can open a
+ * file manager on. Callers must treat `null` as "show the banner without a
+ * path" — never as a reason to skip the banner.
+ */
+export async function vaultDirDisplayPath(
+  vaultId: string | null,
+): Promise<string | null> {
+  if (!hasCapability("localOnlyVault")) return null;
+  try {
+    const base = await appDataDir();
+    // A vault with no id can only be the legacy pre-`vaults/` layout, whose
+    // directory really is `<app_data_dir>/vault`.
+    return vaultId == null
+      ? await join(base, "vault")
+      : await join(base, "vaults", vaultId);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * UI-side discriminated union carrying the form-banner payload for a

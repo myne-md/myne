@@ -70,7 +70,6 @@ import {
   type FormEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { appDataDir, join } from "../platform/path";
 import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
 import i18n from "../i18n";
 import { DestructiveBanner } from "../components/DestructiveBanner";
@@ -94,6 +93,7 @@ import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
   deleteVault,
   mapDeleteVaultError,
+  vaultDirDisplayPath,
   type DeleteVaultPartialFailContext,
   type VaultDeleteError,
 } from "../lib/vault-delete";
@@ -497,8 +497,7 @@ export function Unlock({
         } catch (raw) {
           if (!mountedRef.current) return;
           const e = raw as VaultDeleteError;
-          const base = await appDataDir();
-          const vaultDirPath = await join(base, "vault");
+          const vaultDirPath = await vaultDirDisplayPath(vaultId ?? null);
           if (!mountedRef.current) return;
           const mapping = mapDeleteVaultError(e, vaultDirPath);
           if (mapping.kind === "partial-fail") {
