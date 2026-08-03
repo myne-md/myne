@@ -100,9 +100,12 @@ impl AppleBiometricProvider {
     /// [`QuickUnlockProvider::create`] over an injected Keychain, so the
     /// account-name routing is testable without biometric hardware.
     fn create_with_ops(&self, ops: &dyn KeychainOps) -> Result<ProviderSecret, ProviderError> {
-        let mut wrap_key = [0u8; WRAP_KEY_LEN];
-        getrandom(&mut wrap_key).map_err(|_| ProviderError::Backend)?;
-        let wrap_key = Zeroizing::new(wrap_key);
+        // Filled IN PLACE inside the wrapper. Minting into a bare array and then
+        // moving it into `Zeroizing` wipes the destination slot, never the stack
+        // array the CSPRNG actually wrote — same shape as
+        // `captures::device_key::create`.
+        let mut wrap_key = Zeroizing::new([0u8; WRAP_KEY_LEN]);
+        getrandom(wrap_key.as_mut_slice()).map_err(|_| ProviderError::Backend)?;
 
         // Replace any stale item first (idempotent re-setup). Only this vault's
         // item — a twin's legacy item is not ours to remove.
@@ -206,6 +209,16 @@ impl KeychainOps for RealKeychain {
         // Reading the gated item triggers the OS biometric prompt. A user-cancel
         // / no-hardware surfaces as an error; we map to the coarse variants the
         // command layer expects (cancel → silent password fallback).
+        //
+        // `Zeroizing` goes on the returned `Vec` ITSELF, not on a fixed-size copy
+        // taken from it later: this `Vec` holds the wrap key that unwraps
+        // `vault.quickunlock`'s third `root_key` copy, and every caller arm —
+        // including `wrap_key_from_item`'s wrong-length reject — must leave a
+        // wiped allocation behind. **Honest limit** (`docs/threat-model.md` §7
+        // defers forensic-grade scrubbing): `security_framework` builds this
+        // `Vec` from a `CFData` it then releases without wiping, so a
+        // CoreFoundation-side residue survives; reaching it would mean dropping
+        // to `SecItemCopyMatching` directly.
         get_generic_password(KEYCHAIN_SERVICE, account)
             .map(Zeroizing::new)
             .map_err(map_keychain_error)
@@ -530,6 +543,27 @@ mod tests {
                 format!("get {HASH_HEX}"),
             ]
         );
+    }
+
+    #[test]
+    fn retrieve_rejects_a_wrong_length_item_without_minting_a_wrap_key() {
+        // The corrupt / foreign-item arm. It rejects before any fixed-size copy
+        // exists, which is exactly why the keychain `Vec` has to be `Zeroizing`
+        // at the seam (`KeychainOps::get`) rather than at the copy: this path
+        // never reaches the copy, and the bytes it read are still a wrap key.
+        let provider = AppleBiometricProvider::new(HASH, vault(VAULT_A));
+        let fake = FakeKeychain::empty();
+        fake.items
+            .borrow_mut()
+            .push((provider.account.clone(), vec![0x77; WRAP_KEY_LEN - 1]));
+
+        assert_eq!(
+            provider.retrieve_with_ops(&fake),
+            Err(ProviderError::CredentialMissing)
+        );
+        // And it did NOT fall through to the legacy lookup — a short item is a
+        // corrupt one, not an absent one.
+        assert_eq!(fake.calls(), vec![format!("get {}", provider.account)]);
     }
 
     #[test]

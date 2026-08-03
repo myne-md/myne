@@ -19,6 +19,18 @@
 //! still owe a primitive-level review + live interop test before production trust
 //! (mirrors the Go server's `review-r3-scram-tls-exporter.md`). Fallback if
 //! `-PLUS` slips: plain SCRAM (empty `cbind_data`, gs2 `n,,`) — not wired here.
+//!
+//! **Memory hygiene.** `secret` is `DeriveSubkey(root_key, ServerAuth)`, so
+//! `SaltedPassword`, `ClientKey` and every value below them are `root_key`-
+//! descended key material and follow this crate's `zeroize` discipline
+//! (`protocol/CLAUDE.md`, "Memory hygiene"): the intermediates are `Zeroizing`
+//! and [`ScramClientOutput`] is `ZeroizeOnDrop` with a redacted [`Debug`].
+//! **Best-effort, not a guarantee** — `Zeroizing::new(f(…))` wipes the slot it
+//! is moved into, not the by-value return slot the callee wrote; the `pbkdf2`
+//! and `hkdf` crates' own internal state is unreachable from here; and LLVM
+//! register/stack spills are outside any wrapper. That is the same posture the
+//! rest of the crate has, and `docs/threat-model.md` §7 defers forensic-grade
+//! (freed-page / swap / hibernation) scrubbing outright.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -26,13 +38,21 @@ use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
 use hkdf::Hkdf;
 use sha2::{Digest, Sha256};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// The SCRAM-SHA-256-PLUS channel-binding name (RFC 9266). The GS2 header is
 /// `"p=tls-exporter,,"`. Load-bearing — must match the server byte-for-byte.
 pub const SCRAM_CBIND_NAME: &str = "tls-exporter";
 
 /// The deterministic client-side SCRAM outputs.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// All four fields are `root_key`-descended: `ClientKey` is recoverable from
+/// `stored_key` + `client_proof` once the `AuthMessage` is reconstructed, so the
+/// struct wipes itself on drop rather than leaving four bare 32-byte arrays in a
+/// freed stack frame. `Clone` is kept (each clone wipes itself in turn);
+/// `PartialEq`/`Eq` are a variable-time compare, used only by the determinism
+/// test below and never as a production oracle.
+#[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct ScramClientOutput {
     /// `SHA-256(ClientKey)` — the server-stored verifier half.
     pub stored_key: [u8; 32],
@@ -44,11 +64,42 @@ pub struct ScramClientOutput {
     pub server_signature: [u8; 32],
 }
 
+/// Redacted [`Debug`] impl, following the `blob.rs` `DecryptedNote` precedent in
+/// this crate. `Debug` is KEPT rather than dropped because the module's
+/// `proof_is_deterministic` test asserts with `assert_eq!`, which requires it —
+/// but the derive would print all
+/// four secret fields verbatim, a leak channel through `tracing::debug!`, panic
+/// messages, or test-failure output (the `src-tauri/CLAUDE.md` secret-handling
+/// DENY list forbids exactly this). Nothing formats the type today; this is the
+/// latent channel closed, not an active leak fixed.
+///
+/// Consequence to know: an `assert_eq!` failure on this type reports only the
+/// redaction markers. Assert on the individual hex-encoded fields (as
+/// `protocol/tests/vectors.rs` does) when you need to see which one moved.
+impl core::fmt::Debug for ScramClientOutput {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ScramClientOutput")
+            .field("stored_key", &"<[u8; 32] redacted>")
+            .field("server_key", &"<[u8; 32] redacted>")
+            .field("client_proof", &"<[u8; 32] redacted>")
+            .field("server_signature", &"<[u8; 32] redacted>")
+            .finish()
+    }
+}
+
 /// HMAC-SHA-256(key, msg) via `Hkdf::extract` (RFC 5869 §2.2).
-fn hmac(key: &[u8], msg: &[u8]) -> [u8; 32] {
-    let (prk, _hkdf) = Hkdf::<Sha256>::extract(Some(key), msg);
-    let mut out = [0u8; 32];
+///
+/// Returns `Zeroizing` because every call site here produces key material:
+/// `ClientKey` and `ServerKey` are `SaltedPassword`-descended, and the client
+/// signature is XORed with `ClientKey`. The `hkdf` PRK the value is copied out
+/// of is wiped explicitly — it is the same 32 bytes. The `Hkdf` handle's own
+/// internal HMAC state is not reachable from here (see the module doc's
+/// best-effort note).
+fn hmac(key: &[u8], msg: &[u8]) -> Zeroizing<[u8; 32]> {
+    let (mut prk, _hkdf) = Hkdf::<Sha256>::extract(Some(key), msg);
+    let mut out = Zeroizing::new([0u8; 32]);
     out.copy_from_slice(&prk);
+    prk.as_mut_slice().zeroize();
     out
 }
 
@@ -128,11 +179,17 @@ pub fn scram_client_proof(
     cbind_data: &[u8],
 ) -> ScramClientOutput {
     // SaltedPassword = PBKDF2-HMAC-SHA256(secret, salt, iterations).
-    let salted = pbkdf2::pbkdf2_hmac_array::<Sha256, 32>(secret, salt, iterations);
+    // Wrapped on receipt: `secret` is `DeriveSubkey(root_key, ServerAuth)`, so
+    // this and everything below it is `root_key`-descended. (Best-effort — the
+    // by-value return slot `pbkdf2_hmac_array` wrote is not the slot moved into
+    // here; see the module doc.)
+    let salted = Zeroizing::new(pbkdf2::pbkdf2_hmac_array::<Sha256, 32>(
+        secret, salt, iterations,
+    ));
 
-    let client_key = hmac(&salted, b"Client Key");
-    let stored_key = sha256(&client_key);
-    let server_key = hmac(&salted, b"Server Key");
+    let client_key = hmac(salted.as_slice(), b"Client Key");
+    let stored_key = Zeroizing::new(sha256(client_key.as_slice()));
+    let server_key = hmac(salted.as_slice(), b"Server Key");
 
     let am = auth_message(
         username,
@@ -142,19 +199,22 @@ pub fn scram_client_proof(
         iterations,
         cbind_data,
     );
-    let client_sig = hmac(&stored_key, am.as_bytes());
-    let server_signature = hmac(&server_key, am.as_bytes());
+    let client_sig = hmac(stored_key.as_slice(), am.as_bytes());
+    let server_signature = hmac(server_key.as_slice(), am.as_bytes());
 
-    let mut client_proof = [0u8; 32];
+    let mut client_proof = Zeroizing::new([0u8; 32]);
     for i in 0..32 {
         client_proof[i] = client_key[i] ^ client_sig[i];
     }
 
+    // Each `*x` copies out of a `Zeroizing` whose own slot is wiped when it
+    // drops at the end of this function; the destination struct is
+    // `ZeroizeOnDrop`, so the bytes stay inside a wrapper end to end.
     ScramClientOutput {
-        stored_key,
-        server_key,
-        client_proof,
-        server_signature,
+        stored_key: *stored_key,
+        server_key: *server_key,
+        client_proof: *client_proof,
+        server_signature: *server_signature,
     }
 }
 
@@ -202,5 +262,39 @@ mod tests {
         let a = scram_client_proof(b"secret", b"salt", 2, "MY-X", "cn", "cnsn", &[0xcb; 4]);
         let b = scram_client_proof(b"secret", b"salt", 2, "MY-X", "cn", "cnsn", &[0xcb; 4]);
         assert_eq!(a, b);
+    }
+
+    /// The derive would print all four secret fields; the hand-written impl must
+    /// print none of them. Guards the latent `tracing::debug!(?out)` channel —
+    /// a future `#[derive(Debug)]` restored here fails this test rather than
+    /// shipping the leak.
+    #[test]
+    fn debug_output_redacts_every_secret_field() {
+        let out = ScramClientOutput {
+            stored_key: [0xab; 32],
+            server_key: [0xcd; 32],
+            client_proof: [0xef; 32],
+            server_signature: [0x01; 32],
+        };
+        let s = alloc::format!("{out:?}");
+
+        // `Debug` for `[u8; 32]` renders decimal byte lists; none may appear.
+        for byte in ["171", "205", "239"] {
+            assert!(!s.contains(byte), "debug leaked a secret byte: {s}");
+        }
+        // Field names stay (they are not secret) and each carries the marker.
+        for field in [
+            "stored_key",
+            "server_key",
+            "client_proof",
+            "server_signature",
+        ] {
+            assert!(s.contains(field), "debug dropped the field name {field}");
+        }
+        assert_eq!(
+            s.matches("redacted").count(),
+            4,
+            "one marker per field: {s}"
+        );
     }
 }
