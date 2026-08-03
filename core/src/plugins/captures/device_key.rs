@@ -51,8 +51,19 @@ mod imp {
 
     /// Fetch the device wrap key, creating it on first use. Callers hold the
     /// queue mutex (`super::super::commands`), so create is race-free.
+    ///
+    /// The keychain's `Vec` is wrapped **on receipt**, before any arm inspects
+    /// it: `get_generic_password` returns a plain `Vec<u8>` holding the wrap key,
+    /// and wrapping only the fixed-size copy below would leave the source
+    /// allocation intact on every read — including the corrupt-length arm, which
+    /// never reaches a `Zeroizing` copy at all.
+    ///
+    /// **Honest limit** (`docs/threat-model.md` §7 defers forensic-grade
+    /// scrubbing): `security_framework` builds that `Vec` from a `CFData` it then
+    /// releases without wiping, so a CoreFoundation-side residue survives this.
+    /// Reaching it would mean dropping to `SecItemCopyMatching` directly.
     pub fn get_or_create() -> Result<Zeroizing<[u8; CAPTURE_WRAP_KEY_LEN]>, CaptureError> {
-        match get_generic_password(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT) {
+        match get_generic_password(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT).map(Zeroizing::new) {
             Ok(bytes) if bytes.len() == CAPTURE_WRAP_KEY_LEN => {
                 let mut key = Zeroizing::new([0u8; CAPTURE_WRAP_KEY_LEN]);
                 key.copy_from_slice(&bytes);

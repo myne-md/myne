@@ -77,6 +77,27 @@ const MAX_BYTES_PER_CALL: usize = 65_536;
 /// JS boundary where an allocation on the other side is possible. Allocating the
 /// `Uint8Array` on the JS heap and copying back is a few hundred nanoseconds per
 /// draw and cannot alias a stale buffer.
+///
+/// # Clearing the JS-side buffer
+///
+/// The copy back leaves a twin of the draw on the JS object heap, which the GC
+/// frees without wiping. Most draws on the dispatched web surface are public by
+/// construction (nonces, `change_password`'s fresh salt), but `note_create` /
+/// `note_update` draw a per-note `item_key` and `attachment_import` draws a
+/// per-attachment `attachment_key` — key material whose wasm-side copy is
+/// `Zeroizing`. So the buffer is overwritten before it is dropped.
+///
+/// **What this is not.** It is defence-in-depth hygiene against process-memory /
+/// forensic capture — the residual `docs/threat-model.md` §7 already defers — and
+/// not a spec requirement; no normative text asks for it. It does **not** restore
+/// parity with the wasm-side `Zeroizing` discipline: a GC that already moved the
+/// typed array's backing store leaves a copy `fill` cannot reach. It is also not
+/// the last word on web memory hygiene — `web/src/worker/worker.ts`'s
+/// `JSON.stringify(args)` leaves an unzeroable JS-string copy of the master
+/// password on every unlock, which nothing here touches. And it is not an
+/// A15/TB11 mitigation: a substituted bundle already owns the realm and the typed
+/// master password, and a freed `ArrayBuffer` backing store is unreachable from
+/// page JS regardless.
 fn fill_from_web_crypto(dest: &mut [u8]) -> Result<(), getrandom::Error> {
     for chunk in dest.chunks_mut(MAX_BYTES_PER_CALL) {
         // `new_with_length` takes u32; the chunk is bounded by
@@ -87,6 +108,8 @@ fn fill_from_web_crypto(dest: &mut [u8]) -> Result<(), getrandom::Error> {
         // `buf` was created at `chunk.len()` and `getRandomValues` fills in
         // place without resizing.
         buf.copy_to(chunk);
+        // AFTER the copy, never before — this is the wipe, not the fill.
+        buf.fill(0, 0, buf.length());
     }
     Ok(())
 }
