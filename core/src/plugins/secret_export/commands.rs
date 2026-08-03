@@ -61,11 +61,16 @@ pub async fn save_secret_text_from_host(
     })?;
     validate_secret_destination(&dest, &app_data)?;
 
-    // User destination → `atomic_write_unclobbered` (randomized temp name; never
-    // truncates a pre-existing `<target>.tmp`). `replace = true`: the OS save
-    // dialog already confirmed any overwrite of the chosen file.
+    // User destination → `atomic_write_unclobbered_private`: randomized temp
+    // name (never truncates a pre-existing `<target>.tmp` at a directory the
+    // USER owns) AND create-time mode `0600`. Both properties are required
+    // here and neither helper alone supplies both — this command's payload is
+    // a bearer credential (the 24-word recovery phrase, the account number),
+    // so a umask-default `0644` would leave it readable by every other local
+    // account on the machine. `replace = true`: the OS save dialog already
+    // confirmed any overwrite of the chosen file.
     crate::task::run_blocking(move || {
-        crate::atomic_write::atomic_write_unclobbered(&dest, contents.as_bytes(), true)
+        crate::atomic_write::atomic_write_unclobbered_private(&dest, contents.as_bytes(), true)
     })
     .await
     .map_err(|_| SecretExportError::Io {
