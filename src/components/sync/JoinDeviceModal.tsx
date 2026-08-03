@@ -235,9 +235,34 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
     if (step !== "pending") return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // At most one full sync in flight at a time (see below).
+    let syncing = false;
+    // MYND-537 (#243): the fingerprint poll must NOT sit behind a full content
+    // sync.
+    //
+    // This awaited `sync_now` before every fingerprint check. `sync_now` claims
+    // the approval AND pulls the vault, so on a first join the match code —
+    // which needs nothing but an adopted head — was gated on the entire vault
+    // arriving. On a small vault that reads as a multi-minute "waiting for
+    // approval"; on a large one the tick never returns, the next one never
+    // fires, and the screen never appears at all, while the approving side has
+    // long since shown "approved".
+    //
+    // So: poll the fingerprint on its own cadence, and let `sync_now` run
+    // alongside rather than in front of it. `syncing` keeps at most one in
+    // flight, since overlapping full syncs would contend for the same vault.
     const tick = async () => {
       try {
-        await invoke("plugin:sync|sync_now");
+        if (!syncing) {
+          syncing = true;
+          void invoke("plugin:sync|sync_now")
+            .catch(() => {
+              /* transient — the next tick starts another */
+            })
+            .finally(() => {
+              syncing = false;
+            });
+        }
         const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
         if (!cancelled && fp) {
           // A head was adopted ⇒ this device completed an authed cycle, so the

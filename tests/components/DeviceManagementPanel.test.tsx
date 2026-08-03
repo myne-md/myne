@@ -159,3 +159,118 @@ describe("DeviceManagementPanel — loading", () => {
     await waitFor(() => expect(screen.queryByText("Loading…")).toBeTruthy());
   });
 });
+
+// ── #243: the approving side has to keep looking ────────────────────────────
+//
+// `sync_head_fingerprint` answers `None` for as long as this device has adopted
+// no head, so the single call the panel used to make could — and on a first join
+// routinely did — land before there was anything to show. The panel then sat on
+// "this code appears once the new device finishes its first sync" permanently,
+// while the joining side polled every second.
+describe("DeviceManagementPanel — SAS verify polling", () => {
+  const ROSTER = [
+    { device_id_hex: "aa00", approved: true, retired: false, is_current: true },
+    { device_id_hex: "bb11", approved: true, retired: false, is_current: false },
+    { device_id_hex: "cc22", approved: false, retired: false, is_current: false },
+  ];
+
+  /** Roster + prefs, with `sync_head_fingerprint` driven by `fingerprints`. */
+  function mountWith(fingerprints: (string | null)[]) {
+    const queue = [...fingerprints];
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:sync|sync_list_devices") return ROSTER;
+      if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
+      if (cmd === "plugin:sync|sync_head_fingerprint") {
+        return queue.length > 1 ? queue.shift()! : (queue[0] ?? null);
+      }
+      return undefined;
+    });
+  }
+
+  it("keeps polling until a head is adopted, then renders the code", async () => {
+    vi.useFakeTimers();
+    try {
+      // Two empty answers, then the head lands.
+      mountWith([null, null, "K3M9-QR7T"]);
+      render(<Harness />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("sync.verify-device"));
+      });
+      // First check came back empty — the pending copy, not the code.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.queryByTestId("sync.sas-pending")).toBeTruthy();
+      expect(screen.queryByTestId("sync.sas-fingerprint")).toBeNull();
+
+      // Two more ~1 s ticks and the adopted head arrives.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2100);
+      });
+      expect(screen.getByTestId("sync.sas-fingerprint").textContent).toBe("K3M9-QR7T");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not await sync_now before checking the fingerprint", async () => {
+    vi.useFakeTimers();
+    try {
+      invokeMock.mockImplementation((cmd: string) => {
+        if (cmd === "plugin:sync|sync_list_devices") return Promise.resolve(ROSTER);
+        if (cmd === "plugin:prefs|prefs_read") return Promise.resolve(PREFS_STUB);
+        // A full vault sync that never returns — the shape that made the match
+        // code unreachable on a large vault. The fingerprint check must not be
+        // sequenced behind it.
+        if (cmd === "plugin:sync|sync_now") return new Promise(() => {});
+        if (cmd === "plugin:sync|sync_head_fingerprint") return Promise.resolve("K3M9-QR7T");
+        return Promise.resolve(undefined);
+      });
+      render(<Harness />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("sync.verify-device"));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // `sync_now` was started (single-flight) but never settled, and the code
+      // is on screen anyway.
+      expect(
+        invokeMock.mock.calls.some((c) => c[0] === "plugin:sync|sync_now"),
+      ).toBe(true);
+      expect(screen.getByTestId("sync.sas-fingerprint").textContent).toBe("K3M9-QR7T");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("offers a route back into the verify screen for an already-approved device", async () => {
+    mountWith(["K3M9-QR7T"]);
+    render(<Harness />);
+    await waitFor(() => expect(screen.queryByTestId("sync.verify-device")).toBeTruthy());
+
+    // Only the OTHER device gets the button — comparing a code against itself is
+    // not a ceremony.
+    expect(screen.getAllByTestId("sync.verify-device")).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sync.verify-device"));
+    });
+    await waitFor(() =>
+      expect(screen.queryByTestId("sync.approve-verify")).toBeTruthy(),
+    );
+    // …and it does NOT re-approve on the way in.
+    expect(
+      invokeMock.mock.calls.some((c) => c[0] === "plugin:sync|sync_approve_device"),
+    ).toBe(false);
+  });
+});

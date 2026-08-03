@@ -3072,6 +3072,7 @@
       "verifyPending": "This code appears once the new device finishes its first sync.",
       "verifySyncing": "Syncing…",
       "verifyTitle": "Verify the new device",
+      "verifyAction": "Compare code",
       "yourDevices": "Your devices"
     },
     "endpoint": {
