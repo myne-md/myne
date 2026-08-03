@@ -12,12 +12,12 @@ This document (as of MYND-416) defines the **vault head**: a small, server-relay
 
 In scope here:
 - The head record, its canonical byte encoding, and the HMAC that authenticates it (§3).
-- The semantics of the committed fields — the version vector, the manifest, and the push compare-and-swap (§4).
+- The semantics of the committed fields — the version vector, the manifest **and its canonical byte encoding** (§4.2.1), and the push compare-and-swap (§4).
 - The on-pull verification algorithm and the detection of rollback / fork / withholding (§5).
 - Bootstrap of a fresh device (TOFU) and genesis (§6).
 - The device-local last-seen baseline that anchors continuity across restarts (§7).
 
-Out of scope (other Phase 2 work items): the sync wire protocol and the canonical encoding of the **manifest object itself** (MYND-414 — the head only anchors `SHA-256` of its bytes), the server protocol and storage (MYND-415/419/421), server authentication (MYND-420), device enrollment / approval / the bootstrap-fingerprint UI (MYND-425), tombstones / quota / rate-limit (MYND-422), the Rust implementation (MYND-417), and the cross-implementation golden vectors (MYND-418).
+Out of scope (other Phase 2 work items): the sync wire protocol (MYND-414), the server protocol and storage (MYND-415/419/421), server authentication (MYND-420), device enrollment / approval / the bootstrap-fingerprint UI (MYND-425), tombstones / quota / rate-limit (MYND-422), the Rust implementation (MYND-417), and the cross-implementation golden vectors (MYND-418).
 
 ### 1.2 Threat
 
@@ -78,7 +78,7 @@ head_mac_input =
  || protocol_version        ( 1 B   = 0x01)
  || head_format_version     ( 1 B   = 0x01; the sync-format version hook — see §3.6)
  || account_number_hash     (16 B   the vault-binding field, protocol.md §9.3 / §5.2)
- || manifest_hash           (32 B   SHA-256 of the canonical manifest bytes; §4)
+ || manifest_hash           (32 B   SHA-256 of the canonical manifest bytes; §4.2.1)
  || seq                     ( 8 B   u64 big-endian; §4)
  || parent_count            ( 1 B   0 = genesis, 1 = linear, 2 = merge)
  || prev_head_hash[i]       (32 B × parent_count, byte-sorted; §3.4)
@@ -126,12 +126,14 @@ Four distinct SHA-256 inputs exist on the combined protocol's head / manifest / 
 
 | Hash | Input begins with | Defined in |
 |---|---|---|
-| `manifest_hash` | the manifest canonical prefix (MYND-414) | §4 / MYND-414 |
+| `manifest_hash` | the domain prefix `"myne.v0.1\|vault-manifest\|"` (25 B), then the manifest's own version bytes | §4.2.1 |
 | `head_id` | `head_mac_input`, i.e. `"myne.v0.1|"` … | §3.4 |
 | `head_fingerprint` digest | the domain string `"myne.v0.1 vault-head-fingerprint"`, then `head_id` | §6.3 |
 | CTX commitment | the §5.1.3 `canonical_encode` of (K, N, AD, T) | `protocol.md` §5.1.3 |
 
-Each input starts with a distinct, non-overlapping prefix (the head via the `"myne.v0.1|"` AAD prefix; the manifest under its own MYND-414 prefix; the bootstrap fingerprint under its own `"myne.v0.1 vault-head-fingerprint"` domain string — which begins with the HKDF-style context prefix `"myne.v0.1 "`, **trailing space**, not the AAD prefix `"myne.v0.1|"`, so a fingerprint digest input can never be read as a `head_mac_input`; the CTX commitment under its fixed-length key/nonce-first layout), so no hash input is a prefix or re-encoding of another. In particular the fingerprint hashes `head_id` **under a domain**, never bare: displaying a truncation of `head_id` itself would make the displayed code a re-encoding of the identifier it is supposed to attest. Implementations MUST NOT feed bare, prefix-free data into any of these.
+Each input starts with a distinct, non-overlapping prefix (the head via the `"myne.v0.1|"` AAD prefix; the manifest under its own `"myne.v0.1|vault-manifest|"` prefix, §4.2.1; the bootstrap fingerprint under its own `"myne.v0.1 vault-head-fingerprint"` domain string — which begins with the HKDF-style context prefix `"myne.v0.1 "`, **trailing space**, not the AAD prefix `"myne.v0.1|"`, so a fingerprint digest input can never be read as a `head_mac_input`; the CTX commitment under its fixed-length key/nonce-first layout), so no hash input is a prefix or re-encoding of another. In particular the fingerprint hashes `head_id` **under a domain**, never bare: displaying a truncation of `head_id` itself would make the displayed code a re-encoding of the identifier it is supposed to attest. Implementations MUST NOT feed bare, prefix-free data into any of these.
+
+**On the manifest prefix's shape.** `"myne.v0.1|vault-manifest|"` is the AAD prefix `"myne.v0.1|"` **extended by a role segment** (`vault-manifest|`), which is the one place in this document where a role string appears inside a hashed message — the second note under §3.2 argues *against* one for the head. The two are consistent, and the asymmetry is the point: the head is the message that owns the bare `"myne.v0.1|"` domain, so the byte immediately following that prefix is a `protocol_version` byte (`0x01`) and never ASCII `v` (`0x76`). A `manifest_canonical` and a `head_mac_input` therefore diverge at the first byte after the shared 10-byte prefix, and neither can be read as the other without any type field to distinguish them. The head needs no role tag because its key is purpose-specific and its version bytes already say "head" inside the `myne.v0.1` domain; the manifest, which is hashed under no key at all, has only its prefix to do that work — so it carries one. `"myne.v0.1|vault-manifest|"` is load-bearing in the sense of the root `CLAUDE.md` identifier table: drift changes every `manifest_hash`, therefore every `head_mac`, therefore every `head_id`.
 
 ### 3.6 `head_format_version` (forward hook)
 
@@ -158,7 +160,13 @@ The version vector (VV) is the authority for concurrency and fork detection. Eac
 - **linear** (`parent_count == 1`): copy the parent's VV, then `+1` to the author's component.
 - **merge** (`parent_count == 2`): take the **componentwise maximum** of the two parents' VVs, then `+1` to the author's component.
 
-**Explicit author + consistency check.** The head carries the `author_device_id` (16 B) explicitly (encoded as part of the head record alongside the VV — chosen for simplicity; deriving it by diffing parent VVs is possible but expensive and off-by-one fragile). A verifier MUST reject a head whose author component is not exactly one above the parents' maximum for that device — i.e. `VV[author] == max(parents' VV[author]) + 1`, and `== 1` at genesis. This turns the redundant field into a free consistency check; it cannot contradict the VV.
+**Implicit author + consistency check.** The head carries **no** `author_device_id` field. §3.2's byte list is exhaustive and ends at `vv_canonical`; `protocol.md` §9.16's `head_record` is exactly that message plus its tag, so there is no place in the record for one under either document. The author is instead **derived from the VV**, which is already inside `head_mac_input` and therefore already authenticated:
+
+> **`author = the sole device_id whose component is exactly one above the parents' componentwise maximum for that device`** — i.e. the unique `d` with `H.VV[d] == max(parents' VV[d]) + 1` (absent components read as 0). At genesis (`parent_count == 0`) the parents' maximum is the all-zero vector, so this reduces to: `H.VV` is exactly `{d: 1}` for a single `d`, and that `d` is the author.
+
+A verifier holding the parents MUST reject a head for which **no** such component exists, for which **more than one** does, or for which any *other* component differs from the parents' componentwise maximum. This is the same consistency check the earlier "redundant explicit field" framing bought, obtained without the field — and obtained *better*. An explicit copy riding **outside** the MAC'd message would be unauthenticated, yet §5.2 step 2 mandates a consistency check against the author: the untrusted relay would control that check's input. An explicit copy riding **inside** the message would cost every implementation 16 more bytes of byte-level agreement in exchange for no authority the VV does not already carry, and two implementations disagreeing about whether those bytes are there compute different `head_mac`s and different `head_id`s over the same vault state.
+
+The derivation needs the parents' VVs. Where a parent is on hand (the common case: the baseline is a parent of the candidate) the check runs; where a merge parent is unfetchable past the horizon, it is **skipped** exactly as §5.4 states, and is never replaced by an unauthenticated field. The author is a derived quantity, so it cannot contradict the VV by construction.
 
 **Actor-set authority (no separate roster).** A device's right to be a VV actor is **not** separately authenticated and need not be. Myne is single-user: anyone holding `root_key` is a legitimate author, so a device can introduce a new `device_id` simply by authoring a `root_key`-MAC'd head bearing it. The server, lacking `root_key`, cannot forge a head and therefore cannot inject a phantom `device_id` (it can only replay/withhold/reorder real heads). The VV actor-set is exactly "every `device_id` that appears in a validly-MAC'd head" = the user's enrolled devices. The Phase 2 device-approval gate (MYND-425) is an *availability* control over token issuance, **not** a cryptographic VV roster. Implementations MUST NOT add a roster-authentication step here.
 
@@ -176,9 +184,40 @@ The **vault-head manifest** is the `uuid → content_nonce` map the head commits
 
 Binding the server's **opaque per-note version counter** instead would commit only a bare number, leaving which ciphertext counts as "version N" for the server to play with. The opaque counter is therefore **orthogonal** to the head: it is the sync transport's compare-and-swap token for individual note pushes (MYND-421), not something the head commits.
 
-**Attachment sync-id (normative key-width pin).** The manifest's canonical encoding uses a **uniform 16-byte key** for every entry (MYND-414). A note's key is its 16-byte UUID; an attachment's manifest **and wire** key is the **first 16 bytes of its 32-byte `attachment-id`** (`protocol.md` §9.9) — the **attachment sync-id**. The full 32-byte id continues to live in the `attachments/<hex>` filename, the `vault.attachments` catalog, and the attachment byte-transport (`server-protocol.md` §3.2); only the sync metadata plane truncates. The truncation is safe: within a single vault the birthday bound on a 128-bit prefix is ~2^-64 at any plausible attachment count, and the manifest's duplicate-key rule already makes a collision a **hard, visible encode failure** (never a silent overwrite). An attachment's manifest discriminator is the `content_nonce` from its `MYA1` cleartext header (offset 112), read without decryption — exactly the note rule. One consequence is normative for convergence: because an `attachment-id` is keyed over **plaintext** while encryption is randomized, two devices independently importing the same file mint the **same id but different ciphertext/`content_nonce`**. On a nonce mismatch for an attachment whose id both sides hold, a puller MUST adopt the server's bytes verbatim (**server-wins**) rather than treating the mismatch as a conflict — attachment plaintext is immutable per id, so nothing user-visible is lost and the manifests converge; keep-both (§10.1) applies to notes only.
+**Attachment sync-id (normative key-width pin).** The manifest's canonical encoding uses a **uniform 16-byte key** for every entry (§4.2.1). A note's key is its 16-byte UUID; an attachment's manifest **and wire** key is the **first 16 bytes of its 32-byte `attachment-id`** (`protocol.md` §9.9) — the **attachment sync-id**. The full 32-byte id continues to live in the `attachments/<hex>` filename, the `vault.attachments` catalog, and the attachment byte-transport (`server-protocol.md` §3.2); only the sync metadata plane truncates. The truncation is safe: within a single vault the birthday bound on a 128-bit prefix is ~2^-64 at any plausible attachment count, and the manifest's duplicate-key rule already makes a collision a **hard, visible encode failure** (never a silent overwrite). An attachment's manifest discriminator is the `content_nonce` from its `MYA1` cleartext header (offset 112), read without decryption — exactly the note rule. One consequence is normative for convergence: because an `attachment-id` is keyed over **plaintext** while encryption is randomized, two devices independently importing the same file mint the **same id but different ciphertext/`content_nonce`**. On a nonce mismatch for an attachment whose id both sides hold, a puller MUST adopt the server's bytes verbatim (**server-wins**) rather than treating the mismatch as a conflict — attachment plaintext is immutable per id, so nothing user-visible is lost and the manifests converge; keep-both (§10.1) applies to notes only.
 
 **Deleted notes (tombstones).** A deletion is a `deleted`-marked new note version with its own fresh `content_nonce` (Q3 / MYND-422), so it stays **in the manifest** until horizon-GC — the head commits it, and a server attempting resurrection (serving the pre-deletion `content_nonce`) mismatches the head and is caught. Once horizon-GC fully purges a note, its UUID drops from the manifest; from that point a resurrection is covered not by the head but by Q3's full-reconcile-on-bootstrap + §6 TOFU (a device returning past the horizon is in full-reconcile mode and will not resurrect a vanished note). Pre-GC = head-protected; post-GC = handed to full-reconcile.
+
+#### 4.2.1 Canonical manifest encoding (normative)
+
+The manifest object is **not** a wire message: no device ever transmits it, and the server never sees, computes, or verifies it (it holds no MAC key, by design). It exists only as the byte string whose `SHA-256` the head commits — which is why its encoding is specified here rather than deferred to the wire protocol. `manifest_hash` is bound into `head_mac_input` (§3.2) and therefore into every `head_mac` and every `head_id` (§3.4), so a client that gets these bytes wrong computes a different head from a correct client over identical vault state, and the two cannot share a hash-DAG at all. This is a **client-to-client** contract; every independent client implementation MUST reproduce it bit-identically.
+
+Like `head_mac_input` (§3.2) and the CTX commitment (`protocol.md` §5.1.3), the encoding is **encode-then-hash**: fixed-width, count-prefixed, totally ordered.
+
+```
+manifest_canonical =
+    "myne.v0.1|vault-manifest|"   (25 B  ASCII domain prefix, both pipes included; §3.5)
+ || protocol_version              ( 1 B  = 0x01)
+ || manifest_format_version       ( 1 B  = 0x01; the manifest's forward hook)
+ || entry_count                   ( 4 B  u32 big-endian — the number of entries that follow)
+ || for each entry, SORTED ASCENDING BY id, id unique:
+        id                        (16 B  note UUID, or attachment sync-id per the pin above)
+        content_nonce             (24 B  the per-revision discriminator, protocol.md §9.2)
+
+manifest_hash = SHA-256(manifest_canonical)                         (32 B)
+```
+
+Normative rules:
+
+- **Order.** Entries MUST be sorted **ascending by `id`, compared as 16 unsigned bytes (lexicographic byte-order)** — the same comparison §3.3 applies to `device_id` and §3.4 to `prev_head_hash[]`. An encoder MUST sort; it MUST NOT emit caller order, and MUST NOT sort by any derived or display form of the id.
+- **Uniqueness.** An `id` MUST appear at most once. A duplicate `id` is a **hard encode failure** — never a silent overwrite, never last-one-wins. This is the rule that makes the 16-byte attachment sync-id truncation safe (see the pin above): a prefix collision surfaces as a refused encode rather than as a lost blob.
+- **Widths and endianness.** `entry_count` is u32 big-endian (`protocol.md` §1.2 applies throughout). Each entry is exactly 40 bytes with no per-entry length prefix and no padding, so a well-formed manifest is always exactly `31 + 40 × entry_count` bytes long.
+- **Empty manifest.** `entry_count == 0` is valid and encodes to the 31-byte header alone. The genesis head over an empty corpus (§6.1) commits `SHA-256` of exactly those bytes.
+- **Scope, restated as an encoding rule.** Only content blobs get entries (see "Scope = content blobs only" above). A singleton MUST NOT be given an entry, even a synthetic one, since the manifest is uniform on a single 16-byte key and a single 24-byte discriminator.
+- **`manifest_format_version` is the manifest's forward hook**, the same shape as `head_format_version` (§3.6) and the same shape as the blob families' format byte (`protocol.md` §10.2): it is what a later sync format bumps to change the manifest's structure — the documented Phase-3 case is replacing the flat map with a Merkle tree. v0.1 uses `0x01`. `protocol_version` is the v0.1 protocol byte and is **not** a negotiation point.
+- **Strict decode.** Decoding is not on the sync happy path (a client encodes its own manifest and compares hashes), but implementations that decode — golden-vector runners, cross-checks, audit tooling — MUST reject: a domain-prefix mismatch, `protocol_version ≠ 0x01`, a `manifest_format_version` they do not implement, a total length that is not exactly `31 + 40 × entry_count` (both truncation *and* trailing bytes; trailing bytes are a rejection, never ignorable padding), and entries that are not **strictly** ascending by `id` (which folds the duplicate-id rule into the decode direction).
+
+The bytes and the resulting `manifest_hash` are pinned by the cross-implementation golden vectors (the `manifest` category in `myne-test-vectors`), including an unsorted-input case that catches a port which skips the sort and a tombstone-bearing case that confirms a `deleted`-marked version is an ordinary entry.
 
 ### 4.3 Push compare-and-swap = `prev_head_hash`
 
@@ -199,7 +238,7 @@ Each device persists its **last-seen head** — the full wire-head record of the
 On receiving a candidate head `H` from the server, a device with last-seen baseline `B` MUST, in order:
 
 1. **MAC-verify.** Recompute `head_mac` over `H`'s canonical `head_mac_input` (§3.2) under `head_mac_key`; reject if it does not match (constant-time compare). A head that fails here was not authored by a `root_key` holder — discard it. *(This is the only check the server could even attempt to attack, and it cannot: it lacks `root_key`.)*
-2. **Structural well-formedness.** `parent_count ∈ {0,1,2}`; `prev_head_hash[]` byte-sorted and the right length; VV well-formed (sorted, no duplicate `device_id`); the explicit-author consistency check of §4.1 (`VV[author] == max(parents)[author] + 1`, `== 1` at genesis). Reject on any failure.
+2. **Structural well-formedness.** `parent_count ∈ {0,1,2}`; `prev_head_hash[]` byte-sorted and the right length; VV well-formed (non-empty, sorted, no duplicate `device_id`). Then, **when the parents' VVs are on hand**, the implicit-author consistency check of §4.1: exactly one component sits one above the parents' componentwise maximum, every other component equals that maximum, and at genesis the VV is exactly `{d: 1}`. Reject on any failure. The parent-dependent half follows §5.4 — skipped, not failed, when a merge parent is unfetchable past the horizon.
 3. **VV-dominance (the operative rollback test).** Compare `H.VV` to `B.VV` **componentwise** (treat absent components as 0). This is O(devices) on the single head's embedded VV — **no chain walk, no intermediate-head fetch**. Route to §5.3.
 
 The `prev_head_hash` chain is **not** walked in the happy path. It is the structural backbone for fork-permanence and for **lazy merge-parent verification** (§5.4) only. VV-dominance is sufficient for rollback rejection precisely because the server cannot forge a head with a fabricated VV (step 1): any head it serves carries the *real* VV its author committed.
@@ -238,6 +277,7 @@ This primitive **requires a primitive-level cryptographic review, not merely an 
 - **Fork-incomparability.** Two incomparable heads never both validate as a linear extension of the same baseline (exactly one, or neither, extends; the other forces a merge).
 - **Merge-VV-consistency.** For any DAG, a merge head's author component equals `max(parents) + 1` and all other components equal the componentwise max (§4.1); genesis = `{author: 1}`.
 - **Canonical-encoding determinism.** Independent encoders (Rust, Go) emit byte-identical `head_mac_input` for the same logical head — the bit-identical bar of §3 (VV sort, merge-parent lexicographic sort, fixed widths, big-endian).
+- **Manifest canonical-encoding determinism.** Independent encoders emit byte-identical `manifest_canonical`, and therefore an identical `manifest_hash`, for the same logical `{id → content_nonce}` set regardless of the order the entries were supplied in; a duplicate `id` fails the encode rather than producing bytes; the empty set encodes to the 31-byte header (§4.2.1). This is a **client-to-client** property — the server never computes a manifest — so a missing Go runner for its vectors is not a coverage gap.
 
 ---
 
