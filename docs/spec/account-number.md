@@ -147,10 +147,26 @@ Liberal parsing rules — the user is allowed to enter the account number with o
 ```
 normalize(input):
   1. NFKD Unicode normalize + trim leading/trailing whitespace
-  2. Remove all internal whitespace
+     (whitespace = code points carrying the Unicode `White_Space` property,
+      NOT the ASCII subset; the two disagree on U+2028 among others)
+  2. Remove all internal whitespace (same `White_Space` class as step 1)
   3. Strip leading "MY-" or "my-" (case-insensitive); fail if any other prefix is present
   4. Remove all "-" separators
-  5. Uppercase
+ 4a. Fail if any remaining code point is non-ASCII.
+     An implementation MAY apply this check earlier — the reference
+     implementation applies it right after step 2, and the outcome is
+     identical because every code point steps 3 and 4 consume is ASCII.
+     It MUST NOT be applied later than here: full Unicode uppercase can
+     change string length (ß → SS), which would let a 19-character input
+     pass the step-6 length check.
+  5. Uppercase, ASCII only: U+0061..U+007A → U+0041..U+005A. Every other
+     code point is left unchanged. This mapping MUST NOT be locale-sensitive.
+     (Unlike the phrase pipeline in `protocol.md` §7.4, a locale-sensitive
+      mapping here cannot produce a wrong account_number_hash: tr/az sends
+      i to U+0130, and Crockford excludes I L O U, so step 7 rejects either
+      way. The pin is owed regardless — the canonical form is defined as
+      ASCII, and a case step that can emit a non-ASCII code point breaks
+      that invariant rather than merely failing a later check.)
   6. Verify resulting string is exactly 20 characters
   7. Verify each character is in the Crockford base32 alphabet
   8. Verify Damm-32 check passes on the full 20-character string

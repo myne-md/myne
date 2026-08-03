@@ -108,7 +108,7 @@ enc_root_key_password = AEAD-encrypt(key  = password_wrap_key,
 **Recovery-phrase path** (deriving `recovery_wrap_key` and the phrase-wrapped root key):
 
 ```
-phrase_normalized = NFKD-lowercase-trim(phrase_text)   ← Unicode normalization
+phrase_normalized = normalize_phrase(phrase_text)      ← §7.4 (NFKD + ASCII case fold + whitespace)
 
 salt_recovery     = SHA-256("myne.v0.1 argon2id-recovery|"
                             || account_number_hash
@@ -596,7 +596,7 @@ The 24 words are presented to the user via the recovery flow defined in `recover
 ### 7.3 Use during recovery
 
 ```
-phrase_normalized = NFKD-lowercase-trim(user_input)
+phrase_normalized = normalize_phrase(user_input)                      ← §7.4
 recovery_wrap_key = Argon2id(phrase_normalized, salt_recovery, ...)   ← §3.1
 root_key          = AEAD-decrypt(recovery_wrap_key,
                                  nonce_recovery_wrap,
@@ -610,12 +610,27 @@ After successful recovery the client prompts the user to set a new master passwo
 
 ### 7.4 Phrase normalization
 
+`normalize_phrase` is defined here and **only** here. §3.1 and §7.3 reference it; neither restates it.
+
 ```
-phrase_normalized = lowercase(trim(NFKD(phrase_input)))
-                    where consecutive whitespace runs collapse to a single ASCII space
+normalize_phrase(phrase_input):
+  Apply NFKD compatibility decomposition to phrase_input, then walk the
+  resulting code points left to right, applying both of:
+
+    1. ASCII-only case fold: U+0041..U+005A → U+0061..U+007A.
+       Every other code point is left unchanged.
+    2. Any run of one or more code points carrying the Unicode `White_Space`
+       property becomes a single U+0020, except that a leading or trailing
+       run is removed entirely.
+
+  Return the result as UTF-8 bytes.
 ```
 
-NFKD is applied so that visually-identical phrases entered with different keyboard layouts produce identical bytes. Lowercase + trim handles common user input variation. The wordlist itself is ASCII lowercase, so the normalization is conservative.
+The two rules apply per code point over the NFKD stream and commute, so there is no step-order question to settle: case folding never changes whether a code point is whitespace, and whitespace coalescing never changes the case of a code point it keeps.
+
+The case fold **MUST** be ASCII-only and **MUST NOT** be locale-sensitive. An implementation MUST NOT reach for a default-locale or `tr`/`az`-locale case mapping: those map `I` to U+0131, which changes `phrase_normalized`, therefore the Argon2id password, therefore `recovery_wrap_key`. The resulting tag-verification failure is reported with the single non-distinguishing message §7.3 mandates, so a user holding the correct 24 words — merely typed or pasted in capitals — learns only that the phrase is invalid, never that capitalization was the cause, and §7.5 leaves no partial-recovery path. ASCII-only case folding is not a simplification of Unicode case mapping here; it is the pin. It is byte-identical on every platform and every locale, and it is what every Myne client computes.
+
+NFKD is applied so that visually-identical phrases entered with different keyboard layouts produce identical bytes; it also folds the no-break space (U+00A0) and the ideographic space (U+3000) to U+0020 before the whitespace rule runs. The whitespace class is the Unicode `White_Space` property rather than the ASCII subset — the two disagree on code points a paste can carry through NFKD intact, U+2028 among them — and U+0020 is the single join code point. Because the BIP-39 English wordlist is ASCII lowercase, a phrase Myne generated is already in normalized form; this pipeline exists for what the user types back.
 
 ### 7.5 What the phrase does NOT do
 
@@ -646,17 +661,9 @@ display_form   = "MY-" || group_with_dashes(account_number)
 
 ### 8.3 Normalization for hashing
 
-The account number is normalized before any cryptographic use:
+The account number is normalized before any cryptographic use. `normalize(input)` is defined **normatively and only** in `account-number.md` §5 — an ordered pipeline ending in the canonical 20-character uppercase ASCII string, with an ASCII-only, locale-invariant case step. It is deliberately not restated here.
 
-```
-normalize(input):
-  1. NFKD Unicode normalize + trim whitespace
-  2. Strip optional leading "MY-" / "my-" (case-insensitive)
-  3. Strip all "-" separators and internal whitespace
-  4. Uppercase
-  5. Verify length = 20 and Damm-32 check passes
-  6. Return canonical 20-character uppercase string
-```
+This section previously carried a second copy of that pipeline whose steps ran in a different order, and the two copies disagreed observably. An input of the form `MY -<20 chars>` — a space inside the prefix, trivially produced by pasting a line-wrapped account number — is accepted under `account-number.md` §5, where whitespace removal precedes the prefix strip, and was rejected under the copy here, where the prefix strip ran first and saw `MY ` rather than `MY-`. The copy also dropped the Crockford-alphabet check and §5's "fail if any other prefix is present" rule. `account-number.md` §5 is the list a v0.1 implementation conforms to.
 
 The cryptographic identifier used throughout the protocol is the SHA-256 of the canonical form, truncated to 16 bytes:
 
