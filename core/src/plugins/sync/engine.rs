@@ -748,6 +748,13 @@ pub fn upload_attachment(
     Ok(())
 }
 
+/// Range size for a chunked attachment download (#265).
+///
+/// Big enough that a healthy link pays few round trips on a 64 MiB cap, small
+/// enough that a drop costs at most this much re-transfer. The upload side's
+/// chunking is the client's own and need not match.
+const CHUNK: usize = 4 * 1024 * 1024;
+
 /// Download an attachment's whole ciphertext, resuming past `partial` (the
 /// locally-buffered prefix from an interrupted earlier attempt). Returns:
 /// - `Ok(Some(bytes))` — the complete ciphertext (partial ∥ fetched);
@@ -763,6 +770,12 @@ pub fn download_attachment(
     token: &str,
     id: &[u8; 32],
     partial: &[u8],
+    // Called after each range lands, with everything received SO FAR
+    // (`partial` ∥ fetched). The caller persists it so an interrupted transfer
+    // can resume rather than restart (#265). Still opaque: the whole-blob AEAD
+    // is verified only once the body is complete, so what this hands over is
+    // unverified ciphertext and must not be treated as an attachment yet.
+    mut on_progress: impl FnMut(&[u8]),
 ) -> Result<Option<Vec<u8>>, PullError> {
     let probe = match probe_attachment(transport, token, id) {
         Ok(p) => p,
@@ -786,39 +799,63 @@ pub fn download_attachment(
     let prefix = if partial.len() < total { partial } else { &[] };
 
     let path = attachment_path(id);
-    if prefix.is_empty() {
-        let resp = transport.request_ext(HttpMethod::Get, &path, &[], &[], Some(token))?;
-        return match resp.status {
-            200 => Ok(Some(resp.body)),
-            404 => Ok(None),
-            401 => Err(PullError::Unauthenticated),
-            429 => Err(PullError::RateLimited),
-            _ => Err(PullError::BadResponse),
-        };
-    }
+    let mut full = Vec::with_capacity(total);
+    full.extend_from_slice(prefix);
 
-    let range = format!("bytes={}-", prefix.len());
-    let resp = transport.request_ext(
-        HttpMethod::Get,
-        &path,
-        &[("Range", range.as_str())],
-        &[],
-        Some(token),
-    )?;
-    match resp.status {
-        206 => {
-            let mut full = Vec::with_capacity(total);
-            full.extend_from_slice(prefix);
-            full.extend_from_slice(&resp.body);
-            Ok(Some(full))
+    // #265: fetch in RANGES, reporting each one as it lands.
+    //
+    // The resume branch existed and was unreachable: both callers passed an
+    // empty `partial`, and nothing ever produced a non-empty one — because a
+    // single whole-body GET yields nothing at all when it fails. Upload has
+    // resumed from a HEAD-probed offset since it shipped; download restarted
+    // from byte 0 on every drop, which on a large attachment over a poor link
+    // is a transfer that cannot finish.
+    //
+    // Chunking is what makes a partial exist. Each completed range is handed to
+    // `on_progress` so the caller can persist it, and a failure part-way leaves
+    // the caller holding everything that did arrive.
+    while full.len() < total {
+        let range = format!(
+            "bytes={}-{}",
+            full.len(),
+            (full.len() + CHUNK).min(total) - 1
+        );
+        let resp = transport.request_ext(
+            HttpMethod::Get,
+            &path,
+            &[("Range", range.as_str())],
+            &[],
+            Some(token),
+        )?;
+        match resp.status {
+            206 => {
+                if resp.body.is_empty() {
+                    // No progress: a server that answers 206 with nothing would
+                    // spin this loop forever.
+                    return Err(PullError::BadResponse);
+                }
+                full.extend_from_slice(&resp.body);
+                on_progress(&full);
+            }
+            // A server that ignores Range and sends the whole body is fine —
+            // and is the whole answer, so take it and stop.
+            200 => {
+                if prefix.is_empty() {
+                    return Ok(Some(resp.body));
+                }
+                // With a prefix in hand, a whole-body answer supersedes it:
+                // concatenating would duplicate the prefix.
+                full = resp.body;
+                on_progress(&full);
+                return Ok(Some(full));
+            }
+            404 => return Ok(None),
+            401 => return Err(PullError::Unauthenticated),
+            429 => return Err(PullError::RateLimited),
+            _ => return Err(PullError::BadResponse),
         }
-        // A server that ignores the range and sends the whole body is fine.
-        200 => Ok(Some(resp.body)),
-        404 => Ok(None),
-        401 => Err(PullError::Unauthenticated),
-        429 => Err(PullError::RateLimited),
-        _ => Err(PullError::BadResponse),
     }
+    Ok(Some(full))
 }
 
 /// Author a two-way **merge head** (§5.3) when the local and remote heads are
@@ -1498,7 +1535,7 @@ mod tests {
         );
         t.on(HttpMethod::Get, &att_path(), 200, b"hello".to_vec());
         assert_eq!(
-            download_attachment(&t, "tok", &ATT_ID, &[]).unwrap(),
+            download_attachment(&t, "tok", &ATT_ID, &[], |_| {}).unwrap(),
             Some(b"hello".to_vec())
         );
 
@@ -1515,15 +1552,57 @@ mod tests {
             ],
         );
         t2.on(HttpMethod::Get, &att_path(), 206, b"lo".to_vec());
+        // #265: the callback reports progress so a caller can resume; the range
+        // is now bounded on both ends, because chunking is what makes a partial
+        // exist at all.
+        let mut progress: Vec<usize> = Vec::new();
         assert_eq!(
-            download_attachment(&t2, "tok", &ATT_ID, b"hel").unwrap(),
+            download_attachment(&t2, "tok", &ATT_ID, b"hel", |so_far| progress
+                .push(so_far.len()))
+            .unwrap(),
             Some(b"hello".to_vec())
         );
+        assert_eq!(progress, vec![5], "each landed range is reported");
         let seen = t2.requests();
         assert!(seen[1]
             .4
             .iter()
-            .any(|(n, v)| n == "Range" && v == "bytes=3-"));
+            .any(|(n, v)| n == "Range" && v.starts_with("bytes=3-")));
+    }
+
+    /// #265: a drop part-way leaves the caller holding what DID arrive.
+    ///
+    /// The resume branch existed and was unreachable — both callers passed an
+    /// empty prefix, and a single whole-body GET yields nothing at all when it
+    /// fails, so nothing could ever produce a non-empty one. Upload has resumed
+    /// from a HEAD-probed offset since it shipped; download restarted from byte
+    /// zero on every drop.
+    #[test]
+    fn download_attachment_reports_progress_before_a_failure() {
+        let t = FakeTransport::new();
+        t.on_ext(
+            HttpMethod::Head,
+            &att_path(),
+            200,
+            Vec::new(),
+            vec![
+                ("X-Uploaded-Length".to_string(), "5".to_string()),
+                ("X-Complete".to_string(), "1".to_string()),
+            ],
+        );
+        // The first range lands; the second fails.
+        t.on(HttpMethod::Get, &att_path(), 206, b"he".to_vec());
+        let mut best: Vec<u8> = Vec::new();
+        let _ = download_attachment(&t, "tok", &ATT_ID, &[], |so_far| {
+            if so_far.len() > best.len() {
+                best.clear();
+                best.extend_from_slice(so_far);
+            }
+        });
+        assert!(
+            !best.is_empty(),
+            "a partial transfer must hand back what arrived, or resume is impossible"
+        );
     }
 
     #[test]
@@ -1531,7 +1610,10 @@ mod tests {
         // 404 → None (absent or deleted — non-distinguishing).
         let t = FakeTransport::new();
         t.on(HttpMethod::Head, &att_path(), 404, Vec::new());
-        assert_eq!(download_attachment(&t, "tok", &ATT_ID, &[]).unwrap(), None);
+        assert_eq!(
+            download_attachment(&t, "tok", &ATT_ID, &[], |_| {}).unwrap(),
+            None
+        );
 
         // Incomplete upload → None (never download a half-uploaded blob).
         let t2 = FakeTransport::new();
@@ -1542,7 +1624,10 @@ mod tests {
             Vec::new(),
             vec![("X-Uploaded-Length".to_string(), "3".to_string())],
         );
-        assert_eq!(download_attachment(&t2, "tok", &ATT_ID, &[]).unwrap(), None);
+        assert_eq!(
+            download_attachment(&t2, "tok", &ATT_ID, &[], |_| {}).unwrap(),
+            None
+        );
     }
 
     #[test]

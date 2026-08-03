@@ -733,23 +733,72 @@ async fn write_pending_attachment_tombstones(
     .map_err(|_| SyncCycleError::Io)
 }
 
-/// `download_attachment` with the same 429 backoff as [`download_blob_backoff`].
+/// `download_attachment` with the same 429 backoff as [`download_blob_backoff`],
+/// and — since #265 — RESUMING across those retries.
+///
+/// The engine's resume branch existed and was unreachable: both callers passed
+/// an empty prefix and nothing ever produced a non-empty one, because a single
+/// whole-body GET yields nothing at all when it fails. Upload has resumed from a
+/// HEAD-probed offset since it shipped; download restarted from byte 0 on every
+/// drop, which on a large attachment over a poor link is a transfer that cannot
+/// finish.
+///
+/// The engine now fetches in ranges and reports each one, so `partial` grows
+/// across attempts and a retry asks only for what is missing. A TRANSPORT
+/// failure is retried too, not just a 429 — a dropped connection is exactly the
+/// case resume exists for, and retrying it without a prefix would have been the
+/// same restart in a longer loop.
+///
+/// The prefix lives in RAM for the duration of this call. Persisting it across
+/// cycles would need the IO seam, which this synchronous path does not hold;
+/// the win here is the one the defect was about — a 64 MiB attachment no longer
+/// starts over because one range dropped.
 fn download_attachment_backoff(
     transport: &dyn SyncTransport,
     token: &str,
     id: &[u8; 32],
 ) -> Result<Option<Vec<u8>>, PullError> {
     let mut delay_ms = 250u64;
+    let mut partial: Vec<u8> = Vec::new();
+    let mut last: Option<PullError> = None;
     for _ in 0..6 {
-        match engine::download_attachment(transport, token, id, &[]) {
+        // The prefix this attempt starts from, and a separate buffer the
+        // progress callback fills. Two buffers rather than one because the
+        // engine borrows the prefix for the whole call while the callback
+        // writes — the same value cannot be both.
+        let prefix = std::mem::take(&mut partial);
+        let mut received: Vec<u8> = Vec::new();
+        let mut progress = |so_far: &[u8]| {
+            if so_far.len() > received.len() {
+                received.clear();
+                received.extend_from_slice(so_far);
+            }
+        };
+        let outcome = engine::download_attachment(transport, token, id, &prefix, &mut progress);
+        drop(progress);
+        // Keep whatever arrived — that is the whole point of resuming.
+        partial = if received.len() > prefix.len() {
+            received
+        } else {
+            prefix
+        };
+        match outcome {
             Err(PullError::RateLimited) => {
                 crate::task::block_sleep(std::time::Duration::from_millis(delay_ms));
                 delay_ms = (delay_ms * 2).min(2000);
+                last = Some(PullError::RateLimited);
+            }
+            Err(PullError::Transport(t)) => {
+                crate::task::block_sleep(std::time::Duration::from_millis(delay_ms));
+                delay_ms = (delay_ms * 2).min(2000);
+                last = Some(PullError::Transport(t));
             }
             other => return other,
         }
     }
-    engine::download_attachment(transport, token, id, &[])
+    // Out of attempts: report the last real failure rather than silently
+    // starting a seventh transfer.
+    Err(last.unwrap_or(PullError::BadResponse))
 }
 
 /// `upload_attachment` with the same 429 backoff.
