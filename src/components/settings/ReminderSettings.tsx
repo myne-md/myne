@@ -47,6 +47,11 @@ export type ReminderSettingsProps = {
  * Stating the DATE rather than the day count is the point — "registered through
  * 4 August" is checkable against a calendar; "7 days" makes the reader do the
  * arithmetic and get it wrong.
+ *
+ * The `- 1` (the horizon is inclusive of today) moved next to the cutoff it
+ * describes in #52, because the two clients derived it apart and drifted. This
+ * keeps the `YYYY-MM-DD`-string signature its callers use; the shared helper is
+ * `Date`-based because the mobile caller has a `Date` in hand.
  */
 export function horizonThrough(horizonDays: number | null, today: string): string {
   return shiftDay(today, (horizonDays ?? REMINDER_HORIZON_DAYS) - 1);
