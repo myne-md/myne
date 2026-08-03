@@ -144,7 +144,11 @@ pub fn wipe_files(dir: &Path) {
 fn cleanup_os_credential(dir: &Path) {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     if let Ok((_, meta)) = read_meta(dir) {
-        let _ = super::apple::AppleBiometricProvider::new(meta.account_number_hash).delete();
+        // The Keychain item is keyed by VaultId, not by account_number_hash:
+        // two same-account vaults (a KeepBoth backup restore) would otherwise
+        // share one item and delete each other's credential.
+        let id = crate::paths::vault_id_from_root(dir);
+        let _ = super::apple::AppleBiometricProvider::new(meta.account_number_hash, id).delete();
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     let _ = dir;
@@ -539,7 +543,8 @@ pub async fn quick_unlock_setup_biometric_from_host(
     {
         let dir = active_dir(host, state).await?;
         let (_, meta) = read_meta(&dir)?;
-        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
+        let id = crate::paths::vault_id_from_root(&dir);
+        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash, id);
         setup_with_dir(&dir, state, provider, &meta.account_number_hash).await
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
@@ -574,7 +579,7 @@ pub async fn quick_unlock_with_biometric_from_host(
         let dir = target_dir(host, state, vault_id.as_deref()).await?;
         let (_, meta) = read_meta(&dir)?;
         let id = crate::paths::vault_id_from_root(&dir);
-        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
+        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash, id);
         quick_unlock_with_dir(&dir, id, state, provider, host, hooks, vault_io).await
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
