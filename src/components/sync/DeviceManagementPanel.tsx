@@ -17,7 +17,7 @@
 // mobile SY-05 shows (SYNC-40 carries both ends in 459). Ship-gate: the SYNC-17
 // primitive-level review of the fingerprint substrate is recorded, not passed.
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   REMOVE_DEVICE_CONFIRM,
   REMOVE_DEVICE_DISCLOSURE,
@@ -264,13 +264,64 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
     // screen for a device that was never approved.
     if (!(await approve(deviceId))) return;
     setSas({ deviceId, fingerprint: null, loading: true });
-    try {
-      const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
-      setSas((s) => (s?.deviceId === deviceId ? { ...s, fingerprint: fp, loading: false } : s));
-    } catch {
-      setSas((s) => (s?.deviceId === deviceId ? { ...s, fingerprint: null, loading: false } : s));
-    }
   };
+
+  // #243: the approving side has to KEEP LOOKING, exactly like the two waiting
+  // surfaces do.
+  //
+  // This used to be a single `sync_head_fingerprint` call inside
+  // `approveAndVerify`. `None` is the honest answer for as long as this device
+  // has adopted no head, so that one call landing early left the panel showing
+  // "this code appears once the new device finishes its first sync" forever —
+  // however long the user waited, and however long ago the other device
+  // finished. The joining side polled every second while the approving side
+  // polled never: two halves of one ceremony built on opposite assumptions.
+  //
+  // Same shape as `JoinDeviceModal`: self-scheduling ~1 s tick with `sync_now`
+  // running ALONGSIDE rather than in front of the check (single-flight), so the
+  // match code is never gated on a full vault sync. Runs only while the verify
+  // screen is open and still has no code — the bounded, user-initiated window,
+  // not the steady-state background cadence.
+  const sasDeviceId = sas?.deviceId ?? null;
+  const sasFingerprint = sas?.fingerprint ?? null;
+  useEffect(() => {
+    if (sasDeviceId === null || sasFingerprint !== null) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let syncing = false;
+    const tick = async () => {
+      try {
+        if (!syncing) {
+          syncing = true;
+          void invoke("plugin:sync|sync_now")
+            .catch(() => {
+              /* transient — the next tick starts another */
+            })
+            .finally(() => {
+              syncing = false;
+            });
+        }
+        const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
+        if (!cancelled && fp) {
+          setSas((s) => (s?.deviceId === sasDeviceId ? { ...s, fingerprint: fp, loading: false } : s));
+          return; // the code is on screen — stop polling
+        }
+      } catch {
+        /* transient — retry next tick */
+      }
+      if (!cancelled) {
+        // First tick decided: stop claiming to be loading, so the screen says
+        // what it is actually doing (waiting) instead of "Syncing…" forever.
+        setSas((s) => (s?.deviceId === sasDeviceId && s.loading ? { ...s, loading: false } : s));
+        timer = setTimeout(() => void tick(), 1000);
+      }
+    };
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [sasDeviceId, sasFingerprint]);
 
   // SY-05 desktop end: the SAS eye-compare, shown right after an approve. Renders
   // the frozen Crockford `XXXX-XXXX` (SYNC-17: one encoding, no word-list) for the
@@ -512,6 +563,30 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                     <Icon name="pencil" size={16} />
                   </button>
                 </Tooltip>
+                {/* #243: a way BACK into the verify screen. Approval happens
+                    once, so before this the SAS compare was a dead end — dismiss
+                    it (or leave it showing the pending text) and there was no
+                    route back to the code for a device that was already
+                    approved. The compare is worth doing whenever the user gets
+                    round to it, not only in the seconds after they click
+                    Approve. */}
+                {!d.is_current && (
+                  <Tooltip label={t("sync.devices.verifyAction")}>
+                    <button
+                      type="button"
+                      style={{ ...ICON_BTN, opacity: busy ? 0.5 : 1 }}
+                      {...btnHover(busy)}
+                      disabled={busy}
+                      aria-label={t("sync.devices.verifyAction")}
+                      onClick={() =>
+                        setSas({ deviceId: d.device_id_hex, fingerprint: null, loading: true })
+                      }
+                      data-testid="sync.verify-device"
+                    >
+                      <Icon name="circle-check" size={16} />
+                    </button>
+                  </Tooltip>
+                )}
                 {!d.is_current && (
                   <Tooltip label={t("sync.devices.remove")}>
                     <button
