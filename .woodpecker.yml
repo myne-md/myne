@@ -303,6 +303,13 @@ steps:
       # Capability-descriptor drift gate (MYND-574 task 27): the UI's omission
       # set and the dispatcher's refusal set must agree, in both directions.
       - node scripts/check-web-capabilities.mjs
+      # Crypto-registry chokepoints (epic #249): direct HKDF `.expand`, a
+      # re-typed §10.3 magic, a hand-rolled u16-BE length prefix, a production
+      # `encode_*_raw` caller. All four compile clean, pass clippy and pass
+      # every other guard — and all four fail silently at runtime rather than
+      # loudly. Backstop for the pre-commit hook; sub-second, node-builtins
+      # only, so it runs before the build to fail fast.
+      - node scripts/check-crypto-registries.mjs
       # Prefs-nonce chokepoint (#251): every vault.prefs write flows through
       # `writePref`, which bumps the nonce sibling `usePrefs` instances re-read
       # on. Backstop for the pre-commit hook — `--no-verify` must not land a

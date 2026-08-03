@@ -32,7 +32,7 @@ use crate::attachment_nonce::{scan_attachments_manifest, AttachmentManifestEntry
 use protocol::{
     compute_manifest_hash, derive_subkey, encode_attachments_catalog, parse_vault_meta,
     serialize_vault_meta, AttachmentsCatalog, ManifestEntry, SubkeyRole, VaultHead, VvEntry,
-    VAULT_HEAD_FORMAT_V1,
+    CATALOG_BLOB_MAGIC, PREFS_BLOB_MAGIC, THEMES_BLOB_MAGIC, VAULT_HEAD_FORMAT_V1,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -554,6 +554,20 @@ pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 /// decryption-free — the sync-plane change discriminator shared by the MYC1
 /// catalog and MYP1 prefs envelopes. `None` unless `bytes` opens with the
 /// expected 4-byte magic.
+///
+/// `magic` is always a `protocol` registry constant at the call sites below,
+/// never a re-typed literal (`protocol.md` §10.3 is the single source of truth
+/// for magic-byte allocation, and a magic that stops matching here does not
+/// error — the blob reads as unchanged and its family silently stops syncing).
+/// Same precedent as [`crate::note_nonce`] and [`crate::attachment_nonce`],
+/// and enforced by `scripts/check-crypto-registries.mjs` (epic #249).
+///
+/// The `6..30` slice bounds are still literals, and deliberately so: `protocol`
+/// exports `*_BLOB_HEADER_LEN` for these three families but no per-family
+/// `OFFSET_*_NONCE` the way `protocol::blob` exports `OFFSET_CONTENT_NONCE`.
+/// Closing that gap means adding an exported offset constant per family in
+/// `protocol` first; until then the offsets are a known drift surface, not an
+/// oversight.
 fn read_singleton_nonce(bytes: &[u8], magic: &[u8; 4]) -> Option<[u8; 24]> {
     if bytes.len() < 30 || &bytes[0..4] != magic {
         return None;
@@ -565,7 +579,7 @@ fn read_singleton_nonce(bytes: &[u8], magic: &[u8; 4]) -> Option<[u8; 24]> {
 
 /// The catalog's sync discriminator (`read_singleton_nonce` over MYC1).
 fn read_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, b"MYC1")
+    read_singleton_nonce(bytes, &CATALOG_BLOB_MAGIC)
 }
 
 /// `vault.prefs`' reserved 16-byte sync-plane blob-id:
@@ -577,7 +591,7 @@ pub fn prefs_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 
 /// The prefs blob's sync discriminator (`read_singleton_nonce` over MYP1).
 fn read_prefs_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, b"MYP1")
+    read_singleton_nonce(bytes, &PREFS_BLOB_MAGIC)
 }
 
 /// `vault.themes`' reserved 16-byte sync-plane blob-id:
@@ -589,7 +603,7 @@ pub fn themes_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 
 /// The themes blob's sync discriminator (`read_singleton_nonce` over MYT1).
 fn read_themes_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, b"MYT1")
+    read_singleton_nonce(bytes, &THEMES_BLOB_MAGIC)
 }
 
 /// `<vault>/vault.themes` — the MYT1 custom-themes singleton.
@@ -3010,6 +3024,56 @@ mod tests {
             s.push_str(&format!("{x:02x}"));
         }
         s
+    }
+
+    /// Drift lock for the three singleton discriminators: each one must be
+    /// bound to its `protocol` §10.3 registry constant, and must refuse a
+    /// sibling family's magic. A re-typed literal that stopped matching would
+    /// not error — `read_singleton_nonce` returns `None`, the blob reads as
+    /// unchanged, and the family silently stops syncing. Nothing else in the
+    /// tree compares these bytes against anything but themselves.
+    #[test]
+    fn singleton_discriminators_are_bound_to_the_registry_constants() {
+        const NONCE: [u8; 24] = [0x7Au8; 24];
+
+        // A 30-byte envelope head: 4-byte magic, 2 filler, then the nonce.
+        fn envelope(magic: &[u8; 4]) -> Vec<u8> {
+            let mut b = Vec::with_capacity(30);
+            b.extend_from_slice(magic);
+            b.extend_from_slice(&[0x00, 0x00]);
+            b.extend_from_slice(&NONCE);
+            b
+        }
+
+        // Each reader accepts its own family's registry magic …
+        assert_eq!(
+            read_catalog_nonce(&envelope(&CATALOG_BLOB_MAGIC)),
+            Some(NONCE)
+        );
+        assert_eq!(read_prefs_nonce(&envelope(&PREFS_BLOB_MAGIC)), Some(NONCE));
+        assert_eq!(
+            read_themes_nonce(&envelope(&THEMES_BLOB_MAGIC)),
+            Some(NONCE)
+        );
+
+        // … and refuses every sibling family's, so a copy-paste that swapped
+        // two of them fails here instead of quietly halting one family's sync.
+        assert_eq!(read_catalog_nonce(&envelope(&PREFS_BLOB_MAGIC)), None);
+        assert_eq!(read_catalog_nonce(&envelope(&THEMES_BLOB_MAGIC)), None);
+        assert_eq!(read_prefs_nonce(&envelope(&CATALOG_BLOB_MAGIC)), None);
+        assert_eq!(read_prefs_nonce(&envelope(&THEMES_BLOB_MAGIC)), None);
+        assert_eq!(read_themes_nonce(&envelope(&CATALOG_BLOB_MAGIC)), None);
+        assert_eq!(read_themes_nonce(&envelope(&PREFS_BLOB_MAGIC)), None);
+
+        // Short of the 30-byte nonce window: no partial read.
+        let short = envelope(&CATALOG_BLOB_MAGIC);
+        assert_eq!(read_catalog_nonce(&short[..29]), None);
+
+        // The registry values themselves, spelled out once here so a change to
+        // a §10.3 magic fails a test rather than silently re-keying a family.
+        assert_eq!(&CATALOG_BLOB_MAGIC, b"MYC1");
+        assert_eq!(&PREFS_BLOB_MAGIC, b"MYP1");
+        assert_eq!(&THEMES_BLOB_MAGIC, b"MYT1");
     }
 
     /// End-to-end proof: device A authors a note, pushes it through a real
