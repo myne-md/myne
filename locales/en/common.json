@@ -1090,6 +1090,7 @@
       "menuEdit": "Edit {{field}}",
       "menuTitle": "Add field",
       "repeatNoAnchor": "This task has no date to repeat from, so it won't repeat. Add a due date to start it.",
+      "repeatNeedsDate": "Needs a due date to repeat from",
       "save": "Save",
       "skipOccurrence": "Skip this occurrence",
       "title": {

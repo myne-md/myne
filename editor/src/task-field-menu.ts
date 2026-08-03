@@ -28,6 +28,7 @@ import {
   type TaskFieldEditHandle,
 } from "./decorations/task-chip";
 import { canSkipOccurrence, skipOccurrence } from "./decorations/task-recurrence";
+import { canRecur } from "@myne/dialect/taskRecurrence";
 import i18n from "@myne/editor/i18n";
 
 /** Menu order — the same stable order the writer serializes in. */
@@ -68,7 +69,24 @@ export function openTaskFieldAdd(
       edit.end();
       // Null means the line was deleted while the editor was open — declining is
       // the only correct answer (mirrors the chip listener).
-      if (span !== null) applyTaskFieldEdit(view, span, next);
+      if (span === null) return;
+      if (!applyTaskFieldEdit(view, span, next)) return;
+      // myne#276: a `repeat` with nothing to repeat FROM is inert by
+      // construction, and the menu let you mint one with no warning of any
+      // kind. Rather than refuse the write — the rule the user typed is
+      // correct, and refusing it would discard it — offer the anchor it needs,
+      // in the same surface, immediately. Declining leaves the rule on the line
+      // with its inline explanation (`task-chip.ts`), so nothing is lost either
+      // way.
+      if (kind !== "repeat" || next === "") return;
+      // Re-read the line from the post-write document. Clamped, because a
+      // document that shrank under a concurrent change must not throw here —
+      // an offer of a due date is not worth an exception on the save path.
+      const written = view.state.doc.lineAt(
+        Math.min(span.from, view.state.doc.length),
+      );
+      if (canRecur(written.text)) return;
+      openTaskFieldAdd(view, written.from, "due", anchor);
     },
     onCancel: () => edit.end(),
   });
@@ -131,6 +149,13 @@ export function openTaskFieldMenu(opts: {
   // are inline and a bare test DOM never applies the imported CSS.
   surface.style.position = "fixed";
 
+  // myne#276: whether picking **Repeat** here would mint an inert rule. The
+  // line carries no `due` and no `remind`, so whatever rule the user chooses
+  // has nothing to repeat FROM. Say so on the row, before they commit — the
+  // previous signal was a `title=` tooltip on the resulting raw text, which
+  // requires already knowing where to hover.
+  const repeatNeedsAnchor = !present.has("due") && !/\[remind::/i.test(line.text);
+
   let firstRow: HTMLButtonElement | null = null;
   for (const kind of MENU_KINDS) {
     const row = document.createElement("button");
@@ -139,9 +164,18 @@ export function openTaskFieldMenu(opts: {
     row.setAttribute("role", "menuitem");
     row.setAttribute("data-testid", `editor.task-field-menu-${kind}`);
     const title = i18n.t(`editor.taskField.title.${kind}`);
-    row.textContent = present.has(kind)
+    const label = document.createElement("span");
+    label.textContent = present.has(kind)
       ? i18n.t("editor.taskField.menuEdit", { field: title })
       : title;
+    row.appendChild(label);
+    if (kind === "repeat" && repeatNeedsAnchor) {
+      const note = document.createElement("span");
+      note.className = "cm-task-field-menu-note";
+      note.setAttribute("data-testid", "editor.task-field-menu-repeat-note");
+      note.textContent = i18n.t("editor.taskField.repeatNeedsDate");
+      row.appendChild(note);
+    }
     row.addEventListener("click", () => {
       // Capture the row's rect BEFORE close() removes it from the DOM — the
       // field editor anchors to where the row was.

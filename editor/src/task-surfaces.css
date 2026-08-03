@@ -318,6 +318,25 @@
   cursor: pointer;
 }
 
+/* A row that carries a note stacks label over note instead of centring one
+   line — see `.cm-task-field-menu-note`. */
+.cm-task-field-menu-row:has(.cm-task-field-menu-note) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* myne#276: "Repeat needs a date to repeat from" said on the row, before the
+   user commits to a rule that would be inert. Quieter than the label, and it
+   must NOT take the row's hover colour — it is an explanation, not a second
+   action. */
+.cm-task-field-menu-note {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--fg-3, #6b6a64);
+}
+
 .cm-task-field-menu-row:hover,
 .cm-task-field-menu-row:focus-visible {
   background: var(--accent-soft, #e8edf5);

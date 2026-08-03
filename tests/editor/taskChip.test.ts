@@ -742,6 +742,40 @@ describe("anchorless recurrence rule (myne#197)", () => {
     teardown(view, host);
   });
 
+  // myne#276 — the tooltip was the WHOLE explanation, and it required already
+  // knowing where to hover. This one failure's repair is somewhere else on the
+  // line (a due date that isn't there), so unlike the other three hints, reading
+  // the flagged text is not the diagnosis. It renders inline.
+  it("explains itself inline, not only on hover", () => {
+    const { view, host } = mount("- [ ] shower [repeat:: every day]\n");
+    const hint = host.querySelector('[data-testid="editor.task-field-hint"]');
+    expect(hint).not.toBeNull();
+    expect(hint!.textContent).toBe(i18n.t("editor.taskField.repeatNoAnchor"));
+    teardown(view, host);
+  });
+
+  it("contributes no bytes — the note on disk is what the user typed", () => {
+    const raw = "- [ ] shower [repeat:: every day]\n";
+    const { view, host } = mount(raw);
+    expect(view.state.doc.toString()).toBe(raw);
+    teardown(view, host);
+  });
+
+  it("shows no inline hint for a rule that is simply unreadable", () => {
+    // That text IS the diagnosis — an aside repeating it would be noise.
+    const { view, host } = mount("- [ ] shower [repeat:: every fortnight]\n");
+    expect(host.querySelector('[data-testid="editor.task-field-hint"]')).toBeNull();
+    teardown(view, host);
+  });
+
+  it("drops the inline hint as soon as the line gains an anchor", () => {
+    const { view, host } = mount(
+      "- [ ] shower [due:: 2026-08-01] [repeat:: every day]\n",
+    );
+    expect(host.querySelector('[data-testid="editor.task-field-hint"]')).toBeNull();
+    teardown(view, host);
+  });
+
   it("accepts a reminder as the anchor", () => {
     // A pure reminder still recurs (decisions.md 2026-07-30: the anchor is
     // `due`, else `remind`), so it must still chip.
