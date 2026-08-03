@@ -121,12 +121,50 @@ pub struct EnrollOutcome {
 pub enum EnrollError {
     /// Account/username unknown or the proof was rejected (server 401).
     Unauthenticated,
+    /// The account is FROZEN (server 403 `frozen`, MYND-506).
+    ///
+    /// A distinct variant because the remedy is distinct and the credential
+    /// message is actively wrong: the user's account number, password and
+    /// phrase are all correct, and no amount of re-typing them will help. It
+    /// used to flatten into `Unauthenticated`, so the app told the user their
+    /// credentials were incorrect while the server had said exactly why.
+    Frozen,
+    /// The account is at its device cap (server 403 `device_limit`, MYND-506).
+    /// Same reasoning as `Frozen`: correct credentials, different remedy —
+    /// remove a device.
+    DeviceLimit,
+    /// The device is registered but still awaiting approval (server 403
+    /// `pending_approval`).
+    PendingApproval,
     /// The server's signature did not match — possible MITM; abort (mutual auth).
     ServerSignatureMismatch,
     /// A malformed / unparseable server response.
     BadResponse,
     /// Transport-level failure.
     Transport(TransportError),
+}
+
+/// A server error body (mirrors the Go `errBody`), for the 403 codes above.
+#[derive(Debug, Clone, Deserialize)]
+struct EnrollErrBodyWire {
+    #[serde(default)]
+    error_code: String,
+}
+
+/// Map a 403 body's `error_code` to the variant that names the remedy.
+///
+/// An unparseable or unrecognised body degrades to `Unauthenticated`, which is
+/// what the whole 403 family used to be — no worse than before, and no guessing.
+fn forbidden_reason(body: &[u8]) -> EnrollError {
+    let code = serde_json::from_slice::<EnrollErrBodyWire>(body)
+        .map(|e| e.error_code)
+        .unwrap_or_default();
+    match code.as_str() {
+        "frozen" => EnrollError::Frozen,
+        "device_limit" => EnrollError::DeviceLimit,
+        "pending_approval" => EnrollError::PendingApproval,
+        _ => EnrollError::Unauthenticated,
+    }
 }
 
 impl From<TransportError> for EnrollError {
@@ -305,6 +343,14 @@ pub fn enroll(
     };
     if final_resp.status == 401 {
         return Err(EnrollError::Unauthenticated);
+    }
+    // #268: the server says WHY it refused, in the body, and this used to throw
+    // that away — every 403 became `BadResponse` and then, one layer up, the
+    // non-distinguishing "Account number, password, or recovery phrase is
+    // incorrect" banner. For a frozen account or a hit device cap the
+    // credentials are correct and re-typing them can never work.
+    if final_resp.status == 403 {
+        return Err(forbidden_reason(&final_resp.body));
     }
     if final_resp.status != 200 {
         return Err(EnrollError::BadResponse);
@@ -894,7 +940,9 @@ pub async fn enroll_device_from_host(
                 &client_nonce,
                 device_id,
             )
-            .map_err(|_| SyncDeviceError::Unauthenticated)?;
+            // #268: preserve the server's reason instead of flattening every
+            // refusal into "credentials incorrect".
+            .map_err(SyncDeviceError::from)?;
 
             // 6. On approval: store the token, seed vault.meta to the server (so the
             //    next device can fetch it), and persist the account/device identity
@@ -1406,7 +1454,9 @@ pub async fn join_account_from_host(
                 &client_nonce,
                 device_id,
             )
-            .map_err(|_| SyncDeviceError::Unauthenticated)?;
+            // #268: preserve the server's reason instead of flattening every
+            // refusal into "credentials incorrect".
+            .map_err(SyncDeviceError::from)?;
 
             // Identity persistence is deferred to the async caller (task 86) —
             // `state.rs` is on the storage seam and the seam is async, while

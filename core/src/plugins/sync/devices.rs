@@ -330,8 +330,44 @@ pub enum SyncDeviceError {
     /// and the captured fingerprint is deliberately not reported
     /// (`super::pin_confirm`'s module doc).
     FingerprintMismatch,
+    /// The account is FROZEN — the server said so, in the 403 body (#268).
+    ///
+    /// Its own variant for the same reason `AccountMismatch` is: the remedy is
+    /// different in kind. The account number, password and phrase are all
+    /// correct; re-typing them can never work. Flattened into
+    /// `Unauthenticated`, it produced the non-distinguishing "Account number,
+    /// password, or recovery phrase is incorrect" banner — a message the server
+    /// had already contradicted.
+    AccountFrozen,
+    /// The account is at its device cap (server 403 `device_limit`, #268).
+    /// Correct credentials, different remedy: remove a device first.
+    DeviceLimitReached,
+    /// The device is registered and still awaiting approval (server 403
+    /// `pending_approval`, #268) — not a credential problem either.
+    AwaitingApproval,
     /// Internal (task join, IO).
     Internal,
+}
+
+impl From<super::enroll::EnrollError> for SyncDeviceError {
+    /// #268: preserve the reason the server gave.
+    ///
+    /// Both enrolment call sites used a blanket
+    /// `.map_err(|_| SyncDeviceError::Unauthenticated)`, which flattened a
+    /// frozen account, a hit device cap, a pending approval and a genuine
+    /// credential failure into one message — and three of those four are not
+    /// credential failures at all.
+    fn from(e: super::enroll::EnrollError) -> Self {
+        use super::enroll::EnrollError as E;
+        match e {
+            E::Frozen => SyncDeviceError::AccountFrozen,
+            E::DeviceLimit => SyncDeviceError::DeviceLimitReached,
+            E::PendingApproval => SyncDeviceError::AwaitingApproval,
+            E::ServerSignatureMismatch => SyncDeviceError::FingerprintMismatch,
+            E::Unauthenticated => SyncDeviceError::Unauthenticated,
+            E::BadResponse | E::Transport(_) => SyncDeviceError::Transport,
+        }
+    }
 }
 
 /// The fingerprint gate's refusals, projected onto this command's enum
