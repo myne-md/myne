@@ -1,0 +1,93 @@
+name: Engineering / recurrence prevention
+description: Close a class of defect structurally — a chokepoint, a repo guard, or an API change that makes a recurring mistake impossible rather than merely fixed.
+title: "[Eng]: "
+labels: ["type: chore"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This form is for the cause, not the symptom.**
+
+        - A single broken behaviour → [Bug report](https://github.com/myne-md/myne/issues/new?template=bug_report.yml).
+        - A user-facing capability → [Feature request](https://github.com/myne-md/myne/issues/new?template=feature_request.yml).
+        - An undisclosed or exploitable vulnerability → **STOP**, email **security@myne.md** ([SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md)).
+        - **This form:** the same mistake has landed more than once, or can land again silently, and you want the tree to stop allowing it.
+
+        Myne's guards are the machine-checked half of the rules `CLAUDE.md` states in prose — see the "Repo guards" table there, and `scripts/check-core-io-seam.mjs` for the house ratchet pattern (a recorded violation list that may shrink but never grow). Prefer a ratchet over a hard gate when existing violations are real: it stops new ones on day one and turns each old one into a one-line deletion.
+  - type: textarea
+    id: failure-class
+    attributes:
+      label: Which recurring failure does this prevent?
+      description: Describe the CLASS, not one instance. What does a developer have to remember today, and what happens when they forget?
+      placeholder: "e.g. Every prefs setter must also call bumpPrefsNonce(). It is an optional second line in ~45 call sites, and forgetting it leaves the open editor showing a setting the user already changed."
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Where has it already happened?
+      description: file:line for each known instance. If this is speculative rather than observed, say so — a prevention with no evidence is a guess about the future.
+      placeholder: |
+        - src/lib/prefs.ts:948 setFavorites — favourites silently truncated and the truncation synced
+        - src/lib/prefs.ts:886 setRightPanelActiveTab — palette commands appear to do nothing
+    validations:
+      required: true
+  - type: textarea
+    id: structural
+    attributes:
+      label: Structural change
+      description: What makes the mistake impossible or unnecessary — a required parameter, a single write path, an extracted module, a runtime assert. If the answer is "nothing, only a guard", write "guard only" and say why the structure cannot change.
+    validations:
+      required: true
+  - type: textarea
+    id: guard
+    attributes:
+      label: Ratchet or guard
+      description: The mechanical check, where it runs (pre-commit / CI step), and the message it prints. Guards live in `scripts/`, are zero-dependency and hand-runnable, and carry a header comment explaining the failure they prevent.
+      placeholder: "scripts/check-<name>.mjs — lefthook pre-commit + CI pnpm-build. Fails with the offending file:line and the reason the rule exists."
+  - type: textarea
+    id: violations
+    attributes:
+      label: Known violations to record
+      description: The starting allowlist. Each entry should name the issue that removes it, so the epic's finish condition is "this list is empty".
+      placeholder: |
+        - src/lib/prefs.ts:948 — removed by #NNN
+        - src/lib/prefs.ts:886 — removed by #NNN
+  - type: dropdown
+    id: rung
+    attributes:
+      label: How strongly is the rule held after this lands?
+      description: Higher is better. Reach for the highest rung the change can afford.
+      options:
+        - Impossible — the type system or API shape rejects it (does not compile)
+        - Single path — the side effect lives in a chokepoint, there is nothing to forget
+        - Ratchet — a guard fails the commit; recorded violations may shrink, never grow
+        - Warning — the developer is told, but not blocked (say why a gate would be wrong)
+        - Documentation only — no mechanical enforcement
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area?
+      options:
+        - Desktop client
+        - Web client
+        - Mobile client
+        - Editor / markdown
+        - Sync
+        - Protocol / on-disk format
+        - Repo guards / CI
+        - E2E / test harness
+        - Other
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I described a class of failure with at least one observed instance, not a style preference.
+          required: true
+        - label: This does not disclose an exploitable vulnerability (those go privately to security@myne.md).
+          required: true
+        - label: If this adds a guard, it belongs in the `CLAUDE.md` "Repo guards" table in the same change.
+          required: true
