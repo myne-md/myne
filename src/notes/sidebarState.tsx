@@ -28,6 +28,12 @@ import {
   buildRankMap,
   type NoteId,
 } from "@myne/editor/host/notes/itemOrder";
+import {
+  isLiveNote,
+  isListedTemplate,
+  isResolverCandidate,
+  isTrashedNote,
+} from "@myne/editor/host/notes/selectors";
 import { createNote } from "./createNote";
 import { createDrawing } from "./createDrawing";
 import { isNoteFolderArchived } from "./archivedFolders";
@@ -187,14 +193,7 @@ export function liveCache(
     // out of the working set — the folder-level twin of the per-note `archived:`
     // marker; like note-archive (and unlike trash) it stays in {@link
     // resolverCache}, so `archivedKeys` deliberately does NOT touch that axis.
-    if (
-      record.trashed == null &&
-      record.deleted == null &&
-      record.archived == null &&
-      record.template !== true &&
-      record.conflict !== true &&
-      !isNoteFolderArchived(record.folder, archivedKeys)
-    ) {
+    if (isLiveNote(record) && !isNoteFolderArchived(record.folder, archivedKeys)) {
       live.set(id, record);
     }
   }
@@ -240,12 +239,7 @@ export function resolverCache(
   for (const [id, record] of cache) {
     // Conflict copies are excluded from the resolver too (MYND-427): a transient
     // keep-both copy must not become a backlink target / graph node until reconciled.
-    if (
-      record.trashed == null &&
-      record.deleted == null &&
-      record.template !== true &&
-      record.conflict !== true
-    ) {
+    if (isResolverCandidate(record)) {
       out.set(id, record);
     }
   }
@@ -262,7 +256,7 @@ export function trashedRecords(
   for (const record of cache.values()) {
     // A tombstoned (`deleted:`) note leaves the Trash too — emptying the trash
     // (or discarding a conflict) is a propagating delete, not a move-to-trash.
-    if (record.trashed != null && record.deleted == null) out.push(record);
+    if (isTrashedNote(record)) out.push(record);
   }
   out.sort((a, b) => (b.trashed ?? "").localeCompare(a.trashed ?? ""));
   return out;
@@ -275,7 +269,7 @@ export function trashedRecords(
 export function trashedCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
   let n = 0;
   for (const record of cache.values()) {
-    if (record.trashed != null && record.deleted == null) n += 1;
+    if (isTrashedNote(record)) n += 1;
   }
   return n;
 }
@@ -319,8 +313,7 @@ export function templateRecords(
 ): TitleRecord[] {
   const out: TitleRecord[] = [];
   for (const record of cache.values()) {
-    if (record.template === true && record.trashed == null && record.deleted == null)
-      out.push(record);
+    if (isListedTemplate(record)) out.push(record);
   }
   out.sort((a, b) => {
     const at = a.updatedAt?.getTime() ?? 0;
