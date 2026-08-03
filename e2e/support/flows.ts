@@ -446,10 +446,25 @@ export async function completePasswordReset(
 
 const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
 
+/** Open the sidebar's "+" menu and click one of its entries.
+ *
+ *  #230 folded the separate new-note and new-folder buttons into a single `+`
+ *  menu, so those entries render only while it is open — the testids still
+ *  exist, they are simply not on screen by default. Every helper that used to
+ *  click one directly has to open the menu first. Clicking `+` while the menu is
+ *  already open would toggle it shut, so this checks before firing. */
+export async function clickNewMenuItem(session: Session, testId: string): Promise<void> {
+  if ((await session.byTestIdAll("notes.new-menu-dropdown")).length === 0) {
+    await (await session.byTestId("notes.new-menu")).click();
+    await session.byTestId("notes.new-menu-dropdown");
+  }
+  await (await session.byTestId(testId)).click();
+}
+
 /** Create a note via the sidebar CTA and commit `title` through the
  *  inline-rename input (Enter). Leaves the note selected. */
 export async function createNote(session: Session, title: string): Promise<void> {
-  await (await session.byTestId("notes.create")).click();
+  await clickNewMenuItem(session, "notes.create");
   const rename = await session.byTestId("notes.rename-input");
   await rename.sendKeys(`${title}`);
   await session.waitForGone(testIdSelector("notes.rename-input"));

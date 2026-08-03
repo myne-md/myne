@@ -24,6 +24,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickNewMenuItem,
   createNote,
   dismissImporterOffer,
   editorText,
@@ -254,7 +255,7 @@ describeE2E("nc4 folder delete soft-trashes its notes (MYND-223 / MYND-144)", ()
         await dismissImporterOffer(s);
 
         // Folder + a note inside it (context-menu "New note here").
-        await (await s.byTestId("notes.new-folder")).click();
+        await clickNewMenuItem(s, "notes.new-folder");
         await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv\uE007");
         const folder = await s.byTestId("notes.folder-row");
         await contextMenuPick(s, folder, "new-note");
@@ -294,7 +295,7 @@ describeE2E("ms1 multi-select bulk move (MYND-367)", () => {
         // trailing `\uE007` (W3C Enter) commits the inline new-folder input —
         // without it the input never materializes `notes.folder-row` and the
         // next line times out (the nc4 site above carries the same key).
-        await (await s.byTestId("notes.new-folder")).click();
+        await clickNewMenuItem(s, "notes.new-folder");
         await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv\uE007");
         await s.byTestId("notes.folder-row");
         await createNote(s, "Multi Alfa");

@@ -24,6 +24,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import {
+  clickNewMenuItem,
   dismissImporterOffer,
   pageSeatInvoke,
   runPaletteAction,
@@ -53,7 +54,7 @@ const ENTER = "\uE007";
  * one) and the `data-folder-path` assertion would miss.
  */
 async function createFolder(s: Session, name: string): Promise<void> {
-  await (await s.byTestId("notes.new-folder")).click();
+  await clickNewMenuItem(s, "notes.new-folder");
   await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}${ENTER}`);
   await s.byTestId("notes.folder-row");
 }
