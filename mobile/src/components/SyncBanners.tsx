@@ -9,7 +9,7 @@
 // Direct-to-code per the owner directive; mobile has no i18n → plain strings,
 // EXCEPT the load-bearing literal, which is never i18n'd or paraphrased anyway.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useSyncStatus } from "../lib/use-sync-status";
 import { SYNC_INTEGRITY_ALERT } from "../lib/load-bearing-copy";
@@ -95,18 +95,15 @@ export interface SyncBannersProps {
 /** Host: the three banners above the note list, driven by the shared hook. */
 export function SyncBanners({ onVerifyDevices, onOpenConflicts }: SyncBannersProps) {
   const { t } = useTranslation();
-  const { status, reconciling, integrityAlert } = useSyncStatus();
-  const [reconcileDismissed, setReconcileDismissed] = useState(false);
+  const { status, reconciling, dismissReconcile, integrityAlert } = useSyncStatus();
   const [integrityDismissed, setIntegrityDismissed] = useState(false);
 
-  // Re-arm the reconcile dismiss when a reconcile ends, so the NEXT reconcile
-  // shows again (the integrity alert stays acknowledged — it does not auto-clear).
-  useEffect(() => {
-    if (!reconciling) setReconcileDismissed(false);
-  }, [reconciling]);
-
+  // #48: no local dismissed flag any more. The hook's `reconciling` is armed by
+  // both reconcile events (they both arrive after the fact) and cleared only
+  // here, so "dismissed" and "not armed" are the same state — a second flag
+  // could only get out of step with it.
   const conflictCount = status?.state === "conflicts" ? status.count : 0;
-  const showReconcile = reconciling && !reconcileDismissed;
+  const showReconcile = reconciling;
   const showIntegrity = integrityAlert && !integrityDismissed;
   const showConflicts = conflictCount > 0;
   if (!showReconcile && !showIntegrity && !showConflicts) return null;
@@ -130,7 +127,7 @@ export function SyncBanners({ onVerifyDevices, onOpenConflicts }: SyncBannersPro
           <button
             type="button"
             aria-label={t("common.dismiss")}
-            onClick={() => setReconcileDismissed(true)}
+            onClick={dismissReconcile}
             style={DISMISS}
             data-testid="sync.reconcile-banner-dismiss"
           >

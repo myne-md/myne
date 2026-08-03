@@ -28,9 +28,13 @@ const STATUS_POLL_MS = 5000;
 export interface SyncStatusHook {
   /** The current status; `null` until the first read resolves. */
   status: SyncStatus | null;
-  /** True while a `410`-beyond-horizon full reconcile is running (SYNC-10). */
+  /** True once a `410`-beyond-horizon full reconcile has HAPPENED (SYNC-10).
+   *  Not a live bracket: the producer emits both of its events after the fact,
+   *  so "during" is not observable (#48). Cleared by {@link dismissReconcile}. */
   reconciling: boolean;
   /** True after a fork-integrity alert (rejected rollback / forged head); the banner owns dismissal. */
+  /** Clear the reconcile notice — the banner's dismiss. */
+  dismissReconcile: () => void;
   integrityAlert: boolean;
   /** Trigger an immediate sync. */
   syncNow: () => Promise<void>;
@@ -75,13 +79,21 @@ export function useSyncStatus(): SyncStatusHook {
     // nudge (MYND-461) so the surfaces don't lag a whole poll interval.
     sub("sync://enrollment-changed", tick);
     sub("sync://status-changed", tick);
-    // Reconcile banner: on for the duration of a beyond-horizon full reconcile.
-    sub("sync://reconcile-started", () => {
+    // Reconcile banner: ARMED by both events, exactly as desktop does (#48).
+    //
+    // These were treated as a live bracket — `started` → true, `finished` →
+    // false — but the producer emits BOTH after the fact, in the same tick, at
+    // the end of the reconcile. So the banner turned on and off inside one
+    // event-loop turn and could never be seen: a device that had just silently
+    // re-downloaded and re-reconciled the whole vault showed the user nothing,
+    // including when notes were reshuffled or quarantined by it.
+    //
+    // Cleared by the banner's own dismiss, not by an event.
+    const armReconcile = () => {
       if (mounted.current) setReconciling(true);
-    });
-    sub("sync://reconcile-finished", () => {
-      if (mounted.current) setReconciling(false);
-    });
+    };
+    sub("sync://reconcile-started", armReconcile);
+    sub("sync://reconcile-finished", armReconcile);
     // Fork-integrity alert (rejected rollback / forged head, the Rust-side
     // SYNC-10 verdict) — flipped true here; the integrity banner owns dismissal.
     sub("sync://integrity-alert", () => {
@@ -111,5 +123,13 @@ export function useSyncStatus(): SyncStatusHook {
     }
   }, []);
 
-  return { status, reconciling, integrityAlert, syncNow, busy };
+  return {
+    status,
+    reconciling,
+    // #48: the banner owns dismissal now that no event clears the flag.
+    dismissReconcile: () => setReconciling(false),
+    integrityAlert,
+    syncNow,
+    busy,
+  };
 }
