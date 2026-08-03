@@ -140,7 +140,7 @@ Normative properties:
 When the user commits the new master password, the client:
 
 1. Derives a new `password_wrap_key` via Argon2id with a freshly generated `random_salt_password_16` and the canonical KDF parameter block (`protocol.md` §3.1, §4).
-2. AEAD-encrypts the in-memory `root_key` under the new `password_wrap_key`, producing a new `enc_root_key_password` and a new `nonce_password_wrap`. The AAD binds the new salt and KDF parameters per `protocol.md` §3.1 + §4.3.
+2. AEAD-encrypts the in-memory `root_key` under the new `password_wrap_key`, producing a new `enc_root_key_password` and a new `nonce_password_wrap`. The AAD binds the length-prefixed `password-wrap` role string and the canonical KDF parameter block per `protocol.md` §3.1 + §4.3; it does **not** contain the salt. The fresh salt is bound *implicitly*, by being an Argon2id input — a substituted salt derives a different `password_wrap_key`, so the CTX tag fails and the substitution is caught.
 3. Assembles a new `vault.meta` byte sequence per `protocol.md` §9.3, **preserving** all recovery-side fields unchanged: `random_salt_recovery_16`, `nonce_recovery_wrap`, `enc_root_key_recovery`. The recovery phrase does not change across password resets (`protocol.md` §7.3).
 4. Writes the new bytes via the **tempfile-rename** pattern: write to `vault.meta.tmp` in the same directory as `vault.meta`, fsync the temp file, then rename it over `vault.meta`. POSIX `rename(2)` on the same filesystem is atomic — a power loss before the rename leaves the original `vault.meta` intact and the temp file orphaned (cleanable on next start); a power loss after the rename leaves the new `vault.meta` fully written.
 
