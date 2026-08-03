@@ -169,11 +169,12 @@ export function mapDeleteVaultError(
  *
  * **Post-condition on resolve:** `Slot::Empty` + `<app_data_dir>/vault/`
  * recursively removed (modulo the per-file partial-fail surface).
- * Caller dispatches the appropriate Stage Action variant via the
- * `onDeleteVaultSuccess` callback chain:
- *   - From Settings → Editor → `editor.delete-vault-success` → welcome
- *   - From Unlock screen → `unlock.delete-vault-success` → welcome
- *   - From Recovery phrase-entry → `recover.delete-vault-success` → welcome
+ * Caller fires `onDeleteVaultSuccess`, which the shell wires to `reprobe()`
+ * (#45). Boot routing then picks the return surface by REMAINING vault count —
+ * picker at ≥2, that vault's unlock at 1, welcome at 0. It used to dispatch one
+ * of three `*.delete-vault-success` actions that all transitioned to `welcome`,
+ * which stranded a multi-vault user on the first-run screen with every other
+ * vault invisible.
  *
  * Slot stays Empty regardless of resolve vs reject — on the
  * Unlocked/Recovering arms the zeroize fires before unlink; on the
