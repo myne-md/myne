@@ -912,36 +912,60 @@ steps:
   # only ever ran on aarch64/x86_64 is evidence about a different machine. Both
   # lanes belong in this step; the browser one is what task 15 owes.
   #
-  # ENABLED 2026-07-28. `myne-test-vectors` is a PRIVATE repo, so the clone needs
-  # a token; `vectors_token` is now provisioned in this repo's Woodpecker
-  # secrets (a Forgejo PAT with read:repository on Myne/myne-test-vectors).
+  # WHY THIS IS STILL A COMMENT, AND WHAT IT COSTS. `myne-test-vectors` is a
+  # PRIVATE repo, so the clone needs a token — and a `from_secret:` naming a
+  # secret this repo cannot see fails CONFIG-COMPILE: the WHOLE pipeline errors
+  # before any step runs. Not hypothetical. This step was uncommented on
+  # 2026-07-28 on the assertion that `vectors_token` was provisioned; it was
+  # not, and every gate on this repo was dead on every branch and every PR —
+  # fmt, clippy, cargo-test, vitest, e2e, the web lane — until the re-comment on
+  # 2026-07-29 (MYND-635). Same caution as sync-sim above, which learned it the
+  # hard way.
   #
-  # **The ordering that made this a comment for so long is worth keeping in
-  # mind if it is ever removed again**: referencing a secret this repo cannot see
-  # errors the WHOLE pipeline at config-compile — no step runs at all — so a
-  # `from_secret:` written BEFORE the secret exists takes down every other gate.
-  # Same caution as sync-sim above, which learned it the hard way, and the same
-  # failure that was erroring `myne-server`'s PR checks at the time this landed.
+  # The cost of leaving it commented is NOT zero and is easy to misread as zero:
+  # cargo-test runs the `vectors` target (it is `-p protocol`), every runner
+  # prints `[skip]`, and the step reports green having asserted nothing. Three
+  # docs (protocol/CLAUDE.md twice, myne-server/CLAUDE.md once) describe this
+  # gate as enforcing; today it enforces on no machine. If part 1 below turns
+  # out to be impossible, the honest move is to soften that prose rather than
+  # leave "nobody checked" reading as "someone checked and it was fine".
+  #
+  # TO RE-ENABLE — four parts, IN THIS ORDER. Parts 1 and 2 are not diffs, and
+  # nothing in a review can tell you they happened. That is the whole hazard.
+  #
+  #   1. Provision the token on THIS repo (Woodpecker → repo → Settings →
+  #      Secrets). Two ways: add `vectors_token`, a Forgejo PAT with
+  #      read:repository on Myne/myne-test-vectors; or point the env key below
+  #      at `myne_server_token`, which this repo already has and sync-sim above
+  #      already resolves. Forgejo PAT scopes are per-user rather than per-repo,
+  #      so that existing PAT plausibly already reads the vectors repo — VERIFY
+  #      by cloning with it, never assume, since assuming is precisely what
+  #      caused the 2026-07-28 outage. Whichever you pick, the `from_secret:`
+  #      below must name a secret that exists.
+  #   2. Push any commit with this step STILL COMMENTED and confirm the pipeline
+  #      config-compiles. A green run is the only evidence part 1 landed.
+  #   3. Uncomment the step below AND restore its `notify-failure` entry, whose
+  #      slot is reserved by a comment there. A gate nobody is told about is a
+  #      gate that goes red unnoticed.
+  #   4. Keep `MYNE_VECTORS_REQUIRED` set on the step. `cases_json` in
+  #      protocol/tests/vectors.rs skips a missing fixture — right for a fresh
+  #      clone, wrong for the one step whose entire job is to assert. If that
+  #      helper has no env-gated arm yet, add it in the same change (panic with
+  #      the missing path instead of `eprintln!` + `return None`, only when the
+  #      variable is set, so `pre-push` and fresh clones keep today's skip).
+  #      Without it, an expired token or a moved ref silently returns this step
+  #      to green-and-empty, which is the state it is commented out over.
   #
   # The step still self-skips on an absent token rather than failing, so a fork
   # PR (which gets no secrets) is not blocked by a companion it cannot clone.
-  #
-  # RE-COMMENTED 2026-07-29 (MYND-635). Enabling this on 2026-07-28 asserted the
-  # secret was provisioned; it was not, and the caution three paragraphs up says
-  # exactly what follows from that — a `from_secret:` naming a secret the repo
-  # cannot see fails CONFIG-COMPILE, so no step runs at all. Every gate on this
-  # repo was dead from that commit until this one: fmt, clippy, cargo-test,
-  # vitest, e2e, the web lane, all of it, on every branch and every PR.
-  #
-  # The lesson is not "be careful" — it is that enabling this is a TWO-PART
-  # change and the parts are not both in git. Add `vectors_token` to this repo's
-  # Woodpecker secrets FIRST, confirm a pipeline still compiles, and only then
-  # uncomment. Nothing in a diff can tell you the first half happened.
   # vector-verification:
   #   image: rust:1.96.0-slim
   #   when: *code-paths
   #   depends_on: [cargo-test]
   #   environment:
+  #     # Assert rather than skip: this is the one place a missing fixture is a
+  #     # failure, not a fresh clone. See part 4 above.
+  #     MYNE_VECTORS_REQUIRED: "1"
   #     VECTORS_TOKEN:
   #       from_secret: vectors_token
   #   commands:
@@ -990,11 +1014,13 @@ steps:
         optional: true
       - name: wasm-protocol
         optional: true
-      # Enabled with the `vectors_token` secret (task 15). Listed here because
-      # this is the only thing that pushes a failure to the maintainer, and a
-      # gate nobody is told about is a gate that goes red unnoticed.
-      # vector-verification is commented out (see the step above); its entry
-      # returns here in the same change that re-enables it.
+      # RESERVED SLOT — vector-verification is commented out (see the step
+      # above, part 3 of its re-enable procedure). Uncomment the two lines
+      # below in the SAME change that uncomments the step: this is the only
+      # thing that pushes a failure to the maintainer, and a gate nobody is
+      # told about is a gate that goes red unnoticed.
+      # - name: vector-verification
+      #   optional: true
       - name: pnpm-build
         optional: true
       - name: vitest
