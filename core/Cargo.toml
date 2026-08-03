@@ -26,6 +26,15 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
+# Constant-time equality for the ONE MAC compare this crate performs itself:
+# the SCRAM server-signature check in `plugins::sync::enroll`, which is the
+# client's only proof the peer holds the account's `server-auth` key. No new
+# crate in the TB9 surface — `subtle` 2.x is already in the shared lock via
+# `protocol` and `src-tauri`; this adds a direct-dep edge only. Deliberately
+# NOT a reversal of `decisions.md` 2026-05-06 (MYND-22), which declined the
+# dep for a compare that was redundant behind an AEAD tag; see the
+# 2026-08-04 entry for why a sole-check MAC is the opposite case.
+subtle = { version = "2", default-features = false }
 tracing = "0.1"
 sha2 = { version = "0.10", default-features = false }
 unicode-normalization = { version = "0.1.25", default-features = false }

@@ -417,6 +417,23 @@ The AAD bytes feed both into Poly1305's MAC computation (standard AEAD behavior)
 
 Nonces are 192-bit random values drawn from the OS CSPRNG immediately before each AEAD call. Nonces are stored in the per-note blob (§9.2) and never reused. The protocol does not use deterministic or counter nonces in v0.1.
 
+### 5.4 Constant-time comparison (general rule)
+
+§5.1.3 states the requirement for the CTX commitment tag specifically. It is a general rule, and is stated here once so that every later verifier inherits it rather than each one needing its own clause:
+
+**Every comparison of a MAC, an authentication tag, a key-derived verifier, a proof, a signature, or a bearer token MUST use a constant-time comparator, and MUST NOT short-circuit on an early byte mismatch.** RustCrypto `subtle`'s `ConstantTimeEq` in Myne's clients; libsodium `sodium_memcmp` or Go `crypto/subtle.ConstantTimeCompare` in an independent implementation.
+
+The rule reaches beyond the at-rest format this document otherwise defines, because the values it covers do:
+
+- the CTX commitment tag `T'` (§5.1.3) — the original statement, unchanged;
+- the vault-head fork-consistency MAC (§9.16; `sync-protocol.md` §3);
+- the SCRAM client proof and the **server signature** a client checks to authenticate the sync server (`server-protocol.md` §3.1). The server signature is the client's only evidence that the peer holds the account's `server-auth`-derived key; nothing downstream re-checks it;
+- any device-local or cross-process **bearer token** — the per-device sync token, the browser-clipper pairing token (`threat-model.md` TB10).
+
+The rule is about the comparison, not about what is being protected: it applies on paths whose only observable outcome is accept/reject, and it applies even where a transport (pinned TLS) or a one-shot nonce already makes an oracle expensive to mount. A comparator chosen per-site by whether the site "looks reachable" is how uncovered sites appear, which is the failure this clause exists to prevent.
+
+Two comparisons deliberately fall **outside** it, and are ordinary equality by design: `items_key_id` (§6.4 step 2) and `protocol_version` / magic-byte header checks (§9.2, §9.3). These are public, unkeyed values readable from the blob header by anyone holding the file; comparing them in constant time would protect nothing.
+
 ## 6. Per-Note Encryption
 
 This section narrates the per-note encryption and decryption flow that produces and consumes the `.myn` blob format of §9.2. The key hierarchy that supplies `itemsKey` is established in §3.3; the AEAD primitive is XChaCha20-Poly1305 + CTX commitment per §5.1; the AAD bindings are defined in §5.2. The byte layout in §9.2 is normative — this section adds no new fields and changes no offsets.

@@ -399,7 +399,11 @@ impl TokenRegistry {
     /// the flag; never deletes. Returns whether a live record was revoked.
     pub fn revoke_value(&mut self, value: &str) -> bool {
         for rec in &mut self.records {
-            if rec.token.value() == value && !rec.revoked {
+            // Constant-time (`protocol.md` §5.4), matching `validate` below:
+            // the token value is a bearer secret, so it is never compared with
+            // a short-circuiting `==` even on a path whose outcome is only
+            // "revoked / not revoked".
+            if token_value_ct_eq(rec.token.value(), value) && !rec.revoked {
                 rec.revoked = true;
                 return true;
             }
