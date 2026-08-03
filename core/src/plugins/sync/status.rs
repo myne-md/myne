@@ -71,7 +71,16 @@ pub fn status_from(
 ) -> SyncRuntimeStatus {
     match (endpoint_present, token_present, identity_present) {
         (false, _, _) => SyncRuntimeStatus::Disabled,
-        (true, true, _) => SyncRuntimeStatus::Idle,
+        // #267 belt-and-braces: a token WITHOUT identity may not read green.
+        //
+        // This arm used to be `(true, true, _)`, so a device whose identity
+        // write had been discarded reported `Idle` — and `Idle` is what the
+        // UI's enrol-gate reads as "already enrolled", which hid the only
+        // surface offering a way back while the cycle silently refused to run.
+        // The enrolment paths now fail rather than reach that state; this makes
+        // it unrepresentable in the status even if some future path does.
+        (true, true, true) => SyncRuntimeStatus::Idle,
+        (true, true, false) => SyncRuntimeStatus::NotEnrolled,
         (true, false, true) => SyncRuntimeStatus::Pending,
         (true, false, false) => SyncRuntimeStatus::NotEnrolled,
     }
@@ -201,8 +210,17 @@ mod tests {
     #[test]
     fn base_states_are_derived_honestly() {
         assert_eq!(status_from(false, true, true), SyncRuntimeStatus::Disabled);
-        assert_eq!(status_from(true, true, false), SyncRuntimeStatus::Idle);
+        assert_eq!(status_from(true, true, true), SyncRuntimeStatus::Idle);
         assert_eq!(status_from(true, false, true), SyncRuntimeStatus::Pending);
+        // #267: a token with NO identity is not enrolled, whatever the token
+        // says. It used to read `Idle` — which the UI treats as "already
+        // enrolled" — so a device whose identity write had been discarded
+        // reported green while the cycle silently refused to run, with the only
+        // surface offering a retry hidden.
+        assert_eq!(
+            status_from(true, true, false),
+            SyncRuntimeStatus::NotEnrolled
+        );
         // The one that matters: configured but never added must not read as
         // "Synced".
         assert_eq!(

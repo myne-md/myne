@@ -973,7 +973,29 @@ pub async fn enroll_device_from_host(
         h
     });
     st.device_id_hex = Some(device_id_hex.clone());
-    let _ = super::state::write_sync_state(io, &token_dir, &st).await;
+    // #267: PROPAGATE, and before the token write.
+    //
+    // Discarding this failure produced a device that held a valid token and no
+    // identity — and every downstream gate reads as fine: the cycle's `NotReady`
+    // check is quiet, `status_from` maps (token, enrolled) → `Idle`, and the
+    // UI's enrol-gate treats `idle` as "already enrolled" and hides the way
+    // back. So enrolment reported SUCCESS and the device then refused to sync
+    // forever, with no surface offering a retry.
+    //
+    // Ordered before the token write so a device that cannot persist identity
+    // never holds a token — the reverse order is exactly the state that cannot
+    // recover itself.
+    super::state::write_sync_state(io, &token_dir, &st)
+        .await
+        .map_err(|_| {
+            tracing::warn!(
+                stage = "write_sync_state",
+                error_kind = "Internal",
+                "device identity could not be persisted; failing enrolment rather than \
+                 leaving a token with no identity"
+            );
+            SyncDeviceError::Internal
+        })?;
 
     // The deferred token write (task 86) — see the closure for why it moved.
     if let Some(token) = stored_token {
@@ -1424,7 +1446,19 @@ pub async fn join_account_from_host(
         })?;
     st.account_hash_hex = Some(acct_hex);
     st.device_id_hex = Some(device_id_hex.clone());
-    let _ = super::state::write_sync_state(io, &token_dir, &st).await;
+    // #267 — the join path's byte-identical twin of the discard above. Same
+    // ordering, same reason: identity first, token only if it landed.
+    super::state::write_sync_state(io, &token_dir, &st)
+        .await
+        .map_err(|_| {
+            tracing::warn!(
+                stage = "write_sync_state",
+                error_kind = "Internal",
+                "device identity could not be persisted; failing the join rather than \
+                 leaving a token with no identity"
+            );
+            SyncDeviceError::Internal
+        })?;
 
     if let Some(token) = stored_token {
         super::token_store::default_store()
