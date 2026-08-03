@@ -661,7 +661,7 @@ pub fn probe_attachment(
         // `Unauthenticated`, which is the safe direction — guessing "revoked"
         // from silence is the outcome that cannot be undone by retrying.
         401 => Err(
-            if resp.header("x-error-code").as_deref() == Some("device_revoked")
+            if resp.header("x-error-code") == Some("device_revoked")
                 || is_device_revoked(&resp.body)
             {
                 PushError::DeviceRevoked
