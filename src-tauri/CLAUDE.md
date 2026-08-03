@@ -110,13 +110,13 @@ pub async fn unlock(
 
 Note plaintext (the user's Markdown body) crosses IPC as `String` in both directions — `note_create(plaintext: String)` and `note_read(...) -> Result<String, _>`. Mechanically, the discipline is identical to the password pattern above (first-line `Zeroizing::new(plaintext)` wrap, move into spawn_blocking, drop on closure exit). Threat-shape-wise, plaintext is a longer-lived secret than a password: a password is consumed by Argon2id within milliseconds; plaintext lives in the WebView's V8 immutable string heap for the **hours** the user has the editor open. The Rust-side discipline still applies (and is verified by `core/src/plugins/notes/commands.rs::note_create_with_dir` + `note_read_with_dir`), but the Rust-side window is **strictly dominated** by the V8-side window — the dominant leak is on the WebView side, not the IPC transit. v0.1 accepts the V8-side leak under `threat-model.md` §5 "NOT Protected Against — A7 active local malware" (an A7-class attacker has process-memory inspection capabilities that cover both V8 and Rust heaps regardless).
 
-The intermediate Tauri serde V8-string-deserialization buffer (the bytes that materialize between V8's immutable-string release and the first Rust binding) is **accepted as outside Rust-side wipe scope** — its lifetime is microseconds and the V8-side retention window strictly dominates it. The `zeroize/serde` feature is **explicitly rejected** for plaintext-bearing types: it wraps `serde::Deserialize` impls with Zeroize-on-drop semantics but does not touch the parsing intermediate buffers; it provides "we tried" cosmetic gain without closing the dominant V8 channel. **v005 forward-look:** a native render path (Tauri 2 native widget OR custom IPC channel that bypasses WebView serialization entirely) keeps plaintext outside the WebView and collapses the dominant channel — see `decisions.md` 2026-05-07 "v005 native render path forward-look" for the design constraint.
+The intermediate Tauri serde V8-string-deserialization buffer (the bytes that materialize between V8's immutable-string release and the first Rust binding) is **accepted as outside Rust-side wipe scope** — its lifetime is microseconds and the V8-side retention window strictly dominates it. The `zeroize/serde` feature is **explicitly rejected** for plaintext-bearing types: it wraps `serde::Deserialize` impls with Zeroize-on-drop semantics but does not touch the parsing intermediate buffers; it provides "we tried" cosmetic gain without closing the dominant V8 channel. **Next-major forward-look:** a native render path (Tauri 2 native widget OR custom IPC channel that bypasses WebView serialization entirely) keeps plaintext outside the WebView and collapses the dominant channel — see `decisions.md` 2026-05-07 "v005 native render path forward-look" for the design constraint.
 
 On the read side, `note_read_with_dir` pairs `String::from_utf8(decrypted.plaintext().to_vec())` with an explicit `drop(decrypted)` immediately after. The `to_vec()` allocation is the non-Zeroized intermediate that crosses from `decrypted`'s `Zeroizing<Vec<u8>>` into the eventual `String` (which will leave through IPC); the explicit drop minimizes the window where both wrappers coexist. Same shape applies to any future plugin command that returns plaintext to the WebView.
 
-### DENY list — never emit via tracing, log, format, or any IPC payload
+### DENY list — never emit via tracing, log, format, or panic message
 
-Never reference any of these in a `tracing::*!`, `println!`, `eprintln!`, `format!`, `?fmt`, `%fmt`, or any IPC-bound `serde::Serialize` field. Reviewer-enforced; no automated lint.
+Never reference any of these in a `tracing::*!`, `println!`, `eprintln!`, `format!`, `?fmt`, `%fmt`, or a `panic!` / `.expect(…)` message. Reviewer-enforced; no automated lint. **Log scope only** — the IPC boundary is a separate, narrower list ("Never crosses IPC" below), because the two memberships genuinely differ. The heading used to claim both, which made the list unfollowable rather than strict: note plaintext and `note_id` are never-log values that *must* cross IPC in every shipped notes command (`note_read(note_id: String) -> Result<String, _>` violated the old wording by construction, and the pattern section eight lines above mandates exactly that signature). A reviewer-enforced rule survives on its credibility; a scope a reviewer can be correctly rebutted on devalues every entry that is absolute.
 
 - `password`, recovery phrase
 - `password.len()` / phrase word count (partial-attempt counter telemetry leak)
@@ -128,6 +128,28 @@ Never reference any of these in a `tracing::*!`, `println!`, `eprintln!`, `forma
 - `note_id` — per-note vault-stable correlation tag (same category as the `salts, nonces` line above; `items_key_id` is implicitly covered by that line)
 - full filesystem path
 - raw `std::io::Error::Display` (kernel-dependent path leakage on some platforms)
+
+### Never crosses IPC — WebView-side absence is the invariant
+
+Distinct from and narrower than the DENY list above: these must not appear in an IPC argument or in an IPC-bound `serde::Serialize` field, in any form or encoding. Anchor: `decisions.md` 2026-04-28 "Vault creation flow: backend session pattern; root_key never crosses IPC" — the session-token pattern exists precisely so none of them has to travel.
+
+- `root_key`, `items_key`, `item_key`, wrap keys, HKDF PRK
+- salts, nonces, `items_key_id`
+- `account_number_hash` bytes (the display-form account number is a different value, and does cross — see below)
+- raw `vault.meta` bytes, raw blob bytes
+- **backend-resolved** filesystem paths: `app_data_dir`, `vaults/<VaultId>/`, `.myn` blob paths. `VaultSummary` carries the `VaultId` and no path for exactly this reason
+- `password.len()`, phrase word count, and anything else derived from a secret whose only consumer would be telemetry
+
+**What does cross, deliberately, and is therefore not a violation.** The UI cannot function without these; each is a single designed hop into a surface the user is already looking at, and each stays DENY-listed for logging:
+
+- the password, inbound — `unlock(password: String)`, `vault_creation::begin(password: String)`; the Zeroizing-wrap pattern above is what bounds it
+- the 24-word recovery phrase — outbound exactly once at creation (`vault_creation::begin -> BeginResult { phrase, … }`, so the user can write it down) and inbound at recovery (`recover_with_phrase(phrase: String)`)
+- the display-form account number
+- `note_id`, note plaintext, titles, folder names — governed by "Pattern: Plaintext IPC across the WebView boundary" above, not by this list. `note_list` returns nothing *but* note ids, and no narrower shape exists: a UI cannot address a note it cannot name
+- a **user-chosen** destination path — `vault_export_markdown(destination: String)`, `vault_export_backup(destination: String)`, `import_read_file(root, path)`. It originates in the frontend's own file dialog, so refusing it at the seam would protect nothing; what stays inside is the backend's own path *resolution*
+- one argued carve-out: `cli_bridge::path_shim::shim_dir_for_display`, the CLI PATH-shim directory, which reaches the Settings panel that asked for it and nowhere else. Not vault-derived, not secret — and a redacted path would be an `export PATH="…:$PATH"` line that does not work. Its reach is pinned by a test in `src-tauri/src/cli_bridge/logging_discipline.rs`; a second caller needs the carve-out re-argued, not copied
+
+Crossing IPC once, into the window the user opened, is not the same permission as landing in a log file. When adding a command, decide the two questions separately.
 
 ### ALLOW list — safe to emit via tracing
 
