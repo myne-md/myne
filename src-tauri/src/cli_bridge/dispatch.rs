@@ -179,6 +179,13 @@ pub trait NoteLister: Send + Sync {
     fn daily_append(&self, line: &str) -> DailyAppendOutcome;
 }
 
+/// WebView event fired after a CLI write lands (#258).
+///
+/// The name is duplicated-by-design on the TS side (`src/screens/Editor.tsx`),
+/// like every other Tauri event name in this tree — nothing relates a Rust
+/// string literal to a TS listener, so keep the two in step by hand.
+pub const CLI_NOTES_CHANGED_EVENT: &str = "myne://cli-notes-changed";
+
 fn handle_request(lister: &dyn NoteLister, request_body: &[u8]) -> Vec<u8> {
     let request: Request = match serde_json::from_slice(request_body) {
         Ok(r) => r,
@@ -364,6 +371,26 @@ mod app_seam {
         pub fn new(app: AppHandle<R>) -> Self {
             Self { app }
         }
+
+        /// Tell the WebView that a note changed underneath it (#258).
+        ///
+        /// The CLI writes into the SAME vault the editor has open, and nothing
+        /// here told the editor. An open pane holds the note's content and its
+        /// base hash from the moment it loaded, so `myne daily --append` landed
+        /// on disk and the next autosave wrote the pane's stale body straight
+        /// over it. With sync off there is no base-hash guard to catch it, and
+        /// the snapshot window hides the loss: the overwriting save coalesces
+        /// with the pane's earlier ones, so the CLI's line never gets a
+        /// revision of its own to restore from. `myne new` had the same missing
+        /// invalidation in its milder form — the note existed but did not appear
+        /// in the sidebar until a restart.
+        ///
+        /// Best-effort: a failed emit leaves the editor stale, which is exactly
+        /// where it was before, and must never fail the CLI's write.
+        fn notify_notes_changed(&self) {
+            use tauri::Emitter;
+            let _ = self.app.emit(super::CLI_NOTES_CHANGED_EVENT, ());
+        }
     }
 
     impl<R: Runtime> NoteLister for AppNoteLister<R> {
@@ -528,7 +555,10 @@ mod app_seam {
                 match note_create_from_host(&host, state.inner(), hooks.inner(), plaintext, &io)
                     .await
                 {
-                    Ok(id) => NewOutcome::Ok(id),
+                    Ok(id) => {
+                        self.notify_notes_changed();
+                        NewOutcome::Ok(id)
+                    }
                     Err(NoteCreateError::VaultNotUnlocked) => NewOutcome::VaultLocked,
                     Err(_) => NewOutcome::Io,
                 }
@@ -585,7 +615,10 @@ mod app_seam {
                 line,
             ));
             match result {
-                Ok(()) => DailyAppendOutcome::Ok,
+                Ok(()) => {
+                    self.notify_notes_changed();
+                    DailyAppendOutcome::Ok
+                }
                 Err(DailyError::FolderExcluded) => DailyAppendOutcome::FolderExcluded,
                 Err(DailyError::VaultLocked) => DailyAppendOutcome::VaultLocked,
                 Err(DailyError::Io) => DailyAppendOutcome::Io,
