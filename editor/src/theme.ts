@@ -402,6 +402,17 @@ export const myneTheme = EditorView.theme({
     cursor: "pointer",
   },
 
+  // The inline explanation for an anchorless `repeat` (myne#276). Quieter than
+  // the text it follows — it is an aside about the line, not part of it — but
+  // present without being hovered, which the `title` attribute alone was not.
+  ".cm-task-field-hint": {
+    marginInlineStart: "0.5em",
+    fontSize: "0.85em",
+    color: "var(--fg-3, #6b6a64)",
+    fontStyle: "italic",
+    userSelect: "none",
+  },
+
   // Task-query block (MYND-617) — a live list where a code card would be. The
   // fill is neutral and the completed state is a filled box plus struck text:
   // the canon's no-green-check and no-state-as-fill rules apply here exactly as

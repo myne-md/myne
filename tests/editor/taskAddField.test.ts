@@ -225,3 +225,60 @@ describe("/due /repeat /priority slash commands", () => {
     expect(input.classList.contains("cm-recurrence-family")).toBe(true);
   });
 });
+
+// ── myne#276: an anchorless repeat is explained, not silently minted ─────────
+//
+// #197 taught the chip layer to withhold the chip from a rule with nothing to
+// repeat FROM — correct, and the half that shipped. The half that did not is
+// this one: the menu still offered **Repeat** on a bare task line with no
+// warning of any kind, and the only explanation for the raw text that followed
+// was a `title=` tooltip on the exact field span. From the user's side the whole
+// signal was "the chip didn't appear", which reads as a parser bug.
+describe("an anchorless repeat explains itself (myne#276)", () => {
+  const repeatNote = () =>
+    document.querySelector('[data-testid="editor.task-field-menu-repeat-note"]');
+
+  it("marks the Repeat row as needing a date on an anchorless line", () => {
+    openMenu("- [ ] pay the rent\n");
+    expect(repeatNote()).not.toBeNull();
+    expect(repeatNote()!.textContent).toBeTruthy();
+  });
+
+  it("does not mark it when the line already carries a due date", () => {
+    openMenu("- [ ] pay the rent [due:: 2026-08-01]\n");
+    expect(repeatNote()).toBeNull();
+  });
+
+  it("does not mark it when the line carries a remind date", () => {
+    openMenu("- [ ] pay the rent [remind:: 2026-08-01]\n");
+    expect(repeatNote()).toBeNull();
+  });
+
+  it("offers the due date in the same surface after an anchorless repeat commits", () => {
+    openMenu("- [ ] pay the rent\n");
+    menuRow("repeat").click();
+    (fieldInput() as HTMLSelectElement).value = "interval";
+    fieldInput().dispatchEvent(new Event("change", { bubbles: true }));
+    commit();
+
+    // The rule the user chose is written — it is correct, and refusing it would
+    // discard it…
+    expect(m!.view.state.doc.toString()).toContain("[repeat::");
+    // …and the anchor it needs is asked for straight away, in the same surface.
+    const chained = document.querySelector('[data-testid="editor.task-field-editor"]');
+    expect(chained).not.toBeNull();
+    // It is the DUE editor, not the repeat one that just closed: the repeat
+    // surface leads with a family `<select>`, the due surface with a text input.
+    expect(chained!.getAttribute("aria-label")).toBe("Due date");
+    expect(fieldInput().tagName).toBe("INPUT");
+  });
+
+  it("does not chain into the due editor when the line already has an anchor", () => {
+    openMenu("- [ ] pay the rent [due:: 2026-08-01]\n");
+    menuRow("repeat").click();
+    (fieldInput() as HTMLSelectElement).value = "interval";
+    fieldInput().dispatchEvent(new Event("change", { bubbles: true }));
+    commit();
+    expect(document.querySelector('[data-testid="editor.task-field-editor"]')).toBeNull();
+  });
+});

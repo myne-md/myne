@@ -302,6 +302,44 @@ class TaskChipWidget extends WidgetType {
 }
 
 /**
+ * The inline explanation for an anchorless `repeat` (myne#276).
+ *
+ * Non-editable, non-focusable and outside the document text: it renders after
+ * the field it explains and contributes no bytes, so the note on disk is exactly
+ * what the user typed. `side: 1` keeps it to the RIGHT of the span, and the
+ * position is part of widget identity for the same reason the chip's is — two
+ * anchorless repeats on different lines are otherwise equal, and CodeMirror
+ * would reuse one's DOM for the other.
+ */
+class TaskFieldHintWidget extends WidgetType {
+  constructor(
+    private readonly hintKey: string,
+    private readonly from: number,
+  ) {
+    super();
+  }
+
+  eq(other: TaskFieldHintWidget): boolean {
+    return other.hintKey === this.hintKey && other.from === this.from;
+  }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement("span");
+    span.className = "cm-task-field-hint";
+    span.setAttribute("data-testid", "editor.task-field-hint");
+    // Decorative relative to the text it follows — the same sentence is already
+    // the field's `title`, so announcing it twice is noise.
+    span.setAttribute("aria-hidden", "true");
+    span.textContent = i18n.t(this.hintKey);
+    return span;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+/**
  * Whether task chips are currently revealed as raw source text.
  *
  * **Never on caret** — unlike every cursor-aware decoration around it — and
@@ -332,6 +370,25 @@ function buildTaskChipDecorations(view: EditorView): DecorationSet {
             },
           }).range(span.from, span.to),
         );
+        // …and, for the ONE failure whose repair is somewhere else on the line,
+        // say so where the user is already looking (myne#276).
+        //
+        // The other three hints describe the very characters under the cursor:
+        // an unreadable date, an unknown priority word, an unrecognised rule.
+        // Reading the text IS the diagnosis, so a hover hint adds detail rather
+        // than carrying the whole message. `repeatNoAnchor` is different — the
+        // rule the user is staring at is correct, and what is missing is a due
+        // date that is not on the line at all. From their side the entire signal
+        // was "the chip didn't appear", which reads as a parser bug. So this one
+        // renders inline instead of waiting to be hovered.
+        if (span.hintKey === "editor.taskField.repeatNoAnchor") {
+          decorations.push(
+            Decoration.widget({
+              widget: new TaskFieldHintWidget(span.hintKey, span.from),
+              side: 1,
+            }).range(span.to),
+          );
+        }
         continue;
       }
       decorations.push(
