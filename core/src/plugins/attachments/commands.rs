@@ -3591,6 +3591,18 @@ mod tests {
         .expect("note_create")
     }
 
+    /// Seal `body` as a `.myn` blob bound to `note_id` — the same encoding a
+    /// snapshot carries, which is why the scan can decode both with one key.
+    async fn encode_note_for_test(state: &VaultRuntimeState, note_id: &str, body: &str) -> Vec<u8> {
+        let (_guard, items_key, items_key_id, _root) = state
+            .hold_unlocked_attachment_material()
+            .await
+            .expect("the fixture vault must be unlocked");
+        let uuid = uuid::Uuid::parse_str(note_id).expect("note uuid");
+        protocol::encode_new_note(&items_key, &items_key_id, uuid.as_bytes(), body.as_bytes())
+            .expect("encode note")
+    }
+
     /// Unused ids as an order-independent set (the command returns catalog
     /// `BTreeMap` order; tests assert membership, not order).
     async fn unused_ids(
@@ -3801,6 +3813,82 @@ mod tests {
             // Still-referenced attachment is untouched.
             assert!(catalog_ids(&tmp, &state).await.contains(&a));
             assert!(blob_exists(&tmp, &a));
+        });
+    }
+
+    /// #257: a snapshot is a restorable copy of a note, so an attachment it
+    /// embeds is still referenced. The scan walked `notes/` only, so removing
+    /// the embed from the LIVE note was enough to have the blob classified
+    /// "not used in any note" and erased — while `snapshot_restore` would
+    /// happily bring the old body back, embed span and all, pointing at a blob
+    /// that no longer exists.
+    #[test]
+    fn clean_unused_keeps_an_attachment_a_snapshot_still_embeds() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let notes_dir = tmp.path().join("notes");
+            let a = import_tagged(&tmp, &state, 7).await;
+
+            // The live note does NOT reference the attachment; a snapshot of an
+            // earlier revision does. This is the ordinary shape of "I removed
+            // the image from the note but the history still has it".
+            let nid = create_note(&notes_dir, &state, "the current body, image removed").await;
+            let snapshots_dir = tmp.path().join("snapshots");
+            std::fs::create_dir_all(&snapshots_dir).unwrap();
+            // A snapshot is sealed under the NOTE's uuid, exactly like the live
+            // note — which is what lets the scan decode it with no new key.
+            let snap_uuid = "01930000-0000-7000-8000-0000000000aa";
+            let blob = encode_note_for_test(
+                &state,
+                &nid,
+                &format!("an earlier revision ![[att:{a}]] with the image"),
+            )
+            .await;
+            std::fs::write(snapshots_dir.join(format!("{nid}__{snap_uuid}.myn")), &blob).unwrap();
+
+            let result = attachment_clean_unused_with_dir(tmp.path(), &state, vec![a.clone()])
+                .await
+                .expect("clean");
+            assert_eq!(
+                result,
+                CleanResult {
+                    deleted: 0,
+                    skipped: 1,
+                    bytes_reclaimed: 0,
+                },
+                "an attachment a restorable snapshot embeds is still referenced"
+            );
+            assert!(blob_exists(&tmp, &a), "the blob must survive the sweep");
+        });
+    }
+
+    /// The fail-closed posture extends to the second corpus: a snapshot we
+    /// cannot read means we cannot determine the unused set, so nothing is
+    /// erased. Skipping it silently is what would under-count references.
+    #[test]
+    fn clean_unused_fail_closed_on_unreadable_snapshot() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let notes_dir = tmp.path().join("notes");
+            let a = import_tagged(&tmp, &state, 8).await;
+            let nid = create_note(&notes_dir, &state, "plain note").await;
+
+            let snapshots_dir = tmp.path().join("snapshots");
+            std::fs::create_dir_all(&snapshots_dir).unwrap();
+            let snap_uuid = "01930000-0000-7000-8000-0000000000bb";
+            std::fs::write(
+                snapshots_dir.join(format!("{nid}__{snap_uuid}.myn")),
+                b"corrupt snapshot blob",
+            )
+            .unwrap();
+
+            let result =
+                attachment_clean_unused_with_dir(tmp.path(), &state, vec![a.clone()]).await;
+            assert!(matches!(
+                result,
+                Err(AttachmentCleanUnusedError::NoteScanFailed)
+            ));
+            assert!(blob_exists(&tmp, &a), "an aborted sweep erases nothing");
         });
     }
 

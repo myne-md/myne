@@ -79,6 +79,37 @@ pub async fn collect_referenced_attachment_ids(
     items_key: &[u8; 32],
     items_key_id: &[u8; 16],
 ) -> Result<std::collections::HashSet<String>, ReferencedScanError> {
+    let mut referenced = collect_from_notes(io, notes_dir, items_key, items_key_id).await?;
+
+    // #257: snapshots are a SECOND corpus that keeps an attachment alive.
+    //
+    // The scan walked `notes/` only, and its result is the sole survival
+    // predicate for an irreversible unlink — so an attachment embedded in a
+    // restorable snapshot but no longer in the live note was classified
+    // "not used in any note" and erased. `snapshot_restore` then brought the
+    // old body back verbatim, embed span and all, pointing at a blob that no
+    // longer exists.
+    //
+    // `snapshots/` sits beside `notes/` under the vault root. Deriving it here
+    // rather than taking a second parameter keeps both call sites — the preview
+    // list and the confirmed sweep — on the same corpus by construction; a
+    // sweep that consulted a wider corpus than the list it was shown from would
+    // be a different bug of the same family.
+    let snapshots_dir = notes_dir.parent().map(|root| root.join("snapshots"));
+    if let Some(dir) = snapshots_dir {
+        collect_from_snapshots(io, &dir, items_key, items_key_id, &mut referenced).await?;
+    }
+
+    Ok(referenced)
+}
+
+/// The `notes/` half of [`collect_referenced_attachment_ids`].
+async fn collect_from_notes(
+    io: &dyn VaultIo,
+    notes_dir: &std::path::Path,
+    items_key: &[u8; 32],
+    items_key_id: &[u8; 16],
+) -> Result<std::collections::HashSet<String>, ReferencedScanError> {
     let ids = match io.read_dir(notes_dir).await {
         // The classification half is shared verbatim with the desktop
         // enumerator, so the skip/warn behaviour cannot drift between clients.
@@ -112,6 +143,66 @@ pub async fn collect_referenced_attachment_ids(
         drop(decrypted);
     }
     Ok(referenced)
+}
+
+/// The `snapshots/` half of [`collect_referenced_attachment_ids`] (#257).
+///
+/// Same fail-closed posture as the notes walk, for the same reason: this feeds
+/// an irreversible unlink, so a snapshot we could not read must abort the scan
+/// rather than under-count references. The one benign skip is identical too —
+/// a file that vanished between enumerate and read references nothing.
+///
+/// A filename that does not parse as `<note-uuid>__<snap-uuid>.myn` is skipped
+/// rather than fatal: the enumerator is a directory listing, and a stranger's
+/// file in `snapshots/` is not a snapshot this vault wrote. That mirrors
+/// `note_ids_from_entries`' classification on the notes side.
+async fn collect_from_snapshots(
+    io: &dyn VaultIo,
+    snapshots_dir: &std::path::Path,
+    items_key: &[u8; 32],
+    items_key_id: &[u8; 16],
+    referenced: &mut std::collections::HashSet<String>,
+) -> Result<(), ReferencedScanError> {
+    let entries = match io.read_dir(snapshots_dir).await {
+        Ok(entries) => entries,
+        // No snapshots dir → no snapshot references. A vault that has never
+        // captured one is the common case on a fresh install.
+        Err(IoFailureKind::NotFound) => return Ok(()),
+        Err(kind) => return Err(ReferencedScanError::Io(kind)),
+    };
+
+    for entry in entries {
+        if entry.is_dir {
+            continue;
+        }
+        let Some((note_uuid, _snap_uuid)) =
+            crate::snapshot_store::parse_snapshot_filename(&entry.name)
+        else {
+            continue;
+        };
+        // The AAD binds the NOTE's uuid, not the snapshot's — a snapshot is a
+        // prior revision of that note, sealed under the same binding, which is
+        // what lets `decode_note` read it unchanged.
+        let Ok(parsed) = uuid::Uuid::parse_str(&note_uuid) else {
+            continue;
+        };
+        let note_uuid_bytes = *parsed.as_bytes();
+        let path = snapshots_dir.join(&entry.name);
+        let blob = match io.read(&path).await {
+            Ok(b) => b,
+            Err(IoFailureKind::NotFound) => continue,
+            Err(kind) => return Err(ReferencedScanError::Io(kind)),
+        };
+        let decrypted = decode_note(&blob, &note_uuid_bytes, items_key, items_key_id)
+            .map_err(|_: DecryptError| ReferencedScanError::CannotDecrypt)?;
+        let plaintext = std::str::from_utf8(decrypted.plaintext())
+            .map_err(|_| ReferencedScanError::InvalidPlaintextEncoding)?;
+        for span in crate::plugins::attachments::reconcile::extract_att_embed_spans(plaintext) {
+            referenced.insert(span.id.to_string());
+        }
+        drop(decrypted);
+    }
+    Ok(())
 }
 
 /// Every note's attachment references, as `(note_id, [attachment_id])` pairs.
