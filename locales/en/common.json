@@ -9,6 +9,7 @@
     "passwordLabel": "Master password",
     "approversIntro": "These devices can approve this one:",
     "noApprovers": "No other device on this account can approve it right now. Open Myne on a device that already has access, then come back here.",
+    "pendingStartOver": "Start over with a different account",
     "pendingTitle": "Waiting for approval",
     "sasMatch": "They match — continue",
     "sasMismatch": "They don't match",

@@ -347,9 +347,19 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
           style={{ display: "flex", flexDirection: "column", gap: 6, color: "var(--danger)", fontSize: "var(--text-sm)" }}
         >
           <span>{t("sync.devices.unreachable", { error })}</span>
-          {error === "Unauthenticated" ? (
+          {error === "Unauthenticated" ||
+          error === "AccountFrozen" ||
+          error === "DeviceLimitReached" ||
+          error === "AwaitingApproval" ? (
             // A rejected credential (e.g. this device was removed elsewhere) — a local
             // reset is the actual remedy.
+            //
+            // #269 widens the gate to the three refusals #268 stopped
+            // flattening into `Unauthenticated`. They are not transport
+            // failures, and for a device stuck awaiting an approval that will
+            // never come — the account was wrong, or the approver is gone —
+            // a local reset is the ONLY way back: the enrol-gate hides the
+            // form while enrolment looks live.
             <button
               type="button"
               style={BTN}

@@ -203,6 +203,49 @@ describe("web first-run bootstrap", () => {
     expect(screen.queryByTestId("account-bootstrap.pending-notice")).toBeNull();
   });
 
+  // #269: the wait had no exit. Boot re-enters this stage on every reload, the
+  // enrol-gate treats `pending` as "already enrolled" and hides the form, and
+  // the Settings sync panel does not render one while pending — so a device
+  // that enrolled against the WRONG account, or one whose approver is gone, had
+  // no route back at all. Reloading returned here; there was nothing to press.
+  it("offers a way out of the pending wait", async () => {
+    const onBootstrapped = vi.fn();
+    const calls: string[] = [];
+    invokeMock.mockImplementation(async (cmd) => {
+      calls.push(cmd as string);
+      if (cmd === "plugin:vault-unlock|account_number_check") return true;
+      if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: ENDPOINT };
+      if (cmd === "plugin:sync|sync_join_account") {
+        return {
+          device_id_hex: "bb".repeat(16),
+          vault_id: "00000000-0000-7000-8000-ebebebebebeb",
+          pending: true,
+          fingerprint: null,
+        };
+      }
+      if (cmd === "plugin:sync|sync_list_devices") return [];
+      if (cmd === "plugin:sync|sync_reset_local") return null;
+      if (cmd === "plugin:sync|sync_now") return null;
+      if (cmd === "plugin:sync|sync_head_fingerprint") return null;
+      throw new Error(`unexpected ${cmd}`);
+    });
+    render(<AccountBootstrap onBootstrapped={onBootstrapped} />);
+    await reachPasswordStep();
+    await submitPassword();
+    await screen.findByTestId("account-bootstrap.pending-notice");
+
+    fireEvent.click(screen.getByTestId("account-bootstrap.pending-reset"));
+
+    // It UN-ENROLS rather than just re-rendering: leaving the enrolment in
+    // place would send the next boot straight back to this screen.
+    await waitFor(() =>
+      expect(calls).toContain("plugin:sync|sync_reset_local"),
+    );
+    // …and lands back at the account-number entry, the actual beginning.
+    await screen.findByTestId("account-entry.input");
+    expect(onBootstrapped).not.toHaveBeenCalled();
+  });
+
   it("a pending join explains the wait, names who can approve, and offers no manual continue", async () => {
     const onBootstrapped = vi.fn();
     invokeMock.mockImplementation(async (cmd) => {
