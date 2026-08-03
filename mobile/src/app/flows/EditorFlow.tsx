@@ -8,7 +8,17 @@ import { headingSections } from "@myne/dialect";
 import type { EditorView } from "@codemirror/view";
 import { emit, listen } from "@tauri-apps/api/event";
 import { documentDir, join } from "@tauri-apps/api/path";
-import { Screen, ScreenScroll, Icon, Banner, Spinner, Sheet, SyncBanners, ConflictsSheet } from "../../components";
+import {
+  Screen,
+  ScreenScroll,
+  Icon,
+  Banner,
+  Spinner,
+  Sheet,
+  SnapshotFailedBanner,
+  SyncBanners,
+  ConflictsSheet,
+} from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
 import {
   DrawingCanvasLazy,
@@ -2127,6 +2137,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                 "Verify devices" CTA wires to the devices surface with F3-T13. */}
             <div style={{ flex: "none", padding: "8px 20px 0" }}>
               <SyncBanners onOpenConflicts={() => setConflictsOpen(true)} />
+              {/* #47: the BK-05 quiet notice. The save succeeded and only the
+                  undo point is missing, so it sits with the other non-blocking
+                  banners rather than interrupting. */}
+              <SnapshotFailedBanner />
             </div>
 
             {activeView && (
