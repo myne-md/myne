@@ -308,6 +308,13 @@ steps:
       # on. Backstop for the pre-commit hook — `--no-verify` must not land a
       # setter whose change the open editor never receives.
       - node scripts/check-prefs-nonce.mjs
+      # Twin-module drift (#261): a fix that lands on one client and never
+      # reaches its counterpart. WARNING ONLY and exits 0 by design — most
+      # one-sided changes are legitimate, so a gate here would be wrong and
+      # would be bypassed within a week. The value is converting silence into a
+      # recorded decision in the PR body. Skips itself where the companion is
+      # not cloned, which is every CI run today.
+      - node scripts/check-twin-drift.mjs
       # CLI sidecar contract (cli-thin-client task 11): the `myne` CLI crate has
       # no dependency on `myne-desktop`, so the bundle identifier + the
       # socket/status basenames are duplicated by design — drift compiles clean

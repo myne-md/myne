@@ -78,6 +78,14 @@ pre-commit:
       # prefs write", which a new file elsewhere can break.
       run: node scripts/check-prefs-nonce.mjs
 
+    twin-drift:
+      # #261: a change to one side of a twin module pair. WARNING ONLY (the
+      # script exits 0) — most one-sided changes are legitimate, and a gate
+      # would be bypassed rather than heeded. Prints the counterpart and the
+      # one line to add to the PR body. Silently skips where the `myne-mobile`
+      # companion is not cloned.
+      run: node scripts/check-twin-drift.mjs {staged_files}
+
     web-capabilities:
       # phase3-web-client task 27: the UI's capability descriptor
       # (`web/src/platform/capabilities.ts`) and the dispatcher's refusal table
