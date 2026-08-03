@@ -962,6 +962,29 @@ export async function setFavorites(favorites: string[]): Promise<void> {
 }
 
 /**
+ * Toggle one note in the favorites sequence, against DISK truth (#252).
+ *
+ * `favorites` is persisted as a whole sequence, so a caller that derives the
+ * next value from its own `usePrefs` snapshot writes back whatever that
+ * snapshot was missing. The command palette did exactly that: starring note A
+ * from the sidebar and then palette-toggling note B persisted `[B]`, dropping
+ * A — and since `favorites` is `SharedDiscipline::SequenceLww`, the truncation
+ * was pushed to the account and won on every other device.
+ *
+ * Reading first makes the write depend on what is STORED rather than on which
+ * surface rendered most recently. Surfaces that already hold the live sequence
+ * (the sidebar, which owns the optimistic row state and its revert) keep using
+ * {@link setFavorites} directly.
+ */
+export async function toggleFavoriteOnDisk(noteId: string): Promise<void> {
+  const fresh = await prefsRead();
+  const next = fresh.favorites.includes(noteId)
+    ? fresh.favorites.filter((f) => f !== noteId)
+    : [...fresh.favorites, noteId];
+  await setFavorites(next);
+}
+
+/**
  * Persist the editor three-pane layout (sidebar widths + collapsed flags,
  * MYND-137). The caller passes the full desired layout; the backend
  * atomic-writes vault.prefs with no native side-effect. The codec stores the
