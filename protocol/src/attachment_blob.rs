@@ -165,6 +165,16 @@ pub fn aad_wrap_attachment_key(
 /// content-type (hardcoded `"text/markdown"`), the attachment
 /// content-type is a genuine parameter — attachments are arbitrary
 /// files.
+///
+/// **Caller contract: NFC.** This builder binds the bytes it is handed
+/// verbatim — the parameter is `&[u8]`, not `&str`, and nothing here
+/// normalizes. § 5.2 pins the bound form as UTF-8 **NFC**, which is the
+/// form § 9.10.2 requires of the `vault.attachments` entry every
+/// decoder reads `content_type` back from, so the caller MUST normalize
+/// before sealing. Normalizing here instead would force a decision
+/// about non-UTF-8 input this function does not currently have to make,
+/// and would have to be mirrored on the decode side or the crate would
+/// stop round-tripping itself.
 pub fn aad_encrypt_attachment(
     items_key_id: &[u8; ITEMS_KEY_ID_LEN],
     attachment_id: &[u8; ATTACHMENT_ID_LEN],
