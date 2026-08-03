@@ -950,14 +950,14 @@ Total AAD length: `10 + 1 + 12 + 16 = 39 bytes`.
 
 Implementations SHOULD reject `ciphertext_len > 65536 + 32` (64 KiB plaintext cap + 32-byte CTX commitment tag). The cap exists to bound the parser's pre-AEAD allocation footprint, parallel to the §9.2 `.myn` cap rationale (`../decisions.md` 2026-05-06 entry). v0.1 preferences are bounded to a handful of small typed fields; 64 KiB provides ~13× headroom over any realistic preference set.
 
-The reserved byte at offset 5 MUST be `0x00`. Non-zero values reject the parse, matching the §9.2 and §9.3 discipline. The byte is reserved for v0.1 minor-revision flag carrying.
+The reserved byte at offset 5 MUST be `0x00`. Non-zero values reject the parse, matching the §9.2 and §9.3 discipline. The byte is reserved for v0.1 minor-revision flag carrying. The cap bounds `ciphertext_len`, not the file's total length: per §10.3.1 a `vault.prefs` MUST be exactly `34 + ciphertext_len` bytes, and a file longer than that rejects the parse.
 
 #### 9.5.5 Migration-less semantic
 
 Reading `vault.prefs` returns the persisted preference set on success, or the **default preference set** on any failure:
 
 - File absent on disk → defaults.
-- File truncated or magic-byte mismatch or non-zero reserved byte → defaults.
+- File truncated, or longer than the declared layout (§10.3.1), or magic-byte mismatch, or non-zero reserved byte → defaults.
 - AEAD verification failure (tampered ciphertext, wrong AAD, wrong `prefs_key`) → defaults.
 - Inner JSON parse failure after a successful AEAD verification → defaults.
 
@@ -2310,6 +2310,23 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Custom-themes blob (`vault.themes`) | `MYT1` | `MYT5` | §9.21 | MYND-486 |
 
 Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` next-major reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` next-major convention. These reserved magic values are placeholders — the next major version finalizes them. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
+
+#### 10.3.1 Blob total-length discipline ("strict-trailing")
+
+**Normative.** A blob's **total** byte length MUST equal the length its declared layout implies, given the length fields carried in that blob's own header. A blob shorter than that is truncated; a blob longer than that carries bytes no field of the layout accounts for. Both reject the parse. An implementation MUST NOT ignore bytes past the end of the declared layout, and MUST NOT treat them as a forward-compatibility extension point. This rule is referred to as **strict-trailing**.
+
+Applied to the layout shapes in the allocation table above:
+
+- **Envelope families** — a fixed-offset header followed by a single `ciphertext` field of the declared `ciphertext_len` (§9.2, §9.5–§9.10, §9.13–§9.15, §9.17–§9.21). Total length MUST be exactly `header_len + ciphertext_len`, where `header_len` is that family's fixed prefix, itself computed from the header's own length fields where the prefix is variable (§9.2 / §9.9: `76 + enc_item_key_len`).
+- **`vault.meta`** (§9.3) — a fixed-length layout; the equality is against that fixed length.
+- **The backup container** (§9.11) — states the same equality as its own equation, `file_length == 22 + member_table_len + members_total_len` (§9.11.5), and keeps it. Each member is then subject to the rule for the member's own family, which is what makes §9.11.5's "`member_len` MUST NOT exceed the size cap of the member's own blob family" a bound on the whole member and not merely on its ciphertext.
+- **`vault.head-state`** (§9.16) — the 6-byte header is followed by exactly one wire head record; the file MUST end where that record ends (`sync-protocol.md` §3.2 gives its length), with no bytes after the head's own 32-byte MAC.
+
+**Why this is stated separately from the size caps.** The per-family caps (§9.2, §9.5.4, §9.9, §9.10.4, and their peers) bound the **declared `ciphertext_len`**, not the file's total length. Without this subsection nothing bounds the latter at all, while each cap reads as though it did. Nothing past the ciphertext is covered by the AEAD tag or by the AAD (§5.2), so a tolerated tail is unauthenticated bytes that survive decode — and for a family that syncs, bytes a client would persist and re-upload verbatim. This is a **parsing-discipline and cross-implementation-agreement** rule, not a confidentiality or integrity claim: every decoded field is AEAD-authenticated with or without it. What it buys is that two independent implementations agree on which byte strings are blobs of a given family.
+
+**This does not narrow §10.2.** A minor revision within v0.1 still MAY add fields, in the two places where an added field is authenticated and has an offset: inside the AEAD-protected inner plaintext (§9.5.2's additive-field discipline is the worked example), or at a defined offset of a revised layout signalled by the reserved byte at offset 5 — including the `future fields` space §9.3 reserves at `vault.meta` offset 345. What §10.2 does not license is appending bytes after an envelope's ciphertext: such a field would sit outside the AEAD tag and outside the AAD, reducing an existing security guarantee, which §10.2's own "MUST NOT reduce any existing security guarantee" clause already forbids. A reader checks the equality against the layout of the minor version **it** implements; per §10.1, forward compatibility inside a major version runs newer-reads-older, so a reader handed a later minor layout it does not know rejects the blob rather than half-parsing it.
+
+**Citation.** Implementations, code comments and test vectors reasoning about trailing bytes cite **this subsection**. §10.1 governs which *version* a blob may be parsed under and states no length rule; existing references to "§10.1 strict-trailing" mean this rule and point here.
 
 ### 10.4 Migration procedure (cross-major)
 
