@@ -23,6 +23,14 @@ struct SpellRuntime {
     engine: SpellEngine,
     data: PersonalDictionaryData,
     attempted: std::collections::HashSet<String>,
+    /// Whether `data` reflects a SUCCESSFUL read of `vault.dictionary` (#255).
+    ///
+    /// `false` means "we do not know what is on disk" — either nothing has been
+    /// hydrated yet, or the hydrate failed on a blob that exists. Both are
+    /// states in which a write would persist an empty set over a file nobody
+    /// managed to read; `vault.dictionary` is not synced, so only a
+    /// `.myne-backup` restore would bring it back.
+    hydrated: bool,
 }
 
 /// Tauri-managed handle to the live spell engine + personal dictionary.
@@ -77,7 +85,22 @@ impl SpellState {
             rt.engine
                 .set_ignore_words(data.ignore_words.iter().cloned());
             rt.data = data;
+            // Only a completed read sets this. The caller passes data ONLY on a
+            // successful read (an absent blob is a successful read of nothing);
+            // a failed one never reaches here, leaving the flag false.
+            rt.hydrated = true;
         }
+    }
+
+    /// Does `data` reflect a successful read of the on-disk dictionary (#255)?
+    ///
+    /// The write paths ask before persisting: a write derived from an
+    /// un-hydrated set would overwrite a blob that exists and was merely
+    /// unreadable this once (an AV/backup tool holding a handle, a permission
+    /// change, an EIO). A poisoned lock answers `false` — the protective
+    /// direction.
+    pub fn is_hydrated(&self) -> bool {
+        self.inner.lock().map(|rt| rt.hydrated).unwrap_or(false)
     }
 
     /// Batch-check words against `langs` (empty on a poisoned lock).
@@ -125,6 +148,10 @@ impl SpellState {
             rt.engine.clear();
             rt.data = PersonalDictionaryData::default();
             rt.attempted.clear();
+            // A cleared state knows nothing about any vault's disk contents
+            // (#255) — the next vault's hydrate is what makes writing safe
+            // again.
+            rt.hydrated = false;
         }
     }
 }

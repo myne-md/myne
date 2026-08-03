@@ -7730,6 +7730,7 @@ mod tests {
                         &HASH,
                     )
                 )
+                .expect("the store is readable here")
                 .is_empty(),
                 "a tombstoned theme is gone from the user's list"
             );
