@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   diffReminders,
+  horizonEndDate,
   REMINDER_HORIZON_DAYS,
   reminderId,
   runReminderPass,
@@ -328,5 +329,61 @@ describe("it never throws", () => {
       .join("\n");
     expect(code).not.toMatch(/new Date\(\s*\)/);
     expect(code).not.toContain("Date.now()");
+  });
+});
+
+// #52: the horizon END DATE lives next to the cutoff it describes.
+//
+// The two clients derived it independently and drifted: desktop rendered
+// `today + (N - 1)` and mobile rendered `today + N`, so the same vault told two
+// devices two different dates — and mobile's was a day LATER than any reminder
+// `targetReminders` would actually register.
+describe("horizonEndDate", () => {
+  it("is inclusive of today", () => {
+    // A 1-day horizon covers today and nothing else.
+    expect(horizonEndDate(new Date(2026, 7, 3, 9, 0), 1)).toBe("2026-08-03");
+    expect(horizonEndDate(new Date(2026, 7, 3, 9, 0), 7)).toBe("2026-08-09");
+  });
+
+  it("crosses month and year boundaries in the LOCAL calendar", () => {
+    // A UTC-based shift would name the wrong day for anyone far enough east or
+    // west, on a line whose entire job is being checkable against a calendar.
+    expect(horizonEndDate(new Date(2026, 0, 31, 23, 30), 7)).toBe("2026-02-06");
+    expect(horizonEndDate(new Date(2026, 11, 31, 0, 30), 2)).toBe("2027-01-01");
+    expect(horizonEndDate(new Date(2028, 1, 28, 12, 0), 2)).toBe("2028-02-29");
+  });
+
+  it("defaults to the shared horizon", () => {
+    const today = new Date(2026, 7, 1, 12, 0);
+    expect(horizonEndDate(today)).toBe(horizonEndDate(today, REMINDER_HORIZON_DAYS));
+  });
+
+  it("never names a day past the cutoff targetReminders enforces", () => {
+    // The property the drift violated: every date the line claims must be one
+    // the scheduler would actually register a reminder for.
+    const today = new Date(2026, 7, 3, 0, 0);
+    const end = horizonEndDate(today, REMINDER_HORIZON_DAYS);
+    const cutoff = new Date(
+      today.getTime() + REMINDER_HORIZON_DAYS * 86_400_000,
+    );
+    const p = (n: number): string => String(n).padStart(2, "0");
+    const cutoffDay = `${cutoff.getFullYear()}-${p(cutoff.getMonth() + 1)}-${p(cutoff.getDate())}`;
+    expect(end <= cutoffDay).toBe(true);
+  });
+});
+
+// The two clients must name the SAME day for the same horizon (#52). The
+// signatures differ by input type — desktop holds a `YYYY-MM-DD` string, mobile
+// holds a `Date` — which is why the shared helper did not simply replace both;
+// what matters is that the derivations agree.
+describe("horizon date parity across clients", () => {
+  it("agrees with the desktop settings line", async () => {
+    const { horizonThrough } = await import(
+      "../../src/components/settings/ReminderSettings"
+    );
+    for (const days of [1, 2, 7, 30]) {
+      const today = new Date(2026, 0, 31, 12, 0);
+      expect(horizonThrough(days, "2026-01-31")).toBe(horizonEndDate(today, days));
+    }
   });
 });

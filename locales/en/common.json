@@ -3452,6 +3452,7 @@
       "committing": "Saving…",
       "copied": "Copied",
       "copy": "Copy",
+      "copyFailed": "Couldn't copy — use \u201cSave as file\u201d instead.",
       "eyebrow": "Step 4 of 4 — account number",
       "heading": "Save your account number.",
       "intro": "This is your bearer token — treat it like cash.",

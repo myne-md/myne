@@ -124,6 +124,36 @@ export function parseLocalInstant(at: string): Date {
  *     than not firing, because it reads as the reminder being wrong;
  *   - **instants beyond the horizon** — see the privacy bound above.
  */
+/**
+ * The LAST local calendar day the horizon covers, as `YYYY-MM-DD` (#52).
+ *
+ * Lives next to {@link REMINDER_HORIZON_DAYS} and next to the cutoff it
+ * describes, because the two drifted the moment they lived apart: this client
+ * rendered `today + (N - 1)` and the mobile one rendered `today + N`, so the
+ * same vault told two devices two different dates and one of them was a day
+ * later than any reminder the scheduler would actually register.
+ *
+ * `N - 1` because the horizon is INCLUSIVE of today: a 7-day horizon covers
+ * today plus the next six days, which is what `targetReminders`' cutoff
+ * (`now + N × 86_400_000`) admits.
+ *
+ * Local calendar arithmetic on purpose — a UTC-based shift would name the wrong
+ * day for anyone far enough east or west, on a line whose entire job is being
+ * checkable against a calendar.
+ */
+export function horizonEndDate(
+  today: Date,
+  horizonDays: number = REMINDER_HORIZON_DAYS,
+): string {
+  const end = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() + horizonDays - 1,
+  );
+  const p = (n: number): string => String(n).padStart(2, "0");
+  return `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`;
+}
+
 export function targetReminders(
   tasks: readonly VaultTask[],
   now: Date,
