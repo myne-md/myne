@@ -17,8 +17,21 @@ pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
 chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
-chacha20 = { version = "0.9", default-features = false }
-poly1305 = { version = "0.8", default-features = false }
+# The hand-composed AEAD's cipher- and MAC-state wipe is requested HERE, at the
+# site that relies on it, because a property held by accident is not held. Both
+# impls are `#[cfg(feature = "zeroize")]`: `chacha20`'s `Drop`/`ZeroizeOnDrop`
+# on `ChaChaCore`/`XChaChaCore`, and `poly1305`'s `Drop for State`. `chacha20`'s
+# used to arrive only because `chacha20poly1305` — the line above, a test-only
+# cross-check — declares it unconditionally and cargo unifies, so demoting that
+# crate to a dev-dependency would have compiled the wipe out with no compile
+# error, no failing test and no lockfile diff worth noticing. `poly1305`'s was
+# never on: its feature is implied by an optional dependency and is absent from
+# its `[features]` table, so a reader checking that table concludes there is
+# nothing to enable. `default-features = false` switched neither off — neither
+# crate carries `zeroize` in a default set; the defect was the absent request.
+# No new crate enters the graph: `zeroize` is already a direct dependency below.
+chacha20 = { version = "0.9", default-features = false, features = ["zeroize"] }
+poly1305 = { version = "0.8", default-features = false, features = ["zeroize"] }
 sha2 = { version = "0.10", default-features = false }
 subtle = { version = "2", default-features = false }
 zeroize = { version = "1.8", default-features = false, features = ["alloc", "derive"] }
