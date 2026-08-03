@@ -90,15 +90,39 @@ function submitStyle(disabled: boolean): CSSProperties {
 
 const MODE_VALUES = ["password", "recovery"] as const;
 
-/** Map a non-secret `SyncDeviceError` kind to honest, non-distinguishing copy.
- *  Configuration + transport faults get their own (non-leaking) message; every
- *  credential/account/meta failure collapses to the single banner. */
+/** Map a non-secret `SyncDeviceError` kind to honest copy.
+ *
+ *  The non-distinguishing banner is the DEFAULT, and it stays that way for
+ *  every credential/account/meta failure — telling the user which of account
+ *  number, password or phrase was wrong is an enumeration signal.
+ *
+ *  #268 adds the refusals that are NOT credential failures. The server already
+ *  said why it refused; flattening those into the credential banner told a user
+ *  with a frozen account or a hit device cap to check credentials that were
+ *  correct, and no amount of re-typing could ever clear it. Each of these names
+ *  a remedy the user can act on, and none of them leaks whether an account
+ *  exists — you only reach them AFTER the SCRAM proof has succeeded. */
+export function failureMessageForTest(kind: string): string {
+  return failureMessage(kind);
+}
+
 function failureMessage(kind: string): string {
   switch (kind) {
     case "NotConfigured":
       return i18n.t("sync.enroll.error.notConfigured");
     case "Transport":
       return i18n.t("sync.enroll.error.transport");
+    case "AccountFrozen":
+      return i18n.t("sync.enroll.error.frozen");
+    case "DeviceLimitReached":
+      return i18n.t("sync.enroll.error.deviceLimit");
+    case "AwaitingApproval":
+      return i18n.t("sync.enroll.error.awaitingApproval");
+    case "FingerprintMismatch":
+      // Its own message rather than the credential banner: a mismatch here is
+      // a typo or a man in the middle, and "check your password" is the one
+      // instruction that must not follow it.
+      return i18n.t("sync.enroll.error.serverMismatch");
     default:
       return ENROLL_NON_DISTINGUISHING_BANNER;
   }

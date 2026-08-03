@@ -3100,7 +3100,11 @@
       "deviceNameHelp": "Shown in your device list. You can change it later.",
       "deviceNameLabel": "Name this device",
       "error": {
+        "awaitingApproval": "This device is already waiting for approval. Approve it from a device that is already signed in.",
+        "deviceLimit": "This account has reached its device limit. Remove a device you no longer use, then try again.",
+        "frozen": "This account is frozen, so no new device can be added right now. Your notes on this device are unaffected.",
         "notConfigured": "Set a sync server in settings before adding this device.",
+        "serverMismatch": "The sync server’s identity didn’t match what this device expected. Don’t enter your credentials again until you know why.",
         "transport": "Couldn’t reach the sync server. Check your connection and try again."
       },
       "mode": {
