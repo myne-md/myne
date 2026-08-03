@@ -16,8 +16,15 @@
 //! capture will land in, so — unlike every § 9 vault blob — it binds neither an
 //! `account_number_hash` nor an `items_key_id`. Instead it binds the per-entry
 //! **`capture_id`** (a random UUIDv7, also the queue filename) into the AAD, so
-//! an attacker with write access to the queue directory cannot swap or
-//! duplicate one entry's ciphertext under another entry's slot.
+//! a tampered header `capture_id` fails AEAD rather than silently re-labelling
+//! the entry.
+//!
+//! Note the limit of that property, because it is easy to over-read: the AAD
+//! binds the id in the **header**, not the id in the **filename**. Renaming a
+//! sealed file, or copying it to a second name, produces a blob that still
+//! opens — its header and AAD are internally consistent and the seal was never
+//! broken. Preventing a copy from draining twice is therefore a reader-side
+//! check (§ 9.18.4), not something this construction guarantees.
 //!
 //! The codec is **provider-agnostic**: it only ever sees a symmetric
 //! `wrap_key`. There is **no `SubkeyRole`** (a `root_key`-derived KEK would be

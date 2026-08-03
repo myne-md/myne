@@ -24,9 +24,14 @@
 //! `DeriveSubkey(root_key, …)` subkey. The queue is created while the vault is
 //! locked and is **vault-agnostic**: it binds neither an `account_number_hash`
 //! nor an `items_key_id`, only the per-entry **`share_id`** (16 random bytes,
-//! also the queue filename) into the AAD, so an attacker with write access to
-//! the queue directory cannot swap or duplicate one entry's ciphertext under
-//! another entry's slot.
+//! also the queue filename) into the AAD, so a tampered header `share_id`
+//! fails AEAD rather than silently re-labelling the entry.
+//!
+//! As with the pending-capture queue (§ 9.18.3), the binding is on the id in
+//! the **header**, not the id in the **filename**: a sealed file copied to a
+//! second name still opens, because nothing about it was altered. Preventing
+//! that copy from draining twice is a reader-side check (§ 9.20.4), not a
+//! property of this construction.
 //!
 //! The codec is **provider-agnostic** (it only ever sees a symmetric
 //! `wrap_key`) and has **no `SubkeyRole`**. The plaintext framing (filename /

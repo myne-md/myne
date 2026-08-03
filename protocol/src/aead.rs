@@ -555,9 +555,11 @@ pub fn aad_ai_embeddings_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// `account_number_hash` NOR `items_key_id`: a pending capture is enqueued
 /// while the vault is **locked** and is vault-agnostic (it drains into
 /// whichever vault unlocks first). Instead it binds the per-entry `capture_id`
-/// (the 16-byte UUIDv7 that is also the device-local queue filename), so an
-/// attacker with write access to the queue directory cannot swap or duplicate
-/// one entry's ciphertext into another `capture_id` slot.
+/// (the 16-byte UUIDv7 that is also the device-local queue filename), so a
+/// tampered header `capture_id` fails AEAD rather than silently re-labelling
+/// the entry. The binding is on the header id, not the filename: a sealed
+/// entry copied to a second name still opens, and it is the reader that must
+/// notice (§ 9.18.4).
 ///
 /// Layout (49 bytes):
 ///
