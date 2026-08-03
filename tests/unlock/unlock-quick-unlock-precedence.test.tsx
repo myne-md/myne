@@ -35,6 +35,28 @@ import type { QuickUnlockStatus } from "../../src/lib/quick-unlock";
 const PASSWORD = "component-test-password";
 const STATUS_CMD = "plugin:quick-unlock|quick_unlock_status";
 const UNLOCK_CMD = "plugin:vault-unlock|unlock";
+const VAULT_LIST_CMD = "plugin:vault-unlock|vault_list";
+
+/**
+ * The tail every mock in this file ends with: what an IPC this case does not
+ * care about should resolve to.
+ *
+ * `undefined` is the right answer for a command whose result the screen
+ * ignores, but NOT for one it destructures. The screen probes `vault_list` on
+ * mount to decide whether to offer the back-to-picker link, and `listVaults`
+ * wraps whatever `invoke` resolves as `{ ok }` — so `undefined` yields
+ * `{ ok: undefined }`, which satisfies the `"ok" in res` discriminant and then
+ * throws on `.ok.length`. It throws after the assertions have already passed,
+ * so it surfaces as an unhandled error, not a failing test: green tests, red
+ * run — and only in CI, where the whole suite's errors are tallied.
+ *
+ * An empty list is the honest fixture: these cases pin the credential surface,
+ * not the multi-vault link.
+ */
+function otherIpc(cmd: string): Promise<unknown> {
+  if (cmd === VAULT_LIST_CMD) return Promise.resolve([]);
+  return Promise.resolve(undefined);
+}
 
 /**
  * Back the screen with a given quick-unlock status; every other IPC resolves.
@@ -43,7 +65,7 @@ const UNLOCK_CMD = "plugin:vault-unlock|unlock";
  */
 function withStatus(status: QuickUnlockStatus): void {
   invokeMock.mockImplementation((cmd) =>
-    cmd === STATUS_CMD ? Promise.resolve(status) : Promise.resolve(undefined),
+    cmd === STATUS_CMD ? Promise.resolve(status) : otherIpc(cmd),
   );
 }
 
@@ -151,7 +173,7 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     invokeMock.mockImplementation((cmd) =>
       cmd === STATUS_CMD
         ? Promise.reject(new Error("probe failed"))
-        : Promise.resolve(undefined),
+        : otherIpc(cmd),
     );
     renderUnlock();
 
@@ -173,7 +195,7 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
           releaseRedeem = () => resolve(undefined);
         });
       }
-      return Promise.resolve(undefined);
+      return otherIpc(cmd);
     });
     renderUnlock();
 
@@ -201,7 +223,7 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
       if (cmd === "plugin:quick-unlock|quick_unlock_with_pin") {
         return Promise.reject({ kind: "AttemptsExhausted" });
       }
-      return Promise.resolve(undefined);
+      return otherIpc(cmd);
     });
     renderUnlock();
 

@@ -62,10 +62,21 @@ async function submitPassword(): Promise<void> {
   fireEvent.click(screen.getByTestId("unlock.submit"));
 }
 
+/**
+ * `vault_list` is answered EXPLICITLY rather than falling through to the
+ * catch-all `undefined`. The screen probes it on mount for the back-to-picker
+ * link, and `listVaults` wraps whatever `invoke` resolves as `{ ok }` — so
+ * `undefined` yields `{ ok: undefined }`, which passes the `"ok" in res`
+ * discriminant and then throws on `.ok.length`, unhandled, after the test has
+ * already passed. An empty array is the right fixture: these cases pin unlock
+ * ERROR variants, and a single-vault install is their implied setting.
+ */
 function rejectUnlockWith(error: unknown): void {
-  invokeMock.mockImplementation((cmd) =>
-    cmd === "plugin:vault-unlock|unlock" ? Promise.reject(error) : Promise.resolve(undefined),
-  );
+  invokeMock.mockImplementation((cmd) => {
+    if (cmd === "plugin:vault-unlock|unlock") return Promise.reject(error);
+    if (cmd === "plugin:vault-unlock|vault_list") return Promise.resolve([]);
+    return Promise.resolve(undefined);
+  });
 }
 
 afterEach(() => {
