@@ -44,7 +44,11 @@ import { maybeSeedTestData } from "../../lib/seed";
 import { countWords } from "../../lib/word-count";
 import {
   readNoteFlags,
+  isArchivedNote,
+  isListedTemplate,
   isLiveNote,
+  isResolverCandidate,
+  isTrashedNote,
   bodyAfterFrontmatter,
   frontmatterBody,
   stampUpdated,
@@ -592,15 +596,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   const resolverNotes = useMemo(
     () =>
       notes
+        // #260: the shared predicate, so the resolver's admission rule cannot
+        // drift from desktop's again. Archived notes stay resolvable — archive
+        // is a working-set filter, not a deletion.
         .filter((n) => {
           const f = noteFlags.get(n.id);
-          return (
-            f !== undefined &&
-            f.trashed === null &&
-            f.deleted === null &&
-            !f.template &&
-            !f.conflict
-          );
+          return f !== undefined && isResolverCandidate(f);
         })
         .map((n) => ({
           noteUuid: n.id,
@@ -610,9 +611,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         })),
     [notes, noteFlags, bodies],
   );
-  const trashedNotes = useMemo(() => notes.filter((n) => noteFlags.get(n.id)?.trashed != null), [notes, noteFlags]);
+  // #46: `isTrashedNote` excludes TOMBSTONES (`deleted:`). Without that clause
+  // "Delete permanently" was a visible no-op — the tombstone it writes left the
+  // row rendered, so the note looked like it was still in the trash.
+  const trashedNotes = useMemo(
+    () => notes.filter((n) => isTrashedNote(noteFlags.get(n.id) ?? {})),
+    [notes, noteFlags],
+  );
   const archivedNotes = useMemo(
-    () => notes.filter((n) => noteFlags.get(n.id)?.archived != null && noteFlags.get(n.id)?.trashed == null),
+    () => notes.filter((n) => isArchivedNote(noteFlags.get(n.id) ?? {})),
     [notes, noteFlags],
   );
   // Template notes (`template: true`) — excluded from the live list; managed via
@@ -620,7 +627,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   const templateNotes = useMemo(
     () =>
       notes
-        .filter((n) => noteFlags.get(n.id)?.template === true)
+        .filter((n) => isListedTemplate(noteFlags.get(n.id) ?? {}))
         .map((n) => ({ id: n.id, title: deriveTitleSnippet(bodies.get(n.id) ?? "").title })),
     [notes, noteFlags, bodies],
   );

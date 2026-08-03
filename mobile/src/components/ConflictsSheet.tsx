@@ -8,7 +8,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { noteList, noteRead } from "../lib/notes";
 import { frontmatterBody } from "../lib/note-organize";
-import { readConflictFromFmBody, readConflictOfFromFmBody } from "../dialect/surgery";
+import {
+  readConflictFromFmBody,
+  readConflictOfFromFmBody,
+  readDeletedFromFmBody,
+} from "../dialect/surgery";
 import { deriveTitleSnippet } from "../lib/note-title";
 import { keepAsSeparate, discardConflict, applyConflictVersion } from "../lib/conflictCopy";
 import { ConflictsView, UNKNOWN_CONFLICT_ORIGINAL, type ConflictCopyRow } from "./ConflictsView";
@@ -24,7 +28,11 @@ async function loadConflictGroups(): Promise<Map<string, ConflictCopyRow[]>> {
       continue; // a note removed mid-scan — skip
     }
     const fm = frontmatterBody(text);
-    if (!readConflictFromFmBody(fm)) continue;
+    // #46: a TOMBSTONED conflict copy is gone, not pending. Without this
+    // clause "Discard" never cleared a conflict: discarding writes the
+    // `deleted:` tombstone and leaves `conflict:` in place, so the row was
+    // re-listed on every scan and the sheet never emptied.
+    if (!readConflictFromFmBody(fm) || readDeletedFromFmBody(fm) != null) continue;
     const original = readConflictOfFromFmBody(fm) ?? UNKNOWN_CONFLICT_ORIGINAL;
     const row: ConflictCopyRow = { noteId: id, title: deriveTitleSnippet(text).title };
     const arr = groups.get(original);
