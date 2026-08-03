@@ -208,10 +208,12 @@ root_key (from password via Argon2id, §3.1)
 The three levels are:
 
 1. **`itemsKey_wrap_key`** — deterministically derived from the root key via the registered context string (§3.4). Never stored.
-2. **`itemsKey`** — a single 32-byte random key, generated once on vault initialization, persistent across password changes. Stored on disk as ciphertext under `itemsKey_wrap_key`. Re-wrapped (not regenerated) when the password changes.
+2. **`itemsKey`** — a single 32-byte random key, generated once on vault initialization, persistent across password changes. Stored on disk as ciphertext under `itemsKey_wrap_key`. Neither re-wrapped nor regenerated when the password changes: `itemsKey_wrap_key` is derived from `root_key`, and a password change does not alter `root_key` (§3.1, §7.3).
 3. **`item_key`** — a per-note 32-byte random key, generated when a note is created. Stored alongside that note's ciphertext, wrapped under the current `itemsKey`. The plaintext of the note is encrypted under `item_key` using the AEAD construction defined in §5.
 
-**Why three levels and not two:** when the user changes their master password, the new `root_key` produces a new `itemsKey_wrap_key`. The persistent `itemsKey` is decrypted with the old wrap key and re-encrypted under the new one — a single AEAD operation. None of the per-note `item_key` material is touched, and none of the note ciphertexts are re-encrypted. This is essential for vaults of non-trivial size.
+**What a password change touches:** nothing in this hierarchy. `root_key` is a random per-vault value, not password-derived (§3.1), so a password change re-derives only `password_wrap_key` and rewrites `random_salt_password_16`, `nonce_password_wrap` and `enc_root_key_password` in `vault.meta` (§7.3, §9.3). `itemsKey_wrap_key` is derived from the unchanged `root_key`, so `enc_items_key`, every per-note `item_key` and every `.myn` ciphertext stay byte-identical; the recovery-side fields are preserved too, so the recovery phrase keeps unwrapping the same `root_key`. An already-unlocked session is unaffected — only the next unlock uses the new password-side wrap.
+
+**Why three levels and not two:** not for password rotation, which a two-level `root_key → item_key` hierarchy would perform just as cheaply. The third level exists so that `itemsKey` can be rotated as a unit later: under the epoch-key model below, rotating one 32-byte key re-wraps one 64-byte `enc_item_key` per note and never the bulk ciphertext (§6.6), and the `items_key_id` bound into every blob's AAD (§5.2) is what lets blobs wrapped under different generations coexist and be told apart.
 
 **Forward-compatibility for a later major version's epoch-key model.** The research roadmap (`protocol-next-roadmap.md`, to be written) describes per-epoch `itemsKey` rotation that gives notes forward secrecy: each `EK_e` is derived for an epoch, used to wrap a generation of `item_key` material, then deleted on rotation, after which the corresponding ciphertexts become unrecoverable. To allow this evolution without a wire-format break, the v0.1 context-string registry (§3.4) reserves room for future epoch-key derivations (the concrete context prefix is defined by the next major version, not pre-allocated in v0.1), and the per-note blob format (§9) carries an `itemsKey_id` field whose semantics extend cleanly from "the singleton v0.1 itemsKey" to "the later itemsKey for epoch e".
 
@@ -502,7 +504,7 @@ Each AEAD call below is the CTX-committed XChaCha20-Poly1305 of §5.1: the on-di
 4. Zeroize item_key.
 ```
 
-The note's `note_uuid` and therefore its filename are unchanged by an update, so `AAD_wrap_item_key` and `AAD_encrypt_content` continue to commit to the same identity bytes across the note's lifetime. The persistence of `enc_item_key` is intentional: it allows password rotation (which changes `itemsKey_wrap_key` but not `itemsKey`) to leave every `.myn` file untouched, per §3.3.
+The note's `note_uuid` and therefore its filename are unchanged by an update, so `AAD_wrap_item_key` and `AAD_encrypt_content` continue to commit to the same identity bytes across the note's lifetime. The persistence of `enc_item_key` is intentional: a later `itemsKey` rotation (§3.3) rewrites only this one 64-byte field per note, never the note ciphertext. A password change rewrites neither — it rotates only the password-side wrap of `root_key` (§7.3), leaving every `.myn` file byte-identical.
 
 ### 6.4 Decrypting a note
 
@@ -541,7 +543,7 @@ Because both AEAD operations bind their AAD per §5.2, a successful decrypt comm
 
 ### 6.6 Why two AEAD calls
 
-Encrypting plaintext directly under `itemsKey` would save one AEAD call per note but defeat the password-rotation property of §3.3: re-wrapping under a new key would force every note's ciphertext to be re-encrypted. The two-call structure isolates per-note cost from `itemsKey` rotation — a future rewrap touches one 64-byte field per note, never the bulk plaintext.
+Encrypting plaintext directly under `itemsKey` would save one AEAD call per note but tie every note's ciphertext to the lifetime of that single key: rotating `itemsKey` (§3.3) would then force every note to be re-encrypted. The two-call structure isolates per-note cost from `itemsKey` rotation — a future rewrap touches one 64-byte field per note, never the bulk plaintext.
 
 ### 6.7 Nonce hygiene
 
@@ -2400,7 +2402,7 @@ A snapshot of choices made during the v0.1 draft. Mirrored to `../decisions.md`.
 
 - **Doc strategy is Option C**: ship `protocol.md` v0.1 (this document) alongside a separate `protocol-next-roadmap.md` (to be authored from the user's research). v0.1 is the implementation target; the next major version is the long-term aspirational reference.
 - **Subkey derivation pattern: `derive_key(root_key, context_string)` with context strings drawn from a registered table (§3.4)**. Adding a new subkey role in a minor revision does not require a protocol bump. Concrete primitive (HKDF-SHA-256 vs BLAKE3 derive_key) is `[DEFERRED]`.
-- **Three-level note wrapping**: `itemsKey_wrap_key → itemsKey → item_key → plaintext`. Password rotation re-wraps a single 32-byte itemsKey; no per-note re-encryption.
+- **Three-level note wrapping**: `itemsKey_wrap_key → itemsKey → item_key → plaintext`. Password rotation re-wraps a single 32-byte copy of `root_key` on the password side; `itemsKey`, `itemsKey_wrap_key` and every note blob are untouched. The third level exists for a later version's `itemsKey` rotation, which re-wraps one 64-byte field per note and never the ciphertext.
 - **Forward-compat reservation for later epoch keys**: the context-string registry reserves room for a later version's epoch-key derivations (the concrete context prefix is defined by the next major version, not pre-allocated in v0.1); the `items_key_id` field in v0.1 is structurally compatible with a later version's epoch identifier. No epoch rotation in v0.1.
 - **On-disk binary format with magic bytes**: per-note `MY01` (`.myn`), vault metadata `MYV1` (`vault.meta`). Big-endian integers, fixed offsets, no JSON envelope.
 - **AAD construction with explicit version prefix `"myne.v0.1|"`** (TLS 1.3 §4.1.3 model). AAD includes `protocol_version`, `items_key_id`, `note_uuid`, and (for content) `content_type`. Cross-version substitution and downgrade attempts fail AEAD verification.
