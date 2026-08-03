@@ -389,12 +389,27 @@ pub mod std_io {
             let path = path.to_path_buf();
             let bytes = bytes.to_vec();
             blocking(move || {
-                if opts.unclobbered {
-                    crate::atomic_write::atomic_write_unclobbered(&path, &bytes, opts.replace)
-                } else if opts.private {
-                    crate::atomic_write::atomic_write_private(&path, &bytes, opts.replace)
-                } else {
-                    crate::atomic_write::atomic_write(&path, &bytes, opts.replace)
+                // `unclobbered` and `private` are independent flags, so all
+                // four combinations must dispatch to something that honours
+                // BOTH. The combined arm is first: an earlier shape treated
+                // them as mutually exclusive and silently dropped `private`
+                // for a credential written to a user-owned directory, which is
+                // the regression this ordering forecloses.
+                match (opts.unclobbered, opts.private) {
+                    (true, true) => crate::atomic_write::atomic_write_unclobbered_private(
+                        &path,
+                        &bytes,
+                        opts.replace,
+                    ),
+                    (true, false) => {
+                        crate::atomic_write::atomic_write_unclobbered(&path, &bytes, opts.replace)
+                    }
+                    (false, true) => {
+                        crate::atomic_write::atomic_write_private(&path, &bytes, opts.replace)
+                    }
+                    (false, false) => {
+                        crate::atomic_write::atomic_write(&path, &bytes, opts.replace)
+                    }
                 }
             })
             .await

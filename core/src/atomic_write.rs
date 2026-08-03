@@ -49,6 +49,16 @@
 //! on [`atomic_write`] (fixed temp name is part of the recognized-
 //! artifact vocabulary, e.g. `vault.meta.tmp` recovery detection).
 //!
+//! ## Credential exports: [`atomic_write_unclobbered_private`]
+//!
+//! One export payload is a **bearer credential** rather than user content —
+//! the 24-word recovery phrase and the account number, both written by
+//! [`crate::plugins::secret_export`]. That write needs the unclobbered temp
+//! naming (the destination is user-owned) *and* the `0600` create mode (a
+//! umask-default `0644` leaves the phrase readable by every other local
+//! account). Neither of the two helpers above supplies both, so the
+//! combination has its own function rather than a flag on either.
+//!
 //! ## Interrupted-write recovery test seam (MYND-88)
 //!
 //! The durability + recovery contract is exercised by a `#[cfg(test)]`
@@ -161,11 +171,48 @@ fn normalize_private_mode(_path: &Path) -> std::io::Result<()> {
 /// [`atomic_write`]. See the module-level "Export-destination writes"
 /// section.
 pub fn atomic_write_unclobbered(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result<()> {
+    atomic_write_unclobbered_inner(path, bytes, replace, None)
+}
+
+/// Owner-only variant of [`atomic_write_unclobbered`]: identical randomized
+/// `create_new(true)` temp naming, durability, and failure-path cleanup, but
+/// the temp is created mode `0600` on Unix **from the moment it exists**, and
+/// the committed destination is normalized to `0600` on the way out.
+///
+/// This is the combination a **credential export to a user-owned directory**
+/// needs, and neither existing function supplies it: [`atomic_write_private`]
+/// uses the fixed `<path>.tmp` name, which is unsafe at a destination the user
+/// owns (it would truncate a pre-existing file of that name), while
+/// [`atomic_write_unclobbered`] takes the ambient umask and so lands `0644`
+/// under a typical `022`. The recovery phrase and the account number both leave
+/// the app through [`crate::plugins::secret_export`], so both land here.
+///
+/// Unix-only in effect: [`normalize_private_mode`] is a documented no-op
+/// elsewhere and Windows rides the user-profile ACL, exactly as
+/// [`atomic_write_private`] documents for itself.
+pub fn atomic_write_unclobbered_private(
+    path: &Path,
+    bytes: &[u8],
+    replace: bool,
+) -> std::io::Result<()> {
+    atomic_write_unclobbered_inner(path, bytes, replace, Some(0o600))?;
+    normalize_private_mode(path)
+}
+
+/// Shared body of [`atomic_write_unclobbered`] and
+/// [`atomic_write_unclobbered_private`]. `mode` is the create-time permission
+/// applied to the temp (Unix only; see [`apply_temp_mode`]).
+fn atomic_write_unclobbered_inner(
+    path: &Path,
+    bytes: &[u8],
+    replace: bool,
+    mode: Option<u32>,
+) -> std::io::Result<()> {
     if !replace && path.exists() {
         return Err(std::io::ErrorKind::AlreadyExists.into());
     }
 
-    let (tmp, mut f) = open_unclobbered_temp(path, &UNCLOBBERED_TEMP_COUNTER)?;
+    let (tmp, mut f) = open_unclobbered_temp(path, &UNCLOBBERED_TEMP_COUNTER, mode)?;
 
     // Same failure-path cleanup contract as `atomic_write`: a returned
     // error drops the partial temp on the way out (best-effort; the
@@ -207,15 +254,15 @@ const UNCLOBBERED_TEMP_ATTEMPTS: u32 = 16;
 fn open_unclobbered_temp(
     path: &Path,
     counter: &std::sync::atomic::AtomicU64,
+    mode: Option<u32>,
 ) -> std::io::Result<(std::path::PathBuf, std::fs::File)> {
     for _ in 0..UNCLOBBERED_TEMP_ATTEMPTS {
         let token = counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let tmp = unclobbered_tmp_path(path, token);
-        match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp)
-        {
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        apply_temp_mode(&mut opts, mode);
+        match opts.open(&tmp) {
             Ok(f) => return Ok((tmp, f)),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return Err(e),
@@ -684,6 +731,58 @@ mod tests {
         assert_eq!(read_file(&target), b"cafef00d");
     }
 
+    /// The credential-export combination: randomized `create_new` temp naming
+    /// AND `0600`. The plain `atomic_write_unclobbered` beside it takes the
+    /// ambient umask, which is what let the recovery-phrase export land `0644`.
+    /// Both the fresh-create and the replace-over-a-loose-`0644` case are
+    /// pinned, mirroring `private_write_creates_and_replaces_at_0600`.
+    #[cfg(unix)]
+    #[test]
+    fn unclobbered_private_creates_and_replaces_at_0600() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = ScopedTempDir::new("unclob-private-0600").unwrap();
+        let target = dir.path().join("myne-recovery-phrase.txt");
+
+        atomic_write_unclobbered_private(&target, b"word word word", false).unwrap();
+        let mode = std::fs::metadata(&target).unwrap().permissions().mode();
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "fresh credential export must be owner-only"
+        );
+
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o644)).unwrap();
+        atomic_write_unclobbered_private(&target, b"other other other", true).unwrap();
+        let mode = std::fs::metadata(&target).unwrap().permissions().mode();
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "replacing a loose 0644 file must land 0600"
+        );
+        assert_eq!(read_file(&target), b"other other other");
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name())
+            .collect();
+        assert_eq!(entries.len(), 1, "no temp sibling may survive: {entries:?}");
+    }
+
+    /// The private variant must keep the unclobbered guarantee it is built on:
+    /// a pre-existing user file shaped like a temp sibling is never truncated.
+    #[test]
+    fn unclobbered_private_preserves_preexisting_user_tmp_sibling() {
+        let dir = ScopedTempDir::new("unclob-private-sibling").unwrap();
+        let target = dir.path().join("secret.txt");
+        let decoy = dir.path().join("secret.txt.tmp");
+        std::fs::write(&decoy, b"user data").unwrap();
+
+        atomic_write_unclobbered_private(&target, b"exported", false).unwrap();
+
+        assert_eq!(read_file(&decoy), b"user data", "decoy must be untouched");
+        assert_eq!(read_file(&target), b"exported");
+    }
+
     // ---- atomic_write_unclobbered (export-destination variant, 115-F1) ----
 
     #[test]
@@ -761,7 +860,7 @@ mod tests {
         std::fs::write(&occupied_1, b"sentinel one").unwrap();
 
         let counter = std::sync::atomic::AtomicU64::new(0);
-        let (tmp, f) = open_unclobbered_temp(&target, &counter).unwrap();
+        let (tmp, f) = open_unclobbered_temp(&target, &counter, None).unwrap();
         drop(f);
 
         assert_eq!(tmp, unclobbered_tmp_path(&target, 2));
@@ -774,7 +873,7 @@ mod tests {
             std::fs::write(unclobbered_tmp_path(&target, n), b"x").unwrap();
         }
         let counter = std::sync::atomic::AtomicU64::new(0);
-        let err = open_unclobbered_temp(&target, &counter)
+        let err = open_unclobbered_temp(&target, &counter, None)
             .expect_err("a fully-occupied candidate space must bail closed");
         assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
     }
