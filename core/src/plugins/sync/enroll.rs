@@ -1012,6 +1012,27 @@ pub async fn enroll_device_from_host(
                 _ => return Err(SyncDeviceError::Transport),
             };
             let meta = parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
+            // Bind the meta to the account the user actually typed, on BOTH arms.
+            //
+            // The 404 arm falls back to this device's OWN `vault.meta`, and
+            // without this check nothing tied that file to `account.hash`: a
+            // well-formed, Damm-valid account number that is neither this
+            // vault's nor registered on the server would derive successfully
+            // (own vault + own password), register a fresh server account under
+            // the typed hash, upload this vault's meta there, and report
+            // success — while `sync-state.json` kept the typed hash as the AAD
+            // input for `vault.prefs` / `vault.attachments` / `vault.themes`,
+            // so those three families would decode as empty for the life of the
+            // device. The 200 arm matches by construction (the server stores
+            // the meta under the typed hash), and checking it anyway hardens
+            // against a server serving a foreign account's meta.
+            //
+            // `AccountMismatch` rather than `BadRequest`: nothing the user
+            // retypes about their password fixes it, which is the same reason
+            // the web bootstrap path uses that variant.
+            if meta.account_number_hash != account.hash {
+                return Err(SyncDeviceError::AccountMismatch);
+            }
             // The `vault.meta` came from the (untrusted, TB5) sync server, so its
             // `kdf_params` are attacker-controlled. Validate the Argon2id memory/time
             // floor+ceiling BEFORE deriving — otherwise a hostile server could pin an
