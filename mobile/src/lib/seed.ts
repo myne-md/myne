@@ -10,7 +10,7 @@
 
 import { noteCreate, noteUpdate, noteList, noteRead } from "./notes";
 import { frontmatterTitle } from "./note-organize";
-import { WELCOME_NOTE_TITLE } from "./welcomeNote";
+import { welcomeNoteTitle } from "./welcomeNote";
 import { setFavorites, upsertSavedView, setViewOrder, type SavedView } from "./prefs";
 import { attachmentImport } from "./attachments";
 import { emitAttachmentEmbed } from "./attachmentRef";
@@ -425,7 +425,7 @@ export async function maybeSeedTestData(): Promise<void> {
     // OTHER single note is real user data — leave it alone.
     if (existing.length === 1) {
       const only = await noteRead(existing[0]);
-      if (frontmatterTitle(only) !== WELCOME_NOTE_TITLE) return;
+      if (frontmatterTitle(only) !== welcomeNoteTitle()) return;
     }
     await seedTestData();
   } catch (e) {

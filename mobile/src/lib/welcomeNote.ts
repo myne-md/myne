@@ -7,16 +7,18 @@
 // special-casing. Seeded exactly once, on the create→unlock path only —
 // never re-created on later unlocks.
 //
-// Copy resolves from the shared en catalog (`@myne/locales-en`) via the
-// shared key names — the SAME source strings the desktop i18n runtime
-// serves, so the copy cannot drift between clients. When mobile grows an
-// i18n runtime, resolve the keys through it at seed time like desktop does.
+// Copy resolves through the i18n RUNTIME (#49). It used to read the English
+// catalog directly — correct when this file was written, because mobile had no
+// i18n runtime, and stale from the moment `@myne/i18n` went live: a user who
+// completed onboarding in Turkish got an English Welcome note as the first
+// thing in their vault. Resolved at SEED time rather than at module load, so
+// the note is written in whatever language the user just chose.
 //
 // Desktop also pre-seeds the MYW1 workspace descriptor so its editor opens
 // the note on mount; mobile has no workspace plugin — the note shows up in
 // the notes list after unlock, which is the mobile list-first UX.
 
-import enCatalog from "@myne/locales-en";
+import i18n from "@myne/i18n";
 import {
   buildWelcomeNoteMarkdown,
   WELCOME_NOTE_TITLE_KEY,
@@ -25,25 +27,23 @@ import {
 import { stampUpdated } from "./note-organize";
 import { noteCreate } from "./notes";
 
-// Nested-key catalog lookup (the editor-host `t()` shape, minus plurals and
-// interpolation — the Welcome copy uses neither). Falls back to the raw key.
-function catalogString(key: string): string {
-  let node: unknown = enCatalog;
-  for (const seg of key.split(".")) {
-    if (typeof node !== "object" || node === null) return key;
-    node = (node as Record<string, unknown>)[seg];
-  }
-  return typeof node === "string" ? node : key;
+/** The Welcome note's title in the ACTIVE language. Also the DEV seeder's
+ *  "still-empty vault" marker (seed.ts).
+ *
+ *  A function rather than a `const` (#49): a module-level constant freezes the
+ *  boot language, and the create flow can run after the user has switched. */
+export function welcomeNoteTitle(): string {
+  return i18n.t(WELCOME_NOTE_TITLE_KEY);
 }
 
-/** Resolved copy. The title is also the DEV seeder's "still-empty vault"
- *  marker (seed.ts). */
-export const WELCOME_NOTE_TITLE = catalogString(WELCOME_NOTE_TITLE_KEY);
-export const WELCOME_NOTE_BODY = catalogString(WELCOME_NOTE_BODY_KEY);
+/** The Welcome note's body in the active language. */
+export function welcomeNoteBody(): string {
+  return i18n.t(WELCOME_NOTE_BODY_KEY);
+}
 
 /** Full note plaintext (frontmatter `title:` + body) via the shared builder. */
 export function welcomeNoteMarkdown(): string {
-  return buildWelcomeNoteMarkdown(WELCOME_NOTE_TITLE, WELCOME_NOTE_BODY);
+  return buildWelcomeNoteMarkdown(welcomeNoteTitle(), welcomeNoteBody());
 }
 
 /**
