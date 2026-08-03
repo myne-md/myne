@@ -330,6 +330,21 @@ pub enum SyncDeviceError {
     /// and the captured fingerprint is deliberately not reported
     /// (`super::pin_confirm`'s module doc).
     FingerprintMismatch,
+    /// The vault's Argon2id parameters are affordable to the protocol but not
+    /// to this host (#349).
+    ///
+    /// `validate_kdf_params` accepts up to `MAX_KDF_M_KIB` (4 GiB); a host's
+    /// own ceiling (`HostCtx::max_kdf_memory_kib`, 1 GiB in the browser) can be
+    /// far lower. Passing the protocol range is therefore not the same as being
+    /// derivable here, and an unaffordable `m_kib` aborts inside the allocation
+    /// — in the browser, a dead Worker with no cause.
+    ///
+    /// Its own variant for the same reason `AccountMismatch` is: the remedy is
+    /// different in kind. The credentials are right and re-typing them cannot
+    /// help; the vault has to be opened on a machine that can afford its KDF.
+    /// Reported rather than swallowed so the user is not sent round a
+    /// check-your-password loop that cannot terminate.
+    KdfTooLargeForHost,
     /// The account is FROZEN — the server said so, in the 403 body (#268).
     ///
     /// Its own variant for the same reason `AccountMismatch` is: the remedy is
