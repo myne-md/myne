@@ -1066,17 +1066,29 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
       }
       bumpPrefsNonce();
     }
+    // #50: DISK FIRST, like the custom-theme write below and like desktop's
+    // `AppearancePanel`. This used to paint the new theme, move the selection
+    // and write `localStorage` and only THEN fire the `vault.prefs` write with
+    // a swallowed rejection — so a failed write left the app looking themed
+    // while `vault.prefs` (and therefore sync, backup and the next unlock)
+    // still held the old value. The user had no way to know.
+    if (HAS_TAURI) {
+      try {
+        await persistTheme(
+          next === "system" ? null : (next as "light" | "dark" | "amoled"),
+        );
+      } catch {
+        setToast(t("settings.saveSettingError"));
+        return;
+      }
+    }
     setChoice(next);
     applyThemeChoice(next);
     clearCustomTheme();
     setDraft((d) => ({ ...d, custom_theme: null }));
+    // The pre-unlock boot cache, written only once the vault write has landed
+    // — the custom selection deliberately never joins it (see `pickCustomTheme`).
     if (typeof localStorage !== "undefined") localStorage.setItem(THEME_STORAGE_KEY, next);
-    // Persist to vault.prefs too (parity with desktop: theme survives backup /
-    // restore and rides sync). localStorage stays the pre-unlock boot cache —
-    // the custom selection deliberately never joins it (see `pickCustomTheme`).
-    if (HAS_TAURI) {
-      void persistTheme(next === "system" ? null : (next as "light" | "dark" | "amoled")).catch(() => {});
-    }
   }
 
   /**

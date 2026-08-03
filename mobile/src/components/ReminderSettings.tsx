@@ -29,7 +29,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { REMINDER_HORIZON_DAYS } from "@myne/reminder-schedule";
+import { REMINDER_HORIZON_DAYS, horizonEndDate } from "@myne/reminder-schedule";
 import { REMINDER_APPROXIMATE_DELIVERY_SENTENCE } from "../lib/load-bearing-copy";
 import { createExactAlarmApi, type ExactAlarmApi, type ReminderExactness } from "../lib/reminders";
 import { Switch } from "./inputs";
@@ -83,13 +83,12 @@ function Group({ children }: { children: ReactNode }) {
  * "7 days" makes the reader do the arithmetic and get it wrong.
  */
 export function horizonDate(horizonDays: number | null, today: Date): string {
-  const days = horizonDays ?? REMINDER_HORIZON_DAYS;
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + days);
-  // Local calendar arithmetic on purpose: a UTC-based shift would name the wrong
-  // day for anyone far enough east or west, which is a visible lie on a line
-  // whose entire job is being checkable.
-  const p = (n: number): string => String(n).padStart(2, "0");
-  return `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`;
+  // #52: delegates to the SHARED derivation, which lives next to the cutoff it
+  // describes. This used to compute `today + N` locally while the other client
+  // computed `today + (N - 1)` — so the same vault told two devices two
+  // different dates, and this one named a day LATER than any reminder the
+  // scheduler would actually register (the horizon is inclusive of today).
+  return horizonEndDate(today, horizonDays ?? REMINDER_HORIZON_DAYS);
 }
 
 export type ReminderSwitchBlockProps = {

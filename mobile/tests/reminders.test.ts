@@ -729,12 +729,26 @@ describe("the per-device switch and the horizon line", () => {
   // calendar; "7 days" makes the reader do the arithmetic and get it wrong.
   it("states a date, computed in the user's local calendar", async () => {
     const { horizonDate } = await import("../src/components/ReminderSettings");
-    // 31 Jan + 7 days must land in February, and a local-vs-UTC mistake shows up
-    // as an off-by-one day for anyone far enough east or west.
-    expect(horizonDate(7, new Date(2026, 0, 31, 23, 30))).toBe("2026-02-07");
-    expect(horizonDate(1, new Date(2026, 11, 31, 0, 30))).toBe("2027-01-01");
+    // #52: the horizon is INCLUSIVE of today, so a 7-day horizon ends on
+    // today + 6. This asserted today + 7 — a day LATER than any reminder the
+    // scheduler registers, and a day later than the other client said.
+    // 31 Jan + 6 still lands in February, so the month rollover is still
+    // covered, and a local-vs-UTC mistake still shows up as an off-by-one.
+    expect(horizonDate(7, new Date(2026, 0, 31, 23, 30))).toBe("2026-02-06");
+    // A 1-day horizon covers TODAY and nothing else.
+    expect(horizonDate(1, new Date(2026, 11, 31, 0, 30))).toBe("2026-12-31");
     // A leap day, because February is where date arithmetic goes wrong.
-    expect(horizonDate(1, new Date(2028, 1, 28, 12, 0))).toBe("2028-02-29");
+    expect(horizonDate(2, new Date(2028, 1, 28, 12, 0))).toBe("2028-02-29");
+  });
+
+  it("names the same date the other client does", async () => {
+    // The two derivations drifted precisely because they lived apart; both now
+    // call the shared one, so this pins that they agree rather than re-deriving
+    // an expected value here.
+    const { horizonDate } = await import("../src/components/ReminderSettings");
+    const { horizonEndDate } = await import("@myne/reminder-schedule");
+    const today = new Date(2026, 7, 3, 9, 0);
+    expect(horizonDate(7, today)).toBe(horizonEndDate(today, 7));
   });
 
   it("falls back to the shared horizon when the device has not set one", async () => {
