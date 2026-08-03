@@ -69,23 +69,32 @@ pub async fn change_password_from_host(
     let result =
         change_password_with_path(current_password, new_password, &vault_path, state, hooks).await;
 
-    // MYND-29: wipe the plaintext-derived search index on the force-relock
+    // MYND-29: wipe the plaintext-derived RAM surfaces on the force-relock
     // outcomes — they drop `Slot::Unlocked` to `Empty` and zeroize the keys
     // (`force_relock_on_invalid_vault_meta` / `force_relock_on_cas_mismatch` /
     // the post-Argon2id `HashMismatch` inside `commit_unlocked_rewrite`), so
-    // the index (as sensitive as the keys) must wipe on the SAME path —
-    // upholding `spec/protocol.md` §9.6.5 "nothing search-derived survives a
-    // lock". A SUCCESS leaves the slot Unlocked (`root_key` unchanged — only
-    // its wrap rotated), so the index is preserved; `IoError`/`JoinFailure`
-    // also leave the slot Unlocked → must NOT wipe. `VaultLockedDuringChange`
-    // means a concurrent `vault_lock` already dropped + wiped, so it is not
-    // this command's drop to clean up.
+    // everything plaintext-derived (as sensitive as the keys) must wipe on the
+    // SAME path — upholding `spec/protocol.md` §9.6.5 "nothing search-derived
+    // survives a lock" and §9.8.5 / §9.17.5, which name the credential-rotation
+    // force-relock as one of the slot-drop sites their zeroize-on-every-drop
+    // residency clause covers. The list below is the manual-lock list
+    // (`vault_unlock::commands::lock_from_host`) — a hook added to one and not
+    // the other is the drift these two spec clauses forbid.
+    //
+    // A SUCCESS leaves the slot Unlocked (`root_key` unchanged — only its wrap
+    // rotated), so the indices are preserved; `IoError`/`JoinFailure` also
+    // leave the slot Unlocked → must NOT wipe. `VaultLockedDuringChange` means
+    // a concurrent `vault_lock` already dropped + wiped, so it is not this
+    // command's drop to clean up.
     if matches!(
         &result,
         Err(VaultChangePasswordError::InvalidVaultMeta)
             | Err(VaultChangePasswordError::VaultMetaChangedExternally)
     ) {
         hooks.zeroize_search_index();
+        // MYND-262/266: wipe the spell engine + personal/ignore sets (each add
+        // already persisted, so nothing to flush — only RAM to zeroize).
+        hooks.zeroize_spell();
         // MYND-166: wipe the staged editor-workspace descriptor on this
         // force-relock path too.
         hooks.clear_staged_descriptor();
@@ -94,6 +103,23 @@ pub async fn change_password_from_host(
         // payload on the same force-relock path — locking means locked
         // for every plaintext surface, not just "main".
         hooks.pdf_export_teardown_on_lock();
+        // MYND-31: wipe the plaintext-derived VaultIndices — note titles,
+        // folders, tags, wikilink targets and typed property values
+        // (`spec/protocol.md` §9.8.5) — and, on a `local-inference` desktop
+        // build, the AI embedding vectors the same hook carries (§9.17.5).
+        hooks.zeroize_vault_indices();
+        // MYND-169: wipe the plaintext-derived attachment reference graph —
+        // its note-ids / attachment-ids are correlation tags (AS3). On the web
+        // client this same hook also revokes the object URLs that would
+        // otherwise pin decrypted attachment bytes for the life of the page.
+        hooks.zeroize_attachment_refs();
+        // MYND-259: abort any in-progress voice recording so the mic + RAM
+        // PCM buffer never survive the force-relock.
+        hooks.abort_active_recording();
+        // Deliberately NOT `apply_screen_capture(true, "lock_reset")`: that
+        // call belongs to the manual-lock path alone (`decisions.md`
+        // 2026-05-27), and the next unlock re-applies the vault's persisted
+        // `vault.prefs` choice via the post-unlock pipeline.
     }
 
     // F1: on SUCCESS the on-disk `vault.meta` had its password-side wrap rotated
@@ -456,6 +482,16 @@ pub(crate) async fn change_password_with_path(
             // `decisions.md` 2026-05-06 entry "InvalidVaultMeta posture".
             // TRANSITIONAL (sub-feature 2): drop the active vault entry.
             if let Some(id) = state.active_vault_or_recovering_for_probe().await {
+                // MYND-205: drop the per-session decrypted label + icon on the
+                // SAME force-relock path as the slot, exactly as
+                // `lock_with_state` does — a relocked vault must stop
+                // surfacing its real name / glyph in the switcher (SYNC-3).
+                // It has to happen HERE rather than beside the teardown hooks
+                // in `change_password_from_host`: once `take` has run the slot
+                // is `Empty`, `active_vault_or_recovering_for_probe` returns
+                // `None`, and the id is no longer recoverable.
+                state.evict_cached_label(id).await;
+                state.evict_cached_icon(id).await;
                 let _prior = state.take(id).await;
             }
             tracing::warn!(
@@ -470,6 +506,11 @@ pub(crate) async fn change_password_with_path(
             // 2026-05-06 entry "CAS mismatch posture: force-relock".
             // TRANSITIONAL (sub-feature 2): drop the active vault entry.
             if let Some(id) = state.active_vault_or_recovering_for_probe().await {
+                // MYND-205: same label + icon eviction as the
+                // `InvalidVaultMeta` arm above, and for the same reason —
+                // before the `take`, while the id is still resolvable.
+                state.evict_cached_label(id).await;
+                state.evict_cached_icon(id).await;
                 let _prior = state.take(id).await;
             }
             tracing::warn!(
@@ -581,17 +622,140 @@ pub(crate) async fn change_password_with_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::host::test_host::TestHost;
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
     use crate::plugins::vault_recover::commands::recover_with_phrase_with_path;
     use crate::plugins::vault_unlock::commands::unlock_with_path;
     use crate::plugins::vault_unlock::state::{test_vault_id, SlotKind};
-    use crate::test_support::{ScratchVault, FAST_TEST_KDF};
+    use crate::test_support::{ScopedTempDir, ScratchVault, FAST_TEST_KDF};
 
     /// No-op lifecycle hooks for the `_with_path` core tests — the
     /// quick-unlock-invalidation side-effect (desktop-only) is exercised by the
     /// desktop `quick_unlock` plugin's own tests, not asserted here.
     fn noop_hooks() -> crate::hooks::Hooks {
         std::sync::Arc::new(crate::hooks::NoopHooks)
+    }
+
+    /// A `Hooks` that records the lock-teardown calls it receives, in order,
+    /// and no-ops everything else (the `hooks::test_hooks::CountingHooks`
+    /// pattern). Lives here rather than beside `CountingHooks` because it is
+    /// specific to this path's assertion.
+    ///
+    /// It records two hooks the force-relock deliberately does NOT call —
+    /// `persist_search_index` (the slot is already `Empty`, so there is no
+    /// `root_key` to seal `vault.search` with) and `apply_screen_capture` (the
+    /// manual-lock path's alone, `decisions.md` 2026-05-27) — so the
+    /// whole-vector equality below pins their ABSENCE as well as the presence
+    /// of the seven that are owed.
+    struct RecordingHooks(std::sync::Mutex<Vec<&'static str>>);
+
+    impl RecordingHooks {
+        fn new() -> std::sync::Arc<Self> {
+            std::sync::Arc::new(Self(std::sync::Mutex::new(Vec::new())))
+        }
+
+        fn record(&self, name: &'static str) {
+            self.0.lock().expect("recording hooks mutex").push(name);
+        }
+
+        /// Everything recorded so far, oldest first.
+        fn calls(&self) -> Vec<&'static str> {
+            self.0.lock().expect("recording hooks mutex").clone()
+        }
+    }
+
+    impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
+        fn hydrate_attachment_refs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_search_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_spell<'a>(&'a self, _: &'a VaultRuntimeState) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn reclaim_stray_attachment_blobs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn persist_search_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            self.record("persist_search_index");
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_ai_vectors<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn index_note_attachments<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+            _: &'a str,
+            _: &'a str,
+            _: &'a str,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn zeroize_search_index(&self) {
+            self.record("zeroize_search_index");
+        }
+        fn zeroize_spell(&self) {
+            self.record("zeroize_spell");
+        }
+        fn zeroize_vault_indices(&self) {
+            self.record("zeroize_vault_indices");
+        }
+        fn zeroize_attachment_refs(&self) {
+            self.record("zeroize_attachment_refs");
+        }
+        fn abort_active_recording(&self) {
+            self.record("abort_active_recording");
+        }
+        fn pdf_export_teardown_on_lock(&self) {
+            self.record("pdf_export_teardown_on_lock");
+        }
+        fn clear_staged_descriptor(&self) {
+            self.record("clear_staged_descriptor");
+        }
+        fn apply_screen_capture(&self, _: bool, _: &'static str) {
+            self.record("apply_screen_capture");
+        }
+        fn search_upsert(&self, _: &str, _: &str, _: &str) {}
+        fn search_remove(&self, _: &str) {}
+        fn ai_note_changed(&self, _: &str, _: &str) {}
+        fn ai_note_deleted(&self, _: &str) {}
+        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
+        fn bump_local_change(&self) {}
+        fn emit_snapshot_write_failed(&self, _: &str) {}
+        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
+            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
+        }
+        fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
+        fn preempt_inflight_backup<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn invalidate_quick_unlock(&self, _: &Path) {}
+        fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
+            false
+        }
+        fn purge_note_snapshots(&self, _: &Path, _: &str) -> std::io::Result<usize> {
+            Ok(0)
+        }
     }
 
     /// Same per-test runtime pattern as the sibling plugins. Builds a
@@ -652,6 +816,55 @@ mod tests {
             phrase_string,
             meta_bytes,
         )
+    }
+
+    /// Seed an unlocked vault laid out the way [`change_password_from_host`]
+    /// resolves it — `<app-data>/vaults/<id>/vault.meta` — instead of at the
+    /// bare [`ScratchVault`] path the `_with_path` tests use. The teardown-hook
+    /// block lives in `change_password_from_host`, which resolves its own path,
+    /// so a test that observes those hooks cannot go through
+    /// `change_password_with_path`.
+    ///
+    /// Returns the scratch base (the caller must keep it alive — its `Drop`
+    /// removes the tree), the host, the state, the vault id and the resolved
+    /// `vault.meta` path.
+    async fn seed_unlocked_state_under_host(
+        password: &str,
+    ) -> (
+        ScopedTempDir,
+        TestHost,
+        VaultRuntimeState,
+        crate::vault_id::VaultId,
+        PathBuf,
+    ) {
+        let base = ScopedTempDir::new("change_password_hooks").expect("scratch base");
+        let host = TestHost::new(base.path());
+        let id = crate::vault_id::VaultId::mint();
+        let root = crate::paths::vault_root_for_id_from_base(
+            &host.app_data_dir().expect("test host app_data_dir"),
+            id,
+        );
+        std::fs::create_dir_all(&root).expect("create vault root");
+
+        let session = build_session(id, password, FAST_TEST_KDF).expect("build_session");
+        let meta_bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
+        let meta_path = root.join("vault.meta");
+        std::fs::write(&meta_path, meta_bytes).expect("write vault.meta");
+
+        let state = VaultRuntimeState::default();
+        unlock_with_path(
+            password.to_string(),
+            Some(id),
+            &meta_path,
+            &state,
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("seed: vault_unlock must succeed against the seeded vault");
+        assert_eq!(state.slot_kind(id).await, SlotKind::Unlocked);
+
+        (base, host, state, id, meta_path)
     }
 
     use crate::vault_meta_hash::vault_meta_sha256 as sha256;
@@ -1241,6 +1454,99 @@ mod tests {
                 after_bytes.len(),
                 protocol::VAULT_META_LEN,
                 "disk holds the externally-mutated vault.meta, not the rewrite"
+            );
+        });
+    }
+
+    /// The credential-rotation force-relock drops `Slot::Unlocked` to `Empty`,
+    /// so it owes the SAME teardown as the manual lock: `spec/protocol.md`
+    /// §9.8.5 (`vault.indices`) and §9.17.5 (`vault.embeddings`) both say the
+    /// decrypted material is zeroized at **every** slot-drop site and both name
+    /// the credential-rotation force-relock among them. Asserts the recorded
+    /// call vector equals `lock_from_host`'s teardown list, in its order — a
+    /// hook added to one path and not the other fails here rather than leaving
+    /// plaintext-derived RAM resident until the next unlock overwrites it.
+    ///
+    /// Every other test in this module builds `NoopHooks`, which cannot observe
+    /// a hook at all; this is the only test that can say which ones fired.
+    ///
+    /// The mutation is a whole competing `vault.meta` rather than a flipped
+    /// byte because that is the ordinary way this path is reached: the sync
+    /// meta phase rewrites `vault.meta` while the vault is unlocked without
+    /// refreshing the slot's hash anchor, so a subsequent change-password in
+    /// the same session takes the force-relock branch deterministically.
+    #[test]
+    fn force_relock_runs_the_full_lock_teardown() {
+        rt().block_on(async {
+            let (_base, host, state, id, meta_path) =
+                seed_unlocked_state_under_host("orig-password-12").await;
+
+            // The per-session decrypted label + icon a relock must stop
+            // surfacing in the switcher (SYNC-3).
+            state
+                .set_cached_label(id, Some("Personal".to_string()))
+                .await;
+            state.set_cached_icon(id, Some("book".to_string())).await;
+
+            // A structurally valid but DIFFERENT vault.meta lands on disk, as
+            // a sync meta adopt/merge leaves it.
+            let other_session = build_session(
+                crate::vault_id::VaultId::mint(),
+                "different-password",
+                FAST_TEST_KDF,
+            )
+            .expect("build_session");
+            let other_bytes =
+                build_and_serialize_vault_meta(&other_session).expect("serialize alt vault.meta");
+            std::fs::write(&meta_path, other_bytes).expect("overwrite vault.meta");
+
+            let recorder = RecordingHooks::new();
+            let hooks: crate::hooks::Hooks = recorder.clone();
+            let result = change_password_from_host(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                &state,
+                &hooks,
+                &host,
+            )
+            .await;
+
+            assert!(
+                matches!(
+                    result,
+                    Err(VaultChangePasswordError::VaultMetaChangedExternally)
+                ),
+                "expected VaultMetaChangedExternally, got {result:?}"
+            );
+            assert_eq!(state.slot_kind(id).await, SlotKind::Empty);
+
+            assert_eq!(
+                recorder.calls(),
+                vec![
+                    "zeroize_search_index",
+                    "zeroize_spell",
+                    "clear_staged_descriptor",
+                    "pdf_export_teardown_on_lock",
+                    "zeroize_vault_indices",
+                    "zeroize_attachment_refs",
+                    "abort_active_recording",
+                ],
+                "force-relock must run the manual-lock teardown list — and only \
+                 that list: `persist_search_index` has no root_key left to seal \
+                 with, and `apply_screen_capture` belongs to the manual-lock \
+                 path alone"
+            );
+
+            // The label/icon eviction half, which cannot ride the hook block:
+            // by the time it runs the slot is `Empty` and the id is gone, so
+            // the force-relock arms evict inline before their `take`.
+            assert!(
+                state.cached_label(id).await.is_none(),
+                "force-relock must evict the vault's cached decrypted label"
+            );
+            assert!(
+                state.cached_icon(id).await.is_none(),
+                "force-relock must evict the vault's cached decrypted icon"
             );
         });
     }
