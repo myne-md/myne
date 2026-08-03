@@ -121,6 +121,7 @@
       "transcribeFailed": "نقل نویسی ناکام رہی۔ براہِ کرم دوبارہ کوشش کریں۔",
       "transcribeFeatureOff": "آواز سے متن بند ہے۔ اسے ترتیبات → نقل نویسی میں آن کریں۔",
       "transcribeModelLoadFailed": "آواز سے متن کا ماڈل لوڈ نہیں ہو سکا۔ Myne دوبارہ انسٹال کریں، یا ترتیبات → ڈیولپر → AI میں اپنا حسبِ ضرورت ماڈل جانچیں۔",
+      "transcribeNoModel": "ترتیبات → ڈیولپر → AI میں آواز سے متن کا ماڈل منتخب کریں۔",
       "transcribeNoModelHint": "آواز سے متن کا ماڈل موجود نہیں۔ Myne دوبارہ انسٹال کرنے سے یہ بحال ہو جاتا ہے۔",
       "transcribeStarted": "نقل نویسی ہو رہی ہے…",
       "transcribeVaultLocked": "نقل نویسی کے لیے اپنا والٹ ان لاک کریں۔",
@@ -1474,6 +1475,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "منسوخ کریں",
       "close": "بند کریں",
       "count_one": "{{count}} نوٹ",
       "count_other": "{{count}} نوٹس",
@@ -1483,6 +1485,8 @@
       "emptyTitle": "کچھ آرکائیو نہیں کیا گیا",
       "folderDeleteBody_one": "“{{name}}” اور اس کا {{count}} نوٹ",
       "folderDeleteBody_other": "“{{name}}” اور اس کے {{count}} نوٹس",
+      "folderDeleteConfirm_one": "{{count}} نوٹ ردی میں منتقل کریں؟",
+      "folderDeleteConfirm_other": "{{count}} نوٹس ردی میں منتقل کریں؟",
       "folderDeleteConfirmCta": "ردی میں منتقل کریں",
       "folderDeleteError": "اس فولڈر کے نوٹس ردی میں منتقل نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
       "folderDeleteTitle": "یہ فولڈر ردی میں منتقل کریں؟",
@@ -1836,6 +1840,8 @@
       "imported_one": "1 نوٹ اس فولڈر میں درآمد ہوا",
       "imported_other": "{{count}} نوٹس اس فولڈر میں درآمد ہوئے",
       "importedWithSkips": "{{count}} درآمد ہوئے — {{skipped}} چھوڑ دیے گئے",
+      "importedWithSkips_one": "{{count}} نوٹ درآمد ہوا — {{skipped}} کو چھوڑ دیا گیا",
+      "importedWithSkips_other": "{{count}} نوٹس درآمد ہوئے — {{skipped}} کو چھوڑ دیا گیا",
       "importNoMarkdown": "اس ڈراپ میں کوئی Markdown فائل نہیں"
     },
     "newFromTemplate": {
@@ -3116,6 +3122,8 @@
       "echoLabel": "آپ نے جو درج کیا",
       "echoComplete": "64 میں سے 64 حروف۔ جاری رکھنے سے پہلے اسے اپنی نقل کے ساتھ پڑھ کر ملائیں۔",
       "echoProgress": "اب تک {{total}} میں سے {{count}} حروف۔",
+      "echoProgress_one": "اب تک {{total}} میں سے {{count}} حرف۔",
+      "echoProgress_other": "اب تک {{total}} میں سے {{count}} حروف۔",
       "echoInvalid": "SHA-256 فنگر پرنٹ 64 حروف کا ہوتا ہے، ہر حرف 0–9 یا a–f۔ کولن، خالی جگہیں اور شروع میں “sha256:” ٹھیک ہیں — اس کے علاوہ کچھ بھی اس کا حصہ نہیں۔",
       "helpToggle": "یہ فنگر پرنٹ مجھے کہاں ملے گا؟",
       "helpNotOverTor": "اسی کنکشن سے نہیں۔ اسی راستے سے حاصل کیا گیا فنگر پرنٹ کچھ ثابت نہیں کرتا — جو چیز سرٹیفکیٹ بدل سکتی ہے وہ اس صفحے کو بھی بدل سکتی ہے۔",

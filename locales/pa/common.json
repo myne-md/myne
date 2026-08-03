@@ -121,6 +121,7 @@
       "transcribeFailed": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਅਸਫਲ ਰਹੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "transcribeFeatureOff": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਬੰਦ ਹੈ। ਇਸਨੂੰ ਸੈਟਿੰਗਾਂ → ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਵਿੱਚ ਚਾਲੂ ਕਰੋ।",
       "transcribeModelLoadFailed": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। Myne ਦੁਬਾਰਾ ਇੰਸਟਾਲ ਕਰੋ, ਜਾਂ ਸੈਟਿੰਗਾਂ → ਡਿਵੈਲਪਰ → AI ਵਿੱਚ ਆਪਣਾ ਕਸਟਮ ਮਾਡਲ ਜਾਂਚੋ।",
+      "transcribeNoModel": "ਸੈਟਿੰਗਾਂ → ਡਿਵੈਲਪਰ → AI ਵਿੱਚ ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਮਾਡਲ ਚੁਣੋ।",
       "transcribeNoModelHint": "ਬੋਲੀ-ਤੋਂ-ਲਿਖਤ ਮਾਡਲ ਮੌਜੂਦ ਨਹੀਂ ਹੈ। Myne ਦੁਬਾਰਾ ਇੰਸਟਾਲ ਕਰਨ ਨਾਲ ਇਹ ਵਾਪਸ ਆ ਜਾਂਦਾ ਹੈ।",
       "transcribeStarted": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਹੋ ਰਿਹਾ ਹੈ…",
       "transcribeVaultLocked": "ਟ੍ਰਾਂਸਕ੍ਰਾਈਬ ਕਰਨ ਲਈ ਆਪਣਾ ਵਾਲਟ ਅਨਲਾਕ ਕਰੋ।",
@@ -1474,6 +1475,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "ਰੱਦ ਕਰੋ",
       "close": "ਬੰਦ ਕਰੋ",
       "count_one": "{{count}} ਨੋਟ",
       "count_other": "{{count}} ਨੋਟ",
@@ -1483,6 +1485,8 @@
       "emptyTitle": "ਕੁਝ ਵੀ ਆਰਕਾਈਵ ਨਹੀਂ ਕੀਤਾ",
       "folderDeleteBody_one": "“{{name}}” ਅਤੇ ਇਸਦਾ {{count}} ਨੋਟ",
       "folderDeleteBody_other": "“{{name}}” ਅਤੇ ਇਸਦੇ {{count}} ਨੋਟ",
+      "folderDeleteConfirm_one": "{{count}} ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਭੇਜਣਾ ਹੈ?",
+      "folderDeleteConfirm_other": "{{count}} ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਭੇਜਣੇ ਹਨ?",
       "folderDeleteConfirmCta": "ਰੱਦੀ ਵਿੱਚ ਭੇਜੋ",
       "folderDeleteError": "ਉਸ ਫੋਲਡਰ ਦੇ ਨੋਟ ਰੱਦੀ ਵਿੱਚ ਨਹੀਂ ਭੇਜੇ ਜਾ ਸਕੇ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "folderDeleteTitle": "ਇਸ ਫੋਲਡਰ ਨੂੰ ਰੱਦੀ ਵਿੱਚ ਭੇਜਣਾ ਹੈ?",
@@ -1836,6 +1840,8 @@
       "imported_one": "ਇਸ ਫੋਲਡਰ ਵਿੱਚ 1 ਨੋਟ ਇੰਪੋਰਟ ਹੋਇਆ",
       "imported_other": "ਇਸ ਫੋਲਡਰ ਵਿੱਚ {{count}} ਨੋਟ ਇੰਪੋਰਟ ਹੋਏ",
       "importedWithSkips": "{{count}} ਇੰਪੋਰਟ ਹੋਏ — {{skipped}} ਛੱਡੇ ਗਏ",
+      "importedWithSkips_one": "{{count}} ਨੋਟ ਇੰਪੋਰਟ ਹੋਇਆ — {{skipped}} ਨੂੰ ਛੱਡਿਆ ਗਿਆ",
+      "importedWithSkips_other": "{{count}} ਨੋਟ ਇੰਪੋਰਟ ਹੋਏ — {{skipped}} ਨੂੰ ਛੱਡਿਆ ਗਿਆ",
       "importNoMarkdown": "ਉਸ ਵਿੱਚ ਕੋਈ markdown ਫ਼ਾਈਲ ਨਹੀਂ ਸੀ"
     },
     "newFromTemplate": {
@@ -3116,6 +3122,8 @@
       "echoLabel": "ਜੋ ਤੁਸੀਂ ਦਾਖਲ ਕੀਤਾ",
       "echoComplete": "64 ਵਿੱਚੋਂ 64 ਅੱਖਰ। ਅੱਗੇ ਵਧਣ ਤੋਂ ਪਹਿਲਾਂ ਇਸਨੂੰ ਆਪਣੀ ਕਾਪੀ ਨਾਲ ਪੜ੍ਹ ਕੇ ਮਿਲਾਓ।",
       "echoProgress": "ਹੁਣ ਤੱਕ {{total}} ਵਿੱਚੋਂ {{count}} ਅੱਖਰ।",
+      "echoProgress_one": "ਹੁਣ ਤੱਕ {{total}} ਵਿੱਚੋਂ {{count}} ਅੱਖਰ।",
+      "echoProgress_other": "ਹੁਣ ਤੱਕ {{total}} ਵਿੱਚੋਂ {{count}} ਅੱਖਰ।",
       "echoInvalid": "SHA-256 ਫਿੰਗਰਪ੍ਰਿੰਟ 64 ਅੱਖਰਾਂ ਦਾ ਹੁੰਦਾ ਹੈ, ਹਰ ਅੱਖਰ 0–9 ਜਾਂ a–f। ਕੌਲਨ, ਖਾਲੀ ਥਾਂ ਅਤੇ ਸ਼ੁਰੂ ਵਿੱਚ “sha256:” ਚੱਲ ਜਾਂਦੇ ਹਨ — ਬਾਕੀ ਕੁਝ ਵੀ ਇਸਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ।",
       "helpToggle": "ਇਹ ਫਿੰਗਰਪ੍ਰਿੰਟ ਮੈਨੂੰ ਕਿੱਥੋਂ ਮਿਲੇਗਾ?",
       "helpNotOverTor": "ਇਸੇ ਕਨੈਕਸ਼ਨ ਰਾਹੀਂ ਨਹੀਂ। ਉਸੇ ਸਰਕਟ ਉੱਤੇ ਲਿਆ ਫਿੰਗਰਪ੍ਰਿੰਟ ਕੁਝ ਸਾਬਤ ਨਹੀਂ ਕਰਦਾ — ਜੋ ਸਰਟੀਫਿਕੇਟ ਬਦਲ ਸਕਦਾ ਹੈ, ਉਹ ਉਸ ਪੰਨੇ ਨੂੰ ਵੀ ਬਦਲ ਸਕਦਾ ਹੈ।",

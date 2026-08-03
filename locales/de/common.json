@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Sprache zu Text ist aus. Schalten Sie es unter Einstellungen → Transkription ein.",
       "transcribeModelLoadFailed": "Das Sprache-zu-Text-Modell konnte nicht geladen werden. Installieren Sie Myne neu oder prüfen Sie Ihr eigenes Modell unter Einstellungen → Developer → KI.",
       "transcribeNoModelHint": "Das Sprache-zu-Text-Modell fehlt. Eine Neuinstallation von Myne stellt es wieder her.",
-      "transcribeNoModel": "Wählen Sie unter Einstellungen → Developer → KI ein Transkriptionsmodell aus.",
+      "transcribeNoModel": "Wählen Sie unter Einstellungen → Developer → KI ein Sprache-zu-Text-Modell aus.",
       "transcribeStarted": "Wird transkribiert…",
       "transcribeVaultLocked": "Entsperren Sie Ihren Tresor, um zu transkribieren.",
       "transcriptionModalClose": "Transkription schließen",
@@ -1852,6 +1852,8 @@
       "imported_one": "1 Notiz in diesen Ordner importiert",
       "imported_other": "{{count}} Notizen in diesen Ordner importiert",
       "importedWithSkips": "{{count}} importiert – {{skipped}} übersprungen",
+      "importedWithSkips_one": "{{count}} Notiz importiert – {{skipped}} übersprungen",
+      "importedWithSkips_other": "{{count}} Notizen importiert – {{skipped}} übersprungen",
       "importNoMarkdown": "Keine Markdown-Dateien in dieser Ablage"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Was Sie eingegeben haben",
       "echoComplete": "64 von 64 Zeichen. Lesen Sie ihn gegen Ihre eigene Kopie, bevor Sie fortfahren.",
       "echoProgress": "{{count}} von {{total}} Zeichen bisher.",
+      "echoProgress_one": "{{count}} von {{total}} Zeichen bisher.",
+      "echoProgress_other": "{{count}} von {{total}} Zeichen bisher.",
       "echoInvalid": "Ein SHA-256-Fingerabdruck hat 64 Zeichen, jedes davon 0–9 oder a–f. Doppelpunkte, Leerzeichen und ein vorangestelltes „sha256:“ sind in Ordnung – alles andere gehört nicht dazu.",
       "helpToggle": "Wo finde ich diesen Fingerabdruck?",
       "helpNotOverTor": "Nicht über diese Verbindung. Ein Fingerabdruck, den Sie über denselben Circuit holen, beweist nichts – was das Zertifikat austauschen könnte, könnte auch diese Seite austauschen.",

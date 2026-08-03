@@ -121,6 +121,7 @@
       "transcribeFailed": "ট্রান্সক্রিপশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
       "transcribeFeatureOff": "স্পিচ-টু-টেক্সট বন্ধ আছে। সেটিংস → ট্রান্সক্রিপশন-এ গিয়ে চালু করুন।",
       "transcribeModelLoadFailed": "স্পিচ-টু-টেক্সট মডেলটি লোড করা যায়নি। Myne আবার ইনস্টল করুন, অথবা সেটিংস → ডেভেলপার → AI-তে আপনার কাস্টম মডেলটি দেখে নিন।",
+      "transcribeNoModel": "সেটিংস → ডেভেলপার → AI-তে একটি স্পিচ-টু-টেক্সট মডেল বেছে নিন।",
       "transcribeNoModelHint": "স্পিচ-টু-টেক্সট মডেলটি নেই। Myne আবার ইনস্টল করলে এটি ফিরে আসে।",
       "transcribeStarted": "ট্রান্সক্রাইব করা হচ্ছে…",
       "transcribeVaultLocked": "ট্রান্সক্রাইব করতে আপনার ভল্ট আনলক করুন।",
@@ -1474,6 +1475,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "বাতিল",
       "close": "বন্ধ করুন",
       "count_one": "{{count}}টি নোট",
       "count_other": "{{count}}টি নোট",
@@ -1483,6 +1485,8 @@
       "emptyTitle": "কিছুই আর্কাইভ করা নেই",
       "folderDeleteBody_one": "“{{name}}” এবং তার {{count}}টি নোট",
       "folderDeleteBody_other": "“{{name}}” এবং তার {{count}}টি নোট",
+      "folderDeleteConfirm_one": "{{count}}টি নোট ট্র্যাশে সরাবেন?",
+      "folderDeleteConfirm_other": "{{count}}টি নোট ট্র্যাশে সরাবেন?",
       "folderDeleteConfirmCta": "ট্র্যাশে সরান",
       "folderDeleteError": "সেই ফোল্ডারের নোটগুলি ট্র্যাশে সরানো যায়নি। আবার চেষ্টা করুন।",
       "folderDeleteTitle": "এই ফোল্ডারটি ট্র্যাশে সরাবেন?",
@@ -1836,6 +1840,8 @@
       "imported_one": "এই ফোল্ডারে 1টি নোট ইম্পোর্ট হয়েছে",
       "imported_other": "এই ফোল্ডারে {{count}}টি নোট ইম্পোর্ট হয়েছে",
       "importedWithSkips": "{{count}}টি ইম্পোর্ট হয়েছে — {{skipped}}টি বাদ পড়েছে",
+      "importedWithSkips_one": "{{count}}টি নোট ইম্পোর্ট হয়েছে — {{skipped}}টি বাদ পড়েছে",
+      "importedWithSkips_other": "{{count}}টি নোট ইম্পোর্ট হয়েছে — {{skipped}}টি বাদ পড়েছে",
       "importNoMarkdown": "ছেড়ে দেওয়া জিনিসে কোনও markdown ফাইল নেই"
     },
     "newFromTemplate": {
@@ -3116,6 +3122,8 @@
       "echoLabel": "আপনি যা দিয়েছেন",
       "echoComplete": "64-এর মধ্যে 64টি অক্ষর। চালিয়ে যাওয়ার আগে নিজের কপির সঙ্গে মিলিয়ে পড়ুন।",
       "echoProgress": "এ পর্যন্ত {{total}}-এর মধ্যে {{count}}টি অক্ষর।",
+      "echoProgress_one": "এ পর্যন্ত {{total}}-এর মধ্যে {{count}}টি অক্ষর।",
+      "echoProgress_other": "এ পর্যন্ত {{total}}-এর মধ্যে {{count}}টি অক্ষর।",
       "echoInvalid": "SHA-256 ফিঙ্গারপ্রিন্ট 64 অক্ষরের, প্রতিটি 0–9 বা a–f। কোলন, ফাঁকা জায়গা আর শুরুতে “sha256:” থাকলে অসুবিধা নেই — এর বাইরে কিছু এর অংশ নয়।",
       "helpToggle": "এই ফিঙ্গারপ্রিন্ট কোথায় পাব?",
       "helpNotOverTor": "এই সংযোগের মধ্য দিয়ে নয়। একই সার্কিট দিয়ে আনা ফিঙ্গারপ্রিন্ট কিছুই প্রমাণ করে না — যে সার্টিফিকেট বদলে দিতে পারে, সে ওই পাতাটিও বদলে দিতে পারে।",

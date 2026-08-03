@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Tale-til-tekst er av. Slå det på i Innstillinger → Transkribering.",
       "transcribeModelLoadFailed": "Kunne ikke laste tale-til-tekst-modellen. Installer Myne på nytt, eller sjekk den egendefinerte modellen din i Innstillinger → Utvikler → AI.",
       "transcribeNoModelHint": "Tale-til-tekst-modellen mangler. En ny installasjon av Myne gjenoppretter den.",
-      "transcribeNoModel": "Velg en transkriberingsmodell i Innstillinger → Developer → AI.",
+      "transcribeNoModel": "Velg en tale-til-tekst-modell i Innstillinger → Utvikler → AI.",
       "transcribeStarted": "Transkriberer…",
       "transcribeVaultLocked": "Lås opp hvelvet for å transkribere.",
       "transcriptionModalClose": "Lukk transkripsjonen",
@@ -1852,6 +1852,8 @@
       "imported_one": "Importerte 1 notat til denne mappen",
       "imported_other": "Importerte {{count}} notater til denne mappen",
       "importedWithSkips": "Importerte {{count}} — {{skipped}} hoppet over",
+      "importedWithSkips_one": "Importerte {{count}} notat — {{skipped}} hoppet over",
+      "importedWithSkips_other": "Importerte {{count}} notater — {{skipped}} hoppet over",
       "importNoMarkdown": "Ingen markdown-filer i det du slapp"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Det du skrev inn",
       "echoComplete": "64 av 64 tegn. Les det mot din egen kopi før du fortsetter.",
       "echoProgress": "{{count}} av {{total}} tegn så langt.",
+      "echoProgress_one": "{{count}} av {{total}} tegn så langt.",
+      "echoProgress_other": "{{count}} av {{total}} tegn så langt.",
       "echoInvalid": "Et SHA-256-fingeravtrykk er 64 tegn, hvert av dem 0–9 eller a–f. Kolon, mellomrom og en innledende «sha256:» går fint — alt annet hører ikke med.",
       "helpToggle": "Hvor finner jeg dette fingeravtrykket?",
       "helpNotOverTor": "Ikke gjennom denne tilkoblingen. Et fingeravtrykk du henter over den samme kretsen, beviser ingenting — det som kunne bytte ut sertifikatet, kunne bytte ut den siden også.",

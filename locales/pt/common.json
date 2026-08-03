@@ -127,7 +127,7 @@
       "transcribeFeatureOff": "A voz para texto está desligada. Ligue-a em Definições → Transcrição.",
       "transcribeModelLoadFailed": "Não foi possível carregar o modelo de voz para texto. Reinstale o Myne ou verifique o seu modelo personalizado em Definições → Programador → IA.",
       "transcribeNoModelHint": "Falta o modelo de voz para texto. Reinstalar o Myne repõe-no.",
-      "transcribeNoModel": "Selecione um modelo de transcrição em Definições → Developer → IA.",
+      "transcribeNoModel": "Selecione um modelo de voz para texto em Definições → Programador → IA.",
       "transcribeStarted": "A transcrever…",
       "transcribeVaultLocked": "Desbloqueie o cofre para transcrever.",
       "transcriptionModalClose": "Fechar a transcrição",
@@ -1911,6 +1911,9 @@
       "imported_many": "Importadas {{count}} notas para esta pasta",
       "imported_other": "Importadas {{count}} notas para esta pasta",
       "importedWithSkips": "Importadas {{count}} — {{skipped}} ignoradas",
+      "importedWithSkips_one": "Importada {{count}} nota — ignoradas: {{skipped}}",
+      "importedWithSkips_many": "Importadas {{count}} notas — ignoradas: {{skipped}}",
+      "importedWithSkips_other": "Importadas {{count}} notas — ignoradas: {{skipped}}",
       "importNoMarkdown": "Não há ficheiros Markdown no que largou"
     },
     "newFromTemplate": {
@@ -3234,6 +3237,9 @@
       "echoLabel": "O que introduziu",
       "echoComplete": "64 de 64 caracteres. Confira-a com a sua própria cópia antes de continuar.",
       "echoProgress": "{{count}} de {{total}} caracteres até agora.",
+      "echoProgress_one": "{{count}} caráter de {{total}} até agora.",
+      "echoProgress_many": "{{count}} caracteres de {{total}} até agora.",
+      "echoProgress_other": "{{count}} caracteres de {{total}} até agora.",
       "echoInvalid": "Uma impressão digital SHA-256 tem 64 caracteres, cada um de 0–9 ou a–f. Dois-pontos, espaços e um “sha256:” inicial não fazem mal — o resto não faz parte dela.",
       "helpToggle": "Onde encontro esta impressão digital?",
       "helpNotOverTor": "Não através desta ligação. Uma impressão digital obtida pelo mesmo circuito não prova nada — o que pudesse trocar o certificado também podia trocar essa página.",

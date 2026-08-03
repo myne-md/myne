@@ -127,7 +127,7 @@
       "transcribeFeatureOff": "La reconnaissance vocale est désactivée. Activez-la dans Paramètres → Transcription.",
       "transcribeModelLoadFailed": "Impossible de charger le modèle de reconnaissance vocale. Réinstallez Myne, ou vérifiez votre modèle personnalisé dans Paramètres → Développeur → IA.",
       "transcribeNoModelHint": "Le modèle de reconnaissance vocale est manquant. Réinstaller Myne le rétablit.",
-      "transcribeNoModel": "Sélectionnez un modèle de transcription dans Paramètres → Developer → IA.",
+      "transcribeNoModel": "Sélectionnez un modèle de reconnaissance vocale dans Paramètres → Développeur → IA.",
       "transcribeStarted": "Transcription en cours…",
       "transcribeVaultLocked": "Déverrouillez votre coffre-fort pour transcrire.",
       "transcriptionModalClose": "Fermer la transcription",
@@ -1911,6 +1911,9 @@
       "imported_many": "{{count}} de notes importées dans ce dossier",
       "imported_other": "{{count}} notes importées dans ce dossier",
       "importedWithSkips": "{{count}} importées — {{skipped}} ignorées",
+      "importedWithSkips_one": "{{count}} note importée — {{skipped}} ignorée(s)",
+      "importedWithSkips_many": "{{count}} notes importées — {{skipped}} ignorée(s)",
+      "importedWithSkips_other": "{{count}} notes importées — {{skipped}} ignorée(s)",
       "importNoMarkdown": "Aucun fichier Markdown parmi les éléments déposés"
     },
     "newFromTemplate": {
@@ -3234,6 +3237,9 @@
       "echoLabel": "Ce que vous avez saisi",
       "echoComplete": "64 caractères sur 64. Relisez-la face à votre propre copie avant de continuer.",
       "echoProgress": "{{count}} caractères sur {{total}} pour l'instant.",
+      "echoProgress_one": "{{count}} caractère sur {{total}} pour l'instant.",
+      "echoProgress_many": "{{count}} caractères sur {{total}} pour l'instant.",
+      "echoProgress_other": "{{count}} caractères sur {{total}} pour l'instant.",
       "echoInvalid": "Une empreinte SHA-256 compte 64 caractères, chacun de 0 à 9 ou de a à f. Les deux-points, les espaces et un préfixe « sha256: » sont acceptés — tout le reste n'en fait pas partie.",
       "helpToggle": "Où trouver cette empreinte ?",
       "helpNotOverTor": "Pas par cette connexion. Une empreinte récupérée par le même circuit ne prouve rien — ce qui pourrait remplacer le certificat pourrait aussi remplacer cette page.",

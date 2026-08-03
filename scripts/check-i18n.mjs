@@ -30,13 +30,23 @@
 //
 // Exits non-zero with actionable guidance on any failure.
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EN = join(REPO, "locales/en/common.json");
-const SRC = join(REPO, "src");
+
+// Both clients that share these catalogs, matching `i18next.config.js`'s
+// `extract.input`. Scanning `src/` alone was a real blind spot: three keys used
+// only by `myne-mobile` were absent from English for months, so an
+// English-language mobile user saw the raw dotted key while every translated
+// locale still carried the string (`decisions.md` 2026-08-03). `myne-mobile` is
+// a separately-cloned companion, so its absence is normal and skipped — this
+// tightens the check where the tree is present, it does not require it.
+const TREES = [join(REPO, "src"), join(REPO, "myne-mobile/src")].filter((d) =>
+  existsSync(d),
+);
 const PLURAL_SUFFIXES = ["_zero", "_one", "_two", "_few", "_many", "_other"];
 
 function fail(msg) {
@@ -86,7 +96,7 @@ function walkFiles(dir, out = []) {
 // namespaced) and reject method calls like `.t(` / identifiers ending in `t`.
 const KEY_RE = /(?<![\w.])(?:i18n\.)?t\(\s*["'`]([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)+)["'`]/g;
 const used = new Set();
-for (const f of walkFiles(SRC)) {
+for (const f of TREES.flatMap((t) => walkFiles(t))) {
   const txt = readFileSync(f, "utf8");
   let m;
   while ((m = KEY_RE.exec(txt)) !== null) used.add(m[1]);

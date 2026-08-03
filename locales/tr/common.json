@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Konuşmadan metne kapalı. Ayarlar → Yazıya dökme bölümünden açın.",
       "transcribeModelLoadFailed": "Konuşmadan metne modeli yüklenemedi. Myne’i yeniden kurun ya da Ayarlar → Geliştirici → Yapay Zeka bölümündeki özel modelinizi kontrol edin.",
       "transcribeNoModelHint": "Konuşmadan metne modeli eksik. Myne’i yeniden kurmak onu geri getirir.",
-      "transcribeNoModel": "Ayarlar → Developer → Yapay Zeka bölümünden bir yazıya dökme modeli seçin.",
+      "transcribeNoModel": "Ayarlar → Geliştirici → Yapay Zeka bölümünden bir konuşmadan metne modeli seçin.",
       "transcribeStarted": "Yazıya dökülüyor…",
       "transcribeVaultLocked": "Yazıya dökmek için kasanızın kilidini açın.",
       "transcriptionModalClose": "Metin dökümünü kapat",
@@ -1852,6 +1852,8 @@
       "imported_one": "Bu klasöre 1 not içe aktarıldı",
       "imported_other": "Bu klasöre {{count}} not içe aktarıldı",
       "importedWithSkips": "{{count}} içe aktarıldı — {{skipped}} atlandı",
+      "importedWithSkips_one": "{{count}} not içe aktarıldı — {{skipped}} not atlandı",
+      "importedWithSkips_other": "{{count}} not içe aktarıldı — {{skipped}} not atlandı",
       "importNoMarkdown": "Bırakılanlarda markdown dosyası yok"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Girdikleriniz",
       "echoComplete": "64 karakterin 64’ü. Devam etmeden önce kendi kopyanızla karşılaştırarak okuyun.",
       "echoProgress": "Şu ana kadar {{total}} karakterin {{count}} tanesi.",
+      "echoProgress_one": "Şu ana kadar {{total}} karakterin {{count}} tanesi.",
+      "echoProgress_other": "Şu ana kadar {{total}} karakterin {{count}} tanesi.",
       "echoInvalid": "Bir SHA-256 parmak izi 64 karakterdir; her biri 0–9 ya da a–f. İki nokta, boşluk ve baştaki “sha256:” sorun değil — bunların dışındaki hiçbir şey parmak izinin parçası değildir.",
       "helpToggle": "Bu parmak izini nerede bulurum?",
       "helpNotOverTor": "Bu bağlantı üzerinden değil. Aynı devre üzerinden getirdiğiniz bir parmak izi hiçbir şey kanıtlamaz — sertifikayı değiştirebilen, o sayfayı da değiştirebilir.",

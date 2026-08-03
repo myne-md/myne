@@ -122,7 +122,7 @@
       "transcribeFeatureOff": "Tal till text är avstängt. Slå på det i Inställningar → Transkribering.",
       "transcribeModelLoadFailed": "Kunde inte läsa in tal-till-text-modellen. Installera om Myne, eller kontrollera din egen modell i Inställningar → Utvecklare → AI.",
       "transcribeNoModelHint": "Tal-till-text-modellen saknas. Att installera om Myne återställer den.",
-      "transcribeNoModel": "Välj en transkriberingsmodell i Inställningar → Developer → AI.",
+      "transcribeNoModel": "Välj en tal-till-text-modell i Inställningar → Utvecklare → AI.",
       "transcribeStarted": "Transkriberar…",
       "transcribeVaultLocked": "Lås upp ditt valv för att transkribera.",
       "transcriptionModalClose": "Stäng transkriberingen",
@@ -1852,6 +1852,8 @@
       "imported_one": "Importerade 1 anteckning till den här mappen",
       "imported_other": "Importerade {{count}} anteckningar till den här mappen",
       "importedWithSkips": "Importerade {{count}} — {{skipped}} hoppades över",
+      "importedWithSkips_one": "Importerade {{count}} anteckning — {{skipped}} hoppades över",
+      "importedWithSkips_other": "Importerade {{count}} anteckningar — {{skipped}} hoppades över",
       "importNoMarkdown": "Inga Markdown-filer i det du släppte"
     },
     "newFromTemplate": {
@@ -3148,6 +3150,8 @@
       "echoLabel": "Det du angav",
       "echoComplete": "64 av 64 tecken. Läs det mot din egen kopia innan du fortsätter.",
       "echoProgress": "{{count}} av {{total}} tecken hittills.",
+      "echoProgress_one": "{{count}} av {{total}} tecken hittills.",
+      "echoProgress_other": "{{count}} av {{total}} tecken hittills.",
       "echoInvalid": "Ett SHA-256-fingeravtryck är 64 tecken, vart och ett 0–9 eller a–f. Kolon, mellanslag och ett inledande ”sha256:” går bra — allt annat hör inte till det.",
       "helpToggle": "Var hittar jag det här fingeravtrycket?",
       "helpNotOverTor": "Inte genom den här anslutningen. Ett fingeravtryck du hämtar över samma krets bevisar ingenting — det som kunde byta ut certifikatet kan byta ut den sidan också.",

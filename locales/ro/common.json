@@ -1542,7 +1542,7 @@
       "emptyState": "Arhiva este goală.",
       "folderDeleteConfirm_one": "Muți {{count}} notă în Coș?",
       "folderDeleteConfirm_few": "Muți {{count}} note în Coș?",
-      "folderDeleteConfirm_other": "Muți {{count}} note în Coș?",
+      "folderDeleteConfirm_other": "Muți {{count}} de note în Coș?",
       "folderDeleteConfirmCta": "Mută în Coș",
       "folderDeleteError": "Notele din acel dosar nu au putut fi mutate în Coș. Încearcă din nou.",
       "folderDeleteTitle": "Muți acest folder în Coș?",
@@ -1911,6 +1911,9 @@
       "imported_few": "{{count}} note importate în acest folder",
       "imported_other": "{{count}} de note importate în acest folder",
       "importedWithSkips": "{{count}} importate — {{skipped}} omise",
+      "importedWithSkips_one": "{{count}} notă importată — omise: {{skipped}}",
+      "importedWithSkips_few": "{{count}} note importate — omise: {{skipped}}",
+      "importedWithSkips_other": "{{count}} de note importate — omise: {{skipped}}",
       "importNoMarkdown": "Niciun fișier markdown în ce ai tras aici"
     },
     "newFromTemplate": {
@@ -3234,6 +3237,9 @@
       "echoLabel": "Ce ai introdus",
       "echoComplete": "64 din 64 de caractere. Verific-o față de propria ta copie înainte de a continua.",
       "echoProgress": "{{count}} din {{total}} caractere până acum.",
+      "echoProgress_one": "{{count}} caracter din {{total}} până acum.",
+      "echoProgress_few": "{{count}} caractere din {{total}} până acum.",
+      "echoProgress_other": "{{count}} de caractere din {{total}} până acum.",
       "echoInvalid": "O amprentă SHA-256 are 64 de caractere, fiecare între 0–9 sau a–f. Două puncte, spațiile și un „sha256:” la început sunt în regulă — orice altceva nu face parte din ea.",
       "helpToggle": "Unde găsesc această amprentă?",
       "helpNotOverTor": "Nu prin această conexiune. O amprentă pe care o obții prin același circuit nu dovedește nimic — ce ar putea înlocui certificatul ar putea înlocui și acea pagină.",
