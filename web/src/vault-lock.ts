@@ -22,6 +22,18 @@
 // tab that never acquires never reaches a write path at all — "second tab never
 // writes" is a property of the call order, not of a check inside each write.
 
+/**
+ * The id this client locks on (#254).
+ *
+ * A browser profile holds exactly ONE OPFS container per origin
+ * (`decisions.md` 2026-07-26), so there is one thing to serialise and it needs
+ * a stable name rather than a vault id read from inside the container — which
+ * would require opening the container to learn which lock to take, i.e. the
+ * race this lock exists to prevent. Web Locks are already origin-scoped, so
+ * this constant only has to be stable, not unique across accounts.
+ */
+export const WEB_CONTAINER_ID = "container";
+
 /** Lock name for a vault. Namespaced so it cannot collide with an unrelated lock. */
 export function vaultLockName(vaultId: string): string {
   return `myne.vault.${vaultId}`;

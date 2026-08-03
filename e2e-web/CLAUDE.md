@@ -172,14 +172,15 @@ settles any argument with this section):
 - **Scenarios**: `smoke` (production headers over HTTP, then a browser boot to
   the first-run identity step), `capability-gating`, `device-class-refusal`,
   `isolation-and-viewport`, `no-third-party`, `opfs-seed`, `unlock-from-fixture`,
-  `pending-approval`, `plaintext-residue-web`, `a11y`, `quarantine-roundtrip`.
+  `pending-approval`, `plaintext-residue-web`, `a11y`, `quarantine-roundtrip`,
+  `single-tab-lock` (#254 — two tabs on one origin; the second is refused).
 - **Runners and config**: `scripts/e2e-web-local.sh`, `scripts/e2e-web-one.sh`,
   `vitest.web-e2e.config.ts`, `pnpm test:e2e:web`.
 
 Still outstanding, and worth knowing before you plan work:
 
-- Several "What belongs here" bullets have **no scenario yet**: the single-tab
-  lock, sync-required entry as its own assertion, incremental first-sync
+- Several "What belongs here" bullets have **no scenario yet**:
+  sync-required entry as its own assertion, incremental first-sync
   materialisation, and the quota precheck (unit-level only, in
   `tests/web/quota-precheck.test.ts` — `device-class-refusal` covers the other
   half of that bullet, the unsupported-environment refusal).

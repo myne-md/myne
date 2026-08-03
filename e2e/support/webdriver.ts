@@ -551,6 +551,33 @@ export class Session {
     return this.send("POST", "/url", { url });
   }
 
+  /** The current top-level browsing context's handle (W3C `GET /window`).
+   *
+   *  Unused by the desktop lane — one window, nothing to switch between. The
+   *  web lane needs it because a browser lets the user open the same origin
+   *  twice, which is the whole subject of the single-tab-lock scenario (#254). */
+  windowHandle(): Promise<string> {
+    return this.send("GET", "/window");
+  }
+
+  /** Open a second top-level context and switch to it (W3C `POST /window/new`).
+   *
+   *  A TAB rather than a window, deliberately: Web Locks are scoped to the agent
+   *  cluster, and a tab in the same profile is the pair a user actually creates
+   *  when they duplicate a tab or re-open a bookmark. */
+  async newWindow(): Promise<string> {
+    const res = await this.send<{ handle: string }>("POST", "/window/new", {
+      type: "tab",
+    });
+    await this.switchToWindow(res.handle);
+    return res.handle;
+  }
+
+  /** Switch the session to an already-open context (W3C `POST /window`). */
+  switchToWindow(handle: string): Promise<void> {
+    return this.send("POST", "/window", { handle });
+  }
+
   /** Base64 PNG of the current viewport. */
   screenshot(): Promise<string> {
     return this.send("GET", "/screenshot");

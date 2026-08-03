@@ -27,6 +27,8 @@ import { RootErrorBoundary } from "../../src/components/RootErrorBoundary";
 import "../../src/styles/tokens.css";
 import { gateEnvironment } from "./environment-gate";
 import { UnsupportedEnvironment } from "./UnsupportedEnvironment";
+import { VaultOpenElsewhere } from "./VaultOpenElsewhere";
+import { acquireVaultLock, WEB_CONTAINER_ID } from "./vault-lock";
 import { warmWorker } from "./worker/host";
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
@@ -37,7 +39,7 @@ const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement)
 // iOS Safari in particular — would otherwise die part-way through Argon2id,
 // after the user had already typed their password. The ordering here IS the
 // guarantee: there is no later check to forget.
-void gateEnvironment().then((env) => {
+void gateEnvironment().then(async (env) => {
   if (!env.supported) {
     root.render(
       <React.StrictMode>
@@ -46,6 +48,32 @@ void gateEnvironment().then((env) => {
     );
     return;
   }
+  // The single-tab lock, taken BEFORE the Worker starts (#254).
+  //
+  // `vault-lock.ts` was written, documented and unit-tested for task 21 — and
+  // nothing imported it, so the guarantee it describes never existed. Its lock
+  // name was not even in the shipped bundle: tree-shaken, because no production
+  // module referenced it. Meanwhile `worker/opfs.ts` skips its TOCTOU guard on
+  // the strength of that lock, and `worker.ts` starts a sync loop in EVERY tab,
+  // so two idle tabs wrote the same `sync-state.json`, the same
+  // `vault.head-state` and the same pulled note blobs on their own timers.
+  //
+  // Here rather than deeper in: the property is "a second tab never writes",
+  // and that is a property of the call ORDER — no Worker, no sync loop, no
+  // derivation — not of a check inside each write path. An `unsupported` result
+  // (no Web Locks) keeps today's behaviour rather than refusing a browser the
+  // environment gate already accepted.
+  const acquired = await acquireVaultLock(WEB_CONTAINER_ID);
+  if (!acquired.held && acquired.reason === "open-elsewhere") {
+    root.render(
+      <React.StrictMode>
+        <VaultOpenElsewhere vaultId={WEB_CONTAINER_ID} />
+      </React.StrictMode>,
+    );
+    requestAnimationFrame(() => document.getElementById("boot-shell")?.remove());
+    return;
+  }
+
   // Start the vault Worker in parallel with React's first mount (task 68).
   // Everything expensive about it — fetching the wasm, compiling it, the CSPRNG
   // self-check — is off-thread, and the boot probe is going to need it a moment
