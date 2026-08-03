@@ -654,12 +654,18 @@ pub fn aad_note_content_encrypt(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -
 /// payload (or vice versa). Single source of truth for every
 /// length-prefixed AAD field in this crate.
 ///
-/// Panics in debug builds if `bytes.len() > u16::MAX`. v0.1 inputs
-/// (role strings of 13 bytes; `content_type` of 13 bytes) are bounded
-/// well below this limit; the assert exists to catch a future caller
-/// that would silently truncate via `as u16`.
+/// Panics — in **every** build, debug and release — if
+/// `bytes.len() > u16::MAX`. v0.1 inputs (role strings of 13 bytes;
+/// `content_type`, hardcoded 13 bytes for `.myn` and a sniffed MIME
+/// string for `MYA1`) are bounded well below this limit, so the branch
+/// is unreachable in practice; it exists to catch a future caller that
+/// would otherwise silently truncate via `as u16` and emit an AAD that
+/// two different payloads share. It was a `debug_assert!` until the
+/// registry-chokepoint audit (epic #249): a release-absent check is not
+/// the protection this comment claimed, and one comparison per AAD
+/// build is nothing beside XChaCha20-Poly1305 + SHA-256.
 pub(crate) fn push_length_prefixed_u16_be(buf: &mut Vec<u8>, bytes: &[u8]) {
-    debug_assert!(
+    assert!(
         bytes.len() <= u16::MAX as usize,
         "length-prefixed bytes longer than u16 length-prefix can encode",
     );
@@ -954,6 +960,30 @@ mod tests {
         assert_eq!(buf.len(), 2 + 256);
         assert_eq!(buf[0..2], [0x01, 0x00]);
         assert!(buf[2..].iter().all(|b| *b == 0x42));
+    }
+
+    #[test]
+    #[should_panic(expected = "longer than u16 length-prefix can encode")]
+    fn push_length_prefixed_u16_be_panics_above_u16_max() {
+        // The truncation guard is a release-present `assert!`, not a
+        // `debug_assert!` (epic #249): `65536 as u16` is 0, so a caller
+        // that overflowed would emit a zero-length prefix followed by
+        // the payload — an AAD two different payloads can share, with
+        // no error anywhere. Run under `cargo test --release` too: that
+        // is the lane where a revert to `debug_assert!` shows up.
+        let payload = alloc::vec![0x42u8; u16::MAX as usize + 1];
+        let mut buf = Vec::new();
+        push_length_prefixed_u16_be(&mut buf, &payload);
+    }
+
+    #[test]
+    fn push_length_prefixed_u16_be_accepts_exactly_u16_max() {
+        // The boundary the assert must NOT reject.
+        let payload = alloc::vec![0x42u8; u16::MAX as usize];
+        let mut buf = Vec::new();
+        push_length_prefixed_u16_be(&mut buf, &payload);
+        assert_eq!(buf[0..2], [0xFF, 0xFF]);
+        assert_eq!(buf.len(), 2 + u16::MAX as usize);
     }
 
     #[test]

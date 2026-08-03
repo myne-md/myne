@@ -67,6 +67,25 @@ pre-commit:
       glob: "core/src/**/*.rs"
       run: node scripts/check-core-io-seam.mjs {staged_files}
 
+    crypto-registries:
+      # Epic #249: the protocol layer's registries each get ONE chokepoint in
+      # code — `derive_subkey` for §3.4 subkey roles, a `*_BLOB_MAGIC` constant
+      # per §10.3 family, `push_length_prefixed_u16_be` for §5.2 length
+      # prefixes, the non-`_raw` wrappers for §6.7 nonces — and until now the
+      # rule "go through the chokepoint" was held by a doc comment.
+      #
+      # Every one of those rules is invisible to the compiler: a bypass
+      # compiles, clippy is green, every other guard passes and CI is green.
+      # The divergence is then silent — a wrong-but-self-consistent subkey
+      # still AEAD-verifies against blobs written by the same wrong code, and a
+      # re-typed magic that stops matching just makes a blob family quietly
+      # stop syncing with no error anywhere.
+      #
+      # Whole-tree rather than glob-scoped: the §10.3 registry is discovered by
+      # reading the declaration sites, so a staged-files run would not know
+      # which magics exist.
+      run: node scripts/check-crypto-registries.mjs
+
     prefs-nonce:
       # #251: every `vault.prefs` write goes through `writePref` in
       # `src/lib/prefs.ts`, which bumps the prefs nonce. That bump is the only
