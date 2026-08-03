@@ -1,0 +1,60 @@
+# Maintainer: Ömer Duran <me@omerduran.dev>
+#
+# Binary repackage of the released Debian bundle — the counterpart to
+# ../PKGBUILD, which builds the same app from source.
+#
+# Why this file exists: v0.1.0 shipped `myne-bin-0.1.0-1-x86_64.pkg.tar.zst`,
+# but the only committed PKGBUILD builds from git, so the recipe that actually
+# produced that asset lived in a scratch directory and was gone by v0.2.0. This
+# is that recipe, committed.
+#
+# Why repackage rather than rebuild: the from-source PKGBUILD needs the full
+# Rust toolchain and ~40 min inside an Arch container to produce bytes we have
+# already built and verified. Repackaging the .deb guarantees the Arch package
+# carries the SAME file set the deb ships — the sidecars and the ~1.8 GB model
+# payload included — instead of a second build that could drift from it.
+#
+# `source` is a LOCAL file: the repo is private, so a release-asset URL would
+# need a credential `makepkg` has no clean way to carry. Drop the released
+# .deb beside this PKGBUILD and run `makepkg -f`. When the repo goes public,
+# swap in the release URL and keep everything else.
+
+pkgname=myne-bin
+_appname=myne
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="A calm place for your notes — clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search (binary release)"
+arch=('x86_64')
+url="https://myne.md"
+license=('AGPL-3.0-only')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'librsvg' 'openssl')
+provides=("$_appname")
+conflicts=("$_appname")
+options=('!strip')
+
+source=("Myne_${pkgver}_amd64.deb")
+sha256sums=('SKIP')
+# makepkg would otherwise try to unpack the .deb into $srcdir as a source
+# archive. package() reads it directly instead, so the outer `ar` container and
+# the inner data tarball stay paired.
+noextract=("Myne_${pkgver}_amd64.deb")
+
+package() {
+  # The deb's payload is already the FHS tree this package wants:
+  #   usr/bin/{myne-desktop,myne,myne-tor}   the app, the CLI sidecar, the Tor sidecar
+  #   usr/lib/Myne/{models,dictionaries}     bundled AI model + spell dictionaries
+  #   usr/share/{applications,icons,metainfo}
+  # so extraction IS the packaging step. Nothing is rewritten — a divergence
+  # between the deb and the Arch package would be a bug, not a feature.
+  #
+  # bsdtar reads the `ar` container natively, so this is one pipe: pull the
+  # inner data tarball out of the .deb on stdout, unpack it into $pkgdir. The
+  # glob covers whichever compression the bundler chose (data.tar.gz today).
+  bsdtar -xOf "$srcdir/Myne_${pkgver}_amd64.deb" 'data.tar.*' \
+    | bsdtar -xf - -C "$pkgdir"
+
+  # The deb declares no license file (Tauri's bundler does not emit one), so
+  # attach the project's own for pacman's sake.
+  install -Dm644 "$startdir/../../../LICENSE" \
+    "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
