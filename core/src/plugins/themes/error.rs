@@ -60,6 +60,16 @@ pub enum ThemesError {
     #[error("vault.meta parse failed")]
     InvalidVaultMeta,
 
+    /// `vault.themes` EXISTS but could not be decrypted or decoded (#255).
+    ///
+    /// Distinct from `Io` (the file was readable) and from the empty store
+    /// (which is what a vault with no themes legitimately has). Treating it as
+    /// empty is what destroyed the store: the next read-modify-write re-sealed
+    /// the empty default over it, and because this blob syncs, the wipe reached
+    /// every device. A caller seeing this must decline to write.
+    #[error("vault.themes exists but could not be read")]
+    StoreUnreadable,
+
     /// `themes_read` / `themes_export` for a name absent from the store.
     #[error("no custom theme with that name")]
     NotFound,

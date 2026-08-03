@@ -46,6 +46,12 @@ pub enum SpellWriteError {
     InvalidVaultMeta,
     /// Filesystem failure writing `vault.dictionary`.
     Io,
+    /// `vault.dictionary` exists but could not be read this session (#255), so
+    /// the in-RAM set does not reflect disk and writing it would destroy the
+    /// stored one. The dictionary is not synced, so there would be no peer copy
+    /// to pull back — only a `.myne-backup` restore. The user keeps their
+    /// existing words; the add simply does not persist.
+    DictionaryUnreadable,
 }
 
 impl From<SpellSyncError> for SpellWriteError {
@@ -54,6 +60,7 @@ impl From<SpellSyncError> for SpellWriteError {
             SpellSyncError::SlotNotUnlocked => SpellWriteError::SlotNotUnlocked,
             SpellSyncError::InvalidVaultMeta => SpellWriteError::InvalidVaultMeta,
             SpellSyncError::Io | SpellSyncError::Encode => SpellWriteError::Io,
+            SpellSyncError::Unreadable => SpellWriteError::DictionaryUnreadable,
         }
     }
 }
@@ -148,6 +155,12 @@ pub async fn add_to_personal_dictionary<R: Runtime>(
 ) -> Result<(), SpellWriteError> {
     let dir =
         vault_dir_for_id(&app, state.active_vault_id().await).map_err(|_| SpellWriteError::Io)?;
+    // #255: persisting a set we never managed to read would overwrite the
+    // stored dictionary with an empty one. Refuse instead — the word stays
+    // un-added, which is recoverable; the file would not be.
+    if !spell.is_hydrated() {
+        return Err(SpellWriteError::DictionaryUnreadable);
+    }
     let snapshot = spell.add_personal(&word).ok_or(SpellWriteError::Io)?;
     persist_dictionary_with_dir(&dir, state.inner(), &snapshot)
         .await
@@ -165,6 +178,11 @@ pub async fn ignore_word_in_vault<R: Runtime>(
 ) -> Result<(), SpellWriteError> {
     let dir =
         vault_dir_for_id(&app, state.active_vault_id().await).map_err(|_| SpellWriteError::Io)?;
+    // Same refusal as `add_to_personal_dictionary` (#255) — the two writers
+    // share one blob, so gating one and not the other would leave the hole open.
+    if !spell.is_hydrated() {
+        return Err(SpellWriteError::DictionaryUnreadable);
+    }
     let snapshot = spell.add_ignore(&word).ok_or(SpellWriteError::Io)?;
     persist_dictionary_with_dir(&dir, state.inner(), &snapshot)
         .await

@@ -247,19 +247,43 @@ pub fn decode_themes_map_or_empty(
 // ---- pure `*_in_dir` cores (KEK + account-hash injected) ------------------
 
 /// PURE CORE — read + decrypt `vault.themes` under `vault_dir` into the
-/// `{name → palette}` map. Absent file / AEAD-fail / malformed payload → empty
-/// map (the fall-back-to-empty semantic, § 9.21.4).
+/// `{name → palette}` map.
+///
+/// **Absent is not the same as unreadable (#255).** §9.21.4's fall-back-to-empty
+/// is the right answer for an ABSENT blob: a vault with no custom themes has no
+/// file, and the empty map is the fact, not a guess. It used to cover every
+/// failure alike — so a blob that existed and could not be read this once
+/// collapsed to empty, and the read-modify-writes below re-sealed that empty
+/// over the user's themes. This one is worse than the dictionary's twin:
+/// `vault.themes` IS synced, so the wipe propagates to every device.
+///
+/// `NotFound` → the empty map. Anything else is an error the caller must not
+/// paper over with a write.
+///
+/// This is deliberately NOT [`decode_themes_map_or_empty`], which keeps
+/// collapsing everything: that one decodes the REMOTE blob during sync, where
+/// `merge(local, empty) == local` loses nothing and a hostile store must not be
+/// able to fail the cycle.
 pub async fn read_themes_map_in_dir(
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
-) -> ThemesMap {
-    // Absent is not an error here — §9.21.4's fall-back-to-empty covers absent,
-    // truncated, AEAD-failed and malformed alike, so every IO failure collapses
-    // the same way the decode failures do.
-    let blob = io.read(&vault_dir.join(THEMES_FILE)).await.ok();
-    decode_themes_map_or_empty(themes_key, account_number_hash, blob.as_deref())
+) -> Result<ThemesMap, ThemesError> {
+    let blob = match io.read(&vault_dir.join(THEMES_FILE)).await {
+        Ok(b) => b,
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => return Ok(ThemesMap::default()),
+        Err(io_error_kind) => return Err(ThemesError::Io { io_error_kind }),
+    };
+    decode_themes_blob(themes_key, account_number_hash, &blob)
+        .map(|pt| deserialize_themes_map(&pt))
+        .map_err(|_| {
+            tracing::warn!(
+                event = "themes_undecryptable",
+                "vault.themes exists but could not be decrypted; refusing to treat it as empty"
+            );
+            ThemesError::StoreUnreadable
+        })
 }
 
 /// PURE CORE — encrypt `map` to the `vault.themes` blob and atomically write it
@@ -324,8 +348,10 @@ pub async fn themes_list_in_dir(
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
-) -> Vec<ThemeListEntry> {
-    live_entries(&read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await)
+) -> Result<Vec<ThemeListEntry>, ThemesError> {
+    Ok(live_entries(
+        &read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await?,
+    ))
 }
 
 /// PURE CORE — one **live** theme's palette by name, or
@@ -344,7 +370,7 @@ pub async fn themes_read_in_dir(
     name: &str,
 ) -> Result<ThemePalette, ThemesError> {
     live_palette(
-        &read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await,
+        &read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await?,
         name,
     )
 }
@@ -409,7 +435,7 @@ pub async fn themes_import_in_dir(
     // Security-load-bearing injection guard (threat-model §149): a value that
     // reaches the DOM executes under the WebView's `style-src 'unsafe-inline'`.
     let parsed = validate_theme(palette_json).map_err(|error| ThemesError::Invalid { error })?;
-    let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await;
+    let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await?;
     apply_import(&mut map, name, parsed.vars, now);
     write_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash, &map).await
 }
@@ -425,7 +451,7 @@ pub async fn themes_delete_in_dir(
     name: &str,
     now: u64,
 ) -> Result<(), ThemesError> {
-    let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await;
+    let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await?;
     apply_delete(&mut map, name, now);
     write_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash, &map).await
 }
@@ -445,7 +471,7 @@ async fn read_themes_map_with_dir(
         .ok_or(ThemesError::SlotNotUnlocked)?;
     let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
     let themes_key = derive_subkey(&root_key, SubkeyRole::CustomThemesKey);
-    Ok(read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await)
+    read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await
 }
 
 /// Shared read-modify-write core for the write commands (SYNC-6): take the
@@ -469,7 +495,10 @@ async fn mutate_themes_with_dir(
     let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
     let themes_key = derive_subkey(&root_key, SubkeyRole::CustomThemesKey);
 
-    let mut map = read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await;
+    // A read that FAILED aborts the mutation (#255): re-sealing a map we never
+    // read would replace the stored themes with an empty store — and this blob
+    // syncs, so the wipe would reach every device.
+    let mut map = read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await?;
     mutate(&mut map);
     write_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash, &map).await
 }
@@ -763,6 +792,22 @@ mod tests {
             themes_key,
             account_number_hash,
         ))
+        .expect("read")
+    }
+
+    /// The same read, kept as a `Result` for the tests that assert an
+    /// unreadable store is an ERROR rather than an empty one (#255).
+    fn try_read_themes_map_in_dir(
+        vault_dir: &Path,
+        themes_key: &[u8; AEAD_KEY_LEN],
+        account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+    ) -> Result<ThemesMap, ThemesError> {
+        rt().block_on(super::read_themes_map_in_dir(
+            &IO,
+            vault_dir,
+            themes_key,
+            account_number_hash,
+        ))
     }
 
     fn write_themes_map_in_dir(
@@ -791,6 +836,7 @@ mod tests {
             themes_key,
             account_number_hash,
         ))
+        .expect("list")
     }
 
     fn themes_read_in_dir(
@@ -1093,20 +1139,68 @@ mod tests {
     }
 
     #[test]
-    fn wrong_key_or_hash_reads_empty_cross_vault() {
+    fn wrong_key_or_hash_is_unreadable_not_empty() {
+        // #255: a LOCAL store that exists and does not decrypt is an error, not
+        // an empty map. Reporting empty is what let the next read-modify-write
+        // re-seal an empty store over the user's themes — and this blob syncs,
+        // so the wipe reached every device.
         let tmp = ScopedTempDir::new("themes-crossvault").expect("tmp");
         themes_import_in_dir(tmp.path(), &KEY, &HASH, "secret", &valid_palette_json(), T0)
             .expect("import");
-        // Different KEK (different vault) → AEAD fails → empty.
         let other_key = [0x11; AEAD_KEY_LEN];
-        assert!(read_themes_map_in_dir(tmp.path(), &other_key, &HASH).is_empty());
-        // Different account-hash (cross-vault AAD) → empty.
+        assert!(matches!(
+            try_read_themes_map_in_dir(tmp.path(), &other_key, &HASH),
+            Err(ThemesError::StoreUnreadable)
+        ));
         let other_hash = [0x22; VAULT_META_ACCOUNT_HASH_LEN];
-        assert!(read_themes_map_in_dir(tmp.path(), &KEY, &other_hash).is_empty());
+        assert!(matches!(
+            try_read_themes_map_in_dir(tmp.path(), &KEY, &other_hash),
+            Err(ThemesError::StoreUnreadable)
+        ));
+    }
+
+    /// The consequence, end to end: a write attempted against an unreadable
+    /// store must fail rather than replace it.
+    #[test]
+    fn an_unreadable_store_is_never_replaced_by_a_write() {
+        let tmp = ScopedTempDir::new("themes-nowipe").expect("tmp");
+        themes_import_in_dir(tmp.path(), &KEY, &HASH, "keeper", &valid_palette_json(), T0)
+            .expect("import");
+        let before = rt()
+            .block_on(crate::vault_io::VaultIo::read(
+                &IO,
+                &tmp.path().join(THEMES_FILE),
+            ))
+            .expect("read blob");
+
+        // An import driven with the WRONG key — the "could not read it" case.
+        let wrong = [0x11; AEAD_KEY_LEN];
+        let err = themes_import_in_dir(
+            tmp.path(),
+            &wrong,
+            &HASH,
+            "newcomer",
+            &valid_palette_json(),
+            T0 + 1,
+        )
+        .expect_err("an unreadable store must refuse the write");
+        assert!(matches!(err, ThemesError::StoreUnreadable));
+
+        let after = rt()
+            .block_on(crate::vault_io::VaultIo::read(
+                &IO,
+                &tmp.path().join(THEMES_FILE),
+            ))
+            .expect("read blob");
+        assert_eq!(before, after, "a refused write must not touch the blob");
+        assert!(
+            read_themes_map_in_dir(tmp.path(), &KEY, &HASH).contains_key("keeper"),
+            "the real themes are still there under the real key"
+        );
     }
 
     #[test]
-    fn corrupt_blob_reads_empty() {
+    fn corrupt_blob_is_unreadable_not_empty() {
         let tmp = ScopedTempDir::new("themes-corrupt").expect("tmp");
         // Through the seam like everything else — the bytes are deliberately
         // garbage, but the WRITE is not special, and reaching for `std::fs` here
@@ -1118,7 +1212,10 @@ mod tests {
             crate::vault_io::WriteOpts::default(),
         ))
         .expect("write");
-        assert!(read_themes_map_in_dir(tmp.path(), &KEY, &HASH).is_empty());
+        assert!(matches!(
+            try_read_themes_map_in_dir(tmp.path(), &KEY, &HASH),
+            Err(ThemesError::StoreUnreadable)
+        ));
     }
 
     #[test]

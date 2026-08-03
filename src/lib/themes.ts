@@ -30,6 +30,11 @@ export type ThemesErrorKind =
   | "SlotNotUnlocked"
   | "Io"
   | "InvalidVaultMeta"
+  // `vault.themes` exists but could not be decrypted or decoded (#255). The
+  // store is intact and this write was refused rather than allowed to replace
+  // it with an empty one — which, because this blob syncs, would have wiped
+  // custom themes on every device.
+  | "StoreUnreadable"
   | "NotFound"
   | "Encode"
   | "Invalid";
