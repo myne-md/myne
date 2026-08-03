@@ -22,6 +22,10 @@
 // only check that covers all three.
 
 import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
+import {
+  partitionAssets,
+  unknownExtensionMessage,
+} from "./lib/scanned-assets.mjs";
 import { join } from "node:path";
 
 const DIST = process.argv[2] ?? "web/dist";
@@ -54,15 +58,18 @@ if (!existsSync(DIST)) {
   process.exit(2);
 }
 
-/** Every emitted JS/HTML file, walked. */
+/** Every served file, fail-closed on an unclassified extension (#273).
+ *
+ *  This read `.js` and `.html`, so a hook shipped inside the `.mjs` worker
+ *  chunk — a hook any script on the page can call, which is the whole reason
+ *  this guard exists — went unseen. */
 function files(dir) {
-  const out = [];
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) out.push(...files(full));
-    else if (/\.(js|html)$/.test(name)) out.push(full);
+  const { scan, unknown } = partitionAssets(dir);
+  if (unknown.length > 0) {
+    console.error(unknownExtensionMessage(unknown));
+    process.exit(1);
   }
-  return out;
+  return scan;
 }
 
 const hits = [];

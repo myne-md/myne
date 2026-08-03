@@ -78,6 +78,21 @@ pre-commit:
       # prefs write", which a new file elsewhere can break.
       run: node scripts/check-prefs-nonce.mjs
 
+    unwired:
+      # #272: a module nothing imports does not run. TypeScript does not
+      # complain about an unused export and lint does not, so a module can be
+      # written, documented, unit-tested and never wired — which is exactly how
+      # the web client's single-tab vault lock shipped, with the OPFS write path
+      # skipping its TOCTOU guard on the strength of it. A RATCHET: the recorded
+      # list may shrink, never grow.
+      run: node scripts/check-unwired.mjs
+
+    e2e-menu-testid:
+      # #275: an E2E scenario reaching for a testid that renders only inside an
+      # open menu waits for something that is not on screen and fails as a
+      # timeout — which reads like flake rather than like a stale helper.
+      run: node scripts/check-e2e-menu-testids.mjs
+
     twin-drift:
       # #261: a change to one side of a twin module pair. WARNING ONLY (the
       # script exits 0) — most one-sided changes are legitimate, and a gate

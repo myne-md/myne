@@ -3867,6 +3867,12 @@
     "backUpNow": "Back up now"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Only one tab can hold a vault open at a time — two would write to the same storage and corrupt it. Close the other tab to continue here.",
+      "freed": "The other tab has closed. Reload to open your vault here.",
+      "reload": "Reload",
+      "title": "This vault is open in another tab"
+    },
     "reload": {
       "body": "Reloading this page asks for your password again — there is no quicker way in, by design. Your vault stays encrypted on this device while the page is closed, and the key is rebuilt from your password each time.",
       "title": "A reload means your password again"

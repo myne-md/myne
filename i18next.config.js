@@ -20,7 +20,21 @@ export default defineConfig({
     // keeps desktop + mobile `t("…")` keys in one Weblate-managed source. The
     // shared `@myne/{editor,dialect}` engines carry their own keys (already
     // resident); scanning each client's own source is what surfaces new strings.
-    input: ["src/**/*.{ts,tsx}", "myne-mobile/src/**/*.{ts,tsx}"],
+    // Every shared tree — kept in step with `scripts/lib/shared-roots.mjs` by
+    // hand, because this file is consumed by the extractor CLI rather than by
+    // Node with an import (#273). It listed `src` and `myne-mobile/src` only,
+    // predating the `editor/`, `dialect/` and `copy/` packages: `editor/src`
+    // alone holds 226 live `i18n.t()` keys the extractor never saw, so
+    // following the documented add-a-string procedure exactly still shipped a
+    // raw dotted key.
+    input: [
+      "src/**/*.{ts,tsx}",
+      "editor/src/**/*.{ts,tsx}",
+      "dialect/src/**/*.{ts,tsx}",
+      "copy/src/**/*.{ts,tsx}",
+      "web/src/**/*.{ts,tsx}",
+      "myne-mobile/src/**/*.{ts,tsx}",
+    ],
     output: "locales/{{language}}/{{namespace}}.json",
     // English is the source language: its catalog is hand-maintained and is
     // the per-key runtime fallback for every other locale.
