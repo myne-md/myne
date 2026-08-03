@@ -126,7 +126,20 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
             sig.bump();
         }
     }
-    fn emit_snapshot_write_failed(&self, _: &str) {}
+    fn emit_snapshot_write_failed(&self, note_id: &str) {
+        // #47: this was a bare empty body while mobile really does capture
+        // snapshots (`capture_snapshot_best_effort` below), so a snapshot that
+        // failed to write was silent — the user kept editing a note whose
+        // version history had quietly stopped recording, and the BK-05 banner
+        // the design calls for had no signal to render from.
+        //
+        // Best-effort like the desktop twin: a failed emit must never fail the
+        // save that produced the warning.
+        use tauri::Emitter;
+        let _ = self
+            .app
+            .emit(myne_core::plugins::notes::SNAPSHOT_WRITE_FAILED_EVENT, note_id);
+    }
 
     // ---- Group 5: prefs application ---------------------------------------
     fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
