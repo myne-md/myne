@@ -1759,7 +1759,7 @@ shoulder-surf) layered over the already-encrypted store — it never weakens the
 zero-knowledge root (the master-password Argon2id path is unchanged and remains the
 primary credential). It does **not** defend against **A7** (active local malware, which
 can satisfy the biometric prompt or read process memory — out of scope, `threat-model.md`
-§5). For the PIN provider, a disk-copy attacker (**A4**) can attempt offline brute-force
+§5). For the PIN provider, a disk-copy attacker (**A5**) can attempt offline brute-force
 of the blob; the only defense is PIN entropy × the memory-hard Argon2id cost, so PIN-only
 quick-unlock is strictly weaker than the hardware-bound biometric path and is documented
 as such. A v0.1 client MUST reject `MYQ5` and any unregistered magic; a next-major-version
