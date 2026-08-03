@@ -337,7 +337,12 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       );
       if (already) return prev;
       const next = [...prev, path];
-      void setDeliberateFolders(next).catch(() => {});
+      // #259 audit: revert on a failed write like every sibling. An empty
+      // folder that exists only in this set silently disappears at the next
+      // unlock if the write never landed — and the user was shown it as made.
+      void setDeliberateFolders(next).catch(() => {
+        setDeliberate(prev);
+      });
       return next;
     });
   }, []);
@@ -451,8 +456,16 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // deliberate re-root inside `renameFolder`.
         const reroot = rerootArchivedFolders(node.path, newPath, archivedFolders);
         if (reroot.rewritten > 0) {
+          // #259: revert the optimistic state when the disk write fails —
+          // otherwise the UI shows the re-rooted set for the rest of the
+          // session while `vault.prefs` still holds paths under the OLD name,
+          // and at the next unlock the whole subtree silently un-archives.
+          // Same shape as `performFolderArchive` below, which had it already.
+          const prevArchived = archivedFolders;
           setArchivedFoldersState(reroot.next);
-          void setArchivedFolders(reroot.next).catch(() => {});
+          void setArchivedFolders(reroot.next).catch(() => {
+            setArchivedFoldersState(prevArchived);
+          });
         }
       }
       await Promise.all(result.moved.map((id) => ctx.refreshOne(id)));
@@ -481,8 +494,14 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // (folder-archive). Folded-prefix, mirrors the deliberate trim.
       const nextArchived = planFolderUnarchive(node.path, archivedFolders);
       if (nextArchived.length !== archivedFolders.length) {
+        // Same revert as the rename path (#259): a fire-and-forget write leaves
+        // the UI and disk disagreeing until the next unlock resolves it in
+        // disk's favour.
+        const prevArchived = archivedFolders;
         setArchivedFoldersState(nextArchived);
-        void setArchivedFolders(nextArchived).catch(() => {});
+        void setArchivedFolders(nextArchived).catch(() => {
+          setArchivedFoldersState(prevArchived);
+        });
       }
       // Prune the deleted folder's (and its deliberate descendants') color +
       // icon (MYND-184/185 durability).
@@ -553,13 +572,21 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       }
       const nextArchived = planFolderUnarchive(path, archivedFolders);
       if (nextArchived.length !== archivedFolders.length) {
+        const prevArchived = archivedFolders;
         setArchivedFoldersState(nextArchived);
-        void setArchivedFolders(nextArchived).catch(() => {});
+        void setArchivedFolders(nextArchived).catch(() => {
+          setArchivedFoldersState(prevArchived);
+        });
       }
       const nextDeliberate = deliberate.filter((f) => !folderKey(f).startsWith(key));
       if (nextDeliberate.length !== deliberate.length) {
+        // The deliberate set is the same class of optimistic write (#259 audit
+        // of the sibling call sites): shown as applied, persisted or not.
+        const prevDeliberate = deliberate;
         setDeliberate(nextDeliberate);
-        void setDeliberateFolders(nextDeliberate).catch(() => {});
+        void setDeliberateFolders(nextDeliberate).catch(() => {
+          setDeliberate(prevDeliberate);
+        });
       }
       applyDecorationRemap((m) => pruneFolderPrefix(m, path));
     },
