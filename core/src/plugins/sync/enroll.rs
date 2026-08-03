@@ -36,7 +36,8 @@ use super::transport::{HttpMethod, SyncTransport, TransportError};
 use protocol::{
     aad_password_wrap, aad_recovery_wrap, aead_open_ctx, derive_password_wrap_key,
     derive_recovery_wrap_key_from_normalized, derive_subkey, normalize_user_phrase,
-    parse_account_number, parse_vault_meta, validate_kdf_params, SubkeyRole, AEAD_KEY_LEN,
+    parse_account_number, parse_vault_meta, validate_kdf_params, KdfParams, SubkeyRole,
+    AEAD_KEY_LEN,
 };
 use protocol::{scram_client_final_message, scram_client_proof, SCRAM_CBIND_NAME};
 use serde::{Deserialize, Serialize};
@@ -785,6 +786,141 @@ pub struct EnrollResult {
 // afterwards. None of that was host-shaped either; it merely lived behind an
 // `AppHandle`.
 
+/// Refuse a KDF cost this host cannot service, **before** anything allocates it.
+///
+/// The twin of the ceiling check in
+/// [`crate::plugins::vault_unlock::commands::unlock_with_path`], and the same
+/// question it asks: `protocol::validate_kdf_params` answers whether the
+/// parameters are *legal* (up to `MAX_KDF_M_KIB` = 4 GiB), which is a different
+/// question from whether this client can afford them. A vault created with
+/// high-but-legal parameters passes validation and is still unopenable in a
+/// browser, and on `wasm32` an over-large Argon2id block is not a catchable
+/// allocation failure but an **abort** — the Worker dies and the user sees no
+/// cause. So the refusal has to happen before the allocation, not around it.
+///
+/// `ceiling_kib` is [`crate::host::HostCtx::max_kdf_memory_kib`] read out as a
+/// value. `None` — desktop and mobile — accepts everything the protocol does:
+/// their ceiling is the machine's, which the allocator already reports honestly.
+///
+/// This does NOT relax protocol validation and must not: `validate_kdf_params`
+/// still runs on this path, `MAX_KDF_M_KIB` is unchanged, and the v0.1 256 MiB
+/// baseline is unchanged. The parameters are AAD-bound and read from
+/// `vault.meta` (`protocol.md` §4.2) — they can be neither lowered nor
+/// renegotiated per client. This is strictly an "and can this host service it"
+/// question layered on top (`protocol.md` §11.2: a client that refuses to derive
+/// because the running browser cannot afford 256 MiB is a **client behaviour**,
+/// not a parameter profile).
+///
+/// The variant is [`SyncDeviceError::KdfTooLargeForHost`] rather than a
+/// `BadRequest`, because the remedy is different in kind: the credentials are
+/// correct and re-typing them cannot help — the vault has to be opened where
+/// its KDF is affordable. Flattened into `BadRequest` it would land on the
+/// SYNC-8 non-distinguishing credential banner, sending the user round a loop
+/// that cannot terminate.
+fn check_kdf_host_capability(
+    params: &KdfParams,
+    ceiling_kib: Option<u32>,
+) -> Result<(), SyncDeviceError> {
+    let Some(ceiling_kib) = ceiling_kib else {
+        return Ok(());
+    };
+    let required_kib = params.m_kib;
+    if required_kib <= ceiling_kib {
+        return Ok(());
+    }
+    // Public figures only — both come from the unencrypted KDF block and from
+    // the client build — so this log carries no credential-adjacent value.
+    tracing::error!(
+        stage = "kdf_capability",
+        error_kind = "KdfTooLargeForHost",
+        required_kib,
+        ceiling_kib,
+        "vault KDF memory cost exceeds what this host can service"
+    );
+    Err(SyncDeviceError::KdfTooLargeForHost)
+}
+
+#[cfg(test)]
+mod kdf_ceiling_tests {
+    //! The host-capability half of the enroll gate, tested without a server.
+    //!
+    //! Everything around it in `enroll_device_from_host` — the pre-auth fetch,
+    //! the derive, the SCRAM handshake — needs a live server. The comparison
+    //! does not, and it is the whole of what this gate decides, so it is
+    //! asserted here rather than argued.
+
+    use super::check_kdf_host_capability;
+    use crate::host::test_host::TestHost;
+    use crate::host::HostCtx as _;
+    use crate::plugins::sync::devices::SyncDeviceError;
+    use protocol::{validate_kdf_params, KdfParams, DEFAULT_V0_1_KDF_PARAMS, MAX_KDF_M_KIB};
+
+    /// A browser host's ceiling — the same 1 GiB `web/wasm`'s
+    /// `MAX_KDF_MEMORY_KIB` declares, restated here because `core` cannot see
+    /// that crate. In KiB, the unit `KdfParams::m_kib` and the seam both use, so
+    /// the comparison reads without a conversion in the middle.
+    const WEB_CEILING_KIB: u32 = 1024 * 1024;
+
+    fn params(m_kib: u32) -> KdfParams {
+        KdfParams {
+            m_kib,
+            ..DEFAULT_V0_1_KDF_PARAMS
+        }
+    }
+
+    #[test]
+    fn a_legal_cost_the_host_cannot_service_is_refused() {
+        // The interval this gate exists for. `MAX_KDF_M_KIB` (4 GiB) is what a
+        // hostile server may declare in the `vault.meta` it serves pre-auth, and
+        // the protocol accepts it — so every other check on this path passes and
+        // the derive is reached. On `wasm32` that derive is an abort rather than
+        // an `Err`, which is why the refusal has to come from here.
+        let p = params(MAX_KDF_M_KIB);
+        validate_kdf_params(&p).expect("the protocol accepts this — that is the point");
+
+        let host = TestHost::new("kdf-ceiling").with_kdf_ceiling_kib(WEB_CEILING_KIB);
+        assert_eq!(
+            check_kdf_host_capability(&p, host.max_kdf_memory_kib()),
+            Err(SyncDeviceError::KdfTooLargeForHost)
+        );
+    }
+
+    #[test]
+    fn a_cost_exactly_at_the_ceiling_is_serviceable() {
+        // `>` and not `>=`: a host that declares it can afford N must accept N,
+        // or the ceiling refuses the very cost it advertises.
+        let host = TestHost::new("kdf-at-ceiling").with_kdf_ceiling_kib(WEB_CEILING_KIB);
+        assert_eq!(
+            check_kdf_host_capability(&params(WEB_CEILING_KIB), host.max_kdf_memory_kib()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn the_v0_1_baseline_still_enrolls_under_a_browser_ceiling() {
+        // 256 MiB, measured at 321 MiB of wasm linear memory (`protocol.md`
+        // §4.1). The gate must never be what stops an ordinary vault.
+        let host = TestHost::new("kdf-baseline").with_kdf_ceiling_kib(WEB_CEILING_KIB);
+        assert_eq!(
+            check_kdf_host_capability(&DEFAULT_V0_1_KDF_PARAMS, host.max_kdf_memory_kib()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn a_host_with_no_ceiling_defers_entirely_to_the_protocol() {
+        // Desktop and mobile. `None` by default on the seam, and this gate must
+        // add nothing there: their ceiling is the machine's, which the allocator
+        // already reports honestly.
+        let host = TestHost::new("kdf-no-ceiling");
+        assert_eq!(host.max_kdf_memory_kib(), None);
+        assert_eq!(
+            check_kdf_host_capability(&params(MAX_KDF_M_KIB), host.max_kdf_memory_kib()),
+            Ok(())
+        );
+    }
+}
+
 /// Enroll this device against the configured server using {account# + credential}.
 ///
 /// **The first extracted core that carries key material across the seam**
@@ -834,6 +970,15 @@ pub async fn enroll_device_from_host(
     // the server answers 404, and a device with no local meta and no server copy
     // has nothing to enrol against either way.
     let local_meta: Option<Vec<u8>> = io.read(&dir.join("vault.meta")).await.ok();
+    // The host's Argon2id memory ceiling, read out here as a plain `Option<u32>`
+    // so it can MOVE into the closure. The `host` trait object cannot: it is a
+    // non-`'static` borrow and `run_blocking` requires `F: 'static`. Nor can the
+    // comparison be hoisted the way `unlock_with_path` hoists its own — the
+    // `vault.meta` it compares against is fetched from the server INSIDE the
+    // closure, so out here there is nothing to compare. Moving the VALUE is
+    // enough: the contract is "before the allocation", not "outside the
+    // closure", and on `wasm32` `run_blocking` is inline anyway.
+    let kdf_ceiling_kib = host.max_kdf_memory_kib();
 
     // The SCRAM username is derived inside `enroll` as the account-hash hex —
     // the display-form account number never crosses the wire (AS9).
@@ -874,6 +1019,12 @@ pub async fn enroll_device_from_host(
             // other derive site (unlock / recover / change-password / quick-unlock)
             // already gates on this; the sync enroll path was the one gap.
             validate_kdf_params(&meta.kdf_params).map_err(|_| SyncDeviceError::BadRequest)?;
+            // …and separately, whether THIS host can afford what it declares.
+            // Passing `validate_kdf_params` is not the same as being affordable:
+            // it accepts up to 4 GiB, so anything in (host ceiling, 4 GiB]
+            // satisfies every other check on this path and reaches Argon2id —
+            // precisely the interval the ceiling exists to refuse.
+            check_kdf_host_capability(&meta.kdf_params, kdf_ceiling_kib)?;
 
             // 2. Derive root_key from the credential + the meta salts.
             let root_key: Zeroizing<[u8; AEAD_KEY_LEN]> = match path {

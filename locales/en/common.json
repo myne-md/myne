@@ -3106,6 +3106,7 @@
         "frozen": "This account is frozen, so no new device can be added right now. Your notes on this device are unaffected.",
         "notConfigured": "Set a sync server in settings before adding this device.",
         "serverMismatch": "The sync server’s identity didn’t match what this device expected. Don’t enter your credentials again until you know why.",
+        "kdfTooLarge": "This device does not have enough memory to open that vault. Its encryption settings need more memory than this app can use here. Open it on a desktop computer instead.",
         "transport": "Couldn’t reach the sync server. Check your connection and try again."
       },
       "mode": {

@@ -123,6 +123,12 @@ function failureMessage(kind: string): string {
       // a typo or a man in the middle, and "check your password" is the one
       // instruction that must not follow it.
       return i18n.t("sync.enroll.error.serverMismatch");
+    case "KdfTooLargeForHost":
+      // Not a credential failure either: the vault's Argon2id cost is valid and
+      // the password is right — this client just cannot afford the memory. The
+      // remedy is a different machine, so the credential banner would send the
+      // user round a loop that cannot terminate.
+      return i18n.t("sync.enroll.error.kdfTooLarge");
     default:
       return ENROLL_NON_DISTINGUISHING_BANNER;
   }
