@@ -230,7 +230,11 @@ import {
   workspaceStage,
   workspaceWrite,
 } from "../lib/workspace-persist";
-import { setActiveWorkspace, setCustomTheme, setFavorites } from "../lib/prefs";
+import {
+  setActiveWorkspace,
+  setCustomTheme,
+  toggleFavoriteOnDisk,
+} from "../lib/prefs";
 import { promptForText } from "../lib/promptForText";
 import { QuickPicker, type QuickPickItem } from "../components/QuickPicker";
 import { listCustomThemes } from "../lib/themes";
@@ -2911,8 +2915,20 @@ function CommandPaletteHost({
       onToggleFavorite: () => {
         if (ctx.selectedId === null) return;
         const id = ctx.selectedId;
-        const fav = aiPrefs.favorites;
-        void setFavorites(fav.includes(id) ? fav.filter((x) => x !== id) : [...fav, id]);
+        // #252: re-read disk truth, then toggle. `favorites` is a whole-sequence
+        // write, so deriving `next` from THIS component's `usePrefs` snapshot
+        // dropped every favourite starred from the sidebar since it last read —
+        // and `favorites` is `SharedDiscipline::SequenceLww`, so the truncation
+        // won on every other device. Reading first makes the write depend on
+        // what is stored rather than on which surface rendered more recently.
+        //
+        // The read-modify-write lives in `toggleFavoriteOnDisk` so every
+        // snapshot-holding surface gets the same treatment rather than each
+        // re-deriving the sequence from whatever it last rendered.
+        void toggleFavoriteOnDisk(id).catch(() => {
+          // A failed read must not fall back to the stale snapshot — that is
+          // the write this fix exists to prevent.
+        });
       },
       onShowBacklinks: () => void revealRightPanelTab("backlinks"),
       onShowOutline: () => void revealRightPanelTab("outline"),

@@ -40,6 +40,7 @@ import {
   setShowNoteTimestamps,
   setSpellLanguages,
   setTheme,
+  toggleFavoriteOnDisk,
   setVaultLabel,
   type EditorLayout,
 } from "../../src/lib/prefs";
@@ -212,6 +213,45 @@ describe("prefs-nonce bump discipline", () => {
       chords: null,
     });
     expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+// #252: `favorites` is persisted as a WHOLE sequence, so a caller deriving the
+// next value from its own `usePrefs` snapshot writes back whatever that
+// snapshot was missing. The command palette did exactly that — star A from the
+// sidebar, palette-toggle B, and `[B]` was persisted AND synced (the field is
+// SequenceLww, so the truncation won everywhere).
+describe("toggleFavoriteOnDisk — reads disk before writing", () => {
+  it("adds to the STORED sequence, not to a caller's snapshot", async () => {
+    invokeMock.mockImplementation(async (cmd: string) =>
+      cmd === "plugin:prefs|prefs_read" ? { favorites: ["a"] } : undefined,
+    );
+    await toggleFavoriteOnDisk("b");
+    expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|prefs_read");
+    expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|set_favorites", {
+      order: ["a", "b"],
+    });
+  });
+
+  it("removes from the STORED sequence and keeps the rest", async () => {
+    invokeMock.mockImplementation(async (cmd: string) =>
+      cmd === "plugin:prefs|prefs_read"
+        ? { favorites: ["a", "b", "c"] }
+        : undefined,
+    );
+    await toggleFavoriteOnDisk("b");
+    expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|set_favorites", {
+      order: ["a", "c"],
+    });
+  });
+
+  it("writes nothing when the read fails — a stale fallback is the defect", async () => {
+    invokeMock.mockRejectedValueOnce({ kind: "SlotNotUnlocked" });
+    await expect(toggleFavoriteOnDisk("b")).rejects.toBeTruthy();
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "plugin:prefs|set_favorites",
+      expect.anything(),
+    );
   });
 });
 
