@@ -223,7 +223,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 
 | Context string | Role | Phase 1 use |
 |---|---|---|
-| `"myne.v0.1 server-auth"` | Sync-server authentication material — **placeholder** | Derived locally and held in memory between unlock and lock; **not transmitted in Phase 1** because no sync server exists. The exact use of this material (simple verifier transmission vs. OPAQUE `export_key` integration) is **deferred to Phase 2**; see §11.1 for the criteria that will resolve the choice. |
+| `"myne.v0.1 server-auth"` | Sync-server authentication material — the **SCRAM secret** (Phase 2) | Derived locally and held in memory between unlock and lock; **not transmitted in Phase 1** because no sync server exists. Its use was resolved at Phase 2 and is neither of the two options §11.1 weighed: it is the PBKDF2 input of the **SCRAM-SHA-256(-PLUS)** handshake, passed as the **raw 32 bytes**, so what reaches the server is verifier material (`StoredKey`/`ServerKey`) and never the subkey itself. Wire spec: `server-protocol.md` §3.1; canonicalized by `decisions.md` **2026-06-20**, which supersedes the deferral in §11.1. |
 | `"myne.v0.1 itemsKey-wrap"` | KEK for the persistent itemsKey | Active (wraps itemsKey on disk). |
 | `"myne.v0.1 backup-key"` | Sealed-backup derivation root — **reserved, not used** | **Not used in v0.1** (demoted 2026-06-10; previously "active when user exports a backup"). The v0.1 backup format (§9.11) is a verbatim ciphertext copy with no outer encryption layer: a `root_key`-derived seal would be circular for fresh-machine restore (the credential wraps live inside the backup's own `vault.meta`) and would forbid exporting while locked. The row is retained, like `server-auth`, so the context string stays allocated; a future sealed-backup variant would activate it. See `decisions.md` 2026-06-10. |
 | `"myne.v0.1 prefs-key"` | KEK for `vault.prefs` blob (§9.5) | Active when `vault.prefs` is written. |
@@ -247,7 +247,7 @@ New v0.1 context strings MAY be added in future revisions of this specification;
 
 The **quick-unlock credential blob** (`vault.quickunlock`, §9.14) is deliberately **NOT** in this registry: its KEK is **not** a `DeriveSubkey(root_key, …)` subkey. Because the blob wraps `root_key` itself, a `root_key`-derived KEK would be circular; instead its wrap key is supplied by an external, hardware-bound provider (Apple Keychain biometric secret) or derived from a PIN (§9.14.2). The same holds for the two **device-local staging queues** — the pending-capture queue (`captures/<capture-id-hex>`, §9.18) and the share-import staging queue (`pending-shares/sealed/<share-id-hex>`, §9.20): both must be writable while the vault is locked and `root_key` is unavailable, so both are sealed under a device-local keychain/Keystore `wrap_key` rather than a registered subkey (§9.18.2, §9.20.2). What distinguishes these three is not merely the absence of a row — it is that their sealing key is supplied by an **external, device-bound provider** rather than derived from `root_key` at all. (Per-note blobs (§9.2) and attachment blobs (§9.9) have no row either, for an unrelated reason: their content keys descend from the registered `itemsKey-wrap` lineage rather than from a KEK of their own.) `vault.head-state` (§9.16) also has no row of its own, for a different reason — it is not AEAD-encrypted at all, and its integrity re-uses the registered `vault-head-mac` role. A family that *is* sealed under a `root_key`-derived KEK gets its row above in the same change that ships it.
 
-The deferred resolution of `server-auth` does not affect the v0.1 wire format or any blob produced under v0.1 — the subkey is derived but never used by any v0.1 client. A v0.1 vault opened by a Phase 2 client will still produce the same `server-auth` bytes deterministically; the Phase 2 protocol layer determines what to do with them.
+The use of `server-auth` does not affect the v0.1 at-rest format or any blob produced under v0.1 — the subkey is derived but never written into a blob, and no v0.1 at-rest code reads it. A v0.1 vault opened by a Phase 2 client will still produce the same `server-auth` bytes deterministically; the Phase 2 sync layer (`server-protocol.md` §3.1) feeds them to SCRAM's PBKDF2.
 
 ---
 
@@ -2384,7 +2384,9 @@ This stance directly contradicts the "additive" approach common in older protoco
 
 ## 11. Out of Scope for v0.1
 
-### 11.1 Server-authentication mechanism (Phase 2 decision, intentionally deferred)
+### 11.1 Server-authentication mechanism (Phase 2 decision — resolved 2026-06-20)
+
+> **Resolved; this supersedes the deferral recorded below.** Phase 2 canonicalized **SCRAM-SHA-256-PLUS** with `tls-exporter` channel binding (RFC 5802 / 7677 / 9266) as the server-auth mechanism — `decisions.md` **2026-06-20** "SCRAM-SHA-256-PLUS canonicalized as Phase 2 server-auth" (MYND-420). It is **neither Option A nor Option B** below: SCRAM transmits no secret and stores no Argon2id verifier, so it is a third construction in the same non-aPAKE family as Option A rather than Option A itself. The `server-auth` subkey (§3.4) is the SCRAM secret, fed to PBKDF2 as raw bytes; the wire spec is `server-protocol.md` §3.1. The next-major commitment to OPAQUE (below) is unchanged. The remainder of this section is retained as the record of the deliberation.
 
 The Phase 1 protocol derives a `server-auth` subkey (§3.4) from the user's `root_key`. v0.1 holds this material locally and never transmits it. Phase 2 introduces the sync server and forces a decision between two approaches; the choice is **deliberately deferred** to Phase 2 to avoid premature commitment under low information.
 
@@ -2400,7 +2402,7 @@ The Phase 1 protocol derives a `server-auth` subkey (§3.4) from the user's `roo
 
 **Next-major commitment.** The next major version's roadmap canonicalizes Option B (OPAQUE). Option A in Phase 2 is therefore at most a transitional choice; the next major version's migration would convert any Option-A vaults to OPAQUE.
 
-This deferral is itself a protocol commitment: implementations MUST NOT assume a Phase-2 server-auth decision in v0.1 code. The `server-auth` subkey is opaque material with no defined wire-level use until Phase 2.
+While it stood, this deferral was itself a protocol commitment, and its surviving half is scoped to the at-rest layer: **v0.1 at-rest code** — anything that produces or consumes `vault.meta`, a `.myn` blob or any §10.3 family — MUST NOT assume a server-auth decision, and none does. To that layer the `server-auth` subkey is opaque material with no wire-level use. Its wire-level use is defined by Phase 2 and confined to the sync layer (`server-protocol.md` §3.1).
 
 ### 11.2 Other items deliberately not addressed
 
@@ -2408,7 +2410,7 @@ Items deliberately not addressed by this specification. Each entry names where i
 
 | Item | Where it lives |
 |---|---|
-| Server-side authentication protocol (`serverPassword` is derived but not transmitted in v0.1) | Phase 2; mechanism deferred per §11.1 (MYND-420); server surface in `server-protocol.md` |
+| Server-side authentication protocol (`serverPassword` is derived but not transmitted in v0.1) | Phase 2; mechanism resolved as SCRAM-SHA-256-PLUS (§11.1 preamble; `decisions.md` 2026-06-20; MYND-420); wire surface in `server-protocol.md` §3.1 |
 | Sync wire format, conflict resolution, version vectors | Phase 2; `sync-protocol.md` §8–§11 (fork-consistency vault head §1–§7) |
 | Cross-device synchronization of `vault.prefs` (carried alongside `vault.meta` + `notes/*.myn` as the v0.1 vault-artifact trio) | Phase 2; `sync-protocol.md` §9 (taxonomy) + §10 (conflict merge) |
 | Multi-device coordination, device key management | Phase 2+; the next major version adopts MLS; `protocol-next-roadmap.md` (TBD) |
@@ -2463,6 +2465,8 @@ A snapshot of choices made during the v0.1 draft. Mirrored to `../decisions.md`.
 - **Rust-side primitives: RustCrypto stack, no libsodium bindings** (resolved 2026-04-28). Supersedes the "libsodium bindings + RustCrypto fallback" clause of the entry directly above, and the "libsodium as the single client crypto library" clause of the original Standard Notes 004 primitive baseline — both by name, in `decisions.md` 2026-04-28. Every Myne client links the `protocol/` crate on RustCrypto and none links libsodium (§2): mobile reuses the crate by path rather than binding a platform library (2026-05-01), and the web client compiles it to wasm (below). The earlier entries in this list are left standing as the record of what was believed at the time — wherever one of them says "libsodium", read §2. The Argon2id parameters, AEAD construction, HKDF-SHA-256 subkey derivation, BIP-39 phrase and X25519 are unchanged by this: only the *library implementing them* changed, and the byte-level format did not, which is why libsodium remains a valid choice for an independent implementation (§2, §5.1.4).
 
 - **Phase 3 web client: in-repo `web/` target, shared `src/` tree, wasm-compiled `protocol/` crate** (resolved 2026-07-26). Supersedes the two clauses above that deferred the web bundler and promised a `packages/ui/` extraction. Neither happened, and the architecture that replaced them is different in kind: the web client compiles the **same** `src/` tree the desktop client compiles, substituting one internal boundary — `src/platform/` — at build time, so there is no UI package to extract and no second bundler to decouple. Its cryptographic provider is this repo's `protocol/` crate compiled to `wasm32-unknown-unknown` (§2), not a JavaScript library. §4.1 carries the measured browser cost. `decisions.md` 2026-07-26 records the repo-topology, capability-set, storage, transport, E2E, origin and self-host decisions; `threat-model.md` A15/TB11 records what the served-code delivery channel gives up. **Appended, not edited in place** — the earlier entries are the record of what was believed at the time.
+
+- **Server-auth resolved: SCRAM-SHA-256-PLUS — neither Option A nor Option B** (resolved 2026-06-20). Supersedes the "Server-auth deliberately deferred to Phase 2" bullet above and the deferral in §11.1. The client proves knowledge of `DeriveSubkey(root_key, "server-auth")` without transmitting it, and the server stores only `StoredKey`/`ServerKey`/`Salt`/`Iterations` — so it is neither the transmitted subkey of Option A nor the OPRF of Option B, which is why `decisions.md` records it by name. The subkey is fed to PBKDF2 as raw bytes; wire spec `server-protocol.md` §3.1. The next major version's OPAQUE commitment is unchanged. **Appended, not edited in place** — the earlier bullet is the record of what was believed at the time.
 
 **All deferred conflict-points resolved.** v0.1 specification is complete.
 
