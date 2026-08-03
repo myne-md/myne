@@ -303,6 +303,11 @@ steps:
       # Capability-descriptor drift gate (MYND-574 task 27): the UI's omission
       # set and the dispatcher's refusal set must agree, in both directions.
       - node scripts/check-web-capabilities.mjs
+      # Prefs-nonce chokepoint (#251): every vault.prefs write flows through
+      # `writePref`, which bumps the nonce sibling `usePrefs` instances re-read
+      # on. Backstop for the pre-commit hook — `--no-verify` must not land a
+      # setter whose change the open editor never receives.
+      - node scripts/check-prefs-nonce.mjs
       # CLI sidecar contract (cli-thin-client task 11): the `myne` CLI crate has
       # no dependency on `myne-desktop`, so the bundle identifier + the
       # socket/status basenames are duplicated by design — drift compiles clean

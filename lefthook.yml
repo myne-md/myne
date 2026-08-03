@@ -67,6 +67,17 @@ pre-commit:
       glob: "core/src/**/*.rs"
       run: node scripts/check-core-io-seam.mjs {staged_files}
 
+    prefs-nonce:
+      # #251: every `vault.prefs` write goes through `writePref` in
+      # `src/lib/prefs.ts`, which bumps the prefs nonce. That bump is the only
+      # mechanism by which sibling `usePrefs` instances re-read disk truth, and
+      # as an optional second line in ~56 setters it was forgotten in 31 of
+      # them — favourites silently dropped AND the deletion synced, right-panel
+      # tab actions doing nothing, an AI opt-in the editor never saw. Whole-tree
+      # rather than glob-scoped: rule 2 is "no module outside prefs.ts invokes a
+      # prefs write", which a new file elsewhere can break.
+      run: node scripts/check-prefs-nonce.mjs
+
     web-capabilities:
       # phase3-web-client task 27: the UI's capability descriptor
       # (`web/src/platform/capabilities.ts`) and the dispatcher's refusal table
