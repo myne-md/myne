@@ -27,6 +27,7 @@ import { pickFiles } from "../../platform/filePicker";
 import { ModalShell } from "../primitives/ModalShell";
 import { Button } from "../primitives/Button";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
+import { useWarmAttachmentRefs } from "./useWarmAttachmentRefs";
 import { kindOf } from "./format";
 import { catalogList, type CatalogEntry } from "../../lib/attachments";
 import {
@@ -147,6 +148,9 @@ export function CoverPicker({
   const { t } = useTranslation();
   // `null` = loading; `[]` = loaded-but-empty.
   const [images, setImages] = useState<CatalogEntry[] | null>(null);
+  // #263: a surface that renders thumbnails warms the ids it renders. Scoped to
+  // the images actually listed, never the whole catalog. No-op on desktop.
+  const warmNonce = useWarmAttachmentRefs((images ?? []).map((i) => i.id));
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -255,7 +259,11 @@ export function CoverPicker({
           <div style={GRID_STYLE}>
             {images.map((img) => (
               <button
-                key={img.id}
+                // #263: the warm nonce is in the key so a tile that rendered
+                // before its blob URL existed remounts once it does. Without
+                // the warm this grid was identical blank boxes on web, with the
+                // filename only as a `title` — the user picked a cover blind.
+                key={`${img.id}:${warmNonce}`}
                 type="button"
                 data-testid="cover-picker.image"
                 data-att-id={img.id}

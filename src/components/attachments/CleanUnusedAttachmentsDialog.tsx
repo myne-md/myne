@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { ModalShell } from "../primitives/ModalShell";
 import { Button } from "../primitives/Button";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
+import { useWarmAttachmentRefs } from "./useWarmAttachmentRefs";
 import { formatBytes } from "./format";
 import type { CatalogEntry, CleanResult } from "../../lib/attachments";
 
@@ -98,6 +99,11 @@ export function CleanUnusedAttachmentsDialog({
 }: CleanUnusedAttachmentsDialogProps) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
+  // #263: these thumbnails exist SO THE USER SEES what is about to be erased,
+  // before an irreversible cryptographic erase — and on web they were blank
+  // boxes, because only the library warmed its ids. The set is independently
+  // scanned and already bounded, so warming exactly it is right.
+  const warmNonce = useWarmAttachmentRefs(attachments.map((a) => a.id));
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CleanResult | null>(null);
 
@@ -180,7 +186,11 @@ export function CleanUnusedAttachmentsDialog({
         <div>{t("attachments.cleanUnused.intro", { count: n })}</div>
         <ul style={LIST_STYLE}>
           {attachments.map((a) => (
-            <li key={a.id} style={ROW_STYLE} data-testid="clean-unused.row">
+            <li
+              key={`${a.id}:${warmNonce}`}
+              style={ROW_STYLE}
+              data-testid="clean-unused.row"
+            >
               <div style={THUMB_BOX_STYLE}>
                 <AttachmentThumbnail
                   id={a.id}

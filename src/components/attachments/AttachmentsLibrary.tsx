@@ -41,7 +41,7 @@ import {
   type CleanResult,
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
-import { getHost } from "@myne/editor/host";
+import { useWarmAttachmentRefs } from "./useWarmAttachmentRefs";
 import { startTranscription, type TranscribeError } from "../../lib/transcribe";
 import { usePrefs } from "../../hooks/usePrefs";
 import { showAttachmentToast } from "../../editor/attachments/toast";
@@ -297,7 +297,6 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   const [loadError, setLoadError] = useState(false);
   /** Bumped once the visible entries' render URLs are resolvable, so the
    *  thumbnails re-render against the warmed answers (see the effect below). */
-  const [warmNonce, setWarmNonce] = useState(0);
   const [view, setView] = useState<ViewMode>("grid");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("created-desc");
@@ -634,27 +633,10 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   // Scoped to what is actually on screen after filtering, not the whole
   // catalog: warming everything would decrypt every attachment in the vault to
   // paint one screenful, which on an attachment-heavy vault is gigabytes.
-  useEffect(() => {
-    const warmRefs = getHost().attachments.warmRefs;
-    if (warmRefs === undefined) return; // desktop — nothing to prepare
-    const ids = visible.map((e) => e.id);
-    if (ids.length === 0) return;
-    let cancelled = false;
-    void warmRefs(ids)
-      .then(() => {
-        // The tiles rendered against the pre-warm answers, so they have to be
-        // told to ask again.
-        if (!cancelled) setWarmNonce((n) => n + 1);
-      })
-      .catch(() => {
-        // Best-effort, and per-id inside the host: one attachment that will not
-        // decrypt must not blank the rest. Anything unwarmed keeps the pending
-        // placeholder, which is what a failed desktop fetch shows too.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [visible]);
+  // Lifted into `useWarmAttachmentRefs` (#263) so the OTHER thumbnail surfaces
+  // get the same treatment: the cover picker and the clean-unused dialog both
+  // rendered blank boxes on web because only this one warmed.
+  const warmNonce = useWarmAttachmentRefs(visible.map((e) => e.id));
 
   const isLoading = entries === null;
   const isEmpty = !isLoading && (entries?.length ?? 0) === 0;
