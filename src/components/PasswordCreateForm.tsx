@@ -13,9 +13,10 @@
 //
 // Min-strength gating + zxcvbn lazy-load are owned by the underlying
 // `PasswordInput` primitive's `usePasswordStrength` hook — this form
-// reads `MIN_PASSWORD_LEN` and `MIN_ZXCVBN_SCORE` from there for the
-// ready gate. Forms can never drift on those constants because there
-// is one canonical home.
+// reads `MIN_PASSWORD_LEN`, `MIN_ZXCVBN_SCORE` and the
+// `passwordLength` scalar-value counter from there for the ready gate.
+// Forms can never drift on those constants — or on the unit the floor
+// is counted in — because there is one canonical home.
 //
 // Renamed from `PasswordForm.tsx` in MYND-87+107's Task 3 refactor.
 // API surface preserved (`PasswordCreateForm` accepts the same prop
@@ -30,6 +31,7 @@ import {
   MIN_PASSWORD_LEN,
   MIN_ZXCVBN_SCORE,
   PasswordInput,
+  passwordLength,
   usePasswordStrength,
 } from "./PasswordInput";
 import { generatePassword } from "../lib/password-generator";
@@ -114,10 +116,13 @@ export function PasswordCreateForm({
 
   const { ready: zxcvbnReady, result } = usePasswordStrength(password);
 
-  const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LEN;
+  // Unicode scalar values, not `.length` — same unit as the backend
+  // floor (see `passwordLength`).
+  const passwordLen = passwordLength(password);
+  const tooShort = passwordLen > 0 && passwordLen < MIN_PASSWORD_LEN;
   const mismatch = confirm.length > 0 && confirm !== password;
   const submitReady =
-    password.length >= MIN_PASSWORD_LEN &&
+    passwordLen >= MIN_PASSWORD_LEN &&
     password === confirm &&
     result !== null &&
     result.score >= MIN_ZXCVBN_SCORE;
@@ -126,7 +131,7 @@ export function PasswordCreateForm({
   let passwordTone: "muted" | "danger" | "pending" = "muted";
   let showStrength = false;
 
-  if (password.length === 0) {
+  if (passwordLen === 0) {
     passwordCaption = resolvedEmptyCaption;
     passwordTone = "muted";
   } else if (tooShort) {

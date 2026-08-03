@@ -25,7 +25,9 @@
 // `MIN_ZXCVBN_SCORE = 3`) live here so every consumer (vault-creation
 // `PasswordStep`, vault-recover `PasswordResetStep`, change-password
 // `PasswordChangeForm`) imports the same numbers. Drift across forms
-// is structurally impossible.
+// is structurally impossible. The `passwordLength` helper lives here
+// for the same reason: the floor is only mirrored if both sides also
+// count the same unit.
 
 import {
   useEffect,
@@ -40,6 +42,21 @@ import { Icon } from "./primitives/Icon";
 
 /** Minimum password length enforced by every consumer (frontend gate). */
 export const MIN_PASSWORD_LEN = 12;
+
+/**
+ * Password length in the unit the backend floor counts: Unicode scalar
+ * values, via the string iterator.
+ *
+ * `String.prototype.length` counts UTF-16 code units, while
+ * `protocol::password_policy::validate_min_length` counts USVs
+ * (`str::chars().count()`). Every astral scalar (most emoji, the CJK
+ * extension blocks, historic scripts) is 2 code units and 1 USV, so a
+ * `.length` gate admits an eleven-character password the backend then
+ * refuses — the form says "fine", the ceremony says "too short".
+ * Compare against `MIN_PASSWORD_LEN` through this helper, never
+ * through `.length`.
+ */
+export const passwordLength = (password: string) => [...password].length;
 
 /** Minimum zxcvbn score (0-4) required to pass the strength gate. */
 export const MIN_ZXCVBN_SCORE = 3;

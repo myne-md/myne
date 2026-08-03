@@ -22,6 +22,7 @@ import {
   MIN_PASSWORD_LEN,
   MIN_ZXCVBN_SCORE,
   PasswordInput,
+  passwordLength,
   usePasswordStrength,
 } from "./PasswordInput";
 
@@ -29,8 +30,8 @@ interface PasswordChangeFormProps {
   /**
    * Called with the validated current + new password when the user
    * submits. The component guarantees non-empty current, new ===
-   * confirm, new.length >= MIN_PASSWORD_LEN, and zxcvbn score >=
-   * MIN_ZXCVBN_SCORE before invoking. Same-password and wrong-current
+   * confirm, new at least MIN_PASSWORD_LEN Unicode scalar values, and
+   * zxcvbn score >= MIN_ZXCVBN_SCORE before invoking. Same-password and wrong-current
    * rejections happen backend-side; the consumer maps the resulting
    * error variant to the `error` prop.
    */
@@ -74,11 +75,14 @@ export function PasswordChangeForm({
 
   const { ready: zxcvbnReady, result } = usePasswordStrength(next);
 
-  const tooShort = next.length > 0 && next.length < MIN_PASSWORD_LEN;
+  // Unicode scalar values, not `.length` — same unit as the backend
+  // floor (see `passwordLength`).
+  const nextLen = passwordLength(next);
+  const tooShort = nextLen > 0 && nextLen < MIN_PASSWORD_LEN;
   const mismatch = confirm.length > 0 && confirm !== next;
   const submitReady =
     current.length > 0 &&
-    next.length >= MIN_PASSWORD_LEN &&
+    nextLen >= MIN_PASSWORD_LEN &&
     next === confirm &&
     result !== null &&
     result.score >= MIN_ZXCVBN_SCORE;
@@ -87,7 +91,7 @@ export function PasswordChangeForm({
   let nextTone: "muted" | "danger" | "pending" = "muted";
   let showStrength = false;
 
-  if (next.length === 0) {
+  if (nextLen === 0) {
     nextCaption = undefined;
     nextTone = "muted";
   } else if (tooShort) {
