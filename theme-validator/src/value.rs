@@ -27,12 +27,14 @@
 use crate::error::ThemeError;
 use crate::schema::{parse_theme, ParsedTheme};
 
-/// Parse + required-core validate (task 1) AND value-shape validate (this task).
-/// The single entry point the command layer (MYND-297) calls to turn an
-/// untrusted theme file into a known-safe [`ParsedTheme`].
+/// Parse + key-shape + required-core validate (task 1) AND value-shape validate
+/// (this task). The single entry point the command layer (MYND-297) calls to
+/// turn an untrusted theme file into a known-safe [`ParsedTheme`].
 ///
 /// Returns the first value-shape failure as [`ThemeError::invalid_value`] (keyed
-/// by the offending token), after the parse + required-key pass has succeeded.
+/// by the offending token), after the parse + key-shape + required-key pass has
+/// succeeded — so by the time this loop runs, every key is already on
+/// [`super::schema::is_allowed_key`]'s grammar.
 pub fn validate_theme(json: &str) -> Result<ParsedTheme, ThemeError> {
     let parsed = parse_theme(json)?;
     for (key, value) in &parsed.vars {
@@ -208,6 +210,18 @@ mod tests {
         let err = validate_theme(&s).expect_err("a poisoned value must reject");
         assert_eq!(err.kind, ThemeErrorKind::InvalidValue);
         assert_eq!(err.key.as_deref(), Some("--accent"));
+    }
+
+    #[test]
+    fn validate_theme_rejects_a_bad_key_with_that_key() {
+        // A safe value cannot launder an unsafe token name: the key grammar is
+        // enforced on the way in, not inferred from the value beside it.
+        let mut s = minimal_core_with("#101010");
+        s.pop(); // drop closing brace
+        s.push_str(",\n  \"--accent;}\": \"#101010\"\n}");
+        let err = validate_theme(&s).expect_err("a malformed token name must reject");
+        assert_eq!(err.kind, ThemeErrorKind::InvalidValue);
+        assert_eq!(err.key.as_deref(), Some("--accent;}"));
     }
 
     #[test]

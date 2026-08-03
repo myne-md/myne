@@ -35,8 +35,10 @@ pub enum ThemeErrorKind {
     /// A required-core CSS-variable token is absent. `key` carries the missing
     /// token name (e.g. `--accent`).
     MissingKey,
-    /// A token's value did not match the value-shape allowlist. `key` carries
-    /// the offending token name.
+    /// A token's value did not match the value-shape allowlist, or its *name*
+    /// did not match the token-name allowlist (`schema::is_allowed_key`) — both
+    /// are "this entry is not admissible", so they share one kind rather than
+    /// widening the closed taxonomy. `key` carries the offending token name.
     InvalidValue,
     /// A theme name failed the desktop plugin's `is_valid_theme_name` (path
     /// traversal / separators / out-of-charset).
