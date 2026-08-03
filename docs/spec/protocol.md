@@ -441,7 +441,7 @@ The AAD bytes feed both into Poly1305's MAC computation (standard AEAD behavior)
 
 ### 5.3 Nonce policy
 
-Nonces are 192-bit random values drawn from the OS CSPRNG immediately before each AEAD call. Nonces are stored in the per-note blob (§9.2) and never reused. The protocol does not use deterministic or counter nonces in v0.1.
+Nonces are 192-bit random values drawn from the OS CSPRNG immediately before each AEAD call. **Every AEAD nonce this specification defines is drawn that way, stored in the cleartext header of the blob it seals, and never reused under any key.** The rule binds `vault.meta` (§9.3) and every §10.3 blob family that seals data under AEAD — not only the per-note blob (§9.2), which is simply the first family this document specified. Two §10.3 families fall outside it because they carry no AEAD nonce at all: the backup container (`MYB1`, §9.11) introduces no cryptography of its own, and the device-local sync baseline (`MYH1`, §9.16) is not AEAD-encrypted. v0.1 uses no deterministic, counter, or input-derived nonces anywhere; deviation is a major-version event.
 
 ### 5.4 Constant-time comparison (general rule)
 
@@ -571,7 +571,7 @@ Encrypting plaintext directly under `itemsKey` would save one AEAD call per note
 
 ### 6.7 Nonce hygiene
 
-Both `item_key_nonce` and `content_nonce` are 192-bit values from the OS CSPRNG (§5.3). At this width, random collisions are negligible across any realistic note count or revision count under a single `itemsKey` or `item_key`. v0.1 does not use deterministic, counter, or input-derived nonces; deviation is a major-version event.
+Both `item_key_nonce` and `content_nonce` are drawn under the §5.3 nonce policy, which binds every AEAD nonce in this specification rather than the per-note blob alone. What is specific to `.myn` is the margin: at 192 bits, random collisions are negligible across any realistic note count or revision count under a single `itemsKey` or `item_key`.
 
 ## 7. Recovery Phrase Derivation
 
@@ -2294,7 +2294,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | v0.1 | `"myne.v0.1|"` | `"myne.v0.1 …"` | This document. Active. |
 | next major (reserved) | (defined by the next major version) | (defined by the next major version) | Reserved — its own AAD prefix and HKDF context prefix are not pre-allocated in v0.1. See `protocol-next-roadmap.md` (TBD). |
 
-**Magic-byte allocation (normative).** Each blob family has a distinct 4-byte magic. Implementations MUST reject any magic not in this table. This table is the single source of truth for magic-byte allocation — a new blob family MUST claim a free magic here before it is implemented (this discipline exists because the attachments index initially mis-claimed the already-reserved `MYI1`; see `decisions.md` 2026-06-07).
+**Magic-byte allocation (normative).** Each blob family has a distinct 4-byte magic. Implementations MUST reject any magic not in this table. This table is the single source of truth for magic-byte allocation — a new blob family MUST claim a free magic here before it is implemented (this discipline exists because the attachments index initially mis-claimed the already-reserved `MYI1`; see `decisions.md` 2026-06-07). **Every family in this table that seals data under AEAD inherits the nonce policy of §5.3 without restatement** — the policy is stated once, generally, and is deliberately not repeated per family.
 
 | Blob / file | v0.1 magic | next major (reserved) | Section | Owner |
 |---|---|---|---|---|
