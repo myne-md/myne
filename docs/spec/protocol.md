@@ -267,6 +267,8 @@ Argon2id is used in two places (§3.1): deriving `password_wrap_key` from the ma
 | Salt | 16 bytes (constructed per §3.1) | (in `random_salt_*_16` fields) |
 | Output | 32 bytes | (implicit) |
 
+This table is the v0.1 **baseline**, not the accepted range. A conforming vault MAY carry other cost values (§4.2); what bounds them is the normative range in §4.2.1.
+
 Approximate cost: ~1 second on a 2024 desktop laptop, ~2–3 seconds on mid-tier mobile (Phase 3).
 
 **Measured browser cost (Phase 3 web client).** These parameters were measured in a browser rather than estimated, because an unverified claim about the KDF is a claim about whether the client is usable at all. On **one Apple Silicon Mac (16 GB, 10 cores)**, deriving with `m=256 MiB, t=3, p=2` through this repository's `protocol` crate compiled to `wasm32-unknown-unknown` — the real production derivation path, not a JS reimplementation — took a median of **464 ms (Chrome 150)**, **558 ms (Safari 26.5.2)** and **680 ms (Firefox 153)**, against **412 ms native on the same machine**: a **1.13–1.65× wasm penalty**. No out-of-memory condition in any browser (wasm linear memory settled at 321 MiB, the 256 MiB block plus allocator overhead), and **all three browsers derived a byte-identical key**.
@@ -280,8 +282,30 @@ These parameters are calibrated to provide **≥ 80 bits of effective security w
 The complete parameter set is stored in `vault.meta` (§9.3). Storing parameters per-vault — rather than hardcoding them in the client — has three consequences, all desirable:
 
 1. **Parameter upgrade without format break**: if hardware advances make stronger parameters affordable, a future minor revision MAY raise the baseline; existing vaults continue to open with their original parameters until the user changes their password (which generates a fresh wrap with the new defaults).
-2. **Per-platform calibration without forking the format**: Phase 3 mobile ports MAY ship vaults with reduced parameters where the device cannot afford 256 MiB. The protocol does not require the same parameters across platforms; it requires the same parameters across the *two Argon2id call sites within a single vault*.
+2. **Per-platform calibration without forking the format**: Phase 3 mobile ports MAY ship vaults with reduced parameters where the device cannot afford 256 MiB. The protocol does not require the same parameters across platforms; it requires the same parameters across the *two Argon2id call sites within a single vault*. This MAY is bounded rather than open-ended: reduced parameters MUST stay inside the accepted cost range of §4.2.1, which is the envelope the still-open mobile profile (§11.2) has to land inside.
 3. **Auditor transparency**: the parameters used to lock the vault are inspectable in `vault.meta` without running the client, supporting the compensating-controls plan in `../threat-model.md` §6.
+
+#### 4.2.1 Accepted cost range (use-site client policy)
+
+The MAY in point 2 is bounded. **Before invoking Argon2id on cost parameters read from a `vault.meta`, an implementation MUST reject the vault when those parameters fall outside the range below.** Rejection is a **structural** failure (`InvalidVaultMeta`-class) and MUST NOT be surfaced as a wrong-password or wrong-phrase signal — the non-distinguishing posture of §7.3 is unaffected by it.
+
+| Bound | Range | What it is for |
+|---|---|---|
+| Cost floor | `kdf_m_kib × kdf_t ≥ 8192` (KiB-passes — e.g. 8 MiB at one pass) | A vault *created* at brute-forceable cost. The v0.1 baseline is 786 432 (256 MiB × 3 passes), so the floor sits ~96× below it. |
+| Memory ceiling | `kdf_m_kib ≤ 4 194 304` (4 GiB) | A `vault.meta` declaring an allocation the client cannot afford. |
+| Parallelism | `1 ≤ kdf_p ≤ 16` | Lane counts no legitimate profile uses; the wire field is a `uint8`, so the encoding admits up to 255. |
+
+Three properties of this clause are deliberate.
+
+**It binds the derivation site, not the parser.** §4.3 and §9.3 are the on-disk *encoding* contract, and a decoder that reads a well-formed 11-byte block MUST NOT reject it on cost grounds — cross-implementation encoding vectors legitimately carry sub-floor values, and rejecting them at parse time would make correct decoders non-conforming. The obligation attaches to the step that is about to spend memory and time on those numbers.
+
+**The floor is a cost *area*, not a per-axis minimum.** The memory-by-passes product `kdf_m_kib × kdf_t` is monotone in real Argon2id work and neutral about how an implementation splits its budget between the two axes. A per-axis minimum on `kdf_t` would be actively wrong: RFC 9106's primary recommended profile is `t = 1` with large `m`, so a `kdf_t` floor would refuse a strong `t = 1, m = 2 GiB` vault while still admitting a weak `m = 8 MiB, t = 3` one.
+
+**The ceiling is not redundant with §4.3.** AAD binding defends an *existing* vault against parameter mutation, but it is structurally incapable of covering the ceiling, because the memory is allocated **before** any tag can be verified. The exposure is largest for a joining device, which fetches `vault.meta` **pre-session** (`server-protocol.md` §3.1, `GET /vault.meta`) and would otherwise size an allocation from an answer whose authenticity it has established nothing about.
+
+An implementation MAY enforce a **tighter** range than this one and MUST NOT enforce a looser one. Myne's clients do enforce tighter: a per-axis `kdf_m_kib ∈ [8 MiB, 4 GiB]`, `kdf_t ∈ [1, 16]`, `kdf_p ∈ [1, 16]`, with the web client narrowing the memory ceiling further to 1 GiB because a browser tab's address space is not a desktop's.
+
+This range is a **compatibility commitment**, not a tunable. Raising the floor in a later v0.1 revision would refuse vaults that conformed when they were written, so it is a major-version event (§10) rather than a tightening.
 
 ### 4.3 AAD binding of parameters
 
@@ -776,7 +800,7 @@ Offset  Size       Field                       Description
                                                 credential wraps, epoch keys, etc.).
 ```
 
-The KDF parameter block at offset 22 is the canonical encoding referenced in §4.3 and bound into both wrap AADs (§3.1). Tampering with any parameter byte invalidates the AEAD tag on `enc_root_key_password` and `enc_root_key_recovery`.
+The KDF parameter block at offset 22 is the canonical encoding referenced in §4.3 and bound into both wrap AADs (§3.1). Tampering with any parameter byte invalidates the AEAD tag on `enc_root_key_password` and `enc_root_key_recovery`. The "v0.1 baseline" values in the rows above are exactly that — a baseline, not a bound: this table is the **encoding** contract, and the cost values a client may act on are constrained at the derivation site by §4.2.1, not here.
 
 The two encrypted root_key copies (`enc_root_key_password`, `enc_root_key_recovery`) hold the same 32-byte plaintext under independent wrap keys. Either is sufficient to unlock the vault.
 
@@ -2384,7 +2408,7 @@ Items deliberately not addressed by this specification. Each entry names where i
 | Chunked/streamed attachment AEAD, Merkle manifests, **large (>64 MiB) media requiring chunking/streaming** (long video/audio) | Phase 1.5 or later; future spec extension (new magic + migration, not a `MYA1` extension). Single-shot audio ≤64 MiB already ships as a `MYA1` blob (row above), and on-device speech-to-text (§9.15, MYND-270) transcribes it; only media beyond the single-shot cap is deferred here. |
 | Encrypted search index format (FTS5 inside encrypted SQLite) | Phase 1.5 or later; client-internal, not in this spec |
 | Bidirectional links, graph view rendering | Out of scope for the cryptographic protocol; client UI concern |
-| Mobile Argon2id parameter profile | Phase 3 mobile; this spec's baseline targets desktop-class memory. Deferred, and still open. |
+| Mobile Argon2id parameter profile | Phase 3 mobile; this spec's baseline targets desktop-class memory. Deferred, and still open — but no longer unbounded: whatever profile lands MUST sit inside the §4.2.1 accepted cost range. |
 | WASM Argon2id parameter profile | **Not deferred — there is none.** The Phase 3 web client runs the v0.1 parameters **unchanged**: they are AAD-bound and read from `vault.meta` (§4.2), so a browser cannot lower them without producing a vault no other client can open. Measured browser cost is in §4.1. A client that refuses to derive because the running browser cannot afford 256 MiB is a **client behaviour**, not a parameter profile. |
 | Metadata padding (PURB, Padmé) | a later major version |
 | Plausibly-deniable encryption, decoy passwords, duress codes | Icebox (a later version and beyond) |
@@ -2432,4 +2456,4 @@ Each deferred item has a v0.1 baseline that is internally consistent with this s
 - **No formal verification model** (Tamarin / ProVerif) accompanies v0.1. The compensating-controls plan (`../threat-model.md` §6) is the v1.0 substitute. Formal verification is a next-major-version deliverable.
 - **No external cryptographer review** has occurred at draft time. Plan: pre-launch informal review by at least one independent reviewer per `../threat-model.md` §6.
 - **Migration tool from v0.1 to the next major version has not been written**. The §10.4 procedure describes the intent; concrete code lands when next-major work begins.
-- **Mobile parameter profile** for Argon2id is not specified in v0.1; the spec assumes desktop-class memory. Phase 3 must add a profile.
+- **Mobile parameter profile** for Argon2id is not specified in v0.1; the spec assumes desktop-class memory. Phase 3 must add a profile, and §4.2.1 fixes the range that profile must land inside — what is open is where in that range it sits, not whether it is bounded at all.
