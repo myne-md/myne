@@ -73,7 +73,13 @@ export type SeamOperation =
   // here too would be a second, WIDER path to the same bytes — an opaque handle
   // read with no within-root check — which is precisely what that seam exists to
   // withhold from the WebView.
-  | "filePicker.readPickedText";
+  | "filePicker.readPickedText"
+  // #262 — the NARROW twin of the read above, and the reason it is a separate
+  // member rather than a relaxation of it: this one goes through the importer's
+  // root-confined `import_read_file`, so desktop answers it. It refuses only a
+  // handle this seam did not mint, which is a caller bug rather than a platform
+  // limit.
+  | "filePicker.readPickedSmallText";
 
 /**
  * Thrown by a seam implementation for an operation the platform cannot provide.

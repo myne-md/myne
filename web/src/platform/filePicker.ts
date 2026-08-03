@@ -182,6 +182,18 @@ export async function readPickedText(picked: PickedFile): Promise<string> {
 }
 
 /**
+ * The web arm of the narrow small-text read (#262).
+ *
+ * Identical to {@link readPickedText} here — a browser has no path to confine,
+ * so there is nothing for the narrower form to withhold. The two stay separate
+ * because on DESKTOP they differ: the general read is a typed refusal, and this
+ * one goes through the importer's root-confined seam.
+ */
+export async function readPickedSmallText(picked: PickedFile): Promise<string> {
+  return readPickedText(picked);
+}
+
+/**
  * Import a picked file into the vault (phase3-web-client task 67).
  *
  * # The bytes never touch this thread
