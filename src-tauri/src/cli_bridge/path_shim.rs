@@ -129,14 +129,12 @@ fn shim_path(shim_dir: &Path) -> PathBuf {
     shim_dir.join(COMMAND_NAME)
 }
 
-/// Wrap a string in POSIX single quotes, the one shell quoting form with no
-/// interior escapes at all: `'` ends the literal, `\'` supplies one, `'`
-/// reopens it. Everything else — `"`, `` ` ``, `$`, spaces, newlines — is
-/// inert inside. The sidecar path comes from `current_exe()`, not from a
-/// constant, so it is not ours to assume well-behaved.
-fn sh_single_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', r"'\''"))
-}
+// POSIX single-quoting moved to `crate::sh_quote` (myne#381) — the clipper's
+// native-messaging launcher needed the same property and had been
+// double-quoting instead. The sidecar path comes from `current_exe()`, not
+// from a constant, so it is not ours to assume well-behaved; the helper's own
+// doc says why double quotes are a different thing rather than a weaker one.
+use crate::sh_quote::sh_single_quote;
 
 /// The shim body: `exec` the sidecar with the user's args. The path is
 /// single-quoted so one with spaces (`…/Application Support/…`) survives and
@@ -556,15 +554,10 @@ mod tests {
         assert_eq!(out.status.code(), Some(3));
     }
 
-    #[test]
-    fn single_quoting_survives_an_apostrophe_in_the_path() {
-        // The one character single quotes cannot hold verbatim.
-        assert_eq!(
-            sh_single_quote("/home/o'brien/app"),
-            r"'/home/o'\''brien/app'"
-        );
-        assert_eq!(sh_single_quote("/plain/path"), "'/plain/path'");
-    }
+    // The quoting helper's own unit tests moved with it, to
+    // `crate::sh_quote` (myne#381). What stays here is the test above, which
+    // EXECUTES the generated shim — the property this module is responsible
+    // for, as opposed to the property the helper is.
 
     #[test]
     fn the_sidecar_already_on_path_needs_no_shim() {

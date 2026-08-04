@@ -225,12 +225,21 @@ fn write_wrapper(app_data_dir: &Path, real_binary: &str) -> std::io::Result<Path
     use std::os::unix::fs::PermissionsExt;
     std::fs::create_dir_all(app_data_dir)?;
     let path = app_data_dir.join(WRAPPER_FILE_NAME);
-    // `exec "<bin>" --native-messaging-host "$@"` — quotes tolerate spaces in the
-    // binary path (e.g. `…/Application Support/…`); `"$@"` forwards the browser's
-    // extension-id / origin args, which host mode ignores.
+    // `exec '<bin>' --native-messaging-host "$@"` — the binary path is POSIX
+    // SINGLE-quoted (myne#381). This used to use double quotes with a comment
+    // saying they "tolerate spaces", which was true and beside the point: inside
+    // `sh` double quotes `$`, `` ` `` and `\` stay active, so a `current_exe()`
+    // path containing `$(…)`, a backtick, a `"` or a trailing `\` was not
+    // mis-parsed but EVALUATED — by a shell the browser spawns, unattended, on
+    // every native-messaging connection. `crate::sh_quote` is the same helper
+    // the CLI PATH shim has always used for the same value.
+    //
+    // `NATIVE_MESSAGING_ARG` is a constant and needs no quoting; `"$@"` must
+    // stay double-quoted — that expansion is what forwards the browser's
+    // extension-id / origin args (host mode ignores them) as separate words.
     let script = format!(
-        "#!/bin/sh\nexec \"{}\" {} \"$@\"\n",
-        real_binary,
+        "#!/bin/sh\nexec {} {} \"$@\"\n",
+        crate::sh_quote::sh_single_quote(real_binary),
         super::host::NATIVE_MESSAGING_ARG,
     );
     std::fs::write(&path, script.as_bytes())?;
@@ -590,5 +599,52 @@ mod tests {
         assert!(body.contains(HOST));
         let mode = std::fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o111, 0o111, "wrapper must be executable");
+    }
+
+    /// myne#381, mirroring `cli_bridge::path_shim`'s long-standing sibling.
+    ///
+    /// **This RUNS the wrapper rather than asserting on its text**, and that is
+    /// the whole point. The wrapper used to double-quote a `current_exe()`
+    /// path, and the test above — `body.contains(HOST)` — passed just as
+    /// happily either way. A substring assertion is what let this survive: it
+    /// cannot tell an interpolation the shell will expand from one it will not.
+    ///
+    /// `current_exe()` is not a constant. A user may install the app under a
+    /// directory containing `$`, a backtick or a `"`, and the resulting script
+    /// is executed by the browser, unattended, on every native-messaging
+    /// connection.
+    #[test]
+    #[cfg(unix)]
+    fn a_binary_path_with_shell_metacharacters_is_execed_literally() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = ScopedTempDir::new("clipper-metachars").unwrap();
+        let bundle = dir.path().join("we$ird `dir` \"x\"");
+        std::fs::create_dir_all(&bundle).unwrap();
+
+        // A stand-in for the real binary: it reports the args it was handed and
+        // exits with a code no shell error would produce by accident.
+        let binary = bundle.join("Myne");
+        std::fs::write(&binary, b"#!/bin/sh\necho \"args:$*\"\nexit 3\n").unwrap();
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let wrapper = write_wrapper(dir.path(), binary.to_str().unwrap()).unwrap();
+        let out = std::process::Command::new(&wrapper)
+            .args(["chrome-extension://abc/"])
+            .output()
+            .expect("the wrapper must be executable");
+
+        // Under double quotes, `we$ird` expands `$ird` to nothing and the
+        // backticks run `dir` as a command — so the exec target is a path that
+        // does not exist and the stub never runs.
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout).trim(),
+            format!("args:{} chrome-extension://abc/", super::super::host::NATIVE_MESSAGING_ARG),
+            "the wrapper must exec the real binary with the host flag and forward the browser's args"
+        );
+        assert_eq!(
+            out.status.code(),
+            Some(3),
+            "the stub's exit code must round-trip, proving IT ran rather than a shell error"
+        );
     }
 }
