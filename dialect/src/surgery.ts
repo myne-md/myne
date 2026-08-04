@@ -154,6 +154,50 @@ function applyStateB(source: string, bodyEnd: number, iso: string): string {
 // quote style (double → `\`+`"`, single → `''`) independent of `format`, matching
 // every prior per-field body. (`updated:`'s old body emitted the raw ISO in the
 // quoted branch; escaping an RFC 3339 string is a no-op, so this is byte-identical.)
+/**
+ * One past the last line of the LOGICAL YAML value whose key line is `lines[i]`
+ * (myne#324).
+ *
+ * A managed key is column zero (myne#321), so a continuation line is any line
+ * that is indented — plus a column-zero block-sequence item under a key whose
+ * own value portion is empty, and plus blank lines that are themselves followed
+ * by a continuation (a block scalar may contain them).
+ *
+ * `applyStateCImpl` used to consume continuations only in its block-scalar
+ * branch, and only while they were both indented and non-blank. Everything else
+ * — a multi-line plain scalar, a multi-line quoted scalar, a block sequence, or
+ * a block scalar containing a blank line — had its key line rewritten and its
+ * continuation lines left welded onto the new value. Where the leftovers still
+ * parsed, the rename or move silently produced a mangled value ("z b"); where
+ * they did not, js-yaml threw on the whole block, `loadNoteBatch` swallowed it
+ * and returned `{}`, and the note lost its title, folder, timestamp, tags and
+ * cover all at once — showing as "Untitled" and unfiled, with the raw-slice
+ * title fallback not reached because the parsed map is empty rather than absent.
+ */
+function logicalValueEnd(lines: readonly string[], i: number, valueIsEmpty: boolean): number {
+  const isContinuation = (line: string): boolean =>
+    /^[ \t]/.test(line) || (valueIsEmpty && /^-(?:[ \t]|$)/.test(line));
+
+  let j = i + 1;
+  while (j < lines.length) {
+    const line = lines[j] ?? "";
+    if (line.trim() === "") {
+      // A blank line belongs to the value only if a continuation follows it;
+      // otherwise it ends the value (and, in frontmatter, usually the block).
+      let k = j;
+      while (k < lines.length && (lines[k] ?? "").trim() === "") k++;
+      if (k < lines.length && isContinuation(lines[k] ?? "")) {
+        j = k;
+        continue;
+      }
+      return j;
+    }
+    if (!isContinuation(line)) return j;
+    j++;
+  }
+  return j;
+}
+
 function applyStateCImpl(
   source: string,
   bodyStart: number,
@@ -172,13 +216,21 @@ function applyStateCImpl(
     const valuePortion = m[2] ?? "";
     const trimmedValue = valuePortion.trim();
 
+    // The whole LOGICAL value is replaced, not just its key line (myne#324):
+    // every continuation line goes with it, whatever the value's shape.
+    const valueEnd = logicalValueEnd(lines, i, trimmedValue === "");
+    const replaceValue = (rendered: string): string => {
+      // A key written `tags:` with nothing after it leaves `prefix` without a
+      // separator, so a naive concat emits `tags:cover.png`. Insert the space
+      // the YAML needs.
+      lines[i] = /[ \t]$/.test(prefix) ? prefix + rendered : prefix + " " + rendered;
+      lines.splice(i + 1, valueEnd - (i + 1));
+      return lines.join(NEWLINE);
+    };
+
     // Block-scalar (|, >) → collapse to canonical single-line form.
     if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + format(value);
-      let j = i + 1;
-      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
-      lines.splice(i + 1, j - (i + 1));
-      return lines.join(NEWLINE);
+      return replaceValue(format(value));
     }
 
     // Existing quoted scalar (single or double) → preserve quote style.
@@ -190,20 +242,17 @@ function applyStateCImpl(
         quote === '"'
           ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
           : value.replace(/'/g, "''");
-      lines[i] = prefix + quote + escaped + quote + trailing;
-      return lines.join(NEWLINE);
+      return replaceValue(quote + escaped + quote + trailing);
     }
 
     // Existing unquoted + trailing comment → preserve the comment.
     const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
     if (commentM !== null) {
-      lines[i] = prefix + format(value) + (commentM[2] ?? "");
-      return lines.join(NEWLINE);
+      return replaceValue(format(value) + (commentM[2] ?? ""));
     }
 
     // Existing plain unquoted scalar.
-    lines[i] = prefix + format(value);
-    return lines.join(NEWLINE);
+    return replaceValue(format(value));
   }
 
   return null;

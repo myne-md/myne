@@ -10,6 +10,7 @@ import * as path from "node:path";
 import {
   patchFirstH1Line,
   patchSourceRanges,
+  patchFolderField,
   patchTitleField,
   patchUpdatedField,
   readArchivedFromFmBody,
@@ -554,5 +555,63 @@ describe("managed keys are top-level only (myne#321)", () => {
     );
     expect(out).toContain(`updated: ${TEST_ISO}`);
     expect(out).not.toContain("2020-01-01");
+  });
+});
+
+// ── myne#324: a managed write replaces the whole LOGICAL value ──────────────
+//
+// `applyStateCImpl` rewrote only the key line, and consumed continuations only
+// in its block-scalar branch — and there only while they were both indented and
+// non-blank. Everything else left the old value's continuation lines welded onto
+// the new one.
+//
+// Where the leftovers still parsed, the rename or move silently produced a
+// mangled value with nothing in the UI to explain it. Where they did not,
+// js-yaml threw on the whole block, `loadNoteBatch` caught it and returned `{}`,
+// and the note lost its title, folder, updated timestamp, tags and cover at
+// once — showing "Untitled" and unfiled, with the raw-slice title fallback not
+// reached, because an empty parsed map is not the same as an absent one. The
+// corrupted text is then re-encrypted to disk by the ordinary overwrite path.
+//
+// Reachable from any imported note (the importer preserves rawText byte for
+// byte) or any hand-edited frontmatter.
+describe("multi-line YAML values (myne#324)", () => {
+  const title = (src: string, v = "New") => dec.decode(patchTitleField(enc.encode(src), v));
+
+  it("a block scalar containing a blank line", () => {
+    // The loop used to stop at the blank line, leaving `  Note: x` behind and
+    // making js-yaml throw "bad indentation of a mapping entry".
+    const out = title("---\ntitle: |\n  My\n\n  Note: x\nfolder: work\n---\n\nbody\n");
+    expect(out).toBe("---\ntitle: New\nfolder: work\n---\n\nbody\n");
+  });
+
+  it("a multi-line PLAIN scalar", () => {
+    const out = title("---\ntitle: My\n  Note\nfolder: w\n---\n\nb\n");
+    expect(out).toBe("---\ntitle: New\nfolder: w\n---\n\nb\n");
+  });
+
+  it("a multi-line double-quoted scalar", () => {
+    const out = title('---\ntitle: "My\n  Note"\nfolder: w\n---\n\nb\n');
+    expect(out).toBe("---\ntitle: New\nfolder: w\n---\n\nb\n");
+  });
+
+  it("a multi-line value on another managed field", () => {
+    const out = dec.decode(
+      patchFolderField(enc.encode("---\nfolder: a\n  b\n---\n\nb\n"), "z"),
+    );
+    expect(out).toBe("---\nfolder: z\n---\n\nb\n");
+  });
+
+  it("does not eat the NEXT top-level key", () => {
+    // The bound that matters in the other direction: consuming too much would
+    // delete a sibling field.
+    const out = title("---\ntitle: Old\nfolder: keep\nupdated: 2020-01-01T00:00:00Z\n---\n\nb\n");
+    expect(out).toContain("folder: keep");
+    expect(out).toContain("updated: 2020-01-01T00:00:00Z");
+  });
+
+  it("does not eat a blank line that ends the value", () => {
+    const out = title("---\ntitle: Old\n\nfolder: keep\n---\n\nb\n");
+    expect(out).toContain("folder: keep");
   });
 });
