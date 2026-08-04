@@ -267,6 +267,27 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.viewMode",
   },
   {
+    id: "editor.date-format",
+    panelId: "editor",
+    titleKey: "settings.dateTime.dateLabel",
+    descriptionKey: "settings.dateTime.dateHelper",
+    keywordsKey: "settings.search.keywords.dateFormat",
+  },
+  {
+    id: "editor.time-format",
+    panelId: "editor",
+    titleKey: "settings.dateTime.timeLabel",
+    descriptionKey: "settings.dateTime.timeHelper",
+    keywordsKey: "settings.search.keywords.timeFormat",
+  },
+  {
+    id: "editor.timezone",
+    panelId: "editor",
+    titleKey: "settings.dateTime.zoneLabel",
+    descriptionKey: "settings.dateTime.zoneHelper",
+    keywordsKey: "settings.search.keywords.timezone",
+  },
+  {
     id: "editor.focus-dim",
     panelId: "editor",
     testid: "settings.focus-dim",

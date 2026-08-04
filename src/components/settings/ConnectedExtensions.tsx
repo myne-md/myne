@@ -32,6 +32,7 @@ import {
   CONNECTED_EXTENSIONS_REVOKE_LABEL,
   CONNECTED_EXTENSIONS_TITLE,
 } from "../../lib/load-bearing-copy";
+import { dateTimeDisplay, formatInstant } from "../../lib/datetimeFormat";
 import { Button } from "../primitives/Button";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
@@ -95,11 +96,10 @@ function connectedWhen(pairedAt: number | null): string {
   if (days < 30)
     return i18n.t("settings.connectedExtensions.when.daysAgo", { count: days });
   return i18n.t("settings.connectedExtensions.when.onDate", {
-    date: new Date(pairedAt * 1000).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }),
+    // myne#279: the shared formatter, so this follows the user's chosen date
+    // format instead of the OS locale — which is a different answer from the
+    // language they picked in the app.
+    date: formatInstant(pairedAt * 1000, dateTimeDisplay()),
   });
 }
 

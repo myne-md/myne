@@ -43,6 +43,9 @@ permissions = [
   "allow-set-reminders-enabled",
   "allow-set-reminder-horizon-days",
   "allow-set-editor-line-spacing",
+  "allow-set-date-format",
+  "allow-set-time-format",
+  "allow-set-timezone",
   "allow-set-editor-content-width",
   "allow-set-editor-font-family",
   "allow-set-active-workspace",
@@ -261,6 +264,26 @@ commands.allow = ["set_editor_vim_mode"]
 identifier = "allow-set-archive-disabled"
 description = "Allow invoking prefs:set_archive_disabled (Slot::Unlocked-gated setter for the archive_disabled toggle — disables the note-archive feature's UI entry points; atomic-writes vault.prefs with no native side-effect; the default-OFF policy (archiving enabled) is applied host-side at read time)."
 commands.allow = ["set_archive_disabled"]
+
+# myne#279: display date/time/timezone. Each is a free Option<String> the client
+# validates — an unrecognised value reads as the `system` default rather than
+# failing a write. `timezone` is DISPLAY-ONLY: it decides what the app treats as
+# "today" and how a stored wall-clock value is printed, and never enters a .myn
+# file, a blob, or the sync wire.
+[[permission]]
+identifier = "allow-set-date-format"
+description = "Allow invoking prefs:set_date_format (Slot::Unlocked-gated setter for the date_format display preference — system/iso/dmy/mdy/dmmmy, Option<String> where None clears to the system default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_date_format"]
+
+[[permission]]
+identifier = "allow-set-time-format"
+description = "Allow invoking prefs:set_time_format (Slot::Unlocked-gated setter for the time_format display preference — system/24h/12h, Option<String> where None clears to the system default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_time_format"]
+
+[[permission]]
+identifier = "allow-set-timezone"
+description = "Allow invoking prefs:set_timezone (Slot::Unlocked-gated setter for the timezone DISPLAY override — an IANA zone identifier, Option<String> where None clears to the host's own zone; atomic-writes vault.prefs with no native side-effect and never writes a zone into note bytes)."
+commands.allow = ["set_timezone"]
 
 [[permission]]
 identifier = "allow-set-editor-content-width"

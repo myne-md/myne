@@ -122,7 +122,7 @@
       "transcribeFailed": "Transcription failed. Please try again.",
       "transcribeFeatureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
       "transcribeModelLoadFailed": "Couldn't load the speech-to-text model. Reinstall Myne, or check your custom model in Settings → Developer → AI.",
-      "transcribeNoModel": "Select a speech-to-text model in Settings \u2192 Developer \u2192 AI.",
+      "transcribeNoModel": "Select a speech-to-text model in Settings → Developer → AI.",
       "transcribeNoModelHint": "The speech-to-text model is missing. Reinstalling Myne restores it.",
       "transcribeStarted": "Transcribing…",
       "transcribeVaultLocked": "Unlock your vault to transcribe.",
@@ -2963,8 +2963,26 @@
         "vaultIcon": "vault icon avatar picture symbol",
         "vaultLabel": "vault label name rename title",
         "vaultLocation": "vault location path folder on disk where stored",
-        "viewMode": "default view mode live reading source preview"
+        "viewMode": "default view mode live reading source preview",
+        "dateFormat": "date format day month year iso dd/mm mm/dd calendar",
+        "timeFormat": "time format 24 hour 12 hour clock am pm",
+        "timezone": "timezone time zone tz utc iana region today"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Date format",
+      "dateHelper": "How dates are shown across tasks, saved views and attachments.",
+      "dateSystem": "Match language",
+      "timeLabel": "Time format",
+      "timeHelper": "Whether times are shown on a 24-hour or 12-hour clock.",
+      "timeSystem": "Match language",
+      "time24": "24-hour",
+      "time12": "12-hour",
+      "zoneLabel": "Time zone",
+      "zoneHelper": "Which zone decides what counts as today. Leave empty to follow this device. Times you write in a note are never changed — 09:00 stays 09:00 everywhere.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne doesn't know that time zone. Use a name like Europe/Berlin.",
+      "errorSave": "Couldn't save that setting."
     }
   },
   "storageLost": {
@@ -3084,9 +3102,9 @@
       "connectedPlatformTrust": "Connected over TLS. Your browser verified this server’s certificate.",
       "connecting": "Connecting…",
       "fingerprintLabel": "Server certificate fingerprint:",
-      "confirmFingerprintRequired": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server\u2019s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
-      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. Nothing was saved. Check the fingerprint you pasted \u2014 and if it is right, do not connect: something is between this device and your server.",
-      "confirmFingerprintDeclined": "Nothing was saved \u2014 this device is not connected to that server. Come back once you have its certificate fingerprint.",
+      "confirmFingerprintRequired": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server’s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
+      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. Nothing was saved. Check the fingerprint you pasted — and if it is right, do not connect: something is between this device and your server.",
+      "confirmFingerprintDeclined": "Nothing was saved — this device is not connected to that server. Come back once you have its certificate fingerprint.",
       "pinStatic": "Verified against Myne’s built-in certificate.",
       "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
       "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here — the page is only allowed to talk to this one address.",
@@ -3460,7 +3478,7 @@
       "committing": "Saving…",
       "copied": "Copied",
       "copy": "Copy",
-      "copyFailed": "Couldn't copy — use \u201cSave as file\u201d instead.",
+      "copyFailed": "Couldn't copy — use “Save as file” instead.",
       "eyebrow": "Step 4 of 4 — account number",
       "heading": "Save your account number.",
       "intro": "This is your bearer token — treat it like cash.",

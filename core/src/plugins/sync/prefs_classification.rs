@@ -110,6 +110,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "daily_template",
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
+    // myne#279. **Shared**, the `daily_date_format` class exactly: how a date is
+    // printed is taste, and a device-local value would mean re-choosing it on
+    // every new device.
+    (
+        "date_format",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     (
         "deliberate_folders",
         PrefClass::Shared(SharedDiscipline::SetUnion),
@@ -203,6 +210,21 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("startup_open", PrefClass::DeviceLocal),
     ("startup_open_note", PrefClass::DeviceLocal),
     ("theme", PrefClass::DeviceLocal),
+    // myne#279. **Shared**, same reasoning as `date_format` above — 12h vs 24h
+    // is taste, not a property of the machine.
+    (
+        "time_format",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
+    // myne#279. **DeviceLocal**, deliberately unlike its two display siblings.
+    // Two reasons point the same way. The right zone for a device is a property
+    // of where that device IS — a phone that travels and a desktop that does not
+    // should not have to agree — which is the `theme` argument, not the
+    // `daily_date_format` one. And an IANA zone is a coarse geolocation datum:
+    // `dialect/src/taskFields.ts` keeps it out of note bytes for exactly that
+    // reason, so putting it on the sync wire would give back at the prefs layer
+    // what the note layer refuses to leak.
+    ("timezone", PrefClass::DeviceLocal),
     // MYND-592. **Shared**, for the same reason as `show_task_marker` above and
     // deliberately unlike `ai_enabled` (DeviceLocal): that flag is device-local
     // because it gates a device-local model-path override, and this one gates a
@@ -260,6 +282,7 @@ mod tests {
             daily_date_format: _,
             daily_folder: _,
             daily_template: _,
+            date_format: _,
             deliberate_folders: _,
             developer_mode: _,
             device_names: _,
@@ -304,6 +327,8 @@ mod tests {
             startup_open: _,
             startup_open_note: _,
             theme: _,
+            time_format: _,
+            timezone: _,
             transcription_enabled: _,
             view_order: _,
         } = PrefsView::default();
@@ -330,6 +355,7 @@ mod tests {
             "daily_date_format",
             "daily_folder",
             "daily_template",
+            "date_format",
             "deliberate_folders",
             "developer_mode",
             "device_names",
@@ -374,6 +400,8 @@ mod tests {
             "startup_open",
             "startup_open_note",
             "theme",
+            "time_format",
+            "timezone",
             "transcription_enabled",
             "view_order",
         ];

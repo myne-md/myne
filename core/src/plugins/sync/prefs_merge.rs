@@ -297,6 +297,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // local value wins outright rather than merging.
         reminders_enabled: local.reminders_enabled,
         reminder_horizon_days: local.reminder_horizon_days,
+        // Device-local (myne#279): the right display zone is a property of where
+        // THIS device is, and an IANA zone is a coarse geolocation datum that
+        // `dialect/src/taskFields.ts` deliberately keeps out of note bytes.
+        timezone: local.timezone.clone(),
         show_task_marker: lww!("show_task_marker", show_task_marker),
         // MYND-592: shared for the same reason as `show_task_marker` — wanting
         // speech-to-text is taste, not device capability.
@@ -306,6 +310,11 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // stays device-local below, which is what keeps a synced `true` from
         // starting inference on a device that never opted into AI.
         auto_tag_enabled: lww!("auto_tag_enabled", auto_tag_enabled),
+        // myne#279: how a date and a time are PRINTED is taste, so both merge
+        // last-writer-wins alongside `daily_date_format`. `timezone` is the
+        // exception and stays device-local below — see its comment there.
+        date_format: lww!("date_format", date_format),
+        time_format: lww!("time_format", time_format),
         daily_date_format: lww!("daily_date_format", daily_date_format),
         daily_folder: lww!("daily_folder", daily_folder),
         daily_template: lww!("daily_template", daily_template),

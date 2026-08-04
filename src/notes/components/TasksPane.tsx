@@ -17,6 +17,7 @@ import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { TaskListPanel } from "./TaskListPanel";
 import { toggleTaskSwallowingRefusal } from "../toggleTask";
 import { TASK_FILTERS, todayLocal, type TaskFilter } from "../taskFilters";
+import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
 import { EMPTY_SCOPE, type TaskScope } from "../taskScope";
 import { useLiveVaultTasks, type VaultTask } from "../taskIndex";
 import { useWorkspace } from "../workspaceContext";
@@ -40,7 +41,9 @@ function asScope(raw: { folder?: string; tags?: readonly string[] } | undefined)
 export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceItem }): ReactElement {
   const ws = useWorkspace();
   const tasks = useLiveVaultTasks();
-  const today = useMemo(() => todayLocal(), []);
+  // myne#279: "today" follows the display timezone when one is set.
+  const { timeZone: zone } = useDateTimeDisplay();
+  const today = useMemo(() => todayLocal(new Date(), zone), [zone]);
 
   const persisted = item.kind === "tasks" ? item : undefined;
   const filter = asFilter(persisted?.taskFilter);
@@ -76,7 +79,8 @@ export function NoteTasksPanel(): ReactElement {
   const ws = useWorkspace();
   const all = useLiveVaultTasks();
   const { selectedId } = useSelectedNote();
-  const today = useMemo(() => todayLocal(), []);
+  const { timeZone: zone } = useDateTimeDisplay();
+  const today = useMemo(() => todayLocal(new Date(), zone), [zone]);
   const [filter, setFilter] = useState<TaskFilter>("all");
 
   // Every record already carries its note, so narrowing needs no new query

@@ -25,6 +25,7 @@ import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
 import { VimModeSettings } from "./VimModeSettings";
 import { ToolbarCustomizeSettings } from "./ToolbarCustomizeSettings";
+import { DateTimeSettings } from "./DateTimeSettings";
 import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
 import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
@@ -303,6 +304,10 @@ export function EditorPanel() {
         {/* Default view mode (reading-source-modes, MYND-299) — Live/Reading/
             Source a note opens in; per-tab override via ⇧⌘E. */}
         <DefaultViewModeSettings />
+        {/* Date, time and zone DISPLAY (myne#279) — the single home for how a
+            date is printed, replacing four surfaces that each decided for
+            themselves. Display only: note bytes stay zone-free wall-clock. */}
+        <DateTimeSettings />
         {/* Focus-mode behaviours (focus-mode, MYND-348) — typewriter scroll +
             dim inactive lines, honored when focus mode (⇧⌘F) is active. */}
         <FocusModeSettings />

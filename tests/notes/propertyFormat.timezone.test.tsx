@@ -26,6 +26,15 @@ describe("formatDateValue timezone-independence", () => {
     const { formatDateValue } = await import(
       "../../src/notes/views/propertyFormat"
     );
-    expect(formatDateValue("2026-06-11")).toBe("11 Jun 2026");
+    const { DEFAULT_DISPLAY } = await import("../../src/lib/datetimeFormat");
+    // The property under test is unchanged by myne#279 and is the reason the
+    // shared formatter keeps the UTC anchor: a civil date names a calendar day,
+    // not an instant, so it must not shift west of UTC.
+    expect(
+      formatDateValue("2026-06-11", { ...DEFAULT_DISPLAY, dateFormat: "iso" }),
+    ).toBe("2026-06-11");
+    expect(
+      formatDateValue("2026-06-11", { ...DEFAULT_DISPLAY, dateFormat: "dmy" }),
+    ).toBe("11/06/2026");
   });
 });
