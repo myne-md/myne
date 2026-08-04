@@ -7,7 +7,7 @@
 // the local edit pushes as a clean linear advance. Both revisions survive — no
 // edit is ever silently lost. Runs on mount + on every `sync://changed` event.
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { invoke } from "../platform/core";
 import { listen } from "../platform/event";
 import { createConflictCopy } from "../notes/conflictCopy";
@@ -23,6 +23,25 @@ function hexToUuid(h: string): string {
  * after at least one copy is created so the caller can refresh the note list.
  */
 export function useConflictMaterializer(onMaterialized?: () => void): void {
+  // myne#319 — `onMaterialized` arrives as a fresh closure on every render of
+  // the caller, so keeping it in the `materialize` dep list made `materialize`
+  // change identity on every render, which made the effect below tear down and
+  // re-run. Every autosave does that (`refreshOne` → new `SidebarState` → new
+  // provider value → `EditorChrome` re-render), as does every selection change,
+  // rename, trash and archive.
+  //
+  // The cost was not only churn: between the synchronous `unlisten()` in the
+  // cleanup and the resolution of the next `await listen(...)`, this subscriber
+  // is DEAF, so a `sync://changed` the background loop emitted in that window
+  // was dropped for the conflict drain. And none of it was gated on sync being
+  // configured, so a user with sync off paid an extra directory-listing IPC per
+  // keystroke burst too.
+  //
+  // The ref is the pattern the Editor's own `sync://changed` subscriber already
+  // uses for the same event — it subscribes once.
+  const onMaterializedRef = useRef(onMaterialized);
+  onMaterializedRef.current = onMaterialized;
+
   const materialize = useCallback(async () => {
     let ids: string[];
     try {
@@ -44,7 +63,7 @@ export function useConflictMaterializer(onMaterialized?: () => void): void {
       }
     }
     if (materializedAny) {
-      onMaterialized?.();
+      onMaterializedRef.current?.();
       // Push the new copy + the now-cleanly-advancing local edit.
       try {
         await invoke("plugin:sync|sync_now");
@@ -52,7 +71,7 @@ export function useConflictMaterializer(onMaterialized?: () => void): void {
         // The background loop will pick it up on its next tick.
       }
     }
-  }, [onMaterialized]);
+  }, []);
 
   useEffect(() => {
     void materialize();
