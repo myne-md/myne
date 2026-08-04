@@ -1,0 +1,32 @@
+/* Task-row chrome that inline styles cannot express (myne#284).
+ *
+ * `TaskRow` is otherwise styled entirely inline, which is deliberate — it is
+ * rendered by two clients through different bundlers and carries no class
+ * contract. A hit-area expander is the one thing that needs a real stylesheet:
+ * it is a `::before` pseudo-element, and React's `style` prop cannot reach one.
+ *
+ * Imported as a side effect by `TaskRow.tsx`, so every consumer of the row gets
+ * it without a second import to forget.
+ */
+
+/* The box is 14×14 CSS px — well under the iOS HIG 44 pt and Material 48 dp
+ * touch minimums, roughly a third of each linearly. On a phone that reads as
+ * "tapping it often misses, or opens the note instead of ticking the task".
+ *
+ * The size itself is right: the density is the point of the row, and it was
+ * chosen for a mouse. So the VISUAL box is untouched and a transparent expander
+ * carries the touch target out to 44×44. Gated on `pointer: coarse` so a mouse
+ * user's dense list keeps its exact click behaviour — an invisible 44 px target
+ * between rows this tight would start stealing clicks from neighbours. */
+@media (pointer: coarse) {
+  .myne-task-checkbox {
+    position: relative;
+  }
+
+  .myne-task-checkbox::before {
+    content: "";
+    position: absolute;
+    /* 14 + 2×15 = 44. */
+    inset: -15px;
+  }
+}

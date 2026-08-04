@@ -25,6 +25,7 @@
 import type { CSSProperties, KeyboardEvent, ReactElement } from "react";
 import i18n from "@myne/editor/i18n";
 import { TASK_CHIP_TOKEN, taskChipStyle } from "./taskChipToken";
+import "./task-row.css";
 import { formatStoredValue } from "../lib/datetimeFormat";
 import { useDateTimeDisplay } from "../lib/useDateTimeDisplay";
 
@@ -290,6 +291,10 @@ export function TaskRow({
         }
         title={task.oversized === true ? i18n.t("tasks.row.tooLongToWrite") : undefined}
         tabIndex={disabled ? -1 : 0}
+        // myne#284: the class carries a touch-only hit-area expander. The box
+        // stays 14×14 visually — the density is the point of this row — while
+        // a coarse pointer gets the 44×44 the platform minimums ask for.
+        className="myne-task-checkbox"
         style={boxStyle(task.completed, disabled)}
         data-testid={`${testIdPrefix}.checkbox`}
         onClick={toggle}
