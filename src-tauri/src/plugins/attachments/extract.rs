@@ -476,6 +476,23 @@ fn extract_xlsx_grid_inner(bytes: &[u8], max_rows: usize) -> Vec<Vec<String>> {
 /// (a `<c r="ZZZZZZZZ1">` names a ~2e11 column), so such cells are skipped.
 const XLSX_MAX_COLS: usize = 16_384;
 
+/// Columns the PREVIEW grid materializes, which is a different question from
+/// Excel's ceiling (myne#310).
+///
+/// [`XLSX_MAX_COLS`] bounds a single cell REFERENCE; it does nothing about the
+/// aggregate, and the row is padded out to the referenced index. So a ~1 KB
+/// crafted sheet whose every row carries one cell at `XFD` produced 16,384
+/// `String`s per row — 384 KiB for one value — and 1,000 of those rows are
+/// retained at once: ~375 MiB in the worker, then ~50 MB of JSON across IPC
+/// (16.4 M `""` entries the WebView must parse), then ~8.2 M synchronous `<td>`
+/// nodes, because the renderer clamps rows and not columns.
+///
+/// A 320 px-tall inline preview shows tens of columns. 256 is far past what any
+/// reader can see and four orders below the ceiling that was being honoured;
+/// beyond it the cells are dropped rather than the file rejected, matching the
+/// row cap's truncate-don't-fail posture.
+pub const XLSX_PREVIEW_MAX_COLS: usize = 256;
+
 /// Zero-based column index of an A1-style cell ref (`"B3"` → `Some(1)`), or
 /// `None` when the ref names a column past [`XLSX_MAX_COLS`] (the caller skips
 /// the cell). Non-alphabetic suffix (the row number) ends the run. The
@@ -584,7 +601,11 @@ fn parse_sheet_grid(xml: &str, shared: &[String], max_rows: usize) -> Vec<Vec<St
             Ok(Event::End(e)) => match e.local_name().as_ref() {
                 b"v" => in_value = false,
                 b"c" => {
-                    if let Some(col) = cur_col {
+                    // Past the preview width → drop the cell (myne#310). The
+                    // `Some(col)` from `col_index` only says the reference is a
+                    // legal Excel column; it is this bound that decides how wide
+                    // a row may actually be MATERIALIZED.
+                    if let Some(col) = cur_col.filter(|c| *c < XLSX_PREVIEW_MAX_COLS) {
                         let resolved = if cur_is_shared {
                             cur_value
                                 .trim()
@@ -1428,6 +1449,81 @@ mod tests {
         assert!(r.text.len() <= MAX_EXTRACTED_TEXT_LEN);
         // char_count reflects pre-truncation length.
         assert_eq!(r.char_count as usize, MAX_EXTRACTED_TEXT_LEN + 1000);
+    }
+
+    // ── myne#310: the preview grid is bounded in BOTH dimensions ───────────
+    //
+    // `XLSX_MAX_COLS` bounds one cell REFERENCE and says nothing about the
+    // aggregate: the row was padded out to whatever index the ref named, so a
+    // ~1 KB sheet whose every row carried one cell at `XFD` produced 16,384
+    // `String`s per row (384 KiB for one value), 1,000 rows retained at once
+    // (~375 MiB in the worker), ~50 MB of JSON across IPC, and ~8.2 M `<td>`
+    // appends in the WebView.
+    #[test]
+    fn a_single_far_column_cell_does_not_widen_the_row_to_the_excel_ceiling() {
+        // One cell at XFD (the 16,384th column) per row — the crafted shape.
+        let xml = "<worksheet><sheetData>\
+                   <row><c r=\"XFD1\"><v>1</v></c></row>\
+                   <row><c r=\"XFD2\"><v>2</v></c></row>\
+                   </sheetData></worksheet>";
+        let grid = parse_sheet_grid(xml, &[], 1000);
+        assert_eq!(grid.len(), 2);
+        for row in &grid {
+            assert!(
+                row.len() <= XLSX_PREVIEW_MAX_COLS,
+                "row materialized {} cells; the preview cap is {}",
+                row.len(),
+                XLSX_PREVIEW_MAX_COLS
+            );
+        }
+    }
+
+    #[test]
+    fn cells_inside_the_preview_width_are_kept_verbatim() {
+        // The cap must truncate the unreachable tail, not disturb real data.
+        let xml = "<worksheet><sheetData>\
+                   <row><c r=\"A1\"><v>10</v></c><c r=\"C1\"><v>30</v></c>\
+                   <c r=\"XFD1\"><v>lost</v></c></row>\
+                   </sheetData></worksheet>";
+        let grid = parse_sheet_grid(xml, &[], 1000);
+        assert_eq!(grid.len(), 1);
+        assert_eq!(grid[0][0], "10");
+        assert_eq!(grid[0][1], ""); // sparse fill, unchanged
+        assert_eq!(grid[0][2], "30");
+        assert_eq!(grid[0].len(), 3, "no padding past the last kept cell");
+    }
+
+    #[test]
+    fn the_last_column_inside_the_cap_is_still_materialized() {
+        // Off-by-one at the boundary: index 255 is in, 256 is out.
+        let inside = format!(
+            "<worksheet><sheetData><row><c r=\"{}1\"><v>x</v></c></row></sheetData></worksheet>",
+            col_name(XLSX_PREVIEW_MAX_COLS - 1)
+        );
+        let grid = parse_sheet_grid(&inside, &[], 10);
+        assert_eq!(grid[0].len(), XLSX_PREVIEW_MAX_COLS);
+        assert_eq!(grid[0][XLSX_PREVIEW_MAX_COLS - 1], "x");
+
+        let outside = format!(
+            "<worksheet><sheetData><row><c r=\"{}1\"><v>x</v></c></row></sheetData></worksheet>",
+            col_name(XLSX_PREVIEW_MAX_COLS)
+        );
+        let grid = parse_sheet_grid(&outside, &[], 10);
+        assert!(grid[0].is_empty());
+    }
+
+    /// Zero-based column index → its A1 letters (`0` → `A`, `26` → `AA`).
+    fn col_name(mut idx: usize) -> String {
+        let mut out = Vec::new();
+        loop {
+            out.push(b'A' + (idx % 26) as u8);
+            if idx < 26 {
+                break;
+            }
+            idx = idx / 26 - 1;
+        }
+        out.reverse();
+        String::from_utf8(out).expect("ascii")
     }
 
     // ── myne#309: the embedded-PDF-image inflate is bounded ────────────────
