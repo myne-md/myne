@@ -402,7 +402,7 @@ mod bootstrap_meta_tests {
     //! not — and this is where the three acceptance criteria about re-running
     //! actually live, so it is where they get asserted rather than argued.
 
-    use super::write_bootstrap_meta;
+    use super::{validate_fetched_meta, write_bootstrap_meta};
     use crate::plugins::sync::devices::SyncDeviceError;
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
     use crate::test_support::{ScopedTempDir, FAST_TEST_KDF};
@@ -552,6 +552,68 @@ mod bootstrap_meta_tests {
                 .expect_err("an unwritable path must fail");
             assert_eq!(err, SyncDeviceError::Internal);
         });
+    }
+    // ── myne#297: nothing is written before it is validated ─────────────────
+
+    /// Build a `vault.meta` whose KDF parameters are out of policy, the way a
+    /// hostile or broken server can. Structurally valid — `parse_vault_meta`
+    /// accepts it, because the protocol defers range checks to the derivation
+    /// site — which is exactly what made it reach the disk.
+    fn a_meta_with_out_of_policy_kdf() -> (Vec<u8>, [u8; 16]) {
+        let (bytes, hash) = a_meta("correct horse battery staple");
+        let mut bad = bytes.clone();
+        // `m_kib` sits in the 11-byte canonical KDF param block; drive it to 1,
+        // far below MIN_KDF_M_KIB, by rewriting the parsed value back out.
+        let meta = parse_vault_meta(&bad).expect("parse");
+        let mut params = meta.kdf_params;
+        params.m_kib = 1;
+        // Re-serialize by patching the same offsets the parser read from, so the
+        // rest of the record (magic, version, account hash, wraps) is untouched.
+        let patched = protocol::serialize_vault_meta(&protocol::VaultMeta {
+            kdf_params: params,
+            ..meta
+        });
+        bad.copy_from_slice(&patched);
+        (bad, hash)
+    }
+
+    #[test]
+    fn an_out_of_policy_kdf_is_refused_before_any_write() {
+        let (bad, hash) = a_meta_with_out_of_policy_kdf();
+        assert_eq!(
+            validate_fetched_meta(&bad, &hash).unwrap_err(),
+            SyncDeviceError::BadRequest,
+            "a server-supplied meta the unlock would refuse must never reach disk"
+        );
+    }
+
+    #[test]
+    fn a_meta_for_another_account_is_refused() {
+        // The check has to live at the fetch site: `write_bootstrap_meta`'s own
+        // account-hash arm never executes in the browser, because the container
+        // write ignores `replace: false`.
+        let (bytes, _hash) = a_meta("correct horse battery staple");
+        assert_eq!(
+            validate_fetched_meta(&bytes, &[0xAB; 16]).unwrap_err(),
+            SyncDeviceError::BadRequest,
+        );
+    }
+
+    #[test]
+    fn an_honest_meta_for_the_typed_account_passes() {
+        let (bytes, hash) = a_meta("correct horse battery staple");
+        assert!(validate_fetched_meta(&bytes, &hash).is_ok());
+    }
+
+    #[test]
+    fn garbage_is_refused_as_internal_not_as_a_bad_request() {
+        // A non-meta is not "your credentials are wrong" — keeping the two
+        // distinguishable is what stops the SYNC-8 banner sending the user round
+        // a loop that cannot terminate.
+        assert_eq!(
+            validate_fetched_meta(b"not a vault meta", &[0u8; 16]).unwrap_err(),
+            SyncDeviceError::Internal,
+        );
     }
 }
 
@@ -1481,6 +1543,45 @@ async fn write_bootstrap_meta(
     Ok(())
 }
 
+/// Everything that must be true of a server-supplied `vault.meta` BEFORE a byte
+/// of it is written (myne#297).
+///
+/// `parse_vault_meta` deliberately does not range-check `kdf_params` — the
+/// protocol defers that to the derivation site. So a structurally valid meta
+/// with out-of-policy parameters parsed fine, was persisted, and only then met
+/// `validate_kdf_params` inside the unlock, which refused it.
+///
+/// On the web that is durable and self-trapping. The container reports `Exists`
+/// on presence alone, so after any reload the client routes to Unlock rather
+/// than back to the join screen; the unlock returns `InvalidVaultMeta`, the
+/// corrupted surface renders, and its only CTA is a reload that lands on the
+/// same screen. The join flow that would overwrite the poisoned copy is no
+/// longer reachable — even once the server behaves. Desktop is milder but not
+/// clean: it mints a fresh id per attempt, so each failed join leaves an orphan
+/// container the picker lists as a normal vault and that can never open.
+///
+/// **The write ORDER is the whole protection here**, because
+/// `write_bootstrap_meta`'s create-only guard and its account-hash arm are both
+/// inert in the browser: the container write ignores `replace: false`. So the
+/// account check lives here rather than only there — without it a second
+/// account's meta silently overwrites the resident one, beside the FIRST
+/// account's `notes/`.
+///
+/// The sibling enrol path already validates immediately after parsing and says
+/// why ("a hostile server could pin an absurd `m_kib` … the sync enroll path was
+/// the one gap"); this is the other half of that gap.
+fn validate_fetched_meta(
+    meta_bytes: &[u8],
+    account_hash: &[u8; 16],
+) -> Result<(), SyncDeviceError> {
+    let meta = parse_vault_meta(meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
+    validate_kdf_params(&meta.kdf_params).map_err(|_| SyncDeviceError::BadRequest)?;
+    if &meta.account_number_hash != account_hash {
+        return Err(SyncDeviceError::BadRequest);
+    }
+    Ok(())
+}
+
 pub async fn join_account_from_host(
     host: &dyn crate::host::HostCtx,
     io: &'static dyn crate::vault_io::VaultIo,
@@ -1560,7 +1661,31 @@ pub async fn join_account_from_host(
         })
         .await
         .map_err(|_| SyncDeviceError::Internal)??;
-    parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?; // must be real meta
+    // Validate BEFORE anything is written (myne#297).
+    //
+    // `parse_vault_meta` deliberately does not range-check `kdf_params` — the
+    // protocol defers that to the derivation site. So a structurally valid meta
+    // with out-of-policy parameters parsed fine here, was PERSISTED on the next
+    // few lines, and only then met `validate_kdf_params` inside the unlock,
+    // which refused it.
+    //
+    // On the web that is durable and self-trapping. The container reports
+    // `Exists` on presence alone, so after any reload the client routes to
+    // Unlock rather than back to the join screen; the unlock returns
+    // `InvalidVaultMeta`, the corrupted surface renders, and its only CTA is a
+    // reload that lands on the same screen. The join flow that would overwrite
+    // the poisoned copy is no longer reachable, even once the server behaves.
+    // The write-order IS the protection: `write_bootstrap_meta`'s create-only
+    // guard and its account-hash arm are inert in the browser, because the
+    // container write ignores `replace: false` — so nothing between the fetch
+    // and the write inspects the bytes at all. Desktop is milder but not clean:
+    // it mints a fresh id per attempt, so each failed join leaves an orphan
+    // container the picker lists as a normal vault and that can never open.
+    //
+    // The sibling enrol path already does exactly this and says why ("a hostile
+    // server could pin an absurd `m_kib` … the sync enroll path was the one
+    // gap"). This is the other half of that gap.
+    validate_fetched_meta(&meta_bytes, &account_hash)?;
 
     // 3. Mint a fresh local vault, write the fetched meta, and UNLOCK it (the
     //    normal password-unlock path derives root_key + items_key).
