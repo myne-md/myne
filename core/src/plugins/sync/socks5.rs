@@ -46,9 +46,24 @@ use std::time::Duration;
 
 /// SOCKS protocol version (RFC 1928 is 5, and this client speaks only 5).
 const VER: u8 = 0x05;
-/// Method `0x00`: no authentication. The proxy is a loopback process this app
-/// started; a credential between two processes under the same user would be
-/// theatre, and arti's SOCKS listener wants none.
+/// Method `0x00`: no authentication.
+///
+/// **Not a judgement that the channel needs none** (myne#380). The previous
+/// wording here — "a credential between two processes under the same user would
+/// be theatre" — described a unix socket, and this is a TCP port. A loopback
+/// TCP port carries no uid restriction by default on any desktop platform, so
+/// the listener answers *any* local peer that knocks, including one running as
+/// a different local user; it is materially weaker than this crate's other two
+/// local ingresses (`cli.sock`, `clipper.sock`, both `0600` via
+/// `src-tauri/src/uds.rs`). That sentence was the one a reviewer would read
+/// when deciding whether this door is already fenced, and it answered yes.
+///
+/// `0x00` is nonetheless the only method the listener accepts: arti's `proxy`
+/// offers no SOCKS authentication at all — it consumes RFC 1929's
+/// username/password field as a **stream-isolation token**, never as a
+/// credential — so there is nothing else to send and nothing would check it.
+/// The residual that leaves is recorded in `docs/threat-model.md` §7 under Tor
+/// routing mode.
 const METHOD_NO_AUTH: u8 = 0x00;
 /// The method the proxy returns when it accepts none of the ones offered.
 const METHOD_NONE_ACCEPTABLE: u8 = 0xFF;
