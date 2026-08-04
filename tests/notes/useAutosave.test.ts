@@ -663,3 +663,92 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     expect(saveImpl).toHaveBeenCalledWith("note-1", "initial edit", undefined);
   });
 });
+
+// ── myne#333: a follow-up save keeps the in-flight slot ────────────────────
+//
+// The latest-wins branch hands the slot to a follow-up fire and returns; the
+// outer `finally` then ran and ERASED that registration. Every guard keyed on
+// `inFlightRef` therefore saw an idle hook while a `note_update` was still in
+// flight: `flushIfDirty` resolved, so the close paths proceeded — the web
+// `pagehide` chain discards the page, the desktop close-intercept calls
+// `destroy()` — taking the aborted IPC and the keystrokes typed during the first
+// save with them. And `fireSave` re-entered instead of joining, so a SECOND
+// concurrent write ran for the same note.
+describe("the latest-wins follow-up (myne#333)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("flushIfDirty awaits the follow-up, not just the first save", async () => {
+    const first = defer();
+    const second = defer();
+    const saveImpl = vi
+      .fn<(id: string, body: string) => Promise<string>>()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "v0" } },
+    );
+    rerender({ body: "v1" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    expect(saveImpl).toHaveBeenCalledTimes(1);
+
+    // The user types through the save, so the resolve schedules a follow-up.
+    rerender({ body: "v2" });
+    await act(async () => {
+      first.resolve("v1");
+      await first.promise;
+    });
+    expect(saveImpl).toHaveBeenCalledTimes(2);
+
+    // A close/lock flush now must WAIT for the follow-up.
+    let flushed = false;
+    await act(async () => {
+      void result.current.flushIfDirty().then(() => {
+        flushed = true;
+      });
+      await Promise.resolve();
+    });
+    expect(flushed).toBe(false);
+
+    await act(async () => {
+      second.resolve("v2");
+      await second.promise;
+      await Promise.resolve();
+    });
+    expect(flushed).toBe(true);
+  });
+
+  it("does not start a THIRD concurrent write while the follow-up runs", async () => {
+    const first = defer();
+    const second = defer();
+    const saveImpl = vi
+      .fn<(id: string, body: string) => Promise<string>>()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "v0" } },
+    );
+    rerender({ body: "v1" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    rerender({ body: "v2" });
+    await act(async () => {
+      first.resolve("v1");
+      await first.promise;
+    });
+
+    // Retry while the follow-up is in flight must no-op, not fire again.
+    act(() => result.current.retry());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(saveImpl).toHaveBeenCalledTimes(2);
+  });
+});

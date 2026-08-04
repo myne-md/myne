@@ -315,6 +315,12 @@ export function useAutosave(
     }
     const bodyAtFire = latestBodyRef.current;
     setStatus({ status: "saving" });
+    // Set when the latest-wins branch below hands the in-flight slot to a
+    // follow-up fire (myne#333). Without it the outer `finally` ran after that
+    // branch's `return` and ERASED the follow-up's registration, so every guard
+    // that keys on `inFlightRef` — `flushIfDirty`, `retry`, the unmount cleanup
+    // — saw an idle hook while a `note_update` was still in flight.
+    let handedOff = false;
     const promise = (async () => {
       try {
         // §11.3 expected-base fingerprint: hash of the body this hook
@@ -355,7 +361,21 @@ export function useAutosave(
           setStatus({ status: "saving" });
           inFlightRef.current = null;
           dirtyRef.current = true;
-          // Fire the follow-up.
+          // Fire the follow-up, and tell the `finally` that the slot now
+          // belongs to it (myne#333).
+          //
+          // What the erased registration cost: `flushIfDirty` resolved while
+          // the follow-up `note_update` was still in flight, so the close paths
+          // proceeded — the web `pagehide` chain discards the page and the
+          // desktop close-intercept calls `destroy()`, taking the aborted IPC
+          // and the keystrokes typed during the first save with them. And
+          // `fireSave` re-entered instead of joining, so a SECOND concurrent
+          // `note_update` ran for the same note: with sync on both declare the
+          // same expected-base hash, so the one landing second is rejected
+          // `BaseMismatch` and mints a keep-both conflict copy for a note no
+          // remote writer ever touched; with sync off both are hashless, so an
+          // out-of-order landing writes the older body over the newer.
+          handedOff = true;
           void fireSave();
           return;
         }
@@ -410,7 +430,8 @@ export function useAutosave(
         dirtyRef.current = true;
         setStatus({ status: "error", error: err });
       } finally {
-        inFlightRef.current = null;
+        // Only when this invocation still owns the slot — see `handedOff`.
+        if (!handedOff) inFlightRef.current = null;
       }
     })();
     inFlightRef.current = promise;
