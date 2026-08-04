@@ -5,8 +5,10 @@
 #
 # A NEW local mobile plugin (not a `myne-core` re-export): it drives the shared
 # BM25 engine (`myne_core::search::SearchIndexState`), but the index is
-# frontend-fed — the WebView pushes the whole `(id, title, body)` corpus down
-# via `search_index_replace` and queries it via `note_search`. The index is
+# frontend-fed — the WebView seeds the whole `(id, title, body)` corpus via
+# `search_index_replace` on unlock, carries per-note deltas after that via
+# `search_index_apply` / `search_index_remove`, and queries it via
+# `note_search`. The index is
 # plaintext-derived, session-only RAM (managed in `lib.rs` setup); no persisted
 # MYS1 blob is written on mobile. These are write/query commands →
 # main-window-only invariant.
@@ -17,6 +19,8 @@
 description = "Default permission set for the mobile search plugin — WebView-fed index rebuild + BM25 query."
 permissions = [
   "allow-search-index-replace",
+  "allow-search-index-apply",
+  "allow-search-index-remove",
   "allow-note-search",
 ]
 
@@ -24,6 +28,16 @@ permissions = [
 identifier = "allow-search-index-replace"
 description = "Allow invoking search:search_index_replace (bulk, atomic rebuild of the live in-RAM BM25 index from the WebView's full note corpus — the mobile client already holds every note's plaintext, so it feeds the (id, title, body) list directly; not slot-gated)."
 commands.allow = ["search_index_replace"]
+
+[[permission]]
+identifier = "allow-search-index-apply"
+description = "Allow invoking search:search_index_apply (per-note delta re-index — replace-semantics upsert of each listed (id, title, body) into the live in-RAM BM25 index, leaving the rest of the corpus untouched; batched so one sweep is one round-trip; not slot-gated)."
+commands.allow = ["search_index_apply"]
+
+[[permission]]
+identifier = "allow-search-index-remove"
+description = "Allow invoking search:search_index_remove (drop the listed note ids from the live in-RAM BM25 index; no-op per absent id; the delete half of search_index_apply, without which a purged note keeps matching queries until the next full replace)."
+commands.allow = ["search_index_remove"]
 
 [[permission]]
 identifier = "allow-note-search"

@@ -5,9 +5,13 @@
 //! Unlike desktop — where the notes lifecycle hooks feed the index Rust-side
 //! from decrypted `.myn` blobs — mobile is **frontend-fed**: the WebView
 //! already holds every note's plaintext (it crossed IPC as note bodies), so it
-//! pushes the whole `(id, title, body)` corpus down via `search_index_replace`
-//! and queries it via `note_search`. No Rust-side decryption / hydrate path is
-//! needed, and no persisted `vault.search` (MYS1) blob is written on mobile —
+//! pushes `(id, title, body)` down and queries the result via `note_search`.
+//! It feeds the corpus in two modes: `search_index_replace` seeds the whole
+//! index after unlock, and `search_index_apply` / `search_index_remove` carry
+//! the per-note delta after that (myne-mobile#41 — feeding the whole corpus on
+//! every save made one note's edit cost work proportional to the vault). No
+//! Rust-side decryption / hydrate path is needed, and no persisted
+//! `vault.search` (MYS1) blob is written on mobile —
 //! the index is a live, session-only, plaintext-derived RAM structure rebuilt
 //! from the WebView on each unlock.
 //!
@@ -76,6 +80,35 @@ fn search_index_replace(
     Ok(())
 }
 
+/// `search_index_apply` — re-index just the notes that changed, leaving the
+/// rest of the corpus untouched (myne-mobile#41). The engine's per-document
+/// `upsert` is replace-semantics per id, so one call fully overwrites each
+/// listed note's terms — the same primitive the desktop feeds from its note
+/// write hooks. Takes a batch rather than a single doc so a sweep costs one
+/// round-trip no matter how many notes moved.
+///
+/// `search_index_replace` stays the corpus-level verb: it is what seeds the
+/// index after unlock, when there is no prior state to delta against.
+/// Not slot-gated, for the same reason as its two siblings.
+#[tauri::command]
+fn search_index_apply(docs: Vec<SearchDoc>, search: State<'_, SearchIndexState>) -> Result<(), ()> {
+    for d in docs {
+        search.upsert(&d.id, &d.title, &d.body);
+    }
+    Ok(())
+}
+
+/// `search_index_remove` — drop notes from the live index by id (no-op per
+/// absent id). The delete half of `search_index_apply`: without it a purged
+/// note keeps matching queries until the next full replace.
+#[tauri::command]
+fn search_index_remove(ids: Vec<String>, search: State<'_, SearchIndexState>) -> Result<(), ()> {
+    for id in ids {
+        search.remove(&id);
+    }
+    Ok(())
+}
+
 /// `note_search` — BM25 full-text search over the live in-RAM index. Returns
 /// the top-`NOTE_SEARCH_RESULT_CAP` hits, highest score first (as the engine
 /// ranks them). Empty on an empty/absent index. Never logs the query.
@@ -102,6 +135,11 @@ fn note_search(
 /// plugin holds no plugin-private state of its own.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("search")
-        .invoke_handler(tauri::generate_handler![search_index_replace, note_search])
+        .invoke_handler(tauri::generate_handler![
+            search_index_replace,
+            search_index_apply,
+            search_index_remove,
+            note_search
+        ])
         .build()
 }

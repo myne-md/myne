@@ -22,9 +22,12 @@ function hexToUuid(h: string): string {
 
 /**
  * Drains the engine's staged keep-both conflicts. `onMaterialized` is called
- * after at least one copy is created so the caller can refresh the note list.
+ * with the ids of the copies that were created, so the caller can splice those
+ * rows in rather than reloading the vault (myne-mobile#41). The copy is the ONLY
+ * note this writes — the local edit is left untouched and the shared
+ * orchestrator's other writes are prefs, not notes — so the id list is complete.
  */
-export function useConflictMaterializer(onMaterialized?: () => void): void {
+export function useConflictMaterializer(onMaterialized?: (createdIds: string[]) => void): void {
   const materialize = useCallback(async () => {
     let ids: string[];
     try {
@@ -32,21 +35,20 @@ export function useConflictMaterializer(onMaterialized?: () => void): void {
     } catch {
       return; // sync not configured / vault locked — nothing to do
     }
-    let materializedAny = false;
+    const created: string[] = [];
     for (const idHex of ids) {
       try {
         const remoteBody = await invoke<string>("plugin:sync|sync_take_conflict", {
           originalIdHex: idHex,
         });
-        await createConflictCopy(remoteBody, hexToUuid(idHex));
+        created.push(await createConflictCopy(remoteBody, hexToUuid(idHex)));
         await invoke("plugin:sync|sync_resolve_conflict", { originalIdHex: idHex });
-        materializedAny = true;
       } catch {
         // Leave this one staged; the next sync event retries it.
       }
     }
-    if (materializedAny) {
-      onMaterialized?.();
+    if (created.length > 0) {
+      onMaterialized?.(created);
       // Push the new copy + the now-cleanly-advancing local edit.
       try {
         await invoke("plugin:sync|sync_now");

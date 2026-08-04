@@ -21,9 +21,23 @@ export interface NoteSearchResult {
   score: number;
 }
 
-/** Replace the whole search index with the given corpus (atomic bulk swap). */
+/** Replace the whole search index with the given corpus (atomic bulk swap).
+ *  The SEED, used once per unlock — feeding the corpus on every save is what
+ *  made one note's edit cost work proportional to the vault (myne-mobile#41). */
 export function searchIndexReplace(docs: SearchDoc[]): Promise<void> {
   return invoke("plugin:search|search_index_replace", { docs });
+}
+
+/** Re-index just the notes that changed (replace-semantics per id), leaving the
+ *  rest of the corpus in place. Batched so one sweep is one round-trip. */
+export function searchIndexApply(docs: SearchDoc[]): Promise<void> {
+  return invoke("plugin:search|search_index_apply", { docs });
+}
+
+/** Drop notes from the index by id — without this a purged note keeps matching
+ *  queries until the next full replace. */
+export function searchIndexRemove(ids: string[]): Promise<void> {
+  return invoke("plugin:search|search_index_remove", { ids });
 }
 
 /** Query the index; ≤50 hits, highest BM25 score first. */
