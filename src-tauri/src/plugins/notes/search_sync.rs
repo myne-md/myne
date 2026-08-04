@@ -753,4 +753,73 @@ mod tests {
             ));
         });
     }
+
+    // ── myne#307: an out-of-band MYE1 write must reach DISK, not just RAM ───
+    //
+    // `refresh_attachment_docs_for` is a LIVE-index patch, and the note whose
+    // `att:` docs it rebuilds is never re-saved — a MYE1 cache write does not
+    // touch the note's `content_nonce`. So without a persist the extracted text
+    // is findable for exactly one session: an idle auto-lock (default 300 s)
+    // zeroizes the index and deliberately skips persist, and the next unlock
+    // cannot recover it, because hydrate skips the note (nonce unchanged) while
+    // the OCR backlog skips the attachment (its cache exists). The bytes sit on
+    // disk, unreachable, until an unrelated `extractor_version` bump.
+    //
+    // Source-level because the defect is an ABSENT line at a call site, in
+    // functions that need a live `AppHandle`, an OCR engine and a model on disk
+    // to drive. A unit test of either producer would need all three and would
+    // still not see the missing statement. This sees exactly it, and it
+    // generalises: a THIRD out-of-band producer gets held to the same rule.
+    #[test]
+    fn every_out_of_band_attachment_doc_refresh_is_followed_by_a_persist() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).expect("read src tree") {
+                let p = e.expect("dir entry").path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        walk(&root, &mut files);
+
+        let mut checked = 0usize;
+        for path in files {
+            // The definition's own file is not a call site.
+            if path.ends_with("search_sync.rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).expect("read source");
+            let mut from = 0usize;
+            while let Some(rel) = text[from..].find("refresh_attachment_docs_for(") {
+                let at = from + rel;
+                from = at + 1;
+                // Skip a prose mention inside a comment line.
+                let line_start = text[..at].rfind('\n').map_or(0, |i| i + 1);
+                if text[line_start..at].trim_start().starts_with("//") {
+                    continue;
+                }
+                checked += 1;
+                // The persist must follow, in the same function. A generous
+                // window rather than an exact next-statement match: the OCR
+                // producer's is at the end of the enclosing loop's function,
+                // several statements and a long comment later.
+                let after = &text[at..];
+                let persist = after.find("persist_search_index(");
+                assert!(
+                    persist.is_some(),
+                    "{}: a live-index attachment-doc refresh is not followed by a \
+                     persist — the extracted text will not survive the session",
+                    path.display()
+                );
+            }
+        }
+        assert!(
+            checked >= 2,
+            "expected to find the OCR-backlog and transcript producers; found {checked}"
+        );
+    }
 }

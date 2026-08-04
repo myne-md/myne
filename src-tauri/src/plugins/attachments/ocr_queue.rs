@@ -218,6 +218,30 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         // interactive work on the runtime.
         tokio::task::yield_now().await;
     }
+    // Make the drain DURABLE (myne#307).
+    //
+    // `refresh_attachment_docs_for` above patches the LIVE index only, and the
+    // note's own `.myn` is never rewritten — the MYE1 cache write does not touch
+    // its `content_nonce`. So the extracted text existed only in RAM until the
+    // next free-running 120 s flush. An idle auto-lock in that window zeroizes
+    // the index and deliberately skips persist, and the next unlock then
+    // reasons: hydrate sees the note's nonce unchanged and never re-derives its
+    // `att:` docs, while `collect_candidates` sees the MYE1 cache present and
+    // never re-OCRs it. The text was on disk and unreachable — findable for one
+    // session, then gone across every later one, with nothing to say so.
+    //
+    // One persist per DRAIN, not per item: the snapshot is the whole blob, and
+    // rewriting it once per attachment would be quadratic on a large vault.
+    //
+    // Residual window, stated rather than papered over: a crash or a lock that
+    // interrupts the loop still loses the items already extracted this pass —
+    // the lock arm above returns with the keys already gone, so there is no
+    // persist it could do. Closing that needs an attachment-side staleness
+    // signal in the snapshot (so hydrate can re-derive an unchanged note's
+    // `att:` docs), which is a persisted-format change.
+    if done > 0 {
+        crate::plugins::notes::search_sync::persist_search_index(app, state).await;
+    }
     tracing::info!(event = "ocr_backlog_done", done);
     emit_progress(app, 0, done);
 }
