@@ -31,17 +31,46 @@ import { join } from "node:path";
 const DIST = process.argv[2] ?? "web/dist";
 
 /**
+ * The Worker host bridges the wasm module resolves by exact namespace
+ * (`web/wasm/src/{opfs,sync_transport,attachment_url}.rs` — `js_namespace =
+ * ["globalThis", "__myne…"]`). Each is a required IO seam, not a hook — but each
+ * is also exactly the shape a hook would take, so a FOURTH one has to be argued
+ * for here rather than pass silently. That cost is deliberate.
+ *
+ * Name-exact on purpose: `__myneOpfsDebug` is not `__myneOpfs`.
+ */
+const ALLOWED_GLOBALS = new Set(["__myneOpfs", "__myneSyncHttp", "__myneAttachmentUrl"]);
+
+/**
  * Patterns that would each be a backdoor, with what each one is.
  *
  * Deliberately NOT a generic "any `window.__*`" scan: minifiers emit
  * double-underscore names of their own, and a guard that cries wolf on those
  * gets an allowlist and then gets ignored. Each entry here names a shape this
  * project would plausibly reach for.
+ *
+ * The `__myne*` entry is NOT that generic scan (#387). It names this project's
+ * own namespace, which no minifier emits, and its legitimate members are
+ * enumerated in `ALLOWED_GLOBALS` rather than implied by a shape. It used to
+ * read `window.__myne` — a spelling that appears nowhere in this tree except
+ * that line, while three `globalThis.__myne*` bridges ship — so the repo's only
+ * artefact-level control on the TB11 delivery channel would have waved through a
+ * diagnostic hook written in the codebase's own idiom. In a page context
+ * `globalThis === window`, so the host object was never the discriminator.
+ *
+ * No `window|globalThis|self` prefix is required, for the same reason the
+ * namespace is safe to match bare: a minifier that aliases `globalThis` to a
+ * short identifier would blind a prefixed pattern, and the bare one finds
+ * exactly the same names today.
  */
 const FORBIDDEN = [
   [/window\.__test\b/, "`window.__test` — the classic hook the desktop lane's rule names"],
   [/__TEST_HOOKS__/, "a `__TEST_HOOKS__` bag"],
-  [/window\.__myne\b/i, "a `window.__myne` escape hatch"],
+  [
+    /(__myne[A-Za-z0-9_$]*)/g,
+    "a `__myne*` escape hatch reaching the bundle",
+    ALLOWED_GLOBALS,
+  ],
   [
     /["'`]\?test-stage=/,
     "a `?test-stage=` query-parameter backdoor — `src/CLAUDE.md` records that this " +
@@ -75,8 +104,25 @@ function files(dir) {
 const hits = [];
 for (const file of files(DIST)) {
   const text = readFileSync(file, "utf8");
-  for (const [re, why] of FORBIDDEN) {
-    if (re.test(text)) hits.push({ file, why });
+  for (const [re, why, allowed] of FORBIDDEN) {
+    if (!allowed) {
+      if (re.test(text)) hits.push({ file, why });
+      continue;
+    }
+    // Allowlisted patterns are decided by the IDENTIFIER, not by the shape —
+    // the pattern matches every member of the namespace so a new one cannot
+    // hide, and only the named bridges are dropped. Naming the offender is what
+    // makes the failure actionable: "a `__myne*` escape hatch" alone does not
+    // tell the developer which name to argue for.
+    // One hit per distinct IDENTIFIER per file, rather than the one-per-pattern
+    // the boolean arm above gives: the question an allowlist failure asks is
+    // which NAMES to argue for, and stopping at the first hides the rest.
+    const named = new Set();
+    for (const m of text.matchAll(re)) {
+      if (allowed.has(m[1]) || named.has(m[1])) continue;
+      named.add(m[1]);
+      hits.push({ file, why: `${why} — \`${m[1]}\`` });
+    }
   }
 }
 

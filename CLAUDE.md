@@ -98,7 +98,7 @@ Most of `scripts/` is not tooling — it is the machine-checked half of the rule
 
 | Guard | Enforces | Fires in |
 |---|---|---|
-| `check-platform-seam.mjs` | `src/platform/` is the only place under `src/` importing `@tauri-apps/*`; `editor/`, `dialect/`, `copy/` get **zero** Tauri imports | `pre-commit` + CI `pnpm-build` |
+| `check-platform-seam.mjs` | `src/platform/` is the only place under `src/` importing `@tauri-apps/*`; `editor/`, `dialect/`, `copy/` get **zero** Tauri imports. Covers the runtime global (`__TAURI…__`) too, which is not a module specifier and so slipped the import rule — `src/lib/app-window.ts`'s boot probe is the one exemption; `e2e/` is outside the guarded roots and `pageSeatInvoke` stays sanctioned there | `pre-commit` + CI `pnpm-build` |
 | `check-core-task-seam.mjs` | `crate::task` is the only place in `core/` reaching tokio's *execution* surface (`spawn_blocking` compiles for wasm32 and panics at runtime) | `pre-commit` + CI `pnpm-build` |
 | `check-core-io-seam.mjs` | filesystem ratchet: a `core/src` file not on the recorded list may not start using `std::fs`, and one that leaves may not come back | `pre-commit` + CI `pnpm-build` |
 | `check-web-command-coverage.mjs` | every `plugin:<x>\|<y>` literal in the shared tree is classified in `web/wasm/src/capability.rs` — dispatched, absent-on-web, or a port still owed | `pre-commit` + CI `pnpm-build`, `web-build` |
@@ -116,7 +116,7 @@ Most of `scripts/` is not tooling — it is the machine-checked half of the rule
 | `wasm-repro-check.sh` | the wasm artefact rebuilds byte-identically (double build, `wasm-bindgen-cli` version read from the lock, never hardcoded). It runs here rather than only locally because CI is a *different* machine — that difference is most of the value. `threat-model.md` §6's substitute for the missing audit; against A15/TB11 a bundle hash nobody else can reproduce is a number the publisher asserts about itself | CI `wasm-protocol` |
 | `check-web-third-party.mjs` | zero third-party origins in the web bundle | CI `web-build` |
 | `check-web-no-phrase.mjs` | the recovery phrase is **absent** from the served bundle, not merely hidden | CI `web-build` |
-| `check-web-no-test-hooks.mjs` | no production test hooks in the served bundle (a hook a scenario can call is a hook any script on the page can call) | CI `web-build` |
+| `check-web-no-test-hooks.mjs` | no production test hooks in the served bundle (a hook a scenario can call is a hook any script on the page can call). Any `__myne*` global in the bundle fails unless its exact name is on the guard's `ALLOWED_GLOBALS` — the three Worker↔wasm host bridges — so a fourth one costs a reviewer's argument rather than passing silently | CI `web-build` |
 | `check-web-bundle-budget.mjs` | first-load size ratchet, measured from a real build rather than invented | CI `web-build` |
 | `check-web-screens.mjs` / `check-web-surfaces.mjs` | every screen, and every `src/components/settings/`, `src/lib/`, `src/hooks/` module, carries a web verdict — and the excluded ones really are absent | CI `web-build` |
 | `check-web-testids.mjs` | every web-only rendering module has a testid, named `<screen>.<element>`, and no `data-*` on a pre-unlock web screen is fed a runtime expression (the account number is one keystroke from the DOM, screenshots and CI artefacts) | CI `web-build` |
