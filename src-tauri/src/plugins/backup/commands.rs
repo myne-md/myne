@@ -406,9 +406,18 @@ pub(crate) fn backup_runtime<R: Runtime>(app: &AppHandle<R>) -> tauri::State<'_,
 /// permit to free (`VaultRuntimeState::preempt_backup_for_user_auth`).
 ///
 /// Called from the editor-originated auth ops that can race a live scheduled
-/// backup — `change_password` and `vault_delete`. `unlock` / `vault_recover` /
-/// `vault_creation` deliberately do NOT call it: they run pre-editor, when no
-/// scheduled backup is live (Model A), so there is nothing to preempt.
+/// backup — `change_password`, `vault_delete`, and the quick-unlock
+/// setup/disable commands (Settings → Privacy).
+///
+/// `unlock` / `vault_recover` / `vault_creation` and the quick-unlock REDEEM
+/// path deliberately do NOT call it: they run pre-editor, when no scheduled
+/// backup is live (Model A), so there is nothing to preempt.
+///
+/// This roster is hand-maintained and nothing checks it. It is what tells the
+/// next author that an omission was a decision — the quick-unlock paths joined
+/// the `auth_permits` discipline in myne#378, and without the split above,
+/// adding the permit to setup would have turned "Set PIN" during a scheduled
+/// backup into a rejection.
 pub(crate) async fn preempt_inflight_backup_for_user_auth<R: Runtime>(
     state: &VaultRuntimeState,
     app: &AppHandle<R>,

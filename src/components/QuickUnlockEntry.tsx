@@ -123,6 +123,18 @@ export function QuickUnlockEntry({
         case "Cancelled":
           setNote(null);
           return;
+        // A host-side invariant, not a credential failure (myne#378): another
+        // auth op holds the capacity-1 `auth_permits` semaphore. No attempt was
+        // burned and the credential is intact, so keep offering it — folding it
+        // away would be wrong, and the `default:` copy ("Quick unlock failed.
+        // Use your password.") would tell the user their PIN was rejected.
+        //
+        // The UI already single-flights, so this is unreachable from this
+        // surface; the guard lives in the backend because page context is not
+        // trusted.
+        case "VaultBusyAuth":
+          setNote(t("unlock.errors.inProgress"));
+          return;
         default:
           setNote(t("unlock.quickUnlock.failed"));
           return;

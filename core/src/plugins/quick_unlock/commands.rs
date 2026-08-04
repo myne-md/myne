@@ -179,6 +179,24 @@ pub async fn setup_with_dir<P: QuickUnlockProvider + Send + 'static>(
     provider: P,
     account_number_hash: &[u8; 16],
 ) -> Result<(), QuickUnlockError> {
+    // `auth_permits` gate (myne#378). This runs the provider's 256 MiB Argon2id
+    // and then writes the blob; `change_password` holds the permit whole-body
+    // and its LAST act is `invalidate_quick_unlock`. A setup that read before
+    // that call and wrote after it re-created the credential the rotation was
+    // supposed to delete — and §9.14.4 lists the password change as one of four
+    // events that DELETE the credential. A raceable deletion is not a deletion.
+    let _permit = match state.auth_permits().try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::debug!(
+                stage = "auth_permits",
+                error_kind = "VaultBusyAuth",
+                "quick_unlock setup rejected: another auth-pipeline op in flight"
+            );
+            return Err(QuickUnlockError::VaultBusyAuth);
+        }
+    };
+
     let root_key = state
         .peek_unlocked_root_key_clone()
         .await
@@ -285,7 +303,28 @@ fn requires_full_unlock_first(provider_kind: u8) -> bool {
 
 /// Disable quick-unlock: remove the device-local files. OS-free — the
 /// [`quick_unlock_disable`] command layers the Apple-Keychain cleanup on.
-pub fn disable_with_dir(dir: &Path) -> Result<(), QuickUnlockError> {
+pub fn disable_with_dir(dir: &Path, state: &VaultRuntimeState) -> Result<(), QuickUnlockError> {
+    // `auth_permits` gate (myne#378), BEFORE the precondition — the same
+    // ordering `vault_delete_with_dir` uses, and for the same reason: never
+    // report "nothing to delete" while an operation you cannot see is running.
+    //
+    // Disable is a credential DELETION, and the interleave that matters fails
+    // OPEN: a disable landing between setup's blob write and its attempt-file
+    // write would leave a live credential after the user turned the feature off.
+    //
+    // `Semaphore::try_acquire` is synchronous, so this fn stays sync.
+    let _permit = match state.auth_permits().try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::debug!(
+                stage = "auth_permits",
+                error_kind = "VaultBusyAuth",
+                "quick_unlock disable rejected: another auth-pipeline op in flight"
+            );
+            return Err(QuickUnlockError::VaultBusyAuth);
+        }
+    };
+
     if !blob_path(dir).exists() {
         return Err(QuickUnlockError::NotConfigured);
     }
@@ -312,6 +351,29 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     hooks: &crate::hooks::Hooks,
     vault_io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), QuickUnlockError> {
+    // `auth_permits` gate — RAII guard; try_acquire, reject not queue (myne#378).
+    //
+    // This is a credential Argon2id that ALSO burns the §9.14.4 counter, so the
+    // counter's read-modify-write and the slot install have to share one
+    // critical section with every other auth op. Without it the read at
+    // `read_attempt_state` straddles the KDF await, and N overlapping redeems
+    // all persist the same k+1 — so the "code-enforced" five-attempt bound cost
+    // one try for N wrong PINs. It also stopped a redeem installing an
+    // `Unlocked` slot underneath a lifecycle op that holds the permit believing
+    // it is alone, which is what made `change_password`'s closing
+    // `invalidate_quick_unlock` raceable.
+    let _permit = match state.auth_permits().try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::debug!(
+                stage = "auth_permits",
+                error_kind = "VaultBusyAuth",
+                "quick_unlock rejected: another auth-pipeline op in flight"
+            );
+            return Err(QuickUnlockError::VaultBusyAuth);
+        }
+    };
+
     // Spring-loaded gate (task 9), narrowed to PIN in MYND-641: see
     // `requires_full_unlock_first` for why biometric is exempt. Read off the
     // PROVIDER, not the blob, so the check still costs no disk access — a
@@ -393,6 +455,16 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
                 );
             }
 
+            // Released before the pipeline, exactly where the password path
+            // releases it: `unlock_with_path` drops the permit on return and
+            // `unlock_from_host` runs the pipeline outside it. The critical
+            // section this permit exists for ended at the slot install; the
+            // pipeline below hydrates the whole search index, and holding a
+            // capacity-1 auth permit across a whole-vault walk would reject an
+            // unrelated backup or change-password for its duration — and would
+            // deadlock outright if a hook impl ever took the permit itself.
+            drop(_permit);
+
             // The slot is now `Unlocked`, so this path owes the same
             // post-unlock pipeline the password path runs — persisted prefs
             // (screen-capture protection above all), search + spell hydration,
@@ -469,7 +541,13 @@ pub async fn quick_unlock_setup_pin_from_host(
     pin: String,
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
 ) -> Result<(), QuickUnlockError> {
+    // MYND-351 Direction 2: this one is EDITOR-ORIGINATED (Settings → Privacy),
+    // so a live scheduled backup holding the shared permit must yield first —
+    // the same bridge `change_password` and `vault_delete` use. The redeem path
+    // is pre-editor and deliberately does not (Model A).
+    hooks.preempt_inflight_backup(state).await;
     let pin = Zeroizing::new(pin);
     validate_pin(&pin).map_err(map_pin_validation)?;
     let dir = active_dir(host, state).await?;
@@ -486,8 +564,9 @@ pub async fn quick_unlock_setup_pin<R: Runtime>(
     pin: String,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
 ) -> Result<(), QuickUnlockError> {
-    quick_unlock_setup_pin_from_host(pin, &TauriHost::new(app), state.inner()).await
+    quick_unlock_setup_pin_from_host(pin, &TauriHost::new(app), state.inner(), hooks.inner()).await
 }
 
 /// Attempt a PIN quick-unlock of the active vault.
@@ -538,9 +617,15 @@ pub async fn quick_unlock_with_pin<R: Runtime>(
 pub async fn quick_unlock_setup_biometric_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
 ) -> Result<(), QuickUnlockError> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
+        // MYND-351 Direction 2: this one is EDITOR-ORIGINATED (Settings → Privacy),
+        // so a live scheduled backup holding the shared permit must yield first —
+        // the same bridge `change_password` and `vault_delete` use. The redeem path
+        // is pre-editor and deliberately does not (Model A).
+        hooks.preempt_inflight_backup(state).await;
         let dir = active_dir(host, state).await?;
         let (_, meta) = read_meta(&dir)?;
         let id = crate::paths::vault_id_from_root(&dir);
@@ -549,7 +634,7 @@ pub async fn quick_unlock_setup_biometric_from_host(
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
-        let _ = (host, &state);
+        let _ = (host, &state, hooks);
         Err(QuickUnlockError::HardwareUnavailable)
     }
 }
@@ -561,8 +646,9 @@ pub async fn quick_unlock_setup_biometric_from_host(
 pub async fn quick_unlock_setup_biometric<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
 ) -> Result<(), QuickUnlockError> {
-    quick_unlock_setup_biometric_from_host(&TauriHost::new(app), state.inner()).await
+    quick_unlock_setup_biometric_from_host(&TauriHost::new(app), state.inner(), hooks.inner()).await
 }
 
 /// Attempt an Apple biometric quick-unlock of the active vault. (See the setup
@@ -647,10 +733,16 @@ pub async fn quick_unlock_status<R: Runtime>(
 pub async fn quick_unlock_disable_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
 ) -> Result<(), QuickUnlockError> {
+    // MYND-351 Direction 2: this one is EDITOR-ORIGINATED (Settings → Privacy),
+    // so a live scheduled backup holding the shared permit must yield first —
+    // the same bridge `change_password` and `vault_delete` use. The redeem path
+    // is pre-editor and deliberately does not (Model A).
+    hooks.preempt_inflight_backup(state).await;
     let dir = active_dir(host, state).await?;
     cleanup_os_credential(&dir);
-    disable_with_dir(&dir)
+    disable_with_dir(&dir, state)
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -660,8 +752,9 @@ pub async fn quick_unlock_disable_from_host(
 pub async fn quick_unlock_disable<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
 ) -> Result<(), QuickUnlockError> {
-    quick_unlock_disable_from_host(&TauriHost::new(app), state.inner()).await
+    quick_unlock_disable_from_host(&TauriHost::new(app), state.inner(), hooks.inner()).await
 }
 
 #[cfg(test)]
@@ -998,6 +1091,173 @@ mod tests {
         assert_eq!(material.as_slice(), &ROOT_KEY);
     }
 
+    // ── myne#378: the credential path joins the single-in-flight discipline ──
+
+    #[test]
+    fn quick_unlock_rejects_when_the_auth_permit_is_held() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("qu-busy-redeem").unwrap();
+            let dir = tmp.path();
+            write_sealed_meta(dir);
+            let setup_state = unlocked_state();
+            seed_unlocked(&setup_state, dir).await;
+            let good = MockProvider::new(PROVIDER_KIND_PIN, 0x11);
+            setup_with_dir(dir, &setup_state, good.clone(), &ACCOUNT_HASH)
+                .await
+                .expect("setup");
+
+            let fresh = unlocked_state();
+            fresh.mark_full_unlock_done();
+            // Another auth op holds the capacity-1 permit.
+            let _held = fresh.auth_permits().acquire().await.unwrap();
+
+            let err = quick_unlock_with_dir(
+                dir,
+                crate::paths::vault_id_from_root(dir),
+                &fresh,
+                good,
+                &crate::host::NoopHost,
+                &test_hooks(),
+                &test_io(),
+            )
+            .await
+            .unwrap_err();
+
+            assert_eq!(err, QuickUnlockError::VaultBusyAuth);
+            // Not a credential failure: the credential survives and no attempt
+            // was burned. That distinction is the whole reason the variant is
+            // its own rather than folding into `Backend`.
+            assert!(blob_path(dir).exists());
+            assert_eq!(read_attempt_state(dir).count(), 0);
+        })
+    }
+
+    /// The lost-update gate: an attempt that RUNS the credential is counted
+    /// exactly once, and one that never reaches it is not counted at all.
+    ///
+    /// The defect was a read-modify-write straddling the KDF await — two
+    /// redeems both read count 0, both ran ~1 s of Argon2id, and both persisted
+    /// the same value — so five wrong PINs could cost one of the five allowed
+    /// tries, which is what made §9.14.4's "code-enforced" bound weaker than a
+    /// reader assumes.
+    ///
+    /// Expressed by HOLDING the permit rather than racing two live futures.
+    /// `tokio::join!` needs tokio's `macros` feature, which would add a
+    /// proc-macro crate to the graph for one test — and holding the permit is
+    /// exactly the state a first redeem puts the second one in, so the property
+    /// is the same and the test is deterministic rather than timing-shaped.
+    #[test]
+    fn every_rejected_credential_attempt_is_counted_once() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("qu-count-once").unwrap();
+            let dir = tmp.path();
+            write_sealed_meta(dir);
+            let setup_state = unlocked_state();
+            seed_unlocked(&setup_state, dir).await;
+            setup_with_dir(
+                dir,
+                &setup_state,
+                MockProvider::new(PROVIDER_KIND_PIN, 0x11),
+                &ACCOUNT_HASH,
+            )
+            .await
+            .expect("setup");
+
+            let bad = MockProvider::new(PROVIDER_KIND_PIN, 0x22);
+            let fresh = unlocked_state();
+            fresh.mark_full_unlock_done();
+            let id = crate::paths::vault_id_from_root(dir);
+            let hooks = test_hooks();
+            let io = test_io();
+            let attempt = |provider: MockProvider| {
+                quick_unlock_with_dir(
+                    dir,
+                    id,
+                    &fresh,
+                    provider,
+                    &crate::host::NoopHost,
+                    &hooks,
+                    &io,
+                )
+            };
+
+            // A redeem is in flight (its permit is held): the second one never
+            // reaches the credential, so it must not touch the counter.
+            let held = fresh.auth_permits().acquire().await.unwrap();
+            assert_eq!(
+                attempt(bad.clone()).await.unwrap_err(),
+                QuickUnlockError::VaultBusyAuth
+            );
+            assert_eq!(read_attempt_state(dir).count(), 0);
+
+            // Released: this one runs the credential, and advances the count by
+            // exactly one.
+            drop(held);
+            assert_eq!(
+                attempt(bad).await.unwrap_err(),
+                QuickUnlockError::WrongCredential { remaining: 4 }
+            );
+            assert_eq!(read_attempt_state(dir).count(), 1);
+        })
+    }
+
+    #[test]
+    fn setup_rejects_when_the_auth_permit_is_held() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("qu-busy-setup").unwrap();
+            let dir = tmp.path();
+            write_sealed_meta(dir);
+            let setup_state = unlocked_state();
+            seed_unlocked(&setup_state, dir).await;
+            let _held = setup_state.auth_permits().acquire().await.unwrap();
+
+            let err = setup_with_dir(
+                dir,
+                &setup_state,
+                MockProvider::new(PROVIDER_KIND_PIN, 0x11),
+                &ACCOUNT_HASH,
+            )
+            .await
+            .unwrap_err();
+
+            assert_eq!(err, QuickUnlockError::VaultBusyAuth);
+            // The point: no credential was written underneath a
+            // `change_password` that is about to invalidate it.
+            assert!(!blob_path(dir).exists());
+        })
+    }
+
+    #[test]
+    fn disable_rejects_when_the_auth_permit_is_held() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("qu-busy-disable").unwrap();
+            let dir = tmp.path();
+            write_sealed_meta(dir);
+            let setup_state = unlocked_state();
+            seed_unlocked(&setup_state, dir).await;
+            setup_with_dir(
+                dir,
+                &setup_state,
+                MockProvider::new(PROVIDER_KIND_PIN, 0x11),
+                &ACCOUNT_HASH,
+            )
+            .await
+            .expect("setup");
+
+            let _held = setup_state.auth_permits().acquire().await.unwrap();
+            assert_eq!(
+                disable_with_dir(dir, &setup_state),
+                Err(QuickUnlockError::VaultBusyAuth)
+            );
+            // Permit-before-precondition: the credential is untouched, and on a
+            // vault with none the answer would be `VaultBusyAuth` rather than
+            // `NotConfigured` — the same ordering `vault_delete` uses, and the
+            // safer direction (never report "nothing to delete" while an
+            // operation you cannot see is running).
+            assert!(status_with_dir(dir).configured);
+        })
+    }
+
     #[test]
     fn wrong_credential_counts_then_wipes_at_the_cap() {
         rt().block_on(wrong_credential_counts_then_wipes_at_the_cap_inner())
@@ -1146,9 +1406,12 @@ mod tests {
         .expect("setup");
         assert!(status_with_dir(dir).configured);
 
-        disable_with_dir(dir).expect("disable");
+        disable_with_dir(dir, &setup_state).expect("disable");
         assert!(!status_with_dir(dir).configured);
-        assert_eq!(disable_with_dir(dir), Err(QuickUnlockError::NotConfigured));
+        assert_eq!(
+            disable_with_dir(dir, &setup_state),
+            Err(QuickUnlockError::NotConfigured)
+        );
     }
 
     #[test]

@@ -61,6 +61,11 @@ function errorMessage(e: unknown): string {
         return i18n.t("settings.quickUnlock.errorHardwareUnavailable");
       case "Cancelled":
         return i18n.t("settings.quickUnlock.errorCancelled");
+      // Setup and disable take the auth permit now (myne#378). The `default:`
+      // copy is "Could not configure quick unlock.", which tells the user to
+      // give up on a state that clears in seconds.
+      case "VaultBusyAuth":
+        return i18n.t("settings.quickUnlock.errorBusy");
       case "NotUnlocked":
         return i18n.t("settings.quickUnlock.errorNotUnlocked");
       default:

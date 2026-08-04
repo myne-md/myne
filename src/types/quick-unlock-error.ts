@@ -1,5 +1,6 @@
 // Manual TS mirror of the Rust `QuickUnlockError` enum
-// (`src-tauri/src/plugins/quick_unlock/error.rs`, MYND-329).
+// (`core/src/plugins/quick_unlock/error.rs`, MYND-329 — the enum moved to
+// `myne-core`; the desktop path is now only a `pub use` re-export).
 //
 // Same hand-mirror discipline as `vault-unlock-error.ts` (a `ts-rs`
 // codegen + CI drift check is the Phase-1-end follow-up). Every variant
@@ -15,6 +16,11 @@ import type { IoFailureKind } from "./vault-unlock-error";
 
 /** Discriminated union mirroring `QuickUnlockError`. */
 export type QuickUnlockError =
+  /** Another auth-pipeline op holds the capacity-1 `auth_permits` semaphore
+   *  (myne#378). NOT a credential failure: no attempt was burned and the
+   *  credential is intact, so the copy is "operation in progress" and the
+   *  affordance stays. */
+  | { kind: "VaultBusyAuth" }
   | { kind: "NotUnlocked" }
   | { kind: "NotConfigured" }
   | { kind: "RequiresFullPassword" }
