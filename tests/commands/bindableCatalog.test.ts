@@ -8,7 +8,8 @@
 // MIN_PASSWORD_LEN Rust↔TS mirror check.
 
 import { describe, it, expect } from "vitest";
-import { BINDABLE_COMMANDS } from "../../src/commands/bindableCatalog";
+import { BINDABLE_COMMANDS, catalogDefaults } from "../../src/commands/bindableCatalog";
+import { normalizeChord, splitChord } from "../../src/commands/chord";
 import { EDITOR_KEYMAP_DEFAULTS, EDITOR_KEYMAP_IDS } from "../../src/editor/keymap";
 
 describe("bindableCatalog ↔ editor keymap defaults (#184 drift lock)", () => {
@@ -50,5 +51,79 @@ describe("bindableCatalog ↔ editor keymap defaults (#184 drift lock)", () => {
     expect(find).toBeDefined();
     expect(find!.defaultBindings).toEqual(["Mod-f"]);
     expect(find!.rebindable).toBe(true);
+  });
+});
+
+// ── myne#337: every default chord must be one a keydown can actually produce ──
+//
+// `pane.split-column` shipped `Mod-Shift-\`, and the chord a keydown produces is
+// built from `keyName(event)`, which reports the SHIFTED character — so
+// Shift+`\` arrives as `|` and the stored default could never match. The
+// shortcut was permanently dead while the Hotkeys panel, the command palette and
+// the conflict detector all presented it as live, and the conflict detector
+// reasoned about a binding that cannot fire.
+describe("default chords are producible by a keydown (myne#337)", () => {
+  /** US-layout pairs: pressing Shift with the key on the left yields the right.
+   *  A default that combines `Shift` with a LEFT member is unreachable — the
+   *  event will carry the right member instead. */
+  const SHIFT_PAIRS: Record<string, string> = {
+    "`": "~",
+    "1": "!",
+    "2": "@",
+    "3": "#",
+    "4": "$",
+    "5": "%",
+    "6": "^",
+    "7": "&",
+    "8": "*",
+    "9": "(",
+    "0": ")",
+    "-": "_",
+    "=": "+",
+    "[": "{",
+    "]": "}",
+    "\\": "|",
+    ";": ":",
+    "'": '"',
+    ",": "<",
+    ".": ">",
+    "/": "?",
+  };
+
+  // Scoped to the ids MYNE's dispatcher resolves. `editor.*` chords are
+  // installed into CodeMirror's keymap, and CM falls back to
+  // `base[event.keyCode]` whenever a modifier is held — so `Mod-Shift-7` reaches
+  // `editor.ordered-list` there. Myne's `eventToChord` has no such fallback, and
+  // deliberately: its capture path stores the SHIFTED spelling, so accepting
+  // both would give one chord two spellings and defeat the conflict detector.
+  // The two engines therefore differ, and this guard is about the one that does
+  // not fall back.
+  it("no dispatcher default combines Shift with a key whose shifted form differs", () => {
+    const offenders: string[] = [];
+    for (const [id, chords] of Object.entries(catalogDefaults())) {
+      if (id.startsWith("editor.")) continue;
+      for (const chord of chords) {
+        const { mods, key } = splitChord(chord);
+        const hasShift = mods.some((m) => m.toLowerCase() === "shift" || m.toLowerCase() === "s");
+        if (!hasShift) continue;
+        const shifted = SHIFT_PAIRS[key];
+        if (shifted !== undefined) {
+          offenders.push(`${id}: ${chord} — a keydown produces Shift-${shifted}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("the split-down default is the chord the event carries", () => {
+    expect(catalogDefaults()["pane.split-column"]).toEqual(["Mod-Shift-|"]);
+  });
+
+  it("every default normalizes to itself, so a stored chord compares equal", () => {
+    for (const chords of Object.values(catalogDefaults())) {
+      for (const chord of chords) {
+        expect(normalizeChord(chord)).toBe(normalizeChord(normalizeChord(chord)));
+      }
+    }
   });
 });
