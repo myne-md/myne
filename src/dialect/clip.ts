@@ -796,11 +796,33 @@ function renderInline(
   let pos = from;
   let child = parent.firstChild;
   while (child !== null) {
-    if (child.to <= from || child.from < pos) {
+    if (child.to <= from) {
       child = child.nextSibling;
       continue;
     }
     if (child.from >= to) break;
+    // A node that STARTED before this window and extends into it was already
+    // emitted WHOLE by the window that contained its start — `renderInlineNode`
+    // renders a node's full range, not the slice (myne#322). Its tail here is
+    // therefore not ours to emit again.
+    //
+    // Without this, the trailing `slice(pos, to)` below re-emitted the raw
+    // source of the straddling node's remainder. For a blockquote whose
+    // emphasis, strong, strikethrough, link or code span crosses a line break —
+    // exactly what Turndown produces for `<blockquote><em>a<br>b</em></blockquote>`
+    // — the caller re-prefixes that leftover into a fabricated NESTED
+    // blockquote: `> *a\n> b*` serialized to `> *a b*\n> > b*`. Both
+    // invariants this module declares load-bearing fail on those inputs, and
+    // the second pass diverges further still.
+    if (child.from < from) {
+      pos = Math.max(pos, Math.min(child.to, to));
+      child = child.nextSibling;
+      continue;
+    }
+    if (child.from < pos) {
+      child = child.nextSibling;
+      continue;
+    }
     if (child.from > pos) out += ctx.src.slice(pos, child.from);
     out += renderInlineNode(ctx, child);
     pos = Math.min(Math.max(pos, child.to), to);
