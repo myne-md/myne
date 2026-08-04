@@ -300,11 +300,17 @@ pub async fn drain_pending_shares<R: Runtime>(
     let staging = queue::staging_dir(&app)?;
     let staging_files = queue::list_files(&staging).len();
     let sealed_files = queue::list_files(&sealed).len();
+    // COUNTS ONLY — the two `%…display()` path fields that used to sit here
+    // were a direct DENY-list violation (myne#389 item C): "full filesystem
+    // path" is on the list in `src-tauri/CLAUDE.md`, and `%` is the formatter
+    // the closed-enum mapping rule forbids on a path-bearing value. Both paths
+    // are backend-resolved (`<app_data_dir>/pending-shares/{staging,sealed}`),
+    // so they carry the user's home directory — at INFO, the default level.
+    // The counts are what made this record diagnostic; the paths only made it
+    // leaky.
     tracing::info!(
         stage = "share_import_drain",
-        staging = %staging.display(),
         staging_files,
-        sealed = %sealed.display(),
         sealed_files,
         "drain: scanning queue"
     );
@@ -694,5 +700,59 @@ mod tests {
         // A valid-form but absent id is a successful (idempotent) ack.
         assert!(ack_in_dir(&sealed, &"a".repeat(32)).is_ok());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// myne#389 item C: no `tracing` site in this module may put a filesystem
+    /// path in a formatter slot.
+    ///
+    /// A **source scan**, on the shape `vault_change_password`'s
+    /// `tracing_emits_have_no_deny_listed_secrets` established, because the
+    /// alternative shapes are both weaker here. Driving `drain_pending_shares`
+    /// needs an `AppHandle` and therefore a Tauri runtime; extracting the emit
+    /// into a helper taking two `usize`s makes a value assertion vacuous — a
+    /// function that cannot receive a path cannot leak one, so the test would
+    /// pass forever while a NEW site three lines away leaked freely. What
+    /// actually needs guarding is the file, and the regression is somebody
+    /// re-adding `%dir.display()` to a record because it was handy while
+    /// debugging.
+    ///
+    /// `<app_data_dir>/pending-shares/{staging,sealed}` is backend-resolved, so
+    /// every one of these paths carries the user's home directory, and the site
+    /// this replaced emitted two of them at INFO — the default level.
+    #[test]
+    fn no_tracing_site_in_this_module_formats_a_path() {
+        let source = include_str!("commands.rs");
+        // Same sentinel discipline as the precedent: split on the explicit
+        // bottom-of-file marker rather than the bare `#[cfg(test)]` token, so a
+        // future cfg-gated production helper above it does not silently shrink
+        // the scanned region.
+        let test_marker = "#[cfg(test)]\nmod tests {";
+        let production = source.split(test_marker).next().expect(
+            "source must contain the `#[cfg(test)]\\nmod tests {` sentinel at the \
+             bottom of the file (do NOT add another `#[cfg(test)]` marker above it \
+             without updating this test)",
+        );
+
+        // The two spellings a path reaches a `tracing` record by. `.display()`
+        // is the only way to format a `Path`/`PathBuf` at all, and `%`/`?` are
+        // the formatters the closed-enum mapping rule forbids on one.
+        for (i, line) in production.lines().enumerate() {
+            let code = line.trim();
+            // Comments are not emit sites, and this module's own comments
+            // discuss the forbidden spellings by name — including the one
+            // directly above the record this test exists to protect.
+            if code.starts_with("//") {
+                continue;
+            }
+            for forbidden in ["display()", "%staging", "%sealed", "?staging", "?sealed"] {
+                assert!(
+                    !code.contains(forbidden),
+                    "line {} contains `{forbidden}`: a filesystem path must never reach a \
+                     tracing record (DENY list, src-tauri/CLAUDE.md). Emit a count, a closed \
+                     enum, or a static stage tag instead.\n  {code}",
+                    i + 1,
+                );
+            }
+        }
     }
 }
