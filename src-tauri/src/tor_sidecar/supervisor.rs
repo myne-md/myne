@@ -198,6 +198,15 @@ impl TorSidecar {
         };
 
         let stderr = child.stderr.take();
+        // Reap anything already here before overwriting the slot (myne#313).
+        // Unreachable through the UI today — a failed run leaves the preference
+        // and the switch ON, so the next click is a stop — but assigning over a
+        // live `Child` would drop the handle without killing the process, which
+        // is a leak no later `stop()` or `Drop` can reach.
+        if let Some(mut previous) = inner.child.take() {
+            let _ = previous.kill();
+            let _ = previous.wait();
+        }
         inner.child = Some(child);
         self.apply(&mut inner, Event::Spawned);
         drop(inner);
@@ -292,12 +301,27 @@ impl TorSidecar {
                 // answer — the log line is emitted before any client has ever
                 // connected, and a bound-but-wedged listener would pass a bare
                 // TCP connect.
-                let event = if socks5_greeting_ok(port) {
-                    Event::BootstrapConfirmed
-                } else {
-                    Event::BootstrapTimedOut
-                };
-                this.observe(generation, event);
+                if socks5_greeting_ok(port) {
+                    this.observe(generation, Event::BootstrapConfirmed);
+                    continue;
+                }
+                // A failed probe is a terminal verdict for this run, so it must
+                // REAP the child too (myne#313). Publishing `BootstrapTimedOut`
+                // alone moved the phase to `Failed` and paused sync fail-closed
+                // while leaving arti running with nothing to reap it — this
+                // thread would just keep draining stderr, and the deadline
+                // thread returns on its next tick because the phase is no
+                // longer `Starting`. arti never logs the marker again and
+                // `Failed` absorbs both bootstrap events, so the run cannot
+                // recover; the user's only remedy was toggling Tor off and on.
+                //
+                // This is the same pair the deadline arm already performs, for
+                // the same stated reason ("a sidecar that never bootstrapped is
+                // not going to; leave no process behind waiting on it") — the
+                // asymmetry between the two arms was the bug.
+                this.observe(generation, Event::BootstrapTimedOut);
+                this.kill_current(generation);
+                return;
             }
             // EOF on stderr: the child closed its pipes, i.e. it exited.
             if let Some(this) = this.upgrade() {
@@ -557,6 +581,58 @@ mod tests {
         );
         assert_eq!(s.phase(), Phase::Failed);
         assert_eq!(s.gate().route(), Err(RouteDenied::Failed));
+    }
+
+    // ── myne#313: both bootstrap-failure arms must reap the child ──────────
+    //
+    // Two threads can declare a run failed: the deadline thread, and the stderr
+    // reader when its SOCKS5 probe does not answer. The deadline arm killed the
+    // child; the reader arm published `BootstrapTimedOut` and left arti running
+    // with nothing to reap it — the reader just kept draining stderr, and the
+    // deadline thread returns on its next tick because the phase is no longer
+    // `Starting`. arti never logs the marker again and `Failed` absorbs both
+    // bootstrap events, so the run could not recover: the user's only remedy
+    // was toggling Tor off and on.
+    //
+    // Source-level, because reaching either arm needs a real arti child that
+    // bootstraps and then fails a loopback probe — not something a unit test
+    // can stage. What IS checkable is the asymmetry that was the bug.
+    #[test]
+    fn every_bootstrap_timeout_is_paired_with_a_kill() {
+        let src = include_str!("supervisor.rs");
+        // The production half — split on the test module's own header, not on
+        // a bare `#[cfg(test)]`, which also marks test-only helpers above it.
+        let body = src
+            .split("#[cfg(test)]\nmod tests")
+            .next()
+            .expect("production half of the file");
+        let mut checked = 0usize;
+        let mut from = 0usize;
+        while let Some(rel) = body[from..].find("Event::BootstrapTimedOut") {
+            let at = from + rel;
+            from = at + 1;
+            // Skip the enum definition and any prose mention in a comment.
+            let line_start = body[..at].rfind('\n').map_or(0, |i| i + 1);
+            let line = &body[line_start..];
+            let line = &line[..line.find('\n').unwrap_or(line.len())];
+            let code = line.split("//").next().unwrap_or("");
+            if !code.contains("observe(") {
+                continue;
+            }
+            checked += 1;
+            // The kill must follow, close by — both arms do it on the next
+            // statement or the one after.
+            let window = &body[at..(at + 400).min(body.len())];
+            assert!(
+                window.contains("kill_current("),
+                "a BootstrapTimedOut at byte {at} is published without reaping \
+                 the child; arti would keep running with nothing to stop it"
+            );
+        }
+        assert_eq!(
+            checked, 2,
+            "expected the reader-probe and deadline arms; found {checked}"
+        );
     }
 
     #[test]
