@@ -300,16 +300,42 @@ describe("Frontmatter Properties selection guard (MYND-608 / #209)", () => {
     ).not.toBeNull();
   });
 
-  it("FM7: the caret floor skips a blank line right after the frontmatter, landing on the first body line", () => {
+  it("FM7: a blank line right after the frontmatter IS reachable (myne#285)", () => {
+    // This used to assert the opposite — the floor advanced past every leading
+    // blank line, on the grounds that a caret there rendered against the
+    // Properties panel's rect (MYND-608 / #209) and that the lines were
+    // harmless because they stayed in the document.
+    //
+    // They were not harmless once the user created one: pressing Enter at the
+    // start of the first body line leaves a blank line above the text, and the
+    // guard clamps mouse, keyboard and Backspace alike — so the line could not
+    // be reached, clicked or deleted, and repeated Enters accumulated lines only
+    // an external editor could remove. The rendering half is the `assoc = 1`
+    // forcing, asserted below.
     mounted = mountFm(FM_DOC_BLANK, FM_DOC_BLANK.length);
     const blankLine = mounted.view.state.doc.line(5); // the empty line after ---
     const bodyLine = mounted.view.state.doc.line(6); // "body text"
     expect(blankLine.text).toBe("");
     expect(bodyLine.text).toBe("body text");
-    // Try to land the caret on the blank line — it must snap forward to the body
-    // line (where the caret can render), never onto the blank line at the block edge.
     mounted.view.dispatch({ selection: { anchor: blankLine.from } });
-    expect(mounted.view.state.selection.main.head).toBe(bodyLine.from);
+    expect(mounted.view.state.selection.main.head).toBe(blankLine.from);
     expect(mounted.view.state.selection.main.empty).toBe(true);
+  });
+
+  it("FM8: the floor still refuses every offset INSIDE the block (myne#285)", () => {
+    // What the guard exists for is unchanged: the frontmatter cannot hold the
+    // caret. Only the extra advance past body blank lines is gone.
+    mounted = mountFm(FM_DOC_BLANK, FM_DOC_BLANK.length);
+    const blankLine = mounted.view.state.doc.line(5);
+    mounted.view.dispatch({ selection: { anchor: 0 } });
+    expect(mounted.view.state.selection.main.head).toBe(blankLine.from);
+  });
+
+  it("FM9: a caret clamped to the boundary associates FORWARD, so it renders in the body", () => {
+    // The rendering half of MYND-608 / #209, which is what makes dropping the
+    // blank-line skip safe.
+    mounted = mountFm(FM_DOC_BLANK, FM_DOC_BLANK.length);
+    mounted.view.dispatch({ selection: { anchor: 0 } });
+    expect(mounted.view.state.selection.main.assoc).toBe(1);
   });
 });
