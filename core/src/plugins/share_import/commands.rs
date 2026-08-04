@@ -158,15 +158,52 @@ pub fn seal_staged_in_dir(
 /// decoded entries (that is `ack`'s job — the at-least-once contract).
 pub fn drain_in_dir(sealed: &Path, key: &[u8; 32]) -> Result<Vec<StagedShare>, ShareImportError> {
     let mut out = Vec::new();
-    for path in queue::list_files(sealed) {
-        let name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(n) if queue::is_share_id(n) => n.to_string(),
+    for id in pending_share_ids(sealed) {
+        if let Some(share) = open_share_in_dir(sealed, key, &id) {
+            out.push(share);
+        }
+    }
+    Ok(out)
+}
+
+/// The queue's entry ids, oldest-first by directory order — filename shape only,
+/// nothing read or decrypted.
+///
+/// Exists so the drain can be STREAMED (myne#312). [`drain_in_dir`] decrypts the
+/// whole queue into RAM before the caller imports anything, so peak memory is
+/// the sum of every queued plaintext — N entries at up to 64 MiB each, plus a
+/// second full copy of the entry being imported. Past the platform's foreground
+/// footprint limit the process is killed BEFORE the first `ack`, so nothing
+/// leaves `sealed/`, the next unlock reproduces the identical peak, and the app
+/// dies on the unlock path every time (the drain runs on every editor mount)
+/// with no in-app way to clear the queue.
+pub fn pending_share_ids(sealed: &Path) -> Vec<String> {
+    queue::list_files(sealed)
+        .into_iter()
+        .filter_map(|path| match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) if queue::is_share_id(n) => Some(n.to_string()),
             // Stray non-queue file — leave it alone, skip.
-            _ => continue,
-        };
+            _ => None,
+        })
+        .collect()
+}
+
+/// Read, verify, decrypt and unframe ONE queue entry.
+///
+/// `None` when the entry is not usable, and the reason decides its fate — the
+/// poison-entry policy, unchanged from the batch version it was factored out of:
+/// a header/filename disagreement is SKIPPED (the correctly-named twin is
+/// valid), while a corrupt / foreign / wrong-key blob and a decrypted-but-
+/// malformed framing are DELETED, because neither can ever become an
+/// attachment. A decoded entry is left on disk — removing it is `ack`'s job,
+/// which is what makes the drain at-least-once.
+pub fn open_share_in_dir(sealed: &Path, key: &[u8; 32], id: &str) -> Option<StagedShare> {
+    let name = id.to_string();
+    let path = sealed.join(&name);
+    {
         let blob = match std::fs::read(&path) {
             Ok(b) => b,
-            Err(_) => continue,
+            Err(_) => return None,
         };
         // Filename/header agreement (`protocol.md` §9.20.4, reader-side MUST) —
         // the twin of the pending-capture check. The AAD binds the header
@@ -174,14 +211,14 @@ pub fn drain_in_dir(sealed: &Path, key: &[u8; 32]) -> Result<Vec<StagedShare>, S
         // opens. Skip rather than delete: the correctly-named twin is valid.
         match protocol::share_import_blob::parse_share_import_header(&blob) {
             Ok(h) if hex_id_matches(&name, &h.share_id) => {}
-            Ok(_) => continue,
+            Ok(_) => return None,
             // Unparseable header: fall through to the decode arm, which owns
             // the poison-entry policy.
             Err(_) => {}
         }
         match decode_share_import_blob(key, &blob) {
             Ok(pt) => match frame::unframe_record(&pt) {
-                Some((filename, mime, bytes)) => out.push(StagedShare {
+                Some((filename, mime, bytes)) => Some(StagedShare {
                     id: name,
                     filename,
                     mime,
@@ -190,15 +227,16 @@ pub fn drain_in_dir(sealed: &Path, key: &[u8; 32]) -> Result<Vec<StagedShare>, S
                 // Decrypted but malformed framing — cannot become an attachment.
                 None => {
                     let _ = std::fs::remove_file(&path);
+                    None
                 }
             },
             // Corrupt / foreign / wrong-key — drop, do not error.
             Err(_) => {
                 let _ = std::fs::remove_file(&path);
+                None
             }
         }
     }
-    Ok(out)
 }
 
 /// Does the 32-hex queue filename name the same id the blob header carries?
@@ -286,14 +324,23 @@ pub async fn drain_pending_shares<R: Runtime>(
             "drain: sealed staged plaintext files"
         );
     }
-    let staged = drain_in_dir(&sealed, &key)?;
+    // One entry at a time — ids first, then read → decode → import → ack → drop
+    // per entry (myne#312). This used to decrypt the WHOLE queue up front, so
+    // peak resident memory was the sum of every queued plaintext (N × up to
+    // 64 MiB) plus a second full copy of the entry being imported. Past the
+    // platform's foreground footprint limit the process was killed BEFORE the
+    // first ack, so nothing left `sealed/`, the next unlock reproduced the same
+    // peak, and the app died on the unlock path every time — the drain runs on
+    // every editor mount, and there is no in-app way to clear the queue. Now the
+    // peak is one entry.
+    let ids = pending_share_ids(&sealed);
     tracing::info!(
         stage = "share_import_drain",
-        decrypted = staged.len(),
+        pending = ids.len(),
         sealed_files,
-        "drain: decrypted (decrypted < sealed_files ⇒ some blobs were undecryptable and dropped — likely a device-key/keychain mismatch)"
+        "drain: queue entries to open one at a time"
     );
-    if staged.is_empty() {
+    if ids.is_empty() {
         return Ok(Vec::new());
     }
 
@@ -301,9 +348,18 @@ pub async fn drain_pending_shares<R: Runtime>(
         .map_err(|_| ShareImportError::Backend)?;
 
     let mut imported = Vec::new();
-    for share in staged {
+    let mut undecryptable = 0usize;
+    for id in ids {
+        // Undecryptable / malformed entries are dropped by the opener (its
+        // poison-entry policy); a header/filename disagreement is skipped.
+        let Some(mut share) = open_share_in_dir(&sealed, &key, &id) else {
+            undecryptable += 1;
+            continue;
+        };
         let source = ImportSource::Bytes {
-            bytes: share.bytes.to_vec(),
+            // MOVE, not `to_vec()`: the copy was a second full-size buffer per
+            // entry, and the import takes ownership anyway.
+            bytes: std::mem::take(&mut *share.bytes),
             filename: Some(share.filename.clone()),
         };
         // `share_import` is host-only (cfg `tauri-ipc` + not wasm32), so the
@@ -340,7 +396,8 @@ pub async fn drain_pending_shares<R: Runtime>(
     tracing::info!(
         stage = "share_import_drain",
         imported = imported.len(),
-        "drain: imported into the attachment library"
+        undecryptable,
+        "drain: imported into the attachment library (undecryptable > 0 ⇒ blobs were dropped — likely a device-key/keychain mismatch)"
     );
     Ok(imported)
 }
@@ -366,6 +423,104 @@ mod tests {
             std::env::temp_dir().join(format!("myne-share-import-test-{}", queue::hex_lower(&sfx)));
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    // ── myne#312: the drain opens one entry at a time ──────────────────────
+    //
+    // `drain_in_dir` decrypts the WHOLE queue before the caller imports
+    // anything, so peak resident memory was the sum of every queued plaintext
+    // (N entries × up to 64 MiB) plus a second full copy of the entry being
+    // imported. Past the platform's foreground footprint limit the process is
+    // killed BEFORE the first ack — so nothing leaves `sealed/`, the next
+    // unlock reproduces the identical peak, and the app dies on the unlock path
+    // every time, with no in-app way to clear the queue.
+
+    #[test]
+    fn listing_the_queue_reads_nothing_and_decrypts_nothing() {
+        let root = tmp();
+        let sealed = root.join("sealed");
+        let mut ids = Vec::new();
+        for n in 0..3u8 {
+            let id =
+                seal_share_in_dir(&sealed, &KEY, "f.bin", "application/octet-stream", &[n; 64])
+                    .unwrap()
+                    .expect("sealed");
+            ids.push(queue::hex_lower(&id));
+        }
+        // A stray non-queue file is not an entry.
+        std::fs::write(sealed.join("not-a-share.txt"), b"x").unwrap();
+
+        let listed = pending_share_ids(&sealed);
+        assert_eq!(listed.len(), 3, "listed: {listed:?}");
+        for id in &ids {
+            assert!(listed.contains(id));
+        }
+        // …and an entry sealed under a DIFFERENT key still lists, because
+        // listing is filename shape only — it is the opener that decides.
+        let other = [0x11u8; 32];
+        let foreign = seal_share_in_dir(
+            &sealed,
+            &other,
+            "g.bin",
+            "application/octet-stream",
+            &[7; 8],
+        )
+        .unwrap()
+        .expect("sealed");
+        assert!(pending_share_ids(&sealed).contains(&queue::hex_lower(&foreign)));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn opening_one_entry_yields_only_that_entry() {
+        let root = tmp();
+        let sealed = root.join("sealed");
+        let a = seal_share_in_dir(&sealed, &KEY, "a.png", "image/png", &[1u8; 32])
+            .unwrap()
+            .expect("sealed");
+        let b = seal_share_in_dir(&sealed, &KEY, "b.png", "image/png", &[2u8; 32])
+            .unwrap()
+            .expect("sealed");
+
+        let opened = open_share_in_dir(&sealed, &KEY, &queue::hex_lower(&a)).expect("opens");
+        assert_eq!(opened.filename, "a.png");
+        assert_eq!(opened.bytes.as_slice(), &[1u8; 32]);
+        // Untouched on disk — removing is `ack`'s job (at-least-once).
+        assert_eq!(queue::list_files(&sealed).len(), 2);
+
+        // Its sibling is unaffected and still opens independently.
+        let other = open_share_in_dir(&sealed, &KEY, &queue::hex_lower(&b)).expect("opens");
+        assert_eq!(other.filename, "b.png");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_opener_keeps_the_poison_entry_policy() {
+        let root = tmp();
+        let sealed = root.join("sealed");
+        // Wrong key → corrupt from this device's point of view → DELETED, so a
+        // blob that can never become an attachment cannot wedge the queue.
+        let other = [0x11u8; 32];
+        let id = seal_share_in_dir(
+            &sealed,
+            &other,
+            "x.bin",
+            "application/octet-stream",
+            &[9u8; 16],
+        )
+        .unwrap()
+        .expect("sealed");
+        let hex = queue::hex_lower(&id);
+        assert!(open_share_in_dir(&sealed, &KEY, &hex).is_none());
+        assert_eq!(
+            queue::list_files(&sealed).len(),
+            0,
+            "an undecryptable entry is dropped, not retried forever"
+        );
+
+        // An id that names nothing is simply `None` — no panic, no deletion.
+        assert!(open_share_in_dir(&sealed, &KEY, &"ab".repeat(16)).is_none());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
