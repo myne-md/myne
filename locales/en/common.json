@@ -1205,7 +1205,8 @@
         "rewriteCount_one": "{{count}} link will be rewritten",
         "rewriteCount_other": "{{count}} links will be rewritten",
         "skipped": "skipped — {{reason}}",
-        "title": "Convert imported wikilinks in this note"
+        "title": "Convert imported wikilinks in this note",
+        "staleDocument": "This note changed while the preview was open, so nothing was converted. Run it again to see the current links."
       },
       "convertCore": {
         "noMatch": "no match"

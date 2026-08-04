@@ -259,3 +259,87 @@ describe("runWikilinkConvert — entry point", () => {
     );
   });
 });
+
+// ── myne#325: the preview must describe the edit that gets written ──────────
+//
+// The rewrites' offsets are captured before an untimed confirmation modal — it
+// stays open until the user has picked a target for every ambiguous row — and
+// the note's bytes can change under it with no user action at all: a sync pull,
+// a snapshot restore, or a task written from a list surface all reload the open
+// note, and none of them are stopped by the modal's focus trap.
+//
+// Applying those offsets unmapped was silent corruption. If the document GREW,
+// every rewrite landed early: the original `[[Some Note]]` survived untouched
+// while a same-length span of unrelated prose was destroyed and replaced, in one
+// transaction, and autosaved on the next idle tick. If it SHRANK, `ChangeSet.of`
+// threw a RangeError inside a promise chain nothing catches — no rewrite, no
+// toast, no error shown.
+describe("applyWikilinkRewrites verifies the planned spans (myne#325)", () => {
+  const rewriteAt = (start: number, end: number, after: string) => ({
+    byteRange: { start, end },
+    after,
+  });
+
+  it("applies when the document is unchanged", () => {
+    const { view, host } = mountView("see [[Some Note]] here");
+    const planned = view.state.doc.toString();
+    const ok = applyWikilinkRewrites(
+      view,
+      [rewriteAt(4, 17, "[[folder/Some Note|Some Note]]")],
+      planned,
+    );
+    expect(ok).toBe(true);
+    expect(view.state.doc.toString()).toBe("see [[folder/Some Note|Some Note]] here");
+    view.destroy();
+    host.remove();
+  });
+
+  it("declines when the document GREW under the modal", () => {
+    const { view, host } = mountView("see [[Some Note]] here");
+    const planned = view.state.doc.toString();
+    view.dispatch({ changes: { from: 0, insert: "PREFIX " } });
+
+    const ok = applyWikilinkRewrites(
+      view,
+      [rewriteAt(4, 17, "[[folder/Some Note|Some Note]]")],
+      planned,
+    );
+    expect(ok).toBe(false);
+    expect(view.state.doc.toString()).toBe("PREFIX see [[Some Note]] here");
+    view.destroy();
+    host.remove();
+  });
+
+  it("declines instead of throwing when the document SHRANK past the span", () => {
+    const { view, host } = mountView("see [[Some Note]] here");
+    const planned = view.state.doc.toString();
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "x" } });
+
+    expect(() =>
+      applyWikilinkRewrites(
+        view,
+        [rewriteAt(4, 17, "[[folder/Some Note|Some Note]]")],
+        planned,
+      ),
+    ).not.toThrow();
+    expect(view.state.doc.toString()).toBe("x");
+    view.destroy();
+    host.remove();
+  });
+
+  it("declines when only ONE of several spans moved", () => {
+    // All or nothing: a partial application would be a half-approved edit.
+    const { view, host } = mountView("a [[One]] b [[Two]] c");
+    const planned = view.state.doc.toString();
+    view.dispatch({ changes: { from: 0, insert: "Z" } });
+    const ok = applyWikilinkRewrites(
+      view,
+      [rewriteAt(2, 9, "[[f/One|One]]"), rewriteAt(12, 19, "[[f/Two|Two]]")],
+      planned,
+    );
+    expect(ok).toBe(false);
+    expect(view.state.doc.toString()).toBe("Za [[One]] b [[Two]] c");
+    view.destroy();
+    host.remove();
+  });
+});

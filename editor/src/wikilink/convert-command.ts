@@ -184,13 +184,53 @@ export function showWikilinkConvertPreview(
   });
 }
 
-/** Apply the rewrites in ONE transaction (descending `from` so offsets stay
- *  valid) — one undo step. */
+/**
+ * Apply the rewrites in ONE transaction (descending `from` so offsets stay
+ * valid) — one undo step.
+ *
+ * `expectedSource` is the document the rewrites were PLANNED against
+ * (myne#325). Every span is verified to still hold the exact bytes it was
+ * planned from before anything is written; a span that moved or changed makes
+ * the whole conversion decline.
+ *
+ * That check is the point of the function. The offsets are captured before an
+ * untimed confirmation modal — it stays open until the user has picked a target
+ * for every ambiguous row — and the note's bytes can change under it without
+ * any user action: a sync pull, a snapshot restore, or a task written from a
+ * list surface all call `reloadOpenNote`, and none of them are stopped by the
+ * modal's focus trap.
+ *
+ * Applying unmapped offsets after that was silent corruption: if the document
+ * GREW, every rewrite landed early — the original `[[Some Note]]` survived
+ * untouched while a same-length span of unrelated prose was destroyed and
+ * replaced, in one transaction, and autosaved on the next idle tick. The module
+ * promises byte-preservation outside the matched ref spans, and the whole point
+ * of the mandatory diff preview is that the user approves the edit they get.
+ * If the document SHRANK, `ChangeSet.of` threw a `RangeError` inside the click
+ * handler's promise chain, which nothing catches — no rewrite, no toast, no
+ * error shown at all.
+ *
+ * Declining rather than re-mapping is deliberate: a mapped span would still be
+ * the RIGHT position for a preview the user is no longer looking at. The
+ * conversion is re-runnable and cheap, and re-reading the preview against the
+ * document as it now stands is the only honest way to approve it.
+ *
+ * Returns whether the rewrites were applied.
+ */
 export function applyWikilinkRewrites(
   view: EditorView,
   rewrites: readonly Rewrite[],
-): void {
-  if (rewrites.length === 0) return;
+  expectedSource?: string,
+): boolean {
+  if (rewrites.length === 0) return false;
+  const doc = view.state.doc;
+  if (expectedSource !== undefined) {
+    for (const r of rewrites) {
+      const { start, end } = r.byteRange;
+      if (start < 0 || end > doc.length || start >= end) return false;
+      if (doc.sliceString(start, end) !== expectedSource.slice(start, end)) return false;
+    }
+  }
   const ordered = [...rewrites].sort((a, b) => b.byteRange.start - a.byteRange.start);
   const changes = ordered.map((r) => ({
     from: r.byteRange.start,
@@ -198,20 +238,29 @@ export function applyWikilinkRewrites(
     insert: r.after,
   }));
   view.dispatch({ changes, userEvent: "wikilink.convert" });
+  return true;
 }
 
 /** The R2 command entry point (called by the disabled-no-more palette action). */
 export async function runWikilinkConvert(): Promise<void> {
   const view = getActiveEditorView();
   if (view === null) return;
-  const rows = planWikilinkConversion(view.state.doc.toString(), readNoteSet(view.state));
+  // The document the plan is taken against — and the one every rewrite is
+  // verified against after the modal closes (myne#325).
+  const planned = view.state.doc.toString();
+  const rows = planWikilinkConversion(planned, readNoteSet(view.state));
   if (rows.length === 0) {
     showAttachmentToast(i18n.t("editor.wikilink.convert.noneToConvert"));
     return;
   }
   const { confirmed, rewrites } = await showWikilinkConvertPreview(rows);
   if (!confirmed || rewrites.length === 0) return;
-  applyWikilinkRewrites(view, rewrites);
+  if (!applyWikilinkRewrites(view, rewrites, planned)) {
+    // The note changed under the modal, so the preview no longer describes the
+    // edit that would be written. Say so instead of writing something else.
+    showAttachmentToast(i18n.t("editor.wikilink.convert.staleDocument"), "error");
+    return;
+  }
   view.focus();
   const n = rewrites.length;
   showAttachmentToast(i18n.t("editor.wikilink.convert.convertedToast", { count: n }), "success");
