@@ -1508,6 +1508,27 @@ pub(crate) async fn sync_meta_phase(
     let local_hash = sha256_hex(&local_bytes);
     let dirty = vault_meta_is_dirty(io, vault_root).await;
 
+    // myne#293 — the `vault.meta`-dirty marker opens its OWN push window.
+    //
+    // `allow_push` is threaded from the scheduler, and the scheduler only opens a
+    // push window when the local-change counter advanced — which a credential
+    // change does not bump. So a password change (or a recovery reset) whose
+    // immediate push failed wrote the marker, and then the loop never pushed it:
+    // every poll-driven cycle is pull-only until some UNRELATED note, prefs or
+    // attachment edit happens to open a window. The contract `sync/commands.rs`
+    // states — "a transport failure only writes the marker so the sync loop's
+    // meta phase pushes it later" — was not honoured by the loop alone. A second
+    // device joining in that window fetched the stale `vault.meta`, so the
+    // password the user had just set did not unlock it and the OLD one did.
+    //
+    // Widening the gate here rather than bumping the local-change counter keeps
+    // the two signals honest: the counter means "the user edited content", and a
+    // credential rotation is not content. What `allow_push` protects is
+    // edit-TIMING inference from push cadence; the marker carries no edit timing,
+    // only "a credential changed and the server does not have it" — which the
+    // immediate push at change time already revealed.
+    let may_push = allow_push || dirty;
+
     // Authed GET of THIS device's own server meta (no ?account=, not pre-auth).
     let resp = match transport.request(HttpMethod::Get, "/vault.meta", &[], Some(token)) {
         Ok(r) => r,
@@ -1519,7 +1540,7 @@ pub(crate) async fn sync_meta_phase(
             // Server holds no meta yet (pre-seed). Contribute ours if we have a
             // pending change and may push; else nothing to do.
             if dirty
-                && allow_push
+                && may_push
                 && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok()
             {
                 state.meta_baseline_hex = Some(local_hash);
@@ -1598,7 +1619,7 @@ pub(crate) async fn sync_meta_phase(
 
     // Only I changed (server unchanged since my baseline) → push my meta.
     if local_changed && !server_changed {
-        if allow_push && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok() {
+        if may_push && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok() {
             state.meta_baseline_hex = Some(local_hash);
             let _ = clear_vault_meta_dirty(io, vault_root).await;
             return MetaPhaseOutcome::Pushed;
@@ -1629,11 +1650,13 @@ pub(crate) async fn sync_meta_phase(
     if merged_hash == server_hash {
         // Server already holds the winner — nothing to push; we are converged.
         let _ = clear_vault_meta_dirty(io, vault_root).await;
-    } else if allow_push {
+    } else if may_push {
         let _ = super::enroll::put_vault_meta(transport, token, &merged_bytes);
         let _ = clear_vault_meta_dirty(io, vault_root).await;
     }
-    // (!allow_push && merged != server: keep dirty so a later push cycle propagates.)
+    // (!may_push && merged != server: keep dirty so a later push cycle propagates.
+    // With a pending credential change `may_push` is true regardless of the
+    // scheduler's window — myne#293.)
     MetaPhaseOutcome::Merged
 }
 
@@ -8250,10 +8273,23 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        // A poll cycle (allow_push=false) with a pending local change must NOT push
-        // yet — it keeps the dirty marker for a later push cycle.
+        // myne#293 — a poll cycle (allow_push=false) with the DIRTY MARKER set
+        // must push anyway.
+        //
+        // This test asserted the opposite, and that was the defect: the marker's
+        // only production writer is the credential-push failure arm, and a
+        // credential change bumps no local-change counter, so the scheduler
+        // never opened a push window on its own. A password change whose
+        // immediate push failed then sat unpushed until an unrelated note edit
+        // happened to open one — while a second device joining in that window
+        // fetched the stale meta and was unlocked by the OLD password.
+        //
+        // What `allow_push` protects is edit-TIMING inference from push cadence.
+        // The marker carries no edit timing, only "a credential changed and the
+        // server does not have it", which the immediate push at change time
+        // already revealed.
         #[test]
-        fn poll_cycle_defers_push_and_keeps_dirty() {
+        fn poll_cycle_pushes_a_pending_credential_change() {
             let dir = scratch("poll");
             let baseline = meta_bytes(0xAA);
             let local = meta_bytes(0xCC);
@@ -8265,14 +8301,43 @@ mod tests {
             };
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
+            t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
+
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, false));
+            assert_eq!(out, MetaPhaseOutcome::Pushed);
+            assert_eq!(
+                put_recorded(&t),
+                vec![local],
+                "the rotated credential reaches the server without waiting for an \
+                 unrelated content edit"
+            );
+            assert!(
+                !blocking(vault_meta_is_dirty(&IO, &dir)),
+                "dirty cleared once the server has it"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // …and the coalescing rule is otherwise untouched: a poll cycle with a
+        // local change but NO pending credential change still pushes nothing.
+        #[test]
+        fn poll_cycle_still_defers_a_plain_local_divergence() {
+            let dir = scratch("poll-clean");
+            let baseline = meta_bytes(0xAA);
+            let local = meta_bytes(0xCC);
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            // No `mark_vault_meta_dirty` — the divergence is inferred from the
+            // baseline, not from a credential change.
+            let mut st = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&baseline)),
+                ..Default::default()
+            };
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
 
             let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, false));
             assert_eq!(out, MetaPhaseOutcome::NoChange);
             assert!(put_recorded(&t).is_empty(), "a poll cycle pushes nothing");
-            assert!(
-                blocking(vault_meta_is_dirty(&IO, &dir)),
-                "dirty kept for a later push cycle"
-            );
             std::fs::remove_dir_all(&dir).ok();
         }
 
