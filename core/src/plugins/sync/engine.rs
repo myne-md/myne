@@ -182,10 +182,16 @@ impl From<TransportError> for PullError {
 
 /// Classify a 401 body into `device_revoked` vs plain `unauthenticated`.
 ///
-/// **One reader, on purpose.** The server sends both on status 401, so every
-/// 401 site has to look inside the body or it silently collapses a terminal
-/// condition into a retryable one. Five sites do; a copy at each is five places
-/// for the string to drift from `server-protocol.md` §3.1.
+/// **One reader, on purpose.** The server sends both on status 401, so EVERY
+/// 401 arm in this file has to look inside the body or it silently collapses a
+/// terminal condition into a retryable one. A copy at each would be as many
+/// places for the string to drift from `server-protocol.md` §3.1.
+///
+/// The count used to be stated here as a number, and the number was wrong — it
+/// said five while three arms did not call this at all, which is how
+/// `download_blob`'s omission survived review (myne#294). A number that has to
+/// be re-counted by hand on every edit is not a check; `every_401_arm_consults_
+/// the_body` in this file's tests is, so this doc no longer carries one.
 ///
 /// An unparseable or absent body means `false` — plain `Unauthenticated`, the
 /// SAFE default in the direction that matters. Guessing "revoked" from a missing
@@ -395,7 +401,20 @@ pub fn download_blob(
             B64.decode(wire.ciphertext_b64.as_bytes())
                 .map_err(|_| PullError::BadResponse)
         }
-        401 => Err(PullError::Unauthenticated),
+        // myne#294 — the body decides, here as at every other 401 arm. This one
+        // skipped the check, and it is the arm a revocation landing MID-CYCLE
+        // hits: `pull_to_stable` has already succeeded, and the cycle is minutes
+        // deep in per-note `GET /sync/blob`. A terminal revocation was then
+        // reported as a retryable "sign-in expired", so the UI showed the wrong
+        // copy and the web client's terminal takeover — gated on
+        // `detail === "device_revoked"` — did not render, for up to one 15-minute
+        // auth park. Which is precisely the collapse the separate class exists to
+        // prevent.
+        401 => Err(if is_device_revoked(&resp.body) {
+            PullError::DeviceRevoked
+        } else {
+            PullError::Unauthenticated
+        }),
         // 404/410 are per-blob outcomes (unknown id / horizon-GC reclaimed body,
         // §11.3) — first-class so the apply loop can SKIP the record instead of
         // failing the whole cycle.
@@ -850,7 +869,16 @@ pub fn download_attachment(
                 return Ok(Some(full));
             }
             404 => return Ok(None),
-            401 => return Err(PullError::Unauthenticated),
+            // Symmetry with the probe at the head of this flow, which already
+            // classifies: without it, a revocation landing in the gap between
+            // the probe and this GET reports the wrong class (myne#294).
+            401 => {
+                return Err(if is_device_revoked(&resp.body) {
+                    PullError::DeviceRevoked
+                } else {
+                    PullError::Unauthenticated
+                })
+            }
             429 => return Err(PullError::RateLimited),
             _ => return Err(PullError::BadResponse),
         }
@@ -1114,6 +1142,72 @@ mod tests {
                 PullError::Unauthenticated
             );
         }
+    }
+
+    /// myne#294 — the blob download is the arm a revocation landing MID-CYCLE
+    /// hits, and it was the one arm that never looked inside the body.
+    ///
+    /// By the time the per-note loop runs, `pull_to_stable` has already returned
+    /// 200s; the next minutes are `GET /sync/blob`. A revocation there was
+    /// reported as a retryable "sign-in expired", so the UI showed the wrong copy
+    /// and the web client's terminal takeover never rendered — for up to one
+    /// 15-minute auth park.
+    #[test]
+    fn the_blob_download_distinguishes_it_too() {
+        let id = [0x11u8; 16];
+        let path = format!("/sync/blob?id={}", "11".repeat(16));
+
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            &path,
+            401,
+            b"{\"error_code\":\"device_revoked\"}".to_vec(),
+        );
+        assert_eq!(
+            download_blob(&t, "tok", &id).unwrap_err(),
+            PullError::DeviceRevoked
+        );
+
+        // The other half of the pair: an ordinary expired token must NOT be
+        // reported as a revocation, or a browser erases its local copy.
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Get, &path, 401, b"{}".to_vec());
+        assert_eq!(
+            download_blob(&t, "tok", &id).unwrap_err(),
+            PullError::Unauthenticated
+        );
+    }
+
+    /// The count in `is_device_revoked`'s doc used to be a hand-maintained
+    /// number, and it was wrong — it said five while three arms did not call the
+    /// helper at all, which is how the omission above survived review.
+    ///
+    /// This reads the file instead. A hand-counted invariant is not a check; the
+    /// point of replacing the number with this is that adding a 401 arm that
+    /// forgets the body now fails here rather than shipping a terminal condition
+    /// as a retryable one.
+    #[test]
+    fn every_401_arm_consults_the_body() {
+        let src = include_str!("engine.rs");
+        let mut arms = 0usize;
+        let lines: Vec<&str> = src.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            if !line.trim_start().starts_with("401 =>") {
+                continue;
+            }
+            arms += 1;
+            // The classification is either on this line or within the arm's
+            // first few lines; every existing arm resolves inside four.
+            let window = lines[i..(i + 6).min(lines.len())].join("\n");
+            assert!(
+                window.contains("is_device_revoked") || window.contains("x-error-code"),
+                "the 401 arm at line {} does not classify the body — a revocation \
+                 reported as a retryable auth failure is exactly myne#294",
+                i + 1,
+            );
+        }
+        assert!(arms >= 6, "expected every 401 arm to be found, saw {arms}");
     }
 
     #[test]
