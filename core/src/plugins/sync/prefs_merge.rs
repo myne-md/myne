@@ -145,14 +145,31 @@ fn merge_per_key_map<V: Serialize + Clone + PartialEq>(
                 );
                 out.insert(key.clone(), merged);
             }
-            // Single-sided key: carried over verbatim with its clock (if any).
+            // Single-sided key: either the other side never had it, or the other
+            // side DELETED it (myne#296). The clocks tell the two apart — a
+            // deletion stamps `<field>/<key>` on the removing side, and a side
+            // that simply never held the key has no clock for it at all.
             (Some(v), None) | (None, Some(v)) => {
-                let side = if local_map.contains_key(key) {
-                    local
+                let (present, absent) = if local_map.contains_key(key) {
+                    (local, remote)
                 } else {
-                    remote
+                    (remote, local)
                 };
-                let c = clock_of(side, &clock_key);
+                let present_clock = clock_of(present, &clock_key);
+                let absent_clock = clock_of(absent, &clock_key);
+                if absent_clock > present_clock {
+                    // The absent side removed it more recently than the present
+                    // side last wrote it → the removal wins. Its clock is
+                    // carried forward so the peer that still holds the value
+                    // drops it on the next round instead of pushing it back.
+                    clocks.insert(clock_key, absent_clock);
+                    continue;
+                }
+                // Equal clocks keep the value — "absent sorts lowest" is the
+                // tiebreak this module already uses, and it is the conservative
+                // direction: a decoration that survives one extra round is
+                // recoverable, a value deleted by a clock collision is not.
+                let c = present_clock;
                 if c > 0 {
                     clocks.insert(clock_key, c);
                 }
@@ -213,6 +230,23 @@ pub fn stamp_changed_shared_fields(before: &PrefsView, after: &mut PrefsView, no
                 let am = a.get(*name).and_then(|v| v.as_object()).unwrap_or(&empty);
                 for (key, value) in am {
                     if bm.get(key) != Some(value) {
+                        after.field_clocks.insert(format!("{name}/{key}"), now_ms);
+                    }
+                }
+                // myne#296 — a REMOVED key is a change too, and it was the one
+                // change this loop could not see: it iterated only the AFTER
+                // map, so clearing a folder colour or resetting a folder icon
+                // stamped nothing and therefore had nothing to win a race with,
+                // even in principle. The peer's key survived the union in
+                // `merge_per_key_map`, came back, and the removal was undone
+                // within two rounds — with no concurrency needed, on every
+                // removal, while a second device was enrolled.
+                //
+                // Stamping the absence is what makes "I deleted this" a claim
+                // the merge can compare, rather than an absence indistinguishable
+                // from "I never had it".
+                for key in bm.keys() {
+                    if !am.contains_key(key) {
                         after.field_clocks.insert(format!("{name}/{key}"), now_ms);
                     }
                 }
@@ -912,6 +946,103 @@ mod tests {
             assert_eq!(merged.folder_icons.get("personal/").unwrap(), "leaf");
             assert_eq!(merged.field_clocks.get("item_colors/work/"), Some(&300));
         }
+    }
+
+    // ── myne#296: a removal must be representable ───────────────────────────
+    //
+    // Before this, a per-key map merge was a pure key UNION with no way to say
+    // "I deleted this". Clearing a folder colour or resetting a folder icon
+    // stamped nothing (the stamper iterated only the after-map), so the peer's
+    // copy survived the union, came back, and the removal was undone within two
+    // rounds — with no concurrency needed, on every removal, while a second
+    // device was enrolled. The map's own GC was defeated the same way: a colour
+    // key pruned after its note was deleted, or dropped on a folder rename, came
+    // straight back from the peer.
+
+    #[test]
+    fn a_removed_key_stays_removed() {
+        // A had the colour and cleared it; B still holds it, stamped older.
+        let mut a = PrefsView::default();
+        stamped(&mut a, "item_colors/work/", 300); // the removal's stamp
+        let mut b = PrefsView::default();
+        b.item_colors.insert("work/".into(), "#red".into());
+        stamped(&mut b, "item_colors/work/", 100);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert!(
+                !merged.item_colors.contains_key("work/"),
+                "the removal wins over the peer's older value"
+            );
+            assert_eq!(
+                merged.field_clocks.get("item_colors/work/"),
+                Some(&300),
+                "and carries its clock, so the peer drops it next round rather \
+                 than pushing it back"
+            );
+        }
+    }
+
+    #[test]
+    fn a_key_the_peer_never_had_still_unions_in() {
+        // The other reading of a single-sided key, and the one the union got
+        // right: B simply never held this folder's colour. No clock on B's side,
+        // so nothing claims a deletion.
+        let mut a = PrefsView::default();
+        a.item_colors.insert("work/".into(), "#red".into());
+        stamped(&mut a, "item_colors/work/", 100);
+        let b = PrefsView::default();
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(merged.item_colors.get("work/").unwrap(), "#red");
+        }
+    }
+
+    #[test]
+    fn a_re_add_after_a_removal_wins_on_the_newer_clock() {
+        // A cleared it at T=100; B set a new colour at T=200. The value is newer
+        // than the deletion, so it comes back.
+        let mut a = PrefsView::default();
+        stamped(&mut a, "item_colors/work/", 100);
+        let mut b = PrefsView::default();
+        b.item_colors.insert("work/".into(), "#blue".into());
+        stamped(&mut b, "item_colors/work/", 200);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(merged.item_colors.get("work/").unwrap(), "#blue");
+        }
+    }
+
+    #[test]
+    fn an_equal_clock_keeps_the_value() {
+        // The conservative tiebreak: a decoration that survives one extra round
+        // is recoverable; a value dropped by a clock collision is not.
+        let mut a = PrefsView::default();
+        stamped(&mut a, "folder_icons/work/", 100);
+        let mut b = PrefsView::default();
+        b.folder_icons.insert("work/".into(), "briefcase".into());
+        stamped(&mut b, "folder_icons/work/", 100);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(merged.folder_icons.get("work/").unwrap(), "briefcase");
+        }
+    }
+
+    #[test]
+    fn clearing_a_key_stamps_its_absence() {
+        // The stamper's half: without this the merge above has nothing to
+        // compare, because an absence with no clock is indistinguishable from
+        // "this device never had the key".
+        let mut before = PrefsView::default();
+        before.item_colors.insert("work/".into(), "#red".into());
+        before
+            .folder_icons
+            .insert("work/".into(), "briefcase".into());
+        let mut after = PrefsView::default();
+
+        stamp_changed_shared_fields(&before, &mut after, 777);
+
+        assert_eq!(after.field_clocks.get("item_colors/work/"), Some(&777));
+        assert_eq!(after.field_clocks.get("folder_icons/work/"), Some(&777));
     }
 
     #[test]
