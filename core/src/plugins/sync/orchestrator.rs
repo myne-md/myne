@@ -1685,6 +1685,41 @@ pub async fn run_sync_cycle(
         .await
         .map_err(|_| SyncCycleError::Io)?;
 
+    // CLEAR the whole-corpus flag on entry (myne#292).
+    //
+    // Its own doc says it is "recomputed every cycle, and cleared as readily as
+    // it is set" — because its only job is to authorise an IRREVERSIBLE
+    // cross-device attachment erase, so it has to describe THIS cycle's end
+    // state. It did not: the recompute is the last statement of
+    // `sync_cycle_attempt`, and the only writer of that value to disk is the
+    // success arm below. A cycle that wrote the merged catalog and then failed
+    // in the note loop left the PREVIOUS cycle's `true` on disk — and every
+    // in-attempt checkpoint that did run re-serialised that same stale `true`.
+    // It then survived restarts indefinitely while retries kept failing, because
+    // an offline device fails at the pull and never reaches the recompute.
+    //
+    // The consequence is not a stale badge: "Clean unused" reads this flag,
+    // offers an attachment the device no longer has the corpus to judge, and
+    // tombstones it on every device.
+    //
+    // Clearing on ENTRY rather than computing-before-every-return cannot be
+    // defeated by a future early return added above the recompute. The cost is
+    // that a cycle failing before the recompute leaves `false`, i.e. the sweep
+    // declines until a cycle completes — which is the safe direction.
+    //
+    // It is PERSISTED here rather than left to whichever in-attempt checkpoint
+    // happens to run, because "which checkpoint ran" is not a property the
+    // invariant can rest on: a cycle that dies in the pull before any of them
+    // would otherwise leave the stale `true` on disk, which is the whole defect.
+    // The write is skipped when the flag was already false, so the common case
+    // costs nothing.
+    if state.corpus_complete {
+        state.corpus_complete = false;
+        write_sync_state(io, vault_root, &state)
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
+    }
+
     // Baseline VV + seq from the device-local head baseline (empty on first sync).
     let baseline_head = read_head_baseline(io, root_key, vault_root)
         .await
@@ -4343,6 +4378,140 @@ mod tests {
         assert_eq!(
             b_head.head_id_hex, a_head.head_id_hex,
             "B's early-surfaced SAS fingerprint matches the owner's head"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// myne#292 — a FAILED cycle must not leave the previous cycle's
+    /// `corpus_complete: true` on disk.
+    ///
+    /// The flag's only job is to authorise an irreversible cross-device
+    /// attachment erase, and its own doc says it is "recomputed every cycle, and
+    /// cleared as readily as it is set". It was not: the recompute is the last
+    /// statement of the attempt, and only the SUCCESS arm persisted it — so a
+    /// device that was complete, then fell behind and kept failing, went on
+    /// authorising "Clean unused" indefinitely with a corpus it no longer had.
+    ///
+    /// The existing coverage is the success path only (`corpus_complete` is
+    /// asserted true after a clean pull); this is the other half.
+    #[test]
+    fn a_failed_cycle_clears_the_persisted_whole_corpus_flag() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP a_failed_cycle_clears_the_persisted_whole_corpus_flag: no server");
+            return;
+        };
+        let root_key = [0x7Au8; 32];
+        let account_hash = [0x7Bu8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x15u8; 32];
+        let items_key_id = [0x39u8; 16];
+
+        let dir_a = std::env::temp_dir().join(format!("myne-cc-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-cc-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        let note = NoteId::new_v7();
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &note,
+            b"owner note",
+            false,
+        );
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
+            true,
+        );
+        run_cycle_legacy(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .unwrap();
+
+        // B completes a cycle and is genuinely whole-corpus.
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            false,
+        );
+        run_cycle_legacy(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .unwrap();
+        assert!(
+            read_sync_state(&dir_b).unwrap().corpus_complete,
+            "precondition: B held the whole corpus after a clean cycle"
+        );
+
+        // A authors a second note, so B is now behind.
+        let note2 = NoteId::new_v7();
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &note2,
+            b"second",
+            false,
+        );
+        run_cycle_legacy(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .unwrap();
+
+        // B's next cycle dies in the note-body download loop.
+        let tb_fail = FailBlobTransport {
+            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+        };
+        let res = run_cycle_legacy(
+            &tb_fail,
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        );
+        assert!(
+            res.is_err(),
+            "the cycle errors because the blob download fails"
+        );
+
+        assert!(
+            !read_sync_state(&dir_b).unwrap().corpus_complete,
+            "a device that failed mid-cycle must NOT keep authorising the \
+             irreversible fleet-wide attachment sweep"
         );
 
         std::fs::remove_dir_all(&dir_a).ok();
