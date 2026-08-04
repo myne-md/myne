@@ -34,6 +34,22 @@
   color: var(--fg-1, #23221e);
 }
 
+/* Date + optional time, side by side (myne#280). The time is secondary — a
+   date-only task is the common case — so it takes the narrower share. */
+.cm-task-field-datetime {
+  display: flex;
+  gap: 6px;
+}
+
+.cm-task-field-datetime input[type="date"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cm-task-field-datetime input[type="time"] {
+  flex: 0 0 auto;
+}
+
 /* One consistent control skin for every native input/select the surfaces use. */
 .cm-task-field-editor input,
 .cm-task-field-editor select,

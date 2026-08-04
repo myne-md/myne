@@ -308,7 +308,7 @@ export function slashCommands(): readonly SlashCommand[] {
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "- [ ] "),
     },
     {
-      // `/due` `/repeat` `/priority`: add a task field to the caret line without
+      // `/due` `/remind` `/repeat` `/priority`: add a task field to the caret line without
       // typing the `[key:: value]` syntax. Each opens the same picker the chip
       // opens (native date / recurrence builder / priority select). A non-task
       // line is auto-converted to `- [ ] ` first.
@@ -317,6 +317,16 @@ export function slashCommands(): readonly SlashCommand[] {
       icon: "D",
       svgIcon: "calendar",
       apply: (v, f, t) => openTaskFieldFromSlash(v, f, t, "due"),
+    },
+    {
+      // myne#280 — `remind` is the field the notification scheduler actually
+      // reads, and before this it was reachable only by hand-typing
+      // `[remind:: …]` into the markdown.
+      id: "remind",
+      label: i18n.t("editor.slash.remind"),
+      icon: "R",
+      svgIcon: "clock",
+      apply: (v, f, t) => openTaskFieldFromSlash(v, f, t, "remind"),
     },
     {
       id: "repeat",

@@ -282,3 +282,33 @@ describe("an anchorless repeat explains itself (myne#276)", () => {
     expect(document.querySelector('[data-testid="editor.task-field-editor"]')).toBeNull();
   });
 });
+
+// ── myne#280: `remind` in the add menu and the slash roster ─────────────────
+describe("remind is authorable (myne#280)", () => {
+  it("appears as a menu row", () => {
+    openMenu("- [ ] call mother\n");
+    expect(menuRow("remind")).not.toBeNull();
+  });
+
+  it("writes a reminder with a time through the menu", () => {
+    openMenu("- [ ] call mother\n");
+    menuRow("remind").click();
+    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    (document.querySelector('[data-testid="editor.task-field-time"]') as HTMLInputElement).value =
+      "09:00";
+    commit();
+    expect(m!.view.state.doc.toString()).toContain("[remind:: 2026-09-09 09:00]");
+  });
+
+  it("satisfies the repeat anchor, so no due date is chained after it", () => {
+    openMenu("- [ ] call mother [remind:: 2026-09-09]\n");
+    expect(
+      document.querySelector('[data-testid="editor.task-field-menu-repeat-note"]'),
+    ).toBeNull();
+  });
+
+  it("is offered as a slash command", () => {
+    const ids = slashCommands().map((c) => c.id);
+    expect(ids).toContain("remind");
+  });
+});

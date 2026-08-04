@@ -1,5 +1,6 @@
 // Add-a-task-field entry points: the `+` affordance's mini-menu and the shared
-// opener both the menu and the `/due` `/repeat` `/priority` slash commands call.
+// opener both the menu and the `/due` `/remind` `/repeat` `/priority` slash
+// commands call.
 //
 // The whole point is that NONE of the write machinery is new. A chip click today
 // goes begin-track → open-editor → apply-edit (`task-chip-listener.ts`), and
@@ -32,7 +33,7 @@ import { canRecur } from "@myne/dialect/taskRecurrence";
 import i18n from "@myne/editor/i18n";
 
 /** Menu order — the same stable order the writer serializes in. */
-const MENU_KINDS: readonly TaskFieldKind[] = ["due", "repeat", "priority"];
+const MENU_KINDS: readonly TaskFieldKind[] = ["due", "remind", "repeat", "priority"];
 
 /**
  * Open the field editor to ADD (or, if the line already carries this kind, EDIT)
@@ -93,7 +94,7 @@ export function openTaskFieldAdd(
 }
 
 /**
- * Open the three-way "add field" mini-menu anchored to the `+` affordance.
+ * Open the "add field" mini-menu anchored to the `+` affordance.
  *
  * A kind the line already carries is relabelled "Edit …" and routes through the
  * same opener (which prefills it) — strictly more useful than hiding it, and it
@@ -101,7 +102,7 @@ export function openTaskFieldAdd(
  * uses the transparent-backdrop `openModal` shape `task-field-editor.ts` uses,
  * getting focus-trap + Esc + backdrop-click dismissal for free.
  *
- * A **skip** row joins the three when the caret's line carries a recurrence rule
+ * A **skip** row joins them when the caret's line carries a recurrence rule
  * that can actually be advanced (myne#198). It sits below a separator because it
  * is categorically different from its neighbours: the other rows open an editor
  * to change a value, this one performs an action and closes. The test for
@@ -154,7 +155,7 @@ export function openTaskFieldMenu(opts: {
   // has nothing to repeat FROM. Say so on the row, before they commit — the
   // previous signal was a `title=` tooltip on the resulting raw text, which
   // requires already knowing where to hover.
-  const repeatNeedsAnchor = !present.has("due") && !/\[remind::/i.test(line.text);
+  const repeatNeedsAnchor = !present.has("due") && !present.has("remind");
 
   let firstRow: HTMLButtonElement | null = null;
   for (const kind of MENU_KINDS) {
