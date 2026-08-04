@@ -272,6 +272,53 @@ describe("URL overlay (link)", () => {
     expect(document.body.querySelector(".cm-url-overlay")).toBeNull();
   });
 
+  // ── myne#327: the overlay's selection must follow the document ────────────
+  //
+  // `savedSelection` was frozen at open and `commit()` sliced and replaced those
+  // raw offsets in the CURRENT document. The overlay is open across an untimed
+  // window — the user is typing a URL, often pasting it from elsewhere — so an
+  // autosave stamp or any edit above shifted the run, and the brackets landed
+  // mid-word while the word the user selected kept no link. Silently.
+
+  it("follows an edit made ABOVE the selection while the overlay is open", async () => {
+    m = mount("hello world", 0, 5);
+    await raf();
+    press(buttonByText("↗")!);
+    await raf();
+
+    m.view.dispatch({ changes: { from: 0, insert: "PREFIX " } });
+
+    const input = document.body.querySelector<HTMLInputElement>(".cm-url-overlay-input")!;
+    input.value = "https://x.test";
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    expect(m.view.state.doc.toString()).toBe("PREFIX [hello](https://x.test) world");
+  });
+
+  it("declines instead of throwing when the selection is deleted under it", async () => {
+    m = mount("hello world", 0, 5);
+    await raf();
+    press(buttonByText("↗")!);
+    await raf();
+
+    // The Cmd+A/Backspace shape: the document shrinks past the frozen `to`,
+    // which used to throw a RangeError out of the keydown listener and escape
+    // uncaught — leaving the overlay wedged on document.body, editor unfocused.
+    m.view.dispatch({ changes: { from: 0, to: m.view.state.doc.length, insert: "" } });
+
+    const input = document.body.querySelector<HTMLInputElement>(".cm-url-overlay-input")!;
+    input.value = "https://x.test";
+    expect(() =>
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+      ),
+    ).not.toThrow();
+    expect(m.view.state.doc.toString()).toBe("");
+    // …and the overlay really is gone, rather than wedged.
+    expect(document.body.querySelector(".cm-url-overlay")).toBeNull();
+  });
+
   it("an empty URL on Enter dismisses without mutating the doc", async () => {
     m = mount("hello world", 0, 5);
     await raf();
