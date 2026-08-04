@@ -577,7 +577,15 @@ where
     //     EXISTING entry verbatim (no re-store, no timestamp churn).
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
-    let mut catalog = read_catalog(io, &catalog_path, &catalog_key, &account_number_hash).await?;
+    // `_for_write`, not `read_catalog` (myne#308): this path REWRITES the
+    // catalog a few statements below, and rebuilding it from the empty base an
+    // undecodable file reads as would destroy every other entry.
+    let mut catalog = read_catalog_for_write(io, &catalog_path, &catalog_key, &account_number_hash)
+        .await
+        .map_err(|e| match e {
+            CatalogWriteRefusal::Io(io_error_kind) => AttachmentImportError::Io { io_error_kind },
+            CatalogWriteRefusal::Undecodable => AttachmentImportError::CatalogUndecodable,
+        })?;
 
     // A TOMBSTONED entry (deleted, awaiting sync propagation — MYND-468) is
     // treated as absent: re-importing the same file is the deliberate re-add
@@ -788,6 +796,7 @@ fn attachment_import_error_kind(e: &AttachmentImportError) -> &'static str {
         AttachmentImportError::Io { .. } => "Io",
         AttachmentImportError::InvalidVaultMeta => "InvalidVaultMeta",
         AttachmentImportError::EncodeFailed => "EncodeFailed",
+        AttachmentImportError::CatalogUndecodable => "CatalogUndecodable",
         AttachmentImportError::JoinFailure => "JoinFailure",
     }
 }
@@ -1075,9 +1084,15 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
     referenced: &std::collections::HashSet<String>,
 ) -> Result<(Vec<(String, u64)>, usize), AttachmentCleanUnusedError> {
     let catalog_path = vault_dir.join("vault.attachments");
-    let mut catalog = read_catalog(io, &catalog_path, catalog_key, account_number_hash)
+    // `_for_write`, not `read_catalog` (myne#308) — see its doc.
+    let mut catalog = read_catalog_for_write(io, &catalog_path, catalog_key, account_number_hash)
         .await
-        .map_err(AttachmentCleanUnusedError::from)?;
+        .map_err(|e| match e {
+            CatalogWriteRefusal::Io(io_error_kind) => {
+                AttachmentCleanUnusedError::Io { io_error_kind }
+            }
+            CatalogWriteRefusal::Undecodable => AttachmentCleanUnusedError::CatalogUndecodable,
+        })?;
 
     let mut survivors: Vec<(String, u64)> = Vec::new();
     let mut skipped = 0usize;
@@ -1560,9 +1575,13 @@ pub async fn attachment_delete_with_dir(
 
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
-    let mut catalog = read_catalog(io, &catalog_path, &catalog_key, &account_number_hash)
+    // `_for_write`, not `read_catalog` (myne#308) — see its doc.
+    let mut catalog = read_catalog_for_write(io, &catalog_path, &catalog_key, &account_number_hash)
         .await
-        .map_err(AttachmentDeleteError::from)?;
+        .map_err(|e| match e {
+            CatalogWriteRefusal::Io(io_error_kind) => AttachmentDeleteError::Io { io_error_kind },
+            CatalogWriteRefusal::Undecodable => AttachmentDeleteError::CatalogUndecodable,
+        })?;
 
     // Deletion under sync (MYND-468, `sync-protocol.md` §11.4): the entry is
     // NOT removed — it becomes an **attachment catalog tombstone** (`deleted_at`
@@ -1735,9 +1754,13 @@ pub(crate) async fn attachment_rename_with_dir(
 
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
-    let mut catalog = read_catalog(io, &catalog_path, &catalog_key, &account_number_hash)
+    // `_for_write`, not `read_catalog` (myne#308) — see its doc.
+    let mut catalog = read_catalog_for_write(io, &catalog_path, &catalog_key, &account_number_hash)
         .await
-        .map_err(AttachmentRenameError::from)?;
+        .map_err(|e| match e {
+            CatalogWriteRefusal::Io(io_error_kind) => AttachmentRenameError::Io { io_error_kind },
+            CatalogWriteRefusal::Undecodable => AttachmentRenameError::CatalogUndecodable,
+        })?;
 
     // A tombstoned entry is deleted — renaming it is NotFound (bug-canary;
     // the UI never lists tombstones).
@@ -1933,6 +1956,80 @@ pub async fn read_catalog(
         account_number_hash,
         candidates.first().map(|b| b.as_slice()),
     ))
+}
+
+/// Why a catalog cannot be read for a path that is about to WRITE it back.
+///
+/// The distinction [`read_catalog`] does not draw (myne#308): "the file is
+/// absent" and "the file is there and nothing decoded it" collapse to the same
+/// empty catalog, which is correct for a reader and destructive for a writer.
+pub enum CatalogWriteRefusal {
+    /// A genuine store failure — permission denied, device gone.
+    Io(IoFailureKind),
+    /// The catalog file EXISTS and no candidate copy decoded. The ciphertext is
+    /// still the only record of every entry, so it must not be overwritten.
+    Undecodable,
+}
+
+/// [`read_catalog`] for a caller that will write the catalog back.
+///
+/// # Why this is a separate function
+///
+/// `read_catalog` maps a present-but-undecodable catalog to the empty one, per
+/// §9.10.4. For a READER that is right: the library shows empty until the file
+/// is repaired, and nothing is lost. For a WRITER it is destructive, and the
+/// sequence is short (myne#308):
+///
+/// 1. `vault.attachments` becomes undecodable — one flipped ciphertext byte is
+///    enough (bit rot, a hand-copied vault directory, a torn write on a store
+///    with no atomic-rename contract, or both double-buffer copies failing on
+///    web). The library reads empty; the ciphertext and every blob are intact,
+///    and the file is still recoverable from a backup or by a sync peer's
+///    §11.4 union merge.
+/// 2. The user imports ONE attachment. Import reads the catalog as empty and
+///    writes back a valid, single-entry catalog — destroying the only remaining
+///    record of every other attachment's `content_type` (the inner AAD needed
+///    to serve or export it), `filename`, `size` and `created_at`.
+/// 3. The next unlock runs the stray-blob reclaim. The catalog decodes now, so
+///    every `attachments/<64-hex>` file it does not name is classified stray and
+///    unlinked — no grace window, `tracing::info!` only. On a vault with no sync
+///    peer the bytes are gone.
+///
+/// So a writer refuses instead. This is the same fail-closed posture
+/// `reclaim_stray_blobs` already takes for itself with
+/// `StrayReclaimOutcome::SkipUndecodableCatalog`, and for the same stated
+/// reason — it just was not applied to the paths that rewrite the file.
+///
+/// Read-only consumers (`catalog_list`, the `attachment://` scheme, export)
+/// keep `read_catalog` and its fall-back-to-empty: showing an empty library is
+/// the recoverable answer, and refusing to render would help nobody.
+pub async fn read_catalog_for_write(
+    io: &dyn VaultIo,
+    catalog_path: &Path,
+    catalog_key: &[u8; 32],
+    account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+) -> Result<AttachmentsCatalog, CatalogWriteRefusal> {
+    let candidates = io
+        .read_candidates(catalog_path)
+        .await
+        .map_err(CatalogWriteRefusal::Io)?;
+    for bytes in &candidates {
+        if let Ok(catalog) = decode_attachments_catalog(catalog_key, account_number_hash, bytes) {
+            return Ok(catalog);
+        }
+    }
+    if candidates.is_empty() {
+        // Genuinely absent — §9.10.4's base case. A first import into a vault
+        // that has never had one must still work.
+        return Ok(AttachmentsCatalog::empty());
+    }
+    tracing::error!(
+        stage = "read_catalog_for_write",
+        outcome = "undecodable",
+        candidates = candidates.len(),
+        "refusing to rewrite a catalog that exists and did not decode"
+    );
+    Err(CatalogWriteRefusal::Undecodable)
 }
 
 /// Closed failure surface of [`load_catalog_for_export`] — the two
@@ -3109,6 +3206,83 @@ mod tests {
                 .await
                 .expect("tampered catalog → empty list (§9.10.4)");
             assert!(rows.is_empty());
+        });
+    }
+
+    // ── myne#308: an undecodable catalog must not be REBUILT from empty ────
+    //
+    // §9.10.4's fall-back-to-empty is right for a reader (the library shows
+    // empty, the ciphertext and the blobs are intact, and a backup or a sync
+    // peer's §11.4 union merge can still repair it) and destructive for a
+    // writer. Import used it, so one flipped byte plus one paste replaced the
+    // only record of every other attachment's content type, filename, size and
+    // created-at with a valid single-entry catalog — and armed the next unlock's
+    // stray-blob reclaim to unlink every blob the new catalog did not name.
+    #[test]
+    fn import_refuses_to_rewrite_an_undecodable_catalog() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: PNG_BYTES.to_vec(),
+                    filename: Some("first.png".into()),
+                },
+            )
+            .await
+            .unwrap();
+            let catalog_path = tmp.path().join("vault.attachments");
+            let mut corrupt = std::fs::read(&catalog_path).unwrap();
+            corrupt[40] ^= 0xFF; // one ciphertext byte, past the 34-byte header
+            std::fs::write(&catalog_path, &corrupt).unwrap();
+
+            // A second import must REFUSE rather than rebuild.
+            let err = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    // Different bytes → a different id, so this is a genuine
+                    // second entry rather than a dedup hit.
+                    bytes: [PNG_BYTES, b"second"].concat(),
+                    filename: Some("second.png".into()),
+                },
+            )
+            .await
+            .expect_err("import must refuse an undecodable catalog");
+            assert!(
+                matches!(err, AttachmentImportError::CatalogUndecodable),
+                "expected CatalogUndecodable, got {err:?}"
+            );
+
+            // …and the on-disk ciphertext is byte-identical, so restoring it
+            // from a backup — or a peer's merge — still recovers every entry.
+            assert_eq!(
+                std::fs::read(&catalog_path).unwrap(),
+                corrupt,
+                "the refusal must leave the catalog untouched"
+            );
+        });
+    }
+
+    /// The base case must keep working: a vault that has never had a catalog.
+    /// Refusing there would make the FIRST import impossible.
+    #[test]
+    fn import_into_a_vault_with_no_catalog_still_succeeds() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            assert!(!tmp.path().join("vault.attachments").exists());
+            attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: PNG_BYTES.to_vec(),
+                    filename: None,
+                },
+            )
+            .await
+            .expect("absent catalog is the §9.10.4 base case, not a refusal");
+            assert!(tmp.path().join("vault.attachments").exists());
         });
     }
 

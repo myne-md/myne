@@ -94,6 +94,23 @@ pub enum AttachmentImportError {
     /// write pipeline.
     #[error("attachment import worker failed")]
     JoinFailure,
+
+    /// `vault.attachments` EXISTS and no copy of it decoded, so the catalog
+    /// ciphertext is still the only record of every entry (myne#308).
+    ///
+    /// Refusing is the point. Overwriting it with a catalog rebuilt from the
+    /// empty base would destroy every other attachment's `content_type` (the
+    /// inner AAD needed to serve or export it), `filename`, `size` and
+    /// `created_at` — turning a corruption that a backup or a sync peer's §11.4
+    /// union merge could still repair into permanent metadata loss, and arming
+    /// the next unlock's stray-blob reclaim to unlink every blob the new
+    /// catalog does not name.
+    ///
+    /// CTA: restore `vault.attachments` from a backup, or let a peer device
+    /// sync it back. Read-only surfaces keep working (they show an empty
+    /// library); only the paths that rewrite the file refuse.
+    #[error("the attachments catalog exists but could not be decoded")]
+    CatalogUndecodable,
 }
 
 /// The storage seam's closed error, straight through (phase3-web-client task 44).
@@ -356,6 +373,23 @@ pub enum AttachmentDeleteError {
     /// catalog rewrite — practically unreachable in v0.1.
     #[error("catalog encode failed")]
     EncodeFailed,
+
+    /// `vault.attachments` EXISTS and no copy of it decoded, so the catalog
+    /// ciphertext is still the only record of every entry (myne#308).
+    ///
+    /// Refusing is the point. Overwriting it with a catalog rebuilt from the
+    /// empty base would destroy every other attachment's `content_type` (the
+    /// inner AAD needed to serve or export it), `filename`, `size` and
+    /// `created_at` — turning a corruption that a backup or a sync peer's §11.4
+    /// union merge could still repair into permanent metadata loss, and arming
+    /// the next unlock's stray-blob reclaim to unlink every blob the new
+    /// catalog does not name.
+    ///
+    /// CTA: restore `vault.attachments` from a backup, or let a peer device
+    /// sync it back. Read-only surfaces keep working (they show an empty
+    /// library); only the paths that rewrite the file refuse.
+    #[error("the attachments catalog exists but could not be decoded")]
+    CatalogUndecodable,
 }
 
 /// The storage seam's closed error, straight through (phase3-web-client task 44).
@@ -433,6 +467,23 @@ pub enum AttachmentRenameError {
     /// catalog rewrite — practically unreachable in v0.1.
     #[error("catalog encode failed")]
     EncodeFailed,
+
+    /// `vault.attachments` EXISTS and no copy of it decoded, so the catalog
+    /// ciphertext is still the only record of every entry (myne#308).
+    ///
+    /// Refusing is the point. Overwriting it with a catalog rebuilt from the
+    /// empty base would destroy every other attachment's `content_type` (the
+    /// inner AAD needed to serve or export it), `filename`, `size` and
+    /// `created_at` — turning a corruption that a backup or a sync peer's §11.4
+    /// union merge could still repair into permanent metadata loss, and arming
+    /// the next unlock's stray-blob reclaim to unlink every blob the new
+    /// catalog does not name.
+    ///
+    /// CTA: restore `vault.attachments` from a backup, or let a peer device
+    /// sync it back. Read-only surfaces keep working (they show an empty
+    /// library); only the paths that rewrite the file refuse.
+    #[error("the attachments catalog exists but could not be decoded")]
+    CatalogUndecodable,
 }
 
 /// The storage seam's closed error, straight through (phase3-web-client task 44).
@@ -660,6 +711,23 @@ pub enum AttachmentCleanUnusedError {
     /// `spawn_blocking` panic / runtime shutdown during the re-verify scan.
     #[error("attachment cleanup worker failed")]
     JoinFailure,
+
+    /// `vault.attachments` EXISTS and no copy of it decoded, so the catalog
+    /// ciphertext is still the only record of every entry (myne#308).
+    ///
+    /// Refusing is the point. Overwriting it with a catalog rebuilt from the
+    /// empty base would destroy every other attachment's `content_type` (the
+    /// inner AAD needed to serve or export it), `filename`, `size` and
+    /// `created_at` — turning a corruption that a backup or a sync peer's §11.4
+    /// union merge could still repair into permanent metadata loss, and arming
+    /// the next unlock's stray-blob reclaim to unlink every blob the new
+    /// catalog does not name.
+    ///
+    /// CTA: restore `vault.attachments` from a backup, or let a peer device
+    /// sync it back. Read-only surfaces keep working (they show an empty
+    /// library); only the paths that rewrite the file refuse.
+    #[error("the attachments catalog exists but could not be decoded")]
+    CatalogUndecodable,
 }
 
 /// The storage seam's closed error, straight through (phase3-web-client task 44).

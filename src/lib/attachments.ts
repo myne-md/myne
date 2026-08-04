@@ -79,7 +79,15 @@ export type AttachmentImportError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "EncodeFailed" }
-  | { kind: "JoinFailure" };
+  | { kind: "JoinFailure" }
+  /** `vault.attachments` exists and no copy of it decoded (myne#308).
+   *  The catalog ciphertext is the only remaining record of every entry, so the
+   *  paths that REWRITE it refuse rather than rebuild from the empty base — which
+   *  would destroy every other attachment's content type, filename, size and
+   *  created-at, and arm the next unlock's stray-blob reclaim to unlink their
+   *  bytes. Read-only surfaces keep working (they show an empty library).
+   *  CTA: restore `vault.attachments` from a backup, or let a peer sync it back. */
+  | { kind: "CatalogUndecodable" };
 
 /** Error surface of {@link catalogList} — mirror of `CatalogListError`. */
 export type CatalogListError =
@@ -93,7 +101,15 @@ export type AttachmentDeleteError =
   | { kind: "InvalidId" }
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
-  | { kind: "EncodeFailed" };
+  | { kind: "EncodeFailed" }
+  /** `vault.attachments` exists and no copy of it decoded (myne#308).
+   *  The catalog ciphertext is the only remaining record of every entry, so the
+   *  paths that REWRITE it refuse rather than rebuild from the empty base — which
+   *  would destroy every other attachment's content type, filename, size and
+   *  created-at, and arm the next unlock's stray-blob reclaim to unlink their
+   *  bytes. Read-only surfaces keep working (they show an empty library).
+   *  CTA: restore `vault.attachments` from a backup, or let a peer sync it back. */
+  | { kind: "CatalogUndecodable" };
 
 /** Error surface of {@link attachmentRename} — mirror of `AttachmentRenameError`. */
 export type AttachmentRenameError =
@@ -103,7 +119,15 @@ export type AttachmentRenameError =
   | { kind: "AttachmentNotFound" }
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
-  | { kind: "EncodeFailed" };
+  | { kind: "EncodeFailed" }
+  /** `vault.attachments` exists and no copy of it decoded (myne#308).
+   *  The catalog ciphertext is the only remaining record of every entry, so the
+   *  paths that REWRITE it refuse rather than rebuild from the empty base — which
+   *  would destroy every other attachment's content type, filename, size and
+   *  created-at, and arm the next unlock's stray-blob reclaim to unlink their
+   *  bytes. Read-only surfaces keep working (they show an empty library).
+   *  CTA: restore `vault.attachments` from a backup, or let a peer sync it back. */
+  | { kind: "CatalogUndecodable" };
 
 /** Error surface of {@link attachmentExport} — mirror of `AttachmentExportError`. */
 export type AttachmentExportError =
@@ -139,7 +163,15 @@ export type AttachmentCleanUnusedError =
    *  because the list is advisory and storage can shrink between the two. */
   | { kind: "CorpusIncomplete" }
   | { kind: "EncodeFailed" }
-  | { kind: "JoinFailure" };
+  | { kind: "JoinFailure" }
+  /** `vault.attachments` exists and no copy of it decoded (myne#308).
+   *  The catalog ciphertext is the only remaining record of every entry, so the
+   *  paths that REWRITE it refuse rather than rebuild from the empty base — which
+   *  would destroy every other attachment's content type, filename, size and
+   *  created-at, and arm the next unlock's stray-blob reclaim to unlink their
+   *  bytes. Read-only surfaces keep working (they show an empty library).
+   *  CTA: restore `vault.attachments` from a backup, or let a peer sync it back. */
+  | { kind: "CatalogUndecodable" };
 
 /** Success payload of {@link attachmentReadText} — the decrypted preview text. */
 export interface AttachmentTextPreview {
