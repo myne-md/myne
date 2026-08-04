@@ -1362,11 +1362,35 @@ pub(crate) async fn note_snapshot_flush_with_dir(
 }
 
 /// `note_snapshot_flush` — force-capture a snapshot of the open note's current
-/// state on editor-close / before vault-lock (MYND-96, SYNC-3). The frontend
-/// calls this from its close/lock flush path (paired with the autosave
-/// flush-on-blur/close already in place). Best-effort: a snapshot failure
-/// surfaces the non-blocking `snapshot://write-failed` event; the IPC return
-/// stays `Result<(), NoteUpdateError>`.
+/// state, bypassing the coalescing window (MYND-96, SYNC-3). Best-effort: a
+/// snapshot failure surfaces the non-blocking `snapshot://write-failed` event;
+/// the IPC return stays `Result<(), NoteUpdateError>`.
+///
+/// **No production caller (myne#389 item B).** This doc used to say "the
+/// frontend calls this from its close/lock flush path (paired with the autosave
+/// flush-on-blur/close already in place)", which was not true and is the kind of
+/// claim that costs a reviewer an hour: `src/lib/flush-chain.ts` is the single
+/// shared close/lock flush path and enumerates its writers, and this is not
+/// among them. The only invokers are three E2E files
+/// (`snapshots-restore.e2e.ts`, `version-diff.e2e.ts`,
+/// `capture/userguide.capture.ts`), which reach it through the production ACL
+/// from the page seat.
+///
+/// **The grant is kept deliberately, and that is a decision rather than an
+/// oversight.** Moving it to a test-only seat is possible — the shape exists
+/// (`permissions/pdf-export/default.toml`'s second `[[set]]`, and the
+/// runtime `app.add_capability` in `plugins::local_inference`) — but it would
+/// mean the E2E suite exercising a DIFFERENT capability set than the shipped
+/// binary, and the capability set is precisely the thing those scenarios are
+/// there to exercise. The command itself is a weak primitive to hold: it writes
+/// an encrypted snapshot of a note the caller already has open, behind the
+/// `Slot::Unlocked` gate — no read, no egress, no delete.
+///
+/// **What is genuinely unresolved** is whether the close/lock flush was meant
+/// to call this at all. If it was, the step belongs in `FlushChainSteps`
+/// *after* `flushAll` — a snapshot of an unflushed body is a snapshot of the
+/// wrong bytes — and that is a behaviour change with its own issue, not a
+/// silent addition here.
 #[tauri::command]
 pub async fn note_snapshot_flush<R: Runtime>(
     app: AppHandle<R>,

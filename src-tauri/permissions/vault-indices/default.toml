@@ -27,7 +27,14 @@ permissions = [
   "allow-vault-indices-backlink-candidates",
   "allow-vault-indices-by-tag",
   "allow-vault-indices-tag-tree",
-  "allow-vault-indices-note-properties",
+  # `allow-vault-indices-note-properties` is deliberately NOT in this bundle
+  # (myne#389 item B). `vault_indices_note_properties` has no caller anywhere —
+  # not in `src/`, `editor/`, `web/src/`, `tests/` or `e2e/` — so granting it
+  # widened the main window's surface for a command no product path reaches.
+  # Its `[[permission]]` block stays below: the command is still registered and
+  # still correct, and re-granting it is one line the day a caller exists. A
+  # grant with no consumer is not free — it is a decision nobody has had to
+  # make.
   "allow-vault-indices-property-values",
   "allow-vault-indices-property-keys",
   "allow-vault-indices-persist",
