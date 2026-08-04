@@ -243,8 +243,9 @@ describe("FolderRow — drag affordances", () => {
     expect(onFolderReorderOver).toHaveBeenLastCalledWith(n, "above");
     dragOverZone(row, "below");
     expect(onFolderReorderOver).toHaveBeenLastCalledWith(n, "below");
-    // A folder drag never sets the note-into-folder highlight.
-    expect(onDragTarget).not.toHaveBeenCalled();
+    // An EDGE zone never leaves the into-highlight standing (myne#281 gave the
+    // folder drag the note drag's three zones, so it now has one to clear).
+    expect(onDragTarget).toHaveBeenLastCalledWith(null);
   });
 
   it("note drag over the middle → 'into' highlights the folder as a move target", () => {
@@ -357,5 +358,62 @@ describe("FolderRow — visual extras", () => {
   it("carries no colour marker when colorSlot is omitted", () => {
     const { container } = renderRow();
     expect(container.querySelector("[data-color-slot]")).toBeNull();
+  });
+});
+
+// ── myne#281: a folder drag gets the same three zones a note drag has ───────
+//
+// It used to get two edges and no middle, so a folder could only be reordered
+// among its siblings and the tree could not be re-nested by drag at all — the
+// asymmetry that read as a bug, because drag is the gesture the tree already
+// teaches for notes.
+describe("FolderRow — folder re-nest by drag (myne#281)", () => {
+  it("folder drag over the middle → highlights the folder as a move target", () => {
+    const onDragTarget = vi.fn();
+    const onFolderReorderOver = vi.fn();
+    const onFolderReorderLeave = vi.fn();
+    const n = node({ key: "projects/" });
+    renderRow({
+      node: n,
+      dragKind: "folder",
+      onDropFolderInto: vi.fn(),
+      onDragTarget,
+      onFolderReorderOver,
+      onFolderReorderLeave,
+    });
+    dragOverZone(screen.getByTestId("notes.folder-row"), "into");
+    expect(onDragTarget).toHaveBeenLastCalledWith("projects/");
+    expect(onFolderReorderLeave).toHaveBeenCalledWith("projects/");
+    expect(onFolderReorderOver).not.toHaveBeenCalled();
+  });
+
+  it("folder drop in the middle → onDropFolderInto, not a sibling reorder", () => {
+    const onDropFolderInto = vi.fn();
+    const onFolderReorderDrop = vi.fn();
+    const n = node({ path: "Projects/" });
+    renderRow({ node: n, dragKind: "folder", onDropFolderInto, onFolderReorderDrop });
+    dropZone(screen.getByTestId("notes.folder-row"), "into");
+    expect(onDropFolderInto).toHaveBeenCalledWith(n);
+    expect(onFolderReorderDrop).not.toHaveBeenCalled();
+  });
+
+  it("keeps the edge zones reordering among siblings", () => {
+    const onDropFolderInto = vi.fn();
+    const onFolderReorderDrop = vi.fn();
+    const n = node();
+    renderRow({ node: n, dragKind: "folder", onDropFolderInto, onFolderReorderDrop });
+    dropZone(screen.getByTestId("notes.folder-row"), "above");
+    expect(onFolderReorderDrop).toHaveBeenCalledWith(n, "above");
+    expect(onDropFolderInto).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a sibling reorder when no into-handler is wired", () => {
+    // A surface that has not opted into re-nesting must keep its old behaviour
+    // rather than swallowing the drop.
+    const onFolderReorderDrop = vi.fn();
+    const n = node();
+    renderRow({ node: n, dragKind: "folder", onFolderReorderDrop });
+    dropZone(screen.getByTestId("notes.folder-row"), "into");
+    expect(onFolderReorderDrop).toHaveBeenCalledWith(n, "below");
   });
 });

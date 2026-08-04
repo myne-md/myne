@@ -265,6 +265,10 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const draggedIdsRef = useRef<NoteId[]>([]);
   // Folded key of the folder being dragged (folder-reorder drags only).
   const draggedFolderRef = useRef<string | null>(null);
+  // The node a folder drag started from (myne#281). The folded key above is
+  // enough to reorder among siblings; a re-nest re-roots the whole subtree and
+  // needs the source PATH.
+  const draggedFolderNodeRef = useRef<FolderNode | null>(null);
 
   const [menu, setMenu] = useState<FolderMenuState>(null);
   const [newFolder, setNewFolder] = useState<NewFolderState>(null);
@@ -422,22 +426,18 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     setRenamingFolderKey(node.key);
   }, []);
   const cancelRenameFolder = useCallback(() => setRenamingFolderKey(null), []);
-  const commitRenameFolder = useCallback(
-    async (node: FolderNode, newName: string) => {
-      const newPath = folderParent(node.path) + newName + "/";
-      // Grammar gate (markdown-dialect §3.6.2): a rename edits a single
-      // segment, so `newName` must itself be one legal segment (no `/`), and
-      // the resulting path must fit PATH_MAX. On rejection keep the rename
-      // input open (don't clear `renamingFolderKey`) + surface the notice.
-      if (!isLegalSegment(newName)) {
-        setBlockNotice(folderInputRejectionMessage("illegal-segment"));
-        return;
-      }
-      if (!isLegalPathLength(newPath)) {
-        setBlockNotice(folderInputRejectionMessage("too-long"));
-        return;
-      }
-      setRenamingFolderKey(null);
+  /**
+   * Move a folder's whole subtree from `node.path` to `newPath`.
+   *
+   * The engine underneath is `renameFolder`, which already re-roots the
+   * `folder:` frontmatter of every note beneath the folder transactionally and
+   * rewrites inbound `[[Old/]]` links. A rename and a re-nest are the same
+   * operation over that engine — only the new path differs — so both go through
+   * here rather than either growing a second copy of the decoration, deliberate
+   * and archived re-rooting that has to follow it (myne#281).
+   */
+  const applyFolderPathChange = useCallback(
+    async (node: FolderNode, newPath: string) => {
       const result = await renameFolder(
         node.path,
         newPath,
@@ -471,6 +471,85 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       await Promise.all(result.moved.map((id) => ctx.refreshOne(id)));
     },
     [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap],
+  );
+
+  const commitRenameFolder = useCallback(
+    async (node: FolderNode, newName: string) => {
+      const newPath = folderParent(node.path) + newName + "/";
+      // Grammar gate (markdown-dialect §3.6.2): a rename edits a single
+      // segment, so `newName` must itself be one legal segment (no `/`), and
+      // the resulting path must fit PATH_MAX. On rejection keep the rename
+      // input open (don't clear `renamingFolderKey`) + surface the notice.
+      if (!isLegalSegment(newName)) {
+        setBlockNotice(folderInputRejectionMessage("illegal-segment"));
+        return;
+      }
+      if (!isLegalPathLength(newPath)) {
+        setBlockNotice(folderInputRejectionMessage("too-long"));
+        return;
+      }
+      setRenamingFolderKey(null);
+      await applyFolderPathChange(node, newPath);
+    },
+    [applyFolderPathChange],
+  );
+
+  // ---- move folder (re-nest) ----------------------------------------------
+  /**
+   * Re-nest `node` under `targetParent` (`null` ≡ vault root) — myne#281.
+   *
+   * Before this the folder tree could only be re-nested by deleting and
+   * recreating, by moving every note out one at a time, or by the undocumented
+   * side effect of typing a slash into the rename field. A folder drag had two
+   * edge zones and no middle, and the folder context menu had no "Move to…"
+   * even though the note menu did.
+   *
+   * Three guards a note move does not need, all of which fail LOUDLY rather
+   * than silently doing nothing:
+   *
+   *   - **into itself or its own descendant** would orphan the subtree, and is
+   *     the one drop a tree makes easy to attempt by accident;
+   *   - **a name collision** in the target would merge two folders' contents
+   *     with no way back;
+   *   - **PATH_MAX**, since nesting only ever makes the path longer.
+   *
+   * A move to where the folder already is is a no-op, not an error.
+   */
+  const moveFolderTo = useCallback(
+    async (node: FolderNode, targetParent: string | null) => {
+      setMenu(null);
+      const parent = targetParent === null ? "" : normalizeFolderPath(targetParent);
+      if (parent === null) return;
+      const name = node.path.slice(folderParent(node.path).length);
+      const newPath = parent + name;
+      const norm = normalizeFolderPath(newPath);
+      if (norm === null) {
+        setBlockNotice(folderInputRejectionMessage("illegal-segment"));
+        return;
+      }
+      // Already there — nothing to do, and reporting it as an error would be
+      // wrong.
+      if (foldSegment(norm) === foldSegment(node.path)) return;
+      // Into itself or its own descendant: `Projects/` cannot live inside
+      // `Projects/Myne/`. Folded so a case-only spelling cannot slip past.
+      if (foldSegment(parent).startsWith(foldSegment(node.path))) {
+        setBlockNotice(i18n.t("notes.folderManagement.moveIntoSelf"));
+        return;
+      }
+      if (!isLegalPathLength(norm)) {
+        setBlockNotice(folderInputRejectionMessage("too-long"));
+        return;
+      }
+      // A folder of the same folded name already in the target would merge two
+      // subtrees irreversibly.
+      const existing = findByFoldedKey(treeRef.current.roots, foldSegment(norm));
+      if (existing !== null) {
+        setBlockNotice(i18n.t("notes.folderManagement.moveCollision"));
+        return;
+      }
+      await applyFolderPathChange(node, norm);
+    },
+    [applyFolderPathChange],
   );
 
   // ---- delete folder -------------------------------------------------------
@@ -670,6 +749,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
 
   const onFolderDragStart = useCallback((e: DragEvent, node: FolderNode) => {
     draggedFolderRef.current = node.key;
+    // myne#281 — the drop target needs the NODE, not just its folded key: a
+    // re-nest re-roots the whole subtree and has to name the source path.
+    draggedFolderNodeRef.current = node;
     draggedRef.current = null;
     e.dataTransfer.setData(FOLDER_DRAG_MIME, node.path);
     e.dataTransfer.effectAllowed = "move";
@@ -682,6 +764,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     draggedRef.current = null;
     draggedIdsRef.current = [];
     draggedFolderRef.current = null;
+    draggedFolderNodeRef.current = null;
     setDragKind(null);
     setReorderTarget(null);
     setFolderReorderTarget(null);
@@ -989,6 +1072,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     startRenameFolder,
     commitRenameFolder,
     cancelRenameFolder,
+    moveFolderTo,
     blockNotice,
     dismissBlock,
     caseMerge,
@@ -1029,6 +1113,10 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     clearFolderReorderTarget,
     onFolderReorder,
     onFolderDragStart,
+    /** The folder node a drag started from, or `null` (myne#281). */
+    get dragFolderNode() {
+      return draggedFolderNodeRef.current;
+    },
     onDragEndCleanup,
     // decorations (MYND-184 color labels / MYND-185 folder icons)
     itemColors,

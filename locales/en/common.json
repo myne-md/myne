@@ -1572,7 +1572,9 @@
     },
     "folderManagement": {
       "illegalSegment": "A folder name can't contain / \\ | # ^ [ ] or start/end with a space.",
-      "tooLong": "That folder path is too long."
+      "tooLong": "That folder path is too long.",
+      "moveIntoSelf": "A folder can't be moved inside itself.",
+      "moveCollision": "There's already a folder with that name there."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1848,7 +1850,8 @@
       "importedWithSkips": "Imported {{count}} — {{skipped}} skipped",
       "importedWithSkips_one": "Imported {{count}} — {{skipped}} skipped",
       "importedWithSkips_other": "Imported {{count}} — {{skipped}} skipped",
-      "importNoMarkdown": "No markdown files in that drop"
+      "importNoMarkdown": "No markdown files in that drop",
+      "moveFolderTo": "Move folder to…"
     },
     "newFromTemplate": {
       "back": "Back",

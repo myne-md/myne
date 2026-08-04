@@ -1636,6 +1636,14 @@ function PopulatedList({
   } | null>(
     null,
   );
+  // myne#281 — the folder equivalent. Separate state because the payload is a
+  // folder node, not a note-id set, and the two pickers offer different targets
+  // (a folder cannot be offered itself or its own descendants).
+  const [folderMoveTarget, setFolderMoveTarget] = useState<{
+    x: number;
+    y: number;
+    node: FolderNode;
+  } | null>(null);
   // Undo target for a bulk trash (MYND-367) — the ids just moved to Trash, so
   // "Undo" can restore the whole set (parity with the single-note undo toast).
   const [bulkUndo, setBulkUndo] = useState<readonly NoteId[] | null>(null);
@@ -2076,6 +2084,30 @@ function PopulatedList({
     [folderOptions, runBulkMove, moveTarget, t],
   );
 
+  // myne#281 — "Move folder to…": Vault root + every folder that is not the
+  // dragged folder itself nor one of its own descendants. Filtering the list is
+  // not the guard (`moveFolderTo` still refuses), it is what keeps the menu from
+  // offering a destination it would then reject.
+  const folderMoveMenuItems: ContextMenuItem[] = useMemo(() => {
+    const node = folderMoveTarget?.node;
+    if (node === undefined) return [];
+    const selfKey = foldSegment(node.path);
+    return [
+      {
+        id: "__vault_root__",
+        label: t("notes.list.vaultRoot"),
+        onSelect: () => void fm.moveFolderTo(node, null),
+      },
+      ...folderOptions
+        .filter((o) => !foldSegment(o.path).startsWith(selfKey))
+        .map((o) => ({
+          id: o.path,
+          label: o.label,
+          onSelect: () => void fm.moveFolderTo(node, o.path),
+        })),
+    ];
+  }, [folderOptions, folderMoveTarget, fm, t]);
+
   const menuItems: ContextMenuItem[] = useMemo(() => {
     if (menu === null) return [];
     // Bulk mode: the right-clicked row is part of a multi-selection of >1 — the
@@ -2301,6 +2333,14 @@ function PopulatedList({
         id: "rename",
         label: t("notes.list.rename"),
         onSelect: () => fm.startRenameFolder(node),
+      },
+      {
+        // myne#281 — the note menu has had "Move to…" since MYND-622; the
+        // folder menu had no equivalent, so a keyboard or non-drag user had no
+        // way to re-nest a folder at all. Same picker, same guards as the drop.
+        id: "move",
+        label: t("notes.list.moveFolderTo"),
+        onSelect: () => setFolderMoveTarget({ x: menuPos.x, y: menuPos.y, node }),
       },
       {
         id: "new-note",
@@ -2628,6 +2668,15 @@ function PopulatedList({
                     onFolderReorderDrop={(node, place) =>
                       void fm.onFolderReorder(node, place)
                     }
+                    onDropFolderInto={(node) => {
+                      // myne#281 — the dragged folder re-nests under the hovered
+                      // one. `fm.dragFolder` is the node the drag started from;
+                      // the guards (self/descendant, name collision, PATH_MAX)
+                      // live in `moveFolderTo` so the menu entry gets them too.
+                      const dragged = fm.dragFolderNode;
+                      if (dragged === null) return;
+                      void fm.moveFolderTo(dragged, node.path);
+                    }}
                     onDragEnd={fm.onDragEndCleanup}
                     onCommitRename={(node, newName) =>
                       void fm.commitRenameFolder(node, newName)
@@ -2784,6 +2833,16 @@ function PopulatedList({
           searchable
           searchPlaceholder={t("commands.picker.moveNotePlaceholder")}
           onClose={() => setMoveTarget(null)}
+        />
+      )}
+      {folderMoveTarget !== null && (
+        <ContextMenu
+          x={folderMoveTarget.x}
+          y={folderMoveTarget.y}
+          items={folderMoveMenuItems}
+          searchable
+          searchPlaceholder={t("commands.picker.moveNotePlaceholder")}
+          onClose={() => setFolderMoveTarget(null)}
         />
       )}
       {fm.menu !== null && (

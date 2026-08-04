@@ -826,3 +826,98 @@ describe("root drop (unfile)", () => {
     expect(setItemOrder).not.toHaveBeenCalled();
   });
 });
+
+// ── myne#281: re-nesting a folder ───────────────────────────────────────────
+//
+// Before this the folder tree could only be re-nested by deleting and
+// recreating, by moving every note out one at a time, or by the undocumented
+// side effect of typing a slash into the rename field. The engine underneath is
+// `renameFolder`, which already re-roots the whole subtree transactionally — a
+// rename and a re-nest are the same operation over it, which is why both go
+// through one applier rather than the second growing its own copy of the
+// decoration / deliberate / archived re-rooting that follows.
+describe("move folder (myne#281)", () => {
+  const OK = {
+    moved: ["n1"],
+    failed: [],
+    deliberateRewritten: 0,
+    nextDeliberate: [],
+    invalid: false,
+  };
+
+  it("re-nests under the target, carrying the whole subtree", async () => {
+    renameFolder.mockResolvedValue(OK);
+    const { result, ctx } = mount([rec("n1", "Work/"), rec("n2", "Archive/")]);
+    const node = findNode(result.current.treeRef.current.roots, "work/")!;
+    await act(async () => {
+      await result.current.moveFolderTo(node, "Archive/");
+    });
+    expect(renameFolder).toHaveBeenCalledWith(
+      "Work/",
+      "Archive/Work/",
+      expect.any(Array),
+      expect.any(Array),
+    );
+    expect(ctx.refreshOne).toHaveBeenCalledWith("n1");
+  });
+
+  it("moves back to the vault root on a null target", async () => {
+    renameFolder.mockResolvedValue(OK);
+    const { result } = mount([rec("n1", "Archive/Work/")]);
+    const node = findNode(result.current.treeRef.current.roots, "archive/work/")!;
+    await act(async () => {
+      await result.current.moveFolderTo(node, null);
+    });
+    expect(renameFolder).toHaveBeenCalledWith(
+      "Archive/Work/",
+      "Work/",
+      expect.any(Array),
+      expect.any(Array),
+    );
+  });
+
+  it("refuses a move into itself — that would orphan the subtree", async () => {
+    renameFolder.mockClear();
+    const { result } = mount([rec("n1", "Work/")]);
+    const node = findNode(result.current.treeRef.current.roots, "work/")!;
+    await act(async () => {
+      await result.current.moveFolderTo(node, "Work/");
+    });
+    expect(renameFolder).not.toHaveBeenCalled();
+    expect(result.current.blockNotice).toBeTruthy();
+  });
+
+  it("refuses a move into its own descendant", async () => {
+    renameFolder.mockClear();
+    const { result } = mount([rec("n1", "Work/Reports/")]);
+    const node = findNode(result.current.treeRef.current.roots, "work/")!;
+    await act(async () => {
+      await result.current.moveFolderTo(node, "Work/Reports/");
+    });
+    expect(renameFolder).not.toHaveBeenCalled();
+    expect(result.current.blockNotice).toBeTruthy();
+  });
+
+  it("refuses a name collision in the target rather than merging two subtrees", async () => {
+    renameFolder.mockClear();
+    const { result } = mount([rec("n1", "Work/"), rec("n2", "Archive/Work/")]);
+    const node = findNode(result.current.treeRef.current.roots, "work/")!;
+    await act(async () => {
+      await result.current.moveFolderTo(node, "Archive/");
+    });
+    expect(renameFolder).not.toHaveBeenCalled();
+    expect(result.current.blockNotice).toBeTruthy();
+  });
+
+  it("is a silent no-op when the folder is already there", async () => {
+    // Not an error: nothing to do, and reporting it would be wrong.
+    renameFolder.mockClear();
+    const { result } = mount([rec("n1", "Archive/Work/")]);
+    const node = findNode(result.current.treeRef.current.roots, "archive/work/")!;
+    await act(async () => {
+      await result.current.moveFolderTo(node, "Archive/");
+    });
+    expect(renameFolder).not.toHaveBeenCalled();
+    expect(result.current.blockNotice).toBeNull();
+  });
+});
