@@ -594,6 +594,74 @@ fn read_singleton_nonce(bytes: &[u8], magic: &[u8; 4]) -> Option<[u8; 24]> {
     Some(nonce)
 }
 
+/// Download a synced singleton's bytes and verify them against the record that
+/// advertised them, per `sync-protocol.md` §11.3 — the pre-mutation check the
+/// note path does at `read_myn_content_nonce` and the attachment path at
+/// `read_mya1_content_nonce`.
+///
+/// Returns `None` when there is nothing to pull, **and** when the served bytes
+/// do not carry the advertised `content_nonce`. Both answers mean the same
+/// thing to every caller: take the no-remote-record path, mutate nothing, and
+/// leave the prior baseline authoritative.
+///
+/// Why the singletons need this as much as the notes do, despite being
+/// small and mergeable: `record_blob_baseline` stores the nonce the SERVER
+/// advertised, not the one read back out of the adopted bytes. Adopt unverified
+/// bytes and the on-disk nonce and the recorded baseline disagree forever —
+/// every later cycle re-classifies the record as changed and re-adopts it. If
+/// the bytes additionally lack the family magic, `read_*_nonce` on the adopted
+/// file is `None`, the push-side `if let Some(nonce)` guard adds nothing to
+/// `to_push`, and the blob can never heal: the vault keeps the served bytes and
+/// the loop never terminates. The whole failure is prevented by not writing
+/// them.
+///
+/// `family` is a static label for the skip log. Nothing else is logged: the
+/// nonces themselves are DENY-listed (`src-tauri/CLAUDE.md`), and the blob id
+/// is a vault-stable correlation tag.
+fn verified_singleton_download(
+    transport: &dyn SyncTransport,
+    token: &str,
+    remote_record: Option<&ChangedBlob>,
+    remote_changed: bool,
+    read_nonce: fn(&[u8]) -> Option<[u8; 24]>,
+    family: &'static str,
+) -> Result<SingletonPull, SyncCycleError> {
+    let Some(rec) = remote_record.filter(|_| remote_changed) else {
+        return Ok(SingletonPull::Nothing);
+    };
+    let bytes = download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+    if read_nonce(&bytes) != Some(rec.content_nonce) {
+        // Empty bodies, junk, a truncated blob and a genuine-but-different
+        // revision all land here on one check.
+        tracing::warn!(
+            stage = "singleton_pull_verify",
+            family,
+            "served bytes do not carry the advertised content_nonce; skipping with no local mutation"
+        );
+        return Ok(SingletonPull::Refused);
+    }
+    Ok(SingletonPull::Verified(rec.clone(), bytes))
+}
+
+/// The three outcomes of [`verified_singleton_download`].
+///
+/// `Nothing` and `Refused` both mean "do not adopt", but they are NOT
+/// interchangeable, and collapsing them is a §11.3 violation in its own right.
+/// §11.3 forbids *any* local mutation on a failed verification — "the disk
+/// write **and** the baseline adoption". The prefs phase's no-changed-record
+/// tail performs a baseline self-heal (for a re-enrolled device whose CAS base
+/// went missing), which is correct when there was genuinely nothing to pull and
+/// wrong when a record was refused: it would record the advertised nonce of a
+/// revision the client just declined to accept.
+enum SingletonPull {
+    /// No record, or a record whose bytes we already hold.
+    Nothing,
+    /// A record was served and failed verification. Mutate nothing at all.
+    Refused,
+    /// Verified: the served bytes carry the advertised `content_nonce`.
+    Verified(ChangedBlob, Vec<u8>),
+}
+
 /// The catalog's sync discriminator (`read_singleton_nonce` over MYC1).
 fn read_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
     read_singleton_nonce(bytes, &CATALOG_BLOB_MAGIC)
@@ -912,9 +980,20 @@ async fn sync_catalog_phase(
         .map(|r| Some(r.content_nonce) != local_nonce)
         .unwrap_or(false);
 
-    if let (Some(rec), true) = (remote_record, remote_changed) {
-        let remote_bytes =
-            download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+    // §11.3 gate — verify BEFORE any local mutation, exactly as the note and
+    // attachment paths do. Bytes whose header nonce is not the one the record
+    // advertised are dropped here, so neither the disk write nor the baseline
+    // adoption below can see them.
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_catalog_nonce,
+        "catalog",
+    )?;
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
         // A hostile/corrupt remote catalog collapses to empty (§9.10.4);
         // merge(local, empty) == local, so nothing is lost and the local
         // catalog re-pushes over it.
@@ -928,7 +1007,7 @@ async fn sync_catalog_phase(
             io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
                 .await
                 .map_err(|_| SyncCycleError::Io)?;
-            record_blob_baseline(state, &cat_hex, rec);
+            record_blob_baseline(state, &cat_hex, &rec);
             return Ok(CatalogPhase {
                 merged,
                 dirty: false,
@@ -944,7 +1023,7 @@ async fn sync_catalog_phase(
             .map_err(|_| SyncCycleError::Io)?;
         // Record the server's version as the CAS base WITHOUT claiming its
         // nonce (the local file now differs → dirty).
-        record_blob_baseline(state, &cat_hex, rec);
+        record_blob_baseline(state, &cat_hex, &rec);
         return Ok(CatalogPhase {
             merged,
             dirty: true,
@@ -1076,16 +1155,25 @@ async fn sync_prefs_phase(
     // merges. A server blob that fails decode falls through to the general
     // path (merge with defaults — the hostile-blob posture).
     if local_bytes.is_none() {
-        if let Some(rec) = remote_record {
-            let remote_bytes =
-                download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+        // §11.3 gate. `decode_prefs_blob` below is NOT a substitute: it proves
+        // the bytes are a valid `MYP1` for this vault, not that they are the
+        // revision the record advertised — a server can serve a genuine older
+        // blob under a newer record's nonce and the decode still succeeds.
+        if let SingletonPull::Verified(rec, remote_bytes) = verified_singleton_download(
+            transport,
+            token,
+            remote_record,
+            true,
+            read_prefs_nonce,
+            "prefs-seed",
+        )? {
             if let Ok(seeded) =
                 protocol::decode_prefs_blob(&prefs_key, account_number_hash, &remote_bytes)
             {
                 io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
                     .await
                     .map_err(|_| SyncCycleError::Io)?;
-                record_blob_baseline(state, &id_hex, rec);
+                record_blob_baseline(state, &id_hex, &rec);
                 let shared_hash = shared_subset_hash(&seeded);
                 set_prefs_gate_baseline(vault_root, shared_hash.clone());
                 return Ok(PrefsPhase {
@@ -1113,9 +1201,18 @@ async fn sync_prefs_phase(
         })
         .unwrap_or(false);
 
-    if let (Some(rec), true) = (remote_record, remote_changed) {
-        let remote_bytes =
-            download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+    // §11.3 gate — before the write and before the baseline adoption.
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_prefs_nonce,
+        "prefs",
+    )?;
+
+    let refused = matches!(verified, SingletonPull::Refused);
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
         // A hostile/corrupt remote prefs blob collapses to defaults (§9.5.5);
         // merge(local, default) keeps every locally-clocked value and the
         // local view re-pushes over it.
@@ -1133,7 +1230,7 @@ async fn sync_prefs_phase(
             io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
                 .await
                 .map_err(|_| SyncCycleError::Io)?;
-            record_blob_baseline(state, &id_hex, rec);
+            record_blob_baseline(state, &id_hex, &rec);
             set_prefs_gate_baseline(vault_root, merged_hash.clone());
             return Ok(PrefsPhase {
                 dirty: false,
@@ -1157,7 +1254,7 @@ async fn sync_prefs_phase(
                     .await
                     .map_err(|_| SyncCycleError::Io)?;
             }
-            record_blob_baseline(state, &id_hex, rec);
+            record_blob_baseline(state, &id_hex, &rec);
             set_prefs_gate_baseline(vault_root, merged_hash.clone());
             return Ok(PrefsPhase {
                 dirty: false,
@@ -1175,7 +1272,7 @@ async fn sync_prefs_phase(
         io.write(&path, &merged_bytes, crate::vault_io::WriteOpts::default())
             .await
             .map_err(|_| SyncCycleError::Io)?;
-        record_blob_baseline(state, &id_hex, rec);
+        record_blob_baseline(state, &id_hex, &rec);
         return Ok(PrefsPhase {
             dirty: true,
             applied_remote,
@@ -1188,9 +1285,11 @@ async fn sync_prefs_phase(
     // server's bytes) or only the PERSISTED baseline's nonce (an unsynced
     // local edit re-encrypted the file while the server simply hasn't moved).
     let shared_hash = shared_subset_hash(&local_view);
-    if let Some(rec) = remote_record {
+    if let Some(rec) = remote_record.filter(|_| !refused) {
         // Self-heal the CAS baseline so a re-enrolled/migrated device stops
-        // registering as never-synced.
+        // registering as never-synced. Skipped when the pull was REFUSED: §11.3
+        // bars the baseline adoption as well as the disk write, and adopting a
+        // refused record's advertised nonce is exactly that.
         record_blob_baseline(state, &id_hex, rec);
         // Self-heal the RAM push-gate baseline ONLY when the local blob is
         // provably the server's exact bytes (nonce match). Healing in the
@@ -1309,9 +1408,20 @@ async fn sync_themes_phase(
         .map(|r| Some(r.content_nonce) != local_nonce)
         .unwrap_or(false);
 
-    if let (Some(rec), true) = (remote_record, remote_changed) {
-        let remote_bytes =
-            download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+    // §11.3 gate. This family needs it most: the `io.write` below is shared by
+    // both arms, and the local store falls back to EMPTY when it cannot be
+    // decoded — so for unverified junk `merged == remote_map` holds and the
+    // live `vault.themes` is replaced by that junk.
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_themes_nonce,
+        "themes",
+    )?;
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
         let (themes_key, local_map) = decode_local();
         // A hostile/corrupt remote store collapses to empty (§9.21.4);
         // merge(local, empty) == local, so nothing is lost and the local store
@@ -1340,7 +1450,7 @@ async fn sync_themes_phase(
         io.write(&path, &bytes, crate::vault_io::WriteOpts::default())
             .await
             .map_err(|_| SyncCycleError::Io)?;
-        record_blob_baseline(state, &id_hex, rec);
+        record_blob_baseline(state, &id_hex, &rec);
         return Ok(ThemesPhase {
             dirty,
             applied_remote,
@@ -7402,6 +7512,102 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
+        /// §11.3 on the enrollment seed. `decode_prefs_blob` succeeding is NOT
+        /// the check: these bytes ARE a valid `MYP1` for this vault, they are
+        /// simply not the revision the record advertised — which is exactly
+        /// what a server replaying a genuine older blob under a newer record
+        /// produces. Seeding them would write the wrong revision to a virgin
+        /// vault AND record a baseline the client does not hold.
+        #[test]
+        fn a_seed_whose_bytes_do_not_match_the_record_is_refused() {
+            let dir = scratch("seed-lying");
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut remote = PrefsView {
+                label: Some("Vault Identity".into()),
+                ..PrefsView::default()
+            };
+            remote.field_clocks.insert("label".into(), 900);
+            let mut rec = serve_remote(&t, &pid, &remote);
+            // Same bytes on the wire, a different nonce in the record.
+            rec.content_nonce = [0x11; 24];
+
+            let phase = blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
+
+            assert!(
+                !dir.join("vault.prefs").exists(),
+                "a virgin vault must not be seeded from unverified bytes"
+            );
+            assert!(
+                !st.blobs.contains_key(&hex(&pid)),
+                "no baseline may be adopted for bytes that were never verified"
+            );
+            assert!(!phase.applied_remote);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// The steady-state twin: a populated vault must not have its live
+        /// `vault.prefs` replaced by a revision the record misidentifies.
+        #[test]
+        fn a_steady_state_pull_under_a_lying_record_is_skipped() {
+            let dir = scratch("steady-lying");
+            let local = PrefsView {
+                label: Some("Mine".into()),
+                ..PrefsView::default()
+            };
+            write_local(&dir, &local);
+            let before = std::fs::read(dir.join("vault.prefs")).unwrap();
+
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut remote = PrefsView {
+                label: Some("Theirs".into()),
+                ..PrefsView::default()
+            };
+            remote.field_clocks.insert("label".into(), 9_000);
+            let mut rec = serve_remote(&t, &pid, &remote);
+            rec.content_nonce = [0x11; 24];
+
+            let phase = blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
+
+            assert_eq!(
+                std::fs::read(dir.join("vault.prefs")).unwrap(),
+                before,
+                "the live blob must be byte-untouched"
+            );
+            assert_eq!(read_local(&dir).label, Some("Mine".into()));
+            assert!(
+                !st.blobs.contains_key(&hex(&pid)),
+                "the prior baseline stays authoritative"
+            );
+            assert!(!phase.applied_remote);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
         // A virgin vault against an EMPTY server proceeds on defaults — no
         // crash, no seed, and the initial-publish intent registers as dirty.
         #[test]
@@ -8152,6 +8358,132 @@ mod tests {
             .unwrap();
             assert!(phase.dirty, "the local store re-pushes over the garbage");
             assert_eq!(read_local(&dir), local, "nothing lost");
+            // §11.3: the baseline must NOT be adopted either. Before the
+            // pre-write gate landed, this silently became `[0x9e; 24]` — a
+            // baseline for a revision the client does not hold — and the test
+            // did not look.
+            assert!(
+                !st.blobs.contains_key(&hex(&tid)),
+                "a record whose bytes failed verification must leave no baseline"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// The case the old code actually destroyed data in, and the reason the
+        /// check has to run BEFORE the write rather than being inferred from
+        /// the merge outcome.
+        ///
+        /// With no local store, `decode_themes_map_or_empty` yields empty for
+        /// the junk too, so `merged == remote_map` holds and the adopt arm
+        /// writes the junk to `vault.themes` verbatim. Worse, the junk carries
+        /// no `MYT1` magic, so on the next cycle `read_themes_nonce` of the
+        /// on-disk file is `None`: the push-side `if let Some(nonce)` guard
+        /// adds nothing to `to_push`, `dirty` stays true forever, and the blob
+        /// can never heal.
+        #[test]
+        fn junk_never_reaches_disk_when_there_is_no_local_store() {
+            let dir = scratch("hostile-virgin");
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(b"not a MYT1 blob") });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(&tid)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            let rec = ChangedBlob {
+                id: tid,
+                content_nonce: [0x9e; 24],
+                version: 7,
+                size: 15,
+                attachment_id: None,
+            };
+
+            let phase = blocking(sync_themes_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                Some(&rec),
+            ))
+            .unwrap();
+
+            assert!(
+                !dir.join("vault.themes").exists(),
+                "unverified bytes must never be written; a virgin store stays virgin"
+            );
+            assert!(
+                !st.blobs.contains_key(&hex(&tid)),
+                "no baseline may be adopted for bytes that were never verified"
+            );
+            assert!(!phase.applied_remote, "nothing was applied");
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// A well-formed `MYT1` blob for this vault, served under a record that
+        /// advertises a DIFFERENT nonce. Everything decrypts; only the identity
+        /// of the revision is wrong. This is the case `decode_*` cannot catch
+        /// and the one a malicious server actually has cheap access to — it
+        /// replays a genuine older revision under a newer record.
+        #[test]
+        fn a_genuine_blob_under_a_lying_record_is_skipped() {
+            let dir = scratch("lying-record");
+            let local = ThemesMap::from([theme("nord", "#88c0d0", T0)]);
+            write_local(&dir, &local);
+            let before = std::fs::read(dir.join("vault.themes")).unwrap();
+
+            let remote = ThemesMap::from([theme("gruvbox", "#282828", T0 + 1)]);
+            let remote_bytes = encode_themes_map(&themes_key(), &HASH, &remote).unwrap();
+
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(&remote_bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(&tid)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            // The record advertises a nonce these bytes do not carry.
+            let rec = ChangedBlob {
+                id: tid,
+                content_nonce: [0x11; 24],
+                version: 9,
+                size: remote_bytes.len(),
+                attachment_id: None,
+            };
+
+            let phase = blocking(sync_themes_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                Some(&rec),
+            ))
+            .unwrap();
+
+            assert_eq!(
+                std::fs::read(dir.join("vault.themes")).unwrap(),
+                before,
+                "the live file must be byte-untouched"
+            );
+            assert_eq!(read_local(&dir), local, "the local store is unchanged");
+            assert!(
+                !st.blobs.contains_key(&hex(&tid)),
+                "the prior baseline stays authoritative"
+            );
+            assert!(!phase.applied_remote);
             std::fs::remove_dir_all(&dir).ok();
         }
     }
