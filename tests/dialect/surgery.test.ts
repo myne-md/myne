@@ -12,7 +12,16 @@ import {
   patchSourceRanges,
   patchTitleField,
   patchUpdatedField,
+  readArchivedFromFmBody,
+  readConflictFromFmBody,
+  readConflictOfFromFmBody,
+  readDeletedFromFmBody,
+  readDoneFromFmBody,
+  readKindFromFmBody,
+  readTemplateFromFmBody,
   readTitleFromFmBody,
+  readTrashedFromFmBody,
+  readUpdatedFromFmBody,
 } from "../../src/dialect/surgery";
 import { bytesEqual, dec, enc, fixtureDir } from "./_helpers";
 
@@ -453,5 +462,97 @@ describe("patchSourceRanges — defensive throws", () => {
     expect(() =>
       patchSourceRanges(input, [{ start: 2, end: 1 }], ["X"]),
     ).toThrow(/bounds/i);
+  });
+});
+
+// ── myne#321: a managed key is COLUMN ZERO, always ──────────────────────────
+//
+// The twelve key regexes began `^([ \t]*`, so every reader and every writer
+// matched a key nested inside somebody else's mapping.
+//
+// The write half fires unconditionally: `patchUpdatedField` runs on every save,
+// so a note carrying the ordinary `seo:` / `dates:` / `meta:` shape had its
+// NESTED value silently rewritten each time while the top-level key was never
+// inserted — the user's own value destroyed, and sort-by-updated permanently
+// broken for that note. The read half forges note STATE: a nested `deleted:`
+// with a parseable timestamp made a note vanish from the sidebar, Trash,
+// Conflicts, Archive and the template picker with no recovery affordance.
+//
+// The package already gets this right in `frontmatterSequence` and in the Rust
+// twin; only this file was indent-blind, and it is the one on the hot path.
+describe("managed keys are top-level only (myne#321)", () => {
+  const nested = (key: string, value: string) =>
+    `---\nseo:\n  ${key}: ${value}\n---\n\n# Body\n`;
+
+  describe("writers insert a top-level key instead of patching a nested one", () => {
+    it("patchUpdatedField — the every-save path", () => {
+      const out = dec.decode(
+        patchUpdatedField(enc.encode(nested("updated", "2020-01-01T00:00:00Z")), TEST_ISO),
+      );
+      expect(out).toContain("  updated: 2020-01-01T00:00:00Z");
+      expect(out).toContain(`\nupdated: ${TEST_ISO}`);
+    });
+
+    it("patchTitleField — the importer's title injection", () => {
+      // The exact failure the injection exists to prevent: `seo.title`
+      // overwritten with the filename, and the note STILL landing "Untitled".
+      const out = dec.decode(
+        patchTitleField(enc.encode(nested("title", "Site Name")), "My Note"),
+      );
+      expect(out).toContain("  title: Site Name");
+      expect(out).toContain("\ntitle: My Note");
+    });
+  });
+
+  describe("readers ignore a nested key", () => {
+    const fmBody = (key: string, value: string) => `seo:\n  ${key}: ${value}\n`;
+
+    it("readTitleFromFmBody", () => {
+      expect(readTitleFromFmBody(fmBody("title", "Nested"))).toBeNull();
+    });
+
+    it("readUpdatedFromFmBody", () => {
+      expect(readUpdatedFromFmBody(fmBody("updated", "2026-04-01T00:00:00Z"))).toBeNull();
+    });
+
+    it("readDeletedFromFmBody — the one that made a note vanish", () => {
+      expect(readDeletedFromFmBody(fmBody("deleted", "2026-04-01T00:00:00Z"))).toBeNull();
+    });
+
+    it("readTrashedFromFmBody", () => {
+      expect(readTrashedFromFmBody(fmBody("trashed", "2026-04-01T00:00:00Z"))).toBeNull();
+    });
+
+    it("readArchivedFromFmBody", () => {
+      expect(readArchivedFromFmBody(fmBody("archived", "2026-04-01T00:00:00Z"))).toBeNull();
+    });
+
+    it("readTemplateFromFmBody — the one that moved a note into Templates", () => {
+      expect(readTemplateFromFmBody(fmBody("template", "true"))).toBe(false);
+    });
+
+    it("readKindFromFmBody — the one that force-rendered a canvas", () => {
+      expect(readKindFromFmBody(fmBody("kind", "drawing"))).not.toBe("drawing");
+    });
+
+    it("readConflictFromFmBody / readConflictOfFromFmBody", () => {
+      expect(readConflictFromFmBody(fmBody("conflict", "true"))).toBe(false);
+      expect(readConflictOfFromFmBody(fmBody("conflict_of", "abc"))).toBeNull();
+    });
+
+    it("readDoneFromFmBody", () => {
+      expect(readDoneFromFmBody(fmBody("done", "2026-04-01"))).toBeNull();
+    });
+  });
+
+  it("a top-level key is still read and patched", () => {
+    // The rule narrows what counts as managed; it must not stop the managed
+    // keys working.
+    expect(readTitleFromFmBody("title: Real\n")).toBe("Real");
+    const out = dec.decode(
+      patchUpdatedField(enc.encode("---\nupdated: 2020-01-01T00:00:00Z\n---\n\n# B\n"), TEST_ISO),
+    );
+    expect(out).toContain(`updated: ${TEST_ISO}`);
+    expect(out).not.toContain("2020-01-01");
   });
 });
