@@ -34,7 +34,7 @@
 
 pub mod commands;
 pub(crate) mod compress;
-pub(crate) mod decode;
+pub mod decode;
 pub mod error;
 pub mod extract_types;
 pub mod ocr;

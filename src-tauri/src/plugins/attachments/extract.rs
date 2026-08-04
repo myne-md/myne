@@ -259,6 +259,52 @@ fn ocr_scanned_pdf(doc: &lopdf::Document) -> ExtractedText {
     finalize(out, SourceFormat::Pdf)
 }
 
+/// Most bytes one embedded PDF image stream may inflate to (myne#309).
+///
+/// A sibling of [`MAX_XML_PART_LEN`] — the same class of guard, for the same
+/// reason (deflate reaches ~1030:1, so a cap-compliant attachment can hold a
+/// member that inflates to GiB), applied to the other decompression this crate
+/// performs on untrusted bytes.
+///
+/// Derived from the DECLARED geometry rather than fixed, because here the
+/// legitimate size is known exactly: at `bits_per_component == 8` a raw sample
+/// stream is `width * height * components`, and the widest colour space this
+/// function then accepts is `DeviceRGB` (3). The `+ 1` component of slack
+/// covers an alpha/soft-mask channel; the absolute floor keeps a tiny image
+/// from producing a ceiling so small that a legal stream trips it.
+///
+/// Anything past this is unusable regardless of intent — `RgbImage::from_raw` /
+/// `GrayImage::from_raw` below want the exact length — so refusing early costs
+/// nothing a caller wanted.
+fn plausible_samples_ceiling(w: u32, h: u32) -> u64 {
+    const MAX_COMPONENTS: u64 = 4; // RGB + one channel of slack
+    const FLOOR: u64 = 1024 * 1024;
+    // Saturating: `w` and `h` are attacker-declared dictionary values, and
+    // `u32::MAX * u32::MAX * 4` overflows `u64`. A wrap would hand back a tiny
+    // ceiling — fail-closed, but by accident; saturating says so on purpose.
+    u64::from(w)
+        .saturating_mul(u64::from(h))
+        .saturating_mul(MAX_COMPONENTS)
+        .max(FLOOR)
+}
+
+/// Does `compressed` inflate to at most `ceiling` bytes?
+///
+/// Reads through `Read::take(ceiling + 1)`, so resident memory is bounded by the
+/// ceiling whatever the input claims — the property `decompressed_content()`
+/// does not have. A truncated or corrupt stream answers `false`: this is a
+/// pre-flight for a decode that would fail anyway, so degrading to "skip this
+/// image" is the same outcome by a cheaper route.
+fn flate_inflates_within(compressed: &[u8], ceiling: u64) -> bool {
+    use std::io::Read;
+    let mut sink = std::io::sink();
+    let mut probe = flate2::read::ZlibDecoder::new(compressed).take(ceiling + 1);
+    match std::io::copy(&mut probe, &mut sink) {
+        Ok(n) => n <= ceiling,
+        Err(_) => false,
+    }
+}
+
 /// Turn one embedded PDF image into decoded pixels, or `None` for a codec this
 /// generation does not handle.
 fn decode_pdf_image(
@@ -279,13 +325,37 @@ fn decode_pdf_image(
     let has = |f: &str| filters.iter().any(|x| x == f);
 
     if has("DCTDecode") {
-        // The stream content IS a JPEG file; hand it straight to the decoder.
-        return image::load_from_memory(img.content).ok();
+        // The stream content IS a JPEG file. Through the SHARED bounded-decode
+        // rail (myne#309) — this used to call `image::load_from_memory`, which
+        // runs under `image::Limits::default()`: no width/height caps and a
+        // ~512 MiB allocation ceiling that moves on a dependency bump with no
+        // line of this repo's diff to review. That inherited default is exactly
+        // what `attachments::decode` was written to replace, and a PDF-embedded
+        // JPEG is no less untrusted than an attached one.
+        return myne_core::plugins::attachments::decode::decode_bounded(img.content);
     }
 
     if has("FlateDecode") && filters.len() == 1 {
-        // Raw samples behind zlib. Re-fetch the stream so lopdf inflates it for
-        // us (`PdfImage::content` is the still-filtered bytes).
+        // Raw samples behind zlib. Bound the inflate BEFORE letting lopdf do it
+        // for real (myne#309): `Stream::decompressed_content()` is
+        // `ZlibDecoder::read_to_end` with no ceiling, and deflate reaches
+        // ~1030:1 — so a PDF well under the 64 MiB import cap could carry one
+        // page image that inflated toward tens of GB. The process is OOM-killed
+        // long before the allocator refuses, which neither `guard`'s
+        // `catch_unwind` nor a join-error arm can turn into `Failed`; and the
+        // OCR queue re-runs the same attachment at every unlock, so one hostile
+        // file took the app down again and again.
+        //
+        // The ceiling is not a guess: at `bpc == 8` a legitimate stream inflates
+        // to exactly `w * h * components`, and nothing larger is usable —
+        // `from_raw` below wants that exact length. Anything beyond it is either
+        // a bomb or bytes we would discard.
+        if !flate_inflates_within(img.content, plausible_samples_ceiling(w, h)) {
+            return None;
+        }
+        // Within bounds: re-fetch through lopdf so `/DecodeParms` predictors are
+        // applied as before. Predictors never grow the output past the raw
+        // inflate, so this call is bounded by the probe above.
         let stream = doc.get_object(img.id).ok()?.as_stream().ok()?;
         let raw = stream.decompressed_content().ok()?;
         let bpc = img.bits_per_component.unwrap_or(8);
@@ -1358,6 +1428,72 @@ mod tests {
         assert!(r.text.len() <= MAX_EXTRACTED_TEXT_LEN);
         // char_count reflects pre-truncation length.
         assert_eq!(r.char_count as usize, MAX_EXTRACTED_TEXT_LEN + 1000);
+    }
+
+    // ── myne#309: the embedded-PDF-image inflate is bounded ────────────────
+    //
+    // `lopdf`'s `Stream::decompressed_content()` is `ZlibDecoder::read_to_end`
+    // with no ceiling. Deflate reaches ~1030:1, so a PDF well under the 64 MiB
+    // import cap could carry one page image that inflated toward tens of GB —
+    // and the process is OOM-killed long before the allocator refuses, which
+    // neither `guard`'s `catch_unwind` nor a join-error arm can turn into
+    // `Failed`. The OCR queue re-runs the same attachment on every unlock, so
+    // one hostile file took the app down repeatedly.
+
+    /// Zlib-compress `bytes` the way a PDF `/FlateDecode` stream carries them.
+    fn deflate(bytes: &[u8]) -> Vec<u8> {
+        use std::io::Write;
+        let mut enc = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::best());
+        enc.write_all(bytes).expect("deflate");
+        enc.finish().expect("deflate finish")
+    }
+
+    #[test]
+    fn a_deflate_bomb_is_refused_without_inflating_it() {
+        // 64 MiB of zeros compresses to a few tens of KiB — the shape of the
+        // attack, at a size a test can hold. The probe must answer `false`
+        // having buffered nothing proportional to the payload.
+        let bomb = deflate(&vec![0u8; 64 * 1024 * 1024]);
+        assert!(
+            bomb.len() < 256 * 1024,
+            "fixture is not compressed enough to be the case under test: {}",
+            bomb.len()
+        );
+        // A 100x100 image can legitimately hold at most 100*100*4 bytes, but the
+        // floor lifts the ceiling to 1 MiB — still four orders below the bomb.
+        assert!(!flate_inflates_within(
+            &bomb,
+            plausible_samples_ceiling(100, 100)
+        ));
+    }
+
+    #[test]
+    fn a_real_sized_sample_stream_passes() {
+        // Exactly what a DeviceRGB 200x150 page image inflates to. The guard
+        // must not reject the thing it exists to admit.
+        let samples = vec![0x7fu8; 200 * 150 * 3];
+        let stream = deflate(&samples);
+        assert!(flate_inflates_within(
+            &stream,
+            plausible_samples_ceiling(200, 150)
+        ));
+    }
+
+    #[test]
+    fn the_ceiling_tracks_the_declared_geometry_with_a_floor() {
+        // Large enough to matter → geometry governs (w*h*4).
+        assert_eq!(plausible_samples_ceiling(1000, 1000), 4_000_000);
+        // Small → the floor governs, so a legal small stream is never squeezed.
+        assert_eq!(plausible_samples_ceiling(96, 96), 1024 * 1024);
+        // No overflow at absurd declared dimensions (the arithmetic is u64).
+        assert!(plausible_samples_ceiling(u32::MAX, u32::MAX) > 0);
+    }
+
+    #[test]
+    fn a_corrupt_stream_is_refused_rather_than_trusted() {
+        // Not zlib at all: the decode that follows would fail anyway, so the
+        // pre-flight reaching the same answer earlier costs nothing.
+        assert!(!flate_inflates_within(b"not a zlib stream", 1024 * 1024));
     }
 
     // The postcard payload round-trip tests moved with the types to
