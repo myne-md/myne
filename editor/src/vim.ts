@@ -73,10 +73,31 @@ export function vimWantsEscape(view: EditorView): boolean {
   return mode !== null && mode !== "normal";
 }
 
-/** Monotonic counter: only the newest `reconfigureVim` call may apply its result.
- *  Guards against an interleaved on→off→on where the first dynamic import
- *  resolves after the later one already settled the compartment. */
-let generation = 0;
+/** Monotonic counter PER VIEW: only the newest `reconfigureVim` call for a given
+ *  view may apply its result. Guards against an interleaved on→off→on where the
+ *  first dynamic import resolves after the later one already settled that view's
+ *  compartment.
+ *
+ *  Per view, not module-global (myne#330). A single counter meant any second
+ *  call from a DIFFERENT view cancelled a pending enable — and the losing view
+ *  then had no modal editing, no `data-vim-mode` attribute and so no mode
+ *  indicator, silently: the guard returns rather than throwing, and the
+ *  `[vimMode]` effect never re-fires because the prop does not change again.
+ *  The user is typing into what looks like a vim editor and is not one, with
+ *  `dd`/`x` inserted as literal text.
+ *
+ *  The deterministic case needs no import-timing luck at all: a pane in source
+ *  mode with its read-only preview companion mounts BOTH editors in one commit,
+ *  the primary awaits the import while the companion (no `vimMode` prop) runs
+ *  the synchronous OFF branch and bumps the counter — so the primary is always
+ *  dropped. */
+const generations = new WeakMap<EditorView, number>();
+
+function nextGeneration(view: EditorView): number {
+  const next = (generations.get(view) ?? 0) + 1;
+  generations.set(view, next);
+  return next;
+}
 
 /** The engine module, once it has been dynamically imported. */
 type VimApi = typeof import("@replit/codemirror-vim");
@@ -118,7 +139,7 @@ function detachModeListener(view: EditorView): void {
  *  Turning OFF is synchronous and never imports the engine — that is what keeps
  *  the dependency off the critical path for users who don't want vim. */
 export async function reconfigureVim(view: EditorView, on: boolean): Promise<void> {
-  const mine = ++generation;
+  const mine = nextGeneration(view);
 
   if (!on) {
     detachModeListener(view);
@@ -140,7 +161,7 @@ export async function reconfigureVim(view: EditorView, on: boolean): Promise<voi
   // loaded. (`EditorView.destroyed` is private in CM6; a detached DOM node is the
   // public-API proxy for "this view is gone" — React unmounts the pane's element
   // on close, which is exactly the case we must not dispatch into.)
-  if (mine !== generation || !view.dom.isConnected) return;
+  if (mine !== generations.get(view) || !view.dom.isConnected) return;
 
   view.dispatch({ effects: vimCompartment.reconfigure([mod.vim()]) });
 
@@ -163,10 +184,14 @@ export async function reconfigureVim(view: EditorView, on: boolean): Promise<voi
   modeListenerCleanup.set(view, () => cm.off("vim-mode-change", onModeChange));
 }
 
-/** Test seam: reset the generation counter so an aborted reconfigure in one test
- *  cannot make the next test's call look stale. Not used in production. */
-export function resetVimGenerationForTests(): void {
-  generation = 0;
+/** Test seam: forget a view's generation so an aborted reconfigure in one test
+ *  cannot make the next test's call look stale. Not used in production.
+ *
+ *  Takes the view now that the counter is per view (myne#330); with no argument
+ *  it is a no-op, since a `WeakMap` has no "clear everything" that is safe to
+ *  offer — and the map is keyed on views a test has already dropped. */
+export function resetVimGenerationForTests(view?: EditorView): void {
+  if (view !== undefined) generations.delete(view);
 }
 
 /** Clear every piece of vim state that outlives an editor view — call on the
