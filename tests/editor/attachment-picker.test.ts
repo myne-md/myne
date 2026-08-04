@@ -53,6 +53,7 @@ import {
 import { pickAndInsert, setPickerFn } from "../../src/editor/attachments/picker";
 import { pickerBackedImporter, setPickOneFn } from "../../src/editor/attachments/convert-command";
 import { dismissAttachmentToast } from "../../src/editor/attachments/toast";
+import { attachmentInsertPlaceholderExtension } from "../../src/editor/attachments/insert-placeholder";
 
 const ID = "d".repeat(64);
 
@@ -71,7 +72,15 @@ function mount(doc = ""): EditorView {
   const host = document.createElement("div");
   document.body.appendChild(host);
   return new EditorView({
-    state: EditorState.create({ doc, selection: { anchor: doc.length, head: doc.length } }),
+    state: EditorState.create({
+      doc,
+      selection: { anchor: doc.length, head: doc.length },
+      // The change-mapped insert anchor (myne#332). Production installs this in
+      // `extensions.ts`; without it `insertPlaceholderPos` answers null and the
+      // insert falls back to the raw offset, so a bare view cannot show whether
+      // the anchor tracks.
+      extensions: [attachmentInsertPlaceholderExtension()],
+    }),
     parent: host,
   });
 }
@@ -234,5 +243,61 @@ describe("pickerBackedImporter (auto-resolve → picker fallback)", () => {
     );
     const result = await pickerBackedImporter(ref);
     expect(result).toEqual({ ok: false, note: "source not found" });
+  });
+});
+
+// ── myne#332: the embed lands where the anchor MOVED TO, not at a stale offset ──
+//
+// `/attach` hands in the slash trigger's offset, and the picker is a native
+// dialog with no time bound at all. By the time it returns the caret has
+// typically moved, and any edit above the trigger has shifted every later
+// offset — so the embed landed before the text the user had just typed, or
+// mid-word at an unrelated spot. The clamp to `doc.length` kept the dispatch in
+// range but not correct, and the wrong content was autosaved with no error.
+//
+// This was the ONE import route without the change-mapped placeholder that
+// paste and drop already use.
+describe("pickAndInsert anchors through document changes (myne#332)", () => {
+  it("follows an edit made ABOVE the insertion point while the picker is open", async () => {
+    let resolvePicker: ((v: PickedFile[]) => void) | null = null;
+    restores.push(
+      setPickerFn(
+        () =>
+          new Promise<PickedFile[]>((resolve) => {
+            resolvePicker = resolve;
+          }),
+      ),
+      setImportFn(async () => imported("one.png")),
+    );
+
+    const view = mount("HEADER\ntail");
+    // Invoke at the START of the second line, the way `/attach` does.
+    const anchorAt = view.state.doc.line(2).from;
+    const pending = pickAndInsert(view, anchorAt);
+    await Promise.resolve();
+
+    // The user types above it while the OS dialog is up.
+    view.dispatch({ changes: { from: 0, insert: "PREFIX " } });
+
+    resolvePicker!([picked("/abs/one.png")]);
+    await pending;
+
+    // The embed is at the START of the second line still — not 7 characters
+    // earlier, mid-way through "HEADER".
+    const line2 = view.state.doc.line(2);
+    expect(line2.text.startsWith(`![[att:${ID}|one.png]]`)).toBe(true);
+    expect(view.state.doc.line(1).text).toBe("PREFIX HEADER");
+    view.destroy();
+  });
+
+  it("still inserts at the given offset when nothing moved", async () => {
+    restores.push(
+      setPickerFn(async () => [picked("/abs/one.png")]),
+      setImportFn(async () => imported("one.png")),
+    );
+    const view = mount("ab");
+    await pickAndInsert(view, 1);
+    expect(view.state.doc.toString()).toBe(`a![[att:${ID}|one.png]]b`);
+    view.destroy();
   });
 });

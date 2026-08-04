@@ -20,6 +20,11 @@ import { getHost, type PickedFile } from "../host";
 import i18n from "@myne/editor/i18n";
 import { type ImportSource, importMany, importToastMessage } from "./insert";
 import { insertEmbedsForOutcomes } from "./paste-drop";
+import {
+  clearInsertPlaceholder,
+  insertPlaceholderPos,
+  showInsertPlaceholder,
+} from "./insert-placeholder";
 import { showAttachmentToast } from "./toast";
 
 /** The picker call, isolated so tests can override it without a host.
@@ -53,20 +58,50 @@ export function setPickerFn(fn: OpenFn): () => void {
  * silent no-op. Surfaces the partial-success toast for multi-file imports.
  */
 export async function pickAndInsert(view: EditorView, insertAt?: number): Promise<void> {
+  const at = insertAt ?? view.state.selection.main.head;
+
+  // Anchor at a CM-MAPPED position BEFORE opening the picker (myne#332).
+  //
+  // `/attach` hands in the slash trigger's offset, and a native file dialog has
+  // no time bound at all — so by the time it returns, the caret has typically
+  // moved and any edit above the trigger has shifted every later offset. The
+  // embed then landed before the text the user had just typed, or mid-word at
+  // an unrelated spot, possibly off-screen; the clamp to `doc.length` kept the
+  // dispatch in range but not correct, and the wrong content was autosaved with
+  // no error surfaced.
+  //
+  // The placeholder is the same change-mapped anchor the paste and drop routes
+  // already use — this was the one import route without one. It has to go up
+  // BEFORE the await, not between the picker and the import, because the whole
+  // window that moves the document is the one the dialog is open for.
+  // Decoration-only, so the note bytes stay clean whatever happens next.
+  const token = showInsertPlaceholder(view, at, "importing");
+  const anchored = (): number => insertPlaceholderPos(view, token) ?? at;
+
   let selected: PickedFile[] | null;
   try {
     selected = await openFn();
   } catch {
+    clearInsertPlaceholder(view, token);
     showAttachmentToast(i18n.t("editor.attachment.picker.openFailed"), "error");
     return;
   }
-  if (selected === null || selected.length === 0) return; // cancelled
+  if (selected === null || selected.length === 0) {
+    clearInsertPlaceholder(view, token); // cancelled
+    return;
+  }
 
-  const at = insertAt ?? view.state.selection.main.head;
   const sources: ImportSource[] = selected.map((file) => ({ kind: "picked", file }));
-  const outcomes = await importMany(sources);
+  let outcomes;
+  let insertPos = at;
+  try {
+    outcomes = await importMany(sources);
+  } finally {
+    insertPos = anchored();
+    clearInsertPlaceholder(view, token);
+  }
 
-  insertEmbedsForOutcomes(view, outcomes, at);
+  insertEmbedsForOutcomes(view, outcomes, insertPos);
 
   const message = importToastMessage(outcomes);
   if (message !== null) showAttachmentToast(message);
