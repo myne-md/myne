@@ -951,9 +951,28 @@ fn html_referenced_attachment_ids(html: &str) -> Vec<String> {
         if run.len() == 64 && seen.insert(run.clone()) {
             ids.push(run);
         }
-        // Advance past one byte of the trailer to avoid an infinite loop
-        // on a malformed (non-hex) `attachment://` occurrence.
-        rest = &after[1.min(after.len())..];
+        // Advance past one CHARACTER of the trailer, not one byte (myne#306).
+        //
+        // The loop has to move to avoid spinning on a malformed (non-hex)
+        // `attachment://` occurrence, and it used to do that with `&after[1..]`.
+        // `after` begins on a char boundary — the prefix is ASCII — but the
+        // character there need not be one byte, and slicing mid-character
+        // panics. A note that merely CONTAINS the text `attachment://` followed
+        // by any non-ASCII character (`attachment://…`, `attachment://画像`)
+        // therefore killed the whole HTML-with-images export: the panic became a
+        // `JoinFailure` whose message says "try again", and every retry failed
+        // the same way. The plain-HTML arm never reaches this scanner, so the
+        // note exported fine one way and never the other.
+        //
+        // `char_indices().nth(1)` is the boundary-safe step, and it is what the
+        // twin this comment used to claim parity with already had by accident
+        // (`export_naming::rewrite_html_attachment_srcs` advances by a count of
+        // ASCII hex digits). `None` means `after` held at most one character, so
+        // there is nothing left to scan.
+        rest = after
+            .char_indices()
+            .nth(1)
+            .map_or("", |(byte_idx, _)| &after[byte_idx..]);
     }
     ids
 }
@@ -6402,6 +6421,38 @@ mod tests {
         assert!(html_referenced_attachment_ids("<p>plain</p>").is_empty());
         // A non-64-hex trailer is not accepted as an id (no infinite loop).
         assert!(html_referenced_attachment_ids("attachment://xyz").is_empty());
+    }
+
+    /// myne#306: a non-ASCII character immediately after `attachment://`.
+    ///
+    /// The scanner advanced by one BYTE to break out of a malformed occurrence,
+    /// which lands mid-character when that character is multi-byte — a panic,
+    /// surfaced as `JoinFailure` ("try again") from a retry that could never
+    /// succeed. The whole roster here was ASCII, so nothing saw it.
+    #[test]
+    fn html_referenced_attachment_ids_survives_a_non_ascii_trailer() {
+        // Each of these used to panic on the `&after[1..]` slice.
+        for html in [
+            "attachment://…",
+            "attachment://ör",
+            "attachment://画像",
+            "attachment://\u{1F600}",
+            // Nothing at all after the prefix — the other end of the same step.
+            "attachment://",
+        ] {
+            assert!(
+                html_referenced_attachment_ids(html).is_empty(),
+                "{html:?} carries no id and must simply yield none"
+            );
+        }
+
+        // …and a real id is still found when the noise sits beside it, in both
+        // orders — the advance must not swallow a following occurrence.
+        let a = "a".repeat(64);
+        let html = format!("attachment://…<img src=\"attachment://{a}\">");
+        assert_eq!(html_referenced_attachment_ids(&html), vec![a.clone()]);
+        let html = format!("<img src=\"attachment://{a}\">attachment://画像");
+        assert_eq!(html_referenced_attachment_ids(&html), vec![a]);
     }
 
     #[test]
