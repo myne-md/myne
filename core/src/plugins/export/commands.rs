@@ -579,9 +579,12 @@ fn stage_export_tree_inner(
         // Deterministic per-directory dedup for duplicate (folder,
         // title) pairs.
         let final_name = {
-            let names = assigned.entry(dir_rel).or_default();
+            // The DIRECTORY key is folded too: `Work/` and `work/` are one
+            // namespace on a case-insensitive volume, so they must share one
+            // assigned set (myne#311).
+            let names = assigned.entry(dedup_key(&dir_rel)).or_default();
             let picked = pick_deduped(names, &filename)?;
-            names.insert(picked.clone());
+            names.insert(dedup_key(&picked));
             picked
         };
 
@@ -628,12 +631,12 @@ fn stage_export_tree_inner(
                 return Err(VaultExportError::AttachmentMissing);
             };
             let final_att = {
-                let names = assigned.entry(ATTACHMENTS_DIR.to_string()).or_default();
+                let names = assigned.entry(dedup_key(ATTACHMENTS_DIR)).or_default();
                 let picked = pick_deduped(
                     names,
                     &sanitize_export_component(&meta.filename, "attachment"),
                 )?;
-                names.insert(picked.clone());
+                names.insert(dedup_key(&picked));
                 picked
             };
             att_final.insert(span.id.to_string(), final_att.clone());
@@ -649,7 +652,11 @@ fn stage_export_tree_inner(
         // preserved — frontmatter included, so the `updated:` value
         // parsed off the one slice extraction above applies to both
         // branches). `replace=false` — staging starts empty, so an
-        // AlreadyExists here would be a dedup bug, surfaced as Io.
+        // AlreadyExists here would be a dedup bug, surfaced as Io. It WAS one,
+        // on every case-insensitive volume: the oracle compared byte-exact
+        // names while the volume does not, so `README.md` and `readme.md` both
+        // read as unused and the second write aborted the whole export
+        // (myne#311). The oracle folds case now — see `dedup_key`.
         // The unclobbered variant's randomized temps keep an in-run
         // sibling whose FINAL name is `<x>.tmp` safe from the later
         // `<x>` write's temp (115-F1 variant 2) — the published tree
@@ -905,16 +912,45 @@ fn record_dir_chain(dirs: &mut BTreeSet<String>, segs: &[String]) -> String {
     acc
 }
 
+/// The key a name occupies in a directory's assigned set.
+///
+/// ASCII-lowercased, because the export writes with create-new semantics onto
+/// whatever volume the user chose, and on macOS and Windows that volume is
+/// case-INSENSITIVE by default (myne#311). A byte-exact dedup let `README.md`
+/// and `readme.md` both be "unused", and the second write then returned
+/// `AlreadyExists` — which propagates, discards the staging tree, and aborts
+/// the WHOLE export with a generic write-failure line naming no file. It is
+/// fully deterministic, so retrying never helped and the vault could never be
+/// exported to such a volume again; the only workaround was renaming a note or
+/// attachment the user had no reason to suspect.
+///
+/// Folding the ORACLE only — the emitted name keeps its original case, so
+/// nothing about a successful export changes. This is a strict superset of the
+/// old behaviour: byte-identical names still collide and still dedup, and the
+/// case-differing pair now produces `readme (1).md` instead of failing.
+///
+/// `to_ascii_lowercase`, not `to_lowercase`: it matches what the platforms
+/// actually do closely enough for a collision oracle and cannot change a
+/// string's length, so the suffix arithmetic is unaffected. A pair that differs
+/// only in non-ASCII case still collides on the volume and would still fail —
+/// that is a narrower residue than the one this closes, and full Unicode
+/// case-folding is not what either filesystem implements either.
+fn dedup_key(name: &str) -> String {
+    name.to_ascii_lowercase()
+}
+
 /// Deterministic `" (1)"` suffix-dedup against the names already
 /// assigned in one directory (staging starts empty — pre-existing files
 /// cannot exist, so the in-run set is the whole oracle).
+///
+/// `names` holds [`dedup_key`]s; the returned name is original-case.
 fn pick_deduped(names: &HashSet<String>, candidate: &str) -> Result<String, VaultExportError> {
-    if !names.contains(candidate) {
+    if !names.contains(&dedup_key(candidate)) {
         return Ok(candidate.to_string());
     }
     for n in 1..=DEDUP_RETRY_CAP {
         let suffixed = suffixed_filename(candidate, n);
-        if !names.contains(&suffixed) {
+        if !names.contains(&dedup_key(&suffixed)) {
             return Ok(suffixed);
         }
     }
@@ -1768,9 +1804,55 @@ mod tests {
     fn pick_deduped_suffixes_deterministically() {
         let mut names: HashSet<String> = HashSet::new();
         assert_eq!(pick_deduped(&names, "Dup.md").unwrap(), "Dup.md");
-        names.insert("Dup.md".to_string());
+        names.insert(dedup_key("Dup.md"));
         assert_eq!(pick_deduped(&names, "Dup.md").unwrap(), "Dup (1).md");
-        names.insert("Dup (1).md".to_string());
+        names.insert(dedup_key("Dup (1).md"));
         assert_eq!(pick_deduped(&names, "Dup.md").unwrap(), "Dup (2).md");
+    }
+
+    // ── myne#311: the volume is case-insensitive; the oracle was not ───────
+    //
+    // The export writes with create-new semantics onto whatever volume the user
+    // chose, and on macOS and Windows that volume folds case by default. A
+    // byte-exact dedup let `README.md` and `readme.md` both read as unused, and
+    // the second write returned `AlreadyExists` — which propagates, discards
+    // the staging tree, and aborts the WHOLE export with a generic
+    // write-failure line naming no file. Fully deterministic, so retrying never
+    // helped and that vault could never be exported to such a volume again.
+    //
+    // These assert the CHOSEN NAMES, not merely that a call succeeded: on the
+    // Linux CI runner a filesystem-level test of this would pass trivially,
+    // because ext4 does not fold case.
+    #[test]
+    fn the_dedup_oracle_folds_case_so_a_case_differing_pair_is_suffixed() {
+        let mut names: HashSet<String> = HashSet::new();
+        assert_eq!(pick_deduped(&names, "README.md").unwrap(), "README.md");
+        names.insert(dedup_key("README.md"));
+
+        // The pair that used to abort the export.
+        assert_eq!(pick_deduped(&names, "readme.md").unwrap(), "readme (1).md");
+        assert_eq!(pick_deduped(&names, "ReadMe.md").unwrap(), "ReadMe (1).md");
+        // …and the suffixed form is checked case-insensitively too, so a third
+        // spelling does not collide with the second.
+        names.insert(dedup_key("readme (1).md"));
+        assert_eq!(pick_deduped(&names, "ReadMe.md").unwrap(), "ReadMe (2).md");
+    }
+
+    #[test]
+    fn the_emitted_name_keeps_its_original_case() {
+        // Folding the ORACLE only: nothing about a successful export changes,
+        // so a file exported today keeps the name it has today.
+        let names: HashSet<String> = HashSet::new();
+        assert_eq!(pick_deduped(&names, "MyNotes.md").unwrap(), "MyNotes.md");
+        assert_eq!(pick_deduped(&names, "Photo.PNG").unwrap(), "Photo.PNG");
+    }
+
+    #[test]
+    fn a_folded_directory_key_is_one_namespace() {
+        // `Work/` and `work/` are the same directory on the volume, so they
+        // must share one assigned set — otherwise two same-named notes in
+        // case-differing folders both write into it and the second aborts.
+        assert_eq!(dedup_key("Work/Notes"), dedup_key("work/notes"));
+        assert_ne!(dedup_key("Work/Notes"), dedup_key("Work/Other"));
     }
 }
