@@ -305,6 +305,26 @@ fn read_chunked_body<R: BufRead>(reader: &mut R) -> Result<Vec<u8>, HttpReadErro
         // Strip any chunk extension (everything after the first ';').
         let size_str = size_line.split(';').next().unwrap_or("").trim();
         let size = u64::from_str_radix(size_str, 16).map_err(|_| HttpReadError::Failed)?;
+        // myne#295 — clamp the SERVER-SUPPLIED size at the point it is parsed,
+        // before it reaches any arithmetic.
+        //
+        // The cap below was `body.len() as u64 + size > MAX`, and `size` is 16
+        // hex digits the peer chooses. `ffffffffffffffff` overflows that add: a
+        // debug build aborts on it, and a release build wraps the sum past the
+        // cap, wraps `start + size as usize` to 0 so the resize TRUNCATES the
+        // buffer, and then panics slicing `body[1..]` of a zero-length Vec.
+        // Natively the unwind is contained by `spawn_blocking` and surfaces as an
+        // opaque `Internal`/`Network`, and it poisons that cycle's transport
+        // mutex on the way out — so sync is durably broken against that server
+        // with no diagnosable error. Chunked is the ordinary path behind a
+        // reverse proxy, and a hostile relay is explicitly in scope (TB5).
+        //
+        // Clamping here rather than only making the add checked is the shape the
+        // rest of this file uses, and it means no later expression on this path
+        // can be handed a value the budget never admitted.
+        if size > MAX_SYNC_RESPONSE_BYTES {
+            return Err(HttpReadError::TooLarge);
+        }
         if size == 0 {
             // Trailer section: lines until the final empty line.
             loop {
@@ -316,7 +336,14 @@ fn read_chunked_body<R: BufRead>(reader: &mut R) -> Result<Vec<u8>, HttpReadErro
                 }
             }
         }
-        if body.len() as u64 + size > MAX_SYNC_RESPONSE_BYTES {
+        // Belt-and-braces: `size` is already <= the cap, so this cannot overflow
+        // — but a checked add states that rather than relying on the reader to
+        // re-derive it, and it is what keeps the guard correct if the clamp above
+        // is ever loosened.
+        if (body.len() as u64)
+            .checked_add(size)
+            .is_none_or(|total| total > MAX_SYNC_RESPONSE_BYTES)
+        {
             return Err(HttpReadError::TooLarge);
         }
         let start = body.len();
@@ -631,6 +658,49 @@ mod tests {
             read_http_response(&mut std::io::Cursor::new(raw.as_bytes()), false).unwrap_err(),
             HttpReadError::TooLarge
         );
+    }
+
+    /// myne#295 — a chunk-size line the peer chooses must be clamped BEFORE it
+    /// reaches any arithmetic.
+    ///
+    /// The wire below is minimal: one non-empty chunk so `body.len() > 0`, then a
+    /// size near `u64::MAX`. The old guard added the two, which a debug build
+    /// aborts on and a release build wraps — past the cap, then to a zero-length
+    /// resize, then a panic slicing `body[1..]`. Natively that unwind surfaced as
+    /// an opaque `Internal`/`Network` and poisoned the cycle's transport mutex,
+    /// so sync stayed broken against that server with no diagnosable error.
+    ///
+    /// Chunked is the ordinary path behind a reverse proxy, and a hostile relay
+    /// is explicitly in scope (TB5).
+    #[test]
+    fn a_chunk_size_near_u64_max_is_rejected_not_overflowed() {
+        let raw: &[u8] =
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nA\r\nffffffffffffffff\r\n";
+        assert_eq!(
+            read_http_response(&mut std::io::Cursor::new(raw), false).unwrap_err(),
+            HttpReadError::TooLarge
+        );
+    }
+
+    #[test]
+    fn a_single_oversized_chunk_is_still_too_large() {
+        let raw = format!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n",
+            MAX_SYNC_RESPONSE_BYTES + 1
+        );
+        assert_eq!(
+            read_http_response(&mut std::io::Cursor::new(raw.as_bytes()), false).unwrap_err(),
+            HttpReadError::TooLarge
+        );
+    }
+
+    #[test]
+    fn an_ordinary_chunked_body_still_decodes() {
+        // The clamp must not narrow the honest path it guards.
+        let raw: &[u8] =
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n2\r\n!!\r\n0\r\n\r\n";
+        let (r, _) = read_http_response(&mut std::io::Cursor::new(raw), false).unwrap();
+        assert_eq!(r.body, b"hello!!");
     }
 
     #[test]
