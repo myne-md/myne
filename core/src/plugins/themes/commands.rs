@@ -360,7 +360,46 @@ pub async fn write_themes_map_in_dir(
 // cores read liveness through these two helpers, so the rule cannot drift
 // between the layers.
 
-/// The **live** entries in `map` — name + palette each, name-sorted.
+/// The value-shape allowlist, applied where a palette **leaves** the store
+/// (myne#386).
+///
+/// **Why the read side and not just import.** The injection guard is the
+/// primary control for this surface — the WebView CSP carries
+/// `style-src 'unsafe-inline'`, so a theme value that reaches the DOM executes
+/// — and [`validate_theme`] runs at exactly two call sites, both of them
+/// import. `vault.themes` has **three** writers: import, the sync merge
+/// ([`crate::plugins::sync::conflict::merge_custom_themes`] clones a peer's
+/// entry verbatim, and the agreeing-store arm writes the server's bytes
+/// unchanged), and a restored backup (a container member extracted
+/// byte-identically). Two of the three never see the grammar, so
+/// "every palette in the store is validated" was true only of palettes this
+/// device imported. One check at the exit covers all three and every future
+/// writer, which is what the crate's own doctrine asks for: a control that runs
+/// on one of three producers is not an allowlist.
+///
+/// **Filter, do not reject.** A single off-grammar token from a peer must not
+/// blank the theme picker on every other device, and a dropped token falls back
+/// to the built-in value in `src/styles/tokens.css` — the same path a palette
+/// that merely omits a token already takes. (Import rejects instead, correctly:
+/// there is an author standing there to be told what was wrong. On read there
+/// is no author.)
+///
+/// **This is the per-token grammar, not the whole of [`validate_theme`].** It
+/// deliberately omits `parse_theme`'s `REQUIRED_KEYS` presence check, so a
+/// filtered read can hand back a palette missing a required token — a shape
+/// import can never produce. That is the intended trade: a partially-filtered
+/// theme renders with built-in fallbacks, where rejecting the whole palette
+/// would lose a theme the user can still see the name of.
+fn vetted(palette: &ThemePalette) -> ThemePalette {
+    palette
+        .iter()
+        .filter(|(k, v)| theme_validator::is_allowed_key(k) && theme_validator::is_allowed_value(v))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()
+}
+
+/// The **live** entries in `map` — name + palette each, name-sorted, each
+/// palette [`vetted`].
 ///
 /// Ordering is inherited, not imposed: [`ThemesMap`] is a `BTreeMap`, so
 /// iteration is already lexicographic by name and a filter/map preserves it. No
@@ -370,17 +409,18 @@ fn live_entries(map: &ThemesMap) -> Vec<ThemeListEntry> {
         .filter(|(_, e)| !e.is_tombstone())
         .map(|(name, e)| ThemeListEntry {
             name: name.clone(),
-            palette: e.palette.clone(),
+            palette: vetted(&e.palette),
         })
         .collect()
 }
 
-/// One **live** theme's palette by name, or [`ThemesError::NotFound`] — which a
-/// tombstoned name also yields (it reads as absent).
+/// One **live** theme's [`vetted`] palette by name, or
+/// [`ThemesError::NotFound`] — which a tombstoned name also yields (it reads as
+/// absent).
 fn live_palette(map: &ThemesMap, name: &str) -> Result<ThemePalette, ThemesError> {
     map.get(name)
         .filter(|e| !e.is_tombstone())
-        .map(|e| e.palette.clone())
+        .map(|e| vetted(&e.palette))
         .ok_or(ThemesError::NotFound)
 }
 
@@ -405,6 +445,14 @@ pub async fn themes_list_in_dir(
 /// boundary ([`themes_export_with_dir`] + its `allow-themes-export` ACL), which
 /// is where the TB3 egress door is actually guarded — a duplicate pure-core
 /// alias would add a second name without adding a second check.
+///
+/// One consequence of the read-side [`vetted`] filter (myne#386) belongs here
+/// rather than only at the helper: because export and read are the same core,
+/// an exported `.json` no longer round-trips a token a peer planted through the
+/// sync merge. That is a behaviour change, and a small one downstream — the
+/// `myne-themes` marketplace gate runs `theme-validator`'s own `validate`
+/// binary over every submission — but it means an export is now the vetted
+/// palette rather than the stored bytes.
 pub async fn themes_read_in_dir(
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
@@ -1266,6 +1314,57 @@ mod tests {
         // Nothing written.
         assert!(!tmp.path().join(THEMES_FILE).exists());
         assert!(list_names(tmp.path()).is_empty());
+    }
+
+    /// myne#386, the mirror of the test above in the opposite direction.
+    ///
+    /// `write_themes_map_in_dir` seals an arbitrary `ThemesMap` WITHOUT the
+    /// import guard — which is precisely the shape a second device produces:
+    /// the sync merge clones a peer's entry verbatim, and a restored backup
+    /// extracts the blob byte-identically. Neither passes through
+    /// `validate_theme`, so before this change the store could hold a value the
+    /// grammar would have rejected and the read handed it straight to the
+    /// CSSOM.
+    #[test]
+    fn a_palette_written_around_the_import_guard_is_filtered_on_read() {
+        let tmp = ScopedTempDir::new("themes-unvetted").expect("tmp");
+
+        let mut planted = a_palette();
+        // The exact payload `import_rejects_invalid_palette_without_writing`
+        // refuses at the front door, arriving through the back one.
+        planted.insert("--paper".into(), "url(https://evil.example/x)".into());
+        // A key off the grammar as well, since the guard covers both halves.
+        planted.insert("--evil<script>".into(), "#123456".into());
+        let map = ThemesMap::from([("peer".to_string(), ThemeEntry::live(planted, T0))]);
+        write_themes_map_in_dir(tmp.path(), &KEY, &HASH, &map).expect("seal");
+
+        let palette = themes_read_in_dir(tmp.path(), &KEY, &HASH, "peer").expect("read");
+        assert!(
+            !palette.contains_key("--paper"),
+            "an off-grammar VALUE must not survive the read"
+        );
+        assert!(
+            !palette.contains_key("--evil<script>"),
+            "an off-grammar KEY must not survive the read"
+        );
+        assert_eq!(
+            palette.get("--ink-1").map(String::as_str),
+            Some("#123456"),
+            "every well-formed token is kept — this filters, it does not reject"
+        );
+
+        // The list core goes through the same helper, so the picker sees the
+        // same filtered palette rather than the stored one.
+        let listed = themes_list_in_dir(tmp.path(), &KEY, &HASH);
+        let entry = listed.iter().find(|e| e.name == "peer").expect("entry");
+        assert!(!entry.palette.contains_key("--paper"));
+        assert!(!entry.palette.contains_key("--evil<script>"));
+        assert!(entry.palette.contains_key("--ink-1"));
+        assert_eq!(
+            list_names(tmp.path()),
+            vec!["peer"],
+            "the theme itself survives — filtering a token must not drop the theme"
+        );
     }
 
     #[test]
