@@ -1251,7 +1251,18 @@ async fn sync_themes_phase(
     let _guard = crate::plugins::themes::commands::write_mutex().lock().await;
 
     let path = themes_file_path(vault_root);
-    let local_bytes = io.read(&path).await.ok();
+    // The newest copy that DECRYPTS, not merely the newest that parses a header
+    // (myne#301). A torn slot on the web client otherwise supplied both the
+    // local nonce and, further down, the bytes pushed to the server — where
+    // every peer decodes them to empty.
+    let themes_key_for_read = derive_subkey(root_key, SubkeyRole::CustomThemesKey);
+    let local_bytes = crate::plugins::themes::commands::read_verified_themes_bytes(
+        io,
+        vault_root,
+        &themes_key_for_read,
+        account_number_hash,
+    )
+    .await;
     let local_nonce = local_bytes.as_deref().and_then(read_themes_nonce);
 
     // Decrypting the local store costs an HKDF + a full AEAD open + a whole-map
@@ -2570,7 +2581,17 @@ async fn sync_cycle_attempt(
         // A dirty themes blob (local-only change, or a merge that beat the
         // server's store) rides the same batch as an inline blob (MYND-486).
         if themes_phase.dirty {
-            if let Ok(bytes) = io.read(&themes_file_path(vault_root)).await {
+            // Verified, not merely readable (myne#301): pushing a torn slot
+            // publishes an empty theme store to every peer.
+            let themes_key = derive_subkey(root_key, SubkeyRole::CustomThemesKey);
+            if let Some(bytes) = crate::plugins::themes::commands::read_verified_themes_bytes(
+                io,
+                vault_root,
+                &themes_key,
+                &account_number_hash,
+            )
+            .await
+            {
                 if let Some(nonce) = read_themes_nonce(&bytes) {
                     let base = state
                         .blobs

@@ -270,20 +270,63 @@ pub async fn read_themes_map_in_dir(
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> Result<ThemesMap, ThemesError> {
-    let blob = match io.read(&vault_dir.join(THEMES_FILE)).await {
-        Ok(b) => b,
-        Err(crate::io_failure_kind::IoFailureKind::NotFound) => return Ok(ThemesMap::default()),
-        Err(io_error_kind) => return Err(ThemesError::Io { io_error_kind }),
-    };
-    decode_themes_blob(themes_key, account_number_hash, &blob)
-        .map(|pt| deserialize_themes_map(&pt))
-        .map_err(|_| {
+    // Through the SINGLETON fallback, not a plain read (myne#301). `VaultIo::read`
+    // answers with the newest STRUCTURALLY INTACT candidate — which on the web
+    // client is the newest slot whose 8-byte generation stamp landed, torn
+    // payload and all. A tear there made the whole theme store read as EMPTY
+    // with a complete, verifiable copy sitting unread beside it, and the next
+    // write targeted that intact slot. `vault.themes` is SYNCED, so the wipe
+    // propagated. `open_newest` is the loop that exists so no reader has to
+    // write "take the first" itself, and the caller's own decode is its verifier.
+    //
+    // Sweeping is deliberate here: once a candidate has actually decrypted, the
+    // copies it superseded are litter rather than evidence.
+    use crate::singleton::{open_newest_and_sweep, OpenOutcome};
+    match open_newest_and_sweep(io, &vault_dir.join(THEMES_FILE), |bytes| {
+        decode_themes_blob(themes_key, account_number_hash, bytes)
+            .map(|pt| deserialize_themes_map(&pt))
+    })
+    .await
+    {
+        Ok(map) => Ok(map),
+        // §9.21.4's fall-back-to-empty is the right answer for an ABSENT blob: a
+        // vault with no custom themes has no file, and the empty map is the fact.
+        Err(OpenOutcome::Absent) => Ok(ThemesMap::default()),
+        Err(OpenOutcome::Io(io_error_kind)) => Err(ThemesError::Io { io_error_kind }),
+        Err(OpenOutcome::Undecodable(_)) => {
             tracing::warn!(
                 event = "themes_undecryptable",
-                "vault.themes exists but could not be decrypted; refusing to treat it as empty"
+                "vault.themes exists but no copy could be decrypted; refusing to treat it as empty"
             );
-            ThemesError::StoreUnreadable
-        })
+            Err(ThemesError::StoreUnreadable)
+        }
+    }
+}
+
+/// The newest copy of `vault.themes` that actually DECRYPTS, as raw bytes.
+///
+/// The sync phase needs the bytes rather than the map: it compares nonces, and
+/// it pushes the blob verbatim. A plain `VaultIo::read` there answers with the
+/// newest structurally intact candidate — so on the web client a torn slot was
+/// read, its nonce taken as the local one, and the torn bytes PUSHED to the
+/// server, where every peer decodes them to empty (myne#301).
+///
+/// `None` when no copy exists or none decrypts; the caller treats that the same
+/// way it treats an absent store, which is the conservative direction — it
+/// re-pushes the local map rather than adopting a store it could not read.
+pub async fn read_verified_themes_bytes(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &Path,
+    themes_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+) -> Option<Vec<u8>> {
+    let candidates = io
+        .read_candidates(&vault_dir.join(THEMES_FILE))
+        .await
+        .ok()?;
+    candidates
+        .into_iter()
+        .find(|bytes| decode_themes_blob(themes_key, account_number_hash, bytes).is_ok())
 }
 
 /// PURE CORE — encrypt `map` to the `vault.themes` blob and atomically write it
@@ -818,6 +861,11 @@ mod tests {
         s
     }
 
+    /// The same palette as a decoded map, for tests that build a store directly.
+    fn a_palette() -> ThemePalette {
+        serde_json::from_str(&valid_palette_json()).expect("valid palette JSON")
+    }
+
     /// Wall-clock stand-in for the injected `now` (UNIX seconds).
     const T0: u64 = 1_700_000_000;
 
@@ -868,6 +916,63 @@ mod tests {
             themes_key,
             account_number_hash,
         ))
+    }
+
+    /// An IO stub that serves a scripted candidate list for `vault.themes` — the
+    /// browser's double-buffered container, which native `StdVaultIo` cannot
+    /// model (its `read_candidates` is a one-element list by construction).
+    struct TornContainer {
+        candidates: Vec<Vec<u8>>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::vault_io::VaultIo for TornContainer {
+        async fn read(&self, _path: &Path) -> crate::vault_io::IoResult<Vec<u8>> {
+            // What `VaultIo::read` does on the web: the newest STRUCTURALLY
+            // intact copy, torn payload and all.
+            self.candidates
+                .first()
+                .cloned()
+                .ok_or(crate::io_failure_kind::IoFailureKind::NotFound)
+        }
+        async fn read_candidates(&self, _path: &Path) -> crate::vault_io::IoResult<Vec<Vec<u8>>> {
+            Ok(self.candidates.clone())
+        }
+        async fn read_prefix(&self, _p: &Path, _l: usize) -> crate::vault_io::IoResult<Vec<u8>> {
+            Err(crate::io_failure_kind::IoFailureKind::NotFound)
+        }
+        async fn write(
+            &self,
+            _p: &Path,
+            _b: &[u8],
+            _o: crate::vault_io::WriteOpts,
+        ) -> crate::vault_io::IoResult<()> {
+            unreachable!("not exercised")
+        }
+        async fn remove_file(&self, _p: &Path) -> crate::vault_io::IoResult<()> {
+            Ok(())
+        }
+        async fn exists(&self, _p: &Path) -> crate::vault_io::IoResult<bool> {
+            Ok(true)
+        }
+        async fn read_dir(
+            &self,
+            _p: &Path,
+        ) -> crate::vault_io::IoResult<Vec<crate::vault_io::DirEntry>> {
+            Ok(Vec::new())
+        }
+        async fn create_dir_all(&self, _p: &Path) -> crate::vault_io::IoResult<()> {
+            Ok(())
+        }
+        async fn remove_dir_all(&self, _p: &Path) -> crate::vault_io::IoResult<()> {
+            Ok(())
+        }
+        async fn is_dir(&self, _p: &Path) -> crate::vault_io::IoResult<bool> {
+            Ok(false)
+        }
+        async fn rename(&self, _f: &Path, _t: &Path) -> crate::vault_io::IoResult<()> {
+            unreachable!("not exercised")
+        }
     }
 
     fn write_themes_map_in_dir(
@@ -1362,5 +1467,100 @@ mod tests {
         let bytes = encode_themes_map(&KEY, &HASH, &map).expect("encode");
         assert_eq!(decode_themes_map_or_empty(&KEY, &HASH, Some(&bytes)), map);
         assert!(decode_themes_map_or_empty(&[0x11; AEAD_KEY_LEN], &HASH, Some(&bytes)).is_empty());
+    }
+    // ── myne#301: a torn newest slot must not read as an EMPTY store ─────────
+    //
+    // `VaultIo::read` answers with the newest STRUCTURALLY intact candidate, so
+    // on the web client a slot torn mid-write was read, failed to decrypt, and
+    // — before #255 — collapsed to empty; after #255 it errored. Either way the
+    // complete copy beside it was never consulted, and `vault.themes` is SYNCED,
+    // so the loss propagated.
+
+    #[test]
+    fn a_torn_newest_slot_falls_back_to_the_intact_copy() {
+        let key = [0x42u8; AEAD_KEY_LEN];
+        let mut map = ThemesMap::default();
+        map.insert("midnight".to_string(), ThemeEntry::live(a_palette(), T0));
+        let intact = encode_themes_map(&key, &HASH, &map).expect("encode");
+
+        // A tear that kept the header but lost the tail — the shape the
+        // container models as `StopMidWrite`.
+        let mut torn = intact.clone();
+        torn.truncate(intact.len() - 8);
+
+        let io = TornContainer {
+            candidates: vec![torn, intact],
+        };
+        let got = rt()
+            .block_on(super::read_themes_map_in_dir(
+                &io,
+                Path::new("/vault"),
+                &key,
+                &HASH,
+            ))
+            .expect("the intact copy is right there");
+        assert!(
+            got.contains_key("midnight"),
+            "reading the torn slot and stopping loses every custom theme while a \
+             verifiable copy sits unread beside it"
+        );
+    }
+
+    #[test]
+    fn every_copy_torn_is_still_an_error_not_an_empty_store() {
+        // #255's property, preserved: unreadable is not the same as absent, and
+        // an empty map here would be re-sealed over the user's themes.
+        let key = [0x42u8; AEAD_KEY_LEN];
+        let io = TornContainer {
+            candidates: vec![b"MYT1 torn".to_vec(), b"MYT1 also torn".to_vec()],
+        };
+        let err = rt()
+            .block_on(super::read_themes_map_in_dir(
+                &io,
+                Path::new("/vault"),
+                &key,
+                &HASH,
+            ))
+            .expect_err("no copy decrypts");
+        assert!(matches!(err, ThemesError::StoreUnreadable));
+    }
+
+    #[test]
+    fn no_copy_at_all_is_the_empty_store() {
+        // §9.21.4's fall-back-to-empty, which applies to ABSENT and only absent.
+        let key = [0x42u8; AEAD_KEY_LEN];
+        let io = TornContainer { candidates: vec![] };
+        let got = rt()
+            .block_on(super::read_themes_map_in_dir(
+                &io,
+                Path::new("/vault"),
+                &key,
+                &HASH,
+            ))
+            .expect("absent is not an error");
+        assert!(got.is_empty());
+    }
+
+    #[test]
+    fn the_sync_phase_reads_bytes_that_actually_decrypt() {
+        // The push path takes the BYTES, so a torn slot there is published to
+        // the server and every peer decodes it to empty.
+        let key = [0x42u8; AEAD_KEY_LEN];
+        let mut map = ThemesMap::default();
+        map.insert("midnight".to_string(), ThemeEntry::live(a_palette(), T0));
+        let intact = encode_themes_map(&key, &HASH, &map).expect("encode");
+        let mut torn = intact.clone();
+        torn.truncate(intact.len() - 8);
+
+        let io = TornContainer {
+            candidates: vec![torn, intact.clone()],
+        };
+        let got = rt().block_on(super::read_verified_themes_bytes(
+            &io,
+            Path::new("/vault"),
+            &key,
+            &HASH,
+        ));
+        assert_eq!(got.as_deref(), Some(intact.as_slice()));
     }
 }

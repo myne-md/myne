@@ -115,10 +115,22 @@ async fn read_or_none(
     session_state_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> Option<String> {
-    let bytes = match io.read(workspace_path).await {
-        Ok(b) => b,
-        Err(crate::io_failure_kind::IoFailureKind::NotFound) => return None,
-        Err(io_kind) => {
+    // Through the SINGLETON fallback (myne#301): `VaultIo::read` answers with the
+    // newest structurally intact candidate, so on the web client a slot torn
+    // mid-write discards the intact copy beside it and the workspace silently
+    // resets to default. The caller's own decode is the verifier.
+    use crate::singleton::{open_newest_and_sweep, OpenOutcome};
+    let bytes = match open_newest_and_sweep(io, workspace_path, |b: &[u8]| {
+        decode_workspace_blob(session_state_key, account_number_hash, b)
+            .ok()
+            .and_then(|pt| String::from_utf8(pt.to_vec()).ok())
+            .ok_or(())
+    })
+    .await
+    {
+        Ok(text) => return Some(text),
+        Err(OpenOutcome::Absent) => return None,
+        Err(OpenOutcome::Io(io_kind)) => {
             tracing::warn!(
                 event = "workspace_io_failed",
                 stage = "read",
@@ -127,6 +139,13 @@ async fn read_or_none(
             );
             return None;
         }
+        // Fall through to the existing per-cause logging below, which
+        // distinguishes AEAD failure from a non-UTF-8 payload. Re-reading the
+        // newest copy for that is fine: nothing decoded, so nothing was swept.
+        Err(OpenOutcome::Undecodable(())) => match io.read(workspace_path).await {
+            Ok(b) => b,
+            Err(_) => return None,
+        },
     };
     match decode_workspace_blob(session_state_key, account_number_hash, &bytes) {
         Ok(plaintext) => match String::from_utf8(plaintext.to_vec()) {
