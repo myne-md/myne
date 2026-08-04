@@ -672,7 +672,13 @@ pub async fn sync_delete_quarantine<R: Runtime>(
 ) -> Result<(), SyncDeviceError> {
     let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(|_| SyncDeviceError::Internal)?;
-    delete_quarantine_in(&crate::vault_io::StdVaultIo, &dir, &file_name).await
+    delete_quarantine_in(
+        &crate::vault_io::StdVaultIo,
+        &dir,
+        state.inner(),
+        &file_name,
+    )
+    .await
 }
 
 // --- Enrollment command (MYND-425 task 5; bootstrap resolved) ---
@@ -1224,6 +1230,35 @@ mod tests {
         });
     }
 
+    /// The only destroyer of `quarantine/` content refuses when nothing is
+    /// unlocked — and the blob is still on disk afterwards (myne#382).
+    ///
+    /// Asserted at rest, not only through the return value: §11.3 calls the
+    /// quarantined ciphertext the *recoverable* ceiling on a lying server, and
+    /// "recoverable" is a claim about the bytes, not about an error code. Its
+    /// siblings refuse when locked only as a side effect of needing `items_key`;
+    /// a delete needs no key, so it used to answer.
+    #[test]
+    fn quarantine_delete_refuses_while_locked() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("quar-delete-locked").expect("scoped tempdir");
+            let state = VaultRuntimeState::default(); // no unlocked slot
+            let uuid = uuid::Uuid::parse_str(QUAR_UUID_A).unwrap();
+            let file_name = format!("{QUAR_UUID_A}.myn");
+            seed_quarantined_blob(tmp.path(), &uuid, &file_name);
+
+            let err =
+                delete_quarantine_in(&crate::vault_io::StdVaultIo, tmp.path(), &state, &file_name)
+                    .await
+                    .expect_err("locked vault must not destroy quarantine evidence");
+            assert_eq!(err, SyncDeviceError::Internal);
+            assert!(
+                tmp.path().join("quarantine").join(&file_name).exists(),
+                "the evidence must survive the refusal"
+            );
+        });
+    }
+
     #[test]
     fn quarantine_restore_mints_new_id_removes_source_and_preserves_content() {
         rt().block_on(async {
@@ -1317,6 +1352,12 @@ mod tests {
             .await
             .expect("stage fixture");
 
+            // UNLOCKED, deliberately: threading a `VaultRuntimeState::default()`
+            // here to make it compile would silently turn every assertion below
+            // into an assertion about the LOCKED path, and the traversal guard
+            // would stop being tested at all (myne#382).
+            let state = unlocked_state().await;
+
             // Pattern violations are BadRequest — nothing outside quarantine/ is
             // reachable through this command.
             for bad in [
@@ -1327,7 +1368,7 @@ mod tests {
                 format!("{QUAR_UUID_A}.txt"),
             ] {
                 assert_eq!(
-                    delete_quarantine_in(io, tmp.path(), &bad).await,
+                    delete_quarantine_in(io, tmp.path(), &state, &bad).await,
                     Err(SyncDeviceError::BadRequest),
                     "must reject {bad:?}"
                 );
@@ -1338,13 +1379,13 @@ mod tests {
             );
 
             // The valid name removes exactly that file.
-            delete_quarantine_in(io, tmp.path(), &file_name)
+            delete_quarantine_in(io, tmp.path(), &state, &file_name)
                 .await
                 .expect("valid delete");
             assert!(!io.exists(&qdir.join(&file_name)).await.unwrap());
             // A second delete of the now-missing file surfaces Internal.
             assert_eq!(
-                delete_quarantine_in(io, tmp.path(), &file_name).await,
+                delete_quarantine_in(io, tmp.path(), &state, &file_name).await,
                 Err(SyncDeviceError::Internal)
             );
         });

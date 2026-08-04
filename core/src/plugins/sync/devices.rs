@@ -116,6 +116,19 @@ fn device_action(
 }
 
 /// Approve a pending device (the existing unlocked device authorizes it).
+///
+/// Gated on `Slot::Unlocked`, which makes that sentence true rather than
+/// aspirational (myne#382). The reason here is UNIFORMITY, not data loss —
+/// approving destroys nothing local — and the gate lives in this function
+/// rather than in `authed_transport_from_host`, through which the read-only
+/// roster calls and the deliberately pre-unlock `sync_reset_local` also route.
+///
+/// It refuses nothing a user can reach: every client opens this panel only
+/// post-unlock (desktop `SyncPanel` → `SettingsModal`, mounted only by the
+/// editor screen; mobile the same through `SettingsSheet`). That is an audited
+/// claim about reachability rather than a compiler-checked one, and
+/// `sync-replication.e2e.ts` `sr1` is what would notice if a future
+/// "approve from the pending screen" affordance broke it.
 pub fn approve_device(
     transport: &dyn SyncTransport,
     token: &str,
@@ -137,6 +150,37 @@ pub fn revoke_device(
 mod tests {
     use super::*;
     use crate::plugins::sync::transport::FakeTransport;
+
+    /// The two device MUTATIONS refuse before they resolve a vault root or read
+    /// a token, when nothing is unlocked (myne#382).
+    ///
+    /// Driven with `TestHost`, NOT `NoopHost`: `NoopHost::app_data_dir()` fails,
+    /// so the ungated path would answer `Internal` anyway and the test would
+    /// pass against the unfixed tree, proving nothing. With a real scratch root
+    /// the ungated path resolves it, finds no token file and answers
+    /// `NotEnrolled`; the gated one answers `Internal` without touching disk.
+    ///
+    /// A valid 32-char hex device id, so the assertion still reaches the guard
+    /// if a later refactor moves it below `hex16`.
+    #[test]
+    fn device_mutations_refuse_while_locked() {
+        crate::test_support::block_on(async {
+            let tmp = crate::test_support::ScopedTempDir::new("devices-locked").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let state = crate::plugins::vault_unlock::state::VaultRuntimeState::default();
+            let io = &crate::vault_io::StdVaultIo;
+            let id = "01".repeat(16);
+
+            assert_eq!(
+                approve_device_from_host(&host, io, &state, &id).await,
+                Err(SyncDeviceError::Internal),
+            );
+            assert_eq!(
+                remove_device_from_host(&host, io, &state, &id).await,
+                Err(SyncDeviceError::Internal),
+            );
+        });
+    }
 
     /// Moved here from `commands` with the function (MYND-635). It gains
     /// coverage rather than losing it: `commands` is `tauri-ipc`-gated, so this
@@ -517,6 +561,11 @@ pub async fn approve_device_from_host(
     state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
     device_id_hex: &str,
 ) -> Result<(), SyncDeviceError> {
+    use crate::plugins::vault_unlock::state::SlotKind;
+    if !matches!(state.slot_kind_active().await, SlotKind::Unlocked) {
+        return Err(SyncDeviceError::Internal);
+    }
+
     let id = hex16(device_id_hex).ok_or(SyncDeviceError::BadRequest)?;
     let (token, transport) = authed_transport_from_host(host, io, state).await?;
     crate::task::run_blocking(move || approve_device(transport.as_ref(), &token, &id))
@@ -526,12 +575,20 @@ pub async fn approve_device_from_host(
 }
 
 /// Remove a device — revoke its token (availability; not a crypto lockout, SYNC-2).
+///
+/// Gated on `Slot::Unlocked` for the same reason as its sibling above:
+/// uniformity, not data loss. See `approve_device_from_host`.
 pub async fn remove_device_from_host(
     host: &dyn crate::host::HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
     device_id_hex: &str,
 ) -> Result<(), SyncDeviceError> {
+    use crate::plugins::vault_unlock::state::SlotKind;
+    if !matches!(state.slot_kind_active().await, SlotKind::Unlocked) {
+        return Err(SyncDeviceError::Internal);
+    }
+
     let id = hex16(device_id_hex).ok_or(SyncDeviceError::BadRequest)?;
     let (token, transport) = authed_transport_from_host(host, io, state).await?;
     crate::task::run_blocking(move || revoke_device(transport.as_ref(), &token, &id))
@@ -627,6 +684,14 @@ pub async fn head_fingerprint_from_host(
 /// Reset this device's sync enrolment locally: clear the device-local token and
 /// the sync baseline for the active vault, returning it to a clean "not
 /// enrolled, unsynced" state.
+///
+/// **Deliberately NOT slot-gated**, unlike its two neighbours (myne#382). This
+/// is the PRE-UNLOCK escape hatch: three of its four call sites run with
+/// nothing unlocked — the SAS-mismatch and "start over" paths on the
+/// account-bootstrap screen, and the join modal reached from `welcome`. The web
+/// capability table says the same in its own words ("`sync_reset_local` is that
+/// screen's 'the fingerprints don't match' escape hatch"). Gating it re-creates
+/// the wedge it exists to close.
 ///
 /// NEVER touches `notes/`, attachments or `vault.meta`, and never calls the
 /// server — a rejected token cannot authenticate a server-side remove, and the

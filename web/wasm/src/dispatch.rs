@@ -1687,6 +1687,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 match myne_core::plugins::sync::conflict::delete_quarantine_in(
                     vault_io(),
                     &dir,
+                    state,
                     &a.file_name,
                 )
                 .await
