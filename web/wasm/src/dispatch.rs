@@ -1417,6 +1417,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 vault_io(),
                 crate::session::state(),
+                crate::session::hooks(),
             )
             .await;
             Outcome::ok(&status)

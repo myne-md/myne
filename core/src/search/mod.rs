@@ -405,6 +405,18 @@ impl InvertedIndex {
             .collect()
     }
 
+    /// Whether this index holds a document under `id`.
+    ///
+    /// The persistence layer asks it before writing a nonce manifest: the
+    /// manifest is a claim that the accompanying index already covers each note
+    /// at that nonce, and a note the index has never seen must not be in it
+    /// (myne#305). `add` inserts into `id_to_doc` unconditionally — an empty
+    /// note is still a document — so this is exactly "has been indexed", not
+    /// "has searchable text".
+    pub fn contains_doc(&self, id: &str) -> bool {
+        self.id_to_doc.contains_key(id)
+    }
+
     /// MYND-448a: remove every attachment doc linked to `note_id` (note deleted,
     /// or a pre-refresh clear). No-op when the note has no attachment docs. The
     /// note's OWN body doc (keyed by the bare `note_id`) is untouched.

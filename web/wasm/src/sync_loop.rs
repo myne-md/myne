@@ -209,6 +209,7 @@ pub async fn tick() -> String {
         host,
         crate::dispatch::vault_io(),
         state,
+        crate::session::hooks(),
         allow_push,
     )
     .await;

@@ -290,10 +290,17 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let Some(state) = app.try_state::<VaultRuntimeState>() else {
         return CycleOutcome::NotReady;
     };
+    // A pulled note has to reach the search / attachment / AI indexes exactly
+    // as a locally-saved one does (myne#305), and the hooks are how any of the
+    // three is reachable from here.
+    let Some(hooks) = app.try_state::<crate::hooks::Hooks>() else {
+        return CycleOutcome::NotReady;
+    };
     super::cycle::run_active_cycle_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         state.inner(),
+        hooks.inner(),
         allow_push,
     )
     .await
@@ -354,10 +361,14 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
     let Some(state) = app.try_state::<VaultRuntimeState>() else {
         return Ok(SyncRuntimeStatus::NotEnrolled);
     };
+    let Some(hooks) = app.try_state::<crate::hooks::Hooks>() else {
+        return Ok(SyncRuntimeStatus::NotEnrolled);
+    };
     Ok(super::cycle::sync_now_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         state.inner(),
+        hooks.inner(),
     )
     .await)
 }
