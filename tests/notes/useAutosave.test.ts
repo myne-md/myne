@@ -582,8 +582,12 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
       await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
     });
 
-    // Handler received the buffer body; status is the transient `conflict`.
-    expect(onBaseMismatch).toHaveBeenCalledWith("typed on stale base");
+    // The handler is told WHICH note was rejected and what it tried to write
+    // (myne#335) — not just a body, and not the pane's current note.
+    expect(onBaseMismatch).toHaveBeenCalledWith({
+      noteId: "note-1",
+      body: "typed on stale base",
+    });
     expect(result.current.status).toEqual({ status: "conflict" });
 
     // While the handler is in flight, retry() must no-op (inFlight non-null).
@@ -750,5 +754,54 @@ describe("the latest-wins follow-up (myne#333)", () => {
       await Promise.resolve();
     });
     expect(saveImpl).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── myne#335: the rejection names the note it was for ──────────────────────
+//
+// The catch passed `latestBodyRef.current` to a handler bound to the pane's
+// CURRENT note. After a note switch those are different notes: the keep-both
+// copy was attributed to the wrong one, carrying either that note's untouched
+// body or the previous note's edited one — a spurious duplicate in the sidebar
+// and the Conflicts view either way. And the REJECTED keystrokes were never
+// preserved into a copy, which is the sole purpose of the §11.3 handler; they
+// survived only in the volatile per-pane EditorState cache, and even on return
+// `acceptReloadedBody` marks them saved, so they are never written to disk.
+describe("a BaseMismatch that lands after a note switch (myne#335)", () => {
+  const BASE_MISMATCH = { kind: "BaseMismatch" } as const;
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("attributes the copy to the note the save was for, with that note's body", async () => {
+    const rejection = defer();
+    const saveImpl = vi
+      .fn<(id: string, body: string, h?: string) => Promise<string>>()
+      .mockImplementationOnce(() => rejection.promise);
+    const onBaseMismatch = vi.fn(() => Promise.resolve());
+
+    const { rerender } = renderHook(
+      ({ id, body }: { id: string; body: string }) =>
+        useAutosave(id, body, saveImpl, undefined, onBaseMismatch),
+      { initialProps: { id: "note-A", body: "base" } },
+    );
+    rerender({ id: "note-A", body: "A edited" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    expect(saveImpl).toHaveBeenCalledTimes(1);
+
+    // The user switches notes while A's save is in flight.
+    rerender({ id: "note-B", body: "B body" });
+
+    // …and only then does A's save come back rejected.
+    await act(async () => {
+      rejection.reject(BASE_MISMATCH);
+      await rejection.promise.catch(() => {});
+    });
+
+    expect(onBaseMismatch).toHaveBeenCalledWith({
+      noteId: "note-A",
+      body: "A edited",
+    });
   });
 });

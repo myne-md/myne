@@ -127,7 +127,13 @@ export function useAutosave(
   body: string,
   saveImpl: SaveFn = DEFAULT_SAVE_FN,
   onSaved?: (applyPatch: SavedBodyPatch) => void,
-  onBaseMismatch?: (staleBufferBody: string) => Promise<void>,
+  /** §11.3 rejection handler. Receives the note the rejected save was FOR and
+   *  the body it tried to write — never "whatever the pane is showing now"
+   *  (myne#335). */
+  onBaseMismatch?: (rejected: {
+    readonly noteId: string;
+    readonly body: string;
+  }) => Promise<void>,
   // §11.3 expected-base guard toggle. The guard exists to catch a SYNC
   // pull-apply landing under the editor between the last save and the next
   // keystroke — its whole purpose is a remote writer. With sync off no remote
@@ -421,7 +427,26 @@ export function useAutosave(
         if (isBaseMismatchError(err) && onBaseMismatchRef.current !== undefined) {
           setStatus({ status: "conflict" });
           try {
-            await onBaseMismatchRef.current(latestBodyRef.current);
+            // The note the REJECTED save was for, and the body it tried to
+            // write (myne#335).
+            //
+            // This used to pass `latestBodyRef.current` to a handler bound to
+            // the pane's CURRENT note — so after a note switch the conflict
+            // copy was attributed to the wrong note, carrying either that
+            // note's untouched body or the previous note's edited one. A
+            // spurious duplicate in the sidebar and the Conflicts view either
+            // way, and the rejected keystrokes were never preserved into a
+            // copy — which is the sole purpose of the §11.3 handler. They then
+            // survived only in the volatile per-pane EditorState cache, and
+            // even on return `acceptReloadedBody` marks them saved, so they are
+            // never written.
+            //
+            // While the hook is still on the same note, the newest buffer is
+            // the right thing to preserve; once it has moved on, `bodyAtFire`
+            // is the last text that belonged to `id`.
+            const rejectedBody =
+              noteIdRef.current === id ? latestBodyRef.current : bodyAtFire;
+            await onBaseMismatchRef.current({ noteId: id, body: rejectedBody });
             return;
           } catch {
             // fall through to the error state below

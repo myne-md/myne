@@ -746,14 +746,20 @@ export function PaneView({
   // pull-apply re-based the note underneath the editor. Order is load-bearing
   // (copy FIRST — a copy failure leaves the buffer untouched, zero keystroke
   // loss); the orchestration lives in `baseMismatch.ts` (unit-tested). Read
-  // through a ref-stable callback: `activeId` is captured per render, which is
-  // correct — the handler resolves the pane's CURRENT note.
+  // The handler resolves the note the REJECTED SAVE was for, which the autosave
+  // now names explicitly (myne#335) — not `activeId`, the pane's current note.
+  // Those differ whenever a rejection lands after a note switch, and attributing
+  // the copy to the current note produced a spurious duplicate while losing the
+  // keystrokes the handler exists to preserve.
   const onBaseMismatch = useCallback(
-    async (staleBufferBody: string) => {
-      if (activeId === null) return;
+    async (rejected: { readonly noteId: string; readonly body: string }) => {
       await handleBaseMismatch(
-        { noteId: activeId, bufferBody: staleBufferBody },
+        { noteId: rejected.noteId, bufferBody: rejected.body },
         productionBaseMismatchDeps((diskBody) => {
+          // Re-base the pane only if it is STILL showing that note. Adopting
+          // another note's disk body into this buffer would be the same class of
+          // mistake in the other direction.
+          if (activeIdRef.current !== rejected.noteId) return;
           autosaveRef.current.acceptReloadedBody(diskBody);
           setContent(diskBody);
         }, (copyId) => ctx.refreshOne(copyId)),
