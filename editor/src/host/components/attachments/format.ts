@@ -1,5 +1,7 @@
 // Display formatters for the attachments library (MYND-170). Pure, no IPC.
 
+import { dateTimeDisplay, formatInstant } from "../../lib/datetimeFormat";
+
 /**
  * Human-readable byte size — binary units (KiB/MiB), one decimal above
  * 1 KiB, integer bytes below. Matches the 64 MiB cap's binary basis
@@ -23,13 +25,14 @@ export function formatBytes(bytes: number): string {
  * `created_at`). Locale-aware short form (e.g. "Jun 8, 2026"); no time
  * component — the library lists are date-granular.
  */
-export function formatCreatedAt(unixSeconds: number): string {
-  const d = new Date(unixSeconds * 1000);
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+export function formatCreatedAt(
+  unixSeconds: number,
+  display = dateTimeDisplay(),
+): string {
+  // myne#279: an attachment's `created_at` is UNIX seconds — a real moment on
+  // the timeline — so this is one of the two places the display timezone
+  // genuinely converts, rather than a zone-free wall-clock reading.
+  return formatInstant(unixSeconds * 1000, display);
 }
 
 /**

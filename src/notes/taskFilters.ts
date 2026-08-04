@@ -185,8 +185,34 @@ export function overdueCount(tasks: readonly VaultTask[], today: string): number
   return n;
 }
 
-/** Today as `YYYY-MM-DD` in the user's LOCAL calendar — the only clock read. */
-export function todayLocal(now: Date = new Date()): string {
+/**
+ * Today as `YYYY-MM-DD` in the user's calendar — the only clock read.
+ *
+ * myne#279: "the user's calendar" now means the DISPLAY timezone when one is
+ * set, and the machine's own zone otherwise. That is the whole reach of the
+ * timezone setting on this axis — which tasks count as overdue, due today or
+ * upcoming. It never changes the bytes: `dialect/src/taskFields.ts` keeps stored
+ * times zone-free wall-clock, and nothing here writes.
+ *
+ * `zone` is a parameter rather than a store read so this module stays pure and
+ * clock-free for its callers' tests; callers pass `dateTimeDisplay().timeZone`.
+ */
+export function todayLocal(now: Date = new Date(), zone: string | null = null): string {
+  if (zone !== null) {
+    try {
+      // `en-CA` renders `YYYY-MM-DD` — the civil-date shape, no reassembly.
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(now);
+    } catch {
+      // An unsupported zone falls through to the machine's own calendar rather
+      // than throwing — the pref carries a free string, and "what day is it" is
+      // not a question that may fail.
+    }
+  }
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
   return `${now.getFullYear()}-${mm}-${dd}`;

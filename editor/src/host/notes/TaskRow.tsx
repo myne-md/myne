@@ -25,6 +25,8 @@
 import type { CSSProperties, KeyboardEvent, ReactElement } from "react";
 import i18n from "@myne/editor/i18n";
 import { TASK_CHIP_TOKEN, taskChipStyle } from "./taskChipToken";
+import { formatStoredValue } from "../lib/datetimeFormat";
+import { useDateTimeDisplay } from "../lib/useDateTimeDisplay";
 
 /**
  * Which surface the row is rendering in.
@@ -217,7 +219,13 @@ export function TaskRow({
   twoLine = false,
 }: TaskRowProps): ReactElement {
   const overdue = isOverdue(task, today);
-  const date = rowDate(task);
+  // myne#279: the row used to render the raw stored string, which meant a raw
+  // ISO date and a time that was silently dropped by the `[0,10]` slice on the
+  // way in. It now goes through the one shared formatter, so the user's chosen
+  // format applies and a task written for 09:00 says so.
+  const display = useDateTimeDisplay();
+  const raw = rowDate(task);
+  const date = raw === undefined ? undefined : formatStoredValue(raw, display);
   const disabled = task.oversized === true || onToggle === undefined;
 
   const toggle = (): void => {

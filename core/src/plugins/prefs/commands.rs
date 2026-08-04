@@ -3626,6 +3626,152 @@ pub async fn set_editor_content_width<R: Runtime>(
     .await
 }
 
+/// Slot::Unlocked-gated setter for the `date_format` display preference (myne#279)
+/// — `system`/`iso`/`dmy`/`mdy`/`dmmmy`, or `None` to clear to the `system` default.
+///
+/// A free `Option<String>` (the `set_editor_content_width` precedent
+/// class): the enum interpretation and the unknown-value fallback live on the
+/// client, so a value this build does not recognise reads as the default rather
+/// than failing a write.
+pub async fn set_date_format_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "date_format",
+        |p| {
+            p.date_format = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_date_format<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_date_format_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        value,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the `time_format` display preference (myne#279)
+/// — `system`/`24h`/`12h`, or `None` to clear to the `system` default.
+///
+/// Same free-`Option<String>` discipline as `set_date_format`.
+pub async fn set_time_format_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "time_format",
+        |p| {
+            p.time_format = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_time_format<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_time_format_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        value,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the `timezone` display preference (myne#279)
+/// — an IANA zone identifier, or `None` to clear to the `system` default.
+///
+/// **Display only.** It decides what the app treats as "today" and how a stored
+/// wall-clock value is printed; it never enters a `.myn` file, a blob, or the
+/// sync wire (`prefs_classification` files it DeviceLocal for that reason).
+pub async fn set_timezone_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "timezone",
+        |p| {
+            p.timezone = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_timezone<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_timezone_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        value,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
 /// Slot::Unlocked-gated setter for the `editor_font_family` preset
 /// (editor-typography) — `mono`/`sans`, or `None` to clear to the `mono` default.
 pub async fn set_editor_font_family_from_host(
@@ -5293,6 +5439,8 @@ mod tests {
                     attachment_compression_enabled: true,
                     developer_mode: false,
                     attachment_ocr_enabled: true,
+                    time_format: None,
+                    timezone: None,
                     transcription_enabled: true,
                     screen_capture_protection: false,
                     ai_enabled: false,
@@ -5323,6 +5471,7 @@ mod tests {
                     daily_date_format: None,
                     daily_folder: None,
                     daily_template: None,
+                    date_format: None,
                     favorites: Vec::new(),
                     field_clocks: Default::default(),
                     item_order: Default::default(),

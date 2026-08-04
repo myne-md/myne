@@ -15,34 +15,38 @@ import type { CSSProperties, ReactNode } from "react";
 import type { StoredProperty, StoredScalar } from "./queryEngine";
 import { RFC3339_FULL_DATE } from "./propertyTyping";
 import { tagPillStyle } from "./tagPillToken";
+import {
+  dateTimeDisplay,
+  formatCivilDate,
+  formatInstant,
+  formatStoredValue,
+  splitStoredValue,
+} from "../lib/datetimeFormat";
 
 /** Checked / unchecked glyphs for a checkbox property (calm, glyph-only). */
 export const CHECKBOX_CHECKED = "☑";
 export const CHECKBOX_UNCHECKED = "☐";
 
-/** Absolute human-readable date formatter (dep-free `Intl`); a date-only value
- *  is anchored to 00:00:00Z so the displayed day matches the stored full-date. */
-const DATE_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  // Format in UTC to match the `T00:00:00Z` anchor below: a date-only value must
-  // display the same calendar day everywhere, not shift back a day for users west
-  // of UTC (the whole of the Americas). Without this the day is off-by-one there.
-  timeZone: "UTC",
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
-
 /**
  * Format a `date`-typed property value to a human-readable absolute date.
  * Accepts the §3.6.4 normalized forms (RFC 3339 full-date or date-time); an
  * unparseable value falls back to the raw string (never throws, never blank).
+ *
+ * myne#279: this used to build its own `Intl.DateTimeFormat("en-GB", …)`, so a
+ * user with the app in Turkish, German or US English still got British date
+ * formatting here — and it was a literal, not a fallback. It now goes through
+ * the one shared formatter, which keeps the no-zone-shift behaviour the old
+ * `UTC` anchor was there to provide (a civil date names a calendar day, not an
+ * instant) while honouring the user's chosen format.
  */
-export function formatDateValue(value: string): string {
+export function formatDateValue(value: string, display = dateTimeDisplay()): string {
   const t = value.trim();
   if (t === "") return "";
-  const iso = RFC3339_FULL_DATE.test(t) ? `${t}T00:00:00Z` : t;
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? value : DATE_FORMAT.format(new Date(ms));
+  if (RFC3339_FULL_DATE.test(t)) return formatCivilDate(t, display);
+  const { date } = splitStoredValue(t);
+  if (date !== null) return formatStoredValue(t, display);
+  const ms = Date.parse(t);
+  return Number.isNaN(ms) ? value : formatInstant(ms, display);
 }
 
 /** True iff a checkbox value reads as checked (the §3.6.4 canonical is

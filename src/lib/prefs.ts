@@ -413,6 +413,33 @@ export interface PrefsView {
    */
   editor_layout: EditorLayout | null;
   /**
+   * Display date format (myne#279) — `"system"` | `"iso"` | `"dmy"` | `"mdy"` |
+   * `"dmmmy"`. `null` ≡ `"system"` (follow the OS locale). A free enum string on
+   * the wire (Rust `Option<String>`); the client validates + maps an unknown
+   * value to the default. Omitted from the encrypted blob when `null`.
+   * Non-load-bearing cosmetic. Canonical key slot: after `daily_template`,
+   * before `deliberate_folders`.
+   */
+  date_format: string | null;
+  /**
+   * Display time format (myne#279) — `"system"` | `"24h"` | `"12h"`. `null` ≡
+   * `"system"`. Same free-enum-string discipline as {@link PrefsView.date_format}.
+   * Canonical key slot: after `theme`, before `timezone`.
+   */
+  time_format: string | null;
+  /**
+   * Display timezone override (myne#279) — an IANA zone identifier, or `null` ≡
+   * the host's own zone.
+   *
+   * **Display only.** It decides what the app treats as "today" and how a stored
+   * wall-clock value is printed; it never enters a `.myn` file, a blob, or the
+   * sync wire — `dialect/src/taskFields.ts` keeps note times zone-free, and this
+   * does not walk that back. Filed device-local by `prefs_classification`, since
+   * the right zone is a property of where the device is. Canonical key slot:
+   * after `time_format`, before `transcription_enabled`.
+   */
+  timezone: string | null;
+  /**
    * Editor content max-width preset (editor-typography) — `"narrow"` |
    * `"normal"` | `"wide"` | `"full"`. `null` ≡ the canonical default
    * `"normal"`. A free enum string on the wire (Rust `Option<String>`); the
@@ -1328,6 +1355,32 @@ export async function setEditorTextSize(value: string | null): Promise<void> {
  */
 export async function setEditorLineSpacing(value: string | null): Promise<void> {
   await writePref("plugin:prefs|set_editor_line_spacing", { value });
+}
+
+/**
+ * Set (or clear) the display date format (myne#279) — pass
+ * `"system"`/`"iso"`/`"dmy"`/`"mdy"`/`"dmmmy"`, or `null` to clear to
+ * `"system"`. Same contract as {@link setEditorTextSize}.
+ */
+export async function setDateFormat(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_date_format", { value });
+}
+
+/**
+ * Set (or clear) the display time format (myne#279) — pass
+ * `"system"`/`"24h"`/`"12h"`, or `null` to clear to `"system"`.
+ */
+export async function setTimeFormat(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_time_format", { value });
+}
+
+/**
+ * Set (or clear) the DISPLAY timezone override (myne#279) — pass an IANA zone
+ * identifier, or `null` to follow the host's own zone. Display only: it never
+ * reaches a note, a blob or the sync wire.
+ */
+export async function setTimezone(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_timezone", { value });
 }
 
 /**

@@ -184,6 +184,7 @@ import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
+import { useDateTimeDisplaySync } from "../hooks/useDateTimeDisplaySync";
 import { useReminderScheduler } from "../hooks/useReminderScheduler";
 import { createInAppNotifier } from "../lib/reminderNotifier";
 import { useLiveVaultTasks } from "../notes/taskIndex";
@@ -456,6 +457,11 @@ export function Editor({
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<EditorToast | null>(null);
+
+  // myne#279 — publish the resolved date/time display settings into the shared
+  // store every formatting surface reads. Mounted once, here, so nothing below
+  // has to thread the three prefs down to the rows that print a date.
+  useDateTimeDisplaySync();
 
   // #250 — the authoritative active-vault id for every vault-targeting surface
   // below. Prefer the id the stage already carries; fall back to the runtime

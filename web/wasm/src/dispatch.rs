@@ -2965,6 +2965,93 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        "plugin:prefs|set_date_format" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                value: Option<String>,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_date_format_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.value,
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:prefs|set_time_format" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                value: Option<String>,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_time_format_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.value,
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:prefs|set_timezone" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                value: Option<String>,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_timezone_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.value,
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         "plugin:prefs|set_editor_content_width" => {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]

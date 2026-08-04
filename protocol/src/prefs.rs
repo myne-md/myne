@@ -393,6 +393,23 @@ pub struct PrefsView {
     #[serde(default)]
     pub daily_template: Option<alloc::string::String>,
 
+    /// Display date format (myne#279) — a closed enum string chosen from
+    /// `system` / `iso` / `dmy` / `mdy` / `dmmmy`. `None` ≡ `system` (follow the
+    /// OS locale), applied host-side. Stored as a free `Option<String>` here:
+    /// the enum interpretation + unknown→default fallback live on the client, no
+    /// codec-level validation (the `editor_content_width` precedent class).
+    ///
+    /// **Display only.** It never enters a `.myn` file, a blob or the sync wire
+    /// as a formatting instruction — `dialect/src/taskFields.ts` keeps the
+    /// on-disk bytes zone-free and format-free, and this decides how they are
+    /// printed, nothing else. Canonical key `date_format` — sorts after
+    /// `daily_template` (`dai` < `dat`), before `deliberate_folders`
+    /// (`da` < `de`). Omitted when `None`, so a vault that never chose a format
+    /// is byte-identical to a pre-feature `vault.prefs`. **Non-load-bearing**
+    /// cosmetic (AS-low) — no protective-envelope clamp.
+    #[serde(default)]
+    pub date_format: Option<alloc::string::String>,
+
     /// Favorited notes — an ordered list of note UUIDs surfaced in the
     /// sidebar's Favorites section, in display order (MYND-183). A
     /// **sequence** (order is the payload): the canonical encoder preserves
@@ -749,6 +766,34 @@ pub struct PrefsView {
     /// value can at worst enable or disable a user-initiated local computation;
     /// it grants no read access the vault did not already have, and the host
     /// re-reads it rather than trusting the WebView.
+    /// Display time format (myne#279) — a closed enum string chosen from
+    /// `system` / `24h` / `12h`. `None` ≡ `system` (follow the OS locale),
+    /// applied host-side. Same free-`Option<String>` + client-side validation
+    /// discipline as [`PrefsView::date_format`]. Canonical key `time_format` —
+    /// sorts after `theme` (`th` < `ti`), before `timezone` (`_` < `z`).
+    /// Omitted when `None`. **Non-load-bearing** cosmetic — no clamp.
+    #[serde(default)]
+    pub time_format: Option<alloc::string::String>,
+
+    /// Display timezone override (myne#279) — an IANA zone identifier, or `None`
+    /// ≡ `system` (the host's own zone).
+    ///
+    /// **Display only, and that is load-bearing for a different reason than the
+    /// two fields above.** It decides what the app considers "today" and how a
+    /// stored wall-clock value is printed — it NEVER enters a `.myn` file, a
+    /// blob or the sync wire. `dialect/src/taskFields.ts` states the rule this
+    /// preserves: no timezone offset and no zone identifier is ever produced,
+    /// times are local wall-clock, which is what a personal reminder means and
+    /// which keeps a coarse geolocation datum out of a file that gets exported
+    /// as plaintext. Storing the *display* choice in `vault.prefs` — encrypted
+    /// at rest, never in note bytes — does not walk that back.
+    ///
+    /// Canonical key `timezone` — sorts after `time_format` (`_` < `z`), before
+    /// `transcription_enabled` (`ti` < `tr`). Omitted when `None`.
+    /// **Non-load-bearing** cosmetic — no clamp.
+    #[serde(default)]
+    pub timezone: Option<alloc::string::String>,
+
     #[serde(default = "default_true")]
     pub transcription_enabled: bool,
 
@@ -1207,6 +1252,8 @@ impl Default for PrefsView {
             device_names: Default::default(),
             attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             auto_lock_seconds: None,
             auto_tag_enabled: false,
@@ -1214,6 +1261,7 @@ impl Default for PrefsView {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -1596,6 +1644,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if let Some(ref tmpl) = prefs.daily_template {
         out.extend_from_slice(b"\"daily_template\":");
         push_json_string(&mut out, &tmpl.nfc().collect::<String>());
+        out.push(b',');
+    }
+
+    // date_format (myne#279) — canonical key 'dat…', after daily_template
+    // (`dai` < `dat`) and before deliberate_folders (`da` < `de`). A free enum
+    // string; the client validates + maps unknown→default. Omitted when None so
+    // a vault that never chose a format is byte-identical to a pre-feature
+    // vault.prefs.
+    if let Some(ref v) = prefs.date_format {
+        out.extend_from_slice(b"\"date_format\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
         out.push(b',');
     }
 
@@ -2096,6 +2155,21 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b'"');
     }
 
+    // time_format + timezone (myne#279) — canonical keys 'ti…', between theme
+    // ['th' < 'ti'] and transcription_enabled ['ti' < 'tr']. Leading comma like
+    // theme, since this region is emitted after the last comma-terminated block.
+    // Free enum / IANA strings; the client validates + maps unknown→default.
+    // Each omitted when None so a vault that never chose one is byte-identical
+    // to a pre-feature vault.prefs.
+    if let Some(ref v) = prefs.time_format {
+        out.extend_from_slice(b",\"time_format\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+    }
+    if let Some(ref v) = prefs.timezone {
+        out.extend_from_slice(b",\"timezone\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+    }
+
     // transcription_enabled (canonical key 'transcription_enabled' — after
     // theme ['the' < 'tra'], before view_order ['t' < 'v']). Speech-to-text
     // opt-OUT (MYND-592). Emitted ONLY when FALSE — the same inverse rule as
@@ -2539,6 +2613,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         parse_optional_string_field(rest, &mut cursor, b"\"daily_date_format\":")?;
     let daily_folder = parse_optional_string_field(rest, &mut cursor, b"\"daily_folder\":")?;
     let daily_template = parse_optional_string_field(rest, &mut cursor, b"\"daily_template\":")?;
+    // date_format (myne#279) sits between daily_template (`dai` < `dat`) and
+    // deliberate_folders (`da` < `de`) — same monotonic cursor, so canonical key
+    // order holds. Optional → None when the key is absent.
+    let date_format = parse_optional_string_field(rest, &mut cursor, b"\"date_format\":")?;
     let deliberate_folders =
         parse_optional_array_field(rest, &mut cursor, b"\"deliberate_folders\":")?;
     // developer_mode (canonical key 'd' — after deliberate_folders
@@ -2746,6 +2824,14 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // speech-to-text on, and only a literal `false` turns it off.
     let transcription_enabled =
         parse_optional_bool_marker(after_key, b"\"transcription_enabled\":").unwrap_or(true);
+    // time_format + timezone (myne#279, keys 'ti…' — between theme and
+    // transcription_enabled). Located by marker in the
+    // post-screen_capture_protection region like theme/spell/startup_open.
+    // Tolerant: an absent key OR a non-string value decodes to None (the
+    // editor_default_view_mode / theme forward-compat discipline — both are
+    // non-load-bearing display settings, None ≡ host default `system`).
+    let time_format = parse_optional_string_marker(after_key, b"\"time_format\":");
+    let timezone = parse_optional_string_marker(after_key, b"\"timezone\":");
     // view_order (key 'v' — LAST, after theme [t < v], MYND-273). A sequence
     // array located by marker in the post-screen_capture_protection region, like
     // theme/spell. Absent → empty; present-but-malformed → PlaintextParseFailed.
@@ -2765,6 +2851,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         screen_capture_protection,
         show_note_timestamps,
         show_task_marker,
+        time_format,
+        timezone,
         transcription_enabled,
         folder_icons,
         hidden_bar_items,
@@ -2784,6 +2872,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         daily_date_format,
         daily_folder,
         daily_template,
+        date_format,
         favorites,
         field_clocks,
         item_order,
@@ -3696,6 +3785,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -3724,6 +3815,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -3768,6 +3860,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -3796,6 +3890,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -4157,6 +4252,8 @@ mod tests {
                 attachment_compression_enabled: true,
                 developer_mode: false,
                 attachment_ocr_enabled: true,
+                time_format: None,
+                timezone: None,
                 transcription_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
@@ -4188,6 +4285,7 @@ mod tests {
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
+                date_format: None,
                 active_workspace: None,
                 archive_disabled: None,
                 editor_layout: None,
@@ -4231,6 +4329,8 @@ mod tests {
                 attachment_compression_enabled: true,
                 developer_mode: false,
                 attachment_ocr_enabled: true,
+                time_format: None,
+                timezone: None,
                 transcription_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
@@ -4262,6 +4362,7 @@ mod tests {
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
+                date_format: None,
                 active_workspace: None,
                 archive_disabled: None,
                 editor_layout: None,
@@ -4750,6 +4851,96 @@ mod tests {
         assert_eq!(decoded, original);
     }
 
+    // ---- myne#279: display date/time/timezone -----------------------------
+
+    #[test]
+    fn display_datetime_prefs_round_trip_through_decode() {
+        let original = PrefsView {
+            date_format: Some(alloc::string::String::from("dmy")),
+            time_format: Some(alloc::string::String::from("24h")),
+            timezone: Some(alloc::string::String::from("Europe/Berlin")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn encode_omits_display_datetime_prefs_when_none_byte_identical_to_pre_feature() {
+        // A vault that never chose a display format encodes byte-identically to
+        // the bare pre-feature form (migration-less additive fields — existing
+        // golden vectors unaffected).
+        let encoded = canonical_json_encode(&PrefsView {
+            date_format: None,
+            time_format: None,
+            timezone: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_places_date_format_between_daily_template_and_deliberate_folders() {
+        // Canonical key order: daily_template (`dai`) < date_format (`dat`) <
+        // deliberate_folders (`de`). The exact slot, not merely "somewhere".
+        let encoded = canonical_json_encode(&PrefsView {
+            daily_template: Some(alloc::string::String::from("t1")),
+            date_format: Some(alloc::string::String::from("iso")),
+            deliberate_folders: alloc::vec![alloc::string::String::from("A/")],
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"daily_template":"t1","date_format":"iso","deliberate_folders":["A/"],"screen_capture_protection":true}"#
+        );
+    }
+
+    #[test]
+    fn encode_places_time_fields_between_theme_and_transcription_enabled() {
+        // Canonical key order: theme (`th`) < time_format (`ti`) < timezone
+        // (`_` < `z`) < transcription_enabled (`ti` < `tr`).
+        let encoded = canonical_json_encode(&PrefsView {
+            theme: Some(ThemeChoice::Dark),
+            time_format: Some(alloc::string::String::from("12h")),
+            timezone: Some(alloc::string::String::from("Europe/Istanbul")),
+            transcription_enabled: false,
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"screen_capture_protection":true,"theme":"dark","time_format":"12h","timezone":"Europe/Istanbul","transcription_enabled":false}"#
+        );
+    }
+
+    #[test]
+    fn display_datetime_prefs_survive_a_blob_round_trip() {
+        let original = PrefsView {
+            date_format: Some(alloc::string::String::from("mdy")),
+            time_format: Some(alloc::string::String::from("12h")),
+            timezone: Some(alloc::string::String::from("America/New_York")),
+            ..PrefsView::default()
+        };
+        let key = [7u8; 32];
+        let hash = [9u8; 16];
+        let blob = encode_prefs_blob_raw(&key, &hash, &original, &[3u8; 24]).expect("encode");
+        let decoded = decode_prefs_blob(&key, &hash, &blob).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn a_non_string_display_pref_decodes_to_none_rather_than_failing() {
+        // Forward-compat, the `theme` / `editor_default_view_mode` discipline:
+        // these are non-load-bearing display settings, so a value shape this
+        // build does not understand means "unset", not "corrupt vault".
+        let decoded = canonical_json_decode(
+            br#"{"screen_capture_protection":true,"time_format":7,"timezone":null}"#,
+        )
+        .expect("decode");
+        assert_eq!(decoded.time_format, None);
+        assert_eq!(decoded.timezone, None);
+    }
+
     #[test]
     fn encode_omits_editor_line_numbers_when_none_byte_identical_to_pre_feature() {
         // A vault that never touched the line-number gutter encodes byte-
@@ -4941,6 +5132,8 @@ mod tests {
             cli_rate_limit_disabled: Some(true),
             developer_mode: true,
             show_task_marker: false, // default true → emitted only when false
+            time_format: None,
+            timezone: None,
             transcription_enabled: false, // default true → emitted only when false
             ..PrefsView::default()
         };
@@ -5680,6 +5873,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5705,6 +5900,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
             field_clocks: Default::default(),
             item_order: BTreeMap::from([(
@@ -6133,6 +6329,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -6164,6 +6362,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -6211,6 +6410,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -6243,6 +6444,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -6292,6 +6494,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -6320,6 +6524,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -6368,6 +6573,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -6396,6 +6603,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -6504,6 +6712,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -6535,6 +6745,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -6604,6 +6815,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: true,
@@ -6630,6 +6843,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             favorites: alloc::vec![
                 alloc::string::String::from("f2"),
                 alloc::string::String::from("f1"),
@@ -6692,6 +6906,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -6717,6 +6933,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             favorites: Vec::new(),
             field_clocks: Default::default(),
             item_order: BTreeMap::from([(
@@ -6848,6 +7065,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: false,
@@ -6877,6 +7096,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             favorites: alloc::vec![alloc::string::String::from(
                 "0190a000-0000-7000-8000-000000000002",
             )],
@@ -6950,6 +7170,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -6982,6 +7204,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -7289,6 +7512,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -7317,6 +7542,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -7365,6 +7591,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -7393,6 +7621,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -7443,6 +7672,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -7471,6 +7702,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -7589,6 +7821,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -7617,6 +7851,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -7709,6 +7944,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -7735,6 +7972,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
             field_clocks: Default::default(),
             item_order: BTreeMap::from([(
@@ -8025,6 +8263,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -8053,6 +8293,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -8105,6 +8346,8 @@ mod tests {
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
+            time_format: None,
+            timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -8133,6 +8376,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
@@ -8446,6 +8690,8 @@ mod tests {
                 attachment_compression_enabled: true,
                 developer_mode: false,
                 attachment_ocr_enabled: true,
+                time_format: None,
+                timezone: None,
                 transcription_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
@@ -8477,6 +8723,7 @@ mod tests {
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
+                date_format: None,
                 active_workspace: None,
                 archive_disabled: None,
                 editor_layout: None,
@@ -8519,6 +8766,8 @@ mod tests {
                 attachment_compression_enabled: true,
                 developer_mode: false,
                 attachment_ocr_enabled: true,
+                time_format: None,
+                timezone: None,
                 transcription_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
@@ -8550,6 +8799,7 @@ mod tests {
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
+                date_format: None,
                 active_workspace: None,
                 archive_disabled: None,
                 editor_layout: None,
@@ -8600,6 +8850,8 @@ mod tests {
             // inverse-default bools (default true → emitted only when false)
             attachment_compression_enabled: false,
             attachment_ocr_enabled: false,
+            time_format: None,
+            timezone: None,
             transcription_enabled: false,
             show_note_timestamps: false,
             reminders_enabled: false,
@@ -8655,6 +8907,7 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            date_format: None,
             favorites: alloc::vec![alloc::string::String::from(
                 "0190a000-0000-7000-8000-000000000002",
             )],
@@ -10774,6 +11027,7 @@ mod tests {
             daily_date_format: Some("YYYY-MM-DD".into()),
             daily_folder: Some("Journal/".into()),
             daily_template: Some("0190-aaaa".into()),
+            date_format: None,
             deliberate_folders: alloc::vec!["Journal/".into()],
             ..PrefsView::default()
         };
@@ -10790,6 +11044,7 @@ mod tests {
             daily_date_format: Some("YYYY-MM-DD".into()),
             daily_folder: Some("Daily/".into()),
             daily_template: Some("0190-tmpl-uuid".into()),
+            date_format: None,
             ..PrefsView::default()
         };
         let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);

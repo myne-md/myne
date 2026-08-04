@@ -11,11 +11,23 @@
 // The canon rules are tested as rules, not by eye: no green anywhere, no state
 // carried by a fill.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { TaskRow, type TaskRowData } from "@myne/editor/host/notes/TaskRow";
 import { taskChipStyle, TASK_CHIP_TOKEN } from "@myne/editor/host/notes/taskChipToken";
+import {
+  DEFAULT_DISPLAY,
+  setDateTimeDisplay,
+  __resetDateTimeDisplayForTest,
+} from "../../src/lib/datetimeFormat";
+
+// myne#279: the row prints its date through the shared formatter now, so pin an
+// explicit format rather than depending on the runner's locale. That the raw
+// stored string is NO LONGER what lands on screen is the point of the change —
+// it used to emit raw ISO and silently drop any time.
+beforeEach(() => setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "iso" }));
+afterEach(() => __resetDateTimeDisplayForTest());
 
 const TASK: TaskRowData = {
   key: "n1:3",

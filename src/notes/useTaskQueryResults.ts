@@ -17,6 +17,7 @@
 // because an empty list presented as a finished answer is the worst reading
 // available here.
 
+import { dateTimeDisplay } from "../lib/datetimeFormat";
 import { useEffect, useMemo, useState } from "react";
 import { taskQueryBlocks } from "@myne/editor/decorations/task-query-block";
 import type {
@@ -135,7 +136,8 @@ export function useTaskQueryResults(
 
   const results = useMemo(() => {
     if (queries.length === 0) return EMPTY_RESULTS;
-    const today = todayLocal();
+    // myne#279: "today" follows the display timezone when one is set.
+    const today = todayLocal(new Date(), dateTimeDisplay().timeZone);
     const tagsOf = (noteId: string): readonly string[] => {
       const out: string[] = [];
       for (const [tag, ids] of tagNotes) if (ids.has(noteId)) out.push(tag);

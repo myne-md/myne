@@ -32,6 +32,9 @@ import {
   setCliExcludedFolders as persistCliExcludedFolders,
   setCliRateLimitDisabled as persistCliRateLimitDisabled,
   setDeveloperMode as persistDeveloperMode,
+  setDateFormat,
+  setTimeFormat,
+  setTimezone,
   setEditorContentWidth,
   setEditorFontFamily,
   setEditorLineSpacing,
@@ -85,6 +88,9 @@ const DEFAULT_PREFS: PrefsView = {
   favorites: [],
   item_order: {},
   editor_layout: null,
+  date_format: null,
+  time_format: null,
+  timezone: null,
   editor_content_width: null,
   editor_default_view_mode: null,
   editor_focus_dim_inactive: null,
@@ -211,6 +217,12 @@ interface UsePrefsResult {
    */
   setEditorTextSize: (value: string | null) => Promise<void>;
   setEditorLineSpacing: (value: string | null) => Promise<void>;
+  /** myne#279 — display date format (`system`/`iso`/`dmy`/`mdy`/`dmmmy`). */
+  setDateFormat: (value: string | null) => Promise<void>;
+  /** myne#279 — display time format (`system`/`24h`/`12h`). */
+  setTimeFormat: (value: string | null) => Promise<void>;
+  /** myne#279 — DISPLAY timezone override (IANA id); never reaches a note. */
+  setTimezone: (value: string | null) => Promise<void>;
   setEditorContentWidth: (value: string | null) => Promise<void>;
   setEditorFontFamily: (value: string | null) => Promise<void>;
   /**
@@ -562,6 +574,18 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       writePref({ editor_line_spacing: value }, () => setEditorLineSpacing(value)),
     [writePref],
   );
+  const setDateFormatPref = useCallback(
+    (value: string | null) => writePref({ date_format: value }, () => setDateFormat(value)),
+    [writePref],
+  );
+  const setTimeFormatPref = useCallback(
+    (value: string | null) => writePref({ time_format: value }, () => setTimeFormat(value)),
+    [writePref],
+  );
+  const setTimezonePref = useCallback(
+    (value: string | null) => writePref({ timezone: value }, () => setTimezone(value)),
+    [writePref],
+  );
   const setEditorContentWidthPref = useCallback(
     (value: string | null) =>
       writePref({ editor_content_width: value }, () => setEditorContentWidth(value)),
@@ -638,6 +662,9 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setRightPanelTabOrder,
     setEditorTextSize: setEditorTextSizePref,
     setEditorLineSpacing: setEditorLineSpacingPref,
+    setDateFormat: setDateFormatPref,
+    setTimeFormat: setTimeFormatPref,
+    setTimezone: setTimezonePref,
     setEditorContentWidth: setEditorContentWidthPref,
     setEditorFontFamily: setEditorFontFamilyPref,
     setKeymapBinding: setKeymapBindingPref,

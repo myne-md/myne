@@ -6,7 +6,7 @@
 // typed form (date humanized, list → pills, checkbox → glyph, number/string
 // plain), and the pure helpers format/skip correctly.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import {
   CHECKBOX_CHECKED,
@@ -18,15 +18,37 @@ import {
   isCheckboxChecked,
 } from "../../src/notes/views/propertyFormat";
 import type { StoredProperty } from "../../src/notes/queryEngine";
+import {
+  DEFAULT_DISPLAY,
+  setDateTimeDisplay,
+  __resetDateTimeDisplayForTest,
+} from "../../src/lib/datetimeFormat";
 
 afterEach(cleanup);
 
+// myne#279: these two surfaces read the AMBIENT display settings, so pin one
+// explicitly rather than depending on whatever locale the runner happens to
+// have. What is under test is that the cell follows the setting.
+beforeEach(() => setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "iso" }));
+afterEach(() => __resetDateTimeDisplayForTest());
+
 describe("formatDateValue", () => {
-  it("humanizes an RFC3339 full-date", () => {
-    expect(formatDateValue("2026-06-11")).toBe("11 Jun 2026");
+  // myne#279 — this used to build its own `Intl.DateTimeFormat("en-GB", …)`, so
+  // the expectations here were British by construction and stayed British for a
+  // user with the app in Turkish, German or US English. The cells now go through
+  // the one shared formatter, so what is pinned is the FORMAT FOLLOWING THE
+  // SETTING rather than one hardcoded locale's output.
+  const display = (over = {}) => ({ ...DEFAULT_DISPLAY, ...over });
+
+  it("humanizes an RFC3339 full-date in the chosen format", () => {
+    expect(formatDateValue("2026-06-11", display({ dateFormat: "iso" }))).toBe("2026-06-11");
+    expect(formatDateValue("2026-06-11", display({ dateFormat: "dmy" }))).toBe("11/06/2026");
+    expect(formatDateValue("2026-06-11", display({ dateFormat: "mdy" }))).toBe("06/11/2026");
   });
   it("humanizes a date-time", () => {
-    expect(formatDateValue("2026-01-05T13:00:00Z")).toBe("5 Jan 2026");
+    expect(formatDateValue("2026-01-05T13:00:00Z", display({ dateFormat: "iso" }))).toBe(
+      "2026-01-05",
+    );
   });
   it("falls back to the raw string on an unparseable value", () => {
     expect(formatDateValue("not-a-date")).toBe("not-a-date");
@@ -49,7 +71,7 @@ describe("isCheckboxChecked", () => {
 describe("formatScalarText", () => {
   it("date → humanized, number/string → verbatim, checkbox → glyph", () => {
     expect(formatScalarText({ type: "date", value: "2026-06-11" })).toBe(
-      "11 Jun 2026",
+      "2026-06-11",
     );
     expect(formatScalarText({ type: "number", value: "42" })).toBe("42");
     expect(formatScalarText({ type: "string", value: "hi" })).toBe("hi");
@@ -121,7 +143,7 @@ describe("PropertyValue render", () => {
   it("date → humanized text", () => {
     render(<PropertyValue prop={p({ type: "date", value: "2026-06-11" })} />);
     expect(screen.getByTestId("view.prop-text").textContent).toBe(
-      "11 Jun 2026",
+      "2026-06-11",
     );
   });
 
