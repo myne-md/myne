@@ -333,6 +333,12 @@ impl From<std::io::Error> for NoteUpdateError {
 /// failure tag never names *which* note failed (no `note_id` crosses
 /// the boundary as a distinguisher; `src-tauri/CLAUDE.md`
 /// secret-handling discipline).
+///
+/// The one variant that is **not** "the vault is unchanged" is
+/// [`NoteBatchError::CommittedPendingPublish`], and it carries that meaning
+/// precisely so callers stop having to assume (myne#300). §8.3 is a
+/// crash-atomicity guarantee: past the commit marker the batch completes on the
+/// next open, so an error there says "not yet finished", not "did not happen".
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum NoteBatchError {
@@ -376,10 +382,32 @@ pub enum NoteBatchError {
     NotesDirNotADirectory,
 
     /// File-system IO failure during `notes_dir` resolution, a blob read,
-    /// or the transactional stage / commit. The bounded [`IoFailureKind`]
-    /// keeps OS error messages off the wire.
+    /// or the transactional **stage** phase. The vault is unchanged: nothing
+    /// was staged past the failure, every staged temp was swept, and no commit
+    /// marker survives. The bounded [`IoFailureKind`] keeps OS error messages
+    /// off the wire.
+    ///
+    /// Post-commit IO failures do **not** land here — see
+    /// [`NoteBatchError::CommittedPendingPublish`].
     #[error("io error")]
     Io { io_error_kind: IoFailureKind },
+
+    /// The batch **committed**, and publishing it to its final `.myn` paths
+    /// did not finish (myne#300).
+    ///
+    /// This is not "the write failed". The `.rename-journal` marker is durable
+    /// and deliberately left on disk, so `note_txn::recover_pending_rename`
+    /// publishes every still-staged blob at the next vault open — the rewrite
+    /// completes whether or not the caller does anything. What is temporarily
+    /// true is that the vault reads inconsistently until then: some notes carry
+    /// the new title while an inbound one may still say `[[Old Title]]`.
+    ///
+    /// **Callers must not roll back on this.** Folding it into
+    /// [`NoteBatchError::Io`] — which every caller reads as "the vault is
+    /// unchanged" — is what made a rename the user was told had failed reappear
+    /// after the next unlock, with the sidebar showing the old title in between.
+    #[error("batch committed, publish incomplete")]
+    CommittedPendingPublish { io_error_kind: IoFailureKind },
 
     /// `tokio::task::spawn_blocking` join handle returned an error
     /// (panic in the blocking task, runtime shutdown). Also the landing
@@ -1348,10 +1376,26 @@ mod tests {
                 NoteBatchError::CannotDecrypt => {}
                 NoteBatchError::NotesDirNotADirectory => {}
                 NoteBatchError::Io { io_error_kind: _ } => {}
+                NoteBatchError::CommittedPendingPublish { io_error_kind: _ } => {}
                 NoteBatchError::JoinFailure => {}
             }
         }
         assert_closed(&NoteBatchError::VaultNotUnlocked);
+    }
+
+    /// The post-commit variant's wire shape, pinned like every other: the TS
+    /// mirror narrows on `kind`, and a caller that does not recognize the tag
+    /// falls back to "the vault is unchanged" — the exact wrong answer here
+    /// (myne#300).
+    #[test]
+    fn batch_committed_pending_publish_serializes_with_kind_tag() {
+        let e = NoteBatchError::CommittedPendingPublish {
+            io_error_kind: IoFailureKind::NoSpace,
+        };
+        assert_eq!(
+            serialize_batch(&e),
+            r#"{"kind":"CommittedPendingPublish","detail":{"io_error_kind":"NoSpace"}}"#
+        );
     }
 
     // ---- From<std::io::Error> mapping ----------------------------------

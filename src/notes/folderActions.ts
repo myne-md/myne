@@ -14,6 +14,7 @@
 import { patchFolderField, patchUpdatedField } from "../dialect";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { setDeliberateFolders } from "../lib/prefs";
+import { isBatchCommitted } from "../types/note-batch-error";
 import {
   noteWriteBatchTransactional,
   type NoteBatchEntry,
@@ -346,9 +347,12 @@ export function planFolderRenameBatch(
  * folder-move + inbound folder-target rewrite batch ({@link planFolderRenameBatch}),
  * and commits it **all-or-nothing** via the transactional write primitive
  * (MYND-370 / WL-7) — so a folder-target link (`[[Old/]]`) can never be left
- * dangling by a half-applied rename. On any batch failure the vault is unchanged
- * and the failure is reported (the helper itself never throws). Then prefix-
- * rewrites the deliberate set and best-effort re-indexes the moved notes.
+ * dangling by a half-applied rename. On a PRE-commit batch failure the vault is
+ * unchanged and the failure is reported (the helper itself never throws); a
+ * post-commit one (`CommittedPendingPublish`) is treated as the success it is,
+ * because the backend finishes publishing at the next vault open (myne#300).
+ * Then prefix-rewrites the deliberate set and best-effort re-indexes the moved
+ * notes.
  *
  * `notes` carries every note (id + folder) — all bodies are scanned because an
  * inbound `[[Old/]]` link may live in ANY note, not only the moved ones.
@@ -414,15 +418,25 @@ export async function renameFolder(
     try {
       await noteWriteBatchTransactional(plan.batch);
     } catch (error) {
-      // All-or-nothing: the vault is unchanged, so report the whole set as
-      // failed and write nothing else (deliberate set, re-index) — keeping the
-      // rename atomic at the orchestrator level too.
-      return {
-        moved: [],
-        failed: changedIds.map((noteId) => ({ noteId, error })),
-        deliberateRewritten: 0,
-        nextDeliberate: [...deliberateFolders],
-      };
+      // myne#300 — "the vault is unchanged" is true for every rejection EXCEPT
+      // a post-commit one. Past the `.rename-journal` marker the batch is
+      // committed and the backend publishes the remainder at the next vault
+      // open, so reporting the whole set as failed here would (a) tell the user
+      // a folder rename that is on disk did not happen, and (b) skip the
+      // deliberate-folder rewrite and the re-index, leaving those two out of
+      // step with the notes for good — the recovery pass republishes blobs, it
+      // does not rerun this function.
+      if (!isBatchCommitted(error)) {
+        // All-or-nothing: the vault is unchanged, so report the whole set as
+        // failed and write nothing else (deliberate set, re-index) — keeping
+        // the rename atomic at the orchestrator level too.
+        return {
+          moved: [],
+          failed: changedIds.map((noteId) => ({ noteId, error })),
+          deliberateRewritten: 0,
+          nextDeliberate: [...deliberateFolders],
+        };
+      }
     }
   }
 

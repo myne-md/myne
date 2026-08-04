@@ -24,8 +24,11 @@ export interface NoteBatchEntry {
  * note's own body conventionally comes FIRST, followed by each inbound note;
  * order is not load-bearing (the transaction is atomic over the whole set).
  *
- * Rejects with a `NoteBatchError` (see `src/types/note-batch-error.ts`); on
- * any rejection the vault is unchanged.
+ * Rejects with a `NoteBatchError` (see `src/types/note-batch-error.ts`). On
+ * MOST rejections the vault is unchanged — but not all: a
+ * `CommittedPendingPublish` rejection means the batch got past the commit
+ * marker and completes at the next vault open, so rolling back on it is
+ * wrong (myne#300). Test with `isBatchCommitted` before undoing anything.
  */
 export async function noteWriteBatchTransactional(
   notes: readonly NoteBatchEntry[],

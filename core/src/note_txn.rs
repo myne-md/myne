@@ -62,9 +62,72 @@ use crate::vault_io::{VaultIo, WriteOpts};
 /// per-blob crash property comes for free on top of the journal's.
 async fn publish_staged(io: &dyn VaultIo, tmp: &Path, dst: &Path) -> Result<(), IoFailureKind> {
     let bytes = io.read(tmp).await?;
-    io.write(dst, &bytes, WriteOpts::default()).await?;
+    if let Err(e) = io.write(dst, &bytes, WriteOpts::default()).await {
+        // **Re-stage before returning (myne#300).** On the native arm
+        // `io.write(dst, …)` is `atomic_write`, whose temp name is
+        // `tmp_path(dst)` — byte-for-byte the staged temp this function was
+        // handed. Its failure-path cleanup therefore deletes OUR staged blob,
+        // and the roll-forward pass at the next unlock has nothing left to
+        // publish for this note: the batch stays half-committed forever, some
+        // notes rewritten to the new title and this one still pointing at the
+        // old, with no error naming it.
+        //
+        // The bytes are still in hand, so putting the temp back is free. This
+        // write cannot recurse into the same trap: `tmp_path(tmp)` is
+        // `<uuid>.myn.tmp.tmp`, a different file. Best-effort — the original
+        // error is the one surfaced, and a failure here leaves exactly the
+        // state the missing re-stage would have.
+        let _ = io.write(tmp, &bytes, WriteOpts::default()).await;
+        return Err(e);
+    }
     let _ = io.remove_file(tmp).await;
     Ok(())
+}
+
+/// Why a transaction failed — specifically, **which side of the commit point**.
+///
+/// The distinction is the whole reason this type exists rather than a bare
+/// [`IoFailureKind`] (myne#300). Before the marker is durable the vault really
+/// is untouched and a caller may roll its optimistic UI back. After it, the
+/// batch is *committed*: [`recover_pending_rename`] publishes every surviving
+/// `<uuid>.myn.tmp` at the next unlock, so the rename the user was told had
+/// failed silently completes. A caller that cannot tell the two apart picks one
+/// and is wrong half the time — and the half it was picking (roll back, report
+/// the whole set as failed, skip the deliberate-folder write and the re-index)
+/// is the wrong one for the case where data actually changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TxnFailure {
+    /// Failed at or before the commit marker. **The vault is unchanged** — no
+    /// `.myn` was replaced, no marker survives, and every staged temp was
+    /// swept. Roll the caller's optimistic state back.
+    Aborted(IoFailureKind),
+    /// Failed **after** the commit marker became durable. Some blobs are
+    /// published, the rest are still staged, and the marker is deliberately
+    /// left on disk — which is what guarantees the remainder lands on the next
+    /// vault open. The rename has happened; do not roll it back. The vault is
+    /// briefly inconsistent (an inbound note may still read `[[Old Title]]`)
+    /// until that recovery pass runs.
+    CommittedPendingPublish(IoFailureKind),
+}
+
+impl TxnFailure {
+    /// The underlying IO cause, whichever side of the commit point it came from.
+    pub fn kind(self) -> IoFailureKind {
+        match self {
+            TxnFailure::Aborted(k) | TxnFailure::CommittedPendingPublish(k) => k,
+        }
+    }
+}
+
+impl core::fmt::Display for TxnFailure {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TxnFailure::Aborted(k) => write!(f, "transaction aborted before commit: {k}"),
+            TxnFailure::CommittedPendingPublish(k) => {
+                write!(f, "transaction committed, publish incomplete: {k}")
+            }
+        }
+    }
 }
 
 /// The empty roll-forward marker, written in the notes directory between the
@@ -105,13 +168,17 @@ enum TxnFault {
 }
 
 /// Write all blobs in one all-or-nothing transaction (§8.3). Stages every blob,
-/// then commits the renames; roll-forward-recoverable via the marker. Returns an
-/// error (vault untouched) if any stage fails.
+/// then commits the renames; roll-forward-recoverable via the marker.
+///
+/// The error tells the caller which side of the commit point it happened on —
+/// [`TxnFailure::Aborted`] means the vault is untouched,
+/// [`TxnFailure::CommittedPendingPublish`] means it is not. See [`TxnFailure`];
+/// treating the second as the first is myne#300.
 pub async fn write_batch_transactional(
     io: &dyn VaultIo,
     notes_dir: &Path,
     blobs: &[TxnBlob],
-) -> Result<(), IoFailureKind> {
+) -> Result<(), TxnFailure> {
     write_batch_inner(io, notes_dir, blobs, TxnFault::None).await
 }
 
@@ -122,7 +189,7 @@ async fn write_batch_inner(
     notes_dir: &Path,
     blobs: &[TxnBlob],
     fault: TxnFault,
-) -> Result<(), IoFailureKind> {
+) -> Result<(), TxnFailure> {
     if blobs.is_empty() {
         return Ok(());
     }
@@ -138,7 +205,7 @@ async fn write_batch_inner(
             for (t, _) in &staged {
                 let _ = io.remove_file(t).await;
             }
-            return Err(e);
+            return Err(TxnFailure::Aborted(e));
         }
         staged.push((tmp, b.path.clone()));
     }
@@ -146,29 +213,48 @@ async fn write_batch_inner(
     #[cfg(test)]
     if let TxnFault::StopAfterStage = fault {
         // Crash after staging, before the marker. Leaves `.tmp` + NO marker.
-        return Err(IoFailureKind::Other);
+        return Err(TxnFailure::Aborted(IoFailureKind::Other));
     }
 
-    // Phase 2 — write the empty commit marker (durable).
+    // Phase 2 — write the empty commit marker (durable). This is the COMMIT
+    // POINT: from the line below, the batch completes whatever happens, because
+    // `recover_pending_rename` rolls a marker-present directory forward.
     let marker = notes_dir.join(RENAME_JOURNAL);
-    write_marker(io, &marker).await?;
+    write_marker(io, &marker)
+        .await
+        .map_err(TxnFailure::Aborted)?;
 
     #[cfg(test)]
     if let TxnFault::StopAfterMarker = fault {
         // Crash after the marker, before any publish. Marker + all `.tmp` present.
-        return Err(IoFailureKind::Other);
+        return Err(TxnFailure::CommittedPendingPublish(IoFailureKind::Other));
     }
 
     // Phase 3 — publish every staged blob.
+    //
+    // A failure here does NOT stop the loop (myne#300). One unwritable blob
+    // says nothing about the next, the marker means all of them are committed
+    // regardless, and the difference between "one note waits for the next
+    // unlock" and "all of them do" is the window in which the vault reads
+    // inconsistently. So: remember the first error, keep going, and report the
+    // committed-not-published outcome at the end — with the marker deliberately
+    // left in place, which is what makes the remainder recoverable.
+    let mut first_publish_error: Option<IoFailureKind> = None;
     for (idx, (tmp, dst)) in staged.iter().enumerate() {
-        publish_staged(io, tmp, dst).await?;
+        if let Err(e) = publish_staged(io, tmp, dst).await {
+            first_publish_error.get_or_insert(e);
+        }
         #[cfg(test)]
         if let TxnFault::StopMidCommit = fault {
             if idx == 0 {
                 // One published, the rest still `.tmp`, marker present.
-                return Err(IoFailureKind::Other);
+                return Err(TxnFailure::CommittedPendingPublish(IoFailureKind::Other));
             }
         }
+    }
+    if let Some(e) = first_publish_error {
+        // Marker intentionally NOT cleared — it is the roll-forward promise.
+        return Err(TxnFailure::CommittedPendingPublish(e));
     }
 
     // Phase 4 — clear the marker (the transaction is fully committed).
@@ -282,7 +368,7 @@ mod tests {
         crate::test_support::block_on(f)
     }
 
-    fn write_batch_transactional(notes_dir: &Path, blobs: &[TxnBlob]) -> Result<(), IoFailureKind> {
+    fn write_batch_transactional(notes_dir: &Path, blobs: &[TxnBlob]) -> Result<(), TxnFailure> {
         rt(super::write_batch_transactional(&IO, notes_dir, blobs))
     }
 
@@ -290,7 +376,7 @@ mod tests {
         notes_dir: &Path,
         blobs: &[TxnBlob],
         fault: TxnFault,
-    ) -> Result<(), IoFailureKind> {
+    ) -> Result<(), TxnFailure> {
         rt(super::write_batch_inner(&IO, notes_dir, blobs, fault))
     }
 
@@ -347,7 +433,7 @@ mod tests {
         let blobs = vec![blob(dir, "a", b"NEW-A"), blob(dir, "b", b"NEW-B")];
         // Fail staging the 2nd blob.
         let err = write_batch_inner(dir, &blobs, TxnFault::FailStage(1)).unwrap_err();
-        assert_eq!(err, IoFailureKind::Other);
+        assert_eq!(err, TxnFailure::Aborted(IoFailureKind::Other));
         assert_eq!(
             read(&dir.join("a.myn")).as_deref(),
             Some(&b"OLD-A"[..]),
@@ -426,6 +512,85 @@ mod tests {
         assert_eq!(read(&dir.join("c.myn")).as_deref(), Some(&b"NEW-C"[..]));
         assert_eq!(myn_tmp_count(dir), 0);
         assert!(!marker_exists(dir));
+    }
+
+    // ── myne#300: a phase-3 failure is not "the vault is unchanged" ─────────
+    //
+    // The three properties, all of which the single `IoFailureKind` return
+    // could not express and the `?` in the publish loop actively broke:
+    //
+    //   1. the OUTCOME says the batch committed, so a caller keeps its
+    //      optimistic rename instead of rolling it back onto a vault that has
+    //      already changed;
+    //   2. the staged temp of the FAILING blob survives, so the roll-forward
+    //      pass has something to publish from — `atomic_write`'s own cleanup
+    //      deletes it, because `tmp_path(dst)` IS that temp;
+    //   3. one unpublishable blob does not strand the ones after it.
+    //
+    // Unix-only: the failure is produced with a real filesystem error
+    // (`rename(file, non-empty-dir)` → EISDIR), which is POSIX-specific — the
+    // same technique `atomic_write`'s `finalize_failure_removes_temp` uses.
+    #[cfg(unix)]
+    #[test]
+    fn publish_failure_reports_committed_and_leaves_the_batch_recoverable() {
+        let d = ScopedTempDir::new("txn-publish-fail").unwrap();
+        let dir = d.path();
+        // `b.myn` is an unwritable destination: a non-empty directory, so the
+        // publishing rename fails with EISDIR.
+        std::fs::create_dir(dir.join("b.myn")).unwrap();
+        std::fs::write(dir.join("b.myn").join("inner"), b"x").unwrap();
+        let blobs = vec![
+            blob(dir, "a", b"NEW-A"),
+            blob(dir, "b", b"NEW-B"),
+            blob(dir, "c", b"NEW-C"),
+        ];
+
+        let err = write_batch_transactional(dir, &blobs).unwrap_err();
+
+        // (1) The outcome names the side of the commit point it happened on.
+        assert!(
+            matches!(err, TxnFailure::CommittedPendingPublish(_)),
+            "a post-marker failure must not report Aborted: {err:?}"
+        );
+
+        // (3) The blob after the failing one was still published.
+        assert_eq!(read(&dir.join("a.myn")).as_deref(), Some(&b"NEW-A"[..]));
+        assert_eq!(
+            read(&dir.join("c.myn")).as_deref(),
+            Some(&b"NEW-C"[..]),
+            "one unpublishable blob must not strand the ones after it"
+        );
+
+        // (2) The failing blob is still staged, and the marker is still the
+        // roll-forward promise.
+        assert!(marker_exists(dir), "the commit marker must survive");
+        assert_eq!(
+            read(&dir.join("b.myn.tmp")).as_deref(),
+            Some(&b"NEW-B"[..]),
+            "the failing blob's staged temp must survive for the roll-forward"
+        );
+
+        // …and the roll-forward really does finish it once the destination is
+        // writable again. This is the guarantee the caller is being told about.
+        std::fs::remove_dir_all(dir.join("b.myn")).unwrap();
+        recover_pending_rename(dir).unwrap();
+        assert_eq!(read(&dir.join("b.myn")).as_deref(), Some(&b"NEW-B"[..]));
+        assert_eq!(myn_tmp_count(dir), 0);
+        assert!(!marker_exists(dir));
+    }
+
+    /// The other side of the same distinction: a STAGE failure still reports
+    /// `Aborted`, because there the "vault untouched" reading is true.
+    #[test]
+    fn stage_failure_reports_aborted_not_committed() {
+        let d = ScopedTempDir::new("txn-abort-kind").unwrap();
+        let dir = d.path();
+        let blobs = vec![blob(dir, "a", b"NEW-A"), blob(dir, "b", b"NEW-B")];
+        let err = write_batch_inner(dir, &blobs, TxnFault::FailStage(1)).unwrap_err();
+        assert!(
+            matches!(err, TxnFailure::Aborted(_)),
+            "a pre-marker failure is genuinely all-or-nothing: {err:?}"
+        );
     }
 
     #[test]

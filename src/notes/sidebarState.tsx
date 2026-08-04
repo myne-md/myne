@@ -69,6 +69,7 @@ import {
 } from "./renameInbound";
 import { renameFlushHooks } from "./renameFlushHook";
 import { noteWriteBatchTransactional } from "./noteWriteBatch";
+import { isBatchCommitted } from "../types/note-batch-error";
 import {
   hydrateVaultIndicesOnUnlock,
   reindexNote,
@@ -854,11 +855,27 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
             preNotes,
           },
         );
-        await noteWriteBatchTransactional(plan.batch);
+        let pendingPublish = false;
+        try {
+          await noteWriteBatchTransactional(plan.batch);
+        } catch (err) {
+          // myne#300 — a post-commit failure is not "nothing happened". The
+          // `.rename-journal` marker is durable, so the backend publishes the
+          // remaining blobs at the next vault open. Rolling the optimistic
+          // rename back here would show the user the old title for a change
+          // that is already committed, and then have the new one reappear
+          // after the next unlock with no explanation.
+          if (!isBatchCommitted(err)) throw err;
+          pendingPublish = true;
+        }
         // Refresh in the background to pull the canonical title + updatedAt
         // from the backend (defensive — the optimistic title matches what we
         // just wrote, but updatedAt only refreshes after the round-trip).
-        await refreshOne(id);
+        //
+        // Skipped when the publish has not finished: the blob on disk may still
+        // be the pre-rename one, so this read would put the OLD title back into
+        // the cache — undoing exactly the optimism the branch above kept.
+        if (!pendingPublish) await refreshOne(id);
         // MYND-31: the renamed note's title-key changed AND every inbound
         // note's wikilink edges changed → re-index all of them so backlink /
         // graph resolution tracks the new state (live).
