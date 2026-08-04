@@ -2,11 +2,7 @@
 // vault-creation steps so the 30 s auto-clear window is enforced in
 // one place and the step components don't pull in Tauri plugin imports.
 
-import {
-  writeText as clipboardWriteText,
-  readText as clipboardReadText,
-  clear as clipboardClear,
-} from "../platform/clipboardManager";
+import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { save as dialogSave } from "../platform/dialog";
 import { invoke } from "../platform/core";
 import { has } from "../platform/capabilities";
@@ -33,15 +29,23 @@ export async function copySecretToClipboard(
     logErrorKind(e, "clipboard-write-failed");
     return null;
   }
-  // `readText` rejects when the clipboard holds non-text content
-  // (image, file, empty) — that already means our value is gone, so
-  // swallow and skip the clear.
+  // The read+compare+clear runs HOST-side (myne#379). `recovery-flow.md` §2.2
+  // requires the clear to verify the clipboard still holds the phrase — a
+  // comparison requirement, not a requirement that the WebView be the one
+  // comparing — and doing it here cost a process-lifetime OS-clipboard READ
+  // grant on the main window for this one `setTimeout` body. Read is the more
+  // dangerous direction than write: a write destroys the user's clipboard, a
+  // read harvests whatever they last copied from a password manager. Same
+  // narrow-seam move `saveSecretAsTextFile` below makes for the filesystem.
+  //
+  // The command returns nothing and swallows a non-text clipboard (which
+  // already means our value is gone) exactly as this code did; the `catch` is
+  // now for an ACL refusal, not for the clipboard's state.
   const timer = setTimeout(async () => {
     try {
-      const current = await clipboardReadText();
-      if (current === value) await clipboardClear();
-    } catch {
-      // Clipboard moved on; nothing to clear.
+      await invoke("plugin:secret-export|clipboard_clear_if_matches", { value });
+    } catch (e) {
+      logErrorKind(e, "clipboard-clear-failed");
     }
   }, CLIPBOARD_AUTO_CLEAR_MS);
   return () => clearTimeout(timer);

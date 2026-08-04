@@ -276,7 +276,7 @@ const V = {
   ],
   "src/lib/secret-export.ts": [
     "adapted",
-    "Ships for `saveJsonAsFile` (theme export, through the download seam) — its SECRET callers are the two creation steps, both substituted. The clipboard auto-clear it also exports is web-hostile in a way worth naming: it READS the clipboard back to check it still holds the secret, which page content cannot be granted in Firefox and is gesture-gated elsewhere, so a clear would silently never fire. No web path reaches it.",
+    "Ships for `saveJsonAsFile` (theme export, through the download seam) — its SECRET callers are the two creation steps, both substituted. The clipboard auto-clear it also exports is web-hostile in a way worth naming, and myne#379 changed WHERE that shows up rather than removing it: the read-back that checks the clipboard still holds the secret now runs host-side, so on web the refusal is the dispatcher's (`plugin:secret-export|clipboard_clear_if_matches` is `Class::Unsupported`, backed by the absent `vaultCreation` capability) instead of a browser permission the page would never get — page content cannot be granted clipboard READ in Firefox at all and is gesture-gated elsewhere, so a clear would silently never fire. No web path reaches it, and a web client has no recovery phrase to copy in the first place.",
   ],
   "src/lib/spell.ts": ["adapted", "Unreachable where `spellCheck` is absent; the editor host omits the `spell` member."],
   "src/lib/stage.ts": ["adapted", "Boot routing branches on capabilities: an empty web client goes to account-entry, a corrupt one to re-sync (task 85)."],

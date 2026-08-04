@@ -488,6 +488,20 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // "re-extract", which here would be an unwinnable retry on every import.
     // Scoped to the two READ commands: import, catalog, delete, rename and
     // cleanup all ship, and an attachment still matches by FILENAME.
+    // myne#379. The plugin default is `Pending` (a `save_secret_text` port is
+    // owed for the theme-export path), but THIS command is not owed a port and
+    // never will be: it is the desktop 30 s clipboard auto-clear's read+compare,
+    // moved host-side so the main window stops holding an OS-clipboard READ
+    // grant. `check-web-surfaces.mjs` already records why the web arm cannot
+    // have it — page content cannot be granted clipboard read in Firefox and is
+    // gesture-gated elsewhere, so a clear would silently never fire — and no
+    // web path reaches it: both callers of `copySecretToClipboard` are
+    // substituted out of the bundle. `Pending` here would promise a port that
+    // the platform forbids.
+    (
+        "plugin:secret-export|clipboard_clear_if_matches",
+        Class::Unsupported,
+    ),
     (
         "plugin:attachments|attachment_read_text",
         Class::Unsupported,

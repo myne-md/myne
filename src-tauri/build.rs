@@ -328,7 +328,15 @@ fn main() {
             // without a matching `commands.allow` entry is a security regression
             // (the InlinedPlugin mirror is load-bearing per the `vault-creation`
             // note above).
-            tauri_build::InlinedPlugin::new().commands(&["save_secret_text"]),
+            //
+            // `clipboard_clear_if_matches` (myne#379) is the same narrow-seam
+            // move for the OTHER half of the same screen: the 30 s clipboard
+            // auto-clear's read+compare runs host-side so the main window no
+            // longer needs a standing `clipboard-manager:allow-read-text`
+            // grant. It writes nothing and returns nothing — its whole output
+            // is "the clipboard was cleared, or it had already moved on".
+            tauri_build::InlinedPlugin::new()
+                .commands(&["save_secret_text", "clipboard_clear_if_matches"]),
         )
         .plugin(
             "importer",

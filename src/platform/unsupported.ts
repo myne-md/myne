@@ -54,9 +54,12 @@ export type SeamOperation =
   // the same tab rather than taking one away.
   | "window.show"
   | "webviewWindow.listen"
+  // Write only. `clipboard.readText` / `clipboard.clear` were removed with
+  // myne#379: their one consumer, the recovery-kit 30 s auto-clear, does its
+  // read+compare host-side now, and the two `clipboard-manager:` grants that
+  // backed them are out of the desktop capability. Re-adding either member
+  // means re-adding its grant in the same change.
   | "clipboard.writeText"
-  | "clipboard.readText"
-  | "clipboard.clear"
   | "deepLink.onOpenUrl"
   // phase3-web-client task 48 — the download flow's counterpart. Refused on
   // DESKTOP, which is the only direction of refusal in this union that runs that

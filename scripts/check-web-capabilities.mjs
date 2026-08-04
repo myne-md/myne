@@ -91,7 +91,21 @@ const CAPABILITY_BACKING = {
   backup: ["backup"],
   // A seam refusal (`dialog.save`), not an IPC command.
   nativeSaveAs: [],
-  vaultCreation: ["vault-creation"],
+  // The `secret-export` clipboard auto-clear (myne#379) hangs here rather than
+  // under a clipboard capability of its own: its only callers are
+  // vault-creation's PhraseStep and AccountStep, both substituted out of the
+  // web bundle via `CreateVault.tsx`. Two independent reasons it can never
+  // ship on web, and the second is the durable one — a web client has no
+  // recovery phrase to put on the clipboard in the first place
+  // (`check-web-no-phrase.mjs` asserts the phrase is absent from the served
+  // bundle), and page content cannot be granted clipboard READ in Firefox at
+  // all, so the read-back the clear is gated on would silently never fire.
+  // `save_secret_text` is deliberately NOT here: it also serves the theme
+  // export, which ships on web through the download seam.
+  vaultCreation: [
+    "vault-creation",
+    "plugin:secret-export|clipboard_clear_if_matches",
+  ],
   phraseRecovery: [
     "plugin:vault-recover|recover_with_phrase",
     "plugin:vault-recover|complete_recovery",

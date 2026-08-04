@@ -89,10 +89,9 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   openPath: (...args: unknown[]) => record(...args),
   revealItemInDir: (...args: unknown[]) => record(...args),
 }));
+// Write only — the seam stopped re-exporting `readText`/`clear` with myne#379.
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
   writeText: (...args: unknown[]) => record(...args),
-  readText: (...args: unknown[]) => record(...args),
-  clear: (...args: unknown[]) => record(...args),
 }));
 vi.mock("@tauri-apps/plugin-deep-link", () => ({
   getCurrent: (...args: unknown[]) => record(...args),
@@ -122,8 +121,6 @@ const DESKTOP_SUPPORTS: ReadonlySet<SeamOperation> = new Set<SeamOperation>([
   "window.isFullscreen",
   "webviewWindow.listen",
   "clipboard.writeText",
-  "clipboard.readText",
-  "clipboard.clear",
   "deepLink.onOpenUrl",
 ]);
 
