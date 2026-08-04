@@ -176,9 +176,23 @@ fn download_blob_backoff(
     token: &str,
     id: &[u8; 16],
 ) -> Result<Vec<u8>, PullError> {
+    rate_limit_backoff(|| engine::download_blob(transport, token, id))
+}
+
+/// The 429 backoff ladder itself, over any pull-side request: 250 → 500 → 1000 →
+/// 2000 → 2000 → 2000 ms, then one final unguarded attempt. **Only**
+/// `RateLimited` retries — every other outcome, success or failure, returns
+/// immediately, which is what keeps a batch's `RouteUnsupported` (an `Ok`) from
+/// being retried.
+///
+/// Generic over the request so the single-blob download and the batch window
+/// share one ladder rather than two copies that can drift. Sleeps through
+/// `crate::task::block_sleep`, the target-split seam — a plain
+/// `std::thread::sleep` here compiles for wasm32 and then hangs the Worker.
+fn rate_limit_backoff<T>(mut f: impl FnMut() -> Result<T, PullError>) -> Result<T, PullError> {
     let mut delay_ms = 250u64;
     for _ in 0..6 {
-        match engine::download_blob(transport, token, id) {
+        match f() {
             Err(PullError::RateLimited) => {
                 crate::task::block_sleep(std::time::Duration::from_millis(delay_ms));
                 delay_ms = (delay_ms * 2).min(2000);
@@ -186,7 +200,48 @@ fn download_blob_backoff(
             other => return other,
         }
     }
-    engine::download_blob(transport, token, id)
+    f()
+}
+
+/// Upper bound on the blobs ONE `POST /sync/blobs` asks for (myne-md/myne#240).
+/// Mirrors [`PUSH_CHUNK_MAX_BLOBS`] — the server's per-request work scales with
+/// the id COUNT, and the batch's rate-limit cost is derived from it too.
+const FETCH_WINDOW_MAX_BLOBS: usize = 256;
+
+/// Upper bound on the ciphertext ONE batch window asks for, in bytes measured
+/// before base64. Twin of [`PUSH_CHUNK_MAX_BYTES`], and the same 8 MiB, so the
+/// encoded response (~4/3 of this plus per-entry framing, ≈11 MiB) stays far
+/// under `http_codec::MAX_SYNC_RESPONSE_BYTES`.
+const FETCH_WINDOW_MAX_BYTES: usize = 8 * 1024 * 1024;
+
+/// How many of `queue` the next batch request should ask for, bounded by BOTH
+/// [`FETCH_WINDOW_MAX_BLOBS`] and [`FETCH_WINDOW_MAX_BYTES`] — the window closes
+/// at whichever binds first, and a lone blob over the byte bound still travels by
+/// itself (never zero, or the drain would loop on it forever).
+///
+/// **An empty queue yields ZERO, not one empty window** — the inversion of
+/// [`push_chunks`], which deliberately returns one EMPTY chunk because a head-only
+/// genesis push must still be sent. A fetch with nothing to ask for must send
+/// nothing; the copied-from-push version of this spends a token and a round-trip
+/// on an empty request, and nothing about the resulting data is wrong, so only a
+/// test named for the inversion catches it.
+///
+/// The `size` this windows on is **advertised by the server and untrusted**
+/// (`sync-protocol.md` §8.1), and an older server omits it entirely, in which case
+/// `ChangedBlob::size` deserializes to 0. Neither case is special-cased and none
+/// needs to be: an under-reported size can only make this window LARGER than
+/// intended, the server enforces its own byte cap and serves the prefix that fits,
+/// and the client re-windows whatever went unserved. The advisory number can cost
+/// a round-trip; it cannot produce a wrong result.
+fn fetch_window(queue: &[&engine::ChangedBlob]) -> usize {
+    let mut bytes = 0usize;
+    for (i, c) in queue.iter().enumerate() {
+        if i > 0 && (i >= FETCH_WINDOW_MAX_BLOBS || bytes + c.size > FETCH_WINDOW_MAX_BYTES) {
+            return i;
+        }
+        bytes += c.size;
+    }
+    queue.len()
 }
 
 /// Outcome of one pulled-note write attempt under the notes-write mutex.
@@ -2305,109 +2360,195 @@ async fn sync_cycle_attempt(
     // The ids this cycle WRITES, for the boundary's re-index (myne#305).
     let mut pulled_note_ids: Vec<String> = Vec::new();
     let mut pull_skipped = 0usize;
-    for c in &page.changed {
-        // Attachment records were handled above; the catalog, prefs and themes
-        // records are their phases' (never written as notes).
-        if c.attachment_id.is_some()
-            || Some(c.id) == cat_id
-            || c.id == prefs_id
-            || c.id == themes_id
-        {
-            continue;
-        }
-        // Skip a locally-dirty blob: our on-disk copy diverges from the synced
-        // baseline, so this is an unpushed local edit (or a genuine conflict) and
-        // downloading the server's copy would clobber it. The push phase below
-        // sends it; a real concurrent edit surfaces later via keep-both. This
-        // pre-download form is only the CHEAP FILTER (it reads the cycle-start
-        // manifest); the authoritative re-check runs against the live disk
-        // inside `apply_pulled_note_blob`'s lock.
-        let baseline_nonce = state
-            .blobs
-            .get(&hex(&c.id))
-            .map(|b| b.content_nonce_hex.clone());
-        let local_nonce = local.get(&c.id).map(|n| hex(n));
-        if baseline_nonce.is_some() && baseline_nonce != local_nonce {
-            continue;
-        }
-        let bytes = match download_blob_backoff(transport, token, &c.id) {
-            Ok(b) => b,
-            // Per-blob unavailability (unknown id / horizon-GC reclaimed body,
-            // §11.3): skip the record WITHOUT any local mutation — no write, no
-            // baseline adoption — and keep the cycle alive. Against a pre-§11.3
-            // server the reclaimed body arrives as an empty 200 instead; the
-            // nonce guard below catches that shape the same way.
-            Err(PullError::BlobNotFound | PullError::BlobReclaimed) => {
-                pull_skipped += 1;
-                continue;
-            }
-            Err(e) => return Err(SyncCycleError::Pull(e)),
-        };
-        // Validate BEFORE the write (§11.3): the downloaded header must carry
-        // the exact `content_nonce` the pulled record advertised. Empty bytes
-        // (a reclaimed body served as `""`), junk, and a nonce mismatch all
-        // fail one check (`read_myn_content_nonce` → None for <header-size or
-        // bad magic). On failure NOTHING is mutated: the live local copy stays
-        // intact and the old baseline stays authoritative — the old behavior
-        // (write unverified bytes, adopt the server baseline) is what made
-        // this bug destroy live notes and self-seal.
-        match crate::note_nonce::read_myn_content_nonce(&bytes) {
-            Some(n) if n == c.content_nonce => {
-                match apply_pulled_note_blob(
-                    io,
-                    notes_dir,
-                    &c.id,
-                    &bytes,
-                    baseline_nonce.as_deref(),
-                )
-                .await?
-                {
-                    PulledNoteApply::Applied => {
-                        // Mirror the write into the in-memory manifest for the
-                        // push-detect phase (ONE scan per attempt).
-                        notes_manifest.insert(c.id, n);
-                        state.blobs.insert(
-                            hex(&c.id),
-                            BlobSyncState {
-                                version: c.version,
-                                content_nonce_hex: hex(&c.content_nonce),
-                            },
-                        );
-                        pulled += 1;
-                        // …and reported by id, so the cycle boundary can put it
-                        // in the full-text index. The orchestrator holds no
-                        // `Hooks` (it is deliberately `AppHandle`-free and
-                        // `sim.rs` drives it with none), so it says what it
-                        // wrote rather than indexing it here.
-                        pulled_note_ids.push(uuid::Uuid::from_bytes(c.id).to_string());
-                        // Counted at the WRITE, not at the download: the number
-                        // the user watches is notes that exist locally, and a
-                        // download that then failed to land would otherwise
-                        // advance a bar for work that did not happen.
-                        super::progress::advance();
-                    }
-                    // A local save landed between the cycle-start scan and this
-                    // write — the note is an unpushed local edit now; the push
-                    // phase (or keep-both) owns it. No write, no baseline move.
-                    PulledNoteApply::SkippedDirty => {}
-                    // The store is full (task 91). END the materialisation here
-                    // rather than trying every remaining record against a store
-                    // that cannot take them — each attempt is a round trip and a
-                    // failed write, and the answer will not change within this
-                    // cycle.
-                    //
-                    // `finish()` before the return so the progress readout does
-                    // not sit "active" forever on a bar that stopped.
-                    PulledNoteApply::StorageFull => {
-                        super::progress::finish();
-                        return Err(SyncCycleError::StorageFull);
+    // The records this loop will actually download, with the two filters hoisted
+    // verbatim out of the old per-record loop:
+    //
+    //  - attachment records were handled above; the catalog, prefs and themes
+    //    records belong to their own phases and are never written as notes;
+    //  - a locally-dirty blob is skipped, because our on-disk copy diverges from
+    //    the synced baseline (an unpushed local edit, or a genuine conflict) and
+    //    downloading the server's copy would clobber it. The push phase below
+    //    sends it; a real concurrent edit surfaces later via keep-both.
+    //
+    // That second one is only the CHEAP FILTER (it reads the cycle-start
+    // manifest). The authoritative re-check still runs against the live disk
+    // inside `apply_pulled_note_blob`'s lock, unchanged — batching only means the
+    // cheap filter can now run up to one window earlier than the write, so a
+    // racing local save wastes slightly more download before the in-lock check
+    // catches it.
+    let candidates: Vec<&engine::ChangedBlob> = page
+        .changed
+        .iter()
+        .filter(|c| {
+            !(c.attachment_id.is_some()
+                || Some(c.id) == cat_id
+                || c.id == prefs_id
+                || c.id == themes_id)
+        })
+        .filter(|c| {
+            let baseline_nonce = state.blobs.get(&hex(&c.id)).map(|b| &b.content_nonce_hex);
+            let local_nonce = local.get(&c.id).map(|n| hex(n));
+            !(baseline_nonce.is_some() && baseline_nonce != local_nonce.as_ref())
+        })
+        .collect();
+
+    // Apply ONE downloaded record. Shared by the batch drain and the single-blob
+    // fallback below so the §11.3 verification and everything downstream of it
+    // cannot drift between the two paths.
+    macro_rules! apply_downloaded {
+        ($c:expr, $bytes:expr) => {{
+            let c: &engine::ChangedBlob = $c;
+            let bytes: &[u8] = $bytes;
+            let baseline_nonce = state
+                .blobs
+                .get(&hex(&c.id))
+                .map(|b| b.content_nonce_hex.clone());
+            // Validate BEFORE the write (§11.3): the downloaded header must carry
+            // the exact `content_nonce` the pulled record advertised. Empty bytes
+            // (a reclaimed body served as `""`), junk, and a nonce mismatch all
+            // fail one check (`read_myn_content_nonce` → None for <header-size or
+            // bad magic). On failure NOTHING is mutated: the live local copy stays
+            // intact and the old baseline stays authoritative — the old behavior
+            // (write unverified bytes, adopt the server baseline) is what made
+            // this bug destroy live notes and self-seal.
+            match crate::note_nonce::read_myn_content_nonce(bytes) {
+                Some(n) if n == c.content_nonce => {
+                    match apply_pulled_note_blob(
+                        io,
+                        notes_dir,
+                        &c.id,
+                        bytes,
+                        baseline_nonce.as_deref(),
+                    )
+                    .await?
+                    {
+                        PulledNoteApply::Applied => {
+                            // Mirror the write into the in-memory manifest for the
+                            // push-detect phase (ONE scan per attempt).
+                            notes_manifest.insert(c.id, n);
+                            state.blobs.insert(
+                                hex(&c.id),
+                                BlobSyncState {
+                                    version: c.version,
+                                    content_nonce_hex: hex(&c.content_nonce),
+                                },
+                            );
+                            pulled += 1;
+                            // …and reported by id, so the cycle boundary can put it
+                            // in the full-text index. The orchestrator holds no
+                            // `Hooks` (it is deliberately `AppHandle`-free and
+                            // `sim.rs` drives it with none), so it says what it
+                            // wrote rather than indexing it here.
+                            pulled_note_ids.push(uuid::Uuid::from_bytes(c.id).to_string());
+                            // Counted at the WRITE, not at the download: the number
+                            // the user watches is notes that exist locally, and a
+                            // download that then failed to land would otherwise
+                            // advance a bar for work that did not happen.
+                            super::progress::advance();
+                        }
+                        // A local save landed between the cycle-start scan and this
+                        // write — the note is an unpushed local edit now; the push
+                        // phase (or keep-both) owns it. No write, no baseline move.
+                        PulledNoteApply::SkippedDirty => {}
+                        // The store is full (task 91). END the materialisation here
+                        // rather than trying every remaining record against a store
+                        // that cannot take them — each attempt is a round trip and a
+                        // failed write, and the answer will not change within this
+                        // cycle.
+                        //
+                        // `finish()` before the return so the progress readout does
+                        // not sit "active" forever on a bar that stopped.
+                        PulledNoteApply::StorageFull => {
+                            super::progress::finish();
+                            return Err(SyncCycleError::StorageFull);
+                        }
                     }
                 }
+                _ => {
+                    pull_skipped += 1;
+                }
             }
-            _ => {
-                pull_skipped += 1;
+        }};
+    }
+
+    // Batch the downloads (myne#240). Per-attempt, NOT per-process: a server that
+    // answers 404 costs exactly one wasted round-trip per cycle, and a server that
+    // gains the route is picked up on the next cycle with no state to invalidate.
+    // A global or a `OnceLock` would leak the verdict across vaults and endpoints
+    // and would owe an invalidation story for endpoint change and re-enrollment.
+    let mut batch_ok = true;
+    let mut queue: &[&engine::ChangedBlob] = &candidates;
+    while !queue.is_empty() {
+        if !batch_ok {
+            // Fallback: a server without the batch route. One GET per blob, the
+            // pre-#240 shape, with the same per-record dispositions.
+            for c in queue {
+                match download_blob_backoff(transport, token, &c.id) {
+                    Ok(bytes) => apply_downloaded!(c, &bytes),
+                    // Per-blob unavailability (unknown id / horizon-GC reclaimed
+                    // body, §11.3): skip the record WITHOUT any local mutation —
+                    // no write, no baseline adoption — and keep the cycle alive.
+                    // Against a pre-§11.3 server the reclaimed body arrives as an
+                    // empty 200 instead; the nonce guard catches that shape too.
+                    Err(PullError::BlobNotFound | PullError::BlobReclaimed) => {
+                        pull_skipped += 1;
+                    }
+                    Err(e) => return Err(SyncCycleError::Pull(e)),
+                }
+            }
+            break;
+        }
+        let n = fetch_window(queue);
+        let ids: Vec<[u8; 16]> = queue[..n].iter().map(|c| c.id).collect();
+        let outcome = rate_limit_backoff(|| engine::download_blobs(transport, token, &ids))
+            .map_err(SyncCycleError::Pull)?;
+        let batch = match outcome {
+            engine::BlobBatchOutcome::RouteUnsupported => {
+                batch_ok = false;
+                continue;
+            }
+            engine::BlobBatchOutcome::Served(b) => b,
+        };
+        // Drain the window in request order, stopping at the first id the response
+        // did not account for — the response describes a PREFIX, and everything
+        // from there on is simply unserved and stays queued.
+        let mut served = 0usize;
+        for c in &queue[..n] {
+            match batch.outcome(&c.id) {
+                Some(Ok(bytes)) => {
+                    served += 1;
+                    let bytes = bytes.to_vec();
+                    apply_downloaded!(c, &bytes);
+                }
+                // Same disposition as the single route's 404/410, plus `internal`
+                // and any code this client does not know: skip without mutating.
+                Some(Err(_)) => {
+                    served += 1;
+                    pull_skipped += 1;
+                }
+                None => break,
             }
         }
+        // A response that accounts for NOTHING would loop this drain forever. The
+        // server's side of the contract is that it accounts for at least the first
+        // requested id; a server that does not is one this client cannot talk to.
+        if served == 0 {
+            super::progress::finish();
+            return Err(SyncCycleError::Pull(PullError::BadResponse));
+        }
+        queue = &queue[served..];
+        // Checkpoint the adopted baselines per window — the mirror of the push
+        // side's per-chunk checkpoint (myne#222). Without it a cycle that dies
+        // mid-drain leaves the notes it wrote on disk with NO recorded baseline,
+        // and the push-detect phase then queues them at base_version 0, collects
+        // a 409 blob_stale and aborts that chunk and every chunk behind it. The
+        // "persist only on success" rule this appears to bend is about a
+        // half-advanced CURSOR reaching disk; `pull_to_stable` has already
+        // returned a stable page by here, and `state.cursor` still moves only
+        // below, after the whole loop.
+        write_sync_state(io, vault_root, state)
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
     }
     // Close the progress run whatever the per-record outcomes were. A skipped or
     // deferred record still ends the run: leaving it "active" forever would show
@@ -3161,6 +3302,71 @@ mod tests {
                 }
             }
             self.inner.request(method, path, body, token)
+        }
+    }
+
+    /// Relays to a real transport while watching the blob-download stream: counts
+    /// batch vs single-blob requests, the ids each batch asked for, and the 429s
+    /// the server actually returned.
+    ///
+    /// The 429 count is the discriminating number for myne#240 and it is only
+    /// observable HERE. `download_blob_backoff` swallows 429s in-cycle, so the
+    /// pull loop reports success either way and `FailureClass::RateLimited` never
+    /// fires — the acceptance criterion as originally filed was already green.
+    /// What the change actually buys is the request count, and therefore the wall
+    /// clock, which is what this decorator measures.
+    struct PullObserver {
+        inner: Box<dyn SyncTransport>,
+        batches: std::sync::Mutex<Vec<usize>>,
+        singles: std::sync::atomic::AtomicUsize,
+        rate_limited: std::sync::atomic::AtomicUsize,
+    }
+    impl PullObserver {
+        fn new(inner: Box<dyn SyncTransport>) -> Self {
+            Self {
+                inner,
+                batches: std::sync::Mutex::new(Vec::new()),
+                singles: std::sync::atomic::AtomicUsize::new(0),
+                rate_limited: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+        /// How many ids each `POST /sync/blobs` asked for, in order.
+        fn ids_per_batch(&self) -> Vec<usize> {
+            self.batches.lock().unwrap().clone()
+        }
+        fn single_count(&self) -> usize {
+            self.singles.load(std::sync::atomic::Ordering::Relaxed)
+        }
+        fn rate_limited(&self) -> usize {
+            self.rate_limited.load(std::sync::atomic::Ordering::Relaxed)
+        }
+    }
+    impl SyncTransport for PullObserver {
+        fn request(
+            &self,
+            method: HttpMethod,
+            path: &str,
+            body: &[u8],
+            token: Option<&str>,
+        ) -> Result<TransportResponse, TransportError> {
+            if path == BLOB_BATCH_PATH {
+                // The body is this client's own serialization, so parsing it back
+                // is safe here in a way PushObserver's byte-scan was not.
+                let n = serde_json::from_slice::<serde_json::Value>(body)
+                    .ok()
+                    .and_then(|v| v["blob_ids_hex"].as_array().map(|a| a.len()))
+                    .unwrap_or(0);
+                self.batches.lock().unwrap().push(n);
+            } else if path.starts_with("/sync/blob?") {
+                self.singles
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            let resp = self.inner.request(method, path, body, token)?;
+            if resp.status == 429 {
+                self.rate_limited
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            Ok(resp)
         }
     }
 
@@ -8987,6 +9193,606 @@ mod tests {
                 "an agreeing server clears a stale dirty flag"
             );
             std::fs::remove_dir_all(&dir).ok();
+        }
+    }
+
+    /// Batch blob fetch on the pull path (myne-md/myne#240).
+    mod blob_batch {
+        use super::*;
+
+        fn changed(size: usize) -> engine::ChangedBlob {
+            engine::ChangedBlob {
+                id: [0u8; 16],
+                content_nonce: [0u8; 24],
+                version: 1,
+                size,
+                attachment_id: None,
+            }
+        }
+
+        /// The inversion of `push_chunks`, and the reason it gets a test of its
+        /// own: push returns ONE EMPTY chunk for an empty batch (a head-only
+        /// genesis push must still be sent), so the obvious copy of it here would
+        /// send an empty batch request — spending a token and a round-trip on
+        /// nothing. Every byte of the resulting data would be correct, so nothing
+        /// else in the suite would notice.
+        #[test]
+        fn an_empty_queue_yields_no_window() {
+            assert_eq!(fetch_window(&[]), 0);
+        }
+
+        #[test]
+        fn a_window_closes_on_the_count_bound() {
+            let all: Vec<engine::ChangedBlob> = (0..FETCH_WINDOW_MAX_BLOBS + 44)
+                .map(|_| changed(1))
+                .collect();
+            let q: Vec<&engine::ChangedBlob> = all.iter().collect();
+            assert_eq!(fetch_window(&q), FETCH_WINDOW_MAX_BLOBS);
+            assert_eq!(fetch_window(&q[FETCH_WINDOW_MAX_BLOBS..]), 44);
+            // Exactly at the bound splits cleanly rather than leaving a stray.
+            assert_eq!(
+                fetch_window(&q[..FETCH_WINDOW_MAX_BLOBS]),
+                FETCH_WINDOW_MAX_BLOBS
+            );
+        }
+
+        #[test]
+        fn a_window_closes_on_the_byte_bound_before_the_count_bound() {
+            // 512 KiB each → 16 fit in the 8 MiB budget, far below the count cap.
+            let all: Vec<engine::ChangedBlob> = (0..40).map(|_| changed(512 * 1024)).collect();
+            let q: Vec<&engine::ChangedBlob> = all.iter().collect();
+            let n = fetch_window(&q);
+            assert_eq!(n, 16, "the byte budget must bind before the count cap");
+            assert!(n * 512 * 1024 <= FETCH_WINDOW_MAX_BYTES);
+        }
+
+        /// A lone blob over the whole budget still travels, or the drain loops on
+        /// it forever. Mirrors push_chunks' oversized-lone-blob rule.
+        #[test]
+        fn a_lone_oversized_blob_gets_a_window_of_one() {
+            let all = [changed(FETCH_WINDOW_MAX_BYTES * 2), changed(1)];
+            let q: Vec<&engine::ChangedBlob> = all.iter().collect();
+            assert_eq!(fetch_window(&q), 1);
+        }
+
+        /// `size` is server-advertised and untrusted (§8.1), and an older server
+        /// omits it so it deserializes to 0. Neither is special-cased: with 0 the
+        /// byte accumulator never trips and windowing degrades to count-only,
+        /// after which the server serves the prefix that fits and the client
+        /// re-windows the rest.
+        #[test]
+        fn a_zero_size_degrades_to_the_count_bound() {
+            let all: Vec<engine::ChangedBlob> = (0..FETCH_WINDOW_MAX_BLOBS * 2)
+                .map(|_| changed(0))
+                .collect();
+            let q: Vec<&engine::ChangedBlob> = all.iter().collect();
+            assert_eq!(fetch_window(&q), FETCH_WINDOW_MAX_BLOBS);
+        }
+
+        /// The 50 000-note arithmetic, done as arithmetic rather than as a corpus.
+        /// 1424 B is the 71.2 MB / 50 000 average recorded in the myne#222
+        /// decisions entry; the count cap binds at that size, so the pull that
+        /// used to be 50 000 requests is 196.
+        #[test]
+        fn fifty_thousand_notes_plan_one_hundred_ninety_six_windows() {
+            let all: Vec<engine::ChangedBlob> = (0..50_000).map(|_| changed(1424)).collect();
+            let mut q: &[&engine::ChangedBlob] = &all.iter().collect::<Vec<_>>();
+            let mut windows = 0usize;
+            while !q.is_empty() {
+                let n = fetch_window(q);
+                assert!(
+                    n > 0,
+                    "a window is never empty — the drain would not advance"
+                );
+                assert!(n <= FETCH_WINDOW_MAX_BLOBS);
+                assert!(
+                    n == 1
+                        || q[..n].iter().map(|c| c.size).sum::<usize>() <= FETCH_WINDOW_MAX_BYTES
+                );
+                windows += 1;
+                q = &q[n..];
+            }
+            assert_eq!(windows, 196);
+        }
+
+        /// The end-to-end proof, against the production limiter defaults spelled
+        /// out literally rather than `spawn_server`'s lifted values.
+        ///
+        /// On `develop` this fails at `rate_limited() == 0`: 600 sequential GETs
+        /// against a burst of 256 refilling at 16/s collects hundreds of 429s,
+        /// which `download_blob_backoff` absorbs — the pull still succeeds, just
+        /// slowly, which is exactly why the request count and not the failure
+        /// class is the honest assertion.
+        #[test]
+        fn a_first_pull_of_a_large_vault_fits_inside_the_default_burst() {
+            let Some((_guard, url)) = spawn_server_env("256", "16") else {
+                eprintln!("SKIP blob_batch burst: server binary not found");
+                return;
+            };
+            let root_key = [0xc1u8; 32];
+            let account_hash = [0xc2u8; 16];
+            let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+            let items_key = [0xc3u8; 32];
+            let items_key_id = [0xc4u8; 16];
+            let dir_a = std::env::temp_dir().join(format!("myne-bb-A-{}", std::process::id()));
+            let dir_b = std::env::temp_dir().join(format!("myne-bb-B-{}", std::process::id()));
+            let notes_a = dir_a.join("notes");
+            let notes_b = dir_b.join("notes");
+            std::fs::create_dir_all(&notes_a).unwrap();
+            std::fs::create_dir_all(&notes_b).unwrap();
+
+            // 600 = 2 full windows + 88, so the split is exercised and asymmetric.
+            const N: usize = 600;
+            for i in 0..N {
+                write_note(
+                    &notes_a,
+                    &items_key,
+                    &items_key_id,
+                    &NoteId::new_v7(),
+                    format!("note-{i}").as_bytes(),
+                    false,
+                );
+            }
+            let (ta, dev_a, tok_a) = enroll_device(
+                &url,
+                &account_hash,
+                secret.as_slice(),
+                "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0",
+                true,
+            );
+            run_cycle_legacy(
+                ta.as_ref(),
+                &root_key,
+                account_hash,
+                dev_a,
+                &tok_a,
+                &notes_a,
+                &dir_a,
+                true,
+            )
+            .expect("A pushes 600 notes");
+
+            let (_tb, dev_b, tok_b) = enroll_device(
+                &url,
+                &account_hash,
+                secret.as_slice(),
+                "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1",
+                false,
+            );
+            let obs = PullObserver::new(
+                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            );
+            let pull = run_cycle_legacy(
+                &obs,
+                &root_key,
+                account_hash,
+                dev_b,
+                &tok_b,
+                &notes_b,
+                &dir_b,
+                true,
+            )
+            .expect("B cold-syncs in ONE cycle");
+
+            assert_eq!(pull.pulled, N, "every note landed in one cycle");
+            assert_eq!(
+                obs.rate_limited(),
+                0,
+                "the cold sync must not touch the limiter at all — this is the \
+                 assertion that fails before batching, where 600 GETs against a \
+                 256 burst collect hundreds of 429s"
+            );
+            assert_eq!(
+                obs.ids_per_batch(),
+                vec![FETCH_WINDOW_MAX_BLOBS, FETCH_WINDOW_MAX_BLOBS, 88],
+                "note bodies travel in bounded windows"
+            );
+            assert_eq!(
+                obs.single_count(),
+                0,
+                "no note body fell back to the single-blob route"
+            );
+
+            // The control arm, and the reason the assertion above is meaningful:
+            // a THIRD device doing the identical cold sync one-GET-per-blob — the
+            // pre-#240 shape, still live as the old-server fallback — hammers the
+            // very limiter the batch path did not touch. Without this the "0 429s"
+            // above could just mean the corpus was too small to bind.
+            let dir_c = std::env::temp_dir().join(format!("myne-bb-C-{}", std::process::id()));
+            let notes_c = dir_c.join("notes");
+            std::fs::create_dir_all(&notes_c).unwrap();
+            let (_tc, dev_c, tok_c) = enroll_device(
+                &url,
+                &account_hash,
+                secret.as_slice(),
+                "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+                false,
+            );
+            let legacy = PullObserver::new(Box::new(RouteAbsentTransport {
+                inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
+                    .unwrap(),
+                status: 404,
+            }));
+            run_cycle_legacy(
+                &legacy,
+                &root_key,
+                account_hash,
+                dev_c,
+                &tok_c,
+                &notes_c,
+                &dir_c,
+                true,
+            )
+            .expect("the fallback path still completes, just slowly");
+            // `>=` rather than `==`: every 429 the backoff swallows is itself
+            // another GET the observer counts, which is the cost being measured.
+            assert!(
+                legacy.single_count() >= N,
+                "the control really did one GET per blob: {}",
+                legacy.single_count()
+            );
+            assert!(
+                legacy.rate_limited() > 0,
+                "the control arm did not bind the limiter, so the 0-429 assertion \
+                 above proves nothing — raise N"
+            );
+            std::fs::remove_dir_all(&dir_a).ok();
+            std::fs::remove_dir_all(&dir_b).ok();
+            std::fs::remove_dir_all(&dir_c).ok();
+        }
+
+        /// A server without the route (404, or 405 behind a proxy that knows the
+        /// /sync prefix but not the method) is probed ONCE and the rest of the
+        /// attempt uses the single-blob route.
+        #[test]
+        fn a_server_without_the_batch_route_falls_back_to_single_blob() {
+            let Some((_guard, url)) = spawn_server() else {
+                eprintln!("SKIP blob_batch fallback: server binary not found");
+                return;
+            };
+            let root_key = [0xe1u8; 32];
+            let account_hash = [0xe2u8; 16];
+            let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+            let items_key = [0xe3u8; 32];
+            let items_key_id = [0xe4u8; 16];
+            let dir_a = std::env::temp_dir().join(format!("myne-bbf-A-{}", std::process::id()));
+            let dir_b = std::env::temp_dir().join(format!("myne-bbf-B-{}", std::process::id()));
+            let notes_a = dir_a.join("notes");
+            let notes_b = dir_b.join("notes");
+            std::fs::create_dir_all(&notes_a).unwrap();
+            std::fs::create_dir_all(&notes_b).unwrap();
+
+            for i in 0..5 {
+                write_note(
+                    &notes_a,
+                    &items_key,
+                    &items_key_id,
+                    &NoteId::new_v7(),
+                    format!("old-server-{i}").as_bytes(),
+                    false,
+                );
+            }
+            let (ta, dev_a, tok_a) = enroll_device(
+                &url,
+                &account_hash,
+                secret.as_slice(),
+                "e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0",
+                true,
+            );
+            run_cycle_legacy(
+                ta.as_ref(),
+                &root_key,
+                account_hash,
+                dev_a,
+                &tok_a,
+                &notes_a,
+                &dir_a,
+                true,
+            )
+            .expect("A push");
+
+            for status in [404u16, 405] {
+                let dir = dir_b.join(status.to_string());
+                let notes = dir.join("notes");
+                std::fs::create_dir_all(&notes).unwrap();
+                let (_t, dev, tok) = enroll_device(
+                    &url,
+                    &account_hash,
+                    secret.as_slice(),
+                    &format!("{status}0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")[..32],
+                    false,
+                );
+                let obs = PullObserver::new(Box::new(RouteAbsentTransport {
+                    inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
+                        .unwrap(),
+                    status,
+                }));
+                let pull =
+                    run_cycle_legacy(&obs, &root_key, account_hash, dev, &tok, &notes, &dir, true)
+                        .expect("the cycle completes against a server without the route");
+                assert_eq!(pull.pulled, 5, "every note landed via the fallback");
+                assert_eq!(
+                    obs.ids_per_batch().len(),
+                    1,
+                    "status {status}: the absent route is probed ONCE, not once per window"
+                );
+                assert_eq!(
+                    obs.single_count(),
+                    5,
+                    "status {status}: one GET per note after the fallback"
+                );
+            }
+            std::fs::remove_dir_all(&dir_a).ok();
+            std::fs::remove_dir_all(&dir_b).ok();
+        }
+
+        /// The negative case, and the one that matters: a transport-level failure
+        /// is a server OUTAGE, not a missing route. Falling back on it would mask
+        /// a real outage as a slow success and permanently downgrade the session
+        /// on one dropped packet. The cycle must fail and try the batch again.
+        #[test]
+        fn a_transport_error_on_the_batch_route_does_not_disable_it() {
+            let Some((_guard, url)) = spawn_server() else {
+                eprintln!("SKIP blob_batch outage: server binary not found");
+                return;
+            };
+            let root_key = [0xf1u8; 32];
+            let account_hash = [0xf2u8; 16];
+            let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+            let items_key = [0xf3u8; 32];
+            let items_key_id = [0xf4u8; 16];
+            let dir_a = std::env::temp_dir().join(format!("myne-bbo-A-{}", std::process::id()));
+            let dir_b = std::env::temp_dir().join(format!("myne-bbo-B-{}", std::process::id()));
+            let notes_a = dir_a.join("notes");
+            let notes_b = dir_b.join("notes");
+            std::fs::create_dir_all(&notes_a).unwrap();
+            std::fs::create_dir_all(&notes_b).unwrap();
+
+            let note = NoteId::new_v7();
+            write_note(&notes_a, &items_key, &items_key_id, &note, b"outage", false);
+            let (ta, dev_a, tok_a) = enroll_device(
+                &url,
+                &account_hash,
+                secret.as_slice(),
+                "f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0",
+                true,
+            );
+            run_cycle_legacy(
+                ta.as_ref(),
+                &root_key,
+                account_hash,
+                dev_a,
+                &tok_a,
+                &notes_a,
+                &dir_a,
+                true,
+            )
+            .expect("A push");
+            let (_tb, dev_b, tok_b) = enroll_device(
+                &url,
+                &account_hash,
+                secret.as_slice(),
+                "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+                false,
+            );
+
+            // First cycle: the batch route drops below HTTP.
+            use crate::plugins::sync::transport::{FaultInjectingTransport, FaultMode};
+            let dead = FaultInjectingTransport::fail_path(
+                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+                BLOB_BATCH_PATH,
+                99,
+                FaultMode::Network,
+            );
+            let err = run_cycle_legacy(
+                &dead,
+                &root_key,
+                account_hash,
+                dev_b,
+                &tok_b,
+                &notes_b,
+                &dir_b,
+                true,
+            )
+            .expect_err("an outage on the batch route fails the cycle");
+            assert!(
+                matches!(err, SyncCycleError::Pull(PullError::Transport(_))),
+                "an outage stays a transport error, it is not laundered into a \
+                 fallback: got {err:?}"
+            );
+            assert!(
+                !notes_b.join(format!("{}.myn", note.as_uuid())).exists(),
+                "nothing was written by the failed cycle"
+            );
+
+            // Next cycle, healthy transport: the batch route is tried AGAIN.
+            let obs = PullObserver::new(
+                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            );
+            let pull = run_cycle_legacy(
+                &obs,
+                &root_key,
+                account_hash,
+                dev_b,
+                &tok_b,
+                &notes_b,
+                &dir_b,
+                true,
+            )
+            .expect("the next cycle recovers");
+            assert_eq!(pull.pulled, 1);
+            assert_eq!(
+                obs.ids_per_batch(),
+                vec![1],
+                "the batch route was retried, not permanently disabled"
+            );
+            assert_eq!(obs.single_count(), 0);
+            std::fs::remove_dir_all(&dir_a).ok();
+            std::fs::remove_dir_all(&dir_b).ok();
+        }
+
+        /// Every way a batch response can try to make an id land as empty
+        /// bytes, against a PRE-EXISTING LIVE LOCAL NOTE so a failure is
+        /// destructive and visible. A correct server emits none of these — the
+        /// point is that the client refuses them anyway, because "no local
+        /// mutation" (§11.3) has to hold against a hostile or buggy peer too.
+        ///
+        /// Arms: the id omitted with each code; the id served with an EMPTY
+        /// ciphertext (a pre-§11.3 server, or a hostile one); the id in BOTH
+        /// arrays; and the id in NEITHER, which must stay queued rather than
+        /// default to empty bytes.
+        #[test]
+        fn an_omitted_id_can_never_be_applied_as_a_zero_byte_body() {
+            let items_key = [0x11u8; 32];
+            let items_key_id = [0x22u8; 16];
+            let id_hex_of = |id: &[u8; 16]| hex(id);
+
+            /// `(tag, build the batch body the server returns for this window)`.
+            type Arm = (&'static str, Box<dyn Fn(&str) -> String>);
+            let arms: Vec<Arm> = vec![
+                (
+                    "omitted-reclaimed",
+                    Box::new(|h: &str| {
+                        format!("{{\"blobs\":[],\"omitted\":[{{\"blob_id_hex\":\"{h}\",\"error_code\":\"blob_reclaimed\"}}]}}")
+                    }),
+                ),
+                (
+                    "omitted-notfound",
+                    Box::new(|h: &str| {
+                        format!("{{\"blobs\":[],\"omitted\":[{{\"blob_id_hex\":\"{h}\",\"error_code\":\"not_found\"}}]}}")
+                    }),
+                ),
+                (
+                    "omitted-internal",
+                    Box::new(|h: &str| {
+                        format!("{{\"blobs\":[],\"omitted\":[{{\"blob_id_hex\":\"{h}\",\"error_code\":\"internal\"}}]}}")
+                    }),
+                ),
+                (
+                    "served-empty",
+                    Box::new(|h: &str| {
+                        format!("{{\"blobs\":[{{\"blob_id_hex\":\"{h}\",\"ciphertext_b64\":\"\"}}],\"omitted\":[]}}")
+                    }),
+                ),
+                (
+                    "in-both-arrays",
+                    Box::new(|h: &str| {
+                        format!("{{\"blobs\":[{{\"blob_id_hex\":\"{h}\",\"ciphertext_b64\":\"\"}}],\"omitted\":[{{\"blob_id_hex\":\"{h}\",\"error_code\":\"blob_reclaimed\"}}]}}")
+                    }),
+                ),
+                (
+                    "accounted-nowhere",
+                    Box::new(|_h: &str| "{\"blobs\":[],\"omitted\":[]}".to_string()),
+                ),
+            ];
+
+            for (tag, body_for) in arms {
+                let (dir, notes) = fresh_vault(&format!("bbzero-{tag}"));
+                let id = v7_id();
+                let blob =
+                    encode_new_note(&items_key, &items_key_id, &id, b"precious body").unwrap();
+                let disk_nonce = crate::note_nonce::read_myn_content_nonce(&blob).unwrap();
+                crate::atomic_write::atomic_write(&blob_path(&notes, &id), &blob, false).unwrap();
+                // A CLEAN baseline, so the cheap dirty-filter does not fire and the
+                // record really does reach the batch drain.
+                let mut st = SyncState::default();
+                st.blobs.insert(
+                    hex(&id),
+                    BlobSyncState {
+                        version: 1,
+                        content_nonce_hex: hex(&disk_nonce),
+                    },
+                );
+                write_sync_state(&dir, &st).unwrap();
+
+                let t = FakeTransport::new();
+                // The server advanced the record (new version + nonce), so the
+                // client wants to download it.
+                t.on(
+                    HttpMethod::Get,
+                    "/sync/pull?cursor=0",
+                    200,
+                    pull_body(&meta_json(&id, 2, &[0xbb; 24]), 1),
+                );
+                t.on(
+                    HttpMethod::Get,
+                    "/sync/pull?cursor=1",
+                    200,
+                    pull_body("", 1),
+                );
+                t.on(
+                    HttpMethod::Post,
+                    BLOB_BATCH_PATH,
+                    200,
+                    body_for(&id_hex_of(&id)).into_bytes(),
+                );
+
+                let out = run_cycle_legacy(
+                    &t,
+                    &[0x42; 32],
+                    [0x5c; 16],
+                    [0x0a; 16],
+                    "tok",
+                    &notes,
+                    &dir,
+                    false,
+                );
+                match tag {
+                    // An id the response accounted for nowhere leaves the drain
+                    // with no progress to make. Failing the cycle is the ONLY safe
+                    // answer: looping would hang, and skipping would silently
+                    // discard a record the server never spoke about.
+                    "accounted-nowhere" => {
+                        assert!(
+                            matches!(out, Err(SyncCycleError::Pull(PullError::BadResponse))),
+                            "{tag}: a window that accounts for nothing must fail the cycle, got {out:?}"
+                        );
+                    }
+                    _ => {
+                        let s = out.unwrap_or_else(|e| panic!("{tag}: cycle failed: {e:?}"));
+                        assert_eq!(s.pulled, 0, "{tag}: nothing may count as pulled");
+                        assert_eq!(s.pull_skipped, 1, "{tag}: the skip is honestly counted");
+                    }
+                }
+                // The load-bearing assertion, identical in every arm.
+                let on_disk = std::fs::read(blob_path(&notes, &id)).unwrap();
+                assert_eq!(
+                    on_disk, blob,
+                    "{tag}: the live note must survive byte-identical"
+                );
+                let st2 = read_sync_state(&dir).unwrap();
+                assert_eq!(
+                    st2.blobs.get(&hex(&id)).map(|b| b.version),
+                    Some(1),
+                    "{tag}: the baseline must NOT be adopted — adoption is what made \
+                     this class of bug self-seal"
+                );
+                std::fs::remove_dir_all(&dir).ok();
+            }
+        }
+    }
+
+    /// Answers `POST /sync/blobs` with a chosen status (404/405) while relaying
+    /// everything else, modelling a server that predates the route.
+    struct RouteAbsentTransport {
+        inner: Box<dyn SyncTransport>,
+        status: u16,
+    }
+    impl SyncTransport for RouteAbsentTransport {
+        fn request(
+            &self,
+            method: HttpMethod,
+            path: &str,
+            body: &[u8],
+            token: Option<&str>,
+        ) -> Result<TransportResponse, TransportError> {
+            if path == BLOB_BATCH_PATH {
+                return Ok(TransportResponse {
+                    status: self.status,
+                    body: b"{}".to_vec(),
+                });
+            }
+            self.inner.request(method, path, body, token)
         }
     }
 }
