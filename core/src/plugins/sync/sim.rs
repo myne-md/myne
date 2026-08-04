@@ -85,6 +85,10 @@ fn server_binary() -> Option<PathBuf> {
 struct ServerOpts {
     addr: Option<String>,
     storage_dir: Option<PathBuf>,
+    /// `(burst, refill)` for the per-account limiter. `None` keeps the lifted
+    /// values every other scenario relies on; a scenario that is ABOUT the
+    /// limiter sets the production defaults explicitly.
+    rate_limit: Option<(u64, u64)>,
 }
 
 /// Spawn an ephemeral server; return (guard, base_url). Per-call unique
@@ -107,9 +111,13 @@ fn spawn_server_with(opts: &ServerOpts) -> Option<(ServerGuard, String)> {
         "MYNE_SERVER_ADDR",
         opts.addr.as_deref().unwrap_or("127.0.0.1:0"),
     )
-    .env("MYNE_SERVER_PORTFILE", &portfile)
-    .env("MYNE_RATELIMIT_BURST", "1000000")
-    .env("MYNE_RATELIMIT_REFILL", "1000000");
+    .env("MYNE_SERVER_PORTFILE", &portfile);
+    let (burst, refill) = opts
+        .rate_limit
+        .map(|(b, r)| (b.to_string(), r.to_string()))
+        .unwrap_or_else(|| ("1000000".into(), "1000000".into()));
+    cmd.env("MYNE_RATELIMIT_BURST", burst)
+        .env("MYNE_RATELIMIT_REFILL", refill);
     if let Some(storage) = &opts.storage_dir {
         std::fs::create_dir_all(storage).ok()?;
         cmd.env("MYNE_STORAGE_BACKEND", "fs")
@@ -1392,6 +1400,57 @@ fn discovery_offline_device_catches_up() {
     assert_no_conflicts(&devices);
 }
 
+/// The same catch-up, but against the PRODUCTION limiter (`256` burst, `16`/s
+/// refill) and a corpus several times the burst — the shape myne-md/myne#240 was
+/// filed about, end to end through the real client ops rather than the engine.
+///
+/// What this proves is **convergence under a binding limiter**: the batched drain
+/// crosses a bucket it genuinely exhausts without wedging, without a false
+/// conflict, and without a record going missing. Every other scenario in this
+/// file lifts the limiter, so nothing else here would notice a batch path that
+/// mishandled a 429 mid-window.
+///
+/// What it deliberately does NOT claim is a speedup. The wall-clock bound below
+/// is a hang detector, not a measurement — it is loose enough that the
+/// one-GET-per-blob shape would also fit under it, and a bound tight enough to
+/// discriminate would be a bound tight enough to go flaky on a loaded runner.
+/// The request-count proof, with its control arm, lives in
+/// `orchestrator::tests::blob_batch::a_first_pull_of_a_large_vault_fits_inside_the_default_burst`.
+#[test]
+fn discovery_offline_device_catches_up_under_the_production_rate_limit() {
+    let Some((_guard, url)) = spawn_server_with(&ServerOpts {
+        rate_limit: Some((256, 16)),
+        ..Default::default()
+    }) else {
+        eprintln!("SKIP offline_catchup_rate_limited: server binary not found");
+        return;
+    };
+    let acct = Account::new(0xE9);
+    let devices = enroll_devices(&acct, &url, 2);
+
+    let shared = devices[0].create_note(b"shared base");
+    quiesce(&devices, 8);
+
+    let mut ids = vec![shared];
+    for i in 0..400 {
+        ids.push(devices[0].create_note(format!("throttled {i}").as_bytes()));
+    }
+    devices[0].sync();
+
+    let started = std::time::Instant::now();
+    quiesce(&devices, 30);
+    let elapsed = started.elapsed();
+
+    assert_converged(&devices, &ids);
+    assert_same_blob_sets(&devices);
+    assert_no_conflicts(&devices);
+    assert!(
+        elapsed < std::time::Duration::from_secs(120),
+        "catching up 401 notes under the production limiter took {elapsed:?} — \
+         a drain that stalls on 429s rather than crossing them"
+    );
+}
+
 /// Trash then RESTORE (remove the `trashed:` marker) propagates: a note moved to
 /// trash on A and then restored converges to the restored (live) state on B.
 #[test]
@@ -1729,8 +1788,8 @@ fn sim_fs_server_restart_preserves_cursor_and_head() {
     let storage = std::env::temp_dir().join(format!("myne-sim-fsrestart-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&storage);
     let opts = ServerOpts {
-        addr: None,
         storage_dir: Some(storage.clone()),
+        ..Default::default()
     };
     let Some((mut guard, url)) = spawn_server_with(&opts) else {
         eprintln!(
@@ -1773,6 +1832,7 @@ fn sim_fs_server_restart_preserves_cursor_and_head() {
     let reopts = ServerOpts {
         addr: Some(format!("127.0.0.1:{port}")),
         storage_dir: Some(storage.clone()),
+        ..Default::default()
     };
     let Some((_guard2, url2)) = spawn_server_with(&reopts) else {
         eprintln!("SKIP sim_fs_server_restart: fixed-port respawn did not come up");
