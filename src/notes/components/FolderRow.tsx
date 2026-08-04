@@ -77,12 +77,32 @@ const emptyNameStyle: CSSProperties = {
   fontWeight: 500,
   fontStyle: "italic",
   color: "var(--fg-3)",
+  // myne#283: an italic glyph's right side bearing extends past the inline box
+  // the browser measures, and `overflow: hidden` clips whatever overhangs. It
+  // shows only on the LAST character — nothing follows it to absorb the
+  // overhang — and only for glyphs that have one, which is why `Projects`
+  // clipped its `s` while `Inbox` looked fine. A couple of pixels of trailing
+  // padding gives the overhang somewhere to land inside the clip box. Dropping
+  // the italic would also fix it, but the italic is carrying the "empty"
+  // meaning, so the padding is the cheaper answer.
+  paddingInlineEnd: 2,
+  // …and the second, independent contributor: without a shrink floor the
+  // dimmed name and the "empty" hint compete for width in a narrow sidebar
+  // under the default `flex-shrink: 1`, and the name is the one that gives.
+  // The hint is the shorter, more expendable of the two, so it yields instead.
+  minWidth: 0,
 };
 
 const emptyHintStyle: CSSProperties = {
   fontSize: 11,
   color: "var(--line-3)",
   marginInlineStart: 4,
+  // myne#283: the hint gives way before the folder's own name does. It is the
+  // decoration; the name is the content.
+  flexShrink: 1,
+  minWidth: 0,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
 };
 
 const renameInputStyle: CSSProperties = {
