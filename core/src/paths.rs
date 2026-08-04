@@ -261,22 +261,7 @@ pub async fn notes_dir_for_host_io(
     io: &dyn crate::vault_io::VaultIo,
     active_id: Option<VaultId>,
 ) -> std::io::Result<PathBuf> {
-    let root = active_vault_root_io_from_host(host, active_id)?;
-    if !io
-        .exists(&root)
-        .await
-        .map_err(|_| std::io::Error::other("vault root probe failed"))?
-    {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "vault root does not exist",
-        ));
-    }
-    let dir = root.join("notes");
-    io.create_dir_all(&dir)
-        .await
-        .map_err(|_| std::io::Error::other("notes dir creation failed"))?;
-    Ok(dir)
+    notes_dir_under_io(io, &active_vault_root_io_from_host(host, active_id)?).await
 }
 
 /// [`snapshots_dir_for`] over a host. Ensures the directory exists.
@@ -644,6 +629,46 @@ pub fn notes_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
     Ok(dir)
 }
 
+/// [`notes_dir_under`] over the IO seam — the wasm-capable twin.
+///
+/// Same two steps, same order, same refusal: the vault root must already exist
+/// (never materialize a phantom root — the 2026-06-11 incident class), and only
+/// the `notes/` child is created.
+///
+/// It exists because `notes_dir_under` is `std::fs` all the way down, and its
+/// root check is `Path::is_dir`, which on `wasm32-unknown-unknown` is the
+/// unsupported-platform stub and answers `false` for every path. So a browser
+/// caller does not fail to compile — it fails at runtime with `NotFound`,
+/// before touching anything. That is precisely how the MYS1 search index
+/// managed to never hydrate and never persist on the web client while both
+/// hooks' doc comments said "implemented" (myne#303): the `NotFound` became a
+/// `SearchSyncError::Io` and the best-effort caller swallowed it as a
+/// `tracing::warn!`.
+///
+/// `notes_dir_under` keeps its callers (the native-only resolvers and the tests
+/// that exercise it under a `ScopedTempDir`); anything a browser can reach uses
+/// this.
+pub async fn notes_dir_under_io(
+    io: &dyn crate::vault_io::VaultIo,
+    parent: &Path,
+) -> std::io::Result<PathBuf> {
+    if !io
+        .exists(parent)
+        .await
+        .map_err(|_| std::io::Error::other("vault root probe failed"))?
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "vault root does not exist",
+        ));
+    }
+    let dir = parent.join("notes");
+    io.create_dir_all(&dir)
+        .await
+        .map_err(|_| std::io::Error::other("notes dir creation failed"))?;
+    Ok(dir)
+}
+
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Resolve `<vault-root>/snapshots/` and ensure it exists (MYND-96 encrypted
 /// per-note version history; `spec/protocol.md` §9.1). Mirrors [`notes_dir`] —
@@ -794,6 +819,163 @@ mod tests {
             .expect_err("a missing vault root must be rejected, not created");
         assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
         assert!(!nested_parent.exists());
+    }
+
+    // ---- notes_dir_under_io: the seam twin (myne#303) -------------------
+    //
+    // A `VaultIo` whose namespace `std::fs` cannot see. Every byte still lands
+    // on a real temp directory through `StdVaultIo`; only the PATHS the caller
+    // uses are virtual, rebased onto that directory on the way in.
+    //
+    // That is exactly the wasm32 condition, reproduced on the host: `io.exists`
+    // says the vault root is there, `Path::is_dir` says it is not. It is the
+    // whole reason `notes_dir_under` could compile for the browser and then
+    // fail at runtime with `NotFound` before touching a single note — which is
+    // how the MYS1 search index came to never hydrate and never persist on the
+    // web client, with both hooks' doc comments claiming otherwise.
+    struct Rebased {
+        virt: PathBuf,
+        real: PathBuf,
+    }
+
+    impl Rebased {
+        fn at(&self, p: &Path) -> PathBuf {
+            match p.strip_prefix(&self.virt) {
+                Ok(rest) => self.real.join(rest),
+                // Outside the virtual root: leave it alone, so a leaked
+                // real path in a test failure is obvious rather than silently
+                // rewritten.
+                Err(_) => p.to_path_buf(),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl crate::vault_io::VaultIo for Rebased {
+        async fn read(&self, p: &Path) -> crate::vault_io::IoResult<Vec<u8>> {
+            crate::vault_io::StdVaultIo.read(&self.at(p)).await
+        }
+        async fn read_prefix(&self, p: &Path, n: usize) -> crate::vault_io::IoResult<Vec<u8>> {
+            crate::vault_io::StdVaultIo
+                .read_prefix(&self.at(p), n)
+                .await
+        }
+        async fn write(
+            &self,
+            p: &Path,
+            b: &[u8],
+            o: crate::vault_io::WriteOpts,
+        ) -> crate::vault_io::IoResult<()> {
+            crate::vault_io::StdVaultIo.write(&self.at(p), b, o).await
+        }
+        async fn remove_file(&self, p: &Path) -> crate::vault_io::IoResult<()> {
+            crate::vault_io::StdVaultIo.remove_file(&self.at(p)).await
+        }
+        async fn remove_dir_all(&self, p: &Path) -> crate::vault_io::IoResult<()> {
+            crate::vault_io::StdVaultIo
+                .remove_dir_all(&self.at(p))
+                .await
+        }
+        async fn create_dir_all(&self, p: &Path) -> crate::vault_io::IoResult<()> {
+            crate::vault_io::StdVaultIo
+                .create_dir_all(&self.at(p))
+                .await
+        }
+        async fn read_dir(
+            &self,
+            p: &Path,
+        ) -> crate::vault_io::IoResult<Vec<crate::vault_io::DirEntry>> {
+            crate::vault_io::StdVaultIo.read_dir(&self.at(p)).await
+        }
+        async fn exists(&self, p: &Path) -> crate::vault_io::IoResult<bool> {
+            crate::vault_io::StdVaultIo.exists(&self.at(p)).await
+        }
+        async fn is_dir(&self, p: &Path) -> crate::vault_io::IoResult<bool> {
+            crate::vault_io::StdVaultIo.is_dir(&self.at(p)).await
+        }
+        async fn rename(&self, a: &Path, b: &Path) -> crate::vault_io::IoResult<()> {
+            crate::vault_io::StdVaultIo
+                .rename(&self.at(a), &self.at(b))
+                .await
+        }
+    }
+
+    #[test]
+    fn notes_dir_under_io_resolves_a_root_only_the_seam_can_see() {
+        let tmp = ScopedTempDir::new("notes-dir-io").unwrap();
+        let virt = PathBuf::from("/myne-virtual/vaults/v1");
+        let io = Rebased {
+            virt: virt.clone(),
+            real: tmp.path().to_path_buf(),
+        };
+
+        crate::test_support::block_on(async {
+            // The std::fs twin cannot see this root at all — the wasm32
+            // behaviour, on the host.
+            let err = notes_dir_under(&virt).expect_err("std::fs must not see a virtual root");
+            assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+
+            let dir = notes_dir_under_io(&io, &virt)
+                .await
+                .expect("the seam twin must resolve it");
+            assert_eq!(dir, virt.join("notes"));
+            assert!(
+                tmp.path().join("notes").is_dir(),
+                "…and must really have created the child"
+            );
+            // Idempotent, like its twin.
+            assert_eq!(notes_dir_under_io(&io, &virt).await.unwrap(), dir);
+        });
+    }
+
+    #[test]
+    fn notes_dir_under_io_refuses_a_missing_root_without_creating_it() {
+        // The refusal `notes_dir_under` exists to make (MYND-253) survives the
+        // port: a child resolver never materializes a vault root, so a
+        // mis-resolved root fails loudly instead of producing an empty vault.
+        let tmp = ScopedTempDir::new("notes-dir-io-noroot").unwrap();
+        let virt = PathBuf::from("/myne-virtual/vaults/absent");
+        let io = Rebased {
+            virt: virt.clone(),
+            // Points at a subdirectory that does not exist.
+            real: tmp.path().join("nothing-here"),
+        };
+        crate::test_support::block_on(async {
+            let err = notes_dir_under_io(&io, &virt)
+                .await
+                .expect_err("a missing vault root must be rejected, not created");
+            assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+            assert!(!tmp.path().join("nothing-here").exists());
+        });
+    }
+
+    /// The search-index hooks must reach the notes directory through the seam.
+    ///
+    /// Source-level because no native test can see the difference: on the host
+    /// both helpers work, and the divergence only appears on wasm32, where
+    /// `Path::is_dir` is the unsupported-platform stub. That is what let the
+    /// std::fs helper sit in a fully-ported module for a whole release while
+    /// the doc comments on both hooks said "implemented".
+    #[test]
+    fn the_wasm_reachable_modules_do_not_call_the_std_fs_path_helpers() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        for rel in [
+            "src/plugins/notes/search_sync_core.rs",
+            "../web/wasm/src/dispatch.rs",
+        ] {
+            let text = std::fs::read_to_string(root.join(rel)).unwrap_or_else(|e| {
+                panic!("read {rel}: {e}");
+            });
+            for (i, line) in text.lines().enumerate() {
+                let code = line.split("//").next().unwrap_or("");
+                assert!(
+                    !code.contains("notes_dir_under(") && !code.contains("snapshots_dir_under("),
+                    "{rel}:{} calls a std::fs path helper; use the `_io` twin \
+                     (it returns NotFound for every path on wasm32)",
+                    i + 1
+                );
+            }
+        }
     }
 
     // ---- notes_dir_under: file-at-notes-path defensive -----------------

@@ -182,7 +182,17 @@ pub async fn hydrate_search_index_core(
         .ok_or(SearchSyncError::SlotNotUnlocked)?;
     let account_hash = account_number_hash(io, vault_dir).await?;
     let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
-    let notes_dir = crate::paths::notes_dir_under(vault_dir).map_err(|_| SearchSyncError::Io)?;
+    // Through the IO seam, NOT `notes_dir_under` (myne#303): that helper's root
+    // check is a `std::fs` `Path::is_dir`, which on wasm32 is the
+    // unsupported-platform stub and answers `false` for every path — so on the
+    // web client this line returned `NotFound` before `vault.search` was ever
+    // touched, and the best-effort caller swallowed it as a warning. The MYS1
+    // index therefore never hydrated and never persisted there: every session
+    // started empty, and only notes created or edited in THAT session were
+    // findable. Notes pulled by sync were invisible to the palette entirely.
+    let notes_dir = crate::paths::notes_dir_under_io(io, vault_dir)
+        .await
+        .map_err(|_| SearchSyncError::Io)?;
 
     // Decryption-free staleness scan: a short header prefix per note.
     let on_disk = crate::note_nonce::scan_on_disk_manifest_io(io, &notes_dir).await;
@@ -286,7 +296,17 @@ pub async fn persist_search_index_core(
         .ok_or(SearchSyncError::SlotNotUnlocked)?;
     let account_hash = account_number_hash(io, vault_dir).await?;
     let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
-    let notes_dir = crate::paths::notes_dir_under(vault_dir).map_err(|_| SearchSyncError::Io)?;
+    // Through the IO seam, NOT `notes_dir_under` (myne#303): that helper's root
+    // check is a `std::fs` `Path::is_dir`, which on wasm32 is the
+    // unsupported-platform stub and answers `false` for every path — so on the
+    // web client this line returned `NotFound` before `vault.search` was ever
+    // touched, and the best-effort caller swallowed it as a warning. The MYS1
+    // index therefore never hydrated and never persisted there: every session
+    // started empty, and only notes created or edited in THAT session were
+    // findable. Notes pulled by sync were invisible to the palette entirely.
+    let notes_dir = crate::paths::notes_dir_under_io(io, vault_dir)
+        .await
+        .map_err(|_| SearchSyncError::Io)?;
 
     let on_disk: crate::note_nonce::NonceManifest =
         crate::note_nonce::scan_on_disk_manifest_io(io, &notes_dir)
