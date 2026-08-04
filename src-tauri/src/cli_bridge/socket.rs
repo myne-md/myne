@@ -123,6 +123,66 @@ pub struct ListenerHandle {
 #[cfg(unix)]
 use crate::uds::bind_listener;
 
+/// The deadline of last resort: a thread that shuts the connection down once
+/// [`IO_DEADLINE`] has elapsed. `shutdown(Both)` makes every in-flight and
+/// subsequent read return EOF and every write fail, which is what releases the
+/// handler thread — the same bound `SO_RCVTIMEO` gives, obtained without it.
+///
+/// Armed ONLY when the socket options were refused, so the ordinary connection
+/// still costs exactly one thread. `Drop` disarms it, so a connection that
+/// finishes normally does not leave a thread sitting out the full deadline.
+#[cfg(unix)]
+struct Watchdog {
+    disarm: Option<std::sync::mpsc::Sender<()>>,
+    join: Option<std::thread::JoinHandle<()>>,
+}
+
+#[cfg(unix)]
+impl Watchdog {
+    /// `Ok(None)` when the socket already carries its own deadline and there
+    /// is nothing to arm. `Err` means neither mechanism is available — the
+    /// caller must drop the connection rather than serve it unbounded.
+    fn arm(
+        stream: &std::os::unix::net::UnixStream,
+        deadline_set: bool,
+    ) -> io::Result<Option<Self>> {
+        if deadline_set {
+            return Ok(None);
+        }
+        let fd = stream.try_clone()?;
+        let (disarm, rx) = std::sync::mpsc::channel::<()>();
+        let join = std::thread::Builder::new()
+            .name("myne-cli-door-watchdog".to_string())
+            .spawn(move || {
+                // Only a genuine timeout fires the shutdown. `Disconnected` is
+                // the guard's `Drop` saying the exchange finished — treating
+                // the two alike would tear down every healthy connection the
+                // instant it completed.
+                if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) =
+                    rx.recv_timeout(IO_DEADLINE)
+                {
+                    let _ = fd.shutdown(std::net::Shutdown::Both);
+                }
+            })?;
+        Ok(Some(Self {
+            disarm: Some(disarm),
+            join: Some(join),
+        }))
+    }
+}
+
+#[cfg(unix)]
+impl Drop for Watchdog {
+    fn drop(&mut self) {
+        // Dropping the sender disconnects the channel, which wakes the thread
+        // out of `recv_timeout` immediately; the join is then prompt.
+        self.disarm.take();
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
 /// The real command-socket connection handler (task 4): read exactly one
 /// bounded frame, dispatch it through [`super::dispatch::serve_connection`]
 /// against the shared [`NoteLister`] seam, write exactly one reply frame.
@@ -144,14 +204,40 @@ fn serve_connection(
     // to hold this thread by simply never finishing its frame. Set on the
     // stream BEFORE `try_clone`, so both halves inherit them (the clone
     // shares the same underlying fd and its `SO_RCVTIMEO`/`SO_SNDTIMEO`).
-    // A failure to set them is fatal to this connection rather than ignored
-    // — serving without a deadline is the state this exists to prevent.
-    if stream.set_read_timeout(Some(IO_DEADLINE)).is_err()
-        || stream.set_write_timeout(Some(IO_DEADLINE)).is_err()
-    {
-        tracing::debug!(stage = "cli_bridge_conn_deadline", event = "not_set");
-        return;
+    //
+    // A failure here is NOT fatal to the connection, because on macOS it does
+    // not mean what it reads like. `setsockopt(SO_RCVTIMEO)` on an AF_UNIX
+    // socket whose peer has already closed returns EINVAL there; a live peer
+    // succeeds. So the one shape that reliably tripped this arm was a client
+    // that wrote its whole frame and exited before this thread touched the
+    // socket — a peer that is already gone and therefore cannot hold anything,
+    // since its reads return EOF at once. Returning dropped it unserved and,
+    // worse, skipped the last-access record below, which is the door indicator
+    // the Settings panel reads. (Linux sets the option happily either way,
+    // which is why CI never saw it.)
+    //
+    // The invariant that a connection is never served without a bound still
+    // holds — `_deadline` below enforces it independently, without depending
+    // on a reading of WHY the syscall refused.
+    let deadline_set = stream.set_read_timeout(Some(IO_DEADLINE)).is_ok()
+        && stream.set_write_timeout(Some(IO_DEADLINE)).is_ok();
+    if !deadline_set {
+        tracing::debug!(
+            stage = "cli_bridge_conn_deadline",
+            event = "socket_opt_refused"
+        );
     }
+    let _deadline = match Watchdog::arm(&stream, deadline_set) {
+        Ok(guard) => guard,
+        Err(e) => {
+            // No socket deadline AND no watchdog: this is the unbounded state
+            // the deadline exists to prevent, so here the connection really
+            // does die rather than be served.
+            let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+            tracing::debug!(stage = "cli_bridge_conn_deadline", io_failure_kind = ?kind);
+            return;
+        }
+    };
     let mut read_half = match stream.try_clone() {
         Ok(r) => r,
         Err(e) => {
@@ -692,6 +778,73 @@ mod tests {
         );
 
         teardown(Some(handle));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_watchdog_bounds_a_stalled_peer_when_the_socket_options_are_refused() {
+        // The test above proves the deadline through `SO_RCVTIMEO`. This one
+        // proves the OTHER mechanism, because the two do not run on the same
+        // machines: macOS refuses those options on an AF_UNIX socket whose
+        // peer has already closed, and Linux — where CI runs — never refuses
+        // them at all. Arming the fallback explicitly is the only way this arm
+        // is exercised anywhere, rather than being platform-conditional code
+        // that no suite reaches.
+        let dir = ShortDir::new();
+        let path = dir.path().join("watchdog.sock");
+        let listener =
+            std::os::unix::net::UnixListener::bind(&path).expect("bind watchdog probe socket");
+        let mut client =
+            std::os::unix::net::UnixStream::connect(&path).expect("connect to probe socket");
+        let (server, _) = listener.accept().expect("accept probe connection");
+
+        // `deadline_set: false` is the refusal this exists for. The peer then
+        // stalls exactly like the test above: it sends nothing and waits.
+        let armed = Watchdog::arm(&server, false)
+            .expect("arm the watchdog")
+            .expect("a refused deadline must produce a watchdog");
+
+        client
+            .set_read_timeout(Some(IO_DEADLINE * 5))
+            .expect("set client read timeout");
+        let mut buf = [0u8; 1];
+        assert_eq!(
+            client.read(&mut buf).ok(),
+            Some(0),
+            "the watchdog must shut a stalled connection down on its own"
+        );
+
+        drop(armed);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn disarming_the_watchdog_does_not_shut_a_finished_connection_down() {
+        // The failure this rules out is the mirror of the one above: a guard
+        // whose `Drop` woke the thread but let it fall through to `shutdown`
+        // would tear down every healthy connection the instant it completed,
+        // and `recv_timeout` reports both outcomes as `Err`.
+        let dir = ShortDir::new();
+        let path = dir.path().join("disarm.sock");
+        let listener =
+            std::os::unix::net::UnixListener::bind(&path).expect("bind disarm probe socket");
+        let mut client =
+            std::os::unix::net::UnixStream::connect(&path).expect("connect to probe socket");
+        let (mut server, _) = listener.accept().expect("accept probe connection");
+
+        let armed = Watchdog::arm(&server, false).expect("arm").expect("armed");
+        drop(armed); // the exchange "finished" well inside the deadline
+
+        server.write_all(b"x").expect("write after disarm");
+        server.flush().expect("flush after disarm");
+        let mut buf = [0u8; 1];
+        client
+            .set_read_timeout(Some(IO_DEADLINE))
+            .expect("set client read timeout");
+        client
+            .read_exact(&mut buf)
+            .expect("a disarmed watchdog must leave the connection usable");
+        assert_eq!(&buf, b"x");
     }
 
     #[test]
