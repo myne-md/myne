@@ -18,15 +18,25 @@
 //!   absences above would prove a dead code path rather than a closed leak.
 //!
 //! **How the fixture reaches a real socket without a test hook in the
-//! binary.** `paths::app_data_dir` resolves through `dirs::data_dir()`, which
-//! honours `$XDG_DATA_HOME` on Linux. So the fixture points that at a temp
-//! directory and the production resolution walks into it unchanged — no
-//! `--socket` flag, no env var the binary knows about, nothing that ships. If
-//! the override ever stopped working the success scenarios would fail loudly
-//! with "Myne is not running" rather than passing vacuously.
+//! binary.** `paths::app_data_dir` resolves through `dirs::data_dir()`, so the
+//! fixture moves the directory that call resolves *to* and the production
+//! resolution walks into it unchanged — no `--socket` flag, no env var the
+//! binary knows about, nothing that ships. If the override ever stopped
+//! working the success scenarios would fail loudly with "Myne is not running"
+//! rather than passing vacuously.
+//!
+//! **The override is per-platform, and getting that wrong is silent.**
+//! `dirs::data_dir()` reads `$XDG_DATA_HOME` on Linux but ignores it entirely
+//! on macOS, where it is `$HOME/Library/Application Support`. An
+//! `$XDG_DATA_HOME`-only fixture therefore left the spawned binary resolving
+//! the *real* install on a developer's Mac: it never connected, the fixture's
+//! listener sat in `accept()` forever, and `Drop`'s join turned the loud
+//! failure this harness was designed for into a permanent hang that stalled
+//! `cargo test --workspace` — and with it every `pre-push`. So the fixture
+//! sets BOTH variables and computes the app dir the same way `dirs` does.
 
 use std::io::{Read, Write};
-use std::os::unix::net::UnixListener;
+use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -55,29 +65,48 @@ const CONTENT_SENTINELS: &[&str] = &[
 /// `scripts/check-cli-sidecar.mjs`).
 const BUNDLE_IDENTIFIER: &str = "md.myne.desktop";
 
-/// A fake desktop: a temp `$XDG_DATA_HOME`, optionally a `cli-status` marker,
-/// optionally a bound command socket that answers exactly one request.
+/// A fake desktop: a temp home the binary's own path resolution lands in,
+/// optionally a `cli-status` marker, optionally a bound command socket that
+/// answers exactly one request.
 ///
 /// The directory name is kept short on purpose — a Unix socket path is capped
 /// at ~104 bytes by the kernel, the same constraint the desktop-side socket
 /// tests solve with their own `ShortDir` helper.
 struct FakeDesktop {
-    data_home: PathBuf,
+    /// The fake `$HOME`. Everything the fixture creates lives under it, so
+    /// cleanup is one `remove_dir_all`.
+    root: PathBuf,
     app_dir: PathBuf,
     server: Option<std::thread::JoinHandle<()>>,
 }
 
+/// Rooted at `/tmp` rather than [`std::env::temp_dir`] because of the ~104-byte
+/// `sun_path` cap above: macOS hands out a ~50-character per-user `$TMPDIR`,
+/// and `<tmpdir>/<name>/Library/Application Support/md.myne.desktop/cli.sock`
+/// overruns the cap before the fixture has bound anything.
 fn unique(tag: &str) -> PathBuf {
     use std::sync::atomic::{AtomicU32, Ordering};
     static COUNTER: AtomicU32 = AtomicU32::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!("mycli{}-{tag}{n}", std::process::id()))
+    PathBuf::from("/tmp").join(format!("mycli{}-{tag}{n}", std::process::id()))
+}
+
+/// The app-data dir `dirs::data_dir()` resolves to under a given `$HOME` —
+/// the same per-platform split `paths::app_data_dir` inherits from `dirs`.
+/// `$XDG_DATA_HOME` is set to the Linux arm's parent so both platforms are
+/// pinned rather than one of them merely inheriting the developer's.
+fn data_home_under(root: &std::path::Path) -> PathBuf {
+    if cfg!(target_os = "macos") {
+        root.join("Library/Application Support")
+    } else {
+        root.join(".local/share")
+    }
 }
 
 impl FakeDesktop {
     fn new(tag: &str, status: Option<&[u8]>, reply: Option<Vec<u8>>) -> Self {
-        let data_home = unique(tag);
-        let app_dir = data_home.join(BUNDLE_IDENTIFIER);
+        let root = unique(tag);
+        let app_dir = data_home_under(&root).join(BUNDLE_IDENTIFIER);
         std::fs::create_dir_all(&app_dir).expect("create fake app-data dir");
         if let Some(marker) = status {
             std::fs::write(app_dir.join("cli-status"), marker).expect("write status marker");
@@ -105,7 +134,7 @@ impl FakeDesktop {
             })
         });
         Self {
-            data_home,
+            root,
             app_dir,
             server,
         }
@@ -115,7 +144,8 @@ impl FakeDesktop {
     fn run(&self, args: &[&str], stdin: Option<&str>) -> Run {
         let mut child = Command::new(env!("CARGO_BIN_EXE_myne"))
             .args(args)
-            .env("XDG_DATA_HOME", &self.data_home)
+            .env("HOME", &self.root)
+            .env("XDG_DATA_HOME", data_home_under(&self.root))
             .stdin(if stdin.is_some() {
                 Stdio::piped()
             } else {
@@ -146,9 +176,21 @@ impl FakeDesktop {
 impl Drop for FakeDesktop {
     fn drop(&mut self) {
         if let Some(server) = self.server.take() {
+            // Wake a listener still parked in `accept()` before joining it.
+            // The scenario's CLI invocation is supposed to be the connection
+            // that releases it, so this only fires when the binary never
+            // arrived — exactly the case the module doc wants to fail LOUDLY.
+            // Without it that case is an unjoinable thread instead: the join
+            // below blocks forever, `cargo test` never returns, and the
+            // assertion that would have named the real problem never runs.
+            //
+            // The peer is dropped immediately, so the woken thread's first
+            // `read_exact` sees EOF and returns. Harmless when the server is
+            // already done — the listener is gone and the connect just fails.
+            let _ = UnixStream::connect(self.app_dir.join("cli.sock"));
             let _ = server.join();
         }
-        let _ = std::fs::remove_dir_all(&self.data_home);
+        let _ = std::fs::remove_dir_all(&self.root);
     }
 }
 
@@ -560,10 +602,11 @@ fn help_is_static_text_on_stdout() {
 
 #[test]
 fn the_fixture_really_reaches_the_binarys_own_path_resolution() {
-    // If `$XDG_DATA_HOME` stopped steering `paths::app_data_dir`, every
-    // success scenario above would be talking to nothing — and every
-    // "stderr is clean" assertion would be true for the wrong reason. A
-    // scripted reply arriving intact is what rules that out.
+    // If the fixture's home override stopped steering `paths::app_data_dir`
+    // — on EITHER platform; the two read different variables — every success
+    // scenario above would be talking to nothing, and every "stderr is clean"
+    // assertion would be true for the wrong reason. A scripted reply arriving
+    // intact is what rules that out.
     let desktop = FakeDesktop::new(
         "ctrl",
         Some(b"O"),
