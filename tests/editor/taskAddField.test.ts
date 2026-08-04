@@ -312,3 +312,50 @@ describe("remind is authorable (myne#280)", () => {
     expect(ids).toContain("remind");
   });
 });
+
+// ── myne#326: every row writes where the line IS, not where it was ──────────
+//
+// Only the skip row tracked the line. A menu is easily open for longer than the
+// ~1 s autosave that rewrites the frontmatter `updated:` stamp, and any growth
+// above the task line moves it forward — so the offset captured at open time
+// landed in the PRECEDING line by the time a row was clicked. Nothing downstream
+// guards it: the writer rewrites whatever line text it is handed, so `[due:: …]`
+// could be appended to an unrelated task, to prose, or to a YAML line inside the
+// frontmatter block.
+describe("the + menu survives a document shift (myne#326)", () => {
+  it("writes to the task line after text is inserted ABOVE it", () => {
+    m = mount("first line\n- [ ] pay the rent\n");
+    focusAt(m, m.view.state.doc.line(2).from + 6);
+    cleanup.push(installTaskChipEditor());
+    addButton().dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    // The shift an autosave (or any edit above) produces while the menu sits
+    // open.
+    m.view.dispatch({ changes: { from: 0, insert: "PREFIX-INSERTED\n" } });
+
+    menuRow("due").click();
+    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    commit();
+
+    const text = m.view.state.doc.toString();
+    expect(text).toContain("- [ ] pay the rent [due:: 2026-09-09]");
+    // …and nothing was appended to the lines above it.
+    expect(m.view.state.doc.line(1).text).toBe("PREFIX-INSERTED");
+    expect(m.view.state.doc.line(2).text).toBe("first line");
+  });
+
+  it("declines rather than throwing when the line is deleted under it", () => {
+    m = mount("first line\n- [ ] pay the rent\n");
+    focusAt(m, m.view.state.doc.line(2).from + 6);
+    cleanup.push(installTaskChipEditor());
+    addButton().dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    // A shorter remote version arriving: the captured offset is now past the
+    // end of the document, which used to throw a RangeError out of the click
+    // handler after the menu had already closed.
+    m.view.dispatch({ changes: { from: 0, to: m.view.state.doc.length, insert: "x" } });
+
+    expect(() => menuRow("due").click()).not.toThrow();
+    expect(m.view.state.doc.toString()).toBe("x");
+  });
+});

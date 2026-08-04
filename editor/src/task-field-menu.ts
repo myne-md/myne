@@ -123,10 +123,28 @@ export function openTaskFieldMenu(opts: {
     present.add(span.kind);
   }
 
-  // Set when the skip row is offered — see its own comment below for why the
-  // line has to be tracked while the menu sits open. Ended on dismissal too, so
-  // an abandoned menu leaves no tracking behind.
-  let skipTracked: TaskFieldEditHandle | null = null;
+  // Track the caret's line for as long as the menu is open (myne#326).
+  //
+  // EVERY row needs this, not just the skip row. A menu is easily open for
+  // longer than the ~1 s autosave that rewrites the frontmatter `updated:`
+  // stamp, and any growth above the task line moves it forward — so the offset
+  // captured at open time lands in the PRECEDING line by the time a row is
+  // clicked. Nothing downstream guards it: `planTaskFieldWrite` rewrites
+  // whatever line text it is handed, so `[due:: …]` could be appended to an
+  // unrelated task, to prose, or to a YAML line inside the frontmatter block,
+  // corrupting it. And if the document SHRANK past the captured offset — a
+  // shorter remote version arriving — `doc.lineAt` threw a `RangeError` out of
+  // the click handler after `modal.close()` had already run, so the menu simply
+  // vanished.
+  //
+  // Tracking has to begin HERE rather than on click: by click time the offsets
+  // have already moved. Ended on every exit, so an abandoned menu leaves no
+  // tracking behind.
+  const tracked: TaskFieldEditHandle = beginTaskFieldEdit(view, {
+    from: line.from,
+    to: line.to,
+    kind: "repeat",
+  });
 
   const modal = openModal({
     backdropStyle: {
@@ -136,7 +154,7 @@ export function openTaskFieldMenu(opts: {
       zIndex: "2147483000",
     },
     onDismiss: () => {
-      skipTracked?.end();
+      tracked.end();
       modal.close();
     },
   });
@@ -181,27 +199,21 @@ export function openTaskFieldMenu(opts: {
       // Capture the row's rect BEFORE close() removes it from the DOM — the
       // field editor anchors to where the row was.
       const rect = row.getBoundingClientRect();
+      // The line as it stands NOW, not as it stood when the menu opened
+      // (myne#326). Null means the line was deleted while the menu was open, and
+      // declining is the only correct answer — the same rule the skip row and
+      // the field editor already follow.
+      const span = tracked.current();
+      tracked.end();
       modal.close();
-      openTaskFieldAdd(view, lineFrom, kind, rect);
+      if (span === null) return;
+      openTaskFieldAdd(view, span.from, kind, rect);
     });
     if (firstRow === null) firstRow = row;
     surface.appendChild(row);
   }
 
   if (canSkipOccurrence(line.text)) {
-    // Track the line for as long as the menu is open — the same stale-offset
-    // protection `openTaskFieldAdd` needs, for the same reason: a background
-    // autosave rewrites the frontmatter stamp about a second after any edit,
-    // and a menu is easily open for longer than that. Tracking must begin HERE
-    // rather than on click, since by click time the offsets have already moved.
-    // If the line is deleted while the menu is open, `current()` goes null and
-    // the skip declines rather than guessing.
-    skipTracked = beginTaskFieldEdit(view, {
-      from: line.from,
-      to: line.to,
-      kind: "repeat",
-    });
-
     const separator = document.createElement("div");
     separator.className = "cm-task-field-menu-sep";
     separator.setAttribute("role", "separator");
@@ -214,9 +226,8 @@ export function openTaskFieldMenu(opts: {
     row.setAttribute("data-testid", "editor.task-field-menu-skip");
     row.textContent = i18n.t("editor.taskField.skipOccurrence");
     row.addEventListener("click", () => {
-      const span = skipTracked?.current() ?? null;
-      skipTracked?.end();
-      skipTracked = null;
+      const span = tracked.current();
+      tracked.end();
       modal.close();
       if (span !== null) skipOccurrence(view, span.from);
     });
