@@ -89,11 +89,21 @@ export function useBackupScheduler(
     if (vaultId == null) return;
     const target = vaultId;
     let cancelled = false;
+    // When THIS unlocked session began — the scheduler mounts on unlock, so its
+    // effect start is the session start. `every-unlock` means once per session,
+    // and without a session marker its zero interval made it mean "always"
+    // (myne#316).
+    const sessionStartedAtMs = Date.now();
 
     const tick = async () => {
       try {
         if (cancelled) return;
-        const outcome = await runScheduledBackupIfDue(target, new Date(), LIVE_DEPS);
+        const outcome = await runScheduledBackupIfDue(
+          target,
+          new Date(),
+          LIVE_DEPS,
+          sessionStartedAtMs,
+        );
         if (cancelled) return;
         const freshFailure = shouldToastOutcome(prevOutcomeRef.current, outcome);
         prevOutcomeRef.current = outcome;

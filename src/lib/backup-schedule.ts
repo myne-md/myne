@@ -99,12 +99,37 @@ export function intervalMs(interval: BackupInterval): number {
   }
 }
 
-/** Whether a scheduled backup is due at `nowMs`. Requires the schedule to be
- *  enabled with a target folder; if it has never run it is immediately due,
- *  else the configured interval must have elapsed since the last success. */
-export function isBackupDue(config: ScheduleConfig, nowMs: number): boolean {
+/**
+ * Whether a scheduled backup is due at `nowMs`.
+ *
+ * Requires the schedule to be enabled with a target folder. `every-unlock` means
+ * once per unlocked SESSION; the dated presets mean the configured interval has
+ * elapsed since the last SUCCESS.
+ *
+ * `sessionStartedAtMs` is when this unlocked session began — the scheduler's own
+ * mount. It is what gives `every-unlock` a meaning other than "always" (myne#316):
+ * its interval is zero, so `now - lastSuccess >= 0` was unconditionally true and
+ * the preset fired on every 5-minute tick. A user who asked for one backup per
+ * session got twelve an hour, and the keep-last-N pruner then deleted real files
+ * from their backup folder until the retained window was the last ~35 minutes —
+ * the folder still showing N files and the status still reading "success".
+ */
+export function isBackupDue(
+  config: ScheduleConfig,
+  nowMs: number,
+  sessionStartedAtMs: number,
+): boolean {
   if (!config.enabled) return false;
   if (config.targetFolder == null || config.targetFolder === "") return false;
+
+  if (config.interval === "every-unlock") {
+    // Once per session: due only if the last success predates this unlock.
+    return (
+      config.lastScheduledSuccessAt == null ||
+      config.lastScheduledSuccessAt < sessionStartedAtMs
+    );
+  }
+
   if (config.lastScheduledSuccessAt == null) return true;
   return nowMs - config.lastScheduledSuccessAt >= intervalMs(config.interval);
 }
@@ -185,13 +210,14 @@ export async function runScheduledBackupIfDue(
   vaultId: string,
   now: Date,
   deps: ScheduleEngineDeps,
+  sessionStartedAtMs: number,
 ): Promise<ScheduleRunOutcome> {
   const config = await deps.readConfig(vaultId);
   if (!config.enabled) return "disabled";
   if (config.targetFolder == null || config.targetFolder === "") {
     return "no-target";
   }
-  if (!isBackupDue(config, now.getTime())) return "not-due";
+  if (!isBackupDue(config, now.getTime(), sessionStartedAtMs)) return "not-due";
 
   const filename = await deps.defaultFilename(now);
   const destination = await deps.joinPath(config.targetFolder, filename);
