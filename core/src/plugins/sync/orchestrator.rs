@@ -6205,13 +6205,19 @@ mod tests {
             true,
         )
         .expect_err("revoked token must fail the cycle");
+        // DeviceRevoked, not the generic Unauthenticated: the token did not
+        // expire, the owner revoked it, and myne#294 exists precisely because
+        // reporting that as a retryable "sign-in expired" showed the wrong
+        // copy and suppressed the web client's terminal takeover (gated on
+        // `detail === "device_revoked"`) for up to a 15-minute auth park.
+        // Accepting Unauthenticated here would re-open that collapse silently.
         assert!(
             matches!(
                 err,
-                SyncCycleError::Pull(PullError::Unauthenticated)
-                    | SyncCycleError::Push(PushError::Unauthenticated)
+                SyncCycleError::Pull(PullError::DeviceRevoked)
+                    | SyncCycleError::Push(PushError::DeviceRevoked)
             ),
-            "clean Unauthenticated, got {err:?}"
+            "clean DeviceRevoked, got {err:?}"
         );
         // The local edit is untouched — nothing was lost to the failed cycle.
         assert_eq!(
