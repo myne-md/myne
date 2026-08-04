@@ -10,24 +10,51 @@ import {
 } from "./lezer/frontmatter";
 import type { ByteRange } from "./types";
 
-const UPDATED_KEY_RE = /^([ \t]*updated[ \t]*:[ \t]*)(.*)$/;
-const TITLE_KEY_RE = /^([ \t]*title[ \t]*:[ \t]*)(.*)$/;
-const FOLDER_KEY_RE = /^([ \t]*folder[ \t]*:[ \t]*)(.*)$/;
-const TRASHED_KEY_RE = /^([ \t]*trashed[ \t]*:[ \t]*)(.*)$/;
-const ARCHIVED_KEY_RE = /^([ \t]*archived[ \t]*:[ \t]*)(.*)$/;
+// COLUMN ZERO, every one of them (myne#321).
+//
+// These twelve used to begin `^([ \t]*` — so every reader and every writer
+// matched a key nested inside somebody else's mapping, or a key name appearing
+// inside a block scalar.
+//
+// The write side is the damaging half, and it fires unconditionally.
+// `patchUpdatedField` runs on EVERY save; a note carrying the ordinary
+// Jekyll/Hugo/Obsidian-SEO shape `seo:\n  updated: …` had that nested value
+// silently rewritten each time, while the top-level `updated:` was never
+// inserted — so sort-by-updated never worked for that note and the user's own
+// value was destroyed, which `markdown-dialect.md` promises is preserved. The
+// Obsidian importer's title injection had the same shape: `seo.title` was
+// overwritten with the filename and the note still landed "Untitled", which is
+// precisely the failure the injection exists to prevent.
+//
+// The read side forges note STATE: a nested `deleted:` with a parseable RFC 3339
+// value marks the note a sync tombstone, and every local view excludes those —
+// so it vanished from the sidebar, Trash, Conflicts, Archive and the template
+// picker with no recovery affordance. A nested `template: true` moved it into
+// the Templates manager; a nested `kind: drawing` force-rendered a markdown note
+// as a canvas.
+//
+// The package already gets this right twice and says why: `frontmatterSequence`'s
+// `keyLineRe` ("an indented one belongs to a nested mapping and is none of our
+// business") and the Rust twin `title_extract.rs`. Only this file was
+// indent-blind — and it is the one on the hot path.
+const UPDATED_KEY_RE = /^(updated[ \t]*:[ \t]*)(.*)$/;
+const TITLE_KEY_RE = /^(title[ \t]*:[ \t]*)(.*)$/;
+const FOLDER_KEY_RE = /^(folder[ \t]*:[ \t]*)(.*)$/;
+const TRASHED_KEY_RE = /^(trashed[ \t]*:[ \t]*)(.*)$/;
+const ARCHIVED_KEY_RE = /^(archived[ \t]*:[ \t]*)(.*)$/;
 // MYND-426: the sync deletion tombstone marker. Value-strict RFC 3339 like
 // `trashed:`/`archived:` — only a parseable timestamp marks the note deleted.
-const DELETED_KEY_RE = /^([ \t]*deleted[ \t]*:[ \t]*)(.*)$/;
+const DELETED_KEY_RE = /^(deleted[ \t]*:[ \t]*)(.*)$/;
 // `done:` — the MYND-613 completion stamp (§3.6.1, twelfth managed field).
-const DONE_KEY_RE = /^([ \t]*done[ \t]*:[ \t]*)(.*)$/;
+const DONE_KEY_RE = /^(done[ \t]*:[ \t]*)(.*)$/;
 // MYND-427: the conflict-copy markers. `conflict:` is value-strict canonical
 // `true` (like `template:`); `conflict_of:` carries the original note UUID.
-const CONFLICT_KEY_RE = /^([ \t]*conflict[ \t]*:[ \t]*)(.*)$/;
-const CONFLICT_OF_KEY_RE = /^([ \t]*conflict_of[ \t]*:[ \t]*)(.*)$/;
+const CONFLICT_KEY_RE = /^(conflict[ \t]*:[ \t]*)(.*)$/;
+const CONFLICT_OF_KEY_RE = /^(conflict_of[ \t]*:[ \t]*)(.*)$/;
 const CONFLICT_FLAG_VALUE = "true";
-const TEMPLATE_KEY_RE = /^([ \t]*template[ \t]*:[ \t]*)(.*)$/;
-const FOLDER_INDEX_KEY_RE = /^([ \t]*folder_index[ \t]*:[ \t]*)(.*)$/;
-const KIND_KEY_RE = /^([ \t]*kind[ \t]*:[ \t]*)(.*)$/;
+const TEMPLATE_KEY_RE = /^(template[ \t]*:[ \t]*)(.*)$/;
+const FOLDER_INDEX_KEY_RE = /^(folder_index[ \t]*:[ \t]*)(.*)$/;
+const KIND_KEY_RE = /^(kind[ \t]*:[ \t]*)(.*)$/;
 
 // The single canonical value that marks a note a template. Value-strict:
 // `readTemplateFromFmBody` accepts only this literal, unquoted form
