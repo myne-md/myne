@@ -226,3 +226,73 @@ describe("it never throws", () => {
     }
   });
 });
+
+// ── myne#318: the default clock must not re-arm the effect on every render ───
+//
+// It used to be a destructuring default — `clock = () => new Date()` — which
+// allocates a fresh function identity per call and sat in the effect's dep
+// array. `EditorChrome` re-renders several times per typing burst, so the effect
+// tore down and re-ran that often, each time paying a full reconciliation over
+// EVERY task in the vault.
+//
+// The delivery race is the part that is not merely wasteful: `targetReminders`
+// compares at minute granularity, so a pass at or after the due instant cancels
+// the pending delivery timer. The timer-driven pass is registered after that
+// timer and loses the race by ordering; a render-driven one is not.
+describe("the default clock is stable across renders (myne#318)", () => {
+  /** Mount with a re-renderable options object, returning a re-render fn. */
+  function mountRerenderable(makeOptions: () => ReminderSchedulerOptions) {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const Probe = (): null => {
+      useReminderScheduler(makeOptions());
+      return null;
+    };
+    act(() => root.render(createElement(Probe)));
+    return {
+      rerender: () => act(() => root.render(createElement(Probe, { key: undefined }))),
+      unmount: () => {
+        act(() => root.unmount());
+        host.remove();
+      },
+    };
+  }
+
+  it("does not re-run the pass when nothing but render identity changed", () => {
+    const n = notifier();
+    const tasks = [task({ remind: "2026-07-28 10:00" })];
+    // No `clock` passed — the defaulted one, which is what production does.
+    const { rerender, unmount } = mountRerenderable(() => ({
+      enabled: true,
+      tasks,
+      notifier: n.impl,
+      // A fresh closure per render, the shape every `EditorChrome` render has.
+      onPass: () => {},
+    }));
+    const afterMount = n.calls.listed;
+    expect(afterMount).toBeGreaterThan(0);
+
+    for (let i = 0; i < 3; i++) rerender();
+
+    expect(n.calls.listed).toBe(afterMount);
+    unmount();
+  });
+
+  it("still re-runs when the task list changes", () => {
+    // The dependency that is deliberately kept: a reminder the user just typed
+    // has to register now, not at the next tick.
+    const n = notifier();
+    let tasks = [task({ remind: "2026-07-28 10:00" })];
+    const { rerender, unmount } = mountRerenderable(() => ({
+      enabled: true,
+      tasks,
+      notifier: n.impl,
+    }));
+    const afterMount = n.calls.listed;
+    tasks = [task({ remind: "2026-07-28 11:00" })];
+    rerender();
+    expect(n.calls.listed).toBeGreaterThan(afterMount);
+    unmount();
+  });
+});

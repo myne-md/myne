@@ -78,13 +78,37 @@ export type ReminderSchedulerOptions = {
  * nothing.
  */
 export function useReminderScheduler(options: ReminderSchedulerOptions): void {
-  const { enabled, tasks, notifier, clock = () => new Date(), onPass } = options;
+  const { enabled, tasks, notifier, clock: clockOption, onPass } = options;
   // Kept in a ref so the timer closure always sees the current list without
   // being torn down and rebuilt on every keystroke-driven index change.
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
   const onPassRef = useRef(onPass);
   onPassRef.current = onPass;
+  // myne#318 — the default clock USED to be a destructuring default,
+  // `clock = () => new Date()`, which allocates a fresh function identity on
+  // every call and sat in the effect's dependency array. `EditorChrome` is the
+  // app's hottest component (PaneView reports its readout up on every
+  // autosave-status change and on the 200 ms doc-stats debounce), so the effect
+  // tore down and re-ran several times per typing burst — each time paying a
+  // full `listPending` + `targetReminders` over EVERY task in the vault, plus a
+  // timer teardown and rebuild, for the whole unlocked session.
+  //
+  // Worse than the churn: `targetReminders` compares at minute granularity, so a
+  // pass running at or after the due instant computes the reminder out of the
+  // target set and cancels its pending delivery timer. The timer-driven pass is
+  // always registered after the delivery timer at the same expiry, so delivery
+  // wins by ordering — a RENDER-driven pass has no such ordering, and one
+  // landing between the due instant and the still-queued delivery callback
+  // silently drops that reminder. The window needs a busy main thread, which is
+  // precisely the condition this churn creates.
+  //
+  // A ref-held default is stable across renders, so the effect keys only on the
+  // things that actually change what it should do. An explicitly PASSED clock
+  // stays in the dep list, since a caller swapping clocks means a different
+  // schedule (and the tests do exactly that).
+  const defaultClockRef = useRef<() => Date>(() => new Date());
+  const clock = clockOption ?? defaultClockRef.current;
 
   useEffect(() => {
     if (!enabled || notifier === null) return;
