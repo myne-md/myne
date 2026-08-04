@@ -19,7 +19,7 @@ import type { FolderNode } from "../folderTree";
 import { labelColorVar } from "../decorations";
 import { FolderGlyph } from "./FolderGlyph";
 import { Icon } from "../../components/primitives/Icon";
-import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
+import { dragZone, insertionLineStyle } from "./reorderDnd";
 
 const INDENT_PER_LEVEL = 18;
 // Left inset of a top-level folder icon. Kept small so the folder glyph sits
@@ -273,6 +273,8 @@ export type FolderRowProps = {
   onFolderReorderLeave?: (key: string) => void;
   /** A dragged folder was dropped relative to this row (reorder). */
   onFolderReorderDrop?: (node: FolderNode, place: "above" | "below") => void;
+  /** myne#281 — a folder dropped INTO this one (the middle-half zone). */
+  onDropFolderInto?: (node: FolderNode) => void;
   /** Any drag originating from this row ended (cleanup transient UI). */
   onDragEnd?: () => void;
   /** Commit an inline rename to `newName` (last-segment name). */
@@ -314,6 +316,7 @@ export function FolderRow({
   onFolderReorderOver,
   onFolderReorderLeave,
   onFolderReorderDrop,
+  onDropFolderInto,
   onDragEnd,
   onCommitRename,
   onCancelRename,
@@ -395,11 +398,21 @@ export function FolderRow({
           return;
         }
         if (dragKind === "folder") {
-          // Folder drag → reorder among sibling folders (2-edge).
-          if (!onFolderReorderOver) return;
+          // myne#281 — a folder drag gets the SAME three zones a note drag has.
+          // It used to get two edges and no middle, so a folder could only ever
+          // be reordered among its siblings and the tree could not be re-nested
+          // at all. The asymmetry read as a bug because the gesture is the one
+          // the tree already teaches for notes.
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
-          onFolderReorderOver(node, dragEdge(e));
+          const zone = dragZone(e);
+          if (zone === "into" && onDropFolderInto) {
+            onDragTarget?.(node.key);
+            onFolderReorderLeave?.(node.key);
+          } else if (onFolderReorderOver) {
+            onFolderReorderOver(node, zone === "into" ? "below" : zone);
+            onDragTarget?.(null);
+          }
         } else if (onDropNote) {
           // Note drag → 3-zone: top/bottom quarter reorders the note as a
           // sibling of this folder (insertion line); the middle half moves it
@@ -428,7 +441,10 @@ export function FolderRow({
           return;
         }
         if (dragKind === "folder") {
-          onFolderReorderDrop?.(node, dragEdge(e));
+          const zone = dragZone(e);
+          onDragTarget?.(null);
+          if (zone === "into" && onDropFolderInto) onDropFolderInto(node);
+          else onFolderReorderDrop?.(node, zone === "into" ? "below" : zone);
           return;
         }
         const zone = dragZone(e);
