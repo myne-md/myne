@@ -3030,6 +3030,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "tauri",
  "theme-validator",
  "thiserror 2.0.18",
@@ -3870,6 +3871,7 @@ dependencies = [
  "cpufeatures",
  "opaque-debug",
  "universal-hash",
+ "zeroize",
 ]
 
 [[package]]
