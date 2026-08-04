@@ -671,12 +671,16 @@ pub async fn vault_indices_hydrate_from_host(
 
     // Fast path: decode the persisted snapshot. Absent / AEAD-fail / malformed
     // → empty (manifest, records) → every on-disk note stale → full rebuild.
-    let (manifest, records) = io
-        .read(&vault_dir.join("vault.indices"))
-        .await
-        .ok()
-        .and_then(|blob| decode_snapshot(&vault_indices_key, &account_number_hash, &blob))
-        .unwrap_or_default();
+    // Through the SINGLETON fallback (myne#301) — same reasoning as the search
+    // snapshot: rebuildable, but a torn slot discarding an intact copy costs a
+    // full vault re-parse on the one path built to avoid it.
+    let (manifest, records) = crate::singleton::open_newest_and_sweep(
+        io,
+        &vault_dir.join("vault.indices"),
+        |blob: &[u8]| decode_snapshot(&vault_indices_key, &account_number_hash, blob).ok_or(()),
+    )
+    .await
+    .unwrap_or_default();
 
     let delta = reconcile_delta(&manifest, &on_disk);
 

@@ -114,10 +114,21 @@ async fn read_or_none(
     graph_layout_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> Option<String> {
-    let bytes = match io.read(graph_path).await {
-        Ok(b) => b,
-        Err(crate::io_failure_kind::IoFailureKind::NotFound) => return None,
-        Err(io_kind) => {
+    // Through the SINGLETON fallback (myne#301) — see the twin in
+    // `workspace/commands.rs`. A torn slot on the web client otherwise discards
+    // the intact copy beside it and the layout is recomputed from scratch.
+    use crate::singleton::{open_newest_and_sweep, OpenOutcome};
+    let bytes = match open_newest_and_sweep(io, graph_path, |b: &[u8]| {
+        decode_graph_layout_blob(graph_layout_key, account_number_hash, b)
+            .ok()
+            .and_then(|pt| String::from_utf8(pt.to_vec()).ok())
+            .ok_or(())
+    })
+    .await
+    {
+        Ok(text) => return Some(text),
+        Err(OpenOutcome::Absent) => return None,
+        Err(OpenOutcome::Io(io_kind)) => {
             tracing::warn!(
                 event = "graph_layout_io_failed",
                 stage = "read",
@@ -126,6 +137,12 @@ async fn read_or_none(
             );
             return None;
         }
+        // Fall through to the per-cause logging below. Nothing decoded, so
+        // nothing was swept.
+        Err(OpenOutcome::Undecodable(())) => match io.read(graph_path).await {
+            Ok(b) => b,
+            Err(_) => return None,
+        },
     };
     match decode_graph_layout_blob(graph_layout_key, account_number_hash, &bytes) {
         Ok(plaintext) => match String::from_utf8(plaintext.to_vec()) {

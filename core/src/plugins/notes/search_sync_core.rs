@@ -188,12 +188,17 @@ pub async fn hydrate_search_index_core(
     let on_disk = crate::note_nonce::scan_on_disk_manifest_io(io, &notes_dir).await;
     let on_disk: crate::note_nonce::NonceManifest = on_disk.into_iter().collect();
 
-    let (mut manifest, mut index) = io
-        .read(&vault_dir.join("vault.search"))
-        .await
-        .ok()
-        .and_then(|blob| decode_snapshot(&search_index_key, &account_hash, &blob))
-        .unwrap_or_default();
+    // Through the SINGLETON fallback (myne#301). A rebuildable cache, so a lost
+    // snapshot is not data loss — but on the web client a torn slot threw away
+    // an intact copy and made every note stale, which is a full re-decrypt of
+    // the vault on a path that exists to avoid exactly that.
+    let (mut manifest, mut index) = crate::singleton::open_newest_and_sweep(
+        io,
+        &vault_dir.join("vault.search"),
+        |blob: &[u8]| decode_snapshot(&search_index_key, &account_hash, blob).ok_or(()),
+    )
+    .await
+    .unwrap_or_default();
 
     // Notes that vanished from disk: reconcile drops their body doc, and their
     // separate attachment docs are dropped explicitly below.
