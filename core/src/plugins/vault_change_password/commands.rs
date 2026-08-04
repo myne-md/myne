@@ -869,6 +869,75 @@ mod tests {
 
     use crate::vault_meta_hash::vault_meta_sha256 as sha256;
 
+    /// The sibling of `vault_recover`'s
+    /// `complete_recovery_invalidates_the_quick_unlock_credential`.
+    ///
+    /// This wiring has shipped since MYND-329 and nothing asserted it: the
+    /// `_with_path` tests pass `noop_hooks()`, and `RecordingHooks` leaves
+    /// `invalidate_quick_unlock` an unrecorded no-op — so deleting the call
+    /// would have kept the suite green. `protocol.md` §9.14.4 makes the
+    /// deletion mandatory on every credential rotation, and "mandatory" needs
+    /// a test on each rotation path, not on one.
+    #[test]
+    fn change_password_invalidates_the_quick_unlock_credential() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+            let counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+            let watch = std::sync::Arc::new(crate::hooks::test_hooks::CountingHooks::new(
+                counter.clone(),
+            ));
+            let hooks: crate::hooks::Hooks = watch.clone();
+
+            change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+                &hooks,
+            )
+            .await
+            .expect("change_password happy path");
+
+            let seen = watch.quick_unlock_invalidations();
+            assert_eq!(seen.len(), 1, "a rotation must invalidate exactly once");
+            assert_eq!(
+                seen[0],
+                scratch.path().parent().expect("vault dir"),
+                "the hook receives the vault ROOT, not the vault.meta path"
+            );
+        });
+    }
+
+    /// A rejected rotation must not destroy a working credential.
+    #[test]
+    fn a_rejected_change_password_leaves_the_quick_unlock_credential_alone() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+            let counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+            let watch = std::sync::Arc::new(crate::hooks::test_hooks::CountingHooks::new(
+                counter.clone(),
+            ));
+            let hooks: crate::hooks::Hooks = watch.clone();
+
+            let result = change_password_with_path(
+                "wrong-current-pw".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+                &hooks,
+            )
+            .await;
+
+            assert!(result.is_err(), "the current password is wrong");
+            assert!(
+                watch.quick_unlock_invalidations().is_empty(),
+                "a refused rotation must not touch the credential"
+            );
+        });
+    }
+
     /// Q2 + Q1 happy path: unlock with A → change_password(A→B) →
     /// vault_lock → unlock(A) returns InvalidCredentialOrVault;
     /// unlock(B) returns Ok.

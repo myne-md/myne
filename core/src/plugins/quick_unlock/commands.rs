@@ -157,10 +157,18 @@ fn cleanup_os_credential(dir: &Path) {
 /// Cross-plugin invalidation hook (MYND-329 task 8): wipe the device-local
 /// quick-unlock credential — the files AND the Apple-Keychain item, if any —
 /// for the vault at `dir`. Called when a security event should reset
-/// quick-unlock — currently a **master-password change** (a deliberate
-/// defense-in-depth policy: a password change signals "reset my access", so the
-/// fast second credential is cleared even though `root_key` is unchanged by the
-/// rotation — User Story 8). A best-effort no-op when nothing is configured.
+/// quick-unlock: a **master-password change**, and the **completion of a phrase
+/// recovery**, which commits a new master password by the other route. Both are
+/// the same deliberate policy — a credential rotation signals "reset my
+/// access", so the fast second credential is cleared even though `root_key` is
+/// unchanged by either (User Story 8; `protocol.md` §9.14.4).
+///
+/// That `root_key` survives is exactly why this is not optional bookkeeping:
+/// the quick-unlock AAD binds `account_number_hash` + `provider_kind`, neither
+/// of which a rotation moves, so a credential left in place does not merely
+/// dangle — it still unwraps the live `root_key`.
+///
+/// A best-effort no-op when nothing is configured.
 /// Vault deletion needs no call here — `vault_delete`'s recursive unlink
 /// already removes the files, and unlock reads the blob first, so an orphaned
 /// keychain item already forces the password path.

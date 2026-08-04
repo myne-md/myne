@@ -4846,7 +4846,10 @@ mod tests {
         std::sync::Arc<std::sync::atomic::AtomicU64>,
     ) {
         let counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
-        (std::sync::Arc::new(CountingHooks(counter.clone())), counter)
+        (
+            std::sync::Arc::new(CountingHooks::new(counter.clone())),
+            counter,
+        )
     }
 
     #[test]
