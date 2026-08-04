@@ -267,7 +267,41 @@ fn accept_loop(
             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                 wait_for_connection(&listener);
             }
-            Err(_) => break,
+            Err(e) => {
+                // A transient `accept()` error must not end the loop (myne#314).
+                //
+                // `break` here killed the door for the whole session, silently:
+                // `accept_loop` returns, the by-value listener drops (fd closed)
+                // — but `<app_data_dir>/cli.sock` is NOT unlinked, because only
+                // `teardown` does that and it never runs. The supervisor still
+                // holds `listener: Some(_)`, so neither its re-bind arm nor its
+                // teardown arm can fire, and the status marker stays `O`. Every
+                // later `myne` command then got ECONNREFUSED, which
+                // `classify_unreachable` read against that stale `O` and
+                // reported as a generic IO failure (exit 1) instead of the
+                // app-not-running / vault-locked / cli-disabled distinction the
+                // marker exists to provide. Settings showed the toggle on, with
+                // no fault. Recovery needed a lock/unlock cycle or a restart.
+                //
+                // Reachable without malice: per-process fd exhaustion
+                // (EMFILE/ENFILE — the WebView, open note and attachment files
+                // and up to `MAX_INFLIGHT_CONNECTIONS` handler threads share the
+                // limit), or on macOS/BSD an ECONNABORTED when a client aborts
+                // between connect and accept, e.g. a SIGINT'd `myne list`.
+                //
+                // The sibling local ingress in this crate already made the
+                // opposite choice on the same decision
+                // (`clipper::relay_app`'s accept loop logs and continues), which
+                // is what marks this as an oversight rather than a policy.
+                //
+                // `wait_for_connection` doubles as the backoff, so an EMFILE
+                // storm cannot hot-spin: it is a `poll(2)` with a 50 ms timeout,
+                // and it stays responsive to the stop flag. `break` is now
+                // reserved for that flag alone.
+                let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+                tracing::debug!(stage = "cli_bridge_accept", io_failure_kind = ?kind);
+                wait_for_connection(&listener);
+            }
         }
     }
 }
@@ -295,10 +329,26 @@ pub fn spawn(
     let stop = Arc::new(AtomicBool::new(false));
     let stop_worker = stop.clone();
     let accept_marker = last_access.clone();
+    // PROPAGATE a spawn failure (myne#314). `.ok()` discarded it while `spawn`
+    // still returned `Ok(ListenerHandle)` — the same end state as the
+    // swallowed-accept-error above: a socket file on disk, a status marker
+    // reading `O`, and nothing listening. Returning `Err` instead leaves the
+    // supervisor's `listener` as `None`, so its re-bind arm retries on the next
+    // tick rather than recording a handle for a door nobody serves.
     let join = std::thread::Builder::new()
         .name("cli-bridge-accept".into())
-        .spawn(move || accept_loop(listener, stop_worker, lister, limiter, accept_marker))
-        .ok();
+        .spawn(move || accept_loop(listener, stop_worker, lister, limiter, accept_marker));
+    let join = match join {
+        Ok(j) => Some(j),
+        Err(e) => {
+            // Do not leave the socket FILE advertising a door nobody serves.
+            // `bind_listener` replaces a stale one on the next attempt anyway,
+            // but a file that answers ECONNREFUSED is a worse answer than one
+            // that is simply absent.
+            let _ = std::fs::remove_file(&path);
+            return Err(e);
+        }
+    };
     Ok(ListenerHandle {
         stop,
         join,
@@ -461,6 +511,49 @@ mod tests {
             "the command socket must be owner-only (0600)"
         );
         teardown(Some(handle));
+    }
+
+    // ── myne#314: one transient accept error must not kill the door ────────
+    //
+    // `break` on any non-WouldBlock error ended the loop for the session and
+    // said nothing: the socket FILE stayed on disk (only `teardown` unlinks it,
+    // and it never ran), so the supervisor kept `listener: Some(_)` and neither
+    // its re-bind nor its teardown arm could fire, while the status marker
+    // stayed `O`. Every later `myne` command got ECONNREFUSED, which
+    // `classify_unreachable` read against that stale `O` as a generic IO
+    // failure — exit 1 instead of the app-not-running / vault-locked /
+    // cli-disabled distinction the marker exists to provide. Reachable from fd
+    // exhaustion, or from a SIGINT'd client on macOS/BSD (ECONNABORTED).
+    //
+    // Driven at the source, because producing a real transient `accept()` error
+    // on demand needs the process fd table at its limit — which a test cannot
+    // arrange without destabilising every other test in the binary.
+    #[test]
+    fn the_accept_loop_retries_a_transient_error_instead_of_breaking() {
+        let src = include_str!("socket.rs");
+        let start = src.find("fn accept_loop(").expect("accept_loop must exist");
+        let end = src[start..]
+            .find("\n}\n")
+            .map(|i| start + i)
+            .expect("accept_loop must end");
+        let body = &src[start..end];
+
+        // The stop flag is the only thing that may end the loop.
+        for (i, line) in body.lines().enumerate() {
+            let code = line.split("//").next().unwrap_or("");
+            assert!(
+                !code.contains("break"),
+                "accept_loop line {} still breaks out of the loop: {line:?}",
+                i + 1
+            );
+        }
+        // …and the error arm backs off through the same poll the WouldBlock arm
+        // uses, so an EMFILE storm cannot hot-spin.
+        assert_eq!(
+            body.matches("wait_for_connection(&listener)").count(),
+            2,
+            "both the would-block and the error arm must wait before retrying"
+        );
     }
 
     #[cfg(unix)]
