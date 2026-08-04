@@ -178,6 +178,14 @@ mod tests {
         assert!(toml.contains(r#"console = "info""#));
         // The absences that matter.
         assert!(!toml.contains("[bridges]"));
+        // `socks_listen` absent carries TWO meanings, and only the first is
+        // obvious: the port comes from argv, one source of truth — AND this is
+        // where a listener restriction would be expressed if arti offered one.
+        // It does not (`ListenItem` has only IP variants, and `proxy` has no
+        // SOCKS auth), so the door is unauthenticated loopback TCP and the
+        // residual is recorded in `docs/threat-model.md` §7 (myne#380). Do not
+        // delete this assert while reaching for `socks_listen` — read that
+        // entry first.
         assert!(!toml.contains("socks_listen"));
         assert!(!toml.contains("port_info_file"));
         assert!(!toml.contains("files ="));
