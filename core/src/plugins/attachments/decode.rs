@@ -59,7 +59,12 @@ fn limits() -> image::Limits {
 /// header before allocation. `None` on anything the decoder rejects, including a
 /// declared size beyond [`MAX_IMAGE_DIMENSION_PX`] or a decode that would exceed
 /// [`MAX_DECODE_ALLOC_BYTES`].
-pub(super) fn decode_bounded(bytes: &[u8]) -> Option<image::DynamicImage> {
+// `pub`, not `pub(super)` (myne#309): the desktop PDF extractor decodes images
+// embedded in a scanned PDF, and those are exactly as untrusted as an attached
+// one. It used `image::load_from_memory` — `Limits::default()` — because this
+// rail was not reachable from there. One rail, not two that drift, is the whole
+// point of this module.
+pub fn decode_bounded(bytes: &[u8]) -> Option<image::DynamicImage> {
     let mut reader = reader(bytes)?;
     reader.limits(limits());
     reader.decode().ok()

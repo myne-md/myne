@@ -192,6 +192,20 @@ base64 = "0.22"
 # conveniences) disabled: the stamper needs parse + content append + full
 # rewrite save only. MIT.
 lopdf = { version = "0.42.0", default-features = false }
+
+# Bounded zlib inflate for embedded PDF image streams (myne#309). `lopdf`'s
+# `Stream::decompressed_content()` is `ZlibDecoder::read_to_end` with NO
+# ceiling, so a cap-compliant (≤64 MiB) PDF attachment carrying a deflate bomb
+# inflated toward tens of GB and the process was OOM-killed — repeatedly, since
+# the OCR queue retries the same attachment on every unlock. Bounding it needs a
+# decoder this side can drive with `Read::take`, which is this crate.
+#
+# Adds NOTHING to the dependency closure: `lopdf` already pulls the same
+# `flate2` version, as does the `zip` extractor below. Declaring it directly
+# makes the use auditable instead of reaching through another crate's tree.
+# Command-path only (`plugins/attachments/extract.rs`), never on the boot path.
+# Not crypto, not telemetry. MIT/Apache-2.0.
+flate2 = "1"
 # Decodes the page images pulled out of a scanned (text-layer-less) PDF before
 # they go to OCR (MYND-441, `attachments::extract::decode_pdf_image`), and
 # synthesizes small PNGs in the dispatch tests. Same pin and same narrow feature
