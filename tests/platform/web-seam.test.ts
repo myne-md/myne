@@ -68,13 +68,12 @@ function programBrowserPlatform(): void {
     return null;
   });
   vi.stubGlobal("navigator", {
+    // Write only — `readText` left the seam with myne#379, and the web arm is
+    // where that removal is least controversial: page content cannot be granted
+    // clipboard read in Firefox at all.
     clipboard: {
       writeText: async (t: string) => {
         recorded.push([t]);
-      },
-      readText: async () => {
-        recorded.push([]);
-        return nextResolve as string;
       },
     },
   });
@@ -148,8 +147,6 @@ const SUPPORTS: ReadonlySet<SeamOperation> = new Set<SeamOperation>([
   "window.isFullscreen",
   "webviewWindow.listen",
   "clipboard.writeText",
-  "clipboard.readText",
-  "clipboard.clear",
 ]);
 
 runSeamContract({

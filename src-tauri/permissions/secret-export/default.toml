@@ -10,6 +10,12 @@
 # and rejects anything inside the app-data / vault tree. Adding a command here
 # without a matching `build.rs` `InlinedPlugin::commands` entry is a security
 # regression.
+#
+# `clipboard_clear_if_matches` is the same narrow-seam move for the Copy half of
+# the same screen (myne#379): the 30 s auto-clear's read+compare runs host-side,
+# so the main window no longer holds a standing OS-clipboard READ grant for one
+# `setTimeout` body. It reads the clipboard, compares, and clears on an exact
+# match — it returns nothing, so the comparison's answer never crosses back.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -17,9 +23,15 @@
 description = "Default permission set for the secret-export plugin."
 permissions = [
     "allow-save-secret-text",
+    "allow-clipboard-clear-if-matches",
 ]
 
 [[permission]]
 identifier = "allow-save-secret-text"
 description = "Allow invoking secret-export:save_secret_text (write a recovery phrase / account number to a user-chosen .txt destination; the Rust core does the IO and rejects any destination inside the app-data / vault tree)."
 commands.allow = ["save_secret_text"]
+
+[[permission]]
+identifier = "allow-clipboard-clear-if-matches"
+description = "Allow invoking secret-export:clipboard_clear_if_matches (the recovery-flow §2.2 30-second clipboard auto-clear: read the OS clipboard host-side, clear it only when it still holds exactly the supplied value, and return nothing — so the comparison's answer never crosses back to the WebView). Exists so the main window does not need a process-lifetime clipboard-manager READ grant."
+commands.allow = ["clipboard_clear_if_matches"]

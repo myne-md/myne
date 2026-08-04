@@ -65,8 +65,6 @@ export interface SeamModules {
   };
   clipboardManager: {
     writeText: (text: string) => Promise<void>;
-    readText: () => Promise<string | null>;
-    clear: () => Promise<void>;
   };
   deepLink: {
     loadDeepLink: () => Promise<{
@@ -374,6 +372,10 @@ export function runSeamContract(subject: SeamSubject): void {
     );
 
     // ── clipboard ───────────────────────────────────────────────────────
+    // Write only. `readText` / `clear` left the seam with myne#379 — the
+    // recovery-kit auto-clear's read+compare moved host-side, and the two
+    // `clipboard-manager:` grants behind them left `capabilities/default.json`
+    // with it. There is deliberately no contract for a member no host offers.
     contractFor(
       "clipboard.writeText",
       async () => {
@@ -382,25 +384,6 @@ export function runSeamContract(subject: SeamSubject): void {
         expect(subject.program.calls()[0]).toEqual(["secret"]);
       },
       () => seam.clipboardManager.writeText("secret"),
-    );
-
-    contractFor(
-      "clipboard.readText",
-      async () => {
-        subject.program.resolveWith("secret");
-        expect(await seam.clipboardManager.readText()).toBe("secret");
-      },
-      () => seam.clipboardManager.readText(),
-    );
-
-    contractFor(
-      "clipboard.clear",
-      async () => {
-        subject.program.resolveWith(undefined);
-        await seam.clipboardManager.clear();
-        expect(subject.program.calls().length).toBeGreaterThan(0);
-      },
-      () => seam.clipboardManager.clear(),
     );
 
     // ── deep link ───────────────────────────────────────────────────────

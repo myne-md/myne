@@ -44,8 +44,6 @@
     "clipper-pairing:default",
     "cli-bridge:default",
     "clipboard-manager:allow-write-text",
-    "clipboard-manager:allow-read-text",
-    "clipboard-manager:allow-clear",
     "dialog:allow-save",
     "dialog:allow-open",
     "dialog:allow-confirm",
