@@ -1139,28 +1139,36 @@ pub async fn note_write_batch_transactional_from_host(
         return Ok(());
     }
 
-    let notes_dir =
-        paths::notes_dir_for_host(host, state.active_vault_id().await).map_err(|e| {
-            match e.kind() {
-                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                    tracing::error!(
-                        stage = "notes_dir",
-                        error_kind = "NotesDirNotADirectory",
-                        "note_write_batch notes_dir resolution conflicted with a non-dir entry"
-                    );
-                    NoteBatchError::NotesDirNotADirectory
-                }
-                other => {
-                    let io_kind = from_io_error_kind(other);
-                    tracing::error!(
-                        stage = "notes_dir",
-                        error_kind = "Io",
-                        io_failure_kind = ?io_kind,
-                        "note_write_batch notes_dir resolution failed"
-                    );
-                    NoteBatchError::Io {
-                        io_error_kind: io_kind,
-                    }
+    // Through the IO SEAM, not `std::fs` (myne#299). `notes_dir_for_host` ends in
+    // `require_vault_root`, a `Path::is_dir` stat, and on
+    // wasm32-unknown-unknown that is the unsupported-platform stub — always
+    // false. So this command returned `Io { NotFound }` unconditionally on every
+    // web client, before a single note was read or written, and note rename and
+    // folder rename/move were simply dead there while the identical code worked
+    // on desktop: precisely the divergence the seam exists to prevent. The batch
+    // is never empty on either path (the renamed note's own rewritten body is
+    // always in it), so the early return above never covered it.
+    let notes_dir = paths::notes_dir_for_host_io(host, io, state.active_vault_id().await)
+        .await
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "NotesDirNotADirectory",
+                    "note_write_batch notes_dir resolution conflicted with a non-dir entry"
+                );
+                NoteBatchError::NotesDirNotADirectory
+            }
+            other => {
+                let io_kind = from_io_error_kind(other);
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "Io",
+                    io_failure_kind = ?io_kind,
+                    "note_write_batch notes_dir resolution failed"
+                );
+                NoteBatchError::Io {
+                    io_error_kind: io_kind,
                 }
             }
         })?;

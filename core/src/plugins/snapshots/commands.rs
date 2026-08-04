@@ -391,7 +391,7 @@ pub async fn snapshot_restore_from_host(
     // Threading it keeps the choice at the edge, where the host already is.
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), SnapshotError> {
-    let notes_dir = resolve_notes_dir(host, state.active_vault_id().await)?;
+    let notes_dir = resolve_notes_dir(host, io, state.active_vault_id().await).await?;
     snapshot_restore_in(notes_dir, state, hooks, note_id, snapshot_uuid, io, host)
         .await
         .inspect_err(|e| {
@@ -510,18 +510,26 @@ fn resolve_snapshots_dir(
     })
 }
 
-fn resolve_notes_dir(
+/// Through the IO seam, not `std::fs` (myne#299). This function is not gated
+/// off wasm32, and the `std::fs` sibling's `Path::is_dir` root check is the
+/// unsupported-platform stub there — always false. Snapshots are a port still
+/// owed on web, so this was latent rather than live; routing it through the seam
+/// now means it will not be the next thing to ship dead.
+async fn resolve_notes_dir(
     host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
     active_id: Option<crate::vault_id::VaultId>,
 ) -> Result<PathBuf, SnapshotError> {
-    paths::notes_dir_for_host(host, active_id).map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-            SnapshotError::NotesDirNotADirectory
-        }
-        other => SnapshotError::Io {
-            io_error_kind: from_io_error_kind(other),
-        },
-    })
+    paths::notes_dir_for_host_io(host, io, active_id)
+        .await
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                SnapshotError::NotesDirNotADirectory
+            }
+            other => SnapshotError::Io {
+                io_error_kind: from_io_error_kind(other),
+            },
+        })
 }
 
 #[cfg(test)]

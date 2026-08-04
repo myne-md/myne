@@ -515,17 +515,24 @@ pub(crate) async fn recover_pending_rename_on_unlock(
     io: &dyn crate::vault_io::VaultIo,
     state: &VaultRuntimeState,
 ) {
-    let notes_dir = match crate::paths::notes_dir_for_host(host, state.active_vault_id().await) {
-        Ok(d) => d,
-        Err(e) => {
-            tracing::warn!(
-                event = "rename_recovery_skipped",
-                reason = "notes_dir_resolution_failed",
-                io_failure_kind = ?from_io_error_kind(e.kind()),
-            );
-            return;
-        }
-    };
+    // Through the IO SEAM (myne#299). `notes_dir_for_host` ends in a
+    // `Path::is_dir` stat, which on wasm32 is the unsupported-platform stub, so
+    // this resolution always failed on web and the roll-forward was silently
+    // skipped — logged as `rename_recovery_skipped` and swallowed. Latent while
+    // no web batch could write a journal at all; live the moment the batch
+    // command itself is fixed, which is the same change as this one.
+    let notes_dir =
+        match crate::paths::notes_dir_for_host_io(host, io, state.active_vault_id().await).await {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::warn!(
+                    event = "rename_recovery_skipped",
+                    reason = "notes_dir_resolution_failed",
+                    io_failure_kind = ?from_io_error_kind(e.kind()),
+                );
+                return;
+            }
+        };
     recover_pending_rename_in_dir(io, notes_dir).await;
 }
 
