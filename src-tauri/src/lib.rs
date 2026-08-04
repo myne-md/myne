@@ -52,6 +52,11 @@ mod screen_capture;
 // `crate::search::{SearchIndexState, InvertedIndex, MatchedIn, Document,
 // SearchHit, persist::…}` path keeps resolving.
 pub use myne_core::search;
+// POSIX shell quoting for the two generators that write a `/bin/sh` script
+// around a `current_exe()`-derived path — the CLI PATH shim and the clipper's
+// native-messaging launcher. Shared for the reason `uds` is: it is the same
+// security property in both, not two that happen to match (myne#381).
+mod sh_quote;
 // The snapshot on-disk storage layer + pure retention policy moved to
 // `myne-core` (shared with the mobile client). Re-exported so existing
 // `crate::snapshot_store::…` / `crate::snapshot_policy::…` paths keep resolving
