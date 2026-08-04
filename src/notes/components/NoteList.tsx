@@ -366,10 +366,12 @@ function NotesActionsMenu({
   onNewFolder,
   onCreate,
   onNewFromTemplate,
+  onNewDrawing,
 }: {
   onNewFolder: () => void;
   onCreate: () => void;
   onNewFromTemplate?: () => void;
+  onNewDrawing: () => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -432,6 +434,12 @@ function NotesActionsMenu({
               "file-text",
               onNewFromTemplate,
             )}
+          {/* myne#282: drawings were creatable from three OTHER menus but not
+              this one — and since #230 moved the create actions behind the `+`,
+              this is the discoverable entry point, so a note kind absent from it
+              is effectively hidden. Sits before New folder because it is a note
+              kind, not a container. */}
+          {item(t("notes.list.newDrawingMenu"), "notes.new-drawing", "image", onNewDrawing)}
           {item(t("notes.list.newFolder"), "notes.new-folder", "folder-plus", onNewFolder)}
         </div>
       )}
@@ -1358,6 +1366,7 @@ function EmptyState({
   onNewFromTemplate?: () => void;
 }) {
   const { t } = useTranslation();
+  const ctx = useSelectedNote();
   return (
     <div style={LIST_OUTER_STYLE}>
       <div style={HEADER_ROW_STYLE}>
@@ -1369,6 +1378,7 @@ function EmptyState({
             onNewFolder={() => fm.startNewFolder("")}
             onCreate={onCreate}
             onNewFromTemplate={onNewFromTemplate}
+            onNewDrawing={() => void ctx.createDrawingAndStartRename().catch(() => {})}
           />
         </div>
       </div>
@@ -2536,6 +2546,7 @@ function PopulatedList({
             onNewFolder={() => fm.startNewFolder("")}
             onCreate={onCreate}
             onNewFromTemplate={onNewFromTemplate}
+            onNewDrawing={() => void ctx.createDrawingAndStartRename().catch(() => {})}
           />
         </div>
       </div>

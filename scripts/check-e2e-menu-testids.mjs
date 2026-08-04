@@ -23,7 +23,13 @@ const ROOT = new URL("..", import.meta.url).pathname;
 const TREES = ["e2e"];
 
 /** Testids that render only while the sidebar's `+` menu is open. */
-const MENU_ONLY = ["notes.create", "notes.new-folder", "notes.create-drawing"];
+const MENU_ONLY = [
+  "notes.create",
+  "notes.new-folder",
+  "notes.create-drawing",
+  // myne#282 — "New drawing" joined the `+` menu.
+  "notes.new-drawing",
+];
 
 /** The one helper allowed to name them — it opens the menu first. */
 const HELPER = "clickNewMenuItem";
