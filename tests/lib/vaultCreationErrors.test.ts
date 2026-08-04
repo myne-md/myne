@@ -126,6 +126,30 @@ describe("top-level non-session arms", () => {
   });
 });
 
+// ── myne#289: the two variants the mirror had drifted past ──────────────────
+//
+// The union in `src/types/protocol-error.ts` is the drift lock, and it had
+// fallen behind the Rust enums it mirrors. That is not "an unhelpful message":
+// `mapAppErrorToUserMessage` ends in `default: assertNever(error)`, which
+// THROWS — and it throws inside the creation flow's own catch, so the user was
+// stranded on the exit-less "Encrypting…" screen with no error, no Cancel and
+// no retry. The app had to be force-quit.
+describe("the mirrored-but-unmapped variants (myne#289)", () => {
+  it("WeakNewPassword maps instead of throwing", () => {
+    const r = mapAppErrorToUserMessage({ kind: "WeakNewPassword" });
+    expect(r.displayMode).toBe("inline");
+    expect(r.primaryAction).toBe("retry");
+    expect(r.title).toBeTruthy();
+  });
+
+  it("PlaintextTooLarge maps instead of throwing", () => {
+    const r = mapAppErrorToUserMessage(protocol({ kind: "PlaintextTooLarge" }));
+    expect(r.displayMode).toBe("inline");
+    expect(r.primaryAction).toBe("retry");
+    expect(r.title).toBeTruthy();
+  });
+});
+
 describe("assertNever guards against an unmapped variant", () => {
   it("throws on an unknown AppError kind (compile-error analogue at runtime)", () => {
     expect(() =>

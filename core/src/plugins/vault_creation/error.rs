@@ -31,6 +31,11 @@ use thiserror::Error;
 /// | `Io { kind }`                | `{"kind":"Io","detail":{"kind":"PermissionDenied"}}`         |
 /// | `VaultArtifactsPresent`      | `{"kind":"VaultArtifactsPresent"}`                           |
 /// | `VaultBusyAuth`              | `{"kind":"VaultBusyAuth"}`                                   |
+/// | `WeakNewPassword`            | `{"kind":"WeakNewPassword"}`                                 |
+///
+/// The table is the mirror's reference, so a variant missing from it is how the
+/// TS side comes to be missing it too — which is what happened to
+/// `WeakNewPassword` (myne#289). Add the row in the same change as the variant.
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum AppError {
