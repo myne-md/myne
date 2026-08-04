@@ -148,9 +148,17 @@ export function CoverPicker({
   const { t } = useTranslation();
   // `null` = loading; `[]` = loaded-but-empty.
   const [images, setImages] = useState<CatalogEntry[] | null>(null);
-  // #263: a surface that renders thumbnails warms the ids it renders. Scoped to
-  // the images actually listed, never the whole catalog. No-op on desktop.
-  const warmNonce = useWarmAttachmentRefs((images ?? []).map((i) => i.id));
+  // #263: a surface that renders thumbnails warms the ids it renders. No-op on
+  // desktop.
+  //
+  // `windowed` (myne#388). "Scoped to the images actually listed, never the
+  // whole catalog" was a distinction without a difference here: the list IS
+  // `catalogList()` filtered to images, i.e. every image in the vault, which on
+  // a photo-heavy vault is the largest of the three sets.
+  const { warmKey, observeItem } = useWarmAttachmentRefs(
+    (images ?? []).map((i) => i.id),
+    { windowed: true },
+  );
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -259,11 +267,14 @@ export function CoverPicker({
           <div style={GRID_STYLE}>
             {images.map((img) => (
               <button
-                // #263: the warm nonce is in the key so a tile that rendered
-                // before its blob URL existed remounts once it does. Without
-                // the warm this grid was identical blank boxes on web, with the
-                // filename only as a `title` — the user picked a cover blind.
-                key={`${img.id}:${warmNonce}`}
+                // #263: the key changes on this tile's own cold→warm
+                // transition, so a tile that rendered before its blob URL
+                // existed remounts once it does — and a scroll does not remount
+                // the rest of the grid. Without the warm this grid was identical
+                // blank boxes on web, with the filename only as a `title` — the
+                // user picked a cover blind.
+                key={warmKey(img.id)}
+                ref={observeItem(img.id)}
                 type="button"
                 data-testid="cover-picker.image"
                 data-att-id={img.id}

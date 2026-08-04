@@ -410,16 +410,24 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             // session already holds a `Blob` for these exact bytes, so decrypting
             // again would produce a second copy of the same plaintext for nothing.
             if let Some(url) = crate::attachment_url::cached(&a.id) {
-                return Outcome::ok(&url);
+                // Same success SHAPE whether or not the cache hit — a payload
+                // that changes shape between two paths is what `Outcome`'s
+                // tagged envelope exists to avoid re-introducing at the value
+                // level. The hit also promotes the entry's recency, which is why
+                // it goes through `cached` rather than a map read.
+                return Outcome::ok(&crate::attachment_url::Minted {
+                    url,
+                    evicted: Vec::new(),
+                });
             }
             match attachment_serve_from_host(host_ctx(), vault_io(), crate::session::state(), &a.id)
                 .await
             {
-                Ok(served) => {
-                    let url =
-                        crate::attachment_url::mint(&a.id, served.content_type, &served.bytes);
-                    Outcome::ok(&url)
-                }
+                Ok(served) => Outcome::ok(&crate::attachment_url::mint(
+                    &a.id,
+                    served.content_type,
+                    &served.bytes,
+                )),
                 Err(e) => Outcome::error(&e),
             }
         }
@@ -3634,6 +3642,27 @@ mod tests {
             "the router answers these commands but neither `capability::DISPATCHED` nor \
              `WEB_ONLY_ARMS` lists them, so `classify` still reports them unported: {missing:?}"
         );
+    }
+
+    /// The claim `attachment_url.rs`'s host arm rests on: `js_mint` / `js_revoke`
+    /// are unreachable natively because the SERVE fails first. Asserted rather
+    /// than asserted-in-a-comment — that comment has named this test since it
+    /// was written, with nothing behind it (myne#387's shape, one file over).
+    ///
+    /// `the_web_only_exemptions_are_real_arms` does not cover it: that passes
+    /// `Value::Null` and stops at `BadArgs`, never reaching the serve.
+    #[test]
+    fn attachment_object_url_is_an_io_failure_on_a_host_build() {
+        let json = block_on(dispatch(
+            "plugin:attachments|attachment_object_url",
+            serde_json::json!({ "id": "00".repeat(32) }),
+        ))
+        .to_json();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["outcome"], "error");
+        // `attachment_serve_from_host` resolves its vault directory through
+        // `NoopHost`, which refuses — mapped to `AttachmentServeError::Io`.
+        assert_eq!(parsed["error"]["kind"], "Io");
     }
 
     /// Every web-only exemption is really an arm — the exemption list cannot rot.

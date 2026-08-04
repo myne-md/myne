@@ -49,6 +49,24 @@ export function releaseAttachmentUrls(): void {
  * would put a platform test in the shared host for a call whose desktop cost is
  * zero.
  */
-export async function warmAttachmentUrls(_ids: readonly string[]): Promise<void> {
-  // Intentionally empty — see above.
+export async function warmAttachmentUrls(
+  _ids: readonly string[],
+): Promise<readonly string[]> {
+  // The contract is "the ids whose `resolveRef` answer CHANGED as a result of
+  // this call". Desktop's honest answer is none: `attachment://<id>` answers
+  // for every id from the first render, so no thumbnail ever needs telling to
+  // ask again.
+  return [];
 }
+
+/**
+ * Whether `resolveRef` needs ids warmed before it can answer for them.
+ *
+ * **Desktop: never.** The hook that windows thumbnail warming reads this to
+ * skip building an `IntersectionObserver` whose only product here would be a
+ * `setState` per scroll tick over a grid that already renders correctly.
+ *
+ * Deliberately NOT in `src/platform/capabilities.ts`: that module scopes itself
+ * to *product* capabilities, and this is a property of the URL builder.
+ */
+export const ATTACHMENT_REFS_NEED_WARMING: boolean = false;
