@@ -543,7 +543,7 @@ class PropertiesWidget extends WidgetType {
  * variant `---\n…\n---` has no line to expose; `emptyBodyClickHandler` creates
  * one on demand.)
  */
-function frontmatterBoundary(doc: Text): number | null {
+export function frontmatterBoundary(doc: Text): number | null {
   const range = cachedLocateFrontmatter(doc);
   if (range === null) return null;
   let blockEnd = range.blockEnd;

@@ -40,7 +40,7 @@ import {
 } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
-import { cachedLocateFrontmatter } from "../frontmatter-cache";
+import { frontmatterBoundary } from "./frontmatter";
 import { readingModeFacet } from "./cursor-aware";
 
 /**
@@ -87,9 +87,20 @@ export type TagSuggestionEventDetail = { tag: string };
  * Where the band sits: immediately after the frontmatter block, or at the top of
  * a note that has none. Exported so a test can assert the anchor without
  * reaching into the decoration set.
+ *
+ * myne#287: this read `range.blockEnd` directly, and that is NOT the boundary
+ * the block-replace decoration uses. `frontmatterBoundary` shrinks the replaced
+ * range by one character when the block reaches the end of the document, so the
+ * final empty line stays a live caret target — and a new note is exactly that
+ * shape (`---\ntitle: …\n---\n`). The two therefore differed by one in the one
+ * case that matters, and the band anchored AFTER the note's only body line:
+ * Properties panel → empty body line → Suggested tags, with the caret above the
+ * band. The frontmatter module's own docstring already declares that function
+ * the single source both consumers derive from; this restores that rather than
+ * adding an invariant.
  */
 export function tagSuggestionBandAnchor(state: EditorState): number {
-  return cachedLocateFrontmatter(state.doc)?.blockEnd ?? 0;
+  return frontmatterBoundary(state.doc) ?? 0;
 }
 
 class TagSuggestionBandWidget extends WidgetType {
