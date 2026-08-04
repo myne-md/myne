@@ -10,28 +10,8 @@
 // Scope note: `attachment:` is already trusted in img-src / media-src /
 // frame-src; widening `connect-src` to the SAME scheme opens no new origin.
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const confPath = resolve(here, "../../src-tauri/tauri.conf.json");
-
-function csp(): Record<string, string> {
-  const conf = JSON.parse(readFileSync(confPath, "utf8")) as {
-    app: { security: { csp: string } };
-  };
-  const directives: Record<string, string> = {};
-  for (const part of conf.app.security.csp.split(";")) {
-    const trimmed = part.trim();
-    if (trimmed === "") continue;
-    const sp = trimmed.indexOf(" ");
-    const name = sp === -1 ? trimmed : trimmed.slice(0, sp);
-    directives[name] = sp === -1 ? "" : trimmed.slice(sp + 1);
-  }
-  return directives;
-}
+import { desktopCspDirectives as csp } from "../lib/_desktopCsp";
 
 describe("WebView CSP supports inline pdf.js render", () => {
   it("connect-src allows the attachment: scheme (pdf bytes fetch)", () => {
