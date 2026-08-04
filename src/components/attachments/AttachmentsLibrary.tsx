@@ -630,13 +630,22 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   // (`editor/src/attachments/catalog.ts`); nothing warmed the ids the LIBRARY
   // lists, and this surface is precisely the one that lists all of them.
   //
-  // Scoped to what is actually on screen after filtering, not the whole
-  // catalog: warming everything would decrypt every attachment in the vault to
-  // paint one screenful, which on an attachment-heavy vault is gigabytes.
   // Lifted into `useWarmAttachmentRefs` (#263) so the OTHER thumbnail surfaces
   // get the same treatment: the cover picker and the clean-unused dialog both
   // rendered blank boxes on web because only this one warmed.
-  const warmNonce = useWarmAttachmentRefs(visible.map((e) => e.id));
+  //
+  // `windowed`, and this is the surface that made it necessary (myne#388). The
+  // comment here used to claim the warm was "scoped to what is actually on
+  // screen after filtering, not the whole catalog" — but `visible` is a filter
+  // plus a sort over the whole catalog, and both filters are inert at their
+  // defaults, so on first open it IS the entire catalog. Opening the library
+  // decrypted every attachment in the vault and pinned each for the session.
+  // The hook now warms what an IntersectionObserver reports on screen,
+  // `MAX_WARMED_IDS` backstops it, and the byte ceiling lives in the Worker.
+  const { warmKey, observeItem } = useWarmAttachmentRefs(
+    visible.map((e) => e.id),
+    { windowed: true },
+  );
 
   const isLoading = entries === null;
   const isEmpty = !isLoading && (entries?.length ?? 0) === 0;
@@ -645,6 +654,7 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   // Shared per-item wiring — keeps the grid tile + the list row from drifting.
   const itemProps = (entry: CatalogEntry): ItemActionProps => ({
     entry,
+    itemRef: observeItem(entry.id),
     renaming: renamingId === entry.id,
     cache: ctx.cache,
     popoverOpen: openPopoverId === entry.id,
@@ -854,18 +864,22 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
         ) : view === "grid" ? (
           <div style={GRID_STYLE}>
             {visible.map((entry) => (
-              /* `warmNonce` in the key remounts the tile once its render URL
-                 has been warmed (web only — see the warm effect above), so the
+              /* The key changes on THIS tile's own cold→warm transition, so the
                  <img> is recreated against the resolved URL rather than left
-                 holding the pending placeholder it first rendered with. */
-              <AttachmentTile key={`${entry.id}:${warmNonce}`} {...itemProps(entry)} />
+                 holding the pending placeholder it first rendered with — and a
+                 scroll that warms a neighbour does not remount this one. */
+              <AttachmentTile key={warmKey(entry.id)} {...itemProps(entry)} />
             ))}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
             <ListHeader />
             {visible.map((entry) => (
-              <AttachmentListRow key={entry.id} {...itemProps(entry)} />
+              /* Keyed the same way as the grid tile. This row used to be keyed
+                 on the id alone, so on web a PDF row's first-page render — read
+                 once in an `[id]`-keyed effect — never re-ran after the warm and
+                 the row kept the generic file icon. */
+              <AttachmentListRow key={warmKey(entry.id)} {...itemProps(entry)} />
             ))}
           </div>
         )}
@@ -1121,6 +1135,10 @@ function EmptyState(props: EmptyStateProps) {
 
 interface ItemActionProps {
   entry: CatalogEntry;
+  /** Ref callback from `useWarmAttachmentRefs`, so the surface learns when this
+   *  item is on screen. Both views render thumbnails, so both must report it or
+   *  the one that does not goes back to painting placeholders forever. */
+  itemRef: (el: Element | null) => void;
   renaming: boolean;
   cache: ReadonlyMap<NoteId, import("../../notes/loadNoteBatch").TitleRecord>;
   /** Whether THIS item's used-in-notes popover is the one open (Fix 6). */
@@ -1736,6 +1754,7 @@ const TILE_FOOTER_STYLE: CSSProperties = {
 
 function AttachmentTile({
   entry,
+  itemRef,
   renaming,
   cache,
   popoverOpen,
@@ -1762,6 +1781,7 @@ function AttachmentTile({
 }: ItemActionProps) {
   return (
     <div
+      ref={itemRef}
       style={TILE_STYLE}
       data-testid="attachments.tile"
       data-id={entry.id}
@@ -1886,6 +1906,7 @@ function ListHeader() {
 
 function AttachmentListRow({
   entry,
+  itemRef,
   renaming,
   cache,
   popoverOpen,
@@ -1912,6 +1933,7 @@ function AttachmentListRow({
 }: ItemActionProps) {
   return (
     <div
+      ref={itemRef}
       style={LIST_ROW_STYLE}
       data-testid="attachments.tile"
       data-id={entry.id}

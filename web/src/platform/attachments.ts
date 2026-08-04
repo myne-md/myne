@@ -26,12 +26,27 @@ export function releaseAttachmentUrls(): void {
  * synchronous `convertFileSrc` can answer for them during the render that
  * follows.
  *
+ * Resolves to the ids whose resolved URL CHANGED: those newly minted, plus any
+ * the Worker revoked to stay inside its byte budget. A caller repaints exactly
+ * those and leaves every other tile alone.
+ *
  * Never rejects, and swallows per id: one attachment that is missing, was
  * deleted on another device, or refuses to decrypt must not take a note's other
  * images down with it. An id that does not warm keeps resolving to the pending
  * placeholder, which is the same thing desktop shows for a broken
  * `attachment://` fetch.
  */
-export async function warmAttachmentUrls(ids: readonly string[]): Promise<void> {
-  await warm(ids);
+export async function warmAttachmentUrls(
+  ids: readonly string[],
+): Promise<readonly string[]> {
+  return await warm(ids);
 }
+
+/**
+ * Whether `resolveRef` needs ids warmed before it can answer for them.
+ *
+ * **Web: always.** A `blob:` URL has to be minted before `resolveRef` can
+ * answer, so every surface that renders thumbnails must warm what it shows —
+ * and, since the Worker's budget is finite, must warm only what it shows.
+ */
+export const ATTACHMENT_REFS_NEED_WARMING: boolean = true;

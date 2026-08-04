@@ -27,13 +27,20 @@
 // asset, covered by the `img-src 'self'` that is already there for the app's own
 // icons.
 //
-// # Why the map is never invalidated per entry
+// # Why the map is never invalidated for STALENESS — but is for RESIDENCY
 //
 // An attachment id is a CONTENT HASH (`protocol.md` §9.9), so a given id's bytes
 // never change. There is no staleness to manage — only a session lifetime, and
 // the Worker owns that: `plugin:vault-unlock|lock` revokes every URL it minted,
 // which makes every string here dead at the same instant. `clear()` drops this
 // side to match.
+//
+// Residency is a second, narrower reason an entry dies, and the two must not be
+// conflated (myne#388). The Worker's map is bounded by a byte budget and evicts
+// least-recently-used; the ids it drops come back on the mint response, and this
+// module removes them here. A string left behind would be a handle to a `Blob`
+// the Worker has already revoked — painting it shows a broken image, which reads
+// to a user as corruption rather than as "not ready".
 
 import { invoke } from "./core";
 
@@ -76,13 +83,15 @@ export function isWarm(id: string): boolean {
  * a note's other images down with it. That id simply stays a placeholder, which
  * is the same thing the desktop shows for a broken `attachment://` fetch.
  *
- * Resolves to the ids that became warm, so a caller can skip a re-render when
- * nothing changed.
+ * Resolves to the ids whose resolved URL CHANGED — those that became warm, plus
+ * any the Worker revoked to stay inside its byte budget. A caller repaints
+ * exactly those and skips a re-render when nothing changed.
  */
 export async function warm(ids: readonly string[]): Promise<string[]> {
   const wanted = [...new Set(ids)].filter((id) => !urls.has(id));
   if (wanted.length === 0) return [];
 
+  const evicted = new Set<string>();
   const results = await Promise.all(
     wanted.map(async (id) => {
       // Coalesce: two components rendering the same image must not decrypt it
@@ -90,10 +99,20 @@ export async function warm(ids: readonly string[]): Promise<string[]> {
       // the plaintext in its heap are both avoidable from here.
       let pending = inFlight.get(id);
       if (pending === undefined) {
-        pending = invoke<string>("plugin:attachments|attachment_object_url", { id })
-          .then((url) => {
-            urls.set(id, url);
-            return url;
+        pending = invoke<{ url: string; evicted: readonly string[] }>(
+          "plugin:attachments|attachment_object_url",
+          { id },
+        )
+          .then((res) => {
+            for (const gone of res.evicted) {
+              urls.delete(gone);
+              evicted.add(gone);
+            }
+            // Two-sided by necessity: the Worker has already REVOKED these, so a
+            // string still sitting here is a dead handle. Dropped BEFORE the new
+            // entry lands; the Worker never evicts the id it is minting.
+            urls.set(id, res.url);
+            return res.url;
           })
           .catch(() => null)
           .finally(() => {
@@ -104,7 +123,7 @@ export async function warm(ids: readonly string[]): Promise<string[]> {
       return (await pending) === null ? null : id;
     }),
   );
-  return results.filter((id): id is string => id !== null);
+  return [...results.filter((id): id is string => id !== null), ...evicted];
 }
 
 /**

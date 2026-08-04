@@ -115,7 +115,16 @@ const host: EditorHost = {
     // the ids a note references so its synchronous `resolveRef` can answer.
     // Gating would put a platform test here for a call whose desktop cost is
     // zero.
-    warmRefs: warmAttachmentUrls,
+    //
+    // The `void` wrapper is deliberate. `warmAttachmentUrls` resolves to the ids
+    // whose URL CHANGED (myne#388) — the library surfaces need that, so they go
+    // through `src/platform/attachments` directly — but the editor's own caller
+    // warms the ids the OPEN DOCUMENT embeds and has no thumbnails to remount,
+    // so it wants the void contract. Keeping `EditorHost.warmRefs` as-is is also
+    // what keeps this change out of the mobile client's build.
+    warmRefs: async (ids) => {
+      await warmAttachmentUrls(ids);
+    },
     attachmentExport,
     attachmentRename,
     // Desktop: native Save-As dialog (the OS confirms any overwrite). Omitted

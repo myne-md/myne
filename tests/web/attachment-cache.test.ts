@@ -64,14 +64,14 @@ describe("lookup (synchronous, total)", () => {
 
 describe("warm", () => {
   it("makes lookup answer with the minted URL", async () => {
-    invoke.mockResolvedValue("blob:http://localhost/one");
+    invoke.mockResolvedValue({ url: "blob:http://localhost/one", evicted: [] });
     await warm([A]);
     expect(lookup(A)).toBe("blob:http://localhost/one");
     expect(isWarm(A)).toBe(true);
   });
 
   it("asks the Worker once per id, not once per warm", async () => {
-    invoke.mockResolvedValue("blob:x");
+    invoke.mockResolvedValue({ url: "blob:x", evicted: [] });
     await warm([A]);
     await warm([A, A]);
     expect(invoke).toHaveBeenCalledTimes(1);
@@ -81,23 +81,23 @@ describe("warm", () => {
     // Two components rendering the same image must not decrypt it twice — the
     // second copy of the plaintext in the Worker's heap is the cost that matters,
     // not the message.
-    let release!: (v: string) => void;
+    let release!: (v: { url: string; evicted: readonly string[] }) => void;
     invoke.mockImplementation(
       () =>
-        new Promise<string>((res) => {
+        new Promise<{ url: string; evicted: readonly string[] }>((res) => {
           release = res;
         }),
     );
     const first = warm([A]);
     const second = warm([A]);
-    release("blob:shared");
+    release({ url: "blob:shared", evicted: [] });
     await Promise.all([first, second]);
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(lookup(A)).toBe("blob:shared");
   });
 
   it("de-duplicates within one call", async () => {
-    invoke.mockResolvedValue("blob:x");
+    invoke.mockResolvedValue({ url: "blob:x", evicted: [] });
     await warm([A, A, A]);
     expect(invoke).toHaveBeenCalledTimes(1);
   });
@@ -108,7 +108,7 @@ describe("warm", () => {
   });
 
   it("reports which ids became warm", async () => {
-    invoke.mockResolvedValue("blob:x");
+    invoke.mockResolvedValue({ url: "blob:x", evicted: [] });
     expect(await warm([A])).toEqual([A]);
     // Already warm → nothing changed, so a caller can skip a re-render.
     expect(await warm([A])).toEqual([]);
@@ -118,7 +118,9 @@ describe("warm", () => {
 describe("one failure does not take the note's other images down", () => {
   it("keeps the good id warm and leaves the bad one a placeholder", async () => {
     invoke.mockImplementation((_cmd: string, args: { id: string }) =>
-      args.id === A ? Promise.resolve("blob:good") : Promise.reject({ kind: "NotFound" }),
+      args.id === A
+        ? Promise.resolve({ url: "blob:good", evicted: [] })
+        : Promise.reject({ kind: "NotFound" }),
     );
     await warm([A, B]);
     expect(lookup(A)).toBe("blob:good");
@@ -136,7 +138,7 @@ describe("one failure does not take the note's other images down", () => {
     invoke.mockRejectedValueOnce({ kind: "NotFound" });
     await warm([A]);
     expect(isWarm(A)).toBe(false);
-    invoke.mockResolvedValueOnce("blob:arrived");
+    invoke.mockResolvedValueOnce({ url: "blob:arrived", evicted: [] });
     await warm([A]);
     expect(lookup(A)).toBe("blob:arrived");
   });
@@ -144,7 +146,7 @@ describe("one failure does not take the note's other images down", () => {
 
 describe("clear (the lock path)", () => {
   it("drops every URL so a post-lock render cannot paint a revoked one", async () => {
-    invoke.mockResolvedValue("blob:x");
+    invoke.mockResolvedValue({ url: "blob:x", evicted: [] });
     await warm([A, B]);
     expect(size()).toBe(2);
     clear();
@@ -155,11 +157,49 @@ describe("clear (the lock path)", () => {
   });
 
   it("lets a re-unlock warm the same ids again", async () => {
-    invoke.mockResolvedValue("blob:first");
+    invoke.mockResolvedValue({ url: "blob:first", evicted: [] });
     await warm([A]);
     clear();
-    invoke.mockResolvedValue("blob:second");
+    invoke.mockResolvedValue({ url: "blob:second", evicted: [] });
     await warm([A]);
     expect(lookup(A)).toBe("blob:second");
+  });
+});
+
+// ── myne#388: eviction is two-sided ─────────────────────────────────────────
+//
+// The Worker's URL map is bounded by a byte budget and evicts
+// least-recently-used. The page holds its OWN copy of the strings, so an id the
+// Worker revoked has to leave this map too — otherwise `warm` skips it as
+// already-warm forever and the tile paints a `blob:` handle whose `Blob` is
+// gone. A broken image reads to a user as corruption; the placeholder reads as
+// "not ready", which is the honest answer for something that will re-mint.
+describe("eviction reported by the Worker", () => {
+  it("forgets an evicted id, so a later warm re-mints instead of painting a dead handle", async () => {
+    invoke.mockResolvedValueOnce({ url: "blob:a", evicted: [] });
+    await warm([A]);
+    expect(isWarm(A)).toBe(true);
+
+    // Minting B pushed A out of the Worker's budget.
+    invoke.mockResolvedValueOnce({ url: "blob:b", evicted: [A] });
+    await warm([B]);
+    expect(isWarm(A)).toBe(false);
+    expect(lookup(A)).toBe(PENDING_ATTACHMENT_SRC);
+    expect(lookup(B)).toBe("blob:b");
+
+    // …and A is warmable again rather than stuck.
+    invoke.mockResolvedValueOnce({ url: "blob:a2", evicted: [] });
+    await warm([A]);
+    expect(lookup(A)).toBe("blob:a2");
+  });
+
+  it("reports an evicted id as CHANGED, so its tile repaints", async () => {
+    // The return is "ids whose resolved URL changed" — newly warm plus newly
+    // gone. A caller that only repainted the newly-warm would leave the evicted
+    // tile rendering a stale key against a dead URL.
+    invoke.mockResolvedValueOnce({ url: "blob:a", evicted: [] });
+    await warm([A]);
+    invoke.mockResolvedValueOnce({ url: "blob:b", evicted: [A] });
+    expect([...(await warm([B]))].sort()).toEqual([A, B].sort());
   });
 });

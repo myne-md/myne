@@ -101,9 +101,15 @@ export function CleanUnusedAttachmentsDialog({
   const [busy, setBusy] = useState(false);
   // #263: these thumbnails exist SO THE USER SEES what is about to be erased,
   // before an irreversible cryptographic erase — and on web they were blank
-  // boxes, because only the library warmed its ids. The set is independently
-  // scanned and already bounded, so warming exactly it is right.
-  const warmNonce = useWarmAttachmentRefs(attachments.map((a) => a.id));
+  // boxes, because only the library warmed its ids.
+  //
+  // Deliberately NOT windowed (myne#388): a placeholder here is worse than a
+  // decrypt, because the whole point of the thumbnail is that the user sees the
+  // thing before it is erased. The set is NOT "independently scanned and already
+  // bounded" as this comment used to claim — the unused list returns every
+  // unused row, and a vault of imported-but-never-embedded attachments has an
+  // unused set equal to its catalog. `MAX_WARMED_IDS` is what bounds it.
+  const { warmKey } = useWarmAttachmentRefs(attachments.map((a) => a.id));
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CleanResult | null>(null);
 
@@ -187,7 +193,7 @@ export function CleanUnusedAttachmentsDialog({
         <ul style={LIST_STYLE}>
           {attachments.map((a) => (
             <li
-              key={`${a.id}:${warmNonce}`}
+              key={warmKey(a.id)}
               style={ROW_STYLE}
               data-testid="clean-unused.row"
             >
