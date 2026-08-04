@@ -110,7 +110,18 @@ class SlashMenuView implements PluginValue {
     }
     if (update.selectionSet && this.state !== null) {
       const head = update.view.state.selection.main.head;
-      if (head < this.state.triggerFrom || head > this.state.triggerTo + 1) {
+      // `<= triggerFrom`, not `< triggerFrom` (myne#329). The trigger `/` sits
+      // AT `triggerFrom`, so a caret landing exactly there means the `/` is gone
+      // — Backspace over it — and the menu has nothing left to be about.
+      //
+      // With the old bound the menu stayed open: the filter slice degenerated to
+      // the empty string, the fuzzy filter returns every command for an empty
+      // query, and the whole menu kept rendering. The `Prec.highest` Enter
+      // binding then consumed the key and applied the first entry, `/h1`, whose
+      // `replaceLinePrefix` rewrote the caret's line to `# <line>` and swallowed
+      // the newline the user actually asked for. ArrowUp/ArrowDown/Escape and a
+      // mousedown on any row were hijacked the same way.
+      if (head <= this.state.triggerFrom || head > this.state.triggerTo + 1) {
         this.close();
       }
     }
