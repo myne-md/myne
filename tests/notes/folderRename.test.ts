@@ -250,6 +250,49 @@ describe("renameFolder — async apply (transactional)", () => {
     expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
   });
 
+  // ── myne#300: a post-commit rejection is not "the vault is unchanged" ────
+  //
+  // `write_batch_transactional` used to collapse both sides of the commit
+  // point into one `Io`, and this function read every rejection as
+  // all-or-nothing. Past the `.rename-journal` marker the batch IS committed —
+  // the backend publishes the rest at the next vault open — so the old
+  // behaviour told the user a folder rename that was already on disk had
+  // failed, AND skipped the two things the recovery pass cannot redo for it:
+  // the deliberate-folder rewrite and the re-index.
+  it("treats a CommittedPendingPublish rejection as committed, not as failure", async () => {
+    noteReadMock.mockImplementation((id: string) =>
+      Promise.resolve(id === "ref" ? "[[P/]]" : "---\nfolder: P/\n---\n\nx"),
+    );
+    writeBatchMock.mockRejectedValueOnce({
+      kind: "CommittedPendingPublish",
+      detail: { io_error_kind: "NoSpace" },
+    });
+    setDeliberateFoldersMock.mockResolvedValueOnce(undefined);
+    const notes: Note[] = [
+      { noteUuid: "n", folder: "P/" },
+      { noteUuid: "ref", folder: "Other/" },
+    ];
+    const result = await renameFolder("P/", "Q/", notes, ["P/"]);
+
+    expect(result.failed).toEqual([]);
+    expect(result.moved.sort()).toEqual(["n", "ref"]);
+    // The two writes the recovery pass will NOT redo happen anyway.
+    expect(setDeliberateFoldersMock).toHaveBeenCalledWith(["Q/"]);
+    expect(reindexMock).toHaveBeenCalledWith("n", expect.stringContaining("folder: Q/"));
+  });
+
+  it("still rolls back on an unrecognized rejection — the safe default", async () => {
+    // A rejection shape this build does not know (an older backend, a thrown
+    // Error) must keep the conservative reading. Recognizing "committed" is
+    // opt-in by tag; everything else stays all-or-nothing.
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\nx");
+    writeBatchMock.mockRejectedValueOnce(new Error("boom"));
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], ["P/"]);
+    expect(result.moved).toEqual([]);
+    expect(result.failed).toHaveLength(1);
+    expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
+  });
+
   it("does not commit or persist when nothing changed", async () => {
     noteReadMock.mockResolvedValue("# unrelated, no links, not in subtree");
     await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "Other/" }], ["Other/"]);

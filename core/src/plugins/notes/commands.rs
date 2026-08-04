@@ -1367,8 +1367,21 @@ pub async fn note_write_batch_with_dir(
             // above still leaves the vault in its pre-rename state.
             crate::note_txn::write_batch_transactional(io, &notes_dir_for_commit, &blobs)
                 .await
-                .map_err(|io_error_kind| {
-                    let mapped = NoteBatchError::Io { io_error_kind };
+                .map_err(|failure| {
+                    // The two sides of the commit point are different answers
+                    // and always were; only the type distinguishes them now
+                    // (myne#300). `Aborted` really is "the vault is unchanged";
+                    // `CommittedPendingPublish` is "it happened, and the rest
+                    // lands at the next open" — folding that into `Io` told
+                    // every caller to roll back a rename that had committed.
+                    let mapped = match failure {
+                        crate::note_txn::TxnFailure::Aborted(io_error_kind) => {
+                            NoteBatchError::Io { io_error_kind }
+                        }
+                        crate::note_txn::TxnFailure::CommittedPendingPublish(io_error_kind) => {
+                            NoteBatchError::CommittedPendingPublish { io_error_kind }
+                        }
+                    };
                     tracing::error!(
                         stage = "write_batch_transactional",
                         error_kind = note_batch_error_kind(&mapped),
@@ -1401,6 +1414,7 @@ pub fn note_batch_error_kind(e: &NoteBatchError) -> &'static str {
         NoteBatchError::CannotDecrypt => "CannotDecrypt",
         NoteBatchError::NotesDirNotADirectory => "NotesDirNotADirectory",
         NoteBatchError::Io { .. } => "Io",
+        NoteBatchError::CommittedPendingPublish { .. } => "CommittedPendingPublish",
         NoteBatchError::JoinFailure => "JoinFailure",
     }
 }
