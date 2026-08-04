@@ -221,6 +221,20 @@ pub fn active_vault_root_io_from_host(
 }
 
 /// [`notes_dir_for`] over a host. Ensures the directory exists, like its twin.
+///
+/// **Not available on wasm32** (myne#299). It ends in `notes_dir_under` →
+/// `require_vault_root`, a `Path::is_dir` stat, which on
+/// wasm32-unknown-unknown is the unsupported-platform stub and answers `false`
+/// for every path — so this compiled cleanly for the browser and then failed at
+/// runtime with `NotFound` before touching a single note.
+///
+/// `note_write_batch_transactional` shipped that way: note rename and folder
+/// rename/move were dead on every web client while the identical code worked on
+/// desktop, which is exactly the divergence the seam exists to prevent. A
+/// runtime `NotFound` is invisible to the compiler, to clippy and to every
+/// guard in `scripts/`; a `cfg` is not. Use [`notes_dir_for_host_io`] on any
+/// path a browser can reach.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn notes_dir_for_host(
     host: &dyn HostCtx,
     active_id: Option<VaultId>,
