@@ -219,7 +219,8 @@
       "intro": "Confirm this code matches the one shown in the extension, then Accept to pair.",
       "reject": "Reject",
       "rejected": "Pairing rejected.",
-      "title": "A browser extension wants to connect"
+      "title": "A browser extension wants to connect",
+      "persistFailed": "Myne couldn't save this connection, so it wasn't made. If the vault is locked, unlock it and try connecting again."
     }
   },
   "commandPalette": {

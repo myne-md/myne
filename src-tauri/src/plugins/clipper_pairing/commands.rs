@@ -105,10 +105,11 @@ pub async fn pairing_pending(
 /// [`PairingError::NoPendingPairing`] if there is nothing to accept,
 /// [`PairingError::CsprngUnavailable`] if the core CSPRNG fails (the session
 /// is left intact on a CSPRNG failure so a retry is non-destructive), and
-/// [`PairingError::PersistFailed`] if the prefs write failed (the token is live
-/// in memory for this session, but durability could not be confirmed — the next
-/// pairing change re-persists). The token value is returned only on a fully
-/// successful persist.
+/// [`PairingError::PersistFailed`] if the prefs write failed. On that failure
+/// the accept is ROLLED BACK (myne#290): the pending session is restored under
+/// its original challenge and the minted token is dropped, so a retry is
+/// non-destructive and the dialog still has a session to re-poll. The token
+/// value is returned only on a fully successful persist.
 #[tauri::command]
 pub async fn pairing_accept<R: Runtime>(
     app: AppHandle<R>,
@@ -116,11 +117,30 @@ pub async fn pairing_accept<R: Runtime>(
     vault_state: State<'_, VaultRuntimeState>,
     hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<String, PairingError> {
+    // Snapshot what the accept is about to consume, so a durability failure can
+    // put it back (myne#290). Taken BEFORE `accept_pending`, which takes the
+    // session and inserts the token in one locked step.
+    let prior_pending = state.pending();
+    let prior_registry = state.registry_snapshot();
     match state.accept_pending()? {
         Some(token) => {
             // Persist the new registry (issued token) BEFORE handing the value
             // back, so a durability failure is surfaced to the dialog.
-            persist_registry(&app, state.inner(), vault_state.inner(), hooks.inner()).await?;
+            if let Err(err) =
+                persist_registry(&app, state.inner(), vault_state.inner(), hooks.inner()).await
+            {
+                // Durability could not be confirmed, so the accept did not
+                // happen: restore the session under its original challenge and
+                // drop the token. Retry is then non-destructive, and the dialog
+                // still has a session to re-poll — before this, the card simply
+                // vanished and the user was left with a paired-but-unusable
+                // extension that a lock or restart would erase.
+                if let Some(pending) = prior_pending {
+                    state.rollback_accept(pending, prior_registry);
+                }
+                tracing::debug!(stage = "ext_pairing", outcome = "accept_persist_failed");
+                return Err(err);
+            }
             // Bounded outcome only — never the token value or extension id.
             tracing::debug!(stage = "ext_pairing", outcome = "accepted");
             Ok(token.value().to_string())

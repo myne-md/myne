@@ -22,6 +22,7 @@ import { useFocusTrap } from "../hooks/useFocusTrap";
 import {
   pairingAccept,
   pairingDispatchComplete,
+  pairingErrorKind,
   pairingPending,
   pairingReject,
   type PendingPairing,
@@ -95,6 +96,10 @@ type DialogState =
   | { phase: "idle" }
   | { phase: "pending"; pending: PendingPairing }
   | { phase: "rejected" }
+  /** The accept could not be made durable (myne#290). The host rolled it back,
+   *  so the session is still there and Retry is non-destructive — but the user
+   *  has to be told, or a vanished card reads as a successful Connect. */
+  | { phase: "persist-failed"; pending: PendingPairing }
   | { phase: "working" };
 
 /**
@@ -116,6 +121,13 @@ export function PairingDialog() {
     try {
       const pending = await pairingPending();
       setState((prev) => {
+        // myne#290 — the durability-failure card outlives the poll. The host
+        // ROLLS BACK a failed accept, so the session is live again immediately;
+        // without this the very next tick would replace the message with the
+        // pending card, which is the vanishing-card behaviour this whole fix
+        // exists to stop. Dismissing it hands the pending card straight back, so
+        // a retry is one click away.
+        if (prev.phase === "persist-failed") return prev;
         // Don't override a transient "rejected" acknowledgement until the
         // host has actually cleared the session (pending === null).
         if (prev.phase === "rejected") {
@@ -144,6 +156,9 @@ export function PairingDialog() {
       // two synchronous clicks would otherwise both call `pairingAccept`. The
       // ref flips synchronously, so the second call returns before minting.
       if (busyRef.current) return;
+      // The session as it stands, so a durability failure can re-render the
+      // SAME challenge the user already compared (myne#290).
+      const current = state.phase === "pending" ? state.pending : undefined;
       busyRef.current = true;
       setState({ phase: "working" });
       try {
@@ -155,16 +170,27 @@ export function PairingDialog() {
           await pairingDispatchComplete(requestId, "accepted", token);
         }
         setState({ phase: "idle" });
-      } catch {
-        // Mint failure (CSPRNG) leaves the session intact — re-poll picks it
-        // back up so a retry is non-destructive. The relay times out honestly.
-        setState({ phase: "idle" });
+      } catch (e) {
+        // myne#290 — a DURABILITY failure is not the same as a mint failure and
+        // must not be silent. Both leave the session intact (the host rolls the
+        // accept back), so the re-poll below picks it up and a retry is
+        // non-destructive. The difference is that the user has to be told why
+        // nothing happened: before this, the card simply vanished, which reads
+        // as a successful Connect while the extension is paired-but-unusable and
+        // the next lock or restart erases it.
+        if (pairingErrorKind(e) === "PersistFailed" && current !== undefined) {
+          setState({ phase: "persist-failed", pending: current });
+        } else {
+          // Mint failure (CSPRNG) leaves the session intact — re-poll picks it
+          // back up so a retry is non-destructive. The relay times out honestly.
+          setState({ phase: "idle" });
+        }
       } finally {
         busyRef.current = false;
         void poll();
       }
     },
-    [poll],
+    [poll, state],
   );
 
   const onReject = useCallback(async (requestId?: string | null) => {
@@ -200,6 +226,28 @@ export function PairingDialog() {
         <div style={CARD_STYLE} role="dialog" aria-label={t("clipper.pairing.title")}>
           <p data-testid="pairing.rejected" style={{ margin: 0 }}>
             {t("clipper.pairing.rejected")}
+          </p>
+          <div style={BUTTON_ROW_STYLE}>
+            <button
+              type="button"
+              style={BTN_BASE}
+              data-testid="pairing.dismiss"
+              onClick={() => setState({ phase: "idle" })}
+            >
+              {t("clipper.pairing.close")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.phase === "persist-failed") {
+    return (
+      <div style={BACKDROP_STYLE} data-testid="pairing.dialog" data-phase="persist-failed">
+        <div style={CARD_STYLE} role="dialog" aria-label={t("clipper.pairing.title")}>
+          <p data-testid="pairing.persist-failed" style={{ margin: 0 }}>
+            {t("clipper.pairing.persistFailed")}
           </p>
           <div style={BUTTON_ROW_STYLE}>
             <button

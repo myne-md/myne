@@ -186,6 +186,30 @@ impl PairingState {
         let mut inner = self.inner.lock().expect("pairing state mutex poisoned");
         inner.registry = registry;
     }
+
+    /// Undo an [`Self::accept_pending`] whose durability could not be confirmed
+    /// (myne#290): restore the session under its ORIGINAL challenge and drop the
+    /// token that was just minted.
+    ///
+    /// The defensive-guard shape `src-tauri/CLAUDE.md` documents for
+    /// `vault_creation::commit_with_vault_path` — "restore the session under its
+    /// token so retry stays non-destructive". Without it, a failed
+    /// `persist_registry` left the pairing in the worst possible state: the
+    /// session consumed, so the dialog's re-poll found nothing and its card
+    /// vanished with no message; a token live in RAM, so Settings showed a ghost
+    /// row; and nothing on disk, so a lock or a restart erased it. The user saw
+    /// what looked like a successful Connect and had a paired-but-unusable
+    /// extension.
+    ///
+    /// Restoring both fields under the ONE mutex is what makes it a rollback
+    /// rather than two observable states — a `replace_registry` followed by a
+    /// re-`begin_pairing` would both open a window and mint a fresh challenge,
+    /// which the user has already compared against the extension's.
+    pub fn rollback_accept(&self, pending: PendingPairing, registry: TokenRegistry) {
+        let mut inner = self.inner.lock().expect("pairing state mutex poisoned");
+        inner.registry = registry;
+        inner.pending = Some(pending);
+    }
 }
 
 #[cfg(test)]
@@ -297,5 +321,66 @@ mod tests {
             fresh.registry_snapshot().validate(EXT, token.value()),
             TokenValidation::Valid
         );
+    }
+
+    // ── myne#290: a durability failure must leave nothing behind ─────────────
+
+    #[test]
+    fn rollback_restores_the_session_and_drops_the_minted_token() {
+        // `accept_pending` takes the session AND inserts the token in one step,
+        // before the caller can find out whether the write survived. Without a
+        // rollback that left the worst possible state: no session for the dialog
+        // to re-poll (so its card vanished with no message), a token live in RAM
+        // (so Settings showed a ghost row), and nothing on disk (so the next
+        // lock erased it). The user read that as a successful Connect.
+        let st = PairingState::default();
+        let challenge = st.begin_pairing(EXT).unwrap();
+        let prior_pending = st.pending().expect("a session is open");
+        let prior_registry = st.registry_snapshot();
+
+        let token = st.accept_pending().unwrap().unwrap();
+        assert!(st.pending().is_none(), "accept consumed the session");
+        assert_eq!(
+            st.registry_snapshot().validate(EXT, token.value()),
+            TokenValidation::Valid,
+            "and minted a token"
+        );
+
+        st.rollback_accept(prior_pending, prior_registry);
+
+        assert_eq!(
+            st.registry_snapshot().validate(EXT, token.value()),
+            TokenValidation::Missing,
+            "the token is gone — nothing was durably authorized"
+        );
+        let restored = st.pending().expect("the session is back");
+        assert_eq!(
+            restored.challenge, challenge,
+            "and under its ORIGINAL challenge — the user already compared it \
+             against the extension's, so minting a fresh one would invalidate \
+             a comparison they had done"
+        );
+        assert_eq!(restored.extension_id, EXT);
+    }
+
+    #[test]
+    fn a_rolled_back_accept_can_be_retried_non_destructively() {
+        let st = PairingState::default();
+        st.begin_pairing(EXT).unwrap();
+        let prior_pending = st.pending().unwrap();
+        let prior_registry = st.registry_snapshot();
+        let _ = st.accept_pending().unwrap().unwrap();
+        st.rollback_accept(prior_pending, prior_registry);
+
+        // Retry: exactly one live token, not two.
+        let token = st
+            .accept_pending()
+            .unwrap()
+            .expect("the session was still there");
+        assert_eq!(
+            st.registry_snapshot().validate(EXT, token.value()),
+            TokenValidation::Valid
+        );
+        assert!(st.pending().is_none());
     }
 }
