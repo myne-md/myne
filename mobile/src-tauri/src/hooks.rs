@@ -136,9 +136,10 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
         // Best-effort like the desktop twin: a failed emit must never fail the
         // save that produced the warning.
         use tauri::Emitter;
-        let _ = self
-            .app
-            .emit(myne_core::plugins::notes::SNAPSHOT_WRITE_FAILED_EVENT, note_id);
+        let _ = self.app.emit(
+            myne_core::plugins::notes::SNAPSHOT_WRITE_FAILED_EVENT,
+            note_id,
+        );
     }
 
     // ---- Group 5: prefs application ---------------------------------------
