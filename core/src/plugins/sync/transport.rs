@@ -281,7 +281,98 @@ impl FakeTransport {
     pub fn requests(&self) -> Vec<SeenRequest> {
         self.seen.lock().unwrap().clone()
     }
+
+    /// Answer `POST /sync/blobs` with `404`, modelling a server that predates the
+    /// batch route (myne-md/myne#240) — the fallback-to-single-blob path.
+    pub fn without_blob_batch(&self) {
+        self.on(HttpMethod::Post, BLOB_BATCH_PATH, 404, b"{}".to_vec());
+    }
+
+    /// Synthesize a `POST /sync/blobs` response from the per-blob `GET
+    /// /sync/blob?id=<hex>` entries a test already canned.
+    ///
+    /// Without this, every test that cans single-blob GETs would break the moment
+    /// the pull loop started batching — the map is keyed on the exact
+    /// `"<METHOD> <path>"`, so the batch request would miss and come back
+    /// `TransportError::Network`, which is not the 404 that triggers the fallback.
+    /// Synthesizing keeps each canned status meaning exactly what it meant on the
+    /// single route (`404` → `not_found`, `410` → `blob_reclaimed`, anything else
+    /// → `internal`), and **a missing entry fails the WHOLE batch with
+    /// `Network`** — precisely what the single route would have returned for that
+    /// id, so no test silently changes shape.
+    ///
+    /// An explicit `on(Post, "/sync/blobs", …)` still wins: that is how the
+    /// adversarial batch shapes (an id in both arrays, an id in neither, an entry
+    /// with empty bytes) get tested at all, since no single-blob canning can
+    /// express them.
+    fn synthesize_blob_batch(&self, body: &[u8]) -> Result<TransportResponseExt, TransportError> {
+        #[derive(serde::Deserialize)]
+        struct Req {
+            #[serde(default)]
+            blob_ids_hex: Vec<String>,
+        }
+        let req: Req = serde_json::from_slice(body).map_err(|_| TransportError::BadRequest)?;
+        let responses = self.responses.lock().unwrap();
+        let mut blobs = Vec::new();
+        let mut omitted = Vec::new();
+        for id_hex in &req.blob_ids_hex {
+            let key = Self::key(HttpMethod::Get, &format!("/sync/blob?id={id_hex}"));
+            let Some(canned) = responses.get(&key) else {
+                return Err(TransportError::Network);
+            };
+            match canned.status {
+                200 => {
+                    // Re-use the single-blob body's own `ciphertext_b64` verbatim,
+                    // so a test that canned junk or an empty string still delivers
+                    // exactly that through the batch shape.
+                    let v: serde_json::Value = serde_json::from_slice(&canned.body)
+                        .map_err(|_| TransportError::BadRequest)?;
+                    let ct = v
+                        .get("ciphertext_b64")
+                        .and_then(|c| c.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    blobs.push(serde_json::json!({
+                        "blob_id_hex": id_hex,
+                        "ciphertext_b64": ct,
+                    }));
+                }
+                404 => omitted
+                    .push(serde_json::json!({ "blob_id_hex": id_hex, "error_code": "not_found" })),
+                410 => omitted.push(
+                    serde_json::json!({ "blob_id_hex": id_hex, "error_code": "blob_reclaimed" }),
+                ),
+                other => {
+                    // A canned 429 must stay a 429 for the WHOLE batch: it is the
+                    // one status the caller retries rather than skips, and turning
+                    // it into a per-id omission would silently drop the record.
+                    if other == 429 {
+                        return Ok(TransportResponseExt {
+                            status: 429,
+                            body: b"{}".to_vec(),
+                            headers: Vec::new(),
+                        });
+                    }
+                    omitted.push(
+                        serde_json::json!({ "blob_id_hex": id_hex, "error_code": "internal" }),
+                    );
+                }
+            }
+        }
+        Ok(TransportResponseExt {
+            status: 200,
+            body: serde_json::to_vec(&serde_json::json!({ "blobs": blobs, "omitted": omitted }))
+                .unwrap_or_default(),
+            headers: Vec::new(),
+        })
+    }
 }
+
+/// The batch-fetch route (myne-md/myne#240). Named once so the fake, the engine
+/// and the test decorators cannot disagree about it — and, critically, so a
+/// path-PREFIX match against the single-blob route is never mistaken for a match
+/// against this one.
+pub const BLOB_BATCH_PATH: &str = "/sync/blobs";
 
 fn alloc_format(method: &str, path: &str) -> String {
     let mut s = String::with_capacity(method.len() + 1 + path.len());
@@ -327,12 +418,21 @@ impl SyncTransport for FakeTransport {
                 .map(|(n, v)| (n.to_string(), v.to_string()))
                 .collect(),
         ));
-        self.responses
+        if let Some(canned) = self
+            .responses
             .lock()
             .unwrap()
             .get(&Self::key(method, path))
             .cloned()
-            .ok_or(TransportError::Network)
+        {
+            return Ok(canned);
+        }
+        // Only the batch route falls back to synthesis, and only when nothing was
+        // canned for it explicitly.
+        if method == HttpMethod::Post && path == BLOB_BATCH_PATH {
+            return self.synthesize_blob_batch(body);
+        }
+        Err(TransportError::Network)
     }
 }
 

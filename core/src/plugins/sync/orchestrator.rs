@@ -2959,7 +2959,9 @@ mod tests {
     use super::*;
     use crate::plugins::notes::note_id::NoteId;
     use crate::plugins::sync::enroll::{self, EnrollPath};
-    use crate::plugins::sync::transport::{HttpMethod, TransportError, TransportResponse};
+    use crate::plugins::sync::transport::{
+        HttpMethod, TransportError, TransportResponse, BLOB_BATCH_PATH,
+    };
     use protocol::{decode_note, encode_new_note};
     use std::path::PathBuf;
     use std::process::Child;
@@ -3096,7 +3098,12 @@ mod tests {
             body: &[u8],
             token: Option<&str>,
         ) -> Result<TransportResponse, TransportError> {
-            if path.starts_with("/sync/blob") {
+            // BOTH blob-download routes: the single one and the batch one
+            // (myne-md/myne#240). Spelled out rather than left as a
+            // `starts_with("/sync/blob")` prefix, which happens to catch both
+            // but reads as if it only meant the single route — the same
+            // accident that nearly disarmed `NonceCorruptingTransport`.
+            if path.starts_with("/sync/blob?") || path == BLOB_BATCH_PATH {
                 return Ok(TransportResponse {
                     status: 500,
                     body: Vec::new(),
@@ -3434,6 +3441,14 @@ mod tests {
     struct NonceCorruptingTransport {
         inner: Box<dyn SyncTransport>,
         decoy_b64: String,
+        /// How many responses this decorator actually rewrote. Asserted by the
+        /// test: a decorator that silently stops corrupting turns the §11.3 guard
+        /// into a test that passes having proved nothing. That is not
+        /// hypothetical — the batch route (myne-md/myne#240) is caught by the old
+        /// `starts_with("/sync/blob")` match, and the old top-level
+        /// `v["ciphertext_b64"] = …` rewrite would have added a stray field to a
+        /// batch body while leaving every real per-blob ciphertext intact.
+        fired: std::sync::atomic::AtomicUsize,
     }
     impl SyncTransport for NonceCorruptingTransport {
         fn request(
@@ -3444,12 +3459,29 @@ mod tests {
             token: Option<&str>,
         ) -> Result<TransportResponse, TransportError> {
             let resp = self.inner.request(method, path, body, token)?;
-            if !path.starts_with("/sync/blob") || resp.status != 200 {
+            if resp.status != 200 {
+                return Ok(resp);
+            }
+            let single = path.starts_with("/sync/blob?");
+            let batch = path == BLOB_BATCH_PATH;
+            if !single && !batch {
                 return Ok(resp);
             }
             let mut v: serde_json::Value =
                 serde_json::from_slice(&resp.body).expect("blob response is JSON");
-            v["ciphertext_b64"] = serde_json::Value::String(self.decoy_b64.clone());
+            if single {
+                v["ciphertext_b64"] = serde_json::Value::String(self.decoy_b64.clone());
+                self.fired
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            } else if let Some(entries) = v["blobs"].as_array_mut() {
+                // The ciphertexts live one level down in the batch shape. Rewrite
+                // each of them; a top-level assignment here would corrupt nothing.
+                for e in entries.iter_mut() {
+                    e["ciphertext_b64"] = serde_json::Value::String(self.decoy_b64.clone());
+                    self.fired
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
             Ok(TransportResponse {
                 status: 200,
                 body: serde_json::to_vec(&v).unwrap(),
@@ -3525,6 +3557,7 @@ mod tests {
         let tb = NonceCorruptingTransport {
             inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
             decoy_b64,
+            fired: std::sync::atomic::AtomicUsize::new(0),
         };
         let dev_b = enroll::generate_device_id();
         let out_b = enroll::enroll(
@@ -3565,6 +3598,14 @@ mod tests {
             true,
         )
         .expect("B sync cycle survives a nonce-corrupted download");
+        // The decorator must have actually rewritten something. Without this the
+        // whole test degrades into "an honest download was skipped", which is
+        // false, and it would still pass — the exact way a path-match change
+        // could disarm the §11.3 guard in silence.
+        assert!(
+            tb.fired.load(std::sync::atomic::Ordering::Relaxed) > 0,
+            "the corrupting decorator never fired — this test proves nothing"
+        );
         assert_eq!(
             pull.pulled, 0,
             "mismatching bytes are never counted as pulled"
