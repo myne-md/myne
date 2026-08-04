@@ -141,7 +141,24 @@ export const Comment: MarkdownConfig = {
       name: "DialectCommentBlock",
       // A `%%`-opening line interrupts an open paragraph (a block comment may
       // follow prose without a blank line between), like footnote definitions.
-      endLeaf(_cx: BlockContext, line: Line): boolean {
+      //
+      // …but NOT an open comment block (myne#323). lezer consults these stops
+      // BEFORE the leaf parsers' `nextLine`, and a multi-line comment's CLOSING
+      // line also starts with `%%` — so this fired on the closer, broke out of
+      // the line loop, and `finish` then found no closer in the accumulated
+      // content and declined. The whole closer-on-its-own-line branch in
+      // `nextLine` was unreachable, and the canonical multi-line shape the spec
+      // documents parsed as ordinary prose.
+      //
+      // That is not a cosmetic miss: the comment is not dimmed, not excluded
+      // from document statistics, and not stripped — so an editor-private
+      // note-to-self ships verbatim in exported HTML, in the printed PDF and in
+      // stripped TXT, and `hasDialectComment` answers false so nothing upstream
+      // can warn.
+      endLeaf(_cx: BlockContext, line: Line, leaf: LeafBlock): boolean {
+        const insideOpenComment =
+          opensWithDelim(leaf.content) && indexOfDelim(leaf.content, 2) === -1;
+        if (insideOpenComment) return false;
         return opensWithDelim(line.text.slice(line.pos));
       },
       // Attach the leaf parser when the leaf's first line starts with `%%`.
