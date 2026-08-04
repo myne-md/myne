@@ -277,11 +277,23 @@ A short, eye-comparable code derived from a [vault head](#vault-head)'s [head_id
 
 Used in: `spec/sync-protocol.md` §6.3 (normative construction); `spec/protocol.md` §3.4 (MYND-416); `protocol/src/vault_head.rs::head_fingerprint`
 
+### **batch blob fetch** &nbsp; 📋 *Protocol*
+
+`POST /sync/blobs` — the read-path twin of the chunked push: up to a fixed id cap of a pull's changed ciphertexts in ONE request instead of one `GET /sync/blob` each (`server-protocol.md` §3.3). The client plans each **window** against both an id count and a byte budget estimated from the advisory `size` of the [per-blob sync-meta](#per-blob-sync-meta); because that `size` is server-advertised and untrusted, the window is a hint that can only cost a round-trip, never produce a wrong result. The response accounts for a **prefix** of the request in order: an id in neither the served array nor the `omitted` array was simply not served, and the client re-requests it. Every omission carries a per-id code, so a [reclaimed blob](#blob-reclaimed) is reported by absence-plus-code and **never** as an entry with empty bytes — the §11.3 fail-closed rule, restated for a shape that can violate it by dropping an id rather than by serving a zero-length body. A server predating the route answers `404`/`405` and the client falls back to the single-blob route for that sync attempt; a transport failure is an outage, not that signal. A batch spends tokens in proportion to the ids it carries (`server-protocol.md` §5.2), so it buys round-trips rather than budget. Phase 2.
+
+Used in: `spec/server-protocol.md` §3.3, §5.2; `spec/sync-protocol.md` §8.1, §11.3
+
 ### **blind blob store** &nbsp; 📦 *Product*
 
 The Phase 2 sync server's role: it stores **opaque ciphertext blobs and key-wrapping material only**, and performs **structural** operations on them — current-head pointer compare-and-swap, the per-note version-counter increment, quota accounting — but **never** decrypts, merges, or interprets content (A1; TB5). Plaintext, decryption keys, and the master password never leave the client. Conflict resolution is consequently client-side (`sync-protocol.md` §10). "Blind" = the server is structurally incapable of reading what it relays; self-hosted and hosted operators are identical in this respect (TB5). Phase 2.
 
 Used in: `spec/server-protocol.md` §1–§2
+
+### **blob reclaimed** &nbsp; 📋 *Protocol*
+
+The Layer-2 storage-reclamation outcome (`sync-protocol.md` §11.3): past the tombstone horizon the server dropped a record's ciphertext body and kept only `(uuid, final_version, marker)` — so the record exists and its bytes do not. A ciphertext fetch for one **fails closed**: `410 blob_reclaimed` on the single-blob route, or a per-id `blob_reclaimed` omission on a [batch blob fetch](#batch-blob-fetch). Never an empty-body `200` and never an entry with empty bytes — a blind client cannot tell a zero-length ciphertext from a real one, and this was observed destroying live local notes. Distinct from `not_found`, which says nothing at all: `blob_reclaimed` says the uuid once existed and was reclaimed, so the client drops or quarantines the record rather than re-pushing it (re-pushing would resurrect deleted content and lose the reclaimed version's CAS). Client dispositions: skip without mutation in the pull loop, [quarantine](#sync-quarantine) on the fresh-cursor probe. Phase 2.
+
+Used in: `spec/sync-protocol.md` §11.3; `spec/server-protocol.md` §3.3, §7.2
 
 ### **bottom bar** &nbsp; 📦 *Product*
 
