@@ -10,10 +10,19 @@ import {
   focusAt,
   mount,
   query,
+  queryAll,
   renderedText,
   roundTripBytes,
   teardown,
 } from "./_conformance";
+
+/** The icon's child tags, in order. Empty means the glyph rendered as nothing —
+ *  which is the shape #376 reported and which asserting on `<svg>` alone misses. */
+function iconShapes(m: Mounted): string[] {
+  const svg = query(m, ".cm-callout-title")?.querySelector("svg");
+  if (svg === null || svg === undefined) return [];
+  return Array.from(svg.children).map((c) => c.tagName.toLowerCase());
+}
 
 let m: Mounted | null = null;
 afterEach(() => {
@@ -29,6 +38,25 @@ describe("callouts", () => {
     expect(title).not.toBeNull();
     expect(title!.textContent).toContain("Note");
     expect(title!.querySelector("svg")).not.toBeNull();
+    // The glyph itself, not just its container: an `<svg>` that parsed to nothing
+    // still satisfies the line above (#376). `note` draws the pencil — two paths.
+    expect(iconShapes(m)).toEqual(["path", "path"]);
+  });
+
+  it("draws the type's own glyph, not a shared one", () => {
+    m = mount("> [!info]\n> body text\n");
+    expect(iconShapes(m)).toEqual(["circle", "path", "path"]);
+    teardown(m);
+    m = mount("> [!todo]\n> body text\n");
+    expect(iconShapes(m)).toEqual(["circle"]);
+  });
+
+  // Pins the invariant, NOT the condition that threatens it: the duplicate-header
+  // case needs a Blockquote spanning two of `view.visibleRanges`, and a jsdom mount
+  // has one contiguous range. The dedup in callout.ts is defensive on that path.
+  it("renders exactly one header per callout", () => {
+    m = mount("> [!note] Title\n> body\n");
+    expect(queryAll(m, ".cm-callout-title")).toHaveLength(1);
   });
 
   it("maps types to colors (warning → warning tint)", () => {

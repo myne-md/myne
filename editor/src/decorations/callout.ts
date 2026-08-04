@@ -22,30 +22,96 @@ import { isCursorLine } from "./cursor-aware";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 import i18n from "@myne/editor/i18n";
 
-// Inner SVG (24x24, stroke="currentColor") for the callout icons. Local to keep
-// the decoration self-contained (no edit to the shared ICON_PATHS).
-const ICONS: Record<string, string> = {
-  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
-  pencil:
-    '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
-  lightbulb:
-    '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
-  check: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
-  help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
-  warn: '<path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
-  x: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
-  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
-  todo: '<circle cx="12" cy="12" r="10" stroke-dasharray="3 3"/>',
-  list: '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
-  quote:
-    '<path d="M10 11H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6c0 2-1 3-3 4"/><path d="M19 11h-4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6c0 2-1 3-3 4"/>',
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** One child element of an icon: its tag plus the attributes to set on it. */
+type IconNode = readonly [tag: string, attrs: Readonly<Record<string, string>>];
+
+// Inner shapes (24x24, stroke="currentColor") for the callout icons. Local to
+// keep the decoration self-contained (no edit to the shared ICON_PATHS).
+//
+// Descriptors, not markup: the children are built with `createElementNS` like
+// every other icon in the tree (`slash/icons.ts`, `attachments/icons.ts`,
+// `fenced-code.ts`, `toolbar/plugin.ts`, `lightbox.ts`) rather than parsed from
+// an `innerHTML` string. Same geometry as before, one less parsing path to
+// depend on (#376) and the house TB2 rule restored.
+const ICONS: Record<string, readonly IconNode[]> = {
+  info: [
+    ["circle", { cx: "12", cy: "12", r: "10" }],
+    ["path", { d: "M12 16v-4" }],
+    ["path", { d: "M12 8h.01" }],
+  ],
+  pencil: [
+    ["path", { d: "M12 20h9" }],
+    ["path", { d: "M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" }],
+  ],
+  lightbulb: [
+    [
+      "path",
+      {
+        d: "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5",
+      },
+    ],
+    ["path", { d: "M9 18h6" }],
+    ["path", { d: "M10 22h4" }],
+  ],
+  check: [
+    ["circle", { cx: "12", cy: "12", r: "10" }],
+    ["path", { d: "m9 12 2 2 4-4" }],
+  ],
+  help: [
+    ["circle", { cx: "12", cy: "12", r: "10" }],
+    ["path", { d: "M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" }],
+    ["path", { d: "M12 17h.01" }],
+  ],
+  warn: [
+    ["path", { d: "m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z" }],
+    ["path", { d: "M12 9v4" }],
+    ["path", { d: "M12 17h.01" }],
+  ],
+  x: [
+    ["circle", { cx: "12", cy: "12", r: "10" }],
+    ["path", { d: "m15 9-6 6" }],
+    ["path", { d: "m9 9 6 6" }],
+  ],
+  zap: [
+    [
+      "path",
+      {
+        d: "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z",
+      },
+    ],
+  ],
+  todo: [["circle", { cx: "12", cy: "12", r: "10", "stroke-dasharray": "3 3" }]],
+  list: [
+    ["path", { d: "M8 6h13" }],
+    ["path", { d: "M8 12h13" }],
+    ["path", { d: "M8 18h13" }],
+    ["path", { d: "M3 6h.01" }],
+    ["path", { d: "M3 12h.01" }],
+    ["path", { d: "M3 18h.01" }],
+  ],
+  quote: [
+    ["path", { d: "M10 11H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6c0 2-1 3-3 4" }],
+    ["path", { d: "M19 11h-4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6c0 2-1 3-3 4" }],
+  ],
 };
+
+function el(tag: string, attrs: Readonly<Record<string, string>>): SVGElement {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+}
 
 interface CalloutType {
   readonly color: "info" | "success" | "warning" | "danger" | "accent";
   readonly icon: string;
-  /** i18n key (under `editor.callout.label.*`) for the default title; resolved
-   *  at render time via `i18n.t()` so a language switch re-labels live. */
+  /** i18n key (under `editor.callout.label.*`) for the default title, resolved
+   *  via `i18n.t()` when the decoration set is BUILT — the plugin's rebuild gate
+   *  (`plugin-factory.ts`) watches doc / viewport / selection / focus / tree, not
+   *  `languageChanged`, so a live re-label would need the builder re-run through
+   *  `makeGatedDecorationPlugin`. It isn't wired; a switched language re-labels
+   *  on the next rebuild (any edit, scroll or selection move). */
   readonly labelKey: string;
 }
 
@@ -87,13 +153,22 @@ class CalloutHeaderWidget extends WidgetType {
   ) {
     super();
   }
+  /** Every field `toDOM` renders, so an equal widget really can keep its DOM.
+   *  `labelKey` alone would let two types that share a default title but differ
+   *  in icon/colour reuse each other's node — no such pair exists in
+   *  `CALLOUT_TYPES` today, which is exactly why it would go unnoticed. */
   eq(other: CalloutHeaderWidget): boolean {
-    return other.title === this.title && other.type.labelKey === this.type.labelKey;
+    return (
+      other.title === this.title &&
+      other.type.labelKey === this.type.labelKey &&
+      other.type.icon === this.type.icon &&
+      other.type.color === this.type.color
+    );
   }
   toDOM(): HTMLElement {
     const span = document.createElement("span");
     span.className = `cm-callout-title cm-callout-fg-${this.type.color}`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const svg = document.createElementNS(SVG_NS, "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
     svg.setAttribute("width", "16");
     svg.setAttribute("height", "16");
@@ -102,7 +177,10 @@ class CalloutHeaderWidget extends WidgetType {
     svg.setAttribute("stroke-width", "1.75");
     svg.setAttribute("stroke-linecap", "round");
     svg.setAttribute("stroke-linejoin", "round");
-    svg.innerHTML = ICONS[this.type.icon] ?? ICONS.info; // trusted local SVG
+    svg.setAttribute("aria-hidden", "true");
+    for (const [tag, attrs] of ICONS[this.type.icon] ?? ICONS.info) {
+      svg.appendChild(el(tag, attrs));
+    }
     span.appendChild(svg);
     const label = document.createElement("strong");
     label.textContent = this.title;
@@ -114,6 +192,13 @@ class CalloutHeaderWidget extends WidgetType {
 function buildCalloutDecorations(view: EditorView): DecorationSet {
   const decorations: Array<Range<Decoration>> = [];
   const doc = view.state.doc;
+  // A Blockquote overlapping two visible ranges is entered once PER range, so
+  // without this it contributes duplicate line decorations and — worse — a second
+  // header widget over the identical span. `blockquote.ts` collapses the same
+  // repeat with a Map/Set; this is the same guard. Keyed on the node's whole
+  // extent, not just its start, so a nested quote sharing an offset with its
+  // parent is still its own node.
+  const seen = new Set<string>();
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(view.state).iterate({
@@ -121,6 +206,9 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
       to,
       enter: (node) => {
         if (node.name !== "Blockquote") return undefined;
+        const key = `${node.from}:${node.to}`;
+        if (seen.has(key)) return undefined;
+        seen.add(key);
         const firstLine = doc.lineAt(node.from);
         const m = HEADER_RE.exec(firstLine.text);
         if (m === null) return undefined;

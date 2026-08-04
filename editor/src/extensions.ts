@@ -146,6 +146,7 @@ import { buildMyneKeymap, collapseMultiSelection } from "./keymap";
 import { vimExtension } from "./vim";
 import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
+import { scrollSlackExtension } from "./scroll-slack";
 import { myneTheme } from "./theme";
 
 export function myneExtensions(opts?: {
@@ -339,6 +340,10 @@ export function myneExtensions(opts?: {
     // the rebindable Compartment above) reads this facet.
     indentUnit.of("    "),
     EditorView.lineWrapping,
+    // Scroll slack below the last line (#375) so the tail of a long note can be
+    // lifted off the bottom edge of the viewport. NOT CodeMirror's
+    // `scrollPastEnd()` — see the module header for why that one is wrong here.
+    scrollSlackExtension(),
     // Optional line-number gutter (editor-line-numbers, MYND-314), seeded OFF
     // (prose-first default). Lives in a CM6 Compartment so the host can
     // reconfigure it live on the `editor_line_numbers` pref change (SYNC-3

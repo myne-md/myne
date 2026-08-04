@@ -706,6 +706,18 @@ export const myneTheme = EditorView.theme({
     gap: "6px",
     fontWeight: "700",
   },
+  // The icon is a flex ITEM, and WebKit does not honour an SVG's intrinsic size
+  // as its content-based minimum — so once the inline-flex box is sized below its
+  // max-content width (long title, narrow pane, wrapped line) the icon collapses
+  // to zero width and the header renders as title-only. That is the desktop
+  // WKWebView, and it varies with title length and pane width rather than with
+  // anything the user did, which is what made it read as random (#376). Pin the
+  // box: no shrink, explicit size, independent of intrinsic sizing.
+  ".cm-callout-title svg": {
+    flex: "none",
+    width: "16px",
+    height: "16px",
+  },
   ".cm-callout-fg-info": { color: "var(--info, #2c4a7a)" },
   ".cm-callout-fg-success": { color: "var(--success, #2f6048)" },
   ".cm-callout-fg-warning": { color: "var(--warning, #8a6a1f)" },
