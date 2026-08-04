@@ -2406,6 +2406,7 @@ function EditorChrome({
       />
       <WorkspaceHotkeys
         focusActive={focusActive}
+        activeModal={settingsOpen ? "settings" : paletteOpen ? "palette" : null}
         onToggleFocus={toggleFocus}
         onExitFocus={exitFocus}
         onTogglePalette={() => setPaletteOpen((v) => !v)}
@@ -3491,12 +3492,15 @@ const KEYBIND_DEFAULTS: Readonly<Record<string, string[]>> = catalogDefaults();
 
 function WorkspaceHotkeys({
   focusActive,
+  activeModal,
   onToggleFocus,
   onExitFocus,
   onTogglePalette,
   onToggleSettings,
 }: {
   focusActive: boolean;
+  /** The modal currently owning the screen, or `null` (myne#336). */
+  activeModal: string | null;
   onToggleFocus: () => void;
   onExitFocus: () => void;
   onTogglePalette: () => void;
@@ -3560,12 +3564,16 @@ function WorkspaceHotkeys({
       // listener's gate exactly — stands down in plain inputs (rename/search),
       // stays live inside the CM6 editor surface. The dispatcher's preventDefault
       // also suppresses the WebView's native Print dialog on Cmd+P.
-      { id: "palette.toggle", scope: {}, run: () => onTogglePalette() },
+      // Survives a modal on purpose (myne#336): this chord is how the user
+      // CLOSES the palette, so gating it under "a modal is open" would trap
+      // them in it.
+      { id: "palette.toggle", scope: { allowInModal: true }, run: () => onTogglePalette() },
       // #184 track D — these three were hardcoded window listeners (settings,
       // graph) or palette-only with an INERT declared chord (tasks); routing them
       // through the engine is what makes the panel's "rebindable" mark honest and
       // their default chords actually fire.
-      { id: "app.open-settings", scope: {}, run: () => onToggleSettings() },
+      // Same reasoning as `palette.toggle` above — it is the close chord too.
+      { id: "app.open-settings", scope: { allowInModal: true }, run: () => onToggleSettings() },
       { id: "graph.show", scope: {}, run: () => ws.openGraph() },
       { id: "tasks.show", scope: {}, run: () => ws.openTasks() },
       // In-note find (#184): open the docked find bar. App.tsx still owns the
@@ -3586,8 +3594,22 @@ function WorkspaceHotkeys({
     defaults: KEYBIND_DEFAULTS,
     overrides: prefs.keymap,
     stageName: "editor",
-    selectedNoteId: null,
-    activeModal: null,
+    // myne#336 — both of these were hardcoded, so the two gates the engine
+    // documents never engaged.
+    //
+    // `activeModal: null` meant "window shortcuts stand down under a modal"
+    // was never true: under a modal the user believes is exclusive, window
+    // chords silently acted on the workspace behind it — tabs closed, notes
+    // were created into an unreachable inline rename, the center view changed,
+    // pane history moved. Nothing is overwritten, but the user comes back to a
+    // workspace that is not the one they left, with no record of what changed.
+    //
+    // `selectedNoteId: null` made `ctx.hasSelectedNote` permanently false, so
+    // any entry declaring `scope.requiresNote` would silently never fire. Inert
+    // today because no entry uses the flag — which is exactly how it would have
+    // stayed until the first one did.
+    selectedNoteId: ctx.selectedId,
+    activeModal,
   });
 
   // vim `:q` / `:wq` / `:x` (MYND-313). The ex table lives in the editor package
