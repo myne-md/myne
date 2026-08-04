@@ -308,13 +308,43 @@ pub async fn persist_search_index_core(
         .await
         .map_err(|_| SearchSyncError::Io)?;
 
-    let on_disk: crate::note_nonce::NonceManifest =
-        crate::note_nonce::scan_on_disk_manifest_io(io, &notes_dir)
-            .await
-            .into_iter()
-            .collect();
-    let total = on_disk.len();
+    let scanned = crate::note_nonce::scan_on_disk_manifest_io(io, &notes_dir).await;
+    let total = scanned.len();
     let index = search.snapshot();
+
+    // Persist a manifest entry ONLY for a note the index actually holds a
+    // document for (myne#305).
+    //
+    // The manifest is not a description of the notes directory — it is a claim
+    // that the index shipped beside it already covers each listed note AT that
+    // content nonce, and the next hydrate reads it exactly that way
+    // (`if manifest.get(id) == Some(nonce) { continue; }` — never decrypted).
+    // Pairing a freshly-scanned manifest with whatever the index happened to
+    // hold made that claim about notes nobody had indexed.
+    //
+    // Sync is how they get there: `apply_pulled_note_blob` writes another
+    // device's note straight to disk with no index side effect, so the note is
+    // absent from the live index for the rest of the session — and then the
+    // 120 s flush timer certified it. From that point search reported the note
+    // did not contain text it does contain, permanently, across restarts. The
+    // only escapes were editing it locally (a new nonce) or the blob failing to
+    // decode.
+    //
+    // Filtering here does not index anything; it makes the omission SELF-
+    // HEALING instead of self-sealing. An unindexed note simply stays stale, so
+    // the next hydrate decrypts and indexes it like any changed note.
+    let on_disk: crate::note_nonce::NonceManifest = scanned
+        .into_iter()
+        .filter(|(id, _)| index.contains_doc(id))
+        .collect();
+    let certified = on_disk.len();
+    if certified < total {
+        tracing::debug!(
+            stage = "persist_search_index",
+            omitted = total - certified,
+            "notes on disk that the index does not cover are left out of the manifest"
+        );
+    }
 
     // `run_blocking`, not `spawn_blocking`: the native arm dispatches to a
     // worker so a 10k-note encode does not park one, and the wasm arm runs
@@ -412,4 +442,129 @@ pub async fn note_search_core(
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
+    use crate::search::SearchIndexState;
+    use crate::test_support::{block_on, seed_real_vault_meta, ScopedTempDir};
+
+    /// A vault directory with a parseable `vault.meta` and an unlocked slot.
+    async fn seeded() -> (ScopedTempDir, VaultRuntimeState) {
+        let dir = ScopedTempDir::new("search-persist").unwrap();
+        seed_real_vault_meta(dir.path(), 0x5a);
+        std::fs::create_dir_all(dir.path().join("notes")).unwrap();
+        let state = VaultRuntimeState::default();
+        state
+            .set_unlocked(test_vault_id(), fixture_unlocked_with_keys(7, 9, 1))
+            .await;
+        (dir, state)
+    }
+
+    async fn create(dir: &Path, state: &VaultRuntimeState, body: &str) -> String {
+        crate::plugins::notes::commands::note_create_with_dir(
+            dir.join("notes"),
+            state,
+            body.to_string(),
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("create note")
+    }
+
+    // ── myne#305: the manifest is a claim about the INDEX, not about disk ───
+    //
+    // `apply_pulled_note_blob` writes another device's note straight to disk
+    // with no index side effect, so the note is absent from the live index for
+    // the rest of the session. The 120 s flush timer then persisted a
+    // freshly-scanned manifest beside that index — certifying the note as
+    // covered at its current content nonce. The next hydrate read the manifest
+    // as authoritative and skipped it, and every later persist re-certified it:
+    // search reported the note did not contain text it does contain, forever,
+    // across restarts.
+    //
+    // The escape was editing the note locally (a new nonce) or the blob failing
+    // to decode. Filtering the manifest to what the index actually holds turns
+    // that from self-SEALING into self-HEALING.
+    #[test]
+    fn persist_does_not_certify_a_note_the_index_never_saw() {
+        block_on(async {
+            let (dir, state) = seeded().await;
+            let indexed = create(dir.path(), &state, "# Indexed\nlocal body\n").await;
+            let pulled = create(dir.path(), &state, "# Pulled\nsynchrotron\n").await;
+
+            // Only the local note reached the index — the pulled one is on disk
+            // and nothing told the index about it.
+            let search = SearchIndexState::default();
+            search.upsert(&indexed, "Indexed", "local body");
+
+            persist_search_index_core(&crate::vault_io::StdVaultIo, dir.path(), &state, &search)
+                .await
+                .expect("persist");
+
+            // A fresh session: hydrate from the blob just written.
+            let rehydrated = SearchIndexState::default();
+            hydrate_search_index_core(
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+                dir.path(),
+                &state,
+                &rehydrated,
+                &mut NoAttachmentDocs,
+            )
+            .await
+            .expect("hydrate");
+
+            let hits = rehydrated.query("synchrotron");
+            assert!(
+                hits.iter().any(|h| h.id == pulled),
+                "the un-indexed note must be treated as STALE and re-indexed, \
+                 not certified as covered"
+            );
+            // The note that WAS indexed is still there — the filter must not
+            // throw away a legitimate certification.
+            assert!(!rehydrated.query("local").is_empty());
+        });
+    }
+
+    #[test]
+    fn persist_still_certifies_everything_the_index_holds() {
+        // The other direction: with a complete index, nothing is dropped, so a
+        // clean unlock still takes the skip-everything path rather than
+        // re-decrypting the whole vault.
+        block_on(async {
+            let (dir, state) = seeded().await;
+            let a = create(dir.path(), &state, "# A\nalpha\n").await;
+            let b = create(dir.path(), &state, "# B\nbeta\n").await;
+            let search = SearchIndexState::default();
+            search.upsert(&a, "A", "alpha");
+            search.upsert(&b, "B", "beta");
+            persist_search_index_core(&crate::vault_io::StdVaultIo, dir.path(), &state, &search)
+                .await
+                .expect("persist");
+
+            // Delete the bodies: a hydrate that re-decrypts would now FAIL to
+            // find them, so surviving hits prove the skip path was taken.
+            std::fs::remove_file(dir.path().join("notes").join(format!("{a}.myn"))).unwrap();
+            std::fs::remove_file(dir.path().join("notes").join(format!("{b}.myn"))).unwrap();
+            let rehydrated = SearchIndexState::default();
+            hydrate_search_index_core(
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+                dir.path(),
+                &state,
+                &rehydrated,
+                &mut NoAttachmentDocs,
+            )
+            .await
+            .expect("hydrate");
+            // Both notes are gone from disk, so reconcile drops them — which is
+            // the correct answer and also proves the manifest carried them.
+            assert!(rehydrated.query("alpha").is_empty());
+            assert!(rehydrated.query("beta").is_empty());
+        });
+    }
 }

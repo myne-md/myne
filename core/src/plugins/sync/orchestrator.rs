@@ -103,6 +103,17 @@ pub struct SyncSummary {
     /// (absent from the authoritative roster ⇒ deleted + reclaimed remotely).
     /// Moved to `<vault>/quarantine/` — never destroyed, never re-uploaded.
     pub dropped: usize,
+    /// Canonical 36-char ids of the notes this cycle WROTE to disk (myne#305).
+    ///
+    /// Every local note writer re-indexes through the hooks seam; this one
+    /// cannot, because the orchestrator is deliberately `AppHandle`-free and
+    /// holds no `Hooks`. So it reports what it wrote and the cycle boundary —
+    /// which does hold them — re-indexes. Without that, a note created on
+    /// another device was absent from the live full-text index for the whole
+    /// session, and the next persist certified it as indexed.
+    ///
+    /// Written notes only: a `SkippedDirty` or a failed download is not here.
+    pub pulled_note_ids: Vec<String>,
 }
 
 /// Sync-cycle failures.
@@ -2181,6 +2192,8 @@ async fn sync_cycle_attempt(
         .count() as u32;
     super::progress::begin(note_record_count);
     let mut pulled = 0;
+    // The ids this cycle WRITES, for the boundary's re-index (myne#305).
+    let mut pulled_note_ids: Vec<String> = Vec::new();
     let mut pull_skipped = 0usize;
     for c in &page.changed {
         // Attachment records were handled above; the catalog, prefs and themes
@@ -2251,6 +2264,12 @@ async fn sync_cycle_attempt(
                             },
                         );
                         pulled += 1;
+                        // …and reported by id, so the cycle boundary can put it
+                        // in the full-text index. The orchestrator holds no
+                        // `Hooks` (it is deliberately `AppHandle`-free and
+                        // `sim.rs` drives it with none), so it says what it
+                        // wrote rather than indexing it here.
+                        pulled_note_ids.push(uuid::Uuid::from_bytes(c.id).to_string());
                         // Counted at the WRITE, not at the download: the number
                         // the user watches is notes that exist locally, and a
                         // download that then failed to land would otherwise
@@ -2821,6 +2840,7 @@ async fn sync_cycle_attempt(
         themes_applied_remote: themes_phase.applied_remote,
         pull_skipped,
         dropped,
+        pulled_note_ids,
     })
 }
 
@@ -3271,6 +3291,16 @@ mod tests {
         )
         .expect("B sync cycle");
         assert_eq!(pull.pulled, 1, "B pulled the note");
+        // …and SAYS WHICH ONE (myne#305). The orchestrator holds no `Hooks`, so
+        // this list is the only way the cycle boundary can put a pulled note
+        // into the full-text index. An empty list here is the bug's shape: the
+        // note lands on disk, nothing indexes it, and the next persist certifies
+        // it as covered — permanently unsearchable across restarts.
+        assert_eq!(
+            pull.pulled_note_ids,
+            vec![note.as_uuid().to_string()],
+            "the cycle must report the id it wrote, not just a count"
+        );
 
         // --- B's disk has the note, decrypting to the same plaintext ---
         let b_path = notes_b.join(format!("{}.myn", note.as_uuid()));

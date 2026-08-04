@@ -216,10 +216,60 @@ pub(crate) async fn cycle_account_number_hash(
 /// far better than the alternative this replaced, which was hardcoding
 /// `StdVaultIo` inside the closure. That compiled on both targets and would have
 /// pointed a browser at a filesystem that is not there.
+/// Feed every note the cycle wrote into the live indexes (myne#305).
+///
+/// The same three side effects a local `note_update` performs — full-text body
+/// doc, per-attachment docs, AI re-embed — because a note arriving from another
+/// device is, from this device's point of view, exactly a note that changed.
+///
+/// Best-effort per note: a body that will not decrypt (locked mid-cycle, or a
+/// blob this device cannot read) is skipped rather than failing the cycle. The
+/// omission is no longer permanent either way — `persist_search_index_core`
+/// leaves an unindexed note out of the manifest, so the next unlock picks it up.
+async fn reindex_pulled_notes(
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    notes_dir: &std::path::Path,
+    ids: &[String],
+) {
+    use crate::plugins::notes::drawing_text::{is_drawing, project_drawing_text};
+    for id in ids {
+        let Ok(plaintext) = crate::plugins::notes::commands::note_read_with_dir(
+            notes_dir.to_path_buf(),
+            state,
+            id.clone(),
+            io,
+            &crate::host::NoopHost,
+        )
+        .await
+        else {
+            continue;
+        };
+        let title = crate::plugins::notes::title_extract::resolve_note_title(plaintext.as_bytes())
+            .unwrap_or_default();
+        // The same drawing fold as the local writers: a `kind: drawing` body is
+        // scene JSON, so the body doc is its projected text and it gets no
+        // attachment docs (SF5 / SYNC-4).
+        if is_drawing(plaintext.as_bytes()) {
+            let body = project_drawing_text(plaintext.as_bytes()).unwrap_or_default();
+            hooks.search_upsert(id, &title, &body);
+        } else {
+            hooks.search_upsert(id, &title, &plaintext);
+            hooks
+                .index_note_attachments(state, id, &title, &plaintext)
+                .await;
+        }
+        // Raw body — the AI arm projects for itself (myne#304).
+        hooks.ai_note_changed(id, &plaintext);
+    }
+}
+
 pub async fn run_active_cycle_from_host(
     host: &dyn HostCtx,
     io: &'static dyn crate::vault_io::VaultIo,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     allow_push: bool,
 ) -> CycleOutcome {
     // Serialize with any concurrent cycle + sync_reset_local: run_sync_cycle is a
@@ -332,6 +382,7 @@ pub async fn run_active_cycle_from_host(
         token_hex.push_str(&format!("{b:02x}"));
     }
     let notes_dir = dir.join("notes");
+    let notes_dir_for_reindex = notes_dir.clone();
     let dir_for_prefs = dir.clone();
 
     let res = crate::task::run_blocking_future(move || async move {
@@ -385,6 +436,20 @@ pub async fn run_active_cycle_from_host(
     // Tauri app), so the emit lives at this boundary off the summary/error.
     match res {
         Ok(Ok(summary)) => {
+            // Index what the cycle wrote (myne#305). Every LOCAL note writer
+            // does this through the hooks seam; the pull path could not, because
+            // the orchestrator holds no `Hooks`, so the note went to disk and
+            // nothing told the index — and the next persist then certified it as
+            // covered. Doing it here, at the boundary that does hold them, is
+            // the same choice the prefs/themes refresh below already makes.
+            reindex_pulled_notes(
+                io,
+                state,
+                hooks,
+                &notes_dir_for_reindex,
+                &summary.pulled_note_ids,
+            )
+            .await;
             if summary.reconcile_ran {
                 // A 410-beyond-horizon full reconcile ran this cycle — bracket it
                 // so the reconcile banner (reassuring, "caught up") can show.
@@ -459,9 +524,10 @@ pub async fn sync_now_from_host(
     host: &dyn HostCtx,
     io: &'static dyn crate::vault_io::VaultIo,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
 ) -> super::status::SyncRuntimeStatus {
     use super::status::SyncRuntimeStatus;
-    match run_active_cycle_from_host(host, io, state, true).await {
+    match run_active_cycle_from_host(host, io, state, hooks, true).await {
         CycleOutcome::Disabled => SyncRuntimeStatus::Disabled,
         // `NotReady` is one outcome covering three situations — locked vault,
         // never enrolled, and enrolled-but-awaiting-approval. Answering
