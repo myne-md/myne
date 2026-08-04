@@ -800,6 +800,21 @@ function parsePreviewGrid(text: string, delimiter: string, maxRows: number): str
 /** Max grid rows rendered inline (the rest is available via Export). */
 const PREVIEW_GRID_MAX_ROWS = 500;
 
+/**
+ * Max grid COLUMNS rendered inline (myne#310).
+ *
+ * The row cap alone does not bound the DOM build: a crafted `.xlsx` whose rows
+ * each name one cell at Excel's last column (`XFD`) arrives as 16,384 entries
+ * per row, and 500 × 16,384 is ~8.2 M synchronous `<td>` appends — hundreds of
+ * MB to GB of nodes, a frozen editor, and a plausible renderer kill.
+ *
+ * The host now clamps too, but this clamp is deliberately independent of it:
+ * this function's own contract is that it must not trust any future host with
+ * an unbounded synchronous node build, and it only implemented that for rows.
+ * An inline preview a few hundred pixels tall shows tens of columns.
+ */
+const PREVIEW_GRID_MAX_COLS = 256;
+
 // --- preview result cache ---------------------------------------------------
 //
 // The attachment-embed decoration set is rebuilt over `visibleRanges` on every
@@ -1102,7 +1117,9 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     table.className = "cm-attachment-text-preview-table";
     for (const row of rows) {
       const tr = document.createElement("tr");
-      for (const cell of row) {
+      // Columns bounded as well as rows (myne#310): a CSV line with a million
+      // commas is one row and a million `<td>` appends.
+      for (const cell of row.slice(0, PREVIEW_GRID_MAX_COLS)) {
         const td = document.createElement("td");
         td.textContent = cell;
         tr.appendChild(td);
@@ -1123,7 +1140,7 @@ export class AttachmentTextPreviewWidget extends WidgetType {
       table.className = "cm-attachment-text-preview-table";
       for (const row of content.rows.slice(0, PREVIEW_GRID_MAX_ROWS)) {
         const tr = document.createElement("tr");
-        for (const cell of row) {
+        for (const cell of row.slice(0, PREVIEW_GRID_MAX_COLS)) {
           const td = document.createElement("td");
           td.textContent = cell;
           tr.appendChild(td);

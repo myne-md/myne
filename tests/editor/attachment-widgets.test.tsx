@@ -486,6 +486,37 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
     expect(dom.querySelectorAll("tr")).toHaveLength(500);
   });
 
+  // myne#310: the row cap alone does not bound the DOM build. A crafted `.xlsx`
+  // whose rows each name one cell at Excel's last column arrives as 16,384
+  // entries per row, and 500 × 16,384 is ~8.2 M synchronous `<td>` appends.
+  // The host clamps too now; this clamp is deliberately independent of it,
+  // because this layer's contract is not to trust any future host with an
+  // unbounded synchronous node build.
+  it("bounds a structured grid to the JS-side COLUMN cap as well", async () => {
+    const id = freshId();
+    // One row, 16,384 columns — the Excel ceiling the host used to honour.
+    const rows = [Array.from({ length: 16_384 }, (_, i) => String(i))];
+    const readStructured = vi.fn(async () => ({ kind: "grid" as const, rows }));
+    withHostAttachments({ readStructured });
+    const dom = new AttachmentTextPreviewWidget(id, "wide.xlsx", 1).toDOM(fakeView);
+    await flush();
+    expect(dom.querySelectorAll("td")).toHaveLength(256);
+    // …and the cells that ARE rendered are the leading ones, in order.
+    expect(dom.querySelector("td")?.textContent).toBe("0");
+  });
+
+  it("bounds a csv grid's columns too — one line with a million commas", async () => {
+    const id = freshId();
+    const readText = vi.fn(async () => ({
+      text: Array.from({ length: 5_000 }, (_, i) => String(i)).join(","),
+      truncated: false,
+    }));
+    withHostAttachments({ readText });
+    const dom = new AttachmentTextPreviewWidget(id, "wide.csv", 1).toDOM(fakeView);
+    await flush();
+    expect(dom.querySelectorAll("td")).toHaveLength(256);
+  });
+
   it("rounds a fractional heading_level instead of throwing (no stuck loading chip)", async () => {
     const id = freshId();
     const readStructured = vi.fn(async () => ({
