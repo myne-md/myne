@@ -67,6 +67,38 @@ describe("block / multi-line `%%`…`%%` comments", () => {
     expect(src.slice(r!.from, r!.to)).toBe("%% line one\nline two\nclosing %%");
   });
 
+  // myne#323 — the canonical multi-line shape the spec documents: the closing
+  // `%%` first on its own line.
+  //
+  // lezer consults `endLeaf` stops BEFORE the leaf parsers' `nextLine`, and the
+  // closing line also starts with `%%` — so the stop fired on the closer, broke
+  // out of the line loop, and `finish` found no closer in the accumulated
+  // content and declined. The whole closer-on-its-own-line branch was
+  // unreachable and the comment parsed as ordinary prose: not dimmed, not
+  // excluded from document statistics, and NOT STRIPPED — so an editor-private
+  // note-to-self shipped verbatim in exported HTML, in the printed PDF and in
+  // stripped TXT, with `hasDialectComment` answering false so nothing upstream
+  // could warn.
+  it("parses a block comment whose closer begins its own line", () => {
+    const src = "%%\nTODO: ask legal about the NDA\n%%\nvisible\n";
+    const n = nodeNames(src);
+    expect(n).toContain("DialectCommentBlock");
+    const r = firstRange(src, "DialectCommentBlock");
+    expect(src.slice(r!.from, r!.to)).toBe("%%\nTODO: ask legal about the NDA\n%%");
+  });
+
+  it("parses one whose closer is indented up to three spaces", () => {
+    const src = "%%\nprivate\n   %%\nvisible\n";
+    expect(nodeNames(src)).toContain("DialectCommentBlock");
+  });
+
+  it("still lets a NEW comment interrupt an open paragraph", () => {
+    // The behaviour the `endLeaf` stop exists for, and which the fix must not
+    // cost: a block comment may follow prose with no blank line between.
+    const src = "prose here\n%% a note %%\n";
+    expect(nodeNames(src)).toContain("DialectCommentBlock");
+  });
+
   it("leaves an UNTERMINATED block `%%` inert (no block node)", () => {
     const src = "%% opened but never closed\n\nmore prose below\n";
     const n = nodeNames(src);
