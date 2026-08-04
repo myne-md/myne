@@ -388,11 +388,7 @@ pub fn download_blob(
     token: &str,
     id: &[u8; 16],
 ) -> Result<Vec<u8>, PullError> {
-    let mut hex = String::with_capacity(32);
-    for b in id {
-        hex.push_str(&format!("{b:02x}"));
-    }
-    let path = format!("/sync/blob?id={hex}");
+    let path = format!("/sync/blob?id={}", hex_lower(id));
     let resp = transport.request(HttpMethod::Get, &path, &[], Some(token))?;
     match resp.status {
         200 => {
@@ -423,6 +419,169 @@ pub fn download_blob(
         429 => Err(PullError::RateLimited),
         _ => Err(PullError::BadResponse),
     }
+}
+
+/// A ciphertext the batch route served.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FetchedBlob {
+    /// The blob id it was requested under.
+    pub id: [u8; 16],
+    /// The opaque ciphertext bytes.
+    pub ciphertext: Vec<u8>,
+}
+
+/// Why the server accounted for an id without serving its bytes. These mirror
+/// the per-blob outcomes the single-blob route signals as HTTP statuses, so the
+/// apply loop needs no new class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlobOmission {
+    /// Unknown id (`not_found`) — also the answer for an id in another account's
+    /// namespace.
+    NotFound,
+    /// Horizon-GC reclaimed body (`blob_reclaimed`, §11.3).
+    Reclaimed,
+    /// The server could not read it (`internal`), or a code this client does not
+    /// know. An unknown code lands here deliberately: the disposition — skip the
+    /// record, mutate nothing — is the safe one, so a server that grows a fourth
+    /// condition degrades instead of wedging a client that never re-requests.
+    Other,
+}
+
+/// One batch-fetch response, accounting for a PREFIX of the requested ids.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BlobBatch {
+    /// The ids served, with their bytes.
+    pub blobs: Vec<FetchedBlob>,
+    /// The ids accounted for but not served, with why.
+    pub omitted: Vec<([u8; 16], BlobOmission)>,
+}
+
+impl BlobBatch {
+    /// What the response said about `id`: `None` when it accounted for the id at
+    /// all — the caller must keep it queued and ask again, NEVER default it to
+    /// empty bytes. A `get(..).unwrap_or_default()` here would reproduce the
+    /// exact destructive shape §11.3 was written against, arrived at through a
+    /// different door.
+    pub fn outcome(&self, id: &[u8; 16]) -> Option<Result<&[u8], BlobOmission>> {
+        if let Some(b) = self.blobs.iter().find(|b| &b.id == id) {
+            return Some(Ok(&b.ciphertext));
+        }
+        self.omitted
+            .iter()
+            .find(|(oid, _)| oid == id)
+            .map(|(_, why)| Err(*why))
+    }
+}
+
+/// What [`download_blobs`] found at the far end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlobBatchOutcome {
+    /// The server answered; the batch accounts for a prefix of the request.
+    Served(BlobBatch),
+    /// The server has no batch route (`404`/`405`) — an older self-hosted
+    /// deployment. The caller falls back to [`download_blob`].
+    ///
+    /// Deliberately a value rather than a `PullError` variant: a new error
+    /// variant would fall through `classify_cycle_error`'s catch-all into the
+    /// 1-second retry ladder the moment a caller forgot to handle it, and it
+    /// would put a state that must never reach a user into a UI-facing enum. As
+    /// an enum arm the compiler forces the caller to deal with it, and
+    /// `cycle.rs` needs no change at all.
+    RouteUnsupported,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct BlobBatchEntryWire {
+    blob_id_hex: String,
+    ciphertext_b64: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct BlobBatchOmittedWire {
+    blob_id_hex: String,
+    #[serde(default)]
+    error_code: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct BlobBatchWire {
+    #[serde(default)]
+    blobs: Vec<BlobBatchEntryWire>,
+    #[serde(default)]
+    omitted: Vec<BlobBatchOmittedWire>,
+}
+
+#[derive(Serialize)]
+struct BlobBatchReqWire {
+    blob_ids_hex: Vec<String>,
+}
+
+/// Download many ciphertexts in one request (`POST /sync/blobs`, myne#240) —
+/// the read-path twin of the chunked push. The pull path was one HTTP request
+/// per blob, so a first sync of a large vault spent its cost in round-trips
+/// against the per-account bucket rather than in bandwidth.
+///
+/// The response accounts for a **prefix** of `ids` in request order; an id in
+/// neither array was not served and the caller re-requests it (that is what lets
+/// the server's byte budget truncate safely without the client having to guess
+/// its window right). Callers read outcomes through [`BlobBatch::outcome`].
+pub fn download_blobs(
+    transport: &dyn SyncTransport,
+    token: &str,
+    ids: &[[u8; 16]],
+) -> Result<BlobBatchOutcome, PullError> {
+    let body = serde_json::to_vec(&BlobBatchReqWire {
+        blob_ids_hex: ids.iter().map(hex_lower).collect(),
+    })
+    .map_err(|_| PullError::BadResponse)?;
+    let resp = transport.request(HttpMethod::Post, "/sync/blobs", &body, Some(token))?;
+    match resp.status {
+        200 => {
+            let wire: BlobBatchWire =
+                serde_json::from_slice(&resp.body).map_err(|_| PullError::BadResponse)?;
+            let mut batch = BlobBatch::default();
+            for e in wire.blobs {
+                let id = hex_to_array::<16>(&e.blob_id_hex).ok_or(PullError::BadResponse)?;
+                let ciphertext = B64
+                    .decode(e.ciphertext_b64.as_bytes())
+                    .map_err(|_| PullError::BadResponse)?;
+                batch.blobs.push(FetchedBlob { id, ciphertext });
+            }
+            for o in wire.omitted {
+                let id = hex_to_array::<16>(&o.blob_id_hex).ok_or(PullError::BadResponse)?;
+                let why = match o.error_code.as_str() {
+                    "not_found" => BlobOmission::NotFound,
+                    "blob_reclaimed" => BlobOmission::Reclaimed,
+                    _ => BlobOmission::Other,
+                };
+                batch.omitted.push((id, why));
+            }
+            Ok(BlobBatchOutcome::Served(batch))
+        }
+        // myne#294 — the body decides, here as at every other 401 arm.
+        401 => Err(if is_device_revoked(&resp.body) {
+            PullError::DeviceRevoked
+        } else {
+            PullError::Unauthenticated
+        }),
+        // A server that predates the route. 405 is the same answer through a
+        // reverse proxy that knows the /sync prefix but not this method.
+        404 | 405 => Ok(BlobBatchOutcome::RouteUnsupported),
+        429 => Err(PullError::RateLimited),
+        // No 410 arm: on this route reclamation is a per-id code inside a 200,
+        // never a status. A whole-response 410 is a server this client does not
+        // understand.
+        _ => Err(PullError::BadResponse),
+    }
+}
+
+/// Lowercase hex of a fixed-size id.
+fn hex_lower<const N: usize>(bytes: &[u8; N]) -> String {
+    let mut s = String::with_capacity(N * 2);
+    for b in bytes {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
 }
 
 // ---------------------------------------------------------------------------
@@ -1207,7 +1366,9 @@ mod tests {
                 i + 1,
             );
         }
-        assert!(arms >= 6, "expected every 401 arm to be found, saw {arms}");
+        // A floor, raised whenever an arm is added — the count having been wrong
+        // once (myne#294) is the whole reason this test exists.
+        assert!(arms >= 7, "expected every 401 arm to be found, saw {arms}");
     }
 
     #[test]
@@ -1394,6 +1555,176 @@ mod tests {
         );
         let bytes = download_blob(&t, "tok", &[0x01; 16]).unwrap();
         assert_eq!(bytes, b"opaque-bytes");
+    }
+
+    /// Build a batch-response body from `(id_byte, ciphertext)` served entries
+    /// and `(id_byte, code)` omissions.
+    fn batch_body(served: &[(u8, &str)], omitted: &[(u8, &str)]) -> Vec<u8> {
+        let b = |x: u8| hex_lower(&[x; 16]);
+        let blobs: Vec<String> = served
+            .iter()
+            .map(|(id, ct)| {
+                format!(
+                    "{{\"blob_id_hex\":\"{}\",\"ciphertext_b64\":\"{}\"}}",
+                    b(*id),
+                    B64.encode(ct.as_bytes())
+                )
+            })
+            .collect();
+        let om: Vec<String> = omitted
+            .iter()
+            .map(|(id, code)| {
+                format!(
+                    "{{\"blob_id_hex\":\"{}\",\"error_code\":\"{code}\"}}",
+                    b(*id)
+                )
+            })
+            .collect();
+        format!(
+            "{{\"blobs\":[{}],\"omitted\":[{}]}}",
+            blobs.join(","),
+            om.join(",")
+        )
+        .into_bytes()
+    }
+
+    fn served_batch(t: &FakeTransport, ids: &[[u8; 16]]) -> BlobBatch {
+        match download_blobs(t, "tok", ids).unwrap() {
+            BlobBatchOutcome::Served(b) => b,
+            BlobBatchOutcome::RouteUnsupported => panic!("expected a served batch"),
+        }
+    }
+
+    /// The three per-id outcomes in one response, each mapping to the omission
+    /// class the single-blob route signals as a status.
+    #[test]
+    fn download_blobs_maps_omitted_codes_per_id() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Post,
+            "/sync/blobs",
+            200,
+            batch_body(
+                &[(0x01, "live-bytes")],
+                &[(0x02, "blob_reclaimed"), (0x03, "not_found")],
+            ),
+        );
+        let batch = served_batch(&t, &[[0x01; 16], [0x02; 16], [0x03; 16]]);
+        assert_eq!(batch.outcome(&[0x01; 16]), Some(Ok(&b"live-bytes"[..])));
+        assert_eq!(
+            batch.outcome(&[0x02; 16]),
+            Some(Err(BlobOmission::Reclaimed))
+        );
+        assert_eq!(
+            batch.outcome(&[0x03; 16]),
+            Some(Err(BlobOmission::NotFound))
+        );
+    }
+
+    /// An `error_code` this client does not know degrades to the SAFE
+    /// disposition (skip, mutate nothing) rather than being unaccounted for. A
+    /// server growing a fourth condition must not wedge a client that would
+    /// otherwise re-request the id forever.
+    #[test]
+    fn download_blobs_maps_an_unknown_code_to_other() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Post,
+            "/sync/blobs",
+            200,
+            batch_body(&[], &[(0x07, "internal"), (0x08, "some_future_condition")]),
+        );
+        let batch = served_batch(&t, &[[0x07; 16], [0x08; 16]]);
+        assert_eq!(batch.outcome(&[0x07; 16]), Some(Err(BlobOmission::Other)));
+        assert_eq!(batch.outcome(&[0x08; 16]), Some(Err(BlobOmission::Other)));
+    }
+
+    /// An id the response accounted for NOWHERE is `None` — "not served, ask
+    /// again" — and must never read as empty bytes. A lookup that defaulted a
+    /// missing key to `Vec::new()` would reproduce the exact shape §11.3 was
+    /// written against (an empty body a blind client writes over a live note),
+    /// arrived at through a different door.
+    #[test]
+    fn download_blobs_treats_an_unaccounted_id_as_not_served() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Post,
+            "/sync/blobs",
+            200,
+            batch_body(&[(0x01, "served")], &[]),
+        );
+        let batch = served_batch(&t, &[[0x01; 16], [0x09; 16]]);
+        assert_eq!(batch.outcome(&[0x01; 16]), Some(Ok(&b"served"[..])));
+        assert_eq!(batch.outcome(&[0x09; 16]), None, "unaccounted must be None");
+    }
+
+    /// A server that predates the route answers 404 — or 405 through a proxy
+    /// that knows the /sync prefix but not the method. Both mean "no such
+    /// route", and neither is an error the cycle should fail on.
+    #[test]
+    fn download_blobs_404_and_405_are_route_unsupported() {
+        for status in [404u16, 405] {
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Post, "/sync/blobs", status, b"{}".to_vec());
+            assert_eq!(
+                download_blobs(&t, "tok", &[[0x01; 16]]).unwrap(),
+                BlobBatchOutcome::RouteUnsupported,
+                "status {status}",
+            );
+        }
+    }
+
+    #[test]
+    fn download_blobs_maps_status_errors() {
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Post, "/sync/blobs", 429, b"{}".to_vec());
+        assert_eq!(
+            download_blobs(&t, "tok", &[[0x01; 16]]).unwrap_err(),
+            PullError::RateLimited
+        );
+        // A whole-response 410 is a server this client does not understand:
+        // reclamation is a per-id code inside a 200 on this route.
+        let t410 = FakeTransport::new();
+        t410.on(HttpMethod::Post, "/sync/blobs", 410, b"{}".to_vec());
+        assert_eq!(
+            download_blobs(&t410, "tok", &[[0x01; 16]]).unwrap_err(),
+            PullError::BadResponse
+        );
+        let trev = FakeTransport::new();
+        trev.on(
+            HttpMethod::Post,
+            "/sync/blobs",
+            401,
+            b"{\"error_code\":\"device_revoked\"}".to_vec(),
+        );
+        assert_eq!(
+            download_blobs(&trev, "tok", &[[0x01; 16]]).unwrap_err(),
+            PullError::DeviceRevoked
+        );
+        let tauth = FakeTransport::new();
+        tauth.on(HttpMethod::Post, "/sync/blobs", 401, b"{}".to_vec());
+        assert_eq!(
+            download_blobs(&tauth, "tok", &[[0x01; 16]]).unwrap_err(),
+            PullError::Unauthenticated
+        );
+    }
+
+    #[test]
+    fn download_blobs_rejects_malformed_bodies() {
+        for body in [
+            &b"not json"[..],
+            // A non-hex id: accepting it would let a server steer bytes to an id
+            // the client never asked about.
+            b"{\"blobs\":[{\"blob_id_hex\":\"zz\",\"ciphertext_b64\":\"\"}]}",
+            b"{\"blobs\":[{\"blob_id_hex\":\"01010101010101010101010101010101\",\"ciphertext_b64\":\"!!!\"}]}",
+        ] {
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Post, "/sync/blobs", 200, body.to_vec());
+            assert_eq!(
+                download_blobs(&t, "tok", &[[0x01; 16]]).unwrap_err(),
+                PullError::BadResponse,
+            );
+        }
     }
 
     fn one_blob() -> PushBlob {
