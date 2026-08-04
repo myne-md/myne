@@ -39,12 +39,21 @@ pub const VOICE_CLIP_EVENT: &str = "voice-record:clip";
 /// so the recording UI can flag the gap instead of the clip vanishing silently.
 pub const VOICE_CLIP_FAILED_EVENT: &str = "voice-record:clip-failed";
 
-/// E2E / test escape hatch: when `MYNE_E2E_AUDIO_FIXTURE` is set, capture uses
-/// the deterministic fixture source so the record flow runs with no real mic on
-/// a headless runner.
-fn use_fixture_source() -> bool {
-    std::env::var("MYNE_E2E_AUDIO_FIXTURE").is_ok()
-}
+/// Which capture source this build uses — a COMPILE-time choice, mirroring the
+/// `local-inference-stub` engine selection in `plugins::local_inference::init`.
+///
+/// This replaced `use_fixture_source()`, which read `MYNE_E2E_AUDIO_FIXTURE`
+/// with no `cfg` gate at all (myne#389 item D). That switch was compiled into
+/// the release binary, and `is_ok()` meant *any* value flipped it — including
+/// the empty string — so anything able to set an environment variable on the
+/// process could silently replace the microphone with a synthetic tone. There is
+/// deliberately NO runtime switch now: a build that cannot ship has no need for
+/// an escape hatch, and keeping both a knob and a feature would be two things to
+/// hold in sync, which is how this drifts back.
+#[cfg(feature = "voice-capture-stub")]
+const CAPTURE_SOURCE: SourceFactory = SourceFactory::Fixture;
+#[cfg(not(feature = "voice-capture-stub"))]
+const CAPTURE_SOURCE: SourceFactory = SourceFactory::Cpal;
 
 /// Arm a recording. Unlock-gated; fails if one is already running. Streams the
 /// input level to `VOICE_LEVEL_EVENT` and spawns the continuation-clip consumer.
@@ -61,11 +70,7 @@ pub async fn voice_record_start<R: Runtime>(
     if active.is_some() {
         return Err(VoiceRecordError::AlreadyRecording);
     }
-    let factory = if use_fixture_source() {
-        SourceFactory::Fixture
-    } else {
-        SourceFactory::Cpal
-    };
+    let factory = CAPTURE_SOURCE;
 
     // The capture thread pushes the input level (a non-secret scalar — no audio
     // content) to the WebView. Emit only when the quantized level changes — the

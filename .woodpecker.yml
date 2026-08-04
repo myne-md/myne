@@ -429,7 +429,14 @@ steps:
       # the arti half here fails the build outright rather than shipping a
       # bundle without a Tor client. It costs one release build of `arti` on a
       # cold cache; sccache pays it once.
-      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}'
+      # `--features voice-capture-stub` (myne#389 item D): the `e2e` step below
+      # reuses THIS binary, and the voice scenarios need a capture source that
+      # is not a microphone the runner does not have. It is additive to the
+      # default feature set, so this build still compiles the production arm;
+      # `cargo-test-tauri` (default features) compiles the
+      # `not(feature = "voice-capture-stub")` arm, so both stay covered with no
+      # new step. The feature pulls no dependency, so no dep fingerprint moves.
+      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub
       # Guard the AI-free auditable variant: `--no-default-features` drops candle
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.

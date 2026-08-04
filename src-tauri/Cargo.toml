@@ -53,6 +53,17 @@ local-inference = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers"
 # gets stable AI output without a model file in the repo. NEVER the shipped
 # bundle (the production build uses the real Candle engine). See `docs/dev/e2e.md`.
 local-inference-stub = ["local-inference"]
+# E2E-only build variant for voice capture (myne#389 item D). Swaps the
+# microphone for a deterministic 440 Hz tone at COMPILE time, so the
+# tauri-driver flow-suite can drive record→save→reopen→playback on a headless
+# runner with no input device. This replaced an ungated `MYNE_E2E_AUDIO_FIXTURE`
+# env read that shipped in the release binary — anything able to set an env var
+# on the process could silently substitute the microphone. There is deliberately
+# no runtime switch now: a build that cannot ship needs no escape hatch, and two
+# knobs would be two things to keep in sync. NEVER the shipped bundle; the
+# `Fixture` source and the synthetic generator do not exist without it. See
+# `docs/dev/e2e.md`.
+voice-capture-stub = []
 
 [dependencies]
 tauri = { version = "2", features = [] }

@@ -2,10 +2,13 @@
 //
 // Pins the record → save → reopen → playback-source chain through the
 // production binary. Native cpal capture is swapped for the deterministic
-// FixtureSource via `MYNE_E2E_AUDIO_FIXTURE` so the record flow runs with NO
-// real microphone on the headless runner. This is an env knob selecting a
-// capture *source* — it changes no production behavior and adds no test hook in
-// the IPC path (the binary inherits the harness env, `session.ts` launchApp).
+// FixtureSource by the **`voice-capture-stub` build variant** (myne#389 item D)
+// so the record flow runs with NO real microphone on the headless runner. It is
+// a COMPILE-time selection, not an env knob: the previous
+// `MYNE_E2E_AUDIO_FIXTURE` read had no `cfg` gate and shipped in the release
+// binary, where anything able to set an env var could silently substitute the
+// microphone. `./scripts/e2e-local.sh` and CI both build with the feature; the
+// shipped bundle carries neither the switch nor the synthetic generator.
 //
 // Driven via page-seat IPC (the generic-file-attachment precedent): the slash
 // `/record` UI + the inline player widget render are Vitest-DOM concerns per
@@ -23,11 +26,6 @@
 // `e2e/CLAUDE.md` definition of done it must go green 3× consecutive via
 // `./scripts/e2e-local.sh` before merge (it introduces the
 // `plugin:attachments|voice_record_*` IPC paths through the real ACL).
-
-// The launched binary inherits process.env (session.ts launchApp), so this
-// selects the deterministic fixture capture source for every launch in this
-// file. Vitest isolates test files, so it does not leak to other suites.
-process.env.MYNE_E2E_AUDIO_FIXTURE = "1";
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
@@ -66,7 +64,17 @@ describeE2E("voice notes (MYND-259)", () => {
           { filename: "Voice note e2e.wav" },
           IPC_TIMEOUT,
         );
-        expect(stop.err, "voice_record_stop should store the recording").toBeUndefined();
+        // A failure here almost always means the binary under test was built
+        // WITHOUT `--features voice-capture-stub`, so capture opened a real
+        // (absent) microphone and `voice_record_stop` reported NoInputDevice.
+        // `voice_record_start` cannot tell you that — the source is built
+        // inside the capture thread, so it returns Ok either way. Rebuild via
+        // `./scripts/e2e-local.sh`.
+        expect(
+          stop.err,
+          "voice_record_stop should store the recording — if this is an error, the binary " +
+            "was likely built without `--features voice-capture-stub`",
+        ).toBeUndefined();
         const imported = stop.ok as { id: string; content_type: string } | null;
         expect(imported, "a non-empty fixture recording returns the final clip").not.toBeNull();
         const id = (imported as { id: string }).id;

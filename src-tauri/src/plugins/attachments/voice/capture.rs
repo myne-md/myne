@@ -85,8 +85,28 @@ pub trait AudioSource {
 #[derive(Debug, Clone, Copy)]
 pub enum SourceFactory {
     /// Real microphone via cpal.
+    ///
+    /// Unconstructed under `voice-capture-stub` — that build exists precisely
+    /// so no code path reaches a real device. The allow is scoped to this
+    /// variant rather than the module, so genuine dead code elsewhere in the
+    /// file still fails the build under the stub feature (the
+    /// `local-inference-stub` precedent puts its allow at module scope and
+    /// loses that).
+    #[cfg_attr(feature = "voice-capture-stub", allow(dead_code))]
     Cpal,
     /// Deterministic synthetic tone — for E2E on a headless runner + tests.
+    ///
+    /// Gated (myne#389 item D). The defect this closes was not "an env var
+    /// existed" but "a synthetic-audio source was selectable in a shipped
+    /// binary": gate only the selector and this variant survives as a `pub`
+    /// item one `if` away from being re-wired by somebody reading `capture.rs`
+    /// and not the issue. Gated, re-introducing it does not compile.
+    ///
+    /// The `test` disjunct keeps the four unit tests below running under a
+    /// plain `cargo test`, so the gate costs no test coverage — strictly
+    /// cleaner than the `local-inference-stub` precedent, which leans on
+    /// `#![cfg_attr(…, allow(dead_code))]` because it could not use `test`.
+    #[cfg(any(test, feature = "voice-capture-stub"))]
     Fixture,
 }
 
@@ -94,6 +114,7 @@ impl SourceFactory {
     fn build(self) -> Result<Box<dyn AudioSource>, RecordError> {
         match self {
             SourceFactory::Cpal => Ok(Box::new(CpalSource::start()?)),
+            #[cfg(any(test, feature = "voice-capture-stub"))]
             SourceFactory::Fixture => Ok(Box::new(FixtureSource::default())),
         }
     }
@@ -103,6 +124,10 @@ impl SourceFactory {
 
 /// A deterministic 440 Hz sine source. Drives the record flow with no real
 /// device so the E2E (record→save→reopen→playback) runs on a headless runner.
+///
+/// Absent from the shipped binary — see [`SourceFactory::Fixture`] for why the
+/// generator is gated and not just its selector.
+#[cfg(any(test, feature = "voice-capture-stub"))]
 pub struct FixtureSource {
     sample_rate: u32,
     phase: f32,
@@ -110,6 +135,7 @@ pub struct FixtureSource {
     samples_per_poll: usize,
 }
 
+#[cfg(any(test, feature = "voice-capture-stub"))]
 impl Default for FixtureSource {
     fn default() -> Self {
         let sample_rate = 48_000;
@@ -124,6 +150,7 @@ impl Default for FixtureSource {
     }
 }
 
+#[cfg(any(test, feature = "voice-capture-stub"))]
 impl AudioSource for FixtureSource {
     fn sample_rate(&self) -> u32 {
         self.sample_rate

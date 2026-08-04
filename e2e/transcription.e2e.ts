@@ -5,7 +5,9 @@
 // stub` build variant** — gated on `MYNE_E2E_AI=1` (like `ai-ux-surface.e2e.ts`)
 // so the deterministic StubEngine transcribe runs without a real Whisper model
 // in the repo. A deterministic 440 Hz audio attachment comes from the record
-// fixture (`MYNE_E2E_AUDIO_FIXTURE`, as `voice-notes.e2e.ts`).
+// fixture, which since myne#389 is the compile-time `voice-capture-stub` build
+// variant rather than an env knob (as `voice-notes.e2e.ts`). The full AI lane
+// therefore wants BOTH: `--features local-inference-stub,voice-capture-stub`.
 //
 //   tr1 (gated) — seed a vault → record an audio note (fixture) → embed it →
 //                 enable AI → trigger Transcribe from the audio ⋮ menu → assert
@@ -27,10 +29,6 @@
 // through the ACL).
 //
 // KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
-
-// The launched binary inherits process.env (session launchApp), so this selects
-// the deterministic fixture capture source for every launch in this file.
-process.env.MYNE_E2E_AUDIO_FIXTURE = "1";
 
 import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
@@ -77,7 +75,13 @@ async function recordFixtureAudio(s: Session): Promise<string> {
     { filename: "Voice note tr.wav" },
     IPC_TIMEOUT,
   );
-  expect(stop.err, "voice_record_stop stores the recording").toBeUndefined();
+  // See `voice-notes.e2e.ts`: an error here is usually a binary built without
+  // `--features voice-capture-stub`, not a broken record path.
+  expect(
+    stop.err,
+    "voice_record_stop stores the recording — if this is an error, the binary was likely " +
+      "built without `--features voice-capture-stub`",
+  ).toBeUndefined();
   const imported = stop.ok as { id: string } | null;
   expect(imported, "a non-empty fixture recording returns the final clip").not.toBeNull();
   return (imported as { id: string }).id;
