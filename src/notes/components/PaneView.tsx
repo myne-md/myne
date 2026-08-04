@@ -847,6 +847,23 @@ export function PaneView({
       try {
         const body = await noteRead(activeId);
         if (cancelled) return;
+        // The pane must still be showing the note this read was FOR (myne#334).
+        //
+        // `cancelled` only covers a re-run of THIS effect, which keys on the
+        // reload nonce — a plain note switch does not re-run it, so a read
+        // started for note A could resolve after the pane had moved to B. Both
+        // guards below then passed, and `acceptReloadedBody(bodyA)` re-baselined
+        // B's autosave to A's body while the buffer still held B's: the CAS
+        // refuses the content swap, and the forced re-render carries an
+        // unchanged body so the body-change effect never re-baselines either.
+        //
+        // From there `hasPendingWork()` reported true forever, so the pane
+        // silently ignored every later out-of-band reload; and the next keystroke
+        // in B fired a save whose expected-base was `sha256(bodyA)`, which the
+        // host rejects against B's own disk bytes — minting a keep-both conflict
+        // copy for a note nothing ever conflicted on and relocating the user's
+        // in-progress edit into it.
+        if (activeIdRef.current !== activeId) return;
         // Re-check dirtiness AFTER the await: typing may have started while the
         // read was in flight, and re-baselining now would clobber those keys
         // with the just-read (already-stale) bytes.
