@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window. NOTE on the externalBin sidecars (`myne`, `myne-tor`): neither is launched from the webview, so neither gets a permission here. `myne` is run by the user from a terminal; `myne-tor` (arti, MYND-650) is spawned host-side by Rust when the device-local Tor routing option is on. A Tauri capability grants the WEBVIEW an IPC surface — so adding `shell:allow-execute` (or any process-spawn permission) would let page-context code choose WHICH program runs, which is the thing to refuse. Note the distinction, because the sync bundle already grants something adjacent: `sync:allow-sync-set-tor-routing` does start `myne-tor`, but the webview supplies one boolean — the executable path and the argv are both resolved host-side and neither is user-supplied. Both start a process; only `shell:` lets the caller pick it. The recorded argument, and the guard that notices a second one appearing, are `no_egress::IN_APP_PROCESS_SPAWN_PERMISSIONS`. If you came here to add a `shell:`/`process:` permission: don't; the launch belongs in the host lifecycle module.",
+  "description": "Capability for the main window. NOTE on the externalBin sidecars (`myne`, `myne-tor`): neither is launched from the webview, so neither gets a permission here. `myne` is run by the user from a terminal; `myne-tor` (arti, MYND-650) is spawned host-side by Rust when the device-local Tor routing option is on. A Tauri capability grants the WEBVIEW an IPC surface — so adding `shell:allow-execute` (or any process-spawn permission) would let page-context code choose WHICH program runs, which is the thing to refuse. Note the distinction, because the sync bundle already grants something adjacent: `sync:allow-sync-set-tor-routing` does start `myne-tor`, but the webview supplies one boolean — the executable path and the argv are both resolved host-side and neither is user-supplied. Both start a process; only `shell:` lets the caller pick it. The recorded argument, and the guard that notices a second one appearing, are `no_egress::IN_APP_PROCESS_SPAWN_PERMISSIONS`. If you came here to add a `shell:`/`process:` permission: don't; the launch belongs in the host lifecycle module. NOTE on `opener` (myne#385): `reveal_item_in_dir` is granted by `opener:default` and is NOT listed again on its own — a second identifier for a command already in the bundle resolves to the same authorization set, so it reads as a decision without being one. It also cannot be scoped: the upstream command consults no `CommandScope`/`GlobalScope`, so an `allow` array beside it would be ignored at runtime. Its production consumers are the two export \"Show in folder\" affordances, which is what narrowing the `opener:default` bundle would have to account for.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -17,7 +17,6 @@
         { "path": "$APPDATA/vault" }
       ]
     },
-    "opener:allow-reveal-item-in-dir",
     "deep-link:allow-get-current",
     "vault-creation:default",
     "vault-unlock:default",

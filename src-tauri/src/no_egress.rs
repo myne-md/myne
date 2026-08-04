@@ -322,9 +322,14 @@ pub fn manifest_process_spawn_permissions(toml_text: &str) -> Vec<String> {
     found
 }
 
-/// Permissions in a capability JSON file that satisfy `is_offending`. Walks the
-/// `permissions` array — both bare strings and `{ "identifier": … }` objects.
-fn capability_permissions_matching(json_text: &str, is_offending: fn(&str) -> bool) -> Vec<String> {
+/// Every permission identifier a capability JSON file grants, in file order.
+///
+/// Walks the `permissions` array, which mixes two shapes — a bare string
+/// (`"opener:default"`) and an object carrying a scope
+/// (`{ "identifier": "opener:allow-open-path", "allow": [...] }`). Both are
+/// authorization entries; only the second can carry a scope, and several
+/// commands ignore one even when present.
+fn capability_permission_identifiers(json_text: &str) -> Vec<String> {
     let mut found = Vec::new();
     let Ok(value) = serde_json::from_str::<serde_json::Value>(json_text) else {
         // Unparseable capability JSON is not this gate's concern (tauri build
@@ -342,13 +347,109 @@ fn capability_permissions_matching(json_text: &str, is_offending: fn(&str) -> bo
                 _ => None,
             };
             if let Some(ident) = ident {
-                if is_offending(&ident) {
-                    found.push(ident);
-                }
+                found.push(ident);
             }
         }
     }
     found
+}
+
+/// Permissions in a capability JSON file that satisfy `is_offending`.
+fn capability_permissions_matching(json_text: &str, is_offending: fn(&str) -> bool) -> Vec<String> {
+    capability_permission_identifiers(json_text)
+        .into_iter()
+        .filter(|ident| is_offending(ident))
+        .collect()
+}
+
+/// Split a capability entry into `(plugin, identifier)`.
+///
+/// The separator is the LAST colon, not the first: the core sub-namespaces are
+/// themselves plugin keys carrying a colon, so `core:window:allow-destroy` is
+/// plugin `core:window` + identifier `allow-destroy`, while `core:default` is
+/// plugin `core` + identifier `default`.
+fn split_capability_entry(entry: &str) -> (&str, &str) {
+    match entry.rsplit_once(':') {
+        Some((plugin, ident)) => (plugin, ident),
+        None => ("", entry),
+    }
+}
+
+/// The `plugin|command` grants a single capability entry resolves to, walking
+/// `gen/schemas/acl-manifests.json`.
+///
+/// Three node kinds, in the order the resolver tries them: the plugin's
+/// `default_permission` (reached by the identifier `default`), a named
+/// `permission_sets` entry, and finally a leaf `permissions` entry whose
+/// `commands.allow` list is the actual grant. Sets and defaults nest, and a
+/// nested reference may be bare (same plugin) or qualified — `core:default`
+/// expands to `core:path:default`, `core:event:default` and seven more, each of
+/// which is a *different* top-level plugin key.
+///
+/// An identifier that resolves to nothing recognizable is reported as a
+/// `<unresolved …>` pseudo-command rather than dropped, so a manifest shape
+/// change surfaces as a failing gate instead of a silently emptier one.
+fn resolve_granted_commands(
+    manifests: &serde_json::Value,
+    plugin: &str,
+    identifier: &str,
+    seen: &mut std::collections::BTreeSet<(String, String)>,
+) -> Vec<String> {
+    if !seen.insert((plugin.to_string(), identifier.to_string())) {
+        return Vec::new();
+    }
+    let Some(node) = manifests.get(plugin) else {
+        return vec![format!("<unresolved plugin {plugin}>")];
+    };
+
+    let nested = |list: &serde_json::Value,
+                  seen: &mut std::collections::BTreeSet<(String, String)>| {
+        let mut out = Vec::new();
+        for sub in list.as_array().into_iter().flatten() {
+            let Some(sub) = sub.as_str() else { continue };
+            let (sub_plugin, sub_ident) = if sub.contains(':') {
+                split_capability_entry(sub)
+            } else {
+                (plugin, sub)
+            };
+            out.extend(resolve_granted_commands(
+                manifests, sub_plugin, sub_ident, seen,
+            ));
+        }
+        out
+    };
+
+    if identifier == "default" {
+        return match node
+            .get("default_permission")
+            .and_then(|d| d.get("permissions"))
+        {
+            Some(list) => nested(list, seen),
+            None => Vec::new(),
+        };
+    }
+    if let Some(list) = node
+        .get("permission_sets")
+        .and_then(|s| s.get(identifier))
+        .and_then(|s| s.get("permissions"))
+    {
+        return nested(list, seen);
+    }
+    if let Some(perm) = node.get("permissions").and_then(|p| p.get(identifier)) {
+        return perm
+            .get("commands")
+            .and_then(|c| c.get("allow"))
+            .and_then(|a| a.as_array())
+            .map(|allow| {
+                allow
+                    .iter()
+                    .filter_map(|c| c.as_str())
+                    .map(|c| format!("{plugin}|{c}"))
+                    .collect()
+            })
+            .unwrap_or_default();
+    }
+    vec![format!("<unresolved {plugin}:{identifier}>")]
 }
 
 #[cfg(test)]
@@ -508,6 +609,75 @@ mod tests {
         assert!(
             all_hits.is_empty(),
             "capability files grant process-spawn permissions: {all_hits:?}"
+        );
+    }
+
+    /// myne#385: no command may be granted by two identifiers in the same
+    /// capability.
+    ///
+    /// A second identifier for a command the bundle already grants resolves to
+    /// an identical authorization set — so the line reads as an authorization
+    /// decision while being none, and the next reviewer prices the capability
+    /// by its length rather than by what it resolves to. `opener:default` +
+    /// `opener:allow-reveal-item-in-dir` was that shape; nothing flagged it,
+    /// because both halves are individually correct.
+    ///
+    /// The input is `gen/schemas/acl-manifests.json`, which is gitignored and
+    /// regenerated by `tauri_build` in `build.rs` — that build script runs
+    /// before this test, which is why the gate lives in this crate rather than
+    /// under `scripts/` where a clean clone would have nothing to read. A
+    /// missing manifest fails loudly here rather than passing vacuously.
+    #[test]
+    fn no_command_is_granted_by_two_identifiers() {
+        let manifest_path = src_tauri_dir().join("gen/schemas/acl-manifests.json");
+        let manifest_text = std::fs::read_to_string(&manifest_path).expect(
+            "read gen/schemas/acl-manifests.json — generated by tauri_build in build.rs, so an \
+             absence here means the build script did not run, not that the ACL is clean",
+        );
+        let manifests: serde_json::Value =
+            serde_json::from_str(&manifest_text).expect("parse acl-manifests.json");
+
+        let cap_dir = src_tauri_dir().join("capabilities");
+        let mut duplicates: Vec<String> = Vec::new();
+        let mut unresolved: Vec<String> = Vec::new();
+        for entry in std::fs::read_dir(&cap_dir).expect("read capabilities dir") {
+            let path = entry.expect("dir entry").path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            let json = std::fs::read_to_string(&path).expect("read capability file");
+
+            // Per capability FILE, not across files: two capabilities may
+            // legitimately grant the same command to two different windows.
+            let mut granted_by: std::collections::BTreeMap<String, Vec<String>> =
+                std::collections::BTreeMap::new();
+            for ident in capability_permission_identifiers(&json) {
+                let (plugin, id) = split_capability_entry(&ident);
+                let mut seen = std::collections::BTreeSet::new();
+                for cmd in resolve_granted_commands(&manifests, plugin, id, &mut seen) {
+                    granted_by.entry(cmd).or_default().push(ident.clone());
+                }
+            }
+            for (cmd, idents) in granted_by {
+                if cmd.starts_with('<') {
+                    unresolved.push(format!("{}: {cmd}", file_name(&path)));
+                } else if idents.len() > 1 {
+                    duplicates.push(format!("{}: {cmd} granted by {idents:?}", file_name(&path)));
+                }
+            }
+        }
+
+        assert!(
+            unresolved.is_empty(),
+            "capability entries that resolve to nothing in acl-manifests.json — the manifest \
+             shape changed and this gate is now measuring less than it claims: {unresolved:?}"
+        );
+        assert!(
+            duplicates.is_empty(),
+            "a command is granted twice in the same capability. The resolved authorization set \
+             is identical with or without the second identifier, so drop it — and do NOT replace \
+             it with a scoped object unless the command actually reads a CommandScope: \
+             {duplicates:?}"
         );
     }
 
