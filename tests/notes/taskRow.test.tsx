@@ -359,3 +359,23 @@ describe("two-line layout at narrow width", () => {
     one.cleanup();
   });
 });
+
+// ── myne#284: the checkbox is a real tap target on touch ────────────────────
+describe("touch hit area", () => {
+  it("carries the expander class, so the 14 px box is not the tap target", () => {
+    const { host, cleanup } = render(<TaskRow task={TASK} scope="vault" today={TODAY} />);
+    const box = byTestId(host, "task-row.checkbox")!;
+    // The class is what a `::before` expander can hang off — React's `style`
+    // prop cannot reach a pseudo-element, which is why this is not inline.
+    expect(box.classList.contains("myne-task-checkbox")).toBe(true);
+    cleanup();
+  });
+
+  it("keeps its 14 px visual size — the density is the point of the row", () => {
+    const { host, cleanup } = render(<TaskRow task={TASK} scope="vault" today={TODAY} />);
+    const box = byTestId(host, "task-row.checkbox") as HTMLElement;
+    expect(box.style.width).toBe("14px");
+    expect(box.style.height).toBe("14px");
+    cleanup();
+  });
+});
