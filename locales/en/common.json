@@ -2742,6 +2742,7 @@
       "quickUnlockSubtitle": "Re-enter with {{method}} or a PIN after auto-lock"
     },
     "quickUnlock": {
+      "errorBusy": "Another vault operation is in progress. Try again in a moment.",
       "errorCancelled": "Cancelled.",
       "errorGeneric": "Could not configure quick unlock.",
       "errorHardwareUnavailable": "Touch ID isn't available in this build. It needs a signed macOS build with Touch ID enrolled.",

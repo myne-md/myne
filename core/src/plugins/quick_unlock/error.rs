@@ -14,6 +14,19 @@ use super::provider::ProviderError;
 #[derive(Debug, Error, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", content = "detail")]
 pub enum QuickUnlockError {
+    /// Another auth-pipeline operation (`vault_unlock`, `vault_recover_*`,
+    /// `vault_change_password`, `vault_delete`, `vault_repair`, a backup export)
+    /// holds the capacity-1 `auth_permits` semaphore. `try_acquire` — reject,
+    /// never queue, per the `decisions.md` 2026-05-02 single-in-flight posture.
+    ///
+    /// Shares the variant name with `VaultDeleteError::VaultBusyAuth` and
+    /// `VaultRepairError::VaultBusyAuth`, which is this crate's name for exactly
+    /// this condition. Frontend copy is "operation in progress", NEVER a
+    /// credential failure: no attempt is burned here and the credential is
+    /// intact.
+    #[error("vault busy with auth operation")]
+    VaultBusyAuth,
+
     /// Setup requires the vault to be Unlocked (so `root_key` is in memory).
     #[error("vault is not unlocked")]
     NotUnlocked,

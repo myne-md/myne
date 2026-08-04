@@ -1766,7 +1766,10 @@ client re-offers setup under the new password); (2) enrolled-biometric-set chang
 disabling the feature; (4) vault deletion (the blob lives in the vault directory). A
 **code-enforced** failed-attempt counter (the `auto_lock.rs` two-class discipline,
 `threat-model.md` §7) wipes the blob after a bounded number of consecutive failures —
-this bounds *online* guessing; it does not bound offline brute-force.
+this bounds *online* guessing; it does not bound offline brute-force. Each attempt is
+counted under the same capacity-1 single-in-flight auth permit that serializes every
+other credential operation, so the read-increment-persist of the count cannot interleave
+with a second redeem and every rejected attempt is counted exactly once.
 
 The counter is **persisted**, because a per-session counter would reset on relaunch and
 bound nothing: it lives at `<vault-root>/vault.quickunlock.attempts` as a 2-byte body
