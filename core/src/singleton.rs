@@ -83,13 +83,136 @@ pub async fn open_newest<T, E>(
     )))
 }
 
+/// Decode the newest copy that decodes, then remove the copies it superseded.
+///
+/// The same fallback as [`open_newest`], plus the cleanup half of
+/// `write_single_live` — but performed only once a survivor has been PROVEN by
+/// the caller's own decode (myne#298).
+///
+/// That ordering is the whole point. `double_buffer::sweep_orphans` keeps the
+/// newest RANKABLE slot, because it holds no keys; a slot torn mid-write whose
+/// 8-byte generation stamp landed ranks first. Run from an unverified read path
+/// it therefore deletes the intact older copy — the very copy this helper exists
+/// to fall back to — and turns a recoverable tear into permanent loss.
+///
+/// Here the sweep runs only when a candidate decoded, and only when the one that
+/// decoded was the newest: if an older copy won, the newer slots are torn and
+/// deleting anything would destroy evidence rather than clean up after a crash.
+///
+/// Best-effort: a failed sweep is not a failed open. The orphan simply stays for
+/// the next attempt, which is the same state the process crashing here would
+/// leave.
+pub async fn open_newest_and_sweep<T, E>(
+    io: &dyn VaultIo,
+    path: &Path,
+    decode: impl Fn(&[u8]) -> Result<T, E>,
+) -> Result<T, OpenOutcome<E>> {
+    let candidates = io.read_candidates(path).await.map_err(OpenOutcome::Io)?;
+    if candidates.is_empty() {
+        return Err(OpenOutcome::Absent);
+    }
+
+    let mut newest_error: Option<E> = None;
+    for (index, bytes) in candidates.iter().enumerate() {
+        match decode(bytes) {
+            Ok(value) => {
+                // Only the NEWEST candidate winning means the older ones are
+                // genuinely superseded. An older winner means the newer slots
+                // are torn, and they are evidence, not litter.
+                if index == 0 && candidates.len() > 1 {
+                    let _ = crate::double_buffer::sweep_orphans(io, path).await;
+                }
+                return Ok(value);
+            }
+            Err(e) => {
+                if newest_error.is_none() {
+                    newest_error = Some(e);
+                }
+            }
+        }
+    }
+    Err(OpenOutcome::Undecodable(newest_error.expect(
+        "non-empty candidates with no success has an error",
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::vault_io::{DirEntry, IoResult, WriteOpts};
 
-    /// An IO stub that hands back a scripted candidate list.
+    /// An IO stub that hands back a scripted candidate list and RECORDS every
+    /// removal, so the sweep is observable (myne#298).
     struct Candidates(Vec<Vec<u8>>);
+
+    /// The same, plus a removal log — `Candidates` panics on `remove_file`,
+    /// which is what makes "did not sweep" assertable on it.
+    struct Sweepable {
+        candidates: Vec<Vec<u8>>,
+        removed: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl Sweepable {
+        fn new(candidates: Vec<Vec<u8>>) -> Self {
+            Self {
+                candidates,
+                removed: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+        fn removed(&self) -> Vec<String> {
+            self.removed.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl VaultIo for Sweepable {
+        async fn read(&self, _path: &Path) -> IoResult<Vec<u8>> {
+            self.candidates
+                .first()
+                .cloned()
+                .ok_or(IoFailureKind::NotFound)
+        }
+        async fn read_candidates(&self, _path: &Path) -> IoResult<Vec<Vec<u8>>> {
+            Ok(self.candidates.clone())
+        }
+        async fn read_prefix(&self, path: &Path, len: usize) -> IoResult<Vec<u8>> {
+            // `sweep_orphans` ranks slots by their 8-byte generation prefix. The
+            // `.a` slot is the newer one in every case here.
+            let name = path.to_string_lossy().to_string();
+            let gen: u64 = if name.ends_with(".a") { 2 } else { 1 };
+            let mut out = gen.to_be_bytes().to_vec();
+            out.truncate(len.min(8));
+            Ok(out)
+        }
+        async fn write(&self, _p: &Path, _b: &[u8], _o: WriteOpts) -> IoResult<()> {
+            unreachable!("not exercised")
+        }
+        async fn remove_file(&self, path: &Path) -> IoResult<()> {
+            self.removed
+                .lock()
+                .unwrap()
+                .push(path.to_string_lossy().to_string());
+            Ok(())
+        }
+        async fn exists(&self, _path: &Path) -> IoResult<bool> {
+            Ok(true)
+        }
+        async fn read_dir(&self, _path: &Path) -> IoResult<Vec<DirEntry>> {
+            Ok(Vec::new())
+        }
+        async fn create_dir_all(&self, _path: &Path) -> IoResult<()> {
+            Ok(())
+        }
+        async fn remove_dir_all(&self, _path: &Path) -> IoResult<()> {
+            Ok(())
+        }
+        async fn is_dir(&self, _path: &Path) -> IoResult<bool> {
+            Ok(false)
+        }
+        async fn rename(&self, _from: &Path, _to: &Path) -> IoResult<()> {
+            unreachable!("not exercised")
+        }
+    }
 
     #[async_trait::async_trait]
     impl VaultIo for Candidates {
@@ -165,6 +288,76 @@ mod tests {
                 "a reader that stopped at the newest copy would have reported \
                  corruption with an intact vault beside it"
             );
+        });
+    }
+
+    // ── myne#298: the sweep follows the proof, never precedes it ────────────
+    //
+    // `double_buffer::sweep_orphans` keeps the newest RANKABLE slot, because it
+    // holds no keys. Run from an unverified read — which is where the web IO
+    // seam ran it — a slot torn mid-write whose generation stamp landed ranks
+    // first, survives, and the INTACT older copy beside it is unlinked. The read
+    // returned the torn bytes either way; the sweep is what made the loss
+    // irreversible.
+
+    #[test]
+    fn a_verified_newest_copy_sweeps_the_ones_it_superseded() {
+        rt().block_on(async {
+            let io = Sweepable::new(vec![b"ok:new".to_vec(), b"ok:old".to_vec()]);
+            let got = open_newest_and_sweep(&io, Path::new("notes/n.myn"), decode).await;
+            assert_eq!(got.unwrap(), "new");
+            assert_eq!(
+                io.removed(),
+                vec!["notes/n.myn.b".to_string()],
+                "the superseded copy is cleaned up once the survivor is proven"
+            );
+        });
+    }
+
+    #[test]
+    fn a_torn_newest_sweeps_nothing_at_all() {
+        rt().block_on(async {
+            let io = Sweepable::new(vec![b"TORN".to_vec(), b"ok:old".to_vec()]);
+            let got = open_newest_and_sweep(&io, Path::new("notes/n.myn"), decode).await;
+            assert_eq!(
+                got.unwrap(),
+                "old",
+                "the intact older copy is still readable"
+            );
+            assert!(
+                io.removed().is_empty(),
+                "the older copy is the ONLY intact one — deleting it makes a \
+                 recoverable tear permanent, and for an unpushed note those \
+                 bytes are the only copy anywhere"
+            );
+        });
+    }
+
+    #[test]
+    fn nothing_decodes_sweeps_nothing() {
+        rt().block_on(async {
+            let io = Sweepable::new(vec![b"TORN-a".to_vec(), b"TORN-b".to_vec()]);
+            let got: Result<String, _> =
+                open_newest_and_sweep(&io, Path::new("notes/n.myn"), decode).await;
+            assert!(got.is_err());
+            assert!(
+                io.removed().is_empty(),
+                "both slots are evidence; a repair tool needs them"
+            );
+        });
+    }
+
+    #[test]
+    fn a_single_copy_sweeps_nothing() {
+        rt().block_on(async {
+            let io = Sweepable::new(vec![b"ok:only".to_vec()]);
+            assert_eq!(
+                open_newest_and_sweep(&io, Path::new("notes/n.myn"), decode)
+                    .await
+                    .unwrap(),
+                "only"
+            );
+            assert!(io.removed().is_empty());
         });
     }
 
