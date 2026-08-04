@@ -559,12 +559,24 @@ pub fn note_read_error_kind(e: &NoteReadError) -> &'static str {
 }
 
 /// In-process serializer for every note-blob WRITE that must be atomic with
-/// respect to its own read (read → decode → guard → re-encode → write): the
-/// [`note_update_with_dir`] pipeline and the sync pull-apply writer
-/// (`sync::orchestrator::apply_pulled_note_blob`). Without it the two writers
-/// interleave and the expected-base guard's decision can go stale between its
-/// check and its write. `OnceLock<Mutex<()>>`, lazily initialized — same shape
-/// as `attachments::commands::catalog_write_mutex` / prefs `write_mutex`.
+/// respect to its own read (read → decode → guard → re-encode → write). There
+/// are **three** such writers, and the list is the contract:
+///
+/// 1. [`note_update_with_dir`] — one note, expected-base guarded;
+/// 2. `sync::orchestrator::apply_pulled_note_blob` — one note, nonce guarded;
+/// 3. [`note_write_batch_with_dir`] — N notes under the §8.3 transaction, with
+///    no per-note guard at all (myne#302). Its read and its publish are
+///    separated by the whole encode pipeline, so it is the writer with the
+///    widest window and the one with the least to fall back on.
+///
+/// Without the lock these interleave and a guard's decision goes stale between
+/// its check and its write — or, for the batch, a concurrent write lands inside
+/// the window and is overwritten by a body re-encoded from the plaintext that
+/// preceded it, with no conflict, no `BaseMismatch` and a sync baseline that
+/// now names a version disk does not hold.
+///
+/// `OnceLock<Mutex<()>>`, lazily initialized — same shape as
+/// `attachments::commands::catalog_write_mutex` / prefs `write_mutex`.
 /// Review invariant: NEVER held across network I/O (the orchestrator locks
 /// per-blob, download outside the lock).
 pub(crate) fn notes_write_mutex() -> &'static Mutex<()> {
@@ -1274,6 +1286,34 @@ pub async fn note_write_batch_with_dir(
     };
     tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
 
+    // Serialize this read→decode→re-encode→write pipeline against the other two
+    // note-blob writers (myne#302). It is the same shape `note_update_with_dir`
+    // takes the lock for, over N notes instead of one, and it shipped without
+    // it: the closure below reads every blob and nothing is published until
+    // `write_batch_transactional` far below, so anything that wrote a note
+    // inside that window was silently overwritten by a body re-encoded from the
+    // pre-write plaintext.
+    //
+    // Both interleavings are reachable from an ordinary wikilink rename:
+    //
+    //   - the sync cycle applies another device's edit of X through
+    //     `apply_pulled_note_blob`, whose in-lock nonce re-check sees the
+    //     pre-batch blob (the batch has published nothing yet), adopts the
+    //     remote version as the new baseline, and is then overwritten. The
+    //     baseline now records a version disk does not hold, so the next scan
+    //     reads X as a local change and pushes the stale body to every device;
+    //   - with no sync and no second device, an autosave `note_update` for X
+    //     fires after the WL-8 pane flush, passes its §11.3 base guard against
+    //     the still-unpublished blob, writes, and is overwritten — the editor
+    //     having reported the save as successful.
+    //
+    // Acquired AFTER the slot guard, matching `note_update_with_dir`: those two
+    // are the only sites taking both, so the slot→notes order cannot invert.
+    // Held across the blocking pipeline AND the commit; dropped explicitly
+    // before the slot guard. No network IO under it (the review invariant on
+    // `notes_write_mutex`) — the batch is disk and CPU only.
+    let notes_guard = notes_write_mutex().lock().await;
+
     // spawn_blocking pipeline: for each note read .myn → decode_note →
     // encode_update; build the TxnBlob set; then commit all-or-nothing.
     // Every fallible step aborts the whole closure (and thus the batch)
@@ -1397,7 +1437,9 @@ pub async fn note_write_batch_with_dir(
         "note_write_batch read + AEAD + transactional commit succeeded"
     );
 
-    // Explicit drop — make the lock-release point visible.
+    // Explicit drops — make the lock-release points visible. Notes before slot,
+    // the reverse of acquisition.
+    drop(notes_guard);
     drop(slot);
     Ok(())
 }
@@ -2435,6 +2477,97 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(on_disk, "moved on", "a rejected save must not touch disk");
+        })
+    }
+
+    // ── myne#302: the §8.3 batch is the third `notes_write_mutex` writer ────
+    //
+    // `note_write_batch_with_dir` is a read→decode→re-encode→write pipeline over
+    // N notes, and it shipped taking only the slot READ guard. Its read and its
+    // publish are separated by the whole encode pass, so anything that wrote a
+    // note inside that window was silently overwritten by a body re-encoded from
+    // the plaintext that preceded it — no conflict, no keep-both, no
+    // `BaseMismatch`, and (via sync) a baseline naming a version disk does not
+    // hold, which the next scan pushes to every other device.
+    //
+    // The property is "it does not proceed while another writer holds the lock",
+    // which is what the two racing writers (`note_update_with_dir`, the sync
+    // pull-apply) both rely on. Driven from the lock side rather than by racing
+    // two writers: holding the mutex is exactly the state either of them is in
+    // mid-pipeline, and it makes the test deterministic instead of timing-shaped.
+    #[test]
+    fn note_write_batch_waits_for_the_notes_write_mutex() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("batch-notes-mutex").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await;
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "original body".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            let items: Vec<(String, zeroize::Zeroizing<String>)> = vec![(
+                id.clone(),
+                zeroize::Zeroizing::new("batch body".to_string()),
+            )];
+
+            // Stand in for a writer mid-pipeline (either of the other two).
+            let held = super::notes_write_mutex().lock().await;
+            let blocked = tokio::time::timeout(
+                std::time::Duration::from_millis(250),
+                super::note_write_batch_with_dir(
+                    &crate::vault_io::StdVaultIo,
+                    notes_dir.clone(),
+                    &state,
+                    &items,
+                ),
+            )
+            .await;
+            assert!(
+                blocked.is_err(),
+                "the batch must not run its pipeline while another note writer holds the lock"
+            );
+            assert_eq!(
+                note_read_with_dir(
+                    notes_dir.clone(),
+                    &state,
+                    id.clone(),
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .unwrap(),
+                "original body",
+                "…and must not have published anything"
+            );
+
+            // Released → it proceeds normally. The lock is a serializer, not a
+            // refusal.
+            drop(held);
+            super::note_write_batch_with_dir(
+                &crate::vault_io::StdVaultIo,
+                notes_dir.clone(),
+                &state,
+                &items,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                note_read_with_dir(
+                    notes_dir,
+                    &state,
+                    id,
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .unwrap(),
+                "batch body"
+            );
         })
     }
 

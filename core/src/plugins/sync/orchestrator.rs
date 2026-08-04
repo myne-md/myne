@@ -201,6 +201,12 @@ enum PulledNoteApply {
 /// §11.3 expected-base guard's whole premise. The download already happened
 /// OUTSIDE the lock (review invariant: never network I/O under this mutex).
 ///
+/// The re-check can only see writers that publish under the same lock. The §8.3
+/// rename batch did not, so it was invisible here: this function read a blob the
+/// batch had already re-encoded but not yet published, concluded the disk was
+/// clean, adopted the remote version as the baseline, and was then overwritten
+/// (myne#302). It takes the lock now.
+///
 /// Divergence semantics mirror the pre-download filter: a synced baseline
 /// exists and the disk no longer matches it (including "file vanished" — a
 /// mid-cycle local delete must not be resurrected) → skip without mutation.
@@ -3944,8 +3950,10 @@ mod tests {
     // Two-thread race pin deliberately downgraded: `run_sync_cycle` is
     // monolithic over a transport with no mid-loop injection seam, so a
     // barrier-based race test would need test-only hooks in production code.
-    // Coverage instead: both writers share `notes_write_mutex` (compile-level),
-    // and these units pin the in-lock decision both ways.
+    // Coverage instead: all THREE note-blob writers share `notes_write_mutex`
+    // (compile-level) — this one, `note_update_with_dir`, and the §8.3 batch
+    // (`note_write_batch_with_dir`, which joined them in myne#302) — and these
+    // units pin the in-lock decision both ways.
 
     /// The cycle-start manifest said "clean", but a local save landed before
     /// the write: the in-lock re-read sees the diverged disk nonce and skips —
