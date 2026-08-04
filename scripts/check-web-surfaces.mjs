@@ -49,6 +49,10 @@ const V = {
     "adapted",
     "Never mounted: the `ai` rail entry is filtered out where `localAi` is absent (task 27), so the panel is unreachable rather than empty.",
   ],
+  "src/components/settings/DateTimeSettings.tsx": [
+    "ported",
+    "Three closed-vocabulary rows over date_format / time_format / timezone; prefs-backed, no host call of its own.",
+  ],
   "src/components/settings/AppearancePanel.tsx": ["ported", "Themes + typography; all prefs-backed."],
   "src/components/settings/ArchiveSettings.tsx": ["ported", "Pure prefs toggle."],
   "src/components/settings/AttachmentCompressionSettings.tsx": [
@@ -236,6 +240,8 @@ const V = {
     "adapted",
     "The desktop handle only. The unwrap moved INTO the seam in task 67 — it used to throw for every web pick.",
   ],
+  "src/lib/datetimeFormat.ts": ["ported", "Re-export shim into @myne/editor; pure formatting, no host call."],
+  "src/lib/useDateTimeDisplay.ts": ["ported", "Re-export shim into @myne/editor; reads the ambient display store."],
   "src/lib/prefs.ts": ["ported", "Prefs IPC; the plugin is dispatched."],
   "src/lib/promptForText.ts": ["ported", "In-app modal prompt, not a host dialog."],
   "src/lib/reminderLifecycle.ts": [
@@ -329,6 +335,10 @@ const V = {
   "src/hooks/useIsFullscreen.ts": [
     "adapted",
     "Answers the Fullscreen API on web — the seam's `isFullscreen` is `document.fullscreenElement !== null`, which is the question the caller is asking.",
+  ],
+  "src/hooks/useDateTimeDisplaySync.ts": [
+    "ported",
+    "Publishes resolved prefs + the active language into the shared display store; prefs only.",
   ],
   "src/hooks/usePrefs.ts": ["ported", "The shared prefs hook."],
   "src/hooks/useReminderScheduler.ts": [
