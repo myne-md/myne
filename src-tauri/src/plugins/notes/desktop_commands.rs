@@ -1430,7 +1430,15 @@ mod tests {
     /// this seam, so the snapshot pair must be live; the index/sync side-effects
     /// are irrelevant here. Avoids an `AppHandle` / `tauri::test` harness (TB9
     /// Cargo.lock discipline) — the `ClampHooks` precedent in `prefs/mod.rs`.
-    struct SnapshotHooks;
+    ///
+    /// It also RECORDS every `ai_note_changed` call, because what that hook is
+    /// handed is a contract the compiler cannot state: three of the notes
+    /// commands reach it and each used to decide for itself whether to project a
+    /// drawing body first (myne#304).
+    #[derive(Default)]
+    struct SnapshotHooks {
+        ai_changed: std::sync::Mutex<Vec<(String, String)>>,
+    }
     impl myne_core::hooks::VaultLifecycleHooks for SnapshotHooks {
         fn hydrate_attachment_refs<'a>(
             &'a self,
@@ -1487,7 +1495,12 @@ mod tests {
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
         fn search_remove(&self, _: &str) {}
-        fn ai_note_changed(&self, _: &str, _: &str) {}
+        fn ai_note_changed(&self, id: &str, body: &str) {
+            self.ai_changed
+                .lock()
+                .expect("recorder mutex")
+                .push((id.to_string(), body.to_string()));
+        }
         fn ai_note_deleted(&self, _: &str) {}
         fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
@@ -1531,7 +1544,7 @@ mod tests {
     /// calls these tests drive (the snapshot side-effect is the behavior under
     /// test in several of them).
     fn noop_hooks() -> myne_core::hooks::Hooks {
-        std::sync::Arc::new(SnapshotHooks)
+        std::sync::Arc::new(SnapshotHooks::default())
     }
 
     /// Byte-pattern items_byte from `fixture_unlocked_with_keys` so
@@ -1909,6 +1922,102 @@ mod tests {
                 })
                 .count();
             assert_eq!(residue, 0, "aborted batch leaves no staged residue");
+        });
+    }
+
+    // ── myne#304: what the three notes commands hand `ai_note_changed` ──────
+    //
+    // The hook's body argument is the RAW note body — frontmatter included, and
+    // for a drawing the scene JSON rather than its projected text. The AI arm
+    // projects for itself, because it needs the frontmatter first (the SYNC-14
+    // folder-exclusion set is read from it) and because the unlock-time rebuild
+    // reads raw bodies off disk regardless.
+    //
+    // Before this, `note_create` passed raw while `note_update` and the batch
+    // passed projected — three call sites, three chances to decide differently,
+    // and nothing that could state the contract. These drive all three against
+    // one recording hooks impl so the answer is asserted rather than reviewed.
+
+    /// A `kind: drawing` note: scene JSON in the body, folder in frontmatter.
+    const DRAWING: &str = "---\nkind: drawing\nfolder: Sketches/\n---\n\n```excalidraw\n{\"type\":\"excalidraw\",\"elements\":[{\"type\":\"text\",\"text\":\"roadmap\"}]}\n```\n";
+
+    /// A host whose `app_data_dir` is a scratch directory, with the active
+    /// vault root materialized so the `_from_host` path resolvers succeed.
+    fn host_with_vault(base: &Path) -> myne_core::host::test_host::TestHost {
+        let root = base
+            .join("data")
+            .join("vaults")
+            .join(test_vault_id().as_uuid().to_string());
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        myne_core::host::test_host::TestHost::new(base)
+    }
+
+    #[test]
+    fn all_three_notes_commands_hand_the_ai_hook_the_raw_body() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("ai-hook-raw-body").unwrap();
+            let host = host_with_vault(scratch.path());
+            let recorder = std::sync::Arc::new(SnapshotHooks::default());
+            let hooks: myne_core::hooks::Hooks = recorder.clone();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+
+            // create
+            let id = note_create_from_host(
+                &host,
+                &state,
+                &hooks,
+                DRAWING.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("create");
+
+            // update
+            note_update_from_host(
+                &host,
+                &state,
+                &hooks,
+                id.clone(),
+                DRAWING.to_string(),
+                None,
+                &myne_core::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("update");
+
+            // batch
+            note_write_batch_transactional_from_host(
+                &host,
+                &myne_core::vault_io::StdVaultIo,
+                &state,
+                &hooks,
+                vec![NoteBatchUpdate {
+                    note_id: id.clone(),
+                    plaintext: DRAWING.to_string(),
+                }],
+            )
+            .await
+            .expect("batch");
+
+            let seen = recorder.ai_changed.lock().unwrap().clone();
+            assert_eq!(seen.len(), 3, "all three commands must reach the hook");
+            for (i, (got_id, body)) in seen.iter().enumerate() {
+                assert_eq!(got_id, &id, "call {i} carried the wrong note id");
+                assert_eq!(
+                    body, DRAWING,
+                    "call {i} must hand the hook the raw body, frontmatter and all"
+                );
+            }
         });
     }
 

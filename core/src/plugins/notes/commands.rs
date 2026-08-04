@@ -131,7 +131,8 @@ pub async fn note_create_from_host(
         }
         // MYND-453: eager per-note AI re-embed over the note prose (attachments
         // carry their own search docs now — 448a; detached, no-op unless the
-        // local-inference feature + ai_enabled are on).
+        // local-inference feature + ai_enabled are on). The RAW body, matching
+        // both twins and the `ai_note_changed` contract (myne#304).
         hooks.ai_note_changed(id, &plaintext);
         // MYND-424: mark the sync loop dirty so the new note pushes (soft dep).
         hooks.bump_local_change();
@@ -717,20 +718,22 @@ pub async fn note_update_from_host(
             let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
             // MYND-448a: unfolded note body doc + separate attachment docs.
             // SF5 (MYND-502): a `kind: drawing` body → projected scene text, never
-            // raw JSON (SYNC-4) and no attachment docs; AI re-embeds over the same.
+            // raw JSON (SYNC-4) and no attachment docs.
             if is_drawing(plaintext.as_bytes()) {
                 let body = project_drawing_text(plaintext.as_bytes()).unwrap_or_default();
                 hooks.search_upsert(&note_id, &title, &body);
-                // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
-                hooks.ai_note_changed(&note_id, &body);
             } else {
                 hooks.search_upsert(&note_id, &title, &plaintext);
                 hooks
                     .index_note_attachments(state, &note_id, &title, &plaintext)
                     .await;
-                // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
-                hooks.ai_note_changed(&note_id, &plaintext);
             }
+            // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
+            // The RAW body, outside the drawing branch (myne#304) — the AI arm
+            // needs the frontmatter to resolve the note's folder for the SYNC-14
+            // exclusion set, and does its own drawing projection.
+            hooks.ai_note_changed(&note_id, &plaintext);
+
             // MYND-424: mark the sync loop dirty so the coalesced push fires
             // (soft dependency — a no-op when the sync plugin isn't registered).
             hooks.bump_local_change();
@@ -1199,16 +1202,16 @@ pub async fn note_write_batch_transactional_from_host(
         if is_drawing(plaintext.as_bytes()) {
             let body = project_drawing_text(plaintext.as_bytes()).unwrap_or_default();
             hooks.search_upsert(note_id, &title, &body);
-            // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
-            hooks.ai_note_changed(note_id, &body);
         } else {
             hooks.search_upsert(note_id, &title, plaintext);
             hooks
                 .index_note_attachments(state, note_id, &title, plaintext)
                 .await;
-            // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
-            hooks.ai_note_changed(note_id, plaintext);
         }
+        // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated). The
+        // RAW body, outside the drawing branch — see `note_update`'s twin above
+        // and the `ai_note_changed` doc (myne#304).
+        hooks.ai_note_changed(note_id, plaintext);
     }
     tracing::debug!(
         stage = "success",
