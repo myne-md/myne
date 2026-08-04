@@ -169,8 +169,13 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     /// Pre-empt any in-flight automatic backup before a user-auth rewrite
     /// (change-password / delete) mutates `vault.meta` underneath it.
     fn preempt_inflight_backup<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
-    /// Invalidate the device-local quick-unlock credential for a vault dir
-    /// (a master-password change must force one full-password unlock).
+    /// Invalidate the device-local quick-unlock credential for a vault dir.
+    ///
+    /// Called on EVERY master-password commit — both the `change_password`
+    /// rotation and the completion of a phrase recovery, which is the same
+    /// commit reached from the other direction (`protocol.md` §9.14.4, §7.3).
+    /// It used to say "a master-password change", and recovery was left out on
+    /// the strength of that wording for as long as the rule existed.
     fn invalidate_quick_unlock(&self, vault_dir: &std::path::Path);
 
     // ---- Group 7: note snapshot capture (note_update) ---------------------
@@ -294,7 +299,36 @@ pub mod test_hooks {
     /// else (the snapshots test-mock pattern) — asserts the MYND-517 wiring:
     /// a shared-pref edit opens the coalesced sync push window, a device-local
     /// or no-op edit never does.
-    pub struct CountingHooks(pub std::sync::Arc<std::sync::atomic::AtomicU64>);
+    ///
+    /// Construct with [`CountingHooks::new`] rather than the tuple literal.
+    pub struct CountingHooks(
+        pub std::sync::Arc<std::sync::atomic::AtomicU64>,
+        /// Vault dirs passed to `invalidate_quick_unlock`, in call order.
+        ///
+        /// Here rather than in a second mock because the alternative is a
+        /// third hand-written 27-method impl of this trait, and because the
+        /// property it exists for is one nothing asserted before: `protocol.md`
+        /// §9.14.4's deletion is mandatory on EVERY credential rotation, and
+        /// both rotation paths could have their wiring removed with the suite
+        /// still green.
+        pub std::sync::Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>,
+    );
+
+    impl CountingHooks {
+        /// The counter is the caller's (it usually asserts on it); the
+        /// invalidation log is the mock's own.
+        pub fn new(counter: std::sync::Arc<std::sync::atomic::AtomicU64>) -> Self {
+            Self(
+                counter,
+                std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+            )
+        }
+
+        /// Vault dirs handed to `invalidate_quick_unlock`, oldest first.
+        pub fn quick_unlock_invalidations(&self) -> Vec<std::path::PathBuf> {
+            self.1.lock().expect("counting hooks mutex").clone()
+        }
+    }
 
     impl super::VaultLifecycleHooks for CountingHooks {
         fn hydrate_attachment_refs<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
@@ -351,7 +385,12 @@ pub mod test_hooks {
         fn preempt_inflight_backup<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn invalidate_quick_unlock(&self, _: &Path) {}
+        fn invalidate_quick_unlock(&self, vault_dir: &Path) {
+            self.1
+                .lock()
+                .expect("counting hooks mutex")
+                .push(vault_dir.to_path_buf());
+        }
         fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
             false
         }

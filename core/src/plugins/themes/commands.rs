@@ -1377,7 +1377,7 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = unlocked_vault().await;
             let bumps = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
-            let hooks: crate::hooks::Hooks = std::sync::Arc::new(CountingHooks(bumps.clone()));
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(CountingHooks::new(bumps.clone()));
 
             super::themes_import_with_dir(
                 &IO,

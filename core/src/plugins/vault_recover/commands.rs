@@ -343,7 +343,7 @@ pub async fn complete_recovery_from_host(
         None => state.recovering_vault_id().await,
     };
     let vault_path = vault_meta_path(host, target)?;
-    complete_recovery_with_path(new_password, target, &vault_path, state, host).await?;
+    complete_recovery_with_path(new_password, target, &vault_path, state, hooks, host).await?;
 
     // MYND-160 fix: a post-recovery slot transition to Unlocked owes the same
     // post-unlock pipeline as every other credential path — persisted prefs
@@ -409,6 +409,10 @@ pub(crate) async fn complete_recovery_with_path(
     vault_id: Option<crate::vault_id::VaultId>,
     vault_path: &Path,
     state: &VaultRuntimeState,
+    // Needed only for the quick-unlock invalidation at the tail. It is taken
+    // HERE rather than in the caller so the invalidation runs while the
+    // `auth_permits` guard below is still held — see the call site's comment.
+    hooks: &crate::hooks::Hooks,
     // Supplies `UnlockedVault::unlocked_at` and the duration log, both of which
     // were `Instant`-based until phase3-web-client task 12 — `Instant::now()`
     // panics on wasm32. This path is decided absent on web, but it shares the
@@ -722,6 +726,33 @@ pub(crate) async fn complete_recovery_with_path(
         "post-recovery password commit succeeded; slot is Unlocked"
     );
 
+    // `protocol.md` §9.14.4: committing a new master password invalidates any
+    // device-local quick-unlock credential for this vault. Completing a
+    // recovery IS such a commit (§7.3; `recovery-flow.md` §4) — and it is the
+    // stronger signal of the two, because the user reached it by losing the
+    // password rather than by choosing to rotate it.
+    //
+    // Without this, a pre-recovery PIN or Face ID kept working afterwards.
+    // `root_key` is preserved by both rotation paths and the quick-unlock AAD
+    // binds only `account_number_hash` + `provider_kind`, neither of which
+    // moves, so the stale credential does not dangle — it still unwraps the
+    // live `root_key`. The user watches the old password stop working and
+    // reasonably concludes access was revoked.
+    //
+    // Placed here, as the LAST act inside the `auth_permits` guard, for the
+    // reason `quick_unlock::commands::invalidate_credential` documents: the
+    // permit is what stops a concurrent `setup_with_dir` from re-creating the
+    // credential this just deleted. A raceable deletion is not a deletion.
+    // That is also why `hooks` is threaded down to this function rather than
+    // invalidating in `complete_recovery_from_host`, where the permit has
+    // already been released.
+    //
+    // Best-effort and silent, matching the change-password path: absence of a
+    // credential is a no-op, and the user re-enrols from Settings.
+    if let Some(vault_dir) = vault_path.parent() {
+        hooks.invalidate_quick_unlock(vault_dir);
+    }
+
     Ok(())
 }
 
@@ -918,6 +949,10 @@ mod tests {
         fixture_recovering_with_keys, fixture_unlocked_with_keys, test_vault_id, Slot,
     };
     use crate::test_support::{ScratchVault, FAST_TEST_KDF};
+
+    fn noop_hooks() -> crate::hooks::Hooks {
+        std::sync::Arc::new(crate::hooks::NoopHooks)
+    }
 
     fn rt() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
@@ -1593,6 +1628,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await;
@@ -1640,6 +1676,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await
@@ -1669,6 +1706,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await
@@ -1707,6 +1745,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await
@@ -1744,6 +1783,83 @@ mod tests {
     }
 
     #[test]
+    fn complete_recovery_invalidates_the_quick_unlock_credential() {
+        // `protocol.md` §9.14.4: a master-password commit deletes the
+        // device-local quick-unlock credential. Completing a recovery IS such
+        // a commit — and the sibling of the test above: that one proves the
+        // old PASSWORD is dead, this one proves the fast second credential
+        // minted under it is dead too. Without this, "forgot password →
+        // recovered" left a pre-recovery PIN or Face ID still opening the
+        // vault, because `root_key` is preserved and the quick-unlock AAD
+        // binds nothing that a rotation moves.
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_recovering_state_via_full_a8d("orig-pw").await;
+            let counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+            let watch = std::sync::Arc::new(crate::hooks::test_hooks::CountingHooks::new(
+                counter.clone(),
+            ));
+            let hooks: crate::hooks::Hooks = watch.clone();
+
+            complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &hooks,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("A8f");
+
+            let seen = watch.quick_unlock_invalidations();
+            assert_eq!(
+                seen.len(),
+                1,
+                "recovery completion must invalidate exactly once"
+            );
+            assert_eq!(
+                seen[0],
+                scratch.path().parent().expect("vault dir"),
+                "the hook receives the vault ROOT, not the vault.meta path"
+            );
+        });
+    }
+
+    #[test]
+    fn a_failed_recovery_leaves_the_quick_unlock_credential_alone() {
+        // The invalidation is a consequence of committing a new password, not
+        // of attempting one. A rejected weak password never reaches the
+        // rewrite, so deleting the credential there would destroy a working
+        // convenience gate over a typo.
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_recovering_state_via_full_a8d("orig-pw").await;
+            let counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+            let watch = std::sync::Arc::new(crate::hooks::test_hooks::CountingHooks::new(
+                counter.clone(),
+            ));
+            let hooks: crate::hooks::Hooks = watch.clone();
+
+            let result = complete_recovery_with_path(
+                "a".repeat(11),
+                None,
+                scratch.path(),
+                &state,
+                &hooks,
+                &crate::host::NoopHost,
+            )
+            .await;
+
+            assert!(result.is_err(), "a weak password is rejected");
+            assert!(
+                watch.quick_unlock_invalidations().is_empty(),
+                "a refused recovery must not touch the credential"
+            );
+        });
+    }
+
+    #[test]
     fn complete_recovery_old_password_no_longer_unlocks() {
         // After A8f commits "new-password-12", `vault_unlock("orig-pw")` MUST
         // return `InvalidCredentialOrVault` — the new password fully
@@ -1761,6 +1877,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await
@@ -1804,6 +1921,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await
@@ -1839,6 +1957,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await
@@ -1875,6 +1994,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await;
@@ -1913,6 +2033,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await;
@@ -1948,6 +2069,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
                 &crate::host::NoopHost,
             )
             .await;
@@ -1991,7 +2113,15 @@ mod tests {
             std::fs::remove_dir_all(&scratch.dir).expect("remove parent dir");
 
             let result =
-                complete_recovery_with_path("new-password-12".to_string(), None, scratch.path(), &state, &crate::host::NoopHost).await;
+                complete_recovery_with_path(
+                    "new-password-12".to_string(),
+                    None,
+                    scratch.path(),
+                    &state,
+                    &noop_hooks(),
+                    &crate::host::NoopHost,
+                )
+                .await;
             // Either IoError (read_meta / atomic_write failed) or
             // VaultNotFound (vault.meta was removed alongside the dir).
             assert!(

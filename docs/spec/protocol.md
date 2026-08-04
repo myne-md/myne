@@ -1760,10 +1760,22 @@ reverse) at the AEAD layer.
 
 `vault.quickunlock` is written only while the vault is **Unlocked** (the setup path clones
 the in-memory `root_key`). It is **deleted** (blob + provider credential) on any of:
-(1) master-password change (the wrapped copy is of the *old* `root_key` lineage — the
-client re-offers setup under the new password); (2) enrolled-biometric-set change
+(1) **any master-password commit** — both the `change_password` rotation and the
+completion of a phrase recovery (§7.3), which commits a new master password by the other
+route and is the *stronger* signal of the two, since the user reached it by losing the
+password rather than by choosing to rotate it; (2) enrolled-biometric-set change
 (automatic at the OS level via `biometryCurrentSet` for provider `0x01`); (3) user
-disabling the feature; (4) vault deletion (the blob lives in the vault directory). A
+disabling the feature; (4) vault deletion (the blob lives in the vault directory).
+
+**The reason for (1) is access-reset policy, not key lineage.** An earlier revision of
+this clause said the wrapped copy is "of the *old* `root_key` lineage", which is false:
+neither rotation path changes `root_key` — both re-wrap the same value — and the AAD
+(§9.14.3) binds `account_number_hash` + `provider_kind`, neither of which moves either.
+So a credential left in place after a rotation does not become stale; it keeps unwrapping
+the live `root_key`. Deletion is required because the user asked to reset their access,
+and that is the whole of the justification. Stating a lineage reason that does not hold is
+what let the recovery path ship without the rule: a reader checking whether recovery
+"invalidates the lineage" correctly concluded it does not. A
 **code-enforced** failed-attempt counter (the `auto_lock.rs` two-class discipline,
 `threat-model.md` §7) wipes the blob after a bounded number of consecutive failures —
 this bounds *online* guessing; it does not bound offline brute-force. Each attempt is
