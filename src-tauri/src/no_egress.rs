@@ -264,6 +264,52 @@ pub const IN_APP_PROCESS_SPAWN_PERMISSIONS: &[(&str, &str)] = &[(
      which.",
 )];
 
+/// Tauri `core` sub-namespaces the capability files may grant, each with the
+/// consumer that makes it reachable. `(namespace, reason)`.
+///
+/// **Why a roster and not a denylist (myne#384).** `core:default` is a bundle
+/// that resolves to 92 command grants across nine sub-namespaces, of which 40
+/// are reachable from the platform seam. The unreachable half is not inert:
+/// `core:menu`'s 22 handlers are registered unconditionally on desktop
+/// (`tauri::app` gates tray behind a feature and menu behind nothing), and
+/// `menu|new` + `menu|set_as_app_menu` need no precondition and no vault
+/// gate — so page context could replace the application menu, which on macOS
+/// lives outside the window entirely, in the one place a user is trained to
+/// read as the operating system.
+///
+/// Denying the dangerous identifiers individually was the alternative and is
+/// worse: the ACL is opt-in per command, so a deny list against a bundle means
+/// every future Tauri release that adds a core command grants it silently. An
+/// enumeration cannot rot in that direction.
+///
+/// The gate below asserts **both directions**, on the model of
+/// [`IN_APP_PROCESS_SPAWN_PERMISSIONS`]: a namespace granted but unrecorded is
+/// a decision nobody made; a recorded one nothing grants is a rationale
+/// outliving its subject. `core` itself is deliberately absent — the bare
+/// bundle is exactly what must not come back.
+pub const GRANTED_CORE_NAMESPACES: &[(&str, &str)] = &[
+    (
+        "core:event",
+        "`src/platform/event.ts` re-exports `listen`, which is how every \
+         host-emitted event (sync status, snapshot write-failed, deep-link \
+         arrival, screenshot notice) reaches the UI.",
+    ),
+    (
+        "core:path",
+        "`src/platform/path.ts` re-exports `appDataDir` and `join`, used by \
+         the export/backup destination flows to propose a default path.",
+    ),
+    (
+        "core:window",
+        "`src/platform/window.ts` re-exports `getCurrentWindow`; the three \
+         named `core:window:allow-*` entries beside the sub-default cover \
+         `destroy` (app-exit + editor close-intercept), `show` (reveal after \
+         idle lock) and `start_dragging`, which Tauri's own injected \
+         `drag.js` invokes for `data-tauri-drag-region` — the one consumer \
+         that exists in no source file in this repo.",
+    ),
+];
+
 /// Reported in place of a `[[permission]]` block that says it spawns but whose
 /// `identifier` line this scanner could not read.
 ///
@@ -373,6 +419,27 @@ fn split_capability_entry(entry: &str) -> (&str, &str) {
         Some((plugin, ident)) => (plugin, ident),
         None => ("", entry),
     }
+}
+
+/// The Tauri `core` namespaces a capability JSON file grants, sorted and
+/// deduplicated (myne#384).
+///
+/// The namespace is the entry minus its trailing identifier, which makes the
+/// bundle and a sub-namespace distinguishable by name alone: `core:default`
+/// yields `core`, `core:window:allow-destroy` and `core:window:default` both
+/// yield `core:window`. That asymmetry is the whole mechanism —
+/// [`GRANTED_CORE_NAMESPACES`] records the sub-namespaces and deliberately does
+/// not record `core`, so re-adding the bundle fails the gate by being
+/// unrecorded rather than by matching a pattern somebody had to anticipate.
+pub fn capability_core_namespaces(json_text: &str) -> Vec<String> {
+    let mut found: Vec<String> = capability_permission_identifiers(json_text)
+        .iter()
+        .map(|ident| split_capability_entry(ident).0.to_string())
+        .filter(|ns| ns == "core" || ns.starts_with("core:"))
+        .collect();
+    found.sort();
+    found.dedup();
+    found
 }
 
 /// The `plugin|command` grants a single capability entry resolves to, walking
@@ -678,6 +745,78 @@ mod tests {
              is identical with or without the second identifier, so drop it — and do NOT replace \
              it with a scoped object unless the command actually reads a CommandScope: \
              {duplicates:?}"
+        );
+    }
+
+    /// myne#384: the set of Tauri `core` namespaces the capability files grant
+    /// must equal the recorded roster, in both directions.
+    ///
+    /// Granted-but-unrecorded is a widening nobody argued for — including the
+    /// bare `core:default` bundle, which is absent from the roster precisely so
+    /// that restoring it fails here. Recorded-but-ungranted is a rationale
+    /// outliving its subject, which is how a table stops describing the tree.
+    #[test]
+    fn every_granted_core_namespace_is_recorded_with_its_reason() {
+        let cap_dir = src_tauri_dir().join("capabilities");
+        let mut scanned: Vec<String> = Vec::new();
+        let mut found: Vec<String> = Vec::new();
+        for entry in std::fs::read_dir(&cap_dir).expect("read capabilities dir") {
+            let path = entry.expect("dir entry").path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            scanned.push(file_name(&path));
+            let json = std::fs::read_to_string(&path).expect("read capability file");
+            found.extend(capability_core_namespaces(&json));
+        }
+        found.sort();
+        found.dedup();
+
+        let mut recorded: Vec<String> = GRANTED_CORE_NAMESPACES
+            .iter()
+            .map(|(ns, _)| (*ns).to_string())
+            .collect();
+        recorded.sort();
+
+        assert_eq!(
+            found, recorded,
+            "the set of Tauri `core` namespaces granted by {scanned:?} has drifted from \
+             GRANTED_CORE_NAMESPACES. A namespace here and not there is a widening nobody \
+             argued for — `core` itself means the whole 92-command bundle came back. One \
+             there and not here is a rationale outliving its subject."
+        );
+    }
+
+    #[test]
+    fn capability_core_namespaces_distinguishes_the_bundle_from_a_sub_namespace() {
+        // Both entry shapes, and the asymmetry the roster depends on.
+        let json = r#"{"permissions":[
+            "core:default",
+            "core:window:default",
+            "core:window:allow-destroy",
+            "core:path:default",
+            "opener:default",
+            {"identifier":"core:menu:allow-new"},
+            {"identifier":"opener:allow-open-path","allow":[{"path":"$APPDATA"}]}
+        ]}"#;
+        assert_eq!(
+            capability_core_namespaces(json),
+            vec!["core", "core:menu", "core:path", "core:window"],
+            "the bare bundle must read as `core`, never collapse into a sub-namespace, and \
+             non-core plugins must not appear at all"
+        );
+    }
+
+    #[test]
+    fn negative_restoring_the_core_default_bundle_is_unrecorded() {
+        // The regression this gate exists for: `core:default` resolves to a
+        // namespace no roster entry claims, so it fails by absence rather than
+        // by matching a pattern somebody had to think of first.
+        let namespaces = capability_core_namespaces(r#"{"permissions":["core:default"]}"#);
+        assert_eq!(namespaces, vec!["core"]);
+        assert!(
+            !GRANTED_CORE_NAMESPACES.iter().any(|(ns, _)| *ns == "core"),
+            "`core` must never be recorded: the roster's job is to make the bundle fail"
         );
     }
 
