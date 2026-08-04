@@ -50,6 +50,7 @@ import { Comment } from "@myne/dialect/lezer/comment";
 import { TaskField } from "@myne/dialect/lezer/task-field";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
+import { lineBoundaryKeymap } from "./line-boundary";
 import { viewModeExtension, type ViewMode } from "./view-mode";
 import { textDirectionExtension } from "./direction";
 import { tableKeymap } from "./decorations/table";
@@ -320,6 +321,10 @@ export function myneExtensions(opts?: {
       // (inserts the closing ```) instead of a plain newline (MYND-154).
       ...autoCloseFenceKeymap,
       ...closeBracketsKeymap,
+      // Before defaultKeymap so Cmd+←/→ get a VERIFIED line boundary rather
+      // than CodeMirror's raw coordinate probe against the editor's right edge,
+      // which drops the caret a row in this app's centred column (myne#286).
+      ...lineBoundaryKeymap,
       ...defaultKeymap,
       { key: "Mod-u", run: undoSelection, preventDefault: true },
     ]),
