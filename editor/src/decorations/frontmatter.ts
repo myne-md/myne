@@ -557,35 +557,6 @@ function frontmatterBoundary(doc: Text): number | null {
   return blockEnd;
 }
 
-/**
- * The first offset the CARET is allowed to occupy — the block boundary, advanced
- * past any BLANK lines that immediately follow the closing `---`.
- *
- * A caret cannot render correctly on a blank line right after the block widget:
- * `coordsAtPos` has no element to measure on either side of it and falls back to
- * the block's own rect, so `drawSelection` paints a full-height caret at the
- * panel's edge (MYND-608 / #209 — confirmed in-app: caret at a blank first body
- * line resolved to the panel rect). Landing the caret on the first line WITH
- * content gives `coordsAtPos` something to measure, so it renders in the body.
- * Blank lines stay in the document (byte-preserved); they are just skipped as a
- * caret target. Falls back to the last line if the whole body is blank, so there
- * is always a valid target.
- */
-function frontmatterCaretFloor(doc: Text): number | null {
-  const boundary = frontmatterBoundary(doc);
-  if (boundary === null) return null;
-  let pos = boundary;
-  while (pos < doc.length) {
-    const line = doc.lineAt(pos);
-    // First line with content, or the last line (all-blank body) — stop here.
-    if (line.text.trim().length !== 0 || line.number >= doc.lines) {
-      return line.from;
-    }
-    pos = line.to + 1; // start of the next line
-  }
-  return Math.min(pos, doc.length);
-}
-
 function buildFrontmatterDecorations(
   state: { doc: Parameters<typeof cachedLocateFrontmatter>[0] },
 ): DecorationSet {
@@ -715,7 +686,28 @@ function emptyBodyClickHandler(): Extension {
 function frontmatterSelectionGuard(): Extension {
   return EditorState.transactionFilter.of((tr) => {
     if (tr.selection === undefined) return tr;
-    const boundary = frontmatterCaretFloor(tr.newDoc);
+    // The floor is the first BODY offset, and nothing further.
+    //
+    // It used to advance past every blank line following the closing `---`, to
+    // work around MYND-608 / #209: a caret on a blank first body line had no
+    // element for `coordsAtPos` to measure on either side, fell back to the
+    // block's own rect, and `drawSelection` painted a full-height caret at the
+    // panel's edge. The skipped lines were called harmless because they stayed
+    // in the document.
+    //
+    // They were not harmless once the user CREATED one (myne#285). Pressing
+    // Enter at the start of the first body line leaves a blank line above the
+    // text, and this filter clamps EVERY selection endpoint — keyboard, mouse
+    // and Backspace alike. So the line could not be reached by ArrowUp, could
+    // not be clicked, and could not be deleted from the editor at all, because
+    // Backspace targets `floor - 1`. Pressing Enter repeatedly at the top of a
+    // note accumulated dead lines that only an external editor could remove. A
+    // region of the document the user can create and then never touch again is
+    // worse than the rendering artefact it was avoiding.
+    //
+    // The rendering half is handled below where it belongs, by forcing
+    // `assoc = 1` on the clamped cursor.
+    const boundary = frontmatterBoundary(tr.newDoc);
     if (boundary === null || boundary === 0) return tr;
     let changed = false;
     const ranges = tr.selection.ranges.map((r) => {
