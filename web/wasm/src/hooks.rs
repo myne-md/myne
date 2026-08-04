@@ -258,8 +258,16 @@ impl VaultLifecycleHooks for WebHooks {
     /// silently is exactly the shape of bug this event was added for.
     fn emit_snapshot_write_failed(&self, note_id: &str) {
         use myne_core::host::{EventPayload, HostCtx};
+        // The SHARED constant, not a literal (myne#291). The literal here used
+        // the PLURAL spelling of the family segment, and nothing subscribes to
+        // that: the canonical name is singular, the desktop hook already emits
+        // through the constant, and the shared TS listener mirrors the singular
+        // form. The Worker host demultiplexes by exact `Map` key, so the message
+        // was dropped. Inert only because web has no snapshot writer yet; the
+        // moment it gets one, the silent-snapshot-failure warning would have
+        // shipped dead — exactly the failure the event exists to surface.
         crate::host::WebHost.emit(
-            "snapshots://write-failed",
+            myne_core::plugins::notes::SNAPSHOT_WRITE_FAILED_EVENT,
             EventPayload::Text(note_id.to_string()),
         );
     }
