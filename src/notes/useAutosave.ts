@@ -53,6 +53,11 @@ export type UseAutosaveReturn = {
   retry: () => void;
   /** Flush any pending save synchronously (awaitable). No-op when clean. */
   flushIfDirty: () => Promise<void>;
+  /** Best-effort, fire-and-forget save of the buffer for whatever note the hook
+   *  currently holds — for a caller that is about to stop being that note's
+   *  editor (myne#288). Hashless, and it touches no hook state, because the
+   *  caller is about to reset that state for a DIFFERENT note. */
+  flushOutgoing: () => void;
   /** Adopt an externally-reloaded body as loaded content (not a user edit).
    *  Caller must ensure the buffer is clean first. See the impl docstring. */
   acceptReloadedBody: (reloadedBody: string) => void;
@@ -160,15 +165,36 @@ export function useAutosave(
    *  whose worst case is one extra follow-up save of a body React was about to
    *  render anyway. Never a lost keystroke. */
   const latestBodyRef = useRef<string>(body);
-  latestBodyRef.current = body;
+  /** Latest noteId — used by save fires. */
+  const noteIdRef = useRef<string | null>(noteId);
   /** True if the latest body has unsaved changes (idle/max timer armed
    *  OR error state holds an un-flushed body). */
   const dirtyRef = useRef<boolean>(false);
+  /**
+   * The buffer that belonged to the note the hook still holds, captured the
+   * instant a DIFFERENT note first renders through this hook (myne#288).
+   *
+   * `latestBodyRef` is written during render, so by the time the note-change
+   * effect runs it already holds the INCOMING note's body. Flushing from it
+   * would write note B's text into note A's file — strictly worse than the lost
+   * keystrokes it was meant to save. This snapshot is the last body that was
+   * still note A's, and it is what the outgoing flush writes.
+   *
+   * Captured once per switch: a re-render for the same incoming id must not
+   * overwrite the snapshot with a body that is already the new note's.
+   */
+  const outgoingRef = useRef<{ id: string; body: string } | null>(null);
+  if (noteIdRef.current !== noteId && noteIdRef.current !== null) {
+    if (outgoingRef.current === null || outgoingRef.current.id !== noteIdRef.current) {
+      outgoingRef.current = dirtyRef.current
+        ? { id: noteIdRef.current, body: latestBodyRef.current }
+        : null;
+    }
+  }
+  latestBodyRef.current = body;
   /** True after the first body change post-mount; first mount with
    *  empty body must not arm any timer. */
   const hasEditedRef = useRef<boolean>(false);
-  /** Latest noteId — used by save fires. */
-  const noteIdRef = useRef<string | null>(noteId);
   /** Saved body that produced the current `saved` status — lets us tell
    *  if a fresh edit happened during in-flight (latest-wins). */
   const savedBodyRef = useRef<string | null>(null);
@@ -195,21 +221,80 @@ export function useAutosave(
     }
   }, []);
 
+  /**
+   * Best-effort save of whatever the hook currently holds, for whatever note it
+   * currently holds it for. Used by every path that is about to STOP being this
+   * note's editor: the note-switch reset below, the unmount cleanup, and the
+   * pane's cached state swap (myne#288).
+   *
+   * Deliberately HASHLESS (legacy last-write-wins). By the time this runs there
+   * is no live pane to run the keep-both handler, so a `BaseMismatch` rejection
+   * would drop the keystrokes irrecoverably — whereas a legacy clobber is later
+   * reconciled by the sync engine's own server-side keep-both, because the
+   * remote revision still exists on the server.
+   *
+   * It deliberately does NOT touch `dirtyRef`, `savedBodyRef` or `status`: the
+   * caller is about to reset them for a different note, and a late async write
+   * into them would be a write about the wrong note.
+   */
+  const flushOutgoing = useCallback((): void => {
+    if (inFlightRef.current !== null) return;
+    // Prefer the switch snapshot: once a different note has rendered through
+    // this hook, `latestBodyRef` is already the incoming note's body and writing
+    // it under the outgoing id would corrupt the outgoing note.
+    const pending = outgoingRef.current;
+    const id = pending?.id ?? noteIdRef.current;
+    const text = pending?.body ?? latestBodyRef.current;
+    if (id === null || (pending === null && !dirtyRef.current)) return;
+    outgoingRef.current = null;
+    void saveImplRef.current(id, text).catch(() => {
+      /* best-effort — a switch must never be blocked by a failed save */
+    });
+  }, []);
+  const flushOutgoingRef = useRef(flushOutgoing);
+  flushOutgoingRef.current = flushOutgoing;
+
   useEffect(() => {
     const prevId = noteIdRef.current;
-    noteIdRef.current = noteId;
+    // NOTE: `noteIdRef` is advanced AFTER the flush below, not before — the
+    // outgoing save has to be attributed to the note it came from (myne#288).
     // Note-selection change → reset internal state. The previous note's
     // dirty timers + saved-status must not bleed into the new note (or
     // into the no-selection BottomBar). The `hasEditedRef` guard re-arms
     // so the body-change effect treats the new body as "loaded content"
     // not "user edit".
     if (prevId !== noteId) {
+      // myne#288 — FLUSH BEFORE RESETTING.
+      //
+      // This used to drop the armed γ1/γ2 timers and clear `dirtyRef` without
+      // firing a save, even though `prevId` and `latestBodyRef` still held
+      // everything a save needs. Every KEYBOARD switch path lands here with the
+      // editor still focused — Ctrl+Tab, Mod-W, Mod-[ / Mod-], the vim `:q`
+      // bridge — and none of them calls the flush registry, so the only flush in
+      // the whole notes domain was the incidental DOM blur a MOUSE click
+      // produces. Up to ~10 s of typing was destroyed with no error, no toast
+      // and a status that reset to `clean`.
+      //
+      // Worse than a lost buffer: the outgoing pane's EditorState is cached, so
+      // switching back showed the text again while the autosave had baselined it
+      // as if it were on disk. The user saw their words and had no signal they
+      // were unsaved, until the tab closed or the cache was evicted.
+      //
+      // Deliberately HASHLESS, for the same reason the unmount cleanup below is:
+      // there is no live pane left to run the keep-both handler, so a
+      // BaseMismatch rejection here would drop the keystrokes irrecoverably —
+      // whereas a legacy clobber is later reconciled by the sync engine's own
+      // server-side keep-both.
+      flushOutgoingRef.current();
+      noteIdRef.current = noteId;
       clearTimers();
       inFlightRef.current = null;
       dirtyRef.current = false;
       hasEditedRef.current = false;
       savedBodyRef.current = null;
       setStatus({ status: "clean" });
+    } else {
+      noteIdRef.current = noteId;
     }
   }, [noteId, clearTimers]);
 
@@ -461,24 +546,21 @@ export function useAutosave(
   useEffect(() => {
     return () => {
       clearTimers();
-      if (
-        dirtyRef.current &&
-        inFlightRef.current === null &&
-        noteIdRef.current !== null
-      ) {
-        void saveImplRef
-          .current(noteIdRef.current, latestBodyRef.current)
-          .catch(() => {
-            /* best-effort on unmount */
-          });
-      }
+      flushOutgoingRef.current();
     };
     // Intentionally empty deps — runs only on unmount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return useMemo(
-    () => ({ status, retry, flushIfDirty, acceptReloadedBody, hasPendingWork }),
-    [status, retry, flushIfDirty, acceptReloadedBody, hasPendingWork],
+    () => ({
+      status,
+      retry,
+      flushIfDirty,
+      flushOutgoing,
+      acceptReloadedBody,
+      hasPendingWork,
+    }),
+    [status, retry, flushIfDirty, flushOutgoing, acceptReloadedBody, hasPendingWork],
   );
 }

@@ -673,6 +673,19 @@ export function PaneView({
       if (swapped) {
         const doc = cached.state.doc.toString();
         setContent(doc);
+        // myne#288 — flush the OUTGOING note before baselining the incoming one.
+        //
+        // This effect is registered before `useAutosave`'s own note-change
+        // effect, so it runs first: `acceptReloadedBody` used to clear `dirtyRef`
+        // and re-baseline `savedBodyRef` while the hook still believed it was
+        // editing the previous note. By the time the hook noticed the switch
+        // there was nothing left to flush, and up to ~10 s of typing was gone —
+        // silently, because the cached EditorState put the text back on screen
+        // and the status read `clean`.
+        //
+        // `flushOutgoing` saves for whatever note the hook still holds, which at
+        // this point is the previous one.
+        autosaveRef.current?.flushOutgoing();
         autosaveRef.current?.acceptReloadedBody(doc);
         setLoading(false);
         // Anchor-driven open → land at the top and let the anchor effect take it
@@ -701,6 +714,8 @@ export function PaneView({
         const body = await noteRead(activeId);
         if (cancelled) return;
         setContent(body);
+        // Same ordering hazard as the cached-swap path above (myne#288).
+        autosaveRef.current?.flushOutgoing();
         autosaveRef.current?.acceptReloadedBody(body);
         requestAnimationFrame(() => {
           if (!cancelled && scroller !== null) scroller.scrollTop = 0;

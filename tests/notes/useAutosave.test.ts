@@ -211,7 +211,12 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     expect(result.current.status).toMatchObject({ status: "saved" });
   });
 
-  it("noteId change → clean reset (timers cleared, status cleared)", async () => {
+  it("noteId change → the OUTGOING note is flushed, then state resets (myne#288)", async () => {
+    // This used to assert `saveImpl` was NOT called — which is precisely the
+    // data-loss the switch caused. Every keyboard switch path (Ctrl+Tab, Mod-W,
+    // Mod-[ / Mod-]) lands here with the editor still focused and nothing else
+    // in the notes domain flushing, so up to ~10 s of typing was dropped with no
+    // error and a status that reset to `clean`.
     const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
     const { result, rerender } = renderHook(
       ({ id, body }: { id: string | null; body: string }) =>
@@ -222,18 +227,53 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     rerender({ id: "note-1" as string | null, body: "v1" });
     expect(result.current.status).toEqual({ status: "editing" });
 
-    // Switch note before idle timer fires.
+    // Switch note before the idle timer fires.
     rerender({ id: "note-2" as string | null, body: "completely different" });
     expect(result.current.status).toEqual({ status: "clean" });
+    // The pending keystrokes were written, attributed to the note they came
+    // from and carrying that note's body — not the incoming one's.
+    expect(saveImpl).toHaveBeenCalledTimes(1);
+    expect(saveImpl).toHaveBeenCalledWith("note-1", "v1");
 
-    // The original idle-debounce timer must not fire after the switch.
+    // …and the original idle-debounce timer still does not fire afterwards.
+    saveImpl.mockClear();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS + 100);
     });
     expect(saveImpl).not.toHaveBeenCalled();
-    // Switching back to no-note also clears.
+    // Switching to no-note also clears (and has nothing dirty to flush).
     rerender({ id: null, body: "" });
     expect(result.current.status).toEqual({ status: "clean" });
+    expect(saveImpl).not.toHaveBeenCalled();
+  });
+
+  it("noteId change on a CLEAN buffer writes nothing (myne#288)", async () => {
+    // The flush is conditional on real pending work; a plain tab-cycle through
+    // untouched notes must not rewrite every one of them with a fresh nonce.
+    const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
+    const { rerender } = renderHook(
+      ({ id, body }: { id: string | null; body: string }) =>
+        useAutosave(id, body, saveImpl),
+      { initialProps: { id: "note-1" as string | null, body: "v0" } },
+    );
+    rerender({ id: "note-2" as string | null, body: "other" });
+    rerender({ id: "note-3" as string | null, body: "third" });
+    expect(saveImpl).not.toHaveBeenCalled();
+  });
+
+  it("flushOutgoing() saves for the note the hook still holds (myne#288)", async () => {
+    // The pane's cached state swap runs BEFORE this hook's own note-change
+    // effect, so it needs a way to write the outgoing note's buffer before
+    // `acceptReloadedBody` re-baselines it for the incoming one.
+    const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
+    const { result, rerender } = renderHook(
+      ({ id, body }: { id: string | null; body: string }) =>
+        useAutosave(id, body, saveImpl),
+      { initialProps: { id: "note-1" as string | null, body: "v0" } },
+    );
+    rerender({ id: "note-1" as string | null, body: "v1" });
+    act(() => result.current.flushOutgoing());
+    expect(saveImpl).toHaveBeenCalledWith("note-1", "v1");
   });
 
   it("flushIfDirty() awaits pending save when one is in flight", async () => {
