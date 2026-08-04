@@ -3600,6 +3600,10 @@
       "vaultBusyAuth": {
         "body": "Another vault operation is in progress. Try again in a moment.",
         "title": "Vault busy"
+      },
+      "plaintextTooLarge": {
+        "title": "That note is too large to encrypt",
+        "body": "Try again with less content."
       }
     },
     "orchestrator": {

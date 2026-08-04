@@ -29,7 +29,13 @@ export type ProtocolError =
   | { kind: "AeadFailure" }
   | { kind: "InvalidVaultMeta" }
   | { kind: "AccountNumberInvalid" }
-  | { kind: "Csprng" };
+  | { kind: "Csprng" }
+  /**
+   * The plaintext handed to an encode path exceeds the family's cap.
+   * Mirrors `ProtocolError::PlaintextTooLarge` (`protocol/src/error.rs`),
+   * which the mirror had drifted past (myne#289).
+   */
+  | { kind: "PlaintextTooLarge" };
 
 /**
  * Bounded categorization of file-system failures.
@@ -121,7 +127,23 @@ export type AppError =
    * delete; this only fires against a racing `vault_repair`. Shares the
    * variant name with `VaultDeleteError::VaultBusyAuth`.
    */
-  | { kind: "VaultBusyAuth" };
+  | { kind: "VaultBusyAuth" }
+  /**
+   * The master password is below the project-wide `MIN_PASSWORD_LEN` floor,
+   * measured in **Unicode scalars** (`chars().count()`), not UTF-16 code units.
+   *
+   * Mirrors `VaultCreationError::WeakNewPassword`, which the union had drifted
+   * past (myne#289). The absence was not cosmetic: `mapAppErrorToUserMessage`
+   * ends in `default: assertNever(error)`, which THROWS — inside the creation
+   * flow's own catch — so a password of >= 12 UTF-16 units but < 12 scalars
+   * (any password with a non-BMP character near the floor) stranded the user on
+   * the exit-less "Encrypting…" screen with no error, no retry and no Cancel.
+   *
+   * The frontend length gate now counts scalars too, so this variant is
+   * unreachable from the form; it stays mapped because a direct-IPC caller can
+   * still produce it, and because an unmapped variant is a hang.
+   */
+  | { kind: "WeakNewPassword" };
 
 /**
  * Type-narrowing helper. `if (isProtocolError(e)) { e.detail.kind ... }`.

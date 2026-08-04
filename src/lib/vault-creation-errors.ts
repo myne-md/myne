@@ -80,6 +80,18 @@ function mapProtocolError(error: ProtocolError): ErrorState {
         primaryAction: "retry",
         displayMode: "inline",
       };
+    case "PlaintextTooLarge":
+      // Not reachable from creation (nothing large is encoded here), but an
+      // UNMAPPED variant does not degrade — `assertNever` throws, inside this
+      // flow's own catch, and the user is stranded on the exit-less
+      // "Encrypting…" screen. Every variant gets an arm for that reason
+      // alone (myne#289).
+      return {
+        title: i18n.t("vaultCreation.errors.plaintextTooLarge.title"),
+        body: i18n.t("vaultCreation.errors.plaintextTooLarge.body"),
+        primaryAction: "retry",
+        displayMode: "inline",
+      };
     default:
       return assertNever(error);
   }
@@ -200,6 +212,24 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
       return {
         title: i18n.t("vaultCreation.errors.vaultBusyAuth.title"),
         body: i18n.t("vaultCreation.errors.vaultBusyAuth.body"),
+        primaryAction: "retry",
+        displayMode: "inline",
+      };
+    case "WeakNewPassword":
+      // myne#289 — the variant the mirror had drifted past. `assertNever`
+      // THROWS, and it throws inside the creation flow's own catch, so the
+      // absence was not "an unhelpful message" but a hard hang on a screen with
+      // no Cancel, no Back and no retry.
+      //
+      // The backend counts Unicode SCALARS while the form counted UTF-16 code
+      // units, so any password of >= 12 units but < 12 scalars — one emoji
+      // appended to a ten-character password is enough — passed the form and was
+      // refused by the host. The form counts scalars now too, so this is
+      // unreachable from the UI; it stays mapped because a direct-IPC caller can
+      // still produce it, and because an unmapped variant is a hang.
+      return {
+        title: i18n.t("vaultCreation.errors.passwordTooShort.title"),
+        body: i18n.t("vaultCreation.errors.passwordTooShort.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
