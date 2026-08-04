@@ -22,10 +22,29 @@
 //! and are `Slot::Unlocked`-gated. Any failure on read collapses to the empty
 //! theme store (fall-back-to-empty, § 9.21.4).
 //!
-//! Every imported palette is validated through the shared
+//! ## The injection guard runs at both ends, and the second end is why
+//!
+//! Every **imported** palette is validated through the shared
 //! [`theme_validator::validate_theme`] injection guard (the exact same
 //! security-load-bearing allowlist the desktop client + the `myne-themes`
-//! marketplace CI run — threat-model §149) BEFORE it is sealed into the blob.
+//! marketplace CI run — threat-model §149) BEFORE it is sealed into the blob,
+//! and an off-grammar value is **rejected** there, with its key, so the author
+//! learns what was wrong.
+//!
+//! That sentence used to be the whole story, and it was the wrong shape of
+//! guarantee (myne#386): import is one of **three** writers to `vault.themes`.
+//! The sync merge adopts a peer's entry verbatim — and its agreeing-store arm
+//! writes the server's bytes unchanged — and a restored `.myne-backup` extracts
+//! the blob byte-identically. Neither looks at a value. So every palette that
+//! arrived on a second device had passed no grammar at all, on the device that
+//! paints it.
+//!
+//! The read side therefore filters as well: `commands::vetted` applies the same
+//! per-token allowlist wherever a palette **leaves** the store, which covers all
+//! three writers and every future one with one check instead of one per
+//! producer. Read **filters** rather than rejecting — on read there is no author
+//! to tell, and one bad token from a peer must not blank the picker everywhere
+//! else.
 //!
 //! Like `notes` / `prefs` / `vault_indices`, the `tauri::Builder` `init()`
 //! wiring stays in each client crate (the desktop integration that swaps the old

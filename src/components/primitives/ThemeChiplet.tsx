@@ -34,8 +34,16 @@ const DISPLAY_SAFE_COLOR =
  * refuses a second declaration (`red; position:fixed` is dropped wholesale) —
  * but `url(...)` survives that, and leaving it to the CSP's `img-src` alone
  * inverts the control ordering `threat-model.md` states, where the allowlist is
- * the PRIMARY guard. Already-stored palettes are validated, so this never fires
- * for them.
+ * the PRIMARY guard.
+ *
+ * The last sentence here used to read "Already-stored palettes are validated, so
+ * this never fires for them", and that was false for two of the three writers to
+ * `vault.themes` — the sync merge adopted a peer's entry verbatim and a restored
+ * backup extracted the blob byte-identically, so a palette that arrived on a
+ * second device had passed no grammar on the device painting it. myne#386 made
+ * it true by filtering host-side where a palette LEAVES the store, so a stored
+ * palette now really is vetted by the time it gets here. This check stays: it
+ * covers the deep-link preview, which is upstream of any store.
  */
 function displaySafeColor(value: string): string | null {
   return DISPLAY_SAFE_COLOR.test(value.trim()) ? value : null;

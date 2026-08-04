@@ -8426,6 +8426,86 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
+        /// myne#386 end-to-end: a palette carrying an off-grammar value
+        /// arrives through the merge, is stored verbatim — and does not reach a
+        /// reader.
+        ///
+        /// The attacker is anything holding `root_key` that writes
+        /// `vault.themes` without running the validator: a second enrolled
+        /// device on a modified or older build, a hand-crafted `MYT1`, or a
+        /// restored backup. **Not** a hostile server — the blob is AEAD-sealed
+        /// under `DeriveSubkey(root_key, "custom-themes-key")`, so TB5 can only
+        /// withhold or replay, which is what the neighbouring tests cover.
+        ///
+        /// The merge deliberately keeps the bytes: `merge_custom_themes` clones
+        /// a name only the peer has, and the agreeing-store arm adopts the
+        /// server's bytes verbatim. Filtering there would fight the CRDT and
+        /// churn the nonce. The read is the right chokepoint, and this asserts
+        /// the two halves together — the store keeps what the peer sent, the
+        /// reader does not see it.
+        #[test]
+        fn an_off_grammar_palette_from_a_peer_never_reaches_a_reader() {
+            let dir = scratch("hostile-palette");
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+
+            // A peer's theme whose accent is the CSS escape hatch the
+            // allowlist exists to close, alongside one well-formed token.
+            let mut palette = ThemePalette::from([(
+                "--accent".to_string(),
+                "url(https://evil.example/x)".to_string(),
+            )]);
+            palette.insert("--ink-1".into(), "#123456".into());
+            let remote = ThemesMap::from([("peer".to_string(), ThemeEntry::live(palette, T0))]);
+            let rec = serve_remote(&t, &tid, &remote);
+
+            let phase = blocking(sync_themes_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                Some(&rec),
+            ))
+            .unwrap();
+            assert!(phase.applied_remote, "the peer's theme was adopted");
+
+            // The store holds what the peer sent — the merge is not the place
+            // this gets fixed, and pretending otherwise would hide the point.
+            let stored = read_local(&dir);
+            assert_eq!(
+                stored["peer"].palette.get("--accent").map(String::as_str),
+                Some("url(https://evil.example/x)"),
+                "the merge stores the peer's bytes verbatim, by design"
+            );
+
+            // The reader — the only path to `applyCustomTheme` and the CSSOM —
+            // does not.
+            let read = blocking(crate::plugins::themes::commands::themes_read_in_dir(
+                &IO,
+                &dir,
+                &themes_key(),
+                &HASH,
+                "peer",
+            ))
+            .expect("read");
+            assert!(
+                !read.contains_key("--accent"),
+                "an off-grammar value must not survive the read that feeds the DOM"
+            );
+            assert_eq!(
+                read.get("--ink-1").map(String::as_str),
+                Some("#123456"),
+                "the rest of the palette is kept — this filters, it does not reject"
+            );
+
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
         /// A well-formed `MYT1` blob for this vault, served under a record that
         /// advertises a DIFFERENT nonce. Everything decrypts; only the identity
         /// of the revision is wrong. This is the case `decode_*` cannot catch
