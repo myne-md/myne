@@ -38,7 +38,31 @@ export type PairingDecision = "accepted" | "rejected";
 /** Mirrors `plugins::clipper_pairing::error::PairingError` (closed `kind`). */
 export type PairingError =
   | { kind: "NoPendingPairing" }
-  | { kind: "CsprngUnavailable" };
+  | { kind: "CsprngUnavailable" }
+  /**
+   * The registry write to `vault.prefs` failed, so the pairing could not be
+   * made durable (myne#290). The host ROLLS BACK the accept — the session is
+   * restored under its original challenge and the minted token is dropped — so
+   * a retry is non-destructive and there is still a session to re-poll.
+   *
+   * Two ways in, and the first is ordinary: the vault locked between the dialog
+   * opening and the click (a Lock press, or idle auto-lock — nothing clears the
+   * pending session on lock, so the card stays rendered and clickable over the
+   * Unlock screen). The second is a genuine write failure on the vault volume.
+   *
+   * The union listed only two of the three kinds while claiming to be a closed
+   * mirror, which is what let no consumer be forced to consider this one.
+   */
+  | { kind: "PersistFailed" };
+
+/** Narrow an unknown rejection to a mirrored `PairingError` kind. */
+export function pairingErrorKind(e: unknown): PairingError["kind"] | null {
+  if (typeof e !== "object" || e === null) return null;
+  const kind = (e as { kind?: unknown }).kind;
+  return kind === "NoPendingPairing" || kind === "CsprngUnavailable" || kind === "PersistFailed"
+    ? kind
+    : null;
+}
 
 /**
  * Mirrors `clipper::install::InstallStatus` — the browser native-messaging host
