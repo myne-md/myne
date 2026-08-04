@@ -154,6 +154,29 @@ class ToolbarView implements PluginValue {
   }
 
   update(update: ViewUpdate): void {
+    // Map the frozen selection through any document change (myne#327).
+    //
+    // The URL overlay holds `savedSelection` across an untimed user-interaction
+    // window — the user is typing a URL, and may be pasting it from elsewhere —
+    // and `commit()` then sliced and replaced those raw offsets in the CURRENT
+    // document. So the link brackets landed on a shifted run of characters,
+    // typically mid-word and sometimes swallowing punctuation, while the word
+    // the user actually selected kept no link. Silent: no error, no visual cue.
+    //
+    // Worse at the other end: if the document SHRANK past the frozen `to`,
+    // `ChangeSet.of` threw a `RangeError` out of the Enter keydown listener and
+    // escaped uncaught — so `dismiss()` and `view.focus()` never ran, and the
+    // overlay was left wedged on `document.body` with the editor unfocused.
+    //
+    // `changes.mapPos` is what CodeMirror hands out for exactly this. A
+    // selection whose two ends map to the same position has been deleted out
+    // from under the overlay, and `commit()` declines rather than wrapping
+    // nothing.
+    if (update.docChanged && this.savedSelection !== null) {
+      const from = update.changes.mapPos(this.savedSelection.from, 1);
+      const to = update.changes.mapPos(this.savedSelection.to, -1);
+      this.savedSelection = to > from ? { from, to } : null;
+    }
     // Dismiss when the editor loses focus (e.g. the Settings modal opens over
     // it) — the body-mounted toolbar would otherwise linger on top of other UI.
     // Only a real blur dismisses; showing is NOT gated on focus (a selection set
@@ -624,7 +647,12 @@ class ToolbarView implements PluginValue {
     const commit = (): void => {
       const url = input.value.trim();
       const sel = this.savedSelection;
-      if (sel !== null && url !== "") {
+      // The mapping above keeps `sel` valid, and a collapsed range is nulled
+      // there — but the dispatch is the one place a bad range becomes an
+      // uncaught throw, so it re-checks against the live document rather than
+      // trusting an invariant maintained elsewhere.
+      const len = this.view.state.doc.length;
+      if (sel !== null && url !== "" && sel.from < sel.to && sel.to <= len) {
         const text = this.view.state.doc.sliceString(sel.from, sel.to);
         this.view.dispatch({
           changes: {
