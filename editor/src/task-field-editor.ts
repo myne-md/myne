@@ -46,7 +46,7 @@ import {
   type Weekday,
 } from "@myne/dialect/recurrence";
 
-export type TaskFieldKind = "due" | "repeat" | "priority";
+export type TaskFieldKind = "due" | "remind" | "repeat" | "priority";
 
 export const PRIORITY_VALUES = ["highest", "high", "medium", "low", "lowest"] as const;
 
@@ -346,15 +346,46 @@ function buildBody(kind: TaskFieldKind, value: string): FieldBody {
     return { root: select, getValue: () => select.value, focusTarget: select };
   }
 
-  // `due` — the native date control (task 1's measurement). A date-only value
-  // goes straight in; a value carrying a time keeps its date part (the time
-  // editor is a later slice, and dropping it silently would be worse than
-  // ignoring it here).
-  const input = document.createElement("input");
-  input.type = "date";
-  input.value = value.slice(0, 10);
-  input.setAttribute("data-testid", "editor.task-field-input");
-  return { root: input, getValue: () => input.value, focusTarget: input };
+  // `due` and `remind` — the native date control (task 1's measurement) PLUS an
+  // optional native time control (myne#280).
+  //
+  // `TaskInstant` has always been `{ date, time? }` and the writer has always
+  // round-tripped a time; what was missing was any way to author one, so a task
+  // could be due "on a day" but never "at 14:00", and `remind` — the field the
+  // notification scheduler actually reads — was reachable only by hand-typing
+  // the field into the markdown.
+  //
+  // The time is OPTIONAL and empty by default, because a date-only task is what
+  // most tasks want: an empty time serializes to a bare date, exactly as before.
+  const row = document.createElement("div");
+  row.className = "cm-task-field-datetime";
+
+  const date = document.createElement("input");
+  date.type = "date";
+  date.value = value.slice(0, 10);
+  date.setAttribute("data-testid", "editor.task-field-input");
+  row.appendChild(date);
+
+  const time = document.createElement("input");
+  time.type = "time";
+  // The stored separator is either `T` or a space; both are accepted by the
+  // parser, and the writer emits one canonically — so read past whichever is
+  // there rather than assuming.
+  time.value = /^\d{4}-\d{2}-\d{2}[T ](\d{2}:\d{2})/.exec(value)?.[1] ?? "";
+  time.setAttribute("data-testid", "editor.task-field-time");
+  time.setAttribute("aria-label", i18n.t("editor.taskField.timeLabel"));
+  row.appendChild(time);
+
+  return {
+    root: row,
+    getValue: () => {
+      // No date means no field at all — a bare time is not a `TaskInstant`, and
+      // emitting one would produce bytes the parser refuses.
+      if (date.value === "") return "";
+      return time.value === "" ? date.value : `${date.value} ${time.value}`;
+    },
+    focusTarget: date,
+  };
 }
 
 /**

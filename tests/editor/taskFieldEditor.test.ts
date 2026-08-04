@@ -140,8 +140,9 @@ describe("keyboard operation", () => {
       value: "2026-08-01",
       onCommit: () => {},
     });
+    // date + time (myne#280) + commit + cancel.
     const focusables = surface()!.querySelectorAll("input, select, button");
-    expect(focusables.length).toBe(3);
+    expect(focusables.length).toBe(4);
     handle.close();
     anchor.remove();
   });
@@ -392,5 +393,88 @@ describe("lifecycle", () => {
     expect(surface()!.style.left).not.toBe("");
     expect(surface()!.style.top).not.toBe("");
     handle.close();
+  });
+});
+
+// ── myne#280: an optional time, and `remind` as a fourth kind ───────────────
+//
+// `TaskInstant` has always been `{ date, time? }` and the writer has always
+// round-tripped a time; what was missing was any way to AUTHOR one. So a task
+// could be due "on a day" but never "at 14:00", and `remind` — the field the
+// notification scheduler actually reads — was reachable only by hand-typing the
+// field into the markdown.
+describe("the optional time control", () => {
+  function timeInput(): HTMLInputElement {
+    return document.querySelector('[data-testid="editor.task-field-time"]')!;
+  }
+
+  it("is present beside the date for due and remind", () => {
+    for (const kind of ["due", "remind"] as const) {
+      const anchor = anchorEl();
+      const handle = openTaskFieldEditor({ anchor, kind, value: "", onCommit: () => {} });
+      expect(timeInput()).toBeTruthy();
+      handle.close();
+      anchor.remove();
+    }
+  });
+
+  it("starts empty for a date-only value — the common case", () => {
+    const anchor = anchorEl();
+    const handle = openTaskFieldEditor({
+      anchor,
+      kind: "due",
+      value: "2026-08-01",
+      onCommit: () => {},
+    });
+    expect(timeInput().value).toBe("");
+    handle.close();
+    anchor.remove();
+  });
+
+  it("prefills from a stored time, whichever separator it uses", () => {
+    for (const stored of ["2026-08-01 09:00", "2026-08-01T09:00"]) {
+      const anchor = anchorEl();
+      const handle = openTaskFieldEditor({
+        anchor,
+        kind: "due",
+        value: stored,
+        onCommit: () => {},
+      });
+      expect(timeInput().value).toBe("09:00");
+      handle.close();
+      anchor.remove();
+    }
+  });
+
+  it("commits a date-only value when the time is left empty", () => {
+    const anchor = anchorEl();
+    const onCommit = vi.fn();
+    openTaskFieldEditor({ anchor, kind: "due", value: "", onCommit });
+    (input() as HTMLInputElement).value = "2026-09-09";
+    (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
+    expect(onCommit).toHaveBeenCalledWith("2026-09-09");
+    anchor.remove();
+  });
+
+  it("commits date + time when a time is set", () => {
+    const anchor = anchorEl();
+    const onCommit = vi.fn();
+    openTaskFieldEditor({ anchor, kind: "remind", value: "", onCommit });
+    (input() as HTMLInputElement).value = "2026-09-09";
+    timeInput().value = "14:00";
+    (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
+    expect(onCommit).toHaveBeenCalledWith("2026-09-09 14:00");
+    anchor.remove();
+  });
+
+  it("commits nothing for a bare time — that is not a TaskInstant", () => {
+    // A control must not be able to produce bytes the parser refuses.
+    const anchor = anchorEl();
+    const onCommit = vi.fn();
+    openTaskFieldEditor({ anchor, kind: "due", value: "", onCommit });
+    timeInput().value = "14:00";
+    (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
+    expect(onCommit).toHaveBeenCalledWith("");
+    anchor.remove();
   });
 });

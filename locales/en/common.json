@@ -1058,7 +1058,8 @@
       "time": "Time",
       "todoList": "To-do list",
       "voiceNote": "Voice note",
-      "wikiLink": "Wiki link"
+      "wikiLink": "Wiki link",
+      "remind": "Reminder"
     },
     "spell": {
       "menu": {
@@ -1096,8 +1097,11 @@
       "title": {
         "due": "Due date",
         "repeat": "Repeat",
-        "priority": "Priority"
-      }
+        "priority": "Priority",
+        "remind": "Reminder"
+      },
+      "timeLabel": "Time (optional)",
+      "invalidRemind": "Myne can't read this date, so it won't remind you."
     },
     "toolbar": {
       "apply": "Apply",

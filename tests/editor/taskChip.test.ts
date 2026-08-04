@@ -883,3 +883,48 @@ describe("recurrence rules display localized over canonical storage (task 11)", 
     await i18n.changeLanguage("en");
   });
 });
+
+// ── myne#280: `remind` is a chip kind ───────────────────────────────────────
+//
+// The read side already mapped the `⏰` marker and the index already carried
+// `VaultTask.remind`, but the chip layer did not — so a `[remind:: …]` field
+// rendered as raw text, and the field the notification scheduler actually reads
+// was the one field with no visual presence at all.
+describe("the remind chip (myne#280)", () => {
+  it("chips a readable reminder date", () => {
+    const { view, host } = mount("- [ ] call mother [remind:: 2026-08-01]\n");
+    expect(host.querySelectorAll('[data-testid="editor.task-chip-remind"]').length).toBe(1);
+    teardown(view, host);
+  });
+
+  it("chips the emoji spelling too", () => {
+    // The Obsidian marker form is bare, not bracketed.
+    const { view, host } = mount("- [ ] call mother ⏰ 2026-08-01\n");
+    expect(host.querySelectorAll('[data-testid="editor.task-chip-remind"]').length).toBe(1);
+    teardown(view, host);
+  });
+
+  it("keeps a time on the chip instead of dropping it", () => {
+    const { view, host } = mount("- [ ] call mother [remind:: 2026-08-01 09:00]\n");
+    const chip = host.querySelector('[data-testid="editor.task-chip-remind"]');
+    expect(chip!.textContent).toBe("2026-08-01 09:00");
+    teardown(view, host);
+  });
+
+  it("flags a date it cannot read rather than chipping it", () => {
+    const { view, host } = mount("- [ ] call mother [remind:: next tuesday]\n");
+    expect(host.querySelectorAll('[data-testid="editor.task-chip-remind"]').length).toBe(0);
+    expect(host.querySelector('[data-testid="editor.task-field-invalid-remind"]')).not.toBeNull();
+    teardown(view, host);
+  });
+
+  it("anchors a recurrence rule, so a reminder-only task can repeat", () => {
+    // `canRecur` already accepted `remind` as the anchor; this pins that the
+    // chip layer agrees now that `remind` is chippable.
+    const { view, host } = mount(
+      "- [ ] call mother [remind:: 2026-08-01] [repeat:: every week]\n",
+    );
+    expect(host.querySelectorAll('[data-testid="editor.task-chip-repeat"]').length).toBe(1);
+    teardown(view, host);
+  });
+});

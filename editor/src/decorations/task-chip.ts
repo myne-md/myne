@@ -59,6 +59,12 @@ import { planTaskFieldWrite } from "@myne/dialect/taskFieldWriter";
 import { parseRecurrenceSpec } from "@myne/dialect/recurrence";
 import { canRecur } from "@myne/dialect/taskRecurrence";
 
+/** The kinds a chip can be. `remind` joined in myne#280 — the read side already
+ *  mapped its `⏰` marker, and it is the field the notification scheduler
+ *  actually reads, so leaving it un-chipped meant the reminder feature was
+ *  reachable only by hand-typing the field into the markdown. */
+export type ChipKind = "due" | "remind" | "repeat" | "priority";
+
 /**
  * Which fields get a chip, and what each is called.
  *
@@ -67,9 +73,11 @@ import { canRecur } from "@myne/dialect/taskRecurrence";
  * file happens to use. Priority's five emoji are their own value, hence the
  * separate value map below.
  */
-const CHIP_KINDS: ReadonlyMap<string, "due" | "repeat" | "priority"> = new Map([
+const CHIP_KINDS: ReadonlyMap<string, ChipKind> = new Map([
   ["due", "due"],
   ["📅", "due"],
+  ["remind", "remind"],
+  ["⏰", "remind"],
   ["repeat", "repeat"],
   ["🔁", "repeat"],
   ["priority", "priority"],
@@ -108,11 +116,13 @@ const PRIORITY_EMOJI_LABEL: ReadonlyMap<string, string> = new Map([
  * question was about the value rather than about the record.
  */
 function valueTypes(
-  kind: "due" | "repeat" | "priority",
+  kind: ChipKind,
   value: string,
   lineText: string,
 ): boolean {
-  if (kind === "due") return parseTaskInstant(value) !== null;
+  // `remind` is the same TaskInstant shape as `due` — one date parser, never a
+  // second one (§3.6.4's consume-never-redefine rule).
+  if (kind === "due" || kind === "remind") return parseTaskInstant(value) !== null;
   if (kind === "priority") return PRIORITY_WORDS.has(value.toLowerCase());
   return parseRecurrenceSpec(value).ok && canRecur(lineText);
 }
@@ -131,14 +141,15 @@ function valueTypes(
  * decoration site so the chip scanner is the only thing that decides what an
  * untyped field means.
  */
-const INVALID_HINT_KEY: Readonly<Record<"due" | "repeat" | "priority", string>> = {
+const INVALID_HINT_KEY: Readonly<Record<ChipKind, string>> = {
   due: "editor.taskField.invalidDue",
+  remind: "editor.taskField.invalidRemind",
   repeat: "editor.taskField.invalidRepeat",
   priority: "editor.taskField.invalidPriority",
 };
 
 /** The hint for a field that did NOT type. Only meaningful in that case. */
-function invalidHintKey(kind: "due" | "repeat" | "priority", value: string): string {
+function invalidHintKey(kind: ChipKind, value: string): string {
   // Reaching here means the field failed to type. For `repeat` that leaves two
   // possibilities, and if the vocabulary DOES read the rule then the failure was
   // the anchor — saying "Myne doesn't recognise this rule" would send the user
@@ -157,7 +168,7 @@ function invalidHintKey(kind: "due" | "repeat" | "priority", value: string): str
  * unrecognized rule is never localized — there is nothing to localize, and the
  * raw text is exactly what the user needs to see to fix it.
  */
-function displayLabel(kind: "due" | "repeat" | "priority", value: string, typed: boolean): string {
+function displayLabel(kind: ChipKind, value: string, typed: boolean): string {
   if (kind !== "repeat" || !typed) return value;
   const spec = parseRecurrenceSpec(value);
   return spec.ok ? recurrenceLabel(spec.spec) : value;
@@ -176,7 +187,7 @@ export type ChipSpan = {
   from: number;
   to: number;
   /** Canonical kind — `due` / `repeat` / `priority`, dialect-independent. */
-  kind: "due" | "repeat" | "priority";
+  kind: ChipKind;
   /**
    * The VALUE, in source form — the bytes that are in the file, and the bytes an
    * editor commits back. Kept separate from {@link label} so a localized display
@@ -255,7 +266,7 @@ export function chipRangesIn(state: EditorState, from: number, to: number): Chip
 
 class TaskChipWidget extends WidgetType {
   constructor(
-    private readonly kind: "due" | "repeat" | "priority",
+    private readonly kind: ChipKind,
     /** What the chip shows — already localized where that applies. */
     private readonly value: string,
     /** Source position, part of widget IDENTITY — see `eq`. */
@@ -452,7 +463,7 @@ export function taskChipAt(view: EditorView, target: HTMLElement): ChipSpan | nu
 export const TASK_CHIP_EVENT = "myne-open-task-chip";
 
 export type TaskChipEventDetail = {
-  kind: "due" | "repeat" | "priority";
+  kind: ChipKind;
   /** The value in SOURCE form, never the localized label — this is what the
    *  field editor prefills with and what a commit writes back. */
   value: string;
@@ -539,7 +550,7 @@ export function taskChipDecorations(): readonly Extension[] {
  * is deleted outright, it collapses and the field goes null, so the write
  * declines rather than guessing.
  */
-type PendingChip = { from: number; to: number; kind: "due" | "repeat" | "priority" };
+type PendingChip = { from: number; to: number; kind: ChipKind };
 
 const setPendingChip = StateEffect.define<PendingChip | null>();
 
@@ -578,7 +589,7 @@ export type TaskFieldEditHandle = {
  */
 export function beginTaskFieldEdit(
   view: EditorView,
-  span: { from: number; to: number; kind: "due" | "repeat" | "priority" },
+  span: { from: number; to: number; kind: ChipKind },
 ): TaskFieldEditHandle {
   view.dispatch({
     effects: setPendingChip.of({ from: span.from, to: span.to, kind: span.kind }),
@@ -613,7 +624,7 @@ export function beginTaskFieldEdit(
  */
 export function applyTaskFieldEdit(
   view: EditorView,
-  span: { from: number; to: number; kind: "due" | "repeat" | "priority" },
+  span: { from: number; to: number; kind: ChipKind },
   nextValue: string,
 ): boolean {
   const line = view.state.doc.lineAt(span.from);
@@ -627,23 +638,25 @@ export function applyTaskFieldEdit(
   } else if (span.kind === "repeat") {
     next.repeat = nextValue === "" ? undefined : nextValue;
   } else {
-    // `due` — type through the dialect's own instant parser, so the single
-    // typing authority stays there AND no task-field byte string is built here.
+    // `due` and `remind` (myne#280) — the SAME `TaskInstant` shape, typed
+    // through the dialect's own instant parser, so the single typing authority
+    // stays there AND no task-field byte string is built here.
+    const key = span.kind; // "due" | "remind"
     const instant = nextValue === "" ? null : parseTaskInstant(nextValue);
-    next.due = instant ?? undefined;
+    next[key] = instant ?? undefined;
     if (instant === null && nextValue !== "") {
       // A value the parser refuses is preserved verbatim rather than dropped —
       // the editor will render it as raw text with a hint (task 8).
       next.malformed = [
-        ...current.malformed.filter((f) => f.key !== "due"),
+        ...current.malformed.filter((f) => f.key !== key),
         // `raw` is unused by the writer (it re-emits from key+value), and
         // building a byte-shaped string here would muddy the grep that proves
         // the writer seam is the only emit site. Left empty on purpose.
-        { key: "due", value: nextValue, raw: "" },
+        { key, value: nextValue, raw: "" },
       ];
-      next.due = undefined;
+      next[key] = undefined;
     } else {
-      next.malformed = current.malformed.filter((f) => f.key !== "due");
+      next.malformed = current.malformed.filter((f) => f.key !== key);
     }
   }
 
