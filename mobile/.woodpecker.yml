@@ -105,9 +105,27 @@ steps:
     # Needs protocol/core provisioned by cargo-checks (shared workspace volume).
     depends_on: [cargo-checks]
     commands:
-      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
-      - cargo install --locked cargo-deny
-      - cd src-tauri && cargo deny check --config ../../myne-main/deny.toml  # reuse main repo advisory/license rules (provisioned by cargo-checks)
+      # Installed from the official PINNED prebuilt release (sha256-verified),
+      # mirroring the main repo's own cargo-deny step. `cargo install --locked`
+      # locks this crate's own dependencies but NOT the version of the tool it
+      # resolves, so the step silently rode cargo-deny upgrades — and 0.20 moved
+      # `--config` off the `check` subcommand, which turned into
+      # `error: unexpected argument '--config' found` on a tree nobody had
+      # touched. Pinning is also ~149s faster than building from source. Bump the
+      # version + sha together, in step with the main repo (asset:
+      # cargo-deny-<ver>-x86_64-unknown-linux-musl.tar.gz, tag has no `v` prefix;
+      # sha from the .sha256 sibling asset).
+      # `git` is required by `cargo deny check` for the rustsec advisory-db.
+      - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates
+      - |
+        curl -fsSL "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz" -o /tmp/cargo-deny.tgz
+        echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  /tmp/cargo-deny.tgz" | sha256sum -c -
+        tar -xzf /tmp/cargo-deny.tgz -C /tmp --strip-components=1
+        install -m0755 /tmp/cargo-deny /usr/local/bin/cargo-deny
+      # `--config` is GLOBAL in 0.20+, before the subcommand — `check --config`
+      # is the spelling that broke. Reuses the main repo's advisory/license
+      # rules (the clone is provisioned by cargo-checks).
+      - cd src-tauri && cargo deny --config ../../myne-main/deny.toml check
 
   # ── Frontend build (tsc typecheck + vite bundle) ──────────────────────────
   pnpm-build:
