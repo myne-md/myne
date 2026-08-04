@@ -462,12 +462,24 @@ pub async fn write_single_live_faulting(
 /// Remove every copy of `base` except the newest that is readable.
 ///
 /// The cleanup half of [`write_single_live`], for the window a crash can leave
-/// behind: new copy written, old one not yet removed. Called when the item is
-/// next opened — which is the acceptance criterion's wording and also the moment
-/// it is cheapest, since the generations have just been read anyway.
+/// behind: new copy written, old one not yet removed.
+///
+/// # It keeps the newest RANKABLE slot, not the newest VERIFIABLE one
+///
+/// This function holds no keys and no format knowledge, so "readable" here means
+/// only "carries a rankable 8-byte generation stamp". A slot torn mid-write
+/// whose stamp DID land ranks first and survives — while the intact older copy,
+/// which is the one a reader would fall back to, is unlinked.
+///
+/// That is why it must be called only where the survivor has been VERIFIED
+/// (myne#298). It used to sit on the unverified `read` arm of the web IO seam,
+/// which made a torn newest slot an irreversible loss: the read returned the
+/// torn bytes and the sweep deleted the only intact copy, so no later fix, no
+/// repair tool and not `singleton::open_newest` itself could recover it. For a
+/// note that had not yet been pushed, those bytes were the only copy anywhere.
 ///
 /// Best-effort and idempotent: on a store with nothing to clean it performs no
-/// writes at all, so putting it on a read path costs a comparison.
+/// writes at all.
 pub async fn sweep_orphans(io: &dyn VaultIo, base: &Path) -> IoResult<()> {
     let base_str = base.to_string_lossy().to_string();
     let slots = slot_generations(io, &base_str).await?;

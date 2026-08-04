@@ -194,14 +194,19 @@ impl VaultIo for OpfsVaultIo {
             // is what makes the fallback real; this arm exists so that callers
             // which only need *some* current bytes — a length probe, a
             // presence check — keep working unchanged.
+            //
+            // It does NOT sweep (myne#298). `sweep_orphans` keeps the newest
+            // RANKABLE slot, and this arm cannot verify — so a slot torn
+            // mid-write whose 8-byte generation stamp landed ranks first,
+            // survives the sweep, and the intact older copy beside it is
+            // unlinked. The read would have returned the torn bytes either way;
+            // what the sweep added was that the intact bytes were gone from
+            // disk, so the loss became irreversible — no repair tool and not the
+            // `open_newest` fallback this comment recommends could get them
+            // back. For a note not yet pushed to sync, that was the only copy
+            // anywhere. Cleanup now happens where a survivor has been PROVEN:
+            // `singleton::sweep_after_verified_open`.
             let mut found = container::candidates(&RawOpfs, path).await?;
-            if container::mode_for(&name) == container::Mode::SingleLive {
-                // "Cleaned up on next open" (task 20's third criterion), at the
-                // moment it is cheapest: the generations have just been read.
-                // Best-effort and idempotent — a note that is already single
-                // performs no writes here.
-                let _ = container::sweep_orphans(&RawOpfs, path).await;
-            }
             return if found.is_empty() {
                 Err(IoFailureKind::NotFound)
             } else {
