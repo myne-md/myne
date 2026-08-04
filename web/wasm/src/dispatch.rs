@@ -1724,7 +1724,12 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                     &myne_core::plugins::sync::devices::SyncDeviceError::Internal,
                 );
             };
-            let Ok(notes_dir) = myne_core::paths::notes_dir_under(&dir) else {
+            // `notes_dir_under_io`, not `notes_dir_under` (myne#303): the
+            // latter's root check is a `std::fs` `Path::is_dir`, which is the
+            // unsupported-platform stub here and answers `false` for every
+            // path — so this arm returned `Internal` unconditionally and
+            // quarantine restore was dead on the web client. It compiled.
+            let Ok(notes_dir) = myne_core::paths::notes_dir_under_io(vault_io(), &dir).await else {
                 return Outcome::error(
                     &myne_core::plugins::sync::devices::SyncDeviceError::Internal,
                 );
