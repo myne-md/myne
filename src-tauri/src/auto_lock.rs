@@ -353,10 +353,20 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
                          // vault_unlock::commands), so the idle-auto-lock and manual-lock
                          // teardown lists cannot silently DIVERGE: a new surface added to the
                          // hooks impl is wiped by BOTH paths automatically. This idle leg still
-                         // SKIPS persist (decisions.md 2026-05-30 / grill Q5) — the indices
-                         // rebuild on the next unlock — and `zeroize_vault_indices` also wipes
-                         // the feature-gated AI vector store (see DesktopHooks). Hooks is
-                         // always registered at setup, so this is unconditional in practice.
+                         // SKIPS persist (decisions.md 2026-05-30 / grill Q5), and
+                         // `zeroize_vault_indices` also wipes the feature-gated AI vector store
+                         // (see DesktopHooks). Hooks is always registered at setup, so this is
+                         // unconditional in practice.
+                         //
+                         // The skip's old justification — "the indices rebuild on the next
+                         // unlock" — is true for note BODIES and was false for attachment docs
+                         // (myne#307). A body edit that never persisted leaves a `content_nonce`
+                         // mismatch, which forces hydrate to re-decrypt; an `att:` doc has no
+                         // nonce of its own, so an out-of-band MYE1 write (OCR backlog, voice
+                         // transcript) that only patched the live index was simply gone, and
+                         // neither hydrate nor the backlog would re-derive it. Those two
+                         // producers now persist for themselves, which is what makes the skip
+                         // here safe rather than merely intended.
             if let Some(hooks) = app.try_state::<myne_core::hooks::Hooks>() {
                 hooks.zeroize_search_index();
                 hooks.zeroize_spell();

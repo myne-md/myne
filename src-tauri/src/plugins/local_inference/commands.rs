@@ -227,6 +227,13 @@ pub async fn transcribe<R: Runtime>(
         &attachment_id_hex,
     )
     .await;
+    // …and make it SURVIVE the session (myne#307). The refresh above is a live-
+    // index patch; nothing else made it durable. An idle auto-lock before the
+    // next 120 s flush zeroizes the index and skips persist, and the next unlock
+    // cannot recover: hydrate skips the note (its nonce never changed) and the
+    // OCR backlog skips the attachment (its MYE1 cache exists). One transcript
+    // is one blob rewrite, and it happens once per transcription.
+    crate::plugins::notes::search_sync::persist_search_index(&app, &vault_state).await;
 
     Ok(transcript)
 }
