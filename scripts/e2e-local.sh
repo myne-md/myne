@@ -86,7 +86,10 @@ if [[ "$SHELL_MODE" == 1 ]]; then
     bash -c "$FIX_PERMS && su e2e -s /bin/bash -c '$E2E_ENV && cd /work && exec bash -i'"
 fi
 
-BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
+# `--features voice-capture-stub` (myne#389 item D): the deterministic 440 Hz
+# capture source is a COMPILE-time variant now, not an env knob, so the voice
+# scenarios need it built in. Additive to the default features.
+BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle -- --features voice-capture-stub'
 if [[ "$SKIP_BUILD" == 1 ]]; then
   BUILD_CMD='pnpm install --frozen-lockfile'
 fi

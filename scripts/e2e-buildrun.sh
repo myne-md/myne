@@ -6,7 +6,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 IMAGE=myne-e2e
 
-INNER='set -e; pnpm install --frozen-lockfile && pnpm tauri build --no-bundle; set +e; PASS=""; FAIL="";'
+# `--features voice-capture-stub`: see scripts/e2e-local.sh (myne#389 item D).
+INNER='set -e; pnpm install --frozen-lockfile && pnpm tauri build --no-bundle -- --features voice-capture-stub; set +e; PASS=""; FAIL="";'
 for spec in "$@"; do
   INNER+=" echo \"==== RUN ${spec} ====\";"
   INNER+=" xvfb-run -a pnpm exec vitest run --config vitest.e2e.config.ts e2e/${spec}.e2e.ts;"
