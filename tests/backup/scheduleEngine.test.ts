@@ -18,6 +18,10 @@ const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
 const NOW = new Date("2026-06-18T12:00:00.000Z");
 const NOW_MS = NOW.getTime();
+/** When this unlocked session began. `every-unlock` means once per session, so
+ *  the due-check needs a session marker (myne#316) — an hour ago here, so a
+ *  success stamped before it counts as "a previous session". */
+const SESSION_START_MS = NOW_MS - 60 * 60_000;
 
 function config(overrides: Partial<ScheduleConfig> = {}): ScheduleConfig {
   return {
@@ -43,16 +47,16 @@ describe("intervalMs", () => {
 
 describe("isBackupDue", () => {
   it("is due when never run (and enabled + targeted)", () => {
-    expect(isBackupDue(config({ lastScheduledSuccessAt: null }), NOW_MS)).toBe(true);
+    expect(isBackupDue(config({ lastScheduledSuccessAt: null }), NOW_MS, SESSION_START_MS)).toBe(true);
   });
 
   it("is not due when disabled", () => {
-    expect(isBackupDue(config({ enabled: false }), NOW_MS)).toBe(false);
+    expect(isBackupDue(config({ enabled: false }), NOW_MS, SESSION_START_MS)).toBe(false);
   });
 
   it("is not due with no target folder", () => {
-    expect(isBackupDue(config({ targetFolder: null }), NOW_MS)).toBe(false);
-    expect(isBackupDue(config({ targetFolder: "" }), NOW_MS)).toBe(false);
+    expect(isBackupDue(config({ targetFolder: null }), NOW_MS, SESSION_START_MS)).toBe(false);
+    expect(isBackupDue(config({ targetFolder: "" }), NOW_MS, SESSION_START_MS)).toBe(false);
   });
 
   it("daily: due exactly at the 24h boundary, not a millisecond before", () => {
@@ -63,15 +67,44 @@ describe("isBackupDue", () => {
   });
 
   it("weekly: due exactly at the 7d boundary, not before", () => {
-    expect(isBackupDue(config({ interval: "weekly", lastScheduledSuccessAt: NOW_MS - WEEK_MS + 1 }), NOW_MS)).toBe(false);
-    expect(isBackupDue(config({ interval: "weekly", lastScheduledSuccessAt: NOW_MS - WEEK_MS }), NOW_MS)).toBe(true);
+    expect(isBackupDue(config({ interval: "weekly", lastScheduledSuccessAt: NOW_MS - WEEK_MS + 1 }), NOW_MS, SESSION_START_MS)).toBe(false);
+    expect(isBackupDue(config({ interval: "weekly", lastScheduledSuccessAt: NOW_MS - WEEK_MS }), NOW_MS, SESSION_START_MS)).toBe(true);
   });
 
-  it("every-unlock: due whenever any time has passed", () => {
-    expect(isBackupDue(config({ interval: "every-unlock", lastScheduledSuccessAt: NOW_MS - 1 }), NOW_MS)).toBe(true);
-    // Even a zero gap satisfies a 0-ms interval (back up each evaluation).
-    expect(isBackupDue(config({ interval: "every-unlock", lastScheduledSuccessAt: NOW_MS }), NOW_MS)).toBe(true);
+  // myne#316 — `every-unlock` means once per unlocked SESSION.
+  //
+  // Its interval is zero, and the due-check was `now - lastSuccess >= interval`,
+  // which is unconditionally true. So a user who asked for one backup per
+  // session got one every 5 minutes, and the keep-last-N pruner then deleted
+  // real files from their backup folder until the retained window was the last
+  // ~35 minutes — the folder still showing N files, the status still "success".
+  it("every-unlock: due once per session, not on every evaluation", () => {
+    // A success from a PREVIOUS session (before this unlock) → due.
+    expect(
+      isBackupDue(
+        config({ interval: "every-unlock", lastScheduledSuccessAt: SESSION_START_MS - 1 }),
+        NOW_MS,
+        SESSION_START_MS,
+      ),
+    ).toBe(true);
+    // A success from THIS session → not due again, however long the session runs.
+    expect(
+      isBackupDue(
+        config({ interval: "every-unlock", lastScheduledSuccessAt: SESSION_START_MS + 1 }),
+        NOW_MS,
+        SESSION_START_MS,
+      ),
+    ).toBe(false);
+    // Never run → due.
+    expect(
+      isBackupDue(
+        config({ interval: "every-unlock", lastScheduledSuccessAt: null }),
+        NOW_MS,
+        SESSION_START_MS,
+      ),
+    ).toBe(true);
   });
+
 });
 
 describe("runScheduledBackupIfDue", () => {
@@ -100,7 +133,7 @@ describe("runScheduledBackupIfDue", () => {
     // Overdue daily schedule — the unlock-time evaluation runs the backup.
     const cfg = config({ lastScheduledSuccessAt: NOW_MS - 2 * DAY_MS });
     const { deps: d, calls } = deps(cfg);
-    const outcome = await runScheduledBackupIfDue("vault-1", NOW, d);
+    const outcome = await runScheduledBackupIfDue("vault-1", NOW, d, SESSION_START_MS);
     expect(outcome).toBe("backed-up");
     expect(calls.exportBackup).toHaveBeenCalledWith(
       "/Users/me/Backups/Myne backup 2026-06-18 1200.myne-backup",
@@ -115,27 +148,27 @@ describe("runScheduledBackupIfDue", () => {
 
   it("backs up a never-run schedule", async () => {
     const { deps: d, calls } = deps(config({ lastScheduledSuccessAt: null }));
-    expect(await runScheduledBackupIfDue("v", NOW, d)).toBe("backed-up");
+    expect(await runScheduledBackupIfDue("v", NOW, d, SESSION_START_MS)).toBe("backed-up");
     expect(calls.exportBackup).toHaveBeenCalledOnce();
   });
 
   it("does not fire when not due", async () => {
     const cfg = config({ lastScheduledSuccessAt: NOW_MS - 60_000 }); // 1 min ago, daily
     const { deps: d, calls } = deps(cfg);
-    expect(await runScheduledBackupIfDue("v", NOW, d)).toBe("not-due");
+    expect(await runScheduledBackupIfDue("v", NOW, d, SESSION_START_MS)).toBe("not-due");
     expect(calls.exportBackup).not.toHaveBeenCalled();
     expect(calls.recordResult).not.toHaveBeenCalled();
   });
 
   it("does not fire when disabled", async () => {
     const { deps: d, calls } = deps(config({ enabled: false }));
-    expect(await runScheduledBackupIfDue("v", NOW, d)).toBe("disabled");
+    expect(await runScheduledBackupIfDue("v", NOW, d, SESSION_START_MS)).toBe("disabled");
     expect(calls.exportBackup).not.toHaveBeenCalled();
   });
 
   it("does not fire with no target folder", async () => {
     const { deps: d, calls } = deps(config({ targetFolder: null }));
-    expect(await runScheduledBackupIfDue("v", NOW, d)).toBe("no-target");
+    expect(await runScheduledBackupIfDue("v", NOW, d, SESSION_START_MS)).toBe("no-target");
     expect(calls.exportBackup).not.toHaveBeenCalled();
   });
 
@@ -144,7 +177,7 @@ describe("runScheduledBackupIfDue", () => {
       config({ lastScheduledSuccessAt: null }),
       () => Promise.reject(new Error("target gone")),
     );
-    const outcome = await runScheduledBackupIfDue("v", NOW, d);
+    const outcome = await runScheduledBackupIfDue("v", NOW, d, SESSION_START_MS);
     expect(outcome).toBe("failed");
     expect(calls.recordResult).toHaveBeenCalledWith("v", false);
   });
@@ -155,7 +188,7 @@ describe("runScheduledBackupIfDue", () => {
     const { deps: d, calls } = deps(config({ lastScheduledSuccessAt: null }), () =>
       Promise.reject({ kind: "AuthOperationInProgress" }),
     );
-    const outcome = await runScheduledBackupIfDue("v", NOW, d);
+    const outcome = await runScheduledBackupIfDue("v", NOW, d, SESSION_START_MS);
     expect(outcome).toBe("skipped");
     expect(calls.recordResult).not.toHaveBeenCalled();
   });
@@ -164,7 +197,7 @@ describe("runScheduledBackupIfDue", () => {
     const { deps: d, calls } = deps(config({ lastScheduledSuccessAt: null }), () =>
       Promise.reject({ kind: "Cancelled" }),
     );
-    expect(await runScheduledBackupIfDue("v", NOW, d)).toBe("skipped");
+    expect(await runScheduledBackupIfDue("v", NOW, d, SESSION_START_MS)).toBe("skipped");
     expect(calls.recordResult).not.toHaveBeenCalled();
   });
 });
