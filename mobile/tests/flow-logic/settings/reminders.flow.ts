@@ -11,6 +11,7 @@
 // the checklist look redundant.
 
 import { test, expect } from "@playwright/test";
+import { horizonEndDate } from "@myne/reminder-schedule";
 import { installMockIpc } from "../mock-ipc";
 
 /** Settings → Privacy, where the reminder block lives (a block, not a rail entry). */
@@ -57,15 +58,21 @@ test.describe("mobile task-reminder settings", () => {
     await expect(line).toBeVisible();
 
     // "through <date>" is checkable against a calendar; "7 days" makes the reader
-    // do the arithmetic and get it wrong. Computed here the same way the surface
-    // does — in the LOCAL calendar, which is the part a UTC shift gets wrong.
-    const expected = await page.evaluate(() => {
+    // do the arithmetic and get it wrong.
+    //
+    // The calendar DAY is read from the page, because a browser running in a
+    // different timezone than the runner is exactly the shift this line's local
+    // arithmetic exists to survive. The ARITHMETIC comes from the one shared
+    // derivation rather than a copy: a hand-rolled `today + N` here is what this
+    // assertion used to say, which is the very formula #52 replaced with
+    // `today + (N - 1)` after desktop and mobile told the same vault two
+    // different dates. Re-deriving it locally is how the two drifted apart, so
+    // this spec does not get its own second opinion either.
+    const [year, month, day] = await page.evaluate(() => {
       const now = new Date();
-      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
-      const p = (n: number) => String(n).padStart(2, "0");
-      return `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`;
+      return [now.getFullYear(), now.getMonth(), now.getDate()] as [number, number, number];
     });
-    await expect(line).toContainText(expected);
+    await expect(line).toContainText(horizonEndDate(new Date(year, month, day), 7));
   });
 
   test("the precise-delivery affordance appears only where the permission exists", async ({

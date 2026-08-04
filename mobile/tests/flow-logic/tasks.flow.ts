@@ -142,9 +142,16 @@ test.describe("mobile task surfaces", () => {
     await page.goto("/");
     await openTasksDestination(page);
 
-    for (const label of ["Today", "Upcoming", "Overdue", "All"]) {
-      await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
+    for (const key of ["today", "upcoming", "overdue", "all"]) {
+      await expect(page.getByTestId(`tasks.vault.filter.${key}`)).toBeVisible();
     }
+
+    // "on its own" is the point of the assertion, and an exact-text match on
+    // the chip could never see it: the count is a sibling node INSIDE the
+    // button, so the button reads "Overdue2" and `getByText("Overdue",
+    // { exact: true })` matches nothing. That is what this spec used to do —
+    // it named the count in its title and then checked only the four labels.
+    await expect(page.getByTestId("tasks.vault.overdueCount")).toBeVisible();
   });
 
   test("the scope strip narrows by folder", async ({ page }) => {
