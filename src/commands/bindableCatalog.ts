@@ -69,7 +69,14 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   // Panes & Tabs
   { id: "pane.close-tab", get label() { return i18n.t("commands.hotkeys.command.closeTab"); }, group: "Panes & Tabs", defaultBindings: ["Mod-w"], rebindable: true },
   { id: "pane.split-row", get label() { return i18n.t("commands.hotkeys.command.splitPaneRight"); }, group: "Panes & Tabs", defaultBindings: ["Mod-\\"], rebindable: true },
-  { id: "pane.split-column", get label() { return i18n.t("commands.hotkeys.command.splitPaneDown"); }, group: "Panes & Tabs", defaultBindings: ["Mod-Shift-\\"], rebindable: true },
+  // `Mod-Shift-|`, not `Mod-Shift-\` (myne#337). The chord a keydown produces is
+  // built from `keyName(event)`, which reports the SHIFTED character — so
+  // Shift+`\` arrives as `|` on every platform, and the stored `Mod-Shift-\`
+  // could never match. The shortcut was dead while the Hotkeys panel, the
+  // command palette and the conflict detector all presented it as live; its
+  // unshifted sibling `Mod-\` works, which is why the pair read as "split right
+  // works, split down is broken".
+  { id: "pane.split-column", get label() { return i18n.t("commands.hotkeys.command.splitPaneDown"); }, group: "Panes & Tabs", defaultBindings: ["Mod-Shift-|"], rebindable: true },
   { id: "pane.focus-next", get label() { return i18n.t("commands.hotkeys.command.focusNextPane"); }, group: "Panes & Tabs", defaultBindings: ["Mod-Alt-ArrowRight", "Mod-Alt-ArrowDown"], rebindable: true },
   { id: "pane.focus-prev", get label() { return i18n.t("commands.hotkeys.command.focusPrevPane"); }, group: "Panes & Tabs", defaultBindings: ["Mod-Alt-ArrowLeft", "Mod-Alt-ArrowUp"], rebindable: true },
   { id: "pane.cycle-tab", get label() { return i18n.t("commands.hotkeys.command.cycleTabs"); }, group: "Panes & Tabs", defaultBindings: ["Ctrl-Tab"], rebindable: false },
