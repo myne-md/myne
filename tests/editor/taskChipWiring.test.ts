@@ -178,3 +178,36 @@ describe("committing reaches the document", () => {
     expect(view.state.doc.toString()).not.toContain("2026-09-09");
   });
 });
+
+// ── myne#331: committing a due chip must not delete its time ────────────────
+//
+// The popover seeded `<input type="date">` with `value.slice(0, 10)` and
+// committed exactly what that input held, so a chip carrying `2026-08-01 14:30`
+// came back as `2026-08-01`. `applyTaskFieldEdit` re-typed it through
+// `parseTaskInstant`, got `{date}` with no `time`, and the writer emitted a real
+// edit because the line differed — so the wall-clock time the user wrote was
+// deleted from the note and autosaved, with no warning. Chips never open on
+// caret entry, so this popover is the ONLY way to touch the value.
+describe("a due chip carrying a time (myne#331)", () => {
+  it("round-trips the time through open \u2192 commit", () => {
+    cleanup.push(installChipListener());
+    const { view, host } = mount("- [ ] pay the rent [due:: 2026-08-01 14:30]\n");
+    chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(surface()).not.toBeNull();
+    (
+      document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement
+    ).click();
+    expect(view.state.doc.toString()).toContain("[due:: 2026-08-01 14:30]");
+  });
+
+  it("still writes a bare date when the chip carries no time", () => {
+    cleanup.push(installChipListener());
+    const { view, host } = mount("- [ ] pay the rent [due:: 2026-08-01]\n");
+    chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    (
+      document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement
+    ).click();
+    expect(view.state.doc.toString()).toContain("[due:: 2026-08-01]");
+    expect(view.state.doc.toString()).not.toMatch(/due:: 2026-08-01 \d/);
+  });
+});
