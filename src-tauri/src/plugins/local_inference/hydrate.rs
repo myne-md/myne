@@ -70,6 +70,31 @@ pub fn folder_of(body: &str) -> String {
         .unwrap_or_default()
 }
 
+/// The text the AI actually embeds for a note body.
+///
+/// For an ordinary note this is the body verbatim. For a `kind: drawing` note
+/// the body is Excalidraw scene JSON, and what gets embedded is its projected
+/// text elements — the same thing the search index stores (SF5 / MYND-502).
+/// Embedding the raw JSON puts coordinates, element ids and version counters
+/// into the vector store and leaves the words the user actually wrote buried
+/// among them.
+///
+/// **Projecting here rather than at the hook's call sites** (myne#304): the
+/// exclusion check just above needs the frontmatter, which a projected body no
+/// longer has — so a drawing inside an AI-excluded folder resolved to root and
+/// was embedded anyway. And this walk reads raw bodies off disk regardless, so
+/// projecting at the call sites left the eager path storing scene text and the
+/// durable `vault.embeddings` blob storing JSON, with every unlock replacing
+/// the first with the second.
+fn embeddable_body(body: String) -> String {
+    if myne_core::plugins::notes::drawing_text::is_drawing(body.as_bytes()) {
+        myne_core::plugins::notes::drawing_text::project_drawing_text(body.as_bytes())
+            .unwrap_or_default()
+    } else {
+        body
+    }
+}
+
 /// Whether `folder` falls under any excluded folder (SYNC-14). A folder is
 /// excluded when it EQUALS an excluded entry or is NESTED beneath one. The
 /// excluded entries are canonical trailing-slash paths, so a `starts_with`
@@ -285,12 +310,14 @@ pub(crate) async fn hydrate_ai_vectors<R: Runtime>(app: &AppHandle<R>, state: &V
             else {
                 continue;
             };
+            // Folder FIRST, from the raw body — it comes out of the
+            // frontmatter, which the projection strips.
             let folder = folder_of(&body);
             let content_nonce = nonce_by_id.get(id).cloned().unwrap_or_default();
             notes.push(NoteForIndex {
                 note_id: *id,
                 folder,
-                body,
+                body: embeddable_body(body),
                 content_nonce,
             });
         }
@@ -533,7 +560,7 @@ pub(crate) fn reembed_one_note<R: Runtime>(app: &AppHandle<R>, note_id: &str, bo
         let note = NoteForIndex {
             note_id: nid,
             folder,
-            body,
+            body: embeddable_body(body),
             content_nonce: nonce,
         };
 
@@ -651,6 +678,52 @@ mod tests {
     #[test]
     fn folder_is_excluded_empty_set_excludes_nothing() {
         assert!(!folder_is_excluded("Private/", &[]));
+    }
+
+    // ---- myne#304: what the AI actually embeds -----------------------------
+
+    /// A `kind: drawing` note whose scene carries one text element.
+    fn drawing(folder: &str, text: &str) -> String {
+        let scene =
+            format!(r#"{{"type":"excalidraw","elements":[{{"type":"text","text":"{text}"}}]}}"#);
+        format!("---\nkind: drawing\nfolder: {folder}\n---\n\n```excalidraw\n{scene}\n```\n")
+    }
+
+    #[test]
+    fn a_drawing_is_embedded_as_its_projected_text_not_as_scene_json() {
+        let body = drawing("Sketches/", "quarterly roadmap");
+        let embedded = embeddable_body(body);
+        assert!(
+            embedded.contains("quarterly roadmap"),
+            "the words the user wrote must survive: {embedded:?}"
+        );
+        assert!(
+            !embedded.contains("excalidraw"),
+            "…and the scene JSON must not: {embedded:?}"
+        );
+    }
+
+    #[test]
+    fn an_ordinary_note_is_embedded_verbatim() {
+        let body = "---\nfolder: Work/\n---\n# Plan\n\nSome prose.\n".to_string();
+        assert_eq!(embeddable_body(body.clone()), body);
+    }
+
+    #[test]
+    fn the_folder_must_be_read_before_the_projection_strips_the_frontmatter() {
+        // The ordering hazard this helper's placement exists for. Projecting at
+        // the hook's CALL SITES handed this walk a body with no frontmatter, so
+        // `folder_of` answered "root" for every drawing — and a drawing sitting
+        // in an AI-excluded folder was embedded anyway, which is the SYNC-14
+        // exclusion set failing silently for one note kind.
+        let body = drawing("Private/", "bank details");
+        assert_eq!(folder_of(&body), "Private/");
+        assert!(folder_is_excluded(
+            &folder_of(&body),
+            &["Private/".to_string()]
+        ));
+        // Post-projection, the same question has the wrong answer.
+        assert_eq!(folder_of(&embeddable_body(body)), "");
     }
 
     // ---- #218: re-embed debounce generations ------------------------------

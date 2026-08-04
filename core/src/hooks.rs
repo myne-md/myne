@@ -122,6 +122,24 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     /// no-op unless the `local-inference` feature is built and `ai_enabled` is
     /// on. The durable `vault.embeddings` blob is refreshed by the next unlock's
     /// reconcile (§9.17.4), so this hook only touches RAM.
+    ///
+    /// **`body` is the RAW note body — frontmatter included, and for a drawing
+    /// the `kind: drawing` scene JSON, not its projected text** (myne#304).
+    /// Unlike `search_upsert`, whose caller projects, the projection belongs to
+    /// the implementation here for two reasons:
+    ///
+    ///   - it needs the frontmatter. The desktop arm resolves the note's folder
+    ///     from it to apply the SYNC-14 AI exclusion set, and a projected body
+    ///     has no frontmatter — so a drawing inside an excluded folder read as
+    ///     root and was embedded anyway;
+    ///   - the unlock-time rebuild reads raw bodies off disk and has to project
+    ///     for itself regardless. Projecting at the call sites left the two
+    ///     paths disagreeing: the eager one embedded scene text, the durable
+    ///     one embedded JSON, and every unlock replaced the first with the
+    ///     second.
+    ///
+    /// Three of the five call sites already passed the raw body; the contract
+    /// is now that all of them do.
     fn ai_note_changed(&self, id: &str, body: &str);
     /// Drop a deleted note's vectors from the RAM vector store (MYND-453).
     /// Cheap + synchronous — no model call.
