@@ -15,8 +15,14 @@ use std::io::{BufRead, Read, Write};
 /// Hard cap on a sync response body read from the socket. TB5 treats the
 /// self-hosted/hosted relay as untrusted (a compromised server is in scope), so
 /// an unbounded body read lets it stream a giant body and OOM-crash the client.
-/// 64 MiB comfortably exceeds any legitimate `/sync/pull` or `/sync/blob`
-/// response while turning a hostile oversized body into a clean `TransportError`.
+/// 64 MiB comfortably exceeds any legitimate `/sync/pull`, `/sync/blob` or
+/// `/sync/blobs` response while turning a hostile oversized body into a clean
+/// `TransportError`. The batch route is the one that makes that claim
+/// *conditional*: it is bounded by `orchestrator::FETCH_WINDOW_MAX_BYTES` (8 MiB
+/// raw ≈ 11 MiB encoded), and widening that past ~47 MiB of raw ciphertext would
+/// put a legitimate response over this cap — which is not a slow path but a
+/// wedge, since the next cycle plans the identical window. Raise one, re-read the
+/// other.
 /// Enforced INCREMENTALLY — an over-cap `Content-Length` is rejected before a
 /// single body byte is buffered.
 pub(crate) const MAX_SYNC_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
