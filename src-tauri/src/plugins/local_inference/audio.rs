@@ -151,13 +151,31 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
     if channels == 0 {
         return Err(AudioError::BadLayout);
     }
-    // A zero `sample_rate` is a malformed `fmt ` chunk: it would drive the
-    // resampler's `to_rate / from_rate` ratio to +inf → `out_len = usize::MAX`
-    // → a `Vec::with_capacity` capacity-overflow panic. Reject it here (a
-    // crafted or corrupt WAV — including one synced from a compromised device,
-    // A6 — must not panic the transcribe worker) so decode collapses to a clean
-    // error and the caller re-extracts nothing.
-    if sample_rate == 0 {
+    // A `sample_rate` outside the range real audio uses is a malformed `fmt `
+    // chunk, and the resampler's expansion is driven straight off it.
+    //
+    // Zero was already rejected — it sends `to_rate / from_rate` to +inf, so
+    // `out_len` becomes `usize::MAX` and `Vec::with_capacity` capacity-overflow
+    // panics. But the guard stopped one value short of the problem (myne#315):
+    // `sample_rate = 1` is a finite, "valid" number that expands the clip
+    // 16,000× on the way to Whisper's 16 kHz. A short clip then asks for tens
+    // of GB, and neither outcome is catchable — where the allocator refuses,
+    // `handle_alloc_error` **aborts** (not a panic, so the `spawn_blocking`
+    // JoinError arm never runs); where the OS overcommits, the fill loop
+    // touches every page and the process is OOM-killed. Either way the vault is
+    // dropped mid-session and edits since the last autosave tick are lost.
+    //
+    // It is also a remote-ish DoS in the A6 shape the zero-guard already names:
+    // ONE synced attachment kills the app on every device that tries to
+    // transcribe it.
+    //
+    // The range is the audio one, stated rather than implied: 4 kHz is below
+    // telephony (8 kHz), 384 kHz above any consumer or professional capture
+    // rate. Both ends bound the ratio, so the expansion is at most 4× and the
+    // contraction at most 24×.
+    const MIN_SAMPLE_RATE_HZ: u32 = 4_000;
+    const MAX_SAMPLE_RATE_HZ: u32 = 384_000;
+    if !(MIN_SAMPLE_RATE_HZ..=MAX_SAMPLE_RATE_HZ).contains(&sample_rate) {
         return Err(AudioError::BadLayout);
     }
 
@@ -198,14 +216,23 @@ fn downmix_to_mono_f32(pcm: &RawPcm) -> Vec<f32> {
 /// Linear-interpolation resample from `from_rate` to `to_rate`. Dependency-free
 /// (SYNC-V3); adequate for speech ASR (Whisper's mel front end is tolerant).
 /// Identity fast-path when the rates already match.
-fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Option<Vec<f32>> {
     if from_rate == to_rate || input.is_empty() {
-        return input.to_vec();
+        return Some(input.to_vec());
     }
     let ratio = to_rate as f64 / from_rate as f64;
     let out_len = ((input.len() as f64) * ratio).round() as usize;
     if out_len == 0 {
-        return Vec::new();
+        return Some(Vec::new());
+    }
+    // Defence in depth behind `parse_wav`'s rate range (myne#315). That guard
+    // bounds the RATIO; this one bounds the RESULT, so a legal rate applied to
+    // an enormous clip cannot reach `with_capacity` with a number the allocator
+    // answers by aborting the process. Refuse rather than truncate: a silently
+    // shortened clip would transcribe the first fraction of the audio and
+    // report it as the whole thing.
+    if out_len > MAX_PCM_SAMPLES {
+        return None;
     }
     let mut out = Vec::with_capacity(out_len);
     let step = from_rate as f64 / to_rate as f64; // input samples per output sample
@@ -217,8 +244,16 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
         let b = input[(i0 + 1).min(input.len() - 1)];
         out.push(a + (b - a) * frac);
     }
-    out
+    Some(out)
 }
+
+/// Ceiling on the resampled PCM this path will materialize.
+///
+/// Whisper input is 16 kHz mono `f32`, so this is 8 hours of audio — far past
+/// any voice note, and 2.3 GiB if it were ever reached, which is the point:
+/// the number exists so an allocation the process cannot survive is a typed
+/// refusal instead of an `handle_alloc_error` abort or an OOM kill.
+const MAX_PCM_SAMPLES: usize = WHISPER_SAMPLE_RATE as usize * 60 * 60 * 8;
 
 /// Decode a canonical `audio/wav` byte stream to **16 kHz mono f32** PCM ready
 /// for Whisper. Parse → downmix → resample. The single entry point the
@@ -229,7 +264,8 @@ pub fn wav_to_mono_16k(bytes: &[u8]) -> Result<Vec<f32>, AudioError> {
         return Err(AudioError::Empty);
     }
     let mono = downmix_to_mono_f32(&raw);
-    let out = resample_linear(&mono, raw.sample_rate, WHISPER_SAMPLE_RATE);
+    let out = resample_linear(&mono, raw.sample_rate, WHISPER_SAMPLE_RATE)
+        .ok_or(AudioError::BadLayout)?;
     if out.is_empty() {
         return Err(AudioError::Empty);
     }
@@ -245,7 +281,10 @@ mod tests {
     fn build_wav(channels: u16, sample_rate: u32, samples: &[i16]) -> Vec<u8> {
         let bits = 16u16;
         let block_align = channels * bits / 8;
-        let byte_rate = sample_rate * block_align as u32;
+        // Saturating: a fixture may declare an absurd rate on purpose (the
+        // myne#315 rejection cases), and the header field is not what is under
+        // test there.
+        let byte_rate = sample_rate.saturating_mul(block_align as u32);
         let data_len = (samples.len() * 2) as u32;
         let mut w = Vec::new();
         w.extend_from_slice(b"RIFF");
@@ -328,6 +367,68 @@ mod tests {
         // usize::MAX and `Vec::with_capacity` panics the transcribe worker.
         let wav = build_wav(1, 0, &[1i16, 2, 3, 4]);
         assert_eq!(wav_to_mono_16k(&wav), Err(AudioError::BadLayout));
+    }
+
+    // ── myne#315: zero was one value short of the problem ──────────────────
+    //
+    // `sample_rate = 1` is finite and "valid", and it expands the clip 16,000×
+    // on the way to Whisper's 16 kHz. Neither outcome is catchable: where the
+    // allocator refuses, `handle_alloc_error` ABORTS (not a panic, so the
+    // `spawn_blocking` JoinError arm never runs); where the OS overcommits, the
+    // fill loop touches every page and the process is OOM-killed. One synced
+    // attachment could do it to every device that tried to transcribe it.
+    #[test]
+    fn rejects_an_absurdly_low_sample_rate_before_the_resampler_allocates() {
+        for rate in [1u32, 2, 100, 3_999] {
+            let wav = build_wav(1, rate, &[1i16, 2, 3, 4]);
+            assert_eq!(
+                wav_to_mono_16k(&wav),
+                Err(AudioError::BadLayout),
+                "sample_rate={rate} must be refused at parse time"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_an_absurdly_high_sample_rate_too() {
+        // The other end bounds the CONTRACTION and keeps the ratio arithmetic
+        // in a range worth reasoning about.
+        for rate in [384_001u32, 10_000_000, u32::MAX] {
+            let wav = build_wav(1, rate, &[1i16, 2, 3, 4]);
+            assert_eq!(wav_to_mono_16k(&wav), Err(AudioError::BadLayout));
+        }
+    }
+
+    #[test]
+    fn real_capture_rates_still_decode() {
+        // The guard must admit every rate the encoders actually produce —
+        // telephony, the mobile WebView path, and device-native desktop capture.
+        for rate in [8_000u32, 16_000, 22_050, 44_100, 48_000, 96_000, 192_000] {
+            // A second of audio, so the downsample to 16 kHz still leaves
+            // samples: 4 frames at 192 kHz round to zero output and would come
+            // back `Empty` for reasons that have nothing to do with the guard.
+            let samples: Vec<i16> = (0..rate as usize).map(|i| (i % 1000) as i16).collect();
+            let wav = build_wav(1, rate, &samples);
+            assert!(
+                wav_to_mono_16k(&wav).is_ok(),
+                "sample_rate={rate} is a real capture rate and must decode"
+            );
+        }
+    }
+
+    #[test]
+    fn the_resampler_refuses_rather_than_truncating_past_its_ceiling() {
+        // Defence in depth behind the rate range: a legal ratio applied to an
+        // enormous clip must not reach `with_capacity` with a number the
+        // allocator answers by aborting. Refusal, not truncation — a silently
+        // shortened clip would transcribe the first fraction and report it as
+        // the whole thing.
+        assert!(resample_linear(&[0.0f32; 8], 8_000, 16_000).is_some());
+        // A pretend input just past the ceiling at a 1:1 ratio is `Some`
+        // (identity fast-path), so drive the bound through the ratio instead.
+        let input = vec![0.0f32; 1024];
+        assert!(resample_linear(&input, 4_000, 16_000).is_some());
+        assert_eq!(MAX_PCM_SAMPLES, WHISPER_SAMPLE_RATE as usize * 60 * 60 * 8);
     }
 
     #[test]
