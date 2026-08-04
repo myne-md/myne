@@ -166,12 +166,20 @@ export function buildCsp(config: CspConfig): string {
  * The complete header set the container serves.
  *
  * Kept together with the CSP because they are one security posture, not a
- * policy plus some extras: dropping COEP silently turns cross-origin isolation
- * off, and the client needs it. "Silently" is the operative word — nothing in
- * the app can detect a missing response header, which is exactly why these are
- * baked into the image rather than described in a runbook (`decisions.md`
- * 2026-07-26, "the web client ships self-hostable as a container with security
- * headers baked in").
+ * policy plus some extras: dropping COEP turns cross-origin isolation off, and
+ * the client needs it. Which is why they are baked into the image rather than
+ * described in a runbook (`decisions.md` 2026-07-26, "the web client ships
+ * self-hostable as a container with security headers baked in").
+ *
+ * **The app cannot detect MOST of these, but COOP/COEP is the exception**
+ * (myne#320). CSP, HSTS, CORP and Permissions-Policy have no in-page verdict —
+ * a deployment missing them looks exactly like a correct one. Cross-origin
+ * isolation does: the browser publishes `crossOriginIsolated`, and
+ * `SharedArrayBuffer` is either constructible or not. The boot gate probes it
+ * (`web/src/environment-gate.ts`), because its absence is not a weakened
+ * posture but a client that unlocks fine and then dies at the first HTTP 429
+ * from the sync server. This comment used to say the whole set was
+ * undetectable, and that claim is what left the probe unwritten.
  */
 export function securityHeaders(config: CspConfig): Record<string, string> {
   return {

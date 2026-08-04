@@ -45,10 +45,19 @@ all of them silently:
 | `Strict-Transport-Security` | The one origin where a MITM is fatal loses its strongest transport defence. |
 | `Permissions-Policy` | A substituted bundle could reach the camera or microphone with only a browser prompt in the way. |
 
-**Nothing in the application can detect a missing response header.** A
-deployment with none of them looks, to you and to your users, exactly like a
-correct one. That is why they are baked into the image rather than described in
-a runbook you might not finish reading.
+**The application cannot detect most of these.** A deployment missing the CSP,
+HSTS, CORP or Permissions-Policy looks — to you and to your users — exactly like
+a correct one. That is why they are baked into the image rather than described
+in a runbook you might not finish reading.
+
+`Cross-Origin-Opener-Policy` + `Cross-Origin-Embedder-Policy` are the one
+exception, and the client now checks them at boot: the browser publishes
+`crossOriginIsolated`, and `SharedArrayBuffer` is either constructible or not.
+Serve the bundle without them (or behind something that strips them) and the
+page refuses to open the vault, naming both headers. It is a hard refusal rather
+than a warning because the vault would otherwise unlock normally and then die
+at the first HTTP 429 from the sync server — the rate-limit backoff sleeps on
+`Atomics.wait`, which needs isolation.
 
 ## Deploying
 

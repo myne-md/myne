@@ -21,6 +21,7 @@ const ALL_CAPABLE: EnvironmentProbes = {
   hasOpfs: () => true,
   hasWebLocks: () => true,
   hasCryptoRandom: () => true,
+  hasCrossOriginIsolation: () => true,
 };
 
 const without = (o: Partial<EnvironmentProbes>): EnvironmentProbes => ({ ...ALL_CAPABLE, ...o });
@@ -69,10 +70,36 @@ describe("environment gate", () => {
     ["hasOpfs", "opfs"],
     ["hasWebLocks", "web-locks"],
     ["hasCryptoRandom", "crypto-getrandomvalues"],
+    ["hasCrossOriginIsolation", "cross-origin-isolation"],
   ])("refuses when %s is missing, naming %s", (probe, cap) => {
     const v = probeEnvironment(without({ [probe]: () => false } as Partial<EnvironmentProbes>));
     expect(v.supported).toBe(false);
     expect(v.missing).toContain(cap);
+  });
+
+  // ── myne#320: the deployment probe ────────────────────────────────────
+  //
+  // Every probe above is about the BROWSER. This one is about the server, and
+  // its absence is why a bundle served without COOP/COEP — a generic
+  // nginx/Caddy/S3 host, or an intermediary that strips them — passed the gate,
+  // unlocked normally, and then died at the first HTTP 429 from the sync
+  // server: the rate-limit backoff sleeps on `Atomics.wait` over a
+  // `SharedArrayBuffer`, which needs isolation, and the Rust side treats its
+  // absence as fatal on purpose (a backoff that does not wait is a hot retry
+  // loop against a server already rate-limiting). The wasm instance aborts and
+  // the page rejects every later call for the rest of its life.
+  it("refuses a page that is not cross-origin isolated, whatever the browser can do", () => {
+    const v = probeEnvironment(without({ hasCrossOriginIsolation: () => false }));
+    expect(v.supported).toBe(false);
+    expect(v.missing).toEqual(["cross-origin-isolation"]);
+  });
+
+  it("explains the isolation refusal in terms the operator can act on", () => {
+    // Naming the two headers, because the person who can fix this is serving
+    // the page — "contact the administrator" would be useless here.
+    const text = explainMissing("cross-origin-isolation");
+    expect(text).toContain("Cross-Origin-Opener-Policy: same-origin");
+    expect(text).toContain("Cross-Origin-Embedder-Policy: require-corp");
   });
 
   it("reports every missing capability, not just the first", () => {

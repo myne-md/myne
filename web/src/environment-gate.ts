@@ -49,7 +49,10 @@ export type RequiredCapability =
   | "opfs"
   | "opfs-sync-access-handle"
   | "web-locks"
-  | "crypto-getrandomvalues";
+  | "crypto-getrandomvalues"
+  /** Not a browser feature the user chose — a DEPLOYMENT one. See
+   *  `hasCrossOriginIsolation`. */
+  | "cross-origin-isolation";
 
 export interface EnvironmentVerdict {
   supported: boolean;
@@ -145,6 +148,7 @@ export interface EnvironmentProbes {
   hasOpfs: () => boolean;
   hasWebLocks: () => boolean;
   hasCryptoRandom: () => boolean;
+  hasCrossOriginIsolation: () => boolean;
 }
 
 export const defaultProbes: EnvironmentProbes = {
@@ -181,6 +185,35 @@ export const defaultProbes: EnvironmentProbes = {
 
   hasCryptoRandom: () =>
     typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function",
+
+  /**
+   * Cross-origin isolation, i.e. `SharedArrayBuffer` (myne#320).
+   *
+   * The one probe here that is about the DEPLOYMENT rather than the browser,
+   * and it was missing — so a bundle served from anything that does not send
+   * COOP `same-origin` + COEP `require-corp` (a generic nginx/Caddy/S3 host, or
+   * an intermediary that strips them) passed every gate, unlocked normally, and
+   * then died at the first HTTP 429 from the sync server.
+   *
+   * That path is not exotic: the Worker's own 1 s sync loop drives it, and the
+   * first materialisation of a large vault is precisely the burst-cap case the
+   * backoff exists for. The rate-limit backoff sleeps via `Atomics.wait` on a
+   * `SharedArrayBuffer`, which is unavailable without isolation; the Rust side
+   * treats that as a hard failure on purpose (a backoff that does not wait is a
+   * hot retry loop against a server that is already rate-limiting), so the wasm
+   * instance aborts. The page then rejects every later `invoke` with a fatal
+   * error for the rest of its life — no save, no read, no lock — and the
+   * aborted Worker's linear memory, which held the vault keys, stays resident
+   * until the tab is reloaded.
+   *
+   * Refusing at boot turns that into a sentence the operator can act on.
+   *
+   * Both halves are checked, matching what the web E2E lane already asserts:
+   * `crossOriginIsolated` is the browser's own verdict, and the constructor is
+   * what the backoff actually reaches for.
+   */
+  hasCrossOriginIsolation: () =>
+    globalThis.crossOriginIsolated === true && typeof SharedArrayBuffer === "function",
 };
 
 /**
@@ -206,6 +239,7 @@ export function probeEnvironment(probes: EnvironmentProbes = defaultProbes): Env
   if (!probes.hasWorker()) missing.push("worker");
   if (!probes.hasOpfs()) missing.push("opfs");
   if (!probes.hasWebLocks()) missing.push("web-locks");
+  if (!probes.hasCrossOriginIsolation()) missing.push("cross-origin-isolation");
 
   if (!probes.hasWebAssembly()) {
     missing.push("webassembly");
@@ -323,6 +357,11 @@ export function explainMissing(cap: RequiredCapability): string {
       return "This browser does not support the lock that keeps two tabs from writing to one vault at the same time.";
     case "crypto-getrandomvalues":
       return "This browser does not provide a cryptographic random-number source.";
+    case "cross-origin-isolation":
+      // Addressed to whoever is serving the page, because they are the only
+      // one who can fix it — and named precisely, because "contact the
+      // administrator" is what a reader gets everywhere else.
+      return "This page is not cross-origin isolated, so the vault cannot pause and retry when the sync server asks it to wait. The server must send the headers `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`; if you are self-hosting, check that nothing in front of it is stripping them.";
   }
 }
 
