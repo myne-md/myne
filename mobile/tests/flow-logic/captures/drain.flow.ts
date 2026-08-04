@@ -38,6 +38,10 @@ test.describe("Apple Watch pending-capture drain", () => {
     // Default boot is an Unlocked slot → the app routes straight to the editor,
     // so EditorFlow mounts and the drain runs immediately.
     await installMockIpc(page, {
+      // Stateful writes: the point of the last assertion is that the notes the
+      // drain CREATED become readable rows, which a write-discarding mock
+      // cannot show either way.
+      statefulNoteWrites: true,
       pendingCaptures: [
         { id: "a".repeat(32), text: "Buy oat milk on the way home" },
         { id: "b".repeat(32), text: "Idea: café não 🎙️" },
@@ -57,6 +61,12 @@ test.describe("Apple Watch pending-capture drain", () => {
       expect.arrayContaining(["a".repeat(32), "b".repeat(32)]),
     );
     expect(await readAcks(page)).toHaveLength(2);
+
+    // …and they REACH THE LIST. The drain used to reload the vault and throw
+    // the result away, so the notes it created stayed invisible until something
+    // else refreshed — a full decrypt of every note, for no effect.
+    await expect(page.getByText("Buy oat milk on the way home")).toBeVisible();
+    await expect(page.getByText("Idea: café não 🎙️")).toBeVisible();
   });
 
   test("no queued captures → no notes created, no acks", async ({ page }) => {

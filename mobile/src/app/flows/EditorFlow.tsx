@@ -100,9 +100,10 @@ import { SnapshotsSheet } from "./SnapshotsSheet";
 import { TemplatesSheet } from "./TemplatesSheet";
 import { unmarkTemplate, createTemplate } from "../../lib/templates";
 import { deriveTitleSnippet } from "../../lib/note-title";
-import { searchIndexReplace } from "../../lib/search";
-import { vaultIndicesApply, vaultIndicesAllEdges, vaultIndicesPropertyValues, vaultIndicesPropertyKeys, type WikilinkEdge } from "../../lib/vault-indices";
+import { searchIndexReplace, searchIndexApply, searchIndexRemove, type SearchDoc } from "../../lib/search";
+import { vaultIndicesApply, vaultIndicesRemove, vaultIndicesAllEdges, vaultIndicesPropertyValues, vaultIndicesPropertyKeys, type WikilinkEdge } from "../../lib/vault-indices";
 import { extractRecord } from "../../lib/indices-extract";
+import { createIndexDeltaTracker, type IndexDeltaTracker } from "../../lib/index-delta";
 import { buildNoteGraphAndModel, clientEdges } from "../../lib/backend-graph";
 import { MarkdownView } from "../../components/MarkdownView";
 import type { VaultSummary } from "../../types/vault-summary";
@@ -210,6 +211,14 @@ function nextMobileDrawingTitle(
     if (m !== null) max = Math.max(max, Number(m[1]));
   }
   return `Drawing ${max + 1}`;
+}
+
+/** One index-delta tracker per mount, built lazily — the factory allocates, and
+ *  this component re-renders on every keystroke. */
+function useIndexDeltaTracker(): IndexDeltaTracker {
+  const ref = useRef<IndexDeltaTracker | null>(null);
+  if (ref.current === null) ref.current = createIndexDeltaTracker();
+  return ref.current;
 }
 
 
@@ -942,20 +951,83 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     }
   }, [activeViewId, orderedViews]);
 
+  // Both index feeds below are DELTA-driven (myne-mobile#41). `bodies` is a new
+  // Map on every load, so an effect keyed on it re-fires whether or not any note
+  // actually changed — and both used to answer that by re-sending the entire
+  // vault. The trackers hold what each index last accepted, so a re-fire that
+  // carries one changed body is one apply. Nothing is recorded until the backend
+  // takes it, so a rejected or cancelled item comes back on the next pass.
+  const searchDelta = useIndexDeltaTracker();
+  const indicesDelta = useIndexDeltaTracker();
+  // Both indices belong to the OPEN vault. Every routine exit unmounts this
+  // component (lock and switch both route through the unlock stage), but the
+  // vault id is a prop, so a swap without a remount is expressible — and a
+  // tracker carried across it would delta against another vault's index and
+  // leave this one's records unwritten.
+  useEffect(() => {
+    searchDelta.reset();
+    indicesDelta.reset();
+  }, [vaultId, searchDelta, indicesDelta]);
+
   // Keep the backend MYS1 search index synced with the live corpus (the WebView
-  // already holds every note's plaintext). Debounced bulk atomic replace so a
-  // burst of edits rebuilds the index once, not per save.
+  // already holds every note's plaintext). Debounced so a burst of edits settles
+  // once. The whole-corpus `search_index_replace` is the SEED — it runs on the
+  // first pass after unlock, when there is no prior state to delta against; every
+  // pass after that sends only what moved.
   useEffect(() => {
     if (!HAS_TAURI) return;
-    const docs = liveNotes.map((n) => ({ id: n.id, title: n.title, body: bodies.get(n.id) ?? "" }));
-    const t = window.setTimeout(() => void searchIndexReplace(docs).catch(() => {}), 400);
-    return () => window.clearTimeout(t);
-  }, [liveNotes, bodies]);
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      const tracker = searchDelta;
+      const corpus = liveNotes.map((n) => ({
+        id: n.id,
+        title: n.title,
+        folder: null,
+        body: bodies.get(n.id) ?? "",
+      }));
+      const { changed, removed } = tracker.diff(corpus);
+      // Seeding with a corpus reports every note as changed, so this covers the
+      // seed too — and an EMPTY vault correctly seeds nothing rather than
+      // re-sending an empty replace on every pass.
+      if (changed.length === 0 && removed.length === 0) return;
+      const seeding = tracker.isEmpty();
+      // The wire shape is 3 fields; `folder` only exists to be diffed on.
+      const asDocs = (items: typeof corpus): SearchDoc[] =>
+        items.map((d) => ({ id: d.id, title: d.title, body: d.body }));
+      void (async () => {
+        try {
+          if (seeding) {
+            await searchIndexReplace(asDocs(corpus));
+          } else {
+            if (removed.length > 0) await searchIndexRemove(removed);
+            if (cancelled) return;
+            if (changed.length > 0) await searchIndexApply(asDocs(changed));
+          }
+          if (cancelled) return;
+          changed.forEach((d) => tracker.markApplied(d));
+          removed.forEach((id) => tracker.markRemoved(id));
+        } catch {
+          // Nothing marked → the next pass retries this exact delta.
+        }
+      })();
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [liveNotes, bodies, searchDelta]);
 
-  // Feed the backend vault-indices (MYI1) — extract each note's links/tags
-  // TS-side, apply (in parallel), then read the Turkish-correctly-folded edge
-  // dump back to drive the graph + backlinks. Debounced; falls back to the
-  // client graph on any failure.
+  // Feed the backend vault-indices (MYI1) — extract each CHANGED note's
+  // links/tags TS-side, apply, then read the Turkish-correctly-folded edge dump
+  // back to drive the graph + backlinks. Debounced; falls back to the client
+  // graph on any failure.
+  //
+  // The applies run SEQUENTIALLY with a live `cancelled` check between them.
+  // They used to be one `Promise.all` over the whole vault, and the flag only
+  // guarded the `setBackendEdges` at the end — so a save landing mid-sweep
+  // stacked a second full sweep on the first instead of replacing it, and every
+  // `extractRecord` parse in the map ran synchronously on the main thread before
+  // the first await could yield.
   useEffect(() => {
     if (!HAS_TAURI) {
       setBackendEdges(null);
@@ -963,15 +1035,27 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     }
     let cancelled = false;
     const t = window.setTimeout(() => {
+      const tracker = indicesDelta;
+      const corpus = resolverNotes.map((n) => ({
+        id: n.noteUuid,
+        title: n.title ?? "",
+        folder: n.folder,
+        body: bodies.get(n.noteUuid) ?? "",
+      }));
+      const { changed, removed } = tracker.diff(corpus);
+      if (changed.length === 0 && removed.length === 0) return;
       void (async () => {
         try {
-          await Promise.all(
-            resolverNotes.map((n) =>
-              vaultIndicesApply(
-                extractRecord(n.noteUuid, n.title ?? "", n.folder, bodies.get(n.noteUuid) ?? ""),
-              ),
-            ),
-          );
+          for (const id of removed) {
+            if (cancelled) return;
+            await vaultIndicesRemove(id);
+            tracker.markRemoved(id);
+          }
+          for (const note of changed) {
+            if (cancelled) return;
+            await vaultIndicesApply(extractRecord(note.id, note.title, note.folder, note.body));
+            tracker.markApplied(note);
+          }
           const edges = await vaultIndicesAllEdges();
           if (!cancelled) setBackendEdges(edges);
         } catch {
@@ -983,7 +1067,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [resolverNotes, bodies]);
+  }, [resolverNotes, bodies, indicesDelta]);
 
   // In-memory note store for browser-dev (no Tauri host). The real backend
   // owns persistence under `pnpm tauri dev`; this keeps `pnpm dev` demoable.
@@ -1009,7 +1093,71 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     return { entries: [...map.entries()].map(([id, text]) => entryFrom(id, text)), texts: map };
   }, [devStore]);
 
-  const refresh = useCallback(async () => {
+  // Surgical vs whole-vault, the desktop split (`sidebarState.tsx` refreshOne /
+  // refreshAll). `refreshAll` re-reads and re-decrypts EVERY note; it belongs to
+  // the paths that genuinely cannot know what moved — the first load after
+  // unlock, and an incoming sync write. Every other write path knows the id it
+  // just touched and must splice that one row instead, or saving one note costs
+  // work proportional to the vault (myne-mobile#41).
+  //
+  // A splice installs a new `bodies` Map identity, same as a full load — the
+  // difference is that the two index feeds now diff against what they last
+  // applied, so a new identity carrying one changed body is one apply.
+
+  /** Splice one note's text into the list + bodies. `text` must be the body as
+   *  written to disk: every caller either just wrote it or just read it. */
+  const applyOne = useCallback((id: string, text: string) => {
+    setBodies((prev) => new Map(prev).set(id, text));
+    setNotes((prev) => {
+      const entry = entryFrom(id, text);
+      const at = prev.findIndex((n) => n.id === id);
+      if (at !== -1) {
+        const next = [...prev];
+        next[at] = entry;
+        return next;
+      }
+      // `note_list` returns ids sorted ascending and the list's own ordering
+      // derives from that, so a new note is inserted in place rather than
+      // appended — otherwise the row order depends on how the note arrived.
+      const next = [...prev, entry];
+      next.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      return next;
+    });
+  }, []);
+
+  /** Drop one note from the list + bodies (hard delete / purge). */
+  const dropOne = useCallback((id: string) => {
+    setBodies((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+    setNotes((prev) => (prev.some((n) => n.id === id) ? prev.filter((n) => n.id !== id) : prev));
+  }, []);
+
+  /** Re-read ONE note and splice it — for a write whose resulting body the
+   *  caller does not hold (a backend-side rewrite, a materialized conflict copy).
+   *  A failed read leaves the row as it was rather than blanking it. */
+  const refreshOne = useCallback(
+    async (id: string) => {
+      if (!HAS_TAURI) {
+        const text = devStore().get(id);
+        if (text !== undefined) applyOne(id, text);
+        else dropOne(id);
+        return;
+      }
+      try {
+        applyOne(id, await noteRead(id));
+      } catch {
+        // The note may simply be gone (deleted underneath us); either way one
+        // unreadable row must not take down the caller's flow.
+      }
+    },
+    [applyOne, dropOne, devStore],
+  );
+
+  const refreshAll = useCallback(async () => {
     setLoading(true);
     setListError(null);
     try {
@@ -1053,8 +1201,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // inline rename (no ref-rewriting rename on mobile). `saveScene`/`renameDrawing`
   // are deliberately omitted; the shared widget hides the inline canvas + makes the
   // title static accordingly. Live deps read through a ref so the seam stays stable.
-  const drawingLiveRef = useRef({ editorText, notes, bodies, openRelated, refresh });
-  drawingLiveRef.current = { editorText, notes, bodies, openRelated, refresh };
+  const drawingLiveRef = useRef({ editorText, notes, bodies, openRelated, applyOne });
+  drawingLiveRef.current = { editorText, notes, bodies, openRelated, applyOne };
   const drawingIo = useMemo<DrawingEmbedIo>(
     () => ({
       readScene: async (id) => extractSceneJson(await noteRead(id)),
@@ -1062,12 +1210,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         const live = drawingLiveRef.current;
         const folder = readNoteFolder(live.editorText) || null;
         const title = nextMobileDrawingTitle(live.notes, live.bodies);
-        await noteCreate(
-          new TextDecoder().decode(buildDrawingNoteBytes(title, folder)),
-        );
-        // Reload so the new drawing enters the resolver note-set and the just-
-        // inserted `![[Drawing N]]` resolves to it.
-        await live.refresh();
+        const body = new TextDecoder().decode(buildDrawingNoteBytes(title, folder));
+        const id = await noteCreate(body);
+        // Splice the new drawing in so it enters the resolver note-set and the
+        // just-inserted `![[Drawing N]]` resolves to it. The body is the one we
+        // just wrote, so this needs no read.
+        live.applyOne(id, body);
         return title;
       },
       openNote: (id) => void drawingLiveRef.current.openRelated(id),
@@ -1098,9 +1246,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     applyStoredTheme();
     void (async () => {
       if (HAS_TAURI) await maybeSeedTestData();
-      await refresh();
+      await refreshAll();
     })();
-  }, [refresh]);
+  }, [refreshAll]);
 
   // SYNC-37: the foreground sync loop (and manual `sync_now`) emit `sync://changed`
   // after a pull writes incoming notes to disk — reload the list + bodies so notes
@@ -1111,8 +1259,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     let cancelled = false;
     void (async () => {
       try {
+        // The event carries no payload, so this genuinely cannot know which
+        // notes the pull wrote — one of the two paths that keeps `refreshAll`.
         const handle = await listen("sync://changed", () => {
-          if (!cancelled) void refresh();
+          if (!cancelled) void refreshAll();
         });
         if (cancelled) handle();
         else unlisten = handle;
@@ -1124,7 +1274,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       cancelled = true;
       if (unlisten) unlisten();
     };
-  }, [refresh]);
+  }, [refreshAll]);
 
   // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
   // emits `PREFS_SYNC_APPLIED_EVENT` (never for this device's own IPC writes).
@@ -1154,7 +1304,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // MYND-427: drain the engine's staged keep-both conflicts (materialize each
   // remote revision as a `conflict_of:` copy, then resolve) on mount + every
   // `sync://changed`, refreshing the list when a copy lands.
-  useConflictMaterializer(refresh);
+  useConflictMaterializer(
+    useCallback(
+      (createdIds: string[]) => {
+        void Promise.allSettled(createdIds.map((id) => refreshOne(id)));
+      },
+      [refreshOne],
+    ),
+  );
 
   // "Reveal in library" from a note's file-card menu (shared @myne/editor) →
   // open the attachments library over the note (desktop-parity action).
@@ -1325,7 +1482,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         // notes (both no-op when empty / the host is absent).
         await sealStagedCaptures();
         const created = await drainPendingCaptures();
-        if (created > 0) await loadEntries();
+        // `refreshAll`, not `loadEntries`: the latter READS the vault and throws
+        // the result away — the drained captures never reached the list, and the
+        // cost was a second full decrypt of every note on every foreground.
+        // The drain reports a count, not ids, so this is a legitimate whole-vault
+        // reload — and it only runs when something was actually created.
+        if (created > 0) await refreshAll();
       })();
     };
     runDrain(); // on mount — every unlock path lands here
@@ -1341,7 +1503,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       window.removeEventListener("focus", runDrain);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [loadEntries]);
+  }, [refreshAll]);
   // The shared `@myne/editor` `/record` slash command routes through the mobile
   // EditorHost's `voiceRecord` slot, which dispatches VOICE_RECORD_EVENT (it
   // can't reach React state directly). Open the same recording sheet.
@@ -1390,15 +1552,19 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     setEditorError(null);
     try {
       const stamped = stampUpdated(editorText);
+      // The written body IS the row's new content, so the list and both index
+      // feeds are updated from what we just wrote — no read, and nothing
+      // proportional to the vault (myne-mobile#41).
       if (editing.id === null) {
-        if (HAS_TAURI) await noteCreate(stamped);
-        else devStore().set(crypto.randomUUID(), stamped);
+        const id = HAS_TAURI ? await noteCreate(stamped) : crypto.randomUUID();
+        if (!HAS_TAURI) devStore().set(id, stamped);
+        applyOne(id, stamped);
       } else {
         if (HAS_TAURI) await noteUpdate(editing.id, stamped);
         else devStore().set(editing.id, stamped);
         loadedTextRef.current = { id: editing.id, text: editorText };
+        applyOne(editing.id, stamped);
       }
-      await refresh();
       exitEditor();
     } catch {
       setEditorError(t("editor.flow.saveFailed"));
@@ -1412,7 +1578,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     if (id == null) return;
     try {
       await purgeNote(id);
-      await refresh();
+      // Dropping the row is enough: the index effects notice the id left the
+      // corpus and issue the backend removals themselves, so every path that
+      // loses a note is covered rather than just this one.
+      dropOne(id);
     } catch {
       /* best-effort; the row stays in Trash on failure */
     }
@@ -1428,7 +1597,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         if (HAS_TAURI) await noteUpdate(editing.id, stamped);
         else devStore().set(editing.id, stamped);
         loadedTextRef.current = { id: editing.id, text: editorText };
-        await refresh();
+        applyOne(editing.id, stamped);
       } catch {
         // Best-effort save; still navigate so the backlink isn't a dead tap.
       }
@@ -1447,9 +1616,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     if (isRegular && editing != null && editing.id === null && editorText.trim() !== "") {
       try {
         const stamped = stampUpdated(editorText);
-        if (HAS_TAURI) await noteCreate(stamped);
-        else devStore().set(crypto.randomUUID(), stamped);
-        await refresh();
+        const newId = HAS_TAURI ? await noteCreate(stamped) : crypto.randomUUID();
+        if (!HAS_TAURI) devStore().set(newId, stamped);
+        applyOne(newId, stamped);
       } catch {
         // Best-effort persist; still navigate so the tap isn't dead.
       }
@@ -1461,8 +1630,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   async function organizeCurrent(fn: (id: string) => Promise<void>, failMsg: string) {
     if (editing?.id == null) return;
     try {
-      await fn(editing.id);
-      await refresh();
+      const id = editing.id;
+      await fn(id);
+      // Archive/trash are frontmatter rewrites — the note stays on disk, so the
+      // row is re-read rather than dropped, and only that row.
+      await refreshOne(id);
       exitEditor();
     } catch {
       setEditorError(failMsg);
@@ -1482,7 +1654,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         loadedTextRef.current = { id, text: editorText };
       }
       await moveNoteToFolder(id, dest);
-      await refresh();
+      await refreshOne(id);
       setMoveTarget(null);
       setCurrentFolder(dest);
       if (editing?.id === id) exitEditor();
@@ -1566,10 +1738,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
    *  `folder:`), so a case-exact prefix match is reliable. */
   async function reRootFolderSubtree(oldPath: string, newPath: string) {
     if (folderKey(oldPath) === folderKey(newPath)) return;
+    const moved: string[] = [];
     for (const [id, folder] of folderOf) {
       if (folder != null && folder.startsWith(oldPath)) {
         const dest = normalizeFolderPath(newPath + folder.slice(oldPath.length));
         await moveNoteToFolder(id, dest);
+        moved.push(id);
       }
     }
     const reroot = (arr: readonly string[]) =>
@@ -1588,7 +1762,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       if (icons.changed) await setFolderIcons(icons.next);
       bumpPrefsNonce();
     }
-    await refresh();
+    // Only the notes that actually moved were rewritten — a folder rename in a
+    // 500-note vault touching 3 notes costs 3 reads, not 500.
+    await Promise.allSettled(moved.map((id) => refreshOne(id)));
   }
 
   /** Apply the folder-name prompt (new / subfolder / rename). Empty = cancel. */
@@ -1638,7 +1814,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     } catch {
       setEditorError(t("editor.flow.trashFailed"));
     }
-    await refresh();
+    await Promise.allSettled(ids.map((id) => refreshOne(id)));
   }
 
   /** Row action in the trash/archive views (restore / unarchive / purge). */
@@ -1648,7 +1824,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     } catch {
       /* best-effort */
     }
-    await refresh();
+    await refreshOne(id);
   }
 
   /** Restore an archived folder (MYND-470): drop it (and any nested archived
@@ -1677,7 +1853,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     if (archiveFolder !== null && folderKey(archiveFolder).startsWith(folderKey(path))) {
       setArchiveFolder(null);
     }
-    await refresh();
+    await Promise.allSettled(ids.map((id) => refreshOne(id)));
   }
 
   async function purgeNote(id: string) {
@@ -1700,7 +1876,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         prefs.daily_template != null
           ? await createNoteFromTemplate(prefs.daily_template, res.dateTitle, res.folder, new Date())
           : await createBlankNamedNote(res.dateTitle, res.folder);
-      await refresh();
+      await refreshOne(id);
       void openFromList(id);
     } catch (e) {
       // Never let the daily-note path crash the app — surface a message instead.
@@ -2390,7 +2566,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
               void (async () => {
                 try {
                   const nid = await createNoteFromTemplate(id, "", currentFolder, new Date());
-                  await refresh();
+                  await refreshOne(nid);
                   void openFromList(nid);
                 } catch {
                   /* browser-dev / create failed */
@@ -2402,7 +2578,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
               void (async () => {
                 try {
                   const nid = await createTemplate("", currentFolder);
-                  await refresh();
+                  await refreshOne(nid);
                   void openFromList(nid);
                 } catch {
                   /* browser-dev / create failed */
@@ -2413,7 +2589,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
               void (async () => {
                 try {
                   if (HAS_TAURI) await unmarkTemplate(id);
-                  await refresh();
+                  await refreshOne(id);
                 } catch {
                   /* no-op */
                 }
@@ -2424,8 +2600,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                 try {
                   // Templates are synced `.myn` notes — route the delete so it
                   // propagates as a tombstone under sync (not a bare local unlink).
+                  // The tombstone is a REWRITE, so the row is re-read (and then
+                  // filtered out as tombstoned) rather than dropped.
                   if (HAS_TAURI) await deleteNoteRouted(id);
-                  await refresh();
+                  await refreshOne(id);
                 } catch {
                   /* no-op */
                 }

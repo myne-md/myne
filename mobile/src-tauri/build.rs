@@ -157,8 +157,12 @@ fn main() {
                 // engine. Adding a command here without a matching entry in
                 // `permissions/search/default.toml` is a security bug.
                 "search",
-                tauri_build::InlinedPlugin::new()
-                    .commands(&["search_index_replace", "note_search"]),
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "search_index_replace",
+                    "search_index_apply",
+                    "search_index_remove",
+                    "note_search",
+                ]),
             )
             .plugin(
                 // MYND-96 (SYNC-9): shared from `myne-core`; the same 4 commands

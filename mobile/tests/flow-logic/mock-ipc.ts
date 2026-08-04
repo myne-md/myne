@@ -131,6 +131,18 @@ export interface MockConfig {
    *  the matching `text` (raw frontmatter + body). For the saved-view render
    *  flow: the view's filter runs over these live notes. */
   notes?: Array<{ id: string; text: string }>;
+  /** Make `note_create` / `note_update` PERSIST into the store `note_list` and
+   *  `note_read` answer from, so a note written through the UI is subsequently
+   *  readable — what a real host does.
+   *
+   *  Off by default, and that default is a known fiction: with writes discarded,
+   *  a vault seeded empty STAYS empty, which is the only reason the dev-only
+   *  spread (`maybeSeedTestData`, which fires on any vault of ≤1 note under
+   *  `vite dev`) is invisible to the empty-vault specs. Flipping the default
+   *  would surface that spread and rewrite what a dozen specs assert — its own
+   *  change, on its own axis. Opt in where a spec genuinely needs to observe a
+   *  write it made. */
+  statefulNoteWrites?: boolean;
   /** Reject `note_read` for these ids (the failed-open flow). The list load's
    *  per-note read falls back to `""` on rejection, so a seeded row still
    *  renders — only the open itself fails. */
@@ -252,8 +264,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // Seeded notes + a STATEFUL saved-views store (so a view created through the
     // UI persists into the next `prefs_read`, mirroring the real prefs setter +
     // nonce-bump round-trip). `note_read` looks the body up by id.
-    const seededNotes = config.notes ?? [];
+    // Copied, not aliased: `note_create` / `note_update` mutate this store so
+    // `note_list` and `note_read` answer from it (see those handlers).
+    const seededNotes = [...(config.notes ?? [])];
     const noteText = new Map(seededNotes.map((n) => [n.id, n.text]));
+    /** Next `note_create` id suffix — 0 reproduces the long-standing constant. */
+    let mintedNotes = 0;
     // MYND-619 reminder state — STATEFUL for the same reason savedViews is: the
     // switch is only meaningful if a write survives into the next `prefs_read`.
     let remindersEnabled = (config.prefs?.reminders_enabled as boolean | undefined) ?? true;
@@ -324,6 +340,32 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       config.prefs?.item_order && typeof config.prefs.item_order === "object"
         ? { ...(config.prefs.item_order as Record<string, string[]>) }
         : {};
+
+    // Index-feed ledger (myne-mobile#41). Every read + index write the editor
+    // performs is recorded here so a test can assert on the SHAPE of the feed,
+    // not just its outcome. That matters because the bug this exists to catch is
+    // invisible from the UI: saving one note used to re-read, re-parse and
+    // re-index the whole vault, and every screen still looked correct while it
+    // did. Counting is the only way a scenario can see it.
+    const feed = (): {
+      noteReads: string[];
+      indicesApplies: string[];
+      indicesRemoves: string[];
+      searchReplaces: number[];
+      searchApplies: string[][];
+      searchRemoves: string[];
+    } => {
+      const w = window as unknown as { __indexFeed?: ReturnType<typeof feed> };
+      return (w.__indexFeed ??= {
+        noteReads: [],
+        indicesApplies: [],
+        indicesRemoves: [],
+        // One entry per whole-corpus replace, holding the doc count it carried.
+        searchReplaces: [],
+        searchApplies: [],
+        searchRemoves: [],
+      });
+    };
 
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
@@ -549,9 +591,16 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         return null;
       },
       // note_list: prefer the richer `notes` seed (id + body for the view render);
-      // fall back to the drawing flow's `noteIds`-only seed.
-      "plugin:notes|note_list": () =>
-        seededNotes.length > 0 ? seededNotes.map((n) => n.id) : config.noteIds ?? [],
+      // fall back to the drawing flow's `noteIds`-only seed. Notes minted by
+      // `note_create` land in `seededNotes`, so they appear here either way —
+      // the union matters for the `noteIds`-only specs, whose seed is not in
+      // that store and must not be displaced by the first create.
+      "plugin:notes|note_list": () => {
+        const stored = seededNotes.map((n) => n.id);
+        const base =
+          (config.notes ?? []).length > 0 ? stored : [...(config.noteIds ?? []), ...stored];
+        return [...new Set(base)];
+      },
       // ── Vault-indices graph surface ──
       // Default [] keeps `backendEdges` an empty dump (degree-0 graph); the
       // graph flow sets `backendEdgesUnavailable` so the sweep rejects and
@@ -559,6 +608,32 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:vault-indices|vault_indices_all_edges": () => {
         if (config.backendEdgesUnavailable) throw { kind: "unavailable" };
         return [];
+      },
+      // ── Index feed (myne-mobile#41) ──
+      // These five are COUNTED. Both indices take per-note deltas, so the number
+      // of calls a single save produces IS the contract: one apply, not one per
+      // note in the vault. Mocking them explicitly rather than leaving them to
+      // the unknown-command `[]` fallback is what makes the count assertable.
+      "plugin:vault-indices|vault_indices_apply": (args) => {
+        feed().indicesApplies.push(String(args.noteId ?? ""));
+        return null;
+      },
+      "plugin:vault-indices|vault_indices_remove": (args) => {
+        feed().indicesRemoves.push(String(args.noteId ?? ""));
+        return null;
+      },
+      "plugin:search|search_index_replace": (args) => {
+        feed().searchReplaces.push(((args.docs ?? []) as unknown[]).length);
+        return null;
+      },
+      "plugin:search|search_index_apply": (args) => {
+        const docs = (args.docs ?? []) as Array<{ id?: string }>;
+        feed().searchApplies.push(docs.map((d) => String(d.id ?? "")));
+        return null;
+      },
+      "plugin:search|search_index_remove": (args) => {
+        feed().searchRemoves.push(...((args.ids ?? []) as unknown[]).map(String));
+        return null;
       },
       // ── Graph-layout persistence (vault.graph MYG1 cache) ──
       "plugin:graph-layout|graph_layout_read": () => config.graphLayoutPayload ?? null,
@@ -634,14 +709,31 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // queued captures became notes; captures|take_pending returns the canned
       // pending set ONCE (then empty, mirroring a real take+ack draining the
       // queue); ack + seal_staged record their calls.
+      // Both writers persist only under `statefulNoteWrites` — see that flag for
+      // why the default discards. Ids are minted in the UUIDv7 shape the real
+      // command returns, the first one keeping the constant the single-create
+      // specs already assert on.
       "plugin:notes|note_create": (args) => {
         const w = window as unknown as { __noteCreates?: string[] };
-        (w.__noteCreates ??= []).push(String(args.plaintext ?? ""));
-        return "00000000-0000-7000-8000-000000000000";
+        const text = String(args.plaintext ?? "");
+        (w.__noteCreates ??= []).push(text);
+        const id = `00000000-0000-7000-8000-${String(mintedNotes++).padStart(12, "0")}`;
+        if (config.statefulNoteWrites === true) {
+          seededNotes.push({ id, text });
+          noteText.set(id, text);
+        }
+        return id;
       },
       "plugin:notes|note_update": (args) => {
         const w = window as unknown as { __noteUpdates?: string[] };
-        (w.__noteUpdates ??= []).push(String(args.plaintext ?? ""));
+        const text = String(args.plaintext ?? "");
+        (w.__noteUpdates ??= []).push(text);
+        const id = String(args.noteId ?? "");
+        if (config.statefulNoteWrites === true) {
+          const row = seededNotes.find((n) => n.id === id);
+          if (row !== undefined) row.text = text;
+          if (noteText.has(id)) noteText.set(id, text);
+        }
         return null;
       },
       "plugin:notes|note_delete": (args) => {
@@ -651,6 +743,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       },
       "plugin:notes|note_read": (args) => {
         const id = String(args.noteId ?? "");
+        feed().noteReads.push(id);
         if (config.noteReadErrorIds?.includes(id)) throw { kind: "Io", detail: { io_error_kind: "NotFound" } };
         return noteText.get(id) ?? config.noteBodies?.[id] ?? "";
       },
