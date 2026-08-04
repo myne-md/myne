@@ -100,11 +100,27 @@ export function intervalMs(interval: BackupInterval): number {
 }
 
 /**
+ * Floor on how soon a FAILED scheduled backup is retried (myne#317).
+ *
+ * `record_failure` stamps the attempt clock and leaves the success clock alone,
+ * and the due-check consulted only the success clock — so any non-transient
+ * failure made the schedule due again on the very next 5-minute tick, for the
+ * whole session, every session, with no backoff and no cap. A "Daily" schedule
+ * attempted a full vault export 288 times a day while the target kept failing,
+ * each attempt taking the capacity-1 auth permit and quiescing note writers.
+ *
+ * An hour is the floor rather than the answer: the configured cadence wins when
+ * it is longer. The floor exists because `every-unlock`'s interval is zero, and
+ * a zero backoff is the bug itself.
+ */
+export const FAILED_RETRY_FLOOR_MS = 60 * 60_000;
+
+/**
  * Whether a scheduled backup is due at `nowMs`.
  *
  * Requires the schedule to be enabled with a target folder. `every-unlock` means
  * once per unlocked SESSION; the dated presets mean the configured interval has
- * elapsed since the last SUCCESS.
+ * elapsed since the last SUCCESS. A recent failure backs the whole thing off.
  *
  * `sessionStartedAtMs` is when this unlocked session began — the scheduler's own
  * mount. It is what gives `every-unlock` a meaning other than "always" (myne#316):
@@ -121,6 +137,12 @@ export function isBackupDue(
 ): boolean {
   if (!config.enabled) return false;
   if (config.targetFolder == null || config.targetFolder === "") return false;
+
+  // A failed attempt backs off by the configured cadence, with an hour floor.
+  if (config.lastBackupStatus === "failed" && config.lastBackupAttemptAt != null) {
+    const backoff = Math.max(intervalMs(config.interval), FAILED_RETRY_FLOOR_MS);
+    if (nowMs - config.lastBackupAttemptAt < backoff) return false;
+  }
 
   if (config.interval === "every-unlock") {
     // Once per session: due only if the last success predates this unlock.

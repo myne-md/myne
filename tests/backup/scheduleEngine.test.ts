@@ -6,6 +6,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  FAILED_RETRY_FLOOR_MS,
   intervalMs,
   isBackupDue,
   runScheduledBackupIfDue,
@@ -105,6 +106,65 @@ describe("isBackupDue", () => {
     ).toBe(true);
   });
 
+  // myne#317 — a failed attempt backs off; it does not retry on the next tick.
+  //
+  // `record_failure` stamps the attempt clock and leaves the success clock
+  // alone, and the due-check consulted only the success clock — so a "Daily"
+  // schedule attempted a full vault export 288 times a day against a failing
+  // target, each attempt taking the capacity-1 auth permit and quiescing note
+  // writers. The user saw one toast; the loop was invisible.
+  describe("after a failure", () => {
+    const failed = (over: Partial<ScheduleConfig> = {}) =>
+      config({
+        lastBackupStatus: "failed",
+        lastBackupAttemptAt: NOW_MS - 5 * 60_000, // one tick ago
+        lastScheduledSuccessAt: NOW_MS - 2 * DAY_MS, // long overdue on its own
+        ...over,
+      });
+
+    it("is not due again on the next 5-minute tick", () => {
+      expect(isBackupDue(failed(), NOW_MS, SESSION_START_MS)).toBe(false);
+    });
+
+    it("is due again once the configured cadence has elapsed", () => {
+      expect(
+        isBackupDue(
+          failed({ lastBackupAttemptAt: NOW_MS - DAY_MS }),
+          NOW_MS,
+          SESSION_START_MS,
+        ),
+      ).toBe(true);
+    });
+
+    it("floors the backoff for every-unlock, whose interval is zero", () => {
+      const base = failed({ interval: "every-unlock", lastScheduledSuccessAt: null });
+      expect(isBackupDue(base, NOW_MS, SESSION_START_MS)).toBe(false);
+      expect(
+        isBackupDue(
+          { ...base, lastBackupAttemptAt: NOW_MS - FAILED_RETRY_FLOOR_MS },
+          NOW_MS,
+          SESSION_START_MS,
+        ),
+      ).toBe(true);
+    });
+
+    it("does not back off after a SUCCESS", () => {
+      // The backoff keys on the recorded status, not on the attempt clock
+      // alone — a successful attempt a minute ago must not block a due weekly.
+      expect(
+        isBackupDue(
+          config({
+            interval: "weekly",
+            lastBackupStatus: "success",
+            lastBackupAttemptAt: NOW_MS - 60_000,
+            lastScheduledSuccessAt: NOW_MS - WEEK_MS,
+          }),
+          NOW_MS,
+          SESSION_START_MS,
+        ),
+      ).toBe(true);
+    });
+  });
 });
 
 describe("runScheduledBackupIfDue", () => {
