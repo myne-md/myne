@@ -331,6 +331,10 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // an UNMOCKED command to `[]`, so without a real handler + store a picker
     // test would pass against its own optimistic draft and prove nothing.
     let vaultIcon: string | null = (config.prefs?.icon as string | null | undefined) ?? null;
+    // Vaults deleted during this session, by id. The delete escape routes by
+    // re-probing rather than by navigating, so the roster is the only thing
+    // that can carry the outcome — see the vault-delete handler.
+    const deletedVaultIds = new Set<string>();
     // STATEFUL item_order MAP (MYND-596). The whole-map setter is written
     // optimistically by the move-up/move-down affordance, so a reopen round-trip
     // is only meaningful if the write survives into the next `prefs_read` —
@@ -375,6 +379,18 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:vault-unlock|vault_list": () => {
         if (config.freshDevice) return [];
         if (config.corruptedVault) return [{ id: "flow-vault", status: { kind: "Corrupted" } }];
+        // Anything deleted this session is gone from here on — see the
+        // vault-delete handler below for why the roster, not the return value,
+        // is what the escape depends on.
+        if (deletedVaultIds.size > 0) {
+          const rows = config.multiVault
+            ? [
+                { id: "vault-personal", status: { kind: "Exists" }, label: "Personal", icon: null, last_unlock: 0 },
+                { id: "vault-work", status: { kind: "Exists" }, label: "Work", icon: null, last_unlock: null },
+              ]
+            : [{ id: "flow-vault", status: { kind: "Exists" }, icon: vaultIcon }];
+          return rows.filter((row) => !deletedVaultIds.has(row.id));
+        }
         // `icon: null` on both rows is STRUCTURAL, not a shortcut: multiVault
         // boots to the pre-unlock picker, and the icon is encrypted-only
         // (SYNC-3), so no vault can have a glyph in the RAM cache there.
@@ -408,9 +424,27 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:vault-creation|commit": () => "flow-vault",
       "plugin:vault-creation|cancel": () => null,
       // ── Vault delete (lost-both-secrets escape) ──
-      "plugin:vault-delete|vault_delete": () => {
+      // A successful delete must make the vault stop existing for every LATER
+      // probe, not merely return null. The app routes out of the cul-de-sac by
+      // re-probing (`AppShell`'s onDeleteVaultSuccess → reprobe), so a roster
+      // that still lists the vault sends it straight back to Unlock — which is
+      // what this mock did, and why the escape read as broken in a spec whose
+      // subject is precisely that it is not. Same stateful-mock shape as the
+      // quick-unlock and prefs setters above.
+      //
+      // Recorded per id (SYNC-6 targets one `vaults/<id>/`), so a multi-vault
+      // delete leaves its siblings listed. A missing id means the active vault,
+      // which is `flow-vault` in every fixture that has one.
+      "plugin:vault-delete|vault_delete": (args) => {
         const w = window as unknown as { __vaultDeletes?: number };
         w.__vaultDeletes = (w.__vaultDeletes ?? 0) + 1;
+        // Recorded BEFORE the error leg on purpose. `PartialDelete` means part
+        // of the vault is already gone — the flow's own comment is "the slot is
+        // already Empty and the editor cannot resume" — so continuing to serve
+        // it as a healthy `Exists` row is the one answer that is certainly
+        // wrong. `UnlockFlow` routes both legs through the same
+        // `onDeleteVaultSuccess`, so both must leave the cul-de-sac.
+        deletedVaultIds.add(String(args?.vaultId ?? "flow-vault"));
         if (config.deleteError) throw config.deleteError;
         return null;
       },
