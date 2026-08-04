@@ -202,6 +202,14 @@ pub fn atomic_write_unclobbered_private(
 /// Shared body of [`atomic_write_unclobbered`] and
 /// [`atomic_write_unclobbered_private`]. `mode` is the create-time permission
 /// applied to the temp (Unix only; see [`apply_temp_mode`]).
+// `std::fs::File` is a zero-sized unsupported stub on wasm32 and implements no
+// `Drop`, so the two explicit `drop(f)` calls below trip `drop_non_drop` there.
+// On every real filesystem the handle must be released before the rename (a hard
+// Windows requirement) and before the failure-path `remove_file`. Allowed on the
+// wasm arm only, so the lint keeps working everywhere it means something —
+// the same treatment its two siblings in this file already carry, and the one
+// this function was missing.
+#[cfg_attr(target_arch = "wasm32", allow(clippy::drop_non_drop))]
 fn atomic_write_unclobbered_inner(
     path: &Path,
     bytes: &[u8],
