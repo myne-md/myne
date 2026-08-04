@@ -3,14 +3,14 @@
 // The window-level Cmd/Ctrl+F listener (App.tsx) is the single owner of native
 // find suppression and lives ABOVE the editor — it has no direct handle to the
 // CodeMirror `EditorView`. Rather than drill a ref down through CMEditor /
-// Editor.tsx, the editor registers its own view here via a ViewPlugin
-// (`find-extension.ts`), and the listener calls `openInNoteFind()`.
+// Editor.tsx, the listener calls `openInNoteFind()`, which resolves the view
+// through the package's active-view registry.
 //
 // Consequence: `openInNoteFind()` no-ops on every non-editor stage (no view
 // registered), which is exactly the desired gating — Cmd/Ctrl+F is swallowed
 // app-wide (native find never appears) but only OPENS the bar in the editor.
 
-import type { EditorView } from "@codemirror/view";
+import { getActiveEditorView } from "../active-view";
 import {
   openSearchPanel,
   searchPanelOpen,
@@ -18,17 +18,26 @@ import {
   SearchQuery,
 } from "@codemirror/search";
 
-let activeView: EditorView | null = null;
-
-/** Called by the find ViewPlugin when an editor mounts. */
-export function registerFindView(view: EditorView): void {
-  activeView = view;
-}
-
-/** Called on editor teardown; guarded so a stale unmount can't clear a newer view. */
-export function unregisterFindView(view: EditorView): void {
-  if (activeView === view) activeView = null;
-}
+// The view find acts on comes from `active-view.ts` (myne#328).
+//
+// This module used to keep its own registry, and it tracked MOUNT rather than
+// FOCUS — so `activeView` was whichever CodeMirror view mounted last, never the
+// one the user was editing. Two consequences, both reachable in an ordinary
+// two-pane or preview-companion layout:
+//
+//   - the bar opened on the wrong pane, and `replaceAll` is bound to that same
+//     wrong view, so a bulk replace launched from a mis-targeted bar rewrote the
+//     OTHER note in one undoable transaction (or, against the read-only preview
+//     companion, silently did nothing);
+//   - when that view unmounted without a sibling remounting, the registry went
+//     to null and the app's only in-note find was unreachable for the rest of
+//     the session — and because Cmd/Ctrl+F is preventDefault'd app-wide, the
+//     WebView's native find is suppressed too, so the key did literally nothing
+//     with no message.
+//
+// `active-view.ts` already solves exactly this, in this package, by tracking
+// focus as well as mount — and its extension is installed in the same bundle. A
+// second registry was the bug; there is now one.
 
 /**
  * Open the in-note find panel on the active editor view, focusing its input.
@@ -36,8 +45,8 @@ export function unregisterFindView(view: EditorView): void {
  * the caller still preventDefault'd the native Cmd/Ctrl+F, it just opens nothing.
  */
 export function openInNoteFind(): boolean {
-  if (activeView === null) return false;
-  const view = activeView;
+  const view = getActiveEditorView();
+  if (view === null) return false;
 
   // Already open (Cmd/Ctrl+F re-press): refocus + select the input, browser-style
   // — do NOT toggle it closed or re-prefill (that would overwrite the live query

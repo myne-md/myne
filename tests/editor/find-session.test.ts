@@ -2,7 +2,7 @@
 //
 // Find-session singleton (`editor/find/find-session.ts`, MYND-175). Three
 // behaviors:
-//   - the active-view registry: register/unregister with stale-unmount guard
+//   - target resolution through the shared active-view registry (myne#328)
 //   - `getFindCaseSensitive` / `setFindCaseSensitive`: the session-level mode bit
 //   - `openInNoteFind`: no-ops (returns false) with no registered view; opens the
 //     panel on the registered view; prefills a single-line selection as the query
@@ -16,13 +16,12 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { getSearchQuery, searchPanelOpen } from "@codemirror/search";
 import {
-  registerFindView,
-  unregisterFindView,
   openInNoteFind,
   getFindCaseSensitive,
   setFindCaseSensitive,
 } from "../../src/editor/find/find-session";
 import { findExtension } from "../../src/editor/find/find-extension";
+import { activeViewExtension } from "../../src/editor/active-view";
 
 type Mounted = { view: EditorView; host: HTMLElement };
 
@@ -33,7 +32,10 @@ function mount(doc: string, anchor = 0, head = anchor): Mounted {
     state: EditorState.create({
       doc,
       selection: { anchor, head },
-      extensions: [...findExtension()],
+      // myne#328 — find resolves its target through the package's ONE
+      // active-view registry now, which tracks focus as well as mount. It is
+      // installed alongside `findExtension()` in production (`extensions.ts`).
+      extensions: [...findExtension(), activeViewExtension()],
     }),
     parent: host,
   });
@@ -45,7 +47,6 @@ let mounted: Mounted | null = null;
 afterEach(() => {
   // Reset the module singleton: clear any leftover registered view + case bit.
   if (mounted !== null) {
-    unregisterFindView(mounted.view);
     mounted.view.destroy();
     mounted.host.remove();
     mounted = null;
@@ -115,25 +116,62 @@ describe("openInNoteFind with a registered view", () => {
   });
 });
 
-describe("register / unregister guard", () => {
-  it("a stale unmount does not clear a newer registered view", () => {
-    const hostA = document.createElement("div");
-    const viewA = new EditorView({ state: EditorState.create({ doc: "a" }), parent: hostA });
-    const hostB = document.createElement("div");
-    const viewB = new EditorView({ state: EditorState.create({ doc: "b" }), parent: hostB });
+// ── myne#328: find targets the FOCUSED view, not the last-mounted one ───────
+//
+// The old registry tracked mount, so `activeView` was whichever CodeMirror view
+// mounted last. In an ordinary two-pane or preview-companion layout that is the
+// pane the user is NOT editing — and `replaceAll` is bound to the same view, so
+// a bulk replace launched from a mis-targeted bar rewrote the other note in one
+// undoable transaction (or, against the read-only companion, silently did
+// nothing). When that view unmounted with no sibling remounting, the registry
+// went null and the app's only in-note find was unreachable for the rest of the
+// session — with Cmd/Ctrl+F preventDefault'd app-wide, so the native find was
+// suppressed too and the key did literally nothing.
+describe("which view find targets (myne#328)", () => {
+  function mountBare(doc: string): Mounted {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        extensions: [...findExtension(), activeViewExtension()],
+      }),
+      parent: host,
+    });
+    return { view, host };
+  }
+
+  it("follows FOCUS, not mount order", () => {
+    const a = mountBare("alpha");
+    const b = mountBare("bravo"); // mounted last
     try {
-      registerFindView(viewA);
-      registerFindView(viewB); // B is now active
-      unregisterFindView(viewA); // stale unmount of A — must NOT clear B
-      // B is still active: opening find should target it (returns true).
+      // The user clicks back into A.
+      a.view.contentDOM.dispatchEvent(new FocusEvent("focus"));
+
       expect(openInNoteFind()).toBe(true);
-      expect(searchPanelOpen(viewB.state)).toBe(true);
+      expect(searchPanelOpen(a.view.state)).toBe(true);
+      expect(searchPanelOpen(b.view.state)).toBe(false);
     } finally {
-      unregisterFindView(viewB);
-      viewA.destroy();
-      hostA.remove();
-      viewB.destroy();
-      hostB.remove();
+      a.view.destroy();
+      a.host.remove();
+      b.view.destroy();
+      b.host.remove();
+    }
+  });
+
+  it("a stale unmount does not clear a newer view", () => {
+    const a = mountBare("alpha");
+    const b = mountBare("bravo");
+    try {
+      b.view.contentDOM.dispatchEvent(new FocusEvent("focus"));
+      a.view.destroy();
+      a.host.remove();
+
+      expect(openInNoteFind()).toBe(true);
+      expect(searchPanelOpen(b.view.state)).toBe(true);
+    } finally {
+      b.view.destroy();
+      b.host.remove();
     }
   });
 });

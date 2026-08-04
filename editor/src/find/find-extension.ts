@@ -24,7 +24,6 @@
 
 import {
   keymap,
-  ViewPlugin,
   EditorView,
   type Panel,
   type ViewUpdate,
@@ -43,8 +42,6 @@ import {
 } from "@codemirror/search";
 import { createFindBarView } from "./find-bar-view";
 import {
-  registerFindView,
-  unregisterFindView,
   getFindCaseSensitive,
   setFindCaseSensitive,
 } from "./find-session";
@@ -328,20 +325,10 @@ function createFindPanel(view: EditorView): Panel {
   };
 }
 
-// Registers the editor's view so the window-level Cmd/Ctrl+F can open find on it
-// (see `find-session.ts`); torn down on editor unmount.
-const findViewRegistration = ViewPlugin.define((view) => {
-  registerFindView(view);
-  return {
-    destroy: () => unregisterFindView(view),
-  };
-});
-
 /** The in-note find bundle, appended to `myneExtensions()`. */
 export function findExtension(): Extension[] {
   return [
     search({ top: true, createPanel: createFindPanel }),
-    findViewRegistration,
     keymap.of([{ key: "Escape", run: closeSearchPanel }]),
   ];
 }
