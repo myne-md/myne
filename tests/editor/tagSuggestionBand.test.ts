@@ -153,6 +153,47 @@ describe("anchor", () => {
     teardown(view, host);
   });
 
+  // myne#287 — the shape the existing composed test misses.
+  //
+  // `frontmatterBoundary` shrinks the replaced range by one character when the
+  // block reaches the end of the document, so the final empty line stays a live
+  // caret target. A brand-new note is EXACTLY that shape, and the band used to
+  // read `range.blockEnd` directly — so the two differed by one and the band
+  // anchored after the note's only body line: Properties panel, then the empty
+  // body line, then Suggested tags, with the caret above the band. Every other
+  // test here uses a note with body content, where the two agree.
+  const EMPTY_BODY_DOC = "---\ntitle: Notes\n---\n";
+
+  it("anchors ABOVE the only body line in a note with an empty body", () => {
+    const { view, host } = mount(EMPTY_BODY_DOC);
+    const at = tagSuggestionBandAnchor(view.state);
+    // The last line stays a caret target, so the boundary is one short of the
+    // document end — and the band sits there, not after it.
+    expect(at).toBe(EMPTY_BODY_DOC.length - 1);
+    teardown(view, host);
+  });
+
+  it("renders above the body line when composed with the Properties widget", () => {
+    const { view, host } = mount(EMPTY_BODY_DOC, [frontmatterDecorations()]);
+    push(view, CHIPS);
+    const band = q(host, "editor.tag-suggestion-band");
+    expect(band).not.toBeNull();
+    const properties = host.querySelector(".cm-fm-properties")!;
+    expect(
+      properties.compareDocumentPosition(band!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // …and no LINE precedes it, which is the actual complaint: there was a
+    // caret position above the band.
+    const firstLine = host.querySelector(".cm-line");
+    if (firstLine !== null) {
+      expect(
+        band!.compareDocumentPosition(firstLine) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(view.state.doc.toString()).toBe(EMPTY_BODY_DOC);
+    teardown(view, host);
+  });
+
   it("follows the boundary when the frontmatter grows", () => {
     const { view, host } = mount();
     const before = tagSuggestionBandAnchor(view.state);
