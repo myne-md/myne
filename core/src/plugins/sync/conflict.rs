@@ -1170,8 +1170,26 @@ pub async fn restore_quarantine_with_dirs(
 pub async fn delete_quarantine_in(
     io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,
+    state: &VaultRuntimeState,
     file_name: &str,
 ) -> Result<(), SyncDeviceError> {
+    use crate::plugins::vault_unlock::state::SlotKind;
+    // Gated on `Slot::Unlocked` FIRST, before the name is parsed (myne#382).
+    //
+    // Its siblings refuse when locked only as a side effect of needing
+    // `items_key`. A command that only deletes needs no key, so without this it
+    // answered with nothing unlocked — and §11.3 calls the quarantined
+    // ciphertext the *recoverable* ceiling on a lying server, which it stops
+    // being the moment something outside a session can destroy it. The only
+    // other gate was a TypeScript confirm modal, on the far side of the IPC
+    // boundary.
+    //
+    // Before the parse, so a locked caller gets no BadRequest-vs-Internal
+    // oracle over file names — the same "(1) precondition, (2) validate"
+    // ordering `vault_delete` labels explicitly.
+    if !matches!(state.slot_kind_active().await, SlotKind::Unlocked) {
+        return Err(SyncDeviceError::Internal);
+    }
     parse_quarantine_file_name(file_name).ok_or(SyncDeviceError::BadRequest)?;
     io.remove_file(&super::orchestrator::quarantine_dir(vault_root).join(file_name))
         .await

@@ -87,12 +87,12 @@ commands.allow = ["sync_account_status"]
 
 [[permission]]
 identifier = "allow-sync-approve-device"
-description = "Allow invoking sync:sync_approve_device (authed: approve a pending device, POST /auth/devices/approve)."
+description = "Allow invoking sync:sync_approve_device (authed: approve a pending device, POST /auth/devices/approve). Requires an unlocked active vault."
 commands.allow = ["sync_approve_device"]
 
 [[permission]]
 identifier = "allow-sync-remove-device"
-description = "Allow invoking sync:sync_remove_device (authed: revoke a device's token, POST /auth/devices/revoke; device_id untouched, SYNC-2)."
+description = "Allow invoking sync:sync_remove_device (authed: revoke a device's token, POST /auth/devices/revoke; device_id untouched, SYNC-2). Requires an unlocked active vault."
 commands.allow = ["sync_remove_device"]
 
 [[permission]]
@@ -152,7 +152,7 @@ commands.allow = ["sync_restore_quarantine"]
 
 [[permission]]
 identifier = "allow-sync-delete-quarantine"
-description = "Allow invoking sync:sync_delete_quarantine (permanently remove ONE quarantined note blob; strict file-name validation, UI confirm-gated — the single path that destroys quarantine evidence). No decrypt, no vault-blob access beyond the quarantine dir."
+description = "Allow invoking sync:sync_delete_quarantine (permanently remove ONE quarantined note blob; strict file-name validation; requires an unlocked active vault (Slot::Unlocked, enforced in the shared core), and the UI confirms first — the single path that destroys quarantine evidence). No decrypt, no vault-blob access beyond the quarantine dir."
 commands.allow = ["sync_delete_quarantine"]
 
 [[permission]]
