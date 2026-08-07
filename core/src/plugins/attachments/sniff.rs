@@ -2,11 +2,11 @@
 //! (MYND-169, sub-feature 2 — `attachments-crypto-pipeline`).
 //!
 //! A tiny, dependency-free sniffer. The v0.1 allowlist is the raster
-//! image set (PNG / JPEG / GIF / WebP), SVG, PDF, and WAV audio
-//! (MYND-259) — the union of what the editor renders inline and the
-//! library can preview. This set governs what the `attachment://`
-//! handler is permitted to SERVE; it is never emitted for anything
-//! outside the set.
+//! image set (PNG / JPEG / GIF / WebP), SVG, PDF, WAV audio (MYND-259),
+//! and MP4 / WebM video (myne#168) — the union of what the editor renders
+//! inline and the library can preview. This set governs what the
+//! `attachment://` handler is permitted to SERVE; it is never emitted for
+//! anything outside the set.
 //!
 //! Since MYND-173 the allowlist no longer gates IMPORT. `attachment_import`
 //! accepts arbitrary bytes; a type the sniffer does not recognize is
@@ -20,9 +20,10 @@
 //! ## Why a hand-rolled sniffer (no `infer` / `tree_magic` dep)
 //!
 //! Adding a crate is a security decision (`CLAUDE.md` "minimal
-//! direct-dependency surface"). The allowlist is seven formats with
-//! short, well-known magic prefixes; a ~50-line match beats a
-//! general-purpose MIME-detection crate's transitive surface. The
+//! direct-dependency surface"). The allowlist is nine formats with
+//! short, well-known magic prefixes (video adds a bounded major-brand /
+//! DocType check on top of the prefix); a compact hand-rolled match beats
+//! a general-purpose MIME-detection crate's transitive surface. The
 //! sniffer is deliberately strict — it recognizes ONLY the allowlisted
 //! formats, returning [`None`] for everything else (no "best guess"
 //! fall-through that a general crate would offer).
@@ -65,6 +66,8 @@ pub const ALLOWLISTED_CONTENT_TYPES: &[&str] = &[
     "image/svg+xml",
     "application/pdf",
     "audio/wav",
+    "video/mp4",
+    "video/webm",
 ];
 
 /// Sniff the content type of `bytes` against the v0.1 attachment
@@ -145,6 +148,18 @@ pub fn sniff_content_type(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(b"%PDF-") {
         return Some("application/pdf");
     }
+    // MP4 (ISO-BMFF, H.264/AAC): an `ftyp` box at offset 4 whose major
+    // brand is in the in-scope set. MOV/QuickTime shares the `ftyp` box
+    // (major brand "qt  ") and is deliberately excluded (myne#168).
+    if looks_like_mp4(bytes) {
+        return Some("video/mp4");
+    }
+    // WebM (a Matroska subset): the EBML header magic followed by a "webm"
+    // DocType within a bounded window. Generic Matroska/MKV (DocType
+    // "matroska") shares the magic and is excluded (myne#168).
+    if looks_like_webm(bytes) {
+        return Some("video/webm");
+    }
     // SVG: text/XML — no fixed binary magic. Recognize after skipping a
     // UTF-8 BOM + leading ASCII whitespace, then require an XML/SVG
     // opener within a bounded prefix window. Strict enough that arbitrary
@@ -193,6 +208,50 @@ fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
         return false;
     }
     haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+/// The ISO-BMFF major brands recognized as in-scope MP4 video. MOV's
+/// `qt  ` brand is absent by construction, so QuickTime rejects here and
+/// degrades to the file card (myne#168 supported set: MP4 H.264/AAC). The
+/// set can be widened as real-world brands demand; the `qt  ` exclusion is
+/// fixed (`sync-ledger.md` SYNC-2 of the video-attachments epic).
+const MP4_MAJOR_BRANDS: &[&[u8]] = &[
+    b"isom", b"mp41", b"mp42", b"avc1", b"iso2", b"M4V ", b"dash",
+];
+
+/// Recognize an ISO-BMFF (MP4) stream by its `ftyp` box: a 4-byte box size
+/// is followed by the ASCII tag `ftyp` at offset 4 and the major brand at
+/// offset 8. Only the brands in [`MP4_MAJOR_BRANDS`] pass, so MOV (`qt  `)
+/// and 3GP (`3gp4`) fall through — the brand gate is what keeps the
+/// out-of-scope containers off the video path.
+fn looks_like_mp4(bytes: &[u8]) -> bool {
+    if bytes.len() < 12 || &bytes[4..8] != b"ftyp" {
+        return false;
+    }
+    let major = &bytes[8..12];
+    MP4_MAJOR_BRANDS.contains(&major)
+}
+
+/// Recognize a WebM stream: the EBML header magic `1A 45 DF A3` followed by a
+/// `webm` DocType *element*. Matching the full DocType marker — element ID
+/// `42 82`, a length-4 vint `84`, then the ASCII `webm` — rather than a bare
+/// `webm` substring is what actually excludes a generic Matroska/MKV file:
+/// MKV's DocType is `matroska`, and its writing-app / tag / title metadata may
+/// itself contain the string `webm` (ffmpeg-muxed files often do), which a bare
+/// substring scan would false-positive on. Scanned within a bounded window like
+/// [`looks_like_svg`], since the DocType lives in the EBML header, never deep in
+/// the stream. A non-canonical DocType size encoding (multi-byte vint) is not
+/// matched and falls back to the file card — acceptable, since standard muxers
+/// emit the 1-byte `84`.
+fn looks_like_webm(bytes: &[u8]) -> bool {
+    if !bytes.starts_with(&[0x1A, 0x45, 0xDF, 0xA3]) {
+        return false;
+    }
+    // DocType element (ID 0x4282) + length-4 vint (0x84) + the ASCII "webm".
+    const WEBM_DOCTYPE: &[u8] = &[0x42, 0x82, 0x84, b'w', b'e', b'b', b'm'];
+    const WINDOW: usize = 1024;
+    let window = &bytes[..bytes.len().min(WINDOW)];
+    contains_subslice(window, WEBM_DOCTYPE)
 }
 
 #[cfg(test)]
@@ -326,6 +385,76 @@ mod tests {
     }
 
     #[test]
+    fn sniffs_mp4_isom_brand() {
+        // ISO-BMFF: 4-byte box size, "ftyp", in-scope major brand "isom".
+        let mp4 = b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00mp41";
+        assert_eq!(sniff_content_type(mp4), Some("video/mp4"));
+    }
+
+    #[test]
+    fn sniffs_mp4_mp42_and_avc1_brands() {
+        assert_eq!(
+            sniff_content_type(b"\x00\x00\x00\x18ftypmp42...."),
+            Some("video/mp4")
+        );
+        assert_eq!(
+            sniff_content_type(b"\x00\x00\x00\x18ftypavc1...."),
+            Some("video/mp4")
+        );
+    }
+
+    #[test]
+    fn mov_quicktime_ftyp_rejects() {
+        // MOV shares the `ftyp` box (major brand "qt  ") and is OUT of scope —
+        // it must fall through to octet-stream / the file card, never video/mp4.
+        let mov = b"\x00\x00\x00\x14ftypqt  \x00\x00\x02\x00qt  ";
+        assert_eq!(sniff_content_type(mov), None);
+    }
+
+    #[test]
+    fn ftyp_out_of_scope_brand_rejects() {
+        // 3GP (major brand "3gp4") is not in the MP4 set.
+        assert_eq!(sniff_content_type(b"\x00\x00\x00\x18ftyp3gp4...."), None);
+    }
+
+    #[test]
+    fn too_short_ftyp_rejects() {
+        // Fewer than 12 bytes cannot carry a major brand.
+        assert_eq!(sniff_content_type(b"\x00\x00\x00\x18ftyp"), None);
+    }
+
+    #[test]
+    fn sniffs_webm_with_doctype() {
+        // EBML header (1A 45 DF A3) + a "webm" DocType within the header window.
+        let webm = b"\x1a\x45\xdf\xa3\x9f\x42\x86\x81\x01\x42\x82\x84webm";
+        assert_eq!(sniff_content_type(webm), Some("video/webm"));
+    }
+
+    #[test]
+    fn matroska_without_webm_doctype_rejects() {
+        // Generic Matroska/MKV (DocType "matroska") shares the EBML magic but
+        // is OUT of scope — it must reject, not sniff as WebM.
+        let mkv = b"\x1a\x45\xdf\xa3\x9f\x42\x86\x81\x01\x42\x82\x88matroska";
+        assert_eq!(sniff_content_type(mkv), None);
+    }
+
+    #[test]
+    fn matroska_with_webm_in_metadata_rejects() {
+        // A generic Matroska (DocType "matroska") whose WritingApp/tag string
+        // merely CONTAINS "webm" (ffmpeg-muxed files often carry "libwebm") must
+        // NOT mis-classify as WebM — only the DocType element (42 82 84 "webm")
+        // counts, never a bare "webm" substring.
+        let mkv = b"\x1a\x45\xdf\xa3\x9f\x42\x82\x88matroska\x4d\x80\x87libwebm";
+        assert_eq!(sniff_content_type(mkv), None);
+    }
+
+    #[test]
+    fn ebml_magic_alone_is_not_webm() {
+        // The bare EBML magic with no DocType must not classify as WebM.
+        assert_eq!(sniff_content_type(&[0x1A, 0x45, 0xDF, 0xA3]), None);
+    }
+
+    #[test]
     fn every_sniffable_type_is_in_the_allowlist() {
         // Drift guard: anything sniff_content_type can return MUST be a
         // member of ALLOWLISTED_CONTENT_TYPES (the handler emits only
@@ -338,6 +467,8 @@ mod tests {
             b"%PDF-1.4",
             b"<svg></svg>",
             b"RIFF\x00\x00\x00\x00WAVE",
+            b"\x00\x00\x00\x18ftypisom",
+            b"\x1A\x45\xDF\xA3\x42\x82\x84webm",
         ];
         for s in samples {
             let mime = sniff_content_type(s).expect("sample must sniff");
