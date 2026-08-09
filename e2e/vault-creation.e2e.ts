@@ -242,25 +242,27 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       const hits = scanForPlaintext(app.dataHome, [words.join(" "), VC1_PASSWORD]);
       expect(hits).toEqual([]);
 
-      // MYND-118 — a freshly-created vault is seeded with one onboarding
-      // "Welcome to Myne" note, auto-opened in the editor via the pre-seeded
-      // workspace descriptor. A vault with no welcome note would show zero
-      // rows AND zero tabs, so the row's presence plus a tab carrying the
-      // SAME note id proves the whole chain: created → listed → restored
-      // open. (Lives on VC-1 — the epic's one production-KDF creation that
-      // lands in the editor — rather than a second multi-minute creation.)
+      // #393 — a freshly-created vault is seeded with a small EXAMPLE VAULT:
+      // five ordinary notes under one "Getting started" folder, with the index
+      // note ("Start here") auto-opened in the editor via the pre-seeded
+      // workspace descriptor. A vault with no seed would show zero folders AND
+      // zero tabs, so the folder's presence plus a note tab opened on the index
+      // proves the whole chain: created → foldered → listed → restored open.
+      // (Lives on VC-1 — the epic's one production-KDF creation that lands in
+      // the editor — rather than a second multi-minute creation.)
       await dismissImporterOffer(app.session);
-      const welcomeRow = await app.session.byTestId("notes.row", { timeoutMs: 15_000 });
-      const welcomeNoteId = await welcomeRow.attribute("data-note-id");
-      expect(welcomeNoteId).toBeTruthy();
-      const welcomeTab = await app.session.byTestId("editor.tab", { timeoutMs: 15_000 });
-      // A tab carries its workspace-item key in `data-tab-id` (Saved Views #4
-      // generalized tabs to `note | view` items: `data-note-id` → `data-tab-id`,
-      // value `note:<id>`) — the note tab's key is `note:<welcomeNoteId>`.
-      expect(await welcomeTab.attribute("data-tab-id")).toBe(`note:${welcomeNoteId}`);
-      // Title is frontmatter-`title:` driven (no body-H1 fallback), so the
-      // row must read "Welcome to Myne", never the "Untitled" placeholder.
-      expect(await welcomeRow.textContent()).toContain("Welcome to Myne");
+      // The example folder is in the tree (its label is the frontmatter `folder:`).
+      const exampleFolder = await app.session.byTestId("notes.folder-row", {
+        timeoutMs: 15_000,
+      });
+      expect(await exampleFolder.textContent()).toContain("Getting started");
+      // A note tab is open — the index note, keyed `note:<id>` in `data-tab-id`
+      // (Saved Views #4 generalized tabs to `note | view` items). Its title is
+      // frontmatter-`title:` driven (no body-H1 fallback), so it reads
+      // "Start here", never the "Untitled" placeholder.
+      const indexTab = await app.session.byTestId("editor.tab", { timeoutMs: 15_000 });
+      expect(await indexTab.attribute("data-tab-id")).toMatch(/^note:/);
+      expect(await indexTab.textContent()).toContain("Start here");
     });
   });
 });

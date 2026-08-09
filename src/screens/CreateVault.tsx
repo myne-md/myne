@@ -43,7 +43,7 @@ import { ReadyStep } from "./vault-creation/ReadyStep";
 import { SessionLostStep } from "./vault-creation/SessionLostStep";
 import { mapAppErrorToUserMessage } from "../lib/vault-creation-errors";
 import { isAppError, logErrorKind } from "../lib/vault-creation-logging";
-import { seedWelcomeNote } from "../notes/welcomeNote";
+import { seedExampleVault } from "../notes/exampleVault";
 import type { BeginResult } from "../types/protocol-error";
 
 interface CreateVaultProps {
@@ -292,11 +292,12 @@ export function CreateVault({
         vaultId: committedVaultIdRef.current,
       });
       passwordRef.current = null;
-      // MYND-118 — seed the onboarding Welcome note now the new vault is
-      // unlocked (note_create requires an unlocked slot). Best-effort:
-      // seedWelcomeNote never throws, so a failure here can't bounce a
-      // successfully-unlocked user back to the manual-unlock fallback.
-      await seedWelcomeNote();
+      // #393 — seed the first-run example vault now the new vault is unlocked
+      // (note_create requires an unlocked slot). Supersedes the single MYND-118
+      // Welcome note. Best-effort: seedExampleVault never throws, so a failure
+      // here can't bounce a successfully-unlocked user back to the manual-unlock
+      // fallback.
+      await seedExampleVault();
       onAutoUnlockSuccess(committedVaultIdRef.current);
     } catch (e) {
       passwordRef.current = null;
