@@ -83,15 +83,24 @@ describe("processImportedMedia — hybrid ingest + residual fallback", () => {
     expect(r.counts.ingested.pdf).toBe(1);
   });
 
-  it("residual audio/video → placeholder comment + omitted tally", async () => {
+  it("audio/video carry through (form-C rewrite) when the importer ingests them — MYND-173, not placeholder'd", async () => {
+    // Since MYND-173 the importer ingests ANY resolvable in-cap media ref (via
+    // attachment_import's byte re-sniff), so audio/video are NOT dropped on
+    // import; MP4/WebM then classify as video/* and play inline (myne#168). The
+    // injected importer stands in for "resolvable + in-cap"; real video/*
+    // classification through the Rust sniffer is E2E-covered by
+    // e2e/video-attachment.e2e.ts. A ref the importer DECLINES still falls to a
+    // placeholder — see the missing/unresolvable case below.
     const body = "![[song.mp3]] and ![[clip.mp4]]\n";
-    const r = await processImportedMedia(body, ingestExts(new Set(["png"]))); // nothing ingestable
-    expect(r.body).toContain("<!-- omitted attachment: song.mp3 -->");
-    expect(r.body).toContain("<!-- omitted attachment: clip.mp4 -->");
+    const r = await processImportedMedia(body, ingestExts(new Set(["mp3", "mp4"])));
+    expect(r.body).toContain("att:id-mp3");
+    expect(r.body).toContain("att:id-mp4");
     expect(r.body).not.toContain("![[song.mp3]]");
-    expect(r.counts.omitted.audio).toBe(1);
-    expect(r.counts.omitted.video).toBe(1);
-    expect(r.counts.ingested.image).toBe(0);
+    expect(r.body).not.toContain("<!-- omitted attachment:");
+    expect(r.counts.ingested.audio).toBe(1);
+    expect(r.counts.ingested.video).toBe(1);
+    expect(r.counts.omitted.audio).toBe(0);
+    expect(r.counts.omitted.video).toBe(0);
   });
 
   it("a missing/unresolvable local ref → placeholder, not rewritten on a guess", async () => {

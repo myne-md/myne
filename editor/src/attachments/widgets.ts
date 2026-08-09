@@ -732,6 +732,150 @@ function stripFileExtension(filename: string): string {
   return filename.replace(/\.[A-Za-z0-9]{1,8}$/, "");
 }
 
+// --- resolved video (inline native player, MP4/WebM, myne#168) -------------
+
+/**
+ * A resolved video attachment (MP4/WebM, served as `video/mp4` / `video/webm`).
+ * Renders inline as a native `<video controls>` player fed from
+ * `attachment://<id>` (decrypted in-memory + re-sniffed + allowlist-fenced
+ * Rust-side, myne#168 / SYNC-1). Deliberately native chrome — no autoplay, loop
+ * or mute; the browser's own controls give seek + volume + fullscreen +
+ * accessibility for free, and `preload="metadata"` paints the first frame as
+ * the poster (no separate poster artefact). Sized within the image frame's edge
+ * so a portrait clip doesn't dominate the note. The `<video error>` → file-card
+ * fallback for an undecodable file is task 3 (a separate slice); this widget is
+ * the happy path. Structurally modelled on the file-card / audio widgets: the
+ * shared "⋯" overflow menu (Export / Rename / Remove / Reveal) and a teardown
+ * that releases the media buffer if CM6 discards the DOM.
+ */
+export class AttachmentVideoWidget extends WidgetType {
+  private teardown: (() => void) | null = null;
+  /** Build-time object URL — see AttachmentImageWidget.url (#211): keys eq() so a
+   *  post-warm rebuild re-renders against the resolved URL on web; no-op on
+   *  desktop. */
+  private readonly url: string;
+
+  constructor(
+    private readonly id: string,
+    private readonly filename: string,
+    private readonly size: number,
+  ) {
+    super();
+    this.url = attachmentUrl(id);
+  }
+
+  eq(other: AttachmentVideoWidget): boolean {
+    return (
+      other.id === this.id &&
+      other.filename === this.filename &&
+      other.size === this.size &&
+      other.url === this.url
+    );
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const frame = document.createElement("span");
+    frame.className = "cm-attachment-frame cm-attachment-video";
+    frame.setAttribute("data-testid", "attachment-video");
+    frame.setAttribute("role", "group");
+    frame.setAttribute("aria-label", this.filename);
+
+    // Clean progress chip until the first frame + metadata paint; removed on
+    // `loadedmetadata` (or left in place under the still-hidden player if decode
+    // never starts — the task-3 error path swaps to the file card there).
+    const loading = makeProgressChip("loading");
+    frame.appendChild(loading);
+
+    // The player: a native `<video controls>`. `attachment://<id>` is decrypted
+    // in-memory, re-sniffed and allowlist-fenced (video/mp4|video/webm) by the
+    // Rust handler — no plaintext on disk, no network. `playsinline` keeps the
+    // WebView from hijacking fullscreen on iOS.
+    const video = document.createElement("video");
+    video.setAttribute("data-testid", "attachment-video.player");
+    video.controls = true;
+    video.preload = "metadata";
+    video.setAttribute("playsinline", "");
+    video.src = this.url;
+    // Bound any orientation to the image frame's edge so a tall/portrait clip
+    // does not dominate the note (grill: "sized per image-widget constraints").
+    video.style.maxWidth = `${FRAME_WIDTH}px`;
+    video.style.maxHeight = `${FRAME_WIDTH}px`;
+    video.style.display = "none";
+    video.addEventListener("loadedmetadata", () => {
+      video.style.display = "block";
+      loading.remove();
+    });
+    frame.appendChild(video);
+
+    const menu = buildOverflowMenu(
+      [
+        // Absent, not disabled: a platform with no export destination (the web
+        // client) omits the item rather than offering one that cannot work.
+        ...(canExportAttachment()
+          ? [
+              {
+                label: i18n.t("editor.attachment.widget.menu.export"),
+                testid: "attachment-video.export",
+                run: () => void exportAttachment(this.id, this.filename),
+              },
+            ]
+          : []),
+        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-video.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-video.remove", run: () => removeFileCard(view, frame, this.id) },
+        { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-video.reveal", run: () => revealFileCard(view, this.id) },
+      ],
+      { buttonTestId: "attachment-video.menu-button", menuTestId: "attachment-video.menu" },
+    );
+    frame.appendChild(menu.wrap);
+
+    this.teardown = () => {
+      menu.teardown();
+      video.pause();
+      video.removeAttribute("src");
+      video.load(); // release the decoded buffer
+    };
+
+    // Graceful fallback (task 3): a video the WebView cannot decode — WebM under
+    // Linux WebKitGTK with no system codec, a MOV that reached here, a corrupt
+    // file — fires `error`. Swap the whole widget to the export-only file card
+    // (the same widget an unsupported/oversize file gets) so it degrades cleanly
+    // instead of leaving a broken player. Idempotent via `swapped`; the fallback
+    // is a real AttachmentFileCardWidget so its overflow menu tears down through
+    // our destroy(). (A pre-this-feature octet-stream video never reaches this
+    // widget at all — it routes straight to the file card — so that path needs
+    // nothing here.)
+    let swapped = false;
+    video.addEventListener("error", () => {
+      if (swapped) return;
+      swapped = true;
+      this.teardown?.(); // pause + release the buffer + tear the video menu down
+      const fallback = new AttachmentFileCardWidget(this.id, this.filename, this.size);
+      const card = fallback.toDOM(view);
+      frame.classList.remove("cm-attachment-frame", "cm-attachment-video");
+      frame.removeAttribute("role");
+      frame.removeAttribute("aria-label");
+      frame.replaceChildren(card);
+      // Keep the fallback card's menu teardown reachable if CM6 later discards
+      // the frame while that menu is open.
+      this.teardown = () => fallback.destroy();
+    });
+
+    return frame;
+  }
+
+  // Stop playback + tear the menu down if CM6 discards the widget's DOM.
+  destroy(): void {
+    this.teardown?.();
+    this.teardown = null;
+  }
+
+  // Let clicks reach the native controls / menu rather than being swallowed as a
+  // CM event; the widget stays atomic (it never mutates doc/selection).
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
+
 // --- resolved text/code/csv (inline read-only preview, MYND-268 Tier-1) ----
 
 /** Filename extensions that get a Tier-1 inline TEXT preview instead of the
@@ -1192,6 +1336,9 @@ export function makeResolvedWidget(row: CatalogRow): WidgetType {
   if (isPlayableAudioType(row.contentType)) {
     return new AttachmentAudioWidget(row.id, row.filename);
   }
+  if (isPlayableVideoType(row.contentType)) {
+    return new AttachmentVideoWidget(row.id, row.filename, row.size);
+  }
   // Generic with a previewable extension → inline read-only preview (Tier-1
   // text/code/csv, or Tier-2 Rust-parsed docx/xlsx).
   if (isPreviewableTextFile(row.filename) || isPreviewableStructuredFile(row.filename)) {
@@ -1209,4 +1356,15 @@ function isRenderableImageType(contentType: string): boolean {
 /** The audio content-types served inline as a player (v0.1: WAV only). */
 function isPlayableAudioType(contentType: string): boolean {
   return contentType.startsWith("audio/");
+}
+
+/** The video content-types served inline as a native player (myne#168: MP4 +
+ *  WebM). Exact-match rather than a `video/` prefix (unlike the audio/image
+ *  predicates) is a deliberate per-format opt-in: a new served video container
+ *  must be added BOTH to the serve allowlist and here, so inline rendering stays
+ *  an explicit choice — a container the WebView may not decode is never
+ *  auto-routed to a `<video>` on a prefix match. (A mismatched `video/*` hint
+ *  would still degrade gracefully via the widget's error→file-card fallback.) */
+function isPlayableVideoType(contentType: string): boolean {
+  return contentType === "video/mp4" || contentType === "video/webm";
 }
