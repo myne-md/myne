@@ -48,7 +48,7 @@ export interface CleanResult {
 }
 
 /** The allowlisted MIME set the host accepts (PNG/JPEG/GIF/WebP/SVG/PDF). */
-export const ATTACHMENT_ACCEPT = "image/png,image/jpeg,image/gif,image/webp,image/svg+xml,application/pdf";
+export const ATTACHMENT_ACCEPT = "image/png,image/jpeg,image/gif,image/webp,image/svg+xml,application/pdf,video/mp4,video/webm";
 
 /** Read the full attachments catalog (Slot::Unlocked-gated; empty on decode fail). */
 export function catalogList(): Promise<CatalogEntry[]> {
