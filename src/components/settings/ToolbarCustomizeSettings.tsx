@@ -38,11 +38,11 @@ const ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: 8,
+  gap: "var(--space-2)",
   padding: "5px 8px",
   borderRadius: "var(--radius-1)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
 // Drop indicator drawn as an inset accent bar via boxShadow — unlike a border it
@@ -60,7 +60,7 @@ const DROP_AFTER_STYLE: CSSProperties = {
 const GRIP_STYLE: CSSProperties = {
   cursor: "grab",
   color: "var(--fg-3)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   lineHeight: 1,
   userSelect: "none",
   padding: "0 2px",
@@ -68,7 +68,7 @@ const GRIP_STYLE: CSSProperties = {
 const ITEM_LABEL_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   cursor: "pointer",
   flex: 1,
   minWidth: 0,
@@ -80,7 +80,7 @@ const ITEM_LABEL_PENDING_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 const PENDING_HINT_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   flexShrink: 0,
 };
@@ -123,7 +123,7 @@ const ARROW_STYLE: CSSProperties = {
   color: "var(--fg-2)",
   cursor: "pointer",
   padding: "0 4px",
-  fontSize: 14,
+  fontSize: "var(--text-base)",
   lineHeight: 1,
   borderRadius: "var(--radius-1)",
   transition: HOVER_TRANSITION,

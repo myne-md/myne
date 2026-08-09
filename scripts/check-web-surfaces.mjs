@@ -114,6 +114,10 @@ const V = {
     "Never mounted: the `network` rail entry is filtered out where `torRouting` is absent, so the Tor toggle is unreachable rather than greyed. A page has no subprocess to spawn and no raw socket to tunnel; web users route the whole browser through Tor Browser instead. Ships in the bundle (one small panel), and both of its commands are `Unsupported` in the dispatcher.",
   ],
   "src/components/settings/panel-styles.ts": ["ported", "Style constants."],
+  "src/components/settings/settingsCompact.ts": [
+    "ported",
+    "Pure content-width → compact-layout decision plus its ResizeObserver glue and context; no host call. Restacks Settings rows (and drops the Editor preview column) on a narrow dialog so labels never overlap controls (#391). Web applies it at the equivalent viewport width for free.",
+  ],
   "src/components/settings/PrivacyPanel.tsx": [
     "adapted",
     "Ships; the screen-capture toggle and quick-unlock block are capability-gated, and both are filtered from search. The CLI block carries a `developer_mode` gate on top of its capability gate (#181); on web the capability half already decides it.",
@@ -283,6 +287,7 @@ const V = {
   "src/lib/syntaxTheme.ts": ["ported", "CodeMirror theme."],
   "src/lib/theme-errors.ts": ["ported", "Error copy."],
   "src/lib/theme.ts": ["ported", "CSSOM only."],
+  "src/lib/themeMeasure.ts": ["ported", "Pure arithmetic + getComputedStyle."],
   "src/lib/themeDeepLink.ts": ["adapted", "Deep links arrive through the seam; a browser has no OS URL registration."],
   "src/lib/themes.ts": ["ported", "`MYT1` IPC; the plugin is dispatched (task 45)."],
   "src/lib/transcribe.ts": ["adapted", "Unreachable where `localAi` is absent."],

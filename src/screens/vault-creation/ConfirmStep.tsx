@@ -34,7 +34,7 @@ const labelStyle = {
   color: "var(--fg-3)",
   textTransform: "uppercase" as const,
   letterSpacing: "0.08em",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 
 export function ConfirmStep({
@@ -63,7 +63,7 @@ export function ConfirmStep({
       <StepEyebrow icon="check">{t("vaultCreation.confirm.eyebrow")}</StepEyebrow>
       <StepHeading>{t("vaultCreation.confirm.heading")}</StepHeading>
 
-      <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
+      <div style={{ fontSize: "var(--text-base)", lineHeight: 1.6, color: "var(--fg-2)" }}>
         {t("vaultCreation.confirm.intro")}
       </div>
 
@@ -113,7 +113,7 @@ export function ConfirmStep({
         })}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         <Button
           variant="ghost"
           onClick={() => dispatch({ type: "CONFIRM_BACK" })}

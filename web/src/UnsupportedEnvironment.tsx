@@ -46,10 +46,10 @@ const CARD: React.CSSProperties = {
   maxWidth: 560,
   display: "flex",
   flexDirection: "column",
-  gap: 16,
+  gap: "var(--space-4)",
 };
 
-const H1: React.CSSProperties = { fontSize: 20, fontWeight: 600, margin: 0 };
+const H1: React.CSSProperties = { fontSize: 20, fontWeight: "var(--weight-semibold)", margin: 0 };
 const P: React.CSSProperties = { margin: 0, lineHeight: 1.6, color: "var(--fg-2)" };
 const LIST: React.CSSProperties = {
   margin: 0,

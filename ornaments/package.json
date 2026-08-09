@@ -1,0 +1,13 @@
+{
+  "name": "@myne/ornaments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0",
+  "//": "Shared ornament layer (myne#394) — the stylesheet that draws every ornament primitive plus the role helper that routes a component to it. Consumed as SOURCE by the desktop/web client (src/) and the mobile client (myne-mobile/src/), so all three clients render a theme's ornament identically BY CONSTRUCTION rather than by three implementations agreeing. The theme only ever NAMES a variant; what that variant draws lives here, which is what keeps pseudo-elements, composite shadows and textures reachable without widening the theme value allowlist.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ornaments.css": "./src/ornaments.css",
+    "./*": "./src/*.ts"
+  }
+}

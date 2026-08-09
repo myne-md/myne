@@ -41,7 +41,7 @@ export function Input({
         background: "var(--bg-1)",
         color: "var(--fg-1)",
         border: `1px solid ${borderColor}`,
-        borderRadius: 3,
+        borderRadius: "var(--radius-1)",
         outline: "none",
         boxShadow: focused
           ? "0 0 0 2px var(--bg-1), 0 0 0 4px var(--accent)"

@@ -45,13 +45,13 @@ const CARD_STYLE: CSSProperties = {
   width: 420,
   background: "var(--bg-1)",
   border: "1px solid var(--line-1)",
-  borderRadius: 10,
+  borderRadius: "var(--radius-3)",
   padding: "var(--space-5, 24px)",
   fontFamily: "var(--font-sans)",
   color: "var(--fg-1)",
   display: "flex",
   flexDirection: "column",
-  gap: 16,
+  gap: "var(--space-4)",
 };
 
 const CHALLENGE_STYLE: CSSProperties = {
@@ -67,16 +67,16 @@ const CHALLENGE_STYLE: CSSProperties = {
 
 const BUTTON_ROW_STYLE: CSSProperties = {
   display: "flex",
-  gap: 12,
+  gap: "var(--space-3)",
   justifyContent: "flex-end",
 };
 
 const BTN_BASE: CSSProperties = {
   padding: "8px 16px",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   border: "1px solid var(--line-1)",
   fontFamily: "var(--font-sans)",
-  fontSize: 14,
+  fontSize: "var(--text-base)",
   cursor: "pointer",
 };
 
@@ -272,8 +272,8 @@ export function PairingDialog() {
   return (
     <div style={BACKDROP_STYLE} data-testid="pairing.dialog" data-phase="pending">
       <div ref={dialogRef} style={CARD_STYLE} role="dialog" aria-label={t("clipper.pairing.title")}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>{t("clipper.pairing.title")}</h2>
-        <p style={{ margin: 0, fontSize: 14, color: "var(--fg-2)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--text-lg)" }}>{t("clipper.pairing.title")}</h2>
+        <p style={{ margin: 0, fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
           {t("clipper.pairing.intro")}
         </p>
         <div

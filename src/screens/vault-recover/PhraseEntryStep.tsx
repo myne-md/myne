@@ -180,8 +180,8 @@ const CANCEL_STYLE: CSSProperties = {
   borderRadius: "var(--radius-2)",
   padding: "7px 14px",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   cursor: "pointer",
 };
 
@@ -197,8 +197,8 @@ const DELETE_LINK_STYLE: CSSProperties = {
   padding: 0,
   marginInlineStart: "var(--space-3)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--danger)",
   cursor: "pointer",
   textDecoration: "underline",
@@ -212,8 +212,8 @@ function submitStyle(disabled: boolean): CSSProperties {
     borderRadius: "var(--radius-2)",
     padding: "7px 14px",
     fontFamily: "var(--font-sans)",
-    fontSize: 13,
-    fontWeight: 500,
+    fontSize: "var(--text-sm)",
+    fontWeight: "var(--weight-medium)",
     cursor: disabled ? "not-allowed" : "pointer",
   };
 }

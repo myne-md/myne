@@ -20,6 +20,8 @@
 
 import { setCustomTheme, type ThemeChoice } from "./prefs";
 import { deriveSyntaxTokensForTheme } from "./syntaxTheme";
+import { applyOrnamentAttributes, clearOrnamentAttributes } from "@myne/ornaments";
+import { clampPalette, readMeasureDefaults } from "./themeMeasure";
 import type { ThemePalette } from "./themes";
 
 // The CSS-custom-property keys most recently written by `applyCustomTheme`, so
@@ -56,10 +58,28 @@ export function applyTheme(choice: ThemeChoice | null): void {
 export function applyCustomTheme(palette: Record<string, string>): void {
   const root = document.documentElement;
   clearCustomTheme();
+  // Read the built-in measure defaults BEFORE `data-theme` is dropped and while
+  // no custom palette is painted — that ordering is what makes this the built-in
+  // value rather than the previous theme's, and reading beats a hardcoded table
+  // because it cannot drift from `tokens.css` (deep-customization, myne#394).
+  const measureDefaults = readMeasureDefaults(root);
   root.removeAttribute("data-theme");
+  // Colour and ornament keys pass through untouched; measure keys are bounded to
+  // 0.5×–2× of their default, and one that cannot be bounded (unit mismatch, no
+  // known default) is skipped rather than painted unbounded — an unusable window
+  // is the failure the envelope exists to prevent.
+  const { applied } = clampPalette(palette, measureDefaults);
+  // Ornament selections reach CSS as root attributes (CSS cannot branch on a
+  // custom property's value) plus the `data-o-on` flag the layer is scoped
+  // under. The shared package owns both, so no client can reflect and forget.
+  applyOrnamentAttributes(root, applied);
   const keys: string[] = [];
-  for (const [key, value] of Object.entries(palette)) {
-    if (key.startsWith("--")) {
+  for (const [key, value] of Object.entries(applied)) {
+    // `--_o-*` is the ornament layer's private namespace — `--_o-ceiling` is the
+    // bound the tint wash is clamped by. The key grammar allows `_`, so a palette
+    // can carry one; the host filters it on read, and this is the second line of
+    // that defence for any path that reaches here without one (myne#394).
+    if (key.startsWith("--") && !key.startsWith("--_")) {
       root.style.setProperty(key, value);
       keys.push(key);
     }
@@ -85,6 +105,9 @@ export function clearCustomTheme(): void {
   const root = document.documentElement;
   for (const key of appliedCustomKeys) root.style.removeProperty(key);
   appliedCustomKeys = [];
+  // Off with the palette: a leftover attribute would keep a locked screen wearing
+  // the vault's ornament (A6), exactly like a leftover variable.
+  clearOrnamentAttributes(root);
 }
 
 /**

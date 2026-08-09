@@ -47,7 +47,7 @@ const FOLDER_STYLE_BASE: CSSProperties = {
   display: "block",
   background: "var(--paper-2)",
   border: "1px solid var(--line-1)",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   padding: "8px 12px",
   fontFamily: "var(--font-mono)",
   fontSize: "var(--text-sm)",

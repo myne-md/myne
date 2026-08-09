@@ -82,17 +82,17 @@ export const STATUS_LINE_STYLE: CSSProperties = {
 
 export const HEADER_TITLE_STYLE: CSSProperties = {
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   margin: 0,
 };
 
 export const COUNT_STYLE: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-3)",
   background: "var(--paper-3)",
-  borderRadius: 999,
+  borderRadius: "var(--radius-pill)",
   padding: "2px 8px",
 };
 
@@ -135,7 +135,7 @@ export const ROW_STYLE: CSSProperties = {
 export const ROW_TITLE_STYLE: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -143,7 +143,7 @@ export const ROW_TITLE_STYLE: CSSProperties = {
 };
 
 export const AGE_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   flexShrink: 0,
 };
@@ -151,7 +151,7 @@ export const AGE_STYLE: CSSProperties = {
 export const ROW_BTN_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   padding: "4px 8px",
   borderRadius: 5,
   cursor: "pointer",
@@ -188,12 +188,12 @@ export const EMPTY_ICON_STYLE: CSSProperties = {
 };
 export const EMPTY_TITLE_STYLE: CSSProperties = {
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-2)",
   margin: 0,
 };
 export const EMPTY_BODY_STYLE: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
   maxWidth: 340,
   lineHeight: 1.5,

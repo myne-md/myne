@@ -108,19 +108,24 @@ describe("MYND-90 round-trip — C1 preservation (allowlist-modulo byte equality
     );
   });
 
-  it("media: ingestable image → att: rewrite, residual audio → placeholder, rest preserved", async () => {
+  it("media: an ingested ref → att: rewrite, a DECLINED ref → placeholder, rest preserved", async () => {
+    // pngImporter ingests only .png here, so song.mp3 is DECLINED and falls to a
+    // placeholder — this exercises the decline→placeholder path, NOT a claim that
+    // audio is inherently omitted. Since MYND-173 the real importer ingests any
+    // resolvable ≤ 64 MiB media ref, so resolvable audio/video carry through (see
+    // the carry-through case in import-media.test.ts + e2e/video-attachment.e2e.ts).
     const body = "before\n![[photo.png]]\nmiddle\n![[song.mp3]]\nafter\n";
     const h = harness({ Media: { "pics.md": body } });
     const r = await importVault("/v", h.ports, new Set(), "skip", { importMedia: pngImporter });
     const out = h.createdList[0]!;
-    expect(out).toContain("att:att1"); // image ingested + rewritten
-    expect(out).toContain("<!-- omitted attachment: song.mp3 -->"); // residual placeholder
+    expect(out).toContain("att:att1"); // ingested ref rewritten
+    expect(out).toContain("<!-- omitted attachment: song.mp3 -->"); // declined ref → placeholder
     expect(out).toContain("folder: Media/");
     expect(out).toContain("before\n");
     expect(out).toContain("middle\n");
     expect(out).toContain("after\n");
     expect(r.media.ingested.image).toBe(1);
-    expect(r.media.omitted.audio).toBe(1);
+    expect(r.media.omitted.audio).toBe(1); // declined here (not "audio is always omitted")
   });
 
   it("ignore buckets + empty dir + summary counts (SYNC-10 / SYNC-4)", async () => {

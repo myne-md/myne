@@ -167,7 +167,7 @@ const LABEL: CSSProperties = {
   color: "var(--fg-3)",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 
 const ECHO_GROUPS: CSSProperties = {

@@ -279,6 +279,53 @@ describeE2E("nc4 folder delete soft-trashes its notes (MYND-223 / MYND-144)", ()
   });
 });
 
+describeE2E("nc7 cancel-focused Delete swallows Enter (#397)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  //
+  // Twin of nc5, which covers Enter on the CONFIRM-focused gate. The folder
+  // delete uses the default CANCEL-focused modal, where a bare Enter used to
+  // activate the focused Cancel button and dismiss the dialog silently — a
+  // close indistinguishable from a successful delete. #397 makes Enter a no-op
+  // there: the dialog stays open and nothing is deleted.
+  it("Enter on the folder-delete confirm is a no-op — dialog stays open, nothing deleted", async () => {
+    let password = "";
+    await scenario(
+      "nc7-folder-delete-enter-noop",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // Folder + a note inside it (same setup as nc4).
+        await clickNewMenuItem(s, "notes.new-folder");
+        await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv\uE007");
+        const folder = await s.byTestId("notes.folder-row");
+        await contextMenuPick(s, folder, "new-note");
+        await (await s.byTestId("notes.rename-input")).sendKeys("Klasör Notu\uE007");
+        await s.waitForGone(testIdSelector("notes.rename-input"));
+        await s.byTestId("notes.row"); // the in-folder note settled (as in nc4)
+
+        // Open the (cancel-focused) confirm, then press Enter.
+        await contextMenuPick(s, await s.byTestId("notes.folder-row"), "delete");
+        await s.byTestId("delete-confirm.confirm");
+        await pressKey(s, KEY.ENTER);
+
+        // The discriminating assertion: Enter did NOT close the dialog. Under
+        // the old silent-cancel bug the modal would be gone here.
+        await s.byTestId("delete-confirm.confirm");
+        await s.byTestId("notes.folder-row");
+
+        // Dismiss deliberately via Cancel; the folder is still in the live tree
+        // (nothing was deleted by the stray Enter).
+        await (await s.byTestId("delete-confirm.cancel")).click();
+        await s.waitForGone(testIdSelector("delete-confirm.confirm"));
+        await s.byTestId("notes.folder-row");
+      },
+    );
+  });
+});
+
 describeE2E("ms1 multi-select bulk move (MYND-367)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("cmd-click gathers a multi-selection; the bulk context menu moves it all into a folder", async () => {

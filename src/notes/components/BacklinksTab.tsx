@@ -85,7 +85,7 @@ export function BacklinksTab() {
         {t("editor.chrome.backlinks.linkedFrom", { count: rows.length })}
       </div>
       {rows.length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)", marginTop: "var(--space-1)" }}>
           {t("editor.chrome.backlinks.empty")}
         </div>
       ) : (
@@ -100,7 +100,7 @@ export function BacklinksTab() {
               {...hoverSurface({ restBg: "var(--bg-1)" })}
               style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
             >
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}>
+              <span style={{ fontSize: 12, fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
                 {row.sourceTitle ?? t("editor.chrome.backlinks.untitled")}
               </span>
               {row.count > 1 && (
@@ -130,11 +130,11 @@ export function BacklinksTab() {
         </div>
       )}
 
-      <div style={{ ...SECTION_HEADING_STYLE, marginTop: 16 }}>
+      <div style={{ ...SECTION_HEADING_STYLE, marginTop: "var(--space-4)" }}>
         {t("editor.chrome.backlinks.linksTo", { count: outgoingRows.length })}
       </div>
       {outgoingRows.length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)", marginTop: "var(--space-1)" }}>
           {t("editor.chrome.backlinks.outgoingEmpty")}
         </div>
       ) : (
@@ -149,7 +149,7 @@ export function BacklinksTab() {
               {...hoverSurface({ restBg: "var(--bg-1)" })}
               style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
             >
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}>
+              <span style={{ fontSize: 12, fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
                 {row.targetTitle ?? t("editor.chrome.backlinks.untitled")}
               </span>
               {row.count > 1 && (

@@ -74,7 +74,7 @@ export function PhraseStep({
       <StepEyebrow icon="key-round">{t("vaultCreation.phrase.eyebrow")}</StepEyebrow>
       <StepHeading>{t("vaultCreation.phrase.heading")}</StepHeading>
 
-      <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
+      <div style={{ fontSize: "var(--text-base)", lineHeight: 1.6, color: "var(--fg-2)" }}>
         {t("vaultCreation.phrase.intro")}
       </div>
 
@@ -86,10 +86,10 @@ export function PhraseStep({
             display: "grid",
             gridTemplateColumns: "repeat(4, 1fr)",
             gap: 6,
-            padding: 16,
+            padding: "var(--space-4)",
             background: "var(--paper-2)",
             border: "1px solid var(--line-1)",
-            borderRadius: 6,
+            borderRadius: "var(--radius-2)",
             filter: revealed ? "none" : "blur(8px)",
             transition: "filter 180ms cubic-bezier(0.2,0,0,1)",
             userSelect: revealed ? "text" : "none",
@@ -107,9 +107,9 @@ export function PhraseStep({
                 padding: "6px 10px",
                 background: "var(--bg-1)",
                 border: "1px solid var(--line-1)",
-                borderRadius: 3,
+                borderRadius: "var(--radius-1)",
                 fontFamily: "var(--font-mono)",
-                fontSize: 13,
+                fontSize: "var(--text-sm)",
                 fontFeatureSettings: '"ss02","zero","calt"',
               }}
             >
@@ -142,19 +142,19 @@ export function PhraseStep({
               cursor: "pointer",
               color: "var(--fg-1)",
               fontFamily: "var(--font-sans)",
-              fontSize: 13,
-              fontWeight: 500,
+              fontSize: "var(--text-sm)",
+              fontWeight: "var(--weight-medium)",
             }}
           >
             <span
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 8,
+                gap: "var(--space-2)",
                 padding: "8px 14px",
                 background: "var(--bg-1)",
                 border: "1px solid var(--line-2)",
-                borderRadius: 6,
+                borderRadius: "var(--radius-2)",
               }}
             >
               <Icon name="eye" size={14} />
@@ -164,7 +164,7 @@ export function PhraseStep({
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
         <Button variant="ghost" icon="copy" onClick={handleCopy}>
           {t("vaultCreation.phrase.copy")}
         </Button>
@@ -173,7 +173,7 @@ export function PhraseStep({
         </Button>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         <Button
           variant="ghost"
           onClick={onCancelSession}

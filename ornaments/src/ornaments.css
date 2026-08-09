@@ -1,0 +1,742 @@
+/* Ornament layer — the paint a theme's ornament selections resolve to.
+ * deep-customization, myne#394 task 5 (the layer); tasks 6–7 draw the primitives.
+ *
+ * WHY THE RULES LIVE HERE AND NOT IN THE THEME
+ * A theme is untrusted input applied through the CSSOM, and the WebView CSP
+ * carries `style-src 'unsafe-inline'`, so a value reaching the DOM executes.
+ * The value allowlist therefore admits only hex / rgb() / hsl() / a bare keyword
+ * / <number><unit> — which can express `thick`, but never a pseudo-element, a
+ * composite shadow or a gradient. Putting the RULES in this stylesheet and
+ * leaving only the SELECTION to the theme is what makes ornament expressible at
+ * all without widening that allowlist by a single shape.
+ *
+ * THE PAINT RULE
+ * Ornament is drawn on ::before / ::after and never participates in layout or
+ * hit-testing. A themed button must be exactly where an unthemed one was — a
+ * decoration able to move a control could put "Delete" under a click aimed at
+ * "Cancel", and themes are distributed. `pointer-events: none` on both layers is
+ * the mechanical half; `position: absolute` + `inset: 0` is the geometric half.
+ *
+ * NOTHING APPLIES UNTIL A THEME SELECTS SOMETHING
+ * Every unconditional rule below is scoped under `:root[data-o-on]`, a flag the
+ * host sets only when the active palette actually carries an ornament selection.
+ * Without it, a session with no custom theme — and every colour-only theme, which
+ * is every theme published before this vocabulary existed — still paid for a
+ * `position`, two pseudo-element style resolutions and a non-`none` `box-shadow`
+ * on every role-bearing element. With it, `[data-ornament]` sits in the DOM
+ * matching no rule at all.
+ *
+ * DEFAULTS ARE `none`
+ * Every primitive falls back to a no-op, so a theme that sets no ornament — and
+ * every theme published before this vocabulary existed — renders exactly as it
+ * did before. That is also the degradation path for a value this build does not
+ * recognize: the host filters it out, the var resolves to its fallback, nothing
+ * is drawn.
+ */
+
+:root[data-o-on] [data-ornament] {
+  /* The layers position against their host without changing its own layout:
+   * `relative` only establishes a containing block. If a host already sets
+   * `position`, this is a no-op for it. */
+  position: relative;
+  /* WHAT THIS DOES TO THE HOST, stated plainly: `relative` establishes a
+   * containing block and `isolation` a stacking context, so an absolutely
+   * positioned descendant that resolved against a farther ancestor re-anchors
+   * here, and a promoted descendant is trapped in this context. Both apply ONLY
+   * when a theme selects ornament. The host's own box is unchanged — that is the
+   * paint-layer guarantee — but "ornament changes nothing about layout" would be
+   * too strong a reading, and the glossary says so.
+   *
+   * ONE stacking context, on the host. The obvious alternative — promoting every
+   * child with `[data-ornament] > * { position: relative; z-index: 1 }` — costs a
+   * PaintLayer PER CHILD, and the hosts here include CM6 line decorations: the
+   * role lands on the `.cm-line` div of every blockquote and callout line in the
+   * viewport, so every syntax-highlight span on those lines would be promoted,
+   * and CM6 rebuilds that DOM on viewport edits. `isolation` + a negative z-index
+   * on the layers gives the identical paint order for one context per host. */
+  isolation: isolate;
+}
+
+:root[data-o-on] [data-ornament]::before,
+:root[data-o-on] [data-ornament]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* Load-bearing, not defensive: the ornament layer must never take a click.
+   *
+   * What holds this: `tests/ornaments/roles.test.ts` pins the RULES — no
+   * `border`, no `clip-path`, `pointer-events: none`, absolute + inset — and the
+   * segment tests pin that the multi-line-box rules only remove paint. The
+   * end-to-end HIT-RECTANGLE MEASUREMENT is still owed (myne#394 task 14;
+   * `e2e/ornament.e2e.ts`'s header records it). This comment claimed a
+   * `tests/ornaments/hit-testing` file that has never existed — it was the last
+   * surviving copy of a claim the glossary and the decisions log had already
+   * been corrected on, and it sat in the security-relevant file. */
+  pointer-events: none;
+  /* Behind the host's content, above its background — ornament decorates rather
+   * than obscures. Negative rather than `0` so no child needs promoting; the
+   * host's `isolation: isolate` keeps this from escaping into the page. */
+  z-index: -1;
+  /* Nothing is drawn until a primitive is selected — tasks 6–7 add the rules
+   * that give these layers a background, border or mask. */
+  display: none;
+  border-radius: inherit;
+}
+
+
+/* Reduced motion: no ornament animates today, and none may be added without
+ * honouring this — a decorative layer is exactly the kind of thing that should
+ * hold still when the user has asked the system to. */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-o-on] [data-ornament]::before,
+  :root[data-o-on] [data-ornament]::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * PRIMITIVE SET A — frame · shadow · edge · corner fold      (myne#394 task 6)
+ *
+ * HOW A SELECTION REACHES A RULE
+ * The theme sets `--box-frame: thick`; CSS cannot branch on that, so the host
+ * reflects it onto the root as `data-o-box-frame="thick"` (see `ornamentAttr`).
+ * Every rule below is therefore `:root[data-o-<role>-<primitive>="<value>"]
+ * [data-ornament="<role>"]`.
+ *
+ * WHY FRAME IS AN INSET SHADOW AND NOT A BORDER
+ * A border changes the box. That is precisely what ornament may never do — a
+ * themed control has to sit exactly where an unthemed one sat. `box-shadow:
+ * inset` paints the same line and occupies nothing. The same argument rules out
+ * `padding`, `outline-offset` and `clip-path` on the host (the last also clips
+ * hit-testing, which would let a decoration eat a click).
+ *
+ * ROLE SCOPE IS NOT UNIFORM, and the asymmetry is structural rather than chosen:
+ * `frame` and `shadow` write custom properties on the HOST element, and custom
+ * properties inherit — so `--surface-frame` reaches a box nested inside a
+ * surface. The other six write on `::before`/`::after`, and a pseudo-element is
+ * not an ancestor, so they do not. A theme that wants a frame on panels but not
+ * on the rows inside them must set the inner role's frame to `none` explicitly.
+ *
+ * WHY TWO SHADOW SLOTS RATHER THAN TWO DECLARATIONS
+ * `frame` and `shadow` are independent primitives that both want `box-shadow`,
+ * and a second declaration would replace the first. They write into two
+ * variables which the host composes once, so selecting both composes rather than
+ * one silently winning.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+:root[data-o-on] [data-ornament] {
+  /* `0 0 #0000` is a shadow that paints nothing — the neutral element for this
+   * composition, so an unselected slot costs nothing and needs no fallback rule.
+   *
+   * The frame is composed from FOUR EDGES rather than one ring, so a multi-line
+   * box can drop its top and bottom on the lines that are not its ends. See the
+   * segment block below for why that is not optional. */
+  box-shadow: var(--_o-fr-t, 0 0 #0000), var(--_o-fr-r, 0 0 #0000),
+    var(--_o-fr-b, 0 0 #0000), var(--_o-fr-l, 0 0 #0000),
+    var(--_o-frame-extra, 0 0 #0000), var(--_o-shadow, 0 0 #0000);
+}
+
+/* ── the `none` opt-out ─────────────────────────────────────────────────── */
+/* `frame` and `shadow` write their slots on the HOST element, and custom
+ * properties inherit — so `--surface-frame: thick` reaches every box and control
+ * nested inside that surface. The header above documents the escape hatch ("set
+ * the inner role's frame to `none` explicitly") and, until now, nothing
+ * implemented it: `applyOrnamentAttributes` faithfully reflected
+ * `data-o-box-frame="none"` and no rule selected it, so `ModalShell` (a surface)
+ * framed every `SettingRow` (a box) inside it and no theme could stop that.
+ *
+ * REMOVING the attribute is NOT the same thing and cannot be. An absent
+ * attribute leaves the inherited value in place; only an explicit rule can put
+ * the slot back to its neutral. That is why `none` is the one enumerated value
+ * with a suppression obligation, and why the vocabulary guard no longer excuses
+ * it for these two primitives.
+ *
+ * The other six primitives draw on `::before`/`::after`. A pseudo-element is not
+ * an ancestor, so nothing inherits and their `none` needs no rule. */
+
+:root[data-o-surface-frame="none"] [data-ornament="surface"],
+:root[data-o-box-frame="none"] [data-ornament="box"],
+:root[data-o-chrome-frame="none"] [data-ornament="chrome"] {
+  --_o-fr-t: 0 0 #0000;
+  --_o-fr-r: 0 0 #0000;
+  --_o-fr-b: 0 0 #0000;
+  --_o-fr-l: 0 0 #0000;
+  --_o-frame-extra: 0 0 #0000;
+}
+
+:root[data-o-surface-shadow="none"] [data-ornament="surface"],
+:root[data-o-box-shadow="none"] [data-ornament="box"],
+:root[data-o-chrome-shadow="none"] [data-ornament="chrome"] {
+  --_o-shadow: 0 0 #0000;
+}
+
+/* ── frame ──────────────────────────────────────────────────────────────── */
+/* Each variant declares its four edges separately. A single `inset 0 0 0 Npx`
+ * ring would be one indivisible value, and the segment rules below could not
+ * take the top off it — which is what a multi-line callout needs. Offsets rather
+ * than spread, for the same reason: spread grows in every direction at once. */
+
+:root[data-o-surface-frame="hairline"] [data-ornament="surface"],
+:root[data-o-box-frame="hairline"] [data-ornament="box"],
+:root[data-o-chrome-frame="hairline"] [data-ornament="chrome"] {
+  --_o-fr-t: inset 0 1px 0 0 var(--line-1);
+  --_o-fr-r: inset -1px 0 0 0 var(--line-1);
+  --_o-fr-b: inset 0 -1px 0 0 var(--line-1);
+  --_o-fr-l: inset 1px 0 0 0 var(--line-1);
+}
+
+:root[data-o-surface-frame="thick"] [data-ornament="surface"],
+:root[data-o-box-frame="thick"] [data-ornament="box"],
+:root[data-o-chrome-frame="thick"] [data-ornament="chrome"] {
+  --_o-fr-t: inset 0 3px 0 0 var(--line-2);
+  --_o-fr-r: inset -3px 0 0 0 var(--line-2);
+  --_o-fr-b: inset 0 -3px 0 0 var(--line-2);
+  --_o-fr-l: inset 3px 0 0 0 var(--line-2);
+}
+
+/* Two rules with the paper colour between them — a double rule drawn without a
+ * `border-style`, which would have needed a real border. Each edge carries its
+ * own three layers; earlier layers paint over later ones. */
+:root[data-o-surface-frame="double"] [data-ornament="surface"],
+:root[data-o-box-frame="double"] [data-ornament="box"],
+:root[data-o-chrome-frame="double"] [data-ornament="chrome"] {
+  --_o-fr-t:
+    inset 0 1px 0 0 var(--line-2), inset 0 3px 0 0 var(--bg-1),
+    inset 0 4px 0 0 var(--line-2);
+  --_o-fr-r:
+    inset -1px 0 0 0 var(--line-2), inset -3px 0 0 0 var(--bg-1),
+    inset -4px 0 0 0 var(--line-2);
+  --_o-fr-b:
+    inset 0 -1px 0 0 var(--line-2), inset 0 -3px 0 0 var(--bg-1),
+    inset 0 -4px 0 0 var(--line-2);
+  --_o-fr-l:
+    inset 1px 0 0 0 var(--line-2), inset 3px 0 0 0 var(--bg-1),
+    inset 4px 0 0 0 var(--line-2);
+}
+
+/* A recessed edge: hairline rule plus a soft inner shade at the top. The shade
+ * is not an edge, so it rides the extra slot and is dropped by segment. */
+:root[data-o-surface-frame="inset"] [data-ornament="surface"],
+:root[data-o-box-frame="inset"] [data-ornament="box"],
+:root[data-o-chrome-frame="inset"] [data-ornament="chrome"] {
+  --_o-fr-t: inset 0 1px 0 0 var(--line-2);
+  --_o-fr-r: inset -1px 0 0 0 var(--line-2);
+  --_o-fr-b: inset 0 -1px 0 0 var(--line-2);
+  --_o-fr-l: inset 1px 0 0 0 var(--line-2);
+  --_o-frame-extra: inset 0 2px 4px rgb(0 0 0 / 0.08);
+}
+
+/* ── shadow ─────────────────────────────────────────────────────────────── */
+/* The vertical drop is factored out as `--_o-sh-y` so a mid-block line can zero
+ * it and keep only the sideways part — see the segment block below. */
+
+:root[data-o-surface-shadow="soft"] [data-ornament="surface"],
+:root[data-o-box-shadow="soft"] [data-ornament="box"],
+:root[data-o-chrome-shadow="soft"] [data-ornament="chrome"] {
+  --_o-shadow: var(--shadow-2);
+}
+
+/* Hard: no blur. Reads as printed rather than floating. */
+:root[data-o-surface-shadow="hard"] [data-ornament="surface"],
+:root[data-o-box-shadow="hard"] [data-ornament="box"],
+:root[data-o-chrome-shadow="hard"] [data-ornament="chrome"] {
+  --_o-shadow: 0 var(--_o-sh-y, 2px) 0 var(--line-2);
+}
+
+/* Offset: displaced, unblurred, solid — the brutalist / risograph register. */
+:root[data-o-surface-shadow="offset"] [data-ornament="surface"],
+:root[data-o-box-shadow="offset"] [data-ornament="box"],
+:root[data-o-chrome-shadow="offset"] [data-ornament="chrome"] {
+  --_o-shadow: 4px var(--_o-sh-y, 4px) 0 var(--line-2);
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * MULTI-LINE BOXES — reassembling one card out of N line elements
+ *
+ * A callout or a blockquote is one box to the reader and N sibling `<div>`s to
+ * CodeMirror: there is no element for the block, and there cannot be one without
+ * block-replacing the text and making it uneditable. So the role lands on every
+ * line, and `editor/src/decorations/ornament-segment.ts` marks each line with
+ * where it sits — `start`, `mid`, `end`, or no attribute at all for a lone line.
+ *
+ * Without this block a three-line callout under `frame: thick` drew three
+ * complete frames, stacked, with a seam between every line; `shadow: offset`
+ * dropped a shadow under each line, inside the box. What follows draws the top
+ * edge once, the bottom edge once, and the sides on every line.
+ *
+ * Nothing here changes geometry: every rule below only removes paint. The
+ * paint-layer rule holds through the whole mechanism.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Not the top of the box → no top edge, and no inner shade (which reads as a
+ * top-lit recess and would repeat down the block). */
+:root[data-o-on] [data-ornament][data-o-seg="mid"],
+:root[data-o-on] [data-ornament][data-o-seg="end"] {
+  --_o-fr-t: 0 0 #0000;
+  --_o-frame-extra: 0 0 #0000;
+}
+
+/* Not the bottom of the box → no bottom edge, and no downward drop shadow: the
+ * sideways part of an offset shadow still runs the full height, which is what
+ * makes the block read as one card standing off the page. */
+:root[data-o-on] [data-ornament][data-o-seg="start"],
+:root[data-o-on] [data-ornament][data-o-seg="mid"] {
+  --_o-fr-b: 0 0 #0000;
+  --_o-sh-y: 0;
+}
+
+/* The corner radius is a property of the BOX, not of a line — rounding every
+ * line's corners is what makes a tall quote look like a stack of pills. */
+:root[data-o-on] [data-ornament][data-o-seg="start"] {
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+:root[data-o-on] [data-ornament][data-o-seg="mid"] {
+  border-radius: 0;
+}
+:root[data-o-on] [data-ornament][data-o-seg="end"] {
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+
+/* The decoration layers are the box's EDGES — a torn top, a dog-eared corner, a
+ * ribbon, a row of punched holes. Each belongs at one end of the block, drawn
+ * once, not repeated on every line. `left` perforation is the exception and is
+ * restored below: a punched margin runs the whole height by definition. */
+:root[data-o-on] [data-ornament][data-o-seg="start"]::before,
+:root[data-o-on] [data-ornament][data-o-seg="mid"]::before,
+:root[data-o-on] [data-ornament][data-o-seg="end"]::before {
+  --_o-edge: none;
+}
+/* Ribbons (corner tape, top band, label) all sit at the TOP, so they belong to
+ * the start line. Perforation is handled below, per variant. */
+:root[data-o-on] [data-ornament][data-o-seg="mid"]::after,
+:root[data-o-on] [data-ornament][data-o-seg="end"]::after {
+  --_o-ribbon: none;
+  --_o-perforation: none;
+}
+
+/* The two folds live at OPPOSITE ends, so they cannot share a rule: `dogear`
+ * turns the top-right corner down (start line), `folded` lifts the bottom-right
+ * one (end line). Collapsing them into one "not the start" rule put the dog-ear
+ * on the last line of every callout. */
+:root[data-o-surface-fold="dogear"] [data-ornament="surface"][data-o-seg="mid"]::after,
+:root[data-o-surface-fold="dogear"] [data-ornament="surface"][data-o-seg="end"]::after,
+:root[data-o-box-fold="dogear"] [data-ornament="box"][data-o-seg="mid"]::after,
+:root[data-o-box-fold="dogear"] [data-ornament="box"][data-o-seg="end"]::after {
+  --_o-fold: none;
+}
+:root[data-o-surface-fold="folded"] [data-ornament="surface"][data-o-seg="start"]::after,
+:root[data-o-surface-fold="folded"] [data-ornament="surface"][data-o-seg="mid"]::after,
+:root[data-o-box-fold="folded"] [data-ornament="box"][data-o-seg="start"]::after,
+:root[data-o-box-fold="folded"] [data-ornament="box"][data-o-seg="mid"]::after {
+  --_o-fold: none;
+}
+
+/* A punched left margin runs the whole height by definition, so it is restored
+ * on every line — for `left` and for the left half of `both`. The `top` row, and
+ * the top half of `both`, stay where the rule above left them: on the start line
+ * only. */
+:root[data-o-surface-perforation="left"] [data-ornament="surface"][data-o-seg]::after,
+:root[data-o-surface-perforation="both"] [data-ornament="surface"][data-o-seg]::after,
+:root[data-o-box-perforation="left"] [data-ornament="box"][data-o-seg]::after,
+:root[data-o-box-perforation="both"] [data-ornament="box"][data-o-seg]::after {
+  --_o-perforation:
+    radial-gradient(circle, var(--bg-1) 0 4px, var(--line-2) 4px 5px, transparent
+    5px) 9px 0 / 18px 24px repeat-y;
+}
+
+/* ── edge ───────────────────────────────────────────────────────────────── */
+/* Drawn as a band INSIDE the ::before layer rather than by clipping the host:
+ * clipping would change the hit area. The band sits on the top and bottom edges,
+ * which is where a torn or perforated sheet reads from. */
+
+:root[data-o-surface-edge="torn"] [data-ornament="surface"]::before,
+:root[data-o-box-edge="torn"] [data-ornament="box"]::before {
+  display: block;
+  /* Scallops bitten out of the sheet. Deeper and wider than before (16px across,
+   * 9px deep): at the old 13x6 the bite was smaller than the corner radius and
+   * read as a slightly fuzzy edge rather than a torn one. */
+  --_o-edge:
+    radial-gradient(circle at 50% 0, transparent 0 8px, var(--bg-1) 8px) 0 0 /
+    16px 9px repeat-x,
+    radial-gradient(circle at 50% 100%, transparent 0 8px, var(--bg-1) 8px) 0
+    100% / 16px 9px repeat-x;
+}
+
+/* Serrated: straight-sided teeth rather than torn scallops. */
+:root[data-o-surface-edge="serrated"] [data-ornament="surface"]::before,
+:root[data-o-box-edge="serrated"] [data-ornament="box"]::before {
+  display: block;
+  /* Straight-sided teeth — the shape is what separates this from `torn`, so the
+   * teeth have to be big enough to read as triangles rather than as texture. */
+  --_o-edge:
+    linear-gradient(135deg, var(--bg-1) 40%, transparent 40%) 0 0 / 12px 10px
+    repeat-x,
+    linear-gradient(-135deg, var(--bg-1) 40%, transparent 40%) 0 100% / 12px 10px
+    repeat-x;
+}
+
+/* Cut: the two top corners chamfered, drawn as opaque triangles in the page
+ * colour so the host's own corner is masked without touching its geometry. */
+:root[data-o-surface-edge="cut"] [data-ornament="surface"]::before,
+:root[data-o-box-edge="cut"] [data-ornament="box"]::before {
+  display: block;
+  /* Chamfered corners. Larger than before, and all FOUR of them: cutting only the
+   * top two made a box that looked misaligned rather than chamfered. */
+  --_o-edge:
+    linear-gradient(45deg, var(--bg-1) 0 13px, transparent 13px) 0 0 / 14px 14px
+    no-repeat,
+    linear-gradient(-45deg, var(--bg-1) 0 13px, transparent 13px) 100% 0 / 14px
+    14px no-repeat,
+    linear-gradient(-45deg, var(--bg-1) 0 13px, transparent 13px) 0 100% / 14px
+    14px no-repeat,
+    linear-gradient(45deg, var(--bg-1) 0 13px, transparent 13px) 100% 100% / 14px
+    14px no-repeat;
+}
+
+/* ── corner fold ────────────────────────────────────────────────────────── */
+/* The ::after layer. `folded` lifts the bottom-right corner; `dogear` turns the
+ * top-right down, the way a page is marked. */
+
+:root[data-o-surface-fold="folded"] [data-ornament="surface"]::after,
+:root[data-o-box-fold="folded"] [data-ornament="box"]::after {
+  display: block;
+  /* A lifted bottom-right corner: the page shows through the cut, and the crease
+   * is drawn in the DIVIDER tone at 2px. The old 1px `--line-2` hairline over a
+   * `--bg-1` triangle was invisible on any surface a step from the page colour,
+   * which is every callout. */
+  --_o-fold:
+    linear-gradient(315deg, var(--bg-1) 0 13px, transparent 13px) 100% 100% /
+    22px 22px no-repeat,
+    linear-gradient(315deg, transparent 0 13px, var(--line-3) 13px 15px, transparent
+    15px) 100% 100% / 22px 22px no-repeat;
+}
+
+:root[data-o-surface-fold="dogear"] [data-ornament="surface"]::after,
+:root[data-o-box-fold="dogear"] [data-ornament="box"]::after {
+  display: block;
+  /* A turned-down top-right corner. The fold FACE is `--bg-3` (the back of the
+   * sheet, one step darker) rather than `--bg-2` (the sheet itself, which made
+   * the fold the same colour as the thing it was folded from), and the crease is
+   * 2px in the divider tone — the 1px hairline is what made `folded` invisible
+   * on every callout. */
+  --_o-fold:
+    linear-gradient(225deg, var(--bg-3) 0 14px, transparent 14px) 100% 0 / 24px
+    24px no-repeat,
+    linear-gradient(225deg, transparent 0 14px, var(--line-3) 14px 16px, transparent
+    16px) 100% 0 / 24px 24px no-repeat;
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * PRIMITIVE SET B — texture · ruled ground · ribbon · perforation · tint
+ *                                                            (myne#394 task 7)
+ *
+ * THE OPACITY CEILING, AND EXACTLY WHAT IT COVERS
+ * `texture`, `ruled` and the tint wash render as a FIELD behind the text — every
+ * glyph sits on top of them. The contrast gate cannot see that: it computes a
+ * ratio over a colour pair and is blind to a pattern between the glyphs and
+ * their background, so a theme could pass every WCAG floor and still be
+ * unreadable. The answer is not another check — it is that the strength a theme
+ * asks for is composed through `min()` against a ceiling defined HERE, in Myne's
+ * own stylesheet, which a theme has no way to raise. A theme asking for 0.9 gets
+ * `--_o-ceiling`.
+ *
+ * IT DOES NOT COVER THE EDGE DECORATIONS, and saying otherwise was an
+ * overstatement this file carried for a while. `ribbon`, `perforation`, `edge`
+ * and `fold` are opaque by design — a strip of tape or a punched margin that
+ * fades to 14% is not one — and they sit at the box's EDGE rather than as a
+ * field under the writing. They are bounded by geometry, not by alpha. The
+ * honest claim is therefore narrower than "everything behind text is capped":
+ * the fields are capped, the edge decorations are opaque and confined, and a
+ * passing contrast check still means "its colours are readable", never "this
+ * theme is readable" (`decisions.md` 2026-08-06).
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+:root[data-o-on] [data-ornament] {
+  /* The most a behind-text ornament may ever be worth. Deliberately low: at this
+   * strength a texture reads as paper grain, not as a second layer of content. */
+  --_o-ceiling: 0.14;
+  /* The theme's requested strength, clamped by the ceiling it cannot see past.
+   * `min()` rather than a JS clamp so it holds even if a future path writes the
+   * variable without going through the host's apply. */
+  --_o-strength: min(var(--tint-strength, 0.08), var(--_o-ceiling));
+  /* The ink every pattern below is drawn in — derived from the theme's own text
+   * colour rather than fixed black.
+   *
+   * Fixed black is invisible on a dark theme, which is most of the register
+   * these primitives exist for: measured against a dark palette, `scanline` —
+   * the CRT texture the whole primitive was requested for — produced no visible
+   * line at all, and `grain` and `grid` were nearly as bad. A pattern that
+   * cannot be seen on half the themes is not a subtle bug, it is the feature
+   * missing.
+   *
+   * Mixing from `--ink-1` inverts with the palette for free: dark text on light
+   * paper draws a dark pattern, light text on dark paper a light one, and no
+   * light/dark signal has to reach this stylesheet — which matters because a
+   * custom theme drops `data-theme` and there IS no such signal to read.
+   *
+   * The ceiling still governs: the strength is `--_o-strength`, already clamped
+   * above, and mixing toward `transparent` is the same bounding the tint wash
+   * uses. `--ink-1` rather than `--ink-0` because the pattern should sit under
+   * body text, not compete with display text. */
+  --_o-ink: color-mix(
+    in srgb,
+    var(--ink-1, #000) calc(var(--_o-strength) * 100%),
+    transparent
+  );
+}
+
+/* ── texture ────────────────────────────────────────────────────────────── */
+
+/* Paper: a fine, irregular fibre speck.
+ *
+ * `repeating-radial-gradient` was the wrong tool and drew the wrong thing — it
+ * repeats a ring OUTWARD from one origin, so the "texture" was a set of
+ * concentric circles centred on the box, which reads as a ripple rather than as
+ * paper. Two offset dot grids at coprime sizes (3px / 7px) never line up into a
+ * visible lattice, which is what makes speckle look random without needing an
+ * image. */
+:root[data-o-surface-texture="paper"] [data-ornament="surface"]::before,
+:root[data-o-box-texture="paper"] [data-ornament="box"]::before,
+:root[data-o-chrome-texture="paper"] [data-ornament="chrome"]::before {
+  display: block;
+  --_o-texture:
+    radial-gradient(circle at 30% 40%, var(--_o-ink) 0 0.5px, transparent 0.5px) 0
+    0 / 3px 3px,
+    radial-gradient(circle at 70% 65%, var(--_o-ink) 0 0.5px, transparent 0.5px) 0
+    0 / 7px 7px;
+}
+
+:root[data-o-surface-texture="grain"] [data-ornament="surface"]::before,
+:root[data-o-box-texture="grain"] [data-ornament="box"]::before,
+:root[data-o-chrome-texture="grain"] [data-ornament="chrome"]::before {
+  display: block;
+  --_o-texture:
+    repeating-conic-gradient(
+      var(--_o-ink) 0% 25%,
+      transparent 0% 50%
+    )
+    0 0 / 3px 3px;
+}
+
+/* Scanline — the CRT register. This is the original issue's "CRT filter", and it
+ * is a texture value rather than a feature of its own. */
+:root[data-o-surface-texture="scanline"] [data-ornament="surface"]::before,
+:root[data-o-box-texture="scanline"] [data-ornament="box"]::before,
+:root[data-o-chrome-texture="scanline"] [data-ornament="chrome"]::before {
+  display: block;
+  --_o-texture:
+    repeating-linear-gradient(
+      to bottom,
+      var(--_o-ink) 0 1px,
+      transparent 1px 3px
+    );
+}
+
+:root[data-o-surface-texture="grid"] [data-ornament="surface"]::before,
+:root[data-o-box-texture="grid"] [data-ornament="box"]::before,
+:root[data-o-chrome-texture="grid"] [data-ornament="chrome"]::before {
+  display: block;
+  --_o-texture:
+    repeating-linear-gradient(
+      to right,
+      var(--_o-ink) 0 1px,
+      transparent 1px 16px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--_o-ink) 0 1px,
+      transparent 1px 16px
+    );
+}
+
+/* ── ruled ground ───────────────────────────────────────────────────────── */
+/* Notebook rules. Spaced off the type scale rather than a fixed pixel value, so
+ * a theme that enlarges the text keeps its lines under the lines. */
+
+:root[data-o-surface-ruled="lines"] [data-ornament="surface"]::before,
+:root[data-o-box-ruled="lines"] [data-ornament="box"]::before {
+  display: block;
+  --_o-ruled:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--text-base, 15px) * 1.6 - 1px),
+      var(--_o-ink) calc(var(--text-base, 15px) * 1.6 - 1px)
+        calc(var(--text-base, 15px) * 1.6)
+    );
+}
+
+/* Squared paper: the horizontal rules are the TEXT's lines, and the verticals
+ * match them, so the squares track the type scale.
+ *
+ * That is the whole difference from `texture: grid`, and previously there was
+ * none worth seeing: both drew a fixed lattice (24px here, 16px there) and the
+ * two values were the same idea at two sizes. A ruled ground belongs to the
+ * writing — enlarge the text and the squares grow with it — where a texture is
+ * a surface treatment that does not. */
+:root[data-o-surface-ruled="grid"] [data-ornament="surface"]::before,
+:root[data-o-box-ruled="grid"] [data-ornament="box"]::before {
+  display: block;
+  --_o-ruled:
+    repeating-linear-gradient(
+      to right,
+      var(--_o-ink) 0 1px,
+      transparent 1px calc(var(--text-base, 15px) * 1.6)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--text-base, 15px) * 1.6 - 1px),
+      var(--_o-ink) calc(var(--text-base, 15px) * 1.6 - 1px)
+        calc(var(--text-base, 15px) * 1.6)
+    );
+}
+
+:root[data-o-surface-ruled="dotted"] [data-ornament="surface"]::before,
+:root[data-o-box-ruled="dotted"] [data-ornament="box"]::before {
+  display: block;
+  /* Dot grid, spaced off the type scale like the other two ruled grounds. At a
+   * fixed 20px it was the same thing as a dot TEXTURE at a different size; tied
+   * to the line height it is a notebook rule — the dots land where the writing
+   * does, and they grow when the text does. */
+  --_o-ruled:
+    radial-gradient(circle, var(--_o-ink) 0 1px, transparent 1px) 0 0 /
+    calc(var(--text-base, 15px) * 1.6) calc(var(--text-base, 15px) * 1.6);
+}
+
+/* ── tint wash ──────────────────────────────────────────────────────────── */
+/* The wash needs the layer OPENED, and it is the one primitive that cannot open
+ * it by selector: the `::before` layer is `display: none` until a rule turns it
+ * on, and CSS cannot branch on whether a custom property is set — `--tint` is a
+ * value, not a selectable state. So the host reflects `data-o-tint` when a
+ * palette carries one, exactly as it reflects a role's primitive selection.
+ *
+ * Without this a tint-only theme raised `data-o-on`, painted its colour into
+ * `--_o-tint`, composed it into `background` — and drew nothing, because the
+ * layer it painted on was never displayed. It appeared only when some OTHER
+ * `::before` primitive happened to be selected and opened the layer for it,
+ * which is why "tint plus a texture" looked identical to "just a texture". */
+:root[data-o-tint] [data-ornament]::before {
+  display: block;
+}
+
+/* The one primitive whose colour the theme supplies directly — and therefore the
+ * one that needs the ceiling most, because a wash sits under text exactly like a
+ * texture does and the theme picks its colour rather than only its strength.
+ *
+ * The ceiling is applied by MIXING toward transparent rather than by handing the
+ * theme's colour straight to the gradient: `--tint: #000000` is a valid,
+ * allowlisted value, and painted raw it is an opaque rectangle behind every word
+ * — invisible to the contrast gate, which measures colour pairs and cannot see a
+ * layer. `color-mix` is safe to use here because this stylesheet is Myne's, not
+ * the theme's; the theme's contribution is only the colour being mixed. */
+
+:root[data-o-on] [data-ornament]::before {
+  --_o-tint-bounded: color-mix(
+    in srgb,
+    var(--tint, transparent) calc(var(--_o-strength) * 100%),
+    transparent
+  );
+  --_o-tint: linear-gradient(var(--_o-tint-bounded), var(--_o-tint-bounded));
+}
+
+/* ── ribbon ─────────────────────────────────────────────────────────────── */
+/* The ::after layer, alongside the corner fold. Ribbons sit ON the surface, not
+ * under text, so they are not ceiling-bound. */
+
+:root[data-o-box-ribbon="corner"] [data-ornament="box"]::after {
+  display: block;
+  /* Corner tape: a soft fill with the accent's own line along its inner edge.
+   * The fill alone (`--accent-soft`) is a BACKGROUND tone — one step from the
+   * surface it lies on — so on a light theme the tape was there and nobody
+   * could see it. The edge is what makes it read as a stuck-on strip. */
+  --_o-ribbon:
+    linear-gradient(45deg, transparent 0 21px, var(--accent) 21px 23px, transparent
+    23px) 0 0 / 34px 34px no-repeat,
+    linear-gradient(45deg, transparent 0 6px, var(--accent-soft) 6px 22px, transparent
+    22px) 0 0 / 34px 34px no-repeat;
+}
+
+:root[data-o-box-ribbon="band"] [data-ornament="box"]::after {
+  display: block;
+  /* Top band: the accent tone itself, not its soft background shade. A band is
+   * meant to be seen from across the page — that is the whole point of it. */
+  --_o-ribbon:
+    linear-gradient(var(--accent), var(--accent)) 0 0 / 100% 4px no-repeat,
+    linear-gradient(var(--accent-soft), var(--accent-soft)) 0 4px / 100% 3px
+    no-repeat;
+}
+
+:root[data-o-box-ribbon="label"] [data-ornament="box"]::after {
+  display: block;
+  /* A blank label stuck to the top edge. It is drawn in the PAGE tone with a
+   * rule under it, not in `--paper-2`: a box is already `--paper-2`, so the old
+   * version painted the surface onto itself and could only ever be invisible on
+   * the role it was written for. */
+  --_o-ribbon:
+    linear-gradient(var(--bg-1), var(--bg-1)) 12px 0 / 84px 18px no-repeat,
+    linear-gradient(var(--line-3), var(--line-3)) 12px 18px / 84px 2px no-repeat;
+}
+
+/* ── perforation ────────────────────────────────────────────────────────── */
+
+:root[data-o-surface-perforation="left"] [data-ornament="surface"]::after,
+:root[data-o-box-perforation="left"] [data-ornament="box"]::after {
+  display: block;
+  --_o-perforation:
+    radial-gradient(circle, var(--bg-1) 0 4px, var(--line-2) 4px 5px, transparent
+    5px) 9px 0 / 18px 24px repeat-y;
+}
+
+:root[data-o-surface-perforation="top"] [data-ornament="surface"]::after,
+:root[data-o-box-perforation="top"] [data-ornament="box"]::after {
+  display: block;
+  --_o-perforation:
+    radial-gradient(circle, var(--bg-1) 0 4px, var(--line-2) 4px 5px, transparent
+    5px) 0 9px / 24px 18px repeat-x;
+}
+
+:root[data-o-surface-perforation="both"] [data-ornament="surface"]::after,
+:root[data-o-box-perforation="both"] [data-ornament="box"]::after {
+  display: block;
+  --_o-perforation:
+    radial-gradient(circle, var(--bg-1) 0 4px, var(--line-2) 4px 5px, transparent
+    5px) 9px 0 / 18px 24px repeat-y,
+    radial-gradient(circle, var(--bg-1) 0 4px, var(--line-2) 4px 5px, transparent
+    5px) 0 9px / 24px 18px repeat-x;
+}
+
+/* ── layer composition (set A + set B) ──────────────────────────────────── */
+/* Re-stated with every slot, so a theme selecting several primitives stacks them
+ * in a defined order: edge over texture over ruled over tint on the lower layer,
+ * ribbon over perforation over fold on the upper one.
+ *
+ * `background`, NOT `background-image`, and the difference is the whole rule
+ * working rather than eleven of eighteen variants silently drawing nothing.
+ * Most slots carry a full background LAYER — `<image> <position> / <size>
+ * <repeat>` — because a torn edge, a dog-ear and a perforation strip are all
+ * tiled patterns that mean nothing without their size and repeat. Fed to
+ * `background-image`, which accepts images and nothing else, that layer is
+ * invalid at computed-value time; the property does not take the image and
+ * discard the rest, it drops the WHOLE declaration. Worse than per-slot: one
+ * bad slot took the valid slots beside it down with it, so `texture: grid` +
+ * `edge: cut` drew neither. Measured in a browser, not reasoned about — every
+ * `edge`, `fold`, `ribbon` and `perforation` value plus `texture: grain` and
+ * `ruled: dotted` were inert. The shorthand accepts the same comma-separated
+ * layer list and each layer's full grammar, which is what these values were
+ * written in all along. It also resets `background-color` to `transparent` on
+ * these pseudo-elements — which is what they already had, and what they must
+ * keep: a coloured ornament layer would sit over the host's own background. */
+
+:root[data-o-on] [data-ornament]::before {
+  background: var(--_o-edge, none), var(--_o-texture, none),
+    var(--_o-ruled, none), var(--_o-tint, none);
+}
+
+:root[data-o-on] [data-ornament]::after {
+  background: var(--_o-ribbon, none), var(--_o-perforation, none),
+    var(--_o-fold, none);
+}

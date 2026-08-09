@@ -17,8 +17,6 @@
 use std::io::Read;
 use std::process::ExitCode;
 
-use theme_validator::validate_theme;
-
 fn main() -> ExitCode {
     let arg = std::env::args().nth(1);
     let json = match arg.as_deref() {
@@ -39,8 +37,34 @@ fn main() -> ExitCode {
         },
     };
 
-    match validate_theme(&json) {
-        Ok(theme) => {
+    // Two gates, in order: the value-shape allowlist (is this SAFE?) and then the
+    // WCAG floors (is this READABLE?). The second used to live in the
+    // marketplace's own JS lint and so covered published themes only; running it
+    // here means the repo and the client answer with the same code, and a theme
+    // cannot pass CI and then be refused on install (myne#394).
+    match theme_validator::validate_theme_for_import(&json) {
+        Ok(mut theme) => {
+            // Ornament values this build does not know are a WARNING, never a
+            // failure: a submission may legitimately target a newer client, and
+            // the older one degrades to plain rather than breaking. Saying so on
+            // stderr means a reviewer sees an intentional forward-looking value
+            // instead of wondering why nothing renders (myne#394).
+            let dropped = theme_validator::drop_unknown_ornament_values(&mut theme);
+            for key in &dropped {
+                eprintln!("warning: unrecognized ornament value for {key} — renders plain");
+            }
+            // …and the sibling case, which had no signal at all: a key naming a
+            // real role and a real primitive that this role does not accept.
+            // Stored and ignored is the right behaviour (it is indistinguishable
+            // from a future vocabulary), but an author who wrote `--chrome-fold`
+            // deserves to hear that it draws nothing rather than discover it on
+            // a gallery card.
+            for key in theme_validator::refused_ornament_keys(&theme) {
+                eprintln!(
+                    "warning: {key} is not a role/primitive pair this vocabulary accepts \
+                     — stored and ignored, renders plain"
+                );
+            }
             println!("ok: {} tokens", theme.vars.len());
             ExitCode::SUCCESS
         }

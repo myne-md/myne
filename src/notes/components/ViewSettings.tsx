@@ -84,7 +84,7 @@ const FIELD_STYLE: CSSProperties = {
 };
 
 const LABEL_STYLE: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
   color: "var(--fg-1)",
 };

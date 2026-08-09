@@ -98,6 +98,17 @@
   feature branch). Fix: `docker volume rm myne-e2e-target`, then a full rebuild
   (`--skip-build` is not enough). Same class as the shared-`CARGO_TARGET_DIR`
   collision, one layer down.
+- **`e2e-one.sh` re-provisions the pinned Rust toolchain per run, which flakes the boot.**
+  Each `e2e-one.sh` invocation spawns a fresh `--rm` container whose `RUSTUP_HOME`
+  is not a persisted volume, so `rust-toolchain.toml`'s pinned toolchain re-downloads
+  (~2 min) before the run; under that I/O pressure the WebKit/xvfb app boot can exceed
+  the first vitest attempt's timeout, producing spurious retries and intermittent
+  failures on a **deterministic** scenario. To prove a scenario green **N× consecutive**,
+  pass the spec N times to `e2e-buildrun.sh` (`./scripts/e2e-buildrun.sh <spec> <spec> <spec>`):
+  one build, then N runs in the **same warm container** — no per-run re-provision, no
+  fresh-container boot flake. (A no-rebuild `e2e-one.sh` loop is the wrong tool for the
+  3× gate.) Persisting `RUSTUP_HOME` as a volume — or baking the pinned toolchain into
+  `e2e/Dockerfile` — would remove the re-provision cost; tracked as a separate infra item.
 - Post-exit assertions (disk state AFTER the app quit): launch with
   `keepDataDir: true`, capture `dataHome` in the SEED callback (the
   launch-failure path leaks the dir otherwise), gate on

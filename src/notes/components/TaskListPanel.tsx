@@ -84,7 +84,7 @@ function toRowData(task: VaultTask): TaskRowData {
 const STRIP_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 4,
+  gap: "var(--space-1)",
   padding: "6px 8px",
   borderBottom: "1px solid var(--line-1)",
   flexWrap: "wrap",
@@ -115,14 +115,14 @@ const COUNT_STYLE: CSSProperties = {
   // the backlog shout every time the panel opens.
   color: "var(--fg-3)",
   fontVariantNumeric: "tabular-nums",
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
 };
 
 const EMPTY_STYLE: CSSProperties = {
   padding: "20px 16px",
   color: "var(--fg-3)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   lineHeight: 1.5,
   textAlign: "center",
 };

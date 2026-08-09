@@ -3,21 +3,29 @@
 // The "Untitled" regression: a note's title is derived from the frontmatter
 // `title:` field ONLY (loadNoteBatch.ts — no body-`# H1` fallback), so the
 // seeded Welcome note must carry `title:` in frontmatter or the sidebar/tab
-// renders the "Untitled" placeholder. These run locally (the seeding flow
-// itself is container-only E2E) and pin the exact thing that regressed.
+// renders the "Untitled" placeholder. Desktop first run now seeds the example
+// vault (#393) instead of this note, but MOBILE still seeds it and consumes the
+// SAME shared `@myne/dialect/welcomeNote` builder — so this pins the shared
+// builder's shape directly, the way the desktop resolver (now removed) used to.
+// The full seeding flow is container-only E2E.
 
 import { describe, it, expect } from "vitest";
 import { readTitleFromFmBody } from "../../src/dialect";
 import {
-  welcomeNoteMarkdown,
-  welcomeNoteTitle,
-} from "../../src/notes/welcomeNote";
+  buildWelcomeNoteMarkdown,
+  WELCOME_NOTE_BODY_KEY,
+  WELCOME_NOTE_TITLE_KEY,
+} from "../../src/dialect/welcomeNote";
+import i18n from "../../src/i18n";
 
-// The seed copy is resolved from the i18n runtime at call time; under Vitest's
-// default boot language (English) these getters yield the English source, so
+// Resolve the copy through the i18n runtime exactly as the seeder does. Under
+// Vitest's default boot language (English) these yield the English source, so
 // the structural assertions below hold exactly as they did for the old consts.
-const WELCOME_NOTE_MARKDOWN = welcomeNoteMarkdown();
-const WELCOME_NOTE_TITLE = welcomeNoteTitle();
+const WELCOME_NOTE_TITLE = i18n.t(WELCOME_NOTE_TITLE_KEY);
+const WELCOME_NOTE_MARKDOWN = buildWelcomeNoteMarkdown(
+  WELCOME_NOTE_TITLE,
+  i18n.t(WELCOME_NOTE_BODY_KEY),
+);
 
 /** The frontmatter body (between the leading `---` delimiters) — the slice
  *  shape loadNoteBatch reads `title:` from. */

@@ -165,7 +165,7 @@ export function OutlineTab() {
     <>
       <div style={SECTION_HEADING_STYLE}>{t("editor.chrome.rightPanel.outline.heading")}</div>
       {entries.length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)", marginTop: "var(--space-1)" }}>
           {t("editor.chrome.rightPanel.outline.empty")}
         </div>
       ) : (
@@ -254,7 +254,7 @@ export function OutlineTab() {
                     transition: HOVER_TRANSITION,
                     border: 0,
                     padding: "4px 6px 4px 0",
-                    fontSize: 13,
+                    fontSize: "var(--text-sm)",
                     lineHeight: 1.4,
                     color: isActive
                       ? "var(--accent)"

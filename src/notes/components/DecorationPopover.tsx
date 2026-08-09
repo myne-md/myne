@@ -34,14 +34,14 @@ const POPOVER_STYLE: CSSProperties = {
   background: "var(--paper)",
   border: "1px solid var(--line-2)",
   borderRadius: 8,
-  padding: 8,
+  padding: "var(--space-2)",
   boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
   fontFamily: "var(--font-sans)",
 };
 
 const SECTION_LABEL_STYLE: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 500,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-3)",
   padding: "0 2px 6px",
 };
@@ -69,14 +69,14 @@ const SWATCH_BUTTON_BASE: CSSProperties = {
 const ICON_GRID_STYLE: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(6, 28px)",
-  gap: 4,
+  gap: "var(--space-1)",
 };
 
 const ICON_BUTTON_BASE: CSSProperties = {
   width: 28,
   height: 28,
   padding: 0,
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   border: "1px solid transparent",
   cursor: "pointer",
   display: "flex",

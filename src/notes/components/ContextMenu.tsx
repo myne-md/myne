@@ -80,11 +80,11 @@ const MENU_STYLE: CSSProperties = {
   overflowY: "auto",
   background: "var(--paper)",
   border: "1px solid var(--line-2)",
-  borderRadius: 6,
-  padding: 4,
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-1)",
   boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
 };
 
 const ITEM_STYLE_BASE: CSSProperties = {
@@ -128,10 +128,10 @@ const SEARCH_INPUT_STYLE: CSSProperties = {
   background: "var(--paper)",
   outline: "none",
   fontFamily: "inherit",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   padding: "6px 10px",
-  marginBottom: 4,
+  marginBottom: "var(--space-1)",
 };
 
 export function ContextMenu({
@@ -291,7 +291,7 @@ export function ContextMenu({
             {item.checked === undefined ? (
               item.label
             ) : (
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
                 <span
                   aria-hidden="true"
                   style={{ width: 12, flexShrink: 0, textAlign: "center" }}

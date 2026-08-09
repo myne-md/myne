@@ -241,6 +241,7 @@ import { promptForText } from "../lib/promptForText";
 import { QuickPicker, type QuickPickItem } from "../components/QuickPicker";
 import { listCustomThemes } from "../lib/themes";
 import { applyCustomTheme } from "../lib/theme";
+import { ornamentRole } from "@myne/ornaments";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
 // bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
@@ -1376,7 +1377,8 @@ function EditorChrome({
 
         if (startupMode === "specific" && startupNote) {
           // Open just the chosen note in a fresh single-slot workspace (the same
-          // shape `seedWelcomeNote` produces). A deleted / unreadable note simply
+          // shape the example-vault seed opens its index note through,
+          // `openInFocusedTab`). A deleted / unreadable note simply
           // surfaces the pane's own missing-note state; we never auto-clear the
           // pref. The saved workspace blob is preserved (staging guard).
           nonDefaultStartupRef.current = true;
@@ -1854,7 +1856,7 @@ function EditorChrome({
                 style={{
                   height: STRIP_HEIGHT,
                   flexShrink: 0,
-                  background: "var(--paper-2)",
+                  // Ground painted by SidebarPane — see its comment.
                   borderInlineEnd: "1px solid var(--line-1)",
                 }}
               />
@@ -1908,7 +1910,7 @@ function EditorChrome({
                 style={{
                   fontFamily: "var(--font-sans)",
                   fontSize: 15,
-                  fontWeight: 600,
+                  fontWeight: "var(--weight-semibold)",
                   color: "var(--fg-1)",
                 }}
               >
@@ -2562,7 +2564,7 @@ function SidebarVaultSwitcher({
         // Sits below the traffic-light clearance row, so normal padding — no
         // bottom divider (it reads as a header above the Notes list directly).
         padding: "8px 8px 6px",
-        background: "var(--paper-2)",
+        // Ground painted by SidebarPane — see its comment.
         borderInlineEnd: "1px solid var(--line-1)",
       }}
     >
@@ -3768,7 +3770,7 @@ function RightSidebar() {
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
-        background: "var(--paper-2)",
+        // Ground painted by SidebarPane — see its comment.
         borderInlineStart: "1px solid var(--line-1)",
       }}
     >
@@ -3884,11 +3886,11 @@ function RightSidebar() {
           padding: "16px 18px",
           display: "flex",
           flexDirection: "column",
-          gap: 8,
+          gap: "var(--space-2)",
         }}
       >
         {active === null ? (
-          <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)", marginTop: "var(--space-1)" }}>
             {t("editor.chrome.rightPanel.allHidden")}
           </div>
         ) : active === "backlinks" ? (
@@ -4060,10 +4062,28 @@ function SidebarPane({
 
   return (
     <div
+      // A sidebar pane is a SURFACE for ornament purposes (myne#394): the theme
+      // decides what a panel ground wears. Declared on the outer pane rather
+      // than the inner wrapper so the ornament spans the pane's full height
+      // even while the collapse animation is running.
+      {...ornamentRole("surface")}
       style={{
         position: "relative",
         width: collapsed ? 0 : width,
         flexShrink: 0,
+        // THE PANEL GROUND IS PAINTED HERE, not by the blocks inside.
+        //
+        // The role has always been on this element — but every child painted an
+        // opaque `--paper-2` of its own, and the ornament layer is `z-index: -1`
+        // inside the host's own stacking context: above the HOST's background,
+        // below everything the host contains. So a theme's surface texture,
+        // ruled ground or frame was drawn and then covered, on every sidebar,
+        // always. Measured by rendering the captured interface: all three
+        // surface primitives came back byte-identical to no ornament at all.
+        //
+        // Moving the fill up here is visually identical (same token, same area)
+        // and is what gives the layer a ground to sit on.
+        background: "var(--paper-2)",
         display: "flex",
         // Pin the inner content to the inner edge so collapsing clips it
         // toward the screen edge (left sidebar clips right→, right sidebar
@@ -4132,8 +4152,8 @@ function SwitchingOverlay() {
         backdropFilter: "blur(1px)",
         color: "var(--fg-2)",
         fontFamily: "var(--font-sans)",
-        fontSize: 13,
-        fontWeight: 500,
+        fontSize: "var(--text-sm)",
+        fontWeight: "var(--weight-medium)",
       }}
     >
       <Spinner size={16} style={{ borderWidth: 2 }} />
@@ -4311,7 +4331,7 @@ function BottomBar({
             cursor: "pointer",
             fontFamily: "var(--font-sans)",
             fontSize: 12,
-            fontWeight: 500,
+            fontWeight: "var(--weight-medium)",
             transition: HOVER_TRANSITION,
           }}
         >
@@ -4431,7 +4451,7 @@ function BottomBar({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 4,
+          gap: "var(--space-1)",
           padding: "4px 8px",
           background: "transparent",
           border: 0,
@@ -4439,7 +4459,7 @@ function BottomBar({
           color: "var(--fg-3)",
           fontFamily: "var(--font-sans)",
           fontSize: 12,
-          fontWeight: 500,
+          fontWeight: "var(--weight-medium)",
           cursor: "pointer",
           transition: HOVER_TRANSITION,
         }}
@@ -4530,6 +4550,8 @@ function BottomBar({
     <div
       data-testid="editor.bottom-bar"
       data-editor-chrome
+      // Chrome, for ornament purposes (myne#394) — same role as the tab strip.
+      {...ornamentRole("chrome")}
       onContextMenu={onContextMenu}
       style={{
         height: 28,
@@ -4542,7 +4564,7 @@ function BottomBar({
       }}
     >
       <div style={{ flex: 1 }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
         {/* Preview-companion toggle is pinned (contextual, not a BAR_ITEMS id):
             it is never reorderable and anchors at the start of the right
             cluster. */}
@@ -4696,7 +4718,7 @@ function WorkspaceSwitcherControl({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 4,
+          gap: "var(--space-1)",
           maxWidth: 160,
           padding: "2px 8px",
           background: "transparent",
@@ -4706,7 +4728,7 @@ function WorkspaceSwitcherControl({
           cursor: "pointer",
           fontFamily: "var(--font-sans)",
           fontSize: 12,
-          fontWeight: 500,
+          fontWeight: "var(--weight-medium)",
           transition: HOVER_TRANSITION,
         }}
       >
@@ -4737,7 +4759,7 @@ function WorkspaceSwitcherControl({
             border: "1px solid var(--line-1)",
             borderRadius: "var(--radius-2)",
             boxShadow: "var(--shadow-3, 0 8px 24px rgba(0,0,0,0.12))",
-            padding: 4,
+            padding: "var(--space-1)",
             zIndex: 60,
           }}
         >

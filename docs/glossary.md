@@ -724,6 +724,12 @@ The storage or device limit a server would actually enforce for one account: the
 
 Used in: `spec/server-protocol.md` §7.1; `decisions.md` 2026-07-13, 2026-07-26
 
+### **example vault** &nbsp; 📦 *Product*
+
+The small set of ordinary notes seeded into a freshly-created vault on first run (#393), replacing the single welcome note on desktop. Five `.myn` notes under one `Getting started/` folder, with an index note auto-opened via the workspace pre-seed; each note demonstrates a shipped feature by using it — [wikilinks](#wikilink) and backlinks, a [line-task](#line-task) list with a due date, `#tags`, and the Markdown the editor renders. Defining property: it is removable in **one action** — every note is under the one folder, so a single folder-delete soft-trashes the whole set (recoverable from Trash), which is what makes a richer starter set acceptable where a scattered one would not be. The notes are ordinary throughout (editable, renamable, deletable, no read-only, no special-casing) and cross-link by title through interpolation placeholders the seeder fills with the resolved titles, so no link breaks in any locale. Seeded once, on the create→unlock path only, never re-created on a later unlock, never synced as a special case. Mobile still seeds the single welcome note until its companion change lands.
+
+Used in: `decisions.md` 2026-08-08 (first-run example vault)
+
 ### **export** &nbsp; 📦 *Product*
 
 A one-shot, user-initiated operation that decrypts user content and writes it as ordinary **unencrypted** files to a destination the user explicitly chose via the OS file dialog — per-note markdown, the whole-vault markdown tree, attachment files, a rendered PDF, standalone HTML, or stripped plain text (HTML + plain text added by MYND-340). Export is the portability path ("you walk away with your files", `vision.md`): the markdown forms write the stored plaintext **verbatim** (frontmatter included; the only sanctioned mutation is the attachments-mode embed rewrite, `markdown-dialect.md` §6 — HTML's image-sidecar `src` rewrite is the same sanctioned-transform class). PDF/HTML/plain-text are **lossy projections**, not byte-stable round-trips of the source. Terminology wall: an export is never a [vault backup file](#vault-backup-file) (that stays exactly as encrypted as the vault) and never a snapshot (version history). Threat-model framing: a deliberate plaintext crossing of TB3 under user authority — the artifact is outside Myne's protection from the moment it is written (`threat-model.md` §3 TB3, §5). There is no plaintext *mode*: no watch, mirror, or export-on-save exists.
@@ -1424,11 +1430,39 @@ The family a rule belongs to is fixed by the rule's shape, so the user chooses t
 
 Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
+### **ornament primitive** &nbsp; 📦 *Product*
+
+One of the nine generic visual parts a [custom theme](#custom-theme) may select to decorate a surface: **frame**, **shadow**, **texture**, **ruled ground**, **edge**, **corner fold**, **ribbon**, **perforation**, **tint wash**. Each takes one of a small enumerated set of values (`frame: none | hairline | thick | double | inset`), and the theme supplies only that selection plus its parameters — Myne owns what the selection draws.
+
+**The parts are deliberately generic, never named objects.** There is no `polaroid` primitive; a polaroid is thick frame + hard shadow + paper texture, and the same nine parts also produce a notebook page (ruled ground + left perforation) or a brutalist card (thick frame + offset shadow + grain). Named combinations exist only as convenience presets in the website theme builder, which write generic values — no such name enters Myne's code or product vocabulary.
+
+**Why this shape rather than letting a theme write CSS.** The WebView CSP carries `style-src 'unsafe-inline'`, so a theme value that reaches the DOM executes; the value-shape allowlist is therefore the primary security control (`threat-model.md` "Custom-theme CSS-value surface"). A primitive selection is a bare keyword and a parameter is `<number><unit>` — both already admissible — so pseudo-elements, composite shadows and textures become expressible while the allowlist stays byte-identical. See [paint layer](#paint-layer) for the integrity half of the rule.
+
+Used in: `decisions.md` 2026-08-06; `spec/protocol.md` §9.21
+
+### **ornament role** &nbsp; 📦 *Product*
+
+The scope at which an [ornament primitive](#ornament-primitive) is chosen. Three roles: **surface** (page and panel grounds), **box** (callouts, code blocks, quotes, cards), **chrome** (tabs, buttons, bars). A component declares its role; the theme sets ornament per role rather than per element.
+
+The alternative — one ornament setting per element — would put several hundred keys in a theme file (twenty-three callout types alone), making both the file and the builder unusable. Role scoping keeps the vocabulary near thirty keys. Colour is unaffected: a callout still takes its colour from its own type's tone, and only ornament is role-scoped. A per-element override is deliberately deferred and is additive when it lands, since an absent key already falls back.
+
+Used in: `decisions.md` 2026-08-06
+
 ### **orphan vault artefact** &nbsp; 📋 *Protocol*
 
 A residual file under `<app_data_dir>/vault/` that survives a partial-fail `vault_delete` — most often an orphan `.myn` blob (plus its containing `notes/` + `vault/` directories) left when `vault.meta` was unlinked successfully but a later unlink hit a file lock (antivirus / Spotlight / OneDrive sync), or a `vault.meta.tmp` / `vault.prefs.tmp` mid-write tempfile from an interrupted `atomic_write`. Once `vault.meta` is gone the artefacts are computationally-unrecoverable junk (the `items_key` that sealed each `.myn` left with it), yet they block a fresh `vault_create` (the `vault_artifacts_present` guard) and cannot be removed by `vault_delete` (which rejects `VaultNotFound` when `vault.meta` is absent). In-app cleanup is the v0.2 `vault_repair` feature, which sweeps everything under `vault_dir` while leaving the create-able container (Plane MYND-159; `decisions.md` 2026-06-06 "vault_repair v0.2"). *Alias: vault residue.*
 
 Used in: `decisions.md` 2026-05-26 "vault_delete partial-fail posture", 2026-06-06 "vault_repair v0.2"; MYND-105, MYND-159
+
+### **paint layer** &nbsp; 📦 *Product*
+
+The rendering rule every [ornament primitive](#ornament-primitive) obeys: ornament is drawn **over** an element and takes no part in layout or hit-testing. It cannot change a control's position, size or clickable geometry, and it receives no pointer events.
+
+**This is what makes ornament on interactive chrome safe.** A theme is untrusted input, and themes are distributed — so a decoration able to move a control could put "Delete" where the user aimed for "Cancel". Confining ornament to paint removes that class outright instead of policing it. Layout *is* still themable, but through the measure tokens (spacing, radius, type scale, weight, tracking), which are Myne's own values and are therefore clamped to 0.5×–2× of their built-in defaults — a bound a freely positioned ornament layer could not have.
+
+**What is enforced, and what is not.** Ornament draws on `::before` / `::after` with `pointer-events: none`, so it takes no click, and the host's own box is unchanged. Two declarations the layer does add to its host — `position: relative` (a containing block) and `isolation: isolate` (a stacking context) — *can* re-anchor an absolutely-positioned descendant or re-order a promoted one, and both apply only when a theme selects ornament. The stylesheet's rules are pinned by assertion (`tests/ornaments/roles.test.ts`: no `border`, no `clip-path`, `pointer-events: none`, absolute + inset); the end-to-end hit-rectangle measurement is **owed** (`e2e/ornament.e2e.ts` header, myne#394 task 14) and until it lands the guarantee rests on those rules plus review, not on measurement.
+
+Used in: `decisions.md` 2026-08-06
 
 ### **partitioning oracle** &nbsp; ⚠️ *Threat*
 
@@ -1525,6 +1559,18 @@ Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 The 32-byte AEAD KEK encrypting `vault.prefs`. Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "prefs-key")` helper (`spec/protocol.md` §3.2 + §3.4 registry entry `"myne.v0.1 prefs-key"`). Never persisted; re-derived on each `vault_unlock` (in-pipeline) and on each `set_*` prefs writer call. Independent from `items_key` lineage by design — preserves prefs portability across the later epoch-rotation `items_key` evolution (`decisions.md` 2026-05-27 "Vault preferences blob: root_key-derived prefs_key").
 
 Used in: `spec/protocol.md` §3.4, §9.5; `decisions.md` 2026-05-27 "Vault preferences blob"
+### **preview snapshot** &nbsp; 📦 *Product*
+
+The real Myne interface, captured as data: the editor's own DOM plus every CSS rule the app had loaded, taken from the running desktop client by `e2e/capture/theme-preview.capture.ts` and shipped as the source-consumed `@myne/preview` package. It is what every surface showing a person "how a theme looks" renders — the website's theme builder, the theme gallery, and the `myne-themes` card renderer — instead of the three separately hand-written mock UIs they used before.
+
+**Why capture rather than draw.** A picture of an interface, drawn by hand, drifts from the interface on its own schedule and nobody is told. All three imitations had, and none of them knew [ornament](#ornament-primitive) existed — so a theme selecting a thick frame or a scanline texture previewed as a plain rectangle everywhere a person looked *before* installing. A snapshot cannot drift on its own because nobody writes it.
+
+**It stays alive because a theme is applied the way the app applies one.** The capture is taken under the default theme with no ornament selected; a palette then reaches it as custom properties on the root plus `data-o-*` attributes, which resolve at paint time — so a static document re-themes completely. What does NOT re-theme is a value hardcoded in an inline style, and that is the honest half: the preview shows a theme changing precisely what it can change in the real app, including the places it still cannot reach (the debt `scripts/check-token-adoption.mjs` tracks).
+
+**It can go stale, and that is a warning rather than a gate.** `scripts/check-preview-freshness.mjs` reports when the surfaces the snapshot depicts have changed since it was taken. Most UI changes do not change what it shows, and re-capturing needs a Linux container (tauri-driver has no macOS support), so a hard gate would be routed around rather than heeded — the same posture as `check-twin-drift.mjs`.
+
+Used in: `decisions.md` 2026-08-08
+
 
 ### **PrefsView** &nbsp; 🛠️ *Tooling*
 
@@ -2181,6 +2227,18 @@ The user's Light / Dark / System choice, persisted as the `theme` field of [`vau
 A `myne://theme/install?v=1&name=…&author=…&src=…&payload=…` URL that hands a [custom theme](#custom-theme) from the website's Themes page to the desktop app in one click (MYND-567; website half MYND-568). The OS resolves the `myne://` scheme to the installed app — registered at bundle time on macOS / Windows / Linux — which then shows a **confirmation dialog** (name, author, source, palette preview) before anything is written; Apply routes through the ordinary `themes_import` into [`vault.themes`](#vaultthemes), Cancel writes nothing.
 
 The palette travels **inside the URL** as base64url-encoded JSON, not as a link the app fetches: the client has no network egress path (CSP `connect-src` allowlist + no HTTP-client crate, gated by `no_egress.rs`), so a `src=` parameter is **displayed provenance only, never dereferenced**. Every field is treated as hostile input — any website can serve such a link — under explicit caps (16 KiB decoded payload, 64-char name, fatal UTF-8 decoding, control/bidi stripping on display strings), and the payload must still clear the host-side `theme_validator` value-shape allowlist before it is sealed. A link arriving while the vault is locked is held in an in-memory latch and presented after unlock, then dropped with the process if the user never unlocks. The `myne://` scheme is **shared with the mobile client**, which owns the `open` and `capture` actions (`decisions.md` 2026-07-13); each client ignores the other's actions. Introduced `decisions.md` 2026-07-25. See also [custom theme](#custom-theme), [vault.themes](#vaultthemes).
+
+### **theme vocabulary** &nbsp; 📦 *Product*
+
+The set of CSS-variable keys a [custom theme](#custom-theme) may meaningfully supply. Three families: the **colour** core (the twenty-one required ramp tokens plus the optional `--syntax-*` / `--label-*` / `--highlight-*` families), the **measure** tokens (spacing, radius, type scale, weight, tracking — clamped to 0.5×–2× of their built-in defaults), and the [ornament](#ornament-primitive) keys, scoped by [role](#ornament-role).
+
+The vocabulary is **open, and growing it is not a format event**: `vault.themes` carries the same flat map (§9.21), only the required core is fixed, and an unrecognized key is written and ignored rather than rejected. That is what lets an older client render a newer theme — it applies the colours it understands and skips ornament it has never heard of — and it is why adding a family costs no migration, no magic byte and no version bump.
+
+The vocabulary is also not the readability gate: the WCAG floors apply to the colour pairs they name (resolving a semantic alias in place of its ramp token, since the app reads the alias), refuse a gated colour they cannot resolve, and say nothing about the rest of the map.
+
+Distinguish it from the **value-shape allowlist**, which is a security control over what a value may *look like* and is deliberately narrow (`threat-model.md` "Custom-theme CSS-value surface"). The vocabulary says which keys mean something; the allowlist says which values may exist at all. Widening the first has never required widening the second.
+
+Used in: `decisions.md` 2026-08-06; `spec/protocol.md` §9.21
 
 ### **threat model** &nbsp; ⚠️ *Threat*
 

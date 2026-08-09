@@ -22,7 +22,7 @@ const CSS = `
   box-shadow: var(--shadow-3, 0 8px 24px rgba(0,0,0,0.12));
   padding: 6px;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--fg-1);
   max-height: 288px;
   overflow-y: auto;
@@ -30,7 +30,7 @@ const CSS = `
 .cm-slash-menu-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 6px 8px;
   border-radius: var(--radius-1, 3px);
   cursor: pointer;
@@ -46,7 +46,7 @@ const CSS = `
   height: 20px;
   font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--fg-2);
   flex-shrink: 0;
 }
@@ -55,7 +55,7 @@ const CSS = `
 }
 .cm-slash-menu-kbd {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--fg-3);
 }
 
@@ -69,7 +69,7 @@ const CSS = `
   box-shadow: var(--shadow-3, 0 8px 24px rgba(0,0,0,0.12));
   padding: 6px;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--fg-1);
   min-width: 180px;
   max-height: 288px;
@@ -98,14 +98,14 @@ const CSS = `
 }
 .cm-wiki-picker-title {
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   color: var(--fg-1);
   line-height: 1.3;
 }
 .cm-wiki-picker-path {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--fg-3);
   line-height: 1.2;
 }
@@ -114,7 +114,7 @@ const CSS = `
 .cm-wiki-picker-folder-row {
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .cm-wiki-picker-folder-glyph {
   width: 16px;
@@ -126,13 +126,13 @@ const CSS = `
 .cm-wiki-picker-heading-row {
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .cm-wiki-picker-heading-glyph {
   min-width: 16px;
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
   color: var(--accent, var(--fg-3));
   text-align: left;
 }
@@ -154,7 +154,7 @@ const CSS = `
   border: 1px solid var(--line-2, #c8c7c1);
   border-radius: var(--radius-2, 6px);
   box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
-  padding: 4px;
+  padding: var(--space-1);
   font-family: var(--font-sans);
 }
 .cm-toolbar-button {
@@ -166,7 +166,7 @@ const CSS = `
   border: 0;
   background-color: transparent;
   color: var(--fg-1);
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
   border-radius: var(--radius-1, 3px);
   font-family: var(--font-sans);
@@ -196,12 +196,12 @@ const CSS = `
   border: 1px solid var(--line-2, #c8c7c1);
   border-radius: var(--radius-2, 6px);
   box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
-  padding: 4px;
+  padding: var(--space-1);
   min-width: 120px;
 }
 .cm-toolbar-heading-item {
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
   border-radius: var(--radius-1, 3px);
   color: var(--fg-1);
@@ -225,7 +225,7 @@ const CSS = `
 .cm-toolbar-highlight-dropdown {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-1);
   max-width: 176px;
   background-color: var(--paper, #faf8f3);
   border: 1px solid var(--line-2, #c8c7c1);
@@ -237,8 +237,8 @@ const CSS = `
    highlight. Spans the swatch grid's full width on its own row. */
 .cm-toolbar-highlight-remove {
   flex-basis: 100%;
-  margin-top: 4px;
-  padding: 4px 6px;
+  margin-top: var(--space-1);
+  padding: var(--space-1) 6px;
   font-size: 12px;
   text-align: left;
   color: var(--fg-2, #4a4944);
@@ -266,7 +266,7 @@ const CSS = `
 .cm-url-overlay {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   background-color: var(--paper, #faf8f3);
   border: 1px solid var(--line-2, #c8c7c1);
   border-radius: var(--radius-2, 6px);
@@ -283,7 +283,7 @@ const CSS = `
   outline: none;
   box-shadow: none;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--fg-1);
   min-width: 200px;
 }
@@ -293,7 +293,7 @@ const CSS = `
   color: var(--accent-on, #fff);
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   padding: 6px 12px;
   border-radius: var(--radius-1, 3px);
   cursor: pointer;
@@ -333,7 +333,7 @@ const CSS = `
   box-shadow: none;
   font-family: var(--font-sans);
   font-size: 1.571em;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   line-height: 1.3;
   color: var(--fg-1);
   padding: 2px 6px;
@@ -343,7 +343,7 @@ const CSS = `
 .cm-fm-properties-name::placeholder {
   color: var(--fg-3);
   font-style: italic;
-  font-weight: 400;
+  font-weight: var(--weight-regular);
 }
 .cm-fm-properties-name:hover {
   background: var(--paper-2, #f3f1eb);
@@ -357,7 +357,7 @@ const CSS = `
 }
 .cm-fm-properties-title {
   font-size: 1em;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--fg-1);
   margin-bottom: 10px;
 }
@@ -365,7 +365,7 @@ const CSS = `
   display: grid;
   grid-template-columns: 24px 160px 1fr;
   row-gap: 2px;
-  column-gap: 8px;
+  column-gap: var(--space-2);
   align-items: center;
 }
 .cm-fm-properties-row {
@@ -392,7 +392,7 @@ const CSS = `
   font-size: 0.929em;
   color: var(--fg-2);
   font-family: var(--font-sans);
-  padding: 4px 6px;
+  padding: var(--space-1) 6px;
   border-radius: var(--radius-1, 3px);
 }
 .cm-fm-properties-key:hover {
@@ -418,7 +418,7 @@ const CSS = `
   font-family: var(--font-sans);
   font-size: 0.929em;
   color: var(--fg-1);
-  padding: 4px 6px;
+  padding: var(--space-1) 6px;
   border-radius: var(--radius-1, 3px);
 }
 .cm-fm-properties-value:hover {
@@ -440,14 +440,14 @@ const CSS = `
   align-items: center;
   gap: 6px;
   margin-top: 10px;
-  margin-left: 24px;
+  margin-left: var(--space-5);
   border: 0;
   background: transparent;
   color: var(--fg-3);
   font-family: var(--font-sans);
   font-size: 0.929em;
   cursor: pointer;
-  padding: 4px 6px;
+  padding: var(--space-1) 6px;
   border-radius: var(--radius-1, 3px);
 }
 .cm-fm-properties-add:hover {
@@ -462,7 +462,7 @@ const CSS = `
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 2px 6px;
 }
 .cm-fm-properties-tag {
@@ -475,7 +475,7 @@ const CSS = `
   border-radius: var(--radius-pill, 999px);
   color: var(--fg-1);
   font-size: 0.857em;
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   line-height: 1.4;
   white-space: nowrap;
 }
@@ -520,7 +520,7 @@ const CSS = `
   font-family: var(--font-sans);
   font-size: 0.929em;
   color: var(--fg-1);
-  padding: 4px 6px;
+  padding: var(--space-1) 6px;
   border-radius: var(--radius-1, 3px);
 }
 .cm-fm-properties-tag-input::placeholder {
@@ -547,7 +547,7 @@ const CSS = `
   gap: 6px;
   width: 100%;
   box-sizing: border-box;
-  padding: 8px 12px;
+  padding: var(--space-2) 12px;
   background-color: var(--paper, #fbfbfa);
   border-bottom: 1px solid var(--line-1, #e3e2dd);
   font-family: var(--font-sans);
@@ -555,7 +555,7 @@ const CSS = `
 .cm-find-bar-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
 }
 /* The replace row's leading glyph sits in the same lead column as the find
@@ -584,7 +584,7 @@ const CSS = `
   color: var(--fg-2, #3a3934);
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   padding: 0 10px;
   border-radius: var(--radius-1, 3px);
   cursor: pointer;
@@ -619,7 +619,7 @@ const CSS = `
   background: var(--paper, #fbfbfa);
   padding: 0 10px;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--fg-1, #1a1a17);
   outline: none;
   box-shadow: none;
@@ -640,17 +640,17 @@ const CSS = `
 .cm-find-bar-status {
   flex-shrink: 0;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--fg-3, #6b6a64);
 }
 .cm-find-bar-status--count {
   font-family: var(--font-mono);
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   font-feature-settings: "ss02", "zero", "calt";
 }
 .cm-find-bar-status--nomatch {
   font-family: var(--font-sans);
-  font-weight: 400;
+  font-weight: var(--weight-regular);
 }
 .cm-find-bar-status--hidden {
   display: none;
@@ -672,7 +672,7 @@ const CSS = `
   background-color: transparent;
   color: var(--fg-2, #3a3934);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
   border-radius: 4px;
 }
@@ -686,7 +686,7 @@ const CSS = `
 }
 .cm-find-bar-case {
   width: 30px;
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   color: var(--fg-3, #6b6a64);
 }
 .cm-find-bar-close {

@@ -116,7 +116,7 @@ const KEYCAP_STYLE: CSSProperties = {
   boxSizing: "border-box",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   background: "var(--paper-3)",
   border: "1px solid var(--line-2)",

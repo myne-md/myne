@@ -44,6 +44,7 @@ import {
   dismissImporterOffer,
   enableDeveloperModeInSettings,
   pageSeatInvoke,
+  pasteIntoEditor,
   runPaletteAction,
   unlockToEditor,
 } from "./../support/flows";
@@ -146,46 +147,12 @@ async function editorText(session: Session): Promise<string> {
 /** Inject `text` into the live CodeMirror document via a synthetic paste
  *  event. Keystroke typing is unusable for Markdown samples — CodeMirror's
  *  bracket auto-close eats `[ ]` (so `> [!note]` collapses to `!note` and
- *  the callout never renders). A paste inserts verbatim, untouched by
- *  auto-close. After pasting, move the cursor to the document start so the
- *  live-preview widgets render (the block under the cursor shows source). */
-async function typeBody(session: Session, text: string): Promise<void> {
-  // Re-fetch the .cm-content handle right before each keystroke op: CM6
-  // remounts on note-switch/focus, which staleness-invalidates a handle
-  // held across awaits (observed as "stale element reference"). On a stale
-  // throw, settle and retry once — the remount has finished by then.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await (await session.waitForElement(CM_CONTENT)).click();
-      // Move to document END first so the paste lands AFTER the managed
-      // frontmatter (title/updated). Pasting at the top would displace it
-      // below line 1, breaking title parsing ("Untitled") and dumping raw
-      // frontmatter as a trailing code block.
-      await (await session.waitForElement(CM_CONTENT)).sendKeys(CTRL + END + CTRL);
-      // Synthetic paste (querySelector is always fresh — no stale handle).
-      // Inserts verbatim, untouched by bracket auto-close.
-      await session.execute(
-        "var el = document.querySelector(arguments[0]);" +
-          "el.focus();" +
-          "var dt = new DataTransfer();" +
-          "dt.setData('text/plain', arguments[1]);" +
-          "el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));",
-        [CM_CONTENT, text],
-      );
-      // Mod-Home → document start, off the pasted block so every
-      // live-preview widget renders (the block under the cursor shows source).
-      await (await session.waitForElement(CM_CONTENT)).sendKeys(CTRL + HOME + CTRL);
-      await session.waitUntil(async () => (await editorText(session)).length > 5 || null, {
-        label: "pasted body landed",
-        timeoutMs: 5000,
-      });
-      return;
-    } catch (e) {
-      if (attempt === 1) throw e;
-      await sleep(800); // CM remount settling; retry the whole sequence
-    }
-  }
-}
+ *  the callout never renders).
+ *
+ *  The mechanism moved to `support/flows.ts` when the theme-preview capture
+ *  needed the same verbatim insert; this alias keeps the local name (used at
+ *  ~30 call sites below) pointing at the one implementation. */
+const typeBody = pasteIntoEditor;
 
 /** Try a list of CSS selectors in order, click the first that resolves. */
 async function clickFirst(session: Session, selectors: string[], timeoutMs = 6000): Promise<void> {

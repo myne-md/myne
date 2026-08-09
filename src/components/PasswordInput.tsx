@@ -118,7 +118,7 @@ const labelStyle: CSSProperties = {
   color: "var(--fg-3)",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 
 /**
@@ -151,7 +151,7 @@ export function PasswordInput({
           display: "flex",
           alignItems: "baseline",
           justifyContent: "space-between",
-          gap: 12,
+          gap: "var(--space-3)",
         }}
       >
         <label style={labelStyle}>{label}</label>
@@ -183,7 +183,7 @@ export function PasswordInput({
             border: 0,
             color: "var(--fg-3)",
             cursor: disabled ? "default" : "pointer",
-            padding: 4,
+            padding: "var(--space-1)",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",

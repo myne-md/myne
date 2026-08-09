@@ -83,11 +83,11 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
       </StepEyebrow>
       <StepHeading>{t("vaultCreation.briefing.heading")}</StepHeading>
 
-      <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
+      <div style={{ fontSize: "var(--text-base)", lineHeight: 1.6, color: "var(--fg-2)" }}>
         {t("vaultCreation.briefing.intro")}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {STATEMENTS.map((s) => {
           const isExpanded = !!expanded[s.id];
           return (
@@ -96,17 +96,17 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: 12,
-                padding: 16,
+                gap: "var(--space-3)",
+                padding: "var(--space-4)",
                 background: "var(--paper-2)",
                 border: "1px solid var(--line-1)",
-                borderRadius: 6,
+                borderRadius: "var(--radius-2)",
               }}
             >
               <div
                 style={{
                   fontSize: 15,
-                  fontWeight: 600,
+                  fontWeight: "var(--weight-semibold)",
                   lineHeight: 1.4,
                   color: "var(--fg-1)",
                 }}
@@ -125,7 +125,7 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 4,
+                  gap: "var(--space-1)",
                   alignSelf: "flex-start",
                   padding: 0,
                   border: "none",
@@ -133,8 +133,8 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
                   cursor: "pointer",
                   color: "var(--accent)",
                   fontFamily: "var(--font-sans)",
-                  fontSize: 13,
-                  fontWeight: 500,
+                  fontSize: "var(--text-sm)",
+                  fontWeight: "var(--weight-medium)",
                 }}
               >
                 {t("vaultCreation.briefing.why")}
@@ -180,7 +180,7 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
         })}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         <Button
           variant="ghost"
           onClick={onBack}

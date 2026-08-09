@@ -83,7 +83,7 @@ function chipStyle(active: boolean): CSSProperties {
   return {
     display: "flex",
     alignItems: "center",
-    gap: 8,
+    gap: "var(--space-2)",
     // Notion-style full-width workspace switcher row at the top of the sidebar
     // (MYND-166): mark + vault name (flex) + chevron, left-aligned, no border,
     // subtle `--paper-3` fill on hover/open.
@@ -111,7 +111,7 @@ const CHIP_MARK_STYLE: CSSProperties = {
   justifyContent: "center",
   fontFamily: "var(--font-mono)",
   fontSize: 12,
-  fontWeight: 700,
+  fontWeight: "var(--weight-bold)",
 };
 
 // The square mark shown at the lead of the chip + each dropdown row. Renders the
@@ -146,8 +146,8 @@ const CHIP_LABEL_STYLE: CSSProperties = {
   flex: 1,
   minWidth: 0,
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--ink-1)",
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -189,7 +189,7 @@ function rowStyle(state: "active" | "hover" | "rest"): CSSProperties {
     width: "100%",
     height: 48,
     boxSizing: "border-box",
-    padding: 8,
+    padding: "var(--space-2)",
     background:
       state === "active"
         ? "var(--accent-soft)"
@@ -225,7 +225,7 @@ function rowNameStyle(opts: {
 }): CSSProperties {
   return {
     fontFamily: "var(--font-sans)",
-    fontSize: 13,
+    fontSize: "var(--text-sm)",
     fontWeight: opts.active ? 600 : 500,
     // Fallback ("Vault N") names demote to `--ink-2`; real names are `--ink-1`.
     color: opts.fallback ? "var(--ink-2)" : "var(--ink-1)",
@@ -258,19 +258,19 @@ const FOOTER_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "row",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   width: "100%",
   boxSizing: "border-box",
   height: 40,
-  padding: 8,
+  padding: "var(--space-2)",
   background: "transparent",
   border: 0,
   borderRadius: "var(--radius-1)",
   cursor: "pointer",
   textAlign: "start",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--accent)",
   transition: HOVER_TRANSITION,
 };

@@ -35,6 +35,7 @@ import { ViewsSettings } from "./ViewsSettings";
 import { ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
+import { useSettingsCompact } from "./settingsCompact";
 import { usePrefs } from "../../hooks/usePrefs";
 
 // Two-column layout: the controls scroll on the left, a live preview sticks on
@@ -88,7 +89,7 @@ const SAMPLE_HEADING_STYLE: CSSProperties = {
   fontFamily: "var(--editor-font-family)",
   fontSize: "calc(var(--editor-text-size) * 1.5)",
   lineHeight: "var(--editor-line-spacing)",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 const SAMPLE_BODY_STYLE: CSSProperties = {
   margin: "0 0 var(--space-2)",
@@ -264,6 +265,10 @@ export function EditorPanel() {
   // `usePrefs` reads once on mount, so the panel — not the hook — is what keeps
   // the switch in step with the write the block performs itself.
   const { prefs } = usePrefs();
+  // On a narrow dialog the 264px preview column is dropped (#391): it is
+  // decoration for the settings, not a setting, and the space it frees lets the
+  // controls column keep its rows side-by-side instead of overlapping.
+  const compact = useSettingsCompact();
   const [remindersEnabled, setRemindersEnabledEcho] = useState<boolean | null>(null);
   useEffect(() => {
     setRemindersEnabledEcho(null);
@@ -347,7 +352,7 @@ export function EditorPanel() {
         <ViewsSettings />
       </SettingsSection>
       </div>
-      <EditorSettingsPreview />
+      {!compact && <EditorSettingsPreview />}
     </div>
   );
 }

@@ -57,8 +57,8 @@ const MESSAGE_STYLE = {
   display: "grid",
   placeItems: "center",
   color: "var(--fg-3)",
-  fontSize: 13,
-  padding: 24,
+  fontSize: "var(--text-sm)",
+  padding: "var(--space-5)",
   textAlign: "center" as const,
 };
 
@@ -297,7 +297,7 @@ export function GraphPane() {
           flex: "0 0 auto",
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: "var(--space-2)",
           padding: "8px 12px",
           borderBottom: "1px solid var(--line-1)",
           fontSize: 12,
@@ -335,7 +335,7 @@ export function GraphPane() {
               background: "var(--bg-1)",
               color: "var(--fg-2)",
               border: "1px solid var(--line-1)",
-              borderRadius: 6,
+              borderRadius: "var(--radius-2)",
               cursor: "pointer",
             }}
           >
@@ -359,7 +359,7 @@ export function GraphPane() {
               background: "var(--bg-1)",
               color: "var(--fg-2)",
               border: "1px solid var(--line-1)",
-              borderRadius: 6,
+              borderRadius: "var(--radius-2)",
             }}
           >
             <option value="">{t("notes.graph.tagPlaceholder")}</option>
@@ -382,7 +382,7 @@ export function GraphPane() {
               background: "var(--bg-1)",
               color: "var(--fg-2)",
               border: "1px solid var(--line-1)",
-              borderRadius: 6,
+              borderRadius: "var(--radius-2)",
               cursor: "pointer",
             }}
           >
@@ -434,7 +434,7 @@ function FilterChip({
         background: active ? "var(--paper-3)" : "transparent",
         color: active ? "var(--fg-1)" : "var(--fg-3)",
         border: "1px solid var(--line-1)",
-        borderRadius: 6,
+        borderRadius: "var(--radius-2)",
         cursor: "pointer",
       }}
     >
