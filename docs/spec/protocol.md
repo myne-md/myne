@@ -1313,12 +1313,13 @@ The inner plaintext is canonical JSON per the §9.5.2 discipline (object keys le
 - `filename` — the display filename (NFC). Free-form: duplicates across attachments are permitted (the id is the key).
 - `size` — plaintext byte length (integer).
 
-Two **additive optional fields** exist for Phase 2 sync (MYND-468; both absent from a pre-sync catalog and from any entry they don't apply to):
+Three **additive optional fields** exist for Phase 2 sync (MYND-468 + myne-md/myne#405; each absent from a pre-sync catalog and from any entry it doesn't apply to):
 
 - `deleted_at` — Unix epoch seconds (integer), **optional**. Its presence turns the entry into an **attachment catalog tombstone**: the attachment was deleted and the entry is retained purely as the multi-device deletion marker (`sync-protocol.md` §11.4). A tombstone entry's metadata is **scrubbed** at deletion time — `filename` and `content_type` are emptied and `size` zeroed, so the synced catalog keeps no descriptive metadata for a crypto-erased file. An entry without `deleted_at` is live.
 - `updated_at` — Unix epoch seconds (integer), **optional**. The `filename` LWW discriminator for the sync merge (set on rename; absent means `created_at`; `sync-protocol.md` §11.4 rule 4). Single-device semantics ignore it.
+- `version` — a monotonic **causal merge counter** (integer, u64), **optional**, absent = 0. On any local mutation of the id (import / rename / delete), `version = max(versions this device has observed for that id) + 1`. It is the **primary key of the merge join** (`sync-protocol.md` §11.4 rule 4); the wall-clock fields only break an equal-`version` tie, which is what makes that merge associative. Causal, not a wall-clock — it orders edits and is not a security property. Single-device semantics ignore it.
 
-Per-key the metadata fields are themselves emitted in canonical (lexicographic) order: `content_type`, `created_at`, `deleted_at` (when present), `filename`, `size`, `updated_at` (when present). An empty catalog is the canonical JSON object `{}`. Schema evolution within v0.1 is additive optional fields (`#[serde(default)]`), per the §9.5.2 / §10.6 discipline — no inner version field; these two fields are exactly that discipline in action, so the `MYC1` magic and envelope are **unchanged** (no §10.3 event). Honesty note: a pre-sync reader tolerates unknown fields on decode but **drops them on re-encode** (`#[serde(default)]` round-trips only known fields) — acceptable pre-alpha, since sync ships to all clients simultaneously and a dropped tombstone degrades to the accepted §11.4 rule-6 bootstrap bound, never to data corruption.
+Per-key the metadata fields are themselves emitted in canonical (lexicographic) order: `content_type`, `created_at`, `deleted_at` (when present), `filename`, `size`, `updated_at` (when present), `version` (when present). An empty catalog is the canonical JSON object `{}`. Schema evolution within v0.1 is additive optional fields (`#[serde(default)]`), per the §9.5.2 / §10.6 discipline — no envelope format-version discriminator (the causal per-entry `version` above is not one); these three additive fields are exactly that discipline in action, so the `MYC1` magic and envelope are **unchanged** (no §10.3 event). Honesty note: a pre-sync reader tolerates unknown fields on decode but **drops them on re-encode** (`#[serde(default)]` round-trips only known fields) — acceptable pre-alpha, since sync ships to all clients simultaneously and a dropped tombstone degrades to the accepted §11.4 rule-6 bootstrap bound, never to data corruption.
 
 #### 9.10.3 AAD construction
 
@@ -2274,13 +2275,16 @@ The sealed plaintext is a deterministic (canonical-key-order) JSON map keyed by 
 { "<name>": { "created_at": <unix-seconds>,
               "deleted_at": <unix-seconds>,   // present iff tombstoned
               "palette": { "--token": "value", … },
-              "updated_at": <unix-seconds>
+              "updated_at": <unix-seconds>,
+              "version": <counter>            // causal merge key; absent = 0
             }, … }
 ```
 
 Keys are emitted in lexicographic order (the canonical-JSON rule of §9.5.2); `deleted_at` is **omitted** unless the entry is a tombstone, so a live entry stays compact and its *presence* is the tombstone discriminator.
 
 Each name carries its **own clocks**. This is load-bearing for the merge (§9.21.5): without per-name clocks, two devices that concurrently add different themes would lose one of them. The clocks are wall-clock **seconds** — the same clock the attachments catalog uses (§9.10), whose tombstone rules this format reuses; note this differs from the `vault.prefs` `field_clocks`, which are milliseconds (§9.5.2). They inherit the clock-honesty caveat of `sync-protocol.md` §11.4 verbatim — they order edits, they are not a security property.
+
+Each name additionally carries a **`version`** — a monotonic causal merge counter (u64, `#[serde(default)]`, absent = 0), bumped to `max(observed for this name) + 1` on any local mutation. It is the **primary key of the merge join** (`sync-protocol.md` §10.2.2): the greater `version` wins, and the wall-clock fields above only break an equal-`version` tie — which is what makes the merge associative (myne-md/myne#405). Like `deleted_at`/`updated_at` for the catalog (§9.10.2) it is an additive optional field, so the `MYT1` magic and envelope are **unchanged** (no §10.3 event) and a pre-#405 blob decodes with `version = 0`. It sorts last in canonical key order (after `updated_at`).
 
 A **tombstone** is an entry whose `deleted_at` is set. Deleting a theme writes a tombstone rather than removing the key, so the deletion propagates instead of the theme resurrecting from another device. The tombstone **MUST scrub the `palette`** so the synced store retains nothing descriptive about a deleted theme (the `AttachmentMeta` rule of §9.10). Scrubbing is a confidentiality measure and **does not** by itself make two tombstones byte-identical — `created_at` and `updated_at` survive it and diverge whenever one device carried an unsynced edit; convergence is delivered by the total-order tie-break of `sync-protocol.md` §10.2.2, not by the scrub. Tombstones are not garbage-collected: a tombstone is a name plus timestamps, and a vault holds single-digit theme counts. Readers (list / read / export) MUST skip tombstoned entries.
 
@@ -2310,7 +2314,7 @@ it is the app rendering in the default theme. This is the same class as `vault.d
 
 #### 9.21.5 Sync + backup
 
-`vault.themes` is **Class-1 Authoritative data** (`sync-protocol.md` §9) — a synced singleton outside the head manifest, addressed by the reserved blob-id `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]` (§3.4). Merge is **per-theme-name**, with the palette **LWW within a name** (a palette is one coherent design; merging it token-by-token would produce an incoherent result). Deletion follows the attachments-catalog tombstone rule (`sync-protocol.md` §10.2.2 + §11.4): a live entry survives a tombstone **iff** its `created_at` strictly postdates the tombstone's `deleted_at` (a deliberate re-add) — on ties the tombstone wins (the resurrection guard). It is also a §9.11.3 backup-allowlist member, preserving the `sync ⊆ backup` invariant.
+`vault.themes` is **Class-1 Authoritative data** (`sync-protocol.md` §9) — a synced singleton outside the head manifest, addressed by the reserved blob-id `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]` (§3.4). Merge is **per-theme-name**, with the palette **LWW within a name** (a palette is one coherent design; merging it token-by-token would produce an incoherent result). Deletion follows the attachments-catalog tombstone rule (`sync-protocol.md` §10.2.2 + §11.4): reconciliation is a join over the per-entry causal **`version`** (§9.21.2) — the greater `version` wins (a re-add observes the delete and outranks the tombstone), and on an equal-`version` tie the tombstone wins (remove-wins, the resurrection guard), which makes the merge associative (myne-md/myne#405). It is also a §9.11.3 backup-allowlist member, preserving the `sync ⊆ backup` invariant.
 
 ## 10. Protocol Versioning & Migration
 

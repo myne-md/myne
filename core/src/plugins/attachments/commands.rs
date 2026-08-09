@@ -762,10 +762,15 @@ where
     //      is an orphan (recoverable — a re-import recomputes the same id,
     //      dedup-misses on the absent catalog entry, and the create-only
     //      blob write folds AlreadyExists to Ok, re-adding the entry).
-    catalog.entries.insert(
-        id_hex.clone(),
-        AttachmentMeta::live(content_type.to_string(), created_at, filename.clone(), size),
-    );
+    // Causal version bump (myne-md/myne#405): at this point the entry is
+    // absent (new id) or a tombstone (a deliberate re-add) — dedup on a live
+    // entry already returned earlier. `max(prior version) + 1` makes a re-add
+    // outrank the tombstone it clears, so the merge keeps the revival.
+    let version = catalog.entries.get(&id_hex).map_or(0, |e| e.version) + 1;
+    let mut meta =
+        AttachmentMeta::live(content_type.to_string(), created_at, filename.clone(), size);
+    meta.version = version;
+    catalog.entries.insert(id_hex.clone(), meta);
     let catalog_bytes = encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
         .map_err(|_| AttachmentImportError::EncodeFailed)?;
     io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
@@ -1774,6 +1779,11 @@ pub(crate) async fn attachment_rename_with_dir(
     entry.filename = filename;
     // The filename-LWW discriminator for the sync merge (§11.4 rule 4).
     entry.updated_at = Some(host.now_unix_secs());
+    // Causal bump (myne-md/myne#405): a rename is a mutation of the id, so it
+    // outranks a stale copy — including on a spec-conformant peer (`protocol.md`
+    // §9.10.2: "import / rename / delete"). Matches the themes twin, where a
+    // palette edit bumps `version` in `apply_import`.
+    entry.version += 1;
 
     let catalog_bytes = encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
         .map_err(|_| AttachmentRenameError::EncodeFailed)?;
