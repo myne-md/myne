@@ -1377,7 +1377,8 @@ function EditorChrome({
 
         if (startupMode === "specific" && startupNote) {
           // Open just the chosen note in a fresh single-slot workspace (the same
-          // shape `seedWelcomeNote` produces). A deleted / unreadable note simply
+          // shape the example-vault seed opens its index note through,
+          // `openInFocusedTab`). A deleted / unreadable note simply
           // surfaces the pane's own missing-note state; we never auto-clear the
           // pref. The saved workspace blob is preserved (staging guard).
           nonDefaultStartupRef.current = true;

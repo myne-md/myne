@@ -1534,6 +1534,29 @@
       "untitled": "Untitled",
       "warning": "This cannot be undone."
     },
+    "example": {
+      "folder": "Getting started",
+      "index": {
+        "title": "Start here",
+        "body": "This is a small example vault. A few ordinary notes that show what Myne can do, and nothing here is special: edit, rename, or delete any of it.\n\n- [[{{markdown}}]] shows how plain text becomes formatting\n- [[{{tasks}}]] gathers checklists into one place\n- [[{{links}}]] connects notes and sorts them with tags\n- [[{{makeItYours}}]] clears all of this in one step\n\nSeen enough? Right-click the **Getting started** folder in the sidebar and choose Delete. The notes move to Trash, so you can bring them back if you change your mind.\n"
+      },
+      "markdown": {
+        "title": "Writing with Markdown",
+        "body": "Myne writes plain Markdown and shows the result as you type.\n\n## The basics\nMake a word **bold** or *italic*, or drop in `inline code`.\n\n## A list\n- One item\n- Another item\n  - A nested one\n\n## A quote\n> Small notes, kept for years, beat big notes you never write.\n\n## A table\n| Shortcut | What it does |\n| --- | --- |\n| Cmd/Ctrl + B | Bold |\n| Cmd/Ctrl + K | Add a link |\n\n## Some code\n```\nconsole.log(\"hello from Myne\")\n```\n\nWhen you are ready, head back to [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Tasks",
+        "body": "Any line that starts with `- [ ]` is a task. Myne collects every open task from across your notes into one Tasks view, so nothing gets lost between notes.\n\n- [ ] Read [[{{markdown}}]]\n- [ ] Add a task of your own\n- [ ] Try one with a due date 📅 2030-12-31\n- [x] Create your vault\n\nCheck a box here, then open the Tasks view in the sidebar to watch the list update.\n\nBack to [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Links and tags",
+        "body": "Type `[[` to link to another note. Links go both ways: open [[{{index}}]] and you will see this note under its backlinks, and the graph draws a line between them.\n\nAdd a #tag anywhere and Myne files the note under it in the tag tree. This note is tagged #example and #getting-started, so open the tag tree in the sidebar to find it.\n\nYour turn: link this note to [[{{tasks}}]], or invent a tag of your own.\n"
+      },
+      "makeItYours": {
+        "title": "Make it yours",
+        "body": "This is your vault now. These notes are only a starting point, so change anything, or clear them and begin fresh.\n\nTo remove the whole example, right-click the **Getting started** folder in the sidebar and choose Delete. Everything moves to Trash together, and you can restore it from there if you want it back.\n\nWhen you are ready, press Cmd/Ctrl + N to make a new note and start writing.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Add condition",
       "addFilterGroup": "Add filter group",
