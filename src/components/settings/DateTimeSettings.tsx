@@ -138,6 +138,12 @@ export function DateTimeSettings() {
         helper={t("settings.dateTime.dateHelper")}
         error={dateError}
         control={
+          // Known deferral (#391): DATE_FORMATS has 5 members, so this is a
+          // 5-option Segmented, over the docs/design "Segmented 2–4, Select 5+"
+          // rule. #391 fixed the reported OVERLAP generally via SettingRow's
+          // narrow-dialog restack, which is the cleaner fix for that bug and
+          // covers every panel; the Segmented→Select migration for this row is
+          // a separate UX change tracked on #391, deliberately not folded in.
           <Segmented
             options={dateOptions}
             value={dateFormat}
