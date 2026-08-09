@@ -24,6 +24,8 @@
 // drops `data-theme`.
 
 import { deriveSyntaxTokensForTheme } from "@myne/syntax-theme";
+import { applyOrnamentAttributes, clearOrnamentAttributes } from "@myne/ornaments";
+import { clampPalette, readMeasureDefaults } from "@myne/theme-measure";
 
 import { HAS_TAURI } from "./app-window";
 import { prefsRead } from "./prefs";
@@ -58,11 +60,26 @@ const PAINT_DEADLINE_MS = 2_000;
 export function applyCustomTheme(palette: ThemePalette): void {
   const root = document.documentElement;
   clearCustomTheme();
+  // Measure defaults are read BEFORE `data-theme` is dropped and while no custom
+  // palette is painted, so what is read is the built-in value rather than the
+  // previous theme's. Shared with desktop (`@myne/theme-measure`) because the
+  // clamp is a protective envelope: two clients disagreeing about the band would
+  // mean one paints a value the other refused (myne#394).
+  const measureDefaults = readMeasureDefaults(root);
   root.removeAttribute("data-theme");
 
+  const { applied } = clampPalette(palette, measureDefaults);
+  // Ornament selections reach CSS as root attributes (CSS cannot branch on a
+  // custom property's value) plus the `data-o-on` flag the layer is scoped
+  // under. The shared package owns both, so no client can reflect and forget.
+  applyOrnamentAttributes(root, applied);
   const keys: string[] = [];
-  for (const [key, value] of Object.entries(palette)) {
-    if (key.startsWith("--")) {
+  for (const [key, value] of Object.entries(applied)) {
+    // `--_o-*` is the ornament layer's private namespace — `--_o-ceiling` is the
+    // bound the tint wash is clamped by. The key grammar allows `_`, so a palette
+    // can carry one; the host filters it on read, and this is the second line of
+    // that defence for any path that reaches here without one (myne#394).
+    if (key.startsWith("--") && !key.startsWith("--_")) {
       root.style.setProperty(key, value);
       keys.push(key);
     }
@@ -92,6 +109,9 @@ export function clearCustomTheme(): void {
   const root = document.documentElement;
   for (const key of appliedCustomKeys) root.style.removeProperty(key);
   appliedCustomKeys = [];
+  // Off with the palette: a leftover attribute would keep a locked screen wearing
+  // the vault's ornament (A6), exactly like a leftover variable.
+  clearOrnamentAttributes(root);
 }
 
 /**

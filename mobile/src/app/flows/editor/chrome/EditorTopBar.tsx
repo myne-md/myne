@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { ornamentRole } from "@myne/ornaments";
 import { useTranslation } from "react-i18next";
 import { Icon, LIST_TOP } from "../../../../components";
 
@@ -50,6 +51,10 @@ export function EditorTopBar({
   return (
     <div
       data-testid="editor.top-bar"
+      // Ornament role (myne#394): a bar is CHROME, so the active theme decides
+      // what bars wear. Declared here rather than in a stylesheet because this
+      // element is where the bar exists.
+      {...ornamentRole("chrome")}
       style={{
         flex: "none",
         padding: `${EDITOR_TOP} 8px 8px`,
