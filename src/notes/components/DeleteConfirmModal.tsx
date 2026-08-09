@@ -180,21 +180,31 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onCancel]);
 
-  // Enter → Confirm, but ONLY for the confirm-focused keyboard soft-trash gate
-  // (MYND-487): `initialFocus="confirm"` promises "Enter confirms / Escape
-  // cancels". An explicit handler is load-bearing — the focus trap places the
-  // confirm button's focus asynchronously and a focused <button>'s Enter→click
-  // default action is not fired reliably across WebViews (WebKitGTK under the
-  // E2E harness), so relying on button focus alone drops the confirm. The
-  // default cancel-focused modals (irreversible folder delete / permanent
-  // purge) deliberately do NOT get this — a stray Enter must never confirm
-  // there; Escape is their documented cancel path.
+  // Enter handling, both branches load-bearing:
+  //
+  // - `initialFocus="confirm"` (reversible keyboard soft-trash gate, MYND-487)
+  //   promises "Enter confirms / Escape cancels". An explicit handler is
+  //   required — the focus trap places the confirm button's focus
+  //   asynchronously and a focused <button>'s Enter→click default action is not
+  //   fired reliably across WebViews (WebKitGTK under the E2E harness), so
+  //   relying on button focus alone drops the confirm.
+  //
+  // - cancel-focused (the default; irreversible folder delete / permanent
+  //   purge, and the recoverable soft-trash confirms we still withhold from
+  //   Enter) swallows Enter as a no-op. Cancel holds initial focus, so a bare
+  //   Enter would otherwise fire its native click and dismiss the dialog
+  //   silently — a close indistinguishable from a successful confirm, so the
+  //   user believes the delete went through when nothing happened (MYND-497 /
+  //   #397). preventDefault stops the focused button's activation; keeping the
+  //   dialog open forces a deliberate click or Tab to a real answer. A stray
+  //   Enter must never confirm here — that reasoning still stands, this only
+  //   stops it from silently cancelling either.
   useEffect(() => {
-    if (initialFocus !== "confirm") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter") return;
       e.preventDefault();
-      onConfirm();
+      if (initialFocus === "confirm") onConfirm();
+      // cancel-focused: swallow — no action, dialog stays open.
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
