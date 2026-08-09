@@ -109,7 +109,7 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
 
       <div
         style={{
-          fontSize: 14,
+          fontSize: "var(--text-base)",
           lineHeight: 1.6,
           color: "var(--fg-2)",
           textAlign: "center",
@@ -119,7 +119,7 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
         {t("vaultCreation.ready.body")}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
         <Button
           variant="ghost"
           icon="folder"
@@ -153,7 +153,7 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
       {backupState === "error" && (
         <div
           data-testid="create.ready-backup-error"
-          style={{ fontSize: 13, color: "var(--fg-2)", textAlign: "center" }}
+          style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", textAlign: "center" }}
         >
           {t("vaultCreation.ready.backupError")}
         </div>

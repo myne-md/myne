@@ -30,6 +30,13 @@ export const SHARED_ROOTS = Object.freeze([
   "editor/src",
   "dialect/src",
   "copy/src",
+  "ornaments/src",
+  // `preview/src` is deliberately ABSENT. It is a captured ARTEFACT (the app's
+  // own DOM and stylesheet, plus one plain-ESM helper), not source compiled into
+  // a client — so the i18n scan has nothing to find there and the token-adoption
+  // ratchet would count the app's own literals a second time. `check-platform-seam`
+  // guards it through its own list, because "no Tauri import" IS meaningful for a
+  // package the website consumes. Stated here so the omission reads as a decision.
   "web/src",
   "myne-mobile/src",
 ]);

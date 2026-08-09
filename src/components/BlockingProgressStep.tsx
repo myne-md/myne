@@ -58,7 +58,7 @@ const ROOT_STYLE: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   background: "var(--bg-1)",
-  padding: 24,
+  padding: "var(--space-5)",
 };
 
 const COLUMN_STYLE: CSSProperties = {
@@ -71,26 +71,26 @@ const COLUMN_STYLE: CSSProperties = {
 
 const EYEBROW_STYLE: CSSProperties = {
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: "var(--fg-3)",
   textAlign: "center",
-  marginTop: 12,
+  marginTop: "var(--space-3)",
 };
 
 const HEADING_STYLE: CSSProperties = {
-  fontSize: 28,
-  fontWeight: 600,
+  fontSize: "var(--text-2xl)",
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "-0.015em",
   lineHeight: 1.2,
   color: "var(--fg-display)",
   textAlign: "center",
-  marginTop: 4,
+  marginTop: "var(--space-1)",
 };
 
 const SUB_CAPTION_STYLE: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   lineHeight: 1.5,
   color: "var(--fg-3)",
   textAlign: "center",
@@ -98,7 +98,7 @@ const SUB_CAPTION_STYLE: CSSProperties = {
 };
 
 const CAPTION_STYLE: CSSProperties = {
-  fontSize: 14,
+  fontSize: "var(--text-base)",
   lineHeight: 1.6,
   color: "var(--fg-2)",
   textAlign: "center",
@@ -109,7 +109,7 @@ const FOOTER_STYLE: CSSProperties = {
   lineHeight: 1.5,
   color: "var(--fg-3)",
   textAlign: "center",
-  marginTop: 32,
+  marginTop: "var(--space-6)",
   maxWidth: 320,
 };
 

@@ -46,8 +46,8 @@ const ROW_STYLE: CSSProperties = {
 
 const TITLE_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: 14,
-  fontWeight: 500,
+  fontSize: "var(--text-base)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-1)",
   overflow: "hidden",
   textOverflow: "ellipsis",

@@ -80,9 +80,9 @@ export function RepairResidueBanner() {
       data-testid="repair-residue.banner"
       style={{
         border: "1px solid var(--line-1)",
-        borderRadius: 10,
+        borderRadius: "var(--radius-3)",
         background: "var(--bg-2)",
-        padding: 16,
+        padding: "var(--space-4)",
         display: "flex",
         flexDirection: "column",
         gap: 10,
@@ -102,7 +102,7 @@ export function RepairResidueBanner() {
 function BannerBody({ phase }: { phase: Phase }) {
   const { t } = useTranslation();
   const Title = ({ children }: { children: string }) => (
-    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>
+    <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
       {children}
     </div>
   );
@@ -185,7 +185,7 @@ function BannerActions({
     case "sweeping": {
       const busy = phase.kind === "sweeping";
       return (
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
           <Button variant="ghost" disabled={busy} onClick={() => onCancel(phase.count)}>
             {t("welcome.repairResidue.cancel")}
           </Button>

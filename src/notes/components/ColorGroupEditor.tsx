@@ -50,12 +50,12 @@ const PALETTE: ReadonlyArray<{ key: string; label: string }> = [
 ];
 
 const SECTION_HEADING_STYLE: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-3)",
   textTransform: "uppercase",
   letterSpacing: "0.02em",
-  marginTop: 4,
+  marginTop: "var(--space-1)",
 };
 
 const ROW_STYLE: CSSProperties = {
@@ -75,7 +75,7 @@ const NAME_INPUT_STYLE: CSSProperties = {
   color: "var(--fg-1)",
   background: "transparent",
   border: "1px solid transparent",
-  borderRadius: 3,
+  borderRadius: "var(--radius-1)",
   padding: "2px 4px",
   outline: "none",
 };
@@ -123,7 +123,7 @@ const FILTER_ROW_STYLE: CSSProperties = {
   alignItems: "center",
   gap: 6,
   padding: "0 2px 4px 22px",
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
 };
 
@@ -216,7 +216,7 @@ export function ColorGroupEditor() {
 
       {rules.length === 0 ? (
         <div data-testid="editor.color-groups-empty" style={EMPTY_HINT_STYLE}>
-          <p style={{ margin: "0 0 2px", color: "var(--fg-2)", fontWeight: 500 }}>
+          <p style={{ margin: "0 0 2px", color: "var(--fg-2)", fontWeight: "var(--weight-medium)" }}>
             {t("notes.graph.colorGroups.emptyTitle")}
           </p>
           <p style={{ margin: "0 0 6px" }}>{t("notes.graph.colorGroups.emptyBody")}</p>
@@ -353,7 +353,7 @@ export function ColorGroupEditor() {
           alignSelf: "flex-start",
           display: "flex",
           alignItems: "center",
-          gap: 4,
+          gap: "var(--space-1)",
           fontSize: 12,
           padding: "4px 8px",
           background: "var(--bg-1)",

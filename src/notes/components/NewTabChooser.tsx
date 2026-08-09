@@ -59,7 +59,7 @@ const CARD: CSSProperties = {
 const SEARCH_ROW: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   padding: "11px 14px",
   borderBottom: "1px solid var(--line-1)",
   color: "var(--fg-3)",
@@ -75,14 +75,14 @@ const INPUT: CSSProperties = {
   background: "transparent",
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",
-  fontSize: 14,
+  fontSize: "var(--text-base)",
 };
 
 const SECTION_LABEL: CSSProperties = {
   padding: "10px 14px 4px",
   fontFamily: "var(--font-sans)",
-  fontSize: 11,
-  fontWeight: 600,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
   color: "var(--fg-3)",
@@ -100,7 +100,7 @@ const LIST: CSSProperties = {
 const ROW: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   width: "100%",
   padding: "8px 8px",
   border: 0,
@@ -110,14 +110,14 @@ const ROW: CSSProperties = {
   cursor: "pointer",
   textAlign: "start",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   transition: HOVER_TRANSITION,
 };
 
 const EMPTY: CSSProperties = {
   padding: "16px 14px",
   color: "var(--fg-3)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   textAlign: "center",
 };
 
@@ -144,8 +144,8 @@ const ACTION_ROW: CSSProperties = {
   cursor: "pointer",
   textAlign: "start",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   transition: HOVER_TRANSITION,
 };
 

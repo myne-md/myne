@@ -29,7 +29,7 @@ interface CleanUnusedAttachmentsDialogProps {
 const BODY_STYLE: CSSProperties = {
   padding: "var(--space-4) var(--space-5)",
   fontFamily: "var(--font-sans)",
-  fontSize: 14,
+  fontSize: "var(--text-base)",
   color: "var(--fg-1)",
   display: "flex",
   flexDirection: "column",
@@ -57,7 +57,7 @@ const THUMB_BOX_STYLE: CSSProperties = {
   width: 40,
   height: 40,
   flex: "0 0 auto",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   overflow: "hidden",
   border: "1px solid var(--line-1)",
   display: "flex",
@@ -68,7 +68,7 @@ const THUMB_BOX_STYLE: CSSProperties = {
 
 const NAME_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   wordBreak: "break-all",
   flex: "1 1 auto",
@@ -88,7 +88,7 @@ const FOOTER_STYLE: CSSProperties = {
 };
 
 const ERROR_STYLE: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--danger)",
 };
 
@@ -210,7 +210,7 @@ export function CleanUnusedAttachmentsDialog({
             </li>
           ))}
         </ul>
-        <div style={{ color: "var(--fg-3)", fontSize: 13 }}>
+        <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>
           {t("attachments.cleanUnused.willBeReclaimed", {
             size: formatBytes(totalBytes),
           })}

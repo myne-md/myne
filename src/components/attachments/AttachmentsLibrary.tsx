@@ -203,7 +203,7 @@ const SEARCH_INPUT_STYLE: CSSProperties = {
   boxShadow: "none",
   background: "transparent",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
 
@@ -250,7 +250,7 @@ const CENTER_MESSAGE_STYLE: CSSProperties = {
   gap: "var(--space-3)",
   color: "var(--fg-3)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   textAlign: "center",
 };
 
@@ -269,7 +269,7 @@ const CLEAN_NOTICE_STYLE: CSSProperties = {
   border: "1px solid var(--line-1)",
   boxShadow: "var(--shadow-2, 0 4px 16px rgba(0,0,0,0.18))",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   zIndex: 10,
 };
@@ -982,8 +982,8 @@ const TOOLBAR_BUTTON_STYLE: CSSProperties = {
   height: 30,
   padding: "0 var(--space-3)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-1)",
   background: "var(--bg-1)",
   border: "1px solid var(--line-2)",
@@ -1082,7 +1082,7 @@ function EmptyState(props: EmptyStateProps) {
     return (
       <div style={CENTER_MESSAGE_STYLE} data-testid="attachments.empty-no-results">
         <Icon name="search" size={40} style={{ color: "var(--fg-3)" }} />
-        <div style={{ fontSize: 14, color: "var(--fg-2)" }}>
+        <div style={{ fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
           {t("attachments.library.emptyNoResultsTitle")}
         </div>
         <button
@@ -1097,7 +1097,7 @@ function EmptyState(props: EmptyStateProps) {
             borderRadius: "var(--radius-1)",
             cursor: "pointer",
             fontFamily: "var(--font-sans)",
-            fontSize: 13,
+            fontSize: "var(--text-sm)",
             color: "var(--accent)",
             transition: HOVER_TRANSITION,
           }}
@@ -1111,7 +1111,7 @@ function EmptyState(props: EmptyStateProps) {
   return (
     <div style={CENTER_MESSAGE_STYLE} data-testid="attachments.empty-no-attachments">
       <Icon name="paperclip" size={40} style={{ color: "var(--fg-3)" }} />
-      <div style={{ fontSize: 14, color: "var(--fg-2)" }}>
+      <div style={{ fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
         {props.loadError
           ? t("attachments.library.emptyLoadError")
           : t("attachments.library.emptyNoAttachments")}
@@ -1209,11 +1209,11 @@ function RenameInput({
       style={{
         width: "100%",
         fontFamily: "var(--font-sans)",
-        fontSize: 13,
+        fontSize: "var(--text-sm)",
         color: "var(--fg-1)",
         background: "var(--paper-1, var(--bg-1))",
         border: "1px solid var(--accent)",
-        borderRadius: 3,
+        borderRadius: "var(--radius-1)",
         padding: "2px 5px",
         outline: "none",
       }}
@@ -1360,7 +1360,7 @@ const MENU_ITEM_STYLE: CSSProperties = {
   border: 0,
   cursor: "pointer",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   whiteSpace: "nowrap",
 };
@@ -1724,14 +1724,14 @@ const TILE_META_STYLE: CSSProperties = {
   padding: "var(--space-2) var(--space-3)",
   display: "flex",
   flexDirection: "column",
-  gap: 4,
+  gap: "var(--space-1)",
   minWidth: 0,
 };
 
 const FILENAME_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-1)",
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -1740,7 +1740,7 @@ const FILENAME_STYLE: CSSProperties = {
 
 const SUBTEXT_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
 };
 
@@ -1875,8 +1875,8 @@ const LIST_HEADER_STYLE: CSSProperties = {
   ...LIST_ROW_STYLE,
   padding: "var(--space-2)",
   fontFamily: "var(--font-sans)",
-  fontSize: 11,
-  fontWeight: 600,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   color: "var(--fg-3)",
@@ -1949,7 +1949,7 @@ function AttachmentListRow({
         style={{
           width: 28,
           height: 28,
-          borderRadius: 3,
+          borderRadius: "var(--radius-1)",
           overflow: "hidden",
           border: "1px solid var(--line-1)",
         }}

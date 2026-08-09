@@ -77,7 +77,7 @@ const VAULT_CARD_STYLE: CSSProperties = { ...CARD_STYLE, width: 480 };
 
 const FIELD_LABEL_STYLE: CSSProperties = {
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-3)",
 };
 
@@ -112,7 +112,7 @@ const RADIO_ROW_STYLE: CSSProperties = {
   padding: "2px 0",
   cursor: "pointer",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   textAlign: "start",
 };
@@ -123,7 +123,7 @@ const FOLDER_SELECT_STYLE: CSSProperties = {
   marginInlineStart: "calc(14px + var(--space-2))",
   height: 32,
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   background: "var(--paper-2)",
   border: "1px solid var(--line-1)",
@@ -133,7 +133,7 @@ const FOLDER_SELECT_STYLE: CSSProperties = {
 
 const ERROR_LINE_STYLE: CSSProperties = {
   margin: 0,
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   lineHeight: 1.5,
   color: "var(--danger)",
 };
@@ -425,7 +425,7 @@ export function VaultExportModal({
               {t("export.vault.running.title")}
             </h2>
             <div
-              style={{ ...MONO, fontSize: 13, color: "var(--fg-1)" }}
+              style={{ ...MONO, fontSize: "var(--text-sm)", color: "var(--fg-1)" }}
               data-testid="vault-export.progress"
             >
               {formatRunningCounts(state.progress)}
@@ -462,7 +462,7 @@ export function VaultExportModal({
               {t("export.vault.summary.title")}
             </h2>
             <div style={SUB_PANEL_STYLE} data-testid="vault-export.summary">
-              <span style={{ fontSize: 13, color: "var(--fg-1)" }}>
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-1)" }}>
                 {formatSummaryCounts(state.summary)}
               </span>
               {exclusionsLine !== null && (

@@ -47,8 +47,8 @@ const MESSAGE_STYLE: CSSProperties = {
   display: "grid",
   placeItems: "center",
   color: "var(--fg-3)",
-  fontSize: 13,
-  padding: 24,
+  fontSize: "var(--text-sm)",
+  padding: "var(--space-5)",
   textAlign: "center",
 };
 
@@ -187,7 +187,7 @@ export function TagBrowser({
             flex: "0 0 auto",
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            gap: "var(--space-2)",
             padding: "10px 16px",
             borderBottom: "1px solid var(--line-1)",
           }}
@@ -202,7 +202,7 @@ export function TagBrowser({
             style={{
               flex: 1,
               minWidth: 0,
-              fontSize: 13,
+              fontSize: "var(--text-sm)",
               fontFamily: "var(--font-sans)",
               padding: "6px 10px",
               background: "var(--bg-1)",
@@ -229,11 +229,11 @@ export function TagBrowser({
           }}
         >
           {allRows.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
               {t("notes.tagBrowser.noTagsYet")}
             </span>
           ) : chips.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
               {t("notes.tagBrowser.noTagsMatch", { query })}
             </span>
           ) : (
@@ -278,7 +278,7 @@ export function TagBrowser({
             flex: "0 0 auto",
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            gap: "var(--space-2)",
             padding: "10px 16px 6px",
           }}
         >
@@ -339,7 +339,7 @@ export function TagBrowser({
               flex: "0 0 auto",
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: "var(--space-2)",
               padding: "0 16px 8px",
             }}
           >
@@ -357,7 +357,7 @@ export function TagBrowser({
               style={{
                 flex: 1,
                 minWidth: 0,
-                fontSize: 13,
+                fontSize: "var(--text-sm)",
                 fontFamily: "var(--font-sans)",
                 padding: "6px 10px",
                 background: "var(--bg-1)",
@@ -411,7 +411,7 @@ export function TagBrowser({
             padding: "0 16px 14px",
             display: "flex",
             flexDirection: "column",
-            gap: 8,
+            gap: "var(--space-2)",
           }}
         >
           {!hasSelection ? (
@@ -430,16 +430,16 @@ export function TagBrowser({
                 {...hoverSurface({ restBg: "var(--bg-1)" })}
                 style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
               >
-                <span style={{ fontSize: 13, fontWeight: 500, color: "var(--accent)" }}>
+                <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)", color: "var(--accent)" }}>
                   {r.title ?? t("notes.tagBrowser.untitled")}
                 </span>
                 {mode === "or" && r.matchedKeys.length > 0 && (
-                  <span style={{ display: "inline-flex", gap: 4, marginInlineStart: 8 }}>
+                  <span style={{ display: "inline-flex", gap: "var(--space-1)", marginInlineStart: 8 }}>
                     {r.matchedKeys.map((k) => (
                       <span
                         key={k}
                         style={{
-                          fontSize: 11,
+                          fontSize: "var(--text-xs)",
                           color: "var(--accent)",
                           background: "var(--accent-soft)",
                           borderRadius: "var(--radius-pill)",

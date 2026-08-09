@@ -349,7 +349,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
             <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>{t("sync.devices.verifySyncing")}</span>
           ) : sas.fingerprint ? (
             <span
-              style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xl)", fontWeight: 700, letterSpacing: "0.14em", color: "var(--fg-1)" }}
+              style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xl)", fontWeight: "var(--weight-bold)", letterSpacing: "0.14em", color: "var(--fg-1)" }}
               data-testid="sync.sas-fingerprint"
             >
               {sas.fingerprint}
@@ -477,7 +477,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
         <div style={SECTION_LABEL}>{t("sync.devices.yourDevices")}</div>
         {renameFailed && (
           <div
-            style={{ color: "var(--danger)", fontSize: "var(--text-sm)", paddingBottom: 4 }}
+            style={{ color: "var(--danger)", fontSize: "var(--text-sm)", paddingBottom: "var(--space-1)" }}
             data-testid="sync.rename-error"
           >
             {t("sync.devices.renameFailed")}
@@ -634,7 +634,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                 // "identical to desktop" true by construction rather than by
                 // review — there is one implementation and both clients mount it.
                 <div style={CONFIRM_BOX} data-testid="sync.remove-confirm">
-                  <span style={{ fontWeight: 600 }}>{REMOVE_DEVICE_CONFIRM}</span>
+                  <span style={{ fontWeight: "var(--weight-semibold)" }}>{REMOVE_DEVICE_CONFIRM}</span>
                   <span style={{ color: "var(--fg-2)" }} data-testid="sync.remove-disclosure">
                     {REMOVE_DEVICE_DISCLOSURE}
                   </span>

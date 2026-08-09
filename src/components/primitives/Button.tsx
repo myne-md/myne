@@ -17,10 +17,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const baseStyle: CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   padding: "7px 14px",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",

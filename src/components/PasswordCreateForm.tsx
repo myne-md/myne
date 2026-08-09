@@ -183,7 +183,7 @@ export function PasswordCreateForm({
             style={{
               fontFamily: "var(--font-sans)",
               fontSize: 12,
-              fontWeight: 500,
+              fontWeight: "var(--weight-medium)",
               color: "var(--accent)",
               background: "none",
               border: 0,
@@ -217,7 +217,7 @@ export function PasswordCreateForm({
         testId={tid("confirm-input")}
       />
 
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         {secondaryAction && (
           <Button
             variant="ghost"

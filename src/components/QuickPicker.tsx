@@ -80,11 +80,11 @@ const LIST_STYLE: CSSProperties = { flex: 1, overflowY: "auto", padding: 6 };
 const ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   padding: "8px 10px",
   borderRadius: "var(--radius-1, 3px)",
   cursor: "pointer",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
 // accent-soft (not --paper-2) so the active row stays visible on AMOLED, where
@@ -98,13 +98,13 @@ const LABEL_STYLE: CSSProperties = {
   whiteSpace: "nowrap",
 };
 const SUBLABEL_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   flexShrink: 0,
 };
 const EMPTY_STYLE: CSSProperties = {
   padding: "20px 16px",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
   textAlign: "center",
 };

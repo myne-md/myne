@@ -35,7 +35,7 @@ use std::sync::OnceLock;
 use crate::host::tauri_host::TauriHost;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
-use theme_validator::validate_theme;
+use theme_validator::validate_theme_for_import;
 use tokio::sync::Mutex;
 
 /// Build-time coupling guard: the `vault.meta` account-hash field and the
@@ -418,7 +418,23 @@ pub async fn write_themes_map_in_dir(
 fn vetted(palette: &ThemePalette) -> ThemePalette {
     palette
         .iter()
+        // SAFETY (threat-model §149): the injection guard. A value here reaches
+        // the DOM and executes. Never widen this.
         .filter(|(k, v)| theme_validator::is_allowed_key(k) && theme_validator::is_allowed_value(v))
+        // The ornament layer's INTERNAL variables (`--_o-ceiling`, `--_o-strength`,
+        // `--_o-frame`, …) are reachable by the key grammar — `_` is an allowed
+        // character — and `applyCustomTheme` writes every `--*` key onto `:root`.
+        // Today the cascade contains that (the consuming rules re-declare what
+        // matters, and no allowed value is a valid <image> or <shadow>), but that
+        // containment is an accident one refactor deep: hoisting `--_o-ceiling` to
+        // `:root` would hand a theme the opacity ceiling it is bounded by. The
+        // prefix is reserved here so the property is structural, not incidental.
+        .filter(|(k, _)| !k.starts_with("--_"))
+        // MEANING (myne#394): an ornament value a NEWER peer knows and this build
+        // does not renders plain rather than failing. Widening this is free, and
+        // keeping the two filters separate is what stops a compatibility
+        // relaxation from reading like a security one.
+        .filter(|(k, v)| theme_validator::is_known(k, v))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect()
 }
@@ -442,11 +458,50 @@ fn live_entries(map: &ThemesMap) -> Vec<ThemeListEntry> {
 /// One **live** theme's [`vetted`] palette by name, or
 /// [`ThemesError::NotFound`] — which a tombstoned name also yields (it reads as
 /// absent).
+/// A single live palette, vetted and **gated on readability** (myne#394).
+///
+/// The contrast gate runs HERE as well as at import, and the distinction between
+/// this and [`themes_list_in_dir`] is the whole point: `read` is what an *apply*
+/// goes through, `list` is what the picker goes through. Gating only import left
+/// three populations permanently ungated — palettes sealed before the gate
+/// existed, palettes arriving by sync from a device on an older build, and
+/// palettes reinstated wholesale by a backup restore. `decisions.md` 2026-08-06
+/// clause (e) says "refused at apply time", and this is what makes that true.
+///
+/// The picker is deliberately NOT gated: a peer's unreadable palette must still
+/// be listed and nameable (so the user can delete it), and blanking the picker
+/// over one bad entry is the failure the read path's filter-don't-reject rule
+/// exists to prevent. Refusing at the moment of *use* is the narrowest place the
+/// refusal can live.
 fn live_palette(map: &ThemesMap, name: &str) -> Result<ThemePalette, ThemesError> {
-    map.get(name)
+    live_palette_gated(map, name, true)
+}
+
+/// [`live_palette`], with the readability gate optional.
+///
+/// **Export does not gate, and that is deliberate.** The contrast floor exists so
+/// an unreadable palette cannot be WORN; it has nothing to say about whether the
+/// user may have their file back. Routing export through the gated read made a
+/// stored theme un-exportable — a grandfathered one, or one whose gated colour is
+/// a bare keyword the gate refuses rather than skips — which is the one outcome
+/// "you walk away with your files" does not permit. The user can still delete it,
+/// still see it listed, and now still get it out; what they cannot do is apply it
+/// (myne#394).
+fn live_palette_gated(
+    map: &ThemesMap,
+    name: &str,
+    gate_contrast: bool,
+) -> Result<ThemePalette, ThemesError> {
+    let palette = map
+        .get(name)
         .filter(|e| !e.is_tombstone())
         .map(|e| vetted(&e.palette))
-        .ok_or(ThemesError::NotFound)
+        .ok_or(ThemesError::NotFound)?;
+    if gate_contrast {
+        theme_validator::check_contrast(&palette)
+            .map_err(|error| ThemesError::Invalid { error })?;
+    }
+    Ok(palette)
 }
 
 /// PURE CORE — the name-sorted list of **live** custom themes in the store,
@@ -553,9 +608,13 @@ pub async fn themes_import_in_dir(
     palette_json: &str,
     now: u64,
 ) -> Result<(), ThemesError> {
-    // Security-load-bearing injection guard (threat-model §149): a value that
-    // reaches the DOM executes under the WebView's `style-src 'unsafe-inline'`.
-    let parsed = validate_theme(palette_json).map_err(|error| ThemesError::Invalid { error })?;
+    // The full import gate in one call (threat-model §149 injection guard, then
+    // the WCAG floors). One entry point rather than two calls per site: composing
+    // the pair by convention already failed once — the readability gate reached
+    // only this function and not its sibling below, and every unit test stayed
+    // green while the real command shipped unguarded (myne#394).
+    let parsed =
+        validate_theme_for_import(palette_json).map_err(|error| ThemesError::Invalid { error })?;
     let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await?;
     apply_import(&mut map, name, parsed.vars, now);
     write_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash, &map).await
@@ -661,14 +720,25 @@ pub async fn themes_read_with_dir(
     live_palette(&read_themes_map_with_dir(io, vault_dir, state).await?, name)
 }
 
-/// Testable core of [`themes_export`] (byte-identical to the read core).
+/// Testable core of [`themes_export`] — the read core WITHOUT the readability
+/// gate.
+///
+/// It used to delegate to [`themes_read_with_dir`] verbatim, which meant the
+/// contrast floor gated export too: a palette that fails the floor could not be
+/// got out of the app at all. Refusing to let someone WEAR an unreadable theme is
+/// the point of the gate; refusing to let them keep a copy of their own file is
+/// not (myne#394).
 pub async fn themes_export_with_dir(
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     name: &str,
 ) -> Result<ThemePalette, ThemesError> {
-    themes_read_with_dir(io, vault_dir, state, name).await
+    live_palette_gated(
+        &read_themes_map_with_dir(io, vault_dir, state).await?,
+        name,
+        false,
+    )
 }
 
 /// Testable core of [`themes_import`]. Validation runs BEFORE the SYNC-6 write
@@ -682,7 +752,10 @@ pub async fn themes_import_with_dir(
     name: &str,
     palette_json: &str,
 ) -> Result<(), ThemesError> {
-    let parsed = validate_theme(palette_json).map_err(|error| ThemesError::Invalid { error })?;
+    // Same one gate as the `_in_dir` sibling — see its comment for why this is a
+    // single call rather than a composition each site re-performs.
+    let parsed =
+        validate_theme_for_import(palette_json).map_err(|error| ThemesError::Invalid { error })?;
     let vars = parsed.vars;
     let now = host.now_unix_secs();
     mutate_themes_with_dir(io, vault_dir, state, hooks, |map| {
@@ -950,12 +1023,26 @@ mod tests {
 
     /// A complete, well-formed minimal-core palette JSON (every required key,
     /// valid hex values) under `name`, as a JSON string.
+    ///
+    /// The ink/paper tokens carry REAL values rather than one filler colour,
+    /// because import now runs the WCAG gate (myne#394) and a palette of
+    /// identical hexes measures 1.00:1 — every gated pair would fail. The five
+    /// gated tokens are the only ones that have to be honest; the rest stay
+    /// filler, which keeps the fixture's intent (structure, not aesthetics)
+    /// legible.
     fn valid_palette_json() -> String {
         let mut s = String::from("{\n");
         let keys = theme_validator::REQUIRED_KEYS;
         for (i, key) in keys.iter().enumerate() {
             let comma = if i + 1 < keys.len() { "," } else { "" };
-            s.push_str(&format!("  \"{key}\": \"#123456\"{comma}\n"));
+            let value = match *key {
+                "--paper" | "--paper-2" | "--paper-3" => "#ffffff",
+                "--ink-0" | "--ink-1" => "#1a1a17",
+                "--ink-2" => "#5c5c50",
+                "--accent" => "#8a5a2b",
+                _ => "#123456",
+            };
+            s.push_str(&format!("  \"{key}\": \"{value}\"{comma}\n"));
         }
         s.push('}');
         s
@@ -1167,6 +1254,112 @@ mod tests {
             .collect()
     }
 
+    /// A palette that is *stored* but fails the readability floor.
+    ///
+    /// Written straight into the map rather than through import, because import
+    /// refuses it — which is the whole point: these are the palettes that got in
+    /// before the gate existed, arrived by sync from an older device, or came
+    /// back with a backup restore.
+    fn seal_unreadable(vault_dir: &Path, name: &str) {
+        let mut map = ThemesMap::new();
+        let mut palette = ThemePalette::new();
+        for key in theme_validator::REQUIRED_KEYS {
+            // Ink equal to paper: perfectly safe, perfectly unreadable, 1.00:1.
+            palette.insert((*key).into(), "#ffffff".into());
+        }
+        map.insert(name.into(), ThemeEntry::live(palette, T0));
+        write_themes_map_in_dir(vault_dir, &KEY, &HASH, &map).expect("write");
+    }
+
+    #[test]
+    fn an_unreadable_stored_palette_cannot_be_worn() {
+        // The 2026-08-07 entry's thesis was that the gate reached one import path
+        // and not its sibling, every unit test stayed green, and only an E2E
+        // scenario noticed. The read-path gate shipped with the same shape: delete
+        // `check_contrast` from `live_palette` and nothing in the repo failed.
+        let tmp = ScopedTempDir::new("themes-unreadable-read").expect("tmp");
+        seal_unreadable(tmp.path(), "flat");
+        let err = themes_read_in_dir(tmp.path(), &KEY, &HASH, "flat")
+            .expect_err("an unreadable palette must not be applicable");
+        assert!(
+            matches!(err, ThemesError::Invalid { .. }),
+            "expected Invalid, got {err:?}",
+        );
+    }
+
+    #[test]
+    fn an_unreadable_stored_palette_is_still_listed() {
+        // Deliberately NOT gated: a peer's bad palette must stay visible so the
+        // user can find and delete it. Blanking the picker over one bad entry is
+        // the failure the read path's filter-don't-reject rule exists to prevent.
+        let tmp = ScopedTempDir::new("themes-unreadable-list").expect("tmp");
+        seal_unreadable(tmp.path(), "flat");
+        assert_eq!(list_names(tmp.path()), vec!["flat"]);
+    }
+
+    #[test]
+    fn vetted_strips_the_reserved_namespace_and_unknown_ornament_values() {
+        // `--_o-ceiling` is the bound the tint wash is clamped by; a palette that
+        // could set it could raise its own ceiling. An ornament value this build
+        // does not know renders plain rather than failing — the forward-compat
+        // contract an older client depends on.
+        let mut palette = ThemePalette::new();
+        palette.insert("--accent".into(), "#8a5a2b".into());
+        palette.insert("--_o-ceiling".into(), "1".into());
+        palette.insert("--box-frame".into(), "thick".into());
+        // An ornament key this build knows, carrying a value it does not.
+        palette.insert("--box-texture".into(), "quilted".into());
+        // A role×primitive pair the sparse matrix refuses outright.
+        palette.insert("--chrome-fold".into(), "dogear".into());
+
+        let out = vetted(&palette);
+        assert_eq!(out.get("--accent").map(String::as_str), Some("#8a5a2b"));
+        assert_eq!(out.get("--box-frame").map(String::as_str), Some("thick"));
+        assert!(
+            !out.contains_key("--_o-ceiling"),
+            "reserved namespace leaked"
+        );
+        // The half this test used to NAME and never check: deleting the
+        // `is_known` filter left the previous version green, because it asserted
+        // only the two survivors and the reserved key.
+        assert!(
+            !out.contains_key("--box-texture"),
+            "unknown ornament value survived vetting"
+        );
+        // …and the distinction that is easy to get backwards, pinned so it is a
+        // decision rather than an accident. An unrecognized VALUE on a cell this
+        // build owns is dropped: the build knows what `--box-texture` means and
+        // knows `quilted` is not one of the answers. A refused CELL is NOT
+        // dropped — `classify_key` returns `Other` for it, which is the same
+        // answer it gives a key from a vocabulary that does not exist yet, and
+        // this build genuinely cannot tell those apart. Dropping it would make
+        // an export round-trip lose a newer peer's ornament, which is the
+        // forward-compat property §9.21.2 promises. It is safe because it is
+        // still key- and value-allowlisted, and because reflection is gated
+        // separately: `ornamentAttributes` filters through `roleAccepts`, so no
+        // `data-o-chrome-fold` ever reaches the DOM.
+        assert_eq!(
+            out.get("--chrome-fold").map(String::as_str),
+            Some("dogear"),
+            "a refused cell must survive vetting — it is indistinguishable from a future key"
+        );
+    }
+
+    #[test]
+    fn an_unreadable_palette_can_still_be_exported() {
+        // "You walk away with your files." The floor stops a theme being WORN; it
+        // has no business stopping the user keeping a copy. Export used to
+        // delegate to the gated read verbatim, which made such a palette
+        // impossible to get out of the app at all.
+        let tmp = ScopedTempDir::new("themes-unreadable-export").expect("tmp");
+        seal_unreadable(tmp.path(), "flat");
+        let map = read_themes_map_in_dir(tmp.path(), &KEY, &HASH);
+        let exported = super::live_palette_gated(&map, "flat", false).expect("export must work");
+        assert!(!exported.is_empty());
+        // …and the same map, gated, refuses — so the two paths really do differ.
+        assert!(super::live_palette_gated(&map, "flat", true).is_err());
+    }
+
     #[test]
     fn seal_then_read_map_round_trips_with_fixed_key() {
         let tmp = ScopedTempDir::new("themes-roundtrip").expect("tmp");
@@ -1243,7 +1436,7 @@ mod tests {
         assert_eq!(list_names(tmp.path()), vec!["solar"]);
         // read
         let palette = themes_read_in_dir(tmp.path(), &KEY, &HASH, "solar").expect("read");
-        assert_eq!(palette.get("--accent").map(String::as_str), Some("#123456"));
+        assert_eq!(palette.get("--accent").map(String::as_str), Some("#8a5a2b"));
         assert_eq!(palette.len(), theme_validator::REQUIRED_KEYS.len());
         // export reads through the same core
         let exported = themes_read_in_dir(tmp.path(), &KEY, &HASH, "solar").expect("export");
@@ -1401,7 +1594,7 @@ mod tests {
         );
         assert_eq!(
             palette.get("--ink-1").map(String::as_str),
-            Some("#123456"),
+            Some("#1a1a17"),
             "every well-formed token is kept — this filters, it does not reject"
         );
 

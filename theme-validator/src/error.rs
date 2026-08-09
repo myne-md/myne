@@ -43,6 +43,21 @@ pub enum ThemeErrorKind {
     /// A theme name failed the desktop plugin's `is_valid_theme_name` (path
     /// traversal / separators / out-of-charset).
     InvalidName,
+    /// A colour pair fell below its WCAG floor (`contrast::CONTRAST_RULES`), so
+    /// the palette is unreadable rather than unsafe. `key` carries the
+    /// foreground token, `against` the background, and `ratio` / `min` the
+    /// measured and required values (myne#394).
+    LowContrast,
+    /// The theme carries a key in the ornament layer's private `--_` namespace
+    /// (`--_o-ceiling` and friends). `key` carries it.
+    ///
+    /// Distinct from [`InvalidValue`] because the key is perfectly well-formed —
+    /// the key grammar admits `_` — and the objection is ownership, not shape:
+    /// those variables are the bounds Myne's own stylesheet clamps a theme by,
+    /// so a theme that could write one could raise its own ceiling. Five
+    /// consumers filter the prefix on read; this is the boundary that stops it
+    /// entering the ecosystem at all (myne#394).
+    ReservedKey,
 }
 
 /// A single theme-validation failure, rich enough for the picker UI (and the
@@ -66,6 +81,34 @@ pub struct ThemeError {
     /// The 1-based source line, when the failure is a locatable parse error.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line: Option<usize>,
+    /// The background token a [`ThemeErrorKind::LowContrast`] failure measured
+    /// `key` against. `None` for every other kind.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub against: Option<String>,
+    /// The measured contrast ratio, formatted to two decimals. Carried as a
+    /// string so this type keeps its `Eq` derive — `f64` is not `Eq`, and a
+    /// ratio is a display value here rather than something to compare.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ratio: Option<String>,
+    /// The floor the pair had to clear, formatted the way the rule states it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<String>,
+}
+
+impl Default for ThemeError {
+    /// The all-absent shape every constructor starts from. Exists so adding a
+    /// sixth field is one edit rather than one per constructor — the struct has
+    /// public fields and `skip_serializing_if`, so nothing else would force them.
+    fn default() -> Self {
+        ThemeError {
+            kind: ThemeErrorKind::ParseError,
+            key: None,
+            line: None,
+            against: None,
+            ratio: None,
+            min: None,
+        }
+    }
 }
 
 impl ThemeError {
@@ -73,8 +116,8 @@ impl ThemeError {
     pub fn parse(line: Option<usize>) -> Self {
         ThemeError {
             kind: ThemeErrorKind::ParseError,
-            key: None,
             line,
+            ..Default::default()
         }
     }
 
@@ -83,7 +126,7 @@ impl ThemeError {
         ThemeError {
             kind: ThemeErrorKind::MissingKey,
             key: Some(key.into()),
-            line: None,
+            ..Default::default()
         }
     }
 
@@ -92,7 +135,16 @@ impl ThemeError {
         ThemeError {
             kind: ThemeErrorKind::InvalidValue,
             key: Some(key.into()),
-            line: None,
+            ..Default::default()
+        }
+    }
+
+    /// A key in the ornament layer's reserved `--_` namespace.
+    pub fn reserved_key(key: impl Into<String>) -> Self {
+        ThemeError {
+            kind: ThemeErrorKind::ReservedKey,
+            key: Some(key.into()),
+            ..Default::default()
         }
     }
 
@@ -100,8 +152,26 @@ impl ThemeError {
     pub fn invalid_name() -> Self {
         ThemeError {
             kind: ThemeErrorKind::InvalidName,
-            key: None,
+            ..Default::default()
+        }
+    }
+
+    /// A colour pair below its WCAG floor. Carries both token names and both
+    /// numbers, because "your theme is unreadable" without them is not a thing
+    /// an author can act on.
+    pub fn low_contrast(
+        fg: impl Into<String>,
+        bg: impl Into<String>,
+        ratio: f64,
+        min: f64,
+    ) -> Self {
+        ThemeError {
+            kind: ThemeErrorKind::LowContrast,
+            key: Some(fg.into()),
             line: None,
+            against: Some(bg.into()),
+            ratio: Some(format!("{ratio:.2}")),
+            min: Some(format!("{min}")),
         }
     }
 }

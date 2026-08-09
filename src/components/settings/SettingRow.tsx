@@ -32,8 +32,11 @@ import {
   ERROR_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
+  TOGGLE_ROW_COMPACT_STYLE,
   TOGGLE_ROW_STYLE,
 } from "./panel-styles";
+import { ornamentRole } from "@myne/ornaments";
+import { useSettingsCompact } from "./settingsCompact";
 
 interface SettingRowProps {
   /** The setting's name, rendered left. Already localised — call `t()` at the
@@ -76,6 +79,9 @@ export function SettingRow({
   children,
 }: SettingRowProps) {
   const helperId = useId();
+  // Narrow dialog: restack the control under the label so a shrinking label
+  // cell can never paint over the control (#391).
+  const compact = useSettingsCompact();
 
   return (
     <div
@@ -83,9 +89,13 @@ export function SettingRow({
       data-setting-row="true"
       data-setting-anchor={anchorId}
       data-testid={testId}
+      // A setting row is a BOX (myne#394) — the same role callouts and cards
+      // take, so a theme that gives boxes a frame gives one here too.
+      {...ornamentRole("box")}
+      data-setting-compact={compact ? "true" : undefined}
       {...stateAttrs}
     >
-      <div style={TOGGLE_ROW_STYLE}>
+      <div style={compact ? TOGGLE_ROW_COMPACT_STYLE : TOGGLE_ROW_STYLE}>
         <span style={LABEL_STYLE}>{label}</span>
         <div style={CONTROL_SLOT_STYLE}>
           {typeof control === "function" ? control(helperId) : control}

@@ -37,6 +37,7 @@ import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
+import { truncateMiddle } from "./truncateMiddle";
 import type { IllegalSegmentFlag, PreexistingFolder } from "./mapping";
 import type { ImportFailure, ImportResult } from "./engine";
 import type { UnfollowedLink } from "./source";
@@ -405,7 +406,7 @@ function SetupBody({
             NAME is fine; reproducing third-party logos is a trademark grey area). */}
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
           <span
-            style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}
+            style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)", color: "var(--fg-1)" }}
             data-testid="import.chosen-source"
           >
             {t(spec.labelKey)}
@@ -451,7 +452,7 @@ function SetupBody({
           }}
         >
           <span
-            style={{ fontSize: "var(--text-xs)", color: "var(--fg-1)", fontWeight: 500 }}
+            style={{ fontSize: "var(--text-xs)", color: "var(--fg-1)", fontWeight: "var(--weight-medium)" }}
           >
             {t("notes.import.modal.keepsLabel")}
           </span>
@@ -465,7 +466,7 @@ function SetupBody({
             style={{
               fontSize: "var(--text-xs)",
               color: "var(--fg-1)",
-              fontWeight: 500,
+              fontWeight: "var(--weight-medium)",
               marginTop: "var(--space-1)",
             }}
           >
@@ -480,7 +481,7 @@ function SetupBody({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}>
+          <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)", color: "var(--fg-1)" }}>
             {t("notes.import.modal.vaultFolderLabel")}
           </span>
           <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
@@ -491,7 +492,7 @@ function SetupBody({
                 fontSize: "var(--text-sm)",
                 background: "var(--paper-2)",
                 border: "1px solid var(--line-1)",
-                borderRadius: 6,
+                borderRadius: "var(--radius-2)",
                 padding: "8px 12px",
                 color: folder === null ? "var(--fg-3)" : "var(--fg-1)",
                 whiteSpace: "nowrap",
@@ -513,7 +514,7 @@ function SetupBody({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}>
+          <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)", color: "var(--fg-1)" }}>
             {t("notes.import.modal.ifNoteExistsLabel")}
           </span>
           <RadioRow
@@ -603,7 +604,7 @@ function RadioRow({
         )}
       </span>
       <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}>
+        <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)", color: "var(--fg-1)" }}>
           {label}
         </span>
         <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{hint}</span>
@@ -659,7 +660,7 @@ function RunningBody({
           </div>
         ) : (
           <div style={{ fontSize: "var(--text-md)", color: "var(--fg-1)" }}>
-            <span style={{ ...MONO, fontWeight: 600 }}>{done}</span>
+            <span style={{ ...MONO, fontWeight: "var(--weight-semibold)" }}>{done}</span>
             <span style={{ color: "var(--fg-3)" }}>{t("notes.import.modal.progressOf")}</span>
             <span style={MONO}>{total}</span>
             <span style={{ color: "var(--fg-3)" }}>{t("notes.import.modal.progressNotes")}</span>
@@ -718,7 +719,7 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
             }}
           >
             <Icon name="circle-alert" size={15} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
               <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-1)" }}>
                 {t("notes.import.modal.stoppedAt", {
                   imported: result.imported,
@@ -744,7 +745,7 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
             paddingBottom: "var(--space-2)",
           }}
         >
-          <span style={{ ...MONO, fontSize: "var(--text-3xl)", fontWeight: 600, color: "var(--fg-display)" }}>
+          <span style={{ ...MONO, fontSize: "var(--text-3xl)", fontWeight: "var(--weight-semibold)", color: "var(--fg-display)" }}>
             {result.imported}
           </span>
           <span style={{ fontSize: "var(--text-md)", color: "var(--fg-2)" }}>
@@ -939,7 +940,7 @@ function NeedsAttention({
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
         <Icon name="circle-alert" size={15} />
-        <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--fg-1)" }}>
+        <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
           {t("notes.import.modal.needsAttention")}
         </span>
         <span
@@ -1000,7 +1001,7 @@ function NeedsAttention({
                 flag.kind === "folder"
                   ? t("notes.import.modal.flagKindFolder")
                   : t("notes.import.modal.flagKindTitle"),
-              segment: flag.segment,
+              segment: truncateMiddle(flag.segment),
               reason: illegalReasonLabel(flag.reason, t),
             })}
             suggestion={suggestName(flag.segment)}
@@ -1016,7 +1017,9 @@ function NeedsAttention({
           <AttentionRow
             key={key}
             path={pf.derivedFromPath ?? t("notes.import.modal.vaultRoot")}
-            detail={t("notes.import.modal.preexistingDetail", { existing: pf.existing })}
+            detail={t("notes.import.modal.preexistingDetail", {
+              existing: truncateMiddle(pf.existing),
+            })}
             suggestion={pf.existing}
             resolved={resolved.has(key)}
             onResolve={() => markResolved(key)}
@@ -1076,15 +1079,23 @@ function AttentionRow({
           wordBreak: "break-all",
         }}
       >
-        {path}
+        {truncateMiddle(path, 96)}
       </code>
-      <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{detail}</span>
+      <span
+        style={{
+          fontSize: "var(--text-xs)",
+          color: "var(--fg-3)",
+          overflowWrap: "anywhere",
+        }}
+      >
+        {detail}
+      </span>
       {resolved ? (
         <span
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 4,
+            gap: "var(--space-1)",
             fontSize: "var(--text-xs)",
             color: "var(--success)",
           }}

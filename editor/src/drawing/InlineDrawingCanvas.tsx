@@ -86,7 +86,7 @@ export function InlineDrawingCanvas({
           height: "100%",
           color: "var(--fg-3)",
           fontFamily: "var(--font-sans)",
-          fontSize: 13,
+          fontSize: "var(--text-sm)",
         }}
       />
     );

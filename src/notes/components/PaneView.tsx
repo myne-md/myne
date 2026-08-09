@@ -82,6 +82,7 @@ import {
   isDrawingBody,
   type DrawingEmbedIo,
 } from "@myne/editor/drawing";
+import { ornamentRole } from "@myne/ornaments";
 
 export type PaneReadout = {
   status: SaveStatus;
@@ -1127,9 +1128,26 @@ export function PaneView({
       // wrapper and updates the editor live (no CodeMirror remount).
       <div
         data-testid="editor.content-frame"
+        // THE WRITING PANE IS A SURFACE (myne#394 task 11).
+        //
+        // It is the element `texture` and `ruled` were designed for — the
+        // stylesheet's dotted rule says "the dots land where the writing does,
+        // and they grow when the text does", and the whole opacity ceiling
+        // exists because these primitives render behind body text. The role was
+        // never declared here: `surface` reached only the sidebar panes and
+        // `ModalShell`, so a theme asking for notebook rules got them on the
+        // file tree and none on the page.
+        //
+        // Safe against the paint-layer rule's one real risk (`position:
+        // relative` re-anchoring an absolutely-positioned descendant): every
+        // editor overlay is `position: fixed` and mounted to `document.body`
+        // (`editor/src/floating-styles.ts`), the one `absolute` rule anchors to
+        // a fixed backdrop, and CodeMirror's own absolutes anchor to
+        // `.cm-editor`, which sets `position: relative` itself.
+        {...ornamentRole("surface")}
         style={
           companionVisible
-            ? { ...typographyStyle(prefs), maxWidth: "none", margin: 0, display: "flex", gap: 16 }
+            ? { ...typographyStyle(prefs), maxWidth: "none", margin: 0, display: "flex", gap: "var(--space-4)" }
             : { ...typographyStyle(prefs), margin: "0 auto" }
         }
       >
@@ -1395,7 +1413,7 @@ export function PaneView({
           padding: isDrawing ? 0 : "0 24px 32px",
         }}
       >
-        <div style={isDrawing ? { height: "100%" } : { paddingTop: 12 }}>
+        <div style={isDrawing ? { height: "100%" } : { paddingTop: "var(--space-3)" }}>
           {editorEl}
         </div>
       </div>
@@ -1446,7 +1464,7 @@ function PaneLoading() {
         margin: "10vh auto 0",
         textAlign: "center",
         color: "var(--fg-3)",
-        fontSize: 13,
+        fontSize: "var(--text-sm)",
         fontFamily: "var(--font-sans)",
       }}
     >
@@ -1567,7 +1585,7 @@ function ViewHost({ viewId }: { viewId: string }) {
             margin: "12vh auto 0",
             textAlign: "center",
             color: "var(--fg-3)",
-            fontSize: 13,
+            fontSize: "var(--text-sm)",
             fontFamily: "var(--font-sans)",
             lineHeight: 1.6,
           }}

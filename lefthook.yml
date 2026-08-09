@@ -106,6 +106,24 @@ pre-commit:
       # list may shrink, never grow.
       run: node scripts/check-unwired.mjs
 
+    token-adoption:
+      glob: "{src,editor/src}/**/*.{ts,tsx,css}"
+      # myne#394: a hardcoded visual value in an inline style is unreachable to
+      # every custom theme, permanently — inline style outranks any stylesheet,
+      # so there is no override. The deep-customization plan pays that debt down
+      # surface by surface; this stops it regrowing at the same rate, which is
+      # what would otherwise happen (no compiler or lint reports a new literal).
+      # A RATCHET: a file's recorded count may fall, never rise.
+      run: node scripts/check-token-adoption.mjs
+
+    ornament-vocabulary:
+      glob: "{theme-validator/src/ornament.rs,ornaments/src/*}"
+      # myne#394: a value must exist in all three of theme-validator (may a theme
+      # say it), ornaments/src/roles.ts (does the client reflect it) and
+      # ornaments.css (does anything draw it). Missing from the third, it
+      # validates, syncs, and silently does nothing.
+      run: node scripts/check-ornament-vocabulary.mjs
+
     e2e-menu-testid:
       # #275: an E2E scenario reaching for a testid that renders only inside an
       # open menu waits for something that is not on screen and fails as a
@@ -119,6 +137,15 @@ pre-commit:
       # one line to add to the PR body. Silently skips where the `myne-mobile`
       # companion is not cloned.
       run: node scripts/check-twin-drift.mjs {staged_files}
+
+    preview-freshness:
+      glob: "{src,editor/src,ornaments/src}/**/*.{ts,tsx,css}"
+      # myne#394: the theme-preview snapshot is captured FROM this interface and
+      # shown to people who have not installed Myne yet (the website builder, the
+      # theme gallery). It goes stale silently — it keeps rendering, just of an
+      # older app. WARNING ONLY (the script exits 0): most UI changes do not
+      # change what the preview shows, and re-capturing costs a container run.
+      run: node scripts/check-preview-freshness.mjs
 
     web-capabilities:
       # phase3-web-client task 27: the UI's capability descriptor
@@ -173,7 +200,15 @@ pre-commit:
       # those carry upstream trailing whitespace / blank EOF lines / license
       # `=======` dividers that read as conflict markers — not ours to reformat
       # (hash-pinned upstream data).
-      run: git diff --cached --check -- ':(exclude)src-tauri/resources/dictionaries/**' ':(exclude)src-tauri/resources/models/**'
+      #
+      # Also excludes the captured theme-preview snapshot (myne#394). It is
+      # written by `e2e/capture/theme-preview.capture.ts` from the running app
+      # and carries its own header saying not to hand-edit it — the CSS-in-JS
+      # emitter leaves a space after `{` on nine `@keyframes` lines, and the
+      # captured DOM keeps the indentation of text nodes. Reformatting it by
+      # hand would be a diff the next capture silently reverts, and stripping
+      # whitespace inside captured markup is not obviously safe.
+      run: git diff --cached --check -- ':(exclude)src-tauri/resources/dictionaries/**' ':(exclude)src-tauri/resources/models/**' ':(exclude)preview/src/preview.html' ':(exclude)preview/src/preview.css'
 
     eof-newline:
       # Skips tool-generated/exported assets: Lucide icons, Penpot brand

@@ -30,7 +30,7 @@ interface DeleteAttachmentDialogProps {
 const BODY_STYLE: CSSProperties = {
   padding: "var(--space-4) var(--space-5)",
   fontFamily: "var(--font-sans)",
-  fontSize: 14,
+  fontSize: "var(--text-base)",
   color: "var(--fg-1)",
   display: "flex",
   flexDirection: "column",
@@ -39,7 +39,7 @@ const BODY_STYLE: CSSProperties = {
 
 const NAME_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
   wordBreak: "break-all",
 };
@@ -49,7 +49,7 @@ const NOTE_LIST_STYLE: CSSProperties = {
   paddingInlineStart: "var(--space-5)",
   maxHeight: 160,
   overflowY: "auto",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
   display: "flex",
   flexDirection: "column",
@@ -64,7 +64,7 @@ const FOOTER_STYLE: CSSProperties = {
 };
 
 const ERROR_STYLE: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--danger)",
 };
 
@@ -120,7 +120,7 @@ export function DeleteAttachmentDialog({
             </ul>
           </>
         ) : (
-          <div style={{ color: "var(--fg-3)", fontSize: 13 }}>
+          <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>
             {t("attachments.deleteDialog.notUsed")}
           </div>
         )}
