@@ -74,4 +74,42 @@ describe("Slash menu trigger-context suppression", () => {
     // Position 12 is inside `![[image.png]]`.
     expect(isSlashSuppressed(state, 12)).toBe(true);
   });
+
+  // myne#407 — the caret ONE position past a suppressed node must NOT be
+  // suppressed. `iterate` used to enter a node ending exactly at `pos-1`, so the
+  // first caret position after a wikilink / inline code / fenced block was
+  // wrongly treated as inside it, killing the trigger for one character. The
+  // containment guard (`node.to > pos`) rejects the just-left node.
+
+  it("start of the line after a wikilink → NOT suppressed", () => {
+    // `[[Note]]` is [0,8); the next line begins at 9.
+    const state = makeState("[[Note]]\n");
+    expect(isSlashSuppressed(state, 9)).toBe(false);
+  });
+
+  it("after a space that follows a wikilink → NOT suppressed", () => {
+    // `[[Note]]` is [0,8), a space at 8, body at 9.
+    const state = makeState("[[Note]] x\n");
+    expect(isSlashSuppressed(state, 9)).toBe(false);
+  });
+
+  it("after a space that follows inline code → NOT suppressed", () => {
+    // `` `x` `` is [0,3), a space at 3, body at 4.
+    const state = makeState("`x` y\n");
+    expect(isSlashSuppressed(state, 4)).toBe(false);
+  });
+
+  it("start of the line after a closing fence → NOT suppressed", () => {
+    // "```ts\nx\n```\n" — the fenced block ends before the trailing newline at
+    // 11; position 12 is the start of the (empty) line after it.
+    const state = makeState("```ts\nx\n```\n");
+    expect(isSlashSuppressed(state, 12)).toBe(false);
+  });
+
+  it("still suppressed one position INSIDE a node's right edge", () => {
+    // Guard against over-correcting: the last content char of `[[Note]]` (`]`
+    // at index 7) is still inside the node, so a `/` there stays suppressed.
+    const state = makeState("[[Note]]\n");
+    expect(isSlashSuppressed(state, 7)).toBe(true);
+  });
 });
