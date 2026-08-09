@@ -50,7 +50,14 @@ export function isSlashSuppressed(
     from: Math.max(0, pos - 1),
     to: pos,
     enter: (node) => {
-      if (nodeNames.has(node.name)) {
+      // Containment, not mere touching (myne#407). Lezer's `iterate` enters
+      // every node that TOUCHES the [pos-1, pos] range — including a suppressed
+      // node ending exactly at the caret's just-left boundary (`node.to === pos`),
+      // i.e. the node the caret has already stepped out of. That wrongly killed
+      // the trigger for one character after a wikilink / inline code / fenced
+      // block / URL. Require the node to actually COVER the trigger position:
+      // `from <= pos` (it starts at or before) and `to > pos` (it has not ended).
+      if (nodeNames.has(node.name) && node.from <= pos && node.to > pos) {
         suppressed = true;
         return false;
       }
@@ -107,6 +114,20 @@ class SlashMenuView implements PluginValue {
         };
         this.scheduleRender();
       }
+      // Reopen-on-deletion (myne#408, approach B, continuous). A no-match query
+      // closes the menu (`render()` nulls state), and the only open path is an
+      // inserted `/` — so backspacing a mistyped query back toward the `/` never
+      // brought the menu back. Here: whenever a change leaves the menu closed but
+      // the caret is back inside a live `/` query, reopen so the list tracks the
+      // query in BOTH directions. Guarded on `state === null`, so it never fights
+      // the open-from-insert path above; and because it only latches onto an
+      // EXISTING `/`, deleting the `/` itself can never reopen it — that #329
+      // close still runs below on `selectionSet`, after this, and wins.
+      if (this.state === null) {
+        const head = update.view.state.selection.main.head;
+        const triggerFrom = this.findSlashTriggerLeftOfCaret(update.view, head);
+        if (triggerFrom !== null) this.open(triggerFrom, head);
+      }
     }
     if (update.selectionSet && this.state !== null) {
       const head = update.view.state.selection.main.head;
@@ -135,6 +156,42 @@ class SlashMenuView implements PluginValue {
     if (slashPos === 0) return true;
     const prev = view.state.doc.sliceString(slashPos - 1, slashPos);
     return prev === " " || prev === "\t" || prev === "\n";
+  }
+
+  /** Approach B for myne#408: find the `/` that anchors the slash query the
+   *  caret currently sits in, so a deletion landing back inside a live trigger
+   *  can reopen the menu. Returns the `/` position, or null when the caret is
+   *  not inside a live slash query.
+   *
+   *  Scans the current line leftward from the caret over the contiguous
+   *  non-whitespace run: a slash query never spans whitespace (a space ends it,
+   *  which closes the menu on the ensuing no-match), so the first whitespace
+   *  breaks the search. The candidate `/` must clear the SAME two guards the
+   *  open path uses — `isLineStartOrAfterWhitespace` and the corrected
+   *  `isSlashSuppressed` (myne#407) — so a `/` mid-word, or one inside code / a
+   *  URL / a wikilink, is never treated as a trigger. Because it only ever
+   *  latches onto an existing `/`, deleting the `/` itself cannot reopen the
+   *  menu (myne#329). */
+  private findSlashTriggerLeftOfCaret(view: EditorView, head: number): number | null {
+    const { doc } = view.state;
+    const line = doc.lineAt(head);
+    let triggerFrom = -1;
+    for (let i = head - 1; i >= line.from; i--) {
+      const ch = doc.sliceString(i, i + 1);
+      if (ch === " " || ch === "\t") return null; // whitespace ends the query run
+      if (ch === "/") {
+        triggerFrom = i;
+        break;
+      }
+    }
+    if (triggerFrom === -1) return null;
+    if (
+      isSlashSuppressed(view.state, triggerFrom) ||
+      !this.isLineStartOrAfterWhitespace(view, triggerFrom)
+    ) {
+      return null;
+    }
+    return triggerFrom;
   }
 
   private open(triggerFrom: number, triggerTo: number): void {
