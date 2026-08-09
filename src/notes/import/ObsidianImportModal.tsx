@@ -37,6 +37,7 @@ import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
+import { truncateMiddle } from "./truncateMiddle";
 import type { IllegalSegmentFlag, PreexistingFolder } from "./mapping";
 import type { ImportFailure, ImportResult } from "./engine";
 import type { UnfollowedLink } from "./source";
@@ -1000,7 +1001,7 @@ function NeedsAttention({
                 flag.kind === "folder"
                   ? t("notes.import.modal.flagKindFolder")
                   : t("notes.import.modal.flagKindTitle"),
-              segment: flag.segment,
+              segment: truncateMiddle(flag.segment),
               reason: illegalReasonLabel(flag.reason, t),
             })}
             suggestion={suggestName(flag.segment)}
@@ -1016,7 +1017,9 @@ function NeedsAttention({
           <AttentionRow
             key={key}
             path={pf.derivedFromPath ?? t("notes.import.modal.vaultRoot")}
-            detail={t("notes.import.modal.preexistingDetail", { existing: pf.existing })}
+            detail={t("notes.import.modal.preexistingDetail", {
+              existing: truncateMiddle(pf.existing),
+            })}
             suggestion={pf.existing}
             resolved={resolved.has(key)}
             onResolve={() => markResolved(key)}
@@ -1076,9 +1079,17 @@ function AttentionRow({
           wordBreak: "break-all",
         }}
       >
-        {path}
+        {truncateMiddle(path, 96)}
       </code>
-      <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{detail}</span>
+      <span
+        style={{
+          fontSize: "var(--text-xs)",
+          color: "var(--fg-3)",
+          overflowWrap: "anywhere",
+        }}
+      >
+        {detail}
+      </span>
       {resolved ? (
         <span
           style={{
