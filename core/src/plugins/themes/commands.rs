@@ -80,10 +80,28 @@ pub struct ThemeEntry {
     pub deleted_at: Option<u64>,
     /// The theme's CSS-variable palette. Empty on a tombstone.
     pub palette: ThemePalette,
-    /// Last-edit timestamp — UNIX seconds. The LWW discriminator for a
-    /// same-name concurrent edit (greater wins). Equals `created_at` on a fresh
-    /// import; re-importing the same name bumps it.
+    /// Last-edit timestamp — UNIX seconds. Now only a **tie-break** discriminator
+    /// for a same-`version` concurrent edit (greater wins); the primary key is
+    /// `version`. Equals `created_at` on a fresh import; re-importing the same
+    /// name bumps it.
     pub updated_at: u64,
+    /// Causal merge counter — the **primary key** of the sync merge join
+    /// (`sync-protocol.md` §10.2.2, myne-md/myne#405). Bumped to
+    /// `max(versions observed for this name) + 1` on any local mutation; the
+    /// greater `version` wins a reconcile, and the wall-clock fields above only
+    /// break an equal-`version` tie. Absent on a legacy (pre-#405) blob → 0,
+    /// repaired on the first clocked write; an additive optional field
+    /// (`#[serde(default)]`, skipped when 0), so a legacy blob stays
+    /// byte-identical. Declared last to keep canonical (alphabetical) key order.
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub version: u64,
+}
+
+/// `#[serde(skip_serializing_if)]` predicate: omit a `version` of 0 so a
+/// legacy (pre-#405) entry re-encodes byte-identically and a fresh field stays
+/// compact.
+fn is_zero_u64(v: &u64) -> bool {
+    *v == 0
 }
 
 /// One **live** theme as the list surface hands it out: the name plus the
@@ -112,13 +130,17 @@ pub struct ThemeListEntry {
 }
 
 impl ThemeEntry {
-    /// A live (non-tombstone) entry imported at `now`.
+    /// A live (non-tombstone) entry imported at `now` — a brand-new name, so its
+    /// causal `version` starts at 1 (`max(∅) + 1`). The real upsert path
+    /// ([`apply_import`]) computes `version` from the existing entry instead, so
+    /// a revival/edit outranks its predecessor.
     pub fn live(palette: ThemePalette, now: u64) -> Self {
         Self {
             created_at: now,
             deleted_at: None,
             palette,
             updated_at: now,
+            version: 1,
         }
     }
 
@@ -137,14 +159,17 @@ impl ThemeEntry {
     /// Commutativity is delivered by `merge_theme_entry`'s total-order
     /// tie-break, which compares every retained field.
     ///
-    /// `created_at` is retained (required field; the merge compares the *live*
-    /// side's `created_at` against `deleted_at`).
+    /// `created_at`/`updated_at` are retained; `version` is bumped
+    /// (`self.version + 1`) because a delete is a mutation — the tombstone must
+    /// outrank the live entry it replaces so a peer's stale live copy loses the
+    /// merge (`sync-protocol.md` §10.2.2, myne-md/myne#405).
     pub fn into_tombstone(self, deleted_at: u64) -> Self {
         Self {
             created_at: self.created_at,
             deleted_at: Some(deleted_at),
             palette: ThemePalette::new(),
             updated_at: self.updated_at,
+            version: self.version + 1,
         }
     }
 }
@@ -527,15 +552,19 @@ pub async fn themes_read_in_dir(
 /// - **existing live name** → replace-in-place: the palette and `updated_at`
 ///   move, `created_at` is retained (the theme's identity did not restart).
 /// - **tombstoned name** → the deliberate **re-add**: a fresh live entry whose
-///   `created_at` is `now`, clearing the tombstone. `now` postdates the
-///   `deleted_at` in wall-clock terms, so the revival wins the merge — the same
-///   rule (and the same single-second clock-granularity caveat, §11.4) the
-///   attachments catalog's re-import path carries.
+///   `created_at` is `now`, clearing the tombstone. Its `version` is bumped past
+///   the tombstone's (`max(observed) + 1`), so the revival — which observed the
+///   delete — outranks it in the merge (`sync-protocol.md` §10.2.2,
+///   myne-md/myne#405).
 fn apply_import(map: &mut ThemesMap, name: &str, palette: ThemePalette, now: u64) {
-    let created_at = match map.get(name) {
+    let prev = map.get(name);
+    let created_at = match prev {
         Some(e) if !e.is_tombstone() => e.created_at,
         _ => now,
     };
+    // Causal bump: max(version seen for this name) + 1 — new name → 1, an edit or
+    // a revival outranks its predecessor (live or tombstone).
+    let version = prev.map_or(0, |e| e.version) + 1;
     map.insert(
         name.to_string(),
         ThemeEntry {
@@ -543,6 +572,7 @@ fn apply_import(map: &mut ThemesMap, name: &str, palette: ThemePalette, now: u64
             deleted_at: None,
             palette,
             updated_at: now,
+            version,
         },
     );
 }
@@ -936,6 +966,28 @@ mod tests {
     // The same counting double the prefs plugin asserts its sync window with
     // (#266) — one copy, so the two assertions cannot drift.
     use crate::hooks::test_hooks::CountingHooks;
+
+    #[test]
+    fn theme_entry_version_is_additive_absent_zero_and_zero_omitted() {
+        // Migration (myne-md/myne#405): a legacy JSON entry with no `version`
+        // decodes to 0, and a version-0 entry re-encodes WITHOUT the field, so a
+        // pre-#405 blob stays byte-identical. A stamped entry emits the field.
+        let legacy_json = r##"{"created_at":5,"palette":{"--accent":"#x"},"updated_at":5}"##;
+        let e: ThemeEntry = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(e.version, 0, "absent version decodes to 0");
+        let reser = serde_json::to_string(&e).unwrap();
+        assert!(!reser.contains("version"), "version 0 is omitted: {reser}");
+        let stamped = ThemeEntry {
+            created_at: 5,
+            deleted_at: None,
+            palette: ThemePalette::from([("--accent".to_string(), "#x".to_string())]),
+            updated_at: 5,
+            version: 2,
+        };
+        assert!(serde_json::to_string(&stamped)
+            .unwrap()
+            .contains("\"version\":2"));
+    }
 
     /// A vault directory with a parseable `vault.meta` plus an unlocked slot
     /// keyed to it, so the `*_with_dir` production cores can run.

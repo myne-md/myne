@@ -917,6 +917,97 @@ fn three_devices_converge() {
     assert_no_conflicts(&devices);
 }
 
+/// myne-md/myne#405 end-to-end: the §10.2.2 non-associative counterexample as a
+/// THREE-device fleet, driven through the real sync cycle. Before the causal-
+/// `version` fix the tombstone-guard merge was non-associative, so the fleet's
+/// `merged == remote` push-gate never agreed and the devices CAS-ping-ponged
+/// forever. With the fix the merge is a join over `version` (associative), so the
+/// fleet reaches a fixed point: every device holds byte-identical `vault.themes`
+/// and a further cycle pushes NOTHING.
+#[test]
+fn themes_three_device_counterexample_converges_no_ping_pong() {
+    use crate::plugins::themes::commands::{
+        decode_themes_map_or_empty, encode_themes_map, ThemeEntry, ThemePalette, ThemesMap,
+    };
+
+    let (_guard, url) = server_or_skip!("themes_405_converge");
+    let acct = Account::new(0x40);
+    let devices = enroll_devices(&acct, &url, 3);
+    let themes_key = derive_subkey(&acct.root_key, SubkeyRole::CustomThemesKey);
+
+    let palette = |c: &str| ThemePalette::from([(String::from("--accent"), String::from(c))]);
+    let write_themes = |d: &Device, map: &ThemesMap| {
+        let bytes = encode_themes_map(&themes_key, &acct.account_hash, map).unwrap();
+        std::fs::write(d.vault_dir.join("vault.themes"), &bytes).unwrap();
+    };
+    let read_themes = |d: &Device| -> ThemesMap {
+        let bytes = std::fs::read(d.vault_dir.join("vault.themes")).unwrap_or_default();
+        decode_themes_map_or_empty(&themes_key, &acct.account_hash, Some(&bytes))
+    };
+
+    // The exact §10.2.2 counterexample, all at the SAME `version` (concurrent):
+    //   A = tombstone("nord")   version 1, deleted_at 5   (the deletion)
+    //   B = live("nord", #bbb)  version 1, created 10/updated 10
+    //   C = live("nord", #ccc)  version 1, created 1 /updated 100
+    // The old `created_at`-vs-`deleted_at` guard reconciled these three to
+    // different bytes by pairing order → ping-pong; the version-primary join is
+    // associative → they converge (remove-wins ⇒ the tombstone).
+    let mut a = ThemesMap::new();
+    a.insert(
+        "nord".into(),
+        ThemeEntry {
+            created_at: 100,
+            deleted_at: Some(5),
+            palette: ThemePalette::new(),
+            updated_at: 100,
+            version: 1,
+        },
+    );
+    let mut b = ThemesMap::new();
+    b.insert(
+        "nord".into(),
+        ThemeEntry {
+            created_at: 10,
+            deleted_at: None,
+            palette: palette("#bbb"),
+            updated_at: 10,
+            version: 1,
+        },
+    );
+    let mut c = ThemesMap::new();
+    c.insert(
+        "nord".into(),
+        ThemeEntry {
+            created_at: 1,
+            deleted_at: None,
+            palette: palette("#ccc"),
+            updated_at: 100,
+            version: 1,
+        },
+    );
+    write_themes(&devices[0], &a);
+    write_themes(&devices[1], &b);
+    write_themes(&devices[2], &c);
+
+    quiesce(&devices, 16);
+
+    // Every device converged to a byte-identical themes map.
+    let m0 = read_themes(&devices[0]);
+    let m1 = read_themes(&devices[1]);
+    let m2 = read_themes(&devices[2]);
+    assert_eq!(m0, m1, "A and B converged");
+    assert_eq!(m1, m2, "B and C converged");
+    assert!(
+        m0["nord"].is_tombstone(),
+        "the concurrent-tie fixed point is the tombstone (remove-wins)"
+    );
+
+    // Steady state: a further cycle on every device pushes NOTHING — the CAS
+    // ping-pong the old non-associative guard produced is gone.
+    let pushed: usize = devices.iter().map(|d| d.sync().pushed).sum();
+    assert_eq!(pushed, 0, "quiesced fleet stays silent (no CAS ping-pong)");
+}
+
 /// Two devices create DIFFERENT notes offline; after sync both notes exist on
 /// both devices. Distinct-note concurrency is never a conflict.
 #[test]
