@@ -641,6 +641,59 @@ export async function editorText(session: Session): Promise<string> {
 }
 
 /**
+ * Insert `text` into the open note's body VERBATIM, via a synthetic paste.
+ *
+ * The counterpart to `typeIntoEditor`, and the right tool whenever the payload
+ * is markdown rather than keystrokes: a paste is not tokenized by CM6's input
+ * handlers, so brackets do not auto-close, list continuation does not fire, and
+ * — the reason this exists — the pipeline probe's `"q"` never touches the
+ * document. Anything whose exact bytes matter (a fixture body, a capture's
+ * sample note) wants this; anything testing the typing path itself wants
+ * `typeIntoEditor`.
+ *
+ * The caret is left at the document START so every live-preview widget renders:
+ * CM6 shows the SOURCE of the block under the cursor, so a caret parked in the
+ * pasted body would leave that one block un-decorated.
+ *
+ * Insertion goes to the document END, after the managed frontmatter — pasting at
+ * the top displaces the title/updated block below line 1, which breaks title
+ * parsing ("Untitled") and dumps raw frontmatter as a trailing code block.
+ */
+export async function pasteIntoEditor(session: Session, text: string): Promise<void> {
+  const CONTROL = String.fromCharCode(0xe009);
+  const END = String.fromCharCode(0xe010);
+  const HOME = String.fromCharCode(0xe011);
+  // Re-fetch the `.cm-content` handle right before each keystroke op: CM6
+  // remounts on note-switch/focus, which staleness-invalidates a handle held
+  // across awaits. On a stale throw, settle and retry once — the remount has
+  // finished by then.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await (await session.waitForElement(CM_CONTENT)).click();
+      await (await session.waitForElement(CM_CONTENT)).sendKeys(CONTROL + END + CONTROL);
+      // `querySelector` inside the page is always fresh — no stale handle.
+      await session.execute(
+        "var el = document.querySelector(arguments[0]);" +
+          "el.focus();" +
+          "var dt = new DataTransfer();" +
+          "dt.setData('text/plain', arguments[1]);" +
+          "el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));",
+        [CM_CONTENT, text],
+      );
+      await (await session.waitForElement(CM_CONTENT)).sendKeys(CONTROL + HOME + CONTROL);
+      await session.waitUntil(async () => (await editorText(session)).length > 5 || null, {
+        label: "pasted body landed",
+        timeoutMs: 5_000,
+      });
+      return;
+    } catch (e) {
+      if (attempt === 1) throw e;
+      await new Promise((r) => setTimeout(r, 800)); // CM remount settling
+    }
+  }
+}
+
+/**
  * Fill the 24 recovery phrase cells (in DOM order) and leave the
  * screen ready for `recover.submit`. Used by the VR-1 drill and the
  * slot-priority reload scenarios.

@@ -113,11 +113,11 @@ const rowBaseStyle: CSSProperties = {
   display: "flex",
   flexDirection: "row",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   padding: "8px 14px",
   minHeight: 52,
   cursor: "pointer",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   marginInlineStart: 4,
   marginInlineEnd: 4,
   // Never grow past the sidebar: the flex content shrinks + the title ellipsizes
@@ -213,8 +213,8 @@ const titleStyle: CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-1)",
   lineHeight: 1.35,
 };
@@ -223,7 +223,7 @@ const titleUntitledStyle: CSSProperties = {
   ...titleStyle,
   fontStyle: "italic",
   color: "var(--fg-3)",
-  fontWeight: 400,
+  fontWeight: "var(--weight-regular)",
 };
 
 const subtitleStyle: CSSProperties = {
@@ -231,8 +231,8 @@ const subtitleStyle: CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   fontFamily: "var(--font-sans)",
-  fontSize: 11,
-  fontWeight: 400,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-regular)",
   color: "var(--fg-3)",
   lineHeight: 1.3,
 };
@@ -331,8 +331,8 @@ const renameInputStyle: CSSProperties = {
   background: "var(--bg-2)",
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   lineHeight: 1.35,
   outline: "none",
   boxShadow: "0 0 0 2px var(--accent-soft)",

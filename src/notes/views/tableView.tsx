@@ -49,7 +49,7 @@ const CELL_STYLE: CSSProperties = {
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
   padding: "var(--space-2) 0",
 };
@@ -63,7 +63,7 @@ const NAME_CELL_STYLE: CSSProperties = {
   // row + wrapper `--paper` fill so the occlusion is seamless).
   background: "var(--paper)",
   paddingInlineEnd: "var(--space-3)",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
 };
 
@@ -86,7 +86,7 @@ function gridRowStyle(template: string, minWidth: number): CSSProperties {
 const HEADER_CELL_STYLE: CSSProperties = {
   ...CELL_STYLE,
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-3)",
 };
 

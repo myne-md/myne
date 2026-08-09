@@ -26,6 +26,7 @@ import {
   EditorView,
 } from "@codemirror/view";
 import { isInsideRange } from "./cursor-aware";
+import { ornamentSegment } from "./ornament-segment";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 
 // Nesting bars. Penpot `flow--editor-ref-and-block` blockquote specimen
@@ -136,7 +137,22 @@ function buildBlockquoteDecorations(view: EditorView): DecorationSet {
           ? { attributes: { style: blockquoteBarStyle(depth) } }
           : {
               class: "cm-blockquote",
-              attributes: { style: blockquoteBarStyle(depth) },
+              // Quotes are boxes too (myne#394) — same role, same theme control.
+              //
+              // The block's extent is read off `depthByLine` rather than from a
+              // node: this loop is per-line by construction, and a quote's
+              // neighbours are exactly the lines the same walk recorded. A line
+              // whose predecessor is not quoted starts the box; one whose
+              // successor is not quoted ends it. Without that, a theme selecting
+              // a frame drew one around every line of the quote.
+              attributes: {
+                style: blockquoteBarStyle(depth),
+                ...ornamentSegment(
+                  lineNo,
+                  depthByLine.has(lineNo - 1) ? lineNo - 1 : lineNo,
+                  depthByLine.has(lineNo + 1) ? lineNo + 1 : lineNo,
+                ),
+              },
             },
       ).range(line.from),
     );

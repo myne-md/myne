@@ -108,8 +108,8 @@ const HEADING_STYLE: CSSProperties = {
 };
 
 const EYEBROW_STYLE: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: "var(--danger)",
@@ -131,7 +131,7 @@ const COPY_SECONDARY_STYLE: CSSProperties = {
 
 const INPUT_LABEL_STYLE: CSSProperties = {
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
   color: "var(--fg-3)",

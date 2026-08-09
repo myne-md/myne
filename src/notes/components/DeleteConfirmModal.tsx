@@ -46,19 +46,19 @@ const MODAL_STYLE: CSSProperties = {
 };
 
 const TITLE_STYLE: CSSProperties = {
-  fontSize: 16,
-  fontWeight: 600,
+  fontSize: "var(--text-md)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   margin: 0,
-  marginBottom: 12,
+  marginBottom: "var(--space-3)",
 };
 
 const BODY_TITLE_STYLE: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-2)",
   margin: 0,
-  marginBottom: 4,
+  marginBottom: "var(--space-1)",
   wordBreak: "break-word",
 };
 
@@ -72,15 +72,15 @@ const BODY_WARNING_STYLE: CSSProperties = {
 const BUTTON_ROW_STYLE: CSSProperties = {
   display: "flex",
   justifyContent: "flex-end",
-  gap: 8,
+  gap: "var(--space-2)",
 };
 
 const BUTTON_BASE_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   padding: "8px 14px",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   cursor: "pointer",
   border: "1px solid transparent",
 };

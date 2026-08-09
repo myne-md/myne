@@ -19,6 +19,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { isCursorLine } from "./cursor-aware";
+import { ornamentSegment } from "./ornament-segment";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 import i18n from "@myne/editor/i18n";
 
@@ -223,6 +224,20 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
           decorations.push(
             Decoration.line({
               class: `cm-callout cm-callout-bg-${type.color}`,
+              // A callout is a BOX for ornament purposes (myne#394): the active
+              // theme decides what a box wears, and the callout keeps taking its
+              // colour from its own type. Declared here rather than in a
+              // stylesheet because the decoration is what creates the element.
+              //
+              // `data-o-seg` says where this LINE sits in the block, because
+              // CodeMirror has no element for the block itself — every line is a
+              // sibling div. Without it a three-line callout is three boxes, and
+              // a theme selecting a frame draws three of them, stacked: the
+              // ornament reads as chopped-up rather than as one card. The
+              // stylesheet uses it to draw the top edge once, the bottom edge
+              // once, and the sides on every line. A single-line callout carries
+              // no attribute at all, which is the whole-box case.
+              attributes: ornamentSegment(n, firstLine.number, lastLine.number),
             }).range(line.from),
           );
         }

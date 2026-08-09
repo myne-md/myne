@@ -53,7 +53,7 @@ const NAME: CSSProperties = {
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   lineHeight: 1.3,
 };
 

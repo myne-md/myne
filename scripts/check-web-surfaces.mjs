@@ -283,6 +283,7 @@ const V = {
   "src/lib/syntaxTheme.ts": ["ported", "CodeMirror theme."],
   "src/lib/theme-errors.ts": ["ported", "Error copy."],
   "src/lib/theme.ts": ["ported", "CSSOM only."],
+  "src/lib/themeMeasure.ts": ["ported", "Pure arithmetic + getComputedStyle."],
   "src/lib/themeDeepLink.ts": ["adapted", "Deep links arrive through the seam; a browser has no OS URL registration."],
   "src/lib/themes.ts": ["ported", "`MYT1` IPC; the plugin is dispatched (task 45)."],
   "src/lib/transcribe.ts": ["adapted", "Unreachable where `localAi` is absent."],

@@ -88,7 +88,7 @@ const LINK_STYLE: CSSProperties = {
   transition: "color var(--duration-fast) var(--ease-standard)",
   display: "inline-flex",
   alignItems: "center",
-  gap: 4,
+  gap: "var(--space-1)",
   alignSelf: "flex-start",
 };
 

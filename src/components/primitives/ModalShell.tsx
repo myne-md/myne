@@ -22,6 +22,7 @@ import {
 } from "react";
 import { Icon } from "./Icon";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { ornamentRole } from "@myne/ornaments";
 
 interface ModalShellProps {
   open: boolean;
@@ -171,6 +172,10 @@ export function ModalShell({
     >
       <div
         ref={modalRef}
+        // The modal card is a SURFACE for ornament purposes (myne#394). Marked
+        // on the card rather than the backdrop: a themed dialog should wear the
+        // theme, while the dimmed page behind it should not.
+        {...ornamentRole("surface")}
         style={modalStyle}
         onClick={(e) => e.stopPropagation()}
       >

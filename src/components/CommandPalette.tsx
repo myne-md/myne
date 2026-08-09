@@ -120,7 +120,7 @@ const SUGGEST_LIST_STYLE: CSSProperties = {
 const SUGGEST_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "baseline",
-  gap: 8,
+  gap: "var(--space-2)",
   padding: "6px 10px",
   border: 0,
   borderRadius: "var(--radius-1, 3px)",
@@ -133,7 +133,7 @@ const SUGGEST_OP_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontSize: "var(--text-sm)",
   color: "var(--accent)",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 const SUGGEST_HINT_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
@@ -151,11 +151,11 @@ const SUGGEST_KEY_STYLE: CSSProperties = {
 const ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   padding: "8px 10px",
   borderRadius: "var(--radius-1, 3px)",
   cursor: "pointer",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
 
@@ -175,14 +175,14 @@ const ROW_DISABLED_STYLE: CSSProperties = {
 };
 
 const CATEGORY_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   marginInlineEnd: "auto",
 };
 
 const HINT_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   fontFamily: "var(--font-mono)",
 };
@@ -192,8 +192,8 @@ const HINT_STYLE: CSSProperties = {
 const ARCHIVED_BADGE_STYLE: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  gap: 4,
-  fontSize: 11,
+  gap: "var(--space-1)",
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   flexShrink: 0,
 };
@@ -202,7 +202,7 @@ const ARCHIVED_BADGE_STYLE: CSSProperties = {
 // have rows, so a single-section list stays unlabeled.
 const SECTION_LABEL_STYLE: CSSProperties = {
   fontSize: 10,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
   color: "var(--fg-3)",
@@ -211,7 +211,7 @@ const SECTION_LABEL_STYLE: CSSProperties = {
 
 const EMPTY_STYLE: CSSProperties = {
   padding: "20px 16px",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
   textAlign: "center",
 };
@@ -220,7 +220,7 @@ const EMPTY_STYLE: CSSProperties = {
 // WHAT matched, not just "matched in body"). Mono + muted; the matched span
 // lifts to full foreground with a soft highlight.
 const SNIPPET_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   fontFamily: "var(--font-mono)",
   whiteSpace: "nowrap",
@@ -881,7 +881,7 @@ function renderRow(
         </>
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", width: "100%" }}>
             <span
               style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
             >

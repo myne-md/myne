@@ -19,18 +19,18 @@ import type { GraphSettings } from "../graphSettings";
 import { ColorGroupEditor } from "./ColorGroupEditor";
 
 const SECTION_HEADING_STYLE: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-3)",
   textTransform: "uppercase",
   letterSpacing: "0.02em",
-  marginTop: 4,
+  marginTop: "var(--space-1)",
 };
 
 const SLIDER_ROW_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: 4,
+  gap: "var(--space-1)",
   fontSize: 12,
   color: "var(--fg-2)",
 };
@@ -138,14 +138,14 @@ export function GraphSettingsPanel({
             border: "1px solid var(--line-1)",
             borderRadius: "var(--radius-3, 8px)",
             boxShadow: "var(--shadow-3)",
-            padding: 12,
+            padding: "var(--space-3)",
             display: "flex",
             flexDirection: "column",
             gap: 10,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}>
+            <span style={{ fontSize: 12, fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
               {t("notes.graph.settings.title")}
             </span>
             <button
@@ -174,7 +174,7 @@ export function GraphSettingsPanel({
               justifyContent: "space-between",
               fontSize: 12,
               color: "var(--fg-2)",
-              gap: 8,
+              gap: "var(--space-2)",
             }}
           >
             {t("notes.graph.settings.showArrows")}

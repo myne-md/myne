@@ -46,13 +46,13 @@ const GROUP_HEADING_STYLE: CSSProperties = {
   margin: "var(--space-5) 0 var(--space-2)",
   padding: "0 var(--space-3)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-2)",
 };
 
 const GROUP_COUNT_STYLE: CSSProperties = {
-  fontWeight: 400,
+  fontWeight: "var(--weight-regular)",
   fontSize: 12,
   color: "var(--fg-3)",
 };
@@ -62,7 +62,7 @@ const EMPTY_STYLE: CSSProperties = {
   maxWidth: 420,
   textAlign: "center",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
   lineHeight: 1.6,
 };

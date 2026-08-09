@@ -73,6 +73,8 @@ Both at the strategic and visual levels. The list is long because privacy produc
 - Emoji as iconography in the product. Lucide stroke icons only, `currentColor`, never colored independently.
 - Modals as the first reach for any interaction.
 
+**Scope of the visual list: it binds the interface Myne ships, not the one a user builds for themselves.** Every anti-pattern above governs Myne's own surfaces — the default appearance, the built-in themes, the marketing site, every screen the project authors. It does **not** govern a [custom theme](docs/glossary.md) a user writes, or one they install from `myne-themes`. A user may give their own vault a look this project would never ship, and that is the point of the feature rather than a leak in the canon: the product's voice is what Myne says, and a person's own notebook is not Myne talking. What still binds a user theme is the machinery, not the taste — the value-shape allowlist (a theme value reaches the DOM and therefore executes), the contrast floor that refuses an unreadable palette at import and at apply, and the rule that [ornament](docs/glossary.md) is paint. The floor covers the colour pairs it names; it cannot see a pattern drawn behind text, which is why the ornament layer's *fields* — texture, ruled ground, tint wash — are capped in Myne's own stylesheet rather than trusted to the palette. Its edge decorations (tape, perforation, torn edges, folds) are opaque by design and bounded by where they sit rather than by how strong they are. Recorded in `docs/decisions.md` 2026-08-06; the strategic anti-products above are unaffected and remain absolute.
+
 ## Design Principles
 
 Five strategic principles. They override convenience and they override convention. They do not bend.

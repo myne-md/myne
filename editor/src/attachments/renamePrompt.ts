@@ -65,7 +65,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
     label.textContent = i18n.t("editor.attachment.rename.title");
     Object.assign(label.style, {
       fontSize: "13px",
-      fontWeight: "600",
+      fontWeight: "var(--weight-semibold)",
       color: "var(--fg-1, #1a1a17)",
       marginBottom: "10px",
     });
@@ -118,7 +118,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
     Object.assign(confirm.style, {
       fontFamily: "var(--font-sans)",
       fontSize: "13px",
-      fontWeight: "500",
+      fontWeight: "var(--weight-medium)",
       padding: "6px 12px",
       borderRadius: "var(--radius-1, 4px)",
       border: "1px solid var(--accent, #2c4a7a)",

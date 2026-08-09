@@ -125,7 +125,7 @@ export interface AccountBootstrapProps {
 const SAS_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontSize: "var(--text-2xl)",
-  fontWeight: 700,
+  fontWeight: "var(--weight-bold)",
   letterSpacing: "0.16em",
   textAlign: "center",
   padding: "var(--space-4)",

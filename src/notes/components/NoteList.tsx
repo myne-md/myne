@@ -311,12 +311,12 @@ const HEADER_ROW_STYLE: CSSProperties = {
 const HEADER_BUTTON_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-3)",
   background: "transparent",
   border: 0,
   padding: "2px 6px",
-  borderRadius: 3,
+  borderRadius: "var(--radius-1)",
   cursor: "pointer",
 };
 
@@ -339,7 +339,7 @@ const NEW_MENU_STYLE: CSSProperties = {
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-2)",
   boxShadow: "var(--shadow-2)",
-  padding: 4,
+  padding: "var(--space-1)",
   display: "flex",
   flexDirection: "column",
   gap: 1,
@@ -348,7 +348,7 @@ const NEW_MENU_STYLE: CSSProperties = {
 const NEW_MENU_ITEM_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   width: "100%",
   padding: "8px 10px",
   border: 0,
@@ -358,7 +358,7 @@ const NEW_MENU_ITEM_STYLE: CSSProperties = {
   cursor: "pointer",
   textAlign: "start",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   transition: HOVER_TRANSITION,
 };
 
@@ -485,19 +485,19 @@ const EMPTY_WRAPPER_STYLE: CSSProperties = {
 
 const EMPTY_COPY_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
 };
 
 const EMPTY_CTA_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
   color: "var(--accent-on)",
   background: "var(--accent)",
   border: 0,
   padding: "10px 14px",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   cursor: "pointer",
 };
 
@@ -533,7 +533,7 @@ const FOOTER_ENTRY_STYLE: CSSProperties = {
   background: "transparent",
   color: "var(--fg-2)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   cursor: "pointer",
   textAlign: "start",
   transition: HOVER_TRANSITION,
@@ -541,7 +541,7 @@ const FOOTER_ENTRY_STYLE: CSSProperties = {
 
 const TRASH_COUNT_BADGE_STYLE: CSSProperties = {
   marginInlineStart: "auto",
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
 };
 
@@ -589,12 +589,12 @@ const NEW_FOLDER_INPUT_STYLE: CSSProperties = {
   flex: 1,
   minWidth: 0,
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   background: "var(--paper-1)",
   border: "1px solid var(--accent)",
-  borderRadius: 3,
+  borderRadius: "var(--radius-1)",
   padding: "3px 6px",
   outline: "none",
 };
@@ -604,7 +604,7 @@ const BLOCK_NOTICE_STYLE: CSSProperties = {
   padding: "8px 10px",
   background: "var(--warning-soft, var(--paper-1))",
   borderInlineStart: "2px solid var(--line-3)",
-  borderRadius: 3,
+  borderRadius: "var(--radius-1)",
   fontFamily: "var(--font-sans)",
   fontSize: 12,
   color: "var(--fg-2)",
@@ -624,9 +624,9 @@ const CASE_MERGE_STYLE: CSSProperties = {
 
 const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
   display: "flex",
-  gap: 8,
+  gap: "var(--space-2)",
   justifyContent: "flex-end",
-  marginTop: 8,
+  marginTop: "var(--space-2)",
 };
 
 /** Optional props. `onNewFromTemplate` wires the new-note caret that opens

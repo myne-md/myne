@@ -30,7 +30,7 @@ const HEADER_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: 8,
+  gap: "var(--space-2)",
 };
 
 /** Optional handlers the Editor wires; absent in isolation (e.g. tests). */
@@ -58,7 +58,7 @@ export interface AiChatTabProps {
 const ASK_INPUT_STYLE: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   background: "var(--bg-1)",
   border: "1px solid var(--line-1)",
@@ -68,7 +68,7 @@ const ASK_INPUT_STYLE: CSSProperties = {
 
 const ASK_SUBMIT_STYLE: CSSProperties = {
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-2)",
   background: "var(--bg-2)",
   border: "1px solid var(--line-1)",
@@ -78,7 +78,7 @@ const ASK_SUBMIT_STYLE: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const TURN_TEXT_STYLE: CSSProperties = { fontSize: 13, lineHeight: 1.5 };
+const TURN_TEXT_STYLE: CSSProperties = { fontSize: "var(--text-sm)", lineHeight: 1.5 };
 
 /** One source-note citation chip under a grounded assistant turn. Clicking opens
  *  the source note (`onOpenNote`, task 8; disabled when absent). The label is the
@@ -103,7 +103,7 @@ function CitationChip({
       onClick={() => onOpenNote?.(citation.noteId, citation.byteStart, citation.byteEnd)}
       disabled={onOpenNote === undefined}
       style={{
-        fontSize: 11,
+        fontSize: "var(--text-xs)",
         color: "var(--fg-2)",
         background: "var(--bg-1)",
         border: "1px solid var(--line-1)",
@@ -153,7 +153,7 @@ function ChatTurnView({
         padding: "6px 9px",
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-3)", marginBottom: 2 }}>
+      <div style={{ fontSize: "var(--text-xs)", fontWeight: "var(--weight-medium)", color: "var(--fg-3)", marginBottom: 2 }}>
         {isUser
           ? t("editor.chrome.rightPanel.aiChat.you")
           : t("editor.chrome.rightPanel.aiChat.assistant")}
@@ -191,9 +191,9 @@ function ChatTurnView({
       {turn.citations.length > 0 && (
         <div
           data-testid="ai.citations"
-          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginTop: 6 }}
+          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-1)", marginTop: 6 }}
         >
-          <span style={{ fontSize: 11, color: "var(--fg-3)" }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
             {t("editor.chrome.rightPanel.aiChat.citations")}
           </span>
           {turn.citations.map((c, i) => (
@@ -213,9 +213,9 @@ function ChatTurnView({
           data-testid="ai.insert-turn"
           onClick={() => onInsert(turn.text)}
           style={{
-            marginTop: 8,
+            marginTop: "var(--space-2)",
             fontSize: 12,
-            fontWeight: 500,
+            fontWeight: "var(--weight-medium)",
             color: "var(--fg-2)",
             background: "var(--bg-2)",
             border: "1px solid var(--line-1)",
@@ -260,8 +260,8 @@ export function AiChatTab({
           data-ai-enabled={aiEnabled ? "true" : "false"}
           data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
           style={{
-            fontSize: 11,
-            fontWeight: 500,
+            fontSize: "var(--text-xs)",
+            fontWeight: "var(--weight-medium)",
             color: aiEnabled && !noModel ? "var(--fg-2)" : "var(--fg-3)",
             border: "1px solid var(--line-1)",
             borderRadius: "var(--radius-1)",
@@ -284,7 +284,7 @@ export function AiChatTab({
       {ready && (
         <p
           data-testid="ai.honesty-note"
-          style={{ fontSize: 11, lineHeight: 1.4, color: "var(--fg-3)", margin: "8px 0 0" }}
+          style={{ fontSize: "var(--text-xs)", lineHeight: 1.4, color: "var(--fg-3)", margin: "8px 0 0" }}
         >
           {AI_CHAT_HONESTY_NOTE}
         </p>
@@ -370,7 +370,7 @@ export function AiChatTab({
         <p
           data-testid={noModel ? "ai.status-no-model" : undefined}
           style={{
-            fontSize: 13,
+            fontSize: "var(--text-sm)",
             lineHeight: 1.5,
             color: "var(--fg-3)",
             margin: "8px 0 0",

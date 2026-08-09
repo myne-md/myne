@@ -536,13 +536,18 @@ function renderBlockquote(ctx: Ctx, node: SyntaxNode): string {
       });
       const cls = `callout callout-${header[2]!.toLowerCase()} callout-tone-${type.tone}`;
       const titleHtml = `<p class="callout-title">${escapeHtml(title)}</p>`;
+      // The ornament role travels with the HTML projection too (myne#394), so a
+      // themed callout looks the same in the editor and in an export. This file
+      // and `editor/src/decorations/callout.ts` are hand-kept twins; a one-sided
+      // change here means a themed editor and an unthemed PDF.
+      const open = `<div class="${cls}" data-ornament="box">`;
       return body === ""
-        ? `<div class="${cls}">\n${titleHtml}\n</div>`
-        : `<div class="${cls}">\n${titleHtml}\n${body}\n</div>`;
+        ? `${open}\n${titleHtml}\n</div>`
+        : `${open}\n${titleHtml}\n${body}\n</div>`;
     }
   }
   const inner = renderBlockChildren(ctx, node);
-  return `<blockquote>\n${inner}\n</blockquote>`;
+  return `<blockquote data-ornament="box">\n${inner}\n</blockquote>`;
 }
 
 function renderList(ctx: Ctx, node: SyntaxNode, ordered: boolean): string {

@@ -29,7 +29,7 @@ export function StepLayout({
         alignItems: "center",
         justifyContent: "center",
         background: "var(--bg-1)",
-        padding: 24,
+        padding: "var(--space-5)",
       }}
     >
       <div
@@ -70,7 +70,7 @@ export function StepEyebrow({ icon, testId, children }: StepEyebrowProps) {
           color: "var(--fg-3)",
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          fontWeight: 600,
+          fontWeight: "var(--weight-semibold)",
         }}
       >
         {children}
@@ -105,8 +105,8 @@ export function StepHeading({ centered, children }: StepHeadingProps) {
       tabIndex={-1}
       className="vc-step-heading"
       style={{
-        fontSize: 28,
-        fontWeight: 600,
+        fontSize: "var(--text-2xl)",
+        fontWeight: "var(--weight-semibold)",
         letterSpacing: "-0.015em",
         lineHeight: 1.2,
         color: "var(--fg-display)",
