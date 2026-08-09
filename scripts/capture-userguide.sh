@@ -49,6 +49,16 @@ RUN_FLAGS=(
   -v myne-e2e-node-modules:/work/node_modules
   -v myne-e2e-target:/work/target
   -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  # Per-member node_modules volumes, matching the three e2e runners. Without
+  # them the container's `pnpm install` rewrites each bind-mounted workspace
+  # member's symlinks and breaks the HOST install — the documented failure mode
+  # (e2e/CLAUDE.md). This script had never carried them; it got away with it
+  # only because a capture run happens rarely.
+  -v myne-e2e-nm-dialect:/work/dialect/node_modules
+  -v myne-e2e-nm-editor:/work/editor/node_modules
+  -v myne-e2e-nm-copy:/work/copy/node_modules
+  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
+  -v myne-e2e-nm-preview:/work/preview/node_modules
   -w /work
   --user root
 )

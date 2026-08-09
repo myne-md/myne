@@ -33,6 +33,20 @@ export function describeThemeError(error: ThemeError): string {
         : i18n.t("settings.customThemes.error.parseError");
     case "InvalidName":
       return i18n.t("settings.customThemes.error.invalidName");
+    case "LowContrast":
+      // Name the pair AND both numbers. "Your theme is unreadable" is not
+      // something an author can act on; "--ink-1 on --paper is 1.03, needs 4.5"
+      // is (myne#394).
+      return i18n.t("settings.customThemes.error.lowContrast", {
+        key: error.key ?? "",
+        against: error.against ?? "",
+        ratio: error.ratio ?? "",
+        min: error.min ?? "",
+      });
+    case "ReservedKey":
+      // The `--_` namespace is Myne's own — a theme that could write
+      // `--_o-ceiling` could raise the bound its own tint wash is clamped by.
+      return i18n.t("settings.customThemes.error.reservedKey", { key: error.key ?? "" });
     default:
       return i18n.t("settings.customThemes.error.invalidFile");
   }

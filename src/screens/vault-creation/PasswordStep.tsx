@@ -59,11 +59,11 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
         helperCopy={
           <div
             style={{
-              padding: 12,
+              padding: "var(--space-3)",
               background: "var(--paper-2)",
               border: "1px solid var(--line-1)",
-              borderRadius: 6,
-              fontSize: 13,
+              borderRadius: "var(--radius-2)",
+              fontSize: "var(--text-sm)",
               lineHeight: 1.6,
               color: "var(--fg-2)",
             }}

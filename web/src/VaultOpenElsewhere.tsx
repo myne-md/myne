@@ -37,10 +37,10 @@ const CARD: React.CSSProperties = {
   maxWidth: 560,
   display: "flex",
   flexDirection: "column",
-  gap: 16,
+  gap: "var(--space-4)",
 };
 
-const H1: React.CSSProperties = { fontSize: 20, fontWeight: 600, margin: 0 };
+const H1: React.CSSProperties = { fontSize: 20, fontWeight: "var(--weight-semibold)", margin: 0 };
 const P: React.CSSProperties = {
   margin: 0,
   lineHeight: 1.6,
@@ -49,12 +49,12 @@ const P: React.CSSProperties = {
 const CTA: React.CSSProperties = {
   alignSelf: "flex-start",
   padding: "8px 16px",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   border: "1px solid var(--line-2)",
   background: "var(--bg-2)",
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",
-  fontSize: 14,
+  fontSize: "var(--text-base)",
   cursor: "pointer",
 };
 

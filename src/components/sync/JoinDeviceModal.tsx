@@ -73,7 +73,7 @@ const LABEL: CSSProperties = {
   color: "var(--fg-3)",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 
 const ROW: CSSProperties = {
@@ -85,8 +85,8 @@ const ROW: CSSProperties = {
 function btn(primary: boolean, disabled: boolean): CSSProperties {
   return {
     padding: "8px 18px",
-    fontSize: 13,
-    fontWeight: 500,
+    fontSize: "var(--text-sm)",
+    fontWeight: "var(--weight-medium)",
     borderRadius: "var(--radius-2)",
     cursor: disabled ? "not-allowed" : "pointer",
     border: primary ? "none" : "1px solid var(--line-1)",
@@ -360,7 +360,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: "var(--text-2xl)",
-              fontWeight: 700,
+              fontWeight: "var(--weight-bold)",
               letterSpacing: "0.16em",
               textAlign: "center",
               padding: "var(--space-4)",

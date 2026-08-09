@@ -62,7 +62,7 @@ const TITLE_STYLE: CSSProperties = {
 };
 
 const LINK_STYLE: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--accent)",
   textDecoration: "underline",
   background: "none",
@@ -73,7 +73,7 @@ const LINK_STYLE: CSSProperties = {
   fontFamily: "inherit",
   display: "inline-flex",
   alignItems: "center",
-  gap: 4,
+  gap: "var(--space-1)",
   alignSelf: "flex-start",
   transition: "color var(--duration-fast) var(--ease-standard)",
 };
@@ -172,7 +172,7 @@ function ModelRoleBlock(props: {
         <span
           data-testid={props.testIdSelect}
           style={{
-            fontSize: 13,
+            fontSize: "var(--text-sm)",
             color: props.path === null ? "var(--fg-3)" : "var(--fg-1)",
             fontFamily: "var(--font-mono)",
             overflow: "hidden",
@@ -195,7 +195,7 @@ function ModelRoleBlock(props: {
           })}
           style={{
             font: "inherit",
-            fontSize: 13,
+            fontSize: "var(--text-sm)",
             padding: "var(--space-1) var(--space-2)",
             borderRadius: "var(--radius-1)",
             border: "1px solid var(--line-1)",
@@ -349,7 +349,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
             marginTop: "var(--space-1)",
             color: "var(--fg-2)",
             font: "inherit",
-            fontSize: 13,
+            fontSize: "var(--text-sm)",
             textDecoration: "underline",
             cursor: "pointer",
           }}

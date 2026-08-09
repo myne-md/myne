@@ -43,7 +43,7 @@ const BUBBLE_STYLE: CSSProperties = {
   color: "var(--bg-1)",
   fontFamily: "var(--font-sans)",
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   lineHeight: 1.3,
   padding: "4px 8px",
   borderRadius: "var(--radius-1)",

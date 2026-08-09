@@ -68,7 +68,7 @@ const HEADER_STYLE: CSSProperties = {
 
 const HEADER_TITLE_STYLE: CSSProperties = {
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   margin: 0,
 };
@@ -116,12 +116,12 @@ const ROW_SELECTED_STYLE: CSSProperties = {
 };
 
 const ROW_AGE_STYLE: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
 
 const ROW_META_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
 };
 
@@ -152,7 +152,7 @@ const DETAIL_GROUP_STYLE: CSSProperties = {
   minWidth: 0,
 };
 
-const COMPARE_SELECT_STYLE: CSSProperties = { height: 26, fontSize: 11 };
+const COMPARE_SELECT_STYLE: CSSProperties = { height: 26, fontSize: "var(--text-xs)" };
 
 // The preview region; `<DiffView>` is the scrolling child inside it.
 const PREVIEW_STYLE: CSSProperties = {
@@ -166,7 +166,7 @@ const EMPTY_STATE_STYLE: CSSProperties = {
   margin: "auto",
   padding: "var(--space-7) var(--space-5)",
   textAlign: "center",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
   maxWidth: 360,
 };
@@ -175,7 +175,7 @@ const PLACEHOLDER_STYLE: CSSProperties = {
   margin: "auto",
   padding: "var(--space-7)",
   textAlign: "center",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
 };
 
@@ -193,7 +193,7 @@ const STATUS_STYLE: CSSProperties = { fontSize: 12, color: "var(--warning)" };
 const BTN_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   padding: "4px 10px",
   borderRadius: 5,
   cursor: "pointer",
@@ -616,13 +616,13 @@ const CONFIRM_CARD_STYLE: CSSProperties = {
 
 const CONFIRM_TITLE_STYLE: CSSProperties = {
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   margin: "0 0 var(--space-2)",
 };
 
 const CONFIRM_BODY_STYLE: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
   margin: "0 0 var(--space-5)",
   lineHeight: 1.5,

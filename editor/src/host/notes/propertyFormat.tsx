@@ -87,7 +87,7 @@ export function hasDisplayableValue(prop: StoredProperty | undefined): boolean {
 const PILL_ROW_STYLE: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
-  gap: 4,
+  gap: "var(--space-1)",
 };
 
 const CHECKBOX_STYLE: CSSProperties = {

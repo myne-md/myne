@@ -34,7 +34,7 @@ export function SessionLostStep({ error, dispatch }: SessionLostStepProps) {
 
       <div
         style={{
-          fontSize: 14,
+          fontSize: "var(--text-base)",
           lineHeight: 1.6,
           color: "var(--fg-2)",
           textAlign: "center",
@@ -47,7 +47,7 @@ export function SessionLostStep({ error, dispatch }: SessionLostStepProps) {
       <Button
         variant="primary"
         onClick={() => dispatch({ type: "RESET" })}
-        style={{ marginTop: 12 }}
+        style={{ marginTop: "var(--space-3)" }}
         data-testid="create.session-lost-start-over"
       >
         {t("vaultCreation.sessionLost.startOver")}

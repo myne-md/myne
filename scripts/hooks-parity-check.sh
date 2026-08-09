@@ -71,7 +71,10 @@ echo "== trailing whitespace (diff-scoped, matches the pre-commit hook) =="
 base="${CI_PREV_COMMIT_SHA:-}"
 tip="${CI_COMMIT_SHA:-HEAD}"
 if [ -n "$base" ] && git rev-parse -q --verify "${base}^{commit}" >/dev/null 2>&1; then
-  if git diff --check "$base" "$tip" -- ':(exclude)src-tauri/resources/dictionaries/**' ':(exclude)src-tauri/resources/models/**'; then
+  # Exclusions mirror lefthook.yml's `whitespace` job, which carries the
+  # rationale for each: vendored upstream data, and the captured theme-preview
+  # snapshot (generated, do-not-hand-edit).
+  if git diff --check "$base" "$tip" -- ':(exclude)src-tauri/resources/dictionaries/**' ':(exclude)src-tauri/resources/models/**' ':(exclude)preview/src/preview.html' ':(exclude)preview/src/preview.css'; then
     echo "  ok"
   else
     fail=1

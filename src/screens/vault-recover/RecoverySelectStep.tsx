@@ -123,7 +123,7 @@ const ROW_LABEL_COL_STYLE: CSSProperties = {
 function rowLabelStyle(real: boolean): CSSProperties {
   return {
     fontSize: "var(--text-base)",
-    fontWeight: 500,
+    fontWeight: "var(--weight-medium)",
     color: real ? "var(--fg-1)" : "var(--fg-2)",
     fontStyle: real ? "normal" : "italic",
     overflow: "hidden",

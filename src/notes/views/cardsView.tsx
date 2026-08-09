@@ -163,13 +163,13 @@ const GROUP_HEADING_STYLE: CSSProperties = {
   gap: "var(--space-2)",
   margin: "var(--space-5) 0 var(--space-3)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-2)",
 };
 
 const GROUP_COUNT_STYLE: CSSProperties = {
-  fontWeight: 400,
+  fontWeight: "var(--weight-regular)",
   fontSize: 12,
   color: "var(--fg-3)",
 };
@@ -212,8 +212,8 @@ const CARD_IMAGE_STYLE: CSSProperties = {
 
 const CARD_TITLE_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: 14,
-  fontWeight: 600,
+  fontSize: "var(--text-base)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   lineHeight: 1.35,
 };
@@ -230,7 +230,7 @@ const EMPTY_STYLE: CSSProperties = {
   maxWidth: 420,
   textAlign: "center",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
   lineHeight: 1.6,
 };
@@ -264,7 +264,7 @@ const COVER_BUTTON_STYLE: CSSProperties = {
   insetInlineEnd: "var(--space-2)",
   display: "inline-flex",
   alignItems: "center",
-  gap: 4,
+  gap: "var(--space-1)",
   padding: "3px 8px",
   fontFamily: "var(--font-sans)",
   fontSize: 11,

@@ -106,7 +106,7 @@ const OPTION_STYLE: CSSProperties = {
   border: 0,
   cursor: "pointer",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   whiteSpace: "nowrap",
 };

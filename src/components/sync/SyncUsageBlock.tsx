@@ -41,7 +41,7 @@ const VALUE_STYLE: CSSProperties = {
 
 const METER_TRACK_STYLE: CSSProperties = {
   height: 6,
-  borderRadius: 3,
+  borderRadius: "var(--radius-1)",
   background: "var(--paper-2)",
   border: "1px solid var(--line-1)",
   overflow: "hidden",
@@ -53,7 +53,7 @@ const FROZEN_BADGE_STYLE: CSSProperties = {
   color: "var(--fg-1)",
   background: "var(--paper-2)",
   border: "1px solid var(--line-1)",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   padding: "4px 10px",
 };
 

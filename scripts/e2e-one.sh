@@ -20,6 +20,8 @@ RUN_FLAGS=(
   -v myne-e2e-nm-dialect:/work/dialect/node_modules
   -v myne-e2e-nm-editor:/work/editor/node_modules
   -v myne-e2e-nm-copy:/work/copy/node_modules
+  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
+  -v myne-e2e-nm-preview:/work/preview/node_modules
   -v myne-e2e-target:/work/target
   -v myne-e2e-cargo-registry:/usr/local/cargo/registry
   -w /work

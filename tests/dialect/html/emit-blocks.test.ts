@@ -89,20 +89,20 @@ describe("lists", () => {
 describe("blockquotes + callouts", () => {
   it("renders a plain blockquote", async () => {
     const html = await emit("> quoted text\n");
-    expect(html).toContain("<blockquote>\n<p>quoted text</p>\n</blockquote>");
+    expect(html).toContain("<blockquote data-ornament=\"box\">\n<p>quoted text</p>\n</blockquote>");
   });
 
   it("renders nested blockquotes", async () => {
     const html = await emit("> outer\n> > inner\n");
     expect(html).toMatch(
-      /<blockquote>\n<p>outer<\/p>\n<blockquote>\n<p>inner<\/p>\n<\/blockquote>\n<\/blockquote>/,
+      /<blockquote data-ornament=\"box\">\n<p>outer<\/p>\n<blockquote data-ornament=\"box\">\n<p>inner<\/p>\n<\/blockquote>\n<\/blockquote>/,
     );
   });
 
   it("promotes a known callout type to a typed container with classes only", async () => {
     const html = await emit("> [!note]\n> body text\n");
     expect(html).toContain(
-      '<div class="callout callout-note callout-tone-accent">',
+      '<div class="callout callout-note callout-tone-accent" data-ornament="box">',
     );
     expect(html).toContain('<p class="callout-title">Note</p>');
     expect(html).toContain("<p>body text</p>");
@@ -113,7 +113,7 @@ describe("blockquotes + callouts", () => {
   it("uses the custom title when present (case-insensitive type)", async () => {
     const html = await emit("> [!WARNING] Mind the gap\n> body\n");
     expect(html).toContain(
-      '<div class="callout callout-warning callout-tone-warning">',
+      '<div class="callout callout-warning callout-tone-warning" data-ornament="box">',
     );
     expect(html).toContain('<p class="callout-title">Mind the gap</p>');
   });
@@ -122,7 +122,7 @@ describe("blockquotes + callouts", () => {
     for (const [type, def] of Object.entries(CALLOUT_HTML_TYPES)) {
       const html = await emit(`> [!${type}]\n> x\n`);
       expect(html).toContain(
-        `<div class="callout callout-${type} callout-tone-${def.tone}">`,
+        `<div class="callout callout-${type} callout-tone-${def.tone}" data-ornament="box">`,
       );
       expect(html).toContain(
         `<p class="callout-title">${i18n.t(def.labelKey)}</p>`,
@@ -132,7 +132,7 @@ describe("blockquotes + callouts", () => {
 
   it("leaves an unknown type as a plain blockquote", async () => {
     const html = await emit("> [!florble] nope\n> body\n");
-    expect(html).toContain("<blockquote>");
+    expect(html).toContain("<blockquote data-ornament=\"box\">");
     expect(html).not.toContain("callout");
     expect(html).toContain("[!florble]");
   });

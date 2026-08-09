@@ -25,6 +25,11 @@ import ReactDOM from "react-dom/client";
 import App from "../../src/App";
 import { RootErrorBoundary } from "../../src/components/RootErrorBoundary";
 import "../../src/styles/tokens.css";
+// The ornament layer (myne#394). The web client shares `src/lib/theme.ts`, so it
+// already reflects every `data-o-*` selection onto the root — without this import
+// it would reflect them onto a document with no rules to select them, and every
+// ornament would silently do nothing.
+import "@myne/ornaments/ornaments.css";
 import { gateEnvironment } from "./environment-gate";
 import { UnsupportedEnvironment } from "./UnsupportedEnvironment";
 import { VaultOpenElsewhere } from "./VaultOpenElsewhere";

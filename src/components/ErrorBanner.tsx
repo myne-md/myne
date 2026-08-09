@@ -18,15 +18,15 @@ export function ErrorBanner({ error }: ErrorBannerProps) {
       role="alert"
       aria-live="polite"
       style={{
-        padding: 12,
+        padding: "var(--space-3)",
         background: "var(--danger-soft)",
         border: "1px solid var(--danger)",
-        borderRadius: 6,
+        borderRadius: "var(--radius-2)",
       }}
     >
       <div
         style={{
-          fontWeight: 600,
+          fontWeight: "var(--weight-semibold)",
           marginBottom: 4,
           color: "var(--fg-1)",
         }}
@@ -35,7 +35,7 @@ export function ErrorBanner({ error }: ErrorBannerProps) {
       </div>
       <div
         style={{
-          fontSize: 13,
+          fontSize: "var(--text-sm)",
           lineHeight: 1.5,
           color: "var(--fg-2)",
         }}

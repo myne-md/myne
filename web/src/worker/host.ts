@@ -192,8 +192,14 @@ function ensureWorker(): { worker: Worker; ready: Promise<void> } {
     w.onerror = (event) => {
       event.preventDefault();
       clearTimeout(timer);
+      // `typeof` first, because a bare `instanceof ErrorEvent` throws
+      // ReferenceError wherever the global is absent — and it throws INSIDE the
+      // handler whose entire job is to not lose the fatal, so the death route
+      // this whole file exists to settle would itself die. Browsers always
+      // define it; the node-environment tests that cover these routes do not,
+      // and three of them have failed since this landed (#134).
       const at =
-        event instanceof ErrorEvent && event.filename
+        typeof ErrorEvent !== "undefined" && event instanceof ErrorEvent && event.filename
           ? `${event.filename}:${event.lineno ?? 0}`
           : undefined;
       declareFatal(FATAL_CODES.workerError, at);

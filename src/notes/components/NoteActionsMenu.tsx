@@ -66,18 +66,18 @@ const MENU_STYLE: CSSProperties = {
   minWidth: 208,
   background: "var(--paper)",
   border: "1px solid var(--line-2)",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
-  padding: 4,
+  padding: "var(--space-1)",
   zIndex: 60,
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
 };
 
 const ITEM_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   width: "100%",
   textAlign: "start",
   padding: "6px 10px",
