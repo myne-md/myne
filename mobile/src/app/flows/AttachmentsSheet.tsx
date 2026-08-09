@@ -2,7 +2,8 @@
 // decrypt thumbnail per row, and Insert / Rename / Delete actions. Reads through
 // the shared `myne-core` attachments plugin; images are served by the in-app
 // `attachment://` scheme (decrypt in RAM + re-sniff). Images/PDFs open the shared
-// lightbox on tap; voice notes get an inline play/pause tile (no text-extraction).
+// lightbox on tap; voice notes and MP4/WebM video get an inline play/pause tile
+// (video shows a first-frame poster; no text-extraction).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,6 +24,10 @@ const isPdf = (t: string) => t === "application/pdf";
 /** Voice notes / audio (stored as `audio/wav`): an inline play/pause tile in the
  *  row rather than a lightbox — playback, not a focused visual preview. */
 const isAudio = (t: string) => t.startsWith("audio/");
+/** Video (MP4/WebM, myne#168): a first-frame poster + inline play/pause tile,
+ *  mirroring {@link AudioTile}; the note's inline widget is the primary player,
+ *  so no lightbox surface here (kept out of {@link previewKind}). */
+const isVideo = (t: string) => t.startsWith("video/");
 /** Which preview the shared lightbox can show for a content-type (else null).
  *  Audio is deliberately excluded here — it is handled by {@link AudioTile}. */
 const previewKind = (t: string): "image" | "pdf" | null =>
@@ -270,13 +275,15 @@ export function AttachmentsSheet({
             <div key={e.id} style={{ borderTop: "1px solid var(--line-1)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 4px" }}>
               <div
-                onClick={isAudio(e.content_type) ? undefined : () => openPreview(e)}
+                onClick={isAudio(e.content_type) || isVideo(e.content_type) ? undefined : () => openPreview(e)}
                 style={{ width: 44, height: 44, borderRadius: 8, background: "var(--bg-2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", cursor: previewKind(e.content_type) ? "pointer" : "default" }}
               >
                 {isImage(e.content_type) ? (
                   <img src={attachmentSrc(e.id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : isAudio(e.content_type) ? (
                   <AudioTile id={e.id} filename={e.filename} />
+                ) : isVideo(e.content_type) ? (
+                  <VideoTile id={e.id} filename={e.filename} />
                 ) : isPdf(e.content_type) ? (
                   <PdfThumbnail id={e.id} size={44} glyphSize={20} />
                 ) : (
@@ -416,6 +423,72 @@ function AudioTile({ id, filename }: { id: string; filename: string }) {
         )}
       </button>
     </>
+  );
+}
+
+/** First-frame poster + inline play/pause tile for a video attachment (MP4/WebM,
+ *  myne#168) — the row thumbnail slot (44×44). Mirrors {@link AudioTile}: a
+ *  `<video preload="metadata">` (served by the in-app `attachment://` scheme,
+ *  allowed by the CSP `media-src`) paints the first frame as a poster and plays
+ *  in place on tap; playback is paused on unmount so the decode buffer is released
+ *  when the row scrolls out or the tab closes (playback-residue discipline). The
+ *  note's inline widget is the primary player; an undecodable file (e.g. WebM
+ *  under iOS WKWebView) simply shows no frame here and degrades to the file card
+ *  in the note. */
+function VideoTile({ id, filename }: { id: string; filename: string }) {
+  const { t } = useTranslation();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  // Stop playback (release the decode buffer) when the tile unmounts.
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => video?.pause();
+  }, []);
+
+  const toggle = (ev: React.MouseEvent) => {
+    // Don't let the tap bubble to the row (openPreview / rename) or select text.
+    ev.preventDefault();
+    ev.stopPropagation();
+    const video = videoRef.current;
+    if (video === null) return;
+    if (video.paused) {
+      void video.play();
+      setPlaying(true);
+    } else {
+      video.pause();
+      setPlaying(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      data-testid="files.video-play"
+      data-attachment-id={id}
+      aria-label={playing ? t("attachments.pauseLabel", { filename }) : t("attachments.playLabel", { filename })}
+      style={{ width: "100%", height: "100%", border: "none", background: "transparent", padding: 0, position: "relative", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}
+    >
+      <video
+        ref={videoRef}
+        src={attachmentSrc(id)}
+        preload="metadata"
+        playsInline
+        onEnded={() => setPlaying(false)}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      />
+      {!playing && (
+        <span
+          aria-hidden="true"
+          style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.28)", color: "#fff" }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </span>
+      )}
+    </button>
   );
 }
 
