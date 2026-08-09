@@ -88,7 +88,7 @@ const SAMPLE_HEADING_STYLE: CSSProperties = {
   fontFamily: "var(--editor-font-family)",
   fontSize: "calc(var(--editor-text-size) * 1.5)",
   lineHeight: "var(--editor-line-spacing)",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 const SAMPLE_BODY_STYLE: CSSProperties = {
   margin: "0 0 var(--space-2)",

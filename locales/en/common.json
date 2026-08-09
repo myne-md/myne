@@ -2482,9 +2482,11 @@
         "invalidName": "Unsafe theme name",
         "invalidValue": "Invalid value for {{key}}",
         "invalidValueWithLine": "Invalid value for {{key}} (line {{line}})",
+        "lowContrast": "{{key}} on {{against}} has {{ratio}}:1 contrast, but needs at least {{min}}:1 to stay readable",
         "missingKey": "Missing required color {{key}}",
         "parseError": "Not valid JSON",
-        "parseErrorWithLine": "Not valid JSON (line {{line}})"
+        "parseErrorWithLine": "Not valid JSON (line {{line}})",
+        "reservedKey": "{{key}} is reserved for Myne's own use and can't be set by a theme"
       },
       "export": "Export",
       "exportError": "Couldn't export that theme. Please try again.",

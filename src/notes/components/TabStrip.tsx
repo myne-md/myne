@@ -36,6 +36,7 @@ import {
 import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { ornamentRole } from "@myne/ornaments";
 
 /** Strip height (px) — also the editor body's top inset, so the drop overlay
  *  starts below the strip and leaves the tabs interactive during a drag. */
@@ -182,6 +183,10 @@ export function TabStrip({
 
   return (
     <div
+      // The tab strip is CHROME for ornament purposes (myne#394). Ornament here
+      // is paint only, so a themed strip's tab hit areas are exactly where an
+      // unthemed one's were — the property task 14 measures.
+      {...ornamentRole("chrome")}
       style={{
         ...stripStyle,
         paddingInlineStart: STRIP_BASE_PADDING_LEFT + insetLeft,
@@ -412,7 +417,7 @@ function Tab({
     opacity: stacked || active || hovering ? 1 : 0.72,
     cursor: "pointer",
     fontFamily: "var(--font-sans)",
-    fontSize: 13,
+    fontSize: "var(--text-sm)",
     // Stacked deck (tab-modes / MYND-319): cards partially overlap and each casts
     // a soft shadow onto the card behind it, so the row reads as a front-to-back
     // deck; the active/hovered card lifts above the rest. Functional layout.
@@ -583,7 +588,7 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
         color: "var(--fg-2)",
         flexShrink: 0,
         fontFamily: "var(--font-sans)",
-        fontSize: 13,
+        fontSize: "var(--text-sm)",
       }}
     >
       <Icon name="file-text" size={13} />
@@ -686,7 +691,7 @@ function OverflowMenu({
           insetInlineEnd: 0,
           zIndex: 11,
           margin: 0,
-          padding: 4,
+          padding: "var(--space-1)",
           listStyle: "none",
           minWidth: 200,
           // Cap the width so a long tab title (e.g. a clipped web page's full
@@ -728,7 +733,7 @@ function OverflowMenu({
                     id === activeTab ? "var(--accent-soft)" : "transparent",
                   color: italic ? "var(--fg-3)" : "var(--fg-1)",
                   fontFamily: "var(--font-sans)",
-                  fontSize: 13,
+                  fontSize: "var(--text-sm)",
                   fontStyle: italic ? "italic" : "normal",
                   cursor: "pointer",
                   whiteSpace: "nowrap",

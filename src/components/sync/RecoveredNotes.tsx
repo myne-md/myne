@@ -52,7 +52,7 @@ const ROW_ID_STYLE: CSSProperties = {
 };
 
 const ROW_META_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   flex: 1,
   minWidth: 0,
@@ -64,7 +64,7 @@ const ROW_META_STYLE: CSSProperties = {
 const BTN_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   padding: "3px 9px",
   borderRadius: 5,
   cursor: "pointer",
@@ -137,14 +137,14 @@ const PREVIEW_HEADER_STYLE: CSSProperties = {
 
 const PREVIEW_TITLE_STYLE: CSSProperties = {
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   margin: 0,
 };
 
 const PREVIEW_ID_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
 };
 
@@ -165,7 +165,7 @@ const PREVIEW_PLACEHOLDER_STYLE: CSSProperties = {
   margin: "auto",
   padding: "var(--space-7)",
   textAlign: "center",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
 };
 

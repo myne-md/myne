@@ -124,11 +124,11 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
 }
 
 const INFO_BOX_STYLE: CSSProperties = {
-  padding: 12,
+  padding: "var(--space-3)",
   background: "var(--paper-2)",
   border: "1px solid var(--line-1)",
-  borderRadius: 6,
-  fontSize: 13,
+  borderRadius: "var(--radius-2)",
+  fontSize: "var(--text-sm)",
   lineHeight: 1.6,
   color: "var(--fg-2)",
 };
@@ -140,7 +140,7 @@ const ROOT_STYLE: CSSProperties = {
   justifyContent: "center",
   background: "var(--bg-1)",
   fontFamily: "var(--font-sans)",
-  padding: 24,
+  padding: "var(--space-5)",
 };
 
 const COLUMN_STYLE: CSSProperties = {
@@ -152,15 +152,15 @@ const COLUMN_STYLE: CSSProperties = {
 
 const EYEBROW_STYLE: CSSProperties = {
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: "var(--fg-3)",
 };
 
 const TITLE_STYLE: CSSProperties = {
-  fontSize: 28,
-  fontWeight: 600,
+  fontSize: "var(--text-2xl)",
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "-0.015em",
   lineHeight: 1.2,
   color: "var(--fg-display)",

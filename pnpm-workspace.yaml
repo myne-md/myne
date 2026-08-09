@@ -7,6 +7,14 @@ packages:
   # Shared load-bearing user-facing copy (SYNC-42) — privacy-property strings
   # kept byte-identical across the desktop + mobile clients by construction.
   - copy
+  # Shared ornament layer (myne#394) — the stylesheet a custom theme's ornament
+  # selections resolve against, plus the role helper components declare through.
+  - ornaments
+  # Theme-preview snapshot (myne#394) — the real editor's DOM + stylesheet,
+  # captured from the running app, so a theme preview is Myne rather than a
+  # hand-written imitation of it. Consumed by the website builder and the
+  # myne-themes gallery renderer.
+  - preview
 allowBuilds:
   # @swc/core is pulled in by the dev-only i18next-cli (string extraction). Its
   # prebuilt binary loads without a local build step (extraction runs fine), so

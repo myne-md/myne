@@ -47,7 +47,7 @@ const NAV_ROW_STYLE: CSSProperties = {
   background: "transparent",
   color: "var(--fg-2)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   cursor: "pointer",
   textAlign: "start",
   boxSizing: "border-box",
@@ -119,7 +119,7 @@ const SEARCH_INPUT_STYLE: CSSProperties = {
   outline: "none",
   background: "transparent",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
 
@@ -136,13 +136,13 @@ const ROW_BASE_STYLE: CSSProperties = {
   height: 30,
   padding: "0 8px",
   boxSizing: "border-box",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   background: "transparent",
   border: 0,
   color: "var(--fg-1)",
   cursor: "pointer",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   textAlign: "start",
 };
 
@@ -158,14 +158,14 @@ const RENAME_INPUT_STYLE: CSSProperties = {
   flex: "1 1 auto",
   minWidth: 0,
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   padding: "2px 4px",
   background: "var(--bg-2)",
   color: "var(--fg-1)",
   // Clean inline edit: soft accent halo instead of a hard border + the global
   // focus ring (the inline boxShadow overrides `--ring`).
   border: "1px solid transparent",
-  borderRadius: 3,
+  borderRadius: "var(--radius-1)",
   outline: "none",
   boxShadow: "0 0 0 2px var(--accent-soft)",
 };

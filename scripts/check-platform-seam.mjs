@@ -47,6 +47,13 @@ const GUARDED = [
   { root: "editor", seam: null },
   { root: "dialect", seam: null },
   { root: "copy", seam: null },
+  // `ornaments` and `preview` (myne#394) are shared source packages on the same
+  // terms as the three above, and they reach FURTHER than the others: both are
+  // consumed by the website and by the myne-themes gallery renderer, neither of
+  // which is a Tauri host at all. A `@tauri-apps/*` import here would not
+  // degrade those consumers, it would fail their build outright.
+  { root: "ornaments", seam: null },
+  { root: "preview", seam: null },
 ];
 
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|mts|cts)$/;

@@ -128,7 +128,7 @@ const SEARCH_INPUT_STYLE: CSSProperties = {
   outline: "none",
   background: "transparent",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
 
@@ -148,7 +148,7 @@ const OPTION_STYLE: CSSProperties = {
   border: 0,
   cursor: "pointer",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   whiteSpace: "nowrap",
 };
@@ -156,7 +156,7 @@ const OPTION_STYLE: CSSProperties = {
 const EMPTY_STYLE: CSSProperties = {
   padding: "var(--space-2) var(--space-3)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
 };
 

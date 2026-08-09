@@ -123,11 +123,11 @@ function isOverdue(task: TaskRowData, today: string): boolean {
 const ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "flex-start",
-  gap: 8,
+  gap: "var(--space-2)",
   padding: "6px 8px",
   borderRadius: "var(--radius-2, 6px)",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   lineHeight: 1.45,
   color: "var(--fg-1)",
 };
@@ -137,7 +137,7 @@ const BOX_BASE: CSSProperties = {
   width: 14,
   height: 14,
   marginTop: 3,
-  borderRadius: 3,
+  borderRadius: "var(--radius-1)",
   border: "1px solid var(--line-2, var(--line-1))",
   background: "transparent",
   padding: 0,

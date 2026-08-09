@@ -14,7 +14,13 @@ import { importReadFile } from "../notes/import/ports";
 import { splitExportPath } from "../notes/exportFlow";
 
 /** Mirror of Rust `theme_validator::ThemeErrorKind`. */
-export type ThemeErrorKind = "ParseError" | "MissingKey" | "InvalidValue" | "InvalidName";
+export type ThemeErrorKind =
+  | "ParseError"
+  | "MissingKey"
+  | "InvalidValue"
+  | "InvalidName"
+  | "LowContrast"
+  | "ReservedKey";
 
 /** Mirror of Rust `theme_validator::ThemeError` — the rich validation failure. */
 export interface ThemeError {
@@ -23,6 +29,12 @@ export interface ThemeError {
   key?: string;
   /** The 1-based source line, when the failure is a locatable parse error. */
   line?: number;
+  /** The background token a `LowContrast` failure measured `key` against. */
+  against?: string;
+  /** The measured contrast ratio, formatted to two decimals (a display value). */
+  ratio?: string;
+  /** The floor the pair had to clear. */
+  min?: string;
 }
 
 /** Mirror of Rust `themes::error::ThemesError` variant tag. */

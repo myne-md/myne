@@ -37,7 +37,7 @@ type ExportState =
 const BODY_STYLE: CSSProperties = {
   padding: "var(--space-4) var(--space-5)",
   fontFamily: "var(--font-sans)",
-  fontSize: 14,
+  fontSize: "var(--text-base)",
   lineHeight: 1.6,
   color: "var(--fg-1)",
   display: "flex",

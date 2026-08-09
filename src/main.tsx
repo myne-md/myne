@@ -14,6 +14,11 @@ import { RootErrorBoundary } from "./components/RootErrorBoundary";
 import { initThemeDeepLinks } from "./lib/themeDeepLink";
 import { installGlobalFailureHandlers } from "./lib/global-failure";
 import "./styles/tokens.css";
+// The ornament layer (myne#394). After the token sheet, because every rule in it
+// reads tokens the theme supplies. Drawing nothing until a component declares a
+// role AND the active theme selects a primitive, so importing it costs an
+// unthemed session nothing.
+import "@myne/ornaments/ornaments.css";
 
 // MYND-567: subscribe to `myne://` URLs at module scope — BEFORE React mounts,
 // so a cold launch from a theme-install link cannot race the subscription. The

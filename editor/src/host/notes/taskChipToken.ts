@@ -25,7 +25,7 @@ export const TASK_CHIP_TOKEN = {
   paddingY: 2,
   paddingX: 8,
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
 } as const;
 
 /**
@@ -68,7 +68,7 @@ export function taskChipStyle(): CSSProperties {
   return {
     display: "inline-flex",
     alignItems: "center",
-    gap: 4,
+    gap: "var(--space-1)",
     padding: `${TASK_CHIP_TOKEN.paddingY}px ${TASK_CHIP_TOKEN.paddingX}px`,
     background: TASK_CHIP_TOKEN.bg,
     color: TASK_CHIP_TOKEN.fg,

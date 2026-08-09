@@ -84,14 +84,14 @@ export const CARD_STYLE: CSSProperties = {
 
 export const TITLE_STYLE: CSSProperties = {
   margin: 0,
-  fontSize: 16,
-  fontWeight: 600,
+  fontSize: "var(--text-md)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
 };
 
 export const SENTENCE_STYLE: CSSProperties = {
   margin: 0,
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   lineHeight: 1.5,
   color: "var(--fg-2)",
 };
@@ -110,14 +110,14 @@ const TOGGLE_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   cursor: "pointer",
 };
 
 const SUB_LABEL_STYLE: CSSProperties = {
   margin: 0,
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   lineHeight: 1.5,
   color: "var(--fg-3)",
   // Indent under the checkbox (13px box + gap) so the sub-label aligns

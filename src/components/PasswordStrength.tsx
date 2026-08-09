@@ -49,7 +49,7 @@ export function PasswordStrength({
   const feedbackColor = warning ? "var(--danger)" : "var(--fg-3)";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ display: "flex", flex: 1, gap: 2 }}>
           {Array.from({ length: TOTAL_SEGMENTS }).map((_, i) => (
@@ -68,8 +68,8 @@ export function PasswordStrength({
         </div>
         <span
           style={{
-            fontSize: 11,
-            fontWeight: 600,
+            fontSize: "var(--text-xs)",
+            fontWeight: "var(--weight-semibold)",
             color,
             letterSpacing: "0.08em",
             textTransform: "uppercase",

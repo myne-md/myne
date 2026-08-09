@@ -52,7 +52,7 @@ const LABEL: CSSProperties = {
   color: "var(--fg-3)",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 
 const FIELD: CSSProperties = {
@@ -81,8 +81,8 @@ function submitStyle(disabled: boolean): CSSProperties {
     borderRadius: "var(--radius-2)",
     padding: "8px 18px",
     fontFamily: "var(--font-sans)",
-    fontSize: 13,
-    fontWeight: 500,
+    fontSize: "var(--text-sm)",
+    fontWeight: "var(--weight-medium)",
     cursor: disabled ? "not-allowed" : "pointer",
     transition: HOVER_TRANSITION,
   };

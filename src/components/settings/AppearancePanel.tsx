@@ -420,7 +420,7 @@ function AccentColorRow() {
                   boxSizing: "border-box",
                   padding: "var(--space-2)",
                   fontFamily: "var(--font-mono)",
-                  fontSize: 13,
+                  fontSize: "var(--text-sm)",
                   color: "var(--fg-1)",
                   background: "var(--bg-2)",
                   border: "1px solid var(--line-2)",
