@@ -1,3 +1,4 @@
+import { ornamentRole } from "@myne/ornaments";
 import { type CSSProperties, type ReactNode, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { editorCommands } from "@myne/editor/toolbar/commands";
@@ -160,6 +161,8 @@ export function FormatBar({
   return (
     <div
       data-testid="editor.format-bar"
+      // Ornament role (myne#394): CHROME, like every other bar.
+      {...ornamentRole("chrome")}
       style={{
         flex: "none",
         display: "flex",
