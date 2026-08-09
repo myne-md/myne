@@ -36,6 +36,7 @@ import {
   AttachmentPdfWidget,
   AttachmentTextPreviewWidget,
   AttachmentTombstoneWidget,
+  AttachmentVideoWidget,
   UrlImageChipWidget,
   makeResolvedWidget,
 } from "../../src/editor/attachments/widgets";
@@ -535,6 +536,48 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
   });
 });
 
+describe("AttachmentVideoWidget (myne#168)", () => {
+  it("renders a native <video controls preload=metadata> with testid and no autoplay/loop/mute", () => {
+    const dom = new AttachmentVideoWidget(ID, "clip.mp4", 1234).toDOM(fakeView);
+    expect(dom.getAttribute("data-testid")).toBe("attachment-video");
+    const video = dom.querySelector("video") as HTMLVideoElement;
+    expect(video).not.toBeNull();
+    expect(video.getAttribute("data-testid")).toBe("attachment-video.player");
+    expect(video.controls).toBe(true);
+    expect(video.preload).toBe("metadata");
+    expect(video.hasAttribute("playsinline")).toBe(true);
+    // User-initiated only — never autoplay/loop/mute.
+    expect(video.autoplay).toBe(false);
+    expect(video.loop).toBe(false);
+    expect(video.muted).toBe(false);
+    // Served from the id (attachment://<id> on desktop / the host-safe literal
+    // in jsdom); bounded to the image frame's edge so no orientation dominates.
+    expect(video.getAttribute("src")).toContain(ID);
+    expect(video.style.maxWidth).toBe("320px");
+    expect(video.style.maxHeight).toBe("320px");
+  });
+
+  it("reveals the player and drops the loading chip on loadedmetadata", () => {
+    const dom = new AttachmentVideoWidget(ID, "clip.webm", 1).toDOM(fakeView);
+    const video = dom.querySelector("video") as HTMLVideoElement;
+    expect(video.style.display).toBe("none");
+    expect(dom.querySelector(".cm-attachment-progress")).not.toBeNull();
+    video.dispatchEvent(new Event("loadedmetadata"));
+    expect(video.style.display).toBe("block");
+    expect(dom.querySelector(".cm-attachment-progress")).toBeNull();
+  });
+
+  it("swaps to the export-only file card when the video errors (undecodable → graceful fallback)", () => {
+    const dom = new AttachmentVideoWidget(ID, "broken.webm", 42).toDOM(fakeView);
+    expect(dom.querySelector("video")).not.toBeNull();
+    expect(dom.querySelector('[data-testid="attachment-card"]')).toBeNull();
+    dom.querySelector("video")!.dispatchEvent(new Event("error"));
+    // The broken player is gone; the frame now hosts the export-only file card.
+    expect(dom.querySelector("video")).toBeNull();
+    expect(dom.querySelector('[data-testid="attachment-card"]')).not.toBeNull();
+  });
+});
+
 describe("makeResolvedWidget (content-type router)", () => {
   function row(contentType: string): CatalogRow {
     return { id: ID, contentType, filename: "f", size: 1 };
@@ -554,5 +597,14 @@ describe("makeResolvedWidget (content-type router)", () => {
     expect(makeResolvedWidget(row("application/octet-stream"))).toBeInstanceOf(
       AttachmentFileCardWidget,
     );
+  });
+  it("routes video/mp4 and video/webm → video widget", () => {
+    expect(makeResolvedWidget(row("video/mp4"))).toBeInstanceOf(AttachmentVideoWidget);
+    expect(makeResolvedWidget(row("video/webm"))).toBeInstanceOf(AttachmentVideoWidget);
+  });
+  it("routes a non-allowlisted video type → file card (exact-match, not a video/ prefix)", () => {
+    // MOV/other never reach here as a video/* hint (the sniffer rejects them),
+    // and exact-match means even if one did it can't route to an unservable player.
+    expect(makeResolvedWidget(row("video/quicktime"))).toBeInstanceOf(AttachmentFileCardWidget);
   });
 });
