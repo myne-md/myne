@@ -120,8 +120,8 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
       >
         <div
           style={{
-            fontSize: 22,
-            fontWeight: 600,
+            fontSize: "var(--text-xl)",
+            fontWeight: "var(--weight-semibold)",
             letterSpacing: "-0.015em",
             color: "var(--fg-display)",
           }}
@@ -131,7 +131,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
 
         {state.step === "pick" && (
           <>
-            <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
+            <div style={{ fontSize: "var(--text-base)", lineHeight: 1.6, color: "var(--fg-2)" }}>
               <Trans
                 i18nKey="restore.pick.body"
                 components={{ code: <code /> }}
@@ -143,7 +143,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 </>
               )}
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
               <Button
                 variant="primary"
                 onClick={() => void pickFile()}
@@ -162,7 +162,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
           <>
             <div
               data-testid="restore.progress"
-              style={{ fontSize: 14, color: "var(--fg-2)" }}
+              style={{ fontSize: "var(--text-base)", color: "var(--fg-2)" }}
             >
               {state.progress === null
                 ? t("restore.working.verifying")
@@ -192,11 +192,11 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
           <>
             <div
               data-testid="restore.collision"
-              style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}
+              style={{ fontSize: "var(--text-base)", lineHeight: 1.6, color: "var(--fg-2)" }}
             >
               {t("restore.collision.body")}
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
               <Button
                 variant="primary"
                 onClick={() =>
@@ -228,11 +228,11 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
           <>
             <div
               data-testid="restore.damaged"
-              style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}
+              style={{ fontSize: "var(--text-base)", lineHeight: 1.6, color: "var(--fg-2)" }}
             >
               {t("restore.damaged.body")}
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
               <Button
                 variant="secondary"
                 onClick={() => void runRestore(state.source, { salvage: true })}
@@ -251,9 +251,9 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
           <>
             <div
               data-testid="restore.summary"
-              style={{ fontSize: 14, lineHeight: 1.8, color: "var(--fg-2)" }}
+              style={{ fontSize: "var(--text-base)", lineHeight: 1.8, color: "var(--fg-2)" }}
             >
-              <div style={{ color: "var(--fg-1)", fontWeight: 600 }}>
+              <div style={{ color: "var(--fg-1)", fontWeight: "var(--weight-semibold)" }}>
                 {state.outcome.skipped.length > 0
                   ? t("restore.summary.partialHeader", {
                       count: state.outcome.skipped.length,
@@ -274,7 +274,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 })}
               </div>
               {state.outcome.collided_vault_id !== null && (
-                <div style={{ marginTop: 8 }}>
+                <div style={{ marginTop: "var(--space-2)" }}>
                   {t("restore.summary.collidedNote")}
                 </div>
               )}
@@ -282,11 +282,11 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 <div
                   data-testid="restore.skipped-list"
                   style={{
-                    marginTop: 8,
+                    marginTop: "var(--space-2)",
                     padding: "8px 12px",
                     background: "var(--paper-2)",
                     border: "1px solid var(--line-1)",
-                    borderRadius: 6,
+                    borderRadius: "var(--radius-2)",
                     fontFamily: "var(--font-mono)",
                     fontSize: "var(--text-sm)",
                     maxHeight: 160,
@@ -319,7 +319,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
             >
               {state.message}
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
               <Button variant="secondary" onClick={() => setState({ step: "pick" })}>
                 {t("restore.error.tryAnotherFile")}
               </Button>

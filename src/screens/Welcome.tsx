@@ -27,7 +27,7 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: Welcom
         alignItems: "center",
         justifyContent: "center",
         background: "var(--bg-1)",
-        padding: 24,
+        padding: "var(--space-5)",
       }}
     >
       <div
@@ -35,15 +35,15 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: Welcom
           width: 420,
           display: "flex",
           flexDirection: "column",
-          gap: 24,
+          gap: "var(--space-5)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
           <MyneMark size={36} />
           <div
             style={{
               fontSize: 24,
-              fontWeight: 600,
+              fontWeight: "var(--weight-semibold)",
               letterSpacing: "-0.02em",
               color: "var(--fg-display)",
             }}
@@ -54,9 +54,9 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: Welcom
 
         <div
           style={{
-            fontSize: 28,
+            fontSize: "var(--text-2xl)",
             lineHeight: 1.2,
-            fontWeight: 600,
+            fontWeight: "var(--weight-semibold)",
             letterSpacing: "-0.015em",
             color: "var(--fg-display)",
           }}
@@ -68,7 +68,7 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: Welcom
 
         <div
           style={{
-            fontSize: 14,
+            fontSize: "var(--text-base)",
             lineHeight: 1.6,
             color: "var(--fg-2)",
             maxWidth: 360,
@@ -87,8 +87,8 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: Welcom
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 8,
-            marginTop: 8,
+            gap: "var(--space-2)",
+            marginTop: "var(--space-2)",
           }}
         >
           <Button
@@ -114,7 +114,7 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: Welcom
           </Button>
         </div>
 
-        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 8 }}>
+        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: "var(--space-2)" }}>
           v0.1 pre-alpha
         </div>
       </div>

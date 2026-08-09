@@ -55,7 +55,7 @@ const EMPTY_HINT_STYLE: CSSProperties = {
   padding: "var(--space-4)",
   textAlign: "center",
   color: "var(--fg-3)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   lineHeight: 1.6,
 };
 
@@ -108,7 +108,7 @@ const COUNT_STYLE: CSSProperties = {
 
 const BADGE_STYLE: CSSProperties = {
   flexShrink: 0,
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   border: "1px solid var(--line-2)",
   borderRadius: "var(--radius-1)",

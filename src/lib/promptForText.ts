@@ -95,7 +95,7 @@ export function promptForText(
     label.textContent = title;
     Object.assign(label.style, {
       fontSize: "13px",
-      fontWeight: "600",
+      fontWeight: "var(--weight-semibold)",
       color: "var(--fg-1, #1a1a17)",
       marginBottom: "10px",
     });
@@ -149,7 +149,7 @@ export function promptForText(
     Object.assign(confirm.style, {
       fontFamily: "var(--font-sans)",
       fontSize: "13px",
-      fontWeight: "500",
+      fontWeight: "var(--weight-medium)",
       padding: "6px 12px",
       borderRadius: "var(--radius-1, 4px)",
       border: "1px solid var(--accent, #2c4a7a)",

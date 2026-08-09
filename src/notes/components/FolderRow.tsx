@@ -37,7 +37,7 @@ const rowBaseStyle: CSSProperties = {
   height: 30,
   paddingInlineEnd: 12,
   cursor: "pointer",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   marginInlineStart: 4,
   marginInlineEnd: 4,
   // Matches NoteRow: a 3px bottom gap so an active/hover folder row never butts
@@ -50,12 +50,12 @@ const rowBaseStyle: CSSProperties = {
 };
 
 const nameStyle: CSSProperties = {
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   // Matched to the note-row title weight (`NoteRow.titleStyle`, 500) so a
   // folder heading and a note heading read at the same size — the folder icon
   // (enlarged below) carries the container's visual weight instead of bolder
   // text.
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-2)",
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -74,7 +74,7 @@ const nameGrowStyle: CSSProperties = {
 
 const emptyNameStyle: CSSProperties = {
   ...nameStyle,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   fontStyle: "italic",
   color: "var(--fg-3)",
   // myne#283: an italic glyph's right side bearing extends past the inline box
@@ -94,7 +94,7 @@ const emptyNameStyle: CSSProperties = {
 };
 
 const emptyHintStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--line-3)",
   marginInlineStart: 4,
   // myne#283: the hint gives way before the folder's own name does. It is the
@@ -109,12 +109,12 @@ const renameInputStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
   background: "var(--paper-1)",
   border: "1px solid var(--accent)",
-  borderRadius: 3,
+  borderRadius: "var(--radius-1)",
   padding: "1px 4px",
   outline: "none",
 };
@@ -126,7 +126,7 @@ const renameInputStyle: CSSProperties = {
 const indexAffordanceBaseStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  gap: 4,
+  gap: "var(--space-1)",
   marginInlineStart: "auto",
   flexShrink: 0,
   padding: "1px 5px",
@@ -135,8 +135,8 @@ const indexAffordanceBaseStyle: CSSProperties = {
   background: "transparent",
   color: "var(--fg-3)",
   fontFamily: "var(--font-sans)",
-  fontSize: 11,
-  fontWeight: 500,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-medium)",
   cursor: "pointer",
 };
 

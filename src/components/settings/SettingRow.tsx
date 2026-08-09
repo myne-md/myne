@@ -34,6 +34,7 @@ import {
   LABEL_STYLE,
   TOGGLE_ROW_STYLE,
 } from "./panel-styles";
+import { ornamentRole } from "@myne/ornaments";
 
 interface SettingRowProps {
   /** The setting's name, rendered left. Already localised — call `t()` at the
@@ -83,6 +84,9 @@ export function SettingRow({
       data-setting-row="true"
       data-setting-anchor={anchorId}
       data-testid={testId}
+      // A setting row is a BOX (myne#394) — the same role callouts and cards
+      // take, so a theme that gives boxes a frame gives one here too.
+      {...ornamentRole("box")}
       {...stateAttrs}
     >
       <div style={TOGGLE_ROW_STYLE}>

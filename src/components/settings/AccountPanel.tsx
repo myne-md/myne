@@ -148,8 +148,8 @@ const HELPER_TEXT_MUTED_STYLE: CSSProperties = {
 // than the panel's semantic-token helpers so the eyebrow / input / Save button
 // match the rename-control frame exactly (Inter 11/600 eyebrow, 36px controls).
 const LABEL_EYEBROW_STYLE: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "var(--tracking-caps)",
   textTransform: "uppercase",
   color: "var(--ink-3)",
@@ -157,8 +157,8 @@ const LABEL_EYEBROW_STYLE: CSSProperties = {
 };
 
 const LABEL_HELPER_STYLE: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 400,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-regular)",
   lineHeight: "var(--leading-normal)",
   color: "var(--ink-2)",
   margin: 0,
@@ -168,7 +168,7 @@ const LABEL_INPUT_ROW_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "row",
   alignItems: "center",
-  gap: 8,
+  gap: "var(--space-2)",
   alignSelf: "stretch",
 };
 
@@ -183,7 +183,7 @@ function labelInputStyle(focused: boolean): CSSProperties {
     border: `1px solid ${focused ? "var(--accent)" : "var(--line-2)"}`,
     borderRadius: "var(--radius-1)",
     fontFamily: "var(--font-sans)",
-    fontSize: 13,
+    fontSize: "var(--text-sm)",
     color: "var(--ink-1)",
     outline: "none",
   };
@@ -199,8 +199,8 @@ function labelSaveButtonStyle(disabled: boolean): CSSProperties {
     border: `1px solid ${disabled ? "var(--line-1)" : "var(--accent)"}`,
     borderRadius: "var(--radius-2)",
     fontFamily: "var(--font-sans)",
-    fontSize: 13,
-    fontWeight: 500,
+    fontSize: "var(--text-sm)",
+    fontWeight: "var(--weight-medium)",
     color: disabled ? "var(--line-3)" : "var(--accent-on)",
     cursor: disabled ? "default" : "pointer",
   };
@@ -209,8 +209,8 @@ function labelSaveButtonStyle(disabled: boolean): CSSProperties {
 // VAULT ICON picker grid (vault-icons) — a curated glyph grid mirroring the
 // folder-icon picker (DecorationPopover), laid out inline in the panel.
 const ICON_PICKER_LABEL_STYLE: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
   letterSpacing: "var(--tracking-caps)",
   textTransform: "uppercase",
   color: "var(--ink-3)",
@@ -244,8 +244,8 @@ function iconPickerButtonStyle(
     border: `1px solid ${selected ? "var(--accent)" : "var(--line-2)"}`,
     borderRadius: "var(--radius-1)",
     fontFamily: "var(--font-sans)",
-    fontSize: 13,
-    fontWeight: 600,
+    fontSize: "var(--text-sm)",
+    fontWeight: "var(--weight-semibold)",
     color: selected ? "var(--accent)" : "var(--ink-1)",
     cursor: disabled ? "default" : "pointer",
     opacity: disabled ? 0.6 : 1,

@@ -12,11 +12,11 @@ import type { CSSProperties } from "react";
  * `--fg-3` ink, 11px sans, 0.08em tracking, 600 weight.
  */
 export const SECTION_HEADING_STYLE: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  fontWeight: 600,
+  fontWeight: "var(--weight-semibold)",
 };
 
 /**
@@ -31,7 +31,7 @@ export const SIDEBAR_CARD_STYLE: CSSProperties = {
   textAlign: "start",
   background: "var(--bg-1)",
   border: "1px solid var(--line-1)",
-  borderRadius: 6,
+  borderRadius: "var(--radius-2)",
   padding: "10px 11px",
   margin: 0,
   cursor: "pointer",

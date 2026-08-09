@@ -234,7 +234,7 @@ export function UnlinkedMentionsSection({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 8,
+        gap: "var(--space-2)",
         // As a full tab body the section owns the whole pane, so it drops the
         // nested top border + offset it carried below the backlinks list.
         ...(asTab
@@ -307,11 +307,11 @@ export function UnlinkedMentionsSection({
           )}
 
           {busy ? (
-            <div style={{ fontSize: 13, color: "var(--fg-3)" }}>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
               {t("notes.unlinkedMentions.searching")}
             </div>
           ) : mentions.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--fg-3)" }}>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
               {t("notes.unlinkedMentions.empty")}
             </div>
           ) : (
@@ -325,7 +325,7 @@ export function UnlinkedMentionsSection({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    gap: 8,
+                    gap: "var(--space-2)",
                   }}
                 >
                   <button
@@ -341,7 +341,7 @@ export function UnlinkedMentionsSection({
                       cursor: "pointer",
                       fontFamily: "inherit",
                       fontSize: 12,
-                      fontWeight: 600,
+                      fontWeight: "var(--weight-semibold)",
                       color: "var(--fg-1)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -365,7 +365,7 @@ export function UnlinkedMentionsSection({
                       padding: "3px 8px",
                       cursor: "pointer",
                       fontFamily: "inherit",
-                      fontSize: 11,
+                      fontSize: "var(--text-xs)",
                       color: "var(--fg-2)",
                     }}
                   >

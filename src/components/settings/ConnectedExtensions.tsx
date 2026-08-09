@@ -65,7 +65,7 @@ const ROW_TEXT_STYLE = {
 // The PRIMARY line — the browser the extension runs in (derived from the id).
 const BROWSER_STYLE = {
   fontSize: "var(--text-sm)",
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
   color: "var(--fg-1)",
 };
 

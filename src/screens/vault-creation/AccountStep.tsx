@@ -81,7 +81,7 @@ export function AccountStep({
       <StepEyebrow icon="id-card">{t("vaultCreation.account.eyebrow")}</StepEyebrow>
       <StepHeading>{t("vaultCreation.account.heading")}</StepHeading>
 
-      <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
+      <div style={{ fontSize: "var(--text-base)", lineHeight: 1.6, color: "var(--fg-2)" }}>
         {t("vaultCreation.account.intro")}
       </div>
 
@@ -91,10 +91,10 @@ export function AccountStep({
 
       <div
         style={{
-          padding: 24,
+          padding: "var(--space-5)",
           background: "var(--paper-2)",
           border: "1px solid var(--line-1)",
-          borderRadius: 6,
+          borderRadius: "var(--radius-2)",
           textAlign: "center",
         }}
       >
@@ -107,14 +107,14 @@ export function AccountStep({
         </span>
       </div>
 
-      <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--fg-2)" }}>
+      <div style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--fg-2)" }}>
         <strong style={{ color: "var(--danger)" }}>
           {t("vaultCreation.account.shownOnceEmphasis")}
         </strong>{" "}
         {t("vaultCreation.account.shownOnceBody")}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
         <Button variant="ghost" icon="copy" onClick={handleCopy}>
           {copied ? t("vaultCreation.account.copied") : t("vaultCreation.account.copy")}
         </Button>
@@ -131,7 +131,7 @@ export function AccountStep({
           padding: 12,
           background: "var(--paper-2)",
           border: "1px solid var(--line-1)",
-          borderRadius: 6,
+          borderRadius: "var(--radius-2)",
           cursor: "pointer",
         }}
       >
@@ -144,12 +144,12 @@ export function AccountStep({
           style={{ marginTop: 3, accentColor: "var(--accent)" }}
           data-testid="create.account-ack"
         />
-        <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg-1)" }}>
+        <div style={{ fontSize: "var(--text-sm)", lineHeight: 1.5, color: "var(--fg-1)" }}>
           {t("vaultCreation.account.ackLabel")}
         </div>
       </label>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         <Button
           variant="ghost"
           onClick={() => dispatch({ type: "ACCOUNT_BACK" })}

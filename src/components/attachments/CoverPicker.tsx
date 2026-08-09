@@ -92,7 +92,7 @@ const TILE_STYLE: CSSProperties = {
 const STATE_STYLE: CSSProperties = {
   textAlign: "center",
   color: "var(--fg-3)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   lineHeight: 1.6,
   padding: "12vh var(--space-5) 0",
 };

@@ -71,6 +71,9 @@ importers:
       '@myne/editor':
         specifier: workspace:*
         version: link:editor
+      '@myne/ornaments':
+        specifier: workspace:*
+        version: link:ornaments
       '@tauri-apps/api':
         specifier: ^2.11.0
         version: 2.11.0
@@ -278,6 +281,10 @@ importers:
       react-dom:
         specifier: ^19
         version: 19.2.7(react@19.2.7)
+
+  ornaments: {}
+
+  preview: {}
 
 packages:
 

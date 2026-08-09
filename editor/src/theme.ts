@@ -122,7 +122,7 @@ export const myneTheme = EditorView.theme({
   ".cm-h1": {
     fontFamily: "var(--font-display, var(--font-sans))",
     fontSize: "2em",
-    fontWeight: "700",
+    fontWeight: "var(--weight-bold)",
     lineHeight: "1.25",
     letterSpacing: "-0.015em",
     // No margin/padding on .cm-line — CM6's vertical cursor movement
@@ -133,37 +133,37 @@ export const myneTheme = EditorView.theme({
   ".cm-h2": {
     fontFamily: "var(--font-display, var(--font-sans))",
     fontSize: "1.571em",
-    fontWeight: "700",
+    fontWeight: "var(--weight-bold)",
     lineHeight: "1.3",
   },
   ".cm-h3": {
     fontFamily: "var(--font-display, var(--font-sans))",
     fontSize: "1.286em",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     lineHeight: "1.35",
   },
   ".cm-h4": {
     fontFamily: "var(--font-display, var(--font-sans))",
     fontSize: "1.143em",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     lineHeight: "1.4",
   },
   ".cm-h5": {
     fontFamily: "var(--font-display, var(--font-sans))",
     fontSize: "1em",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     lineHeight: "1.4",
   },
   ".cm-h6": {
     fontFamily: "var(--font-display, var(--font-sans))",
     fontSize: "0.929em",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     lineHeight: "1.4",
     color: "var(--fg-2)",
   },
 
   // Inline marks — text style classes from emphasis.ts / link.ts / inline-code.ts.
-  ".cm-bold": { fontWeight: "700" },
+  ".cm-bold": { fontWeight: "var(--weight-bold)" },
   ".cm-italic": { fontStyle: "italic" },
   ".cm-strike": { textDecoration: "line-through" },
   // `unicode-bidi: isolate` (RTL, myne#172): a link's own text is a neutral run
@@ -368,7 +368,7 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-embedded-html-block summary": {
     cursor: "pointer",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
   },
 
   // Math (MYND-48) — KaTeX output. Block math centers as a card-like row;
@@ -531,7 +531,7 @@ export const myneTheme = EditorView.theme({
     color: "var(--fg-2, #4a4943)",
     fontFamily: "inherit",
     fontSize: "12px",
-    fontWeight: "500",
+    fontWeight: "var(--weight-medium)",
     cursor: "pointer",
   },
   ".cm-tag-suggestion-dismiss": {
@@ -572,8 +572,8 @@ export const myneTheme = EditorView.theme({
     display: "inline-block",
     maxWidth: "100%",
     overflowX: "auto",
-    backgroundColor: "#fbfbfa",
-    border: "1px solid #e3e2dd",
+    backgroundColor: "var(--paper)",
+    border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
     padding: "16px",
     color: "#1a1a17",
@@ -704,7 +704,7 @@ export const myneTheme = EditorView.theme({
     display: "inline-flex",
     alignItems: "center",
     gap: "6px",
-    fontWeight: "700",
+    fontWeight: "var(--weight-bold)",
   },
   // The icon is a flex ITEM, and WebKit does not honour an SVG's intrinsic size
   // as its content-based minimum — so once the inline-flex box is sized below its
@@ -736,7 +736,7 @@ export const myneTheme = EditorView.theme({
   // Definition lists — line classes from definition-list.ts (MYND-152). Term
   // reads as a label; definition rows indent under it with the `:` hidden.
   ".cm-def-term": {
-    fontWeight: "700",
+    fontWeight: "var(--weight-bold)",
     color: "var(--fg-1)",
   },
   ".cm-def-desc": {
@@ -792,7 +792,7 @@ export const myneTheme = EditorView.theme({
   // cells share the editor background; the header reads as distinct by its bold
   // weight alone. A single surface colour + the cell borders, Obsidian-style.
   ".cm-table th": {
-    fontWeight: "700",
+    fontWeight: "var(--weight-bold)",
   },
   // Rendered cell content lives in its own block span so a cell keeps the exact
   // same box whether it shows rendered marks or the edit input (no resize on
@@ -1201,7 +1201,7 @@ export const myneTheme = EditorView.theme({
     backgroundColor: "var(--paper-2, #f3f1eb)",
     border: "1px solid var(--line-1, #d8d5cc)",
     color: "var(--fg-1)",
-    fontWeight: "500",
+    fontWeight: "var(--weight-medium)",
     fontFamily: "var(--font-sans)",
     fontSize: "13px",
     cursor: "pointer",
@@ -1288,7 +1288,7 @@ export const myneTheme = EditorView.theme({
     WebkitAppearance: "none",
     font: "inherit",
     fontSize: "13px",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     color: "var(--fg-1)",
     caretColor: "var(--fg-1)",
     fontFamily: "var(--font-sans)",
@@ -1311,7 +1311,7 @@ export const myneTheme = EditorView.theme({
     flex: "1",
     minWidth: "0",
     fontSize: "13px",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     color: "var(--fg-1)",
     fontFamily: "var(--font-sans)",
     padding: "2px 6px",
@@ -1323,7 +1323,7 @@ export const myneTheme = EditorView.theme({
   ".cm-drawing-embed-action": {
     font: "inherit",
     fontSize: "12px",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     padding: "3px 12px",
     borderRadius: "var(--radius-1, 4px)",
     border: "1px solid var(--line-2, #cfccc4)",
@@ -1492,7 +1492,7 @@ export const myneTheme = EditorView.theme({
     whiteSpace: "nowrap",
     fontFamily: "var(--font-mono)",
     fontSize: "0.85em",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     color: "var(--accent, #2c4a7a)",
     fontVariantNumeric: "tabular-nums",
   },
@@ -1709,7 +1709,7 @@ export const myneTheme = EditorView.theme({
     color: "var(--fg-1, #1a1a17)",
     fontFamily: "var(--font-sans)",
     fontSize: "13px",
-    fontWeight: "500",
+    fontWeight: "var(--weight-medium)",
     verticalAlign: "baseline",
     cursor: "default",
   },
@@ -1727,7 +1727,7 @@ export const myneTheme = EditorView.theme({
     borderRadius: "6px",
     fontFamily: "var(--font-sans)",
     fontSize: "13px",
-    fontWeight: "500",
+    fontWeight: "var(--weight-medium)",
     verticalAlign: "baseline",
     cursor: "default",
   },
@@ -1788,7 +1788,7 @@ export const myneTheme = EditorView.theme({
   ".cm-attachment-file-card-name": {
     color: "var(--fg-1, #1a1a17)",
     fontSize: "13px",
-    fontWeight: "500",
+    fontWeight: "var(--weight-medium)",
     whiteSpace: "nowrap",
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -1874,7 +1874,7 @@ export const myneTheme = EditorView.theme({
     whiteSpace: "nowrap",
   },
   ".cm-attachment-text-preview-table tr:first-child td": {
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     backgroundColor: "var(--bg-2, #f4f4f2)",
   },
   // docx structured render — tame the browser-default huge headings.
@@ -1884,11 +1884,11 @@ export const myneTheme = EditorView.theme({
     lineHeight: "1.5",
     color: "var(--fg-1)",
   },
-  ".cm-attachment-text-preview-doc h1": { fontSize: "1.35em", fontWeight: "700", margin: "0.4em 0 0.2em" },
-  ".cm-attachment-text-preview-doc h2": { fontSize: "1.2em", fontWeight: "700", margin: "0.4em 0 0.2em" },
-  ".cm-attachment-text-preview-doc h3": { fontSize: "1.1em", fontWeight: "600", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h1": { fontSize: "1.35em", fontWeight: "var(--weight-bold)", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h2": { fontSize: "1.2em", fontWeight: "var(--weight-bold)", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h3": { fontSize: "1.1em", fontWeight: "var(--weight-semibold)", margin: "0.4em 0 0.2em" },
   ".cm-attachment-text-preview-doc h4, .cm-attachment-text-preview-doc h5, .cm-attachment-text-preview-doc h6":
-    { fontSize: "1em", fontWeight: "600", margin: "0.3em 0 0.2em" },
+    { fontSize: "1em", fontWeight: "var(--weight-semibold)", margin: "0.3em 0 0.2em" },
   ".cm-attachment-text-preview-doc p": { margin: "0.3em 0" },
   ".cm-attachment-text-preview-truncated": {
     display: "block",
@@ -1922,7 +1922,7 @@ export const myneTheme = EditorView.theme({
   // Filename — top-left of the card.
   ".cm-attachment-audio-name": {
     fontSize: "12px",
-    fontWeight: "500",
+    fontWeight: "var(--weight-medium)",
     color: "var(--fg-1, #1a1a17)",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -2107,7 +2107,7 @@ export const myneTheme = EditorView.theme({
     padding: "2px 0",
     fontFamily: "var(--font-sans)",
     fontSize: "12px",
-    fontWeight: "600",
+    fontWeight: "var(--weight-semibold)",
     color: "var(--fg-2, #44423d)",
     cursor: "pointer",
   },
@@ -2189,7 +2189,7 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-tooltip-autocomplete .cm-completionMatchedText": {
     textDecoration: "none",
-    fontWeight: "700",
+    fontWeight: "var(--weight-bold)",
     color: "var(--accent, #2c4a7a)",
   },
   ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText": {

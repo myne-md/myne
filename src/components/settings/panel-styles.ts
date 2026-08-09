@@ -89,7 +89,7 @@ export const FOLDER_TEXTAREA_STYLE: CSSProperties = {
   width: "100%",
   resize: "vertical",
   font: "inherit",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   fontFamily: "var(--font-mono)",
   color: "var(--fg-1)",
   background: "var(--paper-2)",

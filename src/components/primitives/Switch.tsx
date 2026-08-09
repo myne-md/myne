@@ -34,7 +34,7 @@ const TRACK_BASE_STYLE: CSSProperties = {
   height: 20,
   background: "var(--paper-3)",
   border: "1px solid var(--line-2)",
-  borderRadius: 10,
+  borderRadius: "var(--radius-3)",
   padding: 0,
   flexShrink: 0,
   transition:

@@ -18,7 +18,7 @@ export const TAG_PILL_TOKEN = {
   paddingY: 2,
   paddingX: 8,
   fontSize: 12,
-  fontWeight: 500,
+  fontWeight: "var(--weight-medium)",
 } as const;
 
 /**

@@ -66,7 +66,7 @@ const CODE_LINE_STYLE: CSSProperties = {
   marginTop: "var(--space-1)",
   padding: "var(--space-2)",
   fontFamily: "var(--font-mono)",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
   background: "var(--paper-2)",
   border: "1px solid var(--line-1)",
