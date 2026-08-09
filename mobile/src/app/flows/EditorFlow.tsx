@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ornamentRole } from "@myne/ornaments";
 import { CMEditor } from "@myne/editor/CMEditor";
 import { typographyStyle } from "@myne/editor/typography";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
@@ -2216,7 +2217,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             onSettings={() => setSettingsOpen(true)}
           />
         )}
-        <div ref={tabPaneRef} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {/* Ornament role (myne#394): the tab pane is the page a note is read and
+            written on, so it is the SURFACE role — the same call the desktop
+            makes in `src/screens/Editor.tsx`. Boxes (callouts, quotes) already
+            carry their role from the shared `editor/` decorations, which this
+            client mounts; this is the half that is mobile's own. */}
+        <div
+          ref={tabPaneRef}
+          {...ornamentRole("surface")}
+          style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+        >
         {tab === "notes" && (
           <>
             <div style={{ flex: "none", padding: "8px 20px 0" }}>

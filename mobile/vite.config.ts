@@ -92,6 +92,20 @@ export default defineConfig(async () => ({
       // imports at all — pure functions over a `Record<string, string>`, no DOM,
       // no host calls. Exact specifier, no wildcard (same reasoning as above).
       { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
+      // The measure-token CLAMP (deep-customization, myne#394). Shared for the
+      // same reason as the syntax derivation, and for a stronger one: the clamp
+      // is a protective envelope, so two clients disagreeing about it means one
+      // of them paints a theme value the other refused. Aliasable out of
+      // Tauri-coupled `../src/lib/` because the module's only environmental
+      // touch is `getComputedStyle` on an element the caller passes in.
+      { find: /^@myne\/theme-measure$/, replacement: sib("../src/lib/themeMeasure.ts") },
+      // The shared ORNAMENT LAYER (myne#394) — the stylesheet a theme's ornament
+      // selections resolve against, plus the role helper components declare
+      // through. Wildcard rather than exact, because the CSS is a second entry
+      // point (`@myne/ornaments/ornaments.css`) and a client imports it from its
+      // own root the way it imports its token sheet.
+      { find: /^@myne\/ornaments$/, replacement: sib("../ornaments/src/index.ts") },
+      { find: /^@myne\/ornaments\/(.*)$/, replacement: sib("../ornaments/src/$1") },
       // The task index's WIRE DECODER (myne-md/myne-mobile#36). Shared because
       // the null-vs-absent conversion is not a local preference: it is a
       // statement about how the Rust `TaskRecord` serializes, which it cannot

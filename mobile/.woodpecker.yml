@@ -64,7 +64,13 @@ steps:
           rm -rf "$PARENT/myne-main"
           git clone --depth 1 "$MYNE_URL" "$PARENT/myne-main"
         fi
-        for d in protocol core editor dialect locales src theme-validator src-tauri; do
+        # `ornaments` is on this list because `src/lib/customTheme.ts` imports
+        # `@myne/ornaments`, whose alias points at `../ornaments/src`. Everything
+        # resolves on a maintainer's machine only because this repo is CLONED
+        # INSIDE the main checkout; CI's standalone checkout has nothing there
+        # unless the symlink is made, so an absent entry here is an
+        # unresolvable-import failure that no local run can reproduce.
+        for d in protocol core editor dialect locales src theme-validator src-tauri ornaments; do
           ln -sfn "$PARENT/myne-main/$d" "$PARENT/$d"
         done
       - rustup component add rustfmt clippy

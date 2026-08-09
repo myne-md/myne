@@ -41,6 +41,15 @@ export default defineConfig({
       // The custom-theme syntax derivation (MYND-598) — mirror of
       // vite.config.ts, which carries the rationale for sharing it.
       { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
+      // The ornament role contract and the measure-token clamp (myne#394) —
+      // mirror of vite.config.ts. `src/lib/customTheme.ts` imports both, so
+      // without these two lines every test that reaches custom-theme code fails
+      // to TRANSFORM: two files never load and their 21 tests appear in no
+      // count, passing or failing. This file's own header says why the mirror
+      // exists, and it is exactly the failure it warns about.
+      { find: /^@myne\/theme-measure$/, replacement: sib("../src/lib/themeMeasure.ts") },
+      { find: /^@myne\/ornaments$/, replacement: sib("../ornaments/src/index.ts") },
+      { find: /^@myne\/ornaments\/(.*)$/, replacement: sib("../ornaments/src/$1") },
       // The task index's wire decoder (myne-md/myne-mobile#36) — mirror of
       // vite.config.ts, which carries the rationale for sharing it.
       { find: /^@myne\/task-wire$/, replacement: sib("../src/notes/taskWire.ts") },

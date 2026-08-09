@@ -15,6 +15,10 @@ import { initCaptures } from "./lib/captures";
 import { initShareIntent } from "./lib/shareImport";
 import { initReminderTaps } from "./lib/reminderTap";
 import "./styles/tokens.css";
+// The shared ornament layer (myne#394) — same sheet the desktop client loads, so
+// a synced theme's ornament renders identically here. Draws nothing until a
+// component declares a role and the active theme selects a primitive.
+import "@myne/ornaments/ornaments.css";
 import "./styles/mobile.css";
 
 // Subscribe to the widget `myne://` deep links as early as possible so a
