@@ -160,7 +160,7 @@ An arbitrary file of **any type** stored as an encrypted blob in the vault, sepa
 
 ### **attachment catalog tombstone** &nbsp; 📋 *Protocol*
 
-A [`vault.attachments`](#vaultattachments) entry whose optional `deleted_at` field is set (`spec/protocol.md` §9.10.2): the multi-device **deletion marker** for an [attachment](#attachment) under Phase 2 sync (`spec/sync-protocol.md` §11.4). Written at delete time with the entry's metadata **scrubbed** (filename/content-type emptied, size zeroed) so the synced catalog keeps nothing descriptive about a crypto-erased file; it defeats stale-catalog resurrection in the per-entry merge (a live entry wins only if its `created_at` postdates `deleted_at` — a deliberate re-add). Prunable client-side after the [tombstone horizon](#tombstone-horizon). **Distinct from** the [deleted-attachment tombstone](#deleted-attachment-tombstone), which is the *UI placeholder* an editor embed renders for an unresolvable id. Phase 2. (MYND-468)
+A [`vault.attachments`](#vaultattachments) entry whose optional `deleted_at` field is set (`spec/protocol.md` §9.10.2): the multi-device **deletion marker** for an [attachment](#attachment) under Phase 2 sync (`spec/sync-protocol.md` §11.4). Written at delete time with the entry's metadata **scrubbed** (filename/content-type emptied, size zeroed) so the synced catalog keeps nothing descriptive about a crypto-erased file; it defeats stale-catalog resurrection in the per-entry merge (the greater [merge version](#merge-version) wins, so a deliberate re-add — which observes the delete — outranks a stale live copy; on an equal-`version` tie the tombstone wins; myne-md/myne#405). Prunable client-side after the [tombstone horizon](#tombstone-horizon). **Distinct from** the [deleted-attachment tombstone](#deleted-attachment-tombstone), which is the *UI placeholder* an editor embed renders for an unresolvable id. Phase 2. (MYND-468)
 
 ### **attachment-id** &nbsp; 📋 *Protocol*
 
@@ -1237,6 +1237,10 @@ Used in: `spec/protocol.md` §9.1, §9.2, §9.3, §10.3
 The user's primary authentication credential. Held in user memory only. Fed to Argon2id with `salt_password` to derive `password_wrap_key`, which encrypts a copy of `root_key`. Myne recommends ≥12 characters and zxcvbn score ≥3 at signup; users with weaker passwords are protected primarily by their recovery phrase.
 
 Used in: `spec/protocol.md` §3.1, §4.1
+
+### **merge version** &nbsp; 📋 *Protocol*
+
+The monotonic causal counter carried per entry by the synced tombstone-guarded singletons — the [`vault.themes`](#vaultthemes) per-name map (`spec/protocol.md` §9.21.2) and the [`vault.attachments`](#vaultattachments) catalog (§9.10.2) — and the **primary key of their per-entry merge join** (`spec/sync-protocol.md` §10.2.2 / §11.4). On any local mutation of a key it is bumped to `max(versions this device has observed for that key) + 1`; the greater `version` wins a reconcile, and the wall-clock fields (`created_at`/`updated_at`/`deleted_at`) only break an equal-`version` tie (**remove-wins** on tombstone-ness). Because "pick the maximum under a total order" is associative, this closes the three-device CAS ping-pong the earlier `created_at`-vs-`deleted_at` guard admitted (myne-md/myne#405). An additive optional field (`#[serde(default)]`, absent = 0), introducing no `MYC1`/`MYT1` magic, AAD, or version change. Causal, not a wall-clock — it orders edits, it is not a security property. Phase 2.
 
 ### **migration (cross-major)** &nbsp; 📋 *Protocol*
 

@@ -109,8 +109,9 @@ pub const MAX_CATALOG_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 /// One attachment's authoritative metadata (spec § 9.10.2). Fields are
 /// emitted in fixed canonical (lexicographic) order: `content_type` <
 /// `created_at` < `deleted_at` (when present) < `filename` < `size` <
-/// `updated_at` (when present). The two `Option` fields are the
-/// additive Phase-2-sync fields (MYND-468); absent = pre-sync shape,
+/// `updated_at` (when present) < `version` (when non-zero). The two
+/// `Option` fields plus `version` are the additive Phase-2-sync fields
+/// (MYND-468 + myne-md/myne#405); all absent/zero = pre-sync shape,
 /// byte-identical to the original four-field encode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentMeta {
@@ -132,9 +133,17 @@ pub struct AttachmentMeta {
     pub size: u64,
     /// Filename-LWW discriminator for the sync merge — UNIX seconds,
     /// **optional** (set on rename; absent means `created_at`;
-    /// `sync-protocol.md` § 11.4 rule 4). Single-device semantics
-    /// ignore it.
+    /// `sync-protocol.md` § 11.4 rule 4). Now only a tie-break under
+    /// `version`. Single-device semantics ignore it.
     pub updated_at: Option<u64>,
+    /// Causal merge counter — the **primary key** of the sync merge join
+    /// (`sync-protocol.md` § 11.4, myne-md/myne#405). Bumped to
+    /// `max(versions observed for this id) + 1` on any local mutation; the
+    /// greater `version` wins a reconcile, and the wall-clock fields only
+    /// break an equal-`version` tie. Absent on a legacy blob → 0; an additive
+    /// field emitted only when non-zero, so a pre-#405 entry stays
+    /// byte-identical. Declared last to keep canonical key order.
+    pub version: u64,
 }
 
 impl AttachmentMeta {
@@ -149,6 +158,7 @@ impl AttachmentMeta {
             filename,
             size,
             updated_at: None,
+            version: 0,
         }
     }
 
@@ -162,9 +172,10 @@ impl AttachmentMeta {
     /// descriptive metadata **scrubbed** (`filename`/`content_type`
     /// emptied, `size` zeroed, `updated_at` dropped) so the synced
     /// catalog keeps nothing descriptive about a crypto-erased file
-    /// (§ 9.10.2). `created_at` is retained (required field; not used by
-    /// the merge, which compares the *live* side's `created_at` against
-    /// `deleted_at`).
+    /// (§ 9.10.2). `created_at` is retained (required field); `version` is
+    /// bumped (`self.version + 1`) because a delete is a mutation — the
+    /// tombstone must outrank the live entry it replaces so a peer's stale
+    /// live copy loses the merge (`sync-protocol.md` § 11.4, myne-md/myne#405).
     pub fn into_tombstone(self, deleted_at: u64) -> Self {
         Self {
             content_type: String::new(),
@@ -173,6 +184,7 @@ impl AttachmentMeta {
             filename: String::new(),
             size: 0,
             updated_at: None,
+            version: self.version + 1,
         }
     }
 }
@@ -327,6 +339,10 @@ fn canonical_json_encode(catalog: &AttachmentsCatalog) -> Vec<u8> {
         if let Some(updated_at) = meta.updated_at {
             out.extend_from_slice(b",\"updated_at\":");
             push_json_uint(&mut out, updated_at);
+        }
+        if meta.version != 0 {
+            out.extend_from_slice(b",\"version\":");
+            push_json_uint(&mut out, meta.version);
         }
         out.push(b'}');
     }
@@ -487,6 +503,7 @@ impl Parser<'_> {
         let mut filename: Option<String> = None;
         let mut size: Option<u64> = None;
         let mut updated_at: Option<u64> = None;
+        let mut version: u64 = 0;
 
         if self.peek() == Some(b'}') {
             self.pos += 1;
@@ -503,6 +520,7 @@ impl Parser<'_> {
                 "filename" => filename = Some(self.parse_string()?),
                 "size" => size = Some(self.parse_uint()?),
                 "updated_at" => updated_at = Some(self.parse_uint()?),
+                "version" => version = self.parse_uint()?,
                 // Unknown (future additive) field — skip its value.
                 _ => self.skip_value()?,
             }
@@ -525,6 +543,7 @@ impl Parser<'_> {
             filename: filename?,
             size: size?,
             updated_at,
+            version,
         })
     }
 
@@ -947,7 +966,8 @@ mod tests {
         // A tombstone entry (deleted_at set, metadata scrubbed) plus a
         // live renamed entry (updated_at set) round-trip, and the encode
         // emits the optional keys at their lexicographic positions:
-        // content_type < created_at < deleted_at < filename < size < updated_at.
+        // content_type < created_at < deleted_at < filename < size < updated_at
+        // < version. The tombstone carries version 1 (into_tombstone bumps it).
         let mut entries = BTreeMap::new();
         entries.insert(
             "aa11".to_string(),
@@ -963,7 +983,7 @@ mod tests {
         let bytes = canonical_json_encode(&catalog);
         let s = String::from_utf8(bytes.clone()).unwrap();
         assert!(s.contains(
-            r#""aa11":{"content_type":"","created_at":100,"deleted_at":200,"filename":"","size":0}"#
+            r#""aa11":{"content_type":"","created_at":100,"deleted_at":200,"filename":"","size":0,"version":1}"#
         ));
         assert!(s.contains(r#""bb22":{"content_type":"t","created_at":300,"filename":"new-name.txt","size":7,"updated_at":400}"#));
         let decoded = canonical_json_decode(&bytes).expect("decode tombstone");
