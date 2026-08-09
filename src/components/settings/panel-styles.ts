@@ -57,6 +57,18 @@ export const TOGGLE_ROW_STYLE: CSSProperties = {
   gap: "var(--space-3)",
 };
 
+/** Narrow-dialog restack of {@link TOGGLE_ROW_STYLE} (#391): the control moves
+ *  UNDER the label instead of beside it, so the two never share pixels when the
+ *  label cell would otherwise shrink past its text. `SettingRow` swaps to this
+ *  under {@link useSettingsCompact}; the control cell aligns to the start so it
+ *  reads as its own line rather than hugging the right edge. */
+export const TOGGLE_ROW_COMPACT_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: "var(--space-2)",
+};
+
 /** The row's right-hand cell. Holds the control (or a small cluster of them)
  *  at its natural width and never shrinks — the label is the flexible cell, so
  *  a long label wraps instead of squeezing the control.

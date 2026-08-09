@@ -44,6 +44,10 @@ import {
   groupResultsByPanel,
 } from "./settings/search/resultsGrouping";
 import type { SettingsIndexEntry } from "./settings/search/settingsSearchIndex";
+import {
+  SettingsCompactContext,
+  useSettingsCompactObserver,
+} from "./settings/settingsCompact";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import * as capabilities from "../platform/capabilities";
@@ -430,6 +434,9 @@ export function SettingsModal({
   const [query, setQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  // Narrow-dialog restack (#391): watch the content area's width and let every
+  // panel's rows (and the Editor preview column) respond via context.
+  const compact = useSettingsCompactObserver(contentRef);
   // The setting to scroll to + flash once the target panel has mounted (a result
   // was selected). Held across the panel switch; consumed by the effect below.
   const [pendingScroll, setPendingScroll] = useState<SettingsIndexEntry | null>(
@@ -787,16 +794,18 @@ export function SettingsModal({
             style={CONTENT_STYLE}
           >
             <div style={CONTENT_INNER_STYLE}>
-              {searching ? (
-                <SettingsSearchResults
-                  results={results}
-                  query={query}
-                  activeId={activeId}
-                  onSelect={handleSelectResult}
-                />
-              ) : (
-                panelContent[selected]
-              )}
+              <SettingsCompactContext.Provider value={compact}>
+                {searching ? (
+                  <SettingsSearchResults
+                    results={results}
+                    query={query}
+                    activeId={activeId}
+                    onSelect={handleSelectResult}
+                  />
+                ) : (
+                  panelContent[selected]
+                )}
+              </SettingsCompactContext.Provider>
             </div>
           </div>
         </div>
