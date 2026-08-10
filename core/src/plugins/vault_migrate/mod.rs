@@ -30,7 +30,6 @@ use protocol::{
     decode_attachments_catalog, decode_note, decode_prefs_blob, derive_subkey, derive_subkey_v0_2,
     encode_attachments_catalog_versioned, encode_prefs_blob_versioned, encode_vault_meta_v0_2_raw,
     reseal_attachment_v0_2, reseal_kek_envelope_v0_2, KdfParams, MetaVersion, SubkeyRole,
-    ATTACHMENT_ID_LEN,
 };
 use std::path::Path;
 use zeroize::Zeroizing;
@@ -121,30 +120,6 @@ pub enum MigrationError {
 
 fn fill_random(buf: &mut [u8]) -> Result<(), MigrationError> {
     getrandom::getrandom(buf).map_err(|_| MigrationError::Csprng)
-}
-
-/// One hex nibble → its 0..=15 value, or `Err(())` on a non-hex byte.
-fn hex_nibble(c: u8) -> Result<u8, ()> {
-    match c {
-        b'0'..=b'9' => Ok(c - b'0'),
-        b'a'..=b'f' => Ok(c - b'a' + 10),
-        b'A'..=b'F' => Ok(c - b'A' + 10),
-        _ => Err(()),
-    }
-}
-
-/// Decode a hex string into `out`, `Err(())` on a wrong length or a non-hex
-/// nibble. Turns an attachments-catalog key (the attachment-id hex) back into the
-/// 32-byte id [`reseal_attachment_v0_2`] wants, without pulling in a hex crate.
-fn hex_to_bytes(s: &str, out: &mut [u8]) -> Result<(), ()> {
-    let bytes = s.as_bytes();
-    if bytes.len() != out.len() * 2 {
-        return Err(());
-    }
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = (hex_nibble(bytes[i * 2])? << 4) | hex_nibble(bytes[i * 2 + 1])?;
-    }
-    Ok(())
 }
 
 /// Re-key + re-format the crypto core of a v0.1 vault into v0.2 (§10.4.1).
@@ -387,8 +362,18 @@ pub async fn vault_migrate_from_host(
     // `NTV5` to disk, so a lock failure here must not turn a successful migration
     // into an error — the next reprobe/lock reconciles. The stale search index it
     // persists under the old key is a rebuildable cache and is rebuilt on unlock.
-    if let Err(e) = crate::plugins::vault_unlock::commands::lock_from_host(state, hooks).await {
-        tracing::warn!(target: "vault_migrate", "post-migration lock failed: {e:?}");
+    if crate::plugins::vault_unlock::commands::lock_from_host(state, hooks)
+        .await
+        .is_err()
+    {
+        // Static label only (secret-handling discipline: no `?e` Debug format even
+        // on the closed `VaultUnlockError`). Best-effort — `NTV5` is already
+        // committed, so the next reprobe/lock reconciles the dead-keyed session.
+        tracing::warn!(
+            target: "vault_migrate",
+            event = "post_migration_lock_failed",
+            "post-migration session lock failed; the next reprobe/lock reconciles"
+        );
     }
 
     Ok(summary)
@@ -620,10 +605,10 @@ pub async fn migrate_vault_notes_on_disk(
                     if meta.is_tombstone() {
                         continue; // no blob on disk for a deleted attachment
                     }
-                    let mut id = [0u8; ATTACHMENT_ID_LEN];
-                    if hex_to_bytes(id_hex, &mut id).is_err() {
+                    let Some(id) = crate::plugins::attachments::commands::hex_decode_id(id_hex)
+                    else {
                         continue; // malformed catalog key — leave it, do not abort
-                    }
+                    };
                     let blob_path = att_dir.join(id_hex);
                     let Ok(old_blob) = io.read(&blob_path).await else {
                         continue; // catalog entry with no blob file (torn state)

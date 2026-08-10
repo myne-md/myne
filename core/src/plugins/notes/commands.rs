@@ -205,19 +205,65 @@ pub async fn note_create_with_dir(
     let note_id = NoteId::new_v7();
     let note_uuid_bytes = *note_id.as_uuid().as_bytes();
 
+    // The new note's seal format follows the vault's generation: a migrated
+    // (v0.2 / `NTV5`) vault writes `NC05` — the CRDT format the migration
+    // produced and that `note_read`/`note_update` dispatch on — so new content
+    // gets the Automerge merge the migration exists to enable rather than
+    // reverting to the `MY01` keep-both model (a resting mixed state §10.4.1
+    // rule 2 forbids). The unlocked slot carries no `MetaVersion`, so read it
+    // from `vault.meta` the same per-op way prefs/themes/dictionary/attachments
+    // do; an absent/unreadable meta falls back to v0.1 (the pre-migration
+    // default), so a test fixture with no `vault.meta` keeps writing `MY01`.
+    let is_v0_2 = match notes_dir.parent() {
+        Some(vault_root) => match io.read(&vault_root.join("vault.meta")).await {
+            Ok(bytes) => protocol::meta_version_of(&bytes) == Some(protocol::MetaVersion::V0_2),
+            Err(_) => false,
+        },
+        None => false,
+    };
+    // A fresh CSPRNG Automerge actor id (device provenance) for the NC05 note;
+    // unused on the v0.1 path. Drawn here so a getrandom failure surfaces before
+    // the blocking hop (mirrors `sync::crdt_doc`'s production actor source).
+    let actor = if is_v0_2 {
+        match crate::plugins::sync::crdt_doc::fresh_actor_bytes() {
+            Ok(a) => a,
+            Err(_) => {
+                tracing::error!(
+                    stage = "encode",
+                    error_kind = "JoinFailure",
+                    "note_create failed to draw a CSPRNG actor id for an NC05 note"
+                );
+                return Err(NoteCreateError::JoinFailure);
+            }
+        }
+    } else {
+        [0u8; 16]
+    };
+
     // AEAD on a background thread. `Zeroizing<String>` and
     // `Zeroizing<[u8; 32]>` move into the closure; both drop and zero
     // their bytes on closure exit. The slot read guard remains in the
     // outer task across this `.await` — its lifetime is bounded by
-    // `state`, not the closure.
+    // `state`, not the closure. The note's content timestamp (`now_millis`) is
+    // pre-read so the NC05 branch need not move `host` across the hop.
     let started_ms = host.monotonic_millis();
+    let now_millis = host.now_unix_millis();
     let blob_result = crate::task::run_blocking(move || {
-        encode_new_note(
-            &items_key,
-            &items_key_id,
-            &note_uuid_bytes,
-            plaintext.as_bytes(),
-        )
+        if is_v0_2 {
+            let save = crate::plugins::notes::crdt::encode_note_at_millis(
+                plaintext.as_str(),
+                &actor,
+                now_millis,
+            );
+            protocol::encode_crdt_note_blob(&items_key, &items_key_id, &note_uuid_bytes, &save)
+        } else {
+            encode_new_note(
+                &items_key,
+                &items_key_id,
+                &note_uuid_bytes,
+                plaintext.as_bytes(),
+            )
+        }
     })
     .await;
     let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
@@ -2670,6 +2716,73 @@ mod tests {
         .expect("seal NC05 fixture note");
         std::fs::write(notes_dir.join(format!("{}.myn", id.as_uuid())), &blob).unwrap();
         id
+    }
+
+    #[test]
+    fn note_create_seals_nc05_on_a_migrated_v0_2_vault_and_my01_otherwise() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("note-create-generation").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await; // items_key [9;32], id [1;16]
+            let io = crate::vault_io::StdVaultIo;
+
+            // (a) No vault.meta on disk → note_create falls back to v0.1 and seals
+            //     `MY01` (the pre-migration default; this is why every existing
+            //     note test that seeds no meta keeps its `MY01` blobs).
+            let v0_1_id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "pre-migration note".to_string(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            let v0_1_blob =
+                std::fs::read(notes_dir.join(format!("{v0_1_id}.myn"))).unwrap();
+            assert!(
+                !crate::plugins::notes::crdt::is_nc05_blob(&v0_1_blob),
+                "no vault.meta → v0.1 default → MY01"
+            );
+            assert_eq!(&v0_1_blob[0..4], protocol::blob::MAGIC.as_slice());
+
+            // (b) A migrated vault carries an `NTV5` vault.meta at the vault root
+            //     (`notes_dir.parent()`). `note_create` reads only the generation
+            //     (`meta_version_of` inspects the 4-byte magic), so the real magic
+            //     constant is a faithful stand-in for a full NTV5 meta here.
+            std::fs::write(
+                tmp.path().join("vault.meta"),
+                protocol::VAULT_META_V0_2_MAGIC, // NTV5 → MetaVersion::V0_2
+            )
+            .unwrap();
+            let v0_2_id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "post-migration note".to_string(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            let v0_2_blob =
+                std::fs::read(notes_dir.join(format!("{v0_2_id}.myn"))).unwrap();
+            assert!(
+                crate::plugins::notes::crdt::is_nc05_blob(&v0_2_blob),
+                "a migrated (NTV5) vault seals new notes as NC05, not a reverted MY01 (§10.4.1 rule 2)"
+            );
+            // …and it round-trips through the magic-dispatching read path under the
+            // same unlocked slot.
+            let got = note_read_with_dir(
+                notes_dir,
+                &state,
+                v0_2_id,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            assert_eq!(got, "post-migration note");
+        })
     }
 
     #[test]

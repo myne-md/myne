@@ -1832,11 +1832,31 @@ pub(crate) async fn sync_meta_phase(
 
     // Both changed (concurrent) → deterministic, commutative merge so both devices
     // converge on the same winner with no server-side version counter.
+    //
+    // Generation guard (§10.4.1, #420): `merge_vault_meta` operates on the
+    // version-less `VaultMeta` fields, so the re-serialize below MUST re-stamp
+    // the SAME generation the inputs carry. Serializing a migrated (v0.2 / `NTV5`)
+    // meta with `serialize_vault_meta` (which unconditionally stamps `MYV1` +
+    // `0x01`) writes a blob that claims v0.1 over v0.2 wrap bytes — the next
+    // unlock reads `meta_version_of` → `V0_1`, derives the KDF under the v0.1
+    // salt domain, and the wrap key never opens: `InvalidCredentialOrVault` for
+    // both password AND recovery, with every `NC05` note stranded under the
+    // now-unreachable v0.2 `itemsKey`. Refuse a cross-generation merge outright
+    // (never merge a `MYV1` and an `NTV5` meta), and serialize under the shared
+    // generation.
+    let local_gen = protocol::meta_version_of(&local_bytes);
+    let server_gen = protocol::meta_version_of(&server_bytes);
+    if local_gen != server_gen {
+        return MetaPhaseOutcome::Skipped; // never merge across generations
+    }
     let winner = meta_password_side_winner(&local_meta, &server_meta);
     let Ok(merged) = merge_vault_meta(&local_meta, &server_meta, winner) else {
         return MetaPhaseOutcome::Skipped; // incompatible invariant → leave local alone
     };
-    let merged_bytes = serialize_vault_meta(&merged);
+    let merged_bytes = match local_gen {
+        Some(protocol::MetaVersion::V0_2) => protocol::serialize_vault_meta_v0_2(&merged),
+        _ => serialize_vault_meta(&merged),
+    };
     let merged_hash = sha256_hex(&merged_bytes);
     if io
         .write(
@@ -2810,6 +2830,12 @@ async fn sync_cycle_attempt(
             // nonce into the baseline so the decryption-free fast diff stops
             // re-flagging it. A genuine edit advances the heads → push + record
             // them. (`MY01` keeps its unchanged always-push-on-nonce-change shape.)
+            // Carries the convergence-probe read forward to the push read below so
+            // an already-synced note (the only case that enters the block) reads
+            // its blob once, not twice — the probe read and the push read hit the
+            // same file. Stays `None` for a new note (`synced.is_none()`), whose
+            // read is paid lazily at the bottom.
+            let mut local_ct_for_push: Option<Vec<u8>> = None;
             if let (Some(keys), Some(b)) = (crdt_keys, synced.as_ref()) {
                 // Read the local blob to decide NC05 dirtiness by causal heads.
                 // Absence is tolerated here (fall through to the push read below,
@@ -2837,6 +2863,10 @@ async fn sync_cycle_attempt(
                             nc05_push_heads.insert(*id, heads);
                         }
                     }
+                    // The bytes we just read ARE the push payload (only the
+                    // `!dirty` arm above short-circuits, and it `continue`d).
+                    // Reuse them so the push read below is skipped.
+                    local_ct_for_push = Some(local_ct);
                 }
             }
 
@@ -2865,10 +2895,15 @@ async fn sync_cycle_attempt(
             // Read the local blob for the push — LAZILY, exactly here, so a note
             // that hit keep-both / convergence-adopt / reclaim above (all of which
             // `continue`) never reads it, and only a genuine push pays the read.
-            let ciphertext = io
-                .read(&blob_path(notes_dir, id))
-                .await
-                .map_err(|_| SyncCycleError::Io)?;
+            // An already-synced note read it once for the convergence probe above;
+            // reuse those bytes rather than reading the same file twice.
+            let ciphertext = match local_ct_for_push {
+                Some(ct) => ct,
+                None => io
+                    .read(&blob_path(notes_dir, id))
+                    .await
+                    .map_err(|_| SyncCycleError::Io)?,
+            };
             to_push.push(PushBlob {
                 id: *id,
                 base_version: synced.as_ref().map(|b| b.version).unwrap_or(0),
@@ -9296,6 +9331,62 @@ mod tests {
 
             std::fs::remove_dir_all(&dir_a).ok();
             std::fs::remove_dir_all(&dir_b).ok();
+        }
+
+        // The v0.2 (`NTV5`) twin of `meta_bytes`: same fields, stamped with the
+        // migrated magic. Two of these differ only in the password-side wrap — a
+        // password change on a MIGRATED vault.
+        fn meta_bytes_v0_2(pw: u8) -> Vec<u8> {
+            let m = VaultMeta {
+                account_number_hash: [0x33; 16],
+                kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+                random_salt_password: [pw; VAULT_META_SALT_RANDOM_LEN],
+                random_salt_recovery: [0x55; VAULT_META_SALT_RANDOM_LEN],
+                nonce_password_wrap: [pw; VAULT_META_NONCE_LEN],
+                enc_root_key_password: [pw; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+                nonce_recovery_wrap: [0x55; VAULT_META_NONCE_LEN],
+                enc_root_key_recovery: [0x55; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+                items_key_id: [0x07; VAULT_META_ITEMS_KEY_ID_LEN],
+                items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
+                enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            };
+            protocol::serialize_vault_meta_v0_2(&m).to_vec()
+        }
+
+        // A concurrent password change on two MIGRATED (v0.2 / `NTV5`) devices must
+        // re-serialize the merged meta as `NTV5`, NOT `MYV1`. Serializing it as
+        // `MYV1` (the old unconditional `serialize_vault_meta`) writes v0.2 wrap
+        // bytes under a v0.1 magic: the next unlock reads `V0_1`, derives the wrong
+        // KDF salt domain, and BRICKS the vault (password AND recovery), stranding
+        // every `NC05` note under the now-unreachable v0.2 `itemsKey`. The
+        // generation guard in `sync_meta_phase` is what prevents that.
+        #[test]
+        fn concurrent_change_on_migrated_vaults_re_serializes_as_ntv5_not_myv1() {
+            let baseline = meta_bytes_v0_2(0x10);
+            let a_pw = meta_bytes_v0_2(0xAA);
+            let b_pw = meta_bytes_v0_2(0xBB); // deterministic winner (greater wrap)
+
+            let dir = scratch("conc-v0_2");
+            std::fs::write(dir.join("vault.meta"), &a_pw).unwrap();
+            blocking(mark_vault_meta_dirty(&IO, &dir)).unwrap();
+            let mut st = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&baseline)),
+                ..Default::default()
+            };
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, b_pw.clone());
+            t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
+
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            assert_eq!(out, MetaPhaseOutcome::Merged);
+            let merged = std::fs::read(dir.join("vault.meta")).unwrap();
+            assert_eq!(
+                &merged[0..4],
+                protocol::VAULT_META_V0_2_MAGIC.as_slice(),
+                "a merged migrated meta stays NTV5 — it must never revert to MYV1"
+            );
+            assert_eq!(merged, b_pw, "still converges on the deterministic winner");
+            std::fs::remove_dir_all(&dir).ok();
         }
 
         // A server meta with a DIVERGENT itemsKey wrap (different vault / corrupt /
