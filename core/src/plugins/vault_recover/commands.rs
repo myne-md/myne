@@ -575,7 +575,7 @@ pub(crate) async fn complete_recovery_with_path(
 
             // (c) Parse — v0.1 (`MYV1`) or migrated v0.2 (`NTV5`); the rewrite below
             //     stays in the same generation.
-            let is_v0_2 = protocol::meta_version_of(&bytes) == Some(protocol::MetaVersion::V0_2);
+            let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
             let parsed = protocol::parse_vault_meta_any(&bytes).map_err(|e| {
                 tracing::error!(
                     stage = "parse_meta",
@@ -591,23 +591,14 @@ pub(crate) async fn complete_recovery_with_path(
             //     uses the same security parameters the vault was
             //     created under (parameter upgrade is a separate Phase
             //     2+ feature decision).
-            let new_bytes = if is_v0_2 {
-                protocol::rewrite_vault_meta_password_side_v0_2(
-                    &parsed,
-                    &root_key_snapshot,
-                    new_password.as_str(),
-                    &fresh_salt,
-                    &fresh_nonce,
-                )
-            } else {
-                protocol::rewrite_vault_meta_password_side(
-                    &parsed,
-                    &root_key_snapshot,
-                    new_password.as_str(),
-                    &fresh_salt,
-                    &fresh_nonce,
-                )
-            }
+            let new_bytes = protocol::rewrite_vault_meta_password_side_versioned(
+                version,
+                &parsed,
+                &root_key_snapshot,
+                new_password.as_str(),
+                &fresh_salt,
+                &fresh_nonce,
+            )
             .map_err(|e| {
                 tracing::error!(
                     stage = "vault_meta_rewrite",
