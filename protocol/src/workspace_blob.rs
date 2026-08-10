@@ -46,15 +46,24 @@
 
 use crate::aead::{aad_workspace_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use crate::blob_envelope::{
-    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
+    decode_blob_envelope, decode_singleton_versioned, encode_blob_envelope,
+    encode_blob_envelope_raw, encode_singleton_versioned, EnvelopeError,
 };
 use crate::error::ProtocolError;
+use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYW1"` (Myne Workspace v1).
 pub const WORKSPACE_BLOB_MAGIC: [u8; 4] = *b"MYW1";
+
+/// Magic bytes for the migrated v0.2 `vault.workspace` family — ASCII `"MYW5"`
+/// (§10.3 registry).
+pub const WORKSPACE_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYW5";
+
+/// AAD role string bound into both generations' `vault.workspace` AAD.
+const WORKSPACE_BLOB_AAD_ROLE: &[u8] = b"workspace-blob";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const WORKSPACE_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -211,6 +220,53 @@ pub fn decode_workspace_blob(
         &WORKSPACE_BLOB_MAGIC,
         WORKSPACE_BLOB_FORMAT_VERSION,
         &aad,
+        MAX_WORKSPACE_PLAINTEXT_LEN,
+        blob,
+    )
+    .map_err(WorkspaceBlobError::from)
+}
+
+/// Version-aware seal of `vault.workspace` — `MYW1` + v0.1 AAD for
+/// [`MetaVersion::V0_1`], `MYW5` + v0.2 AAD for [`MetaVersion::V0_2`]. The
+/// `session_state_key` MUST be derived under the same generation
+/// (`derive_subkey_versioned(version, root_key, SessionStateKey)`).
+pub fn encode_workspace_blob_versioned(
+    version: MetaVersion,
+    session_state_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, WorkspaceBlobError> {
+    encode_singleton_versioned(
+        version,
+        session_state_key,
+        &WORKSPACE_BLOB_MAGIC,
+        &WORKSPACE_BLOB_V0_2_MAGIC,
+        WORKSPACE_BLOB_FORMAT_VERSION,
+        WORKSPACE_BLOB_AAD_ROLE,
+        account_number_hash,
+        MAX_WORKSPACE_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(WorkspaceBlobError::from)
+}
+
+/// Version-aware open of `vault.workspace` — the mirror of
+/// [`encode_workspace_blob_versioned`], selecting the expected magic + AAD from
+/// `version`.
+pub fn decode_workspace_blob_versioned(
+    version: MetaVersion,
+    session_state_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN],
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, WorkspaceBlobError> {
+    decode_singleton_versioned(
+        version,
+        session_state_key,
+        &WORKSPACE_BLOB_MAGIC,
+        &WORKSPACE_BLOB_V0_2_MAGIC,
+        WORKSPACE_BLOB_FORMAT_VERSION,
+        WORKSPACE_BLOB_AAD_ROLE,
+        account_number_hash,
         MAX_WORKSPACE_PLAINTEXT_LEN,
         blob,
     )

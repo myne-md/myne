@@ -58,15 +58,25 @@
 
 use crate::aead::{aad_custom_themes_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use crate::blob_envelope::{
-    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
+    decode_singleton_versioned, encode_blob_envelope, encode_blob_envelope_raw,
+    encode_singleton_versioned, EnvelopeError,
 };
 use crate::error::ProtocolError;
+use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYT1"` (Myne Themes v1).
 pub const THEMES_BLOB_MAGIC: [u8; 4] = *b"MYT1";
+
+/// Magic bytes for the migrated v0.2 `vault.themes` family — ASCII `"MYT5"`
+/// (§10.3 registry). A v0.2 vault's themes store is written under this magic +
+/// the v0.2 AAD prefix + a `derive_subkey_v0_2` KEK.
+pub const THEMES_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYT5";
+
+/// AAD role string bound into both generations' `vault.themes` AAD.
+const THEMES_BLOB_AAD_ROLE: &[u8] = b"custom-themes-blob";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const THEMES_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -208,12 +218,60 @@ pub fn decode_themes_blob(
     account_number_hash: &[u8; THEMES_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, ThemesBlobError> {
-    let aad = aad_custom_themes_blob(account_number_hash);
-    decode_blob_envelope(
+    let version = if blob.get(0..4) == Some(THEMES_BLOB_V0_2_MAGIC.as_slice()) {
+        MetaVersion::V0_2
+    } else if blob.get(0..4) == Some(THEMES_BLOB_MAGIC.as_slice()) {
+        MetaVersion::V0_1
+    } else {
+        if blob.len() < THEMES_BLOB_HEADER_LEN {
+            return Err(ThemesBlobError::HeaderTooShort);
+        }
+        return Err(ThemesBlobError::MagicMismatch);
+    };
+    decode_themes_blob_versioned(version, custom_themes_key, account_number_hash, blob)
+}
+
+/// Version-aware seal of `vault.themes` — `MYT1` + v0.1 AAD for
+/// [`MetaVersion::V0_1`], `MYT5` + v0.2 AAD for [`MetaVersion::V0_2`]. The
+/// `custom_themes_key` MUST be derived under the same generation
+/// (`derive_subkey_versioned(version, root_key, CustomThemesKey)`).
+pub fn encode_themes_blob_versioned(
+    version: MetaVersion,
+    custom_themes_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; THEMES_BLOB_ACCOUNT_HASH_LEN],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, ThemesBlobError> {
+    encode_singleton_versioned(
+        version,
         custom_themes_key,
         &THEMES_BLOB_MAGIC,
+        &THEMES_BLOB_V0_2_MAGIC,
         THEMES_BLOB_FORMAT_V1,
-        &aad,
+        THEMES_BLOB_AAD_ROLE,
+        account_number_hash,
+        MAX_THEMES_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(ThemesBlobError::from)
+}
+
+/// Version-aware open of `vault.themes` — the mirror of
+/// [`encode_themes_blob_versioned`], selecting the expected magic + AAD from
+/// `version`.
+pub fn decode_themes_blob_versioned(
+    version: MetaVersion,
+    custom_themes_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; THEMES_BLOB_ACCOUNT_HASH_LEN],
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, ThemesBlobError> {
+    decode_singleton_versioned(
+        version,
+        custom_themes_key,
+        &THEMES_BLOB_MAGIC,
+        &THEMES_BLOB_V0_2_MAGIC,
+        THEMES_BLOB_FORMAT_V1,
+        THEMES_BLOB_AAD_ROLE,
+        account_number_hash,
         MAX_THEMES_PLAINTEXT_LEN,
         blob,
     )
