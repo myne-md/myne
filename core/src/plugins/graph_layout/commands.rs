@@ -18,7 +18,7 @@ use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::VaultIo;
 use protocol::{
-    decode_graph_layout_blob, derive_subkey, encode_graph_layout_blob, parse_vault_meta,
+    decode_graph_layout_blob, derive_subkey, encode_graph_layout_blob, parse_vault_meta_any,
     GraphLayoutBlobError, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
@@ -73,7 +73,7 @@ where
     // `read_candidates` yields one element there, so this is the same read
     // followed by the same parse.
     match crate::singleton::open_newest(io, meta_path, |candidate| {
-        parse_vault_meta(candidate).map(|m| m.account_number_hash)
+        parse_vault_meta_any(candidate).map(|m| m.account_number_hash)
     })
     .await
     {

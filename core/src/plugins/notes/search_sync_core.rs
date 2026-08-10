@@ -59,7 +59,7 @@ use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::search::persist::{decode_snapshot, encode_snapshot, reconcile};
 use crate::search::SearchIndexState;
 use crate::vault_io::{VaultIo, WriteOpts};
-use protocol::{derive_subkey, parse_vault_meta, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
+use protocol::{derive_subkey, parse_vault_meta_any, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -157,7 +157,7 @@ async fn account_number_hash(
         .read(&vault_dir.join("vault.meta"))
         .await
         .map_err(|_| SearchSyncError::Io)?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| SearchSyncError::InvalidVaultMeta)?;
+    let meta = parse_vault_meta_any(&bytes).map_err(|_| SearchSyncError::InvalidVaultMeta)?;
     Ok(meta.account_number_hash)
 }
 

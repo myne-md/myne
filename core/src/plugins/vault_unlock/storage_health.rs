@@ -117,7 +117,7 @@ pub async fn probe_storage_health_at(
     let meta_path = vault_root.join("vault.meta");
     match io.read(&meta_path).await {
         Ok(bytes) => {
-            if protocol::parse_vault_meta(&bytes).is_ok() {
+            if protocol::parse_vault_meta_any(&bytes).is_ok() {
                 StorageHealth::Healthy
             } else {
                 // Reached only when the seam's newest-intact fallback has already

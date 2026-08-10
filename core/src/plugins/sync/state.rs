@@ -81,6 +81,16 @@ pub struct BlobSyncState {
     pub version: u64,
     /// The 24-byte `content_nonce` of that synced revision, lowercase hex.
     pub content_nonce_hex: String,
+    /// For an `NC05` CRDT note only: the last-synced Automerge document heads
+    /// (sorted lowercase hex) — the CLIENT-side convergence marker (ASM-5).
+    /// Empty for a `MY01` note. The note is "dirty" (needs push) iff its current
+    /// heads differ from these — a deterministic, terminating test, where
+    /// `content_nonce` byte-equality would read perpetually-dirty (the §10.2.2
+    /// ping-pong one layer down). `content_nonce_hex` stays the SERVER-facing
+    /// discriminator; this is additive (`#[serde(default)]`, omitted when empty)
+    /// so a pre-`NC05` `sync-state.json` stays byte-compatible.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub doc_heads_hex: Vec<String>,
 }
 
 /// The device-local sync state persisted at `<vault_root>/sync-state.json`.

@@ -30,7 +30,7 @@ use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::VaultIo;
 use protocol::{
-    decode_workspace_blob, derive_subkey, encode_workspace_blob, parse_vault_meta, SubkeyRole,
+    decode_workspace_blob, derive_subkey, encode_workspace_blob, parse_vault_meta_any, SubkeyRole,
     WorkspaceBlobError, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
@@ -77,7 +77,7 @@ where
     // "read it" means "the newest copy that PARSES". Native is unchanged by
     // construction: `read_candidates` yields one element there.
     match crate::singleton::open_newest(io, meta_path, |candidate| {
-        parse_vault_meta(candidate).map(|m| m.account_number_hash)
+        parse_vault_meta_any(candidate).map(|m| m.account_number_hash)
     })
     .await
     {

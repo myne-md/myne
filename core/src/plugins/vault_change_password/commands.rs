@@ -295,8 +295,14 @@ pub(crate) async fn change_password_with_path(
                 return Err(VaultChangePasswordError::VaultMetaChangedExternally);
             }
 
-            // (b) Parse.
-            let existing = protocol::parse_vault_meta(&bytes).map_err(|e| {
+            // (b) Parse — accept a v0.1 (`MYV1`) OR a migrated v0.2 (`NTV5`)
+            //     vault.meta. `is_v0_2` selects the KDF salt domain, AAD prefix,
+            //     `itemsKey`-wrap subkey context, and meta framing for every
+            //     crypto step below so a migrated vault can change its password
+            //     without leaving the v0.2 hierarchy (§10.4.1, #420).
+            let is_v0_2 =
+                protocol::meta_version_of(&bytes) == Some(protocol::MetaVersion::V0_2);
+            let existing = protocol::parse_vault_meta_any(&bytes).map_err(|e| {
                 tracing::error!(
                     stage = "parse_meta",
                     error_kind = "InvalidVaultMeta",
@@ -327,12 +333,21 @@ pub(crate) async fn change_password_with_path(
                 VaultChangePasswordError::InvalidVaultMeta
             })?;
 
-            let current_wrap_key = protocol::derive_password_wrap_key(
-                &current_password,
-                &existing.random_salt_password,
-                &existing.account_number_hash,
-                &existing.kdf_params,
-            )
+            let current_wrap_key = if is_v0_2 {
+                protocol::derive_password_wrap_key_v0_2(
+                    &current_password,
+                    &existing.random_salt_password,
+                    &existing.account_number_hash,
+                    &existing.kdf_params,
+                )
+            } else {
+                protocol::derive_password_wrap_key(
+                    &current_password,
+                    &existing.random_salt_password,
+                    &existing.account_number_hash,
+                    &existing.kdf_params,
+                )
+            }
             .map_err(|e| {
                 tracing::error!(
                     stage = "current_password_verify",
@@ -342,7 +357,11 @@ pub(crate) async fn change_password_with_path(
                 );
                 VaultChangePasswordError::InvalidVaultMeta
             })?;
-            let aad = protocol::aad_password_wrap(&existing.kdf_params);
+            let aad = if is_v0_2 {
+                protocol::aad_password_wrap_v0_2(&existing.kdf_params)
+            } else {
+                protocol::aad_password_wrap(&existing.kdf_params)
+            };
             let opened = protocol::aead_open_ctx(
                 &current_wrap_key,
                 &existing.nonce_password_wrap,
@@ -394,9 +413,20 @@ pub(crate) async fn change_password_with_path(
             //       cloned root_key + slot's items_key are both held
             //       in memory; this verify only confirms vault.meta's
             //       wrap is consistent with our memory state).
-            let items_key_wrap_key =
-                protocol::derive_subkey(&root_key_for_seal, protocol::SubkeyRole::ItemsKeyWrap);
-            let aad_items = protocol::aad_vault_items_key_wrap(&existing.items_key_id);
+            let items_key_wrap_key = protocol::derive_subkey_versioned(
+                if is_v0_2 {
+                    protocol::MetaVersion::V0_2
+                } else {
+                    protocol::MetaVersion::V0_1
+                },
+                &root_key_for_seal,
+                protocol::SubkeyRole::ItemsKeyWrap,
+            );
+            let aad_items = if is_v0_2 {
+                protocol::aad_vault_items_key_wrap_v0_2(&existing.items_key_id)
+            } else {
+                protocol::aad_vault_items_key_wrap(&existing.items_key_id)
+            };
             let items_opened = protocol::aead_open_ctx(
                 &items_key_wrap_key,
                 &existing.items_key_nonce,
@@ -443,13 +473,23 @@ pub(crate) async fn change_password_with_path(
             //     primitive. Recovery-side + items_key wrap byte-
             //     preserved per `recovery-flow.md` §4.4 — the helper
             //     enforces the invariant internally.
-            let new_bytes = protocol::rewrite_vault_meta_password_side(
-                &existing,
-                &root_key_for_seal,
-                &new_password,
-                &fresh_salt,
-                &fresh_nonce,
-            )
+            let new_bytes = if is_v0_2 {
+                protocol::rewrite_vault_meta_password_side_v0_2(
+                    &existing,
+                    &root_key_for_seal,
+                    &new_password,
+                    &fresh_salt,
+                    &fresh_nonce,
+                )
+            } else {
+                protocol::rewrite_vault_meta_password_side(
+                    &existing,
+                    &root_key_for_seal,
+                    &new_password,
+                    &fresh_salt,
+                    &fresh_nonce,
+                )
+            }
             .map_err(|e| {
                 tracing::error!(
                     stage = "vault_meta_rewrite",
