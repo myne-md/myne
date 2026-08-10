@@ -53,6 +53,7 @@
 //! prevents downstream code (companion repos, future feature branches)
 //! from match-exhausting a stale list.
 
+use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use hkdf::Hkdf;
 use sha2::Sha256;
@@ -65,6 +66,17 @@ use zeroize::Zeroizing;
 /// parameter that gets bound into every derived subkey. Any drift
 /// here silently invalidates every existing vault.
 const HKDF_PREFIX_V0_1: &[u8] = b"myne.v0.1 ";
+
+/// Domain-separation prefix for every Myne **v0.2** (next-major) HKDF context
+/// string — the CRDT-note-type / migration hierarchy (`spec/protocol.md` §10.3
+/// registry v0.2 row, §10.7). **Load-bearing** exactly as [`HKDF_PREFIX_V0_1`]:
+/// a v0.2 subkey derived under this prefix produces different bytes than the same
+/// role under v0.1 even with the same `root_key` (the §10.5 context-separation
+/// anti-downgrade property), so the whole-vault re-key (§10.4.1, #420) yields a
+/// genuinely independent key hierarchy. Note the trailing space — part of the
+/// bound `info`. Allocated by the `automerge-sync-migration` epic
+/// (`decisions.md` 2026-08-09 format-commitment entry).
+const HKDF_PREFIX_V0_2: &[u8] = b"myne.v0.2 ";
 
 /// Registered role string for the singleton v0.1 `itemsKey` wrap.
 const ROLE_STR_ITEMS_KEY_WRAP: &[u8] = b"itemsKey-wrap";
@@ -396,6 +408,45 @@ pub fn derive_subkey(root_key: &[u8; 32], role: SubkeyRole) -> Zeroizing<[u8; 32
     info.extend_from_slice(HKDF_PREFIX_V0_1);
     info.extend_from_slice(role_bytes);
     derive_with_context(root_key, &info)
+}
+
+/// Derive a 32-byte subkey from a **v0.2** `root_key` for the given role — the
+/// same registered role strings as [`derive_subkey`], under the next-major
+/// context prefix [`HKDF_PREFIX_V0_2`] instead of v0.1's.
+///
+/// This is the **only** public path for a v0.2 subkey, mirroring the v0.1
+/// single-helper discipline (the underlying `hkdf.expand` stays module-private).
+/// It exists for the whole-vault migration (§10.4.1, #420): after minting a fresh
+/// v0.2 `root_key`, the migration derives `itemsKey_wrap_key` and every singleton
+/// KEK through this helper. Because the context prefix differs, a v0.2 subkey is
+/// unrelated to its v0.1 namesake even when the `root_key` bytes coincide — the
+/// §10.5 context-separation property, asserted by
+/// `v0_2_subkey_differs_from_v0_1_same_role_same_root`.
+pub fn derive_subkey_v0_2(root_key: &[u8; 32], role: SubkeyRole) -> Zeroizing<[u8; 32]> {
+    let role_bytes = role.role_str();
+    let mut info = Vec::with_capacity(HKDF_PREFIX_V0_2.len() + role_bytes.len());
+    info.extend_from_slice(HKDF_PREFIX_V0_2);
+    info.extend_from_slice(role_bytes);
+    derive_with_context(root_key, &info)
+}
+
+/// Derive a subkey under the generation named by `version` — [`derive_subkey`]
+/// for [`MetaVersion::V0_1`], [`derive_subkey_v0_2`] for [`MetaVersion::V0_2`].
+///
+/// This is the one dispatch every version-aware reader/writer uses: it reads the
+/// slot's [`MetaVersion`] and derives the KEK under the matching context prefix,
+/// so a migrated (v0.2) vault derives every singleton/index KEK under
+/// `"myne.v0.2 "` while an un-migrated one stays on `"myne.v0.1 "` — with no
+/// per-call-site `match` duplicated across a dozen plugins.
+pub fn derive_subkey_versioned(
+    version: MetaVersion,
+    root_key: &[u8; 32],
+    role: SubkeyRole,
+) -> Zeroizing<[u8; 32]> {
+    match version {
+        MetaVersion::V0_1 => derive_subkey(root_key, role),
+        MetaVersion::V0_2 => derive_subkey_v0_2(root_key, role),
+    }
 }
 
 /// HKDF-SHA-256 (Extract + Expand) over `root_key` with `salt =
@@ -787,6 +838,28 @@ mod tests {
         let items_wrap = derive_subkey(&root, SubkeyRole::ItemsKeyWrap);
         let prefs = derive_subkey(&root, SubkeyRole::PrefsKey);
         assert_ne!(*items_wrap, *prefs);
+    }
+
+    #[test]
+    fn v0_2_subkey_differs_from_v0_1_same_role_same_root() {
+        // §10.5 context-separation: the SAME role under the SAME root_key derives
+        // DIFFERENT bytes across major versions, because the context prefix differs
+        // ("myne.v0.1 " vs "myne.v0.2 "). This is what makes the whole-vault re-key
+        // (§10.4.1) a genuinely independent hierarchy, not a re-label.
+        let root = [0x5Au8; 32];
+        for role in SubkeyRole::ALL {
+            assert_ne!(
+                *derive_subkey(&root, role),
+                *derive_subkey_v0_2(&root, role),
+                "v0.1 and v0.2 subkeys collided for role {role:?}"
+            );
+        }
+        // And the v0.2 helper is exactly `"myne.v0.2 " || role` (no separator).
+        let manual = derive_with_context(&root, b"myne.v0.2 itemsKey-wrap");
+        assert_eq!(
+            *manual,
+            *derive_subkey_v0_2(&root, SubkeyRole::ItemsKeyWrap)
+        );
     }
 
     #[test]

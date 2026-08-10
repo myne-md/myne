@@ -57,9 +57,11 @@
 
 use crate::aead::{aad_ai_embeddings_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use crate::blob_envelope::{
-    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
+    decode_blob_envelope, decode_singleton_versioned, encode_blob_envelope,
+    encode_blob_envelope_raw, encode_singleton_versioned, EnvelopeError,
 };
 use crate::error::ProtocolError;
+use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use thiserror::Error;
 use zeroize::Zeroizing;
@@ -67,6 +69,13 @@ use zeroize::Zeroizing;
 /// Magic bytes at offset 0 — ASCII `"MYR1"` (Myne Retrieval/embeddings v1;
 /// the natural `E`-for-embeddings letter was already taken by `MYE1`).
 pub const EMBEDDINGS_BLOB_MAGIC: [u8; 4] = *b"MYR1";
+
+/// Magic bytes for the migrated v0.2 `vault.embeddings` family — ASCII `"MYR5"`
+/// (§10.3 registry).
+pub const EMBEDDINGS_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYR5";
+
+/// AAD role string bound into both generations' `vault.embeddings` AAD.
+const EMBEDDINGS_BLOB_AAD_ROLE: &[u8] = b"ai-embeddings-blob";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const EMBEDDINGS_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -220,6 +229,53 @@ pub fn decode_embeddings_blob(
         &EMBEDDINGS_BLOB_MAGIC,
         EMBEDDINGS_BLOB_FORMAT_V1,
         &aad,
+        MAX_EMBEDDINGS_PLAINTEXT_LEN,
+        blob,
+    )
+    .map_err(EmbeddingsBlobError::from)
+}
+
+/// Version-aware seal of `vault.embeddings` — `MYR1` + v0.1 AAD for
+/// [`MetaVersion::V0_1`], `MYR5` + v0.2 AAD for [`MetaVersion::V0_2`]. The
+/// `ai_embeddings_key` MUST be derived under the same generation
+/// (`derive_subkey_versioned(version, root_key, AiEmbeddingsKey)`).
+pub fn encode_embeddings_blob_versioned(
+    version: MetaVersion,
+    ai_embeddings_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, EmbeddingsBlobError> {
+    encode_singleton_versioned(
+        version,
+        ai_embeddings_key,
+        &EMBEDDINGS_BLOB_MAGIC,
+        &EMBEDDINGS_BLOB_V0_2_MAGIC,
+        EMBEDDINGS_BLOB_FORMAT_V1,
+        EMBEDDINGS_BLOB_AAD_ROLE,
+        account_number_hash,
+        MAX_EMBEDDINGS_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(EmbeddingsBlobError::from)
+}
+
+/// Version-aware open of `vault.embeddings` — the mirror of
+/// [`encode_embeddings_blob_versioned`], selecting the expected magic + AAD from
+/// `version`.
+pub fn decode_embeddings_blob_versioned(
+    version: MetaVersion,
+    ai_embeddings_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN],
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, EmbeddingsBlobError> {
+    decode_singleton_versioned(
+        version,
+        ai_embeddings_key,
+        &EMBEDDINGS_BLOB_MAGIC,
+        &EMBEDDINGS_BLOB_V0_2_MAGIC,
+        EMBEDDINGS_BLOB_FORMAT_V1,
+        EMBEDDINGS_BLOB_AAD_ROLE,
+        account_number_hash,
         MAX_EMBEDDINGS_PLAINTEXT_LEN,
         blob,
     )

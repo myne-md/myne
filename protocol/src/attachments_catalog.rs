@@ -66,10 +66,12 @@
 //! boundary, or uses [`read_or_empty`] directly.
 
 use crate::aead::{
-    aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_singleton_blob_v0_2, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
+    CTX_COMMITMENT_TAG_LEN,
 };
 use crate::aead::{AAD_PREFIX_V0_1, PROTOCOL_VERSION_V0_1};
 use crate::error::ProtocolError;
+use crate::types::MetaVersion;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -81,6 +83,11 @@ use zeroize::{Zeroize, Zeroizing};
 /// Magic bytes at offset 0 — ASCII `"MYC1"` (Myne Catalog v1).
 /// § 10.3 magic-byte registry.
 pub const CATALOG_BLOB_MAGIC: [u8; 4] = *b"MYC1";
+
+/// Magic bytes for the migrated v0.2 attachments catalog — ASCII `"MYC5"`
+/// (§10.3 registry). Same hand-rolled framing as `MYC1`; v0.2 differs only in
+/// the magic + the v0.2 AAD prefix + the `derive_subkey_v0_2` KEK.
+pub const CATALOG_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYC5";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const CATALOG_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -769,41 +776,17 @@ pub fn decode_attachments_catalog(
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<AttachmentsCatalog, CatalogBlobError> {
-    if blob.len() < CATALOG_BLOB_HEADER_LEN {
-        return Err(CatalogBlobError::HeaderTooShort);
-    }
-    if blob[0..4] != CATALOG_BLOB_MAGIC {
+    let version = if blob.get(0..4) == Some(CATALOG_BLOB_V0_2_MAGIC.as_slice()) {
+        MetaVersion::V0_2
+    } else if blob.get(0..4) == Some(CATALOG_BLOB_MAGIC.as_slice()) {
+        MetaVersion::V0_1
+    } else {
+        if blob.len() < CATALOG_BLOB_HEADER_LEN {
+            return Err(CatalogBlobError::HeaderTooShort);
+        }
         return Err(CatalogBlobError::MagicMismatch);
-    }
-    if blob[4] != CATALOG_BLOB_PROTOCOL_VERSION {
-        return Err(CatalogBlobError::ProtocolVersionMismatch);
-    }
-    if blob[5] != CATALOG_BLOB_RESERVED {
-        return Err(CatalogBlobError::ReservedByteNonZero);
-    }
-
-    let mut catalog_nonce = [0u8; AEAD_NONCE_LEN];
-    catalog_nonce.copy_from_slice(&blob[6..30]);
-
-    let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
-
-    if ciphertext_len > MAX_CATALOG_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
-        return Err(CatalogBlobError::CiphertextLenOverflow);
-    }
-    let ciphertext_end = CATALOG_BLOB_HEADER_LEN + ciphertext_len;
-    if blob.len() < ciphertext_end {
-        return Err(CatalogBlobError::CiphertextTruncated);
-    }
-
-    let aad = aad_attachments_catalog(account_number_hash);
-    let plaintext: Zeroizing<Vec<u8>> = aead_open_ctx(
-        catalog_key,
-        &catalog_nonce,
-        &blob[CATALOG_BLOB_HEADER_LEN..ciphertext_end],
-        &aad,
-    )?;
-
-    canonical_json_decode(&plaintext)
+    };
+    decode_attachments_catalog_versioned(version, catalog_key, account_number_hash, blob)
 }
 
 /// Read-or-empty semantic (§ 9.10.4). Collapse **any** decode failure —
@@ -821,6 +804,122 @@ pub fn read_or_empty(
     match blob {
         Some(bytes) => decode_attachments_catalog(catalog_key, account_number_hash, bytes)
             .unwrap_or_else(|_| AttachmentsCatalog::empty()),
+        None => AttachmentsCatalog::empty(),
+    }
+}
+
+/// Pick the (magic, AAD) pair for `version`: `MYC1` + [`aad_attachments_catalog`]
+/// for v0.1, `MYC5` + the v0.2-prefixed AAD for v0.2. The `protocol_version`
+/// header byte stays `0x01` in both.
+fn catalog_family_for(
+    version: MetaVersion,
+    account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+) -> ([u8; 4], Vec<u8>) {
+    match version {
+        MetaVersion::V0_1 => (
+            CATALOG_BLOB_MAGIC,
+            aad_attachments_catalog(account_number_hash),
+        ),
+        MetaVersion::V0_2 => (
+            CATALOG_BLOB_V0_2_MAGIC,
+            aad_singleton_blob_v0_2(ROLE_STR_ATTACHMENTS_CATALOG, account_number_hash),
+        ),
+    }
+}
+
+/// Version-aware seal of the attachments catalog, pulling the nonce from the OS
+/// CSPRNG. v0.1 writes `MYC1` + `aad_attachments_catalog`; v0.2 writes `MYC5` +
+/// the v0.2 AAD. The `catalog_key` MUST be derived under the same generation.
+pub fn encode_attachments_catalog_versioned(
+    version: MetaVersion,
+    catalog_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    catalog: &AttachmentsCatalog,
+) -> Result<Vec<u8>, CatalogBlobError> {
+    let (magic, aad) = catalog_family_for(version, account_number_hash);
+    let plaintext = canonical_json_encode(catalog);
+    if plaintext.len() > MAX_CATALOG_PLAINTEXT_LEN {
+        return Err(CatalogBlobError::CiphertextLenOverflow);
+    }
+
+    let mut catalog_nonce = [0u8; AEAD_NONCE_LEN];
+    getrandom(&mut catalog_nonce).map_err(|_| CatalogBlobError::RandomnessUnavailable)?;
+    let sealed = match aead_seal_ctx(catalog_key, &catalog_nonce, &plaintext, &aad) {
+        Ok(s) => s,
+        Err(e) => {
+            catalog_nonce.zeroize();
+            return Err(CatalogBlobError::from(e));
+        }
+    };
+    let ciphertext_len = sealed.len();
+
+    let mut out = Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + ciphertext_len);
+    out.extend_from_slice(&magic);
+    out.push(CATALOG_BLOB_PROTOCOL_VERSION);
+    out.push(CATALOG_BLOB_RESERVED);
+    out.extend_from_slice(&catalog_nonce);
+    out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
+    out.extend_from_slice(&sealed);
+    catalog_nonce.zeroize();
+    Ok(out)
+}
+
+/// Version-aware open of the attachments catalog — mirror of
+/// [`encode_attachments_catalog_versioned`].
+pub fn decode_attachments_catalog_versioned(
+    version: MetaVersion,
+    catalog_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    blob: &[u8],
+) -> Result<AttachmentsCatalog, CatalogBlobError> {
+    let (magic, aad) = catalog_family_for(version, account_number_hash);
+    if blob.len() < CATALOG_BLOB_HEADER_LEN {
+        return Err(CatalogBlobError::HeaderTooShort);
+    }
+    if blob[0..4] != magic {
+        return Err(CatalogBlobError::MagicMismatch);
+    }
+    if blob[4] != CATALOG_BLOB_PROTOCOL_VERSION {
+        return Err(CatalogBlobError::ProtocolVersionMismatch);
+    }
+    if blob[5] != CATALOG_BLOB_RESERVED {
+        return Err(CatalogBlobError::ReservedByteNonZero);
+    }
+
+    let mut catalog_nonce = [0u8; AEAD_NONCE_LEN];
+    catalog_nonce.copy_from_slice(&blob[6..30]);
+
+    let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
+    if ciphertext_len > MAX_CATALOG_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
+        return Err(CatalogBlobError::CiphertextLenOverflow);
+    }
+    let ciphertext_end = CATALOG_BLOB_HEADER_LEN + ciphertext_len;
+    if blob.len() < ciphertext_end {
+        return Err(CatalogBlobError::CiphertextTruncated);
+    }
+
+    let plaintext: Zeroizing<Vec<u8>> = aead_open_ctx(
+        catalog_key,
+        &catalog_nonce,
+        &blob[CATALOG_BLOB_HEADER_LEN..ciphertext_end],
+        &aad,
+    )?;
+    canonical_json_decode(&plaintext)
+}
+
+/// Version-aware [`read_or_empty`] — collapses any decode failure (or an absent
+/// file) to the empty catalog, selecting the generation from `version`.
+pub fn read_or_empty_versioned(
+    version: MetaVersion,
+    catalog_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    blob: Option<&[u8]>,
+) -> AttachmentsCatalog {
+    match blob {
+        Some(bytes) => {
+            decode_attachments_catalog_versioned(version, catalog_key, account_number_hash, bytes)
+                .unwrap_or_else(|_| AttachmentsCatalog::empty())
+        }
         None => AttachmentsCatalog::empty(),
     }
 }
