@@ -79,6 +79,15 @@ fn main() {
             tauri_build::InlinedPlugin::new().commands(&["vault_delete"]),
         )
         .plugin(
+            "vault-migrate",
+            // automerge-sync-migration (#420): the `vault_migrate` command runs
+            // the whole-vault v0.1 → v0.2 (MYV1 → NTV5) migration (protocol.md
+            // §10.4.1). Adding a command here without a matching `commands.allow`
+            // entry in `permissions/vault-migrate/default.toml` is a security
+            // regression.
+            tauri_build::InlinedPlugin::new().commands(&["vault_migrate"]),
+        )
+        .plugin(
             "vault-repair",
             // Task 3 of `vault-repair` (MYND-159) ships the read-only
             // `vault_residue_scan` command (orphan-artefact detection

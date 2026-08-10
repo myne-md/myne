@@ -16,8 +16,9 @@ use super::dictionary::PersonalDictionaryData;
 use super::state::SpellState;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_dictionary_blob, derive_subkey, encode_dictionary_blob, parse_vault_meta, SubkeyRole,
-    AEAD_KEY_LEN, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_dictionary_blob, derive_subkey_versioned, encode_dictionary_blob_versioned,
+    meta_version_of, parse_vault_meta_any, MetaVersion, SubkeyRole, AEAD_KEY_LEN,
+    VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime};
@@ -51,10 +52,17 @@ pub enum SpellSyncError {
 
 fn read_account_number_hash(
     vault_meta_path: &Path,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], SpellSyncError> {
+) -> Result<(MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), SpellSyncError> {
     let bytes = std::fs::read(vault_meta_path).map_err(|_| SpellSyncError::Io)?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| SpellSyncError::InvalidVaultMeta)?;
-    Ok(meta.account_number_hash)
+    // Accept a v0.1 (`MYV1`) OR a migrated v0.2 (`NTV5`) vault.meta. The migration
+    // re-seals `vault.dictionary` `MYD1→MYD5` under a `derive_subkey_v0_2` KEK, so
+    // this reader MUST derive the KEK for the SAME generation — a v0.1 parse + v0.1
+    // KEK would fail to read a migrated vault's dictionary (and, worse, a later
+    // word-add would overwrite the `MYD5` blob with `MYD1` under the wrong key,
+    // permanently losing every migrated word). #420.
+    let version = meta_version_of(&bytes).ok_or(SpellSyncError::InvalidVaultMeta)?;
+    let meta = parse_vault_meta_any(&bytes).map_err(|_| SpellSyncError::InvalidVaultMeta)?;
+    Ok((version, meta.account_number_hash))
 }
 
 /// PURE CORE — encrypt `data` to the `vault.dictionary` blob and atomically
@@ -62,6 +70,7 @@ fn read_account_number_hash(
 /// (best-effort) so an empty dictionary leaves no file (fall-back-to-empty on
 /// read; keeps a no-dictionary vault byte-clean).
 pub(crate) fn persist_payload_to_dir(
+    version: MetaVersion,
     vault_dir: &Path,
     dict_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
@@ -74,7 +83,10 @@ pub(crate) fn persist_payload_to_dir(
         return Ok(());
     }
     let payload = data.encode();
-    let blob = encode_dictionary_blob(dict_key, account_number_hash, &payload)
+    // Write in the vault's OWN generation: `MYD5` on a migrated (v0.2) vault so a
+    // word-add never downgrades the migrated blob back to `MYD1`. The `dict_key`
+    // the caller passes is derived for the same generation.
+    let blob = encode_dictionary_blob_versioned(version, dict_key, account_number_hash, &payload)
         .map_err(|_| SpellSyncError::Encode)?;
     crate::atomic_write::atomic_write(&path, &blob, /* replace = */ true)
         .map_err(|_| SpellSyncError::Io)?;
@@ -139,10 +151,10 @@ pub(crate) async fn persist_dictionary_with_dir(
         .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(SpellSyncError::SlotNotUnlocked)?;
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
+    let (version, account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta"))?;
     let dict_key: Zeroizing<[u8; AEAD_KEY_LEN]> =
-        derive_subkey(&root_key, SubkeyRole::PersonalDictKey);
-    persist_payload_to_dir(vault_dir, &dict_key, &account_number_hash, data)
+        derive_subkey_versioned(version, &root_key, SubkeyRole::PersonalDictKey);
+    persist_payload_to_dir(version, vault_dir, &dict_key, &account_number_hash, data)
 }
 
 /// Hydrate the live [`SpellState`] personal/ignore sets from disk on unlock.
@@ -158,9 +170,9 @@ pub(crate) async fn hydrate_dictionary_with_dir(
         .peek_unlocked_root_key_and_hash_clone()
         .await
         .ok_or(SpellSyncError::SlotNotUnlocked)?;
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
+    let (version, account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta"))?;
     let dict_key: Zeroizing<[u8; AEAD_KEY_LEN]> =
-        derive_subkey(&root_key, SubkeyRole::PersonalDictKey);
+        derive_subkey_versioned(version, &root_key, SubkeyRole::PersonalDictKey);
     let data = hydrate_payload_from_dir(vault_dir, &dict_key, &account_number_hash)?;
     spell.hydrate_words(data);
     Ok(())
@@ -227,11 +239,33 @@ mod tests {
             personal_words: vec!["Myne".into(), "tokio".into()],
             ignore_words: vec!["helllo".into()],
         };
-        persist_payload_to_dir(&dir, &KEY, &HASH, &data).expect("persist");
+        persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
         assert!(dir.join("vault.dictionary").exists());
         let back = hydrate_payload_from_dir(&dir, &KEY, &HASH).expect("hydrate");
         assert_eq!(back.personal_words, vec!["Myne", "tokio"]);
         assert_eq!(back.ignore_words, vec!["helllo"]);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_v0_2_dictionary_round_trips_through_the_versioned_reader() {
+        // #420: after migration the dictionary is `MYD5`. The versioned persist
+        // writes it and the magic-detecting hydrate reads it back — the round-trip
+        // the migration's data-preservation depends on (a v0.1-only reader would
+        // fail to decrypt this blob, silently losing every migrated word).
+        let dir = tmp();
+        let data = PersonalDictionaryData {
+            personal_words: vec!["Automerge".into()],
+            ignore_words: vec!["teh".into()],
+        };
+        persist_payload_to_dir(MetaVersion::V0_2, &dir, &KEY, &HASH, &data).expect("persist v0.2");
+        // It is the MYD5 family on disk, not MYD1.
+        let blob = std::fs::read(dir.join("vault.dictionary")).unwrap();
+        assert_eq!(&blob[0..4], protocol::DICTIONARY_BLOB_V0_2_MAGIC.as_slice());
+        // The magic-detecting hydrate reads it under the same key.
+        let back = hydrate_payload_from_dir(&dir, &KEY, &HASH).expect("hydrate v0.2");
+        assert_eq!(back.personal_words, vec!["Automerge"]);
+        assert_eq!(back.ignore_words, vec!["teh"]);
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -252,11 +286,17 @@ mod tests {
             personal_words: vec!["x".into()],
             ignore_words: vec![],
         };
-        persist_payload_to_dir(&dir, &KEY, &HASH, &data).expect("persist");
+        persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
         assert!(dir.join("vault.dictionary").exists());
         // Now persist empty → file removed.
-        persist_payload_to_dir(&dir, &KEY, &HASH, &PersonalDictionaryData::default())
-            .expect("persist empty");
+        persist_payload_to_dir(
+            MetaVersion::V0_1,
+            &dir,
+            &KEY,
+            &HASH,
+            &PersonalDictionaryData::default(),
+        )
+        .expect("persist empty");
         assert!(!dir.join("vault.dictionary").exists());
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -268,7 +308,7 @@ mod tests {
             personal_words: vec!["secret".into()],
             ignore_words: vec![],
         };
-        persist_payload_to_dir(&dir, &KEY, &HASH, &data).expect("persist");
+        persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
         // #255: a blob that EXISTS and does not decrypt is an error, not an
         // empty dictionary. Reporting empty here is what let the next write
         // persist empty over a file that was merely unread.
@@ -306,7 +346,7 @@ mod tests {
             personal_words: vec!["irreplaceable".into()],
             ignore_words: vec![],
         };
-        persist_payload_to_dir(&dir, &KEY, &HASH, &data).expect("persist");
+        persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
         let before = std::fs::read(dir.join("vault.dictionary")).expect("read blob");
 
         // Hydrate with the wrong key — the "could not read it this once" case.
