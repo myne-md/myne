@@ -61,6 +61,7 @@ import { activeVaultId } from "../lib/vault-list";
 import { useUnsyncedEdits } from "../hooks/useUnsyncedEdits";
 import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
+import { RemoteMergeHint } from "../components/sync/RemoteMergeHint";
 import { Icon } from "../components/primitives/Icon";
 import { Tooltip } from "../components/primitives/Tooltip";
 import {
@@ -2476,6 +2477,10 @@ function EditorChrome({
           store — this screen's, NoteList's, sync's, and the editor's imperative
           ones — as one shared collapsed stack. Mounted exactly once. */}
       <Toaster />
+      {/* ASM-6→B / #422: the calm "updated from another device" hint. Headless —
+          it pushes an info toast into the <Toaster> above when the sync cycle
+          reports an NC05 note was reconciled by an automatic CRDT merge (#419). */}
+      <RemoteMergeHint />
     </div>
     </CenterViewProvider>
   );

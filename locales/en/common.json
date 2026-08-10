@@ -2154,6 +2154,21 @@
       "searchPlaceholder": "Search…"
     }
   },
+  "migrate": {
+    "intro": "Upgrade this vault to the new format. Your notes gain automatic cross-device merging. This re-keys the whole vault; the old copy is kept on this device until you confirm.",
+    "passwordLabel": "Master password",
+    "phraseLabel": "Recovery phrase",
+    "phraseHelp": "Required — your new keys are wrapped under this phrase, so recovery keeps working. Enter all your recovery words.",
+    "submit": "Migrate",
+    "migrating": "Migrating…",
+    "done": "Migrated {{count}} notes to the new format.",
+    "error": {
+      "recoveryPhraseRequired": "That recovery phrase didn’t match this vault. Enter your correct recovery phrase to migrate — it’s required so recovery keeps working.",
+      "wrongPassword": "That password didn’t match this vault.",
+      "alreadyMigrated": "This vault is already on the new format.",
+      "generic": "The migration couldn’t complete. Your vault is unchanged; try again."
+    }
+  },
   "recover": {
     "errors": {
       "cancelledVaultLocked": "Recovery cancelled: vault was locked.",
@@ -3059,6 +3074,7 @@
     "buildingIndex": {
       "label": "Building search index…"
     },
+    "remoteMergeHint": "Updated from another device",
     "conflicts": {
       "compare": "Compare",
       "compareClose": "Back to conflicts",
@@ -3445,7 +3461,8 @@
       "inProgress": "Operation in progress.",
       "kdfMemoryExceedsHost": "This vault needs {{required}} MiB of memory to open — more than this browser can give it ({{available}} MiB). The vault is fine; open it in the Myne desktop app.",
       "unexpected": "Unexpected error. Please try again.",
-      "vaultNotFound": "Vault file not found. Please restart the app."
+      "vaultNotFound": "Vault file not found. Please restart the app.",
+      "vaultUpgraded": "This vault was upgraded to a newer format this version of Myne doesn’t support yet. Your data is fine — update Myne to the latest version to open it."
     },
     "passwordLabel": "Password",
     "passwordPlaceholder": "Password",

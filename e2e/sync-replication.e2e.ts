@@ -211,6 +211,50 @@ describeCanary("two-device sync canary (MYND-428)", () => {
     }
   });
 
+  // #422 (ASM-6→B): the CRDT (NC05) counterpart of keep-both — two devices
+  // concurrently edit the SAME NC05 note, the engine MERGES (no keep-both copy,
+  // no Conflicts row), and the pulling device shows the calm "updated from
+  // another device" hint (`sync.remote-merge-hint`).
+  //
+  // SKIPPED — reachable now via #420, pending the two-device migration wiring.
+  // NC05 notes are created only by the whole-vault migration (`vault_migrate`,
+  // #420, now wired end to end — see `e2e/vault-migrate.e2e.ts`). To drive THIS
+  // scenario each device must migrate its shared vault to NTV5/NC05 before the
+  // concurrent edit, which the two-device harness (`support/multi-device`) does
+  // not yet do. Until that setup step lands, the hint's behaviour is covered by
+  // `tests/components/RemoteMergeHint.test.tsx` (the `e2e/CLAUDE.md` "unreachable
+  // → Vitest" downgrade), and the `MY01` keep-both scenario above is the untouched
+  // regression half of the #422 DoD. Un-skip once the harness migrates both
+  // devices; the assertions below are ready.
+  it.skip("crdt-merge: concurrent NC05 edits merge with the hint, no keep-both, no Conflicts row", async () => {
+    const srv = await startSyncServer();
+    try {
+      const { a, b, noteId, teardown } = await setupTwoSyncedDevices(srv);
+      try {
+        const idHex = noteId.replace(/-/g, "");
+        // (Requires `noteId` to be an NC05 note — see the skip note above.)
+        await ipcOk(a.session, "plugin:notes|note_update", { noteId, plaintext: "AAA crdt" });
+        await ipcOk(b.session, "plugin:notes|note_update", { noteId, plaintext: "BBB crdt" });
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+        await ipcOk(b.session, "plugin:sync|sync_now", {});
+        // NC05 merges — B stages NO keep-both conflict for this note...
+        const pending = (await ipcOk(b.session, "plugin:sync|sync_pending_conflicts", {})) as string[];
+        expect(pending).not.toContain(idHex);
+        // ...its single blob still holds BOTH edits (merge, not fork)...
+        expect(noteBlobCount(b.appDataDir)).toBe(1);
+        const merged = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+        expect(merged).toContain("A");
+        expect(merged).toContain("B");
+        // ...and the calm hint is shown on the pulling device.
+        await b.session.byTestId("sync.remote-merge-hint", { timeoutMs: 10_000 });
+      } finally {
+        await teardown();
+      }
+    } finally {
+      await srv.teardown();
+    }
+  });
+
   it("take-theirs: the remote version wins, the local original is tombstoned, and the win replicates to A", async () => {
     const srv = await startSyncServer();
     try {

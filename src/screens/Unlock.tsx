@@ -291,6 +291,11 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
           available: e.detail.available_mib,
         }),
       };
+    case "VaultUpgradedUnsupported":
+      // §10.5 anti-downgrade: the vault is on a newer major this build does not
+      // implement. NOT `corrupted` — the vault is fine, this app is too old, so
+      // the CTA is "update this app", never "restore a backup".
+      return { kind: "banner", text: i18n.t("unlock.errors.vaultUpgraded") };
   }
 }
 

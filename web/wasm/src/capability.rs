@@ -372,6 +372,13 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // served code", and creation both generates and shows it. This is the
     // normative half of that decision, not a scope cut.
     ("vault-creation", Class::Unsupported),
+    // The whole-vault v0.1 → v0.2 migration (#420) is a DESKTOP flow: it re-keys
+    // and re-encrypts the entire vault at rest and requires the 24-word recovery
+    // phrase, which is never typed into served code (the same reason
+    // `vault-creation` and `vault-recover` are absent on web — `decisions.md`
+    // 2026-07-26). A browser client joins an already-current account over sync;
+    // it does not migrate one.
+    ("vault-migrate", Class::Unsupported),
     // Markdown tree export to an OS path chosen through a native Save-As
     // dialog. `core-wasm-assessment.md`: `cannot-exist-in-browser` — "The
     // command's contract IS the desktop filesystem". Task 48's browser
