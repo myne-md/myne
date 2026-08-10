@@ -412,6 +412,67 @@ impl Device {
         )
     }
 
+    // --- NC05 CRDT note operations (the automerge-sync-migration path) ---
+    //
+    // The same `.myn` on-disk slot as a `MY01` note, but the blob is an `NC05`
+    // CRDT note; the sync cycle dispatches on the cleartext magic. The device_id
+    // seeds the Automerge actor (device provenance, ASM-3), and `NoopHost` supplies
+    // the change timestamp (deterministic for the sim; the value is immaterial).
+
+    /// Create a brand-new `NC05` CRDT note (the post-migration note shape).
+    fn create_crdt_note(&self, markdown: &str) -> NoteId {
+        let id = NoteId::new_v7();
+        let nb = *id.as_uuid().as_bytes();
+        let blob = crate::plugins::notes::crdt::encode_note_blob(
+            markdown,
+            &self.acct.items_key,
+            &self.acct.items_key_id,
+            &nb,
+            &self.device_id,
+            &crate::host::NoopHost,
+        )
+        .expect("seal NC05 note");
+        crate::atomic_write::atomic_write(&self.blob_path(&id), &blob, false).unwrap();
+        id
+    }
+
+    /// Edit an existing `NC05` note in place — replaces the single `Text` while
+    /// preserving change-graph ancestry, so a peer's concurrent edit still merges.
+    fn edit_crdt_note(&self, id: &NoteId, markdown: &str) {
+        let nb = *id.as_uuid().as_bytes();
+        let existing = std::fs::read(self.blob_path(id)).expect("read NC05 blob");
+        let upd = crate::plugins::notes::crdt::encode_note_edit(
+            &existing,
+            markdown,
+            &self.acct.items_key,
+            &self.acct.items_key_id,
+            &nb,
+            &crate::host::NoopHost,
+        )
+        .expect("edit NC05 note");
+        crate::atomic_write::atomic_write(&self.blob_path(id), &upd.blob, true).unwrap();
+    }
+
+    /// Decode an `NC05` note to its markdown, or `None` if absent/undecodable.
+    fn read_crdt_note(&self, id: &NoteId) -> Option<String> {
+        let nb = *id.as_uuid().as_bytes();
+        let blob = std::fs::read(self.blob_path(id)).ok()?;
+        crate::plugins::notes::crdt::decode_note_blob(
+            &blob,
+            &nb,
+            &self.acct.items_key,
+            &self.acct.items_key_id,
+        )
+        .ok()
+    }
+
+    /// On-disk byte length of a note's `.myn` blob — for the history-growth
+    /// assertion (a CRDT note's blob carries its full Automerge change-history, so
+    /// it grows with edit count; #421 task 3).
+    fn crdt_blob_len(&self, id: &NoteId) -> Option<u64> {
+        std::fs::metadata(self.blob_path(id)).ok().map(|m| m.len())
+    }
+
     /// The 32-hex ids of every `.myn` blob present in this device's vault.
     fn local_ids(&self) -> BTreeSet<String> {
         let mut out = BTreeSet::new();
@@ -915,6 +976,118 @@ fn three_devices_converge() {
     assert_converged(&devices, &[n]);
     assert_same_blob_sets(&devices);
     assert_no_conflicts(&devices);
+}
+
+/// The automerge-sync-migration end-to-end (myne-md/myne#419): three devices
+/// concurrently edit the SAME `NC05` CRDT note; the engine MERGES (never keep-
+/// both), every device converges to a byte-identical merged note that drops
+/// neither edit, and a further cycle pushes NOTHING. That last property is the
+/// point of the migration: the ASM-5 causal-heads convergence marker means a
+/// non-deterministic Automerge re-serialize is not seen as a push, so the note-
+/// level §10.2.2 CAS ping-pong (the fragility class #405 fixed for singletons)
+/// cannot recur one layer down.
+#[test]
+fn crdt_note_three_device_concurrent_edit_merges_converges_no_ping_pong() {
+    let (_guard, url) = server_or_skip!("crdt_note_converge");
+    let acct = Account::new(0x50);
+    let devices = enroll_devices(&acct, &url, 3);
+
+    // A creates the note; it replicates to B and C. All three now share the same
+    // Automerge change-graph ancestry — the precondition `merge()` needs.
+    let n = devices[0].create_crdt_note("base");
+    quiesce(&devices, 12);
+    for d in &devices {
+        assert_eq!(
+            d.read_crdt_note(&n).as_deref(),
+            Some("base"),
+            "device {} received the CRDT note",
+            d.label
+        );
+    }
+
+    // Two devices edit the SAME note concurrently (neither syncs first — the fork).
+    devices[0].edit_crdt_note(&n, "AAA");
+    devices[1].edit_crdt_note(&n, "BBB");
+    quiesce(&devices, 16);
+
+    // Converged: every device holds byte-identical merged markdown...
+    let merged = devices[0]
+        .read_crdt_note(&n)
+        .expect("A holds the merged note");
+    for d in &devices[1..] {
+        assert_eq!(
+            d.read_crdt_note(&n).as_deref(),
+            Some(merged.as_str()),
+            "device {} converged to the same merged bytes",
+            d.label
+        );
+    }
+    // ...that dropped NEITHER edit (both distinctive runs survive the interleave,
+    // §10.1)...
+    assert!(
+        merged.contains('A') && merged.contains('B'),
+        "both concurrent edits present after merge: {merged:?}"
+    );
+    // ...silently: a CRDT merge is never surfaced as a keep-both conflict (ASM-6→B),
+    // and every device holds the one note id.
+    assert_no_conflicts(&devices);
+    assert_same_blob_sets(&devices);
+
+    // Steady state: a further cycle on EVERY device pushes nothing — the heads did
+    // not change, so a re-serialized blob is not mistaken for a local edit.
+    let pushed: usize = devices.iter().map(|d| d.sync().pushed).sum();
+    assert_eq!(
+        pushed, 0,
+        "quiesced CRDT fleet stays silent (no ASM-5 CAS ping-pong)"
+    );
+}
+
+/// #421 task 3 (ASM-12 Reading B): unbounded synced Automerge history round-trips
+/// across a fleet, and the accepted cost — per-note blob size growing with edit
+/// count — is asserted, not hidden. Many sequential edits of ONE `NC05` note
+/// converge on every device each round, and the on-disk blob is strictly larger
+/// after the edits than at creation (the full change-history rides inside it). The
+/// assertion is deliberate: a future retention bound (#423) needs a known baseline,
+/// and a blob that stopped growing would mean history was silently dropped.
+#[test]
+fn crdt_note_unbounded_history_round_trips_and_grows_with_edits() {
+    let (_guard, url) = server_or_skip!("crdt_history_retention");
+    let acct = Account::new(0x51);
+    let devices = enroll_devices(&acct, &url, 3);
+
+    let n = devices[0].create_crdt_note("rev-0");
+    quiesce(&devices, 12);
+    let size_at_create = devices[2].crdt_blob_len(&n).expect("C holds the note");
+
+    // Many sequential edits on A, each replicated to the whole fleet.
+    const EDITS: usize = 6;
+    for i in 1..=EDITS {
+        devices[0].edit_crdt_note(&n, &format!("rev-{i}"));
+        quiesce(&devices, 12);
+        for d in &devices {
+            assert_eq!(
+                d.read_crdt_note(&n).as_deref(),
+                Some(format!("rev-{i}").as_str()),
+                "device {} converged to rev-{i}",
+                d.label
+            );
+        }
+    }
+    // A single-writer edit stream is never a conflict.
+    assert_no_conflicts(&devices);
+
+    // The accepted cost (the epic's sharpest residual): the synced blob carries the
+    // full edit-history, so it is strictly larger after EDITS edits than at
+    // creation. This is the unbounded-now stance made measurable (#423 bounds it).
+    let size_after = devices[2]
+        .crdt_blob_len(&n)
+        .expect("C still holds the note");
+    assert!(
+        size_after > size_at_create,
+        "unbounded history must accumulate: blob grew from {size_at_create} to \
+         {size_after} bytes over {EDITS} edits (a non-growing blob would mean \
+         history was dropped)"
+    );
 }
 
 /// myne-md/myne#405 end-to-end: the §10.2.2 non-associative counterexample as a

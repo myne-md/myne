@@ -30,7 +30,7 @@ use super::state::{
 use super::transport::{HttpMethod, SyncTransport};
 use crate::attachment_nonce::{scan_attachments_manifest, AttachmentManifestEntry};
 use protocol::{
-    compute_manifest_hash, derive_subkey, encode_attachments_catalog, parse_vault_meta,
+    compute_manifest_hash, derive_subkey, encode_attachments_catalog, parse_vault_meta_any,
     serialize_vault_meta, AttachmentsCatalog, ManifestEntry, SubkeyRole, VaultHead, VvEntry,
     CATALOG_BLOB_MAGIC, PREFS_BLOB_MAGIC, THEMES_BLOB_MAGIC, VAULT_HEAD_FORMAT_V1,
 };
@@ -114,6 +114,14 @@ pub struct SyncSummary {
     ///
     /// Written notes only: a `SkippedDirty` or a failed download is not here.
     pub pulled_note_ids: Vec<String>,
+    /// Canonical 36-char ids of `NC05` notes whose local copy was updated this
+    /// cycle by an **automatic CRDT merge** of a concurrent remote revision
+    /// (ASM-6→B / #422) — a strict subset of `pulled_note_ids`. This is the
+    /// "updated from another device" signal the product surface renders as a calm
+    /// hint; unlike a plain pull (server-wins overwrite of an unedited note) it
+    /// means *both* a local and a remote edit were reconciled. A local-only edit,
+    /// a no-op merge, or a `MY01` keep-both never appears here.
+    pub remote_merged_note_ids: Vec<String>,
 }
 
 /// Sync-cycle failures.
@@ -489,6 +497,7 @@ pub async fn resolve_conflict(
             BlobSyncState {
                 version,
                 content_nonce_hex: nonce_hex,
+                doc_heads_hex: Vec::new(),
             },
         );
         write_sync_state(io, vault_root, &state)
@@ -1111,6 +1120,7 @@ fn record_blob_baseline(state: &mut SyncState, id_hex: &str, rec: &ChangedBlob) 
         BlobSyncState {
             version: rec.version,
             content_nonce_hex: hex(&rec.content_nonce),
+            doc_heads_hex: Vec::new(),
         },
     );
 }
@@ -1695,7 +1705,7 @@ pub(crate) async fn sync_meta_phase(
     let Ok(local_bytes) = io.read(&meta_path).await else {
         return MetaPhaseOutcome::NoChange; // no local meta (unenrolled edge) → nothing
     };
-    let Ok(local_meta) = parse_vault_meta(&local_bytes) else {
+    let Ok(local_meta) = parse_vault_meta_any(&local_bytes) else {
         return MetaPhaseOutcome::Skipped;
     };
     let local_hash = sha256_hex(&local_bytes);
@@ -1744,7 +1754,7 @@ pub(crate) async fn sync_meta_phase(
         }
         _ => return MetaPhaseOutcome::Skipped,
     };
-    let Ok(server_meta) = parse_vault_meta(&server_bytes) else {
+    let Ok(server_meta) = parse_vault_meta_any(&server_bytes) else {
         return MetaPhaseOutcome::Skipped;
     };
     let server_hash = sha256_hex(&server_bytes);
@@ -2116,6 +2126,7 @@ async fn sync_cycle_attempt(
                 .or_insert_with(|| BlobSyncState {
                     version: m.version,
                     content_nonce_hex: hex(&m.content_nonce),
+                    doc_heads_hex: Vec::new(),
                 });
         }
     }
@@ -2212,6 +2223,7 @@ async fn sync_cycle_attempt(
                         BlobSyncState {
                             version: c.version,
                             content_nonce_hex: hex(&c.content_nonce),
+                            doc_heads_hex: Vec::new(),
                         },
                     );
                 }
@@ -2224,6 +2236,7 @@ async fn sync_cycle_attempt(
                             BlobSyncState {
                                 version: c.version,
                                 content_nonce_hex: hex(&c.content_nonce),
+                                doc_heads_hex: Vec::new(),
                             },
                         );
                         continue;
@@ -2286,6 +2299,7 @@ async fn sync_cycle_attempt(
                         BlobSyncState {
                             version: c.version,
                             content_nonce_hex: hex(&c.content_nonce),
+                            doc_heads_hex: Vec::new(),
                         },
                     );
                     attachments_pulled += 1;
@@ -2359,6 +2373,9 @@ async fn sync_cycle_attempt(
     let mut pulled = 0;
     // The ids this cycle WRITES, for the boundary's re-index (myne#305).
     let mut pulled_note_ids: Vec<String> = Vec::new();
+    // The ASM-6/#422 "updated from another device" signal — NC05 notes an
+    // automatic CRDT merge reconciled this cycle (a strict subset of the above).
+    let mut remote_merged_note_ids: Vec<String> = Vec::new();
     let mut pull_skipped = 0usize;
     // The records this loop will actually download, with the two filters hoisted
     // verbatim out of the old per-record loop:
@@ -2431,6 +2448,7 @@ async fn sync_cycle_attempt(
                                 BlobSyncState {
                                     version: c.version,
                                     content_nonce_hex: hex(&c.content_nonce),
+                                    doc_heads_hex: Vec::new(),
                                 },
                             );
                             pulled += 1;
@@ -2647,39 +2665,135 @@ async fn sync_cycle_attempt(
         .collect();
     let mut to_push: Vec<PushBlob> = Vec::new();
     let mut conflicts: Vec<ConflictCopyPlan> = Vec::new();
+    // Heads (the ASM-5 convergence marker) to record for each `NC05` note this
+    // cycle pushes — read at the push-result recording below, in place of the
+    // `Vec::new()` a `MY01` blob records. Keyed by note id.
+    let mut nc05_push_heads: HashMap<[u8; 16], Vec<String>> = HashMap::new();
     if allow_push {
         for (id, nonce) in &local2 {
             let id_hex = hex(id);
             let nonce_hex = hex(nonce);
-            let synced = state.blobs.get(&id_hex);
-            if synced.map(|b| b.content_nonce_hex.as_str()) == Some(nonce_hex.as_str()) {
+            // Cloned, not borrowed: the `NC05` convergence branch below re-inserts
+            // into `state.blobs` (adopts a re-serialized note's new nonce without a
+            // push), which a live `&` borrow of the map would forbid.
+            let synced = state.blobs.get(&id_hex).cloned();
+            if synced.as_ref().map(|b| b.content_nonce_hex.as_str()) == Some(nonce_hex.as_str()) {
                 continue; // already in sync
             }
             // Unresolved staged conflict (see above): never push, never re-stage.
             if pending_conflicts.contains(&id_hex) {
                 continue;
             }
+            // A queued deletion pushes as a tombstone and never merges (there is no
+            // content to converge). Its flag also gates the CRDT dispatch off.
+            let is_tombstoning = pending_tombstones.contains(&id_hex);
+            // The note keys for the `NC05` path — present only when this cycle
+            // carries them (`attachment_keys`, which notes share) AND it is not a
+            // pending deletion. `None` ⇒ the unchanged `MY01` behavior below. The
+            // local blob is read LAZILY inside each `NC05` branch (never at the top
+            // of the loop) so a note that ends up keep-both or reclaimed — paths
+            // that never touch the local content — is not read at all, matching the
+            // pre-CRDT flow: hoisting the read aborted the whole cycle when such a
+            // note's blob was absent, before the attachment push could run.
+            let crdt_keys = if is_tombstoning {
+                None
+            } else {
+                attachment_keys
+            };
+
             // True conflict: this note is locally dirty AND the server advanced it
-            // past our synced baseline (a concurrent remote edit). Pushing a stale
-            // base_version loses the blob CAS (BlobStale), which aborts the chunk it
-            // travels in and abandons every chunk behind it. Exclude it and record
-            // a keep-both plan; the local edit stays on disk untouched (no loss).
-            if let Some(b) = synced {
+            // past our synced baseline (a concurrent remote edit). For `MY01` this
+            // is keep-both (pushing a stale `base_version` loses the CAS and wedges
+            // the chunk); for `NC05` it is an automatic causal MERGE (ASM-9) — the
+            // whole point of the migration.
+            if let Some(b) = &synced {
                 if let Some((server_version, remote_nonce)) = server_meta.get(id) {
                     if *server_version > b.version {
-                        // Stage the remote revision (download it once) so the notes
-                        // layer can materialize a keep-both copy of it; the local
-                        // edit stays on disk untouched. `resolve_conflict` later
-                        // adopts this version as the baseline so the local edit then
-                        // pushes as a clean linear advance.
-                        if let Ok(remote_bytes) = download_blob_backoff(transport, token, id) {
+                        // Download the remote revision once (shared by both arms).
+                        let remote_bytes = download_blob_backoff(transport, token, id).ok();
+                        // `NC05` ⟷ `NC05` → merge, then push the merged blob at the
+                        // server's current version so the CAS lands. A magic
+                        // mismatch (local `NC05` vs remote `MY01`, mid-migration, or
+                        // an undecryptable/corrupt remote) falls through to keep-both
+                        // — never a silent cross-type merge (ASM-9).
+                        // The merge needs the LOCAL blob — read it HERE, only when
+                        // the remote is a live `NC05` revision (a `MY01` conflict, a
+                        // non-CRDT/undecodable remote, or a locally-absent blob all
+                        // fall through to keep-both without a mandatory read, so an
+                        // absent-blob keep-both never aborts the cycle).
+                        let local_ct = match (crdt_keys, remote_bytes.as_ref()) {
+                            (Some(_), Some(remote))
+                                if crate::plugins::notes::crdt::is_nc05_blob(remote) =>
+                            {
+                                io.read(&blob_path(notes_dir, id)).await.ok()
+                            }
+                            _ => None,
+                        };
+                        if let (Some(keys), Some(remote), Some(local_ct)) =
+                            (crdt_keys, remote_bytes.as_ref(), local_ct.as_ref())
+                        {
+                            if crate::plugins::notes::crdt::is_nc05_blob(local_ct) {
+                                if let Ok(merge) =
+                                    crate::plugins::notes::crdt::merge_crdt_note_blobs(
+                                        local_ct,
+                                        remote,
+                                        keys.items_key,
+                                        keys.items_key_id,
+                                        id,
+                                    )
+                                {
+                                    // The merged blob's own header nonce (the value
+                                    // the server records + peers verify).
+                                    if let Some(merged_nonce) =
+                                        crate::note_nonce::read_myn_content_nonce(&merge.blob)
+                                    {
+                                        // Persist the merged blob locally — it
+                                        // supersedes the divergent local copy (no
+                                        // edit lost: the merge contains both) — then
+                                        // queue it for push at the server version.
+                                        io.write(
+                                            &blob_path(notes_dir, id),
+                                            &merge.blob,
+                                            crate::vault_io::WriteOpts::default(),
+                                        )
+                                        .await
+                                        .map_err(|_| SyncCycleError::Io)?;
+                                        nc05_push_heads.insert(*id, merge.heads);
+                                        // The local content changed (from a remote
+                                        // merge) → re-index + re-read into the open
+                                        // editor. `pulled_note_ids` drives the
+                                        // re-index/re-read; `remote_merged_note_ids`
+                                        // is the DISTINCT ASM-6/#422 "updated from
+                                        // another device" signal the calm hint fires
+                                        // on (a merge that reconciled a concurrent
+                                        // remote edit — not a plain server-wins pull).
+                                        let id_str = uuid::Uuid::from_bytes(*id).to_string();
+                                        pulled_note_ids.push(id_str.clone());
+                                        remote_merged_note_ids.push(id_str);
+                                        to_push.push(PushBlob {
+                                            id: *id,
+                                            base_version: *server_version,
+                                            content_nonce: merged_nonce,
+                                            ciphertext: merge.blob,
+                                            tombstone: false,
+                                            attachment_id: None,
+                                        });
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        // `MY01` (or a fallen-through `NC05`): stage the remote
+                        // revision so the notes layer can materialize a keep-both
+                        // copy; the local edit stays on disk untouched.
+                        if let Some(remote) = &remote_bytes {
                             let _ = stage_conflict(
                                 io,
                                 vault_root,
                                 id,
                                 *server_version,
                                 remote_nonce,
-                                &remote_bytes,
+                                remote,
                             )
                             .await;
                         }
@@ -2688,6 +2802,44 @@ async fn sync_cycle_attempt(
                     }
                 }
             }
+
+            // No concurrent remote edit. For an `NC05` note whose on-disk
+            // `content_nonce` changed, decide dirtiness by causal heads not the
+            // nonce (ASM-5): a re-serialize/idempotent-merge that added nothing is
+            // NOT a push — the note-level §10.2.2 ping-pong fix. Adopt the new
+            // nonce into the baseline so the decryption-free fast diff stops
+            // re-flagging it. A genuine edit advances the heads → push + record
+            // them. (`MY01` keeps its unchanged always-push-on-nonce-change shape.)
+            if let (Some(keys), Some(b)) = (crdt_keys, synced.as_ref()) {
+                // Read the local blob to decide NC05 dirtiness by causal heads.
+                // Absence is tolerated here (fall through to the push read below,
+                // which reports it) and a `MY01` blob simply is not an NC05 note.
+                if let Ok(local_ct) = io.read(&blob_path(notes_dir, id)).await {
+                    if crate::plugins::notes::crdt::is_nc05_blob(&local_ct) {
+                        if let Ok((dirty, heads)) = crate::plugins::notes::crdt::nc05_convergence(
+                            &local_ct,
+                            &b.doc_heads_hex,
+                            keys.items_key,
+                            keys.items_key_id,
+                            id,
+                        ) {
+                            if !dirty {
+                                state.blobs.insert(
+                                    id_hex.clone(),
+                                    BlobSyncState {
+                                        version: b.version,
+                                        content_nonce_hex: nonce_hex.clone(),
+                                        doc_heads_hex: heads,
+                                    },
+                                );
+                                continue;
+                            }
+                            nc05_push_heads.insert(*id, heads);
+                        }
+                    }
+                }
+            }
+
             // F4 fresh-cursor probe (§11.3): a re-enrolled device (wiped sync
             // state, cursor 0 → floor-exempt, no 410/reconcile) holding a local
             // copy of a RECLAIMED record would push it at `base_version 0` —
@@ -2710,19 +2862,22 @@ async fn sync_cycle_attempt(
                     continue;
                 }
             }
+            // Read the local blob for the push — LAZILY, exactly here, so a note
+            // that hit keep-both / convergence-adopt / reclaim above (all of which
+            // `continue`) never reads it, and only a genuine push pays the read.
             let ciphertext = io
                 .read(&blob_path(notes_dir, id))
                 .await
                 .map_err(|_| SyncCycleError::Io)?;
             to_push.push(PushBlob {
                 id: *id,
-                base_version: synced.map(|b| b.version).unwrap_or(0),
+                base_version: synced.as_ref().map(|b| b.version).unwrap_or(0),
                 content_nonce: *nonce,
                 ciphertext,
                 // A deletion the notes layer queued → flag it so the server marks
                 // it for horizon-GC (the `deleted:` field still propagates either
                 // way; the flag only governs server-side reclamation).
-                tombstone: pending_tombstones.contains(&id_hex),
+                tombstone: is_tombstoning,
                 attachment_id: None,
             });
         }
@@ -2987,6 +3142,12 @@ async fn sync_cycle_attempt(
                         BlobSyncState {
                             version: *ver,
                             content_nonce_hex: hex(&b.content_nonce),
+                            // The ASM-5 convergence marker for an `NC05` note that
+                            // this cycle sealed (an edit or a merge); empty for
+                            // `MY01` and for singletons/attachments, which have no
+                            // Automerge heads. The next cycle diffs current heads
+                            // against this to decide dirtiness without a push.
+                            doc_heads_hex: nc05_push_heads.get(id).cloned().unwrap_or_default(),
                         },
                     );
                 }
@@ -3092,6 +3253,7 @@ async fn sync_cycle_attempt(
         pull_skipped,
         dropped,
         pulled_note_ids,
+        remote_merged_note_ids,
     })
 }
 
@@ -3999,6 +4161,7 @@ mod tests {
             BlobSyncState {
                 version: 1,
                 content_nonce_hex: hex(&disk_nonce),
+                doc_heads_hex: Vec::new(),
             },
         );
         write_sync_state(&dir, &st).unwrap();
@@ -4111,6 +4274,7 @@ mod tests {
             BlobSyncState {
                 version: 1,
                 content_nonce_hex: hex(&disk_nonce),
+                doc_heads_hex: Vec::new(),
             },
         );
         write_sync_state(&dir, &st).unwrap();
@@ -4242,6 +4406,7 @@ mod tests {
             BlobSyncState {
                 version: 1,
                 content_nonce_hex: hex(&disk_nonce),
+                doc_heads_hex: Vec::new(),
             },
         );
         write_sync_state(&dir, &st).unwrap();
@@ -6911,15 +7076,22 @@ mod tests {
         let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
         let existing = std::fs::read(vault.join("vault.attachments")).ok();
         let mut catalog = protocol::read_or_empty(&catalog_key, account_hash, existing.as_deref());
-        catalog.entries.insert(
-            hex(&id),
-            protocol::AttachmentMeta::live(
-                "application/octet-stream".to_string(),
-                created_at,
-                filename.to_string(),
-                plaintext.len() as u64,
-            ),
+        let id_hex = hex(&id);
+        // Mirror the production `attachment_import` causal version bump (#405):
+        // `max(prior version) + 1`, so a re-add over a tombstone (version N)
+        // outranks it (version N+1) and the §11.4 catalog merge keeps the
+        // revival. Without this the helper writes version 0 and the tombstone
+        // wins the merge — the shape `attachment_readd_after_delete_revives`
+        // caught once `version` became the merge join's primary key.
+        let next_version = catalog.entries.get(&id_hex).map_or(0, |e| e.version) + 1;
+        let mut meta = protocol::AttachmentMeta::live(
+            "application/octet-stream".to_string(),
+            created_at,
+            filename.to_string(),
+            plaintext.len() as u64,
         );
+        meta.version = next_version;
+        catalog.entries.insert(id_hex, meta);
         let bytes =
             protocol::encode_attachments_catalog(&catalog_key, account_hash, &catalog).unwrap();
         crate::atomic_write::atomic_write(&vault.join("vault.attachments"), &bytes, true).unwrap();
@@ -7601,6 +7773,7 @@ mod tests {
                 BlobSyncState {
                     version: 3,
                     content_nonce_hex: "00".repeat(24),
+                    doc_heads_hex: Vec::new(),
                 },
             );
             // The synced baseline was the default view — whose SHARED subset
@@ -7633,6 +7806,7 @@ mod tests {
                 BlobSyncState {
                     version: 3,
                     content_nonce_hex: "00".repeat(24),
+                    doc_heads_hex: Vec::new(),
                 },
             );
             set_prefs_gate_baseline(&dir, shared_subset_hash(&PrefsView::default()));
@@ -7909,6 +8083,7 @@ mod tests {
                 BlobSyncState {
                     version: 3,
                     content_nonce_hex: hex(&synced_nonce),
+                    doc_heads_hex: Vec::new(),
                 },
             );
             // Server unchanged: its record still carries the synced nonce.
@@ -8094,6 +8269,7 @@ mod tests {
                 BlobSyncState {
                     version: 3,
                     content_nonce_hex: "00".repeat(24),
+                    doc_heads_hex: Vec::new(),
                 },
             );
             set_prefs_gate_baseline(&dir_b, shared_subset_hash(&PrefsView::default()));
@@ -8186,6 +8362,7 @@ mod tests {
                 BlobSyncState {
                     version: 3,
                     content_nonce_hex: "00".repeat(24),
+                    doc_heads_hex: Vec::new(),
                 },
             );
             set_prefs_gate_baseline(&dir_a, shared_subset_hash(&a));
@@ -8260,6 +8437,7 @@ mod tests {
                 BlobSyncState {
                     version: 3,
                     content_nonce_hex: "00".repeat(24),
+                    doc_heads_hex: Vec::new(),
                 },
             );
             set_prefs_gate_baseline(&dir_a, shared_subset_hash(&a));
@@ -8437,6 +8615,7 @@ mod tests {
                 BlobSyncState {
                     version: 3,
                     content_nonce_hex: hex(&nonce),
+                    doc_heads_hex: Vec::new(),
                 },
             );
             let t = FakeTransport::new();
@@ -9707,6 +9886,7 @@ mod tests {
                     BlobSyncState {
                         version: 1,
                         content_nonce_hex: hex(&disk_nonce),
+                        doc_heads_hex: Vec::new(),
                     },
                 );
                 write_sync_state(&dir, &st).unwrap();

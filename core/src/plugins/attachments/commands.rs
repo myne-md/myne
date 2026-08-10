@@ -34,10 +34,11 @@ use crate::io_failure_kind::IoFailureKind;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::{VaultIo, WriteOpts};
 use protocol::{
-    compute_attachment_id, decode_attachment_blob, decode_attachments_catalog, derive_subkey,
-    encode_attachment_blob, encode_attachments_catalog, parse_vault_meta, read_or_empty,
-    AttachmentMeta, AttachmentsCatalog, SubkeyRole, ATTACHMENT_ID_LEN,
-    CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN, VAULT_META_ACCOUNT_HASH_LEN,
+    compute_attachment_id, decode_attachment_blob, decode_attachments_catalog,
+    derive_subkey_versioned, encode_attachment_blob, encode_attachments_catalog_versioned,
+    meta_version_of, parse_vault_meta_any, read_or_empty_versioned, AttachmentMeta,
+    AttachmentsCatalog, MetaVersion, SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN,
+    MAX_ATTACHMENT_LEN, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -199,18 +200,26 @@ fn hex_val(b: u8) -> Option<u8> {
 pub async fn read_account_number_hash(
     io: &dyn VaultIo,
     vault_meta_path: &Path,
-) -> Result<Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], MetaParseFailed>, IoFailureKind> {
+) -> Result<Result<(MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), MetaParseFailed>, IoFailureKind>
+{
     // `vault.meta` is a double-buffered singleton on the web store (task 18), so
-    // "read it" means "the newest copy that PARSES" — and `parse_vault_meta` is
-    // exactly the verifier `open_newest` wants. Desktop and mobile are unchanged
-    // by construction: `read_candidates` defaults to a one-element list there,
-    // so this is the same read followed by the same parse.
+    // "read it" means "the newest copy that PARSES" — `parse_vault_meta_any` is the
+    // verifier `open_newest` wants (it accepts both `MYV1` and a migrated `NTV5`).
+    // Desktop and mobile are unchanged by construction: `read_candidates` defaults
+    // to a one-element list there. The generation travels with the hash so the
+    // catalog KEK derives under the vault's OWN generation (#420) — a migrated
+    // vault's `MYC5` catalog needs `derive_subkey_v0_2`.
     match crate::singleton::open_newest(io, vault_meta_path, |candidate| {
-        parse_vault_meta(candidate).map(|m| m.account_number_hash)
+        parse_vault_meta_any(candidate).map(|m| {
+            (
+                meta_version_of(candidate).unwrap_or(MetaVersion::V0_1),
+                m.account_number_hash,
+            )
+        })
     })
     .await
     {
-        Ok(hash) => Ok(Ok(hash)),
+        Ok(pair) => Ok(Ok(pair)),
         // Absence stays an IO answer rather than a parse failure — that is what
         // `std::fs::read` reported here before, and the callers' `Io`/
         // `InvalidVaultMeta` split is built on the distinction.
@@ -558,9 +567,9 @@ where
     tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
 
     // (5) Read vault.meta → account_number_hash (catalog AAD identity).
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
-            Ok(h) => h,
+            Ok((v, h)) => (v, h),
             Err(MetaParseFailed) => return Err(AttachmentImportError::InvalidVaultMeta),
         };
 
@@ -575,7 +584,8 @@ where
 
     // (8) Dedup: read the catalog; if the id already exists, return the
     //     EXISTING entry verbatim (no re-store, no timestamp churn).
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
     // `_for_write`, not `read_catalog` (myne#308): this path REWRITES the
     // catalog a few statements below, and rebuilding it from the empty base an
@@ -639,7 +649,8 @@ where
     // exactly one consumer — the cache write below — which task 90 compiled out
     // of wasm32, so on that target deriving it would be work with no reader.
     #[cfg(not(target_arch = "wasm32"))]
-    let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+    let attachment_text_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentTextKey);
     let filename_for_extract = filename.clone();
     // Only the CPU work stays inside `run_blocking` (task 44): the AEAD seal and
     // the text extraction. Every byte that reaches storage now goes through the
@@ -771,8 +782,13 @@ where
         AttachmentMeta::live(content_type.to_string(), created_at, filename.clone(), size);
     meta.version = version;
     catalog.entries.insert(id_hex.clone(), meta);
-    let catalog_bytes = encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
-        .map_err(|_| AttachmentImportError::EncodeFailed)?;
+    let catalog_bytes = encode_attachments_catalog_versioned(
+        meta_version,
+        &catalog_key,
+        &account_number_hash,
+        &catalog,
+    )
+    .map_err(|_| AttachmentImportError::EncodeFailed)?;
     io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
         .await
         .map_err(|io_error_kind| AttachmentImportError::Io { io_error_kind })?;
@@ -868,16 +884,23 @@ pub(crate) async fn catalog_list_with_dir(
         .await
         .ok_or(CatalogListError::Locked)?;
 
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
-            Ok(h) => h,
+            Ok((v, h)) => (v, h),
             Err(MetaParseFailed) => return Err(CatalogListError::InvalidVaultMeta),
         };
 
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
-    let catalog =
-        read_catalog_or_empty(io, &catalog_path, &catalog_key, &account_number_hash).await;
+    let catalog = read_catalog_or_empty(
+        io,
+        &catalog_path,
+        &catalog_key,
+        &account_number_hash,
+        meta_version,
+    )
+    .await;
 
     let rows: Vec<CatalogEntry> = catalog
         .entries
@@ -987,21 +1010,23 @@ pub(crate) async fn attachment_unused_list_with_dir(
         .await
         .ok_or(AttachmentUnusedListError::Locked)?;
 
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
-            Ok(h) => h,
+            Ok((v, h)) => (v, h),
             Err(MetaParseFailed) => return Err(AttachmentUnusedListError::InvalidVaultMeta),
         };
 
     // Hard-IO surfaces (`read_catalog`, not `read_catalog_or_empty`): a
     // masked-empty catalog would report a populated vault as "nothing to
     // clean". Absent catalog → empty → empty unused list (correct).
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog = read_catalog(
         io,
         &vault_dir.join("vault.attachments"),
         &catalog_key,
         &account_number_hash,
+        meta_version,
     )
     .await
     .map_err(AttachmentUnusedListError::from)?;
@@ -1085,6 +1110,7 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
     vault_dir: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    version: MetaVersion,
     requested: &[String],
     referenced: &std::collections::HashSet<String>,
 ) -> Result<(Vec<(String, u64)>, usize), AttachmentCleanUnusedError> {
@@ -1125,8 +1151,13 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
                     .insert(id.clone(), meta.into_tombstone(deleted_at));
             }
         }
-        let catalog_bytes = encode_attachments_catalog(catalog_key, account_number_hash, &catalog)
-            .map_err(|_| AttachmentCleanUnusedError::EncodeFailed)?;
+        let catalog_bytes = encode_attachments_catalog_versioned(
+            version,
+            catalog_key,
+            account_number_hash,
+            &catalog,
+        )
+        .map_err(|_| AttachmentCleanUnusedError::EncodeFailed)?;
         io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
             .await
             .map_err(AttachmentCleanUnusedError::from)?;
@@ -1225,12 +1256,13 @@ pub async fn attachment_clean_unused_with_dir(
         .await
         .ok_or(AttachmentCleanUnusedError::Locked)?;
 
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
-            Ok(h) => h,
+            Ok((v, h)) => (v, h),
             Err(MetaParseFailed) => return Err(AttachmentCleanUnusedError::InvalidVaultMeta),
         };
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
 
     // Authoritative re-verify scan over ALL notes (fail-closed). Decrypts
     // every note → spawn_blocking. This closes the review→confirm TOCTOU:
@@ -1257,6 +1289,7 @@ pub async fn attachment_clean_unused_with_dir(
         vault_dir,
         &catalog_key,
         &account_number_hash,
+        meta_version,
         &requested,
         &referenced,
     )
@@ -1467,9 +1500,9 @@ pub async fn reclaim_stray_attachment_blobs(
         tracing::warn!(event = "stray_scan_skipped", reason = "slot_not_unlocked");
         return;
     };
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_dir.join("vault.meta")).await {
-            Ok(Ok(h)) => h,
+            Ok(Ok((v, h))) => (v, h),
             Ok(Err(MetaParseFailed)) => {
                 tracing::warn!(event = "stray_scan_skipped", reason = "invalid_vault_meta");
                 return;
@@ -1483,7 +1516,8 @@ pub async fn reclaim_stray_attachment_blobs(
                 return;
             }
         };
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
 
     let _write_guard = catalog_write_mutex().lock().await;
     // No `run_blocking` wrapper any more: what this does is a catalog read, a
@@ -1570,15 +1604,16 @@ pub async fn attachment_delete_with_dir(
         .await
         .ok_or(AttachmentDeleteError::Locked)?;
 
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
-            Ok(h) => h,
+            Ok((v, h)) => (v, h),
             Err(MetaParseFailed) => return Err(AttachmentDeleteError::InvalidVaultMeta),
         };
 
     let _write_guard = catalog_write_mutex().lock().await;
 
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
     // `_for_write`, not `read_catalog` (myne#308) — see its doc.
     let mut catalog = read_catalog_for_write(io, &catalog_path, &catalog_key, &account_number_hash)
@@ -1598,9 +1633,13 @@ pub async fn attachment_delete_with_dir(
         Some(e) if !e.is_tombstone() => {
             let tomb = e.clone().into_tombstone(host.now_unix_secs());
             catalog.entries.insert(id_hex.clone(), tomb);
-            let catalog_bytes =
-                encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
-                    .map_err(|_| AttachmentDeleteError::EncodeFailed)?;
+            let catalog_bytes = encode_attachments_catalog_versioned(
+                meta_version,
+                &catalog_key,
+                &account_number_hash,
+                &catalog,
+            )
+            .map_err(|_| AttachmentDeleteError::EncodeFailed)?;
             io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
                 .await
                 .map_err(AttachmentDeleteError::from)?;
@@ -1749,15 +1788,16 @@ pub(crate) async fn attachment_rename_with_dir(
         .await
         .ok_or(AttachmentRenameError::Locked)?;
 
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
-            Ok(h) => h,
+            Ok((v, h)) => (v, h),
             Err(MetaParseFailed) => return Err(AttachmentRenameError::InvalidVaultMeta),
         };
 
     let _write_guard = catalog_write_mutex().lock().await;
 
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
     // `_for_write`, not `read_catalog` (myne#308) — see its doc.
     let mut catalog = read_catalog_for_write(io, &catalog_path, &catalog_key, &account_number_hash)
@@ -1785,8 +1825,13 @@ pub(crate) async fn attachment_rename_with_dir(
     // palette edit bumps `version` in `apply_import`.
     entry.version += 1;
 
-    let catalog_bytes = encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
-        .map_err(|_| AttachmentRenameError::EncodeFailed)?;
+    let catalog_bytes = encode_attachments_catalog_versioned(
+        meta_version,
+        &catalog_key,
+        &account_number_hash,
+        &catalog,
+    )
+    .map_err(|_| AttachmentRenameError::EncodeFailed)?;
     io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
         .await
         .map_err(AttachmentRenameError::from)?;
@@ -1844,21 +1889,23 @@ pub async fn attachment_serve_with_dir(
         return Err(AttachmentServeError::Locked);
     };
 
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
-            Ok(h) => h,
+            Ok((v, h)) => (v, h),
             Err(MetaParseFailed) => return Err(AttachmentServeError::InvalidVaultMeta),
         };
 
     // The catalog carries the `content_type` bound into the blob's inner AAD at
     // encode time, so a missing entry means the blob cannot be decoded at all —
     // reported as not-found rather than denied, matching the desktop handler.
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog = read_catalog(
         io,
         &vault_dir.join("vault.attachments"),
         &catalog_key,
         &account_number_hash,
+        meta_version,
     )
     .await?;
     let content_type_hint = catalog
@@ -1944,6 +1991,7 @@ pub async fn read_catalog(
     catalog_path: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    version: MetaVersion,
 ) -> Result<AttachmentsCatalog, IoFailureKind> {
     // `read_candidates`, not `read`, and the difference is only visible on the
     // web store: a corrupt NEWEST copy of a double-buffered catalog must fall
@@ -1961,7 +2009,8 @@ pub async fn read_catalog(
     // Absent, or present and undecodable: § 9.10.4's fall-back-to-empty. The
     // `read_or_empty` call is kept for the present-but-undecodable arm so this
     // stays the protocol crate's decision rather than a second copy of it.
-    Ok(read_or_empty(
+    Ok(read_or_empty_versioned(
+        version,
         catalog_key,
         account_number_hash,
         candidates.first().map(|b| b.as_slice()),
@@ -2070,18 +2119,20 @@ pub async fn load_catalog_for_export(
     vault_root: &Path,
     root_key: &[u8; 32],
 ) -> Result<AttachmentsCatalog, CatalogLoadError> {
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_root.join("vault.meta")).await {
-            Ok(Ok(h)) => h,
+            Ok(Ok((v, h))) => (v, h),
             Ok(Err(MetaParseFailed)) => return Err(CatalogLoadError::InvalidVaultMeta),
             Err(kind) => return Err(CatalogLoadError::MetaIo(kind)),
         };
-    let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key =
+        derive_subkey_versioned(meta_version, root_key, SubkeyRole::AttachmentsCatalogKey);
     read_catalog(
         io,
         &vault_root.join("vault.attachments"),
         &catalog_key,
         &account_number_hash,
+        meta_version,
     )
     .await
     .map_err(CatalogLoadError::CatalogIo)
@@ -2263,8 +2314,9 @@ async fn read_catalog_or_empty(
     catalog_path: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    version: MetaVersion,
 ) -> AttachmentsCatalog {
-    read_catalog(io, catalog_path, catalog_key, account_number_hash)
+    read_catalog(io, catalog_path, catalog_key, account_number_hash, version)
         .await
         .unwrap_or_else(|_| AttachmentsCatalog::empty())
 }
@@ -2346,7 +2398,7 @@ mod tests {
         fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
     };
     use crate::test_support::ScopedTempDir;
-    use protocol::{SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
+    use protocol::{derive_subkey, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 
     fn rt() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
@@ -2539,6 +2591,7 @@ mod tests {
             vault_dir,
             catalog_key,
             account_number_hash,
+            MetaVersion::V0_1,
             requested,
             referenced,
         )
@@ -2566,7 +2619,14 @@ mod tests {
         catalog_key: &[u8; 32],
         account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
     ) -> Result<AttachmentsCatalog, IoFailureKind> {
-        super::read_catalog(io(), catalog_path, catalog_key, account_number_hash).await
+        super::read_catalog(
+            io(),
+            catalog_path,
+            catalog_key,
+            account_number_hash,
+            MetaVersion::V0_1,
+        )
+        .await
     }
 
     // Eager-text-extraction → MYE1-cache tests (MYND-328) moved to the desktop

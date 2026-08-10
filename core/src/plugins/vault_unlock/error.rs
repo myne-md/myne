@@ -87,6 +87,18 @@ pub enum VaultUnlockError {
         available_mib: u32,
     },
 
+    /// The `vault.meta` magic is a **newer major version this client does not
+    /// implement** (`protocol.md` §10.5 anti-downgrade). The same "distinct
+    /// advice, not corrupted" reasoning as [`Self::KdfMemoryExceedsHostCapability`]:
+    /// the vault is fine, this build is too old. The user's action is **update
+    /// this app**, never restore a backup — so it MUST NOT collapse to
+    /// [`Self::InvalidVaultMeta`], which would send them to fix a vault that is
+    /// not broken. A v0.1-only client hits this on a migrated `NTV5` vault; the
+    /// current client handles `MYV1` + `NTV5` and reaches it only on a
+    /// hypothetical later major. Never a silent half-parse (§10.1).
+    #[error("vault upgraded to an unsupported newer version")]
+    VaultUpgradedUnsupported,
+
     /// Another unlock attempt is already in progress — the unlock
     /// permit (`Semaphore` capacity 1) is held. Returned by
     /// `Semaphore::try_acquire()` rather than queued (see grilling
@@ -257,6 +269,7 @@ mod tests {
                     required_mib: _,
                     available_mib: _,
                 } => {}
+                VaultUnlockError::VaultUpgradedUnsupported => {}
             }
         }
         assert_closed(&VaultUnlockError::VaultNotFound);

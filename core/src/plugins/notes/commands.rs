@@ -474,6 +474,67 @@ pub async fn note_read_with_dir(
             return Err(NoteReadError::Io { io_error_kind });
         }
     };
+
+    // NC05 dispatch (automerge-sync-migration): a migrated CRDT note decodes
+    // through the single-`Text` Automerge bridge, not the `MY01` codec. Branch on
+    // the cleartext magic BEFORE the `MY01` decode; the AEAD + automerge `load()`
+    // stays on the blocking pool (a CRDT note's `save()` grows with edit history).
+    // Every arm of this block returns, so `blob` / `items_key` / `note_uuid_bytes`
+    // are still available to the `MY01` path below (the CRDT branch diverges).
+    if crate::plugins::notes::crdt::is_nc05_blob(&blob) {
+        use crate::plugins::notes::crdt::DecodeNoteBlobError;
+        let join = crate::task::run_blocking(move || {
+            crate::plugins::notes::crdt::decode_note_blob(
+                &blob,
+                &note_uuid_bytes,
+                &items_key,
+                &items_key_id,
+            )
+        })
+        .await;
+        let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
+        let plaintext = match join {
+            Err(_join_err) => {
+                tracing::error!(
+                    stage = "spawn_blocking_join",
+                    error_kind = "JoinFailure",
+                    "note_read NC05 read+decode panicked or runtime shutdown"
+                );
+                return Err(NoteReadError::JoinFailure);
+            }
+            // Same non-distinguishing §6.4 collapse as the `MY01` arm: the codec
+            // logged the sub-cause; the IPC surface sees only `CannotDecrypt`.
+            Ok(Err(DecodeNoteBlobError::CannotDecrypt)) => {
+                tracing::debug!(
+                    stage = "decode",
+                    outcome = "cannot_decrypt",
+                    "note_read NC05 decode returned CannotDecrypt"
+                );
+                return Err(NoteReadError::CannotDecrypt);
+            }
+            // The AEAD opened but the payload was not a well-formed single-`Text`
+            // document — structural corruption, the CRDT analogue of a non-UTF-8
+            // `MY01` plaintext.
+            Ok(Err(DecodeNoteBlobError::Malformed)) => {
+                tracing::error!(
+                    stage = "decode",
+                    error_kind = "InvalidPlaintextEncoding",
+                    "note_read NC05 payload was not a valid single-Text document"
+                );
+                return Err(NoteReadError::InvalidPlaintextEncoding);
+            }
+            Ok(Ok(markdown)) => markdown,
+        };
+        drop(slot);
+        tracing::debug!(
+            stage = "success",
+            event = "note_read",
+            note_type = "nc05",
+            duration_ms = duration_ms,
+        );
+        return Ok(plaintext);
+    }
+
     let join_result =
         crate::task::run_blocking(move || -> Result<protocol::DecryptedNote, NoteReadError> {
             // `decode_note` parameter order is
@@ -921,6 +982,107 @@ pub async fn note_update_with_dir(
             return Err(NoteUpdateError::Io { io_error_kind });
         }
     };
+
+    // NC05 dispatch (automerge-sync-migration): a migrated CRDT note edits through
+    // the single-`Text` bridge (a whole-`Text` replace preserving change-graph
+    // ancestry, so a peer's concurrent edit still merges), NOT `MY01`'s
+    // `encode_update`. And per ASM-12→B it captures **no snapshot** — the CRDT
+    // change-graph *is* the note's history, so the snapshot store it would feed is
+    // retired for CRDT notes. Every arm returns, leaving the `MY01` pipeline below
+    // intact (this branch diverges, so its moves do not consume the shared bindings
+    // the `MY01` path needs).
+    if crate::plugins::notes::crdt::is_nc05_blob(&blob_bytes) {
+        use crate::plugins::notes::crdt::{CrdtNoteOpError, DecodeNoteBlobError};
+        let join = crate::task::run_blocking(move || -> Result<Vec<u8>, NoteUpdateError> {
+            // Expected-base guard (§11.3), against the DECODED markdown — the same
+            // property as the `MY01` arm, one representation over.
+            if let Some(expected) = expected_base_hash {
+                use sha2::{Digest, Sha256};
+                let base_md = crate::plugins::notes::crdt::decode_note_blob(
+                    &blob_bytes,
+                    &note_uuid_bytes,
+                    &items_key,
+                    &items_key_id,
+                )
+                .map_err(|e| match e {
+                    // Non-distinguishing §6.4 collapse: either the base could not
+                    // be read, so the guard cannot be evaluated safely.
+                    DecodeNoteBlobError::CannotDecrypt | DecodeNoteBlobError::Malformed => {
+                        NoteUpdateError::CannotDecrypt
+                    }
+                })?;
+                let disk_hash: [u8; 32] = Sha256::digest(base_md.as_bytes()).into();
+                if disk_hash != expected {
+                    tracing::debug!(
+                        stage = "base_guard",
+                        outcome = "mismatch",
+                        "note_update NC05 rejected: on-disk base advanced past the caller's declared base"
+                    );
+                    return Err(NoteUpdateError::BaseMismatch);
+                }
+                tracing::debug!(stage = "base_guard", outcome = "match");
+            }
+            let upd = crate::plugins::notes::crdt::encode_note_edit_at_millis(
+                &blob_bytes,
+                &plaintext,
+                &items_key,
+                &items_key_id,
+                &note_uuid_bytes,
+                now_ms,
+            )
+            .map_err(|e| match e {
+                CrdtNoteOpError::TooLarge => NoteUpdateError::PlaintextTooLarge,
+                CrdtNoteOpError::CannotDecrypt | CrdtNoteOpError::Malformed => {
+                    NoteUpdateError::CannotDecrypt
+                }
+                // Entropy failure while re-sealing — the CRDT analogue of the
+                // `MY01` arm's unreachable-ProtocolError → JoinFailure.
+                CrdtNoteOpError::Csprng => NoteUpdateError::JoinFailure,
+            })?;
+            Ok(upd.blob)
+        })
+        .await;
+        let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
+        let new_blob = match join {
+            Err(_join_err) => {
+                tracing::error!(
+                    stage = "spawn_blocking_join",
+                    error_kind = "JoinFailure",
+                    "note_update NC05 read+decode+encode panicked or runtime shutdown"
+                );
+                return Err(NoteUpdateError::JoinFailure);
+            }
+            Ok(Err(e)) => return Err(e),
+            Ok(Ok(b)) => b,
+        };
+        // Shared write tail (mirrors the `MY01` path below).
+        if let Err(io_error_kind) = io.write(&path, &new_blob, WriteOpts::default()).await {
+            let mapped = if !io.is_dir(&notes_dir).await.unwrap_or(true) {
+                NoteUpdateError::NotesDirNotADirectory
+            } else {
+                NoteUpdateError::Io { io_error_kind }
+            };
+            tracing::error!(
+                stage = "atomic_write",
+                error_kind = note_update_error_kind(&mapped),
+                "note_update NC05 atomic_write failed"
+            );
+            return Err(mapped);
+        }
+        drop(notes_guard);
+        drop(slot);
+        tracing::debug!(
+            stage = "success",
+            event = "note_updated",
+            note_type = "nc05",
+            duration_ms = duration_ms,
+        );
+        // A CRDT note captures no snapshot → never a snapshot warning.
+        return Ok(NoteUpdateOutcome {
+            snapshot_warning: false,
+        });
+    }
+
     let join_result =
         crate::task::run_blocking(move || -> Result<(Vec<u8>, bool), NoteUpdateError> {
             let blob = blob_bytes;
@@ -2398,6 +2560,7 @@ mod tests {
     // stay desktop-side as documented above.
 
     use super::{note_create_with_dir, note_read_with_dir, note_update_with_dir};
+    use crate::plugins::notes::note_id::NoteId;
     use crate::plugins::vault_unlock::state::{
         fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
     };
@@ -2480,6 +2643,128 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(on_disk, "moved on", "a rejected save must not touch disk");
+        })
+    }
+
+    // ── automerge-sync-migration: the NC05 read/edit dispatch (myne#418/#419) ──
+    //
+    // A migrated CRDT note is a `.myn` with the `NC05` magic; `note_read` /
+    // `note_update` must dispatch on that magic and route through the automerge
+    // bridge instead of the `MY01` codec. The vault fixture's items_key is
+    // `[9;32]` / id `[1;16]` (`fixture_unlocked_with_keys(7, 9, 1)`), so a blob
+    // sealed under those keys decodes under the same unlocked slot.
+
+    /// Seed an `NC05` note directly on disk under the fixture's items_key, the
+    /// shape the migration (#420) produces and the sync pull-apply writes.
+    fn seed_nc05_note(notes_dir: &std::path::Path, markdown: &str) -> NoteId {
+        let id = NoteId::new_v7();
+        let uuid = *id.as_uuid().as_bytes();
+        let blob = crate::plugins::notes::crdt::encode_note_blob(
+            markdown,
+            &[9u8; 32],
+            &[1u8; 16],
+            &uuid,
+            &[0xAAu8; 16],
+            &crate::host::NoopHost,
+        )
+        .expect("seal NC05 fixture note");
+        std::fs::write(notes_dir.join(format!("{}.myn", id.as_uuid())), &blob).unwrap();
+        id
+    }
+
+    #[test]
+    fn nc05_note_reads_edits_and_rereads_through_the_command_path() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("nc05-read-edit").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await;
+            let md = "---\ntitle: Café İş\n---\n\n# Body 🚀 [[link]]\n";
+            let id = seed_nc05_note(&notes_dir, md);
+
+            // Read dispatches on the NC05 magic → byte-exact markdown.
+            let read = note_read_with_dir(
+                notes_dir.clone(),
+                &state,
+                id.as_uuid().to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            assert_eq!(read, md, "NC05 note read back byte-exact");
+
+            // Edit against the correct base → succeeds, no snapshot for a CRDT note.
+            let out = note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.as_uuid().to_string(),
+                "second version".to_string(),
+                Some(hash_of(md)),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            assert!(!out.snapshot_warning, "a CRDT note captures no snapshot");
+
+            // Re-read → the edit landed, and it is STILL an NC05 blob (the edit
+            // path preserved the family, not silently downgraded to MY01).
+            let reread = note_read_with_dir(
+                notes_dir.clone(),
+                &state,
+                id.as_uuid().to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            assert_eq!(reread, "second version");
+            let on_disk = std::fs::read(notes_dir.join(format!("{}.myn", id.as_uuid()))).unwrap();
+            assert!(
+                crate::plugins::notes::crdt::is_nc05_blob(&on_disk),
+                "the edit kept the note in the NC05 family"
+            );
+        })
+    }
+
+    #[test]
+    fn nc05_note_update_honors_the_expected_base_guard() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("nc05-base-guard").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await;
+            let id = seed_nc05_note(&notes_dir, "base body");
+
+            // A stale base hash is rejected without a write — same §11.3 guard as
+            // the MY01 path, evaluated against the decoded CRDT markdown.
+            let err = note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.as_uuid().to_string(),
+                "racing edit".to_string(),
+                Some(hash_of("a different base")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap_err();
+            assert!(matches!(err, super::NoteUpdateError::BaseMismatch));
+            // Disk untouched.
+            let read = note_read_with_dir(
+                notes_dir,
+                &state,
+                id.as_uuid().to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                read, "base body",
+                "a rejected NC05 save must not touch disk"
+            );
         })
     }
 

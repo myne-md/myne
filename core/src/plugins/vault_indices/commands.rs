@@ -22,7 +22,9 @@ use super::state::{
 };
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
-use protocol::{derive_subkey, parse_vault_meta, SubkeyRole, VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN};
+use protocol::{
+    derive_subkey, parse_vault_meta_any, SubkeyRole, VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN,
+};
 use std::path::Path;
 // Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -549,7 +551,7 @@ async fn read_account_number_hash(
         .read(vault_meta_path)
         .await
         .map_err(|_| VaultIndicesError::InvalidVaultMeta)?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| VaultIndicesError::InvalidVaultMeta)?;
+    let meta = parse_vault_meta_any(&bytes).map_err(|_| VaultIndicesError::InvalidVaultMeta)?;
     Ok(meta.account_number_hash)
 }
 
