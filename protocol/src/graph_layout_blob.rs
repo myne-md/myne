@@ -42,24 +42,15 @@
 
 use crate::aead::{aad_graph_layout_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use crate::blob_envelope::{
-    decode_blob_envelope, decode_singleton_versioned, encode_blob_envelope,
-    encode_blob_envelope_raw, encode_singleton_versioned, EnvelopeError,
+    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
 };
 use crate::error::ProtocolError;
-use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYG1"` (Myne Graph v1).
 pub const GRAPH_LAYOUT_BLOB_MAGIC: [u8; 4] = *b"MYG1";
-
-/// Magic bytes for the migrated v0.2 `vault.graph` family — ASCII `"MYG5"`
-/// (§10.3 registry).
-pub const GRAPH_LAYOUT_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYG5";
-
-/// AAD role string bound into both generations' `vault.graph` AAD.
-const GRAPH_LAYOUT_BLOB_AAD_ROLE: &[u8] = b"graph-layout-blob";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const GRAPH_LAYOUT_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -213,53 +204,6 @@ pub fn decode_graph_layout_blob(
         &GRAPH_LAYOUT_BLOB_MAGIC,
         GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
         &aad,
-        MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
-        blob,
-    )
-    .map_err(GraphLayoutBlobError::from)
-}
-
-/// Version-aware seal of `vault.graph` — `MYG1` + v0.1 AAD for
-/// [`MetaVersion::V0_1`], `MYG5` + v0.2 AAD for [`MetaVersion::V0_2`]. The
-/// `graph_layout_key` MUST be derived under the same generation
-/// (`derive_subkey_versioned(version, root_key, GraphLayoutKey)`).
-pub fn encode_graph_layout_blob_versioned(
-    version: MetaVersion,
-    graph_layout_key: &[u8; AEAD_KEY_LEN],
-    account_number_hash: &[u8; GRAPH_LAYOUT_BLOB_ACCOUNT_HASH_LEN],
-    plaintext: &[u8],
-) -> Result<Vec<u8>, GraphLayoutBlobError> {
-    encode_singleton_versioned(
-        version,
-        graph_layout_key,
-        &GRAPH_LAYOUT_BLOB_MAGIC,
-        &GRAPH_LAYOUT_BLOB_V0_2_MAGIC,
-        GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
-        GRAPH_LAYOUT_BLOB_AAD_ROLE,
-        account_number_hash,
-        MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
-        plaintext,
-    )
-    .map_err(GraphLayoutBlobError::from)
-}
-
-/// Version-aware open of `vault.graph` — the mirror of
-/// [`encode_graph_layout_blob_versioned`], selecting the expected magic + AAD
-/// from `version`.
-pub fn decode_graph_layout_blob_versioned(
-    version: MetaVersion,
-    graph_layout_key: &[u8; AEAD_KEY_LEN],
-    account_number_hash: &[u8; GRAPH_LAYOUT_BLOB_ACCOUNT_HASH_LEN],
-    blob: &[u8],
-) -> Result<Zeroizing<Vec<u8>>, GraphLayoutBlobError> {
-    decode_singleton_versioned(
-        version,
-        graph_layout_key,
-        &GRAPH_LAYOUT_BLOB_MAGIC,
-        &GRAPH_LAYOUT_BLOB_V0_2_MAGIC,
-        GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
-        GRAPH_LAYOUT_BLOB_AAD_ROLE,
-        account_number_hash,
         MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
         blob,
     )

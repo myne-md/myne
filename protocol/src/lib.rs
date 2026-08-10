@@ -148,19 +148,17 @@ pub use dictionary_blob::{
     MAX_DICTIONARY_PLAINTEXT_LEN,
 };
 pub use embeddings_blob::{
-    decode_embeddings_blob, decode_embeddings_blob_versioned, encode_embeddings_blob,
-    encode_embeddings_blob_raw, encode_embeddings_blob_versioned, EmbeddingsBlobError,
-    EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN, EMBEDDINGS_BLOB_FORMAT_V1, EMBEDDINGS_BLOB_HEADER_LEN,
-    EMBEDDINGS_BLOB_MAGIC, EMBEDDINGS_BLOB_PROTOCOL_VERSION, EMBEDDINGS_BLOB_V0_2_MAGIC,
+    decode_embeddings_blob, encode_embeddings_blob, encode_embeddings_blob_raw,
+    EmbeddingsBlobError, EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN, EMBEDDINGS_BLOB_FORMAT_V1,
+    EMBEDDINGS_BLOB_HEADER_LEN, EMBEDDINGS_BLOB_MAGIC, EMBEDDINGS_BLOB_PROTOCOL_VERSION,
     MAX_EMBEDDINGS_PLAINTEXT_LEN,
 };
 pub use error::ProtocolError;
 pub use graph_layout_blob::{
-    decode_graph_layout_blob, decode_graph_layout_blob_versioned, encode_graph_layout_blob,
-    encode_graph_layout_blob_raw, encode_graph_layout_blob_versioned, GraphLayoutBlobError,
-    GRAPH_LAYOUT_BLOB_ACCOUNT_HASH_LEN, GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
+    decode_graph_layout_blob, encode_graph_layout_blob, encode_graph_layout_blob_raw,
+    GraphLayoutBlobError, GRAPH_LAYOUT_BLOB_ACCOUNT_HASH_LEN, GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
     GRAPH_LAYOUT_BLOB_HEADER_LEN, GRAPH_LAYOUT_BLOB_MAGIC, GRAPH_LAYOUT_BLOB_PROTOCOL_VERSION,
-    GRAPH_LAYOUT_BLOB_V0_2_MAGIC, MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
+    MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
 };
 pub use kdf::{
     derive_password_wrap_key, derive_password_wrap_key_v0_2, derive_recovery_wrap_key,
@@ -196,11 +194,10 @@ pub use scram::{
     scram_client_final_message, scram_client_proof, ScramClientOutput, SCRAM_CBIND_NAME,
 };
 pub use search_blob::{
-    decode_search_index_blob, decode_search_index_blob_versioned, encode_search_index_blob,
-    encode_search_index_blob_raw, encode_search_index_blob_versioned, SearchBlobError,
-    MAX_SEARCH_INDEX_PLAINTEXT_LEN, SEARCH_BLOB_ACCOUNT_HASH_LEN, SEARCH_BLOB_HEADER_LEN,
-    SEARCH_BLOB_INDEX_FORMAT_V1, SEARCH_BLOB_MAGIC, SEARCH_BLOB_PROTOCOL_VERSION,
-    SEARCH_BLOB_V0_2_MAGIC,
+    decode_search_index_blob, encode_search_index_blob, encode_search_index_blob_raw,
+    SearchBlobError, MAX_SEARCH_INDEX_PLAINTEXT_LEN, SEARCH_BLOB_ACCOUNT_HASH_LEN,
+    SEARCH_BLOB_HEADER_LEN, SEARCH_BLOB_INDEX_FORMAT_V1, SEARCH_BLOB_MAGIC,
+    SEARCH_BLOB_PROTOCOL_VERSION,
 };
 pub use singleton_migrate::reseal_kek_envelope_v0_2;
 pub use subkey::{derive_subkey, derive_subkey_v0_2, derive_subkey_versioned, SubkeyRole};
@@ -225,11 +222,10 @@ pub use vault_head::{
     VAULT_HEAD_STATE_MAGIC,
 };
 pub use vault_indices_blob::{
-    decode_vault_indices_blob, decode_vault_indices_blob_versioned, encode_vault_indices_blob,
-    encode_vault_indices_blob_raw, encode_vault_indices_blob_versioned, VaultIndicesBlobError,
-    MAX_VAULT_INDICES_PLAINTEXT_LEN, VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN,
+    decode_vault_indices_blob, encode_vault_indices_blob, encode_vault_indices_blob_raw,
+    VaultIndicesBlobError, MAX_VAULT_INDICES_PLAINTEXT_LEN, VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN,
     VAULT_INDICES_BLOB_FORMAT_V1, VAULT_INDICES_BLOB_HEADER_LEN, VAULT_INDICES_BLOB_MAGIC,
-    VAULT_INDICES_BLOB_PROTOCOL_VERSION, VAULT_INDICES_BLOB_V0_2_MAGIC,
+    VAULT_INDICES_BLOB_PROTOCOL_VERSION,
 };
 pub use vault_meta::{
     derive_items_key, parse_vault_meta, rewrite_vault_meta_password_side, serialize_vault_meta,
@@ -239,14 +235,13 @@ pub use vault_meta::{
 };
 pub use vault_meta_v0_2::{
     derive_items_key_v0_2, encode_vault_meta_v0_2_raw, meta_version_of, parse_vault_meta_any,
-    parse_vault_meta_v0_2, rewrite_vault_meta_password_side_v0_2, serialize_vault_meta_v0_2,
+    parse_vault_meta_v0_2, rewrite_vault_meta_password_side_v0_2,
+    rewrite_vault_meta_password_side_versioned, serialize_vault_meta_v0_2,
     unlock_root_key_v0_2_password, unlock_root_key_v0_2_recovery, VAULT_META_V0_2_MAGIC,
     VAULT_META_V0_2_PROTOCOL_VERSION,
 };
 pub use workspace_blob::{
-    decode_workspace_blob, decode_workspace_blob_versioned, encode_workspace_blob,
-    encode_workspace_blob_raw, encode_workspace_blob_versioned, WorkspaceBlobError,
+    decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,
     MAX_WORKSPACE_PLAINTEXT_LEN, WORKSPACE_BLOB_ACCOUNT_HASH_LEN, WORKSPACE_BLOB_FORMAT_VERSION,
     WORKSPACE_BLOB_HEADER_LEN, WORKSPACE_BLOB_MAGIC, WORKSPACE_BLOB_PROTOCOL_VERSION,
-    WORKSPACE_BLOB_V0_2_MAGIC,
 };
