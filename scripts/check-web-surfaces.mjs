@@ -108,6 +108,7 @@ const V = {
   ],
   "src/components/settings/LanguageSelect.tsx": ["ported", "i18n only."],
   "src/components/settings/LineNumbersSettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/MigrateVaultForm.tsx": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration form (#420) is desktop-only — its `vault_migrate` command is Class::Unsupported on web (a browser client joins an already-current account, never migrates). Present but its invoke answers the typed refusal."],
   "src/components/settings/NewNoteLocationSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/NetworkPanel.tsx": [
     "adapted",
@@ -306,6 +307,7 @@ const V = {
     "Creation-flow logging; same reason as vault-creation-errors.",
   ],
   "src/lib/vault-delete.ts": ["adapted", "Task 72 owns what deletion MEANS on a sync-required client; the binding itself is portable."],
+  "src/lib/vault-migrate.ts": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration (#420) is a desktop flow (Class::Unsupported in web/wasm/src/capability.rs, like vault-creation): a browser client joins an already-current account over sync and never migrates. The binding is present but its command answers the typed refusal on web."],
   "src/lib/vault-export-errors.ts": ["ported", "Error copy shared with the note-level export that does ship."],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
   "src/lib/viewsEnabled.ts": ["ported", "Device-local Views feature toggle helper (localStorage); runs as written."],

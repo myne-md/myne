@@ -652,7 +652,7 @@ export function SettingsModal({
       />
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
-    sync: <SyncPanel />,
+    sync: <SyncPanel onMigrated={() => onForceRelock?.({ kind: "Exists" })} />,
     ai: <AiPanel onShowToast={onShowToast} />,
     network: <NetworkPanel />,
     editor: <EditorPanel />,
