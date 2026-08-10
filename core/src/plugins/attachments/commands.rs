@@ -1104,6 +1104,7 @@ pub struct CleanResult {
 /// by the unlock-time scan — rather than dangling catalog entries that would
 /// fail to open. `pub(crate)` so the crash-ordering test can stop here and
 /// assert "catalog updated, blob still present".
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn rewrite_catalog_dropping_unused(
     io: &dyn VaultIo,
     host: &dyn HostCtx,
