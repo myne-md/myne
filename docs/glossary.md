@@ -148,6 +148,13 @@ The property that data stored persistently is encrypted whenever it is not activ
 
 Used in: `spec/protocol.md` §9; `threat-model.md` §1 (A5)
 
+### **Automerge** &nbsp; 🛠️ *Tooling*
+
+The Rust [CRDT](#crdt-conflict-free-replicated-data-type) library Myne adopts as its CRDT (`decisions.md` 2026-08-09, epic ledger ASM-11), superseding the roadmap's provisional [Yjs](#yjs). Chosen for Myne's constraints — Rust-native (compiles to wasm alongside `protocol`/`myne-core`), a proven whole-doc-snapshot-over-a-blind-store pattern, and the only first-party E2EE-CRDT sync line (Ink & Switch's Keyhive/Beelay) targeting a server that cannot decrypt. Merges already-decrypted content client-side (it is **not** crypto; its `sha2` is content-addressed change hashing, not key material). Used at-rest for the next-major `NC05` CRDT note-type (`automerge-sync-migration`) and, later, Phase-4 real-time collaboration.
+
+Used in: `decisions.md` 2026-08-09; `dependency-policy.md` (ledger); `core/Cargo.toml`
+Reference: https://automerge.org
+
 ### **auth_permits** &nbsp; 📦 *Product*
 
 A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleton in `core/src/plugins/vault_unlock/state.rs`) held by **every command that creates, destroys, or mutates `vault.meta`**: `vault_unlock`, `vault_recover_with_phrase`, `vault_complete_recovery`, `vault_change_password`, `vault_delete`, `vault_create::commit`, and `vault_repair`. Each acquires via `try_acquire()` (reject, never queue) at the start of its critical section and releases via RAII guard on every return path. The single-permit invariant guarantees **at most one vault.meta-lifecycle mutation in flight client-wide** — a generalization of the original "at most one ~1-second Argon2id derivation in flight" framing, which became inaccurate once non-Argon2id members joined (`vault_delete` and `vault_repair` hold the permit for a pure filesystem sweep, not a KDF). It defends the no-queue posture (`decisions.md` 2026-05-02 "Phase 1 unlock UI semantics") and closes the `vault_repair` ↔ `vault_create::commit` TOCTOU (`decisions.md` 2026-06-06 "vault_repair v0.2", MYND-159). Renamed from `unlock_permits` (the pre-recovery-flow shape) when the recovery commands started sharing the lock.
@@ -419,6 +426,8 @@ Used in: `threat-model.md` §1 (A2)
 
 The artifact of [keep-both conflict resolution](#keep-both-conflict-resolution): when the sync engine detects a concurrent edit, it materializes the remote revision as a **new** `.myn` note carrying the Myne-managed `conflict: true` + `conflict_of: <original note_uuid>` frontmatter fields (`spec/markdown-dialect.md` §3.6.1) so both edits survive. A conflict copy is excluded from the live sidebar, folder-tree, full-text search, and the backlink resolver — surfaced only in the **Conflicts view**, reached via a count badge — until the user resolves it ("Keep as separate" clears the markers so it re-enters the live set; "Discard" deletes it). TS orchestrator (`src/notes/conflictCopy.ts`) over `note_create` + `patchFrontmatterField`; no backend command, no `.myn` envelope change (MYND-427). Phase 2.
 
+**`MY01`-only.** Keep-both — and therefore the conflict copy and its Conflicts view — is the **v0.1 (`MY01`) note model**. A next-major CRDT note (`NC05`, `protocol.md` §10.7) never produces a conflict copy: a concurrent multi-device edit is reconciled by an automatic CRDT interleave-merge, surfaced only as a calm "updated from another device" hint (ASM-6→B, `decisions.md` 2026-08-10, #422). In a fully-migrated vault the Conflicts view is empty by construction.
+
 ### **content_type** &nbsp; 📋 *Protocol*
 
 A length-prefixed UTF-8 string carried in the AAD of content-encryption AEAD operations. In v0.1 it is always `"text/markdown"`; the field exists so a later version can introduce attachments (with content types like `"image/png"` or `"application/pdf"`) without breaking the AAD layout.
@@ -445,9 +454,9 @@ Used in: `spec/protocol.md` §3.4
 
 ### **CRDT (Conflict-free Replicated Data Type)** &nbsp; 🏗️ *Construction*
 
-A class of data structures that allow concurrent edits across multiple replicas to be merged without coordination. Myne plans to use Yjs (a CRDT library) for Phase 4+ real-time collaborative editing. CRDTs are not in v0.1.
+A class of data structures that allow concurrent edits across multiple replicas to be merged without coordination. Myne uses [Automerge](#automerge) (a Rust CRDT library) as its CRDT — for the next-major note-body CRDT note-type (`automerge-sync-migration`, `decisions.md` 2026-08-09) and, later, Phase-4 real-time collaborative editing. CRDTs are not in v0.1.
 
-Used in: `vision.md` (Phase 4 scope)
+Used in: `vision.md` (Phase 4 scope); `decisions.md` 2026-08-09
 
 ### **Crockford base32** &nbsp; 🏗️ *Construction*
 
@@ -1226,11 +1235,17 @@ The open note's neighborhood (1-2 hop) subgraph in the [graph view](#graph-view)
 
 Used in: `vision.md` Phase 1 Scope (graph view)
 
+### **legacy snapshot** &nbsp; 📋 *Protocol*
+
+The device-local, pre-migration copy of a vault the [cross-major migration](#migration-cross-major) retains in a `legacy/` directory before its atomic commit point — the old `vault.meta` and blobs, still sealed under the **old** `root_key`. It is the abort-before-sync escape hatch: an abort (valid only pre-sync and pre-confirm) restores the byte-identical old vault from it, and on the user's post-migration confirm it is crypto-erased together with the old `root_key`. Never synced, never backed up. Introduced for the v0.1 → v0.2 `NC05` cut (`spec/protocol.md` §10.4.1).
+
+Used in: `spec/protocol.md` §10.4.1, `decisions.md` 2026-08-09.
+
 ### **magic bytes** &nbsp; 📋 *Protocol*
 
-Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. Reserved for the next major version: `NT05`, `NTV5`. Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
+Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. Reserved for the next major version: `NT05`, `NTV5`. **Allocated for v0.2:** `NC05`, the CRDT note-type (`spec/protocol.md` §10.7). Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
 
-Used in: `spec/protocol.md` §9.1, §9.2, §9.3, §10.3
+Used in: `spec/protocol.md` §9.1, §9.2, §9.3, §10.3, §10.7
 
 ### **master password** &nbsp; 🗝️ *Key/identifier*
 
@@ -1244,9 +1259,9 @@ The monotonic causal counter carried per entry by the synced tombstone-guarded s
 
 ### **migration (cross-major)** &nbsp; 📋 *Protocol*
 
-The user-initiated upgrade procedure between major protocol versions (e.g., v0.1 → the next major version). Always explicit, never automatic, never silent. The Phase-2-or-later next-major client decrypts the v0.1 vault end-to-end, generates a new `root_key`, builds the next major version's key hierarchy, re-encrypts every blob under the new keys with the new magic bytes, and rewrites `vault.meta`. v0.1 clients never produce later-version output.
+The user-initiated upgrade procedure between major protocol versions (e.g., v0.1 → v0.2). Always explicit, never automatic, never silent. The next-major client decrypts the v0.1 vault end-to-end, generates a new `root_key`, builds the next major version's key hierarchy, re-encrypts every blob under the new keys with the new magic bytes, and rewrites `vault.meta`. v0.1 clients never produce later-version output. For the first concrete cut (v0.1 → v0.2, the `NC05` note-type), §10.4.1 pins the contract: the recovery phrase is **required** (a password-only migration would strand recovery), the re-encrypt is **eager / whole-vault**, `vault.meta`→`NTV5` is the atomic commit point, and a [legacy snapshot](#legacy-snapshot) is retained until the user confirms (then crypto-erased).
 
-Used in: `spec/protocol.md` §10.4
+Used in: `spec/protocol.md` §10.4, §10.4.1
 
 ### **MIN_PASSWORD_LEN** &nbsp; 🛠️ *Tooling*
 
@@ -2569,9 +2584,9 @@ Reference: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha (draft-
 
 ### **Yjs** &nbsp; 🛠️ *Tooling*
 
-A CRDT library for collaborative editing. Myne plans to use Yjs in Phase 4 for real-time collaboration (`vision.md` Phase 4). Not used in v0.1.
+A JavaScript CRDT library for collaborative editing. Myne's roadmap **provisionally** named Yjs as the Phase-4 CRDT; that choice was superseded by [Automerge](#automerge) (`decisions.md` 2026-08-09, epic ledger ASM-11) — Rust-native and a better fit for Myne's blind-server E2EE model. Retained here for history; not Myne's chosen CRDT and not used in v0.1.
 
-Used in: `vision.md` (Phase 4 scope)
+Used in: `decisions.md` 2026-08-09 (superseded-by note)
 Reference: https://yjs.dev
 
 ### **zero-knowledge** &nbsp; ⚠️ *Threat* (deep entry, *Myne-divergent*)
