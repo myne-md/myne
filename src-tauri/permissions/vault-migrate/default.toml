@@ -1,0 +1,17 @@
+# Permissions for the in-app `vault-migrate` Tauri plugin
+# (automerge-sync-migration #420). Picked up under the `vault-migrate:` ACL
+# namespace only because `build.rs` declares this as an `InlinedPlugin`.
+# Capability files reference these as `vault-migrate:default` (or
+# `vault-migrate:allow-vault-migrate`). Granular capability per the ecosystem
+# convention — a single command, single permission entry.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the vault-migrate plugin."
+permissions = ["allow-vault-migrate"]
+
+[[permission]]
+identifier = "allow-vault-migrate"
+description = "Allow invoking vault-migrate:vault_migrate — the whole-vault v0.1 → v0.2 (MYV1 → NTV5) migration (protocol.md §10.4.1). Verifies the password AND requires a valid recovery phrase (RecoveryPhraseRequired otherwise — a backend gate so recovery is never stranded), then mints a new v0.2 root_key, re-encrypts every note MY01 → NC05 and the KEK singletons under the new keys, stages a device-local legacy/ snapshot, and writes NTV5 vault.meta LAST as the atomic commit point. One-way; the old vault survives in legacy/ until the user confirms."
+commands.allow = ["vault_migrate"]

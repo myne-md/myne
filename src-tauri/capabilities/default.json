@@ -25,6 +25,7 @@
     "vault-recover:default",
     "vault-change-password:default",
     "vault-delete:default",
+    "vault-migrate:default",
     "vault-repair:default",
     "quick-unlock:default",
     "prefs:default",
