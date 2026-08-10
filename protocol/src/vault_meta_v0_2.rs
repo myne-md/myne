@@ -282,6 +282,38 @@ pub fn rewrite_vault_meta_password_side_v0_2(
     Ok(serialize_vault_meta_v0_2(&new_meta))
 }
 
+/// Generation dispatcher for the password-side rewrite — the mirror of
+/// [`crate::derive_subkey_versioned`] one layer up, so a caller (change-password,
+/// recover) threads a single [`MetaVersion`] instead of hand-branching a
+/// `MYV1`-vs-`NTV5` bool at the call site. Both arms are byte-preserving on the
+/// recovery + itemsKey sections; only the salt domain, AAD prefix and meta
+/// framing differ by generation.
+pub fn rewrite_vault_meta_password_side_versioned(
+    version: MetaVersion,
+    existing: &VaultMeta,
+    root_key: &[u8; AEAD_KEY_LEN],
+    new_password: &str,
+    fresh_salt: &[u8; ARGON2_SALT_LEN],
+    fresh_nonce: &[u8; AEAD_NONCE_LEN],
+) -> Result<[u8; VAULT_META_LEN], ProtocolError> {
+    match version {
+        MetaVersion::V0_1 => crate::vault_meta::rewrite_vault_meta_password_side(
+            existing,
+            root_key,
+            new_password,
+            fresh_salt,
+            fresh_nonce,
+        ),
+        MetaVersion::V0_2 => rewrite_vault_meta_password_side_v0_2(
+            existing,
+            root_key,
+            new_password,
+            fresh_salt,
+            fresh_nonce,
+        ),
+    }
+}
+
 /// Re-derive the v0.2 singleton `itemsKey` from `root_key` + a parsed `NTV5`
 /// [`VaultMeta`] — the v0.2 mirror of [`crate::vault_meta::derive_items_key`],
 /// under `derive_subkey_v0_2` + the v0.2 items-key-wrap AAD.

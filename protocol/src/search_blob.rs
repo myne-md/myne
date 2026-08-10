@@ -50,24 +50,15 @@
 
 use crate::aead::{aad_search_index_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use crate::blob_envelope::{
-    decode_blob_envelope, decode_singleton_versioned, encode_blob_envelope,
-    encode_blob_envelope_raw, encode_singleton_versioned, EnvelopeError,
+    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
 };
 use crate::error::ProtocolError;
-use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYS1"` (Myne Search v1).
 pub const SEARCH_BLOB_MAGIC: [u8; 4] = *b"MYS1";
-
-/// Magic bytes for the migrated v0.2 `vault.search` family — ASCII `"MYS5"`
-/// (§10.3 registry).
-pub const SEARCH_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYS5";
-
-/// AAD role string bound into both generations' `vault.search` AAD.
-const SEARCH_BLOB_AAD_ROLE: &[u8] = b"search-index-blob";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const SEARCH_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -212,53 +203,6 @@ pub fn decode_search_index_blob(
         &SEARCH_BLOB_MAGIC,
         SEARCH_BLOB_INDEX_FORMAT_V1,
         &aad,
-        MAX_SEARCH_INDEX_PLAINTEXT_LEN,
-        blob,
-    )
-    .map_err(SearchBlobError::from)
-}
-
-/// Version-aware seal of `vault.search` — `MYS1` + v0.1 AAD for
-/// [`MetaVersion::V0_1`], `MYS5` + v0.2 AAD for [`MetaVersion::V0_2`]. The
-/// `search_index_key` MUST be derived under the same generation
-/// (`derive_subkey_versioned(version, root_key, SearchIndexKey)`).
-pub fn encode_search_index_blob_versioned(
-    version: MetaVersion,
-    search_index_key: &[u8; AEAD_KEY_LEN],
-    account_number_hash: &[u8; SEARCH_BLOB_ACCOUNT_HASH_LEN],
-    plaintext: &[u8],
-) -> Result<Vec<u8>, SearchBlobError> {
-    encode_singleton_versioned(
-        version,
-        search_index_key,
-        &SEARCH_BLOB_MAGIC,
-        &SEARCH_BLOB_V0_2_MAGIC,
-        SEARCH_BLOB_INDEX_FORMAT_V1,
-        SEARCH_BLOB_AAD_ROLE,
-        account_number_hash,
-        MAX_SEARCH_INDEX_PLAINTEXT_LEN,
-        plaintext,
-    )
-    .map_err(SearchBlobError::from)
-}
-
-/// Version-aware open of `vault.search` — the mirror of
-/// [`encode_search_index_blob_versioned`], selecting the expected magic + AAD
-/// from `version`.
-pub fn decode_search_index_blob_versioned(
-    version: MetaVersion,
-    search_index_key: &[u8; AEAD_KEY_LEN],
-    account_number_hash: &[u8; SEARCH_BLOB_ACCOUNT_HASH_LEN],
-    blob: &[u8],
-) -> Result<Zeroizing<Vec<u8>>, SearchBlobError> {
-    decode_singleton_versioned(
-        version,
-        search_index_key,
-        &SEARCH_BLOB_MAGIC,
-        &SEARCH_BLOB_V0_2_MAGIC,
-        SEARCH_BLOB_INDEX_FORMAT_V1,
-        SEARCH_BLOB_AAD_ROLE,
-        account_number_hash,
         MAX_SEARCH_INDEX_PLAINTEXT_LEN,
         blob,
     )

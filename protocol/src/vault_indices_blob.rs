@@ -51,24 +51,15 @@
 
 use crate::aead::{aad_vault_indices_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use crate::blob_envelope::{
-    decode_blob_envelope, decode_singleton_versioned, encode_blob_envelope,
-    encode_blob_envelope_raw, encode_singleton_versioned, EnvelopeError,
+    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
 };
 use crate::error::ProtocolError;
-use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYI1"` (Myne Indices v1).
 pub const VAULT_INDICES_BLOB_MAGIC: [u8; 4] = *b"MYI1";
-
-/// Magic bytes for the migrated v0.2 `vault.indices` family — ASCII `"MYI5"`
-/// (§10.3 registry).
-pub const VAULT_INDICES_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYI5";
-
-/// AAD role string bound into both generations' `vault.indices` AAD.
-const VAULT_INDICES_BLOB_AAD_ROLE: &[u8] = b"vault-indices-blob";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const VAULT_INDICES_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -244,53 +235,6 @@ pub fn decode_vault_indices_blob(
         &VAULT_INDICES_BLOB_MAGIC,
         VAULT_INDICES_BLOB_FORMAT_CURRENT,
         &aad,
-        MAX_VAULT_INDICES_PLAINTEXT_LEN,
-        blob,
-    )
-    .map_err(VaultIndicesBlobError::from)
-}
-
-/// Version-aware seal of `vault.indices` — `MYI1` + v0.1 AAD for
-/// [`MetaVersion::V0_1`], `MYI5` + v0.2 AAD for [`MetaVersion::V0_2`]. The
-/// `vault_indices_key` MUST be derived under the same generation
-/// (`derive_subkey_versioned(version, root_key, VaultIndicesKey)`).
-pub fn encode_vault_indices_blob_versioned(
-    version: MetaVersion,
-    vault_indices_key: &[u8; AEAD_KEY_LEN],
-    account_number_hash: &[u8; VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN],
-    plaintext: &[u8],
-) -> Result<Vec<u8>, VaultIndicesBlobError> {
-    encode_singleton_versioned(
-        version,
-        vault_indices_key,
-        &VAULT_INDICES_BLOB_MAGIC,
-        &VAULT_INDICES_BLOB_V0_2_MAGIC,
-        VAULT_INDICES_BLOB_FORMAT_CURRENT,
-        VAULT_INDICES_BLOB_AAD_ROLE,
-        account_number_hash,
-        MAX_VAULT_INDICES_PLAINTEXT_LEN,
-        plaintext,
-    )
-    .map_err(VaultIndicesBlobError::from)
-}
-
-/// Version-aware open of `vault.indices` — the mirror of
-/// [`encode_vault_indices_blob_versioned`], selecting the expected magic + AAD
-/// from `version`.
-pub fn decode_vault_indices_blob_versioned(
-    version: MetaVersion,
-    vault_indices_key: &[u8; AEAD_KEY_LEN],
-    account_number_hash: &[u8; VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN],
-    blob: &[u8],
-) -> Result<Zeroizing<Vec<u8>>, VaultIndicesBlobError> {
-    decode_singleton_versioned(
-        version,
-        vault_indices_key,
-        &VAULT_INDICES_BLOB_MAGIC,
-        &VAULT_INDICES_BLOB_V0_2_MAGIC,
-        VAULT_INDICES_BLOB_FORMAT_CURRENT,
-        VAULT_INDICES_BLOB_AAD_ROLE,
-        account_number_hash,
         MAX_VAULT_INDICES_PLAINTEXT_LEN,
         blob,
     )
