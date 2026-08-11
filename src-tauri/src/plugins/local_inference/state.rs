@@ -418,6 +418,25 @@ impl LocalInferenceState {
     /// An [`RequestClass::Ambient`] request is refused a
     /// [`BackendClass::Remote`] backend — the rule lives here, in the seam, so
     /// no caller can opt out of it and no setting can turn it off.
+    /// Drop every registered backend's cached model (myne-md/myne#440).
+    ///
+    /// A model-path change is a fact about the LOCALLY side-loaded weights, and
+    /// the command that records it used to invalidate `engine_unclassified()` —
+    /// the ACTIVE arm. With a provider active that is `RemoteEngine`, whose
+    /// `invalidate_models` is the trait no-op, so the in-process arm went on
+    /// serving the previously-loaded weights while the persisted embedding index
+    /// carried the NEW model's identity (§9.17.2). Two model identities, one
+    /// store, and nothing able to tell them apart afterwards.
+    ///
+    /// Every arm rather than "the local one": a no-op on a remote backend costs
+    /// nothing, and picking a target would put a second copy of "which arms
+    /// cache models" beside the trait method that already answers it.
+    pub fn invalidate_all_models(&self) {
+        for b in &self.backends {
+            b.engine().invalidate_models();
+        }
+    }
+
     /// The BACKEND CLASS that [`Self::engine_for`] would resolve for `class`.
     ///
     /// Exists because the capability report has to ask "does the engine that
@@ -1149,6 +1168,60 @@ mod selection_proof {
             .expect("remote infers");
         assert_eq!(answer, "remote answered");
         assert!(wait_for_accept(&accepts), "the control arm must connect");
+    }
+
+    /// A model swap invalidates the LOCAL arm even while a provider is active
+    /// (myne-md/myne#440).
+    ///
+    /// `set_model_path` used to invalidate `engine_unclassified()` — the ACTIVE
+    /// arm — and with a provider named that is the remote one, whose
+    /// `invalidate_models` is the trait no-op. So the in-process arm went on
+    /// serving the previously-loaded weights while the persisted embedding index
+    /// was relabelled with the NEW model's identity: two identities, one store,
+    /// and no way to tell them apart afterwards.
+    #[test]
+    fn a_model_swap_invalidates_every_arm_not_just_the_active_one() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct Counting(Arc<AtomicUsize>);
+        impl Engine for Counting {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                Ok(String::new())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                Ok(vec![0.0])
+            }
+            fn invalidate_models(&self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        let local_hits = Arc::new(AtomicUsize::new(0));
+        let state = LocalInferenceState::with_backends(
+            vec![
+                Backend::new(
+                    "in-process",
+                    BackendClass::InProcessLocal,
+                    Arc::new(Counting(Arc::clone(&local_hits))),
+                ),
+                Backend::new("remote", BackendClass::Remote, Arc::new(LocalEngine)),
+            ],
+            "in-process",
+        )
+        .with_active_vault_reader(Arc::new(|| Some(test_vault())));
+
+        // A provider IS active — without this the local arm would be the active
+        // one and the assertion would hold for the wrong reason.
+        put(&state, Some(snap(configured(), true)));
+        assert_eq!(state.active_class(), BackendClass::Remote);
+
+        state.invalidate_all_models();
+        assert_eq!(
+            local_hits.load(Ordering::SeqCst),
+            1,
+            "the in-process arm caches the side-loaded weights and must be told, \
+             whichever arm happens to be active"
+        );
     }
 
     /// A snapshot read from ANOTHER vault never authorizes a provider

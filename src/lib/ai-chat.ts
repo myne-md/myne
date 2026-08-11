@@ -10,6 +10,7 @@
 // network (the no-egress gate is the structural guarantee).
 
 import { Channel, invoke } from "../platform/core";
+import { normalizeProviderError } from "./engine-error";
 
 import {
   appendChatToken,
@@ -94,10 +95,13 @@ export async function sendChat(
       citations,
       answeredByOf(await aiCapabilityReport(), providerLabelOf(providerWire)),
     );
-  } catch {
-    // The backend error is a closed, DENY-safe kind — we surface only the error
-    // turn state, never a detail string.
-    failChatTurn(runToken);
+  } catch (e) {
+    // The backend error is a closed, DENY-safe KIND, and the kind is exactly
+    // what the user needs (myne-md/myne#440). This used to discard it and render
+    // one sentence, so "your API key is wrong" and "the provider is down" were
+    // indistinguishable and neither suggested an action. `normalizeProviderError`
+    // maps the closed tag; no detail string ever crosses.
+    failChatTurn(runToken, normalizeProviderError(e));
   }
 }
 

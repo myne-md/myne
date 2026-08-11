@@ -18,6 +18,7 @@
 // settings panel states the bounded guarantee).
 
 import { useState, type CSSProperties } from "react";
+import { providerErrorKey } from "../../lib/engine-error";
 import { useTranslation } from "react-i18next";
 
 import { usePrefs } from "../../hooks/usePrefs";
@@ -238,7 +239,12 @@ function ChatTurnView({
           data-testid="ai.turn-error"
           style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", margin: "4px 0 0" }}
         >
-          {t("editor.chrome.rightPanel.aiChat.errorTurn")}
+          {/* Name the class and, through its own copy, the next action
+              (myne-md/myne#440). Falls back to the generic sentence only when
+              the failure carried no cause at all. */}
+          {turn.errorCause
+            ? t(providerErrorKey(turn.errorCause))
+            : t("editor.chrome.rightPanel.aiChat.errorTurn")}
         </p>
       )}
       {/* Which backend produced this answer (#191 task 4, SYNC-13). Attached to

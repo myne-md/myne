@@ -1321,10 +1321,12 @@ pub async fn set_model_path<R: Runtime>(
     .map_err(|_| ModelStoreError::Io {
         kind: crate::io_failure_kind::IoFailureKind::Other,
     })??;
-    // Drop any model the engine already cached so the next infer/embed loads the
-    // newly selected weights — otherwise the process keeps serving the old model
-    // while the persisted index is labeled with the new identity (§9.17.2).
-    engine_state.engine_unclassified().invalidate_models();
+    // EVERY arm, not the active one (myne-md/myne#440). A model path is a fact
+    // about the locally side-loaded weights, and with a provider active the
+    // active arm is the remote one — whose `invalidate_models` is the trait
+    // no-op, so the in-process arm kept serving the old model while the
+    // persisted index carried the new identity (§9.17.2).
+    engine_state.invalidate_all_models();
     Ok(accepted.to_string_lossy().into_owned())
 }
 
