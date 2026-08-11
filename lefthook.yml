@@ -67,6 +67,21 @@ pre-commit:
       glob: "core/src/**/*.rs"
       run: node scripts/check-core-io-seam.mjs {staged_files}
 
+    version-routing:
+      # myne-md/myne#442: a vault is v0.1 or, after the §10.4 migration, v0.2, and
+      # three helpers have a v0.1-only variant that stays in scope and compiles
+      # fine — `parse_vault_meta`, `derive_subkey`, `protocol::decode_note`. When a
+      # reader forgets the version-aware one, nothing says so: the failure appears
+      # only on a MIGRATED vault, and its worst form is silent (a reader that
+      # answers "empty" rather than "error" lets the next write persist that
+      # emptiness over the user's real data).
+      #
+      # A RATCHET, not a ban: the migration legitimately reads the OLD vault, and
+      # the never-synced caches deliberately keep the v0.1 context (§10.4.1 md.2).
+      # Those are recorded with reasons; everything else is debt and must shrink.
+      glob: "{core/src,src-tauri/src}/**/*.rs"
+      run: node scripts/check-version-routing.mjs {staged_files}
+
     crypto-registries:
       # Epic #249: the protocol layer's registries each get ONE chokepoint in
       # code — `derive_subkey` for §3.4 subkey roles, a `*_BLOB_MAGIC` constant

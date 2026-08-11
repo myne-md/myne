@@ -23,6 +23,7 @@
 pub mod commands;
 pub mod crdt;
 pub mod daily_match;
+pub mod decode;
 pub mod drawing_text;
 pub mod error;
 pub mod export_mtime;
