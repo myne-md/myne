@@ -408,6 +408,7 @@ impl Device {
             &self.notes_dir,
             &self.vault_dir,
             true,
+            protocol::MetaVersion::V0_1,
             Some(super::orchestrator::AttachmentKeys {
                 items_key: &self.acct.items_key,
                 items_key_id: &self.acct.items_key_id,
@@ -1124,7 +1125,13 @@ fn themes_three_device_counterexample_converges_no_ping_pong() {
 
     let palette = |c: &str| ThemePalette::from([(String::from("--accent"), String::from(c))]);
     let write_themes = |d: &Device, map: &ThemesMap| {
-        let bytes = encode_themes_map(&themes_key, &acct.account_hash, map).unwrap();
+        let bytes = encode_themes_map(
+            protocol::MetaVersion::V0_1,
+            &themes_key,
+            &acct.account_hash,
+            map,
+        )
+        .unwrap();
         std::fs::write(d.vault_dir.join("vault.themes"), &bytes).unwrap();
     };
     let read_themes = |d: &Device| -> ThemesMap {

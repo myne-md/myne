@@ -30,9 +30,11 @@ use super::state::{
 use super::transport::{HttpMethod, SyncTransport};
 use crate::attachment_nonce::{scan_attachments_manifest, AttachmentManifestEntry};
 use protocol::{
-    compute_manifest_hash, derive_subkey, encode_attachments_catalog, parse_vault_meta_any,
-    serialize_vault_meta, AttachmentsCatalog, ManifestEntry, SubkeyRole, VaultHead, VvEntry,
-    CATALOG_BLOB_MAGIC, PREFS_BLOB_MAGIC, THEMES_BLOB_MAGIC, VAULT_HEAD_FORMAT_V1,
+    compute_manifest_hash, derive_subkey, derive_subkey_versioned,
+    encode_attachments_catalog_versioned, parse_vault_meta_any, serialize_vault_meta,
+    AttachmentsCatalog, ManifestEntry, MetaVersion, SubkeyRole, VaultHead, VvEntry,
+    CATALOG_BLOB_MAGIC, CATALOG_BLOB_V0_2_MAGIC, PREFS_BLOB_MAGIC, PREFS_BLOB_V0_2_MAGIC,
+    THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC, VAULT_HEAD_FORMAT_V1,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -649,8 +651,14 @@ pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 /// Closing that gap means adding an exported offset constant per family in
 /// `protocol` first; until then the offsets are a known drift surface, not an
 /// oversight.
-fn read_singleton_nonce(bytes: &[u8], magic: &[u8; 4]) -> Option<[u8; 24]> {
-    if bytes.len() < 30 || &bytes[0..4] != magic {
+fn read_singleton_nonce(bytes: &[u8], magic: &[u8; 4], magic_v0_2: &[u8; 4]) -> Option<[u8; 24]> {
+    // BOTH generations. The `MY?5` envelope keeps the `MY?1` byte layout — only
+    // the magic differs (§10.4.1 clause 6) — so the nonce is at the same offset.
+    // Accepting only v0.1 makes every reader `None` on a migrated vault, and the
+    // paragraph below spells out what that costs: the recorded baseline and the
+    // on-disk nonce disagree forever, so every cycle re-classifies the record as
+    // changed and re-adopts the server's bytes.
+    if bytes.len() < 30 || (&bytes[0..4] != magic && &bytes[0..4] != magic_v0_2) {
         return None;
     }
     let mut nonce = [0u8; 24];
@@ -728,7 +736,7 @@ enum SingletonPull {
 
 /// The catalog's sync discriminator (`read_singleton_nonce` over MYC1).
 fn read_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, &CATALOG_BLOB_MAGIC)
+    read_singleton_nonce(bytes, &CATALOG_BLOB_MAGIC, &CATALOG_BLOB_V0_2_MAGIC)
 }
 
 /// `vault.prefs`' reserved 16-byte sync-plane blob-id:
@@ -740,7 +748,7 @@ pub fn prefs_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 
 /// The prefs blob's sync discriminator (`read_singleton_nonce` over MYP1).
 fn read_prefs_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, &PREFS_BLOB_MAGIC)
+    read_singleton_nonce(bytes, &PREFS_BLOB_MAGIC, &PREFS_BLOB_V0_2_MAGIC)
 }
 
 /// `vault.themes`' reserved 16-byte sync-plane blob-id:
@@ -752,7 +760,7 @@ pub fn themes_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 
 /// The themes blob's sync discriminator (`read_singleton_nonce` over MYT1).
 fn read_themes_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, &THEMES_BLOB_MAGIC)
+    read_singleton_nonce(bytes, &THEMES_BLOB_MAGIC, &THEMES_BLOB_V0_2_MAGIC)
 }
 
 /// `<vault>/vault.themes` — the MYT1 custom-themes singleton.
@@ -1019,13 +1027,14 @@ async fn sync_catalog_phase(
     state: &mut SyncState,
     cat_id: &[u8; 16],
     remote_record: Option<&ChangedBlob>,
+    version: MetaVersion,
 ) -> Result<CatalogPhase, SyncCycleError> {
     // See `apply_pulled_note_blob` — `blocking_lock` panics inside a runtime.
     let _guard = crate::plugins::attachments::commands::catalog_write_mutex()
         .lock()
         .await;
 
-    let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = derive_subkey_versioned(version, root_key, SubkeyRole::AttachmentsCatalogKey);
     let path = catalog_file_path(vault_root);
     let local_bytes = io.read(&path).await.ok();
     let local_nonce = local_bytes.as_deref().and_then(read_catalog_nonce);
@@ -1080,8 +1089,13 @@ async fn sync_catalog_phase(
 
         // Merge differs from the server → write it fresh and push it this
         // cycle against the server's current version.
-        let merged_bytes = encode_attachments_catalog(&catalog_key, account_number_hash, &merged)
-            .map_err(|_| SyncCycleError::Io)?;
+        let merged_bytes = encode_attachments_catalog_versioned(
+            version,
+            &catalog_key,
+            account_number_hash,
+            &merged,
+        )
+        .map_err(|_| SyncCycleError::Io)?;
         io.write(&path, &merged_bytes, crate::vault_io::WriteOpts::default())
             .await
             .map_err(|_| SyncCycleError::Io)?;
@@ -1193,13 +1207,14 @@ async fn sync_prefs_phase(
     state: &mut SyncState,
     prefs_id: &[u8; 16],
     remote_record: Option<&ChangedBlob>,
+    version: MetaVersion,
 ) -> Result<PrefsPhase, SyncCycleError> {
     use crate::plugins::sync::prefs_merge::{merge_prefs, shared_subset_hash};
 
     // See `apply_pulled_note_blob` — `blocking_lock` panics inside a runtime.
     let _guard = crate::plugins::prefs::commands::write_mutex().lock().await;
 
-    let prefs_key = derive_subkey(root_key, SubkeyRole::PrefsKey);
+    let prefs_key = derive_subkey_versioned(version, root_key, SubkeyRole::PrefsKey);
     let path = vault_root.join("vault.prefs");
     let local_bytes = io.read(&path).await.ok();
     let local_nonce = local_bytes.as_deref().and_then(read_prefs_nonce);
@@ -1312,9 +1327,13 @@ async fn sync_prefs_phase(
             // NOTHING — pushing would ping-pong device-local re-encrypts
             // between peers forever.
             if applied_remote {
-                let merged_bytes =
-                    protocol::encode_prefs_blob(&prefs_key, account_number_hash, &merged)
-                        .map_err(|_| SyncCycleError::Io)?;
+                let merged_bytes = protocol::encode_prefs_blob_versioned(
+                    version,
+                    &prefs_key,
+                    account_number_hash,
+                    &merged,
+                )
+                .map_err(|_| SyncCycleError::Io)?;
                 io.write(&path, &merged_bytes, crate::vault_io::WriteOpts::default())
                     .await
                     .map_err(|_| SyncCycleError::Io)?;
@@ -1332,8 +1351,13 @@ async fn sync_prefs_phase(
         // it this cycle. The server's revision is recorded as the CAS base;
         // its nonce also serves the anti-redownload check, while the local
         // file (freshly re-encrypted) intentionally carries a different one.
-        let merged_bytes = protocol::encode_prefs_blob(&prefs_key, account_number_hash, &merged)
-            .map_err(|_| SyncCycleError::Io)?;
+        let merged_bytes = protocol::encode_prefs_blob_versioned(
+            version,
+            &prefs_key,
+            account_number_hash,
+            &merged,
+        )
+        .map_err(|_| SyncCycleError::Io)?;
         io.write(&path, &merged_bytes, crate::vault_io::WriteOpts::default())
             .await
             .map_err(|_| SyncCycleError::Io)?;
@@ -1425,6 +1449,7 @@ async fn sync_themes_phase(
     state: &mut SyncState,
     themes_id: &[u8; 16],
     remote_record: Option<&ChangedBlob>,
+    version: MetaVersion,
 ) -> Result<ThemesPhase, SyncCycleError> {
     use crate::plugins::themes::commands::{decode_themes_map_or_empty, encode_themes_map};
 
@@ -1436,7 +1461,8 @@ async fn sync_themes_phase(
     // (myne#301). A torn slot on the web client otherwise supplied both the
     // local nonce and, further down, the bytes pushed to the server — where
     // every peer decodes them to empty.
-    let themes_key_for_read = derive_subkey(root_key, SubkeyRole::CustomThemesKey);
+    let themes_key_for_read =
+        derive_subkey_versioned(version, root_key, SubkeyRole::CustomThemesKey);
     let local_bytes = crate::plugins::themes::commands::read_verified_themes_bytes(
         io,
         vault_root,
@@ -1456,7 +1482,7 @@ async fn sync_themes_phase(
     // `ThemesPhase` returns only flags.)
     // §9.21.4 read semantic: any local decode failure falls back to empty.
     let decode_local = || {
-        let themes_key = derive_subkey(root_key, SubkeyRole::CustomThemesKey);
+        let themes_key = derive_subkey_versioned(version, root_key, SubkeyRole::CustomThemesKey);
         let map =
             decode_themes_map_or_empty(&themes_key, account_number_hash, local_bytes.as_deref());
         (themes_key, map)
@@ -1507,7 +1533,7 @@ async fn sync_themes_phase(
             // (freshly re-encrypted) intentionally carries a different nonce
             // from the recorded CAS base.
             (
-                encode_themes_map(&themes_key, account_number_hash, &merged)
+                encode_themes_map(version, &themes_key, account_number_hash, &merged)
                     .map_err(|_| SyncCycleError::Io)?,
                 true,
             )
@@ -1925,6 +1951,12 @@ pub async fn run_sync_cycle(
     notes_dir: &Path,
     vault_root: &Path,
     allow_push: bool,
+    // The vault's generation, resolved from the SAME `vault.meta` parse that
+    // produced `account_number_hash` (`cycle::cycle_account_number_hash`), so the
+    // two cannot disagree. Every singleton phase derives its KEK under it: a
+    // migrated vault's `MYP5`/`MYC5`/`MYT5` need v0.2, and a v0.1 KEK lands in
+    // their read-as-empty branch, which then re-seals empty over the real blob.
+    version: MetaVersion,
     attachment_keys: Option<AttachmentKeys<'_>>,
 ) -> Result<SyncSummary, SyncCycleError> {
     let mut state = read_sync_state(io, vault_root)
@@ -1994,6 +2026,7 @@ pub async fn run_sync_cycle(
             notes_dir,
             vault_root,
             allow_push,
+            version,
             attachment_keys,
             &mut state,
             &baseline_vv,
@@ -2048,6 +2081,12 @@ async fn sync_cycle_attempt(
     notes_dir: &Path,
     vault_root: &Path,
     allow_push: bool,
+    // The vault's generation, resolved from the SAME `vault.meta` parse that
+    // produced `account_number_hash` (`cycle::cycle_account_number_hash`), so the
+    // two cannot disagree. Every singleton phase derives its KEK under it: a
+    // migrated vault's `MYP5`/`MYC5`/`MYT5` need v0.2, and a v0.1 KEK lands in
+    // their read-as-empty branch, which then re-seals empty over the real blob.
+    version: MetaVersion,
     attachment_keys: Option<AttachmentKeys<'_>>,
     state: &mut SyncState,
     baseline_vv: &[VvEntry],
@@ -2202,6 +2241,7 @@ async fn sync_cycle_attempt(
             state,
             &cid,
             remote_cat_rec,
+            version,
         )
         .await?;
 
@@ -2348,6 +2388,7 @@ async fn sync_cycle_attempt(
         state,
         &prefs_id,
         remote_prefs_rec,
+        version,
     )
     .await?;
 
@@ -2369,6 +2410,7 @@ async fn sync_cycle_attempt(
         state,
         &themes_id,
         remote_themes_rec,
+        version,
     )
     .await?;
 
@@ -3417,6 +3459,7 @@ mod tests {
             notes_dir,
             vault_root,
             allow_push,
+            MetaVersion::V0_1,
             None,
         ))
     }
@@ -7103,6 +7146,7 @@ mod tests {
             &vault_root.join("notes"),
             vault_root,
             true,
+            MetaVersion::V0_1,
             Some(AttachmentKeys {
                 items_key,
                 items_key_id,
@@ -7780,6 +7824,118 @@ mod tests {
             protocol::decode_prefs_blob(&prefs_key(), &HASH, &bytes).unwrap()
         }
 
+        /// A MIGRATED vault meeting a peer that has also migrated: both blobs are
+        /// `MYP5` under the v0.2 KEK, and the merge beats the server, so the phase
+        /// takes its decode -> merge -> re-encode -> write path.
+        ///
+        /// Before the generation was threaded in, this phase derived
+        /// `SubkeyRole::PrefsKey` under v0.1 unconditionally. The decoder sniffs
+        /// the magic, so it picked the right family and then failed its tag check
+        /// under the wrong key — and §9.5.5's read semantic answers ANY decode
+        /// failure with `PrefsView::default()`. The phase then re-encoded that
+        /// default as `MYP1` over the user's `MYP5` blob and pushed it, so the
+        /// first sync after a migration reset every preference on every device.
+        ///
+        /// The two assertions are separate on purpose, and each catches one half:
+        /// surviving content catches the KEK, surviving magic catches the encoder.
+        /// Getting only the KEK right still writes `MYP1` bytes no v0.2 reader
+        /// will open again. Both halves were re-broken individually to confirm
+        /// this test names them.
+        #[test]
+        fn a_migrated_vault_keeps_its_myp5_prefs_instead_of_resetting_them() {
+            let dir = scratch("migrated");
+            let v0_2_key = protocol::derive_subkey_versioned(
+                MetaVersion::V0_2,
+                &ROOT,
+                protocol::SubkeyRole::PrefsKey,
+            );
+            let seal = |view: &PrefsView| {
+                protocol::encode_prefs_blob_versioned(MetaVersion::V0_2, &v0_2_key, &HASH, view)
+                    .unwrap()
+            };
+
+            // Local: a SHARED field with the newer clock, so the merge beats the
+            // server and the phase must take its write-a-fresh-blob branch — plus
+            // a device-local one to prove the whole view survives, not just the
+            // field under contention. Without the shared win the phase adopts the
+            // server's bytes and never re-encodes, which makes the encoder half of
+            // this test unfalsifiable (it was, once).
+            let mut mine = PrefsView {
+                label: Some("Mine".into()),
+                auto_lock_seconds: Some(900),
+                ..PrefsView::default()
+            };
+            mine.field_clocks.insert("label".into(), 9_000);
+            let local_bytes = seal(&mine);
+            assert_eq!(
+                &local_bytes[0..4],
+                protocol::PREFS_BLOB_V0_2_MAGIC.as_slice()
+            );
+            std::fs::write(dir.join("vault.prefs"), &local_bytes).unwrap();
+
+            // Remote: a shared edit from the other migrated device, so the merge
+            // differs from BOTH sides and the phase must write a fresh blob.
+            let mut theirs = PrefsView {
+                label: Some("Theirs".into()),
+                ..PrefsView::default()
+            };
+            theirs.field_clocks.insert("label".into(), 100);
+            let remote_bytes = seal(&theirs);
+            let pid = prefs_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(&pid)),
+                200,
+                serde_json::to_vec(
+                    &serde_json::json!({ "ciphertext_b64": B64.encode(&remote_bytes) }),
+                )
+                .unwrap(),
+            );
+            let rec = ChangedBlob {
+                id: pid,
+                version: 7,
+                content_nonce: read_prefs_nonce(&remote_bytes).unwrap(),
+                attachment_id: None,
+                size: remote_bytes.len(),
+            };
+
+            let mut st = SyncState::default();
+            blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+                MetaVersion::V0_2,
+            ))
+            .unwrap();
+
+            let after = std::fs::read(dir.join("vault.prefs")).unwrap();
+            assert_eq!(
+                &after[0..4],
+                protocol::PREFS_BLOB_V0_2_MAGIC.as_slice(),
+                "the phase rewrote a migrated vault's prefs as MYP1",
+            );
+            let back =
+                protocol::decode_prefs_blob(&v0_2_key, &HASH, &after).expect("still v0.2-readable");
+            assert_eq!(
+                back.label.as_deref(),
+                Some("Mine"),
+                "the newer local shared edit lost to the server",
+            );
+            assert_eq!(
+                back.auto_lock_seconds,
+                Some(900),
+                "the user's preferences were reset to defaults",
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
         /// Encode a remote view and register its blob under `/sync/blob?id=…`.
         fn serve_remote(t: &FakeTransport, pid: &[u8; 16], view: &PrefsView) -> ChangedBlob {
             let bytes = protocol::encode_prefs_blob(&prefs_key(), &HASH, view).unwrap();
@@ -7811,7 +7967,16 @@ mod tests {
             let pid = prefs_sync_id(&ROOT);
 
             let phase = blocking(sync_prefs_phase(
-                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None,
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                None,
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.dirty, "never-synced server ⇒ initial publish");
@@ -7845,7 +8010,16 @@ mod tests {
             let t = FakeTransport::new();
 
             let phase = blocking(sync_prefs_phase(
-                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None,
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                None,
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(!phase.dirty, "device-local edit must not push");
@@ -7876,7 +8050,16 @@ mod tests {
             let t = FakeTransport::new();
 
             let phase = blocking(sync_prefs_phase(
-                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None,
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                None,
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.dirty, "shared edit must push");
@@ -7914,6 +8097,7 @@ mod tests {
                 &mut st,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.applied_remote, "remote rename must apply");
@@ -7942,6 +8126,7 @@ mod tests {
                 &mut st,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(!phase2.dirty);
@@ -7977,6 +8162,7 @@ mod tests {
                 &mut st,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.applied_remote);
@@ -7995,6 +8181,7 @@ mod tests {
                 &mut st,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(!phase2.applied_remote);
@@ -8033,6 +8220,7 @@ mod tests {
                 &mut st,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
 
@@ -8081,6 +8269,7 @@ mod tests {
                 &mut st,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
 
@@ -8108,7 +8297,16 @@ mod tests {
             let t = FakeTransport::new();
 
             let phase = blocking(sync_prefs_phase(
-                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None,
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                None,
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(!phase.applied_remote);
@@ -8169,6 +8367,7 @@ mod tests {
                 &mut st,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(
@@ -8213,6 +8412,7 @@ mod tests {
                 &mut st,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.dirty, "merge beat the server ⇒ push");
@@ -8311,7 +8511,16 @@ mod tests {
             let mut st_a = SyncState::default();
             let t_a = FakeTransport::new();
             let phase_a = blocking(sync_prefs_phase(
-                &IO, &t_a, "tok", &ROOT, &HASH, &dir_a, &mut st_a, &pid, None,
+                &IO,
+                &t_a,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir_a,
+                &mut st_a,
+                &pid,
+                None,
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase_a.dirty, "A must push its newly authored rules");
@@ -8349,6 +8558,7 @@ mod tests {
                 &mut st_b,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase_b.applied_remote, "A's rules must land on B");
@@ -8442,6 +8652,7 @@ mod tests {
                 &mut st_a,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.applied_remote, "B's newer edit must land on A");
@@ -8517,6 +8728,7 @@ mod tests {
                 &mut st_a,
                 &pid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
 
@@ -8582,7 +8794,7 @@ mod tests {
         }
 
         fn write_local(dir: &Path, map: &ThemesMap) {
-            let bytes = encode_themes_map(&themes_key(), &HASH, map).unwrap();
+            let bytes = encode_themes_map(MetaVersion::V0_1, &themes_key(), &HASH, map).unwrap();
             std::fs::write(dir.join("vault.themes"), &bytes).unwrap();
         }
 
@@ -8597,7 +8809,7 @@ mod tests {
 
         /// Encode a remote store and register its blob under `/sync/blob?id=…`.
         fn serve_remote(t: &FakeTransport, tid: &[u8; 16], map: &ThemesMap) -> ChangedBlob {
-            let bytes = encode_themes_map(&themes_key(), &HASH, map).unwrap();
+            let bytes = encode_themes_map(MetaVersion::V0_1, &themes_key(), &HASH, map).unwrap();
             let nonce = read_themes_nonce(&bytes).unwrap();
             let body = serde_json::json!({ "ciphertext_b64": B64.encode(&bytes) });
             t.on(
@@ -8637,7 +8849,16 @@ mod tests {
             let tid = themes_sync_id(&ROOT);
 
             let phase = blocking(sync_themes_phase(
-                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None,
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                None,
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(!phase.dirty, "a theme-less vault generates no traffic");
@@ -8655,7 +8876,16 @@ mod tests {
             let tid = themes_sync_id(&ROOT);
 
             let phase = blocking(sync_themes_phase(
-                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None,
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                None,
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.dirty, "an unsynced local theme must push");
@@ -8684,7 +8914,16 @@ mod tests {
             let t = FakeTransport::new();
 
             let phase = blocking(sync_themes_phase(
-                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None,
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                None,
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(!phase.dirty, "byte-untouched blob must not push");
@@ -8714,6 +8953,7 @@ mod tests {
                 &mut st,
                 &tid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.dirty, "merge beat the server ⇒ push");
@@ -8749,6 +8989,7 @@ mod tests {
                 &mut st,
                 &tid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(!phase.dirty, "adopting the server's bytes pushes nothing");
@@ -8786,6 +9027,7 @@ mod tests {
                 &mut st,
                 &tid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.applied_remote, "the peer's delete landed");
@@ -8849,6 +9091,7 @@ mod tests {
                 &mut st,
                 &tid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.dirty, "the local store re-pushes over the garbage");
@@ -8906,6 +9149,7 @@ mod tests {
                 &mut st,
                 &tid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
 
@@ -8965,6 +9209,7 @@ mod tests {
                 &mut st,
                 &tid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
             assert!(phase.applied_remote, "the peer's theme was adopted");
@@ -9014,7 +9259,8 @@ mod tests {
             let before = std::fs::read(dir.join("vault.themes")).unwrap();
 
             let remote = ThemesMap::from([theme("gruvbox", "#282828", T0 + 1)]);
-            let remote_bytes = encode_themes_map(&themes_key(), &HASH, &remote).unwrap();
+            let remote_bytes =
+                encode_themes_map(MetaVersion::V0_1, &themes_key(), &HASH, &remote).unwrap();
 
             let mut st = SyncState::default();
             let t = FakeTransport::new();
@@ -9045,6 +9291,7 @@ mod tests {
                 &mut st,
                 &tid,
                 Some(&rec),
+                MetaVersion::V0_1,
             ))
             .unwrap();
 
