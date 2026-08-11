@@ -238,29 +238,16 @@ describeCanary("two-device sync canary (MYND-428)", () => {
   // keep-both copy, no Conflicts row), and the pulling device shows the calm
   // "updated from another device" hint (`sync.remote-merge-hint`).
   //
-  // ---------------------------------------------------------------------------
-  // STILL SKIPPED, on a DIFFERENT and now-verified blocker: myne-md/myne#447.
+  // Live since myne-md/myne#447. This scenario is what found that defect — the
+  // peer could not join the generation a migration creates, so `migrateFleetToV02`
+  // never got past its adoption step — and it is what proves the fix: B only
+  // reaches the assertions below by staging the server's `NTV5` meta, opening it
+  // with its own password, and promoting it.
   //
-  // #446 rewrote this scenario and its setup, and running it in the container is
-  // what FOUND #447: a peer cannot join the generation a migration creates. It
-  // locks correctly ("upgraded elsewhere"), the user unlocks, and it comes back
-  // in the OLD generation — because the meta phase runs only on a completed
-  // cycle's `Ok` arm and this path returns before it, and because
-  // `merge_vault_meta` refuses a meta whose recovery side and itemsKey both
-  // moved, which is every field a re-key changes. Probed directly: the adopt
-  // returns `Skipped` and `vault.meta` stays `MYV1`.
-  //
-  // What #446 DID close, and why the skip is no longer inert:
-  //   - the old note's premise was WRONG. It said the harness should "migrate
-  //     both devices"; `vault_migrate` mints a fresh random `root_key` per run,
-  //     so that setup forks the fleet irrecoverably. `migrateFleetToV02` does
-  //     the production thing (A migrates + syncs, B adopts + re-unlocks).
-  //   - the assertions below are COUNT-based. The previous version asserted
-  //     `toContain("A")` + `toContain("B")`, which #428's doubling bug satisfies.
-  //   - the setup runs end to end up to the adoption step, so this scenario is
-  //     what will prove #447 fixed, on the day it is.
-  // ---------------------------------------------------------------------------
-  it.skip("crdt-merge: concurrent NC05 edits merge with the hint, no keep-both, no Conflicts row", async () => {
+  // The assertions are COUNT-based on purpose (#446): the previous version
+  // asserted `toContain("A")` + `toContain("B")`, which #428's doubling bug
+  // satisfies. See the count comment inside.
+  it("crdt-merge: concurrent NC05 edits merge with the hint, no keep-both, no Conflicts row", async () => {
     const srv = await startSyncServer();
     try {
       const devices = await setupTwoSyncedDevices(srv);
@@ -339,12 +326,12 @@ describeCanary("two-device sync canary (MYND-428)", () => {
   // timestamp NEITHER device wrote, blended from A's `deleted:` and B's
   // `updated:`. That value parses cleanly, so nothing downstream can catch it;
   // the only place it is visible is here, against the exact bytes.
-  // SKIPPED on the same blocker (myne-md/myne#447) — see the note above. The
-  // scenario itself is complete: it asserts A's `deleted:` value VERBATIM,
-  // because #431's failure mode is a well-formed timestamp neither device wrote,
-  // blended character-wise from A's `deleted:` and B's `updated:`. It parses
-  // cleanly, so `toContain("deleted:")` would pass against the fabrication.
-  it.skip("crdt-remove-wins: a deletion beats a concurrent edit, with no fabricated timestamp", async () => {
+  // Live since myne-md/myne#447 (see the note above). It asserts A's `deleted:`
+  // value VERBATIM, because #431's failure mode is a well-formed timestamp
+  // neither device wrote — blended character-wise from A's `deleted:` and B's
+  // `updated:`. It parses cleanly, so `toContain("deleted:")` would pass against
+  // the fabrication.
+  it("crdt-remove-wins: a deletion beats a concurrent edit, with no fabricated timestamp", async () => {
     const srv = await startSyncServer();
     try {
       const devices = await setupTwoSyncedDevices(srv);

@@ -395,6 +395,31 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
         return Err(QuickUnlockError::RequiresFullPassword);
     }
 
+    // A staged newer-generation `vault.meta` suspends quick-unlock entirely
+    // (myne-md/myne#447), biometric included — this gate is about the vault's
+    // state, not the provider's strength, so the MYND-641 narrowing above does
+    // not apply.
+    //
+    // `MYQ1` wraps a THIRD `root_key` copy and never reads `vault.meta`, so a
+    // redeem would hand back the previous generation's root and never promote
+    // anything. A user who only ever uses their PIN would sit in #447's loop
+    // forever while the fix worked perfectly for everyone else.
+    //
+    // The same variant the spring-loaded gate uses, deliberately: the remedy is
+    // identical ("unlock once with your password"), the UI already routes it,
+    // and the credential is intact — nothing here burns an attempt. Promotion
+    // then drops `vault.quickunlock`, so the PIN is re-enrolled under the new
+    // root, which is what the migrating device already does for itself.
+    if crate::plugins::vault_migrate::adopt::incoming_meta_path(dir).exists() {
+        tracing::info!(
+            stage = "staged_meta",
+            event = "quick_unlock_suspended",
+            "quick-unlock suspended: a newer-generation vault.meta is staged and only \
+             a full-credential unlock can adopt it"
+        );
+        return Err(QuickUnlockError::RequiresFullPassword);
+    }
+
     let blob = match std::fs::read(blob_path(dir)) {
         Ok(b) => b,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
