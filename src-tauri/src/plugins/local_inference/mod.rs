@@ -643,6 +643,116 @@ mod resolve_engine_tests {
         assert!(report.generation.available);
     }
 
+    /// With a provider ACTIVE, the report must describe the arms that actually
+    /// answer — not one unclassified engine for every row (myne-md/myne#438).
+    ///
+    /// Two rows were wrong in exactly the configuration the provider epic added,
+    /// and both told a user whose AI demonstrably works that it is unavailable:
+    ///
+    /// - `auto_tag` gated on `engine_for(Ambient)` — correctly the LOCAL arm —
+    ///   and then asked the ACTIVE (remote) engine whether it had a tag model.
+    ///   `RemoteEngine` does not override that, so it took the trait default
+    ///   `false` while `suggest_tags` ran happily on the local arm.
+    /// - `generation` gated on a locally side-loaded GGUF with no arm for "the
+    ///   active backend brings its own model", which is the entire point of
+    ///   naming a provider.
+    ///
+    /// The fixture is the production shape — both arms registered, remote
+    /// active — with NO local model file, so the two rows can only be right for
+    /// the right reason.
+    #[test]
+    fn a_configured_provider_reports_generation_and_auto_tag_as_available() {
+        use commands::capability_report_from;
+        use state::{Backend, BackendClass, LocalInferenceState, PrefsSnapshot};
+
+        /// A local arm that HAS a tag model — the shape `CandleEngine` reports
+        /// once its blob is attached.
+        struct TaggingLocal;
+        impl engine::Engine for TaggingLocal {
+            fn infer(&self, _p: &str) -> Result<String, error::EngineError> {
+                Ok("local".into())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, error::EngineError> {
+                Ok(vec![0.0])
+            }
+            fn tag_model_available(&self) -> bool {
+                true
+            }
+        }
+
+        /// A remote arm that does NOT override `tag_model_available`, i.e. the
+        /// real `RemoteEngine`'s shape — it takes the trait default `false`.
+        ///
+        /// This matters more than it looks. The obvious fixture is `StubEngine`
+        /// on both arms, and `StubEngine` overrides that method to `true` for
+        /// the E2E build — so the two arms agree, and the auto-tag assertion
+        /// becomes unfalsifiable. Re-injecting the defect against that fixture
+        /// passed; against this one it fails.
+        struct PlainRemote;
+        impl engine::Engine for PlainRemote {
+            fn infer(&self, _p: &str) -> Result<String, error::EngineError> {
+                Ok("remote".into())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, error::EngineError> {
+                Ok(vec![0.0])
+            }
+        }
+
+        let vault = myne_core::vault_id::VaultId::parse("018f0000-0000-7000-8000-0000000000aa")
+            .expect("id");
+        let state = LocalInferenceState::with_backends(
+            vec![
+                Backend::new(
+                    "in-process",
+                    BackendClass::InProcessLocal,
+                    std::sync::Arc::new(TaggingLocal),
+                ),
+                Backend::new(
+                    "fake-remote",
+                    BackendClass::Remote,
+                    std::sync::Arc::new(PlainRemote),
+                ),
+            ],
+            "in-process",
+        )
+        .with_active_vault_reader(std::sync::Arc::new(move || Some(vault)));
+
+        let mut prefs = protocol::PrefsView {
+            ai_enabled: true,
+            developer_mode: true,
+            ai_provider: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_key: Some("sk-test".into()),
+            ai_provider_model: Some("some/model".into()),
+            ..protocol::PrefsView::default()
+        };
+        prefs.ai_provider_model = Some("some/model".into());
+        *state.snapshot_cell().write().expect("cell") = Some(PrefsSnapshot {
+            prefs,
+            developer_mode: true,
+            vault_id: Some(vault),
+        });
+        assert_eq!(
+            state.active_class(),
+            BackendClass::Remote,
+            "the fixture must actually select the remote arm, or it proves nothing"
+        );
+
+        // NO local generation model: `false` for every model flag.
+        let report = capability_report_from(&state, false, false, false);
+
+        assert!(
+            report.generation.available,
+            "a provider brings its own model; a missing local GGUF must not block it (cause: {:?})",
+            report.generation.cause
+        );
+        assert!(
+            report.auto_tag.available,
+            "auto-tag runs on the LOCAL arm, which has a tag model (cause: {:?})",
+            report.auto_tag.cause
+        );
+    }
+
     /// A missing model is `no_model`, not a bar — the two reasons a feature is
     /// unavailable must stay distinguishable, which is the whole reason the
     /// report carries a cause rather than a boolean.
