@@ -2742,7 +2742,7 @@
       "endpointModelPlaceholder": "the model name as the runtime lists it",
       "endpointRejected": {
         "malformed": "That is not an address Myne can use. It needs a scheme and an explicit port — for example http://127.0.0.1:11434.",
-        "notLoopback": "Plain http is only accepted for this computer (localhost, 127.0.0.1 or ::1). Use https for anything else.",
+        "notLoopback": "This address must be on this computer — localhost, 127.0.0.1 or ::1. To use a provider that runs somewhere else, name it under Provider instead.",
         "unsupportedScheme": "Only http and https addresses are accepted."
       },
       "endpointSaveFailed": "Could not save the address. Check that Myne can write its settings.",

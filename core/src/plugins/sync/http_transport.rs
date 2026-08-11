@@ -214,6 +214,22 @@ pub(crate) fn is_loopback(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
+/// The same predicate, reachable from the client crates.
+///
+/// The desktop AI plugin needs it: its "local model runtime" endpoint must be
+/// on this device for EVERY scheme, which [`super::config::validate_endpoint_url`]
+/// deliberately does not enforce — that validator serves the SYNC endpoint,
+/// where `https` to a remote host is the normal case and is answered with rustls
+/// plus a TOFU pin. Sharing the validator without sharing this check is what let
+/// `https://anywhere` register as a loopback-class AI backend.
+///
+/// A wrapper rather than a fourth `matches!`: the doc above already warns that
+/// three copies of a three-name match are three chances for the rules to
+/// disagree about which hosts may be reached in the clear.
+pub fn is_loopback_host(host: &str) -> bool {
+    is_loopback(host)
+}
+
 // ── the browser's transport, installed rather than built (task 35) ───────────
 //
 // On wasm32 there is no rustls arm and no TCP socket, so the `https` case cannot
