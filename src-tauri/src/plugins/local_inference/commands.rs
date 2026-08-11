@@ -35,7 +35,7 @@ use myne_core::plugins::attachments::extract_types::{ExtractStatus, SourceFormat
 use myne_core::plugins::notes::commands::note_read_with_dir;
 use myne_core::plugins::notes::note_id::NoteId;
 
-use super::cancel::{guarded_on_token, CancelRegistry, CancelToken};
+use super::cancel::{guarded_on_token, CancelReach, CancelRegistry, CancelToken, RequestCancel};
 use super::compute_priority::ComputePriority;
 use super::endpoint_config;
 use super::engine::{ChatMessage, ChatRole, Engine};
@@ -88,6 +88,7 @@ pub async fn infer(
     max_new_tokens: Option<usize>,
     state: State<'_, LocalInferenceState>,
     vault_state: State<'_, VaultRuntimeState>,
+    cancel_state: State<'_, CancelRegistry>,
     priority: State<'_, ComputePriority>,
 ) -> Result<String, EngineError> {
     // A user asked for this. Register for the whole call so a background
@@ -105,7 +106,19 @@ pub async fn infer(
         return Err(EngineError::VaultLocked);
     }
     state.refresh().await;
-    infer_with_engine(state.engine_for(INFER_CLASS)?, prompt, max_new_tokens).await
+    // Registered for the duration (myne-md/myne#445). Not for a Stop button —
+    // this surface has none, which is why the reach is `LockOnly` — but so the
+    // vault-lock teardown can abort it: before this, `cancel_all` found nothing
+    // to cancel while a provider request was in flight, so the request outlived
+    // the vault it was answering about and kept billing.
+    let cancel_guard = cancel_state.begin(CancelReach::LockOnly);
+    infer_with_engine(
+        state.engine_for(INFER_CLASS)?,
+        prompt,
+        max_new_tokens,
+        cancel_guard.request_cancel(),
+    )
+    .await
 }
 
 /// One-shot completion for an **ambient** surface — today, inline ghost text.
@@ -132,11 +145,17 @@ pub async fn infer_ambient(
     prompt: String,
     max_new_tokens: Option<usize>,
     state: State<'_, LocalInferenceState>,
+    cancel_state: State<'_, CancelRegistry>,
 ) -> Result<String, EngineError> {
+    // `LockOnly`, like `infer` — ghost text has no Stop of its own, and the
+    // seam bars it from a remote backend, but the loopback runtime it MAY reach
+    // is a socket that must not survive the lock either.
+    let cancel_guard = cancel_state.begin(CancelReach::LockOnly);
     infer_with_engine(
         state.engine_for(INFER_AMBIENT_CLASS)?,
         prompt,
         max_new_tokens,
+        cancel_guard.request_cancel(),
     )
     .await
 }
@@ -514,7 +533,11 @@ pub async fn transcribe<R: Runtime>(
     // takes its OWN token, so a prior Stop cannot reach it and a Stop on it
     // cannot reach a concurrent request. The guard deregisters on drop, so
     // every early return below also retires this request's entry.
-    let cancel_guard = cancel.begin();
+    //
+    // `StopAndLock`: transcription's Stop rides `chat_stop` (there is no second
+    // stop command), so it is one of the two surfaces a composer Stop may reach
+    // — which is exactly what it was before the reach became explicit (#445).
+    let cancel_guard = cancel.begin(CancelReach::StopAndLock);
 
     // Resolve the unlocked slot's key material + the active vault dir. This is
     // the only place with `.await` access to the slot map (mirror the
@@ -857,6 +880,7 @@ fn resolve_hit_texts<'b>(
 /// and calls the blocking `Engine.infer`. Returns the answer + the source set
 /// for citation. No streaming, no network; plaintext never hits disk/log here.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // Tauri State injections, not a design smell
 pub async fn ask<R: Runtime>(
     question: String,
     k: usize,
@@ -864,6 +888,7 @@ pub async fn ask<R: Runtime>(
     vault_state: State<'_, VaultRuntimeState>,
     engine_state: State<'_, LocalInferenceState>,
     vector_state: State<'_, LocalInferenceVectorState>,
+    cancel_state: State<'_, CancelRegistry>,
     priority: State<'_, ComputePriority>,
 ) -> Result<AskResult, EngineError> {
     let question = Zeroizing::new(question);
@@ -940,12 +965,18 @@ pub async fn ask<R: Runtime>(
     let prompt = rag::assemble_rag_prompt(&question, &chunk_texts);
 
     // 5. Generate off the async thread (blocking, no stream) — on the
-    //    GENERATION handle, which may be the named provider.
+    //    GENERATION handle, which may be the named provider. Registered so the
+    //    vault-lock teardown can abort it (#445); `LockOnly` because the Q&A
+    //    surface offers no Stop.
+    let cancel_guard = cancel_state.begin(CancelReach::LockOnly);
     let answer = {
         let engine = Arc::clone(&generator);
-        tokio::task::spawn_blocking(move || engine.infer(prompt.as_str()))
-            .await
-            .map_err(|_| EngineError::InferenceFailed)??
+        let cancel = cancel_guard.request_cancel();
+        tokio::task::spawn_blocking(move || {
+            engine.infer_cancellable(prompt.as_str(), None, cancel.as_fn())
+        })
+        .await
+        .map_err(|_| EngineError::InferenceFailed)??
     };
 
     Ok(AskResult {
@@ -1032,8 +1063,12 @@ pub async fn chat_stream<R: Runtime>(
 
     // Fresh generation → its own token (see the transcribe path above). No
     // reset: a new turn cannot inherit a stale flag it never shared.
-    let cancel_guard = cancel_state.begin();
+    //
+    // `StopAndLock`: the composer's Stop targets the newest turn with a Stop
+    // button, and this is the only surface that has one.
+    let cancel_guard = cancel_state.begin(CancelReach::StopAndLock);
     let cancel = cancel_guard.token().clone();
+    let request_cancel = cancel_guard.request_cancel();
 
     // 1. Embed the question off the async thread.
     let query_vec = {
@@ -1112,7 +1147,17 @@ pub async fn chat_stream<R: Runtime>(
             let mut cb = guarded_on_token(&cancel, |t| {
                 let _ = channel.send(t.to_string());
             });
-            engine.chat_streaming(system.as_str(), &messages, &mut cb)
+            // The publish-guard above stops a STREAMING engine at its emit seam.
+            // A provider does not stream — it blocks on one request and calls
+            // back once with the whole reply — so the predicate handed here is
+            // the only thing that can abort it mid-flight (#445), and it reads
+            // this turn's token rather than "is anything cancelled".
+            engine.chat_streaming_cancellable(
+                system.as_str(),
+                &messages,
+                &mut cb,
+                request_cancel.as_fn(),
+            )
         })
         .await
         .map_err(|_| EngineError::InferenceFailed)??
@@ -1410,13 +1455,16 @@ pub(crate) async fn infer_with_engine(
     engine: Arc<dyn Engine>,
     prompt: String,
     max_new_tokens: Option<usize>,
+    cancel: RequestCancel,
 ) -> Result<String, EngineError> {
     // First statement: bound the plaintext to a Zeroizing wrapper so every
     // early return (join failure, engine error) wipes the bytes.
     let prompt = Zeroizing::new(prompt);
-    let joined = tokio::task::spawn_blocking(move || match max_new_tokens {
-        Some(cap) => engine.infer_bounded(&prompt, cap),
-        None => engine.infer(&prompt),
+    // `RequestCancel` and not a bare `CancelledFn` (myne-md/myne#445): the only
+    // way to obtain one is from a registered `CancelGuard`, so a prompt cannot
+    // reach a backend without a token the vault-lock teardown can find.
+    let joined = tokio::task::spawn_blocking(move || {
+        engine.infer_cancellable(&prompt, max_new_tokens, cancel.as_fn())
     })
     .await;
     unwrap_join(joined, EngineError::InferenceFailed, "infer")
@@ -1470,11 +1518,27 @@ mod tests {
             .expect("current-thread runtime")
     }
 
+    /// A `RequestCancel` for a test that is not exercising cancellation.
+    ///
+    /// It still comes from a real registered guard, because that is the point of
+    /// the type — there is deliberately no way to fabricate one (#445). The
+    /// registry is leaked so the guard can outlive this call; a test process is
+    /// exactly where that is free.
+    fn uncancelled() -> RequestCancel {
+        let reg: &'static CancelRegistry = Box::leak(Box::new(CancelRegistry::default()));
+        Box::leak(Box::new(reg.begin(CancelReach::LockOnly))).request_cancel()
+    }
+
     #[test]
     fn infer_command_core_round_trips_prompt_to_result() {
         let engine: Arc<dyn Engine> = Arc::new(StubEngine);
         let out = rt()
-            .block_on(infer_with_engine(engine, "hello".to_string(), None))
+            .block_on(infer_with_engine(
+                engine,
+                "hello".to_string(),
+                None,
+                uncancelled(),
+            ))
             .expect("stub infer never fails");
         assert!(out.contains("hello"));
     }
@@ -1508,8 +1572,13 @@ mod tests {
     fn infer_command_core_routes_a_ceiling_to_the_bounded_path() {
         let seen = Arc::new(std::sync::Mutex::new(None));
         let engine: Arc<dyn Engine> = Arc::new(RecordingEngine { seen: seen.clone() });
-        rt().block_on(infer_with_engine(engine, "hi".to_string(), Some(24)))
-            .expect("recording engine never fails");
+        rt().block_on(infer_with_engine(
+            engine,
+            "hi".to_string(),
+            Some(24),
+            uncancelled(),
+        ))
+        .expect("recording engine never fails");
         assert_eq!(*seen.lock().expect("seen"), Some(Some(24)));
     }
 
@@ -1518,8 +1587,13 @@ mod tests {
         // The pre-#193 path must stay byte-identical for chat / `/devam`.
         let seen = Arc::new(std::sync::Mutex::new(None));
         let engine: Arc<dyn Engine> = Arc::new(RecordingEngine { seen: seen.clone() });
-        rt().block_on(infer_with_engine(engine, "hi".to_string(), None))
-            .expect("recording engine never fails");
+        rt().block_on(infer_with_engine(
+            engine,
+            "hi".to_string(),
+            None,
+            uncancelled(),
+        ))
+        .expect("recording engine never fails");
         assert_eq!(*seen.lock().expect("seen"), Some(None));
     }
 
@@ -1556,6 +1630,43 @@ mod tests {
         assert_eq!(
             local_inference_error_kind(&EngineError::ModelLoadFailed),
             "model_load_failed"
+        );
+    }
+
+    /// The WIRING, not the primitive (myne-md/myne#445, the #440 lesson).
+    ///
+    /// Every assertion in `cancel.rs` and the two engines would stay green if a
+    /// command here went back to handing its engine the fleet-wide flag — that
+    /// revert compiles, and nothing types it. Two things make it visible:
+    ///
+    ///  1. `RequestCancel` cannot be fabricated (only a `CancelGuard` mints
+    ///     one), which is why no command can call the core without registering;
+    ///  2. this sweep, which is what catches a command that registers a token
+    ///     and then polls something else anyway.
+    ///
+    /// A source sweep rather than a behavioural test because these are
+    /// `#[tauri::command]`s taking `State<'_, …>` — there is no app to drive
+    /// them against without a Tauri runtime, and a test that drove a *copy* of
+    /// the body would assert about the copy.
+    #[test]
+    fn no_command_hands_an_engine_the_fleet_wide_cancel_flag() {
+        let src = include_str!("commands.rs");
+        let production = &src[..src.find("#[cfg(test)]").expect("test module")];
+        assert!(
+            !production.contains("any_cancelled"),
+            "a command reached for the fleet-wide flag: cancelling one request \
+             would abort every other in flight"
+        );
+        // Every surface that carries a prompt to a backend registers, so the
+        // vault-lock teardown has something to find. Counted rather than merely
+        // present: a command that quietly stops registering is the regression,
+        // and `contains` would not see it.
+        assert_eq!(
+            production.matches(".begin(CancelReach::").count(),
+            5,
+            "expected exactly five registered surfaces — infer, infer_ambient, \
+             transcribe, ask, chat_stream. A new prompt-bearing command owes a \
+             registration; a vanished one is a request the lock cannot abort"
         );
     }
 
