@@ -1237,6 +1237,8 @@
       "attachUnsupported": "Only images and PDFs can be attached.",
       "attachFailed": "Couldn't attach that file.",
       "archiveFailed": "Couldn't archive this note.",
+      "aiRewriteFailed": "The rewrite could not be completed, so your selection is unchanged.",
+      "aiRewriteNoProvider": "No AI provider is set up, so nothing was rewritten. Set one up in Settings → Developer → AI.",
       "trashFailed": "Couldn't move this note to Trash."
     },
     "nav": {
@@ -1372,8 +1374,6 @@
         "vaultLocked": "The vault is locked. Unlock it, then try again."
       },
       "flow": {
-        "aiRewriteFailed": "The rewrite could not be completed, so your selection is unchanged.",
-        "aiRewriteNoProvider": "No AI provider is set up, so nothing was rewritten. Set one up in Settings → Developer → AI.",
         "couldNotRead": "This note could not be read.",
         "exportedTo": "Exported to {{filename}}",
         "exportedToWithAttachments_one": "Exported to {{filename}} + {{count}} attachment",
@@ -2730,7 +2730,7 @@
         "whoLabel": "Who receives it"
       },
       "disclosureToggle": "How does this work?",
-      "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
+      "enableHelper": "Runs a model you provide. Where it runs — and whether your notes leave this device — depends on the provider you name below. Experimental, off by default.",
       "enableLabel": "Enable local AI",
       "excludedHelper": "Notes in these folders are never read or indexed by AI. One folder path per line.",
       "excludedLabel": "Excluded folders",
