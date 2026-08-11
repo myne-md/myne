@@ -306,7 +306,14 @@ impl ConfiguredOllamaEngine {
         }
     }
 
-    fn resolve(&self) -> Result<OllamaEngine, EngineError> {
+    /// Resolve the endpoint and build the per-call engine, polling `cancelled`.
+    ///
+    /// It takes the predicate rather than reading `self.cancelled` so the
+    /// per-request path (myne-md/myne#445) can hand in **this** request's token
+    /// instead of the fleet-wide source baked in at plugin setup. The
+    /// non-cancellable methods pass `&self.cancelled`, which is the behaviour
+    /// #440 shipped and the honest answer for a caller that named no request.
+    fn resolve(&self, cancelled: &CancelledFn) -> Result<OllamaEngine, EngineError> {
         let endpoint = super::endpoint_config::read_endpoint(&self.config_path)
             .ok()
             .flatten()
@@ -316,22 +323,36 @@ impl ConfiguredOllamaEngine {
             endpoint.host,
             endpoint.port,
             endpoint.model,
-            Arc::clone(&self.cancelled),
+            Arc::clone(cancelled),
         ))
     }
 }
 
 impl Engine for ConfiguredOllamaEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
-        self.resolve()?.infer(prompt)
+        self.resolve(&self.cancelled)?.infer(prompt)
     }
 
     fn infer_bounded(&self, prompt: &str, max_new_tokens: usize) -> Result<String, EngineError> {
-        self.resolve()?.infer_bounded(prompt, max_new_tokens)
+        self.resolve(&self.cancelled)?
+            .infer_bounded(prompt, max_new_tokens)
+    }
+
+    fn infer_cancellable(
+        &self,
+        prompt: &str,
+        max_new_tokens: Option<usize>,
+        cancelled: &CancelledFn,
+    ) -> Result<String, EngineError> {
+        let engine = self.resolve(cancelled)?;
+        match max_new_tokens {
+            Some(cap) => engine.infer_bounded(prompt, cap),
+            None => engine.infer(prompt),
+        }
     }
 
     fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        self.resolve()?.embed(text)
+        self.resolve(&self.cancelled)?.embed(text)
     }
 
     fn chat_streaming(
@@ -340,11 +361,23 @@ impl Engine for ConfiguredOllamaEngine {
         messages: &[ChatMessage],
         on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
     ) -> Result<String, EngineError> {
-        self.resolve()?.chat_streaming(system, messages, on_token)
+        self.resolve(&self.cancelled)?
+            .chat_streaming(system, messages, on_token)
+    }
+
+    fn chat_streaming_cancellable(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
+        cancelled: &CancelledFn,
+    ) -> Result<String, EngineError> {
+        self.resolve(cancelled)?
+            .chat_streaming(system, messages, on_token)
     }
 
     fn served_model_identity(&self) -> Option<(String, String)> {
-        self.resolve().ok()?.served_model_identity()
+        self.resolve(&self.cancelled).ok()?.served_model_identity()
     }
 }
 
@@ -455,6 +488,7 @@ pub(crate) mod tests {
     use super::*;
     use std::io::{BufRead, Read};
     use std::net::TcpListener;
+    use std::path::PathBuf;
     use std::sync::mpsc;
     use std::time::Instant;
 
@@ -744,6 +778,126 @@ pub(crate) mod tests {
             started.elapsed() < Duration::from_secs(5),
             "cancel took {:?} — it waited for the idle deadline instead",
             started.elapsed()
+        );
+    }
+
+    /// A listener that accepts and then says nothing — a runtime that took the
+    /// request and is thinking. The socket is held so the connection stays open;
+    /// dropping it would make the read fail for the wrong reason.
+    fn silent_listener() -> (u16, std::sync::mpsc::Receiver<TcpStream>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            while let Ok((sock, _)) = listener.accept() {
+                if tx.send(sock).is_err() {
+                    return;
+                }
+            }
+        });
+        (port, rx)
+    }
+
+    /// An endpoint config naming a silent local listener, so the arm resolves
+    /// and reaches its transport with nothing to read.
+    fn configured_at(port: u16, cancelled: CancelledFn) -> (ConfiguredOllamaEngine, PathBuf) {
+        let p = std::env::temp_dir().join(format!("myne-test-endpoint-{port}.json"));
+        super::super::endpoint_config::write_endpoint(
+            &p,
+            &format!("http://127.0.0.1:{port}"),
+            "some-model",
+        )
+        .expect("write endpoint");
+        (ConfiguredOllamaEngine::new(p.clone(), cancelled), p)
+    }
+
+    /// Run `f` on its own thread and answer whether it returned inside `budget`.
+    ///
+    /// The deadline is the assertion, not a convenience: a per-call predicate
+    /// that never reaches the socket leaves the call waiting on `IDLE_TIMEOUT`
+    /// (90 s), and a test that eventually fails 90 seconds later is a test
+    /// nobody runs while injecting the defect it exists to catch.
+    fn finishes_within(budget: Duration, f: impl FnOnce() + Send + 'static) -> bool {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            f();
+            let _ = tx.send(());
+        });
+        rx.recv_timeout(budget).is_ok()
+    }
+
+    /// The per-request abort predicate wins over the one baked in at plugin
+    /// setup (myne-md/myne#445), asserted in **both** directions.
+    ///
+    /// Direction 1 is the fix: a request whose OWN token is cancelled aborts,
+    /// even though the construction-time source says nothing is cancelled.
+    /// Without the `infer_cancellable` override the trait default runs
+    /// `infer`, which polls the construction-time source, and the call sits on
+    /// the socket until the idle deadline — so this fails by name.
+    #[test]
+    fn a_per_request_cancel_aborts_even_when_the_construction_source_says_no() {
+        let (port, _held) = silent_listener();
+        let never_construction: CancelledFn = Arc::new(|| false);
+        let (engine, path) = configured_at(port, never_construction);
+        let mine: CancelledFn = Arc::new(|| true);
+
+        let aborted = finishes_within(Duration::from_secs(5), move || {
+            let _ = engine.infer_cancellable("x", None, &mine);
+        });
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            aborted,
+            "the engine polled the construction-time source instead of THIS \
+             request's token — the call waited for the idle deadline"
+        );
+    }
+
+    /// Direction 2 is the defect itself: another request being cancelled must
+    /// NOT abort this one. The construction-time source answers `true` (the
+    /// fleet-wide `any_cancelled` state that some *other* request produced) and
+    /// this request's own token is clear, so the call must keep waiting.
+    ///
+    /// Without the override — or with the two predicates OR'd together — the
+    /// call aborts at once and this fails by name.
+    ///
+    /// It then flips this request's OWN token, for two reasons: it proves the
+    /// call was alive and polling rather than merely wedged somewhere the
+    /// predicate never runs, and it retires the worker instead of leaving it on
+    /// the socket for the 90 s idle deadline.
+    #[test]
+    fn another_requests_cancel_does_not_abort_this_one() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let (port, _held) = silent_listener();
+        let someone_else_stopped: CancelledFn = Arc::new(|| true);
+        let (engine, path) = configured_at(port, someone_else_stopped);
+
+        let mine_cancelled = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&mine_cancelled);
+        let mine: CancelledFn = Arc::new(move || flag.load(Ordering::SeqCst));
+
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = engine.infer_cancellable("x", None, &mine);
+            let _ = tx.send(());
+        });
+
+        // Short budget on purpose: what is asserted is that the call is STILL
+        // running, not that it ever succeeds (nothing will answer).
+        let returned_early = rx.recv_timeout(Duration::from_secs(2)).is_ok();
+        assert!(
+            !returned_early,
+            "this request aborted because a DIFFERENT one was cancelled — the \
+             engine consulted the fleet-wide source rather than its own token"
+        );
+
+        mine_cancelled.store(true, Ordering::SeqCst);
+        let stopped = rx.recv_timeout(Duration::from_secs(5)).is_ok();
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            stopped,
+            "the request never observed its own cancel — it was not polling the \
+             predicate at all, which would make the assertion above vacuous"
         );
     }
 

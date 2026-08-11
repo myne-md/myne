@@ -36,6 +36,8 @@ use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use super::cancellable_io::CancelledFn;
+
 /// A cloneable, thread-safe abort flag for the active streaming generation.
 /// Clones share the same underlying flag (via `Arc`), so the streaming callback
 /// and the setters (composer Stop / vault-lock) all observe the same state.
@@ -76,13 +78,35 @@ pub fn guarded_on_token<'a>(
     }
 }
 
+/// Which abort paths may reach a request (myne-md/myne#445).
+///
+/// It exists because registering a request is now what makes the vault-lock
+/// teardown able to abort it, so every provider-bound command registers — and
+/// `cancel_newest`'s premise ("chat is the only registered surface, so *newest*
+/// is what a single Stop button means") stopped being true the moment a rewrite
+/// or a grounded answer took a token too. Without this distinction, pressing
+/// Stop in the composer while a rewrite happened to start later would abort the
+/// rewrite and leave the chat streaming.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CancelReach {
+    /// Both abort paths reach it: the composer's Stop **and** the vault-lock
+    /// teardown. Today exactly one surface — the streaming chat turn.
+    StopAndLock,
+    /// Only the vault-lock teardown reaches it. A request with no Stop button
+    /// of its own: `infer`, `infer_ambient`, `ask`. Registering them is not
+    /// cosmetic — before it, `cancel_all` had nothing to cancel while one was in
+    /// flight, so a provider request outlived the lock that dropped the vault it
+    /// was answering about, and on a metered API kept billing.
+    LockOnly,
+}
+
 /// Registry of the tokens for every in-flight streaming request.
 ///
 /// `BTreeMap` rather than a `Vec` so "the newest" is `last_key_value()` — ids
 /// are monotonic, so newest is well-defined even after out-of-order completion.
 #[derive(Default)]
 pub struct CancelRegistry {
-    inner: Mutex<BTreeMap<u64, CancelToken>>,
+    inner: Mutex<BTreeMap<u64, (CancelReach, CancelToken)>>,
     next_id: AtomicU64,
 }
 
@@ -90,13 +114,15 @@ impl CancelRegistry {
     /// Take a token for a new request. The returned guard deregisters on drop,
     /// so a panicking or early-returning command cannot leak an entry — which
     /// would make a later `cancel_newest` abort a request that already ended.
-    pub fn begin(&self) -> CancelGuard<'_> {
+    ///
+    /// `reach` says which abort paths may reach it; see [`CancelReach`].
+    pub fn begin(&self, reach: CancelReach) -> CancelGuard<'_> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let token = CancelToken::default();
         self.inner
             .lock()
             .expect("cancel registry mutex poisoned")
-            .insert(id, token.clone());
+            .insert(id, (reach, token.clone()));
         CancelGuard {
             registry: self,
             id,
@@ -115,20 +141,26 @@ impl CancelRegistry {
     /// always answered `false` — Stop and vault-lock were both inert against a
     /// provider.
     ///
-    /// **Coarser than per-request, and the bound is stated rather than hidden.**
-    /// A finished request's guard deregisters, so a stale cancelled token cannot
-    /// linger; but with two provider requests genuinely in flight, cancelling
-    /// one aborts both. That is the right trade today — the composer has a
-    /// single Stop and remote chat is one request at a time — and it is strictly
-    /// better than the previous answer, which was to abort neither. Making it
-    /// exact needs the request's token threaded into the engine call, which is a
-    /// trait change rather than a wiring one.
+    /// **No longer the abort source for a per-request engine call** (#445). The
+    /// four commands that carry a prompt to a backend each hand the engine a
+    /// [`RequestCancel`] built from their OWN token, so cancelling one no longer
+    /// reaches the others.
+    ///
+    /// What still rides this: the construction-time source baked into every
+    /// engine at plugin setup (`mod.rs::cancel_source`), which covers the calls
+    /// that take no per-request predicate — the loopback `embed`, the served
+    /// model-identity query, the provider model list. Those keep the coarse
+    /// behaviour, and it is coarse in both directions: with nothing registered
+    /// it answers `false`, so one of them in flight during a lock with no other
+    /// request open is not aborted at all. Narrowing that means threading a
+    /// predicate through those call sites too, which is worth doing when one of
+    /// them can run long enough to matter.
     pub fn any_cancelled(&self) -> bool {
         self.inner
             .lock()
             .expect("cancel registry mutex poisoned")
             .values()
-            .any(|t| t.is_cancelled())
+            .any(|(_, t)| t.is_cancelled())
     }
 
     /// Cancel one request by id. `false` when it already finished.
@@ -141,7 +173,7 @@ impl CancelRegistry {
     pub fn cancel(&self, id: u64) -> bool {
         let guard = self.inner.lock().expect("cancel registry mutex poisoned");
         match guard.get(&id) {
-            Some(t) => {
+            Some((_, t)) => {
                 t.cancel();
                 true
             }
@@ -149,11 +181,22 @@ impl CancelRegistry {
         }
     }
 
-    /// Cancel the newest in-flight request — the composer Stop path.
+    /// Cancel the newest in-flight request **that has a Stop button** — the
+    /// composer Stop path.
+    ///
+    /// Newest among [`CancelReach::StopAndLock`] only. A `LockOnly` request
+    /// (`infer`, `ask`) is registered so the vault-lock teardown can reach it,
+    /// not so an unrelated surface's Stop can: cancelling the newest *anything*
+    /// would mean a rewrite that started after the chat turn swallows the Stop
+    /// meant for the chat.
     pub fn cancel_newest(&self) -> bool {
         let guard = self.inner.lock().expect("cancel registry mutex poisoned");
-        match guard.last_key_value() {
-            Some((_, t)) => {
+        match guard
+            .iter()
+            .rev()
+            .find(|(_, (reach, _))| *reach == CancelReach::StopAndLock)
+        {
+            Some((_, (_, t))) => {
                 t.cancel();
                 true
             }
@@ -168,7 +211,7 @@ impl CancelRegistry {
     /// transcript. A per-request registry makes it possible to miss one; this
     /// is the method that must not.
     pub fn cancel_all(&self) {
-        for (_, t) in self
+        for (_, (_, t)) in self
             .inner
             .lock()
             .expect("cancel registry mutex poisoned")
@@ -187,6 +230,29 @@ impl CancelRegistry {
     }
 }
 
+/// The abort predicate for **one** request, obtainable only from a registered
+/// [`CancelGuard`] (myne-md/myne#445).
+///
+/// The newtype is the whole mechanism. [`CancelledFn`] is a bare
+/// `Arc<dyn Fn() -> bool>`, so a command could have handed its engine
+/// `Arc::new(|| false)` — or the fleet-wide [`CancelRegistry::any_cancelled`],
+/// which is what every one of them did — and neither the compiler nor a lint
+/// would have said anything. Requiring *this* type at the command core means a
+/// prompt cannot reach a backend unless a token for it exists in the registry,
+/// which is what turns the vault-lock teardown's totality from something a call
+/// site has to remember into something it cannot avoid.
+///
+/// Cheap to clone (one `Arc`), because the blocking engine call needs `'static`.
+#[derive(Clone)]
+pub struct RequestCancel(CancelledFn);
+
+impl RequestCancel {
+    /// The predicate, for handing to an [`super::engine::Engine`] method.
+    pub fn as_fn(&self) -> &CancelledFn {
+        &self.0
+    }
+}
+
 /// One request's cancellation handle. Deregisters itself on drop.
 pub struct CancelGuard<'a> {
     registry: &'a CancelRegistry,
@@ -197,6 +263,15 @@ pub struct CancelGuard<'a> {
 impl CancelGuard<'_> {
     pub fn token(&self) -> &CancelToken {
         &self.token
+    }
+
+    /// This request's own abort predicate — what the engine polls between
+    /// socket waits. Reads **only** this token, which is the whole point: the
+    /// engine aborts when *this* request is cancelled and not when some other
+    /// one is.
+    pub fn request_cancel(&self) -> RequestCancel {
+        let token = self.token.clone();
+        RequestCancel(Arc::new(move || token.is_cancelled()))
     }
 
     #[cfg(test)]
@@ -291,8 +366,8 @@ mod tests {
     #[test]
     fn cancelling_one_request_leaves_the_other_running() {
         let reg = CancelRegistry::default();
-        let a = reg.begin();
-        let b = reg.begin();
+        let a = reg.begin(CancelReach::StopAndLock);
+        let b = reg.begin(CancelReach::StopAndLock);
         assert!(reg.cancel(a.id()));
         assert!(a.token().is_cancelled());
         assert!(
@@ -304,9 +379,9 @@ mod tests {
     #[test]
     fn vault_lock_cancels_every_in_flight_request() {
         let reg = CancelRegistry::default();
-        let a = reg.begin();
-        let b = reg.begin();
-        let c = reg.begin();
+        let a = reg.begin(CancelReach::StopAndLock);
+        let b = reg.begin(CancelReach::StopAndLock);
+        let c = reg.begin(CancelReach::StopAndLock);
         reg.cancel_all();
         // Total by requirement — chat history is RAM-only and dropped on lock.
         for (name, g) in [("a", &a), ("b", &b), ("c", &c)] {
@@ -317,18 +392,95 @@ mod tests {
     #[test]
     fn composer_stop_hits_the_newest_request() {
         let reg = CancelRegistry::default();
-        let older = reg.begin();
-        let newer = reg.begin();
+        let older = reg.begin(CancelReach::StopAndLock);
+        let newer = reg.begin(CancelReach::StopAndLock);
         assert!(reg.cancel_newest());
         assert!(newer.token().is_cancelled());
         assert!(!older.token().is_cancelled());
+    }
+
+    /// The reach split (myne-md/myne#445).
+    ///
+    /// Registering `infer`/`ask` is what lets the vault-lock teardown abort a
+    /// provider request — but it also put them in the path of `cancel_newest`,
+    /// whose whole definition ("the newest") assumed chat was the only thing in
+    /// the map. Without the split, a rewrite that started after the chat turn
+    /// swallows the Stop the user pressed on the chat, and the chat keeps
+    /// streaming into the transcript they were trying to cut off.
+    #[test]
+    fn composer_stop_skips_a_request_with_no_stop_button_but_the_lock_does_not() {
+        let reg = CancelRegistry::default();
+        let chat = reg.begin(CancelReach::StopAndLock);
+        // Newer, and deliberately so: "newest" is what makes this fail if the
+        // reach is ignored.
+        let rewrite = reg.begin(CancelReach::LockOnly);
+
+        assert!(
+            reg.cancel_newest(),
+            "there IS a stoppable request in flight"
+        );
+        assert!(
+            chat.token().is_cancelled(),
+            "the Stop must reach the newest STOPPABLE request — the chat turn"
+        );
+        assert!(
+            !rewrite.token().is_cancelled(),
+            "a LockOnly request has no Stop button; a composer Stop must not \
+             abort it just because it started later"
+        );
+
+        // The lock is the path that must stay total, LockOnly included — that
+        // is the entire reason these register at all.
+        reg.cancel_all();
+        assert!(rewrite.token().is_cancelled(), "vault lock must be total");
+    }
+
+    /// With nothing stoppable in flight, Stop is a no-op rather than reaching
+    /// for whatever else happens to be registered.
+    #[test]
+    fn composer_stop_with_only_lock_only_requests_cancels_nothing() {
+        let reg = CancelRegistry::default();
+        let a = reg.begin(CancelReach::LockOnly);
+        let b = reg.begin(CancelReach::LockOnly);
+        assert!(!reg.cancel_newest(), "nothing has a Stop button");
+        assert!(!a.token().is_cancelled());
+        assert!(!b.token().is_cancelled());
+    }
+
+    /// The predicate an engine actually polls reads ONE token (#445).
+    ///
+    /// This is the primitive the four command call sites hand to the engine in
+    /// place of `any_cancelled`. Asserted in both directions: cancelling A must
+    /// abort A and must NOT abort B, and the vault-lock's total cancel must
+    /// reach both — the second half is what keeps the totality requirement true
+    /// after cancellation stopped being fleet-wide.
+    #[test]
+    fn a_request_cancel_answers_for_its_own_request_only() {
+        let reg = CancelRegistry::default();
+        let a = reg.begin(CancelReach::StopAndLock);
+        let b = reg.begin(CancelReach::LockOnly);
+        let (fa, fb) = (a.request_cancel(), b.request_cancel());
+
+        assert!(!fa.as_fn()(), "a fresh request is not cancelled");
+        assert!(!fb.as_fn()());
+
+        reg.cancel(a.id());
+        assert!(fa.as_fn()(), "A's predicate must see A's cancel");
+        assert!(
+            !fb.as_fn()(),
+            "B's predicate must NOT see A's cancel — this is the whole issue: \
+             `any_cancelled` answered true here and aborted B's request too"
+        );
+
+        reg.cancel_all();
+        assert!(fb.as_fn()(), "the vault-lock teardown must reach B as well");
     }
 
     #[test]
     fn a_finished_request_deregisters_and_cannot_be_cancelled_afterwards() {
         let reg = CancelRegistry::default();
         let id = {
-            let g = reg.begin();
+            let g = reg.begin(CancelReach::StopAndLock);
             assert_eq!(reg.in_flight(), 1);
             g.id()
         };
@@ -346,10 +498,10 @@ mod tests {
     fn a_new_request_is_never_born_cancelled() {
         let reg = CancelRegistry::default();
         {
-            let first = reg.begin();
+            let first = reg.begin(CancelReach::StopAndLock);
             first.token().cancel();
         }
-        let second = reg.begin();
+        let second = reg.begin(CancelReach::StopAndLock);
         assert!(!second.token().is_cancelled());
     }
 
@@ -366,7 +518,7 @@ mod tests {
         assert!(!reg.any_cancelled(), "idle registry cancels nothing");
 
         {
-            let a = reg.begin();
+            let a = reg.begin(CancelReach::StopAndLock);
             assert!(!reg.any_cancelled(), "a fresh request is not cancelled");
             reg.cancel_newest();
             assert!(reg.any_cancelled(), "composer Stop must reach the poll");
@@ -379,7 +531,7 @@ mod tests {
         );
 
         {
-            let _b = reg.begin();
+            let _b = reg.begin(CancelReach::StopAndLock);
             reg.cancel_all();
             assert!(
                 reg.any_cancelled(),

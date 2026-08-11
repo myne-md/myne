@@ -302,8 +302,15 @@ impl RemoteEngine {
 
     /// Resolve the authorization and the transport for this call, or the
     /// distinguishable refusal the UI renders (task 7's taxonomy).
+    ///
+    /// `cancelled` is what the transport polls while the provider is silent. It
+    /// is a parameter rather than a read of `self.cancelled` so the per-request
+    /// path (myne-md/myne#445) can hand in **this** request's token: the field
+    /// is filled once at plugin setup and can therefore only ever have been
+    /// fleet-wide, which made one request's Stop abort every other in flight.
     fn ready(
         &self,
+        cancelled: &super::cancellable_io::CancelledFn,
     ) -> Result<
         (
             RemoteProvider,
@@ -317,9 +324,34 @@ impl RemoteEngine {
         let provider = auth.provider();
         let transport = super::provider_transport::ProviderTransport::with_cancel(
             provider.host(),
-            std::sync::Arc::clone(&self.cancelled),
+            std::sync::Arc::clone(cancelled),
         );
         Ok((provider, auth.key().to_string(), transport))
+    }
+
+    /// The one body behind both chat entry points, so the cancellable and
+    /// non-cancellable arms cannot drift into two framings of the request.
+    fn chat_with(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
+        cancelled: &super::cancellable_io::CancelledFn,
+    ) -> Result<String, EngineError> {
+        let model = self.model()?;
+        let (provider, key, transport) = self.ready(cancelled)?;
+        let body = provider.build_chat_body(&model, system, messages);
+        let raw = transport
+            .post_json(provider.chat_path(), &body, &key)
+            .map_err(engine_error_of)?;
+        let text = provider.parse_chat_reply(&raw).map_err(|e| match e {
+            ProviderCodecError::Empty => EngineError::InferenceFailed,
+            ProviderCodecError::Malformed => EngineError::InferenceFailed,
+        })?;
+        if !text.is_empty() && on_token(&text).is_break() {
+            return Ok(text);
+        }
+        Ok(text)
     }
 
     /// The model the user named at this provider.
@@ -372,26 +404,51 @@ impl Engine for RemoteEngine {
         Err(EngineError::RemoteBarred)
     }
 
+    /// The cancellable counterpart of [`Engine::infer`] — same single-turn-chat
+    /// framing, with this request's own abort predicate.
+    ///
+    /// `max_new_tokens` is ignored, as it is on the non-cancellable arm: a
+    /// provider's generation ceiling is the model's and the account's, not a
+    /// number this client gets to impose per call.
+    fn infer_cancellable(
+        &self,
+        prompt: &str,
+        _max_new_tokens: Option<usize>,
+        cancelled: &super::cancellable_io::CancelledFn,
+    ) -> Result<String, EngineError> {
+        self.chat_with(
+            "",
+            &[ChatMessage {
+                role: ChatRole::User,
+                content: prompt.to_string(),
+            }],
+            &mut |_| ControlFlow::Continue(()),
+            cancelled,
+        )
+    }
+
     fn chat_streaming(
         &self,
         system: &str,
         messages: &[ChatMessage],
         on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
     ) -> Result<String, EngineError> {
-        let model = self.model()?;
-        let (provider, key, transport) = self.ready()?;
-        let body = provider.build_chat_body(&model, system, messages);
-        let raw = transport
-            .post_json(provider.chat_path(), &body, &key)
-            .map_err(engine_error_of)?;
-        let text = provider.parse_chat_reply(&raw).map_err(|e| match e {
-            ProviderCodecError::Empty => EngineError::InferenceFailed,
-            ProviderCodecError::Malformed => EngineError::InferenceFailed,
-        })?;
-        if !text.is_empty() && on_token(&text).is_break() {
-            return Ok(text);
-        }
-        Ok(text)
+        self.chat_with(
+            system,
+            messages,
+            on_token,
+            &std::sync::Arc::clone(&self.cancelled),
+        )
+    }
+
+    fn chat_streaming_cancellable(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
+        cancelled: &super::cancellable_io::CancelledFn,
+    ) -> Result<String, EngineError> {
+        self.chat_with(system, messages, on_token, cancelled)
     }
 }
 
@@ -416,6 +473,62 @@ pub fn engine_error_of(e: super::provider_transport::ProviderTransportError) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A fully-authorized prefs snapshot, so `ready` gets past the gate and
+    /// builds a transport — without it the refusal would come from somewhere
+    /// unrelated and the assertion below would prove nothing.
+    fn authorized_engine(construction: super::super::cancellable_io::CancelledFn) -> RemoteEngine {
+        RemoteEngine::new(
+            Box::new(|| {
+                Some((
+                    protocol::PrefsView {
+                        ai_enabled: true,
+                        developer_mode: true,
+                        ai_provider: Some("openrouter".into()),
+                        ai_provider_consent: Some("openrouter".into()),
+                        ai_provider_key: Some("sk-test".into()),
+                        ai_provider_model: Some("some/model".into()),
+                        ..protocol::PrefsView::default()
+                    },
+                    true,
+                ))
+            }),
+            construction,
+        )
+    }
+
+    /// The transport is handed **this request's** predicate, not the one baked
+    /// in at plugin setup (myne-md/myne#445).
+    ///
+    /// Asserted on `ready`, which does no I/O — the alternative, driving a real
+    /// completion and counting polls, makes the result depend on reaching
+    /// openrouter.ai, and then a count of zero means "offline" rather than
+    /// "wrongly wired". Both directions, because only the second one catches a
+    /// fix that OR-ed the two predicates together instead of replacing.
+    #[test]
+    fn the_transport_polls_this_requests_predicate_not_the_construction_one() {
+        let never: super::super::cancellable_io::CancelledFn = std::sync::Arc::new(|| false);
+        let always: super::super::cancellable_io::CancelledFn = std::sync::Arc::new(|| true);
+
+        // Construction says "nothing is cancelled"; this request says it is.
+        let engine = authorized_engine(std::sync::Arc::clone(&never));
+        let (_, _, transport) = engine.ready(&always).expect("authorized");
+        assert!(
+            transport.cancelled_now(),
+            "the transport must poll THIS request's token; it got the \
+             construction-time source, so a Stop on this request does nothing"
+        );
+
+        // The mirror, and the actual issue: construction says cancelled (some
+        // OTHER request was stopped) and this one is not.
+        let engine = authorized_engine(always);
+        let (_, _, transport) = engine.ready(&never).expect("authorized");
+        assert!(
+            !transport.cancelled_now(),
+            "a different request's cancel reached this one's transport — that \
+             is the fleet-wide abort #445 exists to remove"
+        );
+    }
 
     fn turns() -> Vec<ChatMessage> {
         vec![

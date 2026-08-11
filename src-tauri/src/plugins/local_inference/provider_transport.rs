@@ -234,6 +234,19 @@ impl ProviderTransport {
         }
     }
 
+    /// Test-only: what this transport's cancel predicate answers right now.
+    ///
+    /// It exists so a test can assert **which** predicate an engine handed over
+    /// (myne-md/myne#445) without opening a socket. Driving a real request to
+    /// count polls would make the assertion depend on reaching the provider —
+    /// and then a poll count of zero means "this machine is offline", not
+    /// "the wrong predicate was wired", which is the failure mode that makes a
+    /// test worse than none.
+    #[cfg(test)]
+    pub(super) fn cancelled_now(&self) -> bool {
+        (self.cancelled)()
+    }
+
     /// Open a verified TLS connection. There is exactly one of these, and it
     /// has no unverified sibling — the only way to get bytes to a provider is
     /// through a handshake the root store accepted.

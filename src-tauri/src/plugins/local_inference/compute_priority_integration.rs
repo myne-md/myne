@@ -222,10 +222,16 @@ fn a_user_infer_is_not_starved_by_a_running_tag_pass() {
     let user_pri = pri.clone();
     let user = std::thread::spawn(move || {
         let _interactive = user_pri.interactive();
+        // The third argument is a real registered request handle: `#445` made
+        // one obtainable only from a `CancelGuard`, precisely so a command
+        // cannot reach an engine without a token the vault lock can find.
+        let reg = crate::plugins::local_inference::cancel::CancelRegistry::default();
+        let guard = reg.begin(crate::plugins::local_inference::cancel::CancelReach::LockOnly);
         let out = rt().block_on(infer_with_engine(
             user_engine,
             "summarize this".to_string(),
             None,
+            guard.request_cancel(),
         ));
         let _ = done_tx.send(out);
     });

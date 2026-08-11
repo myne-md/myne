@@ -21,6 +21,7 @@
 
 use std::ops::ControlFlow;
 
+use super::cancellable_io::CancelledFn;
 use super::error::EngineError;
 
 /// Length of the **stub** embedding vector. The real embedding model
@@ -100,6 +101,54 @@ pub trait Engine: Send + Sync {
     /// degrades to "slower than it needed to be", never to a wrong answer.
     fn infer_bounded(&self, prompt: &str, _max_new_tokens: usize) -> Result<String, EngineError> {
         self.infer(prompt)
+    }
+
+    /// [`Engine::infer`] / [`Engine::infer_bounded`], plus **this request's own**
+    /// abort predicate (myne-md/myne#445).
+    ///
+    /// The two network-backed engines bake a `CancelledFn` in at construction,
+    /// because they are built once at plugin setup and the transport needs
+    /// something to poll while the far side is silent. That source was
+    /// necessarily fleet-wide — "is ANY in-flight request cancelled" — so one
+    /// request's Stop aborted every other one, and a command with no registered
+    /// token could not be aborted at all. This method is how a caller says
+    /// *which* request it is asking about.
+    ///
+    /// `max_new_tokens` carries the same UNTRUSTED-ceiling contract as
+    /// [`Engine::infer_bounded`], and `None` means the engine's own budget.
+    ///
+    /// Default: ignore `cancelled` and take the ordinary path — correct for
+    /// every engine whose cancellation already works at the emit seam (the
+    /// in-process Candle backend emits per token, so [`super::cancel::
+    /// guarded_on_token`] stops it), and for the stub. Only an engine that
+    /// blocks on a socket before producing anything needs to override.
+    fn infer_cancellable(
+        &self,
+        prompt: &str,
+        max_new_tokens: Option<usize>,
+        _cancelled: &CancelledFn,
+    ) -> Result<String, EngineError> {
+        match max_new_tokens {
+            Some(cap) => self.infer_bounded(prompt, cap),
+            None => self.infer(prompt),
+        }
+    }
+
+    /// [`Engine::chat_streaming`] with this request's own abort predicate — the
+    /// streaming counterpart of [`Engine::infer_cancellable`], and the one that
+    /// matters most: a remote provider does not stream, so `on_token` is called
+    /// once with the whole reply and the publish-guard only ever looks *after*
+    /// the request has already completed.
+    ///
+    /// Default: ignore `cancelled` and take the ordinary path.
+    fn chat_streaming_cancellable(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
+        _cancelled: &CancelledFn,
+    ) -> Result<String, EngineError> {
+        self.chat_streaming(system, messages, on_token)
     }
 
     /// Embedding vector for `text`. Real models return a fixed dimensionality

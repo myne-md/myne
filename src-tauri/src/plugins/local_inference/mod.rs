@@ -204,9 +204,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                     .with_active_vault_reader(active_vault_reader(app.clone())),
             );
             app.manage(vector_store::LocalInferenceVectorState::default());
-            // Shared cancel flag for the streaming chat surface (task 4/5): the
-            // `chat_stream` generation observes it; `chat_stop` and the vault-
-            // lock teardown (task 12) set it.
+            // Per-request cancel tokens (task 4/5). Every command that carries a
+            // prompt to a backend takes one for the duration and hands the
+            // engine a predicate reading ONLY its own token (#445); `chat_stop`
+            // cancels the newest request that has a Stop button, and the
+            // vault-lock teardown (task 12) cancels every one of them.
             app.manage(cancel::CancelRegistry::default());
             // Compute-lock priority register (auto-tag, MYND-651 task 4): the
             // user-initiated commands register here for the length of their
@@ -360,7 +362,16 @@ pub(crate) fn resolve_backends(
 /// Every failure resolves to `None`, which the seam reads as the local arm:
 /// no active vault, no vault directory, a locked slot, an unreadable blob. The
 /// fail-closed direction here is "answer locally", never "assume configured".
-/// The abort source the provider transport polls (myne-md/myne#440).
+/// The **fallback** abort source baked into every engine at plugin setup
+/// (myne-md/myne#440), for the calls that name no request.
+///
+/// Since #445 the four prompt-bearing commands hand their engine a predicate
+/// reading their own token instead, so this no longer decides whether a chat
+/// turn or a rewrite can be stopped. What still rides it: the loopback `embed`,
+/// the served model-identity query, the provider model list — short calls with
+/// no `CancelGuard` of their own. It stays fleet-wide and therefore coarse in
+/// both directions, which is stated on [`cancel::CancelRegistry::any_cancelled`]
+/// rather than left to be discovered.
 ///
 /// `false` until the registry exists — during plugin setup the engines are built
 /// before `app.manage`, and "not yet cancellable" is the correct answer for a
