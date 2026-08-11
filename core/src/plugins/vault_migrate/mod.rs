@@ -698,6 +698,14 @@ pub async fn migrate_vault_notes_on_disk(
         // through the same `quick_unlock_invalidate` the change-password path uses.)
         "vault.quickunlock",
         "vault.quickunlock.attempts",
+        // The device-local sync baseline (`MYH1`, §9.16) is the last vault head
+        // this device accepted, and its integrity is that head's own HMAC under
+        // `vault-head-mac` — a subkey of the root_key this migration just
+        // replaced. It therefore fails its OWN verification from here on, so it
+        // is a rebuildable-cache case rather than a preserved one: dropping it
+        // puts the next cycle on the bootstrap path, which is exactly right for a
+        // vault whose head generation is about to be re-based (#429).
+        "vault.head-state",
     ] {
         let _ = io.remove_file(&vault_root.join(stale)).await;
     }
@@ -709,6 +717,21 @@ pub async fn migrate_vault_notes_on_disk(
         .remove_dir_all(&vault_root.join("attachments-text"))
         .await;
 
+    // (5d) Re-base the SYNC plane onto the new generation (#429).
+    //
+    // A re-key invalidates four root-derived sync artefacts at once, and the
+    // migration used to touch none of them: the vault-head MAC, the device-local
+    // head baseline (dropped just above), the SCRAM verifier, and the reserved
+    // sync-ids of the three synced singletons. Left alone, the very next cycle
+    // reads the server's stale-generation head as a FORGERY and tells the user
+    // their server may be tampering with their data — forever, because the cycle
+    // aborts before it could ever re-author the head.
+    //
+    // Best-effort: `NTV5` is about to commit and a sync-bookkeeping failure must
+    // not turn a completed re-key into an error. A device that misses this
+    // re-bases on its next unlock instead, from the same flag.
+    rebase_sync_plane_after_rekey(io, vault_root, old_root_key, &out.new_root_key).await;
+
     // (6) Write the NTV5 vault.meta LAST — the atomic commit point.
     io.write(&meta_path, &out.ntv5_meta, WriteOpts::default())
         .await
@@ -718,6 +741,78 @@ pub async fn migrate_vault_notes_on_disk(
         notes_migrated: out.notes.len(),
         singletons_migrated,
     })
+}
+
+/// Point this device's sync bookkeeping at the new key generation (#429).
+///
+/// Three things have to be true before the next cycle runs, and the migration is
+/// the only place that knows all three:
+///
+/// 1. **The re-base flag is armed.** The server still holds a head MAC'd under
+///    the old `root_key`; without the flag the pull reads it as a forged head,
+///    raises the malicious-server alert and aborts before the push — so the head
+///    is never re-authored and the state feeds itself.
+/// 2. **`vault.meta` is marked dirty.** The `NTV5` meta must reach the server, or
+///    a second device can never learn the vault was re-keyed (it fetches the meta
+///    to derive the new root). The meta phase already knows how to push a dirty
+///    meta; it just needs to be told there is one.
+/// 3. **The old singletons' CAS baselines are dropped.** `prefs`/`catalog`/
+///    `themes` ride reserved sync-ids derived from `root_key`, so all three
+///    CHANGE with the re-key. Their old baselines describe blobs this device can
+///    no longer read and will never push again.
+///
+/// **Known, deliberate leftover:** the blobs behind those three old ids stay on
+/// the server. Horizon-GC reclaims `deleted`-marked records only, and nothing
+/// marks these — a live record simply loses its last reader. They are inert (the
+/// puller's `read_myn_content_nonce` accepts `MY01`/`NC05` magic only, so a
+/// stray `MYP1`/`MYT1`/`MYC1` is skipped, never written as a note), so this is
+/// storage debt rather than a defect. Reclaiming them needs a tombstone push for
+/// an id that is in no local manifest, which is a mechanism of its own; tracked
+/// separately rather than folded into the wedge fix.
+///
+/// Best-effort throughout: a re-key that has already re-written every note must
+/// not fail on sync bookkeeping. A device that misses this still re-bases later,
+/// because the flag is read on every cycle rather than consumed once here.
+async fn rebase_sync_plane_after_rekey(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    old_root_key: &[u8; 32],
+    new_root_key: &[u8; 32],
+) {
+    use crate::plugins::sync::orchestrator::{catalog_sync_id, prefs_sync_id, themes_sync_id};
+    use crate::plugins::sync::state::{mark_vault_meta_dirty, read_sync_state, write_sync_state};
+
+    let Ok(mut state) = read_sync_state(io, vault_root).await else {
+        // Present and unreadable — NOT the same as absent, and the one case where
+        // writing would destroy the cursor, the VV log and every CAS baseline.
+        // Leave it alone; sync is already in a state a human has to look at.
+        return;
+    };
+    if state.device_id_hex.is_none() {
+        return; // never enrolled — there is no sync plane to re-base
+    }
+    state.rekey_rebase_pending = true;
+    for id in [
+        catalog_sync_id(old_root_key),
+        prefs_sync_id(old_root_key),
+        themes_sync_id(old_root_key),
+    ] {
+        state.blobs.remove(&crate::plugins::sync::to_hex(&id));
+    }
+    // Asserted rather than assumed: the new ids must not collide with the old
+    // ones, or the removals above would delete a baseline the new generation is
+    // about to need. They are HKDF outputs under different roots, so this holds
+    // by construction — but the removal is destructive and the check is free.
+    debug_assert!(prefs_sync_id(old_root_key) != prefs_sync_id(new_root_key));
+    if write_sync_state(io, vault_root, &state).await.is_err() {
+        tracing::warn!(
+            target: "vault_migrate",
+            event = "sync_rebase_state_write_failed",
+            "post-migration sync re-base flag not persisted; the next cycle may alarm"
+        );
+        return;
+    }
+    let _ = mark_vault_meta_dirty(io, vault_root).await;
 }
 
 #[cfg(test)]
@@ -1142,6 +1237,109 @@ mod tests {
                     .unwrap(),
                 "the slot is populated after the NTV5 re-unlock"
             );
+        })
+    }
+
+    /// A migration on a SYNC-ENROLLED device must hand the sync plane over to the
+    /// new key generation (myne-md/myne#429).
+    ///
+    /// The re-key replaces `root_key`, and four sync artefacts hang off it: the
+    /// vault-head MAC, the device-local head baseline, the SCRAM verifier, and
+    /// the reserved sync-ids of the three synced singletons. The migration used
+    /// to touch none of them, so the next cycle read the server's
+    /// previous-generation head as a FORGERY, raised the malicious-server alert,
+    /// and aborted before the push — never re-authoring the head, so the state
+    /// fed itself forever.
+    ///
+    /// Each assertion below is one leg of that, and each is separately
+    /// falsifiable: removing any single leg leaves the others green.
+    #[test]
+    fn a_migration_hands_the_sync_plane_to_the_new_key_generation() {
+        use crate::plugins::sync::orchestrator::{catalog_sync_id, prefs_sync_id, themes_sync_id};
+        use crate::plugins::sync::state::{
+            read_sync_state, vault_meta_is_dirty, write_sync_state, BlobSyncState, SyncState,
+        };
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-rebase").unwrap();
+            let host = TestHost::new(tmp.path());
+            let io = StdVaultIo;
+            let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            io.create_dir_all(&vault_root.join("notes")).await.unwrap();
+            build_myv1_vault(&io, &vault_root).await;
+
+            // An enrolled device mid-sync: a cursor, a device id, and CAS
+            // baselines for all three root-derived singleton sync-ids.
+            let mut seeded = SyncState {
+                cursor: 42,
+                device_id_hex: Some("aa".repeat(16)),
+                account_hash_hex: Some("bb".repeat(16)),
+                ..SyncState::default()
+            };
+            let old_ids = [
+                catalog_sync_id(&OLD_ROOT),
+                prefs_sync_id(&OLD_ROOT),
+                themes_sync_id(&OLD_ROOT),
+            ];
+            for id in &old_ids {
+                seeded.blobs.insert(
+                    crate::plugins::sync::to_hex(id),
+                    BlobSyncState {
+                        version: 7,
+                        content_nonce_hex: "cc".repeat(24),
+                        doc_heads_hex: Vec::new(),
+                    },
+                );
+            }
+            write_sync_state(&io, &vault_root, &seeded).await.unwrap();
+            // The device-local head baseline (`MYH1`), whose integrity is the
+            // head's own HMAC under a subkey of the root about to be replaced.
+            io.write(
+                &vault_root.join("vault.head-state"),
+                b"MYH1-placeholder",
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+
+            let state = VaultRuntimeState::default();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io)
+                .await
+                .expect("migration succeeds");
+
+            let after = read_sync_state(&io, &vault_root).await.unwrap();
+            // (1) The next pull is allowed to see an unopenable head once, instead
+            //     of accusing the server of forging it.
+            assert!(
+                after.rekey_rebase_pending,
+                "the re-base exemption must be armed for the next cycle"
+            );
+            // (2) The head baseline is gone: it can no longer verify its own MAC.
+            assert!(
+                io.read(&vault_root.join("vault.head-state")).await.is_err(),
+                "the stale-generation head baseline must not survive the re-key"
+            );
+            // (3) The NTV5 meta is queued for the server, or a second device can
+            //     never learn the vault was re-keyed.
+            assert!(
+                vault_meta_is_dirty(&io, &vault_root).await,
+                "the migrated vault.meta must be queued for push"
+            );
+            // (4) The old singletons' CAS baselines describe blobs under sync-ids
+            //     this vault no longer derives.
+            for id in &old_ids {
+                assert!(
+                    !after.blobs.contains_key(&crate::plugins::sync::to_hex(id)),
+                    "a previous-generation singleton baseline survived the re-key"
+                );
+            }
+            // (5) …and the rest of the enrolment is untouched: re-basing is not
+            //     re-enrolling, and dropping these would cost the device its
+            //     identity and every note's CAS base.
+            assert_eq!(after.cursor, 42);
+            assert_eq!(after.device_id_hex, seeded.device_id_hex);
+            assert_eq!(after.account_hash_hex, seeded.account_hash_hex);
         })
     }
 

@@ -3128,6 +3128,7 @@
   "sync": {
     "materialising": "Downloading your notes — {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",
     "credentialAmbiguous": "Your password may have changed on this device and on another, and Myne can't tell which is newer — so it hasn't changed anything. Sign in on a device that already has access to sort it out.",
+    "vaultRekeyed": "This vault was upgraded to the new format on another device. Unlock again to continue \u2014 nothing was lost.",
     "attachments": {
       "aria": {
         "downloading": "Downloading {{name}}",

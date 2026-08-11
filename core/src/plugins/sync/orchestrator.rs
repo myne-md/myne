@@ -152,9 +152,57 @@ pub enum SyncCycleError {
     StorageFull,
     /// Head authoring (manifest hash / seal) failed.
     Head,
+    /// The vault was re-keyed by the §10.4.1 migration on **another device**
+    /// (myne-md/myne#429): the server's head does not open under this device's
+    /// `root_key`, and the server's `vault.meta` is a NEWER generation than the
+    /// local one.
+    ///
+    /// Split out of `Pull(HeadInvalid)` because the two are byte-identical at the
+    /// pull and mean opposite things. A head that will not open is normally
+    /// evidence of forgery and earns the malicious-server alert; here it is the
+    /// expected consequence of a migration the user themselves ran elsewhere, and
+    /// the alert would be a false accusation the user cannot act on. The
+    /// disambiguating fact is the server's meta generation, which no attacker can
+    /// forge into being — a v0.2 meta only opens under credentials the user holds.
+    ///
+    /// The remedy is not a retry: this device must adopt the new meta and
+    /// re-unlock, so the cycle boundary locks the vault and says so.
+    RekeyedElsewhere,
 }
 
 use super::to_hex as hex;
+
+/// Whether the server holds a `vault.meta` of a NEWER generation than this
+/// device's — i.e. someone ran the §10.4.1 migration on another device
+/// (myne-md/myne#429).
+///
+/// Consulted only to disambiguate an unopenable head, and deliberately
+/// conservative: any doubt (transport failure, unreadable local meta, an
+/// undecodable server meta) answers `false`, which leaves the ordinary
+/// integrity path in charge. A false `true` would suppress a genuine
+/// malicious-server alert, so the bar is "the server demonstrably holds a
+/// generation this device cannot have written".
+async fn server_meta_is_newer_generation(
+    transport: &dyn SyncTransport,
+    token: &str,
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+) -> bool {
+    let Ok(local) = io.read(&vault_root.join("vault.meta")).await else {
+        return false;
+    };
+    // Already v0.2 locally? Then a newer generation is not what this is.
+    if protocol::meta_version_of(&local) != Some(protocol::MetaVersion::V0_1) {
+        return false;
+    }
+    let Ok(resp) = transport.request(HttpMethod::Get, "/vault.meta", &[], Some(token)) else {
+        return false;
+    };
+    if resp.status != 200 {
+        return false;
+    }
+    protocol::meta_version_of(&resp.body) == Some(protocol::MetaVersion::V0_2)
+}
 
 /// Parse a 32-hex blob-id key from `state.blobs` back to its 16 bytes. `None`
 /// for anything malformed (defensive — the state file is device-local JSON).
@@ -2164,6 +2212,11 @@ async fn sync_cycle_attempt(
     {
         local.insert(themes_id, n);
     }
+    // This device re-keyed the vault locally (§10.4.1 migration, #429), so the
+    // head the server still holds cannot open under the new `root_key`. Let the
+    // pull take its id instead of reading it as a forgery; the head-authoring
+    // block below re-bases onto that id and clears the flag.
+    let rekey_rebase = state.rekey_rebase_pending;
     let page = match engine::pull_to_stable(
         transport,
         root_key,
@@ -2172,6 +2225,7 @@ async fn sync_cycle_attempt(
         from_cursor,
         &local,
         false,
+        rekey_rebase,
     ) {
         Ok(p) => p,
         Err(PullError::CursorExpired) => {
@@ -2180,8 +2234,29 @@ async fn sync_cycle_attempt(
             write_sync_state(io, vault_root, state)
                 .await
                 .map_err(|_| SyncCycleError::Io)?;
-            engine::pull_to_stable(transport, root_key, token, baseline_vv, 0, &local, true)
-                .map_err(SyncCycleError::Pull)?
+            engine::pull_to_stable(
+                transport,
+                root_key,
+                token,
+                baseline_vv,
+                0,
+                &local,
+                true,
+                rekey_rebase,
+            )
+            .map_err(SyncCycleError::Pull)?
+        }
+        // A head that will not open is normally a forgery. On a device whose
+        // sibling just ran the §10.4.1 migration it is instead the expected
+        // consequence of a re-key, and the two are indistinguishable at the pull.
+        // Ask the one question that separates them (#429): is the server's
+        // `vault.meta` a NEWER generation than ours? Only the migration produces
+        // that, and no server can fabricate it — a v0.2 meta opens only under
+        // credentials the user holds.
+        Err(PullError::HeadInvalid)
+            if server_meta_is_newer_generation(transport, token, io, vault_root).await =>
+        {
+            return Err(SyncCycleError::RekeyedElsewhere)
         }
         Err(e) => return Err(SyncCycleError::Pull(e)),
     };
@@ -3203,11 +3278,27 @@ async fn sync_cycle_attempt(
     // one. `None` means "the pulled head is still current" — see the corpus block
     // below, which is the only reader.
     let mut final_head_manifest_hash: Option<[u8; 32]> = None;
-    if !to_push.is_empty() || (allow_push && page.head.is_none()) {
+    // A re-key re-base MUST author a head even with nothing to push (#429): the
+    // stale-generation head is the thing being replaced, and waiting for an edit
+    // would leave the vault head unopenable — and this device's own sync
+    // wedged — until the user happens to type something.
+    let rebasing = page.unverifiable_head_id.is_some();
+    if !to_push.is_empty() || (allow_push && page.head.is_none()) || rebasing {
         // Author a linear-advance head over the current (post-pull) head: bump
         // this device's VV component, seq+1, parent = the server's current head
         // (genesis = the zero prev the server's first-head CAS expects).
-        let prev_head_id: [u8; 32] = page.head.as_ref().map(|h| h.head_id).unwrap_or([0u8; 32]);
+        //
+        // On a re-base the parent is the id of the head we could not open. The
+        // server's head CAS compares `SHA-256(record)`, which is keyless, so the
+        // advance lands even though nothing in the old head was readable — the
+        // new generation starts from a fresh VV and `seq`, because an unopened
+        // head contributes neither.
+        let prev_head_id: [u8; 32] = page
+            .head
+            .as_ref()
+            .map(|h| h.head_id)
+            .or(page.unverifiable_head_id)
+            .unwrap_or([0u8; 32]);
         let base_vv: Vec<VvEntry> = page
             .head
             .as_ref()
@@ -3226,7 +3317,7 @@ async fn sync_cycle_attempt(
             .map(|h| h.head.seq)
             .unwrap_or(baseline_seq)
             + 1;
-        let prev_head_hash = if page.head.is_some() {
+        let prev_head_hash = if page.head.is_some() || rebasing {
             vec![prev_head_id]
         } else {
             Vec::new()
@@ -3297,6 +3388,14 @@ async fn sync_cycle_attempt(
             }
             pushed += outcome.results.len();
             head_advanced |= outcome.head_id.is_some();
+            // The re-based head landed → the exemption is spent (#429). Cleared
+            // HERE, on the server's acknowledgement, rather than optimistically
+            // when the migration set it: a re-base that never reached the server
+            // must stay pending, or the next cycle reads the stale-generation
+            // head as a forgery again and this time raises the alarm.
+            if rekey_rebase && outcome.head_id.is_some() {
+                state.rekey_rebase_pending = false;
+            }
             // The prefs push landed → its shared-subset hash is the new push-gate
             // baseline (MYND-478, §10.2.1).
             if outcome.results.iter().any(|(id, _)| *id == prefs_id) {
