@@ -118,7 +118,7 @@ const ALLOWED = new Map([
 
   // ── legitimately v0.1: THE V0.1 SIDE, BY CONSTRUCTION ─────────────────────
   ["core/src/plugins/vault_creation/commands.rs#kek", [3, "a newly created vault IS v0.1"]],
-  ["core/src/plugins/vault_migrate/mod.rs#kek", [3, "the migration reads the OLD vault under the OLD keys"]],
+  ["core/src/plugins/vault_migrate/mod.rs#kek", [4, "the migration reads the OLD vault under the OLD keys (incl. the #441 fail-closed pre-flight)"]],
   ["core/src/plugins/vault_migrate/mod.rs#meta", [1, "the migration parses the OLD `MYV1` meta"]],
   ["core/src/plugins/vault_migrate/mod.rs#note", [1, "the migration decodes the OLD `MY01` notes"]],
   ["core/src/plugins/notes/decode.rs#note", [1, "IS the dispatcher's v0.1 arm"]],
