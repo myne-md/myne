@@ -204,13 +204,28 @@ pub(super) fn capability_report_from(
     embedding_model: bool,
     transcription_model: bool,
 ) -> AiCapabilityReport {
-    let engine = state.engine_unclassified();
     // Generation and transcription are user-initiated; embedding and auto-tag
     // carry the SYNC-14/16 bars, so ask the seam rather than re-deriving them
     // here — a policy restated at a second site is a policy that will disagree.
+    //
+    // Each row asks the SAME engine its command will actually use
+    // (myne-md/myne#438). The report used to take one unclassified engine for
+    // every row, which is wrong in exactly the configuration the provider epic
+    // added: the ambient/user-initiated split means the arm that answers
+    // auto-tag is not the arm that answers generation.
     let generation = match state.engine_for(RequestClass::UserInitiated) {
         Err(cause) => FeatureStatus::blocked(cause),
-        Ok(_) if !generation_model => FeatureStatus::blocked(EngineError::NoModel),
+        // A locally side-loaded GGUF is required only by the in-process arm. A
+        // remote provider or a loopback runtime BRINGS ITS OWN model, which is
+        // the entire point of naming one — reporting `NoModel` there told a user
+        // whose generation demonstrably works that the feature is unavailable.
+        Ok(_)
+            if !generation_model
+                && state.class_for(RequestClass::UserInitiated)
+                    == Ok(super::state::BackendClass::InProcessLocal) =>
+        {
+            FeatureStatus::blocked(EngineError::NoModel)
+        }
         Ok(_) => FeatureStatus::ok(),
     };
     let embedding = match state.embedding_engine() {
@@ -230,7 +245,10 @@ pub(super) fn capability_report_from(
     };
     let auto_tag = match state.engine_for(RequestClass::Ambient) {
         Err(cause) => FeatureStatus::blocked(cause),
-        Ok(_) if !engine.tag_model_available() => FeatureStatus::blocked(EngineError::NoModel),
+        // THIS engine, not the active one. The gate already resolved the ambient
+        // arm — asking a different engine whether it has a tag model is how the
+        // report came to answer `false` for a build whose `suggest_tags` works.
+        Ok(engine) if !engine.tag_model_available() => FeatureStatus::blocked(EngineError::NoModel),
         Ok(_) => FeatureStatus::ok(),
     };
     AiCapabilityReport {

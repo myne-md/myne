@@ -418,6 +418,27 @@ impl LocalInferenceState {
     /// An [`RequestClass::Ambient`] request is refused a
     /// [`BackendClass::Remote`] backend — the rule lives here, in the seam, so
     /// no caller can opt out of it and no setting can turn it off.
+    /// The BACKEND CLASS that [`Self::engine_for`] would resolve for `class`.
+    ///
+    /// Exists because the capability report has to ask "does the engine that
+    /// will actually serve this need a side-loaded model file?", and the answer
+    /// is a property of the arm rather than of the state's ACTIVE arm — an
+    /// ambient request can be barred onto the local arm while the active one is
+    /// remote (myne-md/myne#438). Deriving it from `active_class()` would
+    /// therefore be right for one row and wrong for another, which is precisely
+    /// the bug this closes.
+    pub fn class_for(&self, class: RequestClass) -> Result<BackendClass, EngineError> {
+        if class == RequestClass::Ambient && self.active_class() == BackendClass::Remote {
+            return self
+                .backends
+                .iter()
+                .find(|b| b.class != BackendClass::Remote)
+                .map(|b| b.class)
+                .ok_or(EngineError::RemoteBarred);
+        }
+        Ok(self.backends[self.active()].class)
+    }
+
     pub fn engine_for(&self, class: RequestClass) -> Result<Arc<dyn Engine>, EngineError> {
         if class == RequestClass::Ambient && self.active_class() == BackendClass::Remote {
             return self.non_remote_engine();
