@@ -16,6 +16,12 @@
 //    the transport refuses to connect at all rather than falling back to a
 //    direct connection, so without this strip a paused sync is silent. Absent
 //    the `torRouting` capability the posture is `null` and nothing renders.
+//  - RekeyedElsewhereBanner: the vault was migrated to v0.2 on ANOTHER device
+//    (myne-md/myne#429). The engine emits `sync://vault-rekeyed` and locks the
+//    vault at the cycle boundary, so this strip exists to explain a lock the
+//    user did not ask for. NOT dismissable, for the same reason as the one
+//    below: the session is already locked and the only way forward is to unlock
+//    again, so hiding the sentence would leave an unexplained lock screen.
 //  - CredentialAmbiguousBanner: the meta phase refused to adopt the server's
 //    `vault.meta` because the password-side wraps differ and no baseline says
 //    which side moved (phase3-web-client task 88). NOT dismissable, unlike the
@@ -45,6 +51,7 @@ export function SyncBanners() {
   const [reconcileDismissed, setReconcileDismissed] = useState(false);
   const [integrity, setIntegrity] = useState(false);
   const [credentialAmbiguous, setCredentialAmbiguous] = useState(false);
+  const [rekeyedElsewhere, setRekeyedElsewhere] = useState(false);
   // First-sync materialisation (task 39). Counts, never a percentage or an ETA:
   // the measured cost spans 6× across engines at the same note count, so an ETA
   // would be wrong by that factor on whichever browser the user is running.
@@ -79,6 +86,7 @@ export function SyncBanners() {
     void sub("sync://reconcile-finished", armReconcile);
     void sub("sync://integrity-alert", () => setIntegrity(true));
     void sub("sync://credential-ambiguous", () => setCredentialAmbiguous(true));
+    void sub("sync://vault-rekeyed", () => setRekeyedElsewhere(true));
     return () => {
       cancelled = true;
       for (const fn of unlisteners) fn();
@@ -88,7 +96,14 @@ export function SyncBanners() {
   const showReconcile = reconcileActive && !reconcileDismissed;
   const showMaterialising = materialising !== null && materialising.active;
   const showTor = torPosture === "connecting" || torPosture === "unavailable";
-  if (!showReconcile && !integrity && !credentialAmbiguous && !showMaterialising && !showTor) {
+  if (
+    !showReconcile &&
+    !integrity &&
+    !credentialAmbiguous &&
+    !rekeyedElsewhere &&
+    !showMaterialising &&
+    !showTor
+  ) {
     return null;
   }
 
@@ -154,6 +169,28 @@ export function SyncBanners() {
           }}
         >
           <span>{t("sync.credentialAmbiguous")}</span>
+        </div>
+      )}
+      {rekeyedElsewhere && (
+        // Informational, not an alarm: nothing went wrong and nothing was lost.
+        // The user (or their other device) upgraded this vault's format, and
+        // this session's keys are simply the previous generation's.
+        <div
+          role="status"
+          data-testid="sync.vault-rekeyed"
+          style={{
+            display: "flex",
+            gap: "var(--space-2)",
+            padding: "var(--space-3) var(--space-4)",
+            borderRadius: "var(--radius-2)",
+            border: "1px solid var(--line-1)",
+            background: "var(--bg-2)",
+            color: "var(--fg-1)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          <span>{t("sync.vaultRekeyed")}</span>
         </div>
       )}
     </div>

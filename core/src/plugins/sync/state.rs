@@ -142,6 +142,27 @@ pub struct SyncState {
     /// meta yet. Device-local; not a credential (a hash of already-public bytes).
     #[serde(default)]
     pub meta_baseline_hex: Option<String>,
+    /// Set by the v0.1 → v0.2 migration (§10.4.1, myne-md/myne#429): this device
+    /// re-keyed the vault locally, so the head the server still holds is MAC'd
+    /// under a `root_key` that no longer exists anywhere.
+    ///
+    /// Without it the next pull reads that head as **unopenable**, which is the
+    /// same signal a forged head produces — `PullError::HeadInvalid`, routed to
+    /// the malicious-server alert. The cycle then aborts before the push, so the
+    /// head is never re-authored and the state feeds itself: a sanctioned local
+    /// migration tells the user their server may be tampering with their data,
+    /// forever.
+    ///
+    /// While it is set the pull accepts the server's head **unverified** — taking
+    /// only its `head_id`, which is `SHA-256(record)` and needs no key — and the
+    /// cycle authors a fresh head under the new root with that id as the CAS
+    /// parent. Cleared by the push that lands, so exactly one cycle is exempt.
+    ///
+    /// It is NOT a security relaxation the server can request: only a local
+    /// migration writes it, it survives one cycle, and every OTHER integrity
+    /// check (head-id match, blob `content_nonce` verification, §11.3) stays on.
+    #[serde(default)]
+    pub rekey_rebase_pending: bool,
 }
 
 impl SyncState {
@@ -580,6 +601,7 @@ mod tests {
             account_hash_hex: Some("bb".repeat(16)),
             meta_baseline_hex: Some("cc".repeat(32)),
             corpus_complete: true,
+            rekey_rebase_pending: false,
         };
         let defaulted = SyncState::default();
 

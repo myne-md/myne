@@ -528,6 +528,20 @@ pub async fn run_active_cycle_from_host(
                 // Copy is the pinned `SYNC_INTEGRITY_ALERT` literal on the UI side.
                 host.emit("sync://integrity-alert", EventPayload::Unit);
             }
+            if matches!(&e, super::orchestrator::SyncCycleError::RekeyedElsewhere) {
+                // The vault was migrated on ANOTHER device (#429). This session's
+                // `root_key` is the previous generation's, so every note it pulls
+                // from here is undecryptable — and the keys it holds are not the
+                // ones the vault has. Lock, and say why: the remedy is the user
+                // unlocking again (which re-derives the v0.2 root from the meta
+                // the meta phase adopts), not a retry.
+                //
+                // The emit comes FIRST: a lock can drop the surface the message
+                // would have appeared on, and the ordering is the difference
+                // between an explained lock and a mysterious one.
+                host.emit("sync://vault-rekeyed", EventPayload::Unit);
+                let _ = crate::plugins::vault_unlock::commands::lock_from_host(state, hooks).await;
+            }
             CycleOutcome::Failed(classify_cycle_error(&e))
         }
         // Join error — no class information survives a panicked task.
