@@ -1249,7 +1249,25 @@ async fn rebase_sync_plane_after_rekey(
         prefs_sync_id(old_root_key),
         themes_sync_id(old_root_key),
     ] {
-        state.blobs.remove(&crate::plugins::sync::to_hex(&id));
+        let hex = crate::plugins::sync::to_hex(&id);
+        // Queue the tombstone BEFORE dropping the baseline (#443): the removal
+        // takes the `base_version` with it, and that version is what the
+        // tombstone push CASes against. A singleton this device never pushed
+        // has no baseline and therefore nothing stranded — there is no server
+        // record under that id to reclaim.
+        if let Some(baseline) = state.blobs.get(&hex) {
+            let mut nonce = [0u8; 24];
+            if getrandom::getrandom(&mut nonce).is_ok() {
+                state.pending_orphan_tombstones.push(
+                    crate::plugins::sync::state::OrphanTombstone {
+                        blob_id_hex: hex.clone(),
+                        base_version: baseline.version,
+                        content_nonce_hex: crate::plugins::sync::to_hex(&nonce),
+                    },
+                );
+            }
+        }
+        state.blobs.remove(&hex);
     }
     // Asserted rather than assumed: the new ids must not collide with the old
     // ones, or the removals above would delete a baseline the new generation is
@@ -1786,6 +1804,37 @@ mod tests {
                     "a previous-generation singleton baseline survived the re-key"
                 );
             }
+            // (4b) …and each one is queued for a server-side tombstone (#443),
+            //      carrying the version the baseline held. Dropping the baseline
+            //      without queueing first is exactly the bug: the CAS base is
+            //      gone and the blob is stranded forever.
+            let queued: std::collections::BTreeMap<String, u64> = after
+                .pending_orphan_tombstones
+                .iter()
+                .map(|t| (t.blob_id_hex.clone(), t.base_version))
+                .collect();
+            assert_eq!(
+                queued.len(),
+                3,
+                "all three re-keyed singletons owe a reclaim tombstone, got {queued:?}"
+            );
+            for id in &old_ids {
+                assert_eq!(
+                    queued.get(&crate::plugins::sync::to_hex(id)),
+                    Some(&7),
+                    "the tombstone must CAS against the version the dropped \
+                     baseline held, not 0"
+                );
+            }
+            // A fresh nonce per entry, and none of them the one the live blob
+            // carried — reusing it would be "different bytes, same nonce".
+            let nonces: std::collections::BTreeSet<&str> = after
+                .pending_orphan_tombstones
+                .iter()
+                .map(|t| t.content_nonce_hex.as_str())
+                .collect();
+            assert_eq!(nonces.len(), 3, "each tombstone mints its own nonce");
+            assert!(!nonces.contains(&"cc".repeat(24).as_str()));
             // (5) …and the rest of the enrolment is untouched: re-basing is not
             //     re-enrolling, and dropping these would cost the device its
             //     identity and every note's CAS base.

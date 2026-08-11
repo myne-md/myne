@@ -848,6 +848,98 @@ fn hex_to_arr<const N: usize>(s: &str) -> Option<[u8; N]> {
     Some(out)
 }
 
+/// Push the tombstones that let the server reclaim the blobs a whole-vault
+/// re-key stranded (`sync-protocol.md` §5.6.1, myne-md/myne#443).
+///
+/// # Why this is its own request rather than three more entries in `to_push`
+///
+/// Its `base_version` is the version this device last saw, and the migration
+/// may have run after a long offline stretch in which a peer wrote to the same
+/// old singleton id. That makes a lost CAS genuinely reachable — and a
+/// `blob_stale` 409 fails the **whole** chunk, so a stranded-storage entry mixed
+/// into the content push would abort every push cycle, retry, abort again, and
+/// wedge sync permanently on a cleanup errand. Reclaiming disk the user is not
+/// paying attention to must never be able to cost them their sync.
+///
+/// So: separate request, no head, and the errors are triaged rather than
+/// propagated.
+///
+/// - **Landed** → drop the entries; the records are `deleted`-marked and
+///   horizon-GC will reclaim them on its own schedule.
+/// - **A refusal about these blobs** (`BlobStale`, `QuotaExceeded`,
+///   `PayloadTooLarge`, `BadResponse`) → drop them too. A wrong base version is
+///   not something this device can learn the fix for — the server returns no
+///   current version on a 409 — and retrying a request that is refused for a
+///   structural reason produces one useless round trip per cycle forever. The
+///   blobs stay stranded, which is exactly the pre-#443 state.
+/// - **Anything else** (transport, 429, auth, frozen) → leave them queued. Those
+///   say nothing about the request and everything about the moment.
+///
+/// Returns the number of tombstones the server accepted, for the caller's log.
+async fn drain_orphan_tombstones(
+    transport: &dyn SyncTransport,
+    token: &str,
+    state: &mut SyncState,
+) -> usize {
+    if state.pending_orphan_tombstones.is_empty() {
+        return 0;
+    }
+    let mut blobs = Vec::new();
+    for t in &state.pending_orphan_tombstones {
+        let (Some(id), Some(content_nonce)) = (
+            hex_to_arr::<16>(&t.blob_id_hex),
+            hex_to_arr::<24>(&t.content_nonce_hex),
+        ) else {
+            continue;
+        };
+        blobs.push(PushBlob {
+            id,
+            base_version: t.base_version,
+            content_nonce,
+            // A tombstone record carries no body — the same shape the
+            // attachment tombstone uses, and the one the server reads as
+            // "mark this id deleted" (`SetTombstone`).
+            ciphertext: Vec::new(),
+            tombstone: true,
+            // Not an attachment: there is no stored body to bridge to, only the
+            // blob-plane record.
+            attachment_id: None,
+        });
+    }
+    // `(reclaimed, spent)` — one decision, so there is a single place the queue
+    // is emptied and no arm can forget to.
+    let (reclaimed, spent) = if blobs.is_empty() {
+        // Every entry was malformed. Nothing to send, and nothing worth keeping:
+        // a line that does not parse will not parse next cycle either.
+        (0, true)
+    } else {
+        match engine::push(transport, token, &blobs, None) {
+            Ok(outcome) => (outcome.results.len(), true),
+            Err(
+                PushError::BlobStale
+                | PushError::HeadStale
+                | PushError::QuotaExceeded
+                | PushError::PayloadTooLarge
+                | PushError::BadResponse,
+            ) => {
+                tracing::info!(
+                    stage = "orphan_tombstones",
+                    event = "abandoned",
+                    count = blobs.len(),
+                    "the re-key's stranded singleton blobs could not be marked \
+                     for reclaim; they stay on the server as accepted storage debt"
+                );
+                (0, true)
+            }
+            Err(_) => (0, false),
+        }
+    };
+    if spent {
+        state.pending_orphan_tombstones.clear();
+    }
+    reclaimed
+}
+
 /// Read the pending attachment-tombstone queue (absent → empty; a malformed
 /// line is skipped rather than wedging the cycle).
 pub async fn read_pending_attachment_tombstones(
@@ -3450,6 +3542,18 @@ async fn sync_cycle_attempt(
         }
         // The attachment-tombstone queue drains only after its records landed.
         let _ = clear_pending_attachment_tombstones(io, vault_root, &pushed_att_tombstones).await;
+        // The blobs a re-key stranded (#443). Deliberately AFTER the content
+        // push and in a request of its own — see `drain_orphan_tombstones` for
+        // why mixing them in could wedge every future push cycle.
+        let reclaimed = drain_orphan_tombstones(transport, token, state).await;
+        if reclaimed > 0 {
+            tracing::info!(
+                stage = "orphan_tombstones",
+                event = "reclaimed",
+                count = reclaimed,
+                "marked the re-key's stranded singleton blobs for horizon-GC"
+            );
+        }
         write_head_baseline(io, vault_root, &sealed)
             .await
             .map_err(|_| SyncCycleError::Io)?;
@@ -10594,6 +10698,310 @@ mod tests {
                 std::fs::remove_dir_all(&dir).ok();
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Orphan-tombstone reclaim (`sync-protocol.md` §5.6.1, myne-md/myne#443)
+    // -----------------------------------------------------------------------
+
+    /// Records every `/sync/push` body and answers each with a caller-supplied
+    /// verdict, so the drain's triage is exercised with no server at all.
+    use super::super::state::OrphanTombstone;
+
+    struct ScriptedPush {
+        bodies: std::sync::Mutex<Vec<String>>,
+        verdict: Box<dyn Fn() -> Result<TransportResponse, TransportError> + Send + Sync>,
+    }
+    impl ScriptedPush {
+        fn new(
+            verdict: impl Fn() -> Result<TransportResponse, TransportError> + Send + Sync + 'static,
+        ) -> Self {
+            Self {
+                bodies: std::sync::Mutex::new(Vec::new()),
+                verdict: Box::new(verdict),
+            }
+        }
+        fn bodies(&self) -> Vec<String> {
+            self.bodies.lock().unwrap().clone()
+        }
+    }
+    impl SyncTransport for ScriptedPush {
+        fn request(
+            &self,
+            _method: HttpMethod,
+            path: &str,
+            body: &[u8],
+            _token: Option<&str>,
+        ) -> Result<TransportResponse, TransportError> {
+            assert_eq!(
+                path, "/sync/push",
+                "the drain must not call any other route"
+            );
+            self.bodies
+                .lock()
+                .unwrap()
+                .push(String::from_utf8_lossy(body).into_owned());
+            (self.verdict)()
+        }
+    }
+
+    fn ok_push(results: &[(&str, u64)]) -> Result<TransportResponse, TransportError> {
+        let rows: Vec<String> = results
+            .iter()
+            .map(|(id, v)| format!(r#"{{"blob_id_hex":"{id}","version":{v}}}"#))
+            .collect();
+        Ok(TransportResponse {
+            status: 200,
+            body: format!(r#"{{"results":[{}]}}"#, rows.join(",")).into_bytes(),
+        })
+    }
+
+    fn queued_state(ids: &[(&str, u64)]) -> SyncState {
+        SyncState {
+            pending_orphan_tombstones: ids
+                .iter()
+                .map(|(id, v)| OrphanTombstone {
+                    blob_id_hex: (*id).to_string(),
+                    base_version: *v,
+                    content_nonce_hex: "ab".repeat(24),
+                })
+                .collect(),
+            ..SyncState::default()
+        }
+    }
+
+    /// The reclaim itself: one request, every queued id in it, each marked
+    /// `tombstone` with an EMPTY body and the base version the migration
+    /// recorded — and the queue empty afterwards, so the next cycle does not
+    /// re-flag records the server already marked.
+    #[test]
+    fn orphan_tombstones_are_pushed_as_empty_deletions_and_leave_the_queue() {
+        let ids = ["11".repeat(16), "22".repeat(16)];
+        let t = ScriptedPush::new(move || ok_push(&[("11".repeat(16).as_str(), 8)]));
+        let mut state = queued_state(&[(&ids[0], 7), (&ids[1], 3)]);
+
+        let n = blocking(drain_orphan_tombstones(&t, "tok", &mut state));
+
+        let bodies = t.bodies();
+        assert_eq!(bodies.len(), 1, "one request, not one per id: {bodies:?}");
+        let body = &bodies[0];
+        for id in &ids {
+            assert!(body.contains(id.as_str()), "{id} missing from {body}");
+        }
+        assert!(body.contains(r#""base_version":7"#), "{body}");
+        assert!(body.contains(r#""base_version":3"#), "{body}");
+        assert!(body.contains(r#""tombstone":true"#), "{body}");
+        // Empty ciphertext — a tombstone carries no body. Base64 of "" is "".
+        assert!(body.contains(r#""ciphertext_b64":"""#), "{body}");
+        // No head rides this request: it is a cleanup errand, and advancing the
+        // head from here would put a CAS the cycle already performed at risk.
+        assert!(!body.contains("new_head"), "{body}");
+        assert_eq!(n, 1, "the count comes from the server's results");
+        assert!(
+            state.pending_orphan_tombstones.is_empty(),
+            "a landed reclaim must leave the queue"
+        );
+    }
+
+    /// A lost CAS is abandoned, not retried (#443).
+    ///
+    /// The version came from a baseline recorded before the migration, and a
+    /// peer that wrote to the same old id while this device was offline makes it
+    /// stale. The server returns no current version with its 409, so there is
+    /// nothing to retry WITH — a kept entry would buy one useless request per
+    /// cycle, forever, to reclaim three blobs.
+    #[test]
+    fn an_orphan_tombstone_that_lost_its_cas_is_abandoned_rather_than_retried_forever() {
+        let t = ScriptedPush::new(|| {
+            Ok(TransportResponse {
+                status: 409,
+                body: br#"{"error_code":"blob_stale"}"#.to_vec(),
+            })
+        });
+        let mut state = queued_state(&[(&"33".repeat(16), 7)]);
+
+        let n = blocking(drain_orphan_tombstones(&t, "tok", &mut state));
+
+        assert_eq!(n, 0);
+        assert!(
+            state.pending_orphan_tombstones.is_empty(),
+            "a structurally-refused reclaim must be dropped; the blobs stay \
+             stranded, which is exactly the pre-#443 state"
+        );
+    }
+
+    /// A transport failure says nothing about the request — keep it queued.
+    ///
+    /// The distinction matters: abandoning on a flaky network would throw the
+    /// reclaim away for a reason that will be gone in thirty seconds.
+    #[test]
+    fn a_transport_failure_keeps_the_orphan_tombstones_queued() {
+        let t = ScriptedPush::new(|| Err(TransportError::Network));
+        let mut state = queued_state(&[(&"44".repeat(16), 2)]);
+
+        let n = blocking(drain_orphan_tombstones(&t, "tok", &mut state));
+
+        assert_eq!(n, 0);
+        assert_eq!(
+            state.pending_orphan_tombstones.len(),
+            1,
+            "a network error must not spend the reclaim"
+        );
+    }
+
+    /// An empty queue costs nothing — no request at all, so an ordinary cycle
+    /// on a vault that never migrated is byte-identical to before.
+    #[test]
+    fn an_empty_orphan_queue_issues_no_request() {
+        let t = ScriptedPush::new(|| unreachable!("no request may be made"));
+        let mut state = SyncState::default();
+        assert_eq!(blocking(drain_orphan_tombstones(&t, "tok", &mut state)), 0);
+        assert!(t.bodies().is_empty());
+    }
+
+    /// The wedge property, against the REAL server (#443).
+    ///
+    /// A queued reclaim whose base version is wrong produces a genuine 409 from
+    /// the real store — no decorator, no simulated status. The cycle must still
+    /// succeed and the user's note must still land. Had the tombstones ridden
+    /// the content chunk, that 409 would fail the whole push, the cycle would
+    /// retry, fail again, and every future push would wedge behind a
+    /// storage-cleanup errand the user never asked for.
+    #[test]
+    fn a_refused_orphan_reclaim_does_not_cost_the_cycle_its_push() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP a_refused_orphan_reclaim_...: myne-server not built");
+            return;
+        };
+        let root_key = [0x71u8; 32];
+        let account_hash = [0x72u8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x73u8; 32];
+        let items_key_id = [0x74u8; 16];
+
+        let dir = std::env::temp_dir().join(format!("myne-orch-orphan-{}", std::process::id()));
+        let notes = dir.join("notes");
+        std::fs::create_dir_all(&notes).unwrap();
+        let note = NoteId::new_v7();
+        let blob = encode_new_note(
+            &items_key,
+            &items_key_id,
+            note.as_uuid().as_bytes(),
+            b"this note must land anyway",
+        )
+        .unwrap();
+        crate::atomic_write::atomic_write(
+            &notes.join(format!("{}.myn", note.as_uuid())),
+            &blob,
+            false,
+        )
+        .unwrap();
+
+        let t = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        enroll::register_verifier(t.as_ref(), &account_hash, secret.as_slice()).unwrap();
+        let dev = enroll::generate_device_id();
+        let out = enroll::enroll(
+            t.as_ref(),
+            &account_hash,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            dev,
+        )
+        .unwrap();
+        let tok = hex32(&out.token);
+
+        // A reclaim the server cannot honour: the id has no blob, so its
+        // current version is 0 and a base of 7 is a real CAS mismatch.
+        let orphan = "9f".repeat(16);
+        let mut seeded = read_sync_state(&dir).unwrap();
+        seeded.device_id_hex = Some(hex(&dev));
+        seeded.account_hash_hex = Some(hex(&account_hash));
+        seeded.pending_orphan_tombstones = vec![OrphanTombstone {
+            blob_id_hex: orphan.clone(),
+            base_version: 7,
+            content_nonce_hex: "ab".repeat(24),
+        }];
+        write_sync_state(&dir, &seeded).unwrap();
+
+        let summary = run_cycle_legacy(
+            t.as_ref(),
+            &root_key,
+            account_hash,
+            dev,
+            &tok,
+            &notes,
+            &dir,
+            true,
+        )
+        .expect("a refused reclaim must not fail the cycle");
+        assert!(
+            summary.pushed >= 1,
+            "the user's note must still have been pushed, got {summary:?}"
+        );
+
+        let after = read_sync_state(&dir).unwrap();
+        assert!(
+            after.pending_orphan_tombstones.is_empty(),
+            "the refused reclaim must be abandoned rather than left to re-fail \
+             on every future cycle"
+        );
+        assert!(
+            after.blobs.contains_key(&hex(note.as_uuid().as_bytes())),
+            "the note's CAS baseline must have been recorded"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The structural half (#443): the reclaim queue has exactly ONE reader.
+    ///
+    /// `drain_orphan_tombstones` cannot fail a cycle — it returns `usize`, not
+    /// `Result`, so there is no error to propagate and the guarantee is the
+    /// signature rather than a test. What a signature cannot hold is someone
+    /// later folding these entries into `to_push` "to save a request", which
+    /// silently restores the wedge every assertion above exists to prevent.
+    #[test]
+    fn the_orphan_reclaim_queue_is_read_in_exactly_one_place() {
+        let src = include_str!("orchestrator.rs");
+        let production = &src[..src.find("#[cfg(test)]").expect("test module")];
+        // Compared by POSITION, not by text. The first draft asked whether each
+        // matching LINE also appeared inside the drain, and a read folded into
+        // the push loop passed it — because the line injected there was a copy
+        // of one already in the drain, so the function was being compared
+        // against itself. That is the shape this repo keeps rediscovering, and
+        // a byte range is the fix: a site either falls inside the function or
+        // it does not.
+        let start = production
+            .find("async fn drain_orphan_tombstones")
+            .expect("the drain function");
+        let end = start
+            + production[start..]
+                .find("\n}\n")
+                .map(|i| i + 3)
+                .expect("the drain function ends");
+
+        let mut sites = 0usize;
+        let mut cursor = 0usize;
+        while let Some(i) = production[cursor..].find("pending_orphan_tombstones") {
+            let at = cursor + i;
+            assert!(
+                at >= start && at < end,
+                "the reclaim queue is read outside `drain_orphan_tombstones` \
+                 (byte {at}, function spans {start}..{end}) — folding these \
+                 into the content push restores the 409 wedge"
+            );
+            sites += 1;
+            cursor = at + 1;
+        }
+        // Not pinned to an exact count: refactoring the drain's internals is
+        // nobody's regression. The lower bound is what keeps the test from
+        // passing vacuously if the field is renamed and nothing matches at all.
+        assert!(
+            sites >= 2,
+            "expected at least the emptiness check and the iteration; a search \
+             that matches nothing asserts nothing"
+        );
     }
 
     /// Answers `POST /sync/blobs` with a chosen status (404/405) while relaying
