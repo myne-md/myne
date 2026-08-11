@@ -18,7 +18,9 @@ import { harnessSupported } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import {
   launchDevice,
+  migrateFleetToV02,
   noteBlobCount,
+  noteBlobMagics,
   setupTwoSyncedDevices,
   syncConfigSeed,
   withTwoDevices,
@@ -58,6 +60,26 @@ const describeCanary = ready ? describe : describe.skip;
 const REMOTE_MARKER = "remoteeditalpha7k2m9qx4w8e5rj0";
 const LOCAL_MARKER = "stalepanebravo3f6h1zn8c2vb5kk9";
 const SPLIT_SIDE_TITLE = "splitsidenote1d4t7yp2mq6xs9zz0";
+
+// CRDT-merge scenario constants (myne-md/myne#446). Same needle-design rule as
+// the stale-pane markers above: single lowercase-alnum tokens ≥24 chars, so a
+// tokenizer cannot split one and a count is exact.
+//
+// `BASE_MARKER` belongs to NEITHER edit — it is in the shared base both devices
+// start from, which is what makes its COUNT the discriminator for #428's
+// doubling bug (see the scenario for why a presence check cannot see it).
+const BASE_MARKER = "crdtsharedbase5w1qk8mz3xr7hv2tt";
+const A_MARKER = "crdteditalpha9j4dc6nb0ply5fg1uu";
+const B_MARKER = "crdteditbravo2s8we4rt7yu0iop3mm";
+/** The `deleted:` value A writes — asserted VERBATIM on B (#431). */
+const DELETED_AT = "2026-08-11T04:05:06Z";
+/** The v0.2 CRDT note magic (`protocol.md` §10.7). */
+const CRDT_MAGIC = "NC05";
+
+/** Non-overlapping occurrences of `needle` in `haystack`. */
+function occurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
 
 describeCanary("two-device sync canary (MYND-428)", () => {
   it("boots one server + two isolated devices, each carrying the SYNC-14 endpoint", async () => {
@@ -211,42 +233,156 @@ describeCanary("two-device sync canary (MYND-428)", () => {
     }
   });
 
-  // #422 (ASM-6→B): the CRDT (NC05) counterpart of keep-both — two devices
-  // concurrently edit the SAME NC05 note, the engine MERGES (no keep-both copy,
-  // no Conflicts row), and the pulling device shows the calm "updated from
-  // another device" hint (`sync.remote-merge-hint`).
+  // #422 (ASM-6→B) + myne-md/myne#446: the CRDT (NC05) counterpart of keep-both.
+  // Two devices concurrently edit the SAME NC05 note, the engine MERGES (no
+  // keep-both copy, no Conflicts row), and the pulling device shows the calm
+  // "updated from another device" hint (`sync.remote-merge-hint`).
   //
-  // SKIPPED — reachable now via #420, pending the two-device migration wiring.
-  // NC05 notes are created only by the whole-vault migration (`vault_migrate`,
-  // #420, now wired end to end — see `e2e/vault-migrate.e2e.ts`). To drive THIS
-  // scenario each device must migrate its shared vault to NTV5/NC05 before the
-  // concurrent edit, which the two-device harness (`support/multi-device`) does
-  // not yet do. Until that setup step lands, the hint's behaviour is covered by
-  // `tests/components/RemoteMergeHint.test.tsx` (the `e2e/CLAUDE.md` "unreachable
-  // → Vitest" downgrade), and the `MY01` keep-both scenario above is the untouched
-  // regression half of the #422 DoD. Un-skip once the harness migrates both
-  // devices; the assertions below are ready.
+  // ---------------------------------------------------------------------------
+  // STILL SKIPPED, on a DIFFERENT and now-verified blocker: myne-md/myne#447.
+  //
+  // #446 rewrote this scenario and its setup, and running it in the container is
+  // what FOUND #447: a peer cannot join the generation a migration creates. It
+  // locks correctly ("upgraded elsewhere"), the user unlocks, and it comes back
+  // in the OLD generation — because the meta phase runs only on a completed
+  // cycle's `Ok` arm and this path returns before it, and because
+  // `merge_vault_meta` refuses a meta whose recovery side and itemsKey both
+  // moved, which is every field a re-key changes. Probed directly: the adopt
+  // returns `Skipped` and `vault.meta` stays `MYV1`.
+  //
+  // What #446 DID close, and why the skip is no longer inert:
+  //   - the old note's premise was WRONG. It said the harness should "migrate
+  //     both devices"; `vault_migrate` mints a fresh random `root_key` per run,
+  //     so that setup forks the fleet irrecoverably. `migrateFleetToV02` does
+  //     the production thing (A migrates + syncs, B adopts + re-unlocks).
+  //   - the assertions below are COUNT-based. The previous version asserted
+  //     `toContain("A")` + `toContain("B")`, which #428's doubling bug satisfies.
+  //   - the setup runs end to end up to the adoption step, so this scenario is
+  //     what will prove #447 fixed, on the day it is.
+  // ---------------------------------------------------------------------------
   it.skip("crdt-merge: concurrent NC05 edits merge with the hint, no keep-both, no Conflicts row", async () => {
     const srv = await startSyncServer();
     try {
-      const { a, b, noteId, teardown } = await setupTwoSyncedDevices(srv);
+      const devices = await setupTwoSyncedDevices(srv);
+      const { a, b, noteId, teardown } = devices;
       try {
         const idHex = noteId.replace(/-/g, "");
-        // (Requires `noteId` to be an NC05 note — see the skip note above.)
-        await ipcOk(a.session, "plugin:notes|note_update", { noteId, plaintext: "AAA crdt" });
-        await ipcOk(b.session, "plugin:notes|note_update", { noteId, plaintext: "BBB crdt" });
+        await migrateFleetToV02(devices);
+        // The premise of everything below: this note is a v0.2 CRDT blob on both
+        // devices. Asserted, not assumed — every claim here is about NC05 merge
+        // semantics, and against a MY01 note they would all be vacuous.
+        expect(noteBlobMagics(a.appDataDir)).toEqual([CRDT_MAGIC]);
+        expect(noteBlobMagics(b.appDataDir)).toEqual([CRDT_MAGIC]);
+
+        // A shared base both devices agree on, carrying a marker that belongs to
+        // NEITHER edit. That marker is the whole discriminator — see below.
+        await ipcOk(a.session, "plugin:notes|note_update", {
+          noteId,
+          plaintext: `# Merge\n\n${BASE_MARKER}\n`,
+        });
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+        let based = false;
+        for (let i = 0; i < 24 && !based; i++) {
+          await ipcOk(b.session, "plugin:sync|sync_now", {});
+          await new Promise((r) => setTimeout(r, 2_000));
+          based = (
+            (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string
+          ).includes(BASE_MARKER);
+        }
+        expect(based, "the shared base replicated to B before the divergence").toBe(true);
+
+        // Diverge: each device appends its own marker to the SAME base.
+        const baseBody = (await ipcOk(a.session, "plugin:notes|note_read", { noteId })) as string;
+        await ipcOk(a.session, "plugin:notes|note_update", {
+          noteId,
+          plaintext: `${baseBody}\n${A_MARKER}\n`,
+        });
+        await ipcOk(b.session, "plugin:notes|note_update", {
+          noteId,
+          plaintext: `${baseBody}\n${B_MARKER}\n`,
+        });
         await ipcOk(a.session, "plugin:sync|sync_now", {});
         await ipcOk(b.session, "plugin:sync|sync_now", {});
+
         // NC05 merges — B stages NO keep-both conflict for this note...
         const pending = (await ipcOk(b.session, "plugin:sync|sync_pending_conflicts", {})) as string[];
         expect(pending).not.toContain(idHex);
         // ...its single blob still holds BOTH edits (merge, not fork)...
         expect(noteBlobCount(b.appDataDir)).toBe(1);
         const merged = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
-        expect(merged).toContain("A");
-        expect(merged).toContain("B");
+
+        // COUNTS, not `toContain` (#446). The skipped version of this scenario
+        // asserted `toContain("A")` + `toContain("B")`, and #428's bug satisfies
+        // both: a whole-body `splice_text` records "delete everything, then
+        // insert my entire document", so after the merge both deletions AND both
+        // insertions survive and the note comes back containing the shared base
+        // TWICE — once inside each inserted copy. A presence check cannot see
+        // that; the base marker's count is exactly what can.
+        expect(occurrences(merged, BASE_MARKER)).toBe(1);
+        expect(occurrences(merged, A_MARKER)).toBe(1);
+        expect(occurrences(merged, B_MARKER)).toBe(1);
         // ...and the calm hint is shown on the pulling device.
         await b.session.byTestId("sync.remote-merge-hint", { timeoutMs: 10_000 });
+      } finally {
+        await teardown();
+      }
+    } finally {
+      await srv.teardown();
+    }
+  });
+
+  // myne-md/myne#431 + #446: remove-wins on the CRDT plane.
+  //
+  // A deletes the note while B edits it, concurrently. The merge must keep it
+  // DELETED — and, critically, must not fabricate. Without the remove-wins gate
+  // the two front-matter blocks merge character-wise and produce a `deleted:`
+  // timestamp NEITHER device wrote, blended from A's `deleted:` and B's
+  // `updated:`. That value parses cleanly, so nothing downstream can catch it;
+  // the only place it is visible is here, against the exact bytes.
+  // SKIPPED on the same blocker (myne-md/myne#447) — see the note above. The
+  // scenario itself is complete: it asserts A's `deleted:` value VERBATIM,
+  // because #431's failure mode is a well-formed timestamp neither device wrote,
+  // blended character-wise from A's `deleted:` and B's `updated:`. It parses
+  // cleanly, so `toContain("deleted:")` would pass against the fabrication.
+  it.skip("crdt-remove-wins: a deletion beats a concurrent edit, with no fabricated timestamp", async () => {
+    const srv = await startSyncServer();
+    try {
+      const devices = await setupTwoSyncedDevices(srv);
+      const { a, b, noteId, teardown } = devices;
+      try {
+        const idHex = noteId.replace(/-/g, "");
+        await migrateFleetToV02(devices);
+        expect(noteBlobMagics(b.appDataDir)).toEqual([CRDT_MAGIC]);
+
+        // A tombstones through the real path (the `tombstoneNote` dialect
+        // surgery + the queued flag), B edits the same note concurrently.
+        const current = (await ipcOk(a.session, "plugin:notes|note_read", { noteId })) as string;
+        const tombstoned = new TextDecoder().decode(
+          patchDeletedField(new TextEncoder().encode(current), DELETED_AT),
+        );
+        await ipcOk(a.session, "plugin:notes|note_update", { noteId, plaintext: tombstoned });
+        await ipcOk(a.session, "plugin:sync|sync_mark_tombstone", { noteIdHex: idHex }, 5_000);
+        const bBody = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+        await ipcOk(b.session, "plugin:notes|note_update", {
+          noteId,
+          plaintext: `${bBody}\n${B_MARKER}\n`,
+        });
+
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+        await ipcOk(b.session, "plugin:sync|sync_now", {});
+
+        // The deletion wins on B, even though B's edit is newer.
+        const after = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+        expect(after).toContain("deleted:");
+        // The timestamp is A's, VERBATIM. This is the assertion the issue is
+        // about: a blended value is still a well-formed timestamp, so asserting
+        // "contains deleted:" alone would pass against the fabrication.
+        expect(after).toContain(DELETED_AT);
+        // And no keep-both copy was staged — remove-wins is a merge outcome, not
+        // a conflict the user has to arbitrate.
+        const pending = (await ipcOk(b.session, "plugin:sync|sync_pending_conflicts", {})) as string[];
+        expect(pending).not.toContain(idHex);
+        expect(noteBlobCount(b.appDataDir)).toBe(1);
       } finally {
         await teardown();
       }
