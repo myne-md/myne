@@ -2177,6 +2177,14 @@
     "submit": "Migrate",
     "migrating": "Migrating…",
     "done": "Migrated {{count}} notes to the new format.",
+    "settle": {
+      "intro": "Your vault was upgraded. The old copy is still on this device until you finish up — until then, changing your password won't lock it away.",
+      "confirm": "Everything looks right, remove the old copy",
+      "abort": "Something's wrong, put the old vault back",
+      "errorAlreadySynced": "This vault has already synced in the new format, so it can't be put back. Restore from a backup if you need the old one.",
+      "errorBusy": "Another vault operation is running. Try again in a moment.",
+      "errorIo": "Couldn't finish that. Nothing was changed."
+    },
     "error": {
       "recoveryPhraseRequired": "That recovery phrase didn’t match this vault. Enter your correct recovery phrase to migrate — it’s required so recovery keeps working.",
       "wrongPassword": "That password didn’t match this vault.",

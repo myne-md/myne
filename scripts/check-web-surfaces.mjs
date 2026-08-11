@@ -113,6 +113,7 @@ const V = {
   "src/components/settings/LanguageSelect.tsx": ["ported", "i18n only."],
   "src/components/settings/LineNumbersSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/MigrateVaultForm.tsx": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration form (#420) is desktop-only — its `vault_migrate` command is Class::Unsupported on web (a browser client joins an already-current account, never migrates). Present but its invoke answers the typed refusal."],
+  "src/components/settings/SettleMigrationBlock.tsx": ["typed-unsupported", "The post-migration settle surface (§10.4.1 point 5, #430) — abort / confirm over the `legacy/` snapshot. Desktop-only for the same reason as the form above: a browser client never migrates, so it never has a `legacy/` snapshot to settle. Its status probe answers the typed refusal, and the block renders nothing when the probe fails, so on web it is simply absent."],
   "src/components/settings/NewNoteLocationSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/NetworkPanel.tsx": [
     "adapted",

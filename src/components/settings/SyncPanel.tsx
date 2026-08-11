@@ -19,6 +19,7 @@ import { SyncUsageBlock } from "../sync/SyncUsageBlock";
 import { RecoveredNotes } from "../sync/RecoveredNotes";
 import { has as hasCapability } from "../../platform/capabilities";
 import { MigrateVaultForm } from "./MigrateVaultForm";
+import { SettleMigrationBlock } from "./SettleMigrationBlock";
 import {
   ConflictsView,
   type ConflictCompare,
@@ -377,6 +378,11 @@ export function SyncPanel({ onMigrated }: SyncPanelProps = {}) {
         <div style={BLOCK_STYLE} data-setting-anchor="sync.migrate" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>{t("migrate.submit")}</span>
           <MigrateVaultForm onMigrated={onMigrated} />
+          {/* §10.4.1 point 5 (myne-md/myne#430). Renders only while a `legacy/`
+              snapshot is staged, which is also why it sits BELOW the form: after
+              a migration the vault locks and the user re-unlocks, so this is the
+              surface they come back to, not one they see on the way out. */}
+          <SettleMigrationBlock onSettled={onMigrated} />
         </div>
       )}
 
