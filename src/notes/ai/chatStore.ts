@@ -14,6 +14,7 @@
 // superseded) can never mutate the transcript after `clearChat()`.
 
 import { useSyncExternalStore } from "react";
+import type { ProviderErrorCause } from "../../lib/engine-error";
 import type { AnsweredBy } from "../../components/AnsweredByIndicator";
 
 /** A source-note citation backing a grounded assistant answer (mirrors the Rust
@@ -38,6 +39,16 @@ export interface ChatTurn {
   streaming: boolean;
   /** Assistant turn ended in an error (no/failed generation). */
   error: boolean;
+  /**
+   * WHICH error (myne-md/myne#440). The Rust layer classifies provider failures
+   * — auth, rate limit, model missing, network, cancelled — and `engine-error.ts`
+   * already maps them; the chat call site used to discard the error entirely and
+   * render one sentence, so "your API key is wrong" and "the provider is down"
+   * were indistinguishable and neither suggested an action.
+   *
+   * Optional because a turn can fail before any cause is known.
+   */
+  errorCause?: ProviderErrorCause;
   /** Source notes the grounded answer drew from (assistant turns; may be empty). */
   citations: ChatCitation[];
   /** Whether this assistant turn can be inserted into the open note (summaries +
@@ -74,7 +85,7 @@ export type ChatAction =
     }
   | { type: "TOKEN"; text: string }
   | { type: "FINALIZE"; citations: ChatCitation[]; answeredBy?: AnsweredBy }
-  | { type: "FAIL" }
+  | { type: "FAIL"; cause?: ProviderErrorCause }
   | { type: "STOP" }
   | { type: "CLEARED" };
 
@@ -138,7 +149,12 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const last = state.turns[state.turns.length - 1];
       if (!last || last.role !== "assistant") return { ...state, streaming: false };
       return {
-        turns: replaceLast(state.turns, { ...last, streaming: false, error: true }),
+        turns: replaceLast(state.turns, {
+          ...last,
+          streaming: false,
+          error: true,
+          errorCause: action.cause,
+        }),
         streaming: false,
       };
     }
@@ -226,9 +242,9 @@ export function finalizeChatTurn(
 }
 
 /** Mark the active assistant turn as errored, iff `token` is current. */
-export function failChatTurn(token: number): void {
+export function failChatTurn(token: number, cause?: ProviderErrorCause): void {
   if (!isChatRunCurrent(token)) return;
-  dispatchChat({ type: "FAIL" });
+  dispatchChat({ type: "FAIL", cause });
 }
 
 /** User cut the generation short — close the active turn, keep partial text. */

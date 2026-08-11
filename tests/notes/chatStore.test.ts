@@ -142,6 +142,30 @@ describe("chat store helpers + run epoch", () => {
     expect(state.turns[1].text).toBe("cut here");
   });
 
+  it("carries the provider error CLASS onto the turn, not just a boolean", () => {
+    // myne-md/myne#440. The Rust layer classifies provider failures and
+    // engine-error.ts already maps them, but the chat call site discarded the
+    // error and rendered one sentence — so "your API key is wrong" and "the
+    // provider is down" were indistinguishable and neither suggested an action.
+    const token = sendChatMessage("q");
+    failChatTurn(token, "unauthorized");
+
+    const turn = getChat().turns.at(-1)!;
+    expect(turn.error).toBe(true);
+    expect(turn.errorCause).toBe("unauthorized");
+  });
+
+  it("still fails cleanly when no cause is known", () => {
+    // A turn can fail before any classification exists; the generic sentence is
+    // the fallback, not the default.
+    const token = sendChatMessage("q");
+    failChatTurn(token);
+
+    const turn = getChat().turns.at(-1)!;
+    expect(turn.error).toBe(true);
+    expect(turn.errorCause).toBeUndefined();
+  });
+
   it("failChatTurn from a stale run does not flip a fresh transcript to error", () => {
     const stale = sendChatMessage("q1");
     clearChat();
