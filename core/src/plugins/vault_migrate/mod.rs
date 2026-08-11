@@ -578,6 +578,40 @@ pub async fn migrate_vault_notes_on_disk(
             .map_err(|_| Io)?;
     }
 
+    // (3b) FAIL-CLOSED PRE-FLIGHT (§10.4.1 md.3's MAY; myne-md/myne#441).
+    //
+    //      Every KEK-envelope singleton is re-sealed for real, and the result
+    //      thrown away, BEFORE a single note is overwritten below. The point is
+    //      the failure ordering, not the bytes: the re-seal at step (5) aborts on
+    //      `?`, and it used to sit AFTER the in-place note pass — so an
+    //      undecodable `vault.themes` or `vault.dictionary` produced exactly the
+    //      torn vault §10.4.1 md.3 describes as the CRASH case, with no crash,
+    //      and with no way back (the `legacy/` restore is myne-md/myne#430).
+    //
+    //      Doing the work twice is the deliberate trade. These families are
+    //      capped at 4 MiB and hold single-digit themes or a word list, so the
+    //      second AEAD pass is noise next to the Argon2id derivations this
+    //      migration already paid — and it buys "the vault is still entirely
+    //      v0.1 when this fails", which is the only recovery story that needs no
+    //      new machinery.
+    for fam in KEK_SINGLETONS {
+        let Ok(old_blob) = io.read(&vault_root.join(fam.filename)).await else {
+            continue; // family not present in this vault
+        };
+        reseal_kek_envelope_v0_2(
+            &old_blob,
+            &derive_subkey(old_root_key, fam.kek_role),
+            &derive_subkey_v0_2(&out.new_root_key, fam.kek_role),
+            fam.old_magic,
+            fam.new_magic,
+            fam.format_version,
+            fam.aad_role,
+            account_number_hash,
+            fam.cap,
+        )
+        .map_err(|_| OnDiskMigrationError::Crypto(MigrationError::Crypto))?;
+    }
+
     // (4) Write every NC05 note over its MY01 (same <uuid>.myn filename).
     for mn in &out.notes {
         let name = format!("{}.myn", uuid::Uuid::from_bytes(mn.note_uuid));
@@ -1463,6 +1497,67 @@ mod tests {
                 .expect("migration succeeds once the permit is free");
             let meta = io.read(&vault_root.join("vault.meta")).await.unwrap();
             assert_eq!(&meta[0..4], b"NTV5");
+        })
+    }
+
+    /// An undecodable singleton aborts with the vault still entirely v0.1
+    /// (myne-md/myne#441).
+    ///
+    /// The failure ordering is the whole subject. The singleton re-seal aborts on
+    /// `?`, and it used to run AFTER the in-place note pass — so a corrupt
+    /// `vault.themes` produced precisely the torn vault §10.4.1 md.3 describes as
+    /// the CRASH case, with no crash, and with no way back. The assertions below
+    /// are therefore about what did NOT happen: the meta is still `MYV1` and the
+    /// note is still `MY01`, byte-identical.
+    #[test]
+    fn an_undecodable_singleton_aborts_before_anything_is_rewritten() {
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-failclosed").unwrap();
+            let host = TestHost::new(tmp.path());
+            let io = StdVaultIo;
+            let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            let notes_dir = vault_root.join("notes");
+            io.create_dir_all(&notes_dir).await.unwrap();
+            build_myv1_vault(&io, &vault_root).await;
+
+            let u = *crate::plugins::notes::note_id::NoteId::new_v7()
+                .as_uuid()
+                .as_bytes();
+            let md = "---\ntitle: Survivor\n---\n\n# Untouched\n";
+            let note_path = notes_dir.join(format!("{}.myn", uuid::Uuid::from_bytes(u)));
+            let original_note = my01(&u, md);
+            io.write(&note_path, &original_note, WriteOpts::default())
+                .await
+                .unwrap();
+
+            // A `vault.themes` with the right magic and a payload that will not
+            // open — the shape a torn write or a bit-flip leaves behind.
+            let mut junk = THEMES_BLOB_MAGIC.to_vec();
+            junk.extend_from_slice(&[0xAB; 96]);
+            io.write(
+                &vault_root.join("vault.themes"),
+                &junk,
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+
+            let state = VaultRuntimeState::default();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            match vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io).await {
+                Err(VaultMigrateError::Crypto) => {}
+                other => panic!("an undecodable singleton must abort, got {other:?}"),
+            }
+
+            // Nothing was rewritten: this is the whole assertion.
+            let meta = io.read(&vault_root.join("vault.meta")).await.unwrap();
+            assert_eq!(&meta[0..4], b"MYV1", "the vault must still be v0.1");
+            let note = io.read(&note_path).await.unwrap();
+            assert_eq!(
+                note, original_note,
+                "the note must be byte-identical, not an NC05 rewrite"
+            );
         })
     }
 
