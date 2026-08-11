@@ -36,6 +36,7 @@
 #![allow(dead_code)]
 
 use protocol::PrefsView;
+use zeroize::Zeroizing;
 
 use super::error::EngineError;
 use super::provider_registry::RemoteProvider;
@@ -46,7 +47,7 @@ use super::provider_registry::RemoteProvider;
 /// `ProviderHost` makes about the destination.
 pub struct RemoteAuthorization {
     provider: RemoteProvider,
-    key: String,
+    key: Zeroizing<String>,
 }
 
 impl RemoteAuthorization {
@@ -104,13 +105,17 @@ pub fn authorize_remote(
     let key = prefs
         .ai_provider_key
         .as_deref()
-        .map(str::trim)
+        .map(|k| k.trim())
         .filter(|k| !k.is_empty())
         .ok_or(EngineError::NoCredential)?;
 
     Ok(RemoteAuthorization {
         provider,
-        key: key.to_string(),
+        // Wrapped, because this is a fresh allocation holding the credential and
+        // it outlives the borrow it came from (myne-md/myne#444). The prefs
+        // field being `Zeroizing` would mean little if the authorization the
+        // request is actually built from kept a plain copy.
+        key: Zeroizing::new(key.to_string()),
     })
 }
 
@@ -124,7 +129,7 @@ mod tests {
             ai_enabled: true,
             ai_provider: Some("openrouter".into()),
             ai_provider_consent: Some("openrouter".into()),
-            ai_provider_key: Some("sk-test".into()),
+            ai_provider_key: Some(Zeroizing::new("sk-test".into())),
             ..PrefsView::default()
         }
     }
@@ -243,7 +248,7 @@ mod tests {
     #[test]
     fn rotating_the_key_leaves_consent_intact() {
         let rotated = PrefsView {
-            ai_provider_key: Some("sk-rotated".into()),
+            ai_provider_key: Some(Zeroizing::new("sk-rotated".into())),
             ..ready()
         };
         let auth = authorize_remote(&rotated, true).expect("still consented");
@@ -294,7 +299,7 @@ mod tests {
     #[test]
     fn a_blank_key_is_no_key() {
         let blank = PrefsView {
-            ai_provider_key: Some("   ".into()),
+            ai_provider_key: Some(Zeroizing::new("   ".into())),
             ..ready()
         };
         assert_eq!(
@@ -394,7 +399,7 @@ mod default_off_proof {
             ai_enabled: true,
             ai_provider: Some("openrouter".into()),
             ai_provider_consent: Some("openrouter".into()),
-            ai_provider_key: Some("sk-test".into()),
+            ai_provider_key: Some(Zeroizing::new("sk-test".into())),
             ..PrefsView::default()
         }
     }
