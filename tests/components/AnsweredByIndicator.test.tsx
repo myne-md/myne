@@ -28,7 +28,7 @@ import {
   AnsweredByIndicator,
   type AnsweredBy,
 } from "../../src/components/AnsweredByIndicator";
-import { answeredByOf } from "../../src/lib/ai-capability";
+import { answeredByFromResponse, answeredByOf } from "../../src/lib/ai-capability";
 
 afterEach(() => cleanup());
 
@@ -118,5 +118,34 @@ describe("answeredByOf — the datum, derived from the existing seam", () => {
       kind: "in-process",
     });
     expect(answeredByOf({ backendClass: null })).toEqual({ kind: "in-process" });
+  });
+});
+
+describe("answeredByFromResponse — the attribution the RESPONSE reported (#440)", () => {
+  // The indicator used to be built from a capability report fetched AFTER the
+  // answer arrived, i.e. from the CURRENT selection — so a backend switch
+  // mid-session relabelled turns a different backend had produced. And the name
+  // came from the remote provider's wire value, which a loopback answer does not
+  // have, so a local-runtime answer rendered "Answered by " with nothing after
+  // it. Both are properties of where a note's text went, which is a trust
+  // surface rather than a caption.
+  it("names the loopback runtime instead of rendering an empty string", () => {
+    expect(answeredByFromResponse({ class: "loopback_local", name: "ollama" })).toEqual({
+      kind: "local-runtime",
+      name: "ollama",
+    });
+  });
+
+  it("maps a remote provider's wire name to its proper noun", () => {
+    expect(answeredByFromResponse({ class: "remote", name: "openrouter" })).toEqual({
+      kind: "remote",
+      provider: "OpenRouter",
+    });
+  });
+
+  it("needs no name for the in-process arm — that is Myne itself", () => {
+    expect(answeredByFromResponse({ class: "in_process_local", name: null })).toEqual({
+      kind: "in-process",
+    });
   });
 });
