@@ -357,10 +357,27 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // cannot be a native-messaging host; the extension talks to the desktop app
     // or to nothing. Task 27 "Absent on web: clipper".
     ("clipper-pairing", Class::Unsupported),
-    // On-device LLM inference: candle + multi-GiB GGUF weights loaded from a
-    // bundled resource path, on a CPU thread pool. Task 27 "Absent on web:
-    // local AI". Not a size argument alone — there is no thread pool in a
-    // Worker and no bundled resource directory to load from.
+    // On-device LLM inference. Task 27 "Absent on web: local AI".
+    //
+    // The IN-PROCESS arm genuinely cannot run here: candle + multi-GiB GGUF
+    // weights loaded from a bundled resource path on a CPU thread pool, and a
+    // Worker has neither the pool nor the resource directory.
+    //
+    // **The provider arm is a DECISION, not a browser limitation, and saying
+    // otherwise would be this file's own "a decision outliving the thing it
+    // decided".** Since `decisions.md` 2026-08-09 a user may name a local model
+    // runtime on loopback — and a page *can* reach `127.0.0.1`, so "the browser
+    // can't" is simply false here, unlike the Tor case it superficially
+    // resembles. It stays absent because a served bundle reaching a local
+    // daemon is A15/TB11 territory: it would need its own CSP `connect-src`
+    // analysis, and it collides with `check-web-third-party.mjs` (zero
+    // third-party origins in the served bundle). Revisiting it is a decision
+    // with an owner, not an omission.
+    //
+    // Note this whole entry is inherited by every command under the plugin, so
+    // `check-web-command-coverage.mjs` passes unedited when one is added — which
+    // is exactly why a wrong rationale here is invisible to every guard and
+    // visible only to a reader.
     ("local-inference", Class::Unsupported),
     // Backup export/restore. `decisions.md` 2026-07-26 "Web capability set":
     // "Opening a backup file as an alternative entry path is not offered", and

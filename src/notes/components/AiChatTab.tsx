@@ -21,10 +21,63 @@ import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { usePrefs } from "../../hooks/usePrefs";
-import { useAiModelReady } from "../../hooks/useAiModelReady";
+import { useAiSurfaceState } from "../../hooks/useAiModelReady";
 import { useChat, type ChatCitation, type ChatTurn } from "../ai/chatStore";
 import { AI_CHAT_HONESTY_NOTE } from "../../lib/load-bearing-copy";
+import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
+import { providerLabelOf } from "../../lib/ai-capability";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
+
+/** Why the chat surface is at rest, as a fixed identifier — never content
+ *  (#191 task 3). `ready` covers both "working" and "still asking the host":
+ *  a surface that flashed a degraded state while the one host read was in
+ *  flight would tell the user something false for a frame. */
+type TFn = (key: string) => string;
+
+type RestingCause = "off" | "no-provider" | "unreachable" | "unavailable" | "ready";
+
+/** Causes that mean *the thing you set up is not answering*, as distinct from
+ *  *you have not set anything up*. Different sentence, different fix — which is
+ *  the whole point of the slice. */
+const NOT_ANSWERING: ReadonlySet<string> = new Set([
+  "unreachable",
+  "Unreachable",
+  "timeout",
+  "Timeout",
+  "refused",
+  "Refused",
+]);
+
+/** Total switches over the union rather than lookup tables, and the reason is
+ *  `scripts/check-i18n.mjs`: it verifies **static `t("…")` call sites**, so a
+ *  key sitting in a `Record` is a key no guard checks and a typo in it renders
+ *  the raw key at the user. Written this way the compiler catches a missing
+ *  cause and the guard catches a missing translation. */
+function chipKey(cause: Exclude<RestingCause, "ready">, t: TFn): string {
+  switch (cause) {
+    case "off":
+      return t("editor.chrome.rightPanel.aiChat.statusOff");
+    case "no-provider":
+      return t("editor.chrome.rightPanel.aiChat.statusNoModel");
+    case "unreachable":
+      return t("editor.chrome.rightPanel.aiChat.statusUnreachable");
+    case "unavailable":
+      return t("editor.chrome.rightPanel.aiChat.statusUnavailable");
+  }
+}
+
+function bodyKey(cause: Exclude<RestingCause, "ready">, t: TFn): string {
+  switch (cause) {
+    case "off":
+      return t("editor.chrome.rightPanel.aiChat.offHint");
+    case "no-provider":
+      return t("editor.chrome.rightPanel.aiChat.noModelHint");
+    case "unreachable":
+      return t("editor.chrome.rightPanel.aiChat.unreachableHint");
+    case "unavailable":
+      return t("editor.chrome.rightPanel.aiChat.unavailableHint");
+  }
+}
 
 const HEADER_ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -188,6 +241,18 @@ function ChatTurnView({
           {t("editor.chrome.rightPanel.aiChat.errorTurn")}
         </p>
       )}
+      {/* Which backend produced this answer (#191 task 4, SYNC-13). Attached to
+          the TURN, so switching provider does not retroactively re-label the
+          answers that came before it — and only on a finalized turn, because a
+          streaming one has not been answered by anyone yet. A caption in the
+          same register as the citation chips beside it: no icon, no colour, no
+          badge, no dismissal. Persistent rather than interruptive, because a
+          dialog people see often is a dialog people stop reading. */}
+      {!turn.streaming && turn.answeredBy !== undefined && (
+        <div style={{ marginTop: "var(--space-1)" }}>
+          <AnsweredByIndicator answeredBy={turn.answeredBy} testId="ai.turn-answered-by" />
+        </div>
+      )}
       {turn.citations.length > 0 && (
         <div
           data-testid="ai.citations"
@@ -242,9 +307,26 @@ export function AiChatTab({
   const { t } = useTranslation();
   const { prefs } = usePrefs();
   const aiEnabled = prefs.ai_enabled;
-  // Enabled but no model side-loaded → the engine can't produce output yet.
-  const modelReady = useAiModelReady(aiEnabled);
-  const noModel = aiEnabled && modelReady === false;
+  // One host read, four states (#191 task 1) — replacing a private
+  // `get_model_path` probe that could only say yes/no and defaulted to no.
+  const backend = useAiSurfaceState(aiEnabled);
+  // …and one sentence per state (#191 task 3). The old copy said "No model
+  // selected. Choose one in Settings" for ALL of them, which is wrong in two:
+  // it tells a user whose runtime merely is not running to redo a setup they
+  // already did, and it offers a settings page to a build that has no local AI
+  // compiled in at all.
+  const resting: RestingCause = !aiEnabled
+    ? "off"
+    : backend.kind === "absent"
+      ? "unavailable"
+      : backend.kind === "unavailable"
+        ? NOT_ANSWERING.has(backend.cause ?? "")
+          ? "unreachable"
+          : "no-provider"
+        : backend.kind === "checking"
+          ? "ready"
+          : "ready";
+  const noModel = resting === "no-provider" || resting === "unreachable" || resting === "unavailable";
   const ready = aiEnabled && !noModel;
   const chat = useChat();
   const [message, setMessage] = useState("");
@@ -259,6 +341,7 @@ export function AiChatTab({
           data-testid="ai.chrome-status"
           data-ai-enabled={aiEnabled ? "true" : "false"}
           data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
+          data-ai-cause={resting}
           style={{
             fontSize: "var(--text-xs)",
             fontWeight: "var(--weight-medium)",
@@ -269,13 +352,16 @@ export function AiChatTab({
             whiteSpace: "nowrap",
           }}
         >
-          {!aiEnabled
-            ? t("editor.chrome.rightPanel.aiChat.statusOff")
-            : noModel
-              ? t("editor.chrome.rightPanel.aiChat.statusNoModel")
-              : gettingReady
-                ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
-                : t("editor.chrome.rightPanel.aiChat.statusReady")}
+          {resting !== "ready"
+            ? chipKey(resting, t)
+            : gettingReady
+              ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
+              : // At rest with a provider named, the chip IS the attribution
+                // (#191 task 4): "Ready" would be true and uninformative, and
+                // the provider name is the one fact a user cannot get anywhere
+                // else without opening Settings. A proper noun, not i18n'd.
+                (providerLabelOf(prefs.ai_provider) ??
+                t("editor.chrome.rightPanel.aiChat.statusReady"))}
         </span>
       </div>
       {/* Honest framing (task 13): rendered VERBATIM (load-bearing copy, never
@@ -369,6 +455,7 @@ export function AiChatTab({
       {chat.turns.length === 0 && (
         <p
           data-testid={noModel ? "ai.status-no-model" : undefined}
+          data-ai-cause={resting}
           style={{
             fontSize: "var(--text-sm)",
             lineHeight: 1.5,
@@ -376,13 +463,11 @@ export function AiChatTab({
             margin: "8px 0 0",
           }}
         >
-          {!aiEnabled
-            ? t("editor.chrome.rightPanel.aiChat.offHint")
-            : noModel
-              ? t("editor.chrome.rightPanel.aiChat.noModelHint")
-              : gettingReady
-                ? t("editor.chrome.rightPanel.aiChat.gettingReadyHint")
-                : t("editor.chrome.rightPanel.aiChat.empty")}
+          {resting !== "ready"
+            ? bodyKey(resting, t)
+            : gettingReady
+              ? t("editor.chrome.rightPanel.aiChat.gettingReadyHint")
+              : t("editor.chrome.rightPanel.aiChat.empty")}
         </p>
       )}
 

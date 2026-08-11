@@ -80,6 +80,9 @@ const DEFAULT_PREFS: PrefsView = {
   // optimistic pre-read value is `false` — the same polarity as `ai_enabled`,
   // which the tag pass is independently gated on.
   auto_tag_enabled: false,
+  ai_provider: null,
+  ai_provider_consent: null,
+  ai_provider_model: null,
   active_workspace: null,
   custom_theme: null,
   daily_date_format: null,

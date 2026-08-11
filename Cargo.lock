@@ -4664,6 +4664,8 @@ dependencies = [
  "protocol",
  "qrcode",
  "quick-xml 0.37.5",
+ "rustls",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -4687,6 +4689,7 @@ dependencies = [
  "unicode-normalization",
  "uuid",
  "webkit2gtk",
+ "webpki-roots",
  "webview2-com",
  "windows 0.61.3",
  "windows-sys 0.60.2",
@@ -10144,6 +10147,15 @@ dependencies = [
  "pkg-config",
  "soup3-sys",
  "system-deps",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]

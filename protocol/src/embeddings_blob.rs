@@ -6,7 +6,7 @@
 //! `vault.embeddings` is a vault-level singleton artifact holding the
 //! on-device **AI embedding index**: the semantic-search / Q&A dense vectors,
 //! a `{note_id → content_nonce}` staleness manifest, and a trailing
-//! model-identity tuple `{model_hash, embedding_dim, chunker_version}`. It
+//! model-identity tuple `{model_identity, embedding_dim, chunker_version}`. It
 //! lives next to `vault.meta` at `<vault-root>/vault.embeddings` and is
 //! AEAD-encrypted under
 //! `ai_embeddings_key = DeriveSubkey(root_key, SubkeyRole::AiEmbeddingsKey)`.
@@ -39,9 +39,10 @@
 //! ------  ----  -------------------------  ----------------------------------
 //! 0       4     magic                      ASCII "MYR1"
 //! 4       1     protocol_version           0x01
-//! 5       1     embeddings_format_version  0x01 = the v0.1 inner-plaintext
-//!                                           schema; bumping it lets a client
-//!                                           fall to rebuild on an unknown form
+//! 5       1     embeddings_format_version  0x02 = the current inner-plaintext
+//!                                           schema (0x01 is rejected → rebuild);
+//!                                           bumping it lets a client fall to
+//!                                           rebuild on an unknown form
 //! 6       24    nonce                      XChaCha20-Poly1305 nonce
 //! 30      4     ciphertext_len             big-endian uint32, plaintext_len + 32
 //! 34      M     ciphertext                 AEAD ciphertext + 32-byte CTX tag T'
@@ -71,12 +72,36 @@ pub const EMBEDDINGS_BLOB_MAGIC: [u8; 4] = *b"MYR1";
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const EMBEDDINGS_BLOB_PROTOCOL_VERSION: u8 = 0x01;
 
-/// `embeddings_format_version` byte at offset 5 — the v0.1 inner-plaintext
-/// schema. Distinct from `protocol_version`: the vector-store serialization may
-/// change within v0.1, and a client that does not understand a newer form falls
-/// to rebuild (§ 9.17.4) rather than mis-parsing. The model-identity tuple's own
-/// drift is handled inside the payload, NOT by bumping this byte.
+/// `embeddings_format_version` byte at offset 5 — the FIRST inner-plaintext
+/// schema, superseded by [`EMBEDDINGS_BLOB_FORMAT_V2`] and no longer written.
+/// Retained as a name for the rejected value: a `0x01` blob on disk (a vault
+/// last written by a client before the tagged model identity) is refused with
+/// [`EmbeddingsBlobError::FormatUnsupported`], which the caller collapses to
+/// fall-to-rebuild (§ 9.17.4). See [`EMBEDDINGS_BLOB_FORMAT_V2`] for why the
+/// bump, rather than a payload-side widening, is the safe move.
 pub const EMBEDDINGS_BLOB_FORMAT_V1: u8 = 0x01;
+
+/// `embeddings_format_version` byte at offset 5 — the CURRENT inner-plaintext
+/// schema (§ 9.17.2). Distinct from `protocol_version`: the vector-store
+/// serialization may change within v0.1, and a client that does not understand
+/// a newer form falls to rebuild (§ 9.17.4) rather than mis-parsing.
+///
+/// `0x01` → `0x02` is exactly such a serialization change: the model-identity
+/// field became a **tagged union** (a file-hash arm for a side-loaded model, a
+/// served arm carrying the runtime's model name + content digest). The bump is
+/// load-bearing rather than cosmetic, because the payload is postcard and
+/// therefore **non-self-describing**: a `0x01` snapshot begins with the 32 raw
+/// bytes of the old `model_hash`, where a `0x02` decoder expects a variant
+/// discriminant. Most first bytes fail to decode — but a *valid-looking* one
+/// would succeed and yield a **garbage identity**, and a garbage identity that
+/// happens to compare equal serves semantically wrong vectors instead of
+/// rebuilding. Checking the byte makes the rejection deterministic, and costs
+/// nothing: this blob is a rebuildable cache, never synced, never backed up.
+///
+/// A tuple whose *values* merely differ (another model, dimension, or chunker)
+/// is still handled inside the payload — that is a cache-invalidation event,
+/// not a format change, and does NOT bump this byte.
+pub const EMBEDDINGS_BLOB_FORMAT_V2: u8 = 0x02;
 
 /// Length of the 16-byte `account_number_hash` bound into
 /// `AAD_ai_embeddings_blob` (spec § 9.17.3 + § 9.3 offset 6).
@@ -175,7 +200,7 @@ pub fn encode_embeddings_blob_raw(
     encode_blob_envelope_raw(
         ai_embeddings_key,
         &EMBEDDINGS_BLOB_MAGIC,
-        EMBEDDINGS_BLOB_FORMAT_V1,
+        EMBEDDINGS_BLOB_FORMAT_V2,
         &aad,
         MAX_EMBEDDINGS_PLAINTEXT_LEN,
         plaintext,
@@ -196,7 +221,7 @@ pub fn encode_embeddings_blob(
     encode_blob_envelope(
         ai_embeddings_key,
         &EMBEDDINGS_BLOB_MAGIC,
-        EMBEDDINGS_BLOB_FORMAT_V1,
+        EMBEDDINGS_BLOB_FORMAT_V2,
         &aad,
         MAX_EMBEDDINGS_PLAINTEXT_LEN,
         plaintext,
@@ -218,7 +243,7 @@ pub fn decode_embeddings_blob(
     decode_blob_envelope(
         ai_embeddings_key,
         &EMBEDDINGS_BLOB_MAGIC,
-        EMBEDDINGS_BLOB_FORMAT_V1,
+        EMBEDDINGS_BLOB_FORMAT_V2,
         &aad,
         MAX_EMBEDDINGS_PLAINTEXT_LEN,
         blob,
@@ -253,7 +278,7 @@ mod tests {
         let blob = encode_embeddings_blob_raw(&key, &h, pt, &nonce()).unwrap();
         assert_eq!(&blob[0..4], b"MYR1");
         assert_eq!(blob[4], 0x01);
-        assert_eq!(blob[5], 0x01);
+        assert_eq!(blob[5], 0x02);
         let out = decode_embeddings_blob(&key, &h, &blob).unwrap();
         assert_eq!(out.as_slice(), pt.as_slice());
     }
@@ -306,7 +331,30 @@ mod tests {
         let key = fixed_key();
         let h = account_hash();
         let mut blob = encode_embeddings_blob_raw(&key, &h, b"x", &nonce()).unwrap();
-        blob[5] = 0x02;
+        // 0x03 is "the future" — the next unallocated value. It has to be read
+        // from the constant, not written as a literal next to 0x02: this test
+        // asserted `0x02` before the V1→V2 bump, and a bump that leaves the
+        // literal behind turns the rejection test into a tautology
+        // (`protocol/CLAUDE.md`, "Bumping a version constant silently inverts
+        // the tests that used the next value as 'the future'").
+        blob[5] = EMBEDDINGS_BLOB_FORMAT_V2 + 1;
+        assert_eq!(
+            decode_embeddings_blob(&key, &h, &blob),
+            Err(EmbeddingsBlobError::FormatUnsupported),
+        );
+    }
+
+    #[test]
+    fn the_superseded_v1_format_rejects_for_rebuild() {
+        // LOAD-BEARING (§9.17.2): a `0x01` blob is a snapshot whose trailing
+        // model identity is a bare 32-byte hash where a `0x02` decoder expects
+        // a tagged union. postcard is non-self-describing, so a valid-looking
+        // leading discriminant would decode to a GARBAGE identity rather than
+        // failing — the version byte is what makes the rejection deterministic.
+        let key = fixed_key();
+        let h = account_hash();
+        let mut blob = encode_embeddings_blob_raw(&key, &h, b"x", &nonce()).unwrap();
+        blob[5] = EMBEDDINGS_BLOB_FORMAT_V1;
         assert_eq!(
             decode_embeddings_blob(&key, &h, &blob),
             Err(EmbeddingsBlobError::FormatUnsupported),
@@ -473,7 +521,15 @@ mod tests {
         let mut pf_version = blob_small.clone();
         pf_version[4] = 0x02;
         let mut pf_format = blob_small.clone();
-        pf_format[5] = 0x02;
+        // The next UNALLOCATED format byte, read from the constant rather than
+        // written as a literal — `0x02` was this fixture's "future" until the
+        // V1→V2 bump made it the present (`protocol/CLAUDE.md`).
+        pf_format[5] = EMBEDDINGS_BLOB_FORMAT_V2 + 1;
+        // The SUPERSEDED format byte: a snapshot written before the model
+        // identity became a tagged union. A port that accepts it decodes a
+        // bare 32-byte hash as a variant discriminant (§9.17.2).
+        let mut pf_format_v1 = blob_small.clone();
+        pf_format_v1[5] = EMBEDDINGS_BLOB_FORMAT_V1;
         let pf_header_short: alloc::vec::Vec<u8> = EMBEDDINGS_BLOB_MAGIC.to_vec(); // 4 < 34
         let mut pf_truncated = blob_small.clone();
         pf_truncated.truncate(pf_truncated.len() - 1);
@@ -491,7 +547,7 @@ mod tests {
         dump.push_str("  \"schema\": \"embeddings\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §9.17 + §3.4 + §5.2 + §6.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::encode_embeddings_blob_raw + protocol::decode_embeddings_blob byte mapping for the MYR1 vault.embeddings encrypted on-device AI-embedding-index codec (MYND-453). The inner plaintext is OPAQUE (client-serialized embedding store: semantic-search / Q&A dense vectors + {note_id -> content_nonce} manifest + model-identity tuple) — no canonical-JSON discipline, unlike vault-prefs; the structural twin of vault.search / vault.indices. The inner postcard snapshot is engine-opaque and is NOT pinned here — only the envelope + AAD framing. ai_embeddings_key = derive_subkey(root_key, SubkeyRole::AiEmbeddingsKey) (role 'ai-embeddings-key'); account_number_hash binds via aad_ai_embeddings_blob (role 'ai-embeddings-blob' — a DISTINCT load-bearing string, and DISTINCT from search-index-key/-blob and vault-indices-key/-blob: one magic + one KEK per blob family, MYR1 != MYS1 != MYI1). Model-swap invalidation rides inside the opaque payload (the §9.17.2 model-identity tuple), NOT the AAD. 12 cases: 3 encrypt (empty / small descriptor / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4, real-key fixtures) + 6 parse_fail (one per distinguishable pre-decryption structural reject incl. the load-bearing format_unsupported forward hook). Cases generated by `cargo test -p protocol --lib emit_embeddings_vectors_for_paste -- --ignored` (in protocol/src/embeddings_blob.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_embeddings_blob_raw + protocol::decode_embeddings_blob byte mapping for the MYR1 vault.embeddings encrypted on-device AI-embedding-index codec (MYND-453). The inner plaintext is OPAQUE (client-serialized embedding store: semantic-search / Q&A dense vectors + {note_id -> content_nonce} manifest + model-identity tuple) — no canonical-JSON discipline, unlike vault-prefs; the structural twin of vault.search / vault.indices. The inner postcard snapshot is engine-opaque and is NOT pinned here — only the envelope + AAD framing. ai_embeddings_key = derive_subkey(root_key, SubkeyRole::AiEmbeddingsKey) (role 'ai-embeddings-key'); account_number_hash binds via aad_ai_embeddings_blob (role 'ai-embeddings-blob' — a DISTINCT load-bearing string, and DISTINCT from search-index-key/-blob and vault-indices-key/-blob: one magic + one KEK per blob family, MYR1 != MYS1 != MYI1). Model-swap invalidation rides inside the opaque payload (the §9.17.2 model-identity tuple), NOT the AAD. 13 cases: 3 encrypt (empty / small descriptor / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4, real-key fixtures) + 7 parse_fail (one per distinguishable pre-decryption structural reject, incl. BOTH format_unsupported directions: the forward hook at 0x03 and the superseded 0x01 schema). Cases generated by `cargo test -p protocol --lib emit_embeddings_vectors_for_paste -- --ignored` (in protocol/src/embeddings_blob.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // ---- encrypt closure ----------------------------------------
@@ -714,8 +770,16 @@ mod tests {
         emit_parse_fail(
             &mut dump,
             "parse-fail-format-unsupported",
-            "embeddings_format_version byte (offset 5) set to 0x02 — a future embedding-store serialization a v0.1 client does not understand. The decoder rejects cleanly so the caller falls to rebuild (re-embed) from the .myn files (§9.17.4). This is the forward-migration hook and is load-bearing. NOTE: model-identity drift (a model / dimension / chunker change) is handled INSIDE the opaque payload, not by bumping this byte.",
+            "embeddings_format_version byte (offset 5) set to 0x03 — a future embedding-store serialization no client understands yet. The decoder rejects cleanly so the caller falls to rebuild (re-embed) from the .myn files (§9.17.4). This is the forward-migration hook and is load-bearing. NOTE: model-identity drift (a model / dimension / chunker change in the tuple's VALUES) is handled INSIDE the opaque payload, not by bumping this byte; a change to the tuple's SHAPE is what moved the byte to 0x02.",
             &pf_format,
+            "format_unsupported",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-format-superseded-v1",
+            "embeddings_format_version byte (offset 5) set to 0x01 — the SUPERSEDED inner-plaintext schema, whose trailing model identity was a bare 32-byte SHA-256 where 0x02 carries a tagged union (file-hash | served). Rejected → rebuild. Load-bearing in the backward direction, which the forward hook above does not cover: the payload is postcard and therefore non-self-describing, so a port that accepts 0x01 reads the hash's first byte as a variant discriminant and, when that byte happens to be valid, decodes a GARBAGE identity that may compare equal and serve semantically wrong vectors (§9.17.2).",
+            &pf_format_v1,
             "format_unsupported",
             true,
         );

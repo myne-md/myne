@@ -11,8 +11,17 @@
 # Why repackage rather than rebuild: the from-source PKGBUILD needs the full
 # Rust toolchain and ~40 min inside an Arch container to produce bytes we have
 # already built and verified. Repackaging the .deb guarantees the Arch package
-# carries the SAME file set the deb ships — the sidecars and the ~1.8 GB model
+# carries the SAME file set the deb ships — the sidecars and the ~641 MiB model
 # payload included — instead of a second build that could drift from it.
+#
+# That figure replaces a "~1.8 GB" this comment carried until ai-bundle-slim
+# myne#190 task 8. **Nobody could reconcile 1.8 GB with anything measurable**:
+# the declared payload is 671,889,625 bytes (640.76 MiB, byte-exact sum of every
+# path in `bundle.resources`; run `node scripts/check-desktop-payload-budget.mjs`)
+# and the amd64 deb it repackages is 602.64 MiB. Its provenance could not be
+# determined, so it is replaced rather than adjusted. Ideally this number would
+# be re-measured from the deb itself; the declared payload is used instead
+# because it is reproducible from a checkout by anyone reading this line.
 #
 # `source` is a LOCAL file: the repo is private, so a release-asset URL would
 # need a credential `makepkg` has no clean way to carry. Drop the released
@@ -42,7 +51,10 @@ noextract=("Myne_${pkgver}_amd64.deb")
 package() {
   # The deb's payload is already the FHS tree this package wants:
   #   usr/bin/{myne-desktop,myne,myne-tor}   the app, the CLI sidecar, the Tor sidecar
-  #   usr/lib/Myne/{models,dictionaries}     bundled AI model + spell dictionaries
+  #   usr/lib/Myne/{models,dictionaries}     bundled AI models + spell dictionaries
+  #                                          (640.76 MiB declared: tag 475.36,
+  #                                           whisper 78.76, ocr 21.06,
+  #                                           dictionaries 74.51 — MiB, byte-exact)
   #   usr/share/{applications,icons,metainfo}
   # so extraction IS the packaging step. Nothing is rewritten — a divergence
   # between the deb and the Arch package would be a bug, not a feature.

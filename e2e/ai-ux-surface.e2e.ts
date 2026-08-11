@@ -34,7 +34,14 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
-import { AI_TRUST_DISCLOSURE, AI_TRUST_HEADLINE } from "../src/lib/load-bearing-copy";
+import {
+  aiTrustDisclosure,
+  aiTrustHeadline,
+} from "../src/lib/load-bearing-copy";
+
+// The E2E vault names no provider and stores no endpoint, so the panel is in
+// its in-process state. Still compared by FULL literal, not substring.
+const IN_PROCESS = { kind: "in-process" } as const;
 
 /** Only run against the `local-inference-stub` build (sets `MYNE_E2E_AI=1`),
  *  which swaps in the deterministic StubEngine so inference-adjacent behaviour
@@ -83,14 +90,14 @@ aiDescribe("aux1 AI settings surface + right-sidebar AI Chat tab (ai-ux-surface)
 
         // Headline renders the constant verbatim — a collapse fails this.
         const headline = await s.byTestId("ai.trust-headline");
-        expect(await headline.textContent()).toBe(AI_TRUST_HEADLINE);
+        expect(await headline.textContent()).toBe(aiTrustHeadline(IN_PROCESS));
 
         // Expand the "How does this work?" disclosure, then assert its full text.
         await (await s.byTestId("ai.trust-disclosure-toggle")).click();
         const disclosure = await s.waitForElement(testIdSelector("ai.trust-disclosure"), {
           timeoutMs: 10_000,
         });
-        expect(await disclosure.textContent()).toBe(AI_TRUST_DISCLOSURE);
+        expect(await disclosure.textContent()).toBe(aiTrustDisclosure(IN_PROCESS));
 
         // ── Toggle ai_enabled on (off by default, SYNC-12) ──
         await (await s.byTestId("ai.enable-toggle")).click();

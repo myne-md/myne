@@ -118,6 +118,18 @@ pub enum PrefsWriteError {
     /// have a missing error surface.
     #[error("prefs blob encode failed")]
     PrefsEncodeFailed,
+
+    /// The write carried a value outside the closed set this build accepts —
+    /// today, an AI provider name that is not in `KNOWN_AI_PROVIDERS`
+    /// (myne#415).
+    ///
+    /// Refusing rather than storing matters here: a stored value the code
+    /// cannot honour would be a selection the user can see and the request
+    /// path silently ignores, and a compromised WebView could park a name a
+    /// FUTURE build would start honouring. Carries no echo of the rejected
+    /// value — a settings field's contents reach logs and screenshots.
+    #[error("prefs write carried a value outside the accepted set")]
+    InvalidValue,
 }
 
 impl From<std::io::Error> for PrefsReadError {

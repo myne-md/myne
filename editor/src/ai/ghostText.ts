@@ -24,7 +24,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 
-import { buildCompletionPrompt, infer } from "@myne/editor/host/lib/writing-assistant";
+import { buildCompletionPrompt, inferAmbient } from "@myne/editor/host/lib/writing-assistant";
 
 /** Paused-cursor debounce before a ghost request fires (ms). Longer than
  *  spell's 120ms scan — a completion is heavier + more interruptive. */
@@ -201,7 +201,7 @@ const ghostTriggerPlugin = ViewPlugin.fromClass(
         // Brief prompt + short ceiling + trim (issue #193): the passive
         // suggestion is a few words. `/devam` asks the same builder for the
         // unbounded shape, which is where a long continuation belongs.
-        const raw = await infer(buildCompletionPrompt(preceding, { brief: true }), {
+        const raw = await inferAmbient(buildCompletionPrompt(preceding, { brief: true }), {
           maxNewTokens: GHOST_MAX_NEW_TOKENS,
         });
         completion = trimGhostCompletion(raw);

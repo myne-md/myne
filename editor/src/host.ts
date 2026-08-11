@@ -299,6 +299,14 @@ export interface EditorHost {
    *  compile. A host that ignores them is slower and wordier, never broken. */
   ai?: {
     infer: (prompt: string, opts?: { maxNewTokens?: number }) => Promise<string>;
+    /** The ambient sibling of {@link infer} (SYNC-14) — the surface that fires
+     *  without the user asking. A host that cannot classify its requests omits
+     *  this member, and the engine hides the affordance rather than routing an
+     *  ambient request through the user-initiated door. */
+    inferAmbient?: (
+      prompt: string,
+      opts?: { maxNewTokens?: number },
+    ) => Promise<string>;
     buildCompletionPrompt: (precedingText: string, opts?: { brief?: boolean }) => string;
     buildTitlePrompt: (noteBody: string) => string;
   };

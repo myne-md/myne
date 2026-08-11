@@ -1,31 +1,13 @@
-//! Minimal HTTP/1.1 codec shared by the sync transports (MYND-424 task 2).
+//! HTTP/1.1 request framing and response parsing — pure over `BufRead`/`Write`.
 //!
-//! Both the production `RustlsTransport` (https) and the dev/harness
-//! `HttpTransport` (loopback http) speak the same tiny **keep-alive** HTTP/1.1 —
-//! only the byte stream underneath differs (TLS vs plain TCP). Responses are
-//! read with strict framing (`Content-Length` / chunked), never read-to-EOF,
-//! so one connection carries a whole sync cycle (1 handshake instead of N+2 —
-//! the pre-keep-alive `Connection: close` codec cost a fresh TCP+TLS handshake
-//! per request). The codec is pure over `BufRead` (no sockets), so it is
-//! unit-tested once here and reused by both transports.
+//! Moved **whole and verbatim** out of the sync plugin's HTTP codec module
+//! (ai-ollama-local task 1): every function, type and test kept its name and
+//! its assertions. A renamed or reworded test is not evidence that behaviour
+//! survived a move, and the existing battery passing unchanged is the only
+//! proof this refactor offers.
 
-use super::transport::{HttpMethod, TransportError, TransportResponse, TransportResponseExt};
+use super::{HttpMethod, TransportError, TransportResponse, TransportResponseExt};
 use std::io::{BufRead, Read, Write};
-
-/// Hard cap on a sync response body read from the socket. TB5 treats the
-/// self-hosted/hosted relay as untrusted (a compromised server is in scope), so
-/// an unbounded body read lets it stream a giant body and OOM-crash the client.
-/// 64 MiB comfortably exceeds any legitimate `/sync/pull`, `/sync/blob` or
-/// `/sync/blobs` response while turning a hostile oversized body into a clean
-/// `TransportError`. The batch route is the one that makes that claim
-/// *conditional*: it is bounded by `orchestrator::FETCH_WINDOW_MAX_BYTES` (8 MiB
-/// raw ≈ 11 MiB encoded), and widening that past ~47 MiB of raw ciphertext would
-/// put a legitimate response over this cap — which is not a slow path but a
-/// wedge, since the next cycle plans the identical window. Raise one, re-read the
-/// other.
-/// Enforced INCREMENTALLY — an over-cap `Content-Length` is rejected before a
-/// single body byte is buffered.
-pub(crate) const MAX_SYNC_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Cap on the response head (status line + headers). A hostile server must not
 /// be able to stream an unbounded header section.
@@ -37,7 +19,12 @@ const MAX_CHUNK_LINE_BYTES: usize = 1024;
 /// Build a minimal HTTP/1.1 request (keep-alive — HTTP/1.1's default; the
 /// response reader decides whether the connection survives, via framing +
 /// `Connection: close`).
-pub(crate) fn build_http_request(
+/// Test-only today. `plugins::sync` uses the `_ext` form; this plain one is the
+/// shape a non-sync caller wants and is what #189's Ollama request builder will
+/// reach for. Justified individually rather than hidden — see the module doc on
+/// why this file no longer sits under sync's blanket `allow(dead_code)`.
+#[allow(dead_code)]
+pub fn build_http_request(
     method: HttpMethod,
     path: &str,
     host: &str,
@@ -50,7 +37,7 @@ pub(crate) fn build_http_request(
 /// [`build_http_request`] with caller-supplied extra headers (the attachment
 /// byte-transport sends `Range` / `Content-Type: application/octet-stream`).
 /// A caller-supplied `Content-Type` suppresses the JSON default.
-pub(crate) fn build_http_request_ext(
+pub fn build_http_request_ext(
     method: HttpMethod,
     path: &str,
     host: &str,
@@ -87,13 +74,13 @@ pub(crate) fn build_http_request_ext(
 
 /// Why an incremental response read failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum HttpReadError {
+pub enum HttpReadError {
     /// EOF before ANY response byte arrived — the signature of a stale
     /// keep-alive connection the server closed between requests. The server
     /// provably did not send a response, so the caller may retry the request
     /// once on a fresh connection.
     EofBeforeResponse,
-    /// The body exceeded [`MAX_SYNC_RESPONSE_BYTES`] (hostile or broken relay).
+    /// The body exceeded [`max_bytes`] (hostile or broken relay).
     TooLarge,
     /// Any other failure once bytes started flowing: malformed framing,
     /// truncation, IO/timeout. NOT retry-safe — the server may have processed
@@ -132,7 +119,7 @@ fn read_line_limited<R: BufRead>(
 /// A parsed response head (status line + headers), shared by the framed
 /// response reader and the SSE stream opener (which reads ONLY the head and
 /// hands the still-open stream to the poke listener).
-pub(crate) struct ResponseHead {
+pub struct ResponseHead {
     pub(crate) status: u16,
     pub(crate) headers: Vec<(String, String)>,
     pub(crate) chunked: bool,
@@ -143,9 +130,7 @@ pub(crate) struct ResponseHead {
 
 /// Read a response head (status line + headers up to the blank line), bounded
 /// by [`MAX_HEAD_BYTES`]. EOF before ANY byte → [`HttpReadError::EofBeforeResponse`].
-pub(crate) fn read_response_head<R: BufRead>(
-    reader: &mut R,
-) -> Result<ResponseHead, HttpReadError> {
+pub fn read_response_head<R: BufRead>(reader: &mut R) -> Result<ResponseHead, HttpReadError> {
     let mut head_budget = MAX_HEAD_BYTES;
 
     // Peek before reading, and the reason is a real bug rather than caution.
@@ -245,9 +230,10 @@ pub(crate) fn read_response_head<R: BufRead>(
 /// `head_request` marks a HEAD response: its `Content-Length` describes the
 /// body a GET *would* return (RFC 9110 §9.3.2) and no body follows, so body
 /// framing is skipped entirely.
-pub(crate) fn read_http_response<R: BufRead>(
+pub fn read_http_response<R: BufRead>(
     reader: &mut R,
     head_request: bool,
+    max_bytes: u64,
 ) -> Result<(TransportResponseExt, bool), HttpReadError> {
     let ResponseHead {
         status,
@@ -262,9 +248,9 @@ pub(crate) fn read_http_response<R: BufRead>(
     let body = if head_request {
         Vec::new()
     } else if chunked {
-        read_chunked_body(reader)?
+        read_chunked_body(reader, max_bytes)?
     } else if let Some(n) = content_length {
-        if n > MAX_SYNC_RESPONSE_BYTES {
+        if n > max_bytes {
             return Err(HttpReadError::TooLarge);
         }
         let mut buf = vec![0u8; n as usize];
@@ -278,10 +264,10 @@ pub(crate) fn read_http_response<R: BufRead>(
         let mut buf = Vec::new();
         reader
             .by_ref()
-            .take(MAX_SYNC_RESPONSE_BYTES + 1)
+            .take(max_bytes + 1)
             .read_to_end(&mut buf)
             .map_err(|_| HttpReadError::Failed)?;
-        if buf.len() as u64 > MAX_SYNC_RESPONSE_BYTES {
+        if buf.len() as u64 > max_bytes {
             return Err(HttpReadError::TooLarge);
         }
         buf
@@ -302,7 +288,7 @@ pub(crate) fn read_http_response<R: BufRead>(
 /// total-size cap per chunk. Trailers are read and discarded UP TO the
 /// terminating empty line — they must be drained fully, or the leftover bytes
 /// would poison the next keep-alive response on the same connection.
-fn read_chunked_body<R: BufRead>(reader: &mut R) -> Result<Vec<u8>, HttpReadError> {
+fn read_chunked_body<R: BufRead>(reader: &mut R, max_bytes: u64) -> Result<Vec<u8>, HttpReadError> {
     let mut body = Vec::new();
     loop {
         let mut line_budget = MAX_CHUNK_LINE_BYTES;
@@ -328,7 +314,7 @@ fn read_chunked_body<R: BufRead>(reader: &mut R) -> Result<Vec<u8>, HttpReadErro
         // Clamping here rather than only making the add checked is the shape the
         // rest of this file uses, and it means no later expression on this path
         // can be handed a value the budget never admitted.
-        if size > MAX_SYNC_RESPONSE_BYTES {
+        if size > max_bytes {
             return Err(HttpReadError::TooLarge);
         }
         if size == 0 {
@@ -348,7 +334,7 @@ fn read_chunked_body<R: BufRead>(reader: &mut R) -> Result<Vec<u8>, HttpReadErro
         // is ever loosened.
         if (body.len() as u64)
             .checked_add(size)
-            .is_none_or(|total| total > MAX_SYNC_RESPONSE_BYTES)
+            .is_none_or(|total| total > max_bytes)
         {
             return Err(HttpReadError::TooLarge);
         }
@@ -380,11 +366,12 @@ fn read_chunked_body<R: BufRead>(reader: &mut R) -> Result<Vec<u8>, HttpReadErro
 /// any fresh-connection failure) the error surfaces, so `/sync/push` is never
 /// silently double-applied (and even a pathological duplicate is CAS-guarded →
 /// 409 → the engine's bounded reconcile path).
-pub(crate) fn keepalive_roundtrip<S, F>(
+pub fn keepalive_roundtrip<S, F>(
     slot: &mut Option<std::io::BufReader<S>>,
     connect: F,
     req: &[u8],
     head_request: bool,
+    max_bytes: u64,
 ) -> Result<TransportResponseExt, TransportError>
 where
     S: Read + Write,
@@ -396,7 +383,7 @@ where
             .write_all(req)
             .and_then(|_| conn.get_mut().flush());
         if wrote.is_ok() {
-            match read_http_response(&mut conn, head_request) {
+            match read_http_response(&mut conn, head_request, max_bytes) {
                 Ok((resp, reuse)) => {
                     if reuse {
                         *slot = Some(conn);
@@ -418,7 +405,7 @@ where
         .write_all(req)
         .and_then(|_| conn.get_mut().flush())
         .map_err(|_| TransportError::Network)?;
-    match read_http_response(&mut conn, head_request) {
+    match read_http_response(&mut conn, head_request, max_bytes) {
         Ok((resp, reuse)) => {
             if reuse {
                 *slot = Some(conn);
@@ -431,8 +418,12 @@ where
 
 /// Parse a complete in-memory HTTP/1.1 response into `(status, body)` — the
 /// buffer-oriented compatibility face of [`read_http_response`].
-pub(crate) fn parse_http_response(raw: &[u8]) -> Option<TransportResponse> {
-    parse_http_response_ext(raw, false).map(|r| TransportResponse {
+/// Test-only today; the buffer-oriented face of [`read_http_response`],
+/// kept because a caller holding a complete response in memory (a fake
+/// backend, a fixture) needs it. See the module doc.
+#[allow(dead_code)]
+pub fn parse_http_response(raw: &[u8], max_bytes: u64) -> Option<TransportResponse> {
+    parse_http_response_ext(raw, false, max_bytes).map(|r| TransportResponse {
         status: r.status,
         body: r.body,
     })
@@ -441,18 +432,27 @@ pub(crate) fn parse_http_response(raw: &[u8]) -> Option<TransportResponse> {
 /// [`parse_http_response`] surfacing the response headers (lowercased names).
 /// Thin wrapper over the incremental reader so there is exactly one framing
 /// implementation.
-pub(crate) fn parse_http_response_ext(
+/// Test-only today; the buffer-oriented face of [`read_http_response`],
+/// kept because a caller holding a complete response in memory (a fake
+/// backend, a fixture) needs it. See the module doc.
+#[allow(dead_code)]
+pub fn parse_http_response_ext(
     raw: &[u8],
     head_request: bool,
+    max_bytes: u64,
 ) -> Option<TransportResponseExt> {
     let mut cursor = std::io::Cursor::new(raw);
-    read_http_response(&mut cursor, head_request)
+    read_http_response(&mut cursor, head_request, max_bytes)
         .ok()
         .map(|(resp, _reuse)| resp)
 }
 
 #[cfg(test)]
 mod tests {
+    /// The value sync passes. The codec no longer owns a cap — see the
+    /// module doc — so the tests supply the one whose limits they assert.
+    const MAX_BYTES: u64 = 64 * 1024 * 1024;
+
     use super::*;
 
     #[test]
@@ -491,14 +491,14 @@ mod tests {
     #[test]
     fn parse_extracts_status_and_body() {
         let raw = b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n{\"x\":1}";
-        let resp = parse_http_response(raw).unwrap();
+        let resp = parse_http_response(raw, MAX_BYTES).unwrap();
         assert_eq!(resp.status, 200);
         assert_eq!(resp.body, b"{\"x\":1}");
     }
 
     #[test]
     fn parse_rejects_garbage() {
-        assert!(parse_http_response(b"not http").is_none());
+        assert!(parse_http_response(b"not http", MAX_BYTES).is_none());
     }
 
     #[test]
@@ -508,7 +508,7 @@ mod tests {
         // chunk-size markers inline and corrupted the JSON.
         let raw = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n\
                     a\r\n{\"metas\":[\r\n4\r\n1,2]\r\n0\r\n\r\n";
-        let resp = parse_http_response(raw).unwrap();
+        let resp = parse_http_response(raw, MAX_BYTES).unwrap();
         assert_eq!(resp.status, 200);
         assert_eq!(resp.body, b"{\"metas\":[1,2]");
     }
@@ -517,14 +517,14 @@ mod tests {
     fn parse_honors_content_length_exactly() {
         // Content-Length bounds the body even if extra bytes trail (keep-alive).
         let raw = b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\n{\"x\":1}trailing-garbage";
-        let resp = parse_http_response(raw).unwrap();
+        let resp = parse_http_response(raw, MAX_BYTES).unwrap();
         assert_eq!(resp.body, b"{\"x\":1}");
     }
 
     #[test]
     fn parse_chunked_is_case_insensitive() {
         let raw = b"HTTP/1.1 200 OK\r\nTRANSFER-ENCODING: Chunked\r\n\r\n3\r\nabc\r\n0\r\n\r\n";
-        let resp = parse_http_response(raw).unwrap();
+        let resp = parse_http_response(raw, MAX_BYTES).unwrap();
         assert_eq!(resp.body, b"abc");
     }
 
@@ -532,7 +532,7 @@ mod tests {
     fn parse_rejects_truncated_chunk() {
         // Size says 9 bytes but only 3 follow → malformed, not a silent partial.
         let raw = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n9\r\nabc";
-        assert!(parse_http_response(raw).is_none());
+        assert!(parse_http_response(raw, MAX_BYTES).is_none());
     }
 
     // --- incremental reader: keep-alive semantics --------------------------
@@ -542,12 +542,12 @@ mod tests {
         let raw: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc\
                            HTTP/1.1 404 NF\r\nContent-Length: 2\r\n\r\nno";
         let mut cursor = std::io::Cursor::new(raw);
-        let (r1, reuse1) = read_http_response(&mut cursor, false).unwrap();
+        let (r1, reuse1) = read_http_response(&mut cursor, false, MAX_BYTES).unwrap();
         assert_eq!(
             (r1.status, r1.body.as_slice(), reuse1),
             (200, &b"abc"[..], true)
         );
-        let (r2, reuse2) = read_http_response(&mut cursor, false).unwrap();
+        let (r2, reuse2) = read_http_response(&mut cursor, false, MAX_BYTES).unwrap();
         assert_eq!(
             (r2.status, r2.body.as_slice(), reuse2),
             (404, &b"no"[..], true)
@@ -557,11 +557,13 @@ mod tests {
     #[test]
     fn connection_close_and_eof_framing_kill_reuse() {
         let close: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-        let (_, reuse) = read_http_response(&mut std::io::Cursor::new(close), false).unwrap();
+        let (_, reuse) =
+            read_http_response(&mut std::io::Cursor::new(close), false, MAX_BYTES).unwrap();
         assert!(!reuse, "Connection: close must consume the connection");
 
         let eof_framed: &[u8] = b"HTTP/1.1 200 OK\r\n\r\nbody-until-eof";
-        let (r, reuse) = read_http_response(&mut std::io::Cursor::new(eof_framed), false).unwrap();
+        let (r, reuse) =
+            read_http_response(&mut std::io::Cursor::new(eof_framed), false, MAX_BYTES).unwrap();
         assert_eq!(r.body, b"body-until-eof");
         assert!(!reuse, "an EOF-framed body must consume the connection");
     }
@@ -569,7 +571,8 @@ mod tests {
     #[test]
     fn http10_kills_reuse() {
         let raw: &[u8] = b"HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok";
-        let (_, reuse) = read_http_response(&mut std::io::Cursor::new(raw), false).unwrap();
+        let (_, reuse) =
+            read_http_response(&mut std::io::Cursor::new(raw), false, MAX_BYTES).unwrap();
         assert!(!reuse);
     }
 
@@ -577,13 +580,13 @@ mod tests {
     fn eof_before_any_byte_is_the_stale_signature() {
         let mut empty = std::io::Cursor::new(&b""[..]);
         assert_eq!(
-            read_http_response(&mut empty, false).unwrap_err(),
+            read_http_response(&mut empty, false, MAX_BYTES).unwrap_err(),
             HttpReadError::EofBeforeResponse
         );
         // But EOF mid-head is Failed (bytes flowed → not retry-safe).
         let mut partial = std::io::Cursor::new(&b"HTTP/1.1 200 OK\r\nContent-"[..]);
         assert_eq!(
-            read_http_response(&mut partial, false).unwrap_err(),
+            read_http_response(&mut partial, false, MAX_BYTES).unwrap_err(),
             HttpReadError::Failed
         );
     }
@@ -632,7 +635,7 @@ mod tests {
         ] {
             let mut r = ResettingReader { kind, fired: false };
             assert_eq!(
-                read_http_response(&mut r, false).unwrap_err(),
+                read_http_response(&mut r, false, MAX_BYTES).unwrap_err(),
                 HttpReadError::EofBeforeResponse,
                 "{kind:?} before any response byte must be retry-safe"
             );
@@ -649,7 +652,7 @@ mod tests {
             fired: false,
         };
         assert_eq!(
-            read_http_response(&mut r, false).unwrap_err(),
+            read_http_response(&mut r, false, MAX_BYTES).unwrap_err(),
             HttpReadError::Failed
         );
     }
@@ -658,10 +661,11 @@ mod tests {
     fn oversized_content_length_rejected_before_buffering() {
         let raw = format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
-            MAX_SYNC_RESPONSE_BYTES + 1
+            MAX_BYTES + 1
         );
         assert_eq!(
-            read_http_response(&mut std::io::Cursor::new(raw.as_bytes()), false).unwrap_err(),
+            read_http_response(&mut std::io::Cursor::new(raw.as_bytes()), false, MAX_BYTES)
+                .unwrap_err(),
             HttpReadError::TooLarge
         );
     }
@@ -683,7 +687,7 @@ mod tests {
         let raw: &[u8] =
             b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nA\r\nffffffffffffffff\r\n";
         assert_eq!(
-            read_http_response(&mut std::io::Cursor::new(raw), false).unwrap_err(),
+            read_http_response(&mut std::io::Cursor::new(raw), false, MAX_BYTES).unwrap_err(),
             HttpReadError::TooLarge
         );
     }
@@ -692,10 +696,11 @@ mod tests {
     fn a_single_oversized_chunk_is_still_too_large() {
         let raw = format!(
             "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n",
-            MAX_SYNC_RESPONSE_BYTES + 1
+            MAX_BYTES + 1
         );
         assert_eq!(
-            read_http_response(&mut std::io::Cursor::new(raw.as_bytes()), false).unwrap_err(),
+            read_http_response(&mut std::io::Cursor::new(raw.as_bytes()), false, MAX_BYTES)
+                .unwrap_err(),
             HttpReadError::TooLarge
         );
     }
@@ -705,14 +710,15 @@ mod tests {
         // The clamp must not narrow the honest path it guards.
         let raw: &[u8] =
             b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n2\r\n!!\r\n0\r\n\r\n";
-        let (r, _) = read_http_response(&mut std::io::Cursor::new(raw), false).unwrap();
+        let (r, _) = read_http_response(&mut std::io::Cursor::new(raw), false, MAX_BYTES).unwrap();
         assert_eq!(r.body, b"hello!!");
     }
 
     #[test]
     fn head_response_skips_body_framing_and_stays_reusable() {
         let raw: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Length: 9999\r\nX-Complete: 1\r\n\r\n";
-        let (r, reuse) = read_http_response(&mut std::io::Cursor::new(raw), true).unwrap();
+        let (r, reuse) =
+            read_http_response(&mut std::io::Cursor::new(raw), true, MAX_BYTES).unwrap();
         assert!(r.body.is_empty());
         assert_eq!(r.header("x-complete"), Some("1"));
         assert!(reuse);
@@ -726,7 +732,7 @@ mod tests {
                            4\r\nwiki\r\n5\r\npedia\r\n0\r\n\r\n";
         let drip = std::io::BufReader::with_capacity(2, std::io::Cursor::new(raw));
         let mut reader = drip;
-        let (r, reuse) = read_http_response(&mut reader, false).unwrap();
+        let (r, reuse) = read_http_response(&mut reader, false, MAX_BYTES).unwrap();
         assert_eq!(r.body, b"wikipedia");
         assert!(reuse, "a chunk-framed body is connection-preserving");
     }
@@ -778,6 +784,7 @@ mod tests {
                 },
                 b"GET / HTTP/1.1\r\n\r\n",
                 false,
+                MAX_BYTES,
             )
             .unwrap();
             assert_eq!(resp.status, 200);
@@ -799,6 +806,7 @@ mod tests {
             },
             b"GET / HTTP/1.1\r\n\r\n",
             false,
+            MAX_BYTES,
         )
         .unwrap();
         assert_eq!(resp.status, 200);
@@ -818,6 +826,7 @@ mod tests {
             },
             b"GET / HTTP/1.1\r\n\r\n",
             false,
+            MAX_BYTES,
         )
         .unwrap_err();
         assert_eq!(err, TransportError::Network);
@@ -835,6 +844,7 @@ mod tests {
             },
             b"GET / HTTP/1.1\r\n\r\n",
             false,
+            MAX_BYTES,
         )
         .unwrap_err();
         assert_eq!(err, TransportError::Network);
