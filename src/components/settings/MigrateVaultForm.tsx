@@ -1,0 +1,161 @@
+// The whole-vault v0.1 → v0.2 migration form (automerge-sync-migration #420,
+// task 3). An opt-in Settings surface: the app opens both MYV1 and NTV5 vaults,
+// so migration is user-initiated, not a forced refuse-and-prompt.
+//
+// The recovery phrase is REQUIRED and verified backend-side (a wrong/missing
+// phrase → `RecoveryPhraseRequired`, writing nothing), so this form cannot strand
+// recovery even with a UI bug. Tone is honest-not-alarming (PRODUCT.md): migration
+// is a normal upgrade, not a danger — no red banners, no alarm icons; the one calm
+// caution is that it re-keys the whole vault and is one-way (the old vault survives
+// in a device-local `legacy/` snapshot until confirmed).
+
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { PasswordInput } from "../PasswordInput";
+import { Button } from "../primitives/Button";
+import {
+  isAlreadyMigrated,
+  isRecoveryPhraseRequired,
+  migrateVault,
+  type VaultMigrateSummary,
+} from "../../lib/vault-migrate";
+
+type State =
+  | { kind: "idle" }
+  | { kind: "migrating" }
+  | { kind: "done"; summary: VaultMigrateSummary }
+  | { kind: "error"; messageKey: string };
+
+/**
+ * Map a `vault_migrate` rejection to its i18n copy key (pure — unit-tested
+ * without the async component). `RecoveryPhraseRequired` gets phrase-specific
+ * copy (the load-bearing refusal); a wrong password and an already-migrated
+ * vault get their own; everything else is the calm generic.
+ */
+export function migrateErrorMessageKey(e: unknown): string {
+  if (isRecoveryPhraseRequired(e)) return "migrate.error.recoveryPhraseRequired";
+  if (isAlreadyMigrated(e)) return "migrate.error.alreadyMigrated";
+  if ((e as { kind?: string } | null | undefined)?.kind === "InvalidCredentialOrVault") {
+    return "migrate.error.wrongPassword";
+  }
+  return "migrate.error.generic";
+}
+
+export interface MigrateVaultFormProps {
+  /**
+   * Fired after a successful migration. Migration is a RE-KEY event — the backend
+   * mints a fresh `root_key` + `itemsKey` and drops the running slot, so the app
+   * must route back to Unlock and re-derive the new keys. The Settings shell wires
+   * this to `onForceRelock({ kind: "Exists" })` (the NTV5 vault is `Exists`, not
+   * suspicious — no banner). When absent (e.g. isolation tests), the form falls
+   * back to its own "done" confirmation.
+   */
+  onMigrated?: () => void;
+}
+
+export function MigrateVaultForm({ onMigrated }: MigrateVaultFormProps = {}): React.ReactElement {
+  const { t } = useTranslation();
+  const [password, setPassword] = useState("");
+  const [phrase, setPhrase] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [state, setState] = useState<State>({ kind: "idle" });
+
+  const inFlight = state.kind === "migrating";
+  // The UI-side phrase gate mirrors the backend one — Migrate stays disabled
+  // until both credentials are entered. The backend re-verifies regardless.
+  const canSubmit =
+    password.trim().length > 0 && phrase.trim().length > 0 && !inFlight && state.kind !== "done";
+
+  async function onSubmit() {
+    if (!canSubmit) return;
+    setState({ kind: "migrating" });
+    try {
+      const summary = await migrateVault(password, phrase);
+      setState({ kind: "done", summary });
+      setPassword("");
+      setPhrase("");
+      // Migration re-keyed the vault and the backend dropped the running slot;
+      // route back to Unlock so the user re-derives the new keys. Without a
+      // handler (isolation tests) the "done" confirmation above is the terminal.
+      onMigrated?.();
+    } catch (e) {
+      setState({ kind: "error", messageKey: migrateErrorMessageKey(e) });
+    }
+  }
+
+  if (state.kind === "done") {
+    return (
+      <div data-testid="migrate.done" style={{ color: "var(--fg-2)" }}>
+        {t("migrate.done", { count: state.summary.notes_migrated })}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <p style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)", margin: 0 }}>{t("migrate.intro")}</p>
+
+      <PasswordInput
+        label={t("migrate.passwordLabel")}
+        value={password}
+        onChange={setPassword}
+        show={showPassword}
+        onToggleShow={() => setShowPassword((s) => !s)}
+        disabled={inFlight}
+        testId="migrate.password-input"
+      />
+
+      <label style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+        <span
+          style={{
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-3)",
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            fontWeight: "var(--weight-semibold)",
+          }}
+        >
+          {t("migrate.phraseLabel")}
+        </span>
+        <textarea
+          data-testid="migrate.phrase-input"
+          value={phrase}
+          onChange={(e) => setPhrase(e.target.value)}
+          disabled={inFlight}
+          rows={3}
+          spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect="off"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "var(--text-sm)",
+            padding: "var(--space-2)",
+            border: "1px solid var(--line-2)",
+            borderRadius: "var(--radius-2)",
+            background: "var(--bg-1)",
+            color: "var(--fg-1)",
+            resize: "vertical",
+          }}
+        />
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{t("migrate.phraseHelp")}</span>
+      </label>
+
+      {state.kind === "error" && (
+        <div data-testid="migrate.error" style={{ color: "var(--danger)", fontSize: "var(--text-sm)" }}>
+          {t(state.messageKey)}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+        <Button onClick={onSubmit} disabled={!canSubmit} data-testid="migrate.submit">
+          {inFlight ? t("migrate.migrating") : t("migrate.submit")}
+        </Button>
+        {inFlight && (
+          <span data-testid="migrate.progress" style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>
+            {t("migrate.migrating")}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}

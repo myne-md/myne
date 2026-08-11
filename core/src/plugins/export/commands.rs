@@ -418,7 +418,7 @@ fn read_account_number_hash_blocking(
     vault_dir: &Path,
 ) -> std::io::Result<Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]>> {
     let bytes = std::fs::read(vault_dir.join("vault.meta"))?;
-    Ok(protocol::parse_vault_meta(&bytes)
+    Ok(protocol::parse_vault_meta_any(&bytes)
         .map(|m| m.account_number_hash)
         .ok())
 }

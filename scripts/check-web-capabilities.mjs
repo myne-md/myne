@@ -86,8 +86,11 @@ const CAPABILITY_BACKING = {
     "plugin:attachments|attachment_read_structured",
     "plugin:attachments|attachment_read_extracted_text",
   ],
-  // Never had commands — the legacy layout does not exist in OPFS.
-  vaultMigration: [],
+  // The whole-vault v0.1→v0.2 re-key (#420) is a desktop-only, on-disk
+  // migration — a web/OPFS container is provisioned current and never carries a
+  // v0.1 layout to migrate, so the dispatcher refuses `vault-migrate` and the
+  // `MigrateVaultForm` is gated behind this (absent-on-web) capability.
+  vaultMigration: ["vault-migrate"],
   backup: ["backup"],
   // A seam refusal (`dialog.save`), not an IPC command.
   nativeSaveAs: [],

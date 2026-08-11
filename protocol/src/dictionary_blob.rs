@@ -50,15 +50,24 @@
 
 use crate::aead::{aad_personal_dictionary_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use crate::blob_envelope::{
-    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
+    decode_singleton_versioned, encode_blob_envelope, encode_blob_envelope_raw,
+    encode_singleton_versioned, EnvelopeError,
 };
 use crate::error::ProtocolError;
+use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYD1"` (Myne Dictionary v1).
 pub const DICTIONARY_BLOB_MAGIC: [u8; 4] = *b"MYD1";
+
+/// Magic bytes for the migrated v0.2 `vault.dictionary` family — ASCII `"MYD5"`
+/// (§10.3 registry).
+pub const DICTIONARY_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYD5";
+
+/// AAD role string bound into both generations' `vault.dictionary` AAD.
+const DICTIONARY_BLOB_AAD_ROLE: &[u8] = b"personal-dictionary-blob";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const DICTIONARY_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -200,12 +209,59 @@ pub fn decode_dictionary_blob(
     account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, DictionaryBlobError> {
-    let aad = aad_personal_dictionary_blob(account_number_hash);
-    decode_blob_envelope(
+    let version = if blob.get(0..4) == Some(DICTIONARY_BLOB_V0_2_MAGIC.as_slice()) {
+        MetaVersion::V0_2
+    } else if blob.get(0..4) == Some(DICTIONARY_BLOB_MAGIC.as_slice()) {
+        MetaVersion::V0_1
+    } else {
+        if blob.len() < DICTIONARY_BLOB_HEADER_LEN {
+            return Err(DictionaryBlobError::HeaderTooShort);
+        }
+        return Err(DictionaryBlobError::MagicMismatch);
+    };
+    decode_dictionary_blob_versioned(version, personal_dictionary_key, account_number_hash, blob)
+}
+
+/// Version-aware seal of `vault.dictionary` — `MYD1` + v0.1 AAD for
+/// [`MetaVersion::V0_1`], `MYD5` + v0.2 AAD for [`MetaVersion::V0_2`]. The KEK
+/// MUST be derived under the same generation
+/// (`derive_subkey_versioned(version, root_key, PersonalDictKey)`).
+pub fn encode_dictionary_blob_versioned(
+    version: MetaVersion,
+    personal_dictionary_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, DictionaryBlobError> {
+    encode_singleton_versioned(
+        version,
         personal_dictionary_key,
         &DICTIONARY_BLOB_MAGIC,
+        &DICTIONARY_BLOB_V0_2_MAGIC,
         DICTIONARY_BLOB_FORMAT_V1,
-        &aad,
+        DICTIONARY_BLOB_AAD_ROLE,
+        account_number_hash,
+        MAX_DICTIONARY_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(DictionaryBlobError::from)
+}
+
+/// Version-aware open of `vault.dictionary` — mirror of
+/// [`encode_dictionary_blob_versioned`].
+pub fn decode_dictionary_blob_versioned(
+    version: MetaVersion,
+    personal_dictionary_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, DictionaryBlobError> {
+    decode_singleton_versioned(
+        version,
+        personal_dictionary_key,
+        &DICTIONARY_BLOB_MAGIC,
+        &DICTIONARY_BLOB_V0_2_MAGIC,
+        DICTIONARY_BLOB_FORMAT_V1,
+        DICTIONARY_BLOB_AAD_ROLE,
+        account_number_hash,
         MAX_DICTIONARY_PLAINTEXT_LEN,
         blob,
     )

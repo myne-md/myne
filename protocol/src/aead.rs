@@ -96,6 +96,19 @@ pub(crate) const AAD_PREFIX_V0_1: &[u8] = b"myne.v0.1|";
 /// single-source reason as [`AAD_PREFIX_V0_1`].
 pub(crate) const PROTOCOL_VERSION_V0_1: u8 = 0x01;
 
+/// AAD prefix bound into every Myne **next-major (v0.2)** AEAD tag
+/// (`docs/spec/protocol.md` § 10.5). 10 ASCII bytes ending in pipe `|`,
+/// mirroring [`AAD_PREFIX_V0_1`]'s shape but **domain-separating** the next
+/// major from v0.1: an `NC05` tag built under this prefix MUST NOT verify under
+/// v0.1's prefix, and vice versa — the § 10.5 forward-incompatibility contract,
+/// proven in `crdt_note_blob`'s tests. Minted with the `NC05` CRDT note-type
+/// (automerge-sync-migration, myne-md/myne#418). The v0.1 prefix is untouched.
+pub(crate) const AAD_PREFIX_V0_2: &[u8] = b"myne.v0.2|";
+
+/// `protocol_version` byte bound into every next-major (v0.2) wrap AAD and the
+/// `NC05` blob header (offset 4). `0x02` for the next major.
+pub(crate) const PROTOCOL_VERSION_V0_2: u8 = 0x02;
+
 /// Registered role string for the password-derived wrap AAD
 /// (spec § 3.1).
 const ROLE_STR_PASSWORD_WRAP: &[u8] = b"password-wrap";
@@ -161,6 +174,65 @@ pub fn aad_vault_items_key_wrap(items_key_id: &[u8; 16]) -> Vec<u8> {
 /// ever used for both (which it MUST NOT be)."
 pub fn aad_recovery_wrap(kdf_params: &KdfParams) -> Vec<u8> {
     build_wrap_aad(ROLE_STR_RECOVERY_WRAP, kdf_params)
+}
+
+/// **v0.2** password-wrap AAD (`spec/protocol.md` §10.4.1) — the next-major mirror
+/// of [`aad_password_wrap`], stamped with [`AAD_PREFIX_V0_2`] + version
+/// [`PROTOCOL_VERSION_V0_2`] instead of v0.1's. Binds the same `kdf_params`
+/// canonical block (the §4.3 parameter-downgrade defense carries into v0.2), so a
+/// v0.2 `NTV5` root-key wrap never verifies under a v0.1 AAD.
+pub fn aad_password_wrap_v0_2(kdf_params: &KdfParams) -> Vec<u8> {
+    build_wrap_aad_v0_2(ROLE_STR_PASSWORD_WRAP, kdf_params)
+}
+
+/// **v0.2** recovery-wrap AAD (`spec/protocol.md` §10.4.1) — the next-major mirror
+/// of [`aad_recovery_wrap`]. Differs from [`aad_password_wrap_v0_2`] only in the
+/// role bytes, the same role-separation guarantee v0.1 gives.
+pub fn aad_recovery_wrap_v0_2(kdf_params: &KdfParams) -> Vec<u8> {
+    build_wrap_aad_v0_2(ROLE_STR_RECOVERY_WRAP, kdf_params)
+}
+
+/// **v0.2** singleton-`itemsKey` wrap AAD (`spec/protocol.md` §10.4.1) — the
+/// next-major mirror of [`aad_vault_items_key_wrap`]: `"myne.v0.2|" || 0x02 ||
+/// items_key_id`. Binds the v0.2 vault's `itemsKey` identity into its wrap under
+/// `derive_subkey_v0_2(root_key, ItemsKeyWrap)`.
+pub fn aad_vault_items_key_wrap_v0_2(items_key_id: &[u8; 16]) -> Vec<u8> {
+    let mut aad = Vec::with_capacity(AAD_PREFIX_V0_2.len() + 1 + items_key_id.len());
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    aad.extend_from_slice(items_key_id);
+    aad
+}
+
+/// Generic **v0.1** KEK-singleton blob AAD — the uniform pattern every single-KEK
+/// blob family (§9.5–§9.21) follows: `"myne.v0.1|" || 0x01 || u16_len(role) ||
+/// role || account_number_hash`. The per-family builders ([`aad_prefs_blob`],
+/// [`aad_custom_themes_blob`], [`aad_personal_dictionary_blob`], …) are exactly
+/// this with a fixed role string; this generic form exists so the whole-vault
+/// migration's re-seal (§10.4.1) can rebuild any family's AAD from its role.
+/// `singleton_blob_generic_matches_the_per_family_builders` pins byte-equivalence.
+pub fn aad_singleton_blob(role: &[u8], account_number_hash: &[u8; 16]) -> Vec<u8> {
+    let mut aad =
+        Vec::with_capacity(AAD_PREFIX_V0_1.len() + 1 + 2 + role.len() + account_number_hash.len());
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, role);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
+/// Generic **v0.2** KEK-singleton blob AAD — the next-major mirror of
+/// [`aad_singleton_blob`], stamped with the v0.2 prefix + version. The migration
+/// re-seals a KEK family by decoding under `aad_singleton_blob(role, hash)` and
+/// re-encoding under this (§10.4.1).
+pub fn aad_singleton_blob_v0_2(role: &[u8], account_number_hash: &[u8; 16]) -> Vec<u8> {
+    let mut aad =
+        Vec::with_capacity(AAD_PREFIX_V0_2.len() + 1 + 2 + role.len() + account_number_hash.len());
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, role);
+    aad.extend_from_slice(account_number_hash);
+    aad
 }
 
 /// Build the AAD bound into the AEAD wrap of a per-note `item_key`
@@ -645,6 +717,44 @@ pub fn aad_note_content_encrypt(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -
     aad
 }
 
+/// Build the AAD bound into the AEAD wrap of a per-note `item_key` under the
+/// vault `itemsKey` for the **next-major `NC05` CRDT note-type**
+/// (`docs/spec/protocol.md` § 5.2 next-major row; automerge-sync-migration).
+///
+/// Byte-identical **layout** to [`aad_note_item_key_wrap`] (prefix · version ·
+/// items_key_id · note_uuid) but stamped with the next-major prefix
+/// [`AAD_PREFIX_V0_2`] + version [`PROTOCOL_VERSION_V0_2`], so an `NC05` wrap
+/// tag is domain-separated from a v0.1 `MY01` one and neither opens the other.
+pub fn aad_nc05_item_key_wrap(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> Vec<u8> {
+    let mut aad =
+        Vec::with_capacity(AAD_PREFIX_V0_2.len() + 1 + items_key_id.len() + note_uuid.len());
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    aad.extend_from_slice(items_key_id);
+    aad.extend_from_slice(note_uuid);
+    aad
+}
+
+/// Build the AAD bound into the AEAD encryption of an `NC05` note's **opaque
+/// Automerge payload** under its per-note `item_key` (automerge-sync-migration).
+///
+/// Byte-identical **layout** to [`aad_note_content_encrypt`] — `content_type`
+/// stays the hardcoded `"text/markdown"` (the 4-byte magic, not the AAD,
+/// discriminates the CRDT codec from `MY01`) — but stamped with the next-major
+/// prefix [`AAD_PREFIX_V0_2`] + version [`PROTOCOL_VERSION_V0_2`].
+pub fn aad_nc05_content_encrypt(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> Vec<u8> {
+    const CONTENT_TYPE: &[u8] = b"text/markdown";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len() + 1 + items_key_id.len() + note_uuid.len() + 2 + CONTENT_TYPE.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    aad.extend_from_slice(items_key_id);
+    aad.extend_from_slice(note_uuid);
+    push_length_prefixed_u16_be(&mut aad, CONTENT_TYPE);
+    aad
+}
+
 /// Append `bytes` to `buf` prefixed by its length as a 2-byte
 /// big-endian unsigned integer per `protocol.md` § 5.2's
 /// length-prefix convention.
@@ -682,6 +792,21 @@ fn build_wrap_aad(role: &[u8], kdf_params: &KdfParams) -> Vec<u8> {
         Vec::with_capacity(AAD_PREFIX_V0_1.len() + 1 + 2 + role.len() + kdf_canonical.len());
     aad.extend_from_slice(AAD_PREFIX_V0_1);
     aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, role);
+    aad.extend_from_slice(&kdf_canonical);
+    aad
+}
+
+/// v0.2 mirror of [`build_wrap_aad`] — identical assembly under the next-major
+/// prefix + version, so the wrap-AAD role-separation and KDF-param binding carry
+/// into v0.2 unchanged (`spec/protocol.md` §10.4.1).
+fn build_wrap_aad_v0_2(role: &[u8], kdf_params: &KdfParams) -> Vec<u8> {
+    let kdf_canonical = serialize_kdf_params(kdf_params);
+
+    let mut aad =
+        Vec::with_capacity(AAD_PREFIX_V0_2.len() + 1 + 2 + role.len() + kdf_canonical.len());
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
     push_length_prefixed_u16_be(&mut aad, role);
     aad.extend_from_slice(&kdf_canonical);
     aad
@@ -859,6 +984,32 @@ mod tests {
     use super::*;
     use crate::test_vector_fmt::{hex_lower, json_escape};
     use crate::types::DEFAULT_V0_1_KDF_PARAMS;
+
+    #[test]
+    fn singleton_blob_generic_matches_the_per_family_builders() {
+        // The migration re-seal (§10.4.1) decodes a KEK singleton under
+        // `aad_singleton_blob(role, hash)`; that MUST be byte-identical to the
+        // family's own AAD builder or the decode fails. Pin it for every
+        // real-content KEK family the migration re-seals.
+        let hash = [0x44u8; 16];
+        assert_eq!(
+            aad_singleton_blob(b"prefs-blob", &hash),
+            aad_prefs_blob(&hash)
+        );
+        assert_eq!(
+            aad_singleton_blob(b"custom-themes-blob", &hash),
+            aad_custom_themes_blob(&hash)
+        );
+        assert_eq!(
+            aad_singleton_blob(b"personal-dictionary-blob", &hash),
+            aad_personal_dictionary_blob(&hash)
+        );
+        // And the v0.2 form differs from v0.1 for the same role (domain sep).
+        assert_ne!(
+            aad_singleton_blob(b"custom-themes-blob", &hash),
+            aad_singleton_blob_v0_2(b"custom-themes-blob", &hash)
+        );
+    }
 
     /// Hand-derived golden bytes for `aad_password_wrap(default)`.
     ///

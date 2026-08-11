@@ -22,8 +22,8 @@ use super::error::ThemesError;
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_themes_blob, derive_subkey, encode_themes_blob, parse_vault_meta, SubkeyRole,
-    AEAD_KEY_LEN, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_themes_blob, derive_subkey_versioned, encode_themes_blob, meta_version_of,
+    parse_vault_meta_any, MetaVersion, SubkeyRole, AEAD_KEY_LEN, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -216,13 +216,14 @@ pub fn write_mutex() -> &'static Mutex<()> {
 async fn read_account_number_hash(
     io: &dyn crate::vault_io::VaultIo,
     vault_meta_path: &Path,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], ThemesError> {
+) -> Result<(MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), ThemesError> {
     let bytes = io
         .read(vault_meta_path)
         .await
         .map_err(|io_error_kind| ThemesError::Io { io_error_kind })?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| ThemesError::InvalidVaultMeta)?;
-    Ok(meta.account_number_hash)
+    let version = meta_version_of(&bytes).ok_or(ThemesError::InvalidVaultMeta)?;
+    let meta = parse_vault_meta_any(&bytes).map_err(|_| ThemesError::InvalidVaultMeta)?;
+    Ok((version, meta.account_number_hash))
 }
 
 /// Serialize a `{name → palette}` map to the deterministic-JSON inner plaintext
@@ -649,8 +650,9 @@ async fn read_themes_map_with_dir(
         .peek_unlocked_root_key_and_hash_clone()
         .await
         .ok_or(ThemesError::SlotNotUnlocked)?;
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
-    let themes_key = derive_subkey(&root_key, SubkeyRole::CustomThemesKey);
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
+    let themes_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::CustomThemesKey);
     read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await
 }
 
@@ -673,8 +675,9 @@ async fn mutate_themes_with_dir(
         .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(ThemesError::SlotNotUnlocked)?;
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
-    let themes_key = derive_subkey(&root_key, SubkeyRole::CustomThemesKey);
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
+    let themes_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::CustomThemesKey);
 
     // A read that FAILED aborts the mutation (#255): re-sealing a map we never
     // read would replace the stored themes with an empty store — and this blob

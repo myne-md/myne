@@ -162,7 +162,17 @@ export type VaultUnlockError =
   | {
       kind: "KdfMemoryExceedsHostCapability";
       detail: { required_mib: number; available_mib: number };
-    };
+    }
+  /**
+   * The `vault.meta` magic is a newer major version this build does not
+   * implement (`protocol.md` §10.5 anti-downgrade). Same "distinct advice, not
+   * corrupted" reasoning as `KdfMemoryExceedsHostCapability`: the vault is fine,
+   * this app is too old — the CTA is **update this app**, never "restore a
+   * backup". This build handles `MYV1` + `NTV5`, so it reaches this only on a
+   * hypothetical later major; an un-upgraded older build hits it on a migrated
+   * `NTV5` vault. Never a silent half-parse.
+   */
+  | { kind: "VaultUpgradedUnsupported" };
 
 /**
  * Type-narrowing helper. Use to access `e.detail.io_error_kind`

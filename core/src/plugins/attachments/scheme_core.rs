@@ -16,7 +16,10 @@
 
 use super::commands::hex_decode_id;
 use super::sniff::served_content_type;
-use protocol::{decode_attachment_blob, AttachmentsCatalog, VAULT_META_ACCOUNT_HASH_LEN};
+use protocol::{
+    decode_attachment_blob, meta_version_of, AttachmentsCatalog, MetaVersion,
+    VAULT_META_ACCOUNT_HASH_LEN,
+};
 use std::path::Path;
 use tauri::http;
 use zeroize::Zeroizing;
@@ -49,16 +52,21 @@ pub fn build_response(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) -> http:
     // blob's inner AAD at encode time, so decode needs the SAME bytes).
     // Absent/tampered catalog → empty → no entry → 404 (the blob can't be
     // decoded without the content_type AAD; treat as not-found).
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta")) {
-        Some(h) => h,
-        None => return server_error(),
-    };
-    let catalog_key =
-        protocol::derive_subkey(&keys.root_key, protocol::SubkeyRole::AttachmentsCatalogKey);
+    let (meta_version, account_number_hash) =
+        match read_account_number_hash(&vault_dir.join("vault.meta")) {
+            Some(pair) => pair,
+            None => return server_error(),
+        };
+    let catalog_key = protocol::derive_subkey_versioned(
+        meta_version,
+        &keys.root_key,
+        protocol::SubkeyRole::AttachmentsCatalogKey,
+    );
     let catalog = read_catalog(
         &vault_dir.join("vault.attachments"),
         &catalog_key,
         &account_number_hash,
+        meta_version,
     );
     let content_type_hint = match catalog.entries.get(id_hex) {
         Some(meta) => meta.content_type.clone(),
@@ -189,14 +197,18 @@ pub fn decode_attachment_plaintext(
     let Some(attachment_id) = hex_decode_id(id_hex) else {
         return Err(DecodeError::Denied);
     };
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         read_account_number_hash(&vault_dir.join("vault.meta")).ok_or(DecodeError::ServerError)?;
-    let catalog_key =
-        protocol::derive_subkey(&keys.root_key, protocol::SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = protocol::derive_subkey_versioned(
+        meta_version,
+        &keys.root_key,
+        protocol::SubkeyRole::AttachmentsCatalogKey,
+    );
     let catalog = read_catalog(
         &vault_dir.join("vault.attachments"),
         &catalog_key,
         &account_number_hash,
+        meta_version,
     );
     let content_type_hint = catalog
         .entries
@@ -292,12 +304,17 @@ pub fn extract_id(uri: &http::Uri) -> Option<String> {
 // path intentionally collapses IO/parse failure to empty (§9.10.4) rather than
 // surfacing the distinguishable errors the command path returns.
 
-/// Read `vault.meta`'s account_number_hash; `None` on IO / parse failure.
-fn read_account_number_hash(vault_meta_path: &Path) -> Option<[u8; VAULT_META_ACCOUNT_HASH_LEN]> {
+/// Read `vault.meta`'s account_number_hash + its crypto generation; `None` on
+/// IO / parse failure. The generation travels with the hash so the serve path
+/// derives the catalog KEK under the vault's OWN generation (#420) — a migrated
+/// (`NTV5`) vault's `MYC5` catalog needs `derive_subkey_v0_2`.
+fn read_account_number_hash(
+    vault_meta_path: &Path,
+) -> Option<(MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN])> {
     let bytes = std::fs::read(vault_meta_path).ok()?;
-    protocol::parse_vault_meta(&bytes)
-        .map(|m| m.account_number_hash)
-        .ok()
+    let meta = protocol::parse_vault_meta_any(&bytes).ok()?;
+    let version = meta_version_of(&bytes).unwrap_or(MetaVersion::V0_1);
+    Some((version, meta.account_number_hash))
 }
 
 /// Read + decode the catalog, collapsing any failure to empty
@@ -307,9 +324,15 @@ fn read_catalog(
     catalog_path: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+    version: MetaVersion,
 ) -> AttachmentsCatalog {
     match std::fs::read(catalog_path) {
-        Ok(bytes) => protocol::read_or_empty(catalog_key, account_number_hash, Some(&bytes)),
+        Ok(bytes) => protocol::read_or_empty_versioned(
+            version,
+            catalog_key,
+            account_number_hash,
+            Some(&bytes),
+        ),
         Err(_) => AttachmentsCatalog::empty(),
     }
 }

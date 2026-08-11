@@ -68,6 +68,18 @@ const SALT_PREFIX_RECOVERY: &[u8] = b"myne.v0.1 argon2id-recovery|";
 /// credential wrap keys even if a user's PIN coincided with their password.
 const SALT_PREFIX_QUICKUNLOCK_PIN: &[u8] = b"myne.v0.1 argon2id-quickunlock-pin|";
 
+/// Salt prefix for the **v0.2** password-derived wrap key (`spec/protocol.md`
+/// §10.3 v0.2 row / §10.4.1). The next-major mirror of [`SALT_PREFIX_PASSWORD`]:
+/// same Argon2id primitive + parameters, distinct salt domain, so the same
+/// password derives a different wrap key across major versions (the §10.5
+/// anti-downgrade property at the KDF layer). Allocated by the
+/// `automerge-sync-migration` epic (#420) for the whole-vault re-key.
+const SALT_PREFIX_PASSWORD_V0_2: &[u8] = b"myne.v0.2 argon2id-password|";
+
+/// Salt prefix for the **v0.2** recovery-phrase-derived wrap key
+/// (`spec/protocol.md` §10.4.1). The next-major mirror of [`SALT_PREFIX_RECOVERY`].
+const SALT_PREFIX_RECOVERY_V0_2: &[u8] = b"myne.v0.2 argon2id-recovery|";
+
 /// Argon2id salt length: 16 bytes (truncated SHA-256 output).
 pub const ARGON2_SALT_LEN: usize = 16;
 
@@ -181,6 +193,39 @@ pub fn derive_quick_unlock_pin_wrap_key(
 ) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
     let salt = build_salt(SALT_PREFIX_QUICKUNLOCK_PIN, account_number_hash, pin_salt);
     argon2id_derive(pin.as_bytes(), &salt, params)
+}
+
+/// Derive the **v0.2** 32-byte AEAD wrap key for the password-protected copy of
+/// the new `root_key` (`spec/protocol.md` §10.4.1). Byte-for-byte the same
+/// construction as [`derive_password_wrap_key`] — Argon2id over the password
+/// bytes with `salt = SHA-256(prefix || account_number_hash || salt_random)[:16]`
+/// — under the v0.2 salt domain [`SALT_PREFIX_PASSWORD_V0_2`]. The migration
+/// (#420) calls this to wrap the freshly-minted v0.2 `root_key`.
+pub fn derive_password_wrap_key_v0_2(
+    password: &str,
+    salt_random: &[u8; 16],
+    account_number_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(SALT_PREFIX_PASSWORD_V0_2, account_number_hash, salt_random);
+    argon2id_derive(password.as_bytes(), &salt, params)
+}
+
+/// Derive the **v0.2** 32-byte AEAD wrap key for the recovery-phrase-protected
+/// copy of the new `root_key` from the `phrase_normalized` byte string
+/// (`spec/protocol.md` §10.4.1). The next-major mirror of
+/// [`derive_recovery_wrap_key_from_normalized`], under the v0.2 recovery salt
+/// domain [`SALT_PREFIX_RECOVERY_V0_2`]. Takes the already-normalized phrase (§7.4
+/// NFKD + ASCII-lowercase + single-space join) so the migration can feed the
+/// user's re-entered phrase through the same normalization the recovery flow uses.
+pub fn derive_recovery_wrap_key_from_normalized_v0_2(
+    phrase_normalized: &str,
+    salt_random: &[u8; 16],
+    account_number_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(SALT_PREFIX_RECOVERY_V0_2, account_number_hash, salt_random);
+    argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
 }
 
 /// `salt = SHA-256(prefix || account_number_hash || salt_random)[:16]`

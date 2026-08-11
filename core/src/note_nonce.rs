@@ -25,6 +25,14 @@ use std::path::Path;
 /// `.myn` magic — sourced from `protocol::blob` (protocol.md §9.2 offset 0) so
 /// a header-format change can't silently rot this decryption-free reader.
 const MYN_MAGIC: [u8; 4] = *protocol::blob::MAGIC;
+/// The next-major `NC05` CRDT note magic (`protocol.md` §10.5). A `.myn` file may
+/// hold EITHER family, and `NC05` reuses `blob.rs`'s `OFFSET_CONTENT_NONCE`
+/// verbatim, so the `content_nonce` sits at the identical header offset in both —
+/// the decryption-free staleness signal is magic-agnostic across the note
+/// families by construction. Reading only `MY01` would make every migrated CRDT
+/// note invisible to the sync manifest, the search index and the vault indices
+/// (dropped from every scan, so nothing this device wrote would ever sync).
+const NC05_MAGIC: [u8; 4] = *protocol::NC05_MAGIC;
 /// Offset of `content_nonce` in the `.myn` header — `protocol::blob` *derives*
 /// it from the item-key-wrap sizes, so importing it (not a literal `112`)
 /// tracks any future layout shift (protocol.md §9.2).
@@ -41,12 +49,15 @@ pub type NonceManifest = BTreeMap<String, [u8; MYN_CONTENT_NONCE_LEN]>;
 /// Read a `.myn` file's `content_nonce` from its header bytes WITHOUT
 /// decrypting (the decryption-free staleness signal). `header` must be at
 /// least the first [`MYN_HEADER_PREFIX_FOR_NONCE`] bytes of the file; returns
-/// `None` if too short or the magic is wrong (not a `.myn`).
+/// `None` if too short or the magic is neither note family (`MY01` nor `NC05`).
+///
+/// Both families share the §9.2 header layout, so the same offset reads the
+/// nonce for either — see [`NC05_MAGIC`] for why the reader must accept both.
 pub fn read_myn_content_nonce(header: &[u8]) -> Option<[u8; MYN_CONTENT_NONCE_LEN]> {
     if header.len() < MYN_HEADER_PREFIX_FOR_NONCE {
         return None;
     }
-    if header[0..4] != MYN_MAGIC {
+    if header[0..4] != MYN_MAGIC && header[0..4] != NC05_MAGIC {
         return None;
     }
     let mut nonce = [0u8; MYN_CONTENT_NONCE_LEN];
@@ -116,6 +127,31 @@ mod tests {
         header[0..4].copy_from_slice(b"XXXX");
         assert_eq!(read_myn_content_nonce(&header), None);
         assert_eq!(read_myn_content_nonce(b"MY01short"), None);
+    }
+
+    #[test]
+    fn reads_content_nonce_from_an_nc05_crdt_header_too() {
+        // A migrated CRDT note is a `.myn` with the NC05 magic and the identical
+        // §9.2 header layout — the decryption-free nonce must read from it, or the
+        // note is invisible to sync/search/indices. Reading the SAME offset from
+        // both families is the property under test.
+        let mut header = vec![0u8; MYN_HEADER_PREFIX_FOR_NONCE];
+        header[0..4].copy_from_slice(NC05_MAGIC.as_slice());
+        header[MYN_CONTENT_NONCE_OFFSET..].copy_from_slice(&nonce(0xCD));
+        assert_eq!(read_myn_content_nonce(&header), Some(nonce(0xCD)));
+        // And a real NC05 blob from the protocol codec reads back the nonce its
+        // header carries — the two crates agree on the offset, not just this test.
+        let blob =
+            protocol::encode_crdt_note_blob(&[0x11; 32], &[0x22; 16], &[0x33; 16], b"payload")
+                .expect("seal NC05");
+        assert_eq!(
+            read_myn_content_nonce(&blob),
+            Some(
+                blob[MYN_CONTENT_NONCE_OFFSET..MYN_HEADER_PREFIX_FOR_NONCE]
+                    .try_into()
+                    .unwrap()
+            ),
+        );
     }
 
     /// The scan must find notes on a CONTAINER-backed store, not only on a

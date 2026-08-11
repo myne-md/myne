@@ -142,6 +142,18 @@ The OCR layer MYND-328 deferred: pixels — image attachments and scanned, text-
 
 **Turkish limitation, measured not assumed.** The spike found that `ppocrv5_dict.txt` lacks `Ğ` (U+011E) and `İ` (U+0130), and that in-dict characters (`ş`, `ç`, `ı`) are still emitted unreliably because the model's training distribution is Chinese+English dominant. No Turkish-specific PaddleOCR recognizer exists, and `latin_PP-OCRv3_rec` is worse (185-entry dict, no `ğ`/`Ğ`/`ş`/`Ş`/`İ`). Since every candidate engine shares the weakness, it is mitigated **index-side** — OCR-derived documents are indexed under a diacritic-folded token variant — rather than by swapping deps.
 
+### Automerge CRDT (automerge-sync-migration, #416/#417) — `core/Cargo.toml`
+
+The CRDT that backs the next-major note-body note-type (`NC05`): each note becomes one encrypted Automerge document, merged client-side over the blind blob store (`decisions.md` 2026-08-09). Rust crate, admitted after an empirical `wasm32` buildability probe (#417); **never** the npm prebuilt `@automerge/automerge-wasm` — an opaque binary would break the single shared `Cargo.lock` + the reproducible build. Lives in `core/` (desktop + mobile + web all sync); its `wasm`/`wasm-bindgen` features stay off (the pure-Rust path).
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `automerge` | 0.10 (default features; `wasm`/`wasm-bindgen` OFF) | Client-side conflict-free merge of note bodies (the `NC05` CRDT note-type), over already-decrypted content | ~6 net-new, all pure-Rust: `hexane`, `borsh`, `leb128`, `smol_str`, `cfg_aliases` (+ `sha2 0.11` / `block-buffer 0.12` versions). **No C/FFI** — `flate2 → miniz_oxide`. `getrandom 0.4` + `wasm-bindgen` dedupe with core's existing (via `uuid`); **no `getrandom 0.2` edge** — `protocol`'s wasm-bindgen-free boundary intact | MIT | `decisions.md` 2026-08-09; #417 |
+
+**"The bar" answers.** Non-hand-rollable (a CRDT engine + columnar storage format is exactly the deep, correctness-critical machinery the policy prefers to buy). Actively maintained by Ink & Switch (multi-maintainer, funded). **Not crypto** — automerge's `sha2` is content-addressed change hashing, not key material, so `protocol/`'s closed RustCrypto set and its wasm-bindgen-free boundary are both untouched (verified: `wasm-csprng-check.sh` green + a `cargo tree` showing no `getrandom 0.2` edge from automerge). Single shared `Cargo.lock` intact. Actor ids are seeded from Myne's CSPRNG and change timestamps from the `HostCtx` clock, never automerge's runtime defaults (`core/src/plugins/sync/crdt_doc.rs`).
+
+**Wasm-size delta:** to be measured on a release `build-wasm.sh` (an unlock-time Worker cost, off the first-load bundle-budget critical path — the wasm core loads at unlock); the empirical probe confirmed the `wasm32-unknown-unknown` graph compiles clean.
+
 ### Graph view (MYND-197) — `package.json`
 
 One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypto (consumes already-decrypted in-RAM index data); not telemetry; lazy-loaded (out of the initial bundle, off the crypto/IPC path). Chosen over Cytoscape.js because the Envelope-A scale target shrinks the need to "force-simulation only" and the render/interaction is hand-rolled (clears "The bar" Q1).

@@ -106,6 +106,21 @@ base64 = "0.22"
 # target-split because proc-macros are compiled for the HOST regardless of the
 # build target.
 async-trait = "0.1"
+# The Automerge CRDT (myne-md/myne#417, ASM-2/ASM-11; automerge-sync-migration
+# epic): client-side, conflict-free merge of note bodies for the `NC05` next-major
+# note-type. It merges already-DECRYPTED content in RAM — the same seat the
+# hand-rolled singleton merges occupy today — so it is NOT crypto: its `sha2` is
+# content-addressed change hashing, not key material, and `protocol/`'s closed
+# RustCrypto set is untouched (automerge never enters that crate). Rust crate,
+# never the npm prebuilt `@automerge/automerge-wasm` (opaque binary — breaks the
+# single shared `Cargo.lock`/TB9 + reproducible build; AMG-10). Its `wasm` /
+# `wasm-bindgen` features stay OFF: the empirical probe (#417) proved
+# `cargo check -p myne-core --target wasm32-unknown-unknown` passes with it in the
+# graph, its getrandom-0.4 (via `uuid`) + wasm-bindgen DEDUPE with core's existing
+# versions, no getrandom-0.2 edge reaches `protocol`'s wasm-bindgen-free boundary,
+# and ~6 net-new crates land, all pure-Rust (`flate2 → miniz_oxide`, no C/FFI).
+# MIT. `dependency-policy.md` row + `decisions.md` note owed (this feature, task 5).
+automerge = "0.10"
 
 # ── Target split for the Phase 3 web client (phase3-web-client task 78) ──────
 #

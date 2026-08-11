@@ -15,9 +15,9 @@ use super::error::{PrefsReadError, PrefsWriteError};
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_prefs_blob, derive_subkey, encode_prefs_blob, parse_vault_meta, ColorGroup,
-    EditorLayout, PrefsBlobError, PrefsView, SavedView, SubkeyRole, ThemeChoice,
-    VAULT_META_ACCOUNT_HASH_LEN,
+    decode_prefs_blob, derive_subkey_versioned, encode_prefs_blob_versioned, meta_version_of,
+    parse_vault_meta_any, ColorGroup, EditorLayout, MetaVersion, PrefsBlobError, PrefsView,
+    SavedView, SubkeyRole, ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -225,13 +225,14 @@ fn prefs_blob_error_kind(e: &PrefsBlobError) -> &'static str {
 async fn read_account_number_hash(
     io: &dyn crate::vault_io::VaultIo,
     vault_meta_path: &Path,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], PrefsReadError> {
+) -> Result<(MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), PrefsReadError> {
     let bytes = io
         .read(vault_meta_path)
         .await
         .map_err(|k| PrefsReadError::Io { io_error_kind: k })?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| PrefsReadError::InvalidVaultMeta)?;
-    Ok(meta.account_number_hash)
+    let version = meta_version_of(&bytes).ok_or(PrefsReadError::InvalidVaultMeta)?;
+    let meta = parse_vault_meta_any(&bytes).map_err(|_| PrefsReadError::InvalidVaultMeta)?;
+    Ok((version, meta.account_number_hash))
 }
 
 /// Read-side helper bridging `read_account_number_hash` into the
@@ -241,13 +242,14 @@ async fn read_account_number_hash(
 async fn read_account_number_hash_for_write(
     io: &dyn crate::vault_io::VaultIo,
     vault_meta_path: &Path,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], PrefsWriteError> {
+) -> Result<(MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), PrefsWriteError> {
     let bytes = io
         .read(vault_meta_path)
         .await
         .map_err(|k| PrefsWriteError::Io { io_error_kind: k })?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| PrefsWriteError::InvalidVaultMeta)?;
-    Ok(meta.account_number_hash)
+    let version = meta_version_of(&bytes).ok_or(PrefsWriteError::InvalidVaultMeta)?;
+    let meta = parse_vault_meta_any(&bytes).map_err(|_| PrefsWriteError::InvalidVaultMeta)?;
+    Ok((version, meta.account_number_hash))
 }
 
 /// Shared read-modify-write core for every `Slot::Unlocked`-gated prefs setter
@@ -307,9 +309,9 @@ async fn update_prefs_with_dir(
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
-    let account_number_hash =
+    let (meta_version, account_number_hash) =
         read_account_number_hash_for_write(io, &vault_dir.join("vault.meta")).await?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
     let mut prefs = read_or_default(io, &prefs_path, &prefs_key, &account_number_hash).await;
@@ -342,8 +344,9 @@ async fn update_prefs_with_dir(
     // register; a device-local-only or no-op write never does.
     let shared_changed = shared_subset_hash(&prefs) != shared_subset_hash(&before);
 
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+    let blob_bytes =
+        encode_prefs_blob_versioned(meta_version, &prefs_key, &account_number_hash, &prefs)
+            .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
 
     io.write(
         &prefs_path,
@@ -440,8 +443,9 @@ pub async fn prefs_read_with_dir_reporting_origin(
         .await
         .ok_or(PrefsReadError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
+    let prefs_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
     Ok(read_or_default_reporting_origin(io, &prefs_path, &prefs_key, &account_number_hash).await)
@@ -5737,7 +5741,7 @@ mod tests {
     /// the production decoder will accept.
     fn compute_prefs_key(seed_root: u8) -> [u8; 32] {
         let root_key = [seed_root; 32];
-        let derived = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let derived = protocol::derive_subkey(&root_key, SubkeyRole::PrefsKey);
         *derived
     }
 

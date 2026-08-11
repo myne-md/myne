@@ -17,6 +17,8 @@ import { DeviceJoinQr } from "../sync/DeviceJoinQr";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { SyncUsageBlock } from "../sync/SyncUsageBlock";
 import { RecoveredNotes } from "../sync/RecoveredNotes";
+import { has as hasCapability } from "../../platform/capabilities";
+import { MigrateVaultForm } from "./MigrateVaultForm";
 import {
   ConflictsView,
   type ConflictCompare,
@@ -59,9 +61,25 @@ const SECTION_TITLE_STYLE: CSSProperties = {
   color: "var(--fg-1)",
 };
 
-export function SyncPanel() {
+export interface SyncPanelProps {
+  /**
+   * Routed to Unlock after a successful vault migration (#420). Migration re-keys
+   * the vault and drops the running slot, so the session must re-unlock; the
+   * Settings shell wires this to `onForceRelock({ kind: "Exists" })`.
+   */
+  onMigrated?: () => void;
+}
+
+export function SyncPanel({ onMigrated }: SyncPanelProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  // `MY01`-only by construction (#422, ASM-6→B): keep-both conflict copies carry
+  // the `conflict:`/`conflict_of:` frontmatter, which the sync orchestrator writes
+  // ONLY for `MY01` notes — a next-major CRDT note (`NC05`) is reconciled by an
+  // automatic merge and never staged as keep-both (ASM-9), so `groups` holds no
+  // `NC05` entries and this section is empty in a fully-migrated vault. The
+  // calm "updated from another device" hint (`RemoteMergeHint`) is the CRDT-note
+  // surface; there is deliberately no dual-model Conflicts view.
   const groups = conflictRecordsByOriginal(ctx.cache);
 
   // Device roster, lifted here so its poll feeds BOTH the device list and the
@@ -348,6 +366,19 @@ export function SyncPanel() {
         <p style={HELPER_STYLE}>{t("sync.panel.recovered.helper")}</p>
         <RecoveredNotes onRestored={refreshSidebar} />
       </div>
+
+      {/* Whole-vault v0.1 → v0.2 migration (#420) — gated behind the
+          `vaultMigration` capability (present on desktop, absent on web: a web
+          client joins an already-current account and never migrates). The
+          dispatcher refuses `plugin:vault-migrate|vault_migrate` on web, so this
+          capability is what keeps the UI from offering a control the backend
+          rejects (check-web-capabilities.mjs). */}
+      {hasCapability("vaultMigration") && (
+        <div style={BLOCK_STYLE} data-setting-anchor="sync.migrate" data-setting-row="true">
+          <span style={SECTION_TITLE_STYLE}>{t("migrate.submit")}</span>
+          <MigrateVaultForm onMigrated={onMigrated} />
+        </div>
+      )}
 
       <Toast
         message={takeTheirsPending ? t("sync.conflicts.tookTheirsToast") : null}

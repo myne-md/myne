@@ -243,6 +243,7 @@ mod tests {
             BlobSyncState {
                 version: 7,
                 content_nonce_hex: nonce_hex.to_string(),
+                doc_heads_hex: Vec::new(),
             },
         );
         s
@@ -286,6 +287,7 @@ mod tests {
             BlobSyncState {
                 version: 3,
                 content_nonce_hex: NONCE_2.to_string(),
+                doc_heads_hex: Vec::new(),
             },
         );
         assert!(
@@ -300,6 +302,7 @@ mod tests {
             BlobSyncState {
                 version: 8,
                 content_nonce_hex: NONCE_2.to_string(),
+                doc_heads_hex: Vec::new(),
             },
         );
         assert!(!is_unsynced(&s, ID_A, NONCE_2));

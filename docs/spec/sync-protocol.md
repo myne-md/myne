@@ -415,6 +415,8 @@ The server **cannot** decrypt or merge (A1, TB5), so all conflict resolution is 
 
 A concurrent edit to the same note resolves by **keeping both versions**: the losing version is written as a **conflict-marked duplicate note** for the user to reconcile. **Pure last-writer-wins on a note body is forbidden** — it would silently destroy an edit the server can't see. (At the head level, the two concurrent heads are version-vector-incomparable and the loser authors a merge head, §5.3; at the content level, the conflicting note becomes a duplicate.) UX for grouping conflict copies is a client concern (out of scope here).
 
+> **Keep-both is the `MY01` (v0.1) note model.** A next-major CRDT note (`NC05`, `protocol.md` §10.7) resolves the same concurrent-edit situation by an **automatic CRDT interleave-merge** instead — both edits survive in one convergent revision, so no conflict copy is produced and the head-level merge carries the merged body rather than a keep-both duplicate. The client dispatches on the cleartext blob magic (`MY01` → keep-both, `NC05` → merge), surfaces the CRDT case only as a calm "updated from another device" hint, and the keep-both Conflicts view is `MY01`-only (`../decisions.md` 2026-08-10, ASM-6→B, #422). This clarifies the model split; it changes no wire format, identifier, or the head/VV integrity spine.
+
 ### 10.2 Singletons — post-decrypt field/set merge
 
 Structured singletons merge **field-by-field after decryption**, in RAM (SYNC-3: the plaintext never rests outside the AEAD'd blob), with field names and value shapes following `protocol.md` §9.5.2 **exactly** — do not re-derive the codec taxonomy here, cite it.

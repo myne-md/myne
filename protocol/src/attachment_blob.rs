@@ -422,6 +422,20 @@ pub fn decode_attachment_blob(
     items_key: &[u8; AEAD_KEY_LEN],
     items_key_id: &[u8; ITEMS_KEY_ID_LEN],
 ) -> Result<Zeroizing<Vec<u8>>, AttachmentBlobError> {
+    // Magic-detecting: a migrated vault's attachments are `MYA5` (§10.4.1), sealed
+    // under the v0.2 AAD but the SAME `items_key` (the three-level wrap keys the
+    // per-attachment `attachment_key`, not a `root_key`-derived KEK, so no version
+    // split on the key — only on the magic + AAD). Dispatch `MYA5` to the v0.2
+    // decoder; everything else takes the v0.1 (`MYA1`) path.
+    if blob.get(0..4) == Some(ATTACHMENT_BLOB_V0_2_MAGIC.as_slice()) {
+        return decode_attachment_blob_v0_2(
+            blob,
+            attachment_id,
+            content_type,
+            items_key,
+            items_key_id,
+        );
+    }
     decode_attachment_blob_with_cause(blob, attachment_id, content_type, items_key, items_key_id)
         .map_err(|cause| {
             tracing::debug!(stage = ?cause, "decode_attachment_blob failed");
@@ -522,6 +536,229 @@ pub(crate) fn decode_attachment_blob_with_cause(
     .map_err(|_| DecryptCause::InnerAead)?;
 
     Ok(plaintext)
+}
+
+// ---- v0.2 (MYA5) next-major re-seal (automerge-sync-migration §10.4.1) ----
+
+/// `MYA5` attachment magic — the v0.2 attachment family (`protocol.md` §10.3
+/// registry). Same §9.9 three-level layout as `MYA1`; the migration re-wraps an
+/// attachment under the new `itemsKey` with this magic + the v0.2 AADs, keeping
+/// the attachment id STABLE (the id is carried through, not recomputed — the
+/// stable-attachment-id decision, `decisions.md` 2026-08-09).
+pub const ATTACHMENT_BLOB_V0_2_MAGIC: &[u8; 4] = b"MYA5";
+
+/// v0.2 attachment `protocol_version` byte (offset 4) — `0x02`.
+pub const ATTACHMENT_BLOB_V0_2_PROTOCOL_VERSION: u8 = 0x02;
+
+/// v0.2 mirror of [`aad_wrap_attachment_key`] — the same layout under the
+/// next-major prefix + version (`protocol.md` §10.4.1).
+pub fn aad_wrap_attachment_key_v0_2(
+    items_key_id: &[u8; ITEMS_KEY_ID_LEN],
+    attachment_id: &[u8; ATTACHMENT_ID_LEN],
+) -> Vec<u8> {
+    use crate::aead::{AAD_PREFIX_V0_2, PROTOCOL_VERSION_V0_2};
+    let mut aad =
+        Vec::with_capacity(AAD_PREFIX_V0_2.len() + 1 + items_key_id.len() + attachment_id.len());
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    aad.extend_from_slice(items_key_id);
+    aad.extend_from_slice(attachment_id);
+    aad
+}
+
+/// v0.2 mirror of [`aad_encrypt_attachment`] — the same layout (incl. the
+/// length-prefixed `content_type`) under the next-major prefix + version.
+pub fn aad_encrypt_attachment_v0_2(
+    items_key_id: &[u8; ITEMS_KEY_ID_LEN],
+    attachment_id: &[u8; ATTACHMENT_ID_LEN],
+    content_type: &[u8],
+) -> Vec<u8> {
+    use crate::aead::{AAD_PREFIX_V0_2, PROTOCOL_VERSION_V0_2};
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + items_key_id.len()
+            + attachment_id.len()
+            + 2
+            + content_type.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    aad.extend_from_slice(items_key_id);
+    aad.extend_from_slice(attachment_id);
+    push_length_prefixed_u16_be(&mut aad, content_type);
+    aad
+}
+
+/// Encode a `MYA5` attachment blob from caller-supplied randomness (`_raw`). The
+/// v0.2 mirror of [`encode_attachment_blob_raw`]: same §9.9 byte layout, `MYA5`
+/// magic + `0x02` version, v0.2 AADs. `attachment_id` is carried in (stable id).
+#[allow(clippy::too_many_arguments)]
+pub fn encode_attachment_blob_v0_2_raw(
+    items_key: &[u8; AEAD_KEY_LEN],
+    items_key_id: &[u8; ITEMS_KEY_ID_LEN],
+    attachment_id: &[u8; ATTACHMENT_ID_LEN],
+    content_type: &[u8],
+    attachment_key: &[u8; AEAD_KEY_LEN],
+    attachment_key_nonce: &[u8; AEAD_NONCE_LEN],
+    content_nonce: &[u8; AEAD_NONCE_LEN],
+    file_plaintext: &[u8],
+) -> Result<Vec<u8>, AttachmentBlobError> {
+    if file_plaintext.len() > MAX_ATTACHMENT_LEN {
+        return Err(AttachmentBlobError::AttachmentTooLarge);
+    }
+    let aad_wrap = aad_wrap_attachment_key_v0_2(items_key_id, attachment_id);
+    let enc_attachment_key =
+        aead_seal_ctx(items_key, attachment_key_nonce, attachment_key, &aad_wrap)
+            .map_err(|_| AttachmentBlobError::CannotDecrypt)?;
+    let aad_content = aad_encrypt_attachment_v0_2(items_key_id, attachment_id, content_type);
+    let ciphertext = aead_seal_ctx(attachment_key, content_nonce, file_plaintext, &aad_content)
+        .map_err(|_| AttachmentBlobError::CannotDecrypt)?;
+
+    let total_len = OFFSET_CIPHERTEXT + ciphertext.len();
+    let mut blob = Vec::with_capacity(total_len);
+    blob.extend_from_slice(ATTACHMENT_BLOB_V0_2_MAGIC);
+    blob.push(ATTACHMENT_BLOB_V0_2_PROTOCOL_VERSION);
+    blob.push(ATTACHMENT_BLOB_RESERVED);
+    blob.extend_from_slice(items_key_id);
+    blob.extend_from_slice(attachment_key_nonce);
+    blob.extend_from_slice(&(ENC_ATTACHMENT_KEY_WRAPPED_LEN as u16).to_be_bytes());
+    blob.extend_from_slice(&enc_attachment_key);
+    blob.extend_from_slice(content_nonce);
+    let ciphertext_len_u32 =
+        u32::try_from(ciphertext.len()).map_err(|_| AttachmentBlobError::AttachmentTooLarge)?;
+    blob.extend_from_slice(&ciphertext_len_u32.to_be_bytes());
+    blob.extend_from_slice(&ciphertext);
+    Ok(blob)
+}
+
+/// [`encode_attachment_blob_v0_2_raw`] pulling the fresh `attachment_key` + both
+/// nonces from `getrandom` (the migration's production surface).
+pub fn encode_attachment_blob_v0_2(
+    items_key: &[u8; AEAD_KEY_LEN],
+    items_key_id: &[u8; ITEMS_KEY_ID_LEN],
+    attachment_id: &[u8; ATTACHMENT_ID_LEN],
+    content_type: &[u8],
+    file_plaintext: &[u8],
+) -> Result<Vec<u8>, AttachmentBlobError> {
+    let mut attachment_key = Zeroizing::new([0u8; AEAD_KEY_LEN]);
+    getrandom::getrandom(attachment_key.as_mut_slice())
+        .map_err(|_| AttachmentBlobError::RandomnessUnavailable)?;
+    let mut attachment_key_nonce = [0u8; AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut attachment_key_nonce)
+        .map_err(|_| AttachmentBlobError::RandomnessUnavailable)?;
+    let mut content_nonce = [0u8; AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut content_nonce)
+        .map_err(|_| AttachmentBlobError::RandomnessUnavailable)?;
+    encode_attachment_blob_v0_2_raw(
+        items_key,
+        items_key_id,
+        attachment_id,
+        content_type,
+        &attachment_key,
+        &attachment_key_nonce,
+        &content_nonce,
+        file_plaintext,
+    )
+}
+
+/// Re-seal a `MYA1` attachment to `MYA5` for the whole-vault migration (§10.4.1):
+/// decode the file under the OLD `itemsKey`, re-encode it under the NEW `itemsKey`
+/// with the `MYA5` magic + v0.2 AADs. The `attachment_id` is **carried through
+/// unchanged** (the stable-id decision) so no note reference, catalog key, or
+/// filename moves; only the content is re-keyed (a fresh `attachment_key` under
+/// the new `itemsKey`). `content_type` comes from the catalog (§9.10), exactly as
+/// the decode path already requires.
+pub fn reseal_attachment_v0_2(
+    old_blob: &[u8],
+    attachment_id: &[u8; ATTACHMENT_ID_LEN],
+    content_type: &[u8],
+    old_items_key: &[u8; AEAD_KEY_LEN],
+    old_items_key_id: &[u8; ITEMS_KEY_ID_LEN],
+    new_items_key: &[u8; AEAD_KEY_LEN],
+    new_items_key_id: &[u8; ITEMS_KEY_ID_LEN],
+) -> Result<Vec<u8>, AttachmentBlobError> {
+    let file = decode_attachment_blob(
+        old_blob,
+        attachment_id,
+        content_type,
+        old_items_key,
+        old_items_key_id,
+    )?;
+    encode_attachment_blob_v0_2(
+        new_items_key,
+        new_items_key_id,
+        attachment_id,
+        content_type,
+        &file,
+    )
+}
+
+/// Decode a `MYA5` attachment blob (the v0.2 read side) back to the file
+/// plaintext — the v0.2 mirror of [`decode_attachment_blob`], used to verify a
+/// re-sealed blob. Single-error surface, `MYA5` magic + `0x02` version + v0.2
+/// AADs. `attachment_id` (stable) + `content_type` bind exactly as v0.1.
+pub fn decode_attachment_blob_v0_2(
+    blob: &[u8],
+    attachment_id: &[u8; ATTACHMENT_ID_LEN],
+    content_type: &[u8],
+    items_key: &[u8; AEAD_KEY_LEN],
+    items_key_id: &[u8; ITEMS_KEY_ID_LEN],
+) -> Result<Zeroizing<Vec<u8>>, AttachmentBlobError> {
+    // Parse-level checks (mirror decode_attachment_blob_with_cause, MYA5 header).
+    if blob.len() < OFFSET_CIPHERTEXT
+        || &blob[0..4] != ATTACHMENT_BLOB_V0_2_MAGIC
+        || blob[OFFSET_PROTOCOL_VERSION] != ATTACHMENT_BLOB_V0_2_PROTOCOL_VERSION
+        || blob[OFFSET_RESERVED] != ATTACHMENT_BLOB_RESERVED
+    {
+        return Err(AttachmentBlobError::CannotDecrypt);
+    }
+    let enc_key_len = u16::from_be_bytes(
+        blob[OFFSET_ENC_ATTACHMENT_KEY_LEN..OFFSET_ENC_ATTACHMENT_KEY]
+            .try_into()
+            .expect("2-byte slice"),
+    ) as usize;
+    let ciphertext_len = u32::from_be_bytes(
+        blob[OFFSET_CIPHERTEXT_LEN..OFFSET_CIPHERTEXT]
+            .try_into()
+            .expect("4-byte slice"),
+    ) as usize;
+    if enc_key_len != ENC_ATTACHMENT_KEY_WRAPPED_LEN
+        || !(CTX_COMMITMENT_TAG_LEN..=MAX_ATTACHMENT_LEN + CTX_COMMITMENT_TAG_LEN)
+            .contains(&ciphertext_len)
+        || blob.len() != OFFSET_CIPHERTEXT + ciphertext_len
+        || &blob[OFFSET_ITEMS_KEY_ID..OFFSET_ATTACHMENT_KEY_NONCE] != items_key_id.as_slice()
+    {
+        return Err(AttachmentBlobError::CannotDecrypt);
+    }
+    let attachment_key_nonce: [u8; AEAD_NONCE_LEN] = blob
+        [OFFSET_ATTACHMENT_KEY_NONCE..OFFSET_ENC_ATTACHMENT_KEY_LEN]
+        .try_into()
+        .expect("24-byte slice");
+    let aad_wrap = aad_wrap_attachment_key_v0_2(items_key_id, attachment_id);
+    let attachment_key_z = aead_open_ctx(
+        items_key,
+        &attachment_key_nonce,
+        &blob[OFFSET_ENC_ATTACHMENT_KEY..OFFSET_CONTENT_NONCE],
+        &aad_wrap,
+    )
+    .map_err(|_| AttachmentBlobError::CannotDecrypt)?;
+    if attachment_key_z.len() != AEAD_KEY_LEN {
+        return Err(AttachmentBlobError::CannotDecrypt);
+    }
+    let mut attachment_key = Zeroizing::new([0u8; AEAD_KEY_LEN]);
+    attachment_key.copy_from_slice(&attachment_key_z);
+    let content_nonce: [u8; AEAD_NONCE_LEN] = blob[OFFSET_CONTENT_NONCE..OFFSET_CIPHERTEXT_LEN]
+        .try_into()
+        .expect("24-byte slice");
+    let aad_content = aad_encrypt_attachment_v0_2(items_key_id, attachment_id, content_type);
+    aead_open_ctx(
+        &attachment_key,
+        &content_nonce,
+        &blob[OFFSET_CIPHERTEXT..],
+        &aad_content,
+    )
+    .map_err(|_| AttachmentBlobError::CannotDecrypt)
 }
 
 #[cfg(test)]
@@ -625,6 +862,77 @@ mod tests {
         )
         .expect("round-trip decode succeeds");
         assert_eq!(plaintext.as_slice(), TEST_FILE);
+    }
+
+    #[test]
+    fn mya5_reseal_re_keys_content_keeps_id_stable() {
+        // The migration attachment leg (§10.4.1, stable-id decision): re-seal a
+        // MYA1 attachment to MYA5 under a NEW itemsKey. The id is CARRIED (stable),
+        // the file survives byte-exact under the new key, and the old key can no
+        // longer read the re-sealed blob (content genuinely re-keyed).
+        let old_items_key = TEST_ITEMS_KEY;
+        let old_items_key_id = TEST_ITEMS_KEY_ID;
+        let new_items_key = [0x77u8; 32];
+        let new_items_key_id = [0x88u8; 16];
+
+        let mya1 = encode_with_fixture(TEST_FILE);
+        let mya5 = reseal_attachment_v0_2(
+            &mya1,
+            &TEST_ATTACHMENT_ID,
+            TEST_CONTENT_TYPE,
+            &old_items_key,
+            &old_items_key_id,
+            &new_items_key,
+            &new_items_key_id,
+        )
+        .expect("reseal MYA1→MYA5");
+
+        // It is a MYA5 blob (new family) carrying the SAME items_key_id it was
+        // sealed under — the attachment_id (the filename/catalog key) is unchanged
+        // by construction (it is an input, not stored in the blob).
+        assert_eq!(&mya5[0..4], ATTACHMENT_BLOB_V0_2_MAGIC);
+        assert_eq!(mya5[OFFSET_PROTOCOL_VERSION], 0x02);
+        assert_eq!(
+            &mya5[OFFSET_ITEMS_KEY_ID..OFFSET_ATTACHMENT_KEY_NONCE],
+            &new_items_key_id
+        );
+
+        // Decodes under the NEW itemsKey + same id + content_type → byte-exact file.
+        let got = decode_attachment_blob_v0_2(
+            &mya5,
+            &TEST_ATTACHMENT_ID,
+            TEST_CONTENT_TYPE,
+            &new_items_key,
+            &new_items_key_id,
+        )
+        .expect("decode MYA5 under new itemsKey");
+        assert_eq!(got.as_slice(), TEST_FILE);
+
+        // The OLD itemsKey can no longer read it (real re-key).
+        assert!(decode_attachment_blob_v0_2(
+            &mya5,
+            &TEST_ATTACHMENT_ID,
+            TEST_CONTENT_TYPE,
+            &old_items_key,
+            &new_items_key_id,
+        )
+        .is_err());
+
+        // The magic-detecting base decoder now DISPATCHES the MYA5 magic to the
+        // v0.2 path, so a v0.2-capable reader decodes a migrated attachment
+        // byte-exact under the new itemsKey — the reader-path contract every
+        // attachments consumer relies on post-migration (#420). (§10.5
+        // anti-downgrade is a property of a v0.1-ONLY client that lacks this
+        // dispatch entirely, not of this v0.2-capable one.)
+        let via_base = decode_attachment_blob(
+            &mya5,
+            &TEST_ATTACHMENT_ID,
+            TEST_CONTENT_TYPE,
+            &new_items_key,
+            &new_items_key_id,
+        )
+        .expect("magic-detecting base decoder reads a migrated MYA5 attachment");
+        assert_eq!(via_base.as_slice(), TEST_FILE);
     }
 
     #[test]

@@ -25,6 +25,10 @@ export interface ToastInput {
    *  or the owner clearing it). The `<Toast>` bridge wires this to its `onDone`
    *  so the owning component's state is cleared. Must be idempotent. */
   onDismiss?: () => void;
+  /** Optional `data-testid` override for the rendered toast row (`<screen>.<element>`
+   *  form). Defaults to the shared `editor.toast`; a specific surface (e.g. the
+   *  remote-merge hint, #422) sets its own so E2E can target it distinctly. */
+  testId?: string;
 }
 
 export interface ToastItem {
@@ -34,6 +38,7 @@ export interface ToastItem {
   action?: ToastActionSpec;
   durationMs: number;
   onDismiss?: () => void;
+  testId?: string;
 }
 
 const DEFAULT_DURATION_MS = 2500;
@@ -72,6 +77,7 @@ export function toast(input: ToastInput): number {
       action: input.action,
       durationMs,
       onDismiss: input.onDismiss,
+      testId: input.testId,
     },
   ];
   emit();
