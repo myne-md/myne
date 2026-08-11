@@ -40,6 +40,7 @@ pub mod double_buffer;
 #[cfg(any(test, feature = "test-support"))]
 pub mod double_buffer_fixtures;
 pub mod export_naming;
+pub mod http;
 // The process-host seam (phase3-web-client task 79) — what a command core needs
 // from its host that is not already an ordinary Rust value. Sibling of `hooks`,
 // which is the same idea one axis over (lifecycle side effects).

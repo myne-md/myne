@@ -25,6 +25,7 @@ import {
   infer as defaultInfer,
 } from "@myne/editor/host/lib/writing-assistant";
 import { slashCommands, type SlashCommand } from "./commands";
+import { showAttachmentToast } from "../attachments/toast";
 
 type Infer = (prompt: string) => Promise<string>;
 
@@ -81,8 +82,49 @@ export async function aiSlashTitle(
 }
 
 /** Remove the `/…` slash trigger span, then fire an async AI action. */
-function removeTriggerThen(
-  action: (v: EditorView) => void,
+/**
+ * The `EngineError` variant tag of a raw IPC rejection, or `""`.
+ *
+ * **A deliberate second copy of `src/lib/engine-error.ts::engineErrorTag`, and
+ * the duplication is the package boundary rather than an oversight.** This is
+ * `@myne/editor`, consumed as source by desktop, web and mobile; importing from
+ * the desktop tree would break that (and `check-platform-seam.mjs` guards the
+ * direction). Four lines, pure, over a wire shape frozen by the Rust enum — the
+ * cost of a copy is bounded, and the alternative is a shared package created for
+ * one function.
+ *
+ * Content-free by construction: a fixed identifier, never the prompt or the note.
+ */
+function engineErrorTag(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (raw !== null && typeof raw === "object" && "kind" in raw) {
+    return String((raw as { kind: unknown }).kind);
+  }
+  return "";
+}
+
+/** Causes that mean *nothing is set up to answer*, as distinct from *it tried
+ *  and failed*. Both spellings: Tauri serializes a unit variant as its
+ *  identifier, the `kind()` helper emits snake_case, and a map covering one of
+ *  them silently reports the catch-all for the other. */
+const NO_PROVIDER: ReadonlySet<string> = new Set([
+  "NotReady",
+  "not_ready",
+  "NoModel",
+  "no_model",
+  "NoCredential",
+  "no_credential",
+]);
+
+/** Exported for `tests/editor/aiSlash.test.ts`, which drives this wrapper with a
+ *  rejecting action directly. Testing it through a command's `apply` would need
+ *  an injected `EditorHost`, and mixing the package's two import specifiers in
+ *  one test file resolves a second module graph — which made the first attempt
+ *  pass the WRONG branch (a `getHost()` TypeError, caught by this very catch and
+ *  reported as a generic failure). Exporting the unit under test removes the
+ *  question entirely. */
+export function removeTriggerThen(
+  action: (v: EditorView) => Promise<void>,
 ): (v: EditorView, from: number, to: number) => void {
   return (v, from, to) => {
     v.dispatch({
@@ -90,7 +132,27 @@ function removeTriggerThen(
       selection: { anchor: from },
       userEvent: "slash.apply",
     });
-    action(v);
+    // The `.catch` this used to lack, and its absence was worse than silence
+    // (#191 task 7): the trigger span is deleted BEFORE the action runs, so on
+    // a rejection the user's typed `/devam` vanished, nothing arrived to
+    // replace it, and nothing explained it. On a stock install — no side-loaded
+    // generation model — that was the outcome every single time, and it read as
+    // the editor eating input.
+    //
+    // The trigger text is deliberately NOT re-inserted: the deletion is a
+    // normal transaction with `userEvent: "slash.apply"`, so undo already
+    // brings it back, and re-inserting would fight the undo stack.
+    void action(v).catch((err: unknown) => {
+      // Two direct `i18n.t("…")` call sites rather than one with a computed
+      // key: `scripts/check-i18n.mjs` verifies STATIC call sites, and a key
+      // assembled inside the call is a key no guard checks.
+      showAttachmentToast(
+        NO_PROVIDER.has(engineErrorTag(err))
+          ? i18n.t("editor.slash.aiNoProvider")
+          : i18n.t("editor.slash.aiFailed"),
+        "error",
+      );
+    });
   };
 }
 
@@ -104,13 +166,13 @@ export function aiSlashCommands(): readonly SlashCommand[] {
       id: "ai-continue",
       label: i18n.t("editor.slash.aiContinue"),
       icon: "✦",
-      apply: removeTriggerThen((v) => void aiSlashContinue(v)),
+      apply: removeTriggerThen((v) => aiSlashContinue(v)),
     },
     {
       id: "ai-title",
       label: i18n.t("editor.slash.aiTitle"),
       icon: "✦",
-      apply: removeTriggerThen((v) => void aiSlashTitle(v)),
+      apply: removeTriggerThen((v) => aiSlashTitle(v)),
     },
   ];
 }

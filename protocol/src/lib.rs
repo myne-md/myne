@@ -135,8 +135,8 @@ pub use dictionary_blob::{
 pub use embeddings_blob::{
     decode_embeddings_blob, encode_embeddings_blob, encode_embeddings_blob_raw,
     EmbeddingsBlobError, EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN, EMBEDDINGS_BLOB_FORMAT_V1,
-    EMBEDDINGS_BLOB_HEADER_LEN, EMBEDDINGS_BLOB_MAGIC, EMBEDDINGS_BLOB_PROTOCOL_VERSION,
-    MAX_EMBEDDINGS_PLAINTEXT_LEN,
+    EMBEDDINGS_BLOB_FORMAT_V2, EMBEDDINGS_BLOB_HEADER_LEN, EMBEDDINGS_BLOB_MAGIC,
+    EMBEDDINGS_BLOB_PROTOCOL_VERSION, MAX_EMBEDDINGS_PLAINTEXT_LEN,
 };
 pub use error::ProtocolError;
 pub use graph_layout_blob::{

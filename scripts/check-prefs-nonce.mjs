@@ -50,7 +50,17 @@ const PREFS_MODULE = "src/lib/prefs.ts";
 
 // Prefs commands that only READ. They invalidate nothing, so they need no bump
 // and may be invoked directly.
-const READ_COMMANDS = new Set(["prefs_read", "device_platform"]);
+// `ai_provider_has_key` (myne#415) answers WHETHER a remote-provider API key is
+// stored and returns a bare bool. It is on this list for the same reason as the
+// other two — it writes nothing, so there is no value for a sibling `usePrefs`
+// to go stale on. It is also the reason a read command exists at all here: the
+// key is serde-skipped out of `prefs_read`, so the panel cannot learn "a key is
+// set" from the view and must ask separately.
+const READ_COMMANDS = new Set([
+  "prefs_read",
+  "device_platform",
+  "ai_provider_has_key",
+]);
 
 // Trees that may legitimately hold a `plugin:prefs|` literal without being the
 // TS wrapper module: the Rust side names its own commands, and the web

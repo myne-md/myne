@@ -53,6 +53,49 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "ai_excluded_folders",
         PrefClass::Shared(SharedDiscipline::SetUnion),
     ),
+    // Shared, and a deliberate divergence from its nearest neighbour above:
+    // `ai_enabled` is DeviceLocal because "should THIS machine spend its CPU
+    // on inference" is a property of the machine. Naming a REMOTE provider is
+    // not — it is a statement about where this vault's notes may be sent, and
+    // a vault whose owner said "OpenRouter" has said it about the vault. The
+    // three rows below therefore travel together, and the cost of that is
+    // recorded rather than hidden: a newly enrolled device inherits the
+    // selection, the consent and the key, and begins sending without anyone at
+    // that device seeing the consent screen (ledger SYNC-22;
+    // `threat-model.md` §5 states the same in the normative text).
+    (
+        "ai_provider",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
+    // Shared with the selection it approves — splitting them would produce the
+    // worst state of the four: a device that inherited a provider and a key but
+    // not the consent would be configured and silently refused, with no screen
+    // anywhere to fix it.
+    (
+        "ai_provider_consent",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
+    // Shared (SYNC-15). Last-writer-wins is right for a credential in a way it
+    // is not for a set: rotating the key on one device MUST replace it
+    // everywhere, and a union or a merge of two key values is not a thing that
+    // could mean anything. Note the consequence for revocation — deleting the
+    // key propagates as an LWW write of `None`, which is what makes "revoke"
+    // reach the other devices at all.
+    (
+        "ai_provider_key",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
+    // Shared, with the selection it qualifies — the pair is meaningless split.
+    // Contrast the nearest DEVICE-classified neighbour, the AI endpoint: that
+    // one names a daemon on one machine, so it cannot travel. A model name is
+    // a choice about the account's provider, not about this laptop, and a
+    // device that inherited "OpenRouter" but not "which model" would be
+    // configured and unable to ask (SYNC-24 ships no fallback to paper over
+    // it). LWW rather than a set: two chosen models is not a state.
+    (
+        "ai_provider_model",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     (
         "archive_disabled",
         PrefClass::Shared(SharedDiscipline::ScalarLww),
@@ -267,6 +310,10 @@ mod tests {
             active_workspace: _,
             ai_enabled: _,
             ai_excluded_folders: _,
+            ai_provider: _,
+            ai_provider_consent: _,
+            ai_provider_key: _,
+            ai_provider_model: _,
             archive_disabled: _,
             archived_folders: _,
             attachment_compression_enabled: _,
@@ -340,6 +387,10 @@ mod tests {
             "active_workspace",
             "ai_enabled",
             "ai_excluded_folders",
+            "ai_provider",
+            "ai_provider_consent",
+            "ai_provider_key",
+            "ai_provider_model",
             "archive_disabled",
             "archived_folders",
             "attachment_compression_enabled",

@@ -349,6 +349,16 @@ steps:
       # on both sides and only shows up as "app not running" against a running
       # app. Also asserts the sidecar is still in `bundle.externalBin`.
       - node scripts/check-cli-sidecar.mjs
+      # Declared-payload ratchet (ai-bundle-slim myne#190 task 2): the bytes
+      # `bundle.resources` + `bundle.externalBin` + the release binary declare,
+      # gated at 2% growth. CI never builds an installer (`tauri build
+      # --no-bundle`), so there is no artifact to weigh; the declared payload is
+      # the measurable-in-CI proxy, and weights are incompressible so it tracks
+      # the download ~1:1. Only `resources` is gated here — it is committed and
+      # buildless, so this node-only step measures the same bytes the runner
+      # would ship. It also fails on a Git-LFS pointer, which is the one way
+      # this number could quietly become meaningless.
+      - node scripts/check-desktop-payload-budget.mjs
       - pnpm build
       # i18n-catalog parity (hook-only otherwise): fails on empty English source
       # values or static t()/i18n.t() keys missing from locales/en/common.json.
@@ -449,7 +459,14 @@ steps:
       # `cargo-test-tauri` (default features) compiles the
       # `not(feature = "voice-capture-stub")` arm, so both stay covered with no
       # new step. The feature pulls no dependency, so no dep fingerprint moves.
-      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub
+      # `--features local-inference-stub` (SYNC-9, ai-provider-seam task 3): the
+      # same reasoning, for AI. Nine of the ten AI E2E scenarios gate on
+      # `MYNE_E2E_AI === "1"` and had NEVER run in CI — neither this feature nor
+      # that variable appeared anywhere in this file. The stub engine gives the
+      # deterministic outputs those scenarios assert against (`stub-infer: …`, a
+      # fixed embedding) with no model shipped into the repo. Also additive and
+      # dependency-free; `cargo-test-tauri` still compiles the production arm.
+      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
       # Guard the AI-free auditable variant: `--no-default-features` drops candle
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.
@@ -538,7 +555,11 @@ steps:
       # silently inside the first seeding test's 180 s budget.
       # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
       # tauri-compile) inside the unprivileged shell where the build runs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=2 RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+      # MYNE_E2E_AI=1 (SYNC-9, ai-provider-seam task 3): pairs with the
+      # `local-inference-stub` feature added to `tauri-compile`. Without BOTH,
+      # nine AI scenarios stay `describe.skip` — which is what they had been in
+      # every CI run to date.
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=2 MYNE_E2E_AI=1 RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── Quarantine lane (flaky-test epic) ──────────────────────
   # Runs ONLY the `describeE2E.flaky` contention-victim scenarios (nav1, tp1),

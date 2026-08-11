@@ -19,6 +19,10 @@ const {
   saveModelPath,
   setAutoTagEnabled,
   tagModelAvailable,
+  loadAiEndpoint,
+  saveAiEndpoint,
+  listProviderModels,
+  aiProviderHasKey,
 } = vi.hoisted(() => ({
   openUrl: vi.fn(() => Promise.resolve()),
   openFileDialog: vi.fn((): Promise<string | null> => Promise.resolve(null)),
@@ -26,20 +30,69 @@ const {
   saveModelPath: vi.fn((_role: string, p: string) => Promise.resolve(p)),
   setAutoTagEnabled: vi.fn((_enabled: boolean) => Promise.resolve()),
   tagModelAvailable: vi.fn((): Promise<boolean> => Promise.resolve(true)),
+  loadAiEndpoint: vi.fn(
+    (): Promise<{ url: string; model: string } | null> => Promise.resolve(null),
+  ),
+  saveAiEndpoint: vi.fn(
+    (u: string, _m: string): Promise<string | null> => Promise.resolve(u || null),
+  ),
+  listProviderModels: vi.fn((): Promise<string[]> => Promise.resolve([])),
+  aiProviderHasKey: vi.fn((): Promise<boolean> => Promise.resolve(false)),
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: openFileDialog }));
-vi.mock("../../src/lib/ai-model-store", () => ({ loadModelPath, saveModelPath }));
-vi.mock("../../src/lib/ai-tags", () => ({ tagModelAvailable }));
+// Only the IPC-crossing wrappers are stubbed. `endpointRejectionOf` is a pure
+// narrower over the host's wire shape, and stubbing it would leave the thing
+// most likely to be wrong — the shape of the error the panel reads — untested.
+vi.mock("../../src/lib/ai-model-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/ai-model-store")>()),
+  loadModelPath,
+  saveModelPath,
+  loadAiEndpoint,
+  saveAiEndpoint,
+  listProviderModels,
+}));
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/prefs")>()),
+  aiProviderHasKey,
+  setAiProvider: vi.fn(() => Promise.resolve()),
+  setAiProviderConsent: vi.fn(() => Promise.resolve()),
+  setAiProviderKey: vi.fn(() => Promise.resolve()),
+  setAiProviderModel: vi.fn(() => Promise.resolve()),
+}));
+// Partial: `providerLabelOf` moved into this module in #191 task 4 so the chat
+// transcript could share the panel's wire → proper-noun table. A full stub
+// would leave the real mapping untested while breaking the panel.
+vi.mock("../../src/lib/ai-capability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/ai-capability")>()),
+  // The panel reads the one capability report (SYNC-5) rather than the old
+  // per-role probe. Only `autoTag.available` is asserted here; the rest of the
+  // report is filled so the shape matches production.
+  aiCapabilityReport: () =>
+    tagModelAvailable().then((available: boolean) => ({
+      compiled: true,
+      backendId: "candle",
+      backendClass: "in_process_local",
+      generation: { available: false, cause: "no_model" },
+      embedding: { available: false, cause: "no_model" },
+      transcription: { available: false, cause: "no_model" },
+      autoTag: { available, cause: available ? null : "no_model" },
+    })),
+}));
 
 let aiEnabled = true;
 let autoTagEnabled = false;
+let aiProvider: string | null = null;
+let aiProviderModel: string | null = null;
 vi.mock("../../src/hooks/usePrefs", () => ({
   usePrefs: () => ({
     prefs: {
       ai_enabled: aiEnabled,
       auto_tag_enabled: autoTagEnabled,
       ai_excluded_folders: [],
+      ai_provider: aiProvider,
+      ai_provider_consent: aiProvider,
+      ai_provider_model: aiProviderModel,
     },
     setAiEnabled: vi.fn(),
     setAiExcludedFolders: vi.fn(),
@@ -52,11 +105,20 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { AiPanel } from "../../src/components/settings/AiPanel";
-import { AI_TRUST_HEADLINE } from "../../src/lib/load-bearing-copy";
+import {
+  AI_TRUST_INVARIANT,
+  aiTrustHeadline,
+} from "../../src/lib/load-bearing-copy";
 
 beforeEach(() => {
   aiEnabled = true;
   autoTagEnabled = false;
+  aiProvider = null;
+  aiProviderModel = null;
+  listProviderModels.mockClear();
+  listProviderModels.mockResolvedValue([]);
+  aiProviderHasKey.mockClear();
+  aiProviderHasKey.mockResolvedValue(false);
   openUrl.mockClear();
   openFileDialog.mockClear();
   loadModelPath.mockClear();
@@ -65,6 +127,10 @@ beforeEach(() => {
   setAutoTagEnabled.mockResolvedValue(undefined);
   tagModelAvailable.mockClear();
   tagModelAvailable.mockResolvedValue(true);
+  loadAiEndpoint.mockClear();
+  loadAiEndpoint.mockResolvedValue(null);
+  saveAiEndpoint.mockClear();
+  saveAiEndpoint.mockImplementation((u: string, _m: string) => Promise.resolve(u || null));
 });
 afterEach(() => cleanup());
 
@@ -80,9 +146,31 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
     expect(screen.getByTestId("ai.model-choose-embedding")).toBeTruthy();
   });
 
-  it("still renders the load-bearing trust headline verbatim", () => {
+  it("renders the load-bearing invariant and the in-process headline verbatim", () => {
     render(<AiPanel />);
-    expect(screen.getByTestId("ai.trust-headline").textContent).toBe(AI_TRUST_HEADLINE);
+    // The invariant is shown in every state; the headline varies. With no
+    // provider and no endpoint stored, the state is in-process.
+    expect(screen.getByTestId("ai.trust-invariant").textContent).toBe(AI_TRUST_INVARIANT);
+    expect(screen.getByTestId("ai.trust-headline").textContent).toBe(
+      aiTrustHeadline({ kind: "in-process" }),
+    );
+  });
+
+  it("switches the headline to the REMOTE wording once a provider is named", async () => {
+    // The regression this whole copy edit exists to prevent: showing "runs
+    // entirely on your device" in front of a configured provider.
+    aiProvider = "openrouter";
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.trust-headline").textContent).toBe(
+        aiTrustHeadline({ kind: "remote", provider: "openrouter" }),
+      ),
+    );
+    expect(screen.getByTestId("ai.trust-headline").textContent).not.toContain(
+      "entirely on your device",
+    );
+    // …and the invariant is unchanged, because it is true in every state.
+    expect(screen.getByTestId("ai.trust-invariant").textContent).toBe(AI_TRUST_INVARIANT);
   });
 
   it("opens the recommended GENERATION model in the browser (not a Myne fetch)", () => {
@@ -194,5 +282,275 @@ describe("AiPanel — auto-tag on a build with no bundled tag model (MYND-651)",
       ),
     );
     expect(screen.queryByTestId("ai.auto-tag-unavailable")).toBeNull();
+  });
+});
+
+describe("AiPanel — the local model runtime endpoint row (ai-ollama-local task 8)", () => {
+  it("ships the field EMPTY, with the conventional address only as placeholder", async () => {
+    render(<AiPanel />);
+    const input = (await screen.findByTestId("ai.endpoint-input")) as HTMLInputElement;
+    // A stored default would be Myne naming an endpoint the user did not —
+    // the default-state invariant of `decisions.md` 2026-08-09.
+    expect(input.value).toBe("");
+    expect(input.placeholder).toBe("http://127.0.0.1:11434");
+    expect(saveAiEndpoint).not.toHaveBeenCalled();
+  });
+
+  it("shows a persisted endpoint once the host answers", async () => {
+    loadAiEndpoint.mockResolvedValue({
+      url: "http://127.0.0.1:11434",
+      model: "nomic-embed-text",
+    });
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect((screen.getByTestId("ai.endpoint-input") as HTMLInputElement).value).toBe(
+        "http://127.0.0.1:11434",
+      ),
+    );
+    expect((screen.getByTestId("ai.endpoint-model-input") as HTMLInputElement).value).toBe(
+      "nomic-embed-text",
+    );
+  });
+
+  it("names the runtime, links it through the OS handoff, and discloses generically", () => {
+    render(<AiPanel />);
+    const link = screen.getByTestId("ai.endpoint-runtime-link");
+    expect(link.textContent).toContain("Ollama");
+    fireEvent.click(link);
+    expect(openUrl).toHaveBeenCalledTimes(1);
+    expect(openUrl.mock.calls[0][0]).toBe("https://ollama.com");
+    // The disclosure exists and is a separate element from the link, so E2E can
+    // assert it independently of the affordance.
+    expect(screen.getByTestId("ai.endpoint-third-party")).toBeTruthy();
+  });
+
+  it("persists a loopback URL on blur and shows what the host stored", async () => {
+    render(<AiPanel />);
+    const input = screen.getByTestId("ai.endpoint-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "  http://localhost:11434  " } });
+    fireEvent.change(screen.getByTestId("ai.endpoint-model-input"), {
+      target: { value: "nomic-embed-text" },
+    });
+    fireEvent.blur(input);
+    await waitFor(() =>
+      expect(saveAiEndpoint).toHaveBeenCalledWith(
+        "http://localhost:11434",
+        "nomic-embed-text",
+      ),
+    );
+    expect(screen.queryByTestId("ai.endpoint-error")).toBeNull();
+  });
+
+  it("ships the model field empty too — Myne picks no model (SYNC-24)", async () => {
+    render(<AiPanel />);
+    const model = (await screen.findByTestId(
+      "ai.endpoint-model-input",
+    )) as HTMLInputElement;
+    expect(model.value).toBe("");
+  });
+
+  it("stores a URL with no model, so a half-filled row builds no engine", async () => {
+    render(<AiPanel />);
+    const input = screen.getByTestId("ai.endpoint-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "http://127.0.0.1:11434" } });
+    fireEvent.blur(input);
+    // The empty model reaches the host, which stores it and reports the arm
+    // unusable — better than the panel silently withholding the write, because
+    // the user's typed address survives a restart either way.
+    await waitFor(() =>
+      expect(saveAiEndpoint).toHaveBeenCalledWith("http://127.0.0.1:11434", ""),
+    );
+  });
+
+  it("surfaces the refusal RULE and never echoes the URL that was refused", async () => {
+    // The host's real wire shape (serde `tag = "kind"` / `content = "detail"`),
+    // narrowed by the production `endpointRejectionOf` — not a stubbed one.
+    saveAiEndpoint.mockRejectedValueOnce({
+      kind: "Rejected",
+      detail: { reason: "not_loopback" },
+    });
+    render(<AiPanel />);
+    const input = screen.getByTestId("ai.endpoint-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "http://evil.example.com:11434" } });
+    fireEvent.blur(input);
+
+    const err = await screen.findByTestId("ai.endpoint-error");
+    expect(err.textContent).toBe("settings.ai.endpointRejected.notLoopback");
+    // The refused input must not be repeated into the message — a settings
+    // field's contents reach screenshots and bug reports.
+    expect(err.textContent).not.toContain("evil.example.com");
+    expect(input.getAttribute("aria-describedby")).toBe("ai-endpoint-error");
+  });
+
+  it("clears a stale refusal as soon as the input changes", async () => {
+    saveAiEndpoint.mockRejectedValueOnce({
+      kind: "Rejected",
+      detail: { reason: "malformed" },
+    });
+    render(<AiPanel />);
+    const input = screen.getByTestId("ai.endpoint-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "not-a-url" } });
+    fireEvent.blur(input);
+    await screen.findByTestId("ai.endpoint-error");
+
+    // Leaving the old rule up would attach it to a URL it never judged.
+    fireEvent.change(input, { target: { value: "http://127.0.0.1:11434" } });
+    expect(screen.queryByTestId("ai.endpoint-error")).toBeNull();
+  });
+
+  it("treats a non-refusal failure as a toast, not as an inline field error", async () => {
+    // An IO failure is not a judgement about this URL, so it must not render
+    // under the field as though it were.
+    saveAiEndpoint.mockRejectedValueOnce({
+      kind: "Io",
+      detail: { io_error_kind: "PermissionDenied" },
+    });
+    const onShowToast = vi.fn();
+    render(<AiPanel onShowToast={onShowToast} />);
+    fireEvent.blur(screen.getByTestId("ai.endpoint-input"), {});
+    await waitFor(() =>
+      expect(onShowToast).toHaveBeenCalledWith("settings.ai.endpointSaveFailed"),
+    );
+    expect(screen.queryByTestId("ai.endpoint-error")).toBeNull();
+  });
+
+  it("is non-interactive while the AI beta is off (the same co-gate as the pickers)", () => {
+    aiEnabled = false;
+    render(<AiPanel />);
+    expect((screen.getByTestId("ai.endpoint-input") as HTMLInputElement).disabled).toBe(true);
+  });
+});
+
+// The model chooser (myne#415 task 17, SYNC-24). What is worth asserting here
+// is the THREE-STATE distinction: Myne ships no default model, so the panel has
+// to say which of "nobody asked", "the provider published none" and "asking was
+// refused" it is in. Collapsing any two would tell the user something false.
+describe("AiPanel — the provider model chooser", () => {
+  beforeEach(() => {
+    aiProvider = "openrouter";
+  });
+
+  it("starts unfetched, and does not ask the provider merely because the panel opened", async () => {
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.provider-model-state").textContent).toBe(
+        "settings.ai.providerModelUnfetched",
+      ),
+    );
+    // The call is an egress. Opening a settings panel is not a user asking to
+    // reach a provider, and a panel that fetched on mount would be sending on
+    // nobody's instruction.
+    expect(listProviderModels).not.toHaveBeenCalled();
+  });
+
+  it("cannot ask before a key is stored — there is nothing to ask with", async () => {
+    aiProviderHasKey.mockResolvedValue(false);
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.provider-model-load") as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+  });
+
+  it("an empty catalogue is its own state, not 'not fetched'", async () => {
+    aiProviderHasKey.mockResolvedValue(true);
+    listProviderModels.mockResolvedValue([]);
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.provider-model-load") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("ai.provider-model-load"));
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.provider-model-state").textContent).toBe(
+        "settings.ai.providerModelEmpty",
+      ),
+    );
+  });
+
+  it("a refusal names the cause from the shared taxonomy, and keeps the list unset", async () => {
+    aiProviderHasKey.mockResolvedValue(true);
+    listProviderModels.mockRejectedValue({ kind: "Unauthorized" });
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.provider-model-load") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("ai.provider-model-load"));
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.provider-model-state").textContent).toBe(
+        "settings.ai.providerError.unauthorized",
+      ),
+    );
+    // Not an empty list: "we could not ask" and "there are none" are different
+    // facts and the chooser must not conflate them.
+    expect(screen.queryByTestId("ai.provider-model-select")).toBeNull();
+  });
+
+  it("renders the provider's own list once fetched, with the stored choice selected", async () => {
+    aiProviderHasKey.mockResolvedValue(true);
+    aiProviderModel = "qwen/qwen3-30b";
+    listProviderModels.mockResolvedValue(["meta-llama/llama-3.1-8b", "qwen/qwen3-30b"]);
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.provider-model-load") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("ai.provider-model-load"));
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.provider-model-state").textContent).toBe(
+        "settings.ai.providerModelCount",
+      ),
+    );
+    expect(screen.getByTestId("ai.provider-model-select")).toBeTruthy();
+  });
+});
+
+// The resting provider caption (#191 task 5, SYNC-13). Two states, and the
+// distinction that matters is that "nothing is set up" is a STATE, not an
+// error and not an empty string.
+describe("AiPanel — what is answering right now", () => {
+  it("names the remote provider when one is selected", async () => {
+    aiProvider = "openrouter";
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.active-provider").textContent).toBe(
+        "settings.ai.providerActive",
+      ),
+    );
+  });
+
+  it("names the device-local endpoint when one is configured", async () => {
+    loadAiEndpoint.mockResolvedValue({ url: "http://127.0.0.1:11434", model: "qwen" });
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.active-provider").textContent).toBe(
+        "settings.ai.providerActive",
+      ),
+    );
+  });
+
+  it("says nothing is set up when neither is", async () => {
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.active-provider").textContent).toBe(
+        "settings.ai.providerNothingAnswering",
+      ),
+    );
+  });
+
+  it("is a caption, not a control — it adds no setting row", () => {
+    aiProvider = "openrouter";
+    render(<AiPanel />);
+    const caption = screen.getByTestId("ai.active-provider");
+    expect(caption.tagName).toBe("P");
+    // A `SettingRow` would owe a `settingsSearchIndex.ts` entry in the same
+    // change (src/CLAUDE.md); a caption does not, and this is what keeps that
+    // claim true rather than remembered.
+    expect(caption.closest("[data-setting-row]")).toBeNull();
   });
 });

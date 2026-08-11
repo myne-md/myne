@@ -181,6 +181,39 @@ describe("createTagSuggestionTrigger", () => {
     expect(h.results).toEqual([{ noteId: "n1", suggestions: [{ tag: "rust", isNew: true }] }]);
   });
 
+  // ai-provider-seam task 11. `EngineError::Deferred` exists only because ONE
+  // compute lock exists; a backend that serializes model work out of process
+  // has none and can never produce it (`Backend::serializes_compute` declares
+  // which do). So on such a backend the `pass.deferred` branch above is dead
+  // code — and the caching decision sits immediately downstream of it.
+  //
+  // The concern was that results would be cached on a path only ever exercised
+  // alongside a live deferral signal. They are not: the deferred branch
+  // `return`s, so the cache line is reached exactly on the non-deferred path,
+  // which is the only path such a backend ever takes. Pinned here so the
+  // reasoning is not re-derived — and so a future refactor that moves the
+  // cache write above the deferral branch fails loudly instead of caching a
+  // note the model never looked at.
+  it("caches and emits normally on a backend that can never defer", async () => {
+    const h = harness();
+    // No `deferred` rejection anywhere in this cycle — the shape of a
+    // non-serializing backend.
+    h.suggest.mockResolvedValue("rust, crypto");
+
+    h.trigger.schedule({ noteId: "n1", noteBody: "body", noteFolder: "" });
+    await settle();
+    expect(h.suggest).toHaveBeenCalledTimes(1);
+    expect(h.results).toHaveLength(1);
+
+    // Re-scheduling the same content must hit the cache, not the engine —
+    // which is what proves the result was actually cached rather than merely
+    // emitted.
+    h.trigger.schedule({ noteId: "n1", noteBody: "body", noteFolder: "" });
+    await settle();
+    expect(h.suggest).toHaveBeenCalledTimes(1);
+    expect(h.results).toHaveLength(2);
+  });
+
   it("gives up after a bounded number of deferrals rather than spinning", async () => {
     const h = harness();
     h.suggest.mockRejectedValue({ kind: "deferred" });

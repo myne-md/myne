@@ -8,10 +8,20 @@
 //!     chat history is RAM-only and dropped on lock, so a generation must not
 //!     keep emitting into a torn-down transcript/channel after the vault locks).
 //!
-//! Only one generation runs at a time (the engine's compute lock serializes all
-//! model work), so a single shared token is sufficient: the streaming command
-//! `reset()`s it before starting and checks it through [`guarded_on_token`];
-//! the stop command and the lock teardown both `cancel()` it.
+//! **Per request, not per process (ai-provider-seam task 10).** The original
+//! design used one process-global flag, sound under a premise it stated openly:
+//! *"only one generation runs at a time (the engine's compute lock serializes
+//! all model work)"*. That is a property of the **Candle backend**, not of the
+//! seam — a backend that serializes out of process can genuinely run two
+//! requests at once, and then "Stop" on one would abort the other. So each
+//! request now takes its own [`CancelToken`] from a [`CancelRegistry`], and the
+//! two abort paths differ in reach on purpose:
+//!   - **composer Stop** cancels the newest in-flight request (which is what a
+//!     single Stop button means while chat is the only streaming surface — the
+//!     registry can already cancel any request by id, so a second surface needs
+//!     no redesign here, only an id on the wire);
+//!   - **vault-lock teardown** cancels **every** in-flight request. That one is
+//!     the correctness requirement, and it must stay total.
 //!
 //! The token is checked at the emit seam ([`guarded_on_token`]) — a Qwen
 //! generation emits decoded text on ~every token, so an abort takes effect
@@ -21,9 +31,10 @@
 //! The vault-lock teardown call site lands in task 12; the command wiring
 //! (`app.manage` + `chat_stream`/`chat_stop`) is task 5.
 
+use std::collections::BTreeMap;
 use std::ops::ControlFlow;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 /// A cloneable, thread-safe abort flag for the active streaming generation.
 /// Clones share the same underlying flag (via `Arc`), so the streaming callback
@@ -40,13 +51,6 @@ impl CancelToken {
     /// Whether an abort has been signalled.
     pub fn is_cancelled(&self) -> bool {
         self.0.load(Ordering::SeqCst)
-    }
-
-    /// Clear the flag before starting a fresh generation. The streaming command
-    /// calls this at the top of each new turn so a prior Stop doesn't abort the
-    /// next generation.
-    pub fn reset(&self) {
-        self.0.store(false, Ordering::SeqCst);
     }
 }
 
@@ -72,21 +76,136 @@ pub fn guarded_on_token<'a>(
     }
 }
 
+/// Registry of the tokens for every in-flight streaming request.
+///
+/// `BTreeMap` rather than a `Vec` so "the newest" is `last_key_value()` — ids
+/// are monotonic, so newest is well-defined even after out-of-order completion.
+#[derive(Default)]
+pub struct CancelRegistry {
+    inner: Mutex<BTreeMap<u64, CancelToken>>,
+    next_id: AtomicU64,
+}
+
+impl CancelRegistry {
+    /// Take a token for a new request. The returned guard deregisters on drop,
+    /// so a panicking or early-returning command cannot leak an entry — which
+    /// would make a later `cancel_newest` abort a request that already ended.
+    pub fn begin(&self) -> CancelGuard<'_> {
+        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+        let token = CancelToken::default();
+        self.inner
+            .lock()
+            .expect("cancel registry mutex poisoned")
+            .insert(id, token.clone());
+        CancelGuard {
+            registry: self,
+            id,
+            token,
+        }
+    }
+
+    /// Cancel one request by id. `false` when it already finished.
+    ///
+    /// No production caller yet: the composer's single Stop means "the newest",
+    /// and a second streaming surface is what would put an id on the wire. Kept
+    /// because it is the primitive the other two are expressed against, and
+    /// because it is what proves per-request targeting in the tests.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn cancel(&self, id: u64) -> bool {
+        let guard = self.inner.lock().expect("cancel registry mutex poisoned");
+        match guard.get(&id) {
+            Some(t) => {
+                t.cancel();
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Cancel the newest in-flight request — the composer Stop path.
+    pub fn cancel_newest(&self) -> bool {
+        let guard = self.inner.lock().expect("cancel registry mutex poisoned");
+        match guard.last_key_value() {
+            Some((_, t)) => {
+                t.cancel();
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Cancel **every** in-flight request — the vault-lock teardown path.
+    ///
+    /// Total by requirement, not by convenience: chat history is RAM-only and
+    /// dropped on lock, so no generation may keep emitting into a torn-down
+    /// transcript. A per-request registry makes it possible to miss one; this
+    /// is the method that must not.
+    pub fn cancel_all(&self) {
+        for (_, t) in self
+            .inner
+            .lock()
+            .expect("cancel registry mutex poisoned")
+            .iter()
+        {
+            t.cancel();
+        }
+    }
+
+    #[cfg(test)]
+    fn in_flight(&self) -> usize {
+        self.inner
+            .lock()
+            .expect("cancel registry mutex poisoned")
+            .len()
+    }
+}
+
+/// One request's cancellation handle. Deregisters itself on drop.
+pub struct CancelGuard<'a> {
+    registry: &'a CancelRegistry,
+    id: u64,
+    token: CancelToken,
+}
+
+impl CancelGuard<'_> {
+    pub fn token(&self) -> &CancelToken {
+        &self.token
+    }
+
+    #[cfg(test)]
+    fn id(&self) -> u64 {
+        self.id
+    }
+}
+
+impl Drop for CancelGuard<'_> {
+    fn drop(&mut self) {
+        self.registry
+            .inner
+            .lock()
+            .expect("cancel registry mutex poisoned")
+            .remove(&self.id);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::plugins::local_inference::engine::{Engine, StubEngine};
 
+    /// `reset()` is gone: a fresh turn takes a fresh token, so there is no
+    /// shared flag left to clear. The semantics it protected — a prior Stop must
+    /// not abort the next generation — are now structural and are asserted by
+    /// `a_new_request_is_never_born_cancelled` below, which is a stronger claim
+    /// than "someone remembered to call reset".
     #[test]
-    fn token_starts_uncancelled_then_cancels_and_resets() {
+    fn token_starts_uncancelled_then_cancels_idempotently() {
         let t = CancelToken::default();
         assert!(!t.is_cancelled());
         t.cancel();
         assert!(t.is_cancelled());
         t.cancel(); // idempotent
         assert!(t.is_cancelled());
-        t.reset();
-        assert!(!t.is_cancelled());
     }
 
     #[test]
@@ -140,5 +259,70 @@ mod tests {
             !collected.contains("early") && !collected.contains("here"),
             "publish-guard blocked post-cancel tokens, got: {collected:?}"
         );
+    }
+
+    #[test]
+    fn cancelling_one_request_leaves_the_other_running() {
+        let reg = CancelRegistry::default();
+        let a = reg.begin();
+        let b = reg.begin();
+        assert!(reg.cancel(a.id()));
+        assert!(a.token().is_cancelled());
+        assert!(
+            !b.token().is_cancelled(),
+            "the whole point: one request's Stop must not abort the other"
+        );
+    }
+
+    #[test]
+    fn vault_lock_cancels_every_in_flight_request() {
+        let reg = CancelRegistry::default();
+        let a = reg.begin();
+        let b = reg.begin();
+        let c = reg.begin();
+        reg.cancel_all();
+        // Total by requirement — chat history is RAM-only and dropped on lock.
+        for (name, g) in [("a", &a), ("b", &b), ("c", &c)] {
+            assert!(g.token().is_cancelled(), "request {name} survived the lock");
+        }
+    }
+
+    #[test]
+    fn composer_stop_hits_the_newest_request() {
+        let reg = CancelRegistry::default();
+        let older = reg.begin();
+        let newer = reg.begin();
+        assert!(reg.cancel_newest());
+        assert!(newer.token().is_cancelled());
+        assert!(!older.token().is_cancelled());
+    }
+
+    #[test]
+    fn a_finished_request_deregisters_and_cannot_be_cancelled_afterwards() {
+        let reg = CancelRegistry::default();
+        let id = {
+            let g = reg.begin();
+            assert_eq!(reg.in_flight(), 1);
+            g.id()
+        };
+        assert_eq!(reg.in_flight(), 0, "the guard deregisters on drop");
+        // A leaked entry would let a later Stop abort a request that already
+        // ended — or, worse, one that reused the slot.
+        assert!(!reg.cancel(id));
+        assert!(!reg.cancel_newest(), "nothing in flight, nothing to cancel");
+    }
+
+    /// Each request starts uncancelled, so a prior Stop cannot abort the next
+    /// generation — the reset-before-each-turn semantics, now structural: a new
+    /// turn takes a NEW token rather than clearing a shared one.
+    #[test]
+    fn a_new_request_is_never_born_cancelled() {
+        let reg = CancelRegistry::default();
+        {
+            let first = reg.begin();
+            first.token().cancel();
+        }
+        let second = reg.begin();
+        assert!(!second.token().is_cancelled());
     }
 }

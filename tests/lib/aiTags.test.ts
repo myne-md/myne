@@ -78,30 +78,8 @@ describe("suggestTagsForNote", () => {
   });
 });
 
-describe("tagModelAvailable", () => {
-  it("asks the host whether this build ships a tag model", async () => {
-    invoke.mockResolvedValue(true);
-    const { tagModelAvailable } = await seam();
-
-    await expect(tagModelAvailable()).resolves.toBe(true);
-    expect(invoke).toHaveBeenCalledWith(
-      "plugin:local-inference|tag_model_available",
-      undefined,
-    );
-  });
-
-  it("reports false when the host has no bundled blob", async () => {
-    invoke.mockResolvedValue(false);
-    const { tagModelAvailable } = await seam();
-    await expect(tagModelAvailable()).resolves.toBe(false);
-  });
-
-  it("degrades a rejection to false rather than propagating it", async () => {
-    // An AI-free `--no-default-features` build has no such command at all, and
-    // "the command is missing" and "no blob shipped" are the same fact from the
-    // panel's side — either way there is no auto-tag to offer.
-    invoke.mockRejectedValue("command not found");
-    const { tagModelAvailable } = await seam();
-    await expect(tagModelAvailable()).resolves.toBe(false);
-  });
-});
+// `tagModelAvailable` was REMOVED in myne#191 task 1, and its three tests with
+// it. It was a `catch → false` probe with no production caller left: the panel
+// reads the one capability report (SYNC-5), which names the cause instead of
+// collapsing every rejection into the same boolean. Nothing replaced these —
+// the behaviour they pinned is now pinned by `tests/lib/aiCapability.test.ts`.

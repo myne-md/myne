@@ -67,30 +67,19 @@ export async function suggestTagsForNote(args: {
   });
 }
 
-/**
- * Whether this build ships an auto-tag model at all.
- *
- * The tag role is bundled-only — there is no picker (`threat-model.md` §7) — so
- * `false` is a permanent property of the build, not something the user can fix
- * by side-loading. Settings uses it to say so instead of offering a switch that
- * would persist `true` against a host answering `not_ready` forever.
- *
- * Degrades to `false` on any rejection: an AI-free `--no-default-features`
- * build has no such command, and "the command is missing" and "no blob shipped"
- * are the same fact from the panel's side.
- */
-export async function tagModelAvailable(): Promise<boolean> {
-  return await invoke<boolean>("plugin:local-inference|tag_model_available").catch(
-    () => false,
-  );
-}
-
 /** Map the raw IPC rejection (a serialized `EngineError` — see
  *  {@link engineErrorTag}) to a normalized kind. Anything unrecognized degrades
  *  to `"failed"`. */
-function normalizeTagSuggestError(raw: unknown): TagSuggestError {
+/** Exported for `tests/lib/engineErrorTaxonomy.test.ts`: the drift test must
+ *  exercise the real mapping, not a copy of it. */
+export function normalizeTagSuggestError(raw: unknown): TagSuggestError {
   const tag = engineErrorTag(raw);
   if (tag === "Deferred" || tag === "deferred") return { kind: "deferred" };
   if (tag === "NotReady" || tag === "not_ready") return { kind: "not_ready" };
+  // SYNC-14: auto-tag is ambient, so the seam refuses it a remote backend. The
+  // band simply does not appear, which is what `not_ready` already renders —
+  // #191 owns whether this deserves a state of its own.
+  if (tag === "RemoteBarred" || tag === "remote_barred")
+    return { kind: "not_ready" };
   return { kind: "failed" };
 }

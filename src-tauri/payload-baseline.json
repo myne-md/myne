@@ -1,0 +1,8 @@
+{
+  "note": "Measured from the tree with `node scripts/check-desktop-payload-budget.mjs --update`. Only components in the script's BASELINED list are recorded and gated — today just `resources`, the one that is committed, buildless and identical in every checkout. `externalBin` and `binary` are measured and printed on runs that have them, and deliberately not gated: their size depends on which target triples happen to be staged.",
+  "marginPct": 2,
+  "marginReason": "2%, not the web guard's 10: 10% of a ~650 MiB payload is 65 MiB of invisible growth — more than the whole whisper model. 2% absorbs a dictionary update and stops a model.",
+  "components": {
+    "resources": 527246521
+  }
+}

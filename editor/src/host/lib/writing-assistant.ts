@@ -4,6 +4,13 @@ export function infer(prompt: string, opts?: { maxNewTokens?: number }): Promise
   const ai = getHost().ai;
   return ai ? ai.infer(prompt, opts) : Promise.resolve("");
 }
+/** Ambient completions (SYNC-14). Deliberately does NOT fall back to `infer`:
+ *  a host that cannot classify the request must show no ghost text rather than
+ *  send an ambient request through the user-initiated door. */
+export function inferAmbient(prompt: string, opts?: { maxNewTokens?: number }): Promise<string> {
+  const ai = getHost().ai;
+  return ai?.inferAmbient ? ai.inferAmbient(prompt, opts) : Promise.resolve("");
+}
 export function buildCompletionPrompt(precedingText: string, opts?: { brief?: boolean }): string {
   const ai = getHost().ai;
   return ai ? ai.buildCompletionPrompt(precedingText, opts) : precedingText;

@@ -18,7 +18,7 @@ tauri-build = { version = "2", features = [] }
 
 [features]
 # AI ships in the DEFAULT build, but stays OFF at runtime until the user opts in
-# via the Settings → Labs "AI (Beta)" toggle (`ai_enabled` pref, default off).
+# via the Settings → Developer → AI toggle (`ai_enabled` pref, default off).
 # The `local-inference` feature gates the entire on-device LLM/embedding module
 # (`plugins::local_inference`, local-ai epic MYND-406/408) — Candle engine +
 # embed-on-unlock; the sandboxed sidecar is still deferred. Because it is in
@@ -29,7 +29,10 @@ tauri-build = { version = "2", features = [] }
 # AUDITABLE build: `cargo build -p myne-desktop --no-default-features` (or
 # `pnpm tauri build --no-default-features`) drops the ENTIRE `local-inference`
 # stack — the generation model, the embedding model, the ASR/speech-to-text path
-# and every candle/tokenizers symbol — and carries no network path whatsoever.
+# and every candle/tokenizers symbol. It does NOT carry "no network path":
+# `myne-core`'s first-party sync codec is compiled unconditionally, and since
+# 2026-08-09 a user-named AI provider may open a socket too. See
+# `src-tauri/scripts/ai-no-network-check.sh`'s header for what each gate proves.
 # The reproducible-build / TB9 escape hatch is preserved even though AI is no
 # longer opt-in at compile time. The no-egress guarantee is an ABSOLUTE property
 # of the single shipped tree, proved by `scripts/ai-no-network-check.sh`
@@ -189,6 +192,25 @@ base64 = "0.22"
 # rustls-pki-types) moved to `myne-core` with the sync engine extraction
 # (decisions.md 2026-07-07) — they are now inherited transitively via the
 # `myne-core` path dependency, not declared here.
+
+# The remote-AI-provider TLS arm (myne#415, ledger SYNC-23). `rustls` and
+# `rustls-pki-types` are declared here explicitly rather than leaned on
+# transitively: this crate now *names* their types in its own public shape, and
+# an implicit transitive dependency is one `myne-core` refactor away from
+# silently disappearing.
+#
+# `webpki-roots` is a **static Mozilla root bundle compiled into the binary** —
+# data, not a platform-integration surface. It is a security decision with a
+# ledger row in `docs/dependency-policy.md`, and it is NOT free: a revoked CA
+# stays trusted until Myne ships an update, and roots the user's own machine
+# trusts (corporate MITM, private CAs) are ignored. Both are acceptable ONLY
+# because this path talks to a small closed set of compiled-in provider hosts
+# rather than the open web. It is chosen over `rustls-platform-verifier` for
+# identical behaviour on every machine, which is what the reproducible-build
+# commitment wants.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = "1"
+webpki-roots = "1"
 
 # PDF export per-page footer stamping (MYND-255 hotfix, owner-requested):
 # post-processes the captured PDF to draw the document title (bottom-left)

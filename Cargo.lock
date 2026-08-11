@@ -1878,13 +1878,13 @@ checksum = "ba91f619216e76a5eb2515783f7ec2e271938b51aadac592f4930517f4626863"
 dependencies = [
  "heck 0.5.0",
  "indexmap 2.14.0",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro-crate 3.5.0",
  "proc-macro2",
  "quote",
  "sha3 0.12.0",
  "strum",
- "syn 2.0.117",
+ "syn 3.0.3",
  "unicode-ident",
  "void",
 ]
@@ -4597,6 +4597,8 @@ dependencies = [
  "protocol",
  "qrcode",
  "quick-xml 0.37.5",
+ "rustls",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "sha2",
@@ -4620,6 +4622,7 @@ dependencies = [
  "unicode-normalization",
  "uuid",
  "webkit2gtk",
+ "webpki-roots",
  "webview2-com",
  "windows 0.61.3",
  "windows-sys 0.60.2",
@@ -10056,6 +10059,15 @@ dependencies = [
  "pkg-config",
  "soup3-sys",
  "system-deps",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]
