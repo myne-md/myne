@@ -8,7 +8,7 @@
 // the phrase/password (only in-source fixture constants + emptiness/magic checks).
 
 import { expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
 import { ipcOk, pageSeatInvoke, unlockToEditor } from "./support/flows";
@@ -64,6 +64,80 @@ describeE2E("vault migration v0.1 → v0.2 (1 vault, production KDF)", () => {
         // Re-probe (Cmd+R survives the host slot, now Empty → the NTV5 vault reads
         // Exists, not Corrupted) and re-unlock — proving the NTV5 unlock
         // magic-dispatch end to end against the migrated vault.
+        await app.session.refresh();
+        await unlockToEditor(app.session, fixture.password);
+        await app.session.byTestId("editor.root", { timeoutMs: 30_000 });
+
+        // (4) The migration is NOT settled (§10.4.1 point 5, myne-md/myne#430):
+        // the whole pre-migration vault is staged, and until the user says so the
+        // old root_key is still on disk — wrapped under the OLD password and the
+        // OLD recovery phrase, which is why a later password rotation would not
+        // revoke access to those notes. The status probe says so.
+        const status = (await ipcOk(
+          app.session,
+          "plugin:vault-migrate|vault_migrate_settle_status",
+        )) as { pending: boolean; can_abort: boolean };
+        expect(status.pending).toBe(true);
+        expect(status.can_abort).toBe(true); // unenrolled vault → pre-sync
+
+        // (5) CONFIRM crypto-erases it. Asserted on the old meta's absence rather
+        // than on the 200: the staged meta is the only remaining wrapper of the
+        // old root_key, so its disappearance IS the erase.
+        await ipcOk(app.session, "plugin:vault-migrate|vault_migrate_confirm");
+        expect(
+          existsSync(join(app.appDataDir, "vaults", fixture.vaultId, "legacy", "vault.meta")),
+        ).toBe(false);
+        const settled = (await ipcOk(
+          app.session,
+          "plugin:vault-migrate|vault_migrate_settle_status",
+        )) as { pending: boolean };
+        expect(settled.pending).toBe(false);
+      },
+    );
+  });
+
+  // The other half of §10.4.1 point 5: a migration can be taken BACK, and the
+  // vault that comes back is the byte-identical v0.1 one — not a re-encode, not
+  // a best-effort reconstruction (myne-md/myne#430 + #435).
+  it("aborts a migration and restores the byte-identical v0.1 vault", async () => {
+    let fixture!: SeededVault;
+    await scenario(
+      "vm2-abort",
+      { seed: (appDataDir) => { fixture = seedVault(appDataDir, { kdf: "production" }); } },
+      async (app) => {
+        const vaultRoot = join(app.appDataDir, "vaults", fixture.vaultId);
+        const notesDir = join(vaultRoot, "notes");
+        const metaPath = vaultMetaPath(app.appDataDir, fixture.vaultId);
+
+        await unlockToEditor(app.session, fixture.password);
+        const noteId = (await ipcOk(app.session, "plugin:notes|note_create", {
+          plaintext: "---\ntitle: Survivor\n---\n\n# Untouched\n",
+        })) as string;
+        const notePath = join(notesDir, `${noteId}.myn`);
+        const originalNote = readFileSync(notePath);
+        const originalMeta = readFileSync(metaPath);
+
+        await ipcOk(app.session, "plugin:vault-migrate|vault_migrate", {
+          password: fixture.password,
+          phrase: fixture.phrase,
+        });
+        expect(magic(metaPath)).toBe("NTV5");
+        expect(magic(notePath)).toBe("NC05");
+
+        // Abort. The vault locks (a re-key in EITHER direction is a re-unlock
+        // event), so the assertions below read the disk rather than the UI.
+        await app.session.refresh();
+        await unlockToEditor(app.session, fixture.password);
+        await ipcOk(app.session, "plugin:vault-migrate|vault_migrate_abort");
+
+        // Byte-identical, not merely "opens again". A restore that re-encoded
+        // would satisfy a magic check and still have authored a change into a
+        // vault the user asked to be put back untouched.
+        expect(readFileSync(metaPath).equals(originalMeta)).toBe(true);
+        expect(readFileSync(notePath).equals(originalNote)).toBe(true);
+        expect(existsSync(join(vaultRoot, "legacy", "vault.meta"))).toBe(false);
+
+        // …and the restored v0.1 vault unlocks under the ORIGINAL password.
         await app.session.refresh();
         await unlockToEditor(app.session, fixture.password);
         await app.session.byTestId("editor.root", { timeoutMs: 30_000 });
