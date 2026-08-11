@@ -208,8 +208,14 @@ pub fn encode_note_edit_at_millis(
         .map_err(|_| CrdtNoteOpError::CannotDecrypt)?;
     let mut doc = AutoCommit::load(&save).map_err(|_| CrdtNoteOpError::Malformed)?;
     let text = note_text_id(&doc)?;
-    let len = doc.length(&text);
-    doc.splice_text(&text, 0, len as isize, new_markdown)
+    // `update_text` DIFFS the new full text against the current one and records
+    // only the minimal splices. The obvious-looking alternative — a whole-body
+    // `splice_text(0, len, new)` — records "delete every character, then insert
+    // this entire string", and when two devices each do that from a shared base
+    // both deletions AND both insertions survive the merge: the note comes back
+    // containing itself twice (myne-md/myne#428). A full replace is not a
+    // stronger form of an edit; it is a different edit, and it does not merge.
+    doc.update_text(&text, new_markdown)
         .map_err(|_| CrdtNoteOpError::Malformed)?;
     commit_at_millis(&mut doc, now_millis);
     let heads = doc_heads_hex(&mut doc);
@@ -226,15 +232,61 @@ pub struct CrdtNoteUpdate {
     pub heads: Vec<String>,
 }
 
+/// How a divergent pair of `NC05` revisions of the same note was resolved.
+///
+/// A note deletion is **not** expressed inside the CRDT: per `sync-protocol.md`
+/// §11.1 it is a `deleted:`-marked new encrypted version, i.e. it lives in the
+/// frontmatter the document merely *contains*. An edit, by contrast, is
+/// expressed inside it. A text merge therefore reconciles a deletion and an edit
+/// as two overlapping edits to one string, which is not a resolution rule at all
+/// (myne-md/myne#431).
+///
+/// Measured, not theorised. With the gate below removed, a device deleting a
+/// note (`deleted: 2026-08-11T09:00:00Z`) racing a device editing it
+/// (`updated: 2026-08-11T09:30:00Z`) merges to a note carrying the edit **and**
+/// `deleted: 2026-09-11T09:30:00Z` — a timestamp **neither device ever wrote**,
+/// assembled character-wise from both. The interleave does not corrupt the field
+/// into something a reader rejects; it fabricates a well-formed value. So the
+/// managed frontmatter that carries deletion, trash and daily-note identity is
+/// exactly the content a CRDT text merge must never be handed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CrdtMergeResolution {
+    /// Both revisions are live — the Automerge documents were merged (§10.1).
+    Merged,
+    /// The **remote** revision carries the tombstone and wins (remove-wins): the
+    /// local edit is discarded and the remote blob is adopted verbatim.
+    RemoteTombstoneWins,
+    /// The **local** revision carries the tombstone and wins: the remote edit is
+    /// discarded and the local blob stands.
+    LocalTombstoneWins,
+}
+
 /// The result of merging two divergent `NC05` blobs of the same note.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrdtNoteMerge {
-    /// The re-sealed merged `NC05` blob.
+    /// The winning `NC05` blob: the re-sealed merge, or — when a tombstone won —
+    /// the winning side's bytes **verbatim** (re-sealing would churn the
+    /// `content_nonce` for a revision neither side changed).
     pub blob: Vec<u8>,
-    /// The merged document's heads (records into `BlobSyncState`).
+    /// The winning document's heads (records into `BlobSyncState`).
     pub heads: Vec<String>,
-    /// The merged markdown (for the editor + the "#422" changed-from-remote hint).
+    /// The winning markdown (for the editor + the "#422" changed-from-remote hint).
     pub text: String,
+    /// Which rule produced the above — the caller pushes, adopts or hints
+    /// differently per arm.
+    pub resolution: CrdtMergeResolution,
+}
+
+/// The `deleted:` sync-tombstone marker of a decoded note, or `None` for a live
+/// one. Value-strict through the one reader family the rest of the app uses
+/// ([`fm_deleted_value_strict`]), so a user's own non-timestamp `deleted:` value
+/// leaves the note live here exactly as it does everywhere else.
+///
+/// [`fm_deleted_value_strict`]: crate::plugins::notes::daily_match::fm_deleted_value_strict
+fn deleted_marker(markdown: &str) -> Option<String> {
+    let fm = crate::plugins::notes::title_extract::extract_title_slices(markdown.as_bytes())
+        .frontmatter_bytes?;
+    crate::plugins::notes::daily_match::fm_deleted_value_strict(fm)
 }
 
 /// Merge a `remote` `NC05` blob into the `local` one (both the same note): decode
@@ -244,6 +296,20 @@ pub struct CrdtNoteMerge {
 /// place of `MY01`'s keep-both. `merge()` requires shared ancestry, which the
 /// sync flow guarantees (a note is created once and replicated, never
 /// independently instantiated).
+///
+/// **Deletion is decided before the text merge, not by it** (`sync-protocol.md`
+/// §11.1, myne-md/myne#431). If either side carries the `deleted:` tombstone the
+/// documents are never merged: the tombstone wins outright (**remove-wins**),
+/// the same rule §10.2.2 / §11.4 apply to the themes map and the attachments
+/// catalog. Resurrecting a note the user permanently deleted is the worse of the
+/// two failures — worse than losing a concurrent edit — and it is the one a text
+/// merge produces, because the tombstone lives in the frontmatter rather than in
+/// the CRDT.
+///
+/// The tie-break is a **symmetric total order over content** (`deleted:` value,
+/// then text, then heads), so the two devices — which hold the same pair with
+/// the labels swapped — pick the same winner without either one's "local" role
+/// entering into it.
 pub fn merge_crdt_note_blobs(
     local_blob: &[u8],
     remote_blob: &[u8],
@@ -257,16 +323,59 @@ pub fn merge_crdt_note_blobs(
         .map_err(|_| CrdtNoteOpError::CannotDecrypt)?;
     let mut local = AutoCommit::load(&local_save).map_err(|_| CrdtNoteOpError::Malformed)?;
     let mut remote = AutoCommit::load(&remote_save).map_err(|_| CrdtNoteOpError::Malformed)?;
+
+    let local_text = doc_text(&local)?;
+    let remote_text = doc_text(&remote)?;
+    let local_tomb = deleted_marker(&local_text);
+    let remote_tomb = deleted_marker(&remote_text);
+    if local_tomb.is_some() || remote_tomb.is_some() {
+        let local_heads = doc_heads_hex(&mut local);
+        let remote_heads = doc_heads_hex(&mut remote);
+        // Ordered by tombstone-ness first (remove-wins), then over retained
+        // content only. Every component is symmetric in the two sides, so
+        // swapping the labels cannot swap the winner.
+        let local_wins = (local_tomb.is_some(), &local_tomb, &local_text, &local_heads)
+            > (
+                remote_tomb.is_some(),
+                &remote_tomb,
+                &remote_text,
+                &remote_heads,
+            );
+        return Ok(if local_wins {
+            CrdtNoteMerge {
+                blob: local_blob.to_vec(),
+                heads: local_heads,
+                text: local_text,
+                resolution: CrdtMergeResolution::LocalTombstoneWins,
+            }
+        } else {
+            CrdtNoteMerge {
+                blob: remote_blob.to_vec(),
+                heads: remote_heads,
+                text: remote_text,
+                resolution: CrdtMergeResolution::RemoteTombstoneWins,
+            }
+        });
+    }
+
     local
         .merge(&mut remote)
         .map_err(|_| CrdtNoteOpError::Malformed)?;
-    let text_id = note_text_id(&local)?;
-    let text = local
-        .text(&text_id)
-        .map_err(|_| CrdtNoteOpError::Malformed)?;
+    let text = doc_text(&local)?;
     let heads = doc_heads_hex(&mut local);
     let blob = encode_crdt_note_blob(items_key, items_key_id, note_uuid, &local.save())?;
-    Ok(CrdtNoteMerge { blob, heads, text })
+    Ok(CrdtNoteMerge {
+        blob,
+        heads,
+        text,
+        resolution: CrdtMergeResolution::Merged,
+    })
+}
+
+/// The whole-note markdown of a loaded `NC05` document.
+fn doc_text(doc: &AutoCommit) -> Result<String, CrdtNoteOpError> {
+    let text_id = note_text_id(doc)?;
+    doc.text(&text_id).map_err(|_| CrdtNoteOpError::Malformed)
 }
 
 /// Read a blob's 4-byte magic from its cleartext header (decryption-free) — how
@@ -477,29 +586,171 @@ mod tests {
         assert!(!upd.heads.is_empty());
     }
 
+    /// A deletion racing an edit resolves **remove-wins**, identically on both
+    /// devices (myne-md/myne#431).
+    ///
+    /// The scenario is deliberately an OVERLAPPING frontmatter edit, because a
+    /// disjoint one does not exercise the bug: if device A only appends a
+    /// `deleted:` line and device B only appends to the body, the text merge
+    /// keeps both and the note stays deleted by luck. The dangerous shape is two
+    /// edits to the SAME frontmatter region — Myne rewrites managed frontmatter
+    /// on save. Removing the remove-wins gate and running this test prints what
+    /// that produces: the edit rides into the deleted note AND `deleted:` comes
+    /// out as `2026-09-11T09:30:00Z`, a timestamp neither device wrote, blended
+    /// character-wise from A's `deleted:` and B's `updated:`.
     #[test]
-    fn concurrent_edits_merge_converge_and_drop_neither() {
-        // The merge-engine core: two devices fork a shared note, edit concurrently,
-        // and the merge is order-independent (converges) and drops neither edit.
+    fn a_deletion_beats_a_concurrent_edit_in_either_order() {
         let host = TestHost::new("/base");
         let (ik, ikid, uuid) = ([0x11u8; 32], [0x22u8; 16], [0x33u8; 16]);
+        const BASE: &str = "---\ntitle: Groceries\nupdated: 2026-08-11T08:00:00Z\n---\n\nMilk.\n";
+        let base = encode_note_blob(BASE, &ik, &ikid, &uuid, ACTOR, &host).expect("seal");
+
+        // Device A deletes the note: a `deleted:`-marked revision (§11.1), which
+        // rewrites the managed-frontmatter block.
+        let deleted = encode_note_edit(
+            &base,
+            "---\ntitle: Groceries\nupdated: 2026-08-11T09:00:00Z\ndeleted: 2026-08-11T09:00:00Z\n---\n\nMilk.\n",
+            &ik, &ikid, &uuid, &host,
+        )
+        .expect("delete");
+        // Device B never saw the deletion and edits the note, touching the same
+        // managed-frontmatter block on its way.
+        let edited = encode_note_edit(
+            &base,
+            "---\ntitle: Groceries\nupdated: 2026-08-11T09:30:00Z\n---\n\nMilk.\nEggs.\n",
+            &ik,
+            &ikid,
+            &uuid,
+            &host,
+        )
+        .expect("edit");
+
+        let ab = merge_crdt_note_blobs(&deleted.blob, &edited.blob, &ik, &ikid, &uuid)
+            .expect("merge, deleting device local");
+        let ba = merge_crdt_note_blobs(&edited.blob, &deleted.blob, &ik, &ikid, &uuid)
+            .expect("merge, editing device local");
+
+        // The outcome may not depend on which device happens to run the merge.
+        assert_eq!(
+            ab.text, ba.text,
+            "delete-vs-edit resolved differently depending on which side was local"
+        );
+        assert_eq!(ab.heads, ba.heads);
+        // The deletion survives as a READABLE marker — the assertion that a
+        // shredded frontmatter key fails.
+        assert!(
+            deleted_marker(&ab.text).is_some(),
+            "the note must stay deleted, and `deleted:` must still parse: {:?}",
+            ab.text
+        );
+        // And the losing edit did not ride along into a note the user deleted.
+        assert!(
+            !ab.text.contains("Eggs."),
+            "a deleted note must not carry the concurrent edit: {:?}",
+            ab.text
+        );
+        // Both sides agree on WHO won even though they label it differently.
+        assert_eq!(ab.resolution, CrdtMergeResolution::LocalTombstoneWins);
+        assert_eq!(ba.resolution, CrdtMergeResolution::RemoteTombstoneWins);
+    }
+
+    /// Two devices deleting the same note concurrently converge on one revision.
+    /// The tie-break is a total order over content, so it cannot depend on the
+    /// local/remote labels — which are swapped between the two devices.
+    #[test]
+    fn two_concurrent_deletions_pick_the_same_winner_on_both_devices() {
+        let host = TestHost::new("/base");
+        let (ik, ikid, uuid) = ([0x11u8; 32], [0x22u8; 16], [0x33u8; 16]);
+        const BASE: &str = "---\ntitle: Groceries\n---\n\nMilk.\n";
+        let base = encode_note_blob(BASE, &ik, &ikid, &uuid, ACTOR, &host).expect("seal");
+        let early = encode_note_edit(
+            &base,
+            "---\ntitle: Groceries\ndeleted: 2026-08-11T09:00:00Z\n---\n\nMilk.\n",
+            &ik,
+            &ikid,
+            &uuid,
+            &host,
+        )
+        .expect("delete early");
+        let late = encode_note_edit(
+            &base,
+            "---\ntitle: Groceries\ndeleted: 2026-08-11T11:00:00Z\n---\n\nMilk.\n",
+            &ik,
+            &ikid,
+            &uuid,
+            &host,
+        )
+        .expect("delete late");
+
+        let ab = merge_crdt_note_blobs(&early.blob, &late.blob, &ik, &ikid, &uuid).expect("merge");
+        let ba = merge_crdt_note_blobs(&late.blob, &early.blob, &ik, &ikid, &uuid).expect("merge");
+
+        assert_eq!(ab.text, ba.text, "tombstone-vs-tombstone must converge");
+        assert_eq!(
+            deleted_marker(&ab.text).as_deref(),
+            Some("2026-08-11T11:00:00Z"),
+            "the greater `deleted:` stamp wins: {:?}",
+            ab.text
+        );
+    }
+
+    #[test]
+    fn concurrent_edits_merge_converge_drop_neither_and_duplicate_nothing() {
+        // The merge-engine core: two devices fork a shared note, edit concurrently,
+        // and the merge is order-independent (converges), drops neither edit, and
+        // leaves the shared base present exactly once.
+        //
+        // That last clause has to be asserted by COUNT (#428). A whole-body-replace
+        // encode converges and keeps both edits too — it just returns the entire
+        // document twice, and a `contains(…)` assertion cannot tell the two apart.
+        let host = TestHost::new("/base");
+        let (ik, ikid, uuid) = ([0x11u8; 32], [0x22u8; 16], [0x33u8; 16]);
+        const BASE: &str = "# Meeting notes\n\nFirst item.\n";
         // The note is created once; both devices' edits start from THIS blob
         // (shared change-graph ancestry — the merge precondition).
-        let base = encode_note_blob("base", &ik, &ikid, &uuid, ACTOR, &host).expect("seal");
-        let a = encode_note_edit(&base, "AAA edit", &ik, &ikid, &uuid, &host).expect("edit A");
-        let b = encode_note_edit(&base, "BBB edit", &ik, &ikid, &uuid, &host).expect("edit B");
+        let base = encode_note_blob(BASE, &ik, &ikid, &uuid, ACTOR, &host).expect("seal");
+        let a = encode_note_edit(
+            &base,
+            &format!("{BASE}Added from the desktop.\n"),
+            &ik,
+            &ikid,
+            &uuid,
+            &host,
+        )
+        .expect("edit A");
+        let b = encode_note_edit(
+            &base,
+            &format!("{BASE}Added from the phone.\n"),
+            &ik,
+            &ikid,
+            &uuid,
+            &host,
+        )
+        .expect("edit B");
 
         let ab = merge_crdt_note_blobs(&a.blob, &b.blob, &ik, &ikid, &uuid).expect("merge a←b");
         let ba = merge_crdt_note_blobs(&b.blob, &a.blob, &ik, &ikid, &uuid).expect("merge b←a");
 
         // Commutative + associative → order-independent convergence.
         assert_eq!(ab.heads, ba.heads, "merge converges regardless of order");
-        // Neither edit is dropped (both distinctive runs survive the interleave).
-        assert!(
-            ab.text.contains('A') && ab.text.contains('B'),
-            "both edits present after merge: {:?}",
-            ab.text
-        );
+        // Neither edit is dropped, and neither is duplicated.
+        for line in ["Added from the desktop.", "Added from the phone."] {
+            assert_eq!(
+                ab.text.matches(line).count(),
+                1,
+                "{line:?} must survive the merge exactly once: {:?}",
+                ab.text
+            );
+        }
+        // The shared base is not re-inserted by either side — the #428 assertion.
+        for line in ["# Meeting notes", "First item."] {
+            assert_eq!(
+                ab.text.matches(line).count(),
+                1,
+                "the shared base line {line:?} must not be duplicated: {:?}",
+                ab.text
+            );
+        }
         // The merged blob is a real, decodable NC05 note.
         assert_eq!(&ab.blob[0..4], protocol::NC05_MAGIC);
         let _ = decode_note_blob(&ab.blob, &uuid, &ik, &ikid).expect("merged blob decodes");

@@ -1424,6 +1424,18 @@ struct ThemesPhase {
     dirty: bool,
     /// A remote change was merged onto the on-disk store this cycle.
     applied_remote: bool,
+    /// The exact bytes to push, carried out of the phase whenever `dirty` — the
+    /// merged store it just wrote, or the verified local store it just read.
+    ///
+    /// The phase hands these over rather than letting the push site re-read the
+    /// file, because re-reading meant re-deriving the KEK, and that second
+    /// derivation drifted: it stayed v0.1 after the phase became version-aware,
+    /// so a migrated vault's `MYT5` never opened there (myne-md/myne#436). The
+    /// reader is a strict verifier that answers `None` rather than erroring, so
+    /// the push was skipped with no log, no toast and no failed cycle. `Some`
+    /// exactly when `dirty` — one derivation, at the one site that already had
+    /// the plaintext in hand.
+    push_bytes: Option<Vec<u8>>,
 }
 
 /// Pull-side `vault.themes` reconciliation (MYND-486). The `sync_catalog_phase`
@@ -1545,6 +1557,7 @@ async fn sync_themes_phase(
         return Ok(ThemesPhase {
             dirty,
             applied_remote,
+            push_bytes: dirty.then_some(bytes),
         });
     }
 
@@ -1565,6 +1578,9 @@ async fn sync_themes_phase(
     Ok(ThemesPhase {
         dirty,
         applied_remote: false,
+        // `dirty` already implies `local_bytes.is_some()`, and these are the
+        // VERIFIED bytes (myne#301) — the same ones the push must carry.
+        push_bytes: if dirty { local_bytes } else { None },
     })
 }
 
@@ -2400,7 +2416,7 @@ async fn sync_cycle_attempt(
         .all_metas
         .iter()
         .find(|m| m.id == themes_id && m.attachment_id.is_none());
-    let themes_phase = sync_themes_phase(
+    let mut themes_phase = sync_themes_phase(
         io,
         transport,
         token,
@@ -2804,15 +2820,47 @@ async fn sync_cycle_attempt(
                                         id,
                                     )
                                 {
-                                    // The merged blob's own header nonce (the value
+                                    // The winning blob's own header nonce (the value
                                     // the server records + peers verify).
                                     if let Some(merged_nonce) =
                                         crate::note_nonce::read_myn_content_nonce(&merge.blob)
                                     {
-                                        // Persist the merged blob locally — it
-                                        // supersedes the divergent local copy (no
-                                        // edit lost: the merge contains both) — then
-                                        // queue it for push at the server version.
+                                        use crate::plugins::notes::crdt::CrdtMergeResolution as R;
+                                        // A delete-vs-edit is resolved remove-wins,
+                                        // NOT by the text merge (myne#431). The three
+                                        // arms differ in what has to happen next, so
+                                        // they are spelled out rather than folded.
+                                        if merge.resolution == R::LocalTombstoneWins {
+                                            // Our tombstone wins: the blob on disk is
+                                            // already the winner (untouched), so only
+                                            // the push has to happen — at the server's
+                                            // version, so the CAS lands over the
+                                            // remote edit. No `pulled`/`merged` signal:
+                                            // nothing local changed and a deletion is
+                                            // not an "updated from another device".
+                                            //
+                                            // Pushed WITHOUT the tombstone flag: that
+                                            // flag governs only server-side horizon-GC,
+                                            // and the `deleted:` field is what actually
+                                            // propagates the deletion (§11.1). The
+                                            // `pending-tombstones` queue owns the flag;
+                                            // a note reaching this branch is not on it.
+                                            nc05_push_heads.insert(*id, merge.heads);
+                                            to_push.push(PushBlob {
+                                                id: *id,
+                                                base_version: *server_version,
+                                                content_nonce: merged_nonce,
+                                                ciphertext: merge.blob,
+                                                tombstone: false,
+                                                attachment_id: None,
+                                            });
+                                            continue;
+                                        }
+                                        // Persist the winning blob locally — for a
+                                        // merge it supersedes the divergent local copy
+                                        // (no edit lost: the merge contains both); for
+                                        // a remote tombstone it IS the deletion,
+                                        // adopted verbatim.
                                         io.write(
                                             &blob_path(notes_dir, id),
                                             &merge.blob,
@@ -2820,26 +2868,47 @@ async fn sync_cycle_attempt(
                                         )
                                         .await
                                         .map_err(|_| SyncCycleError::Io)?;
-                                        nc05_push_heads.insert(*id, merge.heads);
-                                        // The local content changed (from a remote
-                                        // merge) → re-index + re-read into the open
-                                        // editor. `pulled_note_ids` drives the
-                                        // re-index/re-read; `remote_merged_note_ids`
-                                        // is the DISTINCT ASM-6/#422 "updated from
-                                        // another device" signal the calm hint fires
-                                        // on (a merge that reconciled a concurrent
-                                        // remote edit — not a plain server-wins pull).
+                                        // The local content changed → re-index +
+                                        // re-read into the open editor.
+                                        // `pulled_note_ids` drives the re-index/
+                                        // re-read; `remote_merged_note_ids` is the
+                                        // DISTINCT ASM-6/#422 "updated from another
+                                        // device" signal the calm hint fires on (a
+                                        // merge that reconciled a concurrent remote
+                                        // edit — not a plain server-wins pull, and
+                                        // never a deletion: "updated from another
+                                        // device" over a note that just disappeared
+                                        // is the wrong sentence).
                                         let id_str = uuid::Uuid::from_bytes(*id).to_string();
                                         pulled_note_ids.push(id_str.clone());
-                                        remote_merged_note_ids.push(id_str);
-                                        to_push.push(PushBlob {
-                                            id: *id,
-                                            base_version: *server_version,
-                                            content_nonce: merged_nonce,
-                                            ciphertext: merge.blob,
-                                            tombstone: false,
-                                            attachment_id: None,
-                                        });
+                                        if merge.resolution == R::Merged {
+                                            remote_merged_note_ids.push(id_str);
+                                            nc05_push_heads.insert(*id, merge.heads);
+                                            to_push.push(PushBlob {
+                                                id: *id,
+                                                base_version: *server_version,
+                                                content_nonce: merged_nonce,
+                                                ciphertext: merge.blob,
+                                                tombstone: false,
+                                                attachment_id: None,
+                                            });
+                                        } else {
+                                            // `RemoteTombstoneWins`: the server already
+                                            // holds exactly these bytes, so pushing
+                                            // them back would be a no-op revision that
+                                            // churns the version counter. Adopt its
+                                            // (version, nonce) as the baseline instead,
+                                            // which is what stops the next cycle
+                                            // re-detecting this note as dirty.
+                                            state.blobs.insert(
+                                                id_hex.clone(),
+                                                BlobSyncState {
+                                                    version: *server_version,
+                                                    content_nonce_hex: hex(&merged_nonce),
+                                                    doc_heads_hex: merge.heads,
+                                                },
+                                            );
+                                        }
                                         continue;
                                     }
                                 }
@@ -3089,17 +3158,14 @@ async fn sync_cycle_attempt(
         // A dirty themes blob (local-only change, or a merge that beat the
         // server's store) rides the same batch as an inline blob (MYND-486).
         if themes_phase.dirty {
-            // Verified, not merely readable (myne#301): pushing a torn slot
-            // publishes an empty theme store to every peer.
-            let themes_key = derive_subkey(root_key, SubkeyRole::CustomThemesKey);
-            if let Some(bytes) = crate::plugins::themes::commands::read_verified_themes_bytes(
-                io,
-                vault_root,
-                &themes_key,
-                &account_number_hash,
-            )
-            .await
-            {
+            // The bytes come from the PHASE (myne#436), which verified them
+            // (myne#301 — pushing a torn slot publishes an empty theme store to
+            // every peer) under the generation-correct KEK it had already
+            // derived. Re-reading here meant re-deriving, and that copy drifted
+            // to v0.1 while the phase went version-aware, so a migrated vault
+            // silently stopped publishing theme edits. One derivation, one
+            // reader, no second opinion to keep in sync.
+            if let Some(bytes) = themes_phase.push_bytes.take() {
                 if let Some(nonce) = read_themes_nonce(&bytes) {
                     let base = state
                         .blobs
@@ -8889,6 +8955,85 @@ mod tests {
             ))
             .unwrap();
             assert!(phase.dirty, "an unsynced local theme must push");
+            // The phase carries the bytes the push will send (myne#436) — the
+            // push site derives no key and re-reads nothing.
+            assert_eq!(
+                phase.push_bytes.as_deref().map(|b| &b[0..4]),
+                Some(protocol::THEMES_BLOB_MAGIC.as_slice()),
+                "a dirty phase must hand the push its verified bytes"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// A MIGRATED vault's dirty theme store must still produce pushable
+        /// bytes — sealed `MYT5` under the v0.2 KEK (myne-md/myne#436).
+        ///
+        /// The failure this pins is silent by construction, which is why it
+        /// survived a release. `read_verified_themes_bytes` is a strict verifier:
+        /// handed a KEK that does not open the blob it answers `None`, not an
+        /// error. So a generation-blind derivation does not fail the cycle, log
+        /// anything, or surface a toast — the themes push is simply skipped, and
+        /// every other device stops receiving the user's theme edits forever
+        /// while sync reports success.
+        ///
+        /// Asserting `dirty` alone would NOT catch it (the flag is computed from
+        /// the outer nonce, which needs no key), and asserting "no error" catches
+        /// nothing at all. The load-bearing assertion is that bytes come out AND
+        /// that they are the v0.2 family.
+        #[test]
+        fn a_migrated_vault_still_pushes_its_myt5_theme_store() {
+            let dir = scratch("migrated-push");
+            let v0_2_key = protocol::derive_subkey_versioned(
+                MetaVersion::V0_2,
+                &ROOT,
+                SubkeyRole::CustomThemesKey,
+            );
+            let map = ThemesMap::from([theme("nord", "#88c0d0", T0)]);
+            let bytes = encode_themes_map(MetaVersion::V0_2, &v0_2_key, &HASH, &map).unwrap();
+            assert_eq!(
+                &bytes[0..4],
+                protocol::THEMES_BLOB_V0_2_MAGIC.as_slice(),
+                "fixture must be a v0.2 store or the test proves nothing"
+            );
+            std::fs::write(dir.join("vault.themes"), &bytes).unwrap();
+
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+            let phase = blocking(sync_themes_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                None,
+                MetaVersion::V0_2,
+            ))
+            .unwrap();
+
+            assert!(phase.dirty, "an unsynced migrated theme store must push");
+            let pushed = phase
+                .push_bytes
+                .expect("a migrated vault's dirty store must reach the push");
+            assert_eq!(
+                &pushed[0..4],
+                protocol::THEMES_BLOB_V0_2_MAGIC.as_slice(),
+                "the push must carry the v0.2 store, not a v0.1 re-seal"
+            );
+            // And it is the user's store, not an empty one read through the
+            // §9.21.4 fallback.
+            assert_eq!(
+                crate::plugins::themes::commands::decode_themes_map_or_empty(
+                    &v0_2_key,
+                    &HASH,
+                    Some(&pushed)
+                ),
+                map,
+                "the pushed store must be the themes the user actually has"
+            );
             std::fs::remove_dir_all(&dir).ok();
         }
 
