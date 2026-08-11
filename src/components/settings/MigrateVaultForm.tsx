@@ -9,7 +9,7 @@
 // caution is that it re-keys the whole vault and is one-way (the old vault survives
 // in a device-local `legacy/` snapshot until confirmed).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PasswordInput } from "../PasswordInput";
 import { Button } from "../primitives/Button";
@@ -17,6 +17,8 @@ import {
   isAlreadyMigrated,
   isRecoveryPhraseRequired,
   migrateVault,
+  migrationProgress,
+  type MigrationProgress,
   type VaultMigrateSummary,
 } from "../../lib/vault-migrate";
 
@@ -61,6 +63,30 @@ export function MigrateVaultForm({ onMigrated }: MigrateVaultFormProps = {}): Re
   const [state, setState] = useState<State>({ kind: "idle" });
 
   const inFlight = state.kind === "migrating";
+  const [progress, setProgress] = useState<MigrationProgress | null>(null);
+  // Polled rather than pushed: the engine writes three atomics with no host in
+  // scope (its crypto core runs in a `'static` blocking closure), and an event
+  // per blob would be thousands of postMessages for one line of text. 400 ms is
+  // slower than a human reads a changing number and far cheaper than the work
+  // being measured.
+  useEffect(() => {
+    if (!inFlight) {
+      setProgress(null);
+      return;
+    }
+    let live = true;
+    const tick = () => {
+      void migrationProgress()
+        .then((p) => live && setProgress(p))
+        .catch(() => {});
+    };
+    tick();
+    const h = setInterval(tick, 400);
+    return () => {
+      live = false;
+      clearInterval(h);
+    };
+  }, [inFlight]);
   // The UI-side phrase gate mirrors the backend one — Migrate stays disabled
   // until both credentials are entered. The backend re-verifies regardless.
   const canSubmit =
@@ -151,8 +177,14 @@ export function MigrateVaultForm({ onMigrated }: MigrateVaultFormProps = {}): Re
           {inFlight ? t("migrate.migrating") : t("migrate.submit")}
         </Button>
         {inFlight && (
+          // §10.4.1 md.2's per-blob progress (myne-md/myne#441). This testid used
+          // to render a constant, so the surface existed and reported nothing on
+          // an operation that runs for minutes. Counts only — see
+          // `migrationProgress` for why there is no percentage or ETA.
           <span data-testid="migrate.progress" style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>
-            {t("migrate.migrating")}
+            {progress && progress.total > 0
+              ? t("migrate.progressCount", { done: progress.done, total: progress.total })
+              : t("migrate.migrating")}
           </span>
         )}
       </div>

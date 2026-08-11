@@ -26,6 +26,11 @@ vi.mock("../../src/lib/vault-migrate", () => ({
   isRecoveryPhraseRequired: (e: unknown) =>
     (e as { kind?: string } | null)?.kind === "RecoveryPhraseRequired",
   isAlreadyMigrated: (e: unknown) => (e as { kind?: string } | null)?.kind === "AlreadyMigrated",
+  // The in-flight progress poll (myne-md/myne#441). Answers "nothing running"
+  // so the form falls back to its indeterminate label, which is what these
+  // specs assert on.
+  migrationProgress: () =>
+    Promise.resolve({ done: 0, total: 0, generation: 0, active: false }),
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
