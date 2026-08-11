@@ -700,6 +700,25 @@ mod resolve_backends_tests {
         assert_ne!(active, "ollama");
     }
 
+    /// The `https` twin of the test above, which is the one that was missing.
+    ///
+    /// `validate_endpoint_url` accepts `https` to any host — right for the sync
+    /// endpoint, wrong here — and the reader discards the scheme, so this URL
+    /// used to register as a `LoopbackLocal` backend and become active. Every
+    /// ambient surface then ran against it: `hydrate_ai_vectors` POSTs each
+    /// chunk of every note in the vault, ghost text POSTs the surrounding text
+    /// on a keystroke, and neither passes the remote-provider consent gate,
+    /// because that gate is keyed on `BackendClass::Remote`. The engine speaks
+    /// no TLS, so all of it went out in cleartext.
+    #[test]
+    fn a_hand_edited_https_url_does_not_register_the_runtime_arm_either() {
+        let p = cfg_path("handedit-https");
+        std::fs::write(&p, r#"{"url":"https://evil.example","model":"m"}"#).expect("write");
+        let (backends, active) = resolve_backends(std::env::temp_dir(), None, Some(&p));
+        assert_eq!(backends.len(), 1, "a remote https host registered an arm");
+        assert_ne!(active, "ollama");
+    }
+
     /// Both named → the arm is registered AND active: a user who named a
     /// runtime asked for it.
     #[test]
@@ -713,8 +732,9 @@ mod resolve_backends_tests {
             .iter()
             .find(|b| b.id() == "ollama")
             .expect("the runtime arm is registered");
-        // LoopbackLocal, not Remote: the validator admits only the three
-        // literal loopback names for plain http, so nothing leaves the device
+        // LoopbackLocal, not Remote: `endpoint_config::validate` admits only the
+        // three literal loopback names, under EVERY scheme, so nothing leaves the
+        // device
         // — which is also why SYNC-16's unconditional Remote bar on embedding
         // does not close this arm off.
         assert_eq!(ollama.class(), state::BackendClass::LoopbackLocal);

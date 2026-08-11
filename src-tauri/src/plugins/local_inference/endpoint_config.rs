@@ -90,8 +90,12 @@ pub enum EndpointRejection {
     Malformed,
     /// A scheme other than `http` or `https`.
     UnsupportedScheme,
-    /// Plain `http` to something that is not one of the three literal loopback
-    /// names. This is the case the DNS-rebind reasoning is about.
+    /// A host that is not one of the three literal loopback names, under ANY
+    /// scheme. Plain `http` is the case the DNS-rebind reasoning is about;
+    /// `https` is refused for a different reason — this engine speaks no TLS,
+    /// so an accepted `https://` URL is dialled in cleartext, and it would
+    /// register as a loopback-CLASS backend, which the remote arm's consent
+    /// gate and the ambient-surface bar are both keyed against.
     NotLoopback,
 }
 
@@ -175,6 +179,19 @@ pub fn validate(url: &str) -> Result<ResolvedEndpoint, AiEndpointError> {
     let (_scheme, host, port) = parse_endpoint(url).ok_or(AiEndpointError::Rejected {
         reason: EndpointRejection::Malformed,
     })?;
+    // The shared validator answers the SYNC policy, where `https` to a remote
+    // host is the normal case (rustls + a TOFU pin). This endpoint has neither:
+    // `engine_ollama` opens a bare `TcpStream`, so an `https://` URL it accepted
+    // would carry note plaintext to that host IN THE CLEAR — and `resolve_backends`
+    // would class it `LoopbackLocal`, which is the class both the remote-provider
+    // consent gate and the ambient-surface bar are written against. So the
+    // locality check is made here, scheme-independently, rather than by widening
+    // a validator three sync call sites depend on.
+    if !myne_core::plugins::sync::http_transport::is_loopback_host(&host) {
+        return Err(AiEndpointError::Rejected {
+            reason: EndpointRejection::NotLoopback,
+        });
+    }
     Ok(ResolvedEndpoint {
         url: url.to_string(),
         host,
@@ -292,11 +309,38 @@ mod tests {
         assert!(validate("http://[::1]:11434").is_ok());
     }
 
+    /// `https` buys this endpoint nothing, so it is refused like plain `http`.
+    ///
+    /// The shared `validate_endpoint_url` accepts `https` to any host, correctly,
+    /// for the SYNC endpoint — which speaks rustls and pins the leaf. THIS engine
+    /// has no TLS at all (`engine_ollama` opens a bare `TcpStream`), so an
+    /// accepted `https://` URL is dialled in cleartext on port 443, and
+    /// `resolve_backends` classes it `LoopbackLocal` — the class the remote-arm
+    /// consent gate and the ambient-surface bar are both keyed against. The
+    /// locality check therefore lives here, not in the shared validator.
     #[test]
-    fn https_to_any_host_is_accepted() {
-        // Not this slice's arm — #415 owns remote — but the validator's rule is
-        // scheme-based, and pretending otherwise here would fork the predicate.
-        assert!(validate("https://example.com").is_ok());
+    fn https_to_a_remote_host_is_refused_too() {
+        assert_eq!(
+            validate("https://example.com"),
+            Err(AiEndpointError::Rejected {
+                reason: EndpointRejection::NotLoopback
+            })
+        );
+        assert_eq!(
+            validate("https://ollama.my-vps.example:443"),
+            Err(AiEndpointError::Rejected {
+                reason: EndpointRejection::NotLoopback
+            })
+        );
+    }
+
+    /// `https` to loopback stays accepted: a runtime behind a local TLS
+    /// terminator is still on this device, and refusing it would be a rule about
+    /// the scheme rather than about where the bytes go.
+    #[test]
+    fn https_to_loopback_is_still_accepted() {
+        assert!(validate("https://127.0.0.1:11434").is_ok());
+        assert!(validate("https://localhost:11434").is_ok());
     }
 
     #[test]
