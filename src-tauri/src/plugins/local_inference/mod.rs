@@ -176,14 +176,27 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                 .app_config_dir()
                 .ok()
                 .map(|d| endpoint_config::endpoint_path_in(&d));
-            let (mut backends, active) =
-                resolve_backends(base, resource_dir.as_deref(), endpoint_path.as_deref());
+            let (mut backends, active) = resolve_backends(
+                base,
+                resource_dir.as_deref(),
+                endpoint_path.as_deref(),
+                cancel_source(app.clone()),
+            );
             // The remote arm is always REGISTERED and never active by
             // registration alone (see `remote_backend`). It shares the state's
             // snapshot cell, so the engine's authorization and the seam's
             // selection read one set of facts.
             let cell: state::PrefsCell = std::sync::Arc::new(std::sync::RwLock::new(None));
-            backends.push(remote_backend(std::sync::Arc::clone(&cell)));
+            // A real abort source for the provider transport (myne-md/myne#440).
+            // It reaches the registry through the AppHandle rather than holding
+            // an `Arc` of it, because the registry stays managed AS
+            // `CancelRegistry` — managing an `Arc<CancelRegistry>` instead would
+            // compile fine and then make every `State<'_, CancelRegistry>`
+            // command fail to resolve at runtime.
+            backends.push(remote_backend(
+                std::sync::Arc::clone(&cell),
+                cancel_source(app.clone()),
+            ));
             app.manage(
                 state::LocalInferenceState::with_backends(backends, active)
                     .with_snapshot_cell(cell)
@@ -307,6 +320,9 @@ pub(crate) fn resolve_backends(
     base: std::path::PathBuf,
     resource_dir: Option<&std::path::Path>,
     endpoint_path: Option<&std::path::Path>,
+    // The loopback arm's abort source (myne-md/myne#440). Taken rather than
+    // defaulted so a caller has to supply one or say `|| false` deliberately.
+    cancelled: cancellable_io::CancelledFn,
 ) -> (Vec<state::Backend>, &'static str) {
     let in_process = resolve_backend(base, resource_dir);
     let in_process_id = in_process.id();
@@ -325,7 +341,7 @@ pub(crate) fn resolve_backends(
     let ollama = state::Backend::new(
         "ollama",
         state::BackendClass::LoopbackLocal,
-        std::sync::Arc::new(engine_ollama::ConfiguredOllamaEngine::new(path)),
+        std::sync::Arc::new(engine_ollama::ConfiguredOllamaEngine::new(path, cancelled)),
     );
     // Deliberately NOT `.serializing_compute()`: the work happens in another
     // process with its own scheduler, so there is no Myne-side lock and
@@ -344,6 +360,19 @@ pub(crate) fn resolve_backends(
 /// Every failure resolves to `None`, which the seam reads as the local arm:
 /// no active vault, no vault directory, a locked slot, an unreadable blob. The
 /// fail-closed direction here is "answer locally", never "assume configured".
+/// The abort source the provider transport polls (myne-md/myne#440).
+///
+/// `false` until the registry exists — during plugin setup the engines are built
+/// before `app.manage`, and "not yet cancellable" is the correct answer for a
+/// request that cannot have started.
+fn cancel_source<R: Runtime>(app: tauri::AppHandle<R>) -> cancellable_io::CancelledFn {
+    std::sync::Arc::new(move || {
+        app.try_state::<cancel::CancelRegistry>()
+            .map(|r| r.any_cancelled())
+            .unwrap_or(false)
+    })
+}
+
 /// The synchronous half of the #437 gate: which vault is unlocked right now.
 ///
 /// Best-effort by construction — `active_vault_id_now` answers `None` when the
@@ -401,15 +430,21 @@ fn prefs_reader<R: Runtime>(app: tauri::AppHandle<R>) -> state::PrefsReader {
 /// own: the work happens on someone else's hardware, and holding Myne's Candle
 /// lock across an internet round trip would block local inference on a network
 /// wait (task 6's criterion).
-pub(crate) fn remote_backend(cell: state::PrefsCell) -> state::Backend {
+pub(crate) fn remote_backend(
+    cell: state::PrefsCell,
+    cancelled: cancellable_io::CancelledFn,
+) -> state::Backend {
     state::Backend::new(
         "remote",
         state::BackendClass::Remote,
-        std::sync::Arc::new(provider_registry::RemoteEngine::new(Box::new(move || {
-            cell.read()
-                .ok()
-                .and_then(|s| s.as_ref().map(|s| (s.prefs.clone(), s.developer_mode)))
-        }))),
+        std::sync::Arc::new(provider_registry::RemoteEngine::new(
+            Box::new(move || {
+                cell.read()
+                    .ok()
+                    .and_then(|s| s.as_ref().map(|s| (s.prefs.clone(), s.developer_mode)))
+            }),
+            cancelled,
+        )),
     )
 }
 
@@ -806,7 +841,12 @@ mod resolve_backends_tests {
     /// setting and no caller that can select what was never registered.
     #[test]
     fn no_endpoint_registers_only_the_in_process_arm() {
-        let (backends, active) = resolve_backends(std::env::temp_dir(), None, None);
+        let (backends, active) = resolve_backends(
+            std::env::temp_dir(),
+            None,
+            None,
+            std::sync::Arc::new(|| false),
+        );
         assert_eq!(backends.len(), 1);
         assert_ne!(active, "ollama");
         assert!(
@@ -822,7 +862,12 @@ mod resolve_backends_tests {
     fn a_url_without_a_model_does_not_register_the_runtime_arm() {
         let p = cfg_path("urlonly");
         endpoint_config::write_endpoint(&p, "http://127.0.0.1:11434", "").expect("write");
-        let (backends, active) = resolve_backends(std::env::temp_dir(), None, Some(&p));
+        let (backends, active) = resolve_backends(
+            std::env::temp_dir(),
+            None,
+            Some(&p),
+            std::sync::Arc::new(|| false),
+        );
         assert_eq!(backends.len(), 1);
         assert_ne!(active, "ollama");
     }
@@ -834,7 +879,12 @@ mod resolve_backends_tests {
     fn a_hand_edited_remote_url_does_not_register_the_runtime_arm() {
         let p = cfg_path("handedit");
         std::fs::write(&p, r#"{"url":"http://evil.example:11434","model":"m"}"#).expect("write");
-        let (backends, active) = resolve_backends(std::env::temp_dir(), None, Some(&p));
+        let (backends, active) = resolve_backends(
+            std::env::temp_dir(),
+            None,
+            Some(&p),
+            std::sync::Arc::new(|| false),
+        );
         assert_eq!(backends.len(), 1);
         assert_ne!(active, "ollama");
     }
@@ -853,7 +903,12 @@ mod resolve_backends_tests {
     fn a_hand_edited_https_url_does_not_register_the_runtime_arm_either() {
         let p = cfg_path("handedit-https");
         std::fs::write(&p, r#"{"url":"https://evil.example","model":"m"}"#).expect("write");
-        let (backends, active) = resolve_backends(std::env::temp_dir(), None, Some(&p));
+        let (backends, active) = resolve_backends(
+            std::env::temp_dir(),
+            None,
+            Some(&p),
+            std::sync::Arc::new(|| false),
+        );
         assert_eq!(backends.len(), 1, "a remote https host registered an arm");
         assert_ne!(active, "ollama");
     }
@@ -865,7 +920,12 @@ mod resolve_backends_tests {
         let p = cfg_path("configured");
         endpoint_config::write_endpoint(&p, "http://127.0.0.1:11434", "nomic-embed-text")
             .expect("write");
-        let (backends, active) = resolve_backends(std::env::temp_dir(), None, Some(&p));
+        let (backends, active) = resolve_backends(
+            std::env::temp_dir(),
+            None,
+            Some(&p),
+            std::sync::Arc::new(|| false),
+        );
         assert_eq!(active, "ollama");
         let ollama = backends
             .iter()
@@ -892,7 +952,12 @@ mod resolve_backends_tests {
     fn the_runtime_arm_reports_not_ready_when_its_config_disappears() {
         let p = cfg_path("vanishes");
         endpoint_config::write_endpoint(&p, "http://127.0.0.1:11434", "some-model").expect("write");
-        let (backends, _) = resolve_backends(std::env::temp_dir(), None, Some(&p));
+        let (backends, _) = resolve_backends(
+            std::env::temp_dir(),
+            None,
+            Some(&p),
+            std::sync::Arc::new(|| false),
+        );
         let engine = backends
             .iter()
             .find(|b| b.id() == "ollama")
@@ -901,5 +966,59 @@ mod resolve_backends_tests {
         std::fs::remove_file(&p).expect("clear the setting");
         assert_eq!(engine.embed("x").err(), Some(error::EngineError::NotReady));
         assert_eq!(engine.infer("x").err(), Some(error::EngineError::NotReady));
+    }
+
+    #[cfg(test)]
+    mod cancel_wiring_tests {
+        use super::*;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        /// The WIRING, not the primitive (myne-md/myne#440).
+        ///
+        /// `cancel::any_cancelled` has its own test, and it would stay green if
+        /// someone re-hardcoded the engines' source back to `|| false` — that
+        /// regression compiles cleanly and no type checks it, which is how the
+        /// original defect shipped. So this drives the engine that `remote_backend`
+        /// builds and asserts the source it was handed is actually consulted.
+        #[test]
+        fn the_remote_backend_consults_the_cancel_source_it_was_given() {
+            let polls = std::sync::Arc::new(AtomicUsize::new(0));
+            let counted = {
+                let polls = std::sync::Arc::clone(&polls);
+                let f: cancellable_io::CancelledFn = std::sync::Arc::new(move || {
+                    polls.fetch_add(1, Ordering::SeqCst);
+                    true
+                });
+                f
+            };
+
+            // A fully-authorized snapshot, so the engine gets past the gate and
+            // reaches its transport — without it the call would refuse for an
+            // unrelated reason and the poll count would prove nothing.
+            let cell: state::PrefsCell =
+                std::sync::Arc::new(std::sync::RwLock::new(Some(state::PrefsSnapshot {
+                    prefs: protocol::PrefsView {
+                        ai_enabled: true,
+                        developer_mode: true,
+                        ai_provider: Some("openrouter".into()),
+                        ai_provider_consent: Some("openrouter".into()),
+                        ai_provider_key: Some("sk-test".into()),
+                        ai_provider_model: Some("some/model".into()),
+                        ..protocol::PrefsView::default()
+                    },
+                    developer_mode: true,
+                    vault_id: None,
+                })));
+
+            let backend = remote_backend(cell, counted);
+            // The call fails — there is no provider to reach — and that is fine.
+            // What is asserted is that the cancel source was CONSULTED on the way.
+            let _ = backend.engine().infer("hello");
+            assert!(
+                polls.load(Ordering::SeqCst) > 0,
+                "the remote engine must poll the cancel source it was constructed \
+             with; a source that is never asked is the inert wiring this fixes"
+            );
+        }
     }
 }

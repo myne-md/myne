@@ -104,6 +104,33 @@ impl CancelRegistry {
         }
     }
 
+    /// Whether ANY in-flight request is cancelled.
+    ///
+    /// The abort source for a backend that cannot be interrupted at an emit
+    /// seam (myne-md/myne#440). `RemoteEngine::chat_streaming` does not stream:
+    /// it blocks on one `post_json` and then calls `on_token` once with the
+    /// whole reply, so [`guarded_on_token`] only ever looks AFTER the request
+    /// has completed. The transport's cancel poll is the only thing that can
+    /// abort a provider call mid-flight, and it was wired to a closure that
+    /// always answered `false` — Stop and vault-lock were both inert against a
+    /// provider.
+    ///
+    /// **Coarser than per-request, and the bound is stated rather than hidden.**
+    /// A finished request's guard deregisters, so a stale cancelled token cannot
+    /// linger; but with two provider requests genuinely in flight, cancelling
+    /// one aborts both. That is the right trade today — the composer has a
+    /// single Stop and remote chat is one request at a time — and it is strictly
+    /// better than the previous answer, which was to abort neither. Making it
+    /// exact needs the request's token threaded into the engine call, which is a
+    /// trait change rather than a wiring one.
+    pub fn any_cancelled(&self) -> bool {
+        self.inner
+            .lock()
+            .expect("cancel registry mutex poisoned")
+            .values()
+            .any(|t| t.is_cancelled())
+    }
+
     /// Cancel one request by id. `false` when it already finished.
     ///
     /// No production caller yet: the composer's single Stop means "the newest",
@@ -324,5 +351,41 @@ mod tests {
         }
         let second = reg.begin();
         assert!(!second.token().is_cancelled());
+    }
+
+    /// The abort source a non-streaming backend polls (myne-md/myne#440).
+    ///
+    /// Both abort paths must reach it: the composer's Stop (`cancel_newest`)
+    /// and the vault-lock teardown (`cancel_all`, the correctness requirement
+    /// this module's doc calls total). Before this, a provider request could be
+    /// stopped by neither — the transport's cancel poll was wired to a closure
+    /// that always answered `false`.
+    #[test]
+    fn any_cancelled_sees_both_abort_paths_and_forgets_finished_requests() {
+        let reg = CancelRegistry::default();
+        assert!(!reg.any_cancelled(), "idle registry cancels nothing");
+
+        {
+            let a = reg.begin();
+            assert!(!reg.any_cancelled(), "a fresh request is not cancelled");
+            reg.cancel_newest();
+            assert!(reg.any_cancelled(), "composer Stop must reach the poll");
+            drop(a);
+        }
+        assert!(
+            !reg.any_cancelled(),
+            "a finished request must not keep the poll cancelled forever — a stale \
+             token would abort every LATER provider call"
+        );
+
+        {
+            let _b = reg.begin();
+            reg.cancel_all();
+            assert!(
+                reg.any_cancelled(),
+                "vault-lock teardown must reach the poll"
+            );
+        }
+        assert!(!reg.any_cancelled());
     }
 }
