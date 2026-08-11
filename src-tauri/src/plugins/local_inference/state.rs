@@ -17,10 +17,27 @@ use std::sync::{Arc, RwLock};
 use super::engine::{Engine, StubEngine};
 use super::error::EngineError;
 
-/// The preference facts a selection depends on: the view, plus `developer_mode`
-/// carried alongside it so the gate's signature keeps stating the SYNC-18
-/// requirement instead of reading it silently.
-pub type PrefsSnapshot = (protocol::PrefsView, bool);
+/// The preference facts a selection depends on, and the vault they came from.
+#[derive(Clone)]
+pub struct PrefsSnapshot {
+    /// The preferences the selection reads.
+    pub prefs: protocol::PrefsView,
+    /// Carried alongside so the gate's signature keeps stating the SYNC-18
+    /// requirement instead of reading it silently.
+    pub developer_mode: bool,
+    /// **The vault these preferences were read from** (myne-md/myne#437).
+    ///
+    /// Without it the cell is a process-global authorization with no owner, and
+    /// that is exactly what it was: nothing invalidated it on lock or unlock, so
+    /// vault A's provider and API key answered for vault B — even with the AI
+    /// beta switched off in B. Stamping the id turns "remember to invalidate at
+    /// every teardown site" into "a snapshot cannot be used outside the vault it
+    /// came from", which is a property rather than a discipline.
+    ///
+    /// `None` means the reader could not name a vault, which resolves the same
+    /// way a mismatch does: the local arm.
+    pub vault_id: Option<myne_core::vault_id::VaultId>,
+}
 
 /// How the seam obtains those facts. Async because `vault.prefs` is encrypted
 /// vault content — reading it decrypts a blob with the unlocked `root_key`, and
@@ -30,6 +47,9 @@ pub type PrefsSnapshot = (protocol::PrefsView, bool);
 /// nested `Arc<RwLock<Option<…>>>` spelled out at each is a rename waiting to
 /// go half-done.
 pub type PrefsCell = Arc<RwLock<Option<PrefsSnapshot>>>;
+
+/// A synchronous read of the currently-unlocked vault id.
+pub type ActiveVaultReader = Arc<dyn Fn() -> Option<myne_core::vault_id::VaultId> + Send + Sync>;
 
 pub type PrefsReader =
     Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Option<PrefsSnapshot>> + Send>> + Send + Sync>;
@@ -183,6 +203,13 @@ pub struct LocalInferenceState {
     /// is locked or nobody has asked yet, and both resolve to the local arm.
     snapshot: PrefsCell,
     reader: Option<PrefsReader>,
+    /// A synchronous, best-effort reader for the CURRENTLY unlocked vault id
+    /// (myne-md/myne#437). Erased behind a closure for the same reason
+    /// [`PrefsReader`] is: the seam must not depend on an `AppHandle`, and the
+    /// tests that drive it have none. Absent ⇒ no remote arm is ever selected,
+    /// which is the correct default for a state that cannot tell which vault it
+    /// is looking at.
+    active_vault_now: Option<ActiveVaultReader>,
 }
 
 impl Default for LocalInferenceState {
@@ -227,6 +254,7 @@ impl LocalInferenceState {
             remote,
             snapshot: Arc::new(RwLock::new(None)),
             reader: None,
+            active_vault_now: None,
         }
     }
 
@@ -246,6 +274,11 @@ impl LocalInferenceState {
     /// reader needs an `AppHandle` and the constructor is reached from tests
     /// that have none; a state with no reader simply never selects the remote
     /// arm, which is the fail-closed direction.
+    pub fn with_active_vault_reader(mut self, reader: ActiveVaultReader) -> Self {
+        self.active_vault_now = Some(reader);
+        self
+    }
+
     pub fn with_prefs_reader(mut self, reader: PrefsReader) -> Self {
         self.reader = Some(reader);
         self
@@ -258,6 +291,19 @@ impl LocalInferenceState {
     /// and a user can revoke a key or switch provider mid-session. Task 9 made
     /// the same argument one layer down for the consent gate; this is the
     /// selection above it.
+    /// Drop the cached authorization (myne-md/myne#437).
+    ///
+    /// Called from the vault-lock teardown, beside the `root_key` wipe, the
+    /// search index, the spell dictionary and the AI vectors — the cell used to
+    /// be the one vault-derived secret that survived all of them. The
+    /// vault-stamped snapshot already makes a stale cell unusable; this makes it
+    /// absent, so the plaintext API key does not outlive the lock.
+    pub fn invalidate(&self) {
+        if let Ok(mut slot) = self.snapshot.write() {
+            *slot = None;
+        }
+    }
+
     pub async fn refresh(&self) {
         let Some(reader) = self.reader.clone() else {
             return;
@@ -303,17 +349,31 @@ impl LocalInferenceState {
         let Ok(slot) = self.snapshot.read() else {
             return self.local;
         };
-        let Some((prefs, developer_mode)) = slot.as_ref() else {
+        let Some(snapshot) = slot.as_ref() else {
             return self.local;
         };
-        if super::provider_gate::authorize_remote(prefs, *developer_mode).is_err() {
+        // The authorization must belong to the vault that is unlocked RIGHT NOW
+        // (myne-md/myne#437). Anything else — a different vault, or a vault the
+        // seam cannot name because the slot lock is contended — resolves to the
+        // local arm. Fail-safe in the only direction that matters: the failure
+        // mode is in-process inference, never another vault's provider.
+        match (
+            self.active_vault_now.as_ref().and_then(|f| f()),
+            snapshot.vault_id,
+        ) {
+            (Some(active), Some(read_from)) if active == read_from => {}
+            _ => return self.local,
+        }
+        if super::provider_gate::authorize_remote(&snapshot.prefs, snapshot.developer_mode).is_err()
+        {
             return self.local;
         }
         // A provider with no model chosen cannot be asked anything. Selecting it
         // anyway would turn every AI surface into `NotReady` — including the
         // ambient ones, which would then report as BARRED rather than as
         // working locally, which is a worse answer than the truth.
-        if prefs
+        if snapshot
+            .prefs
             .ai_provider_model
             .as_deref()
             .map(str::trim)
@@ -937,6 +997,28 @@ mod selection_proof {
             ],
             "in-process",
         )
+        // The vault gate (myne-md/myne#437): a state with no active-vault reader
+        // never selects remote, so every test that expects the remote arm has to
+        // say which vault it is in — which is the property, not a nuisance.
+        .with_active_vault_reader(Arc::new(|| Some(test_vault())))
+    }
+
+    /// The vault `wired()` claims to be unlocked, and the one `snap()` stamps.
+    fn test_vault() -> myne_core::vault_id::VaultId {
+        myne_core::vault_id::VaultId::parse("018f0000-0000-7000-8000-000000000001").expect("id")
+    }
+
+    /// A second, DIFFERENT vault — the cross-vault case.
+    fn other_vault() -> myne_core::vault_id::VaultId {
+        myne_core::vault_id::VaultId::parse("018f0000-0000-7000-8000-000000000002").expect("id")
+    }
+
+    fn snap(prefs: PrefsView, developer_mode: bool) -> PrefsSnapshot {
+        PrefsSnapshot {
+            prefs,
+            developer_mode,
+            vault_id: Some(test_vault()),
+        }
     }
 
     fn put(state: &LocalInferenceState, snapshot: Option<PrefsSnapshot>) {
@@ -963,11 +1045,11 @@ mod selection_proof {
 
         let unconfigured: Vec<(&str, Option<PrefsSnapshot>)> = vec![
             ("vault locked — no snapshot at all", None),
-            ("nothing configured", Some((PrefsView::default(), true))),
-            ("developer mode off", Some((configured(), false))),
+            ("nothing configured", Some(snap(PrefsView::default(), true))),
+            ("developer mode off", Some(snap(configured(), false))),
             (
                 "AI beta off",
-                Some((
+                Some(snap(
                     PrefsView {
                         ai_enabled: false,
                         ..configured()
@@ -977,7 +1059,7 @@ mod selection_proof {
             ),
             (
                 "no provider named",
-                Some((
+                Some(snap(
                     PrefsView {
                         ai_provider: None,
                         ..configured()
@@ -987,7 +1069,7 @@ mod selection_proof {
             ),
             (
                 "consent for a DIFFERENT provider",
-                Some((
+                Some(snap(
                     PrefsView {
                         ai_provider_consent: Some("ollama-cloud".into()),
                         ..configured()
@@ -997,7 +1079,7 @@ mod selection_proof {
             ),
             (
                 "no key",
-                Some((
+                Some(snap(
                     PrefsView {
                         ai_provider_key: None,
                         ..configured()
@@ -1007,7 +1089,7 @@ mod selection_proof {
             ),
             (
                 "no model chosen (SYNC-24 ships no default)",
-                Some((
+                Some(snap(
                     PrefsView {
                         ai_provider_model: None,
                         ..configured()
@@ -1036,7 +1118,7 @@ mod selection_proof {
 
         // The control arm. Without it every zero above is compatible with a
         // remote arm that could never be reached under any configuration.
-        put(&state, Some((configured(), true)));
+        put(&state, Some(snap(configured(), true)));
         assert_eq!(state.active_class(), BackendClass::Remote);
         assert_eq!(state.active_id(), "remote");
         let answer = state
@@ -1048,6 +1130,81 @@ mod selection_proof {
         assert!(wait_for_accept(&accepts), "the control arm must connect");
     }
 
+    /// A snapshot read from ANOTHER vault never authorizes a provider
+    /// (myne-md/myne#437).
+    ///
+    /// This is the consent violation, not a caching nit. The cell is
+    /// process-global and nothing invalidated it on lock or unlock, so:
+    /// configure a provider in vault A, lock A, unlock vault B, trigger an AI
+    /// rewrite — and B's note text went to a provider B never named, under A's
+    /// API key, even with the AI beta switched off in B.
+    ///
+    /// The fix is a property rather than a discipline: a snapshot carries the
+    /// vault it was read from, and a mismatch resolves to the local arm. The
+    /// third case is the one a discipline-shaped fix would miss — an
+    /// unnameable vault (a contended slot lock) must be treated as a mismatch,
+    /// because "cannot confirm" and "confirmed different" have to have the same
+    /// consequence when the alternative is sending a note off the device.
+    #[test]
+    fn a_snapshot_from_another_vault_never_authorizes_a_provider() {
+        let state = wired(1);
+
+        // The control arm FIRST: without it every refusal below is compatible
+        // with a remote arm that could never be selected under any conditions.
+        put(&state, Some(snap(configured(), true)));
+        assert_eq!(
+            state.active_class(),
+            BackendClass::Remote,
+            "the same vault's configured snapshot must select remote"
+        );
+
+        // Same preferences, different vault → local.
+        put(
+            &state,
+            Some(PrefsSnapshot {
+                prefs: configured(),
+                developer_mode: true,
+                vault_id: Some(other_vault()),
+            }),
+        );
+        assert_eq!(
+            state.active_class(),
+            BackendClass::InProcessLocal,
+            "another vault's authorization must not select remote"
+        );
+
+        // Same preferences, unnameable vault → local, for the same reason.
+        put(
+            &state,
+            Some(PrefsSnapshot {
+                prefs: configured(),
+                developer_mode: true,
+                vault_id: None,
+            }),
+        );
+        assert_eq!(
+            state.active_class(),
+            BackendClass::InProcessLocal,
+            "an unnameable vault must be treated as a mismatch, not waved through"
+        );
+    }
+
+    /// The lock teardown drops the cached authorization, so the plaintext API
+    /// key does not outlive the vault it belongs to (myne-md/myne#437).
+    #[test]
+    fn invalidate_drops_the_cached_authorization() {
+        let state = wired(1);
+        put(&state, Some(snap(configured(), true)));
+        assert_eq!(state.active_class(), BackendClass::Remote);
+
+        state.invalidate();
+        assert!(
+            state.snapshot_cell().read().expect("cell").is_none(),
+            "the cell must be empty, not merely unusable — it held the API key"
+        );
+        assert_eq!(state.active_class(), BackendClass::InProcessLocal);
+    }
+
     /// With the remote arm ACTIVE, the two barred surfaces answer **locally**
     /// and open no socket. Barred from the remote arm, not barred from working
     /// — the distinction only becomes observable once the arm can be active,
@@ -1056,7 +1213,7 @@ mod selection_proof {
     fn ambient_and_embedding_fall_back_to_the_local_arm_rather_than_failing() {
         let (port, accepts) = counting_listener();
         let state = wired(port);
-        put(&state, Some((configured(), true)));
+        put(&state, Some(snap(configured(), true)));
         assert_eq!(state.active_class(), BackendClass::Remote);
 
         let ghost = state
@@ -1087,12 +1244,12 @@ mod selection_proof {
     fn revoking_mid_session_routes_the_next_request_locally() {
         let (port, accepts) = counting_listener();
         let state = wired(port);
-        put(&state, Some((configured(), true)));
+        put(&state, Some(snap(configured(), true)));
         assert_eq!(state.active_class(), BackendClass::Remote);
 
         put(
             &state,
-            Some((
+            Some(snap(
                 PrefsView {
                     ai_provider_key: None,
                     ai_provider_consent: None,
