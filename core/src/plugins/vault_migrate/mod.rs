@@ -451,6 +451,282 @@ pub async fn vault_migrate<R: tauri::Runtime>(
     .await
 }
 
+/// Failure of [`vault_migrate_abort_from_host`] / [`vault_migrate_confirm_from_host`]
+/// (§10.4.1 point 5, myne-md/myne#430).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "kind")]
+pub enum MigrationSettleError {
+    /// A filesystem read/write failed.
+    Io,
+    /// There is no `legacy/` snapshot — the vault was never migrated, or the
+    /// migration was already confirmed (and therefore crypto-erased).
+    NothingToSettle,
+    /// The migrated vault has already published its v0.2 generation to the sync
+    /// server, so restoring the v0.1 vault locally would fork this device away
+    /// from every peer. §10.4.1 point 5 scopes abort to **pre-sync** for exactly
+    /// this reason; past that point the way back is a restore from backup.
+    AlreadySynced,
+    /// Another auth-pipeline operation is in flight.
+    AuthOperationInProgress,
+}
+
+/// Everything the migration stages under `legacy/`, by name.
+///
+/// One list, walked by BOTH the abort (restore each) and the confirm
+/// (erase the lot). Two copies of this roster is how an abort quietly stops
+/// restoring a family the migration started staging.
+const LEGACY_RESTORE_FILES: &[&str] = &[
+    "vault.meta",
+    "vault.themes",
+    "vault.dictionary",
+    "vault.prefs",
+    "vault.attachments",
+];
+
+/// Restore the byte-identical v0.1 vault from `legacy/` (§10.4.1 point 5).
+///
+/// **Valid pre-sync and pre-confirm only.** After the re-based head has landed
+/// on the server this device's peers have adopted the v0.2 generation, and a
+/// local roll-back would fork it away from them; the pre-sync condition is read
+/// off `SyncState::rekey_rebase_pending`, which the migration arms and the push
+/// that publishes the new head clears (myne-md/myne#429). An unenrolled vault is
+/// pre-sync by construction.
+pub async fn vault_migrate_abort_from_host(
+    host: &dyn HostCtx,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    io: &dyn VaultIo,
+) -> Result<(), MigrationSettleError> {
+    let _permit = state
+        .auth_permits()
+        .try_acquire()
+        .map_err(|_| MigrationSettleError::AuthOperationInProgress)?;
+    let vault_root =
+        crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+            .map_err(|_| MigrationSettleError::Io)?;
+    let legacy = vault_root.join("legacy");
+    if io.read(&legacy.join("vault.meta")).await.is_err() {
+        return Err(MigrationSettleError::NothingToSettle);
+    }
+    if sync_has_published_the_new_generation(io, &vault_root).await {
+        return Err(MigrationSettleError::AlreadySynced);
+    }
+
+    let _quiesce = state.quiesce_writers().await;
+
+    // Notes first, meta LAST — the mirror of the migration's own commit order.
+    // `vault.meta` is what decides which key hierarchy the vault opens under, so
+    // it is the one file whose write flips the whole vault back; anything that
+    // fails before it leaves a vault that still reads as v0.2, which is the
+    // state we came from rather than a new one.
+    restore_tree(io, &legacy.join("notes"), &vault_root.join("notes")).await?;
+    restore_tree(io, &legacy.join("snapshots"), &vault_root.join("snapshots")).await?;
+    restore_tree(
+        io,
+        &legacy.join("attachments"),
+        &vault_root.join("attachments"),
+    )
+    .await?;
+    for name in LEGACY_RESTORE_FILES.iter().filter(|n| **n != "vault.meta") {
+        if let Ok(bytes) = io.read(&legacy.join(name)).await {
+            io.write(&vault_root.join(name), &bytes, WriteOpts::default())
+                .await
+                .map_err(|_| MigrationSettleError::Io)?;
+        }
+    }
+    let old_meta = io
+        .read(&legacy.join("vault.meta"))
+        .await
+        .map_err(|_| MigrationSettleError::Io)?;
+    io.write(
+        &vault_root.join("vault.meta"),
+        &old_meta,
+        WriteOpts::default(),
+    )
+    .await
+    .map_err(|_| MigrationSettleError::Io)?;
+
+    // The v0.2 caches and the armed re-base flag both describe a vault that no
+    // longer exists.
+    for stale in [
+        "vault.search",
+        "vault.indices",
+        "vault.graph",
+        "vault.embeddings",
+        "vault.head-state",
+    ] {
+        let _ = io.remove_file(&vault_root.join(stale)).await;
+    }
+    if let Ok(mut sync_state) = crate::plugins::sync::state::read_sync_state(io, &vault_root).await
+    {
+        sync_state.rekey_rebase_pending = false;
+        let _ = crate::plugins::sync::state::write_sync_state(io, &vault_root, &sync_state).await;
+    }
+    let _ = io.remove_dir_all(&legacy).await;
+
+    drop(_quiesce);
+    // A re-key in either direction is a re-unlock event: the running slot holds
+    // the v0.2 keys, which now open nothing.
+    let _ = crate::plugins::vault_unlock::commands::lock_from_host(state, hooks).await;
+    Ok(())
+}
+
+/// Crypto-erase the pre-migration vault: the old `root_key` (which exists only
+/// inside `legacy/vault.meta`, wrapped under the old password and the old
+/// recovery phrase) and every blob staged beside it. After this the migration is
+/// **settled** (§10.4.1 point 5) and there is no way back.
+///
+/// This is the step whose absence made rotating the master password stop meaning
+/// what it means: `vault_change_password` rewrites `<vault>/vault.meta` only, so
+/// while `legacy/vault.meta` survived, anyone holding the OLD password and a copy
+/// of the vault directory could still unwrap the old `itemsKey` and read every
+/// staged note. The recovery phrase is unrevocable by design, so the same held
+/// for it permanently.
+pub async fn vault_migrate_confirm_from_host(
+    host: &dyn HostCtx,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+    io: &dyn VaultIo,
+) -> Result<(), MigrationSettleError> {
+    let _permit = state
+        .auth_permits()
+        .try_acquire()
+        .map_err(|_| MigrationSettleError::AuthOperationInProgress)?;
+    let vault_root =
+        crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+            .map_err(|_| MigrationSettleError::Io)?;
+    let legacy = vault_root.join("legacy");
+    if io.read(&legacy.join("vault.meta")).await.is_err() {
+        return Err(MigrationSettleError::NothingToSettle);
+    }
+    io.remove_dir_all(&legacy)
+        .await
+        .map_err(|_| MigrationSettleError::Io)?;
+    Ok(())
+}
+
+/// Whether this device has already published its v0.2 generation to the server.
+///
+/// `rekey_rebase_pending` is armed by the migration and cleared by the push that
+/// lands the re-authored head (myne-md/myne#429), so "enrolled AND not pending"
+/// is exactly "peers have seen v0.2". An unenrolled or unreadable state answers
+/// `false` — abort is the recoverable direction, and refusing it on a doubt
+/// would strand the user with no way back at all.
+async fn sync_has_published_the_new_generation(io: &dyn VaultIo, vault_root: &Path) -> bool {
+    let Ok(state) = crate::plugins::sync::state::read_sync_state(io, vault_root).await else {
+        return false;
+    };
+    state.device_id_hex.is_some() && !state.rekey_rebase_pending
+}
+
+/// Copy every file of `from` over `to`, creating `to` if needed. A missing
+/// source is not an error (the migration stages only what the vault had).
+async fn restore_tree(
+    io: &dyn VaultIo,
+    from: &Path,
+    to: &Path,
+) -> Result<(), MigrationSettleError> {
+    let Ok(entries) = io.read_dir(from).await else {
+        return Ok(());
+    };
+    io.create_dir_all(to)
+        .await
+        .map_err(|_| MigrationSettleError::Io)?;
+    for entry in &entries {
+        if entry.is_dir {
+            continue;
+        }
+        let Ok(bytes) = io.read(&from.join(&entry.name)).await else {
+            continue;
+        };
+        io.write(&to.join(&entry.name), &bytes, WriteOpts::default())
+            .await
+            .map_err(|_| MigrationSettleError::Io)?;
+    }
+    Ok(())
+}
+
+/// Whether this vault holds an **unsettled** migration — a `legacy/` snapshot
+/// the user has neither aborted nor confirmed (§10.4.1 point 5).
+///
+/// Read-only, and separate from the two acting commands on purpose: probing by
+/// calling `confirm` and reading its `NothingToSettle` would erase the very
+/// thing being probed for.
+///
+/// `can_abort` is the pre-sync condition — once the re-based head has landed on
+/// the server, restoring locally would fork this device from its peers, so the
+/// surface offers only confirm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct MigrationSettleStatus {
+    /// A `legacy/` snapshot is present and the migration is not settled.
+    pub pending: bool,
+    /// Abort is still available (pre-sync).
+    pub can_abort: bool,
+}
+
+/// Core of [`vault_migrate_settle_status`].
+pub async fn vault_migrate_settle_status_from_host(
+    host: &dyn HostCtx,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+    io: &dyn VaultIo,
+) -> Result<MigrationSettleStatus, MigrationSettleError> {
+    let vault_root =
+        crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+            .map_err(|_| MigrationSettleError::Io)?;
+    let pending = io
+        .read(&vault_root.join("legacy").join("vault.meta"))
+        .await
+        .is_ok();
+    let can_abort = pending && !sync_has_published_the_new_generation(io, &vault_root).await;
+    Ok(MigrationSettleStatus { pending, can_abort })
+}
+
+/// IPC command: is there an unsettled migration on this vault? (§10.4.1 point 5)
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_migrate_settle_status<R: tauri::Runtime>(
+    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
+    app: tauri::AppHandle<R>,
+) -> Result<MigrationSettleStatus, MigrationSettleError> {
+    vault_migrate_settle_status_from_host(
+        &crate::host::tauri_host::TauriHost::new(app),
+        state.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// IPC command: abort a not-yet-settled migration (§10.4.1 point 5, #430).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_migrate_abort<R: tauri::Runtime>(
+    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
+    hooks: tauri::State<'_, crate::hooks::Hooks>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), MigrationSettleError> {
+    vault_migrate_abort_from_host(
+        &crate::host::tauri_host::TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// IPC command: settle a migration by crypto-erasing `legacy/` (§10.4.1 point 5).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_migrate_confirm<R: tauri::Runtime>(
+    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), MigrationSettleError> {
+    vault_migrate_confirm_from_host(
+        &crate::host::tauri_host::TauriHost::new(app),
+        state.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
 /// What the on-disk migration did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct OnDiskMigrationSummary {
@@ -610,6 +886,45 @@ pub async fn migrate_vault_notes_on_disk(
             fam.cap,
         )
         .map_err(|_| OnDiskMigrationError::Crypto(MigrationError::Crypto))?;
+    }
+
+    // (3c) Move `snapshots/` into `legacy/` (myne-md/myne#435).
+    //
+    //      A snapshot is a byte-verbatim `MY01` note blob under the vault's
+    //      `itemsKey` — there is no snapshot codec or magic of its own — so the
+    //      re-key leaves every one of them permanently undecryptable. The
+    //      migration used to not mention `snapshots/` at all (`grep -c snapshots`
+    //      returned 0), which left that ciphertext sitting in the vault root
+    //      under a key nothing holds, while the version-history UI went on
+    //      listing every revision and failing to open each one.
+    //
+    //      MOVED, not copied: `protocol.md` §9.2 already says a migrated note's
+    //      pre-migration snapshots are part of the `legacy/` snapshot and are
+    //      crypto-erased on confirm, and orphan ciphertext is precisely what
+    //      cryptographic erase exists to prevent. Forward from here the store is
+    //      inert by design — an `NC05` note captures no snapshots, because its
+    //      change-graph IS the history (`decisions.md` 2026-08-09, ASM-12→B).
+    let snapshots = vault_root.join("snapshots");
+    if let Ok(entries) = io.read_dir(&snapshots).await {
+        let legacy_snapshots = legacy.join("snapshots");
+        io.create_dir_all(&legacy_snapshots).await.map_err(|_| Io)?;
+        for entry in &entries {
+            if entry.is_dir {
+                continue;
+            }
+            let Ok(bytes) = io.read(&snapshots.join(&entry.name)).await else {
+                continue; // vanished under us — nothing to preserve
+            };
+            io.write(
+                &legacy_snapshots.join(&entry.name),
+                &bytes,
+                WriteOpts::default(),
+            )
+            .await
+            .map_err(|_| Io)?;
+        }
+        // Only after every one is safely in `legacy/`.
+        let _ = io.remove_dir_all(&snapshots).await;
     }
 
     // (4) Write every NC05 note over its MY01 (same <uuid>.myn filename).
@@ -1557,6 +1872,139 @@ mod tests {
             assert_eq!(
                 note, original_note,
                 "the note must be byte-identical, not an NC05 rewrite"
+            );
+        })
+    }
+
+    /// The migration is not settled until the user says so: `abort` puts the
+    /// v0.1 vault back byte-for-byte, and `confirm` crypto-erases it
+    /// (§10.4.1 point 5, myne-md/myne#430 + #435).
+    ///
+    /// The `legacy/` staging shipped write-only — no reader, no deleter, no
+    /// command — and the consequence was not merely a missing feature. Because
+    /// `vault_change_password` rewrites `<vault>/vault.meta` only, `legacy/
+    /// vault.meta` went on opening under the OLD password forever, so rotating
+    /// the master password stopped revoking access to the staged notes. The
+    /// recovery phrase cannot be rotated at all, so for it the exposure was
+    /// permanent.
+    #[test]
+    fn abort_restores_the_v0_1_vault_and_confirm_erases_it() {
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-settle").unwrap();
+            let host = TestHost::new(tmp.path());
+            let io = StdVaultIo;
+            let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            let notes_dir = vault_root.join("notes");
+            io.create_dir_all(&notes_dir).await.unwrap();
+            build_myv1_vault(&io, &vault_root).await;
+
+            let u = *crate::plugins::notes::note_id::NoteId::new_v7()
+                .as_uuid()
+                .as_bytes();
+            let md = "---\ntitle: Pre\n---\n\n# Body\n";
+            let note_path = notes_dir.join(format!("{}.myn", uuid::Uuid::from_bytes(u)));
+            let original_note = my01(&u, md);
+            io.write(&note_path, &original_note, WriteOpts::default())
+                .await
+                .unwrap();
+            let original_meta = io.read(&vault_root.join("vault.meta")).await.unwrap();
+
+            // A pre-migration snapshot: a byte-verbatim MY01 blob under the OLD
+            // itemsKey, which the re-key would otherwise strand forever (#435).
+            let snapshots = vault_root.join("snapshots");
+            io.create_dir_all(&snapshots).await.unwrap();
+            let snap_name = "snap-one.myn";
+            io.write(
+                &snapshots.join(snap_name),
+                &original_note,
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+
+            let state = VaultRuntimeState::default();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io)
+                .await
+                .expect("migration succeeds");
+
+            // #435: the snapshot moved into legacy/ rather than being left as
+            // undecryptable ciphertext in the vault root.
+            assert!(
+                io.read(&snapshots.join(snap_name)).await.is_err(),
+                "snapshots/ must not survive the re-key as orphan ciphertext"
+            );
+            assert!(
+                io.read(&vault_root.join("legacy/snapshots").join(snap_name))
+                    .await
+                    .is_ok(),
+                "the snapshot must be preserved under legacy/"
+            );
+
+            // ABORT → the v0.1 vault is back, byte for byte.
+            vault_migrate_abort_from_host(&host, &state, &hooks, &io)
+                .await
+                .expect("abort succeeds pre-sync");
+            assert_eq!(
+                io.read(&vault_root.join("vault.meta")).await.unwrap(),
+                original_meta,
+                "vault.meta must be the original bytes"
+            );
+            assert_eq!(
+                io.read(&note_path).await.unwrap(),
+                original_note,
+                "the note must be the original MY01 bytes"
+            );
+            assert_eq!(
+                io.read(&snapshots.join(snap_name)).await.unwrap(),
+                original_note,
+                "the snapshot must come back too"
+            );
+            assert!(
+                io.read(&vault_root.join("legacy/vault.meta"))
+                    .await
+                    .is_err(),
+                "a completed abort leaves no legacy/ behind"
+            );
+
+            // Migrate again, then CONFIRM → the old root_key is gone.
+            vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io)
+                .await
+                .expect("re-migration succeeds");
+            assert!(
+                io.read(&vault_root.join("legacy/vault.meta")).await.is_ok(),
+                "the staged old meta is what confirm has to erase"
+            );
+            vault_migrate_confirm_from_host(&host, &state, &io)
+                .await
+                .expect("confirm succeeds");
+            assert!(
+                io.read(&vault_root.join("legacy/vault.meta"))
+                    .await
+                    .is_err(),
+                "confirm must erase the old root_key's only remaining wrapper"
+            );
+            assert!(
+                io.read(
+                    &vault_root
+                        .join("legacy/notes")
+                        .join(format!("{}.myn", uuid::Uuid::from_bytes(u)))
+                )
+                .await
+                .is_err(),
+                "confirm must erase every staged blob, not just the meta"
+            );
+
+            // Both are idempotent-safe: with nothing staged they refuse rather
+            // than half-acting on a vault that is already settled.
+            assert_eq!(
+                vault_migrate_confirm_from_host(&host, &state, &io).await,
+                Err(MigrationSettleError::NothingToSettle)
+            );
+            assert_eq!(
+                vault_migrate_abort_from_host(&host, &state, &hooks, &io).await,
+                Err(MigrationSettleError::NothingToSettle)
             );
         })
     }

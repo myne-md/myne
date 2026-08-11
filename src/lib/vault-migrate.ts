@@ -8,9 +8,14 @@
 //
 // The **recovery phrase is required and verified backend-side** — a wrong or
 // missing phrase rejects with `RecoveryPhraseRequired` and writes nothing, so a
-// UI bug cannot strand recovery. The command is one-way and re-keys the whole
-// vault; the pre-migration vault survives in a device-local `legacy/` snapshot
-// until the user confirms (a later step).
+// UI bug cannot strand recovery. The command re-keys the whole vault, and the
+// pre-migration vault survives in a device-local `legacy/` snapshot until the
+// user settles it: `abortMigration` puts the v0.1 vault back byte-for-byte
+// (pre-sync only), `confirmMigration` crypto-erases the old `root_key`
+// (`protocol.md` §10.4.1 point 5, myne-md/myne#430). Until one of those runs,
+// rotating the master password does NOT revoke access to the staged notes —
+// `vault_change_password` rewrites `<vault>/vault.meta` only — and the recovery
+// phrase can never be rotated at all.
 
 import { invoke } from "../platform/core";
 
@@ -75,4 +80,47 @@ export async function migrateVault(
     password,
     phrase: recoveryPhrase,
   });
+}
+
+/** Closed error union mirroring the Rust `MigrationSettleError`. */
+export type MigrationSettleError = {
+  kind: "Io" | "NothingToSettle" | "AlreadySynced" | "AuthOperationInProgress";
+};
+
+/** Mirrors the Rust `MigrationSettleStatus`. */
+export interface MigrationSettleStatus {
+  /** A `legacy/` snapshot is present and the migration is not settled. */
+  pending: boolean;
+  /** Abort is still available (pre-sync). */
+  can_abort: boolean;
+}
+
+/**
+ * Is there an unsettled migration on this vault?
+ *
+ * Read-only. Probing by calling {@link confirmMigration} and reading its
+ * `NothingToSettle` would erase the very thing being probed for.
+ */
+export async function migrationSettleStatus(): Promise<MigrationSettleStatus> {
+  return invoke<MigrationSettleStatus>("plugin:vault-migrate|vault_migrate_settle_status");
+}
+
+/**
+ * Restore the byte-identical pre-migration v0.1 vault from `legacy/`.
+ *
+ * Rejects with `AlreadySynced` once the re-based vault head has landed on the
+ * server: the peers have adopted the v0.2 generation by then, and rolling back
+ * locally would fork this device away from them. Locks the vault on success —
+ * a re-key in either direction is a re-unlock event.
+ */
+export async function abortMigration(): Promise<void> {
+  return invoke<void>("plugin:vault-migrate|vault_migrate_abort");
+}
+
+/**
+ * Crypto-erase the pre-migration vault: `legacy/` holds the ONLY remaining copy
+ * of the old `root_key`. Irreversible — after it the migration is settled.
+ */
+export async function confirmMigration(): Promise<void> {
+  return invoke<void>("plugin:vault-migrate|vault_migrate_confirm");
 }

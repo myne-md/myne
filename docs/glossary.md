@@ -1281,7 +1281,9 @@ Used in: `vision.md` Phase 1 Scope (graph view)
 
 The device-local, pre-migration copy of a vault the [cross-major migration](#migration-cross-major) retains in a `legacy/` directory before its atomic commit point — the old `vault.meta` and blobs, still sealed under the **old** `root_key`. It is the abort-before-sync escape hatch: an abort (valid only pre-sync and pre-confirm) restores the byte-identical old vault from it, and on the user's post-migration confirm it is crypto-erased together with the old `root_key`. Never synced, never backed up. Introduced for the v0.1 → v0.2 `NC05` cut (`spec/protocol.md` §10.4.1).
 
-Used in: `spec/protocol.md` §10.4.1, `decisions.md` 2026-08-09.
+The staged set includes `snapshots/`, which is **moved** rather than copied: a snapshot is a byte-verbatim `MY01` note blob under the vault's `itemsKey`, so the re-key would otherwise leave it as undecryptable orphan ciphertext in the vault root. **Pre-sync** is a machine-checked condition, not a convention — it is read off the re-key re-base flag (`spec/sync-protocol.md` §5.6.1), which the migration arms and the push publishing the v0.2 head clears. **Until the confirm runs, a password rotation does not revoke access to what is staged**: the snapshot's `vault.meta` wraps the old `root_key` under the old password *and* the old (unrevocable) recovery phrase, while a password change rewrites only the live `vault.meta` (`decisions.md` 2026-08-11).
+
+Used in: `spec/protocol.md` §10.4.1, `decisions.md` 2026-08-09 + 2026-08-11.
 
 ### **magic bytes** &nbsp; 📋 *Protocol*
 

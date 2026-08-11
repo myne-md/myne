@@ -1,6 +1,6 @@
 //! Vault-migration Tauri plugin (automerge-sync-migration #420).
 //!
-//! Owns the single `vault-migrate:vault_migrate` IPC command — the whole-vault
+//! Owns the `vault-migrate:` IPC commands — `vault_migrate` (the whole-vault
 //! v0.1 → v0.2 (`MYV1` → `NTV5`) migration (`protocol.md` §10.4.1). The command
 //! core + error live in `myne-core` (`plugins::vault_migrate`); this file is just
 //! the desktop `init()` wiring, the same shape as `vault_delete`.
@@ -17,7 +17,13 @@ use tauri::Runtime;
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("vault-migrate")
         .invoke_handler(tauri::generate_handler![
-            myne_core::plugins::vault_migrate::vault_migrate
+            myne_core::plugins::vault_migrate::vault_migrate,
+            // §10.4.1 point 5's other half (myne-md/myne#430): the migration is
+            // not settled until the user confirms, and until then it can be
+            // taken back.
+            myne_core::plugins::vault_migrate::vault_migrate_abort,
+            myne_core::plugins::vault_migrate::vault_migrate_confirm,
+            myne_core::plugins::vault_migrate::vault_migrate_settle_status
         ])
         .build()
 }

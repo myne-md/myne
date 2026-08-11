@@ -85,7 +85,12 @@ fn main() {
             // §10.4.1). Adding a command here without a matching `commands.allow`
             // entry in `permissions/vault-migrate/default.toml` is a security
             // regression.
-            tauri_build::InlinedPlugin::new().commands(&["vault_migrate"]),
+            tauri_build::InlinedPlugin::new().commands(&[
+                "vault_migrate",
+                "vault_migrate_abort",
+                "vault_migrate_confirm",
+                "vault_migrate_settle_status",
+            ]),
         )
         .plugin(
             "vault-repair",
