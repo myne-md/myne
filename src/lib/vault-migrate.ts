@@ -31,7 +31,11 @@ export type VaultMigrateError = {
     | "RecoveryPhraseRequired"
     | "AlreadyMigrated"
     | "Csprng"
-    | "Crypto";
+    | "Crypto"
+    // Another auth-pipeline operation is in flight (myne-md/myne#434). Reject,
+    // never queue — the same posture change-password, backup and quick-unlock
+    // enrolment already take.
+    | "AuthOperationInProgress";
 };
 
 /** Type guard for the `RecoveryPhraseRequired` gate (the load-bearing refusal). */
