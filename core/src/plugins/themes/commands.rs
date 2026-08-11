@@ -22,7 +22,7 @@ use super::error::ThemesError;
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_themes_blob, derive_subkey_versioned, encode_themes_blob, meta_version_of,
+    decode_themes_blob, derive_subkey_versioned, encode_themes_blob_versioned, meta_version_of,
     parse_vault_meta_any, MetaVersion, SubkeyRole, AEAD_KEY_LEN, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::collections::BTreeMap;
@@ -239,14 +239,25 @@ fn deserialize_themes_map(plaintext: &[u8]) -> ThemesMap {
     serde_json::from_slice(plaintext).unwrap_or_default()
 }
 
-/// PURE CORE — seal `map` into the `MYT1` blob bytes.
+/// PURE CORE — seal `map` into the blob bytes for `version`'s family: `MYT1`
+/// under the v0.1 AAD, `MYT5` under the v0.2 one (§10.4.1).
+///
+/// **The version is a parameter, not a default.** The KEK is already derived
+/// version-aware by every caller, so an unversioned encode does not fail — it
+/// stamps `MYT1` over a v0.2-derived key, which is self-inconsistent: the
+/// magic tells the sniffing decoder to verify under the v0.1 AAD, that AEAD
+/// check fails, and §9.21.4's fall-back-to-empty then reports the store as
+/// simply having no themes. A migrated vault lost every custom theme on the
+/// first theme edit that way.
 pub fn encode_themes_map(
+    version: MetaVersion,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
     map: &ThemesMap,
 ) -> Result<Vec<u8>, ThemesError> {
     let plaintext = serialize_themes_map(map)?;
-    encode_themes_blob(themes_key, account_number_hash, &plaintext).map_err(|_| ThemesError::Encode)
+    encode_themes_blob_versioned(version, themes_key, account_number_hash, &plaintext)
+        .map_err(|_| ThemesError::Encode)
 }
 
 /// PURE CORE — decode `bytes` (a `MYT1` blob, or `None` for an absent file)
@@ -361,6 +372,7 @@ pub async fn read_verified_themes_bytes(
 pub async fn write_themes_map_in_dir(
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
+    version: MetaVersion,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
     map: &ThemesMap,
@@ -371,7 +383,7 @@ pub async fn write_themes_map_in_dir(
         let _ = io.remove_file(&path).await;
         return Ok(());
     }
-    let blob = encode_themes_map(themes_key, account_number_hash, map)?;
+    let blob = encode_themes_map(version, themes_key, account_number_hash, map)?;
     io.write(&path, &blob, crate::vault_io::WriteOpts::default())
         .await
         .map_err(|io_error_kind| ThemesError::Io { io_error_kind })?;
@@ -600,9 +612,14 @@ fn apply_delete(map: &mut ThemesMap, name: &str, now: u64) {
 /// — the deliberate re-add), and re-seal the blob. An invalid palette rejects
 /// with [`ThemesError::Invalid`] BEFORE any write, so the on-disk store is
 /// untouched. `now` is UNIX seconds, injected so the core stays pure.
+// The vault's generation joins the KEK, the account hash and the palette on the
+// parameter list; splitting them into a struct would hide which of them the
+// caller is responsible for keeping consistent, which is the whole point here.
+#[allow(clippy::too_many_arguments)]
 pub async fn themes_import_in_dir(
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
+    version: MetaVersion,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
     name: &str,
@@ -618,7 +635,15 @@ pub async fn themes_import_in_dir(
         validate_theme_for_import(palette_json).map_err(|error| ThemesError::Invalid { error })?;
     let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await?;
     apply_import(&mut map, name, parsed.vars, now);
-    write_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash, &map).await
+    write_themes_map_in_dir(
+        io,
+        vault_dir,
+        version,
+        themes_key,
+        account_number_hash,
+        &map,
+    )
+    .await
 }
 
 /// PURE CORE — **tombstone** `name` in the store and re-seal the blob. Deleting
@@ -627,6 +652,7 @@ pub async fn themes_import_in_dir(
 pub async fn themes_delete_in_dir(
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
+    version: MetaVersion,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
     name: &str,
@@ -634,7 +660,15 @@ pub async fn themes_delete_in_dir(
 ) -> Result<(), ThemesError> {
     let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await?;
     apply_delete(&mut map, name, now);
-    write_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash, &map).await
+    write_themes_map_in_dir(
+        io,
+        vault_dir,
+        version,
+        themes_key,
+        account_number_hash,
+        &map,
+    )
+    .await
 }
 
 // ---- `*_with_dir` wrappers (fetch material from the unlocked slot) ---------
@@ -684,7 +718,15 @@ async fn mutate_themes_with_dir(
     // syncs, so the wipe would reach every device.
     let mut map = read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await?;
     mutate(&mut map);
-    write_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash, &map).await?;
+    write_themes_map_in_dir(
+        io,
+        vault_dir,
+        meta_version,
+        &themes_key,
+        &account_number_hash,
+        &map,
+    )
+    .await?;
 
     // #266: open the coalesced push window, exactly as a prefs write does.
     //
@@ -1174,6 +1216,7 @@ mod tests {
         rt().block_on(super::write_themes_map_in_dir(
             &IO,
             vault_dir,
+            MetaVersion::V0_1,
             themes_key,
             account_number_hash,
             map,
@@ -1220,6 +1263,7 @@ mod tests {
         rt().block_on(super::themes_import_in_dir(
             &IO,
             vault_dir,
+            MetaVersion::V0_1,
             themes_key,
             account_number_hash,
             name,
@@ -1238,6 +1282,7 @@ mod tests {
         rt().block_on(super::themes_delete_in_dir(
             &IO,
             vault_dir,
+            MetaVersion::V0_1,
             themes_key,
             account_number_hash,
             name,
@@ -1811,7 +1856,7 @@ mod tests {
         assert!(decode_themes_map_or_empty(&KEY, &HASH, None).is_empty());
         assert!(decode_themes_map_or_empty(&KEY, &HASH, Some(b"not a MYT1 blob")).is_empty());
         let map = ThemesMap::from([("t".to_string(), ThemeEntry::live(ThemePalette::new(), T0))]);
-        let bytes = encode_themes_map(&KEY, &HASH, &map).expect("encode");
+        let bytes = encode_themes_map(MetaVersion::V0_1, &KEY, &HASH, &map).expect("encode");
         assert_eq!(decode_themes_map_or_empty(&KEY, &HASH, Some(&bytes)), map);
         assert!(decode_themes_map_or_empty(&[0x11; AEAD_KEY_LEN], &HASH, Some(&bytes)).is_empty());
     }
@@ -1828,7 +1873,7 @@ mod tests {
         let key = [0x42u8; AEAD_KEY_LEN];
         let mut map = ThemesMap::default();
         map.insert("midnight".to_string(), ThemeEntry::live(a_palette(), T0));
-        let intact = encode_themes_map(&key, &HASH, &map).expect("encode");
+        let intact = encode_themes_map(MetaVersion::V0_1, &key, &HASH, &map).expect("encode");
 
         // A tear that kept the header but lost the tail — the shape the
         // container models as `StopMidWrite`.
@@ -1895,7 +1940,7 @@ mod tests {
         let key = [0x42u8; AEAD_KEY_LEN];
         let mut map = ThemesMap::default();
         map.insert("midnight".to_string(), ThemeEntry::live(a_palette(), T0));
-        let intact = encode_themes_map(&key, &HASH, &map).expect("encode");
+        let intact = encode_themes_map(MetaVersion::V0_1, &key, &HASH, &map).expect("encode");
         let mut torn = intact.clone();
         torn.truncate(intact.len() - 8);
 

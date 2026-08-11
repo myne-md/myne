@@ -182,24 +182,36 @@ pub(crate) enum AccountHashRefusal {
 /// prefs / theme / catalog edits are overwritten forever, and no attachment ever
 /// materialises. Sourcing the value here and refusing on disagreement is what
 /// keeps that state from running.
+///
+/// **The generation travels with the hash, for the same reason.** A migrated
+/// vault's `MYP5`/`MYC5`/`MYT5` singletons need a v0.2-derived KEK; deriving
+/// v0.1 fails their tag check and lands in exactly the read-as-empty branch
+/// described above. Both values come from ONE parse of one blob here, so they
+/// cannot disagree about which vault, or which generation, the cycle is for.
 pub(crate) async fn cycle_account_number_hash(
     io: &dyn crate::vault_io::VaultIo,
     dir: &std::path::Path,
     enrolled: &[u8; 16],
-) -> Result<[u8; 16], AccountHashRefusal> {
+) -> Result<(protocol::MetaVersion, [u8; 16]), AccountHashRefusal> {
     // `vault.meta` is a double-buffered singleton on the web store, so "read it"
     // means "the newest copy that PARSES" — the same reader the attachments
     // catalog uses for the same field. Desktop and mobile are unchanged by
     // construction: `read_candidates` is a one-element list there.
-    let meta_hash = crate::singleton::open_newest(io, &dir.join("vault.meta"), |candidate| {
-        parse_vault_meta_any(candidate).map(|m| m.account_number_hash)
-    })
-    .await
-    .map_err(|_| AccountHashRefusal::MetaUnavailable)?;
+    let (version, meta_hash) =
+        crate::singleton::open_newest(io, &dir.join("vault.meta"), |candidate| {
+            parse_vault_meta_any(candidate).map(|m| {
+                (
+                    protocol::meta_version_of(candidate).unwrap_or(protocol::MetaVersion::V0_1),
+                    m.account_number_hash,
+                )
+            })
+        })
+        .await
+        .map_err(|_| AccountHashRefusal::MetaUnavailable)?;
     if &meta_hash != enrolled {
         return Err(AccountHashRefusal::NotThisVault);
     }
-    Ok(meta_hash)
+    Ok((version, meta_hash))
 }
 
 /// Gather the active vault's sync inputs (endpoint, enrollment identity, token,
@@ -333,27 +345,28 @@ pub async fn run_active_cycle_from_host(
     // cache (see [`cycle_account_number_hash`]). Checked BEFORE the token block:
     // a device whose enrolment names another account must not go on to claim a
     // token under that account's SCRAM username either.
-    let account_number_hash = match cycle_account_number_hash(io, &dir, &account_hash).await {
-        Ok(hash) => hash,
-        Err(AccountHashRefusal::MetaUnavailable) => {
-            tracing::error!(
-                stage = "read_vault_meta",
-                "no parsable vault.meta beside the enrolled state; cycle refused"
-            );
-            return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
-        }
-        Err(AccountHashRefusal::NotThisVault) => {
-            // Fail closed. The alternative — run the cycle on the meta's hash and
-            // keep authenticating as the enrolled one — would leave this vault's
-            // blobs sitting in another account's server namespace, which is worse
-            // than a stalled device that says so. The repair is re-enrolment.
-            tracing::error!(
-                stage = "account_hash_provenance",
-                "the enrolled account is not this vault's; cycle refused"
-            );
-            return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
-        }
-    };
+    let (meta_version, account_number_hash) =
+        match cycle_account_number_hash(io, &dir, &account_hash).await {
+            Ok(hash) => hash,
+            Err(AccountHashRefusal::MetaUnavailable) => {
+                tracing::error!(
+                    stage = "read_vault_meta",
+                    "no parsable vault.meta beside the enrolled state; cycle refused"
+                );
+                return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+            }
+            Err(AccountHashRefusal::NotThisVault) => {
+                // Fail closed. The alternative — run the cycle on the meta's hash and
+                // keep authenticating as the enrolled one — would leave this vault's
+                // blobs sitting in another account's server namespace, which is worse
+                // than a stalled device that says so. The repair is re-enrolment.
+                tracing::error!(
+                    stage = "account_hash_provenance",
+                    "the enrolled account is not this vault's; cycle refused"
+                );
+                return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+            }
+        };
     // Token: the stored per-device token, or — for a still-pending device — one
     // claimed now if an existing device has just approved it (re-handshake under
     // the unlocked root_key). Still pending → nothing to sync this tick.
@@ -422,6 +435,7 @@ pub async fn run_active_cycle_from_host(
             &notes_dir,
             &dir,
             allow_push,
+            meta_version,
             Some(super::orchestrator::AttachmentKeys {
                 items_key: &items_key,
                 items_key_id: &items_key_id,
@@ -678,7 +692,7 @@ mod tests {
 
             assert_eq!(
                 cycle_account_number_hash(&IO, tmp.path(), &seeded(0x2A)).await,
-                Ok(seeded(0x2A))
+                Ok((protocol::MetaVersion::V0_1, seeded(0x2A)))
             );
         });
     }
