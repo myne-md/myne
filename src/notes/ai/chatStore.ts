@@ -14,6 +14,7 @@
 // superseded) can never mutate the transcript after `clearChat()`.
 
 import { useSyncExternalStore } from "react";
+import type { AnsweredBy } from "../../components/AnsweredByIndicator";
 
 /** A source-note citation backing a grounded assistant answer (mirrors the Rust
  *  `SearchHit`; snake_case → camelCase at the IPC boundary). */
@@ -42,6 +43,17 @@ export interface ChatTurn {
   /** Whether this assistant turn can be inserted into the open note (summaries +
    *  any answer the user chooses to keep — SYNC-17 explicit action). (task 10) */
   insertable: boolean;
+  /**
+   * Which backend produced this answer, captured when the turn CLOSED
+   * (myne#191 task 4, SYNC-13).
+   *
+   * Stored per turn rather than read live at render, and that is the whole
+   * requirement: switching provider must not retroactively re-label the answers
+   * that came before it. `undefined` on a turn finalized by a path that has no
+   * provenance to offer yet — the indicator renders nothing rather than an
+   * empty line.
+   */
+  answeredBy?: AnsweredBy;
 }
 
 export interface ChatState {
@@ -61,7 +73,7 @@ export type ChatAction =
       insertable: boolean;
     }
   | { type: "TOKEN"; text: string }
-  | { type: "FINALIZE"; citations: ChatCitation[] }
+  | { type: "FINALIZE"; citations: ChatCitation[]; answeredBy?: AnsweredBy }
   | { type: "FAIL" }
   | { type: "STOP" }
   | { type: "CLEARED" };
@@ -117,6 +129,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
           ...last,
           streaming: false,
           citations: action.citations,
+          answeredBy: action.answeredBy,
         }),
         streaming: false,
       };
@@ -203,9 +216,13 @@ export function appendChatToken(token: number, text: string): void {
 }
 
 /** Close the active assistant turn with its citations, iff `token` is current. */
-export function finalizeChatTurn(token: number, citations: ChatCitation[]): void {
+export function finalizeChatTurn(
+  token: number,
+  citations: ChatCitation[],
+  answeredBy?: AnsweredBy,
+): void {
   if (!isChatRunCurrent(token)) return;
-  dispatchChat({ type: "FINALIZE", citations });
+  dispatchChat({ type: "FINALIZE", citations, answeredBy });
 }
 
 /** Mark the active assistant turn as errored, iff `token` is current. */

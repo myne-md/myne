@@ -40,6 +40,11 @@ permissions = [
   "allow-set-show-task-marker",
   "allow-set-transcription-enabled",
   "allow-set-auto-tag-enabled",
+  "allow-set-ai-provider",
+  "allow-set-ai-provider-consent",
+  "allow-set-ai-provider-key",
+  "allow-set-ai-provider-model",
+  "allow-ai-provider-has-key",
   "allow-set-reminders-enabled",
   "allow-set-reminder-horizon-days",
   "allow-set-editor-line-spacing",
@@ -523,6 +528,31 @@ commands.allow = ["set_transcription_enabled"]
 identifier = "allow-set-auto-tag-enabled"
 description = "Allow invoking prefs:set_auto_tag_enabled (Slot::Unlocked-gated setter for whether automatic on-device tag suggestion runs on this vault's notes, MYND-651). A plain bool defaulting FALSE, emitted on disk only when true so an untouched vault stays byte-identical to a pre-feature vault.prefs. Classified Shared / scalar last-write-wins, following set_transcription_enabled rather than the device-local ai_enabled: the tag pass runs a bundled task-model every AI-capable client carries, so wanting it is a vault-level preference rather than a device capability. This setter is NOT the enforcement point — the tag pass re-reads BOTH ai_enabled and auto_tag_enabled host-side before it touches the model, so a WebView that skips or forges this setter gains nothing and in particular cannot start inference on a vault whose AI opt-in is off. Atomic-writes vault.prefs with no native side-effect. Non-load-bearing: a tampered or replayed value can at worst enable or disable a local background computation that is independently gated. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
 commands.allow = ["set_auto_tag_enabled"]
+
+[[permission]]
+identifier = "allow-set-ai-provider"
+description = "Allow invoking prefs:set_ai_provider (Slot::Unlocked-gated setter for WHICH remote AI provider this account has named, myne#415). An Option<String> holding a closed wire value validated host-side against KNOWN_AI_PROVIDERS; an unrecognized name is REFUSED rather than stored, so a compromised WebView cannot park a value a future build would start honouring. None clears it, and clearing also clears the consent and the key — a key for a provider nobody selected is a credential with no owner, and a surviving consent would silently pre-approve the next provider the user picks. Classified Shared / scalar last-write-wins (sync-protocol.md 10.2): naming a REMOTE provider is a statement about where this vault's notes may be sent, unlike the device-local ai_enabled which is a per-machine compute budget. This setter is NOT the enforcement point — the request path re-reads the provider, the consent and the key before it sends. Atomic-writes vault.prefs with no native side-effect. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_ai_provider"]
+
+[[permission]]
+identifier = "allow-set-ai-provider-consent"
+description = "Allow invoking prefs:set_ai_provider_consent (Slot::Unlocked-gated setter for the one-time consent covering the named remote AI provider, myne#415, ledger SYNC-22). A plain bool defaulting FALSE, emitted on disk only when true so an untouched vault stays byte-identical to a pre-feature vault.prefs. It is a GATE, not a display flag: the request path checks it, so a client whose UI never showed the consent screen still cannot send. Classified Shared / scalar last-write-wins, so the approval is ACCOUNT-scoped — a newly enrolled device inherits it and begins sending without anyone at that device seeing the screen, a cost accepted knowingly and recorded in threat-model.md section 5. Atomic-writes vault.prefs with no native side-effect. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_ai_provider_consent"]
+
+[[permission]]
+identifier = "allow-set-ai-provider-key"
+description = "Allow invoking prefs:set_ai_provider_key (Slot::Unlocked-gated setter for the remote AI provider API key, myne#415). The value travels IN across IPC and never comes back OUT: PrefsView marks the field serde-skip, so prefs_read cannot return it and the UI reads the separate ai_provider_has_key boolean instead. None revokes, and revocation propagates to the account's other devices as a last-write-wins write of None. Wrapped in Zeroizing on arrival and never logged, not even by length (DENY list, src-tauri/CLAUDE.md); an all-whitespace value is treated as a clear rather than stored as a blank that would fail every request with an auth error the user cannot see. Classified Shared / scalar last-write-wins (sync-protocol.md 10.2) — a credential cannot be merged, and rotating on one device must replace everywhere. Atomic-writes vault.prefs with no native side-effect. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_ai_provider_key"]
+
+[[permission]]
+identifier = "allow-set-ai-provider-model"
+description = "Allow invoking prefs:set_ai_provider_model (Slot::Unlocked-gated setter for WHICH model at the named remote AI provider answers, myne#415, ledger SYNC-24). An Option<String>; None clears it and an all-whitespace value is treated as a clear rather than stored as a blank that would fail every request. Deliberately NOT validated against a compiled-in list, unlike its three siblings: the valid set is whatever the provider published a moment ago, which is the whole content of SYNC-24 (Myne ships no per-provider model default; the user picks from the list the provider itself reports). A pinned allowlist would re-introduce the rot that resolution rejected and would buy nothing, because this value selects among a provider's own catalogue and cannot name a DESTINATION — the destination is a compiled-in host constant no pref can redirect. What is bounded instead is the length (200 bytes), so a compromised WebView cannot use the blob as storage. Classified Shared / scalar last-write-wins (sync-protocol.md 10.2), travelling with the selection it qualifies: a device that inherited the provider but not the model would be configured with nothing to ask. Atomic-writes vault.prefs with no native side-effect. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_ai_provider_model"]
+
+[[permission]]
+identifier = "allow-ai-provider-has-key"
+description = "Allow invoking prefs:ai_provider_has_key (Slot::Unlocked-gated READ answering only WHETHER a remote-provider API key is stored, myne#415). It exists because the key is serde-skipped out of prefs_read, so the settings panel has no way to render 'a key is set' from that payload and must not be given one — the same whether-not-what split the browser-clipper panel already uses for pairing tokens. Returns a bare bool and never the value, its length, or any prefix. Answers false rather than erroring when the vault is locked or the prefs blob is unreadable, because 'no key' is the safe answer for a control whose only job is to choose between 'Add key' and 'Replace key'. Read-only: touches no file and has no native side-effect. Main-window-only."
+commands.allow = ["ai_provider_has_key"]
 
 # developer-mode (MYND-593): a write setter, so it inherits the same
 # main-window-only invariant as the other allow-set-* permissions — v0.2

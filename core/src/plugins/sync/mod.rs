@@ -62,7 +62,6 @@ pub mod cycle;
 pub mod engine;
 pub mod enroll;
 pub mod fork_audit;
-pub mod http_codec;
 pub mod http_transport;
 pub mod integrity;
 // Ungated as of phase3-web-client task 84 — but only half of it compiles for a

@@ -4,7 +4,7 @@
 //! **loopback `http`** (`127.0.0.1` / `localhost` / `[::1]`) for the dev server +
 //! the MYND-428 E2E harness (no self-signed-cert dance). This is the plain-TCP
 //! transport for exactly those endpoints — same minimal keep-alive HTTP/1.1
-//! codec (`http_codec`), no TLS. It refuses any non-loopback host (a
+//! codec (`crate::http`), no TLS. It refuses any non-loopback host (a
 //! non-loopback plaintext sync would be an A4 downgrade), so production https
 //! always routes to the pinned rustls layer.
 //!
@@ -25,12 +25,13 @@
 //! transports it selects differ.
 
 #[cfg(not(target_arch = "wasm32"))]
-use super::http_codec::{build_http_request_ext, keepalive_roundtrip, read_response_head};
-#[cfg(not(target_arch = "wasm32"))]
 use super::transport::{
     HttpMethod, SseOpenError, SseStream, TransportResponse, TransportResponseExt,
+    MAX_SYNC_RESPONSE_BYTES,
 };
 use super::transport::{SyncTransport, TransportError};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::http::codec::{build_http_request_ext, keepalive_roundtrip, read_response_head};
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::BufReader;
 #[cfg(not(target_arch = "wasm32"))]
@@ -123,6 +124,7 @@ impl SyncTransport for HttpTransport {
             || self.connect(),
             &req,
             method == HttpMethod::Head,
+            MAX_SYNC_RESPONSE_BYTES,
         )
     }
 
