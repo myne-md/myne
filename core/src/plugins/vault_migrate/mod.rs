@@ -30,6 +30,7 @@ use protocol::{
     decode_attachments_catalog, decode_note, decode_prefs_blob, derive_subkey, derive_subkey_v0_2,
     encode_attachments_catalog_versioned, encode_prefs_blob_versioned, encode_vault_meta_v0_2_raw,
     reseal_attachment_v0_2, reseal_kek_envelope_v0_2, KdfParams, MetaVersion, SubkeyRole,
+    DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_V0_2_MAGIC, THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC,
 };
 use std::path::Path;
 use zeroize::Zeroizing;
@@ -57,8 +58,8 @@ struct KekSingleton {
 const KEK_SINGLETONS: &[KekSingleton] = &[
     KekSingleton {
         filename: "vault.themes",
-        old_magic: b"MYT1",
-        new_magic: b"MYT5",
+        old_magic: &THEMES_BLOB_MAGIC,
+        new_magic: &THEMES_BLOB_V0_2_MAGIC,
         format_version: 0x01,
         aad_role: b"custom-themes-blob",
         kek_role: SubkeyRole::CustomThemesKey,
@@ -66,8 +67,8 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
     },
     KekSingleton {
         filename: "vault.dictionary",
-        old_magic: b"MYD1",
-        new_magic: b"MYD5",
+        old_magic: &DICTIONARY_BLOB_MAGIC,
+        new_magic: &DICTIONARY_BLOB_V0_2_MAGIC,
         format_version: 0x01,
         aad_role: b"personal-dictionary-blob",
         kek_role: SubkeyRole::PersonalDictKey,
