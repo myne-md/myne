@@ -23,7 +23,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // taken back.
             myne_core::plugins::vault_migrate::vault_migrate_abort,
             myne_core::plugins::vault_migrate::vault_migrate_confirm,
-            myne_core::plugins::vault_migrate::vault_migrate_settle_status
+            myne_core::plugins::vault_migrate::vault_migrate_settle_status,
+            myne_core::plugins::vault_migrate::progress::vault_migrate_progress
         ])
         .build()
 }

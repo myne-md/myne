@@ -24,6 +24,8 @@
 //! on a torn migration (the snapshot exists; the restore path is follow-on), and
 //! progress events.
 
+pub mod progress;
+
 use crate::host::HostCtx;
 use crate::vault_io::{VaultIo, WriteOpts};
 use protocol::{
@@ -381,8 +383,12 @@ pub async fn vault_migrate_from_host(
         &actor,
         host,
     )
-    .await
-    .map_err(|e| match e {
+    .await;
+    // Clear the progress cell on EVERY outcome, including the failures. A
+    // migration that aborts must not leave a reading that says a run is still in
+    // flight — the UI would show a stuck bar with no way to learn otherwise.
+    progress::finish();
+    let summary = summary.map_err(|e| match e {
         OnDiskMigrationError::Io => VaultMigrateError::Io,
         OnDiskMigrationError::Crypto(MigrationError::Csprng) => VaultMigrateError::Csprng,
         OnDiskMigrationError::Crypto(_) => VaultMigrateError::Crypto,
@@ -795,6 +801,25 @@ pub async fn migrate_vault_notes_on_disk(
         notes.push((uuid, blob));
     }
 
+    // §10.4.1 md.2's per-blob progress (myne-md/myne#441). The denominator is
+    // notes plus the singleton families actually present, counted before any work
+    // starts so the bar never moves backwards.
+    let singleton_count = {
+        let mut n = 0u32;
+        for name in [
+            "vault.themes",
+            "vault.dictionary",
+            "vault.prefs",
+            "vault.attachments",
+        ] {
+            if io.read(&vault_root.join(name)).await.is_ok() {
+                n += 1;
+            }
+        }
+        n
+    };
+    progress::begin(notes.len() as u32 + singleton_count);
+
     // (2) Run the pure crypto core (mint v0.2 keys, NTV5, MY01→NC05) OFF the
     //     async executor (myne-md/myne#434).
     //
@@ -933,6 +958,7 @@ pub async fn migrate_vault_notes_on_disk(
         io.write(&notes_dir.join(&name), &mn.nc05_blob, WriteOpts::default())
             .await
             .map_err(|_| Io)?;
+        progress::advance();
     }
 
     // (5) Re-seal the KEK-envelope singletons (themes/dictionary) present on disk:
@@ -966,6 +992,7 @@ pub async fn migrate_vault_notes_on_disk(
             .await
             .map_err(|_| Io)?;
         singletons_migrated += 1;
+        progress::advance();
     }
 
     // (5b) Re-seal `vault.prefs` (`MYP1`→`MYP5`). Prefs is hand-rolled (not a

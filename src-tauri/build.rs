@@ -90,6 +90,7 @@ fn main() {
                 "vault_migrate_abort",
                 "vault_migrate_confirm",
                 "vault_migrate_settle_status",
+                "vault_migrate_progress",
             ]),
         )
         .plugin(

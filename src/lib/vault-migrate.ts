@@ -124,3 +124,23 @@ export async function abortMigration(): Promise<void> {
 export async function confirmMigration(): Promise<void> {
   return invoke<void>("plugin:vault-migrate|vault_migrate_confirm");
 }
+
+/** Mirrors the Rust `MigrationProgress` (counts only — no percentage, no ETA). */
+export interface MigrationProgress {
+  done: number;
+  total: number;
+  generation: number;
+  active: boolean;
+}
+
+/**
+ * Read the running migration's per-blob progress (`protocol.md` §10.4.1 point 2).
+ *
+ * Counts, deliberately. The migration's cost is dominated by four Argon2id
+ * derivations at `m=256 MiB, t=3` that run BEFORE the counted loop and vary by
+ * an order of magnitude across machines, so any ETA derived from note throughput
+ * would be wrong by that whole prefix.
+ */
+export async function migrationProgress(): Promise<MigrationProgress> {
+  return invoke<MigrationProgress>("plugin:vault-migrate|vault_migrate_progress");
+}

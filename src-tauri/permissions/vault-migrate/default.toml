@@ -14,6 +14,7 @@ permissions = [
   "allow-vault-migrate-abort",
   "allow-vault-migrate-confirm",
   "allow-vault-migrate-settle-status",
+  "allow-vault-migrate-progress",
 ]
 
 [[permission]]
@@ -35,3 +36,8 @@ commands.allow = ["vault_migrate_confirm"]
 identifier = "allow-vault-migrate-settle-status"
 description = "Allow invoking vault-migrate:vault_migrate_settle_status — a read-only probe for whether this vault holds an unsettled migration (a legacy/ snapshot neither aborted nor confirmed) and whether abort is still available (pre-sync). Separate from the two acting commands because probing by calling confirm would erase the very thing being probed for. Reads no secret and returns two booleans."
 commands.allow = ["vault_migrate_settle_status"]
+
+[[permission]]
+identifier = "allow-vault-migrate-progress"
+description = "Allow invoking vault-migrate:vault_migrate_progress — read the running migration's per-blob progress (protocol.md §10.4.1 point 2). Counts only: done, total, a generation counter and an active flag. No percentage and no ETA, because the migration's cost is dominated by four Argon2id derivations that happen BEFORE the counted loop and vary by an order of magnitude across machines. Reads three atomics; touches no vault data."
+commands.allow = ["vault_migrate_progress"]

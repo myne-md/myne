@@ -2185,6 +2185,7 @@
       "errorBusy": "Another vault operation is running. Try again in a moment.",
       "errorIo": "Couldn't finish that. Nothing was changed."
     },
+    "progressCount": "{{done}} of {{total}} items re-encrypted…",
     "error": {
       "recoveryPhraseRequired": "That recovery phrase didn’t match this vault. Enter your correct recovery phrase to migrate — it’s required so recovery keeps working.",
       "wrongPassword": "That password didn’t match this vault.",
