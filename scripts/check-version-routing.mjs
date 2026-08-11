@@ -129,30 +129,11 @@ const ALLOWED = new Map([
   // branch, so these are recorded rather than rewritten.
   ["core/src/plugins/vault_unlock/commands.rs#meta", [2, "the v0.1 arm of an explicit `is_v0_2` branch"]],
   ["core/src/plugins/vault_unlock/commands.rs#kek", [1, "`derive_items_key`, the v0.1 twin of `derive_items_key_v0_2`"]],
-  // ── DEBT: not yet routed (myne-md/myne#432, #433) ─────────────────────────
-  // Every entry here is a surface that is BROKEN on a migrated vault today.
-  // This group must only ever shrink, and the summary line prints its size so
-  // the number is visible rather than buried.
-  ["core/src/plugins/attachments/ref_scan.rs#note", [3, "debt #432: the attachment reference scan sees every note as unreadable -> orphan cleanup misfires"]],
-  ["core/src/plugins/export/commands.rs#note", [1, "debt #432: vault export aborts on the first note — the escape hatch behind the no-lock-in commitment"]],
-  ["core/src/plugins/export/commands.rs#kek", [2, "debt #433: PrefsKey + AttachmentsCatalogKey, both re-sealed to their MY?5 family by the migration"]],
-  ["core/src/plugins/notes/commands.rs#note", [4, "debt #432: title extraction and the remaining CRUD readers"]],
-  ["core/src/plugins/snapshots/commands.rs#note", [2, "debt #432: snapshot preview + restore"]],
-  ["core/src/plugins/sync/conflict.rs#note", [2, "debt #432: the keep-both conflict surfaces"]],
-  ["core/src/plugins/quick_unlock/commands.rs#meta", [1, "debt #433: PIN re-enrolment is impossible on the vault the migration deliberately un-enrolled"]],
-  ["src-tauri/src/plugins/attachments/blocking_reads.rs#meta", [1, "debt #433: OCR queueing + attachment-text indexing stop"]],
-  ["src-tauri/src/plugins/attachments/blocking_reads.rs#kek", [1, "debt #433: AttachmentsCatalogKey — and `read_or_empty` turns the failure into an EMPTY catalog, not an error"]],
-  // Mixed: two are the MYE1 attachment-text cache (legitimately v0.1, like its
-  // siblings above) and one is AttachmentsCatalogKey, which the migration DOES
-  // re-seal. A (file, class) budget cannot split them, so the whole entry stays
-  // marked debt until the catalog one is routed and this drops to 2.
-  ["src-tauri/src/plugins/attachments/ocr_queue.rs#kek", [3, "debt #433: 1 of 3 is AttachmentsCatalogKey; the other 2 are the MYE1 cache"]],
-  ["src-tauri/src/plugins/attachments/read_text.rs#meta", [1, "debt #433: attachment-text export staging"]],
-  ["src-tauri/src/plugins/backup/restore.rs#meta", [1, "debt #433: every post-migration backup verifies and is unrestorable"]],
-  ["src-tauri/src/plugins/local_inference/commands.rs#meta", [1, "debt #433: the transcript cache is never written"]],
-  ["src-tauri/src/plugins/local_inference/hydrate.rs#meta", [1, "debt #433: embeddings never load — a full re-embed every unlock"]],
-  ["src-tauri/src/plugins/notes/desktop_commands.rs#note", [2, "debt #432: export note, export note with attachments"]],
-  ["src-tauri/src/plugins/notes/search_sync.rs#meta", [1, "debt #433: the search index silently never builds — swallowed as one warn, so search returns zero results forever"]],
+  // ── DEBT: not yet routed ───────────────────────────────────────────────────
+  // EMPTY, and that is the point: #432/#433 drove it to zero. A new entry here
+  // needs an argument for why the surface may stay broken on a migrated vault.
+  ["core/src/plugins/notes/commands.rs#note", [3, "the v0.1 arm of an explicit `is_nc05_blob` branch — note_read, note_update, note_write_batch"]],
+  ["src-tauri/src/plugins/attachments/ocr_queue.rs#kek", [2, "cache: attachments-text (AttachmentTextKey)"]],
 ]);
 
 const SKIP_DIRS = new Set(["target"]);

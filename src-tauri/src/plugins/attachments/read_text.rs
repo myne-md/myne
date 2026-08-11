@@ -201,7 +201,8 @@ fn read_account_number_hash(
     vault_dir: &Path,
 ) -> Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]> {
     let bytes = std::fs::read(vault_dir.join("vault.meta")).ok()?;
-    protocol::parse_vault_meta(&bytes)
+    // Either generation (myne-md/myne#433).
+    protocol::parse_vault_meta_any(&bytes)
         .map(|m| m.account_number_hash)
         .ok()
 }

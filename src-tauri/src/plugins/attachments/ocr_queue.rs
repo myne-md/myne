@@ -264,8 +264,19 @@ async fn collect_candidates(
     let Some((_, _, root_key)) = state.peek_unlocked_attachment_material().await else {
         return Vec::new();
     };
+    // `AttachmentTextKey` stays on the v0.1 context on purpose: `attachments-text`
+    // is a rebuildable cache the migration DROPS rather than re-seals (§10.4.1
+    // md.2), so its KEK never crosses a generation boundary. The CATALOG does get
+    // re-sealed, so its key is version-scoped (myne-md/myne#433) — and getting it
+    // wrong is silent, because `read_catalog` degrades to an empty catalog and
+    // this function then simply queues nothing, forever.
     let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let version = std::fs::read(vault_dir.join("vault.meta"))
+        .ok()
+        .and_then(|b| protocol::meta_version_of(&b))
+        .unwrap_or(protocol::MetaVersion::V0_1);
+    let catalog_key =
+        protocol::derive_subkey_versioned(version, &root_key, SubkeyRole::AttachmentsCatalogKey);
     let Ok(catalog) = read_catalog(
         &vault_dir.join("vault.attachments"),
         &catalog_key,

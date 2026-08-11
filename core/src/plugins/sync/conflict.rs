@@ -1253,10 +1253,10 @@ pub async fn read_quarantine_with_dir(
     // guard's own comment warns about, happening for real. Left as it was, an
     // AEAD decrypt on a quarantined note would have killed the Worker.
     crate::task::run_blocking(move || {
-        let decrypted = protocol::decode_note(&blob, &id, &items_key, &items_key_id)
-            .map_err(|_| SyncDeviceError::Internal)?;
-        let body = String::from_utf8(decrypted.plaintext().to_vec())
-            .map_err(|_| SyncDeviceError::Internal)?;
+        let decrypted =
+            crate::plugins::notes::decode::decode_note_any(&blob, &id, &items_key, &items_key_id)
+                .map_err(|_| SyncDeviceError::Internal)?;
+        let body = String::from_utf8(decrypted.to_vec()).map_err(|_| SyncDeviceError::Internal)?;
         drop(decrypted);
         Ok::<String, SyncDeviceError>(body)
     })
@@ -1371,10 +1371,10 @@ pub async fn take_conflict(
     // quarantine read needed when it left the host-gated module. An AEAD decrypt
     // on the blocking pool is right natively and fatal in a Worker.
     crate::task::run_blocking(move || {
-        let decrypted = protocol::decode_note(&blob, &id, &items_key, &items_key_id)
-            .map_err(|_| SyncDeviceError::Internal)?;
-        let body = String::from_utf8(decrypted.plaintext().to_vec())
-            .map_err(|_| SyncDeviceError::Internal)?;
+        let decrypted =
+            crate::plugins::notes::decode::decode_note_any(&blob, &id, &items_key, &items_key_id)
+                .map_err(|_| SyncDeviceError::Internal)?;
+        let body = String::from_utf8(decrypted.to_vec()).map_err(|_| SyncDeviceError::Internal)?;
         drop(decrypted);
         Ok::<String, SyncDeviceError>(body)
     })

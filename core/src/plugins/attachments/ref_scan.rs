@@ -4,15 +4,15 @@
 //! Extracted from the desktop `notes::desktop_commands` into `myne-core` so the
 //! shared `attachment_unused_list` / `attachment_clean_unused` command cores can
 //! compute the referenced set on both desktop and mobile. Depends only on
-//! `protocol::decode_note`, the core note enumerator
+//! `notes::decode::decode_note_any`, the core note enumerator
 //! ([`crate::plugins::notes::commands::enumerate_notes_dir`]), and the shared
 //! embed tokenizer ([`crate::plugins::attachments::reconcile::extract_att_embed_spans`]).
 //!
 //! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
 
 use crate::io_failure_kind::IoFailureKind;
+use crate::plugins::notes::decode::decode_note_any;
 use crate::vault_io::VaultIo;
-use protocol::{decode_note, DecryptError};
 
 /// Closed failure surface of [`collect_referenced_attachment_ids`]
 /// (MYND-171). The attachments-cleanup commands (`attachment_unused_list` /
@@ -24,7 +24,7 @@ pub enum ReferencedScanError {
     /// `read_dir` of the notes directory, or a per-note `read` other than
     /// `NotFound`, failed. Carries the closed io kind.
     Io(IoFailureKind),
-    /// A note blob failed to AEAD-decrypt (`decode_note` → `CannotDecrypt`).
+    /// A note blob failed to decode (`decode_note_any` → `CannotDecrypt`).
     /// **Fail-closed**: the scan cannot prove the note's references, so the
     /// caller MUST refuse to compute the unused set rather than under-count.
     CannotDecrypt,
@@ -63,7 +63,7 @@ pub enum ReferencedScanError {
 /// type narrowed from `std::io::ErrorKind` to the closed [`IoFailureKind`],
 /// which is what the two callers' IPC enums carried anyway.
 ///
-/// **The per-note `decode_note` stays inline rather than getting its own
+/// **The per-note decode stays inline rather than getting its own
 /// dispatch**, which is a deliberate departure from `note_read`'s
 /// read-through-the-seam-then-`run_blocking`-the-decode shape. There the choice
 /// is one dispatch for one note; here it would be one dispatch PER note across a
@@ -129,9 +129,9 @@ async fn collect_from_notes(
             Err(IoFailureKind::NotFound) => continue,
             Err(kind) => return Err(ReferencedScanError::Io(kind)),
         };
-        let decrypted = decode_note(&blob, &note_uuid_bytes, items_key, items_key_id)
-            .map_err(|_: DecryptError| ReferencedScanError::CannotDecrypt)?;
-        let plaintext = std::str::from_utf8(decrypted.plaintext())
+        let decrypted = decode_note_any(&blob, &note_uuid_bytes, items_key, items_key_id)
+            .map_err(|_| ReferencedScanError::CannotDecrypt)?;
+        let plaintext = std::str::from_utf8(&decrypted)
             .map_err(|_| ReferencedScanError::InvalidPlaintextEncoding)?;
         for span in crate::plugins::attachments::reconcile::extract_att_embed_spans(plaintext) {
             referenced.insert(span.id.to_string());
@@ -182,7 +182,7 @@ async fn collect_from_snapshots(
         };
         // The AAD binds the NOTE's uuid, not the snapshot's — a snapshot is a
         // prior revision of that note, sealed under the same binding, which is
-        // what lets `decode_note` read it unchanged.
+        // what lets the decoder read it unchanged.
         let Ok(parsed) = uuid::Uuid::parse_str(&note_uuid) else {
             continue;
         };
@@ -193,9 +193,9 @@ async fn collect_from_snapshots(
             Err(IoFailureKind::NotFound) => continue,
             Err(kind) => return Err(ReferencedScanError::Io(kind)),
         };
-        let decrypted = decode_note(&blob, &note_uuid_bytes, items_key, items_key_id)
-            .map_err(|_: DecryptError| ReferencedScanError::CannotDecrypt)?;
-        let plaintext = std::str::from_utf8(decrypted.plaintext())
+        let decrypted = decode_note_any(&blob, &note_uuid_bytes, items_key, items_key_id)
+            .map_err(|_| ReferencedScanError::CannotDecrypt)?;
+        let plaintext = std::str::from_utf8(&decrypted)
             .map_err(|_| ReferencedScanError::InvalidPlaintextEncoding)?;
         for span in crate::plugins::attachments::reconcile::extract_att_embed_spans(plaintext) {
             referenced.insert(span.id.to_string());
@@ -252,9 +252,9 @@ pub async fn collect_note_attachment_refs(
             Err(IoFailureKind::NotFound) => continue,
             Err(kind) => return Err(ReferencedScanError::Io(kind)),
         };
-        let decrypted = decode_note(&blob, &note_uuid_bytes, items_key, items_key_id)
-            .map_err(|_: DecryptError| ReferencedScanError::CannotDecrypt)?;
-        let plaintext = std::str::from_utf8(decrypted.plaintext())
+        let decrypted = decode_note_any(&blob, &note_uuid_bytes, items_key, items_key_id)
+            .map_err(|_| ReferencedScanError::CannotDecrypt)?;
+        let plaintext = std::str::from_utf8(&decrypted)
             .map_err(|_| ReferencedScanError::InvalidPlaintextEncoding)?;
         let mut refs: Vec<String> = Vec::new();
         for span in crate::plugins::attachments::reconcile::extract_att_embed_spans(plaintext) {

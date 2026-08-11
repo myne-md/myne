@@ -50,7 +50,7 @@ use crate::plugins::notes::export_mtime::{apply_updated_mtime_from, fm_rfc3339_f
 use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder, fm_title};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_id::VaultId;
-use protocol::{decode_attachment_blob, decode_note, derive_subkey, SubkeyRole};
+use protocol::{decode_attachment_blob, SubkeyRole};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -290,6 +290,14 @@ pub(crate) async fn vault_export_core(
     // spawn_blocking await — the backup pattern; in-flight writers drain
     // first, new writers queue until the drop below).
     let quiesce = state.quiesce_writers().await;
+    // Read under the quiesce guard, with the same `std::fs` this module already
+    // uses (it is host-only and gated out of the wasm build). An unreadable or
+    // unrecognised meta falls back to v0.1, which is the pre-migration answer
+    // and the one this code has always given.
+    let version = std::fs::read(vault_dir.join("vault.meta"))
+        .ok()
+        .and_then(|b| protocol::meta_version_of(&b))
+        .unwrap_or(protocol::MetaVersion::V0_1);
     let params = StageParams {
         vault_dir: vault_dir.clone(),
         forbidden_roots,
@@ -298,6 +306,7 @@ pub(crate) async fn vault_export_core(
         items_key: items_key.clone(),
         items_key_id,
         root_key,
+        version,
         hooks: hooks.clone(),
     };
     let staged = tokio::task::spawn_blocking(move || stage_export_tree(params))
@@ -337,6 +346,13 @@ struct StageParams {
     items_key: Zeroizing<[u8; 32]>,
     items_key_id: [u8; 16],
     root_key: Zeroizing<[u8; 32]>,
+    /// The vault's generation (myne-md/myne#433). The prefs and
+    /// attachments-catalog KEKs below are version-scoped, and a v0.1 derivation
+    /// on a migrated vault does not fail — both readers degrade to EMPTY by
+    /// spec (§9.5.5 for prefs, `read_or_empty` for the catalog). So the export
+    /// silently omitted the user's deliberate folders and every attachment,
+    /// and reported success.
+    version: protocol::MetaVersion,
     hooks: ExportHooks,
 }
 
@@ -459,7 +475,8 @@ fn stage_export_tree_inner(
     // Deliberate empty folders (vault.prefs §9.5.2) — read-or-default,
     // the prefs read discipline (absent / undecodable prefs degrade to
     // "no deliberate folders", never fail the export).
-    let prefs_key = derive_subkey(&params.root_key, SubkeyRole::PrefsKey);
+    let prefs_key =
+        protocol::derive_subkey_versioned(params.version, &params.root_key, SubkeyRole::PrefsKey);
     // `export` is host-only (gated out of the wasm build entirely) AND this
     // function is synchronous, so it cannot await the seam's read. It reads with
     // `std::fs` and shares the decode-and-fall-back half — § 9.5.5's "absent /
@@ -493,7 +510,11 @@ fn stage_export_tree_inner(
         let done = i as u32 + 1;
 
         let blob = std::fs::read(notes_dir.join(format!("{}.myn", id.as_uuid())))?;
-        let decrypted = decode_note(
+        // Either format (myne-md/myne#432). This is the escape hatch behind the
+        // no-lock-in commitment (`vision.md`), and an `MY01`-only decode aborted
+        // the WHOLE export on the first note of a migrated vault — the one
+        // surface whose job is to work when nothing else does.
+        let decrypted = crate::plugins::notes::decode::decode_note_any(
             &blob,
             id.as_uuid().as_bytes(),
             &params.items_key,
@@ -503,11 +524,11 @@ fn stage_export_tree_inner(
             tracing::debug!(
                 stage = "decode",
                 outcome = "cannot_decrypt",
-                "vault_export decode_note returned CannotDecrypt"
+                "vault_export note decode returned CannotDecrypt"
             );
             VaultExportError::CannotDecrypt
         })?;
-        let Ok(plaintext) = std::str::from_utf8(decrypted.plaintext()) else {
+        let Ok(plaintext) = std::str::from_utf8(&decrypted) else {
             tracing::error!(
                 stage = "utf8_check",
                 error_kind = "InvalidPlaintextEncoding",
@@ -518,7 +539,7 @@ fn stage_export_tree_inner(
 
         // FM slices extracted ONCE per note — folder, trash marker,
         // title, and `updated:` all read off this one scan.
-        let slices = extract_title_slices(decrypted.plaintext());
+        let slices = extract_title_slices(&decrypted);
         let frontmatter = slices.frontmatter_bytes;
 
         // Folder + scope filter FIRST (a subtree export's exclusion
@@ -611,8 +632,11 @@ fn stage_export_tree_inner(
                     );
                     return Err(VaultExportError::InvalidVaultMeta);
                 };
-                let catalog_key =
-                    derive_subkey(&params.root_key, SubkeyRole::AttachmentsCatalogKey);
+                let catalog_key = protocol::derive_subkey_versioned(
+                    params.version,
+                    &params.root_key,
+                    SubkeyRole::AttachmentsCatalogKey,
+                );
                 let loaded = match std::fs::read(vault_dir.join("vault.attachments")) {
                     Ok(bytes) => protocol::read_or_empty(&catalog_key, &meta_hash, Some(&bytes)),
                     Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -664,7 +688,7 @@ fn stage_export_tree_inner(
         let updated = frontmatter.and_then(|fm| fm_rfc3339_field_in(fm, b"updated:"));
         let target = dir_abs.join(&final_name);
         if spans.is_empty() {
-            atomic_write::atomic_write_unclobbered(&target, decrypted.plaintext(), false)?;
+            atomic_write::atomic_write_unclobbered(&target, &decrypted, false)?;
         } else {
             let rewritten =
                 Zeroizing::new(rewrite_embeds_to_final_names(plaintext, &spans, &att_final));
