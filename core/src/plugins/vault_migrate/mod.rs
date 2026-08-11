@@ -146,7 +146,13 @@ pub fn migrate_keys_and_notes(
     kdf_params: &KdfParams,
     notes: &[([u8; 16], Vec<u8>)],
     actor: &[u8],
-    host: &dyn HostCtx,
+    // The wall clock for the `NC05` change timestamps, pre-read by the caller.
+    // Host-free on purpose (myne-md/myne#434): this whole function is the
+    // migration's CPU core — four production-parameter Argon2id derivations plus
+    // the note-encryption loop — and it now runs inside `crate::task::run_blocking`,
+    // whose closure is `'static` and cannot borrow `&dyn HostCtx`. Same shape as
+    // `crdt::encode_note_at_millis`, which exists for exactly this reason.
+    now_millis: u64,
 ) -> Result<MigrationOutput, MigrationError> {
     // --- mint the fresh v0.2 key material ---
     let mut new_root_key = Zeroizing::new([0u8; 32]);
@@ -191,13 +197,13 @@ pub fn migrate_keys_and_notes(
             .map_err(|_| MigrationError::CannotDecryptNote)?;
         let markdown =
             core::str::from_utf8(decrypted.plaintext()).map_err(|_| MigrationError::NoteNotUtf8)?;
-        let nc05_blob = crate::plugins::notes::crdt::encode_note_blob(
+        let nc05_blob = crate::plugins::notes::crdt::encode_note_blob_at_millis(
             markdown,
             &new_items_key,
             &new_items_key_id,
             uuid,
             actor,
-            host,
+            now_millis,
         )
         .map_err(|_| MigrationError::Crypto)?;
         migrated.push(MigratedNote {
@@ -236,6 +242,13 @@ pub enum VaultMigrateError {
     Csprng,
     /// A v0.2 seal/derive failed (unreachable under fixed params).
     Crypto,
+    /// Another auth-pipeline operation (change-password, backup, quick-unlock
+    /// enrolment, another migration) is already in flight (myne-md/myne#434).
+    ///
+    /// Reject, never queue — `decisions.md` 2026-05-02 generalizes the
+    /// single-in-flight posture across the auth pipeline, and a whole-vault
+    /// re-key is the most exclusive operation in the app.
+    AuthOperationInProgress,
 }
 
 /// Run the whole-vault v0.1 → v0.2 migration for the active vault (§10.4.1, #420).
@@ -259,6 +272,16 @@ pub async fn vault_migrate_from_host(
         derive_password_wrap_key, derive_recovery_wrap_key_from_normalized, normalize_user_phrase,
         parse_vault_meta, VAULT_META_MAGIC, VAULT_META_V0_2_MAGIC,
     };
+
+    // The single-in-flight permit, before anything is read (myne-md/myne#434).
+    // Every peer in the auth pipeline takes it — `vault_change_password`, backup
+    // export, quick-unlock enrolment — and the migration, which re-keys the whole
+    // vault, took nothing at all. Bound to `_permit` so it is held for the whole
+    // call.
+    let _permit = state
+        .auth_permits()
+        .try_acquire()
+        .map_err(|_| VaultMigrateError::AuthOperationInProgress)?;
 
     let vault_root =
         crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
@@ -332,6 +355,18 @@ pub async fn vault_migrate_from_host(
     let actor = crate::plugins::sync::crdt_doc::fresh_actor_bytes()
         .map_err(|_| VaultMigrateError::Csprng)?;
 
+    // Writer quiescence, held across the whole on-disk pass (myne-md/myne#434).
+    // In-flight note writers drain first and new ones queue until this drops.
+    //
+    // Without it the migration read every note at one point and wrote its `NC05`
+    // replacement at a later one, with nothing held in between — so an autosave
+    // landing in that window was either overwritten by an `NC05` built from the
+    // STALE pre-edit markdown (the edit gone, and `legacy/` holding the pre-edit
+    // copy too), or wrote an `MY01` blob AFTER the `NC05` one, leaving that note
+    // permanently `CannotDecrypt` under the discarded old `itemsKey`. Both
+    // reported `notes_migrated: N`.
+    let _quiesce = state.quiesce_writers().await;
+
     let summary = migrate_vault_notes_on_disk(
         io,
         &vault_root,
@@ -352,6 +387,12 @@ pub async fn vault_migrate_from_host(
         OnDiskMigrationError::Crypto(MigrationError::Csprng) => VaultMigrateError::Csprng,
         OnDiskMigrationError::Crypto(_) => VaultMigrateError::Crypto,
     })?;
+
+    // Release the writer quiescence BEFORE the lock below. Both take the slots
+    // write lock, so holding this across `lock_from_host` self-deadlocks — the
+    // migration would complete on disk and then hang forever with the vault
+    // still unlocked on stale keys.
+    drop(_quiesce);
 
     // Migration is a RE-KEY event: `NTV5` mints a fresh `root_key` and a fresh
     // `items_key`, so any still-Unlocked slot is now holding STALE v0.1 keys that
@@ -391,6 +432,14 @@ pub async fn vault_migrate<R: tauri::Runtime>(
     password: String,
     phrase: String,
 ) -> Result<OnDiskMigrationSummary, VaultMigrateError> {
+    // First-line plaintext-IPC discipline (myne-md/myne#434): bind both secrets to
+    // `Zeroizing` so they wipe on every return path rather than lingering as
+    // plain `String`s across the migration's `.await`s — which, for a whole-vault
+    // re-key, is the longest-lived secret window in the app. The master password
+    // AND the recovery phrase are both in scope here, and the phrase is the one
+    // credential the user can never rotate.
+    let password = Zeroizing::new(password);
+    let phrase = Zeroizing::new(phrase);
     vault_migrate_from_host(
         &crate::host::tauri_host::TauriHost::new(app),
         state.inner(),
@@ -470,19 +519,46 @@ pub async fn migrate_vault_notes_on_disk(
         notes.push((uuid, blob));
     }
 
-    // (2) Run the pure crypto core (mint v0.2 keys, NTV5, MY01→NC05).
-    let out = migrate_keys_and_notes(
-        old_items_key,
-        old_items_key_id,
-        password,
-        phrase_normalized,
-        account_number_hash,
-        kdf_params,
-        &notes,
-        actor,
-        host,
-    )
-    .map_err(OnDiskMigrationError::Crypto)?;
+    // (2) Run the pure crypto core (mint v0.2 keys, NTV5, MY01→NC05) OFF the
+    //     async executor (myne-md/myne#434).
+    //
+    //     This is four production-parameter Argon2id derivations
+    //     (m=256 MiB, t=3) plus one AEAD seal per note. On the executor it parks
+    //     a runtime worker for the whole run — seconds on a small vault, minutes
+    //     on a large one — which is the exact shape `crate::task::run_blocking`
+    //     exists to prevent, and which every other Argon2id-bound command in the
+    //     app already avoids (`vault_change_password`, backup, quick-unlock).
+    let now_millis = host.now_unix_millis();
+    let (old_ik, old_ikid, acct, kdf) = (
+        *old_items_key,
+        *old_items_key_id,
+        *account_number_hash,
+        *kdf_params,
+    );
+    let (pw, phrase, actor_owned) = (
+        Zeroizing::new(password.to_string()),
+        Zeroizing::new(phrase_normalized.to_string()),
+        actor.to_vec(),
+    );
+    // The closure takes ownership and hands `notes` back: the `legacy/` staging
+    // below writes the ORIGINAL blobs, so they must outlive the crypto pass.
+    let (out, notes) = crate::task::run_blocking(move || {
+        let out = migrate_keys_and_notes(
+            &old_ik,
+            &old_ikid,
+            &pw,
+            &phrase,
+            &acct,
+            &kdf,
+            &notes,
+            &actor_owned,
+            now_millis,
+        );
+        (out, notes)
+    })
+    .await
+    .map_err(|_| OnDiskMigrationError::Crypto(MigrationError::Crypto))?;
+    let out = out.map_err(OnDiskMigrationError::Crypto)?;
 
     // (3) Stage the legacy/ snapshot (old vault.meta + old note blobs) BEFORE any
     //     overwrite — the abort-before-sync escape hatch (§10.4.1).
@@ -854,7 +930,7 @@ mod tests {
 
     #[test]
     fn migrates_keys_and_notes_end_to_end() {
-        let host = TestHost::new("/base");
+        let _host = TestHost::new("/base");
         let u1 = [0x01u8; 16];
         let u2 = [0x02u8; 16];
         let md1 = "---\ntitle: One İş 🚀\n---\n\n# Body with a [[link]]\n";
@@ -870,7 +946,7 @@ mod tests {
             &fast_params(),
             &notes,
             ACTOR,
-            &host,
+            0,
         )
         .expect("migrate");
 
@@ -922,7 +998,7 @@ mod tests {
 
     #[test]
     fn a_note_that_does_not_decrypt_under_the_old_key_is_rejected() {
-        let host = TestHost::new("/base");
+        let _host = TestHost::new("/base");
         let u = [0x03u8; 16];
         // A MY01 blob under a DIFFERENT items_key → cannot decrypt under OLD_ITEMS.
         let alien = encode_new_note(&[0x77; 32], &OLD_ITEMS_ID, &u, b"x").expect("MY01");
@@ -937,7 +1013,7 @@ mod tests {
             &fast_params(),
             &[(u, alien)],
             ACTOR,
-            &host,
+            0,
         ) {
             Err(e) => assert_eq!(e, MigrationError::CannotDecryptNote),
             Ok(_) => panic!("an undecryptable note must abort the migration"),
@@ -1343,9 +1419,56 @@ mod tests {
         })
     }
 
+    /// The whole-vault re-key takes the single-in-flight auth permit
+    /// (myne-md/myne#434).
+    ///
+    /// It took nothing at all, while every peer in the auth pipeline took it —
+    /// change-password, backup export, quick-unlock enrolment. The concrete cost
+    /// was not theoretical: `export_backup_core` guards only against permit
+    /// HOLDERS, so a scheduled backup firing mid-migration streamed a vault whose
+    /// notes were half `NC05` and half `MY01` under a still-`MYV1` `vault.meta`
+    /// into a `.myne-backup` that verified cleanly and restored to a permanently
+    /// torn vault.
+    #[test]
+    fn a_migration_is_refused_while_another_auth_operation_holds_the_permit() {
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-permit").unwrap();
+            let host = TestHost::new(tmp.path());
+            let io = StdVaultIo;
+            let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            io.create_dir_all(&vault_root.join("notes")).await.unwrap();
+            build_myv1_vault(&io, &vault_root).await;
+
+            let state = VaultRuntimeState::default();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+
+            // Stand in for any other auth-pipeline operation.
+            let held = state
+                .auth_permits()
+                .try_acquire()
+                .expect("the permit is free at rest");
+            match vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io).await {
+                Err(VaultMigrateError::AuthOperationInProgress) => {}
+                other => panic!("a migration must be refused, not queued, got {other:?}"),
+            }
+            // Refused BEFORE reading anything: the vault is untouched.
+            let meta = io.read(&vault_root.join("vault.meta")).await.unwrap();
+            assert_eq!(&meta[0..4], b"MYV1", "a refused migration writes nothing");
+
+            // Released → it proceeds. The permit is a serializer, not a ban.
+            drop(held);
+            vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io)
+                .await
+                .expect("migration succeeds once the permit is free");
+            let meta = io.read(&vault_root.join("vault.meta")).await.unwrap();
+            assert_eq!(&meta[0..4], b"NTV5");
+        })
+    }
+
     #[test]
     fn empty_vault_migrates_to_just_the_ntv5_meta() {
-        let host = TestHost::new("/base");
+        let _host = TestHost::new("/base");
         let out = migrate_keys_and_notes(
             &OLD_ITEMS,
             &OLD_ITEMS_ID,
@@ -1355,7 +1478,7 @@ mod tests {
             &fast_params(),
             &[],
             ACTOR,
-            &host,
+            0,
         )
         .expect("migrate empty");
         assert_eq!(&out.ntv5_meta[0..4], b"NTV5");

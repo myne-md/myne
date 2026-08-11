@@ -113,7 +113,32 @@ pub fn encode_note_blob(
     actor: &[u8],
     host: &dyn HostCtx,
 ) -> Result<Vec<u8>, ProtocolError> {
-    let save = encode_note(markdown, actor, host);
+    encode_note_blob_at_millis(
+        markdown,
+        items_key,
+        items_key_id,
+        note_uuid,
+        actor,
+        host.now_unix_millis(),
+    )
+}
+
+/// Host-free [`encode_note_blob`] — the caller pre-reads the clock.
+///
+/// Exists for the whole-vault migration (myne-md/myne#434), whose crypto core
+/// runs inside a `'static` [`crate::task::run_blocking`] closure that cannot
+/// borrow `&dyn HostCtx`. One clock read covers the whole batch, which is also
+/// the honest thing to record: every note of one migration is re-encoded at one
+/// instant.
+pub fn encode_note_blob_at_millis(
+    markdown: &str,
+    items_key: &[u8; 32],
+    items_key_id: &[u8; 16],
+    note_uuid: &[u8; 16],
+    actor: &[u8],
+    now_millis: u64,
+) -> Result<Vec<u8>, ProtocolError> {
+    let save = encode_note_at_millis(markdown, actor, now_millis);
     encode_crdt_note_blob(items_key, items_key_id, note_uuid, &save)
 }
 
