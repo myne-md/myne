@@ -114,7 +114,7 @@ const ALLOWED = new Map([
   // (the verifier replace path), not a routing mistake at these sites.
   ["core/src/plugins/sync/cycle.rs#kek", [1, "sync: ServerAuth (SCRAM secret)"]],
   ["core/src/plugins/sync/enroll.rs#kek", [2, "sync: ServerAuth (SCRAM secret)"]],
-  ["core/src/plugins/sync/orchestrator.rs#kek", [1, "sync: `sync_id_for` — the reserved singleton sync-ids"]],
+  ["core/src/plugins/sync/orchestrator.rs#kek", [2, "sync: `sync_id_for` (the reserved singleton sync-ids) + the ServerAuth secret for the #429 verifier replace"]],
 
   // ── legitimately v0.1: THE V0.1 SIDE, BY CONSTRUCTION ─────────────────────
   ["core/src/plugins/vault_creation/commands.rs#kek", [3, "a newly created vault IS v0.1"]],

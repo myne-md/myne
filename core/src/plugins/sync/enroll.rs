@@ -245,6 +245,52 @@ pub fn register_verifier(
     }
 }
 
+/// Replace the account's SCRAM verifier (`POST /auth/verifier`, **authed**).
+///
+/// A whole-vault re-key (`protocol.md` §10.4) mints a new `root_key`, so
+/// `derive_subkey(root_key, ServerAuth)` — the SCRAM secret — changes with it.
+/// [`register_verifier`] cannot carry that: it is first-write-only by design and
+/// answers 409 for an account that already has one, which is exactly the
+/// property that keeps an unauthenticated caller from overwriting a credential.
+///
+/// So the replace is authed, and the server takes the account from the bearer
+/// token rather than from the body — a device can only replace the verifier of
+/// the account it already authenticated against (myne-md/myne#429).
+///
+/// **Called while the CURRENT token is still valid**, i.e. right after the
+/// migration, not lazily. The failure this avoids is delayed and total: an
+/// enrolled device presents a stored token and keeps working, so nothing looks
+/// wrong until that token expires or a new device enrols — and then every
+/// handshake fails 401 with no way to fix it from the client side.
+pub fn replace_verifier(
+    transport: &dyn SyncTransport,
+    token: &str,
+    account_hash: &[u8; 16],
+    secret: &[u8],
+) -> Result<(), EnrollError> {
+    let account_hash_hex = hex_encode(account_hash);
+    let mut salt = [0u8; 16];
+    getrandom::getrandom(&mut salt).map_err(|_| EnrollError::BadResponse)?;
+    let iterations = SCRAM_REGISTER_ITERATIONS;
+    let v = scram_client_proof(secret, &salt, iterations, &account_hash_hex, "", "", &[]);
+    // No `account_hash_hex` field: the server reads the account from the session.
+    // Sending one would invite a reader to think it is the authority.
+    let body = serde_json::json!({
+        "username": account_hash_hex,
+        "salt_hex": hex_encode(&salt),
+        "iterations": iterations,
+        "stored_key_hex": hex_encode(&v.stored_key),
+        "server_key_hex": hex_encode(&v.server_key),
+    });
+    let body = serde_json::to_vec(&body).map_err(|_| EnrollError::BadResponse)?;
+    let resp = transport.request(HttpMethod::Post, "/auth/verifier", &body, Some(token))?;
+    match resp.status {
+        200 => Ok(()),
+        401 => Err(EnrollError::Unauthenticated),
+        _ => Err(EnrollError::BadResponse),
+    }
+}
+
 /// Seed the account's `vault.meta` on the server (`PUT /vault.meta`, authed) so a
 /// new device can fetch it pre-auth at enrollment. The body is the raw
 /// (AEAD-protected, credential-gated) meta bytes — opaque to the blind server.

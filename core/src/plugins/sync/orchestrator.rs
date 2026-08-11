@@ -3394,7 +3394,35 @@ async fn sync_cycle_attempt(
             // must stay pending, or the next cycle reads the stale-generation
             // head as a forgery again and this time raises the alarm.
             if rekey_rebase && outcome.head_id.is_some() {
-                state.rekey_rebase_pending = false;
+                // The other root-derived sync artefact (#429(e)): the SCRAM
+                // secret is `derive_subkey(root_key, ServerAuth)`, so the re-key
+                // invalidated the account's verifier too. `/auth/register` is
+                // first-write-only and 409s, so the replace goes through the
+                // authed route — HERE, while this cycle's token is provably
+                // still valid, because that is the only window in which the
+                // client can still authenticate at all. Left undone, nothing
+                // looks wrong until the token expires or a new device enrols,
+                // and then every handshake 401s permanently.
+                let new_secret = derive_subkey(root_key, SubkeyRole::ServerAuth);
+                let replaced = super::enroll::replace_verifier(
+                    transport,
+                    token,
+                    &account_number_hash,
+                    new_secret.as_slice(),
+                )
+                .is_ok();
+                // Both legs or neither: a head that landed with a stale verifier
+                // still leaves the account unreachable later, and clearing the
+                // flag would spend the one retry the next cycle has.
+                if replaced {
+                    state.rekey_rebase_pending = false;
+                } else {
+                    tracing::warn!(
+                        stage = "rekey_rebase",
+                        event = "verifier_replace_failed",
+                        "the re-based head landed but the SCRAM verifier did not; retrying next cycle"
+                    );
+                }
             }
             // The prefs push landed → its shared-subset hash is the new push-gate
             // baseline (MYND-478, §10.2.1).
