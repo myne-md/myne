@@ -123,6 +123,13 @@ pub fn zeroize_ai_vectors<R: Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(state) = app.try_state::<vector_store::LocalInferenceVectorState>() {
         state.clear();
     }
+    // The cached provider authorization is vault content too — it holds the
+    // plaintext API key (myne-md/myne#437). It used to be the one vault-derived
+    // secret that survived a teardown which wipes `root_key`, the search index,
+    // the spell dictionary and the vectors.
+    if let Some(state) = app.try_state::<state::LocalInferenceState>() {
+        state.invalidate();
+    }
 }
 
 /// Construct the `local-inference` plugin.
@@ -180,7 +187,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             app.manage(
                 state::LocalInferenceState::with_backends(backends, active)
                     .with_snapshot_cell(cell)
-                    .with_prefs_reader(prefs_reader(app.clone())),
+                    .with_prefs_reader(prefs_reader(app.clone()))
+                    .with_active_vault_reader(active_vault_reader(app.clone())),
             );
             app.manage(vector_store::LocalInferenceVectorState::default());
             // Shared cancel flag for the streaming chat surface (task 4/5): the
@@ -336,6 +344,19 @@ pub(crate) fn resolve_backends(
 /// Every failure resolves to `None`, which the seam reads as the local arm:
 /// no active vault, no vault directory, a locked slot, an unreadable blob. The
 /// fail-closed direction here is "answer locally", never "assume configured".
+/// The synchronous half of the #437 gate: which vault is unlocked right now.
+///
+/// Best-effort by construction — `active_vault_id_now` answers `None` when the
+/// slot lock is contended, and the seam treats that as "cannot confirm", which
+/// resolves to the local arm. The gate's failure mode is in-process inference,
+/// never another vault's provider.
+fn active_vault_reader<R: Runtime>(app: tauri::AppHandle<R>) -> state::ActiveVaultReader {
+    std::sync::Arc::new(move || {
+        app.try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()?
+            .active_vault_id_now()
+    })
+}
+
 fn prefs_reader<R: Runtime>(app: tauri::AppHandle<R>) -> state::PrefsReader {
     std::sync::Arc::new(move || {
         let app = app.clone();
@@ -352,7 +373,13 @@ fn prefs_reader<R: Runtime>(app: tauri::AppHandle<R>) -> state::PrefsReader {
             .await
             .ok()?;
             let developer_mode = prefs.developer_mode;
-            Some((prefs, developer_mode))
+            // Stamp the vault this was read from (myne-md/myne#437) — the seam
+            // refuses to route remote unless it still matches the unlocked one.
+            Some(state::PrefsSnapshot {
+                prefs,
+                developer_mode,
+                vault_id: vault.active_vault_id().await,
+            })
         })
     })
 }
@@ -379,7 +406,9 @@ pub(crate) fn remote_backend(cell: state::PrefsCell) -> state::Backend {
         "remote",
         state::BackendClass::Remote,
         std::sync::Arc::new(provider_registry::RemoteEngine::new(Box::new(move || {
-            cell.read().ok().and_then(|s| s.clone())
+            cell.read()
+                .ok()
+                .and_then(|s| s.as_ref().map(|s| (s.prefs.clone(), s.developer_mode)))
         }))),
     )
 }

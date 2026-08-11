@@ -87,12 +87,24 @@ pub async fn infer(
     prompt: String,
     max_new_tokens: Option<usize>,
     state: State<'_, LocalInferenceState>,
+    vault_state: State<'_, VaultRuntimeState>,
     priority: State<'_, ComputePriority>,
 ) -> Result<String, EngineError> {
     // A user asked for this. Register for the whole call so a background
     // auto-tag pass stands down rather than making the user queue behind it
     // (MYND-651 task 4) — held across the await, dropped on every return path.
     let _interactive = priority.interactive();
+    // Refresh the authorization against the CURRENTLY unlocked vault
+    // (myne-md/myne#437). This command carries note text to whatever backend is
+    // selected and took no vault input at all, so it resolved from whatever the
+    // cell last held — which, before the vault stamp, could be another vault's
+    // provider. The stamp makes a stale cell unusable; refreshing here makes it
+    // current, so the user's own configuration takes effect without waiting for
+    // a capability report to happen to run.
+    if vault_state.active_vault_id().await.is_none() {
+        return Err(EngineError::VaultLocked);
+    }
+    state.refresh().await;
     infer_with_engine(state.engine_for(INFER_CLASS)?, prompt, max_new_tokens).await
 }
 

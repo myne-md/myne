@@ -275,6 +275,30 @@ impl VaultRuntimeState {
             .min()
     }
 
+    /// Best-effort **synchronous** read of [`Self::active_vault_id`], for a
+    /// caller that cannot await (myne-md/myne#437).
+    ///
+    /// The AI backend selection is such a caller: it resolves inside a sync
+    /// `active()` and has to answer "is the authorization I hold the CURRENT
+    /// vault's?" before it may route a note off the device. Threading an async
+    /// read through the 41 call sites of that seam would be a large, noisy
+    /// change for one comparison.
+    ///
+    /// **`None` on contention, and that is the point.** A caller must treat an
+    /// unproven answer as "cannot confirm", and for the AI gate that means
+    /// falling back to the local arm — so a contended lock degrades to
+    /// in-process inference, never to another vault's provider. A gate whose
+    /// failure mode is "send anyway" would be the wrong shape regardless of how
+    /// rare the contention is.
+    pub fn active_vault_id_now(&self) -> Option<VaultId> {
+        let slots = self.slots.try_read().ok()?;
+        slots
+            .iter()
+            .filter(|(_, slot)| matches!(slot, Slot::Unlocked(_)))
+            .map(|(id, _)| *id)
+            .min()
+    }
+
     /// The `VaultId` of the sole non-`Empty` entry the idle timer / lock path
     /// should act on — the `Unlocked` key if one exists, else the `Recovering`
     /// key. `None` when no entry is `Unlocked` or `Recovering`.
