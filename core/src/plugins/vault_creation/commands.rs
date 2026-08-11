@@ -427,6 +427,17 @@ pub fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool> {
     if vault_dir.join("vault.meta.tmp").is_file() {
         return Ok(true);
     }
+    // A staged newer-generation meta (myne-md/myne#447). It only exists beside a
+    // real `vault.meta`, so this arm is defence in depth rather than a reachable
+    // state — but a directory holding one is unambiguously a vault, and a fresh
+    // creation on top of it would leave a staged meta from a different account
+    // for the new vault's unlock to try.
+    if vault_dir
+        .join(crate::plugins::vault_migrate::adopt::INCOMING_META_FILE)
+        .is_file()
+    {
+        return Ok(true);
+    }
     // MYND-160: `vault.prefs` (spec § 9.5) is the v0.1 vault-prefs blob.
     // Recognized the same way `vault.meta` is — a leftover from a
     // partial-fail `vault_delete` or manual cleanup must gate a fresh

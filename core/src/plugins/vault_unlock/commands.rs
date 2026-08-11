@@ -713,123 +713,84 @@ pub async fn unlock_with_path(
         }
     })?;
 
-    // ── browser-capability ceiling (task 31) ────────────────────────────────
+    // ── candidate order: a staged newer-generation meta, then this vault's own
+    //    (myne-md/myne#447) ───────────────────────────────────────────────────
     //
-    // Parsed here, OUTSIDE the blocking closure, purely so the host's memory
-    // ceiling can be checked BEFORE `derive_root_key` allocates. The parse is
-    // cheap (345 bytes) and its result moves into the closure, so nothing is
-    // done twice.
+    // The staged copy is tried FIRST, and that ordering is the fix rather than a
+    // detail. This vault's own `vault.meta` still opens under the same password,
+    // so trying the staged one only after a failure would never promote
+    // anything: the device would unlock into the previous generation, sync would
+    // meet the same unopenable head, lock again, and the user would be back
+    // here — the loop #447 describes.
     //
-    // Ordering is the entire contract: on `wasm32` an over-large Argon2id block
-    // is not a catchable allocation failure, it is an abort — the instance dies
-    // and the user sees a dead Worker with no cause. A refusal has to happen
-    // before the allocation, not around it.
-    //
-    // This does NOT relax protocol validation, and must not: `validate_kdf_params`
-    // still runs inside `derive_root_key`, `MAX_KDF_M_KIB` (4 GiB) is unchanged,
-    // and the v0.1 256 MiB baseline is unchanged. Parameters are AAD-bound and
-    // read from `vault.meta` (`protocol.md` §4.2) — they can be neither lowered
-    // nor renegotiated per client. This is strictly an "and can this host
-    // actually service it" question layered on top.
-    if let Some(ceiling_kib) = host.max_kdf_memory_kib() {
-        let required_kib = meta_preview.kdf_params.m_kib;
-        if required_kib > ceiling_kib {
-            // Public figures only (both come from the unencrypted KDF block or
-            // the client build), so this log carries no credential-adjacent
-            // value — see the variant's doc comment.
-            tracing::error!(
-                stage = "kdf_capability",
-                error_kind = "KdfMemoryExceedsHostCapability",
-                required_kib,
-                ceiling_kib,
-                "vault KDF memory cost exceeds what this host can service"
-            );
-            return Err(VaultUnlockError::KdfMemoryExceedsHostCapability {
-                required_mib: required_kib / 1024,
-                available_mib: ceiling_kib / 1024,
-            });
+    // A staged meta this credential cannot open is a fabrication or the residue
+    // of an abandoned migration. It is discarded and the local one answers, so a
+    // hostile server costs one wasted Argon2id and `vault.meta` is never touched.
+    let vault_root = vault_path.parent().unwrap_or(vault_path).to_path_buf();
+    let mut adopted: Option<Vec<u8>> = None;
+    let mut derived: Option<DerivedKeys> = None;
+
+    if let Some(candidate) =
+        crate::plugins::vault_migrate::adopt::read_incoming_meta(io, &vault_root).await
+    {
+        // Its own preview parse: a staged meta belongs to a DIFFERENT
+        // generation, so the local meta's KDF params say nothing about what this
+        // one will ask the host to allocate.
+        match protocol::parse_vault_meta_any(&candidate) {
+            Ok(preview) => {
+                match derive_keys_from_meta_candidate(
+                    host,
+                    &preview,
+                    candidate.clone(),
+                    password.clone(),
+                )
+                .await
+                {
+                    Ok(keys) => {
+                        derived = Some(keys);
+                        adopted = Some(candidate);
+                    }
+                    Err(_) => {
+                        // Not an unlock failure: nothing has failed from the
+                        // user's side, and the local meta is about to answer.
+                        tracing::info!(
+                            stage = "staged_meta",
+                            event = "not_opened",
+                            "a staged newer-generation vault.meta did not open under this \
+                             credential; discarding it and using the local one"
+                        );
+                        crate::plugins::vault_migrate::adopt::discard_incoming_meta(
+                            io,
+                            &vault_root,
+                        )
+                        .await;
+                    }
+                }
+            }
+            Err(_) => {
+                crate::plugins::vault_migrate::adopt::discard_incoming_meta(io, &vault_root).await;
+            }
         }
     }
 
-    let join_outcome =
-        crate::task::run_blocking(move || -> Result<DerivedKeys, VaultUnlockError> {
-            // Dispatch on the `vault.meta` magic (§10.3): `MYV1` → the v0.1 key
-            // hierarchy; `NTV5` → the v0.2 hierarchy a completed migration wrote
-            // (§10.4.1, #420). Any OTHER magic is a newer major this build does
-            // not implement → a typed "vault upgraded, update this app" refusal
-            // (§10.5), never a silent half-parse or a "corrupted" mislabel.
-            let magic = bytes.get(0..4);
-            let is_v0_2 = magic == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice());
-            if !is_v0_2 && magic != Some(protocol::VAULT_META_MAGIC.as_slice()) {
-                tracing::error!(
-                    stage = "parse_meta",
-                    error_kind = "VaultUpgradedUnsupported",
-                    "vault.meta magic is a newer unsupported major version"
-                );
-                return Err(VaultUnlockError::VaultUpgradedUnsupported);
-            }
-
-            let meta = if is_v0_2 {
-                protocol::parse_vault_meta_v0_2(&bytes)
-            } else {
-                protocol::parse_vault_meta(&bytes)
-            }
-            .map_err(|e| {
-                tracing::error!(
-                    stage = "parse_meta",
-                    error_kind = "InvalidVaultMeta",
-                    protocol_error_kind = protocol_error_kind(&e),
-                    "vault.meta parse rejected"
-                );
-                VaultUnlockError::InvalidVaultMeta
-            })?;
-
-            let items_key_id = meta.items_key_id;
-            // SHA-256 of unlock-time vault.meta bytes — the CAS anchor
-            // that `vault_change_password` will compare against before
-            // rewriting in-place. Computed inside spawn_blocking so
-            // sha2 runs on the blocking pool, not the runtime worker.
-            let vault_meta_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&bytes);
-            // items_key derivation drops `root_key` on early-return;
-            // the slot stays empty (no half-state).
-            let (root_key, items_key) = if is_v0_2 {
-                let rk = derive_root_key_v0_2(&password, &meta)?;
-                let ik = derive_items_key_v0_2(&rk, &meta)?;
-                (rk, ik)
-            } else {
-                let rk = derive_root_key(&password, &meta)?;
-                let ik = derive_items_key(&rk, &meta)?;
-                (rk, ik)
-            };
-            Ok(DerivedKeys {
-                root_key,
-                items_key,
-                items_key_id,
-                vault_meta_bytes_hash,
-            })
-        })
-        .await;
-
+    // The local meta. ITS error is the one that reaches the user — a staged meta
+    // failing must never surface as "wrong password" for this vault.
     let DerivedKeys {
         root_key,
         items_key,
         items_key_id,
         vault_meta_bytes_hash,
-    } = match join_outcome {
-        Ok(Ok(keys)) => keys,
-        // Inner `Err` was already traced at its origin (read_meta /
-        // parse_meta / password_kdf / root_unwrap / items_key_unwrap);
-        // do not double-trace here.
-        Ok(Err(inner)) => return Err(inner),
-        Err(_) => {
-            tracing::error!(
-                stage = "spawn_blocking_join",
-                error_kind = "JoinFailure",
-                "blocking task join failed"
-            );
-            return Err(VaultUnlockError::JoinFailure);
-        }
+    } = match derived {
+        Some(keys) => keys,
+        None => derive_keys_from_meta_candidate(host, &meta_preview, bytes, password).await?,
     };
+
+    // Proved. The credential opened it, so it becomes this vault's meta — and
+    // every artefact the replaced root sealed goes with it.
+    if let Some(promoted) = adopted {
+        crate::plugins::vault_migrate::adopt::promote_incoming_meta(io, &vault_root, &promoted)
+            .await;
+    }
 
     let now_ms = host.monotonic_millis();
     // Lock-then-unlock seam (sub-feature 2 task 2): enforce the ≤1-`Unlocked`
@@ -1823,6 +1784,134 @@ pub fn report_user_activity<R: Runtime>(state: State<'_, VaultRuntimeState>, app
     report_user_activity_from_state(state.inner(), &TauriHost::new(app))
 }
 
+/// Parse ONE `vault.meta` candidate and derive its key hierarchy.
+///
+/// Byte-for-byte the work that used to run inline in [`unlock_with_path`]: the
+/// browser-capability ceiling, the `run_blocking` hop, the §10.3 magic dispatch,
+/// and the join collapse. Nothing about a single attempt changed.
+///
+/// It is a function so the caller can try candidates **in order**
+/// (myne-md/myne#447) — a staged newer-generation meta first, this vault's own
+/// second. That turns "which `vault.meta` did the credential actually open" from
+/// an assumption into a value the caller holds, which is what makes promoting
+/// the staged copy safe: it is promoted because it opened, not because a server
+/// offered it.
+async fn derive_keys_from_meta_candidate(
+    host: &dyn HostCtx,
+    meta_preview: &protocol::VaultMeta,
+    bytes: Vec<u8>,
+    password: Zeroizing<String>,
+) -> Result<DerivedKeys, VaultUnlockError> {
+    // ── browser-capability ceiling (task 31) ────────────────────────────────
+    //
+    // Parsed here, OUTSIDE the blocking closure, purely so the host's memory
+    // ceiling can be checked BEFORE `derive_root_key` allocates. The parse is
+    // cheap (345 bytes) and its result moves into the closure, so nothing is
+    // done twice.
+    //
+    // Ordering is the entire contract: on `wasm32` an over-large Argon2id block
+    // is not a catchable allocation failure, it is an abort — the instance dies
+    // and the user sees a dead Worker with no cause. A refusal has to happen
+    // before the allocation, not around it.
+    //
+    // This does NOT relax protocol validation, and must not: `validate_kdf_params`
+    // still runs inside `derive_root_key`, `MAX_KDF_M_KIB` (4 GiB) is unchanged,
+    // and the v0.1 256 MiB baseline is unchanged. Parameters are AAD-bound and
+    // read from `vault.meta` (`protocol.md` §4.2) — they can be neither lowered
+    // nor renegotiated per client. This is strictly an "and can this host
+    // actually service it" question layered on top.
+    if let Some(ceiling_kib) = host.max_kdf_memory_kib() {
+        let required_kib = meta_preview.kdf_params.m_kib;
+        if required_kib > ceiling_kib {
+            // Public figures only (both come from the unencrypted KDF block or
+            // the client build), so this log carries no credential-adjacent
+            // value — see the variant's doc comment.
+            tracing::error!(
+                stage = "kdf_capability",
+                error_kind = "KdfMemoryExceedsHostCapability",
+                required_kib,
+                ceiling_kib,
+                "vault KDF memory cost exceeds what this host can service"
+            );
+            return Err(VaultUnlockError::KdfMemoryExceedsHostCapability {
+                required_mib: required_kib / 1024,
+                available_mib: ceiling_kib / 1024,
+            });
+        }
+    }
+
+    let join_outcome =
+        crate::task::run_blocking(move || -> Result<DerivedKeys, VaultUnlockError> {
+            // Dispatch on the `vault.meta` magic (§10.3): `MYV1` → the v0.1 key
+            // hierarchy; `NTV5` → the v0.2 hierarchy a completed migration wrote
+            // (§10.4.1, #420). Any OTHER magic is a newer major this build does
+            // not implement → a typed "vault upgraded, update this app" refusal
+            // (§10.5), never a silent half-parse or a "corrupted" mislabel.
+            let magic = bytes.get(0..4);
+            let is_v0_2 = magic == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice());
+            if !is_v0_2 && magic != Some(protocol::VAULT_META_MAGIC.as_slice()) {
+                tracing::error!(
+                    stage = "parse_meta",
+                    error_kind = "VaultUpgradedUnsupported",
+                    "vault.meta magic is a newer unsupported major version"
+                );
+                return Err(VaultUnlockError::VaultUpgradedUnsupported);
+            }
+
+            let meta = if is_v0_2 {
+                protocol::parse_vault_meta_v0_2(&bytes)
+            } else {
+                protocol::parse_vault_meta(&bytes)
+            }
+            .map_err(|e| {
+                tracing::error!(
+                    stage = "parse_meta",
+                    error_kind = "InvalidVaultMeta",
+                    protocol_error_kind = protocol_error_kind(&e),
+                    "vault.meta parse rejected"
+                );
+                VaultUnlockError::InvalidVaultMeta
+            })?;
+
+            let items_key_id = meta.items_key_id;
+            // SHA-256 of unlock-time vault.meta bytes — the CAS anchor
+            // that `vault_change_password` will compare against before
+            // rewriting in-place. Computed inside spawn_blocking so
+            // sha2 runs on the blocking pool, not the runtime worker.
+            let vault_meta_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&bytes);
+            // items_key derivation drops `root_key` on early-return;
+            // the slot stays empty (no half-state).
+            let (root_key, items_key) = if is_v0_2 {
+                let rk = derive_root_key_v0_2(&password, &meta)?;
+                let ik = derive_items_key_v0_2(&rk, &meta)?;
+                (rk, ik)
+            } else {
+                let rk = derive_root_key(&password, &meta)?;
+                let ik = derive_items_key(&rk, &meta)?;
+                (rk, ik)
+            };
+            Ok(DerivedKeys {
+                root_key,
+                items_key,
+                items_key_id,
+                vault_meta_bytes_hash,
+            })
+        })
+        .await;
+
+    match join_outcome {
+        Ok(inner) => inner,
+        Err(_) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "blocking task join failed"
+            );
+            Err(VaultUnlockError::JoinFailure)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2146,11 +2235,193 @@ mod tests {
         });
     }
 
-    /// `Slot::Unlocked.vault_meta_bytes_hash` must equal SHA-256 of
-    /// the on-disk vault.meta bytes after a successful unlock — the
-    /// CAS anchor for `vault_change_password`'s in-place rewrite. See
-    /// `decisions.md` 2026-05-06 entry "Slot::Unlocked anchor field
-    /// for vault.meta CAS".
+    // ── staged-meta adoption (myne-md/myne#447) ─────────────────────────────
+
+    fn stage(scratch_path: &std::path::Path, bytes: &[u8]) {
+        let root = scratch_path.parent().expect("vault root");
+        std::fs::write(
+            root.join(crate::plugins::vault_migrate::adopt::INCOMING_META_FILE),
+            bytes,
+        )
+        .expect("stage");
+    }
+
+    fn staged_exists(scratch_path: &std::path::Path) -> bool {
+        scratch_path
+            .parent()
+            .expect("vault root")
+            .join(crate::plugins::vault_migrate::adopt::INCOMING_META_FILE)
+            .exists()
+    }
+
+    /// The fix: a staged meta the user's own credential opens is PROMOTED, and
+    /// the unlock proceeds on it.
+    ///
+    /// It is tried FIRST, and that is the whole point — this vault's own
+    /// `vault.meta` opens under the same password, so a design that only
+    /// consulted the staged copy after a failure would never reach it. The
+    /// device would unlock into the previous generation forever, which is the
+    /// loop #447 describes.
+    #[test]
+    fn a_staged_meta_the_credential_opens_is_promoted() {
+        rt().block_on(async {
+            const PW: &str = "correct horse battery staple";
+            let scratch = scratch_vault();
+            // Two DIFFERENT vaults, both openable by the same password — which
+            // is what a re-key produces: fresh root, fresh itemsKey, same
+            // credential.
+            let (local_bytes, local_root) = seed_vault_meta(PW);
+            let (staged_bytes, staged_root) = seed_vault_meta(PW);
+            assert_ne!(local_root, staged_root, "the fixture must be two roots");
+            scratch.write_meta(&local_bytes);
+            stage(scratch.path(), &staged_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                PW.to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("unlock");
+
+            // The slot holds the STAGED generation's key, not the local one.
+            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
+            assert_eq!(
+                *unlocked.root_key, staged_root,
+                "unlock resolved the local meta — the staged one was not tried first"
+            );
+            // …and it is now this vault's meta, on disk.
+            assert_eq!(
+                std::fs::read(scratch.path()).expect("read meta"),
+                staged_bytes.to_vec(),
+                "the proved meta must be promoted to vault.meta"
+            );
+            assert!(
+                !staged_exists(scratch.path()),
+                "a promoted staging file must not be left to re-promote every unlock"
+            );
+        });
+    }
+
+    /// The security property: a staged meta that does NOT open changes nothing.
+    ///
+    /// This is the case a hostile or broken server produces. `vault.meta` holds
+    /// the only local copy of the wrapped `root_key`, so adopting an unproven
+    /// one would strand the vault — not a confidentiality break, but a loss on
+    /// the one file that must not be lost. The unlock must fall back to the
+    /// local meta, succeed, and leave those bytes untouched.
+    #[test]
+    fn a_staged_meta_the_credential_cannot_open_is_discarded_and_never_promoted() {
+        rt().block_on(async {
+            const PW: &str = "correct horse battery staple";
+            let scratch = scratch_vault();
+            let (local_bytes, local_root) = seed_vault_meta(PW);
+            // A meta for a DIFFERENT credential — the shape a fabrication has.
+            let (hostile_bytes, _) = seed_vault_meta("a password this user never chose");
+            scratch.write_meta(&local_bytes);
+            stage(scratch.path(), &hostile_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                PW.to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("the local meta must still open the vault");
+
+            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
+            assert_eq!(*unlocked.root_key, local_root, "the local vault must open");
+            assert_eq!(
+                std::fs::read(scratch.path()).expect("read meta"),
+                local_bytes.to_vec(),
+                "an unproven meta must never replace vault.meta — that is the whole \
+                 reason adoption is credential-gated rather than trusted"
+            );
+            assert!(
+                !staged_exists(scratch.path()),
+                "a staged meta this credential cannot open is discarded, not re-tried \
+                 (and re-paid for in Argon2id) on every future unlock"
+            );
+        });
+    }
+
+    /// Promotion takes the artefacts the replaced root sealed with it — and
+    /// leaves the notes alone.
+    ///
+    /// The dangerous half is `vault.prefs` / `vault.attachments` / `vault.themes`:
+    /// undecryptable-but-present, they read as EMPTY, and an empty local
+    /// singleton is one push away from overwriting the migrating device's real
+    /// data. `notes/` is the opposite — the pull replaces those blobs, and
+    /// deleting them here would throw away content before its replacement
+    /// arrived.
+    #[test]
+    fn promotion_drops_the_artefacts_the_replaced_root_sealed_but_not_the_notes() {
+        rt().block_on(async {
+            const PW: &str = "correct horse battery staple";
+            let scratch = scratch_vault();
+            let (local_bytes, _) = seed_vault_meta(PW);
+            let (staged_bytes, _) = seed_vault_meta(PW);
+            scratch.write_meta(&local_bytes);
+            stage(scratch.path(), &staged_bytes);
+
+            let root = scratch.path().parent().expect("vault root").to_path_buf();
+            let stale = [
+                "vault.search",
+                "vault.workspace",
+                "vault.indices",
+                "vault.graph",
+                "vault.embeddings",
+                "vault.quickunlock",
+                "vault.head-state",
+                "vault.prefs",
+                "vault.attachments",
+                "vault.themes",
+                "vault.dictionary",
+            ];
+            for f in stale {
+                std::fs::write(root.join(f), b"sealed under the old root").expect("seed");
+            }
+            std::fs::create_dir_all(root.join("notes")).expect("notes dir");
+            std::fs::write(root.join("notes/a.myn"), b"MY01 body").expect("seed note");
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                PW.to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("unlock");
+
+            for f in stale {
+                assert!(
+                    !root.join(f).exists(),
+                    "{f} survived promotion — it is sealed under a root that no longer exists"
+                );
+            }
+            assert!(
+                root.join("notes/a.myn").exists(),
+                "promotion must not delete note blobs; the pull replaces them, and \
+                 removing them here discards content before its replacement lands"
+            );
+        });
+    }
+
+    /// `Slot::Unlocked.vault_meta_bytes_hash` must equal SHA-256 of the on-disk
+    /// vault.meta bytes after a successful unlock — the CAS anchor for
+    /// `vault_change_password`'s in-place rewrite. See `decisions.md`
+    /// 2026-05-06 entry "Slot::Unlocked anchor field for vault.meta CAS".
     #[test]
     fn unlock_populates_slot_meta_bytes_hash() {
         rt().block_on(async {

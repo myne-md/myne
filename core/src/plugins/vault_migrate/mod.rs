@@ -24,6 +24,7 @@
 //! on a torn migration (the snapshot exists; the restore path is follow-on), and
 //! progress events.
 
+pub(crate) mod adopt;
 pub mod progress;
 
 use crate::host::HostCtx;
@@ -489,6 +490,58 @@ const LEGACY_RESTORE_FILES: &[&str] = &[
     "vault.attachments",
 ];
 
+/// Singletons sealed under a `root_key` that is being replaced, by name.
+///
+/// Every one is either rebuildable from the notes (search, indices, graph,
+/// embeddings), device-local editor state (workspace), a credential wrapping a
+/// now-stale `root_key` copy (`vault.quickunlock` + its attempt counter), or the
+/// sync baseline whose integrity is the old head's own MAC (`vault.head-state`).
+/// Left in place they are undecryptable bytes their readers already fall back
+/// over; removed, they rebuild under the new root.
+///
+/// **Two callers, and they are not the same event**: the migration replacing its
+/// own root (§10.4.1), and a peer promoting the generation a migration produced
+/// on another device (myne-md/myne#447). The roster is shared because "which
+/// artefacts does a root replacement invalidate" has exactly one answer.
+///
+/// **The abort path deliberately does NOT use this list** — see
+/// `restore_legacy_vault`, which drops what the *v0.2 session* built while
+/// rolling back to v0.1. The overlap is coincidental; the questions are
+/// opposite, and answering both from one roster is how a roll-back starts
+/// deleting something it was supposed to restore.
+const STALE_UNDER_REPLACED_ROOT: &[&str] = &[
+    "vault.search",
+    "vault.workspace",
+    "vault.indices",
+    "vault.graph",
+    "vault.embeddings",
+    "vault.quickunlock",
+    "vault.quickunlock.attempts",
+    "vault.head-state",
+];
+
+/// Remove every artefact [`STALE_UNDER_REPLACED_ROOT`] names, plus `also`, plus
+/// the per-attachment extracted-text cache subtree.
+///
+/// Best-effort throughout: a delete failure must never abort a committed re-key
+/// or a promotion the user's credential already proved. What is left behind is
+/// undecryptable bytes, which every reader on this path already tolerates.
+pub(crate) async fn drop_artefacts_sealed_under_replaced_root(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    also: &[&str],
+) {
+    for stale in STALE_UNDER_REPLACED_ROOT.iter().chain(also) {
+        let _ = io.remove_file(&vault_root.join(stale)).await;
+    }
+    // `attachments-text/` (`MYE1`, §9.15) is a rebuildable search-extraction
+    // cache under the old key — the whole subtree goes, so it re-extracts on
+    // demand rather than lingering undecryptable.
+    let _ = io
+        .remove_dir_all(&vault_root.join("attachments-text"))
+        .await;
+}
+
 /// Restore the byte-identical v0.1 vault from `legacy/` (§10.4.1 point 5).
 ///
 /// **Valid pre-sync and pre-confirm only.** After the re-based head has landed
@@ -554,6 +607,13 @@ pub async fn vault_migrate_abort_from_host(
 
     // The v0.2 caches and the armed re-base flag both describe a vault that no
     // longer exists.
+    //
+    // **Deliberately its own list, not `STALE_UNDER_REPLACED_ROOT`.** That
+    // roster answers "what did the OLD root seal"; this one answers "what did
+    // the v0.2 session BUILD", and a roll-back needs the second. The lists
+    // overlap only because those caches happen to exist in both states — reusing
+    // the roster here would start deleting `vault.prefs`-class artefacts this
+    // path has just restored from `legacy/`.
     for stale in [
         "vault.search",
         "vault.indices",
@@ -1137,37 +1197,15 @@ pub async fn migrate_vault_notes_on_disk(
     //      readers already fall back over; deleting them keeps the migrated vault
     //      byte-clean and forces a fresh rebuild / PIN re-enrolment under v0.2.
     //      Best-effort: a delete failure never aborts a committed re-key.
-    for stale in [
-        "vault.search",
-        "vault.workspace",
-        "vault.indices",
-        "vault.graph",
-        "vault.embeddings",
-        // The PIN/biometric credential wraps a NOW-STALE `root_key` copy; drop the
-        // blob AND its sibling attempt-counter so a re-key forces a fresh PIN
-        // enrolment. (The OS-keychain biometric item is inert without the blob and
-        // was wrapped under the old root — a follow-up should route migration
-        // through the same `quick_unlock_invalidate` the change-password path uses.)
-        "vault.quickunlock",
-        "vault.quickunlock.attempts",
-        // The device-local sync baseline (`MYH1`, §9.16) is the last vault head
-        // this device accepted, and its integrity is that head's own HMAC under
-        // `vault-head-mac` — a subkey of the root_key this migration just
-        // replaced. It therefore fails its OWN verification from here on, so it
-        // is a rebuildable-cache case rather than a preserved one: dropping it
-        // puts the next cycle on the bootstrap path, which is exactly right for a
-        // vault whose head generation is about to be re-based (#429).
-        "vault.head-state",
-    ] {
-        let _ = io.remove_file(&vault_root.join(stale)).await;
-    }
-    // The per-attachment extracted-text cache (`attachments-text/`, `MYE1`) is a
-    // rebuildable search-extraction cache under the OLD key — drop the whole
-    // subtree so it re-extracts under v0.2 on demand rather than lingering
-    // undecryptable.
-    let _ = io
-        .remove_dir_all(&vault_root.join("attachments-text"))
-        .await;
+    //      The roster is `STALE_UNDER_REPLACED_ROOT`, shared with the peer-side
+    //      promotion (#447) because "which artefacts does a root replacement
+    //      invalidate" has one answer. Notably it includes the PIN/biometric
+    //      credential and its attempt counter, so a re-key forces a fresh
+    //      enrolment. (The OS-keychain biometric item is inert without the blob
+    //      and was wrapped under the old root — a follow-up should route
+    //      migration through the same `quick_unlock_invalidate` the
+    //      change-password path uses.)
+    drop_artefacts_sealed_under_replaced_root(io, vault_root, &[]).await;
 
     // (5d) Re-base the SYNC plane onto the new generation (#429).
     //

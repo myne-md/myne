@@ -172,36 +172,38 @@ pub enum SyncCycleError {
 
 use super::to_hex as hex;
 
-/// Whether the server holds a `vault.meta` of a NEWER generation than this
-/// device's — i.e. someone ran the §10.4.1 migration on another device
-/// (myne-md/myne#429).
+/// The server's `vault.meta` when it is a NEWER generation than this device's —
+/// i.e. someone ran the §10.4.1 migration on another device (myne-md/myne#429).
 ///
 /// Consulted only to disambiguate an unopenable head, and deliberately
 /// conservative: any doubt (transport failure, unreadable local meta, an
-/// undecodable server meta) answers `false`, which leaves the ordinary
-/// integrity path in charge. A false `true` would suppress a genuine
-/// malicious-server alert, so the bar is "the server demonstrably holds a
-/// generation this device cannot have written".
-async fn server_meta_is_newer_generation(
+/// undecodable server meta) answers `None`, which leaves the ordinary integrity
+/// path in charge. A false `Some` would suppress a genuine malicious-server
+/// alert, so the bar is "the server demonstrably holds a generation this device
+/// cannot have written".
+///
+/// It returns the **bytes** rather than a bool because the caller stages them
+/// for the unlock path to promote (#447). Answering only "yes" would mean
+/// fetching the same blob twice and leaving room for the two answers to disagree.
+async fn server_meta_of_newer_generation(
     transport: &dyn SyncTransport,
     token: &str,
     io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,
-) -> bool {
-    let Ok(local) = io.read(&vault_root.join("vault.meta")).await else {
-        return false;
-    };
+) -> Option<Vec<u8>> {
+    let local = io.read(&vault_root.join("vault.meta")).await.ok()?;
     // Already v0.2 locally? Then a newer generation is not what this is.
     if protocol::meta_version_of(&local) != Some(protocol::MetaVersion::V0_1) {
-        return false;
+        return None;
     }
-    let Ok(resp) = transport.request(HttpMethod::Get, "/vault.meta", &[], Some(token)) else {
-        return false;
-    };
+    let resp = transport
+        .request(HttpMethod::Get, "/vault.meta", &[], Some(token))
+        .ok()?;
     if resp.status != 200 {
-        return false;
+        return None;
     }
-    protocol::meta_version_of(&resp.body) == Some(protocol::MetaVersion::V0_2)
+    (protocol::meta_version_of(&resp.body) == Some(protocol::MetaVersion::V0_2))
+        .then_some(resp.body)
 }
 
 /// Parse a 32-hex blob-id key from `state.blobs` back to its 16 bytes. `None`
@@ -1814,7 +1816,11 @@ fn push_chunks(blobs: &[PushBlob]) -> Vec<&[PushBlob]> {
 }
 
 /// SHA-256 of `bytes` as lowercase hex — the `vault.meta` baseline discriminator.
-fn sha256_hex(bytes: &[u8]) -> String {
+///
+/// `pub(crate)` for the peer-side promotion (myne-md/myne#447), which has to
+/// stamp the same baseline this phase compares against. A second hasher there
+/// would be a second opinion about what "the baseline" means.
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     hex(&Sha256::digest(bytes))
 }
@@ -2345,10 +2351,30 @@ async fn sync_cycle_attempt(
         // `vault.meta` a NEWER generation than ours? Only the migration produces
         // that, and no server can fabricate it — a v0.2 meta opens only under
         // credentials the user holds.
-        Err(PullError::HeadInvalid)
-            if server_meta_is_newer_generation(transport, token, io, vault_root).await =>
-        {
-            return Err(SyncCycleError::RekeyedElsewhere)
+        // A head that will not open is normally a forgery. On a device whose
+        // sibling just ran the §10.4.1 migration it is instead the expected
+        // consequence of a re-key. The question below separates them; the
+        // `if let` binds the server's meta because this device is about to
+        // STAGE it (#447) rather than merely learn that it exists.
+        Err(PullError::HeadInvalid) => {
+            let Some(newer) =
+                server_meta_of_newer_generation(transport, token, io, vault_root).await
+            else {
+                return Err(SyncCycleError::Pull(PullError::HeadInvalid));
+            };
+            // Staged, never written over `vault.meta` (#447). The peer cannot
+            // verify these bytes — it has no key for the generation they belong
+            // to — so the only thing that may promote them is the user's own
+            // credential opening them at unlock. A server that serves a
+            // fabricated `NTV5` meta therefore costs a wasted Argon2id and
+            // nothing else; overwriting here would cost the vault, because
+            // `vault.meta` holds the only local copy of the wrapped `root_key`.
+            //
+            // Without this the loop had no exit: the peer locked, the user
+            // unlocked, the OLD local meta re-derived the OLD root, the next
+            // cycle met the same unopenable head, and it locked again.
+            crate::plugins::vault_migrate::adopt::stage_incoming_meta(io, vault_root, &newer).await;
+            return Err(SyncCycleError::RekeyedElsewhere);
         }
         Err(e) => return Err(SyncCycleError::Pull(e)),
     };
@@ -10697,6 +10723,103 @@ mod tests {
                 );
                 std::fs::remove_dir_all(&dir).ok();
             }
+        }
+    }
+
+    /// The peer's exit from the re-key (myne-md/myne#447): a head it cannot open
+    /// while the server holds a NEWER-generation `vault.meta` must **stage** those
+    /// bytes on the way out.
+    ///
+    /// Before this, the branch returned `RekeyedElsewhere` and nothing else — so
+    /// the peer locked, the user unlocked, the OLD local meta re-derived the OLD
+    /// root, and the next cycle met the same head. A loop with no exit, on the
+    /// one path whose entire job is to move a peer onto the new generation.
+    ///
+    /// Hermetic: the head is authored under one root and the cycle runs under
+    /// another, which is exactly the MAC failure a re-key produces — no server,
+    /// no live migration.
+    #[test]
+    fn the_rekey_path_stages_the_servers_meta_on_its_way_out() {
+        let dir = std::env::temp_dir().join(format!(
+            "myne-orch-stage-{}-{:p}",
+            std::process::id(),
+            &"stage"
+        ));
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+
+        // A v0.1 meta locally; a v0.2 meta on the server. Only a migration
+        // produces that pairing, and it is what `server_meta_of_newer_generation`
+        // keys off.
+        let local_v0_1 = protocol::serialize_vault_meta(&meta_fixture()).to_vec();
+        std::fs::write(dir.join("vault.meta"), &local_v0_1).unwrap();
+        let server_v0_2 = protocol::serialize_vault_meta_v0_2(&meta_fixture()).to_vec();
+
+        // The head is sealed under a DIFFERENT root than the cycle runs with, so
+        // it fails its MAC verify — the peer-side signature of a re-key.
+        let authored_under = [0xC1u8; 32];
+        let running_under = [0xC2u8; 32];
+        let account_hash = [0x33u8; 16];
+        let head = sealed_head_fragment(&authored_under, account_hash);
+
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body_with_head("", 0, &head),
+        );
+        t.on(HttpMethod::Get, "/vault.meta", 200, server_v0_2.clone());
+
+        let err = run_cycle_legacy(
+            &t,
+            &running_under,
+            account_hash,
+            [0xA1; 16],
+            "tok",
+            &dir.join("notes"),
+            &dir,
+            true,
+        )
+        .expect_err("an unopenable head over a newer generation is RekeyedElsewhere");
+        assert!(
+            matches!(err, SyncCycleError::RekeyedElsewhere),
+            "expected RekeyedElsewhere, got {err:?}"
+        );
+
+        // `vault.meta` is UNTOUCHED — asserted FIRST, deliberately. Staging is
+        // not adopting: this device cannot verify these bytes, and overwriting
+        // the only local copy of the wrapped root_key on a server's say-so is
+        // the hole staging exists to avoid. Checked before the staged file so
+        // that "adopted instead of staged" fails on the assertion that NAMES it,
+        // rather than incidentally on a missing staging file.
+        assert_eq!(
+            std::fs::read(dir.join("vault.meta")).unwrap(),
+            local_v0_1,
+            "the re-key path overwrote vault.meta with unverified server bytes"
+        );
+        // …and the bytes are staged for the unlock path to prove.
+        let staged = std::fs::read(dir.join("vault.meta.incoming"))
+            .expect("the server's newer meta must be staged, or the peer has no way forward");
+        assert_eq!(staged, server_v0_2);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A `vault.meta` fixture whose fields are irrelevant to the test — only its
+    /// GENERATION matters, and that comes from which serializer stamps it.
+    fn meta_fixture() -> protocol::VaultMeta {
+        protocol::VaultMeta {
+            account_number_hash: [0x33; 16],
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [0x11; protocol::VAULT_META_SALT_RANDOM_LEN],
+            random_salt_recovery: [0x22; protocol::VAULT_META_SALT_RANDOM_LEN],
+            nonce_password_wrap: [0x33; protocol::VAULT_META_NONCE_LEN],
+            enc_root_key_password: [0x44; protocol::VAULT_META_WRAPPED_ROOT_KEY_LEN],
+            nonce_recovery_wrap: [0x55; protocol::VAULT_META_NONCE_LEN],
+            enc_root_key_recovery: [0x66; protocol::VAULT_META_WRAPPED_ROOT_KEY_LEN],
+            items_key_id: [0x07; protocol::VAULT_META_ITEMS_KEY_ID_LEN],
+            items_key_nonce: [0x08; protocol::VAULT_META_NONCE_LEN],
+            enc_items_key: [0x09; protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN],
         }
     }
 
