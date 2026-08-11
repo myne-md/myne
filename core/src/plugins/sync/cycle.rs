@@ -33,7 +33,7 @@ use super::enroll::{self, EnrollPath};
 use super::token_store::TokenStore as _;
 use crate::host::{EventPayload, HostCtx};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
-use protocol::{derive_subkey, parse_vault_meta, SubkeyRole, AEAD_KEY_LEN};
+use protocol::{derive_subkey, parse_vault_meta_any, SubkeyRole, AEAD_KEY_LEN};
 use std::sync::OnceLock;
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
@@ -192,7 +192,7 @@ pub(crate) async fn cycle_account_number_hash(
     // catalog uses for the same field. Desktop and mobile are unchanged by
     // construction: `read_candidates` is a one-element list there.
     let meta_hash = crate::singleton::open_newest(io, &dir.join("vault.meta"), |candidate| {
-        parse_vault_meta(candidate).map(|m| m.account_number_hash)
+        parse_vault_meta_any(candidate).map(|m| m.account_number_hash)
     })
     .await
     .map_err(|_| AccountHashRefusal::MetaUnavailable)?;
@@ -450,6 +450,16 @@ pub async fn run_active_cycle_from_host(
                 &summary.pulled_note_ids,
             )
             .await;
+            // ASM-6→B / #422: an NC05 note whose local copy an automatic CRDT
+            // merge reconciled with a concurrent remote edit this cycle. Emit ONE
+            // `sync://remote-merged` per affected note (`Text(note_id)`), so the
+            // product surface can fire the calm "updated from another device" hint
+            // only when the OPEN note is among them — and stay silent for a plain
+            // server-wins pull, a local-only edit, or a MY01 keep-both. The reindex
+            // above has already re-read the merged content into the editor.
+            for id in &summary.remote_merged_note_ids {
+                host.emit("sync://remote-merged", EventPayload::Text(id.clone()));
+            }
             if summary.reconcile_ran {
                 // A 410-beyond-horizon full reconcile ran this cycle — bracket it
                 // so the reconcile banner (reassuring, "caught up") can show.

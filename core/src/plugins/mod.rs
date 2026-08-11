@@ -51,6 +51,7 @@ pub mod vault_change_password;
 pub mod vault_creation;
 pub mod vault_delete;
 pub mod vault_indices;
+pub mod vault_migrate;
 // ── phrase-recovery: gated OUT of the wasm build ────────────────────────────
 //
 // `decisions.md` 2026-07-26 "Web capability set" is normative: the 24-word

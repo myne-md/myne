@@ -60,6 +60,7 @@ pub(crate) mod blob_envelope;
 pub(crate) mod canonical_json;
 pub mod capture_blob;
 pub mod color_group;
+pub mod crdt_note_blob;
 pub mod dictionary_blob;
 pub mod embeddings_blob;
 pub mod error;
@@ -75,6 +76,7 @@ pub mod saved_view;
 pub mod scram;
 pub mod search_blob;
 pub mod share_import_blob;
+pub mod singleton_migrate;
 pub mod subkey;
 pub mod template;
 pub mod themes_blob;
@@ -82,6 +84,7 @@ pub mod types;
 pub mod vault_head;
 pub mod vault_indices_blob;
 pub mod vault_meta;
+pub mod vault_meta_v0_2;
 pub mod workspace_blob;
 
 /// Test-only shared formatting helpers (`hex_lower` / `json_escape`) for the
@@ -96,15 +99,20 @@ pub use account_number::{
 pub use aead::{
     aad_ai_embeddings_blob, aad_attachment_text_blob, aad_custom_themes_blob,
     aad_graph_layout_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
-    aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
-    aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob,
-    aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_password_wrap_v0_2, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
+    aad_recovery_wrap, aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob,
+    aad_singleton_blob_v0_2, aad_vault_indices_blob, aad_vault_items_key_wrap,
+    aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 pub use attachment_blob::{
-    aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id, decode_attachment_blob,
-    encode_attachment_blob, encode_attachment_blob_raw, AttachmentBlobError, ATTACHMENT_BLOB_MAGIC,
-    ATTACHMENT_BLOB_PROTOCOL_VERSION, ATTACHMENT_BLOB_RESERVED, ATTACHMENT_ID_LEN,
-    MAX_ATTACHMENT_LEN,
+    aad_encrypt_attachment, aad_encrypt_attachment_v0_2, aad_wrap_attachment_key,
+    aad_wrap_attachment_key_v0_2, compute_attachment_id, decode_attachment_blob,
+    decode_attachment_blob_v0_2, encode_attachment_blob, encode_attachment_blob_raw,
+    encode_attachment_blob_v0_2, encode_attachment_blob_v0_2_raw, reseal_attachment_v0_2,
+    AttachmentBlobError, ATTACHMENT_BLOB_MAGIC, ATTACHMENT_BLOB_PROTOCOL_VERSION,
+    ATTACHMENT_BLOB_RESERVED, ATTACHMENT_BLOB_V0_2_MAGIC, ATTACHMENT_BLOB_V0_2_PROTOCOL_VERSION,
+    ATTACHMENT_ID_LEN, MAX_ATTACHMENT_LEN,
 };
 pub use attachment_text_blob::{
     decode_attachment_text_blob, encode_attachment_text_blob, encode_attachment_text_blob_raw,
@@ -114,10 +122,12 @@ pub use attachment_text_blob::{
     MAX_ATTACHMENT_TEXT_PLAINTEXT_LEN,
 };
 pub use attachments_catalog::{
-    aad_attachments_catalog, decode_attachments_catalog, encode_attachments_catalog,
-    encode_attachments_catalog_raw, read_or_empty, AttachmentMeta, AttachmentsCatalog,
-    CatalogBlobError, CATALOG_BLOB_ACCOUNT_HASH_LEN, CATALOG_BLOB_HEADER_LEN, CATALOG_BLOB_MAGIC,
-    CATALOG_BLOB_PROTOCOL_VERSION, CATALOG_BLOB_RESERVED, MAX_CATALOG_PLAINTEXT_LEN,
+    aad_attachments_catalog, decode_attachments_catalog, decode_attachments_catalog_versioned,
+    encode_attachments_catalog, encode_attachments_catalog_raw,
+    encode_attachments_catalog_versioned, read_or_empty, read_or_empty_versioned, AttachmentMeta,
+    AttachmentsCatalog, CatalogBlobError, CATALOG_BLOB_ACCOUNT_HASH_LEN, CATALOG_BLOB_HEADER_LEN,
+    CATALOG_BLOB_MAGIC, CATALOG_BLOB_PROTOCOL_VERSION, CATALOG_BLOB_RESERVED,
+    CATALOG_BLOB_V0_2_MAGIC, MAX_CATALOG_PLAINTEXT_LEN,
 };
 pub use blob::{
     decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,
@@ -126,10 +136,15 @@ pub use blob::{
 pub use color_group::{
     canonical_encode_color_groups, parse_color_groups_array, ColorGroup, ColorGroupParseError,
 };
+pub use crdt_note_blob::{
+    decode_crdt_note_blob, encode_crdt_note_blob, encode_crdt_note_blob_raw, CannotDecryptCrdtNote,
+    NC05_MAGIC, NC05_MAX_PLAINTEXT_LEN, NC05_PROTOCOL_VERSION,
+};
 pub use dictionary_blob::{
-    decode_dictionary_blob, encode_dictionary_blob, encode_dictionary_blob_raw,
-    DictionaryBlobError, DICTIONARY_BLOB_ACCOUNT_HASH_LEN, DICTIONARY_BLOB_FORMAT_V1,
-    DICTIONARY_BLOB_HEADER_LEN, DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_PROTOCOL_VERSION,
+    decode_dictionary_blob, decode_dictionary_blob_versioned, encode_dictionary_blob,
+    encode_dictionary_blob_raw, encode_dictionary_blob_versioned, DictionaryBlobError,
+    DICTIONARY_BLOB_ACCOUNT_HASH_LEN, DICTIONARY_BLOB_FORMAT_V1, DICTIONARY_BLOB_HEADER_LEN,
+    DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_PROTOCOL_VERSION, DICTIONARY_BLOB_V0_2_MAGIC,
     MAX_DICTIONARY_PLAINTEXT_LEN,
 };
 pub use embeddings_blob::{
@@ -146,7 +161,8 @@ pub use graph_layout_blob::{
     MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
 };
 pub use kdf::{
-    derive_password_wrap_key, derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
+    derive_password_wrap_key, derive_password_wrap_key_v0_2, derive_recovery_wrap_key,
+    derive_recovery_wrap_key_from_normalized, derive_recovery_wrap_key_from_normalized_v0_2,
     ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
 };
 pub use manifest::{
@@ -164,9 +180,10 @@ pub use phrase::{
     RECOVERY_PHRASE_WORD_COUNT,
 };
 pub use prefs::{
-    decode_prefs_blob, encode_prefs_blob, encode_prefs_blob_raw, EditorLayout, PrefsBlobError,
-    PrefsView, ThemeChoice, MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN,
-    PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC, PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED,
+    decode_prefs_blob, decode_prefs_blob_versioned, encode_prefs_blob, encode_prefs_blob_raw,
+    encode_prefs_blob_versioned, EditorLayout, PrefsBlobError, PrefsView, ThemeChoice,
+    MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN, PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC,
+    PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED, PREFS_BLOB_V0_2_MAGIC,
 };
 pub use saved_view::{
     canonical_decode_saved_view, canonical_encode_saved_view, canonical_encode_saved_views,
@@ -182,17 +199,19 @@ pub use search_blob::{
     SEARCH_BLOB_HEADER_LEN, SEARCH_BLOB_INDEX_FORMAT_V1, SEARCH_BLOB_MAGIC,
     SEARCH_BLOB_PROTOCOL_VERSION,
 };
-pub use subkey::{derive_subkey, SubkeyRole};
+pub use singleton_migrate::reseal_kek_envelope_v0_2;
+pub use subkey::{derive_subkey, derive_subkey_v0_2, derive_subkey_versioned, SubkeyRole};
 pub use template::{render, supported_tokens, RenderContext};
 pub use themes_blob::{
-    decode_themes_blob, encode_themes_blob, encode_themes_blob_raw, ThemesBlobError,
-    MAX_THEMES_PLAINTEXT_LEN, THEMES_BLOB_ACCOUNT_HASH_LEN, THEMES_BLOB_FORMAT_V1,
-    THEMES_BLOB_HEADER_LEN, THEMES_BLOB_MAGIC, THEMES_BLOB_PROTOCOL_VERSION,
+    decode_themes_blob, decode_themes_blob_versioned, encode_themes_blob, encode_themes_blob_raw,
+    encode_themes_blob_versioned, ThemesBlobError, MAX_THEMES_PLAINTEXT_LEN,
+    THEMES_BLOB_ACCOUNT_HASH_LEN, THEMES_BLOB_FORMAT_V1, THEMES_BLOB_HEADER_LEN, THEMES_BLOB_MAGIC,
+    THEMES_BLOB_PROTOCOL_VERSION, THEMES_BLOB_V0_2_MAGIC,
 };
 pub use types::{
     generate_root_key, parse_kdf_params, serialize_kdf_params, validate_kdf_params, KdfParams,
-    DEFAULT_V0_1_KDF_PARAMS, KDF_PARAMS_CANONICAL_LEN, MAX_KDF_M_KIB, MAX_KDF_P, MAX_KDF_T,
-    MIN_KDF_M_KIB, MIN_KDF_P, MIN_KDF_T,
+    MetaVersion, DEFAULT_V0_1_KDF_PARAMS, KDF_PARAMS_CANONICAL_LEN, MAX_KDF_M_KIB, MAX_KDF_P,
+    MAX_KDF_T, MIN_KDF_M_KIB, MIN_KDF_P, MIN_KDF_T,
 };
 pub use vault_head::{
     compute_head_id, compute_vault_head_mac, decode_head_state, encode_head_state,
@@ -213,6 +232,13 @@ pub use vault_meta::{
     VaultMeta, VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
     VAULT_META_MAGIC, VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
     VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
+};
+pub use vault_meta_v0_2::{
+    derive_items_key_v0_2, encode_vault_meta_v0_2_raw, meta_version_of, parse_vault_meta_any,
+    parse_vault_meta_v0_2, rewrite_vault_meta_password_side_v0_2,
+    rewrite_vault_meta_password_side_versioned, serialize_vault_meta_v0_2,
+    unlock_root_key_v0_2_password, unlock_root_key_v0_2_recovery, VAULT_META_V0_2_MAGIC,
+    VAULT_META_V0_2_PROTOCOL_VERSION,
 };
 pub use workspace_blob::{
     decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,

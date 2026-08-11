@@ -221,7 +221,12 @@ pub(crate) async fn recover_with_phrase_with_path(
                 }
             })?;
 
-            let meta = protocol::parse_vault_meta(&bytes).map_err(|e| {
+            // Accept a v0.1 (`MYV1`) OR a migrated v0.2 (`NTV5`) vault.meta;
+            // `version` selects the recovery-wrap salt domain + AAD prefix and the
+            // itemsKey-wrap subkey context so a migrated vault recovers by phrase
+            // without leaving the v0.2 hierarchy (§10.4.1, #420).
+            let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
+            let meta = protocol::parse_vault_meta_any(&bytes).map_err(|e| {
                 tracing::error!(
                     stage = "parse_meta",
                     error_kind = "InvalidVaultMeta",
@@ -232,10 +237,10 @@ pub(crate) async fn recover_with_phrase_with_path(
             })?;
 
             let items_key_id = meta.items_key_id;
-            let root_key = derive_root_key_from_phrase(&phrase, &meta)?;
+            let root_key = derive_root_key_from_phrase(version, &phrase, &meta)?;
             // items_key derivation drops `root_key` on early-return;
             // the slot stays empty (no half-state).
-            let items_key = derive_items_key(&root_key, &meta)?;
+            let items_key = derive_items_key(version, &root_key, &meta)?;
             Ok(DerivedKeys {
                 root_key,
                 items_key,
@@ -568,8 +573,10 @@ pub(crate) async fn complete_recovery_with_path(
                 }
             })?;
 
-            // (c) Parse.
-            let parsed = protocol::parse_vault_meta(&bytes).map_err(|e| {
+            // (c) Parse — v0.1 (`MYV1`) or migrated v0.2 (`NTV5`); the rewrite below
+            //     stays in the same generation.
+            let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
+            let parsed = protocol::parse_vault_meta_any(&bytes).map_err(|e| {
                 tracing::error!(
                     stage = "parse_meta",
                     error_kind = "InvalidVaultMeta",
@@ -584,7 +591,8 @@ pub(crate) async fn complete_recovery_with_path(
             //     uses the same security parameters the vault was
             //     created under (parameter upgrade is a separate Phase
             //     2+ feature decision).
-            let new_bytes = protocol::rewrite_vault_meta_password_side(
+            let new_bytes = protocol::rewrite_vault_meta_password_side_versioned(
+                version,
                 &parsed,
                 &root_key_snapshot,
                 new_password.as_str(),
@@ -816,6 +824,7 @@ pub async fn resolve_vault_by_account_number<R: Runtime>(
 /// `vault.meta` corruption; both surface as `InvalidVaultMeta`, leaking
 /// no phrase-conditional information.
 fn derive_root_key_from_phrase(
+    version: protocol::MetaVersion,
     phrase: &str,
     meta: &VaultMeta,
 ) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, VaultRecoveryError> {
@@ -841,12 +850,21 @@ fn derive_root_key_from_phrase(
         phrase_or_meta(e)
     })?;
 
-    let wrap_key = protocol::derive_recovery_wrap_key_from_normalized(
-        normalized.as_str(),
-        &meta.random_salt_recovery,
-        &meta.account_number_hash,
-        &meta.kdf_params,
-    )
+    let wrap_key = if version == protocol::MetaVersion::V0_2 {
+        protocol::derive_recovery_wrap_key_from_normalized_v0_2(
+            normalized.as_str(),
+            &meta.random_salt_recovery,
+            &meta.account_number_hash,
+            &meta.kdf_params,
+        )
+    } else {
+        protocol::derive_recovery_wrap_key_from_normalized(
+            normalized.as_str(),
+            &meta.random_salt_recovery,
+            &meta.account_number_hash,
+            &meta.kdf_params,
+        )
+    }
     .map_err(|e| {
         tracing::error!(
             stage = "phrase_kdf",
@@ -856,7 +874,11 @@ fn derive_root_key_from_phrase(
         phrase_or_meta(e)
     })?;
 
-    let aad = protocol::aad_recovery_wrap(&meta.kdf_params);
+    let aad = if version == protocol::MetaVersion::V0_2 {
+        protocol::aad_recovery_wrap_v0_2(&meta.kdf_params)
+    } else {
+        protocol::aad_recovery_wrap(&meta.kdf_params)
+    };
     open_32_byte_secret(
         &wrap_key,
         &meta.nonce_recovery_wrap,
@@ -891,11 +913,17 @@ fn phrase_or_meta(e: protocol::ProtocolError) -> VaultRecoveryError {
 /// credential validity (`decisions.md` 2026-05-02 unlock-error
 /// discipline applies here in parallel).
 fn derive_items_key(
+    version: protocol::MetaVersion,
     root_key: &[u8; AEAD_KEY_LEN],
     meta: &VaultMeta,
 ) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, VaultRecoveryError> {
-    let items_wrap_key = protocol::derive_subkey(root_key, protocol::SubkeyRole::ItemsKeyWrap);
-    let aad = protocol::aad_vault_items_key_wrap(&meta.items_key_id);
+    let items_wrap_key =
+        protocol::derive_subkey_versioned(version, root_key, protocol::SubkeyRole::ItemsKeyWrap);
+    let aad = if version == protocol::MetaVersion::V0_2 {
+        protocol::aad_vault_items_key_wrap_v0_2(&meta.items_key_id)
+    } else {
+        protocol::aad_vault_items_key_wrap(&meta.items_key_id)
+    };
     open_32_byte_secret(
         &items_wrap_key,
         &meta.items_key_nonce,

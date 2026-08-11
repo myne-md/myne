@@ -36,7 +36,7 @@ use super::transport::{HttpMethod, SyncTransport, TransportError};
 use protocol::{
     aad_password_wrap, aad_recovery_wrap, aead_open_ctx, derive_password_wrap_key,
     derive_recovery_wrap_key_from_normalized, derive_subkey, normalize_user_phrase,
-    parse_account_number, parse_vault_meta, validate_kdf_params, KdfParams, SubkeyRole,
+    parse_account_number, parse_vault_meta_any, validate_kdf_params, KdfParams, SubkeyRole,
     AEAD_KEY_LEN,
 };
 use protocol::{scram_client_final_message, scram_client_proof, SCRAM_CBIND_NAME};
@@ -1073,7 +1073,7 @@ pub async fn enroll_device_from_host(
                 404 => local_meta.ok_or(SyncDeviceError::Transport)?,
                 _ => return Err(SyncDeviceError::Transport),
             };
-            let meta = parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
+            let meta = parse_vault_meta_any(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
             // Bind the meta to the account the user actually typed, on BOTH arms.
             //
             // The 404 arm falls back to this device's OWN `vault.meta`, and
@@ -1499,7 +1499,7 @@ async fn write_bootstrap_meta(
         .read(meta_path)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
-    let Ok(local_meta) = parse_vault_meta(&local) else {
+    let Ok(local_meta) = parse_vault_meta_any(&local) else {
         // Rubble, not "a newer local meta". On a double-buffered store the seam
         // has already fallen back to the older copy, so reaching here means BOTH
         // are unusable — and there is nothing in that worth preserving.
@@ -1574,7 +1574,7 @@ fn validate_fetched_meta(
     meta_bytes: &[u8],
     account_hash: &[u8; 16],
 ) -> Result<(), SyncDeviceError> {
-    let meta = parse_vault_meta(meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
+    let meta = parse_vault_meta_any(meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
     validate_kdf_params(&meta.kdf_params).map_err(|_| SyncDeviceError::BadRequest)?;
     if &meta.account_number_hash != account_hash {
         return Err(SyncDeviceError::BadRequest);

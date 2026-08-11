@@ -29,9 +29,11 @@
 //! internal DRY consolidation of the previously copy-pasted framing.
 
 use crate::aead::{
-    aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_singleton_blob, aad_singleton_blob_v0_2, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 use crate::error::ProtocolError;
+use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use getrandom::getrandom;
 use zeroize::{Zeroize, Zeroizing};
@@ -185,4 +187,88 @@ pub(crate) fn decode_blob_envelope(
         aad,
     )?;
     Ok(plaintext)
+}
+
+/// Pick a KEK-envelope family's (magic, AAD) pair for `version`. The v0.1 magic
+/// (`MY?1`) binds `aad_singleton_blob(role, hash)`; the migrated v0.2 magic
+/// (`MY?5`) binds `aad_singleton_blob_v0_2(role, hash)`. The `protocol_version`
+/// header byte is `0x01` in BOTH (the re-seal keeps it — the generations
+/// domain-separate on magic + AAD prefix + KEK, not on that byte), so `version`
+/// selects only the magic + AAD here.
+fn singleton_family_for<'a>(
+    version: MetaVersion,
+    v0_1_magic: &'a [u8; 4],
+    v0_2_magic: &'a [u8; 4],
+    aad_role: &[u8],
+    account_number_hash: &[u8; 16],
+) -> (&'a [u8; 4], Vec<u8>) {
+    match version {
+        MetaVersion::V0_1 => (
+            v0_1_magic,
+            aad_singleton_blob(aad_role, account_number_hash),
+        ),
+        MetaVersion::V0_2 => (
+            v0_2_magic,
+            aad_singleton_blob_v0_2(aad_role, account_number_hash),
+        ),
+    }
+}
+
+/// Version-aware seal of a KEK-envelope singleton. `version` picks the magic
+/// (`MY?1`/`MY?5`) and the AAD prefix; every other byte matches the v0.1 encoder.
+/// The caller MUST have derived `key` under the SAME generation
+/// (`derive_subkey_versioned(version, root, role)`), or the resulting blob is
+/// unreadable by its own family.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn encode_singleton_versioned(
+    version: MetaVersion,
+    key: &[u8; AEAD_KEY_LEN],
+    v0_1_magic: &[u8; 4],
+    v0_2_magic: &[u8; 4],
+    format_version: u8,
+    aad_role: &[u8],
+    account_number_hash: &[u8; 16],
+    max_plaintext_len: usize,
+    plaintext: &[u8],
+) -> Result<Vec<u8>, EnvelopeError> {
+    let (magic, aad) = singleton_family_for(
+        version,
+        v0_1_magic,
+        v0_2_magic,
+        aad_role,
+        account_number_hash,
+    );
+    encode_blob_envelope(
+        key,
+        magic,
+        format_version,
+        &aad,
+        max_plaintext_len,
+        plaintext,
+    )
+}
+
+/// Version-aware open of a KEK-envelope singleton — the mirror of
+/// [`encode_singleton_versioned`]. `version` (from the unlocked slot) selects the
+/// expected magic + AAD; `key` must be the matching-generation KEK.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn decode_singleton_versioned(
+    version: MetaVersion,
+    key: &[u8; AEAD_KEY_LEN],
+    v0_1_magic: &[u8; 4],
+    v0_2_magic: &[u8; 4],
+    format_version: u8,
+    aad_role: &[u8],
+    account_number_hash: &[u8; 16],
+    max_plaintext_len: usize,
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, EnvelopeError> {
+    let (magic, aad) = singleton_family_for(
+        version,
+        v0_1_magic,
+        v0_2_magic,
+        aad_role,
+        account_number_hash,
+    );
+    decode_blob_envelope(key, magic, format_version, &aad, max_plaintext_len, blob)
 }

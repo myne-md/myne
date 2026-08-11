@@ -122,6 +122,34 @@ fn cases_json(category: &str) -> Option<String> {
     }
 }
 
+/// Like [`cases_json`] but reads the `v0.2/` fixture directory — for the first
+/// next-major vector family, `crdt-note-blob` (§10.7, #418). The wasm/browser
+/// lane looks the category up in `embedded::CASES` by name exactly as the v0.1
+/// loader does (each category has one version directory, so the name is the key);
+/// only the native path differs (`v0.2/` instead of `v0.1/`).
+#[allow(dead_code)]
+fn cases_json_v0_2(category: &str) -> Option<String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let path = companion_vectors_root()
+            .join(category)
+            .join("v0.2")
+            .join("cases.json");
+        if !path.exists() {
+            eprintln!(
+                "[skip] {category}: companion repo fixture not present at {}",
+                path.display()
+            );
+            return None;
+        }
+        Some(fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display())))
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        cases_json(category)
+    }
+}
+
 /// The fixtures, baked in (phase3-web-client task 15).
 ///
 /// A browser cannot read `../myne-test-vectors/` at run time, so the bytes have
@@ -172,6 +200,11 @@ mod embedded {
         (
             "color-group",
             include_str!("../../myne-test-vectors/vectors/color-group/v0.1/cases.json"),
+        ),
+        (
+            // The first next-major vector family — its fixtures live under v0.2/.
+            "crdt-note-blob",
+            include_str!("../../myne-test-vectors/vectors/crdt-note-blob/v0.2/cases.json"),
         ),
         (
             "ctx-aead",
@@ -4548,6 +4581,147 @@ fn attachment_blob_vectors() {
         assert!(
             seen_kinds.contains(kind),
             "attachment-blob missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+}
+
+/// `NC05` next-major (v0.2) CRDT note-type codec vectors (§10.7, #418 t4). The
+/// first vector family for a next-major format — it reads the `v0.2/` fixture
+/// dir. Mirrors the attachment/myn-blob runners: `encrypt` (byte output),
+/// `decrypt_ok`, `decrypt_aead_fail` (incl. the v0.1-AAD domain-sep), `parse_fail`
+/// (structural rejects incl. strict-trailing), `aad_construction`.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn crdt_note_blob_vectors() {
+    use protocol::aead::{aad_nc05_content_encrypt, aad_nc05_item_key_wrap};
+    use protocol::{decode_crdt_note_blob, encode_crdt_note_blob_raw, CannotDecryptCrdtNote};
+
+    let Some(raw) = cases_json_v0_2("crdt-note-blob") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[crdt-note-blob] parse cases.json: {e}"));
+
+    assert_eq!(doc["schema"], "crdt-note-blob");
+    assert_eq!(doc["protocol_version"], "v0.2");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "crdt-note-blob must have at least one case"
+    );
+    assert_unique_vector_ids("crdt-note-blob", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encrypt" => {
+                let items_key: [u8; 32] = hex_decode_array(field(case, id, "input_items_key_hex"));
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+                let note_uuid: [u8; 16] = hex_decode_array(field(case, id, "input_note_uuid_hex"));
+                let item_key: [u8; 32] = hex_decode_array(field(case, id, "input_item_key_hex"));
+                let item_key_nonce: [u8; 24] =
+                    hex_decode_array(field(case, id, "input_item_key_nonce_hex"));
+                let content_nonce: [u8; 24] =
+                    hex_decode_array(field(case, id, "input_content_nonce_hex"));
+                let plaintext = hex_decode(field(case, id, "input_plaintext_hex"));
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+
+                let actual = encode_crdt_note_blob_raw(
+                    &items_key,
+                    &items_key_id,
+                    &note_uuid,
+                    &item_key,
+                    &item_key_nonce,
+                    &content_nonce,
+                    &plaintext,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] encode_crdt_note_blob_raw failed: {e:?}"));
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] crdt-note-blob encrypt mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let note_uuid: [u8; 16] = hex_decode_array(field(case, id, "input_note_uuid_hex"));
+                let items_key: [u8; 32] = hex_decode_array(field(case, id, "input_items_key_hex"));
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+                let expected = hex_decode(field(case, id, "expected_plaintext_hex"));
+
+                let actual = decode_crdt_note_blob(&blob, &note_uuid, &items_key, &items_key_id)
+                    .unwrap_or_else(|e| panic!("[{id}] decode_crdt_note_blob failed: {e:?}"));
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] crdt-note-blob decrypt_ok mismatch"
+                );
+            }
+            "decrypt_aead_fail" | "parse_fail" => {
+                // Both collapse to the single non-distinguishing CannotDecryptCrdtNote
+                // (§6.4). The REAL items_key is load-bearing for parse_fail: header
+                // bytes are not AAD-bound, so a port skipping a structural check
+                // decodes Ok and is caught here.
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let note_uuid: [u8; 16] = hex_decode_array(field(case, id, "input_note_uuid_hex"));
+                let items_key: [u8; 32] = hex_decode_array(field(case, id, "input_items_key_hex"));
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+                match decode_crdt_note_blob(&blob, &note_uuid, &items_key, &items_key_id) {
+                    Err(CannotDecryptCrdtNote) => {}
+                    Ok(pt) => panic!(
+                        "[{id}] expected {case_kind}, decode returned Ok ({} bytes) — a check was skipped",
+                        pt.len()
+                    ),
+                }
+            }
+            "aad_construction" => {
+                let builder = field(case, id, "input_aad_builder");
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+                let note_uuid: [u8; 16] = hex_decode_array(field(case, id, "input_note_uuid_hex"));
+                let expected = hex_decode(field(case, id, "expected_aad_hex"));
+                let actual = match builder {
+                    "aad_nc05_item_key_wrap" => aad_nc05_item_key_wrap(&items_key_id, &note_uuid),
+                    "aad_nc05_content_encrypt" => {
+                        aad_nc05_content_encrypt(&items_key_id, &note_uuid)
+                    }
+                    other => panic!("[{id}] unknown aad builder '{other}'"),
+                };
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] {builder} AAD mismatch"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}'"),
+        }
+    }
+
+    for kind in [
+        "encrypt",
+        "decrypt_ok",
+        "decrypt_aead_fail",
+        "parse_fail",
+        "aad_construction",
+    ] {
+        assert!(
+            seen_kinds.contains(kind),
+            "crdt-note-blob missing every case of case_kind '{kind}' — coverage regression"
         );
     }
 }

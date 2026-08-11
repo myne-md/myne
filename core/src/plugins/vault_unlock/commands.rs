@@ -668,7 +668,15 @@ pub async fn unlock_with_path(
         // needs them for the SHA-256 CAS anchor and for `derive_root_key`, and
         // on a double-buffered store "the bytes" means *this* copy's, not
         // whatever a second read would return.
-        protocol::parse_vault_meta(candidate).map(|meta| (meta, candidate.to_vec()))
+        //
+        // `parse_vault_meta_any` accepts BOTH the v0.1 (`MYV1`) and the migrated
+        // v0.2 (`NTV5`) layouts (§10.4.1, #420). It MUST be the any-parser here:
+        // this is the copy-selection gate, and a v0.1-only parser would reject a
+        // migrated vault's `NTV5` meta as `Undecodable` → `InvalidVaultMeta`,
+        // failing the re-unlock BEFORE the magic-dispatch below ever runs. Only
+        // `meta_preview.kdf_params` (the host memory-ceiling check) reads this
+        // parse; the version-specific re-parse happens in the blocking closure.
+        protocol::parse_vault_meta_any(candidate).map(|meta| (meta, candidate.to_vec()))
     })
     .await
     .map_err(|outcome| match outcome {
@@ -745,7 +753,28 @@ pub async fn unlock_with_path(
 
     let join_outcome =
         crate::task::run_blocking(move || -> Result<DerivedKeys, VaultUnlockError> {
-            let meta = protocol::parse_vault_meta(&bytes).map_err(|e| {
+            // Dispatch on the `vault.meta` magic (§10.3): `MYV1` → the v0.1 key
+            // hierarchy; `NTV5` → the v0.2 hierarchy a completed migration wrote
+            // (§10.4.1, #420). Any OTHER magic is a newer major this build does
+            // not implement → a typed "vault upgraded, update this app" refusal
+            // (§10.5), never a silent half-parse or a "corrupted" mislabel.
+            let magic = bytes.get(0..4);
+            let is_v0_2 = magic == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice());
+            if !is_v0_2 && magic != Some(protocol::VAULT_META_MAGIC.as_slice()) {
+                tracing::error!(
+                    stage = "parse_meta",
+                    error_kind = "VaultUpgradedUnsupported",
+                    "vault.meta magic is a newer unsupported major version"
+                );
+                return Err(VaultUnlockError::VaultUpgradedUnsupported);
+            }
+
+            let meta = if is_v0_2 {
+                protocol::parse_vault_meta_v0_2(&bytes)
+            } else {
+                protocol::parse_vault_meta(&bytes)
+            }
+            .map_err(|e| {
                 tracing::error!(
                     stage = "parse_meta",
                     error_kind = "InvalidVaultMeta",
@@ -761,10 +790,17 @@ pub async fn unlock_with_path(
             // rewriting in-place. Computed inside spawn_blocking so
             // sha2 runs on the blocking pool, not the runtime worker.
             let vault_meta_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&bytes);
-            let root_key = derive_root_key(&password, &meta)?;
             // items_key derivation drops `root_key` on early-return;
             // the slot stays empty (no half-state).
-            let items_key = derive_items_key(&root_key, &meta)?;
+            let (root_key, items_key) = if is_v0_2 {
+                let rk = derive_root_key_v0_2(&password, &meta)?;
+                let ik = derive_items_key_v0_2(&rk, &meta)?;
+                (rk, ik)
+            } else {
+                let rk = derive_root_key(&password, &meta)?;
+                let ik = derive_items_key(&rk, &meta)?;
+                (rk, ik)
+            };
             Ok(DerivedKeys {
                 root_key,
                 items_key,
@@ -898,6 +934,28 @@ fn derive_root_key(
         "root_unwrap",
         password_or_meta,
     )
+}
+
+/// The **v0.2** (`NTV5`) mirror of [`derive_root_key`]: unwrap the migrated
+/// `root_key` from an `NTV5` `vault.meta` under the password (v0.2 KDF + AAD).
+/// Same non-distinguishing error discipline — AEAD failure →
+/// `InvalidCredentialOrVault`, structural → `InvalidVaultMeta` (§10.4.1, #420).
+fn derive_root_key_v0_2(
+    password: &str,
+    meta: &VaultMeta,
+) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, VaultUnlockError> {
+    protocol::validate_kdf_params(&meta.kdf_params).map_err(password_or_meta)?;
+    protocol::unlock_root_key_v0_2_password(meta, password, &meta.account_number_hash)
+        .map_err(password_or_meta)
+}
+
+/// The **v0.2** mirror of [`derive_items_key`]: re-derive the migrated `itemsKey`
+/// under `derive_subkey_v0_2` + the v0.2 items-key-wrap AAD.
+fn derive_items_key_v0_2(
+    root_key: &[u8; AEAD_KEY_LEN],
+    meta: &VaultMeta,
+) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, VaultUnlockError> {
+    protocol::derive_items_key_v0_2(root_key, meta).map_err(|_| VaultUnlockError::InvalidVaultMeta)
 }
 
 /// Error mapping for the password-wrap pipeline (KDF + root_key
@@ -1442,9 +1500,18 @@ pub(crate) async fn vault_status_with_path(
             });
         }
     };
+    // A present vault is either v0.1 (`MYV1`) or a migrated v0.2 (`NTV5`). Both are
+    // well-formed, unlockable vaults — the boot probe must report `Exists` for
+    // NTV5, not `Corrupted`, or a just-migrated vault strands the user at the
+    // corrupted-recovery surface (§10.4.1; automerge-sync-migration #420). Try the
+    // v0.1 parser first (the common case), fall through to the v0.2 parser, and
+    // only report `Corrupted` when neither accepts the bytes.
     match protocol::parse_vault_meta(&bytes) {
         Ok(_) => Ok(VaultStatus::Exists),
         Err(e) => {
+            if protocol::parse_vault_meta_v0_2(&bytes).is_ok() {
+                return Ok(VaultStatus::Exists);
+            }
             tracing::error!(
                 stage = "status_check",
                 result = "Corrupted",
@@ -3624,6 +3691,38 @@ mod tests {
             let scratch = ScratchVault::new("vault_status_exists");
             let (bytes, _) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
+
+            let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
+            assert_eq!(result, Ok(VaultStatus::Exists));
+        });
+    }
+
+    #[test]
+    fn vault_status_returns_exists_for_migrated_ntv5_meta() {
+        // A migrated v0.2 (`NTV5`) vault.meta is a valid, present vault — the boot
+        // probe must classify it `Exists`, not `Corrupted`, or a just-migrated
+        // vault strands the user at the corrupted-recovery surface (§10.4.1;
+        // automerge-sync-migration #420). The v0.1 `parse_vault_meta` rejects the
+        // NTV5 magic; the probe falls through to the v0.2 parser.
+        rt().block_on(async {
+            let ntv5 = protocol::encode_vault_meta_v0_2_raw(
+                &[7u8; AEAD_KEY_LEN],
+                &[9u8; AEAD_KEY_LEN],
+                &[3u8; 16],
+                "pw",
+                "abandon abandon abandon",
+                &[1u8; 16],
+                &FAST_TEST_KDF,
+                &[2u8; protocol::ARGON2_SALT_LEN],
+                &[4u8; protocol::ARGON2_SALT_LEN],
+                &[5u8; protocol::AEAD_NONCE_LEN],
+                &[6u8; protocol::AEAD_NONCE_LEN],
+                &[8u8; protocol::AEAD_NONCE_LEN],
+            )
+            .expect("encode NTV5");
+
+            let scratch = ScratchVault::new("vault_status_ntv5_exists");
+            scratch.write_meta(&ntv5);
 
             let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
             assert_eq!(result, Ok(VaultStatus::Exists));

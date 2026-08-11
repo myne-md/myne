@@ -1,0 +1,73 @@
+// automerge-sync-migration #420 task 4: the whole-vault v0.1 → v0.2 migration,
+// end to end through the production binary. One vault, production KDF.
+//
+// Drives the real `vault_migrate` command from the page seat (production IPC, no
+// test hook): a seeded MYV1 vault with a MY01 note migrates to NTV5 + NC05, the
+// phrase-required gate refuses a wrong phrase without writing, and the migrated
+// NTV5 vault re-unlocks (proving the unlock magic-dispatch). SYNC-13: never logs
+// the phrase/password (only in-source fixture constants + emptiness/magic checks).
+
+import { expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describeE2E, scenario } from "./support/scenario";
+import { ipcOk, pageSeatInvoke, unlockToEditor } from "./support/flows";
+import { seedVault, vaultMetaPath, type SeededVault } from "./support/fixtures";
+
+function magic(path: string): string {
+  return readFileSync(path).subarray(0, 4).toString("latin1");
+}
+
+describeE2E("vault migration v0.1 → v0.2 (1 vault, production KDF)", () => {
+  it("migrates MYV1→NTV5 + MY01→NC05, enforces the phrase gate, and the NTV5 vault re-unlocks", async () => {
+    let fixture!: SeededVault;
+    await scenario(
+      "vm1-migrate",
+      { seed: (appDataDir) => { fixture = seedVault(appDataDir, { kdf: "production" }); } },
+      async (app) => {
+        const notesDir = join(app.appDataDir, "vaults", fixture.vaultId, "notes");
+        const metaPath = vaultMetaPath(app.appDataDir, fixture.vaultId);
+        expect(magic(metaPath)).toBe("MYV1");
+
+        // Unlock, then create a MY01 note through the real IPC.
+        await unlockToEditor(app.session, fixture.password);
+        const noteId = (await ipcOk(app.session, "plugin:notes|note_create", {
+          plaintext: "---\ntitle: Pre\n---\n\n# Body [[l]]\n",
+        })) as string;
+        const notePath = join(notesDir, `${noteId}.myn`);
+        expect(magic(notePath)).toBe("MY01");
+
+        // (1) A WRONG phrase is refused backend-side and writes nothing.
+        const wrong = await pageSeatInvoke(app.session, "plugin:vault-migrate|vault_migrate", {
+          password: fixture.password,
+          phrase: "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong",
+        });
+        expect((wrong.err as { kind?: string } | undefined)?.kind).toBe("RecoveryPhraseRequired");
+        expect(magic(metaPath)).toBe("MYV1"); // still v0.1 — nothing written
+
+        // (2) Correct password + phrase migrates the whole vault.
+        const summary = (await ipcOk(app.session, "plugin:vault-migrate|vault_migrate", {
+          password: fixture.password,
+          phrase: fixture.phrase,
+        })) as { notes_migrated: number };
+        expect(summary.notes_migrated).toBeGreaterThanOrEqual(1);
+        expect(magic(metaPath)).toBe("NTV5"); // committed
+        expect(magic(notePath)).toBe("NC05"); // the note re-keyed to CRDT
+        // The pre-migration vault survives in legacy/ (the abort hatch).
+        expect(magic(join(app.appDataDir, "vaults", fixture.vaultId, "legacy", "vault.meta"))).toBe(
+          "MYV1",
+        );
+
+        // (3) Migration is a RE-KEY event: the backend minted a fresh root_key +
+        // itemsKey and DROPPED the running slot (it held stale v0.1 keys that
+        // decrypt none of the new NC05 notes). So the app routes back to Unlock.
+        // Re-probe (Cmd+R survives the host slot, now Empty → the NTV5 vault reads
+        // Exists, not Corrupted) and re-unlock — proving the NTV5 unlock
+        // magic-dispatch end to end against the migrated vault.
+        await app.session.refresh();
+        await unlockToEditor(app.session, fixture.password);
+        await app.session.byTestId("editor.root", { timeoutMs: 30_000 });
+      },
+    );
+  });
+});

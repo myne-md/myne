@@ -81,11 +81,12 @@
 //! the appropriate boundary.
 
 use crate::aead::{
-    aad_prefs_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+    aad_prefs_blob, aad_singleton_blob_v0_2, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 use crate::canonical_json::{push_json_string, push_json_uint, push_json_uint64};
 use crate::error::ProtocolError;
+use crate::types::MetaVersion;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -97,6 +98,15 @@ use zeroize::{Zeroize, Zeroizing};
 
 /// Magic bytes at offset 0 — ASCII `"MYP1"` (Myne Prefs v1).
 pub const PREFS_BLOB_MAGIC: [u8; 4] = *b"MYP1";
+
+/// Magic bytes for the migrated v0.2 `vault.prefs` family — ASCII `"MYP5"`
+/// (§10.3 registry). Same hand-rolled framing as `MYP1`; v0.2 differs only in
+/// the magic + the v0.2 AAD prefix + the `derive_subkey_v0_2` KEK.
+pub const PREFS_BLOB_V0_2_MAGIC: [u8; 4] = *b"MYP5";
+
+/// AAD role string bound into the prefs AAD (matches [`aad_prefs_blob`] under the
+/// generic [`aad_singleton_blob_v0_2`]).
+const PREFS_BLOB_AAD_ROLE: &[u8] = b"prefs-blob";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const PREFS_BLOB_PROTOCOL_VERSION: u8 = 0x01;
@@ -3905,11 +3915,93 @@ pub fn decode_prefs_blob(
     account_number_hash: &[u8; PREFS_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<PrefsView, PrefsBlobError> {
-    // ---- parse the 34-byte header --------------------------------------
+    // Magic-detecting: `MYP1` → the v0.1 family, `MYP5` → the migrated v0.2 family
+    // (§10.4.1). The caller MUST have derived `prefs_key` under the matching
+    // generation (a v0.2 vault derives the KEK via `derive_subkey_v0_2`). Every
+    // other magic fails the magic check; the header-too-short distinction is kept
+    // so the parse_fail reject surface (and its vectors) is unchanged.
+    let version = match blob.get(0..4) {
+        Some(m) if m == PREFS_BLOB_MAGIC => MetaVersion::V0_1,
+        Some(m) if m == PREFS_BLOB_V0_2_MAGIC => MetaVersion::V0_2,
+        _ => {
+            if blob.len() < PREFS_BLOB_HEADER_LEN {
+                return Err(PrefsBlobError::HeaderTooShort);
+            }
+            return Err(PrefsBlobError::MagicMismatch);
+        }
+    };
+    decode_prefs_blob_versioned(version, prefs_key, account_number_hash, blob)
+}
+
+/// Pick the (magic, AAD) pair for `version`: `MYP1` + [`aad_prefs_blob`] for
+/// v0.1, `MYP5` + the v0.2-prefixed AAD for v0.2. The `protocol_version` header
+/// byte stays `0x01` in both (the generations domain-separate on magic + AAD
+/// prefix + KEK, not on that byte — same shape as the `blob_envelope` families).
+fn prefs_family_for(
+    version: MetaVersion,
+    account_number_hash: &[u8; PREFS_BLOB_ACCOUNT_HASH_LEN],
+) -> ([u8; 4], Vec<u8>) {
+    match version {
+        MetaVersion::V0_1 => (PREFS_BLOB_MAGIC, aad_prefs_blob(account_number_hash)),
+        MetaVersion::V0_2 => (
+            PREFS_BLOB_V0_2_MAGIC,
+            aad_singleton_blob_v0_2(PREFS_BLOB_AAD_ROLE, account_number_hash),
+        ),
+    }
+}
+
+/// Version-aware seal of `vault.prefs`, pulling the nonce from the OS CSPRNG. v0.1
+/// writes `MYP1` + `aad_prefs_blob`; v0.2 writes `MYP5` + the v0.2 AAD. Header
+/// assembly + AEAD are byte-identical to [`encode_prefs_blob`] otherwise; the
+/// `prefs_key` MUST be derived under the same generation by the caller.
+pub fn encode_prefs_blob_versioned(
+    version: MetaVersion,
+    prefs_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; PREFS_BLOB_ACCOUNT_HASH_LEN],
+    prefs: &PrefsView,
+) -> Result<Vec<u8>, PrefsBlobError> {
+    let (magic, aad) = prefs_family_for(version, account_number_hash);
+    let plaintext = Zeroizing::new(canonical_json_encode(prefs));
+    if plaintext.len() > MAX_PREFS_PLAINTEXT_LEN {
+        return Err(PrefsBlobError::CiphertextLenOverflow);
+    }
+
+    let mut prefs_nonce = [0u8; AEAD_NONCE_LEN];
+    getrandom(&mut prefs_nonce).map_err(|_| PrefsBlobError::RandomnessUnavailable)?;
+    let sealed = match aead_seal_ctx(prefs_key, &prefs_nonce, &plaintext, &aad) {
+        Ok(s) => s,
+        Err(e) => {
+            prefs_nonce.zeroize();
+            return Err(PrefsBlobError::from(e));
+        }
+    };
+    let ciphertext_len = sealed.len();
+
+    let mut out = Vec::with_capacity(PREFS_BLOB_HEADER_LEN + ciphertext_len);
+    out.extend_from_slice(&magic);
+    out.push(PREFS_BLOB_PROTOCOL_VERSION);
+    out.push(PREFS_BLOB_RESERVED);
+    out.extend_from_slice(&prefs_nonce);
+    out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
+    out.extend_from_slice(&sealed);
+    prefs_nonce.zeroize();
+    Ok(out)
+}
+
+/// Version-aware open of `vault.prefs` — mirror of
+/// [`encode_prefs_blob_versioned`]. Expects the `version`'s magic + AAD; every
+/// structural check runs before decryption, same as [`decode_prefs_blob`].
+pub fn decode_prefs_blob_versioned(
+    version: MetaVersion,
+    prefs_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; PREFS_BLOB_ACCOUNT_HASH_LEN],
+    blob: &[u8],
+) -> Result<PrefsView, PrefsBlobError> {
+    let (magic, aad) = prefs_family_for(version, account_number_hash);
     if blob.len() < PREFS_BLOB_HEADER_LEN {
         return Err(PrefsBlobError::HeaderTooShort);
     }
-    if blob[0..4] != PREFS_BLOB_MAGIC {
+    if blob[0..4] != magic {
         return Err(PrefsBlobError::MagicMismatch);
     }
     if blob[4] != PREFS_BLOB_PROTOCOL_VERSION {
@@ -3923,10 +4015,6 @@ pub fn decode_prefs_blob(
     prefs_nonce.copy_from_slice(&blob[6..30]);
 
     let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
-
-    // Reject oversize BEFORE indexing into the blob — otherwise a
-    // hostile `ciphertext_len = 0xFFFFFFFF` blob causes a panicking
-    // slice-index instead of a clean error.
     if ciphertext_len > MAX_PREFS_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
         return Err(PrefsBlobError::CiphertextLenOverflow);
     }
@@ -3935,16 +4023,12 @@ pub fn decode_prefs_blob(
         return Err(PrefsBlobError::CiphertextTruncated);
     }
 
-    // ---- AEAD-decrypt --------------------------------------------------
-    let aad = aad_prefs_blob(account_number_hash);
     let plaintext_zeroizing = aead_open_ctx(
         prefs_key,
         &prefs_nonce,
         &blob[PREFS_BLOB_HEADER_LEN..ciphertext_end],
         &aad,
     )?;
-
-    // ---- parse the inner canonical JSON --------------------------------
     canonical_json_decode(&plaintext_zeroizing)
 }
 

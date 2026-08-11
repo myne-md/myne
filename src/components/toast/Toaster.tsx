@@ -169,7 +169,7 @@ function ToastRow({
       <div
         role="status"
         aria-live="polite"
-        data-testid="editor.toast"
+        data-testid={item.testId ?? "editor.toast"}
         className={`myne-toast myne-toast--${item.variant}`}
         data-toast-state={phase}
       >

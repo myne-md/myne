@@ -52,6 +52,7 @@ pub mod config;
 // `manifest_hash` rather than any approximation of it.
 pub mod conflict;
 pub mod corpus;
+pub mod crdt_doc;
 pub mod devices;
 // One orchestrated sync cycle + its side effects, lifted out of the host-gated
 // `commands` module by task 84. See the module doc for what was host-shaped and
