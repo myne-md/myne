@@ -204,6 +204,29 @@ fn default_true() -> bool {
     true
 }
 
+/// serde-derive bridge for [`PrefsView::ai_provider_key`]'s `Zeroizing<String>`
+/// (myne-md/myne#444).
+///
+/// Hand-rolled rather than reached for by enabling `zeroize/serde`, which
+/// `src-tauri/CLAUDE.md` rejects by name: that feature wraps the `Deserialize`
+/// impl with zeroize-on-drop semantics without touching serde's own parsing
+/// intermediates, so it buys dependency surface (TB9 is an audit anchor) for a
+/// property it does not actually deliver. Four lines here deliver the part that
+/// is real — the value this struct HOLDS wipes when it drops.
+///
+/// It is near-unreachable in practice: the field is `skip_serializing`, so no
+/// Myne-written JSON ever carries the key and a decode lands on `default`.
+/// `PrefsView`'s `Deserialize` derive still needs the field to have one.
+fn deserialize_optional_zeroizing_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<Zeroizing<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    Ok(Option::<String>::deserialize(deserializer)?.map(Zeroizing::new))
+}
+
 /// In-memory representation of the v0.1 `vault.prefs` plaintext.
 ///
 /// v0.1 has a single field. Future v0.1.x minor revisions append
@@ -402,8 +425,12 @@ pub struct PrefsView {
     /// Canonical key `ai_provider_key` — after `ai_provider_consent`
     /// (`c` < `k`), before `ai_provider_model` (`k` < `m`). Omitted when
     /// `None`.
-    #[serde(default, skip_serializing)]
-    pub ai_provider_key: Option<String>,
+    #[serde(
+        default,
+        skip_serializing,
+        deserialize_with = "deserialize_optional_zeroizing_string"
+    )]
+    pub ai_provider_key: Option<Zeroizing<String>>,
 
     /// **Which model** at [`PrefsView::ai_provider`] answers, or `None`.
     ///
@@ -2626,7 +2653,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
                 let rest = after[consumed..]
                     .strip_prefix(b",")
                     .ok_or(PrefsBlobError::PlaintextParseFailed)?;
-                (Some(val), rest)
+                // Wrapped the moment it exists, so every path out of this
+                // function — including the `?` on a LATER field's parse
+                // failure — wipes the buffer on the way (myne-md/myne#444).
+                (Some(Zeroizing::new(val)), rest)
             }
             None => (None, post_ai_provider_consent),
         };
@@ -5762,7 +5792,9 @@ mod tests {
             ai_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
             ai_provider: Some(alloc::string::String::from("openrouter")),
             ai_provider_consent: Some(alloc::string::String::from("openrouter")),
-            ai_provider_key: Some(alloc::string::String::from("sk-sentinel-000")),
+            ai_provider_key: Some(Zeroizing::new(alloc::string::String::from(
+                "sk-sentinel-000",
+            ))),
             ai_provider_model: Some(alloc::string::String::from("meta-llama/llama-3.1-8b")),
             archive_disabled: Some(true),
             ..PrefsView::default()
@@ -5780,7 +5812,10 @@ mod tests {
         let back = canonical_json_decode(&encoded).expect("decode");
         assert_eq!(back.ai_provider.as_deref(), Some("openrouter"));
         assert_eq!(back.ai_provider_consent.as_deref(), Some("openrouter"));
-        assert_eq!(back.ai_provider_key.as_deref(), Some("sk-sentinel-000"));
+        assert_eq!(
+            back.ai_provider_key.as_deref().map(|k| k.as_str()),
+            Some("sk-sentinel-000")
+        );
         assert_eq!(
             back.ai_provider_model.as_deref(),
             Some("meta-llama/llama-3.1-8b")
@@ -5799,7 +5834,9 @@ mod tests {
         const MODEL: &str = "qwen/qwen3-30b";
         let view = PrefsView {
             ai_provider: Some(alloc::string::String::from("openrouter")),
-            ai_provider_key: Some(alloc::string::String::from("sk-not-this-one")),
+            ai_provider_key: Some(Zeroizing::new(alloc::string::String::from(
+                "sk-not-this-one",
+            ))),
             ai_provider_model: Some(alloc::string::String::from(MODEL)),
             ..PrefsView::default()
         };
@@ -5889,6 +5926,49 @@ mod tests {
         assert_eq!(text, r#"{"screen_capture_protection":true}"#);
     }
 
+    /// The credential's buffer wipes when it drops (myne-md/myne#444).
+    ///
+    /// Asserted at COMPILE time, not by inspecting freed memory. Reading a
+    /// dropped allocation is undefined behaviour, so a runtime "the bytes are
+    /// gone" test would be either unsound or — more likely — a test of what the
+    /// allocator happened to do on one machine, which is the shape of assertion
+    /// that passes forever and means nothing. The property here is entirely
+    /// carried by the type: `Zeroizing<T>` wipes in its `Drop`, so pinning the
+    /// field's type pins the behaviour.
+    ///
+    /// What this catches is the realistic regression: someone adding a prefs
+    /// field, copying the line above it, and quietly widening the type back to
+    /// `String` because that is what every sibling is.
+    #[test]
+    fn the_provider_key_field_is_zeroizing_rather_than_a_plain_string() {
+        let view = PrefsView {
+            ai_provider_key: Some(Zeroizing::new(alloc::string::String::from("sk-x"))),
+            ..PrefsView::default()
+        };
+        // Compiles only while the field is `Option<Zeroizing<String>>`: a plain
+        // `String` fails to coerce, and a different wrapper is a different type.
+        let _pinned: Option<Zeroizing<alloc::string::String>> = view.ai_provider_key.clone();
+
+        // …and the wrapper is transparent to the codec, so the on-disk bytes are
+        // unchanged by the hardening. A format change here would be a silent
+        // cross-implementation break — every other client holds a plain string.
+        let plain = PrefsView {
+            ai_provider_key: None,
+            ..PrefsView::default()
+        };
+        let with_key = canonical_json_encode(&view);
+        assert!(
+            with_key
+                .windows(b"\"ai_provider_key\":\"sk-x\"".len())
+                .any(|w| w == b"\"ai_provider_key\":\"sk-x\""),
+            "the wrapper must not change the emitted bytes: {}",
+            alloc::string::String::from_utf8_lossy(&with_key)
+        );
+        assert!(!canonical_json_encode(&plain)
+            .windows(4)
+            .any(|w| w == b"sk-x"));
+    }
+
     /// **The IPC confinement.** `prefs_read` serializes the whole `PrefsView`
     /// to the WebView, so a key without `#[serde(skip_serializing)]` reaches
     /// page context on every read. The twin of
@@ -5902,7 +5982,7 @@ mod tests {
         let view = PrefsView {
             ai_provider: Some(alloc::string::String::from("openrouter")),
             ai_provider_consent: Some(alloc::string::String::from("openrouter")),
-            ai_provider_key: Some(alloc::string::String::from(SENTINEL)),
+            ai_provider_key: Some(Zeroizing::new(alloc::string::String::from(SENTINEL))),
             ai_provider_model: None,
             ..PrefsView::default()
         };
@@ -5910,7 +5990,10 @@ mod tests {
         // On disk: present, and it comes back.
         let blob = canonical_json_encode(&view);
         let back = canonical_json_decode(&blob).expect("decode");
-        assert_eq!(back.ai_provider_key.as_deref(), Some(SENTINEL));
+        assert_eq!(
+            back.ai_provider_key.as_deref().map(|k| k.as_str()),
+            Some(SENTINEL)
+        );
 
         // Across IPC: absent, by name AND by value.
         let json = serde_json::to_string(&view).expect("serialize");
@@ -9991,7 +10074,7 @@ mod tests {
             ai_excluded_folders: alloc::vec![String::from("Private/")],
             ai_provider: Some(String::from("openrouter")),
             ai_provider_consent: Some(alloc::string::String::from("openrouter")),
-            ai_provider_key: Some(String::from("sk-vector-fixture-000")),
+            ai_provider_key: Some(Zeroizing::new(String::from("sk-vector-fixture-000"))),
             ai_provider_model: Some(String::from("meta-llama/llama-3.1-8b")),
             archive_disabled: Some(true),
             ..PrefsView::default()

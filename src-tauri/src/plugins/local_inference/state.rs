@@ -1104,7 +1104,7 @@ mod selection_proof {
             developer_mode: true,
             ai_provider: Some("openrouter".into()),
             ai_provider_consent: Some("openrouter".into()),
-            ai_provider_key: Some("sk-test".into()),
+            ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
             ai_provider_model: Some("some/model".into()),
             ..PrefsView::default()
         }

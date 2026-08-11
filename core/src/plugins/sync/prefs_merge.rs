@@ -321,7 +321,23 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // `None`, which is what makes revocation reach the other devices.
         ai_provider: lww!("ai_provider", ai_provider),
         ai_provider_consent: lww!("ai_provider_consent", ai_provider_consent),
-        ai_provider_key: lww!("ai_provider_key", ai_provider_key),
+        // The one LWW field whose value is `Zeroizing`-wrapped (myne-md/myne#444),
+        // so it takes the keyed form for the same reason `saved_views` does: the
+        // tiebreak bytes are NORMATIVE (§10.2 — "the values' canonical
+        // encodings"), and the wrapper is this client's memory-hygiene choice,
+        // not a change to what the value encodes as. Keyed on `Option<&str>`,
+        // which serializes byte-identically to the `Option<String>` every other
+        // implementation holds — so an independent client still picks the same
+        // equal-clock winner, and no copy of the key is made to ask.
+        ai_provider_key: lww_field_keyed(
+            "ai_provider_key",
+            &local.ai_provider_key,
+            clock_of(local, "ai_provider_key"),
+            &remote.ai_provider_key,
+            clock_of(remote, "ai_provider_key"),
+            &mut clocks,
+            |v| tiebreak_key(&v.as_deref().map(|s| s.as_str())),
+        ),
         ai_provider_model: lww!("ai_provider_model", ai_provider_model),
         archive_disabled: lww!("archive_disabled", archive_disabled),
         // ingest-image-compression: a content-fidelity switch with a

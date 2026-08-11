@@ -1265,9 +1265,13 @@ pub async fn set_ai_provider_key_from_host(
     // An all-whitespace key is a cleared key, not a stored blank — otherwise a
     // user who selected the field and hit delete would leave the arm "has a
     // key" and every request would fail with an auth error they cannot see.
+    // The trimmed copy is wrapped too (myne-md/myne#444). It used to be a plain
+    // `String`, so the careful `Zeroizing` on the line above bought nothing past
+    // this point: `k.trim().to_string()` allocates a second buffer holding the
+    // same credential, and that one was the copy that reached the blob.
     let stored = key
         .as_deref()
-        .map(|k| k.trim().to_string())
+        .map(|k| zeroize::Zeroizing::new(k.trim().to_string()))
         .filter(|k| !k.is_empty());
     let present = stored.is_some();
     update_prefs_with_dir(
