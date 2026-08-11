@@ -296,6 +296,8 @@ steps:
       # above: `std::fs` compiles for wasm32 and fails at runtime, so a new call
       # site is invisible to every compiler on both targets.
       - node scripts/check-core-io-seam.mjs
+      # myne#442 — the version-routing ratchet (see the script header).
+      - node scripts/check-version-routing.mjs
       # Web command-coverage guard (MYND-574 task 11): every IPC command name in
       # the shared tree is classified in `web/wasm/src/capability.rs`. Spans TS
       # and Rust, so no compiler on either side sees both halves.
