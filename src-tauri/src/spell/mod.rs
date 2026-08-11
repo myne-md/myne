@@ -321,15 +321,50 @@ mod tests {
     // src-tauri/resources/dictionaries/) and prove the engine checks real words.
     // Skips cleanly if the assets aren't present (they are user-committed, so a
     // fresh checkout without them must not fail the suite).
+    /// Read a bundled dictionary pair, or `None` when it is not on disk.
+    ///
+    /// `None` makes the caller self-skip — and a Rust test that returns early
+    /// **passes**, so these four would report `ok` while asserting nothing.
+    /// `MYNE_TEST_REQUIRE_DICTS=1` (or the umbrella
+    /// `MYNE_TEST_REQUIRE_FIXTURES=1`) turns that into a panic naming the
+    /// language.
+    ///
+    /// **Defensive, not a live hole — and worth saying so rather than letting
+    /// this read as a fix.** Every language these tests use is declared in
+    /// `bundle.resources`, and `tauri_build::try_build` fails the *build* on a
+    /// missing declared resource (`resource path resources/dictionaries/en-US
+    /// doesn't exist`), so the skip is unreachable in any tree that compiles.
+    /// Verified by moving `en-US` aside: the build panicked before a test ran.
+    /// The gate covers the case that is not guaranteed — a language tested but
+    /// not bundled. Contrast the server-backed tests in `myne-core`, where the
+    /// same shape *was* live and hid 27 tests.
+    ///
+    /// The predicate is duplicated from `myne_core::plugins::sync::test_fixtures`
+    /// rather than shared: a `#[cfg(test)]` item does not cross a crate
+    /// boundary, and two lines of `env::var` are cheaper than exporting a
+    /// test-only helper from the core crate's public surface.
+    fn fixtures_required(specific: &str) -> bool {
+        std::env::var(specific).is_ok() || std::env::var("MYNE_TEST_REQUIRE_FIXTURES").is_ok()
+    }
+
     fn load_bundled(lang: &str) -> Option<(String, String)> {
         let base = format!(
             "{}/resources/dictionaries/{}",
             env!("CARGO_MANIFEST_DIR"),
             lang
         );
-        let aff = std::fs::read_to_string(format!("{base}/index.aff")).ok()?;
-        let dic = std::fs::read_to_string(format!("{base}/index.dic")).ok()?;
-        Some((aff, dic))
+        let found = (|| {
+            let aff = std::fs::read_to_string(format!("{base}/index.aff")).ok()?;
+            let dic = std::fs::read_to_string(format!("{base}/index.dic")).ok()?;
+            Some((aff, dic))
+        })();
+        assert!(
+            found.is_some() || !fixtures_required("MYNE_TEST_REQUIRE_DICTS"),
+            "MYNE_TEST_REQUIRE_DICTS=1 (or MYNE_TEST_REQUIRE_FIXTURES=1) was set, but the \
+             bundled {lang} dictionary is not on disk at {base} — this run was asked to \
+             exercise real dictionaries and cannot."
+        );
+        found
     }
 
     #[test]

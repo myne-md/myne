@@ -108,14 +108,30 @@ pub fn local_now(unix_secs: i64) -> Option<LocalNow> {
         if libc::localtime_r(&t, &mut tm).is_null() {
             return None;
         }
-        Some(LocalNow {
-            year: tm.tm_year + 1900,
-            month: (tm.tm_mon + 1) as u32,
-            day: tm.tm_mday as u32,
-            hour: tm.tm_hour as u32,
-            minute: tm.tm_min as u32,
-            weekday: tm.tm_wday as u32,
-        })
+        Some(from_tm(&tm))
+    }
+}
+
+/// Map a populated `struct tm` onto [`LocalNow`].
+///
+/// Split out of [`local_now`] so the mapping — the part with the two off-by-one
+/// conversions that actually can be wrong — is testable **without touching the
+/// process environment**. Its test used to force a known offset with
+/// `std::env::set_var("TZ", "UTC")` under a SAFETY comment asserting a
+/// *"single-threaded test process"*, which `cargo test` does not provide: other
+/// threads sit inside `localtime_r` reading `TZ` while that `setenv` runs,
+/// which is a data race and undefined behaviour. It surfaced as two unrelated
+/// `daily_*` tests failing only in a full-suite run and passing in isolation —
+/// the shape that gets called flake and bypassed with `--no-verify`.
+#[cfg(unix)]
+fn from_tm(tm: &libc::tm) -> LocalNow {
+    LocalNow {
+        year: tm.tm_year + 1900,
+        month: (tm.tm_mon + 1) as u32,
+        day: tm.tm_mday as u32,
+        hour: tm.tm_hour as u32,
+        minute: tm.tm_min as u32,
+        weekday: tm.tm_wday as u32,
     }
 }
 
@@ -360,19 +376,30 @@ mod tests {
 
     #[test]
     fn local_now_reads_a_known_utc_instant_under_the_tz_environment() {
-        // Force a known offset so the assertion is deterministic regardless
-        // of the host machine's configured timezone. POSIX requires
-        // `localtime`/`localtime_r` to behave as though `tzset()` had
-        // already been called, so setting `TZ` alone is sufficient — no
-        // explicit `tzset()` call needed.
-        // SAFETY: single-threaded test process at this point, no concurrent
-        // `getenv`/`setenv` — the exact narrow case `localtime_r` is
-        // documented safe for.
-        unsafe {
-            std::env::set_var("TZ", "UTC");
-        }
-        // 2026-07-30T12:34:00Z
-        let now = local_now(1785414840).expect("localtime_r must resolve a current instant");
+        // `gmtime_r`, not `set_var("TZ", …)` + `localtime_r`. The old shape
+        // mutated the PROCESS environment mid-run under a SAFETY comment
+        // claiming a "single-threaded test process" — `cargo test` is not one,
+        // so that `setenv` raced every other thread sitting in `localtime_r`.
+        // Undefined behaviour, and it showed up as two unrelated `daily_*`
+        // tests failing only in a full-suite run.
+        //
+        // What is under test is the tm -> LocalNow mapping (two off-by-ones);
+        // `gmtime_r` pins a known offset without an environment at all. The
+        // choice of `localtime_r` inside `local_now` is one FFI line and stays
+        // uncovered, deliberately.
+        //
+        // SAFETY: `tm` is zero-initialized; `t` points at a live `time_t`;
+        // `gmtime_r` populates every field it documents. No environment is
+        // read or written, so no cross-thread hazard exists.
+        let now = unsafe {
+            let t: libc::time_t = 1785414840; // 2026-07-30T12:34:00Z
+            let mut tm: libc::tm = std::mem::zeroed();
+            assert!(
+                !libc::gmtime_r(&t, &mut tm).is_null(),
+                "gmtime_r must resolve a representable instant"
+            );
+            from_tm(&tm)
+        };
         assert_eq!(now.year, 2026);
         assert_eq!(now.month, 7);
         assert_eq!(now.day, 30);

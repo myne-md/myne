@@ -3577,15 +3577,43 @@ mod tests {
     }
 
     /// Resolve the `myne-server` binary (env override, else the built sibling).
-    /// `None` → the binary isn't built; the caller self-skips (the E2E pattern).
+    ///
+    /// `None` → the binary isn't built and the caller self-skips — **unless
+    /// this run asked for real fixtures**, in which case a missing binary is a
+    /// panic naming it.
+    ///
+    /// **The failure mode that gate exists to prevent.** Every caller does
+    /// `let Some(..) = spawn_server() else { eprintln!("SKIP …"); return; }`,
+    /// and a Rust test that returns early **passes**. So the 25 server-backed
+    /// tests in this file printed one line and reported `ok` on every machine
+    /// and every CI run without the binary — indistinguishable, in the summary
+    /// and in the exit code, from having actually run. A green line that
+    /// asserted nothing is worse than a red one, and this cost a real
+    /// misdiagnosis: a HEAD baseline taken to decide whether a branch had
+    /// broken `attachment_readd_after_delete_revives` came back green because
+    /// the worktree had no server, and the bug was already on develop
+    /// (myne-md/myne#425).
+    ///
+    /// Same shape, and the same fix, as `engine_candle.rs::required_test_env`.
+    /// Opt-in rather than default: a contributor who has not built the
+    /// companion server should still get "skipped".
     fn server_binary() -> Option<PathBuf> {
-        if let Ok(p) = std::env::var("MYNE_E2E_SERVER") {
+        let found = if let Ok(p) = std::env::var("MYNE_E2E_SERVER") {
             let p = PathBuf::from(p);
-            return p.exists().then_some(p);
-        }
-        // cargo test CWD = the crate dir (src-tauri/); the server is a sibling.
-        let p = PathBuf::from("../myne-server/myne-server");
-        p.exists().then_some(p)
+            p.exists().then_some(p)
+        } else {
+            // cargo test CWD = the crate dir; the server is a sibling.
+            let p = PathBuf::from("../myne-server/myne-server");
+            p.exists().then_some(p)
+        };
+        assert!(
+            found.is_some() || !crate::plugins::sync::test_fixtures::required("MYNE_TEST_REQUIRE_SERVER"),
+            "MYNE_TEST_REQUIRE_SERVER=1 (or MYNE_TEST_REQUIRE_FIXTURES=1) was set, but the \
+             myne-server binary is not built — this run was asked to exercise the real server \
+             and cannot. Build it with `cd myne-server && go build -o myne-server ./cmd/myne-server`, \
+             or point MYNE_E2E_SERVER at one."
+        );
+        found
     }
 
     /// Spawn an ephemeral in-memory server; return (guard, base_url). The

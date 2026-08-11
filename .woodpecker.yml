@@ -940,8 +940,18 @@ steps:
       - cd "$CI_WORKSPACE"
       # Point the harness at the freshly built server and run ONLY the sim suite.
       - export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server/myne-server"
+      # And REQUIRE it, now that the binary is guaranteed built three lines up.
+      # Without this the sim tests self-skip on a missing binary and report
+      # `ok` — so a clone or a `go build` that half-failed would leave this step
+      # green having asserted nothing, which is exactly how 27 server-backed
+      # tests in `orchestrator.rs` came to report green on every machine that
+      # lacked the server (myne-md/myne#425). The variable is set HERE and not
+      # globally on purpose: every other step runs without a server, and
+      # requiring one there would turn a correct skip into a failure.
+      - export MYNE_TEST_REQUIRE_SERVER=1
       # Sync moved to myne-core (decisions.md 2026-07-07); sim suite is now
-      # `myne_core::plugins::sync::sim`. Still self-skips without the server.
+      # `myne_core::plugins::sync::sim`. It no longer self-skips here — see
+      # MYNE_TEST_REQUIRE_SERVER above.
       # Quoted: the `:: ` (colon-colon-space) in the test-path filter is parsed
       # as a YAML key:value map otherwise, failing config-compile ("cannot
       # unmarshal map into string").

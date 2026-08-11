@@ -158,3 +158,30 @@ pub(crate) fn to_hex(bytes: &[u8]) -> String {
 // per-client-wiring split the `notes`/`prefs` cores use. The command bodies +
 // engine + transport all live in this shared core (decisions.md 2026-07-07,
 // supersedes the 2026-06-30 "sync stays per-client" scope).
+
+/// Whether this run was told to exercise **real** fixtures, so a missing one is
+/// a failure rather than a skip.
+///
+/// The server-backed tests in `orchestrator.rs` and `sim.rs` all self-skip when
+/// the companion `myne-server` binary is not built — and a Rust test that
+/// returns early **passes**, so 27 of them reported `ok` on every machine and
+/// every CI run that lacked it. That is indistinguishable, in the summary line
+/// and in the exit code, from having actually run.
+///
+/// `MYNE_TEST_REQUIRE_FIXTURES=1` is the umbrella every resource honours, so CI
+/// sets one variable and cannot half-cover the set. `specific` is the narrow
+/// knob for a developer who has provisioned only one of them
+/// (`MYNE_TEST_REQUIRE_SERVER` here; `MYNE_TEST_REQUIRE_MODELS` and
+/// `MYNE_TEST_REQUIRE_DICTS` are the desktop crate's equivalents, which carry
+/// their own copy of this predicate because a `#[cfg(test)]` item does not
+/// cross a crate boundary).
+///
+/// Opt-in rather than default, deliberately: a contributor who has not built
+/// the companion server should still get "skipped". The defect being fixed is
+/// *"reports green while asserting nothing"*, not *"requires a server"*.
+#[cfg(test)]
+pub(crate) mod test_fixtures {
+    pub(crate) fn required(specific: &str) -> bool {
+        std::env::var(specific).is_ok() || std::env::var("MYNE_TEST_REQUIRE_FIXTURES").is_ok()
+    }
+}

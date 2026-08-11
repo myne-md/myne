@@ -67,14 +67,28 @@ impl Drop for ServerGuard {
     }
 }
 
+/// Resolve the `myne-server` binary, or `None` when it is not built.
+///
+/// Gated exactly like `orchestrator.rs`'s twin, and for the same reason: a
+/// caller that self-skips reports `ok`, so these tests were green everywhere
+/// the binary was absent. See `super::test_fixtures` for the full account.
 fn server_binary() -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("MYNE_E2E_SERVER") {
+    let found = if let Ok(p) = std::env::var("MYNE_E2E_SERVER") {
         let p = PathBuf::from(p);
-        return p.exists().then_some(p);
-    }
-    // `cargo test` CWD = the crate dir (src-tauri/); the server is a sibling.
-    let p = PathBuf::from("../myne-server/myne-server");
-    p.exists().then_some(p)
+        p.exists().then_some(p)
+    } else {
+        // `cargo test` CWD = the crate dir; the server is a sibling.
+        let p = PathBuf::from("../myne-server/myne-server");
+        p.exists().then_some(p)
+    };
+    assert!(
+        found.is_some() || !super::test_fixtures::required("MYNE_TEST_REQUIRE_SERVER"),
+        "MYNE_TEST_REQUIRE_SERVER=1 (or MYNE_TEST_REQUIRE_FIXTURES=1) was set, but the \
+         myne-server binary is not built — this run was asked to exercise the real server \
+         and cannot. Build it with `cd myne-server && go build -o myne-server ./cmd/myne-server`, \
+         or point MYNE_E2E_SERVER at one."
+    );
+    found
 }
 
 /// Server spawn options. `Default` = today's shape: ephemeral port, in-memory
