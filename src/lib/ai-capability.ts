@@ -118,6 +118,31 @@ export async function aiCapabilityReport(): Promise<AiCapabilityReport> {
  * indicator that crashes a chat turn because a newer host used a class this
  * build does not know is worse than one that under-states.
  */
+/**
+ * The attribution a RESPONSE reported, as the indicator renders it
+ * (myne-md/myne#440).
+ *
+ * Distinct from {@link answeredByOf}, which derives the same shape from the
+ * current capability report — right for a live status chip, wrong for a turn
+ * that has already been answered. The name comes from the host too: deriving it
+ * frontend-side from the remote provider's wire value made a loopback answer
+ * render "Answered by " with nothing after it, because a loopback answer has no
+ * remote provider.
+ */
+export function answeredByFromResponse(served: {
+  class: string;
+  name: string | null;
+}): AnsweredBy {
+  switch (served.class) {
+    case "remote":
+      return { kind: "remote", provider: providerLabelOf(served.name) ?? "" };
+    case "loopback_local":
+      return { kind: "local-runtime", name: served.name ?? "" };
+    default:
+      return { kind: "in-process" };
+  }
+}
+
 export function answeredByOf(
   report: Pick<AiCapabilityReport, "backendClass">,
   providerLabel?: string,

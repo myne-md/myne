@@ -20,7 +20,7 @@ import {
   sendChatMessage,
   type ChatCitation,
 } from "../notes/ai/chatStore";
-import { aiCapabilityReport, answeredByOf, providerLabelOf } from "./ai-capability";
+import { answeredByFromResponse } from "./ai-capability";
 
 /** One prior-turn message sent to the backend as conversation history. Mirrors
  *  the Rust `ChatMessageDto` (role + content). */
@@ -41,6 +41,8 @@ interface RawSearchHit {
 interface RawAskResult {
   answer: string;
   sources: RawSearchHit[];
+  /** Which backend served THIS turn, reported by the request (myne#440). */
+  served_by: { class: string; name: string | null };
 }
 
 /** Default number of grounding chunks to retrieve per turn (the Rust side is the
@@ -58,11 +60,12 @@ export const CHAT_DEFAULT_K = 10;
 export async function sendChat(
   message: string,
   k: number = CHAT_DEFAULT_K,
-  /** The active provider's stored WIRE name, when there is one (myne#191
-   *  task 4). Supplied by the caller because it lives in `vault.prefs`, which
-   *  the surface already has and this module would otherwise re-read once per
-   *  turn; the wire → proper-noun mapping happens here, in one place. */
-  providerWire?: string | null,
+  /** Unused since myne-md/myne#440: the attribution now comes from the response
+   *  rather than from the caller's view of `vault.prefs`, which could not name
+   *  the loopback runtime and could go stale between send and answer. Kept in
+   *  the signature so the one call site does not have to change in the same
+   *  commit; remove it when that site does. */
+  _providerWire?: string | null,
 ): Promise<void> {
   // Snapshot the PRIOR turns as history before appending the new turn; drop any
   // empty turn so a blank assistant slot never enters the conversation.
@@ -87,14 +90,14 @@ export async function sendChat(
       byteEnd: s.byte_end,
       score: s.score,
     }));
-    // Read AFTER the answer, not before: the point of the attribution is which
-    // backend actually produced this turn, and the selection is re-read per
-    // request (#415 task 18) so it can differ from the one at send time.
-    finalizeChatTurn(
-      runToken,
-      citations,
-      answeredByOf(await aiCapabilityReport(), providerLabelOf(providerWire)),
-    );
+    // Reported BY the response (myne-md/myne#440). This used to fetch a fresh
+    // capability report after the answer arrived and label the turn from the
+    // CURRENT selection — so a backend switch mid-session relabelled turns a
+    // different backend had produced, and the loopback arm rendered an empty
+    // name because every name was derived from the remote provider's wire value.
+    // Attribution of where a note's text went is a trust surface; it comes from
+    // the request that actually sent it.
+    finalizeChatTurn(runToken, citations, answeredByFromResponse(result.served_by));
   } catch (e) {
     // The backend error is a closed, DENY-safe KIND, and the kind is exactly
     // what the user needs (myne-md/myne#440). This used to discard it and render

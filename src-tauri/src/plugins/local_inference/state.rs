@@ -418,6 +418,39 @@ impl LocalInferenceState {
     /// An [`RequestClass::Ambient`] request is refused a
     /// [`BackendClass::Remote`] backend — the rule lives here, in the seam, so
     /// no caller can opt out of it and no setting can turn it off.
+    /// The name to attribute an answer from `class` to (myne-md/myne#440).
+    ///
+    /// `None` for the in-process arm — that is Myne itself and needs no name.
+    /// The other two arms DO have one, and the frontend used to derive both from
+    /// the remote provider's wire value, which a loopback answer does not carry
+    /// — so a local-runtime answer rendered "Answered by " with nothing after
+    /// it.
+    pub fn served_by_name(&self, class: BackendClass) -> Option<String> {
+        match class {
+            BackendClass::InProcessLocal => None,
+            // The provider the user named, read from the same snapshot the
+            // authorization came from.
+            BackendClass::Remote => self
+                .snapshot
+                .read()
+                .ok()?
+                .as_ref()?
+                .prefs
+                .ai_provider
+                .clone(),
+            // The loopback runtime names itself by the backend id, which is the
+            // only stable thing here that does not cost a round trip.
+            BackendClass::LoopbackLocal => Some(
+                self.backends
+                    .iter()
+                    .find(|b| b.class == BackendClass::LoopbackLocal)
+                    .map(|b| b.id)
+                    .unwrap_or("ollama")
+                    .to_string(),
+            ),
+        }
+    }
+
     /// Drop every registered backend's cached model (myne-md/myne#440).
     ///
     /// A model-path change is a fact about the LOCALLY side-loaded weights, and

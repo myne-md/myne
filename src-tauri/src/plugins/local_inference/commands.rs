@@ -781,12 +781,50 @@ pub async fn semantic_search(
     Ok(to_search_hits(hits))
 }
 
+/// Which backend is serving right now, as an answer records it
+/// (myne-md/myne#440). Read at the moment the turn is built rather than by the
+/// frontend afterwards — the selection is re-read per request, so a report
+/// fetched after the answer can name a different backend than the one that
+/// produced it.
+fn served_by_of(state: &LocalInferenceState) -> ServedBy {
+    let class = state.active_class();
+    ServedBy {
+        class: class.as_str(),
+        name: state.served_by_name(class),
+    }
+}
+
 /// A grounded Q&A answer crossing IPC (semantic-search-qa tasks 6 + 7): the
 /// answer text plus the source chunks it was grounded on, for citation.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AskResult {
     pub answer: String,
     pub sources: Vec<SearchHit>,
+    /// **Which backend served THIS turn** (myne-md/myne#440).
+    ///
+    /// Reported by the request rather than read after it. The chat surface used
+    /// to call `ai_capability_report()` once the answer was in and label the
+    /// turn from the CURRENT selection — so a backend switch mid-session
+    /// relabelled turns that a different backend had produced. Attribution of
+    /// where a note's text went is a trust surface, not a caption; it has to
+    /// come from the request that actually sent it.
+    pub served_by: ServedBy,
+}
+
+/// The backend that produced one answer, as the turn records it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ServedBy {
+    /// The `BackendClass` wire form — `in_process_local` / `loopback_local` /
+    /// `remote`.
+    pub class: &'static str,
+    /// The runtime or provider by name, when the class has one to give.
+    ///
+    /// `None` for the in-process arm, which is Myne itself and needs no name.
+    /// Populated for BOTH the loopback and remote arms — the loopback one used
+    /// to render as an empty string, because the frontend derived every name
+    /// from the *remote provider's* wire value, which a loopback answer does not
+    /// have. "Answered by" with nothing after it is worse than no indicator.
+    pub name: Option<String>,
 }
 
 /// Resolve retrieved hits to their chunk texts from resident note bodies,
@@ -861,6 +899,7 @@ pub async fn ask<R: Runtime>(
             return Ok(AskResult {
                 answer: String::new(),
                 sources: Vec::new(),
+                served_by: served_by_of(&engine_state),
             });
         }
         retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
@@ -870,6 +909,7 @@ pub async fn ask<R: Runtime>(
         return Ok(AskResult {
             answer: String::new(),
             sources: Vec::new(),
+            served_by: served_by_of(&engine_state),
         });
     }
 
@@ -911,6 +951,7 @@ pub async fn ask<R: Runtime>(
     Ok(AskResult {
         answer,
         sources: to_search_hits(sources),
+        served_by: served_by_of(&engine_state),
     })
 }
 
@@ -1012,6 +1053,7 @@ pub async fn chat_stream<R: Runtime>(
             return Ok(AskResult {
                 answer: String::new(),
                 sources: Vec::new(),
+                served_by: served_by_of(&engine_state),
             });
         }
         retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
@@ -1079,6 +1121,7 @@ pub async fn chat_stream<R: Runtime>(
     Ok(AskResult {
         answer,
         sources: cite_sources,
+        served_by: served_by_of(&engine_state),
     })
 }
 
