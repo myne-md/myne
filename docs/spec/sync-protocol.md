@@ -508,6 +508,14 @@ A note deletion is a **`deleted`-marked new encrypted version** — a fresh `.my
 
 A tombstone record is superseded by content: a push that CAS-advances the record's version past the tombstoned final version (a legitimate concurrent-edit resurrection racing the delete) **clears the server-side tombstone record and any Layer-2 reclaimed mark** — the blob is live again and MUST NOT be reclaimed off the stale tombstone (a reclaim keyed to a superseded tombstone would destroy the live body).
 
+**Delete-vs-edit on a CRDT (`NC05`) note is remove-wins, decided BEFORE the merge (normative; myne-md/myne#431).** A `NC05` note's content is one Automerge `Text` (`protocol.md` §10.7) and its deletion is, as above, a `deleted:` marker in the managed frontmatter — so the deletion lives in the string the CRDT carries rather than in the CRDT itself. A client MUST therefore resolve a divergent pair by inspecting both revisions' `deleted:` markers **first**, and MUST NOT merge the documents when either side carries one:
+
+- **Either side tombstoned → the tombstone wins**, unchanged and whole; the concurrent edit is discarded. This is the same remove-wins rule §11.4 and §10.2.2 apply to the attachments catalog and the themes map, and it is chosen for the same reason: resurrecting content the user permanently deleted is the worse of the two failures.
+- **Both sides tombstoned →** the greater `deleted:` value wins; ties break over a **total order on retained content** (`deleted:`, then the note text, then the document heads). Every component is symmetric in the two revisions, so the two devices — which hold the same pair with the local/remote labels swapped — MUST select the same winner.
+- The winning blob is adopted **verbatim**. Re-sealing it would rotate `content_nonce` for a revision neither side changed, re-running the §10.2.2 CAS ping-pong.
+
+Merging instead of deciding is not a lesser form of the same answer, it is a different and wrong one: the two revisions' managed-frontmatter blocks overlap, so the interleave **fabricates field values neither device ever wrote** (an observed case blends one device's `deleted:` with the other's `updated:` into a third, well-formed timestamp). A reader cannot detect that, because the result parses. `MY01` notes are unaffected — they keep §10.1 keep-both.
+
 ### 11.2 Hybrid horizon-GC
 
 A tombstone is garbage-collected by **one rule**: it is dropped once **every device counted active within the horizon has acked it** — its sync cursor (§8.2) has advanced past the delete-version. This is the per-device-cursor-ack discipline, not a bare grace-period drop.
