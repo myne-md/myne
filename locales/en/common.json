@@ -2776,7 +2776,7 @@
       "modelNone": "No file selected",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
       "modelTranscriptionLabel": "Speech-to-text model (transcription)",
-      "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. Everything runs on your device.",
+      "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. A model picked here runs on your device; if you have named a provider instead, that provider answers.",
       "providerHelper": "Instead of running a model here, Myne can send a request to a service you name. Your notes leave this device when it does. \"None\" is the default and means no service is contacted at all.",
       "providerKeyAdd": "paste your API key",
       "providerKeyLabel": "API key",
