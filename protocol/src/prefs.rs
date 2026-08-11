@@ -2660,7 +2660,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
                 .ok_or(PrefsBlobError::PlaintextParseFailed)?;
             (Some(val), rest)
         }
-        None => (None, post_ai_provider_key),
+        // Rewinds to the block's OWN predecessor, not one further back: every
+        // field after this one is located by `strip_prefix`, so a cursor that
+        // starts behind `ai_provider_model` makes all four of them miss.
+        None => (None, post_ai_provider_model),
     };
 
     // ---- archived_folders (optional, after archive_disabled — folder-archive) ----
@@ -5810,9 +5813,13 @@ mod tests {
 
     /// A model chosen without a provider is a state the UI cannot produce, but
     /// the codec must not corrupt it: the positional parser has to skip the
-    /// three absent siblings and still find the model. This is the case that
-    /// catches a chain wired to the wrong `post_*` variable, which round-trips
-    /// perfectly whenever every neighbour happens to be present.
+    /// three absent siblings and still find the model.
+    ///
+    /// It does NOT catch a chain wired to the wrong `post_*` variable, though
+    /// an earlier revision of this comment claimed it did. Every field AFTER
+    /// the model is absent here too, so nothing ever consumes the cursor the
+    /// wrong branch would have poisoned. The test below is the one that
+    /// consumes it.
     #[test]
     fn the_model_round_trips_with_every_sibling_absent() {
         let encoded = canonical_json_encode(&PrefsView {
@@ -5826,6 +5833,45 @@ mod tests {
         let back = canonical_json_decode(&encoded).expect("decode");
         assert_eq!(back.ai_provider_model.as_deref(), Some("solo"));
         assert_eq!(back.ai_provider, None);
+    }
+
+    /// The shape the test above cannot reach: the model present WITH fields
+    /// after it also present. `archive_disabled` is `Option<bool>` and is
+    /// omitted unless the user touched the archive toggle, so this is the
+    /// ordinary state of any vault whose owner named a provider — and it is
+    /// exactly where a `None =>` arm wired to the wrong `post_*` bites.
+    ///
+    /// The four fields after `archive_disabled` are located by `strip_prefix`,
+    /// not by `find_top_level_marker`, so a cursor that rewinds BEHIND
+    /// `ai_provider_model` makes every one of them miss its marker and take
+    /// its absent-branch default. Silently: the decode still returns `Ok`.
+    #[test]
+    fn the_model_does_not_swallow_the_preferences_that_follow_it() {
+        let original = PrefsView {
+            ai_provider_model: Some(alloc::string::String::from("meta-llama/llama-3.1-8b")),
+            archive_disabled: None,
+            archived_folders: alloc::vec![alloc::string::String::from("Old/")],
+            attachment_compression_enabled: false,
+            attachment_ocr_enabled: false,
+            auto_lock_seconds: Some(900),
+            ..PrefsView::default()
+        };
+        let back = canonical_json_decode(&canonical_json_encode(&original)).expect("decode");
+
+        // `auto_lock_seconds` first: losing it silently shortens the vault's
+        // protective envelope to DEFAULT_AUTO_LOCK_SECS without the user
+        // asking, which is a security setting changing itself.
+        assert_eq!(back.auto_lock_seconds, Some(900), "auto-lock was reset");
+        assert!(
+            !back.attachment_ocr_enabled,
+            "an OCR opt-out flipped back on"
+        );
+        assert!(!back.attachment_compression_enabled);
+        assert_eq!(back.archived_folders, original.archived_folders);
+        assert_eq!(
+            back.ai_provider_model.as_deref(),
+            Some("meta-llama/llama-3.1-8b"),
+        );
     }
 
     /// The DEFAULT STATE leaves no trace in the blob. A vault that never named
