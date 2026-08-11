@@ -355,6 +355,53 @@ export interface PrefsView {
    */
   auto_tag_enabled: boolean;
   /**
+   * The **remote** AI provider this account has named, or `null` for the
+   * default — which is not "off" but **unreachable**: with no provider named
+   * there is no remote path to reach (`decisions.md` 2026-08-09).
+   *
+   * Deliberately unlike {@link PrefsView.ai_enabled}, which is device-local:
+   * that one answers "should this machine spend its CPU on inference", while
+   * naming a remote provider is a statement about where this vault's notes may
+   * be sent. Shared across devices (scalar LWW).
+   */
+  ai_provider: string | null;
+  /**
+   * **Which provider** the one-time consent was given for, or `null`. **A
+   * gate, not a display flag** — the host's request path checks it, so a UI
+   * that skipped the screen still cannot send.
+   *
+   * A name rather than a boolean because consent is per provider: the screen
+   * names the recipient, so the request path compares this to the active
+   * selection instead of trusting that some setter cleared a flag.
+   *
+   * Account-scoped: it syncs, so a newly enrolled device inherits it and sends
+   * without re-asking (`threat-model.md` §5, ledger SYNC-22).
+   */
+  ai_provider_consent: string | null;
+  /**
+   * **Which model** at {@link PrefsView.ai_provider} answers, or `null`.
+   *
+   * There is no default and the client ships no fallback (SYNC-24): the value
+   * comes from the list the provider itself reports. `null` means *not chosen*,
+   * and the host refuses rather than substituting one — a pinned model tag rots
+   * faster than the release that pinned it, and on a metered API a default
+   * nobody chose is a bill nobody chose.
+   *
+   * Unlike the key it sits beside, this one **does** cross IPC: a published
+   * model name is not a credential, and the panel renders the selection back.
+   */
+  ai_provider_model: string | null;
+  /*
+   * There is deliberately NO `ai_provider_key` here, and its absence is the
+   * point rather than an omission. `prefs_read` serializes the whole host-side
+   * `PrefsView`, so a key present in that struct would reach page context on
+   * every read — and from there a DOM snapshot, a devtools session, or any
+   * script running in the page. The host marks the field serde-skip and answers
+   * {@link aiProviderHasKey} instead: the UI learns *whether*, never *what*.
+   * Adding a field here would not surface the key (the host does not send it);
+   * it would surface `undefined` and invite someone to "fix" the host.
+   */
+  /**
    * Active custom-theme name (custom-themes epic, MYND-297) — a key of the
    * encrypted `vault.themes` store (`MYT1`, `protocol.md` §9.21). It named a
    * plaintext file stem under `app_config_dir/themes/` until `decisions.md`
@@ -769,6 +816,76 @@ export async function setDeliberateFolders(folders: string[]): Promise<void> {
  */
 export async function setAiEnabled(enabled: boolean): Promise<void> {
   await writePref("plugin:prefs|set_ai_enabled", { enabled });
+}
+
+/**
+ * Name the remote AI provider, or pass `null` to clear it (myne#415).
+ *
+ * Clearing also clears the consent and the key host-side — a key for a
+ * provider nobody selected is a credential with no owner, and a surviving
+ * consent would silently pre-approve the next provider the user picks.
+ *
+ * A value outside the host's known set is **refused**, not stored, so the
+ * promise rejects rather than leaving a selection the request path ignores.
+ */
+export async function setAiProvider(provider: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider", { provider });
+}
+
+/**
+ * Record (or withdraw) the one-time consent for the named provider (myne#415).
+ *
+ * This is the persistence, not the enforcement: the host re-reads it before
+ * every remote request, so calling it without having shown the screen buys a
+ * stored `true` and nothing else.
+ */
+export async function setAiProviderConsent(
+  grantedFor: string | null,
+): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_consent", { grantedFor });
+}
+
+/**
+ * Store the provider API key, or pass `null` to **revoke** it (myne#415).
+ *
+ * One-way by design: the value goes in and never comes back out — there is no
+ * command that returns it, and {@link PrefsView} carries no field for it. Read
+ * {@link aiProviderHasKey} to decide between "Add key" and "Replace key".
+ *
+ * Revocation propagates to the account's other devices as an LWW write of
+ * `null`, which is what makes "revoke" mean more than "revoke here".
+ */
+export async function setAiProviderKey(key: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_key", { key });
+}
+
+/**
+ * Choose which of the provider's models answers, or pass `null` to clear it
+ * (myne#415, SYNC-24).
+ *
+ * The candidate list comes from {@link listProviderModels}, never from a
+ * constant in this tree — that is the whole resolution, not an implementation
+ * detail. Changing or clearing the provider clears this host-side, because a
+ * model name is only meaningful at the provider that published it.
+ */
+export async function setAiProviderModel(model: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_model", { model });
+}
+
+/**
+ * Whether a provider API key is stored — the boolean the UI reads **instead
+ * of** the key (myne#415).
+ *
+ * Not a `writePref`, so it bumps no nonce: it is a read. It answers `false`
+ * rather than throwing when the vault is locked or the blob is unreadable,
+ * because "no key" is the safe answer for a control that only chooses a label.
+ */
+export async function aiProviderHasKey(): Promise<boolean> {
+  try {
+    return await invoke<boolean>("plugin:prefs|ai_provider_has_key");
+  } catch {
+    return false;
+  }
 }
 
 /**

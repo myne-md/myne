@@ -329,6 +329,92 @@ pub struct PrefsView {
     #[serde(default)]
     pub auto_lock_seconds: Option<u32>,
 
+    /// The **remote AI provider** the user named, or `None` for the default —
+    /// which is not "off" but **unreachable**: with no provider selected there
+    /// is no remote code path to reach (`decisions.md` 2026-08-09). A closed
+    /// value, stored as its wire string: `"ollama-cloud"` or `"openrouter"`.
+    /// Kept as a `String` rather than an enum because this codec is `no_std`
+    /// canonical JSON and an unknown value must decode to *something* a newer
+    /// client wrote; the host validates it against its own registry and treats
+    /// an unrecognized name as no provider.
+    ///
+    /// **The destination is NOT stored here.** Each provider's base URL is a
+    /// compiled-in constant, so a tampered `vault.prefs` cannot redirect
+    /// traffic to a host of the attacker's choosing.
+    ///
+    /// Canonical key `ai_provider` — sorts after `ai_excluded_folders`
+    /// (`ai_e` < `ai_p`), before `ai_provider_consent` (a shorter string sorts
+    /// before its own extension) and `archive_disabled` (`ai` < `ar`). Omitted
+    /// entirely when `None`, so a vault that never named a provider is
+    /// byte-identical to a pre-feature `vault.prefs`.
+    #[serde(default)]
+    pub ai_provider: Option<String>,
+
+    /// **Which provider** the one-time consent was given for — the screen that
+    /// states plainly that note text leaves the device, and names who receives
+    /// it. `None` ≡ not given (the default).
+    ///
+    /// It records the provider rather than a bare `true` **because consent is
+    /// per provider**: the screen names the recipient, so an approval for one
+    /// cannot stand in for another. As a boolean, that invariant would depend
+    /// on every future setter remembering to clear the flag when the selection
+    /// changes — a rule maintained by memory. As a name, the request path
+    /// simply compares it to the active selection, and a stale approval is
+    /// unusable rather than merely discouraged.
+    ///
+    /// **Account-scoped, not device-scoped, and that is a known cost** (ledger
+    /// SYNC-22): this field syncs, so a newly enrolled device inherits the
+    /// approval and begins sending without anyone at *that* device seeing the
+    /// screen. `threat-model.md` §5 and `glossary.md` say so in the same words;
+    /// if you are reading this while adding a second provider, the residual is
+    /// theirs to restate, not to rediscover.
+    ///
+    /// It is a **gate, not a display flag**: the request path checks it, so a
+    /// UI that forgot to show the screen still cannot send. Canonical key
+    /// `ai_provider_consent` — after `ai_provider`, before `ai_provider_key`
+    /// (`c` < `k`). Omitted when `None`.
+    #[serde(default)]
+    pub ai_provider_consent: Option<String>,
+
+    /// The API key for [`PrefsView::ai_provider`], or `None`.
+    ///
+    /// **`#[serde(skip_serializing)]` is load-bearing.** `prefs_read`
+    /// serializes the *whole* `PrefsView` to the WebView, so without this the
+    /// key would reach page context on every read — and from there a DOM
+    /// snapshot, a devtools session, or any script running in the page. The
+    /// exact in-tree precedent is `PairedExtension::token_value`, and it works
+    /// for the same reason: on-disk persistence here is **hand-rolled byte
+    /// emission**, not serde, so skipping the serde field does not touch the
+    /// blob. The UI is given a `has_key` boolean instead.
+    ///
+    /// It is also DENY-listed for logging (`src-tauri/CLAUDE.md`).
+    ///
+    /// Canonical key `ai_provider_key` — after `ai_provider_consent`
+    /// (`c` < `k`), before `ai_provider_model` (`k` < `m`). Omitted when
+    /// `None`.
+    #[serde(default, skip_serializing)]
+    pub ai_provider_key: Option<String>,
+
+    /// **Which model** at [`PrefsView::ai_provider`] answers, or `None`.
+    ///
+    /// There is no default and Myne ships no per-provider fallback (SYNC-24):
+    /// the user picks from the list the provider itself reports. A pinned
+    /// model tag rots faster than the release that pinned it, and on a metered
+    /// API a default nobody chose is a bill nobody chose. `None` therefore
+    /// means *not yet chosen*, and the remote arm has nothing to ask with —
+    /// which is a refusal, not a silent substitution.
+    ///
+    /// **Not `skip_serializing`, unlike the key.** The panel renders the
+    /// current selection back to the user, so this value has to cross IPC; it
+    /// is a model name the provider published, not a credential.
+    ///
+    /// Canonical key `ai_provider_model` — after `ai_provider_key`
+    /// (`k` < `m`), before `archive_disabled` (`ai` < `ar`). Omitted when
+    /// `None`, so a vault that never named a provider stays byte-identical to
+    /// a pre-feature `vault.prefs`.
+    #[serde(default)]
+    pub ai_provider_model: Option<String>,
+
     /// Automatic on-device tag suggestion toggle (on-device-tag-suggestion,
     /// MYND-651). `false` ≡ off (the default). **Omitted entirely from the
     /// canonical JSON when `false`**, so a vault that never enabled it is
@@ -1265,6 +1351,10 @@ impl Default for PrefsView {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -1466,6 +1556,43 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
             push_json_string(&mut out, f);
         }
         out.extend_from_slice(b"],");
+    }
+
+    // ai_provider / ai_provider_consent / ai_provider_key (canonical keys
+    // 'ai_provider…' — after ai_excluded_folders ['ai_ex' < 'ai_pr'], before
+    // archive_disabled ['ai' < 'ar']; among themselves, the bare key sorts
+    // before its own extensions and 'c' < 'k'). The remote-provider triple
+    // (ai-remote-providers, SYNC-15/SYNC-22). Each omitted entirely when
+    // unset/false, so a vault that never named a provider is byte-identical to
+    // a pre-feature vault.prefs (preserves existing KAT vectors) — and, more to
+    // the point, the DEFAULT STATE leaves no trace in the blob at all.
+    if let Some(ref provider) = prefs.ai_provider {
+        out.extend_from_slice(b"\"ai_provider\":");
+        push_json_string(&mut out, &provider.nfc().collect::<String>());
+        out.push(b',');
+    }
+    if let Some(ref granted_for) = prefs.ai_provider_consent {
+        out.extend_from_slice(b"\"ai_provider_consent\":");
+        push_json_string(&mut out, &granted_for.nfc().collect::<String>());
+        out.push(b',');
+    }
+    // The key IS written to the blob — it is encrypted vault content. What it
+    // must never do is cross IPC, which is the `#[serde(skip_serializing)]` on
+    // the field, not anything here. NFC-normalized like every other string
+    // value so the canonical form is stable; provider keys are ASCII in
+    // practice, so this is a no-op that keeps the rule uniform.
+    if let Some(ref key) = prefs.ai_provider_key {
+        out.extend_from_slice(b"\"ai_provider_key\":");
+        push_json_string(&mut out, &key.nfc().collect::<String>());
+        out.push(b',');
+    }
+    // The chosen model (SYNC-24 — no shipped default; the user picks from the
+    // provider's own list). A published model name, not a credential, so it is
+    // the one member of the quartet that also crosses IPC.
+    if let Some(ref model) = prefs.ai_provider_model {
+        out.extend_from_slice(b"\"ai_provider_model\":");
+        push_json_string(&mut out, &model.nfc().collect::<String>());
+        out.push(b',');
     }
 
     // archive_disabled (canonical key 'a', AFTER active_workspace
@@ -2448,8 +2575,68 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // `"archive_disabled":`-looking substring cannot fool it. The bool value
     // MUST be followed by `,` — screen_capture_protection is mandatory and
     // canonically last, so a further field always follows.
+    // ---- ai_provider / ai_provider_consent / ai_provider_key (optional) ----
+    // Canonical key order ai_excluded_folders < ai_provider <
+    // ai_provider_consent < ai_provider_key < archive_disabled, so each is a
+    // literal PREFIX of what the previous one left — `strip_prefix`, not
+    // `find_subslice`, so a folder name containing an `"ai_provider":`-looking
+    // substring cannot fool it. Absent → unset/false, which is the default and
+    // the unreachable state.
+    let ai_provider_marker = b"\"ai_provider\":";
+    let (ai_provider, post_ai_provider) = match post_ai_excluded.strip_prefix(ai_provider_marker) {
+        Some(after) => {
+            let (val, consumed) =
+                parse_json_string(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            let rest = after[consumed..]
+                .strip_prefix(b",")
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            (Some(val), rest)
+        }
+        None => (None, post_ai_excluded),
+    };
+    let ai_provider_consent_marker = b"\"ai_provider_consent\":";
+    let (ai_provider_consent, post_ai_provider_consent) =
+        match post_ai_provider.strip_prefix(ai_provider_consent_marker) {
+            Some(after) => {
+                let (val, consumed) =
+                    parse_json_string(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                let rest = after[consumed..]
+                    .strip_prefix(b",")
+                    .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                (Some(val), rest)
+            }
+            None => (None, post_ai_provider),
+        };
+    let ai_provider_key_marker = b"\"ai_provider_key\":";
+    let (ai_provider_key, post_ai_provider_key) =
+        match post_ai_provider_consent.strip_prefix(ai_provider_key_marker) {
+            Some(after) => {
+                let (val, consumed) =
+                    parse_json_string(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                let rest = after[consumed..]
+                    .strip_prefix(b",")
+                    .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                (Some(val), rest)
+            }
+            None => (None, post_ai_provider_consent),
+        };
+    let ai_provider_model_marker = b"\"ai_provider_model\":";
+    let (ai_provider_model, post_ai_provider_model) =
+        match post_ai_provider_key.strip_prefix(ai_provider_model_marker) {
+            Some(after) => {
+                let (val, consumed) =
+                    parse_json_string(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                let rest = after[consumed..]
+                    .strip_prefix(b",")
+                    .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                (Some(val), rest)
+            }
+            None => (None, post_ai_provider_key),
+        };
+
     let archive_marker = b"\"archive_disabled\":";
-    let (archive_disabled, post_archive) = match post_ai_excluded.strip_prefix(archive_marker) {
+    let (archive_disabled, post_archive) = match post_ai_provider_model.strip_prefix(archive_marker)
+    {
         Some(after) => {
             let (val, after_val) = if let Some(r) = after.strip_prefix(b"true") {
                 (true, r)
@@ -2463,7 +2650,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
                 .ok_or(PrefsBlobError::PlaintextParseFailed)?;
             (Some(val), rest)
         }
-        None => (None, post_ai_excluded),
+        None => (None, post_ai_provider_key),
     };
 
     // ---- archived_folders (optional, after archive_disabled — folder-archive) ----
@@ -2846,6 +3033,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let startup_open_note = parse_optional_string_marker(after_key, b"\"startup_open_note\":");
 
     Ok(PrefsView {
+        ai_provider,
+        ai_provider_consent,
+        ai_provider_key,
+        ai_provider_model,
         attachment_compression_enabled,
         attachment_ocr_enabled,
         screen_capture_protection,
@@ -3819,6 +4010,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -3894,6 +4089,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -4264,6 +4463,10 @@ mod tests {
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
+                ai_provider: None,
+                ai_provider_consent: None,
+                ai_provider_key: None,
+                ai_provider_model: None,
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 reminders_enabled: true,
@@ -4341,6 +4544,10 @@ mod tests {
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
+                ai_provider: None,
+                ai_provider_consent: None,
+                ai_provider_key: None,
+                ai_provider_model: None,
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 reminders_enabled: true,
@@ -5013,6 +5220,10 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             ..PrefsView::default()
         });
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -5381,6 +5592,10 @@ mod tests {
     fn ai_excluded_folders_omitted_when_empty_present_when_set() {
         let empty = canonical_json_encode(&PrefsView {
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             ..PrefsView::default()
         });
         assert!(!core::str::from_utf8(&empty)
@@ -5388,6 +5603,10 @@ mod tests {
             .contains("ai_excluded_folders"));
         let set = canonical_json_encode(&PrefsView {
             ai_excluded_folders: alloc::vec![alloc::string::String::from("Secret/")],
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             ..PrefsView::default()
         });
         assert_eq!(
@@ -5444,6 +5663,135 @@ mod tests {
             set.as_slice(),
             br#"{"archived_folders":["Projects/"],"screen_capture_protection":true}"#,
         );
+    }
+
+    /// The remote-provider quartet sits between `ai_excluded_folders` and
+    /// `archive_disabled`, and the parser is POSITIONAL — a field placed wrong
+    /// round-trips wrong. Both lexicographic neighbours are named and asserted
+    /// by position, per the `auto_tag_enabled` precedent above.
+    #[test]
+    fn ai_provider_quartet_encodes_between_ai_excluded_folders_and_archive_disabled() {
+        let encoded = canonical_json_encode(&PrefsView {
+            ai_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
+            ai_provider: Some(alloc::string::String::from("openrouter")),
+            ai_provider_consent: Some(alloc::string::String::from("openrouter")),
+            ai_provider_key: Some(alloc::string::String::from("sk-sentinel-000")),
+            ai_provider_model: Some(alloc::string::String::from("meta-llama/llama-3.1-8b")),
+            archive_disabled: Some(true),
+            ..PrefsView::default()
+        });
+        let text = core::str::from_utf8(&encoded).unwrap();
+        let pos = |k: &str| text.find(k).unwrap_or_else(|| panic!("missing {k}"));
+        // ai_excluded_folders < ai_provider < ai_provider_consent <
+        // ai_provider_key < ai_provider_model < archive_disabled.
+        assert!(pos("\"ai_excluded_folders\"") < pos("\"ai_provider\""));
+        assert!(pos("\"ai_provider\"") < pos("\"ai_provider_consent\""));
+        assert!(pos("\"ai_provider_consent\"") < pos("\"ai_provider_key\""));
+        assert!(pos("\"ai_provider_key\"") < pos("\"ai_provider_model\""));
+        assert!(pos("\"ai_provider_model\"") < pos("\"archive_disabled\""));
+        // And it round-trips through the positional parser.
+        let back = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(back.ai_provider.as_deref(), Some("openrouter"));
+        assert_eq!(back.ai_provider_consent.as_deref(), Some("openrouter"));
+        assert_eq!(back.ai_provider_key.as_deref(), Some("sk-sentinel-000"));
+        assert_eq!(
+            back.ai_provider_model.as_deref(),
+            Some("meta-llama/llama-3.1-8b")
+        );
+        assert_eq!(back.archive_disabled, Some(true));
+    }
+
+    /// The model is the one member of the quartet that is BOTH persisted and
+    /// allowed across IPC — the panel renders the current selection back, and a
+    /// published model name is not a credential. Its own test because the
+    /// nearest field in the file (`ai_provider_key`) is the exact opposite, and
+    /// a future `skip_serializing` copied one field too far would leave the
+    /// chooser rendering blank with nothing failing.
+    #[test]
+    fn the_chosen_model_crosses_ipc_unlike_the_key_beside_it() {
+        const MODEL: &str = "qwen/qwen3-30b";
+        let view = PrefsView {
+            ai_provider: Some(alloc::string::String::from("openrouter")),
+            ai_provider_key: Some(alloc::string::String::from("sk-not-this-one")),
+            ai_provider_model: Some(alloc::string::String::from(MODEL)),
+            ..PrefsView::default()
+        };
+        let json = serde_json::to_string(&view).expect("serialize");
+        assert!(
+            json.contains(MODEL),
+            "the chosen model must reach the panel"
+        );
+        assert!(!json.contains("sk-not-this-one"), "the key VALUE leaked");
+    }
+
+    /// A model chosen without a provider is a state the UI cannot produce, but
+    /// the codec must not corrupt it: the positional parser has to skip the
+    /// three absent siblings and still find the model. This is the case that
+    /// catches a chain wired to the wrong `post_*` variable, which round-trips
+    /// perfectly whenever every neighbour happens to be present.
+    #[test]
+    fn the_model_round_trips_with_every_sibling_absent() {
+        let encoded = canonical_json_encode(&PrefsView {
+            ai_provider_model: Some(alloc::string::String::from("solo")),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            core::str::from_utf8(&encoded).unwrap(),
+            r#"{"ai_provider_model":"solo","screen_capture_protection":true}"#,
+        );
+        let back = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(back.ai_provider_model.as_deref(), Some("solo"));
+        assert_eq!(back.ai_provider, None);
+    }
+
+    /// The DEFAULT STATE leaves no trace in the blob. A vault that never named
+    /// a provider must encode byte-identically to a pre-feature `vault.prefs`,
+    /// which is what keeps every existing KAT vector valid — and, separately,
+    /// what stops the blob from carrying an at-rest "this user configured AI"
+    /// fingerprint.
+    #[test]
+    fn the_ai_provider_triple_is_omitted_entirely_when_unset() {
+        let empty = canonical_json_encode(&PrefsView::default());
+        let text = core::str::from_utf8(&empty).unwrap();
+        assert!(!text.contains("ai_provider"), "got: {text}");
+        // The pre-feature baseline: `PrefsView::default()` encodes to exactly
+        // the mandatory trailing field and nothing else.
+        assert_eq!(text, r#"{"screen_capture_protection":true}"#);
+    }
+
+    /// **The IPC confinement.** `prefs_read` serializes the whole `PrefsView`
+    /// to the WebView, so a key without `#[serde(skip_serializing)]` reaches
+    /// page context on every read. The twin of
+    /// `prefs_view_serde_serialization_omits_token_value`: the key survives the
+    /// BLOB round trip (it is encrypted vault content) and is absent from the
+    /// IPC JSON — both the field NAME and a sentinel VALUE, because asserting
+    /// only the name would pass against a rename.
+    #[test]
+    fn the_provider_key_round_trips_on_disk_and_never_reaches_the_ipc_json() {
+        const SENTINEL: &str = "sk-do-not-let-this-cross-ipc";
+        let view = PrefsView {
+            ai_provider: Some(alloc::string::String::from("openrouter")),
+            ai_provider_consent: Some(alloc::string::String::from("openrouter")),
+            ai_provider_key: Some(alloc::string::String::from(SENTINEL)),
+            ai_provider_model: None,
+            ..PrefsView::default()
+        };
+
+        // On disk: present, and it comes back.
+        let blob = canonical_json_encode(&view);
+        let back = canonical_json_decode(&blob).expect("decode");
+        assert_eq!(back.ai_provider_key.as_deref(), Some(SENTINEL));
+
+        // Across IPC: absent, by name AND by value.
+        let json = serde_json::to_string(&view).expect("serialize");
+        assert!(!json.contains("ai_provider_key"), "field name leaked");
+        assert!(!json.contains(SENTINEL), "the key VALUE leaked");
+        // The two siblings DO cross — the UI needs to render which provider is
+        // selected and whether consent was given. Asserting this is what makes
+        // the absence above a targeted skip rather than a serialization that
+        // silently dropped the whole group.
+        assert!(json.contains("ai_provider"), "the selection must cross");
+        assert!(json.contains("ai_provider_consent"), "consent must cross");
     }
 
     #[test]
@@ -5918,6 +6266,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             editor_content_width: None,
             editor_default_view_mode: None,
@@ -6366,6 +6718,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -6448,6 +6804,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -6528,6 +6888,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -6607,6 +6971,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -6749,6 +7117,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -6859,6 +7231,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -6948,6 +7324,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -7111,6 +7491,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -7208,6 +7592,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -7546,6 +7934,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -7625,6 +8017,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -7706,6 +8102,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -7855,6 +8255,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -7982,6 +8386,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             editor_layout: Some(sample_layout()),
             editor_line_numbers: None,
@@ -8297,6 +8705,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -8380,6 +8792,10 @@ mod tests {
             active_workspace: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archive_disabled: None,
             archived_folders: Vec::new(),
             editor_layout: None,
@@ -8702,6 +9118,10 @@ mod tests {
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
+                ai_provider: None,
+                ai_provider_consent: None,
+                ai_provider_key: None,
+                ai_provider_model: None,
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 reminders_enabled: true,
@@ -8778,6 +9198,10 @@ mod tests {
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
+                ai_provider: None,
+                ai_provider_consent: None,
+                ai_provider_key: None,
+                ai_provider_model: None,
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 reminders_enabled: true,
@@ -8884,6 +9308,10 @@ mod tests {
                 },
             }],
             ai_excluded_folders: Vec::new(),
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             archived_folders: Vec::new(),
             reminder_horizon_days: Some(7),
             folder_icons: Default::default(),
@@ -9404,6 +9832,122 @@ mod tests {
             .expect("write label prefs vectors dump");
     }
 
+    /// Mint the two `vault-prefs` cases pinning the **remote-provider triple**
+    /// (myne#415). A separate per-feature generator, per this family's
+    /// convention — `emit_prefs_vectors_for_paste` and its siblings stay
+    /// byte-stable so already-shipped vectors never move.
+    ///
+    /// It emits ready-to-append **JSON case objects** rather than the
+    /// human-transcribed "paste" text the older siblings produce: the
+    /// transcription step is where a hand-copied hex digit goes wrong, and
+    /// there is no reason to keep paying for it.
+    ///
+    /// Nonce `0xF1` — the next free entry in this family's nonce registry
+    /// (0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE are taken).
+    #[test]
+    #[ignore = "generator: mints vault-prefs provider-triple cases for the companion repo"]
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    fn emit_ai_provider_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF1; AEAD_NONCE_LEN];
+
+        // Both lexicographic neighbours are present, so the case pins the
+        // quartet's canonical POSITION and not merely its presence.
+        let view = PrefsView {
+            ai_excluded_folders: alloc::vec![String::from("Private/")],
+            ai_provider: Some(String::from("openrouter")),
+            ai_provider_consent: Some(alloc::string::String::from("openrouter")),
+            ai_provider_key: Some(String::from("sk-vector-fixture-000")),
+            ai_provider_model: Some(String::from("meta-llama/llama-3.1-8b")),
+            archive_disabled: Some(true),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&view);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"ai_excluded_folders":["Private/"],"ai_provider":"openrouter","ai_provider_consent":"openrouter","ai_provider_key":"sk-vector-fixture-000","ai_provider_model":"meta-llama/llama-3.1-8b","archive_disabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "canonical order must be ai_excluded_folders < ai_provider < ai_provider_consent < ai_provider_key < ai_provider_model < archive_disabled < screen_capture_protection",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &view, &nonce)
+            .expect("encode provider triple");
+        // Self-validating at mint: the blob decodes back to the same view.
+        let back = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(back, view);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+        dump.push_str("  {\n");
+        dump.push_str("    \"vector_id\": \"vault-prefs/v0.1/encrypt-ai-provider\",\n");
+        dump.push_str("    \"description\": \"myne#415 remote-provider quartet. PrefsView carries BOTH lexicographic neighbours (ai_excluded_folders before, archive_disabled after) so the case pins the canonical POSITION of ai_provider < ai_provider_consent < ai_provider_key < ai_provider_model, not merely their presence. ai_provider_key is present in the ENCRYPTED blob and MUST NOT cross the host->UI boundary in any implementation (protocol.md 9.5.2). Generated by `cargo test -p protocol --lib emit_ai_provider_prefs_vectors -- --ignored` (in protocol/src/prefs.rs).\",\n");
+        dump.push_str("    \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "    \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str("  },\n");
+        dump.push_str("  {\n");
+        dump.push_str("    \"vector_id\": \"vault-prefs/v0.1/decrypt-ai-provider\",\n");
+        dump.push_str("    \"description\": \"Round-trip with encrypt-ai-provider: the blob decodes back to a PrefsView carrying the provider selection, the consent name, the key and the chosen model, each read from its canonical position between ai_excluded_folders and archive_disabled. A decoder that mis-orders the quartet fails here rather than silently returning a shifted value.\",\n");
+        dump.push_str("    \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "    \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("    \"expected_prefs_view\": {\n");
+        dump.push_str("      \"ai_excluded_folders\": [\"Private/\"],\n");
+        dump.push_str("      \"ai_provider\": \"openrouter\",\n");
+        dump.push_str("      \"ai_provider_consent\": \"openrouter\",\n");
+        dump.push_str("      \"ai_provider_key\": \"sk-vector-fixture-000\",\n");
+        dump.push_str("      \"ai_provider_model\": \"meta-llama/llama-3.1-8b\",\n");
+        dump.push_str("      \"archive_disabled\": true,\n");
+        dump.push_str("      \"screen_capture_protection\": true\n");
+        dump.push_str("    }\n");
+        dump.push_str("  }\n");
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_provider_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write provider prefs vectors dump");
+    }
+
     /// Generator for the `device_names` vector pair (appended to the companion
     /// repo's `vault-prefs` family; per-feature generator, keeps the originals
     /// byte-stable) — pins the MYND-459 / SYNC-41 `device_names` additive field
@@ -9732,6 +10276,10 @@ mod tests {
         let prefs_ai = PrefsView {
             ai_enabled: true,
             ai_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             ..PrefsView::default()
         };
         let canonical_ai = canonical_json_encode(&prefs_ai);

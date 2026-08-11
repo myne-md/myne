@@ -15,45 +15,11 @@
 //! them in `spawn_blocking` (avoids an `async-trait` dependency for the seam).
 
 use std::collections::HashMap;
+// The HTTP wire vocabulary lives in `core::http` since ai-ollama-local task 1.
+// Re-exported here so sync's ~290 references are untouched by the move.
+pub use crate::http::{HttpMethod, TransportError, TransportResponse, TransportResponseExt};
+
 use std::sync::Mutex;
-
-/// HTTP method for a transport request (the server protocol uses only these).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HttpMethod {
-    /// Pull / read-side requests.
-    Get,
-    /// Push / write-side requests.
-    Post,
-    /// Idempotent upload (the `vault.meta` enrollment-bootstrap seed + the
-    /// `/attachments/{id}` resumable chunk upload, MYND-468).
-    Put,
-    /// Header-only probe (the `/attachments/{id}` resume/dedup probe —
-    /// `X-Uploaded-Length` / `X-Complete`; `server-protocol.md` §3.2).
-    Head,
-}
-
-/// A transport response: the HTTP status and the opaque body bytes.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TransportResponse {
-    /// HTTP status code (the engine maps 401/409/410/413/429/507 per §6).
-    pub status: u16,
-    /// Opaque response body (ciphertext / sync-meta / head record bytes).
-    pub body: Vec<u8>,
-}
-
-/// A transport response that also surfaces the response headers — needed only
-/// by the `/attachments/{id}` byte-transport (`X-Uploaded-Length`,
-/// `X-Complete`, `Content-Range`; MYND-468). Header names are lowercased,
-/// values trimmed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TransportResponseExt {
-    /// HTTP status code.
-    pub status: u16,
-    /// Opaque response body.
-    pub body: Vec<u8>,
-    /// Response headers, `(lowercased-name, trimmed-value)`.
-    pub headers: Vec<(String, String)>,
-}
 
 impl TransportResponseExt {
     /// First header value with the given (lowercase) name.
@@ -63,20 +29,6 @@ impl TransportResponseExt {
             .find(|(n, _)| n == name)
             .map(|(_, v)| v.as_str())
     }
-}
-
-/// Transport-level failures (below the HTTP-status layer — these mean the
-/// request never produced a response).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TransportError {
-    /// No sync endpoint configured (SYNC-14) — caller must set one first.
-    NotConfigured,
-    /// Connection / DNS / socket failure.
-    Network,
-    /// TLS handshake or certificate-pin failure (A4).
-    Tls,
-    /// The request could not be built (bad path, etc.).
-    BadRequest,
 }
 
 /// The blind-relay transport contract. One method: issue a request with an
@@ -684,3 +636,12 @@ mod default_binding_tests {
         }
     }
 }
+
+/// Ceiling on a sync response body. **Paired with
+/// `orchestrator::FETCH_WINDOW_MAX_BYTES` — raise one, re-read the other.**
+///
+/// It stays here rather than moving into `core::http` because it is a *sync*
+/// bound, not an HTTP one: the shared codec takes its cap from the caller
+/// precisely so an AI response is never silently held to a number chosen for
+/// batch blob fetches (ai-ollama-local task 1).
+pub(crate) const MAX_SYNC_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;

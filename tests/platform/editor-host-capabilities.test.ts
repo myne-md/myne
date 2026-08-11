@@ -85,6 +85,10 @@ async function loadHost(absent: string[]): Promise<Record<string, unknown>> {
   }));
   vi.doMock("../../src/lib/writing-assistant", () => ({
     infer: async () => "",
+    // The ambient arm is its own export because its CLASS is decided by which
+    // command runs, not by a payload flag (#188). A mock missing it makes the
+    // desktop host fail to install rather than quietly lose the member.
+    inferAmbient: async () => "",
     buildCompletionPrompt: () => "",
     buildTitlePrompt: () => "",
   }));

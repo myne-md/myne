@@ -328,34 +328,148 @@ export const CONNECTED_EXTENSIONS_REVOKE_LABEL = "Revoke";
 export const CONNECTED_EXTENSIONS_REPAIR_HINT =
   "A revoked extension must pair again to reconnect.";
 
-// Local-AI trust affordance (local-ai epic, ai-ux-surface MYND-408, SYNC-16).
-// The AI settings panel's honesty copy: a headline + a "How does this work?"
-// disclosure. Load-bearing because the wording is a threat-model-bounded
-// privacy claim — it must NOT exceed the guarantee set: A7 (local malware) and
-// A13 are acknowledged, and no absolute "fully private / never leaves anywhere"
-// claim is made (PRODUCT.md:41,80). E2E asserts both by FULL-literal equality;
-// changing either is a decisions.md event, not a copy edit. Rendered verbatim
-// in every locale (never i18n'd, per src/CLAUDE.md).
+// AI trust affordance (local-ai epic MYND-408 / ai-remote-providers myne#415,
+// SYNC-16). The AI settings panel's honesty copy. Load-bearing because the
+// wording is a threat-model-bounded privacy claim — it must NOT exceed the
+// guarantee set: A7 (local malware), A13 and, since 2026-08-09, A17 (a provider
+// operator) are acknowledged, and no absolute "fully private / never leaves
+// anywhere" claim is made (PRODUCT.md:41,80). E2E asserts by FULL-literal
+// equality; changing any of it is a decisions.md event, not a copy edit.
+// Rendered verbatim in every locale (never i18n'd, per src/CLAUDE.md).
+//
+// **The shape changed on 2026-08-09 and the reason is worth reading before
+// editing.** It used to be two flat constants asserting "runs entirely on your
+// device … never sends your notes to any server". A user-named provider makes
+// both false — a provider IS a server — so the copy became ONE INVARIANT
+// SENTENCE plus ONE STATE SENTENCE, selected by which backend is answering.
+// That keeps a single stable literal for the part that never changes and makes
+// the varying part explicit rather than hedged into vagueness. The wording is
+// quoted from `decisions.md` 2026-08-09, which fixed it deliberately so three
+// sibling slices would not race the same pinned literal (SYNC-7).
 
-/** AI panel trust headline — the CSP-backed "runs on your device" claim. */
-export const AI_TRUST_HEADLINE =
-  "This model runs entirely on your device. Myne never sends your notes to any server.";
-
-/** AI panel "How does this work?" disclosure — the honest, bounded detail:
- *  local, network-free inference, a user-picked model file, and the A7 residual
- *  (malware already on the device can read app memory) stated plainly.
+/**
+ * Which backend is answering — the one input the trust copy varies on.
  *
- *  NOTE (2026-07-01): the earlier wording claimed inference runs "in a sandboxed
- *  process" — an OVERCLAIM. Per `threat-model.md` §7 "Local AI runs in-process,
- *  not yet sandboxed", the model runtime is IN-PROCESS in v0.1 (the sandboxed
- *  sidecar is a deferred pre-default-on hardening), and the threat model
- *  explicitly forbids claiming model-runtime isolation until it lands — the true
- *  claim is "runs locally, sends nothing". The sandbox phrase was removed; the
- *  no-network / never-transmitted / A7-residual claims are all still accurate
- *  (the no-egress gate guarantees no network path structurally). Re-add the
- *  isolation wording only when the sidecar ships (a `decisions.md` event). */
-export const AI_TRUST_DISCLOSURE =
-  "Inference runs locally with no network access, so your notes are never transmitted. You pick the model file from your own disk. Like the rest of Myne, this does not protect against malware already running on your device — such software can read app memory.";
+ * Three states rather than two, because "on this machine but not in this
+ * process" is genuinely its own trust boundary (TB12) and collapsing it into
+ * either neighbour would misstate it: it is not "entirely on your device, no
+ * network involved", and it is not "sent to a company".
+ */
+export type AiTrustState =
+  | { kind: "in-process" }
+  | { kind: "local-runtime"; name: string }
+  | { kind: "remote"; provider: string };
+
+/**
+ * Shown in **every** state, unchanged by the provider.
+ *
+ * The stable half of the shape #414 specifies: one invariant sentence plus one
+ * state sentence. Keeping the invariant a single fixed literal is deliberate —
+ * a provider-neutral sentence that tried to cover all three states would have
+ * to say something like "your notes stay where you put them", which is true
+ * and tells the user nothing.
+ */
+export const AI_TRUST_INVARIANT =
+  "Myne never sends your notes anywhere you have not named, and never downloads a model.";
+
+/**
+ * The A7 residual, shown in every state and **unchanged** from the pre-provider
+ * wording — malware already on the device can read app memory, and no provider
+ * setting changes that.
+ */
+export const AI_TRUST_A7_RESIDUAL =
+  "Like the rest of Myne, this does not protect against malware already running on your device — such software can read app memory.";
+
+/**
+ * The state headline.
+ *
+ * Every clause is bounded by `threat-model.md` §5/§7 as amended 2026-08-09 and
+ * by TB12/TB13; a later slice may say **less** than this, never more. The
+ * wording is quoted from `decisions.md` 2026-08-09 rather than drafted here.
+ *
+ * Total over the union, so a fourth state fails to compile rather than
+ * rendering an empty string.
+ */
+export function aiTrustHeadline(state: AiTrustState): string {
+  switch (state.kind) {
+    case "in-process":
+      return "This model runs entirely on your device.";
+    case "local-runtime":
+      return "This runs on a program on your computer. Your notes stay on this device.";
+    case "remote":
+      return `Your notes are sent to ${state.provider}, which Myne does not run.`;
+  }
+}
+
+/**
+ * The state detail — the "How does this work?" body, minus the invariant and
+ * the A7 residual, which the panel shows alongside it.
+ *
+ * The remote wording deliberately claims **nothing on the provider's behalf**
+ * (A17): Myne may say what it sends and to whom, never what the far side
+ * retains, and the onward-routing clause exists because a broker forwards to
+ * model vendors.
+ */
+export function aiTrustDetail(state: AiTrustState): string {
+  switch (state.kind) {
+    case "in-process":
+      return "The model is a file on this computer and no network connection is involved.";
+    case "local-runtime":
+      return `Your notes go to ${state.name}, a program running on this computer. They do not leave the device — but ${state.name} is not part of Myne, and Myne cannot see what it does with them.`;
+    case "remote":
+      return `They leave this device. Myne cannot see or control what ${state.provider} keeps, and if ${state.provider} routes your request onward, Myne cannot see that either.`;
+  }
+}
+
+/**
+ * The full disclosure body for a state: the detail followed by the A7 residual.
+ * The panel renders the invariant separately, above the headline.
+ */
+export function aiTrustDisclosure(state: AiTrustState): string {
+  return `${aiTrustDetail(state)} ${AI_TRUST_A7_RESIDUAL}`;
+}
+
+// The one-time per-provider consent screen (ai-remote-providers myne#415
+// task 13, SYNC-13). Load-bearing: this is the screen the whole feature's
+// honesty rests on, and it is shown BEFORE anything leaves. Every sentence is
+// bounded by `threat-model.md` §5/§7 and TB13/A17 as amended 2026-08-09;
+// pinned by full-literal equality and rendered verbatim in every locale.
+//
+// Four questions, each answered explicitly rather than implied: WHAT leaves,
+// WHEN it leaves, TO WHOM, and WHAT MYNE CANNOT VERIFY. The fourth is the one
+// a consent screen usually omits, and it is the one that makes the other three
+// honest.
+
+/** WHAT leaves. Names the content, not a euphemism for it. */
+export const CONSENT_WHAT_LEAVES =
+  "The text of the notes involved in each request leaves your device — the note you are working in, and any note used to answer you.";
+
+/** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for. */
+export const CONSENT_WHEN_IT_LEAVES =
+  "Only when you ask for something: chat, summarize, rewrite, edit selection. Nothing is sent as you type, and nothing is sent in the background.";
+
+/** TO WHOM. Interpolates the provider because a consent screen that cannot
+ *  name the recipient is not consent. */
+export function consentToWhom(provider: string): string {
+  return `Everything above goes to ${provider}, which Myne does not run.`;
+}
+
+/** WHAT MYNE CANNOT VERIFY (A17). Myne may state what it sends and to whom;
+ *  never what the far side retains. */
+export function consentCannotVerify(provider: string): string {
+  return `Myne cannot see or control what ${provider} keeps, how long it keeps it, or whether it passes your request to someone else.`;
+}
+
+/** How to undo it, stated on the screen rather than discovered later. The
+ *  distinction matters: deleting the key here stops THIS account's requests,
+ *  but the credential itself lives at the provider. */
+export const CONSENT_HOW_TO_REVOKE =
+  "You can remove the key at any time, which stops Myne sending anything. Revoking the key itself is done at the provider, and it applies to the key rather than to this device.";
+
+/** The account-scope residual (SYNC-22), stated because the alternative is
+ *  that a second device starts sending with nobody at it having agreed. */
+export const CONSENT_ACCOUNT_SCOPE =
+  "This choice is part of your vault, so any device you add later inherits it and will not ask again.";
 
 /** Conversational-AI-chat honesty note (conversational-ai-chat task 13). A
  *  load-bearing, threat-model-bounded framing shown in the chat surface: the
@@ -375,7 +489,7 @@ export const AI_CHAT_HONESTY_NOTE =
  *  and MAY BE WRONG. It must NOT imply cloud-grade accuracy, and — per
  *  `threat-model.md` §7 — must NOT claim model-runtime isolation ("sandbox"), the
  *  same discipline as `AI_CHAT_HONESTY_NOTE`. The trust affordance itself reuses
- *  `AI_TRUST_HEADLINE` / `AI_TRUST_DISCLOSURE` verbatim — this note is only the
+ *  `aiTrustHeadline` / `aiTrustDisclosure` verbatim — this note is only the
  *  accuracy counterweight. E2E/Vitest pin the exact wording by full-literal
  *  equality (SYNC-8); changing it is a `decisions.md` event, not a copy edit.
  *  Rendered verbatim in every locale (never i18n'd). */

@@ -523,6 +523,16 @@ A Pandoc-style block construct: a *term* line immediately followed by one or mor
 
 Used in: `spec/markdown-dialect.md` §3.1, §8; `decisions.md` 2026-05-30
 
+### **Declared payload** &nbsp; 🛠️ *Tooling*
+
+*(Aliases: none. Myne-divergent: yes — this is Myne's own measure, not a packaging-format term.)*
+
+The byte total of everything the desktop bundle configuration *declares* it will carry: every path under `bundle.resources` in `src-tauri/tauri.conf.json`, plus `bundle.externalBin` and the release binary when a build has produced them. It is **not** the size of a DMG, an AppImage or a `.deb` — those are compressed and carry installer chrome — and it exists because CI never builds one: `tauri-compile` runs `pnpm tauri build --no-bundle`, so there is no artifact on the runner to weigh. The declared payload is the measurable-in-CI proxy, and a good one because model weights are incompressible, so a change there moves the download roughly 1:1. Measured byte-exact from `stat`, never with `du`, whose per-file KiB rounding varies by filesystem and inflated the same tree by 9.4 MiB.
+
+Used in: `scripts/check-desktop-payload-budget.mjs`, `src-tauri/payload-baseline.json`
+
+---
+
 ### **DecryptedNote** &nbsp; 📦 *Product*
 
 The opaque Rust handle returned by `protocol::decode_note` on a successful per-note decryption (`spec/protocol.md` §6.4). Carries — privately — the original 112-byte header slab from the source `.myn` blob (bytes 0..47+N: magic + version + reserved + items_key_id + item_key_nonce + enc_item_key_len + enc_item_key), the unwrapped 32-byte `item_key` in `Zeroizing<[u8; 32]>`, the decrypted markdown plaintext in `Zeroizing<Vec<u8>>`, and the `note_uuid` carried out-of-band per §9.1 (the `.myn` filename, not in the blob bytes). All four fields are private; consumers reach the non-secret subsets through accessor methods that slice into the slab. The slab retention is load-bearing for §6.3's "bytes 0..47+N byte-identical across revisions" invariant: `encode_update` splices the slab verbatim into the new blob, never reconstructs the prefix from fields. `Drop` zeroizes both `item_key` and `plaintext`; the `Debug` impl is hand-written and emits redacted markers (a regression test pins the no-leak property). `encode_update` consumes the handle by value (typestate "one decode, one update"); `encode_update_blob_raw` borrows for D6-style nonce-permutation tests.
@@ -1206,11 +1216,43 @@ The right-panel tab answering **both** directions of a note's [bidirectional lin
 
 ### **local inference** &nbsp; 📦 *Product* (*Myne-divergent*)
 
-On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, entirely on the user's machine — no cloud model, no download, no telemetry, ever (a standing anti-feature). *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, **runtime opt-in beta** capability — it ships in the default build (`decisions.md` 2026-07-02) but stays off until the user enables it at Settings → Developer → AI (`ai_enabled` pref, default off), reachable only once [Developer mode](#developer-mode) is on (`decisions.md` 2026-07-30), and is verified to add **zero networked dependency** by an absolute denylist gate (`ai-no-network-check.sh`). The AI-free auditable binary is the `--no-default-features` build. Powers summarize, semantic search / Q&A, [auto-tag](#auto-tag), and the writing-assistant ([ghost-text](#ghost-text) + slash commands). **Two classes of model, and the distinction is load-bearing:** the generation and embedding roles are the **user's own side-loaded files** (untrusted input — Myne does not vouch for them), while the *task-models* — transcription (`decisions.md` 2026-07-19) and auto-tag (`decisions.md` 2026-07-31) — are **first-party weights bundled inside the signed, reproducible desktop build**. Bundling is not downloading: no runtime fetch path exists in either case, which is the property the never-downloaded commitment actually protects. v0.1 runs the runtime in-process for both classes, with a sandboxed keyless sidecar deferred as pre-default-on hardening — so a bundled model narrows the supply-chain surface but earns no key-isolation claim. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01, 2026-07-02.
+On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, on the user's machine by default. **Amended 2026-08-09:** "on the user's machine, always" is no longer the whole story — a user may name an [AI provider](#ai-provider), and a [remote AI provider](#remote-ai-provider) receives note text off-device. What survives unconditionally is **no model download by Myne and no telemetry, ever**; what replaced the rest is *nothing leaves until the user names a provider*. *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, **runtime opt-in beta** capability — it ships in the default build (`decisions.md` 2026-07-02) but stays off until the user enables it at Settings → Developer → AI (`ai_enabled` pref, default off), reachable only once [Developer mode](#developer-mode) is on (`decisions.md` 2026-07-30), and the denylist gate (`ai-no-network-check.sh`) proves what it can actually prove — *no third-party crate in the closure originates outbound requests* — which is a crate-level property, not "this binary cannot reach the network" (`decisions.md` 2026-08-04). The AI-free auditable binary is the `--no-default-features` build. Powers summarize, semantic search / Q&A, [auto-tag](#auto-tag), and the writing-assistant ([ghost-text](#ghost-text) + slash commands). **Three classes of model now, and the distinctions are load-bearing:** the generation and embedding roles are the **user's own side-loaded files** (untrusted input — Myne does not vouch for them), while the *task-models* — transcription (`decisions.md` 2026-07-19) and auto-tag (`decisions.md` 2026-07-31) — are **first-party weights bundled inside the signed, reproducible desktop build**. Bundling is not downloading: no runtime fetch path exists in either case, which is the property the never-downloaded commitment actually protects. The third class is a **provider-served** model — weights Myne never sees at all, held by a [local model runtime](#local-model-runtime) or a [remote AI provider](#remote-ai-provider). v0.1 runs the runtime in-process for the first two classes, with a sandboxed keyless sidecar deferred as pre-default-on hardening — so a bundled model narrows the supply-chain surface but earns no key-isolation claim. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01, 2026-07-02.
+
+### **AI provider** &nbsp; 📦 *Product* (*Myne-divergent*)
+
+*(Not to be confused with [wrap-key provider](#wrap-key-provider), which is a quick-unlock credential source and shares only the word.)*
+
+The abstraction behind which every AI backend sits, and the thing a user **names** to enable one: the bundled or side-loaded in-process runtime, a [local model runtime](#local-model-runtime), or a [remote AI provider](#remote-ai-provider). *Myne-divergent* in a specific way worth stating: `vision.md` carried the phrase "**no provider call**" as an anti-feature, so naming this abstraction "provider" would ordinarily read as a walk-back hiding behind vocabulary. It is used deliberately **because** that clause is superseded (`decisions.md` 2026-08-09) — calling it anything else would have been the disguise. Default is unset, and unset means the code path is unreachable rather than disabled. See also [named provider](#named-provider), [off-device egress](#off-device-egress).
+
+Used in: `decisions.md` 2026-08-09; `threat-model.md` §3 TB12/TB13
+
+### **local model runtime** &nbsp; 📦 *Product*
+
+A model-serving program the **user** installs and runs on their own machine — Ollama today — that Myne reaches over loopback as an [AI provider](#ai-provider). Note plaintext crosses into it (**TB12**) but never leaves the device. Myne does not ship, sign, lockfile or audit it, and its listener is typically unauthenticated loopback, reachable by any local process (**A16**) — which is why the endpoint Myne will talk to is validated loopback-only as a *literal* address, never a resolved one. Distinct from the in-process Candle runtime, which is Myne's own code, and from a [remote AI provider](#remote-ai-provider), which is off-device.
+
+Used in: `threat-model.md` §3 TB12, §1 A16; `decisions.md` 2026-08-09
+
+### **remote AI provider** &nbsp; 📦 *Product*
+
+An off-device AI service the user names — Ollama Cloud or OpenRouter — that receives note plaintext over the network (**TB13**). The **first** thing in Myne's history that sends note content anywhere but a sync server as opaque ciphertext, and the reason this class is bounded on four sides: opt-in and default off, an explicit one-time consent step naming what is sent, barred from every surface that fires without the user asking, and limited to user-initiated work. Its operator is **A17**, an honest-but-curious party that legitimately receives what it is sent; Myne makes no claim about what happens to a request afterwards, and with a broker like OpenRouter cannot even fully enumerate who receives it.
+
+Used in: `threat-model.md` §3 TB13, §1 A17; `decisions.md` 2026-08-09
+
+### **named provider** &nbsp; 📦 *Product*
+
+The state a user puts Myne into by choosing an [AI provider](#ai-provider), and the subject of the invariant that replaced the old no-network claim: **no byte leaves the device unless the user has named a provider.** "Named" is doing real work — it is not "AI is enabled" and not "a provider is reachable", but "the user chose this one". So is **"the user"**: the naming is recorded at **account** scope, not device scope — the selection, the key and the consent record are synced vault content, so a newly enrolled device inherits them and sends without re-asking (`threat-model.md` §5; ledger SYNC-22). Enforced structurally rather than by convention: unset is the default and makes the path unreachable, and an explicit per-file, reason-carrying allowlist governs which source locations may open a socket on the AI path (the ratchet lands **empty**, so every later addition must argue for itself).
+
+Used in: `decisions.md` 2026-08-09; `threat-model.md` §7
+
+### **off-device egress** &nbsp; 📋 *Protocol*
+
+Bytes leaving the machine Myne runs on — as distinct from **loopback**, which does not. The distinction matters because the AI egress gate was re-framed around it and then past it: "no network surface" was already false (`decisions.md` 2026-08-04), "no off-device egress" became false the moment a [remote AI provider](#remote-ai-provider) entered scope, and the property Myne actually holds is the [named provider](#named-provider) one. A term to reach for carefully: *loopback is not off-device, but a local process with a socket is still an egress* — see `threat-model.md` §3 TB12.
+
+Used in: `decisions.md` 2026-08-09, 2026-08-04; `dev/ai-no-egress.md`
 
 ### **conversational AI chat** &nbsp; 📦 *Product*
 
-The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. History is **RAM-only, dropped on lock** — no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (still fully on-device, no provider call); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
+The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. History is **RAM-only, dropped on lock** — no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default — but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
 
 ### **streaming token channel** &nbsp; 📋 *Protocol*
 
@@ -1483,6 +1525,18 @@ Password-Based Key Derivation Function 2. **Not used by Myne** — referenced on
 
 Used in: `spec/protocol.md` §7.1
 Reference: RFC 8018.
+
+### **Payload ratchet** &nbsp; 🛠️ *Tooling*
+
+*(Aliases: none. Myne-divergent: yes.)*
+
+The gate over the [declared payload](#declared-payload): it may shrink freely and may grow only up to a recorded margin (2%), past which the build fails. Modelled on the web client's first-load ratchet, and a ratchet rather than a fixed number for the same reason — a budget invented before the payload exists is either trivially met or violated immediately, so the baseline is *measured* and committed, and raising it is an edit to `src-tauri/payload-baseline.json` that shows up in a diff with an author and a stated reason.
+
+**It is not a promise to users.** It bounds drift between releases; it says nothing about what the download will be next year. Three structural assertions keep the number honest: a Git-LFS **pointer** where a blob was expected fails by name (a smudge-skipped checkout would otherwise report a tiny payload and pass forever), a missing declared path fails rather than counting zero, and the bundled-model set is compared against a recorded set **in both directions** — an addition is a decision, and a silent removal of `models/ocr` would break OCR-backed search.
+
+Used in: `scripts/check-desktop-payload-budget.mjs`, `CLAUDE.md` (guard table)
+
+---
 
 ### **Personal dictionary** &nbsp; 📦 *Product*
 
@@ -1963,7 +2017,7 @@ Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
 
 ### **speech-to-text (ASR/STT)** &nbsp; 📦 *Product*
 
-On-device transcription of an audio attachment into text — Myne runs it entirely on the user's machine via a Whisper model (a **built-in default on desktop**, overridable with a user's own side-loaded file; `decisions.md` 2026-07-19 "Bundle a default transcription model on desktop") through the [Candle](#candle) stack ([local inference](#local-inference)); **no cloud, no provider call, no telemetry, nothing downloaded at runtime** (a standing anti-feature — decrypted audio never leaves the device, A1). Triggered on-demand per [voice note](#voice-note) (never auto-run on import); the machine [transcript](#transcript) is cached in the note's [`MYE1`](#mye1) extracted-text blob for search parity and can be inserted into the note body by an explicit user action. Gated on `ai_enabled` like the rest of the AI surface; the model is small and **fallible**, so copy treats a transcript as a machine guess, not a record, and — because the runtime is in-process, **not** sandboxed (SYNC-6) — never claims key-isolation. See `decisions.md` 2026-07-19; `threat-model.md` §7 "Local AI". (MYND-270)
+On-device transcription of an audio attachment into text — Myne runs it entirely on the user's machine via a Whisper model (a **built-in default on desktop**, overridable with a user's own side-loaded file; `decisions.md` 2026-07-19 "Bundle a default transcription model on desktop") through the [Candle](#candle) stack ([local inference](#local-inference)); **no cloud, no telemetry, nothing downloaded at runtime** — and, uniquely among the AI surfaces after 2026-08-09, **no [AI provider](#ai-provider) either**: no [remote AI provider](#remote-ai-provider) accepts audio and a [local model runtime](#local-model-runtime) does not serve speech-to-text, so this one really is on-device unconditionally rather than by default (decrypted audio never leaves the device, A1). Triggered on-demand per [voice note](#voice-note) (never auto-run on import); the machine [transcript](#transcript) is cached in the note's [`MYE1`](#mye1) extracted-text blob for search parity and can be inserted into the note body by an explicit user action. Gated on `ai_enabled` like the rest of the AI surface; the model is small and **fallible**, so copy treats a transcript as a machine guess, not a record, and — because the runtime is in-process, **not** sandboxed (SYNC-6) — never claims key-isolation. See `decisions.md` 2026-07-19; `threat-model.md` §7 "Local AI". (MYND-270)
 
 ### **startup open** &nbsp; 📦 *Product*
 

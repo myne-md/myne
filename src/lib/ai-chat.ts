@@ -19,6 +19,7 @@ import {
   sendChatMessage,
   type ChatCitation,
 } from "../notes/ai/chatStore";
+import { aiCapabilityReport, answeredByOf, providerLabelOf } from "./ai-capability";
 
 /** One prior-turn message sent to the backend as conversation history. Mirrors
  *  the Rust `ChatMessageDto` (role + content). */
@@ -53,7 +54,15 @@ export const CHAT_DEFAULT_K = 10;
  * mid-stream is handled by the store's run-epoch guard. Local-only; never
  * transmits the message anywhere (the no-egress gate is structural).
  */
-export async function sendChat(message: string, k: number = CHAT_DEFAULT_K): Promise<void> {
+export async function sendChat(
+  message: string,
+  k: number = CHAT_DEFAULT_K,
+  /** The active provider's stored WIRE name, when there is one (myne#191
+   *  task 4). Supplied by the caller because it lives in `vault.prefs`, which
+   *  the surface already has and this module would otherwise re-read once per
+   *  turn; the wire → proper-noun mapping happens here, in one place. */
+  providerWire?: string | null,
+): Promise<void> {
   // Snapshot the PRIOR turns as history before appending the new turn; drop any
   // empty turn so a blank assistant slot never enters the conversation.
   const history: ChatHistoryMessage[] = getChat()
@@ -77,7 +86,14 @@ export async function sendChat(message: string, k: number = CHAT_DEFAULT_K): Pro
       byteEnd: s.byte_end,
       score: s.score,
     }));
-    finalizeChatTurn(runToken, citations);
+    // Read AFTER the answer, not before: the point of the attribution is which
+    // backend actually produced this turn, and the selection is re-read per
+    // request (#415 task 18) so it can differ from the one at send time.
+    finalizeChatTurn(
+      runToken,
+      citations,
+      answeredByOf(await aiCapabilityReport(), providerLabelOf(providerWire)),
+    );
   } catch {
     // The backend error is a closed, DENY-safe kind — we surface only the error
     // turn state, never a detail string.

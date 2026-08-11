@@ -61,7 +61,8 @@ import {
 import { prefsRead } from "./lib/prefs";
 import { renameFlushHooks } from "./notes/renameFlushHook";
 import { CLOSE_ACTIVE_TAB_EVENT } from "./notes/closeActiveTabSignal";
-import { infer, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-assistant";
+import { infer,
+  inferAmbient, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-assistant";
 import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/spell";
 import { startTranscription } from "./lib/transcribe";
 import { AI_TRANSCRIPT_HONESTY_NOTE } from "./lib/load-bearing-copy";
@@ -146,7 +147,9 @@ const host: EditorHost = {
   },
   // On-device AI: omitted where `localAi` is absent, which takes the ghost-text
   // and the AI slash commands with it — the seam's own contract for `ai`.
-  ...(has("localAi") ? { ai: { infer, buildCompletionPrompt, buildTitlePrompt } } : {}),
+  ...(has("localAi")
+    ? { ai: { infer, inferAmbient, buildCompletionPrompt, buildTitlePrompt } }
+    : {}),
   // Omitted where `spellCheck` is absent (task 47) — the seam's own contract for
   // `spell` is that omission disables the feature, so the editor renders no
   // squiggles and no dictionary affordances rather than ones that reject.
