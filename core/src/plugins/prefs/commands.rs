@@ -1067,6 +1067,368 @@ pub(crate) async fn set_auto_tag_enabled_with_dir(
     Ok(())
 }
 
+/// `Slot::Unlocked`-gated setter for the **remote AI provider** the user named
+/// (myne#415). `None` clears it, returning the arm to **unreachable** — not
+/// merely disabled: with no provider selected there is no remote path to reach.
+///
+/// The value is a closed wire string validated host-side against the build's
+/// own registry; an unrecognized name is refused rather than stored, so a
+/// compromised WebView cannot park a value a future build would honour.
+///
+/// **Not the enforcement point.** The request path re-reads the provider, the
+/// consent and the key before it sends, so a WebView that forges this setter
+/// gains a stored string and nothing else.
+pub async fn set_ai_provider_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    provider: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_ai_provider_with_dir(&dir, state, hooks, provider, io, host).await
+}
+
+/// IPC wrapper for [`set_ai_provider_from_host`].
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_ai_provider<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    provider: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_ai_provider_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        provider,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// The providers this build knows how to reach. A closed list here rather than
+/// a free-form string is what keeps a stored value from outrunning the code
+/// that has to honour it.
+pub const KNOWN_AI_PROVIDERS: &[&str] = &["ollama-cloud", "openrouter"];
+
+/// Testable core of [`set_ai_provider`].
+pub(crate) async fn set_ai_provider_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    provider: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    if let Some(ref name) = provider {
+        if !KNOWN_AI_PROVIDERS.contains(&name.as_str()) {
+            return Err(PrefsWriteError::InvalidValue);
+        }
+    }
+    // Clearing the provider clears the consent and the key with it. Leaving a
+    // key behind for a provider nobody selected is a credential with no owner
+    // and no surface that shows it; leaving the consent behind would silently
+    // pre-approve the NEXT provider the user picks, which is the one thing a
+    // one-time consent must never do.
+    let clearing = provider.is_none();
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            let changed = prefs.ai_provider != provider;
+            prefs.ai_provider = provider.clone();
+            // Clearing drops the key too: a credential for a provider nobody
+            // selected is a credential with no owner and no surface that shows
+            // it. Switching keeps nothing either — the new provider's key is a
+            // different secret. The consent needs no clearing here at all: it
+            // NAMES the provider it was given for, so a stale one simply stops
+            // matching. Belt and braces, it is dropped anyway, because a value
+            // that can only ever be wrong should not sit in the blob.
+            if clearing || changed {
+                prefs.ai_provider_key = None;
+                prefs.ai_provider_consent = None;
+                // And the chosen model, for the third time the same reason: it
+                // names a model AT a provider. Every provider publishes its own
+                // catalogue, so a selection carried across a switch is a name
+                // the new provider has never heard of — and SYNC-24 ships no
+                // fallback that would quietly paper over it.
+                prefs.ai_provider_model = None;
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // The NAME is loggable — it is a closed value from the list above, not user
+    // input. The key never appears here or anywhere else (DENY list).
+    tracing::info!(
+        event = "prefs_written",
+        field = "ai_provider",
+        value = clearing
+    );
+    Ok(())
+}
+
+/// `Slot::Unlocked`-gated setter for the one-time remote-provider consent
+/// (myne#415, SYNC-22).
+///
+/// **A gate, not a display flag.** The request path checks it, so a client
+/// whose UI never showed the screen still cannot send. It is account-scoped —
+/// it syncs, so a newly enrolled device inherits it (`threat-model.md` §5).
+pub async fn set_ai_provider_consent_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    granted_for: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    // The consent names WHO it was given to, so an unknown name is refused for
+    // the same reason `set_ai_provider` refuses one: a consent recorded for a
+    // provider this build cannot reach is a value the request path can only
+    // ignore, and a future build might not.
+    if let Some(ref name) = granted_for {
+        if !KNOWN_AI_PROVIDERS.contains(&name.as_str()) {
+            return Err(PrefsWriteError::InvalidValue);
+        }
+    }
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    let present = granted_for.is_some();
+    update_prefs_with_dir(
+        &dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.ai_provider_consent = granted_for.clone();
+        },
+        io,
+        host,
+    )
+    .await?;
+    tracing::info!(
+        event = "prefs_written",
+        field = "ai_provider_consent",
+        value = present
+    );
+    Ok(())
+}
+
+/// IPC wrapper for [`set_ai_provider_consent_from_host`].
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_ai_provider_consent<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    granted_for: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_ai_provider_consent_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        granted_for,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// `Slot::Unlocked`-gated setter for the remote-provider API key (myne#415).
+/// `None` **revokes** it.
+///
+/// The value goes **in** across IPC and never comes back out: `PrefsView`
+/// marks the field `#[serde(skip_serializing)]`, and the UI reads
+/// [`ai_provider_has_key`] instead. That asymmetry is the whole design — the
+/// user has to be able to type a key, and nothing has to be able to read it
+/// back.
+///
+/// Wrapped in `Zeroizing` on the first non-doc statement, like every other
+/// secret that arrives over IPC (`src-tauri/CLAUDE.md`). Never logged.
+pub async fn set_ai_provider_key_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    key: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let key = key.map(zeroize::Zeroizing::new);
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    // An all-whitespace key is a cleared key, not a stored blank — otherwise a
+    // user who selected the field and hit delete would leave the arm "has a
+    // key" and every request would fail with an auth error they cannot see.
+    let stored = key
+        .as_deref()
+        .map(|k| k.trim().to_string())
+        .filter(|k| !k.is_empty());
+    let present = stored.is_some();
+    update_prefs_with_dir(
+        &dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.ai_provider_key = stored.clone();
+        },
+        io,
+        host,
+    )
+    .await?;
+    // PRESENCE only. Not the value, not its length — a length is a partial
+    // attempt-counter leak of exactly the kind the DENY list names.
+    tracing::info!(
+        event = "prefs_written",
+        field = "ai_provider_key",
+        value = present
+    );
+    Ok(())
+}
+
+/// IPC wrapper for [`set_ai_provider_key_from_host`].
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_ai_provider_key<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    key: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_ai_provider_key_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        key,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// `Slot::Unlocked`-gated setter for **which model** at the named provider
+/// answers (myne#415, SYNC-24). `None` clears the selection.
+///
+/// **Unvalidated against a list, deliberately.** Every sibling setter in this
+/// group checks its value against `KNOWN_AI_PROVIDERS`, and this one cannot:
+/// the valid set is whatever the provider published a moment ago, which is the
+/// entire content of SYNC-24 ("no hardcoded per-provider model default — the
+/// user picks from the list the provider itself reports"). A compiled-in
+/// allowlist here would re-introduce exactly the rot that resolution rejected,
+/// and it would buy nothing — this value chooses among a provider's own
+/// catalogue, it cannot name a *destination*, which is the property the
+/// compiled-in host table protects.
+///
+/// What is bounded instead is the **length**, so a compromised WebView cannot
+/// park an unbounded string in the blob, and an all-whitespace value is treated
+/// as a clear rather than stored as a blank that would fail every request.
+pub async fn set_ai_provider_model_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    model: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    // A provider's model identifier is a short path-like token
+    // ("meta-llama/llama-3.1-8b-instruct"). The cap is generous enough that no
+    // real name meets it and small enough that the blob cannot be used as
+    // storage.
+    const MAX_MODEL_LEN: usize = 200;
+    let model = match model {
+        Some(ref m) if m.trim().is_empty() => None,
+        Some(m) => {
+            if m.len() > MAX_MODEL_LEN {
+                return Err(PrefsWriteError::InvalidValue);
+            }
+            Some(m.trim().to_string())
+        }
+        None => None,
+    };
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    let present = model.is_some();
+    update_prefs_with_dir(
+        &dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.ai_provider_model = model.clone();
+        },
+        io,
+        host,
+    )
+    .await?;
+    // Loggable as a PRESENCE only. The name itself is published by the provider
+    // and is not a secret, but it is a per-account configuration detail with no
+    // diagnostic value that the boolean does not already carry.
+    tracing::info!(
+        event = "prefs_written",
+        field = "ai_provider_model",
+        value = present
+    );
+    Ok(())
+}
+
+/// IPC wrapper for [`set_ai_provider_model_from_host`].
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_ai_provider_model<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    model: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_ai_provider_model_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        model,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Whether a remote-provider API key is stored — **the boolean the UI reads
+/// instead of the key** (myne#415).
+///
+/// It exists because `prefs_read` serializes the whole `PrefsView` and the key
+/// is skipped there, so the panel has no way to render "a key is set" from that
+/// payload — and must not be given one. Same split the clipper already uses:
+/// the panel gets ids and timestamps from a dedicated command, never the token.
+///
+/// Answers `false` rather than an error when the vault is locked or the prefs
+/// blob is unreadable: "no key" is the safe answer for a control whose only
+/// job is to choose between "Add key" and "Replace key".
+pub async fn ai_provider_has_key_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+) -> bool {
+    let Ok(dir) = vault_dir_from_host(host, state.active_vault_id().await) else {
+        return false;
+    };
+    prefs_read_with_dir(&dir, state, io)
+        .await
+        .ok()
+        .and_then(|p| p.ai_provider_key)
+        .is_some()
+}
+
+/// IPC wrapper for [`ai_provider_has_key_from_host`].
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn ai_provider_has_key<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<bool, PrefsWriteError> {
+    Ok(ai_provider_has_key_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await)
+}
+
 /// Slot::Unlocked-gated setter for whether THIS DEVICE shows task reminders
 /// (MYND-618). Device-local: whether a given machine should be interrupted is a
 /// property of that machine, so it never syncs. Omit-when-default keeps an
@@ -5448,6 +5810,10 @@ mod tests {
                     screen_capture_protection: false,
                     ai_enabled: false,
                     ai_excluded_folders: Vec::new(),
+                    ai_provider: None,
+                    ai_provider_consent: None,
+                    ai_provider_key: None,
+                    ai_provider_model: None,
                     bar_items_order: Vec::new(),
                     cli_enabled: false,
                     cli_excluded_folders: Vec::new(),

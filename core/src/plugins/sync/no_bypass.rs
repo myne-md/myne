@@ -169,6 +169,19 @@ fn sync_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/plugins/sync")
 }
 
+/// The second scanned root: the shared HTTP codec, promoted out of this tree by
+/// ai-ollama-local task 1.
+///
+/// It is scanned separately rather than folded into [`sync_sources`] for a dull
+/// but load-bearing reason: both trees contain a `mod.rs`, and this table keys
+/// on the bare file name. Merging them would have made one `mod.rs` shadow the
+/// other — a collision that silently drops a file from the scan is exactly the
+/// class of bug the "found no sources" assertion exists to catch, so it is not
+/// worth introducing to save a loop.
+fn http_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/http")
+}
+
 /// Is `line` a `#[cfg(…)]` attribute that gates its item OUT of a production
 /// build because it is test-only?
 ///
@@ -329,6 +342,39 @@ fn sync_sources() -> Vec<(String, String)> {
     out
 }
 
+/// Production sources of the shared HTTP codec, same stripping as
+/// [`sync_sources`].
+fn http_sources() -> Vec<(String, String)> {
+    let dir = http_dir();
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).unwrap_or_else(|e| {
+        panic!(
+            "read {}: {e}. A root that cannot be read must FAIL, never skip — a \
+             guard scanning nothing reports ok forever, which is worse than no \
+             guard because it is believed.",
+            dir.display()
+        )
+    }) {
+        let path = entry.expect("dir entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .expect("file name")
+            .to_string();
+        let source = std::fs::read_to_string(&path).expect("read source");
+        out.push((name, production_code(&source)));
+    }
+    assert!(
+        !out.is_empty(),
+        "the shared-HTTP root {} contributed no sources — the path is stale",
+        http_dir().display()
+    );
+    out
+}
+
 fn count(haystack: &str, needle: &str) -> usize {
     haystack.matches(needle).count()
 }
@@ -351,6 +397,41 @@ fn every_outbound_socket_site_is_listed_with_its_reason() {
              `RustlsTransport::open_socket` (which consults `ProxyGate::route`). \
              Route it, or add it to `DIRECT_CONNECT_SITES` with the reason it \
              cannot leak a source IP."
+        );
+    }
+}
+
+/// The shared HTTP codec opens no socket, and must not start.
+///
+/// It is pure over `BufRead`/`Write` by design — that purity is what made
+/// promoting it out of this tree safe, and it is what keeps it out of the
+/// routing gate's concern. A `TcpStream::connect` appearing here would be a
+/// socket in a module every transport shares, reached from callers that never
+/// consult `ProxyGate::route`.
+///
+/// **What this root does NOT cover, so no reader concludes otherwise from this
+/// file alone:** the AI provider path in `src-tauri/src/plugins/local_inference/`
+/// is watched by the call-site ratchet in `src-tauri/scripts/ai-no-network-check.sh`
+/// (check 4, landed empty by #414). This module stays in-crate: it is test-only,
+/// resolves from `CARGO_MANIFEST_DIR`, and also compiles for mobile and wasm, so
+/// reaching across to a sibling crate's sources from here would be fragile in
+/// three build configurations to watch a tree that already has an owner.
+#[test]
+fn the_shared_http_codec_opens_no_socket() {
+    let sources = http_sources();
+    assert!(
+        sources.iter().any(|(n, _)| n == "codec.rs"),
+        "the codec itself was not scanned — the root is live but wrong"
+    );
+    for (name, source) in sources {
+        let found = count(&source, "TcpStream::connect");
+        assert_eq!(
+            found, 0,
+            "core/src/http/{name}: found {found} production `TcpStream::connect` \
+             site(s). The shared codec is pure over BufRead/Write; a socket here \
+             is reachable from every transport that shares it, including callers \
+             that never consult `ProxyGate::route`. Open it in a transport, not \
+             in the codec."
         );
     }
 }

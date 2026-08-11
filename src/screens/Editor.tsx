@@ -151,7 +151,7 @@ import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
 import { runSummarizeToChat } from "../notes/ai/aiToChat";
 import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
-import { infer as aiInfer, computeRewrite } from "../lib/writing-assistant";
+import { infer as aiInfer } from "../lib/writing-assistant";
 import { sendChat, stopChat } from "../lib/ai-chat";
 import { isNoteAiExcluded } from "../lib/aiExcludedFolders";
 import { getActiveEditorView } from "../editor/active-view";
@@ -242,6 +242,7 @@ import { QuickPicker, type QuickPickItem } from "../components/QuickPicker";
 import { listCustomThemes } from "../lib/themes";
 import { applyCustomTheme } from "../lib/theme";
 import { ornamentRole } from "@myne/ornaments";
+import { rewriteSelectionToEditor } from "../notes/ai/rewriteToEditor";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
 // bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
@@ -3084,23 +3085,20 @@ function CommandPaletteHost({
         // multi-second blocking infer cannot land a stale range onto a document
         // the user edited (or a different note they switched to) in the meantime.
         const noteAtStart = ctx.selectedId;
-        const stateAtStart = view.state;
-        void (async () => {
-          const result = await computeRewrite({ state: stateAtStart, infer: aiInfer });
-          if (result === null || result.text.length === 0) return;
-          const original = stateAtStart.doc.sliceString(result.from, result.to);
-          const now = getActiveEditorView();
-          // Staleness guard: same view, same note, and the target range still
-          // holds exactly the text we rewrote — otherwise drop the result rather
-          // than corrupt the document with pre-inference offsets.
-          if (now === null || now !== view || ctx.selectedId !== noteAtStart) return;
-          if (result.to > now.state.doc.length) return;
-          if (now.state.doc.sliceString(result.from, result.to) !== original) return;
-          now.dispatch({
-            changes: { from: result.from, to: result.to, insert: result.text },
-            userEvent: "ai.rewrite",
-          });
-        })();
+        // The orchestration lives in `rewriteToEditor` so its FAILURE path can
+        // be tested (#191 task 6). It used to be an un-`catch`ed IIFE right
+        // here, which meant an engine rejection produced no toast, no error and
+        // no document change — indistinguishable, from the user's seat, from
+        // the action never having fired.
+        void rewriteSelectionToEditor({
+          view,
+          stateAtStart: view.state,
+          activeView: getActiveEditorView,
+          stillSameNote: () => ctx.selectedId === noteAtStart,
+          infer: aiInfer,
+          showToast: (message: string) => setToast({ message, variant: "error" }),
+          t,
+        });
       },
       onLock: onLockFlushed,
       onOpenSettings,
@@ -3923,7 +3921,7 @@ function RightSidebar() {
                 userEvent: "ai.insert",
               });
             }}
-            onSend={(m) => void sendChat(m)}
+            onSend={(m) => void sendChat(m, undefined, prefs.ai_provider)}
             onStop={() => {
               // Instant UI: close the turn keeping the partial; then signal the
               // backend to abort the in-flight generation (task 4/9).

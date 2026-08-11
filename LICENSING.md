@@ -55,7 +55,7 @@ with attribution; none is Myne-authored.
 | Asset | Where | Upstream | License | AGPL-3.0 compatibility |
 |---|---|---|---|---|
 | Default speech-to-text model (voice-to-text, MYND-270) | `src-tauri/resources/models/whisper/model.gguf` (Git LFS; desktop-only) | [OpenAI Whisper `whisper-base`](https://huggingface.co/openai/whisper-base) weights, quantized to a candle GGUF | **Apache-2.0** | Compatible (Apache-2.0 → AGPL-3.0 is a one-way-compatible direction per the FSF license list). Redistribution requires only preserving the Apache-2.0 license + attribution — both satisfied here. |
-| Tag-suggestion model (auto-tag, MYND-651) | `src-tauri/resources/models/tag/model.gguf` (Git LFS; desktop-only) | [Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) weights, the first-party `Q4_K_M` GGUF Qwen publishes | **Apache-2.0** | Compatible, on the same one-way Apache-2.0 → AGPL-3.0 direction as the Whisper model above. Redistribution requires preserving the Apache-2.0 license + attribution — both satisfied here. |
+| Tag-suggestion model (auto-tag, MYND-651) | `src-tauri/resources/models/tag/model.gguf` (Git LFS; desktop-only) | [Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) weights — **a Myne-produced derivative** of the first-party `Q4_K_M` GGUF Qwen publishes (one duplicated tensor removed; no re-quantization) | **Apache-2.0** | Compatible, on the same one-way Apache-2.0 → AGPL-3.0 direction as the Whisper model above. Redistribution requires preserving the Apache-2.0 license + attribution, **and stating the modification** — all three satisfied here. |
 | Hunspell spell-check dictionaries | `src-tauri/resources/dictionaries/**` | per-language upstreams | mixed (LGPL / MPL / BSD / GPL-with-linking-exception, per dictionary) | Compatible; each dictionary keeps its upstream license. |
 | `myne-tor` sidecar binary (desktop Tor routing, MYND-650) | `src-tauri/binaries/myne-tor-<triple>` in the bundle; built from the in-repo `tor-sidecar/` crate | [arti](https://gitlab.torproject.org/tpo/core/arti) (The Tor Project's Rust Tor implementation) + its dependency tree | **MIT OR Apache-2.0** | Compatible (both are one-way-compatible into AGPL-3.0). Unlike every other dependency, this one is redistributed as a **separate executable** rather than linked in, so it is listed here as a bundled artefact too. |
 
@@ -72,19 +72,37 @@ model with their own file is responsible for that file's license.
 
 **Tag-model provenance + obligations.** The auto-tag weights are a quantized
 derivative of `Qwen/Qwen2.5-0.5B-Instruct`, distributed under **Apache-2.0** by
-Alibaba Cloud — specifically the first-party `Q4_K_M` GGUF Qwen publishes
-(`Qwen/Qwen2.5-0.5B-Instruct-GGUF`), recorded with its revision + SHA-256 in
-`src-tauri/resources/models/tag/README.md`. The same §4 obligations apply and are
-discharged the same way: the Apache-2.0 text ships beside the model as
+Alibaba Cloud. Myne ships a **derivative of Qwen's own derivative**: the source is
+the first-party `Q4_K_M` GGUF (`Qwen/Qwen2.5-0.5B-Instruct-GGUF`), and Myne
+removed one tensor from it — the duplicated tied LM head `output.weight`, which
+`candle` already handles the absence of (ai-bundle-slim myne#190). **Nothing was
+re-quantized**: every tensor that ships carries Qwen's own bytes, verified by
+byte-comparing the tensor-data region before and after. Both files' revisions and
+SHA-256s are recorded in `src-tauri/resources/models/tag/README.md`, along with a
+committed script (`scripts/strip-gguf-tensor.py`) that reproduces the shipped
+blob byte-for-byte from the upstream one.
+
+Because the modification is Myne's, **Apache-2.0 §4 attaches to it**, and is
+discharged the same way as before: the Apache-2.0 text ships beside the model as
 `MODEL-LICENSE`, attribution to the Qwen2.5 upstream is retained, and the
-modification (quantization to a GGUF — a format conversion of the same weights,
-which does not change their license) is noted here and in
-`src-tauri/resources/models/tag/README.md`. Unlike transcription, this model has
+modification is stated — here, in the model's `README.md`, and in
+`design-notes.md`. (The previous wording described redistributing Qwen's
+unmodified first-party file, which stopped being true when the tensor was
+dropped.) Unlike transcription, this model has
 **no user-override picker**, so no third-party file can take its place and there
 is no user-supplied-license case to disclaim. Reproducible-build note: like the
 Whisper weights it is a **Git LFS**-tracked data asset, not a dependency — no
 crate enters the tree — so the TB9 dependency surface is unchanged either way,
 while the bundle (and therefore the hash a rebuilder reproduces) grows by the
 model for every desktop download, including users who never enable AI. The
-`--no-default-features` AI-free build ships no model at all.
+`--no-default-features` AI-free build **excludes the generative model, the embedding
+model, ASR and every candle/tokenizers symbol** — but it does **not** ship "no model
+at all", and the earlier wording here was simply false. Two reasons: OCR ships in
+every build by design (`decisions.md` 2026-07-31, MYND-441 — it is search
+correctness, not an AI feature), and `bundle.resources` in `tauri.conf.json` is
+static JSON with no feature gating at all, so that build's **bundle** still carries
+the tag and whisper weights even though nothing in its binary can load them. This is
+pre-existing drift, not something the 2026-08-09 provider work introduced; the
+resource-gating mechanism that would make the original sentence true is owed by
+myne-md/myne#190.
 (`design-notes.md` 2026-07-31.)

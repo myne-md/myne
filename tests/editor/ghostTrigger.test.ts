@@ -10,6 +10,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
+/** The AMBIENT arm — the one ghost text must use (#188). */
+const inferAmbientMock = vi.fn();
+/** The user-initiated arm, mocked ONLY so calling it can be asserted against.
+ *  Ghost text firing through this would route a passive, every-keystroke
+ *  surface to whatever backend the user named, which is the exact traffic
+ *  SYNC-14's class split exists to prevent. */
 const inferMock = vi.fn();
 /** Records the option bag the trigger asks the prompt builder for (#193). */
 const promptOptsMock = vi.fn();
@@ -19,6 +25,7 @@ const promptOptsMock = vi.fn();
 // on the prompt handed to `infer`; `buildCompletionPrompt` is a passthrough so
 // the preceding text flows into the asserted prompt.
 vi.mock("@myne/editor/host/lib/writing-assistant", () => ({
+  inferAmbient: (...args: unknown[]) => inferAmbientMock(...args),
   infer: (...args: unknown[]) => inferMock(...args),
   buildCompletionPrompt: (preceding: string, opts?: unknown) => {
     promptOptsMock(opts);
@@ -57,6 +64,7 @@ async function flush(): Promise<void> {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  inferAmbientMock.mockReset();
   inferMock.mockReset();
   promptOptsMock.mockReset();
 });
@@ -70,7 +78,7 @@ afterEach(() => {
 
 describe("ghost trigger (debounce/cancel)", () => {
   it("fires one completion on a paused cursor and shows the ghost", async () => {
-    inferMock.mockResolvedValue(" continuation");
+    inferAmbientMock.mockResolvedValue(" continuation");
     mount("Some prose");
     // Type a char to schedule the debounce.
     view!.dispatch({
@@ -78,17 +86,22 @@ describe("ghost trigger (debounce/cancel)", () => {
       selection: { anchor: view!.state.doc.length + 1 },
     });
     await flush();
-    expect(inferMock).toHaveBeenCalledTimes(1);
-    expect(inferMock).toHaveBeenCalledWith(expect.stringContaining("Some prose"), {
+    expect(inferAmbientMock).toHaveBeenCalledTimes(1);
+    expect(inferAmbientMock).toHaveBeenCalledWith(expect.stringContaining("Some prose"), {
       maxNewTokens: GHOST_MAX_NEW_TOKENS,
     });
+    // The control, and the load-bearing half of this test since #188: the
+    // user-initiated arm must NOT be the one that fired. Retargeting the
+    // assertions above to `inferAmbient` alone would pass just as well if the
+    // trigger called both.
+    expect(inferMock).not.toHaveBeenCalled();
     expect(ghostShowing(view!)).toBe(true);
   });
 
   // #193 — the passive suggestion is a few words. The ceiling is the host's
   // half; these two are the parts that survive a host which ignores it.
   it("asks for the BRIEF prompt shape, not the one `/devam` uses", async () => {
-    inferMock.mockResolvedValue("x");
+    inferAmbientMock.mockResolvedValue("x");
     mount("Some prose");
     view!.dispatch({
       changes: { from: view!.state.doc.length, insert: "." },
@@ -99,7 +112,7 @@ describe("ghost trigger (debounce/cancel)", () => {
   });
 
   it("trims a paragraph reply to one line before it reaches the widget", async () => {
-    inferMock.mockResolvedValue(" a short tail. And a whole second sentence.\nPlus a paragraph.");
+    inferAmbientMock.mockResolvedValue(" a short tail. And a whole second sentence.\nPlus a paragraph.");
     mount("Some prose");
     view!.dispatch({
       changes: { from: view!.state.doc.length, insert: "." },
@@ -110,7 +123,7 @@ describe("ghost trigger (debounce/cancel)", () => {
   });
 
   it("does not pile up calls: rapid edits reschedule a single timer", async () => {
-    inferMock.mockResolvedValue("x");
+    inferAmbientMock.mockResolvedValue("x");
     mount("abc");
     for (let i = 0; i < 5; i++) {
       view!.dispatch({
@@ -121,15 +134,15 @@ describe("ghost trigger (debounce/cancel)", () => {
     }
     // Only after a full pause does exactly one call fire.
     await flush();
-    expect(inferMock).toHaveBeenCalledTimes(1);
+    expect(inferAmbientMock).toHaveBeenCalledTimes(1);
   });
 
   it("suppresses the completion when there is a non-empty selection", async () => {
-    inferMock.mockResolvedValue("x");
+    inferAmbientMock.mockResolvedValue("x");
     mount("abcdef");
     view!.dispatch({ selection: { anchor: 0, head: 3 } }); // a selection, not a bare cursor
     await flush();
-    expect(inferMock).not.toHaveBeenCalled();
+    expect(inferAmbientMock).not.toHaveBeenCalled();
     expect(ghostShowing(view!)).toBe(false);
   });
 });

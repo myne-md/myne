@@ -151,6 +151,11 @@ fn main() {
                 "set_transcription_enabled",
                 // MYND-651.
                 "set_auto_tag_enabled",
+                "set_ai_provider",
+                "set_ai_provider_consent",
+                "set_ai_provider_key",
+                "set_ai_provider_model",
+                "ai_provider_has_key",
                 "set_reminders_enabled",
                 "set_reminder_horizon_days",
                 // developer-mode (MYND-593): named here too, though not
@@ -504,18 +509,28 @@ fn main() {
         );
 
     // local-ai (MYND-406): declare the `local-inference` plugin's ACL namespace
-    // ONLY when the default-off `local-inference` feature is enabled — cargo
-    // exposes it to build.rs as `CARGO_FEATURE_LOCAL_INFERENCE`. The permission
-    // (`local-inference:infer`/`embed`) is then resolvable exactly when the
-    // plugin is compiled and its runtime capability is added
-    // (`plugins/local_inference/mod.rs`), so the default feature-OFF build has
-    // no dangling `local-inference:default` reference. Lock-step the command
-    // list with `permissions/local-inference/default.toml`.
+    // ONLY when the `local-inference` feature is enabled — cargo exposes it to
+    // build.rs as `CARGO_FEATURE_LOCAL_INFERENCE`. The permissions are then
+    // resolvable exactly when the plugin is compiled and its runtime capability
+    // is added (`plugins/local_inference/mod.rs`), so a `--no-default-features`
+    // build has no dangling `local-inference:default` reference.
+    //
+    // This plugin has **no `permissions/local-inference/` directory**, by
+    // design — a static entry would dangle in the feature-off build. (The
+    // comment here used to say "lock-step the command list with
+    // `permissions/local-inference/default.toml`", a file that has never
+    // existed.) What is actually true: each name below autogenerates an
+    // `allow-<cmd>` / `deny-<cmd>` pair, and the OTHER half is the runtime
+    // capability JSON in `plugins/local_inference/mod.rs`, which must list the
+    // matching `local-inference:allow-<cmd>` — plus `generate_handler!`, which
+    // nothing but a test checks. All three are compared, both directions, by
+    // `build_rs_capability_json_and_generate_handler_agree` in that module.
     if std::env::var_os("CARGO_FEATURE_LOCAL_INFERENCE").is_some() {
         attributes = attributes.plugin(
             "local-inference",
             tauri_build::InlinedPlugin::new().commands(&[
                 "infer",
+                "infer_ambient",
                 "embed",
                 "semantic_search",
                 "ask",
@@ -527,6 +542,10 @@ fn main() {
                 "tag_model_available",
                 "set_model_path",
                 "get_model_path",
+                "ai_capability_report",
+                "get_ai_endpoint",
+                "set_ai_endpoint",
+                "list_provider_models",
             ]),
         );
     }

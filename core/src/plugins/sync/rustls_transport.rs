@@ -24,15 +24,15 @@
 //! - Fallback if `-PLUS` channel binding slips: cert-pinning only (the exporter
 //!   call is then simply unused).
 
-use super::http_codec::{
-    build_http_request_ext, keepalive_roundtrip, read_http_response, read_response_head,
-};
 use super::http_transport::SOCKET_TIMEOUT;
 use super::proxy::{self, ProxyGate, Route};
 use super::socks5::connect_via_socks5;
 use super::transport::{
     HttpMethod, SseOpenError, SseStream, SyncTransport, TransportError, TransportResponse,
-    TransportResponseExt,
+    TransportResponseExt, MAX_SYNC_RESPONSE_BYTES,
+};
+use crate::http::codec::{
+    build_http_request_ext, keepalive_roundtrip, read_http_response, read_response_head,
 };
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
@@ -409,6 +409,7 @@ impl SyncTransport for RustlsTransport {
             || self.connect(),
             &req,
             method == HttpMethod::Head,
+            MAX_SYNC_RESPONSE_BYTES,
         )
     }
 
@@ -446,8 +447,12 @@ impl SyncTransport for RustlsTransport {
             .and_then(|_| stream.flush())
             .map_err(|_| TransportError::Network)?;
         let mut reader = BufReader::new(stream);
-        let (resp, _reuse) = read_http_response(&mut reader, method == HttpMethod::Head)
-            .map_err(|_| TransportError::Network)?;
+        let (resp, _reuse) = read_http_response(
+            &mut reader,
+            method == HttpMethod::Head,
+            MAX_SYNC_RESPONSE_BYTES,
+        )
+        .map_err(|_| TransportError::Network)?;
         Ok(TransportResponse {
             status: resp.status,
             body: resp.body,
