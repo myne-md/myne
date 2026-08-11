@@ -195,7 +195,7 @@ pub(crate) fn decode_blob_envelope(
 /// header byte is `0x01` in BOTH (the re-seal keeps it — the generations
 /// domain-separate on magic + AAD prefix + KEK, not on that byte), so `version`
 /// selects only the magic + AAD here.
-fn singleton_family_for<'a>(
+pub(crate) fn singleton_family_for<'a>(
     version: MetaVersion,
     v0_1_magic: &'a [u8; 4],
     v0_2_magic: &'a [u8; 4],
