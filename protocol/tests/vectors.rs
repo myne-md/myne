@@ -4585,6 +4585,192 @@ fn attachment_blob_vectors() {
     }
 }
 
+/// `vault-meta` v0.2 (`NTV5`) — the `0x02` side of the frozen §10.4.1 md.6
+/// `protocol_version` split (myne-md/myne#441).
+///
+/// The two reject cases are the load-bearing ones. A round-trip alone would pass
+/// for an implementation that ignored the magic entirely; §10.5's anti-downgrade
+/// property is that a `MYV1` blob MUST NOT parse as v0.2 and an `NTV5` blob MUST
+/// NOT parse as v0.1, and that is what a port has to get right for a mixed fleet
+/// to be safe.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn vault_meta_v0_2_vectors() {
+    use protocol::{parse_vault_meta, parse_vault_meta_v0_2, serialize_vault_meta_v0_2};
+
+    let Some(raw) = cases_json_v0_2("vault-meta") else {
+        return;
+    };
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[vault-meta/v0.2] parse: {e}"));
+    assert_eq!(doc["schema"], "vault-meta");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("vault-meta/v0.2", cases);
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] case_kind"));
+        seen.insert(kind.to_string());
+        match kind {
+            "roundtrip" => {
+                let meta = protocol::VaultMeta {
+                    account_number_hash: hex_decode_array(field(
+                        case,
+                        id,
+                        "input_account_number_hash_hex",
+                    )),
+                    kdf_params: protocol::KdfParams {
+                        m_kib: case["input_kdf_params"]["m_kib"].as_u64().unwrap() as u32,
+                        t: case["input_kdf_params"]["t"].as_u64().unwrap() as u32,
+                        p: case["input_kdf_params"]["p"].as_u64().unwrap() as u8,
+                        argon2_version: u8::from_str_radix(
+                            case["input_kdf_params"]["argon2_version_hex"]
+                                .as_str()
+                                .unwrap(),
+                            16,
+                        )
+                        .unwrap(),
+                    },
+                    random_salt_password: hex_decode_array(field(
+                        case,
+                        id,
+                        "input_random_salt_password_hex",
+                    )),
+                    random_salt_recovery: hex_decode_array(field(
+                        case,
+                        id,
+                        "input_random_salt_recovery_hex",
+                    )),
+                    nonce_password_wrap: hex_decode_array(field(
+                        case,
+                        id,
+                        "input_nonce_password_wrap_hex",
+                    )),
+                    enc_root_key_password: hex_decode_array(field(
+                        case,
+                        id,
+                        "input_enc_root_key_password_hex",
+                    )),
+                    nonce_recovery_wrap: hex_decode_array(field(
+                        case,
+                        id,
+                        "input_nonce_recovery_wrap_hex",
+                    )),
+                    enc_root_key_recovery: hex_decode_array(field(
+                        case,
+                        id,
+                        "input_enc_root_key_recovery_hex",
+                    )),
+                    items_key_id: hex_decode_array(field(case, id, "input_items_key_id_hex")),
+                    items_key_nonce: hex_decode_array(field(case, id, "input_items_key_nonce_hex")),
+                    enc_items_key: hex_decode_array(field(case, id, "input_enc_items_key_hex")),
+                };
+                let actual = serialize_vault_meta_v0_2(&meta);
+                assert_eq!(
+                    hex_encode(&actual),
+                    field(case, id, "expected_blob_hex"),
+                    "[{id}] NTV5 bytes"
+                );
+                parse_vault_meta_v0_2(&actual)
+                    .unwrap_or_else(|e| panic!("[{id}] round-trip: {e:?}"));
+            }
+            "parse_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert!(
+                    parse_vault_meta_v0_2(&blob).is_err(),
+                    "[{id}] the v0.2 parser must reject a MYV1 blob"
+                );
+            }
+            "parse_fail_v0_1" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert!(
+                    parse_vault_meta(&blob).is_err(),
+                    "[{id}] the v0.1 parser must reject an NTV5 blob"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind {other}"),
+        }
+    }
+    // Coverage asserted rather than hoped for: a cases.json that lost its reject
+    // cases would otherwise still pass, and the rejects are the whole point.
+    for k in ["roundtrip", "parse_fail", "parse_fail_v0_1"] {
+        assert!(seen.contains(k), "vault-meta/v0.2 must cover case_kind {k}");
+    }
+}
+
+/// `vault-themes` v0.2 (`MYT5`) — the `0x01` side of the same frozen split, and
+/// the KEK-envelope archetype `vault.dictionary` shares byte-for-byte
+/// (myne-md/myne#441).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn vault_themes_v0_2_vectors() {
+    use protocol::{decode_themes_blob_versioned, MetaVersion};
+
+    let Some(raw) = cases_json_v0_2("vault-themes") else {
+        return;
+    };
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[vault-themes/v0.2] parse: {e}"));
+    assert_eq!(doc["schema"], "vault-themes");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("vault-themes/v0.2", cases);
+
+    let kek: [u8; 32] = [0x71; 32];
+    let acct: [u8; 16] = [0x5A; 16];
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] case_kind"));
+        seen.insert(kind.to_string());
+        match kind {
+            "encrypt" => {
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+                // Read the two conventions straight off the bytes rather than
+                // inferring them from a successful decode — the decode would
+                // succeed under a different version byte too, since the byte is
+                // not AEAD-bound in this family.
+                assert_eq!(&expected[0..4], b"MYT5", "[{id}] magic");
+                assert_eq!(
+                    format!("{:02x}", expected[4]),
+                    field(case, id, "expected_version_byte_hex"),
+                    "[{id}] KEK-singleton families keep 0x01 in v0.2"
+                );
+                let opened =
+                    decode_themes_blob_versioned(MetaVersion::V0_2, &kek, &acct, &expected)
+                        .unwrap_or_else(|e| panic!("[{id}] decode: {e:?}"));
+                assert_eq!(
+                    hex_encode(&opened),
+                    field(case, id, "input_plaintext_hex"),
+                    "[{id}] plaintext"
+                );
+            }
+            "decode_fail_v0_1" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert!(
+                    decode_themes_blob_versioned(MetaVersion::V0_1, &kek, &acct, &blob).is_err(),
+                    "[{id}] a MYT5 blob must not open under the v0.1 expectation"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind {other}"),
+        }
+    }
+    for k in ["encrypt", "decode_fail_v0_1"] {
+        assert!(
+            seen.contains(k),
+            "vault-themes/v0.2 must cover case_kind {k}"
+        );
+    }
+}
+
 /// `NC05` next-major (v0.2) CRDT note-type codec vectors (§10.7, #418 t4). The
 /// first vector family for a next-major format — it reads the `v0.2/` fixture
 /// dir. Mirrors the attachment/myn-blob runners: `encrypt` (byte output),
