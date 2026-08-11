@@ -294,10 +294,15 @@ pub struct ConfiguredOllamaEngine {
 }
 
 impl ConfiguredOllamaEngine {
-    pub fn new(config_path: std::path::PathBuf) -> Self {
+    /// Construct with a live cancel source (myne-md/myne#440).
+    ///
+    /// This used to hardcode `|| false`, so the loopback arm was as
+    /// un-stoppable as the remote one — the issue named only the remote engine,
+    /// but the same wiring gap was here.
+    pub fn new(config_path: std::path::PathBuf, cancelled: CancelledFn) -> Self {
         Self {
             config_path,
-            cancelled: Arc::new(|| false),
+            cancelled,
         }
     }
 

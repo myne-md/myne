@@ -283,12 +283,20 @@ pub struct RemoteEngine {
 }
 
 impl RemoteEngine {
+    /// Construct with a live cancel source (myne-md/myne#440).
+    ///
+    /// `cancelled` used to be hardcoded to `|| false` here — the transport's
+    /// cancel pipeline existed and had no source, so a provider request could
+    /// not be stopped by anything: not the composer's Stop, not the vault-lock
+    /// teardown. This constructor takes the source, so a caller has to supply
+    /// one or say `|| false` deliberately.
     pub fn new(
         read_prefs: Box<dyn Fn() -> Option<(protocol::PrefsView, bool)> + Send + Sync>,
+        cancelled: super::cancellable_io::CancelledFn,
     ) -> Self {
         Self {
             read_prefs,
-            cancelled: std::sync::Arc::new(|| false),
+            cancelled,
         }
     }
 
@@ -631,7 +639,10 @@ mod remote_engine_tests {
             p.ai_provider_model = (!model.is_empty()).then(|| model.to_string());
             (p, dev)
         });
-        RemoteEngine::new(Box::new(move || prefs.clone()))
+        RemoteEngine::new(
+            Box::new(move || prefs.clone()),
+            std::sync::Arc::new(|| false),
+        )
     }
 
     /// Embedding is refused **at the engine too**, not only at the seam. The
