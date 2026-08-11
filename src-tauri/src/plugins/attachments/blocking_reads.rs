@@ -38,8 +38,8 @@
 
 use myne_core::plugins::attachments::commands::CatalogLoadError;
 use protocol::{
-    derive_subkey, parse_vault_meta, read_or_empty, AttachmentsCatalog, SubkeyRole,
-    CATALOG_BLOB_ACCOUNT_HASH_LEN, VAULT_META_ACCOUNT_HASH_LEN,
+    read_or_empty, AttachmentsCatalog, SubkeyRole, CATALOG_BLOB_ACCOUNT_HASH_LEN,
+    VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::Path;
 
@@ -52,7 +52,11 @@ pub fn read_account_number_hash(
     vault_meta_path: &Path,
 ) -> std::io::Result<Option<[u8; VAULT_META_ACCOUNT_HASH_LEN]>> {
     let bytes = std::fs::read(vault_meta_path)?;
-    Ok(parse_vault_meta(&bytes).map(|m| m.account_number_hash).ok())
+    // Either generation (myne-md/myne#433): OCR queueing and attachment-text
+    // indexing both gate on this hash.
+    Ok(protocol::parse_vault_meta_any(&bytes)
+        .map(|m| m.account_number_hash)
+        .ok())
 }
 
 /// Read + decode the `MYC1` catalog, hard-erroring on any IO failure other than
@@ -94,7 +98,16 @@ pub fn load_catalog_for_export(
             ))
         }
     };
-    let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+    // Version-scoped (myne-md/myne#433). The migration re-seals the catalog to
+    // `MYC5`, and `read_catalog` -> `read_or_empty` answers an EMPTY catalog
+    // rather than an error when the KEK does not open it — so a v0.1 derivation
+    // here did not fail the export, it exported a vault with no attachments.
+    let version = std::fs::read(vault_root.join("vault.meta"))
+        .ok()
+        .and_then(|b| protocol::meta_version_of(&b))
+        .unwrap_or(protocol::MetaVersion::V0_1);
+    let catalog_key =
+        protocol::derive_subkey_versioned(version, root_key, SubkeyRole::AttachmentsCatalogKey);
     read_catalog(
         &vault_root.join("vault.attachments"),
         &catalog_key,

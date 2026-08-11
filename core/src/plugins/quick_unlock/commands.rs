@@ -35,7 +35,7 @@ use protocol::quick_unlock_blob::{
     decode_quick_unlock_blob, encode_quick_unlock_blob, parse_quick_unlock_header,
     PROVIDER_KIND_BIOMETRIC, PROVIDER_KIND_PIN,
 };
-use protocol::{derive_items_key, parse_vault_meta, VaultMeta};
+use protocol::{derive_items_key, VaultMeta};
 use serde::Serialize;
 // Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -104,7 +104,12 @@ fn method_label(provider_kind: u8) -> Option<&'static str> {
 /// `vault_meta_bytes_hash`) alongside the parsed struct.
 pub fn read_meta(dir: &Path) -> Result<(Vec<u8>, VaultMeta), QuickUnlockError> {
     let bytes = std::fs::read(dir.join("vault.meta")).map_err(io)?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
+    // Either generation (myne-md/myne#433). The migration DELETES
+    // `vault.quickunlock` precisely so the user re-enrols under v0.2 — and this
+    // parser rejecting `NTV5` is what made that re-enrolment impossible, so the
+    // vault ended up with quick-unlock permanently off and no way to turn it on.
+    let meta =
+        protocol::parse_vault_meta_any(&bytes).map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
     Ok((bytes, meta))
 }
 

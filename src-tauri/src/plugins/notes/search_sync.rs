@@ -36,7 +36,7 @@
 use crate::paths;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
 use crate::search::SearchIndexState;
-use protocol::{derive_subkey, parse_vault_meta, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
+use protocol::{derive_subkey, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -129,7 +129,12 @@ fn read_account_number_hash(
     vault_meta_path: &Path,
 ) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], SearchSyncError> {
     let bytes = std::fs::read(vault_meta_path).map_err(|_| SearchSyncError::Io)?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| SearchSyncError::InvalidVaultMeta)?;
+    // Either generation (myne-md/myne#433). This failure is swallowed as ONE
+    // `warn` upstream, so an `NTV5` rejection here meant search returned zero
+    // results forever with nothing user-visible saying why. The core twin
+    // (`search_sync_core.rs`) was already version-aware.
+    let meta =
+        protocol::parse_vault_meta_any(&bytes).map_err(|_| SearchSyncError::InvalidVaultMeta)?;
     Ok(meta.account_number_hash)
 }
 

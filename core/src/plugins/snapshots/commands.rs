@@ -20,7 +20,6 @@ use crate::plugins::notes::error::NoteUpdateError;
 use crate::plugins::notes::note_id::NoteId;
 use crate::plugins::notes::title_extract::resolve_note_title;
 use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
-use protocol::{decode_note, DecryptError};
 use serde::Serialize;
 use std::path::PathBuf;
 // Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
@@ -174,10 +173,17 @@ pub(crate) async fn snapshot_preview_in(
                 })
             }
         };
-        let decrypted = decode_note(&blob, &note_uuid_bytes, &items_key, &items_key_id)
-            .map_err(|_: DecryptError| SnapshotError::CannotDecrypt)?;
-        let s = String::from_utf8(decrypted.plaintext().to_vec())
-            .map_err(|_| SnapshotError::CannotDecrypt)?;
+        // Either format (myne-md/myne#432). A snapshot of a note taken BEFORE the
+        // migration is still `MY01` under the OLD itemsKey and no magic branch can
+        // help it — that is myne-md/myne#435's subject, and separate from this.
+        let decrypted = crate::plugins::notes::decode::decode_note_any(
+            &blob,
+            &note_uuid_bytes,
+            &items_key,
+            &items_key_id,
+        )
+        .map_err(|_| SnapshotError::CannotDecrypt)?;
+        let s = String::from_utf8(decrypted.to_vec()).map_err(|_| SnapshotError::CannotDecrypt)?;
         drop(decrypted); // minimize the non-Zeroized intermediate's lifetime
         Ok(s)
     })
@@ -279,10 +285,18 @@ pub(crate) async fn snapshot_restore_in(
                     })
                 }
             };
-            let decrypted = decode_note(&blob, &note_uuid_bytes, &items_key, &items_key_id)
-                .map_err(|_: DecryptError| SnapshotError::CannotDecrypt)?;
-            let s = String::from_utf8(decrypted.plaintext().to_vec())
-                .map_err(|_| SnapshotError::CannotDecrypt)?;
+            // Either format (myne-md/myne#432). A snapshot of a note taken BEFORE the
+            // migration is still `MY01` under the OLD itemsKey and no magic branch can
+            // help it — that is myne-md/myne#435's subject, and separate from this.
+            let decrypted = crate::plugins::notes::decode::decode_note_any(
+                &blob,
+                &note_uuid_bytes,
+                &items_key,
+                &items_key_id,
+            )
+            .map_err(|_| SnapshotError::CannotDecrypt)?;
+            let s =
+                String::from_utf8(decrypted.to_vec()).map_err(|_| SnapshotError::CannotDecrypt)?;
             drop(decrypted);
             Ok(s)
         })
@@ -905,7 +919,7 @@ mod tests {
             let items_key = [FIXTURE_ITEMS_BYTE; 32];
             let items_key_id = [FIXTURE_ITEMS_ID_BYTE; 16];
             let live = std::fs::read(notes_dir.join(format!("{}.myn", note_id.as_uuid()))).unwrap();
-            let dec = decode_note(
+            let dec = protocol::decode_note(
                 &live,
                 note_id.as_uuid().as_bytes(),
                 &items_key,

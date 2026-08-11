@@ -344,7 +344,10 @@ pub(crate) fn validate_backup_file(
     let meta_bytes = extract_member(source, &records, "vault.meta")
         .map_err(BackupRestoreError::from)?
         .ok_or(BackupRestoreError::MissingVaultMeta)?;
-    let meta = protocol::parse_vault_meta(&meta_bytes)
+    // Either generation (myne-md/myne#433). `NTV5` is the same 345 bytes, so
+    // stages 1-4 accept the container and only this parse rejected it: every
+    // backup taken after a migration verified cleanly and was unrestorable.
+    let meta = protocol::parse_vault_meta_any(&meta_bytes)
         .map_err(|_| BackupRestoreError::InvalidVaultMeta)?;
     Ok((records, skipped, meta.account_number_hash))
 }

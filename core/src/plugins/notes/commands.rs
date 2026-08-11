@@ -1396,7 +1396,7 @@ pub async fn note_write_batch_transactional_from_host(
             }
         })?;
 
-    note_write_batch_with_dir(io, notes_dir, state, &items).await?;
+    note_write_batch_with_dir(io, notes_dir, state, &items, host.now_unix_millis()).await?;
 
     // MYND-29 parity with `note_update`: re-index every rewritten note so
     // full-text search reflects the new bodies (esp. the renamed note's
@@ -1459,6 +1459,11 @@ pub async fn note_write_batch_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     items: &[(String, Zeroizing<String>)],
+    // The wall clock for an `NC05` re-encode, pre-read by the caller. The
+    // blocking closure below is `'static` and cannot borrow `&dyn HostCtx`, so
+    // the timestamp is threaded in — the same shape
+    // `crdt::encode_note_edit_at_millis` exists for.
+    now_millis: u64,
 ) -> Result<(), NoteBatchError> {
     if items.is_empty() {
         return Ok(());
@@ -1553,6 +1558,36 @@ pub async fn note_write_batch_with_dir(
                 );
                 mapped
             })?;
+
+            // `NC05` (myne-md/myne#432): the CRDT note-type re-encodes through the
+            // automerge bridge rather than `encode_update`, exactly as
+            // `note_update_with_dir` does one arm over. Without this a batch write
+            // — the path bulk operations and the importer take — failed on every
+            // note of a migrated vault, while single-note update worked, which is
+            // the shape that made it easy to miss.
+            if crate::plugins::notes::crdt::is_nc05_blob(&old_blob) {
+                let upd = crate::plugins::notes::crdt::encode_note_edit_at_millis(
+                    &old_blob,
+                    plaintext,
+                    &items_key,
+                    &items_key_id,
+                    &note_uuid_bytes,
+                    now_millis,
+                )
+                .map_err(|_| {
+                    tracing::debug!(
+                        stage = "decode_note",
+                        outcome = "cannot_decrypt",
+                        "note_write_batch NC05 re-encode failed"
+                    );
+                    NoteBatchError::CannotDecrypt
+                })?;
+                blobs.push(crate::note_txn::TxnBlob {
+                    path: dst,
+                    bytes: upd.blob,
+                });
+                continue;
+            }
 
             let decrypted = decode_note(&old_blob, &note_uuid_bytes, &items_key, &items_key_id)
                 .map_err(|_: DecryptError| {
@@ -2545,19 +2580,27 @@ pub fn decode_one_title_slice(
 ) -> Result<TitleSlice, NoteTitleError> {
     let note_uuid_bytes = *note_id.as_uuid().as_bytes();
     let blob = blob.to_vec();
-    let decrypted = match decode_note(&blob, &note_uuid_bytes, items_key, items_key_id) {
+    // Either format (myne-md/myne#432). This is the sidebar's title source, so
+    // an `MY01`-only decode here rendered every note on a migrated vault with no
+    // title at all — the most visible symptom of the split, and the one nothing
+    // reported as an error.
+    let decrypted = match crate::plugins::notes::decode::decode_note_any(
+        &blob,
+        &note_uuid_bytes,
+        items_key,
+        items_key_id,
+    ) {
         Ok(d) => d,
         Err(_dec_err) => {
-            // `DecryptError` sub-cause was already emitted via
-            // `tracing::debug!(stage = ?cause)` from inside `decode_note`;
-            // host adds a parallel non-distinguishing event without
+            // The sub-cause was already emitted via `tracing::debug!` inside the
+            // codec; the host adds a parallel non-distinguishing event without
             // re-introducing the distinguisher at the IPC boundary
             // (`protocol.md` §6.4 preserved).
             return Err(NoteTitleError::CannotDecrypt);
         }
     };
 
-    let slices = extract_title_slices(decrypted.plaintext());
+    let slices = extract_title_slices(&decrypted);
     // `from_utf8_lossy` allocates a new `String` even for valid UTF-8 —
     // accepted overhead because the slice sizes are small (FM block
     // ~100-500B, H1 line ~10-80B) and the alternative (strict UTF-8
@@ -2599,6 +2642,49 @@ mod tests {
     use super::enumerate_notes_dir;
     use crate::paths::notes_dir_under;
     use crate::test_support::ScopedTempDir;
+
+    /// The sidebar's title source must read BOTH note formats (myne-md/myne#432).
+    ///
+    /// This is the surface where the version split was most visible and least
+    /// diagnosable: on a migrated vault every row rendered untitled, and nothing
+    /// anywhere reported an error — the per-row failure is swallowed into
+    /// "Untitled" by design, because a genuinely title-less note is ordinary.
+    #[test]
+    fn titles_decode_on_both_note_formats() {
+        use crate::host::test_host::TestHost;
+        use crate::plugins::notes::note_id::NoteId;
+        use zeroize::Zeroizing;
+
+        let host = TestHost::new("/base");
+        let ik = Zeroizing::new([0x11u8; 32]);
+        let ikid = [0x22u8; 16];
+        let id = NoteId::new_v7();
+        let uuid = *id.as_uuid().as_bytes();
+        let md = "---\ntitle: From Frontmatter\n---\n\n# H1 fallback\n";
+
+        let my01 = protocol::encode_new_note(&ik, &ikid, &uuid, md.as_bytes()).expect("MY01");
+        let nc05 = crate::plugins::notes::crdt::encode_note_blob(
+            md,
+            &ik,
+            &ikid,
+            &uuid,
+            &[0x44u8; 16],
+            &host,
+        )
+        .expect("NC05");
+
+        for (label, blob) in [("MY01", &my01), ("NC05", &nc05)] {
+            let slice = super::decode_one_title_slice(&id, blob, &ik, &ikid)
+                .unwrap_or_else(|_| panic!("{label} title must decode"));
+            let fm = slice
+                .frontmatter_bytes
+                .unwrap_or_else(|| panic!("{label} must yield a frontmatter slice"));
+            assert!(
+                fm.contains("title: From Frontmatter"),
+                "{label} frontmatter slice must carry the title: {fm:?}"
+            );
+        }
+    }
 
     // ---- expected-base guard (§11.3 ms-race closure) -----------------------
     // The base-guard unit tests live core-side (they need only the vault-unlock
@@ -2925,6 +3011,7 @@ mod tests {
                     notes_dir.clone(),
                     &state,
                     &items,
+                    0,
                 ),
             )
             .await;
@@ -2954,6 +3041,7 @@ mod tests {
                 notes_dir.clone(),
                 &state,
                 &items,
+                0,
             )
             .await
             .unwrap();

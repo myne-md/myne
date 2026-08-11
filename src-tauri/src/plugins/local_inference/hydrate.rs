@@ -46,7 +46,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use myne_core::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
 
-use protocol::{derive_subkey, parse_vault_meta, SubkeyRole};
+use protocol::{derive_subkey, SubkeyRole};
 
 use myne_core::plugins::notes::note_id::NoteId;
 
@@ -135,7 +135,9 @@ fn read_header_nonce(path: &std::path::Path) -> Option<Vec<u8>> {
 /// skipped (the walk still hydrates the RAM store, un-persisted).
 fn read_account_number_hash(vault_meta_path: &std::path::Path) -> Option<[u8; 16]> {
     let bytes = std::fs::read(vault_meta_path).ok()?;
-    parse_vault_meta(&bytes)
+    // Either generation (myne-md/myne#433): without it the embeddings index
+    // never loads and every unlock pays a full re-embed.
+    protocol::parse_vault_meta_any(&bytes)
         .ok()
         .map(|meta| meta.account_number_hash)
 }

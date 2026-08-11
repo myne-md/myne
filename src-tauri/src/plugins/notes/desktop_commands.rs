@@ -30,7 +30,6 @@ use crate::export_naming::{
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
 use crate::search::SearchIndexState;
-use protocol::{decode_note, DecryptError};
 use std::path::PathBuf;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Runtime, State};
@@ -200,21 +199,27 @@ pub(crate) async fn note_export_with_dir(
         // items_key_id) — note_uuid is the SECOND argument. The codec
         // emits its sub-cause via `tracing::debug!` internally; the host
         // adds a parallel non-distinguishing event (`protocol.md` §6.4).
-        let decrypted = decode_note(&blob, &note_uuid_bytes, &items_key, &items_key_id).map_err(
-            |_: DecryptError| {
-                tracing::debug!(
-                    stage = "decode",
-                    outcome = "cannot_decrypt",
-                    "note_export decode_note returned CannotDecrypt"
-                );
-                NoteExportError::CannotDecrypt
-            },
-        )?;
+        // Either format (myne-md/myne#432) — a single-note export is the same
+        // no-lock-in escape hatch as the whole-vault one, one note at a time.
+        let decrypted = myne_core::plugins::notes::decode::decode_note_any(
+            &blob,
+            &note_uuid_bytes,
+            &items_key,
+            &items_key_id,
+        )
+        .map_err(|_| {
+            tracing::debug!(
+                stage = "decode",
+                outcome = "cannot_decrypt",
+                "note_export decode returned CannotDecrypt"
+            );
+            NoteExportError::CannotDecrypt
+        })?;
         // UTF-8 boundary at the command layer — mirror of `note_read`'s.
         // Validates in place (no copy); on failure the export writes
         // NOTHING: corruption is surfaced, not exported as a file of
         // garbage bytes claiming to be markdown.
-        if std::str::from_utf8(decrypted.plaintext()).is_err() {
+        if std::str::from_utf8(&decrypted).is_err() {
             tracing::error!(
                 stage = "utf8_check",
                 error_kind = "InvalidPlaintextEncoding",
@@ -234,7 +239,7 @@ pub(crate) async fn note_export_with_dir(
         // temp is created, so the existing file stays untouched.
         if let Err(e) = atomic_write::atomic_write_unclobbered(
             &target_path,
-            decrypted.plaintext(),
+            &decrypted,
             /* replace = */ overwrite,
         ) {
             let mapped = match e.kind() {
@@ -256,7 +261,7 @@ pub(crate) async fn note_export_with_dir(
         // already succeeded; absent/unparsable `updated:` keeps the
         // natural export time, and a set failure only warns (see
         // `export_mtime` module docs).
-        super::export_mtime::apply_updated_mtime(&target_path, decrypted.plaintext());
+        super::export_mtime::apply_updated_mtime(&target_path, &decrypted);
         // Closure exit: `decrypted` (Zeroizing) drops, plaintext bytes
         // in RAM wipe. The on-disk copy is the user's deliberate egress.
         Ok(())
@@ -590,16 +595,21 @@ pub(crate) async fn note_export_attachments_with_root(
                     return Err(mapped);
                 }
             };
-            let decrypted = decode_note(&blob, &note_uuid_bytes, &items_key, &items_key_id)
-                .map_err(|_: DecryptError| {
-                    tracing::debug!(
-                        stage = "decode",
-                        outcome = "cannot_decrypt",
-                        "note_export_attachments decode_note returned CannotDecrypt"
-                    );
-                    NoteExportAttachmentsError::CannotDecrypt
-                })?;
-            let Ok(plaintext) = std::str::from_utf8(decrypted.plaintext()) else {
+            let decrypted = myne_core::plugins::notes::decode::decode_note_any(
+                &blob,
+                &note_uuid_bytes,
+                &items_key,
+                &items_key_id,
+            )
+            .map_err(|_| {
+                tracing::debug!(
+                    stage = "decode",
+                    outcome = "cannot_decrypt",
+                    "note_export_attachments decode returned CannotDecrypt"
+                );
+                NoteExportAttachmentsError::CannotDecrypt
+            })?;
+            let Ok(plaintext) = std::str::from_utf8(&decrypted) else {
                 tracing::error!(
                     stage = "utf8_check",
                     error_kind = "InvalidPlaintextEncoding",
@@ -1885,6 +1895,7 @@ mod tests {
                 notes_dir.clone(),
                 &state,
                 &items,
+                0,
             )
             .await
             .expect("transactional batch must commit");
@@ -1945,6 +1956,7 @@ mod tests {
                 notes_dir.clone(),
                 &state,
                 &items,
+                0,
             )
             .await
             .expect_err("a missing note must abort the whole batch");
@@ -2080,7 +2092,7 @@ mod tests {
                     ),
                 )
                 .await;
-            note_write_batch_with_dir(&myne_core::vault_io::StdVaultIo, notes_dir, &state, &[])
+            note_write_batch_with_dir(&myne_core::vault_io::StdVaultIo, notes_dir, &state, &[], 0)
                 .await
                 .expect("empty batch is a no-op success");
         });
@@ -2102,6 +2114,7 @@ mod tests {
                 notes_dir,
                 &state,
                 &items,
+                0,
             )
             .await
             .expect_err("a locked slot must reject the batch");
