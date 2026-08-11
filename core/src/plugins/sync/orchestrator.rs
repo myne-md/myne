@@ -219,7 +219,7 @@ const FETCH_WINDOW_MAX_BLOBS: usize = 256;
 /// Upper bound on the ciphertext ONE batch window asks for, in bytes measured
 /// before base64. Twin of [`PUSH_CHUNK_MAX_BYTES`], and the same 8 MiB, so the
 /// encoded response (~4/3 of this plus per-entry framing, ≈11 MiB) stays far
-/// under `http_codec::MAX_SYNC_RESPONSE_BYTES`.
+/// under `transport::MAX_SYNC_RESPONSE_BYTES` (the cap sync passes into `crate::http`).
 const FETCH_WINDOW_MAX_BYTES: usize = 8 * 1024 * 1024;
 
 /// How many of `queue` the next batch request should ask for, bounded by BOTH

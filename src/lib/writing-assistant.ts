@@ -48,6 +48,25 @@ export async function infer(prompt: string, opts?: InferOptions): Promise<string
   return await invoke<string>("plugin:local-inference|infer", payload);
 }
 
+/**
+ * The same one-shot completion, on the **ambient** command (SYNC-14).
+ *
+ * Ghost text appears because the user typed, not because they asked. Routing it
+ * to its own command is what lets the host classify it: the class is decided by
+ * *which command ran*, never by a field in this payload. Everything else —
+ * prompt shape, ceiling, trimming — is unchanged.
+ */
+export async function inferAmbient(
+  prompt: string,
+  opts?: InferOptions,
+): Promise<string> {
+  const payload =
+    opts?.maxNewTokens === undefined
+      ? { prompt }
+      : { prompt, maxNewTokens: opts.maxNewTokens };
+  return await invoke<string>("plugin:local-inference|infer_ambient", payload);
+}
+
 /** Per-call shape knobs for {@link buildCompletionPrompt}. */
 export interface CompletionPromptOptions {
   /** Ask for a few words / one short sentence on a single line (issue #193).

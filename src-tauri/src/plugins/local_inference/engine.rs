@@ -1,8 +1,18 @@
 //! The [`Engine`] trait — the single seam every AI capability sibling reaches
-//! inference through (SYNC-3/7). Two methods, `infer` and `embed`; the impl
-//! (a stub now, Candle then a sandboxed sidecar later) is hidden so the
-//! in-host-vs-sidecar process boundary and any future engine swap stay
-//! invisible to callers.
+//! inference through (SYNC-3/7).
+//!
+//! **Ten methods, four of which stream.** The header used to say "two methods,
+//! `infer` and `embed`" and "no streaming (SYNC-7)"; streaming was added for
+//! the chat surface and that clause superseded by `decisions.md` 2026-07-04.
+//! Eight of the ten are defaulted, which is what lets a backend implement only
+//! `infer` + `embed` and still be a first-class citizen — the mechanism by
+//! which partial capability is modelled, rather than by splitting the trait.
+//!
+//! The concrete impl is hidden so the in-host-vs-sidecar process boundary and
+//! any future engine swap stay invisible to callers. Since ai-provider-seam a
+//! backend is also *described* — identity, class, whether it serializes compute
+//! — but that description lives on `state::Backend`, deliberately not here: the
+//! trait stays about inference, and policy keys off the descriptor.
 //!
 //! The trait is **synchronous** by design: model inference is CPU-bound and
 //! blocking, so the async / `spawn_blocking` seam belongs at the command
@@ -203,6 +213,32 @@ pub trait Engine: Send + Sync {
     /// no-op — the stub holds no cache.
     fn invalidate_models(&self) {}
 
+    /// The **name + content digest** the backend reports for the embedding
+    /// model it is currently serving, or `None` for an engine whose model is a
+    /// file the client hashes itself.
+    ///
+    /// This does not contradict the header's "description lives on
+    /// `state::Backend`, not here". A descriptor is static and known before
+    /// any request; this is a **runtime query only the engine can answer** —
+    /// the digest is the runtime's own bookkeeping, reachable only by asking
+    /// it. `Backend` could not carry it without becoming a cache of something
+    /// that changes underneath it.
+    ///
+    /// Why it exists: `vault.embeddings` is keyed by a model identity
+    /// (`protocol.md` §9.17.2), and a served model has no file to hash. Before
+    /// this method the served case produced NO identity, so the snapshot was
+    /// never written and every unlock re-embedded the whole vault.
+    ///
+    /// Costs a round trip, so callers ask once per walk, not per note. `None`
+    /// on any failure — an unreachable runtime degrades to "no persistence
+    /// this session", never to a wrong identity.
+    ///
+    /// Neither string is logged (both name the user's model choice, and the
+    /// DENY-list discipline in `src-tauri/CLAUDE.md` governs this whole tree).
+    fn served_model_identity(&self) -> Option<(String, String)> {
+        None
+    }
+
     /// Transcribe already-decoded audio to text (voice-to-text, MYND-550;
     /// SYNC-V5). `pcm` is **16 kHz mono f32** — the WAV decode + resample happen
     /// at the command layer ([`super::audio`]) so the engine stays pure
@@ -245,6 +281,61 @@ pub trait Engine: Send + Sync {
     }
 }
 
+/// A deliberate fault the E2E stub can be put into (#191 task 2).
+///
+/// The tauri-driver harness had **no way to drive an unavailable backend**:
+/// `StubEngine::tag_model_available` answers `true` on purpose, so every
+/// scenario has always run against a working one and the degradation paths this
+/// slice exists to fix had zero coverage.
+///
+/// Two faults, because they are different states with different honest copy: a
+/// backend that is not there at all, and one that is there and fails.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// In the default build only `None` is ever constructed — the other two exist so
+// the boundary test can assert that no value reaches them without the stub
+// feature. Named rather than left as a bare allow.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+pub(crate) enum StubFault {
+    None,
+    /// Nothing to answer with — the empty state.
+    Unavailable,
+    /// Present, reachable, and every call fails.
+    Failing,
+}
+
+/// The lever, read **only** in the E2E build.
+///
+/// `#[cfg(feature = "local-inference-stub")]` is the whole safety argument, and
+/// it is a build variant rather than a runtime knob for the reason
+/// `voice-capture-stub` states about itself: *"a build that cannot ship needs no
+/// escape hatch, and two knobs would be two things to keep in sync."* The
+/// default build does not read the variable, so setting it on a shipped binary
+/// does nothing — the code that would have read it does not exist.
+#[cfg(feature = "local-inference-stub")]
+fn stub_fault() -> StubFault {
+    fault_of(std::env::var("MYNE_E2E_AI_FAULT").ok().as_deref())
+}
+
+/// The mapping, split out from the environment read so it is testable in BOTH
+/// builds without a process-global env write — and so the production arm below
+/// can be proved to have no other value than `None`.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+pub(crate) fn fault_of(raw: Option<&str>) -> StubFault {
+    match raw {
+        Some("unavailable") => StubFault::Unavailable,
+        Some("failing") => StubFault::Failing,
+        // An unrecognized value is NOT a fault. A typo in a scenario must leave
+        // the harness working rather than silently testing the empty state.
+        _ => StubFault::None,
+    }
+}
+
+/// The production arm: no lever, no environment read, no branch.
+#[cfg(not(feature = "local-inference-stub"))]
+fn stub_fault() -> StubFault {
+    StubFault::None
+}
+
 /// Trivial in-memory engine used before any model lands (the task-1 tracer).
 ///
 /// `infer` echoes the prompt behind a fixed marker; `embed` returns a
@@ -254,14 +345,32 @@ pub trait Engine: Send + Sync {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct StubEngine;
 
+impl StubEngine {
+    /// The refusal this build's fault lever asks for, or `None` to proceed.
+    /// One place, so a method cannot be added later that quietly ignores it.
+    fn fault(&self) -> Option<EngineError> {
+        match stub_fault() {
+            StubFault::None => None,
+            StubFault::Unavailable => Some(EngineError::NoModel),
+            StubFault::Failing => Some(EngineError::InferenceFailed),
+        }
+    }
+}
+
 impl Engine for StubEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
+        if let Some(e) = self.fault() {
+            return Err(e);
+        }
         // Echo, not a model. The marker lets a test assert the value came
         // through the trait against the stub (not a real completion).
         Ok(format!("stub-infer: {prompt}"))
     }
 
     fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
+        if let Some(e) = self.fault() {
+            return Err(e);
+        }
         Ok(vec![0.0; STUB_EMBED_DIM])
     }
 
@@ -270,6 +379,9 @@ impl Engine for StubEngine {
         prompt: &str,
         on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
     ) -> Result<String, EngineError> {
+        if let Some(e) = self.fault() {
+            return Err(e);
+        }
         // Deterministic token-by-token emission: the same string `infer`
         // returns, split into whitespace-inclusive chunks so tests can assert
         // incremental delivery AND that the concatenation equals the blocking
@@ -290,6 +402,9 @@ impl Engine for StubEngine {
         _prompt: &str,
         should_continue: &mut dyn FnMut() -> ControlFlow<()>,
     ) -> Result<String, EngineError> {
+        if let Some(e) = self.fault() {
+            return Err(e);
+        }
         // Honour the yield probe like the real engine does, so the E2E lane
         // exercises the priority policy rather than routing around it.
         if should_continue().is_break() {
@@ -306,11 +421,17 @@ impl Engine for StubEngine {
     fn tag_model_available(&self) -> bool {
         // The stub IS the tag model in the E2E build, so the settings surface
         // must show auto-tag as offerable there — otherwise the tauri-driver
-        // scenario would drive a switch this very feature had disabled.
-        true
+        // scenario would drive a switch this very feature had disabled. That
+        // stays the answer in the ORDINARY stub path; only the `unavailable`
+        // fault says otherwise, and `failing` deliberately does not — a model
+        // that errors is still a model that exists.
+        stub_fault() != StubFault::Unavailable
     }
 
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
+        if let Some(e) = self.fault() {
+            return Err(e);
+        }
         // Deterministic, model-free: encode the sample count so a test can
         // assert the value came through the trait against the stub (not a real
         // decode), and the E2E flow can assert a transcript round-tripped
@@ -323,6 +444,9 @@ impl Engine for StubEngine {
         pcm: &[f32],
         on_segment: &mut dyn FnMut(&str) -> ControlFlow<()>,
     ) -> Result<String, EngineError> {
+        if let Some(e) = self.fault() {
+            return Err(e);
+        }
         // Emit in whitespace-inclusive chunks like `infer_streaming`, so a test
         // can assert incremental delivery AND that the concatenation equals the
         // blocking `transcribe`. `Break` returns the partial emitted so far.
@@ -335,6 +459,81 @@ impl Engine for StubEngine {
             }
         }
         Ok(emitted)
+    }
+}
+
+#[cfg(test)]
+mod stub_fault_tests {
+    //! The E2E fault lever (#191 task 2). These run in BOTH builds on purpose:
+    //! the mapping is pure, and the production arm's claim — that no value can
+    //! produce a fault, because the environment is never read — is a claim
+    //! about *this* build and is only worth asserting here.
+
+    use super::*;
+
+    #[test]
+    fn the_two_faults_map_and_everything_else_is_none() {
+        assert_eq!(fault_of(Some("unavailable")), StubFault::Unavailable);
+        assert_eq!(fault_of(Some("failing")), StubFault::Failing);
+        // A typo must leave the harness WORKING, not silently testing the empty
+        // state — a scenario that passes against the wrong state is worse than
+        // one that fails.
+        assert_eq!(fault_of(Some("unavaliable")), StubFault::None);
+        assert_eq!(fault_of(Some("")), StubFault::None);
+        assert_eq!(fault_of(None), StubFault::None);
+    }
+
+    /// Inert by default: with no lever set the stub behaves exactly as every
+    /// existing scenario expects, INCLUDING `tag_model_available() == true`.
+    #[test]
+    fn the_stub_is_unchanged_when_no_fault_is_set() {
+        let e = StubEngine;
+        assert!(e.infer("hello").is_ok());
+        assert!(e.embed("x").is_ok());
+        assert!(e.tag_model_available());
+    }
+
+    /// The production build reads no environment variable, so the lever cannot
+    /// be pulled on a shipped binary. Asserted at the source level because the
+    /// alternative — setting the variable and observing nothing — would pass
+    /// just as well against a build that read it and ignored it.
+    #[cfg(not(feature = "local-inference-stub"))]
+    #[test]
+    fn the_default_build_contains_no_environment_read_for_the_lever() {
+        let src = include_str!("engine.rs");
+        let production = &src[..src.find("#[cfg(test)]").expect("test block")];
+        // EVERY line that reads the environment for the lever must sit under
+        // the stub cfg — checked per line, over all of them.
+        //
+        // The first draft of this test found only the FIRST mention and walked
+        // back to the nearest attribute. It passed against an injected ungated
+        // read in the production arm, because that read came later in the file
+        // and the test never looked at it. A guard that inspects one site while
+        // claiming to cover the file is the exact shape this repo keeps getting
+        // burned by, so it is written as a sweep instead.
+        let mut checked = 0;
+        for (n, line) in production.lines().enumerate() {
+            if !line.contains("MYNE_E2E_AI_FAULT") || line.trim_start().starts_with("///") {
+                continue;
+            }
+            checked += 1;
+            let preceding = production
+                .lines()
+                .take(n)
+                .filter(|l| l.trim_start().starts_with("#[cfg("))
+                .last()
+                .unwrap_or("");
+            assert!(
+                preceding.contains("#[cfg(feature = \"local-inference-stub\")]"),
+                "line {n} reads the lever outside the local-inference-stub arm \
+                 (nearest cfg attribute above it: {preceding:?})"
+            );
+        }
+        assert_eq!(
+            checked, 1,
+            "expected exactly one environment read for the lever; a second one \
+             is a second place the boundary has to hold"
+        );
     }
 }
 

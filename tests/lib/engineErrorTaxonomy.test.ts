@@ -1,0 +1,174 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { describe, expect, it } from "vitest";
+
+import { normalizeTagSuggestError } from "../../src/lib/ai-tags";
+import { normalizeProviderError } from "../../src/lib/engine-error";
+import { normalizeTranscribeError } from "../../src/lib/transcribe";
+
+// Drift lock for the `EngineError` cause taxonomy (ai-provider-seam task 5,
+// SYNC-5).
+//
+// The Rust half is compile-checked: `EngineError::kind`'s `match` fails to
+// build on a forgotten variant. The TypeScript half had NOTHING. `CAUSE_BY_TAG`
+// in `src/lib/transcribe.ts` and `normalizeTagSuggestError` in
+// `src/lib/ai-tags.ts` are hand-written tables, and a Rust variant they have
+// never heard of falls silently into their catch-all `"failed"` — the user is
+// told "it failed" for a cause the backend named precisely. Nothing in the tree
+// noticed, which is why #189 filed the vocabulary into #188: adding a backend
+// and its causes in one change is how a table gets missed.
+//
+// The roster below is PARSED FROM THE RUST SOURCE rather than copied. A copy is
+// a third place to forget.
+
+const ERROR_RS = fileURLToPath(
+  new URL(
+    "../../src-tauri/src/plugins/local_inference/error.rs",
+    import.meta.url,
+  ),
+);
+
+/** Every `EngineError::Variant => "tag"` arm of `kind()`, read from the source. */
+function rustTaxonomy(): { variant: string; tag: string }[] {
+  const src = readFileSync(ERROR_RS, "utf8");
+  const body = src.slice(src.indexOf("pub fn kind("));
+  const arms = [...body.matchAll(/EngineError::(\w+)\s*=>\s*"([a-z_]+)"/g)];
+  return arms.map((m) => ({ variant: m[1], tag: m[2] }));
+}
+
+/**
+ * Causes a surface deliberately does not distinguish, each with the reason.
+ *
+ * An entry here is a claim: "this cause cannot reach this surface, or is
+ * correctly collapsed into its catch-all". It is reviewed like any other claim
+ * — the point of listing it is that the alternative (silence) is
+ * indistinguishable from having forgotten.
+ */
+const NOT_APPLICABLE: Record<string, Record<string, string>> = {
+  transcribe: {
+    inference_failed: "generation-only; transcription reports its own failure",
+    embedding_failed: "embedding-only; never reached from the transcribe path",
+    deferred:
+      "the compute-priority stand-down is an auto-tag concept; transcription is user-initiated and never yields",
+    transcription_failed:
+      "correctly collapsed: this IS the transcribe surface's own runtime failure, and TranscribeErrorKind has no more specific state than \"failed\" to render for it",
+    timeout:
+      "speech-to-text has no backend that can time out: no remote provider accepts audio and a local runtime does not serve it (decisions.md 2026-08-09)",
+    unreachable: "same — transcription is in-process only",
+    refused: "same — transcription is in-process only",
+    remote_barred:
+      "transcription is user-initiated and in-process only, so the SYNC-14 bar can never fire on this path",
+    no_credential:
+      "transcription never reaches a provider, so there is no credential for it to be missing (myne#415)",
+    unauthorized: "same — no provider, no credential to be rejected",
+    quota_exhausted: "same — no provider, no quota to exhaust",
+  },
+  provider: {
+    feature_off:
+      "the AI beta gate is checked host-side before a provider is selected, so this never arrives from a provider call",
+    vault_locked:
+      "a provider request only runs from an unlocked vault; the lock tears the transcript down instead",
+    no_model:
+      "this arm has no local model — the model is named by the user and its absence is a NoCredential-shaped setup problem, not a missing file",
+    model_load_failed: "same — nothing is loaded on this side",
+    not_ready:
+      "collapses into the catch-all here: 'the engine is not set up' is not something a provider can tell us",
+    inference_failed:
+      "a provider failure arrives as a status, which maps to unauthorized / quota_exhausted / the catch-all; this variant is the in-process runtime's",
+    embedding_failed:
+      "embedding is barred from a remote backend unconditionally (SYNC-16), so it never fails this way",
+    transcription_failed: "no provider accepts audio (decisions.md 2026-08-09)",
+    deferred:
+      "only a backend that serializes compute can defer, and this one runs out of process — Backend::serializes_compute is false for it",
+  },
+  tagSuggest: {
+    feature_off:
+      "auto-tag has its own pref gate, checked host-side before the engine is touched",
+    vault_locked: "the tag pass only runs while unlocked",
+    no_model:
+      "collapses into not_ready for this surface — the band simply does not appear",
+    model_load_failed: "same collapse; the band does not appear",
+    inference_failed: "collapses into the catch-all; there is no distinct UI",
+    embedding_failed: "embedding-only; never reached from the tag path",
+    transcription_failed: "transcription-only",
+    timeout:
+      "auto-tag runs on the bundled task-model with no override picker, so it has no provider to time out against (threat-model.md, decisions.md 2026-08-09)",
+    unreachable: "same — bundled model only",
+    refused: "same — bundled model only",
+    no_credential:
+      "auto-tag is barred from a remote backend unconditionally (SYNC-14), so it can never need a credential",
+    unauthorized: "same — the bar fires before any credential is consulted",
+    quota_exhausted: "same — nothing is ever billed on this path",
+  },
+};
+
+/**
+ * Ask a normalizer what it makes of a tag. A cause is "handled" when the
+ * normalizer distinguishes it — i.e. answers something other than its
+ * catch-all.
+ */
+function handles(
+  surface: "transcribe" | "tagSuggest" | "provider",
+  tag: string,
+  variant: string,
+): boolean {
+  if (surface === "provider") {
+    return (
+      normalizeProviderError(tag) !== "failed" ||
+      normalizeProviderError(variant) !== "failed"
+    );
+  }
+  if (surface === "transcribe") {
+    const byTag = normalizeTranscribeError(tag).kind;
+    const byVariant = normalizeTranscribeError(variant).kind;
+    return byTag !== "failed" || byVariant !== "failed";
+  }
+  const byTag = normalizeTagSuggestError(tag).kind;
+  const byVariant = normalizeTagSuggestError(variant).kind;
+  return byTag !== "failed" || byVariant !== "failed";
+}
+
+describe("EngineError cause taxonomy", () => {
+  const taxonomy = rustTaxonomy();
+
+  it("parses a non-trivial roster out of the Rust source", () => {
+    // Guards the guard: a regex that silently matched nothing would make every
+    // assertion below vacuously true — the exact shape this file exists to stop.
+    expect(taxonomy.length).toBeGreaterThanOrEqual(9);
+    expect(taxonomy.map((t) => t.tag)).toContain("not_ready");
+  });
+
+  it("emits each tag exactly once", () => {
+    const tags = taxonomy.map((t) => t.tag);
+    expect(new Set(tags).size).toBe(tags.length);
+  });
+
+  for (const surface of ["transcribe", "tagSuggest", "provider"] as const) {
+    it(`${surface}: every Rust cause is either handled or declared not-applicable`, () => {
+      const unaccounted = taxonomy
+        .filter(
+          ({ tag, variant }) =>
+            !handles(surface, tag, variant) && !NOT_APPLICABLE[surface][tag],
+        )
+        .map(({ variant, tag }) => `${variant} ("${tag}")`);
+
+      expect(
+        unaccounted,
+        `${surface} silently collapses these EngineError causes into its catch-all. ` +
+          `Either map them in the normalizer, or add each to NOT_APPLICABLE.${surface} with the reason it cannot reach this surface.`,
+      ).toEqual([]);
+    });
+
+    it(`${surface}: no stale not-applicable entry`, () => {
+      const known = new Set(taxonomy.map((t) => t.tag));
+      const stale = Object.keys(NOT_APPLICABLE[surface]).filter(
+        (tag) => !known.has(tag),
+      );
+      expect(
+        stale,
+        `these tags are declared not-applicable but no longer exist in the Rust enum — a stale exemption is how the next one gets waved through`,
+      ).toEqual([]);
+    });
+  }
+});

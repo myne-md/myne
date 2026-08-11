@@ -35,8 +35,9 @@ use myne_core::plugins::attachments::extract_types::{ExtractStatus, SourceFormat
 use myne_core::plugins::notes::commands::note_read_with_dir;
 use myne_core::plugins::notes::note_id::NoteId;
 
-use super::cancel::{guarded_on_token, CancelToken};
+use super::cancel::{guarded_on_token, CancelRegistry, CancelToken};
 use super::compute_priority::ComputePriority;
+use super::endpoint_config;
 use super::engine::{ChatMessage, ChatRole, Engine};
 use super::error::EngineError;
 use super::hydrate::{folder_is_excluded, folder_of};
@@ -44,6 +45,7 @@ use super::model_store::{self, ModelRole, ModelStoreError};
 use super::rag;
 use super::retrieval::{self, ScoredChunk};
 use super::state::LocalInferenceState;
+use super::state::RequestClass;
 use super::vector_store::LocalInferenceVectorState;
 use crate::plugins::attachments::scheme_core::{decode_attachment_plaintext, ServeKeys};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
@@ -71,6 +73,15 @@ const CHAT_RELEVANCE_THRESHOLD: f32 = 0.30;
 /// engine's full budget, and all of them ride this one command. Omitted, the
 /// engine's own budget applies — the byte-identical pre-#193 behaviour. Supplied,
 /// the engine clamps it to that budget (the value comes from the WebView, TB6).
+/// `infer`'s request class. A **constant in the command body**, never a field
+/// read from the payload — see [`super::state::RequestClass`] for why that
+/// distinction is the whole mechanism.
+pub(super) const INFER_CLASS: RequestClass = RequestClass::UserInitiated;
+
+/// `infer_ambient`'s request class. Ghost text appears because the user typed,
+/// not because they asked for it.
+pub(super) const INFER_AMBIENT_CLASS: RequestClass = RequestClass::Ambient;
+
 #[tauri::command]
 pub async fn infer(
     prompt: String,
@@ -82,7 +93,318 @@ pub async fn infer(
     // auto-tag pass stands down rather than making the user queue behind it
     // (MYND-651 task 4) — held across the await, dropped on every return path.
     let _interactive = priority.interactive();
-    infer_with_engine(state.engine(), prompt, max_new_tokens).await
+    infer_with_engine(state.engine_for(INFER_CLASS)?, prompt, max_new_tokens).await
+}
+
+/// One-shot completion for an **ambient** surface — today, inline ghost text.
+///
+/// Byte-identical to [`infer`] in contract (prompt in, text out, the same
+/// `Zeroizing` wrap and `spawn_blocking` inside [`infer_with_engine`], the same
+/// clamping of the WebView-supplied ceiling) and different in exactly one way:
+/// its class is `Ambient`, so the seam refuses it a remote-class backend
+/// (SYNC-14).
+///
+/// It exists as a separate command *because* the class has to be a host-side
+/// fact. Ghost text used to ride `infer` alongside chat and rewrite, which left
+/// the seam unable to tell them apart — and inferring the class from "there is
+/// a small token ceiling in the payload" would be guessing from a caller-
+/// supplied field, which is the shape this design rejects.
+///
+/// Named for the class rather than for ghost text: a second ambient generative
+/// surface belongs here, not on a second command.
+///
+/// NOT registered as interactive compute — an ambient pass must never make a
+/// user-initiated one queue behind it (the mirror of `suggest_tags`).
+#[tauri::command]
+pub async fn infer_ambient(
+    prompt: String,
+    max_new_tokens: Option<usize>,
+    state: State<'_, LocalInferenceState>,
+) -> Result<String, EngineError> {
+    infer_with_engine(
+        state.engine_for(INFER_AMBIENT_CLASS)?,
+        prompt,
+        max_new_tokens,
+    )
+    .await
+}
+
+/// Per-feature answer in [`AiCapabilityReport`].
+///
+/// `cause` is a **closed `EngineError` kind** (`error.rs`), never a new
+/// vocabulary — SYNC-5. The frontend already has a normalizer for that
+/// taxonomy and a drift test holding it in step; a second, report-only set of
+/// strings would be a second thing to keep in step and the first thing to rot.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct FeatureStatus {
+    pub available: bool,
+    /// `None` when available. Otherwise `EngineError::kind()`.
+    pub cause: Option<&'static str>,
+}
+
+impl FeatureStatus {
+    fn ok() -> Self {
+        Self {
+            available: true,
+            cause: None,
+        }
+    }
+    fn blocked(cause: EngineError) -> Self {
+        Self {
+            available: false,
+            cause: Some(cause.kind()),
+        }
+    }
+}
+
+/// What the AI surface can actually do right now, per feature.
+///
+/// **Per feature, not per model role**, because that is the question the UI
+/// asks: the panel wants to know whether auto-tag works, not whether a file
+/// exists. The two differ the moment a backend can be present-but-unreachable.
+///
+/// The in-tree precedent is quick-unlock — a static build-time capability
+/// (`src/platform/capabilities.ts`'s `localAi`) paired with a runtime status
+/// struct. `localAi` stays build-time by decision; it answers "can this
+/// platform ever", and this answers "can it now".
+///
+/// **`compiled` is always `true` here**, and that is not a tautology worth
+/// deleting: this whole plugin is behind the `local-inference` cargo feature,
+/// so in a `--no-default-features` build the command does not exist and the
+/// invoke is rejected. The frontend reads that rejection as `compiled: false`.
+/// The field carries the positive case so the wrapper has one shape to parse
+/// rather than a presence check plus a parse.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AiCapabilityReport {
+    pub compiled: bool,
+    pub backend_id: &'static str,
+    pub backend_class: &'static str,
+    pub generation: FeatureStatus,
+    pub embedding: FeatureStatus,
+    pub transcription: FeatureStatus,
+    pub auto_tag: FeatureStatus,
+}
+
+/// Build the report from resolved values — no `AppHandle`, so it is testable.
+pub(super) fn capability_report_from(
+    state: &LocalInferenceState,
+    generation_model: bool,
+    embedding_model: bool,
+    transcription_model: bool,
+) -> AiCapabilityReport {
+    let engine = state.engine_unclassified();
+    // Generation and transcription are user-initiated; embedding and auto-tag
+    // carry the SYNC-14/16 bars, so ask the seam rather than re-deriving them
+    // here — a policy restated at a second site is a policy that will disagree.
+    let generation = match state.engine_for(RequestClass::UserInitiated) {
+        Err(cause) => FeatureStatus::blocked(cause),
+        Ok(_) if !generation_model => FeatureStatus::blocked(EngineError::NoModel),
+        Ok(_) => FeatureStatus::ok(),
+    };
+    let embedding = match state.embedding_engine() {
+        Err(cause) => FeatureStatus::blocked(cause),
+        Ok(_) if !embedding_model => FeatureStatus::blocked(EngineError::NoModel),
+        Ok(_) => FeatureStatus::ok(),
+    };
+    // Transcription reads the LOCAL door, because that is the door the
+    // `transcribe` command itself uses: speech-to-text is a bundled local
+    // model, and a named text-generation provider neither serves it nor should
+    // make the report claim it is gone. A report that answers a different
+    // question than the command is worse than no report.
+    let transcription = match state.embedding_engine() {
+        Err(cause) => FeatureStatus::blocked(cause),
+        Ok(_) if !transcription_model => FeatureStatus::blocked(EngineError::NoModel),
+        Ok(_) => FeatureStatus::ok(),
+    };
+    let auto_tag = match state.engine_for(RequestClass::Ambient) {
+        Err(cause) => FeatureStatus::blocked(cause),
+        Ok(_) if !engine.tag_model_available() => FeatureStatus::blocked(EngineError::NoModel),
+        Ok(_) => FeatureStatus::ok(),
+    };
+    AiCapabilityReport {
+        compiled: true,
+        backend_id: state.active_id(),
+        backend_class: state.active_class().as_str(),
+        generation,
+        embedding,
+        transcription,
+        auto_tag,
+    }
+}
+
+/// The one capability report (SYNC-5). Host-side because the WebView CSP
+/// cannot reach a loopback daemon — a browser-side probe would be answering a
+/// question it structurally cannot answer.
+#[tauri::command]
+pub async fn ai_capability_report<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, LocalInferenceState>,
+) -> Result<AiCapabilityReport, EngineError> {
+    // The report describes the selection as it is NOW, so it refreshes like
+    // every other surface that can route remote — #191 task 1 reads this to
+    // decide what the UI says is available.
+    state.refresh().await;
+    let base = crate::paths::app_data_dir(&app).unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let has = |role: ModelRole| {
+        model_store::selected_model(&base, role)
+            .ok()
+            .flatten()
+            .is_some()
+    };
+    let bundled_transcription = app
+        .path()
+        .resource_dir()
+        .ok()
+        .and_then(|rd| model_store::bundled_transcription_model(&rd));
+    let transcription_model =
+        model_store::effective_transcription_model(&base, bundled_transcription.as_deref())
+            .ok()
+            .flatten()
+            .is_some();
+    Ok(capability_report_from(
+        &state,
+        has(ModelRole::Generation),
+        has(ModelRole::Embedding),
+        transcription_model,
+    ))
+}
+
+/// The models the **named remote provider** currently publishes (myne#415
+/// task 17, SYNC-24).
+///
+/// This is the other half of "Myne ships no model default": the user picks from
+/// a list, and the list has to come from somewhere. It comes from the provider,
+/// at the moment the user opens the chooser — never from a constant in this
+/// tree, which would rot and would re-create the pinned-tag problem SYNC-24
+/// rejected.
+///
+/// **It is an egress, and it is gated exactly like a completion.** Same
+/// [`authorize_remote`](super::provider_gate::authorize_remote): developer
+/// mode, the AI beta, a selected provider, a stored key, and consent naming
+/// that provider. All five, re-read here rather than trusted from the panel —
+/// asking a provider "what models do you have" over an authenticated
+/// connection tells that provider this account exists and is active, which is
+/// exactly the kind of byte #414's invariant is about.
+///
+/// It fetches model **names**, never weights. `decisions.md` 2026-08-09 draws
+/// the forbidden line at a provider's *pull or download* endpoint; a listing
+/// call downloads nothing and the feature cannot exist without it.
+///
+/// `RequestClass::UserInitiated` by construction: nothing ambient opens a
+/// settings panel.
+#[tauri::command]
+pub async fn list_provider_models<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Vec<String>, EngineError> {
+    let active = state.active_vault_id().await;
+    let vault_dir = myne_core::paths::active_vault_root_io(&app, active)
+        .map_err(|_| EngineError::VaultLocked)?;
+    let prefs = myne_core::plugins::prefs::commands::prefs_read_with_dir(
+        &vault_dir,
+        state.inner(),
+        &myne_core::vault_io::StdVaultIo,
+    )
+    .await
+    .map_err(|_| EngineError::VaultLocked)?;
+
+    // The gate first, and the network only after it says yes. Written in this
+    // order on purpose: an implementation that connected and then checked would
+    // satisfy every assertion about the RESULT while still having sent a byte.
+    list_models_gated(&prefs, prefs.developer_mode, |provider, key| {
+        let transport = super::provider_transport::ProviderTransport::new(provider.host());
+        transport.get_json(provider.models_path(), key)
+    })
+    .await
+}
+
+/// Testable core of [`list_provider_models`]: the gate, then the fetch, then
+/// the parse — with the fetch injected.
+///
+/// The injection is the point. A test can then assert the thing that actually
+/// matters and that no assertion about the RETURN VALUE can reach: when a
+/// precondition is missing, the fetch is **never called**. An implementation
+/// that connected first and checked afterwards would satisfy every
+/// error-equality assertion while having already sent a byte, which is the
+/// exact failure #414's invariant is written against.
+pub(crate) async fn list_models_gated<F>(
+    prefs: &protocol::PrefsView,
+    developer_mode: bool,
+    fetch: F,
+) -> Result<Vec<String>, EngineError>
+where
+    F: FnOnce(
+            super::provider_registry::RemoteProvider,
+            &str,
+        ) -> Result<Vec<u8>, super::provider_transport::ProviderTransportError>
+        + Send
+        + 'static,
+{
+    let auth = super::provider_gate::authorize_remote(prefs, developer_mode)?;
+    let provider = auth.provider();
+    let key = auth.key().to_string();
+
+    let raw = tokio::task::spawn_blocking(move || fetch(provider, &key))
+        .await
+        .map_err(|_| EngineError::InferenceFailed)?
+        .map_err(super::provider_registry::engine_error_of)?;
+
+    provider
+        .parse_models_reply(&raw)
+        .map_err(|_| EngineError::InferenceFailed)
+}
+
+/// Read the device-local AI endpoint, or `None` when none is configured.
+///
+/// Host-side because the WebView's CSP `connect-src` is
+/// `'self' ipc: http://ipc.localhost attachment: http://attachment.localhost`,
+/// mirrored and asserted in Rust — widening it is the motion that guard exists
+/// to make expensive. A page-side probe would be answering a question it
+/// structurally cannot answer.
+///
+/// **Named for the setting, not the medium.** `no_egress::permission_is_network`
+/// refuses any permission string containing "network", "socket" or "fetch", as
+/// an OR over the namespace check. That is the fail-safe direction and not worth
+/// arguing with.
+#[tauri::command]
+pub async fn get_ai_endpoint<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<Option<(String, String)>, endpoint_config::AiEndpointError> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|_| endpoint_config::AiEndpointError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+        })?;
+    Ok(
+        endpoint_config::read_endpoint(&endpoint_config::endpoint_path_in(&dir))?
+            .map(|e| (e.url, e.model)),
+    )
+}
+
+/// Validate and persist the device-local AI endpoint.
+///
+/// Refuses before writing, so the file can never hold a destination the reader
+/// would reject. An empty string clears it, returning the arm to **unreachable**
+/// rather than merely disabled.
+#[tauri::command]
+pub async fn set_ai_endpoint<R: Runtime>(
+    url: String,
+    model: String,
+    app: AppHandle<R>,
+) -> Result<Option<String>, endpoint_config::AiEndpointError> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|_| endpoint_config::AiEndpointError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+        })?;
+    let path = endpoint_config::endpoint_path_in(&dir);
+    if url.trim().is_empty() {
+        endpoint_config::clear_endpoint(&path)?;
+        return Ok(None);
+    }
+    endpoint_config::write_endpoint(&path, url.trim(), model.trim()).map(|e| Some(e.url))
 }
 
 /// Embedding vector for `text`.
@@ -97,7 +419,7 @@ pub async fn embed(
     text: String,
     state: State<'_, LocalInferenceState>,
 ) -> Result<Vec<f32>, EngineError> {
-    embed_with_engine(state.engine(), text).await
+    embed_with_engine(state.embedding_engine()?, text).await
 }
 
 /// Transcribe an audio attachment to text (voice-to-text, MYND-550; SYNC-V3/V5/V6).
@@ -122,7 +444,7 @@ pub async fn transcribe<R: Runtime>(
     app: AppHandle<R>,
     engine_state: State<'_, LocalInferenceState>,
     vault_state: State<'_, VaultRuntimeState>,
-    cancel: State<'_, CancelToken>,
+    cancel: State<'_, CancelRegistry>,
     priority: State<'_, ComputePriority>,
 ) -> Result<String, EngineError> {
     // User-initiated compute: a background auto-tag pass yields to this and
@@ -158,8 +480,11 @@ pub async fn transcribe<R: Runtime>(
     if !prefs.transcription_enabled {
         return Err(EngineError::FeatureOff);
     }
-    // Fresh cancel window (a prior Stop must not abort this run).
-    cancel.reset();
+    // Fresh cancel window. Structural now rather than a reset: this request
+    // takes its OWN token, so a prior Stop cannot reach it and a Stop on it
+    // cannot reach a concurrent request. The guard deregisters on drop, so
+    // every early return below also retires this request's entry.
+    let cancel_guard = cancel.begin();
 
     // Resolve the unlocked slot's key material + the active vault dir. This is
     // the only place with `.await` access to the slot map (mirror the
@@ -176,8 +501,12 @@ pub async fn transcribe<R: Runtime>(
     let vault_dir = crate::paths::active_vault_root_io(&app, active_id)
         .map_err(|_| EngineError::TranscriptionFailed)?;
 
-    let engine = engine_state.engine();
-    let cancel_token: CancelToken = (*cancel).clone();
+    // Embedding path (SYNC-16): the strict accessor, which never hands back a
+    // remote backend. This surface only embeds — there is no generation here to
+    // split off (#415 task 18 split the two handles in `ask` and `chat_stream`,
+    // where there was one).
+    let engine = engine_state.embedding_engine()?;
+    let cancel_token: CancelToken = cancel_guard.token().clone();
     // Kept for the out-of-band search refresh below (the closure consumes the id).
     let attachment_id_hex = attachment_id.clone();
     let app_for_cache = app.clone();
@@ -400,7 +729,11 @@ pub async fn semantic_search(
     let query = Zeroizing::new(query);
     // The user typed a query — auto-tag yields to it (MYND-651 task 4).
     let _interactive = priority.interactive();
-    let engine = engine_state.engine();
+    // Embedding path (SYNC-16): the strict accessor, which never hands back a
+    // remote backend. This surface only embeds — there is no generation here to
+    // split off (#415 task 18 split the two handles in `ask` and `chat_stream`,
+    // where there was one).
+    let engine = engine_state.embedding_engine()?;
     // Embed off the async thread (CPU-bound); the wrapper zeroizes on drop.
     let query_vec = tokio::task::spawn_blocking(move || engine.embed(&query))
         .await
@@ -468,7 +801,15 @@ pub async fn ask<R: Runtime>(
     // User-initiated: covers BOTH model calls below (embed + generate), so a
     // background auto-tag pass cannot slip between them (MYND-651 task 4).
     let _interactive = priority.interactive();
-    let engine = engine_state.engine();
+    // TWO handles (#415 task 18). Retrieval embeds on the LOCAL embedder —
+    // SYNC-16, and mixing embedders is a retrieval-correctness bug before it is
+    // a privacy one. The generation is user-initiated and MAY be the provider
+    // the user named. Sharing one handle meant this surface could never reach a
+    // provider no matter what the user configured, which was most of why the
+    // remote arm was unreachable.
+    engine_state.refresh().await;
+    let engine = engine_state.embedding_engine()?;
+    let generator = engine_state.engine_for(RequestClass::UserInitiated)?;
 
     // 1. Embed the question off the async thread.
     let query_vec = {
@@ -527,9 +868,10 @@ pub async fn ask<R: Runtime>(
     let (chunk_texts, sources) = resolve_hit_texts(&hits, |id| bodies.get(id).map(|b| b.as_str()));
     let prompt = rag::assemble_rag_prompt(&question, &chunk_texts);
 
-    // 5. Generate off the async thread (blocking, no stream).
+    // 5. Generate off the async thread (blocking, no stream) — on the
+    //    GENERATION handle, which may be the named provider.
     let answer = {
-        let engine = Arc::clone(&engine);
+        let engine = Arc::clone(&generator);
         tokio::task::spawn_blocking(move || engine.infer(prompt.as_str()))
             .await
             .map_err(|_| EngineError::InferenceFailed)??
@@ -594,7 +936,7 @@ pub async fn chat_stream<R: Runtime>(
     vault_state: State<'_, VaultRuntimeState>,
     engine_state: State<'_, LocalInferenceState>,
     vector_state: State<'_, LocalInferenceVectorState>,
-    cancel_state: State<'_, CancelToken>,
+    cancel_state: State<'_, CancelRegistry>,
     priority: State<'_, ComputePriority>,
 ) -> Result<AskResult, EngineError> {
     // First statement: bound the question plaintext to a Zeroizing wrapper.
@@ -602,15 +944,24 @@ pub async fn chat_stream<R: Runtime>(
     // User-initiated: registered for the whole turn, including the streamed
     // generation, which is the longest compute hold in the app (MYND-651 task 4).
     let _interactive = priority.interactive();
-    let engine = engine_state.engine();
+    // TWO handles (#415 task 18). Retrieval embeds on the LOCAL embedder —
+    // SYNC-16, and mixing embedders is a retrieval-correctness bug before it is
+    // a privacy one. The generation is user-initiated and MAY be the provider
+    // the user named. Sharing one handle meant this surface could never reach a
+    // provider no matter what the user configured, which was most of why the
+    // remote arm was unreachable.
+    engine_state.refresh().await;
+    let engine = engine_state.embedding_engine()?;
+    let generator = engine_state.engine_for(RequestClass::UserInitiated)?;
     let messages: Vec<ChatMessage> = history
         .into_iter()
         .map(ChatMessageDto::into_message)
         .collect();
 
-    // Fresh generation → clear any prior Stop signal.
-    let cancel = cancel_state.inner().clone();
-    cancel.reset();
+    // Fresh generation → its own token (see the transcribe path above). No
+    // reset: a new turn cannot inherit a stale flag it never shared.
+    let cancel_guard = cancel_state.begin();
+    let cancel = cancel_guard.token().clone();
 
     // 1. Embed the question off the async thread.
     let query_vec = {
@@ -683,7 +1034,7 @@ pub async fn chat_stream<R: Runtime>(
     let messages = grounded.messages;
     let channel = on_token;
     let answer = {
-        let engine = Arc::clone(&engine);
+        let engine = Arc::clone(&generator);
         tokio::task::spawn_blocking(move || {
             let mut cb = guarded_on_token(&cancel, |t| {
                 let _ = channel.send(t.to_string());
@@ -704,8 +1055,13 @@ pub async fn chat_stream<R: Runtime>(
 /// Idempotent; a no-op when nothing is streaming. Sets the shared cancel flag
 /// the running [`chat_stream`]'s guarded callback observes before its next send.
 #[tauri::command]
-pub async fn chat_stop(cancel_state: State<'_, CancelToken>) -> Result<(), EngineError> {
-    cancel_state.cancel();
+pub async fn chat_stop(cancel_state: State<'_, CancelRegistry>) -> Result<(), EngineError> {
+    // The composer's single Stop means "the generation I am looking at", which
+    // is the newest in flight while chat is the only streaming surface. The
+    // registry can already cancel any request by id, so a second streaming
+    // surface needs an id on the wire and no redesign here. A no-op when
+    // nothing is running — Stop on an idle composer is not an error.
+    cancel_state.cancel_newest();
     Ok(())
 }
 
@@ -826,7 +1182,8 @@ pub async fn suggest_tags<R: Runtime>(
     };
 
     suggest_tags_with_engine(
-        engine_state.engine(),
+        // Ambient (SYNC-14): the tag pass fires on save, not on a user's ask.
+        engine_state.engine_for(RequestClass::Ambient)?,
         (*priority).clone(),
         tag_gate(
             prefs.ai_enabled,
@@ -903,7 +1260,7 @@ pub(crate) async fn suggest_tags_with_engine(
 /// caller learned here.
 #[tauri::command]
 pub fn tag_model_available(engine_state: State<'_, LocalInferenceState>) -> bool {
-    engine_state.engine().tag_model_available()
+    engine_state.engine_unclassified().tag_model_available()
 }
 
 /// Record a user-picked model path for `role` device-locally (ai-ux-surface
@@ -936,7 +1293,7 @@ pub async fn set_model_path<R: Runtime>(
     // Drop any model the engine already cached so the next infer/embed loads the
     // newly selected weights — otherwise the process keeps serving the old model
     // while the persisted index is labeled with the new identity (§9.17.2).
-    engine_state.engine().invalidate_models();
+    engine_state.engine_unclassified().invalidate_models();
     Ok(accepted.to_string_lossy().into_owned())
 }
 
@@ -1481,5 +1838,145 @@ mod tests {
         }
         .into_message();
         assert_eq!(s.role, ChatRole::User);
+    }
+
+    // ---- list_provider_models: the gate runs BEFORE the socket -------------
+
+    use std::sync::atomic::AtomicUsize;
+
+    /// A fully-configured, consented, keyed vault — the only state in which a
+    /// listing may reach the provider.
+    fn listing_ready() -> protocol::PrefsView {
+        protocol::PrefsView {
+            ai_enabled: true,
+            developer_mode: true,
+            ai_provider: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_key: Some("sk-test".into()),
+            ..protocol::PrefsView::default()
+        }
+    }
+
+    fn block_on<F: std::future::Future>(f: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(f)
+    }
+
+    /// Every unconfigured state refuses **with the completion path's own
+    /// cause**, and — the part an error-equality assertion cannot reach — the
+    /// fetch is never invoked. The counter is the assertion; the error is a
+    /// bonus. Modelled on `provider_gate::default_off_proof`, in-process
+    /// because no socket needs to exist for the question to be meaningful.
+    #[test]
+    fn a_listing_reaches_nothing_until_all_five_preconditions_hold() {
+        let cases: Vec<(&str, protocol::PrefsView, EngineError)> = vec![
+            (
+                "developer mode off",
+                protocol::PrefsView {
+                    developer_mode: false,
+                    ..listing_ready()
+                },
+                EngineError::FeatureOff,
+            ),
+            (
+                "AI beta off",
+                protocol::PrefsView {
+                    ai_enabled: false,
+                    ..listing_ready()
+                },
+                EngineError::FeatureOff,
+            ),
+            (
+                "no provider selected",
+                protocol::PrefsView {
+                    ai_provider: None,
+                    ..listing_ready()
+                },
+                EngineError::NotReady,
+            ),
+            (
+                "consent for a DIFFERENT provider",
+                protocol::PrefsView {
+                    ai_provider_consent: Some("ollama-cloud".into()),
+                    ..listing_ready()
+                },
+                EngineError::RemoteBarred,
+            ),
+            (
+                "no key",
+                protocol::PrefsView {
+                    ai_provider_key: None,
+                    ..listing_ready()
+                },
+                EngineError::NoCredential,
+            ),
+        ];
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        for (what, prefs, expected) in &cases {
+            let seen = Arc::clone(&calls);
+            let got = block_on(list_models_gated(
+                prefs,
+                prefs.developer_mode,
+                move |_, _| {
+                    seen.fetch_add(1, Ordering::SeqCst);
+                    Ok(Vec::new())
+                },
+            ))
+            .err();
+            assert_eq!(got, Some(*expected), "{what}");
+        }
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "an unconfigured listing must reach the provider ZERO times",
+        );
+
+        // The control arm. Without it the zero above is compatible with a
+        // closure that could never be called at all — the same reason
+        // `rustls_transport.rs`'s probe insists on one.
+        let seen = Arc::clone(&calls);
+        let models = block_on(list_models_gated(&listing_ready(), true, move |p, key| {
+            seen.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(key, "sk-test", "the gate hands the stored credential over");
+            assert_eq!(p.models_path(), "/api/v1/models");
+            Ok(br#"{"data":[{"id":"meta-llama/llama-3.1-8b"},{"id":"qwen/qwen3-30b"}]}"#.to_vec())
+        }))
+        .expect("a configured listing succeeds");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(models, ["meta-llama/llama-3.1-8b", "qwen/qwen3-30b"]);
+    }
+
+    /// A transport failure arrives as the taxonomy the panel already renders,
+    /// not as a generic error — the chooser distinguishes "your key is wrong"
+    /// from "the provider is down" using the same arms the chat surface does.
+    #[test]
+    fn a_listing_failure_maps_onto_the_shared_taxonomy() {
+        use super::super::provider_transport::ProviderTransportError as T;
+        for (transport_err, expected) in [
+            (T::Unauthorized, EngineError::Unauthorized),
+            (T::QuotaExhausted, EngineError::QuotaExhausted),
+            (T::Unreachable, EngineError::Unreachable),
+        ] {
+            let got = block_on(list_models_gated(&listing_ready(), true, move |_, _| {
+                Err(transport_err)
+            }))
+            .err();
+            assert_eq!(got, Some(expected));
+        }
+    }
+
+    /// A provider that answers with something unparseable is a failure, never
+    /// an empty list: an empty chooser reads as "this provider has no models",
+    /// which is a different and wrong thing to tell the user.
+    #[test]
+    fn an_unparseable_listing_is_a_failure_not_an_empty_list() {
+        let got = block_on(list_models_gated(&listing_ready(), true, |_, _| {
+            Ok(b"<html>not json</html>".to_vec())
+        }));
+        assert_eq!(got.err(), Some(EngineError::InferenceFailed));
     }
 }

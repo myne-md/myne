@@ -10,8 +10,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 let aiEnabled = true;
+let aiProvider: string | null = null;
 vi.mock("../../src/hooks/usePrefs", () => ({
-  usePrefs: () => ({ prefs: { ai_enabled: aiEnabled } }),
+  usePrefs: () => ({ prefs: { ai_enabled: aiEnabled, ai_provider: aiProvider } }),
+}));
+
+// The backend state the tab reads (#191 tasks 1+3). Mocked at the HOOK rather
+// than at `invoke`, so these tests drive the four states directly instead of
+// reconstructing a wire payload for each.
+let surfaceState: { kind: string; cause?: string | null } = { kind: "available" };
+vi.mock("../../src/hooks/useAiModelReady", () => ({
+  useAiSurfaceState: () => surfaceState,
 }));
 
 vi.mock("react-i18next", () => ({
@@ -31,6 +40,8 @@ import {
 
 beforeEach(() => {
   aiEnabled = true;
+  aiProvider = null;
+  surfaceState = { kind: "available" };
   __resetChatForTest();
 });
 afterEach(() => {
@@ -183,5 +194,137 @@ describe("AiChatTab", () => {
       // The user turn is not treated as a no-answer placeholder.
       expect(screen.getAllByTestId("ai.turn")[0].getAttribute("data-role")).toBe("user");
     });
+  });
+});
+
+// The resting state names its ACTUAL cause (#191 task 3).
+//
+// The old copy said "No model selected. Choose one in Settings" for every
+// unavailable backend. That is wrong in two of the three cases — it tells a
+// user whose runtime merely is not running to redo a setup they already did,
+// and it offers a settings page to a build with no local AI compiled in. These
+// assert the three are DIFFERENT, which is the whole claim; a spec that checked
+// each in isolation would pass against a collapsed implementation.
+describe("AiChatTab resting cause", () => {
+  const chip = () => screen.getByTestId("ai.chrome-status");
+  const body = () => screen.getByTestId("ai.status-no-model");
+
+  it("says no provider when nothing is set up", () => {
+    surfaceState = { kind: "unavailable", cause: "no_model" };
+    render(<AiChatTab />);
+    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusNoModel");
+    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.noModelHint");
+    expect(chip().getAttribute("data-ai-cause")).toBe("no-provider");
+  });
+
+  it("says not answering when the configured backend is unreachable", () => {
+    surfaceState = { kind: "unavailable", cause: "unreachable" };
+    render(<AiChatTab />);
+    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusUnreachable");
+    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.unreachableHint");
+    expect(chip().getAttribute("data-ai-cause")).toBe("unreachable");
+  });
+
+  it("says unavailable when the build has no local AI at all", () => {
+    surfaceState = { kind: "absent" };
+    render(<AiChatTab />);
+    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusUnavailable");
+    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.unavailableHint");
+    expect(chip().getAttribute("data-ai-cause")).toBe("unavailable");
+  });
+
+  it("keeps the three apart — no two render the same sentence", () => {
+    const chips = new Set<string>();
+    const bodies = new Set<string>();
+    for (const state of [
+      { kind: "unavailable", cause: "no_model" },
+      { kind: "unavailable", cause: "unreachable" },
+      { kind: "absent" },
+    ]) {
+      surfaceState = state;
+      const { unmount } = render(<AiChatTab />);
+      chips.add(chip().textContent ?? "");
+      bodies.add(body().textContent ?? "");
+      unmount();
+    }
+    // Counted SEPARATELY. A composite of the two would stay unique while two
+    // causes shared a body, which is exactly the collapse under test — the
+    // sentence is the part the user reads.
+    expect(chips.size).toBe(3);
+    expect(bodies.size).toBe(3);
+  });
+
+  it("treats timeout and refused as not answering too", () => {
+    for (const cause of ["timeout", "refused"]) {
+      surfaceState = { kind: "unavailable", cause };
+      const { unmount } = render(<AiChatTab />);
+      expect(chip().getAttribute("data-ai-cause")).toBe("unreachable");
+      unmount();
+    }
+  });
+
+  it("shows nothing degraded while the host read is still in flight", () => {
+    // A surface that flashed "No provider" for a frame before the answer
+    // arrived would be telling the user something false.
+    surfaceState = { kind: "checking" };
+    render(<AiChatTab />);
+    expect(screen.queryByTestId("ai.status-no-model")).toBeNull();
+    expect(chip().getAttribute("data-ai-cause")).toBe("ready");
+  });
+});
+
+// Attribution (#191 task 4, SYNC-13): which backend produced each answer.
+describe("AiChatTab attribution", () => {
+  it("names the active provider on the resting chip instead of a bare 'Ready'", () => {
+    aiProvider = "openrouter";
+    render(<AiChatTab />);
+    // A proper noun, not a translation key — provider names are not i18n'd.
+    expect(screen.getByTestId("ai.chrome-status").textContent).toBe("OpenRouter");
+  });
+
+  it("keeps 'Ready' when no provider is named", () => {
+    render(<AiChatTab />);
+    expect(screen.getByTestId("ai.chrome-status").textContent).toBe(
+      "editor.chrome.rightPanel.aiChat.statusReady",
+    );
+  });
+
+  it("carries a finalized turn's own attribution, and none while it streams", () => {
+    const token = sendChatMessage("who");
+    appendChatToken(token, "an answer");
+    const { rerender } = render(<AiChatTab />);
+    // Streaming: nobody has answered yet, so nothing may claim to have.
+    expect(screen.queryByTestId("ai.turn-answered-by")).toBeNull();
+
+    finalizeChatTurn(token, [], { kind: "remote", provider: "OpenRouter" });
+    rerender(<AiChatTab />);
+    const line = screen.getByTestId("ai.turn-answered-by");
+    expect(line.getAttribute("data-answered-by")).toBe("remote");
+  });
+
+  it("does not retroactively re-label an earlier turn when a later one comes from elsewhere", () => {
+    const first = sendChatMessage("one");
+    appendChatToken(first, "local answer");
+    finalizeChatTurn(first, [], { kind: "in-process" });
+    const second = sendChatMessage("two");
+    appendChatToken(second, "remote answer");
+    finalizeChatTurn(second, [], { kind: "remote", provider: "OpenRouter" });
+
+    render(<AiChatTab />);
+    const kinds = screen
+      .getAllByTestId("ai.turn-answered-by")
+      .map((el) => el.getAttribute("data-answered-by"));
+    // The whole meaning of "persistent": switching provider must not rewrite
+    // history. A re-render that read the LIVE backend would report both as
+    // remote.
+    expect(kinds).toEqual(["in-process", "remote"]);
+  });
+
+  it("renders no empty line for a turn finalized without provenance", () => {
+    const token = sendChatMessage("no provenance");
+    appendChatToken(token, "text");
+    finalizeChatTurn(token, []);
+    render(<AiChatTab />);
+    expect(screen.queryByTestId("ai.turn-answered-by")).toBeNull();
   });
 });

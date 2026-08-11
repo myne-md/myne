@@ -47,7 +47,11 @@ const V = {
   ],
   "src/components/settings/AiPanel.tsx": [
     "adapted",
-    "Never mounted: the `ai` rail entry is filtered out where `localAi` is absent (task 27), so the panel is unreachable rather than empty.",
+    "Never mounted: the `ai` rail entry is filtered out where `localAi` is absent (task 27), so the panel is unreachable rather than empty. Unchanged by the remote-provider controls (myne#415): they live inside this same panel, so they inherit the same rail filter and reach the browser no more than the rest of it does.",
+  ],
+  "src/components/settings/AiProviderConsent.tsx": [
+    "adapted",
+    "Rendered only by AiPanel.tsx, so it inherits that panel's rail filter exactly: where `localAi` is absent the panel is never mounted and this screen is unreachable. It holds no host call of its own — accepting calls back to the panel, which writes the consent — so there is nothing here that would need a web substitution even if it were reachable.",
   ],
   "src/components/settings/DateTimeSettings.tsx": [
     "ported",
@@ -173,6 +177,10 @@ const V = {
   "src/lib/ai-chat.ts": ["adapted", "Unreachable where `localAi` is absent; the editor host omits the `ai` member entirely."],
   "src/lib/ai-model-store.ts": ["adapted", "Same as ai-chat: no AI surface mounts on web."],
   "src/lib/ai-qa.ts": ["adapted", "Same as ai-chat."],
+  "src/lib/ai-capability.ts": [
+    "adapted",
+    "Runs as written and gives the right answer for the wrong-looking reason: the `local-inference` plugin is `Unsupported` in the dispatcher, so the invoke is refused and the module returns UNCOMPILED_REPORT — which is exactly true on web, where no AI is compiled. Nothing renders it there (`localAi` is absent), so it is unreachable in practice; it is `adapted` rather than `excluded` because it is correct if it ever is reached.",
+  ],
   "src/lib/ai-tags.ts": [
     "adapted",
     "Same as ai-chat: the auto-tag seam is unreachable where `localAi` is absent, and its command is `Unsupported` in the dispatcher.",

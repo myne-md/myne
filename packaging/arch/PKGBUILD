@@ -9,6 +9,16 @@ license=('AGPL-3.0-only')
 depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'librsvg' 'openssl')
 makedepends=('cargo' 'pnpm' 'nodejs' 'git')
 options=('!lto')
+# ── Payload: deliberately model-LESS and dictionary-less ────────────────────
+# This from-source package builds `--no-bundle` and installs only the binaries,
+# the icons and the desktop entry, so it ships **none** of the 640.76 MiB of
+# `bundle.resources` that `myne-bin` carries (tag, whisper, ocr, dictionaries).
+# That is a pre-existing, deliberate divergence from the repackaged binary
+# PKGBUILD next to it — recorded here (ai-bundle-slim myne#190 task 8) so the
+# next reader does not "fix" it into a 650 MiB package. Spell-check and the AI
+# surfaces degrade honestly without their assets; see `check-desktop-payload-
+# budget.mjs` for what the binary package declares.
+#
 # ── Source ──────────────────────────────────────────────────────────────────
 # For AUR / distribution: public git URL + version tag.
 # NOTE: verify the <repo-url> and tag against your own remote (is the repo public?).

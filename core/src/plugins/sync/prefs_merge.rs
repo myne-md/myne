@@ -315,6 +315,14 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     // §10.2 classification row.
     PrefsView {
         // ---- shared: scalar-LWW -----------------------------------------
+        // The remote-provider triple (myne#415, SYNC-15/SYNC-22). LWW rather
+        // than a union because a credential cannot be merged — rotating on one
+        // device must REPLACE, and revoking propagates as an LWW write of
+        // `None`, which is what makes revocation reach the other devices.
+        ai_provider: lww!("ai_provider", ai_provider),
+        ai_provider_consent: lww!("ai_provider_consent", ai_provider_consent),
+        ai_provider_key: lww!("ai_provider_key", ai_provider_key),
+        ai_provider_model: lww!("ai_provider_model", ai_provider_model),
         archive_disabled: lww!("archive_disabled", archive_disabled),
         // ingest-image-compression: a content-fidelity switch with a
         // vault-wide irreversible effect, unlike the device-local compute-
@@ -609,11 +617,19 @@ mod tests {
     fn set_union_fields_union_clocklessly() {
         let a = PrefsView {
             ai_excluded_folders: vec!["Private/".into(), "Journal/".into()],
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             deliberate_folders: vec!["A/".into()],
             ..PrefsView::default()
         };
         let b = PrefsView {
             ai_excluded_folders: vec!["Private/".into(), "Work/".into()],
+            ai_provider: None,
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider_model: None,
             deliberate_folders: vec!["B/".into()],
             ..PrefsView::default()
         };

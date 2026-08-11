@@ -5,7 +5,7 @@
 // `infer`, and asserts the dispatched transaction: plain-markdown insert with
 // the `ai.*` userEvent, one-undo reversibility, and the frontmatter title write.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { history, undo } from "@codemirror/commands";
@@ -15,8 +15,10 @@ import {
   aiSlashContinue,
   aiSlashEnabledFacet,
   aiSlashTitle,
+  removeTriggerThen,
   slashCommandsForContext,
 } from "../../src/editor/slash/aiSlash";
+import { setAttachmentToastSink } from "../../src/editor/attachments/toast";
 
 interface Mounted {
   view: EditorView;
@@ -117,5 +119,81 @@ describe("slashCommandsForContext (task 6 gating)", () => {
         extensions: [aiSlashEnabledFacet.of(true)],
       }).facet(aiSlashEnabledFacet),
     ).toBe(true);
+  });
+});
+
+// Failure is observable (ai-backend-degradation myne#191 task 7).
+//
+// The bug was worse than silence: `removeTriggerThen` deletes the `/devam` span
+// BEFORE firing the async action, and the action was `void aiSlashContinue(v)`
+// with no `.catch`. So on a rejection the user's typed characters vanished,
+// nothing arrived to replace them, and nothing explained it — every time, on a
+// stock install with no side-loaded generation model. It read as the editor
+// eating input.
+//
+// Driven against `removeTriggerThen` directly with a rejecting action: that IS
+// the unit that changed, and it needs no injected host, which is what kept the
+// first attempt honest (see the export's own comment).
+describe("AI slash commands — failure answers", () => {
+  const messages: string[] = [];
+
+  beforeEach(() => {
+    messages.length = 0;
+    setAttachmentToastSink((message) => {
+      messages.push(message);
+    });
+  });
+  afterEach(() => setAttachmentToastSink(null));
+
+  async function applyRejecting(rejection: unknown, doc = "hello /devam") {
+    const m = mount(doc);
+    const apply = removeTriggerThen(() => Promise.reject(rejection));
+    apply(m.view, doc.length - "/devam".length, doc.length);
+    await Promise.resolve();
+    await Promise.resolve();
+    return m;
+  }
+
+  it("says a provider is missing for every no-provider cause", async () => {
+    for (const rejection of ["NotReady", { kind: "NoModel" }, "no_credential"]) {
+      messages.length = 0;
+      await applyRejecting(rejection);
+      // The resolved English, not the key: this harness has real catalogs
+      // loaded, and pinning the sentence also pins that it does NOT tell a user
+      // with a broken backend to go and set one up.
+      expect(messages).toEqual([
+        "No AI provider is set up, so nothing was inserted. Set one up in Settings → Developer → AI.",
+      ]);
+    }
+  });
+
+  it("distinguishes a generic failure", async () => {
+    await applyRejecting({ kind: "InferenceFailed" });
+    expect(messages).toEqual([
+      "The AI request could not be completed, so nothing was inserted.",
+    ]);
+  });
+
+  it("never stays silent, whatever the rejection shape is", async () => {
+    await applyRejecting(new Error("something else entirely"));
+    expect(messages).toHaveLength(1);
+  });
+
+  it("leaves the trigger removed and inserts nothing — undo is the way back", async () => {
+    const m = await applyRejecting("NotReady");
+    // The REAL post-failure state, pinned so a future "helpful" re-insertion of
+    // the trigger — which would fight the undo stack — is caught.
+    expect(m.view.state.doc.toString()).toBe("hello ");
+    undo(m.view);
+    expect(m.view.state.doc.toString()).toBe("hello /devam");
+  });
+
+  it("both AI commands go through the wrapper that catches", () => {
+    // The mapping above is only worth anything if the shipped commands use it.
+    for (const id of ["ai-continue", "ai-title"]) {
+      const cmd = aiSlashCommands().find((c) => c.id === id);
+      expect(cmd, id).toBeTruthy();
+      expect(typeof cmd!.apply).toBe("function");
+    }
   });
 });

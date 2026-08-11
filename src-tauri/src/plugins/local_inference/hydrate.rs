@@ -55,7 +55,9 @@ use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};
 use crate::search::persist::{read_myn_content_nonce, MYN_HEADER_PREFIX_FOR_NONCE};
 
 use super::chunker::{ChunkParams, CHUNKER_VERSION};
-use super::embeddings_persist::{decode_snapshot, encode_snapshot, EmbeddingsIdentity};
+use super::embeddings_persist::{
+    decode_snapshot, encode_snapshot, EmbeddingsIdentity, ModelIdentity,
+};
 use super::indexing::{embed_all, embed_note, reconcile, NoteForIndex};
 use super::state::LocalInferenceState;
 use super::vector_store::{AiVectorStore, LocalInferenceVectorState};
@@ -195,7 +197,13 @@ pub(crate) async fn hydrate_ai_vectors<R: Runtime>(app: &AppHandle<R>, state: &V
     let Some(engine_state) = app.try_state::<LocalInferenceState>() else {
         return;
     };
-    let engine = engine_state.engine();
+    // The vault-wide embedding walk (SYNC-16): refused against a remote backend
+    // unconditionally. Both reasons apply here at full strength — it fires on
+    // unlock without anyone asking, and it is the highest-volume operation in
+    // the AI surface.
+    let Ok(engine) = engine_state.embedding_engine() else {
+        return;
+    };
     let Ok(notes_dir) = myne_core::paths::notes_dir_for(app, Some(active_id)) else {
         return;
     };
@@ -232,16 +240,31 @@ pub(crate) async fn hydrate_ai_vectors<R: Runtime>(app: &AppHandle<R>, state: &V
 
         let vault_state = app.state::<VaultRuntimeState>();
 
-        // The model-identity tuple (§9.17.2). Without a `model_hash` (no
-        // embedding model, or the hash could not be computed) we cannot persist
-        // a stable identity → the load below yields nothing and the walk becomes
-        // a cold, un-persisted embed (no regression from the pre-MYND-453 path).
-        let identity = super::model_store::embedding_model_hash_for(&app).map(|model_hash| {
-            EmbeddingsIdentity {
-                model_hash,
-                embedding_dim: dim as u32,
-                chunker_version: CHUNKER_VERSION,
-            }
+        // The model-identity tuple (§9.17.2), in whichever of its two arms this
+        // backend supports. A served model has no file to hash, and asking the
+        // runtime costs a round trip — so ask once, here, not per note.
+        //
+        // Still `Option`: with NEITHER derivation available we cannot name a
+        // stable identity, so the load below yields nothing and the walk is a
+        // cold, un-persisted embed. That was the ONLY outcome for a served
+        // model before the served arm existed, which is the silent regression
+        // this arm removes — not a missing feature but the reinstatement of the
+        // whole-vault re-embed `MYR1` exists to prevent.
+        let model = {
+            let probe = Arc::clone(&engine);
+            tauri::async_runtime::spawn_blocking(move || probe.served_model_identity())
+                .await
+                .ok()
+                .flatten()
+                .map(|(name, digest)| ModelIdentity::Served { name, digest })
+                .or_else(|| {
+                    super::model_store::embedding_model_hash_for(&app).map(ModelIdentity::FileHash)
+                })
+        };
+        let identity = model.map(|model| EmbeddingsIdentity {
+            model,
+            embedding_dim: dim as u32,
+            chunker_version: CHUNKER_VERSION,
         });
 
         // Blob KEK + AAD material.
@@ -551,7 +574,10 @@ pub(crate) fn reembed_one_note<R: Runtime>(app: &AppHandle<R>, note_id: &str, bo
         let Some(engine_state) = app.try_state::<LocalInferenceState>() else {
             return;
         };
-        let engine = engine_state.engine();
+        // Per-note re-embed on save — same bar, same two reasons (SYNC-16).
+        let Ok(engine) = engine_state.embedding_engine() else {
+            return;
+        };
         let Ok(notes_dir) = myne_core::paths::notes_dir_for(&app, Some(active_id)) else {
             return;
         };

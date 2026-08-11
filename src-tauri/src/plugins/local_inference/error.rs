@@ -61,11 +61,74 @@ pub enum EngineError {
     /// an error value or its `Display`.
     #[error("local-inference transcription failed")]
     TranscriptionFailed,
+    // ---- backend-reachability causes (ai-provider-seam task 5) -----------
+    // Filed into #188 by #189 so that slice adds a backend rather than a
+    // backend plus a vocabulary. Nothing produces these yet — the in-process
+    // engine cannot fail this way. Unit, content-free: a host, port, endpoint
+    // or path in one of these would put it in every log line that records a
+    // failure kind, which the DENY-list in this file's header forbids.
+    /// The backend accepted the work but did not answer in time. Actionable:
+    /// retry, or give it a longer deadline. Distinct from a failure inside the
+    /// runtime — nothing is known to be wrong, only slow.
+    #[error("local-inference backend timed out")]
+    Timeout,
+    /// Nothing is listening where the backend was expected. Actionable: start
+    /// it, or correct which one is selected.
+    #[error("local-inference backend unreachable")]
+    Unreachable,
+    /// The backend was reached and actively refused the connection — a
+    /// different fact from silence, and usually a different fix (it is running
+    /// but not accepting this caller).
+    #[error("local-inference backend refused the connection")]
+    Refused,
+    /// The seam refused to hand this request a **remote-class** backend
+    /// (`sync-ledger` SYNC-14 / SYNC-16). Two cases produce it: an *ambient*
+    /// request — one that fires without the user asking — and **any** embedding
+    /// request, unconditionally.
+    ///
+    /// NOT a failure of the backend: nothing was attempted. The request was
+    /// routed nowhere because Myne's own code declines to route it there.
+    #[error("this request may not use a remote backend")]
+    RemoteBarred,
+    // ---- provider-credential + quota causes (ai-remote-providers task 7) ---
+    // The issue asks for "three distinct states, not one"; these are two of the
+    // five, and the two the tree could not otherwise express. Unit and
+    // content-free like every sibling: a provider's response body is
+    // attacker-influenceable and must never be smuggled in as a detail string.
+    /// **No credential is stored** for the named provider. Actionable: paste a
+    /// key. Distinct from [`EngineError::Unauthorized`] on purpose — one means
+    /// "there is nothing to send", the other means "what was sent was
+    /// rejected", and collapsing them produces the message "check your API key"
+    /// for a user who has never entered one.
+    #[error("no credential is stored for the selected provider")]
+    NoCredential,
+    /// The provider **rejected** the credential (HTTP 401/403). Actionable:
+    /// replace it — it is wrong, revoked, or for a different account.
+    ///
+    /// Deliberately not folded into `Refused`, which is a transport fact
+    /// (nothing accepted the connection); this one means the request arrived,
+    /// was understood, and was declined.
+    #[error("the provider rejected the credential")]
+    Unauthorized,
+    /// The provider accepted the credential and declined the work on **cost**
+    /// grounds — out of credit, over a rate limit, or past a spend cap
+    /// (HTTP 402/429). Actionable in a way no other variant is: the fix is on
+    /// the provider's side, not in Myne, and telling the user to "try again"
+    /// would be wrong.
+    #[error("the provider's quota or credit is exhausted")]
+    QuotaExhausted,
     /// A background pass stood down so user-initiated work could have the
     /// compute lock (auto-tag, MYND-651 task 4). NOT a failure: nothing is
     /// wrong, the caller may simply try again later. Distinct from an empty
     /// result so a caller cannot cache "no suggestions" for a note that was
     /// never actually looked at.
+    ///
+    /// **Optional outcome (ai-provider-seam task 11).** This variant exists
+    /// only because *one* compute lock exists. A backend that serializes model
+    /// work out of process has none and can never answer `Deferred` — so a
+    /// caller must treat it as a possibility, never as a guarantee that a busy
+    /// engine will say so. Which backends can produce it is declared, not
+    /// guessed: `Backend::serializes_compute`.
     #[error("local-inference pass deferred to user-initiated work")]
     Deferred,
 }
@@ -84,6 +147,13 @@ impl EngineError {
             EngineError::InferenceFailed => "inference_failed",
             EngineError::EmbeddingFailed => "embedding_failed",
             EngineError::TranscriptionFailed => "transcription_failed",
+            EngineError::Timeout => "timeout",
+            EngineError::Unreachable => "unreachable",
+            EngineError::Refused => "refused",
+            EngineError::RemoteBarred => "remote_barred",
+            EngineError::NoCredential => "no_credential",
+            EngineError::Unauthorized => "unauthorized",
+            EngineError::QuotaExhausted => "quota_exhausted",
             EngineError::Deferred => "deferred",
         }
     }

@@ -6452,8 +6452,8 @@ fn embeddings_vectors() {
 
     let cases = doc["cases"].as_array().expect("cases must be a JSON array");
     assert!(
-        cases.len() >= 12,
-        "embeddings must carry at least 12 vectors (3 encrypt + 1 decrypt_ok + 2 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len() >= 13,
+        "embeddings must carry at least 13 vectors (3 encrypt + 1 decrypt_ok + 2 decrypt_aead_fail + 7 parse_fail — the 7th being the superseded-0x01 reject added with the model-identity tagged union); found {}",
         cases.len()
     );
     assert_unique_vector_ids("embeddings", cases);

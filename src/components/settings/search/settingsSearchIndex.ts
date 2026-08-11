@@ -544,6 +544,43 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
 
   // ── AI (Developer group, MYND-593) ──────────────────────────────────────────
   {
+    // The remote-provider block (myne#415). `developerGated` AND `capability`
+    // both apply: they are independent gates and neither implies the other
+    // (`src/CLAUDE.md`) — the whole AI panel is behind Developer mode, and it
+    // is absent entirely where the platform has no local-AI capability.
+    id: "ai.provider",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.providerLabel",
+    descriptionKey: "settings.ai.providerHelper",
+    keywordsKey: "settings.search.keywords.aiProvider",
+  },
+  {
+    // Scrolls to the provider BLOCK, via the testid fallback, rather than to
+    // the chooser itself: the chooser only renders once a provider is named,
+    // so its own anchor would be missing exactly when someone searches for it
+    // — the "navigates to a panel and scrolls to nothing" failure the
+    // capability gating above exists to prevent, in its runtime form.
+    id: "ai.provider-model",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    testid: "ai.provider-section",
+    titleKey: "settings.ai.providerModelLabel",
+    descriptionKey: "settings.ai.providerModelHelper",
+    keywordsKey: "settings.search.keywords.aiProviderModel",
+  },
+  {
+    id: "ai.endpoint",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.endpointLabel",
+    descriptionKey: "settings.ai.endpointHelper",
+    keywordsKey: "settings.search.keywords.aiEndpoint",
+  },
+  {
     id: "ai.enable",
     capability: "localAi",
     developerGated: true,
