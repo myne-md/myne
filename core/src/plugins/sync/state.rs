@@ -93,6 +93,31 @@ pub struct BlobSyncState {
     pub doc_heads_hex: Vec<String>,
 }
 
+/// A blob the server still holds under a sync-id this vault no longer derives
+/// (`sync-protocol.md` §5.6.1, myne-md/myne#443).
+///
+/// The three synced singletons (`catalog`, `prefs`, `themes`) are keyed by
+/// `root_key`-derived sync-ids, so a whole-vault re-key moves all three to new
+/// ids and strands the old blobs server-side. Nothing reclaims them on its own:
+/// horizon-GC reclaims `deleted`-marked records and nothing marks these, and no
+/// client will ever address them again.
+///
+/// It carries its own `base_version` because the re-base drops the old
+/// `state.blobs` entry in the same breath — the version is the push's CAS base
+/// and there would be nowhere else to read it from afterwards.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrphanTombstone {
+    /// The stranded 16-byte sync-id, lowercase hex.
+    pub blob_id_hex: String,
+    /// The last version this device saw for it — the tombstone push's CAS base.
+    pub base_version: u64,
+    /// A freshly-minted 24-byte `content_nonce`, lowercase hex. Minted rather
+    /// than reused for the same reason the attachment tombstone mints one: a
+    /// record whose bytes changed while its nonce did not is a habit worth not
+    /// having, even where (as here) no manifest covers the id.
+    pub content_nonce_hex: String,
+}
+
 /// The device-local sync state persisted at `<vault_root>/sync-state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SyncState {
@@ -163,6 +188,18 @@ pub struct SyncState {
     /// check (head-id match, blob `content_nonce` verification, §11.3) stays on.
     #[serde(default)]
     pub rekey_rebase_pending: bool,
+    /// Singleton blobs the re-key stranded server-side, awaiting the tombstone
+    /// that lets horizon-GC reclaim them (myne-md/myne#443). See
+    /// [`OrphanTombstone`]; written by the migration's sync-plane re-base,
+    /// drained by a push cycle.
+    ///
+    /// It lives here rather than in a sibling queue file — unlike the
+    /// attachment-tombstone queue it is modelled on — because the one writer is
+    /// the re-base, which is already rewriting this struct in the same
+    /// operation. A second file would be a second write that can fail on its
+    /// own, leaving the flag set and the queue empty or the reverse.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pending_orphan_tombstones: Vec<OrphanTombstone>,
 }
 
 impl SyncState {
@@ -602,6 +639,11 @@ mod tests {
             meta_baseline_hex: Some("cc".repeat(32)),
             corpus_complete: true,
             rekey_rebase_pending: false,
+            pending_orphan_tombstones: vec![OrphanTombstone {
+                blob_id_hex: "dd".repeat(16),
+                base_version: 7,
+                content_nonce_hex: "ee".repeat(24),
+            }],
         };
         let defaulted = SyncState::default();
 
@@ -613,6 +655,13 @@ mod tests {
         // which is what overwrites a locally-newer `vault.meta`.
         assert!(enrolled.meta_baseline_hex.is_some());
         assert!(defaulted.meta_baseline_hex.is_none());
+        // …and forgets which blobs the re-key stranded (#443). The mildest loss
+        // on this list by far — nothing breaks, the server simply keeps three
+        // dead blobs no client will ever address, which is the pre-#443 state.
+        // Listed anyway: the point of this test is the FULL blast radius, and a
+        // field left out because it seemed unimportant is how the list rots.
+        assert!(!enrolled.pending_orphan_tombstones.is_empty());
+        assert!(defaulted.pending_orphan_tombstones.is_empty());
     }
 
     fn sample_head(root_key: &[u8; 32], counter: u64) -> SealedHead {
