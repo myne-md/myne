@@ -117,8 +117,24 @@ describeE2E("td1 a launch-time theme-install link installs after unlock (MYND-56
         await dismissImporterOffer(s);
 
         // Unlocked → the held request surfaces, attributing what the link claims.
+        //
+        // TWO facts, asserted separately, because `text()` conflates them and
+        // then reports the conflation as "". W3C Get Element Text returns the
+        // RENDERED text, so it is empty both when the element carries no name
+        // and when the element is not being rendered — and this assertion had
+        // been failing with `expected '' to be 'Deep Harbor'`, which does not
+        // say which. `textContent` answers the content question on its own, and
+        // a non-zero box answers the rendered question, so a future failure
+        // names its own cause.
         await s.byTestId("theme-install.dialog");
-        expect(await (await s.byTestId("theme-install.name")).text()).toBe("Deep Harbor");
+        const nameEl = await s.byTestId("theme-install.name");
+        expect(await nameEl.textContent(), "the dialog attributes the link's name").toBe(
+          "Deep Harbor",
+        );
+        expect(
+          (await nameEl.rect()).width,
+          "the attribution is actually rendered, not merely in the DOM",
+        ).toBeGreaterThan(0);
         await s.byTestId("theme-install.preview");
 
         await (await s.byTestId("theme-install.apply")).click();
@@ -188,7 +204,18 @@ describeE2E("td3 a malformed theme-install link fails visibly (MYND-567)", () =>
         await dismissImporterOffer(s);
 
         await s.byTestId("theme-install.rejected");
-        expect((await (await s.byTestId("theme-install.error")).text()).length).toBeGreaterThan(0);
+        // Same split as td1: content, then renderedness. A malformed link that
+        // fails SILENTLY is the defect this scenario exists to catch, so "the
+        // message is there but invisible" must fail as loudly as "no message".
+        const errEl = await s.byTestId("theme-install.error");
+        expect(
+          (await errEl.textContent()).length,
+          "the rejection says something",
+        ).toBeGreaterThan(0);
+        expect(
+          (await errEl.rect()).width,
+          "and the something is actually on screen",
+        ).toBeGreaterThan(0);
         // No confirm affordance at all — there is nothing to confirm.
         expect(await s.byTestIdAll("theme-install.apply")).toHaveLength(0);
 

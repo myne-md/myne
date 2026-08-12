@@ -77,16 +77,21 @@ async function readSchedule(session: Session, vaultId: string): Promise<Schedule
 }
 
 /** Drive the exact backend pair the scheduler runs internally: export to
- *  `destination`, then record the result. Returns whether the export succeeded. */
+ *  `destination`, then record the result. Returns the verdict AND the export's
+ *  own error, so a failure can say why on the first run. */
 async function runSchedulerBackend(
   session: Session,
   vaultId: string,
   destination: string,
-): Promise<boolean> {
+): Promise<{ success: boolean; error: unknown }> {
   const exported = await pageSeatInvoke(
     session,
     "plugin:backup|vault_export_backup",
-    { vaultId: null, destination },
+    // `vaultId` is `String`, not `Option<String>` — the command parses it and
+    // answers `VaultNotFound` on a bad one (`plugins/backup/commands.rs`). This
+    // used to send `null` and the whole scenario failed on the arg, never
+    // reaching the export it exists to test.
+    { vaultId, destination },
     60_000,
   );
   const success = exported.err === undefined;
@@ -99,7 +104,13 @@ async function runSchedulerBackend(
   if (rec.err !== undefined) {
     throw new Error("record_result failed: " + JSON.stringify(rec.err));
   }
-  return success;
+  // Carry the export's own error out with the verdict. Collapsing it to a bare
+  // boolean is what made this scenario's failure read `expected false to be
+  // true` — a message that names neither the command that failed nor why, so
+  // the only way to learn anything was to re-run it by hand with a probe. The
+  // backend's error IS the finding here; a scheduled backup that cannot write
+  // is a data-loss-adjacent failure and deserves to say so on the first run.
+  return { success, error: exported.err };
 }
 
 describeE2E("scheduled-backup (MYND-351)", () => {
@@ -138,8 +149,11 @@ describeE2E("scheduled-backup (MYND-351)", () => {
 
         // Run the scheduler's backend exactly as it would on a due tick.
         const destination = path.join(targetFolder, "Myne backup 2026-06-18 1200.myne-backup");
-        const ok = await runSchedulerBackend(session, seeded.vaultId, destination);
-        expect(ok).toBe(true);
+        const run = await runSchedulerBackend(session, seeded.vaultId, destination);
+        expect(
+          run.success,
+          `vault_export_backup refused the scheduled write: ${JSON.stringify(run.error)}`,
+        ).toBe(true);
 
         // A verified .myne-backup landed, and the device-local status + ledger
         // reflect the success.
@@ -175,7 +189,7 @@ describeE2E("scheduled-backup (MYND-351)", () => {
           retentionN: 7,
         });
 
-        const ok = await runSchedulerBackend(session, seeded.vaultId, badDest);
+        const ok = (await runSchedulerBackend(session, seeded.vaultId, badDest)).success;
         expect(ok).toBe(false);
 
         // Failure recorded; schedule stays enabled (story 9), nothing written.
