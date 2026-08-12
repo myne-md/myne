@@ -29,9 +29,10 @@
 // (e2e/CLAUDE.md): each is a bounded claim, and the failure this guards against
 // is a well-meaning paraphrase that softens one of them.
 //
-// AUTHORED ON A NON-HARNESS HOST (macOS) — pending green-3× verification on
-// the Linux tauri-driver container (the e2e DoD; `./scripts/e2e-one.sh
-// beta-terms-consent`).
+// Green 3× consecutive in the Linux tauri-driver container (the e2e DoD),
+// via `./scripts/e2e-buildrun.sh beta-terms-consent beta-terms-consent
+// beta-terms-consent` — one build, three runs in the same warm container, no
+// retries consumed.
 //
 // KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
 
@@ -56,11 +57,19 @@ const CLAUSES: ReadonlyArray<[string, string]> = [
   ["sync.beta-terms.what-we-can-see", BETA_TERMS_WHAT_WE_CAN_SEE],
 ];
 
-/** Assert the four clauses are on screen, verbatim. */
+/**
+ * Assert the four clauses are on screen, verbatim.
+ *
+ * `textContent`, not `text()`: this driver's W3C getText returns only what is
+ * VISIBLE, and the four clauses sit far enough down a tall settings modal that
+ * the lower ones are clipped by its scroll container. The first run of this
+ * spec failed on exactly that — an empty string against a clause that was
+ * present and correct in the DOM.
+ */
 async function expectClausesVerbatim(s: Session): Promise<void> {
   for (const [testId, literal] of CLAUSES) {
     const el = await s.byTestId(testId);
-    expect(await el.text()).toBe(literal);
+    expect(await el.textContent()).toBe(literal);
   }
 }
 
@@ -76,9 +85,16 @@ describeE2E("beta-terms consent gate", () => {
         await dismissImporterOffer(s);
         await openSettings(s, "sync");
 
+        // Wait for the gate before counting anything. `byTestIdAll` is a
+        // one-shot query with no wait in it, and the panel renders neither the
+        // terms nor the form until the device-local read resolves — so a bare
+        // count races the answer and reads zero from a panel that is about to
+        // be right. (That race is what failed bt3 on this spec's first run,
+        // while bt1 happened to win it.)
+        await s.byTestId("sync.beta-terms");
+
         // The gate stands where the enrol form would be. Not "above it" — the
         // form is absent, so there is no route to enrolment that skips the text.
-        expect((await s.byTestIdAll("sync.beta-terms")).length).toBe(1);
         expect((await s.byTestIdAll("sync.enroll.account-input")).length).toBe(0);
 
         await expectClausesVerbatim(s);
@@ -131,7 +147,7 @@ describeE2E("beta-terms consent gate", () => {
         await dismissImporterOffer(s);
         await openSettings(s, "sync");
 
-        expect((await s.byTestIdAll("sync.beta-terms")).length).toBe(1);
+        await s.byTestId("sync.beta-terms");
         expect((await s.byTestIdAll("sync.enroll.account-input")).length).toBe(0);
       },
     );
