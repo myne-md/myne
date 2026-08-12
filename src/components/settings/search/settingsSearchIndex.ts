@@ -529,6 +529,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.changelog",
   },
   {
+    id: "about.legal",
+    panelId: "about",
+    titleKey: "settings.about.legalLabel",
+    descriptionKey: "settings.about.legalHelper",
+    keywordsKey: "settings.search.keywords.legal",
+  },
+  {
     id: "about.license",
     panelId: "about",
     titleKey: "settings.about.licenseLabel",

@@ -39,8 +39,11 @@ vi.mock("../../src/hooks/usePrefs", () => ({
   }),
 }));
 
+// The interface language, which the legal links read to choose between the
+// English and German editions of each document.
+let language = "en";
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language } }),
 }));
 
 import { AboutPanel } from "../../src/components/settings/AboutPanel";
@@ -48,6 +51,7 @@ import { AboutPanel } from "../../src/components/settings/AboutPanel";
 beforeEach(() => {
   localAiCapable = true;
   developerMode = false;
+  language = "en";
   setDeveloperMode.mockClear();
   openUrl.mockClear();
 });
@@ -98,5 +102,58 @@ describe("AboutPanel — Developer mode toggle", () => {
     render(<AboutPanel />);
     fireEvent.click(screen.getByTestId("about.developer-mode-toggle"));
     expect(setDeveloperMode).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("AboutPanel — legal document links (myne-ops#15)", () => {
+  it("offers all four published documents", () => {
+    render(<AboutPanel />);
+    for (const id of [
+      "about.legal-privacy",
+      "about.legal-terms",
+      "about.legal-notice",
+      "about.legal-law-enforcement",
+    ]) {
+      expect(screen.getByTestId(id)).toBeTruthy();
+    }
+  });
+
+  it("opens the English edition on a non-German interface", () => {
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.legal-privacy"));
+    expect(openUrl).toHaveBeenCalledWith("https://myne.md/privacy/");
+  });
+
+  it("opens the German edition on a German interface", () => {
+    // Not a translation of the English page — a separate text at a separate
+    // slug, and the binding one for a German reader.
+    language = "de";
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.legal-terms"));
+    expect(openUrl).toHaveBeenCalledWith("https://myne.md/nutzungsbedingungen/");
+  });
+
+  it("treats a regional German tag as German", () => {
+    language = "de-DE";
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.legal-law-enforcement"));
+    expect(openUrl).toHaveBeenCalledWith("https://myne.md/behoerdenanfragen/");
+  });
+
+  it("falls back to English for a language with no edition of its own", () => {
+    language = "tr";
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.legal-notice"));
+    expect(openUrl).toHaveBeenCalledWith("https://myne.md/notice/");
+  });
+
+  it("does not link the Impressum while its address is unpublished", () => {
+    // myne-ops#9: the page exists and `legalUrl` can produce it, but an
+    // incomplete Impressum is a worse position in Germany than none at all,
+    // because it reads as compliant. This assertion is what makes the omission
+    // deliberate rather than forgotten — it fails the day someone adds the row
+    // without closing #9.
+    render(<AboutPanel />);
+    expect(screen.queryByTestId("about.legal-impressum")).toBeNull();
   });
 });
