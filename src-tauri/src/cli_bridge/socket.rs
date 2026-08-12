@@ -60,17 +60,30 @@ const ACCEPT_POLL: Duration = Duration::from_millis(50);
 /// the cheapest possible client. Generous enough that no honest `myne`
 /// invocation can hit it (the CLI writes its whole request before reading),
 /// short enough that a stalled connection frees its thread promptly.
-#[cfg(not(test))]
+///
+/// ONE value for every build. There used to be a `#[cfg(test)]` arm holding it
+/// at 1 s so the stalled-connection test did not cost ten seconds of suite time,
+/// justified by the claim that 1 s stayed "two orders of magnitude above
+/// anything the round-trip tests in this file take".
+///
+/// That is an assumption about the HOST, not about the code, and nothing
+/// guaranteed it — a busy machine can put a round trip past a second. Rather
+/// than leave every test in this module depending on it, the two tests that
+/// actually want a short deadline now pass one to [`Watchdog::arm`], and
+/// everything else gets the production value.
+///
+/// WHAT THIS DOES NOT CLAIM. It was written while chasing an intermittent
+/// `a_connected_client_can_send_a_frame_and_get_a_reply` failure (11 consecutive
+/// pre-push runs at load 15-25, passing in isolation), on the theory that the
+/// 1 s deadline was firing mid-exchange. **That theory is disproved**: with this
+/// change in place the test still fails, roughly 1 run in 3, under
+/// `CARGO_TARGET_DIR=target/pre-push cargo test --workspace` — the client's
+/// `flush()` returns `ENOTCONN`, i.e. the server side is gone before the request
+/// is fully written, for a reason not yet identified. This change is a
+/// clarity/robustness improvement and nothing more; the flake is still open.
+/// (`tracing::debug!` is not a usable probe here — the test binary installs no
+/// subscriber, so the two early-return paths in `handle_conn` record nothing.)
 const IO_DEADLINE: Duration = Duration::from_secs(10);
-
-/// The same deadline, shortened under `cfg(test)` so the test that proves a
-/// stalled connection IS released does not cost ten seconds of suite time.
-/// Still two orders of magnitude above anything the round-trip tests in this
-/// file take (each writes its whole frame and flushes before the server's
-/// first read), so shortening it changes which test is slow, not which
-/// behaviour is exercised.
-#[cfg(test)]
-const IO_DEADLINE: Duration = Duration::from_secs(1);
 
 /// How many connections may be in flight at once. A same-user process can
 /// already SIGKILL the app, so this is robustness rather than a new adversary
@@ -145,6 +158,7 @@ impl Watchdog {
     fn arm(
         stream: &std::os::unix::net::UnixStream,
         deadline_set: bool,
+        deadline: Duration,
     ) -> io::Result<Option<Self>> {
         if deadline_set {
             return Ok(None);
@@ -158,9 +172,7 @@ impl Watchdog {
                 // the guard's `Drop` saying the exchange finished — treating
                 // the two alike would tear down every healthy connection the
                 // instant it completed.
-                if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) =
-                    rx.recv_timeout(IO_DEADLINE)
-                {
+                if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) = rx.recv_timeout(deadline) {
                     let _ = fd.shutdown(std::net::Shutdown::Both);
                 }
             })?;
@@ -227,7 +239,7 @@ fn serve_connection(
             event = "socket_opt_refused"
         );
     }
-    let _deadline = match Watchdog::arm(&stream, deadline_set) {
+    let _deadline = match Watchdog::arm(&stream, deadline_set, IO_DEADLINE) {
         Ok(guard) => guard,
         Err(e) => {
             // No socket deadline AND no watchdog: this is the unbounded state
@@ -471,6 +483,15 @@ pub fn teardown(handle: Option<ListenerHandle>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The deadline the two watchdog tests arm, and ONLY they. It is short
+    /// because a test that proves a stalled connection is released should not
+    /// cost [`IO_DEADLINE`] of suite time — and it is asked for at the call site
+    /// rather than imposed on the whole module by a `#[cfg(test)]` constant,
+    /// which is what previously turned `a_connected_client_can_send_a_frame_and
+    /// _get_a_reply` into a watchdog test whenever the host was busy enough for
+    /// a round trip to exceed one second.
+    const WATCHDOG_TEST_DEADLINE: Duration = Duration::from_secs(1);
     use crate::cli_bridge::dispatch::{ListOutcome, NewOutcome, SearchOutcome, ShowOutcome};
     use crate::plugins::vault_unlock::state::{
         fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
@@ -800,7 +821,7 @@ mod tests {
 
         // `deadline_set: false` is the refusal this exists for. The peer then
         // stalls exactly like the test above: it sends nothing and waits.
-        let armed = Watchdog::arm(&server, false)
+        let armed = Watchdog::arm(&server, false, WATCHDOG_TEST_DEADLINE)
             .expect("arm the watchdog")
             .expect("a refused deadline must produce a watchdog");
 
@@ -832,7 +853,9 @@ mod tests {
             std::os::unix::net::UnixStream::connect(&path).expect("connect to probe socket");
         let (mut server, _) = listener.accept().expect("accept probe connection");
 
-        let armed = Watchdog::arm(&server, false).expect("arm").expect("armed");
+        let armed = Watchdog::arm(&server, false, WATCHDOG_TEST_DEADLINE)
+            .expect("arm")
+            .expect("armed");
         drop(armed); // the exchange "finished" well inside the deadline
 
         server.write_all(b"x").expect("write after disarm");
