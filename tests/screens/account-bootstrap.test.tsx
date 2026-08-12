@@ -376,6 +376,71 @@ describe("web first-run bootstrap", () => {
     expect(onBootstrapped).toHaveBeenCalledTimes(1);
   });
 
+  // ── the SAS-mismatch abort (test-audit #10/#65) ────────────────────────────
+  //
+  // The whole point of the SYNC-40 eye-compare is that a user who sees a
+  // mismatch can get OUT. That branch had no test on either client — the case
+  // above asserts the button EXISTS and then clicks the match side, which is
+  // the shape of a property claimed in a comment and checked nowhere.
+  //
+  // Two things are pinned, and the second is the one that was actually broken.
+
+  /** Drive the enrol flow to the code-match screen. */
+  async function reachSasStep(resetLocal: () => Promise<unknown>): Promise<void> {
+    let fingerprint: string | null = null;
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "plugin:vault-unlock|account_number_check") return true;
+      if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: ENDPOINT };
+      if (cmd === "plugin:sync|sync_join_account") {
+        return {
+          device_id_hex: "bb".repeat(16),
+          vault_id: "v",
+          pending: true,
+          fingerprint: null,
+        };
+      }
+      if (cmd === "plugin:sync|sync_list_devices") return [];
+      if (cmd === "plugin:sync|sync_now") {
+        fingerprint = "MYNE 4K7P 9QRS";
+        return null;
+      }
+      if (cmd === "plugin:sync|sync_head_fingerprint") return fingerprint;
+      if (cmd === "plugin:sync|sync_reset_local") return resetLocal();
+      return null;
+    });
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    await submitPassword();
+    await screen.findByTestId("account-bootstrap.sas", {}, { timeout: 4000 });
+  }
+
+  it("declining the fingerprint un-enrols the device and leaves the code screen", async () => {
+    const resetLocal = vi.fn(async () => null);
+    await reachSasStep(resetLocal);
+    fireEvent.click(screen.getByTestId("account-bootstrap.sas-mismatch"));
+    await waitFor(() => expect(resetLocal).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByTestId("account-bootstrap.sas")).toBeNull());
+  });
+
+  it("a FAILED un-enrol keeps the code screen up and says the device is still enrolled", async () => {
+    // The defect this covers: the handler used to `.catch(() => {})` and clear
+    // the screen either way. A user who saw a mismatch — the single signal that
+    // a hostile server or a forked head is in play — pressed abort and got the
+    // same result whether the device was disconnected or not. Clearing the
+    // screen IS the claim that it worked, so a failure must not clear it.
+    const resetLocal = vi.fn(async () => {
+      throw { kind: "Io" };
+    });
+    await reachSasStep(resetLocal);
+    fireEvent.click(screen.getByTestId("account-bootstrap.sas-mismatch"));
+    await waitFor(() => expect(resetLocal).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId("account-bootstrap.error")).toBeTruthy());
+    expect(
+      screen.getByTestId("account-bootstrap.sas"),
+      "the code screen must stay up — clearing it would claim the abort worked",
+    ).toBeTruthy();
+  });
+
   it("lets the user go back and correct the account number", async () => {
     wire();
     render(<AccountBootstrap onBootstrapped={() => {}} />);
