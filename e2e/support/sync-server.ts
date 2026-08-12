@@ -13,7 +13,7 @@
 // yields an actionable skip reason so specs self-skip instead of spawn-failing.
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -29,11 +29,62 @@ export function syncServerBinary(): string {
 
 /** Preflight: can we spawn an ephemeral server? (Binary present.) */
 export function syncServerSupported(): { ok: boolean; reason?: string } {
-  if (!existsSync(syncServerBinary())) {
+  const bin = syncServerBinary();
+  if (!existsSync(bin)) {
     return {
       ok: false,
-      reason: `myne-server binary not found at ${syncServerBinary()} — build it (cd myne-server && go build -o myne-server ./cmd/myne-server) or set MYNE_E2E_SERVER. The E2E image (MYND-428 task 5, deferred) builds it from a pinned SHA.`,
+      reason: `myne-server binary not found at ${bin} — build it (cd myne-server && go build -o myne-server ./cmd/myne-server) or set MYNE_E2E_SERVER. The E2E image (MYND-428 task 5, deferred) builds it from a pinned SHA.`,
     };
+  }
+  // PRESENT is not the same as RUNNABLE, and the difference is a whole class of
+  // confusing failure. The desktop suite runs inside a Linux container while the
+  // repo is usually checked out on a developer's macOS host, so
+  // `myne-server/myne-server` is very often a Mach-O binary sitting in a place
+  // an ELF loader is about to look. `execve` then fails with ENOEXEC, the child
+  // exits 126, and the scenario reports
+  //
+  //     myne-server exited early (code 126)
+  //     Cannot run macOS (Mach-O) executable in Docker: Exec format error
+  //
+  // which reads like a product failure in whatever spec happened to be running
+  // and is really "you built this for the wrong OS". A MISSING binary already
+  // self-skips with an honest reason; an unusable one should too, rather than
+  // failing the suite it is not equipped to serve.
+  //
+  // The check reads the file's magic rather than trusting the host platform:
+  // the binary may legitimately have been cross-compiled or come from the CI
+  // image, and what matters is what the loader in THIS process's OS will accept.
+  try {
+    const head = Buffer.alloc(4);
+    const fd = openSync(bin, "r");
+    try {
+      readSync(fd, head, 0, 4, 0);
+    } finally {
+      closeSync(fd);
+    }
+    const isElf = head[0] === 0x7f && head[1] === 0x45 && head[2] === 0x4c && head[3] === 0x46;
+    // Both Mach-O magics, and the fat/universal wrapper.
+    const be = head.readUInt32BE(0);
+    const isMachO =
+      be === 0xfeedface ||
+      be === 0xfeedfacf ||
+      be === 0xcefaedfe ||
+      be === 0xcffaedfe ||
+      be === 0xcafebabe ||
+      be === 0xbebafeca;
+    if (process.platform === "linux" && !isElf) {
+      return {
+        ok: false,
+        reason:
+          `myne-server at ${bin} is not an ELF binary${isMachO ? " (it is Mach-O — built on macOS)" : ""}, ` +
+          "so this Linux container cannot execute it. Rebuild it for Linux " +
+          "(cd myne-server && GOOS=linux GOARCH=amd64 go build -o myne-server ./cmd/myne-server) " +
+          "or set MYNE_E2E_SERVER. CI builds it in the `myne-server-build` step and is unaffected.",
+      };
+    }
+  } catch {
+    // Unreadable for some other reason — let the spawn produce the real error
+    // rather than inventing a skip reason from a failed sniff.
   }
   return { ok: true };
 }
