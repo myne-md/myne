@@ -29,6 +29,7 @@
       "@myne/i18n/*": ["../src/i18n/*"],
       "@myne/reminder-schedule": ["../src/lib/reminderSchedule.ts"],
       "@myne/enroll-gate": ["../src/lib/enroll-gate.ts"],
+      "@myne/legal-urls": ["../src/lib/legal-urls.ts"],
       "@myne/syntax-theme": ["../src/lib/syntaxTheme.ts"],
       "@myne/theme-measure": ["../src/lib/themeMeasure.ts"],
       "@myne/ornaments": ["../ornaments/src/index.ts"],

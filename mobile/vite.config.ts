@@ -81,6 +81,15 @@ export default defineConfig(async () => ({
       // Safe to alias out of Tauri-coupled `../src/lib/`: the module has NO
       // imports at all.
       { find: /^@myne\/enroll-gate$/, replacement: sib("../src/lib/enroll-gate.ts") },
+      // The LEGAL DOCUMENT URLs (operations#15) — which of the two published
+      // editions of each text a client links to, keyed on interface language.
+      // Shared rather than copied because a second copy is how one client ends
+      // up linking at a slug the website no longer serves, silently, months
+      // later: the URLs live in another repo entirely and nothing here would
+      // notice them moving.
+      // Safe to alias out of Tauri-coupled `../src/lib/`: the module has NO
+      // imports at all — it is a slug table and one pure function.
+      { find: /^@myne\/legal-urls$/, replacement: sib("../src/lib/legal-urls.ts") },
       // The custom-theme SYNTAX DERIVATION (MYND-598). Shared for the same
       // reason as the reminder core: it encodes a readability rule both clients
       // must answer identically — which of the 12 `--syntax-*` roles a custom

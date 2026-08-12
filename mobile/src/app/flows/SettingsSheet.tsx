@@ -29,6 +29,8 @@ import { applyCustomTheme, clearCustomTheme, hasCustomTheme } from "../../lib/cu
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { useHiddenHomeTiles, setHomeTileHidden } from "../../lib/home-tiles";
+import { LEGAL_LINKS, legalUrl } from "@myne/legal-urls";
+import { openUrl } from "../../lib/open-url";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { vaultDisplayLabel, VAULT_FALLBACK_LABEL } from "../../lib/vault-label";
 import {
@@ -822,7 +824,7 @@ function strengthLevel(len: number): "Weak" | "Fair" | "Good" | "Strong" {
 }
 
 export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }: SettingsSheetProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { biometric, isAndroid } = usePlatform();
   const [panel, setPanel] = useState<Panel>("root");
   const [choice, setChoice] = useState<ThemeChoice>(() => readStoredChoice());
@@ -1773,6 +1775,33 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 <span style={rowLabel}>{t("settings.about.licenseLabel")}</span>
                 <span style={{ fontSize: 16, color: "var(--fg-3)" }}>AGPL-3.0</span>
               </Row>
+            </Group>
+
+            {/* The published legal documents (operations#15). They open on
+                myne.md in the phone's browser rather than being embedded, so
+                there is one text per document and no way for an app build to
+                carry a stale one. `↗` rather than a chevron: a chevron here
+                means "drills into another panel", and these leave the app.
+
+                The Impressum is deliberately not listed — see the same
+                omission and its reason in the desktop About panel. */}
+            <SectionLabel>{t("settings.about.legalLabel")}</SectionLabel>
+            <Group>
+              {LEGAL_LINKS.map(({ doc, labelKey, testId }, i) => (
+                <Row
+                  key={doc}
+                  first={i === 0}
+                  onClick={() => {
+                    void openUrl(legalUrl(doc, i18n.language));
+                  }}
+                  testId={testId}
+                >
+                  <span style={rowLabel}>{t(labelKey)}</span>
+                  <span style={{ fontSize: 15, color: "var(--fg-3)", flex: "none" }} aria-hidden="true">
+                    ↗
+                  </span>
+                </Row>
+              ))}
             </Group>
 
             <div style={{ marginTop: 16, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
