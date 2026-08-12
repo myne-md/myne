@@ -53,6 +53,27 @@ export default defineConfig({
     // each pass in isolation but flaked once under full-suite load.)
     retry: 2,
     // E2E failures should surface immediately in CI logs.
-    reporters: process.env.CI ? ["default"] : ["verbose"],
+    //
+    // The json + junit reporters are not decoration and are not for humans.
+    // They are the two things a suite's exit code cannot tell you:
+    //
+    //   json  — HOW MANY tests executed, which `scripts/check-e2e-floor.mjs`
+    //           turns into a failure when the count drops. Without it, a run
+    //           that skipped everything and a run that verified everything are
+    //           the same green.
+    //   junit — per-test results in the one format every flake tracker reads.
+    //           `retry` above silently rescues a test that failed twice, so the
+    //           suite's own summary reports a flake rate of zero no matter how
+    //           bad it gets; the archived XML is the only record that the first
+    //           two attempts happened at all.
+    //
+    // Lane-keyed filename: the quarantine lane runs a different (much smaller)
+    // set, and one shared path would let whichever lane finished last overwrite
+    // the other's floor evidence.
+    reporters: process.env.CI ? ["default", "json", "junit"] : ["verbose"],
+    outputFile: {
+      json: `.e2e-report/${process.env.MYNE_E2E_QUARANTINE === "1" ? "quarantine" : "stable"}.json`,
+      junit: `.e2e-report/${process.env.MYNE_E2E_QUARANTINE === "1" ? "quarantine" : "stable"}.junit.xml`,
+    },
   },
 });
