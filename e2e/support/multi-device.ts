@@ -9,6 +9,7 @@
 // into each device's app_config_dir — no test hook).
 
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { BETA_TERMS_VERSION } from "../../src/lib/load-bearing-copy";
 import { join } from "node:path";
 import { type AppSession, type LaunchOptions, launchApp } from "./session";
 import type { EphemeralServer } from "./sync-server";
@@ -58,6 +59,36 @@ export function syncConfigSeed(endpointUrl: string): (appConfigDir: string) => v
   return (appConfigDir: string) => {
     const body = JSON.stringify({ endpoint_url: endpointUrl }, null, 2);
     writeFileSync(join(appConfigDir, "sync-config.json"), body);
+    // Every scenario that seeds an endpoint is a scenario about sync, not about
+    // the terms — so they arrive already accepted (myne-ops#15). Without this
+    // the beta-terms gate stands in front of `sync.enroll.*` and every one of
+    // these specs times out on a testid that is no longer rendered.
+    legalConsentSeed()(appConfigDir);
+  };
+}
+
+/**
+ * A `seedConfig` callback that writes the device-local beta-terms acceptance —
+ * the same `legal-consent.json` the real `sync_accept_beta_terms` command
+ * persists (myne-ops#15).
+ *
+ * Exported separately from {@link syncConfigSeed} so a scenario can seed the
+ * acceptance WITHOUT an endpoint, which is what the gate's own spec needs for
+ * its "already accepted" leg: it must prove the screen stays away on a device
+ * that has accepted, and pointing that device at a server would be testing
+ * something else.
+ *
+ * The version is read from `@myne/copy` rather than written as `"1"` — the
+ * whole mechanism turns on the stored value matching the shipped one, so a
+ * hardcoded literal here would keep passing after a version bump while every
+ * real device correctly re-asked.
+ */
+export function legalConsentSeed(
+  version: string = BETA_TERMS_VERSION,
+): (appConfigDir: string) => void {
+  return (appConfigDir: string) => {
+    const body = JSON.stringify({ beta_terms_version: version }, null, 2);
+    writeFileSync(join(appConfigDir, "legal-consent.json"), body);
   };
 }
 
