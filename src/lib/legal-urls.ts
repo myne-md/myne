@@ -43,3 +43,32 @@ export function legalUrl(doc: LegalDoc, locale: string): string {
   const german = locale.toLowerCase().startsWith("de");
   return `https://myne.md/${SLUGS[doc][german ? "de" : "en"]}/`;
 }
+
+/**
+ * The documents a client offers, in the order a reader is likeliest to want
+ * them, with their label key and test id.
+ *
+ * Shared rather than declared per client so the desktop, the web client and
+ * mobile show the same four documents in the same order under the same test
+ * ids — a second copy is how one client quietly ends up offering three.
+ *
+ * **The Impressum is deliberately not in this list.** `legalUrl` can produce
+ * it and the page exists, but nothing links it until its address is filled in
+ * (myne-ops#9): in Germany an incomplete Impressum is a worse position than
+ * none, because it reads as compliant. Adding the entry here is all it takes
+ * the day that closes — and it lands on all three clients at once.
+ */
+export const LEGAL_LINKS: ReadonlyArray<{
+  doc: LegalDoc;
+  labelKey: string;
+  testId: string;
+}> = [
+  { doc: "privacy", labelKey: "settings.about.legalPrivacy", testId: "about.legal-privacy" },
+  { doc: "terms", labelKey: "settings.about.legalTerms", testId: "about.legal-terms" },
+  { doc: "notice", labelKey: "settings.about.legalNotice", testId: "about.legal-notice" },
+  {
+    doc: "lawEnforcement",
+    labelKey: "settings.about.legalLawEnforcement",
+    testId: "about.legal-law-enforcement",
+  },
+];
