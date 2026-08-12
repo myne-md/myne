@@ -51,7 +51,8 @@ import { expect, it } from "vitest";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
-import { pageSeatInvoke } from "./support/flows";
+import { dismissImporterOffer, pageSeatInvoke, unlockToEditor } from "./support/flows";
+import { seedVault } from "./support/fixtures";
 import {
   endpointConfigJson,
   FAKE_COMPLETION,
@@ -91,6 +92,7 @@ describeE2E("aob AI local model runtime (fake Ollama over loopback)", () => {
       });
 
       // ── aob2: endpoint named → it connects, and the answer comes back ──
+      let password = "";
       await scenario(
         "aob2-configured-endpoint-connects",
         {
@@ -103,10 +105,20 @@ describeE2E("aob AI local model runtime (fake Ollama over loopback)", () => {
               endpointConfigJson(fake),
             );
           },
+          // A vault, UNLOCKED below. Inference refuses against a locked vault
+          // (`VaultLocked`) — correctly: prompts are built from note content,
+          // so there is nothing to infer over and nothing that should leave.
+          // This arm had no vault at all, so it answered `VaultLocked` before
+          // opening a socket, and `fake.accepts()` stayed at zero. Which means
+          // the scenario that exists to prove the endpoint CONNECTS had never
+          // once proved it: aob1's zero and aob2's zero were the same zero.
+          seed: (dir) => void (password = seedVault(dir).password),
         },
         async (app) => {
+          await unlockToEditor(app.session, password);
+          await dismissImporterOffer(app.session);
           const res = await askForCompletion(app.session);
-          expect(res.err).toBeUndefined();
+          expect(res.err, "inference must reach the endpoint once a vault is open").toBeUndefined();
           expect(res.ok).toBe(FAKE_COMPLETION);
           expect(fake.accepts()).toBeGreaterThan(0);
           expect(fake.paths().some((p) => p.startsWith("/api/generate"))).toBe(true);
