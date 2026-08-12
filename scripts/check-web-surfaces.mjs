@@ -241,6 +241,10 @@ const V = {
   "src/lib/imperative-focus-trap.ts": ["ported", "Pure DOM."],
   "src/lib/imperative-modal.ts": ["ported", "Pure DOM."],
   "src/lib/io-banner.ts": ["ported", "Bounded IO-failure copy mapping."],
+  "src/lib/legal-urls.ts": [
+    "ported",
+    "Pure URL construction for the published legal documents (operations#15) — no host call, no IPC, no platform branch. The only input is the i18next language tag, which both clients have. Opening the URL is the seam's job (`openUrl`), and that is already substituted.",
+  ],
   "src/lib/load-bearing-copy.ts": ["ported", "Re-exports `@myne/copy`; the literals are identical across clients by construction."],
   "src/lib/note-export-errors.ts": ["ported", "Error copy; the export destinations differ, the taxonomy does not."],
   "src/lib/noteImageCard.ts": ["ported", "Pure markdown/DOM shaping."],

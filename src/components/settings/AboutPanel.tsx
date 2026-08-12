@@ -31,6 +31,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { servedBuildInfo, type BuildInfo } from "../../platform/build-info";
 import { openUrl } from "../../platform/opener";
+import { legalUrl, type LegalDoc } from "../../lib/legal-urls";
 import { usePrefs } from "../../hooks/usePrefs";
 import { Button } from "../primitives/Button";
 import { MyneMark } from "../primitives/MyneMark";
@@ -44,6 +45,30 @@ import {
 } from "./panel-styles";
 
 const THREAT_MODEL_URL = "https://myne.md/threat-model";
+
+/**
+ * The published legal documents, in the order a user is likeliest to want them
+ * (operations#15). Labels are translated, unlike the threat-model link's raw URL
+ * text: four bare URLs stacked in a settings panel read as noise, and the URL
+ * itself changes with the interface language (`/privacy` → `/datenschutz`),
+ * which makes it the wrong thing to show a reader.
+ *
+ * **The Impressum is deliberately absent.** `legalUrl` can produce it, and the
+ * page exists, but it is not linked anywhere until its address field is filled
+ * (operations#9): in Germany an incomplete Impressum is a worse position than no
+ * Impressum, because it looks compliant. One row here is all it takes when the
+ * address lands.
+ */
+const LEGAL_LINKS: ReadonlyArray<{ doc: LegalDoc; labelKey: string; testId: string }> = [
+  { doc: "privacy", labelKey: "settings.about.legalPrivacy", testId: "about.legal-privacy" },
+  { doc: "terms", labelKey: "settings.about.legalTerms", testId: "about.legal-terms" },
+  { doc: "notice", labelKey: "settings.about.legalNotice", testId: "about.legal-notice" },
+  {
+    doc: "lawEnforcement",
+    labelKey: "settings.about.legalLawEnforcement",
+    testId: "about.legal-law-enforcement",
+  },
+];
 
 const VERSION_TITLE_STYLE: CSSProperties = {
   fontSize: "var(--text-lg)",
@@ -122,8 +147,16 @@ function handleThreatModelClick() {
   });
 }
 
+function handleLegalClick(doc: LegalDoc, locale: string) {
+  openUrl(legalUrl(doc, locale)).catch((err) => {
+    if (import.meta.env.DEV) {
+      console.warn(`AboutPanel: openUrl(${doc}) rejected`, err);
+    }
+  });
+}
+
 export function AboutPanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { prefs, setDeveloperMode } = usePrefs();
   // The SERVED bundle's identity, where there is one (phase3-web-client task
   // 114). `null` on desktop by construction — a desktop user's build identity is
@@ -197,6 +230,35 @@ export function AboutPanel() {
           <span aria-hidden="true">↗</span>
         </button>
         <p style={HELPER_STYLE}>{t("settings.about.threatModelHelper")}</p>
+      </Block>
+
+      <Block data-setting-anchor="about.legal" data-setting-row="true">
+        <span style={LABEL_STYLE}>{t("settings.about.legalLabel")}</span>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: "var(--space-1)",
+          }}
+        >
+          {LEGAL_LINKS.map(({ doc, labelKey, testId }) => (
+            <button
+              key={doc}
+              type="button"
+              onClick={() => {
+                handleLegalClick(doc, i18n.language);
+              }}
+              {...linkHover}
+              style={LINK_STYLE}
+              data-testid={testId}
+            >
+              {t(labelKey)}
+              <span aria-hidden="true">↗</span>
+            </button>
+          ))}
+        </div>
+        <p style={HELPER_STYLE}>{t("settings.about.legalHelper")}</p>
       </Block>
 
       <Block data-setting-anchor="about.license" data-setting-row="true">
