@@ -30,7 +30,7 @@ import {
   closeSettings,
   createNote,
   dismissImporterOffer,
-  openSettings,
+  enableDeveloperMode,
   unlockToEditor,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
@@ -85,7 +85,19 @@ aiDescribe("aux1 AI settings surface + right-sidebar AI Chat tab (ai-ux-surface)
         await createNote(s, "aux1notealfa7k2m9qx4w8e5rj0aa");
 
         // ── Settings → AI panel: trust copy by FULL LITERAL ──
-        await openSettings(s, "ai");
+        // The AI tab lives behind Developer mode and does not exist without it:
+        // `developer-mode.e2e.ts:137` asserts `settings.tab-ai` has length 0
+        // before enabling. This spec used `openSettings(s, "ai")`, which CLICKS
+        // that tab — so it waited its full budget and threw, which is exactly
+        // how it was failing in CI. `ai-degradation.e2e.ts` already had the
+        // right order; this one was never updated when the panel moved behind
+        // the toggle.
+        //
+        // Go straight to the tab rather than through `openSettings`:
+        // `enableDeveloperMode` leaves the modal OPEN on About by design, so
+        // re-clicking `editor.settings-cta` would fight an open modal.
+        await enableDeveloperMode(s);
+        await (await s.byTestId("settings.tab-ai")).click();
         await s.byTestId("settings.ai-panel");
 
         // Headline renders the constant verbatim — a collapse fails this.
