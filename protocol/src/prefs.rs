@@ -11579,6 +11579,168 @@ mod tests {
         .expect("write vault-prefs field-clocks vectors dump");
     }
 
+    /// Generator for the display-formatting quartet's `vault-prefs` cases —
+    /// `auto_tag_enabled`, `date_format`, `time_format`, `timezone`.
+    ///
+    /// `cargo test -p protocol --lib emit_datetime_quartet_prefs_vectors -- --ignored`
+    ///
+    /// These four shipped without a single companion-repo vector between them:
+    /// each is exercised by `#[cfg(test)]` unit tests here and by nothing a port
+    /// can run. That is a real cross-implementation gap rather than a tidiness
+    /// one, because `vault.prefs` is canonical JSON — **key order is part of the
+    /// bytes**, so a port that emits a correct value in the wrong slot produces a
+    /// blob this crate cannot decode, and no existing vector would have said so.
+    ///
+    /// Each field is therefore pinned **beside both of its canonical neighbours**,
+    /// which is what makes the case a slot pin rather than a value pin:
+    ///
+    /// * `auto_lock_seconds` < `auto_tag_enabled` < `bar_items_order`
+    /// * `daily_template` < `date_format` < `deliberate_folders`
+    /// * `theme` < `time_format` < `timezone` < `transcription_enabled`
+    ///
+    /// `auto_tag_enabled` is additionally the one member of the quartet with the
+    /// emit-only-when-`true` convention, so it is set `true` here — set `false`
+    /// it would vanish from the bytes and pin nothing at all.
+    #[test]
+    #[ignore]
+    fn emit_datetime_quartet_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce_dq: [u8; AEAD_NONCE_LEN] = [0xD4; AEAD_NONCE_LEN];
+
+        let prefs_dq = PrefsView {
+            auto_lock_seconds: Some(300),
+            auto_tag_enabled: true,
+            bar_items_order: alloc::vec![String::from("search"), String::from("graph")],
+            daily_template: Some(String::from("Templates/Daily.md")),
+            date_format: Some(String::from("iso")),
+            deliberate_folders: alloc::vec![String::from("Archive/")],
+            theme: Some(ThemeChoice::Dark),
+            time_format: Some(String::from("24h")),
+            timezone: Some(String::from("Europe/Istanbul")),
+            transcription_enabled: false,
+            ..PrefsView::default()
+        };
+
+        let canonical = canonical_json_encode(&prefs_dq);
+        let canonical_str = core::str::from_utf8(&canonical).expect("canonical JSON is UTF-8");
+
+        // Slot assertions, stated as ordering rather than as one frozen string:
+        // a future field landing between any of these pairs must not silently
+        // invalidate the pin it is not related to.
+        let pos = |needle: &str| -> usize {
+            canonical_str
+                .find(needle)
+                .unwrap_or_else(|| panic!("canonical JSON is missing {needle}: {canonical_str}"))
+        };
+        assert!(
+            pos("\"auto_lock_seconds\"") < pos("\"auto_tag_enabled\"")
+                && pos("\"auto_tag_enabled\"") < pos("\"bar_items_order\""),
+            "auto_tag_enabled must sit between auto_lock_seconds and bar_items_order: {canonical_str}"
+        );
+        assert!(
+            pos("\"daily_template\"") < pos("\"date_format\"")
+                && pos("\"date_format\"") < pos("\"deliberate_folders\""),
+            "date_format must sit between daily_template and deliberate_folders: {canonical_str}"
+        );
+        assert!(
+            pos("\"theme\"") < pos("\"time_format\"")
+                && pos("\"time_format\"") < pos("\"timezone\"")
+                && pos("\"timezone\"") < pos("\"transcription_enabled\""),
+            "time_format < timezone must sit between theme and transcription_enabled: {canonical_str}"
+        );
+
+        let blob_dq = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_dq, &nonce_dq)
+            .expect("encode datetime quartet");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_dq).expect("decode");
+        assert_eq!(
+            decoded, prefs_dq,
+            "datetime-quartet blob must round-trip exactly"
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-datetime-quartet
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-datetime-quartet\",\n");
+        dump.push_str("      \"description\": \"The four display-formatting preferences that had no cross-implementation vector: auto_tag_enabled (on-device tag suggestion, emitted only when true), date_format, time_format and timezone (myne#279 display overrides). Each is written beside BOTH of its canonical neighbours so the case pins its slot rather than merely its value: auto_lock_seconds < auto_tag_enabled < bar_items_order; daily_template < date_format < deliberate_folders; theme < time_format < timezone < transcription_enabled. vault.prefs is canonical JSON, so key order is part of the bytes — a port emitting a correct value in the wrong slot produces a blob the reference decoder rejects. All four values are display-only: none ever enters a .myn file, a blob or the sync wire as a formatting instruction. Same vault-A inputs as the sibling cases; prefs_nonce=0xD4x24. Generated by emit_datetime_quartet_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_dq)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_dq)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-datetime-quartet
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-datetime-quartet\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-datetime-quartet: the blob decodes back to a PrefsView carrying all four display-formatting fields at their canonical positions. A decoder that does not know one of them tolerates it per the §9.5.2 forward-compat rule and falls back to that field's default (auto_tag_enabled=false, the other three = 'follow the OS locale'), which is exactly what a pre-feature client does — the point of the case is that skipping a field must not desynchronise the positional cursor and swallow the fields that follow it.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_dq)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"auto_lock_seconds\": 300,\n");
+        dump.push_str("        \"auto_tag_enabled\": true,\n");
+        dump.push_str("        \"bar_items_order\": [\"search\", \"graph\"],\n");
+        dump.push_str("        \"daily_template\": \"Templates/Daily.md\",\n");
+        dump.push_str("        \"date_format\": \"iso\",\n");
+        dump.push_str("        \"deliberate_folders\": [\"Archive/\"],\n");
+        dump.push_str("        \"theme\": \"dark\",\n");
+        dump.push_str("        \"time_format\": \"24h\",\n");
+        dump.push_str("        \"timezone\": \"Europe/Istanbul\",\n");
+        dump.push_str("        \"transcription_enabled\": false\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_datetime_quartet_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs datetime-quartet vectors dump");
+        std::println!("canonical JSON: {canonical_str}");
+    }
+
     /// Generator for the MYND-227 structural `parse_fail` vector cases
     /// (appended to the companion repo's `vault-prefs` family; per-feature-
     /// generator pattern of [`emit_label_and_tolerance_prefs_vectors`]).
