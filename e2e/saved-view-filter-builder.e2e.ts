@@ -27,9 +27,11 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   createNote,
+  clickUntilVisible,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   pageSeatInvoke,
+  setViewsEnabled,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -78,15 +80,19 @@ describeE2E("vf1 filter builder create / empty-save / edit-entry / cancel (MYND-
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget
+        // and the spec fails deterministically.
+        await setViewsEnabled(s, true);
 
-        // The Views section starts empty.
-        await s.byTestId("views.section");
+        // The Views list — and its empty state — live inside a flyout the nav
+        // row opens; both are absent from the screen until it is open.
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.byTestId("views.empty");
 
         // "+ New view" opens the builder EMPTY — it no longer creates a blank
         // view immediately (the old behavior). The empty-state hint shows.
-        await (await s.byTestId("views.new-button")).click();
-        await s.byTestId("view-filter.modal");
+        await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await s.byTestId("view-filter.empty");
 
         // Save with no conditions → an all-pages view is created, opens as a tab,
@@ -95,6 +101,9 @@ describeE2E("vf1 filter builder create / empty-save / edit-entry / cancel (MYND-
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host");
+        // The view rows live in the flyout, and saving CLOSED it (the create
+        // click dismisses it). Re-open before counting rows.
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "saved view appears in the sidebar" },
@@ -131,6 +140,10 @@ describeE2E("vf2 filter builder condition composition (MYND-282)", () => {
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget
+        // and the spec fails deterministically.
+        await setViewsEnabled(s, true);
 
         // One note carrying the token in its body, so the search filter matches.
         await createNote(s, "Hit Note");
@@ -138,8 +151,11 @@ describeE2E("vf2 filter builder condition composition (MYND-282)", () => {
         await waitForSaved(s);
 
         // Open the builder and add the first condition (defaults to a tag).
-        await (await s.byTestId("views.new-button")).click();
-        await s.byTestId("view-filter.modal");
+        // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
+        // is shut but is not interactable, so clicking it silently does nothing.
+        // Open the flyout first — the same order the passing spec uses.
+        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await (await s.byTestId("view-filter.add-condition-first")).click();
         await s.byTestId("view-filter.condition");
 
@@ -154,6 +170,9 @@ describeE2E("vf2 filter builder condition composition (MYND-282)", () => {
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host");
+        // The view rows live in the flyout, and saving CLOSED it (the create
+        // click dismisses it). Re-open before counting rows.
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "filtered view appears in the sidebar" },
@@ -174,6 +193,10 @@ describeE2E("vf3 filter builder property condition (key + op + value)", () => {
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget
+        // and the spec fails deterministically.
+        await setViewsEnabled(s, true);
 
         // Two notes carrying a custom `status` frontmatter property — one
         // matching, one not — created via page-seat IPC (typing frontmatter
@@ -198,8 +221,11 @@ describeE2E("vf3 filter builder property condition (key + op + value)", () => {
         // Compose: type=property, key=status (the option's presence in the
         // picker proves the reindex delivered the key), op pinned to ==,
         // free-text value.
-        await (await s.byTestId("views.new-button")).click();
-        await s.byTestId("view-filter.modal");
+        // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
+        // is shut but is not interactable, so clicking it silently does nothing.
+        // Open the flyout first — the same order the passing spec uses.
+        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await (await s.byTestId("view-filter.add-condition-first")).click();
         await s.byTestId("view-filter.condition");
         await pickSelectOption(s, "view-filter.condition-type", "property");
@@ -226,6 +252,9 @@ describeE2E("vf3 filter builder property condition (key + op + value)", () => {
           async () => ((await s.byTestIdAll("view.card")).length === 1 ? true : null),
           { label: "view renders exactly the matching note" },
         );
+        // The view rows live in the flyout, and saving CLOSED it (the create
+        // click dismisses it). Re-open before counting rows.
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "property view appears in the sidebar" },

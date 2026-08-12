@@ -25,7 +25,12 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, setViewsEnabled, unlockToEditor } from "./support/flows";
+import {
+  clickUntilVisible,
+  dismissImporterOffer,
+  setViewsEnabled,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 /** Explicit WebDriver Enter key (U+E007) — named so it is VISIBLE in source
@@ -72,21 +77,19 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
 
         // Views is a compact nav ROW; its list lives in a right-flyout opened by
         // clicking the row. Open it → empty-state hint (zero views).
-        await s.byTestId("views.section");
-        await (await s.byTestId("views.section")).click();
-        await s.byTestId("views.flyout");
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.byTestId("views.empty");
 
         // Create a view from the flyout's create (+) button (visible while the
         // flyout is open). "+ New view" closes the flyout and opens the filter
         // builder empty (MYND-282); saving with no conditions creates an
         // all-pages view that opens as a tab.
-        await (await s.byTestId("views.new-button")).click();
+        await clickUntilVisible(s, "views.new-button", "view-filter.save");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host"); // the new view opened as a tab
         // Re-open the flyout → the new view is a row.
-        await (await s.byTestId("views.section")).click();
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "first view row appears" },
@@ -117,10 +120,10 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
 
         // Create a second view → two rows (builder opens empty, save creates it).
         // The create (+) click closes the flyout, so re-open it after the save.
-        await (await s.byTestId("views.new-button")).click();
+        await clickUntilVisible(s, "views.new-button", "view-filter.save");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
-        await (await s.byTestId("views.section")).click();
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 2 ? true : null),
           { label: "second view row appears" },
@@ -146,7 +149,7 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
 
         // Delete one view → the list drops to a single row. Re-open the flyout
         // first (clicking a row above closed it).
-        await (await s.byTestId("views.section")).click();
+        await clickUntilVisible(s, "views.section", "views.flyout");
         const labels = await viewRowLabels(s);
         await openRowMenu(s, labels[0]!);
         await (

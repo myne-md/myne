@@ -35,9 +35,11 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickUntilVisible,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   pageSeatInvoke,
+  setViewsEnabled,
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -110,12 +112,18 @@ async function seedFrontmatterNotes(
 /** Create an all-pages view via "+ New view" → empty save (cards default),
  *  waiting until it opens as a view tab and lands as a sidebar row. */
 async function createAllPagesView(s: Session): Promise<void> {
-  await (await s.byTestId("views.new-button")).click();
-  await s.byTestId("view-filter.modal");
+  // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
+  // is shut but is not interactable, so clicking it silently does nothing.
+  // Open the flyout first — the same order the passing spec uses.
+  await clickUntilVisible(s, "views.section", "views.flyout");
+  await clickUntilVisible(s, "views.new-button", "view-filter.modal");
   await (await s.byTestId("view-filter.save")).click();
   await s.waitForGone(testIdSelector("view-filter.modal"));
   await s.byTestId("editor.view-host");
   await s.byTestId("view.cards"); // default view type before the switch
+  // The view rows live in the flyout, and the create click CLOSED it.
+  // Re-open before counting rows.
+  await clickUntilVisible(s, "views.section", "views.flyout");
   await s.waitUntil(
     async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
     { label: "saved view appears in the sidebar" },
@@ -133,6 +141,10 @@ describeE2E("svt1 table view renders property columns + group sections (MYND-277
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget
+        // and the spec fails deterministically.
+        await setViewsEnabled(s, true);
 
         // Three notes with a custom `status` property — two share a value so
         // grouping produces sections of size 2 + 1.
@@ -215,6 +227,10 @@ describeE2E("svl1 list view renders sorted rows with a property meta line (MYND-
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget
+        // and the spec fails deterministically.
+        await setViewsEnabled(s, true);
 
         // Two notes whose `status` values order deterministically ("later" <
         // "urgent" lexicographically), so sort asc pins the row order.
