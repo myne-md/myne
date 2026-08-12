@@ -19,9 +19,11 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickUntilVisible,
   createNote,
   dismissImporterOffer,
   editorText,
+  setViewsEnabled,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -120,13 +122,19 @@ describeE2E("tb2 save current filter as view → appears in the sidebar (Saved V
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget.
+        await setViewsEnabled(s, true);
 
         // One tagged note so the browser has a chip to filter on.
         await createNote(s, "Alpha Note");
         await typeIntoEditor(s, A_MARK);
         await waitForSaved(s);
 
-        // The sidebar Views section starts empty (no saved views yet).
+        // The sidebar Views section starts empty (no saved views yet). The list
+        // and its empty state live inside a flyout the nav row opens; both are
+        // absent from the screen until it is.
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.byTestId("views.empty");
 
         // Open the browser, select #alpha → the "Save as view" affordance shows.
@@ -145,6 +153,9 @@ describeE2E("tb2 save current filter as view → appears in the sidebar (Saved V
         // Modal closes; the saved view appears in the sidebar with NO restart —
         // this is the bug the prefs-nonce chokepoint fixes.
         await s.waitForGone(testIdSelector("tags.modal"));
+        // The view rows live in the flyout, and saving from the tags browser
+        // left it closed. Re-open before counting rows.
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "saved view appears in the sidebar" },
