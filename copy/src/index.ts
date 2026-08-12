@@ -113,3 +113,42 @@ export const DEVICE_REVOKED_DISCLOSURE =
 
 export const LOCAL_ERASE_DISCLOSURE =
   "This erases Myne's copy of your vault from this browser only. Your account and everything already synced stay on the server, and signing in here again brings them back. It is not an account deletion and not a remote wipe. Anything this browser has not synced yet is lost for good.";
+
+// The beta terms, as the app states them (operations#15). The published text is
+// at https://myne.md/terms and this is not a substitute for it — it is the four
+// clauses a person must actually have read before sync starts carrying their
+// notes to a server, phrased so that reading only these four leaves them with an
+// accurate picture rather than a flattering one.
+//
+// Load-bearing for the same reason the consent copy above is: each clause is a
+// bounded claim, and a translation that softened "cannot be recovered" into
+// "may be difficult to recover" would be a good translation and a false
+// statement. Rendered verbatim in every locale; only the chrome around them is
+// translated.
+//
+// Changing any of these four strings is a decisions.md event AND requires
+// bumping BETA_TERMS_VERSION, which re-asks everyone who accepted the old text.
+// `scripts/check-beta-terms-version.mjs` fails the commit that changes one
+// without the other — the discipline is mechanical because "remember to bump
+// it" is exactly the kind of thing that gets remembered four times out of five.
+
+/** The version of the four clauses below. Compared, never ranked: any change
+ *  re-asks, in either direction. Stored device-local by
+ *  `core/src/plugins/sync/legal_consent.rs`. */
+export const BETA_TERMS_VERSION = "1";
+
+/** What the service is, and what it is not. */
+export const BETA_TERMS_WHAT_THIS_IS =
+  "Myne's sync is a free beta. It takes no payment, carries no warranty and makes no uptime promise — software this young breaks, and a bug can lose data.";
+
+/** The clause the architecture makes necessary, and the one most terms omit. */
+export const BETA_TERMS_DATA_LOSS =
+  "If you lose your password and your recovery phrase, your notes cannot be recovered — not by you and not by us. There is no reset, because a reset would mean we held a key to your notes.";
+
+/** The anti-Skiff clause: what happens when the beta ends, and if it shuts. */
+export const BETA_TERMS_WHAT_HAPPENS_NEXT =
+  "When the beta ends your account keeps working. If a paid tier ever exists it will be a choice, not a gate in front of notes you already have. If we ever shut the service down you get at least 90 days' notice, with export working the whole time.";
+
+/** The moderation reality, which is also the DSA Art. 14 transparency line. */
+export const BETA_TERMS_WHAT_WE_CAN_SEE =
+  "We cannot read what you store, so we cannot screen it and do not try. On a substantiated report we can act on an account — freeze it or delete it — but never on a single note, because we cannot tell them apart.";

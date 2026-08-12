@@ -30,8 +30,23 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (cmd: string, args?: Record<string, unknown>) => invokeMock(cmd, args),
 }));
 
+// The beta-terms gate (operations#15) stands in front of this screen. These
+// specs are about what happens AFTER it, so they run with the terms already
+// accepted; `betaTermsAlreadyAccepted` is flipped by the gate's own block at
+// the bottom of the file, which is where the gate is actually exercised.
+let betaTermsAlreadyAccepted = true;
+const acceptBetaTermsMock = vi.fn(() => Promise.resolve());
+vi.mock("../../src/platform/legal-consent", () => ({
+  betaTermsAccepted: () => Promise.resolve(betaTermsAlreadyAccepted),
+  acceptBetaTerms: () => acceptBetaTermsMock(),
+}));
+
 import { AccountBootstrap } from "../../src/screens/AccountBootstrap";
 import {
+  BETA_TERMS_DATA_LOSS,
+  BETA_TERMS_WHAT_HAPPENS_NEXT,
+  BETA_TERMS_WHAT_THIS_IS,
+  BETA_TERMS_WHAT_WE_CAN_SEE,
   ENROLL_NON_DISTINGUISHING_BANNER,
   ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE,
 } from "../../src/lib/load-bearing-copy";
@@ -79,6 +94,8 @@ async function submitPassword(value = "CanaryPass-9-animals!"): Promise<void> {
 
 beforeEach(() => {
   invokeMock.mockReset();
+  betaTermsAlreadyAccepted = true;
+  acceptBetaTermsMock.mockClear();
 });
 
 afterEach(cleanup);
@@ -507,5 +524,61 @@ describe("web first-run bootstrap", () => {
       expect(seen).toContain("plugin:sync|sync_now");
       expect(seen).toContain("plugin:sync|sync_head_fingerprint");
     });
+  });
+});
+
+// ── The beta-terms gate (operations#15) ──────────────────────────────────────
+//
+// This is the web client's only door onto sync — sync is not optional here
+// (decisions.md 2026-07-26) — so the terms are the first thing a new user sees,
+// and there is no route past them.
+describe("web first-run bootstrap — beta terms gate", () => {
+  it("shows the terms before anything else when they have not been accepted", async () => {
+    betaTermsAlreadyAccepted = false;
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+
+    expect(await screen.findByTestId("bootstrap.beta-terms")).toBeTruthy();
+    // Not merely "the terms are above the account field" — the field is not
+    // rendered at all, so there is no route to it that skips the text.
+    expect(screen.queryByTestId("account-entry.input")).toBeNull();
+  });
+
+  it("renders every clause verbatim from the load-bearing constants", async () => {
+    betaTermsAlreadyAccepted = false;
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+
+    // Full-literal equality: a translation that softened any of these would be
+    // a good translation and a false statement.
+    expect((await screen.findByTestId("sync.beta-terms.what-this-is")).textContent).toBe(
+      BETA_TERMS_WHAT_THIS_IS,
+    );
+    expect(screen.getByTestId("sync.beta-terms.data-loss").textContent).toBe(BETA_TERMS_DATA_LOSS);
+    expect(screen.getByTestId("sync.beta-terms.what-happens-next").textContent).toBe(
+      BETA_TERMS_WHAT_HAPPENS_NEXT,
+    );
+    expect(screen.getByTestId("sync.beta-terms.what-we-can-see").textContent).toBe(
+      BETA_TERMS_WHAT_WE_CAN_SEE,
+    );
+  });
+
+  it("records the acceptance and then lets the account step through", async () => {
+    betaTermsAlreadyAccepted = false;
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId("sync.beta-terms.accept"));
+
+    expect(acceptBetaTermsMock).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId("account-entry.input")).toBeTruthy();
+  });
+
+  it("does not show the terms again once accepted", async () => {
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+
+    expect(await screen.findByTestId("account-entry.input")).toBeTruthy();
+    expect(screen.queryByTestId("bootstrap.beta-terms")).toBeNull();
   });
 });

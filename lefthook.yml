@@ -227,6 +227,15 @@ pre-commit:
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n.mjs
 
+    beta-terms-version:
+      # The beta-terms clauses and BETA_TERMS_VERSION must move together
+      # (operations#15). Editing a clause without bumping the version leaves every
+      # device holding an acceptance of text that no longer exists, and nothing
+      # else notices: no compiler, and no test — the clauses are pinned by
+      # literal equality, so a test updated alongside the text passes either way.
+      glob: "{copy/src/index.ts,scripts/beta-terms-digest.json}"
+      run: node scripts/check-beta-terms-version.mjs
+
     whitespace:
       # Excludes vendored third-party dictionary data (wooorm/dictionaries
       # Hunspell .aff/.dic + upstream license text) and the bundled AI model

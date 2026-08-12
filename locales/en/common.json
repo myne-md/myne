@@ -3142,6 +3142,16 @@
     "unsyncedOverflow_other": "…and {{count}} more."
   },
   "sync": {
+    "betaTerms": {
+      "title": "Before you turn on sync",
+      "intro": "Sync sends your notes, encrypted, to a server. Four things are worth knowing first.",
+      "whatThisIsLabel": "What this is",
+      "dataLossLabel": "If you lose both secrets",
+      "whatHappensNextLabel": "When the beta ends",
+      "whatWeCanSeeLabel": "What we can see",
+      "readFull": "Read the full terms",
+      "accept": "I understand — turn on sync"
+    },
     "materialising": "Downloading your notes — {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",
     "credentialAmbiguous": "Your password may have changed on this device and on another, and Myne can't tell which is newer — so it hasn't changed anything. Sign in on a device that already has access to sort it out.",
     "vaultRekeyed": "This vault was upgraded to the new format on another device. Unlock again to continue — nothing was lost.",

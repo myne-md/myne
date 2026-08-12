@@ -6,6 +6,8 @@
 // Built against design tokens; Penpot skipped per the owner directive.
 
 import { useEffect, useId, useState, type CSSProperties } from "react";
+import { BetaTermsConsent } from "./BetaTermsConsent";
+import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
 import { Input } from "../primitives/Input";
@@ -114,6 +116,7 @@ interface JoinDeviceModalProps {
 }
 
 export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
+  const betaTerms = useBetaTermsGate();
   const { t } = useTranslation();
   const baseId = useId();
   const [url, setUrl] = useState("");
@@ -311,6 +314,29 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
         setError(t("sync.join.sasAbortFailed"));
       });
   };
+
+  // The beta-terms gate (operations#15). This is the welcome-screen door onto
+  // sync, and it stands FIRST — before the form, before the cert pin, before
+  // anything that contacts a server. Placing it here rather than beside the
+  // submit button is the same rule the screen itself states: there must be no
+  // route to acceptance that skips the text, and no route past it either.
+  //
+  // Cancelling closes the modal, which is exactly what "not now" means at this
+  // door — the user came from the welcome screen and can go back to it.
+  if (!betaTerms.pending && betaTerms.needed) {
+    return (
+      <div role="dialog" aria-modal="true" style={BACKDROP} data-testid="join.beta-terms">
+        <div style={CARD}>
+          <BetaTermsConsent
+            onAccept={() => {
+              void betaTerms.accept();
+            }}
+            onCancel={onCancel}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Post-join: the fresh device pinned the server's cert (TOFU) — surface the
   // fingerprint for out-of-band cross-device eye-compare, then wait for approval.

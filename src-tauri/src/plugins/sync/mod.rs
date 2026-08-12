@@ -24,6 +24,11 @@ pub use myne_core::plugins::sync::*;
 /// generates, so the `qrcode` dep + this command live here, not in the core.
 pub mod qr;
 
+/// The beta-terms acceptance gate (operations#15). The record and the comparison
+/// live in the shared core; this is the command surface over them, joined to
+/// this plugin so no new capability is needed.
+pub mod legal;
+
 /// Desktop-only device-local Tor routing toggle (MYND-650 task 6). The
 /// preference lives in the shared core; acting on it means spawning an OS
 /// process, which is why the command surface is here.
@@ -60,6 +65,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_restore_quarantine,
             commands::sync_delete_quarantine,
             qr::sync_device_join_qr,
+            legal::sync_beta_terms_accepted,
+            legal::sync_accept_beta_terms,
             tor::sync_get_tor_routing,
             tor::sync_set_tor_routing,
             tor::sync_get_tor_state,

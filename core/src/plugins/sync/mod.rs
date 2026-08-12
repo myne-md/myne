@@ -127,6 +127,13 @@ pub mod state;
 // `commands` module by task 84 so the browser reports the same states from the
 // same code. Only the `Manager`-shaped live-status CELL stayed behind.
 pub mod status;
+// The device-local record of which beta terms this device accepted
+// (operations#15). It sits in the sync plugin because sync is what it gates —
+// the terms govern the hosted service, and nothing else in the app needs
+// agreeing to. Shared rather than desktop-only for the same reason
+// `tor_config` is: the *rule* (a version, not a boolean; every failure re-asks)
+// belongs beside the flow that honours it, and mobile owes the same gate.
+pub mod legal_consent;
 pub mod token_store;
 // The device-local `tor_routing_enabled` preference (MYND-650 task 6) — the one
 // writer of `proxy::ProxyGate`'s enabled flag. Shared rather than desktop-only
