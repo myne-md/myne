@@ -26,6 +26,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  activeNoteId,
   createNote,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
@@ -103,10 +104,15 @@ describeE2E("tsf1 (myne#288): a keyboard tab switch flushes the pane's edits", (
           async () => ((await s.byTestIdAll("editor.tab")).length === 2 ? true : null),
           { label: "tsf1 two tabs open", timeoutMs: 15_000 },
         );
-        await s.waitUntil(
-          async () => ((await editorText(s)).includes(TSF_TITLES[0]!) ? true : null),
-          { label: "tsf1 note A active", timeoutMs: 15_000 },
-        );
+        // Which note is open comes from the TAB STRIP, never from the document
+        // text: a note's title lives in the frontmatter block, which live
+        // preview replaces with the properties widget, whose title is an input
+        // VALUE. `editorText()` on a fresh note is literally
+        // "Properties≡+ Add property" — see `activeNoteId`'s own doc.
+        await s.waitUntil(async () => ((await activeNoteId(s)) === a ? true : null), {
+          label: "tsf1 note A active",
+          timeoutMs: 15_000,
+        });
 
         // Type, then switch WITHOUT letting the editor blur — no click, no
         // palette (both of which would flush incidentally).

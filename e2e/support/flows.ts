@@ -457,6 +457,29 @@ export async function completePasswordReset(
 
 const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
 
+/** The note id of the ACTIVE editor tab, or `null` when the active tab is not a
+ *  note tab (graph, settings, …).
+ *
+ *  THE ASSERTION THIS EXISTS FOR. "Is note X open?" reads like a question
+ *  `editorText()` can answer — `expect(await editorText(s)).toContain(title)` —
+ *  and it cannot, ever. A note's title lives in its managed frontmatter, and
+ *  CM6's live preview REPLACES that block with the properties widget
+ *  (`editor/src/decorations/frontmatter.ts`), whose title is an `<input>`
+ *  VALUE. `textContent()` does not read input values, so the whole document
+ *  text of a freshly-created note is the widget's own chrome —
+ *  `"Properties≡+ Add property"` — with the title nowhere in it. The assertion
+ *  is not flaky and does not depend on timing: it is unsatisfiable, and it
+ *  fails by timeout, which reads exactly like a slow app.
+ *
+ *  The tab strip is the observable that actually carries the answer:
+ *  `data-tab-id="note:<id>"` on `[data-active="true"]` (Saved Views #4). */
+export async function activeNoteId(session: Session): Promise<string | null> {
+  const [tab] = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+  if (!tab) return null;
+  const raw = (await tab.attribute("data-tab-id")) ?? "";
+  return raw.startsWith("note:") ? raw.slice("note:".length) : null;
+}
+
 /** Click a control and wait for what it reveals, RE-CLICKING when a click missed.
  *
  *  THE BUG THIS EXISTS FOR. `await (await s.byTestId(trigger)).click()` followed
