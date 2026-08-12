@@ -130,11 +130,36 @@
   scenario verified as a runner-contention victim, keep the set short, and
   record the debt on the Plane item — a real failure marked `.flaky` is a real
   failure nobody will see. Currently quarantined: `nav1`, `tp1`, `ci1`, `gp1`,
-  `gp2`, `svc1`, `tor1` — the last five are tail-of-suite mount-timeout victims
-  (they miss budget only late in the ~20-min serial run, even under
-  `WOODPECKER_MAX_WORKFLOWS=1`); the real fix is the boot-cost investigation,
-  and `tor1` is provisional pending an isolated run (fake-sidecar, so not a
-  network limit — either raise its 20 s posture timeout or fix a handshake bug).
+  `gp2`, `svc1`, `tor1`.
+- **"Runner contention" was the wrong diagnosis, and the quarantine list is
+  built on it.** The flake reproduces on an IDLE machine — same spec, one warm
+  container, nothing else running: 4 failures in 21 runs (~19 %), every one of
+  them `waitUntil(waitForElement([data-testid="notes.new-menu-dropdown"]))
+  timed out after 45000 ms`. Durations were bimodal (~11 s or ~52–61 s, nothing
+  between), which is a stuck wait, not a loaded host. It was never visible
+  because `retry: 2` rescued the second attempt and the suite reported green —
+  the failing attempt never reached a report at all. The cause was
+  `flows.ts::clickNewMenuItem` firing the `+` trigger ONCE and then waiting the
+  full budget on the dropdown, with nothing to re-click when that click missed;
+  it now re-clicks until the menu is actually up. 75 of the 123 spec files reach
+  that helper, which is why the victim was a different scenario every run, and
+  each occurrence added a full 45 s, which is most of where the "~20-min serial
+  run" came from. Raising `DEFAULT_TIMEOUT_MS` 20 s → 45 s therefore fixed
+  nothing; it doubled the price of each occurrence.
+  **Consequence for this list:** five of the seven quarantined specs (`nav1`,
+  `tp1`, `gp1`/`gp2`, `svc1`) go through that helper and are candidates for
+  release — but candidacy is not evidence. Un-quarantine one only after running
+  it `--retry=0` in a warm container ~15× with zero failures, which is the same
+  bar that proved the fix. `tor1` and `ci1`'s spec do NOT use the helper, so
+  they are separate debts: `tor1` is a fake-sidecar posture timeout (raise its
+  20 s budget or fix a handshake bug), not a network limit.
+- **Hunt flake with `--retry=0`.** With retries on, a failing attempt is erased
+  from the report and the flake rate reads as zero no matter how bad it is.
+  Repeat the spec in ONE warm container and always discard a warm-up run: the
+  first suite invocation in a fresh container costs ~40 s more than every one
+  after it (the `RUSTUP_HOME` re-provision above), and an A/B that does not
+  absorb it will measure that instead of whatever it meant to measure — badly
+  enough to invert the sign when the arms are swapped.
 - States unreachable through real UI are NOT forced into E2E: downgrade to a
   Vitest component test (mocked `invoke`) and record the downgrade on the
   Plane item.

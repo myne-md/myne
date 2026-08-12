@@ -87,3 +87,6 @@ src-tauri/binaries/
 # the script rather than on the source.
 web/wasm/pkg/
 web/bench/pkg/
+
+# E2E run reports (json floor evidence + junit flake history) — regenerated per run.
+.e2e-report/
