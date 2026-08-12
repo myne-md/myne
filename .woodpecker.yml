@@ -655,7 +655,20 @@ steps:
   # e2e "passed".
   e2e-floor:
     image: node:25
-    when: *code-paths
+    # NOT `*code-paths`, and the difference is the whole point. The anchor is a
+    # one-entry list carrying only `path`, and a step inherits the pipeline's
+    # default "skip me if an upstream step failed" — which skipped this one on
+    # pipeline 427 the moment `e2e` went red. That is exactly backwards: a
+    # failing `e2e` is when the floor most needs checking, because "the suite
+    # failed" and "the suite ran almost nothing and one of the few that ran
+    # failed" look identical from the outside. `status: [success, failure]` is
+    # the same mechanism `notify-failure` uses to survive an upstream failure;
+    # the path filter is repeated inline because a list entry cannot merge the
+    # anchor and add a key.
+    when:
+      - path:
+          exclude: ['docs/**', '*.md', '**/CLAUDE.md', '**/README.md']
+        status: [success, failure]
     depends_on:
       - name: e2e
         optional: true
