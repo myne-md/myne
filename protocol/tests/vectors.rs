@@ -61,6 +61,48 @@ fn companion_vectors_root() -> PathBuf {
         .join("vectors")
 }
 
+/// Whether a missing fixture is a **failure** rather than a skip.
+///
+/// The native lane's skip-on-absent-companion contract (`protocol/CLAUDE.md`)
+/// is right for a contributor with no companion checked out and wrong for the
+/// one CI step whose entire job is to assert: there, `[skip]` on every runner
+/// reports green having verified nothing, which is the state the
+/// `vector-verification` step in `.woodpecker.yml` is commented out over.
+///
+/// `MYNE_VECTORS_REQUIRED` inverts the default for that step alone. Unset —
+/// `pre-push`, a fresh clone, a contributor's laptop — keeps today's skip. Set
+/// to anything but `0` or the empty string, a missing fixture panics with the
+/// path it looked for, so an expired token or a moved ref fails loudly instead
+/// of silently returning the step to green-and-empty.
+#[cfg(not(target_arch = "wasm32"))]
+fn vectors_required() -> bool {
+    match std::env::var("MYNE_VECTORS_REQUIRED") {
+        Ok(v) => !v.is_empty() && v != "0",
+        Err(_) => false,
+    }
+}
+
+/// The `[skip]`-or-panic decision both loaders share, so the two cannot drift:
+/// a fixture that is optional in one version directory and mandatory in the
+/// other would be a hole exactly the size of whichever loader was forgotten.
+#[cfg(not(target_arch = "wasm32"))]
+fn missing_fixture(category: &str, path: &std::path::Path) -> Option<String> {
+    if vectors_required() {
+        panic!(
+            "[{category}] MYNE_VECTORS_REQUIRED is set and the fixture is absent: {}\n\
+             This lane exists to assert; skipping here would report green having \
+             verified nothing. Check out `myne-test-vectors` beside this repo (or \
+             unset MYNE_VECTORS_REQUIRED to restore the contributor-side skip).",
+            path.display()
+        );
+    }
+    eprintln!(
+        "[skip] {category}: companion repo fixture not present at {}",
+        path.display()
+    );
+    None
+}
+
 /// The raw `cases.json` for one category's `v0.1` fixtures, or `None` when this
 /// build has none — in which case the caller returns without asserting, exactly
 /// as the per-runner `path.exists()` check used to.
@@ -89,11 +131,7 @@ fn cases_json(category: &str) -> Option<String> {
             .join("v0.1")
             .join("cases.json");
         if !path.exists() {
-            eprintln!(
-                "[skip] {category}: companion repo fixture not present at {}",
-                path.display()
-            );
-            return None;
+            return missing_fixture(category, &path);
         }
         Some(fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display())))
     }
@@ -136,11 +174,7 @@ fn cases_json_v0_2(category: &str) -> Option<String> {
             .join("v0.2")
             .join("cases.json");
         if !path.exists() {
-            eprintln!(
-                "[skip] {category}: companion repo fixture not present at {}",
-                path.display()
-            );
-            return None;
+            return missing_fixture(category, &path);
         }
         Some(fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display())))
     }
