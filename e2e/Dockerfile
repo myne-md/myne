@@ -11,7 +11,27 @@
 # carries build deps + the WebDriver runtime (webkit2gtk-driver, xvfb);
 # the repo itself is bind-mounted at run time, never baked in.
 
-FROM rust:1.90.0-slim
+# Must match `rust-toolchain.toml`'s `channel`. When it does not, every cargo
+# invocation inside a container re-provisions the pinned toolchain from scratch
+# (~2 min), and `scripts/check-e2e-toolchain.mjs` fails the commit that let them
+# drift. This sat at 1.90.0 against a 1.96.0 pin.
+FROM rust:1.96.0-slim
+
+# Bake what the pin asks for beyond the base image. `rust:1.96.0-slim` ships
+# cargo/rustc/rust-std and NOTHING else, so `rust-toolchain.toml`'s rustfmt,
+# clippy and wasm32-unknown-unknown are fetched by the first cargo call in every
+# container — "info: downloading 3 components", measured.
+#
+# That download is not merely slow, it is the failure mode: rustup's partial
+# state is not crash-safe, and a run that raced it produced
+#   error: failed to install component ... detected conflict
+#   error: the 'cargo' binary ... is not applicable to the '1.96.0-…' toolchain
+# after which `cargo build -p e2e-fixture-gen` failed inside each scenario's own
+# budget. The suite then reported 255 FAILURES in 266 s — 245 of them the same
+# infrastructure error wearing a test's name. Baking it makes the runtime step
+# a no-op, which is the only version of it that cannot half-happen.
+RUN rustup component add rustfmt clippy \
+    && rustup target add wasm32-unknown-unknown
 
 # Tauri build sysdeps (same list as .woodpecker.yml's tauri-compile step)
 # + the E2E runtime additions: webkit2gtk-driver (WebKitWebDriver binary),
