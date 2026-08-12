@@ -145,6 +145,15 @@ pre-commit:
       # timeout — which reads like flake rather than like a stale helper.
       run: node scripts/check-e2e-menu-testids.mjs
 
+    woodpecker-substitution:
+      # A single-dollar brace token anywhere in .woodpecker.yml — INCLUDING a
+      # comment — fails Woodpecker's envsubst pass and kills the whole pipeline
+      # on every branch before any step runs. This guard is here and not in CI
+      # because CI is what breaks: a check for "the CI config does not compile"
+      # can never fire from inside CI.
+      glob: ".woodpecker.yml"
+      run: node scripts/check-woodpecker-substitution.mjs
+
     e2e-toolchain:
       # e2e/Dockerfile drifting from rust-toolchain.toml. Nothing fails to build:
       # rustup just re-provisions the pinned toolchain at runtime, inside
