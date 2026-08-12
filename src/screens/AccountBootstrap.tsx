@@ -49,6 +49,8 @@ import { CenteredCard } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { PasswordInput } from "../components/PasswordInput";
 import { AccountNumberEntry } from "./AccountNumberEntry";
+import { BetaTermsConsent } from "../components/sync/BetaTermsConsent";
+import { useBetaTermsGate } from "../hooks/useBetaTermsGate";
 import {
   ENROLL_NON_DISTINGUISHING_BANNER,
   ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE,
@@ -145,6 +147,7 @@ export function AccountBootstrap({
   onBootstrapped,
   initiallyPending = false,
 }: AccountBootstrapProps) {
+  const betaTerms = useBetaTermsGate();
   const { t } = useTranslation();
   const [account, setAccount] = useState<string | null>(null);
   const [password, setPassword] = useState("");
@@ -370,6 +373,30 @@ export function AccountBootstrap({
           {t("accountBootstrap.pendingStartOver")}
         </button>
       </CenteredCard>
+    );
+  }
+
+  // The beta-terms gate (myne-ops#15) — the third and last door onto sync.
+  //
+  // On this client sync is not optional (decisions.md 2026-07-26), so this door
+  // is the ONLY way in and the terms are the first thing a new user sees. It
+  // sits below the pending-approval wait for the same reason the account entry
+  // does: a device already waiting for approval has been through here, and
+  // re-asking would be asking again for something already given.
+  //
+  // There is nothing to cancel TO — the browser client with no account has no
+  // other screen — so declining simply leaves the terms up. That is honest:
+  // the alternative would be a dead end pretending to be a choice.
+  if (!betaTerms.pending && betaTerms.needed) {
+    return (
+      <div data-testid="bootstrap.beta-terms">
+        <BetaTermsConsent
+          onAccept={() => {
+            void betaTerms.accept();
+          }}
+          onCancel={() => {}}
+        />
+      </div>
     );
   }
 

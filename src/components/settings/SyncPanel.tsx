@@ -12,6 +12,8 @@ import { listen } from "../../platform/event";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 import { EndpointConfig } from "../sync/EndpointConfig";
 import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
+import { BetaTermsConsent } from "../sync/BetaTermsConsent";
+import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { DeviceJoinQr } from "../sync/DeviceJoinQr";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
@@ -104,6 +106,7 @@ export function SyncPanel({ onMigrated }: SyncPanelProps = {}) {
   const { status: syncStatus } = useSyncStatus();
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
+  const betaTerms = useBetaTermsGate();
   // Still roster-derived, because it asks something status cannot: the QR
   // invite is only meaningful for a device the ACCOUNT lists as an approved
   // member, and only the roster knows that.
@@ -301,13 +304,33 @@ export function SyncPanel({ onMigrated }: SyncPanelProps = {}) {
         </div>
       )}
 
-      {showEnroll && (
+      {/* The beta-terms gate (myne-ops#15). One of three doors that turn sync
+          on, and the gate stands in front of each — a consent screen at one
+          door is not a consent screen.
+
+          While the answer is still being read (`pending`) neither the terms
+          nor the form renders: showing the form first and replacing it a frame
+          later reads as a glitch, and showing the terms first would flash them
+          at someone who accepted months ago. It is one local read. */}
+      {showEnroll && !betaTerms.pending && (
         <div style={BLOCK_STYLE} data-setting-anchor="sync.add-device" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>
             {t("sync.panel.addDevice.label")}
           </span>
           <p style={HELPER_STYLE}>{t("sync.panel.addDevice.helper")}</p>
-          <EnrollDeviceForm />
+          {betaTerms.needed ? (
+            <BetaTermsConsent
+              onAccept={() => {
+                void betaTerms.accept();
+              }}
+              // Nothing to dismiss to here — the panel is the surface. Declining
+              // simply leaves the form unreached, which is what "not now" means
+              // at this door.
+              onCancel={() => {}}
+            />
+          ) : (
+            <EnrollDeviceForm />
+          )}
         </div>
       )}
 

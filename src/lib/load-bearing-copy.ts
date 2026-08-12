@@ -257,6 +257,16 @@ export {
   // browser it happened TO (task 94). Kept beside it so the two claims stay
   // consistent — a user who reads both must not conclude one is lying.
   DEVICE_REVOKED_DISCLOSURE,
+  // The four beta-terms clauses shown before sync is first switched on
+  // (myne-ops#15), and the version stamp that decides when they are shown
+  // again. Shared for the strongest form of the usual reason: this is the text
+  // a user AGREED to, and an acceptance recorded against a paraphrase on one
+  // client would not be an acceptance of what another client asked.
+  BETA_TERMS_VERSION,
+  BETA_TERMS_WHAT_THIS_IS,
+  BETA_TERMS_DATA_LOSS,
+  BETA_TERMS_WHAT_HAPPENS_NEXT,
+  BETA_TERMS_WHAT_WE_CAN_SEE,
 } from "@myne/copy";
 // Browser-extension clip success notice (desktop-ingest task 7, MYND-442). A
 // clip lands at the vault ROOT (SYNC-15) and the user keeps working — the

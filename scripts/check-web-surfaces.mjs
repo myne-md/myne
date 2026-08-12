@@ -241,6 +241,10 @@ const V = {
   "src/lib/imperative-focus-trap.ts": ["ported", "Pure DOM."],
   "src/lib/imperative-modal.ts": ["ported", "Pure DOM."],
   "src/lib/io-banner.ts": ["ported", "Bounded IO-failure copy mapping."],
+  "src/hooks/useBetaTermsGate.ts": [
+    "ported",
+    "Reads the device-local beta-terms acceptance through the platform seam (myne-ops#15), so the hook itself is platform-free — desktop resolves it to a sync-plugin command, the browser to localStorage on the main thread.",
+  ],
   "src/lib/legal-urls.ts": [
     "ported",
     "Pure URL construction for the published legal documents (myne-ops#15) — no host call, no IPC, no platform branch. The only input is the i18next language tag, which both clients have. Opening the URL is the seam's job (`openUrl`), and that is already substituted.",

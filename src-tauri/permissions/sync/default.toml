@@ -40,6 +40,8 @@ permissions = [
     "allow-sync-restore-quarantine",
     "allow-sync-delete-quarantine",
     "allow-sync-device-join-qr",
+    "allow-sync-beta-terms-accepted",
+    "allow-sync-accept-beta-terms",
     "allow-sync-get-tor-routing",
     "allow-sync-set-tor-routing",
     "allow-sync-get-tor-state",
@@ -159,6 +161,16 @@ commands.allow = ["sync_delete_quarantine"]
 identifier = "allow-sync-device-join-qr"
 description = "Allow invoking sync:sync_device_join_qr (MYND-466 — render a device-join QR for the user-pasted account number + this device's own endpoint/cert-pin. Read-only affordance: reads the endpoint config, moves no vault bytes, carries no secret in the QR — SYNC-47. The account# is a paste argument, never read from storage)."
 commands.allow = ["sync_device_join_qr"]
+
+[[permission]]
+identifier = "allow-sync-beta-terms-accepted"
+description = "Allow invoking sync:sync_beta_terms_accepted (myne-ops#15 — ask whether the beta-terms version this build ships has been accepted on this device, reading app_config_dir/legal-consent.json; absent or unreadable → false). One boolean out, one version string in. No vault access, no network, no side-effect; reachable pre-unlock because two of the three doors that turn sync on run before any vault is open."
+commands.allow = ["sync_beta_terms_accepted"]
+
+[[permission]]
+identifier = "allow-sync-accept-beta-terms"
+description = "Allow invoking sync:sync_accept_beta_terms (myne-ops#15 — record in app_config_dir/legal-consent.json that the given beta-terms version was accepted on this device). Writes one device-local JSON file, read-modify-write so a later field is not cleared; deliberately NOT a vault.prefs field, because enrolment seeds a new device's prefs wholesale and an acceptance that arrives by sync is not an acceptance. No vault access, no network."
+commands.allow = ["sync_accept_beta_terms"]
 
 [[permission]]
 identifier = "allow-sync-get-tor-routing"
