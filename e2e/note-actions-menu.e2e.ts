@@ -90,7 +90,7 @@ describeE2E("na1 note-actions menu — open, list, run, gate (#233)", () => {
         // Gate from the other side: opening the attachments library flips the
         // centre view away from the note, and the trigger must disappear (the
         // same gate the right-sidebar toggle uses; the two float together).
-        await runPaletteAction(s, "attachments.open");
+        await runPaletteAction(s, "attachments.open", "attach");
         await s.byTestId("attachments.library");
         expect(
           (await s.byTestIdAll("editor.note-actions-menu")).length,

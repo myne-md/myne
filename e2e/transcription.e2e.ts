@@ -198,7 +198,7 @@ aiDescribe("tr3 attachments-library transcription viewer (#231)", () => {
         // menu is not the body-portaled self-closing kind (al1 clicks its rows
         // directly), so one open is enough; "View transcription" appears once the
         // per-attachment extracted-text probe resolves.
-        await runPaletteAction(s, "attachments.open");
+        await runPaletteAction(s, "attachments.open", "attach");
         await s.byTestId("attachments.library");
         const tileMenu =
           testIdSelector("attachments.tile", { "data-id": id }) +
