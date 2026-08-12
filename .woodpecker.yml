@@ -929,8 +929,34 @@ steps:
     # healthcheck noise ("only one connection allowed") against the 29 daemon —
     # a red herring, never the actual failure (see the network note below).
     image: docker:cli
+    # MANUAL ONLY (owner decision, 2026-08-13). `develop` pushes still BUILD the
+    # bundle and run every artefact gate in `web-build`; what they no longer do
+    # is publish it.
+    #
+    # Why the automatic half went. `app.myne.md` was tracking unreviewed
+    # `develop` — including, on any given day, another contributor's half-landed
+    # work. And the hash record is a PRECONDITION rather than a log
+    # (`docs/web-bundle-hashes.md`): a bundle may only be deployed once its hash
+    # has been published in a reviewed commit. Those two together mean an
+    # auto-deploy on every push is asking for a human decision on every push,
+    # and getting a red step instead — a gate that is permanently red teaches
+    # people to ignore red, which costs more than the deploy it was guarding.
+    #
+    # What is NOT weakened: the hash record itself. It is the only compensating
+    # control A15/TB11 has — the web bundle is re-delivered from an origin on
+    # every page load, no signature is verified by the browser, and the user
+    # keeps no artefact to compare. Detection-after-the-fact is the whole
+    # mitigation, and it depends on every served bundle having been published
+    # first. Deploying less often does not change that; deploying without the
+    # record would.
+    #
+    # The standing risk of manual-only, stated because nothing else will state
+    # it: a deploy that nobody triggers is a deploy that does not happen, and
+    # `app.myne.md` will quietly serve an older bundle until someone notices.
+    # `web-smoke` verifies WHICH commit is live against the deployed origin, so
+    # the staleness is observable — but only when someone looks.
     when: &web-deploy
-      - event: [push, manual]
+      - event: manual
         branch: develop
     depends_on: [web-build]
     environment:
