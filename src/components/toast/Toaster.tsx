@@ -178,7 +178,17 @@ function ToastRow({
             <Icon name={iconName} size={16} />
           </span>
         )}
-        <span className="myne-toast__msg">{item.message}</span>
+        {/* The message carries its own testid because reading it positionally
+            does not work and silently looks like it does. A toast with an icon
+            renders the icon span FIRST, and that span's textContent is empty
+            (it holds an SVG), so `toast.querySelector("span").textContent` is
+            "" — which a scenario polling for the message reads as "no toast
+            yet" until its budget runs out. Four E2E call sites did exactly
+            that; the ones that passed were the variants that happen to render
+            no icon. */}
+        <span className="myne-toast__msg" data-testid="editor.toast-message">
+          {item.message}
+        </span>
         {item.action !== undefined && (
           <button
             type="button"
