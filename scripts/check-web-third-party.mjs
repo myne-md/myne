@@ -49,6 +49,14 @@ const KNOWN = new Map([
   ["http://www.apache.org", "pdf.js: Apache-2.0 licence header text"],
   ["http://www.xfa.org", "pdf.js: XFA form namespace identifier — an XML namespace URI, never fetched"],
   ["https://docs.rs", "rust: a doc link in a panic/error string compiled into the wasm"],
+  // — Myne's own AI settings panel (#415/#189), not a vendored library. The AI
+  //   panel names Ollama as the local model runtime and offers a link to it;
+  //   `AiPanel.tsx` hands that URL to `openUrl`, an OS handoff into the USER's
+  //   own browser through the platform seam. Nothing in the app fetches it, and
+  //   the panel deliberately offers no "pull a model" affordance — which is what
+  //   keeps "Myne never downloads models" true without an exception. CSP
+  //   (`default-src 'none'`) blocks it at runtime regardless.
+  ["https://ollama.com", "myne AI panel: the local-runtime link the user's own browser opens (openUrl, never fetched)"],
   // — Excalidraw's own services. Its collaboration, library-browser and AI
   //   features point at these. Myne uses none of them: drawing notes are local
   //   and the assets are self-hosted (`excalidraw-asset-path`). CSP-blocked.
