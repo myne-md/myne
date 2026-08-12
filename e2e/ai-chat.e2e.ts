@@ -30,6 +30,7 @@ import { seedVault } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
+  dismissImporterOfferIfPresent,
   enableAi,
   runPaletteAction,
   typeIntoEditor,
@@ -104,7 +105,11 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears"
         const pw = await s.byTestId("unlock.password-input", { timeoutMs: 15_000 });
         await pw.sendKeys(password);
         await (await s.byTestId("unlock.submit")).click();
-        await dismissImporterOffer(s);
+        // Second editor mount: the importer offer is a FRESH-VAULT overlay and does
+        // not re-appear after a lock -> unlock on a vault that already has notes —
+        // `dismissImporterOfferIfPresent`'s own doc says so, and the hard variant
+        // times out waiting for something that is deliberately absent.
+        await dismissImporterOfferIfPresent(s);
         await runPaletteAction(s, "ai.open-chat", "chat");
         // Transcript cleared on lock (task 12): no turns, no transcript region.
         await s.waitUntil(
