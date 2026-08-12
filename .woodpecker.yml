@@ -544,7 +544,7 @@ steps:
     when: *code-paths
     environment:
       # Same secret sync-sim resolves. `$$` escapes Woodpecker's substitution
-      # pass — a bare `${…}` is replaced with the empty string BEFORE the shell
+      # pass — a bare dollar-brace token is replaced with the empty string BEFORE the shell
       # sees it, which is how sync-sim's guard came to `exit 0` on every run.
       MYNE_SERVER_TOKEN:
         from_secret: myne_server_token
@@ -999,17 +999,17 @@ steps:
       MYNE_SERVER_TOKEN:
         from_secret: myne_server_token
     commands:
-      # `$$` is NOT a typo and NOT decoration. Woodpecker pre-processes `${...}`
+      # `$$` is NOT a typo and NOT decoration. Woodpecker pre-processes dollar-brace
       # in commands and substitutes its OWN variables; a name it does not know
       # becomes the empty string BEFORE the shell ever sees the line. Written
-      # `${MYNE_SERVER_TOKEN:-}`, this guard compiled to `if [ -z "" ]` — always
+      # with a single dollar, this guard compiled to `if [ -z "" ]` — always
       # true — so the step printed "skipping sync-sim" and `exit 0`d on every
       # run, with the secret present, and 30 sim tests never executed while the
       # step reported green. `$${…}` escapes the pre-processor (the same idiom
       # the android step's `$${ANDROID_NDK_HOME:+…}` already uses); the sibling
       # guards below reach the shell only because they are brace-LESS
       # (`$VECTORS_TOKEN`, `$PUSHOVER_TOKEN`), which the pre-processor leaves
-      # alone. Never write a bare `${VAR}` in a command here.
+      # alone. Never write a single-dollar brace token in a command here.
       - |
         if [ -z "$${MYNE_SERVER_TOKEN:-}" ]; then
           echo "myne_server_token not provided -> skipping sync-sim (re-add the from_secret to enable)";
