@@ -103,6 +103,15 @@ allow = [
     "BSD-3-Clause",
     "BSL-1.0",
     "CC0-1.0",
+    # webpki-roots's Mozilla CA bundle is dual-stated MPL-2.0 / CDLA-Permissive-2.0,
+    # and cargo-deny reads the CDLA half. The dependency itself was reviewed and
+    # accepted as a security decision — docs/dependency-policy.md "Remote AI
+    # providers (myne#415)" records this exact license pair, decisions.md
+    # 2026-08-09 "User-named AI providers", ledger SYNC-23. The prose said yes and
+    # this list was never told, so `cargo-deny` has been red since e194df44 —
+    # unnoticed because CI was not running on push. Permissive, no copyleft,
+    # applies to certificate DATA rather than to code.
+    "CDLA-Permissive-2.0",
     "ISC",
     "MIT",
     "MIT-0",
