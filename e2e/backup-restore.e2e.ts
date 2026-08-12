@@ -65,7 +65,13 @@ describeE2E("backup-restore (MYND-56)", () => {
         const exported = await pageSeatInvoke(
           session,
           "plugin:backup|vault_export_backup",
-          { vaultId: null, destination },
+          // `vaultId` is `String`, not `Option<String>` — the command parses it
+          // and answers `VaultNotFound` on a bad one
+          // (`plugins/backup/commands.rs`). Sending `null` failed the whole
+          // scenario on argument deserialization, so it never reached the
+          // export/restore round trip it exists to prove. Same defect, same
+          // command, as scheduled-backup carried.
+          { vaultId: seeded.vaultId, destination },
           60_000,
         );
         if (exported.err !== undefined) {

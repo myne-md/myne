@@ -83,8 +83,15 @@ describeE2E("cp1 rotation happy path — no relock (MYND-224)", () => {
 
         // Success closes the modal and toasts — and does NOT relock:
         // the editor stays mounted, no unlock form appears.
-        const toast = await s.byTestId("editor.toast", { timeoutMs: 20_000 });
-        expect(await toast.text()).toBe("Password updated");
+        // Read the MESSAGE span, not the toast root. This driver's W3C
+        // `Get Element Text` drops text inside child elements (the helper's own
+        // doc in `support/webdriver.ts` says so), and the toast's message is a
+        // child span — so `toast.text()` returned "" and this assertion failed
+        // with `expected '' to be 'Password updated'` on a toast that was
+        // rendering the right words the whole time.
+        await s.byTestId("editor.toast", { timeoutMs: 20_000 });
+        const toastMsg = await s.byTestId("editor.toast-message", { timeoutMs: 20_000 });
+        expect(await toastMsg.textContent()).toBe("Password updated");
         await s.waitForGone(testIdSelector("settings.modal"));
         await s.byTestId("editor.root");
         expect((await s.byTestIdAll("unlock.password-input")).length).toBe(0);

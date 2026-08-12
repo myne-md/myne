@@ -77,6 +77,12 @@ const COMPRESSION_SWITCH = "settings.attachment-compression";
  *  shorter than this could step over a notice that appeared and vanished. */
 const TOAST_LIFETIME_MS = 3_200;
 
+/** What a compression disclosure looks like, in either of its two wordings
+ *  (`editor.attachment.compression.notice` / `…noticeContainerChanged`). Both
+ *  end in the `<from> → <to>` byte pair, which is the part that constitutes the
+ *  disclosure — a sentence without it is some other toast. */
+const COMPRESSION_NOTICE = /\d[\d.]*\s*[KMG]?i?B\s*→\s*\d[\d.]*\s*[KMG]?i?B/;
+
 const IPC_TIMEOUT = 20_000;
 
 /** Distinct display names so the two imports are unambiguous in the catalog.
@@ -115,10 +121,31 @@ async function pasteImage(s: Session, base64: string, filename: string): Promise
 
 /** The toast's text, or `null` when no toast is showing. Read in ONE round
  *  trip so a toast that auto-dismisses between find and read cannot turn into
- *  a stale-element throw. */
+ *  a stale-element throw.
+ *
+ *  BOTH surfaces, and that is the fix this scenario needed.
+ *  `showAttachmentToast` has two paths (`editor/src/attachments/toast.ts`):
+ *  when the app has installed a toast SINK it forwards to the central store and
+ *  the message renders as `editor.toast`; only WITHOUT a sink does it build the
+ *  standalone `attachment-toast` node itself. The running desktop app installs
+ *  the sink, so the compression notice has been arriving as `editor.toast` —
+ *  and this scenario polled the fallback testid alone, for 90 s, and reported
+ *  a timeout that read like "compression never disclosed anything".
+ *
+ *  It was not. The diagnostic below showed the catalog holding
+ *  `…​.webp` at 97 KiB from a 149 KiB PNG source: the compression and the
+ *  container swap both happened. Only the reader was pointed at the wrong node.
+ *
+ *  Reading both keeps the assertion true on either path rather than pinning
+ *  today's wiring — the disclosure is what matters, not which element carries
+ *  it. `editor.toast-message` is the message span specifically: the toast root
+ *  renders the icon span first, and that one holds an SVG with no text. */
 function toastText(s: Session): Promise<string | null> {
   return s.execute<string | null>(
-    "var el = document.querySelector(arguments[0]); return el ? el.textContent : null;",
+    "var el = document.querySelector(arguments[0]);" +
+      "if (el) return el.textContent;" +
+      "var m = document.querySelector('[data-testid=\"editor.toast-message\"]');" +
+      "return m ? m.textContent : null;",
     [TOAST],
   );
 }
@@ -186,10 +213,35 @@ describeE2E("ic1 ingest-time image compression (ingest-image-compression)", () =
         // Poll the toast text directly; the decode → Lanczos3 downscale →
         // lossless-WebP encode runs before it appears, so the budget is
         // generous, but the toast only lives 3.2 s once it does.
-        const notice = await s.waitUntil(async () => (await toastText(s)) || null, {
-          label: "compression notice",
-          timeoutMs: 90_000,
-        });
+        //
+        // On timeout, say WHICH of the three things went wrong instead of
+        // reporting 90 s of silence. "waitUntil(compression notice) timed out"
+        // is true of a paste that never became an attachment, of an attachment
+        // that was never compressed, and of a notice that rendered under a
+        // different testid — three different bugs with one message. The catalog
+        // is the disk truth and costs one IPC, and it is only read on the way
+        // to failing anyway.
+        let notice: string;
+        try {
+          notice = await s.waitUntil(async () => (await toastText(s)) || null, {
+            label: "compression notice",
+            timeoutMs: 90_000,
+          });
+        } catch (e) {
+          const rows = await catalog(s).catch(() => [] as Array<{ filename: string; size: number }>);
+          const anyToast = await s.execute<string | null>(
+            "var t = document.querySelector('[data-testid=\"attachment-toast\"]');" +
+              "var r = document.querySelector('[data-testid=\"editor.toast\"]');" +
+              "return t ? 'attachment-toast: ' + t.textContent : (r ? 'editor.toast: ' + r.textContent : null);",
+          );
+          throw new Error(
+            `${(e as Error).message}\n` +
+              `  attachments in the catalog: ${JSON.stringify(rows.map((r) => ({ f: r.filename, size: r.size })))}\n` +
+              `  any toast on screen: ${anyToast ?? "none"}\n` +
+              `  (empty catalog => the paste never imported; a row with the ORIGINAL size => ` +
+              `import worked and compression did not; a toast under another testid => the notice moved)`,
+          );
+        }
 
         // Full shape: the container swap is named, and the "from" size is the
         // ORIGINAL file's — the one nothing on disk remembers any more.
@@ -210,7 +262,21 @@ describeE2E("ic1 ingest-time image compression (ingest-image-compression)", () =
         expect(compressed.filename).toBe("bannerpasteon7q2w9.webp");
 
         // ---- 2. preference OFF: paste → no notice, source stored verbatim ----
+        // Wait for phase 1's OWN notice to clear, on whichever surface carried
+        // it. `waitForGone(TOAST)` alone returned instantly and always has:
+        // `attachment-toast` is the fallback node, which the running app never
+        // builds because it installs a toast sink. The store-backed toast lives
+        // longer than the fallback's 3.2 s, so phase 2's absence assertion was
+        // reading phase 1's message and failing on it — an absence assertion
+        // that never got a chance to be about phase 2 at all.
         await s.waitForGone(TOAST, { timeoutMs: 15_000 });
+        await s.waitUntil(
+          async () => {
+            const t = await toastText(s);
+            return t === null || !COMPRESSION_NOTICE.test(t) ? true : null;
+          },
+          { label: "phase-1 compression notice cleared", timeoutMs: 20_000 },
+        );
         await setCompressionEnabled(s, false);
 
         await (await s.waitForElement(CM_CONTENT)).click();
@@ -226,10 +292,16 @@ describeE2E("ic1 ingest-time image compression (ingest-image-compression)", () =
         let stored: number | null = null;
         let landedAt = 0;
         for (let tick = 0; ; tick++) {
+          // A COMPRESSION notice, not "any toast". `toastText` reads the shared
+          // toast surface, and an ordinary insert may legitimately toast about
+          // something else (a batch summary, an error); asserting "no toast at
+          // all" would fail on those and would be asserting the wrong thing —
+          // what must not happen here is a claim that bytes were re-encoded.
+          const showing = await toastText(s);
           expect(
-            await toastText(s),
-            "no notice may appear when compression is off",
-          ).toBeNull();
+            showing === null || !COMPRESSION_NOTICE.test(showing),
+            `no compression notice may appear when compression is off (saw: ${JSON.stringify(showing)})`,
+          ).toBe(true);
           if (stored === null) {
             if (tick % 5 === 0) {
               const row = (await catalog(s)).find((r) =>
