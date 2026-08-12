@@ -24,6 +24,12 @@ Three files at the repo root carry the visual + strategic system. Read in this o
 
 `/impeccable` commands (craft, polish, audit, etc.) read `PRODUCT.md` + `DESIGN.md` automatically. Do not duplicate their content into other docs.
 
+## Session output convention (pointer)
+
+Every Claude Code session in this repo loads `.claude/skills/adhd/SKILL.md` at start, injected by the checked-in SessionStart hook `.claude/hooks/adhd-always-on.mjs` (wired in `.claude/settings.json`). It shapes *how* answers are written — action first, numbered steps, state restated each turn, no preamble/recap/closers — and never what they are allowed to claim: security, crypto, spec and data-loss content is exempt from every brevity rule, and each artefact-producing skill (`/grill-me`, `/pr-review`, `/summarize`, …) keeps its own format. Read the skill for the full list of where the shape yields.
+
+On by default and per-clone opt-out: `touch .claude/.adhd-off` (gitignored), `MYNE_ADHD_OFF=1` for one invocation, or "stop adhd mode" mid-session. The hook is a no-op when `CI` is set, so the unattended lanes — Woodpecker, the runner jail, the issue-triage and PR-review bots — keep their fixed-format English output.
+
 ## Project status
 
 **Pre-alpha.** Shipped: v0.1 specs (`docs/`), Tauri 2 + Vite + React + TS scaffold (`src/`, `src-tauri/`), Rust crypto crate (`protocol/`, RustCrypto, `#![no_std]` + `alloc`), Cargo workspace (one shared `Cargo.lock`), workspace scripts, pinned toolchain. The desktop scaffold lives at the **repo root** deliberately. It is no longer the only in-repo client: the Phase 3 desktop-**browser** client lives at `web/` and compiles the same `src/` tree (`design-notes.md` **2026-07-26** "The web client lives in-repo at `web/`", which supersedes the one-in-repo-client clause of the 2026-04-26 "Desktop scaffold lives at repository root" entry while leaving its placement decision intact). Mobile, server, website, ops, test-vectors, clipper, themes and branding remain companion repos (`workspace/manifest.txt` is the list); `myne-web` is redundant and archived.
