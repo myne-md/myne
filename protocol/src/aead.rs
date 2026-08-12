@@ -2582,4 +2582,237 @@ mod tests {
         std::fs::write("/tmp/myne_aad_construction_vectors.json", dump.as_bytes())
             .expect("write aad-construction vectors dump");
     }
+
+    /// Generator for the **v0.2** `aad-construction` vectors.
+    ///
+    /// `cargo test -p protocol --lib emit_aad_construction_v0_2_vectors_for_paste -- --ignored`
+    ///
+    /// The four v0.2 AAD builders shipped with no cross-implementation vector of
+    /// any kind, and they are not ordinary additions: each stamps
+    /// [`AAD_PREFIX_V0_2`] (`"myne.v0.2|"`) and [`PROTOCOL_VERSION_V0_2`]
+    /// (`0x02`), both of which the repo-root identifier table lists as
+    /// **major-version-event constants**. They are also live production code —
+    /// `singleton_migrate.rs`, `vault_meta_v0_2.rs`, `blob_envelope.rs`,
+    /// `prefs.rs` and `attachments_catalog.rs` all call them on the §10.4.1
+    /// whole-vault re-seal path — so an unvectored prefix here is a port that can
+    /// migrate a vault into bytes no other implementation will ever open.
+    ///
+    /// The two `aad_nc05_*` builders are the v0.2 family's other half and are
+    /// deliberately absent: `crdt-note-blob/v0.2` already pins both as
+    /// `aad_construction` cases, and duplicating them here would create a second
+    /// place to update. The v0.1 file's exclusion note has the same shape.
+    ///
+    /// `kdf_params` is the v0.1 canonical block on purpose. v0.2's own KDF is
+    /// **not allocated yet** (repo-root `CLAUDE.md`: only the AAD prefix, the
+    /// HKDF context prefix, the `0x02` version byte and the `NC05` magic are
+    /// pinned so far), so what these two cases pin is the *framing* — where the
+    /// param block sits and that it is bound at all — not a v0.2 parameter
+    /// choice. When v0.2 picks its KDF, the values change and the offsets do not.
+    #[test]
+    #[ignore]
+    fn emit_aad_construction_v0_2_vectors_for_paste() {
+        extern crate std;
+        use alloc::string::String;
+
+        let params = DEFAULT_V0_1_KDF_PARAMS;
+        // Same byte patterns as the v0.1 generator, so a reviewer diffing the two
+        // files sees only the differences that are real: prefix, version, role.
+        let items_key_id: [u8; 16] = [0xB1; 16];
+        let account_number_hash: [u8; 16] = [0xA3; 16];
+
+        let aad_pw = aad_password_wrap_v0_2(&params);
+        let aad_rec = aad_recovery_wrap_v0_2(&params);
+        let aad_vik = aad_vault_items_key_wrap_v0_2(&items_key_id);
+        let aad_prefs = aad_singleton_blob_v0_2(b"prefs-blob", &account_number_hash);
+        let aad_themes = aad_singleton_blob_v0_2(b"custom-themes-blob", &account_number_hash);
+
+        // The property that makes the v0.2 prefix worth a vector at all: the same
+        // role under the two majors produces different AAD, so a v0.1 blob cannot
+        // verify as v0.2 or the reverse (§10.5 anti-downgrade).
+        assert_ne!(
+            aad_singleton_blob(b"prefs-blob", &account_number_hash),
+            aad_prefs,
+            "v0.1 and v0.2 singleton AAD for the same role must differ — that difference IS the domain separation"
+        );
+        assert!(
+            aad_prefs.starts_with(AAD_PREFIX_V0_2) && aad_prefs[AAD_PREFIX_V0_2.len()] == 0x02,
+            "v0.2 AAD must carry the v0.2 prefix and version byte"
+        );
+
+        let kdf_params_json = alloc::format!(
+            "      \"input_kdf_params\": {{\n        \"m_kib\": {},\n        \"t\": {},\n        \"p\": {},\n        \"argon2_version_hex\": \"{:02x}\"\n      }},\n",
+            params.m_kib, params.t, params.p, params.argon2_version
+        );
+        let items_key_id_json = alloc::format!(
+            "      \"input_items_key_id_hex\": \"{}\",\n",
+            hex_lower(&items_key_id)
+        );
+        let account_hash_json = alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_number_hash)
+        );
+        let role_and_hash_json = |role: &str| -> String {
+            alloc::format!("      \"input_role_label\": \"{role}\",\n{account_hash_json}")
+        };
+
+        let mut dump = String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"aad-construction\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.2\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §10.4.1 + §10.5 + §5.2\",\n");
+        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for the v0.2 aad_* builders (protocol/src/aead.rs) — the next-major mirrors of the v0.1 family, stamped with the AAD prefix 'myne.v0.2|' and protocol_version byte 0x02. Both are major-version-event constants: the same role under the two majors yields different AAD, which is precisely the §10.5 anti-downgrade separation that stops a v0.1 blob verifying as v0.2 or the reverse. These builders are the §10.4.1 whole-vault migration's re-seal path, so a port that gets the framing wrong migrates a vault into bytes no other implementation can open. 5 cases: the password/recovery wraps, the itemsKey wrap, and the generic KEK-singleton builder shown under two different roles (v0.2 has no per-family singleton builders — the migration rebuilds any family's AAD from its role string, so the role is an INPUT here rather than baked into the function name). The two aad_nc05_* builders are the other half of the v0.2 family and are pinned by crdt-note-blob/v0.2's own aad_construction cases rather than duplicated here. NOTE on kdf_params: v0.2's KDF is not allocated yet, so the password/recovery cases carry the v0.1 canonical block — what they pin is the framing (where the block sits, that it is bound), not a v0.2 parameter choice. Cases generated by `cargo test -p protocol --lib emit_aad_construction_v0_2_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        // `case_slug` and `builder_name` are separate on purpose: the generic
+        // singleton builder appears twice under two roles, so the vector_id has
+        // to distinguish the cases while `input_builder_name` must stay the real
+        // function name the runner dispatches on.
+        let emit_case = |dump: &mut String,
+                         case_slug: &str,
+                         builder_name: &str,
+                         description: &str,
+                         full_aad: &[u8],
+                         segments: &[(&str, usize)],
+                         inputs_json: &str,
+                         trailing_comma: bool| {
+            let total: usize = segments.iter().map(|(_, len)| *len).sum();
+            assert_eq!(
+                total,
+                full_aad.len(),
+                "segment lengths must sum to AAD length for {}",
+                case_slug
+            );
+            assert!(
+                full_aad.starts_with(AAD_PREFIX_V0_2),
+                "{} must carry the v0.2 AAD prefix",
+                case_slug
+            );
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"aad-construction/v0.2/{}\",\n",
+                case_slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_builder_name\": \"{}\",\n",
+                builder_name
+            ));
+            dump.push_str(inputs_json);
+            dump.push_str(&alloc::format!(
+                "      \"expected_aad_hex\": \"{}\",\n",
+                hex_lower(full_aad)
+            ));
+            dump.push_str("      \"informational_aad_segments\": [\n");
+            let mut offset = 0usize;
+            for (i, (label, len)) in segments.iter().enumerate() {
+                let seg = &full_aad[offset..offset + len];
+                dump.push_str(&alloc::format!(
+                    "        {{ \"offset\": {}, \"length\": {}, \"label\": \"{}\", \"bytes_hex\": \"{}\" }}{}\n",
+                    offset,
+                    len,
+                    label,
+                    hex_lower(seg),
+                    if i + 1 == segments.len() { "" } else { "," }
+                ));
+                offset += len;
+            }
+            dump.push_str("      ]\n");
+            dump.push_str(if trailing_comma {
+                "    },\n"
+            } else {
+                "    }\n"
+            });
+        };
+
+        emit_case(
+            &mut dump,
+            "aad_password_wrap_v0_2",
+            "aad_password_wrap_v0_2",
+            "AAD bound into the AEAD wrap of root_key under the password-derived wrap key on a v0.2 vault (§10.4.1). Byte-for-byte the aad_password_wrap shape with the prefix and version byte swapped: role 'password-wrap' stays identical, so the ONLY thing separating a v0.1 wrap from a v0.2 one is those 11 leading bytes. That is the whole point — role reuse is safe precisely because the prefix already domain-separates the majors. account_number_hash is NOT in this AAD; it mixes into the wrap-key salt instead (§3.1).",
+            &aad_pw,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 13),
+                ("kdf_params_canonical", 11),
+            ],
+            &kdf_params_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_recovery_wrap_v0_2",
+            "aad_recovery_wrap_v0_2",
+            "AAD bound into the AEAD wrap of root_key under the recovery-phrase-derived wrap key on a v0.2 vault (§10.4.1). Identical shape to aad_password_wrap_v0_2 but role 'recovery-wrap' — within one major the role bytes are the sole separator between the two wraps, exactly as in v0.1.",
+            &aad_rec,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 13),
+                ("kdf_params_canonical", 11),
+            ],
+            &kdf_params_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_vault_items_key_wrap_v0_2",
+            "aad_vault_items_key_wrap_v0_2",
+            "AAD bound into the AEAD wrap of the singleton itemsKey on a v0.2 vault (§10.4.1). No length-prefixed role — prefix + version + items_key_id, the aad_vault_items_key_wrap shape. Note there is no v0.2 note-scoped sibling in this file: the per-note wrap for the v0.2 note type is aad_nc05_item_key_wrap, pinned by the crdt-note-blob/v0.2 vectors.",
+            &aad_vik,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("items_key_id", 16),
+            ],
+            &items_key_id_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_singleton_blob_v0_2-prefs-blob",
+            "aad_singleton_blob_v0_2",
+            "The generic v0.2 KEK-singleton AAD builder under the 'prefs-blob' role — what the §10.4.1 migration re-seals vault.prefs with. v0.2 has no per-family singleton builders (no aad_prefs_blob_v0_2): the migration walks the families and rebuilds each AAD from its role string, so the role is an INPUT rather than baked into a function name. This case and the next differ ONLY in the role bytes and their length prefix, which is the property a port must reproduce: one generic function, one role per family, no per-family constant to get wrong.",
+            &aad_prefs,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 10),
+                ("account_number_hash", 16),
+            ],
+            &role_and_hash_json("prefs-blob"),
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_singleton_blob_v0_2-custom-themes-blob",
+            "aad_singleton_blob_v0_2",
+            "The same generic v0.2 builder under the 'custom-themes-blob' role — the family whose v0.2 side vault-themes/v0.2 pins as an MYT5 envelope. Paired with the prefs-blob case so the role's length prefix is exercised at two different lengths (10 vs 18 bytes): a port that hardcoded one role length would pass one case and fail the other.",
+            &aad_themes,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 18),
+                ("account_number_hash", 16),
+            ],
+            &role_and_hash_json("custom-themes-blob"),
+            false,
+        );
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write(
+            "/tmp/myne_aad_construction_v0_2_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write aad-construction v0.2 vectors dump");
+    }
 }
