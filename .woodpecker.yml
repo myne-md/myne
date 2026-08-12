@@ -813,7 +813,23 @@ steps:
       # The vitest specs that assert the same two properties (tests/web/,
       # tests/platform/) — so the web lane covers them as tests, not only as
       # scripts, and the seam contract runs against BOTH implementations here.
-      - pnpm test
+      #
+      # SCOPED to those two directories, which is what the sentence above always
+      # said it wanted. It used to be a bare `pnpm test`, i.e. the ENTIRE 7,400-
+      # test suite — the same suite the `vitest` step has already run earlier in
+      # this pipeline. Two consequences, both observed on one pipeline (#446):
+      #
+      #   - it doubled the exposure to any flake in the desktop suite, and did.
+      #     `vitest` ran the full suite green; `web-build` ran the identical
+      #     command on the identical commit minutes later and went red on
+      #     `tests/editor/table-in-blockquote.test.ts`. Same input, two answers
+      #     — which is what a flake IS, proved here for free by the duplication
+      #     rather than by repeated runs;
+      #   - it spent ~2 minutes re-running tests that had already passed, on the
+      #     step that gates the web deploy.
+      #
+      # Coverage is unchanged: the full suite still runs, once, in `vitest`.
+      - pnpm exec vitest run tests/web tests/platform
 
   # ─── Web E2E lane (the built bundle in a real browser, MYND-574 task 105) ────
   # Drives `web/dist` — the SAME artefact `web-build` just produced, served by
