@@ -24,7 +24,12 @@
 import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  clickUntilVisible,
+  dismissImporterOffer,
+  setViewsEnabled,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector } from "./support/webdriver";
 
 describeE2E("vc1 cards cover picker — choose an existing image as a card cover", () => {
@@ -41,24 +46,24 @@ describeE2E("vc1 cards cover picker — choose an existing image as a card cover
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget
+        // and the spec fails deterministically.
+        await setViewsEnabled(s, true);
 
         // All-pages cards view via "+ New view" → save with no conditions.
-        // Under full-suite load the populated exportSuite vault re-indexes after
-        // unlock, so the sidebar can remount and swallow the new-view click
-        // before its React handler is wired (a single click then never opens the
-        // modal — the line-47 timeout). Re-click until the modal actually opens;
-        // the button only OPENS the builder, so a duplicate open creates no view
-        // (the view is committed only by `view-filter.save`).
-        const MODAL_ATTEMPTS = 3;
-        for (let attempt = 1; attempt <= MODAL_ATTEMPTS; attempt++) {
-          await (await s.byTestId("views.new-button")).click();
-          try {
-            await s.byTestId("view-filter.modal", { timeoutMs: 8_000 });
-            break;
-          } catch (e) {
-            if (attempt === MODAL_ATTEMPTS) throw e;
-          }
-        }
+        // The sidebar can remount and swallow the new-view click before its
+        // React handler is wired, and a single click then never opens the modal.
+        // This spec carried a private 3-attempt loop for that; the behaviour now
+        // lives in `clickUntilVisible`, which every other Views spec shares —
+        // the argument for why re-clicking is SAFE here was written down in this
+        // file first and is quoted in the helper: the button only OPENS the
+        // builder, and the view is committed by `view-filter.save`.
+        // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
+        // is shut but is not interactable, so clicking it silently does nothing.
+        // Open the flyout first — the same order the passing spec uses.
+        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host");

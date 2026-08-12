@@ -27,7 +27,12 @@
 import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  clickUntilVisible,
+  dismissImporterOffer,
+  setViewsEnabled,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 /** Pick `value` from a custom `SearchableSelect` (testId `root`): open the
@@ -58,19 +63,44 @@ async function rowMenuAction(
   label: string,
   itemId: string,
 ): Promise<void> {
-  const rows = await s.byTestIdAll("views.row");
-  for (const r of rows) {
-    if ((await r.textContent()).includes(label)) {
-      await r.rightClick();
-      await (
-        await s.waitForElement(
-          testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-        )
-      ).click();
-      return;
-    }
-  }
-  throw new Error(`no views.row labelled "${label}"`);
+  // Three things have to hold AT THE SAME MOMENT here, and the original code
+  // assumed all three and checked none:
+  //   1. the flyout is open — it is what renders the rows, and it does not stay
+  //      open on its own after the create flow;
+  //   2. the row's LABEL has landed — `byTestIdAll` is an immediate query and a
+  //      row's testid appears before its text, so a lone snapshot can hold a row
+  //      whose `textContent` is still empty;
+  //   3. the handle is still live when the right-click fires — the row remounts,
+  //      and a handle taken one statement earlier goes stale.
+  // Observed as all three: "no views.row labelled …" thrown with the row on
+  // screen, a 45 s wait for a label that never arrived, and a
+  // `stale element reference` on the click itself.
+  //
+  // So do the whole thing inside ONE poll: reopen if the rows are gone, find the
+  // labelled row, and right-click it in the same pass. `waitUntil` already
+  // retries a stale handle, which is exactly the third case.
+  await s.waitUntil(
+    async () => {
+      const rows = await s.byTestIdAll("views.row");
+      if (rows.length === 0) {
+        await clickUntilVisible(s, "views.section", "views.flyout");
+        return null;
+      }
+      for (const r of rows) {
+        if ((await r.textContent()).includes(label)) {
+          await r.rightClick();
+          return true;
+        }
+      }
+      return null;
+    },
+    { label: `views.row labelled "${label}" right-clicked` },
+  );
+  await (
+    await s.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+    )
+  ).click();
 }
 
 describeE2E("vd1 cards view display settings — cover image + aspect round-trip", () => {
@@ -84,13 +114,23 @@ describeE2E("vd1 cards view display settings — cover image + aspect round-trip
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget
+        // and the spec fails deterministically.
+        await setViewsEnabled(s, true);
 
         // Create an all-pages cards view via "+ New view" → save with no
         // conditions. It opens as a tab and appears as a sidebar row.
-        await (await s.byTestId("views.new-button")).click();
-        await s.byTestId("view-filter.modal");
+        // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
+        // is shut but is not interactable, so clicking it silently does nothing.
+        // Open the flyout first — the same order the passing spec uses.
+        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
+        // The view rows live in the flyout, and the create click CLOSED it.
+        // Re-open before counting rows.
+        await clickUntilVisible(s, "views.section", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "saved view appears in the sidebar" },

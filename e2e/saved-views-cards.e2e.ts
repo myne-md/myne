@@ -27,7 +27,13 @@
 import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { createNote, dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  clickUntilVisible,
+  createNote,
+  dismissImporterOffer,
+  setViewsEnabled,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 // No raw key sends here — `createNote` commits via the rename-input unmount, so
@@ -54,6 +60,10 @@ describeE2E.flaky("svc1 cards view renders live notes as image-less cards (MYND-
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Views is OPT-IN (`settings.views-enabled`). Without this the Views nav
+        // row never renders, so every `views.*` wait below burns its full budget
+        // and the spec fails deterministically.
+        await setViewsEnabled(s, true);
 
         // Three live notes — none gets an `image:` frontmatter, so every card
         // is image-less (no cover, no broken-image glyph).
@@ -64,7 +74,11 @@ describeE2E.flaky("svc1 cards view renders live notes as image-less cards (MYND-
         // Create a blank view from the Views section header. "+ New view" opens
         // the filter builder empty (MYND-282); saving with no conditions creates
         // a view that opens as a tab.
-        await (await s.byTestId("views.new-button")).click();
+        // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
+        // is shut but is not interactable, so clicking it silently does nothing.
+        // Open the flyout first — the same order the passing spec uses.
+        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickUntilVisible(s, "views.new-button", "view-filter.save");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host"); // the new view opened as a tab
