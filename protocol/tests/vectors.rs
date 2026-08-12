@@ -103,14 +103,14 @@ fn missing_fixture(category: &str, path: &std::path::Path) -> Option<String> {
     None
 }
 
-/// The raw `cases.json` for one category's `v0.1` fixtures, or `None` when this
-/// build has none — in which case the caller returns without asserting, exactly
-/// as the per-runner `path.exists()` check used to.
+/// The raw `cases.json` for one category's fixtures at one protocol version, or
+/// `None` when this build has none — in which case the caller returns without
+/// asserting, exactly as the per-runner `path.exists()` check used to.
 ///
 /// The two arms differ in *when* the bytes are read, and that difference is
 /// forced rather than chosen:
 ///
-/// * **native** — read from `../myne-test-vectors/vectors/<category>/v0.1/cases.json`
+/// * **native** — read from `../myne-test-vectors/vectors/<category>/<version>/cases.json`
 ///   at run time. A missing companion prints `[skip]` and returns `None`, which
 ///   is the long-standing contract (`protocol/CLAUDE.md`): the companion is
 ///   optional for a contributor and required for the gate.
@@ -119,16 +119,25 @@ fn missing_fixture(category: &str, path: &std::path::Path) -> Option<String> {
 ///   Without that feature the browser build still compiles and every runner
 ///   skips.
 ///
-/// A category the embedded table does not carry **panics** instead of skipping.
-/// Natively a missing file means "no companion checked out"; in the browser lane
-/// it can only mean the table fell behind the runners, and a lane that silently
-/// skips the family somebody just added is worse than no lane at all.
-fn cases_json(category: &str) -> Option<String> {
+/// A (category, version) pair the embedded table does not carry **panics**
+/// instead of skipping. Natively a missing file means "no companion checked
+/// out"; in the browser lane it can only mean the table fell behind the runners,
+/// and a lane that silently skips the family somebody just added is worse than
+/// no lane at all.
+///
+/// **The version is part of the key, and that is load-bearing.** The table was
+/// keyed by category name alone while `crdt-note-blob` was the only next-major
+/// family — one version directory per category made the name unambiguous. It
+/// stopped being true the moment `vault-meta` and `vault-themes` landed a `v0.2/`
+/// beside their `v0.1/`: a name-keyed lookup handed the v0.2 runners their v0.1
+/// bytes, and no name-keyed table could have held both rows anyway (the
+/// duplicate check below forbids it). Native and browser therefore key alike.
+fn cases_json_for(category: &str, version: &str) -> Option<String> {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let path = companion_vectors_root()
             .join(category)
-            .join("v0.1")
+            .join(version)
             .join("cases.json");
         if !path.exists() {
             return missing_fixture(category, &path);
@@ -141,13 +150,13 @@ fn cases_json(category: &str) -> Option<String> {
         Some(
             embedded::CASES
                 .iter()
-                .find(|(name, _)| *name == category)
-                .map(|(_, body)| (*body).to_owned())
+                .find(|(name, ver, _)| *name == category && *ver == version)
+                .map(|(_, _, body)| (*body).to_owned())
                 .unwrap_or_else(|| {
                     panic!(
-                        "[{category}] no embedded fixture. The browser lane's table in \
-                         `mod embedded` has fallen behind the runners — add the category \
-                         there rather than letting it skip."
+                        "[{category}/{version}] no embedded fixture. The browser lane's \
+                         table in `mod embedded` has fallen behind the runners — add the \
+                         (category, version) row there rather than letting it skip."
                     )
                 }),
         )
@@ -155,33 +164,22 @@ fn cases_json(category: &str) -> Option<String> {
 
     #[cfg(all(target_arch = "wasm32", not(feature = "browser-vectors")))]
     {
-        let _ = category;
+        let _ = (category, version);
         None
     }
 }
 
-/// Like [`cases_json`] but reads the `v0.2/` fixture directory — for the first
-/// next-major vector family, `crdt-note-blob` (§10.7, #418). The wasm/browser
-/// lane looks the category up in `embedded::CASES` by name exactly as the v0.1
-/// loader does (each category has one version directory, so the name is the key);
-/// only the native path differs (`v0.2/` instead of `v0.1/`).
+/// The `v0.1/` fixtures for a category — the shape almost every runner wants.
+fn cases_json(category: &str) -> Option<String> {
+    cases_json_for(category, "v0.1")
+}
+
+/// The `v0.2/` fixtures for a category — the next-major families (`crdt-note-blob`
+/// §10.7, plus the `vault-meta` / `vault-themes` sides of the §10.4.1 md.6
+/// protocol_version split).
 #[allow(dead_code)]
 fn cases_json_v0_2(category: &str) -> Option<String> {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let path = companion_vectors_root()
-            .join(category)
-            .join("v0.2")
-            .join("cases.json");
-        if !path.exists() {
-            return missing_fixture(category, &path);
-        }
-        Some(fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display())))
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        cases_json(category)
-    }
+    cases_json_for(category, "v0.2")
 }
 
 /// The fixtures, baked in (phase3-web-client task 15).
@@ -202,163 +200,215 @@ fn cases_json_v0_2(category: &str) -> Option<String> {
 /// name the same set.
 #[cfg(all(target_arch = "wasm32", feature = "browser-vectors"))]
 mod embedded {
-    pub const CASES: &[(&str, &str)] = &[
+    pub const CASES: &[(&str, &str, &str)] = &[
         (
             "aad-construction",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/aad-construction/v0.1/cases.json"),
         ),
         (
+            "aad-construction",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/aad-construction/v0.2/cases.json"),
+        ),
+        (
             "account-number",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/account-number/v0.1/cases.json"),
         ),
         (
             "argon2id",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/argon2id/v0.1/cases.json"),
         ),
         (
             "attachment-blob",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/attachment-blob/v0.1/cases.json"),
         ),
         (
             "attachment-text",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/attachment-text/v0.1/cases.json"),
         ),
         (
             "attachments-catalog",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/attachments-catalog/v0.1/cases.json"),
         ),
         (
             "bip39-recovery",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/bip39-recovery/v0.1/cases.json"),
         ),
         (
             "color-group",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/color-group/v0.1/cases.json"),
         ),
         (
-            // The first next-major vector family — its fixtures live under v0.2/.
+            // The first next-major vector family, and the one category that has
+            // NO v0.1 row: `NC05` is a v0.2-only note type.
             "crdt-note-blob",
+            "v0.2",
             include_str!("../../myne-test-vectors/vectors/crdt-note-blob/v0.2/cases.json"),
         ),
         (
             "ctx-aead",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/ctx-aead/v0.1/cases.json"),
         ),
         (
             "damm32-table",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/damm32-table/v0.1/cases.json"),
         ),
         (
             "embeddings",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/embeddings/v0.1/cases.json"),
         ),
         (
             "graph-layout",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/graph-layout/v0.1/cases.json"),
         ),
         (
             "head-fingerprint",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/head-fingerprint/v0.1/cases.json"),
         ),
         (
             "hkdf-sha256",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/hkdf-sha256/v0.1/cases.json"),
         ),
         (
             "manifest",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/manifest/v0.1/cases.json"),
         ),
         (
             "myn-blob",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/myn-blob/v0.1/cases.json"),
         ),
         (
             "note-template",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/note-template/v0.1/cases.json"),
         ),
         (
             "paired-extension",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/paired-extension/v0.1/cases.json"),
         ),
         (
             "password-policy",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/password-policy/v0.1/cases.json"),
         ),
         (
             "pending-capture",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/pending-capture/v0.1/cases.json"),
         ),
         (
             "phrase_normalize",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/phrase_normalize/v0.1/cases.json"),
         ),
         (
             "saved-view",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/saved-view/v0.1/cases.json"),
         ),
         (
             "scram-auth",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/scram-auth/v0.1/cases.json"),
         ),
         (
             "share-import",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/share-import/v0.1/cases.json"),
         ),
         (
             "vault-dictionary",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-dictionary/v0.1/cases.json"),
         ),
         (
             "vault-head",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-head/v0.1/cases.json"),
         ),
         (
             "vault-head-state",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-head-state/v0.1/cases.json"),
         ),
         (
             "vault-indices",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-indices/v0.1/cases.json"),
         ),
         (
             "vault-meta",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-meta/v0.1/cases.json"),
         ),
         (
+            "vault-meta",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/vault-meta/v0.2/cases.json"),
+        ),
+        (
             "vault-prefs",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-prefs/v0.1/cases.json"),
         ),
         (
             "vault-quickunlock",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-quickunlock/v0.1/cases.json"),
         ),
         (
             "vault-search",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-search/v0.1/cases.json"),
         ),
         (
             "vault-themes",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-themes/v0.1/cases.json"),
         ),
         (
+            "vault-themes",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/vault-themes/v0.2/cases.json"),
+        ),
+        (
             "vault-workspace",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-workspace/v0.1/cases.json"),
         ),
         (
             "vault_meta_rewrite",
+            "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault_meta_rewrite/v0.1/cases.json"),
         ),
     ];
 }
 
-/// The browser lane is really running the vectors, not skipping all 34.
+/// The browser lane is really running the vectors, not skipping every one.
 ///
 /// Every runner returns quietly when its fixtures are unavailable — correct for
 /// a contributor without the companion, and catastrophic for a CI lane that
-/// forgot `--features browser-vectors`: the lane would report 34 passing tests
-/// having asserted nothing at all. This is the assertion that distinguishes the
-/// two, and it is why the browser script passes the feature explicitly rather
-/// than relying on a default.
+/// forgot `--features browser-vectors`: the lane would report a full sheet of
+/// passing tests having asserted nothing at all. This is the assertion that
+/// distinguishes the two, and it is why the browser script passes the feature
+/// explicitly rather than relying on a default.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen_test]
 fn the_browser_lane_actually_has_fixtures() {
@@ -369,34 +419,110 @@ fn the_browser_lane_actually_has_fixtures() {
     );
 }
 
-/// The embedded table and the runners name the same categories.
+/// The embedded table and the runners name the same (category, version) pairs.
 ///
-/// One direction is already covered — [`cases_json`] panics on a category the
-/// table lacks. This covers the other: an entry left behind after a runner was
-/// renamed or removed, which otherwise sits there looking like coverage.
+/// One direction is covered by [`cases_json_for`], which panics on a pair the
+/// table lacks. The **other** direction — a row left behind after a runner was
+/// renamed or removed, sitting there looking like coverage — is covered by the
+/// last assertion here, and it is worth saying how, because the obvious way does
+/// not work. A row count cannot do it: the count this test used to carry had
+/// drifted two rows behind reality (34 vs 36) without anyone noticing, since
+/// nothing runs this lane in CI, and a hand-maintained number that nobody
+/// executes is not a guard. Recording lookups at run time cannot do it either —
+/// `wasm_bindgen_test` gives no ordering guarantee, so a test that inspected
+/// which pairs had been requested might run first. What does work is reading
+/// **this file's own source**, compiled in beside the fixtures, and requiring a
+/// literal `cases_json…("<category>")` call for every row. That is checkable at
+/// the only moment both facts exist together, and it cannot go stale.
+///
+/// The key/body assertion is the other one that earns its keep. A row's KEY is
+/// written by hand while its BODY comes from an `include_str!` path written by
+/// hand beside it, so the two can disagree — and the failure that
+/// disagreement produces is the worst kind: the runner gets real, well-formed,
+/// schema-valid vectors for the wrong version and asserts against them. Reading
+/// `schema` + `protocol_version` back out of the bytes and comparing them to the
+/// key closes that gap structurally, and unlike a row count it cannot go stale.
 #[cfg(all(target_arch = "wasm32", feature = "browser-vectors"))]
 #[wasm_bindgen_test]
 fn the_browser_lane_carries_every_category() {
+    let mut keys: Vec<(&str, &str)> = embedded::CASES.iter().map(|(n, v, _)| (*n, *v)).collect();
+    keys.sort_unstable();
+    keys.dedup();
     assert_eq!(
+        keys.len(),
         embedded::CASES.len(),
-        34,
-        "the embedded table has drifted from the 34 runners in this file"
+        "duplicate (category, version) row in the embedded table"
     );
-    let mut names: Vec<&str> = embedded::CASES.iter().map(|(n, _)| *n).collect();
-    names.sort_unstable();
-    names.dedup();
-    assert_eq!(
-        names.len(),
-        embedded::CASES.len(),
-        "duplicate category in the embedded table"
-    );
-    for (name, body) in embedded::CASES {
+
+    for (name, version, body) in embedded::CASES {
         assert!(
             !body.trim().is_empty(),
-            "[{name}] embedded fixture is empty — `include_str!` found a file, \
-             but not one with vectors in it"
+            "[{name}/{version}] embedded fixture is empty — `include_str!` found a \
+             file, but not one with vectors in it"
+        );
+
+        let doc: serde_json::Value = serde_json::from_str(body)
+            .unwrap_or_else(|e| panic!("[{name}/{version}] embedded fixture is not JSON: {e}"));
+        assert_eq!(
+            doc["schema"].as_str(),
+            Some(*name),
+            "[{name}/{version}] the embedded row's key and its `include_str!` path \
+             disagree: the bytes declare schema {:?}. The runner would assert against \
+             another category's vectors.",
+            doc["schema"].as_str()
+        );
+        assert_eq!(
+            doc["protocol_version"].as_str(),
+            Some(*version),
+            "[{name}/{version}] the embedded row's key and its `include_str!` path \
+             disagree: the bytes declare protocol_version {:?}. This is exactly the \
+             shape that handed the v0.2 runners their v0.1 fixtures.",
+            doc["protocol_version"].as_str()
+        );
+
+        // Every row must have a runner that asks for it. `THIS_FILE` is this
+        // source compiled in beside the fixtures; the needles are BUILT at run
+        // time rather than written as literals, so this loop cannot match
+        // itself. A row nothing calls is dead weight that reads as coverage.
+        //
+        // Both spellings count, because both are legitimate: the per-version
+        // wrappers are what runners normally use, and the general loader is what
+        // a runner would reach for if a third version ever landed. Accepting
+        // only the wrapper would fail a correct runner, and a guard that cries
+        // wolf gets deleted.
+        let wrapper = match *version {
+            "v0.1" => concat_str(&["cases_json(\"", name, "\")"]),
+            "v0.2" => concat_str(&["cases_json_v0_2(\"", name, "\")"]),
+            other => panic!(
+                "[{name}/{other}] unknown version in the embedded table — add a \
+                 loader for it and a needle here in the same change"
+            ),
+        };
+        let general = concat_str(&["cases_json_for(\"", name, "\", \"", version, "\")"]);
+        assert!(
+            THIS_FILE.contains(&wrapper) || THIS_FILE.contains(&general),
+            "[{name}/{version}] the embedded table carries this row but no runner \
+             in this file calls `{wrapper}` or `{general}` — either the runner was \
+             renamed or removed and the row was left behind, or the row was added \
+             ahead of its runner. A row nothing reads is not coverage."
         );
     }
+}
+
+/// This test file's own source, for the "is there a runner for this row?"
+/// direction of [`the_browser_lane_carries_every_category`].
+#[cfg(all(target_arch = "wasm32", feature = "browser-vectors"))]
+const THIS_FILE: &str = include_str!("vectors.rs");
+
+/// Build a needle by concatenation rather than `format!`.
+///
+/// Not a style preference: a `format!("cases_json(\"{name}\")")` would put the
+/// literal `cases_json("` into THIS file's source, and this file's source is
+/// what the search runs over — the guard would match itself and pass for every
+/// row. Concatenation keeps the literal out of the haystack.
+#[cfg(all(target_arch = "wasm32", feature = "browser-vectors"))]
+fn concat_str(parts: &[&str]) -> String {
+    parts.concat()
 }
 
 fn hex_decode(s: &str) -> Vec<u8> {
@@ -2428,6 +2554,178 @@ fn aad_construction_vectors() {
             "aad-construction missing decomposition case for {builder} — every vault-scoped pub aad_* builder must have one"
         );
     }
+}
+
+/// `aad-construction` v0.2 — the next-major AAD builders.
+///
+/// These four stamp `"myne.v0.2|"` and the `0x02` version byte, both listed in
+/// the repo-root identifier table as major-version-event constants, and all four
+/// are on the §10.4.1 whole-vault migration's re-seal path (`singleton_migrate`,
+/// `vault_meta_v0_2`, `blob_envelope`, `prefs`, `attachments_catalog`). They
+/// shipped with no cross-implementation vector of any kind: a port that framed
+/// them wrong would migrate a vault into bytes no other implementation opens,
+/// and nothing here would have said so.
+///
+/// The two `aad_nc05_*` builders complete the v0.2 family and are pinned by
+/// `crdt_note_blob_vectors` instead — one home per builder, so there is no
+/// second place to forget.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn aad_construction_v0_2_vectors() {
+    use protocol::{
+        aad_password_wrap_v0_2, aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2,
+        aad_vault_items_key_wrap_v0_2,
+    };
+
+    let Some(raw) = cases_json_v0_2("aad-construction") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[aad-construction/v0.2] parse cases.json: {e}"));
+
+    assert_eq!(doc["schema"], "aad-construction");
+    assert_eq!(doc["protocol_version"], "v0.2");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("aad-construction/v0.2", cases);
+
+    let mut pinned_builders = std::collections::HashSet::new();
+    let mut singleton_roles = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let builder_name = case["input_builder_name"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing input_builder_name"));
+        let expected = hex_decode(
+            case["expected_aad_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing expected_aad_hex")),
+        );
+
+        let items_key_id = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_items_key_id_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_items_key_id_hex")),
+            )
+        };
+        let account_number_hash = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_account_number_hash_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+            )
+        };
+        let role_label = || -> String {
+            case["input_role_label"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_role_label"))
+                .to_string()
+        };
+
+        let actual = match builder_name {
+            "aad_password_wrap_v0_2" => aad_password_wrap_v0_2(&parse_kdf_params(case, id)),
+            "aad_recovery_wrap_v0_2" => aad_recovery_wrap_v0_2(&parse_kdf_params(case, id)),
+            "aad_vault_items_key_wrap_v0_2" => aad_vault_items_key_wrap_v0_2(&items_key_id()),
+            "aad_singleton_blob_v0_2" => {
+                let role = role_label();
+                singleton_roles.insert(role.clone());
+                aad_singleton_blob_v0_2(role.as_bytes(), &account_number_hash())
+            }
+            other => panic!(
+                "[{id}] unknown input_builder_name '{other}' — update this match arm in lockstep with the schema"
+            ),
+        };
+
+        assert_eq!(
+            actual.as_slice(),
+            expected.as_slice(),
+            "[{id}] {builder_name} AAD byte mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+            hex_encode(&expected),
+            hex_encode(&actual),
+        );
+
+        // The v0.2 prefix + version byte are the domain separation. Asserting
+        // them here rather than trusting the pinned bytes means a regenerated
+        // fixture that lost the prefix fails as a prefix bug, by name, instead
+        // of as an opaque byte mismatch.
+        assert!(
+            actual.starts_with(b"myne.v0.2|"),
+            "[{id}] v0.2 AAD must open with the v0.2 prefix"
+        );
+        assert_eq!(
+            actual[10], 0x02,
+            "[{id}] v0.2 AAD must carry protocol_version 0x02"
+        );
+
+        let segments = case["informational_aad_segments"]
+            .as_array()
+            .unwrap_or_else(|| panic!("[{id}] missing informational_aad_segments"));
+        let mut reassembled: Vec<u8> = Vec::with_capacity(expected.len());
+        let mut next_offset = 0u64;
+        for (i, seg) in segments.iter().enumerate() {
+            let offset = seg["offset"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("[{id}] segment {i} missing offset"));
+            let length = seg["length"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("[{id}] segment {i} missing length"));
+            let bytes = hex_decode(
+                seg["bytes_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] segment {i} missing bytes_hex")),
+            );
+            assert_eq!(offset, next_offset, "[{id}] segment {i} not contiguous");
+            assert_eq!(
+                length as usize,
+                bytes.len(),
+                "[{id}] segment {i} length != bytes_hex byte count"
+            );
+            reassembled.extend_from_slice(&bytes);
+            next_offset += length;
+        }
+        assert_eq!(
+            reassembled.as_slice(),
+            expected.as_slice(),
+            "[{id}] segment concatenation must reproduce the full AAD",
+        );
+
+        pinned_builders.insert(builder_name.to_string());
+    }
+
+    let required: [&str; 4] = [
+        "aad_password_wrap_v0_2",
+        "aad_recovery_wrap_v0_2",
+        "aad_vault_items_key_wrap_v0_2",
+        "aad_singleton_blob_v0_2",
+    ];
+    for builder in required {
+        assert!(
+            pinned_builders.contains(builder),
+            "aad-construction/v0.2 missing decomposition case for {builder} — every v0.2 vault-scoped pub aad_* builder must have one"
+        );
+    }
+
+    // The generic singleton builder takes its role as an argument, so one case
+    // proves only that one role works. Two roles of DIFFERENT lengths prove the
+    // u16 length prefix is computed rather than copied — the failure a port with
+    // a hardcoded role length would otherwise sail past.
+    assert!(
+        singleton_roles.len() >= 2,
+        "aad_singleton_blob_v0_2 needs at least two roles pinned; got {singleton_roles:?}"
+    );
+    let mut lengths: Vec<usize> = singleton_roles.iter().map(|r| r.len()).collect();
+    lengths.sort_unstable();
+    lengths.dedup();
+    assert!(
+        lengths.len() >= 2,
+        "the pinned aad_singleton_blob_v0_2 roles must differ in LENGTH, not just in value — \
+         same-length roles cannot catch a hardcoded length prefix (got lengths {lengths:?})"
+    );
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]

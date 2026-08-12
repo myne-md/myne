@@ -17,7 +17,7 @@
 # is what supplies the driver and the fixtures.
 #
 # The runners themselves are the SAME SOURCE the native lane runs. That is the
-# load-bearing part: a second copy of 34 runners would agree with the first one
+# load-bearing part: a second copy of the runners would agree with the first one
 # right up until somebody edited one of them.
 set -euo pipefail
 
