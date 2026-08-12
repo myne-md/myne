@@ -17,15 +17,16 @@
 //
 // KDF: weak generator fixtures (unlock reads params from vault.meta).
 //
-// ⚠️ NEW SCENARIO — authored to the harness conventions but NOT yet validated in
-// the container (this dev host is macOS; the suite is Linux/tauri-driver only).
-// Definition of done per e2e/CLAUDE.md is "green 3× consecutive" via
-// ./scripts/e2e-buildrun.sh. Run ISOLATED — the full suite contaminates.
+// Validated in the container (3× consecutive, isolated). It previously carried
+// a banner saying it had NOT been — authored on macOS, where the suite cannot
+// run, and landed unverified. It was failing: the `<bdi>` assertion needs a note
+// row, and the plain fixture seeds a vault with NO notes, so it read
+// "expected 0 to be greater than 0" on every run.
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
-import { dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
+import { createNote, dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
 /** `[dir, lang]` currently on `<html>`, read off the real applied attributes. */
@@ -46,6 +47,14 @@ describeE2E("rtl1 RTL layout follows the active locale (#175)", () => {
         const s = app.session;
         await unlockToEditor(s, seeded.password);
         await dismissImporterOffer(s);
+
+        // A note to look at. The plain fixture seeds a vault with none, and the
+        // `<bdi>` assertion at the end needs a title in the sidebar. The title
+        // is deliberately MIXED-SCRIPT — Latin word, Arabic word, digits —
+        // because that is the case bidi isolation exists for: without `<bdi>`
+        // the surrounding RTL chrome reorders around it. A pure-Latin title
+        // would satisfy the selector while testing nothing.
+        await createNote(s, "rtl1note مذكرة 7k2");
 
         // Default fixture locale is English → the document is LTR.
         await s.waitUntil(async () => ((await rootDir(s)).dir === "ltr" ? true : null), {
