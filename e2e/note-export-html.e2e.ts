@@ -253,7 +253,7 @@ describeE2E("hh3 HTML export UI flow lands the success toast (MYND-340)", () => 
             await s.execute<{ message: string; action: string } | null>(
               'const t = document.querySelector(\'[data-testid="editor.toast"]\');' +
                 "if (!t) return null;" +
-                "const span = t.querySelector('span');" +
+                "const span = t.querySelector('[data-testid=\"editor.toast-message\"]');" +
                 'const btn = t.querySelector(\'[data-testid="editor.toast-action"]\');' +
                 "return {" +
                 "  message: span && span.textContent ? span.textContent : ''," +
@@ -270,7 +270,14 @@ describeE2E("hh3 HTML export UI flow lands the success toast (MYND-340)", () => 
         expect(await s.execute<number>("return window.__e2eDialogSaveCalls")).toBe(1);
         const html = fs.readFileSync(destination, "utf8");
         expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
-        expect(html).toContain("<body>");
+        // The FULL opening tag, not a bare `<body>`. The exporter emits
+        // `<body dir="auto">` (`src/dialect/html/htmlDocument.ts`), and asserting
+        // the substring `<body>` matched nothing once that attribute landed —
+        // so this failed on a document that was perfectly well-formed. Pinning
+        // the whole tag both fixes that and makes `dir="auto"` a thing the test
+        // protects: it is what makes an exported RTL note read correctly
+        // outside the app, and nothing else asserted it.
+        expect(html).toContain('<body dir="auto">');
       },
     );
   });

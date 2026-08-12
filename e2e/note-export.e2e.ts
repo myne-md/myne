@@ -297,7 +297,7 @@ describeE2E("ne3 UI flow lands the success toast (MYND-116)", () => {
             await s.execute<{ message: string; action: string } | null>(
               'const t = document.querySelector(\'[data-testid="editor.toast"]\');' +
                 "if (!t) return null;" +
-                "const span = t.querySelector('span');" +
+                "const span = t.querySelector('[data-testid=\"editor.toast-message\"]');" +
                 'const btn = t.querySelector(\'[data-testid="editor.toast-action"]\');' +
                 "return {" +
                 "  message: span && span.textContent ? span.textContent : ''," +
@@ -354,7 +354,7 @@ describeE2E("ne4 Copy puts the note text on the clipboard and toasts (MYND-643)"
             await s.execute<string | null>(
               'const t = document.querySelector(\'[data-testid="editor.toast"]\');' +
                 "if (!t) return null;" +
-                "const span = t.querySelector('span');" +
+                "const span = t.querySelector('[data-testid=\"editor.toast-message\"]');" +
                 "return span && span.textContent ? span.textContent : null;",
             ),
           { label: "copy success toast", timeoutMs: 20_000 },

@@ -22,7 +22,7 @@ import { readdirSync } from "node:fs";
 import { harnessSupported } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { setupTwoSyncedDevices } from "./support/multi-device";
-import { ipcOk } from "./support/flows";
+import { ipcOk, pageSeatInvoke } from "./support/flows";
 
 const driver = harnessSupported();
 const server = syncServerSupported();
@@ -47,9 +47,31 @@ describeAttachments("attachment sync (MYND-468)", () => {
         const payload = Array.from(
           new TextEncoder().encode("sync-attachment payload: replicate me across the fleet"),
         );
-        const imported = (await ipcOk(a.session, "plugin:attachments|attachment_import", {
-          source: { kind: "bytes", bytes: payload, filename: "replicated.bin" },
-        })) as { id: string; deduplicated: boolean };
+        // The import has been failing `{"kind":"Locked"}` on a device this
+        // very setup just unlocked, enrolled and pushed a note from — so the
+        // interesting question is not "did it fail" but "what did the host
+        // think the vault's state was at that moment".
+        //
+        // `Locked` here means `hold_unlocked_attachment_material()` found the
+        // ACTIVE slot not `Unlocked` (core/src/plugins/vault_unlock/state.rs).
+        // That is a claim about which vault is active and what its slot holds,
+        // and the host will answer both if asked. Asking costs one IPC on the
+        // failure path only, and it is the difference between a bug report that
+        // says "Locked" and one that says which slot was locked and why.
+        const importRes = await pageSeatInvoke(
+          a.session,
+          "plugin:attachments|attachment_import",
+          { source: { kind: "bytes", bytes: payload, filename: "replicated.bin" } },
+          60_000,
+        );
+        if (importRes.err !== undefined) {
+          const status = await pageSeatInvoke(a.session, "plugin:vault-unlock|vault_status", {}, 20_000);
+          throw new Error(
+            `attachment_import failed: ${JSON.stringify(importRes.err)}\n` +
+              `  vault_status at that moment: ${JSON.stringify(status.ok ?? status.err)}`,
+          );
+        }
+        const imported = importRes.ok as { id: string; deduplicated: boolean };
         expect(imported.id).toMatch(/^[0-9a-f]{64}$/);
 
         // Push A (the import hook marked the loop dirty; drive it explicitly).

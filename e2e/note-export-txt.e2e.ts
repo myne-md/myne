@@ -163,7 +163,7 @@ describeE2E("tt2 plain-text export UI flow lands the success toast (MYND-340)", 
             await s.execute<{ message: string; action: string } | null>(
               'const t = document.querySelector(\'[data-testid="editor.toast"]\');' +
                 "if (!t) return null;" +
-                "const span = t.querySelector('span');" +
+                "const span = t.querySelector('[data-testid=\"editor.toast-message\"]');" +
                 'const btn = t.querySelector(\'[data-testid="editor.toast-action"]\');' +
                 "return {" +
                 "  message: span && span.textContent ? span.textContent : ''," +
