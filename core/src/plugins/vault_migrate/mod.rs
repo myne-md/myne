@@ -2141,4 +2141,733 @@ mod tests {
         assert_eq!(&out.ntv5_meta[0..4], b"NTV5");
         assert!(out.notes.is_empty());
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // The re-key legs BEYOND the notes: themes (`MYT1`→`MYT5`), prefs
+    // (`MYP1`→`MYP5`) and the whole attachment family (`vault.attachments`
+    // `MYC1`→`MYC5` plus every `attachments/<id>` `MYA1`→`MYA5`).
+    //
+    // Until these landed, the only on-disk migration test seeded a
+    // `vault.dictionary` and asserted `singletons_migrated == 1` — one row of the
+    // two-row KEK table, and neither of the two families that carry their own
+    // framing. So the themes row's role/magic/aad wiring, the hand-rolled prefs
+    // leg and the ENTIRE attachment leg were unexecuted, while the attachment
+    // leg's own source comment states the stake: "Without this leg a migrated
+    // vault's attachments read as gone."
+    //
+    // The failure that shape produces is silent AND unrecoverable in place: a
+    // wrong AAD role or a wrong KEK generation is self-consistent inside the
+    // migration (it writes and would read back its own mistake), and only the
+    // production reader — which derives version-aware off `vault.meta` — finds
+    // out. `read_catalog` and §9.21.4 both fall back to EMPTY on a decode
+    // failure, so the user sees "no attachments" and "no themes" rather than an
+    // error. Hence the two-layer coverage below: the byte-level test pins the
+    // families the migration writes, and the end-to-end one re-unlocks the
+    // migrated vault and reads all three back through the production surfaces.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Theme name seeded into the pre-migration `vault.themes`.
+    const THEME_NAME: &str = "Copper Dusk";
+    /// One attachment's file bytes — asserted byte-identical after the re-key.
+    const ATTACHMENT_BYTES: &[u8] = b"\x89PNG\r\n\x1a\nnot really a PNG, but byte-exact";
+    /// The live attachment's catalog `content_type` (bound into the inner AAD).
+    const CONTENT_TYPE: &str = "image/png";
+    /// The deleted attachment's pre-tombstone bytes.
+    const DELETED_BYTES: &[u8] = b"the file behind the tombstone";
+    /// Wall-clock stand-in for the seeded catalog / themes entries.
+    const T0: u64 = 1_700_000_000;
+
+    /// A palette whose one token survives the read-side `vetted` filter, so an
+    /// end-to-end assertion can check the VALUE came through and not only the name.
+    fn a_palette() -> crate::plugins::themes::commands::ThemePalette {
+        let mut palette = crate::plugins::themes::commands::ThemePalette::new();
+        palette.insert("--accent".to_string(), "#8a5a2b".to_string());
+        palette
+    }
+
+    /// Prefs whose values are all NON-default, so "the migration reset the
+    /// settings" cannot pass as "the migration preserved them".
+    fn a_prefs_view() -> protocol::PrefsView {
+        protocol::PrefsView {
+            screen_capture_protection: false, // default true
+            developer_mode: true,             // default false
+            auto_lock_seconds: Some(900),     // default None
+            ..Default::default()
+        }
+    }
+
+    /// What [`seed_v0_1_singletons`] put on disk, for the assertions to compare against.
+    struct SeededV0_1 {
+        /// The exact inner plaintext the `MYT1` blob wrapped.
+        themes_plaintext: Vec<u8>,
+        /// The `PrefsView` the `MYP1` blob carried.
+        prefs: protocol::PrefsView,
+        /// The `MYC1` catalog, live entry + tombstone.
+        catalog: protocol::AttachmentsCatalog,
+        /// The live attachment's content-addressed id (stable across the re-key).
+        live_id: [u8; protocol::ATTACHMENT_ID_LEN],
+        /// …and its lowercase-hex form, which is the on-disk filename.
+        live_id_hex: String,
+        /// The tombstoned entry's id-hex; its blob file is still on disk (a torn
+        /// delete), which is what makes the tombstone SKIP falsifiable.
+        tomb_id_hex: String,
+        /// That leftover blob's exact bytes.
+        tomb_blob: Vec<u8>,
+    }
+
+    /// Seed the v0.1 shape of every family the note pass does not touch:
+    /// `vault.themes` (`MYT1`), `vault.prefs` (`MYP1`), `vault.dictionary`
+    /// (`MYD1`), `vault.attachments` (`MYC1`) and two `attachments/<id>` blobs
+    /// (`MYA1`) — one live, one behind a tombstone.
+    async fn seed_v0_1_singletons(io: &StdVaultIo, vault_root: &Path) -> SeededV0_1 {
+        use crate::plugins::attachments::commands::hex_encode;
+        use crate::plugins::themes::commands::{encode_themes_map, ThemeEntry, ThemesMap};
+        use protocol::{
+            compute_attachment_id, decode_themes_blob, encode_attachment_blob,
+            encode_attachments_catalog, encode_prefs_blob, AttachmentMeta, AttachmentsCatalog,
+        };
+
+        // vault.themes (MYT1) under the OLD CustomThemesKey.
+        let mut map = ThemesMap::new();
+        map.insert(THEME_NAME.to_string(), ThemeEntry::live(a_palette(), T0));
+        let old_themes_kek = derive_subkey(&OLD_ROOT, SubkeyRole::CustomThemesKey);
+        let themes_blob =
+            encode_themes_map(MetaVersion::V0_1, &old_themes_kek, &ACCT, &map).expect("seed MYT1");
+        io.write(
+            &vault_root.join("vault.themes"),
+            &themes_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+        let themes_plaintext = decode_themes_blob(&old_themes_kek, &ACCT, &themes_blob)
+            .expect("the seed decodes under the old KEK")
+            .to_vec();
+
+        // vault.dictionary (MYD1) — the one family the pre-existing test drove;
+        // seeded here so the singleton COUNT below is over the full roster.
+        let old_dict_kek = derive_subkey(&OLD_ROOT, SubkeyRole::PersonalDictKey);
+        let dict_blob =
+            protocol::encode_dictionary_blob(&old_dict_kek, &ACCT, b"opaque dict bytes")
+                .expect("seed MYD1");
+        io.write(
+            &vault_root.join("vault.dictionary"),
+            &dict_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+
+        // vault.prefs (MYP1) under the OLD PrefsKey.
+        let old_prefs_kek = derive_subkey(&OLD_ROOT, SubkeyRole::PrefsKey);
+        let prefs = a_prefs_view();
+        let prefs_blob = encode_prefs_blob(&old_prefs_kek, &ACCT, &prefs).expect("seed MYP1");
+        io.write(
+            &vault_root.join("vault.prefs"),
+            &prefs_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+
+        // Two MYA1 attachment blobs under the OLD itemsKey, at their
+        // content-addressed ids (the filenames the catalog keys resolve to).
+        let att_dir = vault_root.join("attachments");
+        io.create_dir_all(&att_dir).await.unwrap();
+        let live_id = compute_attachment_id(&OLD_ROOT, ATTACHMENT_BYTES);
+        let live_id_hex = hex_encode(&live_id);
+        let live_blob = encode_attachment_blob(
+            &OLD_ITEMS,
+            &OLD_ITEMS_ID,
+            &live_id,
+            CONTENT_TYPE.as_bytes(),
+            ATTACHMENT_BYTES,
+        )
+        .expect("seed live MYA1");
+        io.write(
+            &att_dir.join(&live_id_hex),
+            &live_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+
+        let tomb_id = compute_attachment_id(&OLD_ROOT, DELETED_BYTES);
+        let tomb_id_hex = hex_encode(&tomb_id);
+        let tomb_blob = encode_attachment_blob(
+            &OLD_ITEMS,
+            &OLD_ITEMS_ID,
+            &tomb_id,
+            b"text/plain",
+            DELETED_BYTES,
+        )
+        .expect("seed tombstoned MYA1");
+        io.write(
+            &att_dir.join(&tomb_id_hex),
+            &tomb_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+
+        // vault.attachments (MYC1) under the OLD AttachmentsCatalogKey: one live
+        // entry, one tombstone.
+        let mut catalog = AttachmentsCatalog::empty();
+        catalog.entries.insert(
+            live_id_hex.clone(),
+            AttachmentMeta::live(
+                CONTENT_TYPE.to_string(),
+                T0,
+                "shot.png".to_string(),
+                ATTACHMENT_BYTES.len() as u64,
+            ),
+        );
+        catalog.entries.insert(
+            tomb_id_hex.clone(),
+            AttachmentMeta::live(
+                "text/plain".to_string(),
+                T0,
+                "gone.txt".to_string(),
+                DELETED_BYTES.len() as u64,
+            )
+            .into_tombstone(T0 + 100),
+        );
+        let old_catalog_kek = derive_subkey(&OLD_ROOT, SubkeyRole::AttachmentsCatalogKey);
+        let catalog_blob =
+            encode_attachments_catalog(&old_catalog_kek, &ACCT, &catalog).expect("seed MYC1");
+        io.write(
+            &vault_root.join("vault.attachments"),
+            &catalog_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+
+        SeededV0_1 {
+            themes_plaintext,
+            prefs,
+            catalog,
+            live_id,
+            live_id_hex,
+            tomb_id_hex,
+            tomb_blob,
+        }
+    }
+
+    /// The v0.2 key material a migrated vault's `NTV5` meta hands back — what
+    /// every post-migration reader derives, so the assertions derive it the same
+    /// way rather than trusting a value the migration returned.
+    async fn v0_2_material_from_disk(
+        io: &StdVaultIo,
+        vault_root: &Path,
+    ) -> (Zeroizing<[u8; 32]>, Zeroizing<[u8; 32]>, [u8; 16]) {
+        let meta_bytes = io.read(&vault_root.join("vault.meta")).await.unwrap();
+        assert_eq!(
+            &meta_bytes[0..4],
+            b"NTV5",
+            "the migration must have committed"
+        );
+        let meta = parse_vault_meta_v0_2(&meta_bytes).expect("NTV5 parse");
+        let root = unlock_root_key_v0_2_password(&meta, PASSWORD, &ACCT).expect("pw unlock");
+        let items = derive_items_key_v0_2(&root, &meta).expect("items derive");
+        (root, items, meta.items_key_id)
+    }
+
+    /// Every non-note family the migration re-keys, asserted at the byte level:
+    /// the family magic it lands in, the KEK generation it is readable under, and
+    /// the original preserved in `legacy/`.
+    ///
+    /// Each leg is separately falsifiable — swap one v0.2 role string, drop one
+    /// re-seal, or remove the tombstone skip, and exactly one assertion here goes
+    /// red while every other migration test stays green.
+    #[test]
+    fn migration_rekeys_themes_prefs_and_the_attachment_family_to_v0_2() {
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-families").unwrap();
+            let vault_root = tmp.path().to_path_buf();
+            let notes_dir = vault_root.join("notes");
+            let io = StdVaultIo;
+            io.create_dir_all(&notes_dir).await.unwrap();
+            io.write(
+                &vault_root.join("vault.meta"),
+                b"MYV1 old vault meta bytes (opaque to the migration)",
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+            let u = *crate::plugins::notes::note_id::NoteId::new_v7()
+                .as_uuid()
+                .as_bytes();
+            io.write(
+                &notes_dir.join(format!("{}.myn", uuid::Uuid::from_bytes(u))),
+                &my01(&u, "# note\n"),
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+            let seeded = seed_v0_1_singletons(&io, &vault_root).await;
+
+            let summary = migrate_vault_notes_on_disk(
+                &io,
+                &vault_root,
+                &notes_dir,
+                &OLD_ROOT,
+                &OLD_ITEMS,
+                &OLD_ITEMS_ID,
+                PASSWORD,
+                PHRASE,
+                &ACCT,
+                &fast_params(),
+                ACTOR,
+                &TestHost::new("/base"),
+            )
+            .await
+            .expect("on-disk migration");
+
+            // FOUR families were re-sealed: themes + dictionary (the KEK table),
+            // prefs (hand-rolled) and the catalog. A dropped leg shows up here
+            // before any of the per-family assertions below.
+            assert_eq!(
+                summary.singletons_migrated, 4,
+                "themes + dictionary + prefs + attachments-catalog"
+            );
+
+            let (new_root, new_items, new_items_key_id) =
+                v0_2_material_from_disk(&io, &vault_root).await;
+
+            // ── vault.themes: MYT5 under derive_subkey_v0_2(new_root, CustomThemesKey)
+            let old_themes_kek = derive_subkey(&OLD_ROOT, SubkeyRole::CustomThemesKey);
+            let new_themes_kek = derive_subkey_v0_2(&new_root, SubkeyRole::CustomThemesKey);
+            let themes = io.read(&vault_root.join("vault.themes")).await.unwrap();
+            assert_eq!(
+                &themes[0..4],
+                b"MYT5",
+                "themes must land in the v0.2 family"
+            );
+            let decoded = protocol::decode_themes_blob(&new_themes_kek, &ACCT, &themes)
+                .expect("MYT5 decodes under the v0.2 themes KEK");
+            assert_eq!(
+                decoded.as_slice(),
+                seeded.themes_plaintext.as_slice(),
+                "the theme store survived the re-key byte-exact"
+            );
+            assert!(
+                protocol::decode_themes_blob(&old_themes_kek, &ACCT, &themes).is_err(),
+                "the re-key is real: the OLD themes KEK must no longer open it"
+            );
+            let legacy_themes = io
+                .read(&vault_root.join("legacy/vault.themes"))
+                .await
+                .unwrap();
+            assert_eq!(&legacy_themes[0..4], b"MYT1");
+            assert!(
+                protocol::decode_themes_blob(&old_themes_kek, &ACCT, &legacy_themes).is_ok(),
+                "legacy/ preserves the original openable MYT1 themes blob"
+            );
+
+            // ── vault.prefs: MYP5 under derive_subkey_v0_2(new_root, PrefsKey)
+            let old_prefs_kek = derive_subkey(&OLD_ROOT, SubkeyRole::PrefsKey);
+            let new_prefs_kek = derive_subkey_v0_2(&new_root, SubkeyRole::PrefsKey);
+            let prefs_bytes = io.read(&vault_root.join("vault.prefs")).await.unwrap();
+            assert_eq!(
+                &prefs_bytes[0..4],
+                b"MYP5",
+                "prefs must land in the v0.2 family"
+            );
+            let prefs = decode_prefs_blob(&new_prefs_kek, &ACCT, &prefs_bytes)
+                .expect("MYP5 decodes under the v0.2 prefs KEK");
+            assert_eq!(
+                prefs, seeded.prefs,
+                "every setting survived the re-key (a reset would read as defaults)"
+            );
+            let legacy_prefs = io
+                .read(&vault_root.join("legacy/vault.prefs"))
+                .await
+                .unwrap();
+            assert_eq!(&legacy_prefs[0..4], b"MYP1");
+            assert!(
+                decode_prefs_blob(&old_prefs_kek, &ACCT, &legacy_prefs).is_ok(),
+                "legacy/ preserves the original openable MYP1 prefs blob"
+            );
+
+            // ── vault.attachments: MYC5 under derive_subkey_v0_2(new_root, …Catalog…)
+            let old_catalog_kek = derive_subkey(&OLD_ROOT, SubkeyRole::AttachmentsCatalogKey);
+            let new_catalog_kek = derive_subkey_v0_2(&new_root, SubkeyRole::AttachmentsCatalogKey);
+            let catalog_bytes = io
+                .read(&vault_root.join("vault.attachments"))
+                .await
+                .unwrap();
+            assert_eq!(
+                &catalog_bytes[0..4],
+                b"MYC5",
+                "the catalog must land in the v0.2 family"
+            );
+            let catalog = decode_attachments_catalog(&new_catalog_kek, &ACCT, &catalog_bytes)
+                .expect("MYC5 decodes under the v0.2 catalog KEK");
+            assert_eq!(
+                catalog, seeded.catalog,
+                "the entry set — live AND tombstone — is carried unchanged"
+            );
+            let legacy_catalog = io
+                .read(&vault_root.join("legacy/vault.attachments"))
+                .await
+                .unwrap();
+            assert_eq!(&legacy_catalog[0..4], b"MYC1");
+            assert!(
+                decode_attachments_catalog(&old_catalog_kek, &ACCT, &legacy_catalog).is_ok(),
+                "legacy/ preserves the original openable MYC1 catalog"
+            );
+
+            // ── attachments/<id>: MYA5 under the NEW itemsKey, at the SAME id
+            let live_path = vault_root.join("attachments").join(&seeded.live_id_hex);
+            let live = io.read(&live_path).await.unwrap();
+            assert_eq!(
+                &live[0..4],
+                protocol::ATTACHMENT_BLOB_V0_2_MAGIC.as_slice(),
+                "the blob must land in the v0.2 family at its ORIGINAL filename"
+            );
+            let file = protocol::decode_attachment_blob(
+                &live,
+                &seeded.live_id,
+                CONTENT_TYPE.as_bytes(),
+                &new_items,
+                &new_items_key_id,
+            )
+            .expect("MYA5 decodes under the NEW itemsKey");
+            assert_eq!(
+                file.as_slice(),
+                ATTACHMENT_BYTES,
+                "the file bytes survived the re-key exactly"
+            );
+            assert!(
+                protocol::decode_attachment_blob(
+                    &live,
+                    &seeded.live_id,
+                    CONTENT_TYPE.as_bytes(),
+                    &OLD_ITEMS,
+                    &OLD_ITEMS_ID,
+                )
+                .is_err(),
+                "the re-key is real: the OLD itemsKey must no longer open the blob"
+            );
+            let legacy_live = io
+                .read(
+                    &vault_root
+                        .join("legacy/attachments")
+                        .join(&seeded.live_id_hex),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                &legacy_live[0..4],
+                protocol::ATTACHMENT_BLOB_MAGIC.as_slice(),
+                "legacy/ holds the original MYA1"
+            );
+            assert!(
+                protocol::decode_attachment_blob(
+                    &legacy_live,
+                    &seeded.live_id,
+                    CONTENT_TYPE.as_bytes(),
+                    &OLD_ITEMS,
+                    &OLD_ITEMS_ID,
+                )
+                .is_ok(),
+                "the legacy copy still opens under the old itemsKey"
+            );
+
+            // ── the tombstone produced NO blob work.
+            //
+            // Its blob file is still on disk (the torn-delete shape), so this is
+            // falsifiable rather than vacuous: drop the `is_tombstone()` skip and
+            // these bytes become MYA5 and get staged to legacy/.
+            let tomb_path = vault_root.join("attachments").join(&seeded.tomb_id_hex);
+            assert_eq!(
+                io.read(&tomb_path).await.unwrap(),
+                seeded.tomb_blob,
+                "a tombstoned entry's leftover blob is not re-sealed"
+            );
+            assert!(
+                io.read(
+                    &vault_root
+                        .join("legacy/attachments")
+                        .join(&seeded.tomb_id_hex)
+                )
+                .await
+                .is_err(),
+                "and it is not staged either — the tombstone skip runs before both"
+            );
+        })
+    }
+
+    /// The user-visible half of the same property: migrate a real `MYV1` vault,
+    /// re-unlock it, and read the themes, the settings and the attachment back
+    /// through the PRODUCTION surfaces.
+    ///
+    /// This is the assertion the byte-level test cannot make. Every reader here
+    /// derives its KEK version-aware off `vault.meta`, and every one of them
+    /// falls back to EMPTY / DEFAULT on a decode failure (§9.21.4, §9.5.5,
+    /// `read_catalog`) — so a migration that seals a family under the wrong
+    /// generation produces no error anywhere, just a vault whose themes,
+    /// settings and attachments are quietly gone.
+    #[test]
+    fn a_migrated_vault_still_serves_its_themes_prefs_and_attachments_after_re_unlock() {
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-e2e-families").unwrap();
+            let host = TestHost::new(tmp.path());
+            let io = StdVaultIo;
+            let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            let notes_dir = vault_root.join("notes");
+            io.create_dir_all(&notes_dir).await.unwrap();
+            build_myv1_vault(&io, &vault_root).await;
+            let u = *crate::plugins::notes::note_id::NoteId::new_v7()
+                .as_uuid()
+                .as_bytes();
+            io.write(
+                &notes_dir.join(format!("{}.myn", uuid::Uuid::from_bytes(u))),
+                &my01(&u, "# note\n"),
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+            let seeded = seed_v0_1_singletons(&io, &vault_root).await;
+
+            let state = VaultRuntimeState::default();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io)
+                .await
+                .expect("migration succeeds");
+
+            // The migration locks the slot (a re-key is a re-unlock event), so the
+            // readers below run against a vault opened exactly the way the user's
+            // next launch opens it.
+            crate::plugins::vault_unlock::commands::unlock_with_path(
+                PASSWORD.to_string(),
+                None,
+                &vault_root.join("vault.meta"),
+                &state,
+                &io,
+                &host,
+            )
+            .await
+            .expect("the migrated NTV5 vault unlocks");
+
+            // Themes — through the picker's own surface.
+            let themes =
+                crate::plugins::themes::commands::themes_list_with_dir(&io, &vault_root, &state)
+                    .await
+                    .expect("themes list");
+            let names: Vec<&str> = themes.iter().map(|t| t.name.as_str()).collect();
+            assert_eq!(
+                names,
+                vec![THEME_NAME],
+                "the custom theme is still in the store after the migration"
+            );
+            assert_eq!(
+                themes[0].palette.get("--accent").map(String::as_str),
+                Some("#8a5a2b"),
+                "…and its palette came through, not just its name"
+            );
+
+            // Prefs — through the settings reader.
+            let prefs =
+                crate::plugins::prefs::commands::prefs_read_with_dir(&vault_root, &state, &io)
+                    .await
+                    .expect("prefs read");
+            assert_eq!(
+                prefs,
+                a_prefs_view(),
+                "the settings survived; §9.5.5 would have degraded them to defaults"
+            );
+
+            // Attachments — through the serve path the WebView actually calls.
+            let served = crate::plugins::attachments::commands::attachment_serve_with_dir(
+                &io,
+                &vault_root,
+                &state,
+                &seeded.live_id_hex,
+            )
+            .await
+            .expect("the migrated attachment still serves");
+            assert_eq!(
+                served.bytes.as_slice(),
+                ATTACHMENT_BYTES,
+                "the attachment's bytes are byte-identical after the re-key"
+            );
+
+            // The tombstoned entry stays deleted — the re-key did not resurrect it.
+            match crate::plugins::attachments::commands::attachment_serve_with_dir(
+                &io,
+                &vault_root,
+                &state,
+                &seeded.tomb_id_hex,
+            )
+            .await
+            {
+                Err(crate::plugins::attachments::error::AttachmentServeError::NotFound) => {}
+                other => panic!("a tombstoned attachment must stay deleted, got {other:?}"),
+            }
+        })
+    }
+
+    /// An undecodable `vault.attachments` does NOT abort the migration (unlike a
+    /// KEK-envelope singleton, which is fail-closed pre-flighted) — it stages the
+    /// whole `attachments/` subtree to `legacy/` and leaves the blobs un-re-keyed.
+    ///
+    /// The ids cannot be enumerated without the catalog, so there is nothing to
+    /// re-seal; what this pins is that the "every original is in legacy/"
+    /// guarantee still holds when the catalog itself is the corrupt thing. Post
+    /// migration those attachments read as gone, and `legacy/` is the recovery.
+    #[test]
+    fn an_undecodable_attachments_catalog_stages_the_whole_subtree_to_legacy() {
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-bad-catalog").unwrap();
+            let vault_root = tmp.path().to_path_buf();
+            let notes_dir = vault_root.join("notes");
+            let io = StdVaultIo;
+            io.create_dir_all(&notes_dir).await.unwrap();
+            io.write(
+                &vault_root.join("vault.meta"),
+                b"MYV1 old vault meta bytes (opaque to the migration)",
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+            let seeded = seed_v0_1_singletons(&io, &vault_root).await;
+
+            // Overwrite the catalog with right-magic, won't-open bytes — the shape
+            // a torn write or a bit-flip leaves behind.
+            let mut junk = protocol::CATALOG_BLOB_MAGIC.to_vec();
+            junk.extend_from_slice(&[0xAB; 96]);
+            io.write(
+                &vault_root.join("vault.attachments"),
+                &junk,
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+
+            let summary = migrate_vault_notes_on_disk(
+                &io,
+                &vault_root,
+                &notes_dir,
+                &OLD_ROOT,
+                &OLD_ITEMS,
+                &OLD_ITEMS_ID,
+                PASSWORD,
+                PHRASE,
+                &ACCT,
+                &fast_params(),
+                ACTOR,
+                &TestHost::new("/base"),
+            )
+            .await
+            .expect("a corrupt catalog must not abort the whole migration");
+
+            // themes + dictionary + prefs re-sealed; the catalog did not.
+            assert_eq!(summary.singletons_migrated, 3);
+
+            // Both blobs — the live one AND the tombstoned leftover — are in
+            // legacy/, byte-identical, because without the catalog neither can be
+            // told from the other.
+            for id_hex in [&seeded.live_id_hex, &seeded.tomb_id_hex] {
+                let staged = io
+                    .read(&vault_root.join("legacy/attachments").join(id_hex))
+                    .await
+                    .expect("every attachment is staged when the catalog will not open");
+                assert_eq!(
+                    &staged[0..4],
+                    protocol::ATTACHMENT_BLOB_MAGIC.as_slice(),
+                    "staged as the original MYA1"
+                );
+                assert_eq!(
+                    io.read(&vault_root.join("attachments").join(id_hex))
+                        .await
+                        .unwrap(),
+                    staged,
+                    "and left in place un-re-keyed"
+                );
+            }
+            // The corrupt catalog itself is staged verbatim too.
+            assert_eq!(
+                io.read(&vault_root.join("legacy/vault.attachments"))
+                    .await
+                    .unwrap(),
+                junk,
+                "the raw catalog is staged BEFORE the decode attempt"
+            );
+        })
+    }
+
+    /// An undecodable `vault.prefs` is skipped rather than fatal — and the
+    /// consequence is that the user's settings reset.
+    ///
+    /// This pins a CHOICE that was previously expressed only by omission
+    /// (`if let Ok(prefs) = decode_prefs_blob(…)`, mod.rs's step 5b). The blob is
+    /// staged to `legacy/` and left in place as `MYP1`, which no v0.2 reader can
+    /// open — so §9.5.5's fall-back-to-defaults takes over. Deliberate: an
+    /// unreadable prefs blob was already unreadable before the migration, and
+    /// aborting a whole-vault re-key over recoverable settings would be worse.
+    /// If that trade is ever revisited, this test is what says so out loud.
+    #[test]
+    fn an_undecodable_prefs_blob_is_skipped_and_the_settings_fall_back_to_defaults() {
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-bad-prefs").unwrap();
+            let vault_root = tmp.path().to_path_buf();
+            let notes_dir = vault_root.join("notes");
+            let io = StdVaultIo;
+            io.create_dir_all(&notes_dir).await.unwrap();
+            io.write(
+                &vault_root.join("vault.meta"),
+                b"MYV1 old vault meta bytes (opaque to the migration)",
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+            seed_v0_1_singletons(&io, &vault_root).await;
+
+            let mut junk = protocol::PREFS_BLOB_MAGIC.to_vec();
+            junk.extend_from_slice(&[0xCD; 96]);
+            io.write(&vault_root.join("vault.prefs"), &junk, WriteOpts::default())
+                .await
+                .unwrap();
+
+            let summary = migrate_vault_notes_on_disk(
+                &io,
+                &vault_root,
+                &notes_dir,
+                &OLD_ROOT,
+                &OLD_ITEMS,
+                &OLD_ITEMS_ID,
+                PASSWORD,
+                PHRASE,
+                &ACCT,
+                &fast_params(),
+                ACTOR,
+                &TestHost::new("/base"),
+            )
+            .await
+            .expect("an undecodable prefs blob must not abort the migration");
+
+            // themes + dictionary + catalog re-sealed; prefs did not.
+            assert_eq!(summary.singletons_migrated, 3);
+
+            // The old bytes are staged AND left in place, unreadable under v0.2.
+            assert_eq!(
+                io.read(&vault_root.join("legacy/vault.prefs"))
+                    .await
+                    .unwrap(),
+                junk,
+                "the corrupt blob is staged before the decode attempt"
+            );
+            let on_disk = io.read(&vault_root.join("vault.prefs")).await.unwrap();
+            assert_eq!(on_disk, junk, "and left as-is, not rewritten");
+            let (new_root, _items, _id) = v0_2_material_from_disk(&io, &vault_root).await;
+            let new_prefs_kek = derive_subkey_v0_2(&new_root, SubkeyRole::PrefsKey);
+            assert!(
+                decode_prefs_blob(&new_prefs_kek, &ACCT, &on_disk).is_err(),
+                "so the v0.2 reader cannot open it and §9.5.5 hands back defaults"
+            );
+        })
+    }
 }
