@@ -47,7 +47,13 @@ describeE2E("single-tab vault lock", () => {
         // that, which is why this is the pair that matters (two separate browser
         // profiles are two containers and must BOTH work).
         await browser.session.newWindow();
-        await openApp(browser.session, server.origin);
+        // `navigate`, NOT `openApp`. `openApp` waits for one of the three
+        // ADMITTED surfaces (account entry / unlock / editor), and a refused
+        // tab renders none of them — it renders the refusal below. So calling
+        // it here waited 30 s for a state this tab is defined never to reach,
+        // and the scenario failed on its own precondition rather than on the
+        // thing it asserts. The refusal testid IS this tab's boot completion.
+        await browser.session.navigate(server.origin);
 
         const refusal = await browser.session.byTestId("web.vault-open-elsewhere", {
           timeoutMs: 30_000,
