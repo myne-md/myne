@@ -292,11 +292,24 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
 
   // SAS mismatch → ABORT: un-enroll this device so it stops trusting the
   // (possibly forked) synced data, then close.
+  //
+  // A FAILED un-enrol must not close the modal. This used to be
+  // `.catch(() => {}).finally(() => onCancel())`, which closed either way: a
+  // user who compared fingerprints, saw a mismatch — the single signal that a
+  // hostile server or a forked head is in play — and pressed abort got the same
+  // outcome whether the device was actually disconnected or not. If the reset
+  // failed, they were left enrolled against that endpoint, with a UI that had
+  // just told them they backed out. Silence is indistinguishable from success
+  // exactly where it must not be (test-audit #10/#65).
   const onMismatch = () => {
     setAborting(true);
+    setError(null);
     void invoke("plugin:sync|sync_reset_local")
-      .catch(() => {})
-      .finally(() => onCancel());
+      .then(() => onCancel())
+      .catch(() => {
+        setAborting(false);
+        setError(t("sync.join.sasAbortFailed"));
+      });
   };
 
   // Post-join: the fresh device pinned the server's cert (TOFU) — surface the
@@ -394,6 +407,9 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
               {t("sync.join.sasMatch")}
             </button>
           </div>
+          {/* The abort's own failure surfaces HERE, in the step where the user
+              pressed it — not as a closed modal that implies it worked. */}
+          {error && <DestructiveBanner testId="join.error">{error}</DestructiveBanner>}
         </div>
       </div>
     );

@@ -255,6 +255,11 @@ export function AccountBootstrap({
           <div style={SAS_STYLE} data-testid="account-bootstrap.sas">
             {sas}
           </div>
+          {/* The abort's own failure surfaces HERE, in the step where the user
+              pressed it — not as a cleared screen that implies it worked. */}
+          {error && (
+            <DestructiveBanner testId="account-bootstrap.error">{error}</DestructiveBanner>
+          )}
           <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
             <button
               data-testid="account-bootstrap.sas-mismatch"
@@ -265,14 +270,27 @@ export function AccountBootstrap({
                 // A mismatch means the data this device adopted may be forked.
                 // Un-enrol so it stops trusting it — the join modal's answer,
                 // and the only safe one.
+                //
+                // A FAILED un-enrol must not clear the screen. This used to
+                // `.catch(() => {})` and then reset the state either way, so a
+                // user who saw a fingerprint mismatch — the single signal that a
+                // hostile server or a forked head is in play — and pressed abort
+                // got the same screen whether the device was actually
+                // disconnected or not. If the reset failed they were left
+                // enrolled against that endpoint, looking at a UI that had just
+                // told them they backed out (test-audit #10/#65).
                 setAborting(true);
+                setError(null);
                 void invoke("plugin:sync|sync_reset_local")
-                  .catch(() => {})
-                  .finally(() => {
+                  .then(() => {
                     setAborting(false);
                     setPending(false);
                     setSas(null);
                     setAccount(null);
+                  })
+                  .catch(() => {
+                    setAborting(false);
+                    setError(t("sync.join.sasAbortFailed"));
                   });
               }}
             >

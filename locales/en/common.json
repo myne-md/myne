@@ -914,14 +914,14 @@
           "insert": "Insert into note",
           "noAnswer": "No answer — try rephrasing.",
           "noModelHint": "No AI provider is set up, so chat, summaries, rewriting and semantic search have nothing to run on. Set one up in Settings → Developer → AI.",
-            "unreachableHint": "The provider you set up is not answering. Check that it is running, then send again.",
-            "unavailableHint": "This build of Myne was compiled without local AI, so nothing here can run.",
+          "unreachableHint": "The provider you set up is not answering. Check that it is running, then send again.",
+          "unavailableHint": "This build of Myne was compiled without local AI, so nothing here can run.",
           "offHint": "Local AI is off. Turn it on in Settings → Developer → AI.",
           "send": "Send",
           "statusGettingReady": "Preparing…",
           "statusNoModel": "No provider",
-            "statusUnreachable": "Not answering",
-            "statusUnavailable": "Unavailable",
+          "statusUnreachable": "Not answering",
+          "statusUnavailable": "Unavailable",
           "statusOff": "Off",
           "statusReady": "Ready",
           "stop": "Stop",
@@ -3035,9 +3035,9 @@
       "resultsLabel": "Search results",
       "keywords": {
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
-       "aiEndpoint": "ollama endpoint address local runtime model server port loopback",
-       "aiProvider": "provider remote cloud openrouter ollama cloud api key credential consent send notes",
-       "aiProviderModel": "model catalogue list which model llama qwen gpt choose model remote provider",
+        "aiEndpoint": "ollama endpoint address local runtime model server port loopback",
+        "aiProvider": "provider remote cloud openrouter ollama cloud api key credential consent send notes",
+        "aiProviderModel": "model catalogue list which model llama qwen gpt choose model remote provider",
         "aiEnable": "local ai on off enable disable machine learning",
         "aiExcluded": "excluded folders ignore ai privacy exclude",
         "aiModels": "models gguf download text embedding llm",
@@ -3137,7 +3137,7 @@
   "sync": {
     "materialising": "Downloading your notes — {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",
     "credentialAmbiguous": "Your password may have changed on this device and on another, and Myne can't tell which is newer — so it hasn't changed anything. Sign in on a device that already has access to sort it out.",
-    "vaultRekeyed": "This vault was upgraded to the new format on another device. Unlock again to continue \u2014 nothing was lost.",
+    "vaultRekeyed": "This vault was upgraded to the new format on another device. Unlock again to continue — nothing was lost.",
     "attachments": {
       "aria": {
         "downloading": "Downloading {{name}}",
@@ -3310,7 +3310,8 @@
       "verifyBody": "Check that this code matches the one on the device you approved from.",
       "verifyTitle": "Verify this device",
       "waitingHint": "Keep this window open — once approved, a verification code appears here to compare with your other device.",
-      "waitingTitle": "Waiting for approval"
+      "waitingTitle": "Waiting for approval",
+      "sasAbortFailed": "Could not disconnect this device. It is still enrolled with that server, so treat it as untrusted: open Settings → Sync and remove it there. Your notes were not deleted."
     },
     "panel": {
       "addDevice": {
