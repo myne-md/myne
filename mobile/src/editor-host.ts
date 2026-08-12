@@ -16,6 +16,7 @@
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/host";
 import { isMediaTarget } from "@myne/editor/host/notes/graphModel";
 import i18n from "@myne/i18n";
+import { openUrl } from "./lib/open-url";
 import { documentDir, join } from "@tauri-apps/api/path";
 import {
   attachmentExport,
@@ -102,12 +103,15 @@ const host: EditorHost = {
   // PrefsView ⊇ EditorPrefs (identical field types), so this is structurally sound.
   prefsRead: async (): Promise<EditorPrefs> => prefsRead(),
   openExternal: (url) => {
-    // No opener plugin wired on mobile yet; best-effort WebView open.
-    try {
-      window.open(url, "_blank");
-    } catch {
-      /* no-op */
-    }
+    // Hands the URL to the OS (myne-ops#15). This used to be a `window.open`
+    // fallback with a comment saying no opener plugin was wired — the plugin
+    // was in fact already in `Cargo.toml` and in the capability grant; what was
+    // missing was a caller. Inside a WebView `window.open` opens an in-app
+    // view, is eaten by the popup blocker, or does nothing, depending on the
+    // platform; none of those is what a link in a note is asking for.
+    void openUrl(url).catch(() => {
+      /* Nothing to fall back to, and nothing worth interrupting the editor for. */
+    });
   },
 };
 
