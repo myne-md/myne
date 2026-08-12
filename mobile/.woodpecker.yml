@@ -84,8 +84,10 @@ steps:
   # ── Cross-implementation vector conformance (protocol crate) ──────────────
   # Mobile links the SAME audited `protocol/` crate as desktop, so its blob/
   # crypto path is byte-validated by `protocol/tests/vectors.rs` against the
-  # `myne-test-vectors` companion (28 categories: MY01…MYR1 blobs, KDF, AEAD,
-  # HKDF subkey roles, SCRAM, vault-head, manifest, account-number, BIP-39…).
+  # `myne-test-vectors` companion (52 categories, 708 cases: MY01…MYT1 blobs,
+  # KDF, AEAD, HKDF subkey roles, SCRAM, vault-head, manifest, account-number,
+  # BIP-39, the dialect/task conformance families, and the v0.2 next-major
+  # formats — the companion's own README carries the current count).
   # A passing run here == mobile's crypto is cross-client conformant.
   #
   # DISABLED (mirrors the main repo's step) while `myne-test-vectors` is private:
