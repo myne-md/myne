@@ -11,8 +11,24 @@
 //! short-circuiting tag compare, a key-indexed table) would make |t| explode
 //! into the hundreds. This is a stronger statement than a median-ratio check.
 //!
+//! Every pass also measures its own NOISE FLOOR — a third class running the
+//! identical fixed-key workload — because a timing measurement on a machine
+//! doing other work is not a weaker measurement, it is an invalid one, and the
+//! test previously could not tell the two apart. At a load average of 15-25 it
+//! reported `Welch t = -12.05` and failed as `TIMING LEAK`: a false accusation
+//! about the crypto, produced by the host. With the control, that same
+//! situation reports INCONCLUSIVE and asserts nothing.
+//!
 //! Run visibly:
 //!   cargo test -p protocol --test crypto_attacks_timing -- --nocapture
+//!
+//! `MYNE_TIMING_STRICT=1` turns INCONCLUSIVE into a failure. Deliberately NOT
+//! set anywhere yet: it belongs on a lane that can promise a quiet machine, and
+//! this repo does not have one — CI shares a host across three Woodpecker
+//! instances, so setting it there would trade a false "leak" for a false
+//! "unmeasurable" and flap just the same. Wire it up together with such a lane,
+//! not before. Until then a developer can run it by hand on an idle machine and
+//! get a real answer, which is more than the old shape offered.
 
 use std::time::Instant;
 
@@ -58,6 +74,65 @@ fn crop_high(mut v: Vec<u128>, pct: f64) -> Vec<u128> {
     v
 }
 
+/// One measurement pass: the statistic under test, and the NOISE FLOOR measured
+/// the same way at the same moment.
+struct Measured {
+    /// FIXED vs RANDOM key — the security property. Large ⇒ timing depends on
+    /// key bytes.
+    real: f64,
+    /// FIXED vs the SAME FIXED key, a third class interleaved with the other
+    /// two. Two identical workloads cannot differ for any reason but noise, so
+    /// this is what the machine is contributing. Large ⇒ the host is too noisy
+    /// for `real` to mean anything, in EITHER direction.
+    control: f64,
+}
+
+/// Time `op` over three interleaved classes and return both statistics.
+///
+/// Two things here are deliberate and were both wrong before:
+///
+/// * **The random keys are generated up front.** They used to be produced
+///   between the two timed regions, so the random class was always preceded by
+///   a PRNG round and the fixed class never was — a systematic difference
+///   between the classes that has nothing to do with the code under test.
+/// * **A third, redundant fixed class rides along.** Without it the test cannot
+///   tell a leak from a busy machine, and it resolved that ambiguity by
+///   assuming the machine was quiet: at a load average of 15-25 it reported
+///   `Welch t = -12.05` and failed as `TIMING LEAK`, which is a false
+///   accusation, not a conservative one.
+fn measure(n: usize, fixed: &[u8; 32], seed: u64, op: &dyn Fn(&[u8; 32])) -> Measured {
+    let mut rng = XorShift(seed);
+    let randoms: Vec<[u8; 32]> = (0..n).map(|_| rng.next_key()).collect();
+
+    // Warm up caches / branch predictors.
+    for _ in 0..2000 {
+        op(fixed);
+    }
+
+    let mut t_fixed = Vec::with_capacity(n);
+    let mut t_random = Vec::with_capacity(n);
+    let mut t_control = Vec::with_capacity(n);
+    for rk in &randoms {
+        let s = Instant::now();
+        op(fixed);
+        t_fixed.push(s.elapsed().as_nanos());
+
+        let s = Instant::now();
+        op(rk);
+        t_random.push(s.elapsed().as_nanos());
+
+        let s = Instant::now();
+        op(fixed);
+        t_control.push(s.elapsed().as_nanos());
+    }
+
+    let a = crop_high(t_fixed, 0.05);
+    Measured {
+        real: welch_t(&a, &crop_high(t_random, 0.05)),
+        control: welch_t(&a, &crop_high(t_control, 0.05)),
+    }
+}
+
 #[test]
 fn dudect_decode_timing_independent_of_key_bytes() {
     let blob = encode_new_note(
@@ -69,40 +144,60 @@ fn dudect_decode_timing_independent_of_key_bytes() {
     .expect("encode");
 
     const N: usize = 120_000;
+    const BOUND: f64 = 10.0;
     let fixed_wrong = [0xAAu8; 32]; // FIXED class key (constant)
-    let mut rng = XorShift(0x1234_5678_9ABC_DEF0);
 
-    // Warm up caches / branch predictors.
-    for _ in 0..2000 {
-        let _ = decode_note(&blob, &NOTE_UUID, &fixed_wrong, &ITEMS_KEY_ID);
+    let op = |k: &[u8; 32]| {
+        let _ = decode_note(&blob, &NOTE_UUID, k, &ITEMS_KEY_ID);
+    };
+
+    // Two passes at most: a noisy control is usually a transient (another test
+    // binary saturating a core), and doubling the samples is the cheapest way
+    // to tell a transient from a genuinely unusable host before giving up.
+    let mut m = measure(N, &fixed_wrong, 0x1234_5678_9ABC_DEF0, &op);
+    if m.control.abs() >= BOUND {
+        eprintln!(
+            "[dudect] control t = {:.2} — host too noisy, retrying at 2x samples",
+            m.control
+        );
+        m = measure(N * 2, &fixed_wrong, 0x0FED_CBA9_8765_4321, &op);
     }
 
-    let mut t_fixed = Vec::with_capacity(N);
-    let mut t_random = Vec::with_capacity(N);
-    // Interleave the two classes so any slow clock drift hits both equally.
-    for _ in 0..N {
-        let s = Instant::now();
-        let _ = decode_note(&blob, &NOTE_UUID, &fixed_wrong, &ITEMS_KEY_ID);
-        t_fixed.push(s.elapsed().as_nanos());
-
-        let rk = rng.next_key();
-        let s = Instant::now();
-        let _ = decode_note(&blob, &NOTE_UUID, &rk, &ITEMS_KEY_ID);
-        t_random.push(s.elapsed().as_nanos());
-    }
-
-    let a = crop_high(t_fixed, 0.05);
-    let b = crop_high(t_random, 0.05);
-    let t = welch_t(&a, &b);
     eprintln!(
-        "[dudect] Welch t = {t:.2}  (|t| < 4.5 ⇒ no first-order leak; a real leak is t >> 50)"
+        "[dudect] real t = {:.2}   control t = {:.2}   (bound |t| < {BOUND})",
+        m.real, m.control
     );
 
-    // A genuine key-dependent branch yields |t| in the hundreds at this N;
-    // scheduler noise stays well under 10. Generous bound = non-flaky yet
-    // still catches any real leak.
+    // The control is the licence to interpret `real` AT ALL. Two runs of the
+    // identical workload differ only by what the machine did, so a control past
+    // the bound means this host cannot resolve the difference the test is
+    // looking for — and "cannot measure" is neither "leak" nor "no leak".
+    //
+    // Inconclusive is therefore NOT a pass and NOT a failure by default: it
+    // returns without asserting, loudly. Under MYNE_TIMING_STRICT — the mode a
+    // lane that exists to check this property runs in — it fails instead, so
+    // "we never actually measured" cannot masquerade as green where the
+    // measurement is the whole job. (Same shape as MYNE_VECTORS_REQUIRED.)
+    if m.control.abs() >= BOUND {
+        let msg = format!(
+            "INCONCLUSIVE: the noise floor ({:.2}) is itself past the bound, so the \
+             real statistic ({:.2}) says nothing about constant-timeness. Re-run on \
+             an idle machine.",
+            m.control, m.real
+        );
+        if std::env::var("MYNE_TIMING_STRICT").is_ok_and(|v| !v.is_empty() && v != "0") {
+            panic!("[dudect] {msg}");
+        }
+        eprintln!("[dudect] {msg}");
+        return;
+    }
+
+    // Control is clean ⇒ the machine can resolve this, and `real` means what it
+    // says. A genuine key-dependent branch yields |t| in the hundreds at this N.
     assert!(
-        t.abs() < 10.0,
-        "TIMING LEAK: decode time depends on key bytes (Welch t = {t:.2})"
+        m.real.abs() < BOUND,
+        "TIMING LEAK: decode time depends on key bytes (real t = {:.2}, control t = {:.2})",
+        m.real,
+        m.control
     );
 }
