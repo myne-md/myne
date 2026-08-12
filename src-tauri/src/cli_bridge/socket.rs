@@ -583,6 +583,64 @@ mod tests {
         SharedLastAccess::default()
     }
 
+    /// Write one whole frame — length prefix and body — in a SINGLE `write_all`.
+    ///
+    /// NOT a tidy-up. The two-call form these tests used,
+    ///
+    ///     client.write_all(&(body.len() as u32).to_le_bytes()).unwrap();
+    ///     client.write_all(body).unwrap();
+    ///
+    /// leaves a real window between the two syscalls, and the server is
+    /// entitled to close inside it. `serve_connection` sets `SO_RCVTIMEO` to
+    /// [`IO_DEADLINE`] before its first read; `framing::read_up_to` treats the
+    /// resulting `WouldBlock` as an error rather than a retry (correctly — that
+    /// error IS the deadline firing); `dispatch::serve_connection` returns
+    /// without a reply and the stream drops. The client's SECOND write then
+    /// fails against a peer that is already gone.
+    ///
+    /// That is why this read as flake and only under
+    /// `cargo test --workspace`: [`IO_DEADLINE`] is **1 s** under `cfg(test)`,
+    /// and a client thread descheduled a whole second between two adjacent
+    /// statements is ordinary on a machine running the full workspace suite.
+    ///
+    /// TWO KINDS OF EVIDENCE, and they are not the same strength.
+    ///
+    /// Injection (strong, deterministic): a 1500 ms sleep between the two
+    /// writes fails the test in 1.5 s, at the second write, every time, with no
+    /// other change. The window is real.
+    ///
+    /// A/B (strong, statistical): `CARGO_TARGET_DIR=target/pre-push cargo test
+    /// --workspace`, same machine, same session — **2 failures in 3 runs**
+    /// before, **0 in 6** after.
+    ///
+    /// What is NOT established: the errno taxonomy. The failure was seen
+    /// wearing `ENOTCONN`, `BrokenPipe` and `UnexpectedEof`, which is consistent
+    /// with one cause (the server closing without a reply, racing the client's
+    /// second write) — but standalone probes of every close shape in this file's
+    /// path (plain close, `shutdown(Both)`, a listener closed with the
+    /// connection unaccepted, read-then-deadline-then-close) produced
+    /// `BrokenPipe` on macOS and never `ENOTCONN`. So the account above explains
+    /// the window and the measurement, and does NOT fully explain which errno
+    /// surfaces when. Anyone re-opening this should start there rather than
+    /// assume it was settled.
+    ///
+    /// The constant's own doc comment already states the invariant that makes
+    /// 1 s safe — "each writes its whole frame and flushes before the server's
+    /// first read". These tests were the ones not honouring it, and it now has
+    /// exactly one place to be honoured.
+    ///
+    /// Production is unaffected and deliberately left alone: `framing::write_frame`
+    /// writes in two calls too, but against the real 10 s deadline, and making it
+    /// single-write would copy every reply body to buy nothing.
+    #[cfg(unix)]
+    fn write_whole_frame(client: &mut std::os::unix::net::UnixStream, body: &[u8]) {
+        let mut frame = Vec::with_capacity(4 + body.len());
+        frame.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        frame.extend_from_slice(body);
+        client.write_all(&frame).unwrap();
+        client.flush().unwrap();
+    }
+
     #[cfg(unix)]
     #[test]
     fn bind_listener_sets_owner_only_0600_perms() {
@@ -667,11 +725,7 @@ mod tests {
         let mut client =
             std::os::unix::net::UnixStream::connect(&path).expect("connect to cli bridge socket");
         let body = b"{}";
-        client
-            .write_all(&(body.len() as u32).to_le_bytes())
-            .unwrap();
-        client.write_all(body).unwrap();
-        client.flush().unwrap();
+        write_whole_frame(&mut client, body);
 
         let mut prefix = [0u8; 4];
         client.read_exact(&mut prefix).expect("read reply prefix");
@@ -722,11 +776,7 @@ mod tests {
         let mut client =
             std::os::unix::net::UnixStream::connect(&path).expect("connect to cli bridge socket");
         let body = br#"{"cmd":"list"}"#;
-        client
-            .write_all(&(body.len() as u32).to_le_bytes())
-            .unwrap();
-        client.write_all(body).unwrap();
-        client.flush().unwrap();
+        write_whole_frame(&mut client, body);
 
         let mut prefix = [0u8; 4];
         client.read_exact(&mut prefix).expect("read reply prefix");
@@ -945,11 +995,7 @@ mod tests {
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
             let body = br#"{"cmd":"list"}"#;
-            client
-                .write_all(&(body.len() as u32).to_le_bytes())
-                .unwrap();
-            client.write_all(body).unwrap();
-            client.flush().unwrap();
+            write_whole_frame(&mut client, body);
             let mut prefix = [0u8; 4];
             client.read_exact(&mut prefix).expect("read reply prefix");
             let len = u32::from_le_bytes(prefix) as usize;
@@ -985,11 +1031,7 @@ mod tests {
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
             let body = br#"{"cmd":"list"}"#;
-            client
-                .write_all(&(body.len() as u32).to_le_bytes())
-                .unwrap();
-            client.write_all(body).unwrap();
-            client.flush().unwrap();
+            write_whole_frame(&mut client, body);
             let mut prefix = [0u8; 4];
             client.read_exact(&mut prefix).expect("read reply prefix");
             let len = u32::from_le_bytes(prefix) as usize;
@@ -1044,11 +1086,7 @@ mod tests {
                 let mut client = std::os::unix::net::UnixStream::connect(&path)
                     .expect("connect to cli bridge socket");
                 let body = b"{\"probe\":true}";
-                client
-                    .write_all(&(body.len() as u32).to_le_bytes())
-                    .unwrap();
-                client.write_all(body).unwrap();
-                client.flush().unwrap();
+                write_whole_frame(&mut client, body);
             }
             std::thread::sleep(Duration::from_millis(100));
             teardown(Some(handle));
@@ -1091,11 +1129,7 @@ mod tests {
                 let mut client = std::os::unix::net::UnixStream::connect(&path)
                     .expect("connect to cli bridge socket");
                 let body = b"{\"probe\":true}";
-                client
-                    .write_all(&(body.len() as u32).to_le_bytes())
-                    .unwrap();
-                client.write_all(body).unwrap();
-                client.flush().unwrap();
+                write_whole_frame(&mut client, body);
             }
             std::thread::sleep(Duration::from_millis(100));
 
