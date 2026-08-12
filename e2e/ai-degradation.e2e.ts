@@ -64,12 +64,39 @@ async function openChatWithAiOn(s: Session): Promise<void> {
 }
 
 /** The resting cause the tab reports — a fixed identifier, never content. */
-async function restingCause(s: Session): Promise<string | null> {
-  return await (await s.byTestId("ai.chrome-status")).attribute("data-ai-cause");
-}
-
-async function restingBody(s: Session): Promise<string> {
-  return (await (await s.byTestId("ai.status-no-model")).textContent()) ?? "";
+/** The resting cause AND the sentence that goes with it, read from the SAME
+ *  element in ONE round trip, after the value has stopped moving.
+ *
+ *  These used to be two reads against two elements. Both derive from the same
+ *  `resting` value in `AiChatTab.tsx`, so they cannot disagree WITHIN a render —
+ *  but two WebDriver round trips are not within a render, and the backend probe
+ *  resolves while the panel is open. ad2 caught exactly that: it read a cause
+ *  that was not `no-provider`, the state then settled, and it read a body that
+ *  was the no-provider sentence — so it asserted a contradiction that never
+ *  existed at any single moment, and reported it as a product defect.
+ *
+ *  `ai.status-no-model` carries `data-ai-cause` itself, so one element answers
+ *  both. The settle loop then requires the same cause twice in a row before
+ *  anything is asserted about it. */
+async function restingState(s: Session): Promise<{ cause: string | null; body: string }> {
+  const read = async (): Promise<{ cause: string | null; body: string } | null> =>
+    s.execute<{ cause: string | null; body: string } | null>(
+      "var el = document.querySelector('[data-testid=\"ai.status-no-model\"]');" +
+        "if (el) return { cause: el.getAttribute('data-ai-cause'), body: el.textContent || '' };" +
+        "var c = document.querySelector('[data-testid=\"ai.chrome-status\"]');" +
+        "return c ? { cause: c.getAttribute('data-ai-cause'), body: '' } : null;",
+    );
+  let previous: string | null | undefined;
+  return s.waitUntil(
+    async () => {
+      const now = await read();
+      if (now === null) return null;
+      const settled = previous !== undefined && previous === now.cause;
+      previous = now.cause;
+      return settled ? now : null;
+    },
+    { label: "AI resting state settled", timeoutMs: 20_000 },
+  );
 }
 
 /** Run one scenario with the stub faulted, and never leak the lever. */
@@ -97,8 +124,9 @@ aiDescribe("ad1 the chat resting state names the cause it actually has", () => {
           await unlockToEditor(s, password);
           await dismissImporterOffer(s);
           await openChatWithAiOn(s);
-          cause = await restingCause(s);
-          body = await restingBody(s);
+          const state = await restingState(s);
+          cause = state.cause;
+          body = state.body;
         },
       ),
     );
@@ -124,8 +152,9 @@ aiDescribe("ad2 a backend that is present and failing reads differently", () => 
           await unlockToEditor(s, password);
           await dismissImporterOffer(s);
           await openChatWithAiOn(s);
-          cause = await restingCause(s);
-          body = await restingBody(s);
+          const state = await restingState(s);
+          cause = state.cause;
+          body = state.body;
         },
       ),
     );
