@@ -26,18 +26,48 @@ const BOOT_TIMEOUT_MS = 30_000;
 /** Argon2id at production parameters, in a browser, on a CI runner. */
 const UNLOCK_TIMEOUT_MS = 60_000;
 
-/** Navigate to the app origin and wait for the boot probe to render something. */
+/** Navigate to the app origin and wait for the boot probe to render something.
+ *
+ *  The BETA-TERMS gate is part of "something". `AccountBootstrap` renders it
+ *  ahead of the account-entry step whenever consent is missing (myne-ops#15),
+ *  and a fresh browser profile has no consent — so on the web client it is the
+ *  FIRST screen, every time. This helper used to wait only for the three
+ *  admitted surfaces, none of which exists behind the gate, and every scenario
+ *  in the lane died in `openApp` with a boot timeout: 12 of 20 tests, all with
+ *  the same message, which reads like the bundle failing to start rather than
+ *  like one screen that was added in front of it.
+ *
+ *  The desktop lane was given a consent seed (`multi-device.ts`'s
+ *  `legalConsentSeed`) in the same change; the web lane has no config dir to
+ *  seed, so it accepts the terms the way a user does — through the button. */
 export async function openApp(session: Session, origin: string): Promise<void> {
   await session.navigate(origin);
-  // The boot probe resolves into exactly one of these. Waiting for "any of the
-  // three" rather than for a specific one keeps this helper usable from a
-  // scenario that does not yet know which state the fixture put the client in —
-  // and makes a hang report WHICH surface never appeared.
-  await waitForAnyTestId(
+  // Include the gate in the probe so a hang still reports WHICH surface never
+  // appeared rather than timing out on three that cannot appear.
+  const seen = await waitForAnyTestId(
     session,
-    ["account-entry.input", "unlock.password-input", "editor.root"],
+    ["bootstrap.beta-terms", "account-entry.input", "unlock.password-input", "editor.root"],
     BOOT_TIMEOUT_MS,
   );
+  if (seen === "bootstrap.beta-terms") {
+    // SCROLL first. The terms carry a long full-text block, and in the browser
+    // lane's viewport the accept button sits below it — `/click`'s own
+    // scroll-into-view only guarantees the border box intersects the VIEWPORT,
+    // which is not the same as revealing an element clipped inside an
+    // overflowing container (`support/webdriver.ts` says so at the helper this
+    // uses). Without it the click reports "element interactable" forever, which
+    // reads like a disabled button and is really one that is off-screen.
+    const accept = await session.byTestId("sync.beta-terms.accept", {
+      timeoutMs: BOOT_TIMEOUT_MS,
+    });
+    await accept.scrollIntoView();
+    await accept.click();
+    await waitForAnyTestId(
+      session,
+      ["account-entry.input", "unlock.password-input", "editor.root"],
+      BOOT_TIMEOUT_MS,
+    );
+  }
 }
 
 /** The first-run identity step: type an account number and continue. */
