@@ -31,6 +31,7 @@ import {
   createNote,
   dismissImporterOffer,
   editorText,
+  replaceFieldText,
   runPaletteAction,
   typeIntoEditor,
   unlockToEditor,
@@ -199,7 +200,7 @@ describeE2E("fr2 replace rewrites the canonical buffer under folded regions (MYN
         // the find engine instead: re-querying the NEW token finds both rewritten
         // occurrences (still folded), and the OLD token is gone.
         await (await s.byTestId("find.replace-all")).click();
-        await (await s.byTestId("find.input")).replaceText("revealedfr2");
+        await replaceFieldText(s, "find.input", "revealedfr2");
         await s.waitUntil(
           async () =>
             (await (await s.byTestId("find.replace-all")).textContent()).includes("(2)")
@@ -207,7 +208,7 @@ describeE2E("fr2 replace rewrites the canonical buffer under folded regions (MYN
               : null,
           { label: "the rewritten token is found twice inside the still-folded region" },
         );
-        await (await s.byTestId("find.input")).replaceText("foldablefr2");
+        await replaceFieldText(s, "find.input", "foldablefr2");
         // No matches → the replace-all button disables (bare "Replace all", no
         // count). That the original token is unfindable proves it's gone from the
         // canonical buffer.

@@ -783,6 +783,24 @@ export async function typeIntoEditor(
  *  the edit register ("Editing…"/"Saving…") — polling for "Saved" alone
  *  could match the pre-edit clean state. */
 export async function waitForSaved(session: Session): Promise<void> {
+  // Fail FAST and by name when the badge is not merely late but ABSENT.
+  // The editor hides the save status entirely while no note tab is active
+  // (`Editor.tsx`: `hideSaveStatus={ws.focusedLeaf.activeTab === null}` — with
+  // nothing open the values would be meaningless). A caller that lands there
+  // otherwise waits the full budget and reports
+  // `waitUntil(waitForElement([data-testid="editor.save-status"])) timed out`,
+  // which reads as a slow save and is really a missing precondition: there is
+  // no open note to save. Distinguishing the two costs one query.
+  if ((await session.byTestIdAll("editor.save-status")).length === 0) {
+    const tabs = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+    if (tabs.length === 0) {
+      throw new Error(
+        "waitForSaved: no save status AND no active editor tab — the editor hides " +
+          "the badge when nothing is open, so this is a missing precondition (open a " +
+          "note first), not a slow autosave.",
+      );
+    }
+  }
   // The post-edit saved state renders "Saved·<rel>" (separator + relative
   // time) — distinguishable from the pre-edit clean state's bare "Saved",
   // so this can't pass before the edit's own save actually landed.
@@ -792,6 +810,36 @@ export async function waitForSaved(session: Session): Promise<void> {
       null,
     { label: "autosave settled on Saved·<rel>", timeoutMs: 15_000 },
   );
+}
+
+/** Replace a field's value, RE-LOCATING the element if it goes stale mid-way.
+ *
+ *  `Element.replaceText` costs two round trips — read `value`, then send the
+ *  keystrokes — and a React panel that re-renders between them (the find bar
+ *  after a replace-all, for one) invalidates the handle in the gap. The spec
+ *  then dies with `[stale element reference] Node with identifier 'node-…' was
+ *  not found`, a message that names a GUID and nothing else. Re-locating inside
+ *  the retry is the same shape `typeIntoEditor` already uses for `.cm-content`;
+ *  this is that, for the byTestId fields. */
+export async function replaceFieldText(
+  session: Session,
+  testId: string,
+  text: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await (await session.byTestId(testId)).replaceText(text);
+      return;
+    } catch (e) {
+      if (e instanceof WebDriverError && e.code === "stale element reference") {
+        await new Promise((r) => setTimeout(r, 150));
+        continue;
+      }
+      throw e;
+    }
+  }
+  // Last attempt outside the catch so a persistent staleness surfaces as itself.
+  await (await session.byTestId(testId)).replaceText(text);
 }
 
 /** Current CodeMirror document text (`textContent()` — the doc lives in
