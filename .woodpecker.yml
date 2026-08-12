@@ -1114,11 +1114,19 @@ steps:
   #
   # The cost of leaving it commented is NOT zero and is easy to misread as zero:
   # cargo-test runs the `vectors` target (it is `-p protocol`), every runner
-  # prints `[skip]`, and the step reports green having asserted nothing. Three
-  # docs (protocol/CLAUDE.md twice, myne-server/CLAUDE.md once) describe this
-  # gate as enforcing; today it enforces on no machine. If part 1 below turns
-  # out to be impossible, the honest move is to soften that prose rather than
-  # leave "nobody checked" reading as "someone checked and it was fine".
+  # prints `[skip]`, and the step reports green having asserted nothing. On THIS
+  # repo and on mobile, the gate enforces on no machine — it is a pre-push check
+  # on a developer's laptop, nothing more.
+  #
+  # It is NOT true that it enforces nowhere, and the earlier wording here said so
+  # in a way that quietly discouraged the fix. `myne-server` runs the gate in CI
+  # today: its `.woodpecker.yml` clones the companion with a `vectors_token`
+  # secret, pins an explicit SHA, and FAILS the step when the secret is absent
+  # instead of skipping. So the secret exists and the pattern is proven in this
+  # project — what part 1 below needs is provisioning it for this repo, not
+  # inventing anything. (Server-side coverage is only the three categories the Go
+  # code touches — scram-auth, tls-exporter, vault-head — so it is not a
+  # substitute for this step; it is evidence that this step can work.)
   #
   # TO RE-ENABLE — four parts, IN THIS ORDER. Parts 1 and 2 are not diffs, and
   # nothing in a review can tell you they happened. That is the whole hazard.
