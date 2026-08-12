@@ -34,40 +34,52 @@
 export type IpcCommandName = `plugin:${string}|${string}`;
 
 /** Seam operations, named `<module>.<export>`, that an implementation may refuse. */
-export type SeamOperation =
-  | IpcCommandName
-  | "core.invoke"
-  | "core.Channel"
-  | "event.listen"
-  | "dialog.open"
-  | "dialog.save"
-  | "dialog.confirm"
-  | "opener.openUrl"
-  | "opener.openPath"
-  | "opener.revealItemInDir"
-  | "path.appDataDir"
-  | "path.join"
-  | "window.destroy"
-  | "window.isFullscreen"
+/**
+ * Every non-IPC seam operation, as a VALUE.
+ *
+ * The union below is derived from this array rather than written beside it, so
+ * the two cannot drift — and that matters because the seam CONTRACT
+ * (`tests/platform/seam-contract.ts`) promises exhaustiveness it could not
+ * check: "an implementation cannot quietly opt out of an operation by omitting
+ * it, because omission IS a claim that gets asserted". That was only true of
+ * operations someone had remembered to write a `contractFor` for. Five had
+ * none, including `window.isFullscreen`, which BOTH subjects declared supported
+ * and NEITHER asserted. A type-level union gives a test nothing to iterate;
+ * this array does, and the contract now iterates it.
+ */
+export const NON_IPC_SEAM_OPERATIONS = [
+  "core.invoke",
+  "core.Channel",
+  "event.listen",
+  "dialog.open",
+  "dialog.save",
+  "dialog.confirm",
+  "opener.openUrl",
+  "opener.openPath",
+  "opener.revealItemInDir",
+  "path.appDataDir",
+  "path.join",
+  "window.destroy",
+  "window.isFullscreen",
   // MYND-628 — reveal a window that idle auto-lock hid. Refused on WEB: a page
   // has no hidden window, because web auto-lock re-renders the locked surface in
   // the same tab rather than taking one away.
-  | "window.show"
-  | "webviewWindow.listen"
+  "window.show",
+  "webviewWindow.listen",
   // Write only. `clipboard.readText` / `clipboard.clear` were removed with
   // myne#379: their one consumer, the recovery-kit 30 s auto-clear, does its
   // read+compare host-side now, and the two `clipboard-manager:` grants that
   // backed them are out of the desktop capability. Re-adding either member
   // means re-adding its grant in the same change.
-  | "clipboard.writeText"
-  | "deepLink.onOpenUrl"
+  "clipboard.writeText",
+  "deepLink.onOpenUrl",
   // phase3-web-client task 48 — the download flow's counterpart. Refused on
   // DESKTOP, which is the only direction of refusal in this union that runs that
   // way: every other member is a thing a browser cannot do. Here it is the
   // desktop that declines, because it has the stronger affordance (a native
   // Save-As naming a real path, with the plaintext staying in Rust) and two ways
   // to deliver one file is one too many.
-  | "download.deliverFile"
+  "download.deliverFile",
   // phase3-web-client task 71 — the second desktop-side refusal, and for the
   // same class of reason. Reading a picked handle's text is what the WEB
   // importer does, because a browser has no host to ask. Desktop declines
@@ -76,13 +88,16 @@ export type SeamOperation =
   // here too would be a second, WIDER path to the same bytes — an opaque handle
   // read with no within-root check — which is precisely what that seam exists to
   // withhold from the WebView.
-  | "filePicker.readPickedText"
+  "filePicker.readPickedText",
   // #262 — the NARROW twin of the read above, and the reason it is a separate
   // member rather than a relaxation of it: this one goes through the importer's
   // root-confined `import_read_file`, so desktop answers it. It refuses only a
   // handle this seam did not mint, which is a caller bug rather than a platform
   // limit.
-  | "filePicker.readPickedSmallText";
+  "filePicker.readPickedSmallText",
+] as const;
+
+export type SeamOperation = IpcCommandName | (typeof NON_IPC_SEAM_OPERATIONS)[number];
 
 /**
  * Thrown by a seam implementation for an operation the platform cannot provide.

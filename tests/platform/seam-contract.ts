@@ -28,6 +28,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   isPlatformUnsupported,
+  NON_IPC_SEAM_OPERATIONS,
   type SeamOperation,
 } from "../../src/platform/unsupported";
 
@@ -115,17 +116,29 @@ export function runSeamContract(subject: SeamSubject): void {
       seam = await subject.load();
     });
 
+    /** Every op a `contractFor` below actually covers — checked against the
+     *  full roster at the end of this block. See `UNCONTRACTED` for why. */
+    const contracted = new Set<SeamOperation>();
+
     /**
      * Every operation gets exactly one of two treatments: the supported
      * assertions, or the single unsupported assertion. Neither is skippable —
      * an implementation cannot quietly opt out of an operation by omitting it,
      * because omission IS a claim ("unsupported") that gets asserted.
+     *
+     * That sentence used to be false in the way that is hardest to notice: it
+     * held only for operations someone had remembered to call `contractFor`
+     * for, and five had none. The sharpest was `window.isFullscreen`, which
+     * BOTH subjects declared supported and NEITHER asserted — a claim made
+     * twice and checked zero times. The roster check at the end of this block
+     * is what makes the sentence true.
      */
     function contractFor(
       op: SeamOperation,
       supported: () => Promise<void> | void,
       call: () => Promise<unknown>,
     ) {
+      contracted.add(op);
       if (subject.supports.has(op)) {
         it(`${op} — forwards and unwraps`, supported);
       } else {
@@ -402,5 +415,49 @@ export function runSeamContract(subject: SeamSubject): void {
         return mod.onOpenUrl(() => {});
       },
     );
+
+    // ── the roster check ────────────────────────────────────────────────
+    //
+    // A RATCHET, and deliberately not a hard gate yet. Contracting the five
+    // below means widening the `Seam` interface in this file and both subject
+    // loaders (`tauri-seam.test.ts`, `web-seam.test.ts`) to expose surfaces
+    // they do not carry today — real work, and work that has to be done
+    // carefully for the two DESKTOP-side refusals, which are the only
+    // members of the union that refuse in that direction. Blocking on it
+    // would mean this check never lands.
+    //
+    // What it buys immediately: a NEW `SeamOperation` cannot be added without
+    // either a contract or an argued entry here, and the existing five are a
+    // number that can only go down. Before this, adding a member and no
+    // contract was silent.
+    const UNCONTRACTED: ReadonlySet<SeamOperation> = new Set([
+      // Declared supported by BOTH subjects, asserted by neither.
+      "window.isFullscreen",
+      // Refused on web (a page has no hidden window to reveal).
+      "window.show",
+      // The two DESKTOP-side refusals — the unusual direction, and the reason
+      // these two want a contract most.
+      "download.deliverFile",
+      "filePicker.readPickedText",
+      // Desktop answers this one through the root-confined importer read.
+      "filePicker.readPickedSmallText",
+    ]);
+
+    it("every seam operation has a contract, or a recorded reason it does not", () => {
+      const missing = NON_IPC_SEAM_OPERATIONS.filter(
+        (op) => !contracted.has(op) && !UNCONTRACTED.has(op),
+      );
+      expect(
+        missing,
+        "a SeamOperation with no contractFor is an operation whose behaviour " +
+          "no test states — add one, or record it in UNCONTRACTED with why",
+      ).toEqual([]);
+      const stale = [...UNCONTRACTED].filter((op) => contracted.has(op));
+      expect(
+        stale,
+        "these are contracted now and must leave UNCONTRACTED — a recorded " +
+          "exemption that no longer describes anything is how the list rots",
+      ).toEqual([]);
+    });
   });
 }
