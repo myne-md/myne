@@ -367,6 +367,15 @@ steps:
       # this number could quietly become meaningless.
       - node scripts/check-desktop-payload-budget.mjs
       - pnpm build
+      # Test-tree typecheck ratchet. `pnpm build` above is `include: ["src"]` —
+      # it checks what SHIPS, which is right for it, and leaves tests/, e2e/ and
+      # e2e-web/ checked by NOTHING: Vitest transpiles without checking and no
+      # other step runs tsc over them. A wrong-arity call in a spec therefore
+      # surfaced only as a runtime driver error inside a scenario, where it reads
+      # as a product bug or as flake — `runPaletteAction` was called with two of
+      # its three arguments in two specs, and both sat among the suite's
+      # "chronic failures" for it. Counts may fall, never rise.
+      - node scripts/check-test-typecheck.mjs
       # i18n-catalog parity (hook-only otherwise): fails on empty English source
       # values or static t()/i18n.t() keys missing from locales/en/common.json.
       # Node-builtins only (no extra deps); folded here since node is set up.
@@ -375,7 +384,9 @@ steps:
   # ─── Frontend unit tests (Vitest) ────────────────────────────
   # 59 test files under tests/ (markdown dialect, editor, notes, commands;
   # 718 tests). These live outside src/ so `pnpm build` (tsc, `include: ["src"]`)
-  # does NOT type-check or run them — Vitest is their only CI gate.
+  # does NOT run them — Vitest is their only EXECUTION gate. Their TYPES are
+  # checked by `check-test-typecheck.mjs` in `pnpm-build` (a ratchet over
+  # `tsconfig.tests.json`); before that guard they were checked nowhere at all.
   vitest:
     image: node:25
     when: *code-paths

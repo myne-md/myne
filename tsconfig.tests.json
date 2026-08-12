@@ -1,0 +1,35 @@
+/* Typecheck for the trees the shipped-code typecheck deliberately excludes.
+ *
+ * `tsconfig.json` is `include: ["src"]` — it typechecks what SHIPS, and that is
+ * the right scope for it. The consequence nobody had accounted for is that
+ * `tests/`, `e2e/` and `e2e-web/` were then typechecked by NOTHING: Vitest
+ * transpiles without checking, `pnpm build` never looks at them, and CI runs
+ * neither over them. A test file could call a helper with the wrong arity, the
+ * wrong argument types, or a name that does not exist, and the only report was
+ * a runtime failure inside a scenario — where it reads like a product bug or a
+ * flake rather than a typo.
+ *
+ * That is not hypothetical. `runPaletteAction(session, actionId, query)` was
+ * called with two arguments in two specs; `query` arrived as `undefined`,
+ * `sendKeys(undefined)` reached the driver, and the spec failed with
+ * `WebDriverError: [invalid argument] Missing text parameter` — a message that
+ * points at the driver and names neither the missing argument nor the call
+ * site. Both had been red for as long as anyone had been reading the suite as
+ * "chronically failing".
+ *
+ * `src` is included because the test trees import it; without it every import
+ * resolves to `any` and the check is worth nothing.
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    /* ES2022 rather than the shipped ES2020: the test trees use `Array.at`,
+     * which every runtime they actually execute on has (Node, the WebView,
+     * headless Chrome) and which only the SHIPPED target has a reason to
+     * withhold. Raising it here is not a shipping decision — `tsconfig.json`
+     * still checks `src` at ES2020 on its own — it just stops 23 `.at()` calls
+     * from drowning the real findings. */
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src", "tests", "e2e", "e2e-web"]
+}
