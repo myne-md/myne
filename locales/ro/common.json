@@ -9,6 +9,7 @@
     "passwordLabel": "Parolă principală",
     "approversIntro": "Aceste dispozitive îl pot aproba pe acesta:",
     "noApprovers": "Niciun alt dispozitiv de pe acest cont nu îl poate aproba acum. Deschide Myne pe un dispozitiv care are deja acces, apoi revino aici.",
+    "pendingStartOver": "Începe de la zero cu alt cont",
     "pendingTitle": "Se așteaptă aprobarea",
     "sasMatch": "Se potrivesc — continuă",
     "sasMismatch": "Nu se potrivesc",
@@ -24,6 +25,13 @@
     "hint": "Arată așa: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Este verificat aici, pe dispozitivul tău — deocamdată nu se trimite nimic.",
     "invalid": "Acel număr de cont nu este valid. Verifică-l și încearcă din nou.",
     "title": "Introdu numărul tău de cont"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Răspuns generat pe acest dispozitiv",
+      "localRuntime": "Răspuns generat de {{name}}, pe acest computer",
+      "remote": "Răspuns generat de {{provider}} — notele tale au fost trimise acolo"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -227,7 +235,8 @@
       "intro": "Confirmă că acest cod corespunde cu cel afișat în extensie, apoi apasă Acceptă pentru a asocia.",
       "reject": "Respinge",
       "rejected": "Asociere respinsă.",
-      "title": "O extensie de browser dorește să se conecteze"
+      "title": "O extensie de browser dorește să se conecteze",
+      "persistFailed": "Myne nu a putut salva această conexiune, așa că ea nu a fost realizată. Dacă seiful este blocat, deblochează-l și încearcă din nou să te conectezi."
     }
   },
   "commandPalette": {
@@ -939,10 +948,14 @@
           "insert": "Inserează în notă",
           "noAnswer": "Niciun răspuns — încearcă să reformulezi.",
           "noModelHint": "Niciun model selectat. Alege unul din Setări → Developer → AI pentru a începe.",
+          "unreachableHint": "Furnizorul pe care l-ai configurat nu răspunde. Verifică dacă rulează, apoi trimite din nou.",
+          "unavailableHint": "Această versiune de Myne a fost compilată fără AI local, așa că nimic de aici nu poate rula.",
           "offHint": "AI-ul local este dezactivat. Activează-l din Setări → Developer → AI.",
           "send": "Trimite",
           "statusGettingReady": "Se pregătește…",
           "statusNoModel": "Niciun model",
+          "statusUnreachable": "Nu răspunde",
+          "statusUnavailable": "Indisponibil",
           "statusOff": "Dezactivat",
           "statusReady": "Pregătit",
           "stop": "Oprește",
@@ -1065,6 +1078,8 @@
     },
     "slash": {
       "aiContinue": "Continuă scrierea (AI)",
+      "aiFailed": "Solicitarea AI nu a putut fi finalizată, așa că nu a fost inserat nimic.",
+      "aiNoProvider": "Nu este configurat niciun furnizor AI, așa că nu a fost inserat nimic. Configurează unul din Setări → Developer → AI.",
       "aiTitle": "Sugerează un titlu (AI)",
       "attachFile": "Atașează fișier",
       "bulletList": "Listă cu marcatori",
@@ -1091,7 +1106,8 @@
       "time": "Oră",
       "todoList": "Listă de sarcini",
       "voiceNote": "Notă vocală",
-      "wikiLink": "Wikilink"
+      "wikiLink": "Wikilink",
+      "remind": "Memento"
     },
     "spell": {
       "menu": {
@@ -1123,13 +1139,17 @@
       "menuEdit": "Editează {{field}}",
       "menuTitle": "Adaugă câmp",
       "repeatNoAnchor": "Această sarcină nu are o dată de la care să se repete, așa că nu se va repeta. Adaugă o dată limită pentru a o porni.",
+      "repeatNeedsDate": "Are nevoie de o dată limită de la care să se repete",
       "save": "Salvează",
       "skipOccurrence": "Omite această apariție",
       "title": {
         "due": "Dată limită",
         "repeat": "Repetare",
-        "priority": "Prioritate"
-      }
+        "priority": "Prioritate",
+        "remind": "Memento"
+      },
+      "timeLabel": "Oră (opțional)",
+      "invalidRemind": "Myne nu poate citi această dată, așa că nu îți va aminti."
     },
     "toolbar": {
       "apply": "Aplică",
@@ -1235,7 +1255,8 @@
         "rewriteCount_few": "Se vor rescrie {{count}} legături",
         "rewriteCount_other": "Se vor rescrie {{count}} de legături",
         "skipped": "omis — {{reason}}",
-        "title": "Convertește wikilink-urile importate din această notă"
+        "title": "Convertește wikilink-urile importate din această notă",
+        "staleDocument": "Această notă s-a modificat cât timp previzualizarea era deschisă, așa că nu a fost convertit nimic. Rulează din nou pentru a vedea legăturile actuale."
       },
       "convertCore": {
         "noMatch": "nicio potrivire"
@@ -1253,6 +1274,8 @@
       "attachUnsupported": "Se pot atașa doar imagini și fișiere PDF.",
       "attachFailed": "Fișierul nu a putut fi atașat.",
       "archiveFailed": "Această notă nu a putut fi arhivată.",
+      "aiRewriteFailed": "Rescrierea nu a putut fi finalizată, așa că selecția ta rămâne neschimbată.",
+      "aiRewriteNoProvider": "Nu este configurat niciun furnizor AI, așa că nu a fost rescris nimic. Configurează unul din Setări → Developer → AI.",
       "trashFailed": "Această notă nu a putut fi mutată în Coș."
     },
     "nav": {
@@ -1582,6 +1605,29 @@
       "untitled": "Fără titlu",
       "warning": "Această acțiune nu poate fi anulată."
     },
+    "example": {
+      "folder": "Primii pași",
+      "index": {
+        "title": "Începe de aici",
+        "body": "Acesta este un mic seif de exemplu. Câteva note obișnuite care arată ce poate face Myne, și nimic de aici nu este special: editează, redenumește sau șterge orice.\n\n- [[{{markdown}}]] arată cum textul simplu devine formatare\n- [[{{tasks}}]] adună listele de verificare într-un singur loc\n- [[{{links}}]] leagă notele între ele și le sortează cu etichete\n- [[{{makeItYours}}]] șterge tot acest conținut într-un singur pas\n\nAi văzut destul? Dă clic dreapta pe folderul **Primii pași** din bara laterală și alege Șterge. Notele ajung în Coș, așa că le poți aduce înapoi dacă te răzgândești.\n"
+      },
+      "markdown": {
+        "title": "Scrierea cu Markdown",
+        "body": "Myne scrie Markdown simplu și îți arată rezultatul pe măsură ce tastezi.\n\n## Elementele de bază\nFă un cuvânt **aldin** sau *cursiv* ori inserează `cod în linie`.\n\n## O listă\n- Un element\n- Alt element\n  - Unul imbricat\n\n## Un citat\n> Notele mici, păstrate ani la rând, bat notele mari pe care nu le scrii niciodată.\n\n## Un tabel\n| Scurtătură | Ce face |\n| --- | --- |\n| Cmd/Ctrl + B | Aldin |\n| Cmd/Ctrl + K | Adaugă o legătură |\n\n## Niște cod\n```\nconsole.log(\"hello from Myne\")\n```\n\nCând ești gata, întoarce-te la [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Sarcini",
+        "body": "Orice rând care începe cu `- [ ]` este o sarcină. Myne adună fiecare sarcină deschisă din toate notele tale într-o singură vizualizare Sarcini, așa că nimic nu se pierde între note.\n\n- [ ] Citește [[{{markdown}}]]\n- [ ] Adaugă o sarcină de-a ta\n- [ ] Încearcă una cu o dată limită 📅 2030-12-31\n- [x] Creează-ți seiful\n\nBifează o casetă aici, apoi deschide vizualizarea Sarcini din bara laterală ca să vezi cum se actualizează lista.\n\nÎnapoi la [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Legături și etichete",
+        "body": "Tastează `[[` pentru a crea o legătură către altă notă. Legăturile merg în ambele sensuri: deschide [[{{index}}]] și vei vedea această notă la legăturile ei inverse, iar graficul trasează o linie între ele.\n\nAdaugă o #etichetă oriunde și Myne așază nota sub ea în arborele de etichete. Această notă este etichetată cu #exemplu și #primii-pași, așa că deschide arborele de etichete din bara laterală pentru a o găsi.\n\nE rândul tău: leagă această notă de [[{{tasks}}]] sau inventează-ți propria etichetă.\n"
+      },
+      "makeItYours": {
+        "title": "Fă-l al tău",
+        "body": "De acum, acesta este seiful tău. Aceste note sunt doar un punct de plecare, așa că schimbă orice sau șterge-le și începe de la zero.\n\nPentru a elimina tot exemplul, dă clic dreapta pe folderul **Primii pași** din bara laterală și alege Șterge. Totul ajunge împreună în Coș și îl poți restaura de acolo dacă îl vrei înapoi.\n\nCând ești gata, apasă Cmd/Ctrl + N pentru a crea o notă nouă și începe să scrii.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Adaugă condiție",
       "addFilterGroup": "Adaugă grup de filtre",
@@ -1623,7 +1669,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Un nume de folder nu poate conține / \\ | # ^ [ ] și nu poate începe sau se termina cu un spațiu.",
-      "tooLong": "Acea cale de folder este prea lungă."
+      "tooLong": "Acea cale de folder este prea lungă.",
+      "moveIntoSelf": "Un folder nu poate fi mutat în el însuși.",
+      "moveCollision": "Acolo există deja un folder cu acel nume."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1914,7 +1962,8 @@
       "importedWithSkips_one": "{{count}} notă importată — omise: {{skipped}}",
       "importedWithSkips_few": "{{count}} note importate — omise: {{skipped}}",
       "importedWithSkips_other": "{{count}} de note importate — omise: {{skipped}}",
-      "importNoMarkdown": "Niciun fișier markdown în ce ai tras aici"
+      "importNoMarkdown": "Niciun fișier markdown în ce ai tras aici",
+      "moveFolderTo": "Mută folderul în…"
     },
     "newFromTemplate": {
       "back": "Înapoi",
@@ -2198,6 +2247,30 @@
       "emptyText": "Niciun rezultat.",
       "placeholder": "Selectează…",
       "searchPlaceholder": "Caută…"
+    }
+  },
+  "migrate": {
+    "intro": "Actualizează acest seif la noul format. Notele tale vor beneficia de îmbinare automată între dispozitive. Această operațiune reface cheile întregului seif; copia veche este păstrată pe acest dispozitiv până când confirmi.",
+    "passwordLabel": "Parolă principală",
+    "phraseLabel": "Frază de recuperare",
+    "phraseHelp": "Obligatorie — cheile tale noi sunt împachetate cu această frază, așa că recuperarea continuă să funcționeze. Introdu toate cuvintele tale de recuperare.",
+    "submit": "Migrează",
+    "migrating": "Se migrează…",
+    "done": "S-au migrat {{count}} note la noul format.",
+    "settle": {
+      "intro": "Seiful tău a fost actualizat. Copia veche se află încă pe acest dispozitiv până când finalizezi — până atunci, schimbarea parolei nu o va face inaccesibilă.",
+      "confirm": "Totul pare în regulă, elimină copia veche",
+      "abort": "Ceva nu e în regulă, pune seiful vechi la loc",
+      "errorAlreadySynced": "Acest seif s-a sincronizat deja în noul format, așa că nu poate fi pus la loc. Restaurează dintr-o copie de rezervă dacă ai nevoie de cel vechi.",
+      "errorBusy": "Se execută o altă operațiune asupra seifului. Încearcă din nou peste un moment.",
+      "errorIo": "Operațiunea nu a putut fi finalizată. Nu s-a schimbat nimic."
+    },
+    "progressCount": "{{done}} din {{total}} elemente recriptate…",
+    "error": {
+      "recoveryPhraseRequired": "Acea frază de recuperare nu s-a potrivit cu acest seif. Introdu fraza ta de recuperare corectă pentru a migra — este obligatorie pentru ca recuperarea să funcționeze în continuare.",
+      "wrongPassword": "Acea parolă nu s-a potrivit cu acest seif.",
+      "alreadyMigrated": "Acest seif este deja în noul format.",
+      "generic": "Migrarea nu a putut fi finalizată. Seiful tău este neschimbat; încearcă din nou."
     }
   },
   "recover": {
@@ -2567,9 +2640,11 @@
         "invalidName": "Nume de temă nesigur",
         "invalidValue": "Valoare nevalidă pentru {{key}}",
         "invalidValueWithLine": "Valoare nevalidă pentru {{key}} (linia {{line}})",
+        "lowContrast": "{{key}} pe {{against}} are un contrast de {{ratio}}:1, dar are nevoie de cel puțin {{min}}:1 pentru a rămâne lizibil",
         "missingKey": "Lipsește culoarea necesară {{key}}",
         "parseError": "JSON nevalid",
-        "parseErrorWithLine": "JSON nevalid (linia {{line}})"
+        "parseErrorWithLine": "JSON nevalid (linia {{line}})",
+        "reservedKey": "{{key}} este rezervată pentru uzul intern al Myne și nu poate fi setată de o temă"
       },
       "export": "Exportă",
       "exportError": "Acea temă nu a putut fi exportată. Te rugăm să încerci din nou.",
@@ -2751,12 +2826,45 @@
       "autoTagHelper": "Când te oprești din scris, un model mic de pe dispozitivul tău citește nota și sugerează etichete în partea de sus a ei. Nimic nu este adăugat până când nu accepți o sugestie.",
       "autoTagLabel": "Sugerează etichete automat",
       "autoTagUnavailable": "Această versiune nu include modelul de etichetare, așa că nu pot fi sugerate etichete. Myne nu descarcă niciodată unul — comutatorul se activează singur într-o versiune care îl include.",
+      "consent": {
+        "accept": "Trimite notele mele către {{provider}}",
+        "cancel": "Anulează",
+        "cannotVerifyLabel": "Ce nu poate verifica Myne",
+        "revokeLabel": "Cum anulezi acest lucru",
+        "scopeLabel": "Pe ce dispozitive se aplică",
+        "title": "Înainte ca Myne să trimită ceva către {{provider}}",
+        "whatLabel": "Ce părăsește dispozitivul tău",
+        "whenLabel": "Când pleacă",
+        "whoLabel": "Cine le primește"
+      },
       "disclosureToggle": "Cum funcționează?",
       "enableHelper": "Rulează un model furnizat de tine în întregime pe dispozitivul tău. Experimental, dezactivat implicit.",
       "enableLabel": "Activează AI local",
       "excludedHelper": "Notele din aceste dosare nu sunt niciodată citite sau indexate de AI. O cale de dosar pe linie.",
       "excludedLabel": "Dosare excluse",
       "excludedPlaceholder": "Privat/\nJurnal/",
+      "endpointHelper": "Dacă rulezi deja un mediu de execuție pentru modele pe acest computer, îndreaptă Myne către el în loc să alegi fișiere de model. Lasă gol pentru a folosi fișierele de mai sus.",
+      "endpointLabel": "Mediu local de execuție a modelelor",
+      "endpointModelHelper": "Myne nu alege un model în locul tău. Până când numești unul, adresa de mai sus este salvată, dar nefolosită.",
+      "endpointModelLabel": "Modelul de folosit acolo",
+      "endpointModelPlaceholder": "numele modelului așa cum îl listează mediul de execuție",
+      "endpointRejected": {
+        "malformed": "Aceasta nu este o adresă pe care Myne o poate folosi. Are nevoie de o schemă și de un port explicit — de exemplu http://127.0.0.1:11434.",
+        "notLoopback": "Această adresă trebuie să fie pe acest computer — localhost, 127.0.0.1 sau ::1. Pentru a folosi un furnizor care rulează în altă parte, indică-l în schimb la Furnizor la distanță.",
+        "unsupportedScheme": "Sunt acceptate doar adresele http și https."
+      },
+      "endpointSaveFailed": "Adresa nu a putut fi salvată. Verifică dacă Myne își poate scrie setările.",
+      "endpointThirdParty": "{{name}} este un program separat, cu propriul său comportament de rețea, iar Myne nu îl controlează. Notele tale îi sunt trimise cât timp rulează pe acest computer.",
+      "providerError": {
+        "barred": "Acest tip de solicitare nu ajunge niciodată la un furnizor — rulează pe acest dispozitiv sau deloc.",
+        "failed": "Nu a funcționat. Nu s-a salvat nimic și nu s-a trimis nimic din nou.",
+        "noCredential": "Nu este setată nicio cheie API pentru acest furnizor. Adaugă una din Setări → Developer → AI.",
+        "quotaExhausted": "Furnizorul a refuzat solicitarea — nu mai ai credit sau ai depășit o limită de rată. Acest lucru trebuie rezolvat cu furnizorul, nu în Myne.",
+        "refused": "Furnizorul a refuzat conexiunea. Este posibil să fie oprit sau să blocheze această rețea.",
+        "timeout": "Furnizorul nu a răspuns la timp. Nu a rămas nimic în execuție.",
+        "unauthorized": "Furnizorul ți-a respins cheia API. Înlocuiește-o — poate fi greșită, revocată sau pentru un alt cont.",
+        "unreachable": "Furnizorul nu a putut fi accesat. Verifică-ți conexiunea la rețea."
+      },
       "modelChoose": "Alege fișierul…",
       "modelEmbeddingLabel": "Model de căutare — căutare semantică și întrebări-răspunsuri",
       "modelFilter": {
@@ -2768,11 +2876,31 @@
       "modelSaveFailed": "Calea modelului nu a putut fi salvată (trebuie să fie în afara seifului tău).",
       "modelTranscriptionLabel": "Model de conversie a vorbirii în text (transcriere)",
       "modelsHelper": "Myne nu descarcă niciodată modele — asta ar însemna trimiterea de date prin rețea. Deschide un link pentru a obține unul în browserul tău, apoi alege fișierele descărcate aici. Totul rulează pe dispozitivul tău.",
+      "providerHelper": "În loc să ruleze un model aici, Myne poate trimite o solicitare către un serviciu numit de tine. Când o face, notele tale părăsesc acest dispozitiv. „Niciunul” este valoarea implicită și înseamnă că nu este contactat niciun serviciu.",
+      "providerKeyAdd": "lipește cheia ta API",
+      "providerKeyLabel": "Cheie API",
+      "providerKeyNone": "Nu este stocată nicio cheie, așa că nu se poate trimite nimic încă.",
+      "providerKeyRevoke": "Elimină această cheie",
+      "providerKeyReplace": "lipește o cheie nouă pentru a o înlocui pe cea stocată",
+      "providerKeyStored": "O cheie este stocată. Myne nu ți-o arată niciodată înapoi — lipește una nouă pentru a o înlocui.",
+      "providerActive": "Răspunde acum: {{name}}",
+      "providerLabel": "Furnizor la distanță",
+      "providerModelCount_one": "{{count}} model disponibil.",
+      "providerModelCount_other": "{{count}} de modele disponibile.",
+      "providerModelEmpty": "Acest furnizor nu a publicat niciun model pentru contul tău.",
+      "providerModelHelper": "Myne nu vine cu o valoare implicită. Lista vine de la furnizor, așa că rămâne actuală și nu ești niciodată taxat pentru un model pe care nu l-ai ales.",
+      "providerModelLabel": "Model",
+      "providerModelLoad": "Încarcă modelele",
+      "providerModelNone": "Niciun model ales",
+      "providerModelUnfetched": "Încarcă lista pentru a alege un model.",
+      "providerNone": "Niciunul",
+      "providerNothingAnswering": "Nu este configurat încă nimic care să răspundă.",
       "modelsLabel": "Modele",
       "recommendedFilesEmbedding": "Necesită model.safetensors + config.json + tokenizer.json în același dosar.",
       "recommendedFilesGeneration": "Necesită fișierul .gguf + tokenizer.json în același dosar.",
       "recommendedFilesTranscription": "Necesită fișierul Whisper .gguf + config.json + tokenizer.json în același dosar.",
-      "title": "AI"
+      "title": "AI",
+      "providerModelCount_few": "{{count}} modele disponibile."
     },
     "network": {
       "disabledCue": "Sincronizarea nu mai este rutată prin Tor. Conexiunile noi merg direct la serverul de sincronizare.",
@@ -2832,6 +2960,7 @@
       "quickUnlockSubtitle": "Reintră cu {{method}} sau un PIN după blocarea automată"
     },
     "quickUnlock": {
+      "errorBusy": "Este în curs o altă operațiune asupra seifului. Încearcă din nou peste un moment.",
       "errorCancelled": "Anulat.",
       "errorGeneric": "Deblocarea rapidă nu a putut fi configurată.",
       "errorHardwareUnavailable": "Touch ID nu este disponibil în această versiune. Necesită o versiune macOS semnată, cu Touch ID configurat.",
@@ -3016,6 +3145,9 @@
       },
       "keywords": {
         "aiAutoTag": "etichete automate etichetare sugestii sugerează etichetă ai auto tag",
+        "aiEndpoint": "ollama endpoint adresă mediu local de execuție model server port loopback local runtime",
+        "aiProvider": "furnizor la distanță cloud openrouter ollama cheie api credențial consimțământ trimite note provider remote",
+        "aiProviderModel": "model catalog listă ce model llama qwen gpt alege model furnizor la distanță remote provider",
         "aiEnable": "ai local activează dezactivează pornit oprit inteligență artificială învățare automată on off",
         "aiExcluded": "dosare excluse foldere excludere exclude ignoră ai confidențialitate",
         "aiModels": "modele model gguf descărcare text încorporare embedding llm",
@@ -3072,8 +3204,26 @@
         "vaultIcon": "pictograma seifului avatar imagine simbol icon",
         "vaultLabel": "eticheta seifului nume redenumire titlu label",
         "vaultLocation": "locația seifului cale folder pe disc unde este stocat",
-        "viewMode": "mod de vizualizare implicit live citire sursă previzualizare"
+        "viewMode": "mod de vizualizare implicit live citire sursă previzualizare",
+        "dateFormat": "format dată zi lună an iso dd/mm mm/dd calendar date format",
+        "timeFormat": "format oră 24 de ore 12 ore ceas am pm time format",
+        "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Formatul datei",
+      "dateHelper": "Cum sunt afișate datele în sarcini, vizualizări salvate și atașamente.",
+      "dateSystem": "În funcție de limbă",
+      "timeLabel": "Formatul orei",
+      "timeHelper": "Dacă orele sunt afișate pe un ceas de 24 de ore sau de 12 ore.",
+      "timeSystem": "În funcție de limbă",
+      "time24": "24 de ore",
+      "time12": "12 ore",
+      "zoneLabel": "Fus orar",
+      "zoneHelper": "Ce fus decide ce înseamnă „astăzi”. Lasă gol pentru a urma acest dispozitiv. Orele pe care le scrii într-o notă nu sunt niciodată modificate — 09:00 rămâne 09:00 peste tot.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne nu cunoaște acel fus orar. Folosește un nume precum Europe/Berlin.",
+      "errorSave": "Acea setare nu a putut fi salvată."
     }
   },
   "storageLost": {
@@ -3101,6 +3251,7 @@
   "sync": {
     "materialising": "Se descarcă notele tale — {{done}} din {{total}}. Poți începe să lucrezi; celelalte vor apărea pe măsură ce sosesc.",
     "credentialAmbiguous": "Este posibil ca parola ta să se fi schimbat și pe acest dispozitiv, și pe altul, iar Myne nu poate determina care este mai recentă — așa că nu a schimbat nimic. Conectează-te pe un dispozitiv care are deja acces pentru a lămuri lucrurile.",
+    "vaultRekeyed": "Acest seif a fost actualizat la noul format pe alt dispozitiv. Deblochează din nou pentru a continua — nu s-a pierdut nimic.",
     "attachments": {
       "aria": {
         "downloading": "Se descarcă {{name}}",
@@ -3117,6 +3268,7 @@
     "buildingIndex": {
       "label": "Se construiește indexul de căutare…"
     },
+    "remoteMergeHint": "Actualizat de pe alt dispozitiv",
     "conflicts": {
       "compare": "Compară",
       "compareClose": "Înapoi la conflicte",
@@ -3186,6 +3338,7 @@
       "verifyPending": "Acest cod apare după ce noul dispozitiv își finalizează prima sincronizare.",
       "verifySyncing": "Se sincronizează…",
       "verifyTitle": "Verifică noul dispozitiv",
+      "verifyAction": "Compară codul",
       "yourDevices": "Dispozitivele tale"
     },
     "endpoint": {
@@ -3215,7 +3368,12 @@
       "deviceNameHelp": "Afișat în lista ta de dispozitive. Îl poți schimba mai târziu.",
       "deviceNameLabel": "Denumește acest dispozitiv",
       "error": {
+        "awaitingApproval": "Acest dispozitiv așteaptă deja aprobarea. Aprobă-l de pe un dispozitiv care este deja conectat.",
+        "deviceLimit": "Acest cont a atins limita de dispozitive. Elimină un dispozitiv pe care nu îl mai folosești, apoi încearcă din nou.",
+        "frozen": "Acest cont este înghețat, așa că nu poate fi adăugat niciun dispozitiv nou acum. Notele tale de pe acest dispozitiv nu sunt afectate.",
         "notConfigured": "Setează un server de sincronizare în setări înainte de a adăuga acest dispozitiv.",
+        "serverMismatch": "Identitatea serverului de sincronizare nu s-a potrivit cu ce aștepta acest dispozitiv. Nu îți introduce din nou credențialele până nu afli de ce.",
+        "kdfTooLarge": "Acest dispozitiv nu are suficientă memorie pentru a deschide acel seif. Setările lui de criptare necesită mai multă memorie decât poate folosi această aplicație aici. Deschide-l pe un computer desktop.",
         "transport": "Serverul de sincronizare nu a putut fi accesat. Verifică-ți conexiunea și încearcă din nou."
       },
       "mode": {
@@ -3504,7 +3662,8 @@
       "inProgress": "Operațiune în curs.",
       "kdfMemoryExceedsHost": "Acest seif are nevoie de {{required}} MiB de memorie pentru a fi deschis — mai mult decât îi poate oferi acest browser ({{available}} MiB). Seiful este în regulă; deschide-l în aplicația desktop Myne.",
       "unexpected": "Eroare neașteptată. Te rugăm să încerci din nou.",
-      "vaultNotFound": "Fișierul seifului nu a fost găsit. Te rugăm să repornești aplicația."
+      "vaultNotFound": "Fișierul seifului nu a fost găsit. Te rugăm să repornești aplicația.",
+      "vaultUpgraded": "Acest seif a fost actualizat la un format mai nou, pe care această versiune de Myne nu îl acceptă încă. Datele tale sunt în regulă — actualizează Myne la ultima versiune pentru a-l deschide."
     },
     "passwordLabel": "Parolă",
     "passwordPlaceholder": "Parolă",
@@ -3574,6 +3733,7 @@
       "committing": "Se salvează…",
       "copied": "Copiat",
       "copy": "Copiază",
+      "copyFailed": "Copierea nu a reușit — folosește „Salvează ca fișier”.",
       "eyebrow": "Pasul 4 din 4 — numărul de cont",
       "heading": "Salvează-ți numărul de cont.",
       "intro": "Acesta este jetonul tău la purtător — tratează-l ca pe bani.",
@@ -3688,6 +3848,10 @@
       "vaultBusyAuth": {
         "body": "O altă operațiune asupra seifului este în curs. Încearcă din nou peste un moment.",
         "title": "Seif ocupat"
+      },
+      "plaintextTooLarge": {
+        "title": "Acea notă este prea mare pentru a fi criptată",
+        "body": "Încearcă din nou cu mai puțin conținut."
       }
     },
     "orchestrator": {
@@ -3995,6 +4159,12 @@
     "backUpNow": "Fă o copie de rezervă acum"
   },
   "web": {
+    "openElsewhere": {
+      "body": "O singură filă poate ține un seif deschis la un moment dat — două ar scrie în același spațiu de stocare și l-ar corupe. Închide cealaltă filă pentru a continua aici.",
+      "freed": "Cealaltă filă s-a închis. Reîncarcă pentru a-ți deschide seiful aici.",
+      "reload": "Reîncarcă",
+      "title": "Acest seif este deschis în altă filă"
+    },
     "reload": {
       "body": "Reîncărcarea acestei pagini îți cere din nou parola — nu există o cale mai rapidă de intrare, iar acest lucru este intenționat. Seiful tău rămâne criptat pe acest dispozitiv cât timp pagina este închisă, iar cheia este reconstruită de fiecare dată din parola ta.",
       "title": "O reîncărcare înseamnă parola din nou"

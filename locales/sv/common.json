@@ -9,6 +9,7 @@
     "passwordLabel": "Huvudlösenord",
     "approversIntro": "De här enheterna kan godkänna den här enheten:",
     "noApprovers": "Ingen annan enhet på det här kontot kan godkänna den här enheten just nu. Öppna Myne på en enhet som redan har åtkomst och kom sedan tillbaka hit.",
+    "pendingStartOver": "Börja om med ett annat konto",
     "pendingTitle": "Väntar på godkännande",
     "sasMatch": "De stämmer överens — fortsätt",
     "sasMismatch": "De stämmer inte överens",
@@ -24,6 +25,13 @@
     "hint": "Det ser ut som MY-XXXX-XXXX-XXXX-XXXX-XXXX. Kontrolleras här på din enhet — ingenting skickas ännu.",
     "invalid": "Det kontonumret är inte giltigt. Kontrollera det och försök igen.",
     "title": "Ange ditt kontonummer"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Besvarad på den här enheten",
+      "localRuntime": "Besvarad av {{name}}, på den här datorn",
+      "remote": "Besvarad av {{provider}} — dina anteckningar skickades dit"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -218,7 +226,8 @@
       "intro": "Bekräfta att den här koden stämmer med den som visas i tillägget och tryck sedan på Acceptera för att parkoppla.",
       "reject": "Avvisa",
       "rejected": "Parkoppling avvisad.",
-      "title": "Ett webbläsartillägg vill ansluta"
+      "title": "Ett webbläsartillägg vill ansluta",
+      "persistFailed": "Myne kunde inte spara den här anslutningen, så den upprättades inte. Om valvet är låst, lås upp det och försök ansluta igen."
     }
   },
   "commandPalette": {
@@ -914,10 +923,14 @@
           "insert": "Infoga i anteckning",
           "noAnswer": "Inget svar – prova att formulera om.",
           "noModelHint": "Ingen modell vald. Välj en i Inställningar → Utvecklare → AI för att börja.",
+          "unreachableHint": "Leverantören du har konfigurerat svarar inte. Kontrollera att den körs och skicka sedan igen.",
+          "unavailableHint": "Den här versionen av Myne är byggd utan lokal AI, så ingenting här kan köras.",
           "offHint": "Lokal AI är av. Slå på den i Inställningar → Utvecklare → AI.",
           "send": "Skicka",
           "statusGettingReady": "Förbereder…",
           "statusNoModel": "Ingen modell",
+          "statusUnreachable": "Svarar inte",
+          "statusUnavailable": "Otillgänglig",
           "statusOff": "Av",
           "statusReady": "Redo",
           "stop": "Stoppa",
@@ -1040,6 +1053,8 @@
     },
     "slash": {
       "aiContinue": "Fortsätt skriva (AI)",
+      "aiFailed": "AI-begäran kunde inte slutföras, så ingenting infogades.",
+      "aiNoProvider": "Ingen AI-leverantör är konfigurerad, så ingenting infogades. Konfigurera en i Inställningar → Utvecklare → AI.",
       "aiTitle": "Föreslå titel (AI)",
       "attachFile": "Bifoga fil",
       "bulletList": "Punktlista",
@@ -1066,7 +1081,8 @@
       "time": "Tid",
       "todoList": "Att göra-lista",
       "voiceNote": "Röstanteckning",
-      "wikiLink": "Wikilänk"
+      "wikiLink": "Wikilänk",
+      "remind": "Påminnelse"
     },
     "spell": {
       "menu": {
@@ -1098,13 +1114,17 @@
       "menuEdit": "Redigera {{field}}",
       "menuTitle": "Lägg till fält",
       "repeatNoAnchor": "Den här uppgiften har inget datum att upprepa från, så den upprepas inte. Lägg till ett förfallodatum för att starta den.",
+      "repeatNeedsDate": "Behöver ett förfallodatum att upprepa från",
       "save": "Spara",
       "skipOccurrence": "Hoppa över den här förekomsten",
       "title": {
         "due": "Förfallodatum",
         "repeat": "Upprepning",
-        "priority": "Prioritet"
-      }
+        "priority": "Prioritet",
+        "remind": "Påminnelse"
+      },
+      "timeLabel": "Tid (valfritt)",
+      "invalidRemind": "Myne kan inte tolka det här datumet, så du får ingen påminnelse."
     },
     "toolbar": {
       "apply": "Använd",
@@ -1207,7 +1227,8 @@
         "rewriteCount_one": "{{count}} länk kommer att skrivas om",
         "rewriteCount_other": "{{count}} länkar kommer att skrivas om",
         "skipped": "hoppades över — {{reason}}",
-        "title": "Konvertera importerade wikilänkar i den här anteckningen"
+        "title": "Konvertera importerade wikilänkar i den här anteckningen",
+        "staleDocument": "Anteckningen ändrades medan förhandsgranskningen var öppen, så ingenting konverterades. Kör den igen för att se de aktuella länkarna."
       },
       "convertCore": {
         "noMatch": "ingen träff"
@@ -1225,6 +1246,8 @@
       "attachUnsupported": "Endast bilder och PDF-filer kan bifogas.",
       "attachFailed": "Det gick inte att bifoga filen.",
       "archiveFailed": "Det gick inte att arkivera anteckningen.",
+      "aiRewriteFailed": "Omskrivningen kunde inte slutföras, så din markering är oförändrad.",
+      "aiRewriteNoProvider": "Ingen AI-leverantör är konfigurerad, så ingenting skrevs om. Konfigurera en i Inställningar → Utvecklare → AI.",
       "trashFailed": "Det gick inte att flytta anteckningen till papperskorgen."
     },
     "nav": {
@@ -1537,6 +1560,29 @@
       "untitled": "Namnlös",
       "warning": "Detta kan inte ångras."
     },
+    "example": {
+      "folder": "Kom igång",
+      "index": {
+        "title": "Börja här",
+        "body": "Det här är ett litet exempelvalv. Några vanliga anteckningar som visar vad Myne kan göra, och ingenting här är heligt: redigera, byt namn på eller ta bort vad du vill.\n\n- [[{{markdown}}]] visar hur vanlig text blir formatering\n- [[{{tasks}}]] samlar checklistor på ett och samma ställe\n- [[{{links}}]] kopplar ihop anteckningar och sorterar dem med taggar\n- [[{{makeItYours}}]] rensar bort allt det här i ett enda steg\n\nHar du sett nog? Högerklicka på mappen **Kom igång** i sidofältet och välj Ta bort. Anteckningarna flyttas till papperskorgen, så du kan hämta tillbaka dem om du ändrar dig.\n"
+      },
+      "markdown": {
+        "title": "Skriva med Markdown",
+        "body": "Myne skriver vanlig Markdown och visar resultatet medan du skriver.\n\n## Grunderna\nGör ett ord **fetstilt** eller *kursivt*, eller lägg in `kod i löpande text`.\n\n## En lista\n- En punkt\n- En punkt till\n  - En underpunkt\n\n## Ett citat\n> Små anteckningar som sparas i åratal slår stora anteckningar du aldrig skriver.\n\n## En tabell\n| Kortkommando | Vad det gör |\n| --- | --- |\n| Cmd/Ctrl + B | Fetstil |\n| Cmd/Ctrl + K | Lägg till en länk |\n\n## Lite kod\n```\nconsole.log(\"hello from Myne\")\n```\n\nNär du är redo, gå tillbaka till [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Uppgifter",
+        "body": "Varje rad som börjar med `- [ ]` är en uppgift. Myne samlar alla öppna uppgifter från alla dina anteckningar i en enda Uppgifter-vy, så att ingenting tappas bort mellan anteckningarna.\n\n- [ ] Läs [[{{markdown}}]]\n- [ ] Lägg till en egen uppgift\n- [ ] Testa en med förfallodatum 📅 2030-12-31\n- [x] Skapa ditt valv\n\nKryssa i en ruta här och öppna sedan Uppgifter-vyn i sidofältet för att se listan uppdateras.\n\nTillbaka till [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Länkar och taggar",
+        "body": "Skriv `[[` för att länka till en annan anteckning. Länkar går åt båda hållen: öppna [[{{index}}]] så ser du den här anteckningen bland dess bakåtlänkar, och grafen ritar en linje mellan dem.\n\nLägg till en #tagg var som helst så sorterar Myne in anteckningen under den i taggträdet. Den här anteckningen är taggad med #exempel och #kom-igång, så öppna taggträdet i sidofältet för att hitta den.\n\nNu är det din tur: länka den här anteckningen till [[{{tasks}}]], eller hitta på en egen tagg.\n"
+      },
+      "makeItYours": {
+        "title": "Gör det till ditt",
+        "body": "Det här är ditt valv nu. De här anteckningarna är bara en startpunkt, så ändra vad du vill, eller rensa bort dem och börja om från början.\n\nFör att ta bort hela exemplet högerklickar du på mappen **Kom igång** i sidofältet och väljer Ta bort. Allt flyttas till papperskorgen på en gång, och du kan återställa det därifrån om du vill ha tillbaka det.\n\nNär du är redo trycker du på Cmd/Ctrl + N för att skapa en ny anteckning och börja skriva.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Lägg till villkor",
       "addFilterGroup": "Lägg till filtergrupp",
@@ -1577,7 +1623,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Ett mappnamn får inte innehålla / \\ | # ^ [ ] eller börja/sluta med ett mellanslag.",
-      "tooLong": "Den mappsökvägen är för lång."
+      "tooLong": "Den mappsökvägen är för lång.",
+      "moveIntoSelf": "En mapp kan inte flyttas in i sig själv.",
+      "moveCollision": "Det finns redan en mapp med det namnet där."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1854,7 +1902,8 @@
       "importedWithSkips": "Importerade {{count}} — {{skipped}} hoppades över",
       "importedWithSkips_one": "Importerade {{count}} anteckning — {{skipped}} hoppades över",
       "importedWithSkips_other": "Importerade {{count}} anteckningar — {{skipped}} hoppades över",
-      "importNoMarkdown": "Inga Markdown-filer i det du släppte"
+      "importNoMarkdown": "Inga Markdown-filer i det du släppte",
+      "moveFolderTo": "Flytta mapp till…"
     },
     "newFromTemplate": {
       "back": "Tillbaka",
@@ -2132,6 +2181,30 @@
       "emptyText": "Inga träffar.",
       "placeholder": "Välj…",
       "searchPlaceholder": "Sök…"
+    }
+  },
+  "migrate": {
+    "intro": "Uppgradera det här valvet till det nya formatet. Dina anteckningar får automatisk sammanfogning mellan enheter. Hela valvet får nya nycklar; den gamla kopian behålls på den här enheten tills du bekräftar.",
+    "passwordLabel": "Huvudlösenord",
+    "phraseLabel": "Återställningsfras",
+    "phraseHelp": "Obligatorisk — dina nya nycklar omsluts av den här frasen, så att återställning fortsätter att fungera. Ange alla dina återställningsord.",
+    "submit": "Migrera",
+    "migrating": "Migrerar…",
+    "done": "{{count}} anteckningar migrerades till det nya formatet.",
+    "settle": {
+      "intro": "Ditt valv har uppgraderats. Den gamla kopian ligger kvar på den här enheten tills du är klar — fram till dess låser ett lösenordsbyte inte in den.",
+      "confirm": "Allt ser rätt ut, ta bort den gamla kopian",
+      "abort": "Något är fel, återställ det gamla valvet",
+      "errorAlreadySynced": "Det här valvet har redan synkroniserats i det nya formatet, så det går inte att gå tillbaka. Återställ från en säkerhetskopia om du behöver det gamla.",
+      "errorBusy": "En annan valvåtgärd pågår. Försök igen om en stund.",
+      "errorIo": "Det gick inte att slutföra det. Ingenting ändrades."
+    },
+    "progressCount": "{{done}} av {{total}} objekt omkrypterade…",
+    "error": {
+      "recoveryPhraseRequired": "Återställningsfrasen stämde inte med det här valvet. Ange rätt återställningsfras för att migrera — den krävs för att återställning ska fortsätta fungera.",
+      "wrongPassword": "Lösenordet stämde inte med det här valvet.",
+      "alreadyMigrated": "Det här valvet är redan på det nya formatet.",
+      "generic": "Migreringen kunde inte slutföras. Ditt valv är oförändrat; försök igen."
     }
   },
   "recover": {
@@ -2489,9 +2562,11 @@
         "invalidName": "Osäkert temanamn",
         "invalidValue": "Ogiltigt värde för {{key}}",
         "invalidValueWithLine": "Ogiltigt värde för {{key}} (rad {{line}})",
+        "lowContrast": "{{key}} mot {{against}} har kontrasten {{ratio}}:1, men behöver minst {{min}}:1 för att förbli läsbar",
         "missingKey": "Saknar obligatorisk färg {{key}}",
         "parseError": "Inte giltig JSON",
-        "parseErrorWithLine": "Inte giltig JSON (rad {{line}})"
+        "parseErrorWithLine": "Inte giltig JSON (rad {{line}})",
+        "reservedKey": "{{key}} är reserverad för Mynes eget bruk och kan inte anges av ett tema"
       },
       "export": "Exportera",
       "exportError": "Kunde inte exportera det temat. Försök igen.",
@@ -2672,12 +2747,45 @@
       "autoTagHelper": "När du pausar med skrivandet läser en liten modell på din enhet anteckningen och föreslår taggar överst i den. Ingenting läggs till förrän du accepterar ett förslag.",
       "autoTagLabel": "Föreslå taggar automatiskt",
       "autoTagUnavailable": "Den här versionen levereras utan taggmodellen, så inga taggar kan föreslås. Myne laddar aldrig ner någon — reglaget slås på av sig självt i en version som innehåller den.",
+      "consent": {
+        "accept": "Skicka mina anteckningar till {{provider}}",
+        "cancel": "Avbryt",
+        "cannotVerifyLabel": "Vad Myne inte kan kontrollera",
+        "revokeLabel": "Så ångrar du det här",
+        "scopeLabel": "Vilka enheter det här gäller",
+        "title": "Innan Myne skickar något till {{provider}}",
+        "whatLabel": "Vad som lämnar din enhet",
+        "whenLabel": "När det lämnar enheten",
+        "whoLabel": "Vem som tar emot det"
+      },
       "disclosureToggle": "Hur fungerar det här?",
       "enableHelper": "Kör en modell du tillhandahåller helt på din enhet. Experimentell, av som standard.",
       "enableLabel": "Aktivera lokal AI",
       "excludedHelper": "Anteckningar i dessa mappar läses eller indexeras aldrig av AI. En mappsökväg per rad.",
       "excludedLabel": "Undantagna mappar",
       "excludedPlaceholder": "Privat/\nDagbok/",
+      "endpointHelper": "Om du redan kör en modellkörmiljö på den här datorn kan du peka Myne mot den i stället för att välja modellfiler. Lämna det här tomt för att använda filerna ovan.",
+      "endpointLabel": "Lokal modellkörmiljö",
+      "endpointModelHelper": "Myne väljer ingen modell åt dig. Tills du anger en sparas adressen ovan men används inte.",
+      "endpointModelLabel": "Modell att använda där",
+      "endpointModelPlaceholder": "modellnamnet så som körmiljön anger det",
+      "endpointRejected": {
+        "malformed": "Det är inte en adress som Myne kan använda. Den behöver ett schema och en uttrycklig port — till exempel http://127.0.0.1:11434.",
+        "notLoopback": "Den här adressen måste finnas på den här datorn — localhost, 127.0.0.1 eller ::1. För att använda en leverantör som körs någon annanstans anger du den under Fjärrleverantör i stället.",
+        "unsupportedScheme": "Endast http- och https-adresser accepteras."
+      },
+      "endpointSaveFailed": "Det gick inte att spara adressen. Kontrollera att Myne kan skriva sina inställningar.",
+      "endpointThirdParty": "{{name}} är ett separat program med eget nätverksbeteende, och Myne kontrollerar det inte. Dina anteckningar skickas till det medan det körs på den här datorn.",
+      "providerError": {
+        "barred": "Den här typen av begäran skickas aldrig till en leverantör — den körs på den här enheten eller inte alls.",
+        "failed": "Det fungerade inte. Ingenting sparades och ingenting skickades på nytt.",
+        "noCredential": "Ingen API-nyckel är angiven för den här leverantören. Lägg till en i Inställningar → Utvecklare → AI.",
+        "quotaExhausted": "Leverantören avvisade begäran — ditt saldo är slut eller så har du passerat en hastighetsgräns. Det måste lösas hos leverantören, inte i Myne.",
+        "refused": "Leverantören nekade anslutningen. Den kan ligga nere eller blockera det här nätverket.",
+        "timeout": "Leverantören svarade inte i tid. Ingenting lämnades igång.",
+        "unauthorized": "Leverantören avvisade din API-nyckel. Byt ut den — den kan vara felaktig, återkallad eller höra till ett annat konto.",
+        "unreachable": "Kunde inte nå leverantören. Kontrollera din nätverksanslutning."
+      },
       "modelChoose": "Välj fil…",
       "modelEmbeddingLabel": "Sökmodell – semantisk sökning och frågor och svar",
       "modelFilter": {
@@ -2689,6 +2797,25 @@
       "modelSaveFailed": "Det gick inte att spara modellsökvägen (den måste ligga utanför ditt valv).",
       "modelTranscriptionLabel": "Tal-till-text-modell (transkription)",
       "modelsHelper": "Myne laddar aldrig ner modeller – det skulle innebära att data skickas över nätverket. Öppna en länk för att hämta en i din webbläsare och välj sedan de nedladdade filerna här. Allt körs på din enhet.",
+      "providerHelper": "I stället för att köra en modell här kan Myne skicka en begäran till en tjänst som du anger. Dina anteckningar lämnar då den här enheten. ”Ingen” är standard och innebär att ingen tjänst kontaktas alls.",
+      "providerKeyAdd": "klistra in din API-nyckel",
+      "providerKeyLabel": "API-nyckel",
+      "providerKeyNone": "Ingen nyckel är sparad, så ingenting kan skickas ännu.",
+      "providerKeyRevoke": "Ta bort den här nyckeln",
+      "providerKeyReplace": "klistra in en ny nyckel för att ersätta den sparade",
+      "providerKeyStored": "En nyckel är sparad. Myne visar den aldrig för dig igen — klistra in en ny för att ersätta den.",
+      "providerActive": "Svarar nu: {{name}}",
+      "providerLabel": "Fjärrleverantör",
+      "providerModelCount_one": "{{count}} modell tillgänglig.",
+      "providerModelCount_other": "{{count}} modeller tillgängliga.",
+      "providerModelEmpty": "Den här leverantören har inte publicerat några modeller för ditt konto.",
+      "providerModelHelper": "Myne levererar ingen standardmodell. Listan kommer från leverantören, så den hålls aktuell och du debiteras aldrig för en modell du inte har valt.",
+      "providerModelLabel": "Modell",
+      "providerModelLoad": "Hämta modeller",
+      "providerModelNone": "Ingen modell vald",
+      "providerModelUnfetched": "Hämta listan för att välja en modell.",
+      "providerNone": "Ingen",
+      "providerNothingAnswering": "Ingenting är konfigurerat att svara ännu.",
       "modelsLabel": "Modeller",
       "recommendedFilesEmbedding": "Behöver model.safetensors + config.json + tokenizer.json i en och samma mapp.",
       "recommendedFilesGeneration": "Behöver .gguf-filen + tokenizer.json i samma mapp.",
@@ -2753,6 +2880,7 @@
       "quickUnlockSubtitle": "Ange på nytt med {{method}} eller en PIN-kod efter automatisk låsning"
     },
     "quickUnlock": {
+      "errorBusy": "En annan valvåtgärd pågår. Försök igen om en stund.",
       "errorCancelled": "Avbruten.",
       "errorGeneric": "Kunde inte konfigurera snabb upplåsning.",
       "errorHardwareUnavailable": "Touch ID är inte tillgängligt i den här versionen. Det kräver en signerad macOS-version med registrerat Touch ID.",
@@ -2933,6 +3061,9 @@
       },
       "keywords": {
         "aiAutoTag": "automatiska taggar tagg föreslå förslag etiketter ai auto tag",
+        "aiEndpoint": "ollama slutpunkt adress lokal körmiljö modellserver port loopback endpoint local runtime",
+        "aiProvider": "leverantör fjärrleverantör moln openrouter ollama api-nyckel inloggningsuppgift samtycke skicka anteckningar provider remote cloud api key",
+        "aiProviderModel": "modell modellkatalog lista vilken modell llama qwen gpt välj modell fjärrleverantör model catalogue remote provider",
         "aiEnable": "lokal ai på av aktivera inaktivera stäng av maskininlärning local machine learning",
         "aiExcluded": "undantagna mappar ignorera uteslut exkludera ai sekretess integritet excluded folders",
         "aiModels": "modeller modell gguf ladda ner text inbäddning llm models embedding",
@@ -2989,8 +3120,26 @@
         "vaultIcon": "valvikon ikon avatar bild symbol vault icon",
         "vaultLabel": "valvetikett etikett namn byt namn titel vault label",
         "vaultLocation": "valvplats sökväg mapp disk var lagras vault location",
-        "viewMode": "standardvisningsläge visningsläge direkt läsning källa förhandsgranskning view mode"
+        "viewMode": "standardvisningsläge visningsläge direkt läsning källa förhandsgranskning view mode",
+        "dateFormat": "datumformat datum dag månad år iso dd/mm mm/dd kalender date format",
+        "timeFormat": "tidsformat tid 24-timmars 12-timmars klocka am pm time format 24 hour 12 hour",
+        "timezone": "tidszon zon tz utc iana region idag timezone time zone"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Datumformat",
+      "dateHelper": "Hur datum visas i uppgifter, sparade vyer och bilagor.",
+      "dateSystem": "Följ språket",
+      "timeLabel": "Tidsformat",
+      "timeHelper": "Om tider visas med 24-timmarsklocka eller 12-timmarsklocka.",
+      "timeSystem": "Följ språket",
+      "time24": "24-timmars",
+      "time12": "12-timmars",
+      "zoneLabel": "Tidszon",
+      "zoneHelper": "Vilken zon som avgör vad som räknas som idag. Lämna tomt för att följa den här enheten. Tider du skriver i en anteckning ändras aldrig — 09:00 förblir 09:00 överallt.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne känner inte till den tidszonen. Använd ett namn som Europe/Berlin.",
+      "errorSave": "Kunde inte spara inställningen."
     }
   },
   "storageLost": {
@@ -3016,6 +3165,7 @@
   "sync": {
     "materialising": "Hämtar dina anteckningar — {{done}} av {{total}}. Du kan börja arbeta; resten dyker upp allteftersom de kommer in.",
     "credentialAmbiguous": "Ditt lösenord kan ha ändrats både på den här enheten och på en annan, och Myne kan inte avgöra vilket som är nyare — så ingenting har ändrats. Logga in på en enhet som redan har åtkomst för att reda ut det.",
+    "vaultRekeyed": "Det här valvet uppgraderades till det nya formatet på en annan enhet. Lås upp igen för att fortsätta — ingenting har gått förlorat.",
     "attachments": {
       "aria": {
         "downloading": "Laddar ner {{name}}",
@@ -3032,6 +3182,7 @@
     "buildingIndex": {
       "label": "Bygger sökindex…"
     },
+    "remoteMergeHint": "Uppdaterad från en annan enhet",
     "conflicts": {
       "compare": "Jämför",
       "compareClose": "Tillbaka till konflikter",
@@ -3099,6 +3250,7 @@
       "verifyPending": "Den här koden visas när den nya enheten har slutfört sin första synkronisering.",
       "verifySyncing": "Synkroniserar…",
       "verifyTitle": "Verifiera den nya enheten",
+      "verifyAction": "Jämför kod",
       "yourDevices": "Dina enheter"
     },
     "endpoint": {
@@ -3128,7 +3280,12 @@
       "deviceNameHelp": "Visas i din enhetslista. Du kan ändra det senare.",
       "deviceNameLabel": "Namnge den här enheten",
       "error": {
+        "awaitingApproval": "Den här enheten väntar redan på godkännande. Godkänn den från en enhet som redan är inloggad.",
+        "deviceLimit": "Det här kontot har nått sin enhetsgräns. Ta bort en enhet du inte längre använder och försök sedan igen.",
+        "frozen": "Det här kontot är fryst, så ingen ny enhet kan läggas till just nu. Dina anteckningar på den här enheten påverkas inte.",
         "notConfigured": "Ange en synkserver i inställningarna innan du lägger till den här enheten.",
+        "serverMismatch": "Synkserverns identitet stämde inte med vad den här enheten förväntade sig. Ange inte dina inloggningsuppgifter igen förrän du vet varför.",
+        "kdfTooLarge": "Den här enheten har inte tillräckligt med minne för att öppna det valvet. Dess krypteringsinställningar kräver mer minne än den här appen kan använda här. Öppna det på en dator i stället.",
         "transport": "Kunde inte nå synkservern. Kontrollera din anslutning och försök igen."
       },
       "mode": {
@@ -3412,7 +3569,8 @@
       "inProgress": "Åtgärd pågår.",
       "kdfMemoryExceedsHost": "Det här valvet behöver {{required}} MiB minne för att öppnas — mer än den här webbläsaren kan ge det ({{available}} MiB). Valvet är oskadat; öppna det i Mynes skrivbordsapp.",
       "unexpected": "Oväntat fel. Försök igen.",
-      "vaultNotFound": "Valvfilen hittades inte. Starta om appen."
+      "vaultNotFound": "Valvfilen hittades inte. Starta om appen.",
+      "vaultUpgraded": "Det här valvet uppgraderades till ett nyare format som den här versionen av Myne inte stöder ännu. Dina data är oskadade — uppdatera Myne till den senaste versionen för att öppna det."
     },
     "passwordLabel": "Lösenord",
     "passwordPlaceholder": "Lösenord",
@@ -3481,6 +3639,7 @@
       "committing": "Sparar…",
       "copied": "Kopierad",
       "copy": "Kopiera",
+      "copyFailed": "Det gick inte att kopiera — använd ”Spara som fil” i stället.",
       "eyebrow": "Steg 4 av 4 — kontonummer",
       "heading": "Spara ditt kontonummer.",
       "intro": "Det här är din innehavartoken — behandla den som kontanter.",
@@ -3595,6 +3754,10 @@
       "vaultBusyAuth": {
         "body": "En annan valvåtgärd pågår. Försök igen om en stund.",
         "title": "Valvet är upptaget"
+      },
+      "plaintextTooLarge": {
+        "title": "Anteckningen är för stor för att krypteras",
+        "body": "Försök igen med mindre innehåll."
       }
     },
     "orchestrator": {
@@ -3890,6 +4053,12 @@
     "backUpNow": "Säkerhetskopiera nu"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Bara en flik åt gången kan hålla ett valv öppet — två skulle skriva till samma lagring och förstöra den. Stäng den andra fliken för att fortsätta här.",
+      "freed": "Den andra fliken har stängts. Ladda om för att öppna ditt valv här.",
+      "reload": "Ladda om",
+      "title": "Det här valvet är öppet i en annan flik"
+    },
     "reload": {
       "body": "Att ladda om den här sidan innebär att ditt lösenord efterfrågas igen — det finns medvetet ingen snabbare väg in. Ditt valv förblir krypterat på den här enheten medan sidan är stängd, och nyckeln byggs upp på nytt från ditt lösenord varje gång.",
       "title": "En omladdning kräver ditt lösenord igen"

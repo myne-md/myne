@@ -9,6 +9,7 @@
     "passwordLabel": "Hovedpassord",
     "approversIntro": "Disse enhetene kan godkjenne denne:",
     "noApprovers": "Ingen annen enhet på denne kontoen kan godkjenne den akkurat nå. Åpne Myne på en enhet som allerede har tilgang, og kom deretter tilbake hit.",
+    "pendingStartOver": "Start på nytt med en annen konto",
     "pendingTitle": "Venter på godkjenning",
     "sasMatch": "De stemmer — fortsett",
     "sasMismatch": "De stemmer ikke",
@@ -24,6 +25,13 @@
     "hint": "Det ser slik ut: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Kontrolleres her på enheten din — ingenting sendes ennå.",
     "invalid": "Det kontonummeret er ikke gyldig. Sjekk det og prøv igjen.",
     "title": "Skriv inn kontonummeret ditt"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Besvart på denne enheten",
+      "localRuntime": "Besvart av {{name}}, på denne datamaskinen",
+      "remote": "Besvart av {{provider}} — notatene dine ble sendt dit"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -218,7 +226,8 @@
       "intro": "Bekreft at denne koden samsvarer med den som vises i utvidelsen, og velg deretter Godta for å pare.",
       "reject": "Avvis",
       "rejected": "Paring avvist.",
-      "title": "En nettleserutvidelse vil koble til"
+      "title": "En nettleserutvidelse vil koble til",
+      "persistFailed": "Myne kunne ikke lagre denne tilkoblingen, så den ble ikke opprettet. Hvis hvelvet er låst, lås det opp og prøv å koble til på nytt."
     }
   },
   "commandPalette": {
@@ -914,10 +923,14 @@
           "insert": "Sett inn i notat",
           "noAnswer": "Ingen svar – prøv å omformulere.",
           "noModelHint": "Ingen modell valgt. Velg en i Innstillinger → Utvikler → AI for å starte.",
+          "unreachableHint": "Leverandøren du har satt opp, svarer ikke. Sjekk at den kjører, og send på nytt.",
+          "unavailableHint": "Dette bygget av Myne er kompilert uten lokal AI, så ingenting her kan kjøre.",
           "offHint": "Lokal AI er av. Slå den på i Innstillinger → Utvikler → AI.",
           "send": "Send",
           "statusGettingReady": "Forbereder…",
           "statusNoModel": "Ingen modell",
+          "statusUnreachable": "Svarer ikke",
+          "statusUnavailable": "Utilgjengelig",
           "statusOff": "Av",
           "statusReady": "Klar",
           "stop": "Stopp",
@@ -1040,6 +1053,8 @@
     },
     "slash": {
       "aiContinue": "Fortsett å skrive (AI)",
+      "aiFailed": "AI-forespørselen kunne ikke fullføres, så ingenting ble satt inn.",
+      "aiNoProvider": "Ingen AI-leverandør er satt opp, så ingenting ble satt inn. Sett opp en i Innstillinger → Utvikler → AI.",
       "aiTitle": "Foreslå tittel (AI)",
       "attachFile": "Legg ved fil",
       "bulletList": "Punktliste",
@@ -1066,7 +1081,8 @@
       "time": "Klokkeslett",
       "todoList": "Gjøremålsliste",
       "voiceNote": "Talenotat",
-      "wikiLink": "Wikilenke"
+      "wikiLink": "Wikilenke",
+      "remind": "Påminnelse"
     },
     "spell": {
       "menu": {
@@ -1098,13 +1114,17 @@
       "menuEdit": "Rediger {{field}}",
       "menuTitle": "Legg til felt",
       "repeatNoAnchor": "Denne oppgaven har ingen dato å gjenta fra, så den gjentas ikke. Legg til en forfallsdato for å starte den.",
+      "repeatNeedsDate": "Trenger en forfallsdato å gjenta fra",
       "save": "Lagre",
       "skipOccurrence": "Hopp over denne forekomsten",
       "title": {
         "due": "Forfallsdato",
         "repeat": "Gjentakelse",
-        "priority": "Prioritet"
-      }
+        "priority": "Prioritet",
+        "remind": "Påminnelse"
+      },
+      "timeLabel": "Klokkeslett (valgfritt)",
+      "invalidRemind": "Myne kan ikke lese denne datoen, så du får ingen påminnelse."
     },
     "toolbar": {
       "apply": "Bruk",
@@ -1207,7 +1227,8 @@
         "rewriteCount_one": "{{count}} lenke blir skrevet om",
         "rewriteCount_other": "{{count}} lenker blir skrevet om",
         "skipped": "hoppet over — {{reason}}",
-        "title": "Konverter importerte wikilenker i dette notatet"
+        "title": "Konverter importerte wikilenker i dette notatet",
+        "staleDocument": "Dette notatet ble endret mens forhåndsvisningen var åpen, så ingenting ble konvertert. Kjør konverteringen på nytt for å se de gjeldende lenkene."
       },
       "convertCore": {
         "noMatch": "ingen treff"
@@ -1225,6 +1246,8 @@
       "attachUnsupported": "Bare bilder og PDF-er kan legges ved.",
       "attachFailed": "Kunne ikke legge ved den filen.",
       "archiveFailed": "Kunne ikke arkivere dette notatet.",
+      "aiRewriteFailed": "Omskrivingen kunne ikke fullføres, så utvalget ditt er uendret.",
+      "aiRewriteNoProvider": "Ingen AI-leverandør er satt opp, så ingenting ble skrevet om. Sett opp en i Innstillinger → Utvikler → AI.",
       "trashFailed": "Kunne ikke flytte dette notatet til papirkurven."
     },
     "nav": {
@@ -1537,6 +1560,29 @@
       "untitled": "Uten tittel",
       "warning": "Dette kan ikke angres."
     },
+    "example": {
+      "folder": "Kom i gang",
+      "index": {
+        "title": "Start her",
+        "body": "Dette er et lite eksempelhvelv. Noen få helt vanlige notater som viser hva Myne kan, og ingenting her er spesielt: rediger, endre navn på eller slett det du vil.\n\n- [[{{markdown}}]] viser hvordan ren tekst blir til formatering\n- [[{{tasks}}]] samler sjekklister på ett sted\n- [[{{links}}]] kobler sammen notater og sorterer dem med etiketter\n- [[{{makeItYours}}]] rydder bort alt sammen i ett steg\n\nHar du sett nok? Høyreklikk mappen **Kom i gang** i sidefeltet og velg Slett. Notatene flyttes til papirkurven, så du kan hente dem tilbake hvis du ombestemmer deg.\n"
+      },
+      "markdown": {
+        "title": "Skrive med Markdown",
+        "body": "Myne skriver ren Markdown og viser resultatet mens du skriver.\n\n## Det grunnleggende\nGjør et ord **fett** eller *kursivt*, eller legg inn `innebygd kode`.\n\n## En liste\n- Ett element\n- Et annet element\n  - Et underelement\n\n## Et sitat\n> Små notater, tatt vare på i årevis, slår store notater du aldri skriver.\n\n## En tabell\n| Snarvei | Hva den gjør |\n| --- | --- |\n| Cmd/Ctrl + B | Fet |\n| Cmd/Ctrl + K | Legg til en lenke |\n\n## Litt kode\n```\nconsole.log(\"hello from Myne\")\n```\n\nNår du er klar, gå tilbake til [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Oppgaver",
+        "body": "Enhver linje som starter med `- [ ]` er en oppgave. Myne samler alle åpne oppgaver fra notatene dine i én Oppgaver-visning, så ingenting blir borte mellom notatene.\n\n- [ ] Les [[{{markdown}}]]\n- [ ] Legg til en egen oppgave\n- [ ] Prøv en med forfallsdato 📅 2030-12-31\n- [x] Opprett hvelvet ditt\n\nKryss av en boks her, og åpne deretter Oppgaver-visningen i sidefeltet for å se listen oppdatere seg.\n\nTilbake til [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Lenker og etiketter",
+        "body": "Skriv `[[` for å lenke til et annet notat. Lenker går begge veier: åpne [[{{index}}]], så ser du dette notatet under tilbakekoblingene der, og grafen tegner en linje mellom dem.\n\nLegg til en #etikett hvor som helst, så plasserer Myne notatet under den i etikettreet. Dette notatet er merket med #eksempel og #kom-i-gang, så åpne etikettreet i sidefeltet for å finne det.\n\nDin tur: lenk dette notatet til [[{{tasks}}]], eller finn på en egen etikett.\n"
+      },
+      "makeItYours": {
+        "title": "Gjør det til ditt",
+        "body": "Dette er hvelvet ditt nå. Disse notatene er bare et utgangspunkt, så endre hva du vil, eller rydd dem bort og begynn med blanke ark.\n\nFor å fjerne hele eksempelet høyreklikker du mappen **Kom i gang** i sidefeltet og velger Slett. Alt flyttes til papirkurven samtidig, og du kan gjenopprette det derfra hvis du vil ha det tilbake.\n\nNår du er klar, trykk Cmd/Ctrl + N for å lage et nytt notat og begynne å skrive.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Legg til betingelse",
       "addFilterGroup": "Legg til filtergruppe",
@@ -1577,7 +1623,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Et mappenavn kan ikke inneholde / \\ | # ^ [ ] eller starte/slutte med et mellomrom.",
-      "tooLong": "Den mappebanen er for lang."
+      "tooLong": "Den mappebanen er for lang.",
+      "moveIntoSelf": "En mappe kan ikke flyttes inn i seg selv.",
+      "moveCollision": "Det finnes allerede en mappe med det navnet der."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -1854,7 +1902,8 @@
       "importedWithSkips": "Importerte {{count}} — {{skipped}} hoppet over",
       "importedWithSkips_one": "Importerte {{count}} notat — {{skipped}} hoppet over",
       "importedWithSkips_other": "Importerte {{count}} notater — {{skipped}} hoppet over",
-      "importNoMarkdown": "Ingen markdown-filer i det du slapp"
+      "importNoMarkdown": "Ingen markdown-filer i det du slapp",
+      "moveFolderTo": "Flytt mappe til…"
     },
     "newFromTemplate": {
       "back": "Tilbake",
@@ -2132,6 +2181,30 @@
       "emptyText": "Ingen treff.",
       "placeholder": "Velg…",
       "searchPlaceholder": "Søk…"
+    }
+  },
+  "migrate": {
+    "intro": "Oppgrader dette hvelvet til det nye formatet. Notatene dine får automatisk sammenslåing på tvers av enheter. Hele hvelvet får nye nøkler; den gamle kopien beholdes på denne enheten til du bekrefter.",
+    "passwordLabel": "Hovedpassord",
+    "phraseLabel": "Gjenopprettingsfrase",
+    "phraseHelp": "Påkrevd — de nye nøklene dine pakkes inn under denne frasen, slik at gjenoppretting fortsatt virker. Skriv inn alle gjenopprettingsordene dine.",
+    "submit": "Migrer",
+    "migrating": "Migrerer…",
+    "done": "Migrerte {{count}} notater til det nye formatet.",
+    "settle": {
+      "intro": "Hvelvet ditt ble oppgradert. Den gamle kopien ligger fortsatt på denne enheten til du gjør deg ferdig — inntil da vil ikke en passordendring låse den bort.",
+      "confirm": "Alt ser riktig ut, fjern den gamle kopien",
+      "abort": "Noe er galt, sett tilbake det gamle hvelvet",
+      "errorAlreadySynced": "Dette hvelvet har allerede synkronisert i det nye formatet, så det kan ikke settes tilbake. Gjenopprett fra en sikkerhetskopi hvis du trenger det gamle.",
+      "errorBusy": "En annen hvelvoperasjon kjører. Prøv igjen om et øyeblikk.",
+      "errorIo": "Kunne ikke fullføre det. Ingenting ble endret."
+    },
+    "progressCount": "{{done}} av {{total}} elementer kryptert på nytt…",
+    "error": {
+      "recoveryPhraseRequired": "Den gjenopprettingsfrasen stemte ikke med dette hvelvet. Skriv inn riktig gjenopprettingsfrase for å migrere — den er påkrevd for at gjenoppretting fortsatt skal virke.",
+      "wrongPassword": "Det passordet stemte ikke med dette hvelvet.",
+      "alreadyMigrated": "Dette hvelvet er allerede på det nye formatet.",
+      "generic": "Migreringen kunne ikke fullføres. Hvelvet ditt er uendret; prøv igjen."
     }
   },
   "recover": {
@@ -2489,9 +2562,11 @@
         "invalidName": "Utrygt temanavn",
         "invalidValue": "Ugyldig verdi for {{key}}",
         "invalidValueWithLine": "Ugyldig verdi for {{key}} (linje {{line}})",
+        "lowContrast": "{{key}} på {{against}} har {{ratio}}:1 i kontrast, men trenger minst {{min}}:1 for å være lesbar",
         "missingKey": "Mangler påkrevd farge {{key}}",
         "parseError": "Ikke gyldig JSON",
-        "parseErrorWithLine": "Ikke gyldig JSON (linje {{line}})"
+        "parseErrorWithLine": "Ikke gyldig JSON (linje {{line}})",
+        "reservedKey": "{{key}} er reservert for Mynes egen bruk og kan ikke settes av et tema"
       },
       "export": "Eksporter",
       "exportError": "Kunne ikke eksportere det temaet. Prøv igjen.",
@@ -2672,12 +2747,45 @@
       "autoTagHelper": "Når du tar en pause i skrivingen, leser en liten modell på enheten din notatet og foreslår etiketter øverst i det. Ingenting legges til før du godtar et forslag.",
       "autoTagLabel": "Foreslå etiketter automatisk",
       "autoTagUnavailable": "Dette bygget leveres uten etikettmodellen, så ingen etiketter kan foreslås. Myne laster aldri ned en — bryteren slår seg på av seg selv i et bygg som inkluderer den.",
+      "consent": {
+        "accept": "Send notatene mine til {{provider}}",
+        "cancel": "Avbryt",
+        "cannotVerifyLabel": "Hva Myne ikke kan sjekke",
+        "revokeLabel": "Slik angrer du dette",
+        "scopeLabel": "Hvilke enheter dette gjelder",
+        "title": "Før Myne sender noe til {{provider}}",
+        "whatLabel": "Hva som forlater enheten din",
+        "whenLabel": "Når det forlater den",
+        "whoLabel": "Hvem som mottar det"
+      },
       "disclosureToggle": "Hvordan fungerer dette?",
       "enableHelper": "Kjører en modell du oppgir helt og holdent på enheten din. Eksperimentell, av som standard.",
       "enableLabel": "Aktiver lokal AI",
       "excludedHelper": "Notater i disse mappene blir aldri lest eller indeksert av AI. Én mappesti per linje.",
       "excludedLabel": "Ekskluderte mapper",
       "excludedPlaceholder": "Privat/\nDagbok/",
+      "endpointHelper": "Hvis du allerede kjører et modellkjøremiljø på denne datamaskinen, kan du peke Myne mot det i stedet for å velge modellfiler. La dette stå tomt for å bruke filene ovenfor.",
+      "endpointLabel": "Lokalt modellkjøremiljø",
+      "endpointModelHelper": "Myne velger ikke en modell for deg. Inntil du oppgir en, er adressen ovenfor lagret, men ubrukt.",
+      "endpointModelLabel": "Modell som skal brukes der",
+      "endpointModelPlaceholder": "modellnavnet slik kjøremiljøet oppgir det",
+      "endpointRejected": {
+        "malformed": "Det er ikke en adresse Myne kan bruke. Den trenger en protokoll og en eksplisitt port — for eksempel http://127.0.0.1:11434.",
+        "notLoopback": "Denne adressen må være på denne datamaskinen — localhost, 127.0.0.1 eller ::1. Vil du bruke en leverandør som kjører et annet sted, oppgir du den under Ekstern leverandør i stedet.",
+        "unsupportedScheme": "Bare http- og https-adresser godtas."
+      },
+      "endpointSaveFailed": "Kunne ikke lagre adressen. Sjekk at Myne kan skrive innstillingene sine.",
+      "endpointThirdParty": "{{name}} er et eget program med sin egen nettverksatferd, og Myne styrer det ikke. Notatene dine sendes til det mens det kjører på denne datamaskinen.",
+      "providerError": {
+        "barred": "Denne typen forespørsel går aldri til en leverandør — den kjører på denne enheten, eller ikke i det hele tatt.",
+        "failed": "Det virket ikke. Ingenting ble lagret, og ingenting ble sendt på nytt.",
+        "noCredential": "Ingen API-nøkkel er angitt for denne leverandøren. Legg til en i Innstillinger → Utvikler → AI.",
+        "quotaExhausted": "Leverandøren avslo forespørselen — du er tom for kreditt eller over en hastighetsgrense. Dette må ordnes hos leverandøren, ikke i Myne.",
+        "refused": "Leverandøren avviste tilkoblingen. Den kan være nede eller blokkere dette nettverket.",
+        "timeout": "Leverandøren svarte ikke i tide. Ingenting ble stående og kjøre.",
+        "unauthorized": "Leverandøren avviste API-nøkkelen din. Bytt den ut — den kan være feil, tilbakekalt eller for en annen konto.",
+        "unreachable": "Kunne ikke nå leverandøren. Sjekk nettverkstilkoblingen din."
+      },
       "modelChoose": "Velg fil…",
       "modelEmbeddingLabel": "Søkemodell – semantisk søk og spørsmål og svar",
       "modelFilter": {
@@ -2689,6 +2797,25 @@
       "modelSaveFailed": "Kunne ikke lagre modellstien (den må være utenfor hvelvet ditt).",
       "modelTranscriptionLabel": "Tale-til-tekst-modell (transkribering)",
       "modelsHelper": "Myne laster aldri ned modeller – det ville bety å sende data over nettverket. Åpne en lenke for å hente en i nettleseren din, og velg deretter de nedlastede filene her. Alt kjører på enheten din.",
+      "providerHelper": "I stedet for å kjøre en modell her kan Myne sende en forespørsel til en tjeneste du oppgir. Notatene dine forlater denne enheten når det skjer. «Ingen» er standardvalget og betyr at ingen tjeneste kontaktes i det hele tatt.",
+      "providerKeyAdd": "lim inn API-nøkkelen din",
+      "providerKeyLabel": "API-nøkkel",
+      "providerKeyNone": "Ingen nøkkel er lagret, så ingenting kan sendes ennå.",
+      "providerKeyRevoke": "Fjern denne nøkkelen",
+      "providerKeyReplace": "lim inn en ny nøkkel for å erstatte den lagrede",
+      "providerKeyStored": "En nøkkel er lagret. Myne viser den aldri igjen — lim inn en ny for å erstatte den.",
+      "providerActive": "Svarer nå: {{name}}",
+      "providerLabel": "Ekstern leverandør",
+      "providerModelCount_one": "{{count}} modell tilgjengelig.",
+      "providerModelCount_other": "{{count}} modeller tilgjengelig.",
+      "providerModelEmpty": "Denne leverandøren har ikke publisert noen modeller for kontoen din.",
+      "providerModelHelper": "Myne leveres uten en standardmodell. Listen kommer fra leverandøren, så den holder seg oppdatert, og du blir aldri fakturert for en modell du ikke har valgt.",
+      "providerModelLabel": "Modell",
+      "providerModelLoad": "Hent modeller",
+      "providerModelNone": "Ingen modell valgt",
+      "providerModelUnfetched": "Hent listen for å velge en modell.",
+      "providerNone": "Ingen",
+      "providerNothingAnswering": "Ingenting er satt opp til å svare ennå.",
       "modelsLabel": "Modeller",
       "recommendedFilesEmbedding": "Trenger model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Trenger .gguf-filen + tokenizer.json i samme mappe.",
@@ -2753,6 +2880,7 @@
       "quickUnlockSubtitle": "Lås opp igjen med {{method}} eller en PIN etter automatisk låsing"
     },
     "quickUnlock": {
+      "errorBusy": "En annen hvelvoperasjon pågår. Prøv igjen om et øyeblikk.",
       "errorCancelled": "Avbrutt.",
       "errorGeneric": "Kunne ikke konfigurere rask opplåsing.",
       "errorHardwareUnavailable": "Touch ID er ikke tilgjengelig i dette bygget. Det krever et signert macOS-bygg der Touch ID er registrert.",
@@ -2933,6 +3061,9 @@
       },
       "keywords": {
         "aiAutoTag": "automatisk etikett etiketter foreslå forslag merkelapper ai auto tag tags",
+        "aiEndpoint": "ollama endepunkt adresse lokalt kjøremiljø modellserver port loopback endpoint runtime model server",
+        "aiProvider": "leverandør ekstern sky openrouter ollama api nøkkel legitimasjon samtykke send notater provider remote cloud api key",
+        "aiProviderModel": "modell katalog liste hvilken modell llama qwen gpt velg modell ekstern leverandør model remote provider",
         "aiEnable": "lokal ai på av aktiver deaktiver slå på maskinlæring local enable disable",
         "aiExcluded": "ekskluderte mapper utelat ignorer ai personvern excluded folders",
         "aiModels": "modeller modell gguf last ned tekst embedding llm models",
@@ -2989,8 +3120,26 @@
         "vaultIcon": "hvelvikon ikon avatar bilde symbol vault icon",
         "vaultLabel": "hvelvetikett etikett navn endre navn tittel vault label",
         "vaultLocation": "hvelvplassering bane mappe disk hvor lagres vault location",
-        "viewMode": "standard visningsmodus live lesing kilde forhåndsvisning view mode"
+        "viewMode": "standard visningsmodus live lesing kilde forhåndsvisning view mode",
+        "dateFormat": "datoformat dato format dag måned år iso dd/mm mm/dd kalender date format",
+        "timeFormat": "tidsformat klokkeslett 24 timer 12 timer klokke am pm time format",
+        "timezone": "tidssone sone tz utc iana region i dag timezone time zone"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Datoformat",
+      "dateHelper": "Hvordan datoer vises i oppgaver, lagrede visninger og vedlegg.",
+      "dateSystem": "Følg språket",
+      "timeLabel": "Tidsformat",
+      "timeHelper": "Om klokkeslett vises på 24-timersklokke eller 12-timersklokke.",
+      "timeSystem": "Følg språket",
+      "time24": "24-timers",
+      "time12": "12-timers",
+      "zoneLabel": "Tidssone",
+      "zoneHelper": "Hvilken sone som avgjør hva som regnes som i dag. La feltet stå tomt for å følge denne enheten. Klokkeslett du skriver i et notat, endres aldri — 09:00 er 09:00 overalt.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne kjenner ikke den tidssonen. Bruk et navn som Europe/Berlin.",
+      "errorSave": "Kunne ikke lagre den innstillingen."
     }
   },
   "storageLost": {
@@ -3016,6 +3165,7 @@
   "sync": {
     "materialising": "Laster ned notatene dine — {{done}} av {{total}}. Du kan begynne å jobbe; resten dukker opp etter hvert som de kommer.",
     "credentialAmbiguous": "Passordet ditt kan ha blitt endret både på denne enheten og på en annen, og Myne kan ikke avgjøre hvilken endring som er nyest — så ingenting er endret. Logg inn på en enhet som allerede har tilgang, for å rydde opp i det.",
+    "vaultRekeyed": "Dette hvelvet ble oppgradert til det nye formatet på en annen enhet. Lås opp på nytt for å fortsette — ingenting har gått tapt.",
     "attachments": {
       "aria": {
         "downloading": "Laster ned {{name}}",
@@ -3032,6 +3182,7 @@
     "buildingIndex": {
       "label": "Bygger søkeindeks…"
     },
+    "remoteMergeHint": "Oppdatert fra en annen enhet",
     "conflicts": {
       "compare": "Sammenlign",
       "compareClose": "Tilbake til konflikter",
@@ -3099,6 +3250,7 @@
       "verifyPending": "Denne koden vises når den nye enheten har fullført sin første synkronisering.",
       "verifySyncing": "Synkroniserer…",
       "verifyTitle": "Verifiser den nye enheten",
+      "verifyAction": "Sammenlign kode",
       "yourDevices": "Enhetene dine"
     },
     "endpoint": {
@@ -3128,7 +3280,12 @@
       "deviceNameHelp": "Vises i enhetslisten din. Du kan endre det senere.",
       "deviceNameLabel": "Gi denne enheten et navn",
       "error": {
+        "awaitingApproval": "Denne enheten venter allerede på godkjenning. Godkjenn den fra en enhet som allerede er logget inn.",
+        "deviceLimit": "Denne kontoen har nådd grensen for antall enheter. Fjern en enhet du ikke bruker lenger, og prøv igjen.",
+        "frozen": "Denne kontoen er fryst, så ingen ny enhet kan legges til akkurat nå. Notatene dine på denne enheten påvirkes ikke.",
         "notConfigured": "Angi en synkroniseringsserver i innstillingene før du legger til denne enheten.",
+        "serverMismatch": "Identiteten til synkroniseringsserveren stemte ikke med det denne enheten forventet. Ikke skriv inn legitimasjonen din på nytt før du vet hvorfor.",
+        "kdfTooLarge": "Denne enheten har ikke nok minne til å åpne det hvelvet. Krypteringsinnstillingene til hvelvet krever mer minne enn denne appen kan bruke her. Åpne det på en datamaskin i stedet.",
         "transport": "Kunne ikke nå synkroniseringsserveren. Sjekk tilkoblingen din og prøv igjen."
       },
       "mode": {
@@ -3412,7 +3569,8 @@
       "inProgress": "En operasjon pågår.",
       "kdfMemoryExceedsHost": "Dette hvelvet trenger {{required}} MiB minne for å åpnes — mer enn denne nettleseren kan gi det ({{available}} MiB). Det er ingenting galt med hvelvet; åpne det i Myne-skrivebordsappen.",
       "unexpected": "Uventet feil. Prøv igjen.",
-      "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt."
+      "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt.",
+      "vaultUpgraded": "Dette hvelvet ble oppgradert til et nyere format som denne versjonen av Myne ikke støtter ennå. Dataene dine er i orden — oppdater Myne til nyeste versjon for å åpne det."
     },
     "passwordLabel": "Passord",
     "passwordPlaceholder": "Passord",
@@ -3481,6 +3639,7 @@
       "committing": "Lagrer…",
       "copied": "Kopiert",
       "copy": "Kopier",
+      "copyFailed": "Kunne ikke kopiere — bruk «Lagre som fil» i stedet.",
       "eyebrow": "Steg 4 av 4 — kontonummer",
       "heading": "Lagre kontonummeret ditt.",
       "intro": "Dette er ihendehaver-tokenet ditt — behandle det som kontanter.",
@@ -3595,6 +3754,10 @@
       "vaultBusyAuth": {
         "body": "En annen hvelvoperasjon pågår. Prøv igjen om et øyeblikk.",
         "title": "Hvelvet er opptatt"
+      },
+      "plaintextTooLarge": {
+        "title": "Det notatet er for stort til å krypteres",
+        "body": "Prøv igjen med mindre innhold."
       }
     },
     "orchestrator": {
@@ -3890,6 +4053,12 @@
     "backUpNow": "Sikkerhetskopier nå"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Bare én fane kan holde et hvelv åpent om gangen — to ville skrevet til den samme lagringen og ødelagt den. Lukk den andre fanen for å fortsette her.",
+      "freed": "Den andre fanen er lukket. Last inn på nytt for å åpne hvelvet ditt her.",
+      "reload": "Last inn på nytt",
+      "title": "Dette hvelvet er åpent i en annen fane"
+    },
     "reload": {
       "body": "Å laste denne siden på nytt betyr at du må oppgi passordet ditt igjen — det finnes ingen raskere vei inn, med hensikt. Hvelvet ditt forblir kryptert på denne enheten mens siden er lukket, og nøkkelen bygges opp igjen fra passordet ditt hver gang.",
       "title": "En ny innlasting betyr passordet ditt på nytt"

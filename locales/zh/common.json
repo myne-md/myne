@@ -9,6 +9,7 @@
     "passwordLabel": "主密码",
     "approversIntro": "以下设备可以批准这一台：",
     "noApprovers": "此账户上目前没有其他设备可以批准它。请在一台已有访问权限的设备上打开 Myne，然后回到这里。",
+    "pendingStartOver": "改用其他账户重新开始",
     "pendingTitle": "等待批准",
     "sasMatch": "它们匹配——继续",
     "sasMismatch": "它们不匹配",
@@ -24,6 +25,13 @@
     "hint": "它的格式类似 MY-XXXX-XXXX-XXXX-XXXX-XXXX。核对在你的设备上就地完成——目前不会发送任何内容。",
     "invalid": "该账号无效。请核对后重试。",
     "title": "输入你的账号"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "在此设备上回答",
+      "localRuntime": "由 {{name}} 在这台电脑上回答",
+      "remote": "由 {{provider}} 回答——你的笔记已发送到那里"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -218,7 +226,8 @@
       "intro": "确认此代码与扩展中显示的代码一致，然后点击“接受”进行配对。",
       "reject": "拒绝",
       "rejected": "已拒绝配对。",
-      "title": "一个浏览器扩展想要连接"
+      "title": "一个浏览器扩展想要连接",
+      "persistFailed": "Myne 无法保存此连接，因此连接未建立。如果保险库已锁定，请解锁后再尝试连接。"
     }
   },
   "commandPalette": {
@@ -914,10 +923,14 @@
           "insert": "插入到笔记",
           "noAnswer": "没有答案——请尝试换个说法。",
           "noModelHint": "未选择模型。请在设置 → 开发者 → AI 中选择一个以开始。",
+          "unreachableHint": "你设置的服务商没有响应。请确认它正在运行，然后重新发送。",
+          "unavailableHint": "此构建版本的 Myne 在编译时未包含本地 AI，因此这里无法运行任何内容。",
           "offHint": "本地 AI 已关闭。请在设置 → 开发者 → AI 中开启。",
           "send": "发送",
           "statusGettingReady": "正在准备…",
           "statusNoModel": "无模型",
+          "statusUnreachable": "无响应",
+          "statusUnavailable": "不可用",
           "statusOff": "已关闭",
           "statusReady": "就绪",
           "stop": "停止",
@@ -1040,6 +1053,8 @@
     },
     "slash": {
       "aiContinue": "继续写作（AI）",
+      "aiFailed": "AI 请求无法完成，因此未插入任何内容。",
+      "aiNoProvider": "尚未设置 AI 服务商，因此未插入任何内容。请在设置 → 开发者 → AI 中设置一个。",
       "aiTitle": "建议标题（AI）",
       "attachFile": "附加文件",
       "bulletList": "无序列表",
@@ -1066,7 +1081,8 @@
       "time": "时间",
       "todoList": "待办列表",
       "voiceNote": "语音笔记",
-      "wikiLink": "Wiki 链接"
+      "wikiLink": "Wiki 链接",
+      "remind": "提醒"
     },
     "spell": {
       "menu": {
@@ -1098,13 +1114,17 @@
       "menuEdit": "编辑 {{field}}",
       "menuTitle": "添加字段",
       "repeatNoAnchor": "此任务没有可用于重复的日期，因此不会重复。请添加截止日期来启动它。",
+      "repeatNeedsDate": "需要一个截止日期作为重复的起点",
       "save": "保存",
       "skipOccurrence": "跳过这一次",
       "title": {
         "due": "截止日期",
         "repeat": "重复",
-        "priority": "优先级"
-      }
+        "priority": "优先级",
+        "remind": "提醒"
+      },
+      "timeLabel": "时间（可选）",
+      "invalidRemind": "Myne 无法解析这个日期，因此不会提醒你。"
     },
     "toolbar": {
       "apply": "应用",
@@ -1207,7 +1227,8 @@
         "rewriteCount_one": "将重写 {{count}} 个链接",
         "rewriteCount_other": "将重写 {{count}} 个链接",
         "skipped": "已跳过——{{reason}}",
-        "title": "转换此笔记中导入的 wiki 链接"
+        "title": "转换此笔记中导入的 wiki 链接",
+        "staleDocument": "预览打开期间此笔记发生了变化，因此未转换任何内容。请重新运行一次，以查看当前的链接。"
       },
       "convertCore": {
         "noMatch": "无匹配"
@@ -1225,6 +1246,8 @@
       "attachUnsupported": "只能附加图片和 PDF。",
       "attachFailed": "无法附加该文件。",
       "archiveFailed": "无法归档此笔记。",
+      "aiRewriteFailed": "改写无法完成，因此你选中的内容保持不变。",
+      "aiRewriteNoProvider": "尚未设置 AI 服务商，因此未改写任何内容。请在设置 → 开发者 → AI 中设置一个。",
       "trashFailed": "无法将此笔记移至回收站。"
     },
     "nav": {
@@ -1537,6 +1560,29 @@
       "untitled": "无标题",
       "warning": "此操作无法撤销。"
     },
+    "example": {
+      "folder": "入门指南",
+      "index": {
+        "title": "从这里开始",
+        "body": "这是一个小小的示例保险库。里面只有几篇普通笔记，用来展示 Myne 能做什么；这里没有任何特殊之处：随意编辑、重命名或删除其中的任何内容。\n\n- [[{{markdown}}]] 展示纯文本如何变成排版格式\n- [[{{tasks}}]] 把各处的清单集中到一个地方\n- [[{{links}}]] 连接笔记，并用标签整理它们\n- [[{{makeItYours}}]] 一步清除这一切\n\n看够了？在侧边栏中右键单击 **入门指南** 文件夹，然后选择“删除”。笔记会被移入回收站，如果你改变主意，随时可以把它们找回来。\n"
+      },
+      "markdown": {
+        "title": "用 Markdown 写作",
+        "body": "Myne 写的是纯 Markdown，并在你输入的同时显示排版结果。\n\n## 基础\n把一个词变成**粗体**或*斜体*，或者插入 `行内代码`。\n\n## 一个列表\n- 一个条目\n- 另一个条目\n  - 一个嵌套条目\n\n## 一段引用\n> 多年间坚持写下的小笔记，胜过你永远不会动笔的大笔记。\n\n## 一个表格\n| 快捷键 | 作用 |\n| --- | --- |\n| Cmd/Ctrl + B | 加粗 |\n| Cmd/Ctrl + K | 添加链接 |\n\n## 一些代码\n```\nconsole.log(\"hello from Myne\")\n```\n\n准备好之后，回到 [[{{index}}]]。\n"
+      },
+      "tasks": {
+        "title": "任务",
+        "body": "任何以 `- [ ]` 开头的行都是一个任务。Myne 会把你所有笔记中未完成的任务汇集到同一个任务视图里，这样就不会有任务在各篇笔记之间被遗漏。\n\n- [ ] 读一读 [[{{markdown}}]]\n- [ ] 添加一个你自己的任务\n- [ ] 试试带截止日期的任务 📅 2030-12-31\n- [x] 创建你的保险库\n\n在这里勾选一个复选框，然后打开侧边栏中的任务视图，看着列表随之更新。\n\n回到 [[{{index}}]]。\n"
+      },
+      "links": {
+        "title": "链接与标签",
+        "body": "输入 `[[` 即可链接到另一篇笔记。链接是双向的：打开 [[{{index}}]]，你会在它的反向链接中看到这篇笔记，关系图也会在两者之间画上一条线。\n\n在任意位置写下 #标签 这样的标签，Myne 就会把这篇笔记归入标签树中对应的标签下。这篇笔记带有 #示例 和 #入门指南 两个标签，打开侧边栏中的标签树就能找到它。\n\n轮到你了：把这篇笔记链接到 [[{{tasks}}]]，或者自己想一个标签。\n"
+      },
+      "makeItYours": {
+        "title": "让它成为你自己的",
+        "body": "现在这个保险库属于你了。这些笔记只是一个起点，你可以随意更改，也可以把它们清空、从头开始。\n\n要移除整个示例，请在侧边栏中右键单击 **入门指南** 文件夹，然后选择“删除”。所有内容会一起被移入回收站，如果你想要回它们，可以从那里恢复。\n\n准备好之后，按 Cmd/Ctrl + N 新建一篇笔记，开始写作吧。\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "添加条件",
       "addFilterGroup": "添加条件组",
@@ -1577,7 +1623,9 @@
     },
     "folderManagement": {
       "illegalSegment": "文件夹名不能包含 / \\ | # ^ [ ]，也不能以空格开头或结尾。",
-      "tooLong": "该文件夹路径太长了。"
+      "tooLong": "该文件夹路径太长了。",
+      "moveIntoSelf": "文件夹不能移动到自身内部。",
+      "moveCollision": "那里已经有同名的文件夹了。"
     },
     "folderNote": {
       "defaultTitle": "索引"
@@ -1854,7 +1902,8 @@
       "importedWithSkips": "已导入 {{count}} 篇——跳过 {{skipped}} 篇",
       "importedWithSkips_one": "已导入 {{count}} 篇笔记——跳过 {{skipped}} 篇",
       "importedWithSkips_other": "已导入 {{count}} 篇笔记——跳过 {{skipped}} 篇",
-      "importNoMarkdown": "拖放的内容中没有 Markdown 文件"
+      "importNoMarkdown": "拖放的内容中没有 Markdown 文件",
+      "moveFolderTo": "将文件夹移动到…"
     },
     "newFromTemplate": {
       "back": "返回",
@@ -2132,6 +2181,30 @@
       "emptyText": "无匹配项。",
       "placeholder": "选择…",
       "searchPlaceholder": "搜索…"
+    }
+  },
+  "migrate": {
+    "intro": "将此保险库升级到新格式。你的笔记将获得跨设备自动合并的能力。此操作会为整个保险库重新生成密钥；在你确认之前，旧副本会保留在此设备上。",
+    "passwordLabel": "主密码",
+    "phraseLabel": "恢复短语",
+    "phraseHelp": "此项必填——你的新密钥会用这条短语封装，这样恢复功能才能继续可用。请输入恢复短语中的全部单词。",
+    "submit": "迁移",
+    "migrating": "正在迁移…",
+    "done": "已将 {{count}} 篇笔记迁移到新格式。",
+    "settle": {
+      "intro": "你的保险库已升级。在你完成收尾之前，旧副本仍留在此设备上——在那之前，更改密码并不会把它锁起来。",
+      "confirm": "一切正常，移除旧副本",
+      "abort": "有问题，把旧保险库放回去",
+      "errorAlreadySynced": "此保险库已以新格式同步过，因此无法放回去。如果你需要旧的那一份，请从备份中恢复。",
+      "errorBusy": "另一项保险库操作正在进行中。请稍后重试。",
+      "errorIo": "无法完成该操作。没有做出任何更改。"
+    },
+    "progressCount": "已重新加密 {{done}} 项，共 {{total}} 项…",
+    "error": {
+      "recoveryPhraseRequired": "该恢复短语与此保险库不匹配。请输入正确的恢复短语以进行迁移——这是必需的，这样恢复功能才能继续可用。",
+      "wrongPassword": "该密码与此保险库不匹配。",
+      "alreadyMigrated": "此保险库已经是新格式了。",
+      "generic": "迁移无法完成。你的保险库未发生变化；请重试。"
     }
   },
   "recover": {
@@ -2489,9 +2562,11 @@
         "invalidName": "不安全的主题名称",
         "invalidValue": "{{key}} 的值无效",
         "invalidValueWithLine": "{{key}} 的值无效（第 {{line}} 行）",
+        "lowContrast": "{{key}} 在 {{against}} 上的对比度为 {{ratio}}:1，但要保持可读至少需要 {{min}}:1",
         "missingKey": "缺少所需的颜色 {{key}}",
         "parseError": "不是有效的 JSON",
-        "parseErrorWithLine": "不是有效的 JSON（第 {{line}} 行）"
+        "parseErrorWithLine": "不是有效的 JSON（第 {{line}} 行）",
+        "reservedKey": "{{key}} 保留给 Myne 自用，主题无法设置它"
       },
       "export": "导出",
       "exportError": "无法导出该主题。请重试。",
@@ -2672,12 +2747,45 @@
       "autoTagHelper": "当你停下不再输入时，设备上的一个小模型会读取这篇笔记，并在它顶部建议标签。在你接受某条建议之前，不会添加任何内容。",
       "autoTagLabel": "自动建议标签",
       "autoTagUnavailable": "此构建版本不包含标签模型，因此无法建议标签。Myne 从不下载模型——在包含该模型的构建版本中，此开关会自动开启。",
+      "consent": {
+        "accept": "将我的笔记发送给 {{provider}}",
+        "cancel": "取消",
+        "cannotVerifyLabel": "Myne 无法核实的部分",
+        "revokeLabel": "如何撤销此设置",
+        "scopeLabel": "这适用于哪些设备",
+        "title": "在 Myne 向 {{provider}} 发送任何内容之前",
+        "whatLabel": "哪些内容会离开你的设备",
+        "whenLabel": "它在什么时候离开",
+        "whoLabel": "谁会收到它"
+      },
       "disclosureToggle": "这是如何运作的？",
       "enableHelper": "完全在你的设备上运行你提供的模型。实验性功能，默认关闭。",
       "enableLabel": "启用本地 AI",
       "excludedHelper": "这些文件夹中的笔记永远不会被 AI 读取或索引。每行一个文件夹路径。",
       "excludedLabel": "排除的文件夹",
       "excludedPlaceholder": "Private/\nJournal/",
+      "endpointHelper": "如果这台电脑上已经有一个正在运行的模型运行时，可以让 Myne 指向它，而不必选择模型文件。留空则使用上面的文件。",
+      "endpointLabel": "本地模型运行时",
+      "endpointModelHelper": "Myne 不会替你选择模型。在你指定一个之前，上面的地址会被保存，但不会被使用。",
+      "endpointModelLabel": "在那里使用的模型",
+      "endpointModelPlaceholder": "运行时列出的模型名称",
+      "endpointRejected": {
+        "malformed": "这不是 Myne 可以使用的地址。它需要包含协议和明确的端口——例如 http://127.0.0.1:11434。",
+        "notLoopback": "此地址必须位于这台电脑上——localhost、127.0.0.1 或 ::1。要使用运行在别处的服务商，请改在“远程服务商”中指定它。",
+        "unsupportedScheme": "只接受 http 和 https 地址。"
+      },
+      "endpointSaveFailed": "无法保存该地址。请确认 Myne 能够写入它的设置。",
+      "endpointThirdParty": "{{name}} 是一个独立的程序，有它自己的网络行为，Myne 无法控制它。当它在这台电脑上运行时，你的笔记会被发送给它。",
+      "providerError": {
+        "barred": "这类请求绝不会发送给服务商——它要么在此设备上运行，要么根本不运行。",
+        "failed": "操作未成功。没有保存任何内容，也没有再次发送任何内容。",
+        "noCredential": "尚未为此服务商设置 API 密钥。请在设置 → 开发者 → AI 中添加一个。",
+        "quotaExhausted": "服务商拒绝了此请求——你的额度已用尽，或超出了速率限制。这需要在服务商那边解决，而不是在 Myne 中。",
+        "refused": "服务商拒绝了连接。它可能已停止运行，或屏蔽了此网络。",
+        "timeout": "服务商未及时响应。没有留下任何仍在运行的任务。",
+        "unauthorized": "服务商拒绝了你的 API 密钥。请更换它——它可能有误、已被吊销，或属于另一个账户。",
+        "unreachable": "无法连接到服务商。请检查你的网络连接。"
+      },
       "modelChoose": "选择文件…",
       "modelEmbeddingLabel": "搜索模型——语义搜索和问答",
       "modelFilter": {
@@ -2689,6 +2797,25 @@
       "modelSaveFailed": "无法保存模型路径（它必须位于你的保险库之外）。",
       "modelTranscriptionLabel": "语音转文字模型（转录）",
       "modelsHelper": "Myne 从不下载模型——那意味着通过网络发送数据。在浏览器中打开链接获取一个模型，然后在此处选择下载好的文件。所有内容都在你的设备上运行。",
+      "providerHelper": "Myne 可以不在本机运行模型，而是向你指定的服务发送请求。这样做时，你的笔记会离开此设备。默认是“无”，意味着完全不会联系任何服务。",
+      "providerKeyAdd": "粘贴你的 API 密钥",
+      "providerKeyLabel": "API 密钥",
+      "providerKeyNone": "尚未存储密钥，因此目前无法发送任何内容。",
+      "providerKeyRevoke": "移除此密钥",
+      "providerKeyReplace": "粘贴新密钥以替换已存储的那一个",
+      "providerKeyStored": "已存储一个密钥。Myne 绝不会再把它显示给你——粘贴一个新的即可替换它。",
+      "providerActive": "正在回答：{{name}}",
+      "providerLabel": "远程服务商",
+      "providerModelCount_one": "有 {{count}} 个模型可用。",
+      "providerModelCount_other": "有 {{count}} 个模型可用。",
+      "providerModelEmpty": "此服务商没有为你的账户提供任何模型。",
+      "providerModelHelper": "Myne 不预设任何默认模型。列表来自服务商，因此始终保持最新，你也绝不会为自己没有选择的模型付费。",
+      "providerModelLabel": "模型",
+      "providerModelLoad": "加载模型",
+      "providerModelNone": "未选择模型",
+      "providerModelUnfetched": "先加载列表，再选择模型。",
+      "providerNone": "无",
+      "providerNothingAnswering": "尚未设置任何可用于回答的模型或服务商。",
       "modelsLabel": "模型",
       "recommendedFilesEmbedding": "需要 model.safetensors + config.json + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesGeneration": "需要 .gguf 文件 + tokenizer.json 位于同一文件夹中。",
@@ -2753,6 +2880,7 @@
       "quickUnlockSubtitle": "自动锁定后使用 {{method}} 或 PIN 重新进入"
     },
     "quickUnlock": {
+      "errorBusy": "另一项保险库操作正在进行中。请稍后重试。",
       "errorCancelled": "已取消。",
       "errorGeneric": "无法配置快速解锁。",
       "errorHardwareUnavailable": "此构建版本不支持 Touch ID。它需要已签名并已录入 Touch ID 的 macOS 构建版本。",
@@ -2933,6 +3061,9 @@
       },
       "keywords": {
         "aiAutoTag": "自动标签 标签 建议 推荐 标注 ai auto tag tags suggest suggestions labels",
+        "aiEndpoint": "本地运行时 运行时 端点 地址 模型 服务器 端口 回环 ollama endpoint address local runtime model server port loopback",
+        "aiProvider": "服务商 远程 云端 密钥 凭据 同意 发送笔记 provider remote cloud openrouter ollama api key credential consent send notes",
+        "aiProviderModel": "模型 模型列表 目录 列表 选择模型 远程 服务商 model catalogue list llama qwen gpt choose remote provider",
         "aiEnable": "ai 人工智能 本地 开启 关闭 启用 禁用 机器学习 local enable disable",
         "aiExcluded": "排除 排除的文件夹 文件夹 忽略 ai 隐私 excluded folders exclude privacy",
         "aiModels": "模型 gguf 下载 文本 嵌入 向量 llm models embedding download",
@@ -2989,8 +3120,26 @@
         "vaultIcon": "保险库图标 图标 头像 图片 标志 vault icon avatar symbol",
         "vaultLabel": "保险库标签 标签 名称 重命名 标题 vault label name rename title",
         "vaultLocation": "保险库位置 位置 路径 文件夹 磁盘 存储位置 vault location path folder disk",
-        "viewMode": "默认视图 查看模式 实时 阅读 源代码 预览 default view mode live reading source"
+        "viewMode": "默认视图 查看模式 实时 阅读 源代码 预览 default view mode live reading source",
+        "dateFormat": "日期格式 日期 日 月 年 日历 date format day month year iso dd/mm mm/dd calendar",
+        "timeFormat": "时间格式 时间 时钟 24小时制 12小时制 上午 下午 time format 24 hour 12 hour clock am pm",
+        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today"
       }
+    },
+    "dateTime": {
+      "dateLabel": "日期格式",
+      "dateHelper": "任务、已保存的视图和附件中日期的显示方式。",
+      "dateSystem": "跟随语言",
+      "timeLabel": "时间格式",
+      "timeHelper": "选择时间以 24 小时制还是 12 小时制显示。",
+      "timeSystem": "跟随语言",
+      "time24": "24 小时制",
+      "time12": "12 小时制",
+      "zoneLabel": "时区",
+      "zoneHelper": "由哪个时区决定什么算作今天。留空则跟随此设备。你在笔记中写下的时间永远不会被改动——09:00 在任何地方都还是 09:00。",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne 不认识该时区。请使用类似 Europe/Berlin 的名称。",
+      "errorSave": "无法保存该设置。"
     }
   },
   "storageLost": {
@@ -3016,6 +3165,7 @@
   "sync": {
     "materialising": "正在下载你的笔记——第 {{done}} 篇，共 {{total}} 篇。你可以先开始写；其余的会陆续出现。",
     "credentialAmbiguous": "你的密码可能在此设备和另一台设备上都被更改过，Myne 无法判断哪一次更改更晚——因此它没有做任何更改。请在一台已有访问权限的设备上登录，以理清此事。",
+    "vaultRekeyed": "此保险库已在另一台设备上升级到新格式。请重新解锁以继续——没有任何内容丢失。",
     "attachments": {
       "aria": {
         "downloading": "正在下载 {{name}}",
@@ -3032,6 +3182,7 @@
     "buildingIndex": {
       "label": "正在构建搜索索引…"
     },
+    "remoteMergeHint": "已从另一台设备更新",
     "conflicts": {
       "compare": "比较",
       "compareClose": "返回冲突列表",
@@ -3099,6 +3250,7 @@
       "verifyPending": "此验证码将在新设备完成首次同步后出现。",
       "verifySyncing": "正在同步…",
       "verifyTitle": "验证新设备",
+      "verifyAction": "比对验证码",
       "yourDevices": "你的设备"
     },
     "endpoint": {
@@ -3128,7 +3280,12 @@
       "deviceNameHelp": "会显示在你的设备列表中。你之后可以更改它。",
       "deviceNameLabel": "为此设备命名",
       "error": {
+        "awaitingApproval": "此设备已在等待批准。请在一台已登录的设备上批准它。",
+        "deviceLimit": "此账户已达到设备数量上限。请移除一台不再使用的设备，然后重试。",
+        "frozen": "此账户已冻结，因此目前无法添加新设备。此设备上的笔记不受影响。",
         "notConfigured": "请先在设置中设定同步服务器，然后再添加此设备。",
+        "serverMismatch": "同步服务器的身份与此设备预期的不一致。在弄清原因之前，请不要再次输入你的凭据。",
+        "kdfTooLarge": "此设备没有足够的内存来打开该保险库。它的加密设置所需的内存超出了此应用在这里可用的上限。请改用桌面电脑打开它。",
         "transport": "无法连接到同步服务器。请检查你的网络连接后重试。"
       },
       "mode": {
@@ -3412,7 +3569,8 @@
       "inProgress": "操作正在进行中。",
       "kdfMemoryExceedsHost": "打开此保险库需要 {{required}} MiB 内存——超出了此浏览器能提供的上限（{{available}} MiB）。保险库本身没有问题；请在 Myne 桌面应用中打开它。",
       "unexpected": "出现意外错误。请重试。",
-      "vaultNotFound": "未找到保险库文件。请重新启动应用。"
+      "vaultNotFound": "未找到保险库文件。请重新启动应用。",
+      "vaultUpgraded": "此保险库已升级到当前版本 Myne 尚不支持的更新格式。你的数据没有问题——请将 Myne 更新到最新版本再打开它。"
     },
     "passwordLabel": "密码",
     "passwordPlaceholder": "密码",
@@ -3481,6 +3639,7 @@
       "committing": "正在保存…",
       "copied": "已复制",
       "copy": "复制",
+      "copyFailed": "无法复制——请改用“另存为文件”。",
       "eyebrow": "第 4 步，共 4 步——账号",
       "heading": "保存你的账号。",
       "intro": "这是你的持有人令牌——请像对待现金一样对待它。",
@@ -3595,6 +3754,10 @@
       "vaultBusyAuth": {
         "body": "另一项保险库操作正在进行中。请稍后重试。",
         "title": "保险库忙碌中"
+      },
+      "plaintextTooLarge": {
+        "title": "这篇笔记太大，无法加密",
+        "body": "请减少内容后重试。"
       }
     },
     "orchestrator": {
@@ -3890,6 +4053,12 @@
     "backUpNow": "立即备份"
   },
   "web": {
+    "openElsewhere": {
+      "body": "同一时间只能有一个标签页打开保险库——两个标签页会写入同一处存储并把它损坏。请关闭另一个标签页，以便在这里继续。",
+      "freed": "另一个标签页已关闭。重新加载即可在这里打开你的保险库。",
+      "reload": "重新加载",
+      "title": "此保险库已在另一个标签页中打开"
+    },
     "reload": {
       "body": "重新加载此页面会再次要求输入你的密码——这是设计使然，没有更快的进入方式。页面关闭期间，你的保险库在此设备上保持加密状态，密钥每次都会根据你的密码重新派生。",
       "title": "重新加载意味着要再输一次密码"

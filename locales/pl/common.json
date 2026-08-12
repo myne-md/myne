@@ -9,6 +9,7 @@
     "passwordLabel": "Hasło główne",
     "approversIntro": "To urządzenie mogą zatwierdzić:",
     "noApprovers": "Żadne inne urządzenie na tym koncie nie może go teraz zatwierdzić. Otwórz Myne na urządzeniu, które ma już dostęp, a potem wróć tutaj.",
+    "pendingStartOver": "Zacznij od nowa z innym kontem",
     "pendingTitle": "Oczekiwanie na zatwierdzenie",
     "sasMatch": "Zgadzają się — kontynuuj",
     "sasMismatch": "Nie zgadzają się",
@@ -24,6 +25,13 @@
     "hint": "Wygląda tak: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Sprawdzany tutaj, na Twoim urządzeniu — nic nie jest jeszcze wysyłane.",
     "invalid": "Ten numer konta jest nieprawidłowy. Sprawdź go i spróbuj ponownie.",
     "title": "Wprowadź swój numer konta"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Odpowiedź udzielona na tym urządzeniu",
+      "localRuntime": "Odpowiedź udzielona przez {{name}}, na tym komputerze",
+      "remote": "Odpowiedź udzielona przez {{provider}} — Twoje notatki zostały tam wysłane"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -236,7 +244,8 @@
       "intro": "Potwierdź, że ten kod jest taki sam jak pokazany w rozszerzeniu, a następnie wybierz Akceptuj, aby sparować.",
       "reject": "Odrzuć",
       "rejected": "Parowanie odrzucone.",
-      "title": "Rozszerzenie przeglądarki chce się połączyć"
+      "title": "Rozszerzenie przeglądarki chce się połączyć",
+      "persistFailed": "Myne nie zdołało zapisać tego połączenia, więc nie zostało ono nawiązane. Jeśli skarbiec jest zablokowany, odblokuj go i spróbuj połączyć się ponownie."
     }
   },
   "commandPalette": {
@@ -964,10 +973,14 @@
           "insert": "Wstaw do notatki",
           "noAnswer": "Brak odpowiedzi — spróbuj przeformułować.",
           "noModelHint": "Nie wybrano modelu. Wybierz go w Ustawienia → Deweloper → AI, aby rozpocząć.",
+          "unreachableHint": "Skonfigurowany dostawca nie odpowiada. Sprawdź, czy działa, a potem wyślij ponownie.",
+          "unavailableHint": "Tę kompilację Myne zbudowano bez lokalnego AI, więc nic tutaj nie zadziała.",
           "offHint": "Lokalne AI jest wyłączone. Włącz je w Ustawienia → Deweloper → AI.",
           "send": "Wyślij",
           "statusGettingReady": "Przygotowywanie…",
           "statusNoModel": "Brak modelu",
+          "statusUnreachable": "Nie odpowiada",
+          "statusUnavailable": "Niedostępne",
           "statusOff": "Wyłączone",
           "statusReady": "Gotowe",
           "stop": "Zatrzymaj",
@@ -1090,6 +1103,8 @@
     },
     "slash": {
       "aiContinue": "Kontynuuj pisanie (AI)",
+      "aiFailed": "Nie udało się zrealizować żądania AI, więc nic nie zostało wstawione.",
+      "aiNoProvider": "Nie skonfigurowano żadnego dostawcy AI, więc nic nie zostało wstawione. Skonfiguruj go w Ustawienia → Deweloper → AI.",
       "aiTitle": "Zaproponuj tytuł (AI)",
       "attachFile": "Dołącz plik",
       "bulletList": "Lista punktowana",
@@ -1116,7 +1131,8 @@
       "time": "Godzina",
       "todoList": "Lista zadań",
       "voiceNote": "Notatka głosowa",
-      "wikiLink": "Wikilink"
+      "wikiLink": "Wikilink",
+      "remind": "Przypomnienie"
     },
     "spell": {
       "menu": {
@@ -1148,13 +1164,17 @@
       "menuEdit": "Edytuj {{field}}",
       "menuTitle": "Dodaj pole",
       "repeatNoAnchor": "To zadanie nie ma daty, od której miałoby się powtarzać, więc nie będzie się powtarzać. Dodaj termin, aby je uruchomić.",
+      "repeatNeedsDate": "Potrzebny termin, od którego zadanie ma się powtarzać",
       "save": "Zapisz",
       "skipOccurrence": "Pomiń to wystąpienie",
       "title": {
         "due": "Termin",
         "repeat": "Powtarzanie",
-        "priority": "Priorytet"
-      }
+        "priority": "Priorytet",
+        "remind": "Przypomnienie"
+      },
+      "timeLabel": "Godzina (opcjonalnie)",
+      "invalidRemind": "Myne nie potrafi odczytać tej daty, więc nie pokaże przypomnienia."
     },
     "toolbar": {
       "apply": "Zastosuj",
@@ -1263,7 +1283,8 @@
         "rewriteCount_many": "Zostanie przepisanych {{count}} linków",
         "rewriteCount_other": "Zostanie przepisanych {{count}} linków",
         "skipped": "pominięto — {{reason}}",
-        "title": "Konwertuj zaimportowane wikilinki w tej notatce"
+        "title": "Konwertuj zaimportowane wikilinki w tej notatce",
+        "staleDocument": "Ta notatka zmieniła się, gdy podgląd był otwarty, więc nic nie zostało przekonwertowane. Uruchom go ponownie, aby zobaczyć aktualne linki."
       },
       "convertCore": {
         "noMatch": "brak dopasowania"
@@ -1281,6 +1302,8 @@
       "attachUnsupported": "Można załączać tylko obrazy i pliki PDF.",
       "attachFailed": "Nie udało się załączyć tego pliku.",
       "archiveFailed": "Nie udało się zarchiwizować tej notatki.",
+      "aiRewriteFailed": "Nie udało się dokończyć przepisywania, więc Twoje zaznaczenie pozostało bez zmian.",
+      "aiRewriteNoProvider": "Nie skonfigurowano żadnego dostawcy AI, więc nic nie zostało przepisane. Skonfiguruj go w Ustawienia → Deweloper → AI.",
       "trashFailed": "Nie udało się przenieść tej notatki do kosza."
     },
     "nav": {
@@ -1627,6 +1650,29 @@
       "untitled": "Bez tytułu",
       "warning": "Nie można tego cofnąć."
     },
+    "example": {
+      "folder": "Pierwsze kroki",
+      "index": {
+        "title": "Zacznij tutaj",
+        "body": "To mały przykładowy skarbiec. Kilka zwykłych notatek, które pokazują, co potrafi Myne — nic tu nie jest wyjątkowe: możesz je edytować, zmieniać ich nazwy albo usuwać.\n\n- [[{{markdown}}]] pokazuje, jak zwykły tekst zamienia się w formatowanie\n- [[{{tasks}}]] zbiera listy zadań w jednym miejscu\n- [[{{links}}]] łączy notatki i porządkuje je tagami\n- [[{{makeItYours}}]] usuwa to wszystko w jednym kroku\n\nWystarczy? Kliknij prawym przyciskiem folder **Pierwsze kroki** na pasku bocznym i wybierz Usuń. Notatki trafią do Kosza, więc możesz je przywrócić, jeśli zmienisz zdanie.\n"
+      },
+      "markdown": {
+        "title": "Pisanie w Markdownie",
+        "body": "Myne pisze zwykłym Markdownem i pokazuje wynik w trakcie pisania.\n\n## Podstawy\nZapisz słowo **pogrubieniem** lub *kursywą*, albo wstaw `kod w wierszu`.\n\n## Lista\n- Jeden element\n- Kolejny element\n  - I zagnieżdżony\n\n## Cytat\n> Małe notatki prowadzone latami biją na głowę wielkie notatki, których nigdy nie napiszesz.\n\n## Tabela\n| Skrót | Co robi |\n| --- | --- |\n| Cmd/Ctrl + B | Pogrubia tekst |\n| Cmd/Ctrl + K | Wstawia link |\n\n## Trochę kodu\n```\nconsole.log(\"hello from Myne\")\n```\n\nGdy skończysz, wróć do [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Zadania",
+        "body": "Każdy wiersz zaczynający się od `- [ ]` to zadanie. Myne zbiera wszystkie otwarte zadania z Twoich notatek w jednym widoku Zadania, więc nic nie ginie między notatkami.\n\n- [ ] Przeczytaj [[{{markdown}}]]\n- [ ] Dodaj własne zadanie\n- [ ] Dodaj kolejne, tym razem z terminem 📅 2030-12-31\n- [x] Utwórz swój skarbiec\n\nZaznacz tutaj pole wyboru, a potem otwórz widok Zadania na pasku bocznym i zobacz, jak lista się aktualizuje.\n\nZ powrotem do [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Linki i tagi",
+        "body": "Wpisz `[[`, aby wstawić link do innej notatki. Linki działają w obie strony: otwórz [[{{index}}]], a zobaczysz tę notatkę wśród jej linków zwrotnych; graf narysuje też między nimi linię.\n\nDodaj gdziekolwiek #tag, a Myne przypisze do niego notatkę w drzewie tagów. Ta notatka ma tagi #przykład i #pierwsze-kroki, więc otwórz drzewo tagów na pasku bocznym, aby ją znaleźć.\n\nTeraz Twoja kolej: połącz tę notatkę z [[{{tasks}}]] albo wymyśl własny tag.\n"
+      },
+      "makeItYours": {
+        "title": "Dostosuj do siebie",
+        "body": "To teraz Twój skarbiec. Te notatki są tylko punktem wyjścia — zmień w nich, co zechcesz, albo usuń je i zacznij od czystej karty.\n\nAby usunąć cały przykład, kliknij prawym przyciskiem folder **Pierwsze kroki** na pasku bocznym i wybierz Usuń. Wszystko trafi razem do Kosza i możesz to stamtąd przywrócić, jeśli będzie potrzebne.\n\nKiedy zechcesz, naciśnij Cmd/Ctrl + N, aby utworzyć nową notatkę i zacząć pisać.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Dodaj warunek",
       "addFilterGroup": "Dodaj grupę filtrów",
@@ -1669,7 +1715,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Nazwa folderu nie może zawierać / \\ | # ^ [ ] ani zaczynać się/kończyć spacją.",
-      "tooLong": "Ta ścieżka folderu jest za długa."
+      "tooLong": "Ta ścieżka folderu jest za długa.",
+      "moveIntoSelf": "Nie można przenieść folderu do niego samego.",
+      "moveCollision": "W tym miejscu jest już folder o takiej nazwie."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -1974,7 +2022,8 @@
       "importedWithSkips_few": "Zaimportowano {{count}} notatki — pominięto {{skipped}}",
       "importedWithSkips_many": "Zaimportowano {{count}} notatek — pominięto {{skipped}}",
       "importedWithSkips_other": "Zaimportowano {{count}} notatek — pominięto {{skipped}}",
-      "importNoMarkdown": "Brak plików Markdown wśród upuszczonych"
+      "importNoMarkdown": "Brak plików Markdown wśród upuszczonych",
+      "moveFolderTo": "Przenieś folder do…"
     },
     "newFromTemplate": {
       "back": "Wstecz",
@@ -2264,6 +2313,30 @@
       "emptyText": "Brak dopasowań.",
       "placeholder": "Wybierz…",
       "searchPlaceholder": "Szukaj…"
+    }
+  },
+  "migrate": {
+    "intro": "Uaktualnij ten skarbiec do nowego formatu. Twoje notatki zyskają automatyczne scalanie między urządzeniami. Cały skarbiec otrzyma nowe klucze; stara kopia pozostaje na tym urządzeniu, dopóki nie potwierdzisz.",
+    "passwordLabel": "Hasło główne",
+    "phraseLabel": "Fraza odzyskiwania",
+    "phraseHelp": "Wymagane — nowe klucze są opakowane tą frazą, dzięki czemu odzyskiwanie nadal działa. Wprowadź wszystkie swoje słowa odzyskiwania.",
+    "submit": "Migruj",
+    "migrating": "Migrowanie…",
+    "done": "Zmigrowano {{count}} notatek do nowego formatu.",
+    "settle": {
+      "intro": "Twój skarbiec został uaktualniony. Stara kopia nadal jest na tym urządzeniu, dopóki nie dokończysz — do tego czasu zmiana hasła nie zamknie do niej dostępu.",
+      "confirm": "Wszystko wygląda dobrze, usuń starą kopię",
+      "abort": "Coś jest nie tak, przywróć stary skarbiec",
+      "errorAlreadySynced": "Ten skarbiec już zsynchronizował się w nowym formacie, więc nie można przywrócić starej kopii. Jeśli jej potrzebujesz, odtwórz ją z kopii zapasowej.",
+      "errorBusy": "Trwa inna operacja na skarbcu. Spróbuj ponownie za chwilę.",
+      "errorIo": "Nie udało się tego dokończyć. Nic nie zostało zmienione."
+    },
+    "progressCount": "Ponownie zaszyfrowano {{done}} z {{total}} elementów…",
+    "error": {
+      "recoveryPhraseRequired": "Ta fraza odzyskiwania nie pasuje do tego skarbca. Wprowadź właściwą frazę odzyskiwania, aby przeprowadzić migrację — jest wymagana, aby odzyskiwanie nadal działało.",
+      "wrongPassword": "To hasło nie pasuje do tego skarbca.",
+      "alreadyMigrated": "Ten skarbiec jest już w nowym formacie.",
+      "generic": "Nie udało się ukończyć migracji. Twój skarbiec pozostał bez zmian; spróbuj ponownie."
     }
   },
   "recover": {
@@ -2645,9 +2718,11 @@
         "invalidName": "Niebezpieczna nazwa motywu",
         "invalidValue": "Nieprawidłowa wartość dla {{key}}",
         "invalidValueWithLine": "Nieprawidłowa wartość dla {{key}} (wiersz {{line}})",
+        "lowContrast": "{{key}} na {{against}} ma kontrast {{ratio}}:1, a potrzebuje co najmniej {{min}}:1, aby pozostać czytelnym",
         "missingKey": "Brak wymaganego koloru {{key}}",
         "parseError": "Nieprawidłowy JSON",
-        "parseErrorWithLine": "Nieprawidłowy JSON (wiersz {{line}})"
+        "parseErrorWithLine": "Nieprawidłowy JSON (wiersz {{line}})",
+        "reservedKey": "{{key}} jest zarezerwowany na własny użytek Myne i motyw nie może go ustawić"
       },
       "export": "Eksportuj",
       "exportError": "Nie udało się wyeksportować tego motywu. Spróbuj ponownie.",
@@ -2830,12 +2905,45 @@
       "autoTagHelper": "Gdy przerwiesz pisanie, mały model na Twoim urządzeniu czyta notatkę i proponuje tagi na jej górze. Nic nie zostaje dodane, dopóki nie zaakceptujesz sugestii.",
       "autoTagLabel": "Automatycznie proponuj tagi",
       "autoTagUnavailable": "Ta kompilacja nie zawiera modelu tagów, więc nie da się proponować żadnych tagów. Myne nigdy go nie pobiera — przełącznik włączy się sam w kompilacji, która go zawiera.",
+      "consent": {
+        "accept": "Wysyłaj moje notatki do {{provider}}",
+        "cancel": "Anuluj",
+        "cannotVerifyLabel": "Czego Myne nie może sprawdzić",
+        "revokeLabel": "Jak to cofnąć",
+        "scopeLabel": "Których urządzeń to dotyczy",
+        "title": "Zanim Myne cokolwiek wyśle do {{provider}}",
+        "whatLabel": "Co opuszcza Twoje urządzenie",
+        "whenLabel": "Kiedy opuszcza urządzenie",
+        "whoLabel": "Kto to otrzymuje"
+      },
       "disclosureToggle": "Jak to działa?",
       "enableHelper": "Uruchamia dostarczony przez Ciebie model w całości na Twoim urządzeniu. Eksperymentalne, domyślnie wyłączone.",
       "enableLabel": "Włącz lokalne AI",
       "excludedHelper": "Notatki w tych folderach nigdy nie są odczytywane ani indeksowane przez AI. Jedna ścieżka folderu w wierszu.",
       "excludedLabel": "Wykluczone foldery",
       "excludedPlaceholder": "Prywatne/\nDziennik/",
+      "endpointHelper": "Jeśli na tym komputerze działa już środowisko uruchomieniowe modeli, wskaż je Myne zamiast wybierać pliki modeli. Zostaw to pole puste, aby korzystać z plików powyżej.",
+      "endpointLabel": "Lokalne środowisko uruchomieniowe modelu",
+      "endpointModelHelper": "Myne nie wybiera modelu za Ciebie. Dopóki go nie wskażesz, adres powyżej jest zapisany, ale nieużywany.",
+      "endpointModelLabel": "Model, którego tam użyć",
+      "endpointModelPlaceholder": "nazwa modelu tak, jak podaje ją środowisko",
+      "endpointRejected": {
+        "malformed": "To nie jest adres, którego Myne może użyć. Potrzebny jest schemat i jawnie podany port — na przykład http://127.0.0.1:11434.",
+        "notLoopback": "Ten adres musi wskazywać ten komputer — localhost, 127.0.0.1 lub ::1. Aby skorzystać z dostawcy działającego gdzie indziej, wskaż go w polu Zdalny dostawca.",
+        "unsupportedScheme": "Akceptowane są tylko adresy http i https."
+      },
+      "endpointSaveFailed": "Nie udało się zapisać adresu. Sprawdź, czy Myne może zapisać swoje ustawienia.",
+      "endpointThirdParty": "{{name}} to osobny program z własnym zachowaniem sieciowym, nad którym Myne nie ma kontroli. Twoje notatki są do niego wysyłane, choć działa on na tym komputerze.",
+      "providerError": {
+        "barred": "Tego rodzaju żądanie nigdy nie trafia do dostawcy — wykonuje się na tym urządzeniu albo wcale.",
+        "failed": "To nie zadziałało. Nic nie zostało zapisane ani wysłane ponownie.",
+        "noCredential": "Dla tego dostawcy nie ustawiono klucza API. Dodaj go w Ustawienia → Deweloper → AI.",
+        "quotaExhausted": "Dostawca odrzucił żądanie — skończyły się środki albo przekroczono limit zapytań. Trzeba to rozwiązać u dostawcy, nie w Myne.",
+        "refused": "Dostawca odmówił połączenia. Może być niedostępny albo blokować tę sieć.",
+        "timeout": "Dostawca nie odpowiedział na czas. Nic nie działa już w tle.",
+        "unauthorized": "Dostawca odrzucił Twój klucz API. Zastąp go — może być błędny, unieważniony albo należeć do innego konta.",
+        "unreachable": "Nie udało się połączyć z dostawcą. Sprawdź połączenie sieciowe."
+      },
       "modelChoose": "Wybierz plik…",
       "modelEmbeddingLabel": "Model wyszukiwania — wyszukiwanie semantyczne i pytania/odpowiedzi",
       "modelFilter": {
@@ -2847,11 +2955,32 @@
       "modelSaveFailed": "Nie udało się zapisać ścieżki modelu (musi znajdować się poza sejfem).",
       "modelTranscriptionLabel": "Model zamiany mowy na tekst (transkrypcja)",
       "modelsHelper": "Myne nigdy nie pobiera modeli — oznaczałoby to wysyłanie danych przez sieć. Otwórz link, aby pobrać model w przeglądarce, a następnie wskaż pobrane pliki tutaj. Wszystko działa na Twoim urządzeniu.",
+      "providerHelper": "Zamiast uruchamiać model tutaj, Myne może wysłać żądanie do wskazanej przez Ciebie usługi. Twoje notatki opuszczają wtedy to urządzenie. Domyślna jest opcja „Brak”, która oznacza, że żadna usługa nie jest w ogóle odpytywana.",
+      "providerKeyAdd": "wklej swój klucz API",
+      "providerKeyLabel": "Klucz API",
+      "providerKeyNone": "Nie zapisano żadnego klucza, więc nic nie może jeszcze zostać wysłane.",
+      "providerKeyRevoke": "Usuń ten klucz",
+      "providerKeyReplace": "wklej nowy klucz, aby zastąpić zapisany",
+      "providerKeyStored": "Klucz jest zapisany. Myne nigdy go nie pokazuje — wklej nowy, aby go zastąpić.",
+      "providerActive": "Teraz odpowiada: {{name}}",
+      "providerLabel": "Zdalny dostawca",
+      "providerModelCount_one": "Dostępny {{count}} model.",
+      "providerModelCount_other": "Dostępnych {{count}} modeli.",
+      "providerModelEmpty": "Ten dostawca nie udostępnił żadnych modeli dla Twojego konta.",
+      "providerModelHelper": "Myne nie ma domyślnego modelu. Lista pochodzi od dostawcy, więc pozostaje aktualna i nigdy nie zapłacisz za model, którego nie wybierzesz.",
+      "providerModelLabel": "Model",
+      "providerModelLoad": "Wczytaj modele",
+      "providerModelNone": "Nie wybrano modelu",
+      "providerModelUnfetched": "Wczytaj listę, aby wybrać model.",
+      "providerNone": "Brak",
+      "providerNothingAnswering": "Nic nie jest jeszcze skonfigurowane do odpowiadania.",
       "modelsLabel": "Modele",
       "recommendedFilesEmbedding": "Wymaga plików model.safetensors + config.json + tokenizer.json w jednym folderze.",
       "recommendedFilesGeneration": "Wymaga pliku .gguf + tokenizer.json w tym samym folderze.",
       "recommendedFilesTranscription": "Wymaga pliku Whisper .gguf + config.json + tokenizer.json w tym samym folderze.",
-      "title": "AI"
+      "title": "AI",
+      "providerModelCount_few": "Dostępne {{count}} modele.",
+      "providerModelCount_many": "Dostępnych {{count}} modeli."
     },
     "network": {
       "disabledCue": "Synchronizacja nie jest już kierowana przez Tor. Nowe połączenia idą prosto do serwera synchronizacji.",
@@ -2911,6 +3040,7 @@
       "quickUnlockSubtitle": "Wejdź ponownie za pomocą {{method}} lub PIN-u po automatycznej blokadzie"
     },
     "quickUnlock": {
+      "errorBusy": "Trwa inna operacja na skarbcu. Spróbuj ponownie za chwilę.",
       "errorCancelled": "Anulowano.",
       "errorGeneric": "Nie udało się skonfigurować szybkiego odblokowania.",
       "errorHardwareUnavailable": "Touch ID nie jest dostępny w tej kompilacji. Wymaga podpisanej kompilacji macOS z zarejestrowanym Touch ID.",
@@ -3099,6 +3229,9 @@
       },
       "keywords": {
         "aiAutoTag": "automatyczne tagi tag sugestie sugeruj etykiety ai auto tag suggest",
+        "aiEndpoint": "ollama endpoint adres lokalne środowisko uruchomieniowe model serwer port loopback runtime",
+        "aiProvider": "dostawca zdalny chmura openrouter ollama klucz api zgoda wysyłanie notatek provider cloud api key consent",
+        "aiProviderModel": "model modele katalog lista który model llama qwen gpt wybierz model zdalny dostawca provider",
         "aiEnable": "ai lokalne sztuczna inteligencja włącz wyłącz uczenie maszynowe local enable disable",
         "aiExcluded": "wykluczone foldery wyklucz ignoruj ai prywatność excluded folders exclude",
         "aiModels": "modele model gguf pobieranie tekstowy osadzenia embedding llm models",
@@ -3155,8 +3288,26 @@
         "vaultIcon": "ikona skarbca sejfu awatar obrazek symbol vault icon",
         "vaultLabel": "etykieta skarbca nazwa zmień nazwę tytuł vault label",
         "vaultLocation": "lokalizacja skarbca ścieżka folder na dysku gdzie przechowywany vault location",
-        "viewMode": "domyślny tryb widoku na żywo czytanie źródło podgląd view mode"
+        "viewMode": "domyślny tryb widoku na żywo czytanie źródło podgląd view mode",
+        "dateFormat": "format daty dzień miesiąc rok iso dd mm kalendarz date format",
+        "timeFormat": "format godziny czas zegar 24 12 godzinny am pm time format clock",
+        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Format daty",
+      "dateHelper": "Jak daty są pokazywane w zadaniach, zapisanych widokach i załącznikach.",
+      "dateSystem": "Zgodnie z językiem",
+      "timeLabel": "Format godziny",
+      "timeHelper": "Czy godziny są pokazywane w formacie 24- czy 12-godzinnym.",
+      "timeSystem": "Zgodnie z językiem",
+      "time24": "24-godzinny",
+      "time12": "12-godzinny",
+      "zoneLabel": "Strefa czasowa",
+      "zoneHelper": "Która strefa decyduje o tym, co liczy się jako dzisiaj. Zostaw puste, aby korzystać z ustawień tego urządzenia. Godziny wpisane w notatce nigdy się nie zmieniają — 09:00 wszędzie pozostaje 09:00.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne nie zna tej strefy czasowej. Użyj nazwy takiej jak Europe/Berlin.",
+      "errorSave": "Nie udało się zapisać tego ustawienia."
     }
   },
   "storageLost": {
@@ -3186,6 +3337,7 @@
   "sync": {
     "materialising": "Pobieranie Twoich notatek — {{done}} z {{total}}. Możesz już zacząć pracę; reszta pojawi się, gdy dotrze.",
     "credentialAmbiguous": "Twoje hasło mogło zmienić się i na tym urządzeniu, i na innym, a Myne nie potrafi stwierdzić, które jest nowsze — więc niczego nie zmieniło. Zaloguj się na urządzeniu, które ma już dostęp, aby to uporządkować.",
+    "vaultRekeyed": "Ten skarbiec został uaktualniony do nowego formatu na innym urządzeniu. Odblokuj go ponownie, aby kontynuować — nic nie zostało utracone.",
     "attachments": {
       "aria": {
         "downloading": "Pobieranie {{name}}",
@@ -3202,6 +3354,7 @@
     "buildingIndex": {
       "label": "Budowanie indeksu wyszukiwania…"
     },
+    "remoteMergeHint": "Zaktualizowano z innego urządzenia",
     "conflicts": {
       "compare": "Porównaj",
       "compareClose": "Wróć do konfliktów",
@@ -3273,6 +3426,7 @@
       "verifyPending": "Ten kod pojawi się, gdy nowe urządzenie zakończy pierwszą synchronizację.",
       "verifySyncing": "Synchronizowanie…",
       "verifyTitle": "Zweryfikuj nowe urządzenie",
+      "verifyAction": "Porównaj kod",
       "yourDevices": "Twoje urządzenia"
     },
     "endpoint": {
@@ -3302,7 +3456,12 @@
       "deviceNameHelp": "Widoczna na liście Twoich urządzeń. Możesz ją później zmienić.",
       "deviceNameLabel": "Nazwij to urządzenie",
       "error": {
+        "awaitingApproval": "To urządzenie już czeka na zatwierdzenie. Zatwierdź je z urządzenia, które jest już zalogowane.",
+        "deviceLimit": "To konto osiągnęło limit urządzeń. Usuń urządzenie, z którego już nie korzystasz, a potem spróbuj ponownie.",
+        "frozen": "To konto jest zamrożone, więc nie można teraz dodać nowego urządzenia. Nie ma to wpływu na Twoje notatki na tym urządzeniu.",
         "notConfigured": "Ustaw serwer synchronizacji w ustawieniach, zanim dodasz to urządzenie.",
+        "serverMismatch": "Tożsamość serwera synchronizacji nie zgadza się z tym, czego oczekiwało to urządzenie. Nie wprowadzaj ponownie swoich poświadczeń, dopóki nie ustalisz przyczyny.",
+        "kdfTooLarge": "To urządzenie nie ma wystarczającej ilości pamięci, aby otworzyć ten skarbiec. Jego ustawienia szyfrowania wymagają więcej pamięci, niż aplikacja może tutaj wykorzystać. Otwórz go zamiast tego na komputerze.",
         "transport": "Nie udało się połączyć z serwerem synchronizacji. Sprawdź połączenie i spróbuj ponownie."
       },
       "mode": {
@@ -3596,7 +3755,8 @@
       "inProgress": "Operacja w toku.",
       "kdfMemoryExceedsHost": "Otwarcie tego skarbca wymaga {{required}} MiB pamięci — więcej, niż może mu dać ta przeglądarka ({{available}} MiB). Ze skarbcem wszystko w porządku; otwórz go w aplikacji Myne na komputer.",
       "unexpected": "Nieoczekiwany błąd. Spróbuj ponownie.",
-      "vaultNotFound": "Nie znaleziono pliku skarbca. Uruchom ponownie aplikację."
+      "vaultNotFound": "Nie znaleziono pliku skarbca. Uruchom ponownie aplikację.",
+      "vaultUpgraded": "Ten skarbiec został uaktualniony do nowszego formatu, którego ta wersja Myne jeszcze nie obsługuje. Z Twoimi danymi wszystko w porządku — zaktualizuj Myne do najnowszej wersji, aby go otworzyć."
     },
     "passwordLabel": "Hasło",
     "passwordPlaceholder": "Hasło",
@@ -3667,6 +3827,7 @@
       "committing": "Zapisywanie…",
       "copied": "Skopiowano",
       "copy": "Kopiuj",
+      "copyFailed": "Nie udało się skopiować — użyj zamiast tego opcji „Zapisz jako plik”.",
       "eyebrow": "Krok 4 z 4 — numer konta",
       "heading": "Zapisz swój numer konta.",
       "intro": "To Twój token na okaziciela — traktuj go jak gotówkę.",
@@ -3781,6 +3942,10 @@
       "vaultBusyAuth": {
         "body": "Trwa inna operacja na skarbcu. Spróbuj ponownie za chwilę.",
         "title": "Skarbiec zajęty"
+      },
+      "plaintextTooLarge": {
+        "title": "Ta notatka jest za duża, aby ją zaszyfrować",
+        "body": "Spróbuj ponownie z mniejszą ilością treści."
       }
     },
     "orchestrator": {
@@ -4100,6 +4265,12 @@
     "backUpNow": "Utwórz kopię zapasową teraz"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Skarbiec może być otwarty tylko w jednej karcie naraz — dwie zapisywałyby do tej samej pamięci i uszkodziłyby ją. Zamknij drugą kartę, aby kontynuować tutaj.",
+      "freed": "Druga karta została zamknięta. Załaduj ponownie, aby otworzyć tutaj swój skarbiec.",
+      "reload": "Załaduj ponownie",
+      "title": "Ten skarbiec jest otwarty w innej karcie"
+    },
     "reload": {
       "body": "Ponowne załadowanie tej strony znów poprosi o Twoje hasło — z założenia nie ma szybszej drogi do środka. Gdy strona jest zamknięta, Twój skarbiec pozostaje zaszyfrowany na tym urządzeniu, a klucz jest za każdym razem odtwarzany z Twojego hasła.",
       "title": "Ponowne załadowanie oznacza ponowne podanie hasła"
