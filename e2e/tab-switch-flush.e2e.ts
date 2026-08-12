@@ -28,6 +28,7 @@ import { seedVault } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
+  dismissImporterOfferIfPresent,
   editorText,
   typeIntoEditor,
   unlockToEditor,
@@ -56,6 +57,23 @@ async function row(session: Session, noteId: string): Promise<Element> {
   return session.waitForElement(testIdSelector("notes.row", { "data-note-id": noteId }));
 }
 
+/** Open a note in a NEW tab through the row's real context menu.
+ *
+ *  NOT `middleClick()`. `workspace-state.e2e.ts` already wrote down why: the
+ *  WebDriver synthetic middle-click never fires `auxclick` under WebKit, so the
+ *  gesture is a production affordance that is simply not driver-addressable.
+ *  The context-menu item invokes the SAME workspace action. This spec was still
+ *  using the middle-click and failing on "two tabs open" because the second tab
+ *  never opened. */
+async function openInNewTab(session: Session, noteId: string): Promise<void> {
+  await (await row(session, noteId)).rightClick();
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": "open-in-new-tab" }),
+    )
+  ).click();
+}
+
 describeE2E("tsf1 (myne#288): a keyboard tab switch flushes the pane's edits", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("keeps text typed before a Ctrl+Tab switch, across a lock/unlock reload", async () => {
@@ -80,7 +98,7 @@ describeE2E("tsf1 (myne#288): a keyboard tab switch flushes the pane's edits", (
         // sidebar click REUSES the active slot; middle-click is the new-tab
         // affordance (MYND-367 moved it there from Cmd/Ctrl-click).
         await (await row(s, b!)).click();
-        await (await row(s, a!)).middleClick();
+        await openInNewTab(s, a!);
         await s.waitUntil(
           async () => ((await s.byTestIdAll("editor.tab")).length === 2 ? true : null),
           { label: "tsf1 two tabs open", timeoutMs: 15_000 },
@@ -100,7 +118,11 @@ describeE2E("tsf1 (myne#288): a keyboard tab switch flushes the pane's edits", (
         await (await s.byTestId("editor.lock-cta")).click();
         await s.byTestId("unlock.password-input", { timeoutMs: 20_000 });
         await unlockToEditor(s, password);
-        await dismissImporterOffer(s);
+        // Second editor mount: the importer offer is a FRESH-VAULT overlay and does
+        // not re-appear after a lock -> unlock on a vault that already has notes —
+        // `dismissImporterOfferIfPresent`'s own doc says so, and the hard variant
+        // times out waiting for something that is deliberately absent.
+        await dismissImporterOfferIfPresent(s);
 
         await (await row(s, a!)).click();
         await s.waitUntil(
