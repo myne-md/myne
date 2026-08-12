@@ -594,7 +594,32 @@ export async function clickNewMenuItem(session: Session, testId: string): Promis
       { label: "new-menu dropdown open" },
     );
   }
-  await (await session.byTestId(testId)).click();
+  // The ITEM click needs the same re-click the trigger got, and for the same
+  // reason — but it cannot simply be repeated: every item in this menu COMMITS
+  // (creates a note, opens the new-folder input), so a blind second click on a
+  // first click that actually landed would create two.
+  //
+  // The menu's own render gives the invariant that makes the retry safe.
+  // `NoteList.tsx`'s `item()` runs `setOpen(false)` BEFORE the action, for all
+  // four items, so:
+  //   - the click landed  -> the dropdown is gone, and there is nothing to retry
+  //   - the click missed  -> the dropdown is still up, and nothing was committed
+  // Re-clicking only while the dropdown is still present is therefore exactly
+  // the "the click provably did nothing" case, and cannot double-commit.
+  await session.waitUntil(
+    async () => {
+      if ((await session.byTestIdAll("notes.new-menu-dropdown")).length === 0) return true;
+      const [item] = await session.byTestIdAll(testId);
+      if (!item) return null;
+      await item.click();
+      for (let i = 0; i < 20; i++) {
+        if ((await session.byTestIdAll("notes.new-menu-dropdown")).length === 0) return true;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return null;
+    },
+    { label: `new-menu item [${testId}] committed (dropdown closed)` },
+  );
 }
 
 /** Create a note via the sidebar CTA and commit `title` through the
