@@ -446,17 +446,119 @@ export async function completePasswordReset(
 
 const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
 
+/** Click a control and wait for what it reveals, RE-CLICKING when a click missed.
+ *
+ *  THE BUG THIS EXISTS FOR. `await (await s.byTestId(trigger)).click()` followed
+ *  by `await s.byTestId(revealed)` looks correct and is the single most common
+ *  shape in this suite, but it stakes the whole scenario on ONE click landing.
+ *  When that click misses — it arrives before the trigger is wired, or races the
+ *  outside-click handler that closes what it just opened — nothing re-clicks, so
+ *  the wait burns its full `DEFAULT_TIMEOUT_MS` and throws.
+ *
+ *  It is not rare and it is not contention. Measured on an IDLE machine, one
+ *  warm container, `--retry=0`: the sidebar `+` menu missed in 4 of 21 runs
+ *  (~19 %), and the Views builder in 1 of 10. Both were invisible because
+ *  `retry: 2` rescued the next attempt, so the suite reported green and the
+ *  flake rate read as zero.
+ *
+ *  This is the THIRD place the repo has met this bug and the first time the fix
+ *  is shared: `reopenNoteAfterReload` below re-clicks a note row for exactly
+ *  this reason, and `cards-cover-picker.e2e.ts` grew a private 3-attempt loop
+ *  around `views.new-button`. Prefer this helper over a fourth local copy.
+ *
+ *  SAFETY — the caller owns this. The loop never clicks a trigger whose target
+ *  is already visible (the presence check runs FIRST, before any click), and it
+ *  gives each attempt its own short window before judging it to have missed, so
+ *  a slow-but-successful open is not clicked a second time. That makes a plain
+ *  toggle survivable: the worst case is one wasted open/close before the next
+ *  pass reopens it.
+ *
+ *  What it must NOT be pointed at is a trigger that COMMITS something, where a
+ *  second click means a second write rather than a second attempt.
+ *  `views.new-button` is safe for the reason `cards-cover-picker.e2e.ts` already
+ *  wrote down: it only OPENS the builder, and the view is committed by
+ *  `view-filter.save`.
+ */
+export async function clickUntilVisible(
+  session: Session,
+  triggerTestId: string,
+  revealedTestId: string,
+): Promise<void> {
+  // Which half went missing is the whole diagnosis, and a label naming only the
+  // pair loses it: "the trigger never rendered" (a missing precondition — see
+  // the five Views specs that never enabled `settings.views-enabled`) and "the
+  // trigger is there but its click keeps missing" (the flake this exists for)
+  // are different bugs with different fixes. Track it and say which.
+  let everSawTrigger = false;
+  try {
+    await session.waitUntil(
+      async () => {
+        if ((await session.byTestIdAll(revealedTestId)).length > 0) return true;
+        const trigger = await session.byTestIdAll(triggerTestId);
+        if (trigger.length === 0) return null;
+        everSawTrigger = true;
+        await trigger[0].click();
+        for (let i = 0; i < 20; i++) {
+          if ((await session.byTestIdAll(revealedTestId)).length > 0) return true;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return null;
+      },
+      { label: `${triggerTestId} reveals ${revealedTestId}` },
+    );
+  } catch (e) {
+    const why = everSawTrigger
+      ? `[${triggerTestId}] rendered and was clicked, but [${revealedTestId}] never appeared`
+      : `[${triggerTestId}] NEVER RENDERED — nothing was ever clicked. This is a missing precondition, not a flaky click (e.g. a feature still behind its setting).`;
+    throw new Error(`clickUntilVisible: ${why}\n${(e as Error).message}`);
+  }
+}
+
 /** Open the sidebar's "+" menu and click one of its entries.
  *
  *  #230 folded the separate new-note and new-folder buttons into a single `+`
  *  menu, so those entries render only while it is open — the testids still
  *  exist, they are simply not on screen by default. Every helper that used to
  *  click one directly has to open the menu first. Clicking `+` while the menu is
- *  already open would toggle it shut, so this checks before firing. */
+ *  already open would toggle it shut, so this checks before firing.
+ *
+ *  ONE CLICK IS NOT ENOUGH, and trusting it was the single largest source of
+ *  E2E flake. The old shape fired `+` once and then waited the full
+ *  `DEFAULT_TIMEOUT_MS` on the dropdown; when that click did not open the menu —
+ *  landing before the trigger is wired, or racing the outside-click handler that
+ *  closes it — nothing ever re-clicked, so the helper burned 45 s and threw.
+ *  Measured on an IDLE machine (no CI, no contention, same spec repeated in one
+ *  warm container): 2 of 9 runs, ~22 %, every one of them
+ *  `waitUntil(waitForElement([data-testid="notes.new-menu-dropdown"])) timed out
+ *  after 45000 ms`. `retry: 2` then rescued the second attempt, so the suite
+ *  reported green and the flake rate read as zero — the failure never reached a
+ *  report at all. It also explains the suite's wall-clock: every occurrence adds
+ *  a full budget, across ~123 spec files.
+ *
+ *  So: re-click until the dropdown is actually up. This is the same fix
+ *  `reopenNoteAfterReload` below already applies to the same class of bug (a
+ *  click that lands before its target is wired) — it simply had never been
+ *  applied here. Each attempt gets its own SHORT window before being judged to
+ *  have missed, because re-clicking a menu that did open would toggle it shut
+ *  and turn one flake into an oscillation. */
 export async function clickNewMenuItem(session: Session, testId: string): Promise<void> {
   if ((await session.byTestIdAll("notes.new-menu-dropdown")).length === 0) {
-    await (await session.byTestId("notes.new-menu")).click();
-    await session.byTestId("notes.new-menu-dropdown");
+    await session.waitUntil(
+      async () => {
+        if ((await session.byTestIdAll("notes.new-menu-dropdown")).length > 0) return true;
+        const trigger = await session.byTestIdAll("notes.new-menu");
+        // Sidebar not mounted yet — let the outer budget keep polling rather
+        // than throwing on a `+` that simply has not rendered.
+        if (trigger.length === 0) return null;
+        await trigger[0].click();
+        for (let i = 0; i < 20; i++) {
+          if ((await session.byTestIdAll("notes.new-menu-dropdown")).length > 0) return true;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return null;
+      },
+      { label: "new-menu dropdown open" },
+    );
   }
   await (await session.byTestId(testId)).click();
 }
