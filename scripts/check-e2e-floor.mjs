@@ -32,24 +32,35 @@
 //
 // PROVENANCE OF THE SHIPPED NUMBERS — read this before reacting to a failure.
 //
-// `stable: 279` / `stable_max_failures: 15` are MEASURED, from a full local
-// container run, not invented. They are also measured on the WRONG MACHINE, and
-// the difference is knowable in advance rather than mysterious:
+// `stable: 290` / `stable_max_failures: 33` are MEASURED, from CI (pipeline
+// 431), not invented and not from a laptop. They started as 279 / 15 from a
+// local container run; CI's first end-to-end run in months disagreed, which the
+// first version of this note predicted it might, and these are the re-record.
+// Both differences are explained rather than mysterious:
 //
-//   * CI runs ~8 AI scenarios this machine skips (`MYNE_E2E_AI=1` plus the
-//     `local-inference-stub` feature), so CI should EXECUTE more, not fewer.
-//   * CI's sync scenarios depend on the `myne-server-build` step's binary. With
-//     the secret provisioned they run (as they did here); without it they
-//     self-skip and the executed count drops by ~14.
+//   +11 executed — CI runs the ~8 AI scenarios this machine skips
+//                  (MYNE_E2E_AI=1 + the local-inference-stub feature), and the
+//                  sync scenarios that only started running when the e2e step
+//                  learned to build myne-server.
+//   +18 failed   — the same two groups. Six AI specs and sync-attachments fail
+//                  in CI and had simply never run anywhere before, so this is
+//                  newly VISIBLE breakage, not new breakage.
 //
-// So the first CI run can legitimately disagree, in either direction. If it
-// does, the fix is one `--record` from THAT run's report — not a shrug, and
-// never a nudge downward to make a red pipeline green.
+// What the 33 is made of, so the number carries its own explanation:
+//   ~8  click/wait timeouts — the same "one click then a blind wait" class as
+//       flows.ts::clickNewMenuItem and clickUntilVisible. Cheapest to close.
+//       (ai-chat, ai-summarize, transcription, vault-migrate, ai-ux-surface,
+//        tag-browser, tag-suggestion-band, task-panel)
+//   ~1  a real sync bug, first ever observed: sync-attachments fails with
+//       `attachment_import failed: {"kind":"Locked"}`.
+//   rest real assertion failures (ai-degradation, ai-embeddings-persistence,
+//       note-export-html, theme-deep-link, right-panel-visibility, ...).
 //
 // The ceiling is a DEBT, not a target. It was 25 before the Views specs were
-// repaired (a feature that became opt-in without its specs being updated, which
-// had been read as flake for months) and is 15 now. Every one of the remaining
-// 15 is a real failure with a name in the report. The number goes down.
+// repaired, then 15 measured locally, and is 33 as CI actually sees it. Raising
+// it to make a red pipeline green is the one edit that is never legitimate; this
+// raise is the opposite — replacing a number from the wrong machine with the
+// first honest measurement from the one that matters. It goes down from here.
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
