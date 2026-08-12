@@ -314,7 +314,34 @@ async fn update_prefs_with_dir(
     let prefs_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
-    let mut prefs = read_or_default(io, &prefs_path, &prefs_key, &account_number_hash).await;
+    // REFUSE rather than write over a read that degraded (test-audit #40).
+    //
+    // §9.5.5's "an absent or undecodable `vault.prefs` degrades to defaults,
+    // never fails" is a READ rule — it is what keeps a vault openable when its
+    // prefs blob is unreadable. Carrying that into the WRITE turns a
+    // recoverable read failure into permanent loss: the read-modify-write bases
+    // itself on `PrefsView::default()` and then persists those defaults over a
+    // blob that may be perfectly intact and merely unreadable right now (a full
+    // disk, an EIO, a torn copy on the web client's double buffer). The SHARED
+    // subset syncs, so the defaults do not even stay on this device.
+    //
+    // `Absent` is NOT refused, and the distinction is the point: an absent file
+    // means "this vault has never written prefs", which is an answer and is the
+    // normal state of every vault that has not opened Settings. Only `Degraded`
+    // — the read tried and failed — blocks the write. That is the same line the
+    // attachment-import path already draws on the same value
+    // (`plugins/attachments/commands.rs`), and this brings the write path onto
+    // it rather than inventing a second rule.
+    let (mut prefs, origin) =
+        read_or_default_reporting_origin(io, &prefs_path, &prefs_key, &account_number_hash).await;
+    if origin == PrefsOrigin::Degraded {
+        tracing::warn!(
+            event = "prefs_write_refused",
+            reason = "prefs_unreadable",
+            "prefs write refused: the read degraded to defaults and writing would persist them"
+        );
+        return Err(PrefsWriteError::PrefsUnreadable);
+    }
     let before = prefs.clone();
     mutate(&mut prefs);
 
@@ -5629,6 +5656,98 @@ mod tests {
                 !other.join("vault.prefs").exists(),
                 "the refused write must not have created the other vault's prefs blob"
             );
+        });
+    }
+
+    /// test-audit #40: a write whose READ degraded must refuse, not persist
+    /// defaults over the blob it could not read.
+    ///
+    /// The loss this prevents is total and silent. §9.5.5 says an undecodable
+    /// `vault.prefs` degrades to defaults so the vault stays openable — a READ
+    /// rule. Carrying it into the write means the next toggle bases its
+    /// read-modify-write on `PrefsView::default()` and persists that, over a
+    /// blob that may be intact and merely unreadable at this instant. And
+    /// because the SHARED subset syncs, the defaults do not stay local.
+    #[test]
+    fn a_prefs_write_is_refused_when_the_current_prefs_cannot_be_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let vault_dir = tmp.path().to_path_buf();
+
+            // Write real prefs first, so there is something to lose.
+            vault_set_label_with_dir(
+                &vault_dir,
+                &state,
+                &noop_hooks(),
+                Some("Work".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::test_host::TestHost::new(tmp.path()),
+            )
+            .await
+            .expect("seed a real prefs blob");
+            let stored = std::fs::read(vault_dir.join("vault.prefs")).expect("prefs on disk");
+            assert!(!stored.is_empty(), "the fixture must have written prefs");
+
+            // Corrupt it: the magic survives, the ciphertext does not decode.
+            // This is the shape a torn write or a bit-rotted blob has, and the
+            // one `read_or_default` degrades to defaults on.
+            let mut corrupt = stored.clone();
+            let tail = corrupt.len() - 1;
+            corrupt[tail] ^= 0xff;
+            std::fs::write(vault_dir.join("vault.prefs"), &corrupt).expect("corrupt the blob");
+
+            let err = vault_set_label_with_dir(
+                &vault_dir,
+                &state,
+                &noop_hooks(),
+                Some("Home".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::test_host::TestHost::new(tmp.path()),
+            )
+            .await
+            .expect_err("a write over an unreadable prefs blob must be refused");
+            assert!(
+                matches!(err, PrefsWriteError::PrefsUnreadable),
+                "expected PrefsUnreadable, got {err:?}"
+            );
+
+            // The refusal has teeth: the bytes on disk are untouched, so a
+            // transient read failure leaves the real prefs recoverable.
+            let after = std::fs::read(vault_dir.join("vault.prefs")).expect("prefs still there");
+            assert_eq!(
+                after, corrupt,
+                "the refused write must not have replaced the blob it could not read"
+            );
+        });
+    }
+
+    /// The other half of #40, and the reason this is not simply "refuse on any
+    /// non-Stored read": an ABSENT blob is an answer, not a failure. Every
+    /// vault that has never opened Settings is in that state, so refusing there
+    /// would make the first setting change impossible.
+    #[test]
+    fn a_prefs_write_still_works_when_no_prefs_have_ever_been_written() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let vault_dir = tmp.path().to_path_buf();
+            assert!(
+                !vault_dir.join("vault.prefs").exists(),
+                "this test needs a vault that has never written prefs"
+            );
+            vault_set_label_with_dir(
+                &vault_dir,
+                &state,
+                &noop_hooks(),
+                Some("First".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::test_host::TestHost::new(tmp.path()),
+            )
+            .await
+            .expect("an absent blob must not block the first write");
+            let view = prefs_read_with_dir(&vault_dir, &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read prefs");
+            assert_eq!(view.label.as_deref(), Some("First"));
         });
     }
 

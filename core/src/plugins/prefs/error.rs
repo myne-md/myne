@@ -130,6 +130,32 @@ pub enum PrefsWriteError {
     /// value — a settings field's contents reach logs and screenshots.
     #[error("prefs write carried a value outside the accepted set")]
     InvalidValue,
+
+    /// The read-modify-write's READ degraded to defaults, so writing would
+    /// persist those defaults over whatever is actually stored (test-audit
+    /// #40).
+    ///
+    /// §9.5.5's "an absent or undecodable `vault.prefs` degrades to defaults,
+    /// never fails" is a rule about READING — it keeps a vault openable. It is
+    /// not a licence to WRITE those defaults back, and the difference is the
+    /// whole of this variant: a read that degraded may be looking at a
+    /// transiently unreadable blob (a full disk, an EIO, a torn copy on the
+    /// web client's double buffer), and the user's real settings are still
+    /// there. Persisting defaults over them turns a recoverable read failure
+    /// into permanent loss — and because the SHARED prefs subset syncs, the
+    /// defaults then propagate to every other device.
+    ///
+    /// `Absent` is deliberately NOT this. An absent file genuinely means "this
+    /// vault has never written prefs", which is an answer rather than a
+    /// failure, and is the normal state of every vault that has not opened
+    /// Settings. The same distinction the attachment-import path already makes
+    /// (`plugins/attachments/commands.rs`: it trusts `Absent`, refuses
+    /// `Degraded`); this brings the write path in line with it.
+    ///
+    /// A caller seeing this should not retry blind: the vault's prefs could
+    /// not be read, and the setting the user just changed was not saved.
+    #[error("prefs write refused: the current prefs could not be read")]
+    PrefsUnreadable,
 }
 
 impl From<std::io::Error> for PrefsReadError {
