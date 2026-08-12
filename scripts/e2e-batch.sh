@@ -8,13 +8,31 @@ cd "$(dirname "$0")/.."
 IMAGE=myne-e2e
 
 # Build the in-container loop that runs each spec separately and tallies results.
-INNER='set +e; PASS=""; FAIL="";'
+#
+# THREE buckets, not two. A spec that SELF-SKIPS — no binary, an unset env gate,
+# a build variant missing the feature it needs — runs zero tests and exits 0,
+# which the old two-bucket tally reported as PASS. That is the worst possible
+# reading: it says "verified" about a scenario that never executed. It happened
+# here: `ai-summarize` and `writing-assistant` were reported PASS by this script
+# while both had skipped for want of the `local-inference-stub` build.
+#
+# The classification reads vitest's own summary line rather than the exit code,
+# because the exit code cannot distinguish the two. `Test Files  N skipped (N)`
+# with no `passed` on the line means every file in that run skipped.
+INNER='set +e; PASS=""; FAIL=""; SKIP="";'
 for spec in "$@"; do
   INNER+=" echo \"==== RUN ${spec} ====\";"
-  INNER+=" xvfb-run -a pnpm exec vitest run --config vitest.e2e.config.ts e2e/${spec}.e2e.ts; "
-  INNER+=" if [ \$? -eq 0 ]; then PASS=\"\$PASS ${spec}\"; else FAIL=\"\$FAIL ${spec}\"; fi;"
+  # Redirect rather than pipe: a pipe would make \$? tee's status, not vitest's.
+  INNER+=" xvfb-run -a pnpm exec vitest run --config vitest.e2e.config.ts e2e/${spec}.e2e.ts > /tmp/e2e-out 2>&1; RC=\$?; cat /tmp/e2e-out;"
+  INNER+=" if [ \$RC -ne 0 ]; then FAIL=\"\$FAIL ${spec}\";"
+  # Double quotes, not single: this whole string ends up inside `su -c '...'`,
+  # where a single quote terminates the wrapper and the shell dies with
+  # "unexpected end of file" before running anything.
+  INNER+=" elif grep -qE \"Test Files.*skipped\" /tmp/e2e-out && ! grep -qE \"Test Files.*passed\" /tmp/e2e-out; then SKIP=\"\$SKIP ${spec}\";"
+  INNER+=" else PASS=\"\$PASS ${spec}\"; fi;"
 done
 INNER+=' echo "________ BATCH SUMMARY ________"; echo "PASS:$PASS"; echo "FAIL:$FAIL";'
+INNER+=' if [ -n "$SKIP" ]; then echo "SKIP (ran ZERO tests — NOT verified):$SKIP"; fi;'
 
 RUN_FLAGS=(
   --rm
