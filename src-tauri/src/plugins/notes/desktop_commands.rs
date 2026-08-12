@@ -1491,6 +1491,10 @@ mod tests {
     #[derive(Default)]
     struct SnapshotHooks {
         ai_changed: std::sync::Mutex<Vec<(String, String)>>,
+        /// `(id, body)` per `search_upsert`, and the ids passed to
+        /// `search_remove` — the pair test-audit #20 is about.
+        search_upserts: std::sync::Mutex<Vec<(String, String)>>,
+        search_removes: std::sync::Mutex<Vec<String>>,
     }
     impl myne_core::hooks::VaultLifecycleHooks for SnapshotHooks {
         fn hydrate_attachment_refs<'a>(
@@ -1546,8 +1550,18 @@ mod tests {
         fn pdf_export_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
-        fn search_upsert(&self, _: &str, _: &str, _: &str) {}
-        fn search_remove(&self, _: &str) {}
+        fn search_upsert(&self, id: &str, _: &str, body: &str) {
+            self.search_upserts
+                .lock()
+                .expect("recorder mutex")
+                .push((id.to_string(), body.to_string()));
+        }
+        fn search_remove(&self, id: &str) {
+            self.search_removes
+                .lock()
+                .expect("recorder mutex")
+                .push(id.to_string());
+        }
         fn ai_note_changed(&self, id: &str, body: &str) {
             self.ai_changed
                 .lock()
@@ -2005,6 +2019,90 @@ mod tests {
             .join(test_vault_id().as_uuid().to_string());
         std::fs::create_dir_all(root.join("notes")).unwrap();
         myne_core::host::test_host::TestHost::new(base)
+    }
+
+    /// test-audit #20: a permanent delete under SYNC arrives here as an
+    /// ordinary `note_update` carrying a `deleted:` frontmatter stamp — not as
+    /// an unlink — and it must REMOVE the note from the search index rather
+    /// than re-index it.
+    ///
+    /// What the old behaviour cost: the purged note's full body went back into
+    /// the live BM25 index on the way out, stayed there for the rest of the
+    /// session, and was sealed into the encrypted `vault.search` blob at lock.
+    /// The palette's only exclusion is the sidebar cache's `trashed:`
+    /// predicate, and a tombstoned note has already left that cache — so
+    /// nothing filtered it and the note kept answering searches until the next
+    /// unlock's hydrate happened to drop it.
+    #[test]
+    fn a_tombstoning_update_removes_the_note_from_the_search_index() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("tombstone-search-removal").unwrap();
+            let host = host_with_vault(scratch.path());
+            let recorder = std::sync::Arc::new(SnapshotHooks::default());
+            let hooks: myne_core::hooks::Hooks = recorder.clone();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+
+            const LIVE: &str = "---\ntitle: Secret\n---\n\nthe body that must not survive the purge\n";
+            // The same shape `patchDeletedField` writes: a top-level `deleted:`
+            // timestamp added to the existing frontmatter.
+            const TOMBSTONE: &str =
+                "---\ntitle: Secret\ndeleted: 2026-08-12T00:00:00Z\n---\n\nthe body that must not survive the purge\n";
+
+            let id = note_create_from_host(
+                &host,
+                &state,
+                &hooks,
+                LIVE.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("create");
+
+            // A live edit still indexes — otherwise this test would pass on a
+            // build where search_upsert was simply never called.
+            assert!(
+                recorder
+                    .search_upserts
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|(seen, _)| seen == &id),
+                "the live note must have been indexed in the first place"
+            );
+            recorder.search_upserts.lock().unwrap().clear();
+
+            note_update_from_host(
+                &host,
+                &state,
+                &hooks,
+                id.clone(),
+                TOMBSTONE.to_string(),
+                None,
+                &myne_core::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("tombstoning update");
+
+            assert!(
+                recorder.search_removes.lock().unwrap().contains(&id),
+                "a tombstoning update must remove the note from the index"
+            );
+            assert!(
+                recorder.search_upserts.lock().unwrap().is_empty(),
+                "and must NOT re-index it: {:?}",
+                recorder.search_upserts.lock().unwrap()
+            );
+        });
     }
 
     #[test]

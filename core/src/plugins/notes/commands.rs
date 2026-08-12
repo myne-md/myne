@@ -45,6 +45,7 @@ use tauri::{AppHandle, Runtime, State};
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
+use super::daily_match::fm_deleted_value_strict;
 use super::drawing_text::{is_drawing, project_drawing_text};
 use super::error::{
     NoteBatchError, NoteCreateError, NoteDeleteError, NoteListError, NoteReadError,
@@ -823,10 +824,27 @@ pub async fn note_update_from_host(
             // MYND-448a: note body indexed UNFOLDED; embedded attachments are
             // re-indexed as their own docs (dropping any no longer embedded).
             let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-            // MYND-448a: unfolded note body doc + separate attachment docs.
-            // SF5 (MYND-502): a `kind: drawing` body → projected scene text, never
-            // raw JSON (SYNC-4) and no attachment docs.
-            if is_drawing(plaintext.as_bytes()) {
+            // A TOMBSTONE is a removal from the index, not a re-index of it
+            // (test-audit #20). With sync configured, a permanent delete is not
+            // an unlink — `deleteNoteRouted` writes a `deleted:` frontmatter
+            // stamp through this very command, so a purge arrives here as an
+            // ordinary update. Upserting it put the purged note's FULL BODY back
+            // into the live BM25 index, where it stayed for the rest of the
+            // session and was then sealed into `vault.search` at lock. The only
+            // thing keeping it out of the palette was the sidebar cache's
+            // `trashed:` predicate, and a tombstoned note has already left that
+            // cache — so the predicate could not filter it and the note kept
+            // answering searches until the next unlock's hydrate dropped it.
+            //
+            // `fm_deleted_value_strict` is the same strict reader the daily-note
+            // matcher uses, so "is this deleted" has one answer in this crate.
+            let tombstoned = extract_title_slices(plaintext.as_bytes())
+                .frontmatter_bytes
+                .and_then(fm_deleted_value_strict)
+                .is_some();
+            if tombstoned {
+                hooks.search_remove(&note_id);
+            } else if is_drawing(plaintext.as_bytes()) {
                 let body = project_drawing_text(plaintext.as_bytes()).unwrap_or_default();
                 hooks.search_upsert(&note_id, &title, &body);
             } else {
