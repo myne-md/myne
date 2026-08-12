@@ -9,6 +9,7 @@
     "passwordLabel": "Password principale",
     "approversIntro": "Questi dispositivi possono approvarlo:",
     "noApprovers": "In questo momento nessun altro dispositivo di questo account può approvarlo. Apri Myne su un dispositivo che ha già accesso, poi torna qui.",
+    "pendingStartOver": "Ricomincia con un altro account",
     "pendingTitle": "In attesa di approvazione",
     "sasMatch": "Corrispondono — continua",
     "sasMismatch": "Non corrispondono",
@@ -24,6 +25,13 @@
     "hint": "Ha questo aspetto: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Viene verificato qui sul tuo dispositivo — non viene ancora inviato nulla.",
     "invalid": "Quel numero di account non è valido. Controllalo e riprova.",
     "title": "Inserisci il tuo numero di account"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Risposta generata su questo dispositivo",
+      "localRuntime": "Risposta generata da {{name}}, su questo computer",
+      "remote": "Risposta generata da {{provider}} — le tue note sono state inviate lì"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -227,7 +235,8 @@
       "intro": "Verifica che questo codice corrisponda a quello mostrato nell'estensione, poi tocca Accetta per abbinare.",
       "reject": "Rifiuta",
       "rejected": "Abbinamento rifiutato.",
-      "title": "Un'estensione del browser vuole connettersi"
+      "title": "Un'estensione del browser vuole connettersi",
+      "persistFailed": "Myne non è riuscito a salvare questa connessione, quindi non è stata stabilita. Se la cassaforte è bloccata, sbloccala e prova a connetterti di nuovo."
     }
   },
   "commandPalette": {
@@ -939,10 +948,14 @@
           "insert": "Inserisci nella nota",
           "noAnswer": "Nessuna risposta — prova a riformulare.",
           "noModelHint": "Nessun modello selezionato. Scegline uno in Impostazioni → Developer → AI per iniziare.",
+          "unreachableHint": "Il provider che hai configurato non risponde. Verifica che sia in esecuzione, poi invia di nuovo.",
+          "unavailableHint": "Questa build di Myne è stata compilata senza l'AI locale, quindi qui non può essere eseguito nulla.",
           "offHint": "L'AI locale è disattivata. Attivala in Impostazioni → Developer → AI.",
           "send": "Invia",
           "statusGettingReady": "Preparazione…",
           "statusNoModel": "Nessun modello",
+          "statusUnreachable": "Non risponde",
+          "statusUnavailable": "Non disponibile",
           "statusOff": "Disattivato",
           "statusReady": "Pronto",
           "stop": "Ferma",
@@ -1065,6 +1078,8 @@
     },
     "slash": {
       "aiContinue": "Continua a scrivere (AI)",
+      "aiFailed": "Impossibile completare la richiesta AI, quindi non è stato inserito nulla.",
+      "aiNoProvider": "Non è configurato alcun provider AI, quindi non è stato inserito nulla. Configurane uno in Impostazioni → Developer → AI.",
       "aiTitle": "Suggerisci titolo (AI)",
       "attachFile": "Allega file",
       "bulletList": "Elenco puntato",
@@ -1091,7 +1106,8 @@
       "time": "Ora",
       "todoList": "Elenco attività",
       "voiceNote": "Nota vocale",
-      "wikiLink": "Wikilink"
+      "wikiLink": "Wikilink",
+      "remind": "Promemoria"
     },
     "spell": {
       "menu": {
@@ -1123,13 +1139,17 @@
       "menuEdit": "Modifica {{field}}",
       "menuTitle": "Aggiungi campo",
       "repeatNoAnchor": "Questa attività non ha una data da cui ripetersi, quindi non si ripeterà. Aggiungi una data di scadenza per avviarla.",
+      "repeatNeedsDate": "Serve una data di scadenza da cui ripetersi",
       "save": "Salva",
       "skipOccurrence": "Salta questa ricorrenza",
       "title": {
         "due": "Data di scadenza",
         "repeat": "Ripetizione",
-        "priority": "Priorità"
-      }
+        "priority": "Priorità",
+        "remind": "Promemoria"
+      },
+      "timeLabel": "Ora (facoltativa)",
+      "invalidRemind": "Myne non riesce a leggere questa data, quindi non ti invierà un promemoria."
     },
     "toolbar": {
       "apply": "Applica",
@@ -1235,7 +1255,8 @@
         "rewriteCount_many": "Verranno riscritti {{count}} collegamenti",
         "rewriteCount_other": "Verranno riscritti {{count}} collegamenti",
         "skipped": "ignorato — {{reason}}",
-        "title": "Converti i wikilink importati in questa nota"
+        "title": "Converti i wikilink importati in questa nota",
+        "staleDocument": "Questa nota è cambiata mentre l'anteprima era aperta, quindi non è stato convertito nulla. Esegui di nuovo l'operazione per vedere i collegamenti attuali."
       },
       "convertCore": {
         "noMatch": "nessuna corrispondenza"
@@ -1253,6 +1274,8 @@
       "attachUnsupported": "Si possono allegare solo immagini e PDF.",
       "attachFailed": "Impossibile allegare il file.",
       "archiveFailed": "Impossibile archiviare questa nota.",
+      "aiRewriteFailed": "Impossibile completare la riscrittura, quindi la tua selezione è rimasta invariata.",
+      "aiRewriteNoProvider": "Non è configurato alcun provider AI, quindi non è stato riscritto nulla. Configurane uno in Impostazioni → Developer → AI.",
       "trashFailed": "Impossibile spostare questa nota nel Cestino."
     },
     "nav": {
@@ -1582,6 +1605,29 @@
       "untitled": "Senza titolo",
       "warning": "Questa operazione non può essere annullata."
     },
+    "example": {
+      "folder": "Per iniziare",
+      "index": {
+        "title": "Comincia da qui",
+        "body": "Questa è una piccola cassaforte di esempio. Qualche nota comune che mostra cosa sa fare Myne, e qui non c'è nulla di speciale: modifica, rinomina o elimina quello che vuoi.\n\n- [[{{markdown}}]] mostra come il testo semplice diventa formattazione\n- [[{{tasks}}]] raccoglie le liste di controllo in un unico posto\n- [[{{links}}]] collega le note e le ordina con i tag\n- [[{{makeItYours}}]] cancella tutto questo in un solo passaggio\n\nVisto abbastanza? Fai clic destro sulla cartella **Per iniziare** nella barra laterale e scegli Elimina. Le note finiscono nel Cestino, così puoi recuperarle se cambi idea.\n"
+      },
+      "markdown": {
+        "title": "Scrivere in Markdown",
+        "body": "Myne scrive Markdown puro e ne mostra il risultato mentre digiti.\n\n## Le basi\nRendi una parola **in grassetto** o *in corsivo*, oppure inserisci del `codice inline`.\n\n## Un elenco\n- Un elemento\n- Un altro elemento\n  - Uno annidato\n\n## Una citazione\n> Note piccole, conservate per anni, valgono più di note grandi che non scrivi mai.\n\n## Una tabella\n| Scorciatoia | Cosa fa |\n| --- | --- |\n| Cmd/Ctrl + B | Grassetto |\n| Cmd/Ctrl + K | Aggiungi un collegamento |\n\n## Un po' di codice\n```\nconsole.log(\"hello from Myne\")\n```\n\nQuando sei pronto, torna a [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Attività",
+        "body": "Ogni riga che inizia con `- [ ]` è un'attività. Myne raccoglie tutte le attività aperte sparse fra le tue note in un'unica vista Attività, così non se ne perde nessuna per strada.\n\n- [ ] Leggi [[{{markdown}}]]\n- [ ] Aggiungi un'attività tutta tua\n- [ ] Provane una con una data di scadenza 📅 2030-12-31\n- [x] Crea la tua cassaforte\n\nSpunta una casella qui, poi apri la vista Attività nella barra laterale per vedere l'elenco aggiornarsi.\n\nTorna a [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Collegamenti e tag",
+        "body": "Digita `[[` per collegarti a un'altra nota. I collegamenti valgono in entrambe le direzioni: apri [[{{index}}]] e troverai questa nota fra i suoi backlink, mentre il grafico traccia una linea fra le due.\n\nAggiungi un #tag ovunque e Myne classifica la nota sotto quel tag nell'albero dei tag. Questa nota ha i tag #esempio e #per-iniziare, quindi apri l'albero dei tag nella barra laterale per trovarla.\n\nTocca a te: collega questa nota a [[{{tasks}}]], oppure inventa un tag tutto tuo.\n"
+      },
+      "makeItYours": {
+        "title": "Rendila tua",
+        "body": "Ora questa cassaforte è tua. Queste note sono solo un punto di partenza: cambia quello che vuoi, oppure cancellale e riparti da zero.\n\nPer rimuovere l'intero esempio, fai clic destro sulla cartella **Per iniziare** nella barra laterale e scegli Elimina. Finisce tutto insieme nel Cestino, e da lì puoi ripristinarlo se lo rivuoi.\n\nQuando sei pronto, premi Cmd/Ctrl + N per creare una nuova nota e iniziare a scrivere.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Aggiungi condizione",
       "addFilterGroup": "Aggiungi gruppo di filtri",
@@ -1623,7 +1669,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Il nome di una cartella non può contenere / \\ | # ^ [ ] né iniziare o terminare con uno spazio.",
-      "tooLong": "Quel percorso di cartella è troppo lungo."
+      "tooLong": "Quel percorso di cartella è troppo lungo.",
+      "moveIntoSelf": "Una cartella non può essere spostata dentro sé stessa.",
+      "moveCollision": "Lì esiste già una cartella con quel nome."
     },
     "folderNote": {
       "defaultTitle": "Indice"
@@ -1914,7 +1962,8 @@
       "importedWithSkips_one": "Importata {{count}} nota — ignorate: {{skipped}}",
       "importedWithSkips_many": "Importate {{count}} note — ignorate: {{skipped}}",
       "importedWithSkips_other": "Importate {{count}} note — ignorate: {{skipped}}",
-      "importNoMarkdown": "Nessun file markdown in quel trascinamento"
+      "importNoMarkdown": "Nessun file markdown in quel trascinamento",
+      "moveFolderTo": "Sposta cartella in…"
     },
     "newFromTemplate": {
       "back": "Indietro",
@@ -2198,6 +2247,30 @@
       "emptyText": "Nessuna corrispondenza.",
       "placeholder": "Seleziona…",
       "searchPlaceholder": "Cerca…"
+    }
+  },
+  "migrate": {
+    "intro": "Aggiorna questa cassaforte al nuovo formato. Le tue note acquisiscono l'unione automatica fra dispositivi. L'operazione rigenera le chiavi dell'intera cassaforte; la vecchia copia resta su questo dispositivo finché non confermi.",
+    "passwordLabel": "Password principale",
+    "phraseLabel": "Frase di recupero",
+    "phraseHelp": "Obbligatoria — le tue nuove chiavi vengono cifrate con questa frase, così il recupero continua a funzionare. Inserisci tutte le tue parole di recupero.",
+    "submit": "Migra",
+    "migrating": "Migrazione…",
+    "done": "{{count}} note migrate al nuovo formato.",
+    "settle": {
+      "intro": "La tua cassaforte è stata aggiornata. La vecchia copia resta su questo dispositivo finché non completi l'operazione — fino ad allora, cambiare la password non la renderà inaccessibile.",
+      "confirm": "Va tutto bene, rimuovi la vecchia copia",
+      "abort": "Qualcosa non va, ripristina la vecchia cassaforte",
+      "errorAlreadySynced": "Questa cassaforte si è già sincronizzata nel nuovo formato, quindi non è possibile tornare indietro. Ripristina da un backup se ti serve quella vecchia.",
+      "errorBusy": "È in corso un'altra operazione sulla cassaforte. Riprova tra un momento.",
+      "errorIo": "Impossibile completare l'operazione. Non è stato modificato nulla."
+    },
+    "progressCount": "{{done}} di {{total}} elementi ricrittografati…",
+    "error": {
+      "recoveryPhraseRequired": "Quella frase di recupero non corrisponde a questa cassaforte. Inserisci la frase di recupero corretta per migrare — è obbligatoria affinché il recupero continui a funzionare.",
+      "wrongPassword": "Quella password non corrisponde a questa cassaforte.",
+      "alreadyMigrated": "Questa cassaforte è già nel nuovo formato.",
+      "generic": "Impossibile completare la migrazione. La tua cassaforte è rimasta invariata; riprova."
     }
   },
   "recover": {
@@ -2567,9 +2640,11 @@
         "invalidName": "Nome del tema non sicuro",
         "invalidValue": "Valore non valido per {{key}}",
         "invalidValueWithLine": "Valore non valido per {{key}} (riga {{line}})",
+        "lowContrast": "{{key}} su {{against}} ha un contrasto di {{ratio}}:1, ma per restare leggibile ne serve almeno {{min}}:1",
         "missingKey": "Manca il colore obbligatorio {{key}}",
         "parseError": "JSON non valido",
-        "parseErrorWithLine": "JSON non valido (riga {{line}})"
+        "parseErrorWithLine": "JSON non valido (riga {{line}})",
+        "reservedKey": "{{key}} è riservato all'uso interno di Myne e non può essere impostato da un tema"
       },
       "export": "Esporta",
       "exportError": "Impossibile esportare quel tema. Riprova.",
@@ -2751,12 +2826,45 @@
       "autoTagHelper": "Quando smetti di digitare, un piccolo modello sul tuo dispositivo legge la nota e suggerisce dei tag in cima. Non viene aggiunto nulla finché non accetti un suggerimento.",
       "autoTagLabel": "Suggerisci i tag automaticamente",
       "autoTagUnavailable": "Questa build non include il modello per i tag, quindi non se ne può suggerire nessuno. Myne non ne scarica mai uno — l'interruttore si attiva da sé in una build che lo include.",
+      "consent": {
+        "accept": "Invia le mie note a {{provider}}",
+        "cancel": "Annulla",
+        "cannotVerifyLabel": "Cosa Myne non può verificare",
+        "revokeLabel": "Come annullare questa scelta",
+        "scopeLabel": "Quali dispositivi riguarda",
+        "title": "Prima che Myne invii qualcosa a {{provider}}",
+        "whatLabel": "Cosa esce dal tuo dispositivo",
+        "whenLabel": "Quando esce",
+        "whoLabel": "Chi lo riceve"
+      },
       "disclosureToggle": "Come funziona?",
       "enableHelper": "Esegue un modello fornito da te interamente sul tuo dispositivo. Sperimentale, disattivato per impostazione predefinita.",
       "enableLabel": "Abilita l'AI locale",
       "excludedHelper": "Le note in queste cartelle non vengono mai lette o indicizzate dall'AI. Un percorso di cartella per riga.",
       "excludedLabel": "Cartelle escluse",
       "excludedPlaceholder": "Privato/\nDiario/",
+      "endpointHelper": "Se su questo computer hai già un runtime per modelli in esecuzione, indicalo a Myne invece di selezionare i file del modello. Lascia vuoto per usare i file qui sopra.",
+      "endpointLabel": "Runtime locale per modelli",
+      "endpointModelHelper": "Myne non sceglie un modello al posto tuo. Finché non ne indichi uno, l'indirizzo qui sopra viene salvato ma non usato.",
+      "endpointModelLabel": "Modello da usare lì",
+      "endpointModelPlaceholder": "il nome del modello così come lo elenca il runtime",
+      "endpointRejected": {
+        "malformed": "Questo non è un indirizzo che Myne può usare. Servono uno schema e una porta esplicita — per esempio http://127.0.0.1:11434.",
+        "notLoopback": "Questo indirizzo deve trovarsi su questo computer — localhost, 127.0.0.1 o ::1. Per usare un provider che gira altrove, indicalo invece sotto Provider remoto.",
+        "unsupportedScheme": "Sono accettati solo indirizzi http e https."
+      },
+      "endpointSaveFailed": "Impossibile salvare l'indirizzo. Verifica che Myne possa scrivere le proprie impostazioni.",
+      "endpointThirdParty": "{{name}} è un programma a sé, con un proprio comportamento di rete, e Myne non lo controlla. Le tue note gli vengono inviate mentre è in esecuzione su questo computer.",
+      "providerError": {
+        "barred": "Questo tipo di richiesta non viene mai inviato a un provider — o viene eseguito su questo dispositivo, o non viene eseguito affatto.",
+        "failed": "Non ha funzionato. Non è stato salvato nulla e non è stato inviato di nuovo nulla.",
+        "noCredential": "Per questo provider non è impostata alcuna chiave API. Aggiungine una in Impostazioni → Developer → AI.",
+        "quotaExhausted": "Il provider ha rifiutato la richiesta — hai esaurito il credito o superato un limite di frequenza. Va risolto con il provider, non in Myne.",
+        "refused": "Il provider ha rifiutato la connessione. Potrebbe non essere attivo o bloccare questa rete.",
+        "timeout": "Il provider non ha risposto in tempo. Non è rimasto nulla in esecuzione.",
+        "unauthorized": "Il provider ha rifiutato la tua chiave API. Sostituiscila — potrebbe essere errata, revocata o di un altro account.",
+        "unreachable": "Impossibile raggiungere il provider. Controlla la tua connessione di rete."
+      },
       "modelChoose": "Scegli file…",
       "modelEmbeddingLabel": "Modello di ricerca — ricerca semantica e domande e risposte",
       "modelFilter": {
@@ -2768,11 +2876,31 @@
       "modelSaveFailed": "Impossibile salvare il percorso del modello (deve trovarsi fuori dalla tua cassaforte).",
       "modelTranscriptionLabel": "Modello da voce a testo (trascrizione)",
       "modelsHelper": "Myne non scarica mai modelli — significherebbe inviare dati sulla rete. Apri un link per ottenerne uno nel tuo browser, poi seleziona qui i file scaricati. Tutto viene eseguito sul tuo dispositivo.",
+      "providerHelper": "Invece di eseguire un modello qui, Myne può inviare una richiesta a un servizio indicato da te. Quando lo fa, le tue note escono da questo dispositivo. “Nessuno” è l'impostazione predefinita e significa che non viene contattato alcun servizio.",
+      "providerKeyAdd": "incolla la tua chiave API",
+      "providerKeyLabel": "Chiave API",
+      "providerKeyNone": "Non è memorizzata alcuna chiave, quindi per ora non può essere inviato nulla.",
+      "providerKeyRevoke": "Rimuovi questa chiave",
+      "providerKeyReplace": "incolla una nuova chiave per sostituire quella memorizzata",
+      "providerKeyStored": "È memorizzata una chiave. Myne non te la mostra mai — incollane una nuova per sostituirla.",
+      "providerActive": "Ora risponde: {{name}}",
+      "providerLabel": "Provider remoto",
+      "providerModelCount_one": "{{count}} modello disponibile.",
+      "providerModelCount_other": "{{count}} modelli disponibili.",
+      "providerModelEmpty": "Questo provider non ha pubblicato alcun modello per il tuo account.",
+      "providerModelHelper": "Myne non include alcun modello predefinito. L'elenco arriva dal provider, così resta aggiornato e non ti viene mai addebitato un modello che non hai scelto.",
+      "providerModelLabel": "Modello",
+      "providerModelLoad": "Carica i modelli",
+      "providerModelNone": "Nessun modello scelto",
+      "providerModelUnfetched": "Carica l'elenco per scegliere un modello.",
+      "providerNone": "Nessuno",
+      "providerNothingAnswering": "Non è ancora configurato nulla che possa rispondere.",
       "modelsLabel": "Modelli",
       "recommendedFilesEmbedding": "Richiede model.safetensors + config.json + tokenizer.json nella stessa cartella.",
       "recommendedFilesGeneration": "Richiede il file .gguf + tokenizer.json nella stessa cartella.",
       "recommendedFilesTranscription": "Richiede il file .gguf di Whisper + config.json + tokenizer.json nella stessa cartella.",
-      "title": "AI"
+      "title": "AI",
+      "providerModelCount_many": "{{count}} modelli disponibili."
     },
     "network": {
       "disabledCue": "La sincronizzazione non passa più attraverso Tor. Le nuove connessioni vanno direttamente al server di sincronizzazione.",
@@ -2832,6 +2960,7 @@
       "quickUnlockSubtitle": "Rientra con {{method}} o un PIN dopo il blocco automatico"
     },
     "quickUnlock": {
+      "errorBusy": "È in corso un'altra operazione sulla cassaforte. Riprova tra un momento.",
       "errorCancelled": "Annullato.",
       "errorGeneric": "Impossibile configurare lo sblocco rapido.",
       "errorHardwareUnavailable": "Touch ID non è disponibile in questa build. Richiede una build macOS firmata con Touch ID registrato.",
@@ -3016,6 +3145,9 @@
       },
       "keywords": {
         "aiAutoTag": "tag automatici etichette suggerisci suggerimenti ai auto tag suggestions",
+        "aiEndpoint": "ollama endpoint indirizzo runtime locale modello server porta loopback address model port",
+        "aiProvider": "provider remoto cloud openrouter ollama chiave api credenziale consenso invia note remote key consent",
+        "aiProviderModel": "modello catalogo elenco quale modello llama qwen gpt scegli provider remoto model list",
         "aiEnable": "ai intelligenza artificiale locale attiva disattiva abilita disabilita apprendimento automatico machine learning",
         "aiExcluded": "cartelle escluse esclusione ignora ai privacy escludi excluded folders",
         "aiModels": "modelli modello gguf scarica testo embedding llm models download",
@@ -3072,8 +3204,26 @@
         "vaultIcon": "icona cassaforte avatar immagine simbolo vault icon",
         "vaultLabel": "etichetta cassaforte nome rinomina titolo vault label",
         "vaultLocation": "posizione cassaforte percorso cartella disco dove archiviata vault location",
-        "viewMode": "modalità visualizzazione predefinita live lettura sorgente anteprima view mode"
+        "viewMode": "modalità visualizzazione predefinita live lettura sorgente anteprima view mode",
+        "dateFormat": "formato data giorno mese anno iso gg/mm mm/gg dd/mm calendario date format calendar",
+        "timeFormat": "formato ora orario 24 ore 12 ore orologio am pm time format clock",
+        "timezone": "fuso orario fusi tz utc iana regione oggi timezone time zone"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Formato data",
+      "dateHelper": "Come vengono mostrate le date nelle attività, nelle viste salvate e negli allegati.",
+      "dateSystem": "Segui la lingua",
+      "timeLabel": "Formato ora",
+      "timeHelper": "Se gli orari vengono mostrati nel formato a 24 ore o a 12 ore.",
+      "timeSystem": "Segui la lingua",
+      "time24": "24 ore",
+      "time12": "12 ore",
+      "zoneLabel": "Fuso orario",
+      "zoneHelper": "Quale fuso stabilisce cosa conta come oggi. Lascia vuoto per seguire questo dispositivo. Gli orari che scrivi in una nota non vengono mai modificati — le 09:00 restano le 09:00 ovunque.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne non conosce quel fuso orario. Usa un nome come Europe/Berlin.",
+      "errorSave": "Impossibile salvare quell'impostazione."
     }
   },
   "storageLost": {
@@ -3101,6 +3251,7 @@
   "sync": {
     "materialising": "Download delle tue note — {{done}} di {{total}}. Puoi iniziare a lavorare; le altre appariranno man mano che arrivano.",
     "credentialAmbiguous": "La tua password potrebbe essere cambiata sia su questo dispositivo sia su un altro, e Myne non è in grado di stabilire quale sia più recente — quindi non ha modificato nulla. Accedi da un dispositivo che ha già accesso per risolvere la situazione.",
+    "vaultRekeyed": "Questa cassaforte è stata aggiornata al nuovo formato su un altro dispositivo. Sbloccala di nuovo per continuare — non è andato perso nulla.",
     "attachments": {
       "aria": {
         "downloading": "Download di {{name}} in corso",
@@ -3117,6 +3268,7 @@
     "buildingIndex": {
       "label": "Creazione dell'indice di ricerca…"
     },
+    "remoteMergeHint": "Aggiornata da un altro dispositivo",
     "conflicts": {
       "compare": "Confronta",
       "compareClose": "Torna ai conflitti",
@@ -3186,6 +3338,7 @@
       "verifyPending": "Questo codice appare quando il nuovo dispositivo completa la sua prima sincronizzazione.",
       "verifySyncing": "Sincronizzazione…",
       "verifyTitle": "Verifica il nuovo dispositivo",
+      "verifyAction": "Confronta il codice",
       "yourDevices": "I tuoi dispositivi"
     },
     "endpoint": {
@@ -3215,7 +3368,12 @@
       "deviceNameHelp": "Mostrato nel tuo elenco dei dispositivi. Puoi cambiarlo in seguito.",
       "deviceNameLabel": "Assegna un nome a questo dispositivo",
       "error": {
+        "awaitingApproval": "Questo dispositivo è già in attesa di approvazione. Approvalo da un dispositivo che ha già effettuato l'accesso.",
+        "deviceLimit": "Questo account ha raggiunto il limite di dispositivi. Rimuovi un dispositivo che non usi più, poi riprova.",
+        "frozen": "Questo account è congelato, quindi al momento non è possibile aggiungere nuovi dispositivi. Le tue note su questo dispositivo non ne risentono.",
         "notConfigured": "Imposta un server di sincronizzazione nelle impostazioni prima di aggiungere questo dispositivo.",
+        "serverMismatch": "L'identità del server di sincronizzazione non corrisponde a quella attesa da questo dispositivo. Non inserire di nuovo le tue credenziali finché non ne conosci il motivo.",
+        "kdfTooLarge": "Questo dispositivo non ha memoria sufficiente per aprire quella cassaforte. Le sue impostazioni di crittografia richiedono più memoria di quanta questa app possa usarne qui. Aprila invece su un computer desktop.",
         "transport": "Impossibile raggiungere il server di sincronizzazione. Controlla la connessione e riprova."
       },
       "mode": {
@@ -3504,7 +3662,8 @@
       "inProgress": "Operazione in corso.",
       "kdfMemoryExceedsHost": "Per aprire questa cassaforte servono {{required}} MiB di memoria — più di quanti questo browser possa concederne ({{available}} MiB). La cassaforte è integra; aprila nell'app desktop di Myne.",
       "unexpected": "Errore imprevisto. Riprova.",
-      "vaultNotFound": "File della cassaforte non trovato. Riavvia l'app."
+      "vaultNotFound": "File della cassaforte non trovato. Riavvia l'app.",
+      "vaultUpgraded": "Questa cassaforte è stata aggiornata a un formato più recente che questa versione di Myne non supporta ancora. I tuoi dati sono integri — aggiorna Myne all'ultima versione per aprirla."
     },
     "passwordLabel": "Password",
     "passwordPlaceholder": "Password",
@@ -3574,6 +3733,7 @@
       "committing": "Salvataggio…",
       "copied": "Copiato",
       "copy": "Copia",
+      "copyFailed": "Impossibile copiare — usa invece “Salva come file”.",
       "eyebrow": "Passaggio 4 di 4 — numero di account",
       "heading": "Salva il tuo numero di account.",
       "intro": "Questo è il tuo token al portatore — trattalo come contanti.",
@@ -3688,6 +3848,10 @@
       "vaultBusyAuth": {
         "body": "È in corso un'altra operazione sulla cassaforte. Riprova tra un momento.",
         "title": "Cassaforte occupata"
+      },
+      "plaintextTooLarge": {
+        "title": "Quella nota è troppo grande per essere crittografata",
+        "body": "Riprova con meno contenuto."
       }
     },
     "orchestrator": {
@@ -3995,6 +4159,12 @@
     "backUpNow": "Esegui il backup ora"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Solo una scheda per volta può tenere aperta una cassaforte — due scriverebbero sullo stesso spazio di archiviazione e lo danneggerebbero. Chiudi l'altra scheda per continuare qui.",
+      "freed": "L'altra scheda è stata chiusa. Ricarica per aprire qui la tua cassaforte.",
+      "reload": "Ricarica",
+      "title": "Questa cassaforte è aperta in un'altra scheda"
+    },
     "reload": {
       "body": "Ricaricare questa pagina richiede di nuovo la tua password — per scelta progettuale non esiste una via d'accesso più rapida. La tua cassaforte resta crittografata su questo dispositivo mentre la pagina è chiusa, e la chiave viene ricostruita ogni volta dalla tua password.",
       "title": "Un ricaricamento significa reinserire la password"

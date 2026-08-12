@@ -9,6 +9,7 @@
     "passwordLabel": "マスターパスワード",
     "approversIntro": "このデバイスを承認できるデバイス：",
     "noApprovers": "現在、このアカウントでこのデバイスを承認できる他のデバイスはありません。すでにアクセス権のあるデバイスでMyneを開いてから、ここに戻ってください。",
+    "pendingStartOver": "別のアカウントでやり直す",
     "pendingTitle": "承認待ち",
     "sasMatch": "一致します — 続ける",
     "sasMismatch": "一致しません",
@@ -24,6 +25,13 @@
     "hint": "MY-XXXX-XXXX-XXXX-XXXX-XXXX のような形式です。確認はこのデバイス上で行われます — まだ何も送信されません。",
     "invalid": "そのアカウント番号は有効ではありません。確認してもう一度お試しください。",
     "title": "アカウント番号を入力"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "このデバイスで回答しました",
+      "localRuntime": "このコンピュータ上の{{name}}が回答しました",
+      "remote": "{{provider}}が回答しました — ノートはそこへ送信されました"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -218,7 +226,8 @@
       "intro": "このコードが拡張機能に表示されているものと一致することを確認し、「承認」を押してペアリングします。",
       "reject": "拒否",
       "rejected": "ペアリングを拒否しました。",
-      "title": "ブラウザ拡張機能が接続しようとしています"
+      "title": "ブラウザ拡張機能が接続しようとしています",
+      "persistFailed": "Myneはこの接続を保存できなかったため、接続は行われませんでした。保管庫がロックされている場合は、ロックを解除してからもう一度接続をお試しください。"
     }
   },
   "commandPalette": {
@@ -914,10 +923,14 @@
           "insert": "ノートに挿入",
           "noAnswer": "回答がありません — 言い換えてみてください。",
           "noModelHint": "モデルが選択されていません。開始するには 設定 → 開発者 → AI で選択してください。",
+          "unreachableHint": "設定したプロバイダーが応答していません。動作していることを確認してから、もう一度送信してください。",
+          "unavailableHint": "このMyneのビルドにはローカルAIが含まれていないため、ここでは何も実行できません。",
           "offHint": "ローカルAIはオフです。設定 → 開発者 → AI でオンにしてください。",
           "send": "送信",
           "statusGettingReady": "準備中…",
           "statusNoModel": "モデルなし",
+          "statusUnreachable": "応答なし",
+          "statusUnavailable": "利用不可",
           "statusOff": "オフ",
           "statusReady": "準備完了",
           "stop": "停止",
@@ -1040,6 +1053,8 @@
     },
     "slash": {
       "aiContinue": "続きを書く（AI）",
+      "aiFailed": "AIリクエストを完了できなかったため、何も挿入されませんでした。",
+      "aiNoProvider": "AIプロバイダーが設定されていないため、何も挿入されませんでした。設定 → 開発者 → AI で設定してください。",
       "aiTitle": "タイトルを提案（AI）",
       "attachFile": "ファイルを添付",
       "bulletList": "箇条書きリスト",
@@ -1066,7 +1081,8 @@
       "time": "時刻",
       "todoList": "To-Doリスト",
       "voiceNote": "ボイスノート",
-      "wikiLink": "Wikiリンク"
+      "wikiLink": "Wikiリンク",
+      "remind": "リマインダー"
     },
     "spell": {
       "menu": {
@@ -1098,13 +1114,17 @@
       "menuEdit": "{{field}}を編集",
       "menuTitle": "フィールドを追加",
       "repeatNoAnchor": "このタスクには繰り返しの起点となる日付がないため、繰り返されません。期限を追加すると開始します。",
+      "repeatNeedsDate": "繰り返しの起点となる期限が必要です",
       "save": "保存",
       "skipOccurrence": "今回をスキップ",
       "title": {
         "due": "期限",
         "repeat": "繰り返し",
-        "priority": "優先度"
-      }
+        "priority": "優先度",
+        "remind": "リマインダー"
+      },
+      "timeLabel": "時刻（任意）",
+      "invalidRemind": "Myneはこの日付を読み取れないため、リマインダーは通知されません。"
     },
     "toolbar": {
       "apply": "適用",
@@ -1207,7 +1227,8 @@
         "rewriteCount_one": "{{count}}件のリンクが書き換えられます",
         "rewriteCount_other": "{{count}}件のリンクが書き換えられます",
         "skipped": "スキップ — {{reason}}",
-        "title": "このノートでインポートされたWikiリンクを変換"
+        "title": "このノートでインポートされたWikiリンクを変換",
+        "staleDocument": "プレビューを開いている間にこのノートが変更されたため、何も変換されませんでした。もう一度実行して、現在のリンクを確認してください。"
       },
       "convertCore": {
         "noMatch": "一致なし"
@@ -1225,6 +1246,8 @@
       "attachUnsupported": "添付できるのは画像とPDFのみです。",
       "attachFailed": "そのファイルを添付できませんでした。",
       "archiveFailed": "このノートをアーカイブできませんでした。",
+      "aiRewriteFailed": "書き換えを完了できなかったため、選択範囲は変更されていません。",
+      "aiRewriteNoProvider": "AIプロバイダーが設定されていないため、何も書き換えられませんでした。設定 → 開発者 → AI で設定してください。",
       "trashFailed": "このノートをゴミ箱に移動できませんでした。"
     },
     "nav": {
@@ -1537,6 +1560,29 @@
       "untitled": "無題",
       "warning": "この操作は元に戻せません。"
     },
+    "example": {
+      "folder": "はじめに",
+      "index": {
+        "title": "まずはここから",
+        "body": "これは小さなサンプルの保管庫です。Myneに何ができるかを示すだけの、ごく普通のノートがいくつか入っています。特別なものは何もないので、自由に編集・名前変更・削除してかまいません。\n\n- [[{{markdown}}]] — プレーンテキストがどのように書式になるかを紹介します\n- [[{{tasks}}]] — チェックリストを1か所に集めます\n- [[{{links}}]] — ノートどうしをつなぎ、タグで整理します\n- [[{{makeItYours}}]] — ここにあるものをまとめて片づけます\n\nもう見終わりましたか？サイドバーの**はじめに**フォルダを右クリックして「削除」を選んでください。ノートはゴミ箱に移動するので、気が変わったら元に戻せます。\n"
+      },
+      "markdown": {
+        "title": "Markdownで書く",
+        "body": "MyneではプレーンなMarkdownで書き、入力しながらその結果を確認できます。\n\n## 基本\n単語を**太字**や*斜体*にしたり、`インラインコード`を差し込んだりできます。\n\n## リスト\n- 1つ目の項目\n- 2つ目の項目\n  - 入れ子の項目\n\n## 引用\n> 何年も残る小さなノートは、書かれることのない大きなノートに勝ります。\n\n## 表\n| ショートカット | 動作 |\n| --- | --- |\n| Cmd/Ctrl + B | 太字 |\n| Cmd/Ctrl + K | リンクを追加 |\n\n## コード\n```\nconsole.log(\"hello from Myne\")\n```\n\n準備ができたら、[[{{index}}]] に戻りましょう。\n"
+      },
+      "tasks": {
+        "title": "タスク",
+        "body": "`- [ ]` で始まる行はタスクになります。Myneはすべてのノートから未完了のタスクを集めて1つのタスクビューに表示するので、ノートの間で見失うことがありません。\n\n- [ ] [[{{markdown}}]] を読む\n- [ ] 自分のタスクを追加する\n- [ ] 期限付きのタスクを試す 📅 2030-12-31\n- [x] 保管庫を作成する\n\nここでチェックを付けてから、サイドバーのタスクビューを開くと、一覧が更新されるのがわかります。\n\n[[{{index}}]] に戻る。\n"
+      },
+      "links": {
+        "title": "リンクとタグ",
+        "body": "`[[` と入力すると、別のノートへリンクできます。リンクは双方向です。[[{{index}}]] を開くと、そのバックリンクにこのノートが表示され、グラフには両者を結ぶ線が描かれます。\n\nどこかに #タグ を書くと、Myneはそのタグの下にノートを整理します。このノートには #サンプル と #はじめに のタグが付いているので、サイドバーのタグツリーを開くと見つけられます。\n\n次はあなたの番です。このノートを [[{{tasks}}]] にリンクしたり、自分だけのタグを作ってみたりしてください。\n"
+      },
+      "makeItYours": {
+        "title": "自分のものにする",
+        "body": "ここからはあなたの保管庫です。これらのノートは出発点にすぎないので、好きなように変えても、まとめて片づけて一から始めてもかまいません。\n\nサンプル全体を削除するには、サイドバーの**はじめに**フォルダを右クリックして「削除」を選んでください。すべてまとめてゴミ箱に移動するので、元に戻したくなったらそこから復元できます。\n\n準備ができたら、Cmd/Ctrl + N を押して新しいノートを作り、書き始めましょう。\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "条件を追加",
       "addFilterGroup": "フィルタグループを追加",
@@ -1577,7 +1623,9 @@
     },
     "folderManagement": {
       "illegalSegment": "フォルダ名には / \\ | # ^ [ ] を含めたり、スペースで始めたり終えたりすることはできません。",
-      "tooLong": "そのフォルダパスは長すぎます。"
+      "tooLong": "そのフォルダパスは長すぎます。",
+      "moveIntoSelf": "フォルダを自分自身の中に移動することはできません。",
+      "moveCollision": "その場所には、同じ名前のフォルダがすでにあります。"
     },
     "folderNote": {
       "defaultTitle": "インデックス"
@@ -1854,7 +1902,8 @@
       "importedWithSkips": "{{count}}件をインポート — {{skipped}}件をスキップ",
       "importedWithSkips_one": "ノート{{count}}件をインポート — {{skipped}}件をスキップ",
       "importedWithSkips_other": "ノート{{count}}件をインポート — {{skipped}}件をスキップ",
-      "importNoMarkdown": "ドロップされたものにMarkdownファイルはありません"
+      "importNoMarkdown": "ドロップされたものにMarkdownファイルはありません",
+      "moveFolderTo": "フォルダを移動…"
     },
     "newFromTemplate": {
       "back": "戻る",
@@ -2132,6 +2181,30 @@
       "emptyText": "一致なし。",
       "placeholder": "選択…",
       "searchPlaceholder": "検索…"
+    }
+  },
+  "migrate": {
+    "intro": "この保管庫を新しい形式にアップグレードします。ノートはデバイス間で自動的にマージされるようになります。保管庫全体の鍵を作り直しますが、あなたが確認するまで、古いコピーはこのデバイスに残ります。",
+    "passwordLabel": "マスターパスワード",
+    "phraseLabel": "復元フレーズ",
+    "phraseHelp": "必須です — 新しい鍵はこのフレーズで保護されるため、復元は今後も機能します。復元フレーズの単語をすべて入力してください。",
+    "submit": "移行する",
+    "migrating": "移行中…",
+    "done": "{{count}}件のノートを新しい形式に移行しました。",
+    "settle": {
+      "intro": "保管庫はアップグレードされました。仕上げが済むまで、古いコピーはこのデバイスに残ります — それまでは、パスワードを変更しても、古いコピーは新しいパスワードでは守られません。",
+      "confirm": "問題ないので、古いコピーを削除する",
+      "abort": "問題があるので、古い保管庫に戻す",
+      "errorAlreadySynced": "この保管庫はすでに新しい形式で同期されているため、元に戻すことはできません。古いものが必要な場合は、バックアップから復元してください。",
+      "errorBusy": "別の保管庫の操作が実行中です。しばらくしてからもう一度お試しください。",
+      "errorIo": "処理を完了できませんでした。何も変更されていません。"
+    },
+    "progressCount": "{{total}}件中{{done}}件を再暗号化しています…",
+    "error": {
+      "recoveryPhraseRequired": "その復元フレーズはこの保管庫と一致しませんでした。移行するには正しい復元フレーズを入力してください — 復元がこれからも機能するために必要です。",
+      "wrongPassword": "そのパスワードはこの保管庫と一致しませんでした。",
+      "alreadyMigrated": "この保管庫はすでに新しい形式になっています。",
+      "generic": "移行を完了できませんでした。保管庫は変更されていません。もう一度お試しください。"
     }
   },
   "recover": {
@@ -2489,9 +2562,11 @@
         "invalidName": "安全でないテーマ名です",
         "invalidValue": "{{key}}の値が無効です",
         "invalidValueWithLine": "{{key}}の値が無効です（{{line}}行目）",
+        "lowContrast": "{{against}}上の{{key}}のコントラスト比は{{ratio}}:1ですが、読みやすさを保つには少なくとも{{min}}:1が必要です",
         "missingKey": "必須の色{{key}}がありません",
         "parseError": "有効なJSONではありません",
-        "parseErrorWithLine": "有効なJSONではありません（{{line}}行目）"
+        "parseErrorWithLine": "有効なJSONではありません（{{line}}行目）",
+        "reservedKey": "{{key}}はMyne自身が使用するために予約されているため、テーマから設定することはできません"
       },
       "export": "エクスポート",
       "exportError": "そのテーマをエクスポートできませんでした。もう一度お試しください。",
@@ -2672,12 +2747,45 @@
       "autoTagHelper": "入力の手が止まると、このデバイス上の小さなモデルがノートを読み、その先頭にタグを提案します。提案を受け入れるまで、何も追加されません。",
       "autoTagLabel": "タグを自動で提案",
       "autoTagUnavailable": "このビルドにはタグ用のモデルが同梱されていないため、タグを提案できません。Myneがモデルをダウンロードすることはありません — 同梱されたビルドでは、このスイッチが自動的にオンになります。",
+      "consent": {
+        "accept": "ノートを{{provider}}に送信する",
+        "cancel": "キャンセル",
+        "cannotVerifyLabel": "Myneが確認できないこと",
+        "revokeLabel": "取り消す方法",
+        "scopeLabel": "対象となるデバイス",
+        "title": "Myneが{{provider}}に何かを送信する前に",
+        "whatLabel": "デバイスから出ていくもの",
+        "whenLabel": "いつ出ていくか",
+        "whoLabel": "受け取る相手"
+      },
       "disclosureToggle": "これはどのように機能しますか？",
       "enableHelper": "あなたが用意したモデルを完全にデバイス上で実行します。実験的機能で、デフォルトはオフです。",
       "enableLabel": "ローカルAIを有効化",
       "excludedHelper": "これらのフォルダ内のノートは、AIによって読み取られたりインデックス化されたりすることはありません。1行につき1つのフォルダパス。",
       "excludedLabel": "除外するフォルダ",
       "excludedPlaceholder": "Private/\nJournal/",
+      "endpointHelper": "このコンピュータですでにモデルランタイムを動かしている場合は、モデルファイルを選ぶ代わりに、Myneをそこへ向けられます。空のままにすると、上のファイルが使われます。",
+      "endpointLabel": "ローカルのモデルランタイム",
+      "endpointModelHelper": "Myneがモデルを選ぶことはありません。モデル名を指定するまで、上のアドレスは保存されても使われません。",
+      "endpointModelLabel": "そこで使うモデル",
+      "endpointModelPlaceholder": "ランタイムが表示しているとおりのモデル名",
+      "endpointRejected": {
+        "malformed": "これはMyneが使用できるアドレスではありません。スキームと明示的なポート番号が必要です — 例：http://127.0.0.1:11434",
+        "notLoopback": "このアドレスはこのコンピュータ上のものである必要があります — localhost、127.0.0.1、::1 のいずれかです。別の場所で動作するプロバイダーを使うには、代わりに「リモートプロバイダー」で指定してください。",
+        "unsupportedScheme": "使用できるのは http と https のアドレスのみです。"
+      },
+      "endpointSaveFailed": "アドレスを保存できませんでした。Myneが設定を書き込めるか確認してください。",
+      "endpointThirdParty": "{{name}}は独自のネットワーク動作を持つ別のプログラムであり、Myneはそれを制御しません。このコンピュータ上で動作している間、ノートはそのプログラムに送信されます。",
+      "providerError": {
+        "barred": "この種のリクエストがプロバイダーに送られることはありません — このデバイスで実行されるか、まったく実行されないかのどちらかです。",
+        "failed": "うまくいきませんでした。何も保存されず、再送信も行われていません。",
+        "noCredential": "このプロバイダーのAPIキーが設定されていません。設定 → 開発者 → AI で追加してください。",
+        "quotaExhausted": "プロバイダーがリクエストを拒否しました — 残高が不足しているか、レート制限を超えています。これはMyneではなく、プロバイダー側で解決する必要があります。",
+        "refused": "プロバイダーが接続を拒否しました。停止しているか、このネットワークをブロックしている可能性があります。",
+        "timeout": "プロバイダーから時間内に応答がありませんでした。実行されたまま残っているものはありません。",
+        "unauthorized": "プロバイダーがAPIキーを拒否しました。キーを入れ替えてください — 間違っているか、失効しているか、別のアカウントのものである可能性があります。",
+        "unreachable": "プロバイダーに接続できませんでした。ネットワーク接続を確認してください。"
+      },
       "modelChoose": "ファイルを選択…",
       "modelEmbeddingLabel": "検索モデル — セマンティック検索とQ&A",
       "modelFilter": {
@@ -2689,6 +2797,25 @@
       "modelSaveFailed": "モデルのパスを保存できませんでした（ボールトの外にある必要があります）。",
       "modelTranscriptionLabel": "音声認識モデル（文字起こし）",
       "modelsHelper": "Myneはモデルをダウンロードしません — それはネットワーク経由でデータを送信することを意味するからです。ブラウザでリンクを開いて入手し、ダウンロードしたファイルをここで選択してください。すべてがデバイス上で実行されます。",
+      "providerHelper": "ここでモデルを実行する代わりに、Myneは指定したサービスにリクエストを送信できます。その際、ノートはこのデバイスの外に出ます。デフォルトは「なし」で、どのサービスにも一切接続しないことを意味します。",
+      "providerKeyAdd": "APIキーを貼り付け",
+      "providerKeyLabel": "APIキー",
+      "providerKeyNone": "キーが保存されていないため、まだ何も送信できません。",
+      "providerKeyRevoke": "このキーを削除",
+      "providerKeyReplace": "新しいキーを貼り付けて、保存済みのキーを置き換え",
+      "providerKeyStored": "キーが保存されています。Myneがそのキーを再び表示することはありません — 置き換えるには新しいキーを貼り付けてください。",
+      "providerActive": "現在の応答元：{{name}}",
+      "providerLabel": "リモートプロバイダー",
+      "providerModelCount_one": "{{count}}件のモデルが利用できます。",
+      "providerModelCount_other": "{{count}}件のモデルが利用できます。",
+      "providerModelEmpty": "このプロバイダーは、あなたのアカウント向けにモデルを公開していません。",
+      "providerModelHelper": "Myneはデフォルトのモデルを用意していません。一覧はプロバイダーから取得されるため常に最新で、選んでいないモデルの料金が請求されることはありません。",
+      "providerModelLabel": "モデル",
+      "providerModelLoad": "モデルを読み込む",
+      "providerModelNone": "モデルが選択されていません",
+      "providerModelUnfetched": "モデルを選ぶには、一覧を読み込んでください。",
+      "providerNone": "なし",
+      "providerNothingAnswering": "回答できるものはまだ設定されていません。",
       "modelsLabel": "モデル",
       "recommendedFilesEmbedding": "model.safetensors + config.json + tokenizer.json が1つのフォルダに必要です。",
       "recommendedFilesGeneration": ".gguf ファイル + tokenizer.json が同じフォルダに必要です。",
@@ -2753,6 +2880,7 @@
       "quickUnlockSubtitle": "自動ロック後に{{method}}またはPINで再入力"
     },
     "quickUnlock": {
+      "errorBusy": "別の保管庫の操作が進行中です。しばらくしてからもう一度お試しください。",
       "errorCancelled": "キャンセルしました。",
       "errorGeneric": "クイックロック解除を設定できませんでした。",
       "errorHardwareUnavailable": "このビルドではTouch IDを利用できません。署名済みのmacOSビルドと、Touch IDの登録が必要です。",
@@ -2933,6 +3061,9 @@
       },
       "keywords": {
         "aiAutoTag": "自動タグ タグ 提案 ラベル ai auto tag tags suggest suggestions labels",
+        "aiEndpoint": "エンドポイント アドレス ローカル ランタイム モデル サーバー ポート ループバック ollama endpoint address local runtime model server port loopback",
+        "aiProvider": "プロバイダー リモート クラウド apiキー 認証情報 同意 ノート送信 openrouter ollama provider remote cloud api key credential consent send notes",
+        "aiProviderModel": "モデル 一覧 カタログ どのモデル モデル選択 リモートプロバイダー llama qwen gpt model catalogue list which choose remote provider",
         "aiEnable": "ai ローカルai 有効 無効 オン オフ 機械学習 local ai enable disable machine learning",
         "aiExcluded": "除外 除外フォルダ フォルダ 無視 プライバシー ai excluded folders ignore exclude privacy",
         "aiModels": "モデル gguf ダウンロード テキスト 埋め込み ai llm models download embedding",
@@ -2989,8 +3120,26 @@
         "vaultIcon": "保管庫アイコン アイコン 画像 シンボル アバター vault icon avatar picture symbol",
         "vaultLabel": "保管庫ラベル ラベル 名前 名前変更 タイトル vault label name rename title",
         "vaultLocation": "保管庫の場所 場所 パス フォルダ ディスク 保存先 vault location path folder on disk where stored",
-        "viewMode": "表示モード デフォルト ライブ 読み取り ソース プレビュー default view mode live reading source preview"
+        "viewMode": "表示モード デフォルト ライブ 読み取り ソース プレビュー default view mode live reading source preview",
+        "dateFormat": "日付形式 日付 表示形式 日 月 年 カレンダー date format day month year iso dd/mm mm/dd calendar",
+        "timeFormat": "時刻形式 時刻 表示形式 24時間 12時間 時計 午前 午後 time format 24 hour 12 hour clock am pm",
+        "timezone": "タイムゾーン 時間帯 地域 今日 timezone time zone tz utc iana region today"
       }
+    },
+    "dateTime": {
+      "dateLabel": "日付形式",
+      "dateHelper": "タスク、保存されたビュー、添付ファイルで日付をどのように表示するか。",
+      "dateSystem": "言語に合わせる",
+      "timeLabel": "時刻形式",
+      "timeHelper": "時刻を24時間制で表示するか、12時間制で表示するか。",
+      "timeSystem": "言語に合わせる",
+      "time24": "24時間制",
+      "time12": "12時間制",
+      "zoneLabel": "タイムゾーン",
+      "zoneHelper": "どのタイムゾーンを基準に「今日」を判断するか。空のままにすると、このデバイスに従います。ノートに書いた時刻が変更されることはありません — 09:00はどこでも09:00のままです。",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myneはそのタイムゾーンを認識できません。Europe/Berlin のような名前を使用してください。",
+      "errorSave": "その設定を保存できませんでした。"
     }
   },
   "storageLost": {
@@ -3016,6 +3165,7 @@
   "sync": {
     "materialising": "ノートをダウンロード中 — {{total}}件中{{done}}件。作業を始められます。残りは届き次第表示されます。",
     "credentialAmbiguous": "このデバイスと別のデバイスの両方でパスワードが変更された可能性があり、Myneはどちらが新しいか判断できません — そのため何も変更していません。すでにアクセス権のあるデバイスでサインインして解消してください。",
+    "vaultRekeyed": "この保管庫は別のデバイスで新しい形式にアップグレードされました。続けるにはもう一度ロックを解除してください — 失われたものはありません。",
     "attachments": {
       "aria": {
         "downloading": "{{name}}をダウンロード中",
@@ -3032,6 +3182,7 @@
     "buildingIndex": {
       "label": "検索インデックスを構築中…"
     },
+    "remoteMergeHint": "別のデバイスから更新されました",
     "conflicts": {
       "compare": "比較",
       "compareClose": "競合一覧に戻る",
@@ -3099,6 +3250,7 @@
       "verifyPending": "このコードは、新しいデバイスが最初の同期を完了すると表示されます。",
       "verifySyncing": "同期中…",
       "verifyTitle": "新しいデバイスを確認",
+      "verifyAction": "コードを照合",
       "yourDevices": "お使いのデバイス"
     },
     "endpoint": {
@@ -3128,7 +3280,12 @@
       "deviceNameHelp": "デバイス一覧に表示されます。後から変更できます。",
       "deviceNameLabel": "このデバイスに名前を付ける",
       "error": {
+        "awaitingApproval": "このデバイスはすでに承認待ちです。すでにサインインしているデバイスから承認してください。",
+        "deviceLimit": "このアカウントはデバイス数の上限に達しています。使わなくなったデバイスを削除してから、もう一度お試しください。",
+        "frozen": "このアカウントは凍結されているため、今は新しいデバイスを追加できません。このデバイス上のノートに影響はありません。",
         "notConfigured": "このデバイスを追加する前に、設定で同期サーバーを指定してください。",
+        "serverMismatch": "同期サーバーの身元が、このデバイスの想定と一致しませんでした。理由がわかるまで、認証情報を再入力しないでください。",
+        "kdfTooLarge": "このデバイスには、その保管庫を開くのに十分なメモリがありません。保管庫の暗号化設定は、ここでこのアプリが使用できる量を超えるメモリを必要とします。代わりにデスクトップコンピュータで開いてください。",
         "transport": "同期サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
       },
       "mode": {
@@ -3412,7 +3569,8 @@
       "inProgress": "操作が進行中です。",
       "kdfMemoryExceedsHost": "この保管庫を開くには{{required}} MiBのメモリが必要ですが、このブラウザが確保できる量（{{available}} MiB）を超えています。保管庫に問題はありません。Myneのデスクトップアプリで開いてください。",
       "unexpected": "予期しないエラーが発生しました。もう一度お試しください。",
-      "vaultNotFound": "保管庫ファイルが見つかりません。アプリを再起動してください。"
+      "vaultNotFound": "保管庫ファイルが見つかりません。アプリを再起動してください。",
+      "vaultUpgraded": "この保管庫は、このバージョンのMyneがまだ対応していない新しい形式にアップグレードされています。データに問題はありません — 開くにはMyneを最新バージョンに更新してください。"
     },
     "passwordLabel": "パスワード",
     "passwordPlaceholder": "パスワード",
@@ -3481,6 +3639,7 @@
       "committing": "保存中…",
       "copied": "コピーしました",
       "copy": "コピー",
+      "copyFailed": "コピーできませんでした — 代わりに「ファイルとして保存」をお使いください。",
       "eyebrow": "ステップ4 / 4 — アカウント番号",
       "heading": "アカウント番号を保存してください。",
       "intro": "これはあなたの所持人払いトークンです — 現金のように扱ってください。",
@@ -3595,6 +3754,10 @@
       "vaultBusyAuth": {
         "body": "別の保管庫操作が実行中です。しばらくしてからもう一度お試しください。",
         "title": "保管庫がビジー状態です"
+      },
+      "plaintextTooLarge": {
+        "title": "そのノートは大きすぎて暗号化できません",
+        "body": "内容を減らして、もう一度お試しください。"
       }
     },
     "orchestrator": {
@@ -3890,6 +4053,12 @@
     "backUpNow": "今すぐバックアップ"
   },
   "web": {
+    "openElsewhere": {
+      "body": "保管庫を開いておけるタブは、同時に1つだけです — 2つあると同じストレージに書き込み、保管庫が壊れてしまいます。ここで続けるには、もう一方のタブを閉じてください。",
+      "freed": "もう一方のタブが閉じられました。再読み込みすると、ここで保管庫を開けます。",
+      "reload": "再読み込み",
+      "title": "この保管庫は別のタブで開かれています"
+    },
     "reload": {
       "body": "このページを再読み込みすると、再びパスワードの入力を求められます — 設計上、これより早く入る方法はありません。ページが閉じている間、保管庫はこのデバイス上で暗号化されたまま保たれ、鍵は毎回あなたのパスワードから再構築されます。",
       "title": "再読み込みには再度パスワードが必要です"

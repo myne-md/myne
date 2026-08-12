@@ -9,6 +9,7 @@
     "passwordLabel": "Mot de passe maître",
     "approversIntro": "Ces appareils peuvent approuver celui-ci :",
     "noApprovers": "Aucun autre appareil de ce compte ne peut l'approuver pour le moment. Ouvrez Myne sur un appareil qui a déjà accès, puis revenez ici.",
+    "pendingStartOver": "Recommencer avec un autre compte",
     "pendingTitle": "En attente d'approbation",
     "sasMatch": "Ils correspondent — continuer",
     "sasMismatch": "Ils ne correspondent pas",
@@ -24,6 +25,13 @@
     "hint": "Il ressemble à MY-XXXX-XXXX-XXXX-XXXX-XXXX. Vérifié ici, sur votre appareil — rien n'est encore envoyé.",
     "invalid": "Ce numéro de compte n'est pas valide. Vérifiez-le et réessayez.",
     "title": "Saisissez votre numéro de compte"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Réponse générée sur cet appareil",
+      "localRuntime": "Réponse générée par {{name}}, sur cet ordinateur",
+      "remote": "Réponse générée par {{provider}} — vos notes lui ont été envoyées"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -227,7 +235,8 @@
       "intro": "Vérifiez que ce code correspond à celui affiché dans l'extension, puis cliquez sur Accepter pour appairer.",
       "reject": "Refuser",
       "rejected": "Appairage refusé.",
-      "title": "Une extension de navigateur souhaite se connecter"
+      "title": "Une extension de navigateur souhaite se connecter",
+      "persistFailed": "Myne n'a pas pu enregistrer cette connexion : elle n'a donc pas été établie. Si le coffre-fort est verrouillé, déverrouillez-le et relancez la connexion."
     }
   },
   "commandPalette": {
@@ -939,10 +948,14 @@
           "insert": "Insérer dans la note",
           "noAnswer": "Aucune réponse — essayez de reformuler.",
           "noModelHint": "Aucun modèle sélectionné. Choisissez-en un dans Paramètres → Développeur → IA pour commencer.",
+          "unreachableHint": "Le fournisseur que vous avez configuré ne répond pas. Vérifiez qu'il est bien en cours d'exécution, puis renvoyez votre message.",
+          "unavailableHint": "Cette version de Myne a été compilée sans l'IA locale : rien ne peut donc s'exécuter ici.",
           "offHint": "L'IA locale est désactivée. Activez-la dans Paramètres → Développeur → IA.",
           "send": "Envoyer",
           "statusGettingReady": "Préparation…",
           "statusNoModel": "Aucun modèle",
+          "statusUnreachable": "Ne répond pas",
+          "statusUnavailable": "Indisponible",
           "statusOff": "Désactivé",
           "statusReady": "Prêt",
           "stop": "Arrêter",
@@ -1065,6 +1078,8 @@
     },
     "slash": {
       "aiContinue": "Continuer la rédaction (IA)",
+      "aiFailed": "La requête IA n'a pas pu aboutir, rien n'a donc été inséré.",
+      "aiNoProvider": "Aucun fournisseur d'IA n'est configuré, rien n'a donc été inséré. Configurez-en un dans Paramètres → Développeur → IA.",
       "aiTitle": "Suggérer un titre (IA)",
       "attachFile": "Joindre un fichier",
       "bulletList": "Liste à puces",
@@ -1091,7 +1106,8 @@
       "time": "Heure",
       "todoList": "Liste de tâches",
       "voiceNote": "Note vocale",
-      "wikiLink": "Lien wiki"
+      "wikiLink": "Lien wiki",
+      "remind": "Rappel"
     },
     "spell": {
       "menu": {
@@ -1123,13 +1139,17 @@
       "menuEdit": "Modifier {{field}}",
       "menuTitle": "Ajouter un champ",
       "repeatNoAnchor": "Cette tâche n'a aucune date depuis laquelle se répéter, elle ne se répétera donc pas. Ajoutez une échéance pour la lancer.",
+      "repeatNeedsDate": "Nécessite une échéance depuis laquelle se répéter",
       "save": "Enregistrer",
       "skipOccurrence": "Ignorer cette occurrence",
       "title": {
         "due": "Échéance",
         "repeat": "Répétition",
-        "priority": "Priorité"
-      }
+        "priority": "Priorité",
+        "remind": "Rappel"
+      },
+      "timeLabel": "Heure (facultatif)",
+      "invalidRemind": "Myne ne peut pas lire cette date, vous ne recevrez donc aucun rappel."
     },
     "toolbar": {
       "apply": "Appliquer",
@@ -1235,7 +1255,8 @@
         "rewriteCount_many": "{{count}} de liens seront réécrits",
         "rewriteCount_other": "{{count}} liens seront réécrits",
         "skipped": "ignoré — {{reason}}",
-        "title": "Convertir les liens wiki importés de cette note"
+        "title": "Convertir les liens wiki importés de cette note",
+        "staleDocument": "Cette note a changé pendant que l'aperçu était ouvert, rien n'a donc été converti. Relancez l'opération pour voir les liens actuels."
       },
       "convertCore": {
         "noMatch": "aucune correspondance"
@@ -1253,6 +1274,8 @@
       "attachUnsupported": "Seuls les images et les PDF peuvent être joints.",
       "attachFailed": "Impossible de joindre ce fichier.",
       "archiveFailed": "Impossible d'archiver cette note.",
+      "aiRewriteFailed": "La réécriture n'a pas pu aboutir, votre sélection est donc inchangée.",
+      "aiRewriteNoProvider": "Aucun fournisseur d'IA n'est configuré, rien n'a donc été réécrit. Configurez-en un dans Paramètres → Développeur → IA.",
       "trashFailed": "Impossible de déplacer cette note vers la corbeille."
     },
     "nav": {
@@ -1582,6 +1605,29 @@
       "untitled": "Sans titre",
       "warning": "Cette action est irréversible."
     },
+    "example": {
+      "folder": "Premiers pas",
+      "index": {
+        "title": "Commencez ici",
+        "body": "Ceci est un petit coffre-fort d'exemple. Quelques notes ordinaires qui montrent ce que Myne sait faire, et rien ici n'est figé : modifiez, renommez ou supprimez ce que vous voulez.\n\n- [[{{markdown}}]] montre comment du texte brut devient de la mise en forme\n- [[{{tasks}}]] rassemble les listes de cases à cocher au même endroit\n- [[{{links}}]] relie les notes entre elles et les classe avec des étiquettes\n- [[{{makeItYours}}]] efface tout cela en une seule étape\n\nVous en avez assez vu ? Faites un clic droit sur le dossier **Premiers pas** dans la barre latérale et choisissez Supprimer. Les notes partent à la corbeille : vous pourrez donc les récupérer si vous changez d'avis.\n"
+      },
+      "markdown": {
+        "title": "Écrire en Markdown",
+        "body": "Myne écrit du Markdown brut et en affiche le résultat au fil de la frappe.\n\n## Les bases\nMettez un mot en **gras** ou en *italique*, ou insérez du `code en ligne`.\n\n## Une liste\n- Un élément\n- Un autre élément\n  - Un élément imbriqué\n\n## Une citation\n> De petites notes, gardées pendant des années, valent mieux que de grandes notes jamais écrites.\n\n## Un tableau\n| Raccourci | Ce qu'il fait |\n| --- | --- |\n| Cmd/Ctrl + B | Gras |\n| Cmd/Ctrl + K | Ajouter un lien |\n\n## Un peu de code\n```\nconsole.log(\"hello from Myne\")\n```\n\nQuand vous êtes prêt, revenez à [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Tâches",
+        "body": "Toute ligne qui commence par `- [ ]` est une tâche. Myne rassemble dans une seule vue Tâches toutes les tâches non terminées de vos notes, pour que rien ne se perde d'une note à l'autre.\n\n- [ ] Lire [[{{markdown}}]]\n- [ ] Ajouter votre propre tâche\n- [ ] En essayer une avec une échéance 📅 2030-12-31\n- [x] Créer votre coffre-fort\n\nCochez une case ici, puis ouvrez la vue Tâches dans la barre latérale pour voir la liste se mettre à jour.\n\nRetour à [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Liens et étiquettes",
+        "body": "Tapez `[[` pour créer un lien vers une autre note. Les liens vont dans les deux sens : ouvrez [[{{index}}]] et vous y verrez cette note parmi ses rétroliens, et le graphe trace un trait entre les deux.\n\nAjoutez une #étiquette n'importe où et Myne classe la note sous celle-ci dans l'arborescence des étiquettes. Cette note porte les étiquettes #exemple et #premiers-pas : ouvrez l'arborescence des étiquettes dans la barre latérale pour la retrouver.\n\nÀ votre tour : reliez cette note à [[{{tasks}}]], ou inventez une étiquette à vous.\n"
+      },
+      "makeItYours": {
+        "title": "Faites-en votre coffre-fort",
+        "body": "Ce coffre-fort est le vôtre désormais. Ces notes ne sont qu'un point de départ : modifiez ce que vous voulez, ou effacez-les pour repartir de zéro.\n\nPour supprimer tout l'exemple, faites un clic droit sur le dossier **Premiers pas** dans la barre latérale et choisissez Supprimer. Tout part ensemble à la corbeille, d'où vous pouvez tout restaurer si vous changez d'avis.\n\nQuand vous êtes prêt, appuyez sur Cmd/Ctrl + N pour créer une nouvelle note et commencer à écrire.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Ajouter une condition",
       "addFilterGroup": "Ajouter un groupe de filtres",
@@ -1623,7 +1669,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Un nom de dossier ne peut pas contenir / \\ | # ^ [ ] ni commencer ou finir par un espace.",
-      "tooLong": "Ce chemin de dossier est trop long."
+      "tooLong": "Ce chemin de dossier est trop long.",
+      "moveIntoSelf": "Un dossier ne peut pas être déplacé dans lui-même.",
+      "moveCollision": "Un dossier portant ce nom existe déjà à cet endroit."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1914,7 +1962,8 @@
       "importedWithSkips_one": "{{count}} note importée — {{skipped}} ignorée(s)",
       "importedWithSkips_many": "{{count}} notes importées — {{skipped}} ignorée(s)",
       "importedWithSkips_other": "{{count}} notes importées — {{skipped}} ignorée(s)",
-      "importNoMarkdown": "Aucun fichier Markdown parmi les éléments déposés"
+      "importNoMarkdown": "Aucun fichier Markdown parmi les éléments déposés",
+      "moveFolderTo": "Déplacer le dossier vers…"
     },
     "newFromTemplate": {
       "back": "Retour",
@@ -2198,6 +2247,30 @@
       "emptyText": "Aucun résultat.",
       "placeholder": "Sélectionner…",
       "searchPlaceholder": "Rechercher…"
+    }
+  },
+  "migrate": {
+    "intro": "Mettez ce coffre-fort à niveau vers le nouveau format. Vos notes bénéficient alors de la fusion automatique entre appareils. Cette opération renouvelle les clés de tout le coffre-fort ; l'ancienne copie est conservée sur cet appareil jusqu'à votre confirmation.",
+    "passwordLabel": "Mot de passe maître",
+    "phraseLabel": "Phrase de récupération",
+    "phraseHelp": "Obligatoire — vos nouvelles clés sont enveloppées avec cette phrase, afin que la récupération continue de fonctionner. Saisissez tous vos mots de récupération.",
+    "submit": "Migrer",
+    "migrating": "Migration…",
+    "done": "{{count}} notes migrées vers le nouveau format.",
+    "settle": {
+      "intro": "Votre coffre-fort a été mis à niveau. L'ancienne copie est encore sur cet appareil tant que vous n'avez pas terminé — d'ici là, changer votre mot de passe ne la mettra pas hors d'atteinte.",
+      "confirm": "Tout semble correct, supprimer l'ancienne copie",
+      "abort": "Quelque chose ne va pas, rétablir l'ancien coffre-fort",
+      "errorAlreadySynced": "Ce coffre-fort s'est déjà synchronisé dans le nouveau format, il ne peut donc pas être rétabli. Restaurez une sauvegarde si vous avez besoin de l'ancien.",
+      "errorBusy": "Une autre opération sur le coffre-fort est en cours. Réessayez dans un instant.",
+      "errorIo": "Impossible de terminer l'opération. Rien n'a été modifié."
+    },
+    "progressCount": "{{done}} sur {{total}} éléments rechiffrés…",
+    "error": {
+      "recoveryPhraseRequired": "Cette phrase de récupération ne correspond pas à ce coffre-fort. Saisissez la bonne phrase de récupération pour migrer — elle est obligatoire pour que la récupération continue de fonctionner.",
+      "wrongPassword": "Ce mot de passe ne correspond pas à ce coffre-fort.",
+      "alreadyMigrated": "Ce coffre-fort est déjà au nouveau format.",
+      "generic": "La migration n'a pas pu aboutir. Votre coffre-fort est inchangé ; réessayez."
     }
   },
   "recover": {
@@ -2567,9 +2640,11 @@
         "invalidName": "Nom de thème non sûr",
         "invalidValue": "Valeur non valide pour {{key}}",
         "invalidValueWithLine": "Valeur non valide pour {{key}} (ligne {{line}})",
+        "lowContrast": "{{key}} sur {{against}} a un contraste de {{ratio}}:1, alors qu'il en faut au moins {{min}}:1 pour rester lisible",
         "missingKey": "Couleur requise manquante {{key}}",
         "parseError": "JSON non valide",
-        "parseErrorWithLine": "JSON non valide (ligne {{line}})"
+        "parseErrorWithLine": "JSON non valide (ligne {{line}})",
+        "reservedKey": "{{key}} est réservé à l'usage interne de Myne et ne peut pas être défini par un thème"
       },
       "export": "Exporter",
       "exportError": "Impossible d'exporter ce thème. Veuillez réessayer.",
@@ -2751,12 +2826,45 @@
       "autoTagHelper": "Lorsque vous cessez de taper, un petit modèle sur votre appareil lit la note et suggère des étiquettes en haut de celle-ci. Rien n'est ajouté tant que vous n'acceptez pas une suggestion.",
       "autoTagLabel": "Suggérer des étiquettes automatiquement",
       "autoTagUnavailable": "Cette version est livrée sans le modèle d'étiquetage : aucune étiquette ne peut donc être suggérée. Myne n'en télécharge jamais — l'option s'active d'elle-même dans une version qui l'inclut.",
+      "consent": {
+        "accept": "Envoyer mes notes à {{provider}}",
+        "cancel": "Annuler",
+        "cannotVerifyLabel": "Ce que Myne ne peut pas vérifier",
+        "revokeLabel": "Comment revenir en arrière",
+        "scopeLabel": "Quels appareils sont concernés",
+        "title": "Avant que Myne n'envoie quoi que ce soit à {{provider}}",
+        "whatLabel": "Ce qui quitte votre appareil",
+        "whenLabel": "Quand cela quitte votre appareil",
+        "whoLabel": "Qui le reçoit"
+      },
       "disclosureToggle": "Comment ça marche ?",
       "enableHelper": "Exécute entièrement sur votre appareil un modèle que vous fournissez. Expérimental, désactivé par défaut.",
       "enableLabel": "Activer l'IA locale",
       "excludedHelper": "Les notes de ces dossiers ne sont jamais lues ni indexées par l'IA. Un chemin de dossier par ligne.",
       "excludedLabel": "Dossiers exclus",
       "excludedPlaceholder": "Privé/\nJournal/",
+      "endpointHelper": "Si vous exécutez déjà un moteur de modèles sur cet ordinateur, indiquez son adresse à Myne au lieu de sélectionner des fichiers de modèle. Laissez ce champ vide pour utiliser les fichiers ci-dessus.",
+      "endpointLabel": "Moteur de modèles local",
+      "endpointModelHelper": "Myne ne choisit pas de modèle à votre place. Tant que vous n'en indiquez pas un, l'adresse ci-dessus est enregistrée mais inutilisée.",
+      "endpointModelLabel": "Modèle à y utiliser",
+      "endpointModelPlaceholder": "le nom du modèle tel que le moteur l'affiche",
+      "endpointRejected": {
+        "malformed": "Ce n'est pas une adresse que Myne peut utiliser. Il lui faut un schéma et un port explicite — par exemple http://127.0.0.1:11434.",
+        "notLoopback": "Cette adresse doit se trouver sur cet ordinateur — localhost, 127.0.0.1 ou ::1. Pour utiliser un fournisseur qui s'exécute ailleurs, indiquez-le plutôt sous Fournisseur distant.",
+        "unsupportedScheme": "Seules les adresses http et https sont acceptées."
+      },
+      "endpointSaveFailed": "Impossible d'enregistrer l'adresse. Vérifiez que Myne peut écrire ses paramètres.",
+      "endpointThirdParty": "{{name}} est un programme distinct, avec son propre comportement réseau, et Myne ne le contrôle pas. Vos notes lui sont envoyées pendant qu'il s'exécute sur cet ordinateur.",
+      "providerError": {
+        "barred": "Ce type de requête n'est jamais envoyé à un fournisseur — il s'exécute sur cet appareil ou pas du tout.",
+        "failed": "Cela n'a pas fonctionné. Rien n'a été enregistré et rien n'a été renvoyé.",
+        "noCredential": "Aucune clé API n'est définie pour ce fournisseur. Ajoutez-en une dans Paramètres → Développeur → IA.",
+        "quotaExhausted": "Le fournisseur a refusé la requête — vous n'avez plus de crédit ou vous avez dépassé une limite de débit. Cela doit se régler auprès du fournisseur, pas dans Myne.",
+        "refused": "Le fournisseur a refusé la connexion. Il est peut-être hors service ou bloque ce réseau.",
+        "timeout": "Le fournisseur n'a pas répondu à temps. Rien n'est resté en cours d'exécution.",
+        "unauthorized": "Le fournisseur a rejeté votre clé API. Remplacez-la — elle est peut-être erronée, révoquée, ou liée à un autre compte.",
+        "unreachable": "Impossible de joindre le fournisseur. Vérifiez votre connexion réseau."
+      },
       "modelChoose": "Choisir un fichier…",
       "modelEmbeddingLabel": "Modèle de recherche — recherche sémantique et questions-réponses",
       "modelFilter": {
@@ -2768,11 +2876,31 @@
       "modelSaveFailed": "Impossible d'enregistrer le chemin du modèle (il doit se trouver en dehors de votre coffre-fort).",
       "modelTranscriptionLabel": "Modèle de reconnaissance vocale (transcription)",
       "modelsHelper": "Myne ne télécharge jamais de modèles — cela reviendrait à envoyer des données sur le réseau. Ouvrez un lien pour en obtenir un dans votre navigateur, puis sélectionnez ici les fichiers téléchargés. Tout s'exécute sur votre appareil.",
+      "providerHelper": "Au lieu d'exécuter un modèle ici, Myne peut envoyer une requête à un service que vous désignez. Vos notes quittent alors cet appareil. « Aucun » est la valeur par défaut et signifie qu'aucun service n'est contacté.",
+      "providerKeyAdd": "collez votre clé API",
+      "providerKeyLabel": "Clé API",
+      "providerKeyNone": "Aucune clé n'est enregistrée, rien ne peut donc encore être envoyé.",
+      "providerKeyRevoke": "Supprimer cette clé",
+      "providerKeyReplace": "collez une nouvelle clé pour remplacer celle enregistrée",
+      "providerKeyStored": "Une clé est enregistrée. Myne ne vous la réaffiche jamais — collez-en une nouvelle pour la remplacer.",
+      "providerActive": "Répond actuellement : {{name}}",
+      "providerLabel": "Fournisseur distant",
+      "providerModelCount_one": "{{count}} modèle disponible.",
+      "providerModelCount_other": "{{count}} modèles disponibles.",
+      "providerModelEmpty": "Ce fournisseur ne publie aucun modèle pour votre compte.",
+      "providerModelHelper": "Myne ne fournit aucun modèle par défaut. La liste vient du fournisseur : elle reste donc à jour, et vous n'êtes jamais facturé pour un modèle que vous n'avez pas choisi.",
+      "providerModelLabel": "Modèle",
+      "providerModelLoad": "Charger les modèles",
+      "providerModelNone": "Aucun modèle sélectionné",
+      "providerModelUnfetched": "Chargez la liste pour choisir un modèle.",
+      "providerNone": "Aucun",
+      "providerNothingAnswering": "Rien n'est encore configuré pour répondre.",
       "modelsLabel": "Modèles",
       "recommendedFilesEmbedding": "Nécessite model.safetensors + config.json + tokenizer.json dans un même dossier.",
       "recommendedFilesGeneration": "Nécessite le fichier .gguf + tokenizer.json dans le même dossier.",
       "recommendedFilesTranscription": "Nécessite le fichier .gguf Whisper + config.json + tokenizer.json dans le même dossier.",
-      "title": "IA"
+      "title": "IA",
+      "providerModelCount_many": "{{count}} de modèles disponibles."
     },
     "network": {
       "disabledCue": "La synchronisation ne passe plus par Tor. Les nouvelles connexions vont directement au serveur de synchronisation.",
@@ -2832,6 +2960,7 @@
       "quickUnlockSubtitle": "Déverrouiller de nouveau avec {{method}} ou un PIN après le verrouillage automatique"
     },
     "quickUnlock": {
+      "errorBusy": "Une autre opération sur le coffre-fort est en cours. Réessayez dans un instant.",
       "errorCancelled": "Annulé.",
       "errorGeneric": "Impossible de configurer le déverrouillage rapide.",
       "errorHardwareUnavailable": "Touch ID n'est pas disponible dans cette version. Il nécessite une version macOS signée avec Touch ID configuré.",
@@ -3016,6 +3145,9 @@
       },
       "keywords": {
         "aiAutoTag": "étiquettes automatiques suggérer suggestions libellés ia auto tag tags",
+        "aiEndpoint": "ollama adresse moteur de modèles local serveur port boucle locale endpoint runtime loopback",
+        "aiProvider": "fournisseur distant cloud openrouter ollama clé api identifiant consentement envoyer notes provider remote",
+        "aiProviderModel": "modèle catalogue liste quel modèle llama qwen gpt choisir fournisseur distant model provider",
         "aiEnable": "ia locale activer désactiver ai local machine learning apprentissage",
         "aiExcluded": "dossiers exclus exclure ignorer ia confidentialité excluded ai",
         "aiModels": "modèles gguf téléchargement texte embedding llm ia models",
@@ -3072,8 +3204,26 @@
         "vaultIcon": "icône du coffre-fort avatar image symbole",
         "vaultLabel": "étiquette du coffre-fort nom renommer titre",
         "vaultLocation": "emplacement du coffre-fort chemin dossier disque stockage",
-        "viewMode": "mode d'affichage par défaut direct lecture source aperçu"
+        "viewMode": "mode d'affichage par défaut direct lecture source aperçu",
+        "dateFormat": "format de date jour mois année iso jj/mm mm/jj calendrier date format",
+        "timeFormat": "format d'heure 24 heures 12 heures horloge am pm time format",
+        "timezone": "fuseau horaire zone tz utc iana région aujourd'hui timezone"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Format de date",
+      "dateHelper": "Comment les dates sont affichées dans les tâches, les vues enregistrées et les pièces jointes.",
+      "dateSystem": "Suivre la langue",
+      "timeLabel": "Format d'heure",
+      "timeHelper": "Détermine si les heures sont affichées au format 24 heures ou 12 heures.",
+      "timeSystem": "Suivre la langue",
+      "time24": "24 heures",
+      "time12": "12 heures",
+      "zoneLabel": "Fuseau horaire",
+      "zoneHelper": "Le fuseau qui détermine ce qui compte comme aujourd'hui. Laissez vide pour suivre cet appareil. Les heures que vous écrivez dans une note ne sont jamais modifiées — 09:00 reste 09:00 partout.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne ne connaît pas ce fuseau horaire. Utilisez un nom comme Europe/Berlin.",
+      "errorSave": "Impossible d'enregistrer ce paramètre."
     }
   },
   "storageLost": {
@@ -3101,6 +3251,7 @@
   "sync": {
     "materialising": "Téléchargement de vos notes — {{done}} sur {{total}}. Vous pouvez commencer à travailler ; le reste apparaîtra au fur et à mesure.",
     "credentialAmbiguous": "Votre mot de passe a peut-être changé sur cet appareil et sur un autre, et Myne ne peut pas déterminer lequel est le plus récent — il n'a donc rien modifié. Connectez-vous sur un appareil qui a déjà accès pour régler la situation.",
+    "vaultRekeyed": "Ce coffre-fort a été mis à niveau vers le nouveau format sur un autre appareil. Déverrouillez-le à nouveau pour continuer — rien n'a été perdu.",
     "attachments": {
       "aria": {
         "downloading": "Téléchargement de {{name}}",
@@ -3117,6 +3268,7 @@
     "buildingIndex": {
       "label": "Construction de l'index de recherche…"
     },
+    "remoteMergeHint": "Mis à jour depuis un autre appareil",
     "conflicts": {
       "compare": "Comparer",
       "compareClose": "Retour aux conflits",
@@ -3186,6 +3338,7 @@
       "verifyPending": "Ce code apparaît une fois que le nouvel appareil a terminé sa première synchronisation.",
       "verifySyncing": "Synchronisation…",
       "verifyTitle": "Vérifier le nouvel appareil",
+      "verifyAction": "Comparer le code",
       "yourDevices": "Vos appareils"
     },
     "endpoint": {
@@ -3215,7 +3368,12 @@
       "deviceNameHelp": "Affiché dans votre liste d'appareils. Vous pourrez le changer plus tard.",
       "deviceNameLabel": "Nommez cet appareil",
       "error": {
+        "awaitingApproval": "Cet appareil est déjà en attente d'approbation. Approuvez-le depuis un appareil déjà connecté.",
+        "deviceLimit": "Ce compte a atteint sa limite d'appareils. Retirez un appareil que vous n'utilisez plus, puis réessayez.",
+        "frozen": "Ce compte est gelé : aucun nouvel appareil ne peut donc être ajouté pour le moment. Vos notes sur cet appareil ne sont pas affectées.",
         "notConfigured": "Définissez un serveur de synchronisation dans les paramètres avant d'ajouter cet appareil.",
+        "serverMismatch": "L'identité du serveur de synchronisation ne correspond pas à celle attendue par cet appareil. Ne saisissez pas de nouveau vos identifiants tant que vous n'en connaissez pas la raison.",
+        "kdfTooLarge": "Cet appareil n'a pas assez de mémoire pour ouvrir ce coffre-fort. Ses paramètres de chiffrement demandent plus de mémoire que cette application ne peut en utiliser ici. Ouvrez-le plutôt sur un ordinateur de bureau.",
         "transport": "Impossible de joindre le serveur de synchronisation. Vérifiez votre connexion et réessayez."
       },
       "mode": {
@@ -3504,7 +3662,8 @@
       "inProgress": "Opération en cours.",
       "kdfMemoryExceedsHost": "Ce coffre-fort a besoin de {{required}} MiB de mémoire pour s'ouvrir — plus que ce que ce navigateur peut lui accorder ({{available}} MiB). Le coffre-fort est intact ; ouvrez-le dans l'application de bureau Myne.",
       "unexpected": "Erreur inattendue. Veuillez réessayer.",
-      "vaultNotFound": "Fichier du coffre-fort introuvable. Veuillez redémarrer l'application."
+      "vaultNotFound": "Fichier du coffre-fort introuvable. Veuillez redémarrer l'application.",
+      "vaultUpgraded": "Ce coffre-fort a été mis à niveau vers un format plus récent que cette version de Myne ne prend pas encore en charge. Vos données sont intactes — mettez Myne à jour vers la dernière version pour l'ouvrir."
     },
     "passwordLabel": "Mot de passe",
     "passwordPlaceholder": "Mot de passe",
@@ -3574,6 +3733,7 @@
       "committing": "Enregistrement…",
       "copied": "Copié",
       "copy": "Copier",
+      "copyFailed": "Impossible de copier — utilisez plutôt « Enregistrer dans un fichier ».",
       "eyebrow": "Étape 4 sur 4 — numéro de compte",
       "heading": "Enregistrez votre numéro de compte.",
       "intro": "C'est votre jeton au porteur — traitez-le comme de l'argent liquide.",
@@ -3688,6 +3848,10 @@
       "vaultBusyAuth": {
         "body": "Une autre opération sur le coffre-fort est en cours. Réessayez dans un instant.",
         "title": "Coffre-fort occupé"
+      },
+      "plaintextTooLarge": {
+        "title": "Cette note est trop volumineuse pour être chiffrée",
+        "body": "Réessayez avec moins de contenu."
       }
     },
     "orchestrator": {
@@ -3995,6 +4159,12 @@
     "backUpNow": "Sauvegarder maintenant"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Un seul onglet peut garder un coffre-fort ouvert à la fois — deux écriraient dans le même stockage et le corrompraient. Fermez l'autre onglet pour continuer ici.",
+      "freed": "L'autre onglet a été fermé. Rechargez pour ouvrir votre coffre-fort ici.",
+      "reload": "Recharger",
+      "title": "Ce coffre-fort est ouvert dans un autre onglet"
+    },
     "reload": {
       "body": "Recharger cette page vous redemande votre mot de passe — il n'y a pas d'accès plus rapide, et c'est voulu. Votre coffre-fort reste chiffré sur cet appareil pendant que la page est fermée, et la clé est reconstruite à partir de votre mot de passe à chaque fois.",
       "title": "Un rechargement redemande votre mot de passe"

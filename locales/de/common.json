@@ -9,6 +9,7 @@
     "passwordLabel": "Master-Passwort",
     "approversIntro": "Diese Geräte können dieses hier genehmigen:",
     "noApprovers": "Derzeit kann es kein anderes Gerät in diesem Konto genehmigen. Öffnen Sie Myne auf einem Gerät, das bereits Zugriff hat, und kommen Sie dann hierher zurück.",
+    "pendingStartOver": "Mit einem anderen Konto von vorne beginnen",
     "pendingTitle": "Warten auf Genehmigung",
     "sasMatch": "Sie stimmen überein – fortfahren",
     "sasMismatch": "Sie stimmen nicht überein",
@@ -24,6 +25,13 @@
     "hint": "Sie sieht aus wie MY-XXXX-XXXX-XXXX-XXXX-XXXX. Wird hier auf Ihrem Gerät geprüft – es wird noch nichts gesendet.",
     "invalid": "Diese Kontonummer ist nicht gültig. Prüfen Sie sie und versuchen Sie es erneut.",
     "title": "Geben Sie Ihre Kontonummer ein"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Auf diesem Gerät beantwortet",
+      "localRuntime": "Beantwortet von {{name}}, auf diesem Computer",
+      "remote": "Beantwortet von {{provider}} – Ihre Notizen wurden dorthin gesendet"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -218,7 +226,8 @@
       "intro": "Bestätigen Sie, dass dieser Code mit dem in der Erweiterung angezeigten übereinstimmt, und klicken Sie dann auf „Akzeptieren“, um zu koppeln.",
       "reject": "Ablehnen",
       "rejected": "Kopplung abgelehnt.",
-      "title": "Eine Browser-Erweiterung möchte sich verbinden"
+      "title": "Eine Browser-Erweiterung möchte sich verbinden",
+      "persistFailed": "Myne konnte diese Verbindung nicht speichern, daher wurde sie nicht hergestellt. Wenn der Tresor gesperrt ist, entsperren Sie ihn und versuchen Sie es erneut."
     }
   },
   "commandPalette": {
@@ -914,10 +923,14 @@
           "insert": "In Notiz einfügen",
           "noAnswer": "Keine Antwort – versuche es anders zu formulieren.",
           "noModelHint": "Kein Modell ausgewählt. Wähle eines unter Einstellungen → Developer → KI, um zu beginnen.",
+          "unreachableHint": "Der von dir eingerichtete Anbieter antwortet nicht. Prüfe, ob er läuft, und sende dann erneut.",
+          "unavailableHint": "Dieser Build von Myne wurde ohne lokale KI kompiliert, daher kann hier nichts laufen.",
           "offHint": "Lokale KI ist aus. Aktiviere sie unter Einstellungen → Developer → KI.",
           "send": "Senden",
           "statusGettingReady": "Wird vorbereitet…",
           "statusNoModel": "Kein Modell",
+          "statusUnreachable": "Antwortet nicht",
+          "statusUnavailable": "Nicht verfügbar",
           "statusOff": "Aus",
           "statusReady": "Bereit",
           "stop": "Stopp",
@@ -1040,6 +1053,8 @@
     },
     "slash": {
       "aiContinue": "Weiterschreiben (KI)",
+      "aiFailed": "Die KI-Anfrage konnte nicht abgeschlossen werden, daher wurde nichts eingefügt.",
+      "aiNoProvider": "Es ist kein KI-Anbieter eingerichtet, daher wurde nichts eingefügt. Richte einen unter Einstellungen → Developer → KI ein.",
       "aiTitle": "Titel vorschlagen (KI)",
       "attachFile": "Datei anhängen",
       "bulletList": "Aufzählung",
@@ -1066,7 +1081,8 @@
       "time": "Uhrzeit",
       "todoList": "To-do-Liste",
       "voiceNote": "Sprachnotiz",
-      "wikiLink": "Wikilink"
+      "wikiLink": "Wikilink",
+      "remind": "Erinnerung"
     },
     "spell": {
       "menu": {
@@ -1098,13 +1114,17 @@
       "menuEdit": "{{field}} bearbeiten",
       "menuTitle": "Feld hinzufügen",
       "repeatNoAnchor": "Diese Aufgabe hat kein Datum, ab dem sie sich wiederholen könnte, daher wiederholt sie sich nicht. Fügen Sie ein Fälligkeitsdatum hinzu, um sie zu starten.",
+      "repeatNeedsDate": "Benötigt ein Fälligkeitsdatum als Ausgangspunkt für die Wiederholung",
       "save": "Speichern",
       "skipOccurrence": "Diesen Termin überspringen",
       "title": {
         "due": "Fälligkeitsdatum",
         "repeat": "Wiederholung",
-        "priority": "Priorität"
-      }
+        "priority": "Priorität",
+        "remind": "Erinnerung"
+      },
+      "timeLabel": "Uhrzeit (optional)",
+      "invalidRemind": "Myne kann dieses Datum nicht lesen, daher gibt es dazu keine Erinnerung."
     },
     "toolbar": {
       "apply": "Anwenden",
@@ -1207,7 +1227,8 @@
         "rewriteCount_one": "{{count}} Link wird neu geschrieben",
         "rewriteCount_other": "{{count}} Links werden neu geschrieben",
         "skipped": "übersprungen – {{reason}}",
-        "title": "Importierte Wikilinks in dieser Notiz umwandeln"
+        "title": "Importierte Wikilinks in dieser Notiz umwandeln",
+        "staleDocument": "Diese Notiz hat sich geändert, während die Vorschau offen war, daher wurde nichts umgewandelt. Führen Sie den Vorgang erneut aus, um die aktuellen Links zu sehen."
       },
       "convertCore": {
         "noMatch": "kein Treffer"
@@ -1225,6 +1246,8 @@
       "attachUnsupported": "Nur Bilder und PDFs können angehängt werden.",
       "attachFailed": "Diese Datei konnte nicht angehängt werden.",
       "archiveFailed": "Diese Notiz konnte nicht archiviert werden.",
+      "aiRewriteFailed": "Das Umschreiben konnte nicht abgeschlossen werden, daher ist deine Auswahl unverändert.",
+      "aiRewriteNoProvider": "Es ist kein KI-Anbieter eingerichtet, daher wurde nichts umgeschrieben. Richte einen unter Einstellungen → Developer → KI ein.",
       "trashFailed": "Diese Notiz konnte nicht in den Papierkorb verschoben werden."
     },
     "nav": {
@@ -1537,6 +1560,29 @@
       "untitled": "Ohne Titel",
       "warning": "Dies kann nicht rückgängig gemacht werden."
     },
+    "example": {
+      "folder": "Erste Schritte",
+      "index": {
+        "title": "Hier starten",
+        "body": "Dies ist ein kleiner Beispieltresor. Ein paar ganz gewöhnliche Notizen, die zeigen, was Myne kann – nichts davon ist besonders: Sie können alles bearbeiten, umbenennen oder löschen.\n\n- [[{{markdown}}]] zeigt, wie aus einfachem Text Formatierung wird\n- [[{{tasks}}]] sammelt Checklisten an einem Ort\n- [[{{links}}]] verbindet Notizen und ordnet sie mit Tags\n- [[{{makeItYours}}]] räumt das alles in einem Schritt weg\n\nGenug gesehen? Klicken Sie in der Seitenleiste mit der rechten Maustaste auf den Ordner **Erste Schritte** und wählen Sie „Löschen“. Die Notizen wandern in den Papierkorb, Sie können sie also zurückholen, wenn Sie es sich anders überlegen.\n"
+      },
+      "markdown": {
+        "title": "Mit Markdown schreiben",
+        "body": "Myne schreibt reines Markdown und zeigt das Ergebnis, während Sie tippen.\n\n## Die Grundlagen\nMachen Sie ein Wort **fett** oder *kursiv*, oder streuen Sie `Inline-Code` ein.\n\n## Eine Liste\n- Ein Eintrag\n- Noch ein Eintrag\n  - Ein verschachtelter\n\n## Ein Zitat\n> Kleine Notizen, über Jahre gesammelt, schlagen große Notizen, die Sie nie schreiben.\n\n## Eine Tabelle\n| Tastenkürzel | Was es macht |\n| --- | --- |\n| Cmd/Ctrl + B | Fett |\n| Cmd/Ctrl + K | Link einfügen |\n\n## Etwas Code\n```\nconsole.log(\"hello from Myne\")\n```\n\nWenn Sie so weit sind, geht es zurück zu [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Aufgaben",
+        "body": "Jede Zeile, die mit `- [ ]` beginnt, ist eine Aufgabe. Myne sammelt jede offene Aufgabe aus all Ihren Notizen in einer einzigen Aufgabenansicht, damit zwischen den Notizen nichts verloren geht.\n\n- [ ] [[{{markdown}}]] lesen\n- [ ] Eine eigene Aufgabe hinzufügen\n- [ ] Eine mit Fälligkeitsdatum ausprobieren 📅 2030-12-31\n- [x] Tresor erstellen\n\nSetzen Sie hier ein Häkchen und öffnen Sie dann die Aufgabenansicht in der Seitenleiste, um zu sehen, wie sich die Liste aktualisiert.\n\nZurück zu [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Links und Tags",
+        "body": "Tippen Sie `[[`, um auf eine andere Notiz zu verlinken. Links gelten in beide Richtungen: Öffnen Sie [[{{index}}]], und Sie finden diese Notiz dort unter den Backlinks – und der Graph zeichnet eine Linie zwischen beiden.\n\nSchreiben Sie irgendwo ein #tag, und Myne ordnet die Notiz im Tag-Baum unter diesem Tag ein. Diese Notiz ist mit #beispiel und #erste-schritte getaggt, öffnen Sie also den Tag-Baum in der Seitenleiste, um sie zu finden.\n\nSie sind dran: Verlinken Sie diese Notiz mit [[{{tasks}}]], oder denken Sie sich einen eigenen Tag aus.\n"
+      },
+      "makeItYours": {
+        "title": "Ihr eigener Tresor",
+        "body": "Das ist jetzt Ihr Tresor. Diese Notizen sind nur ein Anfang – ändern Sie alles, was Sie möchten, oder räumen Sie sie weg und fangen Sie neu an.\n\nUm das ganze Beispiel zu entfernen, klicken Sie in der Seitenleiste mit der rechten Maustaste auf den Ordner **Erste Schritte** und wählen Sie „Löschen“. Alles wandert gemeinsam in den Papierkorb, und von dort können Sie es wiederherstellen, falls Sie es doch zurückhaben möchten.\n\nWenn Sie so weit sind, drücken Sie Cmd/Ctrl + N, um eine neue Notiz zu erstellen und loszuschreiben.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Bedingung hinzufügen",
       "addFilterGroup": "Filtergruppe hinzufügen",
@@ -1577,7 +1623,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Ein Ordnername darf keine Zeichen / \\ | # ^ [ ] enthalten und nicht mit einem Leerzeichen beginnen oder enden.",
-      "tooLong": "Dieser Ordnerpfad ist zu lang."
+      "tooLong": "Dieser Ordnerpfad ist zu lang.",
+      "moveIntoSelf": "Ein Ordner kann nicht in sich selbst verschoben werden.",
+      "moveCollision": "Dort gibt es bereits einen Ordner mit diesem Namen."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1854,7 +1902,8 @@
       "importedWithSkips": "{{count}} importiert – {{skipped}} übersprungen",
       "importedWithSkips_one": "{{count}} Notiz importiert – {{skipped}} übersprungen",
       "importedWithSkips_other": "{{count}} Notizen importiert – {{skipped}} übersprungen",
-      "importNoMarkdown": "Keine Markdown-Dateien in dieser Ablage"
+      "importNoMarkdown": "Keine Markdown-Dateien in dieser Ablage",
+      "moveFolderTo": "Ordner verschieben nach…"
     },
     "newFromTemplate": {
       "back": "Zurück",
@@ -2132,6 +2181,30 @@
       "emptyText": "Keine Treffer.",
       "placeholder": "Auswählen…",
       "searchPlaceholder": "Suchen…"
+    }
+  },
+  "migrate": {
+    "intro": "Aktualisieren Sie diesen Tresor auf das neue Format. Ihre Notizen werden dann geräteübergreifend automatisch zusammengeführt. Dabei erhält der gesamte Tresor neue Schlüssel; die alte Kopie bleibt auf diesem Gerät, bis Sie bestätigen.",
+    "passwordLabel": "Master-Passwort",
+    "phraseLabel": "Wiederherstellungsphrase",
+    "phraseHelp": "Erforderlich – Ihre neuen Schlüssel werden mit dieser Phrase verschlüsselt, damit die Wiederherstellung weiterhin funktioniert. Geben Sie alle Ihre Wiederherstellungswörter ein.",
+    "submit": "Migrieren",
+    "migrating": "Wird migriert…",
+    "done": "{{count}} Notizen ins neue Format migriert.",
+    "settle": {
+      "intro": "Ihr Tresor wurde aktualisiert. Die alte Kopie liegt noch auf diesem Gerät, bis Sie den Vorgang abschließen – bis dahin wird sie auch durch eine Passwortänderung nicht weggesperrt.",
+      "confirm": "Alles sieht richtig aus, alte Kopie entfernen",
+      "abort": "Etwas stimmt nicht, alten Tresor zurückholen",
+      "errorAlreadySynced": "Dieser Tresor wurde bereits im neuen Format synchronisiert, daher lässt er sich nicht zurückholen. Stellen Sie aus einer Sicherung wieder her, wenn Sie den alten brauchen.",
+      "errorBusy": "Ein anderer Tresorvorgang läuft gerade. Versuchen Sie es gleich erneut.",
+      "errorIo": "Das konnte nicht abgeschlossen werden. Es wurde nichts geändert."
+    },
+    "progressCount": "{{done}} von {{total}} Elementen neu verschlüsselt…",
+    "error": {
+      "recoveryPhraseRequired": "Diese Wiederherstellungsphrase passt nicht zu diesem Tresor. Geben Sie Ihre korrekte Wiederherstellungsphrase ein, um zu migrieren – sie ist erforderlich, damit die Wiederherstellung weiterhin funktioniert.",
+      "wrongPassword": "Dieses Passwort passt nicht zu diesem Tresor.",
+      "alreadyMigrated": "Dieser Tresor ist bereits im neuen Format.",
+      "generic": "Die Migration konnte nicht abgeschlossen werden. Ihr Tresor ist unverändert; versuchen Sie es erneut."
     }
   },
   "recover": {
@@ -2489,9 +2562,11 @@
         "invalidName": "Unsicherer Design-Name",
         "invalidValue": "Ungültiger Wert für {{key}}",
         "invalidValueWithLine": "Ungültiger Wert für {{key}} (Zeile {{line}})",
+        "lowContrast": "{{key}} auf {{against}} hat einen Kontrast von {{ratio}}:1, benötigt aber mindestens {{min}}:1, um lesbar zu bleiben",
         "missingKey": "Erforderliche Farbe {{key}} fehlt",
         "parseError": "Kein gültiges JSON",
-        "parseErrorWithLine": "Kein gültiges JSON (Zeile {{line}})"
+        "parseErrorWithLine": "Kein gültiges JSON (Zeile {{line}})",
+        "reservedKey": "{{key}} ist für Mynes eigene Verwendung reserviert und kann nicht von einem Design gesetzt werden"
       },
       "export": "Exportieren",
       "exportError": "Dieses Design konnte nicht exportiert werden. Bitte versuchen Sie es erneut.",
@@ -2672,12 +2747,45 @@
       "autoTagHelper": "Wenn Sie beim Tippen innehalten, liest ein kleines Modell auf Ihrem Gerät die Notiz und schlägt oben in ihr Tags vor. Es wird nichts hinzugefügt, bis Sie einen Vorschlag annehmen.",
       "autoTagLabel": "Tags automatisch vorschlagen",
       "autoTagUnavailable": "Dieser Build wird ohne das Tag-Modell ausgeliefert, daher können keine Tags vorgeschlagen werden. Myne lädt nie eines herunter – in einem Build, der es enthält, schaltet sich der Schalter von selbst ein.",
+      "consent": {
+        "accept": "Meine Notizen an {{provider}} senden",
+        "cancel": "Abbrechen",
+        "cannotVerifyLabel": "Was Myne nicht überprüfen kann",
+        "revokeLabel": "Wie Sie das rückgängig machen",
+        "scopeLabel": "Für welche Geräte das gilt",
+        "title": "Bevor Myne etwas an {{provider}} sendet",
+        "whatLabel": "Was Ihr Gerät verlässt",
+        "whenLabel": "Wann es das Gerät verlässt",
+        "whoLabel": "Wer es empfängt"
+      },
       "disclosureToggle": "Wie funktioniert das?",
       "enableHelper": "Führt ein von dir bereitgestelltes Modell vollständig auf deinem Gerät aus. Experimentell, standardmäßig aus.",
       "enableLabel": "Lokale KI aktivieren",
       "excludedHelper": "Notizen in diesen Ordnern werden von der KI nie gelesen oder indexiert. Ein Ordnerpfad pro Zeile.",
       "excludedLabel": "Ausgeschlossene Ordner",
       "excludedPlaceholder": "Privat/\nTagebuch/",
+      "endpointHelper": "Wenn Sie auf diesem Computer bereits eine Modell-Laufzeitumgebung betreiben, geben Sie hier deren Adresse an – dann nutzt Myne sie, statt Modelldateien auszuwählen. Lassen Sie dies leer, um die Dateien oben zu verwenden.",
+      "endpointLabel": "Lokale Modell-Laufzeitumgebung",
+      "endpointModelHelper": "Myne wählt kein Modell für Sie aus. Solange Sie keines angeben, wird die Adresse oben zwar gespeichert, aber nicht verwendet.",
+      "endpointModelLabel": "Dort zu verwendendes Modell",
+      "endpointModelPlaceholder": "der Modellname, wie ihn die Laufzeitumgebung anzeigt",
+      "endpointRejected": {
+        "malformed": "Diese Adresse kann Myne nicht verwenden. Sie braucht ein Schema und einen ausdrücklichen Port – zum Beispiel http://127.0.0.1:11434.",
+        "notLoopback": "Diese Adresse muss auf diesem Computer liegen – localhost, 127.0.0.1 oder ::1. Um einen Anbieter zu verwenden, der woanders läuft, geben Sie ihn stattdessen unter „Entfernter Anbieter“ an.",
+        "unsupportedScheme": "Es werden nur http- und https-Adressen akzeptiert."
+      },
+      "endpointSaveFailed": "Die Adresse konnte nicht gespeichert werden. Prüfen Sie, ob Myne seine Einstellungen schreiben kann.",
+      "endpointThirdParty": "{{name}} ist ein eigenständiges Programm mit eigenem Netzwerkverhalten, und Myne hat keine Kontrolle darüber. Ihre Notizen werden dorthin gesendet, während es auf diesem Computer läuft.",
+      "providerError": {
+        "barred": "Diese Art von Anfrage geht nie an einen Anbieter – sie läuft auf diesem Gerät oder gar nicht.",
+        "failed": "Das hat nicht funktioniert. Es wurde nichts gespeichert und nichts erneut gesendet.",
+        "noCredential": "Für diesen Anbieter ist kein API-Schlüssel hinterlegt. Fügen Sie einen unter Einstellungen → Developer → KI hinzu.",
+        "quotaExhausted": "Der Anbieter hat die Anfrage abgelehnt – Ihr Guthaben ist aufgebraucht oder ein Ratenlimit ist überschritten. Das lässt sich nur beim Anbieter klären, nicht in Myne.",
+        "refused": "Der Anbieter hat die Verbindung abgelehnt. Möglicherweise ist er ausgefallen oder blockiert dieses Netzwerk.",
+        "timeout": "Der Anbieter hat nicht rechtzeitig geantwortet. Es läuft nichts weiter.",
+        "unauthorized": "Der Anbieter hat Ihren API-Schlüssel zurückgewiesen. Ersetzen Sie ihn – er könnte falsch, widerrufen oder für ein anderes Konto sein.",
+        "unreachable": "Der Anbieter ist nicht erreichbar. Prüfen Sie Ihre Netzwerkverbindung."
+      },
       "modelChoose": "Datei auswählen…",
       "modelEmbeddingLabel": "Suchmodell – semantische Suche & Q&A",
       "modelFilter": {
@@ -2689,6 +2797,25 @@
       "modelSaveFailed": "Der Modellpfad konnte nicht gespeichert werden (er muss außerhalb deines Tresors liegen).",
       "modelTranscriptionLabel": "Sprache-zu-Text-Modell (Transkription)",
       "modelsHelper": "Myne lädt niemals Modelle herunter – das würde bedeuten, Daten über das Netzwerk zu senden. Öffne einen Link, um eines in deinem Browser zu holen, und wähle dann hier die heruntergeladenen Dateien aus. Alles läuft auf deinem Gerät.",
+      "providerHelper": "Statt ein Modell hier auszuführen, kann Myne eine Anfrage an einen von Ihnen benannten Dienst senden. Dabei verlassen Ihre Notizen dieses Gerät. „Keiner“ ist die Voreinstellung und bedeutet, dass überhaupt kein Dienst kontaktiert wird.",
+      "providerKeyAdd": "Ihren API-Schlüssel einfügen",
+      "providerKeyLabel": "API-Schlüssel",
+      "providerKeyNone": "Es ist kein Schlüssel gespeichert, daher kann noch nichts gesendet werden.",
+      "providerKeyRevoke": "Diesen Schlüssel entfernen",
+      "providerKeyReplace": "einen neuen Schlüssel einfügen, um den gespeicherten zu ersetzen",
+      "providerKeyStored": "Ein Schlüssel ist gespeichert. Myne zeigt ihn Ihnen nie wieder an – fügen Sie einen neuen ein, um ihn zu ersetzen.",
+      "providerActive": "Antwortet gerade: {{name}}",
+      "providerLabel": "Entfernter Anbieter",
+      "providerModelCount_one": "{{count}} Modell verfügbar.",
+      "providerModelCount_other": "{{count}} Modelle verfügbar.",
+      "providerModelEmpty": "Dieser Anbieter hat für Ihr Konto keine Modelle veröffentlicht.",
+      "providerModelHelper": "Myne liefert keine Voreinstellung mit. Die Liste kommt vom Anbieter, bleibt dadurch aktuell, und Ihnen wird nie ein Modell berechnet, das Sie nicht ausgewählt haben.",
+      "providerModelLabel": "Modell",
+      "providerModelLoad": "Modelle laden",
+      "providerModelNone": "Kein Modell ausgewählt",
+      "providerModelUnfetched": "Laden Sie die Liste, um ein Modell auszuwählen.",
+      "providerNone": "Keiner",
+      "providerNothingAnswering": "Es ist noch nichts eingerichtet, das antworten könnte.",
       "modelsLabel": "Modelle",
       "recommendedFilesEmbedding": "Benötigt model.safetensors + config.json + tokenizer.json in einem Ordner.",
       "recommendedFilesGeneration": "Benötigt die .gguf-Datei + tokenizer.json im selben Ordner.",
@@ -2753,6 +2880,7 @@
       "quickUnlockSubtitle": "Nach dem automatischen Sperren mit {{method}} oder einer PIN erneut entsperren"
     },
     "quickUnlock": {
+      "errorBusy": "Ein anderer Tresorvorgang läuft gerade. Versuchen Sie es gleich erneut.",
       "errorCancelled": "Abgebrochen.",
       "errorGeneric": "Schnellentsperrung konnte nicht eingerichtet werden.",
       "errorHardwareUnavailable": "Touch ID ist in diesem Build nicht verfügbar. Dafür ist ein signierter macOS-Build mit eingerichtetem Touch ID nötig.",
@@ -2933,6 +3061,9 @@
       },
       "keywords": {
         "aiAutoTag": "auto tag tags vorschlagen vorschläge schlagwörter automatisch ki ai",
+        "aiEndpoint": "ollama endpunkt endpoint adresse lokale laufzeitumgebung runtime modellserver server port loopback",
+        "aiProvider": "anbieter provider entfernt remote cloud openrouter ollama api schlüssel key zugangsdaten einwilligung zustimmung notizen senden",
+        "aiProviderModel": "modell modelle katalog liste welches modell llama qwen gpt auswählen entfernter anbieter remote",
         "aiEnable": "lokale ki ai an aus aktivieren deaktivieren einschalten maschinelles lernen llm",
         "aiExcluded": "ausgeschlossene ordner ausschließen ignorieren ki ai datenschutz privatsphäre",
         "aiModels": "modelle modell gguf herunterladen download text embedding einbettung llm ki",
@@ -2989,8 +3120,26 @@
         "vaultIcon": "tresor symbol icon avatar bild",
         "vaultLabel": "tresor bezeichnung name umbenennen titel",
         "vaultLocation": "tresor speicherort pfad ordner festplatte wo gespeichert",
-        "viewMode": "standard ansichtsmodus ansicht live lesen quelltext vorschau"
+        "viewMode": "standard ansichtsmodus ansicht live lesen quelltext vorschau",
+        "dateFormat": "datumsformat datum format tag monat jahr iso dd/mm mm/dd kalender",
+        "timeFormat": "zeitformat uhrzeit format 24 stunden 12 stunden uhr am pm",
+        "timezone": "zeitzone zeitzonen zone tz utc iana region heute"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Datumsformat",
+      "dateHelper": "Wie Datumsangaben in Aufgaben, gespeicherten Ansichten und Anhängen angezeigt werden.",
+      "dateSystem": "Der Sprache folgen",
+      "timeLabel": "Zeitformat",
+      "timeHelper": "Ob Uhrzeiten im 24-Stunden- oder im 12-Stunden-Format angezeigt werden.",
+      "timeSystem": "Der Sprache folgen",
+      "time24": "24 Stunden",
+      "time12": "12 Stunden",
+      "zoneLabel": "Zeitzone",
+      "zoneHelper": "Diese Zone bestimmt, was als heute gilt. Leer lassen, um diesem Gerät zu folgen. Uhrzeiten, die Sie in eine Notiz schreiben, werden nie geändert – 09:00 bleibt überall 09:00.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne kennt diese Zeitzone nicht. Verwenden Sie einen Namen wie Europe/Berlin.",
+      "errorSave": "Diese Einstellung konnte nicht gespeichert werden."
     }
   },
   "storageLost": {
@@ -3016,6 +3165,7 @@
   "sync": {
     "materialising": "Ihre Notizen werden heruntergeladen – {{done}} von {{total}}. Sie können bereits arbeiten; der Rest erscheint, sobald er eintrifft.",
     "credentialAmbiguous": "Ihr Passwort wurde möglicherweise auf diesem und auf einem anderen Gerät geändert, und Myne kann nicht erkennen, welche Änderung neuer ist – daher wurde nichts geändert. Melden Sie sich auf einem Gerät an, das bereits Zugriff hat, um das zu klären.",
+    "vaultRekeyed": "Dieser Tresor wurde auf einem anderen Gerät auf das neue Format aktualisiert. Entsperren Sie erneut, um fortzufahren – es ist nichts verloren gegangen.",
     "attachments": {
       "aria": {
         "downloading": "{{name}} wird heruntergeladen",
@@ -3032,6 +3182,7 @@
     "buildingIndex": {
       "label": "Suchindex wird erstellt…"
     },
+    "remoteMergeHint": "Von einem anderen Gerät aktualisiert",
     "conflicts": {
       "compare": "Vergleichen",
       "compareClose": "Zurück zu den Konflikten",
@@ -3099,6 +3250,7 @@
       "verifyPending": "Dieser Code erscheint, sobald das neue Gerät seine erste Synchronisierung abgeschlossen hat.",
       "verifySyncing": "Wird synchronisiert…",
       "verifyTitle": "Neues Gerät verifizieren",
+      "verifyAction": "Code vergleichen",
       "yourDevices": "Ihre Geräte"
     },
     "endpoint": {
@@ -3128,7 +3280,12 @@
       "deviceNameHelp": "Wird in Ihrer Geräteliste angezeigt. Sie können ihn später ändern.",
       "deviceNameLabel": "Diesem Gerät einen Namen geben",
       "error": {
+        "awaitingApproval": "Dieses Gerät wartet bereits auf Genehmigung. Genehmigen Sie es von einem Gerät aus, das bereits angemeldet ist.",
+        "deviceLimit": "Dieses Konto hat sein Gerätelimit erreicht. Entfernen Sie ein Gerät, das Sie nicht mehr nutzen, und versuchen Sie es erneut.",
+        "frozen": "Dieses Konto ist eingefroren, daher kann derzeit kein neues Gerät hinzugefügt werden. Ihre Notizen auf diesem Gerät sind davon nicht betroffen.",
         "notConfigured": "Legen Sie in den Einstellungen einen Sync-Server fest, bevor Sie dieses Gerät hinzufügen.",
+        "serverMismatch": "Die Identität des Sync-Servers stimmte nicht mit dem überein, was dieses Gerät erwartet hat. Geben Sie Ihre Zugangsdaten erst wieder ein, wenn Sie wissen, warum.",
+        "kdfTooLarge": "Dieses Gerät hat nicht genug Arbeitsspeicher, um diesen Tresor zu öffnen. Seine Verschlüsselungseinstellungen benötigen mehr Arbeitsspeicher, als diese App hier verwenden kann. Öffnen Sie ihn stattdessen auf einem Desktop-Computer.",
         "transport": "Der Sync-Server ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
       },
       "mode": {
@@ -3412,7 +3569,8 @@
       "inProgress": "Vorgang läuft.",
       "kdfMemoryExceedsHost": "Dieser Tresor benötigt {{required}} MiB Arbeitsspeicher zum Öffnen – mehr, als dieser Browser bereitstellen kann ({{available}} MiB). Mit dem Tresor ist alles in Ordnung; öffnen Sie ihn in der Myne-Desktop-App.",
       "unexpected": "Unerwarteter Fehler. Bitte versuchen Sie es erneut.",
-      "vaultNotFound": "Tresordatei nicht gefunden. Bitte starten Sie die App neu."
+      "vaultNotFound": "Tresordatei nicht gefunden. Bitte starten Sie die App neu.",
+      "vaultUpgraded": "Dieser Tresor wurde auf ein neueres Format aktualisiert, das diese Myne-Version noch nicht unterstützt. Mit Ihren Daten ist alles in Ordnung – aktualisieren Sie Myne auf die neueste Version, um ihn zu öffnen."
     },
     "passwordLabel": "Passwort",
     "passwordPlaceholder": "Passwort",
@@ -3481,6 +3639,7 @@
       "committing": "Wird gespeichert…",
       "copied": "Kopiert",
       "copy": "Kopieren",
+      "copyFailed": "Kopieren nicht möglich – verwenden Sie stattdessen „Als Datei speichern“.",
       "eyebrow": "Schritt 4 von 4 – Kontonummer",
       "heading": "Speichern Sie Ihre Kontonummer.",
       "intro": "Dies ist Ihr Inhaber-Token – behandeln Sie es wie Bargeld.",
@@ -3595,6 +3754,10 @@
       "vaultBusyAuth": {
         "body": "Ein anderer Tresorvorgang läuft gerade. Versuchen Sie es gleich erneut.",
         "title": "Tresor ausgelastet"
+      },
+      "plaintextTooLarge": {
+        "title": "Diese Notiz ist zu groß zum Verschlüsseln",
+        "body": "Versuchen Sie es mit weniger Inhalt erneut."
       }
     },
     "orchestrator": {
@@ -3890,6 +4053,12 @@
     "backUpNow": "Jetzt sichern"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Nur ein Tab kann einen Tresor gleichzeitig geöffnet halten – zwei würden in denselben Speicher schreiben und ihn beschädigen. Schließen Sie den anderen Tab, um hier fortzufahren.",
+      "freed": "Der andere Tab wurde geschlossen. Laden Sie neu, um Ihren Tresor hier zu öffnen.",
+      "reload": "Neu laden",
+      "title": "Dieser Tresor ist in einem anderen Tab geöffnet"
+    },
     "reload": {
       "body": "Beim Neuladen dieser Seite wird erneut nach Ihrem Passwort gefragt – einen schnelleren Weg hinein gibt es bewusst nicht. Ihr Tresor bleibt auf diesem Gerät verschlüsselt, während die Seite geschlossen ist, und der Schlüssel wird jedes Mal aus Ihrem Passwort neu aufgebaut.",
       "title": "Neu laden bedeutet: Passwort erneut eingeben"

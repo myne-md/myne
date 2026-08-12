@@ -9,6 +9,7 @@
     "passwordLabel": "Mesterjelszó",
     "approversIntro": "Ezek az eszközök hagyhatják jóvá ezt:",
     "noApprovers": "A fiókodhoz tartozó többi eszköz közül most egyik sem tudja jóváhagyni. Nyisd meg a Myne-t egy olyan eszközön, amelynek már van hozzáférése, majd térj vissza ide.",
+    "pendingStartOver": "Újrakezdés másik fiókkal",
     "pendingTitle": "Várakozás a jóváhagyásra",
     "sasMatch": "Egyeznek — folytatás",
     "sasMismatch": "Nem egyeznek",
@@ -24,6 +25,13 @@
     "hint": "Így néz ki: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Az ellenőrzés itt, az eszközödön történik — egyelőre semmi nem megy el innen.",
     "invalid": "Ez a fiókszám nem érvényes. Ellenőrizd, és próbáld újra.",
     "title": "Add meg a fiókszámodat"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "A válasz ezen az eszközön készült",
+      "localRuntime": "{{name}} válaszolt, ezen a számítógépen",
+      "remote": "{{provider}} válaszolt — a Myne odaküldte a jegyzeteidet"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -218,7 +226,8 @@
       "intro": "Erősítsd meg, hogy ez a kód megegyezik a bővítményben megjelenővel, majd kattints az Elfogadás gombra a párosításhoz.",
       "reject": "Elutasítás",
       "rejected": "A párosítás elutasítva.",
-      "title": "Egy böngészőbővítmény csatlakozni szeretne"
+      "title": "Egy böngészőbővítmény csatlakozni szeretne",
+      "persistFailed": "A Myne nem tudta menteni ezt a kapcsolatot, ezért nem jött létre. Ha a széf zárolva van, oldd fel, és próbáld újra a csatlakozást."
     }
   },
   "commandPalette": {
@@ -914,10 +923,14 @@
           "insert": "Beszúrás a jegyzetbe",
           "noAnswer": "Nincs válasz – próbálja átfogalmazni.",
           "noModelHint": "Nincs kiválasztott modell. Válasszon egyet a Beállítások → Fejlesztő → AI menüben a kezdéshez.",
+          "unreachableHint": "A beállított szolgáltató nem válaszol. Ellenőrizd, hogy fut-e, majd küldd el újra.",
+          "unavailableHint": "A Myne-nak ez a buildje helyi AI nélkül készült, így itt semmi nem tud futni.",
           "offHint": "A helyi AI ki van kapcsolva. Kapcsolja be a Beállítások → Fejlesztő → AI menüben.",
           "send": "Küldés",
           "statusGettingReady": "Előkészítés…",
           "statusNoModel": "Nincs modell",
+          "statusUnreachable": "Nem válaszol",
+          "statusUnavailable": "Nem érhető el",
           "statusOff": "Ki",
           "statusReady": "Kész",
           "stop": "Leállítás",
@@ -1040,6 +1053,8 @@
     },
     "slash": {
       "aiContinue": "Írás folytatása (AI)",
+      "aiFailed": "Az AI-kérés nem teljesíthető, ezért semmi nem lett beszúrva.",
+      "aiNoProvider": "Nincs beállítva AI-szolgáltató, ezért semmi nem lett beszúrva. Állíts be egyet a Beállítások → Fejlesztő → AI menüben.",
       "aiTitle": "Cím javaslása (AI)",
       "attachFile": "Fájl csatolása",
       "bulletList": "Felsorolás",
@@ -1066,7 +1081,8 @@
       "time": "Idő",
       "todoList": "Tennivaló-lista",
       "voiceNote": "Hangjegyzet",
-      "wikiLink": "Wikilink"
+      "wikiLink": "Wikilink",
+      "remind": "Emlékeztető"
     },
     "spell": {
       "menu": {
@@ -1098,13 +1114,17 @@
       "menuEdit": "{{field}} szerkesztése",
       "menuTitle": "Mező hozzáadása",
       "repeatNoAnchor": "Ennek a feladatnak nincs dátuma, amelytől ismétlődhetne, ezért nem fog ismétlődni. Adj hozzá határidőt az indításához.",
+      "repeatNeedsDate": "Határidő kell, amelytől ismétlődhet",
       "save": "Mentés",
       "skipOccurrence": "Ennek az előfordulásnak a kihagyása",
       "title": {
         "due": "Határidő",
         "repeat": "Ismétlés",
-        "priority": "Prioritás"
-      }
+        "priority": "Prioritás",
+        "remind": "Emlékeztető"
+      },
+      "timeLabel": "Időpont (nem kötelező)",
+      "invalidRemind": "A Myne nem tudja értelmezni ezt a dátumot, ezért nem fog emlékeztetni."
     },
     "toolbar": {
       "apply": "Alkalmaz",
@@ -1207,7 +1227,8 @@
         "rewriteCount_one": "{{count}} hivatkozás lesz átírva",
         "rewriteCount_other": "{{count}} hivatkozás lesz átírva",
         "skipped": "kihagyva — {{reason}}",
-        "title": "Importált wikilinkek konvertálása ebben a jegyzetben"
+        "title": "Importált wikilinkek konvertálása ebben a jegyzetben",
+        "staleDocument": "Ez a jegyzet megváltozott, amíg az előnézet nyitva volt, ezért semmi nem lett konvertálva. Futtasd újra, hogy az aktuális hivatkozásokat lásd."
       },
       "convertCore": {
         "noMatch": "nincs találat"
@@ -1225,6 +1246,8 @@
       "attachUnsupported": "Csak képek és PDF-ek csatolhatók.",
       "attachFailed": "Nem sikerült csatolni a fájlt.",
       "archiveFailed": "Nem sikerült archiválni ezt a jegyzetet.",
+      "aiRewriteFailed": "Az átírás nem teljesíthető, ezért a kijelölésed változatlan maradt.",
+      "aiRewriteNoProvider": "Nincs beállítva AI-szolgáltató, ezért semmi nem lett átírva. Állíts be egyet a Beállítások → Fejlesztő → AI menüben.",
       "trashFailed": "Nem sikerült a jegyzetet a Kukába helyezni."
     },
     "nav": {
@@ -1537,6 +1560,29 @@
       "untitled": "Névtelen",
       "warning": "Ez nem vonható vissza."
     },
+    "example": {
+      "folder": "Első lépések",
+      "index": {
+        "title": "Kezdd itt",
+        "body": "Ez egy kis példaszéf. Néhány hétköznapi jegyzet, amely megmutatja, mire képes a Myne — és semmi sem érinthetetlen benne: bármit szerkeszthetsz, átnevezhetsz vagy törölhetsz.\n\n- [[{{markdown}}]] megmutatja, hogyan lesz a sima szövegből formázás\n- [[{{tasks}}]] egy helyre gyűjti a teendőlistákat\n- [[{{links}}]] összeköti a jegyzeteket, és címkékkel rendszerezi őket\n- [[{{makeItYours}}]] egyetlen lépésben eltakarítja mindezt\n\nLáttál eleget? Kattints jobb gombbal az **Első lépések** mappára az oldalsávon, és válaszd a Törlés lehetőséget. A jegyzetek a Kukába kerülnek, így vissza tudod hozni őket, ha meggondolod magad.\n"
+      },
+      "markdown": {
+        "title": "Írás Markdownnal",
+        "body": "A Myne egyszerű Markdownt ír, és gépelés közben mutatja az eredményt.\n\n## Az alapok\nTegyél egy szót **félkövérré** vagy *dőltté*, vagy szúrj be `soron belüli kódot`.\n\n## Egy lista\n- Egy elem\n- Egy másik elem\n  - Egy beágyazott\n\n## Egy idézet\n> A sok éven át megőrzött apró jegyzet többet ér, mint a nagy jegyzet, amelyet sosem írsz meg.\n\n## Egy táblázat\n| Gyorsbillentyű | Mit csinál |\n| --- | --- |\n| Cmd/Ctrl + B | Félkövér |\n| Cmd/Ctrl + K | Hivatkozás beszúrása |\n\n## Egy kis kód\n```\nconsole.log(\"hello from Myne\")\n```\n\nHa készen állsz, térj vissza ide: [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Feladatok",
+        "body": "Minden sor, amely `- [ ]` jelöléssel kezdődik, feladat. A Myne a jegyzeteidből az összes nyitott feladatot egyetlen Feladatok nézetbe gyűjti, így semmi nem vész el a jegyzetek között.\n\n- [ ] Olvasd el: [[{{markdown}}]]\n- [ ] Vegyél fel egy saját feladatot\n- [ ] Próbálj ki egyet határidővel 📅 2030-12-31\n- [x] Hozd létre a széfedet\n\nPipálj ki itt egy jelölőnégyzetet, majd nyisd meg a Feladatok nézetet az oldalsávon, és nézd, ahogy a lista frissül.\n\nVissza ide: [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Hivatkozások és címkék",
+        "body": "Írj `[[` jelet, hogy egy másik jegyzetre hivatkozz. A hivatkozások mindkét irányban működnek: nyisd meg a [[{{index}}]] jegyzetet, és ott látod majd ezt a jegyzetet a visszahivatkozásai között, a gráf pedig vonalat húz közéjük.\n\nÍrj bárhová egy #címke jelölést, és a Myne a címkefában az adott címke alá sorolja be a jegyzetet. Ez a jegyzet a #példa és az #első-lépések címkét kapta, szóval nyisd meg a címkefát az oldalsávon, hogy megtaláld.\n\nTe jössz: hivatkozz erről a jegyzetről a [[{{tasks}}]] jegyzetre, vagy találj ki egy saját címkét.\n"
+      },
+      "makeItYours": {
+        "title": "Tedd a sajátoddá",
+        "body": "Ez a széf mostantól a tiéd. Ezek a jegyzetek csak kiindulópontok, szóval változtass rajtuk bármit, vagy töröld őket, és kezdj tisztán.\n\nA teljes példa eltávolításához kattints jobb gombbal az **Első lépések** mappára az oldalsávon, és válaszd a Törlés lehetőséget. Minden együtt kerül a Kukába, és onnan vissza is állíthatod, ha mégis kellene.\n\nHa készen állsz, nyomd meg a Cmd/Ctrl + N billentyűkombinációt új jegyzet létrehozásához, és kezdj írni.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Feltétel hozzáadása",
       "addFilterGroup": "Szűrőcsoport hozzáadása",
@@ -1577,7 +1623,9 @@
     },
     "folderManagement": {
       "illegalSegment": "A mappa neve nem tartalmazhat / \\ | # ^ [ ] karaktert, és nem kezdődhet vagy végződhet szóközzel.",
-      "tooLong": "Ez a mappaútvonal túl hosszú."
+      "tooLong": "Ez a mappaútvonal túl hosszú.",
+      "moveIntoSelf": "Egy mappa nem helyezhető át önmagába.",
+      "moveCollision": "Ott már van ilyen nevű mappa."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1854,7 +1902,8 @@
       "importedWithSkips": "{{count}} importálva — {{skipped}} kihagyva",
       "importedWithSkips_one": "{{count}} jegyzet importálva — {{skipped}} kihagyva",
       "importedWithSkips_other": "{{count}} jegyzet importálva — {{skipped}} kihagyva",
-      "importNoMarkdown": "Nincs markdown-fájl a bedobott elemek között"
+      "importNoMarkdown": "Nincs markdown-fájl a bedobott elemek között",
+      "moveFolderTo": "Mappa áthelyezése ide…"
     },
     "newFromTemplate": {
       "back": "Vissza",
@@ -2132,6 +2181,30 @@
       "emptyText": "Nincs találat.",
       "placeholder": "Válassz…",
       "searchPlaceholder": "Keresés…"
+    }
+  },
+  "migrate": {
+    "intro": "Frissítsd ezt a széfet az új formátumra. A jegyzeteid ezzel automatikus, eszközök közötti összefésülést kapnak. Ez az egész széfet újrakulcsolja; a régi példány addig megmarad ezen az eszközön, amíg meg nem erősíted.",
+    "passwordLabel": "Mesterjelszó",
+    "phraseLabel": "Helyreállító mondat",
+    "phraseHelp": "Kötelező — az új kulcsaidat ez a mondat csomagolja be, így a helyreállítás továbbra is működik. Add meg az összes helyreállító szavadat.",
+    "submit": "Áttelepítés",
+    "migrating": "Áttelepítés folyamatban…",
+    "done": "{{count}} jegyzet áttelepítve az új formátumra.",
+    "settle": {
+      "intro": "A széfed frissítve lett. A régi példány addig marad ezen az eszközön, amíg le nem zárod a folyamatot — addig a jelszavad módosítása sem zárja el.",
+      "confirm": "Minden rendben, töröld a régi példányt",
+      "abort": "Valami nem stimmel, állítsd vissza a régi széfet",
+      "errorAlreadySynced": "Ez a széf már szinkronizálódott az új formátumban, ezért nem állítható vissza. Ha a régire van szükséged, állítsd helyre egy biztonsági mentésből.",
+      "errorBusy": "Egy másik széfművelet van folyamatban. Próbáld újra egy pillanat múlva.",
+      "errorIo": "Nem sikerült befejezni. Semmi nem változott."
+    },
+    "progressCount": "{{done}} / {{total}} elem újratitkosítva…",
+    "error": {
+      "recoveryPhraseRequired": "Ez a helyreállító mondat nem illik ehhez a széfhez. Add meg a helyes helyreállító mondatodat az áttelepítéshez — kötelező, hogy a helyreállítás továbbra is működjön.",
+      "wrongPassword": "Ez a jelszó nem illik ehhez a széfhez.",
+      "alreadyMigrated": "Ez a széf már az új formátumon van.",
+      "generic": "Az áttelepítés nem fejeződött be. A széfed változatlan; próbáld újra."
     }
   },
   "recover": {
@@ -2489,9 +2562,11 @@
         "invalidName": "Nem biztonságos témanév",
         "invalidValue": "Érvénytelen érték ehhez: {{key}}",
         "invalidValueWithLine": "Érvénytelen érték ehhez: {{key}} ({{line}}. sor)",
+        "lowContrast": "Kontraszt {{key}} és {{against}} között: {{ratio}}:1 — az olvashatósághoz legalább {{min}}:1 szükséges",
         "missingKey": "Hiányzó kötelező szín: {{key}}",
         "parseError": "Nem érvényes JSON",
-        "parseErrorWithLine": "Nem érvényes JSON ({{line}}. sor)"
+        "parseErrorWithLine": "Nem érvényes JSON ({{line}}. sor)",
+        "reservedKey": "Fenntartva a Myne saját használatára, téma nem állíthatja be: {{key}}"
       },
       "export": "Exportálás",
       "exportError": "Nem sikerült exportálni ezt a témát. Kérlek, próbáld újra.",
@@ -2672,12 +2747,45 @@
       "autoTagHelper": "Amikor szünetet tartasz a gépelésben, egy kis modell az eszközödön elolvassa a jegyzetet, és címkéket javasol a tetején. Semmi nem kerül bele, amíg el nem fogadsz egy javaslatot.",
       "autoTagLabel": "Címkék automatikus javaslása",
       "autoTagUnavailable": "Ez a build a címkemodell nélkül készült, így nem lehet címkéket javasolni. A Myne soha nem tölt le ilyet — a kapcsoló magától bekapcsolhatóvá válik egy olyan buildben, amely tartalmazza.",
+      "consent": {
+        "accept": "Jegyzeteim elküldése ide: {{provider}}",
+        "cancel": "Mégse",
+        "cannotVerifyLabel": "Amit a Myne nem tud ellenőrizni",
+        "revokeLabel": "Hogyan vonható vissza",
+        "scopeLabel": "Mely eszközökre vonatkozik",
+        "title": "Mielőtt a Myne bármit elküldene ide: {{provider}}",
+        "whatLabel": "Mi hagyja el az eszközödet",
+        "whenLabel": "Mikor hagyja el",
+        "whoLabel": "Ki kapja meg"
+      },
       "disclosureToggle": "Hogyan működik ez?",
       "enableHelper": "Egy Ön által biztosított modellt futtat teljes egészében az eszközén. Kísérleti, alapértelmezés szerint kikapcsolva.",
       "enableLabel": "Helyi AI engedélyezése",
       "excludedHelper": "Az AI soha nem olvassa be és nem indexeli az ezekben a mappákban lévő jegyzeteket. Soronként egy mappaútvonal.",
       "excludedLabel": "Kizárt mappák",
       "excludedPlaceholder": "Privát/\nNapló/",
+      "endpointHelper": "Ha már futtatsz modell-futtatókörnyezetet ezen a számítógépen, modellfájlok kiválasztása helyett irányítsd oda a Myne-t. Hagyd üresen, ha a fenti fájlokat szeretnéd használni.",
+      "endpointLabel": "Helyi modell-futtatókörnyezet",
+      "endpointModelHelper": "A Myne nem választ helyetted modellt. Amíg nem nevezel meg egyet, a fenti cím mentve van, de nincs használatban.",
+      "endpointModelLabel": "Ott használandó modell",
+      "endpointModelPlaceholder": "a modell neve, ahogy a futtatókörnyezet listázza",
+      "endpointRejected": {
+        "malformed": "Ezt a címet a Myne nem tudja használni. Séma és kifejezett port szükséges hozzá — például http://127.0.0.1:11434.",
+        "notLoopback": "Ennek a címnek ezen a számítógépen kell lennie — localhost, 127.0.0.1 vagy ::1. Ha máshol futó szolgáltatót szeretnél használni, azt inkább a Távoli szolgáltató mezőben add meg.",
+        "unsupportedScheme": "Csak http és https címek fogadhatók el."
+      },
+      "endpointSaveFailed": "Nem sikerült menteni a címet. Ellenőrizd, hogy a Myne tudja-e írni a beállításait.",
+      "endpointThirdParty": "{{name}}: külön program, saját hálózati viselkedéssel, amelyet a Myne nem felügyel. A jegyzeteid hozzá kerülnek, amíg ezen a számítógépen fut.",
+      "providerError": {
+        "barred": "Ez a fajta kérés soha nem megy szolgáltatóhoz — vagy ezen az eszközön fut le, vagy sehogy.",
+        "failed": "Ez nem sikerült. Semmi nem lett elmentve, és semmi nem lett újraküldve.",
+        "noCredential": "Ehhez a szolgáltatóhoz nincs beállítva API-kulcs. Adj hozzá egyet a Beállítások → Fejlesztő → AI menüben.",
+        "quotaExhausted": "A szolgáltató elutasította a kérést — elfogyott a kereted, vagy túllépted a sebességkorlátot. Ezt a szolgáltatónál kell rendezni, nem a Myne-ban.",
+        "refused": "A szolgáltató visszautasította a kapcsolatot. Lehet, hogy nem üzemel, vagy blokkolja ezt a hálózatot.",
+        "timeout": "A szolgáltató nem válaszolt időben. Semmi nem maradt futásban.",
+        "unauthorized": "A szolgáltató elutasította az API-kulcsodat. Cseréld le — lehet, hogy hibás, visszavonták, vagy egy másik fiókhoz tartozik.",
+        "unreachable": "Nem sikerült elérni a szolgáltatót. Ellenőrizd a hálózati kapcsolatodat."
+      },
       "modelChoose": "Fájl kiválasztása…",
       "modelEmbeddingLabel": "Keresőmodell – szemantikus keresés és kérdés-válasz",
       "modelFilter": {
@@ -2689,6 +2797,25 @@
       "modelSaveFailed": "Nem sikerült menteni a modell útvonalát (a széfen kívül kell lennie).",
       "modelTranscriptionLabel": "Beszédfelismerő modell – átirat készítése",
       "modelsHelper": "A Myne soha nem tölt le modelleket – az adatküldést jelentene a hálózaton. Nyisson meg egy hivatkozást, hogy a böngészőjében szerezzen egyet, majd válassza ki itt a letöltött fájlokat. Minden az eszközén fut.",
+      "providerHelper": "Ahelyett, hogy itt futtatna modellt, a Myne el tud küldeni egy kérést egy általad megnevezett szolgáltatásnak. Ilyenkor a jegyzeteid elhagyják ezt az eszközt. Az alapértelmezés a „Nincs”, ami azt jelenti, hogy a Myne semmilyen szolgáltatással nem lép kapcsolatba.",
+      "providerKeyAdd": "illeszd be az API-kulcsodat",
+      "providerKeyLabel": "API-kulcs",
+      "providerKeyNone": "Nincs tárolt kulcs, így egyelőre semmi nem küldhető el.",
+      "providerKeyRevoke": "Kulcs eltávolítása",
+      "providerKeyReplace": "illessz be egy új kulcsot a tárolt lecseréléséhez",
+      "providerKeyStored": "Egy kulcs el van tárolva. A Myne soha nem mutatja meg újra — illessz be egy újat a cseréjéhez.",
+      "providerActive": "Most válaszol: {{name}}",
+      "providerLabel": "Távoli szolgáltató",
+      "providerModelCount_one": "{{count}} modell érhető el.",
+      "providerModelCount_other": "{{count}} modell érhető el.",
+      "providerModelEmpty": "Ez a szolgáltató nem tett közzé modelleket a fiókodhoz.",
+      "providerModelHelper": "A Myne nem hoz magával alapértelmezett választást. A lista a szolgáltatótól érkezik, így naprakész marad, és soha nem számláznak ki olyan modellt, amelyet nem te választottál.",
+      "providerModelLabel": "Modell",
+      "providerModelLoad": "Modellek betöltése",
+      "providerModelNone": "Nincs kiválasztott modell",
+      "providerModelUnfetched": "Töltsd be a listát a modell kiválasztásához.",
+      "providerNone": "Nincs",
+      "providerNothingAnswering": "Még semmi nincs beállítva, ami válaszolna.",
       "modelsLabel": "Modellek",
       "recommendedFilesEmbedding": "Szükséges a model.safetensors + config.json + tokenizer.json egy mappában.",
       "recommendedFilesGeneration": "Szükséges a .gguf fájl + tokenizer.json ugyanabban a mappában.",
@@ -2753,6 +2880,7 @@
       "quickUnlockSubtitle": "Újbóli belépés {{method}} vagy PIN-kód használatával automatikus zárolás után"
     },
     "quickUnlock": {
+      "errorBusy": "Egy másik széfművelet van folyamatban. Próbáld újra egy pillanat múlva.",
       "errorCancelled": "Megszakítva.",
       "errorGeneric": "Nem sikerült beállítani a gyors feloldást.",
       "errorHardwareUnavailable": "A Touch ID nem érhető el ebben a buildben. Aláírt macOS-build szükséges hozzá, regisztrált Touch ID-val.",
@@ -2933,6 +3061,9 @@
       },
       "keywords": {
         "aiAutoTag": "automatikus címkézés címkék javaslat javaslatok címke ai auto tag",
+        "aiEndpoint": "ollama végpont cím helyi futtatókörnyezet modell szerver port endpoint local runtime loopback",
+        "aiProvider": "szolgáltató távoli felhő openrouter ollama api kulcs hitelesítő adat hozzájárulás jegyzetek küldése provider remote cloud api key consent",
+        "aiProviderModel": "modell katalógus lista melyik modell llama qwen gpt modellválasztás távoli szolgáltató model list remote provider",
         "aiEnable": "helyi ai be ki bekapcsolás kikapcsolás engedélyezés gépi tanulás local enable",
         "aiExcluded": "kizárt mappák kizárás mellőzés ai adatvédelem excluded folders",
         "aiModels": "modellek modell gguf letöltés szöveg beágyazás llm models embedding",
@@ -2989,8 +3120,26 @@
         "vaultIcon": "széf ikon avatár kép szimbólum vault icon",
         "vaultLabel": "széf címke név átnevezés cím vault label",
         "vaultLocation": "széf helye útvonal mappa lemez tárolás hol vault location",
-        "viewMode": "alapértelmezett nézetmód élő olvasás forrás előnézet view mode"
+        "viewMode": "alapértelmezett nézetmód élő olvasás forrás előnézet view mode",
+        "dateFormat": "dátumformátum dátum formátum nap hónap év iso dd/mm mm/dd naptár date format calendar",
+        "timeFormat": "időformátum idő formátum 24 órás 12 órás óra de du am pm time format clock",
+        "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Dátumformátum",
+      "dateHelper": "Hogyan jelennek meg a dátumok a feladatoknál, a mentett nézeteknél és a mellékleteknél.",
+      "dateSystem": "Nyelv szerint",
+      "timeLabel": "Időformátum",
+      "timeHelper": "Az időpontok 24 órás vagy 12 órás formátumban jelenjenek-e meg.",
+      "timeSystem": "Nyelv szerint",
+      "time24": "24 órás",
+      "time12": "12 órás",
+      "zoneLabel": "Időzóna",
+      "zoneHelper": "Melyik zóna dönti el, mi számít mai napnak. Hagyd üresen, ha ezt az eszközt szeretnéd követni. A jegyzetbe írt időpontok soha nem változnak — a 09:00 mindenhol 09:00 marad.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "A Myne nem ismeri ezt az időzónát. Használj ilyen nevet: Europe/Berlin.",
+      "errorSave": "Nem sikerült menteni ezt a beállítást."
     }
   },
   "storageLost": {
@@ -3016,6 +3165,7 @@
   "sync": {
     "materialising": "A jegyzeteid letöltése — {{done}} / {{total}}. Elkezdhetsz dolgozni; a többi megjelenik, ahogy megérkezik.",
     "credentialAmbiguous": "Elképzelhető, hogy a jelszavad ezen az eszközön és egy másikon is megváltozott, és a Myne nem tudja megállapítani, melyik az újabb — ezért nem változtatott semmin. Jelentkezz be egy olyan eszközön, amelynek már van hozzáférése, hogy tisztázd.",
+    "vaultRekeyed": "Ezt a széfet egy másik eszközön az új formátumra frissítették. A folytatáshoz oldd fel újra — semmi nem veszett el.",
     "attachments": {
       "aria": {
         "downloading": "{{name}} letöltése",
@@ -3032,6 +3182,7 @@
     "buildingIndex": {
       "label": "Keresési index építése…"
     },
+    "remoteMergeHint": "Frissítve egy másik eszközről",
     "conflicts": {
       "compare": "Összehasonlítás",
       "compareClose": "Vissza az ütközésekhez",
@@ -3099,6 +3250,7 @@
       "verifyPending": "Ez a kód akkor jelenik meg, amikor az új eszköz befejezi az első szinkronizálást.",
       "verifySyncing": "Szinkronizálás…",
       "verifyTitle": "Az új eszköz ellenőrzése",
+      "verifyAction": "Kód összehasonlítása",
       "yourDevices": "Az eszközeid"
     },
     "endpoint": {
@@ -3128,7 +3280,12 @@
       "deviceNameHelp": "Az eszközlistádban jelenik meg. Később módosíthatod.",
       "deviceNameLabel": "Nevezd el ezt az eszközt",
       "error": {
+        "awaitingApproval": "Ez az eszköz már jóváhagyásra vár. Hagyd jóvá egy olyan eszközről, amelyre már be vagy jelentkezve.",
+        "deviceLimit": "Ez a fiók elérte az eszközkorlátját. Távolíts el egy eszközt, amelyet már nem használsz, majd próbáld újra.",
+        "frozen": "Ez a fiók be van fagyasztva, ezért most nem adható hozzá új eszköz. Az ezen az eszközön lévő jegyzeteidet ez nem érinti.",
         "notConfigured": "Az eszköz hozzáadása előtt állíts be egy szinkronszervert a beállításokban.",
+        "serverMismatch": "A szinkronszerver azonossága nem egyezett azzal, amit ez az eszköz várt. Ne add meg újra a hitelesítő adataidat, amíg nem tudod, mi ennek az oka.",
+        "kdfTooLarge": "Ennek az eszköznek nincs elég memóriája a széf megnyitásához. A széf titkosítási beállításai több memóriát igényelnek, mint amennyit ez az alkalmazás itt használni tud. Nyisd meg inkább asztali számítógépen.",
         "transport": "Nem sikerült elérni a szinkronszervert. Ellenőrizd a kapcsolatot, és próbáld újra."
       },
       "mode": {
@@ -3412,7 +3569,8 @@
       "inProgress": "Művelet van folyamatban.",
       "kdfMemoryExceedsHost": "Ennek a széfnek a megnyitásához {{required}} MiB memória kell — több, mint amennyit ez a böngésző adni tud ({{available}} MiB). A széffel nincs baj; nyisd meg a Myne asztali alkalmazásában.",
       "unexpected": "Váratlan hiba. Kérlek, próbáld újra.",
-      "vaultNotFound": "A széf fájlja nem található. Kérlek, indítsd újra az alkalmazást."
+      "vaultNotFound": "A széf fájlja nem található. Kérlek, indítsd újra az alkalmazást.",
+      "vaultUpgraded": "Ezt a széfet olyan újabb formátumra frissítették, amelyet a Myne-nak ez a verziója még nem támogat. Az adataiddal nincs baj — a megnyitásához frissítsd a Myne-t a legújabb verzióra."
     },
     "passwordLabel": "Jelszó",
     "passwordPlaceholder": "Jelszó",
@@ -3481,6 +3639,7 @@
       "committing": "Mentés…",
       "copied": "Másolva",
       "copy": "Másolás",
+      "copyFailed": "Nem sikerült a másolás — használd inkább a „Mentés fájlként” lehetőséget.",
       "eyebrow": "4. lépés a 4-ből — fiókszám",
       "heading": "Mentsd el a fiókszámodat.",
       "intro": "Ez a bemutatóra szóló tokened — kezeld úgy, mint a készpénzt.",
@@ -3595,6 +3754,10 @@
       "vaultBusyAuth": {
         "body": "Egy másik széfművelet van folyamatban. Próbáld újra egy pillanat múlva.",
         "title": "A széf foglalt"
+      },
+      "plaintextTooLarge": {
+        "title": "Ez a jegyzet túl nagy a titkosításhoz",
+        "body": "Próbáld újra kevesebb tartalommal."
       }
     },
     "orchestrator": {
@@ -3890,6 +4053,12 @@
     "backUpNow": "Biztonsági mentés most"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Egyszerre csak egy lap tarthat nyitva egy széfet — kettő ugyanabba a tárhelybe írna, és tönkretenné. Zárd be a másik lapot, hogy itt folytathasd.",
+      "freed": "A másik lap bezárult. Töltsd újra az oldalt, hogy itt nyisd meg a széfedet.",
+      "reload": "Újratöltés",
+      "title": "Ez a széf egy másik lapon van nyitva"
+    },
     "reload": {
       "body": "Az oldal újratöltése után a Myne újra kéri a jelszavadat — szándékosan nincs ennél gyorsabb út befelé. A széfed titkosítva marad ezen az eszközön, amíg az oldal zárva van, és a kulcs minden alkalommal a jelszavadból épül újra.",
       "title": "Az újratöltés újra jelszót kér"

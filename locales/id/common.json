@@ -9,6 +9,7 @@
     "passwordLabel": "Kata sandi master",
     "approversIntro": "Perangkat berikut dapat menyetujui perangkat ini:",
     "noApprovers": "Tidak ada perangkat lain di akun ini yang dapat menyetujuinya saat ini. Buka Myne di perangkat yang sudah memiliki akses, lalu kembali ke sini.",
+    "pendingStartOver": "Mulai ulang dengan akun lain",
     "pendingTitle": "Menunggu persetujuan",
     "sasMatch": "Cocok — lanjutkan",
     "sasMismatch": "Tidak cocok",
@@ -24,6 +25,13 @@
     "hint": "Bentuknya seperti MY-XXXX-XXXX-XXXX-XXXX-XXXX. Diperiksa di sini, di perangkat Anda — belum ada yang dikirim.",
     "invalid": "Nomor akun itu tidak valid. Periksa lalu coba lagi.",
     "title": "Masukkan nomor akun Anda"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Dijawab di perangkat ini",
+      "localRuntime": "Dijawab oleh {{name}}, di komputer ini",
+      "remote": "Dijawab oleh {{provider}} — catatan Anda dikirim ke sana"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -218,7 +226,8 @@
       "intro": "Pastikan kode ini cocok dengan yang ditampilkan di ekstensi, lalu pilih Terima untuk memasangkan.",
       "reject": "Tolak",
       "rejected": "Pemasangan ditolak.",
-      "title": "Sebuah ekstensi peramban ingin terhubung"
+      "title": "Sebuah ekstensi peramban ingin terhubung",
+      "persistFailed": "Myne tidak dapat menyimpan koneksi ini, jadi koneksi tidak terbentuk. Jika brankas terkunci, buka kuncinya lalu coba hubungkan lagi."
     }
   },
   "commandPalette": {
@@ -914,10 +923,14 @@
           "insert": "Sisipkan ke catatan",
           "noAnswer": "Tidak ada jawaban — coba ubah kalimatnya.",
           "noModelHint": "Tidak ada model terpilih. Pilih satu di Pengaturan → Developer → AI untuk memulai.",
+          "unreachableHint": "Penyedia yang Anda siapkan tidak merespons. Pastikan penyedia itu berjalan, lalu kirim lagi.",
+          "unavailableHint": "Build Myne ini dikompilasi tanpa AI lokal, jadi tidak ada yang dapat dijalankan di sini.",
           "offHint": "AI lokal mati. Nyalakan di Pengaturan → Developer → AI.",
           "send": "Kirim",
           "statusGettingReady": "Menyiapkan…",
           "statusNoModel": "Tidak ada model",
+          "statusUnreachable": "Tidak merespons",
+          "statusUnavailable": "Tidak tersedia",
           "statusOff": "Mati",
           "statusReady": "Siap",
           "stop": "Hentikan",
@@ -1040,6 +1053,8 @@
     },
     "slash": {
       "aiContinue": "Lanjutkan menulis (AI)",
+      "aiFailed": "Permintaan AI tidak dapat diselesaikan, jadi tidak ada yang disisipkan.",
+      "aiNoProvider": "Tidak ada penyedia AI yang disiapkan, jadi tidak ada yang disisipkan. Siapkan satu di Pengaturan → Developer → AI.",
       "aiTitle": "Sarankan judul (AI)",
       "attachFile": "Lampirkan berkas",
       "bulletList": "Daftar berbutir",
@@ -1066,7 +1081,8 @@
       "time": "Waktu",
       "todoList": "Daftar tugas",
       "voiceNote": "Catatan suara",
-      "wikiLink": "Wikilink"
+      "wikiLink": "Wikilink",
+      "remind": "Pengingat"
     },
     "spell": {
       "menu": {
@@ -1098,13 +1114,17 @@
       "menuEdit": "Sunting {{field}}",
       "menuTitle": "Tambah bidang",
       "repeatNoAnchor": "Tugas ini tidak punya tanggal acuan untuk diulang, jadi tidak akan berulang. Tambahkan tanggal tenggat untuk memulainya.",
+      "repeatNeedsDate": "Perlu tanggal tenggat sebagai acuan pengulangan",
       "save": "Simpan",
       "skipOccurrence": "Lewati kemunculan ini",
       "title": {
         "due": "Tanggal tenggat",
         "repeat": "Pengulangan",
-        "priority": "Prioritas"
-      }
+        "priority": "Prioritas",
+        "remind": "Pengingat"
+      },
+      "timeLabel": "Waktu (opsional)",
+      "invalidRemind": "Myne tidak dapat membaca tanggal ini, jadi Anda tidak akan diingatkan."
     },
     "toolbar": {
       "apply": "Terapkan",
@@ -1207,7 +1227,8 @@
         "rewriteCount_one": "{{count}} tautan akan ditulis ulang",
         "rewriteCount_other": "{{count}} tautan akan ditulis ulang",
         "skipped": "dilewati — {{reason}}",
-        "title": "Konversi wikilink yang diimpor di catatan ini"
+        "title": "Konversi wikilink yang diimpor di catatan ini",
+        "staleDocument": "Catatan ini berubah saat pratinjau terbuka, jadi tidak ada yang dikonversi. Jalankan lagi untuk melihat tautan terkini."
       },
       "convertCore": {
         "noMatch": "tidak ada yang cocok"
@@ -1225,6 +1246,8 @@
       "attachUnsupported": "Hanya gambar dan PDF yang dapat dilampirkan.",
       "attachFailed": "Tidak dapat melampirkan berkas itu.",
       "archiveFailed": "Tidak dapat mengarsipkan catatan ini.",
+      "aiRewriteFailed": "Penulisan ulang tidak dapat diselesaikan, jadi pilihan Anda tidak berubah.",
+      "aiRewriteNoProvider": "Tidak ada penyedia AI yang disiapkan, jadi tidak ada yang ditulis ulang. Siapkan satu di Pengaturan → Developer → AI.",
       "trashFailed": "Tidak dapat memindahkan catatan ini ke Sampah."
     },
     "nav": {
@@ -1537,6 +1560,29 @@
       "untitled": "Tanpa judul",
       "warning": "Tindakan ini tidak dapat dibatalkan."
     },
+    "example": {
+      "folder": "Memulai",
+      "index": {
+        "title": "Mulai di sini",
+        "body": "Ini adalah brankas contoh kecil. Beberapa catatan biasa yang menunjukkan apa yang bisa dilakukan Myne, dan tidak ada yang istimewa di sini: sunting, ganti nama, atau hapus semuanya sesuka Anda.\n\n- [[{{markdown}}]] menunjukkan cara teks biasa berubah menjadi teks berformat\n- [[{{tasks}}]] mengumpulkan daftar centang di satu tempat\n- [[{{links}}]] menghubungkan catatan dan menatanya dengan tag\n- [[{{makeItYours}}]] membersihkan semua ini dalam satu langkah\n\nSudah cukup? Klik kanan folder **Memulai** di bilah sisi lalu pilih Hapus. Catatannya pindah ke Sampah, jadi Anda bisa mengembalikannya kalau berubah pikiran.\n"
+      },
+      "markdown": {
+        "title": "Menulis dengan Markdown",
+        "body": "Myne menulis Markdown biasa dan menampilkan hasilnya sambil Anda mengetik.\n\n## Dasar-dasarnya\nBuat sebuah kata menjadi **tebal** atau *miring*, atau sisipkan `kode sebaris`.\n\n## Daftar\n- Satu butir\n- Butir lainnya\n  - Satu butir bersarang\n\n## Kutipan\n> Catatan kecil yang disimpan bertahun-tahun mengalahkan catatan besar yang tak pernah Anda tulis.\n\n## Tabel\n| Pintasan | Fungsinya |\n| --- | --- |\n| Cmd/Ctrl + B | Tebal |\n| Cmd/Ctrl + K | Tambah tautan |\n\n## Sedikit kode\n```\nconsole.log(\"hello from Myne\")\n```\n\nKalau sudah siap, kembalilah ke [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Tugas",
+        "body": "Setiap baris yang diawali `- [ ]` adalah sebuah tugas. Myne mengumpulkan setiap tugas yang belum selesai dari seluruh catatan Anda ke dalam satu tampilan Tugas, jadi tidak ada yang tercecer di antara catatan.\n\n- [ ] Baca [[{{markdown}}]]\n- [ ] Tambahkan tugas Anda sendiri\n- [ ] Coba satu dengan tanggal tenggat 📅 2030-12-31\n- [x] Buat brankas Anda\n\nCentang sebuah kotak di sini, lalu buka tampilan Tugas di bilah sisi untuk melihat daftarnya diperbarui.\n\nKembali ke [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Tautan dan tag",
+        "body": "Ketik `[[` untuk menautkan ke catatan lain. Tautan berlaku dua arah: buka [[{{index}}]] dan Anda akan melihat catatan ini di daftar backlink-nya, lalu grafik menggambar garis di antara keduanya.\n\nTambahkan #tag di mana saja dan Myne akan menempatkan catatan itu di bawahnya pada pohon tag. Catatan ini diberi tag #contoh dan #memulai, jadi buka pohon tag di bilah sisi untuk menemukannya.\n\nGiliran Anda: tautkan catatan ini ke [[{{tasks}}]], atau ciptakan tag Anda sendiri.\n"
+      },
+      "makeItYours": {
+        "title": "Jadikan milik Anda",
+        "body": "Ini brankas Anda sekarang. Catatan-catatan ini hanyalah titik awal, jadi ubah apa pun, atau bersihkan semuanya dan mulai dari nol.\n\nUntuk menghapus seluruh contoh ini, klik kanan folder **Memulai** di bilah sisi lalu pilih Hapus. Semuanya pindah ke Sampah sekaligus, dan Anda dapat memulihkannya dari sana jika ingin mengembalikannya.\n\nKalau sudah siap, tekan Cmd/Ctrl + N untuk membuat catatan baru dan mulai menulis.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Tambah kondisi",
       "addFilterGroup": "Tambah grup filter",
@@ -1577,7 +1623,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Nama folder tidak boleh memuat / \\ | # ^ [ ] atau diawali/diakhiri dengan spasi.",
-      "tooLong": "Jalur folder itu terlalu panjang."
+      "tooLong": "Jalur folder itu terlalu panjang.",
+      "moveIntoSelf": "Folder tidak dapat dipindahkan ke dalam dirinya sendiri.",
+      "moveCollision": "Sudah ada folder dengan nama itu di sana."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -1854,7 +1902,8 @@
       "importedWithSkips": "{{count}} diimpor — {{skipped}} dilewati",
       "importedWithSkips_one": "{{count}} catatan diimpor — {{skipped}} dilewati",
       "importedWithSkips_other": "{{count}} catatan diimpor — {{skipped}} dilewati",
-      "importNoMarkdown": "Tidak ada berkas markdown yang dijatuhkan"
+      "importNoMarkdown": "Tidak ada berkas markdown yang dijatuhkan",
+      "moveFolderTo": "Pindahkan folder ke…"
     },
     "newFromTemplate": {
       "back": "Kembali",
@@ -2132,6 +2181,30 @@
       "emptyText": "Tidak ada yang cocok.",
       "placeholder": "Pilih…",
       "searchPlaceholder": "Cari…"
+    }
+  },
+  "migrate": {
+    "intro": "Tingkatkan brankas ini ke format baru. Catatan Anda akan digabungkan secara otomatis antarperangkat. Ini mengganti kunci seluruh brankas; salinan lamanya tetap disimpan di perangkat ini sampai Anda mengonfirmasi.",
+    "passwordLabel": "Kata sandi master",
+    "phraseLabel": "Frasa pemulihan",
+    "phraseHelp": "Wajib — kunci baru Anda dibungkus dengan frasa ini, sehingga pemulihan tetap berfungsi. Masukkan semua kata pemulihan Anda.",
+    "submit": "Migrasikan",
+    "migrating": "Memigrasikan…",
+    "done": "{{count}} catatan dimigrasikan ke format baru.",
+    "settle": {
+      "intro": "Brankas Anda telah ditingkatkan. Salinan lamanya masih ada di perangkat ini sampai Anda menuntaskannya — sampai saat itu, mengubah kata sandi tidak akan menguncinya.",
+      "confirm": "Semuanya sudah benar, hapus salinan lama",
+      "abort": "Ada yang salah, kembalikan brankas lama",
+      "errorAlreadySynced": "Brankas ini sudah tersinkron dalam format baru, jadi tidak dapat dikembalikan. Pulihkan dari cadangan jika Anda memerlukan yang lama.",
+      "errorBusy": "Operasi brankas lain sedang berjalan. Coba lagi sebentar lagi.",
+      "errorIo": "Tidak dapat menyelesaikannya. Tidak ada yang diubah."
+    },
+    "progressCount": "{{done}} dari {{total}} item dienkripsi ulang…",
+    "error": {
+      "recoveryPhraseRequired": "Frasa pemulihan itu tidak cocok dengan brankas ini. Masukkan frasa pemulihan yang benar untuk bermigrasi — frasa itu wajib agar pemulihan tetap berfungsi.",
+      "wrongPassword": "Kata sandi itu tidak cocok dengan brankas ini.",
+      "alreadyMigrated": "Brankas ini sudah memakai format baru.",
+      "generic": "Migrasi tidak dapat diselesaikan. Brankas Anda tidak berubah; coba lagi."
     }
   },
   "recover": {
@@ -2489,9 +2562,11 @@
         "invalidName": "Nama tema tidak aman",
         "invalidValue": "Nilai tidak valid untuk {{key}}",
         "invalidValueWithLine": "Nilai tidak valid untuk {{key}} (baris {{line}})",
+        "lowContrast": "{{key}} di atas {{against}} memiliki kontras {{ratio}}:1, padahal perlu setidaknya {{min}}:1 agar tetap terbaca",
         "missingKey": "Warna wajib {{key}} tidak ada",
         "parseError": "JSON tidak valid",
-        "parseErrorWithLine": "JSON tidak valid (baris {{line}})"
+        "parseErrorWithLine": "JSON tidak valid (baris {{line}})",
+        "reservedKey": "{{key}} dicadangkan untuk keperluan Myne sendiri dan tidak dapat diatur oleh tema"
       },
       "export": "Ekspor",
       "exportError": "Tidak dapat mengekspor tema itu. Silakan coba lagi.",
@@ -2672,12 +2747,45 @@
       "autoTagHelper": "Saat Anda berhenti mengetik, model kecil di perangkat Anda membaca catatan itu dan menyarankan tag di bagian atasnya. Tidak ada yang ditambahkan sampai Anda menerima sebuah saran.",
       "autoTagLabel": "Sarankan tag secara otomatis",
       "autoTagUnavailable": "Build ini dikirim tanpa model tag, jadi tidak ada tag yang dapat disarankan. Myne tidak pernah mengunduh model — sakelar ini menyala dengan sendirinya pada build yang menyertakannya.",
+      "consent": {
+        "accept": "Kirim catatan saya ke {{provider}}",
+        "cancel": "Batal",
+        "cannotVerifyLabel": "Yang tidak dapat diperiksa Myne",
+        "revokeLabel": "Cara membatalkan ini",
+        "scopeLabel": "Perangkat mana saja yang tercakup",
+        "title": "Sebelum Myne mengirim apa pun ke {{provider}}",
+        "whatLabel": "Apa yang keluar dari perangkat Anda",
+        "whenLabel": "Kapan itu keluar",
+        "whoLabel": "Siapa yang menerimanya"
+      },
       "disclosureToggle": "Bagaimana ini bekerja?",
       "enableHelper": "Menjalankan model yang Anda sediakan sepenuhnya di perangkat Anda. Eksperimental, mati secara bawaan.",
       "enableLabel": "Aktifkan AI lokal",
       "excludedHelper": "Catatan di folder ini tidak pernah dibaca atau diindeks oleh AI. Satu path folder per baris.",
       "excludedLabel": "Folder yang dikecualikan",
       "excludedPlaceholder": "Private/\nJournal/",
+      "endpointHelper": "Jika Anda sudah menjalankan runtime model di komputer ini, arahkan Myne ke sana alih-alih memilih berkas model. Biarkan kosong untuk memakai berkas di atas.",
+      "endpointLabel": "Runtime model lokal",
+      "endpointModelHelper": "Myne tidak memilihkan model untuk Anda. Sampai Anda menyebutkan satu, alamat di atas tersimpan tetapi tidak dipakai.",
+      "endpointModelLabel": "Model yang dipakai di sana",
+      "endpointModelPlaceholder": "nama model seperti yang dicantumkan runtime",
+      "endpointRejected": {
+        "malformed": "Itu bukan alamat yang dapat dipakai Myne. Alamatnya perlu skema dan port eksplisit — misalnya http://127.0.0.1:11434.",
+        "notLoopback": "Alamat ini harus berada di komputer ini — localhost, 127.0.0.1, atau ::1. Untuk memakai penyedia yang berjalan di tempat lain, sebutkan di bagian Penyedia jarak jauh.",
+        "unsupportedScheme": "Hanya alamat http dan https yang diterima."
+      },
+      "endpointSaveFailed": "Tidak dapat menyimpan alamat itu. Pastikan Myne dapat menulis pengaturannya.",
+      "endpointThirdParty": "{{name}} adalah program terpisah dengan perilaku jaringannya sendiri, dan Myne tidak mengendalikannya. Catatan Anda dikirim ke program itu selama ia berjalan di komputer ini.",
+      "providerError": {
+        "barred": "Permintaan jenis ini tidak pernah dikirim ke penyedia — ia berjalan di perangkat ini atau tidak sama sekali.",
+        "failed": "Itu tidak berhasil. Tidak ada yang disimpan dan tidak ada yang dikirim ulang.",
+        "noCredential": "Belum ada kunci API yang disetel untuk penyedia ini. Tambahkan di Pengaturan → Developer → AI.",
+        "quotaExhausted": "Penyedia menolak permintaan itu — kredit Anda habis atau Anda melewati batas laju. Ini harus dibereskan dengan penyedianya, bukan di Myne.",
+        "refused": "Penyedia menolak koneksi. Mungkin sedang mati atau memblokir jaringan ini.",
+        "timeout": "Penyedia tidak menjawab tepat waktu. Tidak ada yang dibiarkan berjalan.",
+        "unauthorized": "Penyedia menolak kunci API Anda. Gantilah kuncinya — mungkin salah, sudah dicabut, atau milik akun lain.",
+        "unreachable": "Tidak dapat menjangkau penyedia. Periksa koneksi jaringan Anda."
+      },
       "modelChoose": "Pilih berkas…",
       "modelEmbeddingLabel": "Model pencarian — pencarian semantik & Tanya-Jawab",
       "modelFilter": {
@@ -2689,6 +2797,25 @@
       "modelSaveFailed": "Tidak dapat menyimpan path model (harus di luar brankas Anda).",
       "modelTranscriptionLabel": "Model ucapan-ke-teks (transkripsi)",
       "modelsHelper": "Myne tidak pernah mengunduh model — itu berarti mengirim data melalui jaringan. Buka tautan untuk mendapatkannya di peramban Anda, lalu pilih berkas yang telah diunduh di sini. Semuanya berjalan di perangkat Anda.",
+      "providerHelper": "Alih-alih menjalankan model di sini, Myne dapat mengirim permintaan ke layanan yang Anda sebutkan. Catatan Anda keluar dari perangkat ini saat itu terjadi. “Tidak ada” adalah pilihan bawaannya dan berarti tidak ada layanan yang dihubungi sama sekali.",
+      "providerKeyAdd": "tempel kunci API Anda",
+      "providerKeyLabel": "Kunci API",
+      "providerKeyNone": "Belum ada kunci yang tersimpan, jadi belum ada yang dapat dikirim.",
+      "providerKeyRevoke": "Hapus kunci ini",
+      "providerKeyReplace": "tempel kunci baru untuk menggantikan yang tersimpan",
+      "providerKeyStored": "Sebuah kunci tersimpan. Myne tidak pernah menampilkannya kembali kepada Anda — tempel kunci baru untuk menggantinya.",
+      "providerActive": "Yang menjawab sekarang: {{name}}",
+      "providerLabel": "Penyedia jarak jauh",
+      "providerModelCount_one": "{{count}} model tersedia.",
+      "providerModelCount_other": "{{count}} model tersedia.",
+      "providerModelEmpty": "Penyedia ini tidak mencantumkan model apa pun untuk akun Anda.",
+      "providerModelHelper": "Myne tidak menyertakan pilihan bawaan. Daftarnya berasal dari penyedia, jadi selalu terkini dan Anda tidak pernah ditagih untuk model yang tidak Anda pilih.",
+      "providerModelLabel": "Model",
+      "providerModelLoad": "Muat daftar model",
+      "providerModelNone": "Tidak ada model terpilih",
+      "providerModelUnfetched": "Muat daftarnya untuk memilih model.",
+      "providerNone": "Tidak ada",
+      "providerNothingAnswering": "Belum ada yang disiapkan untuk menjawab.",
       "modelsLabel": "Model",
       "recommendedFilesEmbedding": "Membutuhkan model.safetensors + config.json + tokenizer.json dalam satu folder.",
       "recommendedFilesGeneration": "Membutuhkan berkas .gguf + tokenizer.json dalam folder yang sama.",
@@ -2753,6 +2880,7 @@
       "quickUnlockSubtitle": "Masuk kembali dengan {{method}} atau PIN setelah kunci otomatis"
     },
     "quickUnlock": {
+      "errorBusy": "Operasi brankas lain sedang berlangsung. Coba lagi sebentar lagi.",
       "errorCancelled": "Dibatalkan.",
       "errorGeneric": "Tidak dapat mengonfigurasi buka kunci cepat.",
       "errorHardwareUnavailable": "Touch ID tidak tersedia di build ini. Diperlukan build macOS yang ditandatangani dengan Touch ID terdaftar.",
@@ -2933,6 +3061,9 @@
       },
       "keywords": {
         "aiAutoTag": "tag otomatis saran menyarankan label ai auto tag",
+        "aiEndpoint": "ollama endpoint alamat runtime lokal model server port loopback local runtime",
+        "aiProvider": "penyedia jarak jauh awan cloud openrouter ollama kunci api kredensial persetujuan kirim catatan provider",
+        "aiProviderModel": "model katalog daftar model mana llama qwen gpt pilih model penyedia jarak jauh remote provider",
         "aiEnable": "ai lokal hidup mati aktifkan matikan pembelajaran mesin local ai",
         "aiExcluded": "folder dikecualikan kecualikan abaikan ai privasi excluded",
         "aiModels": "model gguf unduh teks embedding llm models",
@@ -2989,8 +3120,26 @@
         "vaultIcon": "ikon brankas avatar gambar simbol vault icon",
         "vaultLabel": "label brankas nama ganti nama judul vault label",
         "vaultLocation": "lokasi brankas jalur folder disk tempat disimpan vault location",
-        "viewMode": "mode tampilan bawaan langsung baca sumber pratinjau view mode"
+        "viewMode": "mode tampilan bawaan langsung baca sumber pratinjau view mode",
+        "dateFormat": "format tanggal hari bulan tahun iso dd/mm mm/dd kalender date format",
+        "timeFormat": "format waktu 24 jam 12 jam am pm penunjuk waktu time format",
+        "timezone": "zona waktu tz utc iana wilayah hari ini timezone"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Format tanggal",
+      "dateHelper": "Bagaimana tanggal ditampilkan di tugas, tampilan tersimpan, dan lampiran.",
+      "dateSystem": "Ikuti bahasa",
+      "timeLabel": "Format waktu",
+      "timeHelper": "Apakah waktu ditampilkan dalam format 24 jam atau 12 jam.",
+      "timeSystem": "Ikuti bahasa",
+      "time24": "24 jam",
+      "time12": "12 jam",
+      "zoneLabel": "Zona waktu",
+      "zoneHelper": "Zona mana yang menentukan apa yang dihitung sebagai hari ini. Biarkan kosong untuk mengikuti perangkat ini. Waktu yang Anda tulis di dalam catatan tidak pernah diubah — 09:00 tetap 09:00 di mana pun.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne tidak mengenali zona waktu itu. Gunakan nama seperti Europe/Berlin.",
+      "errorSave": "Tidak dapat menyimpan pengaturan itu."
     }
   },
   "storageLost": {
@@ -3016,6 +3165,7 @@
   "sync": {
     "materialising": "Mengunduh catatan Anda — {{done}} dari {{total}}. Anda sudah dapat mulai bekerja; sisanya akan muncul seiring kedatangannya.",
     "credentialAmbiguous": "Kata sandi Anda mungkin berubah di perangkat ini dan di perangkat lain, dan Myne tidak dapat menentukan mana yang lebih baru — sehingga tidak ada yang diubah. Masuk di perangkat yang sudah memiliki akses untuk membereskannya.",
+    "vaultRekeyed": "Brankas ini ditingkatkan ke format baru di perangkat lain. Buka kuncinya lagi untuk melanjutkan — tidak ada yang hilang.",
     "attachments": {
       "aria": {
         "downloading": "Mengunduh {{name}}",
@@ -3032,6 +3182,7 @@
     "buildingIndex": {
       "label": "Membangun indeks pencarian…"
     },
+    "remoteMergeHint": "Diperbarui dari perangkat lain",
     "conflicts": {
       "compare": "Bandingkan",
       "compareClose": "Kembali ke konflik",
@@ -3099,6 +3250,7 @@
       "verifyPending": "Kode ini muncul setelah perangkat baru menyelesaikan sinkronisasi pertamanya.",
       "verifySyncing": "Menyinkronkan…",
       "verifyTitle": "Verifikasi perangkat baru",
+      "verifyAction": "Bandingkan kode",
       "yourDevices": "Perangkat Anda"
     },
     "endpoint": {
@@ -3128,7 +3280,12 @@
       "deviceNameHelp": "Ditampilkan di daftar perangkat Anda. Anda dapat mengubahnya nanti.",
       "deviceNameLabel": "Beri nama perangkat ini",
       "error": {
+        "awaitingApproval": "Perangkat ini sudah menunggu persetujuan. Setujui dari perangkat yang sudah masuk.",
+        "deviceLimit": "Akun ini telah mencapai batas perangkatnya. Hapus perangkat yang tidak lagi Anda pakai, lalu coba lagi.",
+        "frozen": "Akun ini dibekukan, jadi tidak ada perangkat baru yang dapat ditambahkan saat ini. Catatan Anda di perangkat ini tidak terpengaruh.",
         "notConfigured": "Atur server sinkronisasi di pengaturan sebelum menambahkan perangkat ini.",
+        "serverMismatch": "Identitas server sinkronisasi tidak cocok dengan yang diharapkan perangkat ini. Jangan masukkan kredensial Anda lagi sampai Anda tahu penyebabnya.",
+        "kdfTooLarge": "Perangkat ini tidak memiliki cukup memori untuk membuka brankas itu. Pengaturan enkripsinya membutuhkan memori lebih besar daripada yang dapat dipakai aplikasi ini di sini. Bukalah di komputer desktop.",
         "transport": "Tidak dapat menjangkau server sinkronisasi. Periksa koneksi Anda lalu coba lagi."
       },
       "mode": {
@@ -3412,7 +3569,8 @@
       "inProgress": "Operasi sedang berlangsung.",
       "kdfMemoryExceedsHost": "Brankas ini memerlukan {{required}} MiB memori untuk dibuka — lebih besar dari yang dapat diberikan peramban ini ({{available}} MiB). Brankasnya sendiri baik-baik saja; buka di aplikasi desktop Myne.",
       "unexpected": "Kesalahan tak terduga. Silakan coba lagi.",
-      "vaultNotFound": "Berkas brankas tidak ditemukan. Silakan mulai ulang aplikasi."
+      "vaultNotFound": "Berkas brankas tidak ditemukan. Silakan mulai ulang aplikasi.",
+      "vaultUpgraded": "Brankas ini ditingkatkan ke format yang lebih baru dan belum didukung versi Myne ini. Data Anda baik-baik saja — perbarui Myne ke versi terbaru untuk membukanya."
     },
     "passwordLabel": "Kata sandi",
     "passwordPlaceholder": "Kata sandi",
@@ -3481,6 +3639,7 @@
       "committing": "Menyimpan…",
       "copied": "Disalin",
       "copy": "Salin",
+      "copyFailed": "Tidak dapat menyalin — gunakan “Simpan sebagai berkas” saja.",
       "eyebrow": "Langkah 4 dari 4 — nomor akun",
       "heading": "Simpan nomor akun Anda.",
       "intro": "Ini adalah token pembawa Anda — perlakukan seperti uang tunai.",
@@ -3595,6 +3754,10 @@
       "vaultBusyAuth": {
         "body": "Operasi brankas lain sedang berlangsung. Coba lagi sebentar.",
         "title": "Brankas sedang sibuk"
+      },
+      "plaintextTooLarge": {
+        "title": "Catatan itu terlalu besar untuk dienkripsi",
+        "body": "Coba lagi dengan isi yang lebih sedikit."
       }
     },
     "orchestrator": {
@@ -3890,6 +4053,12 @@
     "backUpNow": "Cadangkan sekarang"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Hanya satu tab yang dapat membuka brankas dalam satu waktu — dua tab akan menulis ke penyimpanan yang sama dan merusaknya. Tutup tab satunya untuk melanjutkan di sini.",
+      "freed": "Tab satunya sudah ditutup. Muat ulang untuk membuka brankas Anda di sini.",
+      "reload": "Muat ulang",
+      "title": "Brankas ini terbuka di tab lain"
+    },
     "reload": {
       "body": "Memuat ulang halaman ini akan meminta kata sandi Anda lagi — memang tidak ada jalan masuk yang lebih cepat. Brankas Anda tetap terenkripsi di perangkat ini selama halaman tertutup, dan kuncinya dibangun ulang dari kata sandi Anda setiap kali.",
       "title": "Memuat ulang berarti memasukkan kata sandi lagi"

@@ -9,6 +9,7 @@
     "passwordLabel": "Hovedadgangskode",
     "approversIntro": "Disse enheder kan godkende denne enhed:",
     "noApprovers": "Ingen anden enhed på denne konto kan godkende den lige nu. Åbn Myne på en enhed, der allerede har adgang, og vend så tilbage hertil.",
+    "pendingStartOver": "Start forfra med en anden konto",
     "pendingTitle": "Venter på godkendelse",
     "sasMatch": "De stemmer overens — fortsæt",
     "sasMismatch": "De stemmer ikke overens",
@@ -24,6 +25,13 @@
     "hint": "Det ser sådan ud: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Tjekkes her på din enhed — intet sendes endnu.",
     "invalid": "Det kontonummer er ikke gyldigt. Tjek det, og prøv igen.",
     "title": "Indtast dit kontonummer"
+  },
+  "ai": {
+    "answeredBy": {
+      "inProcess": "Besvaret på denne enhed",
+      "localRuntime": "Besvaret af {{name}} på denne computer",
+      "remote": "Besvaret af {{provider}} — dine noter blev sendt dertil"
+    }
   },
   "attachments": {
     "cleanUnused": {
@@ -218,7 +226,8 @@
       "intro": "Bekræft, at denne kode matcher den, der vises i udvidelsen, og vælg så Acceptér for at parre.",
       "reject": "Afvis",
       "rejected": "Parring afvist.",
-      "title": "En browserudvidelse vil oprette forbindelse"
+      "title": "En browserudvidelse vil oprette forbindelse",
+      "persistFailed": "Myne kunne ikke gemme denne forbindelse, så den blev ikke oprettet. Hvis boksen er låst, så lås den op, og prøv at oprette forbindelse igen."
     }
   },
   "commandPalette": {
@@ -914,10 +923,14 @@
           "insert": "Indsæt i note",
           "noAnswer": "Intet svar — prøv at omformulere.",
           "noModelHint": "Ingen model valgt. Vælg en under Indstillinger → Developer → AI for at komme i gang.",
+          "unreachableHint": "Den udbyder, du har konfigureret, svarer ikke. Tjek, at den kører, og send så igen.",
+          "unavailableHint": "Dette build af Myne er kompileret uden lokal AI, så intet her kan køre.",
           "offHint": "Lokal AI er slået fra. Slå den til under Indstillinger → Developer → AI.",
           "send": "Send",
           "statusGettingReady": "Forbereder…",
           "statusNoModel": "Ingen model",
+          "statusUnreachable": "Svarer ikke",
+          "statusUnavailable": "Ikke tilgængelig",
           "statusOff": "Fra",
           "statusReady": "Klar",
           "stop": "Stop",
@@ -1040,6 +1053,8 @@
     },
     "slash": {
       "aiContinue": "Fortsæt med at skrive (AI)",
+      "aiFailed": "AI-anmodningen kunne ikke fuldføres, så der blev ikke indsat noget.",
+      "aiNoProvider": "Der er ikke konfigureret nogen AI-udbyder, så der blev ikke indsat noget. Konfigurer en under Indstillinger → Developer → AI.",
       "aiTitle": "Foreslå titel (AI)",
       "attachFile": "Vedhæft fil",
       "bulletList": "Punktliste",
@@ -1066,7 +1081,8 @@
       "time": "Klokkeslæt",
       "todoList": "Opgaveliste",
       "voiceNote": "Talenote",
-      "wikiLink": "Wikilink"
+      "wikiLink": "Wikilink",
+      "remind": "Påmindelse"
     },
     "spell": {
       "menu": {
@@ -1098,13 +1114,17 @@
       "menuEdit": "Redigér {{field}}",
       "menuTitle": "Tilføj felt",
       "repeatNoAnchor": "Denne opgave har ingen dato at gentage fra, så den gentages ikke. Tilføj en forfaldsdato for at sætte den i gang.",
+      "repeatNeedsDate": "Kræver en forfaldsdato at gentage fra",
       "save": "Gem",
       "skipOccurrence": "Spring denne forekomst over",
       "title": {
         "due": "Forfaldsdato",
         "repeat": "Gentagelse",
-        "priority": "Prioritet"
-      }
+        "priority": "Prioritet",
+        "remind": "Påmindelse"
+      },
+      "timeLabel": "Klokkeslæt (valgfrit)",
+      "invalidRemind": "Myne kan ikke læse denne dato, så du får ingen påmindelse."
     },
     "toolbar": {
       "apply": "Anvend",
@@ -1207,7 +1227,8 @@
         "rewriteCount_one": "{{count}} link bliver omskrevet",
         "rewriteCount_other": "{{count}} links bliver omskrevet",
         "skipped": "sprunget over — {{reason}}",
-        "title": "Konvertér importerede wikilinks i denne note"
+        "title": "Konvertér importerede wikilinks i denne note",
+        "staleDocument": "Denne note blev ændret, mens forhåndsvisningen var åben, så intet blev konverteret. Kør den igen for at se de aktuelle links."
       },
       "convertCore": {
         "noMatch": "intet match"
@@ -1225,6 +1246,8 @@
       "attachUnsupported": "Kun billeder og PDF'er kan vedhæftes.",
       "attachFailed": "Kunne ikke vedhæfte filen.",
       "archiveFailed": "Kunne ikke arkivere denne note.",
+      "aiRewriteFailed": "Omskrivningen kunne ikke fuldføres, så din markering er uændret.",
+      "aiRewriteNoProvider": "Der er ikke konfigureret nogen AI-udbyder, så intet blev omskrevet. Konfigurer en under Indstillinger → Developer → AI.",
       "trashFailed": "Kunne ikke flytte denne note til papirkurven."
     },
     "nav": {
@@ -1537,6 +1560,29 @@
       "untitled": "Uden titel",
       "warning": "Dette kan ikke fortrydes."
     },
+    "example": {
+      "folder": "Kom godt i gang",
+      "index": {
+        "title": "Start her",
+        "body": "Dette er en lille eksempelboks. Nogle ganske almindelige noter, der viser, hvad Myne kan, og intet her er specielt: redigér, omdøb eller slet det hele, som du har lyst til.\n\n- [[{{markdown}}]] viser, hvordan almindelig tekst bliver til formatering\n- [[{{tasks}}]] samler tjeklister ét sted\n- [[{{links}}]] forbinder noter og sorterer dem med tags\n- [[{{makeItYours}}]] rydder det hele væk i ét trin\n\nSet nok? Højreklik på mappen **Kom godt i gang** i sidepanelet, og vælg Slet. Noterne flyttes til papirkurven, så du kan hente dem tilbage, hvis du ombestemmer dig.\n"
+      },
+      "markdown": {
+        "title": "Skriv med Markdown",
+        "body": "Myne skriver almindelig Markdown og viser resultatet, mens du skriver.\n\n## Det grundlæggende\nSæt et ord i **fed** eller *kursiv*, eller indsæt `kode i teksten`.\n\n## En liste\n- Et punkt\n- Et punkt mere\n  - Et underpunkt\n\n## Et citat\n> Små noter, gemt gennem årevis, slår store noter, du aldrig får skrevet.\n\n## En tabel\n| Genvej | Hvad den gør |\n| --- | --- |\n| Cmd/Ctrl + B | Fed |\n| Cmd/Ctrl + K | Indsæt et link |\n\n## Lidt kode\n```\nconsole.log(\"hello from Myne\")\n```\n\nNår du er klar, så gå tilbage til [[{{index}}]].\n"
+      },
+      "tasks": {
+        "title": "Opgaver",
+        "body": "Enhver linje, der begynder med `- [ ]`, er en opgave. Myne samler alle åbne opgaver på tværs af dine noter i én Opgaver-visning, så intet forsvinder mellem noterne.\n\n- [ ] Læs [[{{markdown}}]]\n- [ ] Tilføj din egen opgave\n- [ ] Prøv en med en forfaldsdato 📅 2030-12-31\n- [x] Opret din boks\n\nSæt et flueben her, og åbn så Opgaver-visningen i sidepanelet for at se listen blive opdateret.\n\nTilbage til [[{{index}}]].\n"
+      },
+      "links": {
+        "title": "Links og tags",
+        "body": "Skriv `[[` for at linke til en anden note. Links går begge veje: åbn [[{{index}}]], og du vil se denne note under dens tilbagelinks, mens grafen tegner en linje mellem dem.\n\nTilføj et #tag hvor som helst, så sorterer Myne noten ind under det i tag-træet. Denne note er tagget med #eksempel og #kom-godt-i-gang, så åbn tag-træet i sidepanelet for at finde den.\n\nNu er det din tur: link denne note til [[{{tasks}}]], eller find selv på et tag.\n"
+      },
+      "makeItYours": {
+        "title": "Gør boksen til din egen",
+        "body": "Boksen er din nu. Disse noter er kun et udgangspunkt, så lav om på hvad som helst, eller ryd dem væk og begynd på en frisk.\n\nVil du fjerne hele eksemplet, så højreklik på mappen **Kom godt i gang** i sidepanelet, og vælg Slet. Det hele flyttes til papirkurven på én gang, og du kan gendanne det derfra, hvis du vil have det tilbage.\n\nNår du er klar, så tryk Cmd/Ctrl + N for at oprette en ny note og komme i gang med at skrive.\n"
+      }
+    },
     "filterBuilder": {
       "addCondition": "Tilføj betingelse",
       "addFilterGroup": "Tilføj filtergruppe",
@@ -1577,7 +1623,9 @@
     },
     "folderManagement": {
       "illegalSegment": "Et mappenavn kan ikke indeholde / \\ | # ^ [ ] eller begynde/slutte med et mellemrum.",
-      "tooLong": "Den mappesti er for lang."
+      "tooLong": "Den mappesti er for lang.",
+      "moveIntoSelf": "En mappe kan ikke flyttes ind i sig selv.",
+      "moveCollision": "Der findes allerede en mappe med det navn dér."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -1854,7 +1902,8 @@
       "importedWithSkips": "Importerede {{count}} — {{skipped}} sprunget over",
       "importedWithSkips_one": "Importerede {{count}} note — {{skipped}} sprunget over",
       "importedWithSkips_other": "Importerede {{count}} noter — {{skipped}} sprunget over",
-      "importNoMarkdown": "Ingen markdown-filer i det, du trak ind"
+      "importNoMarkdown": "Ingen markdown-filer i det, du trak ind",
+      "moveFolderTo": "Flyt mappe til…"
     },
     "newFromTemplate": {
       "back": "Tilbage",
@@ -2132,6 +2181,30 @@
       "emptyText": "Ingen resultater.",
       "placeholder": "Vælg…",
       "searchPlaceholder": "Søg…"
+    }
+  },
+  "migrate": {
+    "intro": "Opgradér denne boks til det nye format. Dine noter får automatisk fletning på tværs af enheder. Hele boksen får nye nøgler; den gamle kopi bliver liggende på denne enhed, indtil du bekræfter.",
+    "passwordLabel": "Hovedadgangskode",
+    "phraseLabel": "Gendannelsessætning",
+    "phraseHelp": "Påkrævet — dine nye nøgler indpakkes med denne sætning, så gendannelse bliver ved med at virke. Indtast alle dine gendannelsesord.",
+    "submit": "Migrér",
+    "migrating": "Migrerer…",
+    "done": "{{count}} noter er migreret til det nye format.",
+    "settle": {
+      "intro": "Din boks blev opgraderet. Den gamle kopi ligger stadig på denne enhed, indtil du gør det færdigt — indtil da bliver den ikke låst væk, selv om du skifter adgangskode.",
+      "confirm": "Alt ser rigtigt ud, fjern den gamle kopi",
+      "abort": "Noget er galt, sæt den gamle boks tilbage",
+      "errorAlreadySynced": "Denne boks er allerede synkroniseret i det nye format, så den kan ikke sættes tilbage. Gendan fra en sikkerhedskopi, hvis du har brug for den gamle.",
+      "errorBusy": "En anden handling på boksen er i gang. Prøv igen om et øjeblik.",
+      "errorIo": "Kunne ikke gøre det færdigt. Intet blev ændret."
+    },
+    "progressCount": "{{done}} af {{total}} elementer er krypteret på ny…",
+    "error": {
+      "recoveryPhraseRequired": "Den gendannelsessætning passede ikke til denne boks. Indtast din korrekte gendannelsessætning for at migrere — den er påkrævet, for at gendannelse bliver ved med at virke.",
+      "wrongPassword": "Den adgangskode passede ikke til denne boks.",
+      "alreadyMigrated": "Denne boks er allerede på det nye format.",
+      "generic": "Migreringen kunne ikke gennemføres. Din boks er uændret; prøv igen."
     }
   },
   "recover": {
@@ -2489,9 +2562,11 @@
         "invalidName": "Usikkert temanavn",
         "invalidValue": "Ugyldig værdi for {{key}}",
         "invalidValueWithLine": "Ugyldig værdi for {{key}} (linje {{line}})",
+        "lowContrast": "{{key}} på {{against}} har en kontrast på {{ratio}}:1, men skal have mindst {{min}}:1 for at være læsbar",
         "missingKey": "Manglende påkrævet farve {{key}}",
         "parseError": "Ikke gyldig JSON",
-        "parseErrorWithLine": "Ikke gyldig JSON (linje {{line}})"
+        "parseErrorWithLine": "Ikke gyldig JSON (linje {{line}})",
+        "reservedKey": "{{key}} er reserveret til Mynes eget brug og kan ikke sættes af et tema"
       },
       "export": "Eksportér",
       "exportError": "Kunne ikke eksportere det tema. Prøv igen.",
@@ -2672,12 +2747,45 @@
       "autoTagHelper": "Når du holder pause i skrivningen, læser en lille model på din enhed noten og foreslår tags øverst i den. Intet tilføjes, før du accepterer et forslag.",
       "autoTagLabel": "Foreslå tags automatisk",
       "autoTagUnavailable": "Dette build leveres uden tag-modellen, så der kan ikke foreslås tags. Myne henter aldrig en — kontakten slår til af sig selv i et build, der indeholder den.",
+      "consent": {
+        "accept": "Send mine noter til {{provider}}",
+        "cancel": "Annullér",
+        "cannotVerifyLabel": "Hvad Myne ikke kan kontrollere",
+        "revokeLabel": "Sådan fortryder du det",
+        "scopeLabel": "Hvilke enheder det gælder for",
+        "title": "Før Myne sender noget til {{provider}}",
+        "whatLabel": "Hvad der forlader din enhed",
+        "whenLabel": "Hvornår det sendes",
+        "whoLabel": "Hvem der modtager det"
+      },
       "disclosureToggle": "Hvordan fungerer det?",
       "enableHelper": "Kører en model, du selv leverer, helt på din enhed. Eksperimentel, slået fra som standard.",
       "enableLabel": "Aktivér lokal AI",
       "excludedHelper": "Noter i disse mapper læses eller indekseres aldrig af AI. Én mappesti pr. linje.",
       "excludedLabel": "Ekskluderede mapper",
       "excludedPlaceholder": "Privat/\nJournal/",
+      "endpointHelper": "Kører du allerede et modelmiljø på denne computer, kan du pege Myne mod det i stedet for at vælge modelfiler. Lad feltet stå tomt for at bruge filerne ovenfor.",
+      "endpointLabel": "Lokalt modelmiljø",
+      "endpointModelHelper": "Myne vælger ikke en model for dig. Indtil du angiver en, bliver adressen ovenfor gemt, men ikke brugt.",
+      "endpointModelLabel": "Model, der skal bruges dér",
+      "endpointModelPlaceholder": "modelnavnet, sådan som modelmiljøet viser det",
+      "endpointRejected": {
+        "malformed": "Det er ikke en adresse, Myne kan bruge. Den skal have en protokol og en udtrykkeligt angivet port — for eksempel http://127.0.0.1:11434.",
+        "notLoopback": "Denne adresse skal ligge på denne computer — localhost, 127.0.0.1 eller ::1. Vil du bruge en udbyder, der kører et andet sted, skal du i stedet angive den under Ekstern udbyder.",
+        "unsupportedScheme": "Kun http- og https-adresser accepteres."
+      },
+      "endpointSaveFailed": "Kunne ikke gemme adressen. Tjek, at Myne kan skrive sine indstillinger.",
+      "endpointThirdParty": "{{name}} er et selvstændigt program med sin egen netværksadfærd, og Myne styrer det ikke. Dine noter sendes til det, mens det kører på denne computer.",
+      "providerError": {
+        "barred": "Den slags anmodning sendes aldrig til en udbyder — den kører på denne enhed eller slet ikke.",
+        "failed": "Det virkede ikke. Intet blev gemt, og intet blev sendt igen.",
+        "noCredential": "Der er ikke angivet nogen API-nøgle for denne udbyder. Tilføj en under Indstillinger → Developer → AI.",
+        "quotaExhausted": "Udbyderen afviste anmodningen — du er løbet tør for kredit eller har overskredet en hastighedsgrænse. Det skal løses hos udbyderen, ikke i Myne.",
+        "refused": "Udbyderen afviste forbindelsen. Den er måske nede eller blokerer dette netværk.",
+        "timeout": "Udbyderen svarede ikke i tide. Intet blev efterladt kørende.",
+        "unauthorized": "Udbyderen afviste din API-nøgle. Udskift den — den kan være forkert, tilbagekaldt eller høre til en anden konto.",
+        "unreachable": "Kunne ikke nå udbyderen. Tjek din netværksforbindelse."
+      },
       "modelChoose": "Vælg fil…",
       "modelEmbeddingLabel": "Søgemodel — semantisk søgning og spørgsmål/svar",
       "modelFilter": {
@@ -2689,6 +2797,25 @@
       "modelSaveFailed": "Kunne ikke gemme modellens sti (den skal ligge uden for din boks).",
       "modelTranscriptionLabel": "Tale-til-tekst-model (transskription)",
       "modelsHelper": "Myne downloader aldrig modeller — det ville betyde at sende data over netværket. Åbn et link for at hente en i din browser, og vælg derefter de downloadede filer her. Alt kører på din enhed.",
+      "providerHelper": "I stedet for at køre en model her kan Myne sende en anmodning til en tjeneste, du angiver. Dine noter forlader denne enhed, når det sker. “Ingen” er standard og betyder, at der slet ikke kontaktes nogen tjeneste.",
+      "providerKeyAdd": "indsæt din API-nøgle",
+      "providerKeyLabel": "API-nøgle",
+      "providerKeyNone": "Der er ingen nøgle gemt, så der kan endnu ikke sendes noget.",
+      "providerKeyRevoke": "Fjern denne nøgle",
+      "providerKeyReplace": "indsæt en ny nøgle for at erstatte den gemte",
+      "providerKeyStored": "Der er gemt en nøgle. Myne viser den aldrig frem igen — indsæt en ny for at erstatte den.",
+      "providerActive": "Svarer nu: {{name}}",
+      "providerLabel": "Ekstern udbyder",
+      "providerModelCount_one": "{{count}} model tilgængelig.",
+      "providerModelCount_other": "{{count}} modeller tilgængelige.",
+      "providerModelEmpty": "Denne udbyder har ikke offentliggjort nogen modeller til din konto.",
+      "providerModelHelper": "Myne leveres uden en standardmodel. Listen kommer fra udbyderen, så den holdes opdateret, og du bliver aldrig opkrævet for en model, du ikke selv har valgt.",
+      "providerModelLabel": "Model",
+      "providerModelLoad": "Hent modeller",
+      "providerModelNone": "Ingen model valgt",
+      "providerModelUnfetched": "Hent listen for at vælge en model.",
+      "providerNone": "Ingen",
+      "providerNothingAnswering": "Der er endnu ikke konfigureret noget til at svare.",
       "modelsLabel": "Modeller",
       "recommendedFilesEmbedding": "Kræver model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Kræver .gguf-filen + tokenizer.json i samme mappe.",
@@ -2753,6 +2880,7 @@
       "quickUnlockSubtitle": "Indtast igen med {{method}} eller en PIN efter automatisk låsning"
     },
     "quickUnlock": {
+      "errorBusy": "En anden handling på boksen er i gang. Prøv igen om et øjeblik.",
       "errorCancelled": "Annulleret.",
       "errorGeneric": "Kunne ikke konfigurere hurtig oplåsning.",
       "errorHardwareUnavailable": "Touch ID er ikke tilgængelig i dette build. Det kræver et signeret macOS-build med Touch ID registreret.",
@@ -2933,6 +3061,9 @@
       },
       "keywords": {
         "aiAutoTag": "automatiske tags tag foreslå forslag mærkater ai auto tag",
+        "aiEndpoint": "ollama endpoint adresse lokalt modelmiljø model server port loopback runtime",
+        "aiProvider": "udbyder ekstern sky openrouter ollama cloud api-nøgle legitimation samtykke send noter provider",
+        "aiProviderModel": "model modelkatalog liste hvilken model llama qwen gpt vælg model ekstern udbyder provider",
         "aiEnable": "lokal ai til fra aktiver deaktiver slå maskinlæring local ai",
         "aiExcluded": "ekskluderede mapper udelad ignorer ai privatliv undtagelser excluded",
         "aiModels": "modeller model gguf download tekst embedding llm hent models",
@@ -2989,8 +3120,26 @@
         "vaultIcon": "boks ikon avatar billede symbol vault icon",
         "vaultLabel": "boks mærkat navn omdøb titel vault label",
         "vaultLocation": "boks placering sti mappe disk hvor gemt vault location",
-        "viewMode": "standardvisning visningstilstand live læsning kilde forhåndsvisning view mode"
+        "viewMode": "standardvisning visningstilstand live læsning kilde forhåndsvisning view mode",
+        "dateFormat": "datoformat dato dag måned år iso dd/mm mm/dd kalender date format",
+        "timeFormat": "tidsformat klokkeslæt 24 timer 12 timer ur am pm time format",
+        "timezone": "tidszone zone tz utc iana region i dag timezone"
       }
+    },
+    "dateTime": {
+      "dateLabel": "Datoformat",
+      "dateHelper": "Hvordan datoer vises i opgaver, gemte visninger og vedhæftede filer.",
+      "dateSystem": "Følg sproget",
+      "timeLabel": "Tidsformat",
+      "timeHelper": "Om klokkeslæt vises på et 24-timers eller 12-timers ur.",
+      "timeSystem": "Følg sproget",
+      "time24": "24-timers",
+      "time12": "12-timers",
+      "zoneLabel": "Tidszone",
+      "zoneHelper": "Hvilken zone der afgør, hvad der tæller som i dag. Lad feltet stå tomt for at følge denne enhed. Klokkeslæt, du skriver i en note, ændres aldrig — 09:00 er 09:00 alle steder.",
+      "zonePlaceholder": "Europe/Berlin",
+      "zoneUnknown": "Myne kender ikke den tidszone. Brug et navn som Europe/Berlin.",
+      "errorSave": "Kunne ikke gemme den indstilling."
     }
   },
   "storageLost": {
@@ -3016,6 +3165,7 @@
   "sync": {
     "materialising": "Henter dine noter — {{done}} af {{total}}. Du kan godt gå i gang; resten dukker op, efterhånden som de ankommer.",
     "credentialAmbiguous": "Din adgangskode kan være ændret både på denne enhed og på en anden, og Myne kan ikke afgøre, hvilken der er nyest — så der er ikke ændret noget. Log ind på en enhed, der allerede har adgang, for at få det afklaret.",
+    "vaultRekeyed": "Denne boks blev opgraderet til det nye format på en anden enhed. Lås op igen for at fortsætte — intet gik tabt.",
     "attachments": {
       "aria": {
         "downloading": "Henter {{name}}",
@@ -3032,6 +3182,7 @@
     "buildingIndex": {
       "label": "Bygger søgeindeks…"
     },
+    "remoteMergeHint": "Opdateret fra en anden enhed",
     "conflicts": {
       "compare": "Sammenlign",
       "compareClose": "Tilbage til konflikter",
@@ -3099,6 +3250,7 @@
       "verifyPending": "Denne kode vises, når den nye enhed har fuldført sin første synkronisering.",
       "verifySyncing": "Synkroniserer…",
       "verifyTitle": "Verificér den nye enhed",
+      "verifyAction": "Sammenlign kode",
       "yourDevices": "Dine enheder"
     },
     "endpoint": {
@@ -3128,7 +3280,12 @@
       "deviceNameHelp": "Vises på din liste over enheder. Du kan ændre det senere.",
       "deviceNameLabel": "Navngiv denne enhed",
       "error": {
+        "awaitingApproval": "Denne enhed venter allerede på godkendelse. Godkend den fra en enhed, der allerede er logget ind.",
+        "deviceLimit": "Denne konto har nået sin grænse for antal enheder. Fjern en enhed, du ikke længere bruger, og prøv igen.",
+        "frozen": "Denne konto er frosset, så der kan ikke tilføjes nye enheder lige nu. Dine noter på denne enhed er upåvirkede.",
         "notConfigured": "Angiv en synkroniseringsserver i indstillinger, før du tilføjer denne enhed.",
+        "serverMismatch": "Synkroniseringsserverens identitet stemte ikke overens med det, denne enhed forventede. Indtast ikke dine legitimationsoplysninger igen, før du ved hvorfor.",
+        "kdfTooLarge": "Denne enhed har ikke nok hukommelse til at åbne den boks. Dens krypteringsindstillinger kræver mere hukommelse, end denne app kan bruge her. Åbn den på en desktopcomputer i stedet.",
         "transport": "Kunne ikke nå synkroniseringsserveren. Tjek din forbindelse, og prøv igen."
       },
       "mode": {
@@ -3412,7 +3569,8 @@
       "inProgress": "Handling i gang.",
       "kdfMemoryExceedsHost": "Denne boks kræver {{required}} MiB hukommelse for at kunne åbnes — mere, end denne browser kan give den ({{available}} MiB). Der er ikke noget galt med boksen; åbn den i Mynes desktop-app.",
       "unexpected": "Uventet fejl. Prøv igen.",
-      "vaultNotFound": "Boks-filen blev ikke fundet. Genstart appen."
+      "vaultNotFound": "Boks-filen blev ikke fundet. Genstart appen.",
+      "vaultUpgraded": "Denne boks blev opgraderet til et nyere format, som denne version af Myne endnu ikke understøtter. Der er ikke noget galt med dine data — opdatér Myne til den nyeste version for at åbne den."
     },
     "passwordLabel": "Adgangskode",
     "passwordPlaceholder": "Adgangskode",
@@ -3481,6 +3639,7 @@
       "committing": "Gemmer…",
       "copied": "Kopieret",
       "copy": "Kopiér",
+      "copyFailed": "Kunne ikke kopiere — brug “Gem som fil” i stedet.",
       "eyebrow": "Trin 4 af 4 — kontonummer",
       "heading": "Gem dit kontonummer.",
       "intro": "Dette er din ihændehaver-nøgle — behandl den som kontanter.",
@@ -3595,6 +3754,10 @@
       "vaultBusyAuth": {
         "body": "En anden boks-handling er i gang. Prøv igen om et øjeblik.",
         "title": "Boks optaget"
+      },
+      "plaintextTooLarge": {
+        "title": "Den note er for stor til at kryptere",
+        "body": "Prøv igen med mindre indhold."
       }
     },
     "orchestrator": {
@@ -3890,6 +4053,12 @@
     "backUpNow": "Sikkerhedskopiér nu"
   },
   "web": {
+    "openElsewhere": {
+      "body": "Kun ét faneblad kan have en boks åben ad gangen — to ville skrive til det samme lager og ødelægge det. Luk det andet faneblad for at fortsætte her.",
+      "freed": "Det andet faneblad er lukket. Genindlæs for at åbne din boks her.",
+      "reload": "Genindlæs",
+      "title": "Denne boks er åben i et andet faneblad"
+    },
     "reload": {
       "body": "Genindlæser du denne side, bliver du bedt om din adgangskode igen — der findes ingen hurtigere vej ind, og det er med vilje. Din boks forbliver krypteret på denne enhed, mens siden er lukket, og nøglen genopbygges fra din adgangskode hver gang.",
       "title": "En genindlæsning kræver din adgangskode igen"
