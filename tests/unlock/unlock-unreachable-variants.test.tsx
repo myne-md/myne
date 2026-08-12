@@ -11,7 +11,7 @@
 // - VaultRecoveryInProgress → the recovery-in-progress MODE (form
 //   suppressed, info banner, "Continue" → resume-recovery callback).
 // - JoinFailure → generic banner (the previously-untested trigger
-//   path named in the Plane item).
+//   path named in the tracking issue).
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

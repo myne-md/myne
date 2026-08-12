@@ -222,7 +222,7 @@ export function TabStrip({
           stacked
             ? // Stacked deck (tab-modes / MYND-319): tabs overlap (negative
               // gap) and the row scrolls horizontally. Functional layout —
-              // visual polish deferred (no Penpot pass this slice).
+              // visual polish deferred to a later slice.
               { ...scrollAreaStyle, gap: 0, paddingInlineStart: 14 }
             : scrollAreaStyle
         }

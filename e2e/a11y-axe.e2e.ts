@@ -5,7 +5,8 @@
 // below (editor tab-strip + palette structural debt the gate surfaced, tracked
 // for a dedicated follow-up). The gate enforces every other rule + full
 // coverage on Welcome/Unlock + no regression; the baseline shrinks as the debt
-// is fixed. Contrast remediation goes to the token source via penpot-sync.
+// is fixed. Contrast remediation goes to the token source
+// (`docs/design/colors_and_type.css`), never to a per-component override.
 //
 // Vault-count precondition declared per scenario. Linux-only; self-skips.
 

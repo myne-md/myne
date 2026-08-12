@@ -8,8 +8,8 @@
 // fixed rows (SYNC-9). Writes go through usePrefs().setKeymapBinding (optimistic
 // + nonce-bump → the live engine re-reads). Capture validates (≥1 modifier /
 // F-key; capture.ts) and checks conflicts (warn-only, never blocks; conflicts.ts
-// / SYNC-7). Visual layout is code-first against design tokens; the canonical
-// Penpot frame + visual review is a follow-up (no MCP pairing this pass).
+// / SYNC-7). Visual layout is built against the design tokens in
+// `docs/design/colors_and_type.css`.
 
 import { Fragment, useMemo, useState, useEffect, useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";

@@ -214,8 +214,8 @@ frontmatter flag (the inverse-visibility twin of `trashed:`; `markdown-dialect.m
   (`createTemplate` → open in editor), Edit (row click → open), Remove from
   templates (`convertTemplateToNote`, non-destructive), Delete (`deleteTemplate`
   → soft-trash, recoverable). Esc / backdrop / close dismiss; first-run empty
-  state (start-empty, no seeding). Design canon: Penpot page "4 — Desktop UI
-  Kit", `screen------templates--manage` frames.
+  state (start-empty, no seeding). Design canon: `docs/design/` — tokens from
+  `colors_and_type.css`, modal anatomy from `ui_kits/desktop/`.
 - **`{{` token autocomplete** (`editor/template-tokens/plugin.ts`): a CM6
   ViewPlugin modeled on `editor/slash/plugin.ts`, composed in `editor/extensions.ts`
   alongside the slash menu. **Active only inside a `template: true` note** (reads

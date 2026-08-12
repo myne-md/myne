@@ -10,7 +10,7 @@
 #   ./scripts/capture-userguide.sh --skip-build   # reuse the built binary
 #
 # The xvfb screen is sized 1280x800 so the 1100x720 Tauri window fits
-# with margin (Penpot's desktop frames are 1280x800).
+# with margin (1280x800 is the reference desktop frame — DESIGN.json breakpoints).
 
 set -euo pipefail
 cd "$(dirname "$0")/.."

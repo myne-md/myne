@@ -25,7 +25,7 @@ docs/
 │   ├── markdown-dialect.md ← the markdown dialect + canonical frontmatter fields
 │   └── wikilink.md         ← `[[wikilink]]` syntax and resolution rules
 ├── design/                ← visual design tokens, icons, ui_kits
-└── dev/                   ← internal dev notes (e2e, i18n, penpot-design-diff, etc.)
+└── dev/                   ← internal dev notes (e2e, i18n, userguide-screenshots, etc.)
 ```
 
 The A/AS/TB rosters grow as the product does — `threat-model.md` §1/§2/§3 are the lists of record. Don't restate their extent (or their count) anywhere else; point at them.

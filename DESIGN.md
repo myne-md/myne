@@ -1,8 +1,8 @@
 ---
 name: Myne
 description: Open-source, end-to-end-encrypted markdown notes. Paper and ink surface, one cool accent, monospace for cryptographic identifiers.
-canonicalSource: penpot
-canonicalSourceNote: "Penpot is the canonical design source (page '4 — Desktop UI Kit'). Tokens here are extracted from docs/design/colors_and_type.css, which is the code-side projection. When Penpot and the values below disagree, Penpot wins and these values get updated."
+canonicalSource: repo
+canonicalSourceNote: "The design canon lives in this repository at docs/design/. Tokens below are extracted from docs/design/colors_and_type.css, which is the CSS-variable source and therefore the binding value. When that file and the values below disagree, the CSS wins and these values get corrected."
 colors:
   iron-blue: "#2c4a7a"
   iron-blue-hover: "#233b62"
@@ -322,7 +322,7 @@ Used only when an inline progressive disclosure is genuinely impossible. Backgro
 ## 6. Do's and Don'ts
 
 ### Do
-- **Do** treat Penpot as the canonical design source. Every screen ships from Penpot to code, never the reverse. When code and Penpot disagree, run `scripts/penpot-diff.sh` (see `docs/dev/penpot-design-diff.md`) and fix the side that is wrong.
+- **Do** treat `docs/design/` as the canonical design source, and bind every component to the CSS variables in `docs/design/colors_and_type.css` rather than to a literal. When a shipped screen and the canon disagree, fix whichever side is actually wrong — and update `docs/design/` in the same change when it is the canon that has fallen behind.
 - **Do** use OKLCH-style descriptive names in token discussions ("warm paper", "iron blue", "brick danger") rather than hex-code references in copy. The hex values are normative; the names are what humans use.
 - **Do** render every cryptographic identifier (account numbers, recovery-phrase words, key fingerprints, hash prefixes) in JetBrains Mono with `ss02` and `zero` features on.
 - **Do** use the standard 2px iron-blue ring with a 1px paper offset for `:focus-visible` on every interactive element. The ring is always visible; never removed.

@@ -244,8 +244,8 @@
      below (:root[data-theme="dark"] + the prefers-color-scheme:dark @media)
      only repeat `--token: var(--_token-dark)` assignments — never the literal
      hex — so a value retune touches ONE place and the worst possible drift is
-     a missed assignment (one token stuck light in one mode, caught by visual /
-     Penpot-diff review), never two diverging colors. AA (>=4.5:1) vs the dark
+     a missed assignment (one token stuck light in one mode, caught by visual
+     review), never two diverging colors. AA (>=4.5:1) vs the dark
      --paper-2 (#1a1a17) is preserved for the syntax hues (MYND-154). */
   --_paper-dark:    #121210;
   --_paper-2-dark:  #1a1a17;
