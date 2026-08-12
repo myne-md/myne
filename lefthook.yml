@@ -145,6 +145,16 @@ pre-commit:
       # timeout — which reads like flake rather than like a stale helper.
       run: node scripts/check-e2e-menu-testids.mjs
 
+    e2e-toolchain:
+      # e2e/Dockerfile drifting from rust-toolchain.toml. Nothing fails to build:
+      # rustup just re-provisions the pinned toolchain at runtime, inside
+      # whichever scenario makes the first cargo call. That is slow, and it is
+      # not crash-safe — one run raced it and reported 255 FAILURES in 266 s,
+      # 245 of them the same "cargo build -p e2e-fixture-gen" error wearing a
+      # test's name. Invisible to every other check here.
+      glob: "{e2e/Dockerfile,rust-toolchain.toml}"
+      run: node scripts/check-e2e-toolchain.mjs
+
     twin-drift:
       # #261: a change to one side of a twin module pair. WARNING ONLY (the
       # script exits 0) — most one-sided changes are legitimate, and a gate
