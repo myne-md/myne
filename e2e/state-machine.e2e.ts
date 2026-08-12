@@ -12,6 +12,7 @@ import { expect, it } from "vitest";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
+import { legalConsentSeed } from "./support/multi-device";
 import {
   dismissImporterOffer,
   enterRecoveryPhrase,
@@ -234,6 +235,14 @@ describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
           seedVault(appDataDir, { password: PASSWORD_A });
           seedVault(appDataDir, { password: PASSWORD_B });
         },
+        // The beta-terms gate stands in front of the join form (myne-ops#15),
+        // and this scenario is about picker ROUTING — that the Add-this-device
+        // CTA reaches the join modal at all — not about the terms. Arriving
+        // with consent already given keeps it that way; without it the spec
+        // waits out its budget on `join.account-input`, which renders behind
+        // the gate, and reports a routing failure that is really a screen the
+        // routing correctly reached.
+        seedConfig: legalConsentSeed(),
       },
       async (app) => {
         await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
@@ -575,6 +584,10 @@ describeE2E("in-app switcher transitions (MYND-127 task 5)", () => {
     await scenario(
       "sm-switcher-join-entry",
       {
+        // Same reason as the picker entry above: this scenario is about the
+        // switcher's teardown hop — lock, then open the join modal — not about
+        // the beta-terms gate that now stands in front of the join form.
+        seedConfig: legalConsentSeed(),
         seed: (appDataDir) => {
           a = seedVault(appDataDir, { password: PASSWORD_A });
           seedVault(appDataDir, { password: PASSWORD_B });
