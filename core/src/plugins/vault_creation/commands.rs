@@ -879,6 +879,7 @@ mod tests {
         let result = BeginResult {
             phrase: core::array::from_fn(|i| format!("w{i}")),
             account_number: "MY-XXXX-XXXX-XXXX-XXXX-XXXX".to_string(),
+            // secret-scan:allow — test stub, not a credential
             session_token: "deadbeef-0000-0000-0000-000000000000".to_string(),
         };
         let json = serde_json::to_string(&result).unwrap();

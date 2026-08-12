@@ -44,7 +44,9 @@ import {
 } from "./support/flows";
 import { scanForPlaintext, waitForFsQuiescence } from "./support/plaintext-scan";
 
+// secret-scan:allow — PS-1 residue needles are high-entropy BY DESIGN
 const BODY_TOKEN = "ps1bodyresidue7k2m9qx4w8e5rj";
+// secret-scan:allow — same
 const TITLE_TOKEN = "ps1titleresidue3f6h1zn8c2vb5";
 const PASSWORD = "Qp9#xT4!nG7&wM2k-ps1";
 /** Needle indices in every scan below: 0=body, 1=title, 2=password. */

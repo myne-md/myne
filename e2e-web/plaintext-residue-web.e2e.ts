@@ -58,6 +58,7 @@ const ACCOUNT_NUMBER = "MY-934G-2V6A-P76G-CNKM-A4X3";
 
 /** ≥24 chars, all-lowercase alphanumeric: survives the tokenizer verbatim, so a
  *  hypothetical plaintext index would contain it intact rather than in pieces. */
+// secret-scan:allow — scenario constant, not a credential
 const PASSWORD = "residuescanmasterpassword7x3k9q";
 
 /** Needle order is the failure vocabulary: a hit reports this index, never the

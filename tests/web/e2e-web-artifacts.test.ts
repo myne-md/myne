@@ -18,6 +18,7 @@ import {
   type Secret,
 } from "../../e2e-web/support/artifacts";
 
+// secret-scan:allow — test fixture, not a credential
 const ACCOUNT: Secret = { kind: "account-number", value: "MY-J8K2-P4QR-7TWX-9YZ3-B5" };
 const PASSWORD: Secret = { kind: "password", value: "correct horse battery staple" };
 
