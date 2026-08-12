@@ -40,6 +40,7 @@ use std::path::Path;
 /// Fixed so a re-run produces a fixture the same scenarios can unlock. Not a
 /// secret in any sense that matters: it opens one throwaway vault whose bytes
 /// are regenerated on every emit.
+// secret-scan:allow — fixture-generator constant, not a credential
 const PASSWORD: &str = "fixture-vault-password-7x3k9q";
 
 /// Body of the quarantined note. A distinctive token so a scenario can assert

@@ -294,16 +294,76 @@ pre-commit:
         fi
 
     secret-scan:
-      # Catches accidental private-key and AWS-key paste-ins.
-      # Not a substitute for real secret scanning; just a cheap last-line guard.
+      # Two tiers, because the one-tier version this replaces missed the secret
+      # that actually got committed in the myne-agents companion: a
+      # PLANE_API_KEY in .claude-plugin/plugin.json matched none of PEM / AKIA /
+      # aws_secret_access_key and sat in the tree for months. A guard whose only
+      # real test it failed is worth rewriting rather than trusting. The `run:`
+      # block below is kept byte-identical to the myne-agents copy so the two
+      # cannot drift; only these comments are repo-specific.
+      #
+      #   tier 1 — vendor-prefixed tokens. The shape alone identifies them, so
+      #            there is no escape hatch: a hit is a hit.
+      #   tier 2 — a credential-ish NAME assigned a high-entropy VALUE. This is
+      #            the tier that catches the Plane-shaped key, and the tier that
+      #            no threshold can make precise. Measured, not assumed: this
+      #            repo deliberately ships high-entropy test needles
+      #            (e2e/CLAUDE.md requires the plaintext-residue markers be
+      #            single alnum tokens >=24 chars, tokenizer-survivable) and
+      #            they are indistinguishable from an API key by length, digit
+      #            count and character variety alike. So tier 2 carries an
+      #            ESCAPE HATCH instead of a tighter threshold: a line carrying
+      #            `secret-scan:allow`, on itself or the line above, is skipped.
+      #            That puts every exemption in the diff where a reviewer sees
+      #            it, instead of in a path list nobody re-reads.
+      #
+      # Matches are MASKED in the output. A guard that echoes the secret into a
+      # terminal scrollback or a CI log has leaked it a second time.
+      #
+      # Measured against the whole tracked tree when it landed: 80 hits under a
+      # naive length-only rule, 9 under the entropy rule, 1 after the pragmas.
+      # That 1 is e2e-web/fixtures/unlockable-vault.json — JSON carries no
+      # comment, so it cannot hold a pragma and will fire whenever that fixture
+      # is staged. Confirm the value is fixture data and commit with --no-verify,
+      # or move the credential out of the fixture.
+      #
+      # Still a cheap last-line guard, not real secret scanning. gitleaks would
+      # do this properly with a maintained ruleset; that is a dependency
+      # decision (see docs/dependency-policy.md), not a hook edit.
       run: |
+        vendor='BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{18,}|sk-[A-Za-z0-9]{20,}'
         fail=0
         for f in {staged_files}; do
           [ -f "$f" ] || continue
           if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
-          if grep -nE 'BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|aws_secret_access_key[[:space:]]*=' "$f" >/dev/null; then
-            echo "secret-like pattern in: $f"
-            grep -nE 'BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|aws_secret_access_key[[:space:]]*=' "$f"
+
+          hits=$(grep -nE "$vendor" "$f")
+          if [ -n "$hits" ]; then
+            echo "secret-scan: vendor-prefixed credential in $f"
+            printf '%s\n' "$hits" | sed -E 's|[A-Za-z0-9+/=_-]{12,}|********|g'
+            fail=1
+          fi
+
+          hits=$(awk '
+            function digits(s,  t){ t=s; return gsub(/[0-9]/,"",t) }
+            function letters(s,  t){ t=s; return gsub(/[A-Za-z]/,"",t) }
+            {
+              cur = $0
+              if (cur ~ /secret-scan:allow/ || prev ~ /secret-scan:allow/) { prev = cur; next }
+              if (tolower(cur) ~ /(api[_-]?key|apikey|secret|token|password|passwd|credential)[^[:alnum:]]{0,2}[[:space:]]*[:=]/) {
+                line = cur
+                while (match(line, /[A-Za-z0-9+\/=_-]{24,}/)) {
+                  tok = substr(line, RSTART, RLENGTH)
+                  line = substr(line, RSTART + RLENGTH)
+                  if (digits(tok) >= 2 && letters(tok) >= 2) { print FNR ":" cur; break }
+                }
+              }
+              prev = cur
+            }' "$f")
+          if [ -n "$hits" ]; then
+            echo "secret-scan: credential-shaped assignment in $f"
+            printf '%s\n' "$hits" | sed -E 's|[A-Za-z0-9+/=_-]{16,}|********|g'
+            echo "  If this is a fixture or a test constant, mark the line 'secret-scan:allow'."
             fail=1
           fi
         done

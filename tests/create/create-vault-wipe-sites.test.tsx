@@ -60,6 +60,7 @@ const TOKEN = "11111111-2222-4333-8444-555555555555";
 const NEW_VAULT_ID = "00000000-0000-7000-8000-0000000000aa";
 
 function beginResult() {
+  // secret-scan:allow — test fixture, not a credential
   return { phrase: PHRASE, account_number: "MY-0000-0000-0000-0000-0000", session_token: TOKEN };
 }
 
