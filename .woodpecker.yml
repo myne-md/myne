@@ -1,7 +1,7 @@
 # Woodpecker CI — Myne main repo
 # Self-hosted Woodpecker via Forgejo mirror of GitHub.
 # Decision: docs/decisions.md "2026-05-01 — CI: self-hosted Woodpecker via Forgejo mirror"
-# Plan: tracked in Plane (plane.myne.md)
+# Plan: tracked in GitHub Issues under the myne-md org
 #
 # Notes:
 # - Each step runs in its own container; installed packages do NOT inherit between steps.

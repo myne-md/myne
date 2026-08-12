@@ -245,8 +245,8 @@ pre-commit:
       run: git diff --cached --check -- ':(exclude)src-tauri/resources/dictionaries/**' ':(exclude)src-tauri/resources/models/**' ':(exclude)preview/src/preview.html' ':(exclude)preview/src/preview.css'
 
     eof-newline:
-      # Skips tool-generated/exported assets: Lucide icons, Penpot brand
-      # exports, design preview specimens, Tauri/Android icon resources,
+      # Skips tool-generated/exported assets: Lucide icons, exported brand
+      # artwork, design preview specimens, Tauri/Android icon resources,
       # vendored Hunspell dictionaries, and the bundled AI model data (upstream
       # Whisper config/tokenizer + Apache-2.0 license, MYND-270 — hash-pinned
       # upstream data). Those round-trip through external tools that don't emit

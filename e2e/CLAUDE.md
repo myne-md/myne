@@ -128,8 +128,8 @@
   flake, and the non-blocking `e2e-quarantine` step (`MYNE_E2E_QUARANTINE=1`,
   `failure: ignore`) runs only them and reports without gating. Reserve it for a
   scenario verified as a runner-contention victim, keep the set short, and
-  record the debt on the Plane item — a real failure marked `.flaky` is a real
-  failure nobody will see. Currently quarantined: `nav1`, `tp1`, `ci1`, `gp1`,
+  record the debt on the tracking issue — a real failure marked `.flaky` is a
+  real failure nobody will see. Currently quarantined: `nav1`, `tp1`, `ci1`, `gp1`,
   `gp2`, `svc1`, `tor1`.
 - **"Runner contention" was the wrong diagnosis, and the quarantine list is
   built on it.** The flake reproduces on an IDLE machine — same spec, one warm
@@ -162,4 +162,4 @@
   enough to invert the sign when the arms are swapped.
 - States unreachable through real UI are NOT forced into E2E: downgrade to a
   Vitest component test (mocked `invoke`) and record the downgrade on the
-  Plane item.
+  tracking issue.

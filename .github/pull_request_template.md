@@ -1,6 +1,6 @@
 <!--
-PR title = conventional-commit subject carrying the Plane ID, e.g.
-  fix(editor): reveal colored highlights cleanly (MYND-637)
+PR title = conventional-commit subject, e.g.
+  fix(editor): reveal colored highlights cleanly
 Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects attribution trailers.
 -->
 
@@ -10,7 +10,6 @@ Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects att
 
 ## Linked work
 
-- Plane task: MYND-
 - Closes #
 
 ## Type of change
@@ -27,7 +26,7 @@ Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects att
 
 ## Checklist
 
-- [ ] Conventional-commit subject carrying the Plane ID (e.g. `fix(editor): … (MYND-637)`).
+- [ ] Conventional-commit subject; the issue is linked with `Closes #n` above.
 - [ ] Lint + tests pass locally (`cargo clippy --workspace --all-targets -- -D warnings`, `pnpm build`, `pnpm test`).
 - [ ] A new user-facing flow ships with its `data-testid` pass + an E2E scenario on the right harness (`e2e/` desktop, `e2e-web/` web).
 - [ ] Docs / specs / glossary / decisions updated where behavior changed.

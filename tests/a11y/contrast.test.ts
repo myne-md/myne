@@ -5,8 +5,9 @@
 // text/control pair clears WCAG 2.1 AA (>=4.5:1) in BOTH light and dark.
 //
 // Per the MYND-93 decision, a contrast failure on a primary token is a design-
-// canon bug fixed at the token source (+ propagated to Penpot via penpot-sync),
-// never a per-component override. This test makes such a regression fail loudly.
+// canon bug fixed at the token source — `docs/design/colors_and_type.css`, with
+// `DESIGN.md`/`DESIGN.json` corrected in the same change — never a per-component
+// override. This test makes such a regression fail loudly.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";

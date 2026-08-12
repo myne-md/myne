@@ -17,7 +17,7 @@
 //   - today's `vault_delete` targets `vaults/<id>/` directly, so its
 //     partial-fail residue takes the same Corrupted path.
 //
-// The reachability gap is recorded on the Plane item; this suite pins
+// The reachability gap is recorded on the tracking issue; this suite pins
 // the component's contract (phase transitions, full-literal copy,
 // pluralization, IPC discipline) so the banner is ready the day its
 // trigger is rehomed.

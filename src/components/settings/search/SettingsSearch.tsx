@@ -1,8 +1,7 @@
 // Settings search input (MYND-536). Sits at the TOP of the left rail, above the
 // panel tab list. Controlled by the SettingsModal, which owns the query and
-// swaps the content pane to results when it is non-empty. Code-first against
-// DESIGN.md tokens (HotkeysPanel `SEARCH_INPUT_STYLE` precedent); Penpot frame +
-// /penpot-sync visual review is a tracked follow-up.
+// swaps the content pane to results when it is non-empty. Built against the
+// DESIGN.md tokens (HotkeysPanel `SEARCH_INPUT_STYLE` precedent).
 
 import {
   forwardRef,
