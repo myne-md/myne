@@ -1,0 +1,218 @@
+# Standalone workspace — myne-mobile is cloned INSIDE the main `myne` repo
+# directory, so without this table cargo would treat src-tauri as a member
+# of the main repo's workspace (which doesn't list it) and fail. The
+# screen-guard plugin is a member so ONE Cargo.lock governs it (TB9-style
+# single-lock discipline). The share-intent plugin (MYND-511), the qr-scan
+# plugin (MYND-466) and the reminders plugin (MYND-619) are members for the same
+# reason.
+[workspace]
+members = [
+    "tauri-plugin-screen-guard",
+    "tauri-plugin-share-intent",
+    "tauri-plugin-qr-scan",
+    "tauri-plugin-reminders",
+]
+
+[package]
+name = "myne-mobile"
+version = "0.4.0"
+description = "Myne — mobile client"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0"
+# App crate, never published — lets cargo-deny's allow-wildcard-paths apply to
+# the `../../{protocol,core}` path deps (crates.io disallows path deps, so it
+# rejects wildcard paths on publishable crates). Matches the desktop crate.
+publish = false
+
+# `_lib` suffix is required to avoid the Windows lib-vs-bin name collision
+# (rust-lang/cargo#8519) — same rule as the desktop crate. Don't rename.
+# Mobile needs staticlib (iOS) + cdylib (Android) in addition to rlib.
+[lib]
+name = "myne_mobile_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# Debug builds must stay usable on-device: an unoptimized Argon2id at
+# m=256 MiB turns unlock into minutes (observed on the iOS simulator dev
+# build). Optimize ONLY the crypto-hot leaf crates in dev — same pattern as
+# the main repo's candle override; our own crates keep full debug info.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.chacha20]
+opt-level = 3
+[profile.dev.package.chacha20poly1305]
+opt-level = 3
+[profile.dev.package.poly1305]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+# Candle inference (MYND-563 transcription) — same treatment as the crypto
+# crates above: keep the matmul/quantization hot paths optimized even in dev so
+# a debug build's on-device transcription isn't unusably slow.
+[profile.dev.package.gemm]
+opt-level = 3
+[profile.dev.package."gemm-f16"]
+opt-level = 3
+[profile.dev.package."gemm-f32"]
+opt-level = 3
+[profile.dev.package."gemm-common"]
+opt-level = 3
+[profile.dev.package.half]
+opt-level = 3
+[profile.dev.package."candle-core"]
+opt-level = 3
+
+[features]
+# Transcription (MYND-563) ships in the default build, gated at RUNTIME by the
+# `transcription_enabled` pref (default on) — mirrors desktop's local-inference
+# posture (AI in the default build, off by a pref, not a compile flag).
+# `--no-default-features` drops the whole candle/whisper stack for a lean build.
+default = ["local-inference"]
+local-inference = [
+    "dep:candle-core",
+    "dep:candle-nn",
+    "dep:candle-transformers",
+    "dep:tokenizers",
+]
+# E2E build knob (mirrors desktop): swap the CandleEngine for the deterministic
+# StubEngine so a Rust-driven transcription test needs no bundled model. The
+# ported engine files reference this cfg; declaring it silences the
+# unexpected-cfg warning even where nothing enables it yet.
+local-inference-stub = ["local-inference"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+# `update_android_manifest` — the committed, regeneration-surviving channel for
+# Android manifest additions (the Android mirror of `Info.ios.plist`; it edits
+# `gen/android/.../AndroidManifest.xml` on every `tauri android dev/build` and
+# no-ops on desktop/iOS where TAURI_ANDROID_PROJECT_PATH is unset).
+tauri-utils = { version = "2", features = ["build"] }
+
+[dependencies]
+# Reuse the audited Phase-1 crypto crate directly (no port). From this
+# crate's directory the main repo's `protocol/` is two levels up.
+protocol = { path = "../../protocol" }
+# Shared backend logic (vault / notes / prefs plugin cores + crate-root
+# helpers), extracted from the desktop crate into `myne-core` so the mobile
+# client consumes one source of truth instead of a copied backend. The
+# desktop-only side-effects attach through `myne_core::hooks` (mobile installs
+# the no-op `NoopHooks`).
+myne-core = { path = "../../core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+# Custom-URL-scheme (`myne://`) delivery for the iOS home/lock-screen widgets +
+# Control Center "New note" action. The widget process is OUTSIDE the plaintext
+# trust boundary (it can carry no vault content); all it does is hand the app a
+# `myne://open` / `myne://capture` URL, which this plugin surfaces to the WebView
+# (`getCurrent` at cold launch + `onOpenUrl` at runtime). The capture route then
+# drives the ordinary React new-note editor after unlock — no second, unaudited
+# capture path.
+tauri-plugin-deep-link = "2"
+# MYND-469: in-repo Android FLAG_SECURE bridge for `screen_guard` (Kotlin
+# under the plugin's own `android/`, since gitignored `gen/android` cannot
+# carry committed code). Rust-only surface — no WebView commands, no
+# capability entry. Zero external crates.
+tauri-plugin-screen-guard = { path = "tauri-plugin-screen-guard" }
+# MYND-511: in-repo Android OS-share-sheet (ACTION_SEND) receiver for the
+# share-import feature (SF3). Committed Kotlin under the plugin's own `android/`
+# (gitignored `gen/android` cannot carry committed code). Rust-only WebView
+# surface — no WebView commands, no capability entry; it delivers each shared
+# file to the WebView as a global `share-intent` event. Zero external crates.
+tauri-plugin-share-intent = { path = "tauri-plugin-share-intent" }
+# MYND-466: in-repo iOS AVFoundation QR scanner for device-join via QR. WebView
+# command `scan` (deny-by-default `qr-scan:default` capability, camera-gated,
+# NSCameraUsageDescription). iOS-only (SYNC-46); Android decode is MYND-465.
+tauri-plugin-qr-scan = { path = "tauri-plugin-qr-scan" }
+# MYND-619: in-repo local-notification scheduler for task reminders, carrying
+# BOTH native halves (Swift + Kotlin) under the plugin's own `ios/`+`android/`.
+# Four WebView commands behind the deny-by-default `reminders:default`
+# capability. `tauri-plugin-notification` was declined (grill SYNC-44): it
+# implements `schedule` on mobile ONLY — its desktop backend silently drops the
+# schedule field — so "one plugin everywhere" would have shipped a half-feature
+# on the desktop, and on Android it would additionally have pulled a large JSON
+# library, AppCompat and Material, and added three install-time permissions.
+# Zero external crates.
+tauri-plugin-reminders = { path = "tauri-plugin-reminders" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "v7"] }
+thiserror = "2"
+getrandom = "0.2"
+zeroize = { version = "1.8", features = ["alloc", "derive"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
+# `tracing` for structured ops-side logging (stage tags + bounded
+# variant-name fields only; see the main repo's src-tauri/CLAUDE.md
+# "Secret-handling logging discipline").
+tracing = "0.1"
+# The actual log sink (desktop `lib.rs` parity). Without it every mobile
+# `tracing::*!` event is silently dropped — the device checklists
+# (`docs/dev/device-matrix.md` §7) read these events via the iOS dev console /
+# `adb logcat -s RustStdoutStderr`. NOT a new audit surface: already in the
+# shared lock via the `tracing-test` dev-dependency.
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# NFC/NFKD normalization shared with the protocol crate's vault.prefs folder
+# normalization. Pure-Rust, already in the shared lock.
+unicode-normalization = { version = "0.1.25", default-features = false }
+# SHA-256 of `vault.meta` bytes for the slot-held CAS anchor
+# (`Slot::Unlocked.vault_meta_bytes_hash`). Same RustCrypto sister crate the
+# protocol crate uses.
+sha2 = { version = "0.10", default-features = false }
+
+# On-device speech-to-text (MYND-563) — Candle Whisper, feature-gated by
+# `local-inference` (see [features]). default-features=false keeps hf-hub/http
+# OUT (nothing is downloaded at runtime — the model is bundled) and Metal/CUDA
+# off (CPU baseline on mobile). iOS needs `-C target-feature=+fp16` for
+# gemm-f16's NEON half-precision matmul — set in `.cargo/config.toml`.
+# tokenizers uses the audited `onig` backend (same as desktop).
+candle-core = { version = "0.8", optional = true, default-features = false }
+candle-nn = { version = "0.8", optional = true, default-features = false }
+candle-transformers = { version = "0.8", optional = true, default-features = false }
+tokenizers = { version = "0.20", optional = true, default-features = false, features = ["onig"] }
+
+# iOS-only: Objective-C runtime access for the WKWebView keyboard-accessory-bar
+# swizzle (`ios_chrome`) and the screen-capture secure-field splice
+# (`screen_guard`, MYND-469). NOT a new dependency to audit — `objc2` is
+# already compiled into the build transitively via `wry`; this just names the
+# existing version so we can reference it directly. Pinned to the version
+# already in the shared lock. The `exception` feature (objc2::exception::catch
+# around the UIKit splice) is likewise declaration-only: wry already enables it
+# for Apple targets, so feature unification adds no crates.
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2 = { version = "0.6", features = ["exception"] }
+# CoreGraphics geometry types (CGRect/CGPoint/CGSize) for the note→PDF render
+# (`pdf_export`, MYND-475): they carry the correct `objc2::Encode` impls so a
+# CGRect can cross `msg_send!` + the `UIGraphics*PDF*` C ABI without hand-rolled
+# encodings. Same policy as `objc2` above — already compiled into the build
+# transitively via `wry`/`objc2-ui-kit`; this only names it for direct use.
+# default-features off + just the geometry module (`CFCGTypes`) and its
+# `objc2::Encode` impls (`objc2`): both are already enabled transitively via
+# `objc2-ui-kit`, so this adds a dependency edge but NO new crate/feature to the
+# build (keeps the minimal-surface discipline — `threat-model.md` §6).
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["CFCGTypes", "objc2"] }
+# ObjC block support for the `userDidTakeScreenshotNotification` observer
+# (`screen_guard`, MYND-476) — `addObserverForName:...usingBlock:` needs a heap
+# block. Already in the shared lock (pulled transitively via `objc2-*`); this
+# only names it for direct use. Pairs with objc2 0.6.
+block2 = "0.6"
+# SF2 (MYND-510): typed `NSFileManager` binding to resolve the share-import
+# App-Group container path (`FileManager.containerURL(forSecurityApplication
+# GroupIdentifier:)`) on the app's DRAIN side (`share_import_ffi`). The path is
+# then injected into the shared-core queue seam so the app reads the SAME
+# `pending-shares/sealed/` dir the Share Extension wrote. Same policy as the
+# `objc2*` deps above — already compiled into the build transitively via `wry`
+# (present in the resolved lock), so naming it here adds a dependency EDGE but NO
+# new crate/feature to the build (minimal-surface discipline, `threat-model.md`
+# §6). default-features off + only the three classes we touch.
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSString", "NSURL"] }
+
+# Dev-dependencies — same policy bar as runtime deps. `tracing-test` captures
+# `tracing` events per-test so the plugins' tracing-level discipline is
+# asserted in unit tests rather than reviewer-inspected.
+[dev-dependencies]
+tracing-test = "0.2"
+# The `test-support` feature exposes the shared `ScopedTempDir` /
+# `seed_real_vault_meta` / `VaultRuntimeState` fixtures so mobile-side tests can
+# reuse the same harness the core tests use.
+myne-core = { path = "../../core", features = ["test-support"] }

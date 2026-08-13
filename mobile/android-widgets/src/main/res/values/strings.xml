@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English-only for now, matching the iOS widget strings (the app-wide i18n
+     pass has not reached the widget surfaces on either platform). -->
+<resources>
+    <string name="myne_brand">Myne</string>
+
+    <string name="myne_widget_open_label">Open Myne</string>
+    <string name="myne_widget_open_desc">A door into your vault. Nothing is shown until you unlock.</string>
+    <string name="myne_widget_capture_label">Quick capture</string>
+    <string name="myne_widget_capture_desc">Start a new note. It is encrypted the moment you save.</string>
+    <string name="myne_widget_encrypted_label">Encrypted</string>
+    <string name="myne_widget_encrypted_desc">A reminder that your notes are sealed on this device.</string>
+
+    <string name="myne_new_note">New note</string>
+    <string name="myne_encrypted_private">Encrypted and private</string>
+    <string name="myne_encrypted_two_line">Encrypted\nand private</string>
+    <string name="myne_voice_note">New voice note</string>
+
+    <string name="myne_tile_new_note_label">Myne — New note</string>
+</resources>

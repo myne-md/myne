@@ -1,0 +1,246 @@
+# Woodpecker CI — myne-mobile (Phase-3 mobile client).
+# Mirrors the main `myne` repo's self-hosted Woodpecker pipeline, adapted for the
+# mobile layout:
+#   * The Cargo workspace is at `src-tauri/` (mobile has no root Cargo.toml).
+#   * The audited `protocol` crate is REUSED from the main repo via the nested
+#     path dep `../../protocol`. Locally that resolves because myne-mobile is
+#     cloned inside the main `myne` checkout; in CI (standalone checkout) the
+#     `provision-protocol` snippet clones the main repo and symlinks it into
+#     place — the same companion-repo-clone idiom the desktop `sync-sim` step
+#     uses (token-gated Forgejo clone).
+#   * Native iOS/Android builds need Xcode / the Android SDK+NDK and CANNOT run
+#     on the Linux runner — they belong to a separate mac/Android release matrix
+#     (documented, not gated here), exactly as the desktop signed-bundle release
+#     pipeline is separate from this verification CI.
+
+when:
+  - event: [push, pull_request]
+    branch: [develop, main]
+  - event: manual
+
+steps:
+  # ── Rust style + lint + unit tests (mirrored vault/notes/prefs plugins) ───
+  # Compiling the mobile Tauri lib for the Linux host exercises the platform-
+  # agnostic Rust logic; it needs the Tauri Linux WebView sysdeps + the protocol
+  # crate provisioned adjacently.
+  cargo-checks:
+    image: rust:1.96.0-slim
+    environment:
+      MYNE_REPO_TOKEN:
+        from_secret: myne_repo_token
+    commands:
+      - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      - apt-get update && apt-get install -y --no-install-recommends
+        git ca-certificates pkg-config libssl-dev
+        libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      # provision-shared: everything the mobile build reuses from the main repo
+      # is one clone away — the Rust path deps (protocol, core) AND the frontend's
+      # shared SOURCE packages (editor, dialect, locales; aliased by tsconfig/vite
+      # as @myne/*, NOT npm members). `src` is symlinked too: the @myne/i18n
+      # runtime (MYND-485) aliases the desktop APP source `../src/i18n/` directly
+      # (its documented follow-up is to extract a real @myne/i18n package), so
+      # tsc/vite need ../src to exist here exactly as in the nested local layout.
+      # Clone the main repo once and symlink each next to this checkout so both
+      # `cargo` and `pnpm build` resolve them. The workspace volume is shared
+      # across steps, so the JS steps (cargo-deny, pnpm-build) reuse these via
+      # depends_on: [cargo-checks].
+      - |
+        PARENT="$(cd .. && pwd)"
+        MYNE_URL="https://github.com/myne-md/myne.git"
+        if [ -n "$MYNE_REPO_TOKEN" ]; then
+          MYNE_URL="https://oauth2:$MYNE_REPO_TOKEN@github.com/myne-md/myne.git"
+        fi
+        # ALWAYS refresh the shared-source checkout to the current develop. The
+        # old `if [ ! -e ] clone` reused a workspace-cached myne-main across
+        # runs and NEVER updated it, so every time a shared command / type / hook
+        # landed in core on develop the mobile build broke against the stale
+        # clone (e.g. `cannot find __cmd__sync_*` after new sync commands land).
+        # fetch+reset an existing checkout; clone fresh otherwise.
+        if [ -e "$PARENT/myne-main/.git" ]; then
+          git -C "$PARENT/myne-main" remote set-url origin "$MYNE_URL"
+          git -C "$PARENT/myne-main" fetch --depth 1 origin develop
+          git -C "$PARENT/myne-main" reset --hard FETCH_HEAD
+        else
+          rm -rf "$PARENT/myne-main"
+          git clone --depth 1 "$MYNE_URL" "$PARENT/myne-main"
+        fi
+        # `ornaments` is on this list because `src/lib/customTheme.ts` imports
+        # `@myne/ornaments`, whose alias points at `../ornaments/src`. Everything
+        # resolves on a maintainer's machine only because this repo is CLONED
+        # INSIDE the main checkout; CI's standalone checkout has nothing there
+        # unless the symlink is made, so an absent entry here is an
+        # unresolvable-import failure that no local run can reproduce.
+        for d in protocol core editor dialect locales src theme-validator src-tauri ornaments; do
+          ln -sfn "$PARENT/myne-main/$d" "$PARENT/$d"
+        done
+      - rustup component add rustfmt clippy
+      # fmt runs here (not a standalone step) because `cargo fmt --all` resolves
+      # the ../../core + ../../protocol path deps, which exist only after the
+      # provisioning above.
+      - cd src-tauri && cargo fmt --all -- --check
+      - cargo clippy --all-targets -- -D warnings
+      - cargo test --no-fail-fast
+
+  # ── Cross-implementation vector conformance (protocol crate) ──────────────
+  # Mobile links the SAME audited `protocol/` crate as desktop, so its blob/
+  # crypto path is byte-validated by `protocol/tests/vectors.rs` against the
+  # `myne-test-vectors` companion (52 categories, 708 cases: MY01…MYT1 blobs,
+  # KDF, AEAD, HKDF subkey roles, SCRAM, vault-head, manifest, account-number,
+  # BIP-39, the dialect/task conformance families, and the v0.2 next-major
+  # formats — the companion's own README carries the current count).
+  # A passing run here == mobile's crypto is cross-client conformant.
+  #
+  # DISABLED (mirrors the main repo's step) while `myne-test-vectors` is private:
+  # the runner SKIPS-with-message when the companion is absent, so leaving this
+  # off does not fail CI — it just doesn't gate. Enable once the vectors repo is
+  # reachable (public, or a `vectors_token` secret):
+  #
+  # protocol-vectors:
+  #   image: rust:1.96.0-slim
+  #   environment:
+  #     VECTORS_TOKEN: { from_secret: vectors_token }
+  #   commands:
+  #     - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+  #     - PARENT="$(cd .. && pwd)"
+  #     - '[ -e "$PARENT/protocol" ] || { git clone --depth 1 https://github.com/myne-md/myne.git "$PARENT/myne-main" && ln -sfn "$PARENT/myne-main/protocol" "$PARENT/protocol" && ln -sfn "$PARENT/myne-main/core" "$PARENT/core"; }'
+  #     # vectors.rs locates the companion at <protocol>/../myne-test-vectors:
+  #     - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@github.com/myne-md/myne-test-vectors.git" "$PARENT/myne-test-vectors"
+  #     - cd "$PARENT/protocol" && cargo test -p protocol --test vectors
+
+  # ── Rust supply-chain audit ───────────────────────────────────────────────
+  cargo-deny:
+    image: rust:1.96.0-slim
+    # Needs protocol/core provisioned by cargo-checks (shared workspace volume).
+    depends_on: [cargo-checks]
+    commands:
+      # Installed from the official PINNED prebuilt release (sha256-verified),
+      # mirroring the main repo's own cargo-deny step. `cargo install --locked`
+      # locks this crate's own dependencies but NOT the version of the tool it
+      # resolves, so the step silently rode cargo-deny upgrades — and 0.20 moved
+      # `--config` off the `check` subcommand, which turned into
+      # `error: unexpected argument '--config' found` on a tree nobody had
+      # touched. Pinning is also ~149s faster than building from source. Bump the
+      # version + sha together, in step with the main repo (asset:
+      # cargo-deny-<ver>-x86_64-unknown-linux-musl.tar.gz, tag has no `v` prefix;
+      # sha from the .sha256 sibling asset).
+      # `git` is required by `cargo deny check` for the rustsec advisory-db.
+      - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates
+      - |
+        curl -fsSL "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz" -o /tmp/cargo-deny.tgz
+        echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  /tmp/cargo-deny.tgz" | sha256sum -c -
+        tar -xzf /tmp/cargo-deny.tgz -C /tmp --strip-components=1
+        install -m0755 /tmp/cargo-deny /usr/local/bin/cargo-deny
+      # `--config` is GLOBAL in 0.20+, before the subcommand — `check --config`
+      # is the spelling that broke. Reuses the main repo's advisory/license
+      # rules (the clone is provisioned by cargo-checks).
+      - cd src-tauri && cargo deny --config ../../myne-main/deny.toml check
+
+  # ── Frontend build (tsc typecheck + vite bundle) ──────────────────────────
+  pnpm-build:
+    image: node:25
+    # Needs editor/dialect/locales provisioned by cargo-checks (the @myne/*
+    # aliases resolve to ../editor/src, ../dialect/src, ../locales), shared via
+    # the workspace volume.
+    depends_on: [cargo-checks]
+    commands:
+      - npm install -g pnpm@11.8.0
+      # The frontend source-consumes @myne/{editor,dialect} from the provisioned
+      # main repo (../editor, ../dialect → myne-main/*). Those TS sources import
+      # their own npm deps (react, js-yaml, pdfjs-dist, @types/*), so install the
+      # main repo's workspace first — that populates myne-main/node_modules with
+      # every dep the shared source needs.
+      - (cd ../myne-main && pnpm install --frozen-lockfile)
+      # tsc (moduleResolution: bundler) resolves the shared source's deps by
+      # walking node_modules up from the ../editor SYMLINK path, NOT its realpath
+      # under myne-main. That walk-up lands in the checkout's PARENT dir — so
+      # mirror myne-main's node_modules there. Without this, tsc finds react/
+      # js-yaml's .js in the pnpm store but not their adjacent @types (TS7016),
+      # and pdfjs-dist doesn't resolve at all (TS2307). Locally this "just works"
+      # because mobile is nested INSIDE the main checkout, so the walk-up hits
+      # the main repo's node_modules; the symlink reproduces that layout in CI.
+      - ln -sfn "$(cd .. && pwd)/myne-main/node_modules" "$(cd .. && pwd)/node_modules"
+      - pnpm install --frozen-lockfile
+      - pnpm build
+
+  # ── npm dependency-license gate (MYND-504) — npm analogue of cargo-deny ────
+  # Fails on any transitive npm license outside the allowlist in
+  # scripts/check-npm-licenses.mjs, which mirrors deny.toml's [licenses].allow.
+  # Depends on pnpm-build so the deps are already provisioned in the shared
+  # workspace volume; re-installs frozen to populate node_modules for the query.
+  npm-licenses:
+    image: node:25
+    depends_on: [pnpm-build]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile
+      - node scripts/check-npm-licenses.mjs
+
+  # ── Frontend unit tests (TS↔Rust mirrors, dialect, etc.) ──────────────────
+  # Serialized after pnpm-build so the two pnpm-install steps stay linear (the
+  # desktop pipeline does the same to avoid pnpm lockdir ENOENT races).
+  vitest:
+    image: node:25
+    depends_on: [pnpm-build]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile
+      - pnpm test
+
+  # ── Sync UI flow-logic tier (MYND-462 T3) — NOT end-to-end ────────────────
+  # Playwright drives headless Chromium against the Vite DEV SERVER with a MOCK
+  # Tauri IPC (`tests/flow-logic/mock-ipc.ts`) — it exercises the sync UI's flow
+  # machine (enroll transitions, status rendering, conflict-sheet wiring) via the
+  # `data-testid` contract. There is NO device, NO Rust backend, NO real transport
+  # here, so this tier is deliberately labeled "flow-logic" and MUST NEVER be
+  # called end-to-end: device-level UI testing is the SYNC-44 exemption (MYND-467).
+  flow-logic:
+    image: mcr.microsoft.com/playwright:v1.61.1-noble
+    depends_on: [vitest]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile
+      # The Playwright image ships the browsers; `pnpm dev` is started by the
+      # config's webServer (reuseExistingServer:true → starts one in CI).
+      - pnpm run test:flow
+
+  # Failure notification via Pushover. The token + group come ONLY from CI
+  # secrets, never committed (public repo). A missing secret makes the step skip
+  # silently; failure:ignore keeps it from ever failing the pipeline.
+  notify-failure:
+    image: alpine:3.21
+    depends_on:
+      - name: cargo-checks
+        optional: true
+      - name: cargo-deny
+        optional: true
+      - name: pnpm-build
+        optional: true
+      - name: vitest
+        optional: true
+      - name: flow-logic
+        optional: true
+    environment:
+      PUSHOVER_TOKEN:
+        from_secret: pushover_token
+      PUSHOVER_GROUP:
+        from_secret: pushover_group
+    commands:
+      - apk add --no-cache curl
+      - |
+        if [ -z "$PUSHOVER_TOKEN" ]; then echo "pushover secret absent; skipping"; exit 0; fi
+        curl -fsS -m 15 \
+          --data-urlencode "token=$PUSHOVER_TOKEN" \
+          --data-urlencode "user=$PUSHOVER_GROUP" \
+          --data-urlencode "title=❌ $CI_REPO_NAME failed · $CI_COMMIT_BRANCH" \
+          --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
+          --data-urlencode "url=$CI_PIPELINE_URL" \
+          https://api.pushover.net/1/messages.json
+    when:
+      - event: [push, manual]
+        status: failure
+    failure: ignore
+
+# Native build matrix (NOT run here — needs Xcode / Android SDK+NDK):
+#   iOS:     pnpm tauri ios build      (mac runner, signing identity)
+#   Android: pnpm tauri android build  (JDK 17 + Android SDK/NDK runner)
+# See operations for the reproducible mobile-build recipe (Phase-3 release track).

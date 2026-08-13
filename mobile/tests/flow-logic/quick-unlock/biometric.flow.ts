@@ -1,0 +1,127 @@
+// Flow-logic: the Face ID / Touch ID quick-unlock surfaces (MYND-329 mobile
+// biometric). Drives headless Chromium against the dev server with mock IPC —
+// NOT an end-to-end suite (no device, no Rust, no real Face ID; the OS
+// biometric sheet is system UI a WebView test can never reach — see
+// docs/dev/mobile-e2e-options.md §6.3). What this tier CAN pin down is the
+// flow logic around the prompt: the auto-prompt on unlock entry, the
+// cancel → retry surface, the password fallback, and the settings toggle
+// round-trip.
+
+import { test, expect } from "@playwright/test";
+import { installMockIpc } from "../mock-ipc";
+
+test.describe("biometric quick-unlock — unlock screen", () => {
+  test("redeemable biometric credential auto-prompts and unlocks to the editor", async ({ page }) => {
+    await installMockIpc(page, {
+      lockedVault: true,
+      quickUnlock: { configured: true, method: "biometric", available: true },
+    });
+    await page.goto("/");
+
+    // The auto-prompt fires on entry; the mock redeem resolves → editor. The
+    // editor header's Settings button is the stable "we are in the editor" mark.
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+  });
+
+  test("cancelled prompt lands on the retry surface; retry works", async ({ page }) => {
+    await installMockIpc(page, {
+      lockedVault: true,
+      quickUnlock: { configured: true, method: "biometric", available: true },
+      biometricRedeemError: { kind: "Cancelled" },
+    });
+    await page.goto("/");
+
+    // Auto-prompt → mock Cancelled → the UN-02-style failure surface. A cancel
+    // must NOT loop the prompt: the retry is a user tap.
+    const bio = page.getByTestId("unlock-biometric");
+    await expect(bio).toBeVisible();
+    await expect(bio).toHaveAttribute("data-state", "failed");
+    await expect(page.getByTestId("unlock-biometric-retry")).toBeVisible();
+
+    // Retry re-fires the redeem (still Cancelled in the mock) — stays failed.
+    await page.getByTestId("unlock-biometric-retry").click();
+    await expect(bio).toHaveAttribute("data-state", "failed");
+  });
+
+  test("password fallback from the biometric surface, and back", async ({ page }) => {
+    await installMockIpc(page, {
+      lockedVault: true,
+      quickUnlock: { configured: true, method: "biometric", available: true },
+      biometricRedeemError: { kind: "Cancelled" },
+    });
+    await page.goto("/");
+
+    await expect(page.getByTestId("unlock-biometric")).toBeVisible();
+    await page.getByTestId("unlock-use-password").click();
+    await expect(page.getByTestId("unlock-password")).toBeVisible();
+
+    // The escape hatch is two-way: the password form offers the biometric
+    // surface back (method-aware link).
+    await page.getByTestId("unlock-use-biometric").click();
+    await expect(page.getByTestId("unlock-biometric")).toBeVisible();
+  });
+
+  test("a session-cold credential (available: false) never shows the biometric surface", async ({ page }) => {
+    await installMockIpc(page, {
+      lockedVault: true,
+      quickUnlock: { configured: true, method: "biometric", available: false },
+    });
+    await page.goto("/");
+
+    // Spring-loaded gate: configured on disk but no full unlock this session →
+    // the password form, with no biometric affordance offered.
+    await expect(page.getByTestId("unlock-password")).toBeVisible();
+    await expect(page.getByTestId("unlock-biometric")).not.toBeVisible();
+    await expect(page.getByTestId("unlock-use-biometric")).not.toBeVisible();
+  });
+});
+
+test.describe("biometric quick-unlock — settings", () => {
+  async function openQuickUnlockPanel(page: import("@playwright/test").Page) {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Settings" }).first().click();
+    await page.getByText("Privacy & security", { exact: true }).click();
+    await page.getByTestId("settings.quick-unlock-row").click();
+  }
+
+  test("Face ID toggle enables biometric quick unlock", async ({ page }) => {
+    await installMockIpc(page, {});
+    await openQuickUnlockPanel(page);
+
+    const toggle = page.getByTestId("settings.quick-unlock-biometric-toggle").getByRole("switch");
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await toggle.click();
+
+    // The mock setup mutates the canned status; the refreshed read flips the
+    // toggle on and the confirmation toast names the platform biometric.
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByText("Face ID quick unlock is on")).toBeVisible();
+  });
+
+  test("toggle off disables the credential in place", async ({ page }) => {
+    await installMockIpc(page, {
+      quickUnlock: { configured: true, method: "biometric", available: true },
+    });
+    await openQuickUnlockPanel(page);
+
+    const toggle = page.getByTestId("settings.quick-unlock-biometric-toggle").getByRole("switch");
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await toggle.click();
+
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByText("Quick unlock turned off")).toBeVisible();
+  });
+
+  test("HardwareUnavailable surfaces an honest error, toggle stays off", async ({ page }) => {
+    await installMockIpc(page, {
+      biometricSetupError: { kind: "HardwareUnavailable" },
+    });
+    await openQuickUnlockPanel(page);
+
+    const toggle = page.getByTestId("settings.quick-unlock-biometric-toggle").getByRole("switch");
+    await toggle.click();
+
+    await expect(page.getByText("Face ID isn't available on this device.")).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
+});

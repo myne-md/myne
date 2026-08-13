@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WG-01 · Open Myne — brand tile + wordmark, whole widget is one tap target
+     (OpenWidget.kt binds myne://open on @id/myne_root). RemoteViews-safe views
+     only. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/myne_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/myne_widget_bg"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <ImageView
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:background="@drawable/myne_logo_bg_52"
+        android:importantForAccessibility="no"
+        android:src="@drawable/myne_mark" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="-0.02"
+        android:text="@string/myne_brand"
+        android:textColor="@color/myne_ink"
+        android:textSize="17sp" />
+</LinearLayout>

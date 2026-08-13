@@ -1,0 +1,162 @@
+/* The in-phone Myne UI, authored at 440x956 logical px (iPhone points) and
+   scaled x2.2 by build.js. Every value is the app's own token from
+   docs/design/colors_and_type.css — warm-paper #fbfbfa, ink #1a1a17, iron-blue
+   #2c4a7a, the 4px spacing scale, Inter (UI) + JetBrains Mono (crypto ids only).
+   Component structure mirrors myne-mobile/src/app/flows/. If a token changes,
+   change it here too. Solid surfaces only; no gradients, no glass. */
+
+.app{width:440px;height:956px;display:flex;flex-direction:column;
+  background:#fbfbfa;color:#1a1a17;font-family:Inter;overflow:hidden}
+.grow{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.pad{padding:0 20px}
+
+/* ── status bar (iOS) ── */
+.sb{position:relative;height:54px;flex:none;color:#1a1a17}
+.sb-t{position:absolute;left:24px;top:0;height:54px;display:flex;align-items:center;
+  font-size:17px;font-weight:600;letter-spacing:.1px}
+.sb-r{position:absolute;right:22px;top:0;height:54px;display:flex;align-items:center;gap:7px;fill:#1a1a17}
+
+/* ── top app header (AppHeader.tsx) ── */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 6px 20px;flex:none}
+.hdr-org{display:flex;align-items:center;gap:8px;min-width:0}
+.hdr-org .nm{font-size:15px;font-weight:600;color:#1a1a17;white-space:nowrap}
+.hdr-act{display:flex;align-items:center;gap:4px}
+.hdr-act .ib{width:36px;height:36px;display:flex;align-items:center;justify-content:center}
+
+/* ── page title row ── */
+.titlerow{display:flex;align-items:center;justify-content:space-between;padding:8px 20px 0}
+.h1{font-size:32px;line-height:1.05;font-weight:700;letter-spacing:-.025em;color:#0b0b09}
+.title-act{display:flex;align-items:center;gap:8px}
+.sqbtn{width:36px;height:36px;border:1px solid #c8c7c1;border-radius:10px;background:transparent;
+  display:flex;align-items:center;justify-content:center;color:#3a3934}
+.newnote{height:36px;border-radius:10px;background:#2c4a7a;color:#fff;display:flex;align-items:center;
+  gap:6px;padding:0 14px;font-size:14px;font-weight:600}
+
+/* ── quick-action tiles (ActionPill.tsx) ── */
+.tiles{display:flex;gap:8px;padding:12px 20px 0}
+.tile{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;border:1px solid #e3e2dd;
+  border-radius:12px;color:#3a3934;font-size:12px;font-weight:600;padding:12px 4px}
+
+/* ── search + filter + sort row ── */
+.toolrow{display:flex;gap:8px;padding:12px 20px 0}
+.field{flex:1;height:38px;border:1px solid #c8c7c1;border-radius:10px;background:#f4f4f2;
+  display:flex;align-items:center;gap:8px;padding:0 12px;color:#6b6a64;font-size:14px}
+.tbtn{width:44px;height:38px;border:1px solid #c8c7c1;border-radius:10px;background:transparent;
+  display:flex;align-items:center;justify-content:center;color:#3a3934}
+.tbtn.on{background:#e8edf5;border-color:#e8edf5;color:#2c4a7a}
+
+/* ── favorites strip (FavoritesStrip.tsx) ── */
+.favs{padding:14px 0 4px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6a64;padding:0 20px}
+.fav-row{display:flex;gap:12px;padding:10px 20px 0}
+.fav{width:64px;flex:none}
+.fav-sq{width:60px;height:60px;border-radius:16px;background:#e8edf5;border:1px solid #e3e2dd;
+  display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#2c4a7a}
+.fav-nm{font-size:11px;line-height:1.25;color:#3a3934;margin-top:6px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* ── folder tree + note rows ── */
+.list{padding:8px 0 0;flex:1;overflow:hidden}
+.frow{display:flex;align-items:center;gap:10px;padding:11px 20px}
+.frow .cnt{margin-left:auto;font-size:13px;color:#6b6a64;min-width:30px;text-align:right}
+.frow .nm{font-size:16px;font-weight:600;color:#1a1a17}
+.chev{color:#6b6a64;flex:none}
+.nrow{display:flex;align-items:center;gap:10px;margin:3px 8px;padding:8px 12px;border-radius:8px}
+.nrow.sel{background:#e8edf5}
+.nrow .mid{flex:1;min-width:0}
+.nrow .tt{font-size:16px;font-weight:600;color:#1a1a17;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:8px}
+.nrow .su{font-size:13px;color:#6b6a64;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:9999px;flex:none}
+.indent{margin-left:18px}
+.rail{border-left:1px solid #c8c7c1;margin-left:29px;padding-left:0}
+
+/* ── bottom tab bar (TabBar.tsx) ── */
+.tabbar{flex:none;border-top:1px solid #e3e2dd;background:#fbfbfa;display:flex;
+  padding:6px 0 22px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:#6b6a64;font-size:10px;font-weight:500}
+.tab.on{color:#2c4a7a;font-weight:600}
+
+/* ── editor (EditorTopBar / FormatBar / MarkdownView) ── */
+.etop{display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #e3e2dd;flex:none}
+.eback{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#2c4a7a}
+.ecrumb{font-family:"JetBrains Mono";font-size:12px;color:#6b6a64;letter-spacing:.01em}
+.eact{display:flex;align-items:center;gap:4px;color:#3a3934}
+.edoc{flex:1;overflow:hidden;padding:18px 22px}
+.md-h1{font-size:29px;line-height:1.2;font-weight:700;color:#0b0b09;letter-spacing:-.02em;margin-bottom:14px}
+.md-p{font-size:16px;line-height:1.65;color:#1a1a17;margin:0 0 14px}
+.md-p.mut{color:#3a3934}
+.wl{color:#2c4a7a;border-bottom:1px solid #2c4a7a}
+.hl{background:#f3e7c4;border-radius:2px;padding:0 2px}
+.b{font-weight:700}
+.i{font-style:italic}
+.md-ul{margin:0 0 14px;padding-left:22px}
+.md-ul li{font-size:16px;line-height:1.7;color:#1a1a17;margin-bottom:4px}
+.chk{display:flex;align-items:flex-start;gap:10px;font-size:16px;line-height:1.55;margin-bottom:10px;color:#1a1a17}
+.chk .box{width:20px;height:20px;border-radius:4px;border:1.6px solid #c8c7c1;flex:none;margin-top:1px}
+.chk .box.on{background:#2c4a7a;border-color:#2c4a7a;display:flex;align-items:center;justify-content:center}
+.chk.done{color:#6b6a64;text-decoration:line-through}
+.code{background:#f4f4f2;border:1px solid #e3e2dd;border-radius:8px;padding:12px 14px;
+  font-family:"JetBrains Mono";font-size:13.5px;line-height:1.5;color:#1a1a17;margin:0 0 14px;white-space:pre}
+.tok-k{color:#7a3b8c}.tok-s{color:#3f6a4a}.tok-c{color:#706f66}.tok-f{color:#1f5c6e}.tok-n{color:#9a5d2a}
+.quote{border-left:3px solid #c8c7c1;padding-left:14px;color:#3a3934;font-size:16px;line-height:1.6;margin:0 0 14px}
+.fmtbar{flex:none;border-top:1px solid #e3e2dd;background:#f4f4f2;display:flex;align-items:center;
+  gap:2px;padding:0 8px;height:52px;color:#3a3934}
+.fmt{width:40px;height:40px;display:flex;align-items:center;justify-content:center;flex:none}
+.fmt.txt{font-size:16px;font-weight:700}
+.fmt.push{margin-left:auto}
+.fmt.acc{color:#2c4a7a}
+.fbar-div{width:1px;height:22px;background:#c8c7c1;margin:0 4px;flex:none}
+
+/* ── knowledge graph (WikiGraph.tsx) ── */
+.gtop{display:flex;align-items:baseline;justify-content:space-between;padding:8px 20px 0}
+.gmeta{font-size:13px;color:#6b6a64}
+.gwrap{flex:1;min-height:0;position:relative}
+.gwrap svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* ── account-number reveal (CreateVaultFlow.tsx) ── */
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:0 32px;text-align:center}
+.wm{display:flex;align-items:center;gap:8px;padding-top:56px}
+.wm .w{font-size:18px;font-weight:600;letter-spacing:-.02em;color:#1a1a17}
+.flow-eyebrow{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6b6a64;margin-top:52px}
+.vtitle{font-size:27px;font-weight:600;letter-spacing:-.02em;color:#0b0b09;margin-top:8px}
+.lead{font-size:15px;line-height:1.55;color:#3a3934;margin-top:12px;max-width:340px}
+.acct{display:inline-flex;align-items:center;gap:12px;background:#f4f4f2;border:1px solid #e3e2dd;
+  border-radius:8px;padding:16px 18px;margin-top:26px}
+.acct .num{font-family:"JetBrains Mono";font-size:17px;font-weight:500;letter-spacing:.04em;
+  color:#1a1a17;font-feature-settings:"ss02","zero","calt";white-space:nowrap}
+.acct-btns{display:flex;gap:10px;margin-top:16px}
+.sbtn{border:1px solid #c8c7c1;border-radius:6px;background:transparent;color:#3a3934;
+  font-size:14px;font-weight:600;padding:9px 14px;display:flex;align-items:center;gap:7px}
+.ack{display:flex;align-items:center;gap:10px;margin-top:26px;font-size:14px;color:#3a3934}
+.ack .box{width:20px;height:20px;border-radius:4px;background:#2c4a7a;display:flex;align-items:center;justify-content:center;flex:none}
+.pbtn{height:52px;border-radius:6px;background:#2c4a7a;color:#fff;font-size:16px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;width:100%;max-width:360px;margin-top:auto;margin-bottom:14px}
+.noemail{display:inline-flex;align-items:center;gap:8px;margin-top:20px;font-size:13px;color:#6b6a64}
+
+/* ── settings → appearance (SettingsSheet.tsx) ── */
+.set-top{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px;flex:none}
+.set-top .t{font-size:17px;font-weight:600;color:#1a1a17}
+.set-top .l,.set-top .r{color:#2c4a7a;font-size:16px;min-width:52px}
+.set-top .r{text-align:right}
+.set-body{flex:1;overflow:hidden;padding:6px 16px;display:flex;flex-direction:column}
+.set-lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6b6a64;margin:18px 4px 8px}
+.set-lbl.first{margin-top:6px}
+.seg4{display:flex;background:#f4f4f2;border:1px solid #e3e2dd;border-radius:8px;padding:3px;gap:3px}
+.seg4 .s{flex:1;text-align:center;font-size:13px;font-weight:600;color:#6b6a64;padding:9px 0;border-radius:6px}
+.seg4 .s.on{background:#fbfbfa;border:1px solid #e3e2dd;color:#1a1a17}
+.segp{display:flex;background:#f4f4f2;border:1px solid #e3e2dd;border-radius:8px;padding:3px;gap:3px;margin-top:8px}
+.segp .s{flex:1;text-align:center;font-size:13px;font-weight:600;color:#6b6a64;padding:9px 0;border-radius:6px}
+.segp .s.on{background:#2c4a7a;color:#fff}
+.trow{display:flex;align-items:center;gap:12px;padding:12px 2px}
+.trow .tx{flex:1;min-width:0}
+.trow .tt{font-size:16px;color:#1a1a17}
+.trow .ts{font-size:13px;color:#6b6a64;margin-top:2px}
+.sw{width:51px;height:31px;border-radius:9999px;flex:none;position:relative;background:#c8c7c1}
+.sw.on{background:#2f6048}
+.sw .knob{position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:9999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sw.on .knob{left:22px}
+.grp{border:1px solid #e3e2dd;border-radius:10px;padding:0 14px;margin-top:8px}
+.grp .trow + .trow{border-top:1px solid #e3e2dd}
+.rowchev{color:#6b6a64;font-size:15px;display:flex;align-items:center;gap:6px}
+.foot{text-align:center;font-family:"JetBrains Mono";font-size:11px;color:#a3a29c;margin-top:auto;padding:24px 0 22px}

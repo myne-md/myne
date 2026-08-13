@@ -1,0 +1,36 @@
+# Permissions for the in-app `vault-recover` Tauri plugin.
+# Picked up under the `vault-recover:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `vault-recover:default` (or
+# `vault-recover:allow-<cmd>`).
+#
+# Task 4 of `vault-recovery-from-phrase` introduces
+# `allow-recover-with-phrase`. Task 6 adds `allow-complete-recovery`.
+# MYND-206 adds `allow-resolve-vault-by-account-number` (the optional
+# multi-vault recovery selector — header-only read, no decrypt, no
+# auth_permits).
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the vault-recover plugin."
+permissions = [
+    "allow-recover-with-phrase",
+    "allow-complete-recovery",
+    "allow-resolve-vault-by-account-number",
+]
+
+[[permission]]
+identifier = "allow-recover-with-phrase"
+description = "Allow invoking vault_recover:recover_with_phrase (open an existing vault using the 24-word BIP-39 recovery phrase; populates Slot::Recovering pending password commit)."
+commands.allow = ["recover_with_phrase"]
+
+[[permission]]
+identifier = "allow-complete-recovery"
+description = "Allow invoking vault_recover:complete_recovery (commit a new master password after a successful recovery; rewrites vault.meta password-side, preserves recovery-side, promotes Slot::Recovering → Slot::Unlocked)."
+commands.allow = ["complete_recovery"]
+
+[[permission]]
+identifier = "allow-resolve-vault-by-account-number"
+description = "Allow invoking vault_recover:resolve_vault_by_account_number (optional multi-vault recovery selector — matches a user-typed account-number's account_number_hash against on-disk vault.meta headers to pick a VaultId; header-only read, no decrypt, no unlock, no auth_permits)."
+commands.allow = ["resolve_vault_by_account_number"]

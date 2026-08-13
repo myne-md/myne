@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WG-03 · Encrypted — lock ring + two-line caption, no state, tap opens the
+     app (EncryptedWidget.kt binds myne://open on @id/myne_root). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/myne_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/myne_widget_bg"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <ImageView
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:background="@drawable/myne_circle_outline"
+        android:importantForAccessibility="no"
+        android:padding="13dp"
+        android:src="@drawable/myne_ic_lock"
+        android:tint="@color/myne_ink" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:lineSpacingExtra="2dp"
+        android:text="@string/myne_encrypted_two_line"
+        android:textColor="@color/myne_ink_secondary"
+        android:textSize="14sp" />
+</LinearLayout>

@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "paths": {
+      "@myne/editor": ["../editor/src/index.ts"],
+      "@myne/editor/CMEditor": ["../editor/src/CMEditor.tsx"],
+      "@myne/editor/*": ["../editor/src/*"],
+      "@myne/dialect": ["../dialect/src/index.ts"],
+      "@myne/dialect/*": ["../dialect/src/*"],
+      "@myne/locales-en": ["../locales/en/common.json"],
+      "@myne/i18n": ["../src/i18n/index.ts"],
+      "@myne/i18n/*": ["../src/i18n/*"],
+      "@myne/reminder-schedule": ["../src/lib/reminderSchedule.ts"],
+      "@myne/enroll-gate": ["../src/lib/enroll-gate.ts"],
+      "@myne/legal-urls": ["../src/lib/legal-urls.ts"],
+      "@myne/syntax-theme": ["../src/lib/syntaxTheme.ts"],
+      "@myne/theme-measure": ["../src/lib/themeMeasure.ts"],
+      "@myne/ornaments": ["../ornaments/src/index.ts"],
+      "@myne/ornaments/*": ["../ornaments/src/*"],
+      "@myne/task-wire": ["../src/notes/taskWire.ts"],
+      "@myne/task-panel": ["../src/notes/components/TaskListPanel.tsx"],
+      "@myne/task-filters": ["../src/notes/taskFilters.ts"],
+      "@myne/task-scope": ["../src/notes/taskScope.ts"],
+      "@myne/task-write": ["../src/notes/taskWriteCore.ts"],
+      "@myne/note-completion": ["../src/notes/completeNoteCore.ts"],
+      "@myne/decorations": ["../src/notes/decorations.ts"],
+      "@myne/decorations/folderIcons": ["../src/notes/folderIcons.ts"]
+    }
+  },
+  "include": ["src"]
+}
