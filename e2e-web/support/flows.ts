@@ -50,6 +50,18 @@ export async function openApp(session: Session, origin: string): Promise<void> {
     BOOT_TIMEOUT_MS,
   );
   if (seen === "bootstrap.beta-terms") {
+    // OPEN the dialog first. The gate itself renders only a heading, an intro
+    // and a "review the terms" button; the accept button lives inside
+    // `BetaTermsConsent`, which `AccountBootstrap` mounts with `open={termsOpen}`
+    // and `ModalShell` renders as NOTHING while that is false. Waiting for
+    // `sync.beta-terms.accept` straight off the gate therefore waits for an
+    // element that cannot exist until this click, which is how the lane spent 12
+    // of 20 tests timing out inside `openApp` on a message that reads like a
+    // dead bundle. The user's own path is review-then-accept; so is this.
+    const review = await session.byTestId("bootstrap.beta-terms.open", {
+      timeoutMs: BOOT_TIMEOUT_MS,
+    });
+    await review.click();
     // SCROLL first. The terms carry a long full-text block, and in the browser
     // lane's viewport the accept button sits below it — `/click`'s own
     // scroll-into-view only guarantees the border box intersects the VIEWPORT,
