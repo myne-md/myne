@@ -581,6 +581,7 @@
   },
   "common": {
     "cancel": "Cancel",
+    "close": "Close",
     "dismiss": "Dismiss",
     "prompt": {
       "cancel": "Cancel",
@@ -2795,10 +2796,15 @@
       "providerModelCount_one": "{{count}} model available.",
       "providerModelCount_other": "{{count}} models available.",
       "providerModelEmpty": "This provider published no models for your account.",
-      "providerModelHelper": "Myne ships no default. The list comes from the provider, so it stays current and you are never billed for a model you did not choose.",
+      "providerModelHelper": "Myne ships no default. The list comes from the provider, so it stays current and you are never billed for a model you did not choose. Only models that read and write text are listed, because this is the only kind Myne asks a provider for.",
+      "providerModelHidden_one": "{{count}} model hidden — it does not read and write text.",
+      "providerModelHidden_other": "{{count}} models hidden — they do not read and write text.",
       "providerModelLabel": "Model",
       "providerModelLoad": "Load models",
       "providerModelNone": "No model chosen",
+      "providerModelNoTextModels": "This provider published models, but none of them read and write text. Myne only asks for text, so none can be used here.",
+      "providerModelShowAll": "Show all models",
+      "providerModelShowTextOnly": "Show text models only",
       "providerModelUnfetched": "Load the list to choose a model.",
       "providerNone": "None",
       "providerNothingAnswering": "Nothing is set up to answer yet.",
@@ -3150,6 +3156,7 @@
       "whatHappensNextLabel": "When the beta ends",
       "whatWeCanSeeLabel": "What we can see",
       "readFull": "Read the full terms",
+      "review": "Review the beta terms",
       "accept": "I understand — turn on sync"
     },
     "materialising": "Downloading your notes — {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",

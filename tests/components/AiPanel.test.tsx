@@ -9,6 +9,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+// Type-only, so it is erased before `vi.hoisted` below runs.
+import type { ProviderModel } from "../../src/lib/ai-model-store";
 
 // Hoisted so the mock factories (which run BEFORE module-body consts init) can
 // reference these — the canonical vitest pattern for direct factory references.
@@ -36,7 +38,7 @@ const {
   saveAiEndpoint: vi.fn(
     (u: string, _m: string): Promise<string | null> => Promise.resolve(u || null),
   ),
-  listProviderModels: vi.fn((): Promise<string[]> => Promise.resolve([])),
+  listProviderModels: vi.fn((): Promise<ProviderModel[]> => Promise.resolve([])),
   aiProviderHasKey: vi.fn((): Promise<boolean> => Promise.resolve(false)),
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
@@ -493,7 +495,10 @@ describe("AiPanel — the provider model chooser", () => {
   it("renders the provider's own list once fetched, with the stored choice selected", async () => {
     aiProviderHasKey.mockResolvedValue(true);
     aiProviderModel = "qwen/qwen3-30b";
-    listProviderModels.mockResolvedValue(["meta-llama/llama-3.1-8b", "qwen/qwen3-30b"]);
+    listProviderModels.mockResolvedValue([
+      { id: "meta-llama/llama-3.1-8b", text_capable: true },
+      { id: "qwen/qwen3-30b", text_capable: true },
+    ]);
     render(<AiPanel />);
     await waitFor(() =>
       expect(
@@ -507,6 +512,101 @@ describe("AiPanel — the provider model chooser", () => {
       ),
     );
     expect(screen.getByTestId("ai.provider-model-select")).toBeTruthy();
+  });
+});
+
+// The text-only filter. Myne's remote arm calls nothing but chat/completion, so
+// offering a model that cannot read and write text is offering a request that
+// fails — on a metered API, after billing. What is worth asserting is that the
+// filter HIDES rather than DROPS: every one of these cases turns on a model
+// still being reachable, which a hard filter would make untestable because it
+// would also be untrue.
+describe("AiPanel — only text models are offered", () => {
+  /** Open the chooser's option list and read back what it offers. */
+  const optionValues = (): string[] => {
+    fireEvent.click(screen.getByTestId("ai.provider-model-select"));
+    return screen
+      .getAllByTestId("ai.provider-model-select-option")
+      .map((el) => el.getAttribute("data-value") ?? "");
+  };
+
+  const loaded = async (models: ProviderModel[]) => {
+    aiProviderHasKey.mockResolvedValue(true);
+    listProviderModels.mockResolvedValue(models);
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.provider-model-load") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("ai.provider-model-load"));
+    // Wait on the state line rather than on the chooser: when the filter leaves
+    // nothing to choose from there IS no chooser, and that is one of the cases
+    // below — a helper that waited for it would make that test unwritable.
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.provider-model-state").textContent).not.toBe(
+        "settings.ai.providerModelUnfetched",
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    aiProvider = "openrouter";
+  });
+
+  it("leaves a non-text model out of the list, and says how many it withheld", async () => {
+    await loaded([
+      { id: "vendor/chatty", text_capable: true },
+      { id: "vendor/painter", text_capable: false },
+    ]);
+    expect(optionValues()).toEqual(["", "vendor/chatty"]);
+    // The count is of what is OFFERED, and the hidden ones are accounted for
+    // rather than silently absent — an unexplained short list reads as the
+    // provider having fewer models than it does.
+    expect(screen.getByTestId("ai.provider-model-state").textContent).toContain(
+      "settings.ai.providerModelHidden",
+    );
+  });
+
+  it("shows the withheld models on request, over the SAME fetch", async () => {
+    await loaded([
+      { id: "vendor/chatty", text_capable: true },
+      { id: "vendor/painter", text_capable: false },
+    ]);
+    fireEvent.click(screen.getByTestId("ai.provider-model-show-all"));
+    expect(optionValues()).toEqual(["", "vendor/chatty", "vendor/painter"]);
+    // One egress, not two: revealing what was already fetched must not ask the
+    // provider again — the listing call is gated precisely because it is one.
+    expect(listProviderModels).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no escape hatch when the filter withheld nothing", async () => {
+    await loaded([{ id: "vendor/chatty", text_capable: true }]);
+    // A permanent "show all" implies something is being kept back when nothing
+    // is.
+    expect(screen.queryByTestId("ai.provider-model-show-all")).toBeNull();
+  });
+
+  it("keeps a stored non-text model selectable, filter or no filter", async () => {
+    // The model a user picked before this filter existed, or wrote via the CLI.
+    // It is stored and it is what answers; leaving it out of the options makes
+    // the panel summarise an empty selection and report "No model chosen" about
+    // a vault that has one.
+    aiProviderModel = "vendor/painter";
+    await loaded([
+      { id: "vendor/chatty", text_capable: true },
+      { id: "vendor/painter", text_capable: false },
+    ]);
+    expect(optionValues()).toContain("vendor/painter");
+  });
+
+  it("a catalogue with no text model in it is its own state, not an empty one", async () => {
+    await loaded([{ id: "vendor/painter", text_capable: false }]);
+    // "This provider published no models" would be false: it published one.
+    // The true statement is that none of them are the kind Myne asks for.
+    expect(screen.getByTestId("ai.provider-model-state").textContent).toBe(
+      "settings.ai.providerModelNoTextModels",
+    );
   });
 });
 

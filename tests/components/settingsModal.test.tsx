@@ -13,6 +13,8 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 // Capture the AccountPanel's onInFlightChange so a test can flip in-flight.
 let accountInFlight: ((busy: boolean) => void) | undefined;
+// Same, for the AI panel's child-dialog signal (the provider consent).
+let aiDialogOpen: ((open: boolean) => void) | undefined;
 
 // Developer mode gates the whole Developer group — the AI panel (MYND-593) and
 // the Network/Tor panel (MYND-650) — controllable per test, default off
@@ -48,7 +50,10 @@ vi.mock("../../src/components/settings/AboutPanel", () => ({
   AboutPanel: () => <div data-testid="panel.about">about</div>,
 }));
 vi.mock("../../src/components/settings/AiPanel", () => ({
-  AiPanel: () => <div data-testid="panel.ai">ai</div>,
+  AiPanel: (props: { onDialogOpenChange?: (open: boolean) => void }) => {
+    aiDialogOpen = props.onDialogOpenChange;
+    return <div data-testid="panel.ai">ai</div>;
+  },
 }));
 vi.mock("../../src/components/settings/NetworkPanel", () => ({
   NetworkPanel: () => <div data-testid="panel.network">network</div>,
@@ -58,6 +63,7 @@ import { SettingsModal } from "../../src/components/SettingsModal";
 
 beforeEach(() => {
   accountInFlight = undefined;
+  aiDialogOpen = undefined;
   developerMode = false;
 });
 
@@ -205,5 +211,57 @@ describe("SettingsModal — in-flight gating", () => {
     expect(
       (screen.getByTestId("settings.close") as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+});
+
+// The other gate, and the one that is invisible when it is missing: a panel
+// that opens a `ModalShell` of its own puts TWO Esc listeners on `window`. One
+// press would close the child dialog AND this modal under it — the user
+// declines a consent and the whole surface disappears, which reads as a crash.
+describe("SettingsModal — child-dialog gating", () => {
+  function openAiPanel() {
+    developerMode = true;
+    const rendered = renderModal();
+    fireEvent.click(screen.getByTestId("settings.tab-ai"));
+    expect(aiDialogOpen).toBeDefined();
+    return rendered;
+  }
+
+  it("Esc and the backdrop no-op while a panel's dialog is open", () => {
+    const { props } = openAiPanel();
+    act(() => aiDialogOpen!(true));
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByTestId("settings.modal"));
+    expect(props.onClose).not.toHaveBeenCalled();
+
+    // Closing the child hands the keys back.
+    act(() => aiDialogOpen!(false));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("the rail keys stand down too, not only Esc", () => {
+    // "/" would pull focus to the search box behind the dialog and the arrows
+    // would cycle a rail the user cannot see — both reachable from a keyboard
+    // that the dialog is supposed to own.
+    openAiPanel();
+    act(() => aiDialogOpen!(true));
+
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    expect(screen.getByTestId("panel.ai")).toBeTruthy();
+    expect(
+      screen.getByTestId("settings.tab-ai").getAttribute("aria-selected"),
+    ).toBe("true");
+  });
+
+  it("does not disable the × the way in-flight does", () => {
+    // The child's own backdrop already covers the header, so a greyed close
+    // button would be claiming a restriction that is not one.
+    openAiPanel();
+    act(() => aiDialogOpen!(true));
+    expect(
+      (screen.getByTestId("settings.close") as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 });

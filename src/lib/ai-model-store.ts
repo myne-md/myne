@@ -128,6 +128,28 @@ export function endpointRejectionOf(err: unknown): EndpointRejection | null {
  * does: "we could not ask the provider" and "the provider has no models" are
  * different facts and a caller must be able to tell them apart.
  */
-export async function listProviderModels(): Promise<string[]> {
-  return await invoke<string[]>("plugin:local-inference|list_provider_models");
+export async function listProviderModels(): Promise<ProviderModel[]> {
+  return await invoke<ProviderModel[]>(
+    "plugin:local-inference|list_provider_models",
+  );
+}
+
+/** One model a provider published, mirroring the host's `ProviderModel`. */
+export interface ProviderModel {
+  id: string;
+  /**
+   * Takes text in and produces text out — the only shape Myne's remote arm can
+   * use, since it calls nothing but chat/completion. An image generator, a
+   * text-to-speech model or an embedding model is `false`.
+   *
+   * A model that accepts images **as well as** text is `true`: it answers in
+   * text, and requiring a text-only input would drop the strongest picks.
+   *
+   * **The host fails open** — a model whose capability metadata is missing
+   * arrives `true`, so a provider changing its schema costs the user a
+   * mislabelled entry rather than an empty chooser. The panel filters on this
+   * by default and lets the user show everything, so a wrong `false` is
+   * recoverable without a release.
+   */
+  text_capable: boolean;
 }

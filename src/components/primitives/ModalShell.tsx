@@ -39,6 +39,13 @@ interface ModalShellProps {
   /** Accessible label for the close button (default "Close"). */
   closeLabel?: string;
   /**
+   * `data-testid` for the backdrop root — the element whose presence means
+   * "this dialog is up". Optional because most callers put their testids on
+   * the controls inside; the consent dialogs need it because their E2E waits
+   * on the surface itself.
+   */
+  testId?: string;
+  /**
    * Stacking level for the backdrop. Defaults to the shared modal level, which
    * is correct for anything the user opened themselves — those are opened one
    * at a time, by an owner that closes the previous one first.
@@ -117,6 +124,7 @@ export function ModalShell({
   height,
   closeLabel = "Close",
   zIndex,
+  testId,
   children,
 }: ModalShellProps) {
   useEffect(() => {
@@ -167,6 +175,7 @@ export function ModalShell({
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelId}
+      data-testid={testId}
       style={zIndex === undefined ? BACKDROP_STYLE : { ...BACKDROP_STYLE, zIndex }}
       onClick={handleBackdropClick}
     >

@@ -148,6 +148,8 @@ export function AccountBootstrap({
   initiallyPending = false,
 }: AccountBootstrapProps) {
   const betaTerms = useBetaTermsGate();
+  /** The beta-terms dialog, opened from the gate below. */
+  const [termsOpen, setTermsOpen] = useState(false);
   const { t } = useTranslation();
   const [account, setAccount] = useState<string | null>(null);
   const [password, setPassword] = useState("");
@@ -385,18 +387,37 @@ export function AccountBootstrap({
   // re-asking would be asking again for something already given.
   //
   // There is nothing to cancel TO — the browser client with no account has no
-  // other screen — so declining simply leaves the terms up. That is honest:
-  // the alternative would be a dead end pretending to be a choice.
+  // other screen — so the terms are a dialog over THIS gate rather than over
+  // the account entry: dismissing returns here, and the entry form is not
+  // rendered at all until the terms are accepted. A dismissable dialog in
+  // front of a live form would be a route past the gate, not a gate.
   if (!betaTerms.pending && betaTerms.needed) {
     return (
-      <div data-testid="bootstrap.beta-terms">
+      <CenteredCard>
+        <div data-testid="bootstrap.beta-terms">
+          <h1 style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xl)" }}>
+            {t("sync.betaTerms.title")}
+          </h1>
+          <p style={HINT_STYLE}>{t("sync.betaTerms.intro")}</p>
+          <button
+            data-testid="bootstrap.beta-terms.open"
+            type="button"
+            style={{ marginTop: "var(--space-3)" }}
+            onClick={() => setTermsOpen(true)}
+          >
+            {t("sync.betaTerms.review")}
+          </button>
+        </div>
         <BetaTermsConsent
+          open={termsOpen}
+          testId="bootstrap.beta-terms.dialog"
           onAccept={() => {
+            setTermsOpen(false);
             void betaTerms.accept();
           }}
-          onCancel={() => {}}
+          onCancel={() => setTermsOpen(false)}
         />
-      </div>
+      </CenteredCard>
     );
   }
 

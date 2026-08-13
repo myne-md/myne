@@ -113,6 +113,42 @@ describe("Select primitive", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
   });
 
+  // The menu caps at `maxHeight: 280` and scrolls, so any list longer than that
+  // is scrolled inside the menu itself. The close-on-scroll listener is
+  // CAPTURE-phase, so it also sees that scroll — and closing on it made a long
+  // list literally un-scrollable: the wheel dismissed the menu it was moving.
+  // The distinction is which element scrolled, so both directions are asserted;
+  // only the pair catches a "fix" that stopped closing on scroll entirely and
+  // left the menu floating away from its trigger.
+  describe("scrolling", () => {
+    it("stays open while its OWN option list scrolls", () => {
+      render(<Harness />);
+      fireEvent.click(getTrigger());
+      const list = screen.getByRole("listbox");
+      fireEvent.scroll(list);
+      expect(screen.queryByRole("listbox")).not.toBeNull();
+      // …and an option inside it, since a wheel over a row targets the row.
+      fireEvent.scroll(screen.getByRole("option", { name: "Bravo" }));
+      expect(screen.queryByRole("listbox")).not.toBeNull();
+    });
+
+    it("still closes when an ANCESTOR scrolls, because the fixed menu would drift", () => {
+      render(<Harness />);
+      fireEvent.click(getTrigger());
+      expect(screen.getByRole("listbox")).toBeTruthy();
+      fireEvent.scroll(document.body);
+      expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("still closes on resize", () => {
+      render(<Harness />);
+      fireEvent.click(getTrigger());
+      expect(screen.getByRole("listbox")).toBeTruthy();
+      fireEvent(window, new Event("resize"));
+      expect(screen.queryByRole("listbox")).toBeNull();
+    });
+  });
+
   it("keeps at most one Select open: opening the second closes the first", () => {
     render(
       <>

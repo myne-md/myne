@@ -15,6 +15,14 @@
 // change-password Argon2id window so Esc / backdrop / × all become
 // no-ops. The user must wait for the backend response before the modal
 // becomes dismissable again.
+//
+// Child-dialog gating: a panel that opens a `ModalShell` of its own (the AI
+// provider consent, the beta terms) raises `childDialogOpen`. Both this shell
+// and `ModalShell` listen for Esc on `window`, so ungated one press would close
+// the child AND this modal under it. It gates Esc and the backdrop only —
+// NOT the × the way `childInFlight` does, because the child's own backdrop
+// already covers the header and a greyed close button would be claiming a
+// restriction that isn't one.
 
 import {
   Fragment,
@@ -428,6 +436,7 @@ export function SettingsModal({
     if (!panels.some((p) => p.id === selected)) setSelected("account");
   }, [panels, selected]);
   const [childInFlight, setChildInFlight] = useState(false);
+  const [childDialogOpen, setChildDialogOpen] = useState(false);
   // Settings search (MYND-536). A non-empty query swaps the content pane from
   // the active panel to a flat, panel-grouped results list built off the static
   // search index — so filtering never mounts the other nine panels.
@@ -490,6 +499,7 @@ export function SettingsModal({
   // change.
   const selectedRef = useRef(selected);
   const childInFlightRef = useRef(childInFlight);
+  const childDialogOpenRef = useRef(childDialogOpen);
   const queryRef = useRef(query);
   const panelsRef = useRef(panels);
   useEffect(() => {
@@ -498,6 +508,9 @@ export function SettingsModal({
   useEffect(() => {
     childInFlightRef.current = childInFlight;
   }, [childInFlight]);
+  useEffect(() => {
+    childDialogOpenRef.current = childDialogOpen;
+  }, [childDialogOpen]);
   useEffect(() => {
     queryRef.current = query;
   }, [query]);
@@ -515,6 +528,10 @@ export function SettingsModal({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      // A panel's own dialog is up: stand down entirely. Not just Esc — "/"
+      // would pull focus to the search box behind the dialog and the arrows
+      // would cycle a rail the user cannot see.
+      if (childDialogOpenRef.current) return;
       const activeEl = document.activeElement;
       const inSearchBox = activeEl === searchInputRef.current;
       const inTextField =
@@ -564,10 +581,10 @@ export function SettingsModal({
 
   const handleBackdropClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (childInFlight) return;
+      if (childInFlight || childDialogOpen) return;
       if (e.target === e.currentTarget) onClose();
     },
-    [onClose, childInFlight],
+    [onClose, childInFlight, childDialogOpen],
   );
 
   // Selecting a result jumps to the owning panel, clears the query (so the
@@ -652,8 +669,13 @@ export function SettingsModal({
       />
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
-    sync: <SyncPanel onMigrated={() => onForceRelock?.({ kind: "Exists" })} />,
-    ai: <AiPanel onShowToast={onShowToast} />,
+    sync: (
+      <SyncPanel
+        onMigrated={() => onForceRelock?.({ kind: "Exists" })}
+        onDialogOpenChange={setChildDialogOpen}
+      />
+    ),
+    ai: <AiPanel onShowToast={onShowToast} onDialogOpenChange={setChildDialogOpen} />,
     network: <NetworkPanel />,
     editor: <EditorPanel />,
     files: <FilesPanel />,

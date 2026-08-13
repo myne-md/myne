@@ -44,6 +44,7 @@ import {
   applyConflictVersion,
   undoConflictVersion,
 } from "../../notes/conflictCopy";
+import { Button } from "../primitives/Button";
 import { Toast } from "../Toast";
 import { noteList } from "../../notes";
 import { useDevices } from "../../hooks/useDevices";
@@ -71,9 +72,15 @@ export interface SyncPanelProps {
    * Settings shell wires this to `onForceRelock({ kind: "Exists" })`.
    */
   onMigrated?: () => void;
+  /**
+   * Raised while this panel has a modal dialog of its own up (the beta terms).
+   * The Settings shell stands its global keys down while a child dialog owns
+   * the surface — see the child-dialog gating note in `SettingsModal.tsx`.
+   */
+  onDialogOpenChange?: (open: boolean) => void;
 }
 
-export function SyncPanel({ onMigrated }: SyncPanelProps = {}) {
+export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   // `MY01`-only by construction (#422, ASM-6→B): keep-both conflict copies carry
@@ -107,6 +114,15 @@ export function SyncPanel({ onMigrated }: SyncPanelProps = {}) {
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
   const betaTerms = useBetaTermsGate();
+  // The terms dialog, opened from the gate below. Local, and reported up so
+  // the Settings shell stops competing for Esc while it is open. The cleanup
+  // matters: the shell's flag outlives this panel, so unmounting with the
+  // dialog open would leave Esc gated for every later session.
+  const [termsOpen, setTermsOpen] = useState(false);
+  useEffect(() => {
+    onDialogOpenChange?.(termsOpen);
+    return () => onDialogOpenChange?.(false);
+  }, [termsOpen, onDialogOpenChange]);
   // Still roster-derived, because it asks something status cannot: the QR
   // invite is only meaningful for a device the ACCOUNT lists as an approved
   // member, and only the roster knows that.
@@ -308,10 +324,15 @@ export function SyncPanel({ onMigrated }: SyncPanelProps = {}) {
           on, and the gate stands in front of each — a consent screen at one
           door is not a consent screen.
 
-          While the answer is still being read (`pending`) neither the terms
-          nor the form renders: showing the form first and replacing it a frame
-          later reads as a glitch, and showing the terms first would flash them
-          at someone who accepted months ago. It is one local read. */}
+          While the answer is still being read (`pending`) neither the gate nor
+          the form renders: showing the form first and replacing it a frame
+          later reads as a glitch, and showing the gate first would flash it at
+          someone who accepted months ago. It is one local read.
+
+          The terms are a DIALOG, and the gate is what stands in the form's
+          place until they are accepted. The form is not merely covered — it is
+          not rendered — so dismissing the dialog cannot reveal a route past the
+          text it was asking about. */}
       {showEnroll && !betaTerms.pending && (
         <div style={BLOCK_STYLE} data-setting-anchor="sync.add-device" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>
@@ -319,20 +340,31 @@ export function SyncPanel({ onMigrated }: SyncPanelProps = {}) {
           </span>
           <p style={HELPER_STYLE}>{t("sync.panel.addDevice.helper")}</p>
           {betaTerms.needed ? (
-            <BetaTermsConsent
-              onAccept={() => {
-                void betaTerms.accept();
-              }}
-              // Nothing to dismiss to here — the panel is the surface. Declining
-              // simply leaves the form unreached, which is what "not now" means
-              // at this door.
-              onCancel={() => {}}
-            />
+            <div style={{ marginTop: "var(--space-2)" }}>
+              <Button
+                variant="primary"
+                data-testid="sync.beta-terms.open"
+                onClick={() => setTermsOpen(true)}
+              >
+                {t("sync.betaTerms.review")}
+              </Button>
+            </div>
           ) : (
             <EnrollDeviceForm />
           )}
         </div>
       )}
+      <BetaTermsConsent
+        open={termsOpen}
+        testId="sync.beta-terms"
+        onAccept={() => {
+          setTermsOpen(false);
+          void betaTerms.accept();
+        }}
+        // Declining closes the dialog and leaves the gate standing — the form
+        // was never rendered, so there is nothing to take back.
+        onCancel={() => setTermsOpen(false)}
+      />
 
       {/* What that form is replaced BY for a device that is already waiting
           (MYND-635). Stating the situation rather than offering an action,

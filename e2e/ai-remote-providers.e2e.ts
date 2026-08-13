@@ -151,11 +151,11 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
           // The host agrees with the copy: nothing remote is selected.
           expect((await capabilityReport(s)).backend_class).not.toBe("remote");
 
-          // ── selecting a provider shows the consent screen and stores nothing ──
+          // ── selecting a provider shows the consent dialog and stores nothing ──
           await (await s.byTestId("ai.provider-choice-openrouter")).click();
           await s.waitUntil(
             async () => (await s.byTestIdAll("ai-consent.screen")).at(0) ?? null,
-            { label: "the consent screen", timeoutMs: 15_000 },
+            { label: "the consent dialog", timeoutMs: 15_000 },
           );
           // All four disclosures are on screen BEFORE the accepting action —
           // and the accepting action exists nowhere else, so there is no route
@@ -172,11 +172,30 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
             expect((await el.textContent())?.length ?? 0).toBeGreaterThan(20);
           }
 
+          // ── Esc closes the consent dialog and NOT the Settings modal ──
+          // Both surfaces listen for Escape on `window`, so an ungated press
+          // closes the dialog and the shell under it: the user declines a
+          // consent and the whole of Settings vanishes, which reads as a crash.
+          // The shell stands its global keys down while a child dialog is up.
+          await pressKey(s, KEY.ESCAPE);
+          await s.waitUntil(
+            async () => ((await s.byTestIdAll("ai-consent.screen")).length === 0 ? true : null),
+            { label: "Esc closes the consent dialog", timeoutMs: 15_000 },
+          );
+          await s.byTestId("settings.modal");
+          const afterEsc = await pageSeatInvoke(s, "plugin:prefs|prefs_read", {}, 15_000);
+          expect((afterEsc.ok as { ai_provider?: unknown }).ai_provider ?? null).toBeNull();
+
           // ── cancel: nothing stored, and the controls come back ──
+          await (await s.byTestId("ai.provider-choice-openrouter")).click();
+          await s.waitUntil(
+            async () => (await s.byTestIdAll("ai-consent.cancel")).at(0) ?? null,
+            { label: "the consent dialog, reopened", timeoutMs: 15_000 },
+          );
           await (await s.byTestId("ai-consent.cancel")).click();
           await s.waitUntil(
             async () => ((await s.byTestIdAll("ai-consent.screen")).length === 0 ? true : null),
-            { label: "the consent screen closes", timeoutMs: 15_000 },
+            { label: "the consent dialog closes", timeoutMs: 15_000 },
           );
           const afterCancel = await pageSeatInvoke(s, "plugin:prefs|prefs_read", {}, 15_000);
           expect((afterCancel.ok as { ai_provider?: unknown }).ai_provider ?? null).toBeNull();

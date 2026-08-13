@@ -549,6 +549,11 @@ describe("web first-run bootstrap — beta terms gate", () => {
     wire();
     render(<AccountBootstrap onBootstrapped={() => {}} />);
 
+    // The terms are a dialog now; the gate is what stands in the entry form's
+    // place until they are accepted. Opening it is the only way to the clauses,
+    // and the clauses are the only way to the accepting button.
+    fireEvent.click(await screen.findByTestId("bootstrap.beta-terms.open"));
+
     // Full-literal equality: a translation that softened any of these would be
     // a good translation and a false statement.
     expect((await screen.findByTestId("sync.beta-terms.what-this-is")).textContent).toBe(
@@ -568,10 +573,27 @@ describe("web first-run bootstrap — beta terms gate", () => {
     wire();
     render(<AccountBootstrap onBootstrapped={() => {}} />);
 
+    fireEvent.click(await screen.findByTestId("bootstrap.beta-terms.open"));
     fireEvent.click(await screen.findByTestId("sync.beta-terms.accept"));
 
     expect(acceptBetaTermsMock).toHaveBeenCalledTimes(1);
     expect(await screen.findByTestId("account-entry.input")).toBeTruthy();
+  });
+
+  it("dismissing the dialog returns to the gate, not to the account field", async () => {
+    // The property the dialog could have cost: a dismissable surface in front
+    // of a LIVE form would be a route past the gate. The form is not rendered
+    // at all, so cancelling reveals nothing and records nothing.
+    betaTermsAlreadyAccepted = false;
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId("bootstrap.beta-terms.open"));
+    fireEvent.click(await screen.findByTestId("sync.beta-terms.cancel"));
+
+    expect(acceptBetaTermsMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("account-entry.input")).toBeNull();
+    expect(screen.getByTestId("bootstrap.beta-terms.open")).toBeTruthy();
   });
 
   it("does not show the terms again once accepted", async () => {

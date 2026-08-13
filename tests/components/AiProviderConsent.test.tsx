@@ -179,6 +179,31 @@ describe("the per-provider consent screen", () => {
     expect(providerCall).toBeLessThan(consentCall);
   });
 
+  it("shows the pending choice on the control behind the dialog, and reverts it on cancel", async () => {
+    // The dialog leaves the panel standing, so the segmented control is now
+    // visible while the question is being asked. It highlights the provider
+    // being asked ABOUT — a control that does not move when clicked reads as
+    // broken — and that highlight is the whole of what happened: nothing is
+    // written until accept, and cancelling puts it back.
+    render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await screen.findByTestId("ai-consent.screen");
+    expect(
+      screen.getByTestId("ai.provider-choice-openrouter").getAttribute("data-active"),
+    ).toBe("true");
+    expect(setAiProvider).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("ai-consent.cancel"));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("ai.provider-choice-openrouter").getAttribute("data-active"),
+      ).toBe("false"),
+    );
+    expect(screen.getByTestId("ai.provider-choice-none").getAttribute("data-active")).toBe(
+      "true",
+    );
+  });
+
   it("cancelling stores nothing and returns to the controls", async () => {
     render(<AiPanel />);
     fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));

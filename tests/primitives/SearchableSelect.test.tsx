@@ -120,6 +120,27 @@ describe("SearchableSelect", () => {
     expect(screen.queryByTestId("probe.lang-menu")).toBeNull();
     expect(document.activeElement).toBe(screen.getByTestId("probe.lang"));
   });
+
+  // This primitive already exempts its own menu from the capture-phase
+  // close-on-scroll listener — and nothing asserted it, which is how the
+  // identical bug survived in `Select` long after being fixed here. Both
+  // directions: an exemption that swallowed every scroll would leave the fixed
+  // menu drifting away from its trigger.
+  describe("scrolling", () => {
+    it("stays open while its OWN option list scrolls", () => {
+      render(<Harness />);
+      fireEvent.click(screen.getByTestId("probe.lang"));
+      fireEvent.scroll(screen.getByRole("listbox"));
+      expect(screen.queryByTestId("probe.lang-menu")).not.toBeNull();
+    });
+
+    it("still closes when an ANCESTOR scrolls", () => {
+      render(<Harness />);
+      fireEvent.click(screen.getByTestId("probe.lang"));
+      fireEvent.scroll(document.body);
+      expect(screen.queryByTestId("probe.lang-menu")).toBeNull();
+    });
+  });
 });
 
 // Keep the module's single-open coordinator from leaking between files.

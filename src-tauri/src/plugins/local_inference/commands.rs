@@ -359,7 +359,7 @@ pub async fn ai_capability_report<R: Runtime>(
 pub async fn list_provider_models<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
-) -> Result<Vec<String>, EngineError> {
+) -> Result<Vec<super::provider_registry::ProviderModel>, EngineError> {
     let active = state.active_vault_id().await;
     let vault_dir = myne_core::paths::active_vault_root_io(&app, active)
         .map_err(|_| EngineError::VaultLocked)?;
@@ -394,7 +394,7 @@ pub(crate) async fn list_models_gated<F>(
     prefs: &protocol::PrefsView,
     developer_mode: bool,
     fetch: F,
-) -> Result<Vec<String>, EngineError>
+) -> Result<Vec<super::provider_registry::ProviderModel>, EngineError>
 where
     F: FnOnce(
             super::provider_registry::RemoteProvider,
@@ -2148,7 +2148,14 @@ mod tests {
         }))
         .expect("a configured listing succeeds");
         assert_eq!(calls.load(Ordering::SeqCst), 1);
-        assert_eq!(models, ["meta-llama/llama-3.1-8b", "qwen/qwen3-30b"]);
+        assert_eq!(
+            models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            ["meta-llama/llama-3.1-8b", "qwen/qwen3-30b"]
+        );
+        // Neither entry published an `architecture`, so both arrive usable —
+        // the fail-open direction, asserted here as well as in the codec's own
+        // tests because this is the path the panel actually reads.
+        assert!(models.iter().all(|m| m.text_capable));
     }
 
     /// A transport failure arrives as the taxonomy the panel already renders,

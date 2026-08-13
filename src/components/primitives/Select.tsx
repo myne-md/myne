@@ -9,8 +9,9 @@
 // top bar's wrap container and the surface scroll clipping.
 //
 // Keyboard: open on Enter / Space / ↓; ↑/↓ move the active option; Enter
-// selects; Esc closes. Closes on outside-click and on any scroll / resize
-// (a fixed menu would desync from the trigger). role="listbox" / role="option"
+// selects; Esc closes. Closes on outside-click, on an ANCESTOR/window scroll,
+// and on resize (a fixed menu would desync from the trigger) — but never on the
+// menu's own list scrolling, see `onReflow`. role="listbox" / role="option"
 // + aria-selected for assistive tech. Generic over the option value type.
 
 import {
@@ -187,7 +188,25 @@ export function Select<T extends string>({
         close();
       }
     };
-    const onReflow = () => close();
+    const onReflow = (e?: Event) => {
+      // The scroll listener below is capture-phase, so it ALSO fires when the
+      // menu's own option list scrolls past `MENU_STYLE.maxHeight` — and
+      // closing on that makes a long list literally un-scrollable: the wheel
+      // dismisses the menu it is trying to move. Ignore a scroll originating
+      // inside the menu; an ancestor/window scroll is the one that drifts the
+      // fixed menu away from its trigger and still warrants a close, and a
+      // resize always does. Same fix as SearchableSelect.tsx, which had it
+      // first — this primitive never got it, so every Select in the app with
+      // more options than fit was affected.
+      if (
+        e?.type === "scroll" &&
+        e.target instanceof Node &&
+        menuRef.current?.contains(e.target)
+      ) {
+        return;
+      }
+      close();
+    };
     // CAPTURE phase: a container that stops click propagation (e.g. the Settings
     // modal content, which stops bubbling to keep backdrop-close from firing)
     // would otherwise swallow a bubble-phase document listener, so clicking
