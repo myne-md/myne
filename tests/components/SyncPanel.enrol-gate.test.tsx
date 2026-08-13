@@ -58,8 +58,18 @@ const PREFS_STUB = { device_names: {} };
  * what made the old gate stick — so any behaviour difference between the cases
  * below comes from `sync_status` alone.
  */
-function mountWith(syncState: string, betaTermsAccepted = true) {
+function mountWith(
+  syncState: string,
+  betaTermsAccepted = true,
+  migration: { offerable: boolean; pending: boolean; can_abort?: boolean } = {
+    offerable: false,
+    pending: false,
+  },
+) {
   invokeMock.mockImplementation(async (cmd: string) => {
+    if (cmd === "plugin:vault-migrate|vault_migrate_settle_status") {
+      return { can_abort: false, ...migration };
+    }
     if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
     if (cmd === "plugin:sync|sync_status") return { state: syncState };
     if (cmd === "plugin:sync|sync_beta_terms_accepted") return betaTermsAccepted;
@@ -191,5 +201,49 @@ describe("the enrol gate, for a device that cannot read the roster", () => {
 
     expect(notEnrolledShowsForm).toBe(true);
     expect(pendingShowsForm).toBe(false);
+  });
+});
+
+/**
+ * The migration block, and the vault it has nothing to say to.
+ *
+ * A vault created today is v0.2 from birth (`decisions.md` 2026-08-13), and a
+ * migrated one is v0.2 too. For both, the "Upgrade this vault" form is an offer
+ * the backend refuses (`AlreadyMigrated`) — and it is not a cheap offer to
+ * ignore: taking it means typing the 24-word recovery phrase.
+ *
+ * So the block is driven by what the vault actually is, not by the platform
+ * capability alone. The heading goes with it: a section title over nothing is
+ * how the panel used to look on a migrated vault.
+ */
+describe("the migration block, per vault generation", () => {
+  it("offers the upgrade on a vault that is still v0.1", async () => {
+    // Pinned first, so a fix that merely deleted the block would fail here.
+    mountWith("idle", true, { offerable: true, pending: false });
+    await waitFor(() => {
+      expect(screen.getByTestId("migrate.phrase-input")).toBeTruthy();
+    });
+  });
+
+  it("hides the whole block — heading included — on a current vault", async () => {
+    mountWith("idle", true, { offerable: false, pending: false });
+    await waitFor(() => {
+      expect(screen.getByTestId("sync.device-management")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("migrate.phrase-input")).toBeNull();
+    expect(document.querySelector('[data-setting-anchor="sync.migrate"]')).toBeNull();
+  });
+
+  it("keeps the block for an unsettled migration, but without the form", async () => {
+    // The one case where the two halves disagree: the vault is already v0.2
+    // (nothing to migrate) while its `legacy/` snapshot still has to be
+    // settled. Showing the form here would invite a no-op; hiding the block
+    // would strand the snapshot, which holds the OLD root_key under the OLD
+    // password (§10.4.1 point 5).
+    mountWith("idle", true, { offerable: false, pending: true, can_abort: true });
+    await waitFor(() => {
+      expect(document.querySelector('[data-setting-anchor="sync.migrate"]')).toBeTruthy();
+    });
+    expect(screen.queryByTestId("migrate.phrase-input")).toBeNull();
   });
 });

@@ -11,7 +11,14 @@ import { expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
-import { ipcOk, pageSeatInvoke, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOfferIfPresent,
+  ipcOk,
+  openSettings,
+  pageSeatInvoke,
+  unlockToEditor,
+} from "./support/flows";
+import { testIdSelector } from "./support/webdriver";
 import { seedVault, vaultMetaPath, type SeededVault } from "./support/fixtures";
 
 function magic(path: string): string {
@@ -82,9 +89,13 @@ describeE2E("vault migration v0.1 → v0.2 (1 vault, production KDF)", () => {
         const status = (await ipcOk(
           app.session,
           "plugin:vault-migrate|vault_migrate_settle_status",
-        )) as { pending: boolean; can_abort: boolean };
+        )) as { pending: boolean; can_abort: boolean; offerable: boolean };
         expect(status.pending).toBe(true);
         expect(status.can_abort).toBe(true); // unenrolled vault → pre-sync
+        // …and the UPGRADE is no longer on offer, which is what removes the
+        // form from Settings. The two flags disagree here on purpose: the vault
+        // is current (nothing to migrate) while its snapshot is unsettled.
+        expect(status.offerable).toBe(false);
 
         // (5) CONFIRM crypto-erases it. Asserted on the old meta's absence rather
         // than on the 200: the staged meta is the only remaining wrapper of the
@@ -96,8 +107,27 @@ describeE2E("vault migration v0.1 → v0.2 (1 vault, production KDF)", () => {
         const settled = (await ipcOk(
           app.session,
           "plugin:vault-migrate|vault_migrate_settle_status",
-        )) as { pending: boolean };
+        )) as { pending: boolean; offerable: boolean };
         expect(settled.pending).toBe(false);
+        expect(settled.offerable).toBe(false);
+
+        // (6) With both flags down, Settings shows NO migration block at all —
+        // not a heading over an empty section, and not a form that would ask for
+        // the recovery phrase to perform a no-op. Asserted through the real
+        // Settings surface rather than on the flags alone, because the flags
+        // reaching the panel is the half that can break.
+        // The re-unlocked editor can still be carrying the importer onboarding
+        // overlay, which sits over the Settings CTA — the tolerant variant,
+        // because on this vault the offer may equally not be there at all.
+        await dismissImporterOfferIfPresent(app.session);
+        await openSettings(app.session, "sync");
+        await app.session.byTestId("settings.modal");
+        expect(
+          await app.session.findElements(testIdSelector("migrate.phrase-input")),
+        ).toHaveLength(0);
+        expect(
+          await app.session.findElements('[data-setting-anchor="sync.migrate"]'),
+        ).toHaveLength(0);
       },
     );
   });
