@@ -1,0 +1,21 @@
+# Permissions for the in-app `vault-change-password` Tauri plugin.
+# Picked up under the `vault-change-password:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `vault-change-password:default` (or
+# `vault-change-password:allow-<cmd>`).
+#
+# Task 7 of `vault-change-password` introduces `allow-change-password`.
+# The pipeline body (the actual Q1–Q9 contracts) lands in Tasks 8–13.
+# Command name is `change_password` (not `commit`) to avoid a
+# `#[tauri::command]` macro symbol collision with `vault_creation::commit`.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the vault-change-password plugin."
+permissions = ["allow-change-password"]
+
+[[permission]]
+identifier = "allow-change-password"
+description = "Allow invoking vault_change_password:change_password (rotate the master password on an unlocked vault: re-derive password_wrap_key from CSPRNG-fresh salt + nonce, AEAD-seal root_key, atomic-rewrite vault.meta password-side, recovery-side byte-preserved). Requires Slot::Unlocked; takes both current_password and new_password."
+commands.allow = ["change_password"]

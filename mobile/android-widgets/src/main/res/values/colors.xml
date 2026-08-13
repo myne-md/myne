@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Myne design tokens for the widget surfaces, mirroring src/styles/tokens.css
+     — the same 9 tokens (and hex values) as ios-widgets MyneColor.swift. The
+     values-night/ variant carries the dark half of each pair, so the widgets
+     follow the system appearance the way the WebView follows `data-theme`. -->
+<resources>
+    <color name="myne_paper">#FBFBFA</color>          <!-- ~~paper / bg-1 -->
+    <color name="myne_paper2">#F4F4F2</color>         <!-- ~~paper-2 / bg-2 -->
+    <color name="myne_ink">#1A1A17</color>            <!-- ~~ink-1 / fg-1 -->
+    <color name="myne_ink_display">#0B0B09</color>    <!-- ~~ink-0 / fg-display -->
+    <color name="myne_ink_secondary">#6B6A64</color>  <!-- ~~ink-3 / fg-3 -->
+    <color name="myne_line">#E3E2DD</color>           <!-- ~~line-1 -->
+    <color name="myne_line2">#C8C7C1</color>          <!-- ~~line-2 -->
+    <color name="myne_accent">#2C4A7A</color>         <!-- ~~accent -->
+    <color name="myne_accent_on">#FFFFFF</color>      <!-- ~~accent-on -->
+</resources>

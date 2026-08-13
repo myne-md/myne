@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget container corner radius below Android 12; values-v31 swaps in
+         the launcher-driven system radius. -->
+    <dimen name="myne_widget_radius">16dp</dimen>
+</resources>

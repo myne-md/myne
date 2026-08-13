@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  iOS-only Info.plist additions, merged into the generated
+  gen/apple/myne-mobile_iOS/Info.plist by `tauri ios build` (the generated
+  plist is under the gitignored src-tauri/gen/, so this source-controlled
+  partial is the regeneration-surviving home — MYND-459 T10).
+
+  NSLocalNetworkUsageDescription: without this key iOS silently blocks any
+  connection to a host on the same LAN, so a self-hosting user could not reach a
+  Myne sync server on their home/office network (SYNC-46 iOS-only v1, SYNC-26
+  self-host). The string is honest and telemetry-free — it names exactly why the
+  permission is asked (reaching a self-hosted sync server on the local network),
+  consistent with the no-telemetry / no-analytics posture. Myne opens NO other
+  local-network sockets and declares no Bonjour service.
+
+  NSFaceIDUsageDescription: required by the biometric quick-unlock provider
+  (MYND-329; main repo docs/decisions.md 2026-07-12) — without it iOS denies
+  the Face ID evaluation behind the gated Keychain read
+  (kSecAccessControlBiometryCurrentSet) and the feature silently fails. The
+  string is honest: Face ID only gates the device-local re-unlock key; it never
+  replaces the master password and nothing biometric leaves the device.
+
+  NSMicrophoneUsageDescription: required for voice notes (mobile voice-notes
+  feature; main repo docs/decisions.md 2026-07-12). The WebView records audio
+  via getUserMedia and stores it as an encrypted audio/wav attachment in the
+  vault; without this key iOS terminates the app on the first capture. The
+  string is honest and telemetry-free: audio is recorded ONLY while the user is
+  actively recording a voice note, is encrypted on-device, and is never sent
+  anywhere (it syncs end-to-end encrypted like any other attachment).
+
+  NSCameraUsageDescription: required for the "Take Photo" option in the WKWebView
+  file picker when attaching an image (MYND-474). Tapping an <input type="file">
+  and choosing "Take Photo" opens the camera; without this key iOS TERMINATES the
+  app on first camera access (a hard NSInvalidArgumentException crash, not a
+  permission prompt). The picker's "Photo Library" option uses PHPicker
+  (out-of-process, needs no usage string), so only the camera key is required.
+  The string is honest and telemetry-free: the camera is used ONLY while you take
+  a photo to attach, or scan a device-join QR (MYND-466 — the QR carries no secret;
+  the scanner reads one code then closes). Both uses stay on-device.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Myne connects to a Myne sync server on your local network only if you set one up. It never scans your network or sends any data anywhere else.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Myne uses Face ID to unlock this vault again quickly after it auto-locks. Your master password is still required after a restart.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Myne uses the microphone only while you record a voice note. Recordings are encrypted on this device and never sent anywhere.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Myne uses the camera when you take a photo to attach it to a note, or scan a QR code to add this device to your account. Photos are encrypted on this device; the QR carries no secret. Nothing is sent anywhere without your action.</string>
+	<!-- `myne://` custom URL scheme — the target of the home / lock-screen
+	     widgets + Control Center "New note" action (ios-widgets/). Delivered to
+	     the WebView by tauri-plugin-deep-link; resolved app-side into an unlock
+	     + new-note flow (src/lib/deep-link.ts). Lives HERE (not only in the
+	     gitignored gen/apple/project.yml) so a fresh clone's `tauri ios init`
+	     keeps it — the same regeneration-surviving channel as the usage strings
+	     above (the Android side of the same scheme comes from tauri.conf.json
+	     plugins.deep-link, injected into AndroidManifest.xml by the plugin). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>md.myne.mobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>myne</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,429 @@
+# Permissions for the in-app `prefs` Tauri plugin (MYND-160).
+# Picked up under the `prefs:` ACL namespace only because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference
+# these as `prefs:default` (or `prefs:allow-prefs-read` /
+# `prefs:allow-set-screen-capture-protection`).
+#
+# MYND-160 grill Q5.4 — main-window-only invariant. The `default`
+# permission bundle is the only one consumed in v0.1; v0.2 multi-window
+# may grant `prefs:allow-prefs-read` to sub-windows but MUST NOT grant
+# `prefs:allow-set-screen-capture-protection` to any non-main window
+# per `decisions.md` 2026-05-27 "Forward commitment: prefs:write
+# capability stays main-window-only".
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the prefs plugin — both read + per-field setters."
+permissions = [
+  "allow-prefs-read",
+  "allow-set-reminders-enabled",
+  "allow-set-reminder-horizon-days",
+  "allow-set-transcription-enabled",
+  "allow-set-screen-capture-protection",
+  "allow-set-attachment-compression-enabled",
+  "allow-set-deliberate-folders",
+  "allow-set-archived-folders",
+  "allow-set-auto-lock-timeout",
+  "allow-set-item-order",
+  "allow-set-hidden-bar-items",
+  "allow-set-bar-items-order",
+  "allow-set-favorites",
+  "allow-set-editor-layout",
+  "allow-set-theme",
+  "allow-set-custom-theme",
+  "allow-set-daily-date-format",
+  "allow-set-daily-folder",
+  "allow-set-daily-template",
+  "allow-set-new-note-location",
+  "allow-set-startup-open",
+  "allow-set-editor-text-size",
+  "allow-set-editor-line-numbers",
+  "allow-set-archive-disabled",
+  "allow-set-editor-line-spacing",
+  "allow-set-editor-content-width",
+  "allow-set-editor-font-family",
+  "allow-set-active-workspace",
+  "allow-set-editor-default-view-mode",
+  "allow-set-editor-focus-dim-inactive",
+  "allow-set-editor-focus-typewriter",
+  "allow-set-item-colors",
+  "allow-set-folder-icons",
+  # MYND-548 device naming: the per-key `device_names` setter + the platform
+  # token the enrollment forms seed their suggested name from.
+  "allow-set-device-name",
+  "allow-device-platform",
+  "allow-vault-set-label",
+  "allow-vault-set-icon",
+  "allow-set-spell-enabled",
+  "allow-set-spell-languages",
+  "allow-set-show-note-timestamps",
+  "allow-set-keymap-binding",
+  "allow-upsert-saved-view",
+  "allow-delete-saved-view",
+  "allow-set-view-order",
+  "allow-set-right-panel-active-tab",
+  "allow-set-right-panel-hidden-tabs",
+  "allow-set-right-panel-tab-order",
+  "allow-set-editor-toolbar-order",
+  "allow-set-editor-toolbar-hidden",
+]
+
+[[permission]]
+identifier = "allow-prefs-read"
+description = "Allow invoking prefs:prefs_read (Slot::Unlocked-gated read of the vault.prefs blob; returns PrefsView with fall-back-to-defaults on absence / AEAD-fail / parse-fail per protocol.md § 9.5.5)."
+commands.allow = ["prefs_read"]
+
+[[permission]]
+identifier = "allow-set-screen-capture-protection"
+description = "Allow invoking prefs:set_screen_capture_protection (Slot::Unlocked-gated per-field setter for the screen_capture_protection bool; atomic-writes vault.prefs FIRST then calls screen_capture::apply for the native side-effect — disk-then-native ordering is load-bearing for UI/disk consistency per MYND-160 grill Q5.2)."
+commands.allow = ["set_screen_capture_protection"]
+
+# ingest-image-compression: a write setter, so it inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. SHARED in the sync
+# merge (sync-protocol.md §10.2) — a content-fidelity switch with a vault-wide
+# irreversible effect, unlike the device-local compute-budget toggles
+# (spell_enabled etc.) elsewhere in this file.
+[[permission]]
+identifier = "allow-set-attachment-compression-enabled"
+description = "Allow invoking prefs:set_attachment_compression_enabled (Slot::Unlocked-gated setter for the attachment_compression_enabled ingest-time image-compression toggle; atomic-writes vault.prefs with no native side-effect; shared per sync-protocol.md §10.2 — a content-fidelity switch with a vault-wide irreversible effect, unlike the device-local attachment_ocr_enabled/spell_enabled cluster; defaults to true, so it is emitted on disk only when false)."
+commands.allow = ["set_attachment_compression_enabled"]
+
+# MYND-144: a write setter, so it inherits the same main-window-only
+# invariant as allow-set-screen-capture-protection — v0.2 multi-window
+# MUST NOT grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-deliberate-folders"
+description = "Allow invoking prefs:set_deliberate_folders (Slot::Unlocked-gated setter for the deliberate_folders set — the carrier for empty/deliberately-created folders in the virtual-folder model; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_deliberate_folders"]
+
+# MYND-470 mobile folder-archive parity: a write setter, so it inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-archived-folders"
+description = "Allow invoking prefs:set_archived_folders (Slot::Unlocked-gated setter for the archived_folders set — the folder-level twin of the per-note archived marker; folders archived as a unit drop out of the working set while their notes stay live; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_archived_folders"]
+
+# MYND-121: a write setter, so it inherits the same main-window-only
+# invariant as the other allow-set-* permissions.
+[[permission]]
+identifier = "allow-set-auto-lock-timeout"
+description = "Allow invoking prefs:set_auto_lock_timeout (Slot::Unlocked-gated setter for the auto_lock_seconds field — atomic-writes vault.prefs FIRST then refreshes the idle timer's cached effective timeout, clamped through the protective envelope; MYND-121)."
+commands.allow = ["set_auto_lock_timeout"]
+
+# Unified manual sidebar order + favorites (MYND-183): write setters, so they
+# inherit the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant these to any non-main window.
+[[permission]]
+identifier = "allow-set-item-order"
+description = "Allow invoking prefs:set_item_order (Slot::Unlocked-gated setter for the item_order sequence — the unified manual sidebar order across the interleaved file-tree, a heterogeneous list of note UUIDs + folder paths; atomic-writes vault.prefs with no native side-effect, preserving element order)."
+commands.allow = ["set_item_order"]
+
+# Bottom-bar customization: a write setter for the hidden_bar_items set — the
+# BottomBar element ids the user hid via the bar's right-click menu. Inherits
+# the same main-window-only invariant as the other allow-set-* permissions —
+# v0.2 multi-window MUST NOT grant this to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-hidden-bar-items"
+description = "Allow invoking prefs:set_hidden_bar_items (Slot::Unlocked-gated setter for the hidden_bar_items set — the bottom-bar element ids the user chose to hide; codec NFC-sorts+dedupes; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_hidden_bar_items"]
+
+# Bottom-bar customization: a write setter for the bar_items_order sequence —
+# the right-cluster BottomBar element ids in the order the user arranged them by
+# drag-to-reorder or the bar's right-click move actions. Inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-bar-items-order"
+description = "Allow invoking prefs:set_bar_items_order (Slot::Unlocked-gated setter for the bar_items_order sequence — the bottom-bar item display order; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of unknown ids)."
+commands.allow = ["set_bar_items_order"]
+
+[[permission]]
+identifier = "allow-set-favorites"
+description = "Allow invoking prefs:set_favorites (Slot::Unlocked-gated setter for the favorites sequence — the user's favorited notes shown in the sidebar's Favorites section; atomic-writes vault.prefs with no native side-effect, preserving element order)."
+commands.allow = ["set_favorites"]
+
+# MYND-137: a write setter, so it inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window
+# MUST NOT grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-editor-layout"
+description = "Allow invoking prefs:set_editor_layout (Slot::Unlocked-gated setter for the editor_layout object — the editor three-pane sidebar widths + collapsed flags; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_layout"]
+
+# MYND-110: a write setter, so it inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window
+# MUST NOT grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-theme"
+description = "Allow invoking prefs:set_theme (Slot::Unlocked-gated setter for the theme field — the user's Light/Dark/System choice; Option<ThemeChoice> where None ≡ system clears the field; atomic-writes vault.prefs with no native side-effect, no protective-envelope clamp since theme is non-load-bearing)."
+commands.allow = ["set_theme"]
+
+# custom-themes epic (MYND-297): a write setter for the custom_theme field —
+# the active custom-theme name. Inherits the same main-window-only invariant as
+# the other allow-set-* permissions — v0.2 multi-window MUST NOT grant this to
+# any non-main window. Atomic-writes vault.prefs with no native side-effect;
+# non-load-bearing cosmetic (no clamp; the apply layer validates the file and
+# falls back to a built-in theme on any failure).
+[[permission]]
+identifier = "allow-set-custom-theme"
+description = "Allow invoking prefs:set_custom_theme (Slot::Unlocked-gated setter for the custom_theme field — the active custom-theme name; Option<String> where None clears it and the client falls back to the built-in theme; atomic-writes vault.prefs with no native side-effect; logs set/cleared only, never the name)."
+commands.allow = ["set_custom_theme"]
+
+# MYND-191 daily-notes: three write setters, so they inherit the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant these to any non-main window. All three are
+# non-load-bearing (cold/derivable) prefs, atomic-writing vault.prefs with no
+# native side-effect.
+[[permission]]
+identifier = "allow-set-daily-date-format"
+description = "Allow invoking prefs:set_daily_date_format (Slot::Unlocked-gated setter for the daily_date_format field — the daily-notes date-format string; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_daily_date_format"]
+
+[[permission]]
+identifier = "allow-set-daily-folder"
+description = "Allow invoking prefs:set_daily_folder (Slot::Unlocked-gated setter for the daily_folder field — the daily-notes folder path; also registers it as a deliberate folder so it survives empty; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_daily_folder"]
+
+[[permission]]
+identifier = "allow-set-daily-template"
+description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_daily_template"]
+
+# MYND-462 "Files" settings panel: two write setters for the new-note default
+# location pair + the startup-open pair. Both inherit the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window MUST NOT
+# grant these to any non-main window. Both atomic-write vault.prefs with no
+# native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-new-note-location"
+description = "Allow invoking prefs:set_new_note_location (Slot::Unlocked-gated setter for the new_note_location mode + new_note_location_folder target pair — root/current/specific, the folder also registered as a deliberate folder when mode is specific; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_new_note_location"]
+
+[[permission]]
+identifier = "allow-set-startup-open"
+description = "Allow invoking prefs:set_startup_open (Slot::Unlocked-gated setter for the startup_open mode + startup_open_note target pair — last/empty/specific; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_startup_open"]
+
+# MYND-184 / MYND-185 sidebar decorations: two write setters for the
+# decoration maps (item_colors = per-item color labels; folder_icons =
+# per-folder custom icons). Both inherit the same main-window-only invariant
+# as the other allow-set-* permissions — v0.2 multi-window MUST NOT grant
+# these to any non-main window. Both atomic-write vault.prefs with no native
+# side-effect; non-load-bearing (cosmetic, AS-low).
+# editor-typography: four write setters for the editor text-size / line-spacing
+# / content-width / font-family presets. Each inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window MUST NOT
+# grant these to any non-main window. All atomic-write vault.prefs with no native
+# side-effect; non-load-bearing cosmetic (no clamp; the client validates the
+# preset enum and maps unknown→default).
+[[permission]]
+identifier = "allow-set-editor-text-size"
+description = "Allow invoking prefs:set_editor_text_size (Slot::Unlocked-gated setter for the editor_text_size preset — sm/md/lg/xl base text size, Option<String> where None clears to the md default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_text_size"]
+
+[[permission]]
+identifier = "allow-set-editor-line-spacing"
+description = "Allow invoking prefs:set_editor_line_spacing (Slot::Unlocked-gated setter for the editor_line_spacing preset — tight/normal/relaxed, Option<String> where None clears to the normal default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_line_spacing"]
+
+# editor-line-numbers (MYND-314): a write setter for the editor_line_numbers
+# toggle — the optional line-number gutter. Inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window MUST NOT
+# grant this to any non-main window. Atomic-writes vault.prefs with no native
+# side-effect; non-load-bearing cosmetic (no clamp; default-OFF is host policy).
+[[permission]]
+identifier = "allow-set-editor-line-numbers"
+description = "Allow invoking prefs:set_editor_line_numbers (Slot::Unlocked-gated setter for the editor_line_numbers toggle — the optional editor line-number gutter; atomic-writes vault.prefs with no native side-effect; the default-OFF policy is applied host-side at read time)."
+commands.allow = ["set_editor_line_numbers"]
+
+[[permission]]
+identifier = "allow-set-archive-disabled"
+description = "Allow invoking prefs:set_archive_disabled (Slot::Unlocked-gated setter for the archive_disabled toggle — disables the note-archive feature's UI entry points; atomic-writes vault.prefs with no native side-effect; the default-OFF policy (archiving enabled) is applied host-side at read time)."
+commands.allow = ["set_archive_disabled"]
+
+[[permission]]
+identifier = "allow-set-editor-content-width"
+description = "Allow invoking prefs:set_editor_content_width (Slot::Unlocked-gated setter for the editor_content_width preset — narrow/normal/wide/full, Option<String> where None clears to the normal default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_content_width"]
+
+[[permission]]
+identifier = "allow-set-editor-font-family"
+description = "Allow invoking prefs:set_editor_font_family (Slot::Unlocked-gated setter for the editor_font_family preset — mono/sans, Option<String> where None clears to the mono default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_font_family"]
+
+# MYND-308 / MYND-299 / MYND-348: write setters for the active-workspace slot id
+# + the editor default-view-mode + the two focus-mode toggles. Each inherits the
+# same main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant these to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-active-workspace"
+description = "Allow invoking prefs:set_active_workspace (Slot::Unlocked-gated setter for the active_workspace slot id — Option<String> where None clears to the host default workspace policy; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_active_workspace"]
+
+[[permission]]
+identifier = "allow-set-editor-default-view-mode"
+description = "Allow invoking prefs:set_editor_default_view_mode (Slot::Unlocked-gated setter for the editor_default_view_mode preset — live/reading/source, Option<String> where None clears to the host default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_default_view_mode"]
+
+[[permission]]
+identifier = "allow-set-editor-focus-dim-inactive"
+description = "Allow invoking prefs:set_editor_focus_dim_inactive (Slot::Unlocked-gated setter for the editor_focus_dim_inactive toggle — the focus-mode dim-inactive-paragraphs option; atomic-writes vault.prefs with no native side-effect; the default focus policy is applied host-side at read time)."
+commands.allow = ["set_editor_focus_dim_inactive"]
+
+[[permission]]
+identifier = "allow-set-editor-focus-typewriter"
+description = "Allow invoking prefs:set_editor_focus_typewriter (Slot::Unlocked-gated setter for the editor_focus_typewriter toggle — the focus-mode typewriter-scrolling option; atomic-writes vault.prefs with no native side-effect; the default focus policy is applied host-side at read time)."
+commands.allow = ["set_editor_focus_typewriter"]
+
+[[permission]]
+identifier = "allow-set-item-colors"
+description = "Allow invoking prefs:set_item_colors (Slot::Unlocked-gated setter for the item_colors map — per-item color labels keyed by note UUID or canonical folder path; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_item_colors"]
+
+[[permission]]
+identifier = "allow-set-folder-icons"
+description = "Allow invoking prefs:set_folder_icons (Slot::Unlocked-gated setter for the folder_icons map — per-folder custom sidebar icons keyed by canonical folder path; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_folder_icons"]
+
+# MYND-548 device naming: a write setter for ONE device_names entry, unlock-gated
+# by construction (the write needs prefs_key). There is no clear path by design:
+# device_names merges per-key by UNION (sync-protocol.md §10.2), so a deletion
+# would not propagate — it would resurrect from the first peer that still holds it.
+[[permission]]
+identifier = "allow-set-device-name"
+description = "Allow invoking prefs:set_device_name (Slot::Unlocked-gated setter for one device_names entry — the human-readable label the device list shows for a device_id, keyed by its hex; a blank name is refused so no row renders nameless; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_device_name"]
+
+# MYND-548: the read half — the platform token the enrollment forms seed their
+# suggested device name from. Deliberately NOT unlock-gated and vault-free: it
+# returns std::env::consts::OS, and the join flow needs it while bootstrapping a
+# vault that is not unlocked yet. Reads no vault state and writes nothing.
+[[permission]]
+identifier = "allow-device-platform"
+description = "Allow invoking prefs:device_platform (returns the compile-time std::env::consts::OS token — macos/windows/linux/ios/android — as the single default-device-name heuristic the enrollment forms seed from; touches no vault state and writes nothing)."
+commands.allow = ["device_platform"]
+
+# MYND-205 in-app vault switcher: a write setter for the per-vault label, so it
+# inherits the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
+# Unlock-gated by construction (writing the label needs prefs_key, which only
+# exists for the active/sole-Unlocked vault); atomic-writes vault.prefs with no
+# native side-effect, then refreshes the per-session RAM label cache.
+[[permission]]
+identifier = "allow-vault-set-label"
+description = "Allow invoking prefs:vault_set_label (Slot::Unlocked-gated setter for the per-vault label field — the in-app vault switcher's human-readable name; Option<String> where None clears it; atomic-writes vault.prefs with no native side-effect, then refreshes the per-session RAM label cache so vault_list reflects the rename immediately)."
+commands.allow = ["vault_set_label"]
+
+# vault-icons: a write setter for the per-vault icon glyph name — the switcher's
+# decorative glyph shown beside the vault name. Inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. Unlock-gated by
+# construction (writing the icon needs prefs_key, which only exists for the
+# active/sole-Unlocked vault); atomic-writes vault.prefs with no native
+# side-effect, then refreshes the per-session RAM icon cache.
+[[permission]]
+identifier = "allow-vault-set-icon"
+description = "Allow invoking prefs:vault_set_icon (Slot::Unlocked-gated setter for the per-vault icon field — the in-app vault switcher's decorative glyph name; Option<String> where None clears it to the neutral wordmark; atomic-writes vault.prefs with no native side-effect, then refreshes the per-session RAM icon cache so vault_list reflects the change immediately)."
+commands.allow = ["vault_set_icon"]
+
+# MYND-267 spell-checker: two write setters for the spell-check prefs
+# (spell_enabled toggle + spell_languages set). Both inherit the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant these to any non-main window. Both atomic-write
+# vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-spell-enabled"
+description = "Allow invoking prefs:set_spell_enabled (Slot::Unlocked-gated setter for the spell_enabled toggle; atomic-writes vault.prefs with no native side-effect; the default-ON policy is applied host-side at read time)."
+commands.allow = ["set_spell_enabled"]
+
+[[permission]]
+identifier = "allow-set-spell-languages"
+description = "Allow invoking prefs:set_spell_languages (Slot::Unlocked-gated setter for the spell_languages set — the active spell-check language tags, SYNC-11 union; codec NFC-sorts+dedupes; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_spell_languages"]
+
+# sidebar-note-timestamps: a write setter for the show_note_timestamps toggle —
+# the per-note "last edited" date under each sidebar note row. Inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing (no clamp). The field
+# is a plain bool defaulting true; the codec omits it on disk when true.
+[[permission]]
+identifier = "allow-set-show-note-timestamps"
+description = "Allow invoking prefs:set_show_note_timestamps (Slot::Unlocked-gated setter for the show_note_timestamps bool — show/hide the per-note last-edited date in the sidebar; default true is omitted on disk; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_show_note_timestamps"]
+
+# MYND-273 Saved Views: save/edit (upsert-by-id) of one saved-view definition.
+# Inherits the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant this to any non-main window
+# (a view's name/filter/property is AS3-Sensitive). Atomic-writes vault.prefs
+# with no native side-effect; the 64 KiB MYP1 cap fails the encode (no write)
+# before touching disk; non-load-bearing (no clamp).
+# MYND-304 rebindable hotkeys: a write setter for one command's keymap override.
+# Inherits the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
+# Atomic-writes vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-keymap-binding"
+description = "Allow invoking prefs:set_keymap_binding (Slot::Unlocked-gated setter for ONE command's keymap override; Option<Vec<String>> where Some(non-empty)=override, Some(empty)=explicit-unbind ([]), None=remove (revert to default); codec NFC-sorts+dedupes each chord set; atomic-writes vault.prefs with no native side-effect; logs set/remove + chord count only, never the command id or chords)."
+commands.allow = ["set_keymap_binding"]
+
+[[permission]]
+identifier = "allow-upsert-saved-view"
+description = "Allow invoking prefs:upsert_saved_view (Slot::Unlocked-gated save/edit of one SavedView — replaces by id else appends; atomic-writes vault.prefs with no native side-effect; over the 64 KiB MYP1 cap fails PrefsEncodeFailed before any write, leaving on-disk prefs intact; logs view count only, never a name/filter/property)."
+commands.allow = ["upsert_saved_view"]
+
+[[permission]]
+identifier = "allow-delete-saved-view"
+description = "Allow invoking prefs:delete_saved_view (Slot::Unlocked-gated delete of one SavedView by id — removes it from saved_views and prunes the id from view_order; atomic-writes vault.prefs with no native side-effect; deleting an absent id is an idempotent no-op; logs view count only)."
+commands.allow = ["delete_saved_view"]
+
+[[permission]]
+identifier = "allow-set-view-order"
+description = "Allow invoking prefs:set_view_order (Slot::Unlocked-gated setter for the view_order sequence — the saved-view display order; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of stale ids)."
+commands.allow = ["set_view_order"]
+
+[[permission]]
+identifier = "allow-set-right-panel-active-tab"
+description = "Allow invoking prefs:set_right_panel_active_tab (Slot::Unlocked-gated setter for the right_panel_active_tab pointer — the right-sidebar tab the editor restores, or None to clear to the host default; atomic-writes vault.prefs with no native side-effect; non-load-bearing, the client owns tab-id interpretation + unknown→default fallback)."
+commands.allow = ["set_right_panel_active_tab"]
+
+[[permission]]
+identifier = "allow-set-right-panel-hidden-tabs"
+description = "Allow invoking prefs:set_right_panel_hidden_tabs (Slot::Unlocked-gated setter for the right_panel_hidden_tabs set — the right-sidebar tabs hidden via the panel's right-click menu; atomic-writes vault.prefs with no native side-effect; codec canonicalizes sorted + deduped on encode; no codec GC of unknown ids)."
+commands.allow = ["set_right_panel_hidden_tabs"]
+
+[[permission]]
+identifier = "allow-set-right-panel-tab-order"
+description = "Allow invoking prefs:set_right_panel_tab_order (Slot::Unlocked-gated setter for the right_panel_tab_order sequence — the right-sidebar tab display order; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of unknown ids)."
+commands.allow = ["set_right_panel_tab_order"]
+
+[[permission]]
+identifier = "allow-set-editor-toolbar-order"
+description = "Allow invoking prefs:set_editor_toolbar_order (Slot::Unlocked-gated setter for the editor_toolbar_order sequence — the editor format-bar action display order, MYND-555; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of unknown ids. DEVICE-LOCAL in the sync merge policy, so a phone layout never propagates to a desktop)."
+commands.allow = ["set_editor_toolbar_order"]
+
+[[permission]]
+identifier = "allow-set-editor-toolbar-hidden"
+description = "Allow invoking prefs:set_editor_toolbar_hidden (Slot::Unlocked-gated setter for the editor_toolbar_hidden set — the editor format-bar actions the user hid, MYND-555; atomic-writes vault.prefs with no native side-effect; codec canonicalizes sorted + deduped on encode; no codec GC of unknown ids. DEVICE-LOCAL, like its order twin)."
+commands.allow = ["set_editor_toolbar_hidden"]
+
+[[permission]]
+identifier = "allow-set-reminders-enabled"
+description = "Allow invoking prefs:set_reminders_enabled (Slot::Unlocked-gated setter for whether THIS DEVICE shows task reminders, MYND-618/619). A plain bool defaulting true, omitted from the canonical encoding at its default so an untouched vault stays byte-identical. Classified DEVICE-LOCAL — whether a given phone should be interrupted is a property of that phone, so it must not sync. Non-load-bearing: a tampered value can at worst silence or enable a notification. Main-window-only, same invariant as every other prefs setter."
+commands.allow = ["set_reminders_enabled"]
+
+[[permission]]
+identifier = "allow-set-reminder-horizon-days"
+description = "Allow invoking prefs:set_reminder_horizon_days (Slot::Unlocked-gated setter for how many days ahead this device registers reminders with the OS, MYND-618/619; None falls back to the client's built-in horizon). Optional and omitted when unset, so an untouched vault stays byte-identical. DEVICE-LOCAL for the same reason as reminders_enabled. The horizon is a PRIVACY bound before a resource one — pending reminder times leave the AEAD envelope and sit in OS-owned plaintext (threat-model.md §7), so a shorter horizon exposes less. Stored verbatim with no clamp; clamping here would silently disagree with what the settings UI showed."
+commands.allow = ["set_reminder_horizon_days"]
+
+[[permission]]
+identifier = "allow-set-transcription-enabled"
+description = "Allow invoking prefs:set_transcription_enabled (Slot::Unlocked-gated setter for whether on-device voice-to-text is available, MYND-563/592). A plain bool defaulting true (opt-OUT), omitted from the canonical encoding at its default so an untouched vault stays byte-identical. It is a SEPARATE switch from the AI-beta ai_enabled opt-in — transcription ships a bundled model and is a product feature, not part of the AI beta. Non-load-bearing: the transcribe command re-reads this host-side before any decrypt, so a tampered value can at worst enable/disable a feature, never bypass the gate. Main-window-only, same invariant as every other prefs setter."
+commands.allow = ["set_transcription_enabled"]

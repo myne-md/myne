@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark halves of the MyneColor pairs (values/colors.xml carries light). -->
+<resources>
+    <color name="myne_paper">#1A1A17</color>
+    <color name="myne_paper2">#232220</color>
+    <color name="myne_ink">#E8E7DF</color>
+    <color name="myne_ink_display">#F7F6EE</color>
+    <color name="myne_ink_secondary">#8D8C85</color>
+    <color name="myne_line">#2C2B28</color>
+    <color name="myne_line2">#3A3935</color>
+    <color name="myne_accent">#8AA4D0</color>
+    <color name="myne_accent_on">#0B0B09</color>
+</resources>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WG-02 (small) · Quick capture at 2×2 — header, accent plus-box, "New
+     note". The WHOLE widget is one tap target (QuickCaptureWidget.kt binds
+     myne://capture on @id/myne_root), mirroring the iOS systemSmall
+     `widgetURL`. The empty FrameLayout is the spacer (Space is not a
+     RemoteViews-safe view). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/myne_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/myne_widget_bg"
+    android:orientation="vertical"
+    android:padding="18dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/myne_logo_bg_20"
+            android:importantForAccessibility="no"
+            android:src="@drawable/myne_mark" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/myne_brand"
+            android:textColor="@color/myne_ink_secondary"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <ImageView
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/myne_plus_box"
+        android:importantForAccessibility="no"
+        android:padding="11dp"
+        android:src="@drawable/myne_ic_plus"
+        android:tint="@color/myne_accent_on" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="-0.02"
+        android:text="@string/myne_new_note"
+        android:textColor="@color/myne_ink"
+        android:textSize="17sp" />
+</LinearLayout>

@@ -1,0 +1,841 @@
+/* =========================================================================
+   Myne -- Color + Type Tokens
+   Privacy-first, monochrome-leaning. Generous whitespace, monospace
+   accents for cryptographic identifiers (account numbers, fingerprints).
+
+   Source: docs/design/colors_and_type.css (canonical home moves to src/styles/
+   for the desktop client; the design subtree retains its copy as reference).
+
+   Themes (MYND-110): light is the bare-:root default. With NO `data-theme`
+   on <html> the UI follows the OS `prefers-color-scheme` live (System mode +
+   all pre-unlock screens). `data-theme="dark"`/`"light"` on <html> is an
+   explicit override. Both themes are first-class -- neither dominates.
+   ========================================================================= */
+
+/* -- Fonts ----------------------------------------------------------------
+   Self-hosted; reproducible builds preclude CDN imports.
+   - Inter Variable: UI sans (substituted for a custom sans until brand-final)
+   - JetBrains Mono Variable: monospace accents (account numbers, fingerprints,
+     code, keyboard shortcuts). Has a true zero with a slash and disambiguates
+     0/O, 1/lI/!, which matters for hand-typed Crockford-base32 identifiers.
+
+   The @font-face blocks are kept commented out until the WOFF2 binaries are
+   added under public/fonts/. The system stack below substitutes meanwhile.
+   ------------------------------------------------------------------------ */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/JetBrainsMono.woff2") format("woff2");
+}
+
+:root {
+  /* -- Type families --------------------------------------------------- */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo,
+    Consolas, "Liberation Mono", monospace;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* -- Type scale (modular, 1.25 minor third) ------------------------- */
+  --text-xs:    11px;
+  --text-sm:    13px;
+  --text-base:  14px;   /* desktop client default */
+  --text-md:    16px;
+  --text-lg:    18px;
+  --text-xl:    22px;
+  --text-2xl:   28px;
+  --text-3xl:   36px;
+  --text-4xl:   48px;
+
+  /* Line heights */
+  --leading-tight:   1.15;
+  --leading-snug:    1.3;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.65;
+  --leading-mono:    1.4;
+
+  /* Letter spacing */
+  --tracking-tight:  -0.015em;
+  --tracking-normal: 0em;
+  --tracking-wide:   0.02em;
+  --tracking-caps:   0.08em;
+
+  /* Weights */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* -- Color -- Neutral ramp (light theme default) -------------------- */
+  --paper:    #fbfbfa;   /* page background */
+  --paper-2:  #f4f4f2;   /* recessed surfaces (sidebars, cards) */
+  --paper-3:  #ecebe7;   /* hover / pressed surfaces */
+  --line-1:   #e3e2dd;   /* hairline borders */
+  --line-2:   #c8c7c1;   /* stronger borders, dividers */
+  --line-3:   #a3a29c;   /* disabled controls */
+
+  --ink-3:    #6b6a64;   /* tertiary text, captions */
+  --ink-2:    #3a3934;   /* secondary text */
+  --ink-1:    #1a1a17;   /* primary text */
+  --ink-0:    #0b0b09;   /* high-emphasis / display */
+
+  /* Semantic foreground/background aliases */
+  --bg-1:     var(--paper);
+  --bg-2:     var(--paper-2);
+  --bg-3:     var(--paper-3);
+  --fg-1:     var(--ink-1);
+  --fg-2:     var(--ink-2);
+  --fg-3:     var(--ink-3);
+  --fg-display: var(--ink-0);
+
+  /* -- Color -- Accent ------------------------------------------------ */
+  --accent:        #2c4a7a;   /* iron-blue */
+  --accent-hover:  #233b62;
+  --accent-press:  #1b2e4d;
+  --accent-soft:   #e8edf5;
+  --accent-on:     #ffffff;
+
+  /* -- Color -- State ------------------------------------------------- */
+  --danger:        #8a2a23;
+  --danger-soft:   #f5e7e5;
+  --warning:       #8a6a1f;
+  --warning-soft:  #f5efde;
+  --success:       #2f6048;
+  --success-soft:  #e3eee8;
+  --info:          #2c4a7a;
+  --info-soft:     var(--accent-soft);
+
+  /* -- Color -- Highlight (==text==) ---------------------------------- */
+  /* Warm-amber wash for `==highlight==` + embedded `<mark>`. The text on top
+     stays `--fg-1`, so the wash VALUE must flip per theme: a light amber in
+     light mode (dark ink reads on it), a dark amber in dark mode (light ink
+     reads on it). Single-sourced like the other dark values below. */
+  --highlight:     #f3e7c4;
+  /* Multi-color highlight palette (`<mark class="hl-…">`; decisions.md
+     2026-06-15). `--highlight` IS the yellow/default (`hl-yellow` + `==text==`).
+     Four sibling washes follow the same per-theme flip discipline: low-sat paper
+     washes here, dark twins below. Closed vocabulary — see sanitize.ts. */
+  --highlight-green:  #d8e9cf;
+  --highlight-blue:   #d3e2ee;
+  --highlight-pink:   #efd8e2;
+  --highlight-purple: #e2d8ee;
+
+  /* -- Color -- Label slots (MYND-184; sidebar color labels) ---------- */
+  /* Six muted, hue-named DECORATIVE slots for note/folder color dots — NOT a
+     repurpose of the semantic state colors. Solid-fill dots, no `-soft`
+     variant. Mirrors docs/design/colors_and_type.css. decisions.md 2026-06-07. */
+  --label-clay:   #b0543f;   /* warm brick-red  */
+  --label-ochre:  #94701c;   /* amber / gold    */
+  --label-moss:   #4d7a55;   /* forest green    */
+  --label-slate:  #46688a;   /* iron blue-grey  */
+  --label-plum:   #7e4d76;   /* muted purple    */
+  --label-stone:  #6f6d64;   /* warm grey       */
+
+  /* -- Color -- Code syntax highlighting (MYND-154) ------------------- */
+  /* Mirrors docs/design/colors_and_type.css. Each hue clears WCAG AA
+     (>=4.5:1) vs --paper-2 in both themes (grill Q15). */
+  --syntax-keyword:  #7a3b8c;
+  --syntax-string:   #3f6a4a;
+  --syntax-comment:  #706f66;
+  --syntax-number:   #9a5d2a;
+  --syntax-variable: #1a1a17;
+  --syntax-property: #2c4a7a;
+  --syntax-function: #1f5c6e;
+  --syntax-type:     #8a5a1f;
+  --syntax-operator: #5c5b54;
+  --syntax-tag:      #8a2a23;
+  --syntax-meta:     #5a5478;
+  --syntax-invalid:  #992018;
+
+  /* -- Focus ring ----------------------------------------------------- */
+  --ring:        0 0 0 2px var(--bg-1), 0 0 0 4px var(--accent);
+  --ring-inset:  inset 0 0 0 2px var(--accent);
+
+  /* -- Elevation ------------------------------------------------------ */
+  --shadow-1: 0 1px 0 rgba(11,11,9,0.04), 0 1px 2px rgba(11,11,9,0.06);
+  --shadow-2: 0 2px 4px rgba(11,11,9,0.06), 0 4px 12px rgba(11,11,9,0.08);
+  --shadow-3: 0 8px 16px rgba(11,11,9,0.08), 0 16px 40px rgba(11,11,9,0.12);
+
+  /* -- Radii ---------------------------------------------------------- */
+  --radius-1: 3px;
+  --radius-2: 6px;
+  --radius-3: 10px;
+  --radius-pill: 999px;
+
+  /* -- Spacing scale (4px base) -------------------------------------- */
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+  --space-7:  48px;
+  --space-8:  64px;
+  --space-9:  96px;
+
+  /* -- Motion --------------------------------------------------------- */
+  --ease-standard: cubic-bezier(0.2, 0.0, 0.0, 1.0);
+  --ease-out:      cubic-bezier(0.0, 0.0, 0.2, 1.0);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 260ms;
+
+  /* -- Dark palette source values (MYND-110) -------------------------- */
+  /* Single source for the dark token VALUES. The two application blocks
+     below (:root[data-theme="dark"] + the prefers-color-scheme:dark @media)
+     only repeat `--token: var(--_token-dark)` assignments — never the literal
+     hex — so a value retune touches ONE place and the worst possible drift is
+     a missed assignment (one token stuck light in one mode, caught by visual /
+     Penpot-diff review), never two diverging colors. AA (>=4.5:1) vs the dark
+     --paper-2 (#1a1a17) is preserved for the syntax hues (MYND-154). */
+  --_paper-dark:    #121210;
+  --_paper-2-dark:  #1a1a17;
+  --_paper-3-dark:  #232220;
+  --_line-1-dark:   #2c2b28;
+  --_line-2-dark:   #3a3935;
+  --_line-3-dark:   #5a5852;
+
+  --_ink-3-dark:    #8d8c85;
+  --_ink-2-dark:    #c2c1b9;
+  --_ink-1-dark:    #e8e7df;
+  --_ink-0-dark:    #f7f6ee;
+
+  --_accent-dark:        #8aa4d0;
+  --_accent-hover-dark:  #a3b8de;
+  --_accent-press-dark:  #6e8dc0;
+  --_accent-soft-dark:   #1f2735;
+  --_accent-on-dark:     #0b0b09;
+
+  --_danger-dark:       #d99086;
+  --_danger-soft-dark:  #2e1f1d;
+  --_warning-dark:      #d8b76a;
+  --_warning-soft-dark: #2c2618;
+  --_success-dark:      #8cc1a4;
+  --_success-soft-dark: #1a2620;
+  --_highlight-dark:    #4f4422;
+  --_highlight-green-dark:  #2c3d28;
+  --_highlight-blue-dark:   #24384a;
+  --_highlight-pink-dark:   #46283a;
+  --_highlight-purple-dark: #392a4c;
+
+  /* Label slots — dark-surface values (MYND-184). Mirrors colors_and_type.css. */
+  --_label-clay-dark:   #d99683;
+  --_label-ochre-dark:  #d4b46a;
+  --_label-moss-dark:   #8cc1a4;
+  --_label-slate-dark:  #93b4d6;
+  --_label-plum-dark:   #c79cc0;
+  --_label-stone-dark:  #a8a69d;
+
+  --_syntax-keyword-dark:  #c79ad4;
+  --_syntax-string-dark:   #8cc1a4;
+  --_syntax-comment-dark:  #8e8d85;
+  --_syntax-number-dark:   #d8b76a;
+  --_syntax-variable-dark: #e8e7df;
+  --_syntax-property-dark: #8aa4d0;
+  --_syntax-function-dark: #7fbfcf;
+  --_syntax-type-dark:     #d4a96a;
+  --_syntax-operator-dark: #a8a79f;
+  --_syntax-tag-dark:      #d99086;
+  --_syntax-meta-dark:     #a59fc4;
+  --_syntax-invalid-dark:  #e88b80;
+
+  --_shadow-1-dark: 0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5);
+  --_shadow-2-dark: 0 2px 4px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5);
+  --_shadow-3-dark: 0 8px 16px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6);
+
+  /* -- AMOLED palette source values -----------------------------------
+     A pure-black variant of the dark palette for OLED hardware (true
+     pixel-off on the page background). Same single-source discipline as
+     the dark set above: the :root[data-theme="amoled"] application block
+     only repeats `--token: var(--_token-amoled)` assignments. The neutral
+     base goes to #000000 with subtly RAISED recessed surfaces so cards /
+     sidebars stay distinguishable against the black page; ink, accent,
+     state, highlight, label + syntax hues are inherited verbatim from the
+     dark ramp (they retain AA on black, which is strictly darker than the
+     dark --paper-2 they were tuned against). The *-soft fills are nudged
+     one notch darker since soft washes read brighter on true black. */
+  --_paper-amoled:    #000000;
+  --_paper-2-amoled:  #0c0c0b;
+  --_paper-3-amoled:  #161614;
+  --_line-1-amoled:   #1f1e1c;
+  --_line-2-amoled:   #2c2b28;
+  --_line-3-amoled:   #44423d;
+
+  --_ink-3-amoled:    var(--_ink-3-dark);
+  --_ink-2-amoled:    var(--_ink-2-dark);
+  --_ink-1-amoled:    var(--_ink-1-dark);
+  --_ink-0-amoled:    var(--_ink-0-dark);
+
+  --_accent-amoled:        var(--_accent-dark);
+  --_accent-hover-amoled:  var(--_accent-hover-dark);
+  --_accent-press-amoled:  var(--_accent-press-dark);
+  --_accent-soft-amoled:   #161d28;
+  --_accent-on-amoled:     var(--_accent-on-dark);
+
+  --_danger-amoled:       var(--_danger-dark);
+  --_danger-soft-amoled:  #241715;
+  --_warning-amoled:      var(--_warning-dark);
+  --_warning-soft-amoled: #221c10;
+  --_success-amoled:      var(--_success-dark);
+  --_success-soft-amoled: #121c16;
+  --_highlight-amoled:    #423818;
+  --_highlight-green-amoled:  #22311e;
+  --_highlight-blue-amoled:   #1b2d3d;
+  --_highlight-pink-amoled:   #3a1e2e;
+  --_highlight-purple-amoled: #2e2040;
+
+  --_label-clay-amoled:   var(--_label-clay-dark);
+  --_label-ochre-amoled:  var(--_label-ochre-dark);
+  --_label-moss-amoled:   var(--_label-moss-dark);
+  --_label-slate-amoled:  var(--_label-slate-dark);
+  --_label-plum-amoled:   var(--_label-plum-dark);
+  --_label-stone-amoled:  var(--_label-stone-dark);
+
+  --_syntax-keyword-amoled:  var(--_syntax-keyword-dark);
+  --_syntax-string-amoled:   var(--_syntax-string-dark);
+  --_syntax-comment-amoled:  var(--_syntax-comment-dark);
+  --_syntax-number-amoled:   var(--_syntax-number-dark);
+  --_syntax-variable-amoled: var(--_syntax-variable-dark);
+  --_syntax-property-amoled: var(--_syntax-property-dark);
+  --_syntax-function-amoled: var(--_syntax-function-dark);
+  --_syntax-type-amoled:     var(--_syntax-type-dark);
+  --_syntax-operator-amoled: var(--_syntax-operator-dark);
+  --_syntax-tag-amoled:      var(--_syntax-tag-dark);
+  --_syntax-meta-amoled:     var(--_syntax-meta-dark);
+  --_syntax-invalid-amoled:  var(--_syntax-invalid-dark);
+
+  --_shadow-1-amoled: var(--_shadow-1-dark);
+  --_shadow-2-amoled: var(--_shadow-2-dark);
+  --_shadow-3-amoled: var(--_shadow-3-dark);
+}
+
+/* =========================================================================
+   Theme application (MYND-110) — pure CSS, no JS.
+
+   Light is the bare :root default above. Dark is applied by repeating the
+   `--token: var(--_token-dark)` assignments (values single-sourced in :root):
+     1. :root[data-theme="dark"] — explicit Dark choice (overrides the OS).
+     2. @media (prefers-color-scheme: dark) on a :root with NO explicit
+        light/dark attribute — System mode + every pre-unlock screen follow
+        the OS live, with zero JS matchMedia / zero FOUC.
+   An explicit :root[data-theme="light"] matches NEITHER block, so it falls
+   through to the bare :root light defaults — Light overrides a dark OS.
+   Semantic aliases (--bg-1: var(--paper), …) re-resolve automatically when a
+   raw token flips, so only the raw tokens are reassigned here.
+   ========================================================================= */
+:root[data-theme="dark"] {
+  --paper:    var(--_paper-dark);
+  --paper-2:  var(--_paper-2-dark);
+  --paper-3:  var(--_paper-3-dark);
+  --line-1:   var(--_line-1-dark);
+  --line-2:   var(--_line-2-dark);
+  --line-3:   var(--_line-3-dark);
+
+  --ink-3:    var(--_ink-3-dark);
+  --ink-2:    var(--_ink-2-dark);
+  --ink-1:    var(--_ink-1-dark);
+  --ink-0:    var(--_ink-0-dark);
+
+  --accent:        var(--_accent-dark);
+  --accent-hover:  var(--_accent-hover-dark);
+  --accent-press:  var(--_accent-press-dark);
+  --accent-soft:   var(--_accent-soft-dark);
+  --accent-on:     var(--_accent-on-dark);
+
+  --danger:       var(--_danger-dark);
+  --danger-soft:  var(--_danger-soft-dark);
+  --warning:      var(--_warning-dark);
+  --warning-soft: var(--_warning-soft-dark);
+  --success:      var(--_success-dark);
+  --success-soft: var(--_success-soft-dark);
+  --info:         var(--accent);
+  --info-soft:    var(--accent-soft);
+  --highlight:    var(--_highlight-dark);
+  --highlight-green:  var(--_highlight-green-dark);
+  --highlight-blue:   var(--_highlight-blue-dark);
+  --highlight-pink:   var(--_highlight-pink-dark);
+  --highlight-purple: var(--_highlight-purple-dark);
+
+  --label-clay:   var(--_label-clay-dark);
+  --label-ochre:  var(--_label-ochre-dark);
+  --label-moss:   var(--_label-moss-dark);
+  --label-slate:  var(--_label-slate-dark);
+  --label-plum:   var(--_label-plum-dark);
+  --label-stone:  var(--_label-stone-dark);
+
+  --syntax-keyword:  var(--_syntax-keyword-dark);
+  --syntax-string:   var(--_syntax-string-dark);
+  --syntax-comment:  var(--_syntax-comment-dark);
+  --syntax-number:   var(--_syntax-number-dark);
+  --syntax-variable: var(--_syntax-variable-dark);
+  --syntax-property: var(--_syntax-property-dark);
+  --syntax-function: var(--_syntax-function-dark);
+  --syntax-type:     var(--_syntax-type-dark);
+  --syntax-operator: var(--_syntax-operator-dark);
+  --syntax-tag:      var(--_syntax-tag-dark);
+  --syntax-meta:     var(--_syntax-meta-dark);
+  --syntax-invalid:  var(--_syntax-invalid-dark);
+
+  --shadow-1: var(--_shadow-1-dark);
+  --shadow-2: var(--_shadow-2-dark);
+  --shadow-3: var(--_shadow-3-dark);
+}
+
+/* AMOLED — explicit pure-black choice (overrides the OS). Like Dark, an
+   explicit attribute; never reached by the prefers-color-scheme:dark @media
+   below, so OS-dark in System mode resolves to the regular Dark palette, and
+   AMOLED only comes from an explicit user choice. */
+:root[data-theme="amoled"] {
+  --paper:    var(--_paper-amoled);
+  --paper-2:  var(--_paper-2-amoled);
+  --paper-3:  var(--_paper-3-amoled);
+  --line-1:   var(--_line-1-amoled);
+  --line-2:   var(--_line-2-amoled);
+  --line-3:   var(--_line-3-amoled);
+
+  --ink-3:    var(--_ink-3-amoled);
+  --ink-2:    var(--_ink-2-amoled);
+  --ink-1:    var(--_ink-1-amoled);
+  --ink-0:    var(--_ink-0-amoled);
+
+  --accent:        var(--_accent-amoled);
+  --accent-hover:  var(--_accent-hover-amoled);
+  --accent-press:  var(--_accent-press-amoled);
+  --accent-soft:   var(--_accent-soft-amoled);
+  --accent-on:     var(--_accent-on-amoled);
+
+  --danger:       var(--_danger-amoled);
+  --danger-soft:  var(--_danger-soft-amoled);
+  --warning:      var(--_warning-amoled);
+  --warning-soft: var(--_warning-soft-amoled);
+  --success:      var(--_success-amoled);
+  --success-soft: var(--_success-soft-amoled);
+  --info:         var(--accent);
+  --info-soft:    var(--accent-soft);
+  --highlight:    var(--_highlight-amoled);
+  --highlight-green:  var(--_highlight-green-amoled);
+  --highlight-blue:   var(--_highlight-blue-amoled);
+  --highlight-pink:   var(--_highlight-pink-amoled);
+  --highlight-purple: var(--_highlight-purple-amoled);
+
+  --label-clay:   var(--_label-clay-amoled);
+  --label-ochre:  var(--_label-ochre-amoled);
+  --label-moss:   var(--_label-moss-amoled);
+  --label-slate:  var(--_label-slate-amoled);
+  --label-plum:   var(--_label-plum-amoled);
+  --label-stone:  var(--_label-stone-amoled);
+
+  --syntax-keyword:  var(--_syntax-keyword-amoled);
+  --syntax-string:   var(--_syntax-string-amoled);
+  --syntax-comment:  var(--_syntax-comment-amoled);
+  --syntax-number:   var(--_syntax-number-amoled);
+  --syntax-variable: var(--_syntax-variable-amoled);
+  --syntax-property: var(--_syntax-property-amoled);
+  --syntax-function: var(--_syntax-function-amoled);
+  --syntax-type:     var(--_syntax-type-amoled);
+  --syntax-operator: var(--_syntax-operator-amoled);
+  --syntax-tag:      var(--_syntax-tag-amoled);
+  --syntax-meta:     var(--_syntax-meta-amoled);
+  --syntax-invalid:  var(--_syntax-invalid-amoled);
+
+  --shadow-1: var(--_shadow-1-amoled);
+  --shadow-2: var(--_shadow-2-amoled);
+  --shadow-3: var(--_shadow-3-amoled);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]):not([data-theme="amoled"]) {
+    --paper:    var(--_paper-dark);
+    --paper-2:  var(--_paper-2-dark);
+    --paper-3:  var(--_paper-3-dark);
+    --line-1:   var(--_line-1-dark);
+    --line-2:   var(--_line-2-dark);
+    --line-3:   var(--_line-3-dark);
+
+    --ink-3:    var(--_ink-3-dark);
+    --ink-2:    var(--_ink-2-dark);
+    --ink-1:    var(--_ink-1-dark);
+    --ink-0:    var(--_ink-0-dark);
+
+    --accent:        var(--_accent-dark);
+    --accent-hover:  var(--_accent-hover-dark);
+    --accent-press:  var(--_accent-press-dark);
+    --accent-soft:   var(--_accent-soft-dark);
+    --accent-on:     var(--_accent-on-dark);
+
+    --danger:       var(--_danger-dark);
+    --danger-soft:  var(--_danger-soft-dark);
+    --warning:      var(--_warning-dark);
+    --warning-soft: var(--_warning-soft-dark);
+    --success:      var(--_success-dark);
+    --success-soft: var(--_success-soft-dark);
+    --info:         var(--accent);
+    --info-soft:    var(--accent-soft);
+    --highlight:    var(--_highlight-dark);
+    --highlight-green:  var(--_highlight-green-dark);
+    --highlight-blue:   var(--_highlight-blue-dark);
+    --highlight-pink:   var(--_highlight-pink-dark);
+    --highlight-purple: var(--_highlight-purple-dark);
+
+    --label-clay:   var(--_label-clay-dark);
+    --label-ochre:  var(--_label-ochre-dark);
+    --label-moss:   var(--_label-moss-dark);
+    --label-slate:  var(--_label-slate-dark);
+    --label-plum:   var(--_label-plum-dark);
+    --label-stone:  var(--_label-stone-dark);
+
+    --syntax-keyword:  var(--_syntax-keyword-dark);
+    --syntax-string:   var(--_syntax-string-dark);
+    --syntax-comment:  var(--_syntax-comment-dark);
+    --syntax-number:   var(--_syntax-number-dark);
+    --syntax-variable: var(--_syntax-variable-dark);
+    --syntax-property: var(--_syntax-property-dark);
+    --syntax-function: var(--_syntax-function-dark);
+    --syntax-type:     var(--_syntax-type-dark);
+    --syntax-operator: var(--_syntax-operator-dark);
+    --syntax-tag:      var(--_syntax-tag-dark);
+    --syntax-meta:     var(--_syntax-meta-dark);
+    --syntax-invalid:  var(--_syntax-invalid-dark);
+
+    --shadow-1: var(--_shadow-1-dark);
+    --shadow-2: var(--_shadow-2-dark);
+    --shadow-3: var(--_shadow-3-dark);
+  }
+}
+
+/* =========================================================================
+   Base reset + body defaults
+   ========================================================================= */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  /* Lock outer scroll so the sidebar / editor / right rail never scroll
+   * as a whole — each pane manages its own inner overflow. Without this
+   * the desktop window's webview body could elastic-scroll past the
+   * fixed layout, jumping the sidebar out of view on macOS. */
+  overflow: hidden;
+  /* Disable elastic rubber-band scroll on macOS WebKit. */
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--fg-1);
+  background: var(--bg-2);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Desktop-app text-selection discipline. Native apps don't let you select
+ * arbitrary chrome (labels, buttons); a stray Cmd/Ctrl+A while focus sits
+ * outside an editable region must not sweep the entire UI into a selection.
+ * UI chrome is non-selectable by default; editable + intentionally-selectable
+ * regions opt back in. Inputs/textareas are always selectable regardless.
+ * `.t-account-number` keeps its `user-select: all` (more specific). */
+#root {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.cm-editor .cm-content,
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* -- Focus mode (MYND-348) --------------------------------------------------
+   Distraction-free writing: when the editor root carries data-focus-active, fade
+   every chrome element that opted in (tab strip, bottom bar, floated title-bar
+   cluster) and disable its pointer events. Sidebars are collapsed separately (to
+   reclaim editor width). The opacity transition is zeroed by the reduced-motion
+   rule below, so reduced-motion users get an instant, non-animated toggle. */
+[data-editor-chrome] {
+  transition: opacity 200ms ease;
+}
+[data-focus-active="true"] [data-editor-chrome] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Focus-mode line dimming (MYND-348): when the editor root carries
+   data-focus-dim (= focus active && the editor_focus_dim_inactive pref), dim
+   every editor line except the active one(s). `.cm-activeLine` comes from the
+   highlightActiveLine() extension (its background is neutralized in theme.ts, so
+   it is invisible in normal mode and only marks the active line here). */
+[data-focus-dim="true"] .cm-line {
+  opacity: 0.4;
+  transition: opacity 200ms ease;
+}
+[data-focus-dim="true"] .cm-line.cm-activeLine {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+/* -- Spinner ----------------------------------------------------------------
+   Used by <Spinner /> primitive. Border-top accent + linear rotation.
+   The reduced-motion media query above zeroes the animation duration, leaving
+   a static ring — honest work-in-progress indicator without rotation. */
+
+@keyframes myne-spinner-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.myne-spinner {
+  animation: myne-spinner-rotate 800ms linear infinite;
+  /* WKWebView rotates an <svg> element around the SVG user-space origin (0,0 —
+     the top-left corner) unless the reference box is pinned explicitly, so the
+     ring swings in a wide arc off its own centre and reads as "not spinning".
+     Pin the box + origin to its own centre so it rotates in place. */
+  transform-box: border-box;
+  transform-origin: 50% 50%;
+}
+
+/* -- Sidebar tree disclosure ------------------------------------------------
+   Enter/exit motion for folder-tree rows revealed/hidden by expand/collapse
+   lives in `NoteList`'s `DisclosureWrapper` as an inline `grid-template-rows`
+   (1fr↔0fr) + opacity transition — each row's HEIGHT collapses alongside the
+   fade, so the hand-rolled VirtualList's per-row ResizeObserver reflows the
+   spacers every frame and the fold glides shut instead of snapping once the
+   rows are removed. The reduced-motion media query above zeroes
+   transition-duration; NoteList also skips the deferred-removal path under
+   reduced motion so collapse is instant rather than leaving rows lingering. */
+
+/* -- Focus ring -------------------------------------------------------------
+   Global :focus-visible visualization for all interactive elements. Keyboard
+   focus shows the --ring shadow; mouse focus does not (per :focus-visible
+   semantics). Element-specific styles (e.g. Input's own focused box-shadow)
+   coexist — both render box-shadow, the most-recent wins by inline-style
+   specificity. */
+
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-2);
+}
+
+/* Step headings receive programmatic focus on mount (orchestrator focus
+   management). They are visually unchanged; the ring is the only signal. */
+.vc-step-heading:focus {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-2);
+}
+.vc-step-heading:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+/* =========================================================================
+   Semantic type styles -- apply via class names, not by tag.
+   ========================================================================= */
+
+.t-display {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-display);
+}
+
+.t-h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-display);
+}
+
+.t-h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-1);
+}
+
+.t-h3 {
+  font-family: var(--font-sans);
+  font-size: var(--text-xl);
+  line-height: var(--leading-snug);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-1);
+}
+
+.t-h4 {
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-1);
+}
+
+.t-body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  font-weight: var(--weight-regular);
+  color: var(--fg-1);
+}
+
+.t-body-lg {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  font-weight: var(--weight-regular);
+  color: var(--fg-1);
+}
+
+.t-caption {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--fg-3);
+}
+
+.t-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  color: var(--fg-3);
+}
+
+.t-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: var(--leading-mono);
+  font-feature-settings: "ss02", "zero", "calt";
+  color: var(--fg-1);
+}
+
+.t-mono-sm {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-mono);
+  font-feature-settings: "ss02", "zero", "calt";
+  color: var(--fg-2);
+}
+
+.t-mono-lg {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  line-height: var(--leading-mono);
+  font-feature-settings: "ss02", "zero", "calt";
+  color: var(--fg-1);
+}
+
+/* The account-number specimen -- MY-XXXX-XXXX-XXXX-XXXX-X.
+   Always monospace, always rendered with non-breaking hyphens (U+2011). */
+.t-account-number {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  letter-spacing: 0.04em;
+  font-weight: var(--weight-medium);
+  font-feature-settings: "ss02", "zero", "calt";
+  white-space: nowrap;
+  user-select: all;
+  color: var(--fg-1);
+}
+
+.t-code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  padding: 1px 5px;
+  border-radius: var(--radius-1);
+  color: var(--fg-1);
+}
+
+.t-link {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.t-link:hover { border-bottom-color: currentColor; }
+
+/* VAULT LABEL rename input (MYND-205 task 6). Placeholder color cannot be set
+   via inline style, so the "Add a label…" hint color (--line-3) lives here. */
+.vault-label-input::placeholder { color: var(--line-3); opacity: 1; }
+
+/* -- Thin scrollbars (MYND-166 behavioral pass) -----------------------------
+   The default WebKit scrollbar is ~15px and reads as a heavy bar. Slim it to
+   a ~4px thumb (10px track minus a 3px transparent padding-box border) with a
+   transparent track, app-wide. Firefox/standards via `scrollbar-width`. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-3);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* -- RTL primitives (shared design canon; mirror of the desktop tokens.css) ---
+   The shared `@myne/i18n` runtime sets `document.documentElement.dir` from the
+   active locale at boot and on every language switch (RTL epic). These two
+   utilities are the code-side hooks for it:
+     • `[data-flip]` mirrors a directional glyph (back / disclosure chevrons,
+       nav arrows) so a "‹" back affordance points "›" under RTL;
+     • `.bidi-isolate` isolates a neutral inline run (code span, link, account
+       number) so an LTR token can't reorder the RTL line around it. */
+[dir="rtl"] [data-flip] {
+  transform: scaleX(-1);
+}
+.bidi-isolate {
+  unicode-bidi: isolate;
+}

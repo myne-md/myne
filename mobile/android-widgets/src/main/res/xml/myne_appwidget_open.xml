@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WG-01 · Open Myne — fixed 2×2 launcher. updatePeriodMillis=0 everywhere:
+     the widgets are static by design (content would leak vault state).
+     targetCell*/previewLayout/description are API-31 attributes, ignored
+     below (the pre-31 picker falls back to the app icon). No `not_keyguard`
+     opt-out: the Android 16 QPR2 lock-screen hub may host these — a launcher
+     is exactly what a locked glance should be. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/myne_widget_open_desc"
+    android:initialLayout="@layout/myne_widget_open"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:previewLayout="@layout/myne_widget_open"
+    android:resizeMode="none"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />
