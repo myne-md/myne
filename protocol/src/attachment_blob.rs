@@ -662,6 +662,43 @@ pub fn encode_attachment_blob_v0_2(
     )
 }
 
+/// Encode a fresh attachment blob in the generation named by `version` —
+/// [`encode_attachment_blob`] (`MYA1`) for [`MetaVersion::V0_1`],
+/// [`encode_attachment_blob_v0_2`] (`MYA5`) for [`MetaVersion::V0_2`].
+///
+/// **Every import path should call THIS.** The two encoders are otherwise
+/// indistinguishable at a call site — same parameters, same return type — and
+/// picking the v0.1 one on a migrated vault does not fail: the decoder is
+/// magic-detecting, so the `MYA1` blob it just wrote reads back perfectly and
+/// nothing ever reports the hybrid. §10.4.1 point 2 says a v0.2 vault carries
+/// `MY?5` throughout, and this is the only helper that keeps that true without
+/// the caller remembering.
+pub fn encode_attachment_blob_versioned(
+    version: crate::types::MetaVersion,
+    items_key: &[u8; AEAD_KEY_LEN],
+    items_key_id: &[u8; ITEMS_KEY_ID_LEN],
+    attachment_id: &[u8; ATTACHMENT_ID_LEN],
+    content_type: &[u8],
+    file_plaintext: &[u8],
+) -> Result<Vec<u8>, AttachmentBlobError> {
+    match version {
+        crate::types::MetaVersion::V0_1 => encode_attachment_blob(
+            items_key,
+            items_key_id,
+            attachment_id,
+            content_type,
+            file_plaintext,
+        ),
+        crate::types::MetaVersion::V0_2 => encode_attachment_blob_v0_2(
+            items_key,
+            items_key_id,
+            attachment_id,
+            content_type,
+            file_plaintext,
+        ),
+    }
+}
+
 /// Re-seal a `MYA1` attachment to `MYA5` for the whole-vault migration (§10.4.1):
 /// decode the file under the OLD `itemsKey`, re-encode it under the NEW `itemsKey`
 /// with the `MYA5` magic + v0.2 AADs. The `attachment_id` is **carried through

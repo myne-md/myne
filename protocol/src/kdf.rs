@@ -211,6 +211,28 @@ pub fn derive_password_wrap_key_v0_2(
     argon2id_derive(password.as_bytes(), &salt, params)
 }
 
+/// Derive the **v0.2** 32-byte AEAD wrap key from a freshly-generated
+/// [`RecoveryPhrase`] — the next-major mirror of [`derive_recovery_wrap_key`],
+/// and the twin the **creation** path needs (the migration re-enters a phrase
+/// and so goes through the `_from_normalized_v0_2` door instead).
+///
+/// Same shape as its v0.1 namesake: a generated phrase is canonical by
+/// construction, so this joins it and forwards.
+pub fn derive_recovery_wrap_key_v0_2(
+    phrase: &RecoveryPhrase,
+    salt_random: &[u8; 16],
+    account_number_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let phrase_normalized = phrase.join_normalized();
+    derive_recovery_wrap_key_from_normalized_v0_2(
+        phrase_normalized.as_str(),
+        salt_random,
+        account_number_hash,
+        params,
+    )
+}
+
 /// Derive the **v0.2** 32-byte AEAD wrap key for the recovery-phrase-protected
 /// copy of the new `root_key` from the `phrase_normalized` byte string
 /// (`spec/protocol.md` §10.4.1). The next-major mirror of

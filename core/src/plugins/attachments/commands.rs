@@ -35,10 +35,10 @@ use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::{VaultIo, WriteOpts};
 use protocol::{
     compute_attachment_id, decode_attachment_blob, decode_attachments_catalog,
-    derive_subkey_versioned, encode_attachment_blob, encode_attachments_catalog_versioned,
-    meta_version_of, parse_vault_meta_any, read_or_empty_versioned, AttachmentMeta,
-    AttachmentsCatalog, MetaVersion, SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN,
-    MAX_ATTACHMENT_LEN, VAULT_META_ACCOUNT_HASH_LEN,
+    derive_subkey_versioned, encode_attachments_catalog_versioned, meta_version_of,
+    parse_vault_meta_any, read_or_empty_versioned, AttachmentMeta, AttachmentsCatalog, MetaVersion,
+    SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
+    VAULT_META_ACCOUNT_HASH_LEN,
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -659,7 +659,13 @@ where
     // inside it.
     let join = crate::task::run_blocking(
         move || -> Result<(Vec<u8>, Option<ExtractedText>), AttachmentImportError> {
-            let blob = encode_attachment_blob(
+            // Under the vault's OWN generation: a migrated vault takes `MYA5`.
+            // The v0.1 encoder does not fail here — `decode_attachment_blob` is
+            // magic-detecting, so an `MYA1` blob written into a v0.2 vault reads
+            // back perfectly and the hybrid is invisible from every direction
+            // (§10.4.1 point 2; myne-md/myne#442 follow-up).
+            let blob = protocol::encode_attachment_blob_versioned(
+                meta_version,
                 &items_key,
                 &items_key_id,
                 &attachment_id,
@@ -2459,6 +2465,37 @@ mod tests {
         (tmp, state)
     }
 
+    /// The `NTV5` twin of [`seed_vault_meta`] — same filler fields, v0.2 framing.
+    /// Only the magic is load-bearing here: every generation-routed site under
+    /// test reads it back through `meta_version_of`.
+    fn seed_vault_meta_v0_2(dir: &Path, seed: u8) {
+        let meta = protocol::VaultMeta {
+            account_number_hash: [seed; VAULT_META_ACCOUNT_HASH_LEN],
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+        };
+        std::fs::write(
+            dir.join("vault.meta"),
+            protocol::serialize_vault_meta_v0_2(&meta),
+        )
+        .expect("seed NTV5 vault.meta");
+    }
+
+    async fn temp_vault_v0_2() -> (ScopedTempDir, VaultRuntimeState) {
+        let tmp = ScopedTempDir::new("attach-it-v0-2").expect("scoped tempdir");
+        seed_vault_meta_v0_2(tmp.path(), SEED_ACCOUNT_HASH);
+        let state = unlocked_state().await;
+        (tmp, state)
+    }
+
     // ── the two seams, filled in for the ~180 call sites below ──────────────
     //
     // Task 44 gave every core here `io: &dyn VaultIo` and (where it needs a
@@ -2656,6 +2693,48 @@ mod tests {
     }
 
     // ---- attachment_export (MYND-173) ----------------------------------
+
+    /// An import into a MIGRATED vault must write the vault's own generation.
+    ///
+    /// This is the defect class the magic-detecting decoders hide: writing an
+    /// `MYA1` blob into an `NTV5` vault fails nothing. The blob decodes, the
+    /// catalog decodes, export round-trips, and every existing test here stays
+    /// green — the vault just quietly stops being one generation, against
+    /// §10.4.1 point 2. So the assertion has to be on the MAGIC BYTES on disk;
+    /// asserting behaviour cannot see this at all.
+    #[test]
+    fn attachment_import_writes_the_vaults_own_generation() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault_v0_2().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: PNG_BYTES.to_vec(),
+                    filename: Some("shot.png".to_string()),
+                },
+            )
+            .await
+            .expect("import into a migrated vault succeeds");
+
+            let blob = std::fs::read(tmp.path().join("attachments").join(&imported.id))
+                .expect("blob on disk");
+            assert_eq!(
+                &blob[0..4],
+                protocol::ATTACHMENT_BLOB_V0_2_MAGIC.as_slice(),
+                "an attachment imported into an NTV5 vault must be MYA5, not MYA1"
+            );
+
+            // The catalog beside it was already version-routed; assert it too so
+            // the pair cannot drift back apart.
+            let catalog = std::fs::read(tmp.path().join("vault.attachments")).expect("catalog");
+            assert_eq!(
+                &catalog[0..4],
+                protocol::CATALOG_BLOB_V0_2_MAGIC.as_slice(),
+                "the catalog of a migrated vault must be MYC5"
+            );
+        });
+    }
 
     #[test]
     fn export_round_trips_imported_bytes() {

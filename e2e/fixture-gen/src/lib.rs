@@ -15,20 +15,24 @@
 //! Also the home of the byte-surgery offset table the TS fault-
 //! injection helpers mirror (`e2e/support/fixtures.ts`). The tests pin
 //! each offset SEMANTICALLY (tampering a field breaks exactly the
-//! unwrap that field participates in), so a layout change in
-//! `protocol::serialize_vault_meta` fails here before it can silently
-//! desync the TS mirror.
+//! unwrap that field participates in), so a layout change in the
+//! `vault.meta` serializer fails here before it can silently desync the
+//! TS mirror. The offsets are generation-INDEPENDENT: `NTV5` is the same
+//! 345-byte layout as `MYV1` with bytes 0..5 swapped (§10.4.1 md.6).
 
 use std::fs;
 use std::path::Path;
 
 use protocol::{
-    aad_password_wrap, aad_recovery_wrap, aad_vault_items_key_wrap, aead_open_ctx, aead_seal_ctx,
-    compute_attachment_id, derive_password_wrap_key, derive_recovery_wrap_key, derive_subkey,
-    encode_attachment_blob, encode_attachments_catalog, encode_new_note, generate_account_number,
-    generate_recovery_phrase, generate_root_key, parse_vault_meta, serialize_vault_meta,
-    AttachmentMeta, AttachmentsCatalog, KdfParams, ProtocolError, SubkeyRole, VaultMeta,
-    ACCOUNT_NUMBER_HASH_LEN, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN, VAULT_META_LEN,
+    aad_password_wrap, aad_password_wrap_v0_2, aad_recovery_wrap, aad_recovery_wrap_v0_2,
+    aad_vault_items_key_wrap, aad_vault_items_key_wrap_v0_2, aead_open_ctx, aead_seal_ctx,
+    compute_attachment_id, derive_password_wrap_key, derive_password_wrap_key_v0_2,
+    derive_recovery_wrap_key, derive_recovery_wrap_key_v0_2, derive_subkey,
+    derive_subkey_versioned, encode_attachment_blob, encode_attachments_catalog, encode_new_note,
+    generate_account_number, generate_recovery_phrase, generate_root_key, meta_version_of,
+    parse_vault_meta_any, serialize_vault_meta_versioned, AttachmentMeta, AttachmentsCatalog,
+    KdfParams, MetaVersion, ProtocolError, SubkeyRole, VaultMeta, ACCOUNT_NUMBER_HASH_LEN,
+    AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN, VAULT_META_LEN,
 };
 use zeroize::Zeroizing;
 
@@ -55,7 +59,7 @@ pub const WEAK_TEST_KDF: KdfParams = KdfParams {
 /// `e2e/support/fixtures.ts` (`VAULT_META_OFFSETS`) — keep in lockstep;
 /// the tests below pin the semantics of each entry.
 pub mod offsets {
-    /// `"MYV1"` magic.
+    /// The 4-byte family magic — `"MYV1"` (v0.1) or `"NTV5"` (v0.2).
     pub const MAGIC: usize = 0;
     pub const ACCOUNT_HASH: usize = 6;
     pub const KDF_PARAMS: usize = 22;
@@ -82,6 +86,11 @@ pub struct Fixture {
     pub account: String,
     /// The serialized 345-byte `vault.meta`.
     pub meta_bytes: [u8; VAULT_META_LEN],
+    /// The generation everything in this fixture is built in. Travels with the
+    /// fixture so a suite builder cannot seal blobs under the wrong one — a
+    /// mismatch is invisible at runtime, since every blob decoder detects its
+    /// own magic and would decode the hybrid happily.
+    pub generation: MetaVersion,
     /// Account-number hash (§ 9.3 offset 6) — the AAD ingredient every
     /// vault-level blob (prefs / search / catalog / …) binds to.
     pub account_hash: [u8; ACCOUNT_NUMBER_HASH_LEN],
@@ -116,9 +125,41 @@ fn seal_32(
     Ok((nonce, blob))
 }
 
-/// Build one in-memory fixture (mirror of the production
-/// `build_session` + `build_and_serialize_vault_meta` composition).
+/// The generation a fixture is built in unless the caller says otherwise —
+/// the same one the production creation path uses
+/// (`vault_creation::BIRTH_GENERATION`).
+///
+/// Restated rather than imported: this crate depends on `protocol` alone by
+/// design, and `BIRTH_GENERATION` is a product decision living in `myne-core`.
+/// The two are therefore hand-kept in sync, and what catches a drift is the E2E
+/// lane itself — a fixture in the wrong generation and an app that creates the
+/// other one disagree the moment a scenario creates a vault and then reads a
+/// seeded one.
+pub const DEFAULT_FIXTURE_GENERATION: MetaVersion = MetaVersion::V0_2;
+
+/// Build one in-memory fixture in the product's birth generation (mirror of the
+/// production `build_session` + `build_and_serialize_vault_meta` composition).
+///
+/// A scenario that specifically needs a PRE-flip vault — the migration, and
+/// anything asserting that an old vault still opens — calls
+/// [`build_fixture_in`] with [`MetaVersion::V0_1`] and says why.
 pub fn build_fixture(password: &str, kdf_params: KdfParams) -> Result<Fixture, ProtocolError> {
+    build_fixture_in(DEFAULT_FIXTURE_GENERATION, password, kdf_params)
+}
+
+/// [`build_fixture`] in an explicit generation.
+///
+/// Every derivation and every AAD below is selected by `generation`, and the
+/// generation travels out on the [`Fixture`] — a fixture that mixed generations
+/// (a v0.2 `vault.meta` over v0.1 blobs, say) would still decode, because every
+/// blob decoder detects its own magic, and would then be testing a vault shape
+/// production never produces.
+pub fn build_fixture_in(
+    generation: MetaVersion,
+    password: &str,
+    kdf_params: KdfParams,
+) -> Result<Fixture, ProtocolError> {
+    let v0_2 = generation == MetaVersion::V0_2;
     let account = generate_account_number()?;
     let phrase = generate_recovery_phrase()?;
     let root_key = generate_root_key()?;
@@ -126,23 +167,41 @@ pub fn build_fixture(password: &str, kdf_params: KdfParams) -> Result<Fixture, P
     let salt_password: [u8; ARGON2_SALT_LEN] = random_bytes()?;
     let salt_recovery: [u8; ARGON2_SALT_LEN] = random_bytes()?;
 
-    let password_wrap_key =
-        derive_password_wrap_key(password, &salt_password, &account.hash, &kdf_params)?;
-    let recovery_wrap_key =
-        derive_recovery_wrap_key(&phrase, &salt_recovery, &account.hash, &kdf_params)?;
+    let password_wrap_key = if v0_2 {
+        derive_password_wrap_key_v0_2(password, &salt_password, &account.hash, &kdf_params)?
+    } else {
+        derive_password_wrap_key(password, &salt_password, &account.hash, &kdf_params)?
+    };
+    let recovery_wrap_key = if v0_2 {
+        derive_recovery_wrap_key_v0_2(&phrase, &salt_recovery, &account.hash, &kdf_params)?
+    } else {
+        derive_recovery_wrap_key(&phrase, &salt_recovery, &account.hash, &kdf_params)?
+    };
 
-    let aad_pw = aad_password_wrap(&kdf_params);
+    let aad_pw = if v0_2 {
+        aad_password_wrap_v0_2(&kdf_params)
+    } else {
+        aad_password_wrap(&kdf_params)
+    };
     let (nonce_password_wrap, enc_root_key_password) =
         seal_32(&password_wrap_key, &root_key, &aad_pw)?;
 
-    let aad_rec = aad_recovery_wrap(&kdf_params);
+    let aad_rec = if v0_2 {
+        aad_recovery_wrap_v0_2(&kdf_params)
+    } else {
+        aad_recovery_wrap(&kdf_params)
+    };
     let (nonce_recovery_wrap, enc_root_key_recovery) =
         seal_32(&recovery_wrap_key, &root_key, &aad_rec)?;
 
-    let items_wrap_key = derive_subkey(&root_key, SubkeyRole::ItemsKeyWrap);
+    let items_wrap_key = derive_subkey_versioned(generation, &root_key, SubkeyRole::ItemsKeyWrap);
     let items_key = generate_root_key()?;
     let items_key_id: [u8; 16] = *uuid::Uuid::now_v7().as_bytes();
-    let aad_items = aad_vault_items_key_wrap(&items_key_id);
+    let aad_items = if v0_2 {
+        aad_vault_items_key_wrap_v0_2(&items_key_id)
+    } else {
+        aad_vault_items_key_wrap(&items_key_id)
+    };
     let (items_key_nonce, enc_items_key) = seal_32(&items_wrap_key, &items_key, &aad_items)?;
 
     let meta = VaultMeta {
@@ -164,7 +223,8 @@ pub fn build_fixture(password: &str, kdf_params: KdfParams) -> Result<Fixture, P
         password: password.to_string(),
         phrase: phrase.words().join(" "),
         account: account.display.clone(),
-        meta_bytes: serialize_vault_meta(&meta),
+        meta_bytes: serialize_vault_meta_versioned(generation, &meta),
+        generation,
         account_hash: account.hash,
         root_key,
         items_key,
@@ -187,14 +247,28 @@ pub fn unwrap_root_key_with_password(
     bytes: &[u8],
     password: &str,
 ) -> Result<Zeroizing<Vec<u8>>, ProtocolError> {
-    let meta = parse_vault_meta(bytes)?;
-    let wrap = derive_password_wrap_key(
-        password,
-        &meta.random_salt_password,
-        &meta.account_number_hash,
-        &meta.kdf_params,
-    )?;
-    let aad = aad_password_wrap(&meta.kdf_params);
+    let v0_2 = meta_version_of(bytes) == Some(MetaVersion::V0_2);
+    let meta = parse_vault_meta_any(bytes)?;
+    let wrap = if v0_2 {
+        derive_password_wrap_key_v0_2(
+            password,
+            &meta.random_salt_password,
+            &meta.account_number_hash,
+            &meta.kdf_params,
+        )?
+    } else {
+        derive_password_wrap_key(
+            password,
+            &meta.random_salt_password,
+            &meta.account_number_hash,
+            &meta.kdf_params,
+        )?
+    };
+    let aad = if v0_2 {
+        aad_password_wrap_v0_2(&meta.kdf_params)
+    } else {
+        aad_password_wrap(&meta.kdf_params)
+    };
     aead_open_ctx(
         &wrap,
         &meta.nonce_password_wrap,
@@ -208,14 +282,28 @@ pub fn unwrap_root_key_with_phrase(
     bytes: &[u8],
     normalized_phrase: &str,
 ) -> Result<Zeroizing<Vec<u8>>, ProtocolError> {
-    let meta = parse_vault_meta(bytes)?;
-    let wrap = protocol::derive_recovery_wrap_key_from_normalized(
-        normalized_phrase,
-        &meta.random_salt_recovery,
-        &meta.account_number_hash,
-        &meta.kdf_params,
-    )?;
-    let aad = aad_recovery_wrap(&meta.kdf_params);
+    let v0_2 = meta_version_of(bytes) == Some(MetaVersion::V0_2);
+    let meta = parse_vault_meta_any(bytes)?;
+    let wrap = if v0_2 {
+        protocol::derive_recovery_wrap_key_from_normalized_v0_2(
+            normalized_phrase,
+            &meta.random_salt_recovery,
+            &meta.account_number_hash,
+            &meta.kdf_params,
+        )?
+    } else {
+        protocol::derive_recovery_wrap_key_from_normalized(
+            normalized_phrase,
+            &meta.random_salt_recovery,
+            &meta.account_number_hash,
+            &meta.kdf_params,
+        )?
+    };
+    let aad = if v0_2 {
+        aad_recovery_wrap_v0_2(&meta.kdf_params)
+    } else {
+        aad_recovery_wrap(&meta.kdf_params)
+    };
     aead_open_ctx(
         &wrap,
         &meta.nonce_recovery_wrap,
@@ -302,7 +390,22 @@ fn proto_io<E: core::fmt::Debug>(e: E) -> std::io::Error {
 /// `notes/<id>.myn` ×3, `attachments/<id-hex>` ×3, and the `MYC1`
 /// `vault.attachments` catalog. Call once per fixture, right after
 /// [`write_fixture`].
+///
+/// **`MetaVersion::V0_1` only, and asserted.** The blobs written here are
+/// `MY01` / `MYA1` / `MYC1`, and a v0.2 vault's notes are `NC05` — an Automerge
+/// document this crate cannot build, because it depends on `protocol` alone by
+/// design. Pairing these blobs with a v0.2 `vault.meta` would produce a hybrid
+/// vault that decodes perfectly (every decoder detects its own magic) while
+/// being a shape production never writes, so the scenarios using this suite seed
+/// an explicitly v0.1 fixture and are, by that fact, the lane's **legacy-vault**
+/// coverage: proof that a pre-flip vault still opens, reads and exports.
 pub fn write_export_suite(base: &Path, fixture: &Fixture) -> std::io::Result<ExportSuite> {
+    assert_eq!(
+        fixture.generation,
+        MetaVersion::V0_1,
+        "the export suite writes MY01/MYA1/MYC1 blobs — build its fixture with \
+         build_fixture_in(MetaVersion::V0_1, ..)"
+    );
     let vault_dir = base.join("vaults").join(&fixture.vault_id);
     // Build attachment ids first — the notes' plaintexts embed them.
     // The first two are the MYND-116 dedup bait (shared image filename);
@@ -419,6 +522,16 @@ pub fn write_export_suite(base: &Path, fixture: &Fixture) -> std::io::Result<Exp
 mod tests {
     use super::*;
 
+    /// The items-key-wrap AAD for `generation`. The two AAD builders have no
+    /// versioned wrapper in `protocol` (the production call sites all sit inside
+    /// an explicit branch), so the tests pick here rather than hardcode v0.1.
+    fn items_wrap_aad(generation: MetaVersion, items_key_id: &[u8; 16]) -> Vec<u8> {
+        match generation {
+            MetaVersion::V0_1 => aad_vault_items_key_wrap(items_key_id),
+            MetaVersion::V0_2 => aad_vault_items_key_wrap_v0_2(items_key_id),
+        }
+    }
+
     const PW: &str = "e2e-fixture-password-1";
 
     #[test]
@@ -433,11 +546,13 @@ mod tests {
             unwrap_root_key_with_phrase(&f.meta_bytes, &f.phrase).expect("phrase unwrap");
         assert_eq!(root_pw.as_slice(), root_rec.as_slice());
 
-        // Items key unwraps under the derived subkey (the post-unlock step).
-        let meta = parse_vault_meta(&f.meta_bytes).expect("parse");
+        // Items key unwraps under the derived subkey (the post-unlock step) —
+        // under the fixture's OWN generation, so this stays an independent
+        // check rather than a restatement of one version.
+        let meta = parse_vault_meta_any(&f.meta_bytes).expect("parse");
         let root: [u8; 32] = root_pw.as_slice().try_into().expect("32-byte root");
-        let items_wrap = derive_subkey(&root, SubkeyRole::ItemsKeyWrap);
-        let aad = aad_vault_items_key_wrap(&meta.items_key_id);
+        let items_wrap = derive_subkey_versioned(f.generation, &root, SubkeyRole::ItemsKeyWrap);
+        let aad = items_wrap_aad(f.generation, &meta.items_key_id);
         aead_open_ctx(
             &items_wrap,
             &meta.items_key_nonce,
@@ -480,10 +595,10 @@ mod tests {
         let mut tampered = f.meta_bytes;
         tampered[offsets::ENC_ITEMS_KEY] ^= 0xff;
         let root = unwrap_root_key_with_password(&tampered, PW).expect("root ok");
-        let meta = parse_vault_meta(&tampered).expect("parse ok");
+        let meta = parse_vault_meta_any(&tampered).expect("parse ok");
         let root: [u8; 32] = root.as_slice().try_into().unwrap();
-        let items_wrap = derive_subkey(&root, SubkeyRole::ItemsKeyWrap);
-        let aad = aad_vault_items_key_wrap(&meta.items_key_id);
+        let items_wrap = derive_subkey_versioned(f.generation, &root, SubkeyRole::ItemsKeyWrap);
+        let aad = items_wrap_aad(f.generation, &meta.items_key_id);
         assert!(aead_open_ctx(
             &items_wrap,
             &meta.items_key_nonce,
@@ -493,9 +608,12 @@ mod tests {
         .is_err());
 
         // Tamper magic → structural parse failure (fail-closed class).
+        // Through `parse_vault_meta_any`, so this asserts the byte matches
+        // NEITHER generation's magic rather than merely not being `MYV1`.
         let mut tampered = f.meta_bytes;
         tampered[offsets::MAGIC] ^= 0xff;
-        assert!(parse_vault_meta(&tampered).is_err());
+        assert!(parse_vault_meta_any(&tampered).is_err());
+        assert_eq!(meta_version_of(&tampered), None);
 
         // Layout arithmetic stays glued to the protocol constants.
         assert_eq!(offsets::END, VAULT_META_LEN);
@@ -516,7 +634,9 @@ mod tests {
     /// both embedded in the attachments note's plaintext.
     #[test]
     fn export_suite_round_trips_the_production_read_paths() {
-        let f = build_fixture(PW, WEAK_TEST_KDF).expect("build");
+        // v0.1 on purpose: the suite writes MY01/MYA1/MYC1 (see its doc), so
+        // this doubles as the legacy-vault read path.
+        let f = build_fixture_in(MetaVersion::V0_1, PW, WEAK_TEST_KDF).expect("build");
         let tmp = std::env::temp_dir().join(format!("fixture-gen-export-suite-{}", f.vault_id));
         write_fixture(&tmp, &f).expect("write fixture");
         let suite = write_export_suite(&tmp, &f).expect("write export suite");

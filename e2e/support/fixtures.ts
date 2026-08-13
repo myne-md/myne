@@ -80,8 +80,20 @@ export interface SeedOptions {
   kdf?: "weak" | "production";
   count?: number;
   password?: string;
-  /** Lay the MYND-116 note-export suite into every seeded vault. */
+  /** Lay the MYND-116 note-export suite into every seeded vault.
+   *  Implies `generation: "v0.1"` — the suite writes `MY01`/`MYA1`/`MYC1`. */
   exportSuite?: boolean;
+  /**
+   * Which protocol generation the seeded vault is written in. Defaults to the
+   * product's birth format (v0.2 — `decisions.md` 2026-08-13), so a scenario
+   * that says nothing gets the vault a real user would have.
+   *
+   * Pass `"v0.1"` ONLY when the scenario is about a pre-flip vault: the
+   * migration itself, and the legacy-vault coverage that proves an old vault
+   * still opens. Say which in a comment at the call site — a v0.1 seed that
+   * exists by accident silently stops testing the format users actually get.
+   */
+  generation?: "v0.1" | "v0.2";
 }
 
 /** § 9.3 field offsets in vault.meta — lockstep mirror of
@@ -148,6 +160,9 @@ export function seedVaults(appDataDir: string, opts: SeedOptions = {}): SeededVa
   ];
   if (opts.password) args.push("--password", opts.password);
   if (opts.exportSuite) args.push("--export-suite");
+  // `--export-suite` pins v0.1 generator-side; passing both is refused there
+  // rather than silently reconciled, so only forward an explicit choice.
+  if (opts.generation && !opts.exportSuite) args.push("--generation", opts.generation);
   let stdout: string;
   try {
     stdout = execFileSync(bin, args, {

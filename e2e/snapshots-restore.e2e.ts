@@ -105,7 +105,12 @@ describeE2E("sr1 snapshot restore round-trip + MY01 at-rest (MYND-232)", () => {
       "sr1-snapshot-restore",
       {
         seed: (dir) => {
-          vaultId = seedVault(dir, { password: PASSWORD }).vaultId;
+          // v0.1 ON PURPOSE: local per-note snapshots are a v0.1 feature.
+          // `NC05` notes capture none by design — the synced Automerge
+          // change-history replaces them (`decisions.md` 2026-08-09, ASM-12→B) —
+          // so this scenario, which is entirely about the snapshot store, needs
+          // a pre-flip vault to have a subject at all.
+          vaultId = seedVault(dir, { password: PASSWORD, generation: "v0.1" }).vaultId;
         },
       },
       async (app) => {

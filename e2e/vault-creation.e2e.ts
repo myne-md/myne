@@ -192,13 +192,23 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       const metaPath = join(vaultsDir, vaultId, "vault.meta");
       const metaBytes = readFileSync(metaPath);
       expect(metaBytes).toHaveLength(345);
-      expect(metaBytes.subarray(0, 4).toString("latin1")).toBe("MYV1");
+      // `NTV5`, not `MYV1`: a vault created today is born v0.2
+      // (`decisions.md` 2026-08-13 — the birth-format entry; `protocol.md`
+      // §10.3.1). The layout is the same 345 bytes; only bytes 0..5 differ.
+      // This assertion IS the birth format's end-to-end proof — it runs against
+      // the production binary through the real creation UI, so nothing about it
+      // is mocked or seeded.
+      expect(metaBytes.subarray(0, 4).toString("latin1")).toBe("NTV5");
 
       // Soft checks: format-verified when present, warned when absent
       // (these artifacts are creation-version-dependent).
+      // The two singletons the creation path seeds eagerly carry the SAME
+      // generation as the meta above — `MYP5`/`MYC5`, not `MYP1`/`MYC1`. A
+      // mismatch here is the hybrid-vault shape §10.3.1 forbids, and it is
+      // invisible at runtime because every decoder detects its own magic.
       const soft: Array<[string, (buf: Buffer) => boolean]> = [
-        ["vault.prefs", (b) => b.subarray(0, 4).toString("latin1") === "MYP1"],
-        ["vault.attachments", (b) => b.subarray(0, 4).toString("latin1") === "MYC1"],
+        ["vault.prefs", (b) => b.subarray(0, 4).toString("latin1") === "MYP5"],
+        ["vault.attachments", (b) => b.subarray(0, 4).toString("latin1") === "MYC5"],
       ];
       for (const [name, check] of soft) {
         const p = join(vaultsDir, vaultId, name);

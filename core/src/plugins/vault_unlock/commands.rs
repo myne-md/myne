@@ -2480,10 +2480,19 @@ mod tests {
             // Seed vault.prefs encrypted under the SAME root_key the
             // unlock will recover, with the account_number_hash bound
             // into the AAD from the seeded vault.meta.
-            let parsed_meta = protocol::parse_vault_meta(&meta_bytes).expect("parse meta");
-            let prefs_key =
-                protocol::derive_subkey(&original_root_key, protocol::SubkeyRole::PrefsKey);
-            let prefs_blob = protocol::encode_prefs_blob(
+            // Read the generation off the fixture rather than assuming one:
+            // `seed_vault_meta` goes through the production creation path, so
+            // its generation is whatever a vault is BORN in today, and a
+            // hardcoded v0.1 here would silently stop matching on the flip.
+            let generation = protocol::meta_version_of(&meta_bytes).expect("known generation");
+            let parsed_meta = protocol::parse_vault_meta_any(&meta_bytes).expect("parse meta");
+            let prefs_key = protocol::derive_subkey_versioned(
+                generation,
+                &original_root_key,
+                protocol::SubkeyRole::PrefsKey,
+            );
+            let prefs_blob = protocol::encode_prefs_blob_versioned(
+                generation,
                 &prefs_key,
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
@@ -2879,15 +2888,25 @@ mod tests {
             let (meta_bytes, original_root_key) = seed_vault_meta("pw");
             scratch.write_meta(&meta_bytes);
 
-            let parsed = protocol::parse_vault_meta(&meta_bytes).expect("parse seed");
+            let generation = protocol::meta_version_of(&meta_bytes).expect("known generation");
+            let parsed = protocol::parse_vault_meta_any(&meta_bytes).expect("parse seed");
 
             // Independent items_key derivation from the same root_key
             // using the same protocol primitives the unlock command
-            // calls. Verifies the unlock command does not introduce
-            // any spurious transformation in the items_key path.
-            let items_wrap_key =
-                protocol::derive_subkey(&original_root_key, protocol::SubkeyRole::ItemsKeyWrap);
-            let aad = protocol::aad_vault_items_key_wrap(&parsed.items_key_id);
+            // calls — under the fixture's OWN generation, so this stays an
+            // independent check rather than a restatement of one version.
+            // Verifies the unlock command does not introduce any spurious
+            // transformation in the items_key path.
+            let items_wrap_key = protocol::derive_subkey_versioned(
+                generation,
+                &original_root_key,
+                protocol::SubkeyRole::ItemsKeyWrap,
+            );
+            let aad = if generation == protocol::MetaVersion::V0_2 {
+                protocol::aad_vault_items_key_wrap_v0_2(&parsed.items_key_id)
+            } else {
+                protocol::aad_vault_items_key_wrap(&parsed.items_key_id)
+            };
             let expected_items_key = protocol::aead_open_ctx(
                 &items_wrap_key,
                 &parsed.items_key_nonce,
@@ -3050,11 +3069,19 @@ mod tests {
 
     #[test]
     fn parse_fail_bad_protocol_version_returns_invalid_vault_meta() {
-        // Spec §9.3 offset 4: protocol_version = 0x01 for v0.1.
-        // Anything else is forward-incompatible-by-design (§10).
+        // Spec §9.3 offset 4: `protocol_version` is 0x01 for v0.1 and 0x02 for
+        // the v0.2 meta a vault is born with today. Anything else is
+        // forward-incompatible-by-design (§10), so 0xFF is the tamper.
+        //
+        // It used to be 0x02 — "the next major", back when a fresh vault was
+        // v0.1. The birth-format flip turned that into the value the fixture
+        // legitimately carries, so the tamper became a no-op and the test
+        // asserted that an UNTOUCHED meta parses (the failure that surfaced it:
+        // `got Ok(Exists)`). That is the recorded version-constant hazard in
+        // `protocol/CLAUDE.md`; pick a value no major version claims.
         rt().block_on(async {
             let (mut bytes, _) = seed_vault_meta("pw");
-            bytes[4] = 0x02;
+            bytes[4] = 0xFF;
             assert_invalid_vault_meta_on_bytes(&bytes).await;
         });
     }
@@ -4053,11 +4080,11 @@ mod tests {
 
     #[test]
     fn vault_status_corrupted_on_bad_protocol_version() {
-        // Spec §9.3 offset 4: protocol_version = 0x01 for v0.1.
-        // Anything else is forward-incompatible-by-design (§10).
+        // 0xFF, not 0x02 — see the sibling parse-fail test for why the old
+        // value stopped tampering anything when the birth format flipped.
         rt().block_on(async {
             let (mut bytes, _) = seed_vault_meta("pw");
-            bytes[4] = 0x02;
+            bytes[4] = 0xFF;
             assert_corrupted_on_bytes(&bytes).await;
         });
     }

@@ -250,11 +250,17 @@ describeCanary("two-device sync canary (MYND-428)", () => {
   it("crdt-merge: concurrent NC05 edits merge with the hint, no keep-both, no Conflicts row", async () => {
     const srv = await startSyncServer();
     try {
-      const devices = await setupTwoSyncedDevices(srv);
+      // BORN v0.2 rather than migrated (`decisions.md` 2026-08-13): this is the
+      // vault a new user gets, and it is also the only fleet shape that
+      // exercises the v0.2 arm of device ENROLMENT — the enrol path derives both
+      // credential wrap keys under the vault's generation, and deriving them
+      // under v0.1 against a v0.2 meta reports a correct password as wrong.
+      // `crdt-remove-wins` below keeps the migrated route, so both ways of
+      // reaching a CRDT fleet stay covered.
+      const devices = await setupTwoSyncedDevices(srv, { generation: "v0.2" });
       const { a, b, noteId, teardown } = devices;
       try {
         const idHex = noteId.replace(/-/g, "");
-        await migrateFleetToV02(devices);
         // The premise of everything below: this note is a v0.2 CRDT blob on both
         // devices. Asserted, not assumed — every claim here is about NC05 merge
         // semantics, and against a MY01 note they would all be vacuous.
