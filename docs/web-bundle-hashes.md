@@ -91,3 +91,25 @@ leaving a force-push behind.**
 | 2026-08-03 | `a8b952f38b9ce935685bd99caa9733b0eede1a0d` | `sha256:9bb290392657dcad02fc252f003a2fcad9d46334c0ca95b908a0953659d223f5` |
 | 2026-08-04 | `9fb28ac2173420fed6ffb8de6ff37fad3317851c` | `sha256:e6c80b92a461fd8fd9e5bbe3412d9f0610d33ff58c04fa0796d3727569917b14` |
 | 2026-08-13 | `fd8d23c1041351c196bdac274f956fe2fcaa8107` | `sha256:c5f4cd6e8399e96c5ddd8894b078cd595e67eaab4e106f6ef553d7908611ec98` |
+| 2026-08-14 | `fd8d23c1041351c196bdac274f956fe2fcaa8107` | `sha256:d175d1fde8e1234c17ebfc4915e199d05e0d2728ade201d36f8c3ff9052dee25` |
+
+### Why v0.5.0 has two rows for one commit
+
+Both were built from `fd8d23c1`; they differ because the **build host** differs,
+which [#228](https://github.com/myne-md/myne/issues/228) already tracks. The
+first was produced on macOS/arm64 by `pnpm web:build`, the second inside
+`web/container/Dockerfile` on Linux. The wasm artefact is not byte-identical
+across the two (`…8k_t5cx8` vs `…D-hQnqxT`), and because every JS chunk that
+imports it is content-hashed, one differing artefact renames a third of the
+bundle.
+
+**The container row is the one that ships.** The origin serves the container
+image, so that is the hash a reader should find at `/version.json`. The
+macOS row is left in place rather than edited away — rows here are appended,
+never rewritten, and a row that turned out not to be the shipped one is still
+a true record of what was published in advance.
+
+This is also why the "the same commit produces the same hash, on any machine"
+sentence above is **currently too strong**: it holds for a fixed build host, and
+#228 is the work of making it hold across hosts. Read it as scoped until that
+lands.
