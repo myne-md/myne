@@ -40,21 +40,17 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
+  ctaHover,
+  ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { DEVICE_REVOKED_DISCLOSURE } from "../lib/load-bearing-copy";
 
+/** The shared card CTA, sized to its label rather than to the card. See the
+ *  note on the identical constant in `StorageLost.tsx`. */
 const CTA_STYLE: CSSProperties = {
+  ...ctaStyle(false),
   marginTop: "var(--space-2)",
   alignSelf: "flex-start",
-  background: "var(--accent)",
-  color: "var(--accent-on)",
-  border: "none",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-5)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  cursor: "pointer",
 };
 
 export interface DeviceRevokedProps {
@@ -112,6 +108,7 @@ export function DeviceRevoked({ onEraseLocalCopy, onDismiss }: DeviceRevokedProp
           type="button"
           onClick={onDismiss}
           style={CTA_STYLE}
+          {...ctaHover(false)}
           data-testid="device-revoked.cta"
         >
           {t("deviceRevoked.cta")}

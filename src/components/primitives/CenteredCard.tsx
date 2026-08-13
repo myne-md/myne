@@ -4,7 +4,8 @@
 // on `--bg-1` canvas, max-width 480, `--bg-2` fill + `--line-1`
 // hairline + `--radius-2` + `--space-6` padding + `--space-4` row gap).
 
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, MouseEvent, ReactNode } from "react";
+import { HOVER_TRANSITION, hoverSurface } from "./hoverSurface";
 
 interface CenteredCardProps {
   children: ReactNode;
@@ -62,6 +63,9 @@ export const CARD_BODY_STYLE: CSSProperties = {
  * an in-flight `<Spinner>` sits beside the label rather than displacing it — the
  * unlock surfaces all run multi-second Argon2id, and a CTA that just goes quiet
  * reads as a hung app.
+ *
+ * Pair with `ctaHover(disabled)` for the pointer feedback — the resting fill
+ * lives here, the transient one there, and neither works without the other.
  */
 export function ctaStyle(disabled: boolean): CSSProperties {
   return {
@@ -78,5 +82,45 @@ export function ctaStyle(disabled: boolean): CSSProperties {
     alignItems: "center",
     justifyContent: "center",
     gap: "var(--space-2)",
+    transition: HOVER_TRANSITION,
+  };
+}
+
+/**
+ * Pointer feedback for a `ctaStyle()` button: hover deepens `--accent` to
+ * `--accent-hover`, press goes one step further to `--accent-press`, leave and
+ * release restore the resting fill. `docs/design/README.md`: background only —
+ * no colour shift, no transform, no scale.
+ *
+ * Handlers rather than a stylesheet `:hover`/`:active`, for the reason
+ * `hoverSurface.ts` documents at length: the app styles inline, and an inline
+ * `background` always outranks a stylesheet rule, so a CSS hover would lose to
+ * the button's own resting fill. Disabled returns empty handlers on every one of
+ * the four, so a dimmed CTA never lights up under the pointer.
+ */
+export function ctaHover(disabled: boolean): {
+  onMouseEnter?: (e: MouseEvent<HTMLElement>) => void;
+  onMouseLeave?: (e: MouseEvent<HTMLElement>) => void;
+  onMouseDown?: (e: MouseEvent<HTMLElement>) => void;
+  onMouseUp?: (e: MouseEvent<HTMLElement>) => void;
+} {
+  const surface = hoverSurface({
+    restBg: "var(--accent)",
+    hoverBg: "var(--accent-hover)",
+    disabled,
+  });
+  if (disabled) return surface;
+  return {
+    ...surface,
+    onMouseDown: (e) => {
+      e.currentTarget.style.background = "var(--accent-press)";
+    },
+    // Back to the HOVER fill, not the resting one: the pointer is still over the
+    // button when the click releases, and dropping straight to `--accent` would
+    // read as the button losing focus under the cursor. `onMouseLeave` owns the
+    // return to rest.
+    onMouseUp: (e) => {
+      e.currentTarget.style.background = "var(--accent-hover)";
+    },
   };
 }

@@ -26,7 +26,10 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
+  ctaHover,
+  ctaStyle,
 } from "./primitives/CenteredCard";
+import { hoverSurface } from "./primitives/hoverSurface";
 import type { IoFailureKind } from "../lib/stage";
 
 export type FailClosedReason =
@@ -114,18 +117,12 @@ function copyForReason(reason: FailClosedReason, t: TFunction): ReasonCopy {
   }
 }
 
+/** The shared card CTA, sized to its label rather than to the card. See the
+ *  note on the identical constant in `StorageLost.tsx`. */
 const CTA_STYLE: CSSProperties = {
+  ...ctaStyle(false),
   marginTop: "var(--space-2)",
   alignSelf: "flex-start",
-  background: "var(--accent)",
-  color: "var(--accent-on)",
-  border: "none",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-5)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  cursor: "pointer",
 };
 
 const SECONDARY_CTA_STYLE: CSSProperties = {
@@ -134,6 +131,12 @@ const SECONDARY_CTA_STYLE: CSSProperties = {
   color: "var(--fg-2)",
   border: "1px solid var(--line-1)",
 };
+
+/** The secondary's own hover — the canon surface deepen, not the accent ramp.
+ *  `ctaHover` would restore `--accent` on pointer-leave and repaint a
+ *  transparent button solid blue. */
+const secondaryHover = () =>
+  hoverSurface({ restBg: "transparent", hoverBg: "var(--bg-3)" });
 
 export function FailClosedError({
   reason,
@@ -175,6 +178,7 @@ export function FailClosedError({
             type="button"
             onClick={restoreDoor}
             style={CTA_STYLE}
+            {...ctaHover(false)}
             data-testid="fail-closed.restore-cta"
           >
             {t("failClosed.restoreFromBackup")}
@@ -184,6 +188,7 @@ export function FailClosedError({
           type="button"
           onClick={onCtaClick}
           style={restoreDoor !== undefined ? SECONDARY_CTA_STYLE : CTA_STYLE}
+          {...(restoreDoor !== undefined ? secondaryHover() : ctaHover(false))}
           data-testid="fail-closed.cta"
         >
           {ctaLabelKey ? t(ctaLabelKey) : copy.cta}
@@ -192,6 +197,7 @@ export function FailClosedError({
           <button
             type="button"
             style={SECONDARY_CTA_STYLE}
+            {...secondaryHover()}
             data-testid="fail-closed.copy-diagnostics"
             data-code={code}
             onClick={() => {

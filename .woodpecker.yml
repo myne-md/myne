@@ -326,6 +326,11 @@ steps:
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
       - node scripts/check-token-adoption.mjs
+      # Native-button guard: tokens.css carries no base `button {}` rule, so a
+      # <button> with neither className nor style renders as browser chrome —
+      # and nothing else reports it (tsc is happy; the token ratchet counts
+      # literals, of which a styleless button has none).
+      - node scripts/check-native-buttons.mjs
       # Ornament vocabulary (myne#394): Rust, TS and CSS must agree on which
       # values exist, or a theme setting validates and then draws nothing.
       - node scripts/check-ornament-vocabulary.mjs

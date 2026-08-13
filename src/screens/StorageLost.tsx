@@ -43,7 +43,13 @@
 
 import { useTranslation } from "react-i18next";
 import type { CSSProperties } from "react";
-import { CARD_BODY_STYLE, CARD_TITLE_STYLE, CenteredCard } from "../components/primitives/CenteredCard";
+import {
+  CARD_BODY_STYLE,
+  CARD_TITLE_STYLE,
+  CenteredCard,
+  ctaHover,
+  ctaStyle,
+} from "../components/primitives/CenteredCard";
 import { has } from "../platform/capabilities";
 
 export type StorageLostKind = "evicted" | "unopenable";
@@ -74,18 +80,13 @@ const LIST_STYLE: CSSProperties = {
   overflowY: "auto",
 };
 
+/** The shared card CTA, sized to its label rather than to the card. Was a
+ *  byte-for-byte copy of `ctaStyle()` — three of them, in three files — which is
+ *  how all three silently missed the hover/press feedback when it landed. */
 const CTA_STYLE: CSSProperties = {
+  ...ctaStyle(false),
   marginTop: "var(--space-2)",
   alignSelf: "flex-start",
-  background: "var(--accent)",
-  color: "var(--accent-on)",
-  border: "none",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-5)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  cursor: "pointer",
 };
 
 /** How many titles to name before summarising. A wall of 300 rows is not a
@@ -159,6 +160,7 @@ export function StorageLost({ kind, unsyncedTitles, onReDownload, onLock }: Stor
               type="button"
               onClick={onReDownload}
               style={CTA_STYLE}
+              {...ctaHover(false)}
               data-testid="storage-lost.redownload-cta"
             >
               {t("storageLost.reDownloadCta")}
@@ -169,6 +171,7 @@ export function StorageLost({ kind, unsyncedTitles, onReDownload, onLock }: Stor
             type="button"
             onClick={onLock}
             style={CTA_STYLE}
+            {...ctaHover(false)}
             data-testid="storage-lost.lock-cta"
           >
             {t("storageLost.lockCta")}
