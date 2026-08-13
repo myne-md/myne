@@ -253,6 +253,29 @@ pub trait Engine: Send + Sync {
         false
     }
 
+    /// Whether this engine supplies the models for the LOCAL roles itself, so a
+    /// missing side-loaded or bundled file is not the absence of a model.
+    ///
+    /// The capability report resolves generation / embedding / transcription by
+    /// asking the DISK — a selected GGUF for generation and embedding, a bundled
+    /// blob for transcription — which is right for the Candle engine and wrong
+    /// for any engine that carries its own weights. The E2E [`StubEngine`] is
+    /// the one such engine today: it answers deterministically with no file
+    /// anywhere, and the report nonetheless called every role `NoModel`, so the
+    /// whole AI surface rendered as "no provider" in the very build the AI
+    /// scenarios drive. `auto_tag` was the exception that showed the shape —
+    /// it asks [`Engine::tag_model_available`] instead of the disk, and it was
+    /// the one row that worked.
+    ///
+    /// Like `tag_model_available` this reveals a property of the BUILD, not of
+    /// the vault: no prefs read, no note decrypt, no gate. `false` is the safe
+    /// answer for any engine that does not override it — an engine whose
+    /// weights come from a file the user picks must keep saying so, or the
+    /// report would promise a capability whose first call answers `NoModel`.
+    fn carries_own_models(&self) -> bool {
+        false
+    }
+
     /// Drop any lazily-cached loaded model so the next `infer`/`embed` re-reads
     /// from disk. Called after the user picks a new model file
     /// (`set_model_path`) so a swap takes effect without an app restart —
@@ -385,6 +408,23 @@ fn stub_fault() -> StubFault {
     StubFault::None
 }
 
+/// Does this fault leave the stub holding models at all?
+///
+/// Split out for the same reason [`fault_of`] is: it is the fault → capability
+/// mapping, and both stub answers about model presence
+/// ([`Engine::tag_model_available`] and [`Engine::carries_own_models`]) key off
+/// it. Two copies of `!= Unavailable` would be two things to keep in step, and
+/// the copy that drifted would report a model the other says is gone.
+///
+/// `Unavailable` is the empty state a scenario drives on purpose; `Failing` is
+/// deliberately NOT — a model that errors is still a model that exists, and the
+/// two states have different honest copy, which is the whole reason the lever
+/// has two values.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+pub(crate) fn models_present_under(fault: StubFault) -> bool {
+    fault != StubFault::Unavailable
+}
+
 /// Trivial in-memory engine used before any model lands (the task-1 tracer).
 ///
 /// `infer` echoes the prompt behind a fixed marker; `embed` returns a
@@ -474,7 +514,16 @@ impl Engine for StubEngine {
         // stays the answer in the ORDINARY stub path; only the `unavailable`
         // fault says otherwise, and `failing` deliberately does not — a model
         // that errors is still a model that exists.
-        stub_fault() != StubFault::Unavailable
+        models_present_under(stub_fault())
+    }
+
+    fn carries_own_models(&self) -> bool {
+        // The stub IS every local model in the E2E build — it answers
+        // generation, embedding and transcription from code, with no file
+        // anywhere — so the capability report must stop asking the disk about
+        // roles this engine already serves. Same fault mapping as
+        // `tag_model_available` above, through the same helper.
+        models_present_under(stub_fault())
     }
 
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
@@ -540,6 +589,40 @@ mod stub_fault_tests {
         assert!(e.infer("hello").is_ok());
         assert!(e.embed("x").is_ok());
         assert!(e.tag_model_available());
+        assert!(e.carries_own_models());
+    }
+
+    /// The fault → model-presence mapping, asserted without a process-global env
+    /// write (the reason it is a separate function at all).
+    ///
+    /// `failing` is the load-bearing row: it must keep the models PRESENT, or
+    /// the report falls back to the disk, finds nothing, and answers `no_model`
+    /// — which is the `no-provider` empty state, i.e. exactly the surface the
+    /// `failing` fault exists to distinguish itself from.
+    #[test]
+    fn only_the_unavailable_fault_takes_the_stubs_models_away() {
+        assert!(!models_present_under(StubFault::Unavailable));
+        assert!(models_present_under(StubFault::Failing));
+        assert!(models_present_under(StubFault::None));
+    }
+
+    /// An engine that does NOT override `carries_own_models` keeps the trait
+    /// default, i.e. keeps deferring to the disk. This is what makes the
+    /// production Candle path unaffected by the stub's override: its weights
+    /// come from a file the user picks, and a report that promised generation
+    /// before that file existed would promise a call that answers `NoModel`.
+    #[test]
+    fn an_engine_that_does_not_carry_models_says_so_by_default() {
+        struct DiskBacked;
+        impl Engine for DiskBacked {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                Ok(String::new())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                Ok(Vec::new())
+            }
+        }
+        assert!(!DiskBacked.carries_own_models());
     }
 
     /// The production build reads no environment variable, so the lever cannot

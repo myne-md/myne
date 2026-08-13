@@ -232,14 +232,24 @@ pub(super) fn capability_report_from(
     // every row, which is wrong in exactly the configuration the provider epic
     // added: the ambient/user-initiated split means the arm that answers
     // auto-tag is not the arm that answers generation.
+    //
+    // The three disk-resolved rows also ask the engine whether it carries its
+    // own weights (`Engine::carries_own_models`). A model file is evidence that
+    // a role can be served, not the definition of it: the E2E stub answers all
+    // three from code with no file anywhere, and asking only the disk reported
+    // `NoModel` for a build whose AI demonstrably works — which is what left
+    // every AI scenario driving a surface stuck in its empty state. `auto_tag`
+    // below is the row that already asked the engine, and the row that already
+    // worked.
     let generation = match state.engine_for(RequestClass::UserInitiated) {
         Err(cause) => FeatureStatus::blocked(cause),
         // A locally side-loaded GGUF is required only by the in-process arm. A
         // remote provider or a loopback runtime BRINGS ITS OWN model, which is
         // the entire point of naming one — reporting `NoModel` there told a user
         // whose generation demonstrably works that the feature is unavailable.
-        Ok(_)
+        Ok(engine)
             if !generation_model
+                && !engine.carries_own_models()
                 && state.class_for(RequestClass::UserInitiated)
                     == Ok(super::state::BackendClass::InProcessLocal) =>
         {
@@ -249,7 +259,9 @@ pub(super) fn capability_report_from(
     };
     let embedding = match state.embedding_engine() {
         Err(cause) => FeatureStatus::blocked(cause),
-        Ok(_) if !embedding_model => FeatureStatus::blocked(EngineError::NoModel),
+        Ok(engine) if !embedding_model && !engine.carries_own_models() => {
+            FeatureStatus::blocked(EngineError::NoModel)
+        }
         Ok(_) => FeatureStatus::ok(),
     };
     // Transcription reads the LOCAL door, because that is the door the
@@ -259,7 +271,9 @@ pub(super) fn capability_report_from(
     // question than the command is worse than no report.
     let transcription = match state.embedding_engine() {
         Err(cause) => FeatureStatus::blocked(cause),
-        Ok(_) if !transcription_model => FeatureStatus::blocked(EngineError::NoModel),
+        Ok(engine) if !transcription_model && !engine.carries_own_models() => {
+            FeatureStatus::blocked(EngineError::NoModel)
+        }
         Ok(_) => FeatureStatus::ok(),
     };
     let auto_tag = match state.engine_for(RequestClass::Ambient) {
