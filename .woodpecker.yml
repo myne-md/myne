@@ -636,6 +636,11 @@ steps:
     depends_on:
       - name: e2e
         optional: true
+      # Same binary the stable lane consumes. Optional for the same reason it is
+      # optional there: no token (a fork PR) means no binary, and the sync
+      # scenarios self-skip rather than the lane not running.
+      - name: myne-server-build
+        optional: true
     environment:
       CI: "true"
     failure: ignore
@@ -645,8 +650,15 @@ steps:
       - npm install -g pnpm@11.8.0
       - cargo install tauri-driver --locked --version 2.0.6
       - useradd -m ci && chown -R ci:ci . /usr/local/cargo/registry
+      # The same server export the stable `e2e` step does, and it was missing
+      # here: the quarantine lane reported "myne-server binary not found" and
+      # self-skipped device-names, sync-replication, prefs-sync and
+      # sync-attachments in the SAME pipeline where the stable lane ran them.
+      # A lane that silently covers less than the one beside it is the shape
+      # `e2e-floor` exists to notice, and no floor is recorded for this lane yet.
+      - test -x "$CI_WORKSPACE/myne-server-e2e" && export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server-e2e" || echo "no myne-server binary -> sync scenarios self-skip"
       # MYNE_E2E_QUARANTINE=1 → scenario.ts's gate runs ONLY describeE2E.flaky specs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_QUARANTINE=1 RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_QUARANTINE=1 MYNE_E2E_SERVER="'"$MYNE_E2E_SERVER"'" RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── E2E floor (the one part of the E2E lane that BLOCKS) ────
   # `e2e` above is `failure: ignore` because of a chronic contention flake, and
