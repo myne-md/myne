@@ -802,20 +802,81 @@ mod resolve_engine_tests {
     /// A missing model is `no_model`, not a bar — the two reasons a feature is
     /// unavailable must stay distinguishable, which is the whole reason the
     /// report carries a cause rather than a boolean.
+    ///
+    /// The fixture is a DISK-BACKED in-process engine, not `StubEngine`, and the
+    /// difference is the point: the stub carries its own weights
+    /// (`Engine::carries_own_models`), so against it "no model file" is not the
+    /// absence of a model and these rows are legitimately available. Written
+    /// against the stub, this test asserted the very defect that left every AI
+    /// E2E scenario driving an empty surface — and passed while doing it.
     #[test]
     fn a_missing_model_reports_no_model_rather_than_a_bar() {
         use commands::capability_report_from;
         use state::LocalInferenceState;
 
-        let local = LocalInferenceState::new(std::sync::Arc::new(engine::StubEngine));
+        /// The `CandleEngine` shape: weights come from a file the user picks or
+        /// the bundle ships, so every model flag below is the disk's answer.
+        struct DiskBacked;
+        impl engine::Engine for DiskBacked {
+            fn infer(&self, _p: &str) -> Result<String, error::EngineError> {
+                Ok("local".into())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, error::EngineError> {
+                Ok(vec![0.0])
+            }
+            fn tag_model_available(&self) -> bool {
+                true
+            }
+        }
+
+        let local = LocalInferenceState::new(std::sync::Arc::new(DiskBacked));
         let report = capability_report_from(&local, false, false, false);
 
         assert_eq!(report.generation.cause, Some("no_model"));
         assert_eq!(report.embedding.cause, Some("no_model"));
         assert_eq!(report.transcription.cause, Some("no_model"));
         assert_eq!(report.backend_class, "in_process_local");
-        // The stub declares a tag model, so auto-tag is the control here.
+        // The fixture declares a tag model, so auto-tag is the control here.
         assert!(report.auto_tag.available);
+    }
+
+    /// An engine that carries its own models is reported as serving every local
+    /// role, with no model file anywhere.
+    ///
+    /// This is the `local-inference-stub` E2E build, and the row it fixes: the
+    /// report resolved generation, embedding and transcription from the DISK, so
+    /// the AI-feature binary — whose stub answers all three from code —
+    /// advertised `no_model` on all three, the chat surface settled on its
+    /// `no-provider` empty state, and seven AI scenarios drove a UI that had
+    /// drawn no AI affordances at all. `auto_tag` already asked the engine
+    /// (`Engine::tag_model_available`) and was the one row that worked.
+    #[test]
+    fn an_engine_that_carries_its_own_models_serves_every_local_role() {
+        use commands::capability_report_from;
+        use state::LocalInferenceState;
+
+        let stub = LocalInferenceState::new(std::sync::Arc::new(engine::StubEngine));
+        // No selected GGUF, no bundled transcription blob — the E2E build's
+        // actual on-disk situation.
+        let report = capability_report_from(&stub, false, false, false);
+
+        assert!(
+            report.generation.available,
+            "the stub answers generation from code (cause: {:?})",
+            report.generation.cause
+        );
+        assert!(
+            report.embedding.available,
+            "the stub answers embedding from code (cause: {:?})",
+            report.embedding.cause
+        );
+        assert!(
+            report.transcription.available,
+            "the stub answers transcription from code (cause: {:?})",
+            report.transcription.cause
+        );
+        assert!(report.auto_tag.available);
+        assert_eq!(report.backend_class, "in_process_local");
     }
 
     /// The production Candle backend must keep declaring that it serializes
