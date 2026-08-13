@@ -6,7 +6,7 @@ product
 
 ## Scope
 
-This document binds **all Myne client surfaces**: the Phase 1 Tauri desktop client at this repo root, the in-repo desktop-**browser** client at `web/` (same `src/` tree, platform seam substituted at build time), and the in-repo **mobile** client at `mobile/` (iOS + Android) — all of which share the same protocol, voice, and visual language. (There is no `myne-web` or `myne-mobile` repo; both companions are archived and both clients live in this one — `docs/decisions.md` 2026-07-26 and 2026-08-13.) The marketing site (`myne-website`) is a separate brand-register surface and carries its own PRODUCT.md.
+This document binds **all Myne client surfaces**: the Phase 1 Tauri desktop client at this repo root, the in-repo desktop-**browser** client at `web/` (same `src/` tree, platform seam substituted at build time), and the in-repo **mobile** client at `mobile/` (iOS + Android) — all of which share the same protocol, voice, and visual language. (There is no `myne-web` or `myne-mobile` repo; both clients live in this one — `docs/decisions.md` 2026-07-26 and 2026-08-13.) The marketing site (`myne-website`) is a separate brand-register surface and carries its own PRODUCT.md.
 
 ### Source of truth (read this order)
 
