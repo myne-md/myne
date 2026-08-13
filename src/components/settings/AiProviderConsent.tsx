@@ -1,11 +1,19 @@
-// The one-time per-provider consent screen (ai-remote-providers myne#415
+// The one-time per-provider consent dialog (ai-remote-providers myne#415
 // task 13, SYNC-13).
 //
 // **The accepting action cannot be reached without the disclosure on screen.**
 // Not "the disclosure is above the button" — the button is rendered by this
 // component and only by this component, so there is no route to acceptance
-// that skips the text. That is why it is a screen rather than a confirm dialog
-// with a summary.
+// that skips the text. What the dialog carries is therefore the WHOLE
+// disclosure, never a summary with the detail one click away: a confirm box
+// that says "this sends your notes to a third party — details" would be the
+// shape this rule exists to forbid. The six clauses and the accepting button
+// live in one container, and the container is what opens.
+//
+// **Dismissing is declining.** Esc, the backdrop and the × all call `onCancel`,
+// which stores nothing — the panel writes the provider only from `onAccept`.
+// So there is no dismissal that leaves a provider selected, and no dismissal
+// that has to be undone.
 //
 // **No "don't ask again" checkbox**, because it is already once-only: consent
 // is recorded per provider and the panel routes through here exactly when the
@@ -14,8 +22,8 @@
 //
 // **Nothing here decides anything.** Accepting calls back to the panel, which
 // writes the consent; the host re-reads all five preconditions at request time
-// (`provider_gate.rs`) and would refuse regardless of what this screen did.
-// The screen is the asking, not the enforcement — the same discipline the AI
+// (`provider_gate.rs`) and would refuse regardless of what this dialog did.
+// The dialog is the asking, not the enforcement — the same discipline the AI
 // panel already follows.
 //
 // Copy discipline: every sentence comes from `load-bearing-copy.ts` verbatim
@@ -36,14 +44,8 @@ import {
   consentToWhom,
 } from "../../lib/load-bearing-copy";
 import { Button } from "../primitives/Button";
-import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
-
-const TITLE_STYLE: CSSProperties = {
-  margin: 0,
-  fontSize: "var(--text-lg)",
-  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
-  color: "var(--fg-1)",
-};
+import { ModalShell } from "../primitives/ModalShell";
+import { HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 
 const CLAUSE_STYLE: CSSProperties = {
   ...HELPER_STYLE,
@@ -51,14 +53,27 @@ const CLAUSE_STYLE: CSSProperties = {
   marginTop: "var(--space-1)",
 };
 
+/** The clauses scroll; the actions do not. A dialog whose buttons scroll out
+ *  of view reads as unanswerable. */
+const SCROLL_STYLE: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: "auto",
+  padding: "var(--space-5)",
+};
+
 const ACTIONS_STYLE: CSSProperties = {
   display: "flex",
   gap: "var(--space-2)",
-  marginTop: "var(--space-3)",
   justifyContent: "flex-end",
+  flex: "0 0 auto",
+  padding: "var(--space-4) var(--space-5)",
+  borderTop: "1px solid var(--line-1)",
 };
 
 interface AiProviderConsentProps {
+  /** Whether the dialog is up. Closed renders nothing. */
+  open: boolean;
   /** The provider being selected, as the user reads it. */
   providerLabel: string;
   onAccept: () => void;
@@ -79,6 +94,7 @@ function Clause(props: { label: string; body: string; testId: string }) {
 }
 
 export function AiProviderConsent({
+  open,
   providerLabel,
   onAccept,
   onCancel,
@@ -86,53 +102,65 @@ export function AiProviderConsent({
   const { t } = useTranslation();
 
   return (
-    <div data-testid="ai-consent.screen" style={BLOCK_STYLE}>
-      <h3 style={TITLE_STYLE}>
-        {t("settings.ai.consent.title", { provider: providerLabel })}
-      </h3>
-      {/* The state headline for the remote case, verbatim — the same sentence
-          the panel will show afterwards, so the screen and the steady state
-          cannot disagree about what was agreed to. */}
-      <p data-testid="ai-consent.headline" style={{ ...LABEL_STYLE, lineHeight: 1.5 }}>
-        {aiTrustHeadline({ kind: "remote", provider: providerLabel })}
-      </p>
+    <ModalShell
+      open={open}
+      // Names the provider in the title bar, so the recipient is on screen
+      // even before the clauses are read.
+      title={t("settings.ai.consent.title", { provider: providerLabel })}
+      onClose={onCancel}
+      labelId="ai-consent-title"
+      closeLabel={t("common.close")}
+      width={560}
+      testId="ai-consent.screen"
+      // No `zIndex` override: this opens from inside the Settings modal, whose
+      // own fixed backdrop is a stacking context, so the dialog already paints
+      // above it. The raised level is for surfaces that arrive UNSOLICITED.
+    >
+      <div style={SCROLL_STYLE}>
+        {/* The state headline for the remote case, verbatim — the same sentence
+            the panel will show afterwards, so the dialog and the steady state
+            cannot disagree about what was agreed to. */}
+        <p data-testid="ai-consent.headline" style={{ ...LABEL_STYLE, lineHeight: 1.5 }}>
+          {aiTrustHeadline({ kind: "remote", provider: providerLabel })}
+        </p>
 
-      <Clause
-        label={t("settings.ai.consent.whatLabel")}
-        body={CONSENT_WHAT_LEAVES}
-        testId="ai-consent.what"
-      />
-      <Clause
-        label={t("settings.ai.consent.whenLabel")}
-        body={CONSENT_WHEN_IT_LEAVES}
-        testId="ai-consent.when"
-      />
-      <Clause
-        label={t("settings.ai.consent.whoLabel")}
-        body={consentToWhom(providerLabel)}
-        testId="ai-consent.who"
-      />
-      {/* The clause a consent screen usually omits, and the one that makes the
-          other three honest (A17). */}
-      <Clause
-        label={t("settings.ai.consent.cannotVerifyLabel")}
-        body={consentCannotVerify(providerLabel)}
-        testId="ai-consent.cannot-verify"
-      />
-      <Clause
-        label={t("settings.ai.consent.revokeLabel")}
-        body={CONSENT_HOW_TO_REVOKE}
-        testId="ai-consent.revoke"
-      />
-      <Clause
-        label={t("settings.ai.consent.scopeLabel")}
-        body={CONSENT_ACCOUNT_SCOPE}
-        testId="ai-consent.scope"
-      />
+        <Clause
+          label={t("settings.ai.consent.whatLabel")}
+          body={CONSENT_WHAT_LEAVES}
+          testId="ai-consent.what"
+        />
+        <Clause
+          label={t("settings.ai.consent.whenLabel")}
+          body={CONSENT_WHEN_IT_LEAVES}
+          testId="ai-consent.when"
+        />
+        <Clause
+          label={t("settings.ai.consent.whoLabel")}
+          body={consentToWhom(providerLabel)}
+          testId="ai-consent.who"
+        />
+        {/* The clause a consent dialog usually omits, and the one that makes the
+            other three honest (A17). */}
+        <Clause
+          label={t("settings.ai.consent.cannotVerifyLabel")}
+          body={consentCannotVerify(providerLabel)}
+          testId="ai-consent.cannot-verify"
+        />
+        <Clause
+          label={t("settings.ai.consent.revokeLabel")}
+          body={CONSENT_HOW_TO_REVOKE}
+          testId="ai-consent.revoke"
+        />
+        <Clause
+          label={t("settings.ai.consent.scopeLabel")}
+          body={CONSENT_ACCOUNT_SCOPE}
+          testId="ai-consent.scope"
+        />
 
-      <p data-testid="ai-consent.residual" style={CLAUSE_STYLE}>
-        {AI_TRUST_A7_RESIDUAL}
-      </p>
+        <p data-testid="ai-consent.residual" style={CLAUSE_STYLE}>
+          {AI_TRUST_A7_RESIDUAL}
+        </p>
+      </div>
 
       <div style={ACTIONS_STYLE}>
         <Button
@@ -147,6 +175,6 @@ export function AiProviderConsent({
           {t("settings.ai.consent.accept", { provider: providerLabel })}
         </Button>
       </div>
-    </div>
+    </ModalShell>
   );
 }

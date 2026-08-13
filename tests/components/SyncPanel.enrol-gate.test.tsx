@@ -32,7 +32,7 @@
 // and nothing anywhere would have said so.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn();
 
@@ -58,10 +58,12 @@ const PREFS_STUB = { device_names: {} };
  * what made the old gate stick — so any behaviour difference between the cases
  * below comes from `sync_status` alone.
  */
-function mountWith(syncState: string) {
+function mountWith(syncState: string, betaTermsAccepted = true) {
   invokeMock.mockImplementation(async (cmd: string) => {
     if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
     if (cmd === "plugin:sync|sync_status") return { state: syncState };
+    if (cmd === "plugin:sync|sync_beta_terms_accepted") return betaTermsAccepted;
+    if (cmd === "plugin:sync|sync_accept_beta_terms") return undefined;
     if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
     if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: null };
     if (cmd === "plugin:sync|sync_account_status") return null;
@@ -132,6 +134,43 @@ describe("the enrol gate, for a device that cannot read the roster", () => {
     });
     expect(screen.queryByText("Add a device")).toBeNull();
     expect(screen.queryByTestId("sync.panel.awaiting-approval")).toBeNull();
+  });
+
+  // ── The beta-terms gate in front of that form (myne-ops#15) ──────────────
+  //
+  // The terms are a dialog, and a dialog can be dismissed. What must survive
+  // that is the rule the consent component states: no route to the enrol form
+  // that skips the text. It survives by the form not being RENDERED until the
+  // terms are accepted — not by being covered, and not by being disabled.
+  it("withholds the enrol form until the beta terms are accepted", async () => {
+    mountWith("not_enrolled", false);
+    await waitFor(() => expect(screen.getByTestId("sync.beta-terms.open")).toBeTruthy());
+    expect(screen.queryByTestId("sync.enroll")).toBeNull();
+  });
+
+  it("opening the dialog, dismissing it, and only then accepting", async () => {
+    mountWith("not_enrolled", false);
+    fireEvent.click(await screen.findByTestId("sync.beta-terms.open"));
+
+    // Every clause is in the dialog — the accepting button is rendered beside
+    // them and nowhere else.
+    expect(await screen.findByTestId("sync.beta-terms.what-this-is")).toBeTruthy();
+    expect(screen.getByTestId("sync.beta-terms.data-loss")).toBeTruthy();
+    expect(screen.getByTestId("sync.beta-terms.what-happens-next")).toBeTruthy();
+    expect(screen.getByTestId("sync.beta-terms.what-we-can-see")).toBeTruthy();
+
+    // Dismissing records nothing and reveals nothing.
+    fireEvent.click(screen.getByTestId("sync.beta-terms.cancel"));
+    await waitFor(() => expect(screen.queryByTestId("sync.beta-terms.accept")).toBeNull());
+    expect(screen.queryByTestId("sync.enroll")).toBeNull();
+    expect(
+      invokeMock.mock.calls.some((c) => c[0] === "plugin:sync|sync_accept_beta_terms"),
+    ).toBe(false);
+
+    // Accepting is what opens the door.
+    fireEvent.click(screen.getByTestId("sync.beta-terms.open"));
+    fireEvent.click(await screen.findByTestId("sync.beta-terms.accept"));
+    expect(await screen.findByTestId("sync.enroll")).toBeTruthy();
   });
 
   it("the roster failure alone does not decide it", async () => {

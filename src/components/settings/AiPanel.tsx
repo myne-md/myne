@@ -36,7 +36,11 @@ import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
 import { openUrl } from "../../platform/opener";
 
-import type { EndpointRejection, ModelRole } from "../../lib/ai-model-store";
+import type {
+  EndpointRejection,
+  ModelRole,
+  ProviderModel,
+} from "../../lib/ai-model-store";
 import { usePrefs } from "../../hooks/usePrefs";
 import {
   endpointRejectionOf,
@@ -64,7 +68,7 @@ import {
 } from "../../lib/load-bearing-copy";
 import { Input } from "../primitives/Input";
 import { Segmented } from "../primitives/Segmented";
-import { Select } from "../primitives/Select";
+import { SearchableSelect } from "../primitives/SearchableSelect";
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
 import {
@@ -225,6 +229,13 @@ function endpointRejectionText(
 
 interface AiPanelProps {
   onShowToast?: (message: string) => void;
+  /**
+   * Raised while this panel has a modal dialog of its own up (the provider
+   * consent). The Settings shell listens on `window` for Esc, and so does
+   * `ModalShell` — ungated, one Esc press closes both. The shell uses this to
+   * stand down while a child dialog owns the key.
+   */
+  onDialogOpenChange?: (open: boolean) => void;
 }
 
 /** A single model role's block: heading → recommended-model browser link + the
@@ -305,7 +316,7 @@ function ModelRoleBlock(props: {
   );
 }
 
-export function AiPanel({ onShowToast }: AiPanelProps) {
+export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const { t } = useTranslation();
   const { prefs, setAiEnabled, setAiExcludedFolders, setAutoTagEnabled } =
     usePrefs(onShowToast);
@@ -355,17 +366,32 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
   const [keyDraft, setKeyDraft] = useState("");
   // The provider awaiting consent, or `null`. Selecting a provider whose
   // consent is not already recorded routes HERE first; nothing is stored until
-  // the screen is accepted.
+  // the dialog is accepted.
   const [pendingProvider, setPendingProvider] = useState<string | null>(null);
+  // Tell the Settings shell a modal of ours is up (see `onDialogOpenChange`).
+  // The cleanup is load-bearing: the shell's flag outlives this panel, so
+  // unmounting with the dialog open — Settings closed by its own × — would
+  // leave Esc gated for every later session.
+  useEffect(() => {
+    onDialogOpenChange?.(pendingProvider !== null);
+    return () => onDialogOpenChange?.(false);
+  }, [pendingProvider, onDialogOpenChange]);
   // The provider's own catalogue, and the three states it can be in. `null` is
   // "not asked yet" and is NOT the same as `[]` ("asked, and the provider
   // published none") — collapsing them would tell the user a provider has no
   // models when in fact nobody has looked (SYNC-24 task 17).
-  const [models, setModels] = useState<string[] | null>(null);
+  const [models, setModels] = useState<ProviderModel[] | null>(null);
   const [modelsError, setModelsError] = useState<ProviderErrorCause | null>(
     null,
   );
   const [modelsLoading, setModelsLoading] = useState(false);
+  // Show what the filter hides. Deliberately component-local rather than a
+  // stored preference: the catalogue itself is not persisted either (every
+  // visit starts at "Load models"), so a switch that outlived the list it
+  // filters would be a setting about nothing — and a persisted field here would
+  // owe the whole `PrefsView` + encoder + parser + sync-table + spec §9.5.2
+  // chain for a view toggle.
+  const [showAllModels, setShowAllModels] = useState(false);
 
   const aiEnabled = prefs.ai_enabled;
   // Who answers at rest. A remote provider names itself; a device-local runtime
@@ -566,6 +592,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
     // show. Back to "not asked", not to an empty list.
     setModels(null);
     setModelsError(null);
+    setShowAllModels(false);
   };
 
   /** Ask the provider what it publishes. Explicit rather than automatic: the
@@ -591,6 +618,38 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
       .filter((s) => s.length > 0);
     void setAiExcludedFolders(folders);
   };
+
+  // The catalogue, filtered to what this arm can actually use. Myne's remote
+  // path calls nothing but chat/completion, so a model that does not read AND
+  // write text is an offer that would fail — on a metered API, after billing.
+  //
+  // Hiding rather than dropping: the host sends its verdict per model instead
+  // of filtering, so "show all" is a toggle over the ONE fetch already made,
+  // and a model this classification gets wrong stays reachable without a
+  // release. See `ProviderModel.text_capable`.
+  const textModels = models?.filter((m) => m.text_capable) ?? null;
+  const hiddenCount =
+    models !== null && textModels !== null ? models.length - textModels.length : 0;
+  const visibleModels = (showAllModels ? models : textModels) ?? null;
+
+  // A stored model is ALWAYS offered, even when the filter would hide it — a
+  // model chosen before this filter existed, or written by the CLI, is stored
+  // and answering. Leaving it out of the options makes SearchableSelect
+  // summarise an empty selection, so the panel would show "No model chosen"
+  // about a vault that has one.
+  const storedModel = prefs.ai_provider_model;
+  const modelOptions =
+    visibleModels === null
+      ? []
+      : [
+          { value: "", label: t("settings.ai.providerModelNone") },
+          ...(storedModel !== null &&
+          storedModel !== "" &&
+          !visibleModels.some((m) => m.id === storedModel)
+            ? [{ value: storedModel, label: storedModel }]
+            : []),
+          ...visibleModels.map((m) => ({ value: m.id, label: m.id })),
+        ];
 
   return (
     <div data-testid="settings.ai-panel" style={PANEL_ROOT_STYLE}>
@@ -889,9 +948,12 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
           2. The key field NEVER renders a stored value. It cannot: the field
              is serde-skipped out of `prefs_read`, so the panel reads a boolean
              and shows "Add" or "Replace".
-          3. First-time selection routes through the consent screen BEFORE
-             anything is stored. Storing first would make the screen a
-             notification.
+          3. First-time selection routes through the consent dialog BEFORE
+             anything is stored. Storing first would make the dialog a
+             notification. The segmented control shows the pending choice while
+             the dialog is up — a control that does not move when clicked reads
+             as broken — but that highlight is the only thing that happened:
+             cancelling reverts it and no write occurred.
           4. Rotate does not re-ask consent (the recipient is unchanged);
              clearing the provider revokes the key AND the consent, so "turn
              this off" leaves the state of "never turned it on". */}
@@ -901,160 +963,195 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
         data-setting-row="true"
         data-testid="ai.provider-section"
       >
-        {pendingProvider !== null ? (
-          <AiProviderConsent
-            providerLabel={providerLabel(pendingProvider)}
-            onAccept={() => void acceptConsent()}
-            onCancel={() => setPendingProvider(null)}
+        <AiProviderConsent
+          open={pendingProvider !== null}
+          providerLabel={providerLabel(pendingProvider)}
+          onAccept={() => void acceptConsent()}
+          onCancel={() => setPendingProvider(null)}
+        />
+        <label style={LABEL_STYLE}>{t("settings.ai.providerLabel")}</label>
+        <p style={HELPER_STYLE}>{t("settings.ai.providerHelper")}</p>
+        <div style={{ marginTop: "var(--space-1)" }}>
+          <Segmented
+            options={[
+              { value: "none", label: t("settings.ai.providerNone") },
+              ...REMOTE_PROVIDERS.map((p) => ({
+                value: p.wire,
+                label: p.label,
+              })),
+            ]}
+            value={pendingProvider ?? prefs.ai_provider ?? "none"}
+            onChange={(v) => chooseProvider(v === "none" ? null : v)}
+            ariaLabel={t("settings.ai.providerLabel")}
+            testId="ai.provider-choice"
           />
-        ) : (
+        </div>
+
+        {prefs.ai_provider !== null && (
           <>
-            <label style={LABEL_STYLE}>{t("settings.ai.providerLabel")}</label>
-            <p style={HELPER_STYLE}>{t("settings.ai.providerHelper")}</p>
+            <label
+              style={{ ...LABEL_STYLE, marginTop: "var(--space-2)" }}
+              htmlFor="ai-provider-key"
+            >
+              {t("settings.ai.providerKeyLabel")}
+            </label>
             <div style={{ marginTop: "var(--space-1)" }}>
-              <Segmented
-                options={[
-                  { value: "none", label: t("settings.ai.providerNone") },
-                  ...REMOTE_PROVIDERS.map((p) => ({
-                    value: p.wire,
-                    label: p.label,
-                  })),
-                ]}
-                value={prefs.ai_provider ?? "none"}
-                onChange={(v) => chooseProvider(v === "none" ? null : v)}
-                ariaLabel={t("settings.ai.providerLabel")}
-                testId="ai.provider-choice"
+              <Input
+                id="ai-provider-key"
+                data-testid="ai.provider-key-input"
+                mono
+                type="password"
+                spellCheck={false}
+                autoComplete="off"
+                disabled={!aiEnabled}
+                value={keyDraft}
+                placeholder={
+                  hasKey
+                    ? t("settings.ai.providerKeyReplace")
+                    : t("settings.ai.providerKeyAdd")
+                }
+                onChange={(e) => setKeyDraft(e.target.value)}
+                onBlur={() => void commitKey()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void commitKey();
+                  }
+                }}
               />
             </div>
+            <p data-testid="ai.provider-key-state" style={HELPER_STYLE}>
+              {hasKey
+                ? t("settings.ai.providerKeyStored")
+                : t("settings.ai.providerKeyNone")}
+            </p>
+            {hasKey && (
+              <button
+                type="button"
+                data-testid="ai.provider-key-revoke"
+                disabled={!aiEnabled}
+                onClick={() => void revokeKey()}
+                {...linkHover}
+                style={LINK_STYLE}
+              >
+                {t("settings.ai.providerKeyRevoke")}
+              </button>
+            )}
 
-            {prefs.ai_provider !== null && (
-              <>
-                <label
-                  style={{ ...LABEL_STYLE, marginTop: "var(--space-2)" }}
-                  htmlFor="ai-provider-key"
-                >
-                  {t("settings.ai.providerKeyLabel")}
-                </label>
-                <div style={{ marginTop: "var(--space-1)" }}>
-                  <Input
-                    id="ai-provider-key"
-                    data-testid="ai.provider-key-input"
-                    mono
-                    type="password"
-                    spellCheck={false}
-                    autoComplete="off"
-                    disabled={!aiEnabled}
-                    value={keyDraft}
-                    placeholder={
-                      hasKey
-                        ? t("settings.ai.providerKeyReplace")
-                        : t("settings.ai.providerKeyAdd")
-                    }
-                    onChange={(e) => setKeyDraft(e.target.value)}
-                    onBlur={() => void commitKey()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void commitKey();
-                      }
-                    }}
-                  />
-                </div>
-                <p data-testid="ai.provider-key-state" style={HELPER_STYLE}>
-                  {hasKey
-                    ? t("settings.ai.providerKeyStored")
-                    : t("settings.ai.providerKeyNone")}
-                </p>
-                {hasKey && (
-                  <button
-                    type="button"
-                    data-testid="ai.provider-key-revoke"
-                    disabled={!aiEnabled}
-                    onClick={() => void revokeKey()}
-                    {...linkHover}
-                    style={LINK_STYLE}
-                  >
-                    {t("settings.ai.providerKeyRevoke")}
-                  </button>
-                )}
-
-                {/* The model chooser (SYNC-24). Gated on a stored key because
-                    there is nothing to ask the provider WITH before then — a
-                    disabled control with a real label, never "coming soon"
-                    (src/CLAUDE.md disabled-control discipline). */}
-                <label
-                  style={{ ...LABEL_STYLE, marginTop: "var(--space-2)" }}
-                  htmlFor="ai-provider-model"
-                >
-                  {t("settings.ai.providerModelLabel")}
-                </label>
-                <p style={HELPER_STYLE}>
-                  {t("settings.ai.providerModelHelper")}
-                </p>
-                <div
+            {/* The model chooser (SYNC-24). Gated on a stored key because
+                there is nothing to ask the provider WITH before then — a
+                disabled control with a real label, never "coming soon"
+                (src/CLAUDE.md disabled-control discipline). */}
+            <label
+              style={{ ...LABEL_STYLE, marginTop: "var(--space-2)" }}
+              htmlFor="ai-provider-model"
+            >
+              {t("settings.ai.providerModelLabel")}
+            </label>
+            <p style={HELPER_STYLE}>
+              {t("settings.ai.providerModelHelper")}
+            </p>
+            <div
+              style={{
+                ...TOGGLE_ROW_STYLE,
+                marginTop: "var(--space-1)",
+              }}
+            >
+              {visibleModels !== null && modelOptions.length > 1 ? (
+                // SearchableSelect, not Select: a provider catalogue runs to
+                // hundreds of entries, which is past where a plain dropdown is
+                // usable — docs/design/README.md "The setting row",
+                // decisions.md 2026-08-01. The synthetic "" option stays: the
+                // primitive's `placeholder` DISPLAYS an empty selection but
+                // offers no way to return to one, and letting a user put a
+                // model back is existing behaviour.
+                <SearchableSelect
+                  options={modelOptions}
+                  selected={
+                    storedModel !== null && storedModel !== ""
+                      ? [storedModel]
+                      : []
+                  }
+                  onChange={(next) => {
+                    const picked = next[0];
+                    void setAiProviderModel(
+                      picked === undefined || picked === "" ? null : picked,
+                    );
+                  }}
+                  aria-label={t("settings.ai.providerModelLabel")}
+                  placeholder={t("settings.ai.providerModelNone")}
+                  testId="ai.provider-model-select"
+                />
+              ) : (
+                <span
+                  data-testid="ai.provider-model-current"
                   style={{
-                    ...TOGGLE_ROW_STYLE,
-                    marginTop: "var(--space-1)",
+                    fontSize: "var(--text-sm)",
+                    color:
+                      prefs.ai_provider_model === null
+                        ? "var(--fg-3)"
+                        : "var(--fg-1)",
+                    fontFamily: "var(--font-mono)",
                   }}
                 >
-                  {models !== null && models.length > 0 ? (
-                    <Select
-                      value={prefs.ai_provider_model ?? ""}
-                      options={[
-                        {
-                          value: "",
-                          label: t("settings.ai.providerModelNone"),
-                        },
-                        ...models.map((m) => ({ value: m, label: m })),
-                      ]}
-                      onChange={(v) => void setAiProviderModel(v === "" ? null : v)}
-                      aria-label={t("settings.ai.providerModelLabel")}
-                      testId="ai.provider-model-select"
-                    />
-                  ) : (
-                    <span
-                      data-testid="ai.provider-model-current"
-                      style={{
-                        fontSize: "var(--text-sm)",
-                        color:
-                          prefs.ai_provider_model === null
-                            ? "var(--fg-3)"
-                            : "var(--fg-1)",
-                        fontFamily: "var(--font-mono)",
-                      }}
-                    >
-                      {prefs.ai_provider_model ??
-                        t("settings.ai.providerModelNone")}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    data-testid="ai.provider-model-load"
-                    disabled={!aiEnabled || !hasKey || modelsLoading}
-                    onClick={() => void loadModels()}
-                    {...linkHover}
-                    style={LINK_STYLE}
-                  >
-                    {t("settings.ai.providerModelLoad")}
-                  </button>
-                </div>
-                {/* Three states, three sentences. `models === null` with no
-                    error is "nobody has asked yet"; an empty array is "we
-                    asked and the provider published none"; an error names the
-                    refusal from the shared taxonomy. */}
-                <p data-testid="ai.provider-model-state" style={HELPER_STYLE}>
-                  {modelsError !== null
-                    ? t(providerErrorKey(modelsError))
-                    : models === null
-                      ? t("settings.ai.providerModelUnfetched")
-                      : models.length === 0
-                        ? t("settings.ai.providerModelEmpty")
-                        : t("settings.ai.providerModelCount", {
-                            count: models.length,
-                          })}
-                </p>
-              </>
-            )}
+                  {prefs.ai_provider_model ??
+                    t("settings.ai.providerModelNone")}
+                </span>
+              )}
+              <button
+                type="button"
+                data-testid="ai.provider-model-load"
+                disabled={!aiEnabled || !hasKey || modelsLoading}
+                onClick={() => void loadModels()}
+                {...linkHover}
+                style={LINK_STYLE}
+              >
+                {t("settings.ai.providerModelLoad")}
+              </button>
+              {/* Only offered when the filter is actually withholding
+                  something — a link that always says "show all" while there is
+                  nothing more to show implies a list is being kept from the
+                  user when it is not. */}
+              {hiddenCount > 0 && (
+                <button
+                  type="button"
+                  data-testid="ai.provider-model-show-all"
+                  onClick={() => setShowAllModels((v) => !v)}
+                  {...linkHover}
+                  style={LINK_STYLE}
+                >
+                  {showAllModels
+                    ? t("settings.ai.providerModelShowTextOnly")
+                    : t("settings.ai.providerModelShowAll")}
+                </button>
+              )}
+            </div>
+            {/* Four states, four sentences. `models === null` with no error is
+                "nobody has asked yet"; an empty array is "we asked and the
+                provider published none"; a non-empty array with nothing
+                text-capable is a DIFFERENT fact — the provider does publish
+                models, they are just not the kind Myne asks for, and saying
+                "published no models" there would be false; an error names the
+                refusal from the shared taxonomy. */}
+            <p data-testid="ai.provider-model-state" style={HELPER_STYLE}>
+              {modelsError !== null
+                ? t(providerErrorKey(modelsError))
+                : models === null || visibleModels === null
+                  ? t("settings.ai.providerModelUnfetched")
+                  : models.length === 0
+                    ? t("settings.ai.providerModelEmpty")
+                    : visibleModels.length === 0
+                      ? t("settings.ai.providerModelNoTextModels")
+                      : `${t("settings.ai.providerModelCount", {
+                          count: visibleModels.length,
+                        })}${
+                          hiddenCount > 0 && !showAllModels
+                            ? ` ${t("settings.ai.providerModelHidden", {
+                                count: hiddenCount,
+                              })}`
+                            : ""
+                        }`}
+            </p>
           </>
         )}
       </div>

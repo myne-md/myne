@@ -324,17 +324,17 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   // Cancelling closes the modal, which is exactly what "not now" means at this
   // door — the user came from the welcome screen and can go back to it.
   if (!betaTerms.pending && betaTerms.needed) {
+    // The consent carries its own dialog chrome, so this door hands it the
+    // surface outright rather than wrapping it in a second one.
     return (
-      <div role="dialog" aria-modal="true" style={BACKDROP} data-testid="join.beta-terms">
-        <div style={CARD}>
-          <BetaTermsConsent
-            onAccept={() => {
-              void betaTerms.accept();
-            }}
-            onCancel={onCancel}
-          />
-        </div>
-      </div>
+      <BetaTermsConsent
+        open
+        testId="join.beta-terms"
+        onAccept={() => {
+          void betaTerms.accept();
+        }}
+        onCancel={onCancel}
+      />
     );
   }
 

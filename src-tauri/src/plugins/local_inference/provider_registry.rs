@@ -115,7 +115,36 @@ struct OllamaMessage {
     content: String,
 }
 
-/// OpenRouter's model list: `{"data":[{"id":…}]}`.
+/// A model a provider published, with the one classification the chooser needs.
+///
+/// **Why the flag travels instead of the filtering happening here.** The panel
+/// offers "show all models" so a user can reach something this classifier calls
+/// non-text — a provider's schema can change, and a hard filter would make a
+/// model unreachable with no way to argue. Sending the verdict rather than
+/// applying it keeps that escape hatch a client-side toggle over ONE fetch,
+/// instead of a second egress to get the unfiltered list.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct ProviderModel {
+    pub id: String,
+    /// Takes text in and produces text out. Myne's remote arm calls nothing but
+    /// chat/completion, so a model that cannot do both is not usable here.
+    ///
+    /// **Fail-OPEN: absent metadata means `true`.** A provider that renames or
+    /// drops the capability fields would otherwise empty the list and take the
+    /// feature down; being over-inclusive costs the user a bad pick they can
+    /// see and undo, and the panel labels the filtered set either way.
+    pub text_capable: bool,
+}
+
+/// Model families that embed rather than generate. Ollama's `/api/tags`
+/// publishes the family, so this is the provider's own metadata rather than a
+/// guess at what a model name implies.
+const EMBEDDING_FAMILIES: [&str; 2] = ["bert", "nomic-bert"];
+
+/// The modality name both providers spell the same way.
+const TEXT_MODALITY: &str = "text";
+
+/// OpenRouter's model list: `{"data":[{"id":…,"architecture":{…}}]}`.
 #[derive(Deserialize, Default)]
 struct OpenRouterModels {
     #[serde(default)]
@@ -125,9 +154,24 @@ struct OpenRouterModels {
 struct OpenRouterModel {
     #[serde(default)]
     id: String,
+    #[serde(default)]
+    architecture: Option<OpenRouterArchitecture>,
+}
+/// Two generations of the same field live here on purpose: OpenRouter's current
+/// replies carry the modality ARRAYS, older ones only the arrow string
+/// (`text->text`, `text+image->text`). Reading both means a mixed or rolled-back
+/// reply classifies rather than falling through to fail-open for every entry.
+#[derive(Deserialize, Default)]
+struct OpenRouterArchitecture {
+    #[serde(default)]
+    input_modalities: Option<Vec<String>>,
+    #[serde(default)]
+    output_modalities: Option<Vec<String>>,
+    #[serde(default)]
+    modality: Option<String>,
 }
 
-/// Ollama's model list: `{"models":[{"name":…}]}`.
+/// Ollama's model list: `{"models":[{"name":…,"details":{…}}]}`.
 #[derive(Deserialize, Default)]
 struct OllamaModels {
     #[serde(default)]
@@ -139,6 +183,58 @@ struct OllamaModel {
     name: String,
     #[serde(default)]
     model: String,
+    #[serde(default)]
+    details: Option<OllamaDetails>,
+}
+#[derive(Deserialize, Default)]
+struct OllamaDetails {
+    #[serde(default)]
+    family: String,
+    #[serde(default)]
+    families: Option<Vec<String>>,
+}
+
+impl OpenRouterArchitecture {
+    /// `true` when this architecture takes text in AND puts text out.
+    ///
+    /// Note what is deliberately NOT required: that text be the *only* input.
+    /// A vision model is `text+image -> text` and is one of the better things a
+    /// user can pick for a text task, so requiring a text-only input would drop
+    /// exactly the models worth having.
+    fn text_capable(&self) -> bool {
+        if let (Some(input), Some(output)) = (&self.input_modalities, &self.output_modalities) {
+            return has_text(input) && has_text(output);
+        }
+        // The arrow form. `split_once` rather than `split`, so a malformed value
+        // with two arrows is not silently read as its first segment.
+        if let Some(arrow) = self.modality.as_deref().and_then(|m| m.split_once("->")) {
+            let (inputs, outputs) = arrow;
+            let takes_text = inputs.split('+').any(|m| m.trim() == TEXT_MODALITY);
+            let makes_text = outputs.split('+').any(|m| m.trim() == TEXT_MODALITY);
+            return takes_text && makes_text;
+        }
+        // Neither shape present: fail open, per the field docs.
+        true
+    }
+}
+
+fn has_text(modalities: &[String]) -> bool {
+    modalities.iter().any(|m| m == TEXT_MODALITY)
+}
+
+impl OllamaDetails {
+    /// Ollama publishes no modality, so the question it CAN answer is asked
+    /// instead: is this an embedding family? Everything else generates text.
+    fn text_capable(&self) -> bool {
+        let is_embedding = |f: &str| EMBEDDING_FAMILIES.contains(&f);
+        if is_embedding(self.family.as_str()) {
+            return false;
+        }
+        match &self.families {
+            Some(fs) => !fs.iter().any(|f| is_embedding(f.as_str())),
+            None => true,
+        }
+    }
 }
 
 impl RemoteProvider {
@@ -238,25 +334,36 @@ impl RemoteProvider {
         Ok(text)
     }
 
-    /// Read the model names out of a list reply. Names only; nothing here
-    /// touches weights.
-    pub fn parse_models_reply(self, raw: &[u8]) -> Result<Vec<String>, ProviderCodecError> {
-        let names: Vec<String> = match self {
+    /// Read the model names out of a list reply, each with the one flag the
+    /// chooser filters on. Names only; nothing here touches weights.
+    ///
+    /// The classification is applied per entry rather than used to DROP
+    /// entries: see [`ProviderModel::text_capable`] on why the verdict travels.
+    pub fn parse_models_reply(self, raw: &[u8]) -> Result<Vec<ProviderModel>, ProviderCodecError> {
+        let models: Vec<ProviderModel> = match self {
             Self::OpenRouter => serde_json::from_slice::<OpenRouterModels>(raw)
                 .map_err(|_| ProviderCodecError::Malformed)?
                 .data
                 .into_iter()
-                .map(|m| m.id)
+                .map(|m| ProviderModel {
+                    id: m.id,
+                    // No `architecture` at all is fail-open, same as an
+                    // architecture carrying neither shape.
+                    text_capable: m.architecture.map(|a| a.text_capable()).unwrap_or(true),
+                })
                 .collect(),
             Self::OllamaCloud => serde_json::from_slice::<OllamaModels>(raw)
                 .map_err(|_| ProviderCodecError::Malformed)?
                 .models
                 .into_iter()
-                // Newer runtimes emit `model`; older ones only `name`.
-                .map(|m| if m.model.is_empty() { m.name } else { m.model })
+                .map(|m| ProviderModel {
+                    // Newer runtimes emit `model`; older ones only `name`.
+                    id: if m.model.is_empty() { m.name } else { m.model },
+                    text_capable: m.details.map(|d| d.text_capable()).unwrap_or(true),
+                })
                 .collect(),
         };
-        Ok(names.into_iter().filter(|n| !n.is_empty()).collect())
+        Ok(models.into_iter().filter(|m| !m.id.is_empty()).collect())
     }
 }
 
@@ -714,17 +821,126 @@ mod tests {
         );
     }
 
+    /// Just the ids, for the assertions that are about parsing rather than
+    /// classification.
+    fn ids(models: &[ProviderModel]) -> Vec<&str> {
+        models.iter().map(|m| m.id.as_str()).collect()
+    }
+
+    /// The one entry with this id, so a classification assertion names what it
+    /// is asserting about instead of indexing into a list.
+    fn capable(models: &[ProviderModel], id: &str) -> bool {
+        models
+            .iter()
+            .find(|m| m.id == id)
+            .unwrap_or_else(|| panic!("{id} missing from {:?}", ids(models)))
+            .text_capable
+    }
+
     #[test]
     fn model_lists_parse_from_each_providers_own_shape() {
         let or = br#"{"data":[{"id":"vendor/model-a"},{"id":"vendor/model-b"},{"id":""}]}"#;
         assert_eq!(
-            RemoteProvider::OpenRouter.parse_models_reply(or).unwrap(),
+            ids(&RemoteProvider::OpenRouter.parse_models_reply(or).unwrap()),
             vec!["vendor/model-a", "vendor/model-b"]
         );
         let oc = br#"{"models":[{"name":"a:1","model":"a:1"},{"name":"b:2"}]}"#;
         assert_eq!(
-            RemoteProvider::OllamaCloud.parse_models_reply(oc).unwrap(),
+            ids(&RemoteProvider::OllamaCloud.parse_models_reply(oc).unwrap()),
             vec!["a:1", "b:2"]
+        );
+    }
+
+    /// The classification the chooser filters on, over OpenRouter's CURRENT
+    /// shape (the modality arrays).
+    ///
+    /// The load-bearing case is the vision model: `text+image -> text` must
+    /// classify as text-capable. A "text models only" filter that required a
+    /// text-ONLY input would drop exactly the models a user most wants for a
+    /// text task, which is the failure this asserts against by name.
+    #[test]
+    fn openrouter_modality_arrays_keep_vision_models_and_drop_image_generators() {
+        let raw = br#"{"data":[
+            {"id":"v/plain","architecture":{"input_modalities":["text"],"output_modalities":["text"]}},
+            {"id":"v/vision","architecture":{"input_modalities":["text","image"],"output_modalities":["text"]}},
+            {"id":"v/painter","architecture":{"input_modalities":["text"],"output_modalities":["image"]}},
+            {"id":"v/transcriber","architecture":{"input_modalities":["audio"],"output_modalities":["text"]}}
+        ]}"#;
+        let got = RemoteProvider::OpenRouter.parse_models_reply(raw).unwrap();
+        assert!(capable(&got, "v/plain"));
+        assert!(
+            capable(&got, "v/vision"),
+            "a text+image -> text model is a text model; dropping it removes the best picks"
+        );
+        assert!(!capable(&got, "v/painter"), "it does not produce text");
+        assert!(!capable(&got, "v/transcriber"), "it does not take text");
+    }
+
+    /// The older arrow shape classifies the same way, so a reply that predates
+    /// (or rolls back to) the arrays is not silently all-fail-open.
+    #[test]
+    fn openrouter_legacy_arrow_modality_classifies_the_same_way() {
+        let raw = br#"{"data":[
+            {"id":"v/plain","architecture":{"modality":"text->text"}},
+            {"id":"v/vision","architecture":{"modality":"text+image->text"}},
+            {"id":"v/painter","architecture":{"modality":"text->image"}},
+            {"id":"v/transcriber","architecture":{"modality":"audio->text"}}
+        ]}"#;
+        let got = RemoteProvider::OpenRouter.parse_models_reply(raw).unwrap();
+        assert!(capable(&got, "v/plain"));
+        assert!(capable(&got, "v/vision"));
+        assert!(!capable(&got, "v/painter"));
+        assert!(!capable(&got, "v/transcriber"));
+    }
+
+    /// Absent metadata is fail-OPEN, in every shape it can be absent in.
+    ///
+    /// The direction matters: a provider that renames these fields would
+    /// otherwise classify its entire catalogue as unusable and take the feature
+    /// down with a UI that says the provider published no text models.
+    #[test]
+    fn a_model_with_no_capability_metadata_stays_in_the_list() {
+        let no_arch = br#"{"data":[{"id":"v/bare"}]}"#;
+        assert!(capable(
+            &RemoteProvider::OpenRouter
+                .parse_models_reply(no_arch)
+                .unwrap(),
+            "v/bare"
+        ));
+        let empty_arch = br#"{"data":[{"id":"v/empty","architecture":{}}]}"#;
+        assert!(capable(
+            &RemoteProvider::OpenRouter
+                .parse_models_reply(empty_arch)
+                .unwrap(),
+            "v/empty"
+        ));
+        let no_details = br#"{"models":[{"name":"a:1"}]}"#;
+        assert!(capable(
+            &RemoteProvider::OllamaCloud
+                .parse_models_reply(no_details)
+                .unwrap(),
+            "a:1"
+        ));
+    }
+
+    /// Ollama publishes no modality, so the family is what answers. Both places
+    /// it appears are read — a runtime that fills only `families` would
+    /// otherwise pass an embedding model through.
+    #[test]
+    fn ollama_embedding_families_are_not_text_models() {
+        let raw = br#"{"models":[
+            {"name":"chat:1","details":{"family":"llama","families":["llama"]}},
+            {"name":"embed:1","details":{"family":"nomic-bert","families":["nomic-bert"]}},
+            {"name":"embed:2","details":{"family":"bert"}},
+            {"name":"embed:3","details":{"family":"","families":["bert"]}}
+        ]}"#;
+        let got = RemoteProvider::OllamaCloud.parse_models_reply(raw).unwrap();
+        assert!(capable(&got, "chat:1"));
+        assert!(!capable(&got, "embed:1"));
+        assert!(!capable(&got, "embed:2"));
+        assert!(
+            !capable(&got, "embed:3"),
+            "the family is also published in `families`, and reading only `family` misses it"
         );
     }
 }
