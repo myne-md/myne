@@ -67,10 +67,22 @@ describe("what reaches the platform is opaque", () => {
   // platform's plaintext store is correlatable metadata (threat-model.md §7).
   it("carries nothing derived from the task", () => {
     const opaque = opaqueFor(LOCATOR);
-    // No run of three or more characters from the locator survives — a check
-    // that stays meaningful even though a hex string trivially contains "4".
+    // No run of three or more characters from the locator survives.
+    //
+    // Runs that are THEMSELVES valid hex are skipped, and that is not a
+    // weakening — it is what makes the assertion mean anything. The identifier
+    // is 32 random hex characters, so it contains a given hex triple by chance
+    // with probability ~30/16^3, and `note-abc-123` contributes exactly one
+    // such triple: `abc`. That made this a ~0.7%-per-run failure with no defect
+    // behind it — which is precisely what it did, on the first run of this
+    // suite after it started executing in CI at all. A hex triple appearing in
+    // a hex string carries no information about the input; a non-hex run
+    // appearing there could only have been copied.
+    const HEX_RUN = /^[0-9a-f]+$/;
     for (let i = 0; i + 3 <= LOCATOR.length; i++) {
-      expect(opaque, `leaks ${LOCATOR.slice(i, i + 3)}`).not.toContain(LOCATOR.slice(i, i + 3));
+      const run = LOCATOR.slice(i, i + 3);
+      if (HEX_RUN.test(run)) continue;
+      expect(opaque, `leaks ${run}`).not.toContain(run);
     }
   });
 
