@@ -42,7 +42,7 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../platform/core";
-import { CenteredCard } from "../components/primitives/CenteredCard";
+import { CenteredCard, ctaHover, ctaStyle } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { formatAccountNumberInput } from "../lib/account-number-format";
 
@@ -142,8 +142,18 @@ export function AccountNumberEntry({ onValid }: AccountNumberEntryProps) {
         {error !== null && (
           <DestructiveBanner testId="account-entry.error">{error}</DestructiveBanner>
         )}
-        <button data-testid="account-entry.submit" type="submit" disabled={!submittable}>
-          {checking ? t("accountEntry.checking") : t("accountEntry.continue")}
+        {/* No `<Spinner>` on the in-flight label, unlike the unlock surfaces:
+            what this button waits for is a local Damm-32 parse, not Argon2id.
+            It resolves in well under a frame, so a spinner would flicker rather
+            than reassure. */}
+        <button
+          data-testid="account-entry.submit"
+          type="submit"
+          disabled={!submittable}
+          style={ctaStyle(!submittable)}
+          {...ctaHover(!submittable)}
+        >
+          <span>{checking ? t("accountEntry.checking") : t("accountEntry.continue")}</span>
         </button>
       </form>
     </CenteredCard>

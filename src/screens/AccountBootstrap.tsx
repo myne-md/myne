@@ -45,9 +45,10 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../platform/core";
-import { CenteredCard } from "../components/primitives/CenteredCard";
+import { CenteredCard, ctaHover, ctaStyle } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { PasswordInput } from "../components/PasswordInput";
+import { Spinner } from "../components/Spinner";
 import { AccountNumberEntry } from "./AccountNumberEntry";
 import { BetaTermsConsent } from "../components/sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../hooks/useBetaTermsGate";
@@ -305,9 +306,11 @@ export function AccountBootstrap({
               data-testid="account-bootstrap.sas-match"
               type="button"
               disabled={aborting}
+              style={ctaStyle(aborting)}
+              {...ctaHover(aborting)}
               onClick={onBootstrapped}
             >
-              {t("accountBootstrap.sasMatch")}
+              <span>{t("accountBootstrap.sasMatch")}</span>
             </button>
           </div>
         </CenteredCard>
@@ -402,10 +405,11 @@ export function AccountBootstrap({
           <button
             data-testid="bootstrap.beta-terms.open"
             type="button"
-            style={{ marginTop: "var(--space-3)" }}
+            style={{ ...ctaStyle(false), marginTop: "var(--space-3)" }}
+            {...ctaHover(false)}
             onClick={() => setTermsOpen(true)}
           >
-            {t("sync.betaTerms.review")}
+            <span>{t("sync.betaTerms.review")}</span>
           </button>
         </div>
         <BetaTermsConsent
@@ -528,12 +532,19 @@ export function AccountBootstrap({
         {error !== null && (
           <DestructiveBanner testId="account-bootstrap.error">{error}</DestructiveBanner>
         )}
+        {/* The `<Spinner>` earns its place here and not on the account-number
+            step: this button runs a network join AND Argon2id, so the wait is
+            seconds rather than a frame, and a CTA that only swaps its label
+            reads as a hung app. Same shape as `Unlock.tsx`'s submit. */}
         <button
           data-testid="account-bootstrap.submit"
           type="submit"
           disabled={password.length === 0 || busy}
+          style={ctaStyle(password.length === 0 || busy)}
+          {...ctaHover(password.length === 0 || busy)}
         >
-          {busy ? t("accountBootstrap.working") : t("accountBootstrap.continue")}
+          {busy && <Spinner size={14} />}
+          <span>{busy ? t("accountBootstrap.working") : t("accountBootstrap.continue")}</span>
         </button>
         <button
           data-testid="account-bootstrap.change-account"

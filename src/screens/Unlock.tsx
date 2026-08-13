@@ -80,6 +80,7 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
+  ctaHover,
   ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { Spinner } from "../components/Spinner";
@@ -599,6 +600,7 @@ export function Unlock({
           type="button"
           onClick={onResumeRecovery}
           style={ctaStyle(false)}
+          {...ctaHover(false)}
           data-testid="unlock.resume-cta"
         >
           <span>{t("unlock.continue")}</span>
@@ -737,6 +739,7 @@ export function Unlock({
             type="submit"
             disabled={submitDisabled}
             style={ctaStyle(submitDisabled)}
+            {...ctaHover(submitDisabled)}
             data-testid="unlock.submit"
           >
             {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
