@@ -34,10 +34,11 @@ use super::devices::SyncDeviceError;
 use super::token_store::TokenStore as _;
 use super::transport::{HttpMethod, SyncTransport, TransportError};
 use protocol::{
-    aad_password_wrap, aad_recovery_wrap, aead_open_ctx, derive_password_wrap_key,
-    derive_recovery_wrap_key_from_normalized, derive_subkey, normalize_user_phrase,
-    parse_account_number, parse_vault_meta_any, validate_kdf_params, KdfParams, SubkeyRole,
-    AEAD_KEY_LEN,
+    aad_password_wrap, aad_password_wrap_v0_2, aad_recovery_wrap, aad_recovery_wrap_v0_2,
+    aead_open_ctx, derive_password_wrap_key, derive_password_wrap_key_v0_2,
+    derive_recovery_wrap_key_from_normalized, derive_recovery_wrap_key_from_normalized_v0_2,
+    derive_subkey, meta_version_of, normalize_user_phrase, parse_account_number,
+    parse_vault_meta_any, validate_kdf_params, KdfParams, MetaVersion, SubkeyRole, AEAD_KEY_LEN,
 };
 use protocol::{scram_client_final_message, scram_client_proof, SCRAM_CBIND_NAME};
 use serde::{Deserialize, Serialize};
@@ -453,7 +454,7 @@ mod bootstrap_meta_tests {
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
     use crate::test_support::{ScopedTempDir, FAST_TEST_KDF};
     use crate::vault_io::{StdVaultIo, VaultIo};
-    use protocol::parse_vault_meta;
+    use protocol::{meta_version_of, parse_vault_meta_any, MetaVersion};
 
     const IO: StdVaultIo = StdVaultIo;
 
@@ -469,7 +470,9 @@ mod bootstrap_meta_tests {
         let session = build_session(crate::vault_id::VaultId::mint(), password, FAST_TEST_KDF)
             .expect("build_session");
         let bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
-        let hash = parse_vault_meta(&bytes).expect("parse").account_number_hash;
+        let hash = parse_vault_meta_any(&bytes)
+            .expect("parse")
+            .account_number_hash;
         (bytes.to_vec(), hash)
     }
 
@@ -490,7 +493,7 @@ mod bootstrap_meta_tests {
             assert_eq!(IO.read(&path).await.unwrap(), bytes);
             // And the KDF parameters are readable from it, which is what makes
             // "never hardcoded" checkable at all.
-            let parsed = parse_vault_meta(&bytes).unwrap();
+            let parsed = parse_vault_meta_any(&bytes).unwrap();
             assert_eq!(parsed.kdf_params, FAST_TEST_KDF);
         });
     }
@@ -610,15 +613,22 @@ mod bootstrap_meta_tests {
         let mut bad = bytes.clone();
         // `m_kib` sits in the 11-byte canonical KDF param block; drive it to 1,
         // far below MIN_KDF_M_KIB, by rewriting the parsed value back out.
-        let meta = parse_vault_meta(&bad).expect("parse");
+        let meta = parse_vault_meta_any(&bad).expect("parse");
         let mut params = meta.kdf_params;
         params.m_kib = 1;
         // Re-serialize by patching the same offsets the parser read from, so the
-        // rest of the record (magic, version, account hash, wraps) is untouched.
-        let patched = protocol::serialize_vault_meta(&protocol::VaultMeta {
+        // rest of the record (magic, version, account hash, wraps) is untouched
+        // — INCLUDING the generation. Re-stamping a v0.2 meta as `MYV1` would
+        // make this fixture reject for the wrong reason and stop testing the
+        // KDF-policy gate at all.
+        let rebuilt = protocol::VaultMeta {
             kdf_params: params,
             ..meta
-        });
+        };
+        let patched = match meta_version_of(&bad).expect("known generation") {
+            MetaVersion::V0_2 => protocol::serialize_vault_meta_v0_2(&rebuilt),
+            MetaVersion::V0_1 => protocol::serialize_vault_meta(&rebuilt),
+        };
         bad.copy_from_slice(&patched);
         (bad, hash)
     }
@@ -949,6 +959,159 @@ fn check_kdf_host_capability(
 }
 
 #[cfg(test)]
+mod enrol_root_key_tests {
+    //! The credential→`root_key` half of enrolment, tested without a server.
+    //!
+    //! Both generations are built BY HAND here rather than through
+    //! `build_and_serialize_vault_meta`, and each case asserts the magic of the
+    //! bytes it just built. That is deliberate: the creation path's generation
+    //! is exactly what the birth-format flip changes, so a fixture borrowed from
+    //! it would silently stop testing the generation its test name claims.
+
+    use super::{unwrap_root_key_for_enrol, EnrollPath};
+    use crate::plugins::sync::devices::SyncDeviceError;
+    use crate::test_support::FAST_TEST_KDF;
+    use protocol::{
+        aad_password_wrap, aad_recovery_wrap, aead_seal_ctx, derive_password_wrap_key,
+        derive_recovery_wrap_key_from_normalized, encode_vault_meta_v0_2_raw, meta_version_of,
+        normalize_user_phrase, parse_vault_meta_any, serialize_vault_meta, MetaVersion, VaultMeta,
+    };
+
+    const ROOT_KEY: [u8; 32] = [0x5c; 32];
+    const ITEMS_KEY: [u8; 32] = [0xa1; 32];
+    const ACCOUNT_HASH: [u8; 16] = [0x2b; 16];
+    const PASSWORD: &str = "correct horse battery staple";
+    const PHRASE: &str = "abandon ability able about above absent absorb abstract absurd abuse access accident acoustic acquire across act action actor actress actual";
+
+    /// A v0.1 (`MYV1`) meta wrapping [`ROOT_KEY`] under both credentials.
+    fn a_v0_1_meta() -> VaultMeta {
+        let salt_pw = [0x11u8; 16];
+        let salt_rec = [0x22u8; 16];
+        let pw_key =
+            derive_password_wrap_key(PASSWORD, &salt_pw, &ACCOUNT_HASH, &FAST_TEST_KDF).unwrap();
+        let enc_pw = aead_seal_ctx(
+            &pw_key,
+            &[0x31u8; 24],
+            &ROOT_KEY,
+            &aad_password_wrap(&FAST_TEST_KDF),
+        )
+        .unwrap();
+        let normalized = normalize_user_phrase(PHRASE);
+        let rec_key = derive_recovery_wrap_key_from_normalized(
+            normalized.as_str(),
+            &salt_rec,
+            &ACCOUNT_HASH,
+            &FAST_TEST_KDF,
+        )
+        .unwrap();
+        let enc_rec = aead_seal_ctx(
+            &rec_key,
+            &[0x41u8; 24],
+            &ROOT_KEY,
+            &aad_recovery_wrap(&FAST_TEST_KDF),
+        )
+        .unwrap();
+        let mut enc_root_key_password = [0u8; 64];
+        enc_root_key_password.copy_from_slice(&enc_pw);
+        let mut enc_root_key_recovery = [0u8; 64];
+        enc_root_key_recovery.copy_from_slice(&enc_rec);
+        VaultMeta {
+            account_number_hash: ACCOUNT_HASH,
+            kdf_params: FAST_TEST_KDF,
+            random_salt_password: salt_pw,
+            random_salt_recovery: salt_rec,
+            nonce_password_wrap: [0x31u8; 24],
+            enc_root_key_password,
+            nonce_recovery_wrap: [0x41u8; 24],
+            enc_root_key_recovery,
+            items_key_id: [0x07u8; 16],
+            items_key_nonce: [0x51u8; 24],
+            enc_items_key: [0u8; 64],
+        }
+    }
+
+    /// The v0.2 (`NTV5`) twin — same `ROOT_KEY`, same credentials, v0.2 salt
+    /// domains and AADs throughout.
+    fn a_v0_2_meta() -> VaultMeta {
+        let normalized = normalize_user_phrase(PHRASE);
+        let bytes = encode_vault_meta_v0_2_raw(
+            &ROOT_KEY,
+            &ITEMS_KEY,
+            &[0x07u8; 16],
+            PASSWORD,
+            normalized.as_str(),
+            &ACCOUNT_HASH,
+            &FAST_TEST_KDF,
+            &[0x11u8; 16],
+            &[0x22u8; 16],
+            &[0x31u8; 24],
+            &[0x41u8; 24],
+            &[0x51u8; 24],
+        )
+        .expect("encode NTV5 meta");
+        assert_eq!(
+            meta_version_of(&bytes),
+            Some(MetaVersion::V0_2),
+            "fixture must really be NTV5"
+        );
+        parse_vault_meta_any(&bytes).expect("parse NTV5 meta")
+    }
+
+    #[test]
+    fn a_v0_1_vault_enrols_on_either_credential() {
+        let meta = a_v0_1_meta();
+        assert_eq!(
+            meta_version_of(&serialize_vault_meta(&meta)),
+            Some(MetaVersion::V0_1),
+            "fixture must really be MYV1"
+        );
+        for path in [EnrollPath::Password, EnrollPath::Recovery] {
+            let credential = match path {
+                EnrollPath::Password => PASSWORD,
+                EnrollPath::Recovery => PHRASE,
+            };
+            let rk = unwrap_root_key_for_enrol(MetaVersion::V0_1, &meta, path, credential)
+                .expect("v0.1 enrol unwrap");
+            assert_eq!(rk.as_slice(), &ROOT_KEY, "{path:?}");
+        }
+    }
+
+    /// The defect: enrolment derived under v0.1 unconditionally, so a MIGRATED
+    /// vault could not enrol a device on either credential — and the error it
+    /// returned, `BadRequest`, is the same one a genuinely wrong password gets.
+    #[test]
+    fn a_migrated_vault_enrols_on_either_credential() {
+        let meta = a_v0_2_meta();
+        for path in [EnrollPath::Password, EnrollPath::Recovery] {
+            let credential = match path {
+                EnrollPath::Password => PASSWORD,
+                EnrollPath::Recovery => PHRASE,
+            };
+            let rk = unwrap_root_key_for_enrol(MetaVersion::V0_2, &meta, path, credential)
+                .expect("v0.2 enrol unwrap");
+            assert_eq!(rk.as_slice(), &ROOT_KEY, "{path:?}");
+        }
+    }
+
+    /// The generations really are separate domains — the same password against
+    /// the wrong generation is refused, which is what makes the routing
+    /// load-bearing rather than cosmetic.
+    #[test]
+    fn the_wrong_generation_refuses_a_correct_credential() {
+        let v0_1 = a_v0_1_meta();
+        let v0_2 = a_v0_2_meta();
+        assert!(matches!(
+            unwrap_root_key_for_enrol(MetaVersion::V0_2, &v0_1, EnrollPath::Password, PASSWORD),
+            Err(SyncDeviceError::BadRequest)
+        ));
+        assert!(matches!(
+            unwrap_root_key_for_enrol(MetaVersion::V0_1, &v0_2, EnrollPath::Password, PASSWORD),
+            Err(SyncDeviceError::BadRequest)
+        ));
+    }
+}
+
+#[cfg(test)]
 mod kdf_ceiling_tests {
     //! The host-capability half of the enroll gate, tested without a server.
     //!
@@ -1029,6 +1192,94 @@ mod kdf_ceiling_tests {
     }
 }
 
+/// Unwrap the vault's `root_key` from `meta` under `credential`, in the
+/// generation `version` names — the enrol path's crypto core.
+///
+/// **Split out of [`enroll_device_from_host`] so it can be asserted at all.**
+/// The rest of that path needs a live server (`kdf_ceiling_tests` says so in as
+/// many words), and this step did not — it simply had no seam, so the one part
+/// of enrolment testable offline went untested. It was also wrong: it derived
+/// under v0.1 unconditionally, so a migrated (`NTV5`) vault could not enrol a
+/// device at all. The failure surfaced as `BadRequest`, i.e. "wrong password"
+/// for a password that was right (myne-md/myne#442 follow-up).
+fn unwrap_root_key_for_enrol(
+    version: MetaVersion,
+    meta: &protocol::VaultMeta,
+    path: EnrollPath,
+    credential: &str,
+) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, SyncDeviceError> {
+    let v0_2 = version == MetaVersion::V0_2;
+    let (wrap, nonce, sealed, aad) = match path {
+        EnrollPath::Password => {
+            let wrap = if v0_2 {
+                derive_password_wrap_key_v0_2(
+                    credential,
+                    &meta.random_salt_password,
+                    &meta.account_number_hash,
+                    &meta.kdf_params,
+                )
+            } else {
+                derive_password_wrap_key(
+                    credential,
+                    &meta.random_salt_password,
+                    &meta.account_number_hash,
+                    &meta.kdf_params,
+                )
+            }
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+            let aad = if v0_2 {
+                aad_password_wrap_v0_2(&meta.kdf_params)
+            } else {
+                aad_password_wrap(&meta.kdf_params)
+            };
+            (
+                wrap,
+                &meta.nonce_password_wrap,
+                &meta.enc_root_key_password,
+                aad,
+            )
+        }
+        EnrollPath::Recovery => {
+            let normalized = normalize_user_phrase(credential);
+            let wrap = if v0_2 {
+                derive_recovery_wrap_key_from_normalized_v0_2(
+                    normalized.as_str(),
+                    &meta.random_salt_recovery,
+                    &meta.account_number_hash,
+                    &meta.kdf_params,
+                )
+            } else {
+                derive_recovery_wrap_key_from_normalized(
+                    normalized.as_str(),
+                    &meta.random_salt_recovery,
+                    &meta.account_number_hash,
+                    &meta.kdf_params,
+                )
+            }
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+            let aad = if v0_2 {
+                aad_recovery_wrap_v0_2(&meta.kdf_params)
+            } else {
+                aad_recovery_wrap(&meta.kdf_params)
+            };
+            (
+                wrap,
+                &meta.nonce_recovery_wrap,
+                &meta.enc_root_key_recovery,
+                aad,
+            )
+        }
+    };
+    let opened =
+        aead_open_ctx(&wrap, nonce, sealed, &aad).map_err(|_| SyncDeviceError::BadRequest)?;
+    if opened.len() != AEAD_KEY_LEN {
+        return Err(SyncDeviceError::Internal);
+    }
+    let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
+    rk.copy_from_slice(&opened);
+    Ok(rk)
+}
+
 /// Enroll this device against the configured server using {account# + credential}.
 ///
 /// **The first extracted core that carries key material across the seam**
@@ -1043,6 +1294,9 @@ mod kdf_ceiling_tests {
 /// desktop bumps a `Manager::try_state` counter, the browser calls its
 /// scheduler. That side effect is the one host-shaped thing left, and it stayed
 /// outside.
+///
+/// The credential→`root_key` step lives in [`unwrap_root_key_for_enrol`] rather
+/// than inline, so it can be asserted without a server.
 pub async fn enroll_device_from_host(
     host: &dyn crate::host::HostCtx,
     io: &dyn crate::vault_io::VaultIo,
@@ -1155,54 +1409,18 @@ pub async fn enroll_device_from_host(
             // precisely the interval the ceiling exists to refuse.
             check_kdf_host_capability(&meta.kdf_params, kdf_ceiling_kib)?;
 
-            // 2. Derive root_key from the credential + the meta salts.
-            let root_key: Zeroizing<[u8; AEAD_KEY_LEN]> = match path {
-                EnrollPath::Password => {
-                    let wrap = derive_password_wrap_key(
-                        &credential,
-                        &meta.random_salt_password,
-                        &meta.account_number_hash,
-                        &meta.kdf_params,
-                    )
-                    .map_err(|_| SyncDeviceError::BadRequest)?;
-                    let opened = aead_open_ctx(
-                        &wrap,
-                        &meta.nonce_password_wrap,
-                        &meta.enc_root_key_password,
-                        &aad_password_wrap(&meta.kdf_params),
-                    )
-                    .map_err(|_| SyncDeviceError::BadRequest)?;
-                    let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
-                    if opened.len() != AEAD_KEY_LEN {
-                        return Err(SyncDeviceError::Internal);
-                    }
-                    rk.copy_from_slice(&opened);
-                    rk
-                }
-                EnrollPath::Recovery => {
-                    let normalized = normalize_user_phrase(&credential);
-                    let wrap = derive_recovery_wrap_key_from_normalized(
-                        normalized.as_str(),
-                        &meta.random_salt_recovery,
-                        &meta.account_number_hash,
-                        &meta.kdf_params,
-                    )
-                    .map_err(|_| SyncDeviceError::BadRequest)?;
-                    let opened = aead_open_ctx(
-                        &wrap,
-                        &meta.nonce_recovery_wrap,
-                        &meta.enc_root_key_recovery,
-                        &aad_recovery_wrap(&meta.kdf_params),
-                    )
-                    .map_err(|_| SyncDeviceError::BadRequest)?;
-                    let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
-                    if opened.len() != AEAD_KEY_LEN {
-                        return Err(SyncDeviceError::Internal);
-                    }
-                    rk.copy_from_slice(&opened);
-                    rk
-                }
-            };
+            // 2. Derive root_key from the credential + the meta salts — under the
+            //    generation the meta declares.
+            //
+            //    `parse_vault_meta_any` above accepts a migrated `NTV5` meta, but
+            //    the parse is where the generation stops: a `VaultMeta` has no
+            //    field for it. Deriving under v0.1 against a v0.2 meta produces a
+            //    wrap key that opens nothing, and this path maps that to
+            //    `BadRequest` — so a migrated vault reported "wrong password" for
+            //    a correct password and could not enrol a device at all
+            //    (myne-md/myne#442 follow-up).
+            let version = meta_version_of(&meta_bytes).ok_or(SyncDeviceError::Internal)?;
+            let root_key = unwrap_root_key_for_enrol(version, &meta, path, &credential)?;
 
             // 3. ServerAuth secret.
             let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);

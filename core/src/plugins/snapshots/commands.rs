@@ -69,7 +69,28 @@ fn map_note_update_err(e: NoteUpdateError) -> SnapshotError {
 
 // ---- snapshot_list ------------------------------------------------------
 
-/// Testable core of [`snapshot_list`]. Decrypt-free (SYNC-6).
+/// The `notes/` sibling of a resolved `snapshots/` directory.
+///
+/// Both are children of the vault root, so the CRDT arm below can reach the note
+/// blob without a second host round-trip — which is what keeps
+/// `snapshot_list`/`snapshot_preview`'s IPC signatures unchanged while they gain
+/// a second history source.
+fn notes_dir_beside(snapshots_dir: &std::path::Path) -> Option<PathBuf> {
+    snapshots_dir.parent().map(|vault| vault.join("notes"))
+}
+
+/// Testable core of [`snapshot_list`].
+///
+/// **Two history sources, chosen by the note's own magic.** A `MY01` note's
+/// history is the `snapshots/` store, listed decrypt-free from filenames + stat
+/// (SYNC-6). An `NC05` note captures no snapshots at all — by design, since its
+/// synced Automerge change-graph IS the version store (`decisions.md`
+/// 2026-08-09, ASM-12→B) — so its history is read out of the note itself, which
+/// costs one decrypt.
+///
+/// Dispatching on the BLOB rather than on the vault generation is deliberate: it
+/// gives the right answer for every note in a vault regardless of how the vault
+/// got there, including a v0.1 note in a migrated vault that abort left behind.
 pub(crate) async fn snapshot_list_in(
     snapshots_dir: PathBuf,
     state: &VaultRuntimeState,
@@ -78,9 +99,53 @@ pub(crate) async fn snapshot_list_in(
     let note_id = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
 
     let slot = state.slot_read_active().await;
-    match &*slot {
-        Slot::Unlocked(_) => {}
+    let (items_key, items_key_id) = match &*slot {
+        Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
         Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+    };
+
+    if let Some(notes_dir) = notes_dir_beside(&snapshots_dir) {
+        let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+        let note_path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+        let crdt = crate::task::run_blocking(
+            move || -> Result<Option<Vec<SnapshotMeta>>, SnapshotError> {
+                let blob = match std::fs::read(&note_path) {
+                    Ok(b) => b,
+                    // An absent note is not this function's error to raise: the
+                    // `MY01` path below reports its own empty/not-found shape.
+                    Err(_) => return Ok(None),
+                };
+                if !crate::plugins::notes::crdt::is_nc05_blob(&blob) {
+                    return Ok(None);
+                }
+                let revisions = crate::plugins::notes::crdt::crdt_note_history(
+                    &blob,
+                    &note_uuid_bytes,
+                    &items_key,
+                    &items_key_id,
+                )
+                .map_err(|_| SnapshotError::CannotDecrypt)?;
+                // Newest-first, matching the `snapshots/` listing the UI already
+                // renders. `get_changes` yields causal order (oldest first).
+                Ok(Some(
+                    revisions
+                        .into_iter()
+                        .rev()
+                        .map(|r| SnapshotMeta {
+                            snapshot_uuid: r.change_hash_hex,
+                            captured_at_ms: r.timestamp_millis.max(0) as u64,
+                            size_bytes: r.size_bytes,
+                        })
+                        .collect(),
+                ))
+            },
+        )
+        .await
+        .map_err(|_| SnapshotError::JoinFailure)??;
+        if let Some(revisions) = crdt {
+            drop(slot);
+            return Ok(revisions);
+        }
     }
 
     let note_uuid = note_id.as_uuid().to_string();
@@ -145,9 +210,12 @@ pub(crate) async fn snapshot_preview_in(
     snapshot_uuid: String,
 ) -> Result<String, SnapshotError> {
     let note_id = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
-    if !valid_v7(&snapshot_uuid) {
-        return Err(SnapshotError::InvalidSnapshotId);
-    }
+    // A CRDT revision id is a change hash, not a UUIDv7, so the shape check is
+    // per-source rather than up-front: the `MY01` arm keeps it (below), and the
+    // CRDT arm validates by looking the hash up in the document — a stricter
+    // check than any shape test, since it also rejects a well-formed hash from
+    // another note.
+    let crdt_candidate = !valid_v7(&snapshot_uuid);
 
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
@@ -156,6 +224,48 @@ pub(crate) async fn snapshot_preview_in(
     };
 
     let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+
+    if crdt_candidate {
+        let Some(notes_dir) = notes_dir_beside(&snapshots_dir) else {
+            return Err(SnapshotError::InvalidSnapshotId);
+        };
+        let note_path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+        let revision = snapshot_uuid.clone();
+        let key = items_key.clone();
+        let text = crate::task::run_blocking(move || -> Result<String, SnapshotError> {
+            let blob = std::fs::read(&note_path).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    SnapshotError::SnapshotNotFound
+                } else {
+                    SnapshotError::Io {
+                        io_error_kind: from_io_error_kind(e.kind()),
+                    }
+                }
+            })?;
+            if !crate::plugins::notes::crdt::is_nc05_blob(&blob) {
+                // Not a CRDT note and not a UUIDv7 id — there is no source that
+                // could serve this request.
+                return Err(SnapshotError::InvalidSnapshotId);
+            }
+            crate::plugins::notes::crdt::crdt_note_text_at(
+                &blob,
+                &note_uuid_bytes,
+                &key,
+                &items_key_id,
+                &revision,
+            )
+            .map_err(|e| match e {
+                crate::plugins::notes::crdt::CrdtNoteOpError::RevisionNotFound => {
+                    SnapshotError::SnapshotNotFound
+                }
+                _ => SnapshotError::CannotDecrypt,
+            })
+        })
+        .await
+        .map_err(|_| SnapshotError::JoinFailure)??;
+        drop(slot);
+        return Ok(text);
+    }
     let path = snapshots_dir.join(crate::snapshot_store::snapshot_filename(
         &note_id.as_uuid().to_string(),
         &snapshot_uuid,
@@ -253,16 +363,58 @@ pub(crate) async fn snapshot_restore_in(
     host: &dyn HostCtx,
 ) -> Result<(), SnapshotError> {
     let note_id_parsed = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
-    if !valid_v7(&snapshot_uuid) {
-        return Err(SnapshotError::InvalidSnapshotId);
-    }
+    // A CRDT revision id is a change hash rather than a UUIDv7 — same per-source
+    // shape rule as `snapshot_preview_in`.
+    let crdt_candidate = !valid_v7(&snapshot_uuid);
     let snapshots_dir = notes_dir
         .parent()
         .map(|p| p.join("snapshots"))
         .ok_or(SnapshotError::NotesDirNotADirectory)?;
 
-    // Step 1: decode the snapshot → plaintext (in-memory; Zeroizing-bounded).
-    let plaintext: Zeroizing<String> = {
+    // Step 1: decode the requested revision → plaintext (in-memory;
+    // Zeroizing-bounded). For a CRDT note the source is the note's own change
+    // graph; for a v0.1 note it is the `snapshots/` blob.
+    let plaintext: Zeroizing<String> = if crdt_candidate {
+        let slot = state.slot_read_active().await;
+        let (items_key, items_key_id) = match &*slot {
+            Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
+            Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+        };
+        let note_uuid_bytes = *note_id_parsed.as_uuid().as_bytes();
+        let live_path = notes_dir.join(format!("{}.myn", note_id_parsed.as_uuid()));
+        let revision = snapshot_uuid.clone();
+        let pt = crate::task::run_blocking(move || -> Result<String, SnapshotError> {
+            let blob = std::fs::read(&live_path).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    SnapshotError::SnapshotNotFound
+                } else {
+                    SnapshotError::Io {
+                        io_error_kind: from_io_error_kind(e.kind()),
+                    }
+                }
+            })?;
+            if !crate::plugins::notes::crdt::is_nc05_blob(&blob) {
+                return Err(SnapshotError::InvalidSnapshotId);
+            }
+            crate::plugins::notes::crdt::crdt_note_text_at(
+                &blob,
+                &note_uuid_bytes,
+                &items_key,
+                &items_key_id,
+                &revision,
+            )
+            .map_err(|e| match e {
+                crate::plugins::notes::crdt::CrdtNoteOpError::RevisionNotFound => {
+                    SnapshotError::SnapshotNotFound
+                }
+                _ => SnapshotError::CannotDecrypt,
+            })
+        })
+        .await
+        .map_err(|_| SnapshotError::JoinFailure)??;
+        drop(slot);
+        Zeroizing::new(pt)
+    } else {
         let slot = state.slot_read_active().await;
         let (items_key, items_key_id) = match &*slot {
             Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
@@ -315,29 +467,40 @@ pub(crate) async fn snapshot_restore_in(
     // contract (SYNC-5) must never degrade into silent data-loss. A missing live
     // blob is a fresh note — nothing to undo, proceed. File IO runs on a blocking
     // thread; mirrors how `note_update` routes its pre-overwrite snapshot.
-    if let Some(vault_root) = notes_dir.parent().map(std::path::Path::to_path_buf) {
-        let note_uuid_str = note_id_parsed.as_uuid().to_string();
-        let live_path = notes_dir.join(format!("{note_uuid_str}.myn"));
-        let hooks_owned: crate::hooks::Hooks = hooks.clone();
-        let undo_failed = crate::task::run_blocking(move || match std::fs::read(&live_path) {
-            Ok(old_blob) => {
-                let now_ms = crate::snapshot_store::now_unix_ms();
-                hooks_owned.capture_snapshot(
-                    &vault_root,
-                    &note_uuid_str,
-                    &old_blob,
-                    now_ms,
-                    /* force = */ true,
-                )
+    //
+    // **Skipped entirely for a CRDT note, and the SYNC-5 contract is stronger
+    // rather than weaker there.** Restoring a revision of an `NC05` note is an
+    // ordinary edit: it appends a change and the pre-restore state stays in the
+    // document's own history, so the undo point is the previous revision — which
+    // is already in the list the user just picked from. Writing a `snapshots/`
+    // entry here would be a v0.1 artefact in a v0.2 vault (the hybrid this
+    // change set exists to prevent), and `note_update` captures none for these
+    // notes either.
+    if !crdt_candidate {
+        if let Some(vault_root) = notes_dir.parent().map(std::path::Path::to_path_buf) {
+            let note_uuid_str = note_id_parsed.as_uuid().to_string();
+            let live_path = notes_dir.join(format!("{note_uuid_str}.myn"));
+            let hooks_owned: crate::hooks::Hooks = hooks.clone();
+            let undo_failed = crate::task::run_blocking(move || match std::fs::read(&live_path) {
+                Ok(old_blob) => {
+                    let now_ms = crate::snapshot_store::now_unix_ms();
+                    hooks_owned.capture_snapshot(
+                        &vault_root,
+                        &note_uuid_str,
+                        &old_blob,
+                        now_ms,
+                        /* force = */ true,
+                    )
+                }
+                Err(_) => false, // no live blob → nothing to undo
+            })
+            .await
+            .map_err(|_| SnapshotError::JoinFailure)?;
+            if undo_failed {
+                return Err(SnapshotError::Io {
+                    io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+                });
             }
-            Err(_) => false, // no live blob → nothing to undo
-        })
-        .await
-        .map_err(|_| SnapshotError::JoinFailure)?;
-        if undo_failed {
-            return Err(SnapshotError::Io {
-                io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
-            });
         }
     }
 
@@ -752,6 +915,161 @@ mod tests {
             let list = snapshot_list_in(sdir, &state, id).await.unwrap();
             assert_eq!(list.len(), 1);
             assert!(list[0].size_bytes > 0);
+        });
+    }
+
+    /// Mark `vault_root` as a v0.2 vault so the `notes` plugin writes `NC05`.
+    ///
+    /// Only the magic is read (`meta_version_of`), so the rest is filler — but
+    /// it is a REAL `NTV5` serialization rather than four hand-written bytes, so
+    /// the fixture cannot drift from the format it claims to be.
+    fn mark_vault_v0_2(vault_root: &std::path::Path) {
+        let meta = protocol::VaultMeta {
+            account_number_hash: [0x2b; 16],
+            kdf_params: crate::test_support::FAST_TEST_KDF,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [FIXTURE_ITEMS_ID_BYTE; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+        };
+        std::fs::write(
+            vault_root.join("vault.meta"),
+            protocol::serialize_vault_meta_v0_2(&meta),
+        )
+        .expect("write NTV5 vault.meta");
+    }
+
+    /// A CRDT note's version history comes from its own change graph.
+    ///
+    /// This is the read side of the snapshots retirement: `NC05` notes capture
+    /// no `snapshots/` entries at all, so before this arm existed the history
+    /// panel of every note in a v0.2 vault was permanently empty — a feature
+    /// that silently disappeared for anyone whose vault was migrated, and (once
+    /// v0.2 became the birth format) for every new user. The list must be
+    /// non-empty, newest-first, and each id must preview to the text as it stood
+    /// at that revision.
+    #[test]
+    fn a_crdt_notes_history_comes_from_its_change_graph() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("snap-crdt-history").unwrap();
+            mark_vault_v0_2(scratch.path());
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let sdir = snapshots_dir_under(scratch.path()).unwrap();
+            let state = unlocked().await;
+
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# v1\nfirst".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            // The note really is NC05 — otherwise this test would pass through
+            // the `snapshots/` arm and assert nothing about the CRDT path.
+            let blob = std::fs::read(notes_dir.join(format!("{id}.myn"))).unwrap();
+            assert!(crate::plugins::notes::crdt::is_nc05_blob(&blob));
+
+            for body in ["# v2\nsecond", "# v3\nthird"] {
+                note_update_with_dir(
+                    notes_dir.clone(),
+                    &state,
+                    &noop_hooks(),
+                    id.clone(),
+                    body.to_string(),
+                    None,
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .unwrap();
+            }
+
+            // `snapshots/` holds nothing for this note, by design.
+            assert!(!sdir.join(&id).exists());
+
+            let list = snapshot_list_in(sdir.clone(), &state, id.clone())
+                .await
+                .unwrap();
+            assert_eq!(list.len(), 3, "one revision per committed edit");
+            assert!(
+                list[0].captured_at_ms >= list[list.len() - 1].captured_at_ms,
+                "newest-first"
+            );
+            // The size the UI renders is the revision's real encoded size, not a
+            // placeholder — a "0 B" row beside every entry is the shape this
+            // assertion exists to keep out.
+            assert!(list.iter().all(|r| r.size_bytes > 0), "real revision sizes");
+
+            // The OLDEST revision previews as the original text.
+            let oldest = list.last().unwrap().snapshot_uuid.clone();
+            let preview = snapshot_preview_in(sdir.clone(), &state, id.clone(), oldest.clone())
+                .await
+                .unwrap();
+            assert_eq!(preview, "# v1\nfirst");
+
+            // …and restoring it puts that text back on the live note, without
+            // writing a `snapshots/` entry (the undo point is the revision list).
+            snapshot_restore_in(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                oldest,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            let after = std::fs::read(notes_dir.join(format!("{id}.myn"))).unwrap();
+            let text = crate::plugins::notes::crdt::decode_note_blob(
+                &after,
+                id.parse::<uuid::Uuid>().unwrap().as_bytes(),
+                &[FIXTURE_ITEMS_BYTE; 32],
+                &[FIXTURE_ITEMS_ID_BYTE; 16],
+            )
+            .unwrap();
+            assert_eq!(text, "# v1\nfirst");
+            assert!(!sdir.join(&id).exists(), "no v0.1 snapshot artefact");
+
+            // The restore itself is a revision, so history GREW rather than
+            // rewound — which is what makes it undoable.
+            let after_list = snapshot_list_in(sdir, &state, id).await.unwrap();
+            assert_eq!(after_list.len(), 4);
+        });
+    }
+
+    /// A revision id the note does not carry is `SnapshotNotFound`, not an empty
+    /// preview — a stale list must not silently render a blank note.
+    #[test]
+    fn a_crdt_preview_rejects_an_unknown_revision() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("snap-crdt-unknown").unwrap();
+            mark_vault_v0_2(scratch.path());
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let sdir = snapshots_dir_under(scratch.path()).unwrap();
+            let state = unlocked().await;
+
+            let id = note_create_with_dir(
+                notes_dir,
+                &state,
+                "body".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            let bogus = "0".repeat(64);
+            assert_eq!(
+                snapshot_preview_in(sdir, &state, id, bogus).await,
+                Err(SnapshotError::SnapshotNotFound)
+            );
         });
     }
 

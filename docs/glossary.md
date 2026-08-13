@@ -263,6 +263,14 @@ Used in: `vision.md` Phase 1 Scope
 
 An Obsidian-style `^block-id` marker at the end of a line, addressable from a [wikilink](#bidirectional-links) as `[[Note^block-id]]`. Myne is **enumerate-only** about them (MYND-382): the `[[^^` picker mode lists, vault-wide, the anchors that already exist (e.g. imported from Obsidian) via the imported block-anchor records persisted in [`vault.indices`](#myi1) (`spec/protocol.md` §9.8.2), and emitting a link never mints a marker — note bytes are never rewritten to create one. Distinct from the `[[#`/`[[##` heading picker modes, which address document structure rather than an explicit marker. (`decisions.md` 2026-07-13)
 
+### **birth format** &nbsp; 📋 *Protocol*
+
+The major protocol version a **newly created** vault is written in — as of `decisions.md` 2026-08-13, **v0.2** (`NTV5` `vault.meta`, [`NC05`](#nc05) notes, `MY?5` singletons). Named separately from "current version" because the two are not the same thing: v0.1 stays fully **readable** (it is what a [cross-major migration](#migration-cross-major) reads *from*, and pre-flip vaults keep working unmigrated) while no client **produces** it any more. Pinned normatively in `spec/protocol.md` §10.3.1 and carried in code by the single constant `vault_creation::BIRTH_GENERATION`.
+
+Changing it is a fleet event, not a client-local choice: §10.5's anti-downgrade refusal means a client without v0.2 read support refuses an `NTV5` vault outright, so every supported client needs read support before — or in the same release as — the flip.
+
+Used in: `spec/protocol.md` §10.3.1
+
 ### **bookmark note** &nbsp; 📦 *Product*
 
 A content-light `.myn` note created by the [browser clipper](#browser-clipper) holding a source URL (bare autolink) + title + `source:` / `clipped:` frontmatter; no page body. Participates in tags / backlinks / graph / saved views as an ordinary note. Re-clipping a URL creates an independent note (no dedup detection in v1).
@@ -1303,7 +1311,7 @@ The monotonic causal counter carried per entry by the synced tombstone-guarded s
 
 ### **migration (cross-major)** &nbsp; 📋 *Protocol*
 
-The user-initiated upgrade procedure between major protocol versions (e.g., v0.1 → v0.2). Always explicit, never automatic, never silent. The next-major client decrypts the v0.1 vault end-to-end, generates a new `root_key`, builds the next major version's key hierarchy, re-encrypts every blob under the new keys with the new magic bytes, and rewrites `vault.meta`. v0.1 clients never produce later-version output. For the first concrete cut (v0.1 → v0.2, the `NC05` note-type), §10.4.1 pins the contract: the recovery phrase is **required** (a password-only migration would strand recovery), the re-encrypt is **eager / whole-vault**, `vault.meta`→`NTV5` is the atomic commit point, and a [legacy snapshot](#legacy-snapshot) is retained until the user confirms (then crypto-erased).
+The user-initiated upgrade procedure between major protocol versions (e.g., v0.1 → v0.2). Always explicit, never automatic, never silent. Since the [birth format](#birth-format) moved to v0.2 (`decisions.md` 2026-08-13) this applies only to vaults **created before** that change — a new vault is already v0.2 and has nothing to migrate. The next-major client decrypts the v0.1 vault end-to-end, generates a new `root_key`, builds the next major version's key hierarchy, re-encrypts every blob under the new keys with the new magic bytes, and rewrites `vault.meta`. v0.1 clients never produce later-version output. For the first concrete cut (v0.1 → v0.2, the `NC05` note-type), §10.4.1 pins the contract: the recovery phrase is **required** (a password-only migration would strand recovery), the re-encrypt is **eager / whole-vault**, `vault.meta`→`NTV5` is the atomic commit point, and a [legacy snapshot](#legacy-snapshot) is retained until the user confirms (then crypto-erased).
 
 Used in: `spec/protocol.md` §10.4, §10.4.1
 

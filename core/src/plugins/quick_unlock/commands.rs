@@ -35,7 +35,7 @@ use protocol::quick_unlock_blob::{
     decode_quick_unlock_blob, encode_quick_unlock_blob, parse_quick_unlock_header,
     PROVIDER_KIND_BIOMETRIC, PROVIDER_KIND_PIN,
 };
-use protocol::{derive_items_key, VaultMeta};
+use protocol::VaultMeta;
 use serde::Serialize;
 // Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -466,7 +466,14 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
 
     match decode_quick_unlock_blob(&wrap_key, &meta.account_number_hash, &blob) {
         Ok(root_key) => {
-            let items_key = derive_items_key(&root_key, &meta)
+            // `MYQ1` hands back the `root_key` and stops there — the generation
+            // lives in `vault.meta`'s magic, which `read_meta`'s parser consumes.
+            // Deriving the `itemsKey` under the wrong one fails the AEAD open, so
+            // a migrated vault refused every PIN and biometric attempt while the
+            // password path branched correctly (myne-md/myne#442 follow-up).
+            let version =
+                protocol::meta_version_of(&meta_bytes).ok_or(QuickUnlockError::InvalidVaultMeta)?;
+            let items_key = protocol::derive_items_key_versioned(version, &root_key, &meta)
                 .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
             let vault_meta_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&meta_bytes);
             state
@@ -857,6 +864,39 @@ mod tests {
         std::fs::write(dir.join("vault.meta"), serialize_vault_meta(&meta)).expect("write meta");
     }
 
+    /// The v0.2 (`NTV5`) twin of [`write_sealed_meta`] — the same `ITEMS_KEY`
+    /// under the same `ROOT_KEY`, but wrapped through the v0.2 KEK context and
+    /// the v0.2 AAD and framed with the v0.2 magic. That is byte-for-byte what
+    /// the §10.4 migration leaves behind, which is the only way to reach the
+    /// generation-routing this file's redeem path depends on.
+    fn write_sealed_meta_v0_2(dir: &Path) {
+        let items_key_id = [0x07u8; 16];
+        let items_wrap_key = protocol::derive_subkey_v0_2(&ROOT_KEY, SubkeyRole::ItemsKeyWrap);
+        let aad = protocol::aad_vault_items_key_wrap_v0_2(&items_key_id);
+        let nonce = [0x08u8; 24];
+        let sealed = aead_seal_ctx(&items_wrap_key, &nonce, &ITEMS_KEY, &aad).expect("seal");
+        let mut enc_items_key = [0u8; 64];
+        enc_items_key.copy_from_slice(&sealed);
+        let meta = VaultMeta {
+            account_number_hash: ACCOUNT_HASH,
+            kdf_params: crate::test_support::FAST_TEST_KDF,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id,
+            items_key_nonce: nonce,
+            enc_items_key,
+        };
+        std::fs::write(
+            dir.join("vault.meta"),
+            protocol::serialize_vault_meta_v0_2(&meta),
+        )
+        .expect("write meta");
+    }
+
     fn unlocked_state() -> VaultRuntimeState {
         VaultRuntimeState::default()
     }
@@ -1127,6 +1167,60 @@ mod tests {
             .await
             .expect("unlocked");
         assert_eq!(material.as_slice(), &ROOT_KEY);
+    }
+
+    /// A quick-unlock of a MIGRATED (`NTV5`) vault must reach the same slot the
+    /// password path would.
+    ///
+    /// `MYQ1` is generation-agnostic by design — it wraps a third `root_key`
+    /// copy and never reads `vault.meta` — so the redeem hands back a correct
+    /// `root_key` on either generation. The `itemsKey` step is where the
+    /// generation matters, and nothing in the signature says so: a parsed
+    /// `VaultMeta` has no generation field, so calling `derive_items_key`
+    /// (v0.1 KEK context + v0.1 AAD) compiles and reads perfectly next to a
+    /// correct `read_meta`. On a v0.2 vault it fails the AEAD open, so every
+    /// PIN and biometric attempt returned `InvalidVaultMeta` — while the
+    /// password path two files over branched correctly. Asserting the
+    /// `items_key` VALUE rather than just "unlock succeeded" is the point: it
+    /// is the byte the v0.1 twin cannot produce.
+    #[test]
+    fn quick_unlock_derives_the_items_key_under_the_vaults_own_generation() {
+        rt().block_on(quick_unlock_on_a_migrated_vault_inner())
+    }
+    async fn quick_unlock_on_a_migrated_vault_inner() {
+        let tmp = ScopedTempDir::new("qu-v0-2").unwrap();
+        let dir = tmp.path();
+        write_sealed_meta_v0_2(dir);
+
+        let setup_state = unlocked_state();
+        seed_unlocked(&setup_state, dir).await;
+        let provider = MockProvider::new(PROVIDER_KIND_PIN, 0x11);
+        setup_with_dir(dir, &setup_state, provider.clone(), &ACCOUNT_HASH)
+            .await
+            .expect("setup on a migrated vault");
+
+        let fresh = unlocked_state();
+        fresh.mark_full_unlock_done();
+        let vault_id = crate::paths::vault_id_from_root(dir);
+        quick_unlock_with_dir(
+            dir,
+            vault_id,
+            &fresh,
+            provider.clone(),
+            &crate::host::NoopHost,
+            &test_hooks(),
+            &test_io(),
+        )
+        .await
+        .expect("quick unlock on a migrated (NTV5) vault");
+
+        let (items_key, items_key_id, root_key) = fresh
+            .peek_unlocked_attachment_material()
+            .await
+            .expect("unlocked");
+        assert_eq!(root_key.as_slice(), &ROOT_KEY);
+        assert_eq!(items_key.as_slice(), &ITEMS_KEY);
+        assert_eq!(items_key_id, [0x07u8; 16]);
     }
 
     // ── myne#378: the credential path joins the single-in-flight discipline ──

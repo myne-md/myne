@@ -2356,8 +2356,19 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 
 | Major version | AAD prefix | Context prefix | Status |
 |---|---|---|---|
-| v0.1 | `"myne.v0.1|"` | `"myne.v0.1 …"` | This document. Active. |
-| v0.2 (next major) | `"myne.v0.2|"` | `"myne.v0.2 …"` | **Being defined incrementally by the `automerge-sync-migration` epic** (`decisions.md` 2026-08-09 — the format-commitment entry). The CRDT note-type (`NC05`) format and these two prefixes are pinned by §10.7; the rest of the v0.2 hierarchy (its KDF, its other blob families) is finalized as the migration lands. This supersedes the prior "not pre-allocated in v0.1" posture **for these two prefixes only** — pulling them forward is a direct consequence of the whole-vault §10.4 cutover (Reading A). |
+| v0.1 | `"myne.v0.1|"` | `"myne.v0.1 …"` | This document. **Active for reading, retired for writing** — every v0.1 blob family stays fully readable and is what the §10.4 migration reads *from*, but no client produces a v0.1 vault any more (§10.3.1). |
+| v0.2 (next major) | `"myne.v0.2|"` | `"myne.v0.2 …"` | Defined by the `automerge-sync-migration` epic (`decisions.md` 2026-08-09 — the format-commitment entry). **The birth format** as of `decisions.md` 2026-08-13: a vault created today is `NTV5`/`NC05`/`MY?5` throughout (§10.3.1). The CRDT note-type and these two prefixes are pinned by §10.7; the v0.2 salt domains, the `NTV5` layout and the `MY?5` singleton framing landed with the migration. This supersedes the prior "not pre-allocated in v0.1" posture — pulling the prefixes forward was a direct consequence of the whole-vault §10.4 cutover (Reading A). |
+
+#### 10.3.1 The birth format (normative)
+
+**A vault created by a compliant client is born v0.2.** The creation path derives both credential wrap keys under the v0.2 salt domains, derives the `itemsKey` wrap under the v0.2 subkey context, binds the v0.2 AAD prefix into all three wraps, frames `vault.meta` as `NTV5`, and seeds the singletons it writes eagerly (`vault.prefs`, `vault.attachments`) with their `MY?5` magic. Notes written into it are `NC05` (§10.7).
+
+Two consequences are normative and neither is optional:
+
+1. **A client MUST NOT write a v0.1 blob into a v0.2 vault.** The v0.1 and v0.2 blob families share a byte layout and differ only in magic + AAD + KEK context, and every §10.3 decoder is *magic-detecting* — so a v0.1 blob written into a v0.2 vault decodes correctly, round-trips correctly, and is invisible to every runtime check. A hybrid vault is therefore a defect that only static analysis can catch (`scripts/check-version-routing.mjs` is this repository's).
+2. **The flip is a fleet event, not a client-local choice.** §10.5's anti-downgrade refusal means a client that predates v0.2 read support refuses an `NTV5` vault outright, so a device on an older release cannot open — or be enrolled into — an account created after the flip. A published implementation MUST therefore ship v0.2 *read* support to every client it supports before, or in the same release as, the birth-format change.
+
+v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` accepts it, the migration reads from it, and vaults created before the flip keep working unmigrated for as long as their owner wants. What ends is its production, not its support.
 
 **Magic-byte allocation (normative).** Each blob family has a distinct 4-byte magic. Implementations MUST reject any magic not in this table. This table is the single source of truth for magic-byte allocation — a new blob family MUST claim a free magic here before it is implemented (this discipline exists because the attachments index initially mis-claimed the already-reserved `MYI1`; see `decisions.md` 2026-06-07). **Every family in this table that seals data under AEAD inherits the nonce policy of §5.3 without restatement** — the policy is stated once, generally, and is deliberately not repeated per family.
 
@@ -2482,7 +2493,7 @@ This stance directly contradicts the "additive" approach common in older protoco
 
 ### 10.7 Next-major note-type format: `NC05` (v0.2 CRDT notes)
 
-> **This subsection defines a concrete next-major (v0.2) at-rest format** — the first Myne specifies. It is pulled forward from "reserved, layout-free" (§10.3, the 2026-08-07 reservation) by the `automerge-sync-migration` decision (`decisions.md` 2026-08-09 — the format-commitment entry). A v0.1 client never produces or reads an `NC05` blob (§10.1); a v0.1 vault reaches this format only through the §10.4 migration.
+> **This subsection defines a concrete next-major (v0.2) at-rest format** — the first Myne specifies. It is pulled forward from "reserved, layout-free" (§10.3, the 2026-08-07 reservation) by the `automerge-sync-migration` decision (`decisions.md` 2026-08-09 — the format-commitment entry). A v0.1 client never produces or reads an `NC05` blob (§10.1). An **existing** v0.1 vault reaches this format only through the §10.4 migration; a **newly created** vault is born in it (§10.3.1), so `NC05` is the note format of the default path rather than of the migrated one alone.
 
 **Purpose.** `NC05` is a **CRDT note-type** that replaces the `MY01` per-note body (§9.2). The note's whole content is stored as one encrypted [Automerge](../glossary.md) document, so two devices that edited the same note concurrently **merge** into a single convergent revision rather than fork into a keep-both conflict copy (`sync-protocol.md` §10.1). The merge runs client-side after decryption; the server stays a blind opaque blob store (TB5) and never sees Automerge's native change-sync protocol (which would leak the change-DAG, actor ids, and op counts). This is the async single-user-multi-device foundation the Phase-4 live-collaboration plane later reuses — the same at-rest artifact, so the format is not throwaway toward that path.
 

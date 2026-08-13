@@ -23,7 +23,13 @@ describeE2E("vault migration v0.1 → v0.2 (1 vault, production KDF)", () => {
     let fixture!: SeededVault;
     await scenario(
       "vm1-migrate",
-      { seed: (appDataDir) => { fixture = seedVault(appDataDir, { kdf: "production" }); } },
+      {
+        seed: (appDataDir) => {
+          // v0.1 ON PURPOSE: this scenario IS the pre-flip vault. A new vault is
+          // born v0.2 (`decisions.md` 2026-08-13), which has nothing to migrate.
+          fixture = seedVault(appDataDir, { kdf: "production", generation: "v0.1" });
+        },
+      },
       async (app) => {
         const notesDir = join(app.appDataDir, "vaults", fixture.vaultId, "notes");
         const metaPath = vaultMetaPath(app.appDataDir, fixture.vaultId);
@@ -103,7 +109,13 @@ describeE2E("vault migration v0.1 → v0.2 (1 vault, production KDF)", () => {
     let fixture!: SeededVault;
     await scenario(
       "vm2-abort",
-      { seed: (appDataDir) => { fixture = seedVault(appDataDir, { kdf: "production" }); } },
+      {
+        seed: (appDataDir) => {
+          // v0.1 ON PURPOSE: this scenario IS the pre-flip vault. A new vault is
+          // born v0.2 (`decisions.md` 2026-08-13), which has nothing to migrate.
+          fixture = seedVault(appDataDir, { kdf: "production", generation: "v0.1" });
+        },
+      },
       async (app) => {
         const vaultRoot = join(app.appDataDir, "vaults", fixture.vaultId);
         const notesDir = join(vaultRoot, "notes");

@@ -143,6 +143,21 @@ export type TwoSyncedDevices = {
  *  only once `sync_head_fingerprint` observes a pulled head. */
 /** Options shared by every `setupTwoSyncedDevices` overload. */
 interface SetupOptions {
+  /**
+   * Which generation A's vault is seeded in. **Defaults to `"v0.1"`** — not
+   * because that is what a user gets today (a new vault is born v0.2,
+   * `decisions.md` 2026-08-13), but because most scenarios in these suites are
+   * about `MY01` semantics that a v0.2 vault does not have: keep-both conflict
+   * copies, take-theirs, the `snapshots/` store. Those need a pre-flip vault to
+   * have a subject at all.
+   *
+   * Pass `"v0.2"` for a fleet that is v0.2 FROM BIRTH — which is a different
+   * thing from a migrated fleet (`migrateFleetToV02`) and worth covering
+   * separately: enrolment derives the credential wrap keys under the vault's
+   * generation, so a birth-v0.2 fleet is the only shape that exercises the v0.2
+   * arm of the enrol path.
+   */
+  generation?: "v0.1" | "v0.2";
   /** MYND-548: type these into the two enrollment forms' "Name this device"
    *  fields instead of accepting the pre-filled platform default. */
   deviceNames?: { a: string; b: string };
@@ -170,7 +185,10 @@ export async function setupTwoSyncedDevices(
   const a = await launchDevice(0, {
     seedConfig: syncConfigSeed(srv.url),
     seed: (appDataDir) => {
-      const v = seedVault(appDataDir, { password: "CanaryPass-9-animals!" });
+      const v = seedVault(appDataDir, {
+        password: "CanaryPass-9-animals!",
+        generation: opts.generation ?? "v0.1",
+      });
       account = v.account;
       password = v.password;
       phrase = v.phrase;

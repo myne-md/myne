@@ -169,6 +169,9 @@ pub enum CrdtNoteOpError {
     TooLarge,
     /// The CSPRNG was unavailable while re-sealing.
     Csprng,
+    /// The requested revision id is not a change this document carries — a
+    /// malformed hash, or one from a list the note has since diverged from.
+    RevisionNotFound,
 }
 
 impl From<ProtocolError> for CrdtNoteOpError {
@@ -456,6 +459,10 @@ pub struct CrdtRevision {
     /// The authoring device's Automerge actor id (hex) — the device that made
     /// this edit. Cross-device provenance; not a user identity.
     pub actor_hex: String,
+    /// The change's encoded size in bytes — what this revision costs inside the
+    /// note blob. The analogue of a `snapshots/` entry's file size, and the same
+    /// thing the history UI renders beside each entry.
+    pub size_bytes: u64,
 }
 
 /// Enumerate a CRDT note's revision history in causal order — every change the
@@ -480,8 +487,46 @@ pub fn crdt_note_history(
             change_hash_hex: c.hash().to_string(),
             timestamp_millis: c.timestamp(),
             actor_hex: hex_lower(c.actor_id().to_bytes()),
+            size_bytes: c.raw_bytes().len() as u64,
         })
         .collect())
+}
+
+/// Reconstruct a CRDT note's text **as of** the revision `change_hash_hex`
+/// names — the "view an old version" half of [`crdt_note_history`], which that
+/// function's doc left as a follow-on.
+///
+/// The revision id is a change hash, and a change hash is a causal frontier: the
+/// document read at `heads = [hash]` is the document as it stood when that change
+/// landed, including every change it depends on and excluding everything
+/// concurrent-but-later. That is exactly the "old version" a reader means, and it
+/// is why no separate stored copy is needed — the history is inside the note.
+///
+/// A hash the document does not carry is [`CrdtNoteOpError::RevisionNotFound`]
+/// rather than an empty string, so a stale UI list cannot silently preview a
+/// blank note.
+pub fn crdt_note_text_at(
+    blob: &[u8],
+    note_uuid: &[u8; 16],
+    items_key: &[u8; 32],
+    items_key_id: &[u8; 16],
+    change_hash_hex: &str,
+) -> Result<String, CrdtNoteOpError> {
+    let save = decode_crdt_note_blob(blob, note_uuid, items_key, items_key_id)
+        .map_err(|_| CrdtNoteOpError::CannotDecrypt)?;
+    let mut doc = AutoCommit::load(&save).map_err(|_| CrdtNoteOpError::Malformed)?;
+    let target: automerge::ChangeHash = change_hash_hex
+        .parse()
+        .map_err(|_| CrdtNoteOpError::RevisionNotFound)?;
+    if !doc.get_changes(&[]).into_iter().any(|c| c.hash() == target) {
+        return Err(CrdtNoteOpError::RevisionNotFound);
+    }
+    let text_obj = match doc.get(ROOT, NOTE_TEXT_KEY) {
+        Ok(Some((_, id))) => id,
+        _ => return Err(CrdtNoteOpError::Malformed),
+    };
+    doc.text_at(&text_obj, &[target])
+        .map_err(|_| CrdtNoteOpError::Malformed)
 }
 
 /// Lowercase-hex a byte slice (local helper — the crate's `to_hex` lives in the

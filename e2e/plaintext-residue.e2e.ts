@@ -80,14 +80,21 @@ describeE2E("PS-1 note plaintext at-rest residue (MYND-228)", () => {
           await waitForSaved(s);
 
           // Positive control A: the content demonstrably reached disk
-          // — exactly one .myn blob, MY01 magic, larger than the
-          // marker. Without this, a scan over a never-written tree
+          // — exactly one .myn blob, a KNOWN note magic, larger than
+          // the marker. Without this, a scan over a never-written tree
           // would pass meaninglessly.
+          //
+          // The magic is asserted against the set rather than one value: a
+          // vault created today is born v0.2, so its notes are `NC05`
+          // (`decisions.md` 2026-08-13), while a pre-flip vault's are `MY01`.
+          // Both are sealed blobs and either satisfies this control — what it
+          // must never accept is a note that is neither, which is what a
+          // plaintext .myn would be.
           const notesDir = join(app.appDataDir, "vaults", vaultId, "notes");
           const blobs = readdirSync(notesDir).filter((n) => n.endsWith(".myn"));
           expect(blobs).toHaveLength(1);
           const blob = readFileSync(join(notesDir, blobs[0]));
-          expect(blob.subarray(0, 4).toString("latin1")).toBe("MY01");
+          expect(["MY01", "NC05"]).toContain(blob.subarray(0, 4).toString("latin1"));
           expect(blob.length).toBeGreaterThan(BODY_TOKEN.length);
 
           // Positive control B: the scanner provably detects planted

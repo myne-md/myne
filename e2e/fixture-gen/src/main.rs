@@ -24,8 +24,11 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use e2e_fixture_gen::{build_fixture, offsets, write_export_suite, write_fixture, WEAK_TEST_KDF};
-use protocol::DEFAULT_V0_1_KDF_PARAMS;
+use e2e_fixture_gen::{
+    build_fixture_in, offsets, write_export_suite, write_fixture, DEFAULT_FIXTURE_GENERATION,
+    WEAK_TEST_KDF,
+};
+use protocol::{MetaVersion, DEFAULT_V0_1_KDF_PARAMS};
 
 const DEFAULT_PASSWORD: &str = "e2e-fixture-password-1";
 
@@ -47,7 +50,7 @@ fn json_escape(s: &str) -> String {
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage: e2e-fixture-gen --base <app-data-dir> [--count N] [--kdf weak|production] [--password <pw>] [--export-suite]"
+        "usage: e2e-fixture-gen --base <app-data-dir> [--count N] [--kdf weak|production] [--password <pw>] [--export-suite] [--generation v0.1|v0.2]"
     );
     ExitCode::from(2)
 }
@@ -58,6 +61,9 @@ fn main() -> ExitCode {
     let mut kdf = WEAK_TEST_KDF;
     let mut password = DEFAULT_PASSWORD.to_string();
     let mut export_suite = false;
+    // The product's birth format unless the caller asks for a pre-flip vault.
+    let mut generation = DEFAULT_FIXTURE_GENERATION;
+    let mut generation_explicit = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -87,14 +93,36 @@ fn main() -> ExitCode {
                 None => return usage(),
             },
             "--export-suite" => export_suite = true,
+            "--generation" => match args.next().as_deref() {
+                Some("v0.1") => {
+                    generation = MetaVersion::V0_1;
+                    generation_explicit = true;
+                }
+                Some("v0.2") => {
+                    generation = MetaVersion::V0_2;
+                    generation_explicit = true;
+                }
+                _ => return usage(),
+            },
             _ => return usage(),
         }
     }
     let Some(base) = base else { return usage() };
 
+    // The export suite is MY01/MYA1/MYC1 by construction (see its doc comment),
+    // so it pins the vault to v0.1 rather than producing a hybrid. An explicit
+    // `--generation v0.2` alongside it is a contradiction, not a preference.
+    if export_suite {
+        if generation_explicit && generation != MetaVersion::V0_1 {
+            eprintln!("error: --export-suite writes v0.1 blobs; it cannot be combined with --generation v0.2");
+            return ExitCode::from(2);
+        }
+        generation = MetaVersion::V0_1;
+    }
+
     let mut entries = Vec::with_capacity(count);
     for _ in 0..count {
-        let fixture = match build_fixture(&password, kdf) {
+        let fixture = match build_fixture_in(generation, &password, kdf) {
             Ok(f) => f,
             Err(_) => {
                 // ProtocolError variants are unit-like; no secrets leak,

@@ -109,10 +109,10 @@ pub use attachment_blob::{
     aad_encrypt_attachment, aad_encrypt_attachment_v0_2, aad_wrap_attachment_key,
     aad_wrap_attachment_key_v0_2, compute_attachment_id, decode_attachment_blob,
     decode_attachment_blob_v0_2, encode_attachment_blob, encode_attachment_blob_raw,
-    encode_attachment_blob_v0_2, encode_attachment_blob_v0_2_raw, reseal_attachment_v0_2,
-    AttachmentBlobError, ATTACHMENT_BLOB_MAGIC, ATTACHMENT_BLOB_PROTOCOL_VERSION,
-    ATTACHMENT_BLOB_RESERVED, ATTACHMENT_BLOB_V0_2_MAGIC, ATTACHMENT_BLOB_V0_2_PROTOCOL_VERSION,
-    ATTACHMENT_ID_LEN, MAX_ATTACHMENT_LEN,
+    encode_attachment_blob_v0_2, encode_attachment_blob_v0_2_raw, encode_attachment_blob_versioned,
+    reseal_attachment_v0_2, AttachmentBlobError, ATTACHMENT_BLOB_MAGIC,
+    ATTACHMENT_BLOB_PROTOCOL_VERSION, ATTACHMENT_BLOB_RESERVED, ATTACHMENT_BLOB_V0_2_MAGIC,
+    ATTACHMENT_BLOB_V0_2_PROTOCOL_VERSION, ATTACHMENT_ID_LEN, MAX_ATTACHMENT_LEN,
 };
 pub use attachment_text_blob::{
     decode_attachment_text_blob, encode_attachment_text_blob, encode_attachment_text_blob_raw,
@@ -163,7 +163,7 @@ pub use graph_layout_blob::{
 pub use kdf::{
     derive_password_wrap_key, derive_password_wrap_key_v0_2, derive_recovery_wrap_key,
     derive_recovery_wrap_key_from_normalized, derive_recovery_wrap_key_from_normalized_v0_2,
-    ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
+    derive_recovery_wrap_key_v0_2, ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
 };
 pub use manifest::{
     compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
@@ -234,11 +234,11 @@ pub use vault_meta::{
     VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
 pub use vault_meta_v0_2::{
-    derive_items_key_v0_2, encode_vault_meta_v0_2_raw, meta_version_of, parse_vault_meta_any,
-    parse_vault_meta_v0_2, rewrite_vault_meta_password_side_v0_2,
+    derive_items_key_v0_2, derive_items_key_versioned, encode_vault_meta_v0_2_raw, meta_version_of,
+    parse_vault_meta_any, parse_vault_meta_v0_2, rewrite_vault_meta_password_side_v0_2,
     rewrite_vault_meta_password_side_versioned, serialize_vault_meta_v0_2,
-    unlock_root_key_v0_2_password, unlock_root_key_v0_2_recovery, VAULT_META_V0_2_MAGIC,
-    VAULT_META_V0_2_PROTOCOL_VERSION,
+    serialize_vault_meta_versioned, unlock_root_key_v0_2_password, unlock_root_key_v0_2_recovery,
+    VAULT_META_V0_2_MAGIC, VAULT_META_V0_2_PROTOCOL_VERSION,
 };
 pub use workspace_blob::{
     decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,

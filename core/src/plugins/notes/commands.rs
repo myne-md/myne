@@ -1101,7 +1101,11 @@ pub async fn note_update_with_dir(
                 }
                 // Entropy failure while re-sealing — the CRDT analogue of the
                 // `MY01` arm's unreachable-ProtocolError → JoinFailure.
-                CrdtNoteOpError::Csprng => NoteUpdateError::JoinFailure,
+                // `RevisionNotFound` belongs to the history reader, not to a
+                // write; it cannot arise here and collapses the same way.
+                CrdtNoteOpError::Csprng | CrdtNoteOpError::RevisionNotFound => {
+                    NoteUpdateError::JoinFailure
+                }
             })?;
             Ok(upd.blob)
         })

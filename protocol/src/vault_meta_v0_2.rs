@@ -331,6 +331,49 @@ pub fn derive_items_key_v0_2(
     to_key(pt)
 }
 
+/// Serialize a [`VaultMeta`] in the generation named by `version` —
+/// [`crate::vault_meta::serialize_vault_meta`] (`MYV1`) for
+/// [`MetaVersion::V0_1`], [`serialize_vault_meta_v0_2`] (`NTV5`) for
+/// [`MetaVersion::V0_2`].
+///
+/// For the sites that re-serialize a meta they just parsed. `VaultMeta` carries
+/// no generation, so the naked `serialize_vault_meta` re-stamps `MYV1` over
+/// whatever it was handed — and on a v0.2 record that produces a blob claiming
+/// v0.1 over v0.2 wrap bytes, which no credential opens and which strands every
+/// `NC05` note behind an unreachable `itemsKey`.
+pub fn serialize_vault_meta_versioned(
+    version: MetaVersion,
+    meta: &VaultMeta,
+) -> [u8; VAULT_META_LEN] {
+    match version {
+        MetaVersion::V0_1 => crate::vault_meta::serialize_vault_meta(meta),
+        MetaVersion::V0_2 => serialize_vault_meta_v0_2(meta),
+    }
+}
+
+/// Re-derive the singleton `itemsKey` under the generation named by `version` —
+/// [`crate::vault_meta::derive_items_key`] for [`MetaVersion::V0_1`],
+/// [`derive_items_key_v0_2`] for [`MetaVersion::V0_2`].
+///
+/// **Every post-`root_key` unlock path should call THIS, not either twin.** A
+/// parsed [`VaultMeta`] carries no generation of its own — the magic is consumed
+/// by the parser and never reaches the struct — so a call site holding only a
+/// `VaultMeta` has nothing to remind it that `derive_items_key` pins v0.1. That
+/// is not hypothetical: quick-unlock called the v0.1 twin directly, and a
+/// PIN/biometric unlock of a migrated vault failed on every attempt while the
+/// password path beside it branched correctly (`meta_version_of` on the bytes
+/// the reader already holds is where `version` comes from).
+pub fn derive_items_key_versioned(
+    version: MetaVersion,
+    root_key: &[u8; AEAD_KEY_LEN],
+    meta: &VaultMeta,
+) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, ProtocolError> {
+    match version {
+        MetaVersion::V0_1 => crate::vault_meta::derive_items_key(root_key, meta),
+        MetaVersion::V0_2 => derive_items_key_v0_2(root_key, meta),
+    }
+}
+
 /// Coerce a decrypted-key `Zeroizing<Vec<u8>>` to a fixed 32-byte key, rejecting
 /// a wrong length (a structurally-invalid unwrap) as [`ProtocolError::AeadFailure`].
 fn to_key(

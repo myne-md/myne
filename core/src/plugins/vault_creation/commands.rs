@@ -10,7 +10,7 @@ use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_id::VaultId;
 use protocol::{
-    KdfParams, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN, DEFAULT_V0_1_KDF_PARAMS,
+    KdfParams, MetaVersion, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN, DEFAULT_V0_1_KDF_PARAMS,
     VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
 use serde::Serialize;
@@ -23,6 +23,22 @@ use crate::host::tauri_host::TauriHost;
 use tauri::{Runtime, State};
 use uuid::Uuid;
 use zeroize::Zeroizing;
+
+/// The generation a vault created **today** is born in.
+///
+/// Every write on the creation path derives and frames through this one constant
+/// — the credential wrap keys, the `itemsKey` wrap, the three AADs, `vault.meta`
+/// itself, and the two singletons seeded beside it. Reading it is how you tell
+/// what a fresh vault is; changing it is the whole of the birth-format decision,
+/// and it is a **major-version event for every client**: §10.5 makes a v0.1
+/// client refuse an `NTV5` vault outright rather than half-open it, so a device
+/// left on an older release cannot join an account created after the flip.
+///
+/// v0.1 stays fully READABLE — it is what the §10.4 migration reads from, what
+/// `parse_vault_meta_any` accepts, and what every `*_versioned` helper's v0.1 arm
+/// serves — but nothing in the product produces it any more. The fixtures that
+/// still do are test-only and say so.
+const BIRTH_GENERATION: MetaVersion = MetaVersion::V0_2;
 
 /// Result returned by [`begin`].
 ///
@@ -195,10 +211,22 @@ pub fn build_session(
     let salt_password: [u8; ARGON2_SALT_LEN] = random_bytes()?;
     let salt_recovery: [u8; ARGON2_SALT_LEN] = random_bytes()?;
 
-    let password_wrap_key =
-        protocol::derive_password_wrap_key(password, &salt_password, &account.hash, &kdf_params)?;
-    let recovery_wrap_key =
-        protocol::derive_recovery_wrap_key(&phrase, &salt_recovery, &account.hash, &kdf_params)?;
+    // BIRTH FORMAT: v0.2. A vault created today is born `NTV5`/`NC05`, so both
+    // wrap keys derive under the v0.2 salt domain (`myne.v0.2 argon2id-…|`).
+    // v0.1 remains fully readable — it is what the §10.4 migration reads FROM —
+    // but nothing produces it any more.
+    let password_wrap_key = protocol::derive_password_wrap_key_v0_2(
+        password,
+        &salt_password,
+        &account.hash,
+        &kdf_params,
+    )?;
+    let recovery_wrap_key = protocol::derive_recovery_wrap_key_v0_2(
+        &phrase,
+        &salt_recovery,
+        &account.hash,
+        &kdf_params,
+    )?;
 
     Ok(VaultCreationSession {
         vault_id,
@@ -601,7 +629,8 @@ pub(crate) async fn commit_with_vault_path(
                     // is bounded; full atomic rollback would force the
                     // user to redo the entire Argon2id pipeline on every
                     // disk hiccup, which is the worse UX.
-                    let prefs_key = protocol::derive_subkey(
+                    let prefs_key = protocol::derive_subkey_versioned(
+                        BIRTH_GENERATION,
                         &session.root_key,
                         protocol::SubkeyRole::PrefsKey,
                     );
@@ -609,7 +638,8 @@ pub(crate) async fn commit_with_vault_path(
                         .parent()
                         .expect("vault_path has a parent (vault dir)")
                         .join("vault.prefs");
-                    match protocol::encode_prefs_blob(
+                    match protocol::encode_prefs_blob_versioned(
+                        BIRTH_GENERATION,
                         &prefs_key,
                         &session.account.hash,
                         &protocol::PrefsView::default(),
@@ -648,7 +678,8 @@ pub(crate) async fn commit_with_vault_path(
                     // vault.prefs: if this write fails the next catalog read
                     // falls back to empty per spec § 9.10.4 (read_or_empty),
                     // so the vault stays usable — no rollback of vault.meta.
-                    let catalog_key = protocol::derive_subkey(
+                    let catalog_key = protocol::derive_subkey_versioned(
+                        BIRTH_GENERATION,
                         &session.root_key,
                         protocol::SubkeyRole::AttachmentsCatalogKey,
                     );
@@ -656,7 +687,8 @@ pub(crate) async fn commit_with_vault_path(
                         .parent()
                         .expect("vault_path has a parent (vault dir)")
                         .join("vault.attachments");
-                    match protocol::encode_attachments_catalog(
+                    match protocol::encode_attachments_catalog_versioned(
+                        BIRTH_GENERATION,
                         &catalog_key,
                         &session.account.hash,
                         &protocol::AttachmentsCatalog::empty(),
@@ -741,23 +773,26 @@ pub fn build_and_serialize_vault_meta(
     session: &VaultCreationSession,
 ) -> Result<[u8; protocol::VAULT_META_LEN], AppError> {
     // Wrap root_key under password_wrap_key.
-    let aad_pw = protocol::aad_password_wrap(&session.kdf_params);
+    let aad_pw = protocol::aad_password_wrap_v0_2(&session.kdf_params);
     let (nonce_password_wrap, enc_root_key_password) =
         seal_32_byte_secret(&session.password_wrap_key, &session.root_key, &aad_pw)?;
 
     // Wrap root_key under recovery_wrap_key.
-    let aad_rec = protocol::aad_recovery_wrap(&session.kdf_params);
+    let aad_rec = protocol::aad_recovery_wrap_v0_2(&session.kdf_params);
     let (nonce_recovery_wrap, enc_root_key_recovery) =
         seal_32_byte_secret(&session.recovery_wrap_key, &session.root_key, &aad_rec)?;
 
     // Derive itemsKey_wrap_key, generate the singleton itemsKey + its
     // UUIDv7 identifier, and wrap.
-    let items_wrap_key =
-        protocol::derive_subkey(&session.root_key, protocol::SubkeyRole::ItemsKeyWrap);
+    let items_wrap_key = protocol::derive_subkey_versioned(
+        BIRTH_GENERATION,
+        &session.root_key,
+        protocol::SubkeyRole::ItemsKeyWrap,
+    );
     let items_key = protocol::generate_root_key()?;
     let items_uuid = Uuid::now_v7();
     let items_key_id: [u8; VAULT_META_ITEMS_KEY_ID_LEN] = *items_uuid.as_bytes();
-    let aad_items = protocol::aad_vault_items_key_wrap(&items_key_id);
+    let aad_items = protocol::aad_vault_items_key_wrap_v0_2(&items_key_id);
     let (items_key_nonce, enc_items_key) =
         seal_32_byte_secret(&items_wrap_key, &items_key, &aad_items)?;
 
@@ -779,7 +814,7 @@ pub fn build_and_serialize_vault_meta(
     // CTX-commitment AEAD shape). Compile-time guard:
     const _: () = assert!(VAULT_META_WRAPPED_ITEMS_KEY_LEN == VAULT_META_WRAPPED_ROOT_KEY_LEN);
 
-    Ok(protocol::serialize_vault_meta(&meta))
+    Ok(protocol::serialize_vault_meta_v0_2(&meta))
 }
 
 /// Fill a fixed-size buffer from the OS CSPRNG, mapping any failure
@@ -1510,7 +1545,13 @@ mod tests {
 
             let catalog_bytes = std::fs::read(scratch.dir.join("vault.attachments"))
                 .expect("vault.attachments must exist after eager-write");
-            let catalog_key = protocol::derive_subkey(
+            assert_eq!(
+                &catalog_bytes[0..4],
+                protocol::CATALOG_BLOB_V0_2_MAGIC.as_slice(),
+                "a vault born v0.2 seeds an MYC5 catalog"
+            );
+            let catalog_key = protocol::derive_subkey_versioned(
+                BIRTH_GENERATION,
                 &original_root_key,
                 protocol::SubkeyRole::AttachmentsCatalogKey,
             );
@@ -1573,6 +1614,43 @@ mod tests {
 
     /// MYND-160 Task 12: the eager-written `vault.prefs` decrypts under
     /// the same `root_key` the just-created vault carries, and the
+    /// THE BIRTH FORMAT, asserted on the bytes.
+    ///
+    /// Everything else about creation is generation-blind by construction —
+    /// `parse_vault_meta_any` accepts either, the singleton decoders detect the
+    /// magic, unlock branches — so a regression to v0.1 would break nothing
+    /// visible and no other test here would notice. The four-byte magic is the
+    /// only thing that says which generation a new user's vault actually is.
+    #[test]
+    fn a_freshly_created_vault_is_born_in_the_birth_generation() {
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let state = VaultCreationState::default();
+            let token = Uuid::new_v4();
+            let session = build_session(VaultId::mint(), "birth-format-pw", FAST_TEST_KDF)
+                .expect("build_session");
+            state
+                .try_insert(token, session)
+                .expect("scratch state has room");
+
+            commit_with_vault_path(token, scratch.path().to_path_buf(), &state)
+                .await
+                .expect("commit happy-path");
+
+            let meta_bytes = std::fs::read(scratch.path()).expect("vault.meta");
+            assert_eq!(
+                protocol::meta_version_of(&meta_bytes),
+                Some(BIRTH_GENERATION),
+                "a new vault must be born in BIRTH_GENERATION"
+            );
+            assert_eq!(
+                &meta_bytes[0..4],
+                protocol::VAULT_META_V0_2_MAGIC.as_slice(),
+                "and that generation is NTV5 on disk"
+            );
+        });
+    }
+
     /// plaintext is `PrefsView::default()` (screen_capture_protection
     /// defaults to `true` per spec § 9.5.5 safer-state semantic).
     /// Pins the round-trip property: a fresh vault opened immediately
@@ -1604,8 +1682,16 @@ mod tests {
             // root_key and account_number_hash.
             let prefs_bytes = std::fs::read(scratch.dir.join("vault.prefs"))
                 .expect("vault.prefs must exist after eager-write");
-            let prefs_key =
-                protocol::derive_subkey(&original_root_key, protocol::SubkeyRole::PrefsKey);
+            assert_eq!(
+                &prefs_bytes[0..4],
+                protocol::PREFS_BLOB_V0_2_MAGIC.as_slice(),
+                "a vault born v0.2 seeds an MYP5 prefs blob"
+            );
+            let prefs_key = protocol::derive_subkey_versioned(
+                BIRTH_GENERATION,
+                &original_root_key,
+                protocol::SubkeyRole::PrefsKey,
+            );
             let prefs_view =
                 protocol::decode_prefs_blob(&prefs_key, &original_account_hash, &prefs_bytes)
                     .expect(
