@@ -161,7 +161,7 @@ pub(crate) fn to_hex(bytes: &[u8]) -> String {
 }
 // NOTE: `init()` + `generate_handler!` + the `sync:default` capability live in
 // each CLIENT's thin shim (desktop `src-tauri/src/plugins/sync/mod.rs`, mobile
-// `myne-mobile/src-tauri/src/plugins/sync/mod.rs`), not here — the same
+// `mobile/src-tauri/src/plugins/sync/mod.rs`), not here — the same
 // per-client-wiring split the `notes`/`prefs` cores use. The command bodies +
 // engine + transport all live in this shared core (decisions.md 2026-07-07,
 // supersedes the 2026-06-30 "sync stays per-client" scope).

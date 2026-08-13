@@ -927,6 +927,113 @@ steps:
         fi
         pnpm test:e2e:web
 
+  # ─── Mobile lane (the client moved in-repo; see decisions.md) ────────────────
+  # These four steps replace the whole of `myne-mobile/.woodpecker.yml`, and the
+  # thing worth noticing is what is NOT here: that pipeline began by cloning THIS
+  # repo and `git reset --hard`-ing it to `develop` tip, then symlinking nine
+  # directories next to the checkout, because the mobile crate path-depends on
+  # `protocol` + `core` and its TS aliases resolve into `src/`, `editor/`,
+  # `dialect/`, `ornaments/` and `locales/`. That block is deleted rather than
+  # ported. It is also what made mobile CI unable to gate anything: a mobile
+  # commit built against whatever develop happened to be at that moment, so the
+  # same SHA gave different answers on different days, and a change HERE that
+  # broke mobile stayed invisible until somebody pushed THERE.
+  #
+  # Three of that pipeline's six steps are simply gone, absorbed by workspace-wide
+  # steps that already exist: `cargo fmt --all` (cargo-fmt) and `cargo deny check`
+  # (cargo-deny) now reach the mobile crates because they are workspace members,
+  # and its `pnpm install` half is the shared one.
+  #
+  # Placement follows `web-build`'s rule exactly, and for its reason: the desktop
+  # lane is one serial chain because each of its steps runs `pnpm install` into
+  # the shared workspace node_modules, so this hangs off the END and adds nothing
+  # to that chain's wall-clock.
+  mobile-build:
+    image: node:25
+    when: *code-paths
+    depends_on:
+      - name: web-build
+        optional: true
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm mobile:build
+
+  # npm dependency-license gate — the npm analogue of cargo-deny, and the one
+  # step here that got STRICTER by moving. It lived in `myne-mobile/scripts/` and
+  # walked only that client's dependency tree, so the desktop and web npm trees
+  # had never been license-gated at all; the first workspace-wide run turned up
+  # five ungated packages. One lockfile is what made a workspace-wide run mean
+  # anything.
+  npm-licenses:
+    image: node:25
+    when: *code-paths
+    depends_on: [mobile-build]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - node scripts/check-npm-licenses.mjs
+
+  # Mobile frontend unit tests (the ported state machine + helpers). Serialized
+  # after mobile-build so the pnpm-install steps stay linear, same as the desktop
+  # lane's vitest.
+  mobile-vitest:
+    image: node:25
+    when: *code-paths
+    depends_on: [mobile-build]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm mobile:test
+
+  # Sync UI flow-logic tier (MYND-462 T3) — NOT end-to-end. Playwright drives
+  # headless Chromium against the Vite DEV SERVER with a MOCK Tauri IPC, so it
+  # exercises the flow machine via the `data-testid` contract: no device, no Rust
+  # backend, no real transport. Device-level UI testing is the SYNC-44 exemption
+  # (MYND-467). Keep the "flow-logic" label — never call this tier end-to-end.
+  #
+  # The dev server it starts is on :1422. Desktop holds :1420 and web :1421; the
+  # mobile client claimed :1420 too while it was a separate checkout, which in one
+  # repo would have let `reuseExistingServer` attach these specs to the DESKTOP
+  # app and report green about the wrong client.
+  mobile-flow-logic:
+    image: mcr.microsoft.com/playwright:v1.61.1-noble
+    when: *code-paths
+    depends_on: [mobile-vitest]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm mobile:test:flow
+
+  # Mobile Rust: clippy + unit tests for `myne-mobile` and its four Tauri
+  # plugins. A step of its own rather than extra `-p` flags on `cargo-test-tauri`
+  # for the placement reason above — that step is inside the serial desktop
+  # chain, and this must not lengthen it. It needs the Tauri Linux WebView
+  # sysdeps; compiling the mobile lib for the Linux host is what exercises the
+  # platform-agnostic Rust logic (the real iOS/Android builds need Xcode and the
+  # Android SDK+NDK and belong to the release matrix, exactly as the desktop
+  # signed-bundle pipeline is separate from this verification CI).
+  mobile-compile:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    depends_on:
+      - name: web-build
+        optional: true
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      - apt-get update && apt-get install -y --no-install-recommends
+        git ca-certificates pkg-config libssl-dev
+        libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - rustup component add clippy
+      - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders --all-targets -- -D warnings
+      - cargo test -p myne-mobile --no-fail-fast
+
   # ─── Hosted web-client deploy (MYND-574 task 112) ────────────────────────────
   # The repo's first deployable artefact. Same shape every sibling repo already
   # uses (`myne-server`, `myne-website`): a `docker:28-cli` step that builds on
@@ -1292,6 +1399,20 @@ steps:
       # gate, not a quarantine — so leaving it out would mean a red pipeline with
       # no push, the same hole `mobile-crosscheck` left below.
       - name: e2e-web
+        optional: true
+      # The mobile lane. Every one of these five is a blocking gate with no
+      # failure:ignore, so each can go red on its own — the exact hole
+      # `mobile-crosscheck` left below, and the reason mobile CI failures used to
+      # notify a different pipeline in a different repo.
+      - name: mobile-build
+        optional: true
+      - name: npm-licenses
+        optional: true
+      - name: mobile-vitest
+        optional: true
+      - name: mobile-flow-logic
+        optional: true
+      - name: mobile-compile
         optional: true
       # The deploy chain (task 112). A deploy that fails silently is worse than
       # one that fails loudly: the previous container keeps serving and nobody

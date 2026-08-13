@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import tauriConf from "../src-tauri/tauri.conf.json";
 
-// Regression guard for the mobile CSP (myne-mobile/src-tauri/tauri.conf.json).
+// Regression guard for the mobile CSP (mobile/src-tauri/tauri.conf.json).
 //
 // The Files-tab PDF preview loads the decrypted bytes via `fetch("attachment://…")`
 // (editor/src/attachments/pdf-render.ts), which is governed by CSP `connect-src`;

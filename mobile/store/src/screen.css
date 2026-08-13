@@ -2,7 +2,7 @@
    scaled x2.2 by build.js. Every value is the app's own token from
    docs/design/colors_and_type.css — warm-paper #fbfbfa, ink #1a1a17, iron-blue
    #2c4a7a, the 4px spacing scale, Inter (UI) + JetBrains Mono (crypto ids only).
-   Component structure mirrors myne-mobile/src/app/flows/. If a token changes,
+   Component structure mirrors mobile/src/app/flows/. If a token changes,
    change it here too. Solid surfaces only; no gradients, no glass. */
 
 .app{width:440px;height:956px;display:flex;flex-direction:column;

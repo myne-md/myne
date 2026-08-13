@@ -7,7 +7,7 @@ turns it on (Settings → Transcription; on by default). Mobile bundles a smalle
 Play Store bundle-size limits make base's ~80 MB too heavy — whisper-tiny q8_0 is
 ~40 MB. A user who picks their own model **overrides** whatever ships here.
 
-Bundled into the mobile app via `myne-mobile/src-tauri/tauri.conf.json`
+Bundled into the mobile app via `mobile/src-tauri/tauri.conf.json`
 (`"../../src-tauri/resources/models/whisper-tiny": "models/whisper"`), so at
 runtime it resolves to `<resource_dir>/models/whisper/model.gguf` — the same path
 `model_store::bundled_transcription_model` reads on both clients.
@@ -21,7 +21,7 @@ runtime it resolves to `<resource_dir>/models/whisper/model.gguf` — the same p
 | `tokenizer.json` | the Whisper tokenizer | normal git |
 | `MODEL-LICENSE` | the Apache-2.0 license text for the weights | normal git |
 
-The engine (`myne-mobile/src-tauri/src/plugins/local_inference/engine_candle.rs`,
+The engine (`mobile/src-tauri/src/plugins/local_inference/engine_candle.rs`,
 `load_transcription`) loads `model.gguf` via candle's `WhisperVarBuilder::from_gguf`
 and reads the two siblings. If any file is absent (e.g. a `--no-default-features`
 build, or a checkout whose LFS blob was not fetched) resolution degrades cleanly
@@ -32,7 +32,7 @@ to side-load-only (`Engine::NotReady`), so the build never breaks.
 - **Source:** [`openai/whisper-tiny`](https://huggingface.co/openai/whisper-tiny)
   `model.safetensors` + `config.json` + `tokenizer.json`. **License: Apache-2.0**
   (see `MODEL-LICENSE`; attribution in the repo-root `LICENSING.md` and
-  `myne-mobile/LICENSING.md`).
+  the root `LICENSING.md` "Bundled third-party assets" section).
 - **Quantization:** q8_0 (near-lossless), via candle `0.8.4` `tensor-tools`:
   `tensor-tools quantize model.safetensors --out-file model.gguf --quantization q8_0`.
   (llama.cpp policy — 2D weights quantized, norms/biases/conv kept f32.)
@@ -57,4 +57,4 @@ tensor-tools quantize model.safetensors --out-file model.gguf --quantization q8_
 ```
 
 Commit via Git LFS (`git lfs ls-files` must list `model.gguf` as a pointer). iOS
-builds need `-C target-feature=+fp16` (see `myne-mobile/src-tauri/.cargo/config.toml`).
+builds need `-C target-feature=+fp16` (see `mobile/src-tauri/.cargo/config.toml`).

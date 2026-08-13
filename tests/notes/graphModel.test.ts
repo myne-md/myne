@@ -1,7 +1,7 @@
 // The desktop half of the cross-client graph-model contract (myne-md/myne#199).
 // Runs the shared fixture through the desktop extraction pipeline — parse →
 // `extractWikilinkEdges` → `buildGraphModel` — and compares the summary against
-// the one expected answer. `myne-mobile/tests/wikilinks.test.ts` runs the same
+// the one expected answer. `mobile/tests/wikilinks.test.ts` runs the same
 // fixture through its own pipeline; the two agreeing IS the parity guarantee.
 
 import { describe, expect, it } from "vitest";

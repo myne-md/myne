@@ -38,7 +38,7 @@
 // ## Scheme grammar (shared across the fleet)
 //
 // `myne://` is co-owned with the mobile client, which already ships
-// `myne://open` and `myne://capture?mode=voice` (`myne-mobile/src/lib/deep-link.ts`).
+// `myne://open` and `myne://capture?mode=voice` (`mobile/src/lib/deep-link.ts`).
 // Desktop adds the `theme` action; the two parsers ignore each other's actions
 // by design, so neither has to know the other's grammar.
 //

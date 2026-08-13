@@ -1,7 +1,7 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 
-// Resolve a path relative to THIS config file (myne-mobile/), so the sibling
+// Resolve a path relative to THIS config file (mobile/), so the sibling
 // shared packages under the parent `myne/` repo resolve regardless of cwd.
 const sib = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 

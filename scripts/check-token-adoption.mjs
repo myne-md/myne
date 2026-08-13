@@ -62,10 +62,15 @@ const RECORD = join(ROOT, "scripts/token-adoption.json");
  *
  * Keeping a private list is what `scripts/lib/shared-roots.mjs` exists to stop,
  * and it had already bitten: `web/src` is painted by the very same
- * `applyCustomTheme` and carried uncounted literals. `myne-mobile/src` is dropped
- * because it is a companion repo, absent from CI and from a fresh clone.
+ * `applyCustomTheme` and carried uncounted literals.
+ *
+ * `mobile/src` used to be dropped here — it was a companion repo, absent from CI
+ * and from a fresh clone, so counting it would have meant one number locally and
+ * a different one on the runner. It is in-repo now and it is painted by the same
+ * `applyCustomTheme`, so it is in scope like every other shared root, with its
+ * current per-file counts recorded as the starting debt in `token-adoption.json`.
  */
-const SCAN_ROOTS = presentSharedRoots().present.filter((r) => !r.startsWith("myne-mobile"));
+const SCAN_ROOTS = presentSharedRoots().present;
 
 /**
  * Files that DEFINE token values rather than consuming them.

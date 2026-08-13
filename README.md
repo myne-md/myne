@@ -95,7 +95,6 @@ The full project spans several repos under the [`myne-md`](https://github.com/my
 | Repo | What it is |
 |---|---|
 | [`myne-server`](https://github.com/myne-md/myne-server) | Zero-knowledge sync server — the TB5 trust boundary, identical hosted and self-hosted |
-| [`myne-mobile`](https://github.com/myne-md/myne-mobile) | iOS + Android client |
 | [`myne-clipper`](https://github.com/myne-md/myne-clipper) | Browser-extension clipper — the paired channel that talks to this repo's native host |
 | [`myne-website`](https://github.com/myne-md/myne-website) | Marketing site (myne.md) |
 | [`myne-test-vectors`](https://github.com/myne-md/myne-test-vectors) | Language-agnostic vectors that pin byte-level cross-implementation agreement on the protocol |

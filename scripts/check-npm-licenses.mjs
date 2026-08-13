@@ -37,6 +37,17 @@ const ALLOW = new Set([
   "Zlib",
   "0BSD",
   "Python-2.0",
+  // BlueOak-1.0.0 — the Blue Oak Model License 1.0.0, OSI-approved and
+  // permissive with no copyleft, so AGPL-compatible like every other entry here.
+  // Deps: the `isaacs` tooling family (glob, minimatch, lru-cache, minipass,
+  // path-scurry). Third npm-ecosystem addition, and the one with a story: this
+  // gate lived in `myne-mobile/scripts/` and walked only the mobile client's
+  // dependency tree, so the DESKTOP and WEB npm trees had never been license-
+  // gated at all — the five packages above sat in them, ungated, the whole time.
+  // Folding the mobile client in-repo left one lockfile and one node_modules,
+  // which is what made a workspace-wide run possible and turned them up. The
+  // dependencies are not new; the gate over them is.
+  "BlueOak-1.0.0",
 ]);
 
 // Per-package exceptions — verified-permissive but NOT machine-detectable by

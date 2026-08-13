@@ -26,7 +26,7 @@
 # (no real user data) and claims nothing the threat model does not back.
 set -euo pipefail
 cd "$(dirname "$0")"                    # store/
-ROOT="$(cd .. && pwd)"                  # myne-mobile/
+ROOT="$(cd .. && pwd)"                  # mobile/
 
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 OUT="6.9"

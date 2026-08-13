@@ -10,12 +10,18 @@
 //     mobile's Trash list and Conflicts sheet never got it, so "Delete
 //     permanently" was a visible no-op and "Discard" never cleared a conflict
 //   - `src/App.tsx` replaced post-delete routing with `reprobe`;
-//     `myne-mobile/src/lib/stage.ts` still routes to the first-run Welcome
+//     `mobile/src/lib/stage.ts` still routes to the first-run Welcome
 //     screen — SEVEN MONTHS of commits later
-//   - `myne-mobile/src-tauri/src/hooks.rs` has `emit_snapshot_write_failed` as a
+//   - `mobile/src-tauri/src/hooks.rs` has `emit_snapshot_write_failed` as a
 //     bare empty body while desktop emits and renders an indicator
-//   - `myne-mobile/src/lib/welcomeNote.ts` is still English-only after
+//   - `mobile/src/lib/welcomeNote.ts` is still English-only after
 //     `@myne/i18n` went live on mobile
+//
+// Every one of those was found by hand, because until the mobile client moved
+// in-repo this check could not run where it mattered: the mobile tree was a
+// gitignored companion clone, absent from every CI run, so the guard written
+// FOR the desktop/mobile twin problem printed "skipped" on the runner and had
+// never once executed there. That is why the not-cloned branch below is gone.
 //
 // **This is a WARNING, not a gate, and that is deliberate.** A hard gate would
 // be wrong and would be bypassed within a week: most one-sided changes are
@@ -33,7 +39,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
-const MOBILE = "myne-mobile";
+const MOBILE = "mobile";
 
 /**
  * Pairs that are twins by NAME rather than by path — one client's module and
@@ -105,7 +111,13 @@ function* walk(dir) {
  */
 function discoverTwins() {
   const mobileRoot = join(ROOT, MOBILE);
-  if (!existsSync(mobileRoot)) return { byPath: new Map(), byName: new Map() };
+  // In-repo since the mobile client moved here, so an absent tree is a broken
+  // checkout rather than the normal companion-not-cloned case this used to
+  // return an empty map for. Say so instead of silently finding no twins.
+  if (!existsSync(mobileRoot)) {
+    console.error(`twin-drift: ${MOBILE}/ is missing — this is an in-repo tree, so the checkout is broken.`);
+    process.exit(1);
+  }
 
   const mobileFiles = [...walk(mobileRoot)];
   const byPath = new Map();
@@ -162,14 +174,7 @@ for (const file of changed) {
 }
 
 if (notes.length === 0) {
-  if (byPath.size === 0) {
-    console.log(
-      "twin-drift: skipped — the myne-mobile companion is not cloned here " +
-        "(clone it via ./workspace/setup.sh to get this check locally).",
-    );
-  } else {
-    console.log(`twin-drift: ok (no one-sided twin change in ${changed.length} changed file(s))`);
-  }
+  console.log(`twin-drift: ok (no one-sided twin change in ${changed.length} changed file(s))`);
   process.exit(0);
 }
 

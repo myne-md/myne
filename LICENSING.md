@@ -38,7 +38,7 @@ licensed (each carries its own `LICENSE`):
 
 | Repo | License |
 |---|---|
-| `myne-server`, `myne-mobile`, `myne-clipper` | AGPL-3.0 |
+| `myne-server`, `myne-clipper` | AGPL-3.0 |
 | `myne-web` | AGPL-3.0 — **archived**; the web client is the in-repo `web/` subtree above (`docs/decisions.md` 2026-07-26) |
 | `myne-test-vectors` | CC-BY-4.0 |
 | `myne-website` | MIT |
@@ -48,15 +48,21 @@ licensed (each carries its own `LICENSE`):
 
 ## Bundled third-party assets
 
-Some non-source assets are redistributed inside the desktop bundle. Each is
-under a license compatible with the application's AGPL-3.0 and is redistributed
-with attribution; none is Myne-authored.
+Some non-source assets are redistributed inside the desktop bundle, and a
+different subset inside the mobile `.ipa` / `.apk`. Each is under a license
+compatible with the application's AGPL-3.0 and is redistributed with attribution;
+none is Myne-authored. The mobile rows were merged in here on 2026-08-13 when the
+mobile client moved in-repo — they had been in a `myne-mobile/LICENSING.md` of
+their own, and they are **not** duplicates of the desktop rows: the two bundles
+ship different Whisper weights.
 
 | Asset | Where | Upstream | License | AGPL-3.0 compatibility |
 |---|---|---|---|---|
 | Default speech-to-text model (voice-to-text, MYND-270) | `src-tauri/resources/models/whisper/model.gguf` (Git LFS; desktop-only) | [OpenAI Whisper `whisper-base`](https://huggingface.co/openai/whisper-base) weights, quantized to a candle GGUF | **Apache-2.0** | Compatible (Apache-2.0 → AGPL-3.0 is a one-way-compatible direction per the FSF license list). Redistribution requires only preserving the Apache-2.0 license + attribution — both satisfied here. |
 | Tag-suggestion model (auto-tag, MYND-651) | `src-tauri/resources/models/tag/model.gguf` (Git LFS; desktop-only) | [Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) weights — **a Myne-produced derivative** of the first-party `Q4_K_M` GGUF Qwen publishes (one duplicated tensor removed; no re-quantization) | **Apache-2.0** | Compatible, on the same one-way Apache-2.0 → AGPL-3.0 direction as the Whisper model above. Redistribution requires preserving the Apache-2.0 license + attribution, **and stating the modification** — all three satisfied here. |
 | Hunspell spell-check dictionaries | `src-tauri/resources/dictionaries/**` | per-language upstreams | mixed (LGPL / MPL / BSD / GPL-with-linking-exception, per dictionary) | Compatible; each dictionary keeps its upstream license. |
+| Default speech-to-text model — **mobile bundle** (voice-to-text, MYND-563) | `models/whisper/model.gguf` in the `.ipa`/`.apk`, from `src-tauri/resources/models/whisper-tiny/` (Git LFS), pulled in by `mobile/src-tauri/tauri.conf.json` `bundle.resources` | [OpenAI Whisper `whisper-tiny`](https://huggingface.co/openai/whisper-tiny) weights, quantized to a candle GGUF | **Apache-2.0** | Compatible, same one-way direction as the desktop row above. |
+| Text-recognition (OCR) models — **mobile bundle** | `models/ocr/` in the `.ipa`/`.apk`, from `src-tauri/resources/models/ocr/` (Git LFS) | RapidOCR / PP-OCR models via the `rten` runtime | permissive (per upstream) | Compatible; each model keeps its upstream license. |
 | `myne-tor` sidecar binary (desktop Tor routing, MYND-650) | `src-tauri/binaries/myne-tor-<triple>` in the bundle; built from the in-repo `tor-sidecar/` crate | [arti](https://gitlab.torproject.org/tpo/core/arti) (The Tor Project's Rust Tor implementation) + its dependency tree | **MIT OR Apache-2.0** | Compatible (both are one-way-compatible into AGPL-3.0). Unlike every other dependency, this one is redistributed as a **separate executable** rather than linked in, so it is listed here as a bundled artefact too. |
 
 **Whisper model provenance + obligations.** The bundled model is a quantized
@@ -69,6 +75,17 @@ as `MODEL-LICENSE`), (b) retain attribution to OpenAI Whisper, and (c) note that
 the file is a quantized modification of the upstream weights — all recorded here
 and in `src-tauri/resources/models/whisper/README.md`. A user who overrides the
 model with their own file is responsible for that file's license.
+
+**The mobile bundle ships a different Whisper model, and that is deliberate.**
+Mobile bundles **whisper-tiny** (~40 MB) where desktop bundles **whisper-base**
+(~80 MB), because App Store / Play Store bundle-size limits make base too heavy.
+The Apache-2.0 §4 obligations are identical and identically satisfied: the license
+text ships next to the model as `MODEL-LICENSE`, attribution to OpenAI Whisper is
+retained, and the quantization (q8_0 via candle `tensor-tools`) is stated as a
+format conversion of the upstream weights — recorded here and in
+`src-tauri/resources/models/whisper-tiny/README.md`. The OCR `.rten` weights were
+bundled on mobile with no licensing file at all until MYND-563 documented them;
+the row above is that record.
 
 **Tag-model provenance + obligations.** The auto-tag weights are a quantized
 derivative of `Qwen/Qwen2.5-0.5B-Instruct`, distributed under **Apache-2.0** by

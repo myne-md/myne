@@ -82,7 +82,7 @@ tauri = { version = "2", features = [] }
 # `theme_validator` allowlist, and the app re-validates every deep-linked
 # payload as untrusted, author-controlled input.
 #
-# Same crate + version already vetted and shipping in the `myne-mobile`
+# Same crate + version already vetted and shipping in the `mobile/`
 # companion (which owns the `myne://open` / `myne://capture` half of the
 # scheme grammar) — one implementation across the fleet, no fork. Adds NO
 # network surface: no HTTP client in its tree (`serde`, `url`, `tauri-utils`,
