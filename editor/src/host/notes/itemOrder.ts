@@ -10,7 +10,7 @@
 // so a reorder in one folder never clobbers another's order.
 //
 // This module is the single home the desktop (`src/notes/components/*` shims)
-// and mobile (`myne-mobile/src/lib/folders.ts`) both import, replacing the two
+// and mobile (`mobile/src/lib/folders.ts`) both import, replacing the two
 // parallel copies (`buildItemRankMap`/`itemOrderRank`) that had begun to drift.
 
 import { foldSegment, normalizeFolderPath } from "@myne/dialect/folderPath";

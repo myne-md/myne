@@ -1,7 +1,15 @@
 packages:
+  # The mobile client. Unlike `web/` — a pure Vite target with no package.json
+  # of its own — this is a second Tauri APPLICATION: it owns a tauri.conf.json,
+  # its own CLI invocations (`tauri ios dev`, `tauri android build`) and an icon
+  # sync hook, and Tauri runs `beforeDevCommand` with `mobile/` as the cwd. So it
+  # keeps its package.json and joins as a workspace MEMBER, which is what buys
+  # the thing the split never could: one lockfile, one node_modules, and no way
+  # for a shared dependency to be pinned differently here than in `src/`.
+  - mobile
   # Shared frontend source packages (consumed as source by desktop `src/` and
-  # mobile `myne-mobile/src/`) — the JS analog of the shared `core`/`protocol`
-  # Rust crates. Phase A editor/dialect extraction.
+  # `mobile/src/`) — the JS analog of the shared `core`/`protocol` Rust crates.
+  # Phase A editor/dialect extraction.
   - dialect
   - editor
   # Shared load-bearing user-facing copy (SYNC-42) — privacy-property strings

@@ -29,7 +29,7 @@ We may also work with you to coordinate disclosure timing with downstream packag
 
 In scope for security reports:
 - The `myne-md/myne` repository (this one) — desktop client, the in-repo **web client** (`web/`), `protocol/` Rust crypto crate, build configuration
-- Companion repositories under `myne-md/`: `myne-server`, `myne-mobile`, `myne-clipper`, `myne-website`, `myne-themes`, `myne-status`, `operations`, `myne-test-vectors`
+- Companion repositories under `myne-md/`: `myne-server`, `myne-clipper`, `myne-website`, `myne-themes`, `myne-status`, `operations`, `myne-test-vectors`
   - `myne-clipper` also reaches across into this one: the extension is keyless, and its scoped pairing token binds it to the native-messaging host that lives in `src-tauri/src/clipper/` here (`docs/threat-model.md` TB10 / A14). Report either half wherever you found it — we will route it.
 - **The served web bundle and its integrity chain** — the reproducible build of `web/`, the published per-release bundle hashes and their append-only record, and any way to make a served bundle differ from the source it claims to be built from without that being detectable
 - **The documented service-worker update policy and the decision logic that implements it** (`web/src/sw/update-policy.ts`) — its signing key, its rotation and revocation story, and any way to get code past the pin that policy defines. The worker that would enforce it **is not implemented yet** (`docs/threat-model.md` A15 / TB11), so a report here is against the design and the policy function, not against a pin running in anyone's browser

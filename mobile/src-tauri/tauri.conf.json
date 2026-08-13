@@ -5,7 +5,7 @@
   "identifier": "md.myne.mobile",
   "build": {
     "beforeDevCommand": "pnpm sync-icons && pnpm dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:1422",
     "beforeBuildCommand": "pnpm sync-icons && pnpm build",
     "frontendDist": "../dist"
   },

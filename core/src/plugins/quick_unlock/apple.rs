@@ -7,7 +7,7 @@
 //! - **macOS** — Touch ID via the login Keychain.
 //! - **iOS** — Face ID / Touch ID via the device Keychain (Secure-Enclave-backed
 //!   on all supported hardware). The host app MUST declare
-//!   `NSFaceIDUsageDescription` (myne-mobile `Info.ios.plist`) or the Face ID
+//!   `NSFaceIDUsageDescription` (mobile `Info.ios.plist`) or the Face ID
 //!   prompt is denied by the OS.
 //!
 //! ⚠️ **UNVERIFIED — pending biometric hardware test + a primitive-level review.**

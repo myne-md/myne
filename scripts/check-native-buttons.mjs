@@ -71,18 +71,20 @@ import { join, relative } from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname;
 
 // Deliberately NOT `scripts/lib/shared-roots.mjs`, which that module asks a
-// narrower guard to say out loud. Two roots there do not belong to this rule:
+// narrower guard to say out loud. One root there does not belong to this rule:
 //
-//   - `myne-mobile/src` is a companion REPO. It is nested in a full workspace
-//     checkout and absent from CI, so importing the roster made this guard scan
-//     220 extra buttons locally and none on the runner — a gate that means
-//     something different on two machines. It also has its own token set and its
-//     own review; this repo does not get to fail its commits.
 //   - `copy/`, `ornaments/`, `preview/` render no buttons; listing them would
 //     imply a scope that has never had anything to find.
 //
-// What remains is exactly the tree compiled into the desktop and web clients.
-const SCANNED_TREES = ["src", "web/src", "editor/src", "dialect/src"];
+// `mobile/src` used to be excluded too, for two reasons that both expired when
+// the mobile client moved in-repo: it was a companion REPO absent from CI, so
+// scanning it meant 220 extra buttons locally and none on the runner — a gate
+// that means something different on two machines — and it had its own review, so
+// this repo did not get to fail its commits. Same repo, same CI, same review now,
+// and the tree passes clean (447 buttons total), so it is simply in scope.
+//
+// What remains is exactly the tree compiled into a client that renders buttons.
+const SCANNED_TREES = ["src", "web/src", "editor/src", "dialect/src", "mobile/src"];
 
 /** A property whose presence means the button paints itself rather than letting
  *  the user agent do it. Prefix match, so `borderRadius`, `backgroundColor` and

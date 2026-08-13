@@ -1,6 +1,16 @@
-# myne-mobile — Tauri 2 Mobile client
+# `mobile/` — Tauri 2 Mobile client
 
-> Companion repository to [`myne`](https://github.com/myne-md/myne). License: AGPL-3.0.
+> In-repo client, at `mobile/` (`design-notes.md` 2026-08-13). License: AGPL-3.0,
+> per the repo-root [`LICENSING.md`](../LICENSING.md), which also carries this
+> bundle's third-party asset attributions.
+>
+> This was the `myne-mobile` companion repository until 2026-08-13. It never
+> built outside a `myne` checkout — `src-tauri` path-depends on `../../protocol`
+> and `../../core`, and roughly twenty-five `@myne/*` aliases resolve into the
+> parent tree — so the boundary cost a second `Cargo.lock` (62 of 572 shared
+> crates drifted), a CI pipeline that cloned this repo's `develop` tip on every
+> run, and six guards that skipped themselves. The pnpm PACKAGE is still named
+> `myne-mobile`; the directory is not.
 
 ## Status
 

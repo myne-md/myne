@@ -178,8 +178,9 @@ pre-commit:
       # #261: a change to one side of a twin module pair. WARNING ONLY (the
       # script exits 0) — most one-sided changes are legitimate, and a gate
       # would be bypassed rather than heeded. Prints the counterpart and the
-      # one line to add to the PR body. Silently skips where the `myne-mobile`
-      # companion is not cloned.
+      # one line to add to the PR body. It used to skip silently where the
+      # `myne-mobile` companion was not cloned — i.e. always, in CI; the mobile
+      # tree is in-repo now, so it runs everywhere.
       run: node scripts/check-twin-drift.mjs {staged_files}
 
     preview-freshness:
@@ -296,11 +297,15 @@ pre-commit:
       #   - protocol/fuzz — an intentionally severed tooling workspace (its own
       #     empty [workspace] table so the nightly libFuzzer toolchain stays out
       #     of the product build).
-      #   - companion repos nested under this checkout (myne-mobile/, myne-server/,
+      #   - companion repos nested under this checkout (myne-server/, operations/,
       #     …; all gitignored) — each is a separate repo with its own deliberate
-      #     lock (e.g. myne-mobile/src-tauri/Cargo.lock shares `myne-core` via a
-      #     path dep but pins it in its own standalone workspace lock), never the
-      #     main repo's audit anchor.
+      #     lock, never the main repo's audit anchor.
+      # The mobile client USED to be the sharpest example of that second class:
+      # `myne-mobile/src-tauri/Cargo.lock` shared `myne-core` and `protocol` via
+      # path deps but pinned their closure in a standalone workspace lock of its
+      # own, in which 62 of 572 shared crates had drifted from this one. It is a
+      # member of this workspace now, governed by the root lock like every other
+      # crate, which is what makes the anchor describe the mobile build too.
       # `git check-ignore` filters those out while still catching a real
       # per-crate lock SPLIT committed inside the workspace.
       run: |

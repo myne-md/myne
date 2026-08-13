@@ -21,9 +21,9 @@ const ROOT = new URL("..", import.meta.url).pathname + "../";
 /**
  * Every tree whose source is compiled into more than one client.
  *
- * `myne-mobile/src` is here because it IS shared-consuming, and absent from a
- * fresh clone — see {@link presentSharedRoots}, which is what a guard should
- * actually walk.
+ * All of them are now in-repo, so every root here is present in every checkout
+ * and in every CI run — see {@link presentSharedRoots}, which used to be the
+ * load-bearing part of this module and is now a formality.
  */
 export const SHARED_ROOTS = Object.freeze([
   "src",
@@ -38,16 +38,17 @@ export const SHARED_ROOTS = Object.freeze([
   // guards it through its own list, because "no Tauri import" IS meaningful for a
   // package the website consumes. Stated here so the omission reads as a decision.
   "web/src",
-  "myne-mobile/src",
+  "mobile/src",
 ]);
 
 /**
  * The roots that exist in THIS checkout.
  *
- * `myne-mobile` is a companion repo, ignored here and absent from every CI run.
- * A guard that silently drops it reports a smaller number with no explanation;
- * one that fails on it is unrunnable in CI. So the roster reports which roots
- * it skipped, and the caller decides whether to say so.
+ * This used to matter: `myne-mobile` was a companion repo, gitignored here and
+ * absent from every CI run, so a guard that walked the roster blindly meant one
+ * thing locally and another on the runner. Every root is in-repo now, so
+ * `missing` is expected to be empty and a non-empty one means a broken checkout
+ * rather than a normal one. Kept as the single place that would notice.
  */
 export function presentSharedRoots(rootDir = ROOT) {
   const present = [];

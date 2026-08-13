@@ -6,7 +6,7 @@ import packageJson from "./package.json";
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
-// Resolve a path relative to THIS config file (myne-mobile/), so the sibling
+// Resolve a path relative to THIS config file (mobile/), so the sibling
 // shared packages under the parent `myne/` repo resolve regardless of cwd.
 const sib = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -184,16 +184,24 @@ export default defineConfig(async () => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
+  // 2. tauri expects a fixed port, fail if that port is not available.
+  //
+  // One port per client, and they must not collide now that all three live in
+  // one repo: desktop 1420 (hard-pinned, root vite.config.ts), web 1421, mobile
+  // 1422 (HMR 1423). While mobile was a separate checkout it also claimed 1420,
+  // which was survivable only because nobody ran both at once — and it was not
+  // actually survivable: `strictPort` made a running desktop server fail the
+  // mobile start, and the flow-logic Playwright config's `reuseExistingServer`
+  // did something worse, silently attaching the mobile specs to the DESKTOP app.
   server: {
-    port: 1420,
+    port: 1422,
     strictPort: true,
     host: host || false,
     hmr: host
       ? {
           protocol: "ws",
           host,
-          port: 1421,
+          port: 1423,
         }
       : undefined,
     watch: {

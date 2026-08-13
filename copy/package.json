@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0",
-  "//": "Shared LOAD-BEARING user-facing copy (SYNC-42) — privacy-property strings whose exact English wording is a security property (non-distinguishing failure banners, honest revocation / integrity / enrollment notices). Consumed as SOURCE by the desktop client (src/) and the mobile client (myne-mobile/src/), so the literals are byte-identical across clients BY CONSTRUCTION — E2E asserts them by full-literal equality; changing any is a decisions.md event, never a paraphrase. NOT i18n'd (src/CLAUDE.md). Currently holds the sync/enroll/device family; other load-bearing copy stays desktop-local until a second client needs it.",
+  "//": "Shared LOAD-BEARING user-facing copy (SYNC-42) — privacy-property strings whose exact English wording is a security property (non-distinguishing failure banners, honest revocation / integrity / enrollment notices). Consumed as SOURCE by the desktop client (src/) and the mobile client (mobile/src/), so the literals are byte-identical across clients BY CONSTRUCTION — E2E asserts them by full-literal equality; changing any is a decisions.md event, never a paraphrase. NOT i18n'd (src/CLAUDE.md). Currently holds the sync/enroll/device family; other load-bearing copy stays desktop-local until a second client needs it.",
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*.ts"

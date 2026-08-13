@@ -424,7 +424,7 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // trait method and web installs `NoopHooks`, which returns `false` — so
     // nothing on this client ever writes a snapshot, and shipping the readers
     // would give a history viewer that is permanently empty. Making the hook
-    // async is a `myne-mobile` companion change; both belong to task 83.
+    // async is a `mobile/` client change; both belong to task 83.
     ("snapshots", Class::Pending), // task 83 (WebHooks decides capture first)
     // Both commands are DISPATCHED (task 46); the entry stays so a future
     // graph-layout command lands loudly rather than silently.

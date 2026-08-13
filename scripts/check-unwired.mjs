@@ -13,9 +13,13 @@
 //     guarantee: zero production importers, and the lock name was not even in
 //     the shipped bundle (tree-shaken). `web/src/worker/opfs.ts` skips its
 //     TOCTOU guard *because* it believes that lock is held.
-//   - `myne-mobile/src/lib/reminderPass.ts` — `runBoundedReminderPass`, imported
+//   - `mobile/src/lib/reminderPass.ts` — `runBoundedReminderPass`, imported
 //     by two test files and nothing else.
-//   - `myne-mobile/src/lib/vault-unlock.ts` — `isVaultUnlocked`, zero call sites.
+//   - `mobile/src/lib/vault-unlock.ts` — `isVaultUnlocked`, zero call sites.
+//
+// The mobile examples above were found BY HAND, because the mobile tree was a
+// gitignored companion clone this guard could not walk. It watches `mobile/src`
+// now, and the first run turned up three more.
 //
 // Test importers do not count. A module whose only importer is its own test is
 // precisely the shape being looked for: it passes CI and does nothing.
@@ -34,10 +38,10 @@ import { basename, join, relative } from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname;
 
 /** Trees whose modules must be reachable from production code. */
-const WATCHED = ["web/src", "src/lib", "src/hooks"];
+const WATCHED = ["web/src", "src/lib", "src/hooks", "mobile/src/lib", "mobile/src/hooks"];
 
 /** Every tree that may contain an importer (production or test). */
-const IMPORTER_TREES = ["src", "web/src", "editor/src", "dialect/src", "copy/src", "tests", "e2e", "e2e-web"];
+const IMPORTER_TREES = ["src", "web/src", "mobile/src", "editor/src", "dialect/src", "copy/src", "tests", "e2e", "e2e-web", "mobile/tests"];
 
 /** A file is a TEST importer when it lives here or is named like one. */
 function isTestFile(rel) {
@@ -73,6 +77,7 @@ const EXEMPT = new Map([
   ["web/src/platform/clipboard.ts", "platform-seam twin"],
   ["web/src/platform/deepLink.ts", "platform-seam twin"],
   ["web/src/platform/unsupported.ts", "platform-seam twin"],
+  ["mobile/src/lib/graph-layout.worker.ts", "worker entry — `WikiGraph.tsx` loads it with `new Worker(new URL(…, import.meta.url))`, a real edge that a static import scan cannot see"],
 
   // ---- RECORDED VIOLATIONS (the starting list; may shrink, never grow) ----
   //
@@ -87,6 +92,10 @@ const EXEMPT = new Map([
   ["src/lib/ai-qa.ts", "UNWIRED — the AI question-answering binding. `ai-chat.ts` names it in a comment and imports nothing."],
   ["src/lib/reminderLifecycle.ts", "UNWIRED — the reminder lifecycle (cancel-everything-on-lock). `Editor.tsx` names it in a comment; no import."],
   ["src/lib/reminderPermission.ts", "UNWIRED — the notification-permission request. Nothing asks for the permission reminders need."],
+  // The first three findings this guard produced against the mobile tree, which
+  // it could not see until the client moved in-repo.
+  ["mobile/src/lib/query-engine.ts", "UNWIRED — a pure `export * from \"@myne/editor/host/notes/queryEngine\"` shim. Every consumer imports that shared module directly, so the shim forwards for nobody. Dead rather than dangerous; the fix is deleting it."],
+  ["mobile/src/lib/reminderPass.ts", "UNWIRED — `runBoundedReminderPass`, the pass that applies the shared scheduling decision core (`@myne/reminder-schedule`) to the OS. Two test files import it; NOTHING in `mobile/src` or `mobile/src-tauri` calls it, so the reminders plugin is installed, the decision core is shared, and the step that would act on either never runs. Note the company it keeps two lines up: `src/lib/reminderLifecycle.ts` and `src/lib/reminderPermission.ts` are the same subsystem, inert on the desktop side. The reminder feature is partly unwired on BOTH clients."],
 ]);
 
 function* walk(dir) {

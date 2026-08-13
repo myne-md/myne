@@ -1992,7 +1992,7 @@ Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `web/src
 
 The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing). Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
 
-Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `myne-mobile/src/platform/SizeClassContext.tsx`
+Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `mobile/src/platform/SizeClassContext.tsx`
 
 ### **skip (a recurring task)** &nbsp; 📦 *Product*
 

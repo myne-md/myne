@@ -17,7 +17,7 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:1420",
+    baseURL: "http://localhost:1422",
     trace: "off",
   },
   projects: [
@@ -52,10 +52,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // The Tauri-aware Vite dev server (strictPort 1420). Reuse a server the
-    // developer already has running; start one otherwise.
+    // The Tauri-aware Vite dev server (strictPort 1422 — the MOBILE port; the
+    // desktop holds 1420 and the web client 1421). Reuse a server the developer
+    // already has running; start one otherwise. `pnpm dev` resolves against
+    // `mobile/package.json` because Playwright runs it with this config's
+    // directory as cwd, so it starts the mobile server and not the desktop one.
     command: "pnpm dev",
-    url: "http://localhost:1420",
+    url: "http://localhost:1422",
     reuseExistingServer: true,
     timeout: 120_000,
   },

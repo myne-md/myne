@@ -3,7 +3,7 @@
 // The exact English wording of these strings is a security/privacy property, not
 // a stylistic choice. They are consumed as SOURCE by BOTH the desktop client
 // (`src/lib/load-bearing-copy.ts` re-exports them) and the mobile client
-// (`myne-mobile/src/…`), so the literals are byte-identical across clients by
+// (`mobile/src/…`), so the literals are byte-identical across clients by
 // construction — cross-client paraphrase is impossible. E2E asserts them by
 // FULL-literal equality; changing any is a `design-notes.md` event, never a
 // copy edit. Never i18n these (see `src/CLAUDE.md` "Do NOT i18n load-bearing copy").

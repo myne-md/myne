@@ -1,6 +1,6 @@
 // The five Myne mobile screens, redrawn from the real design tokens
 // (docs/design/colors_and_type.css) and the real component structure
-// (myne-mobile/src/app/flows/). Marketing mockups, not captures — but every
+// (mobile/src/app/flows/). Marketing mockups, not captures — but every
 // colour, radius, spacing step, type size, icon path and label below is the
 // app's own value, so what the store shows is what the app renders.
 //

@@ -32,7 +32,7 @@
 //! native screen-capture protection via `crate::screen_guard` (iOS
 //! secure-field layer splice / Android FLAG_SECURE bridge). Every other hook
 //! stays a no-op until its subsystem lands on mobile (see
-//! `myne-mobile/CLAUDE.md`).
+//! `mobile/CLAUDE.md`).
 
 use myne_core::hooks::{BoxFuture, VaultLifecycleHooks};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;

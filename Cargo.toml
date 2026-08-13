@@ -21,7 +21,18 @@
 # it is spawned as a subprocess, never linked, so arti stays outside
 # `myne-desktop`'s `cargo tree -e normal` closure and the no-egress gate keeps
 # scanning a tree with no networked crate in it.
-members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "tor-sidecar"]
+#
+# `mobile/src-tauri` (+ its four Tauri plugins) is the Phase 3 mobile client,
+# moved in-repo from the `myne-mobile` companion. It joins here for the reason
+# the split could never deliver: it path-depends on `protocol` and `core` and
+# aliases ~25 TS specifiers into `src/`, `editor/`, `dialect/` and `ornaments/`,
+# so it never built outside a `myne` checkout — while resolving its own second
+# `Cargo.lock`, in which 62 of 572 shared crates had drifted from this one
+# (`bip39 -> bitcoin_hashes` among them). One lock is what makes TB9's audit
+# anchor describe the artefact mobile actually ships. The four plugins are listed
+# explicitly rather than left to cargo's automatic path-dependency membership,
+# because this list is the documented source of truth (CLAUDE.md).
+members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "tor-sidecar", "mobile/src-tauri", "mobile/src-tauri/tauri-plugin-screen-guard", "mobile/src-tauri/tauri-plugin-share-intent", "mobile/src-tauri/tauri-plugin-qr-scan", "mobile/src-tauri/tauri-plugin-reminders"]
 resolver = "2"
 
 # Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`
@@ -61,6 +72,37 @@ opt-level = 3
 [profile.dev.package.rten-vecmath]
 opt-level = 3
 [profile.dev.package.rten-tensor]
+opt-level = 3
+
+# The crypto-hot leaf crates, moved here verbatim from `mobile/src-tauri`'s own
+# manifest when the mobile client came in-repo. They MUST live at the workspace
+# root: cargo silently ignores a `[profile]` table in a non-root member, so
+# leaving them where they were would have turned them off with no warning and no
+# build failure — and the thing they buy is that an unoptimized Argon2id at
+# m=256 MiB does not turn an on-device debug unlock into minutes (observed on the
+# iOS simulator). Desktop dev builds now get the same treatment, which is a
+# straight improvement; `profile.dev` only, so the reproducible RELEASE build is
+# unchanged on every client.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.chacha20]
+opt-level = 3
+[profile.dev.package.chacha20poly1305]
+opt-level = 3
+[profile.dev.package.poly1305]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+
+# The remaining gemm variants mobile's candle transcription path (MYND-563)
+# pinned; `gemm` and `half` are already covered above.
+[profile.dev.package."gemm-f16"]
+opt-level = 3
+[profile.dev.package."gemm-f32"]
+opt-level = 3
+[profile.dev.package."gemm-common"]
 opt-level = 3
 
 # Same override for the `test` profile (it does NOT inherit `profile.dev`'s

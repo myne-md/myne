@@ -1,18 +1,11 @@
-# Standalone workspace — myne-mobile is cloned INSIDE the main `myne` repo
-# directory, so without this table cargo would treat src-tauri as a member
-# of the main repo's workspace (which doesn't list it) and fail. The
-# screen-guard plugin is a member so ONE Cargo.lock governs it (TB9-style
-# single-lock discipline). The share-intent plugin (MYND-511), the qr-scan
-# plugin (MYND-466) and the reminders plugin (MYND-619) are members for the same
-# reason.
-[workspace]
-members = [
-    "tauri-plugin-screen-guard",
-    "tauri-plugin-share-intent",
-    "tauri-plugin-qr-scan",
-    "tauri-plugin-reminders",
-]
-
+# No `[workspace]` table here on purpose: this crate and its four plugins are
+# members of the REPO-ROOT workspace, listed in `../../Cargo.toml`. It used to
+# declare a standalone workspace because the mobile client was a companion repo
+# cloned inside this one, and cargo would otherwise have treated it as a member
+# of a workspace that did not list it. That standalone workspace also carried a
+# second `Cargo.lock`, which is what the move in-repo removed — 62 of 572 shared
+# crates had drifted between the two locks, so the TB9 audit anchor described the
+# desktop build and not this one.
 [package]
 name = "myne-mobile"
 version = "0.4.0"
@@ -32,37 +25,12 @@ publish = false
 name = "myne_mobile_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-# Debug builds must stay usable on-device: an unoptimized Argon2id at
-# m=256 MiB turns unlock into minutes (observed on the iOS simulator dev
-# build). Optimize ONLY the crypto-hot leaf crates in dev — same pattern as
-# the main repo's candle override; our own crates keep full debug info.
-[profile.dev.package.argon2]
-opt-level = 3
-[profile.dev.package.blake2]
-opt-level = 3
-[profile.dev.package.chacha20]
-opt-level = 3
-[profile.dev.package.chacha20poly1305]
-opt-level = 3
-[profile.dev.package.poly1305]
-opt-level = 3
-[profile.dev.package.sha2]
-opt-level = 3
-# Candle inference (MYND-563 transcription) — same treatment as the crypto
-# crates above: keep the matmul/quantization hot paths optimized even in dev so
-# a debug build's on-device transcription isn't unusably slow.
-[profile.dev.package.gemm]
-opt-level = 3
-[profile.dev.package."gemm-f16"]
-opt-level = 3
-[profile.dev.package."gemm-f32"]
-opt-level = 3
-[profile.dev.package."gemm-common"]
-opt-level = 3
-[profile.dev.package.half]
-opt-level = 3
-[profile.dev.package."candle-core"]
-opt-level = 3
+# The `[profile.dev.package.*]` overrides that used to sit here — the crypto-hot
+# leaf crates (argon2, blake2, chacha20, chacha20poly1305, poly1305, sha2) and
+# the candle/gemm transcription crates — now live in the ROOT `Cargo.toml`.
+# Cargo ignores a `[profile]` table in a non-root workspace member SILENTLY, so
+# they had to move with the crate or they would have stopped applying with no
+# warning, no error, and a debug unlock back up in the minutes.
 
 [features]
 # Transcription (MYND-563) ships in the default build, gated at RUNTIME by the
