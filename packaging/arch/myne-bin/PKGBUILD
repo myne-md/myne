@@ -30,7 +30,7 @@
 
 pkgname=myne-bin
 _appname=myne
-pkgver=0.4.0
+pkgver=0.5.0
 pkgrel=1
 pkgdesc="A calm place for your notes — clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search (binary release)"
 arch=('x86_64')
