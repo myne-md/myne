@@ -727,6 +727,16 @@ pub struct MigrationSettleStatus {
     pub pending: bool,
     /// Abort is still available (pre-sync).
     pub can_abort: bool,
+    /// **This vault is still v0.1, so the upgrade is offerable.** False for a
+    /// vault that is already v0.2 — whether it was migrated or born that way
+    /// (`decisions.md` 2026-08-13).
+    ///
+    /// The settle surface and the migrate form are two different questions and
+    /// this command answers both, rather than adding a second round-trip: after
+    /// a migration `offerable` is false while `pending` is true (the vault is
+    /// current, but its `legacy/` snapshot still has to be settled), and on a
+    /// freshly-created vault both are false and the whole block disappears.
+    pub offerable: bool,
 }
 
 /// Core of [`vault_migrate_settle_status`].
@@ -743,7 +753,19 @@ pub async fn vault_migrate_settle_status_from_host(
         .await
         .is_ok();
     let can_abort = pending && !sync_has_published_the_new_generation(io, &vault_root).await;
-    Ok(MigrationSettleStatus { pending, can_abort })
+    // Read the generation off the LIVE meta, not off the presence of `legacy/`:
+    // the two answer different questions, and a vault born v0.2 has neither.
+    let offerable = match io.read(&vault_root.join("vault.meta")).await {
+        Ok(bytes) => protocol::meta_version_of(&bytes) == Some(MetaVersion::V0_1),
+        // An unreadable meta is not a migration offer. The unlock path owns that
+        // failure and states it far better than a settings row could.
+        Err(_) => false,
+    };
+    Ok(MigrationSettleStatus {
+        pending,
+        can_abort,
+        offerable,
+    })
 }
 
 /// IPC command: is there an unsettled migration on this vault? (§10.4.1 point 5)
@@ -2869,5 +2891,70 @@ mod tests {
                 "so the v0.2 reader cannot open it and §9.5.5 hands back defaults"
             );
         })
+    }
+
+    /// The settings surface asks this command whether it has anything to show,
+    /// so `offerable` has to answer for the LIVE meta rather than for the
+    /// presence of `legacy/`.
+    ///
+    /// Three vault shapes, three answers — and the middle one is the reason the
+    /// two flags are separate: right after a migration the vault is already
+    /// v0.2 (nothing to offer) while its `legacy/` snapshot still has to be
+    /// settled (§10.4.1 point 5). Collapsing them would either strand the
+    /// snapshot or offer an upgrade the backend refuses with `AlreadyMigrated`.
+    #[test]
+    fn settle_status_offers_the_upgrade_only_to_a_v0_1_vault() {
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-offerable").unwrap();
+            let host = TestHost::new(tmp.path());
+            let io = StdVaultIo;
+            let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            io.create_dir_all(&vault_root.join("notes")).await.unwrap();
+            let state = VaultRuntimeState::default();
+
+            // (1) A v0.1 vault: offerable, nothing staged.
+            build_myv1_vault(&io, &vault_root).await;
+            let s1 = vault_migrate_settle_status_from_host(&host, &state, &io)
+                .await
+                .expect("status on a v0.1 vault");
+            assert!(s1.offerable, "a v0.1 vault can be upgraded");
+            assert!(!s1.pending);
+
+            // (2) The same vault after the meta flips to v0.2, with a `legacy/`
+            //     snapshot staged: NOT offerable any more, but still unsettled.
+            let ntv5 = protocol::serialize_vault_meta_v0_2(
+                &protocol::parse_vault_meta_any(
+                    &io.read(&vault_root.join("vault.meta")).await.unwrap(),
+                )
+                .unwrap(),
+            );
+            io.write(&vault_root.join("vault.meta"), &ntv5, WriteOpts::default())
+                .await
+                .unwrap();
+            io.create_dir_all(&vault_root.join("legacy")).await.unwrap();
+            io.write(
+                &vault_root.join("legacy").join("vault.meta"),
+                b"staged",
+                WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+            let s2 = vault_migrate_settle_status_from_host(&host, &state, &io)
+                .await
+                .expect("status on a migrated vault");
+            assert!(!s2.offerable, "a v0.2 vault has nothing to migrate");
+            assert!(s2.pending, "but its legacy snapshot is unsettled");
+
+            // (3) Settled: neither flag, so the whole block leaves Settings.
+            io.remove_file(&vault_root.join("legacy").join("vault.meta"))
+                .await
+                .unwrap();
+            let s3 = vault_migrate_settle_status_from_host(&host, &state, &io)
+                .await
+                .expect("status on a settled vault");
+            assert!(!s3.offerable);
+            assert!(!s3.pending);
+        });
     }
 }

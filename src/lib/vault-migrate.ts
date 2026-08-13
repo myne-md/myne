@@ -93,6 +93,12 @@ export interface MigrationSettleStatus {
   pending: boolean;
   /** Abort is still available (pre-sync). */
   can_abort: boolean;
+  /**
+   * This vault is still v0.1, so the upgrade is offerable. False for a vault
+   * that is already v0.2 — migrated or born that way (`decisions.md`
+   * 2026-08-13), which is every vault created today.
+   */
+  offerable: boolean;
 }
 
 /**

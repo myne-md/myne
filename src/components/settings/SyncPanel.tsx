@@ -22,6 +22,7 @@ import { RecoveredNotes } from "../sync/RecoveredNotes";
 import { has as hasCapability } from "../../platform/capabilities";
 import { MigrateVaultForm } from "./MigrateVaultForm";
 import { SettleMigrationBlock } from "./SettleMigrationBlock";
+import { migrationSettleStatus } from "../../lib/vault-migrate";
 import {
   ConflictsView,
   type ConflictCompare,
@@ -134,6 +135,32 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // re-derives vault.search/vault.indices after a full-reconcile or a fresh
   // device enroll and emits `sync://index-building` around that window. Dormant
   // until the loop lands (R3); no-op outside Tauri (browser dev shim).
+  // Does this vault have anything to say about migration at all?
+  //
+  // `offerable` is "still v0.1, the upgrade can be offered"; `pending` is "a
+  // migration ran and its `legacy/` snapshot is unsettled". A vault created
+  // today is v0.2 from birth (`decisions.md` 2026-08-13) and has NEITHER, so
+  // the whole block — heading included — stays out of Settings rather than
+  // showing a permanently-inert control. `null` while the probe is in flight,
+  // which renders as absent: a row that appears a beat late is better than one
+  // that flashes and disappears.
+  const [migration, setMigration] = useState<{
+    offerable: boolean;
+    pending: boolean;
+  } | null>(null);
+  const probeMigration = useCallback(() => {
+    // Not on web: the dispatcher refuses the whole `vault-migrate` plugin there
+    // (a web client joins an already-current account and never migrates), so
+    // probing would be a call the backend answers with a refusal.
+    if (!hasCapability("vaultMigration")) return;
+    void migrationSettleStatus()
+      .then((s) => setMigration({ offerable: s.offerable, pending: s.pending }))
+      // A probe failure hides the block, exactly as it does on a vault that was
+      // never migrated. The unlock path owns any real meta failure.
+      .catch(() => setMigration(null));
+  }, []);
+  useEffect(probeMigration, [probeMigration]);
+
   const [buildingIndex, setBuildingIndex] = useState(false);
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -429,15 +456,31 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
           dispatcher refuses `plugin:vault-migrate|vault_migrate` on web, so this
           capability is what keeps the UI from offering a control the backend
           rejects (check-web-capabilities.mjs). */}
-      {hasCapability("vaultMigration") && (
+      {hasCapability("vaultMigration") && (migration?.offerable || migration?.pending) && (
         <div style={BLOCK_STYLE} data-setting-anchor="sync.migrate" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>{t("migrate.submit")}</span>
-          <MigrateVaultForm onMigrated={onMigrated} />
+          {/* The form only where there is something to migrate. On an
+              already-current vault it would ask for the 24-word recovery phrase
+              to perform a no-op that the backend refuses with `AlreadyMigrated`
+              — an offer the product cannot honour. */}
+          {migration?.offerable && (
+            <MigrateVaultForm
+              onMigrated={() => {
+                probeMigration();
+                onMigrated?.();
+              }}
+            />
+          )}
           {/* §10.4.1 point 5 (myne-md/myne#430). Renders only while a `legacy/`
               snapshot is staged, which is also why it sits BELOW the form: after
               a migration the vault locks and the user re-unlocks, so this is the
               surface they come back to, not one they see on the way out. */}
-          <SettleMigrationBlock onSettled={onMigrated} />
+          <SettleMigrationBlock
+            onSettled={() => {
+              probeMigration();
+              onMigrated?.();
+            }}
+          />
         </div>
       )}
 
