@@ -64,6 +64,43 @@ export function orderByLastUnlock(vaults: VaultSummary[]): VaultSummary[] {
 }
 
 /**
+ * The stable per-vault number behind the `Vault N` fallback (myne-md/myne#411).
+ *
+ * **The rule.** N is the vault's 1-based rank in the ascending `VaultId` order
+ * of the vaults on this device. It is a function of the SET, not of the array's
+ * order, so every caller may keep rendering in whatever order suits it.
+ *
+ * **Why a rank and not a hash.** The number is the name a user is asked to
+ * remember for a vault whose real name this device cannot read, so two things
+ * have to hold: it must not move as the app is used, and two vaults must never
+ * land on the same one. A rank over a set of distinct ids gives the second by
+ * construction, because it is an injection. A hash of the `VaultId` folded into
+ * a small range gives it only probabilistically (three vaults over 1..99 is
+ * already a few percent), and would need a tie-break that changes one vault's
+ * number to resolve the collision anyway. It also produces `Vault 47` beside
+ * `Vault 3`, which reads as an identifier rather than as a name. The rank
+ * keeps 1..n, dense, exactly as the old positional numbers looked.
+ *
+ * **What it is NOT stable against, said plainly.** A change to the set. A newly
+ * created vault gets a UUIDv7, which sorts after every existing one, so
+ * creating a vault appends and renumbers nobody; DELETING one shifts the vaults
+ * that sort after it down by one. That is the honest cost, and it is the right
+ * trade: deletion is rare, deliberate and already irreversible, while unlocking
+ * a vault is the single most common thing a user does here and used to renumber
+ * every row on the screen.
+ *
+ * Total by construction: an id absent from the list still gets a number.
+ */
+export function stableVaultNumber(
+  vaults: readonly VaultSummary[],
+  id: string,
+): number {
+  let rank = 1;
+  for (const v of vaults) if (v.id < id) rank += 1;
+  return rank;
+}
+
+/**
  * The id of the ONLY vault on this device, or `null` when there are zero or
  * two-plus (#250).
  *

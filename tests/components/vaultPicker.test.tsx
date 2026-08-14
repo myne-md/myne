@@ -45,6 +45,27 @@ const TWO: VaultSummary[] = [
   summary({ id: "v2", label: "Home", last_unlock: 1000 }),
 ];
 
+// Three unnamed vaults, i.e. what every row looks like once the device-wide
+// hide-vault-names option is on. Ids sort a < b < c; the unlock times run the
+// other way, so the old positional fallback and the stable one disagree on
+// every row.
+const A = "0197c0de-0000-7000-8000-00000000000a";
+const B = "0197c0de-0000-7000-8000-00000000000b";
+const C = "0197c0de-0000-7000-8000-00000000000c";
+
+function unnamed(id: string, last_unlock: number): VaultSummary {
+  return summary({ id, last_unlock });
+}
+
+/** The rendered text of the row for `id`. */
+function rowText(id: string): string {
+  const row = screen
+    .getAllByTestId("picker.vault-row")
+    .find((el) => el.getAttribute("data-vault-id") === id);
+  if (row === undefined) throw new Error(`no row for ${id}`);
+  return row.textContent ?? "";
+}
+
 beforeEach(() => {
   listVaults.mockReset();
 });
@@ -87,5 +108,59 @@ describe("VaultPicker — the action block", () => {
     renderPicker({ err: { detail: { io_error_kind: "Other" } } });
     await waitFor(() => expect(screen.getByTestId("picker.join-cta")).toBeTruthy());
     expect(screen.queryAllByTestId("picker.vault-row")).toHaveLength(0);
+  });
+});
+
+// The "Vault N" fallback, end to end through the screen (myne-md/myne#411).
+//
+// The unit-level rule lives in `tests/lib/stableVaultNumber.test.ts`; what this
+// block adds is that the SCREEN uses it, over the list it actually renders,
+// which is the half a passing helper test cannot show.
+describe("VaultPicker: the fallback number", () => {
+  it("gives a vault the same number across two runs with a different unlock order in between", async () => {
+    // Run one: A was opened last.
+    renderPicker({
+      ok: [unnamed(A, 300), unnamed(B, 200), unnamed(C, 100)],
+    });
+    await screen.findAllByTestId("picker.vault-row");
+    const first = [A, B, C].map(rowText);
+    cleanup();
+
+    // Run two: the user opened C in between, so the list comes back in a
+    // different order. Every row's number must be what it was.
+    renderPicker({
+      ok: [unnamed(C, 900), unnamed(A, 300), unnamed(B, 200)],
+    });
+    await screen.findAllByTestId("picker.vault-row");
+    expect([A, B, C].map(rowText)).toEqual(first);
+  });
+
+  it("numbers the rows by vault, not by their position on screen", async () => {
+    // The concrete rendering, so the assertion above cannot pass by both runs
+    // being equally wrong. C is the TOP row here and is Vault 3.
+    renderPicker({
+      ok: [unnamed(C, 900), unnamed(A, 300), unnamed(B, 200)],
+    });
+    const rows = await screen.findAllByTestId("picker.vault-row");
+    expect(rows.map((el) => el.getAttribute("data-vault-id"))).toEqual([C, A, B]);
+    expect(rowText(A)).toContain("Vault 1");
+    expect(rowText(B)).toContain("Vault 2");
+    expect(rowText(C)).toContain("Vault 3");
+  });
+
+  it("never shows two rows the same number", async () => {
+    renderPicker({
+      ok: [unnamed(C, 900), unnamed(A, 300), unnamed(B, 200)],
+    });
+    await screen.findAllByTestId("picker.vault-row");
+    const numbers = [A, B, C].map(rowText);
+    expect(new Set(numbers).size).toBe(3);
+  });
+
+  it("still prefers a real name over any number", async () => {
+    renderPicker({ ok: TWO });
+    await screen.findAllByTestId("picker.vault-row");
+    expect(rowText("v1")).toContain("Work");
+    expect(rowText("v1")).not.toContain("Vault");
   });
 });
