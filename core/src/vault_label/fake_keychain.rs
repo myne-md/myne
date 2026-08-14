@@ -25,6 +25,10 @@ pub(crate) struct FakeKeychain {
     calls: Mutex<Vec<String>>,
     store_fails: bool,
     unavailable: bool,
+    /// Accounts whose `delete` refuses. One account rather than a global flag,
+    /// because the property the sweep has to prove is that a failure on ONE
+    /// vault does not stop the others.
+    delete_fails_for: Mutex<Vec<String>>,
 }
 
 impl FakeKeychain {
@@ -34,6 +38,7 @@ impl FakeKeychain {
             calls: Mutex::new(Vec::new()),
             store_fails: false,
             unavailable: false,
+            delete_fails_for: Mutex::new(Vec::new()),
         }
     }
 
@@ -77,6 +82,16 @@ impl FakeKeychain {
         self.calls.lock().expect("fake keychain lock").clone()
     }
 
+    /// Make `delete` refuse for exactly this account, leaving its item in
+    /// place. The one keychain failure the whole-device sweep has to survive
+    /// without abandoning the vaults after it.
+    pub(crate) fn fail_delete_for(&self, account: &str) {
+        self.delete_fails_for
+            .lock()
+            .expect("fake keychain lock")
+            .push(account.to_string());
+    }
+
     pub(crate) fn put(&self, account: &str, secret: Vec<u8>) {
         let mut items = self.items.lock().expect("fake keychain lock");
         items.retain(|(a, _)| a.as_str() != account);
@@ -113,6 +128,15 @@ impl LabelKeychain for FakeKeychain {
         self.log(format!("delete {account}"));
         if self.unavailable {
             return Err(VaultLabelError::KeychainUnavailable);
+        }
+        if self
+            .delete_fails_for
+            .lock()
+            .expect("fake keychain lock")
+            .iter()
+            .any(|a| a.as_str() == account)
+        {
+            return Err(VaultLabelError::Backend);
         }
         self.items
             .lock()
