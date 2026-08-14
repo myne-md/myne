@@ -8,7 +8,11 @@
 //
 // # Two execution targets, one set of runners (phase3-web-client task 15)
 //
-// The same 34 runners execute natively and **inside a browser**. Cross-
+// Every runner in this file executes natively and **inside a browser** (the
+// count used to be written out here and had drifted six runners behind before
+// anyone noticed — a hand-maintained number nothing executes is not a fact
+// about anything, the same reason `the_browser_lane_carries_every_category`
+// stopped carrying a row count). Cross-
 // implementation agreement is a property of compiled code on its execution
 // target, and the web client's target is a browser's wasm engine — so a suite
 // that only ever ran on aarch64/x86_64 was evidence about a different machine
@@ -352,6 +356,11 @@ mod embedded {
             "vault-indices",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/vault-indices/v0.1/cases.json"),
+        ),
+        (
+            "vault-label",
+            "v0.1",
+            include_str!("../../myne-test-vectors/vectors/vault-label/v0.1/cases.json"),
         ),
         (
             "vault-meta",
@@ -4710,6 +4719,303 @@ fn share_import_vectors() {
         assert!(
             seen_parse_errors.contains(err),
             "share-import missing parse_fail coverage for ShareImportBlobError '{err}' — every structural reject must be pinned"
+        );
+    }
+}
+
+/// `vault-label` (`MYL1`, §9.22) — the device-local sealed label store the
+/// LOCKED vault picker reads a vault's name from (myne-md/myne#411).
+///
+/// Structurally the `share-import` / `pending-capture` runner above plus the two
+/// things this family does that they cannot, and both are why the extra case
+/// kinds exist:
+///
+/// * **The AAD binds the `VaultId` the READER expected**, not the one the blob
+///   carries, which splits the cross-vault surface in two. An untouched blob
+///   from another vault is `vault_id_mismatch`, refused by the structural
+///   comparison before any key is touched; the *same* blob with its header
+///   rewritten to claim the expected vault passes that comparison and is
+///   refused by the AAD instead, collapsing to `CannotDecrypt`. The schema says
+///   the two MUST surface different outcomes — a port that only compares passes
+///   the first and fails the second, one that only binds reports the wrong error
+///   for the first — so this runner asserts the split directly (below), rather
+///   than leaving it implied by two independent cases.
+/// * **Strict-trailing is enforced** (§10.3.1), so `trailing_bytes` is a named
+///   reject rather than a tolerated tail, and `encode_fail` pins the write-side
+///   cap refusal that pairs with the at-cap `encrypt` case to make the 4 KiB
+///   boundary inclusive rather than off by one.
+///
+/// Every `parse_fail` fixture carries the **real** `wrap_key`. None of the
+/// corrupted header fields is AAD-bound, so a port that skips one of these
+/// checks decodes the fixture successfully — and this runner's exact-variant
+/// assertion is what catches that. A dummy key would hide the same bug behind a
+/// coincidental `CannotDecrypt`.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn vault_label_vectors() {
+    // vault_label_blob is NOT re-exported at the crate root (it is a `pub mod`
+    // with no flattened `pub use`), so the codec items are imported via the full
+    // module path — same convention as capture_blob / quick_unlock_blob /
+    // share_import_blob. `aad_vault_label_blob` is likewise absent from the
+    // crate-root `pub use aead::{…}` block, for the same device-local reason.
+    use protocol::aead::aad_vault_label_blob;
+    use protocol::vault_label_blob::{
+        decode_vault_label_blob, encode_vault_label_blob_raw, VaultLabelBlobError,
+        VAULT_LABEL_BLOB_HEADER_LEN,
+    };
+
+    let Some(raw) = cases_json("vault-label") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-label] parse cases.json: {e}"));
+
+    assert_eq!(doc["schema"], "vault-label");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 18,
+        "vault-label must carry at least 18 vectors (1 aad_construction + 3 encrypt + 1 encode_fail + 2 decrypt_ok + 3 decrypt_aead_fail + 8 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("vault-label", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+    // The untouched-blob half of the cross-vault pin, kept for the derived
+    // relabelled-header check after the loop.
+    let mut cross_vault_pin: Option<(String, Vec<u8>, [u8; 16])> = None;
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "aad_construction" => {
+                let builder = field(case, id, "input_aad_builder");
+                let vault_id: [u8; 16] = hex_decode_array(field(case, id, "input_vault_id_hex"));
+                let expected = hex_decode(field(case, id, "expected_aad_hex"));
+
+                let actual = match builder {
+                    "aad_vault_label_blob" => aad_vault_label_blob(&vault_id),
+                    other => {
+                        panic!("[{id}] unknown aad builder '{other}' — this family has exactly one")
+                    }
+                };
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] {builder} AAD mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "encrypt" => {
+                let wrap_key: [u8; 32] = hex_decode_array(field(case, id, "input_wrap_key_hex"));
+                let vault_id: [u8; 16] = hex_decode_array(field(case, id, "input_vault_id_hex"));
+                let label = hex_decode(field(case, id, "input_label_utf8_hex"));
+                let nonce: [u8; 24] = hex_decode_array(field(case, id, "input_nonce_hex"));
+                let expected = hex_decode(field(case, id, "expected_vault_label_blob_hex"));
+
+                let actual = encode_vault_label_blob_raw(&wrap_key, &vault_id, &label, &nonce)
+                    .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] vault-label encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "encode_fail" => {
+                // The write-side cap refusal. An over-cap label must be refused
+                // OUTRIGHT rather than truncated: a truncating port emits a blob
+                // that decodes cleanly forever after, carrying a wrong name.
+                let wrap_key: [u8; 32] = hex_decode_array(field(case, id, "input_wrap_key_hex"));
+                let vault_id: [u8; 16] = hex_decode_array(field(case, id, "input_vault_id_hex"));
+                let label = hex_decode(field(case, id, "input_label_utf8_hex"));
+                let nonce: [u8; 24] = hex_decode_array(field(case, id, "input_nonce_hex"));
+                let expected_error = field(case, id, "expected_error");
+
+                let expected_variant = match expected_error {
+                    "ciphertext_len_overflow" => VaultLabelBlobError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown encode-side expected_error '{other}' — schema enforces enum; update this match arm in lockstep with VaultLabelBlobError"
+                    ),
+                };
+
+                match encode_vault_label_blob_raw(&wrap_key, &vault_id, &label, &nonce) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected encode_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(blob) => panic!(
+                        "[{id}] expected encode_fail '{expected_error}', encode returned Ok ({} bytes) — an over-cap label was sealed (truncated?) instead of refused",
+                        blob.len()
+                    ),
+                }
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let wrap_key: [u8; 32] = hex_decode_array(field(case, id, "input_wrap_key_hex"));
+                let vault_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_expected_vault_id_hex"));
+                let expected_label = hex_decode(field(case, id, "expected_label_utf8_hex"));
+
+                let decoded = decode_vault_label_blob(&wrap_key, &vault_id, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_label.as_slice(),
+                    "[{id}] vault-label decrypt label mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected_label),
+                    hex_encode(&decoded),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let wrap_key: [u8; 32] = hex_decode_array(field(case, id, "input_wrap_key_hex"));
+                let vault_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_expected_vault_id_hex"));
+                assert_eq!(
+                    field(case, id, "expected_kind"),
+                    "aead_fail",
+                    "[{id}] decrypt_aead_fail carries a non-aead expected_kind"
+                );
+
+                match decode_vault_label_blob(&wrap_key, &vault_id, &blob) {
+                    Err(VaultLabelBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected VaultLabelBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(label) => panic!(
+                        "[{id}] expected aead_fail, decode_vault_label_blob returned Ok ({} bytes)",
+                        label.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                // The REAL wrap_key, deliberately (schema: "input_wrap_key_hex
+                // … the REAL wrap_key"). A port that skips one of these checks
+                // decodes the fixture SUCCESSFULLY; a dummy key would mask that
+                // as a coincidental AEAD failure.
+                let wrap_key: [u8; 32] = hex_decode_array(field(case, id, "input_wrap_key_hex"));
+                let vault_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_expected_vault_id_hex"));
+                let expected_error = field(case, id, "expected_error");
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => VaultLabelBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => VaultLabelBlobError::ProtocolVersionMismatch,
+                    "vault_id_mismatch" => VaultLabelBlobError::VaultIdMismatch,
+                    "ciphertext_len_overflow" => VaultLabelBlobError::CiphertextLenOverflow,
+                    "header_too_short" => VaultLabelBlobError::HeaderTooShort,
+                    "ciphertext_truncated" => VaultLabelBlobError::CiphertextTruncated,
+                    "trailing_bytes" => VaultLabelBlobError::TrailingBytes,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with VaultLabelBlobError"
+                    ),
+                };
+
+                match decode_vault_label_blob(&wrap_key, &vault_id, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(VaultLabelBlobError::CannotDecrypt) => panic!(
+                        "[{id}] expected the DISTINGUISHABLE structural reject '{expected_error}' ({expected_variant:?}), got CannotDecrypt — the decoder collapsed a pre-decryption check into the AEAD stage, which is the ordering bug these fixtures (real wrap_key, one corrupted field) exist to name"
+                    ),
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(label) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode_vault_label_blob returned Ok ({} bytes) — a structural check was skipped",
+                        label.len()
+                    ),
+                }
+
+                if expected_error == "vault_id_mismatch" {
+                    cross_vault_pin = Some((id.to_string(), blob, vault_id));
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    // ---- the cross-vault split, asserted rather than implied ----------
+    //
+    // The schema's MUST: an untouched blob from another vault and the same blob
+    // with its header relabelled MUST surface DIFFERENT outcomes. Derived here
+    // from the `vault_id_mismatch` fixture rather than matched by vector_id, so
+    // the assertion holds even if the companion's relabelled case is renamed or
+    // dropped — and so it is a claim about the codec, not about two case files
+    // agreeing with each other.
+    let (pin_id, pin_blob, expected_vault_id) = cross_vault_pin
+        .expect("vault-label must carry the vault_id_mismatch fixture (required_parse_errors)");
+    let wrap_key: [u8; 32] = [0u8; 32]; // any key: neither outcome reaches a correct decrypt
+    let untouched = decode_vault_label_blob(&wrap_key, &expected_vault_id, &pin_blob);
+    assert_eq!(
+        untouched,
+        Err(VaultLabelBlobError::VaultIdMismatch),
+        "[{pin_id}] the untouched cross-vault blob must be refused by the structural comparison"
+    );
+
+    assert!(
+        pin_blob.len() >= VAULT_LABEL_BLOB_HEADER_LEN,
+        "[{pin_id}] the vault_id_mismatch fixture must be a full-header blob for the relabelled half to be derivable"
+    );
+    let mut relabelled = pin_blob.clone();
+    relabelled[5..21].copy_from_slice(&expected_vault_id);
+    let relabelled_outcome = decode_vault_label_blob(&wrap_key, &expected_vault_id, &relabelled);
+    assert_eq!(
+        relabelled_outcome,
+        Err(VaultLabelBlobError::CannotDecrypt),
+        "[{pin_id}] relabelling the header to the expected vault must leave the AAD to refuse (CannotDecrypt), not the comparison"
+    );
+    assert_ne!(
+        untouched, relabelled_outcome,
+        "[{pin_id}] the two halves of the cross-vault pin collapsed to one outcome — a port that only compares, or only binds, would pass"
+    );
+
+    for kind in [
+        "aad_construction",
+        "encrypt",
+        "encode_fail",
+        "decrypt_ok",
+        "decrypt_aead_fail",
+        "parse_fail",
+    ] {
+        assert!(
+            seen_kinds.contains(kind),
+            "vault-label missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+    // One per `VaultLabelBlobError` DECODE variant. `CannotDecrypt` is the
+    // non-distinguishing AEAD surface (covered by decrypt_aead_fail) and
+    // `RandomnessUnavailable` cannot be expressed as a fixture, so neither is
+    // listed here.
+    let required_parse_errors: [&str; 7] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "vault_id_mismatch",
+        "ciphertext_len_overflow",
+        "header_too_short",
+        "ciphertext_truncated",
+        "trailing_bytes",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "vault-label missing parse_fail coverage for VaultLabelBlobError '{err}' — every structural reject must be pinned"
         );
     }
 }
