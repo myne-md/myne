@@ -382,4 +382,54 @@ describe("AccountPanel — vault label rename", () => {
     });
     expect(setVaultLabel).toHaveBeenCalledWith("Renamed");
   });
+
+  // myne-md/myne#411. The device-local name cache does not sync, so another
+  // device shows the name IT last decrypted until this vault is unlocked there.
+  // That sentence is the whole mitigation for the window (clearing on
+  // sync-head movement and a fixed expiry were both rejected), which is why it
+  // is pinned here rather than left to review.
+  it("no cross-device notice while the draft matches what is saved", async () => {
+    prefsRead.mockResolvedValue({ label: "Existing" });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe("Existing"),
+    );
+    expect(screen.queryByTestId("settings.label-rename-notice")).toBeNull();
+  });
+
+  it("renaming surfaces the cross-device notice before the save lands", async () => {
+    prefsRead.mockResolvedValue({ label: "Existing" });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe("Existing"),
+    );
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "Renamed" },
+    });
+    const notice = screen.getByTestId("settings.label-rename-notice");
+    expect(notice.textContent ?? "").toMatch(/other devices/i);
+    expect(notice.textContent ?? "").toMatch(/old name/i);
+    expect(notice.textContent ?? "").toMatch(/unlock/i);
+  });
+
+  it("CLEARING the name surfaces it too, which is the case it exists for", async () => {
+    // Someone emptying the field is renaming precisely to get a name off a
+    // screen. Silence here would be actively misleading, because the old name
+    // is exactly what the other devices keep.
+    prefsRead.mockResolvedValue({ label: "Tax Returns" });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe("Tax Returns"),
+    );
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "" },
+    });
+    expect(screen.getByTestId("settings.label-rename-notice")).toBeTruthy();
+  });
 });
