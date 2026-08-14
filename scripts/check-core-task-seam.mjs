@@ -241,9 +241,15 @@ for (const file of files) {
   let depth = 0;
   let sawBrace = false;
   text.split("\n").forEach((line, i) => {
+    // myne-md/myne#411: `!skipping` guards the reset. A NESTED gate, on a helper
+    // already inside `#[cfg(test)] mod tests`, must not restart the tracker:
+    // resetting there ends the outer exemption at the inner helper's closing
+    // brace, and everything after it in the test module is checked as
+    // production code. The outer region already covers the inner item.
     if (
-      /^\s*#\[cfg\(test\)\]/.test(line) ||
-      (/^\s*#\[cfg\(/.test(line) && isNativeOnlyGate(line))
+      !skipping &&
+      (/^\s*#\[cfg\(test\)\]/.test(line) ||
+        (/^\s*#\[cfg\(/.test(line) && isNativeOnlyGate(line)))
     ) {
       skipping = true;
       depth = 0;
