@@ -238,6 +238,12 @@ pre-commit:
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n.mjs
 
+    decisions-index:
+      # docs/decisions.md is generated over docs/decisions/**. Without this, the first person to
+      # add a decision hand-edits the index, and the next regeneration silently discards it.
+      # Deliberately NOT scoped to code paths: a docs-only commit is exactly when a decision lands.
+      run: node scripts/decisions-index.mjs --check
+
     beta-terms-version:
       # The beta-terms clauses and BETA_TERMS_VERSION must move together
       # (myne-ops#15). Editing a clause without bumping the version leaves every
