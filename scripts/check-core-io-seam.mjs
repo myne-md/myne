@@ -134,19 +134,40 @@ for (const file of files) {
   }
 
   // `#[cfg(test)]` regions are exempt: test code never compiles for wasm32.
-  // Tracked by brace depth from the attribute, exactly as
-  // `check-core-task-seam.mjs` does it.
+  // Tracked by brace depth from the attribute, the same way
+  // `check-core-task-seam.mjs` does it — including both of its corrections,
+  // which this file was missing while its comment claimed parity.
+  //
+  // #274: a BRACE-LESS gated item (a `use`, a `type` alias, a `mod x;`) never
+  // closes a block, so a plain brace-depth exit leaves `skipping` true for the
+  // whole rest of the file and the guard goes silently blind. An item ending in
+  // `;` before any brace opened IS the whole item.
+  //
+  // myne-md/myne#411: a NESTED `#[cfg(test)]`, on a helper already inside
+  // `#[cfg(test)] mod tests`, must not restart the tracker. Resetting there ends
+  // the outer exemption at the inner helper's closing brace, and every later
+  // `std::fs` call in the test module gets reported as a production seam
+  // violation. The outer region already covers the inner item, so ignore it.
   let skipping = false;
   let depth = 0;
+  let sawBrace = false;
   const hits = [];
   text.split("\n").forEach((line, i) => {
-    if (/^\s*#\[cfg\((any\()?test/.test(line)) {
+    if (!skipping && /^\s*#\[cfg\((any\()?test/.test(line)) {
       skipping = true;
       depth = 0;
+      sawBrace = false;
     }
     if (skipping) {
-      depth += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
-      if (depth <= 0 && /\}/.test(line)) skipping = false;
+      const opens = (line.match(/\{/g) || []).length;
+      const closes = (line.match(/\}/g) || []).length;
+      depth += opens - closes;
+      if (opens > 0) sawBrace = true;
+      if (!sawBrace && /;\s*$/.test(line) && !/^\s*#\[/.test(line)) {
+        skipping = false;
+        return;
+      }
+      if (sawBrace && depth <= 0 && closes > 0) skipping = false;
       return;
     }
     if (line.trim().startsWith("//")) return;
