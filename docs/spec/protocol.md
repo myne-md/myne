@@ -702,6 +702,7 @@ A Myne vault is a directory on the user's filesystem containing:
 ├── vault.attachments     ← encrypted attachments catalog (MYC1, §9.10)
 ├── vault.dictionary      ← encrypted personal dictionary (MYD1, §9.13)
 ├── vault.quickunlock     ← device-local quick-unlock credential (MYQ1, §9.14)
+├── vault.label           ← device-local sealed label store (MYL1, §9.22)
 ├── vault.head-state      ← device-local sync baseline (MYH1, §9.16)
 ├── vault.embeddings      ← encrypted AI embedding index (MYR1, §9.17)
 ├── vault.graph           ← encrypted graph-layout cache (MYG1, §9.19)
@@ -1419,6 +1420,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.embeddings` | OUT | Pure rebuildable **and** model-specific cache (§9.17); re-embedded locally on the first unlock after restore (§9.17.4) — a backed-up index could be wrong on a device holding a different embedding model. Class 3 (`sync-protocol.md` §319) |
 | `vault.graph` | OUT | Pure rebuildable knowledge-graph layout cache (`MYG1`, §9.19); re-laid-out locally on the next graph open. Class 3 (`sync-protocol.md` §326) |
 | `vault.quickunlock` | OUT | Device-local credential (§9.14); wrap key is bound to *this* device's hardware (`thisDeviceOnly`), so a copy is inert elsewhere — re-set per device after restore |
+| `vault.label` | OUT | Device-local sealed label store (`MYL1`, §9.22); the per-vault wrap key lives in *this* device's keychain (`thisDeviceOnly`), so a copy is inert elsewhere. The name is re-cached on the first unlock after restore, from the authoritative `label` inside `vault.prefs`. Carrying it would also put a name into a portable artefact, which is exactly what §9.22.5's erase is a statement about |
 | `vault.quickunlock.attempts` | OUT | Device-local failed-attempt counter for that credential (§9.14.4); a 2-byte unencrypted `sentinel \|\| count`, meaningless on another device and re-created on demand — carrying it would only restore a stale lockout |
 | `vault.head-state` | OUT | Device-local sync baseline (`MYH1`, §9.16); a backed-up baseline would be stale on restore — the restored vault TOFU-re-bootstraps (`sync-protocol.md` §6) |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
@@ -2336,6 +2338,81 @@ it is the app rendering in the default theme. This is the same class as `vault.d
 
 `vault.themes` is **Class-1 Authoritative data** (`sync-protocol.md` §9) — a synced singleton outside the head manifest, addressed by the reserved blob-id `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]` (§3.4). Merge is **per-theme-name**, with the palette **LWW within a name** (a palette is one coherent design; merging it token-by-token would produce an incoherent result). Deletion follows the attachments-catalog tombstone rule (`sync-protocol.md` §10.2.2 + §11.4): reconciliation is a join over the per-entry causal **`version`** (§9.21.2) — the greater `version` wins (a re-add observes the delete and outranks the tombstone), and on an equal-`version` tie the tombstone wins (remove-wins, the resurrection guard), which makes the merge associative (myne-md/myne#405). It is also a §9.11.3 backup-allowlist member, preserving the `sync ⊆ backup` invariant.
 
+### 9.22 Sealed label store (`vault.label`, `MYL1`)
+
+> **Magic allocation.** `MYL1`/`MYL5` is a free-pool §10.3 allocation (L = *label*, myne-md/myne#411), chosen the same way every family's magic is (implementer-picked from the free pool, as §9.20's `MYF1` row records). A later letter change would be a mechanical rename, not a format change.
+
+A vault's human-readable **name** is the `label` field of `vault.prefs` (§9.5.2), which is AEAD-sealed under a `root_key`-derived KEK and therefore readable only after that vault is unlocked. The vault picker runs **before** any unlock, so it can only render a neutral fallback. `vault.label` is the device-local cache that closes that gap: one file per vault at the vault root beside `vault.quickunlock`, carrying the label and nothing else, sealed under a **per-vault** 32-byte `wrap_key` held in the OS keychain. Landed with myne-md/myne#411; see `decisions.md` 2026-08-15, which supersedes the "no plaintext label is ever written at rest" clause of 2026-06-09.
+
+It is a sibling of the two device-local staging queues (§9.18, §9.20) and shares their keychain-held `wrap_key`, their **no SubkeyRole** posture and their 49-byte header. It differs from both in that it is **not** vault-agnostic: it belongs to exactly one vault, binds that vault's identity, and its key is scoped the same way (§9.22.2).
+
+A vault this device has never unlocked has no `vault.label` file, and that is the correct state rather than a gap: there is no key with which to read a label the device has never held. The reader falls back to the neutral name.
+
+The store is **device-local**: never synced (`sync-protocol.md` Class 4) and never in a backup, because the §9.11.3 member set is a closed allowlist, so a new family is excluded by construction rather than by an exclusion anyone maintains.
+
+#### 9.22.1 On-disk layout
+
+```text
+Offset  Size  Field             Notes
+------  ----  ----------------  ------------------------------------
+0       4     magic             ASCII "MYL1"
+4       1     protocol_version  0x01
+5       16    vault_id          the UUIDv7 naming vaults/<id>/; AAD-bound
+21      24    wrap_nonce        XChaCha20-Poly1305 nonce
+45      4     ciphertext_len    big-endian uint32, = plaintext_len + 32
+49      ..    ciphertext        UTF-8 label AEAD-sealed + 32-byte CTX tag
+```
+
+Header = 49 bytes, the §9.18.1 / §9.20.3 shape with `vault_id` where those carry a per-entry id. The `vault_id` is already the name of the enclosing directory, so putting it in the header leaks nothing that the filesystem does not; what it buys is a structural reject before any key is touched. `ciphertext_len` is variable (`plaintext_len + 32`).
+
+Magic, `protocol_version`, the `vault_id` binding, `ciphertext_len` and the §10.3.1 strict-trailing equality are all validated **before** any decryption is attempted.
+
+#### 9.22.2 Per-vault wrap key (no SubkeyRole)
+
+The blob is sealed under a **32-byte `wrap_key` held in the OS keychain**, **NOT** a `DeriveSubkey(root_key, …)` subkey. There is no HKDF context string and no §10.3 subkey role; the codec is provider-agnostic and only ever sees a symmetric key. The key is non-biometric (the picker reads it on every launch, and a biometric prompt to render a list would be absurd) and device-only (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` on Apple, the equivalent non-exportable device-only key elsewhere). The keychain service string is `md.myne.vaultlabel`, DISTINCT from `md.myne.quickunlock`, `md.myne.captures` and `md.myne.shareimport`.
+
+Two properties of the key are normative, and both are about erase rather than confidentiality.
+
+**One key per vault, keyed by `VaultId`.** §9.18 and §9.20 each mint one device-global key because an entry is enqueued before anyone knows which vault it lands in. That shape is wrong here: vault deletion carries a per-`VaultId` cryptographic-erase guarantee, and under a shared key a deleted vault's name would stay readable while the key lived, weakening the guarantee at the one artefact a person actually recognises. Per-vault scoping is what lets deletion destroy exactly one vault's name.
+
+**A derived subkey would not do.** It fails twice over. The label must be readable while the vault is **locked**, so `root_key` does not exist at read time; and a derived subkey cannot be destroyed on its own while its root survives, so it would only look like per-vault erase. This is the §9.14/§9.18 no-circular-KEK argument plus an erase argument the queues do not need.
+
+#### 9.22.3 AAD
+
+`AAD_vault_label_blob` binds the 16-byte `vault_id` after the role string `"vault-label-blob"` (length-prefixed UTF-8: 2-B big-endian length + 16 ASCII bytes):
+
+```text
+AAD_vault_label_blob =
+  AAD_prefix (10 B) || protocol_version (1 B) || u16_be(16) || "vault-label-blob" (16 B) || vault_id (16 B)
+```
+
+Total AAD length: `10 + 1 + 18 + 16 = 45 bytes`. Neither `account_number_hash` nor `items_key_id` is bound: the label lives outside every `root_key` lineage, and the vault directory rather than the account is what the file belongs to (one account can hold two vault directories on one device).
+
+**The bound `vault_id` is the one the READER expected, not merely the one the blob carries.** §9.18.3 and §9.20.3 both record a limit they cannot close: their AAD binds the id in the header, so a sealed entry copied to a second filename is unaltered and still opens, and agreement is left to a reader-side check. Here the caller already knows which vault it is reading (the id is the directory it is reading from), so the expected id goes into the AAD and the header's copy is compared against it first. A file moved between vault directories therefore fails AEAD, and does so structurally rather than because an implementer remembered a comparison. Implementations MUST bind the expected `vault_id` and MUST reject a header whose `vault_id` differs from it.
+
+#### 9.22.4 Size cap, empty labels, and read semantics
+
+Implementations MUST reject `ciphertext_len > 4096 + 32` (4 KiB plaintext cap + 32-byte CTX tag) before allocating. A vault name is a few words, so the cap is several orders of magnitude of headroom while still bounding the pre-AEAD allocation (the §9.5.4 / §9.6.5 DoS-allocation discipline). An over-cap label is refused at write time rather than truncated: a silently shortened name is a wrong name.
+
+**Clearing a name removes the file**; an empty label is never stored. Implementations MUST NOT write a zero-length plaintext, so "no file" is the single representation of "this device has no name for that vault" and a reader has one case to get right instead of two.
+
+Read semantic is **fall-back-to-neutral** on any failure (file absent, truncated, magic/version/vault-id mismatch, AEAD verification failure, non-UTF-8 plaintext): the picker shows the neutral label, per the §6.4 non-distinguishing-error discipline. A failure MUST NOT surface as an error on the picker: a name is a convenience, and a vault whose name cannot be read still opens normally.
+
+Two of those failures are worth separating in an implementation, because they are different facts. A file whose **key is gone** can never be read again (the restore-onto-a-new-device case, and what the erase below leaves behind), so the file is deleted and the row falls back silently. The **keychain being unavailable as a whole** is a different state: nothing is wrong with the file, the facility is missing, and an implementation that offers the option below has to be able to say so rather than appear to do nothing.
+
+#### 9.22.5 Erase, and what it does not reach
+
+Making a name unreadable means **destroying its key**, not rewriting or deleting the file. Rewriting a plaintext file removes bytes from the file's current contents and not from the medium: on a copy-on-write or journalled filesystem, and after any snapshot or SSD relocation, the old bytes survive. This is the project's settled posture, fixed by `decisions.md` 2026-05-07 when it rejected platform-specific secure-delete for note deletion. Removing the `vault.label` file is tidiness that follows the key destruction, never a substitute for it, and an implementation MUST destroy the key before removing the file so a crash between the two leaves unreadable ciphertext rather than a live key beside a deleted file.
+
+Two paths destroy a key. **Vault deletion** destroys that vault's key, which is what keeps the per-`VaultId` cryptographic-erase guarantee whole. A device-wide **hide-vault-names** option destroys every per-vault key, removes every `vault.label` file, and stops future writes; turning it off again resurrects nothing, because names reappear only as each vault is unlocked afresh.
+
+Two limits are recorded here rather than rounded off, and both are stated to the user rather than left to be discovered ([`../threat-model.md`](../threat-model.md) §7):
+
+- **Crypto-erase protects against someone who reads the medium afterwards.** A full-system snapshot taken while names were enabled carries both the ciphertext and the keychain, and destroying the key later does not reach that copy.
+- **The cache is device-local and does not sync**, so renaming a vault on one device leaves the old name on every other device's lock screen until that vault is unlocked there. A locked device cannot learn otherwise: the authoritative name is inside `vault.prefs`.
+
+**Falling back to a plaintext name when no keychain is available is forbidden.** It would look identical on screen while voiding the erase guarantee and making the threat-model paragraph false.
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -2392,6 +2469,7 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 | Graph layout cache (`vault.graph`) | `MYG1` | `MYG5` | §9.19 | graph-rework |
 | Share-import staging queue (`pending-shares/<id>`) | `MYF1` | `MYF5` | §9.20 | MYND-507 |
 | Custom-themes blob (`vault.themes`) | `MYT1` | `MYT5` | §9.21 | MYND-486 |
+| Sealed label store (`vault.label`) | `MYL1` | `MYL5` | §9.22 | myne-md/myne#411 |
 | CRDT note-type (`.myn`, v0.2) | — | `NC05` (allocated, v0.2) | §10.7 | automerge-sync-migration / #418 |
 
 Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` next-major reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` next-major convention. These reserved magic values are placeholders — the next major version finalizes them. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The **CRDT note-type** row (`NC05`) is **next-major-only** — it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09 — the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family).
@@ -2402,7 +2480,7 @@ Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND
 
 Applied to the layout shapes in the allocation table above:
 
-- **Envelope families** — a fixed-offset header followed by a single `ciphertext` field of the declared `ciphertext_len` (§9.2, §9.5–§9.10, §9.13–§9.15, §9.17–§9.21). Total length MUST be exactly `header_len + ciphertext_len`, where `header_len` is that family's fixed prefix, itself computed from the header's own length fields where the prefix is variable (§9.2 / §9.9: `76 + enc_item_key_len`).
+- **Envelope families** — a fixed-offset header followed by a single `ciphertext` field of the declared `ciphertext_len` (§9.2, §9.5–§9.10, §9.13–§9.15, §9.17–§9.22). Total length MUST be exactly `header_len + ciphertext_len`, where `header_len` is that family's fixed prefix, itself computed from the header's own length fields where the prefix is variable (§9.2 / §9.9: `76 + enc_item_key_len`).
 - **`vault.meta`** (§9.3) — a fixed-length layout; the equality is against that fixed length.
 - **The backup container** (§9.11) — states the same equality as its own equation, `file_length == 22 + member_table_len + members_total_len` (§9.11.5), and keeps it. Each member is then subject to the rule for the member's own family, which is what makes §9.11.5's "`member_len` MUST NOT exceed the size cap of the member's own blob family" a bound on the whole member and not merely on its ciphertext.
 - **`vault.head-state`** (§9.16) — the 6-byte header is followed by exactly one wire head record; the file MUST end where that record ends (`sync-protocol.md` §3.2 gives its length), with no bytes after the head's own 32-byte MAC.

@@ -69,7 +69,7 @@ The trait is deliberately scoped to note-CRUD + unlock/lock. Hooks that fire onl
 | `vault_unlock` | the `UnlockedVault` slot, unlock/lock, status probes, storage health |
 | `workspace` | `vault.workspace` (`MYW1`) pane tree + the RAM-only stage |
 
-Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence — shared, though only desktop feeds it), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_meta_hash`, `note_txn`, `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
+Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence — shared, though only desktop feeds it), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_label` (the `MYL1` sealed label store: the per-vault keychain key + the device-local file the LOCKED picker reads a vault's name from), `vault_meta_hash`, `note_txn`, `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
 
 ### Command shape — three layers
 
