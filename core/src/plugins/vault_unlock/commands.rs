@@ -1640,10 +1640,16 @@ pub struct VaultSummary {
 /// Enumerate every discovered vault under `<app_data_dir>/vaults/` and
 /// project each into a [`VaultSummary`] (SYNC-4).
 ///
-/// Read-only: does not hold the unlock permit, does not call into Argon2id,
-/// does not populate or peek [`VaultRuntimeState`]. The multi-vault
+/// Reads no vault content: does not hold the unlock permit, does not call into
+/// Argon2id, does not populate or peek [`VaultRuntimeState`]. The multi-vault
 /// generalization of [`vault_status`] — a downstream picker consumes the
 /// returned list (plus the runtime slot map, sub-feature 2) to route boot.
+///
+/// It is not, however, side-effect free on disk: a sealed label file that can
+/// never be decoded again is removed as it is found
+/// ([`discard_unreadable_label`]). That is a cache line the app itself wrote and
+/// can no longer read, never vault content, and the alternative is re-reading
+/// and re-failing on it at every launch for the life of the profile.
 ///
 /// A corrupted vault (missing/unreadable `vault.meta`) is surfaced with
 /// `status: Corrupted`, never dropped. An empty / absent `vaults/` directory
@@ -1709,15 +1715,27 @@ pub async fn vault_list<R: Runtime>(
 /// `Absent` without touching the keychain and this returns `None`. Nothing has
 /// to remember to special-case it.
 ///
-/// Two answers are deliberately collapsed into `None` here and belong to
-/// task 6 of `myne-agents/features/locked-picker-vault-names/`:
-/// [`crate::vault_label::store::LabelRead::Unreadable`] (a file whose key is
-/// gone, and the orphan is left in place for that task's cleanup to remove) and
-/// [`crate::vault_label::error::VaultLabelError::KeychainUnavailable`] (a
-/// device with no usable keychain, which that task makes reportable to the
-/// UI). Neither may error the picker: the list is the surface a user reaches a
-/// vault through, and failing it because a name could not be read would trade
-/// the vault for its label.
+/// **The two degraded answers reach `None` by different routes, and the
+/// difference is the point** (myne-md/myne#411 task 6):
+///
+/// - [`crate::vault_label::store::LabelRead::Unreadable`] is permanent. The
+///   file's key was destroyed, or the vault directory was restored onto a
+///   machine that never held one, and no future run will read it. The orphan is
+///   **deleted here** and the row falls back silently, because there is no
+///   action a user could take on it and a prompt would be noise about a state
+///   with no remedy.
+/// - [`crate::vault_label::error::VaultLabelError::KeychainUnavailable`] is a
+///   property of the DEVICE, not of the file, and it can end: a secret service
+///   that is not running today may run tomorrow, and the sealed file is still
+///   openable when it does. Nothing is deleted, and the state is reported to the
+///   UI through its own probe ([`crate::vault_label::key::keychain_available`],
+///   surfaced by `vault_label_keychain_status`) rather than through this
+///   resolver, because the list may not fail and a per-row field would repeat
+///   one device-wide fact once per vault.
+///
+/// Neither may error the picker: the list is the surface a user reaches a vault
+/// through, and failing it because a name could not be read would trade the
+/// vault for its label. Neither, on any path, writes a name in the clear.
 async fn resolve_summary_label(
     state: &VaultRuntimeState,
     io: &dyn VaultIo,
@@ -1733,8 +1751,33 @@ async fn resolve_summary_label(
     match crate::vault_label::store::read_label(io, vault_root, id, keychain).await {
         Ok(crate::vault_label::store::LabelRead::Label(name)) => Some(name),
         Ok(crate::vault_label::store::LabelRead::Absent) => None,
-        Ok(crate::vault_label::store::LabelRead::Unreadable) => None,
+        Ok(crate::vault_label::store::LabelRead::Unreadable) => {
+            discard_unreadable_label(io, vault_root).await;
+            None
+        }
         Err(_) => None,
+    }
+}
+
+/// Remove a sealed label file that can never be decoded again, best-effort.
+///
+/// `remove_label` and not `erase`, and the distinction is the same one
+/// `writeback::persist_label_at` draws when a name is cleared: there is no key
+/// left to destroy in the case that produced this (that IS why the file is
+/// unreadable), and in the corrupt-file case the vault's key must survive to
+/// seal the next name. Deleting the file is therefore all that is available and
+/// all that is wanted.
+///
+/// A failed removal changes nothing the caller does: the row already falls back,
+/// and the next launch tries again. It is logged with the shared closed-enum tag
+/// so no path can put the label, or a filesystem path, into a log line.
+async fn discard_unreadable_label(io: &dyn VaultIo, vault_root: &Path) {
+    if let Err(e) = crate::vault_label::store::remove_label(io, vault_root).await {
+        tracing::debug!(
+            stage = "vault_list",
+            kind = crate::vault_label::error::vault_label_error_kind(&e),
+            "an unreadable sealed vault label could not be removed"
+        );
     }
 }
 
@@ -4512,14 +4555,15 @@ mod tests {
             assert_eq!(summaries.len(), 1, "the vault is still listed");
             assert_eq!(summaries[0].status, VaultSummaryStatus::Exists);
             assert_eq!(summaries[0].label, None, "and it falls back to no name");
-            // Deliberately NOT deleted here. Cleaning up the orphan is task 6 of
-            // `myne-agents/features/locked-picker-vault-names/`, and this pins
-            // the boundary so that task has something to flip rather than a
-            // behaviour to discover.
+            // The orphan is DELETED on the read that found it. Its key is gone,
+            // so it can never be decoded again by anyone, and keeping it would
+            // leave a file the app re-reads and re-fails on every launch. There
+            // is nothing to tell the user: no action of theirs would bring the
+            // key back.
             assert!(
-                crate::vault_label::store::label_path(&tmp.path().join(VAULTS_DIR).join(&id))
+                !crate::vault_label::store::label_path(&tmp.path().join(VAULTS_DIR).join(&id))
                     .exists(),
-                "the orphan file survives this read; its removal belongs to task 6"
+                "a sealed file whose key is gone must be removed, not re-read forever"
             );
         });
     }
@@ -4528,8 +4572,9 @@ mod tests {
     fn vault_list_falls_back_rather_than_erroring_when_the_keychain_is_unavailable() {
         rt().block_on(async {
             // The Linux-with-no-secret-service shape. The files are there and
-            // the facility is not, which is a reportable state (task 6) but not
-            // one the list may fail on.
+            // the facility is not, which is a reportable state (the
+            // `vault_label_keychain_status` probe) but not one the list may fail
+            // on.
             let tmp = ScopedTempDir::new("vlist-nokeychain").unwrap();
             let id = seed_disk_vault(tmp.path(), true);
             let good = FakeKeychain::empty();
@@ -4545,7 +4590,83 @@ mod tests {
             .await;
             assert_eq!(summaries.len(), 1, "the vault is still listed");
             assert_eq!(summaries[0].label, None);
+            // And the file SURVIVES, which is the difference between the two
+            // degraded states. This one is temporary: the secret service comes
+            // back, the key is still there, and the name reads again. Deleting
+            // here would turn a daemon that was not running into a name the user
+            // has to re-earn by unlocking that vault.
+            assert!(
+                crate::vault_label::store::label_path(&tmp.path().join(VAULTS_DIR).join(&id))
+                    .exists(),
+                "an unavailable keychain must not cost the user a readable name"
+            );
         });
+    }
+
+    #[test]
+    fn neither_degraded_path_writes_a_plaintext_name_anywhere() {
+        // The forbidden fallback, asserted directly rather than assumed absent.
+        // A plaintext write on either path would look identical on screen (the
+        // row shows the name) while voiding the cryptographic-erase guarantee
+        // and making the `docs/threat-model.md` § 7 paragraph false. The walk
+        // covers the whole scratch device rather than the one file we expected
+        // to be wrong.
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vlist-degraded-plaintext").unwrap();
+            let orphaned = seed_disk_vault(tmp.path(), true);
+            let unreadable = seed_disk_vault(tmp.path(), true);
+            let good = FakeKeychain::empty();
+            seal_label(tmp.path(), &orphaned, "Orphan Name", &good).await;
+            seal_label(tmp.path(), &unreadable, "Locked Out Name", &good).await;
+            crate::vault_label::key::destroy_key(
+                &good,
+                crate::vault_id::VaultId::parse(&orphaned).unwrap(),
+            )
+            .expect("destroy one vault's key behind the app's back");
+
+            let state = VaultRuntimeState::default();
+            // Both degraded paths in one pass: the orphan (key gone) resolves
+            // through the deletion arm, and the second vault through the
+            // unavailable-keychain arm.
+            let _ = vault_list_from_base(tmp.path(), &state, &StdVaultIo, &good).await;
+            let _ = vault_list_from_base(
+                tmp.path(),
+                &state,
+                &StdVaultIo,
+                &FakeKeychain::unavailable(),
+            )
+            .await;
+
+            let mut checked = 0usize;
+            for path in walk_files(tmp.path()) {
+                let bytes = std::fs::read(&path).unwrap_or_default();
+                for name in ["Orphan Name", "Locked Out Name"] {
+                    assert!(
+                        !bytes.windows(name.len()).any(|w| w == name.as_bytes()),
+                        "the plaintext name {name:?} is on disk at {path:?}"
+                    );
+                }
+                checked += 1;
+            }
+            assert!(checked > 0, "the walk must actually have read some files");
+        });
+    }
+
+    /// Every regular file under `root`, recursively.
+    fn walk_files(root: &Path) -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        let Ok(entries) = std::fs::read_dir(root) else {
+            return out;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                out.extend(walk_files(&path));
+            } else {
+                out.push(path);
+            }
+        }
+        out
     }
 
     #[test]

@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! The hide-vault-names command pair (myne-md/myne#411).
+//! The hide-vault-names command pair, and the keychain-availability probe
+//! beside it (myne-md/myne#411).
 //!
 //! Two commands over [`super::hide_flag`] and [`super::erase_all`]: read the
 //! device-local flag, and write it. Both are reachable **pre-unlock**, for the
 //! same reason the sync-endpoint pair is: the behaviour they govern happens on
 //! the picker, before any vault is open, and neither touches vault content.
+//!
+//! A third, [`keychain_status_with`], answers a different question with the same
+//! audience: whether this device has a usable keychain at all. It is separate
+//! rather than a field on the pair's view because the flag and the facility fail
+//! independently, and because turning the option OFF deliberately touches no
+//! keychain. See [`KeychainStatusView`] for what the answer may and may not be
+//! used for.
 //!
 //! ## Writing the flag ON is the erase
 //!
@@ -46,8 +54,10 @@
 //!
 //! ## No path here writes a name
 //!
-//! Neither command takes a label, returns a label, or logs one. The only
-//! plaintext that exists on either path is the boolean.
+//! No command here takes a label, returns a label, or logs one. The only
+//! plaintext that exists on any of these paths is the boolean. In particular
+//! the probe reporting `available: false` never causes a name to be written in
+//! the clear: it changes what the UI says and nothing else.
 
 use crate::io_failure_kind::IoFailureKind;
 use crate::vault_io::VaultIo;
@@ -62,16 +72,45 @@ use serde::Serialize;
 use std::path::Path;
 use thiserror::Error;
 
-/// What both commands report back: the flag as it now stands on disk.
+/// What both flag commands report back: the flag as it now stands on disk.
 ///
-/// A struct rather than a bare `bool` so the surfaces this feeds (the Privacy
-/// row and, later, the keychain-unavailable state it has to render) can gain a
-/// field without changing an IPC signature. Same shape and same reason as
+/// A struct rather than a bare `bool` so the surface this feeds can gain a field
+/// without changing an IPC signature. Same shape and same reason as
 /// [`crate::plugins::sync::tor_config`]'s view.
+///
+/// **The keychain-unavailable state is deliberately NOT a field here**, though
+/// an earlier note in this file expected it to be. Two things stopped it, and
+/// both are about honesty rather than tidiness. Turning the option OFF touches
+/// no keychain at all, which is exactly what lets it succeed on a device that
+/// has none; filling an availability field on that path would mean probing a
+/// keychain the path is defined by not needing. And the setter would then have
+/// to answer a question it never asked on the way through. So availability is
+/// its own question with its own command, [`keychain_status_with`], and this
+/// struct keeps describing only the flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct HideVaultNamesView {
     /// `true` when vault names are hidden on this device.
     pub hidden: bool,
+}
+
+/// Whether this device can store vault names at all.
+///
+/// The one failure in this feature a user can be told something true about. On a
+/// machine with no usable keychain (a Linux desktop with no secret service, an
+/// unsigned build on macOS) the store can hold nothing: every write fails, every
+/// row falls back, and with no way to say so the Privacy row would look broken
+/// forever to exactly the person who most needs to understand it.
+///
+/// **`available: false` is not a licence to write the name in the clear.**
+/// Nothing anywhere reacts to it by falling back to plaintext; that combination
+/// would look identical on screen while voiding the erase guarantee and making
+/// the `docs/threat-model.md` § 7 paragraph false (`decisions.md` 2026-08-15).
+/// The only thing this state changes is what the UI says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct KeychainStatusView {
+    /// `true` when the device keychain answered, whether or not it holds
+    /// anything. `false` only when the facility itself is not there.
+    pub available: bool,
 }
 
 /// Failure surface for the command pair. No `String` and no path
@@ -172,6 +211,21 @@ pub async fn set_hide_vault_names_at(
     Ok(HideVaultNamesView { hidden })
 }
 
+/// Ask the device whether it has a usable keychain.
+///
+/// Infallible by construction, and that is the design rather than a shortcut: a
+/// probe whose whole subject is "does this facility answer" has nothing useful
+/// to say in an `Err`, and a caller forced to handle one would have to invent a
+/// third state the UI does not have. The unavailable case IS the answer.
+///
+/// Takes no host and no IO: there is no file, no path and no vault involved,
+/// only the keychain the caller hands it.
+pub fn keychain_status_with(keychain: &dyn LabelKeychain) -> KeychainStatusView {
+    KeychainStatusView {
+        available: crate::vault_label::key::keychain_available(keychain),
+    }
+}
+
 // ---- layer 1: the host-taking cores ----------------------------------------
 
 /// [`hide_vault_names_at`] against the device's own config directory.
@@ -209,6 +263,21 @@ pub async fn hide_vault_names<R: tauri::Runtime>(
 ) -> Result<HideVaultNamesView, HideVaultNamesError> {
     let host = crate::host::tauri_host::TauriHost::new(app);
     hide_vault_names_from_host(&host, &crate::vault_io::StdVaultIo).await
+}
+
+/// Report whether this device has a usable keychain, so the Privacy row can say
+/// that the option cannot work here instead of appearing to do nothing. Reads
+/// one keychain item that does not exist; stores nothing, mints nothing, and
+/// touches no vault.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_label_keychain_status() -> Result<KeychainStatusView, HideVaultNamesError> {
+    // `Result` for IPC-contract uniformity with the pair above (and so a future
+    // failure mode does not change the TS signature), never because this can
+    // fail: the probe's unavailable answer is a value, not an error.
+    Ok(keychain_status_with(
+        crate::vault_label::key::platform_keychain(),
+    ))
 }
 
 /// Turn the device-local hide-vault-names option on or off. Turning it ON
@@ -447,6 +516,120 @@ mod tests {
             );
         });
         assert!(keychain.accounts().is_empty());
+    }
+
+    #[test]
+    fn the_keychain_status_reports_available_on_a_device_that_has_one() {
+        let keychain = FakeKeychain::empty();
+        assert_eq!(
+            keychain_status_with(&keychain),
+            KeychainStatusView { available: true },
+            "a keychain holding nothing yet is still a keychain"
+        );
+    }
+
+    #[test]
+    fn the_keychain_status_reports_unavailable_so_the_row_can_say_so() {
+        // The state that has to reach the UI. Collapsed into silence, the user
+        // toggles the option, nothing happens, and nothing ever explains why.
+        let none = FakeKeychain::unavailable();
+        assert_eq!(
+            keychain_status_with(&none),
+            KeychainStatusView { available: false }
+        );
+    }
+
+    #[test]
+    fn the_status_probe_is_not_a_second_way_to_read_the_flag() {
+        // Two questions, two answers, independently: names can be hidden on a
+        // device that has a keychain, and shown on one that does not.
+        let d = device();
+        let keychain = FakeKeychain::empty();
+        block_on(async {
+            set_hide_vault_names_at(&StdVaultIo, &d.base, &d.flag_path, &keychain, true)
+                .await
+                .expect("enable");
+        });
+        assert_eq!(
+            keychain_status_with(&keychain),
+            KeychainStatusView { available: true }
+        );
+        assert_eq!(
+            keychain_status_with(&FakeKeychain::unavailable()),
+            KeychainStatusView { available: false }
+        );
+    }
+
+    #[test]
+    fn probing_leaves_the_keychain_and_the_device_exactly_as_it_found_them() {
+        let d = device();
+        let keychain = FakeKeychain::empty();
+        seed_two_named_vaults(&d, &keychain);
+        let mut before = walk(d._dir.path());
+        before.sort();
+
+        let _ = keychain_status_with(&keychain);
+
+        let mut accounts = keychain.accounts();
+        accounts.sort();
+        assert_eq!(
+            accounts,
+            vec![VAULT_A.to_string(), VAULT_B.to_string()],
+            "the probe minted or destroyed a key"
+        );
+        let mut after = walk(d._dir.path());
+        after.sort();
+        assert_eq!(before, after, "the probe wrote a file");
+    }
+
+    #[test]
+    fn an_unavailable_keychain_still_writes_no_name_anywhere() {
+        // The forbidden fallback, on the path that would be tempted by it: the
+        // device where sealing cannot work. Asserted by walking the whole device
+        // rather than by inspecting the file we expected to be wrong.
+        let d = device();
+        let none = FakeKeychain::unavailable();
+        assert_eq!(
+            keychain_status_with(&none),
+            KeychainStatusView { available: false }
+        );
+
+        let result = block_on(async {
+            // A rename and an unlock on such a device both come through here.
+            crate::vault_label::writeback::persist_label_at(
+                &StdVaultIo,
+                &d.flag_path,
+                &d.a,
+                vault(VAULT_A),
+                Some("Work"),
+                &none,
+            )
+            .await
+        });
+
+        // The disk is asserted BEFORE the return value, deliberately. What the
+        // call answered is the weaker fact: a plaintext fallback could report
+        // either one while the name sat on the medium in the clear, so the bytes
+        // are what has to be checked.
+        let mut checked = 0usize;
+        for path in walk(d._dir.path()) {
+            let bytes = std::fs::read(&path).unwrap_or_default();
+            assert!(
+                !bytes.windows(4).any(|w| w == b"Work"),
+                "the plaintext name is on disk at {path:?}"
+            );
+            checked += 1;
+        }
+        assert!(checked > 0, "the walk must actually have read some files");
+        assert!(
+            !label_path(&d.a).exists(),
+            "no sealed file, and no other one"
+        );
+        assert_eq!(
+            result,
+            Err(VaultLabelError::KeychainUnavailable),
+            "and the caller is told why, rather than told it worked"
+        );
     }
 
     #[test]

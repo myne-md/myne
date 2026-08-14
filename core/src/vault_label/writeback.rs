@@ -55,7 +55,7 @@
 use crate::host::HostCtx;
 use crate::vault_id::VaultId;
 use crate::vault_io::VaultIo;
-use crate::vault_label::error::VaultLabelError;
+use crate::vault_label::error::{vault_label_error_kind, VaultLabelError};
 use crate::vault_label::hide_flag::{
     hide_flag_path_from_host, names_hidden_at_rest, read_hide_vault_names,
 };
@@ -118,7 +118,7 @@ pub async fn persist_label_from_host(
     };
 
     if let Err(e) = persist_label_at(io, &flag_path, vault_root, vault_id, label, keychain).await {
-        log_failure(error_kind(&e));
+        log_failure(vault_label_error_kind(&e));
     }
 }
 
@@ -138,21 +138,7 @@ pub async fn forget_label(
     keychain: &dyn LabelKeychain,
 ) {
     if let Err(e) = erase(io, vault_root, vault_id, keychain).await {
-        log_failure(error_kind(&e));
-    }
-}
-
-/// Closed-enum mapping from a store failure to a static log tag. No variant can
-/// carry the label, and this keeps it that way by construction rather than by
-/// anyone remembering not to format the error.
-fn error_kind(e: &VaultLabelError) -> &'static str {
-    match e {
-        VaultLabelError::KeychainUnavailable => "keychain_unavailable",
-        VaultLabelError::KeyMissing => "key_missing",
-        VaultLabelError::EmptyLabel => "empty_label",
-        VaultLabelError::LabelTooLong => "label_too_long",
-        VaultLabelError::Io(_) => "io",
-        VaultLabelError::Backend => "backend",
+        log_failure(vault_label_error_kind(&e));
     }
 }
 

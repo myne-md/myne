@@ -15,8 +15,12 @@
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the vault-label plugin: read and write of the device-local hide-vault-names option."
-permissions = ["allow-hide-vault-names", "allow-set-hide-vault-names"]
+description = "Default permission set for the vault-label plugin: read and write of the device-local hide-vault-names option, plus the keychain-availability probe the Privacy row renders."
+permissions = [
+  "allow-hide-vault-names",
+  "allow-set-hide-vault-names",
+  "allow-vault-label-keychain-status",
+]
 
 [[permission]]
 identifier = "allow-hide-vault-names"
@@ -27,3 +31,8 @@ commands.allow = ["hide_vault_names"]
 identifier = "allow-set-hide-vault-names"
 description = "Allow invoking vault-label:set_hide_vault_names (persist the device-local hide-vault-names flag). Turning it ON first destroys EVERY per-vault vault.label wrap key in the md.myne.vaultlabel keychain service and removes every vault.label file, and persists the flag only if that sweep completed; turning it off restores nothing and touches no keychain. Destructive by design and bounded to that one keychain service and that one filename; it reads no vault content, decrypts nothing, and neither takes nor returns a label."
 commands.allow = ["set_hide_vault_names"]
+
+[[permission]]
+identifier = "allow-vault-label-keychain-status"
+description = "Allow invoking vault-label:vault_label_keychain_status (report whether this device has a usable OS keychain, so the Privacy row can say the option cannot work here instead of appearing to do nothing). Reads ONE md.myne.vaultlabel item that by construction does not exist and reports only whether the facility answered: it stores nothing, mints nothing, destroys nothing, reads no vault content, and neither takes nor returns a label. One boolean out."
+commands.allow = ["vault_label_keychain_status"]
