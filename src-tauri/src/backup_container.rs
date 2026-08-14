@@ -1288,6 +1288,10 @@ mod tests {
             ("vault.search", None),
             ("vault.workspace", None),
             ("vault.indices", None),
+            // §9.22 sealed label store: OUT, and OUT by construction rather
+            // than by an exclusion anyone maintains: the allowlist is closed,
+            // so a new family is rejected until someone adds it deliberately.
+            ("vault.label", None),
             ("attachments-text/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", None),
             ("notes/whatever.txt", None),
             ("notes/0190a000-0000-7000-8000-000000000001.myn.tmp", None),

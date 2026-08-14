@@ -686,6 +686,42 @@ pub fn aad_share_import_blob(share_id: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the AAD bound into the AEAD encryption of a sealed label blob
+/// (`vault.label`, `MYL1`, § 9.22.3). A DISTINCT device-local role from every
+/// vault-scoped blob AND from `pending-capture-blob` / `share-import-blob`.
+///
+/// Layout (45 bytes):
+///
+/// ```text
+/// "myne.v0.1|"                     10 bytes  (AAD prefix, § 5.2)
+/// 0x01                              1 byte   (protocol_version, § 9.22.1)
+/// u16_be(16) || "vault-label-blob" 18 bytes  (length-prefixed role)
+/// vault_id                         16 bytes  (the UUIDv7 naming vaults/<id>/)
+/// ```
+///
+/// Like `aad_capture_blob` and `aad_share_import_blob`, no `DeriveSubkey` role:
+/// the KEK is a device-local key held in the OS keychain, NOT `root_key`-derived
+/// (§ 3.4). It derives from neither because the label must be readable while the
+/// vault is LOCKED, and it must be destroyable on its own so that deleting one
+/// vault erases exactly one name.
+///
+/// Unlike those two it is **not vault-agnostic**: it binds the 16-byte `VaultId`
+/// of the directory the blob lives in, and the caller passes the id it EXPECTS
+/// rather than the one the blob claims. That is what closes, structurally, the
+/// copied-to-another-name gap § 9.18.3 and § 9.20.3 both have to leave to a
+/// reader-side check.
+pub fn aad_vault_label_blob(vault_id: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_VAULT_LABEL_BLOB: &[u8] = b"vault-label-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_VAULT_LABEL_BLOB.len() + vault_id.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_VAULT_LABEL_BLOB);
+    aad.extend_from_slice(vault_id);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a note's
 /// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
 ///
@@ -1402,6 +1438,52 @@ mod tests {
         // Vault-agnostic + distinct from the capture role (one-role-per-family).
         assert_ne!(aad, aad_prefs_blob(&share_id));
         assert_ne!(aad, aad_capture_blob(&share_id));
+    }
+
+    #[test]
+    fn aad_vault_label_blob_default_matches_pinned_hex() {
+        // § 5.2 + § 9.22.3: 45 bytes = prefix (10) + version (1) +
+        // u16_be(16) + "vault-label-blob" (16) + vault_id (16).
+        let vault_id: [u8; 16] = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        let aad = aad_vault_label_blob(&vault_id);
+        let expected: [u8; 45] = [
+            // "myne.v0.1|", 10 bytes
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
+            // protocol_version
+            0x01, // length-prefixed role: u16_be(16) || "vault-label-blob"
+            0x00, 0x10, // u16_be(16)
+            0x76, 0x61, 0x75, 0x6C, 0x74, 0x2D, // "vault-"
+            0x6C, 0x61, 0x62, 0x65, 0x6C, 0x2D, // "label-"
+            0x62, 0x6C, 0x6F, 0x62, // "blob"
+            // vault_id
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+        assert_eq!(aad.len(), 45, "spec § 9.22.3 mandates 45-byte AAD");
+        // Device-local, but vault-BOUND: distinct from the two vault-agnostic
+        // queue roles AND from every vault-scoped singleton role, so no blob of
+        // one family can ever AEAD-verify as another's.
+        assert_ne!(aad, aad_prefs_blob(&vault_id));
+        assert_ne!(aad, aad_capture_blob(&vault_id));
+        assert_ne!(aad, aad_share_import_blob(&vault_id));
+    }
+
+    #[test]
+    fn aad_vault_label_blob_separates_two_vaults() {
+        // The whole point of the binding: one vault's AAD is never another's, so
+        // a sealed name cannot be re-homed by moving its file.
+        let a = [0x0Au8; 16];
+        let b = [0x0Bu8; 16];
+        assert_ne!(aad_vault_label_blob(&a), aad_vault_label_blob(&b));
+        // And only the trailing 16 bytes differ; the framing is shared.
+        assert_eq!(
+            aad_vault_label_blob(&a)[..29],
+            aad_vault_label_blob(&b)[..29]
+        );
     }
 
     #[test]
