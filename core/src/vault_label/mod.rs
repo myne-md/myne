@@ -21,17 +21,31 @@
 //!   decryption, and the AAD binds the `VaultId` the reader expected, so a file
 //!   moved between vault directories fails AEAD rather than opening.
 //!
+//! Three more carry the device-wide **hide vault names** option, which is the
+//! store's off switch and its eraser:
+//!
+//! - [`hide_flag`]: the flag itself, a device-local boolean at
+//!   `<app_config_dir>/vault-names.json`. Deliberately not a `vault.prefs`
+//!   field, because that file is sealed and the picker reads this with no key.
+//! - [`erase_all`]: the sweep. Every vault the disk-scan finds, every key
+//!   destroyed, every file removed, and a partial sweep reported as failure.
+//! - [`commands`]: the read/write command pair, where turning the flag on
+//!   performs the sweep in the same operation and the ordering between the two
+//!   is what stops the screen claiming an erase that did not happen.
+//!
 //! **Never synced, never backed up.** The store is device-local by design, and
 //! the § 9.11.3 closed allowlist rejects an unlisted member path outright, so a
 //! new family is excluded from the backup container by construction rather than
 //! by anyone remembering to exclude it.
 //!
-//! This module is the storage layer only. The call sites that write through it
-//! (unlock, rename, vault delete), the device-wide hide-vault-names option and
-//! its erase sweep, and the picker's own rendering, each land in their own
-//! change; see `agent-tooling/features/locked-picker-vault-names/`.
+//! Still outside this module: the call sites that write through the store
+//! (unlock, rename, vault delete) and the picker's own rendering. Each lands in
+//! its own change; see `agent-tooling/features/locked-picker-vault-names/`.
 
+pub mod commands;
+pub mod erase_all;
 pub mod error;
+pub mod hide_flag;
 pub mod key;
 pub mod store;
 
