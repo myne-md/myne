@@ -44,7 +44,6 @@ coverage/
 /myne-clipper/
 /myne-themes/
 /myne-branding/
-/myne-status/
 
 # Vite dep-optimization cache (regenerated each build).
 .vite/
