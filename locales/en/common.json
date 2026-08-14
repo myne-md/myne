@@ -2377,7 +2377,7 @@
       "localEraseButton": "Sign out and erase this browser's copy…",
       "deleteVaultButton": "Delete vault…",
       "vaultLabelEyebrow": "VAULT LABEL",
-      "vaultLabelHelper": "A name for this vault shown in the in-app switcher. Stored encrypted inside the vault; never leaves your device in plaintext.",
+      "vaultLabelHelper": "A name for this vault, shown in the in-app switcher and on the startup vault picker before you unlock. Stored encrypted inside the vault; never leaves your device in plaintext.",
       "vaultLabelPlaceholder": "Add a label…",
       "vaultLabelRenameNotice": "Your other devices will keep showing the old name on their lock screen until you unlock this vault there.",
       "vaultLabelSave": "Save",
