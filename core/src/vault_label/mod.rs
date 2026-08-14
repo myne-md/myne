@@ -33,14 +33,22 @@
 //!   performs the sweep in the same operation and the ordering between the two
 //!   is what stops the screen claiming an erase that did not happen.
 //!
+//! One more carries the write side, and it is one module rather than one branch
+//! per caller:
+//!
+//! - [`writeback`]: what unlock, rename, clearing a name and vault deletion all
+//!   call. The hide-flag suppression and the clearing-removes-the-file rule live
+//!   here exactly once, because both are the kind of rule that decays when it is
+//!   written at three call sites.
+//!
 //! **Never synced, never backed up.** The store is device-local by design, and
 //! the § 9.11.3 closed allowlist rejects an unlisted member path outright, so a
 //! new family is excluded from the backup container by construction rather than
 //! by anyone remembering to exclude it.
 //!
-//! Still outside this module: the call sites that write through the store
-//! (unlock, rename, vault delete) and the picker's own rendering. Each lands in
-//! its own change; see `myne-agents/features/locked-picker-vault-names/`.
+//! Still outside this module: the picker's own rendering, the orphan-file
+//! cleanup and the keychain-unavailable UI state. Each lands in its own change;
+//! see `myne-agents/features/locked-picker-vault-names/`.
 
 pub mod commands;
 pub mod erase_all;
@@ -48,6 +56,7 @@ pub mod error;
 pub mod hide_flag;
 pub mod key;
 pub mod store;
+pub mod writeback;
 
 /// In-memory keychain stand-in, shared by [`key`]'s and [`store`]'s tests.
 #[cfg(test)]

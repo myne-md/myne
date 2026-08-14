@@ -146,6 +146,7 @@ pub async fn unlock_from_host(
     hooks: &crate::hooks::Hooks,
     host: &dyn HostCtx,
     io: &dyn VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), VaultUnlockError> {
     // SYNC-6 targeting: `Some(id)` → unlock exactly `vaults/<id>/` (the picker
     // of sub-feature 3 passes the chosen id); `None`/malformed → the sole-vault
@@ -210,7 +211,7 @@ pub async fn unlock_from_host(
     // which is exactly why quick-unlock and recovery never wrote it (#250). It
     // now runs as the pipeline's first step, so every credential path stamps by
     // construction.
-    run_post_unlock_pipeline(host, state, hooks, io).await;
+    run_post_unlock_pipeline(host, state, hooks, io, keychain).await;
 
     Ok(())
 }
@@ -246,6 +247,12 @@ pub(crate) async fn run_post_unlock_pipeline(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     io: &dyn VaultIo,
+    // myne-md/myne#411: seals the just-decrypted vault name into the
+    // device-local label store, which is what the LOCKED picker reads on the
+    // next launch. Threaded in for the same reason `host` and `hooks` were:
+    // every credential path has to do it, and the way this file guarantees
+    // that is by every credential path calling this one function.
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) {
     // ---- #250: stamp the registry's last-unlock, on EVERY credential path ----
     //
@@ -316,7 +323,7 @@ pub(crate) async fn run_post_unlock_pipeline(
     // logged via `tracing::warn!` inside `prefs::read_or_default`
     // and `screen_capture::apply`. **vault_unlock's `VaultUnlockError`
     // surface is unchanged** — the user's unlock succeeds regardless.
-    apply_persisted_prefs(host, state, hooks, io).await;
+    apply_persisted_prefs(host, state, hooks, io, keychain).await;
 
     // ---- MYND-649: rebuild the attachment reference graph ---------------
     //
@@ -381,6 +388,7 @@ pub async fn unlock<R: Runtime>(
         hooks.inner(),
         &TauriHost::new(app),
         &crate::vault_io::StdVaultIo,
+        crate::vault_label::key::platform_keychain(),
     )
     .await
 }
@@ -409,6 +417,7 @@ pub(crate) async fn apply_persisted_prefs(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     io: &dyn VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) {
     // SYNC-6: resolve the ACTIVE vault root via the just-unlocked slot's id
     // (`unlock_with_path` set the slot to `Unlocked` before this runs, so
@@ -468,6 +477,27 @@ pub(crate) async fn apply_persisted_prefs(
     // stale entry. The plaintext label exists ONLY in this RAM cache at
     // runtime — never persisted, never logged.
     if let Some(active) = state.active_vault_id().await {
+        // myne-md/myne#411: the decrypted name also goes to the device-local
+        // sealed label store, which is what lets the LOCKED picker show it on
+        // the NEXT launch. Unlock is the only moment the name is knowable, so
+        // it is the only moment this can happen; a vault this device has never
+        // unlocked has no file and falls back, structurally.
+        //
+        // Best-effort and suppressed entirely while the device-wide
+        // hide-vault-names option is on. Both of those live inside
+        // `persist_label_from_host` rather than here, so the unlock path and
+        // the Settings row cannot come to different conclusions about a damaged
+        // flag file.
+        crate::vault_label::writeback::persist_label_from_host(
+            host,
+            io,
+            &vault_dir,
+            active,
+            prefs.label.as_deref(),
+            keychain,
+        )
+        .await;
+
         state.set_cached_label(active, prefs.label).await;
         // vault-icons: same per-session RAM-cache path as the label so the
         // switcher surfaces the just-unlocked vault's glyph immediately.
@@ -4450,7 +4480,14 @@ mod tests {
                 .await;
 
             let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
-            run_post_unlock_pipeline(&host, &state, &hooks, &crate::vault_io::StdVaultIo).await;
+            run_post_unlock_pipeline(
+                &host,
+                &state,
+                &hooks,
+                &crate::vault_io::StdVaultIo,
+                &crate::vault_label::key::UnavailableKeychain,
+            )
+            .await;
 
             assert_eq!(
                 crate::vault_registry::load_or_rebuild_registry(&base).last_unlock_ms(&id),
@@ -4480,7 +4517,14 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
-            run_post_unlock_pipeline(&host, &state, &hooks, &crate::vault_io::StdVaultIo).await;
+            run_post_unlock_pipeline(
+                &host,
+                &state,
+                &hooks,
+                &crate::vault_io::StdVaultIo,
+                &crate::vault_label::key::UnavailableKeychain,
+            )
+            .await;
 
             assert_eq!(
                 crate::vault_registry::load_or_rebuild_registry(&base).last_unlock_ms(&id),
@@ -4488,6 +4532,211 @@ mod tests {
                 "no unlocked slot means no vault to stamp"
             );
         });
+    }
+
+    // ---- myne-md/myne#411: the sealed label write-through ----------------
+
+    /// A device with a vault unlocked on it, its name already persisted in
+    /// `vault.prefs`, and a config directory the hide flag can live in.
+    ///
+    /// `NoopHost` is used for the prefs seeding on purpose: it resolves no
+    /// config directory, so the seeding rename's OWN write-through is a no-op
+    /// and the `vault.label` a test then observes can only have come from the
+    /// pipeline under test.
+    ///
+    /// No `#[cfg(test)]` attribute: it is already inside one, and a nested one
+    /// RESETS `check-core-io-seam.mjs`'s brace-depth tracker, ending the
+    /// exemption early and reporting every `std::fs` call after this point as a
+    /// production seam violation.
+    fn device_with_a_named_unlocked_vault(
+        tag: &str,
+        label: Option<&str>,
+    ) -> (
+        crate::test_support::ScopedTempDir,
+        crate::host::test_host::TestHost,
+        std::path::PathBuf,
+        VaultRuntimeState,
+    ) {
+        use crate::plugins::vault_unlock::state::fixture_unlocked_with_keys;
+        use crate::test_support::{block_on, ScopedTempDir};
+
+        let tmp = ScopedTempDir::new(tag).expect("temp dir");
+        let host = crate::host::test_host::TestHost::new(tmp.path());
+        let base = host.app_data_dir().expect("test host data dir");
+        let id = test_vault_id();
+        let vault_dir = base.join("vaults").join(id.to_string());
+        std::fs::create_dir_all(&vault_dir).expect("create vault dir");
+        // `0x33` is the account_number_hash the prefs AAD binds; `0x42` is the
+        // root_key the fixture slot holds. They have to be the pair the prefs
+        // codec agrees on, which is why both come from the shared helpers.
+        crate::test_support::seed_real_vault_meta(&vault_dir, 0x33);
+
+        let state = VaultRuntimeState::default();
+        block_on(async {
+            state
+                .set_unlocked(id, fixture_unlocked_with_keys(0x42, 0x99, 1))
+                .await;
+            if let Some(label) = label {
+                let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+                crate::plugins::prefs::commands::vault_set_label_with_dir(
+                    &vault_dir,
+                    &state,
+                    &hooks,
+                    Some(label.to_string()),
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost,
+                    &crate::vault_label::key::UnavailableKeychain,
+                )
+                .await
+                .expect("seed the name into vault.prefs");
+            }
+        });
+        assert!(
+            !crate::vault_label::store::label_path(&vault_dir).exists(),
+            "the seeding must not have written a sealed file of its own"
+        );
+
+        (tmp, host, vault_dir, state)
+    }
+
+    /// Unlock is the only moment a vault's name is knowable, so it is the only
+    /// moment it can be cached for the LOCKED picker. Asserted through
+    /// [`run_post_unlock_pipeline`] rather than through the password path,
+    /// because that is what makes quick-unlock and recovery inherit it.
+    #[test]
+    fn post_unlock_pipeline_seals_the_vault_name_for_the_locked_picker() {
+        use crate::test_support::block_on;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::store::{read_label, LabelRead};
+
+        let (_tmp, host, vault_dir, state) =
+            device_with_a_named_unlocked_vault("unlock-label-write", Some("Work"));
+        let keychain = FakeKeychain::empty();
+
+        block_on(async {
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            run_post_unlock_pipeline(
+                &host,
+                &state,
+                &hooks,
+                &crate::vault_io::StdVaultIo,
+                &keychain,
+            )
+            .await;
+
+            assert_eq!(
+                read_label(
+                    &crate::vault_io::StdVaultIo,
+                    &vault_dir,
+                    test_vault_id(),
+                    &keychain
+                )
+                .await
+                .expect("read the sealed name back"),
+                LabelRead::Label("Work".to_string()),
+                "the pipeline must seal the name it just decrypted, or the next \
+                 launch's picker shows a neutral fallback for a named vault"
+            );
+        });
+    }
+
+    /// The suppression, and it is the acceptance criterion the whole privacy
+    /// option rests on: with the device-wide hide-vault-names flag on, an
+    /// unlock caches nothing.
+    #[test]
+    fn post_unlock_pipeline_writes_no_name_while_names_are_hidden() {
+        use crate::test_support::block_on;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::hide_flag::{
+            hide_flag_path_from_host, write_hide_vault_names, HideVaultNamesConfig,
+        };
+
+        let (_tmp, host, vault_dir, state) =
+            device_with_a_named_unlocked_vault("unlock-label-hidden", Some("Work"));
+        let keychain = FakeKeychain::empty();
+
+        block_on(async {
+            let flag_path = hide_flag_path_from_host(&host, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("flag path");
+            write_hide_vault_names(
+                &crate::vault_io::StdVaultIo,
+                &flag_path,
+                HideVaultNamesConfig { hidden: true },
+            )
+            .await
+            .expect("turn the option on");
+
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            run_post_unlock_pipeline(
+                &host,
+                &state,
+                &hooks,
+                &crate::vault_io::StdVaultIo,
+                &keychain,
+            )
+            .await;
+        });
+
+        assert!(
+            !crate::vault_label::store::label_path(&vault_dir).exists(),
+            "an unlock while names are hidden must cache nothing"
+        );
+        assert!(
+            keychain.accounts().is_empty(),
+            "and must not mint a wrap key either"
+        );
+        // The hard rule, asserted over the whole vault directory rather than
+        // over the one file we expected to be wrong.
+        for entry in std::fs::read_dir(&vault_dir).expect("list the vault root") {
+            let path = entry.expect("dir entry").path();
+            let bytes = std::fs::read(&path).unwrap_or_default();
+            assert!(
+                !bytes.windows(4).any(|w| w == b"Work"),
+                "the plaintext name is on disk at {path:?}"
+            );
+        }
+    }
+
+    /// Clearing a name removes the sealed file rather than leaving a stale one.
+    /// The picker then falls back, which is the truth about a vault with no
+    /// name.
+    #[test]
+    fn post_unlock_pipeline_removes_a_stale_name_when_the_vault_has_none() {
+        use crate::test_support::block_on;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::store::{label_path, write_label};
+
+        let (_tmp, host, vault_dir, state) =
+            device_with_a_named_unlocked_vault("unlock-label-cleared", None);
+        let keychain = FakeKeychain::empty();
+
+        block_on(async {
+            write_label(
+                &crate::vault_io::StdVaultIo,
+                &vault_dir,
+                test_vault_id(),
+                "Work",
+                &keychain,
+            )
+            .await
+            .expect("a name this device cached before it was cleared elsewhere");
+
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            run_post_unlock_pipeline(
+                &host,
+                &state,
+                &hooks,
+                &crate::vault_io::StdVaultIo,
+                &keychain,
+            )
+            .await;
+        });
+
+        assert!(
+            !label_path(&vault_dir).exists(),
+            "a vault whose name was cleared must not keep showing the old one"
+        );
     }
 
     #[test]
