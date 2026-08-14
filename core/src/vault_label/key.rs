@@ -76,6 +76,40 @@ pub trait LabelKeychain: Send + Sync {
     fn delete(&self, account: &str) -> Result<(), VaultLabelError>;
 }
 
+/// The account the availability probe reads, and the only account this module
+/// ever addresses that is not a vault's.
+///
+/// It is never stored under: [`keychain_available`] performs a `get` and
+/// nothing else, so no item by this name is ever created. It cannot collide
+/// with a real key either, because every real account is a canonical 36-char
+/// `VaultId` rendering and this parses as none.
+pub const KEYCHAIN_PROBE_ACCOUNT: &str = "availability-probe";
+
+/// Is there a usable keychain on this device at all?
+///
+/// The one failure this store has that a user can be told something true about,
+/// and the reason it is asked as its own question: on a device with no secret
+/// service the feature cannot store a name at all, and the Privacy row has to
+/// say so. Without it the row toggles, nothing happens, and it looks broken
+/// forever with no explanation.
+///
+/// Answered by reading an account that does not exist, so the ordinary answer is
+/// "no such item", which is [`LabelKeychain::get`]'s `Ok(None)`. Only
+/// [`VaultLabelError::KeychainUnavailable`] reports unavailable: a transient
+/// backend error means the facility answered and failed, and telling the user
+/// their device cannot store vault names on the strength of one bad call would
+/// be a claim about the machine rather than about the call.
+///
+/// **This is a probe, not a fallback.** Nothing anywhere reacts to a `false` by
+/// writing the name in the clear; the store simply holds nothing on such a
+/// device (`decisions.md` 2026-08-15).
+pub fn keychain_available(ops: &dyn LabelKeychain) -> bool {
+    !matches!(
+        ops.get(KEYCHAIN_PROBE_ACCOUNT),
+        Err(VaultLabelError::KeychainUnavailable)
+    )
+}
+
 /// The keychain account component for one vault: the canonical 36-char
 /// `VaultId` rendering. **Frozen encoding**: the OS matches it byte-for-byte.
 ///
@@ -411,6 +445,48 @@ mod tests {
             get_or_create_key(&fake, vault(VAULT_A)),
             Err(VaultLabelError::Backend)
         );
+    }
+
+    #[test]
+    fn the_probe_reports_a_working_keychain_that_holds_nothing_as_available() {
+        // The distinction the probe exists to draw: "no item for that vault" is
+        // the ordinary state of a device that has never named a vault, and it is
+        // not the same fact as "this device has no keychain".
+        let fake = FakeKeychain::empty();
+        assert!(keychain_available(&fake));
+    }
+
+    #[test]
+    fn the_probe_reports_a_device_with_no_keychain_as_unavailable() {
+        assert!(!keychain_available(&UnavailableKeychain));
+    }
+
+    #[test]
+    fn the_probe_neither_mints_nor_stores_anything() {
+        // It answers with one read. A probe that created an item would leave a
+        // keychain entry behind on every launch of the Settings panel.
+        let fake = FakeKeychain::empty();
+        assert!(keychain_available(&fake));
+        assert!(fake.accounts().is_empty(), "the probe minted a key");
+        assert_eq!(fake.calls(), vec![format!("get {KEYCHAIN_PROBE_ACCOUNT}")]);
+    }
+
+    #[test]
+    fn a_transient_backend_failure_is_not_reported_as_an_absent_keychain() {
+        // `store_fails` leaves `get` working, which is the probe's whole input.
+        // Only `KeychainUnavailable` means the facility is not there, and the
+        // row's sentence ("this device cannot store vault names") would be a
+        // lie about a keychain that answered.
+        let fake = FakeKeychain::failing_store();
+        assert!(keychain_available(&fake));
+    }
+
+    #[test]
+    fn the_probe_account_can_never_name_a_vaults_key() {
+        // Every real account is a canonical 36-char `VaultId` rendering, so the
+        // probe cannot address, shadow or destroy one.
+        assert!(VaultId::parse(KEYCHAIN_PROBE_ACCOUNT).is_err());
+        assert_ne!(keychain_account(vault(VAULT_A)), KEYCHAIN_PROBE_ACCOUNT);
     }
 
     #[test]

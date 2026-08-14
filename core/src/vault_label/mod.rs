@@ -31,7 +31,11 @@
 //!   destroyed, every file removed, and a partial sweep reported as failure.
 //! - [`commands`]: the read/write command pair, where turning the flag on
 //!   performs the sweep in the same operation and the ordering between the two
-//!   is what stops the screen claiming an erase that did not happen.
+//!   is what stops the screen claiming an erase that did not happen. Beside it,
+//!   the keychain-availability probe: on a device with no usable keychain this
+//!   feature can store nothing at all, and that is the one failure here a user
+//!   can be told something true about, so it is answered as its own question
+//!   rather than collapsed into the silence every other failure gets.
 //!
 //! One more carries the write side, and it is one module rather than one branch
 //! per caller:
@@ -46,9 +50,17 @@
 //! new family is excluded from the backup container by construction rather than
 //! by anyone remembering to exclude it.
 //!
-//! Still outside this module: the picker's own rendering, the orphan-file
-//! cleanup and the keychain-unavailable UI state. Each lands in its own change;
-//! see `agent-tooling/features/locked-picker-vault-names/`.
+//! One degraded path lives deliberately outside this module: a sealed file whose
+//! key is gone is **removed by the reader that found it**, in
+//! `plugins::vault_unlock::commands::resolve_summary_label`, because that is
+//! where the fact is discovered and where falling back to the neutral label
+//! already happens. The store reports [`store::LabelRead::Unreadable`] and says
+//! nothing about what to do with it.
+//!
+//! Still outside this module: the picker's own rendering and the Privacy row
+//! that renders the keychain-unavailable state this module now reports. Each
+//! lands in its own change; see
+//! `agent-tooling/features/locked-picker-vault-names/`.
 
 pub mod commands;
 pub mod erase_all;

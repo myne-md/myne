@@ -5,6 +5,12 @@
 //! erase that turning it on performs. The store the flag governs (`MYL1`,
 //! `protocol.md` § 9.22) lives in `myne_core::vault_label`.
 //!
+//! It also owns `vault_label_keychain_status`, which answers a different
+//! question for the same row: whether this device has a usable keychain at all.
+//! On one that does not, the option cannot store a name however it is set, and
+//! the row says so instead of appearing inert. It reads one keychain item that
+//! does not exist and reports whether the facility answered.
+//!
 //! ## Why its own plugin rather than a pair added to `vault-unlock`
 //!
 //! `sync`'s Tor toggle joined an existing plugin and its module doc says so; the
@@ -19,11 +25,11 @@
 //! ## Capability ACL
 //!
 //! `vault-label:default` bundles `allow-hide-vault-names` +
-//! `allow-set-hide-vault-names`, main-window-only. Both are reachable
-//! **pre-unlock** and deliberately so: the picker is the surface they govern and
-//! it runs before any vault is open. Neither touches vault content, neither
-//! takes or returns a label, and the only value that crosses either way is a
-//! boolean.
+//! `allow-set-hide-vault-names` + `allow-vault-label-keychain-status`,
+//! main-window-only. All three are reachable **pre-unlock** and deliberately so:
+//! the picker is the surface they govern and it runs before any vault is open.
+//! None touches vault content, none takes or returns a label, and the only value
+//! that crosses in either direction is a boolean.
 //!
 //! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
 
@@ -44,6 +50,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::hide_vault_names,
             commands::set_hide_vault_names,
+            commands::vault_label_keychain_status,
         ])
         .build()
 }

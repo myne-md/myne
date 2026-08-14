@@ -57,3 +57,21 @@ impl From<IoFailureKind> for VaultLabelError {
         VaultLabelError::Io(kind)
     }
 }
+
+/// Closed-enum mapping from a store failure to a static log tag.
+///
+/// The one mapping, shared by every module that logs one of these, rather than a
+/// `match` per call site: no variant of this enum can carry the label, and this
+/// is what keeps it that way by construction instead of by each site remembering
+/// not to format the error. Adding a variant compile-fails here, which is the
+/// point (`src-tauri/CLAUDE.md` "Closed-enum mapping rule").
+pub fn vault_label_error_kind(e: &VaultLabelError) -> &'static str {
+    match e {
+        VaultLabelError::KeychainUnavailable => "keychain_unavailable",
+        VaultLabelError::KeyMissing => "key_missing",
+        VaultLabelError::EmptyLabel => "empty_label",
+        VaultLabelError::LabelTooLong => "label_too_long",
+        VaultLabelError::Io(_) => "io",
+        VaultLabelError::Backend => "backend",
+    }
+}
