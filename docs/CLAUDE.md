@@ -9,7 +9,9 @@ docs/
 ├── vision.md              ← phased plan, anti-features (commitments)
 ├── threat-model.md        ← the A/AS/TB rosters (adversaries, assets, trust boundaries) — NORMATIVE
 ├── glossary.md            ← canonical terminology, one A–Z entry per term
-├── decisions.md           ← append-only timeline
+├── decisions.md           ← generated INDEX over design-notes/ (do not hand-edit)
+├── decisions/             ← the log itself: one file per decision, grouped by topic,
+│                          numbered NNNN in one global chronological sequence
 ├── questions.md           ← informal Q&A summaries of the specs (explicitly not normative)
 ├── dependency-policy.md   ← when a dependency may be added and how it is reviewed
 ├── self-host-policy.md    ← operator contract for a self-hosted sync server (normative)
@@ -44,10 +46,28 @@ If the change touches **sync**, add `spec/sync-protocol.md` (vault head, conflic
 
 ## Authoring discipline
 
-### `decisions.md` is append-only
+### The decisions log is append-only, and it is now one file per decision
 
-- **Newest entry last.** Never reorder.
-- **Reversals get new entries** with the form `### YYYY-MM-DD — <title> (supersedes YYYY-MM-DD — <old title>)`. The supersession belongs in the *title*, so a reader scanning headings sees it; a reversal that only mentions the old entry in its body is invisible. Never delete or rewrite past entries; the audit trail is the value.
+The log used to be a single 1.86 MB `decisions.md` carrying 489 entries, which is well past what
+anything can read in one pass, so in practice nobody read it and agents grepped it. It is now
+`design-notes/<topic>/<NNNN>-<slug>.md`, one file per decision, with `design-notes.md`
+regenerated as the index over them. The `decisions.md` path still exists and carries the full
+chronological table, so an existing reference of the form "see `decisions.md` 2026-06-09" still
+lands somewhere useful, at the cost of one hop to reach the entry itself.
+
+**The log was written with mixed heading levels**, 470 entries as `###` and 19 as `##`, and the
+first split matched `###` only, so those 19 were absorbed into the preceding entry's body. They
+still read fine to a human and were unreachable to the index, to a topic browse and to any tooling.
+Six of them are the written record behind rows in `threat-model.md`. `scripts/decisions-index.mjs`
+now refuses any entry file carrying a second dated heading, which detects that shape regardless of
+the level it was written at.
+
+- **`NNNN` is a single global sequence in date order**, not per directory. Sorting on it
+  reconstructs the original timeline exactly, which is the property that makes the split safe.
+- **`design-notes.md` is generated. Never hand-edit it.** Add the entry file, then run `node scripts/decisions-index.mjs`. A hand-edit survives until the next regeneration and then vanishes, which is why `--check` runs in `pre-commit`.
+- **Newest entry gets the next number.** Never renumber, never reorder.
+- **Reversals get new entries** with the form `### YYYY-MM-DD — <title> (supersedes YYYY-MM-DD — <old title>)`. The supersession belongs in the *title*, so a reader scanning headings sees it; a reversal that only mentions the old entry in its body is invisible. Never delete or rewrite a past entry; the audit trail is the value. A superseded entry keeps its file and its number.
+- **Pick the topic a reader would look in first**, and cross-reference the other one in the body when two fit. The topic is navigation, not taxonomy, and getting it slightly wrong costs nothing because the index lists everything.
 - One entry per decision, even if multiple land the same day.
 - Use absolute dates, not "yesterday" / "last week".
 - Link out to the spec/PR/ADR; the log is a pointer, not a replacement.
@@ -101,4 +121,4 @@ Cross-reference is **one-way**: a runbook (AGPL) points to the policy doc (CC-BY
 ## Gotchas
 
 - `glossary.md` references are case-sensitive matches in some downstream tools — keep entry titles stable.
-- `decisions.md` is long (several hundred dated entries and growing); adding more never breaks anything but **never reorder existing ones**, even to fix a date typo (write a new entry that says "2026-04-26 entry has wrong date, actual was 2026-04-27").
+- The decisions log keeps growing; adding an entry never breaks anything, but **never renumber or reorder existing ones**, even to fix a date typo. Write a new entry that says "2026-04-26 entry has wrong date, actual was 2026-04-27" and leave the original alone.
