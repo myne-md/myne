@@ -19,7 +19,7 @@
 // the plugin hands the URL to the OS, which is what "open in the browser"
 // means to the person tapping it.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * Hand a URL to the operating system's default handler.

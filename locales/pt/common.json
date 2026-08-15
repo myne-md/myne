@@ -2946,7 +2946,7 @@
       "realtimeSyncHelper": "As alterações de outros dispositivos chegam em segundos através de um sinal sem conteúdo — o servidor transmite apenas “algo mudou”, nunca o quê. Enquanto o seu cofre está desbloqueado, a aplicação verifica o servidor regularmente de qualquer forma, pelo que isto não acrescenta visibilidade significativa; não há nada para configurar.",
       "realtimeSyncLabel": "Sincronização em tempo real",
       "screenCaptureHelperOff": "A proteção aplica-se sempre antes do desbloqueio. Após o desbloqueio, segue esta preferência.",
-      "screenCaptureHelperOn": "Ativa no macOS e no Windows 10 (atualização de maio de 2020 ou posterior). O suporte para Linux chegará numa versão futura.",
+      "screenCaptureHelperOn": "Eficaz no Windows 10 (atualização de maio de 2020) e posterior. O macOS e o Linux não oferecem uma API de sistema para isto, por isso aí não é possível bloquear a captura.",
       "screenCaptureLabel": "Proteção contra captura de ecrã",
       "screenCaptureSubtitle": "Bloquear capturas de ecrã e gravação de ecrã",
       "screenshotBlocked": "A proteção contra captura de ecrã está ativada — as capturas de ecrã do Myne saem em branco.",

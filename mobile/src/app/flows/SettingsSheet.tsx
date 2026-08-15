@@ -8,8 +8,8 @@ import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
 import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { HideVaultNamesBlock } from "../../components";
-import { applyTheme } from "../../platform/theme";
-import type { ThemeName } from "../../platform/PlatformContext";
+import { applyTheme } from "../../formfactor/theme";
+import type { ThemeName } from "../../formfactor/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
 import { isRtl } from "../../lib/util";
 import { changePassword } from "../../lib/vault-change-password";
@@ -21,7 +21,7 @@ import {
   quickUnlockDisable,
   type QuickUnlockStatus,
 } from "../../lib/quick-unlock";
-import { usePlatform } from "../../platform/PlatformContext";
+import { usePlatform } from "../../formfactor/PlatformContext";
 import { vaultExportMarkdown, defaultExportDestination } from "../../lib/export";
 import { shareFile } from "../../lib/share";
 import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
@@ -32,7 +32,6 @@ import { usePrefs } from "../../lib/use-prefs";
 import { useHiddenHomeTiles, setHomeTileHidden } from "../../lib/home-tiles";
 import { LEGAL_LINKS, legalUrl } from "@myne/legal-urls";
 import { openUrl } from "../../lib/open-url";
-import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import {
   setTheme as persistTheme,
@@ -941,22 +940,24 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   const [renameText, setRenameText] = useState("");
 
   /** Optimistic prefs setter: reflect instantly, persist, revert the one key on
-   *  failure. On success bumps the shared prefs nonce so EVERY `usePrefs`
-   *  consumer (this sheet + the live editor behind it) re-reads disk truth. In
-   *  browser-dev (no Tauri host) the draft-only path keeps the UI interactive. */
-  function writePref<K extends keyof PrefsView>(key: K, value: PrefsView[K], persist: () => Promise<void>) {
+   *  failure. Deliberately NOT named `writePref`: that is the IPC chokepoint in
+   *  `lib/prefs.ts`, which is what bumps the shared prefs nonce so EVERY
+   *  `usePrefs` consumer (this sheet + the live editor behind it) re-reads disk
+   *  truth. This wrapper adds only the optimistic draft and its revert; the
+   *  failure path needs no bump because the draft key is dropped, leaving `eff`
+   *  back on the unchanged `prefs`. In browser-dev (no Tauri host) the draft-only
+   *  path keeps the UI interactive. */
+  function writeDraftPref<K extends keyof PrefsView>(key: K, value: PrefsView[K], persist: () => Promise<void>) {
     setDraft((d) => ({ ...d, [key]: value }));
     if (!HAS_TAURI) return;
-    void persist()
-      .then(() => bumpPrefsNonce())
-      .catch(() => {
-        setDraft((d) => {
-          const next = { ...d };
-          delete next[key];
-          return next;
-        });
-        setToast(t("settings.saveSettingError"));
+    void persist().catch(() => {
+      setDraft((d) => {
+        const next = { ...d };
+        delete next[key];
+        return next;
       });
+      setToast(t("settings.saveSettingError"));
+    });
   }
 
   const wipeRef = useRef<() => void>(() => {});
@@ -1067,7 +1068,6 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         setToast(t("settings.saveSettingError"));
         return;
       }
-      bumpPrefsNonce();
     }
     // #50: DISK FIRST, like the custom-theme write below and like desktop's
     // `AppearancePanel`. This used to paint the new theme, move the selection
@@ -1121,7 +1121,6 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         setToast(t("settings.customThemes.applyError"));
         return;
       }
-      bumpPrefsNonce();
     }
     applyCustomTheme(entry.palette);
     setDraft((d) => ({ ...d, custom_theme: entry.name }));
@@ -1138,16 +1137,17 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   }
 
   /** Persist the vault icon (vault-icons). `null` clears back to the wordmark.
-   *  Goes through `writePref`, not the `submitRename` shape below it: writePref
-   *  reflects optimistically, bumps the prefs nonce on success so the header and
-   *  sidebar marks re-read, and reverts THIS key with a toast on failure — which
-   *  is why no in-flight/disabled state is needed. Re-picking the active glyph is
+   *  Goes through `writeDraftPref`, not the `submitRename` shape below it: it
+   *  reflects optimistically and reverts THIS key with a toast on failure, which
+   *  is why no in-flight/disabled state is needed. The success-path nonce bump
+   *  that makes the header and sidebar marks re-read comes from `writePref`
+   *  inside `lib/prefs.ts`, one layer down. Re-picking the active glyph is
    *  a no-op. An unrecognized stored name matches no cell and is left alone: the
    *  field is Shared(ScalarLww), so normalizing it here would clobber a newer
    *  client's choice on the next merge. */
   const selectIcon = (name: string | null) => {
     if (name === eff.icon) return;
-    writePref("icon", name, () => setVaultIcon(name));
+    writeDraftPref("icon", name, () => setVaultIcon(name));
   };
 
   async function submitRename() {
@@ -1155,7 +1155,6 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     try {
       if (HAS_TAURI) await setVaultLabel(label.length > 0 ? label : null);
       setDraft((d) => ({ ...d, label: label.length > 0 ? label : null }));
-      bumpPrefsNonce();
       setToast(t("settings.account.renamedToast"));
       setPanel("account");
     } catch {
@@ -1544,21 +1543,21 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               options={["sm", "md", "lg", "xl"]}
               labels={[t("settings.appearance.sizeS"), t("settings.appearance.sizeM"), t("settings.appearance.sizeL"), t("settings.appearance.sizeXL")]}
               value={eff.editor_text_size ?? "md"}
-              onPick={(v) => writePref("editor_text_size", v, () => setEditorTextSize(v))}
+              onPick={(v) => writeDraftPref("editor_text_size", v, () => setEditorTextSize(v))}
             />
             <SegmentBlock
               label={t("settings.appearance.editorFont")}
               options={["mono", "sans"]}
               labels={[t("editor.typography.font.mono"), t("editor.typography.font.sans")]}
               value={eff.editor_font_family ?? "mono"}
-              onPick={(v) => writePref("editor_font_family", v, () => setEditorFontFamily(v))}
+              onPick={(v) => writeDraftPref("editor_font_family", v, () => setEditorFontFamily(v))}
             />
             <SegmentBlock
               label={t("settings.typography.lineSpacingLabel")}
               options={["tight", "normal", "relaxed"]}
               labels={[t("editor.typography.lineSpacing.tight"), t("editor.typography.lineSpacing.normal"), t("editor.typography.lineSpacing.relaxed")]}
               value={eff.editor_line_spacing ?? "normal"}
-              onPick={(v) => writePref("editor_line_spacing", v, () => setEditorLineSpacing(v))}
+              onPick={(v) => writeDraftPref("editor_line_spacing", v, () => setEditorLineSpacing(v))}
             />
             <Group>
               <ToggleRow
@@ -1566,7 +1565,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 title={t("settings.appearance.showEditTimesLabel")}
                 subtitle={t("settings.appearance.showEditTimesSubtitle")}
                 on={eff.show_note_timestamps}
-                onToggle={() => writePref("show_note_timestamps", !eff.show_note_timestamps, () => setShowNoteTimestamps(!eff.show_note_timestamps))}
+                onToggle={() => writeDraftPref("show_note_timestamps", !eff.show_note_timestamps, () => setShowNoteTimestamps(!eff.show_note_timestamps))}
               />
             </Group>
             {/* Home quick-action tiles — show/hide each individually (MYND-479). */}
@@ -1604,37 +1603,37 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               options={["live", "reading", "source"]}
               labels={[t("editor.chrome.viewMode.live"), t("settings.viewMode.optionReading"), t("settings.viewMode.optionSource")]}
               value={eff.editor_default_view_mode ?? "live"}
-              onPick={(v) => writePref("editor_default_view_mode", v, () => setEditorDefaultViewMode(v))}
+              onPick={(v) => writeDraftPref("editor_default_view_mode", v, () => setEditorDefaultViewMode(v))}
             />
             <Group>
               <ToggleRow
                 first
                 title={t("settings.spell.label")}
                 on={eff.spell_enabled ?? true}
-                onToggle={() => writePref("spell_enabled", !(eff.spell_enabled ?? true), () => setSpellEnabled(!(eff.spell_enabled ?? true)))}
+                onToggle={() => writeDraftPref("spell_enabled", !(eff.spell_enabled ?? true), () => setSpellEnabled(!(eff.spell_enabled ?? true)))}
               />
               <ToggleRow
                 title={t("settings.lineNumbers.label")}
                 on={eff.editor_line_numbers ?? false}
-                onToggle={() => writePref("editor_line_numbers", !(eff.editor_line_numbers ?? false), () => setEditorLineNumbers(!(eff.editor_line_numbers ?? false)))}
+                onToggle={() => writeDraftPref("editor_line_numbers", !(eff.editor_line_numbers ?? false), () => setEditorLineNumbers(!(eff.editor_line_numbers ?? false)))}
               />
               <ToggleRow
                 title={t("settings.editor.typewriter")}
                 subtitle={t("settings.editor.typewriterSubtitle")}
                 on={eff.editor_focus_typewriter ?? false}
-                onToggle={() => writePref("editor_focus_typewriter", !(eff.editor_focus_typewriter ?? false), () => setEditorFocusTypewriter(!(eff.editor_focus_typewriter ?? false)))}
+                onToggle={() => writeDraftPref("editor_focus_typewriter", !(eff.editor_focus_typewriter ?? false), () => setEditorFocusTypewriter(!(eff.editor_focus_typewriter ?? false)))}
               />
               <ToggleRow
                 title={t("settings.focusMode.dimAria")}
                 on={eff.editor_focus_dim_inactive ?? false}
-                onToggle={() => writePref("editor_focus_dim_inactive", !(eff.editor_focus_dim_inactive ?? false), () => setEditorFocusDimInactive(!(eff.editor_focus_dim_inactive ?? false)))}
+                onToggle={() => writeDraftPref("editor_focus_dim_inactive", !(eff.editor_focus_dim_inactive ?? false), () => setEditorFocusDimInactive(!(eff.editor_focus_dim_inactive ?? false)))}
               />
               <ToggleRow
                 title={t("settings.editor.enableArchiving")}
                 on={!(eff.archive_disabled ?? false)}
                 onToggle={() => {
                   const nextDisabled = !(eff.archive_disabled ?? false);
-                  writePref("archive_disabled", nextDisabled, () => setArchiveDisabled(nextDisabled));
+                  writeDraftPref("archive_disabled", nextDisabled, () => setArchiveDisabled(nextDisabled));
                 }}
               />
             </Group>
@@ -1653,8 +1652,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
           <FormatBarPanel
             order={eff.editor_toolbar_order}
             hidden={eff.editor_toolbar_hidden}
-            onOrder={(next) => writePref("editor_toolbar_order", next, () => setEditorToolbarOrder(next))}
-            onHidden={(next) => writePref("editor_toolbar_hidden", next, () => setEditorToolbarHidden(next))}
+            onOrder={(next) => writeDraftPref("editor_toolbar_order", next, () => setEditorToolbarOrder(next))}
+            onHidden={(next) => writeDraftPref("editor_toolbar_hidden", next, () => setEditorToolbarHidden(next))}
           />
         )}
 
@@ -1666,7 +1665,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 title={t("settings.privacy.screenCaptureLabel")}
                 subtitle={t("settings.privacy.screenCaptureSubtitle")}
                 on={eff.screen_capture_protection}
-                onToggle={() => writePref("screen_capture_protection", !eff.screen_capture_protection, () => setScreenCaptureProtection(!eff.screen_capture_protection))}
+                onToggle={() => writeDraftPref("screen_capture_protection", !eff.screen_capture_protection, () => setScreenCaptureProtection(!eff.screen_capture_protection))}
               />
               {/* On-device voice-to-text (MYND-563; opt-out, default on). The
                   transcribe command re-reads this host-side, so the toggle only
@@ -1675,7 +1674,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 title={t("settings.transcription.label")}
                 subtitle={t("settings.transcription.helper")}
                 on={eff.transcription_enabled}
-                onToggle={() => writePref("transcription_enabled", !eff.transcription_enabled, () => setTranscriptionEnabled(!eff.transcription_enabled))}
+                onToggle={() => writeDraftPref("transcription_enabled", !eff.transcription_enabled, () => setTranscriptionEnabled(!eff.transcription_enabled))}
                 testId="settings.transcription-toggle"
               />
             </Group>
@@ -1691,7 +1690,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               options={[60, 300, 900, 1800, 3600]}
               labels={[t("settings.privacy.autoLock1m"), t("settings.privacy.autoLock5m"), t("settings.privacy.autoLock15m"), t("settings.privacy.autoLock30m"), t("settings.privacy.autoLock1h")]}
               value={eff.auto_lock_seconds ?? 300}
-              onPick={(v) => writePref("auto_lock_seconds", v, () => setAutoLockTimeout(v))}
+              onPick={(v) => writeDraftPref("auto_lock_seconds", v, () => setAutoLockTimeout(v))}
             />
             <Group>
               <Row first onClick={() => setPanel("quick-unlock")} testId="settings.quick-unlock-row">
@@ -1720,7 +1719,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               enabled={eff.reminders_enabled}
               horizonDays={eff.reminder_horizon_days}
               onEnabledChange={(next) =>
-                writePref("reminders_enabled", next, () => setRemindersEnabled(next))
+                writeDraftPref("reminders_enabled", next, () => setRemindersEnabled(next))
               }
             />
             {eff.reminders_enabled && <ExactAlarmBlock />}
@@ -1735,7 +1734,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 title={t("settings.attachmentCompression.label")}
                 subtitle={t("settings.attachmentCompression.helper")}
                 on={eff.attachment_compression_enabled}
-                onToggle={() => writePref("attachment_compression_enabled", !eff.attachment_compression_enabled, () => setAttachmentCompressionEnabled(!eff.attachment_compression_enabled))}
+                onToggle={() => writeDraftPref("attachment_compression_enabled", !eff.attachment_compression_enabled, () => setAttachmentCompressionEnabled(!eff.attachment_compression_enabled))}
                 testId="settings.attachment-compression"
               />
             </Group>

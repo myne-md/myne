@@ -223,16 +223,25 @@ function ChatTurnView({
           </span>
         )}
       </div>
-      {/* Empty finalized answer (the small model produced nothing) → a friendly
-          placeholder instead of a blank bubble. */}
-      {!isUser && !turn.streaming && !turn.error && turn.text.length === 0 && (
-        <p
-          data-testid="ai.no-answer"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", fontStyle: "italic", margin: 0 }}
-        >
-          {t("editor.chrome.rightPanel.aiChat.noAnswer")}
-        </p>
-      )}
+      {/* Empty finalized answer (the model produced nothing) renders a friendly
+          placeholder instead of a blank bubble.
+
+          Two routes reach it and they converge BEFORE the store, not here. A
+          local engine finalizes a turn with no text; a remote provider reports
+          the same outcome as the typed failure `empty_completion`
+          (myne-md/myne#466), because the transport has to distinguish it from a
+          policy refusal and from a reply shape Myne does not model. `ai-chat.ts`
+          finalizes that cause rather than failing it, so by the time a turn is
+          rendered `error` means what it says and this condition reads one
+          field. */}
+      {!isUser && !turn.streaming && turn.text.length === 0 && !turn.error && (
+          <p
+            data-testid="ai.no-answer"
+            style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", fontStyle: "italic", margin: 0 }}
+          >
+            {t("editor.chrome.rightPanel.aiChat.noAnswer")}
+          </p>
+        )}
       {turn.error && (
         <p
           role="alert"

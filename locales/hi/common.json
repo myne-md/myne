@@ -2844,7 +2844,7 @@
       "autoLockSearchEmpty": "कोई अवधि मेल नहीं खाती।",
       "autoLockSearchPlaceholder": "अवधि खोजें…",
       "screenCaptureHelperOff": "अनलॉक से पहले सुरक्षा हमेशा लागू रहती है। अनलॉक के बाद यह पसंद लागू होती है।",
-      "screenCaptureHelperOn": "macOS और Windows 10 (मई 2020 अपडेट या उसके बाद) पर सक्रिय। Linux समर्थन किसी आगामी रिलीज़ में आएगा।",
+      "screenCaptureHelperOn": "Windows 10 (मई 2020 अपडेट) और उसके बाद प्रभावी। macOS और Linux में इसके लिए कोई सिस्टम API नहीं है, इसलिए वहाँ यह कैप्चर नहीं रोक सकती।",
       "screenCaptureLabel": "स्क्रीन-कैप्चर सुरक्षा",
       "screenCaptureSubtitle": "स्क्रीनशॉट और स्क्रीन रिकॉर्डिंग रोकें",
       "screenshotBlocked": "स्क्रीन सुरक्षा चालू है — Myne के स्क्रीनशॉट खाली आते हैं।",

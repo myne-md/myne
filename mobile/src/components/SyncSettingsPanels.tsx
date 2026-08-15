@@ -42,8 +42,11 @@ import {
 } from "../lib/load-bearing-copy";
 import { canAddThisDevice } from "@myne/enroll-gate";
 import { Banner, Segmented } from "./index";
-
-const HAS_TAURI = "__TAURI_INTERNALS__" in window;
+// The host probe has ONE definition (`lib/app-window.ts`), which is also the one
+// file `check-platform-seam.mjs` exempts from the runtime-global rule. This
+// module used to re-spell it inline, and the copy was subtly weaker: no
+// `typeof window` guard, so it threw off-DOM instead of answering `false`.
+import { HAS_TAURI } from "../lib/app-window";
 
 // ── Shared panel primitives (settings-card geometry) ─────────────────────────
 
