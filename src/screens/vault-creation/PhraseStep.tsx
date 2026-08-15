@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
+import { CopyStatus, useCopyStatus } from "../../components/CopyStatus";
 import {
   copySecretToClipboard,
   saveSecretAsTextFile,
@@ -51,19 +52,45 @@ export function PhraseStep({
 
   const phraseString = useMemo(() => phrase.join(" "), [phrase]);
 
-  // Cancel any pending clipboard auto-clear on unmount so the timer's
-  // closure (which captures the 24-word phrase) is released promptly.
+  // myne-md/myne#390: this step had no copy feedback at all, and no i18n keys
+  // for one, it was never given the affordance rather than given it wrongly.
+  const { outcome, markCopied, markFailed } = useCopyStatus();
+
+  // This used to cancel the pending auto-clear on unmount, and that was wrong in
+  // a way the copy made visible (myne-md/myne#390): advancing to the confirm step
+  // is the intended next action and takes seconds, so cancelling there left the
+  // twenty-four words on the system clipboard PERMANENTLY, while the screen had
+  // just said they would clear in thirty seconds. A promise the mechanism cannot
+  // keep is the exact class of claim this feature exists to remove.
+  //
+  // The cancel existed for a heap reason that no longer applies: the timer's
+  // closure used to capture the phrase for the whole window. `copySecret` now
+  // releases it on both exits (`src/lib/clipboard.ts`), so what remains is a
+  // 30 s reference in a process that already holds the phrase in React state -
+  // not a new exposure, and far cheaper than an indefinite one on a clipboard
+  // every other app can read.
+  //
+  // Letting it fire after unmount is safe: the clear is the host-side
+  // compare-and-clear, so it only wipes the clipboard if the phrase is still on
+  // it. A user who copied something else in the window keeps it.
   const cancelAutoClearRef = useRef<(() => void) | null>(null);
-  useEffect(
-    () => () => {
-      cancelAutoClearRef.current?.();
-    },
-    [],
-  );
 
   const handleCopy = async () => {
     cancelAutoClearRef.current?.();
-    cancelAutoClearRef.current = await copySecretToClipboard(phraseString);
+    // The surface myne-md/myne#390 opened on, and the reason both arms are INLINE
+    // and persistent rather than toasts. This is the screen where the twenty-four
+    // words are shown ONCE and never again. Before this, pressing Copy changed
+    // nothing on screen whether it worked or not, so "I pressed Copy" was not
+    // evidence the phrase was anywhere, and a user who believed a failed copy
+    // had worked has an unrecoverable vault the moment they leave.
+    //
+    // A transient toast would be the weakest option available here: on a
+    // shown-once screen, a confirmation the user can miss is barely better than
+    // none.
+    cancelAutoClearRef.current = await copySecretToClipboard(phraseString, {
+      onSuccess: { kind: "inline", run: markCopied },
+      onFailure: { kind: "inline", run: markFailed },
+    });
   };
 
   const handleSave = () =>
@@ -165,13 +192,27 @@ export function PhraseStep({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-        <Button variant="ghost" icon="copy" onClick={handleCopy}>
+        <Button variant="ghost" icon="copy" onClick={handleCopy} data-testid="create.phrase-copy">
           {t("vaultCreation.phrase.copy")}
         </Button>
         <Button variant="ghost" icon="download" onClick={handleSave}>
           {t("vaultCreation.phrase.saveAsFile")}
         </Button>
       </div>
+
+      {/* Both outcomes render here, unlike the account step's, because the Copy
+          button's own label does NOT swap on this screen, so without this line
+          a successful copy would still be invisible. */}
+      <CopyStatus
+        testId="create.phrase-copy-status"
+        message={
+          outcome === "copied"
+            ? t("vaultCreation.phrase.copied")
+            : outcome === "failed"
+              ? t("vaultCreation.phrase.copyFailed")
+              : null
+        }
+      />
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         <Button

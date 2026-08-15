@@ -1,6 +1,9 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ornamentRole } from "@myne/ornaments";
+import { copyText } from "@myne/clipboard";
+import { showToast } from "../../components/ToastHost";
+import { writeText as clipboardWriteText } from "../../lib/clipboard";
 import { CMEditor } from "@myne/editor/CMEditor";
 import { typographyStyle } from "@myne/editor/typography";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
@@ -1889,13 +1892,33 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   /** Copy the current note's Markdown to the clipboard (WebView clipboard API —
    *  no native plugin). Transient "Copied" feedback via the button label. */
   async function copyNote() {
-    try {
-      await navigator.clipboard.writeText(editorText);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard unavailable — no-op */
-    }
+    // myne-md/myne#455 opened on this function. It reached the WebView clipboard
+    // API directly, and it swallowed the rejection, so a refused write left the
+    // sheet reading "Copy to clipboard" exactly as if the tap had not
+    // registered, and the user then pasted whatever was on the clipboard
+    // before, believing it was their note.
+    //
+    // Two things changed. The write goes through the native seam, which a
+    // WebView cannot refuse the way it can refuse a page's clipboard request, so
+    // the failure is now rare rather than merely reported. And both outcomes are
+    // stated, so when it does fail the user is told.
+    await copyText(clipboardWriteText, editorText, {
+      onSuccess: {
+        kind: "inline",
+        run: () => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        },
+      },
+      onFailure: {
+        // Ordinary content, so a TOAST rather than an inline confirmation: the
+        // note sheet may already be closing, and there is no once-only value at
+        // stake. Reuses the desktop client's key rather than minting a mobile
+        // twin, so both clients say the same sentence about the same action.
+        kind: "toast",
+        run: () => showToast(t("export.note.modal.copyFailed")),
+      },
+    });
   }
 
   /** Insert text at the end of the note. Caret-aware insertion + selection

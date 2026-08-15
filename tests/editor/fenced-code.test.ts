@@ -181,4 +181,46 @@ describe("copy control (task 6, jsdom)", () => {
     expect(copied).not.toMatch(/```/);
     expect(copied.trim()).toBe("pnpm install");
   });
+
+  // The two below pin the button's FEEDBACK rather than its payload, and they
+  // exist because myne-md/myne#390 moved this call off `navigator.clipboard` and
+  // onto the host seam. Nothing was asserting the icon, so the transport could
+  // have been rerouted into something that never resolves, or that swallows a
+  // rejection differently, and every existing test here would still have passed:
+  // they all read the write spy, which is upstream of the part the user sees.
+  //
+  // The code block is also one of the two surfaces this feature deliberately
+  // does NOT convert to a toast. Its confirmation sits on the control that was
+  // pressed, and its silence on refusal is intentional. Both are easy to "tidy
+  // up" later by someone who does not know they were decided, so they are held
+  // by a test rather than only by a comment.
+
+  it("flips the icon to a check when the write lands", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    m = mount("```bash\npnpm install\n```");
+    const btn = m.host.querySelector(".cm-code-copy") as HTMLButtonElement;
+
+    expect(btn.classList.contains("cm-code-copy-done")).toBe(false);
+    btn.click();
+    await vi.waitFor(() => {
+      expect(btn.classList.contains("cm-code-copy-done")).toBe(true);
+    });
+  });
+
+  it("leaves the icon untouched when the write is refused", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("clipboard denied"));
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    m = mount("```bash\npnpm install\n```");
+    const btn = m.host.querySelector(".cm-code-copy") as HTMLButtonElement;
+
+    btn.click();
+    // Let the rejected promise settle before asserting, otherwise this passes
+    // for the wrong reason: the icon has not flipped YET either way.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(btn.classList.contains("cm-code-copy-done")).toBe(false);
+  });
 });

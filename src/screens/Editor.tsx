@@ -77,7 +77,6 @@ import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndic
 import { AiHydrationProbe } from "../notes/components/AiHydrationProbe";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast, type ToastAction, type ToastVariant } from "../components/Toast";
-import { Toaster } from "../components/toast/Toaster";
 import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
@@ -735,9 +734,22 @@ function EditorChrome({
     async (id: string) => {
       try {
         const { copyNoteMarkdown } = await import("../notes/copyNoteMarkdown");
-        await copyNoteMarkdown(id);
-        setToast({ message: i18n.t("export.note.modal.copied"), variant: "success" });
+        await copyNoteMarkdown(id, {
+          onSuccess: {
+            kind: "toast",
+            run: () =>
+              setToast({ message: i18n.t("export.note.modal.copied"), variant: "success" }),
+          },
+          onFailure: {
+            kind: "toast",
+            run: () =>
+              setToast({ message: i18n.t("export.note.modal.copyFailed"), variant: "error" }),
+          },
+        });
       } catch {
+        // The READ failed (or the module import did). Distinct from a refused
+        // clipboard, which the pair above already reported, but the user-facing
+        // outcome is the same sentence: nothing reached the clipboard.
         setToast({ message: i18n.t("export.note.modal.copyFailed"), variant: "error" });
       }
     },
@@ -2474,10 +2486,13 @@ function EditorChrome({
         durationMs={toast?.action !== undefined ? 6000 : 2500}
         onDone={() => setToast(null)}
       />
-      {/* The single toast surface (#238): renders every toast from the central
-          store — this screen's, NoteList's, sync's, and the editor's imperative
-          ones — as one shared collapsed stack. Mounted exactly once. */}
-      <Toaster />
+      {/* The `<Toaster />` used to mount HERE, and that placement was the defect
+          myne-md/myne#390 found underneath its own findings. This screen renders
+          only after unlock, so vault creation, unlock and the fail-closed
+          takeovers were all outside it, a `toast(...)` from any of them drew
+          nothing at all, silently, which is why those surfaces had grown label
+          swaps and silences instead. It now mounts once in `App.tsx`, above the
+          stage switch, so every stage can reach it. */}
       {/* ASM-6→B / #422: the calm "updated from another device" hint. Headless —
           it pushes an info toast into the <Toaster> above when the sync cycle
           reports an NC05 note was reconciled by an automatic CRDT merge (#419). */}

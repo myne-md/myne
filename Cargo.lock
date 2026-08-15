@@ -4849,6 +4849,7 @@ dependencies = [
  "tauri-plugin-qr-scan",
  "tauri-plugin-reminders",
  "tauri-plugin-screen-guard",
+ "tauri-plugin-sensitive-clipboard",
  "tauri-plugin-share-intent",
  "tauri-utils",
  "thiserror 2.0.18",
@@ -8263,6 +8264,18 @@ dependencies = [
  "serde",
  "tauri",
  "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-sensitive-clipboard"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+ "zeroize",
 ]
 
 [[package]]
