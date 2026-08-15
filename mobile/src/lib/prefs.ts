@@ -573,7 +573,7 @@ export async function prefsRead(): Promise<PrefsView> {
  * is still in flight (`./prefsNonce.ts` states that ordering as its rule).
  * `mobile/tests/prefs-nonce.test.ts` holds this half specifically, because the
  * guard reads call shapes and would stay green with the bump hoisted above the
- * `invoke`. A few `EditorFlow` writers keep their own `.catch(bumpPrefsNonce)`;
+ * `invoke`. A few `EditorFlow` writers keep their own `.catch(ignorePrefsWriteFailure)`;
  * that catch is there to stop an unhandled rejection on a `void`-ed call, and
  * its own comment records why the bump inside it buys nothing.
  *

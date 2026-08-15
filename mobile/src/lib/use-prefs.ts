@@ -104,6 +104,9 @@ export function usePrefs(): UsePrefs {
   // flag AFTER the await (`src/hooks/usePrefs.ts:265`); a token additionally
   // covers `reload`, which no effect cleanup can cancel.
   const request = useRef(0);
+  // The highest-numbered read whose view actually reached state. Separate from
+  // `request` because "issued" and "applied" answer different questions.
+  const applied = useRef(0);
 
   const load = useCallback(async () => {
     const mine = ++request.current;
@@ -120,7 +123,14 @@ export function usePrefs(): UsePrefs {
     setError(false);
     try {
       const view = await prefsRead();
-      if (superseded()) return;
+      // High-water mark rather than `superseded()`, and the difference is a real
+      // case: if read N is overtaken by read N+1 and N+1 then FAILS, dropping
+      // N's successful view leaves the hook on data older than what it had in
+      // hand, with no further bump coming. Applying the newest view that
+      // actually succeeded is the property wanted; a later success still wins,
+      // because its own number is higher.
+      if (mine <= applied.current) return;
+      applied.current = mine;
       setPrefs(view);
     } catch {
       if (superseded()) return;

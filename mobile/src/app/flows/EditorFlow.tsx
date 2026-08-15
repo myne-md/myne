@@ -1771,7 +1771,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     const reroot = (arr: readonly string[]) =>
       arr.map((f) => (f.startsWith(oldPath) ? normalizeFolderPath(newPath + f.slice(oldPath.length)) ?? f : f));
     if (HAS_TAURI) {
-      // One nonce advance for the whole rename, not one per setter. Each of
+      // One nonce NOTIFY for the whole rename, not one per setter. Each of
       // these four writes bumps inside `writePref`, and they await each other,
       // so without the batch the microtask coalescing cannot collapse them:
       // a rename cost up to four advances, each re-reading and re-decrypting
