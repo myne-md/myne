@@ -199,7 +199,7 @@ export interface MockConfig {
   /** How `plugin:local-inference|transcribe` behaves (MYND-563). `text` →
    *  resolves with that transcript; `"not_ready"` / `"failed"` → rejects with
    *  that serialized `EngineError` kind. Defaults to resolving a canned string. */
-  transcribe?: { text: string } | { error: "not_ready" | "failed" };
+  transcribe?: { text: string } | { error: "not_ready" | "too_long" | "failed" };
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -713,7 +713,15 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:local-inference|transcribe": () => {
         const c = config.transcribe;
         if (c && "error" in c) {
-          const kind = c.error === "not_ready" ? "NotReady" : "TranscriptionFailed";
+          // The real `EngineError` variant names, not the normalized kinds: the
+          // point of driving this through `normalizeTranscribeError` is that the
+          // mapping is part of what the flow tier covers (myne#485).
+          const kind =
+            c.error === "not_ready"
+              ? "NotReady"
+              : c.error === "too_long"
+                ? "AudioTooLong"
+                : "TranscriptionFailed";
           throw { kind };
         }
         return c && "text" in c ? c.text : "the quick brown fox";
