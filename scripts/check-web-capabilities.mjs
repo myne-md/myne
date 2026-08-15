@@ -135,6 +135,13 @@ const CAPABILITY_BACKING = {
   // NOT here: they write ordinary `vault.prefs` fields that sync to every
   // client, and a desktop that later reads them must see what the user chose.
   cliAccess: ["cli-bridge"],
+  // myne-md/myne#411: the whole `vault-label` plugin, meaning the flag, the
+  // setter that performs the erase, and the keychain probe. All three serve the locked
+  // picker, which `check-web-screens.mjs` records as `excluded` on web, and all
+  // three sit on top of an OS keychain a page does not have. `MYL1` itself is
+  // deliberately NOT what this names: the format is unchanged and the desktop
+  // row is ungated.
+  lockedVaultNames: ["vault-label"],
   // MYND-650 task 6: the two toggle commands, NOT the whole `sync` plugin —
   // sync itself ships on web and most of its surface is dispatched. The pair is
   // singled out because what they do is spawn and stop an OS process and point

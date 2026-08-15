@@ -83,6 +83,10 @@ pub mod themes_blob;
 pub mod types;
 pub mod vault_head;
 pub mod vault_indices_blob;
+/// `MYL1` sealed label store (§9.22). Device-local like `capture_blob` /
+/// `quick_unlock_blob` / `share_import_blob`, so it is deliberately absent from
+/// the `pub use` block below and is reached as `protocol::vault_label_blob::…`.
+pub mod vault_label_blob;
 pub mod vault_meta;
 pub mod vault_meta_v0_2;
 pub mod workspace_blob;

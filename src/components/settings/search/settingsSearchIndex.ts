@@ -110,6 +110,27 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.screenCapture",
   },
   {
+    // myne-md/myne#411. One gate, and deliberately not the other.
+    //
+    // `capability`, because PrivacyPanel omits the row where
+    // `lockedVaultNames` is absent, and an untagged entry would navigate to an
+    // anchor that was never rendered. The capability is about the locked
+    // picker and the keychain-sealed store behind it, not about the setting.
+    //
+    // No `developerGated`: `developer_mode` is a per-vault `vault.prefs` field
+    // and the picker this governs is device-wide, and the person the option is
+    // fully honest for is the one who sets it before a first unlock ever
+    // writes a name, and a control behind Developer mode cannot be found by
+    // them.
+    id: "privacy.hide-vault-names",
+    capability: "lockedVaultNames",
+    panelId: "privacy",
+    testid: "settings.hide-vault-names",
+    titleKey: "settings.privacy.hideVaultNamesLabel",
+    descriptionKey: "settings.privacy.hideVaultNamesHelper",
+    keywordsKey: "settings.search.keywords.hideVaultNames",
+  },
+  {
     id: "privacy.auto-lock",
     panelId: "privacy",
     testid: "settings.auto-lock-select",

@@ -69,7 +69,7 @@ The trait is deliberately scoped to note-CRUD + unlock/lock. Hooks that fire onl
 | `vault_unlock` | the `UnlockedVault` slot, unlock/lock, status probes, storage health |
 | `workspace` | `vault.workspace` (`MYW1`) pane tree + the RAM-only stage |
 
-Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence — shared, though only desktop feeds it), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_meta_hash`, `note_txn`, `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
+Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence — shared, though only desktop feeds it), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_label` (the `MYL1` sealed label store: the per-vault keychain key + the device-local file the LOCKED picker reads a vault's name from), `vault_meta_hash`, `note_txn`, `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
 
 ### Command shape — three layers
 
@@ -163,6 +163,16 @@ cargo check -p myne-core --target aarch64-apple-ios
 CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`nextest … -p myne-desktop -p myne-core`), and the sync simulation (`plugins::sync::sim`) in its own `sync-sim` step off the end of the chain. Locally, `pre-push` runs `cargo clippy --workspace --all-targets` + `cargo test --workspace`, both of which cover this crate.
 
 ## Gotchas
+
+- **Every keychain-backed device-local secret in this crate is Apple-only today.** `quick_unlock`
+  has an `apple.rs`, `captures/device_key.rs` is `#[cfg(any(target_os = "macos", target_os = "ios"))]`,
+  and `vault_label::key::platform_keychain` returns `UnavailableKeychain` on every other target. So a
+  feature that seals something under a keychain works on macOS and iOS and reports "cannot work here"
+  on Windows, Linux and Android. That is the posture rather than an oversight (adding a keychain crate
+  is a dependency decision, which root `CLAUDE.md` classes as a security decision), but it has to
+  reach the UI copy and the user guide, or both promise something two of the four platforms do not
+  do. myne-md/myne#411 shipped a guide sentence blaming "a Linux desktop with no secret service",
+  which implied Linux with one worked, and mentioned neither Windows nor Android.
 
 - **A breaking change here now fails in the same build, and it did not used to.** Mobile consumed this crate as a path dependency into a *sibling checkout*, so a changed trait method, a changed shared type, or a new `VaultLifecycleHooks` method compiled fine here and broke `MobileHooks` in another repository — which only went red once the change was already on `develop`. The mobile client moved in-repo on 2026-08-13 (`decisions.md`): `mobile/src-tauri` is a workspace member, `cargo clippy --workspace` compiles it, and the `mobile-compile` CI step gates it. No companion PR, no land order, no worktree dance. If you are following an older instruction that mentions any of those, it is stale.
 - **`../../CLAUDE.md` pointers in this crate do not resolve.** Modules that moved here brought their relative pointers along, where `../../CLAUDE.md` now names a `core/src/CLAUDE.md` that has never existed. Write new pointers **repo-relative** — `src-tauri/CLAUDE.md "Secret-handling logging discipline"` — which is what the crate-root modules already do.

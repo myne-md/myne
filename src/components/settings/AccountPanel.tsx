@@ -189,6 +189,28 @@ function labelInputStyle(focused: boolean): CSSProperties {
   };
 }
 
+// The cross-device staleness notice (myne-md/myne#411), shown while a rename is
+// pending. The device-local name cache does not sync: another device keeps
+// showing the name IT last decrypted until this vault is unlocked there.
+// Clearing on sync-head movement and a fixed expiry were both considered and
+// rejected (`docs/decisions/security/0491-…`), so this sentence is the whole
+// mitigation for that window rather than a footnote about one.
+//
+// Marked with a left rule rather than a colour: it is a consequence of the
+// action, not a warning about it, and the person most likely to read it is
+// renaming precisely to get a name off a screen. Alarm styling would misreport
+// a normal outcome (PRODUCT.md).
+//
+// The rule is `--line-1`, the hairline token. `docs/design/README.md`
+// "Borders + dividers" reserves `--line-2` for input borders and hover states,
+// and this is neither: it separates a sentence from the control above it.
+const LABEL_RENAME_NOTICE_STYLE: CSSProperties = {
+  ...LABEL_HELPER_STYLE,
+  color: "var(--ink-3)",
+  paddingLeft: "var(--space-3)",
+  borderLeft: "1px solid var(--line-1)",
+};
+
 function labelSaveButtonStyle(disabled: boolean): CSSProperties {
   return {
     height: 36,
@@ -676,6 +698,32 @@ export function AccountPanel({
             {t("settings.account.vaultLabelSave")}
           </button>
         </div>
+
+        {/*
+          Shown while a rename is pending, which is the moment the user can act
+          on it: unlock the vault on the other device, or decide what is sitting
+          on that lock screen is acceptable. `labelChanged` also covers CLEARING
+          the name, and that is the case this exists for -- someone emptying the
+          field to get a name off a screen would otherwise be told nothing about
+          the copy that stays.
+
+          The gate is deliberately NOT narrowed to "there was a saved label".
+          `savedLabel` is this vault's `vault.prefs.label`, which syncs; the
+          stored copy on another device does not, so a vault whose label was
+          cleared here can still be sitting under its old name over there. A
+          gate on `savedLabel !== ""` would go quiet in exactly that case. The
+          copy carries the breadth instead: it names what the other devices show
+          without asserting that it is a name.
+        */}
+        {labelChanged && (
+          <p
+            role="status"
+            data-testid="settings.label-rename-notice"
+            style={LABEL_RENAME_NOTICE_STYLE}
+          >
+            {t("settings.account.vaultLabelRenameNotice")}
+          </p>
+        )}
 
         <p style={ICON_PICKER_LABEL_STYLE}>{t("settings.account.vaultIconLabel")}</p>
         <div

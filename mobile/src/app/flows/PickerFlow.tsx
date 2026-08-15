@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Screen, ScreenScroll, Title, FooterBar, Button, Banner, Spinner, MyneMark } from "../../components";
-import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
+import { listVaults, orderByLastUnlock, stableVaultNumber } from "../../lib/vault-list";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { ioBanner } from "../../lib/io-banner";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -230,14 +230,22 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {ioError && <Banner kind="danger">{ioError}</Banner>}
-            {vaults.map((vault, i) => {
+            {vaults.map((vault) => {
               const corrupted = vault.status.kind === "Corrupted";
               const labeled = vault.label !== null;
+              // Both the dot and the fallback number are keyed off the vault's
+              // stable rank rather than its row position (myne-md/myne#411).
+              // They used to be `i`, over a list ordered by last unlock, so
+              // every recognition cue on this screen moved as the app was used:
+              // open the green "Vault 3" and it came back slate, called
+              // "Vault 1". The LIST keeps its last-unlock ordering; only what
+              // identifies a row stopped following it.
+              const n = stableVaultNumber(vaults, vault.id);
               return (
                 <VaultRow
                   key={vault.id}
-                  dot={labeled ? DOT_PALETTE[i % DOT_PALETTE.length] : "var(--line-2)"}
-                  name={vaultDisplayLabel(vault.label, i + 1)}
+                  dot={labeled ? DOT_PALETTE[(n - 1) % DOT_PALETTE.length] : "var(--line-2)"}
+                  name={vaultDisplayLabel(vault.label, n)}
                   when={openedWhen(vault.last_unlock, t)}
                   italic={!labeled}
                   corrupted={corrupted}

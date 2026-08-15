@@ -39,7 +39,11 @@ import { Icon } from "./primitives/Icon";
 import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
 import { FolderGlyph } from "../notes/components/FolderGlyph";
 import { FOLDER_ICON_PATHS } from "../notes/folderIcons";
-import { listVaults, orderByLastUnlock } from "../lib/vault-list";
+import {
+  listVaults,
+  orderByLastUnlock,
+  stableVaultNumber,
+} from "../lib/vault-list";
 import { VAULT_PREFS_CHANGED_EVENT } from "../lib/prefs";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
 import type { VaultId } from "../lib/stage";
@@ -448,9 +452,17 @@ export function VaultSwitcher({
   // a layout flash.
   if (vaults !== null && ordered.length < 1) return null;
 
+  // myne-md/myne#411: the fallback number is the vault's stable per-vault
+  // number, not its row position. The chip used to hardcode `n: 1` because the
+  // active vault is always the top row, which made "Vault 1" mean a different
+  // vault after every switch and disagree with the picker the user had just
+  // come from. Same helper on both surfaces so the two cannot drift.
   const chipLabel =
     activeId !== null
-      ? ordered[0].label ?? t("vaultSwitcher.vaultFallback", { n: 1 })
+      ? ordered[0].label ??
+        t("vaultSwitcher.vaultFallback", {
+          n: stableVaultNumber(ordered, ordered[0].id),
+        })
       : t("vaultSwitcher.chipFallback");
   // The active vault's icon glyph (vault-icons) drives the chip mark; `null`
   // (no vault, or none set) falls back to the "M" wordmark inside VaultChipMark.
@@ -504,10 +516,14 @@ export function VaultSwitcher({
             pointerEvents: visible ? "auto" : "none",
           }}
         >
-          {ordered.map((v, i) => {
+          {ordered.map((v) => {
             const isActive = v.id === activeId;
             const isFallback = v.label == null;
-            const name = v.label ?? t("vaultSwitcher.vaultFallback", { n: i + 1 });
+            const name =
+              v.label ??
+              t("vaultSwitcher.vaultFallback", {
+                n: stableVaultNumber(ordered, v.id),
+              });
             const isSaving = switching && pendingId === v.id;
             const isHover = hoveredId === v.id && !isActive;
             const rowState: "active" | "hover" | "rest" = isActive

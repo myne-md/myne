@@ -416,6 +416,25 @@ fn main() {
                 .commands(&["graph_layout_read", "graph_layout_write"]),
         )
         .plugin(
+            "vault-label",
+            // myne-md/myne#411: the device-local hide-vault-names option:
+            // `hide_vault_names` (read) + `set_hide_vault_names` (write, and
+            // the write is the erase: turning it on destroys every per-vault
+            // `MYL1` wrap key before the flag is persisted), plus
+            // `vault_label_keychain_status`, which reports whether this device
+            // has a usable keychain at all so the Privacy row can say the
+            // option cannot work here rather than looking inert. Same
+            // InlinedPlugin discipline as the plugins above; without a matching
+            // `commands.allow` entry in `permissions/vault-label/default.toml`
+            // the ACL resolver never authorizes the
+            // `plugin:vault-label|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "hide_vault_names",
+                "set_hide_vault_names",
+                "vault_label_keychain_status",
+            ]),
+        )
+        .plugin(
             "spell",
             // MYND-262/266: spell_check (read) + add_to_personal_dictionary /
             // ignore_word_in_vault (Slot::Unlocked-gated writers). InlinedPlugin

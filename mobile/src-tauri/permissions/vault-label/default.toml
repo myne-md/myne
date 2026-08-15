@@ -1,0 +1,45 @@
+# Permissions for the in-app `vault-label` Tauri plugin, mobile (myne-md/myne#411).
+# Mirror of the desktop `src-tauri/permissions/vault-label/default.toml`, down to
+# the three identifiers and what each one is allowed to reach. Picked up under
+# the `vault-label:` ACL namespace only because `build.rs` declares this as an
+# `InlinedPlugin`. Capability files reference these as `vault-label:default`.
+#
+# All three commands are reachable PRE-UNLOCK, deliberately: the surface they
+# govern is the vault picker, which renders before any vault is open. None takes
+# a vault label, returns one, or reaches vault content: the only value crossing
+# either way is a boolean. Adding a command here without a matching entry in
+# `src-tauri/src/plugins/vault_label/mod.rs`'s `generate_handler!` ships it dead
+# (root CLAUDE.md: an ACL entry does not wire a command, and nothing checks that
+# it does).
+#
+# The keychain-availability probe is NOT droppable on mobile even though it is
+# the smallest of the three. `myne_core::vault_label::key::platform_keychain` has
+# an Apple backend and returns `UnavailableKeychain` on every other target, so on
+# Android the store holds nothing today and the row's whole job there is to say
+# so. See `src/plugins/vault_label/mod.rs` for why that is a stated state rather
+# than a plaintext fallback.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the vault-label plugin: read and write of the device-local hide-vault-names option, plus the keychain-availability probe the Privacy row renders."
+permissions = [
+  "allow-hide-vault-names",
+  "allow-set-hide-vault-names",
+  "allow-vault-label-keychain-status",
+]
+
+[[permission]]
+identifier = "allow-hide-vault-names"
+description = "Allow invoking vault-label:hide_vault_names (read the device-local hide-vault-names flag from app_config_dir/vault-names.json; absent means names are shown, a damaged file resolves to hidden). One boolean out; no vault access, no keychain access, no write."
+commands.allow = ["hide_vault_names"]
+
+[[permission]]
+identifier = "allow-set-hide-vault-names"
+description = "Allow invoking vault-label:set_hide_vault_names (persist the device-local hide-vault-names flag). Turning it ON first destroys EVERY per-vault vault.label wrap key in the md.myne.vaultlabel keychain service and removes every vault.label file, and persists the flag only if that sweep completed; turning it off restores nothing and touches no keychain. Destructive by design and bounded to that one keychain service and that one filename; it reads no vault content, decrypts nothing, and neither takes nor returns a label."
+commands.allow = ["set_hide_vault_names"]
+
+[[permission]]
+identifier = "allow-vault-label-keychain-status"
+description = "Allow invoking vault-label:vault_label_keychain_status (report whether this device has a usable OS keychain, so the Privacy row can say the option cannot work here instead of appearing to do nothing). Reads ONE md.myne.vaultlabel item that by construction does not exist and reports only whether the facility answered: it stores nothing, mints nothing, destroys nothing, reads no vault content, and neither takes nor returns a label. One boolean out."
+commands.allow = ["vault_label_keychain_status"]

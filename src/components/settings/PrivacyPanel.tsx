@@ -13,8 +13,18 @@
 // framework exists yet). TR strings ("Otomatik kilit" / "Bu kadar
 // hareketsizlik sonrası kasayı kilitle.") await an app-wide i18n layer.
 
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
+import {
+  hideNamesWriteNotice,
+  hideVaultNamesErrorKind,
+  readHideVaultNames,
+  readKeychainStatus,
+  setHideVaultNames,
+  type HideNamesNotice,
+  type KeychainStatus,
+} from "../../lib/vault-label";
 import { has } from "../../platform/capabilities";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
@@ -22,7 +32,7 @@ import { Switch } from "../primitives/Switch";
 import { CliAccessSettings } from "./CliAccessSettings";
 import { QuickUnlockSettings } from "./QuickUnlockSettings";
 import { SettingRow } from "./SettingRow";
-import { PANEL_ROOT_STYLE } from "./panel-styles";
+import { HELPER_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 
 // MYND-160 grill Q2.1 disclosure: when the user toggles off, the
 // helper text MUST disclose the off-after-unlock semantic so a
@@ -106,6 +116,166 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
   );
 }
 
+// ── Hide vault names on the lock screen (myne-md/myne#411) ──────────────────
+//
+// The picker renders before any vault is open, so the names it shows come from
+// a device-local sealed cache rather than from `vault.prefs`. This row is the
+// switch that destroys that cache and stops it being refilled.
+//
+// # Not gated by Developer mode, deliberately
+//
+// `developer_mode` is a `vault.prefs` field and therefore per vault, while the
+// picker is device-wide: gating on it would need a rule about which vault's
+// preference governs a shared screen. And cryptographic erase cannot reach a
+// snapshot taken earlier, so the person for whom this option is fully honest is
+// the one who sets it BEFORE a first unlock ever writes a name. A control
+// behind Developer mode cannot be found by that person.
+//
+// # The copy states the bound in the same breath as the promise
+//
+// Two sentences, always visible, never behind a disclosure toggle. Writing
+// "erases" and letting the reader supply their own idea of how far it reaches
+// is the failure this row exists to prevent, and a bound the reader has to
+// click for is a bound most readers never see. They are bounded by
+// `docs/threat-model.md` §7 and by `docs/decisions/security/0491-…`, and they
+// say the same two things the user guide says at greater length.
+//
+// # Omitted, not greyed, where there are no vault names to hide
+//
+// The row is gated on `lockedVaultNames` and on nothing else, which on desktop
+// means it renders for everyone. Where that capability is absent (web) the
+// switch governs nothing: the locked picker it is about is unreachable there,
+// and the sealed store it erases needs an OS keychain a page does not have. So
+// the row is omitted rather than rendered against three commands that reject,
+// per the normative omit-never-grey rule in `decisions.md` 2026-07-26.
+//
+// # `available: false` is never a licence to show a name from somewhere else
+//
+// The probe reports whether this device has a usable keychain at all. When it
+// does not, nothing writes a name in the clear as a fallback (that would look
+// identical on screen while voiding the erase guarantee), so the honest thing
+// on screen is the row saying the option cannot work here. The switch stays
+// INTERACTIVE in that state on purpose: turning the option OFF touches no
+// keychain, which is exactly what lets it succeed on a device that has none, so
+// a disabled control would strand a user whose keychain disappeared after they
+// turned it on.
+
+// The types, the error narrowing and the three command wrappers live in
+// `src/lib/vault-label.ts`, at the same relative path as their mobile twin, so
+// `scripts/check-twin-drift.mjs` can see the pair.
+
+/** The two bound sentences, stacked. Token-valued throughout. */
+const DISCLOSURE_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+};
+
+function HideVaultNamesRow() {
+  const { t } = useTranslation();
+  const [hidden, setHidden] = useState(false);
+  const [keychain, setKeychain] = useState<KeychainStatus>("unknown");
+  const [notice, setNotice] = useState<HideNamesNotice | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // The mount reads and a toggle's write are UNORDERED, and `alive` does not
+  // order them: it only says the row is still on screen. A mount read that
+  // resolves after a write has landed would call `setHidden` with the value
+  // from before the write and flip the switch back on its own, which misreports
+  // whether a destructive erase took effect. Once a write has started the mount
+  // reads describe a state that no longer exists, so they are dropped.
+  const writeStartedRef = useRef(false);
+
+  // Two independent questions, asked independently: whether names are hidden,
+  // and whether this device could store one at all. They fail apart: names can
+  // be hidden on a device with a keychain and shown on one without.
+  useEffect(() => {
+    let alive = true;
+    const superseded = () => !alive || writeStartedRef.current;
+    void readHideVaultNames()
+      .then((next) => {
+        if (!superseded()) setHidden(next);
+      })
+      .catch(() => {
+        // Do not assert a position we could not read.
+        if (!superseded()) setNotice("read");
+      });
+    // A rejection resolves to "unknown" inside `readKeychainStatus`, never to
+    // "unavailable": the unavailable case arrives as a value and never as an
+    // error, so a rejection means the question went unanswered.
+    void readKeychainStatus().then((next) => {
+      if (!superseded()) setKeychain(next);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const toggle = async (next: boolean) => {
+    writeStartedRef.current = true;
+    setNotice(null);
+    setBusy(true);
+    try {
+      setHidden(await setHideVaultNames(next));
+    } catch (e) {
+      const kind = hideVaultNamesErrorKind(e);
+      setNotice(hideNamesWriteNotice(kind));
+      // This one IS authoritative: the backend answered the question, it just
+      // answered it through the error channel because the write could not
+      // proceed. Nothing here writes a name as a consolation.
+      if (kind === "KeychainUnavailable") setKeychain("unavailable");
+      // Re-read rather than guess which way the switch should land. The erase
+      // runs BEFORE the flag is persisted, so a failed write leaves the flag
+      // wherever it already was while the keys may already be gone.
+      await readHideVaultNames()
+        .then(setHidden)
+        .catch(() => {
+          /* the notice already says the attempt failed */
+        });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingRow
+      anchorId="privacy.hide-vault-names"
+      testId="settings.hide-vault-names"
+      stateAttrs={{ "data-hidden": String(hidden), "data-keychain": keychain }}
+      label={t("settings.privacy.hideVaultNamesLabel")}
+      helper={t("settings.privacy.hideVaultNamesHelper")}
+      control={(helperId) => (
+        <Switch
+          checked={hidden}
+          onChange={busy ? undefined : (next) => void toggle(next)}
+          ariaLabel={t("settings.privacy.hideVaultNamesLabel")}
+          ariaDescribedBy={helperId}
+          testId="settings.hide-vault-names-toggle"
+        />
+      )}
+    >
+      <div style={DISCLOSURE_STYLE} data-testid="settings.hide-vault-names-disclosure">
+        <p style={HELPER_STYLE}>{t("settings.privacy.hideVaultNamesErases")}</p>
+        <p style={HELPER_STYLE}>{t("settings.privacy.hideVaultNamesResidue")}</p>
+      </div>
+
+      {keychain === "unavailable" && (
+        <p style={HELPER_STYLE} data-testid="settings.hide-vault-names-unavailable">
+          {t("settings.privacy.hideVaultNamesUnavailable")}
+        </p>
+      )}
+
+      {notice !== null && (
+        <p style={HELPER_STYLE} role="status" data-testid="settings.hide-vault-names-notice">
+          {notice === "read" && t("settings.privacy.hideVaultNamesErrorRead")}
+          {notice === "save" && t("settings.privacy.hideVaultNamesErrorSave")}
+          {notice === "erase" && t("settings.privacy.hideVaultNamesErrorErase")}
+        </p>
+      )}
+    </SettingRow>
+  );
+}
+
 interface PrivacyPanelProps {
   /**
    * Toast surface — invoked when an optimistic write rolled back
@@ -145,6 +315,13 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           />
         )}
       />
+      {/* Beside screen-capture protection rather than beside the lock timers:
+          both rows answer "what can somebody looking at this machine see",
+          which is the question the user came to Privacy holding.
+
+          Gated on `lockedVaultNames` only, never on `developer_mode` (see the
+          block comment above the row). On desktop that gate is always open. */}
+      {has("lockedVaultNames") && <HideVaultNamesRow />}
       <AutoLockRow
         seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}
         onChange={(secs) => {

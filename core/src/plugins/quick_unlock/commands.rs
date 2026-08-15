@@ -347,6 +347,11 @@ pub fn disable_with_dir(dir: &Path, state: &VaultRuntimeState) -> Result<(), Qui
 
 /// Attempt a quick-unlock: recover `root_key` via the provider and install the
 /// Unlocked slot, or count the failure (and wipe at the cap).
+// Eight, and every one of them is a seam this crate deliberately does not let a
+// core reach for on its own: the host, the storage, the hooks and now the
+// keychain. Bundling them into a context struct would hide exactly the list a
+// reviewer wants to see when asking what a credential path touches.
+#[allow(clippy::too_many_arguments)]
 pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     dir: &Path,
     vault_id: VaultId,
@@ -363,6 +368,12 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     // below for why omitting it left screen-capture protection stuck ON.
     hooks: &crate::hooks::Hooks,
     vault_io: &dyn crate::vault_io::VaultIo,
+    // Threaded in for the same reason `hooks` was: the post-unlock pipeline now
+    // also seals the vault's name into the device-local label store
+    // (myne-md/myne#411), and a credential path that skipped it would leave the
+    // LOCKED picker showing whatever the vault was called the last time some
+    // OTHER path opened it.
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), QuickUnlockError> {
     // `auth_permits` gate — RAII guard; try_acquire, reject not queue (myne#378).
     //
@@ -520,7 +531,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
             // Best-effort end-to-end (every step swallows its own failures), so
             // the unlock the user just completed can never fail because of it.
             crate::plugins::vault_unlock::commands::run_post_unlock_pipeline(
-                host, state, hooks, vault_io,
+                host, state, hooks, vault_io, keychain,
             )
             .await;
 
@@ -622,13 +633,14 @@ pub async fn quick_unlock_with_pin_from_host(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     vault_io: &dyn crate::vault_io::VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), QuickUnlockError> {
     let pin = Zeroizing::new(pin);
     let dir = target_dir(host, state, vault_id.as_deref()).await?;
     let (_, meta) = read_meta(&dir)?;
     let id = crate::paths::vault_id_from_root(&dir);
     let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
-    quick_unlock_with_dir(&dir, id, state, provider, host, hooks, vault_io).await
+    quick_unlock_with_dir(&dir, id, state, provider, host, hooks, vault_io, keychain).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -649,6 +661,7 @@ pub async fn quick_unlock_with_pin<R: Runtime>(
         state.inner(),
         hooks.inner(),
         &crate::vault_io::StdVaultIo,
+        crate::vault_label::key::platform_keychain(),
     )
     .await
 }
@@ -704,6 +717,7 @@ pub async fn quick_unlock_with_biometric_from_host(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     vault_io: &dyn crate::vault_io::VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), QuickUnlockError> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
@@ -711,11 +725,11 @@ pub async fn quick_unlock_with_biometric_from_host(
         let (_, meta) = read_meta(&dir)?;
         let id = crate::paths::vault_id_from_root(&dir);
         let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash, id);
-        quick_unlock_with_dir(&dir, id, state, provider, host, hooks, vault_io).await
+        quick_unlock_with_dir(&dir, id, state, provider, host, hooks, vault_io, keychain).await
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
-        let _ = (host, &state, &vault_id, hooks, vault_io);
+        let _ = (host, &state, &vault_id, hooks, vault_io, keychain);
         Err(QuickUnlockError::HardwareUnavailable)
     }
 }
@@ -736,6 +750,7 @@ pub async fn quick_unlock_with_biometric<R: Runtime>(
         state.inner(),
         hooks.inner(),
         &crate::vault_io::StdVaultIo,
+        crate::vault_label::key::platform_keychain(),
     )
     .await
 }
@@ -1107,6 +1122,7 @@ mod tests {
             &host,
             &hooks_handle,
             &test_io(),
+            &crate::vault_label::key::UnavailableKeychain,
         )
         .await
         .expect("quick unlock");
@@ -1158,6 +1174,7 @@ mod tests {
             &crate::host::NoopHost,
             &test_hooks(),
             &test_io(),
+            &crate::vault_label::key::UnavailableKeychain,
         )
         .await
         .expect("quick unlock");
@@ -1210,6 +1227,7 @@ mod tests {
             &crate::host::NoopHost,
             &test_hooks(),
             &test_io(),
+            &crate::vault_label::key::UnavailableKeychain,
         )
         .await
         .expect("quick unlock on a migrated (NTV5) vault");
@@ -1251,6 +1269,7 @@ mod tests {
                 &crate::host::NoopHost,
                 &test_hooks(),
                 &test_io(),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .unwrap_err();
@@ -1310,6 +1329,7 @@ mod tests {
                     &crate::host::NoopHost,
                     &hooks,
                     &io,
+                    &crate::vault_label::key::UnavailableKeychain,
                 )
             };
 
@@ -1420,6 +1440,7 @@ mod tests {
                 &crate::host::NoopHost,
                 &test_hooks(),
                 &test_io(),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .unwrap_err();
@@ -1439,6 +1460,7 @@ mod tests {
             &crate::host::NoopHost,
             &test_hooks(),
             &test_io(),
+            &crate::vault_label::key::UnavailableKeychain,
         )
         .await
         .unwrap_err();
@@ -1481,6 +1503,7 @@ mod tests {
                 &crate::host::NoopHost,
                 &test_hooks(),
                 &test_io(),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .unwrap_err();
@@ -1510,6 +1533,7 @@ mod tests {
                 &crate::host::NoopHost,
                 &test_hooks(),
                 &test_io(),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .unwrap_err(),
@@ -1610,6 +1634,7 @@ mod tests {
                 &crate::host::NoopHost,
                 &test_hooks(),
                 &test_io(),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .unwrap_err(),
@@ -1628,6 +1653,7 @@ mod tests {
             &crate::host::NoopHost,
             &test_hooks(),
             &test_io(),
+            &crate::vault_label::key::UnavailableKeychain,
         )
         .await
         .expect("quick unlock after full unlock");

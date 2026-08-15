@@ -136,7 +136,9 @@ pub async fn vault_delete_from_host(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
     vault_id: String,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), VaultDeleteError> {
     // SYNC-6 explicit-id targeting (mirrors `unlock` / `recover`): the IPC layer
     // carries a canonical hyphenated `VaultId` string, and since #250 it is
@@ -165,8 +167,8 @@ pub async fn vault_delete_from_host(
     // inside `vault_delete_with_dir` is not rejected by the invisible job.
     hooks.preempt_inflight_backup(state).await;
 
-    let result = vault_delete_with_dir(vault_dir, vault_id, state).await;
-    run_post_delete_teardown(hooks, &result);
+    let result = vault_delete_with_dir(vault_dir.clone(), vault_id, state).await;
+    run_post_delete_teardown(hooks, io, &vault_dir, vault_id, keychain, &result).await;
     result
 }
 
@@ -186,6 +188,7 @@ pub async fn vault_delete_via_io_from_host(
     host: &dyn HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     vault_id: String,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), VaultDeleteError> {
     // Required target, same as the native twin (#250) — the browser reaches
     // this through the same TS wrapper, so an optional id here would reopen the
@@ -199,8 +202,8 @@ pub async fn vault_delete_via_io_from_host(
 
     hooks.preempt_inflight_backup(state).await;
 
-    let result = vault_delete_via_io(io, vault_dir, vault_id, state).await;
-    run_post_delete_teardown(hooks, &result);
+    let result = vault_delete_via_io(io, vault_dir.clone(), vault_id, state).await;
+    run_post_delete_teardown(hooks, io, &vault_dir, vault_id, keychain, &result).await;
     result
 }
 
@@ -210,7 +213,21 @@ pub async fn vault_delete_via_io_from_host(
 /// the slot was dropped on exactly those paths. A rejected delete
 /// (`VaultBusyAuth` / `VaultNotFound`) left the slot untouched, so any live
 /// index belongs to a still-unlocked session and MUST NOT be wiped.
-fn run_post_delete_teardown(hooks: &crate::hooks::Hooks, result: &Result<(), VaultDeleteError>) {
+///
+/// That gate is why the sealed label erase (myne-md/myne#411) belongs on THIS
+/// list rather than beside the unlink: the vault's cached name is one more
+/// artefact that must not outlive it, and destroying its wrap key on a
+/// **rejected** delete would leave a surviving vault's picker row falling back
+/// until its next unlock. Everything above the erase is RAM; the erase is the
+/// one durable member, and it goes last for that reason.
+async fn run_post_delete_teardown(
+    hooks: &crate::hooks::Hooks,
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &std::path::Path,
+    vault_id: VaultId,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
+    result: &Result<(), VaultDeleteError>,
+) {
     if matches!(result, Ok(()) | Err(VaultDeleteError::PartialDelete { .. })) {
         hooks.zeroize_search_index();
         // MYND-166: wipe the staged editor-workspace descriptor too.
@@ -230,6 +247,19 @@ fn run_post_delete_teardown(hooks: &crate::hooks::Hooks, result: &Result<(), Vau
         // MYND-259: abort any in-progress voice recording so the mic + RAM
         // PCM buffer do not outlive the deleted vault.
         hooks.abort_active_recording();
+        // myne-md/myne#411: destroy this vault's sealed-label wrap key, and
+        // remove the `vault.label` file if the sweep above left one.
+        //
+        // `forget_label` rather than `remove_label`, and the difference is the
+        // whole point: the recursive unlink already deleted the ciphertext from
+        // the live filesystem, and deleted bytes stay recoverable from the
+        // medium (`decisions.md` 2026-05-07 settled that when it rejected
+        // platform-specific secure-delete). A surviving key over recoverable
+        // ciphertext would weaken the per-`VaultId` cryptographic-erase
+        // guarantee vault deletion carries today, in the one place a person
+        // actually recognises: the vault's name. Destroying the key IS the
+        // erase.
+        crate::vault_label::writeback::forget_label(io, vault_dir, vault_id, keychain).await;
     }
 }
 
@@ -243,7 +273,15 @@ pub async fn vault_delete<R: Runtime>(
     app: AppHandle<R>,
     vault_id: String,
 ) -> Result<(), VaultDeleteError> {
-    vault_delete_from_host(state.inner(), hooks.inner(), &TauriHost::new(app), vault_id).await
+    vault_delete_from_host(
+        state.inner(),
+        hooks.inner(),
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        vault_id,
+        crate::vault_label::key::platform_keychain(),
+    )
+    .await
 }
 
 /// Testable core of [`vault_delete`]. The Tauri-command wrapper
@@ -1639,6 +1677,181 @@ mod tests {
                     .is_file(),
                 "the sibling's note blob must remain"
             );
+        });
+    }
+
+    // ---- myne-md/myne#411: the sealed label survives nothing --------------
+    //
+    // The recursive unlink above removes `vault.label` with the rest of the
+    // tree, and that is NOT the erase. Deleted bytes stay recoverable from the
+    // medium (`decisions.md` 2026-05-07, which rejected platform-specific
+    // secure-delete for the project), so a surviving wrap key would leave the
+    // deleted vault's name readable to anyone who can reach the disk. The name
+    // is the one artefact of a vault a person actually recognises, so that
+    // would weaken the per-`VaultId` cryptographic-erase guarantee in its most
+    // visible place.
+
+    /// A `<app_data_dir>/vaults/<id>/` a host-taking delete can resolve, with a
+    /// `vault.meta` when `well_formed`.
+    fn seeded_vault(
+        base: &std::path::Path,
+        id: crate::vault_id::VaultId,
+        well_formed: bool,
+    ) -> std::path::PathBuf {
+        let dir = base.join("vaults").join(id.to_string());
+        std::fs::create_dir_all(&dir).expect("vault root");
+        if well_formed {
+            std::fs::write(dir.join("vault.meta"), b"meta bytes").expect("seed vault.meta");
+        }
+        dir
+    }
+
+    #[test]
+    fn deleting_a_vault_destroys_its_sealed_label_key_and_not_only_its_file() {
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::store::write_label;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-label-erase").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id = VaultId::mint();
+            let dir = seeded_vault(&base, id, true);
+
+            let keychain = FakeKeychain::empty();
+            write_label(&crate::vault_io::StdVaultIo, &dir, id, "Work", &keychain)
+                .await
+                .expect("seed the cached name");
+            assert!(keychain.read(&id.to_string()).is_some(), "key seeded");
+
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            vault_delete_from_host(
+                &state,
+                &hooks,
+                &host,
+                &crate::vault_io::StdVaultIo,
+                id.to_string(),
+                &keychain,
+            )
+            .await
+            .expect("delete");
+
+            assert!(!dir.exists(), "the vault tree is gone");
+            assert!(
+                keychain.read(&id.to_string()).is_none(),
+                "the sealed-label wrap key survived the delete. Removing the file \
+                 alone is not an erase: the ciphertext stays recoverable from the \
+                 medium, and a live key over it reads out the deleted vault's name."
+            );
+        });
+    }
+
+    #[test]
+    fn deleting_one_vault_leaves_another_vaults_cached_name_readable() {
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::store::{read_label, write_label, LabelRead};
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-label-erase-scoped").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id_a = VaultId::mint();
+            let id_b = VaultId::mint();
+            let dir_a = seeded_vault(&base, id_a, true);
+            let dir_b = seeded_vault(&base, id_b, true);
+
+            let keychain = FakeKeychain::empty();
+            for (dir, id, name) in [(&dir_a, id_a, "Work"), (&dir_b, id_b, "Personal")] {
+                write_label(&crate::vault_io::StdVaultIo, dir, id, name, &keychain)
+                    .await
+                    .expect("seed");
+            }
+
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id_a,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            vault_delete_from_host(
+                &state,
+                &hooks,
+                &host,
+                &crate::vault_io::StdVaultIo,
+                id_a.to_string(),
+                &keychain,
+            )
+            .await
+            .expect("delete A");
+
+            assert!(keychain.read(&id_a.to_string()).is_none());
+            assert_eq!(
+                read_label(&crate::vault_io::StdVaultIo, &dir_b, id_b, &keychain)
+                    .await
+                    .expect("read B"),
+                LabelRead::Label(String::from("Personal")),
+                "deleting one vault must not make another's name unreadable"
+            );
+        });
+    }
+
+    #[test]
+    fn a_rejected_delete_does_not_destroy_the_key() {
+        // The `matches!(result, Ok | PartialDelete)` gate, which is why the
+        // erase sits on the teardown list rather than beside the unlink. A
+        // rejected delete left the vault standing, so destroying its key would
+        // blank a surviving vault's picker row until its next unlock.
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::store::{label_path, write_label};
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-label-rejected").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id = VaultId::mint();
+            // No `vault.meta`, so the empty-slot arm rejects with VaultNotFound.
+            let dir = seeded_vault(&base, id, false);
+
+            let keychain = FakeKeychain::empty();
+            write_label(&crate::vault_io::StdVaultIo, &dir, id, "Work", &keychain)
+                .await
+                .expect("seed");
+
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+
+            assert!(
+                matches!(
+                    vault_delete_from_host(
+                        &state,
+                        &hooks,
+                        &host,
+                        &crate::vault_io::StdVaultIo,
+                        id.to_string(),
+                        &keychain,
+                    )
+                    .await,
+                    Err(VaultDeleteError::VaultNotFound)
+                ),
+                "the delete must be rejected for this test to mean anything"
+            );
+
+            assert!(keychain.read(&id.to_string()).is_some(), "the key survives");
+            assert!(label_path(&dir).exists(), "and so does the sealed file");
         });
     }
 

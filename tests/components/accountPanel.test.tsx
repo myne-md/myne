@@ -382,4 +382,83 @@ describe("AccountPanel — vault label rename", () => {
     });
     expect(setVaultLabel).toHaveBeenCalledWith("Renamed");
   });
+
+  // myne-md/myne#411. The device-local name cache does not sync, so another
+  // device shows the name IT last decrypted until this vault is unlocked there.
+  // That sentence is the whole mitigation for the window (clearing on
+  // sync-head movement and a fixed expiry were both rejected), which is why it
+  // is pinned here rather than left to review.
+  it("no cross-device notice while the draft matches what is saved", async () => {
+    prefsRead.mockResolvedValue({ label: "Existing" });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe("Existing"),
+    );
+    expect(screen.queryByTestId("settings.label-rename-notice")).toBeNull();
+  });
+
+  it("renaming surfaces the cross-device notice before the save lands", async () => {
+    prefsRead.mockResolvedValue({ label: "Existing" });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe("Existing"),
+    );
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "Renamed" },
+    });
+    const notice = screen.getByTestId("settings.label-rename-notice");
+    expect(notice.textContent ?? "").toMatch(/other devices/i);
+    expect(notice.textContent ?? "").toMatch(/earlier name/i);
+    expect(notice.textContent ?? "").toMatch(/unlock/i);
+  });
+
+  it("does not claim an old name when there was never a name", async () => {
+    // The gate is `labelChanged`, which is true on the FIRST naming of a
+    // never-named vault: `savedLabel` starts "". The other devices are showing
+    // `Vault N` there, not an old name, so copy that said "the old name" was
+    // false in probably the most common use of the field.
+    //
+    // The fix broadened the copy rather than narrowing the gate, because
+    // narrowing it would go quiet in a case that genuinely needs it:
+    // `vault.prefs.label` syncs and the device-local stored copy does not, so a
+    // vault whose label was cleared on THIS device can still be sitting under
+    // its old name on another one, with `savedLabel` back at "".
+    prefsRead.mockResolvedValue({ label: null });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe(""),
+    );
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "First name" },
+    });
+    const notice = screen.getByTestId("settings.label-rename-notice");
+    const text = notice.textContent ?? "";
+    expect(text).toMatch(/other devices/i);
+    expect(text).toMatch(/placeholder/i);
+    // The sentence must not assert that an old name exists.
+    expect(text).not.toMatch(/the old name/i);
+  });
+
+  it("CLEARING the name surfaces it too, which is the case it exists for", async () => {
+    // Someone emptying the field is renaming precisely to get a name off a
+    // screen. Silence here would be actively misleading, because the old name
+    // is exactly what the other devices keep.
+    prefsRead.mockResolvedValue({ label: "Tax Returns" });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe("Tax Returns"),
+    );
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "" },
+    });
+    expect(screen.getByTestId("settings.label-rename-notice")).toBeTruthy();
+  });
 });
