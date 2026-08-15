@@ -1791,6 +1791,16 @@ Rules are **stored in canonical English and displayed localized**: a file carryi
 
 Used in: `spec/markdown-dialect.md` §3.8.3, §3.8.7; `decisions.md` 2026-07-28
 
+### **reference build environment** &nbsp; 🛠️ *Tooling*
+
+*(Aliases: reference platform.)*
+
+The build environment a published hash is defined against, so that "reproducible" names a property someone can actually check. For the web bundle it is a **`linux/amd64` container built from `web/container/Dockerfile`**, and the qualifier is load-bearing rather than pedantic: cargo hashes `rustc -vV` (whose `host:` line names the build machine's triple) into every crate's `-C metadata`, rustc folds that into `StableCrateId`, and symbol names then feed codegen-unit partitioning. So the same commit built on a different host architecture produces a different wasm artefact, and every content-hashed chunk importing it renames. Reaching the reference platform is not a privilege of matching hardware: an arm64 machine gets the byte-identical result through emulation (`docker buildx --platform linux/amd64`), which is what keeps the check available to every verifier rather than to whoever owns the right CPU. Distinct from building to **serve**: a self-hoster builds natively for their own architecture and needs no comparison, because they read the source themselves. Their users did not, so an instance other people rely on is built in the reference environment or its users are told no published row will match it.
+
+The scope is across hosts and **not yet across time**: the three base images in that Dockerfile are floating tags, so the environment can move under a row written before it moved. `web-bundle-hashes.md` records that residual beside the claim. See also [reproducible builds](#reproducible-builds).
+
+Used in: `web-bundle-hashes.md`; `self-host-web.md`; `decisions.md` 2026-08-15
+
 ### **reference link** &nbsp; 📦 *Product*
 
 A CommonMark link that names a [link reference definition](#link-reference-definition) instead of carrying its URL inline: full `[text][label]`, collapsed `[text][]` (label = the text), or shortcut `[label]`. Myne v0.1 recognizes and **renders** reference links — a usage whose label resolves against a definition shows its visible text as a link and its definition line hides off-cursor — while a dangling reference (no matching definition) stays plain text. Rendering is cursor-aware and byte-preserving (§6 C1); the canonical emit form for new links is the inline `[text](url)`, so reference links are recognized and rendered but **never emitted**. Distinguished from an inline link by the parse tree (a reference link has a `LinkLabel` child or no `URL`); resolution uses the shared collector, since the parser alone emits a node even for a broken full reference. See also [link reference definition](#link-reference-definition), [decoration layer](#decoration-layer).
@@ -1821,7 +1831,9 @@ Used in: `spec/protocol.md` §9.12, §9.11.3; `decisions.md` 2026-06-13
 
 ### **reproducible builds** &nbsp; 🛠️ *Tooling*
 
-Build artifacts that can be regenerated bit-for-bit from public source code by independent third parties. Myne commits to reproducible builds for desktop (Tauri), web, and server binaries — feasible in months for Tauri (vs. ~10 person-years for Chromium-based Electron). Part of the compensating-controls plan in lieu of a paid third-party audit.
+Build artifacts that can be regenerated bit-for-bit from public source code by independent third parties. Part of the compensating-controls plan in lieu of a paid third-party audit.
+
+**Shipped for the web bundle and the server image; not for desktop.** The commitment used to be stated for all three, and `threat-model.md` §6 corrected that on 2026-08-15 (entry 0496) rather than leave a control the project does not have: desktop artifacts are built locally, are not reproducible, and with every `myne-md` repository private have no public source to be reproduced *from*. The web bundle's guarantee carries its own qualifier: it holds in a [reference build environment](#reference-build-environment), not on every host, because the build machine's target triple reaches the emitted wasm (entry 0498).
 
 Used in: `threat-model.md` §6
 Reference: https://reproducible-builds.org
