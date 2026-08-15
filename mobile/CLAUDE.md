@@ -71,6 +71,29 @@ Phase 3 mobile is the **minimum viable** read+write client. Feature parity with 
 - No telemetry / analytics — App Store + Play Store will push toward analytics SDKs; **resist them** or document the explicit exemption in main repo `design-notes.md`
 - Reproducible builds — mobile build determinism is harder (Xcode/Gradle environment variability) but still a goal; document the recipe in `operations/`
 
+## The platform seam under `mobile/src` (myne#492)
+
+`mobile/src/platform/` is the ONE place under `mobile/src` allowed to import `@tauri-apps/*`. Six
+modules, one per host capability: `core`, `event`, `path`, `window`, `clipboardManager`, `deepLink`.
+Everything else under `mobile/src` imports from there. `scripts/check-platform-seam.mjs` enforces it
+in `pre-commit` and in CI, so `--no-verify` does not slip one through, and it fails on the runtime
+global (`__TAURI…__`) too, which is not a module specifier and so slips the import rule. Exactly one
+file per client may name that global, and here it is `mobile/src/lib/app-window.ts`.
+
+**The reason is not the desktop reason.** Desktop's seam exists so the web client can substitute a
+wasm-Worker implementation behind it. Nothing substitutes behind mobile's: mobile is a Tauri host on
+both of its targets. It exists so the guard has a boundary to enforce at all, and so the twin
+modules under `mobile/src/lib` stay byte-identical to their desktop counterparts, which is how a fix
+to one reaches the other. Before this, 41 files here imported Tauri directly and four of them
+differed from their desktop twin in the import line and in nothing else.
+
+**`mobile/src/formfactor/` is a different thing that used to share this name.** It holds the
+iOS-versus-Android and phone-versus-tablet PRESENTATION split (`PlatformContext`,
+`SizeClassContext`, `theme`) and was renamed out of the way, so `<tree>/platform/` means the host
+seam in all three clients. A path from before 2026-08-15 naming `mobile/src/platform/SizeClassContext.tsx`
+resolves to a real directory holding something else entirely, which is worse than a dangling one.
+Full rationale: `design-notes/clients/0497-*`.
+
 ## Gotchas
 
 - **App icons: `gen/` is regenerated with STOCK Tauri icons** — the committed Myne set lives in `src-tauri/icons/{ios,android}`, but every `tauri [ios|android] init` re-stamps the git-ignored `src-tauri/gen` with the default Tauri logo. `scripts/sync-icons.sh` restores the Myne set: it runs automatically on every dev/build (`tauri.conf.json` before-hooks → `pnpm sync-icons`) and from `android-postinit.sh`. Never hand-edit icon files under `gen/` — the next hook run overwrites them; change `src-tauri/icons/` instead.
