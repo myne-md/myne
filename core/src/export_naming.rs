@@ -85,7 +85,154 @@ pub fn suffixed_filename(name: &str, n: u32) -> String {
     }
 }
 
-/// Splice every located embed span to `![[<final-filename>]]`,
+/// Translate a form-C alias's layout segments (myne#409) into the alias slot of
+/// the exported plain wikilink embed, returning `""` when there is nothing to
+/// carry.
+///
+/// Deliberately NARROW. The canonical grammar lives in TypeScript
+/// (`@myne/dialect/embedLayout`), consumed from source by all three clients;
+/// this side learns exactly two things: that a pixel `w=` (optionally with
+/// `h=`) becomes Obsidian's own `|300` / `|300x200` spelling, and that `alt=`
+/// is terminal. Everything else, including a percentage width Obsidian has no
+/// slot for, travels through unchanged in its original order. The two
+/// implementations are held together by the published `embed-layout` vectors
+/// rather than by two parallel parsers, which is the only arrangement in which
+/// "narrow" stays true.
+///
+/// A value the canonical grammar would reject is passed through as an opaque
+/// `w=…` segment rather than dropped: refusing to export bytes this side merely
+/// failed to understand is how an export loses data. That is why
+/// [`is_export_dimension`] exists and why it is not merely "a run of digits":
+/// emitting a BARE Obsidian dimension for a rejected value would export `w=0`
+/// as `|0`, rendering a zero-width image in Obsidian where Myne renders the
+/// default.
+fn obsidian_layout_suffix(alias: &str) -> String {
+    if alias.is_empty() {
+        return String::new();
+    }
+    let mut width: Option<&str> = None;
+    let mut height: Option<&str> = None;
+    // Where a lone `h=` belongs in `passthrough` if no pixel width arrives.
+    let mut height_at: Option<(usize, &str)> = None;
+    let mut passthrough: Vec<&str> = Vec::new();
+
+    // Segment 1 is always the filename and is replaced by the final export
+    // name, so it is skipped here. From segment 2 on, an unkeyed segment is
+    // part of the filename (a filename may contain a `|`) and is likewise
+    // dropped, because the final name already stands in for all of it.
+    //
+    // `alt=` is TERMINAL: it swallows the remainder of the alias, pipes
+    // included. Splitting naively on `|` truncates a pipe-bearing alt at its
+    // first pipe, which silently rewrites the author's words on export. The
+    // published vectors caught exactly that.
+    let mut alt_tail: Option<&str> = None;
+    // Byte offset of the segment currently being examined. Accumulated in this
+    // one pass so the `alt=` tail can be sliced straight out of `alias`.
+    let mut offset = alias.split('|').next().map_or(0, |first| first.len() + 1);
+    for segment in alias.split('|').skip(1) {
+        if segment.starts_with("alt=") {
+            alt_tail = Some(&alias[offset..]);
+            break;
+        }
+        match segment.split_once('=') {
+            // First occurrence wins, matching the canonical parser: a repeated
+            // key is hand-authored (the emitter never produces one) and the
+            // repeat is reported rather than applied.
+            Some(("w", v)) if width.is_none() && is_export_dimension(v) => width = Some(v),
+            Some(("h", v)) if height.is_none() && is_export_dimension(v) => {
+                // Remember where it sat, so that if no pixel width turns up it
+                // can be re-inserted in its ORIGINAL position rather than
+                // hoisted to the front. Obsidian has no height-only spelling.
+                height = Some(v);
+                height_at = Some((passthrough.len(), segment));
+            }
+            Some((key, _)) if is_canonical_key(key) => passthrough.push(segment),
+            // Unkeyed by the canonical rule: part of the filename, already
+            // covered by `final_name`.
+            _ => {}
+        }
+        offset += segment.len() + 1;
+    }
+
+    let mut out = String::new();
+    match (width, height) {
+        // Obsidian's own two spellings.
+        (Some(w), Some(h)) => {
+            out.push('|');
+            out.push_str(w);
+            out.push('x');
+            out.push_str(h);
+        }
+        (Some(w), None) => {
+            out.push('|');
+            out.push_str(w);
+        }
+        // Obsidian has no height-only spelling, so a lone height travels
+        // through as an opaque segment IN ITS ORIGINAL POSITION rather than
+        // being dropped or hoisted. It used to be consumed into `height` and
+        // then emitted only inside the width arm, so a standalone `h=` vanished
+        // from the export entirely. That is reachable in two clicks: import an
+        // Obsidian `300x200`, then pick Full width, which replaces the pixel
+        // width with a percentage.
+        (None, Some(_)) => {
+            if let Some((at, seg)) = height_at {
+                passthrough.insert(at.min(passthrough.len()), seg);
+            }
+        }
+        (None, None) => {}
+    }
+    for segment in passthrough {
+        out.push('|');
+        out.push_str(segment);
+    }
+    if let Some(tail) = alt_tail {
+        out.push('|');
+        out.push_str(tail);
+    }
+    out
+}
+
+/// The canonical key shape, mirroring `KEYED_RE` in `@myne/dialect/embedLayout`:
+/// a leading ASCII letter, then letters, digits, `_` or `-`.
+///
+/// A looser test here (originally "anything before the first `=`") made the two
+/// implementations disagree about what a segment IS, not merely about its
+/// value: `1=x`, `a.b=2` and `my key=1` are filename bytes canonically and were
+/// re-emitted here as alias segments, so the exported wikilink carried filename
+/// fragments in Obsidian's display-alias slot next to a `final_name` that
+/// already stood in for them.
+fn is_canonical_key(key: &str) -> bool {
+    let mut chars = key.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+/// A value the canonical grammar accepts as a pixel dimension: a positive
+/// integer, no leading zero, no greater than the ceiling.
+///
+/// This is the ONE piece of the grammar this side reproduces, and it is
+/// deliberately just the number: the segment rules (unkeyed rejoin, `alt=`
+/// terminality, the key vocabulary) stay canonical in TypeScript. Recognising
+/// the number is unavoidable, because the alternative is emitting a BARE
+/// Obsidian dimension for a value the canonical parser rejected, so `w=0` would
+/// export as `|0` and Obsidian would render a zero-width image where Myne
+/// renders the default. Anything this does not accept travels through as an
+/// opaque `w=…` segment, which is the same treatment `w=abc` and `w=100%` get.
+fn is_export_dimension(s: &str) -> bool {
+    if s.is_empty() || s.starts_with('0') || !s.bytes().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    s.parse::<u32>().is_ok_and(|n| n <= MAX_EMBED_DIMENSION_PX)
+}
+
+/// Mirrors `MAX_EMBED_DIMENSION_PX` in `@myne/dialect/embedLayout`. Held in
+/// lockstep by the published `embed-layout` vectors, not by convention.
+const MAX_EMBED_DIMENSION_PX: u32 = 8192;
+
+/// Splice every located embed span to `![[<final-filename><layout-suffix>]]`,
 /// preserving each byte outside the spans (the `markdown-dialect.md`
 /// §6 sanctioned export transform — the importer media-rewrite's exact
 /// inverse). A span whose id somehow has no final name (structurally
@@ -104,6 +251,7 @@ pub fn rewrite_embeds_to_final_names(
             Some(final_name) => {
                 out.push_str("![[");
                 out.push_str(final_name);
+                out.push_str(&obsidian_layout_suffix(span.alias));
                 out.push_str("]]");
             }
             None => out.push_str(&plaintext[span.start..span.end]),
@@ -339,5 +487,185 @@ mod tests {
         assert_eq!(percent_encode_path("a-b_c.d~e"), "a-b_c.d~e");
         assert_eq!(percent_encode_path("scan (1).png"), "scan%20%281%29.png");
         assert_eq!(percent_encode_path("a&b#c.png"), "a%26b%23c.png");
+    }
+}
+
+#[cfg(test)]
+mod embed_layout_export_tests {
+    use super::*;
+
+    /// The §6 export transform's layout arm (myne#409). The canonical grammar
+    /// is TypeScript; this side learns one translation, and these pin exactly
+    /// how narrow it is.
+    #[test]
+    fn pixel_width_becomes_obsidians_own_spelling() {
+        assert_eq!(obsidian_layout_suffix("photo.png|w=300"), "|300");
+    }
+
+    #[test]
+    fn width_and_height_become_the_x_form() {
+        assert_eq!(obsidian_layout_suffix("photo.png|w=300|h=200"), "|300x200");
+    }
+
+    #[test]
+    fn a_percentage_width_has_no_obsidian_slot_and_travels_unchanged() {
+        assert_eq!(obsidian_layout_suffix("photo.png|w=100%"), "|w=100%");
+    }
+
+    #[test]
+    fn other_keys_pass_through_in_order_after_the_dimension() {
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|w=300|align=center|alt=A sunset"),
+            "|300|align=center|alt=A sunset",
+        );
+    }
+
+    #[test]
+    fn keys_written_out_of_order_still_put_the_dimension_first() {
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|align=center|w=300"),
+            "|300|align=center",
+        );
+    }
+
+    #[test]
+    fn no_alias_and_a_bare_filename_carry_nothing() {
+        assert_eq!(obsidian_layout_suffix(""), "");
+        assert_eq!(obsidian_layout_suffix("photo.png"), "");
+    }
+
+    /// A filename may contain a `|` today, so an UNKEYED later segment is part
+    /// of the filename. The final export name already stands in for all of it,
+    /// so it must not be re-emitted as a layout segment.
+    #[test]
+    fn a_pipe_bearing_filename_contributes_no_segments() {
+        assert_eq!(obsidian_layout_suffix("re|port.png"), "");
+        assert_eq!(obsidian_layout_suffix("re|port.png|w=300"), "|300");
+    }
+
+    /// Passed through, not dropped. Refusing to export bytes this side merely
+    /// failed to understand is how an export loses data.
+    #[test]
+    fn a_value_this_side_cannot_read_is_passed_through_not_dropped() {
+        assert_eq!(obsidian_layout_suffix("photo.png|w=abc"), "|w=abc");
+        assert_eq!(obsidian_layout_suffix("photo.png|z=9"), "|z=9");
+    }
+
+    /// The two drifts the published vectors caught on their first run, kept as
+    /// named unit tests so the reason survives even if the companion is absent.
+    #[test]
+    fn alt_is_terminal_and_keeps_its_pipes() {
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|alt=A sunset | 2026"),
+            "|alt=A sunset | 2026",
+        );
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|alt=a|w=300"),
+            "|alt=a|w=300"
+        );
+    }
+
+    #[test]
+    fn a_rejected_dimension_never_becomes_a_bare_obsidian_number() {
+        // `|0` would render a zero-width image in Obsidian where Myne renders
+        // the default, so a value the canonical grammar rejects passes through.
+        assert_eq!(obsidian_layout_suffix("photo.png|w=0"), "|w=0");
+        assert_eq!(obsidian_layout_suffix("photo.png|w=0300"), "|w=0300");
+        assert_eq!(obsidian_layout_suffix("photo.png|w=8193"), "|w=8193");
+        assert_eq!(obsidian_layout_suffix("photo.png|w=8192"), "|8192");
+    }
+
+    #[test]
+    fn a_duplicate_key_keeps_the_first_like_the_canonical_parser() {
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|w=300|w=400"),
+            "|300|w=400"
+        );
+    }
+
+    #[test]
+    fn the_full_rewrite_splices_the_layout_beside_the_final_name() {
+        let body = "a ![[att:".to_string() + &"a".repeat(64) + "|photo.png|w=300|align=center]] b";
+        let spans = crate::plugins::attachments::reconcile::extract_att_embed_spans(&body);
+        assert_eq!(spans.len(), 1);
+        let mut names = HashMap::new();
+        names.insert("a".repeat(64), "photo (1).png".to_string());
+        assert_eq!(
+            rewrite_embeds_to_final_names(&body, &spans, &names),
+            "a ![[photo (1).png|300|align=center]] b",
+        );
+    }
+}
+
+/// Cross-implementation vector runner for the form-C embed layout segments
+/// (myne#409). The canonical grammar is TypeScript (`@myne/dialect/embedLayout`,
+/// source-consumed by desktop, web and mobile); this side implements only the
+/// export translation. Neither can detect drift from the other alone, so both
+/// assert against the same published cases.
+///
+/// Skips when the `myne-test-vectors` companion is not cloned, matching the
+/// `tls-exporter` precedent: a contributor not touching the dialect should not
+/// see a red test about their checkout layout.
+#[cfg(test)]
+mod embed_layout_vectors {
+    use super::obsidian_layout_suffix;
+
+    #[test]
+    fn export_suffix_matches_every_published_vector() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../myne-test-vectors/vectors/embed-layout/v0.1/cases.json");
+        let Ok(raw) = std::fs::read_to_string(&path) else {
+            // `MYNE_VECTORS_REQUIRED=1` turns a missing companion into a loud
+            // failure instead of a green run that verified nothing. Without it
+            // this skips, because the companion is optional for a contributor
+            // not touching the dialect; with it, a lane that believes it is
+            // gating on the vectors finds out when it is not.
+            assert!(
+                std::env::var_os("MYNE_VECTORS_REQUIRED").is_none(),
+                "MYNE_VECTORS_REQUIRED is set but the embed-layout vectors are absent at {}",
+                path.display(),
+            );
+            eprintln!("[skip] embed-layout vectors absent at {}", path.display());
+            return;
+        };
+        let doc: serde_json::Value = serde_json::from_str(&raw).expect("vectors parse as JSON");
+        let cases = doc["cases"]
+            .as_array()
+            .expect("vectors carry a cases array");
+
+        // A silently-empty case set would make this test vacuously green, which
+        // is the failure mode a vector runner is most prone to.
+        assert!(!cases.is_empty(), "embed-layout vectors must not be empty");
+
+        for case in cases {
+            let id = case["vector_id"]
+                .as_str()
+                .expect("case carries a vector_id");
+            let hex = case["input_alias_utf8_hex"]
+                .as_str()
+                .expect("case carries the alias as hex");
+            let alias_bytes: Vec<u8> = (0..hex.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("vector carries hex"))
+                .collect();
+            let alias = String::from_utf8(alias_bytes).expect("alias is UTF-8");
+
+            // The hex is the contract; the readable mirror is informational and
+            // is cross-checked so a hand-edited case cannot drift from its label.
+            assert_eq!(
+                alias,
+                case["informational_alias"].as_str().unwrap_or_default(),
+                "{id}: informational_alias must mirror the hex"
+            );
+
+            let want = case["expected_export_suffix"]
+                .as_str()
+                .expect("case carries the expected suffix");
+            assert_eq!(
+                obsidian_layout_suffix(&alias),
+                want,
+                "{id}: exported layout suffix has drifted from the published vector"
+            );
+        }
     }
 }

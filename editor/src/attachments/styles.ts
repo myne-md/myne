@@ -399,6 +399,37 @@ const CSS = `
 .cm-attachment-file-card-menuitem-disabled:hover {
   background-color: transparent;
 }
+/* Group rule between the file actions, the sizes, the alignments and the alt
+   editor (myne#409). Presentational only: no name, no role, no tab stop. */
+.cm-attachment-file-card-menusep {
+  height: 1px;
+  margin: var(--space-1, 4px) 0;
+  background-color: var(--line-1, #e3e2dd);
+}
+/* The active choice in a size / alignment group. The tick is a ::before rather
+   than DOM text so the row's accessible name stays the label alone and is not
+   read as "check mark Small"; aria-checked on the menuitemradio is what
+   announces the state. */
+.cm-attachment-file-card-menuitem-checked {
+  font-weight: var(--weight-medium, 500);
+}
+.cm-attachment-file-card-menuitem-checked::before {
+  content: "✓";
+  display: inline-block;
+  width: 1em;
+  margin-right: var(--space-1, 4px);
+  color: var(--fg-2, #4a4944);
+}
+/* Keep unchecked rows in the same groups aligned with the checked one, so the
+   list does not jump horizontally as the choice moves. */
+.cm-attachment-file-card-menuitem[role="menuitemradio"]:not(
+    .cm-attachment-file-card-menuitem-checked
+  )::before {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  margin-right: var(--space-1, 4px);
+}
 
 /* Voice-note recording bar (MYND-259). Body-mounted floating surface (escapes
    the .cm-editor theme scope, like the toast/menu above). */
