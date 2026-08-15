@@ -33,7 +33,12 @@ On by default and per-clone opt-out: `touch .claude/.adhd-off` (gitignored), `MY
 ## Worktrees (pointer)
 
 A worktree for this repo is created **only** with `EnterWorktree`, or with `git worktree add` into
-`.claude/worktrees/<name>`, and never anywhere else. The session scratchpad under `/private/tmp` is
+`.claude/worktrees/<name>`, and never anywhere else. It branches from **`origin/develop`**, always:
+that is what `worktree.baseRef: fresh` in `.claude/settings.json` pins (the setting is checked in so
+a fresh clone inherits it), and a hand-made `git worktree add` passes `origin/develop` explicitly.
+Branching from the current local HEAD instead carries whatever the working checkout happens to be
+sitting on into the new branch, which is how a feature branch picks up an unrelated half-finished
+change and a PR arrives with a diff nobody can explain. The session scratchpad under `/private/tmp` is
 specifically wrong for one: it is per session and gets cleaned, so the worktree outlives the
 directory `git worktree list` still points at, and `.claude/worktrees/` stops being the roster of
 what is in flight. Name it after the issue (`410-note-covers`) so the worktree, the branch and the
