@@ -11,7 +11,7 @@
 // is a boolean.
 
 import i18n from "@myne/i18n";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** Display name for a vault. Pass `ordinal` in multi-vault lists so unnamed
  *  vaults stay distinguishable ("Vault 2").

@@ -36,7 +36,7 @@
 // backgrounded / locked", which the vault's other blobs already reveal, rather
 // than "a folder was toggled at 14:32" — the desktop property, preserved.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { HAS_TAURI } from "./app-window";
 import {
   isExpandDirty,

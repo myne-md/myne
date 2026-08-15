@@ -17,7 +17,7 @@
 // threat-model entry `docs/decisions.md` 2026-07-12). The UI must not present
 // it as a trusted gate until that verification passes.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** Mirror of the Rust `QuickUnlockStatus` (`commands.rs`). */
 export interface QuickUnlockStatus {

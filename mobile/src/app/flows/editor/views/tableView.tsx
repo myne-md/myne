@@ -10,7 +10,7 @@
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ScreenScroll } from "../../../../components";
-import { useSizeClass } from "../../../../platform/SizeClassContext";
+import { useSizeClass } from "../../../../formfactor/SizeClassContext";
 import type { SavedView } from "../../../../lib/prefs";
 import type { ViewResult, ViewRow } from "@myne/editor/host/notes/queryEngine";
 import {

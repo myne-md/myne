@@ -196,6 +196,18 @@ pub async fn tick() -> String {
         if edge {
             s.arm_immediate_poll();
         }
+        // Mirror the verify hold into the scheduler, exactly as the shared
+        // `spawn_sync_loop` does for the two Tauri clients.
+        //
+        // This client drives `SyncScheduler::tick` itself and was not wired, and
+        // the consequence is the failure the mirror exists to prevent: `tick`
+        // returns `Push`, CONSUMES `dirty_since`, the cycle then resolves
+        // `PushGate::VerifyHold` and pushes nothing, reports `Success`, and
+        // `on_cycle_outcome` re-arms the anchor only on `Failed`. The edit sits
+        // unpushed until some unrelated local change re-dirties the scheduler.
+        // Web is also the client that runs this ceremony hardest, because OPFS is
+        // evictable and a re-bootstrap re-runs the compare.
+        s.set_verify_hold(myne_core::plugins::sync::verify_hold::verify_hold().is_held(now));
         s.tick(now)
     });
 

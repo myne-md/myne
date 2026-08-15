@@ -293,6 +293,11 @@ fn main() {
                     "sync_join_account",
                     "sync_reset_local",
                     "sync_head_fingerprint",
+                    // myne#462: the device-verification push hold. In-RAM flag
+                    // only; holds CONTENT pushes while a SYNC-40 eye-compare is
+                    // open so the head both screens read cannot move under them.
+                    "sync_verify_hold_begin",
+                    "sync_verify_hold_end",
                     "sync_list_quarantine",
                     "sync_read_quarantine",
                     "sync_restore_quarantine",

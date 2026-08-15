@@ -2,9 +2,9 @@ import { useState } from "react";
 import { SECTIONS } from "./registry";
 import type { ScreenDef } from "./types";
 import { DeviceFrame } from "../device";
-import { PlatformProvider, type Platform } from "../platform/PlatformContext";
-import { useTheme } from "../platform/theme";
-import type { ThemeName } from "../platform/PlatformContext";
+import { PlatformProvider, type Platform } from "../formfactor/PlatformContext";
+import { useTheme } from "../formfactor/theme";
+import type { ThemeName } from "../formfactor/PlatformContext";
 import { MyneMark } from "../components/Icon";
 
 const PLATFORMS: { id: Platform; label: string }[] = [
