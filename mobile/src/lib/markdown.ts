@@ -4,6 +4,8 @@
 // renders a React token tree, never `dangerouslySetInnerHTML`). Covers the marks
 // a note commonly uses; anything unrecognized falls through as plain text.
 
+import { parseEmbedAlias } from "@myne/dialect/embedLayout";
+
 export type Inline =
   | { kind: "text"; text: string }
   | { kind: "bold"; text: string }
@@ -26,10 +28,22 @@ export type Block =
 const INLINE = [
   { re: /^`([^`]+)`/, make: (m: RegExpExecArray): Inline => ({ kind: "code", text: m[1] }) },
   {
-    // Form-C attachment embed `![[att:<id>|<name>]]` — must precede the wikilink
+    // Form-C attachment embed `![[att:<id>|<alias>]]`. Must precede the wikilink
     // rule so the leading `!` + `att:` target aren't split into text + wikilink.
+    //
+    // The alias is NOT the label: it may carry layout segments (myne#409,
+    // `photo.png|w=300`) and the filename itself may contain a pipe
+    // (`re|port.png`). Reading it whole showed the raw segments as the caption
+    // and as `alt`, and broke `isAudioLabel`, whose extension test then missed
+    // a `.wav` whose alias had picked up an importer-carried `alt=`, silently
+    // degrading the inline player. `@myne/dialect` owns the split, and mobile
+    // source-consumes it, so there is one grammar rather than a second copy.
     re: /^!\[\[att:([0-9a-f]{64})(?:\|([^\]\n]*))?\]\]/,
-    make: (m: RegExpExecArray): Inline => ({ kind: "attachment", id: m[1], label: (m[2] ?? "").trim() }),
+    make: (m: RegExpExecArray): Inline => ({
+      kind: "attachment",
+      id: m[1],
+      label: parseEmbedAlias(m[2] ?? "").filename.trim(),
+    }),
   },
   {
     re: /^\[\[([^\]|\n]+?)(?:\|([^\]\n]*))?\]\]/,

@@ -7,7 +7,14 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /** A line-icon glyph name → its child SVG element strings (path `d` only). */
-type IconName = "image" | "image-off" | "file" | "file-warning" | "play" | "pause";
+type IconName =
+  | "image"
+  | "image-off"
+  | "file"
+  | "file-warning"
+  | "play"
+  | "pause"
+  | "circle-alert";
 
 function el(tag: string, attrs: Record<string, string>): SVGElement {
   const node = document.createElementNS(SVG_NS, tag);
@@ -55,6 +62,16 @@ export function makeAttachmentIcon(name: IconName): SVGSVGElement {
       svg.append(
         el("path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }),
         el("path", { d: "M14 2v4a2 2 0 0 0 2 2h4" }),
+      );
+      break;
+    case "circle-alert":
+      // Lucide "circle-alert": the design canon's Status glyph, drawn here for
+      // the embed's unreadable-segment marker. Same shape the attachment toast
+      // draws through `host/lib/icons.ts`.
+      svg.append(
+        el("circle", { cx: "12", cy: "12", r: "10" }),
+        el("line", { x1: "12", y1: "8", x2: "12", y2: "12" }),
+        el("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" }),
       );
       break;
     case "file-warning":

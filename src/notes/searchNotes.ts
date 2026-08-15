@@ -11,6 +11,7 @@
 
 import { invoke } from "../platform/core";
 import type { NoteSearchResult } from "../types/note-search-result";
+import { parseEmbedAlias } from "@myne/dialect/embedLayout";
 
 /**
  * Full-text search the live in-RAM index. Resolves to an empty list when the
@@ -56,7 +57,16 @@ export type MatchSnippet = { before: string; match: string; after: string };
  *  may legitimately carry the searched filename). Display-only. */
 function cleanSnippetText(s: string): string {
   return s
-    .replace(/!?\[\[[^\]|]*\|([^\]]+)\]\]/g, "$1") // [[target|alias]] → alias
+    .replace(/!?\[\[[^\]|]*\|([^\]]+)\]\]/g, (_whole, alias: string) =>
+      // The alias is no longer the display name (myne#409): a form-C embed's
+      // alias is a `|`-separated list whose first segment is the filename, so
+      // the raw capture surfaced `photo.png|w=300|align=center|alt=A sunset` in
+      // a search excerpt. Route it through the one splitter rather than
+      // re-deriving the shape here, which is what four other consumers already
+      // do. An ordinary `[[note|alias]]` has no keyed segments, so the parse
+      // returns the alias unchanged and this stays correct for it too.
+      parseEmbedAlias(alias).filename,
+    )
     .replace(/!?\[\[([^\]]+)\]\]/g, "$1"); // [[target]] → target
 }
 
