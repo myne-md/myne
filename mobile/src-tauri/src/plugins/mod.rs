@@ -67,7 +67,7 @@ pub use myne_core::plugins::vault_creation;
 pub mod vault_delete;
 pub mod vault_indices;
 // Sealed label store (MYL1, §9.22): a thin re-export wrapper over
-// `myne_core::vault_label` — the device-local hide-vault-names option and the
+// `myne_core::vault_label`, the device-local hide-vault-names option and the
 // erase that turning it on performs (myne-md/myne#411). All THREE of desktop's
 // commands, including the keychain probe: on Android the store holds nothing
 // today and the probe is what lets the Privacy row say so.

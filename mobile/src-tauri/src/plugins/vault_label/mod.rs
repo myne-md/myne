@@ -1,4 +1,4 @@
-//! `vault_label` Tauri plugin (mobile shim) — the hide-vault-names option
+//! `vault_label` Tauri plugin (mobile shim): the hide-vault-names option
 //! (myne-md/myne#411).
 //!
 //! Owns the same three commands the desktop plugin does: `hide_vault_names`
@@ -37,11 +37,11 @@
 //! `permissions/vault-label/default.toml` (both the `[[permission]]` block and
 //! the `[default]` roster that names it), and `capabilities/default.json`.
 //! Missing any of the last three fails CLOSED at runtime on a device, which is
-//! exactly where it is most expensive to discover — `tests/hide-vault-names.test.ts`
+//! exactly where it is most expensive to discover. `tests/hide-vault-names.test.ts`
 //! compares all four.
 
 // The command bodies and their error enum live in `myne-core` (shared with the
-// desktop client — the `graph_layout` / `themes` re-export precedent).
+// desktop client, the `graph_layout` / `themes` re-export precedent).
 // Re-exported so `crate::plugins::vault_label::…` resolves like every other
 // shared plugin; the `init()` wiring stays mobile-side.
 #[allow(unused_imports)]

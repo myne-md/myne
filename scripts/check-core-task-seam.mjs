@@ -246,6 +246,11 @@ for (const file of files) {
     // resetting there ends the outer exemption at the inner helper's closing
     // brace, and everything after it in the test module is checked as
     // production code. The outer region already covers the inner item.
+    //
+    // No file in this tree has that shape today, and this clause changes no
+    // output here. It is carried because the io-seam guard, whose gate regex is
+    // broader, did hit it for real. Keeping the two trackers identical is worth
+    // more than trimming a clause that costs nothing.
     if (
       !skipping &&
       (/^\s*#\[cfg\(test\)\]/.test(line) ||
@@ -265,7 +270,23 @@ for (const file of files) {
       // for the whole rest of the file. Everything after `core/src/hooks.rs`'s
       // gated type aliases was silently unchecked. An item that ends in `;`
       // before any brace opened IS the whole item.
-      if (!sawBrace && /;\s*$/.test(line) && !/^\s*#\[/.test(line)) {
+      // The `;` test runs on the line with any trailing `//` comment stripped:
+      // `#[cfg(test)]` + `use std::fs; // test-only` otherwise fails the test,
+      // `sawBrace` stays false, and the exemption swallows the next production
+      // item whole. The merge-base guard had this hole too, so it is not a
+      // regression, but the #274 note above claims the `;` shape is covered and
+      // a guard whose stated coverage exceeds its real coverage is the thing
+      // root CLAUDE.md says costs more than no guard.
+      const code = line.replace(/\/\/.*$/, "");
+      if (!sawBrace && /;\s*$/.test(code) && !/^\s*#\[/.test(line)) {
+        skipping = false;
+        return;
+      }
+      // #411: a brace-less gated item closed by its ENCLOSING block, not by a
+      // `;`: a trailing `#[cfg(test)]` enum variant ends at the enum's `}`.
+      // Without this the exemption runs to end-of-file. The `;` arm above has
+      // covered the `use`/`type`/`mod x;` shapes since #274 and never this one.
+      if (!sawBrace && closes > 0) {
         skipping = false;
         return;
       }

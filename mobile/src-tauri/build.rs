@@ -224,7 +224,7 @@ fn main() {
                     .commands(&["graph_layout_read", "graph_layout_write"]),
             )
             .plugin(
-                // Sealed label store (MYL1, §9.22) — the device-local
+                // Sealed label store (MYL1, §9.22): the device-local
                 // hide-vault-names option (myne-md/myne#411): shared from
                 // `myne-core`; the same THREE commands the desktop registers, and
                 // all three are needed. The probe (`vault_label_keychain_status`)

@@ -326,6 +326,10 @@ const V = {
   "src/lib/vault-delete.ts": ["adapted", "Task 72 owns what deletion MEANS on a sync-required client; the binding itself is portable."],
   "src/lib/vault-migrate.ts": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration (#420) is a desktop flow (Class::Unsupported in web/wasm/src/capability.rs, like vault-creation): a browser client joins an already-current account over sync and never migrates. The binding is present but its command answers the typed refusal on web."],
   "src/lib/vault-export-errors.ts": ["ported", "Error copy shared with the note-level export that does ship."],
+  "src/lib/vault-label.ts": [
+    "adapted",
+    "Ships, and nothing on this client calls it. It is the shared half of the hide-vault-names row (myne-md/myne#411): the error narrowing, the notice mapping and the three `plugin:vault-label|...` wrappers. `PrivacyPanel` omits that row where `lockedVaultNames` is absent, which it is on web. The dispatcher answers `Unsupported` for the whole plugin to match: a page has no OS keychain to seal a name with, and no locked picker to show one on. It lives at this path rather than inside the panel so `scripts/check-twin-drift.mjs` can see its `mobile/src/lib/vault-label.ts` twin.",
+  ],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
   "src/lib/viewsEnabled.ts": ["ported", "Device-local Views feature toggle helper (localStorage); runs as written."],
   "src/lib/vault-recover.ts": [

@@ -26,7 +26,7 @@
 //! `localStorage`, and this is not one of them. Two reasons, and the second is
 //! the load-bearing one. It has a **host-side consequence** (a key destruction),
 //! which page-context code cannot perform. And it is a **security control**:
-//! `localStorage` is writable by anything running in the WebView (TB6), so a
+//! `localStorage` is writable by anything running in the WebView (TB2), so a
 //! flag stored there could be flipped back on by page-context code and the
 //! suppression it drives would be an honour system. The backend holds it, the
 //! backend enforces it.

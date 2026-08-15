@@ -10,7 +10,7 @@
 //
 // Every runner in this file executes natively and **inside a browser** (the
 // count used to be written out here and had drifted six runners behind before
-// anyone noticed — a hand-maintained number nothing executes is not a fact
+// anyone noticed. A hand-maintained number nothing executes is not a fact
 // about anything, the same reason `the_browser_lane_carries_every_category`
 // stopped carrying a row count). Cross-
 // implementation agreement is a property of compiled code on its execution
@@ -4723,7 +4723,7 @@ fn share_import_vectors() {
     }
 }
 
-/// `vault-label` (`MYL1`, §9.22) — the device-local sealed label store the
+/// `vault-label` (`MYL1`, §9.22): the device-local sealed label store the
 /// LOCKED vault picker reads a vault's name from (myne-md/myne#411).
 ///
 /// Structurally the `share-import` / `pending-capture` runner above plus the two
@@ -4736,9 +4736,9 @@ fn share_import_vectors() {
 ///   comparison before any key is touched; the *same* blob with its header
 ///   rewritten to claim the expected vault passes that comparison and is
 ///   refused by the AAD instead, collapsing to `CannotDecrypt`. The schema says
-///   the two MUST surface different outcomes — a port that only compares passes
+///   the two MUST surface different outcomes. A port that only compares passes
 ///   the first and fails the second, one that only binds reports the wrong error
-///   for the first — so this runner asserts the split directly (below), rather
+///   for the first, so this runner asserts the split directly (below), rather
 ///   than leaving it implied by two independent cases.
 /// * **Strict-trailing is enforced** (§10.3.1), so `trailing_bytes` is a named
 ///   reject rather than a tolerated tail, and `encode_fail` pins the write-side
@@ -4747,7 +4747,7 @@ fn share_import_vectors() {
 ///
 /// Every `parse_fail` fixture carries the **real** `wrap_key`. None of the
 /// corrupted header fields is AAD-bound, so a port that skips one of these
-/// checks decodes the fixture successfully — and this runner's exact-variant
+/// checks decodes the fixture successfully, and this runner's exact-variant
 /// assertion is what catches that. A dummy key would hide the same bug behind a
 /// coincidental `CannotDecrypt`.
 #[cfg_attr(not(target_arch = "wasm32"), test)]
@@ -4755,7 +4755,7 @@ fn share_import_vectors() {
 fn vault_label_vectors() {
     // vault_label_blob is NOT re-exported at the crate root (it is a `pub mod`
     // with no flattened `pub use`), so the codec items are imported via the full
-    // module path — same convention as capture_blob / quick_unlock_blob /
+    // module path, the same convention as capture_blob / quick_unlock_blob /
     // share_import_blob. `aad_vault_label_blob` is likewise absent from the
     // crate-root `pub use aead::{…}` block, for the same device-local reason.
     use protocol::aead::aad_vault_label_blob;
@@ -4784,8 +4784,18 @@ fn vault_label_vectors() {
     let mut seen_kinds = std::collections::HashSet::new();
     let mut seen_parse_errors = std::collections::HashSet::new();
     // The untouched-blob half of the cross-vault pin, kept for the derived
-    // relabelled-header check after the loop.
-    let mut cross_vault_pin: Option<(String, Vec<u8>, [u8; 16])> = None;
+    // relabelled-header check after the loop. The fixture's own wrap_key rides
+    // along because the derived half claims an AAD refusal, and only the REAL
+    // key can make that claim true: a dummy key fails the CTX check whatever
+    // the AAD binds, so the assertion would not be able to tell "the AAD
+    // refused" from "the key was wrong".
+    struct CrossVaultPin {
+        id: String,
+        blob: Vec<u8>,
+        expected_vault_id: [u8; 16],
+        wrap_key: [u8; 32],
+    }
+    let mut cross_vault_pin: Option<CrossVaultPin> = None;
 
     for case in cases {
         let id = case["vector_id"]
@@ -4805,7 +4815,7 @@ fn vault_label_vectors() {
                 let actual = match builder {
                     "aad_vault_label_blob" => aad_vault_label_blob(&vault_id),
                     other => {
-                        panic!("[{id}] unknown aad builder '{other}' — this family has exactly one")
+                        panic!("[{id}] unknown aad builder '{other}': this family has exactly one")
                     }
                 };
                 assert_eq!(
@@ -4849,7 +4859,7 @@ fn vault_label_vectors() {
                 let expected_variant = match expected_error {
                     "ciphertext_len_overflow" => VaultLabelBlobError::CiphertextLenOverflow,
                     other => panic!(
-                        "[{id}] unknown encode-side expected_error '{other}' — schema enforces enum; update this match arm in lockstep with VaultLabelBlobError"
+                        "[{id}] unknown encode-side expected_error '{other}': schema enforces enum; update this match arm in lockstep with VaultLabelBlobError"
                     ),
                 };
 
@@ -4859,7 +4869,7 @@ fn vault_label_vectors() {
                         "[{id}] expected encode_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
                     ),
                     Ok(blob) => panic!(
-                        "[{id}] expected encode_fail '{expected_error}', encode returned Ok ({} bytes) — an over-cap label was sealed (truncated?) instead of refused",
+                        "[{id}] expected encode_fail '{expected_error}', encode returned Ok ({} bytes). An over-cap label was sealed (truncated?) instead of refused",
                         blob.len()
                     ),
                 }
@@ -4925,29 +4935,34 @@ fn vault_label_vectors() {
                     "ciphertext_truncated" => VaultLabelBlobError::CiphertextTruncated,
                     "trailing_bytes" => VaultLabelBlobError::TrailingBytes,
                     other => panic!(
-                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with VaultLabelBlobError"
+                        "[{id}] unknown expected_error '{other}': schema enforces enum; update this match arm in lockstep with VaultLabelBlobError"
                     ),
                 };
 
                 match decode_vault_label_blob(&wrap_key, &vault_id, &blob) {
                     Err(e) if e == expected_variant => {}
                     Err(VaultLabelBlobError::CannotDecrypt) => panic!(
-                        "[{id}] expected the DISTINGUISHABLE structural reject '{expected_error}' ({expected_variant:?}), got CannotDecrypt — the decoder collapsed a pre-decryption check into the AEAD stage, which is the ordering bug these fixtures (real wrap_key, one corrupted field) exist to name"
+                        "[{id}] expected the DISTINGUISHABLE structural reject '{expected_error}' ({expected_variant:?}), got CannotDecrypt. The decoder collapsed a pre-decryption check into the AEAD stage, which is the ordering bug these fixtures (real wrap_key, one corrupted field) exist to name"
                     ),
                     Err(other) => panic!(
                         "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
                     ),
                     Ok(label) => panic!(
-                        "[{id}] expected parse_fail '{expected_error}', decode_vault_label_blob returned Ok ({} bytes) — a structural check was skipped",
+                        "[{id}] expected parse_fail '{expected_error}', decode_vault_label_blob returned Ok ({} bytes). A structural check was skipped",
                         label.len()
                     ),
                 }
 
                 if expected_error == "vault_id_mismatch" {
-                    cross_vault_pin = Some((id.to_string(), blob, vault_id));
+                    cross_vault_pin = Some(CrossVaultPin {
+                        id: id.to_string(),
+                        blob,
+                        expected_vault_id: vault_id,
+                        wrap_key,
+                    });
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}': schema enforces enum"),
         }
     }
 
@@ -4957,11 +4972,21 @@ fn vault_label_vectors() {
     // with its header relabelled MUST surface DIFFERENT outcomes. Derived here
     // from the `vault_id_mismatch` fixture rather than matched by vector_id, so
     // the assertion holds even if the companion's relabelled case is renamed or
-    // dropped — and so it is a claim about the codec, not about two case files
+    // dropped. It is therefore a claim about the codec, not about two case files
     // agreeing with each other.
-    let (pin_id, pin_blob, expected_vault_id) = cross_vault_pin
+    //
+    // Both halves run under the fixture's REAL wrap_key (every parse_fail case
+    // carries it, by schema), which is what makes the relabelled half's message
+    // true: with a dummy key CannotDecrypt would be the answer no matter what
+    // the AAD binds, so the assertion would prove only that the structural
+    // comparison had been passed.
+    let CrossVaultPin {
+        id: pin_id,
+        blob: pin_blob,
+        expected_vault_id,
+        wrap_key,
+    } = cross_vault_pin
         .expect("vault-label must carry the vault_id_mismatch fixture (required_parse_errors)");
-    let wrap_key: [u8; 32] = [0u8; 32]; // any key: neither outcome reaches a correct decrypt
     let untouched = decode_vault_label_blob(&wrap_key, &expected_vault_id, &pin_blob);
     assert_eq!(
         untouched,
@@ -4973,6 +4998,19 @@ fn vault_label_vectors() {
         pin_blob.len() >= VAULT_LABEL_BLOB_HEADER_LEN,
         "[{pin_id}] the vault_id_mismatch fixture must be a full-header blob for the relabelled half to be derivable"
     );
+
+    // The positive control, and the reason the relabelled half below can be
+    // ATTRIBUTED to the AAD at all. Read the same blob under the vault it was
+    // sealed for (the one its own header names) and it opens: the key is the
+    // right key and the ciphertext is intact. Everything that changes between
+    // here and the next assertion is the 16 header bytes and, through them, the
+    // AAD, so CannotDecrypt there has exactly one remaining cause.
+    let own_vault_id: [u8; 16] = pin_blob[5..21].try_into().expect("header vault_id");
+    assert!(
+        decode_vault_label_blob(&wrap_key, &own_vault_id, &pin_blob).is_ok(),
+        "[{pin_id}] the fixture's own wrap_key must OPEN its blob when read as the vault it was sealed for; without that the relabelled half below proves only that something refused"
+    );
+
     let mut relabelled = pin_blob.clone();
     relabelled[5..21].copy_from_slice(&expected_vault_id);
     let relabelled_outcome = decode_vault_label_blob(&wrap_key, &expected_vault_id, &relabelled);
@@ -4983,7 +5021,7 @@ fn vault_label_vectors() {
     );
     assert_ne!(
         untouched, relabelled_outcome,
-        "[{pin_id}] the two halves of the cross-vault pin collapsed to one outcome — a port that only compares, or only binds, would pass"
+        "[{pin_id}] the two halves of the cross-vault pin collapsed to one outcome. A port that only compares, or only binds, would pass"
     );
 
     for kind in [
@@ -4996,7 +5034,7 @@ fn vault_label_vectors() {
     ] {
         assert!(
             seen_kinds.contains(kind),
-            "vault-label missing every case of case_kind '{kind}' — coverage regression"
+            "vault-label missing every case of case_kind '{kind}': coverage regression"
         );
     }
     // One per `VaultLabelBlobError` DECODE variant. `CannotDecrypt` is the
@@ -5015,7 +5053,7 @@ fn vault_label_vectors() {
     for err in required_parse_errors {
         assert!(
             seen_parse_errors.contains(err),
-            "vault-label missing parse_fail coverage for VaultLabelBlobError '{err}' — every structural reject must be pinned"
+            "vault-label missing parse_fail coverage for VaultLabelBlobError '{err}': every structural reject must be pinned"
         );
     }
 }

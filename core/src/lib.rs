@@ -76,7 +76,7 @@ pub mod vault_id;
 /// three that make this crate host-independent, alongside [`host`] (paths, events,
 /// clock) and [`task`] (blocking execution, timers).
 pub mod vault_io;
-/// The sealed label store (`MYL1`, `protocol.md` §9.22) — the per-vault
+/// The sealed label store (`MYL1`, `protocol.md` §9.22): the per-vault
 /// keychain key and the device-local file that let the LOCKED picker show a
 /// vault's real name. Top-level rather than under `plugins/` because four
 /// flows consume it (unlock, rename, vault delete, the picker's list) and none

@@ -154,6 +154,21 @@ Most of `scripts/` is not tooling — it is the machine-checked half of the rule
 
 **Verifying a guard means breaking it, not running it.** Every guard above claims to catch something, and a guard that has never failed is a guard nobody has tested. Three consecutive reviews of one feature found a check that passed while the thing it checked was wrong — a matrix compared in one direction while the success line claimed two, a roster compared against a second copy of itself, a filter named in a test title and never exercised. In each case the check had just been *fixed*, and the fix was "verified" by the check passing afterwards, which proves nothing. **Inject the exact defect the guard now claims to catch, watch it name that defect, then restore.** It costs a minute and it is the only evidence that means anything.
 
+**Editing a guard is one of those changes, and the exemption logic is where it bites.** A guard fix
+verified by "the tree is still green afterwards" is the same non-evidence as any other, because a
+guard that has stopped checking is green by definition. myne-md/myne#411 corrected
+`check-core-io-seam.mjs`'s `#[cfg(test)]` tracker, ran the tree, saw green, and shipped a version
+that reported nothing for a production `std::fs::read` the pre-fix guard caught: closing one blind
+spot opened another, one line away. Both directions have to be injected, and the second one is the
+one nobody thinks to try: prove the guard still catches what it caught BEFORE, not only what it
+missed.
+
+**And when a test can assert either a return value or a state, assert the state.** The same feature's
+first plaintext-fallback test checked `expect_err` before walking the disk, which is the weaker fact:
+a fallback could report either result while the name sat on the medium. A failure message may not
+claim more than its inputs can prove either, which is why a cross-vault assertion run under an
+all-zero key cannot say "the AAD refused" when a wrong key would have failed identically.
+
 Two shared libraries sit under `scripts/lib/` and exist because the drift they prevent is invisible: `shared-roots.mjs` is the ONE roster of shared trees (each guard kept a private copy, and `check-i18n.mjs`'s never learned about `editor/`, `dialect/` or `copy/` — 226 live `i18n.t()` keys outside its scope), and `scanned-assets.mjs` inverts the artefact-scan filter so a guard **fails on an extension nobody classified** instead of skipping it (the four web greps read `.js`/`.css`/`.html` and never opened the 1.2 MB `.mjs` chunk or the 3.9 MB `.wasm` the bundle actually ships).
 
 Not gated anywhere and run by hand: `check-web-no-ip-logging.sh` (asserts the web container logs no client IP — the "no persistent server-side IP logging" commitment; a page load on that origin is a vault opening), `check-macos-dmg.mjs` (needs a built artifact and a Mac to mount it; the Linux runner has neither, so it belongs to the release runbook rather than the pipeline) and `check-i18n-stale.mjs` (finds translations whose **English source was rewritten after them** — the key exists, the value is non-empty, the placeholders match, and only the meaning is old, so no other check and no reviewer sees it; it walks the full history of all 32 catalogs per key, which is minutes rather than a hook budget, and it reports rather than fails because a gate here would block every English copy edit). The rest of `scripts/` is tooling, not gates: `build-wasm.sh`, `emit-web-version.mjs`, the `e2e-*.sh` runners, `bench-web.mjs`, `browser-vectors.sh`, `capture-userguide.sh`, `capture-theme-preview.sh`, `clipper-dev-install.sh`.

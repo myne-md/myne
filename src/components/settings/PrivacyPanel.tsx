@@ -13,11 +13,19 @@
 // framework exists yet). TR strings ("Otomatik kilit" / "Bu kadar
 // hareketsizlik sonrası kasayı kilitle.") await an app-wide i18n layer.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
+import {
+  hideNamesWriteNotice,
+  hideVaultNamesErrorKind,
+  readHideVaultNames,
+  readKeychainStatus,
+  setHideVaultNames,
+  type HideNamesNotice,
+  type KeychainStatus,
+} from "../../lib/vault-label";
 import { has } from "../../platform/capabilities";
-import { invoke } from "../../platform/core";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
@@ -152,75 +160,9 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
 // a disabled control would strand a user whose keychain disappeared after they
 // turned it on.
 
-/** Mirrors `myne_core::vault_label::commands::HideVaultNamesView`. */
-interface HideVaultNamesView {
-  /** `true` when vault names are hidden on this device. */
-  hidden: boolean;
-}
-
-/** Mirrors `myne_core::vault_label::commands::KeychainStatusView`. */
-interface KeychainStatusView {
-  /** `true` when the device keychain answered, whether or not it holds anything. */
-  available: boolean;
-}
-
-/** Mirrors `myne_core::vault_label::commands::HideVaultNamesError`'s `kind` tag. */
-export type HideVaultNamesErrorKind =
-  | "Io"
-  | "Parse"
-  | "KeychainUnavailable"
-  | "EraseIncomplete";
-
-/** Narrow an unknown thrown value to the backend error's `kind` tag. */
-export function hideVaultNamesErrorKind(e: unknown): HideVaultNamesErrorKind | null {
-  const kind = (e as { kind?: unknown } | null)?.kind;
-  return kind === "Io" ||
-    kind === "Parse" ||
-    kind === "KeychainUnavailable" ||
-    kind === "EraseIncomplete"
-    ? kind
-    : null;
-}
-
-/**
- * What this device can do with vault names.
- *
- * Three values because a failed PROBE is not an unavailable KEYCHAIN. The
- * backend's unavailable case is a value (`{ available: false }`), never a
- * rejection, so a rejection means the question was not answered: a dev context
- * with no host, a client that has not ported the command. Reading that as
- * "unavailable" would put a false explanation on screen and, worse, would be
- * the shape a plaintext fallback later hides behind.
- */
-type KeychainStatus = "available" | "unavailable" | "unknown";
-
-/**
- * Which notice is on screen. A discriminant rather than a resolved i18n key so
- * every `t()` call below stays a literal. `scripts/check-i18n.mjs` only sees
- * static ones, and a key it cannot see is a key nothing checks.
- */
-type HideNamesNotice = "read" | "save" | "erase";
-
-/**
- * The notice a failed write leaves on screen.
- *
- * `EraseIncomplete` gets its own line because the backend erases FIRST and
- * persists second: a key that survived the sweep means the flag was deliberately
- * not written, so the row still reads "shown" and that is the truth. Collapsing
- * it into a generic save failure would drop the one fact the user needs, which
- * is that the names are still readable.
- *
- * `KeychainUnavailable` is deliberately absent from the return type: it is not a
- * transient failure to report and retry, it is the device's standing state, and
- * the row already carries a line for it.
- */
-export function hideNamesWriteNotice(
-  kind: HideVaultNamesErrorKind | null,
-): HideNamesNotice | null {
-  if (kind === "KeychainUnavailable") return null;
-  if (kind === "EraseIncomplete") return "erase";
-  return "save";
-}
+// The types, the error narrowing and the three command wrappers live in
+// `src/lib/vault-label.ts`, at the same relative path as their mobile twin, so
+// `scripts/check-twin-drift.mjs` can see the pair.
 
 /** The two bound sentences, stacked. Token-valued throughout. */
 const DISCLOSURE_STYLE: CSSProperties = {
@@ -236,42 +178,45 @@ function HideVaultNamesRow() {
   const [notice, setNotice] = useState<HideNamesNotice | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // The mount reads and a toggle's write are UNORDERED, and `alive` does not
+  // order them: it only says the row is still on screen. A mount read that
+  // resolves after a write has landed would call `setHidden` with the value
+  // from before the write and flip the switch back on its own, which misreports
+  // whether a destructive erase took effect. Once a write has started the mount
+  // reads describe a state that no longer exists, so they are dropped.
+  const writeStartedRef = useRef(false);
+
   // Two independent questions, asked independently: whether names are hidden,
   // and whether this device could store one at all. They fail apart: names can
   // be hidden on a device with a keychain and shown on one without.
   useEffect(() => {
     let alive = true;
-    void invoke<HideVaultNamesView>("plugin:vault-label|hide_vault_names")
-      .then((view) => {
-        if (alive) setHidden(view.hidden);
+    const superseded = () => !alive || writeStartedRef.current;
+    void readHideVaultNames()
+      .then((next) => {
+        if (!superseded()) setHidden(next);
       })
       .catch(() => {
         // Do not assert a position we could not read.
-        if (alive) setNotice("read");
+        if (!superseded()) setNotice("read");
       });
-    void invoke<KeychainStatusView>("plugin:vault-label|vault_label_keychain_status")
-      .then((view) => {
-        if (alive) setKeychain(view.available ? "available" : "unavailable");
-      })
-      .catch(() => {
-        // A rejection is "the question went unanswered", NOT "unavailable":
-        // the unavailable case arrives as a value and never as an error.
-        if (alive) setKeychain("unknown");
-      });
+    // A rejection resolves to "unknown" inside `readKeychainStatus`, never to
+    // "unavailable": the unavailable case arrives as a value and never as an
+    // error, so a rejection means the question went unanswered.
+    void readKeychainStatus().then((next) => {
+      if (!superseded()) setKeychain(next);
+    });
     return () => {
       alive = false;
     };
   }, []);
 
   const toggle = async (next: boolean) => {
+    writeStartedRef.current = true;
     setNotice(null);
     setBusy(true);
     try {
-      const view = await invoke<HideVaultNamesView>(
-        "plugin:vault-label|set_hide_vault_names",
-        { hidden: next },
-      );
-      setHidden(view.hidden);
+      setHidden(await setHideVaultNames(next));
     } catch (e) {
       const kind = hideVaultNamesErrorKind(e);
       setNotice(hideNamesWriteNotice(kind));
@@ -282,8 +227,8 @@ function HideVaultNamesRow() {
       // Re-read rather than guess which way the switch should land. The erase
       // runs BEFORE the flag is persisted, so a failed write leaves the flag
       // wherever it already was while the keys may already be gone.
-      await invoke<HideVaultNamesView>("plugin:vault-label|hide_vault_names")
-        .then((view) => setHidden(view.hidden))
+      await readHideVaultNames()
+        .then(setHidden)
         .catch(() => {
           /* the notice already says the attempt failed */
         });
