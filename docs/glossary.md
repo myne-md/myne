@@ -1788,6 +1788,12 @@ The value a [`remind`](#remind) field carries: a date, optionally with a wall-cl
 
 Used in: `spec/markdown-dialect.md` §3.8.3; `decisions.md` 2026-07-28
 
+### **reference build environment** &nbsp; 🛠️ *Tooling*
+
+The build environment a published hash is defined against, so that "reproducible" names a property someone can actually check. For the web bundle it is a **`linux/amd64` container built from `web/container/Dockerfile`**, and the qualifier is load-bearing rather than pedantic: cargo hashes `rustc -vV` (whose `host:` line names the build machine's triple) into every crate's `-C metadata`, rustc folds that into `StableCrateId`, and symbol names then feed codegen-unit partitioning — so the same commit built on a different host architecture produces a different wasm artefact, and every content-hashed chunk importing it renames. Reaching the reference platform is not a privilege of matching hardware: an arm64 machine gets the byte-identical result through emulation (`docker buildx --platform linux/amd64`), which is what keeps the check available to every verifier rather than to whoever owns the right CPU. Distinct from building to **serve** — a self-hoster builds natively for their own architecture and needs no comparison, because they are their own code-delivery operator. See also [reproducible builds](#reproducible-builds).
+
+Used in: `web-bundle-hashes.md`; `self-host-web.md`; `decisions.md` 2026-08-15
+
 ### **rename journal** &nbsp; 📋 *Protocol*
 
 The empty `.rename-journal` marker file in a vault's notes directory that makes a [wikilink](#wikilink)-rename's multi-note rewrite **all-or-nothing**. A title rename rewrites the renamed note's own `.myn` blob plus every inbound `[[…]]`-bearing note; because a single per-blob atomic write is not collectively atomic across N blobs, the writer stages every updated blob to `<uuid>.myn.tmp`, writes the (content-free) marker, then commits every rename, then clears the marker. On the next vault-open — before the resolution index rebuilds — recovery rolls **forward** (marker present ⇒ rename all staged `.tmp` into place) or **back** (marker absent ⇒ delete orphan `.tmp`), so a crash mid-commit never leaves a half-renamed vault with broken title-keyed links. The marker carries no data (no UUIDs, no titles), is not a magic-byte format, and is excluded from backups; rolled-forward blobs are still AEAD/CTX-verified on read, so it adds no tamper surface. See also [wikilink](#wikilink), [wikilink chip](#wikilink-chip).
