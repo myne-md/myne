@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Thay đổi từ các thiết bị khác đến trong vài giây qua một tín hiệu không chứa nội dung — máy chủ chỉ chuyển tiếp “có gì đó đã thay đổi”, không bao giờ là nội dung gì. Khi kho lưu trữ của bạn được mở khóa, ứng dụng vẫn kiểm tra máy chủ thường xuyên, nên điều này không làm lộ thêm gì đáng kể; không có gì để cấu hình.",
       "realtimeSyncLabel": "Đồng bộ thời gian thực",
       "screenCaptureHelperOff": "Bảo vệ luôn được áp dụng trước khi mở khóa. Sau khi mở khóa, theo tùy chọn này.",
-      "screenCaptureHelperOn": "Hoạt động trên macOS và Windows 10 (Bản cập nhật tháng 5 năm 2020 trở lên). Hỗ trợ Linux sẽ có trong bản phát hành tương lai.",
+      "screenCaptureHelperOn": "Có hiệu lực trên Windows 10 (Bản cập nhật tháng 5 năm 2020) trở lên. macOS và Linux không có API hệ thống cho việc này, nên ở đó không thể chặn việc ghi màn hình.",
       "screenCaptureLabel": "Chống chụp màn hình",
       "screenCaptureSubtitle": "Chặn chụp màn hình và quay màn hình",
       "screenshotBlocked": "Chống chụp màn hình đang bật — ảnh chụp màn hình của Myne sẽ bị trống.",

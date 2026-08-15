@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Ändringar från andra enheter anländer inom sekunder via en innehållslös signal – servern förmedlar bara ”något ändrades”, aldrig vad. Medan ditt valv är upplåst kontrollerar appen ändå servern regelbundet, så detta ger ingen betydande insyn; det finns inget att konfigurera.",
       "realtimeSyncLabel": "Realtidssynkronisering",
       "screenCaptureHelperOff": "Skyddet gäller alltid före upplåsning. Efter upplåsning följs den här inställningen.",
-      "screenCaptureHelperOn": "Aktivt på macOS och Windows 10 (May 2020 Update eller senare). Stöd för Linux kommer i en framtida version.",
+      "screenCaptureHelperOn": "Fungerar på Windows 10 (May 2020 Update) och senare. macOS och Linux saknar system-API för detta, så där kan inspelning inte blockeras.",
       "screenCaptureLabel": "Skydd mot skärminspelning",
       "screenCaptureSubtitle": "Blockera skärmdumpar och skärminspelning",
       "screenshotBlocked": "Skärmskyddet är på — skärmdumpar av Myne blir tomma.",

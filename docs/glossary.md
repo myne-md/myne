@@ -1593,9 +1593,15 @@ A short piece of dictated note text captured on the native-SwiftUI Apple Watch c
 
 ### **platform seam** &nbsp; 📦 *Product*
 
-The single internal boundary through which the shared React UI reaches its host platform — `src/platform/`, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). Desktop's implementation re-exports Tauri; the web client's routes the same calls into a wasm Worker. No file under `src/` outside the seam may import `@tauri-apps/*`, and a `pre-commit` hook plus a CI step enforce it. The seam's whole purpose is that the two clients are the **same tree with one substitution**, which is also why a single **contract-test** suite — the [seam contract](#seam-contract) — runs against every implementation rather than each being tested on its own terms.
+The internal boundary through which a client's UI tree reaches its host platform, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). The shared tree's seam is `src/platform/`: desktop's implementation re-exports Tauri, the web client's routes the same calls into a wasm Worker, and that one substitution is what makes the two clients the **same tree** rather than two trees that resemble each other.
 
-Used in: `decisions.md` 2026-07-26 (web E2E policy); `src/platform/`
+Since myne#492 the rule is stated per guarded tree rather than for `src/` alone, and `scripts/check-platform-seam.mjs` enforces it over **eight** roots in `pre-commit` and in CI. Two of them are Tauri hosts and get a seam directory of their own: `src` (`src/platform/`) and `mobile/src` (`mobile/src/platform/`, six modules). The other six get the strictest form, no seam directory at all, so `@tauri-apps/*` is banned outright: `editor/`, `dialect/`, `copy/`, `ornaments/`, `preview/` and `web/src`. The reason is not that those trees have no Tauri consumer, it is that not **every** consumer is one, and a module-scope import lands in a non-Tauri consumer's bundle whether or not the call ever fires.
+
+Mobile's seam is not a substitution point: mobile is a Tauri host on both of its targets, so there is nothing to substitute. It exists to give the guard a boundary to enforce and to keep the twin modules under `mobile/src/lib` byte-identical to their desktop counterparts, which is how a fix reaches both clients. `mobile/src/formfactor/` is a **different** thing that used to share the name: the iOS-versus-Android and phone-versus-tablet PRESENTATION split (see [size class](#size-class)), renamed out of the way so `<tree>/platform/` means one thing in all three clients.
+
+The seam is meant to be pinned by a single contract suite rather than each implementation being tested on its own terms: see [seam contract](#seam-contract), including which implementations it covers today.
+
+Used in: `decisions.md` 2026-07-26 (web E2E policy); `src/platform/`; `mobile/src/platform/`; `web/src/platform/`; `scripts/check-platform-seam.mjs`
 
 ### **plausibly-deniable encryption** &nbsp; ⚠️ *Threat*
 
@@ -1639,11 +1645,30 @@ Signal's post-quantum-augmented X3DH key-agreement protocol, with hybrid X25519 
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 
+### **prefs chokepoint** &nbsp; 🛠️ *Tooling*
+
+The single function each client routes every `vault.prefs` write through, so that the [prefs-changed nonce](#prefs-changed-nonce) is bumped by the write path itself rather than by the caller. Module-private, named `writePref`, one per client tree (`src/lib/prefs.ts` and `mobile/src/lib/prefs.ts`); a module holding one is a **prefs module**, which is also the set rule 2 of `scripts/check-prefs-nonce.mjs` exempts. It exists because the bump began life as an optional second line beside each setter and was forgotten in 31 of about 56 desktop setters (#251), silently dropping starred favourites and leaving an AI opt-in the open editor never saw. Mobile shipped the pre-#251 shape until myne-md/myne#486. The guard reads call shapes rather than behaviour, so it cannot tell that the chokepoint still bumps, or that it bumps only after the write resolves: the roster loops in `tests/lib/prefsBindings.test.ts` and `mobile/tests/prefs-nonce.test.ts` are the half that can.
+
+Used in: `scripts/check-prefs-nonce.mjs`; `src/lib/prefs.ts`; `mobile/src/lib/prefs.ts`
+
+### **prefs-changed nonce** &nbsp; 🛠️ *Tooling*
+
+> **Not `prefs_nonce`.** The on-disk `prefs_nonce` is the 192-bit **random** AEAD nonce at offset 6 of the `MYP1` header (`spec/protocol.md` §9.5.1), and it is a [nonce](#nonce) in the cryptographic sense: never reused, never predictable, never a counter. The thing this entry defines is a UI refresh signal that never leaves memory, and the code calls it the vault-prefs "changed" nonce for exactly that reason. Two different objects, one unfortunate word.
+
+A monotonic in-memory counter, one per client, advanced after a `vault.prefs` write resolves. It is the mechanism by which sibling `usePrefs` instances learn that a setting changed: each subscribes through `useSyncExternalStore` and re-reads the blob on an advance, so a settings surface and the editor behind it converge on disk truth without sharing state. Bumping it BEFORE the write resolves is a defect rather than an optimisation, because the re-read then races the write and can pull stale disk truth.
+
+**Two sources advance it, and the second is the one a reader will not guess.** The [prefs chokepoint](#prefs-chokepoint) advances it on every local write. The `PREFS_SYNC_APPLIED_EVENT` bridge advances it when the sync loop merges a REMOTE `vault.prefs` change onto disk (`src/screens/Editor.tsx`, `mobile/src/app/flows/EditorFlow.tsx`), which is the only advance with no local write behind it. `scripts/check-prefs-nonce.mjs` matches prefs command literals rather than `bumpPrefsNonce` call sites, so it does not police this and cannot.
+
+**The NOTIFY can be deferred; the counter cannot.** `withPrefsBatch(fn)` (`mobile/src/lib/prefsNonce.ts` and its byte-identical desktop twin `src/notes/prefsNonce.ts`) holds the subscriber notification for the duration of a multi-write user action and delivers one at the end. The counter still increments per write, so it stays monotonic and no subscriber observes a value that skipped a change. The suppression is module-wide rather than per-action, so a concurrent write elsewhere is deferred to the same end point (nothing is lost: subscribers re-read disk truth, not a diff), and a watchdog bounds the wait so a batched write that hangs cannot swallow notifications for the rest of the session. It exists because the awaits between a folder rename's four prefs writes defeat the module's microtask coalescing, which only collapses a synchronous burst. Today only mobile has a call site; the export is present on both twins so a fix reaches both clients, which is the invariant `decisions.md` 2026-08-15 (`clients/0497`) states.
+
+Used in: `src/notes/prefsNonce.ts`; `mobile/src/lib/prefsNonce.ts`; `scripts/check-prefs-nonce.mjs`
+
 ### **prefs_key** &nbsp; 🗝️ *Key/identifier*
 
 The 32-byte AEAD KEK encrypting `vault.prefs`. Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "prefs-key")` helper (`spec/protocol.md` §3.2 + §3.4 registry entry `"myne.v0.1 prefs-key"`). Never persisted; re-derived on each `vault_unlock` (in-pipeline) and on each `set_*` prefs writer call. Independent from `items_key` lineage by design — preserves prefs portability across the later epoch-rotation `items_key` evolution (`decisions.md` 2026-05-27 "Vault preferences blob: root_key-derived prefs_key").
 
 Used in: `spec/protocol.md` §3.4, §9.5; `decisions.md` 2026-05-27 "Vault preferences blob"
+
 ### **preview snapshot** &nbsp; 📦 *Product*
 
 The real Myne interface, captured as data: the editor's own DOM plus every CSS rule the app had loaded, taken from the running desktop client by `e2e/capture/theme-preview.capture.ts` and shipped as the source-consumed `@myne/preview` package. It is what every surface showing a person "how a theme looks" renders — the website's theme builder, the theme gallery, and the `myne-themes` card renderer — instead of the three separately hand-written mock UIs they used before.
@@ -1766,6 +1791,16 @@ Rules are **stored in canonical English and displayed localized**: a file carryi
 
 Used in: `spec/markdown-dialect.md` §3.8.3, §3.8.7; `decisions.md` 2026-07-28
 
+### **reference build environment** &nbsp; 🛠️ *Tooling*
+
+*(Aliases: reference platform.)*
+
+The build environment a published hash is defined against, so that "reproducible" names a property someone can actually check. For the web bundle it is a **`linux/amd64` container built from `web/container/Dockerfile`**, and the qualifier is load-bearing rather than pedantic: cargo hashes `rustc -vV` (whose `host:` line names the build machine's triple) into every crate's `-C metadata`, rustc folds that into `StableCrateId`, and symbol names then feed codegen-unit partitioning. So the same commit built on a different host architecture produces a different wasm artefact, and every content-hashed chunk importing it renames. Reaching the reference platform is not a privilege of matching hardware: an arm64 machine gets the byte-identical result through emulation (`docker buildx --platform linux/amd64`), which is what keeps the check available to every verifier rather than to whoever owns the right CPU. Distinct from building to **serve**: a self-hoster builds natively for their own architecture and needs no comparison, because they read the source themselves. Their users did not, so an instance other people rely on is built in the reference environment or its users are told no published row will match it.
+
+The scope is across hosts and **not yet across time**: the three base images in that Dockerfile are floating tags, so the environment can move under a row written before it moved. `web-bundle-hashes.md` records that residual beside the claim. See also [reproducible builds](#reproducible-builds).
+
+Used in: `web-bundle-hashes.md`; `self-host-web.md`; `decisions.md` 2026-08-15
+
 ### **reference link** &nbsp; 📦 *Product*
 
 A CommonMark link that names a [link reference definition](#link-reference-definition) instead of carrying its URL inline: full `[text][label]`, collapsed `[text][]` (label = the text), or shortcut `[label]`. Myne v0.1 recognizes and **renders** reference links — a usage whose label resolves against a definition shows its visible text as a link and its definition line hides off-cursor — while a dangling reference (no matching definition) stays plain text. Rendering is cursor-aware and byte-preserving (§6 C1); the canonical emit form for new links is the inline `[text](url)`, so reference links are recognized and rendered but **never emitted**. Distinguished from an inline link by the parse tree (a reference link has a `LinkLabel` child or no `URL`); resolution uses the shared collector, since the parser alone emits a node even for a broken full reference. See also [link reference definition](#link-reference-definition), [decoration layer](#decoration-layer).
@@ -1788,12 +1823,6 @@ The value a [`remind`](#remind) field carries: a date, optionally with a wall-cl
 
 Used in: `spec/markdown-dialect.md` §3.8.3; `decisions.md` 2026-07-28
 
-### **reference build environment** &nbsp; 🛠️ *Tooling*
-
-The build environment a published hash is defined against, so that "reproducible" names a property someone can actually check. For the web bundle it is a **`linux/amd64` container built from `web/container/Dockerfile`**, and the qualifier is load-bearing rather than pedantic: cargo hashes `rustc -vV` (whose `host:` line names the build machine's triple) into every crate's `-C metadata`, rustc folds that into `StableCrateId`, and symbol names then feed codegen-unit partitioning — so the same commit built on a different host architecture produces a different wasm artefact, and every content-hashed chunk importing it renames. Reaching the reference platform is not a privilege of matching hardware: an arm64 machine gets the byte-identical result through emulation (`docker buildx --platform linux/amd64`), which is what keeps the check available to every verifier rather than to whoever owns the right CPU. Distinct from building to **serve** — a self-hoster builds natively for their own architecture and needs no comparison, because they are their own code-delivery operator. See also [reproducible builds](#reproducible-builds).
-
-Used in: `web-bundle-hashes.md`; `self-host-web.md`; `decisions.md` 2026-08-15
-
 ### **rename journal** &nbsp; 📋 *Protocol*
 
 The empty `.rename-journal` marker file in a vault's notes directory that makes a [wikilink](#wikilink)-rename's multi-note rewrite **all-or-nothing**. A title rename rewrites the renamed note's own `.myn` blob plus every inbound `[[…]]`-bearing note; because a single per-blob atomic write is not collectively atomic across N blobs, the writer stages every updated blob to `<uuid>.myn.tmp`, writes the (content-free) marker, then commits every rename, then clears the marker. On the next vault-open — before the resolution index rebuilds — recovery rolls **forward** (marker present ⇒ rename all staged `.tmp` into place) or **back** (marker absent ⇒ delete orphan `.tmp`), so a crash mid-commit never leaves a half-renamed vault with broken title-keyed links. The marker carries no data (no UUIDs, no titles), is not a magic-byte format, and is excluded from backups; rolled-forward blobs are still AEAD/CTX-verified on read, so it adds no tamper surface. See also [wikilink](#wikilink), [wikilink chip](#wikilink-chip).
@@ -1802,7 +1831,9 @@ Used in: `spec/protocol.md` §9.12, §9.11.3; `decisions.md` 2026-06-13
 
 ### **reproducible builds** &nbsp; 🛠️ *Tooling*
 
-Build artifacts that can be regenerated bit-for-bit from public source code by independent third parties. Myne commits to reproducible builds for desktop (Tauri), web, and server binaries — feasible in months for Tauri (vs. ~10 person-years for Chromium-based Electron). Part of the compensating-controls plan in lieu of a paid third-party audit.
+Build artifacts that can be regenerated bit-for-bit from public source code by independent third parties. Part of the compensating-controls plan in lieu of a paid third-party audit.
+
+**Shipped for the web bundle and the server image; not for desktop.** The commitment used to be stated for all three, and `threat-model.md` §6 corrected that on 2026-08-15 (entry 0496) rather than leave a control the project does not have: desktop artifacts are built locally, are not reproducible, and with every `myne-md` repository private have no public source to be reproduced *from*. The web bundle's guarantee carries its own qualifier: it holds in a [reference build environment](#reference-build-environment), not on every host, because the build machine's target triple reaches the emitted wasm (entry 0498).
 
 Used in: `threat-model.md` §6
 Reference: https://reproducible-builds.org
@@ -1845,13 +1876,15 @@ Used in: `decisions.md` 2026-06-18; `agent-tooling/features/scheduled-local-back
 
 ### **screen-capture protection** &nbsp; 📦 *Product*
 
-Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (macOS `NSWindowSharingNone`, Windows `WDA_EXCLUDEFROMCAPTURE`). Platform support: macOS (all Tauri-supported versions), Windows 10 build 19041+. Unavailable on Linux v0.1.
+Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (Windows `WDA_EXCLUDEFROMCAPTURE`, macOS `NSWindowSharingNone`). **Effective on Windows 10 build 19041+ only.** The macOS call is still made but nothing is claimed for it — Apple documents `NSWindowSharingNone` as a legacy constant macOS no longer uses and states no public API exists for preventing screen capture. No Linux display server offers an application-requestable exclusion; on KDE Plasma 6.6+ and Hyprland 0.50+ the **user** can configure one as a window rule. `decisions.md` 2026-08-15 supersedes the macOS clause of 2026-05-27.
 
 Used in: `threat-model.md` §6, §7
 
 ### **seam contract** &nbsp; 🛠️ *Tooling*
 
-The one assertion suite that pins the behaviour of the [platform seam](#platform-seam) — call shape, error propagation, subscribe/unsubscribe lifecycle, and the typed *unsupported* outcome for every seam module — and is run against **every** implementation (the Tauri one and the web one) in **both** CI lanes (`tests/platform/seam-contract.ts`, driven by `tauri-seam.test.ts` / `web-seam.test.ts`). It exists because the reason the web client gets no mirror of the desktop E2E suite — "it is the same `src/` tree, only the seam differs" — is a *premise*, and an unverified premise is how a divergence ships; the contract turns it into a checked property. It also pins desktop seam behaviour, which nothing pinned before. See also [capability gating](#capability-gating), [single-tab lock](#single-tab-lock).
+The one assertion suite that pins the behaviour of the [platform seam](#platform-seam), meaning call shape, error propagation, subscribe/unsubscribe lifecycle, and the typed *unsupported* outcome for every seam module. It runs against the **desktop and web** implementations in **both** CI lanes (`tests/platform/seam-contract.ts`, driven by `tauri-seam.test.ts` / `web-seam.test.ts`). It exists because the reason the web client gets no mirror of the desktop E2E suite ("it is the same `src/` tree, only the seam differs") is a *premise*, and an unverified premise is how a divergence ships; the contract turns it into a checked property. It also pins desktop seam behaviour, which nothing pinned before. See also [capability gating](#capability-gating), [single-tab lock](#single-tab-lock).
+
+**Known gap, recorded rather than implied away.** The [platform seam](#platform-seam) got a third implementation in myne#492, `mobile/src/platform/`, and it has no contract driver: `tests/platform/` holds two subjects, not three. So the coverage claim above is exact and deliberately narrower than "every implementation", which is what this entry used to say while a third seam shipped outside it. The suite is already parameterised for a third subject (it takes a `supports` set), so closing the gap is a driver file rather than a redesign; until it lands, mobile's seam is verified by its own specs and by the twin-drift warning, not by this contract.
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
 
@@ -2010,7 +2043,7 @@ Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `web/src
 
 The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing). Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
 
-Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `mobile/src/platform/SizeClassContext.tsx`
+Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `mobile/src/formfactor/SizeClassContext.tsx`
 
 ### **skip (a recurring task)** &nbsp; 📦 *Product*
 

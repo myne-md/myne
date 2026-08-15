@@ -2946,7 +2946,7 @@
       "realtimeSyncHelper": "Le modifiche da altri dispositivi arrivano in pochi secondi tramite un segnale privo di contenuto — il server trasmette solo “qualcosa è cambiato”, mai cosa. Mentre la tua cassaforte è sbloccata l'app controlla comunque il server con regolarità, quindi questo non aggiunge alcuna visibilità significativa; non c'è nulla da configurare.",
       "realtimeSyncLabel": "Sincronizzazione in tempo reale",
       "screenCaptureHelperOff": "La protezione si applica sempre prima dello sblocco. Dopo lo sblocco, segue questa preferenza.",
-      "screenCaptureHelperOn": "Attiva su macOS e Windows 10 (aggiornamento di maggio 2020 o successivo). Il supporto per Linux arriverà in una versione futura.",
+      "screenCaptureHelperOn": "Attiva su Windows 10 (aggiornamento di maggio 2020) e versioni successive. macOS e Linux non offrono un’API di sistema per questo, quindi lì non può bloccare la cattura.",
       "screenCaptureLabel": "Protezione dalla cattura schermo",
       "screenCaptureSubtitle": "Blocca screenshot e registrazione dello schermo",
       "screenshotBlocked": "La protezione dello schermo è attiva — gli screenshot di Myne risultano vuoti.",

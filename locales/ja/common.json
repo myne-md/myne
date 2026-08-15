@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "他のデバイスからの変更は、内容を含まないシグナルによって数秒以内に届きます — サーバーが中継するのは「何かが変更された」ということだけで、その内容は決して中継しません。ボールトのロックが解除されている間、アプリはいずれにせよ定期的にサーバーを確認するため、これによって意味のある可視性が加わることはありません。設定する項目はありません。",
       "realtimeSyncLabel": "リアルタイム同期",
       "screenCaptureHelperOff": "保護はロック解除前には常に適用されます。ロック解除後はこの設定に従います。",
-      "screenCaptureHelperOn": "macOSおよびWindows 10（2020年5月更新以降）で有効です。Linuxは今後のリリースで対応予定です。",
+      "screenCaptureHelperOn": "Windows 10（2020年5月更新）以降で有効です。macOSとLinuxにはこのためのシステムAPIがないため、そこではキャプチャを防げません。",
       "screenCaptureLabel": "画面キャプチャ保護",
       "screenCaptureSubtitle": "スクリーンショットと画面録画をブロック",
       "screenshotBlocked": "画面キャプチャ保護がオンです — Myneのスクリーンショットは空白になります。",
