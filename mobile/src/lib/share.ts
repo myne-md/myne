@@ -1,7 +1,15 @@
 // Frontend half of the native file share/save bridge (MYND-475). Every mobile
-// export/download flow first writes its file to a reachable location (the app's
-// Documents directory, as before — so nothing regresses), then calls
-// `shareFile(path)` to offer the user a native destination chooser.
+// export/download flow first writes its file to the app's Documents directory,
+// then calls `shareFile(path)` to offer the user a native destination chooser.
+//
+// That directory is NOT browsable on either platform on a current OS, and the
+// comment here used to imply it was browsable on both. iOS declares no
+// `UIFileSharingEnabled`, so `Documents` is invisible in the Files app and this
+// share sheet is the user's only route to the file. Android's copy is
+// `Android/data/<pkg>/files/Documents`, which the system Files app has refused to
+// navigate into since API 30, and Android has no share sheet yet (below). Either
+// way the directory is excluded from platform cloud backup — myne-md/myne#491,
+// `backup_exclude.rs`.
 //
 // This emits `share-file` to the Rust setup hook (`src-tauri/src/lib.rs`), which
 // presents the platform share sheet on the main thread (iOS:
@@ -9,6 +17,12 @@
 // now, the file stays in Documents). Mirrors the fire-and-forget `emit`
 // contract of the PDF export path — the sheet appearing is the user feedback,
 // and the already-saved Documents copy means a cancel is never a silent no-op.
+//
+// The "never a silent no-op" half is weaker than it reads, on BOTH platforms:
+// the copy exists, and on neither platform can the user browse to it. On iOS a
+// cancelled sheet therefore leaves them without a reachable file while the toast
+// names `Documents/…` (myne-md/myne#504); on Android there is no sheet to cancel
+// and the same toast names the same unreachable place (myne-md/myne#505).
 
 import { emit } from "../platform/event";
 import { HAS_TAURI } from "./app-window";

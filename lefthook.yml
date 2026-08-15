@@ -121,6 +121,22 @@ pre-commit:
       # list may shrink, never grow.
       run: node scripts/check-unwired.mjs
 
+    mobile-export-backup:
+      # myne#491: the mobile client writes plaintext into a device-visible
+      # directory in four places (recovery phrase, vault markdown tree, note
+      # PDF, exported attachment) and both platforms back that directory up by
+      # default — a saved recovery phrase alone reconstructs the vault. The
+      # exclusion lives across a Rust module, two Android XML resources and a
+      # library manifest, so nothing compares them; this does, in both
+      # directions.
+      #
+      # Globbed, unlike the two unglobbed guards above it: every side of this
+      # property lives under mobile/, so a docs-only or protocol-only commit has
+      # nothing here to break. The `run:` takes no {staged_files} — the glob
+      # decides WHETHER it runs, and it still checks the whole tree when it does.
+      glob: "{mobile/**,scripts/check-mobile-export-backup.mjs}"
+      run: node scripts/check-mobile-export-backup.mjs
+
     token-adoption:
       glob: "{src,editor/src}/**/*.{ts,tsx,css}"
       # myne#394: a hardcoded visual value in an inline style is unreachable to

@@ -32,6 +32,11 @@ pub use myne_core::{
     vault_meta_hash, vault_registry,
 };
 
+// myne-md/myne#491: keep the plaintext export directory out of the platform's
+// automatic cloud backup. iOS does it at runtime (the module); Android does it
+// declaratively from the committed `android-widgets` manifest. Declared for both
+// so the setup hook has one unconditional call site.
+mod backup_exclude;
 mod hooks;
 #[cfg(target_os = "ios")]
 mod ios_chrome;
@@ -326,6 +331,17 @@ pub fn run() {
             #[cfg(target_os = "ios")]
             ios_chrome::suppress_keyboard_accessory_bar();
 
+            // myne-md/myne#491: exclude the plaintext export directory from the
+            // platform's automatic cloud backup, BEFORE any flow can write into
+            // it. Four flows put plaintext there (recovery phrase / account
+            // number, the whole-vault markdown tree, a note's PDF, an exported
+            // attachment) and iCloud Backup carried all four; a saved recovery
+            // phrase alone reconstructs the vault. Directory-level, so it covers
+            // future writers too. iOS does it here; Android carries the same
+            // property declaratively from the committed `android-widgets`
+            // manifest, so this is a no-op there. See `backup_exclude`.
+            backup_exclude::init(app.handle());
+
             // MYND-469: one-time secure-field layer splice, protection ON —
             // the pre-unlock always-ON invariant from before the first painted
             // frame. Setup runs inside the Ready dispatch AFTER the config
@@ -384,7 +400,7 @@ pub fn run() {
             }
 
             // Native file share/save (MYND-475). Export/download flows write the
-            // file to Documents (reachable, no regression) and then emit
+            // file to Documents (additive, no regression) and then emit
             // SHARE_FILE_EVENT with the path; present the platform share sheet
             // (iOS: UIActivityViewController → Save to Files) on the main thread
             // so the user can pick a destination. Android is a documented no-op.

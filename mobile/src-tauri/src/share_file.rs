@@ -3,10 +3,17 @@
 //! Save-As dialog, so every export/download flow historically wrote silently to
 //! the app's Documents directory with no way for the user to pick a destination
 //! (MYND-475). The Rust write still happens (the file always lands in Documents,
-//! reachable via the Files app — so this is purely ADDITIVE and never a
-//! regression), and afterwards the frontend emits [`SHARE_FILE_EVENT`] with the
-//! written path; the setup hook (`lib.rs`) listens and presents the platform
-//! "ask where to save" UI on the main thread.
+//! so this is purely ADDITIVE and never a regression), and afterwards the
+//! frontend emits [`SHARE_FILE_EVENT`] with the written path; the setup hook
+//! (`lib.rs`) listens and presents the platform "ask where to save" UI on the
+//! main thread.
+//!
+//! **That Documents copy is not equally useful on the two platforms**, and this
+//! header used to say it was ("reachable via the Files app"). iOS declares no
+//! `UIFileSharingEnabled`, so the directory is invisible in the Files app there
+//! and the sheet below is the user's only route to the file; Android exposes the
+//! directory but has no sheet (see below). The directory is excluded from
+//! platform cloud backup on both (myne-md/myne#491, `backup_exclude`).
 //!
 //! ## iOS
 //!
