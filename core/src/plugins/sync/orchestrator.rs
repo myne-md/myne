@@ -1918,6 +1918,14 @@ pub(crate) async fn sync_meta_phase(
     // edit-TIMING inference from push cadence; the marker carries no edit timing,
     // only "a credential changed and the server does not have it" — which the
     // immediate push at change time already revealed.
+    //
+    // The device-verification hold (myne#462) reaches this phase as
+    // `allow_push == false`, i.e. exactly like a poll cycle, and that is correct
+    // rather than incidental: a `vault.meta` PUT goes to its own endpoint, is not
+    // a manifest member, and authors no head — so it cannot move the fingerprint
+    // the eye-compare is reading. Stranding a credential rotation to protect a
+    // code it cannot affect would be the wrong trade, and the `dirty` arm keeps
+    // it moving.
     let may_push = allow_push || dirty;
 
     // Authed GET of THIS device's own server meta (no ?account=, not pre-auth).
@@ -2099,6 +2107,50 @@ pub(crate) async fn sync_meta_phase(
 /// conflict — by the time a push runs, `pull_to_stable` has already returned a
 /// stable page, so the cursor being persisted alongside is fully advanced and
 /// consistent with what the pull wrote to disk.
+/// What this cycle is allowed to push.
+///
+/// This replaced a bare `allow_push: bool` when the device-verification hold
+/// landed (myne#462), because the hold needs a state the bool could not express:
+/// **suppress content, but still author a genesis head.** Left as a bool, the
+/// hold would have re-broken the liveness fix of `decisions.md` 2026-07-12 — on a
+/// zero-note account nobody has ever pushed to, the genesis head is the only
+/// thing a joining device can adopt, and a device holding pushes for the compare
+/// would never author it, so the joiner's SAS would never appear and both screens
+/// would wait forever. That is a worse bug than the one being fixed, and it is
+/// invisible on any account that already has a head.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PushGate {
+    /// A push cycle: the coalescing window elapsed, or the caller asked for one
+    /// explicitly (`sync_now`).
+    Allowed,
+    /// A poll-driven pull-only cycle. Pushes are coalesced elsewhere; firing one
+    /// here would turn the poll cadence into an edit-timing channel (§8.3
+    /// resolution-blur).
+    PollOnly,
+    /// A push cycle running while a device-verification eye-compare is open on
+    /// this device (myne#462). Content is held so the vault head stands still
+    /// under the compare; genesis is not, for the liveness reason above.
+    VerifyHold,
+}
+
+impl PushGate {
+    /// May this cycle push content — notes, attachments, prefs, the catalog —
+    /// and therefore author a head over them?
+    pub fn allows_content(self) -> bool {
+        matches!(self, PushGate::Allowed)
+    }
+
+    /// May this cycle author the genesis head of an account that has none?
+    ///
+    /// True under a verify hold, deliberately. A genesis push is head-only over
+    /// an empty manifest: it commits nothing the user typed, it cannot move a
+    /// head that does not exist, and it is the very head the joining device is
+    /// waiting to adopt.
+    pub fn allows_genesis(self) -> bool {
+        matches!(self, PushGate::Allowed | PushGate::VerifyHold)
+    }
+}
+
 // The arguments are each a distinct, independent input to the cycle (the
 // transport, the two keys/ids, the token, the two paths, the push gate); bundling
 // them into a struct would not aid clarity at this single orchestrator entry.
@@ -2112,7 +2164,7 @@ pub async fn run_sync_cycle(
     token: &str,
     notes_dir: &Path,
     vault_root: &Path,
-    allow_push: bool,
+    gate: PushGate,
     // The vault's generation, resolved from the SAME `vault.meta` parse that
     // produced `account_number_hash` (`cycle::cycle_account_number_hash`), so the
     // two cannot disagree. Every singleton phase derives its KEK under it: a
@@ -2187,7 +2239,7 @@ pub async fn run_sync_cycle(
             token,
             notes_dir,
             vault_root,
-            allow_push,
+            gate,
             version,
             attachment_keys,
             &mut state,
@@ -2204,8 +2256,15 @@ pub async fn run_sync_cycle(
                 // meta hiccup must not fail a cycle that already synced notes; it
                 // mutates `state.meta_baseline_hex` (persisted just below) and does
                 // its own vault.meta write / dirty-marker clear.
-                let meta_outcome =
-                    sync_meta_phase(io, transport, token, vault_root, &mut state, allow_push).await;
+                let meta_outcome = sync_meta_phase(
+                    io,
+                    transport,
+                    token,
+                    vault_root,
+                    &mut state,
+                    gate.allows_content(),
+                )
+                .await;
                 summary.credential_ambiguous =
                     meta_outcome == MetaPhaseOutcome::CredentialAmbiguous;
                 // Persist the advanced cursor + per-blob CAS state + meta baseline
@@ -2242,7 +2301,7 @@ async fn sync_cycle_attempt(
     token: &str,
     notes_dir: &Path,
     vault_root: &Path,
-    allow_push: bool,
+    gate: PushGate,
     // The vault's generation, resolved from the SAME `vault.meta` parse that
     // produced `account_number_hash` (`cycle::cycle_account_number_hash`), so the
     // two cannot disagree. Every singleton phase derives its KEK under it: a
@@ -2940,7 +2999,7 @@ async fn sync_cycle_attempt(
     // cycle pushes — read at the push-result recording below, in place of the
     // `Vec::new()` a `MY01` blob records. Keyed by note id.
     let mut nc05_push_heads: HashMap<[u8; 16], Vec<String>> = HashMap::new();
-    if allow_push {
+    if gate.allows_content() {
         for (id, nonce) in &local2 {
             let id_hex = hex(id);
             let nonce_hex = hex(nonce);
@@ -3228,7 +3287,7 @@ async fn sync_cycle_attempt(
     // durably stored (SYNC-5 blobs-first-then-head, extended to attachments).
     let mut attachments_pushed = 0usize;
     let mut pushed_att_tombstones: HashSet<[u8; 32]> = HashSet::new();
-    if allow_push {
+    if gate.allows_content() {
         if let Some(_keys) = attachment_keys {
             let cid = cat_id.expect("cat_id set whenever attachment_keys is Some");
             // No post-pull rescan: the pull loop maintained `att_scan` in
@@ -3401,7 +3460,21 @@ async fn sync_cycle_attempt(
     // would leave the vault head unopenable — and this device's own sync
     // wedged — until the user happens to type something.
     let rebasing = page.unverifiable_head_id.is_some();
-    if !to_push.is_empty() || (allow_push && page.head.is_none()) || rebasing {
+    // The genesis carve-out is the §6.1 GENESIS-ON-EMPTY push, and `local2` being
+    // empty is what makes that true rather than merely intended.
+    //
+    // Without the corpus check the exemption was strictly wider than the spec
+    // bullet it implements: a device with notes on disk and no head yet (account
+    // created, corpus written, the first coalesced push not yet due) would, DURING
+    // a compare, publish a `vault-head-mac`-authenticated head whose
+    // `manifest_hash` is taken from `local2` while `to_push` is empty, because
+    // both content blocks sit behind `gate.allows_content()`. That head commits
+    // `content_nonce`s for blobs the server does not hold, which is the SYNC-5
+    // ordering this very function states as its invariant a few lines down, and a
+    // peer pulling in that window cannot tell an over-claiming author from a
+    // withholding server. The joining device pulls in exactly that window.
+    let genesis_on_empty = gate.allows_genesis() && page.head.is_none() && local2.is_empty();
+    if !to_push.is_empty() || genesis_on_empty || rebasing {
         // Author a linear-advance head over the current (post-pull) head: bump
         // this device's VV component, seq+1, parent = the server's current head
         // (genesis = the zero prev the server's first-head CAS expects).
@@ -3770,6 +3843,11 @@ mod tests {
         token: &str,
         notes_dir: &Path,
         vault_root: &Path,
+        // Still a bool here, and converted below. The ~80 existing scenarios say
+        // "this is a push cycle" / "this is a poll cycle" and mean exactly that;
+        // rewriting each to name a `PushGate` would be churn with no reader
+        // benefit. The gate's third state (`VerifyHold`) is exercised by its own
+        // tests, which call `run_sync_cycle` directly.
         allow_push: bool,
     ) -> Result<SyncSummary, SyncCycleError> {
         blocking(run_sync_cycle(
@@ -3781,7 +3859,11 @@ mod tests {
             token,
             notes_dir,
             vault_root,
-            allow_push,
+            if allow_push {
+                PushGate::Allowed
+            } else {
+                PushGate::PollOnly
+            },
             MetaVersion::V0_1,
             None,
         ))
@@ -5637,6 +5719,244 @@ mod tests {
         std::fs::remove_dir_all(&dir_b).ok();
     }
 
+    /// myne#462, the half that fixes the bug: while a device-verification
+    /// eye-compare is open, a cycle with local changes authors **no head**, so
+    /// the fingerprint both screens are reading stands still.
+    ///
+    /// Asserted as state, not as a return value: the return could report
+    /// "nothing pushed" for several unrelated reasons, whereas `vv_log.last()`
+    /// is literally what `sync_head_fingerprint` reads, so pinning it pins the
+    /// displayed code.
+    #[test]
+    fn a_verify_hold_cycle_authors_no_head() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP a_verify_hold_cycle_authors_no_head: myne-server binary not found");
+            return;
+        };
+        let root_key = [0x71u8; 32];
+        let account_hash = [0x72u8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x15u8; 32];
+        let items_key_id = [0x39u8; 16];
+
+        let dir = std::env::temp_dir().join(format!("myne-hold-{}", std::process::id()));
+        let notes = dir.join("notes");
+        std::fs::create_dir_all(&notes).unwrap();
+
+        let (t, dev, tok) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            true,
+        );
+
+        // A first ordinary cycle so the account HAS a head — the genesis case is
+        // the sibling test below, and conflating the two would let either pass
+        // for the other's reason.
+        let first = NoteId::new_v7();
+        write_note(&notes, &items_key, &items_key_id, &first, b"one", false);
+        run_cycle_legacy(
+            t.as_ref(),
+            &root_key,
+            account_hash,
+            dev,
+            &tok,
+            &notes,
+            &dir,
+            true,
+        )
+        .expect("the seeding cycle");
+        let before = read_sync_state(&dir)
+            .unwrap()
+            .vv_log
+            .last()
+            .cloned()
+            .expect("a head after the seeding cycle");
+
+        // Now the ceremony is open, and the user edits (or an autosave fires).
+        let second = NoteId::new_v7();
+        write_note(&notes, &items_key, &items_key_id, &second, b"two", false);
+        let held = blocking(run_sync_cycle(
+            &IO,
+            t.as_ref(),
+            &root_key,
+            account_hash,
+            dev,
+            &tok,
+            &notes,
+            &dir,
+            PushGate::VerifyHold,
+            MetaVersion::V0_1,
+            None,
+        ))
+        .expect("the held cycle still runs");
+        assert_eq!(held.pushed, 0, "a held cycle pushes no content");
+        assert!(!held.head_advanced, "a held cycle authors no head");
+
+        let after = read_sync_state(&dir)
+            .unwrap()
+            .vv_log
+            .last()
+            .cloned()
+            .expect("the observation survives the held cycle");
+        assert_eq!(
+            after.head_id_hex, before.head_id_hex,
+            "the head the SAS is derived from must not move under the compare"
+        );
+
+        // And the edit is not lost — the very next unheld cycle pushes it.
+        let released = run_cycle_legacy(
+            t.as_ref(),
+            &root_key,
+            account_hash,
+            dev,
+            &tok,
+            &notes,
+            &dir,
+            true,
+        )
+        .expect("the cycle after the compare closed");
+        assert_eq!(released.pushed, 1, "the held edit flushes once released");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// myne#462's liveness carve-out, and the reason `PushGate` is an enum
+    /// rather than a second bool.
+    ///
+    /// On an account nobody has ever pushed to, the genesis head is the only
+    /// thing a joining device can adopt — and without an adopted head its SAS
+    /// never appears at all (`decisions.md` 2026-07-12, and
+    /// `empty_vault_authors_genesis_head_so_joiner_sees_sas` above). A hold that
+    /// suppressed *every* push would therefore hang both screens forever on
+    /// exactly the accounts where the ceremony matters most: brand new ones.
+    /// That is a worse bug than the one the hold fixes, and it is invisible on
+    /// any account that already has a head.
+    #[test]
+    fn a_verify_hold_still_authors_the_genesis_head() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP a_verify_hold_still_authors_the_genesis_head: server binary not found");
+            return;
+        };
+        let root_key = [0x73u8; 32];
+        let account_hash = [0x74u8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+
+        let dir = std::env::temp_dir().join(format!("myne-holdgen-{}", std::process::id()));
+        let notes = dir.join("notes");
+        std::fs::create_dir_all(&notes).unwrap(); // EMPTY — nothing to push
+
+        let (t, dev, tok) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3",
+            true,
+        );
+
+        let held = blocking(run_sync_cycle(
+            &IO,
+            t.as_ref(),
+            &root_key,
+            account_hash,
+            dev,
+            &tok,
+            &notes,
+            &dir,
+            PushGate::VerifyHold,
+            MetaVersion::V0_1,
+            None,
+        ))
+        .expect("the held first cycle");
+        assert!(
+            held.head_advanced,
+            "genesis must still be authored under a verify hold, or a joining \
+             device on a fresh account never adopts a head and its SAS never appears"
+        );
+        assert_eq!(held.pushed, 0, "genesis is head-only — no blobs");
+        assert!(
+            read_sync_state(&dir).unwrap().vv_log.last().is_some(),
+            "the genesis observation is recorded, so a fingerprint exists to compare"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The genesis carve-out is genesis-ON-EMPTY, and a non-empty corpus is not
+    /// it.
+    ///
+    /// The condition used to be `gate.allows_genesis() && page.head.is_none()`
+    /// with no look at the corpus, which is strictly wider than the §6.1 bullet
+    /// it implements ("A device with zero content blobs ... a head-only push").
+    /// A device with notes on disk and no head yet would, under a compare,
+    /// author a head whose `manifest_hash` comes from the full local manifest
+    /// while `to_push` is empty, because both content blocks sit behind
+    /// `gate.allows_content()`. That head commits `content_nonce`s for blobs the
+    /// server does not hold, which inverts the SYNC-5 ordering this function
+    /// states as its own invariant, and a peer pulling in that window cannot
+    /// tell an over-claiming author from a withholding server.
+    #[test]
+    fn a_verify_hold_does_not_author_genesis_over_a_non_empty_corpus() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!(
+                "SKIP a_verify_hold_does_not_author_genesis_over_a_non_empty_corpus: \
+                 server binary not found"
+            );
+            return;
+        };
+        let root_key = [0x75u8; 32];
+        let account_hash = [0x76u8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+
+        let dir = std::env::temp_dir().join(format!("myne-holdgen2-{}", std::process::id()));
+        let notes = dir.join("notes");
+        std::fs::create_dir_all(&notes).unwrap();
+        // NOT empty: one local note, never pushed. This is the whole difference
+        // from the sibling test above.
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let only = NoteId::new_v7();
+        write_note(
+            &notes,
+            &items_key,
+            &items_key_id,
+            &only,
+            b"local only",
+            false,
+        );
+
+        let (t, dev, tok) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+            true,
+        );
+
+        let held = blocking(run_sync_cycle(
+            &IO,
+            t.as_ref(),
+            &root_key,
+            account_hash,
+            dev,
+            &tok,
+            &notes,
+            &dir,
+            PushGate::VerifyHold,
+            MetaVersion::V0_1,
+            None,
+        ))
+        .expect("the held first cycle");
+        assert_eq!(held.pushed, 0, "content is held, as it must be");
+        assert!(
+            !held.head_advanced,
+            "a head authored here would commit a manifest the server cannot serve"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
     /// Regression: a device that holds the account's blobs locally but whose
     /// synced baseline (`state.blobs`) was lost — the chunked push-response parse
     /// bug left it empty even though the server stored the blobs — must SELF-HEAL
@@ -7468,7 +7788,7 @@ mod tests {
             token,
             &vault_root.join("notes"),
             vault_root,
-            true,
+            PushGate::Allowed,
             MetaVersion::V0_1,
             Some(AttachmentKeys {
                 items_key,

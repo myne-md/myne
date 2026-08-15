@@ -1039,9 +1039,22 @@ impl ChatMessageDto {
 /// each channel send, so a lock mid-generation never emits into a torn-down
 /// transcript.
 ///
-/// Local-only, no network. Plaintext (question, history, chunk texts, tokens)
-/// never hits disk or log (DENY-list); the question is `Zeroizing`-wrapped. AI
-/// off (store not enabled) → empty answer, no model call (mirrors [`ask`]).
+/// **Not local-only, and this doc used to say it was.** That claim has been
+/// false since the remote arm shipped (#414 / #415):
+/// `engine_for(RequestClass::UserInitiated)` can resolve to a named provider,
+/// and then this call sends the framed question, grounded on note text, off the
+/// device. The guarantee is the narrower, true one: no byte leaves the device
+/// unless the user has named a provider, consented and stored a key, which the
+/// host re-reads on every call (`RemoteEngine::ready`). The frontend half of
+/// this same call carries the identical correction (`src/lib/ai-chat.ts`);
+/// fixing one side and leaving the other is how the next reader of the backend
+/// gets told the path cannot egress.
+///
+/// Plaintext (question, history, chunk texts, tokens) never hits disk or log
+/// (DENY-list); the question is `Zeroizing`-wrapped. A vector store that is not
+/// enabled is a typed [`EngineError::NotReady`] rather than an empty answer: an
+/// empty answer renders "try rephrasing", and no rephrasing fixes an index that
+/// has not been built yet.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)] // Tauri State/Channel injections, not a design smell
 pub async fn chat_stream<R: Runtime>(
@@ -1084,6 +1097,25 @@ pub async fn chat_stream<R: Runtime>(
     let cancel = cancel_guard.token().clone();
     let request_cancel = cancel_guard.request_cancel();
 
+    // 0. Refuse BEFORE embedding, because the refusal's copy says "Nothing was
+    //    sent anywhere" and that has to be true.
+    //
+    //    `embedding_engine()` refuses only `BackendClass::Remote`; it returns
+    //    the active LoopbackLocal arm, which is what answers whenever a
+    //    device-local runtime endpoint is configured. So with an Ollama
+    //    endpoint set and the embed-on-unlock pass not yet finished, embedding
+    //    first sent the user's question over loopback to a daemon Myne does not
+    //    ship (threat-model TB12: separately distributed, unsigned by Myne,
+    //    absent from `Cargo.lock`, reachable by A16's unprivileged same-machine
+    //    peer) and only then returned `NotReady`, whose sentence denies it.
+    //
+    //    The check at step 2 stays where it is: it holds the lock across the
+    //    check and the scan, which is what makes "enabled" true for the
+    //    retrieval that follows. This one is an early exit, not a replacement.
+    if !vector_state.lock().is_enabled() {
+        return Err(EngineError::NotReady);
+    }
+
     // 1. Embed the question off the async thread.
     let query_vec = {
         let engine = Arc::clone(&engine);
@@ -1095,15 +1127,20 @@ pub async fn chat_stream<R: Runtime>(
 
     // 2. Retrieve top-k (sync scan; host-side opt-in + excluded-folder gates, so
     //    a compromised WebView cannot ground on a disabled feature / excluded
-    //    note — SYNC-14). AI off → empty answer, no model call.
+    //    note — SYNC-14). The store is off → a typed refusal, NOT an empty
+    //    answer (myne-md/myne#466).
+    //
+    //    This used to return `Ok(AskResult { answer: "" })`. An empty successful
+    //    turn is exactly what renders "No answer — try rephrasing", so a user
+    //    whose index had not been built yet was told their WORDING was the
+    //    problem, and rewording could never fix it. The store only becomes
+    //    enabled inside the embed-on-unlock pass (`hydrate.rs`'s
+    //    `set_policy(true, …)`), so "not enabled" means the index is not ready —
+    //    a state, not an answer. `NotReady` says so and names the next step.
     let hits = {
         let store = vector_state.lock();
         if !store.is_enabled() {
-            return Ok(AskResult {
-                answer: String::new(),
-                sources: Vec::new(),
-                served_by: served_by_of(&engine_state),
-            });
+            return Err(EngineError::NotReady);
         }
         retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
     };
@@ -1530,6 +1567,44 @@ mod tests {
         tokio::runtime::Builder::new_current_thread()
             .build()
             .expect("current-thread runtime")
+    }
+
+    /// The `NotReady` refusal must come BEFORE the question is embedded, and
+    /// the order is the whole guarantee: its user-facing sentence says "Nothing
+    /// was sent anywhere".
+    ///
+    /// `embedding_engine()` refuses only `BackendClass::Remote`. It returns the
+    /// active LoopbackLocal arm, so with a device-local runtime endpoint
+    /// configured, embedding first sends the user's question to a daemon Myne
+    /// does not ship (threat-model TB12) and the refusal then denies it.
+    ///
+    /// Asserted over the source rather than by driving the command, because
+    /// `chat_stream` is a `#[tauri::command]` with `State` and `Channel`
+    /// injections and no seam that lets a test observe the ordering. This is the
+    /// same shape `state.rs` uses to pin the engine doors, and for the same
+    /// reason: the property is positional, so a positional check is what holds
+    /// it. Reordering the two lines makes this fail.
+    #[test]
+    fn chat_stream_refuses_before_it_embeds() {
+        let src = include_str!("commands.rs");
+        let start = src
+            .find("pub async fn chat_stream<R: Runtime>")
+            .expect("chat_stream");
+        let body = &src[start..];
+        let end = body.find("\n}\n").expect("body end");
+        let body = &body[..end];
+
+        let refusal = body
+            .find("if !vector_state.lock().is_enabled() {")
+            .expect("the early NotReady refusal");
+        let embed = body
+            .find("engine.embed(&q)")
+            .expect("the question embedding");
+        assert!(
+            refusal < embed,
+            "chat_stream embeds the question at byte {embed} and refuses at {refusal}: \
+             the refusal says nothing was sent anywhere, so it has to come first"
+        );
     }
 
     /// A `RequestCancel` for a test that is not exercising cancellation.

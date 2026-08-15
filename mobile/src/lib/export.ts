@@ -1,11 +1,23 @@
 // IPC bindings for the mobile `export` plugin — whole-vault → plaintext Markdown
 // tree (shared core in `myne-core::plugins::export`). The Rust command decrypts
 // every note + attachment and writes a folder tree to `destination`; on mobile
-// we target the app's Documents directory (reachable via the Files app), since
-// there is no native folder picker. Mirrors the desktop DTOs.
+// we target the app's Documents directory, since there is no native folder
+// picker. Mirrors the desktop DTOs.
+//
+// Where that leaves the user, per platform: on iOS the directory is invisible in
+// the Files app (no `UIFileSharingEnabled`) and the share sheet is the only route
+// to it; on Android it is `Android/data/<pkg>/files/Documents`, which the system
+// Files app has refused to navigate into since API 30, and the Android share
+// sheet is not implemented (myne-md/myne#505). Neither platform hands the user a
+// browsable copy on a current OS. See `../platform/path.ts` for the definition
+// site of that claim.
+//
+// The directory is excluded from platform cloud backup on both — a whole-vault
+// plaintext export is every note, and it was going to iCloud / Google Drive until
+// myne-md/myne#491. See `mobile/src-tauri/src/backup_exclude.rs`.
 
-import { invoke } from "@tauri-apps/api/core";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { invoke } from "../platform/core";
+import { documentDir, join } from "../platform/path";
 
 /** Result of {@link vaultExportMarkdown} — mirror of Rust `VaultExportSummary`. */
 export interface VaultExportSummary {

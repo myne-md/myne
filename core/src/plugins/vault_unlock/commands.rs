@@ -2083,6 +2083,103 @@ mod tests {
         assert!(is_vault_switch(Some(a), b));
     }
 
+    /// The manual/auto lock path owes the full teardown, and this pins it as a
+    /// whole vector rather than as a set of individual presence checks: a hook
+    /// dropped from `lock_from_host`, or reordered past the slot drop, fails
+    /// here. It is the twin of `vault_change_password`'s
+    /// `force_relock_runs_the_full_lock_teardown` — the two slot-drop paths
+    /// assert against the same recorder precisely so they can be compared,
+    /// which is why the recorder lives in `test_support` rather than in either
+    /// module.
+    ///
+    /// Order is load-bearing, not incidental. `persist_search_index` runs
+    /// FIRST because it peeks `root_key` out of the still-`Unlocked` slot to
+    /// seal `vault.search`; moved after `lock_with_state` it would have no key
+    /// and the flush would silently stop happening. Every wipe runs AFTER the
+    /// slot drop, so nothing plaintext-derived outlives the keys. And
+    /// `apply_screen_capture` is last, restoring the pre-unlock default-ON
+    /// native state (`decisions.md` 2026-05-27).
+    ///
+    /// The assertion is on STATE as well as on the vector: the slot is `Empty`
+    /// afterwards, and a real [`VaultIndicesState`] seeded before the lock is
+    /// empty after it — so this says the teardown HAPPENED, not merely that a
+    /// method was invoked.
+    ///
+    /// **What it cannot say** (myne-md/myne#454, and the reason that bug needed
+    /// a guard rather than a test): `RecordingHooks` is a test double. A real
+    /// client whose hook body is `{}` satisfies this test completely. Whether a
+    /// client that HOLDS one of these states actually implements the hook is
+    /// `scripts/check-lock-teardown.mjs`'s question, and nothing here overlaps
+    /// with it.
+    #[test]
+    fn lock_runs_the_full_teardown_and_empties_the_index() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _) = seed_vault_meta("lock-teardown-pw");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                "lock-teardown-pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("seeded vault unlocks");
+            assert_eq!(state.slot_kind_active().await, SlotKind::Unlocked);
+
+            // A real index with real content, so the post-lock assertion is
+            // about the index rather than about the recorder.
+            let indices = std::sync::Arc::new(
+                crate::plugins::vault_indices::state::VaultIndicesState::default(),
+            );
+            indices.apply(
+                "note-a",
+                crate::plugins::vault_indices::state::NoteRecord {
+                    title: Some("A locked vault's note title".to_string()),
+                    folder: Some("Private".to_string()),
+                    ..Default::default()
+                },
+            );
+            assert_eq!(indices.note_count(), 1, "index seeded before the lock");
+
+            let recorder = crate::test_support::RecordingHooks::with_indices(indices.clone());
+            let hooks: crate::hooks::Hooks = recorder.clone();
+
+            lock_from_host(&state, &hooks).await.expect("lock succeeds");
+
+            assert_eq!(
+                state.slot_kind_active().await,
+                SlotKind::Empty,
+                "the lock must drop the slot"
+            );
+            assert_eq!(
+                indices.note_count(),
+                0,
+                "the plaintext-derived index must not outlive the keys"
+            );
+            assert_eq!(
+                recorder.calls(),
+                vec![
+                    "persist_search_index",
+                    "zeroize_search_index",
+                    "zeroize_spell",
+                    "clear_staged_descriptor",
+                    "pdf_export_teardown_on_lock",
+                    "zeroize_vault_indices",
+                    "zeroize_attachment_refs",
+                    "abort_active_recording",
+                    "apply_screen_capture",
+                ],
+                "the manual-lock teardown vector, in order — persist before the \
+                 slot drop, every wipe after it, screen-capture default-ON last"
+            );
+        });
+    }
+
     // ---- MYND-85 task 3c: on-unlock rename recovery wiring -------------
 
     #[test]

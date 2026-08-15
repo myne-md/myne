@@ -10,7 +10,7 @@
 // awaiting + try/catch every call site. The probe is read-only,
 // idempotent, and runs in microseconds (vault.meta is 345 bytes).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type {
   VaultStatus,
   VaultStatusError,

@@ -17,7 +17,7 @@ import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/h
 import { isMediaTarget } from "@myne/editor/host/notes/graphModel";
 import i18n from "@myne/i18n";
 import { openUrl } from "./lib/open-url";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { documentDir, join } from "./platform/path";
 import {
   attachmentExport,
   attachmentImport,
@@ -84,8 +84,12 @@ const host: EditorHost = {
     attachmentExport,
     attachmentRename,
     // Mobile has no Save-As dialog plugin: export the decrypted bytes into the
-    // app's Documents folder (reachable from the iOS Files app). Overwrites by
-    // name (exportAttachment is called with overwrite=true). Sanitize to a bare
+    // app's Documents folder. (That folder is browsable on neither platform on a
+    // current OS: iOS declares no `UIFileSharingEnabled`, and Android's copy under
+    // `Android/data/` has been closed to the system Files app since API 30. See
+    // `./platform/path.ts`. It is excluded from platform cloud backup on both:
+    // myne-md/myne#491, `backup_exclude.rs`.) Overwrites by name
+    // (exportAttachment is called with overwrite=true). Sanitize to a bare
     // basename first — a crafted attachment name containing `/`, `\`, or a
     // leading `..` must not let join() escape the Documents directory.
     pickExportDestination: async (filename) => {

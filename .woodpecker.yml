@@ -36,8 +36,16 @@ steps:
     # defined here (first step) and aliased as `*code-paths` by every other
     # compile/test step. hooks-parity deliberately keeps NO filter (its EOF/
     # whitespace/SPDX checks apply to docs too), so it runs on every push.
+    #
+    # TWO anchors, and the inner one is not decoration. A `when` entry carries an
+    # implicit `status: success`, so a step that must run after an unrelated red
+    # has to spell `status: [success, failure]` out — and a YAML list entry
+    # cannot alias `*code-paths` and add a key to it. Such a step aliases
+    # `*code-path-globs` instead and writes its own `status:` beside it, so the
+    # glob list stays one source of truth rather than a hand-copy per step.
+    # `e2e-floor` carried exactly that hand-copy until myne-md/myne#458.
     when: &code-paths
-      - path:
+      - path: &code-path-globs
           exclude: ['docs/**', '*.md', '**/CLAUDE.md', '**/README.md']
     commands:
       - rustup component add rustfmt
@@ -277,6 +285,28 @@ steps:
       - git fetch origin develop --depth=50 || true
       - node scripts/check-bundle-record.mjs --append-only origin/develop
 
+  # ─── Every desktop/mobile twin carries a verdict (#472) ──────────────────────
+  # No `code-paths` filter, for exactly bundle-record's reason one step up: the
+  # guard's `--check` half compares the GENERATED docs/dev/twin-inventory.md
+  # against what --emit would write, so a docs/** file is one of its inputs. A
+  # hand edit to that document is a docs-only commit, and under the filter CI
+  # would never look, leaving only the --no-verify-bypassable pre-commit hook.
+  #
+  # It lived inside the filtered pnpm-build step until review, under a comment
+  # asserting the document "is never read by the check". The line directly below
+  # that comment read it.
+  #
+  # Distinct from check-twin-drift.mjs, which stays a warning in pnpm-build: that
+  # one fires on a NEW one-sided change and says nothing about the pairs that had
+  # already drifted. A twin ENTERING the set fails HERE, which is decisions.md
+  # 0488's own failure signal mechanised: "A mobile/ directory that started to
+  # grow its own copy of a shared screen would be the signal that this decision
+  # had failed."
+  twin-inventory:
+    image: node:25
+    commands:
+      - node scripts/check-twin-inventory.mjs --check
+
   pnpm-build:
     image: node:25
     when: *code-paths
@@ -322,6 +352,12 @@ steps:
       # lock shipped that way while the OPFS write path skipped its TOCTOU guard
       # believing the lock was held.
       - node scripts/check-unwired.mjs
+      # Mobile export-backup exclusion (myne#491): the plaintext export directory
+      # (`Documents`) stays out of iCloud Backup and Android Auto Backup. Four
+      # files in three languages carry that property and no compiler compares
+      # them; a saved recovery phrase reconstructs the vault, so a one-sided
+      # drift is a zero-knowledge break that every build reports as green.
+      - node scripts/check-mobile-export-backup.mjs
       # Token-adoption ratchet (myne#394): a literal written into an inline style
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
@@ -334,6 +370,11 @@ steps:
       # Ornament vocabulary (myne#394): Rust, TS and CSS must agree on which
       # values exist, or a theme setting validates and then draws nothing.
       - node scripts/check-ornament-vocabulary.mjs
+      # Lock-teardown hooks (myne#454): a client that manages a plaintext-derived
+      # RAM state must implement the hook that wipes it on every slot drop. An
+      # empty body compiles, satisfies clippy and passes every other guard, so a
+      # lock quietly stops locking; mobile shipped three that way.
+      - node scripts/check-lock-teardown.mjs
       # E2E menu-testid guard (#275): a scenario reaching for a control that
       # renders only inside an open menu fails as a timeout, which reads as flake.
       - node scripts/check-e2e-menu-testids.mjs
@@ -683,7 +724,7 @@ steps:
   # e2e "passed".
   e2e-floor:
     image: node:25
-    # NOT `*code-paths`, and the difference is the whole point. The anchor is a
+    # NOT `*code-paths`, and the difference is the whole point. That anchor is a
     # one-entry list carrying only `path`, and a step inherits the pipeline's
     # default "skip me if an upstream step failed" — which skipped this one on
     # pipeline 427 the moment `e2e` went red. That is exactly backwards: a
@@ -691,11 +732,11 @@ steps:
     # failed" and "the suite ran almost nothing and one of the few that ran
     # failed" look identical from the outside. `status: [success, failure]` is
     # the same mechanism `notify-failure` uses to survive an upstream failure;
-    # the path filter is repeated inline because a list entry cannot merge the
-    # anchor and add a key.
+    # the glob list comes from `*code-path-globs` (see `cargo-fmt`) because a
+    # list entry cannot merge `*code-paths` and add a key, and a hand-copy of
+    # the globs is a second place for them to drift.
     when:
-      - path:
-          exclude: ['docs/**', '*.md', '**/CLAUDE.md', '**/README.md']
+      - path: *code-path-globs
         status: [success, failure]
     depends_on:
       - name: e2e
@@ -748,7 +789,18 @@ steps:
   # a real break and must go red.
   web-build:
     image: node:25
-    when: *code-paths
+    # Same `status: [success, failure]` as the mobile lane, and for the reason
+    # the comment above already gives. `optional: true` on the `e2e` edge only
+    # says "do not WAIT for a step that may not run"; the implicit
+    # `status: success` in a bare `when` is pipeline-wide, so this step was
+    # SKIPPED whenever `e2e` reddened, which is the common case on develop. That
+    # silently skipped the four web artefact greps, the seam contract, the
+    # bundle budget and the screen/surface/testid rosters, and by this file's own
+    # sentence a gate that did not run is indistinguishable from one that passed.
+    # Two of those greps hold A15 compensating controls.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     depends_on:
       - name: e2e
         optional: true
@@ -894,7 +946,11 @@ steps:
   # signed-archive apt install.
   e2e-web:
     image: node:25
-    when: *code-paths
+    # Inherits web-build's reasoning: it depends on web-build, so a bare `when`
+    # skipped it on exactly the pipelines web-build was skipped on.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     depends_on: [web-build]
     environment:
       CI: "true"
@@ -948,9 +1004,44 @@ steps:
   # lane is one serial chain because each of its steps runs `pnpm install` into
   # the shared workspace node_modules, so this hangs off the END and adds nothing
   # to that chain's wall-clock.
+  #
+  # ─── Why every step in this lane carries `status: [success, failure]` ────────
+  # myne-md/myne#458. Placement bought the lane wall-clock and cost it isolation:
+  # a `when` entry carries an implicit `status: success`, and that condition is
+  # PIPELINE-WIDE rather than scoped to `depends_on`. So any red step anywhere
+  # skipped this whole lane, including steps it has no dependency path to.
+  # `web-docker-build` going red skipped `npm-licenses`, `mobile-vitest` and
+  # `mobile-flow-logic` even though `mobile-build` itself was green.
+  #
+  # What that cost, measured during the v0.5.0 release rather than reasoned
+  # about: the mobile Vitest suite had not executed in CI once since the client
+  # moved in-repo. Run by hand it failed — `mobile/tests/reminder-tap.test.ts`
+  # carried a ~0.7%-per-run assertion flake, fixed in `794c33e8`. `npm-licenses`,
+  # the workspace-wide license gate, had likewise never run here. Same class as
+  # the `e2e-floor` rationale above: a gate that did not run is indistinguishable
+  # from a gate that passed.
+  #
+  # Where it bites is narrower and worse than "a step went red once".
+  # `web-docker-build` is `event: manual` + `branch: develop` (`&web-deploy`,
+  # decisions 0484), so it does not run on a push at all — which means these four
+  # gates vanished on exactly the runs that publish `app.example.com`.
+  #
+  # `mobile-build` is in the list even though the symptom was downstream of it,
+  # and that is the part worth not trimming: `npm-licenses` and `mobile-vitest`
+  # depend on it with a plain list (non-optional), and `mobile-flow-logic`
+  # depends on `mobile-vitest` the same way. A red step scheduled BEFORE
+  # `mobile-build` skips it, and the three then skip too, `status:` key or not.
+  # Exempting the four without the head would be four comments claiming a
+  # property the lane does not have.
+  #
+  # The path filter is unchanged in effect — each step still aliases the same
+  # globs, so a docs-only commit still skips the lane. What changed is that a
+  # failure somewhere else is no longer evidence about this lane.
   mobile-build:
     image: node:25
-    when: *code-paths
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     depends_on:
       - name: web-build
         optional: true
@@ -967,7 +1058,10 @@ steps:
   # anything.
   npm-licenses:
     image: node:25
-    when: *code-paths
+    # `status: [success, failure]` — see the lane header above (#458).
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     depends_on: [mobile-build]
     commands:
       - npm install -g pnpm@11.8.0
@@ -979,8 +1073,20 @@ steps:
   # lane's vitest.
   mobile-vitest:
     image: node:25
-    when: *code-paths
-    depends_on: [mobile-build]
+    # `status: [success, failure]` — see the lane header above (#458). This is
+    # the step whose silent absence the issue was opened over.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    # Chained after `npm-licenses` rather than beside it. Both are children of
+    # `mobile-build` and both run `pnpm install --frozen-lockfile` into the
+    # SHARED workspace `node_modules`, so as siblings they installed
+    # concurrently, which this file names by its failure at the lane header:
+    # ERR_PNPM_ENOENT from corrupted temp dirs. The comment below already
+    # asserted the installs stay linear; that was true of the parent and false
+    # of the sibling. The lane is off the critical path by design, so the added
+    # wall clock is free.
+    depends_on: [npm-licenses]
     commands:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
@@ -998,7 +1104,10 @@ steps:
   # app and report green about the wrong client.
   mobile-flow-logic:
     image: mcr.microsoft.com/playwright:v1.61.1-noble
-    when: *code-paths
+    # `status: [success, failure]` — see the lane header above (#458).
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     depends_on: [mobile-vitest]
     commands:
       - npm install -g pnpm@11.8.0
@@ -1015,7 +1124,12 @@ steps:
   # signed-bundle pipeline is separate from this verification CI).
   mobile-compile:
     image: rust:1.96.0-slim
-    when: *code-paths
+    # `status: [success, failure]` — see the lane header above (#458). It hangs
+    # off `web-build` optionally, which survives that ONE step failing and not
+    # the pipeline-wide condition; both are needed.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     depends_on:
       - name: web-build
         optional: true
@@ -1157,7 +1271,13 @@ steps:
 
   sync-sim:
     image: rust:1.96.0-slim
-    when: *code-paths
+    # The comment below says this step runs REGARDLESS of e2e's result, and with
+    # a bare `when` that was not true: `optional: true` only removes the wait,
+    # while the implicit `status: success` is pipeline-wide and skipped this step
+    # whenever e2e was red. The claim is now enforced rather than asserted.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     # `optional: true`: run AFTER e2e (keeps the heavy steps serial on the
     # shared host) but REGARDLESS of e2e's result. e2e is chronically flaky on
     # develop (a plain `depends_on: [e2e]` skips sync-sim whenever e2e is red),
@@ -1392,6 +1512,10 @@ steps:
       - name: e2e-floor
         optional: true
       - name: bundle-record
+        optional: true
+      # Unfiltered like bundle-record, so it can go red on a docs-only commit,
+      # which is precisely the commit that hand-edits its generated projection.
+      - name: twin-inventory
         optional: true
       - name: web-build
         optional: true

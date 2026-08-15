@@ -75,10 +75,20 @@ use tauri::{Runtime, Url};
 /// `tauri.localhost.evil.example` fails.
 pub fn is_allowed_navigation(url: &Url) -> bool {
     match url.scheme() {
-        "tauri" => url.host_str() == Some("localhost"),
+        // The PORT is part of an origin (RFC 6454), and leaving it unconstrained
+        // meant `tauri://localhost:9999/` and `https://tauri.localhost:4443/?d=<note>`
+        // were admitted while the doc above and `threat-model.md` §7 both said
+        // "the app's own origins". On Android the app is served on port 80 and
+        // wry's asset interception is keyed on the request URL, so a non-80
+        // `tauri.localhost` URL is the one admitted shape whose resolution the
+        // platform resolver decides rather than this policy: a query string on
+        // it is exactly the channel this module exists to close.
+        "tauri" => url.host_str() == Some("localhost") && url.port().is_none(),
         "attachment" => true,
         "http" | "https" => match url.host_str() {
-            Some("tauri.localhost") | Some("attachment.localhost") => true,
+            Some("tauri.localhost") | Some("attachment.localhost") => {
+                url.port_or_known_default() == Some(if url.scheme() == "https" { 443 } else { 80 })
+            }
             // The dev server is plain http and exists only in a dev build.
             // The port is deliberately not pinned: `strictPort` keeps Vite on
             // 1420, but `TAURI_DEV_HOST` and any future `devUrl` edit would
