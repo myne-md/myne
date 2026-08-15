@@ -21,7 +21,7 @@ import { TaskListPanel } from "@myne/task-panel";
 import { EMPTY_SCOPE, type TaskScope } from "@myne/task-scope";
 import { TASK_FILTERS, todayLocal, type TaskFilter } from "@myne/task-filters";
 import { setTaskCompleted, useVaultTasks, type VaultTask } from "../lib/tasks";
-import { useSizeClass } from "../platform/SizeClassContext";
+import { useSizeClass } from "../formfactor/SizeClassContext";
 import { TaskScopeStrip } from "./TaskScopeStrip";
 
 export type TaskSurfaceScope =
