@@ -28,11 +28,20 @@
 // assertion 1 are untyped by design: the mocked `invoke` resolves regardless of
 // payload, and the payload is not what is under test.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
+// @ts-expect-error — a .mjs guard script with no type declarations. Importing the
+// guard's own classification rather than mirroring it is the point: a copy here
+// would go stale in both directions (a new read command would make this file
+// demand a bump from something that writes nothing; a command moved OUT of the
+// set would keep being exempted, silently shrinking the only check that proves
+// `writePref` still bumps).
+import { READ_COMMANDS as READ_COMMANDS_UNTYPED } from "../../scripts/check-prefs-nonce.mjs";
 
-const invoke = vi.fn(async () => undefined as unknown);
+const READ_COMMANDS = READ_COMMANDS_UNTYPED as Set<string>;
+
+const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 
 // `usePrefs` short-circuits to DEFAULT_PREFS without a Tauri host, which would
@@ -47,9 +56,18 @@ import { usePrefs, DEFAULT_PREFS } from "../src/lib/use-prefs";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** The read-only prefs commands, mirroring `scripts/check-prefs-nonce.mjs`'s
- *  `READ_COMMANDS`: they invalidate nothing, so they owe no bump. */
-const READ_COMMANDS = new Set(["prefs_read", "device_platform", "ai_provider_has_key"]);
+/**
+ * Setters sanctioned to skip the bump via `writePref(cmd, args, { bump: false })`.
+ *
+ * Landed EMPTY and compared in the one direction that matters: without this set
+ * the first legitimate use of the documented escape hatch fails below with
+ * "wrote … without bumping the nonce", a message that reads like a defect rather
+ * than like "you took the opt-out and owe an entry here". The hatch is
+ * documented in both prefs modules and used in neither, so an empty set with a
+ * reason is what keeps it usable at the cost of one reviewable line, the shape
+ * CLAUDE.md praises for `ai-no-network-check.sh` check 4.
+ */
+const BUMPLESS = new Set<string>();
 
 const prefsWritesOf = (calls: unknown[][]) =>
   calls
@@ -62,10 +80,6 @@ beforeEach(() => {
   invoke.mockReset();
   invoke.mockResolvedValue(undefined);
   __resetPrefsNonceForTest();
-});
-
-afterEach(() => {
-  vi.useRealTimers();
 });
 
 describe("the mobile prefs chokepoint", () => {
@@ -87,6 +101,7 @@ describe("the mobile prefs chokepoint", () => {
       }
       const writes = prefsWritesOf(invoke.mock.calls);
       if (writes.length === 0) continue;
+      if (BUMPLESS.has(name)) continue;
       covered.push(name);
       expect(getPrefsNonce(), `${name} wrote ${writes.join(", ")} without bumping the nonce`).toBeGreaterThan(
         before,

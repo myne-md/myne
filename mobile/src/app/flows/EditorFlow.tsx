@@ -2763,8 +2763,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             viewOrder={prefs.view_order}
             onOpenNote={(id) => void openFromList(id)}
             onSavedView={(id) => {
+              // No bump here: `TagBrowserSheet` awaits `upsertSavedView` +
+              // `setViewOrder` before calling this, and both bump inside
+              // `writePref`. A third bump is a third `prefs_read` + decrypt per
+              // mounted `usePrefs` for one saved view. `ViewEditorSheet`, the
+              // other saved-view writer, already relies on the chokepoint alone.
               setTagBrowserOpen(false);
-              bumpPrefsNonce();
               setActiveViewId(id);
               setActiveTag(null);
               setListView("notes");

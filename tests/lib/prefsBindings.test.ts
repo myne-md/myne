@@ -44,6 +44,15 @@ import {
   setVaultLabel,
   type EditorLayout,
 } from "../../src/lib/prefs";
+// The whole module namespace, for the roster block at the bottom: it iterates
+// every export rather than a remembered list.
+import * as allPrefs from "../../src/lib/prefs";
+// @ts-expect-error — a .mjs guard script with no type declarations. Imported
+// rather than mirrored so the read/write classification cannot drift between the
+// guard and this spec.
+import { READ_COMMANDS as READ_COMMANDS_UNTYPED } from "../../scripts/check-prefs-nonce.mjs";
+
+const READ_COMMANDS = READ_COMMANDS_UNTYPED as Set<string>;
 
 beforeEach(() => {
   invokeMock.mockReset();
@@ -263,5 +272,74 @@ describe("rejection propagation (optimistic-UI revert contract)", () => {
     });
     // The bump runs only AFTER a resolved invoke — a failed write never refreshes.
     expect(bumpPrefsNonceMock).not.toHaveBeenCalled();
+  });
+});
+
+// ── the roster ──────────────────────────────────────────────────────────────
+//
+// The named cases above pin ARG-KEY SHAPE, which has to be written out per
+// setter because only a human knows that `setFavorites` renames its argument to
+// `order`. Property 2 (every write bumps) needs no such knowledge, and pinning it
+// through a hand-maintained import list covered 17 of this module's ~71 exports:
+// a setter added tomorrow was behaviourally uncovered unless somebody remembered
+// to extend the list.
+//
+// This block closes that by construction. It is the twin of
+// `mobile/tests/prefs-nonce.test.ts`'s roster loop and landed in the same change
+// (myne-md/myne#486) for a reason worth stating: inventing a stronger shape and
+// applying it to ONE half of a twin pair is the exact drift that change is about.
+//
+// Keyed off what each binding actually sent to `invoke`, never off its name, so
+// a rename covers itself.
+describe("the roster — every export that writes vault.prefs bumps the nonce", () => {
+  /** Sanctioned `writePref(cmd, args, { bump: false })` users. Landed EMPTY:
+   *  without it the first legitimate use of the documented hatch fails here with
+   *  a message that reads like a defect rather than like "record it". */
+  const BUMPLESS = new Set<string>();
+
+  const prefsWritesOf = (calls: unknown[][]) =>
+    calls
+      .map((c) => c[0])
+      .filter((c): c is string => typeof c === "string" && c.startsWith("plugin:prefs|"))
+      .map((c) => c.slice("plugin:prefs|".length))
+      .filter((c) => !READ_COMMANDS.has(c));
+
+  it("covers every write-emitting export, not a remembered subset", async () => {
+    const covered: string[] = [];
+
+    for (const [name, fn] of Object.entries(allPrefs)) {
+      if (typeof fn !== "function") continue;
+      invokeMock.mockReset();
+      invokeMock.mockResolvedValue(undefined);
+      bumpPrefsNonceMock.mockReset();
+      // Two positional arguments cover every setter's arity; the mocked `invoke`
+      // resolves whatever it is handed, and a binding that reaches no prefs
+      // command (a pure normalizer, a read) is skipped by the filter below.
+      try {
+        await (fn as (...a: unknown[]) => unknown)("probe", "probe");
+      } catch {
+        // A shape the binding rejects before its IPC call is not a write; the
+        // filter decides that, not this catch.
+      }
+      const writes = prefsWritesOf(invokeMock.mock.calls);
+      if (writes.length === 0) continue;
+      if (BUMPLESS.has(name)) continue;
+      covered.push(name);
+      expect(
+        bumpPrefsNonceMock,
+        `${name} wrote ${writes.join(", ")} without bumping the nonce`,
+      ).toHaveBeenCalled();
+    }
+
+    // Non-vacuity: an empty roster satisfies the loop above without asserting
+    // anything. The floor sits below the real count so adding a setter does not
+    // fail this line, while gutting the module's exports still does.
+    expect(covered.length).toBeGreaterThanOrEqual(40);
+    // Named rather than merely counted, because a stale read on either is not
+    // just a stale value: screen-capture protection is a `docs/threat-model.md`
+    // §6 mitigation, and reminders govern whether pending times keep leaving the
+    // AEAD envelope into OS-owned storage.
+    expect(covered).toContain("setScreenCaptureProtection");
+    expect(covered).toContain("setRemindersEnabled");
   });
 });
