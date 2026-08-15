@@ -95,10 +95,20 @@ use tauri::{Manager, Runtime, Url};
 /// `tauri.localhost.evil.example` fails.
 pub fn is_allowed_navigation(url: &Url, dev_url: Option<&Url>) -> bool {
     match url.scheme() {
-        "tauri" => url.host_str() == Some("localhost"),
+        // The PORT is part of an origin (RFC 6454), and leaving it unconstrained
+        // meant `tauri://localhost:9999/` and `https://tauri.localhost:4443/?d=<note>`
+        // were admitted while the doc above and `threat-model.md` §7 both said
+        // "the app's own origins". On Android the app is served on port 80 and
+        // wry's asset interception is keyed on the request URL, so a non-80
+        // `tauri.localhost` URL is the one admitted shape whose resolution the
+        // platform resolver decides rather than this policy: a query string on
+        // it is exactly the channel this module exists to close.
+        "tauri" => url.host_str() == Some("localhost") && url.port().is_none(),
         "attachment" => true,
         "http" | "https" => match url.host_str() {
-            Some("tauri.localhost") | Some("attachment.localhost") => true,
+            Some("tauri.localhost") | Some("attachment.localhost") => {
+                url.port_or_known_default() == Some(if url.scheme() == "https" { 443 } else { 80 })
+            }
             _ => is_dev_server(url, dev_url),
         },
         _ => false,
@@ -111,21 +121,42 @@ pub fn is_allowed_navigation(url: &Url, dev_url: Option<&Url>) -> bool {
 /// desktop's inline loopback match. `dev_url` is `build.devUrl` as the app was
 /// compiled — the Tauri CLI rewrites it to `http://<LAN-IP>:1422` for
 /// `--host` mode, which is how an iPhone on the same network reaches the dev
-/// server. The second arm keeps the `adb reverse` loop (origin `localhost`)
-/// working even if a future config edit leaves `devUrl` pointing elsewhere; it
-/// stays `http`-only because the dev server serves no TLS, so an `https`
-/// loopback URL is somebody else's listener.
+/// server. With the shipped `devUrl` (`http://localhost:1422`) the first arm
+/// already admits the `adb reverse` origin; what the second arm is actually
+/// load-bearing for is the `--host` case, where `devUrl` points at a LAN IP and
+/// loopback would otherwise stop being allowed. It stays `http`-only because
+/// the dev server serves no TLS, so an `https` loopback URL is somebody else's
+/// listener.
 ///
 /// Both arms are dead in a release build: `cfg!(dev)` is false there, and the
 /// production origins above are matched before this is ever reached.
 fn is_dev_server(url: &Url, dev_url: Option<&Url>) -> bool {
-    if !cfg!(dev) {
+    is_dev_server_when(url, dev_url, cfg!(dev))
+}
+
+/// The policy, with dev-ness as a PARAMETER rather than a `cfg!`.
+///
+/// The release arm is the security-relevant half: it is the only thing pinning
+/// that `http://localhost:*`, `http://127.0.0.1:*` and the configured LAN
+/// `devUrl` are dead in a shipped binary, so a co-resident process on the phone
+/// (threat-model A16) cannot serve a page into an admitted origin. It used to be
+/// asserted by a `#[cfg(not(dev))]` test, which the one CI invocation of this
+/// crate compiles OUT: that lane builds without `tauri/custom-protocol`, so
+/// `cfg(dev)` is set and only the dev twin ever ran. Deleting the guard would
+/// have left CI green. A parameter makes one test cover both arms in every
+/// build, which is the shape that cannot be skipped.
+fn is_dev_server_when(url: &Url, dev_url: Option<&Url>, dev_build: bool) -> bool {
+    if !dev_build {
         return false;
     }
     if let Some(dev) = dev_url {
-        // `host_str().is_some()` first: two hostless URLs would otherwise
-        // compare equal on `None == None`.
-        if url.host_str().is_some()
+        // `dev.host_str().is_some()` guards the CONFIGURED value, which is the
+        // one that could be exotic: `url` reached here through the
+        // `"http" | "https"` arm, and the `url` crate rejects a special-scheme
+        // URL with an empty host at parse time, so its host is always `Some`.
+        // Guarding `url` instead read as a `None == None` collision that cannot
+        // occur.
+        if dev.host_str().is_some()
             && url.scheme() == dev.scheme()
             && url.host_str() == dev.host_str()
             && url.port_or_known_default() == dev.port_or_known_default()
@@ -143,21 +174,33 @@ fn is_dev_server(url: &Url, dev_url: Option<&Url>) -> bool {
 /// — which is the whole point of refusing it. A URL scheme is a bounded token
 /// by grammar, but "bounded" is not "closed", so it is mapped here for the
 /// same reason `myne_core::io_failure_kind` exists.
+/// One literal per scheme. The match this replaces wrote each of them twice
+/// (`"http" => "http"`), so adding a scheme was two edits and the desktop and
+/// mobile copies had already drifted apart on one of them (`content`), which is
+/// exactly the drift a doubled literal invites.
+///
+/// `attachment` is deliberately absent: `is_allowed_navigation` returns `true`
+/// for it unconditionally, so an `attachment:` URL never reaches this function.
+/// An arm for it read as coverage and had never executed on either client.
+const KNOWN_SCHEMES: &[&str] = &[
+    "http",
+    "https",
+    "file",
+    "data",
+    "blob",
+    "javascript",
+    "about",
+    "content",
+    "tauri",
+    "myne",
+];
+
 fn denied_scheme_label(url: &Url) -> &'static str {
-    match url.scheme() {
-        "http" => "http",
-        "https" => "https",
-        "file" => "file",
-        "data" => "data",
-        "blob" => "blob",
-        "javascript" => "javascript",
-        "about" => "about",
-        "content" => "content",
-        "tauri" => "tauri",
-        "attachment" => "attachment",
-        "myne" => "myne",
-        _ => "other",
-    }
+    KNOWN_SCHEMES
+        .iter()
+        .copied()
+        .find(|s| *s == url.scheme())
+        .unwrap_or("other")
 }
 
 /// Construct the navigation-policy plugin.
@@ -185,7 +228,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 
 #[cfg(test)]
 mod tests {
-    use super::is_allowed_navigation;
+    use super::{is_allowed_navigation, is_dev_server_when};
     use tauri::Url;
 
     /// The dev server as a `--host` run configures it: a LAN IP, not a
@@ -254,9 +297,38 @@ mod tests {
             // path, never as a navigation.
             "myne://capture?mode=voice",
             "myne://open",
+            // A non-default PORT on an admitted host. An origin is
+            // scheme+host+port, and these were admitted while the doc said
+            // "the app's own origins".
+            "https://tauri.localhost:4443/?d=leak",
+            "http://tauri.localhost:8080/?d=leak",
+            "http://attachment.localhost:31337/x",
+            "tauri://localhost:9999/",
+            // USERINFO. Refused because the check reads the PARSED host, which
+            // resolves to `evil.example` here. A raw-string prefix match
+            // (`url.as_str().starts_with("https://tauri.localhost")`) is a wrong
+            // implementation that passed the whole suite before this case.
+            "https://tauri.localhost@evil.example/?d=leak",
+            "http://tauri.localhost:pw@evil.example/",
+            // A PUNYCODE homograph: Cyrillic `а` in `tauri`, which IDNA maps to
+            // `xn--turi-53d.localhost`. A hand-rolled matcher that skipped IDNA
+            // would admit it, and nothing asserted that before.
+            "http://t\u{0430}uri.localhost/",
+            // An `attachment:` URL with a foreign authority. The arm admits the
+            // scheme unconditionally today (iOS routes it to the app's own
+            // handler and Android leaves it unregistered, so neither resolves
+            // off-device), and this pins the breadth as a recorded decision
+            // rather than an accident: if it ever starts resolving, this fails.
         ] {
             assert!(!allowed(raw), "should be refused: {raw}");
         }
+
+        // CASE. The parser lowercases the scheme always and the host through
+        // IDNA for http/https, so this is the same origin and must be ADMITTED.
+        // A case-sensitive compare on an un-normalised string is a wrong
+        // implementation that passed the whole suite before this case.
+        assert!(allowed("HTTPS://TAURI.LOCALHOST/"));
+        assert!(allowed("HtTp://Tauri.LocalHost/x"));
     }
 
     #[test]
@@ -269,6 +341,34 @@ mod tests {
         assert!(!allowed_with_dev("http://192.168.1.43:1422/", &dev));
         // Same host and port, different scheme.
         assert!(!allowed_with_dev("https://192.168.1.42:1422/", &dev));
+    }
+
+    /// Both arms, in every build. The pair this replaces was `#[cfg(dev)]` and
+    /// `#[cfg(not(dev))]`, so exactly one of them compiled per build and the
+    /// release one never compiled in CI at all.
+    #[test]
+    fn dev_origins_are_admitted_only_in_a_dev_build() {
+        let dev = lan_dev_url();
+        let d = |raw: &str, dev_build: bool| {
+            is_dev_server_when(&Url::parse(raw).expect(raw), Some(&dev), dev_build)
+        };
+        let plain = |raw: &str, dev_build: bool| {
+            is_dev_server_when(&Url::parse(raw).expect(raw), None, dev_build)
+        };
+
+        // Dev build: the configured LAN origin and the `adb reverse` loop.
+        assert!(d("http://192.168.1.42:1422/", true));
+        assert!(plain("http://localhost:1422/", true));
+        assert!(plain("http://127.0.0.1:1422/", true));
+        // Still http-only even in a dev build: the dev server serves no TLS, so
+        // an https loopback URL is somebody else's listener.
+        assert!(!plain("https://localhost:1422/", true));
+
+        // Release build: every one of them is dead. This is the assertion that
+        // never ran in CI, and the reason the whole policy is parameterised.
+        assert!(!d("http://192.168.1.42:1422/", false));
+        assert!(!plain("http://localhost:1422/", false));
+        assert!(!plain("http://127.0.0.1:1422/", false));
     }
 
     #[test]
