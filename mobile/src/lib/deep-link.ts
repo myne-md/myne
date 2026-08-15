@@ -18,6 +18,7 @@
 // cold-launches the app, the capture intent is LATCHED and replayed once the
 // editor mounts post-unlock.
 
+import { loadDeepLink } from "../platform/deepLink";
 import { HAS_TAURI } from "./app-window";
 
 export type CaptureMode = "text" | "voice";
@@ -64,7 +65,7 @@ export function consumePendingCapture(): CaptureMode | null {
 export async function initDeepLinks(): Promise<void> {
   if (!HAS_TAURI) return;
   try {
-    const { onOpenUrl, getCurrent } = await import("@tauri-apps/plugin-deep-link");
+    const { onOpenUrl, getCurrent } = await loadDeepLink();
     // Cold launch: the URL the widget tapped opened us with.
     const current = await getCurrent().catch(() => null);
     current?.forEach(handleUrl);

@@ -22,7 +22,7 @@
 // stages plaintext + emits an event; all encryption + note creation is here /
 // in Rust.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { HAS_TAURI } from "./app-window";
 import { noteCreate } from "./notes";
 
@@ -95,7 +95,7 @@ export async function initCaptures(): Promise<void> {
   try {
     // The native WatchConnectivity receiver emits a `capture` event whenever it
     // stages a freshly-delivered capture; seal it promptly.
-    const { listen } = await import("@tauri-apps/api/event");
+    const { listen } = await import("../platform/event");
     await listen("capture", () => void sealStagedCaptures());
   } catch {
     // Older host / no event API — the boot poll + window trigger still cover it.

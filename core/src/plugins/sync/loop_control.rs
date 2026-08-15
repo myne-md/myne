@@ -200,6 +200,17 @@ pub struct SyncScheduler {
     /// Failure gate: no *scheduled* action (poll pull / coalesced push) fires
     /// before this logical time. Pokes and immediate polls bypass it.
     next_retry_at: Option<u64>,
+    /// A device-verification eye-compare is open on this device (myne#462), so
+    /// no push may author a head under it. **Pushes only** — pulls keep firing,
+    /// because the approving side reaches the tip by pulling and the joining
+    /// side's whole ceremony is a pull.
+    ///
+    /// This is deliberately NOT the `suspended` early-return shape: suspend
+    /// hard-idles the loop, and hard-idling here would stall the very
+    /// convergence the compare is waiting on. Mirrored from
+    /// [`super::verify_hold::VerifyHold`] by the loop each tick; the authority
+    /// is that lease, not this field.
+    verify_hold: bool,
 }
 
 impl SyncScheduler {
@@ -220,6 +231,7 @@ impl SyncScheduler {
             immediate_poll_pending: false,
             consecutive_failures: 0,
             next_retry_at: None,
+            verify_hold: false,
         }
     }
 
@@ -283,6 +295,22 @@ impl SyncScheduler {
         self.dirty_since.is_some()
     }
 
+    /// Mirror the device-verification push hold into the scheduler (myne#462).
+    /// The loop calls this every tick from
+    /// [`super::verify_hold::VerifyHold::is_held`], the same way it feeds
+    /// [`Self::on_suspend`] / [`Self::on_resume`] from the lifecycle signal.
+    ///
+    /// **Why the scheduler needs this at all**, given that the cycle itself also
+    /// refuses to push while held: without it `tick` would still return `Push`,
+    /// **consuming `dirty_since`**, and the cycle would then run push-free and
+    /// report success — after which nothing re-arms the intent (`on_cycle_outcome`
+    /// only re-arms on failure). The edit would sit unpushed until some unrelated
+    /// local change re-dirtied the scheduler. This field's job is to leave the
+    /// anchor alone.
+    pub fn set_verify_hold(&mut self, held: bool) {
+        self.verify_hold = held;
+    }
+
     /// Decide what to do at logical time `now`, advancing internal state.
     pub fn tick(&mut self, now: u64) -> SyncAction {
         // Locked OR suspended → no action; all pending state is retained for the
@@ -307,9 +335,16 @@ impl SyncScheduler {
 
         // Push is due once the coalescing window has elapsed since the first
         // pending change (resolution-blur). While gated the intent is RETAINED,
-        // not consumed — a failed cycle must never strand an edit locally.
+        // not consumed — a failed cycle must never strand an edit locally. The
+        // verify hold (myne#462) rides on exactly that property: it suppresses
+        // the push without touching `dirty_since`, so the edit flushes the moment
+        // the eye-compare closes.
         let push = match self.dirty_since {
-            Some(t) if !gated && now.saturating_sub(t) >= self.coalesce_window_ms => {
+            Some(t)
+                if !gated
+                    && !self.verify_hold
+                    && now.saturating_sub(t) >= self.coalesce_window_ms =>
+            {
                 self.dirty_since = None;
                 true
             }
@@ -378,6 +413,10 @@ impl SyncScheduler {
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Emitter, Manager, Runtime};
+// `now_unix_millis` for the verify-hold lease (myne#462) — wall-clock, because
+// the lease is armed from a WebView that cannot see this loop's origin.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::HostCtx as _;
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Device-local "a note changed" signal: the note-save path bumps it, the sync
@@ -530,6 +569,21 @@ pub fn spawn_sync_loop<R: Runtime>(app: AppHandle<R>) {
                     sched.on_resume(now);
                 }
             }
+
+            // Device-verification eye-compare open on this device (myne#462)?
+            // Mirror the lease into the scheduler so `tick` withholds the push
+            // WITHOUT consuming `dirty_since` — the cycle refuses to push while
+            // held either way, but a consumed anchor would leave the edit
+            // unpushed until some unrelated local change re-dirtied the
+            // scheduler, because `on_cycle_outcome` only re-arms on failure.
+            //
+            // Wall-clock, not the loop's monotonic `now`: the lease is armed from
+            // a WebView that has no access to this loop's origin.
+            sched.set_verify_hold(
+                super::verify_hold::verify_hold().is_held(
+                    crate::host::tauri_host::TauriHost::new(app.clone()).now_unix_millis(),
+                ),
+            );
 
             let action = sched.tick(now);
             if action == SyncAction::Idle {
@@ -1066,5 +1120,76 @@ mod tests {
         );
         assert_eq!(s.tick(7_500), SyncAction::Idle); // inside the 2s gate
         assert_eq!(s.tick(8_200), SyncAction::Push); // 2s gate passed (4s would still Idle)
+    }
+
+    // --- the device-verification push hold (myne#462) ---
+
+    /// The property the whole hold rests on: a held push is **withheld, not
+    /// consumed**. If `tick` returned `Push` and cleared `dirty_since`, the
+    /// cycle would then run push-free (the cycle refuses too) and report
+    /// success — and `on_cycle_outcome` re-arms only on FAILURE, so the edit
+    /// would sit unpushed until some unrelated local change happened to
+    /// re-dirty the scheduler.
+    #[test]
+    fn a_held_push_is_withheld_rather_than_consumed() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(1_000);
+        s.set_verify_hold(true);
+        // Window elapsed, but the compare is open.
+        assert_eq!(s.tick(10_000), SyncAction::Idle);
+        assert!(s.has_pending_push(), "the coalescing anchor must survive");
+        // Still held a poll interval later — the intent keeps surviving, and
+        // the pull that tick is due still fires.
+        assert_eq!(s.tick(40_000), SyncAction::Pull);
+        assert!(s.has_pending_push());
+        // Compare closed → the edit flushes on the next eligible tick.
+        s.set_verify_hold(false);
+        assert_eq!(s.tick(41_000), SyncAction::Push);
+        assert!(!s.has_pending_push());
+    }
+
+    /// The hold is push-only. Withholding pulls would stall the very
+    /// convergence the compare is waiting on — the approving side reaches the
+    /// head it displays BY pulling, and the joining side's whole ceremony is a
+    /// pull.
+    #[test]
+    fn a_hold_never_withholds_a_pull_or_a_poke() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.set_verify_hold(true);
+        assert_eq!(s.tick(30_000), SyncAction::Pull); // interval pull still fires
+        s.on_poke();
+        assert_eq!(s.tick(30_100), SyncAction::Pull); // pokes still honored
+    }
+
+    /// A tick that would have been `PullAndPush` degrades to `Pull`, keeping
+    /// its push intent. This is the shape a real ceremony hits: the poll
+    /// interval and the coalescing window both elapse while the screen is open.
+    #[test]
+    fn a_hold_downgrades_pull_and_push_to_pull() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(0);
+        assert_eq!(s.tick(30_000), SyncAction::PullAndPush); // baseline shape
+        s.on_local_change(30_001);
+        s.set_verify_hold(true);
+        assert_eq!(s.tick(60_000), SyncAction::Pull);
+        assert!(s.has_pending_push());
+    }
+
+    /// Deliberately NOT the `suspended` shape: suspend hard-idles everything,
+    /// which here would be wrong. This pins the difference so a later "unify
+    /// these two flags" refactor has to argue with a failing test.
+    #[test]
+    fn a_hold_is_not_a_suspend() {
+        let mut held = sched();
+        held.set_unlocked(true);
+        held.set_verify_hold(true);
+        let mut suspended = sched();
+        suspended.set_unlocked(true);
+        suspended.on_suspend();
+        assert_eq!(held.tick(30_000), SyncAction::Pull);
+        assert_eq!(suspended.tick(30_000), SyncAction::Idle);
     }
 }

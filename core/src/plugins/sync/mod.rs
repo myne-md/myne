@@ -147,6 +147,10 @@ pub mod transport;
 // this is a property of each note, and the two diverge in exactly the case that
 // matters — an `Idle` device holding edits the server has never seen.
 pub mod unsynced;
+// The SYNC-40 eye-compare's push hold (myne#462). Ungated on purpose: the
+// browser runs this ceremony on both sides, so the flag cannot live in Tauri
+// managed state the way `loop_control`'s mobile lifecycle signal does.
+pub mod verify_hold;
 
 /// Byte slice → lowercase hex, in a single allocation (no per-byte `format!`).
 /// The canonical hex encoder for the sync module — the per-file `hex` /

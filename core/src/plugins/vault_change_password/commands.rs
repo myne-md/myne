@@ -656,135 +656,13 @@ mod tests {
     use crate::plugins::vault_recover::commands::recover_with_phrase_with_path;
     use crate::plugins::vault_unlock::commands::unlock_with_path;
     use crate::plugins::vault_unlock::state::{test_vault_id, SlotKind};
-    use crate::test_support::{ScopedTempDir, ScratchVault, FAST_TEST_KDF};
+    use crate::test_support::{RecordingHooks, ScopedTempDir, ScratchVault, FAST_TEST_KDF};
 
     /// No-op lifecycle hooks for the `_with_path` core tests — the
     /// quick-unlock-invalidation side-effect (desktop-only) is exercised by the
     /// desktop `quick_unlock` plugin's own tests, not asserted here.
     fn noop_hooks() -> crate::hooks::Hooks {
         std::sync::Arc::new(crate::hooks::NoopHooks)
-    }
-
-    /// A `Hooks` that records the lock-teardown calls it receives, in order,
-    /// and no-ops everything else (the `hooks::test_hooks::CountingHooks`
-    /// pattern). Lives here rather than beside `CountingHooks` because it is
-    /// specific to this path's assertion.
-    ///
-    /// It records two hooks the force-relock deliberately does NOT call —
-    /// `persist_search_index` (the slot is already `Empty`, so there is no
-    /// `root_key` to seal `vault.search` with) and `apply_screen_capture` (the
-    /// manual-lock path's alone, `decisions.md` 2026-05-27) — so the
-    /// whole-vector equality below pins their ABSENCE as well as the presence
-    /// of the seven that are owed.
-    struct RecordingHooks(std::sync::Mutex<Vec<&'static str>>);
-
-    impl RecordingHooks {
-        fn new() -> std::sync::Arc<Self> {
-            std::sync::Arc::new(Self(std::sync::Mutex::new(Vec::new())))
-        }
-
-        fn record(&self, name: &'static str) {
-            self.0.lock().expect("recording hooks mutex").push(name);
-        }
-
-        /// Everything recorded so far, oldest first.
-        fn calls(&self) -> Vec<&'static str> {
-            self.0.lock().expect("recording hooks mutex").clone()
-        }
-    }
-
-    impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
-        fn hydrate_attachment_refs<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
-        fn hydrate_search_index<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
-        fn hydrate_spell<'a>(&'a self, _: &'a VaultRuntimeState) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
-        fn reclaim_stray_attachment_blobs<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
-        fn persist_search_index<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> crate::hooks::BoxFuture<'a> {
-            self.record("persist_search_index");
-            Box::pin(std::future::ready(()))
-        }
-        fn hydrate_ai_vectors<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
-        fn index_note_attachments<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-            _: &'a str,
-            _: &'a str,
-            _: &'a str,
-        ) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
-        fn zeroize_search_index(&self) {
-            self.record("zeroize_search_index");
-        }
-        fn zeroize_spell(&self) {
-            self.record("zeroize_spell");
-        }
-        fn zeroize_vault_indices(&self) {
-            self.record("zeroize_vault_indices");
-        }
-        fn zeroize_attachment_refs(&self) {
-            self.record("zeroize_attachment_refs");
-        }
-        fn abort_active_recording(&self) {
-            self.record("abort_active_recording");
-        }
-        fn pdf_export_teardown_on_lock(&self) {
-            self.record("pdf_export_teardown_on_lock");
-        }
-        fn clear_staged_descriptor(&self) {
-            self.record("clear_staged_descriptor");
-        }
-        fn apply_screen_capture(&self, _: bool, _: &'static str) {
-            self.record("apply_screen_capture");
-        }
-        fn search_upsert(&self, _: &str, _: &str, _: &str) {}
-        fn search_remove(&self, _: &str) {}
-        fn ai_note_changed(&self, _: &str, _: &str) {}
-        fn ai_note_deleted(&self, _: &str) {}
-        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
-        fn bump_local_change(&self) {}
-        fn emit_snapshot_write_failed(&self, _: &str) {}
-        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
-        }
-        fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
-        fn preempt_inflight_backup<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
-        fn invalidate_quick_unlock(&self, _: &Path) {}
-        fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
-            false
-        }
-        fn purge_note_snapshots(&self, _: &Path, _: &str) -> std::io::Result<usize> {
-            Ok(0)
-        }
     }
 
     /// Same per-test runtime pattern as the sibling plugins. Builds a

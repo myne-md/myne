@@ -44,6 +44,15 @@ import {
   setVaultLabel,
   type EditorLayout,
 } from "../../src/lib/prefs";
+// The whole module namespace, for the roster block at the bottom: it iterates
+// every export rather than a remembered list.
+import * as allPrefs from "../../src/lib/prefs";
+// @ts-expect-error: a .mjs guard script with no type declarations. Imported
+// rather than mirrored so the read/write classification cannot drift between the
+// guard and this spec.
+import { READ_COMMANDS as READ_COMMANDS_UNTYPED } from "../../scripts/check-prefs-nonce.mjs";
+
+const READ_COMMANDS = READ_COMMANDS_UNTYPED as Set<string>;
 
 beforeEach(() => {
   invokeMock.mockReset();
@@ -263,5 +272,101 @@ describe("rejection propagation (optimistic-UI revert contract)", () => {
     });
     // The bump runs only AFTER a resolved invoke — a failed write never refreshes.
     expect(bumpPrefsNonceMock).not.toHaveBeenCalled();
+  });
+});
+
+// ── the roster ──────────────────────────────────────────────────────────────
+//
+// The named cases above pin ARG-KEY SHAPE, which has to be written out per
+// setter because only a human knows that `setFavorites` renames its argument to
+// `order`. Property 2 (every write bumps) needs no such knowledge, and pinning it
+// through a hand-maintained import list covered 17 of this module's ~71 exports:
+// a setter added tomorrow was behaviourally uncovered unless somebody remembered
+// to extend the list.
+//
+// This block closes that by construction. It is the twin of
+// `mobile/tests/prefs-nonce.test.ts`'s roster loop and landed in the same change
+// (myne-md/myne#486) for a reason worth stating: inventing a stronger shape and
+// applying it to ONE half of a twin pair is the exact drift that change is about.
+//
+// Keyed off what each binding actually sent to `invoke`, never off its name, so
+// a rename covers itself.
+describe("the roster: every export that writes vault.prefs bumps the nonce", () => {
+  /** Sanctioned `writePref(cmd, args, { bump: false })` users. Landed EMPTY:
+   *  without it the first legitimate use of the documented hatch fails here with
+   *  a message that reads like a defect rather than like "record it". */
+  const BUMPLESS = new Set<string>();
+
+  const prefsWritesOf = (calls: unknown[][]) =>
+    calls
+      .map((c) => c[0])
+      .filter((c): c is string => typeof c === "string" && c.startsWith("plugin:prefs|"))
+      .map((c) => c.slice("plugin:prefs|".length))
+      .filter((c) => !READ_COMMANDS.has(c));
+
+  it("covers every write-emitting export, not a remembered subset", async () => {
+    const covered: string[] = [];
+
+    for (const [name, fn] of Object.entries(allPrefs)) {
+      if (typeof fn !== "function") continue;
+      invokeMock.mockReset();
+      // `prefs_read` answers with a usable view, not `undefined`. A READ-then-write
+      // binding (`toggleFavoriteOnDisk` reads the fresh favourites before writing
+      // them back) otherwise throws on `fresh.favorites` before reaching its
+      // write, lands at `writes.length === 0`, and is skipped by the very loop
+      // that claims to cover every write-emitting export. It was, until this
+      // line: the one setter whose #251 defect this file calls the worst of them
+      // was the one silently outside the roster.
+      invokeMock.mockImplementation(async (cmd: unknown) =>
+        cmd === "plugin:prefs|prefs_read" ? { favorites: [] } : undefined,
+      );
+      bumpPrefsNonceMock.mockReset();
+      // Two positional arguments cover every setter's arity, and a binding that
+      // reaches no prefs WRITE command (a pure normalizer, a read) is skipped by
+      // the filter below.
+      try {
+        await (fn as (...a: unknown[]) => unknown)("probe", "probe");
+      } catch {
+        // A throw is not a verdict. Whether the binding wrote is decided by what
+        // reached `invoke`, which the filter below reads, so a binding that threw
+        // AFTER its write is still covered. What a throw can do is hide a write
+        // that never happened, which is why the floor is pinned at the real count
+        // rather than under it.
+      }
+      const writes = prefsWritesOf(invokeMock.mock.calls);
+      if (writes.length === 0) continue;
+      if (BUMPLESS.has(name)) continue;
+      covered.push(name);
+      expect(
+        bumpPrefsNonceMock,
+        `${name} wrote ${writes.join(", ")} without bumping the nonce`,
+      ).toHaveBeenCalled();
+    }
+
+    // Non-vacuity, pinned at the REAL count rather than under it. A floor fires
+    // when the number drops, and an addition raises it, so slack below reality
+    // buys nothing and costs coverage: a setter that starts early-returning
+    // before its `invoke` leaves the loop through `writes.length === 0` and
+    // silently stops being tested. This number is measured, and it is also the
+    // guard against the read-then-write exclusion the mock above fixed.
+    expect(covered.length).toBeGreaterThanOrEqual(68);
+    expect(covered).toContain("toggleFavoriteOnDisk");
+    // Two names pinned rather than left to the count, because these two toggles
+    // are the ones a user reads as a privacy promise, so a surface showing the
+    // old value is worse here than a stale font size. What §6 of
+    // `docs/threat-model.md` actually covers on this client is narrower than
+    // "screen-capture exclusion": Windows 10 build 19041+ is the one platform
+    // where the layer earns its place, macOS makes the call and claims nothing
+    // (Apple documents `NSWindowSharingNone` as a legacy constant macOS no
+    // longer uses), and Linux applies no protection on any display server. That
+    // per-platform split is not pedantry: one unqualified sentence is what made
+    // this item overclaim for a year, and §6 says in its own text that no
+    // compiler warning, lint or repo guard signals the drift, so a comment is
+    // exactly the surface where it creeps back. The mobile twin of this
+    // assertion carries no §6 citation at all, because §6 describes no mobile
+    // platform. What this assertion pins is true on every platform and needs no
+    // §6 claim: the displayed state of these toggles must match disk.
+    expect(covered).toContain("setScreenCaptureProtection");
+    expect(covered).toContain("setRemindersEnabled");
   });
 });
