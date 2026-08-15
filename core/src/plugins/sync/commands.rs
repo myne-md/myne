@@ -396,6 +396,34 @@ pub async fn sync_lifecycle_resume<R: Runtime>(app: AppHandle<R>) {
     }
 }
 
+/// A device-verification eye-compare (SYNC-40) is open on this device — hold
+/// content pushes so the vault head cannot advance under it (myne#462).
+///
+/// **Idempotent, and it doubles as the lease ping.** The open screen calls this
+/// about once a second; silence for
+/// [`VERIFY_HOLD_LEASE_MS`](super::verify_hold::VERIFY_HOLD_LEASE_MS) releases
+/// the hold, so a crashed WebView cannot leave this device silently unsynced.
+/// Renewal cannot push past
+/// [`VERIFY_HOLD_MAX_MS`](super::verify_hold::VERIFY_HOLD_MAX_MS).
+///
+/// Like the lifecycle pair above: an in-RAM flag only — no vault access, no IO,
+/// no server call. Pulls are untouched, which is required rather than
+/// incidental (both sides reach the head they are comparing by pulling).
+#[tauri::command]
+pub async fn sync_verify_hold_begin<R: Runtime>(app: AppHandle<R>) {
+    use crate::host::HostCtx as _;
+    let now = crate::host::tauri_host::TauriHost::new(app).now_unix_millis();
+    super::verify_hold::verify_hold().begin(now);
+}
+
+/// Release the hold engaged by [`sync_verify_hold_begin`] — the compare closed,
+/// by match, by mismatch or by unmount. Idempotent: the UI releases on every
+/// unmount path and cannot always know which one ran first.
+#[tauri::command]
+pub async fn sync_verify_hold_end<R: Runtime>(_app: AppHandle<R>) {
+    super::verify_hold::verify_hold().end();
+}
+
 // --- Device management commands (MYND-425 tasks 7/8) ---
 //
 // Authed device roster + approve/remove over the server auth surface. The token

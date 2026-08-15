@@ -37,6 +37,7 @@ import {
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { parseAttachmentTarget } from "@myne/editor/host/notes/attachmentRef";
+import { parseEmbedAlias } from "@myne/dialect/embedLayout";
 import { parseWikilinkParts } from "../wikilink/chip-widget";
 import {
   catalogField,
@@ -96,12 +97,6 @@ export function rangeOverlapsAttachmentEmbed(
   return overlaps;
 }
 
-/** The display filename (alias) of an embed, for the tombstone/caption label. */
-function embedFilename(state: EditorState, node: SyntaxNode): string {
-  const parts = parseWikilinkParts(state, node.from, node.to);
-  return parts.alias ?? "";
-}
-
 function buildAttachmentEmbedDecorations(
   state: EditorState,
   catalog: CatalogState,
@@ -114,14 +109,20 @@ function buildAttachmentEmbedDecorations(
       to,
       enter: (node) => {
         if (node.name !== "Wikilink") return undefined;
-        const id = attachmentEmbedId(state, node.node);
+        // ONE walk per embed per rebuild. `attachmentEmbedId` + `embedAlias`
+        // each ran `parseWikilinkParts` over the same node, so the tree was
+        // iterated and the alias sliced twice on a path that re-runs on every
+        // document and viewport change.
+        const parts = parseWikilinkParts(state, node.from, node.to);
+        const id =
+          parts.isEmbed && parts.target !== null ? parseAttachmentTarget(parts.target) : null;
         if (id === null) return false; // not an attachment embed — leave to wikilink chip
-        const filename = embedFilename(state, node.node);
+        const { filename, layout, dropped } = parseEmbedAlias(parts.alias ?? "");
 
         const resolution = resolveCatalog(catalog, id);
         let widget;
         if (resolution.kind === "resolved") {
-          widget = makeResolvedWidget(resolution.row);
+          widget = makeResolvedWidget(resolution.row, layout, dropped);
         } else {
           // Either a DELETED attachment (`kind === "deleted"`: a syntactically
           // valid id absent from a loaded catalog — it once existed) OR the

@@ -35,6 +35,8 @@ permissions = [
     "allow-sync-join-account",
     "allow-sync-reset-local",
     "allow-sync-head-fingerprint",
+    "allow-sync-verify-hold-begin",
+    "allow-sync-verify-hold-end",
     "allow-sync-list-quarantine",
     "allow-sync-read-quarantine",
     "allow-sync-restore-quarantine",
@@ -186,3 +188,13 @@ commands.allow = ["sync_set_tor_routing"]
 identifier = "allow-sync-get-tor-state"
 description = "Allow invoking sync:sync_get_tor_state (MYND-650 — read the live routing posture: Tor mode as the sync routing gate has it, the bundled Tor client's phase (starting / ready / failed / stopped), and whether the configured endpoint is routed at all). With Tor mode off it reads an in-memory cell and touches no file. With Tor mode on it also reads the device-local endpoint config (app_config_dir/sync-config.json) to answer the third field — read-only, creating no directory, and only so the UI cannot claim a tunnel over a loopback endpoint that never enters one. Starts nothing; the loopback SOCKS port is the only payload and it names a listener on this device. This is what lets the UI say 'sync is paused' instead of implying protection while the tunnel is down. No vault access."
 commands.allow = ["sync_get_tor_state"]
+
+[[permission]]
+identifier = "allow-sync-verify-hold-begin"
+description = "Allow invoking sync:sync_verify_hold_begin (myne#462 — declare that a SYNC-40 device-verification eye-compare is open on this device, so the sync engine holds CONTENT pushes and the vault head both screens are comparing cannot advance under them). Idempotent, and it doubles as the lease ping: silence releases the hold after 15s and a hard ceiling of 5 minutes bounds it regardless, so a crashed WebView cannot leave this device silently unsynced. Flips an in-RAM flag only — no vault access, no IO, no server call, and pulls are never held. It cannot suppress an edit, only delay it: the coalescing anchor is retained, so the push flushes when the compare closes."
+commands.allow = ["sync_verify_hold_begin"]
+
+[[permission]]
+identifier = "allow-sync-verify-hold-end"
+description = "Allow invoking sync:sync_verify_hold_end (myne#462 — release the push hold engaged by sync_verify_hold_begin, on match, on mismatch or on unmount). Idempotent; in-RAM flag only, no vault access, no IO, no server call. Releasing early only restores the ordinary push cadence."
+commands.allow = ["sync_verify_hold_end"]

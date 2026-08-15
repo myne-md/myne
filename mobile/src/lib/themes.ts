@@ -10,7 +10,7 @@
 // here would be rejected by the ACL resolver, not silently succeed. Do not add
 // wrappers for them "for parity" — desktop is where themes are authored.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** A theme's flat `--token → value` CSS-variable palette map. Mirror of Rust
  *  `ThemePalette` (a `BTreeMap<String, String>`). */

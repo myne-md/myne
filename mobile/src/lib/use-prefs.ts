@@ -6,7 +6,7 @@
 // desktop chokepoint discipline. In browser-dev (`pnpm dev`, no Tauri host) it
 // resolves to {@link DEFAULT_PREFS} so the Settings UI stays navigable.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HAS_TAURI } from "./app-window";
 import { prefsRead, type PrefsView } from "./prefs";
 import { usePrefsNonce } from "./prefsNonce";
@@ -86,7 +86,35 @@ export function usePrefs(): UsePrefs {
   const [loading, setLoading] = useState(HAS_TAURI);
   const [error, setError] = useState(false);
 
+  // Monotonic request token: only the LATEST read may write state.
+  //
+  // Without it these reads are last-resolver-wins, and they genuinely overlap.
+  // One user action can advance the nonce several times (a folder rename writes
+  // deliberate_folders, archived_folders, item_colors and folder_icons, each
+  // bumping as it resolves), the bumps land in separate microtasks so
+  // `prefsNonce.ts`'s coalescing does not collapse them, and each re-runs this
+  // effect. If read N resolves after read N+1, the older view wins and the
+  // surface sits on pre-write prefs with no further bump coming, which is the
+  // stale-open-editor defect the chokepoint exists to prevent, arriving by a
+  // different road.
+  //
+  // The `cancelled` flag this replaces could not do the job: it was read before
+  // `await load()`, where it is always false, and `load` wrote state
+  // unconditionally. The desktop twin already gets this right by checking its
+  // flag AFTER the await (`src/hooks/usePrefs.ts:265`); a token additionally
+  // covers `reload`, which no effect cleanup can cancel.
+  const request = useRef(0);
+  // The highest-numbered read whose view actually reached state. Separate from
+  // `request` because "issued" and "applied" answer different questions.
+  const applied = useRef(0);
+
   const load = useCallback(async () => {
+    const mine = ++request.current;
+    const superseded = () => mine !== request.current;
+    // No token check here, deliberately: nothing between the increment above
+    // and this branch awaits or yields, so `superseded()` is provably false and
+    // a guard would read as a race that cannot happen. The token exists for the
+    // three sites after `await prefsRead()`.
     if (!HAS_TAURI) {
       setPrefs(DEFAULT_PREFS);
       setLoading(false);
@@ -94,24 +122,27 @@ export function usePrefs(): UsePrefs {
     }
     setError(false);
     try {
-      setPrefs(await prefsRead());
+      const view = await prefsRead();
+      // High-water mark rather than `superseded()`, and the difference is a real
+      // case: if read N is overtaken by read N+1 and N+1 then FAILS, dropping
+      // N's successful view leaves the hook on data older than what it had in
+      // hand, with no further bump coming. Applying the newest view that
+      // actually succeeded is the property wanted; a later success still wins,
+      // because its own number is higher.
+      if (mine <= applied.current) return;
+      applied.current = mine;
+      setPrefs(view);
     } catch {
+      if (superseded()) return;
       // Non-distinguishing: keep the last-known / default view; surface a flag.
       setError(true);
     } finally {
-      setLoading(false);
+      if (!superseded()) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (cancelled) return;
-      await load();
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void load();
     // Re-run on nonce advance (a setter resolved) so the UI reflects disk truth.
   }, [load, nonce]);
 

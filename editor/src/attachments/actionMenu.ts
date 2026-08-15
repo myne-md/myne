@@ -14,6 +14,25 @@
 import i18n from "@myne/editor/i18n";
 import { ensureAttachmentInsertStyles } from "./styles";
 
+/**
+ * A rule between two groups of rows. Not an action: it has no label, no testid
+ * and no keyboard stop, so assistive tech and Tab both skip it.
+ *
+ * Added for the embed layout rows (myne#409), which turn a four-row file menu
+ * into a four-group one. A SUBMENU was the alternative and was rejected: it
+ * would have exactly one consumer, and a flat list with rules is the smaller
+ * change to a menu primitive three other widgets already depend on.
+ */
+export interface OverflowSeparator {
+  readonly separator: true;
+}
+
+export type OverflowRow = OverflowAction | OverflowSeparator;
+
+function isSeparator(row: OverflowRow): row is OverflowSeparator {
+  return "separator" in row;
+}
+
 /** One row of the overflow menu. */
 export interface OverflowAction {
   readonly label: string;
@@ -27,6 +46,11 @@ export interface OverflowAction {
   /** OPTIONAL — why the row is disabled, surfaced as the row's `title` + aria so
    *  the reason is discoverable (e.g. "Enable AI in Settings → Labs → AI"). */
   readonly disabledReason?: string;
+  /** OPTIONAL: render the row as the CURRENTLY ACTIVE choice in its group
+   *  (a check mark plus `aria-checked`). Used by the embed layout rows, where
+   *  the menu is the only way to see which size or alignment is in effect;
+   *  activating the checked row clears the choice rather than rewriting it. */
+  readonly checked?: boolean;
 }
 
 export interface OverflowMenuOptions {
@@ -43,7 +67,7 @@ export interface OverflowMenuOptions {
  * widget DOM (its document `mousedown` listener would otherwise leak).
  */
 export function buildOverflowMenu(
-  actions: ReadonlyArray<OverflowAction> | (() => ReadonlyArray<OverflowAction>),
+  actions: ReadonlyArray<OverflowRow> | (() => ReadonlyArray<OverflowRow>),
   opts: OverflowMenuOptions,
 ): { wrap: HTMLElement; teardown: () => void } {
   const wrap = document.createElement("span");
@@ -87,13 +111,31 @@ export function buildOverflowMenu(
     // than freezing the row set at widget `toDOM` time — the widget is not
     // re-created when a compartment reconfigures, so a frozen list goes stale.
     const items = typeof actions === "function" ? actions() : actions;
-    for (const action of items) {
+    for (const row of items) {
+      if (isSeparator(row)) {
+        const rule = document.createElement("div");
+        rule.className = "cm-attachment-file-card-menusep";
+        // Presentational: no name, no role, no tab stop. A separator that
+        // announces itself is worse than no separator.
+        rule.setAttribute("role", "presentation");
+        menu.appendChild(rule);
+        continue;
+      }
+      const action = row;
       const item = document.createElement("button");
       item.type = "button";
       item.className = "cm-attachment-file-card-menuitem";
       item.setAttribute("role", "menuitem");
       item.setAttribute("data-testid", action.testid);
       item.textContent = action.label;
+      if (action.checked !== undefined) {
+        // `menuitemradio` rather than `menuitem`: these rows are a choice within
+        // a group, and `aria-checked` is what tells a screen-reader user which
+        // size or alignment is currently in effect.
+        item.setAttribute("role", "menuitemradio");
+        item.setAttribute("aria-checked", action.checked ? "true" : "false");
+        if (action.checked) item.classList.add("cm-attachment-file-card-menuitem-checked");
+      }
       if (action.disabled === true) {
         // Disabled-not-hidden: keep the real label, block activation, and surface
         // the reason (title + aria-disabled). No click handler is attached.

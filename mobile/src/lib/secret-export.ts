@@ -6,9 +6,9 @@ import {
   writeText as clipboardWriteText,
   readText as clipboardReadText,
   clear as clipboardClear,
-} from "@tauri-apps/plugin-clipboard-manager";
-import { invoke } from "@tauri-apps/api/core";
-import { documentDir, join } from "@tauri-apps/api/path";
+} from "../platform/clipboardManager";
+import { invoke } from "../platform/core";
+import { documentDir, join } from "../platform/path";
 import { logErrorKind } from "./vault-creation-logging";
 import { shareFile } from "./share";
 
@@ -48,12 +48,28 @@ export async function copySecretToClipboard(
 
 /**
  * Save a secret (recovery phrase / account number) to a `.txt` file in the app's
- * Documents directory — reachable via the iOS Files app — then present the
- * native share sheet (MYND-475) so the user can pick a destination ("Save to
- * Files" elsewhere, AirDrop, etc.). Uses the `myne-core` `secret_export` plugin
- * (the Rust-side write) because the mobile backend has no fs / save-dialog
- * plugin. The plaintext secret is written to a user-visible location by the
- * user's explicit intent (threat-model TB3 egress exception).
+ * Documents directory, then present the native share sheet (MYND-475) so the
+ * user can pick a destination ("Save to Files" elsewhere, AirDrop, etc.). Uses
+ * the `myne-core` `secret_export` plugin (the Rust-side write) because the
+ * mobile backend has no fs / save-dialog plugin. The plaintext secret is written
+ * by the user's explicit intent (threat-model TB3 egress exception).
+ *
+ * **Where that directory actually is, per platform** (this used to read
+ * "reachable via the iOS Files app", which is not true of either platform as
+ * shipped): on **iOS** the app declares no `UIFileSharingEnabled`, so `Documents`
+ * is NOT browsable in the Files app and the share sheet is the only way the user
+ * reaches the file. On **Android** the directory is
+ * `Android/data/<pkg>/files/Documents`, which the system Files app and
+ * DocumentsUI have refused to navigate into since Android 11 (API 30) while
+ * `minSdk` here is 24, and the share sheet is a documented no-op
+ * (`share_file.rs`). So on a current Android the write is the delivery and the
+ * user has no supported way to reach what was delivered: myne-md/myne#505 is the
+ * follow-up, and myne-md/myne#504 is the iOS label that claims otherwise.
+ *
+ * The file is **excluded from the platform's automatic cloud backup** on both
+ * platforms (myne-md/myne#491) — a saved recovery phrase alone reconstructs the
+ * vault, and until that landed iCloud Backup and Google Auto Backup carried it
+ * off the device. See `mobile/src-tauri/src/backup_exclude.rs`.
  *
  * Resolves to a short display label (`"Documents/<file>"`) on success, or `null`
  * on failure (the caller shows a message). `filename` should end in `.txt`.

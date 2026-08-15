@@ -41,6 +41,8 @@ permissions = [
     "allow-sync-join-account",
     "allow-sync-reset-local",
     "allow-sync-head-fingerprint",
+    "allow-sync-verify-hold-begin",
+    "allow-sync-verify-hold-end",
     "allow-sync-list-quarantine",
     "allow-sync-read-quarantine",
     "allow-sync-restore-quarantine",
@@ -164,3 +166,13 @@ commands.allow = ["sync_lifecycle_resume"]
 identifier = "allow-sync-decode-join-qr"
 description = "Allow invoking sync:sync_decode_join_qr (MYND-466 — decode a scanned device-join QR string into {endpoint_url, account#, cert_pin, pin_source, fresh} for the confirm screen). Pure over the scanned string + the clock; no vault access, no IO, no server call, carries no secret."
 commands.allow = ["sync_decode_join_qr"]
+
+[[permission]]
+identifier = "allow-sync-verify-hold-begin"
+description = "Allow invoking sync:sync_verify_hold_begin (myne#462 — declare that a SYNC-40 device-verification eye-compare is open on this device, so the sync engine holds CONTENT pushes and the vault head both screens are comparing cannot advance under them). Idempotent, and it doubles as the lease ping: silence releases the hold after 15s and a hard ceiling of 5 minutes bounds it regardless, so a crashed WebView cannot leave this device silently unsynced. Flips an in-RAM flag only — no vault access, no IO, no server call, and pulls are never held. It cannot suppress an edit, only delay it: the coalescing anchor is retained, so the push flushes when the compare closes."
+commands.allow = ["sync_verify_hold_begin"]
+
+[[permission]]
+identifier = "allow-sync-verify-hold-end"
+description = "Allow invoking sync:sync_verify_hold_end (myne#462 — release the push hold engaged by sync_verify_hold_begin, on match, on mismatch or on unmount). Idempotent; in-RAM flag only, no vault access, no IO, no server call. Releasing early only restores the ordinary push cadence."
+commands.allow = ["sync_verify_hold_end"]

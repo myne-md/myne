@@ -35,13 +35,161 @@ import {
   renameFileCard,
   revealFileCard,
 } from "./fileCardActions";
-import { buildOverflowMenu, type OverflowAction } from "./actionMenu";
+import { buildOverflowMenu, type OverflowAction, type OverflowRow } from "./actionMenu";
+import {
+  type DroppedEmbedSegment,
+  type EmbedLayout,
+  emptyEmbedLayout,
+  isAliasSafeText,
+  sameEmbedLayout,
+} from "@myne/dialect/embedLayout";
+import {
+  hasWidth,
+  parseWidthInput,
+  readEmbedLayout,
+  setAlt,
+  toggleAlign,
+  toggleWidthPercent,
+  toggleWidthPx,
+  updateEmbedLayout,
+} from "./embedLayoutActions";
+import { promptForText } from "./renamePrompt";
+import { showAttachmentToast } from "./toast";
 import { decodePeaks } from "./waveform";
 import { createTranscriptSection } from "./transcript";
 import { transcriptionEnabledFacet } from "./transcription-gate";
 
-/** Width (CSS px) the inline image / PDF frame renders at. */
+/** Default width (CSS px) an inline image / PDF frame renders at when the
+ *  embed carries no explicit `w=` segment. Mirrored by `.cm-attachment-frame`
+ *  and `.cm-attachment-pdf-scroller` in `theme.ts`; change all three together. */
 const FRAME_WIDTH = 320;
+
+/**
+ * Apply an embed's layout segments (myne#409) to its frame.
+ *
+ * **An explicit width is a maximum intent, not a guarantee.** The frame is
+ * always paired with `max-width: 100%`, so it is bounded by the editor's
+ * content column, which is itself a user preference
+ * (`editor_content_width`: narrow 560 / normal 680 / wide 820 / full unbounded,
+ * `editor/src/typography.ts`). Without the clamp a `w=800` embed would overflow
+ * the 680px default column, and changing that preference would break the layout
+ * of notes already written.
+ *
+ * **Typed CSSOM property setters and classes only.** Never `style.cssText`,
+ * never `setAttribute("style", …)`, never a custom property. A typed setter
+ * parses the value against that property's own grammar and rejects it wholesale
+ * on failure, so a note-authored value cannot carry a second declaration
+ * through it. That is what keeps this off the `style-src 'unsafe-inline'`
+ * surface, and it is the reason this needs no validator crate of its own. The
+ * closed grammar in `@myne/dialect/embedLayout` is still upstream of every
+ * value that reaches here; this is defence in depth, not the only defence.
+ */
+function applyEmbedLayout(frame: HTMLElement, layout: EmbedLayout): void {
+  const width =
+    layout.widthPx !== null
+      ? `${layout.widthPx}px`
+      : layout.widthPercent !== null
+        ? `${layout.widthPercent}%`
+        : null;
+  if (width !== null) {
+    frame.style.width = width;
+    frame.style.maxWidth = "100%";
+  }
+
+  if (layout.align !== null) {
+    // Alignment is a class, never an inline style string. The frame is
+    // `inline-flex` by default, which no margin can centre; the aligned variant
+    // makes it block-level and `fit-content` wide so the auto margins bite.
+    frame.classList.add("cm-attachment-frame-align", `cm-attachment-frame-align-${layout.align}`);
+  }
+}
+
+function sameDroppedSegments(
+  a: readonly DroppedEmbedSegment[],
+  b: readonly DroppedEmbedSegment[],
+): boolean {
+  return a.length === b.length && a.every((seg, i) => seg.source === b[i].source);
+}
+
+/**
+ * The persistent unreadable-segment marker (myne#409 task 6).
+ *
+ * `markdown-dialect.md` §3.9.3 binds the shape, and every clause of it is
+ * load-bearing here: the report must be persistent, IN the rendered block,
+ * carry the source text verbatim, and never be a transient notification. The
+ * block re-renders on every note open, so a notification would recur
+ * indefinitely, and a shown-once notification goes silent, which is the exact
+ * failure the visible-drop rule exists to prevent.
+ *
+ * It appears ONLY for a known key carrying an invalid value. An unrecognised
+ * key is version skew across three independently-versioned clients reading one
+ * synced vault: the note is right, the client is old, and there is nothing the
+ * reader can act on. `parseEmbedAlias` makes that split, so anything reaching
+ * here is author-fixable by construction.
+ *
+ * Quiet by design. The embed still renders correctly at its default size, so a
+ * loud marker would read as damage.
+ */
+
+function buildDroppedSegmentMarker(
+  dropped: readonly DroppedEmbedSegment[],
+  testidPrefix: string,
+): HTMLElement {
+  const mark = document.createElement("span");
+  mark.className = "cm-attachment-embed-warning";
+  mark.setAttribute("data-testid", `${testidPrefix}.unreadable`);
+  // A Lucide glyph, not a unicode character: `docs/design/README.md`
+  // Iconography forbids unicode symbols as icons, and Status already uses
+  // `circle-alert` (the toast one directory over draws the same one).
+  mark.appendChild(makeAttachmentIcon("circle-alert"));
+  const detail = dropped.map((d) => d.source).join(", ");
+  const label = i18n.t("editor.attachment.widget.unreadableSegment", { segments: detail });
+  mark.setAttribute("role", "img");
+  mark.setAttribute("aria-label", label);
+  mark.title = label;
+  return mark;
+}
+
+/**
+ * The accessible name for an embed, and whether the media itself should be
+ * announced at all.
+ *
+ * `alt === null` means the author wrote none, so the filename stands in.
+ * `alt === ""` means the author deliberately marked the media decorative, which
+ * is a different thing: it is hidden from assistive tech entirely.
+ *
+ * **The name goes on the MEDIA, never on the frame.** ARIA gives an element
+ * with `role="img"` presentational children, so putting the role on the frame
+ * removed every descendant from the accessibility tree, and the frame is where
+ * the overflow menu and the unreadable-segment marker live. On the default path
+ * (an embed with no authored alt, which is nearly all of them) that made the
+ * whole feature invisible to a screen reader: those menu rows are the only
+ * authoring path there is, and the marker is the §3.9.3 report. The frame stays
+ * a plain container on every path.
+ */
+function applyEmbedAltText(
+  frame: HTMLElement,
+  media: HTMLElement,
+  filename: string,
+  layout: EmbedLayout,
+): void {
+  // Never on the frame. Cleared defensively so a caller that set one before
+  // calling this cannot leave the frame's children presentational.
+  frame.removeAttribute("role");
+  frame.removeAttribute("aria-label");
+
+  if (layout.alt === "") {
+    // Decorative: hide the media, keep the frame and everything inside it.
+    media.setAttribute("alt", "");
+    media.setAttribute("role", "presentation");
+    media.removeAttribute("aria-label");
+    return;
+  }
+  const name = layout.alt ?? filename;
+  media.setAttribute("alt", name);
+  media.setAttribute("role", "img");
+  media.setAttribute("aria-label", name);
+}
 
 /** Tombstone flavor: a deleted attachment (id was once in the catalog) vs a
  *  broken reference (malformed `att:` target — never a valid id). */
@@ -57,10 +205,14 @@ export class AttachmentImageWidget extends WidgetType {
    *  the id, so eq() is unchanged there. `attachmentUrl` is host-safe (falls back
    *  to the canonical literal when no host is installed — vitest/jsdom). */
   private readonly url: string;
+  /** Tear-down for the body-mounted overflow menu: see the file card's. */
+  private menuTeardown: (() => void) | null = null;
 
   constructor(
     private readonly id: string,
     private readonly filename: string,
+    private readonly layout: EmbedLayout = emptyEmbedLayout(),
+    private readonly dropped: readonly DroppedEmbedSegment[] = [],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -70,15 +222,20 @@ export class AttachmentImageWidget extends WidgetType {
     return (
       other.id === this.id &&
       other.filename === this.filename &&
-      other.url === this.url
+      other.url === this.url &&
+      // Without this the widget survives a layout edit unchanged: CM6 keeps the
+      // old DOM whenever eq() says the rebuild matches.
+      sameEmbedLayout(other.layout, this.layout) &&
+      sameDroppedSegments(other.dropped, this.dropped)
     );
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const frame = document.createElement("span");
     frame.className = "cm-attachment-frame";
-    frame.setAttribute("role", "img");
-    frame.setAttribute("aria-label", this.filename);
+    // role + aria-label are owned by `applyEmbedAltText` below, which writes
+    // them on every path and removes them for a decorative image.
+    applyEmbedLayout(frame, this.layout);
 
     const url = this.url;
 
@@ -94,8 +251,21 @@ export class AttachmentImageWidget extends WidgetType {
     // allowlists. SVG is served as image/svg+xml and rendered here ONLY through
     // the `<img>` element (secure static mode); its markup never enters the DOM.
     img.src = url;
-    img.alt = this.filename;
-    img.style.maxWidth = `${FRAME_WIDTH}px`;
+    applyEmbedAltText(frame, img, this.filename, this.layout);
+    // The frame carries the width (applyEmbedLayout); the image fills it and is
+    // bounded by it, so an explicit width never overflows the content column.
+    // With no explicit width this reproduces the historical 320px cap.
+    if (this.layout.widthPx === null && this.layout.widthPercent === null) {
+      img.style.maxWidth = `${FRAME_WIDTH}px`;
+    } else {
+      img.style.width = "100%";
+      img.style.maxWidth = "100%";
+    }
+    // An explicit height means the author asked for exactly that box, which is
+    // what Obsidian's `300x200` means too. Aspect distortion is the request.
+    if (this.layout.heightPx !== null) {
+      img.style.height = `${this.layout.heightPx}px`;
+    }
     // Hidden until decoded so the progress chip is the only thing visible while
     // the bytes decrypt; swap on load (or drop the chip on error so a genuine
     // broken-image affordance still surfaces).
@@ -117,7 +287,20 @@ export class AttachmentImageWidget extends WidgetType {
     });
     frame.appendChild(img);
 
+    if (this.dropped.length > 0) frame.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-image"));
+
+    const menu = buildEmbedOverflowMenu(view, frame, this.id, this.filename, this.dropped, "attachment-image");
+    this.menuTeardown = menu.teardown;
+    frame.appendChild(menu.wrap);
+
     return frame;
+  }
+
+  // If CM6 discards the widget while its menu is open, tear the menu down so its
+  // document `mousedown` listener cannot outlive the DOM.
+  destroy(): void {
+    this.menuTeardown?.();
+    this.menuTeardown = null;
   }
 
   // Let the click reach the <img> handler (lightbox) rather than being
@@ -128,6 +311,224 @@ export class AttachmentImageWidget extends WidgetType {
   }
 }
 
+/**
+ * The size presets offered in the embed menu, chosen against the editor's own
+ * content-column widths (narrow 560 / normal 680 / wide 820,
+ * `editor/src/typography.ts`) so all four read as distinct in the default
+ * column rather than collapsing into each other under the clamp.
+ *
+ * There is deliberately no "Original" preset. The grammar has no way to say
+ * "the image's natural size" (`w=` takes a length, not a keyword), and a row
+ * labelled Original that actually meant "back to the 320px default cap" would
+ * be a lie. Selecting the already-active preset clears the width instead, which
+ * is the real undo, and a natural-size keyword is a grammar question for later.
+ */
+const SIZE_PRESETS: ReadonlyArray<{
+  name: string;
+  labelKey: string;
+  px: number | null;
+  percent: number | null;
+}> = [
+  { name: "small", labelKey: "editor.attachment.widget.menu.size.small", px: 240, percent: null },
+  { name: "medium", labelKey: "editor.attachment.widget.menu.size.medium", px: 400, percent: null },
+  { name: "large", labelKey: "editor.attachment.widget.menu.size.large", px: 640, percent: null },
+  { name: "full", labelKey: "editor.attachment.widget.menu.size.full", px: null, percent: 100 },
+];
+
+const EMBED_ALIGNMENTS = ["left", "center", "right"] as const;
+
+/** Custom size: prompt, validate through the SAME closed grammar the parser
+ *  enforces, and refuse visibly rather than writing a value the parser would
+ *  then drop and report back at the author. */
+async function promptCustomSize(
+  view: EditorView,
+  host: HTMLElement,
+  id: string,
+  current: EmbedLayout,
+): Promise<void> {
+  const shown =
+    current.widthPx !== null
+      ? String(current.widthPx)
+      : current.widthPercent !== null
+        ? `${current.widthPercent}%`
+        : "";
+  const raw = await promptForText(shown, {
+    titleKey: "editor.attachment.customSizePrompt.title",
+    confirmKey: "editor.attachment.customSizePrompt.confirm",
+    testidPrefix: "attachment-custom-size",
+  });
+  if (raw === null) return; // cancelled
+  const parsed = parseWidthInput(raw);
+  if (parsed === null) {
+    showAttachmentToast(i18n.t("editor.attachment.widget.menu.customSizeInvalid"), "error");
+    return;
+  }
+  updateEmbedLayout(view, host, id, (current) => ({
+    ...current,
+    widthPx: parsed.px,
+    widthPercent: parsed.percent,
+  }));
+}
+
+/**
+ * Edit alt text.
+ *
+ * Two edges, both of which silently destroyed something before:
+ *
+ * 1. **`]]` terminates the embed.** `wikilink.md` §2.1 forbids it inside a
+ *    wikilink and v0.1 has no escape for it, so `alt=see [[Note]]` emitted a
+ *    wikilink that ends at the first `]]`: the alt was truncated and the rest
+ *    landed in the note as literal text. Alt is the only free-text write this
+ *    feature makes into the note (rename writes the catalog, custom size is
+ *    grammar-validated), so it is the one place that needs the guard.
+ * 2. **An empty submission is not "no alt".** An image with no alt opens an
+ *    empty box, and pressing Enter used to write `alt=""`, which marks it
+ *    DECORATIVE and hides it from assistive tech. Nothing in the UI passed
+ *    `null`, and a form-C embed is atomic with no source-lift, so it could not
+ *    be undone once the session's undo stack was gone. An empty submission on
+ *    an embed that had no alt now CLEARS the key instead.
+ */
+async function promptAltText(
+  view: EditorView,
+  host: HTMLElement,
+  id: string,
+  current: EmbedLayout,
+): Promise<void> {
+  const raw = await promptForText(current.alt ?? "", {
+    titleKey: "editor.attachment.altPrompt.title",
+    confirmKey: "editor.attachment.altPrompt.confirm",
+    testidPrefix: "attachment-alt-text",
+  });
+  if (raw === null) return; // cancelled
+  // `]`, not `]]`. A single one is the worse of the two: the tree parser scans
+  // for the first `]]` PAIR and renders the embed normally, while the three
+  // regex extractors bound the alias with `[^\]]` and match NOTHING, so the note
+  // silently leaves the attachment's referencing set and the delete
+  // confirmation stops warning about it. `isAliasSafeText` owns the rule so a
+  // second writer cannot re-open the gap.
+  if (!isAliasSafeText(raw)) {
+    showAttachmentToast(i18n.t("editor.attachment.widget.menu.altInvalid"), "error");
+    return;
+  }
+  // Empty box + no alt to begin with = "I did not want one", so clear the key
+  // rather than writing the decorative marker. Deliberately marking an image
+  // decorative is still reachable: clear an EXISTING alt down to empty.
+  const next = raw === "" && current.alt === null ? null : raw;
+  updateEmbedLayout(view, host, id, setAlt(next));
+}
+
+/**
+ * The file-actions and layout rows every inline EMBED (image / PDF) offers.
+ * Extracted so the two embed widgets share one definition instead of a second
+ * copy of the card's.
+ *
+ * Export is **absent, not disabled**, when the platform has no export
+ * destination: the same rule (and the same reason) the file card applies: the
+ * web client has no API granting a page a write path, so offering a row that
+ * cannot work is worse than omitting it.
+ *
+ * The `⋯` sits over the media rather than beside it (an embed has no metadata
+ * row to host it), and it is rendered unconditionally rather than revealed on
+ * hover: `editor/` is shared with the mobile WebView, where there is no hover
+ * and a hover-gated control is simply unreachable.
+ */
+function buildEmbedOverflowMenu(
+  view: EditorView,
+  host: HTMLElement,
+  id: string,
+  filename: string,
+  dropped: readonly DroppedEmbedSegment[],
+  testidPrefix: string,
+): { wrap: HTMLElement; teardown: () => void } {
+  // Resolved PER OPEN, not frozen at toDOM time: the checked state has to
+  // reflect the layout as it is now. The widget is not rebuilt for every
+  // reason the document changes, so a frozen row set would show a stale tick.
+  const rows = (): OverflowRow[] => {
+    const current = readEmbedLayout(view, host, id)?.layout ?? emptyEmbedLayout();
+    return [
+      ...(canExportAttachment()
+        ? [
+            {
+              label: i18n.t("editor.attachment.widget.menu.export"),
+              testid: `${testidPrefix}.export`,
+              run: () => void exportAttachment(id, filename),
+            },
+          ]
+        : []),
+      {
+        label: i18n.t("editor.attachment.widget.menu.rename"),
+        testid: `${testidPrefix}.rename`,
+        run: () => void renameFileCard(view, id, filename),
+      },
+      {
+        label: i18n.t("editor.attachment.widget.menu.remove"),
+        testid: `${testidPrefix}.remove`,
+        run: () => removeFileCard(view, host, id),
+      },
+      {
+        label: i18n.t("editor.attachment.widget.menu.reveal"),
+        testid: `${testidPrefix}.reveal`,
+        run: () => revealFileCard(view, id),
+      },
+      { separator: true },
+      ...SIZE_PRESETS.map((preset) => ({
+        label: i18n.t(preset.labelKey),
+        testid: `${testidPrefix}.size-${preset.name}`,
+        checked: hasWidth(current, preset.px, preset.percent),
+        run: () =>
+          updateEmbedLayout(
+            view,
+            host,
+            id,
+            preset.px !== null ? toggleWidthPx(preset.px) : toggleWidthPercent(preset.percent!),
+          ),
+      })),
+      {
+        label: i18n.t("editor.attachment.widget.menu.customSize"),
+        testid: `${testidPrefix}.size-custom`,
+        run: () => void promptCustomSize(view, host, id, current),
+      },
+      { separator: true },
+      ...EMBED_ALIGNMENTS.map((align) => ({
+        label: i18n.t(`editor.attachment.widget.menu.align.${align}`),
+        testid: `${testidPrefix}.align-${align}`,
+        checked: current.align === align,
+        run: () => updateEmbedLayout(view, host, id, toggleAlign(align)),
+      })),
+      { separator: true },
+      {
+        label: i18n.t("editor.attachment.widget.menu.editAlt"),
+        testid: `${testidPrefix}.edit-alt`,
+        run: () => void promptAltText(view, host, id, current),
+      },
+      // The verbatim source text §3.9.3 requires. Disabled-not-hidden: it is a
+      // report, not an action, and there is nothing sensible to run.
+      ...(dropped.length > 0
+        ? [
+            { separator: true } as OverflowRow,
+            {
+              label: i18n.t("editor.attachment.widget.unreadableSegment", {
+                segments: dropped.map((d) => d.source).join(", "),
+              }),
+              testid: `${testidPrefix}.unreadable-detail`,
+              disabled: true,
+              run: () => {},
+            } as OverflowRow,
+          ]
+        : []),
+    ];
+  };
+
+  const menu = buildOverflowMenu(rows, {
+    buttonTestId: `${testidPrefix}.menu-button`,
+    menuTestId: `${testidPrefix}.menu`,
+  });
+  // Overlay positioning; the shared wrap keeps its own class for the button
+  // styles, this one only places it.
+  menu.wrap.classList.add("cm-attachment-embed-menu");
+  return menu;
+}
+
 // --- resolved PDF (pdf.js first page, icon fallback) -----------------------
 
 export class AttachmentPdfWidget extends WidgetType {
@@ -135,10 +536,14 @@ export class AttachmentPdfWidget extends WidgetType {
    *  post-warm rebuild re-renders against the resolved URL on web; no-op on
    *  desktop. */
   private readonly url: string;
+  /** Tear-down for the body-mounted overflow menu: see the file card's. */
+  private menuTeardown: (() => void) | null = null;
 
   constructor(
     private readonly id: string,
     private readonly filename: string,
+    private readonly layout: EmbedLayout = emptyEmbedLayout(),
+    private readonly dropped: readonly DroppedEmbedSegment[] = [],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -148,15 +553,16 @@ export class AttachmentPdfWidget extends WidgetType {
     return (
       other.id === this.id &&
       other.filename === this.filename &&
-      other.url === this.url
+      other.url === this.url &&
+      sameEmbedLayout(other.layout, this.layout) &&
+      sameDroppedSegments(other.dropped, this.dropped)
     );
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const frame = document.createElement("span");
     frame.className = "cm-attachment-frame cm-attachment-pdf";
-    frame.setAttribute("role", "img");
-    frame.setAttribute("aria-label", this.filename);
+    applyEmbedLayout(frame, this.layout);
 
     // The bounded, scrollable reader: the visible scroll container the pages
     // stack in + the IntersectionObserver roots against. It is NEVER hidden —
@@ -165,6 +571,23 @@ export class AttachmentPdfWidget extends WidgetType {
     // shows its own small "Loading…" chip inside until the first page paints.
     const scroller = document.createElement("div");
     scroller.className = "cm-attachment-pdf-scroller";
+    // Same accessible-name rule as the image widget: the name goes on the media
+    // (the reader), never on the frame, so the overflow menu and the marker
+    // beside it stay in the accessibility tree. This also fixes an authored
+    // EMPTY alt, which the hand-rolled `?? ` here used to turn into a
+    // `role="img"` with an empty name (an unnamed graphic a screen reader
+    // announces) instead of a decorative element it skips.
+    applyEmbedAltText(frame, scroller, this.filename, this.layout);
+    // The scroller's stylesheet width is the 320px default. When the embed
+    // carries an explicit width the FRAME owns it (and is clamped to the
+    // content column), so the scroller fills the frame instead of re-capping it.
+    if (this.layout.widthPx !== null || this.layout.widthPercent !== null) {
+      scroller.style.width = "100%";
+      scroller.style.maxWidth = "100%";
+    }
+    if (this.layout.heightPx !== null) {
+      scroller.style.maxHeight = `${this.layout.heightPx}px`;
+    }
     // Clicking the inline reader opens the BIGGER lightbox reader (parallels the
     // image click→lightbox). zoom-in cursor hints the affordance.
     scroller.style.cursor = "zoom-in";
@@ -182,7 +605,10 @@ export class AttachmentPdfWidget extends WidgetType {
 
     this.cleanup = mountPdfScroller(scroller, {
       url: attachmentUrl(this.id),
-      pageWidth: FRAME_WIDTH,
+      // Render the pages at the width the author asked for, so an enlarged PDF
+      // is genuinely re-rendered rather than a 320px raster scaled up. A
+      // percentage width has no px value at build time, so it keeps the default.
+      pageWidth: this.layout.widthPx ?? FRAME_WIDTH,
       onError: () => {
         // MANDATORY generic-PDF-icon fallback (SYNC-5): pdf.js absent / failed.
         // Already warned (DENY-list-safe) inside the scroller, which has cleared
@@ -199,15 +625,23 @@ export class AttachmentPdfWidget extends WidgetType {
       },
     });
 
+    if (this.dropped.length > 0) frame.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-pdf"));
+
+    const menu = buildEmbedOverflowMenu(view, frame, this.id, this.filename, this.dropped, "attachment-pdf");
+    this.menuTeardown = menu.teardown;
+    frame.appendChild(menu.wrap);
+
     return frame;
   }
 
-  // Tear the reader down (pdf.js task.destroy + observer disconnect) if CM
-  // discards this widget's DOM.
+  // Tear the reader down (pdf.js task.destroy + observer disconnect) and close
+  // any open overflow menu if CM discards this widget's DOM.
   private cleanup: (() => void) | null = null;
   destroy(): void {
     this.cleanup?.();
     this.cleanup = null;
+    this.menuTeardown?.();
+    this.menuTeardown = null;
   }
 
   ignoreEvent(): boolean {
@@ -1326,12 +1760,19 @@ export class AttachmentTextPreviewWidget extends WidgetType {
  *  extension (MYND-268 Tier-1) takes the inline read-only preview; every other
  *  generic (non-renderable) attachment — `application/octet-stream`, MYND-173 —
  *  takes the export-only file-card path. */
-export function makeResolvedWidget(row: CatalogRow): WidgetType {
+export function makeResolvedWidget(
+  row: CatalogRow,
+  layout: EmbedLayout = emptyEmbedLayout(),
+  dropped: readonly DroppedEmbedSegment[] = [],
+): WidgetType {
+  // Only the media widgets take a layout today. A file card, an audio player
+  // and a text preview have no meaningful width/alignment story yet, and giving
+  // them one silently would be a feature nobody specified.
   if (row.contentType === "application/pdf") {
-    return new AttachmentPdfWidget(row.id, row.filename);
+    return new AttachmentPdfWidget(row.id, row.filename, layout, dropped);
   }
   if (isRenderableImageType(row.contentType)) {
-    return new AttachmentImageWidget(row.id, row.filename);
+    return new AttachmentImageWidget(row.id, row.filename, layout, dropped);
   }
   if (isPlayableAudioType(row.contentType)) {
     return new AttachmentAudioWidget(row.id, row.filename);

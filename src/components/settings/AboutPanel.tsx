@@ -181,8 +181,17 @@ export function AboutPanel() {
 
       <Block>
         <span style={LABEL_STYLE}>{t("settings.about.buildLabel")}</span>
+        {/* Served build first, compile-time define second. On web the commit is
+            a property of the SERVED bundle, not of whoever built it: the web
+            config pins `__BUILD_COMMIT__` so the bundle takes nothing from its
+            build environment (myne-md/myne#458), and `version.json` carries the
+            real commit — the document this panel already fetches for the hash.
+            Desktop answers `null` from the seam by construction and renders the
+            define, which is the identity of the installer that was run.
+            Sliced because `version.json` holds the full 40-hex SHA while the
+            desktop define is `--short=9`; `"unknown"` survives the slice. */}
         <p style={VALUE_STYLE} data-testid="about.build-commit">
-          {__BUILD_COMMIT__}
+          {(served?.commit ?? __BUILD_COMMIT__).slice(0, 9)}
         </p>
         {served !== null && (
           <p
