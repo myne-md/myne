@@ -132,6 +132,15 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
 // `docs/threat-model.md` §7 and by `design-notes/security/0491-…`, and they
 // say the same two things the user guide says at greater length.
 //
+// # Omitted, not greyed, where there are no vault names to hide
+//
+// The row is gated on `lockedVaultNames` and on nothing else, which on desktop
+// means it renders for everyone. Where that capability is absent (web) the
+// switch governs nothing: the locked picker it is about is unreachable there,
+// and the sealed store it erases needs an OS keychain a page does not have. So
+// the row is omitted rather than rendered against three commands that reject,
+// per the normative omit-never-grey rule in `decisions.md` 2026-07-26.
+//
 // # `available: false` is never a licence to show a name from somewhere else
 //
 // The probe reports whether this device has a usable keychain at all. When it
@@ -363,8 +372,11 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
       />
       {/* Beside screen-capture protection rather than beside the lock timers:
           both rows answer "what can somebody looking at this machine see",
-          which is the question the user came to Privacy holding. */}
-      <HideVaultNamesRow />
+          which is the question the user came to Privacy holding.
+
+          Gated on `lockedVaultNames` only, never on `developer_mode` (see the
+          block comment above the row). On desktop that gate is always open. */}
+      {has("lockedVaultNames") && <HideVaultNamesRow />}
       <AutoLockRow
         seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}
         onChange={(secs) => {
