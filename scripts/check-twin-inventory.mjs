@@ -5,8 +5,10 @@
 // # The failure this prevents
 //
 // Desktop and mobile compile from trees meant to share their decisions and
-// sharing almost none of them: 90 same-relative-path twins, 19 byte-identical,
-// 71 drifted. `scripts/check-twin-drift.mjs` (#261) warns when a change touches
+// sharing almost none of them. The measurement that opened this epic was 90
+// same-relative-path twins, 19 byte-identical, 71 drifted; it is 104 and 80 now
+// (the platform seam, myne-md/myne#492, plus two more pairs), and the numbers
+// live in the projection rather than here precisely because they move. `scripts/check-twin-drift.mjs` (#261) warns when a change touches
 // one side and leaves the other alone, which covers a NEW one-sided change and
 // says nothing about the drift that already exists. So "fix the drift" is an
 // unbounded ask that never starts, and the seven sibling sub-features have no
@@ -289,7 +291,7 @@ const CURATED_TWINS = [
  * argues above that a recorded flag goes stale the moment either file is edited.
  * An earlier draft carried a `lines` tuple anyway; it was dead (nothing read
  * it), and it had already rotted, being `split("\n").length` rather than `wc -l`
- * on all 96 entries. The projection renders live counts instead.
+ * on every entry. The projection renders live counts instead.
  */
 const ROSTER = [
   // ── src/dialect/: nine re-export shims into the shared @myne/dialect package
@@ -830,6 +832,91 @@ const ROSTER = [
   // would cost every reader a vocabulary entry and every sibling an extra
   // invariant, so the strain is recorded instead of designed around. If a second
   // case appears, this comment is the argument for reopening it.
+  // ── The two platform seams, and the six files that make them up
+  //
+  // These arrived after this roster was first measured (myne-md/myne#492 gave
+  // `mobile/src` its own seam directory; `src/platform/` already had one), which
+  // is the ENTERING-the-set case this guard exists to catch, and it caught them.
+  //
+  // Every one is `screen` under the second clause, and the clause was written
+  // for exactly this shape: the file exists to name the host it renders into.
+  // Two things follow from that and neither is drift. A seam names what ITS OWN
+  // host is asked for, so a member present on one side and absent on the other
+  // is a client that has no such call site rather than a gap. And desktop's seam
+  // has a second implementation behind it (the web build substitutes a
+  // wasm-Worker module with the same shape) while mobile's has none, so the two
+  // are not even answering the same question: desktop's holds a contract open,
+  // mobile's holds a boundary closed.
+  //
+  // The exception is `clipboardManager.ts`, which is `decision`, and mobile's
+  // own file header already says why in as many words.
+  {
+    a: "src/platform/core.ts",
+    b: "mobile/src/platform/core.ts",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "The IPC entry point. Identical export line on both sides; the headers differ because desktop's explains the web substitution the seam holds a contract open for, and mobile's explains that nothing substitutes behind it. Comment-only difference.",
+  },
+  {
+    a: "src/platform/event.ts",
+    b: "mobile/src/platform/event.ts",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "Backend-to-UI push. Mobile also exports `emit`, for the `share-file` event its setup hook listens for; desktop has no such call site, and adding one to make the files match would be inventing it. Mobile's header says so.",
+  },
+  {
+    a: "src/platform/window.ts",
+    b: "mobile/src/platform/window.ts",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "Host-window lifecycle. Same one-line export; the headers diverge on what the host IS, which is the point of the seam (a browser tab has no window to destroy; a phone has no `onCloseRequested` to swallow a fail-closed exit).",
+  },
+  {
+    a: "src/platform/deepLink.ts",
+    b: "mobile/src/platform/deepLink.ts",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "Deep-link registration. Desktop loads the plugin lazily because it is desktop-only and the import itself pulls a Tauri IPC binding into the web bundle; mobile is a Tauri host on both targets and needs no such guard.",
+  },
+  {
+    a: "src/platform/path.ts",
+    b: "mobile/src/platform/path.ts",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "Path arithmetic. The two clients address DIFFERENT directories on purpose: desktop re-exports `appDataDir`, mobile `documentDir`, because desktop picks an export destination through the OS save dialog and mobile has no dialog to pick with (myne-md/myne#491). Making the member lists match would be wrong on both sides.",
+  },
+  {
+    a: "src/platform/clipboardManager.ts",
+    b: "mobile/src/platform/clipboardManager.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "The only seam pair that is NOT per-client by construction. `Should the main window hold a process-lifetime OS-clipboard READ grant to run a comparison` is one question with one answer, and desktop answered it (myne-md/myne#379: the read-back moved host-side to `plugin:secret-export|clipboard_clear_if_matches`, and `clipboard-manager:allow-read-text` plus `allow-clear` left the capability file in the same change). Mobile still exports all three. Mobile's own header records this as a finding and adds a second one measured while writing it: the Rust half of the plugin is not registered on mobile at all, so none of the three calls can reach a command on a device and the caller's `catch` hid it. Destination waits on the port or the removal; myne-md/myne#390 is adjacent.",
+  },
+
+  // ── The two Rust/TS pairs the merge brought in
+  {
+    a: "src-tauri/src/navigation.rs",
+    b: "mobile/src-tauri/src/navigation.rs",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "The WebView navigation allowlist: the one exfiltration channel the CSP cannot see (myne-md/myne#383, mobile twin myne-md/myne#453). Which origins a WebView may navigate to after a DOMPurify bypass is one security question with one answer, and the two files argue it in near-identical prose. What legitimately differs is the allowlist CONTENTS (dev-server port, `tauri.localhost` versus the Android asset host), which is data, not policy. A shared core taking a per-client allowlist is the obvious destination and nobody has decided it.",
+  },
+  {
+    a: "src/hooks/useHeadFingerprintCompare.ts",
+    b: "mobile/src/hooks/useHeadFingerprintCompare.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "When two devices have converged, and what the UI says while they have not (myne-md/myne#462). One question, one answer, and a wrong answer on either client tells the user their vaults match when they do not. The twins were kept byte-identical through that change deliberately; nothing about convergence is per-client.",
+  },
+
   {
     a: "src-tauri/src/lib.rs",
     b: "mobile/src-tauri/src/lib.rs",

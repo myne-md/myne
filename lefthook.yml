@@ -141,13 +141,13 @@ pre-commit:
       # myne#472: every desktop/mobile twin module carries a verdict, and no
       # verdict outlives its files. `check-twin-drift.mjs` (#261) warns when a
       # change touches one side and leaves the other alone, which covers a NEW
-      # one-sided change and says nothing about the 71 pairs that had already
+      # one-sided change and says nothing about the pairs that had already
       # drifted before anyone counted them. This is the count, and it is also
       # what makes a twin ENTERING the set fail rather than pass unnoticed,
       # which is `decisions.md` 0488's own stated failure signal mechanised.
       # Whole-tree rather than glob-scoped, for the same reason `unwired` and
       # `prefs-nonce` are: a staged-files run cannot see a roster. Measured at
-      # about 11 ms of I/O for the full 96-pair sweep.
+      # about 11 ms of I/O for the full sweep.
       #
       # `--check` also holds the generated projection to the roster. Without it
       # the "Do not edit by hand" banner on `docs/dev/twin-inventory.md` had no
