@@ -36,3 +36,7 @@ export {
   type ReminderSwitchBlockProps,
   horizonDate,
 } from "./ReminderSettings";
+export {
+  HideVaultNamesBlock,
+  type HideVaultNamesBlockProps,
+} from "./HideVaultNamesBlock";

@@ -181,6 +181,13 @@ pub fn run() {
         // stay in lockstep with build.rs + permissions/themes/default.toml or
         // the ACL resolver fails closed.
         .plugin(plugins::themes::init())
+        // Sealed label store (MYL1, §9.22) — the device-local hide-vault-names
+        // option (myne-md/myne#411). Shared from `myne-core`; the same three
+        // commands the desktop registers, all reachable PRE-UNLOCK because the
+        // surface they govern is the picker. The command list must stay in
+        // lockstep with build.rs + permissions/vault-label/default.toml or the
+        // ACL resolver fails closed.
+        .plugin(plugins::vault_label::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::attachments::init())
