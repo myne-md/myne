@@ -28,18 +28,30 @@ never published. That is the whole point of the file.
 
 ## Reproducing an entry yourself
 
-The bundle is reproducible: the same commit produces the same hash, on any
-machine, because `version.json` carries the COMMIT's timestamp rather than a
-wall clock and the wasm build remaps every machine-specific path
-(`scripts/build-wasm.sh`).
+The bundle is reproducible **in the reference build environment**: the same
+commit produces the same hash for anyone who builds it there, because
+`version.json` carries the COMMIT's timestamp rather than a wall clock and the
+wasm build remaps every machine-specific path (`scripts/build-wasm.sh`).
+
+The reference build environment is **`linux/amd64`, built from
+`web/container/Dockerfile`**. `--platform` is load-bearing here, not decoration:
+the same commit built on an arm64 host produces a different hash from every row
+below, for the reason measured in "Why the build host is part of the hash", and
+plain `docker build` silently builds for whatever the host happens to be. Which
+is exactly the trap this section used to set: the procedure failed for the
+honest arm64 verifier and told them nothing about why.
+
+Emulation is not a caveat, it is the point: an arm64 machine reaches the
+reference platform through it and gets the byte-identical result.
 
 ```
 git checkout <commit>
-docker build -f web/container/Dockerfile \
+docker buildx build --platform linux/amd64 -f web/container/Dockerfile \
   --build-arg MYNE_BUILD_COMMIT=$(git rev-parse HEAD) \
   --build-arg MYNE_BUILD_TIMESTAMP=$(git show -s --format=%cI HEAD) \
-  -t myne-web:verify .
-docker run --rm -e MYNE_SYNC_ORIGIN=https://sync.myne.md -p 8099:8080 myne-web:verify &
+  -t myne-web:verify --load .
+docker run --rm --platform linux/amd64 \
+  -e MYNE_SYNC_ORIGIN=https://sync.myne.md -p 8099:8080 myne-web:verify &
 curl -s localhost:8099/version.json | grep bundle_hash
 ```
 
@@ -116,9 +128,77 @@ x86_64 host and the image is built on that host's own daemon, so amd64 is what
 away: rows here are appended, never rewritten, and a row that turned out not to
 be the shipped one is still a true record of what was published in advance.
 
-This is why the "the same commit produces the same hash, on any machine"
-sentence above is **currently false as written**. It holds for a fixed build
-host and architecture; #228 is the work of making it hold across hosts. Until
-that lands, a verifier must reproduce on the same architecture the origin runs
-on, and this record must name which architecture each row came from — which is
-what the table in this section is for.
+This is why the section above names a reference build environment rather than
+"any machine". The narrower sentence is the one that is true, and it is enough:
+**the same commit produces the same hash for every build of the reference
+platform, from any host.**
+
+Verified rather than asserted. The `linux/amd64` row above,
+`sha256:1d8ccfeb…`, was rebuilt from `fd8d23c1` on a macOS **arm64** laptop, in
+an emulated `linux/amd64` container, and came out byte-identical (2026-08-15,
+[#228](https://github.com/myne-md/myne/issues/228)). The verifier and the
+publisher shared neither operating system nor CPU architecture, which is the
+case that matters: a hash only one machine in the world can produce is a number
+the publisher asserts about itself.
+
+**The residual, stated rather than left for a verifier to hit.** The claim above
+is scoped across hosts and it is not yet scoped across time, because the
+reference environment is not itself pinned. `web/container/Dockerfile` names
+`rust:1.96-bookworm`, `node:25-slim` and `caddy:2.8-alpine`, all floating tags,
+and its wasm stage installs `nodejs` from live Debian. Its own comment says the
+digest pinning belongs to the release pipeline (task 16), and that pipeline does
+not exist yet. So a base image can move under a row that was written before it
+moved, and a verifier rebuilding an older row later can get a mismatch that means
+"the environment drifted", not "the bundle was substituted", which is the same
+false alarm this section closes for the architecture axis. Read a row as
+reproducible against the reference environment **as it stood when the row was
+written**. Pinning the three base images by digest, and recording the digests per
+row, is what closes it, and it is tracked rather than done
+([#228](https://github.com/myne-md/myne/issues/228)).
+
+## Why the build host is part of the hash
+
+The divergence is in the **wasm artefact**, and everything else follows from it.
+`web/wasm/pkg/myne_web_wasm_bg.wasm` is an input to the JS bundle, every chunk
+is content-hashed, and the chunk that carries the wasm's URL renames when the
+wasm renames, which renames its importers, and theirs, up to `index.html`. One
+differing artefact renamed 16 JS chunks in the measured case. Reading that
+symptom as "the bundler emits architecture-dependent output" is the wrong turn
+this section exists to prevent.
+
+Measured on the two published `0.2.0` image variants (504 assets each): 487
+byte-identical, 17 differing per side (16 `.js` and the one `.wasm`), and after
+normalising the hashed asset references inside the differing chunks, all of them
+collapse to the same text, except the wasm-bindgen glue, where the divergence
+is a Rust symbol name.
+
+The chain, from the bottom:
+
+1. Cargo derives `-C metadata` for every crate by hashing, among other things,
+   the output of `rustc -vV`, which carries a `host:` line naming the build
+   machine's target triple.
+2. rustc folds `-C metadata` into each crate's `StableCrateId`, which is what a
+   symbol's hash suffix encodes. Two container builds of the same commit, same
+   pinned rustc, same `wasm32-unknown-unknown` target, gave `wasm-bindgen` the
+   disambiguator `9394cf8502cefdb6` on arm64 and `5abedafe4fd079f5` on amd64.
+3. Symbol names are inputs to codegen-unit partitioning and to static-data
+   ordering, so the effect does not stay in the name section. Comparing the two
+   builds section by section: `code` differs (by 3011 bytes), and so do `data`,
+   `export`, `elem`, `function` and `custom:name`; `type`, `import`, `memory`,
+   `global`, `producers` and `target_features` are identical.
+
+**`-C symbol-mangling-version=v0` does not fix it, and was measured rather than
+assumed.** v0 removes the legacy `h<16 hex>` suffix, then encodes the same
+`StableCrateId` as a crate disambiguator instead
+(`_Result_____wasm_bindgen_9394cf8502cefdb6___JsError___true_`), so the arm64
+and amd64 artefacts still differ, in the same six sections. No stable-toolchain
+flag neutralises the `rustc -vV` input to cargo's metadata hash, which is why
+the fix is to name the build environment instead of chasing host independence.
+
+**The bundler was ruled out, not assumed innocent.** Vite 8 bundles through
+Rolldown, whose binding is a per-architecture native binary, which makes it the
+obvious suspect. Building the same commit four ways on one machine (native
+`darwin-arm64` binding, the architecture-independent `wasm32-wasi` binding
+(forced with `NAPI_RS_FORCE_WASI=error`, which fails closed rather than falling
+back), and with `RAYON_NUM_THREADS` at 1 and 2) produced one hash,
+`sha256:a585e43e…`, four times.

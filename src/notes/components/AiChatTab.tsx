@@ -223,20 +223,18 @@ function ChatTurnView({
           </span>
         )}
       </div>
-      {/* Empty finalized answer (the small model produced nothing) → a friendly
+      {/* Empty finalized answer (the model produced nothing) renders a friendly
           placeholder instead of a blank bubble.
 
-          Two routes reach it. A local engine can finalize a turn with no text
-          at all; and a remote provider reports an empty completion as a typed
-          failure, `empty_completion` (myne-md/myne#466), because the transport
-          has to distinguish it from a policy refusal and from a reply shape
-          Myne does not model. Both mean the same thing to the reader, so both
-          land here rather than in the red alert paragraph below: an empty
-          answer is a result, not a fault. */}
-      {!isUser &&
-        !turn.streaming &&
-        turn.text.length === 0 &&
-        (!turn.error || turn.errorCause === "empty_completion") && (
+          Two routes reach it and they converge BEFORE the store, not here. A
+          local engine finalizes a turn with no text; a remote provider reports
+          the same outcome as the typed failure `empty_completion`
+          (myne-md/myne#466), because the transport has to distinguish it from a
+          policy refusal and from a reply shape Myne does not model. `ai-chat.ts`
+          finalizes that cause rather than failing it, so by the time a turn is
+          rendered `error` means what it says and this condition reads one
+          field. */}
+      {!isUser && !turn.streaming && turn.text.length === 0 && !turn.error && (
           <p
             data-testid="ai.no-answer"
             style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", fontStyle: "italic", margin: 0 }}
@@ -244,7 +242,7 @@ function ChatTurnView({
             {t("editor.chrome.rightPanel.aiChat.noAnswer")}
           </p>
         )}
-      {turn.error && turn.errorCause !== "empty_completion" && (
+      {turn.error && (
         <p
           role="alert"
           data-testid="ai.turn-error"

@@ -20,7 +20,7 @@
 // `decisions.md` 2026-05-02 (the IPC contract pins `Slot::Unlocked`
 // as the success postcondition).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { SlotKind } from "../types/slot-kind";
 
 /**
