@@ -247,3 +247,28 @@ Appearance → Language → **العربية** (`ar`); spot-check on both platfo
 | 10.5 | **Inline isolation** — a note with a code span, a link, and an account-number-shaped run inside an Arabic paragraph | the neutral LTR runs do NOT reorder the surrounding RTL line (they are `unicode-bidi: isolate`d) |
 | 10.6 | **Editing surface bidi** — type Arabic then Latin on separate lines in the editor | per-line direction resolves correctly (shared `@myne/editor` bidi); caret + selection track the line's direction |
 | 10.7 | **Logical layout spot-check** — list-row dividers, the settings toggle knobs, unread/count badges, the table view's pinned Name column | all mirror: dividers inset from the correct side, knob ON-side flips, badges on the inline-end, the Name column pins to the RIGHT |
+
+## 11. Navigation-policy verification checklist (myne-md/myne#453)
+
+`src-tauri/src/navigation.rs` refuses every WebView navigation outside an allowlist of the
+app's own origins. On iOS **every** navigation action reaches that hook, the app's own first
+load included, so a wrong allowlist does not degrade a feature — it boots a blank app. No CI
+lane builds for iOS or Android, so this table is the only thing standing between the unit
+tests and a device.
+
+Run the whole table on **both** platforms; a failed 11.1 or 11.2 means the allowlist is
+wrong and the change must not ship (the module's `is_allowed_navigation` is one function —
+fix the arm, do not widen it to `true`). Production rows want an INSTALLED build
+(`--export-method debugging` per §1, or the Android install loop in §6.1), because dev
+builds load from Vite and never exercise the production origin at all.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 11.1 | **Production cold start** — install and launch the built app | the vault picker renders; NOT a blank/white screen. A blank screen with `navigation_denied` in the log (`tauri` stdout / `adb logcat -s RustStdoutStderr`) is the app's own origin being refused |
+| 11.2 | **Attachment preview** — open a note with an embedded image, then a PDF, then a voice note | all three render/play. On Android these load over `http://attachment.localhost`, on iOS over `attachment://` — the two arms the allowlist admits separately |
+| 11.3 | **External link** — tap an `https://` autolink in a note | it opens in the OS browser (`src/lib/open-url.ts`), and the in-app WebView does NOT navigate. The refusal is not the mechanism here; nothing should even reach the hook |
+| 11.4 | **Deep link, warm** — with the app open, trigger the home-screen widget / launcher shortcut (`myne://capture`) | the capture flow starts. Deep links arrive as OS events, not navigations, so a `navigation_denied` line naming scheme `myne` means something changed and the widget path is broken |
+| 11.5 | **Deep link, cold** — force-quit, then trigger `myne://open` from the widget | the app launches and lands in the same place as before this change |
+| 11.6 | **Dev loop, cabled** — `pnpm mobile:android` (or iOS on the simulator), i.e. the `adb reverse` / loopback origin | the app loads and HMR works |
+| 11.7 | **Dev loop, `--host`** — `pnpm tauri ios dev --host` against a physical iPhone on the same LAN | the app loads from the LAN IP. This is the arm desktop's hardcoded loopback list would refuse, and the reason the dev arm reads `build.devUrl` at runtime |
+| 11.8 | **Refusal is silent to the user** — nothing in the table above surfaced an error toast or a crash | the policy denies by returning `false`; a refusal logs a scheme LABEL only, never the URL (it is the value most likely to carry note plaintext) |
