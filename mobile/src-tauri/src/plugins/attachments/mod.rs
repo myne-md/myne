@@ -22,11 +22,12 @@
 //! scheme IS registered on the mobile Tauri `Builder` in `lib.rs` (delegating to
 //! the shared `scheme_core::build_response`) and already serves `audio/wav`.
 //!
-//! The lock-teardown wipe of the reference graph is a desktop-only
-//! `hooks::VaultLifecycleHooks` side-effect; mobile installs `NoopHooks`, so the
-//! graph simply lives for the process while a vault is unlocked (same posture as
-//! the search index being absent on mobile). `AttachmentRefsState` is managed in
-//! `lib.rs` setup (like desktop).
+//! The lock-teardown wipe of the reference graph is wired: `myne-core` calls
+//! `VaultLifecycleHooks::zeroize_attachment_refs` at every slot-drop site and
+//! `crate::hooks::MobileHooks` implements it against the `AttachmentRefsState`
+//! `lib.rs` manages (myne-md/myne#454). It was an empty body until then, which
+//! left one vault's note-id ↔ attachment-id correlation tags (AS3) resident
+//! across a lock and additively merged with the next vault's.
 //!
 //! Commands are registered via the `myne_core::plugins::attachments` module path
 //! so `generate_handler!` finds each command's hidden `__cmd__` items (a bare

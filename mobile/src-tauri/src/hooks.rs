@@ -30,22 +30,41 @@
 //! A fourth live hook is
 //! [`apply_screen_capture`](MobileHooks::apply_screen_capture) (MYND-469):
 //! native screen-capture protection via `crate::screen_guard` (iOS
-//! secure-field layer splice / Android FLAG_SECURE bridge). Every other hook
-//! stays a no-op until its subsystem lands on mobile (see
-//! `mobile/CLAUDE.md`).
+//! secure-field layer splice / Android FLAG_SECURE bridge).
+//!
+//! The fifth, sixth and seventh are the **lock-teardown** hooks
+//! [`zeroize_search_index`](MobileHooks::zeroize_search_index),
+//! [`zeroize_vault_indices`](MobileHooks::zeroize_vault_indices) and
+//! [`zeroize_attachment_refs`](MobileHooks::zeroize_attachment_refs)
+//! (myne-md/myne#454). Each resolves the state `lib.rs` manages and `clear()`s
+//! it, mirroring the desktop twins. They are not optional the way the absent
+//! subsystems below are: mobile HOLDS all three of these states for the process
+//! lifetime, so an empty body means a locked vault's plaintext-derived strings
+//! stay in RAM and bleed into the next vault to unlock. `scripts/check-lock-
+//! teardown.mjs` is the machine half of that rule.
+//!
+//! Every other hook stays a no-op until its subsystem lands on mobile (see
+//! `mobile/CLAUDE.md`) — `zeroize_spell`, `abort_active_recording`,
+//! `pdf_export_teardown_on_lock` and `clear_staged_descriptor` are empty
+//! because mobile holds no spell engine, no in-process recording session, no
+//! pdf-export window and no staged workspace descriptor (it does not register
+//! `workspace_stage`). Those are absences, not omissions.
 
 use myne_core::hooks::{BoxFuture, VaultLifecycleHooks};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use tauri::{AppHandle, Manager, Runtime};
 
-/// Mobile wiring for the shared command-core lifecycle hooks: no-op everywhere
-/// except the two snapshot hooks (which drive the `myne-core` snapshot store)
-/// and `bump_local_change` (nudges the shared `SyncLocalChange` counter) and
-/// `apply_screen_capture` (native screen-capture protection, MYND-469). Holds
-/// an [`AppHandle`] so `bump_local_change` reaches the managed
-/// `SyncLocalChange` via `try_state` and the screen-capture hook reaches
-/// `screen_guard::apply` (which owns its per-platform threading) — mirrors the
-/// desktop `DesktopHooks`.
+/// Mobile wiring for the shared command-core lifecycle hooks: no-op for every
+/// subsystem mobile does not carry, live for the two snapshot hooks (which
+/// drive the `myne-core` snapshot store), `bump_local_change` (nudges the
+/// shared `SyncLocalChange` counter), `apply_screen_capture` (native
+/// screen-capture protection, MYND-469) and the three lock-teardown wipes
+/// (myne-md/myne#454). Holds an [`AppHandle`] because all of those resolve
+/// app-managed state via `try_state` — the teardown wipes reach
+/// `SearchIndexState` / `VaultIndicesState` / `AttachmentRefsState`,
+/// `bump_local_change` reaches `SyncLocalChange`, and the screen-capture hook
+/// reaches `screen_guard::apply` (which owns its per-platform threading).
+/// Mirrors the desktop `DesktopHooks`.
 pub struct MobileHooks<R: Runtime> {
     app: AppHandle<R>,
 }
@@ -90,10 +109,40 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     }
 
     // ---- Group 2: sync ----------------------------------------------------
-    fn zeroize_search_index(&self) {}
+    //
+    // The three teardown hooks below were empty bodies until myne-md/myne#454,
+    // while `lib.rs` managed all three states for the process lifetime. Nothing
+    // else can wipe them: `myne-core` already calls these hooks at every
+    // slot-drop site there is (manual/auto `lock_from_host`, the vault-SWITCH
+    // branch of `unlock_from_host`, `vault_delete`, the change-password
+    // force-relock), so the client supplies the bodies and only the bodies.
+    // Empty, a lock left the prior vault's index in RAM and mobile's additive
+    // re-seed stacked the next vault's records on top of it.
+    fn zeroize_search_index(&self) {
+        if let Some(search) = self.app.try_state::<myne_core::search::SearchIndexState>() {
+            search.clear();
+        }
+    }
     fn zeroize_spell(&self) {}
-    fn zeroize_vault_indices(&self) {}
-    fn zeroize_attachment_refs(&self) {}
+    fn zeroize_vault_indices(&self) {
+        // No AI arm, unlike the desktop twin: mobile `local_inference` is
+        // transcription-only (no embedding role), so there is no vector store
+        // to wipe on this leg.
+        if let Some(indices) = self
+            .app
+            .try_state::<crate::plugins::vault_indices::VaultIndicesState>()
+        {
+            indices.clear();
+        }
+    }
+    fn zeroize_attachment_refs(&self) {
+        if let Some(refs) = self
+            .app
+            .try_state::<crate::plugins::attachments::AttachmentRefsState>()
+        {
+            refs.clear();
+        }
+    }
     fn abort_active_recording(&self) {}
     fn pdf_export_teardown_on_lock(&self) {}
     fn clear_staged_descriptor(&self) {}

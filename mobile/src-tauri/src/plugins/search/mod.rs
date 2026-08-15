@@ -18,7 +18,12 @@
 //! No slot gate: the frontend only calls these while the vault is unlocked, and
 //! the plaintext already crossed IPC as the note bodies it is re-pushing here.
 //! The index (`SearchIndexState`) is managed in `lib.rs` setup, like the
-//! structurally-twin `vault-indices` state.
+//! structurally-twin `vault-indices` state, and torn down on the same leg:
+//! `crate::hooks::MobileHooks::zeroize_search_index` clears it wherever
+//! `myne-core` drops the slot (myne-md/myne#454). Nothing is flushed first, and
+//! nothing needs to be — mobile writes no `vault.search` blob, so the index is
+//! purely a rebuildable RAM cache the WebView re-seeds with
+//! `search_index_replace` on the next unlock.
 //!
 //! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
 //! discipline" — no note plaintext (title/body/query) is ever logged here.
