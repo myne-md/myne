@@ -466,6 +466,16 @@ A class of data structures that allow concurrent edits across multiple replicas 
 
 Used in: `vision.md` (Phase 4 scope); `decisions.md` 2026-08-09
 
+### **credential phishing** &nbsp; ⚠️ *Threat*
+
+*(Aliases: phrase phishing, lookalike origin. Myne-divergent: no, but what makes it reachable here is Myne-specific.)*
+
+Adversary class A18: an origin the user mistakes for Myne's asks them for their 24-word recovery phrase and account number, which together yield `root_key` and therefore the whole vault, permanently and with no in-app remedy (`spec/protocol.md` §7). It needs no bundle compromise, so it is neither [A15](#hostile-code-delivery) nor A4, and no delivery-channel control touches it.
+
+The reason it is a **new** row rather than an always-present one is the part worth remembering: until 2026-08-15 the web client never generated, displayed or accepted a phrase (`decisions.md` 2026-07-26), so "a web page is asking me for my 24 words" was itself proof of an attack, with no judgement required of the user. Shipping web creation and web recovery (`decisions.md` 2026-08-15) spends that inference. What replaces it is narrower and weaker: the phrase is asked for on the web client in exactly one situation, a recovery the user started themselves, which is why phrase-credential *device enrolment* stays a decided absence there.
+
+Used in: `threat-model.md` §1 (A18), §5
+
 ### **Crockford base32** &nbsp; 🏗️ *Construction*
 
 The 32-character alphanumeric base-32 encoding defined by Douglas Crockford, excluding the visually ambiguous `I L O U`. Myne encodes account-number entropy as 19 Crockford characters (95 bits) plus 1 Damm-32 check character (`spec/account-number.md` §2).
@@ -768,6 +778,12 @@ Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 20
 A **self-host-only** operator flag (`MYNE_EXTENDED_RETENTION`) that disables the server's Layer-2 ciphertext reclamation, so deleted blobs are kept past the [tombstone horizon](#tombstone-horizon). A documented, deliberate **policy deviation**, never a default: it **weakens the user's "delete means gone" expectation** and the §6 operator obligation not to retain deleted ciphertext past the horizon. Hosted MUST NOT enable it. The structural guarantees (no plaintext, no required IP log) are unaffected — extended retention trades a retention-policy obligation, not a confidentiality guarantee. Phase 2.
 
 Used in: `self-host-policy.md` §4, `server-protocol.md` §6, `decisions.md` 2026-06-20 (MYND-438/440)
+### **extension host permissions** &nbsp; ⚠️ *Threat*
+
+The access a browser grants an installed extension over a given origin. An extension holding them reads that origin's DOM and input events directly, which for the web client means the recovery-phrase grid, the recovery cells and the master-password field. Adversary class A19, graded ❌ Out of scope because there is no control to apply: a content-security policy governs what the *page* may load, not what an extension may read out of it, and the page cannot detect the extension at all. Distinct from A14, which is about Myne's own keyless clipper extension being compromised.
+
+Used in: `threat-model.md` §1 (A19), §5
+
 ### **extension pairing token** &nbsp; 🗝️ *Key/identifier*
 
 A scoped, revocable, **append-only** credential (create-clip + is-unlocked-status only — never a vault key) issued to the [browser clipper](#browser-clipper) after an in-app Accept/Reject + numeric-challenge handshake bound to the exact extension ID. Crossing [TB10](#native-messaging-host) requires it; a compromised token cannot read, modify, or delete notes. The short numeric code compared during this handshake is the **pairing challenge** (a.k.a. numeric challenge): a 6-digit nonce drawn from the core CSPRNG, shown identically in the in-app pairing dialog and the extension so the user confirms both endpoints share one pairing attempt — a human-comparison value, never a key. The registry of issued/revoked tokens persists encrypted at rest in the [vault.prefs](#vaultprefs) prefs-family blob (`decisions.md` 2026-06-20) so pairing survives a restart and revocation is durable.

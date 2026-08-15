@@ -29,6 +29,20 @@ export async function copySecretToClipboard(
     logErrorKind(e, "clipboard-write-failed");
     return null;
   }
+  // No auto-clear where the platform cannot perform one (`decisions.md`
+  // 2026-08-15). The clear is gated on reading the clipboard BACK, so that
+  // unrelated content copied since is never destroyed, and page content is
+  // granted no clipboard read in Firefox at all and only a prompt-plus-focus
+  // read elsewhere. Scheduling the timer anyway would either wipe blind — worse
+  // than not clearing — or fire into a refusal and log noise on a path the user
+  // was told was protected.
+  //
+  // Returning `null` is the same "nothing to cancel" answer the write-failure
+  // arm above gives, so no caller learns a new shape. What the CALLER owes is a
+  // sentence: `recovery-flow.md` §2.2 forbids presenting a control whose stated
+  // protection the client cannot perform, so the phrase step says plainly that
+  // the clipboard will not be cleared.
+  if (!has("clipboardAutoClear")) return null;
   // The read+compare+clear runs HOST-side (myne#379). `recovery-flow.md` §2.2
   // requires the clear to verify the clipboard still holds the phrase — a
   // comparison requirement, not a requirement that the WebView be the one
@@ -55,6 +69,29 @@ export async function saveSecretAsTextFile(
   defaultPath: string,
   contents: string,
 ): Promise<void> {
+  // The download arm, mirroring `saveJsonAsFile` below (`decisions.md`
+  // 2026-08-15). `recovery-flow.md` §2.2 requires the save-as-file affordance
+  // and this client cannot satisfy the "user-chosen location" half: a page has
+  // no arbitrary write path, which is exactly what the absent `nativeSaveAs`
+  // capability says. The browser download answers the requirement with the
+  // destination the browser chooses, same content, same default filename.
+  //
+  // The file's exposure is identical on both platforms and is disclosed in the
+  // same place on both: `threat-model.md` §5 already says a saved phrase is an
+  // ordinary plain-text file that anyone with access to that location can read.
+  // What differs is only who picked the location.
+  if (!has("nativeSaveAs")) {
+    try {
+      await deliverFile(defaultPath, new TextEncoder().encode(contents), "text/plain");
+    } catch (e) {
+      // Swallowed, matching the dialog arm's write failure directly below: this
+      // affordance is a convenience beside a phrase that is on screen, and the
+      // user has not lost anything a retry cannot get.
+      logErrorKind(e, "download-failed");
+    }
+    return;
+  }
+
   let path: string | null;
   try {
     path = await dialogSave({

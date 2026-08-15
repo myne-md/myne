@@ -19,6 +19,7 @@
     "working": "Setting up…"
   },
   "accountEntry": {
+    "createAccount": "I do not have an account yet. Create one.",
     "checkFailed": "Could not check that account number. Try again.",
     "checking": "Checking…",
     "continue": "Continue",
@@ -3692,6 +3693,11 @@
       "footerHint": "If this takes longer than 30 seconds, close the window and try again.",
       "heading": "Encrypting your vault"
     },
+    "provisioning": {
+      "heading": "Creating your account",
+      "caption": "Registering this vault with the sync server. Your recovery phrase comes next.",
+      "footerHint": "This takes a moment. Closing this window now cancels the whole thing and creates nothing."
+    },
     "errors": {
       "accountNumberInvalid": {
         "body": "Try again.",
@@ -3776,6 +3782,10 @@
       "genericError": {
         "body": "Try again.",
         "title": "Something went wrong"
+      },
+      "provisionFailed": {
+        "body": "We could not reach the sync server, so nothing was created and nothing was saved on this device. Your recovery phrase was never generated, so there is nothing to write down and nothing to lose. Start again when you are back online.",
+        "title": "Your account was not created"
       }
     },
     "password": {
@@ -3786,6 +3796,8 @@
       "submit": "Generate recovery phrase"
     },
     "phrase": {
+        "clipboardNotCleared": "Your browser will not let Myne clear your clipboard afterwards, so those 24 words stay there until you copy something else. Paste them into your password manager, then copy anything.",
+        "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "back": "Back",
       "continue": "I've saved this — confirm phrase",
       "copy": "Copy",

@@ -11,7 +11,6 @@ use protocol::{AccountNumber, KdfParams, RecoveryPhrase, AEAD_KEY_LEN, ARGON2_SA
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
@@ -56,9 +55,18 @@ pub const TOMBSTONE_RETENTION_SECS: u64 = 3600;
 pub struct VaultCreationState {
     sessions: Mutex<HashMap<Uuid, VaultCreationSession>>,
     /// Tokens recently evicted by the TTL background task. Maps to the
-    /// instant of eviction; entries older than `TOMBSTONE_RETENTION_SECS`
-    /// are pruned by every `evict_*` call.
-    tombstones: Mutex<HashMap<Uuid, Instant>>,
+    /// MONOTONIC MILLISECOND reading at eviction; entries older than
+    /// `TOMBSTONE_RETENTION_SECS` are pruned by every `evict_*` call.
+    ///
+    /// Milliseconds from [`crate::host::HostCtx::monotonic_millis`] rather than
+    /// `std::time::Instant`, because `Instant::now()` is not merely unavailable
+    /// on `wasm32-unknown-unknown` — it **panics at runtime** while compiling
+    /// cleanly, so the web client's first `begin` would have trapped the wasm
+    /// instance permanently (`decisions.md` 2026-08-15 ships creation there).
+    /// The clock is still monotonic and still never leaves the device; what
+    /// changed is that its reading is supplied by the host seam instead of
+    /// taken from `std`.
+    tombstones: Mutex<HashMap<Uuid, u64>>,
     /// Reserved + materialized session slots. Bumped by [`Self::try_reserve`]
     /// before `spawn_blocking` Argon2id work starts; decremented by the
     /// reservation's `Drop` (early-exit) or by [`Self::take`] /
@@ -165,13 +173,23 @@ impl VaultCreationState {
     /// The reservation is consumed (its `Drop` becomes a no-op) so the
     /// slot stays accounted for until `take` / `take_ignore_status` /
     /// `evict_older_than` removes the session.
+    ///
+    /// `now_millis` is the caller's monotonic reading
+    /// ([`crate::host::HostCtx::monotonic_millis`]) and is stamped onto the
+    /// session HERE rather than in `build_session`, which is where the TTL
+    /// actually starts: the field measures how long an entry has been in the
+    /// map, and `build_session` is a pure function with no clock of its own.
+    /// The retry path (`take` -> `try_insert`) deliberately does not re-stamp,
+    /// so a failed commit cannot silently extend a session's life.
     pub fn commit_reservation(
         &self,
         mut reservation: SlotReservation<'_>,
         token: Uuid,
-        session: VaultCreationSession,
+        mut session: VaultCreationSession,
+        now_millis: u64,
     ) {
         debug_assert!(std::ptr::eq(reservation.state, self));
+        session.created_at = now_millis;
         self.sessions
             .lock()
             .expect("session map poisoned")
@@ -275,8 +293,9 @@ impl VaultCreationState {
     /// `tombstones` so a subsequent `take()` returns `Expired`.
     /// Old tombstones (older than `TOMBSTONE_RETENTION_SECS`) are
     /// pruned in the same call to bound memory.
-    pub fn evict_older_than(&self, cutoff: Instant) -> usize {
-        let now = Instant::now();
+    pub fn evict_older_than(&self, now_millis: u64, max_age_millis: u64) -> usize {
+        let now = now_millis;
+        let cutoff = now_millis.saturating_sub(max_age_millis);
         let mut sessions = self.sessions.lock().expect("session map poisoned");
         let mut tombstones = self.tombstones.lock().expect("tombstones poisoned");
 
@@ -296,15 +315,15 @@ impl VaultCreationState {
         }
 
         // Prune ancient tombstones.
-        let tombstone_cutoff = now - Duration::from_secs(TOMBSTONE_RETENTION_SECS);
+        let tombstone_cutoff = now.saturating_sub(TOMBSTONE_RETENTION_SECS * 1_000);
         tombstones.retain(|_, ts| *ts >= tombstone_cutoff);
 
         evicted
     }
 
     /// Convenience: evict sessions older than `SESSION_TTL_SECS`.
-    pub fn evict_expired(&self) -> usize {
-        self.evict_older_than(Instant::now() - Duration::from_secs(SESSION_TTL_SECS))
+    pub fn evict_expired(&self, now_millis: u64) -> usize {
+        self.evict_older_than(now_millis, SESSION_TTL_SECS * 1_000)
     }
 }
 
@@ -352,9 +371,14 @@ pub struct VaultCreationSession {
     pub password_wrap_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     /// Cached recovery-phrase-derived wrap key.
     pub recovery_wrap_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
-    /// Wall-clock instant the session entered the state map.
-    /// Used by the TTL evictor.
-    pub created_at: Instant,
+    /// Monotonic milliseconds at which the session entered the state map,
+    /// stamped by [`VaultCreationState::commit_reservation`]. Used by the TTL
+    /// evictor.
+    ///
+    /// `build_session` leaves this `0`, which is correct rather than a
+    /// placeholder: a session that never reaches the map has no TTL to run, and
+    /// the one path that inserts is the one that stamps.
+    pub created_at: u64,
 }
 
 #[cfg(test)]
@@ -374,11 +398,11 @@ mod tests {
             salt_recovery: [0u8; ARGON2_SALT_LEN],
             password_wrap_key: Zeroizing::new([0u8; AEAD_KEY_LEN]),
             recovery_wrap_key: Zeroizing::new([0u8; AEAD_KEY_LEN]),
-            created_at: Instant::now(),
+            created_at: 0,
         }
     }
 
-    fn fixture_session_at(created_at: Instant) -> VaultCreationSession {
+    fn fixture_session_at(created_at: u64) -> VaultCreationSession {
         let mut s = fixture_session();
         s.created_at = created_at;
         s
@@ -484,18 +508,21 @@ mod tests {
     #[test]
     fn evict_older_than_removes_old_sessions_only() {
         let state = VaultCreationState::default();
-        let now = Instant::now();
+        // A fixed monotonic reading, not a clock call: the whole point of the
+        // millis refactor is that the caller supplies the reading, so a test
+        // that read a clock would be exercising a path production no longer has.
+        let now = 4_000_000u64;
         // Old session — created 1 hour ago.
         let old = Uuid::new_v4();
         state
-            .try_insert(old, fixture_session_at(now - Duration::from_secs(3600)))
+            .try_insert(old, fixture_session_at(now - 3_600 * 1_000))
             .unwrap();
         // Fresh session — created right now.
         let fresh = Uuid::new_v4();
         state.try_insert(fresh, fixture_session_at(now)).unwrap();
 
         // Cutoff at 10 minutes ago: only `old` evicts.
-        let evicted = state.evict_older_than(now - Duration::from_secs(600));
+        let evicted = state.evict_older_than(now, 600 * 1_000);
         assert_eq!(evicted, 1);
         assert_eq!(state.count(), 1);
 
@@ -510,8 +537,7 @@ mod tests {
         let state = VaultCreationState::default();
         state.try_insert(Uuid::new_v4(), fixture_session()).unwrap();
         // Cutoff in the distant past: nothing evicts.
-        let evicted = state
-            .evict_older_than(Instant::now() - Duration::from_secs(TOMBSTONE_RETENTION_SECS * 100));
+        let evicted = state.evict_older_than(4_000_000, TOMBSTONE_RETENTION_SECS * 100 * 1_000);
         assert_eq!(evicted, 0);
         assert_eq!(state.count(), 1);
     }
@@ -646,7 +672,7 @@ mod tests {
         let state = VaultCreationState::default();
         let token = Uuid::new_v4();
         let reservation = state.try_reserve().unwrap();
-        state.commit_reservation(reservation, token, fixture_session());
+        state.commit_reservation(reservation, token, fixture_session(), 4_000_000);
         // Materialized session: slot remains accounted for.
         assert_eq!(state.in_flight_count(), 1);
         assert_eq!(state.count(), 1);
@@ -681,17 +707,14 @@ mod tests {
     #[test]
     fn evict_older_than_decrements_in_flight() {
         let state = VaultCreationState::default();
-        let now = Instant::now();
+        let now = 4_000_000u64;
         for _ in 0..3 {
             state
-                .try_insert(
-                    Uuid::new_v4(),
-                    fixture_session_at(now - Duration::from_secs(3600)),
-                )
+                .try_insert(Uuid::new_v4(), fixture_session_at(now - 3_600 * 1_000))
                 .unwrap();
         }
         assert_eq!(state.in_flight_count(), 3);
-        let evicted = state.evict_older_than(now - Duration::from_secs(600));
+        let evicted = state.evict_older_than(now, 600 * 1_000);
         assert_eq!(evicted, 3);
         assert_eq!(state.in_flight_count(), 0);
     }
@@ -719,15 +742,12 @@ mod tests {
         let state = VaultCreationState::default();
         let evicted_token = Uuid::new_v4();
         state
-            .try_insert(
-                evicted_token,
-                fixture_session_at(Instant::now() - Duration::from_secs(3600)),
-            )
+            .try_insert(evicted_token, fixture_session_at(4_000_000 - 3_600 * 1_000))
             .unwrap();
         let unknown_token = Uuid::new_v4();
 
         // Force eviction.
-        state.evict_older_than(Instant::now() - Duration::from_secs(600));
+        state.evict_older_than(4_000_000, 600 * 1_000);
 
         assert!(matches!(state.take(evicted_token), SessionLookup::Expired));
         assert!(matches!(state.take(unknown_token), SessionLookup::NotFound));

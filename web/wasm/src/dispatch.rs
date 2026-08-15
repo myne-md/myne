@@ -1558,6 +1558,207 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // ── phrase recovery (`decisions.md` 2026-08-15) ─────────────────────
+        //
+        // The other half of the reversal, and the half that costs something:
+        // this is where 24 words are TYPED into served code. `threat-model.md`
+        // A18 is the price, named rather than mitigated, and the containment is
+        // that this is the ONLY situation in which this client asks — the
+        // enrolment credential stays refused a few arms below.
+        //
+        // Nothing about the cryptography changes. Same Argon2id salt domain,
+        // same AAD, same `enc_root_key_recovery` slot, same non-distinguishing
+        // failure. What the core gained is the IO seam on its read and write
+        // paths, threaded through as ONE implementation rather than a wasm
+        // twin, so the desktop keeps calling the same code it always did.
+        "plugin:vault-recover|recover_with_phrase" => {
+            use myne_core::plugins::vault_recover::commands::recover_with_phrase_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                #[serde(default)]
+                vault_id: Option<String>,
+                phrase: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match recover_with_phrase_from_host(
+                a.vault_id,
+                a.phrase,
+                crate::session::state(),
+                host_ctx(),
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        // The mandatory chained step (`recovery-flow.md` §4.1). Not optional and
+        // not skippable: a recovered vault whose password was never reset would
+        // leave the user with no way in next time, which is the trap the spec
+        // wrote this step to close.
+        "plugin:vault-recover|complete_recovery" => {
+            use myne_core::plugins::vault_recover::commands::complete_recovery_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                #[serde(default)]
+                vault_id: Option<String>,
+                new_password: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match complete_recovery_from_host(
+                a.vault_id,
+                a.new_password,
+                crate::session::state(),
+                crate::session::hooks(),
+                host_ctx(),
+                vault_io(),
+                // Inert here, as on every other route through this dispatcher:
+                // no OS keychain, one container per origin, and no locked picker
+                // for a sealed label to serve.
+                myne_core::vault_label::key::platform_keychain(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        // ── vault creation (`decisions.md` 2026-08-15) ──────────────────────
+        //
+        // The reversal that puts account creation in a browser. What arrives
+        // here is the SAME core the desktop calls: same Argon2id parameters,
+        // same `MYV1` layout, same subkey roles, same AAD. Two things differ and
+        // both are recorded on the core functions themselves.
+        //
+        // 1. **The vault id is a constant, not a mint.** `begin_from_host` scans
+        //    `vaults/` for a collision-free UUIDv7, which is meaningless where
+        //    an origin holds exactly one container — and worse than meaningless,
+        //    since that scan fails on wasm32 and would hand back a random id the
+        //    rest of this client cannot find. `begin_with_vault_id` takes
+        //    `paths::web_single_vault_id()`, the same constant
+        //    `sync_join_account` uses, which is what keeps a re-run idempotent.
+        //
+        // 2. **Writes go through the IO seam.** The native commit path reaches
+        //    `atomic_write`; `commit_from_host_io` reaches
+        //    `VaultIo::write(.., WriteOpts::create_new())`, which carries the
+        //    same "never overwrite an existing vault.meta" guarantee that keeps
+        //    a fresh creation from destroying an existing vault's key wraps.
+        //
+        // The phrase crosses back to the page in `begin`'s result, which is the
+        // whole point of the reversal and the whole cost of it
+        // (`threat-model.md` A18/A19).
+        "plugin:vault-creation|begin" => {
+            use myne_core::plugins::vault_creation::commands::begin_with_vault_id;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                password: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match begin_with_vault_id(
+                a.password,
+                myne_core::paths::web_single_vault_id(),
+                crate::session::creation(),
+                host_ctx(),
+            )
+            .await
+            {
+                Ok(out) => Outcome::ok(&out),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:vault-creation|commit" => {
+            use myne_core::plugins::vault_creation::commands::commit_from_host_io;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                // Matches the desktop command's optional override. The web
+                // caller does not send one; `None` falls through to the
+                // session's own id, which `begin` set to the constant.
+                #[serde(default)]
+                vault_id: Option<String>,
+                session_token: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match commit_from_host_io(
+                a.vault_id,
+                a.session_token,
+                crate::session::creation(),
+                host_ctx(),
+                vault_io(),
+            )
+            .await
+            {
+                Ok(id) => Outcome::ok(&id),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        // Pure state removal — no IO, no clock, so the native core is reached
+        // unchanged. It matters more than it looks: this is what drops the
+        // in-flight session's `Zeroizing` phrase and keys when the user backs
+        // out of the flow, and the web client has no background TTL evictor to
+        // do it later (see `session::creation`).
+        "plugin:vault-creation|cancel" => {
+            use myne_core::plugins::vault_creation::commands::cancel_from_state;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                session_token: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match cancel_from_state(a.session_token, crate::session::creation()) {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         // ── sync: first-run bootstrap ───────────────────────────────────────
         //
         // Task 85's "log in" leg: point at a server, fetch the account's

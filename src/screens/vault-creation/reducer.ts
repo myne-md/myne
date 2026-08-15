@@ -13,6 +13,19 @@ export type Step =
   | "briefing"
   | "password"
   | "encrypting"
+  /**
+   * The vault is written locally and is being registered with the sync server,
+   * BEFORE the phrase is shown (`decisions.md` 2026-08-15).
+   *
+   * Entered only where sync is required (the web client). The ordering is the
+   * load-bearing part, not the spinner: `recovery-flow.md` §2.4 is a
+   * no-re-display commitment, so a phrase shown before a failed registration
+   * leaves the user holding 24 words for an account that does not exist, and a
+   * retry mints a DIFFERENT phrase, silently making the words they wrote down
+   * wrong for the vault they end up with. Desktop never enters this step: its
+   * creation has no server leg to fail.
+   */
+  | "provisioning"
   | "phrase"
   | "confirm"
   | "account"
@@ -107,7 +120,10 @@ export function makeInitialState(withBriefing: boolean): VaultCreationState {
  * Diagram (informally):
  *   briefing    →[BRIEFING_ACKED]→ password (first-run only, MYND-114)
  *   password    →[BEGIN_REQUESTED]→ encrypting
- *   encrypting  →[BEGIN_OK]→ phrase
+ *   encrypting  →[BEGIN_OK]→ phrase            (sync optional: desktop)
+ *   encrypting  →[BEGIN_OK requiresProvisioning]→ provisioning   (sync required: web)
+ *   provisioning →[PROVISION_OK]→ phrase
+ *   provisioning →[PROVISION_ERR]→ session-lost (nothing was created)
  *   encrypting  →[BEGIN_ERR]→ password (with inline error)
  *   phrase      →[PHRASE_ACKED]→ confirm
  *   phrase      →[RESET_TO_PASSWORD]→ password (cancel session)
@@ -128,6 +144,12 @@ export type Action =
       phrase: string[];
       accountNumber: string;
       sessionToken: string;
+      /**
+       * Where sync is required, `begin` does not lead to the phrase screen. The
+       * flow goes through `provisioning` first, and the phrase is only shown
+       * once the account exists on the server.
+       */
+      requiresProvisioning?: boolean;
     }
   | { type: "BEGIN_ERR"; error: ErrorState }
   | { type: "PHRASE_REVEALED" }
@@ -138,6 +160,8 @@ export type Action =
   | { type: "CONFIRM_BACK" }
   | { type: "ACCOUNT_ACK_TOGGLED"; checked: boolean }
   | { type: "ACCOUNT_BACK" }
+  | { type: "PROVISION_OK" }
+  | { type: "PROVISION_ERR"; error: ErrorState }
   | { type: "COMMIT_REQUESTED" }
   | { type: "COMMIT_OK" }
   | { type: "COMMIT_ERR"; error: ErrorState }
@@ -195,7 +219,7 @@ export function vaultCreationReducer(
     case "BEGIN_OK":
       return {
         ...state,
-        step: "phrase",
+        step: action.requiresProvisioning ? "provisioning" : "phrase",
         phrase: action.phrase,
         accountNumber: action.accountNumber,
         sessionToken: action.sessionToken,
@@ -207,6 +231,22 @@ export function vaultCreationReducer(
       };
     case "BEGIN_ERR":
       return { ...state, step: "password", error: action.error };
+    case "PROVISION_OK":
+      return { ...state, step: "phrase", error: null };
+    case "PROVISION_ERR":
+      // Dedicated rather than inline, and terminal rather than retryable: the
+      // container has been erased and the session cancelled, so there is
+      // nothing for a retry to resume. The user starts over with a fresh
+      // account number and a fresh phrase, which is exactly right — the phrase
+      // they never saw was never written down.
+      return {
+        ...state,
+        step: "session-lost",
+        phrase: null,
+        accountNumber: null,
+        sessionToken: null,
+        error: action.error,
+      };
     case "PHRASE_REVEALED":
       return { ...state, phraseRevealed: true };
     case "PHRASE_HIDDEN":

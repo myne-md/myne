@@ -89,9 +89,16 @@ const ALLOWED = new Map([
   ["core/src/plugins/quick_unlock/commands.rs", "task 40 (quick-unlock PIN path)"],
   ["core/src/plugins/snapshots/commands.rs", "task 83 (snapshots — the capture hook decides first)"],
   ["core/src/plugins/vault_change_password/commands.rs", "task 41 (change password)"],
-  ["core/src/plugins/vault_creation/commands.rs", "decided absent on web; port not owed"],
+  [
+    "core/src/plugins/vault_creation/commands.rs",
+    "PORTED (`decisions.md` 2026-08-15): `commit_from_host_io` + `vault_artifacts_present_io` " +
+      "are the seam-going siblings the web client dispatches. The direct `std::fs` calls that " +
+      "remain belong to the NATIVE arm, which runs inside `run_blocking` and would gain nothing " +
+      "from the async seam. The old reason on this line — 'decided absent on web; port not " +
+      "owed' — became false the day creation shipped there, and a stale reason on an allowlist " +
+      "is how a ratchet quietly stops describing anything.",
+  ],
   ["core/src/plugins/vault_recover/account_number_select.rs", "task 32 (recovery entry points)"],
-  ["core/src/plugins/vault_recover/commands.rs", "task 32 (recovery entry points)"],
   ["core/src/snapshot_store.rs", "task 83 (snapshots — the capture hook decides first)"],
   ["core/src/vault_registry.rs", "task 12 (vault registry scan)"],
   ["core/src/vault_sweep.rs", "task 72 (vault delete)"],

@@ -15,7 +15,7 @@
 // credential — the same message a mistyped password gets — so a bug that
 // resurrected this path would look like a user error and stay in the product.
 // A throw names the boundary at the moment it is crossed. It is unreachable in
-// practice: `has("phraseRecovery")` is false on this client, so the arm that
+// practice: `has("phraseEnrolment")` is false on this client, so the arm that
 // would call this is never rendered.
 
 /** No grid on this client. See the header for why `0` and not `24`. */

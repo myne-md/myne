@@ -43,10 +43,32 @@ static STATE: OnceLock<VaultRuntimeState> = OnceLock::new();
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
 static INDICES: OnceLock<VaultIndicesState> = OnceLock::new();
 static SEARCH: OnceLock<SearchIndexState> = OnceLock::new();
+static CREATION: OnceLock<myne_core::plugins::vault_creation::state::VaultCreationState> =
+    OnceLock::new();
 
 /// The Worker's single [`VaultRuntimeState`].
 pub fn state() -> &'static VaultRuntimeState {
     STATE.get_or_init(VaultRuntimeState::default)
+}
+
+/// The Worker's single [`VaultCreationState`] (`decisions.md` 2026-08-15).
+///
+/// A process-global for the same reason as [`state`]: on desktop Tauri manages
+/// it and hands each command a `State<'_, VaultCreationState>`, and the wasm
+/// entry surface has no equivalent handle to thread through.
+///
+/// It holds **secret-bearing in-flight sessions** between `begin` and `commit`:
+/// the recovery phrase, `root_key`, and both derived wrap keys, each in a
+/// `Zeroizing` wrapper that wipes on drop. Two things bound how long they live,
+/// and only one of them exists here. The slot cap is enforced on both platforms
+/// by the reservation at `begin`. The desktop's **background TTL evictor** is
+/// the half that is absent: it is a `tauri::async_runtime` interval task with no
+/// counterpart in this crate, so a session dropped by the user closing the tab
+/// dies with the wasm instance rather than being swept. That is the same
+/// lifetime the rest of this Worker's key material already has, which is why it
+/// is acceptable and why it is written down rather than left to be discovered.
+pub fn creation() -> &'static myne_core::plugins::vault_creation::state::VaultCreationState {
+    CREATION.get_or_init(myne_core::plugins::vault_creation::state::VaultCreationState::default)
 }
 
 /// The lifecycle hooks.

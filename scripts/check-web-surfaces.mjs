@@ -333,9 +333,8 @@ const V = {
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
   "src/lib/viewsEnabled.ts": ["ported", "Device-local Views feature toggle helper (localStorage); runs as written."],
   "src/lib/vault-recover.ts": [
-    "excluded",
-    "The phrase-recovery binding; module-gated out of the wasm build too (task 12).",
-    "plugin:vault-recover|recover_with_phrase",
+    "ported",
+    "The phrase-recovery binding. Was `excluded` and module-gated out of the wasm build (task 12); `decisions.md` 2026-08-15 reverses that and ships recovery here. The core's read and write moved onto the IO seam as ONE implementation rather than a wasm twin, so this binding calls the same commands it always did.",
   ],
   "src/lib/vault-repair.ts": ["adapted", "Task 72 owns the verdict; the dispatcher answers `Pending` meanwhile."],
   "src/lib/vault-slot-kind.ts": ["ported", "Boot probe."],

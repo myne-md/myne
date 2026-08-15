@@ -105,14 +105,35 @@ const CAPABILITY_BACKING = {
   // all, so the read-back the clear is gated on would silently never fire.
   // `save_secret_text` is deliberately NOT here: it also serves the theme
   // export, which ships on web through the download seam.
-  vaultCreation: [
-    "vault-creation",
-    "plugin:secret-export|clipboard_clear_if_matches",
-  ],
+  // `decisions.md` 2026-08-15 ships creation on web, so `vaultCreation` is no
+  // longer absent and no longer appears in the descriptor's ABSENT set. The
+  // entry stays here, empty, because this map is also read as documentation of
+  // what a capability's backend surface IS, and deleting the key would make a
+  // future reader think the mapping was never considered.
+  vaultCreation: [],
+  // The clipboard auto-clear moved out of `vaultCreation` and onto its own
+  // capability in the same change. It had to move: the command is still
+  // `Unsupported` (Firefox grants page content no clipboard read, so the clear
+  // would silently never fire), and check 2 below requires every refusal to be
+  // covered by an ABSENT capability. Leaving it under a capability that is now
+  // present would have failed the guard, which is the guard doing its job.
+  clipboardAutoClear: ["plugin:secret-export|clipboard_clear_if_matches"],
   phraseRecovery: [
     "plugin:vault-recover|recover_with_phrase",
     "plugin:vault-recover|complete_recovery",
   ],
+  // Deliberately empty, and for the same reason `localOnlyVault` is: there is
+  // no refused command behind it. `plugin:sync|sync_enroll` IS dispatched on
+  // web and would accept a phrase-derived credential perfectly well. What is
+  // absent is the OFFER — the credential picker's recovery arm and the 24-cell
+  // grid, substituted out of the bundle (`web/vite.config.ts`) and asserted gone
+  // from the built artefact by `check-web-no-phrase.mjs`.
+  //
+  // Pointing this at the `vault-recover` commands would be wrong twice over: it
+  // would claim a refusal that does not exist, and `decisions.md` 2026-08-15
+  // ships those two commands on web, so the entry would break the moment
+  // recovery lands while saying nothing true about enrolment.
+  phraseEnrolment: [],
   vaultExport: ["export"],
   // Task 47: the whole `spell` plugin is refused. `MYD1` itself is deliberately
   // NOT here — it is vault content, not a command surface, and it keeps syncing.

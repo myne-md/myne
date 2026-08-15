@@ -78,9 +78,37 @@ export interface AccountNumberEntryProps {
    *  validates locally. The caller carries it into password entry and then into
    *  sync — hashed at that boundary, never sent raw. */
   onValid: (accountNumber: string) => void;
+  /**
+   * Leave for the creation flow instead of signing in (`decisions.md`
+   * 2026-08-15).
+   *
+   * Optional, and its absence is meaningful rather than a default: this screen
+   * is also the entry for a client that cannot create an account, and offering
+   * a door that leads nowhere is the greyed-control failure the capability
+   * descriptor exists to prevent. The caller passes it only where
+   * `vaultCreation` is present.
+   */
+  onCreateAccount?: () => void;
 }
 
-export function AccountNumberEntry({ onValid }: AccountNumberEntryProps) {
+/**
+ * The secondary "no account yet" door. Ghost-styled on purpose: signing in is
+ * the primary action on this screen, and a second filled button would make the
+ * two read as equal choices when one of them creates a permanent credential.
+ */
+const CREATE_LINK_STYLE: CSSProperties = {
+  background: "none",
+  border: "none",
+  color: "var(--fg-2)",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: "var(--text-sm)",
+  marginTop: "var(--space-3)",
+  padding: 0,
+  textDecoration: "underline",
+};
+
+export function AccountNumberEntry({ onValid, onCreateAccount }: AccountNumberEntryProps) {
   const { t } = useTranslation();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +183,16 @@ export function AccountNumberEntry({ onValid }: AccountNumberEntryProps) {
         >
           <span>{checking ? t("accountEntry.checking") : t("accountEntry.continue")}</span>
         </button>
+        {onCreateAccount && (
+          <button
+            data-testid="account-entry.create-account"
+            type="button"
+            style={CREATE_LINK_STYLE}
+            onClick={onCreateAccount}
+          >
+            {t("accountEntry.createAccount")}
+          </button>
+        )}
       </form>
     </CenteredCard>
   );

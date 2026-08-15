@@ -17,7 +17,7 @@
 //
 // Spec: protocol.md § 7 (BIP-39 24-word, English wordlist) + § 7.5.
 
-import { useEffect, useMemo, useRef, type Dispatch } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
@@ -27,6 +27,7 @@ import {
 } from "../../lib/secret-export";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
 import type { Action } from "./reducer";
+import { has } from "../../platform/capabilities";
 
 interface PhraseStepProps {
   phrase: string[];
@@ -34,6 +35,19 @@ interface PhraseStepProps {
   dispatch: Dispatch<Action>;
   onCancelSession: () => void;
 }
+
+/**
+ * The two platform-caveat lines under the Copy / Save row. Secondary ink and the
+ * small type scale: these are facts to read once, not warnings to be alarmed by
+ * (`PRODUCT.md` register; `docs/design/README.md` voice).
+ */
+const CAVEAT_STYLE: CSSProperties = {
+  color: "var(--fg-3)",
+  fontSize: "var(--text-sm)",
+  lineHeight: 1.5,
+  margin: 0,
+  maxWidth: 560,
+};
 
 export function PhraseStep({
   phrase,
@@ -43,10 +57,27 @@ export function PhraseStep({
 }: PhraseStepProps) {
   const { t } = useTranslation();
   // Re-blur when the user Cmd-Tabs or the OS hides the window.
+  //
+  // **Two events, because one of them does not observe the same user action on
+  // both platforms** (`recovery-flow.md` §2.2 as amended 2026-08-15). `blur`
+  // catches Cmd-Tab, an app switch and a screen lock, which is the whole
+  // walk-away surface on a desktop window. In a browser the most common
+  // walk-away is a TAB switch, and whether that fires `blur` is not something to
+  // rely on — `visibilitychange` is the event that actually reports it. Both are
+  // registered on both clients: the extra listener is inert where the platform
+  // does not fire it, and a capability check here would be gating a listener
+  // rather than a feature.
   useEffect(() => {
-    const onBlur = () => dispatch({ type: "PHRASE_HIDDEN" });
-    window.addEventListener("blur", onBlur);
-    return () => window.removeEventListener("blur", onBlur);
+    const hide = () => dispatch({ type: "PHRASE_HIDDEN" });
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") hide();
+    };
+    window.addEventListener("blur", hide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", hide);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [dispatch]);
 
   const phraseString = useMemo(() => phrase.join(" "), [phrase]);
@@ -172,6 +203,27 @@ export function PhraseStep({
           {t("vaultCreation.phrase.saveAsFile")}
         </Button>
       </div>
+
+      {/* The two sentences this client owes the user and the desktop does not.
+          Both are `recovery-flow.md` §2.2 requirements as amended 2026-08-15,
+          and both are stated rather than implied: a control whose protection
+          the platform cannot perform may not be presented as if it could, and
+          an exposure the page cannot prevent has to be named. Rendered
+          together, in the calm register `PRODUCT.md` asks for — a fact and what
+          to do about it, not a warning banner. */}
+      {!has("clipboardAutoClear") && (
+        <p
+          data-testid="create.phrase-clipboard-notice"
+          style={CAVEAT_STYLE}
+        >
+          {t("vaultCreation.phrase.clipboardNotCleared")}
+        </p>
+      )}
+      {!has("screenCaptureProtection") && (
+        <p data-testid="create.phrase-extension-notice" style={CAVEAT_STYLE}>
+          {t("vaultCreation.phrase.extensionNotice")}
+        </p>
+      )}
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         <Button

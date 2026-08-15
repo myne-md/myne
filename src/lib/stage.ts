@@ -665,13 +665,27 @@ export function transition(prev: Stage, action: Action): Stage {
       // illegal by design.
       return rejectIllegal(prev, action);
     case "account-entry":
-      // Same posture, and for the same kind of reason: a validated account
-      // number is not a stage change, it is the input to the unlock that
-      // follows (task 32's flow), which re-enters through `reprobe()` once the
-      // vault container exists. Modelling an `account-entry.success` action
-      // would put the same fact in two places — the reducer and the screen —
-      // and they would drift.
-      return rejectIllegal(prev, action);
+      switch (action.type) {
+        case "create-vault.start":
+          // The one genuine exit (`decisions.md` 2026-08-15): a user with no
+          // account, on a client that can now make one. It is a stage change
+          // rather than a reprobe because nothing about the container has
+          // changed — the user is choosing a different door, not reporting a
+          // new fact about disk.
+          //
+          // `briefing: true`, matching `welcome`: this is a first-run entry,
+          // and the pre-create safety briefing (MYND-114) is exactly as owed to
+          // someone starting in a browser as to someone starting on a desktop.
+          return { name: "create-vault", briefing: true };
+        default:
+          // Otherwise the same posture as before: a validated account number is
+          // not a stage change, it is the input to the unlock that follows
+          // (task 32's flow), which re-enters through `reprobe()` once the vault
+          // container exists. Modelling an `account-entry.success` action would
+          // put the same fact in two places — the reducer and the screen — and
+          // they would drift.
+          return rejectIllegal(prev, action);
+      }
     case "pending-approval":
       // Same posture again, and here it is load-bearing rather than tidy
       // (MYND-635). Approval is granted on ANOTHER device; this one learns of
@@ -789,12 +803,22 @@ export function initialStageFromProbe(
 
   const vaults = vaultList.ok;
   if (vaults.length === 0) {
-    // `welcome` offers vault CREATION, which a client without that capability
-    // cannot honour — and on the web client the empty state is not "no vault
-    // yet, make one", it is "this browser has not been told which account to
-    // pull" (phase3-web-client task 85: the `Missing → welcome` mapping is
-    // wrong there, and it is wrong in the direction that dead-ends the user).
-    return has("vaultCreation") ? { name: "welcome" } : { name: "account-entry" };
+    // On the web client the empty state is not "no vault yet, make one", it is
+    // "this browser has not been told which account to pull"
+    // (phase3-web-client task 85: the `Missing → welcome` mapping is wrong
+    // there, and it is wrong in the direction that dead-ends the user).
+    //
+    // **Gated on `localOnlyVault`, not on `vaultCreation`** (`decisions.md`
+    // 2026-08-15). Those two were the same question for as long as the web
+    // client could not create an account; they stopped being the same question
+    // the day it could. What actually decides this arm is whether a vault on
+    // this client may be the only copy: where sync is required, the first
+    // question is still which account, and `AccountBootstrap` is what asks it —
+    // now with a "create one" affordance beside the sign-in, since creation
+    // ships here too. Keeping the old `vaultCreation` gate would have routed the
+    // browser to `welcome`, which is substituted out of that bundle and would
+    // have rendered a stub as the entry screen.
+    return has("localOnlyVault") ? { name: "welcome" } : { name: "account-entry" };
   }
   if (vaults.length === 1) {
     // Exactly one vault — unlock it directly (SYNC-7a: no picker for the
@@ -833,7 +857,11 @@ export function initialStageFromProbe(
         // wait already has a home in the Settings panel. The browser is the only
         // client with nowhere else to put it and nothing else to do until the
         // approval lands.
-        if (pendingApproval && !has("vaultCreation")) {
+        // Same regate as the empty-vault arm above (`decisions.md` 2026-08-15):
+        // the question is "is this the client whose vault came from a server",
+        // which `localOnlyVault` answers directly and `vaultCreation` only used
+        // to answer by coincidence.
+        if (pendingApproval && !has("localOnlyVault")) {
           return { name: "pending-approval" };
         }
         return { name: "unlock", initialStatus: { kind: "Exists" }, vaultId };
@@ -894,6 +922,10 @@ import type { VaultListResult, VaultSummary } from "../types/vault-summary";
  */
 const LEGAL: Record<string, Stage["name"]> = {
   "welcome|create-vault.start": "create-vault",
+  // `decisions.md` 2026-08-15. The web client's entry screen gained a "create an
+  // account" affordance, so `account-entry` has one legal exit that is a real
+  // stage change rather than a reprobe.
+  "account-entry|create-vault.start": "create-vault",
   // Back-from-create is reprobe-based (MYND-219 / SYNC-16) — no
   // `create-vault.back` action exists; App.tsx calls `reprobe()`.
   "create-vault|create-vault.commit-success": "unlock",
@@ -1123,7 +1155,7 @@ function verifyInitialStageFromProbe(): void {
       label: "AllEmpty + 0 vaults",
       vaultList: okList(),
       slotMap: allEmpty,
-      expectedName: has("vaultCreation") ? "welcome" : "account-entry",
+      expectedName: has("localOnlyVault") ? "welcome" : "account-entry",
     },
     {
       label: "AllEmpty + 1 vault Exists",
@@ -1236,7 +1268,7 @@ function verifyInitialStageFromProbe(): void {
       vaultList: okList(existsVault(VID_A)),
       slotMap: allEmpty,
       pendingApproval: true,
-      expectedName: has("vaultCreation") ? "unlock" : "pending-approval",
+      expectedName: has("localOnlyVault") ? "unlock" : "pending-approval",
     },
     {
       // The default is silence. Every desktop caller omits the argument, so

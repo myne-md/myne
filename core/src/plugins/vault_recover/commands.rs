@@ -90,13 +90,20 @@ pub async fn recover_with_phrase_from_host(
     phrase: String,
     state: &VaultRuntimeState,
     host: &dyn HostCtx,
+    // Threaded through since `decisions.md` 2026-08-15, when phrase recovery
+    // shipped on the web client. ONE implementation rather than a `_io` twin:
+    // the seam's native arm forwards to the same `std::fs` this used to call
+    // directly, and it runs the call through `task::run_blocking` exactly as
+    // the surrounding pipeline does, so the desktop keeps its "the read happens
+    // off the runtime worker" property while the browser gets OPFS.
+    io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), VaultRecoveryError> {
     // SYNC-6 targeting: `Some(id)` recovers exactly `vaults/<id>/`; `None`/
     // malformed → the sole-vault fallback. The parsed id keys BOTH the path
     // resolution and the slot map so they cannot diverge.
     let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref());
     let vault_path = vault_meta_path(host, target)?;
-    recover_with_phrase_with_path(phrase, target, &vault_path, state, host).await
+    recover_with_phrase_with_path(phrase, target, &vault_path, state, host, io).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -109,7 +116,14 @@ pub async fn recover_with_phrase<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
 ) -> Result<(), VaultRecoveryError> {
-    recover_with_phrase_from_host(vault_id, phrase, state.inner(), &TauriHost::new(app)).await
+    recover_with_phrase_from_host(
+        vault_id,
+        phrase,
+        state.inner(),
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`recover_with_phrase`]. The Tauri-command wrapper
@@ -125,6 +139,7 @@ pub(crate) async fn recover_with_phrase_with_path(
     // See the sibling `complete_recovery_with_path`: the duration log was
     // `Instant`-based, and `Instant::now()` panics on wasm32 (task 12).
     host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), VaultRecoveryError> {
     // Wrap immediately so any early-return path (VaultAlreadyUnlocked,
     // RecoveryAlreadyInProgress, RecoveryInProgress, IO failure, parse
@@ -189,38 +204,46 @@ pub(crate) async fn recover_with_phrase_with_path(
         }
     };
 
-    // Own the path so it can move into spawn_blocking (the closure
-    // captures by-value). Cheap one-allocation clone.
-    let vault_path = vault_path.to_path_buf();
-
-    let join_outcome =
-        crate::task::run_blocking(move || -> Result<DerivedKeys, VaultRecoveryError> {
-            // IO + parse + NFKD + KDF + AEAD all run inside the
-            // blocking task: this frees the runtime worker across
-            // the whole pipeline (Windows / cold-disk / antivirus
-            // latency doesn't stall the async runtime).
-            let bytes = std::fs::read(&vault_path).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
+    // The READ moved out of the blocking closure and onto the seam
+    // (`decisions.md` 2026-08-15). It still runs off the runtime worker — the
+    // seam's native arm goes through `task::run_blocking` itself — so the
+    // property the old comment claimed is preserved; what changed is that OPFS
+    // can answer it too. Parse, NFKD, KDF and AEAD stay inside the blocking
+    // task below, which is where the CPU actually is.
+    let bytes = match io.read(vault_path).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            // The seam's error vocabulary is closed and deliberately small, so
+            // the NotFound arm is matched on the seam's own kind rather than on
+            // an `io::ErrorKind`. Recovery is unreachable without a vault, and
+            // saying "not found" is materially different from "the disk failed"
+            // for a user who is already having a bad day.
+            return Err(match e {
+                crate::io_failure_kind::IoFailureKind::NotFound => {
                     tracing::error!(
                         stage = "read_meta",
                         error_kind = "VaultNotFound",
                         "vault.meta does not exist (recovery flow unreachable without a vault)"
                     );
                     VaultRecoveryError::VaultNotFound
-                } else {
-                    let io_kind = from_io_error_kind(e.kind());
+                }
+                other => {
                     tracing::error!(
                         stage = "read_meta",
                         error_kind = "IoError",
-                        io_failure_kind = ?io_kind,
+                        io_failure_kind = ?other,
                         "vault.meta read failed"
                     );
                     VaultRecoveryError::IoError {
-                        io_error_kind: io_kind,
+                        io_error_kind: other,
                     }
                 }
-            })?;
+            });
+        }
+    };
 
+    let join_outcome =
+        crate::task::run_blocking(move || -> Result<DerivedKeys, VaultRecoveryError> {
             // Accept a v0.1 (`MYV1`) OR a migrated v0.2 (`NTV5`) vault.meta;
             // `version` selects the recovery-wrap salt domain + AAD prefix and the
             // itemsKey-wrap subkey context so a migrated vault recovers by phrase
@@ -329,6 +352,11 @@ pub async fn complete_recovery_from_host(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     host: &dyn HostCtx,
+    // Threaded through since `decisions.md` 2026-08-15. Same reasoning as its
+    // sibling: one implementation, the seam's native arm forwarding to the same
+    // `atomic_write` that owned durability before, so "no behaviour change on
+    // desktop" stays checkable by reading rather than only by running.
+    io: &dyn crate::vault_io::VaultIo,
     // The post-unlock pipeline below now also seals the vault's name into the
     // device-local label store (myne-md/myne#411). Recovery ends with an
     // unlocked vault like every other credential path, so it owes the same
@@ -353,7 +381,7 @@ pub async fn complete_recovery_from_host(
         None => state.recovering_vault_id().await,
     };
     let vault_path = vault_meta_path(host, target)?;
-    complete_recovery_with_path(new_password, target, &vault_path, state, hooks, host).await?;
+    complete_recovery_with_path(new_password, target, &vault_path, state, hooks, host, io).await?;
 
     // MYND-160 fix: a post-recovery slot transition to Unlocked owes the same
     // post-unlock pipeline as every other credential path — persisted prefs
@@ -364,11 +392,12 @@ pub async fn complete_recovery_from_host(
     // point). See `run_post_unlock_pipeline` for why the steps live in one
     // shared function rather than inline per path.
     crate::plugins::vault_unlock::commands::run_post_unlock_pipeline(
-        host,
-        state,
-        hooks,
-        &crate::vault_io::StdVaultIo,
-        keychain,
+        host, state, hooks,
+        // The threaded seam, not `StdVaultIo`: that concrete type is
+        // `#[cfg(not(wasm32))]`, so hardcoding it here compiled on desktop and
+        // broke the wasm build the moment this path stopped being gated out
+        // (`decisions.md` 2026-08-15).
+        io, keychain,
     )
     .await;
 
@@ -406,6 +435,7 @@ pub async fn complete_recovery<R: Runtime>(
         state.inner(),
         hooks.inner(),
         &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
         crate::vault_label::key::platform_keychain(),
     )
     .await
@@ -427,9 +457,10 @@ pub(crate) async fn complete_recovery_with_path(
     hooks: &crate::hooks::Hooks,
     // Supplies `UnlockedVault::unlocked_at` and the duration log, both of which
     // were `Instant`-based until phase3-web-client task 12 — `Instant::now()`
-    // panics on wasm32. This path is decided absent on web, but it shares the
-    // `UnlockedVault` type with the password path that is not.
+    // panics on wasm32. This path SHIPS on web since `decisions.md` 2026-08-15;
+    // the note above about it being "decided absent on web" no longer holds.
     host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), VaultRecoveryError> {
     // Wrap immediately so any early-return path drops the wrapper and
     // zeroes the bytes.
@@ -524,8 +555,39 @@ pub(crate) async fn complete_recovery_with_path(
             }
         };
 
-    let vault_path_for_derive = vault_path.to_path_buf();
-    let vault_path_for_write = vault_path_for_derive.clone();
+    let vault_path_for_write = vault_path.to_path_buf();
+
+    // The read moved out of the derive closure and onto the seam
+    // (`decisions.md` 2026-08-15). Ordering is unchanged in the way that
+    // matters: this still happens AFTER the slot was taken and BEFORE any
+    // Argon2id work, so a vault.meta that vanished mid-recovery is still caught
+    // here rather than after a two-second derivation.
+    let meta_bytes = match io.read(vault_path).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return Err(match e {
+                IoFailureKind::NotFound => {
+                    tracing::error!(
+                        stage = "read_meta",
+                        error_kind = "VaultNotFound",
+                        "vault.meta vanished mid-recovery"
+                    );
+                    VaultRecoveryError::VaultNotFound
+                }
+                other => {
+                    tracing::error!(
+                        stage = "read_meta",
+                        error_kind = "IoError",
+                        io_failure_kind = ?other,
+                        "vault.meta read failed during complete_recovery"
+                    );
+                    VaultRecoveryError::IoError {
+                        io_error_kind: other,
+                    }
+                }
+            });
+        }
+    };
 
     // (4) Run the Argon2id-bound derivation pipeline in spawn_blocking.
     //     Returns the freshly-built vault.meta bytes WITHOUT writing
@@ -557,28 +619,9 @@ pub(crate) async fn complete_recovery_with_path(
                 }
             })?;
 
-            // (b) Read existing vault.meta.
-            let bytes = std::fs::read(&vault_path_for_derive).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    tracing::error!(
-                        stage = "read_meta",
-                        error_kind = "VaultNotFound",
-                        "vault.meta vanished mid-recovery"
-                    );
-                    VaultRecoveryError::VaultNotFound
-                } else {
-                    let io_kind = from_io_error_kind(e.kind());
-                    tracing::error!(
-                        stage = "read_meta",
-                        error_kind = "IoError",
-                        io_failure_kind = ?io_kind,
-                        "vault.meta read failed during complete_recovery"
-                    );
-                    VaultRecoveryError::IoError {
-                        io_error_kind: io_kind,
-                    }
-                }
-            })?;
+            // (b) The existing vault.meta, read through the seam before this
+            //     closure was entered (see `meta_bytes` above).
+            let bytes: Vec<u8> = meta_bytes;
 
             // (c) Parse — v0.1 (`MYV1`) or migrated v0.2 (`NTV5`); the rewrite below
             //     stays in the same generation.
@@ -1029,6 +1072,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("recover with correct phrase");
@@ -1070,6 +1114,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("recover with explicit vault_id");
@@ -1124,6 +1169,7 @@ mod tests {
                 scratch_b.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("B's phrase recovers B's vault.meta");
@@ -1160,7 +1206,7 @@ mod tests {
             let state = VaultRuntimeState::default();
 
             let result =
-                recover_with_phrase_with_path(phrase_a, Some(id_b), scratch_b.path(), &state, &crate::host::NoopHost).await;
+                recover_with_phrase_with_path(phrase_a, Some(id_b), scratch_b.path(), &state, &crate::host::NoopHost, &crate::vault_io::StdVaultIo).await;
             assert!(
                 matches!(result, Err(VaultRecoveryError::InvalidCredentialOrVault)),
                 "wrong-vault phrase must map to the same non-distinguishing variant as a typo; got {result:?}"
@@ -1192,6 +1238,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("single-vault recovery via sole-vault fallback");
@@ -1227,6 +1274,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(
@@ -1263,6 +1311,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("NFKD-normalized phrase must recover successfully");
@@ -1291,6 +1340,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(result, Err(VaultRecoveryError::VaultNotFound)));
@@ -1319,6 +1369,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             match result {
@@ -1350,6 +1401,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(result, Err(VaultRecoveryError::InvalidVaultMeta)));
@@ -1372,6 +1424,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(result, Err(VaultRecoveryError::InvalidVaultMeta)));
@@ -1403,6 +1456,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(
@@ -1445,6 +1499,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(
@@ -1481,6 +1536,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(
@@ -1498,6 +1554,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("retry after permit released succeeds");
@@ -1536,6 +1593,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             // Peek catches it before try_acquire runs.
@@ -1573,6 +1631,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(
@@ -1592,6 +1651,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("retry after wrong-phrase failure works");
@@ -1636,6 +1696,7 @@ mod tests {
             scratch.path(),
             &state,
             &crate::host::NoopHost,
+            &crate::vault_io::StdVaultIo,
         )
         .await
         .expect("seed: A8d must succeed against the seeded vault");
@@ -1665,6 +1726,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             let elapsed = started.elapsed();
@@ -1713,6 +1775,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("A8f must succeed when slot is Recovering");
@@ -1743,6 +1806,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("A8f");
@@ -1782,6 +1846,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("A8f");
@@ -1843,6 +1908,7 @@ mod tests {
                 &state,
                 &hooks,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("A8f");
@@ -1883,6 +1949,7 @@ mod tests {
                 &state,
                 &hooks,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
 
@@ -1914,6 +1981,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("A8f");
@@ -1958,6 +2026,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("A8f");
@@ -1994,6 +2063,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("A8f");
@@ -2007,6 +2077,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("phrase must still recover after A8f");
@@ -2031,6 +2102,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(
@@ -2070,6 +2142,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(
@@ -2106,6 +2179,7 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await;
             assert!(matches!(
@@ -2155,6 +2229,7 @@ mod tests {
                     &state,
                     &noop_hooks(),
                     &crate::host::NoopHost,
+                    &crate::vault_io::StdVaultIo,
                 )
                 .await;
             // Either IoError (read_meta / atomic_write failed) or
