@@ -353,10 +353,19 @@ describe("the roster: every export that writes vault.prefs bumps the nonce", () 
     expect(covered).toContain("toggleFavoriteOnDisk");
     // Two names pinned rather than left to the count, because these two toggles
     // are the ones a user reads as a privacy promise, so a surface showing the
-    // old value is worse here than a stale font size. `docs/threat-model.md` §6
-    // covers screen-capture exclusion on THIS client (Windows and macOS via
-    // `set_content_protected`); the mobile twin of this assertion deliberately
-    // carries no such citation, because §6 describes no mobile platform.
+    // old value is worse here than a stale font size. What §6 of
+    // `docs/threat-model.md` actually covers on this client is narrower than
+    // "screen-capture exclusion": Windows 10 build 19041+ is the one platform
+    // where the layer earns its place, macOS makes the call and claims nothing
+    // (Apple documents `NSWindowSharingNone` as a legacy constant macOS no
+    // longer uses), and Linux applies no protection on any display server. That
+    // per-platform split is not pedantry: one unqualified sentence is what made
+    // this item overclaim for a year, and §6 says in its own text that no
+    // compiler warning, lint or repo guard signals the drift, so a comment is
+    // exactly the surface where it creeps back. The mobile twin of this
+    // assertion carries no §6 citation at all, because §6 describes no mobile
+    // platform. What this assertion pins is true on every platform and needs no
+    // §6 claim: the displayed state of these toggles must match disk.
     expect(covered).toContain("setScreenCaptureProtection");
     expect(covered).toContain("setRemindersEnabled");
   });

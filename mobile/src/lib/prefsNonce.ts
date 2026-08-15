@@ -15,8 +15,32 @@ import { useSyncExternalStore } from "react";
 let nonce = 0;
 let flushScheduled = false;
 let batchDepth = 0;
-let bumpedWhileBatched = false;
+// Increments that have happened and have NOT been published. Held rather than
+// applied because `getPrefsNonce` is `useSyncExternalStore`'s `getSnapshot`, and
+// that contract requires the snapshot to change only when the subscription
+// fires. Incrementing without notifying satisfies the letter of "monotonic" and
+// breaks the store: React re-reads the snapshot on EVERY re-render, so a
+// component re-rendering mid-batch for an unrelated reason would see the new
+// value and run exactly the read the batch exists to avoid.
+let pendingBumps = 0;
+let batchWatchdog: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
+
+/**
+ * How long a batch may hold the notify before the module stops waiting for it.
+ *
+ * The suppression is module-wide, not per-action: while a batch is open, a
+ * write made anywhere else in the app has its notify deferred too. That is
+ * bounded and harmless in the normal case, because subscribers re-read disk
+ * truth rather than applying a diff, so the one notify at the end carries the
+ * concurrent write as well. What is NOT acceptable is an unbounded wait: if a
+ * batched write hangs rather than resolving or rejecting, `batchDepth` would
+ * never return to zero and every prefs notify for the rest of the session would
+ * be swallowed, leaving surfaces on stale values with nothing to recover them.
+ * Five seconds is far longer than any prefs round-trip and far shorter than a
+ * session.
+ */
+const BATCH_NOTIFY_CEILING_MS = 5000;
 
 function scheduleFlush(): void {
   if (flushScheduled) return;
@@ -36,11 +60,11 @@ function scheduleFlush(): void {
  * chokepoint, after the prefs write has resolved.
  */
 export function bumpPrefsNonce(): void {
-  nonce += 1;
   if (batchDepth > 0) {
-    bumpedWhileBatched = true;
+    pendingBumps += 1;
     return;
   }
+  nonce += 1;
   scheduleFlush();
 }
 
@@ -56,22 +80,70 @@ export function bumpPrefsNonce(): void {
  * in sequence, so it cost up to four advances times the number of mounted
  * hooks, and the newest read discards the rest after paying for them.
  *
- * The nonce still increments per write, so it stays monotonic and no subscriber
- * can observe a value that skipped a change. Only the NOTIFY is deferred, once,
- * to the end. Nested calls are counted, and a throw inside `fn` still flushes
- * whatever landed before it.
+ * The counter is held with the notify, not advanced behind it, because
+ * `getPrefsNonce` is `useSyncExternalStore`'s `getSnapshot` and that contract
+ * requires the snapshot to change only when the subscription fires. At the end
+ * of the batch it moves once, by everything the batch wrote, so it stays
+ * monotonic and a subscriber never observes a value that skipped a change: it
+ * re-reads disk truth, which already carries every write in between. Nested
+ * calls are counted, and a throw inside `fn` still publishes whatever landed
+ * before it.
+ *
+ * **The suppression is module-wide, not per-action.** While a batch is open, a
+ * write made anywhere else in the app has its notify deferred to the same end
+ * point. Nothing is lost: subscribers re-read disk truth rather than applying a
+ * diff, so the single notify carries the concurrent write too. What the
+ * `BATCH_NOTIFY_CEILING_MS` watchdog bounds is the WAIT, so a batched write that
+ * hangs instead of settling cannot swallow notifications for the rest of the
+ * session.
+ *
+ * The batch is a display concern only. A prefs command applies its own
+ * host-side effect before it returns (screen-capture protection, for one, is
+ * applied inside the command at `core/src/plugins/prefs/commands.rs`), so
+ * deferring the notify never defers enforcement.
  */
 export async function withPrefsBatch<T>(fn: () => Promise<T>): Promise<T> {
-  batchDepth += 1;
+  openBatch();
   try {
     return await fn();
   } finally {
-    batchDepth -= 1;
-    if (batchDepth === 0 && bumpedWhileBatched) {
-      bumpedWhileBatched = false;
-      scheduleFlush();
-    }
+    closeBatch();
   }
+}
+
+function openBatch(): void {
+  batchDepth += 1;
+  if (batchDepth > 1) return;
+  batchWatchdog = setTimeout(() => {
+    // The batch did not close. Stop waiting for it rather than swallowing every
+    // prefs notify for the rest of the session: `batchDepth` is zeroed here, so
+    // the pending `closeBatch` calls become no-ops and suppression ends now.
+    batchWatchdog = null;
+    batchDepth = 0;
+    flushBatched();
+  }, BATCH_NOTIFY_CEILING_MS);
+}
+
+function closeBatch(): void {
+  if (batchDepth === 0) return; // the watchdog already ended this batch
+  batchDepth -= 1;
+  if (batchDepth > 0) return;
+  if (batchWatchdog !== null) {
+    clearTimeout(batchWatchdog);
+    batchWatchdog = null;
+  }
+  flushBatched();
+}
+
+function flushBatched(): void {
+  if (pendingBumps === 0) return;
+  // Published as one step, so the snapshot moves exactly once and moves by
+  // everything the batch wrote. It is still monotonic and it still never skips:
+  // a subscriber goes from the pre-batch value to the post-batch value and
+  // re-reads disk truth, which carries every write in between.
+  nonce += pendingBumps;
+  pendingBumps = 0;
+  scheduleFlush();
 }
 
 /** Subscribe to nonce advances; returns an unsubscribe fn. */
@@ -97,6 +169,10 @@ export function __resetPrefsNonceForTest(): void {
   nonce = 0;
   flushScheduled = false;
   batchDepth = 0;
-  bumpedWhileBatched = false;
+  pendingBumps = 0;
+  if (batchWatchdog !== null) {
+    clearTimeout(batchWatchdog);
+    batchWatchdog = null;
+  }
   listeners.clear();
 }

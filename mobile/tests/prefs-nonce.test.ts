@@ -290,3 +290,105 @@ describe("withPrefsBatch", () => {
     expect(getPrefsNonce()).toBe(3);
   });
 });
+describe("usePrefs read ordering", () => {
+  // The token is the other half of this change and nothing pinned it: deleted
+  // tomorrow, every other spec in this file still passes. Both cases below are
+  // races, so they are driven by resolving the mocked reads by hand rather than
+  // by hoping a timer lands in the right order.
+
+  function deferred<T>() {
+    let resolve!: (v: T) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  it("keeps the newer view when an older read resolves last", async () => {
+    const first = deferred<typeof DEFAULT_PREFS>();
+    const second = deferred<typeof DEFAULT_PREFS>();
+    const reads = [first.promise, second.promise];
+    invoke.mockImplementation(async (cmd: unknown) =>
+      cmd === "plugin:prefs|prefs_read" ? reads.shift() : undefined,
+    );
+
+    let seen: typeof DEFAULT_PREFS | null = null;
+    function Probe() {
+      const { prefs: p } = usePrefs();
+      seen = p;
+      return null;
+    }
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(createElement(Probe));
+    });
+
+    // A second read is issued while the first is still in flight, exactly as a
+    // nonce advance during a mount read does.
+    await act(async () => {
+      bumpPrefsNonce();
+    });
+
+    await act(async () => {
+      second.resolve({ ...DEFAULT_PREFS, editor_text_size: "xl" });
+    });
+    await act(async () => {
+      first.resolve({ ...DEFAULT_PREFS, editor_text_size: "sm" });
+    });
+
+    // Without the token the late-resolving OLDER read wins and the surface
+    // shows "sm", which is the stale-open-editor defect one road over.
+    expect(seen?.editor_text_size).toBe("xl");
+
+    await act(async () => {
+      root.unmount();
+    });
+    host.remove();
+  });
+
+  it("applies an older successful read when the newer one fails", async () => {
+    const first = deferred<typeof DEFAULT_PREFS>();
+    const second = deferred<typeof DEFAULT_PREFS>();
+    const reads = [first.promise, second.promise];
+    invoke.mockImplementation(async (cmd: unknown) =>
+      cmd === "plugin:prefs|prefs_read" ? reads.shift() : undefined,
+    );
+
+    let seen: typeof DEFAULT_PREFS | null = null;
+    function Probe() {
+      const { prefs: p } = usePrefs();
+      seen = p;
+      return null;
+    }
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(createElement(Probe));
+    });
+    await act(async () => {
+      bumpPrefsNonce();
+    });
+
+    // The newer read fails, the older one then succeeds. A plain
+    // latest-issued-wins check discards the older view and the hook sits on
+    // DEFAULT_PREFS, older than what it had in hand.
+    await act(async () => {
+      second.reject(new Error("read failed"));
+    });
+    await act(async () => {
+      first.resolve({ ...DEFAULT_PREFS, editor_text_size: "sm" });
+    });
+
+    expect(seen?.editor_text_size).toBe("sm");
+
+    await act(async () => {
+      root.unmount();
+    });
+    host.remove();
+  });
+});
