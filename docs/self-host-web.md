@@ -138,6 +138,9 @@ to produce a number to compare against a row.**
    record, which also carries the container recipe for reproducing a row from
    scratch.
 
+   The serve-versus-compare split is stated in full under "Read this first"
+   above and in step 2, so it is not restated here.
+
 A match means the bundle you are about to serve is the one built from the source
 you just read. On a mismatch, rule out the build environment before anything
 else: a bundle built outside `linux/amd64` is **expected** to differ, and only a
