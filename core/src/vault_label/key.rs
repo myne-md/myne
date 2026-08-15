@@ -93,21 +93,34 @@ pub const KEYCHAIN_PROBE_ACCOUNT: &str = "availability-probe";
 /// say so. Without it the row toggles, nothing happens, and it looks broken
 /// forever with no explanation.
 ///
-/// Answered by reading an account that does not exist, so the ordinary answer is
-/// "no such item", which is [`LabelKeychain::get`]'s `Ok(None)`. Only
-/// [`VaultLabelError::KeychainUnavailable`] reports unavailable: a transient
-/// backend error means the facility answered and failed, and telling the user
-/// their device cannot store vault names on the strength of one bad call would
-/// be a claim about the machine rather than about the call.
+/// **Answered by attempting a WRITE, not a read, and that is the whole point.**
+/// This probe used to `get` an account that does not exist and treat "no such
+/// item" as proof the facility works. On macOS it is not: an ad-hoc-signed build
+/// (every `tauri dev` run) can READ the data-protection keychain and gets a
+/// clean `errSecItemNotFound`, while every `SecItemAdd` fails with
+/// `errSecMissingEntitlement` (-34018). So the read probe answered "available",
+/// the row promised the picker would show names, and each unlock silently wrote
+/// nothing. That is precisely the looks-fine-does-nothing state this function
+/// exists to prevent, reached through the one door nobody checked.
+///
+/// So it stores a one-byte value under the probe account and deletes it again.
+/// Two keychain calls on a Settings-panel mount is nothing, and it asks the
+/// question the caller actually has: can this device STORE a name. The delete is
+/// best-effort; a leftover probe item is inert (it is not a `VaultId`, so
+/// nothing reads it as a wrap key) and the next probe overwrites it.
+///
+/// Only [`VaultLabelError::KeychainUnavailable`] reports unavailable. A
+/// transient backend error means the facility answered and failed, and telling
+/// someone their device cannot store vault names on the strength of one bad call
+/// would be a claim about the machine rather than about the call.
 ///
 /// **This is a probe, not a fallback.** Nothing anywhere reacts to a `false` by
 /// writing the name in the clear; the store simply holds nothing on such a
 /// device (`decisions.md` 2026-08-15).
 pub fn keychain_available(ops: &dyn LabelKeychain) -> bool {
-    !matches!(
-        ops.get(KEYCHAIN_PROBE_ACCOUNT),
-        Err(VaultLabelError::KeychainUnavailable)
-    )
+    let stored = ops.store(KEYCHAIN_PROBE_ACCOUNT, &[0u8]);
+    let _ = ops.delete(KEYCHAIN_PROBE_ACCOUNT);
+    !matches!(stored, Err(VaultLabelError::KeychainUnavailable))
 }
 
 /// The keychain account component for one vault: the canonical 36-char
@@ -462,13 +475,37 @@ mod tests {
     }
 
     #[test]
-    fn the_probe_neither_mints_nor_stores_anything() {
-        // It answers with one read. A probe that created an item would leave a
-        // keychain entry behind on every launch of the Settings panel.
+    fn the_probe_writes_and_then_cleans_up_after_itself() {
+        // It has to WRITE, because writing is the thing the caller wants to know
+        // about. It must also leave nothing behind: a probe that kept its item
+        // would add a keychain entry on every Settings-panel mount.
         let fake = FakeKeychain::empty();
         assert!(keychain_available(&fake));
-        assert!(fake.accounts().is_empty(), "the probe minted a key");
-        assert_eq!(fake.calls(), vec![format!("get {KEYCHAIN_PROBE_ACCOUNT}")]);
+        assert!(fake.accounts().is_empty(), "the probe left its item behind");
+        assert_eq!(
+            fake.calls(),
+            vec![
+                format!("store {KEYCHAIN_PROBE_ACCOUNT}"),
+                format!("delete {KEYCHAIN_PROBE_ACCOUNT}"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_keychain_that_reads_but_cannot_write_is_reported_unavailable() {
+        // The macOS ad-hoc-signed shape, and the reason this probe stopped being
+        // a read. Every `tauri dev` build is in it: `get` returns a clean
+        // errSecItemNotFound and `SecItemAdd` fails with errSecMissingEntitlement
+        // (-34018). The read probe called such a device healthy, so the Privacy
+        // row promised the picker would show names while each unlock silently
+        // wrote nothing. Reported by furkan against the running app, and it is
+        // exactly the looks-fine-does-nothing state this option exists to avoid.
+        let fake = FakeKeychain::readable_but_unwritable();
+        assert!(
+            fake.get(KEYCHAIN_PROBE_ACCOUNT).is_ok(),
+            "precondition: reads must work, or this proves nothing"
+        );
+        assert!(!keychain_available(&fake));
     }
 
     #[test]

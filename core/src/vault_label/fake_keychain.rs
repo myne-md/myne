@@ -21,6 +21,9 @@ use zeroize::Zeroizing;
 /// (the production one is shared across the runtime) and the store's tests drive
 /// it from an async body.
 pub(crate) struct FakeKeychain {
+    /// `store` answers `KeychainUnavailable` while `get` works. See
+    /// [`FakeKeychain::readable_but_unwritable`].
+    store_unavailable: bool,
     items: Mutex<Vec<(String, Vec<u8>)>>,
     calls: Mutex<Vec<String>>,
     store_fails: bool,
@@ -37,6 +40,7 @@ impl FakeKeychain {
             items: Mutex::new(Vec::new()),
             calls: Mutex::new(Vec::new()),
             store_fails: false,
+            store_unavailable: false,
             unavailable: false,
             delete_fails_for: Mutex::new(Vec::new()),
         }
@@ -47,6 +51,19 @@ impl FakeKeychain {
     pub(crate) fn failing_store() -> Self {
         Self {
             store_fails: true,
+            ..Self::empty()
+        }
+    }
+
+    /// **The macOS ad-hoc-signed shape**: reads answer normally, writes are
+    /// refused with `KeychainUnavailable`. Every `tauri dev` build is in it,
+    /// because the data-protection keychain returns a clean
+    /// `errSecItemNotFound` on a `get` and `errSecMissingEntitlement` (-34018)
+    /// on a `SecItemAdd`. A probe that only reads calls this device healthy and
+    /// the feature then writes nothing, silently, forever.
+    pub(crate) fn readable_but_unwritable() -> Self {
+        Self {
+            store_unavailable: true,
             ..Self::empty()
         }
     }
@@ -115,6 +132,9 @@ impl LabelKeychain for FakeKeychain {
     fn store(&self, account: &str, secret: &[u8]) -> Result<(), VaultLabelError> {
         self.log(format!("store {account}"));
         if self.unavailable {
+            return Err(VaultLabelError::KeychainUnavailable);
+        }
+        if self.store_unavailable {
             return Err(VaultLabelError::KeychainUnavailable);
         }
         if self.store_fails {
