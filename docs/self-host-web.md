@@ -138,14 +138,8 @@ to produce a number to compare against a row.**
    record, which also carries the container recipe for reproducing a row from
    scratch.
 
-   **Use that container recipe if you want a comparison that can match.** The
-   published rows are container builds, and the bundle is not yet byte-identical
-   across build hosts — a local `pnpm web:build` on a different OS or CPU
-   architecture produces a different hash from the same commit
-   ([#228](https://github.com/myne-md/myne/issues/228), and the record's own
-   "three rows for one commit" section shows it measured). Step 2 is still the
-   right way to build a bundle to *serve*; it is the wrong way to build one to
-   *compare*, and the two were not distinguished here before.
+   The serve-versus-compare split is stated in full under "Read this first"
+   above and in step 2, so it is not restated here.
 
 A match means the bundle you are about to serve is the one built from the source
 you just read. On a mismatch, rule out the build environment before anything

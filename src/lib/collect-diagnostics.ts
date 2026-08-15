@@ -33,7 +33,8 @@ export async function collectDiagnostics(failureCode: string): Promise<string> {
     channel: import.meta.env.MODE === "development" ? "Development" : "Stable",
     // Unsliced, unlike the About row: a maintainer reading a pasted block wants
     // the whole SHA. Served build first for the reason given there — the web
-    // define is pinned, so `version.json` is where the commit lives (0497).
+    // define is pinned, so `version.json` is where the commit lives
+    // (myne-md/myne#458).
     commit: served?.commit ?? __BUILD_COMMIT__,
     bundleHash: served?.bundleHash ?? null,
     failureCode,

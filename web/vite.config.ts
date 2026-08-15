@@ -382,7 +382,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
     // PINNED, and deliberately NOT `git rev-parse` the way the desktop config
-    // does it (myne-md/myne#458; decisions 0497).
+    // does it (myne-md/myne#458).
     //
     // `check-bundle-record.mjs --has` refuses to deploy a bundle whose hash is
     // not already published in a reviewed commit. That precondition is only

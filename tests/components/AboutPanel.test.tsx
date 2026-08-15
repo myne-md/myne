@@ -6,10 +6,10 @@
 // renders on every client including the web-shaped capability set, which used
 // to hide it (#181) — and the build readout, which must show the SERVED
 // commit where there is one and the compile-time define where there is not
-// (decisions 0497).
+// (myne-md/myne#458).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 const { openUrl } = vi.hoisted(() => ({
   openUrl: vi.fn(() => Promise.resolve()),
@@ -168,7 +168,7 @@ describe("AboutPanel — legal document links (myne-ops#15)", () => {
 });
 
 describe("AboutPanel — build readout", () => {
-  // decisions 0497 / myne-md/myne#458. The web config pins `__BUILD_COMMIT__`
+  // myne-md/myne#458. The web config pins `__BUILD_COMMIT__`
   // to a literal so the bundle takes no commit from its build environment, and
   // the real commit arrives at runtime in `version.json`. These two cases are
   // what keep the panel honest about which of the two it is showing.
@@ -187,10 +187,21 @@ describe("AboutPanel — build readout", () => {
     expect(screen.getByTestId("about.build-commit").textContent).toBe("fd8d23c10");
   });
 
-  it("falls back to the compile-time define where nothing is served", () => {
+  it("falls back to the compile-time define where nothing is served", async () => {
     // Desktop: the seam answers `null` by construction, so the installer's own
     // identity is what the row shows. `vitest.config.ts` pins the define here.
+    //
+    // AWAITED, and that is the whole test. Asserting synchronously observes only
+    // the FIRST paint, which carries the define whatever the seam is about to
+    // resolve to, so the assertion passed under both arms of the branch it
+    // claims to discriminate: populating a served bundle here left it green.
+    // It is the only guard on the fallback the design rests on.
     render(<AboutPanel />);
+    // Let the effect's promise settle, so what is asserted is the RESOLVED
+    // `null` rather than the pre-effect render.
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(screen.getByTestId("about.build-commit").textContent).toBe("test");
     expect(screen.queryByTestId("about.bundle-hash")).toBeNull();
   });
