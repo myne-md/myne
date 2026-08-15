@@ -110,6 +110,24 @@ fn obsidian_layout_suffix(alias: &str) -> String {
     if alias.is_empty() {
         return String::new();
     }
+    // A line break anywhere in the alias makes the whole suffix unusable, so
+    // emit none and let the embed export as the bare `![[final name]]` this
+    // transform produced before layout existed.
+    //
+    // `parse_canonical_embed_at` ends an alias at the first `]` and accepts a
+    // newline on the way, and `alt=` is terminal, so a note written by a
+    // non-Myne tool can carry `alt=a\n\n# Heading` inside a form-C embed.
+    // Splicing that through produces an exported wikilink whose closing `]]`
+    // is on a later line, which `wikilink.md` §2.1 makes unparseable (a
+    // wikilink terminates at the first line break), and turns `# Heading` into
+    // a real ATX heading in the exported file. The authoring path cannot
+    // produce it (the alt prompt is a single-line input), so the reachable case
+    // is a synced or imported note, which is exactly the attacker-influenceable
+    // one. Dropping the suffix loses a rendering hint; splicing it corrupts the
+    // document.
+    if alias.contains('\n') || alias.contains('\r') {
+        return String::new();
+    }
     let mut width: Option<&str> = None;
     let mut height: Option<&str> = None;
     // Where a lone `h=` belongs in `passthrough` if no pixel width arrives.
@@ -575,11 +593,53 @@ mod embed_layout_export_tests {
         assert_eq!(obsidian_layout_suffix("photo.png|w=8192"), "|8192");
     }
 
+    /// Pixel slot only, and the name says so now.
+    ///
+    /// The canonical parser's first-wins guard covers the whole WIDTH slot
+    /// (`widthPx !== null || widthPercent !== null`); this one tracks the pixel
+    /// slot alone, so `w=100%|w=300` and `w=300|w=100%` export identically
+    /// while the parser renders them differently. Unreachable in-app
+    /// (`emitEmbedAlias` never writes two `w=`, and the passthrough list can
+    /// never hold one), so it takes a hand-edited file or a foreign writer.
+    /// Pinned rather than fixed because widening the guard here would change
+    /// which bytes reach an exported document, and the two directions of that
+    /// belong to one change with the parser, not to this one.
     #[test]
-    fn a_duplicate_key_keeps_the_first_like_the_canonical_parser() {
+    fn a_duplicate_pixel_width_keeps_the_first() {
         assert_eq!(
             obsidian_layout_suffix("photo.png|w=300|w=400"),
             "|300|w=400"
+        );
+    }
+
+    /// Both orderings of a mixed duplicate, so the divergence above is on the
+    /// record as a value rather than as a sentence.
+    #[test]
+    fn a_mixed_duplicate_width_exports_the_same_either_way() {
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|w=100%|w=300"),
+            obsidian_layout_suffix("photo.png|w=300|w=100%"),
+        );
+    }
+
+    /// A newline in the alias drops the whole suffix.
+    ///
+    /// Splicing it produces an exported wikilink whose closing `]]` is on a
+    /// later line, and `# Heading` becomes a real heading in the exported file.
+    #[test]
+    fn a_line_break_in_the_alias_drops_the_suffix_rather_than_corrupting_the_export() {
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|w=300|alt=a\n\n# Heading"),
+            ""
+        );
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|w=300|alt=a\r\n# Heading"),
+            ""
+        );
+        // The control: the same alias without the break still carries.
+        assert_eq!(
+            obsidian_layout_suffix("photo.png|w=300|alt=a # Heading"),
+            "|300|alt=a # Heading"
         );
     }
 

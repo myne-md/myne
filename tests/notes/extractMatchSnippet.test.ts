@@ -69,4 +69,19 @@ describe("extractMatchSnippet", () => {
     expect(t!.match).toBe("Target");
     expect((t!.before + t!.match + t!.after)).not.toContain("[[");
   });
+
+  it("shows only the filename of a form-C embed carrying layout segments", () => {
+    // myne#409 made the alias a `|`-separated list, so the two-segment
+    // assumption here surfaced `photo.png|w=300|align=center|alt=A sunset` in a
+    // search excerpt. The test above covers only the two-segment shape, which
+    // is why the regression was invisible.
+    const id = "a".repeat(64);
+    const body = `see ![[att:${id}|photo.png|w=300|align=center|alt=A sunset]] here`;
+    const r = extractMatchSnippet(body, "photo", 60)!;
+    const whole = r.before + r.match + r.after;
+    expect(whole).toContain("photo.png");
+    expect(whole).not.toContain("w=300");
+    expect(whole).not.toContain("align=center");
+    expect(whole).not.toContain("alt=A sunset");
+  });
 });

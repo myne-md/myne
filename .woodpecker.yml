@@ -358,6 +358,12 @@ steps:
       # them; a saved recovery phrase reconstructs the vault, so a one-sided
       # drift is a zero-knowledge break that every build reports as green.
       - node scripts/check-mobile-export-backup.mjs
+      # Embed-layout grammar drift (myne#409): the TS canonical grammar and the
+      # narrow Rust mirror in the export rewrite share one numeric bound. Both
+      # sides claimed the published embed-layout vectors held them together, and
+      # that vector step is commented out below pending a vectors_token secret,
+      # so the stated lock ran nowhere. This one runs.
+      - node scripts/check-embed-layout-drift.mjs
       # Token-adoption ratchet (myne#394): a literal written into an inline style
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.

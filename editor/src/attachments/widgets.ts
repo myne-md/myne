@@ -40,6 +40,7 @@ import {
   type DroppedEmbedSegment,
   type EmbedLayout,
   emptyEmbedLayout,
+  isAliasSafeText,
   sameEmbedLayout,
 } from "@myne/dialect/embedLayout";
 import {
@@ -399,7 +400,13 @@ async function promptAltText(
     testidPrefix: "attachment-alt-text",
   });
   if (raw === null) return; // cancelled
-  if (raw.includes("]]")) {
+  // `]`, not `]]`. A single one is the worse of the two: the tree parser scans
+  // for the first `]]` PAIR and renders the embed normally, while the three
+  // regex extractors bound the alias with `[^\]]` and match NOTHING, so the note
+  // silently leaves the attachment's referencing set and the delete
+  // confirmation stops warning about it. `isAliasSafeText` owns the rule so a
+  // second writer cannot re-open the gap.
+  if (!isAliasSafeText(raw)) {
     showAttachmentToast(i18n.t("editor.attachment.widget.menu.altInvalid"), "error");
     return;
   }

@@ -12,6 +12,7 @@
 
 import { type EditorView } from "@codemirror/view";
 import {
+  type DroppedEmbedSegment,
   type EmbedLayout,
   parseEmbedAlias,
   sameEmbedLayout,
@@ -24,7 +25,14 @@ export function readEmbedLayout(
   view: EditorView,
   hostEl: HTMLElement,
   id: string,
-): { filename: string; layout: EmbedLayout; unknown: readonly string[]; from: number; to: number } | null {
+): {
+  filename: string;
+  layout: EmbedLayout;
+  unknown: readonly string[];
+  dropped: readonly DroppedEmbedSegment[];
+  from: number;
+  to: number;
+} | null {
   // Located by LIVE document position and re-resolved through the syntax tree,
   // exactly as `removeFileCard` does. A text search for the embed would misfire
   // onto a different occurrence of the same attachment in the same note.
@@ -34,8 +42,8 @@ export function readEmbedLayout(
   // hand-rolled version of this ("first pipe, minus the trailing `]]`") was a
   // third site hardcoding the form-C byte layout, and it swallowed a `#heading`
   // or `^blockid` anchor that the tree models separately.
-  const { filename, layout, unknown } = parseEmbedAlias(span.alias);
-  return { filename, layout, unknown, from: span.from, to: span.to };
+  const { filename, layout, unknown, dropped } = parseEmbedAlias(span.alias);
+  return { filename, layout, unknown, dropped, from: span.from, to: span.to };
 }
 
 /**
@@ -60,10 +68,20 @@ export function updateEmbedLayout(
     changes: {
       from: current.from,
       to: current.to,
-      // `current.unknown` is carried through verbatim. Without it, every layout
-      // edit would delete a segment written by a newer client (or a fragment of
-      // a filename containing both a pipe and an equals sign).
-      insert: emitAttachmentEmbed(id, current.filename, next, current.unknown),
+      // `current.unknown` AND `current.dropped` are both carried through
+      // verbatim. Without the first, every layout edit would delete a segment
+      // written by a newer client (or a fragment of a filename containing both a
+      // pipe and an equals sign). Without the second, it would delete a known
+      // key whose value this version cannot read, which the spec says twice it
+      // does not do, and which is the shape version skew produces the moment a
+      // newer client widens a bound.
+      insert: emitAttachmentEmbed(
+        id,
+        current.filename,
+        next,
+        current.unknown,
+        current.dropped,
+      ),
     },
     userEvent: "input.attachment-embed-layout",
   });

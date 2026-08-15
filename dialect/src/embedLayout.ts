@@ -223,6 +223,7 @@ export function emitEmbedAlias(
   filename: string,
   layout: EmbedLayout,
   unknown: readonly string[] = [],
+  dropped: readonly DroppedEmbedSegment[] = [],
 ): string {
   const out = [filename];
   if (layout.widthPx !== null) out.push(`w=${layout.widthPx}`);
@@ -231,8 +232,53 @@ export function emitEmbedAlias(
   if (layout.align !== null) out.push(`align=${layout.align}`);
   // Before `alt=`, which is terminal and would swallow them.
   for (const segment of unknown) out.push(segment);
+  // `dropped` is re-emitted for the same reason `unknown` is, and leaving it
+  // out was a real byte-loss path rather than an omission of tidiness.
+  //
+  // Three statements on this feature's own branch say the note's bytes are not
+  // rewritten when a value is unreadable: `wikilink.md` §5.1 ("dropped, never
+  // clamped and never rewritten. The note's bytes are not modified in any
+  // case"), the glossary, and this module's own parse comment. All three were
+  // true of the PARSER and false of the round trip: `w=99999` plus one click on
+  // "Align center" re-emitted without it, taking the author's bytes and the
+  // §3.9.3 marker that was the only thing telling them to fix it.
+  //
+  // It is worse under version skew, which is the case the retain rule exists
+  // for. A newer client that widens the ceiling writes `w=12000`; an older
+  // client reads that as a KNOWN key with a bad value, so it lands here rather
+  // than in `unknown`, and the retain argument applies verbatim. Dropping a
+  // segment because this version cannot READ it is the same mistake in both
+  // buckets; the buckets differ in whether the reader is TOLD, not in whether
+  // the bytes survive.
+  for (const segment of dropped) out.push(segment.source);
   if (layout.alt !== null) out.push(`${ALT_PREFIX}${layout.alt}`);
   return out.join("|");
+}
+
+/**
+ * Whether `text` is safe to write into an alias segment.
+ *
+ * **A single `]` is fatal, not just `]]`**, and the guard that checked only for
+ * `]]` let the worse of the two through. The reason is that the tree parser and
+ * the regex extractors disagree about it: `dialect/src/lezer/wikilink.ts` scans
+ * for the first `]]` PAIR, so `alt=Figure [1] caption` parses as one whole
+ * embed and renders normally, while `extractAttachmentRefs`, mobile's markdown
+ * rule and mobile's `attachmentRef` all bound the alias with `[^\]]`, so they
+ * match NOTHING and the embed becomes invisible to them.
+ *
+ * That divergence is a data-loss path rather than a rendering nit.
+ * `applyNoteAttachmentRefs` is replace-on-apply over `extractAttachmentIds`, so
+ * the note silently leaves that attachment's referencing set: the library's
+ * "used in N notes" count and the delete confirmation both stop seeing it, and
+ * the user can crypto-erase a blob that is still embedded in a note that still
+ * renders it. The HTML-export attachment scan and the editor's catalog warm
+ * miss it the same way.
+ *
+ * Lives here, beside [`emitEmbedAlias`], because one grammar owns what may be
+ * written into an alias. A caller that validates on its own re-opens the gap.
+ */
+export function isAliasSafeText(text: string): boolean {
+  return !text.includes("]");
 }
 
 /**

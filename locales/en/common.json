@@ -642,6 +642,7 @@
         "skippedSuffix_one": " · {{count}} skipped",
         "skippedSuffix_other": " · {{count}} skipped",
         "layoutPreserved": "{{count}} kept its size or alt text",
+        "layoutPreserved_one": "{{count}} kept its size or alt text",
         "layoutPreserved_other": "{{count}} kept their size or alt text"
       },
       "fileKind": {
@@ -778,7 +779,7 @@
             "center": "Align center",
             "right": "Align right"
           },
-          "altInvalid": "Alt text cannot contain ]] , which would end the embed."
+          "altInvalid": "Alt text cannot contain \"]\", which would break the embed."
         },
         "pdfFallback": "PDF",
         "textPreview": {
