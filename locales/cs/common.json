@@ -3026,7 +3026,7 @@
       "realtimeSyncHelper": "Změny z jiných zařízení dorazí během několika sekund prostřednictvím signálu bez obsahu — server přenáší pouze „něco se změnilo“, nikdy co. Když je váš trezor odemčený, aplikace stejně kontroluje server pravidelně, takže to nepřidává žádnou významnou viditelnost; není co nastavovat.",
       "realtimeSyncLabel": "Synchronizace v reálném čase",
       "screenCaptureHelperOff": "Ochrana platí vždy před odemknutím. Po odemknutí se řídí touto předvolbou.",
-      "screenCaptureHelperOn": "Aktivní na macOS a Windows 10 (aktualizace z května 2020 nebo novější). Podpora pro Linux přijde v budoucím vydání.",
+      "screenCaptureHelperOn": "Účinné na Windows 10 (aktualizace z května 2020) a novějších. macOS ani Linux pro to nemají systémové API, takže tam zachycení obrazovky zabránit nedokáže.",
       "screenCaptureLabel": "Ochrana proti snímání obrazovky",
       "screenCaptureSubtitle": "Blokovat snímky a nahrávání obrazovky",
       "screenshotBlocked": "Ochrana proti snímání obrazovky je zapnutá — snímky Myne vyjdou prázdné.",
