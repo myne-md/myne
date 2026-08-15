@@ -180,11 +180,14 @@ have replaced a true statement in a published record with a false one. When two 
 check whether they could have concurred for the same wrong reason before treating the concurrence
 as confirmation.
 
-**A generated document that a `--check` compares must contain nothing read live off the tree.** The
-same feature's projection printed a per-row line count, so `--check` failed on any one-line edit to
-any of the 192 files it covered, in `pre-commit` and in CI, under a message telling the author the
-document had been hand-edited. It had not. Either the value is derived from the roster and belongs
-in the projection, or it is derived from the tree and belongs in a count the reader expects to move.
+**A generated document that a `--check` compares may carry no value that moves on an edit its
+subject does not cover.** The same feature's projection printed a per-row line count, so `--check`
+failed on any one-line edit to any of the 192 files it covered, in `pre-commit` and in CI, under a
+message telling the author the document had been hand-edited. It had not. A tree-derived value is
+fine when it moves only when the record itself should be regenerated: that projection still prints
+how many pairs differ, and a pair starting or stopping differing is exactly the event that should
+force a re-emit. The line count was not that. Ask what edit moves the number, not where the number
+came from.
 
 Two shared libraries sit under `scripts/lib/` and exist because the drift they prevent is invisible: `shared-roots.mjs` is the ONE roster of shared trees (each guard kept a private copy, and `check-i18n.mjs`'s never learned about `editor/`, `dialect/` or `copy/` — 226 live `i18n.t()` keys outside its scope), and `scanned-assets.mjs` inverts the artefact-scan filter so a guard **fails on an extension nobody classified** instead of skipping it (the four web greps read `.js`/`.css`/`.html` and never opened the 1.2 MB `.mjs` chunk or the 3.9 MB `.wasm` the bundle actually ships).
 
