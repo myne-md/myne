@@ -334,6 +334,11 @@ steps:
       # Ornament vocabulary (myne#394): Rust, TS and CSS must agree on which
       # values exist, or a theme setting validates and then draws nothing.
       - node scripts/check-ornament-vocabulary.mjs
+      # Lock-teardown hooks (myne#454): a client that manages a plaintext-derived
+      # RAM state must implement the hook that wipes it on every slot drop. An
+      # empty body compiles, satisfies clippy and passes every other guard, so a
+      # lock quietly stops locking; mobile shipped three that way.
+      - node scripts/check-lock-teardown.mjs
       # E2E menu-testid guard (#275): a scenario reaching for a control that
       # renders only inside an open menu fails as a timeout, which reads as flake.
       - node scripts/check-e2e-menu-testids.mjs
