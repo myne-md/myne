@@ -59,7 +59,11 @@ import {
   setAiProviderKey,
   setAiProviderModel,
 } from "../../lib/prefs";
-import { aiCapabilityReport, providerLabelOf } from "../../lib/ai-capability";
+import {
+  aiCapabilityReport,
+  providerLabelOf,
+  type AiCapabilityReport,
+} from "../../lib/ai-capability";
 import {
   AI_TRUST_INVARIANT,
   aiTrustDisclosure,
@@ -333,6 +337,11 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // side-load fallback, so `false` is permanent for this build and the panel
   // has to say so rather than offer a switch that can only ever persist `true`.
   const [tagModel, setTagModel] = useState<boolean | null>(null);
+  /** The host's own view of which backend is active (myne-md/myne#466). `null`
+   *  until the first report lands, which renders as "nothing is answering" —
+   *  the honest reading of "we have not been told yet", and the same thing the
+   *  panel showed before any provider was configured. */
+  const [capability, setCapability] = useState<AiCapabilityReport | null>(null);
   // Local edit buffer for the excluded-folders textarea (one folder/line); the
   // backend NFC-sorts + dedups the set on encode, so the raw lines are fine.
   const [excludedDraft, setExcludedDraft] = useState<string>(
@@ -394,24 +403,54 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const [showAllModels, setShowAllModels] = useState(false);
 
   const aiEnabled = prefs.ai_enabled;
-  // Who answers at rest. A remote provider names itself; a device-local runtime
-  // names its endpoint's host; otherwise the answer comes from this process and
-  // there is nothing to name — which is the "nothing is set up yet" state, not
-  // an error. `undefined` is that state; it is NOT the same as an empty string.
+  // Who answers at rest — asked of the HOST, not of the preferences
+  // (myne-md/myne#466).
+  //
+  // This used to read `prefs.ai_provider` alone and carried a comment claiming
+  // it could not disagree with the request path because it read "the SAME
+  // stored state the host's own gate reads". That was wrong. The gate is
+  // `LocalInferenceState::active()`, and it checks SEVEN things — developer
+  // mode, the AI beta flag, a recognized provider, matching consent, a stored
+  // key, a NON-EMPTY `ai_provider_model`, and that the preferences came from
+  // the vault that is unlocked right now — falling back to the local arm the
+  // moment any one of them fails. Naming a provider satisfies exactly one of
+  // the seven. A user who named a provider and never picked a model therefore
+  // read "Answered by <Provider>" here while every request went to the local
+  // engine; when that engine then failed, the failure looked like the
+  // provider's. Attribution of where a note's text goes is a trust surface, so
+  // it has to name what happened, not what was intended.
+  //
+  // `backendClass` is the host's own verdict. The NAME still comes from the
+  // preferences, because only they carry it — but it is shown only for the
+  // class the host says is active, so the claim can no longer outrun the fact.
+  const backendClass = capability?.backendClass ?? null;
+  // `undefined` is the "nothing is set up yet" state, NOT an empty string.
   const activeProviderName: string | undefined =
-    providerLabelOf(prefs.ai_provider) ?? (savedEndpoint ?? undefined);
-  // Which backend is answering, for the trust copy. Derived from the SAME
-  // stored state the host's own gate reads, so the sentence the user sees and
-  // the decision the request path makes cannot disagree.
+    backendClass === "remote"
+      ? providerLabelOf(prefs.ai_provider)
+      : backendClass === "loopback_local"
+        ? (savedEndpoint ?? undefined)
+        : undefined;
+  // The trust headline answers a DIFFERENT question from the caption above, and
+  // the difference is deliberate. The caption says *who answered*; this says
+  // *where this configuration can send your text*. So it stays on the union —
+  // remote if the host resolved remote OR a provider is named — rather than on
+  // the host's verdict alone.
+  //
+  // The asymmetry is a safety direction, not an oversight. Over-claiming egress
+  // makes a user more careful than they need to be; under-claiming tells
+  // someone their text stays on the device while it leaves. Deriving this from
+  // `backendClass` alone would under-claim twice: once in the window before the
+  // first report lands (`capability` is null, which would read as in-process),
+  // and once for a user who named a provider and has not yet picked a model —
+  // one keystroke away from egress, on the very panel where they will make it.
   //
   // The endpoint draft is deliberately NOT consulted: a half-typed address is
   // not a configured runtime, and the copy must describe what is in effect
-  // rather than what is being typed. `endpointDraft` reflects the STORED value
-  // on mount, and a keystroke since then only ever makes this stale in the safe
-  // direction — toward the stronger claim being withheld, never asserted.
+  // rather than what is being typed.
   const trustState: AiTrustState = prefs.ai_provider
     ? { kind: "remote", provider: prefs.ai_provider }
-    : savedEndpoint
+    : backendClass === "loopback_local" || savedEndpoint
       ? { kind: "local-runtime", name: LOCAL_RUNTIME.name }
       : { kind: "in-process" };
   const autoTag = prefs.auto_tag_enabled;
@@ -472,15 +511,31 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // fact from the panel's side. That stops being true the moment a backend can
   // be present-but-unreachable, and the report names the cause instead.
   // Rendering that cause is #191's; this panel still shows the same boolean.
+  //
+  // Re-run when anything `active()` reads changes (myne-md/myne#466): the
+  // report now also drives the "who is answering" caption, and a caption that
+  // only refreshed on mount would keep claiming the old backend for the rest of
+  // the session — the exact staleness this slice exists to remove. `hasKey`
+  // is in the list because storing a key is what completes the remote gate,
+  // and it is state on this side rather than a preference field.
   useEffect(() => {
     let alive = true;
     void aiCapabilityReport().then((report) => {
-      if (alive) setTagModel(report.autoTag.available);
+      if (!alive) return;
+      setTagModel(report.autoTag.available);
+      setCapability(report);
     });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [
+    prefs.ai_enabled,
+    prefs.ai_provider,
+    prefs.ai_provider_consent,
+    prefs.ai_provider_model,
+    prefs.developer_mode,
+    hasKey,
+  ]);
 
   const chooseModel = async (role: ModelRole) => {
     const picked = await openFileDialog({

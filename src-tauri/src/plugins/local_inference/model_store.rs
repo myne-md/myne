@@ -137,6 +137,17 @@ pub enum ModelStoreError {
     /// that has no user-selectable path ([`ModelRole::TagSuggestion`]).
     #[error("unknown model role")]
     InvalidRole,
+    /// A marker records a model path and **the file it names is not there**
+    /// (myne-md/myne#466). Distinct from `Ok(None)` — "nothing was ever picked"
+    /// and "what was picked is gone" want different next steps, and the second
+    /// one used to reach the caller wearing the first one's clothes, or worse,
+    /// as a generic load failure with nothing in it to act on.
+    ///
+    /// Carries no path: a backend-resolved filesystem path may neither be
+    /// logged nor cross IPC (see: src-tauri/CLAUDE.md "Secret-handling logging
+    /// discipline").
+    #[error("the recorded model file is missing")]
+    RecordedModelMissing,
     /// An IO failure resolving/creating the models directory or reading/
     /// writing a marker, reduced to a closed, path-free kind.
     #[error("model store io failure")]
@@ -149,6 +160,7 @@ impl ModelStoreError {
         match self {
             ModelStoreError::InsideVaultTree => "inside_vault_tree",
             ModelStoreError::InvalidRole => "invalid_role",
+            ModelStoreError::RecordedModelMissing => "recorded_model_missing",
             ModelStoreError::Io { .. } => "io",
         }
     }
@@ -319,6 +331,12 @@ pub fn set_selected_model(
         return Err(ModelStoreError::InvalidRole);
     };
     let accepted = ensure_outside_vault_tree(base, model_path)?;
+    // Refuse a pick whose file is not there, for EVERY role (myne-md/myne#466).
+    // The hash-marker roles below already got this incidentally, through
+    // `file_stat` inside the hashing block; `Generation` has no hash marker, so
+    // nothing checked its pick and nothing checked its read either. Recording a
+    // path that cannot be opened is never useful, whatever the role.
+    let _ = file_stat(&accepted)?;
     let dir = ensure_models_dir(base)?;
     // Roles with a hash marker (Embedding / Transcription) record the file's
     // SHA-256 at pick-time — computed BEFORE the path marker so a hash/IO
@@ -387,6 +405,39 @@ pub fn selected_model(base: &Path, role: ModelRole) -> Result<Option<PathBuf>, M
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e.into()),
     }
+}
+
+/// [`selected_model`], but the recorded path is checked against the filesystem
+/// before it is handed back (myne-md/myne#466).
+///
+/// `selected_model` answers "what is recorded", which is the right question for
+/// the UI signal, the hash backfill and the transcription fallback. It is the
+/// WRONG question for a loader, which is about to open the file: a marker
+/// written months ago for a model since deleted comes back from it as
+/// confidently as a live one, and the loader's `File::open` then fails with a
+/// generic error naming nothing.
+///
+/// The **generation** role is the only one with this hole, which is why this
+/// wrapper exists rather than a change to `selected_model` itself. Embedding
+/// and transcription both carry a hash marker, and
+/// [`hash_marker_file_name`](ModelRole::hash_marker_file_name) returning `Some`
+/// is exactly what routes them through [`file_stat`] at pick time and again on
+/// every hash backfill. Generation returns `None` there, so nothing ever opened
+/// its file except the loader.
+pub fn selected_model_verified(
+    base: &Path,
+    role: ModelRole,
+) -> Result<Option<PathBuf>, ModelStoreError> {
+    let Some(path) = selected_model(base, role)? else {
+        return Ok(None);
+    };
+    // `is_file` rather than `exists`: a marker pointing at a directory, a FIFO
+    // or a device is no more loadable than a marker pointing at nothing, and
+    // `file_stat` applies the same rule at pick time.
+    if !path.is_file() {
+        return Err(ModelStoreError::RecordedModelMissing);
+    }
+    Ok(Some(path))
 }
 
 /// Path components (under the Tauri `resource_dir`) of the **bundled default**
@@ -618,11 +669,23 @@ mod tests {
         assert!(ensure_outside_vault_tree(base, &in_models).is_ok());
     }
 
+    /// A real, bounded file to point a marker at. Since myne-md/myne#466 a pick
+    /// is refused unless its target exists, so a test that wants a successful
+    /// pick has to put something on disk — an invented path is now exactly the
+    /// case the guard rejects.
+    fn a_model_file(dir: &Path, name: &str) -> PathBuf {
+        let p = dir.join(name);
+        std::fs::create_dir_all(dir).expect("model dir");
+        std::fs::write(&p, b"gguf-ish bytes").expect("model file");
+        p
+    }
+
     #[test]
     fn set_and_get_selected_model_round_trips_device_locally() {
         let tmp = ScopedTempDir::new("local-inf-model-store").expect("scoped tempdir");
         let base = tmp.path();
-        let model = Path::new("/home/user/models/qwen2.5-1.5b-q4.gguf");
+        let model = a_model_file(&base.join("elsewhere"), "qwen2.5-1.5b-q4.gguf");
+        let model = model.as_path();
 
         assert_eq!(selected_model(base, ModelRole::Generation).unwrap(), None);
 
@@ -639,6 +702,65 @@ mod tests {
         let marker = models_dir_from_base(base).join("generation.path");
         assert!(marker.exists());
         assert!(!is_inside_vaults_tree(base, &marker));
+    }
+
+    /// The half of myne-md/myne#466 that reads. A marker recorded months ago for
+    /// a model since deleted came back from `selected_model` as confidently as a
+    /// live one, and the loader's `File::open` then failed with an error that
+    /// named nothing — which the frontend's catch-all rendered as a *provider*
+    /// failure, on a request that never left the device.
+    #[test]
+    fn a_marker_pointing_at_a_deleted_file_is_not_a_selected_model() {
+        let tmp = ScopedTempDir::new("local-inf-stale-marker").expect("scoped tempdir");
+        let base = tmp.path();
+        let model = a_model_file(&base.join("elsewhere"), "gone.gguf");
+
+        set_selected_model(base, ModelRole::Generation, &model).expect("set ok");
+        // Live: both readers agree.
+        assert_eq!(
+            selected_model_verified(base, ModelRole::Generation).unwrap(),
+            Some(model.clone())
+        );
+
+        std::fs::remove_file(&model).expect("delete the model out from under the marker");
+
+        // `selected_model` still answers "what is recorded" — that contract is
+        // unchanged, and the UI signal and hash backfill depend on it.
+        assert_eq!(
+            selected_model(base, ModelRole::Generation).unwrap(),
+            Some(model.clone())
+        );
+        // The loader's reader is the one that must not be fooled, and it must
+        // NOT answer `Ok(None)` either: "nothing was ever picked" and "what was
+        // picked is gone" want different sentences.
+        assert_eq!(
+            selected_model_verified(base, ModelRole::Generation).err(),
+            Some(ModelStoreError::RecordedModelMissing)
+        );
+
+        // A directory where a model should be is no more loadable than nothing.
+        std::fs::create_dir_all(&model).expect("directory in the model's place");
+        assert_eq!(
+            selected_model_verified(base, ModelRole::Generation).err(),
+            Some(ModelStoreError::RecordedModelMissing)
+        );
+    }
+
+    /// The half of myne-md/myne#466 that writes. Embedding and transcription got
+    /// an existence check incidentally, through the `file_stat` inside their
+    /// hashing block; `Generation` has no hash marker, so nothing checked its
+    /// pick — a path could be recorded that was never openable in the first
+    /// place.
+    #[test]
+    fn picking_a_generation_model_refuses_a_path_that_is_not_there() {
+        let tmp = ScopedTempDir::new("local-inf-pick-missing").expect("scoped tempdir");
+        let base = tmp.path();
+        let absent = base.join("elsewhere").join("never-existed.gguf");
+
+        assert!(set_selected_model(base, ModelRole::Generation, &absent).is_err());
+        // And it recorded NOTHING — a refused pick must not leave a marker
+        // behind for the loader to trip over later.
+        assert_eq!(selected_model(base, ModelRole::Generation).unwrap(), None);
     }
 
     #[test]

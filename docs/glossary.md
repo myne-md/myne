@@ -1273,6 +1273,18 @@ Bytes leaving the machine Myne runs on — as distinct from **loopback**, which 
 
 Used in: `decisions.md` 2026-08-09, 2026-08-04; `dev/ai-no-egress.md`
 
+### **policy refusal** &nbsp; 📦 *Product*
+
+A [remote AI provider](#remote-ai-provider) declining a request under **its own** rules — an account guardrail, a workspace policy, a model the plan does not carry. Its shape is what makes it a term rather than a detail: the provider answers **HTTP 200** and puts an `error` member in the body where the answer belongs, so at the transport layer it is indistinguishable from success. Distinct from a *credential* rejection (401/403), from a *cost* decline (402/429 — see the quota causes), and from a transport refusal, which is nothing accepting the connection at all. Distinguishing it needs only whether that member is **present**; its text is attacker-influenceable and is never read, logged, stored or shown — the reply structs type it `Option<serde::de::IgnoredAny>`, which deserializes any value and retains nothing. The user-facing consequence is the reason the term exists: a policy refusal is fixed at the provider, so telling the user to rephrase is wrong advice, and telling them nothing was sent is a false statement — the note text had already left.
+
+Used in: `decisions.md` 2026-08-15; myne-md/myne#466
+
+### **effective backend** &nbsp; 📦 *Product*
+
+Which AI backend a request **actually** reaches, as opposed to which one the preferences name. The two can differ: selecting the remote arm requires seven conditions to hold at once (developer mode, the AI beta flag, a recognized [AI provider](#ai-provider), matching consent, a stored key, a non-empty model selection, and preferences read from the vault unlocked right now), and any one failing falls back silently to the local arm. Naming a provider satisfies one of the seven, so a caption derived from that alone can claim a backend that answered nothing. Attribution of where a note's text went is a trust surface, so it names this; the separate **trust headline** — where a configuration *can* send text — deliberately stays on the configured value, because over-claiming egress makes a reader cautious while under-claiming tells them their text stayed home when it did not.
+
+Used in: `decisions.md` 2026-08-15; myne-md/myne#466
+
 ### **conversational AI chat** &nbsp; 📦 *Product*
 
 The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. History is **RAM-only, dropped on lock** — no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default — but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
