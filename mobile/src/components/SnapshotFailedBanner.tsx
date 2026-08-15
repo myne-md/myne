@@ -11,7 +11,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../platform/event";
 
 /** Backend event name — mirror of `SNAPSHOT_WRITE_FAILED_EVENT` (Rust). */
 const SNAPSHOT_WRITE_FAILED_EVENT = "snapshot://write-failed";

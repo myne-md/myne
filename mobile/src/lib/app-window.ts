@@ -21,7 +21,7 @@
 // the host window — the user closes the browser tab manually. Phase 1
 // is desktop-only so this is a developer-experience nicety only.
 
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "../platform/window";
 
 /**
  * `true` when running inside `pnpm tauri dev` / production bundle (the
@@ -30,6 +30,25 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
  * constant — cheaper than per-call check.
  */
 export const HAS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+/**
+ * The same question, asked at CALL time.
+ *
+ * Two callers need this rather than the constant above, and the difference is
+ * not a style choice: `attachmentSrc` is reached from jsdom specs that stub the
+ * Tauri global INSIDE the test body (`mobile/tests/attachment-embed.test.ts`),
+ * long after this module was evaluated. A module-load constant answers `false`
+ * there forever and the branch under test never runs.
+ *
+ * It lives here because this file is the ONE place allowed to spell the runtime
+ * global (`scripts/check-platform-seam.mjs`'s `TAURI_GLOBAL_EXEMPT`): the probe
+ * asks whether a host EXISTS, it does not call one, and no seam module could
+ * answer without itself importing Tauri. Callers that re-spelled it inline is
+ * exactly what that exemption is meant to prevent.
+ */
+export function hasTauriHost(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
 
 /**
  * Destroy the host app window.

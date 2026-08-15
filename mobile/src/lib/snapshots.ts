@@ -4,7 +4,7 @@
 // writes via `MobileHooks::capture_snapshot`, so this read/restore surface has
 // real data. Mirrors the desktop `src/notes/snapshots.ts` arg convention.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** One snapshot row — mirror of the Rust `SnapshotMeta` (derived from filename +
  *  stat, decrypt-free). */

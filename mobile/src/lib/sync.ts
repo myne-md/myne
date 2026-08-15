@@ -9,9 +9,9 @@
 // straight to IPC and never parked in module or hook state.
 
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { setDeviceName } from "./prefs";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../platform/event";
 
 // ── Endpoint config (SY-02) ──────────────────────────────────────────────────
 
