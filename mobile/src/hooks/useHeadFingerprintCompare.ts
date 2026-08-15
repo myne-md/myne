@@ -27,6 +27,11 @@ export type CompareRole = "approver" | "joiner";
 /// releases after 15 s of silence.
 const TICK_MS = 1_000;
 
+/// How long an approver's value may be treated as still converging before a
+/// change counts as an alarm. See the desktop twin for why this is a wall clock
+/// rather than the first cycle settling.
+const CONVERGENCE_GRACE_MS = 10_000;
+
 export interface HeadFingerprintCompare {
   fingerprint: string | null;
   syncing: boolean;
@@ -39,7 +44,10 @@ export function useHeadFingerprintCompare(
   role: CompareRole,
 ): HeadFingerprintCompare {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  // Seeded from `active`: set only inside the effect, the approver's first
+  // committed render showed the pending copy on a screen zero milliseconds
+  // old. Same correction as the desktop twin.
+  const [syncing, setSyncing] = useState(active);
   const [changed, setChanged] = useState(false);
   const shown = useRef<string | null>(null);
 
@@ -55,7 +63,18 @@ export function useHeadFingerprintCompare(
     let cycling = false;
     // Has this screen's first sync cycle finished, one way or the other? Until
     // it has, an approver's value is still converging and a change is not news.
-    let settled = role !== "approver";
+    //
+    // BOUNDED by a wall clock, and the bound is the security property. Keyed to
+    // the first `sync_now` alone, a cycle the server stalls keeps `settled`
+    // false for the life of the screen, so the alarm below can never fire and
+    // `cycling` stays true so no second cycle is ever issued. An untrusted
+    // server can then hold an approver on its pre-ceremony head, seat the TOFU
+    // joiner on that same stale head, and the two codes MATCH. Desktop twin
+    // carries the same fix and the full argument.
+    const armedAt = Date.now();
+    const settledByDeadline = () => Date.now() - armedAt >= CONVERGENCE_GRACE_MS;
+    let cycleSettled = role !== "approver";
+    const isSettled = () => cycleSettled || settledByDeadline();
     setSyncing(true);
 
     const tick = async () => {
@@ -65,6 +84,9 @@ export function useHeadFingerprintCompare(
         /* an unarmed hold degrades to the pre-fix behaviour, never to a stall */
       }
       try {
+        // Released by the deadline too, or a hung cycle also stops this screen
+        // re-issuing `sync_now` and the device stops pulling.
+        if (cycling && settledByDeadline()) cycling = false;
         if (!cycling) {
           cycling = true;
           // Fired and watched, never awaited. `settled` only decides whether a
@@ -76,12 +98,12 @@ export function useHeadFingerprintCompare(
             })
             .finally(() => {
               cycling = false;
-              settled = true;
+              cycleSettled = true;
             });
         }
         const fp = await syncHeadFingerprint();
         if (!cancelled && fp && fp !== shown.current) {
-          if (shown.current !== null && settled) setChanged(true);
+          if (shown.current !== null && isSettled()) setChanged(true);
           shown.current = fp;
           setFingerprint(fp);
         }

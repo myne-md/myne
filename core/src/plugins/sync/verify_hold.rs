@@ -118,20 +118,48 @@ impl VerifyHold {
     /// * a hold that went quiet and came back (a stalled tick, a briefly
     ///   backgrounded app) resumes under its ORIGINAL ceiling — it cannot buy
     ///   itself a fresh five minutes by falling silent;
-    /// * a hold that has reached the ceiling stays finished, and pinging will
-    ///   not resurrect it. Only [`Self::end`] clears that, so a new ceremony
-    ///   starts a new ceiling and a screen left open on a desk does not.
+    /// * a hold that has reached the ceiling stays finished, and a PING will not
+    ///   resurrect it, so a screen left open on a desk does not buy itself
+    ///   another five minutes;
+    /// * but a NEW ceremony does get its full ceiling, even when the previous
+    ///   hold was abandoned without an `end`.
     ///
-    /// Written the other way round — re-engaging whenever `is_held` is false —
-    /// the ceiling could never bind at all: a screen pinging once a second would
-    /// lapse at the ceiling and re-anchor on the very next ping, forever.
+    /// That last clause is the correction, and the bug it fixes was silent.
+    /// Recovery from a spent ceiling used to route exclusively through
+    /// [`Self::end`], which is the one call a dead WebView cannot make, and this
+    /// module's whole premise (see the module doc) is that the WebView CAN die
+    /// without telling anyone. So one abandoned ceremony left `engaged` true with
+    /// `engaged_at` pinned to it, and every later `begin` took the renewal branch,
+    /// saw the ceiling spent and armed nothing: the hold was disabled for the rest
+    /// of the process, with no error and no log, reverting every subsequent
+    /// compare to the false-mismatch behaviour this module exists to remove. That
+    /// is the only mitigation `threat-model.md` §7 records for the TOFU-bootstrap
+    /// hole, so a silent revert is the worst available failure.
+    ///
+    /// The two cases are told apart by the LEASE rather than by an explicit
+    /// release. A live screen pings about once a second, so its lease can never be
+    /// fully lapsed when it renews; an abandoned hold minutes old always is.
+    ///
+    /// Written the other way round, re-engaging whenever `is_held` is false, the
+    /// ceiling could never bind at all: a screen pinging once a second would lapse
+    /// at the ceiling and re-anchor on the very next ping, forever.
     pub fn begin(&self, now_ms: u64) {
         if self.engaged.load(Ordering::Acquire) {
             let engaged_at = self.engaged_at_ms.load(Ordering::Relaxed);
             // Ceiling spent, or the wall clock moved backwards past the anchor.
-            // Either way this hold is over and a ping is not allowed to restart
-            // it; `end` is.
             if now_ms < engaged_at || now_ms - engaged_at >= VERIFY_HOLD_MAX_MS {
+                let renewed_at = self.renewed_at_ms.load(Ordering::Relaxed);
+                let lease_lapsed =
+                    now_ms < renewed_at || now_ms - renewed_at >= VERIFY_HOLD_LEASE_MS;
+                if !lease_lapsed {
+                    // Still being pinged: this is the same ceremony running past
+                    // its ceiling, and it stays finished.
+                    return;
+                }
+                // Nobody has pinged for a full lease, so the previous ceremony is
+                // gone whether or not anyone said so. This is a new one.
+                self.engaged_at_ms.store(now_ms, Ordering::Relaxed);
+                self.renewed_at_ms.store(now_ms, Ordering::Relaxed);
                 return;
             }
             self.renewed_at_ms.store(now_ms, Ordering::Relaxed);
@@ -281,17 +309,71 @@ mod tests {
     /// a second must not be able to re-anchor itself forever.
     #[test]
     fn a_ping_after_the_ceiling_does_not_resurrect_the_hold() {
+        // A LIVE screen, which is what "a ping" means: it renews about once a
+        // second, so its lease is never fully lapsed. That is what distinguishes
+        // it from an abandoned hold, and it is why the ceiling still binds
+        // against a screen somebody left open on a desk.
+        //
+        // The previous version of this test jumped from 0 straight to the
+        // ceiling with no pings in between, which is indistinguishable from
+        // abandonment, and pinned the behaviour that produced the lockout below.
         let h = VerifyHold::default();
         h.begin(0);
+        let mut t = 0;
+        while t < VERIFY_HOLD_MAX_MS {
+            t += VERIFY_HOLD_LEASE_MS / 3;
+            h.begin(t);
+        }
         let spent = VERIFY_HOLD_MAX_MS + 1;
-        assert!(!h.is_held(spent));
+        assert!(!h.is_held(spent), "the ceiling binds against a live screen");
         h.begin(spent);
-        assert!(!h.is_held(spent));
-        // ...and an explicit release followed by a fresh arm DOES start over,
-        // so a genuinely new ceremony is never blocked by an old one.
+        assert!(
+            !h.is_held(spent),
+            "and pinging does not buy another ceiling"
+        );
+
+        // An explicit release followed by a fresh arm starts over.
         h.end();
         h.begin(spent);
         assert!(h.is_held(spent));
+    }
+
+    /// A new ceremony after an ABANDONED one gets its full ceiling, with no
+    /// `end` in between.
+    ///
+    /// This is the case the lockout broke, and it is the one that matters most:
+    /// recovery from a spent ceiling used to route only through `end`, which is
+    /// the one call a dead WebView cannot make, and this module exists because
+    /// the WebView can die without telling anyone. One abandoned ceremony
+    /// therefore disabled the hold for the rest of the process, silently,
+    /// reverting every later compare to the false-mismatch behaviour that
+    /// `threat-model.md` §7 names as the only TOFU-bootstrap mitigation.
+    #[test]
+    fn a_new_ceremony_after_an_abandoned_one_gets_its_own_ceiling() {
+        let h = VerifyHold::default();
+        h.begin(0);
+        // The screen dies. Nobody pings, nobody calls `end`.
+        let much_later = VERIFY_HOLD_MAX_MS * 3;
+        assert!(!h.is_held(much_later));
+
+        // A new ceremony opens.
+        h.begin(much_later);
+        assert!(h.is_held(much_later), "a new ceremony must arm");
+
+        // And it gets its FULL ceiling rather than the remains of the abandoned
+        // one. Pinged the way a live screen pings, because `is_held` wants both
+        // a fresh lease and an unspent ceiling: a hold nobody renews lapses on
+        // the lease first, which is the whole point of the lease.
+        let mut t = much_later;
+        while t < much_later + VERIFY_HOLD_MAX_MS - VERIFY_HOLD_LEASE_MS {
+            t += VERIFY_HOLD_LEASE_MS / 3;
+            h.begin(t);
+            assert!(h.is_held(t), "still inside the new ceremony's own ceiling");
+        }
+        assert!(
+            !h.is_held(much_later + VERIFY_HOLD_MAX_MS),
+            "which still ends at its own ceiling"
+        );
     }
 
     /// `end` before `begin` is not an error: the UI releases on every unmount
