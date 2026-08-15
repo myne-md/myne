@@ -283,22 +283,30 @@ pub fn run() {
             // MYND-31: app-level live in-RAM VaultIndices state (wikilink graph
             // + backlinks + tag index + typed properties), rebuilt on unlock by
             // the TS-orchestrated sweep. Mirrors the desktop `app.manage(...)`
-            // wiring; the lock-teardown wipe is a desktop-only hooks side-effect
-            // (mobile installs NoopHooks), so nothing tears it down here.
+            // wiring, INCLUDING the lock teardown: `MobileHooks::zeroize_vault_indices`
+            // clears this on every slot drop (myne#454), and
+            // `scripts/check-lock-teardown.mjs` fails if a client holds this state
+            // with an empty hook body. This comment used to say mobile installed
+            // `NoopHooks` and nothing tore it down, which is what the guard exists
+            // to stop a reader from having to believe.
             app.manage(plugins::vault_indices::VaultIndicesState::default());
             // MYS1: app-level live in-RAM full-text search index (BM25). Fed by
             // the WebView via `search_index_replace` (the mobile client already
             // holds every note's plaintext, so it pushes the corpus down — no
             // Rust-side decryption/hydrate). Mirrors the desktop `app.manage(...)`
-            // wiring; the lock-teardown wipe is a desktop-only hooks side-effect
-            // (mobile installs NoopHooks), so nothing tears it down here — the
-            // frontend re-pushes the corpus on the next unlock.
+            // wiring, INCLUDING the lock teardown: `MobileHooks::zeroize_search_index`
+            // clears this on every slot drop (myne#454) and the frontend re-pushes
+            // the corpus on the next unlock. The wipe is one half; `note_search`
+            // is slot-gated so a locked vault's index cannot answer through the
+            // IPC door either, which is the property the shared `lock_from_host`
+            // rests its no-leak claim on.
             app.manage(myne_core::search::SearchIndexState::default());
             // MYND-169: app-level live in-RAM attachment reference graph
             // (note → attachment-ids), rebuilt on unlock by the TS-orchestrated
-            // note sweep. Mirrors the desktop `app.manage(...)` wiring; the
-            // lock-teardown wipe is a desktop-only hooks side-effect (mobile
-            // installs NoopHooks), so nothing tears it down here.
+            // note sweep. Mirrors the desktop `app.manage(...)` wiring, INCLUDING
+            // the lock teardown: `MobileHooks::zeroize_attachment_refs` clears this
+            // on every slot drop (myne#454), and the three attachment-ref commands
+            // are slot-gated besides.
             app.manage(plugins::attachments::AttachmentRefsState::default());
             // Kill the native WKWebView keyboard "form assistant" bar (the
             // ‹ › ⌄ Done strip UIKit draws above the keyboard) — no web-side fix
