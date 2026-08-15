@@ -761,7 +761,18 @@ steps:
   # a real break and must go red.
   web-build:
     image: node:25
-    when: *code-paths
+    # Same `status: [success, failure]` as the mobile lane, and for the reason
+    # the comment above already gives. `optional: true` on the `e2e` edge only
+    # says "do not WAIT for a step that may not run"; the implicit
+    # `status: success` in a bare `when` is pipeline-wide, so this step was
+    # SKIPPED whenever `e2e` reddened, which is the common case on develop. That
+    # silently skipped the four web artefact greps, the seam contract, the
+    # bundle budget and the screen/surface/testid rosters, and by this file's own
+    # sentence a gate that did not run is indistinguishable from one that passed.
+    # Two of those greps hold A15 compensating controls.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     depends_on:
       - name: e2e
         optional: true
@@ -907,7 +918,11 @@ steps:
   # signed-archive apt install.
   e2e-web:
     image: node:25
-    when: *code-paths
+    # Inherits web-build's reasoning: it depends on web-build, so a bare `when`
+    # skipped it on exactly the pipelines web-build was skipped on.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     depends_on: [web-build]
     environment:
       CI: "true"
@@ -1035,7 +1050,15 @@ steps:
     when:
       - path: *code-path-globs
         status: [success, failure]
-    depends_on: [mobile-build]
+    # Chained after `npm-licenses` rather than beside it. Both are children of
+    # `mobile-build` and both run `pnpm install --frozen-lockfile` into the
+    # SHARED workspace `node_modules`, so as siblings they installed
+    # concurrently, which this file names by its failure at the lane header:
+    # ERR_PNPM_ENOENT from corrupted temp dirs. The comment below already
+    # asserted the installs stay linear; that was true of the parent and false
+    # of the sibling. The lane is off the critical path by design, so the added
+    # wall clock is free.
+    depends_on: [npm-licenses]
     commands:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
@@ -1220,7 +1243,13 @@ steps:
 
   sync-sim:
     image: rust:1.96.0-slim
-    when: *code-paths
+    # The comment below says this step runs REGARDLESS of e2e's result, and with
+    # a bare `when` that was not true: `optional: true` only removes the wait,
+    # while the implicit `status: success` is pipeline-wide and skipped this step
+    # whenever e2e was red. The claim is now enforced rather than asserted.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
     # `optional: true`: run AFTER e2e (keeps the heavy steps serial on the
     # shared host) but REGARDLESS of e2e's result. e2e is chronically flaky on
     # develop (a plain `depends_on: [e2e]` skips sync-sim whenever e2e is red),

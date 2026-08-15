@@ -184,7 +184,7 @@ export function AboutPanel() {
         {/* Served build first, compile-time define second. On web the commit is
             a property of the SERVED bundle, not of whoever built it: the web
             config pins `__BUILD_COMMIT__` so the bundle takes nothing from its
-            build environment (decisions 0497), and `version.json` carries the
+            build environment (myne-md/myne#458), and `version.json` carries the
             real commit — the document this panel already fetches for the hash.
             Desktop answers `null` from the seam by construction and renders the
             define, which is the identity of the installer that was run.
