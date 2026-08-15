@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 //
-// Component tests for `src/components/settings/AboutPanel.tsx`'s Developer
-// mode toggle (developer-mode feature, MYND-593, task 6). Focus: the toggle
+// Component tests for `src/components/settings/AboutPanel.tsx`. Two focuses:
+// the Developer mode toggle (developer-mode feature, MYND-593, task 6) — it
 // reflects `prefs.developer_mode`, calls `setDeveloperMode` on click, and
-// renders on every client — including the web-shaped capability set, which
-// used to hide it (#181).
+// renders on every client including the web-shaped capability set, which used
+// to hide it (#181) — and the build readout, which must show the SERVED
+// commit where there is one and the compile-time define where there is not
+// (decisions 0497).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -18,8 +20,14 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   revealItemInDir: vi.fn(),
 }));
 
+// Mutable so the build-readout tests can drive both arms of the seam: `null` is
+// desktop (no served bundle), a populated object is web. Every pre-existing case
+// leaves it `null`, which is what the `beforeEach` reset restores.
+const { servedBuild } = vi.hoisted(() => ({
+  servedBuild: { value: null as { bundleHash: string; commit: string } | null },
+}));
 vi.mock("../../src/platform/build-info", () => ({
-  servedBuildInfo: () => Promise.resolve(null),
+  servedBuildInfo: () => Promise.resolve(servedBuild.value),
 }));
 
 let localAiCapable = true;
@@ -52,6 +60,7 @@ beforeEach(() => {
   localAiCapable = true;
   developerMode = false;
   language = "en";
+  servedBuild.value = null;
   setDeveloperMode.mockClear();
   openUrl.mockClear();
 });
@@ -155,5 +164,34 @@ describe("AboutPanel — legal document links (myne-ops#15)", () => {
     // without closing #9.
     render(<AboutPanel />);
     expect(screen.queryByTestId("about.legal-impressum")).toBeNull();
+  });
+});
+
+describe("AboutPanel — build readout", () => {
+  // decisions 0497 / myne-md/myne#458. The web config pins `__BUILD_COMMIT__`
+  // to a literal so the bundle takes no commit from its build environment, and
+  // the real commit arrives at runtime in `version.json`. These two cases are
+  // what keep the panel honest about which of the two it is showing.
+
+  it("shows the served commit, sliced, when a bundle identifies itself", async () => {
+    servedBuild.value = {
+      bundleHash: "sha256:1d8ccfeb4e673113ebc3f92da257c31a2fd62e70263af75387337f40832cad4d",
+      commit: "fd8d23c1041351c196bdac274f956fe2fcaa8107",
+    };
+    render(<AboutPanel />);
+    // The fetch is a promise the effect resolves, so the first paint carries the
+    // define; await the element that only appears once it lands.
+    await screen.findByTestId("about.bundle-hash");
+    // Sliced to 9, matching what the desktop `--short=9` define renders, rather
+    // than 40 hex characters across a settings row.
+    expect(screen.getByTestId("about.build-commit").textContent).toBe("fd8d23c10");
+  });
+
+  it("falls back to the compile-time define where nothing is served", () => {
+    // Desktop: the seam answers `null` by construction, so the installer's own
+    // identity is what the row shows. `vitest.config.ts` pins the define here.
+    render(<AboutPanel />);
+    expect(screen.getByTestId("about.build-commit").textContent).toBe("test");
+    expect(screen.queryByTestId("about.bundle-hash")).toBeNull();
   });
 });
