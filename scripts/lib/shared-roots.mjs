@@ -42,6 +42,31 @@ export const SHARED_ROOTS = Object.freeze([
 ]);
 
 /**
+ * Every Rust tree a guard scanning "the clients" means.
+ *
+ * `SHARED_ROOTS` above is the TS/JS roster and says nothing about Rust, so the
+ * Rust guards each kept a private list, which is the same failure one language
+ * over. It is a live one rather than a hypothetical: `check-crypto-registries.mjs`
+ * listed `src-tauri/src`, `cli/src`, `web/wasm/src` and `e2e/fixture-gen/src`
+ * and never learned about `mobile/src-tauri/src` after the mobile client moved
+ * in-repo on 2026-08-13, so the guard that owns the HKDF-expand ownership rule
+ * and the §10.3 magic registry had not seen a whole client for two days. Adding
+ * it costs nothing today (46 more files, zero new violations), which is exactly
+ * when a scope is free to widen.
+ *
+ * `protocol/src` and `core/src` are deliberately absent: they are the SHARED
+ * crates, not clients, and a guard that wants them says so by naming them
+ * alongside this list rather than by finding them in it.
+ */
+export const RUST_CLIENT_TREES = Object.freeze([
+  "src-tauri/src",
+  "mobile/src-tauri/src",
+  "web/wasm/src",
+  "cli/src",
+  "tor-sidecar/src",
+]);
+
+/**
  * The roots that exist in THIS checkout.
  *
  * This used to matter: `myne-mobile` was a companion repo, gitignored here and

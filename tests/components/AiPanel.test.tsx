@@ -74,7 +74,10 @@ vi.mock("../../src/lib/ai-capability", async (importOriginal) => ({
     tagModelAvailable().then((available: boolean) => ({
       compiled: true,
       backendId: "candle",
-      backendClass: "in_process_local",
+      // Mutable since myne#466: the panel's "what is answering" caption now
+      // reads the HOST's verdict rather than `prefs.ai_provider`, so a test
+      // that wants the remote caption has to say the host resolved remote.
+      backendClass,
       generation: { available: false, cause: "no_model" },
       embedding: { available: false, cause: "no_model" },
       transcription: { available: false, cause: "no_model" },
@@ -86,6 +89,9 @@ let aiEnabled = true;
 let autoTagEnabled = false;
 let aiProvider: string | null = null;
 let aiProviderModel: string | null = null;
+/** What the HOST says is answering. `in_process_local` is the honest default:
+ *  a fresh profile has no provider resolved, whatever the preferences say. */
+let backendClass = "in_process_local";
 vi.mock("../../src/hooks/usePrefs", () => ({
   usePrefs: () => ({
     prefs: {
@@ -117,6 +123,7 @@ beforeEach(() => {
   autoTagEnabled = false;
   aiProvider = null;
   aiProviderModel = null;
+  backendClass = "in_process_local";
   listProviderModels.mockClear();
   listProviderModels.mockResolvedValue([]);
   aiProviderHasKey.mockClear();
@@ -616,6 +623,7 @@ describe("AiPanel — only text models are offered", () => {
 describe("AiPanel — what is answering right now", () => {
   it("names the remote provider when one is selected", async () => {
     aiProvider = "openrouter";
+    backendClass = "remote";
     render(<AiPanel />);
     await waitFor(() =>
       expect(screen.getByTestId("ai.active-provider").textContent).toBe(
@@ -625,6 +633,7 @@ describe("AiPanel — what is answering right now", () => {
   });
 
   it("names the device-local endpoint when one is configured", async () => {
+    backendClass = "loopback_local";
     loadAiEndpoint.mockResolvedValue({ url: "http://127.0.0.1:11434", model: "qwen" });
     render(<AiPanel />);
     await waitFor(() =>
@@ -643,8 +652,49 @@ describe("AiPanel — what is answering right now", () => {
     );
   });
 
+  // myne#466. A provider NAMED is one of the seven conditions
+  // `LocalInferenceState::active()` checks; the other six can fail silently,
+  // and then every request goes to the local arm. The caption used to read
+  // `prefs.ai_provider` alone and claim the provider was answering anyway — so
+  // when the local engine failed, the failure looked like the provider's, and
+  // the user went looking at an account that had never been contacted.
+  it("does not name a provider the host did not actually resolve", async () => {
+    aiProvider = "openrouter";
+    aiProviderModel = null; // the condition users trip over: no model chosen
+    backendClass = "in_process_local"; // …so the host resolved LOCAL
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.active-provider").textContent).toBe(
+        "settings.ai.providerNothingAnswering",
+      ),
+    );
+  });
+
+  // The caption and the trust headline answer different questions, and the
+  // asymmetry is the safety direction. Asserting them TOGETHER is the point: a
+  // future edit that "tidies" both onto one source breaks exactly one of these
+  // two expectations, whichever source it picks.
+  it("still warns about egress while declining to claim the provider answered", async () => {
+    aiProvider = "openrouter";
+    aiProviderModel = null;
+    backendClass = "in_process_local";
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.active-provider").textContent).toBe(
+        "settings.ai.providerNothingAnswering",
+      ),
+    );
+    // Over-claiming egress makes a user more careful than they need to be;
+    // under-claiming tells them their text stays here while it leaves. This
+    // configuration is one keystroke — picking a model — from sending.
+    expect(screen.getByTestId("ai.trust-headline").textContent).toBe(
+      aiTrustHeadline({ kind: "remote", provider: "openrouter" }),
+    );
+  });
+
   it("is a caption, not a control — it adds no setting row", () => {
     aiProvider = "openrouter";
+    backendClass = "remote";
     render(<AiPanel />);
     const caption = screen.getByTestId("ai.active-provider");
     expect(caption.tagName).toBe("P");

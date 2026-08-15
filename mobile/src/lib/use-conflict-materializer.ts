@@ -10,8 +10,8 @@
 // sync_now emit it after a pull, SYNC-37).
 
 import { useCallback, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from "../platform/core";
+import { listen } from "../platform/event";
 import { createConflictCopy } from "./conflictCopy";
 
 /** 32-char hex note id → the canonical dashed UUID the `conflict_of:` field (and

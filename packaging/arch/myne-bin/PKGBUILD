@@ -23,10 +23,17 @@
 # be re-measured from the deb itself; the declared payload is used instead
 # because it is reproducible from a checkout by anyone reading this line.
 #
-# `source` is a LOCAL file: the repo is private, so a release-asset URL would
-# need a credential `makepkg` has no clean way to carry. Drop the released
-# .deb beside this PKGBUILD and run `makepkg -f`. When the repo goes public,
-# swap in the release URL and keep everything else.
+# `source` is a URL again, and the repo is still private — that combination is
+# the point. The .deb is fetched from downloads.myne.md, the project's own
+# artefact origin, which needs no credential because it is public even though
+# github.com/myne-md/myne is not. This comment used to say "when the repo goes
+# public, swap in the release URL"; standing up the origin got there first
+# (`decisions.md` 2026-08-15, entry 0496).
+#
+# `sha256sums` carries the real hash rather than 'SKIP'. It is the same value
+# the release's minisign-signed SHA256SUMS publishes and the same one myne.md
+# lists, so `makepkg` refuses a substituted download instead of trusting the
+# transport. Update it in the same edit as `pkgver`, never separately.
 
 pkgname=myne-bin
 _appname=myne
@@ -41,8 +48,8 @@ provides=("$_appname")
 conflicts=("$_appname")
 options=('!strip')
 
-source=("Myne_${pkgver}_amd64.deb")
-sha256sums=('SKIP')
+source=("https://downloads.myne.md/releases/v${pkgver}/Myne_${pkgver}_amd64.deb")
+sha256sums=('e4ea227ba1df344cd52fccb82f1a2d562b7d2948b38d880b0252f9d87fa805a9')
 # makepkg would otherwise try to unpack the .deb into $srcdir as a source
 # archive. package() reads it directly instead, so the outer `ar` container and
 # the inner data tarball stay paired.

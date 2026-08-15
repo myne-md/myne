@@ -46,10 +46,14 @@ const ALL: ProviderErrorCause[] = [
   "no_credential",
   "unauthorized",
   "quota_exhausted",
+  "policy_refused",
   "unreachable",
   "refused",
   "timeout",
   "barred",
+  "empty_completion",
+  "local_model_missing",
+  "not_ready",
   "failed",
 ];
 
@@ -66,6 +70,13 @@ describe("provider failure causes", () => {
       ["Refused", "refused", "refused"],
       ["Timeout", "timeout", "timeout"],
       ["RemoteBarred", "remote_barred", "barred"],
+      // myne#466 — four causes that had no entry at all and therefore reached
+      // the user as the same sentence, one of which ("nothing was sent again")
+      // was untrue for the first of them.
+      ["PolicyRefused", "policy_refused", "policy_refused"],
+      ["EmptyCompletion", "empty_completion", "empty_completion"],
+      ["LocalModelMissing", "local_model_missing", "local_model_missing"],
+      ["NotReady", "not_ready", "not_ready"],
     ];
     for (const [variant, tag, expected] of pairs) {
       expect(normalizeProviderError(variant)).toBe(expected);
