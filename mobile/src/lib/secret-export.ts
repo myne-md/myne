@@ -59,9 +59,12 @@ export async function copySecretToClipboard(
  * shipped): on **iOS** the app declares no `UIFileSharingEnabled`, so `Documents`
  * is NOT browsable in the Files app and the share sheet is the only way the user
  * reaches the file. On **Android** the directory is
- * `Android/data/<pkg>/files/Documents`, reachable from the system Files app, and
- * the share sheet is a documented no-op (`share_file.rs`), so the write itself is
- * the delivery.
+ * `Android/data/<pkg>/files/Documents`, which the system Files app and
+ * DocumentsUI have refused to navigate into since Android 11 (API 30) while
+ * `minSdk` here is 24, and the share sheet is a documented no-op
+ * (`share_file.rs`). So on a current Android the write is the delivery and the
+ * user has no supported way to reach what was delivered: myne-md/myne#505 is the
+ * follow-up, and myne-md/myne#504 is the iOS label that claims otherwise.
  *
  * The file is **excluded from the platform's automatic cloud backup** on both
  * platforms (myne-md/myne#491) — a saved recovery phrase alone reconstructs the
