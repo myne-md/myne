@@ -77,3 +77,21 @@ export { lineDiff, diffWithSegments, changedLineCount } from "./diff";
 export type { DiffLine, DiffSegment } from "./diff";
 export { normalizeForDiff, normalizeConflictPair } from "./diffNormalize";
 export type { NormalizedConflictPair } from "./diffNormalize";
+
+// Form-C embed layout segments (myne#409): the one splitter and the one
+// emitter for `![[att:<id>|filename|w=…|align=…|alt=…]]`, shared by all three
+// clients so a note laid out on one is read identically on the others.
+export {
+  MAX_EMBED_DIMENSION_PX,
+  emitEmbedAlias,
+  emptyEmbedLayout,
+  isEmptyEmbedLayout,
+  parseEmbedAlias,
+  sameEmbedLayout,
+} from "./embedLayout";
+export type {
+  DroppedEmbedSegment,
+  EmbedAlign,
+  EmbedLayout,
+  ParsedEmbedAlias,
+} from "./embedLayout";
