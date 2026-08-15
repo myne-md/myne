@@ -31,6 +31,7 @@ import {
   MAX_EMBED_DIMENSION_PX,
   emitEmbedAlias,
   emptyEmbedLayout,
+  isAliasSafeText,
   parseEmbedAlias,
   type EmbedLayout,
 } from "@myne/dialect/embedLayout";
@@ -264,5 +265,71 @@ describe("unknown keyed segments survive a round trip", () => {
     const r = parseEmbedAlias("re|2024=report.png");
     expect(r.filename).toBe("re|2024=report.png");
     expect(r.unknown).toEqual([]);
+  });
+
+  // ── the round trip is total: NEITHER bucket may be destroyed ──────────────
+
+  it("re-emits a dropped segment, so a bad value survives the next edit", () => {
+    // The bug this pins: `dropped` was parsed, reported, and then left out of
+    // the emitter, so one click on an alignment row deleted the author's bytes
+    // AND the marker that was the only thing telling them to fix it. Three
+    // statements on this feature's own branch say that does not happen
+    // (`wikilink.md` §5.1, the glossary, this module's parse comment); all
+    // three were true of the parser and false of the round trip.
+    const r = parseEmbedAlias("photo.png|w=99999|align=center");
+    expect(r.dropped.map((d) => d.source)).toEqual(["w=99999"]);
+    expect(emitEmbedAlias(r.filename, r.layout, r.unknown, r.dropped)).toBe(
+      "photo.png|align=center|w=99999",
+    );
+  });
+
+  it("re-emits a dropped segment written by a NEWER client", () => {
+    // The version-skew case the retain rule exists for, and the reason
+    // `dropped` needs it as much as `unknown` does: a client that widens the
+    // ceiling writes `w=12000`, and an older client reads that as a KNOWN key
+    // with a bad value, so it lands in `dropped` rather than in `unknown`.
+    const r = parseEmbedAlias("photo.png|w=12000");
+    expect(r.dropped.map((d) => d.source)).toEqual(["w=12000"]);
+    expect(emitEmbedAlias(r.filename, r.layout, r.unknown, r.dropped)).toBe(
+      "photo.png|w=12000",
+    );
+  });
+
+  it("keeps both retained buckets ahead of the terminal alt", () => {
+    const r = parseEmbedAlias("photo.png|z=9|w=99999|alt=A | B");
+    expect(emitEmbedAlias(r.filename, r.layout, r.unknown, r.dropped)).toBe(
+      "photo.png|z=9|w=99999|alt=A | B",
+    );
+  });
+
+  // ── what may be written into an alias ─────────────────────────────────────
+
+  it("refuses a single `]`, not merely `]]`", () => {
+    // A `]` splits the four form-C readers: the lezer scan looks for the first
+    // `]]` PAIR and matches the embed whole, while `extractAttachmentRefs`,
+    // mobile's markdown rule and mobile's attachmentRef all bound the alias
+    // with `[^\]]` and match NOTHING. The note then leaves the attachment's
+    // referencing set, the delete confirmation stops warning, and the user can
+    // crypto-erase a blob that is still embedded in a note that still renders
+    // it. The guard that checked `]]` let the worse of the two through.
+    expect(isAliasSafeText("A sunset")).toBe(true);
+    expect(isAliasSafeText("A sunset | 2026")).toBe(true);
+    expect(isAliasSafeText("")).toBe(true);
+    expect(isAliasSafeText("Figure [1]")).toBe(false);
+    expect(isAliasSafeText("Figure [1] caption")).toBe(false);
+    expect(isAliasSafeText("ends]]")).toBe(false);
+  });
+
+  it("demonstrates the reader divergence a `]` causes", () => {
+    // Not a mock: the two real shapes, side by side, on the same bytes. If
+    // either ever agrees with the other on this input, the guard above can be
+    // reconsidered; until then it is the only thing holding them together.
+    const id = "a".repeat(64);
+    const src = `![[att:${id}|photo.png|alt=Figure [1] caption]]`;
+    // The extractor shape, verbatim from editor/src/host/notes/attachmentRef.ts.
+    const extractor = /!\[\[att:([0-9a-f]{64})(?:\|([^\]]*))?\]\]/;
+    expect(extractor.test(src)).toBe(false);
+    // The tree scan stops at the first `]]` PAIR, which is the real one.
+    expect(src.indexOf("]]")).toBe(src.length - 2);
   });
 });

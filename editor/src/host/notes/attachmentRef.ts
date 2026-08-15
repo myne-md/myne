@@ -24,6 +24,7 @@
 
 import { getHost } from "../../host";
 import {
+  type DroppedEmbedSegment,
   type EmbedLayout,
   emitEmbedAlias,
   emptyEmbedLayout,
@@ -67,8 +68,9 @@ export function emitAttachmentEmbed(
   filename: string,
   layout: EmbedLayout = emptyEmbedLayout(),
   unknown: readonly string[] = [],
+  dropped: readonly DroppedEmbedSegment[] = [],
 ): string {
-  return `![[${ATT_SCHEME}${id}|${emitEmbedAlias(filename, layout, unknown)}]]`;
+  return `![[${ATT_SCHEME}${id}|${emitEmbedAlias(filename, layout, unknown, dropped)}]]`;
 }
 
 /**
