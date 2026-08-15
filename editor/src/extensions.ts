@@ -63,6 +63,7 @@ import { wikilinkHoverExtension } from "./wikilink/hover";
 import { wikilinkPickerExtension } from "./wikilink/picker";
 import { activeViewExtension } from "./active-view";
 import { attachmentCatalogExtension } from "./attachments/catalog";
+import { coverBannerExtension } from "./decorations/cover-banner";
 import { attachmentPasteDropExtension } from "./attachments/paste-drop";
 import { attachmentInsertPlaceholderExtension } from "./attachments/insert-placeholder";
 import { slashMenuExtension } from "./slash/plugin";
@@ -232,6 +233,11 @@ export function myneExtensions(opts?: {
     // StateField the form-C embed decorator resolves ids against. Composed
     // before the decorations so the field exists when they first build.
     ...attachmentCatalogExtension(),
+    // The note's cover banner (myne-md/myne#410): a block widget at position 0,
+    // above the frontmatter Properties block. Composed AFTER the catalog
+    // extension for the same reason the embed decorations are — it resolves the
+    // cover id against `catalogField`, which must exist when it first builds.
+    ...coverBannerExtension(),
     // Attachment INSERT (MYND-164): paste an image / drop image-SVG-PDF files
     // into the editor → bytes → `attachment_import` → form-C embed at the
     // cursor. WebView HTML5 DnD only (`dragDropEnabled` stays false, SYNC-10);

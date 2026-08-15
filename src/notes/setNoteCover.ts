@@ -8,11 +8,23 @@
 // open cards view reading it — refreshes (the reindex chokepoint bumps the
 // index nonce; `useViewResult` re-runs and the card's cover appears at once).
 //
-// The cover lives in an ORDINARY user property (the property NAME comes from the
-// saved view's `image` setting, default `cover`) — NOT a Myne-managed canonical
-// field. The stored value is a form-C attachment embed (`![[att:<id>|name]]`),
-// the same shape the editor writes on paste/drop and that `resolveCoverAttachmentId`
-// (cardsView.tsx) reads back.
+// This writes TWO things through one parameterised path, and the difference
+// matters to the reader:
+//
+//   - `propertyKey === "cover"` (the `COVER_FIELD_KEY` constant) is the
+//     Myne-managed CANONICAL field, `markdown-dialect.md` §3.6.1, which names
+//     this file as its writer. Its read is value-strict (`readCoverValue`).
+//   - any other key is the saved view's own `image` property, an ordinary user
+//     property, read leniently by `resolveCoverAttachmentId` (viewLayout.ts).
+//
+// The two grammars are deliberately different and §3.6.1 records why: Myne is
+// strict about what it writes and lenient about what the user points it at.
+// Both store a form-C attachment embed (`![[att:<id>|name]]`), the same shape
+// the editor writes on paste/drop.
+//
+// The value is emitted through `formatYamlScalar`, so it lands double-quoted on
+// disk (a leading `!` forces quoting). That is what keeps it valid YAML to a
+// foreign reader.
 
 import { patchFrontmatterField, patchUpdatedField } from "../dialect";
 import { emitAttachmentEmbed } from "./attachmentRef";

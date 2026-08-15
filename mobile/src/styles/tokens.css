@@ -173,6 +173,15 @@
   --radius-3: 10px;
   --radius-pill: 999px;
 
+  /* -- Note cover banner ---------------------------------------------- */
+  /* Mobile RENDERS a cover (the banner extension is composed for every client)
+     but cannot yet EDIT one: `mobile/src/editor-host.ts` installs no `cover`
+     seam member, so the hover controls and the Add-cover affordance are absent
+     here by construction. The token is still needed, or the shared editor CSS
+     falls back to its hardcoded literal and mobile opts out of the theme layer
+     (myne-md/myne#410). */
+  --cover-banner-h: 180px;
+
   /* -- Spacing scale (4px base) -------------------------------------- */
   --space-0:  0;
   --space-1:  4px;

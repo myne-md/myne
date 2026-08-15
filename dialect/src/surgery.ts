@@ -92,6 +92,50 @@ export function formatYamlScalar(value: string): string {
   return `"${escaped}"`;
 }
 
+/**
+ * The inverse of {@link formatYamlScalar} for the double-quoted form: take a
+ * value portion and return the logical string it encodes.
+ *
+ * This exists because the shared scalar extractor cannot do it. That extractor
+ * matches `/^(["'])(.*?)\1[ \t]*(?:#.*)?$/`, which has no notion of `\"`, so a
+ * value carrying BOTH an escaped quote and a later `#` closes the group on the
+ * escaped quote and hands the rest to the optional-comment tail. Every managed
+ * field whose value is a timestamp or the literal `true` is immune, which is
+ * why the gap survived; `cover:` is the first whose value can carry a filename,
+ * so it is the first that can hit it.
+ *
+ * Returns `null` for anything that is not a well-formed double-quoted scalar,
+ * so the caller can fall back to the plain-scalar path.
+ */
+export function parseDoubleQuotedYamlScalar(valuePortion: string): string | null {
+  const s = valuePortion.trim();
+  if (!s.startsWith('"')) return null;
+  let out = "";
+  let i = 1;
+  while (i < s.length) {
+    const ch = s[i]!;
+    if (ch === "\\") {
+      // `formatYamlScalar` only ever emits `\\` and `\"`; anything else is a
+      // value we did not write, and passing the escaped char through verbatim
+      // is the conservative read.
+      const next = s[i + 1];
+      if (next === undefined) return null;
+      out += next;
+      i += 2;
+      continue;
+    }
+    if (ch === '"') {
+      // Closing quote. Only whitespace and an optional `# comment` may follow.
+      const tail = s.slice(i + 1);
+      return /^[ \t]*(?:#.*)?$/.test(tail) ? out : null;
+    }
+    out += ch;
+    i += 1;
+  }
+  // Ran off the end without a closing quote.
+  return null;
+}
+
 // Would YAML re-type the bare scalar `value` to something other than the exact
 // string? A title like `2026-06-07` is a YAML timestamp, `5` an int, `true` a
 // bool, `null` the null value — all parse back as non-strings (or a different
@@ -1352,6 +1396,101 @@ function isCanonicalFolderIndexFlag(valuePortion: string): boolean {
   return raw.trim() === FOLDER_INDEX_FLAG_VALUE;
 }
 
+// === cover: — the note's cover image (myne-md/myne#410) ===
+//
+// `cover:` is the 13th Myne-managed canonical FM field (markdown-dialect.md
+// §3.6.1). Its value is a form-C attachment embed, which makes it the first
+// managed field whose value can legitimately contain a `#` or a `"` (a filename
+// can; an RFC 3339 timestamp and the literal `true` cannot). That is why the
+// read below goes through `extractTrashedScalar` — the shared scalar extractor
+// every other value-strict field already uses — instead of matching the raw
+// line. The extractor only recognises a comment AFTER the closing quote, and
+// the value is quoted on disk (`needsYamlQuoting` returns true for a leading
+// `!`), so a `#` inside a filename survives and a user's trailing comment does
+// not cost them the cover. Hand-rolling a second reader here is exactly what
+// would break both.
+//
+// The strictness is on the GRAMMAR of the value, not on whether the attachment
+// still resolves: the catalog distinguishes `loading` from `deleted`, and a
+// resolvability-strict field would flicker between valid and invalid while the
+// catalog loads. A dangling cover is a render decision (draw nothing), not an
+// invalid field.
+//
+// The WRITE is the generic keyed `patchFrontmatterField` via
+// `src/notes/setNoteCover.ts`, like the conflict pair — no bespoke surgery
+// family, because the generic path already gives set, change and delete.
+
+/** A resolved cover reference: the attachment id plus its display alias. */
+export interface CoverRef {
+  readonly id: string;
+  readonly filename: string;
+}
+
+/** The canonical field name. Exported so no caller writes the string `"cover"`
+ *  by hand into a `patchFrontmatterField` call and drifts from this reader. */
+export const COVER_FIELD_KEY = "cover";
+
+const COVER_KEY_RE = /^(cover[ \t]*:[ \t]*)(.*)$/;
+/**
+ * The whole logical value must be ONE form-C embed and nothing else.
+ *
+ * The alias is `[^\]]*`, character-for-character the alias grammar the shared
+ * form-C scanner uses (`extractAttachmentRefs`, which owns the body-embed
+ * form). Matching it matters twice over. It keeps one grammar: a filename
+ * containing `]` must not parse as a cover when the same embed in the note body
+ * would not parse either. And it is what makes "exactly one embed" true without
+ * a hand-rolled lookahead: an alias that cannot contain `]` cannot swallow a
+ * second embed, which a greedy `.*` anchored on `\]\]$` silently did, reading
+ * `![[att:A|a.png]] ![[att:B|b.png]]` as one embed for id A and picking a
+ * winner the user never chose.
+ */
+const COVER_EMBED_RE = /^!\[\[att:([0-9a-f]{64})\|([^\]]*)\]\]$/;
+
+/**
+ * Value-strict read of one `cover:` **value portion** (the bytes after `cover:`).
+ * Returns the reference iff the logical value is exactly one form-C attachment
+ * embed, else `null`.
+ *
+ * Rejects everything Myne does not write: `cover: true`, `cover: photo.png`, a
+ * bare attachment id, a `[[att:…]]` missing the `!`, two embeds, an embed with
+ * surrounding prose, and an id that is not 64 lowercase hex characters. Accepts
+ * the quoted on-disk form, the same with a trailing YAML comment, and a
+ * hand-written unquoted embed.
+ *
+ * The alias is un-escaped (the inverse of `formatYamlScalar`) so a filename
+ * containing `"` reads back as the user's filename rather than its on-disk
+ * escaping. Validity never depends on the alias.
+ */
+export function readCoverValue(valuePortion: string): CoverRef | null {
+  // The quoted form FIRST, through the escape-aware parser: this is the form
+  // Myne writes, and the shared extractor mis-reads it when the filename
+  // carries both an escaped quote and a later `#`. Fall back to the shared
+  // extractor for the plain-scalar form a user may have hand-written.
+  const scalar =
+    parseDoubleQuotedYamlScalar(valuePortion) ?? extractTrashedScalar(valuePortion);
+  if (scalar === null) return null;
+  const m = COVER_EMBED_RE.exec(scalar);
+  if (m === null) return null;
+  return { id: m[1]!, filename: m[2]! };
+}
+
+/**
+ * Read the Myne-managed `cover:` reference, **value-strict**, from a frontmatter
+ * **body** (the slice shape `loadNoteBatch` parses, identical to
+ * {@link readTemplateFromFmBody}). **First `cover:` line wins**, matching how
+ * `kind:` resolves a duplicated key, so a note carrying two of them renders
+ * deterministically rather than depending on read order.
+ */
+export function readCoverFromFmBody(fmBody: string): CoverRef | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = COVER_KEY_RE.exec(line);
+    if (m === null) continue;
+    return readCoverValue(m[2] ?? "");
+  }
+  return null;
+}
+
 // === kind: drawing — the drawing-note marker (drawing-notes SF2, MYND-499) ===
 //
 // `kind:` is the 7th Myne-managed canonical FM field (markdown-dialect.md
@@ -1480,11 +1619,15 @@ function canonicalKind(valuePortion: string): NoteKind {
 // write target for a saved view's cover image (the property NAME comes from the
 // view's `image` setting, default `cover`), set without opening the note.
 //
-// `cover` (or whatever the view points at) is NOT a Myne-managed canonical field
-// (markdown-dialect.md §3.6.1 is unchanged); it is an ordinary property, so this
-// helper carries no value-strict contract — it just round-trips a string through
-// `formatYamlScalar`. Same A/B/C/D states as `patchFolderField`. `value === null`
-// deletes the field (with empty-block collapse).
+// The helper itself carries NO value-strict contract: it just round-trips a
+// string through `formatYamlScalar`. That is true whatever key it is handed,
+// including `cover`, which IS a Myne-managed canonical field
+// (markdown-dialect.md §3.6.1) whose §3.6.1 Writer column points at
+// `src/notes/setNoteCover.ts` calling straight through here, exactly as the
+// `conflict:` / `conflict_of:` pair does. Value-strictness for those fields
+// lives in their READERS, not in this writer. Same A/B/C/D states as
+// `patchFolderField`. `value === null` deletes the field (with empty-block
+// collapse).
 
 // Build the `^(<indent><key><sep>)(value)$` matcher for an arbitrary property
 // name. The key is a YAML property name (identifier-ish), but regex

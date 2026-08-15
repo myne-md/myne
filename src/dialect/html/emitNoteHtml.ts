@@ -12,7 +12,8 @@
 //     sanitized SVG, DOMPurify under the editor's 8-tag allowlist).
 //   - PURE over the input: the emitter never mutates the plaintext (asserted
 //     by the round-trip guard in tests).
-//   - Frontmatter projects ONLY `title:` (→ `<h1 class="note-title">`); every
+//   - Frontmatter projects `title:` (→ `<h1 class="note-title">`) and a valid
+//     `cover:` (→ a leading `<img class="note-cover">`, myne-md/myne#410); every
 //     other FM field is dropped and the block itself is never rendered.
 //   - Inline `#tags` render as plain text (SYNC-17 — no chip).
 //   - Heavy renderers stay lazy (SYNC-4) — see renderers.ts.
@@ -37,7 +38,7 @@ import type { SyntaxNode } from "@lezer/common";
 import i18n from "../../i18n";
 import { parser } from "../lezer/parser";
 import { locateFrontmatter } from "../lezer/frontmatter";
-import { readTitleFromFmBody } from "../surgery";
+import { readCoverFromFmBody, readTitleFromFmBody } from "../surgery";
 import { foldLabel } from "@myne/editor/decorations/link-reference-collector";
 import { SANITIZE_CONFIG } from "@myne/editor/html/sanitize";
 import {
@@ -98,10 +99,8 @@ export async function emitNoteHtml(
   opts: EmitNoteHtmlOptions = {},
 ): Promise<EmitNoteHtmlResult> {
   const fm = locateFrontmatter(plaintext);
-  const rawTitle =
-    fm === null
-      ? null
-      : readTitleFromFmBody(plaintext.slice(fm.bodyStart, fm.bodyEnd));
+  const fmBody = fm === null ? null : plaintext.slice(fm.bodyStart, fm.bodyEnd);
+  const rawTitle = fmBody === null ? null : readTitleFromFmBody(fmBody);
   const title = rawTitle === null || rawTitle === "" ? null : rawTitle;
   const src = fm === null ? plaintext : plaintext.slice(fm.blockEnd);
 
@@ -156,6 +155,41 @@ export async function emitNoteHtml(
   };
 
   const parts: string[] = [];
+  // The note's cover, above the title (myne-md/myne#410) — the same stack the
+  // editor draws. Emitted as an ordinary `attachment://<id>` `<img>`, so the
+  // HTML-with-attachments export's sidecar rewriter picks it up with no new
+  // logic and the PDF window inherits it from this same composition.
+  //
+  // The §3.6.1 grammar is the ONLY gate: an invalid `cover:` emits nothing,
+  // rather than this file forming a second opinion about what a cover is.
+  // Whether the attachment still EXISTS is not checked here, deliberately — the
+  // export pipeline already handles a reference it cannot resolve, and adding a
+  // catalog read to a pure projection would give the exporter a second, slower
+  // answer to a question the renderer already answers.
+  const cover = fmBody === null ? null : readCoverFromFmBody(fmBody);
+  if (cover !== null) {
+    // The cover goes through the SAME extension classification as a body embed,
+    // and that is load-bearing rather than tidiness. The flow's pre-export
+    // notice (`scanExcludedAttachments`) reads the whole plaintext, so it
+    // already sees this frontmatter embed and lists it as excluded whenever its
+    // filename is outside `IMAGE_EXT_RE`. Emitting the `<img>` regardless would
+    // put the file in the export after telling the user it was left out, and
+    // `attachment-classification.ts` states that invariant in the one direction
+    // that is allowed: the notice may name a file the projection keeps as
+    // literal text, never the reverse. That notice is the disclosure a TB3
+    // plaintext egress rests on, so it must not under-state what leaves.
+    const coverName = attachmentEmbedDisplayName(cover.filename);
+    if (IMAGE_EXT_RE.test(coverName)) {
+      // `escapeAttr`, not `escapeHtml`: this is an ATTRIBUTE value, and
+      // `escape.ts` states the emitter's contract as "everything reaching the
+      // document as text or attribute value goes through one of these two".
+      parts.push(
+        `<img class="note-cover" src="${escapeAttr(ctx.attachmentUrl(cover.id))}" alt="">`,
+      );
+    } else {
+      collectExcluded(ctx, cover.id, coverName);
+    }
+  }
   if (title !== null) {
     parts.push(`<h1 class="note-title">${escapeHtml(title)}</h1>`);
   }
