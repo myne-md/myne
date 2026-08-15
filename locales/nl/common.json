@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Wijzigingen van andere apparaten arriveren binnen enkele seconden via een inhoudsloos signaal — de server geeft alleen door dat “er iets is veranderd”, nooit wat. Terwijl je kluis ontgrendeld is, controleert de app de server toch al regelmatig, dus dit voegt geen betekenisvolle zichtbaarheid toe; er is niets in te stellen.",
       "realtimeSyncLabel": "Realtime synchronisatie",
       "screenCaptureHelperOff": "Bescherming geldt altijd vóór ontgrendeling. Na ontgrendeling volgt het deze voorkeur.",
-      "screenCaptureHelperOn": "Actief op macOS en Windows 10 (mei 2020-update of later). Linux-ondersteuning volgt in een toekomstige release.",
+      "screenCaptureHelperOn": "Werkt op Windows 10 (mei 2020-update) en later. macOS en Linux bieden hiervoor geen systeem-API, dus daar kan opname niet worden geblokkeerd.",
       "screenCaptureLabel": "Bescherming tegen schermopname",
       "screenCaptureSubtitle": "Schermafbeeldingen en schermopname blokkeren",
       "screenshotBlocked": "Bescherming tegen schermopname staat aan — schermafbeeldingen van Myne worden leeg.",

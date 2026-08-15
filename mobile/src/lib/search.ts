@@ -5,7 +5,7 @@
 // TS re-implementation. Falls back to nothing in browser-dev (no Tauri host);
 // the caller uses the client-side `searchNotes` there.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 export interface SearchDoc {
   id: string;

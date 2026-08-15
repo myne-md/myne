@@ -38,7 +38,7 @@ The reference build environment is **`linux/amd64`, built from
 the same commit built on an arm64 host produces a different hash from every row
 below, for the reason measured in "Why the build host is part of the hash", and
 plain `docker build` silently builds for whatever the host happens to be. Which
-is exactly the trap this section used to set — the procedure failed for the
+is exactly the trap this section used to set: the procedure failed for the
 honest arm64 verifier and told them nothing about why.
 
 Emulation is not a caveat, it is the point: an arm64 machine reaches the
@@ -141,12 +141,27 @@ publisher shared neither operating system nor CPU architecture, which is the
 case that matters: a hash only one machine in the world can produce is a number
 the publisher asserts about itself.
 
+**The residual, stated rather than left for a verifier to hit.** The claim above
+is scoped across hosts and it is not yet scoped across time, because the
+reference environment is not itself pinned. `web/container/Dockerfile` names
+`rust:1.96-bookworm`, `node:25-slim` and `caddy:2.8-alpine`, all floating tags,
+and its wasm stage installs `nodejs` from live Debian. Its own comment says the
+digest pinning belongs to the release pipeline (task 16), and that pipeline does
+not exist yet. So a base image can move under a row that was written before it
+moved, and a verifier rebuilding an older row later can get a mismatch that means
+"the environment drifted", not "the bundle was substituted", which is the same
+false alarm this section closes for the architecture axis. Read a row as
+reproducible against the reference environment **as it stood when the row was
+written**. Pinning the three base images by digest, and recording the digests per
+row, is what closes it, and it is tracked rather than done
+([#228](https://github.com/myne-md/myne/issues/228)).
+
 ## Why the build host is part of the hash
 
 The divergence is in the **wasm artefact**, and everything else follows from it.
 `web/wasm/pkg/myne_web_wasm_bg.wasm` is an input to the JS bundle, every chunk
 is content-hashed, and the chunk that carries the wasm's URL renames when the
-wasm renames — which renames its importers, and theirs, up to `index.html`. One
+wasm renames, which renames its importers, and theirs, up to `index.html`. One
 differing artefact renamed 16 JS chunks in the measured case. Reading that
 symptom as "the bundler emits architecture-dependent output" is the wrong turn
 this section exists to prevent.
@@ -154,7 +169,7 @@ this section exists to prevent.
 Measured on the two published `0.2.0` image variants (504 assets each): 487
 byte-identical, 17 differing per side (16 `.js` and the one `.wasm`), and after
 normalising the hashed asset references inside the differing chunks, all of them
-collapse to the same text — except the wasm-bindgen glue, where the divergence
+collapse to the same text, except the wasm-bindgen glue, where the divergence
 is a Rust symbol name.
 
 The chain, from the bottom:
@@ -182,8 +197,8 @@ the fix is to name the build environment instead of chasing host independence.
 
 **The bundler was ruled out, not assumed innocent.** Vite 8 bundles through
 Rolldown, whose binding is a per-architecture native binary, which makes it the
-obvious suspect. Building the same commit four ways on one machine — native
+obvious suspect. Building the same commit four ways on one machine (native
 `darwin-arm64` binding, the architecture-independent `wasm32-wasi` binding
 (forced with `NAPI_RS_FORCE_WASI=error`, which fails closed rather than falling
-back), and with `RAYON_NUM_THREADS` at 1 and 2 — produced one hash,
+back), and with `RAYON_NUM_THREADS` at 1 and 2) produced one hash,
 `sha256:a585e43e…`, four times.

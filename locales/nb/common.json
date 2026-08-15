@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Endringer fra andre enheter kommer innen sekunder via et innholdsløst signal – serveren videreformidler bare «noe er endret», aldri hva. Mens hvelvet ditt er låst opp sjekker appen serveren jevnlig uansett, så dette gir ingen meningsfull synlighet; det er ingenting å konfigurere.",
       "realtimeSyncLabel": "Sanntidssynkronisering",
       "screenCaptureHelperOff": "Beskyttelse gjelder alltid før opplåsing. Etter opplåsing følger den denne innstillingen.",
-      "screenCaptureHelperOn": "Aktiv på macOS og Windows 10 (May 2020 Update eller nyere). Linux-støtte kommer i en fremtidig utgivelse.",
+      "screenCaptureHelperOn": "Virker på Windows 10 (May 2020 Update) og nyere. macOS og Linux har ikke noe system-API for dette, så der kan den ikke blokkere opptak.",
       "screenCaptureLabel": "Beskyttelse mot skjermopptak",
       "screenCaptureSubtitle": "Blokker skjermbilder og skjermopptak",
       "screenshotBlocked": "Beskyttelse mot skjermopptak er på — skjermbilder av Myne blir tomme.",

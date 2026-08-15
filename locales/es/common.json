@@ -2946,7 +2946,7 @@
       "realtimeSyncHelper": "Los cambios de otros dispositivos llegan en segundos mediante una señal sin contenido: el servidor solo transmite «algo ha cambiado», nunca qué. Mientras tu bóveda está desbloqueada, la aplicación consulta el servidor con regularidad de todos modos, así que esto no añade visibilidad significativa; no hay nada que configurar.",
       "realtimeSyncLabel": "Sincronización en tiempo real",
       "screenCaptureHelperOff": "La protección siempre se aplica antes de desbloquear. Tras desbloquear, sigue esta preferencia.",
-      "screenCaptureHelperOn": "Activa en macOS y Windows 10 (actualización de mayo de 2020 o posterior). La compatibilidad con Linux llegará en una versión futura.",
+      "screenCaptureHelperOn": "Efectiva en Windows 10 (actualización de mayo de 2020) y posteriores. macOS y Linux no ofrecen una API del sistema para esto, así que allí no puede bloquear la captura.",
       "screenCaptureLabel": "Protección contra capturas de pantalla",
       "screenCaptureSubtitle": "Bloquea capturas de pantalla y grabación de pantalla",
       "screenshotBlocked": "La protección de pantalla está activada — las capturas de pantalla de Myne salen en blanco.",

@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Ændringer fra andre enheder ankommer inden for sekunder via et indholdsløst signal — serveren videresender kun “noget blev ændret”, aldrig hvad. Mens din boks er låst op, tjekker appen alligevel serveren regelmæssigt, så dette giver ingen nævneværdig synlighed; der er intet at konfigurere.",
       "realtimeSyncLabel": "Realtidssynkronisering",
       "screenCaptureHelperOff": "Beskyttelsen gælder altid før oplåsning. Efter oplåsning følger den denne indstilling.",
-      "screenCaptureHelperOn": "Aktiv på macOS og Windows 10 (May 2020 Update eller nyere). Linux-understøttelse kommer i en fremtidig udgivelse.",
+      "screenCaptureHelperOn": "Virker på Windows 10 (May 2020 Update) og nyere. macOS og Linux har ikke noget system-API til dette, så der kan indstillingen ikke blokere optagelse.",
       "screenCaptureLabel": "Beskyttelse mod skærmoptagelse",
       "screenCaptureSubtitle": "Bloker skærmbilleder og skærmoptagelse",
       "screenshotBlocked": "Beskyttelsen mod skærmoptagelse er slået til — skærmbilleder af Myne bliver tomme.",

@@ -2844,7 +2844,7 @@
       "autoLockSearchEmpty": "Hakuna muda unaolingana.",
       "autoLockSearchPlaceholder": "Tafuta muda…",
       "screenCaptureHelperOff": "Ulinzi hutumika daima kabla ya kufungua. Baada ya kufungua, hufuata mapendeleo haya.",
-      "screenCaptureHelperOn": "Inafanya kazi kwenye macOS na Windows 10 (May 2020 Update au baadaye). Msaada wa Linux unakuja katika toleo lijalo.",
+      "screenCaptureHelperOn": "Inafanya kazi kwenye Windows 10 (May 2020 Update) na baadaye. macOS na Linux hazina API ya mfumo kwa hili, hivyo huko haiwezi kuzuia kunasa skrini.",
       "screenCaptureLabel": "Ulinzi dhidi ya kunasa skrini",
       "screenCaptureSubtitle": "Zuia picha za skrini na kurekodi skrini",
       "screenshotBlocked": "Ulinzi wa skrini umewashwa — picha za skrini za Myne hutoka tupu.",
