@@ -4,7 +4,7 @@
 // the `attachment://` scheme. Mirrors the desktop `src/lib/attachments.ts` DTOs
 // so an attachment imported on mobile is byte-identical on desktop.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { IoFailureKind } from "../types/vault-unlock-error";
 import { shareFile } from "./share";
 

@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Diğer cihazlardan gelen değişiklikler, içeriksiz bir sinyal üzerinden saniyeler içinde ulaşır — sunucu yalnızca “bir şey değişti” bilgisini iletir, asla neyin değiştiğini değil. Kasanızın kilidi açıkken uygulama zaten sunucuyu düzenli olarak kontrol eder, bu nedenle bu, anlamlı bir görünürlük eklemez; yapılandırılacak bir şey yoktur.",
       "realtimeSyncLabel": "Gerçek zamanlı eşitleme",
       "screenCaptureHelperOff": "Koruma, kilit açılmadan önce her zaman geçerlidir. Kilit açıldıktan sonra bu tercihi izler.",
-      "screenCaptureHelperOn": "macOS ve Windows 10’da (Mayıs 2020 Güncellemesi veya sonrası) etkindir. Linux desteği ileriki bir sürümde gelecek.",
+      "screenCaptureHelperOn": "Windows 10’da (Mayıs 2020 Güncellemesi) ve sonrasında etkilidir. macOS ve Linux bunun için bir sistem API’si sunmaz, orada yakalamayı engelleyemez.",
       "screenCaptureLabel": "Ekran görüntüsü koruması",
       "screenCaptureSubtitle": "Ekran görüntülerini ve ekran kaydını engelle",
       "screenshotBlocked": "Ekran koruması açık — Myne’in ekran görüntüleri boş çıkar.",
