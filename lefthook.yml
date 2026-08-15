@@ -121,6 +121,70 @@ pre-commit:
       # list may shrink, never grow.
       run: node scripts/check-unwired.mjs
 
+    mobile-export-backup:
+      # myne#491: the mobile client writes plaintext into a device-visible
+      # directory in four places (recovery phrase, vault markdown tree, note
+      # PDF, exported attachment) and both platforms back that directory up by
+      # default — a saved recovery phrase alone reconstructs the vault. The
+      # exclusion lives across a Rust module, two Android XML resources and a
+      # library manifest, so nothing compares them; this does, in both
+      # directions.
+      #
+      # Globbed, unlike the two unglobbed guards above it: every side of this
+      # property lives under mobile/, so a docs-only or protocol-only commit has
+      # nothing here to break. The `run:` takes no {staged_files} — the glob
+      # decides WHETHER it runs, and it still checks the whole tree when it does.
+      glob: "{mobile/**,scripts/check-mobile-export-backup.mjs}"
+      run: node scripts/check-mobile-export-backup.mjs
+
+    twin-inventory:
+      # myne#472: every desktop/mobile twin module carries a verdict, and no
+      # verdict outlives its files. `check-twin-drift.mjs` (#261) warns when a
+      # change touches one side and leaves the other alone, which covers a NEW
+      # one-sided change and says nothing about the pairs that had already
+      # drifted before anyone counted them. This is the count, and it is also
+      # what makes a twin ENTERING the set fail rather than pass unnoticed,
+      # which is `decisions.md` 0488's own stated failure signal mechanised.
+      # Globbed, unlike `unwired` and `prefs-nonce` above, and the difference is
+      # real rather than a preference: their properties can be broken by a file
+      # anywhere in the repo, and every side of THIS one lives under the globbed
+      # paths. A docs-only, `core/`-only, `protocol/`-only or `locales/`-only
+      # commit provably cannot change the verdict, and 55% of recent develop
+      # commits are one of those. The `run:` takes no {staged_files}, so the glob
+      # decides WHETHER it runs and it still sweeps the whole tree when it does.
+      #
+      # Cost when it runs: about 82 ms end to end, of which ~57 ms is the guard's
+      # own work (a walk of both trees, then a read and a normalize of each side
+      # of every byte-different pair). The figure here used to read "about 11 ms
+      # of I/O for the full sweep", which was the readFileSync half only and left
+      # out both the walk and the comment stripper.
+      #
+      # `--check` also holds the generated projection to the roster. Without it
+      # the "Do not edit by hand" banner on `docs/dev/twin-inventory.md` had no
+      # mechanism behind it. CI runs the same `--check` in its own UNFILTERED
+      # `twin-inventory` step rather than inside `pnpm-build`, because a hand
+      # edit to the projection is a docs-only commit and the `code-paths` filter
+      # would skip it, leaving this bypassable hook as the only gate.
+      # `bundle-record` is unfiltered for the identical reason, and
+      # `decisions-index` guards its generated index the same way two hooks
+      # below.
+      glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,docs/dev/twin-inventory.md}"
+      run: node scripts/check-twin-inventory.mjs --check
+
+    embed-layout-drift:
+      # myne#409: the form-C embed-layout grammar is written in TypeScript
+      # (canonical, source-consumed by all three clients) and, for the export
+      # rewrite alone, mirrored narrowly in Rust. Both files and the decision
+      # entry said the two halves were "held together by the published
+      # embed-layout vectors" — and that vector step is commented out in
+      # .woodpecker.yml pending a vectors_token secret, MYNE_VECTORS_REQUIRED
+      # is set nowhere outside that comment, and both runners skip silently
+      # when the companion repo is absent. So the stated lock ran on no
+      # machine. This compares the one shared numeric bound, the same way
+      # damm32-table-drift compares the frozen quasigroup table.
+      glob: "{dialect/src/embedLayout.ts,core/src/export_naming.rs,scripts/check-embed-layout-drift.mjs}"
+      run: node scripts/check-embed-layout-drift.mjs
+
     token-adoption:
       glob: "{src,editor/src}/**/*.{ts,tsx,css}"
       # myne#394: a hardcoded visual value in an inline style is unreachable to
@@ -148,6 +212,16 @@ pre-commit:
       # ornaments.css (does anything draw it). Missing from the third, it
       # validates, syncs, and silently does nothing.
       run: node scripts/check-ornament-vocabulary.mjs
+
+    lock-teardown:
+      # myne#454: a client that MANAGES a plaintext-derived RAM state must
+      # implement the lock-teardown hook that wipes it. The failure is an empty
+      # function body, which every compiler, clippy and every other guard
+      # accepts — so a lock stops locking with the whole tree green. Mobile
+      # shipped all three (search index / vault indices / attachment refs)
+      # empty, mixing two vaults' tasks and leaving a locked vault's titles in
+      # RAM.
+      run: node scripts/check-lock-teardown.mjs
 
     e2e-menu-testid:
       # #275: an E2E scenario reaching for a testid that renders only inside an

