@@ -277,6 +277,14 @@ pre-commit:
       # Whisper config/tokenizer + Apache-2.0 license, MYND-270 — hash-pinned
       # upstream data). Those round-trip through external tools that don't emit
       # a trailing \n.
+      #
+      # Tauri plugin permission schemas are the one entry here that is rewritten
+      # by a build rather than by an export: the plugin's build.rs regenerates
+      # `permissions/schemas/schema.json` on EVERY `cargo build`, and emits no
+      # trailing \n. Adding one by hand (9cf3207f did, to unblock hooks-parity)
+      # does not hold — the next build strips it again, so the tree goes dirty
+      # after any compile and the file ping-pongs forever. The generator's output
+      # is what is committed; both this hook and its CI backstop skip the path.
       run: |
         fail=0
         for f in {staged_files}; do
@@ -286,6 +294,7 @@ pre-commit:
             src-tauri/icons/*|public/*.svg) continue ;;
             src-tauri/resources/dictionaries/*) continue ;;
             src-tauri/resources/models/*) continue ;;
+            */permissions/schemas/schema.json) continue ;;
           esac
           if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
           if [ -n "$(tail -c1 "$f")" ]; then
