@@ -4,7 +4,7 @@
 // Three defences stand between a browser and a 24-word phrase, and they are
 // deliberately at different layers because each one alone has a hole:
 //
-//  1. **The UI gate** — `has("phraseRecovery")` is false, so the arm is not
+//  1. **The UI gate** — `has("phraseEnrolment")` is false, so the arm is not
 //     rendered. Bypassed by one `invoke` from a devtools console.
 //  2. **The dispatcher** — `web/wasm/src/dispatch.rs` answers the recovery
 //     credential kind with a typed `unsupported`, before any network, any KDF

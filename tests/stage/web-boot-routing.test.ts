@@ -22,7 +22,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The capabilities the two clients actually declare (mirrors their descriptors). */
 const DESKTOP_ABSENT: string[] = [];
-const WEB_ABSENT = ["vaultCreation", "phraseRecovery", "backup", "nativeSaveAs", "clipper"];
+// `vaultCreation` LEFT this list on 2026-08-15: the web client creates accounts
+// now. `localOnlyVault` is what took over the routing decisions, and it was
+// always the honest subject — "may this client's vault be the only copy" is the
+// question both arms are really asking. The two answers coincided for as long as
+// the browser could not create an account, which is exactly the kind of
+// coincidence that reads as a rule until it stops being one.
+const WEB_ABSENT = [
+  "localOnlyVault",
+  "phraseRecovery",
+  "backup",
+  "nativeSaveAs",
+  "clipper",
+];
 
 async function loadStage(absent: string[]) {
   vi.resetModules();

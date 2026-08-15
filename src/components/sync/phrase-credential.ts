@@ -2,7 +2,9 @@
 //
 // # Why one function gets its own module
 //
-// The enrolment form gates the recovery arm on `has("phraseRecovery")`, and the
+// The enrolment form gates the recovery arm on `has("phraseEnrolment")` (its own
+// capability since `decisions.md` 2026-08-15, so the reversal that ships phrase
+// display and phrase entry on web leaves this third path shut), and the
 // grid's testid and the BIP-39 wordlist both grep to zero hits in the built web
 // bundle. That is the measured state, and it is not the same as a structural
 // one: the gate is a runtime branch in shared code, so what keeps the wordlist

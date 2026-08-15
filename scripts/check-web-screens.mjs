@@ -45,16 +45,23 @@ const DIST = join("web", "dist");
 const VERDICTS = {
   // ── excluded: substituted out of the web bundle ─────────────────────────
   "CreateVault.tsx": {
-    verdict: "excluded",
-    marker: "create.phrase-grid",
-    note: "Vault creation generates and DISPLAYS the 24-word phrase; decisions.md 2026-07-26 forbids that in served code (task 32).",
+    verdict: "adapted",
+    note:
+      "SHIPS since decisions.md 2026-08-15, which reverses the 2026-07-26 ban on generating and " +
+      "displaying the phrase in served code. Adapted rather than ported because the ORDER differs: " +
+      "where sync is required the flow registers the account with the server between `commit` and " +
+      "the phrase screen (`ProvisioningStep`), so the 24 words are never shown for an account that " +
+      "does not exist. Desktop keeps display-then-commit; it has no server leg to fail.",
   },
   "VaultRecover.tsx": {
-    verdict: "excluded",
-    marker: "recover.phrase-cell",
-    note: "Recovery TYPES the phrase into the page — the same prohibition, the other direction (task 32).",
+    verdict: "ported",
+    note:
+      "SHIPS since decisions.md 2026-08-15. The phrase-entry grid, the single non-distinguishing " +
+      "failure, the full cell wipe, the no-lockout rule and the mandatory chained password reset " +
+      "are the shared implementation, unchanged: what the core gained was the IO seam on its read " +
+      "and write paths, threaded as ONE implementation rather than a wasm twin.",
   },
-  "Welcome.tsx": {
+    "Welcome.tsx": {
     verdict: "excluded",
     marker: "welcome.create-cta",
     note: "Unreachable on web (an empty client routes to account-entry, task 85) and every door it offers — create, join, fresh-install restore — is an absent capability.",
@@ -114,28 +121,47 @@ const VERDICTS = {
 
   // ── the creation and recovery step trees ───────────────────────────────
   //
-  // Each is reached ONLY through its parent screen, and both parents are
-  // substituted, so none of them enters the bundle. They are listed
-  // individually rather than by prefix because the roster's job is to notice a
-  // NEW file, and a prefix rule would swallow one.
-  "vault-creation/AccountStep.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/BriefingStep.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/ConfirmStep.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/EncryptingStep.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/index.ts": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/PasswordStep.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/PhraseStep.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/ReadyStep.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/reducer.ts": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/SessionLostStep.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-creation/step-shell.tsx": { verdict: "excluded", via: "CreateVault.tsx" },
-  "vault-recover/DecryptingStep.tsx": { verdict: "excluded", via: "VaultRecover.tsx" },
-  "vault-recover/index.ts": { verdict: "excluded", via: "VaultRecover.tsx" },
-  "vault-recover/PasswordResetStep.tsx": { verdict: "excluded", via: "VaultRecover.tsx" },
-  "vault-recover/PhraseEntryStep.tsx": { verdict: "excluded", via: "VaultRecover.tsx" },
-  "vault-recover/RecoverySelectStep.tsx": { verdict: "excluded", via: "VaultRecover.tsx" },
-  "vault-recover/reducer.ts": { verdict: "excluded", via: "VaultRecover.tsx" },
-  "vault-recover/step-shell.tsx": { verdict: "excluded", via: "VaultRecover.tsx" },
+  // Each is reached ONLY through its parent screen. Both groups became `ported`
+  // on 2026-08-15, when creation and recovery shipped on this client. They are listed individually rather than by prefix because the
+  // roster's job is to notice a NEW file, and a prefix rule would swallow one —
+  // which is exactly what happened to `ProvisioningStep.tsx`, added by that same
+  // change and caught by this gate rather than by a reviewer.
+  "vault-creation/AccountStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/BriefingStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/ConfirmStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/EncryptingStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/index.ts": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/PasswordStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/PhraseStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/ReadyStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/reducer.ts": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/SessionLostStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/step-shell.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/ReadyLocalArtefacts.tsx": {
+    verdict: "excluded",
+    marker: "create.ready-backup-now",
+    note:
+      "The creation flow's two local-disk affordances: a `.myne-backup` write through a native " +
+      "save dialog, and revealing the vault directory in an OS file manager. Both need a disk this " +
+      "client does not have (`backup` and `nativeSaveAs` absent; OPFS has no path to reveal). " +
+      "Extracted into its own module on 2026-08-15 for exactly this substitution — creation now " +
+      "ships here, so its transitive imports are served code, and `src/lib/vault-backup.ts` is " +
+      "itself an `excluded` surface.",
+  },
+  "vault-creation/ProvisioningStep.tsx": {
+    verdict: "web-only",
+    note:
+      "Only ever rendered where sync is REQUIRED, i.e. on this client. It is the step that " +
+      "registers the account with the server before the phrase is displayed; desktop creation has " +
+      "no server leg and never enters it (decisions.md 2026-08-15).",
+  },
+  "vault-recover/DecryptingStep.tsx": { verdict: "ported", via: "VaultRecover.tsx" },
+  "vault-recover/index.ts": { verdict: "ported", via: "VaultRecover.tsx" },
+  "vault-recover/PasswordResetStep.tsx": { verdict: "ported", via: "VaultRecover.tsx" },
+  "vault-recover/PhraseEntryStep.tsx": { verdict: "ported", via: "VaultRecover.tsx" },
+  "vault-recover/RecoverySelectStep.tsx": { verdict: "ported", via: "VaultRecover.tsx" },
+  "vault-recover/reducer.ts": { verdict: "ported", via: "VaultRecover.tsx" },
+  "vault-recover/step-shell.tsx": { verdict: "ported", via: "VaultRecover.tsx" },
 };
 
 /** Every file under `src/screens/`, as roster keys. */

@@ -78,8 +78,41 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // `decisions.md` 2026-07-26: the 24-word recovery phrase is "never generated
   // by, displayed by, or typed into served code". Creation generates and shows
   // it; recovery types it. Both are normative removals, not scope cuts.
-  "vaultCreation",
-  "phraseRecovery",
+  //
+  // **Rule 1 is reversed by `decisions.md` 2026-08-15**, and both halves have
+  // now left this set: `vaultCreation` (the flow registers the account with the
+  // sync server BEFORE the phrase is ever displayed, so a failure leaves no
+  // account and no words to write down) and `phraseRecovery` (a user who forgot
+  // their password can recover in the browser they have always used, instead of
+  // being sent to download a desktop client on the worst day of their Myne
+  // life). What did NOT leave is directly below.
+  // The 30 second clipboard auto-clear, NOT the Copy affordance, which ships.
+  // The clear is gated on reading the clipboard back so unrelated content is
+  // never destroyed, and a page cannot read the clipboard: Firefox grants page
+  // content none at all, the rest gate it behind a prompt plus focus. A blind
+  // clear would be worse than none. The phrase step says so in words, because
+  // `recovery-flow.md` §2.2 forbids presenting a control whose stated
+  // protection this client cannot perform.
+  "clipboardAutoClear",
+  // The third phrase path, and the one the 2026-08-15 reversal deliberately
+  // does NOT lift: the phrase as a device-enrolment credential. It stays absent
+  // on web permanently, which is why it is its own capability rather than a
+  // branch of `phraseRecovery`.
+  //
+  // The reason is not portability. `plugin:sync|sync_enroll` is dispatched here
+  // and the credential would work; what is refused is offering it. Enrolment is
+  // a ROUTINE action that already accepts account number plus master password,
+  // and every routine use of the phrase in a page is what trains a user that
+  // typing 24 words into a browser is normal. That training is the entire
+  // mechanism behind `threat-model.md` A18, and keeping this absent is what
+  // leaves a rule a user can actually apply: this client asks for the phrase in
+  // exactly ONE situation, a recovery they started themselves. Never to add a
+  // device, never to sign in.
+  //
+  // Enforced structurally rather than by this flag alone: the credential grid is
+  // substituted out of the bundle (`web/vite.config.ts`) and its absence from
+  // the built artefact is asserted by `scripts/check-web-no-phrase.mjs`.
+  "phraseEnrolment",
   // The command's contract IS the desktop filesystem (`core-wasm-assessment.md`:
   // `cannot-exist-in-browser`).
   "vaultExport",

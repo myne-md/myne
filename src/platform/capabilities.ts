@@ -56,6 +56,35 @@ export type Capability =
   | "vaultCreation"
   /** Recovery by typing the 24-word phrase. */
   | "phraseRecovery"
+  /**
+   * Clearing the OS clipboard after a secret was copied to it, gated on reading
+   * it back so unrelated content is never destroyed.
+   *
+   * The read-back is what makes the clear safe, and it is what a page cannot
+   * do: Firefox grants page content no clipboard read at all, and the other
+   * engines gate it behind a permission prompt plus document focus. So on web
+   * the Copy affordance ships and the 30 second auto-clear does not
+   * (`recovery-flow.md` §2.2 as amended 2026-08-15).
+   *
+   * A capability rather than a silent branch because the UI owes the user a
+   * sentence when it is absent: `recovery-flow.md` forbids presenting a control
+   * whose stated protection the client cannot perform.
+   */
+  | "clipboardAutoClear"
+  /**
+   * The 24-word phrase used as a DEVICE-ENROLMENT credential, the third phrase
+   * path and the one that is easy to miss because that screen is about adding a
+   * device rather than about the phrase.
+   *
+   * Split out of `phraseRecovery` by `decisions.md` 2026-08-15. One flag used to
+   * gate both, so lifting the served-code phrase ban would have shipped three
+   * phrase screens while the decision named two. They are separable on the
+   * merits: recovery is the one situation with no alternative credential, and
+   * enrolment already accepts account number plus master password. Every
+   * ROUTINE use of the phrase is what teaches a user that typing 24 words into a
+   * page is normal, which is the whole mechanism behind `threat-model.md` A18.
+   */
+  | "phraseEnrolment"
   /** Markdown-tree export to an OS directory. */
   | "vaultExport"
   /** Spell-check: misspelling detection, suggestions and the dictionary ops
@@ -266,6 +295,8 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   nativeSaveAs: true,
   vaultCreation: true,
   phraseRecovery: true,
+  phraseEnrolment: true,
+  clipboardAutoClear: true,
   vaultExport: true,
   changePassword: true,
   pinQuickUnlock: true,

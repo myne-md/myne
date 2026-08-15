@@ -147,7 +147,15 @@ export function EnrollDeviceForm() {
   // rather than about the phrase. `protocol.md` §7 sets the bar: the phrase
   // survives every password change and no rotation command exists, so one
   // exposure is permanent.
-  const phraseCredentialAvailable = has("phraseRecovery");
+  //
+  // **`phraseEnrolment`, not `phraseRecovery`** (`decisions.md` 2026-08-15).
+  // Those were one flag, and the reversal that ships creation and recovery on
+  // web would have dragged this screen along with them — three phrase paths
+  // opened by a decision that named two. This one stays shut: enrolment is
+  // routine and already has a password credential, and a routine phrase prompt
+  // in a browser is exactly what makes A18 phishing work. Reading
+  // `phraseRecovery` here again would reopen it silently.
+  const phraseCredentialAvailable = has("phraseEnrolment");
   const availableModes = MODE_VALUES.filter(
     (value) => value !== "recovery" || phraseCredentialAvailable,
   );

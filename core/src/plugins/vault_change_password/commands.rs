@@ -1069,6 +1069,7 @@ mod tests {
                 scratch.path(),
                 &state,
                 &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
             )
             .await
             .expect("recovery phrase must still work after change_password");
