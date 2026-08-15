@@ -297,14 +297,6 @@ pub async fn run_active_cycle_from_host(
     // `useConflictMaterializer`, which fires `sync_now` on every `sync://changed`,
     // i.e. exactly when a joining device's first pull lands.
     //
-    // So the gate is resolved at the one point every cycle passes through.
-    let gate = if !allow_push {
-        super::orchestrator::PushGate::PollOnly
-    } else if super::verify_hold::verify_hold().is_held(host.now_unix_millis()) {
-        super::orchestrator::PushGate::VerifyHold
-    } else {
-        super::orchestrator::PushGate::Allowed
-    };
     // Serialize with any concurrent cycle + sync_reset_local: run_sync_cycle is a
     // read-modify-write on sync-state.json / staging / tombstones with no other
     // guard, so two overlapping cycles (a double "Sync now", or a click coinciding
@@ -312,6 +304,23 @@ pub async fn run_active_cycle_from_host(
     // tombstone revives a deleted note elsewhere. Held across the whole gather +
     // spawn_blocking so the token claim is serialized too.
     let _cycle_guard = sync_cycle_mutex().lock().await;
+    // So the gate is resolved at the one point every cycle passes through, and
+    // AFTER the serializer, which is load-bearing rather than tidy. The mutex is
+    // held across the whole gather plus `spawn_blocking`, i.e. across network
+    // round-trips, so a cycle that queues behind a long one waits minutes. Sampled
+    // before the wait, such a cycle carried a stale `Allowed` and pushed content
+    // under a compare that opened while it queued: the exact event this gate
+    // exists to prevent. The waiters are not hypothetical either. The verify
+    // screens fire `sync_now` about once a second and `useConflictMaterializer`
+    // fires one on every `sync://changed`, which is precisely when a joining
+    // device's first pull lands and the ceremony opens.
+    let gate = if !allow_push {
+        super::orchestrator::PushGate::PollOnly
+    } else if super::verify_hold::verify_hold().is_held(host.now_unix_millis()) {
+        super::orchestrator::PushGate::VerifyHold
+    } else {
+        super::orchestrator::PushGate::Allowed
+    };
     let Ok(cfg) = async {
         let p = super::config::config_path_from_host(host, io).await?;
         read_config(io, &p).await

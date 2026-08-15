@@ -71,6 +71,17 @@ export type CompareRole = "approver" | "joiner";
 /// tick lets the head move.
 const TICK_MS = 1_000;
 
+/// How long an approver's value may be treated as "still converging" before a
+/// change starts counting as an alarm.
+///
+/// The convergence phase exists because an approver's first read is the head it
+/// held BEFORE the approval, and the correction that follows is not news. But
+/// the phase has to end on something that always happens: keyed to the first
+/// `sync_now` settling, a cycle the server stalls keeps the phase open forever,
+/// and with it the alarm disarmed. Ten seconds is far longer than a cycle that
+/// is going to complete and far shorter than a human comparing two codes.
+const CONVERGENCE_GRACE_MS = 10_000;
+
 export interface HeadFingerprintCompare {
   /// The `XXXX-XXXX` code to show, or `null` while there is nothing to show.
   fingerprint: string | null;
@@ -91,7 +102,13 @@ export function useHeadFingerprintCompare(
   role: CompareRole,
 ): HeadFingerprintCompare {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  // Seeded from `active`, not `false`. Set only inside the effect, the
+  // approver's FIRST committed render had `syncing === false` and
+  // `fingerprint === null`, which is the pending branch: a screen zero
+  // milliseconds old told the user the code appears once the new device
+  // finishes its first sync. The state this replaced was set in the same
+  // synchronous update as the screen, so the flash was a regression.
+  const [syncing, setSyncing] = useState(active);
   const [changed, setChanged] = useState(false);
   // The last value we showed, read inside the tick without re-arming the effect.
   // Keeping it in a ref rather than the effect's deps is what lets the poll run
@@ -112,7 +129,27 @@ export function useHeadFingerprintCompare(
     let cycling = false;
     // Has this screen's first sync cycle finished, one way or the other? Until
     // it has, an approver's value is still converging and a change is not news.
-    let settled = role !== "approver";
+    //
+    // BOUNDED, and the bound is the security property. `settled` and `cycling`
+    // were cleared only in the first `sync_now`'s `.finally()`, and that call is
+    // fired without being awaited, so a cycle that never settles left `settled`
+    // false for the life of the screen: the alarm at the bottom of this tick
+    // could never fire, and `cycling` stayed true so no second cycle was ever
+    // started either, which stops the approving device pulling as well.
+    //
+    // An untrusted server controls that duration by stalling its pull response.
+    // It could therefore keep an approver displaying its pre-ceremony head with
+    // no alarm and no syncing indication, seat the TOFU joiner on that same
+    // real-but-stale head, and the two codes MATCH. That is a false negative in
+    // the one comparison `threat-model.md` §7 records as the only mitigation for
+    // the TOFU-bootstrap hole, and it is the direction `decisions.md` claims this
+    // ceremony cannot fail in.
+    //
+    // A wall-clock deadline always terminates, so the alarm always arms.
+    const armedAt = Date.now();
+    const settledByDeadline = () => Date.now() - armedAt >= CONVERGENCE_GRACE_MS;
+    let cycleSettled = role !== "approver";
+    const isSettled = () => cycleSettled || settledByDeadline();
     setSyncing(true);
 
     const tick = async () => {
@@ -125,6 +162,10 @@ export function useHeadFingerprintCompare(
         /* an unarmed hold degrades to the pre-fix behaviour, never to a stall */
       }
       try {
+        // `cycling` is released by the deadline too. Left to the `.finally()`
+        // alone, a hung cycle also stopped this screen re-issuing `sync_now`,
+        // so the approving device stopped pulling as well as stopped alarming.
+        if (cycling && settledByDeadline()) cycling = false;
         if (!cycling) {
           cycling = true;
           // Fired and watched, never awaited — see `CompareRole`. `settled`
@@ -136,7 +177,7 @@ export function useHeadFingerprintCompare(
             })
             .finally(() => {
               cycling = false;
-              settled = true;
+              cycleSettled = true;
             });
         }
         const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
@@ -145,7 +186,7 @@ export function useHeadFingerprintCompare(
           // past the approver's convergence phase. Otherwise this is the
           // pre-sync head being corrected, which happens on every approval and
           // is not what the user needs to be told about.
-          if (shown.current !== null && settled) setChanged(true);
+          if (shown.current !== null && isSettled()) setChanged(true);
           shown.current = fp;
           setFingerprint(fp);
         }

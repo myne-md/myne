@@ -3460,7 +3460,21 @@ async fn sync_cycle_attempt(
     // would leave the vault head unopenable — and this device's own sync
     // wedged — until the user happens to type something.
     let rebasing = page.unverifiable_head_id.is_some();
-    if !to_push.is_empty() || (gate.allows_genesis() && page.head.is_none()) || rebasing {
+    // The genesis carve-out is the §6.1 GENESIS-ON-EMPTY push, and `local2` being
+    // empty is what makes that true rather than merely intended.
+    //
+    // Without the corpus check the exemption was strictly wider than the spec
+    // bullet it implements: a device with notes on disk and no head yet (account
+    // created, corpus written, the first coalesced push not yet due) would, DURING
+    // a compare, publish a `vault-head-mac`-authenticated head whose
+    // `manifest_hash` is taken from `local2` while `to_push` is empty, because
+    // both content blocks sit behind `gate.allows_content()`. That head commits
+    // `content_nonce`s for blobs the server does not hold, which is the SYNC-5
+    // ordering this very function states as its invariant a few lines down, and a
+    // peer pulling in that window cannot tell an over-claiming author from a
+    // withholding server. The joining device pulls in exactly that window.
+    let genesis_on_empty = gate.allows_genesis() && page.head.is_none() && local2.is_empty();
+    if !to_push.is_empty() || genesis_on_empty || rebasing {
         // Author a linear-advance head over the current (post-pull) head: bump
         // this device's VV component, seq+1, parent = the server's current head
         // (genesis = the zero prev the server's first-head CAS expects).
@@ -5864,6 +5878,80 @@ mod tests {
         assert!(
             read_sync_state(&dir).unwrap().vv_log.last().is_some(),
             "the genesis observation is recorded, so a fingerprint exists to compare"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The genesis carve-out is genesis-ON-EMPTY, and a non-empty corpus is not
+    /// it.
+    ///
+    /// The condition used to be `gate.allows_genesis() && page.head.is_none()`
+    /// with no look at the corpus, which is strictly wider than the §6.1 bullet
+    /// it implements ("A device with zero content blobs ... a head-only push").
+    /// A device with notes on disk and no head yet would, under a compare,
+    /// author a head whose `manifest_hash` comes from the full local manifest
+    /// while `to_push` is empty, because both content blocks sit behind
+    /// `gate.allows_content()`. That head commits `content_nonce`s for blobs the
+    /// server does not hold, which inverts the SYNC-5 ordering this function
+    /// states as its own invariant, and a peer pulling in that window cannot
+    /// tell an over-claiming author from a withholding server.
+    #[test]
+    fn a_verify_hold_does_not_author_genesis_over_a_non_empty_corpus() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!(
+                "SKIP a_verify_hold_does_not_author_genesis_over_a_non_empty_corpus: \
+                 server binary not found"
+            );
+            return;
+        };
+        let root_key = [0x75u8; 32];
+        let account_hash = [0x76u8; 16];
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+
+        let dir = std::env::temp_dir().join(format!("myne-holdgen2-{}", std::process::id()));
+        let notes = dir.join("notes");
+        std::fs::create_dir_all(&notes).unwrap();
+        // NOT empty: one local note, never pushed. This is the whole difference
+        // from the sibling test above.
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let only = NoteId::new_v7();
+        write_note(
+            &notes,
+            &items_key,
+            &items_key_id,
+            &only,
+            b"local only",
+            false,
+        );
+
+        let (t, dev, tok) = enroll_device(
+            &url,
+            &account_hash,
+            secret.as_slice(),
+            "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+            true,
+        );
+
+        let held = blocking(run_sync_cycle(
+            &IO,
+            t.as_ref(),
+            &root_key,
+            account_hash,
+            dev,
+            &tok,
+            &notes,
+            &dir,
+            PushGate::VerifyHold,
+            MetaVersion::V0_1,
+            None,
+        ))
+        .expect("the held first cycle");
+        assert_eq!(held.pushed, 0, "content is held, as it must be");
+        assert!(
+            !held.head_advanced,
+            "a head authored here would commit a manifest the server cannot serve"
         );
 
         std::fs::remove_dir_all(&dir).ok();
