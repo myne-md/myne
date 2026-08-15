@@ -39,7 +39,11 @@ import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { Input } from "../../components/primitives/Input";
 import { Spinner } from "../../components/Spinner";
-import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
+import {
+  listVaults,
+  orderByLastUnlock,
+  stableVaultNumber,
+} from "../../lib/vault-list";
 import { resolveVaultByAccountNumber } from "../../lib/vault-recover";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { formatRelativeTime, useTick } from "../../notes/components/relativeTime";
@@ -76,10 +80,18 @@ function listReducer(state: ListState, action: ListAction): ListState {
   }
 }
 
-/** Display name for a row — real label when cached this session (SYNC-3),
- *  else the neutral "Vault N" fallback (N = 1-based last-unlock position). */
-function rowLabel(vault: VaultSummary, index: number): string {
-  return vault.label ?? i18n.t("vaultRecover.select.vaultFallback", { index: index + 1 });
+/** Display name for a row: the real label when `vault_list` has one (SYNC-3),
+ *  else the neutral "Vault N" fallback. N is the vault's stable per-vault
+ *  number and not its position in this list (myne-md/myne#411: a positional N
+ *  renamed every vault whenever one was unlocked). Same helper as the picker
+ *  and the switcher, so one vault reads the same on all three. */
+function rowLabel(vault: VaultSummary, vaults: readonly VaultSummary[]): string {
+  return (
+    vault.label ??
+    i18n.t("vaultRecover.select.vaultFallback", {
+      index: stableVaultNumber(vaults, vault.id),
+    })
+  );
 }
 
 function lastUnlockText(lastUnlock: number | null): string {
@@ -273,11 +285,11 @@ export function RecoverySelectStep({
 
       {list.kind === "loaded" && (
         <div style={LIST_STYLE}>
-          {list.vaults.map((vault, index) => (
+          {list.vaults.map((vault) => (
             <VaultRow
               key={vault.id}
               vault={vault}
-              label={rowLabel(vault, index)}
+              label={rowLabel(vault, list.vaults)}
               meta={lastUnlockText(vault.last_unlock)}
               onSelect={() => onVaultSelected(vault.id)}
             />

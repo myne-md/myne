@@ -326,6 +326,10 @@ pub fn run() {
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::graph_layout::init())
+        // myne#411: the device-local hide-vault-names option. Registered
+        // unconditionally and reachable pre-unlock, because the picker it
+        // governs is the screen that renders before any vault is open.
+        .plugin(plugins::vault_label::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
         // ext-foundation-handoff task 4: the browser-extension pairing

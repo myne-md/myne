@@ -239,6 +239,22 @@ export function graphLayoutPath(appDataDir: string, vaultId: string): string {
   return join(appDataDir, "vaults", vaultId, "vault.graph");
 }
 
+/** Path to the MYL1 sealed label store: `vaults/<id>/vault.label`
+ *  (`protocol/src/vault_label_blob.rs`; spec § 9.22.1; myne-md/myne#411).
+ *  Device-local: it holds one vault's NAME, sealed under a per-vault OS-keychain
+ *  wrap key, so the locked picker can render it before any unlock. */
+export function vaultLabelPath(appDataDir: string, vaultId: string): string {
+  return join(appDataDir, "vaults", vaultId, "vault.label");
+}
+
+/** Path to the device-local hide-vault-names flag,
+ *  `<app_config_dir>/vault-names.json` (`core/src/vault_label/hide_flag.rs`).
+ *  Note the directory: it is a DEVICE setting, not vault data, so it lives
+ *  beside `sync-config.json` under `app_config_dir` and not under any vault. */
+export function hideVaultNamesFlagPath(appConfigDir: string): string {
+  return join(appConfigDir, "vault-names.json");
+}
+
 /**
  * Assert a blob's leading 4 bytes equal `magic` (latin1). The generic shape
  * every at-rest format check reuses — MYA1 (per-attachment blob), MYC1

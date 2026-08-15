@@ -7,6 +7,7 @@ import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, S
 import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
 import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
+import { HideVaultNamesBlock } from "../../components";
 import { applyTheme } from "../../platform/theme";
 import type { ThemeName } from "../../platform/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -32,7 +33,7 @@ import { useHiddenHomeTiles, setHomeTileHidden } from "../../lib/home-tiles";
 import { LEGAL_LINKS, legalUrl } from "@myne/legal-urls";
 import { openUrl } from "../../lib/open-url";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
-import { vaultDisplayLabel, VAULT_FALLBACK_LABEL } from "../../lib/vault-label";
+import { vaultDisplayLabel } from "../../lib/vault-label";
 import {
   setTheme as persistTheme,
   setShowNoteTimestamps,
@@ -1678,6 +1679,13 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 testId="settings.transcription-toggle"
               />
             </Group>
+            {/* Directly after screen-capture protection rather than beside the
+                lock timers (myne-md/myne#411): both answer the same question,
+                which is what somebody holding this phone can see. Its own card
+                because its two bounds are always-visible sentences under the
+                row, not a subtitle. See the block for why they are not behind
+                a chevron. */}
+            <HideVaultNamesBlock />
             <SegmentBlock
               label={t("settings.privacy.autoLockAfter")}
               options={[60, 300, 900, 1800, 3600]}
@@ -1813,7 +1821,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         {panel === "rename" && (
           <div>
             <FieldLabel mt={4}>{t("settings.panelTitle.vaultName")}</FieldLabel>
-            <SheetInput value={renameText} onChange={setRenameText} autoFocus placeholder={VAULT_FALLBACK_LABEL} />
+            <SheetInput value={renameText} onChange={setRenameText} autoFocus placeholder={vaultDisplayLabel(null)} />
             <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
               {t("settings.account.renameHelper")}
             </div>
