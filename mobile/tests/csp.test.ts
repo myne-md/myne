@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import tauriConf from "../src-tauri/tauri.conf.json";
+import { mobileCspDirectives } from "../../tests/lib/_desktopCsp";
 
 // Regression guard for the mobile CSP (mobile/src-tauri/tauri.conf.json).
 //
@@ -12,25 +12,24 @@ import tauriConf from "../src-tauri/tauri.conf.json";
 // (mock IPC, Vite dev server, no `attachment://`) cannot catch a regression here;
 // this asserts the config string directly, which is the only automated net.
 
-const directives = new Map<string, string>();
-for (const part of tauriConf.app.security.csp.split(";")) {
-  const trimmed = part.trim();
-  if (trimmed === "") continue;
-  directives.set(trimmed.split(/\s+/)[0], trimmed);
-}
+// The shared parser, not a third copy. Its own header says why: this file used
+// to inline a loop that disagreed with it about the map's shape (`name -> whole
+// directive` here against `name -> value` there), so the same claim read
+// differently on the two clients and neither reading was obviously the right one.
+const directives = mobileCspDirectives();
 
 describe("mobile CSP", () => {
   it("allows the attachment: scheme for connect-src (pdf.js byte fetch)", () => {
-    expect(directives.get("connect-src")).toContain("attachment:");
+    expect(directives["connect-src"]).toContain("attachment:");
   });
 
   it("allows blob: workers for worker-src (pdf.js worker)", () => {
-    expect(directives.get("worker-src")).toContain("blob:");
+    expect(directives["worker-src"]).toContain("blob:");
   });
 
   it("keeps attachment: on img-src + media-src (image + audio preview)", () => {
-    expect(directives.get("img-src")).toContain("attachment:");
-    expect(directives.get("media-src")).toContain("attachment:");
+    expect(directives["img-src"]).toContain("attachment:");
+    expect(directives["media-src"]).toContain("attachment:");
   });
 
   it("lists http://attachment.localhost wherever attachment: appears (MYND-519)", () => {
@@ -40,24 +39,41 @@ describe("mobile CSP", () => {
     // scheme-source `attachment:` alone does not cover it. Dropping any of
     // these re-breaks Android attachment render (images/audio) and PDF
     // preview (pdf.js byte fetch).
-    expect(directives.get("img-src")).toContain("http://attachment.localhost");
-    expect(directives.get("media-src")).toContain("http://attachment.localhost");
-    expect(directives.get("connect-src")).toContain("http://attachment.localhost");
+    expect(directives["img-src"]).toContain("http://attachment.localhost");
+    expect(directives["media-src"]).toContain("http://attachment.localhost");
+    expect(directives["connect-src"]).toContain("http://attachment.localhost");
   });
 
   it("leaves the defense-in-depth XSS directives intact", () => {
-    expect(directives.get("default-src")).toBe("default-src 'self'");
-    expect(directives.get("object-src")).toBe("object-src 'none'");
-    expect(directives.get("script-src")).toContain("'self'");
+    expect(directives["default-src"]).toBe("'self'");
+    expect(directives["object-src"]).toBe("'none'");
+    expect(directives["script-src"]).toContain("'self'");
     // script-src must NOT gain 'unsafe-inline' — the primary XSS control is here.
-    expect(directives.get("script-src")).not.toContain("'unsafe-inline'");
+    expect(directives["script-src"]).not.toContain("'unsafe-inline'");
+  });
+
+  it("closes the three navigation-shaped directives (myne#453)", () => {
+    // `form-action` is the one that is NOT defense-in-depth. A form submission
+    // is a navigation, and navigation directives get NO `default-src` fallback
+    // (that fallback covers fetch directives only), so omitting it inherits
+    // nothing. On Android it is the only control that can see the case at all:
+    // the WebViewClient `shouldOverrideUrlLoading` hook the navigation policy
+    // installs (`mobile/src-tauri/src/navigation.rs`) is not called for POST requests.
+    expect(directives["form-action"]).toBe("'none'");
+    // `<base href="https://evil/">` injected by a sanitizer bypass repoints
+    // every relative asset URL in the bundle.
+    expect(directives["base-uri"]).toBe("'none'");
+    // Works only because Tauri serves this policy as an HTTP response header;
+    // `frame-ancestors` is ignored in a `<meta http-equiv>` policy. Recorded
+    // here so a future move to a meta tag cannot pass silently.
+    expect(directives["frame-ancestors"]).toBe("'none'");
   });
 
   it("does not cargo-cult desktop-only origins that mobile IPC never uses", () => {
     // Mobile IPC routes through the WKWebView/Android bridge, not a CSP-gated
     // fetch, so `ipc:`/`http://ipc.localhost` are deliberately absent (decisions
     // 2026-07-12). frame-src is unneeded — the PDF reader is canvas-based.
-    expect(directives.get("connect-src")).not.toContain("ipc:");
-    expect(directives.has("frame-src")).toBe(false);
+    expect(directives["connect-src"]).not.toContain("ipc:");
+    expect("frame-src" in directives).toBe(false);
   });
 });

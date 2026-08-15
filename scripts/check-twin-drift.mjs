@@ -147,29 +147,47 @@ for (const file of changed) {
     }
   }
 
-  // Same relative path under both trees.
-  if (!file.startsWith(`${MOBILE}/`)) {
-    const twin = byPath.get(file);
-    if (twin && !changedSet.has(twin)) {
+  // Same relative path under both trees, checked in BOTH directions.
+  //
+  // This block used to be gated on `!file.startsWith(MOBILE)`, so it only ever
+  // looked from desktop towards mobile. A one-sided change to the MOBILE half
+  // warned nobody, and mobile is the side that lags: measured on
+  // `navigation.rs`, touching the desktop file alone reported the pair and
+  // touching the mobile file alone reported nothing. The curated `NAMED_TWINS`
+  // block above was already symmetric, which is why the gap was invisible for
+  // any pair somebody had thought to name.
+  if (file.startsWith(`${MOBILE}/`)) {
+    const desktopTwin = file.slice(MOBILE.length + 1);
+    if (existsSync(join(ROOT, desktopTwin)) && !changedSet.has(desktopTwin)) {
       notes.push({
         file,
-        counterpart: twin,
-        why: "same relative path in the mobile tree",
-      });
-      continue;
-    }
-    // Same basename, different path — weaker, so only reported when the path
-    // twin did not already fire.
-    const sameName = (byName.get(basename(file)) ?? []).filter(
-      (t) => !changedSet.has(t),
-    );
-    if (sameName.length === 1) {
-      notes.push({
-        file,
-        counterpart: sameName[0],
-        why: "same module name in the mobile tree",
+        counterpart: desktopTwin,
+        why: "same relative path outside the mobile tree",
       });
     }
+    continue;
+  }
+
+  const twin = byPath.get(file);
+  if (twin && !changedSet.has(twin)) {
+    notes.push({
+      file,
+      counterpart: twin,
+      why: "same relative path in the mobile tree",
+    });
+    continue;
+  }
+  // Same basename, different path: weaker, so only reported when the path
+  // twin did not already fire.
+  const sameName = (byName.get(basename(file)) ?? []).filter(
+    (t) => !changedSet.has(t),
+  );
+  if (sameName.length === 1) {
+    notes.push({
+      file,
+      counterpart: sameName[0],
+      why: "same module name in the mobile tree",
+    });
   }
 }
 
