@@ -84,8 +84,11 @@ const host: EditorHost = {
     attachmentExport,
     attachmentRename,
     // Mobile has no Save-As dialog plugin: export the decrypted bytes into the
-    // app's Documents folder (reachable from the iOS Files app). Overwrites by
-    // name (exportAttachment is called with overwrite=true). Sanitize to a bare
+    // app's Documents folder. (That folder is browsable in the system Files app
+    // on Android and NOT on iOS, which declares no `UIFileSharingEnabled` — the
+    // iOS route is the share sheet. It is excluded from platform cloud backup on
+    // both: myne-md/myne#491, `backup_exclude.rs`.) Overwrites by name
+    // (exportAttachment is called with overwrite=true). Sanitize to a bare
     // basename first — a crafted attachment name containing `/`, `\`, or a
     // leading `..` must not let join() escape the Documents directory.
     pickExportDestination: async (filename) => {

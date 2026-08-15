@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 and below (API <= 30) Auto Backup rules — myne-md/myne#491.
+
+  The `android:fullBackupContent` half of the same decision `myne_backup_rules.xml`
+  carries for API 31+. Both are needed: `android:dataExtractionRules` is ignored
+  below API 31, and `minSdk` here is well under that, so dropping this file would
+  leave every pre-Android-12 device backing up the plaintext export directory
+  while the tree looked fixed.
+
+  Must exclude the same paths as `myne_backup_rules.xml`
+  (`scripts/check-mobile-export-backup.mjs` holds the two to the same roster).
+  This format has no device-transfer block — the API-30 backup surface is
+  cloud-only.
+-->
+<full-backup-content>
+    <exclude domain="external" path="Documents" />
+</full-backup-content>

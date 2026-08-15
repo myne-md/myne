@@ -199,6 +199,13 @@ so every row must confirm BOTH that the file lands (no regression) AND that the 
 appears. iOS-first: Android share is a documented no-op (file stays in Documents + a toast names
 the location) — its rows confirm the non-silent fallback, not a SAF picker.
 
+Rows **8.9 / 8.10** (myne-md/myne#491) belong here for a different reason: they check where the
+exported file is allowed to come to rest. Every export above puts plaintext in `Documents`, and both
+platforms back that directory up by default, so a saved recovery phrase was reaching iCloud / Google
+Drive. The exclusion is native (an xattr on iOS, two manifest attributes on Android) and its *effect*
+is unreachable from CI — a green build and a green guard say the four files agree, not that the
+platform honoured them.
+
 | # | Scenario | Expected |
 |---|---|---|
 | 8.1 | **iOS "Take Photo" attach (MYND-474)** — Files/attach → file picker → Take Photo, grant camera | camera opens, photo captures, lands as an encrypted image attachment; **no crash** (the pre-fix `NSInvalidArgumentException`) |
@@ -209,6 +216,8 @@ the location) — its rows confirm the non-silent fallback, not a SAF picker.
 | 8.6 | **iOS Export attachment** — attachment → export | share sheet opens on the file with its correct extension; Save to Files writes the decrypted bytes |
 | 8.7 | **iOS share cancel is non-silent** — open any export share sheet, cancel it | the file is still saved in Documents (the success toast already fired); no silent no-op |
 | 8.8 | **Android export fallback (no SAF yet)** — run each export flow | file writes to Documents; a toast names the location; no crash, no silent no-op (SAF picker deferred, see `share_file.rs` module docs) |
+| 8.9 | **iOS export directory is excluded from iCloud Backup (myne-md/myne#491)** — launch the app once (simulator is enough), then on the host: `ls -l@ ~/Library/Developer/CoreSimulator/Devices/<device-id>/data/Containers/Data/Application/<app-id>/Documents` | the directory carries the `com.apple.metadata:com_apple_backup_excludeItem` xattr. **This row is the only proof the iOS half works** — the Rust compiles and `scripts/check-mobile-export-backup.mjs` passes whether or not Foundation honoured the call, and a saved recovery phrase in an iCloud backup reconstructs the vault. Absent xattr ⇒ `backup_exclude.rs` shipped inert; do not report the issue fixed |
+| 8.10 | **Android export directory is excluded from Auto Backup + device transfer (same issue)** — after `tauri android build`, grep the merged manifest: `gen/android/app/build/intermediates/merged_manifests/**/AndroidManifest.xml` | `<application>` carries BOTH `android:dataExtractionRules="@xml/myne_backup_rules"` and `android:fullBackupContent="@xml/myne_backup_rules_legacy"` (the second is what every API ≤ 30 device reads; the first is ignored there). Both resources resolve. Stronger check when a device is on hand: `adb shell bmgr backupnow md.myne.mobile` then confirm the export directory is not in the transported set |
 
 ## 9. Folder-archive parity checklist (MYND-470)
 

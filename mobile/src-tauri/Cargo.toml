@@ -172,8 +172,16 @@ block2 = "0.6"
 # `objc2*` deps above — already compiled into the build transitively via `wry`
 # (present in the resolved lock), so naming it here adds a dependency EDGE but NO
 # new crate/feature to the build (minimal-surface discipline, `threat-model.md`
-# §6). default-features off + only the three classes we touch.
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSString", "NSURL"] }
+# §6). default-features off + only the classes we touch.
+#
+# `NSValue` + `NSError` (myne-md/myne#491) are the two the export directory's
+# backup exclusion needs (`backup_exclude`): `NSValue` carries `NSNumber`, the
+# boxed `@YES`, and `setResourceValue:forKey:error:` is itself gated on
+# `NSError`. Same policy as the rest of this list: modules of a crate already in
+# the build, not a new crate. `NSError` is enabled transitively in the iOS graph
+# anyway — declared here so this crate does not depend on something ELSE keeping
+# it on, which is the shape that breaks a build for no reason anyone can see.
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSError", "NSFileManager", "NSString", "NSURL", "NSValue"] }
 
 # Dev-dependencies — same policy bar as runtime deps. `tracing-test` captures
 # `tracing` events per-test so the plugins' tracing-level discipline is

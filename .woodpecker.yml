@@ -322,6 +322,12 @@ steps:
       # lock shipped that way while the OPFS write path skipped its TOCTOU guard
       # believing the lock was held.
       - node scripts/check-unwired.mjs
+      # Mobile export-backup exclusion (myne#491): the plaintext export directory
+      # (`Documents`) stays out of iCloud Backup and Android Auto Backup. Four
+      # files in three languages carry that property and no compiler compares
+      # them; a saved recovery phrase reconstructs the vault, so a one-sided
+      # drift is a zero-knowledge break that every build reports as green.
+      - node scripts/check-mobile-export-backup.mjs
       # Token-adoption ratchet (myne#394): a literal written into an inline style
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
