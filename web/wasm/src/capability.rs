@@ -437,6 +437,26 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // vault-delete command lands loudly rather than silently.
     ("vault-delete", Class::Pending),
     ("vault-recover", Class::Pending), // task 32 (account-number resolve only; see PER_COMMAND)
+    // myne-md/myne#411: the device-local hide-vault-names flag, its setter
+    // (which IS the erase) and the keychain-availability probe the Settings
+    // Privacy row renders. Nothing on this client answers them today: the
+    // locked picker they serve does not render on web (an origin holds exactly
+    // one container, so `VaultPicker.tsx` is recorded `excluded` in
+    // `check-web-screens.mjs`) and there is no OS keychain behind the `MYL1`
+    // store, which is why `dispatch.rs`'s two `platform_keychain()` call sites
+    // already resolve to the unavailable one.
+    //
+    // `Pending` rather than `Unsupported`, and the gap between them is a
+    // decision nobody has taken rather than a hedge. `Unsupported` is consumed
+    // by the capability descriptor to make an affordance permanently ABSENT.
+    // It needs a capability of its own and an owner willing to say this can
+    // never exist here, and that is not obviously true: the flag is a
+    // device-local file the storage seam can hold, and the erase is a sweep
+    // over files this client also has. What web lacks is the keychain and the
+    // screen, not the mechanism. Until that is decided the loud class is the
+    // right answer to an open question, exactly as this file's header says:
+    // `Pending` covers undecided, not just unwritten.
+    ("vault-label", Class::Pending),
     // Owner decision, 2026-07-27 (task 72): repair is ABSENT on web. It scans a
     // vault DIRECTORY for orphan artefacts, which exists because a desktop
     // directory is writable by other software; an OPFS container has one writer

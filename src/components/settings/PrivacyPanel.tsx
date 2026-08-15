@@ -13,16 +13,18 @@
 // framework exists yet). TR strings ("Otomatik kilit" / "Bu kadar
 // hareketsizlik sonrası kasayı kilitle.") await an app-wide i18n layer.
 
+import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import { has } from "../../platform/capabilities";
+import { invoke } from "../../platform/core";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { CliAccessSettings } from "./CliAccessSettings";
 import { QuickUnlockSettings } from "./QuickUnlockSettings";
 import { SettingRow } from "./SettingRow";
-import { PANEL_ROOT_STYLE } from "./panel-styles";
+import { HELPER_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 
 // MYND-160 grill Q2.1 disclosure: when the user toggles off, the
 // helper text MUST disclose the off-after-unlock semantic so a
@@ -106,6 +108,220 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
   );
 }
 
+// ── Hide vault names on the lock screen (myne-md/myne#411) ──────────────────
+//
+// The picker renders before any vault is open, so the names it shows come from
+// a device-local sealed cache rather than from `vault.prefs`. This row is the
+// switch that destroys that cache and stops it being refilled.
+//
+// # Not gated by Developer mode, deliberately
+//
+// `developer_mode` is a `vault.prefs` field and therefore per vault, while the
+// picker is device-wide: gating on it would need a rule about which vault's
+// preference governs a shared screen. And cryptographic erase cannot reach a
+// snapshot taken earlier, so the person for whom this option is fully honest is
+// the one who sets it BEFORE a first unlock ever writes a name. A control
+// behind Developer mode cannot be found by that person.
+//
+// # The copy states the bound in the same breath as the promise
+//
+// Two sentences, always visible, never behind a disclosure toggle. Writing
+// "erases" and letting the reader supply their own idea of how far it reaches
+// is the failure this row exists to prevent, and a bound the reader has to
+// click for is a bound most readers never see. They are bounded by
+// `docs/threat-model.md` §7 and by `design-notes/security/0491-…`, and they
+// say the same two things the user guide says at greater length.
+//
+// # `available: false` is never a licence to show a name from somewhere else
+//
+// The probe reports whether this device has a usable keychain at all. When it
+// does not, nothing writes a name in the clear as a fallback (that would look
+// identical on screen while voiding the erase guarantee), so the honest thing
+// on screen is the row saying the option cannot work here. The switch stays
+// INTERACTIVE in that state on purpose: turning the option OFF touches no
+// keychain, which is exactly what lets it succeed on a device that has none, so
+// a disabled control would strand a user whose keychain disappeared after they
+// turned it on.
+
+/** Mirrors `myne_core::vault_label::commands::HideVaultNamesView`. */
+interface HideVaultNamesView {
+  /** `true` when vault names are hidden on this device. */
+  hidden: boolean;
+}
+
+/** Mirrors `myne_core::vault_label::commands::KeychainStatusView`. */
+interface KeychainStatusView {
+  /** `true` when the device keychain answered, whether or not it holds anything. */
+  available: boolean;
+}
+
+/** Mirrors `myne_core::vault_label::commands::HideVaultNamesError`'s `kind` tag. */
+export type HideVaultNamesErrorKind =
+  | "Io"
+  | "Parse"
+  | "KeychainUnavailable"
+  | "EraseIncomplete";
+
+/** Narrow an unknown thrown value to the backend error's `kind` tag. */
+export function hideVaultNamesErrorKind(e: unknown): HideVaultNamesErrorKind | null {
+  const kind = (e as { kind?: unknown } | null)?.kind;
+  return kind === "Io" ||
+    kind === "Parse" ||
+    kind === "KeychainUnavailable" ||
+    kind === "EraseIncomplete"
+    ? kind
+    : null;
+}
+
+/**
+ * What this device can do with vault names.
+ *
+ * Three values because a failed PROBE is not an unavailable KEYCHAIN. The
+ * backend's unavailable case is a value (`{ available: false }`), never a
+ * rejection, so a rejection means the question was not answered: a dev context
+ * with no host, a client that has not ported the command. Reading that as
+ * "unavailable" would put a false explanation on screen and, worse, would be
+ * the shape a plaintext fallback later hides behind.
+ */
+type KeychainStatus = "available" | "unavailable" | "unknown";
+
+/**
+ * Which notice is on screen. A discriminant rather than a resolved i18n key so
+ * every `t()` call below stays a literal. `scripts/check-i18n.mjs` only sees
+ * static ones, and a key it cannot see is a key nothing checks.
+ */
+type HideNamesNotice = "read" | "save" | "erase";
+
+/**
+ * The notice a failed write leaves on screen.
+ *
+ * `EraseIncomplete` gets its own line because the backend erases FIRST and
+ * persists second: a key that survived the sweep means the flag was deliberately
+ * not written, so the row still reads "shown" and that is the truth. Collapsing
+ * it into a generic save failure would drop the one fact the user needs, which
+ * is that the names are still readable.
+ *
+ * `KeychainUnavailable` is deliberately absent from the return type: it is not a
+ * transient failure to report and retry, it is the device's standing state, and
+ * the row already carries a line for it.
+ */
+export function hideNamesWriteNotice(
+  kind: HideVaultNamesErrorKind | null,
+): HideNamesNotice | null {
+  if (kind === "KeychainUnavailable") return null;
+  if (kind === "EraseIncomplete") return "erase";
+  return "save";
+}
+
+/** The two bound sentences, stacked. Token-valued throughout. */
+const DISCLOSURE_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+};
+
+function HideVaultNamesRow() {
+  const { t } = useTranslation();
+  const [hidden, setHidden] = useState(false);
+  const [keychain, setKeychain] = useState<KeychainStatus>("unknown");
+  const [notice, setNotice] = useState<HideNamesNotice | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Two independent questions, asked independently: whether names are hidden,
+  // and whether this device could store one at all. They fail apart: names can
+  // be hidden on a device with a keychain and shown on one without.
+  useEffect(() => {
+    let alive = true;
+    void invoke<HideVaultNamesView>("plugin:vault-label|hide_vault_names")
+      .then((view) => {
+        if (alive) setHidden(view.hidden);
+      })
+      .catch(() => {
+        // Do not assert a position we could not read.
+        if (alive) setNotice("read");
+      });
+    void invoke<KeychainStatusView>("plugin:vault-label|vault_label_keychain_status")
+      .then((view) => {
+        if (alive) setKeychain(view.available ? "available" : "unavailable");
+      })
+      .catch(() => {
+        // A rejection is "the question went unanswered", NOT "unavailable":
+        // the unavailable case arrives as a value and never as an error.
+        if (alive) setKeychain("unknown");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const toggle = async (next: boolean) => {
+    setNotice(null);
+    setBusy(true);
+    try {
+      const view = await invoke<HideVaultNamesView>(
+        "plugin:vault-label|set_hide_vault_names",
+        { hidden: next },
+      );
+      setHidden(view.hidden);
+    } catch (e) {
+      const kind = hideVaultNamesErrorKind(e);
+      setNotice(hideNamesWriteNotice(kind));
+      // This one IS authoritative: the backend answered the question, it just
+      // answered it through the error channel because the write could not
+      // proceed. Nothing here writes a name as a consolation.
+      if (kind === "KeychainUnavailable") setKeychain("unavailable");
+      // Re-read rather than guess which way the switch should land. The erase
+      // runs BEFORE the flag is persisted, so a failed write leaves the flag
+      // wherever it already was while the keys may already be gone.
+      await invoke<HideVaultNamesView>("plugin:vault-label|hide_vault_names")
+        .then((view) => setHidden(view.hidden))
+        .catch(() => {
+          /* the notice already says the attempt failed */
+        });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingRow
+      anchorId="privacy.hide-vault-names"
+      testId="settings.hide-vault-names"
+      stateAttrs={{ "data-hidden": String(hidden), "data-keychain": keychain }}
+      label={t("settings.privacy.hideVaultNamesLabel")}
+      helper={t("settings.privacy.hideVaultNamesHelper")}
+      control={(helperId) => (
+        <Switch
+          checked={hidden}
+          onChange={busy ? undefined : (next) => void toggle(next)}
+          ariaLabel={t("settings.privacy.hideVaultNamesLabel")}
+          ariaDescribedBy={helperId}
+          testId="settings.hide-vault-names-toggle"
+        />
+      )}
+    >
+      <div style={DISCLOSURE_STYLE} data-testid="settings.hide-vault-names-disclosure">
+        <p style={HELPER_STYLE}>{t("settings.privacy.hideVaultNamesErases")}</p>
+        <p style={HELPER_STYLE}>{t("settings.privacy.hideVaultNamesResidue")}</p>
+      </div>
+
+      {keychain === "unavailable" && (
+        <p style={HELPER_STYLE} data-testid="settings.hide-vault-names-unavailable">
+          {t("settings.privacy.hideVaultNamesUnavailable")}
+        </p>
+      )}
+
+      {notice !== null && (
+        <p style={HELPER_STYLE} role="status" data-testid="settings.hide-vault-names-notice">
+          {notice === "read" && t("settings.privacy.hideVaultNamesErrorRead")}
+          {notice === "save" && t("settings.privacy.hideVaultNamesErrorSave")}
+          {notice === "erase" && t("settings.privacy.hideVaultNamesErrorErase")}
+        </p>
+      )}
+    </SettingRow>
+  );
+}
+
 interface PrivacyPanelProps {
   /**
    * Toast surface — invoked when an optimistic write rolled back
@@ -145,6 +361,10 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           />
         )}
       />
+      {/* Beside screen-capture protection rather than beside the lock timers:
+          both rows answer "what can somebody looking at this machine see",
+          which is the question the user came to Privacy holding. */}
+      <HideVaultNamesRow />
       <AutoLockRow
         seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}
         onChange={(secs) => {
