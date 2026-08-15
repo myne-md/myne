@@ -30,6 +30,31 @@ Every Claude Code session in this repo loads `.claude/skills/adhd/SKILL.md` at s
 
 On by default and per-clone opt-out: `touch .claude/.adhd-off` (gitignored), `MYNE_ADHD_OFF=1` for one invocation, or "stop adhd mode" mid-session. The hook is a no-op when `CI` is set, so the unattended lanes — Woodpecker, the runner jail, the issue-triage and PR-review bots — keep their fixed-format English output.
 
+## Worktrees (pointer)
+
+A worktree for this repo is created **only** with `EnterWorktree`, or with `git worktree add` into
+`.claude/worktrees/<name>`, and never anywhere else. It branches from **`origin/develop`**, always:
+that is what `worktree.baseRef: fresh` in `.claude/settings.json` pins (the setting is checked in so
+a fresh clone inherits it), and a hand-made `git worktree add` passes `origin/develop` explicitly.
+Branching from the current local HEAD instead carries whatever the working checkout happens to be
+sitting on into the new branch, which is how a feature branch picks up an unrelated half-finished
+change and a PR arrives with a diff nobody can explain. The session scratchpad under `/private/tmp` is
+specifically wrong for one: it is per session and gets cleaned, so the worktree outlives the
+directory `git worktree list` still points at, and `.claude/worktrees/` stops being the roster of
+what is in flight. Name it after the issue (`410-note-covers`) so the worktree, the branch and the
+session read the same.
+
+**The point is that finished work leaves nothing behind**: branch pushed, PR open, machine back to
+where it started. So the worktree is removed once its PR is open, together with its local branch,
+since the PR tracks the remote one. Never before the PR exists, and never on a dirty tree without
+saying what is uncommitted.
+
+One trap, because it has cost two sessions already: inside a worktree, a nested companion repo
+(`agent-tooling` and friends) is a **symlink** to the shared checkout, and that is correct. The Write
+tool refuses to resolve through it; the answer is one Bash write to the absolute path, not cloning
+the companion in. A copy lands the file in a tree nobody commits, so it looks written and is
+invisible everywhere else. Full rule: `agent-tooling/reference/worktrees.md`.
+
 ## Project status
 
 **Pre-alpha.** Shipped: v0.1 specs (`docs/`), Tauri 2 + Vite + React + TS scaffold (`src/`, `src-tauri/`), Rust crypto crate (`protocol/`, RustCrypto, `#![no_std]` + `alloc`), Cargo workspace (one shared `Cargo.lock`), workspace scripts, pinned toolchain. The desktop scaffold lives at the **repo root** deliberately. It is no longer the only in-repo client — **all three clients live here now**: the Phase 3 desktop-**browser** client at `web/` (`design-notes.md` **2026-07-26** "The web client lives in-repo at `web/`", which supersedes the one-in-repo-client clause of the 2026-04-26 "Desktop scaffold lives at repository root" entry while leaving its placement decision intact) and the Phase 3 **mobile** client at `mobile/` (`decisions.md` **2026-08-13** "The mobile client lives in-repo at `mobile/`", superseding the companion-repo clause of 2026-05-11 while leaving its Tauri-2-Mobile stack decision intact). All three compile the same `src/` tree. Server, website, ops, test-vectors, clipper, themes and branding remain companion repos (`workspace/manifest.txt` is the list); `myne-web` is archived; `myne-mobile` was deleted outright on 2026-08-13 (see the decisions entry of that date and its correction).
