@@ -52,6 +52,7 @@ while IFS= read -r f; do
     src-tauri/icons/*|public/*.svg) continue ;;
     src-tauri/resources/dictionaries/*) continue ;;
     src-tauri/resources/models/*) continue ;;
+    */permissions/schemas/schema.json) continue ;;
   esac
   [ -f "$f" ] || continue
   if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
