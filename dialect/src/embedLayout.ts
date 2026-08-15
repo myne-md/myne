@@ -278,7 +278,50 @@ export function emitEmbedAlias(
  * written into an alias. A caller that validates on its own re-opens the gap.
  */
 export function isAliasSafeText(text: string): boolean {
-  return !text.includes("]");
+  return sanitizeAliasText(text) === text;
+}
+
+/**
+ * Make `name` safe to interpolate into an alias segment, by the rule
+ * `core/src/export_naming.rs::sanitize_export_component` already applies at
+ * export time: an embed-grammar breaker becomes `_`.
+ *
+ * It exists because that rule ran on the wrong side. The export sanitizes a
+ * filename on its way OUT, and nothing sanitized it on the way IN, so an
+ * attachment whose catalog name contains a `]` produced an embed that no reader
+ * accepts. For a body embed that is a chip which will not draw. For a note
+ * cover it is destructive: attachment liveness is derived from form-C embed
+ * spans over the whole plaintext, so a cover that parses as ZERO spans makes
+ * its attachment look unreferenced, and `attachment_clean_unused` then
+ * crypto-erases a blob the note still names in its own bytes.
+ *
+ * Line breaks and control characters are included for a second reason. A cover
+ * value is spliced into a YAML frontmatter scalar, and `formatYamlScalar`
+ * quotes but does not escape a raw newline, so one opens a second physical line
+ * inside the frontmatter block. The Rust readers are line scanners, so a
+ * filename of `photo\ntrashed: <rfc3339>` makes a live note read as trashed and
+ * the whole-vault export drops it silently, counted in a bucket labelled
+ * "trashed".
+ *
+ * Replacing rather than refusing, because the caller is an insert path holding
+ * a catalog name it did not choose and cannot fix: a chip labelled `a_b.png` is
+ * a cosmetic loss, and the alternative is an insert that fails or, worse, one
+ * that succeeds into a value no reader accepts.
+ */
+export function sanitizeAliasText(name: string): string {
+  let out = "";
+  for (const ch of name) {
+    const code = ch.codePointAt(0) ?? 0;
+    // `]` and control characters only. A `|` is deliberately NOT replaced: an
+    // unkeyed segment rejoins the filename, which is the rule that lets an
+    // attachment legitimately be called `re|port.png`, and `alt=` is terminal
+    // so alt prose may carry pipes too. Replacing one would corrupt a name the
+    // grammar handles correctly. `[` is likewise harmless inside an alias; the
+    // export sanitizer replaces it for a filesystem reason that does not apply
+    // here.
+    out += ch === "]" || code < 0x20 || code === 0x7f ? "_" : ch;
+  }
+  return out;
 }
 
 /**

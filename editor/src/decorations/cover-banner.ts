@@ -187,7 +187,7 @@ class CoverBannerWidget extends WidgetType {
         ),
       );
       controls.appendChild(
-        makeCoverControl(COVER_REMOVE_TESTID, i18n.t("editor.cover.remove"), () =>
+        makeCoverControl(COVER_REMOVE_TESTID, i18n.t("attachments.coverPicker.removeCover"), () =>
           cover.remove(),
         ),
       );

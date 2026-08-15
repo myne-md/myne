@@ -35,6 +35,13 @@ import { reindexNoteFromBody } from "./vaultIndices";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+/** Byte equality, so a no-op patch is detected without decoding twice. */
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 /**
  * Set the note's cover-image property `propertyKey` to a form-C embed of the
  * given attachment, or delete it when `attachment === null` (remove cover).
@@ -52,6 +59,16 @@ export async function setNoteCover(
       ? null
       : emitAttachmentEmbed(attachment.id, attachment.filename);
   const patched = patchFrontmatterField(encoder.encode(current), propertyKey, value);
+  // A patch that changed nothing is not written, and that is a correctness
+  // guard rather than an optimisation. "Remove cover" is offered
+  // unconditionally, on the reasoning that clearing an absent field is a
+  // harmless no-op. It is not: `patchFrontmatterField` returns the source
+  // unchanged when the key is absent, and `patchUpdatedField` then runs anyway
+  // and PREPENDS a whole frontmatter block to a note that had none. So
+  // "Remove cover" on a plain note used to inject `---\nupdated: ...\n---` into
+  // the user's text, and on a note that has frontmatter it bumped `updated:`,
+  // re-encrypted and pushed a sync version for nothing.
+  if (bytesEqual(patched, encoder.encode(current))) return;
   const stamped = patchUpdatedField(patched, new Date().toISOString());
   const next = decoder.decode(stamped);
   await noteUpdate(noteId, next);

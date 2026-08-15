@@ -163,7 +163,12 @@ describe("check-twin-inventory", () => {
     // this branch was open. That is the guard's stated purpose working: a twin
     // ENTERING the set fails rather than passing unnoticed, and each of the
     // eight cost a verdict and a reason before this number could move.
-    expect(full.out).toContain("104 twin(s) discovered");
+    //
+    // The curated half went 6 to 8 with myne-md/myne#410's two cover pairs,
+    // which is the OTHER half working: both sit at different paths on the two
+    // sides, so the sweep cannot see either, and the guard was green and blind
+    // to them until they were rostered by hand.
+    expect(full.out).toContain("106 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -337,7 +342,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(104);
+    expect(ROSTER.length).toBe(106);
   });
 
   it("keeps `screen` narrow", () => {

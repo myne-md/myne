@@ -8,6 +8,7 @@ import {
   NEWLINE,
   locateFrontmatter,
 } from "./lezer/frontmatter";
+import { MANAGED_FRONTMATTER_FIELDS } from "./managedFields";
 import type { ByteRange } from "./types";
 
 // COLUMN ZERO, every one of them (myne#321).
@@ -1632,9 +1633,43 @@ function canonicalKind(valuePortion: string): NoteKind {
 // Build the `^(<indent><key><sep>)(value)$` matcher for an arbitrary property
 // name. The key is a YAML property name (identifier-ish), but regex
 // metacharacters are escaped defensively so a stray char can't widen the match.
-function fmKeyRe(key: string): RegExp {
+function fmKeyRe(key: string, anchored = false): RegExp {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^([ \\t]*${escaped}[ \\t]*:[ \\t]*)(.*)$`);
+  const indent = anchored ? "" : "[ \\t]*";
+  return new RegExp(`^(${indent}${escaped}[ \\t]*:[ \\t]*)(.*)$`);
+}
+
+/**
+ * Whether `key` must match at COLUMN ZERO only.
+ *
+ * The indent-tolerant matcher is right for an arbitrary user property: a
+ * reader looking for `status:` should find an indented one. It is wrong for a
+ * MANAGED field, and myne#321 is the record of why. Every managed field's
+ * dedicated reader is anchored (`UPDATED_KEY_RE` and its siblings all start
+ * `^`), so a tolerant WRITER paired with an anchored READER edits a line the
+ * reader will never look at.
+ *
+ * `cover:` is the field that makes this reachable rather than theoretical. The
+ * shape
+ *
+ *     ---
+ *     seo:
+ *       cover: hero.jpg
+ *     ---
+ *
+ * is ordinary in a vault imported from Jekyll, Hugo or an Obsidian SEO plugin.
+ * With a tolerant writer, "Add cover" rewrites the user's NESTED value while
+ * the anchored reader still reports no cover, so the banner never appears, the
+ * offer stays, and every retry destroys the value again. "Remove cover" deletes
+ * their line outright.
+ *
+ * The conflict pair does not have this exposure and that is why it was a safe
+ * precedent for riding the generic writer: `conflict:` and `conflict_of:` are
+ * Myne-minted keys on Myne-minted conflict copies, so a nested one cannot
+ * arrive. `cover:` is user- and foreign-authored.
+ */
+function isManagedKey(key: string): boolean {
+  return MANAGED_FRONTMATTER_FIELDS.includes(key as (typeof MANAGED_FRONTMATTER_FIELDS)[number]);
 }
 
 function applyStateAField(source: string, key: string, value: string): string {
@@ -1668,7 +1703,7 @@ function applyStateCField(
     source,
     bodyStart,
     bodyEnd,
-    fmKeyRe(key),
+    fmKeyRe(key, isManagedKey(key)),
     formatYamlScalar,
     value,
   );
@@ -1678,7 +1713,7 @@ function deleteField(source: string, key: string): string {
   const fm = locateFrontmatter(source);
   if (fm === null) return source;
 
-  const keyRe = fmKeyRe(key);
+  const keyRe = fmKeyRe(key, isManagedKey(key));
   const fmBody = source.substring(fm.bodyStart, fm.bodyEnd);
   const lines = fmBody.split(NEWLINE);
   const idx = lines.findIndex((l) => keyRe.test(l));

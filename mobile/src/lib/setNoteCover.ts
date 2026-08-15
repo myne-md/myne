@@ -22,6 +22,13 @@ export interface CoverChoice {
   filename: string;
 }
 
+/** Byte equality, so a no-op patch is detected without decoding twice. */
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 /**
  * Write the note's `cover:` field, or delete it when `choice === null`.
  *
@@ -37,6 +44,12 @@ export async function setNoteCover(
   const current = await noteRead(noteId);
   const value = choice === null ? null : emitAttachmentEmbed(choice.id, choice.filename);
   const patched = patchFrontmatterField(enc.encode(current), COVER_FIELD_KEY, value);
+  // A patch that changed nothing is not written. `patchFrontmatterField`
+  // returns the source unchanged when the key is absent, and `patchUpdatedField`
+  // then PREPENDS a whole frontmatter block to a note that had none, so a
+  // remove on a note with no cover used to inject `---` into the user's text.
+  // Byte-identical to desktop's guard, which is the property this file claims.
+  if (bytesEqual(patched, enc.encode(current))) return;
   const stamped = patchUpdatedField(patched, new Date().toISOString());
   await noteUpdate(noteId, dec.decode(stamped));
 }

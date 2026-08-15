@@ -10,6 +10,7 @@
 // embedded on mobile renders on desktop and rides sync unchanged. Pure — no
 // IPC; `attachmentSrc` consults the Tauri global at CALL time only.
 
+import { emitAttachmentEmbed as sharedEmitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
 import { convertFileSrc } from "../platform/core";
 import { hasTauriHost } from "./app-window";
 
@@ -26,7 +27,12 @@ export function isAttachmentId(id: string): boolean {
 
 /** Emit the canonical form-C embed (always with the filename alias). */
 export function emitAttachmentEmbed(id: string, filename: string): string {
-  return `![[${ATT_SCHEME}${id}|${filename}]]`;
+  // Delegates rather than restating the template. This copy used to be a bare
+  // interpolation while desktop's routed the alias through `emitEmbedAlias`,
+  // so the two clients' "byte-exact by construction" claim was a comment: a
+  // filename carrying a `]` produced an embed no reader accepts here and a
+  // sanitized one there. `@myne/editor` already resolves from this tree.
+  return sharedEmitAttachmentEmbed(id, filename);
 }
 
 /** Recognize an attachment id from a wikilink target (the bytes before `|`).
