@@ -10,8 +10,8 @@
 // is every note, and it was going to iCloud / Google Drive until myne-md/myne#491.
 // See `mobile/src-tauri/src/backup_exclude.rs`.
 
-import { invoke } from "@tauri-apps/api/core";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { invoke } from "../platform/core";
+import { documentDir, join } from "../platform/path";
 
 /** Result of {@link vaultExportMarkdown} — mirror of Rust `VaultExportSummary`. */
 export interface VaultExportSummary {

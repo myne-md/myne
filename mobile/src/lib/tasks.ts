@@ -17,7 +17,7 @@
 // Rust** — a parameterized accessor would move the §3.6.4 type authority out of
 // the dialect layer — so every surface filters over one shared list.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { useCallback, useEffect, useState } from "react";
 import {
   patchNoteCompletion,

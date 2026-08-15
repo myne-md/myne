@@ -31,7 +31,11 @@ export async function collectDiagnostics(failureCode: string): Promise<string> {
   return buildDiagnostics({
     version: __APP_VERSION__,
     channel: import.meta.env.MODE === "development" ? "Development" : "Stable",
-    commit: __BUILD_COMMIT__,
+    // Unsliced, unlike the About row: a maintainer reading a pasted block wants
+    // the whole SHA. Served build first for the reason given there — the web
+    // define is pinned, so `version.json` is where the commit lives
+    // (myne-md/myne#458).
+    commit: served?.commit ?? __BUILD_COMMIT__,
     bundleHash: served?.bundleHash ?? null,
     failureCode,
     // The engine and major version only — never the full UA string, whose tail

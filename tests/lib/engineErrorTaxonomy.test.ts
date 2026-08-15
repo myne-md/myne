@@ -63,6 +63,12 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
       "transcription never reaches a provider, so there is no credential for it to be missing (myne#415)",
     unauthorized: "same — no provider, no credential to be rejected",
     quota_exhausted: "same — no provider, no quota to exhaust",
+    policy_refused:
+      "same — a policy refusal is a provider's decision inside a 200 reply, and transcription never sends one (myne#466)",
+    empty_completion:
+      "a completion is generation's output; transcription produces a transcript, and an empty one is TranscriptionFailed's business",
+    local_model_missing:
+      "generation-only: the stale marker this names is generation.path, and transcription resolves through effective_transcription_model, which falls back to the bundled default rather than reporting a gone override (myne#466)",
   },
   provider: {
     feature_off:
@@ -72,8 +78,6 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     no_model:
       "this arm has no local model — the model is named by the user and its absence is a NoCredential-shaped setup problem, not a missing file",
     model_load_failed: "same — nothing is loaded on this side",
-    not_ready:
-      "collapses into the catch-all here: 'the engine is not set up' is not something a provider can tell us",
     inference_failed:
       "a provider failure arrives as a status, which maps to unauthorized / quota_exhausted / the catch-all; this variant is the in-process runtime's",
     embedding_failed:
@@ -100,6 +104,12 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
       "auto-tag is barred from a remote backend unconditionally (SYNC-14), so it can never need a credential",
     unauthorized: "same — the bar fires before any credential is consulted",
     quota_exhausted: "same — nothing is ever billed on this path",
+    policy_refused:
+      "same — the SYNC-14 bar means no provider is ever asked, so none can refuse under its own policy (myne#466)",
+    empty_completion:
+      "collapses into not_ready for this surface: a tag pass that produced nothing shows no band, and there is nothing for the user to rephrase — the pass has no prompt they wrote",
+    local_model_missing:
+      "auto-tag runs on the BUNDLED task-model, which has no marker file and no picker at all (ModelRole::TagSuggestion), so there is no recorded path that could go stale",
   },
 };
 

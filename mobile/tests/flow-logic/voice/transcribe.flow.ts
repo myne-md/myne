@@ -74,4 +74,22 @@ test.describe("on-device transcription UI (MYND-563)", () => {
     // Retry is offered — the idle Transcribe control is present again inside the error row.
     await expect(page.getByTestId("files.transcribe-error").getByRole("button")).toBeVisible();
   });
+
+  test("too long: says so, and offers NO retry (myne#485)", async ({ page }) => {
+    // The exact inverse of the `failed` case above, and the reason it is worth a
+    // test of its own: the ceiling refuses the same clip every time, so a retry
+    // button here would be advice that cannot work. A regression that
+    // reintroduced the button would leave the `failed` assertion green and this
+    // behaviour uncovered.
+    await openFilesWithAudio(page, {
+      prefs: { transcription_enabled: true },
+      transcribe: { error: "too_long" },
+    });
+    await page.getByTestId("files.transcribe-start").click();
+    const err = page.getByTestId("files.transcribe-error");
+    await expect(err).toBeVisible();
+    await expect(err).toContainText(/too long/i);
+    // Not "is hidden": the button must not be in the row at all.
+    await expect(err.getByRole("button")).toHaveCount(0);
+  });
 });

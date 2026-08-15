@@ -101,16 +101,23 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { RUST_CLIENT_TREES } from "./lib/shared-roots.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
 /** Every Rust tree that can hold a violation of rules 2 or 4. */
+// The two shared crates by name, then every client tree from the one roster.
+//
+// `mobile/src-tauri/src` was absent from the hand-written list this replaces,
+// so from 2026-08-13 (when the mobile client moved in-repo) until now the guard
+// that owns the HKDF-expand ownership rule, the u16-cast rule and the §10.3
+// magic registry had never scanned a whole client. It reported `ok` throughout.
+// Widening found no violation, which is the good outcome and also the reason
+// the widening had to happen now rather than after the first one.
 const SCANNED_TREES = [
   "protocol/src",
   "core/src",
-  "src-tauri/src",
-  "cli/src",
-  "web/wasm/src",
+  ...RUST_CLIENT_TREES,
   "e2e/fixture-gen/src",
 ];
 

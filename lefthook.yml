@@ -159,6 +159,16 @@ pre-commit:
       # validates, syncs, and silently does nothing.
       run: node scripts/check-ornament-vocabulary.mjs
 
+    lock-teardown:
+      # myne#454: a client that MANAGES a plaintext-derived RAM state must
+      # implement the lock-teardown hook that wipes it. The failure is an empty
+      # function body, which every compiler, clippy and every other guard
+      # accepts — so a lock stops locking with the whole tree green. Mobile
+      # shipped all three (search index / vault indices / attachment refs)
+      # empty, mixing two vaults' tasks and leaving a locked vault's titles in
+      # RAM.
+      run: node scripts/check-lock-teardown.mjs
+
     e2e-menu-testid:
       # #275: an E2E scenario reaching for a testid that renders only inside an
       # open menu waits for something that is not on screen and fails as a

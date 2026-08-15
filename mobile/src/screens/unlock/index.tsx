@@ -8,7 +8,7 @@ import {
   Icon,
   MyneMark,
 } from "../../components";
-import { usePlatform } from "../../platform/PlatformContext";
+import { usePlatform } from "../../formfactor/PlatformContext";
 import type { ScreenDef } from "../../gallery/types";
 
 // ── Shared bits ──────────────────────────────────────────────────────────────
