@@ -201,6 +201,26 @@ export type Capability =
    */
   | "cliAccess"
   /**
+   * Vault names on the LOCKED picker, and with them the device-local sealed
+   * `MYL1` store that makes showing one possible (myne-md/myne#411).
+   *
+   * **Absent on web, and already decided before this capability existed.** The
+   * picker is the whole subject: a name is cached so the pre-unlock screen can
+   * label a row, and `check-web-screens.mjs` records `VaultPicker.tsx` as
+   * `excluded` because an origin holds exactly one container, so the
+   * two-or-more-vault branch that produces that screen cannot be reached. The
+   * store behind it is sealed under an OS keychain `wrap_key`, and a page has
+   * no keychain, so there is no second half either.
+   *
+   * Named for the NAMES rather than for the Privacy switch that hides them,
+   * because the switch is downstream: what a client without this capability
+   * lacks is the display and its cache, and the setting that governs them is
+   * omitted as a consequence. `decisions.md` 2026-08-15 records the erase
+   * semantics; none of that changes here, and none of it is what web is
+   * missing. `MYL1` and desktop behaviour are untouched.
+   */
+  | "lockedVaultNames"
+  /**
    * Routing this client's own sync egress through a device-local Tor proxy
    * (MYND-650).
    *
@@ -257,6 +277,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   attachmentTextSearch: true,
   imageCompression: true,
   cliAccess: true,
+  lockedVaultNames: true,
   torRouting: true,
 });
 

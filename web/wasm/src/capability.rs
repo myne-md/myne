@@ -44,10 +44,14 @@
 //!
 //! Nothing here is invented. Each `Unsupported` entry cites either
 //! `docs/decisions.md` 2026-07-26 "Web capability set", the `Absent on web` list
-//! in task 27, or a `cannot-exist-in-browser` verdict from
-//! `core-wasm-assessment.md`. Anything not covered by one of those is `Pending`
-//! by construction, which is why this file cannot quietly grow a product
-//! decision.
+//! in task 27, a `cannot-exist-in-browser` verdict from
+//! `core-wasm-assessment.md`, or a decision another roster in this repo has
+//! already taken and recorded (myne#411's `vault-label` cites
+//! `check-web-screens.mjs`'s `excluded` verdict on `VaultPicker.tsx`: a setting
+//! whose entire subject is a screen this client cannot reach has no referent
+//! here, and that is a decision, not a gap). Anything not covered by one of
+//! those is `Pending` by construction, which is why this file cannot quietly
+//! grow a product decision.
 
 /// What the web client does with a given IPC command name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -439,24 +443,29 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     ("vault-recover", Class::Pending), // task 32 (account-number resolve only; see PER_COMMAND)
     // myne-md/myne#411: the device-local hide-vault-names flag, its setter
     // (which IS the erase) and the keychain-availability probe the Settings
-    // Privacy row renders. Nothing on this client answers them today: the
-    // locked picker they serve does not render on web (an origin holds exactly
-    // one container, so `VaultPicker.tsx` is recorded `excluded` in
-    // `check-web-screens.mjs`) and there is no OS keychain behind the `MYL1`
-    // store, which is why `dispatch.rs`'s two `platform_keychain()` call sites
-    // already resolve to the unavailable one.
+    // Privacy row renders. ABSENT on web, and decided by two facts this repo
+    // had already recorded rather than by a fresh call. The setting's entire
+    // subject is what the LOCKED PICKER shows, and there is no locked picker
+    // here: `check-web-screens.mjs` records `VaultPicker.tsx` as `excluded`
+    // because an origin holds exactly one container (constant vault id, task
+    // 85), so the >=2-vault branch that produces the picker stage cannot be
+    // reached. And the `MYL1` store the flag governs is sealed under an OS
+    // keychain `wrap_key`, which a browser does not have, which is why
+    // `dispatch.rs`'s two `platform_keychain()` call sites already resolve to
+    // the unavailable one.
     //
-    // `Pending` rather than `Unsupported`, and the gap between them is a
-    // decision nobody has taken rather than a hedge. `Unsupported` is consumed
-    // by the capability descriptor to make an affordance permanently ABSENT.
-    // It needs a capability of its own and an owner willing to say this can
-    // never exist here, and that is not obviously true: the flag is a
-    // device-local file the storage seam can hold, and the erase is a sweep
-    // over files this client also has. What web lacks is the keychain and the
-    // screen, not the mechanism. Until that is decided the loud class is the
-    // right answer to an open question, exactly as this file's header says:
-    // `Pending` covers undecided, not just unwritten.
-    ("vault-label", Class::Pending),
+    // What is absent is the PICKER and the KEYCHAIN, not the encryption.
+    // `MYL1` is untouched by this and so is desktop, where the row ships
+    // ungated. Web simply has no screen for the option to govern and nowhere
+    // to keep the key whose destruction is the erase, so the option here would
+    // be a control with no referent.
+    //
+    // `Unsupported` rather than `Pending` for the reason `vault-repair` below
+    // is: `Pending` promises a port, and no port makes a switch meaningful
+    // when the thing it switches does not render. The capability behind it is
+    // `lockedVaultNames`, absent in the web descriptor, so `PrivacyPanel`
+    // omits the row instead of rendering one whose three probes all reject.
+    ("vault-label", Class::Unsupported),
     // Owner decision, 2026-07-27 (task 72): repair is ABSENT on web. It scans a
     // vault DIRECTORY for orphan artefacts, which exists because a desktop
     // directory is writable by other software; an OPFS container has one writer

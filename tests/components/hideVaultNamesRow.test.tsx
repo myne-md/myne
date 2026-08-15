@@ -97,7 +97,7 @@ describe("hide vault names: reachable without Developer mode", () => {
     expect(await screen.findByTestId("settings.hide-vault-names")).toBeTruthy();
   });
 
-  it("is in the settings search index, and neither developer-gated nor capability-gated", () => {
+  it("is in the settings search index, capability-tagged and NOT developer-gated", () => {
     const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === ENTRY_ID);
     expect(entry, `no settings-search entry for ${ENTRY_ID}`).toBeDefined();
     expect(entry!.panelId).toBe("privacy");
@@ -105,10 +105,13 @@ describe("hide vault names: reachable without Developer mode", () => {
       entry!.developerGated,
       "the option must be findable by someone who has never opened Developer mode",
     ).toBeUndefined();
+    // The two gates are independent, and only one of them applies here. The
+    // capability tag has to match the panel's own condition or search would
+    // navigate to an anchor that was never rendered.
     expect(
       entry!.capability,
-      "the row ships on every client that has a Privacy panel",
-    ).toBeUndefined();
+      "PrivacyPanel omits the row where `lockedVaultNames` is absent",
+    ).toBe("lockedVaultNames");
   });
 
   it("search finds it with Developer mode OFF", () => {
@@ -305,5 +308,68 @@ describe("hide vault names: failure reporting", () => {
     const copy = t("settings.privacy.hideVaultNamesErrorSave").toLowerCase();
     expect(copy).not.toContain("nothing changed");
     expect(copy).toContain("may already have been destroyed");
+  });
+});
+
+describe("hide vault names: absent where the picker and the keychain are", () => {
+  // Asserted against the WEB descriptor itself rather than an invented absent
+  // set, so this cannot pass while the real client still renders the row. What
+  // it pins is the pairing the two files owe each other: the dispatcher answers
+  // `Unsupported` for `vault-label` (`web/wasm/src/capability.rs`), and a
+  // refusal with the affordance still on screen is the broken-control failure
+  // the capability descriptor exists to prevent.
+  async function mountWebPanel() {
+    const web = await import("../../web/src/platform/capabilities");
+    vi.resetModules();
+    vi.doMock("../../src/platform/capabilities", () => ({
+      has: web.has,
+      ALL_CAPABILITIES: web.ALL_CAPABILITIES,
+    }));
+    const { PrivacyPanel: WebPrivacyPanel } = await import(
+      "../../src/components/settings/PrivacyPanel"
+    );
+    invokeMock.mockImplementation((cmd: string) =>
+      cmd === "plugin:prefs|prefs_read"
+        ? Promise.resolve({})
+        : Promise.reject(new Error(`unstubbed command: ${cmd}`)),
+    );
+    render(<WebPrivacyPanel />);
+  }
+
+  afterEach(() => {
+    vi.doUnmock("../../src/platform/capabilities");
+    vi.resetModules();
+  });
+
+  it("renders no row on a client without `lockedVaultNames`", async () => {
+    await mountWebPanel();
+    // The panel itself mounted, so this is an absent ROW rather than an absent
+    // panel: screen-capture protection is the row directly above it.
+    await waitFor(() =>
+      expect(screen.queryByTestId("settings.hide-vault-names")).toBeNull(),
+    );
+    expect(screen.queryByTestId("settings.hide-vault-names-toggle")).toBeNull();
+  });
+
+  it("issues none of the three vault-label commands there", async () => {
+    // The defect this closes was three probes rejecting behind a rendered row.
+    // Absence has to reach the IPC layer, not only the DOM.
+    await mountWebPanel();
+    await waitFor(() => expect(invokeMock).toHaveBeenCalled());
+    const called = invokeMock.mock.calls.map((c) => c[0] as string);
+    expect(called.filter((c) => c.startsWith("plugin:vault-label|"))).toEqual([]);
+  });
+
+  it("search cannot navigate to a row that was never rendered", async () => {
+    const web = await import("../../web/src/platform/capabilities");
+    vi.resetModules();
+    vi.doMock("../../src/platform/capabilities", () => ({
+      has: web.has,
+      ALL_CAPABILITIES: web.ALL_CAPABILITIES,
+    }));
+    const { visibleSettingsIndex: webVisible } = await import(
+      "../../src/components/settings/search/settingsSearchIndex"
+    );
+    expect(webVisible(true).map((e) => e.id)).not.toContain(ENTRY_ID);
   });
 });

@@ -126,7 +126,7 @@ const V = {
   ],
   "src/components/settings/PrivacyPanel.tsx": [
     "adapted",
-    "Ships; the screen-capture toggle and quick-unlock block are capability-gated, and both are filtered from search. The CLI block carries a `developer_mode` gate on top of its capability gate (#181); on web the capability half already decides it.",
+    "Ships; the screen-capture toggle, the quick-unlock block and the hide-vault-names row are capability-gated, and all three are filtered from search. The hide-vault-names row is gated on `lockedVaultNames` (myne-md/myne#411): a browser origin holds exactly one container, so the locked picker the setting governs never renders there, and there is no OS keychain to seal its store. The CLI block carries a `developer_mode` gate on top of its capability gate (#181); on web the capability half already decides it.",
   ],
   "src/components/settings/QuickUnlockSettings.tsx": [
     "adapted",
