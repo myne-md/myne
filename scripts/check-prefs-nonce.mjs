@@ -22,11 +22,20 @@
 // path (`writePref`), and this guard keeps it there.
 //
 // What it enforces:
-//   1. Inside `src/lib/prefs.ts`, only `writePref` may invoke a prefs WRITE
+//   1. Inside a prefs module, only `writePref` may invoke a prefs WRITE
 //      command. Read commands (`prefs_read`, `device_platform`) are exempt by
 //      name — they have nothing to invalidate.
-//   2. No module outside `src/lib/prefs.ts` may invoke a prefs write command at
+//   2. No module outside a prefs module may invoke a prefs write command at
 //      all. Reaching around the module is reaching around the bump.
+//
+// TWO prefs modules, one per client tree (myne-md/myne#486). The mobile client
+// moved in-repo on 2026-08-13 and this guard did not learn about it: `mobile/src`
+// was in neither `PREFS_MODULES` nor `SCANNED_TREES`, so both rules were blind to
+// a whole client. `mobile/src/lib/prefs.ts` had no chokepoint at all — 47 setters
+// with the bump supplied by 29 separate CALL SITES, which is the pre-#251 desktop
+// shape. Every one of them happened to be right; the shape is what fails, one
+// copied neighbour later. Same rules, both trees, so a mobile setter written
+// tomorrow costs a failed commit rather than a stale open editor.
 //
 // Both rules match the COMMAND LITERAL, not the call shape. The first version
 // required `invoke<T>("…")` — a mandatory generic and a double quote — and
@@ -46,7 +55,11 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
-const PREFS_MODULE = "src/lib/prefs.ts";
+
+// One per client tree. Each holds its own `writePref` — the two are twins, not a
+// shared module: mobile's lives in its own React tree (`mobile/src`) and imports
+// its own `prefsNonce`. Rule 1 runs over each; rule 2 exempts each.
+export const PREFS_MODULES = ["src/lib/prefs.ts", "mobile/src/lib/prefs.ts"];
 
 // Prefs commands that only READ. They invalidate nothing, so they need no bump
 // and may be invoked directly.
@@ -65,7 +78,7 @@ const READ_COMMANDS = new Set([
 // Trees that may legitimately hold a `plugin:prefs|` literal without being the
 // TS wrapper module: the Rust side names its own commands, and the web
 // dispatcher/capability tables classify every command in the tree.
-const SCANNED_TREES = ["src", "editor/src", "dialect/src", "copy/src"];
+export const SCANNED_TREES = ["src", "editor/src", "dialect/src", "copy/src", "mobile/src"];
 
 // `writePref(` is optional in the pattern and mandatory in the rule: any prefs
 // literal NOT sitting as writePref's first argument is the violation.
@@ -110,46 +123,56 @@ function* walk(dir) {
  * same reason, as `scripts/check-web-command-coverage.mjs`: a spec that
  * reimplemented the scan could pass while the script failed, or agree with a bug.
  *
- * `prefsSource` injects prefs.ts's own text so a spec can drive the MATCHER over
- * the evasion shapes without a fixture the real run would then have to exempt.
- * Rule 2 always reads the real trees.
+ * `prefsSource` injects one prefs module's own text so a spec can drive the
+ * MATCHER over the evasion shapes without a fixture the real run would then have
+ * to exempt. When given it REPLACES the real modules for rule 1 (one virtual
+ * module, not an addition), so an injected-source assertion counts only its own
+ * findings. Rule 2 always reads the real trees.
  */
 export function analyse({ prefsSource } = {}) {
   const failures = [];
+  let writes = 0;
 
-  // ---- rule 1: inside prefs.ts, writes go through writePref ----------------
-  const prefsSrc = prefsSource ?? readFileSync(join(ROOT, PREFS_MODULE), "utf8");
+  // ---- rule 1: inside each prefs module, writes go through writePref -------
+  const modules =
+    prefsSource === undefined
+      ? PREFS_MODULES.map((rel) => [rel, readFileSync(join(ROOT, rel), "utf8")])
+      : [[PREFS_MODULES[0], prefsSource]];
 
-  // Whole-file, not line-by-line: `writePref(\n  "plugin:prefs|…"` spans lines,
-  // and the `\s` inside the optional group has to be allowed to cross one.
-  PREFS_WRITE_CALL.lastIndex = 0;
-  let m;
-  while ((m = PREFS_WRITE_CALL.exec(prefsSrc)) !== null) {
-    if (m[1]) continue; // sat as writePref's first argument — the chokepoint
-    const command = m[2];
-    if (READ_COMMANDS.has(command)) continue;
-    failures.push({
-      file: PREFS_MODULE,
-      line: lineOf(prefsSrc, m.index),
-      command,
-      why: "invokes a prefs write command directly. Route it through writePref(), which bumps the nonce — usePrefs siblings only re-read on that bump (src/hooks/usePrefs.ts), so without it the open editor keeps the old value for the rest of the session.",
-    });
-  }
+  for (const [rel, prefsSrc] of modules) {
+    // Whole-file, not line-by-line: `writePref(\n  "plugin:prefs|…"` spans lines,
+    // and the `\s` inside the optional group has to be allowed to cross one.
+    PREFS_WRITE_CALL.lastIndex = 0;
+    let m;
+    while ((m = PREFS_WRITE_CALL.exec(prefsSrc)) !== null) {
+      if (m[1]) continue; // sat as writePref's first argument — the chokepoint
+      const command = m[2];
+      if (READ_COMMANDS.has(command)) continue;
+      failures.push({
+        file: rel,
+        line: lineOf(prefsSrc, m.index),
+        command,
+        why: `invokes a prefs write command directly. Route it through ${rel}'s writePref(), which bumps the nonce — usePrefs siblings only re-read on that bump, so without it the open editor keeps the old value for the rest of the session.`,
+      });
+    }
 
-  if (!/async function writePref\(/.test(prefsSrc)) {
-    failures.push({
-      file: PREFS_MODULE,
-      line: 0,
-      command: "(none)",
-      why: "the writePref chokepoint is missing. Every prefs write must flow through it; removing it re-opens the class of defect #251 closed.",
-    });
+    if (!/async function writePref\(/.test(prefsSrc)) {
+      failures.push({
+        file: rel,
+        line: 0,
+        command: "(none)",
+        why: "the writePref chokepoint is missing. Every prefs write must flow through it; removing it re-opens the class of defect #251 closed.",
+      });
+    }
+
+    writes += (prefsSrc.match(/await writePref\(/g) ?? []).length;
   }
 
   // ---- rule 2: nobody else invokes a prefs write --------------------------
   for (const tree of SCANNED_TREES) {
     for (const file of walk(join(ROOT, tree))) {
       const rel = relative(ROOT, file);
-      if (rel === PREFS_MODULE) continue;
+      if (PREFS_MODULES.includes(rel)) continue;
       const src = readFileSync(file, "utf8");
       if (!src.includes("plugin:prefs|")) continue;
       PREFS_LITERAL.lastIndex = 0;
@@ -161,13 +184,12 @@ export function analyse({ prefsSource } = {}) {
           file: rel,
           line: lineOf(src, hit.index),
           command,
-          why: "invokes a prefs write from outside src/lib/prefs.ts. Add a wrapper there instead — reaching around the module reaches around the nonce bump.",
+          why: `invokes a prefs write from outside a prefs module (${PREFS_MODULES.join(", ")}). Add a wrapper in the one for this client's tree instead — reaching around the module reaches around the nonce bump.`,
         });
       }
     }
   }
 
-  const writes = (prefsSrc.match(/await writePref\(/g) ?? []).length;
   return { failures, writes };
 }
 

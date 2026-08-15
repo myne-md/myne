@@ -557,6 +557,40 @@ export async function prefsRead(): Promise<PrefsView> {
 }
 
 /**
+ * The one path a `vault.prefs` WRITE takes — invoke, then bump the prefs nonce.
+ * The twin of `src/lib/prefs.ts`'s chokepoint, and it exists for the same reason
+ * (#251, ported to mobile by myne-md/myne#486).
+ *
+ * The bump is the ONLY mechanism by which sibling `usePrefs` instances re-read
+ * (`./use-prefs.ts`), and mobile has four independent mount sites — `EditorFlow`,
+ * `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels`. Before this helper
+ * the bump was an optional second line in 47 setters and supplied by 29 separate
+ * CALL SITES instead: `SettingsSheet`'s own `writeDraftPref`, `.then(bumpPrefsNonce)`
+ * chains in `EditorFlow`, and bare block-level bumps. Every one of them happened
+ * to be right, which is the fragile version of correct: a new setter is written
+ * by copying a neighbour, and #251 is the record of what happens when one
+ * neighbour is wrong. `scripts/check-prefs-nonce.mjs` now holds the rule for this
+ * module too.
+ *
+ * Bumps on SUCCESS only: a rejected `invoke` throws before the bump, so nothing
+ * claims disk truth changed when it did not. A caller running optimistic local
+ * state that it corrects by re-reading (rather than by reverting) therefore still
+ * owns its own `.catch(bumpPrefsNonce)` — see `EditorFlow`'s decoration writes.
+ *
+ * Skipping the bump stays possible via `{ bump: false }`, which costs an explicit
+ * argument carrying its reason: a visible choice in review rather than an
+ * invisible omission.
+ */
+async function writePref(
+  command: string,
+  args: Record<string, unknown>,
+  opts: { bump?: boolean } = {},
+): Promise<void> {
+  await invoke<void>(command, args);
+  if (opts.bump !== false) bumpPrefsNonce();
+}
+
+/**
  * Toggle screen-capture protection.
  *
  * Critical ordering on the backend: vault.prefs disk write succeeds
@@ -566,7 +600,7 @@ export async function prefsRead(): Promise<PrefsView> {
  * revert.
  */
 export async function setScreenCaptureProtection(enabled: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_screen_capture_protection", { enabled });
+  await writePref("plugin:prefs|set_screen_capture_protection", { enabled });
 }
 
 /**
@@ -579,7 +613,7 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
  * must revert.
  */
 export async function setAttachmentCompressionEnabled(enabled: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_attachment_compression_enabled", { enabled });
+  await writePref("plugin:prefs|set_attachment_compression_enabled", { enabled });
 }
 
 /**
@@ -590,7 +624,7 @@ export async function setAttachmentCompressionEnabled(enabled: boolean): Promise
  * codec and core setter are the desktop feature's — mobile consumes them.
  */
 export async function setRemindersEnabled(enabled: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_reminders_enabled", { enabled });
+  await writePref("plugin:prefs|set_reminders_enabled", { enabled });
 }
 
 /**
@@ -600,7 +634,7 @@ export async function setRemindersEnabled(enabled: boolean): Promise<void> {
  * the toggle gates the feature, never bypasses the gate.
  */
 export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_transcription_enabled", { enabled });
+  await writePref("plugin:prefs|set_transcription_enabled", { enabled });
 }
 
 /**
@@ -611,7 +645,7 @@ export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
  * AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7).
  */
 export async function setReminderHorizonDays(days: number | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_reminder_horizon_days", { days });
+  await writePref("plugin:prefs|set_reminder_horizon_days", { days });
 }
 
 /**
@@ -624,7 +658,7 @@ export async function setReminderHorizonDays(days: number | null): Promise<void>
  * must revert.
  */
 export async function setDeliberateFolders(folders: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_deliberate_folders", { folders });
+  await writePref("plugin:prefs|set_deliberate_folders", { folders });
 }
 
 /**
@@ -636,7 +670,7 @@ export async function setDeliberateFolders(folders: string[]): Promise<void> {
  * disk write failed and the caller's optimistic UI must revert.
  */
 export async function setArchivedFolders(folders: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_archived_folders", { folders });
+  await writePref("plugin:prefs|set_archived_folders", { folders });
 }
 
 /**
@@ -647,7 +681,7 @@ export async function setArchivedFolders(folders: string[]): Promise<void> {
  * (re-read disk truth, as the screen-capture toggle does).
  */
 export async function setAutoLockTimeout(seconds: number): Promise<void> {
-  await invoke<void>("plugin:prefs|set_auto_lock_timeout", { seconds });
+  await writePref("plugin:prefs|set_auto_lock_timeout", { seconds });
 }
 
 /**
@@ -661,7 +695,7 @@ export async function setAutoLockTimeout(seconds: number): Promise<void> {
  * Rust command's `order: BTreeMap<String, Vec<String>>` parameter.
  */
 export async function setItemOrder(order: Record<string, string[]>): Promise<void> {
-  await invoke<void>("plugin:prefs|set_item_order", { order });
+  await writePref("plugin:prefs|set_item_order", { order });
 }
 
 /**
@@ -675,7 +709,7 @@ export async function setItemOrder(order: Record<string, string[]>): Promise<voi
  * command's `order: Vec<String>` parameter.
  */
 export async function setBarItemsOrder(order: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_bar_items_order", { order });
+  await writePref("plugin:prefs|set_bar_items_order", { order });
 }
 
 /**
@@ -687,7 +721,7 @@ export async function setBarItemsOrder(order: string[]): Promise<void> {
  * (`items`) matches the Rust command's `items: Vec<String>` parameter.
  */
 export async function setHiddenBarItems(items: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_hidden_bar_items", { items });
+  await writePref("plugin:prefs|set_hidden_bar_items", { items });
 }
 
 /**
@@ -703,7 +737,7 @@ export async function setHiddenBarItems(items: string[]): Promise<void> {
  * only registers it. Device-local field: see {@link PrefsView.editor_toolbar_order}.
  */
 export async function setEditorToolbarOrder(order: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_toolbar_order", { order });
+  await writePref("plugin:prefs|set_editor_toolbar_order", { order });
 }
 
 /**
@@ -714,7 +748,7 @@ export async function setEditorToolbarOrder(order: string[]): Promise<void> {
  * (`items`) matches the Rust command's `items: Vec<String>` parameter.
  */
 export async function setEditorToolbarHidden(items: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_toolbar_hidden", { items });
+  await writePref("plugin:prefs|set_editor_toolbar_hidden", { items });
 }
 
 /**
@@ -726,7 +760,7 @@ export async function setEditorToolbarHidden(items: string[]): Promise<void> {
  * Rust command's `value: Option<String>` parameter.
  */
 export async function setRightPanelActiveTab(value: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_right_panel_active_tab", { value });
+  await writePref("plugin:prefs|set_right_panel_active_tab", { value });
 }
 
 /**
@@ -738,7 +772,7 @@ export async function setRightPanelActiveTab(value: string | null): Promise<void
  * Rust command's `items: Vec<String>` parameter.
  */
 export async function setRightPanelHiddenTabs(items: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_right_panel_hidden_tabs", { items });
+  await writePref("plugin:prefs|set_right_panel_hidden_tabs", { items });
 }
 
 /**
@@ -751,7 +785,7 @@ export async function setRightPanelHiddenTabs(items: string[]): Promise<void> {
  * `order: Vec<String>` parameter.
  */
 export async function setRightPanelTabOrder(order: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_right_panel_tab_order", { order });
+  await writePref("plugin:prefs|set_right_panel_tab_order", { order });
 }
 
 /**
@@ -761,7 +795,7 @@ export async function setRightPanelTabOrder(order: string[]): Promise<void> {
  * promise means the disk write failed and the caller's optimistic UI must revert.
  */
 export async function setFavorites(favorites: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_favorites", { order: favorites });
+  await writePref("plugin:prefs|set_favorites", { order: favorites });
 }
 
 /**
@@ -774,7 +808,7 @@ export async function setFavorites(favorites: string[]): Promise<void> {
  * state remains the source of truth until the next successful write.
  */
 export async function setEditorLayout(layout: EditorLayout): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_layout", { layout });
+  await writePref("plugin:prefs|set_editor_layout", { layout });
 }
 
 /**
@@ -787,7 +821,7 @@ export async function setEditorLayout(layout: EditorLayout): Promise<void> {
  * non-load-bearing cosmetic preference — no clamp, no in-flight gating.
  */
 export async function setTheme(theme: ThemeChoice | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_theme", { theme });
+  await writePref("plugin:prefs|set_theme", { theme });
 }
 
 /**
@@ -800,7 +834,7 @@ export async function setTheme(theme: ThemeChoice | null): Promise<void> {
  * non-load-bearing cosmetic preference — no clamp, no in-flight gating.
  */
 export async function setCustomTheme(customTheme: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_custom_theme", { customTheme });
+  await writePref("plugin:prefs|set_custom_theme", { customTheme });
 }
 
 /**
@@ -809,7 +843,7 @@ export async function setCustomTheme(customTheme: string | null): Promise<void> 
  * rejected promise means the disk write failed. Non-load-bearing.
  */
 export async function setDailyDateFormat(format: string): Promise<void> {
-  await invoke<void>("plugin:prefs|set_daily_date_format", { format });
+  await writePref("plugin:prefs|set_daily_date_format", { format });
 }
 
 /**
@@ -818,7 +852,7 @@ export async function setDailyDateFormat(format: string): Promise<void> {
  * `deliberate_folders` so it survives empty. Disk-first, no native side-effect.
  */
 export async function setDailyFolder(folder: string): Promise<void> {
-  await invoke<void>("plugin:prefs|set_daily_folder", { folder });
+  await writePref("plugin:prefs|set_daily_folder", { folder });
 }
 
 /**
@@ -828,7 +862,7 @@ export async function setDailyFolder(folder: string): Promise<void> {
  * failed.
  */
 export async function setDailyTemplate(templateId: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_daily_template", { templateId });
+  await writePref("plugin:prefs|set_daily_template", { templateId });
 }
 
 /**
@@ -848,8 +882,7 @@ export async function setNewNoteLocation(
   location: string | null,
   folder: string | null,
 ): Promise<void> {
-  await invoke<void>("plugin:prefs|set_new_note_location", { location, folder });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_new_note_location", { location, folder });
 }
 
 /**
@@ -863,8 +896,7 @@ export async function setStartupOpen(
   mode: string | null,
   note: string | null,
 ): Promise<void> {
-  await invoke<void>("plugin:prefs|set_startup_open", { mode, note });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_startup_open", { mode, note });
 }
 
 /**
@@ -876,7 +908,7 @@ export async function setStartupOpen(
  * means the disk write failed and the caller's optimistic UI must revert.
  */
 export async function setItemColors(colors: Record<string, string>): Promise<void> {
-  await invoke<void>("plugin:prefs|set_item_colors", { colors });
+  await writePref("plugin:prefs|set_item_colors", { colors });
 }
 
 /**
@@ -886,7 +918,7 @@ export async function setItemColors(colors: Record<string, string>): Promise<voi
  * order-irrelevant, no-native-side-effect contract as {@link setItemColors}.
  */
 export async function setFolderIcons(icons: Record<string, string>): Promise<void> {
-  await invoke<void>("plugin:prefs|set_folder_icons", { icons });
+  await writePref("plugin:prefs|set_folder_icons", { icons });
 }
 
 /**
@@ -902,12 +934,7 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
  * "cancel".
  */
 export async function setDeviceName(deviceIdHex: string, name: string): Promise<void> {
-  await invoke<void>("plugin:prefs|set_device_name", { deviceIdHex, name });
-  // Bump AFTER the IPC resolves (the standard chokepoint): every mounted
-  // `usePrefs` consumer re-reads, so the device list refreshes without its own
-  // reload path — and so does a name written during enrollment, which has no
-  // list on screen to refresh manually.
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_device_name", { deviceIdHex, name });
 }
 
 /**
@@ -932,7 +959,7 @@ export async function devicePlatform(): Promise<string> {
  * at rest — it never touches disk in plaintext except as this input.
  */
 export async function setVaultLabel(label: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|vault_set_label", { label });
+  await writePref("plugin:prefs|vault_set_label", { label });
 }
 
 /**
@@ -943,11 +970,11 @@ export async function setVaultLabel(label: string | null): Promise<void> {
  * (the write needs the active vault's `prefs_key`), backend atomic-writes
  * `vault.prefs` disk-first with no native side-effect, then refreshes the
  * per-session RAM icon cache so `vault_list` reflects the change immediately.
- * Like every other mobile prefs setter it does not self-notify — the caller
- * bumps the prefs nonce (`writePref` in the Settings sheet does both).
+ * Like every other mobile prefs setter it bumps the prefs nonce through
+ * {@link writePref}, so every mounted `usePrefs` re-reads.
  */
 export async function setVaultIcon(icon: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|vault_set_icon", { icon });
+  await writePref("plugin:prefs|vault_set_icon", { icon });
 }
 
 /**
@@ -967,7 +994,7 @@ export const PREFS_SYNC_APPLIED_EVENT = "myne://prefs-changed";
  * the write failed and the caller's optimistic UI must revert. Non-load-bearing.
  */
 export async function setSpellEnabled(enabled: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_spell_enabled", { enabled });
+  await writePref("plugin:prefs|set_spell_enabled", { enabled });
 }
 
 /**
@@ -978,7 +1005,7 @@ export async function setSpellEnabled(enabled: boolean): Promise<void> {
  * side-effect; a rejected promise means the disk write failed.
  */
 export async function setSpellLanguages(languages: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_spell_languages", { languages });
+  await writePref("plugin:prefs|set_spell_languages", { languages });
 }
 
 /**
@@ -1002,8 +1029,7 @@ export async function setKeymapBinding(
   commandId: string,
   chords: string[] | null,
 ): Promise<void> {
-  await invoke<void>("plugin:prefs|set_keymap_binding", { commandId, chords });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_keymap_binding", { commandId, chords });
 }
 
 /**
@@ -1020,8 +1046,7 @@ export async function setKeymapBinding(
  * setters).
  */
 export async function setShowNoteTimestamps(enabled: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_show_note_timestamps", { enabled });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_show_note_timestamps", { enabled });
 }
 
 /**
@@ -1034,8 +1059,7 @@ export async function setShowNoteTimestamps(enabled: boolean): Promise<void> {
  * chokepoint discipline as {@link setShowNoteTimestamps}. Non-load-bearing.
  */
 export async function setEditorTextSize(value: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_text_size", { value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_editor_text_size", { value });
 }
 
 /**
@@ -1044,8 +1068,7 @@ export async function setEditorTextSize(value: string | null): Promise<void> {
  * default. Same disk-first + nonce-bump contract as {@link setEditorTextSize}.
  */
 export async function setEditorLineSpacing(value: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_line_spacing", { value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_editor_line_spacing", { value });
 }
 
 /**
@@ -1054,8 +1077,7 @@ export async function setEditorLineSpacing(value: string | null): Promise<void> 
  * `"normal"` default. Same contract as {@link setEditorTextSize}.
  */
 export async function setEditorContentWidth(value: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_content_width", { value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_editor_content_width", { value });
 }
 
 /**
@@ -1064,8 +1086,7 @@ export async function setEditorContentWidth(value: string | null): Promise<void>
  * as {@link setEditorTextSize}.
  */
 export async function setEditorFontFamily(value: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_font_family", { value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_editor_font_family", { value });
 }
 
 /**
@@ -1078,8 +1099,7 @@ export async function setEditorFontFamily(value: string | null): Promise<void> {
  * — same chokepoint discipline as {@link setEditorTextSize}. Non-load-bearing.
  */
 export async function setEditorLineNumbers(value: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_line_numbers", { enabled: value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_editor_line_numbers", { enabled: value });
 }
 
 /**
@@ -1094,8 +1114,7 @@ export async function setEditorLineNumbers(value: boolean): Promise<void> {
  * Non-load-bearing.
  */
 export async function setArchiveDisabled(value: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_archive_disabled", { enabled: value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_archive_disabled", { enabled: value });
 }
 
 /**
@@ -1105,8 +1124,7 @@ export async function setArchiveDisabled(value: boolean): Promise<void> {
  * as {@link setEditorContentWidth}.
  */
 export async function setActiveWorkspace(value: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_active_workspace", { value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_active_workspace", { value });
 }
 
 /**
@@ -1115,8 +1133,7 @@ export async function setActiveWorkspace(value: string | null): Promise<void> {
  * contract as {@link setEditorContentWidth}.
  */
 export async function setEditorDefaultViewMode(value: string | null): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_default_view_mode", { value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_editor_default_view_mode", { value });
 }
 
 /**
@@ -1126,8 +1143,7 @@ export async function setEditorDefaultViewMode(value: string | null): Promise<vo
  * {@link setEditorLineNumbers}. Non-load-bearing.
  */
 export async function setEditorFocusDimInactive(value: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_focus_dim_inactive", { enabled: value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_editor_focus_dim_inactive", { enabled: value });
 }
 
 /**
@@ -1137,8 +1153,7 @@ export async function setEditorFocusDimInactive(value: boolean): Promise<void> {
  * contract as {@link setEditorLineNumbers}. Non-load-bearing.
  */
 export async function setEditorFocusTypewriter(value: boolean): Promise<void> {
-  await invoke<void>("plugin:prefs|set_editor_focus_typewriter", { enabled: value });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_editor_focus_typewriter", { enabled: value });
 }
 
 /**
@@ -1150,10 +1165,7 @@ export async function setEditorFocusTypewriter(value: boolean): Promise<void> {
  * write failed and the caller's optimistic UI must revert.
  */
 export async function upsertSavedView(view: SavedView): Promise<void> {
-  await invoke<void>("plugin:prefs|upsert_saved_view", { view });
-  // Post-mutation chokepoint: refresh every `usePrefs` consumer (e.g. the
-  // sidebar Views section) regardless of which surface saved the view.
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|upsert_saved_view", { view });
 }
 
 /**
@@ -1162,8 +1174,7 @@ export async function upsertSavedView(view: SavedView): Promise<void> {
  * success. Disk-first, no native side-effect.
  */
 export async function deleteSavedView(id: string): Promise<void> {
-  await invoke<void>("plugin:prefs|delete_saved_view", { id });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|delete_saved_view", { id });
 }
 
 /**
@@ -1173,6 +1184,5 @@ export async function deleteSavedView(id: string): Promise<void> {
  * caller's job (no backend GC). A rejected promise means the write failed.
  */
 export async function setViewOrder(order: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_view_order", { order });
-  bumpPrefsNonce();
+  await writePref("plugin:prefs|set_view_order", { order });
 }
