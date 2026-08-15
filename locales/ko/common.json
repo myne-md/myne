@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "다른 기기의 변경 사항은 내용 없는 신호를 통해 몇 초 내에 도착합니다 — 서버는 오직 “무언가 바뀌었다”만 전달하고, 무엇이 바뀌었는지는 절대 전달하지 않습니다. 볼트가 잠금 해제된 동안 앱은 어차피 정기적으로 서버를 확인하므로, 이 기능은 의미 있는 노출을 추가하지 않습니다; 설정할 것은 없습니다.",
       "realtimeSyncLabel": "실시간 동기화",
       "screenCaptureHelperOff": "보호는 잠금 해제 전에는 항상 적용됩니다. 잠금 해제 후에는 이 설정을 따릅니다.",
-      "screenCaptureHelperOn": "macOS 및 Windows 10(2020년 5월 업데이트 이상)에서 작동합니다. Linux 지원은 향후 출시 예정입니다.",
+      "screenCaptureHelperOn": "Windows 10(2020년 5월 업데이트) 이상에서 작동합니다. macOS와 Linux에는 이를 위한 시스템 API가 없어 해당 환경에서는 캡처를 막을 수 없습니다.",
       "screenCaptureLabel": "화면 캡처 방지",
       "screenCaptureSubtitle": "스크린샷 및 화면 녹화 차단",
       "screenshotBlocked": "화면 보호가 켜져 있습니다 — Myne의 스크린샷은 빈 화면으로 나옵니다.",
