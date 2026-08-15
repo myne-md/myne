@@ -2844,7 +2844,7 @@
       "autoLockSearchEmpty": "ਕੋਈ ਮਿਆਦ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ।",
       "autoLockSearchPlaceholder": "ਮਿਆਦਾਂ ਖੋਜੋ…",
       "screenCaptureHelperOff": "ਅਨਲਾਕ ਤੋਂ ਪਹਿਲਾਂ ਸੁਰੱਖਿਆ ਹਮੇਸ਼ਾ ਲਾਗੂ ਰਹਿੰਦੀ ਹੈ। ਅਨਲਾਕ ਤੋਂ ਬਾਅਦ ਇਹ ਪਸੰਦ ਲਾਗੂ ਹੁੰਦੀ ਹੈ।",
-      "screenCaptureHelperOn": "macOS ਅਤੇ Windows 10 (ਮਈ 2020 ਅੱਪਡੇਟ ਜਾਂ ਬਾਅਦ) ਉੱਤੇ ਸਰਗਰਮ। Linux ਸਮਰਥਨ ਕਿਸੇ ਅਗਲੀ ਰਿਲੀਜ਼ ਵਿੱਚ।",
+      "screenCaptureHelperOn": "Windows 10 (ਮਈ 2020 ਅੱਪਡੇਟ) ਅਤੇ ਬਾਅਦ ਉੱਤੇ ਕੰਮ ਕਰਦਾ ਹੈ। macOS ਅਤੇ Linux ਕੋਲ ਇਸ ਲਈ ਕੋਈ ਸਿਸਟਮ API ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਉੱਥੇ ਇਹ ਕੈਪਚਰ ਨਹੀਂ ਰੋਕ ਸਕਦਾ।",
       "screenCaptureLabel": "ਸਕਰੀਨ-ਕੈਪਚਰ ਸੁਰੱਖਿਆ",
       "screenCaptureSubtitle": "ਸਕਰੀਨਸ਼ਾਟ ਅਤੇ ਸਕਰੀਨ ਰਿਕਾਰਡਿੰਗ ਰੋਕੋ",
       "screenshotBlocked": "ਸਕਰੀਨ ਸੁਰੱਖਿਆ ਚਾਲੂ ਹੈ — Myne ਦੇ ਸਕਰੀਨਸ਼ਾਟ ਖਾਲੀ ਆਉਂਦੇ ਹਨ।",
