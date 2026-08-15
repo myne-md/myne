@@ -2844,7 +2844,7 @@
       "autoLockSearchEmpty": "کوئی دورانیہ مطابقت نہیں رکھتا۔",
       "autoLockSearchPlaceholder": "دورانیے تلاش کریں…",
       "screenCaptureHelperOff": "ان لاک سے پہلے تحفظ ہمیشہ لاگو رہتا ہے۔ ان لاک کے بعد یہ اسی ترجیح کے مطابق چلتا ہے۔",
-      "screenCaptureHelperOn": "macOS اور Windows 10 (مئی 2020 اپ ڈیٹ یا اس کے بعد) پر فعال۔ Linux کی معاونت آئندہ کسی ریلیز میں آئے گی۔",
+      "screenCaptureHelperOn": "Windows 10 (مئی 2020 اپ ڈیٹ) اور اس کے بعد مؤثر ہے۔ macOS اور Linux میں اس کے لیے کوئی سسٹم API نہیں، اس لیے وہاں یہ کیپچر نہیں روک سکتی۔",
       "screenCaptureLabel": "اسکرین کیپچر سے تحفظ",
       "screenCaptureSubtitle": "اسکرین شاٹ اور اسکرین ریکارڈنگ روکیں",
       "screenshotBlocked": "اسکرین تحفظ آن ہے — Myne کے اسکرین شاٹ خالی آتے ہیں۔",

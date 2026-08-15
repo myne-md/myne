@@ -2844,7 +2844,7 @@
       "autoLockSearchEmpty": "ไม่มีช่วงเวลาที่ตรงกัน",
       "autoLockSearchPlaceholder": "ค้นหาช่วงเวลา…",
       "screenCaptureHelperOff": "การป้องกันมีผลเสมอก่อนปลดล็อก หลังปลดล็อกจะเป็นไปตามค่าที่ตั้งไว้นี้",
-      "screenCaptureHelperOn": "ใช้งานได้บน macOS และ Windows 10 (May 2020 Update ขึ้นไป) การรองรับ Linux จะมาในรุ่นถัดไป",
+      "screenCaptureHelperOn": "ใช้งานได้บน Windows 10 (May 2020 Update) ขึ้นไป macOS และ Linux ไม่มี API ของระบบสำหรับสิ่งนี้ จึงไม่สามารถบล็อกการบันทึกหน้าจอได้",
       "screenCaptureLabel": "การป้องกันการจับภาพหน้าจอ",
       "screenCaptureSubtitle": "บล็อกภาพหน้าจอและการบันทึกหน้าจอ",
       "screenshotBlocked": "การป้องกันหน้าจอเปิดอยู่ — ภาพหน้าจอของ Myne จะออกมาว่างเปล่า",
