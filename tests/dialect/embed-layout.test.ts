@@ -33,6 +33,7 @@ import {
   emptyEmbedLayout,
   isAliasSafeText,
   parseEmbedAlias,
+  sanitizeAliasText,
   type EmbedLayout,
 } from "@myne/dialect/embedLayout";
 
@@ -318,6 +319,45 @@ describe("unknown keyed segments survive a round trip", () => {
     expect(isAliasSafeText("Figure [1]")).toBe(false);
     expect(isAliasSafeText("Figure [1] caption")).toBe(false);
     expect(isAliasSafeText("ends]]")).toBe(false);
+    // A line break is refused for a second reason: a cover value is spliced
+    // into a YAML frontmatter scalar, and `formatYamlScalar` quotes but does
+    // not escape one, so a raw newline opens a second physical line that the
+    // Rust line-scanning readers treat as a field of their own.
+    expect(isAliasSafeText("two\nlines")).toBe(false);
+    expect(isAliasSafeText("carriage\rreturn")).toBe(false);
+  });
+
+  it("sanitizes a filename the caller cannot fix, and only what breaks a reader", () => {
+    // The catalog is not a trusted source of alias-safe text: nothing rejects a
+    // `]` on attachment import or rename. An embed carrying one parses as ZERO
+    // spans, and attachment liveness is derived from those spans, so a cover
+    // whose filename has one makes its attachment read as unreferenced and
+    // `attachment_clean_unused` erases a blob the note still names.
+    expect(sanitizeAliasText("report[final].png")).toBe("report[final_.png");
+    expect(sanitizeAliasText("a]b.png")).toBe("a_b.png");
+    expect(sanitizeAliasText("photo\ntrashed: 2026-01-01T00:00:00Z")).toBe(
+      "photo_trashed: 2026-01-01T00:00:00Z",
+    );
+
+    // NOT sanitized, and each for a stated reason. A `|` is legal because an
+    // unkeyed segment rejoins the filename, which is what lets an attachment be
+    // called `re|port.png`; a `[` is harmless inside an alias; ordinary
+    // punctuation and non-ASCII are untouched.
+    expect(sanitizeAliasText("re|port.png")).toBe("re|port.png");
+    expect(sanitizeAliasText("写真 (1).png")).toBe("写真 (1).png");
+    expect(sanitizeAliasText("plain.png")).toBe("plain.png");
+  });
+
+  it("emits an alias that reads back, for every name the catalog can hold", () => {
+    // The round-trip property, asserted rather than documented. The spec used
+    // to record this hole as "one-sided" and leave it: the emitter interpolated
+    // a filename verbatim, so an attachment whose name contained a `]` could be
+    // written as a cover and then read back as no cover at all.
+    for (const name of ["a]b.png", "report[final].png", "re|port.png", "写真.png", "x\ny.png"]) {
+      const alias = emitEmbedAlias(sanitizeAliasText(name), emptyEmbedLayout());
+      expect(alias.includes("]"), `${name}: emitted alias must not contain ]`).toBe(false);
+      expect(parseEmbedAlias(alias).filename).toBe(sanitizeAliasText(name));
+    }
   });
 
   it("demonstrates the reader divergence a `]` causes", () => {

@@ -13,11 +13,22 @@
 // the failure mode the strictness exists to prevent.
 
 import { describe, expect, it } from "vitest";
-import { readCoverFromFmBody, readCoverValue } from "@myne/dialect";
+import { patchFrontmatterField, readCoverFromFmBody, readCoverValue } from "@myne/dialect";
+import { locateFrontmatter } from "../../src/dialect/lezer/frontmatter";
 import { MANAGED_FRONTMATTER_FIELDS } from "../../src/dialect/managedFields";
 
 const ID = "a".repeat(64);
 const ID2 = "0123456789abcdef".repeat(4);
+
+
+const encode = (s: string) => new TextEncoder().encode(s);
+const decode = (b: Uint8Array) => new TextDecoder().decode(b);
+/** The frontmatter BODY of a note, which is what `readCoverFromFmBody` takes. */
+function fmBodyOf(source: string): string {
+  const fm = locateFrontmatter(source);
+  if (fm === null) return "";
+  return source.slice(fm.bodyStart, fm.bodyEnd);
+}
 
 describe("readCoverValue — accepted forms", () => {
   it("reads the quoted on-disk form Myne writes", () => {
@@ -142,5 +153,39 @@ describe("readCoverFromFmBody", () => {
 describe("importer reject list", () => {
   it("carries cover, so an imported note cannot forge Myne's cover state", () => {
     expect(MANAGED_FRONTMATTER_FIELDS).toContain("cover");
+  });
+});
+
+describe("a managed key is anchored to column zero, so a nested one is untouched", () => {
+  // myne#321's bug class, on the one managed key most likely to be nested. The
+  // twelve existing managed fields have anchored READERS, and `cover:` rides
+  // the GENERIC writer, whose matcher was indent-tolerant. On the ordinary
+  // Jekyll / Hugo / Obsidian-SEO shape below, "Add cover" rewrote the user's
+  // nested value while the anchored reader still reported no cover: the banner
+  // never appeared, the offer stayed, and every retry destroyed the value
+  // again. "Remove cover" deleted their line outright.
+  const NESTED = ["---", "title: Post", "seo:", "  cover: hero.jpg", "---", "", "body"].join("\n");
+
+  it("writes a new top-level cover instead of editing the nested one", () => {
+    const out = decode(
+      patchFrontmatterField(encode(NESTED), "cover", '![[att:' + "a".repeat(64) + '|photo.png]]'),
+    );
+    expect(out).toContain("  cover: hero.jpg");
+    expect(out).toContain('cover: "![[att:');
+    // And the reader now sees the one the writer wrote.
+    expect(readCoverFromFmBody(fmBodyOf(out))).not.toBeNull();
+  });
+
+  it("does not delete a nested cover when the note has none of its own", () => {
+    const out = decode(patchFrontmatterField(encode(NESTED), "cover", null));
+    expect(out).toContain("  cover: hero.jpg");
+  });
+
+  it("still edits an indented value for an UNMANAGED key, which is the tolerant case", () => {
+    // The tolerance is right for an arbitrary user property, and narrowing it
+    // for every key would be a different bug. Only managed keys are anchored.
+    const src = ["---", "seo:", "  status: draft", "---", "", "b"].join("\n");
+    const out = decode(patchFrontmatterField(encode(src), "status", "final"));
+    expect(out).toContain("  status: final");
   });
 });

@@ -167,8 +167,9 @@ describe("editor host, per client", () => {
     // mount the same React picker over the same `attachment_import`, and the
     // seam member only carries the request from CodeMirror DOM into the shell.
     expect(host.cover).toBeDefined();
-    expect(typeof host.cover?.openPicker).toBe("function");
-    expect(typeof host.cover?.remove).toBe("function");
+    const cover = host.cover as Record<string, unknown>;
+    expect(typeof cover.openPicker).toBe("function");
+    expect(typeof cover.remove).toBe("function");
     // Attachment IO stays installed: the port is task 44, and until then these
     // reject as `NotPortedToWeb` — a modelled refusal, not a silent lie.
     const attachments = host.attachments as Record<string, unknown>;

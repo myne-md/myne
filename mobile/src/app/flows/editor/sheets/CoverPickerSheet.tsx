@@ -41,7 +41,7 @@ const STATE_STYLE: CSSProperties = {
   padding: "var(--space-5) 0",
   textAlign: "center",
   color: "var(--fg-3)",
-  fontSize: "0.875rem",
+  fontSize: "var(--text-base)",
 };
 
 /**
@@ -126,7 +126,7 @@ export function CoverPickerSheet({
             onClick={onRemove}
             style={{ marginLeft: "auto", background: "none", border: 0, color: "var(--fg-2)" }}
           >
-            {t("editor.cover.remove")}
+            {t("attachments.coverPicker.removeCover")}
           </button>
         )}
       </div>
