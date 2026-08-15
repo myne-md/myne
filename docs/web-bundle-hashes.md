@@ -110,6 +110,15 @@ The wasm artefact is not byte-identical across them, and because every JS chunk
 importing it is content-hashed, one differing artefact renames roughly a third
 of the bundle. Same tree, same commit, same Dockerfile — three hashes.
 
+A **second** build-environment input reached the bundle at the time these rows
+were measured and no longer does: `web/vite.config.ts` compiled the short commit
+in as `__BUILD_COMMIT__`, which the container build answered `"unknown"` (it has
+no `.git` and no `git`) while a local `pnpm web:build` answered with the real
+SHA. That define is pinned as of `decisions.md` 2026-08-15 (entry 0497), so the
+bundle now takes nothing from where or from which commit it was built. It does
+not close the gap this section is about — the wasm artefact still differs per
+host, and #228 owns that.
+
 **The `linux/amd64` row is the one that ships.** `app.example.com` runs on an
 x86_64 host and the image is built on that host's own daemon, so amd64 is what
 `/version.json` will report. The other two are left in place rather than edited

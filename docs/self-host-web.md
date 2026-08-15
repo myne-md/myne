@@ -112,6 +112,15 @@ something you can check.
    record, which also carries a container-based recipe for reproducing a row
    from scratch.
 
+   **Use that container recipe if you want a comparison that can match.** The
+   published rows are container builds, and the bundle is not yet byte-identical
+   across build hosts — a local `pnpm web:build` on a different OS or CPU
+   architecture produces a different hash from the same commit
+   ([#228](https://github.com/myne-md/myne/issues/228), and the record's own
+   "three rows for one commit" section shows it measured). Step 2 is still the
+   right way to build a bundle to *serve*; it is the wrong way to build one to
+   *compare*, and the two were not distinguished here before.
+
 A match means the bundle you are about to serve is the one built from the source
 you just read. A mismatch means it is not, and that is worth stopping for.
 
