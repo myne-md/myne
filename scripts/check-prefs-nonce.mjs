@@ -77,7 +77,6 @@ const ROOT = new URL("..", import.meta.url).pathname;
 // can fall behind SCANNED_TREES, which is a silent narrowing rather than a silent
 // widening, and `tests/lib/prefsNonce.test.ts` asserts both rosters by name.
 export const PREFS_MODULES = ["src/lib/prefs.ts", "mobile/src/lib/prefs.ts"];
-const PREFS_MODULE_LIST = PREFS_MODULES.join(", ");
 
 // Prefs commands that only READ. They invalidate nothing, so they need no bump
 // and may be invoked directly.
@@ -120,8 +119,7 @@ export const READ_COMMANDS = new Set([
 // still prints `ok`. `shared-roots.mjs` calls itself "the single place that
 // would notice", and noticing only works if an importer acts on it, which is why
 // `analyse` turns a missing root into a failure rather than into a smaller walk.
-const { present: SCANNED_TREES_PRESENT, missing: SCANNED_TREES_MISSING } = presentSharedRoots();
-export const SCANNED_TREES = SCANNED_TREES_PRESENT;
+export const { present: SCANNED_TREES, missing: SCANNED_TREES_MISSING } = presentSharedRoots();
 
 // `writePref(` is optional in the pattern and mandatory in the rule: any prefs
 // literal NOT sitting as writePref's first argument is the violation.
@@ -163,6 +161,13 @@ function* walk(dir) {
  * same reason, as `scripts/check-web-command-coverage.mjs`: a spec that
  * reimplemented the scan could pass while the script failed, or agree with a bug.
  *
+ * `missingTrees` injects the absent-root list for the same reason `prefsSource`
+ * injects module text: the rule that turns a vanished shared tree into a failure
+ * is otherwise unreachable from a spec, because every shared root IS on disk, so
+ * the only way to see it fire would be to delete one for real. A rule nobody has
+ * watched fail is a rule nobody has tested, and this one exists precisely to
+ * catch a silent narrowing.
+ *
  * `prefsSource` injects one prefs module's own text so a spec can drive the
  * MATCHER over the evasion shapes without a fixture the real run would then have
  * to exempt. When given it REPLACES the real modules for rule 1 (one virtual
@@ -171,14 +176,17 @@ function* walk(dir) {
  * trees happen to be clean today. Rule 2's own coverage comes from the
  * no-argument call, which is what the real run makes.
  */
-export function analyse({ prefsSource } = {}) {
+export function analyse({ prefsSource, missingTrees } = {}) {
   const failures = [];
+  // Asked once, at the top. The two spellings of this question used to sit 40
+  // lines apart and a reader had to hold "is this the real run or the spec run?"
+  // across the whole function.
+  const injected = prefsSource !== undefined;
 
   // ---- rule 1: inside each prefs module, writes go through writePref -------
-  const modules =
-    prefsSource === undefined
-      ? PREFS_MODULES.map((rel) => [rel, readFileSync(join(ROOT, rel), "utf8")])
-      : [["(injected source)", prefsSource]];
+  const modules = injected
+    ? [["(injected source)", prefsSource]]
+    : PREFS_MODULES.map((rel) => [rel, readFileSync(join(ROOT, rel), "utf8")]);
 
   for (const [rel, prefsSrc] of modules) {
     // Whole-file, not line-by-line: `writePref(\n  "plugin:prefs|…"` spans lines,
@@ -193,7 +201,7 @@ export function analyse({ prefsSource } = {}) {
         file: rel,
         line: lineOf(prefsSrc, m.index),
         command,
-        why: `invokes a prefs write command directly. Route it through ${rel}'s writePref(), which bumps the nonce. usePrefs siblings only re-read on that bump, so without it the open editor keeps the old value for the rest of the session.`,
+        why: `invokes a prefs write command directly. Route it through the writePref() in this client's prefs module (${PREFS_MODULES.join(", ")}), which bumps the nonce. usePrefs siblings only re-read on that bump, so without it the open editor keeps the old value for the rest of the session.`,
       });
     }
 
@@ -207,17 +215,20 @@ export function analyse({ prefsSource } = {}) {
     }
   }
 
+  // The injected run stops here. Rule 2 is skipped by design (see the docstring),
+  // and `writes` is a count over the REAL modules, so returning it for a virtual
+  // one would be a number about nothing. The specs assert on `failures`.
+  if (injected) return { failures, writes: 0 };
+
   const writes = modules.reduce(
     (n, [, src]) => n + (src.match(/await writePref\(/g) ?? []).length,
     0,
   );
 
-  if (prefsSource !== undefined) return { failures, writes };
-
   // A shared root that is not on disk means rule 2 is about to scan less than it
   // claims. Reported as a failure rather than skipped: "scanned fewer trees, said
   // ok" is the exact shape this guard's private roster copy used to have.
-  for (const rel of SCANNED_TREES_MISSING) {
+  for (const rel of missingTrees ?? SCANNED_TREES_MISSING) {
     failures.push({
       file: rel,
       line: 0,
@@ -242,7 +253,7 @@ export function analyse({ prefsSource } = {}) {
           file: rel,
           line: lineOf(src, hit.index),
           command,
-          why: `invokes a prefs write from outside a prefs module (${PREFS_MODULE_LIST}). Add a wrapper in the one for this client's tree instead. Reaching around the module reaches around the nonce bump.`,
+          why: `invokes a prefs write from outside a prefs module (${PREFS_MODULES.join(", ")}). Add a wrapper in the one for this client's tree instead. Reaching around the module reaches around the nonce bump.`,
         });
       }
     }

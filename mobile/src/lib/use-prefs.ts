@@ -108,11 +108,13 @@ export function usePrefs(): UsePrefs {
   const load = useCallback(async () => {
     const mine = ++request.current;
     const superseded = () => mine !== request.current;
+    // No token check here, deliberately: nothing between the increment above
+    // and this branch awaits or yields, so `superseded()` is provably false and
+    // a guard would read as a race that cannot happen. The token exists for the
+    // three sites after `await prefsRead()`.
     if (!HAS_TAURI) {
-      if (!superseded()) {
-        setPrefs(DEFAULT_PREFS);
-        setLoading(false);
-      }
+      setPrefs(DEFAULT_PREFS);
+      setLoading(false);
       return;
     }
     setError(false);

@@ -22,8 +22,8 @@
 // reimplemented the scan could pass while the script failed, or agree with a bug.
 
 import { describe, expect, it } from "vitest";
-// @ts-expect-error: a .mjs guard script with no type declarations; the import
-// is the point (see the header), not the typing.
+// A .mjs guard script with no type declarations; the import is the point (see
+// the header), not the typing, so every symbol is re-typed below.
 import {
   analyse as analyseUntyped,
   PREFS_MODULES as PREFS_MODULES_UNTYPED,
@@ -38,7 +38,10 @@ interface PrefsReport {
   failures: { file: string; line: number; command: string; why: string }[];
   writes: number;
 }
-const analyse = analyseUntyped as (opts?: { prefsSource?: string }) => PrefsReport;
+const analyse = analyseUntyped as (opts?: {
+  prefsSource?: string;
+  missingTrees?: string[];
+}) => PrefsReport;
 
 /** The five shapes, all of which type-check and all of which are violations. */
 const EVASIONS = [
@@ -109,5 +112,24 @@ describe("the prefs-nonce guard", () => {
     const { failures } = analyse({ prefsSource: "// no chokepoint here\n" });
     expect(failures).toHaveLength(1);
     expect(failures[0].command).toBe("(none)");
+  });
+
+  it("fails on a shared tree that is on the roster and not on disk", () => {
+    // The narrowing this rule exists to catch: rule 2 walks `SCANNED_TREES`, so
+    // a root that vanishes makes the scan cover less while the success line
+    // still reads `ok`. Every shared root IS on disk, so the only way to watch
+    // this fire is to inject the absent list, which is why `analyse` takes it.
+    const { failures } = analyse({ missingTrees: ["ghost/src"] });
+    const missing = failures.filter((f) => f.command === "(missing tree)");
+    expect(missing).toHaveLength(1);
+    expect(missing[0].file).toBe("ghost/src");
+    expect(missing[0].why).toContain("scan one tree fewer");
+  });
+
+  it("reports no missing tree for the real roster, which is the claim it makes", () => {
+    // The other direction, and the one that would rot silently: an injected
+    // failure proves the rule can fire, not that it is quiet when it should be.
+    const { failures } = analyse();
+    expect(failures.filter((f) => f.command === "(missing tree)")).toEqual([]);
   });
 });

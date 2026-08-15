@@ -14,7 +14,22 @@ import { useSyncExternalStore } from "react";
 
 let nonce = 0;
 let flushScheduled = false;
+let batchDepth = 0;
+let bumpedWhileBatched = false;
 const listeners = new Set<() => void>();
+
+function scheduleFlush(): void {
+  if (flushScheduled) return;
+  flushScheduled = true;
+  queueMicrotask(() => {
+    // Reset AFTER notifying: a re-entrant `bumpPrefsNonce()` from inside a
+    // listener is then absorbed into THIS flush (the latest nonce is already
+    // observable via getPrefsNonce) instead of scheduling a second microtask,
+    // preserving the "synchronous burst collapses to one" invariant.
+    for (const listener of listeners) listener();
+    flushScheduled = false;
+  });
+}
 
 /**
  * Advance the prefs-changed nonce. MUST be called only at the post-mutation
@@ -22,16 +37,41 @@ const listeners = new Set<() => void>();
  */
 export function bumpPrefsNonce(): void {
   nonce += 1;
-  if (flushScheduled) return;
-  flushScheduled = true;
-  queueMicrotask(() => {
-    // Reset AFTER notifying: a re-entrant `bumpPrefsNonce()` from inside a
-    // listener is then absorbed into THIS flush (the latest nonce is already
-    // observable via getPrefsNonce) instead of scheduling a second microtask —
-    // preserving the "synchronous burst collapses to one" invariant.
-    for (const listener of listeners) listener();
-    flushScheduled = false;
-  });
+  if (batchDepth > 0) {
+    bumpedWhileBatched = true;
+    return;
+  }
+  scheduleFlush();
+}
+
+/**
+ * Run a multi-write user action as ONE nonce advance.
+ *
+ * The microtask coalescing above only collapses a SYNCHRONOUS burst. A user
+ * action that awaits between writes gets one flush per write, and each flush
+ * re-runs the `[load, nonce]` effect in every mounted `usePrefs`, where a read
+ * is a full backend round-trip: read `vault.meta`, derive the prefs subkey,
+ * decrypt `vault.prefs`, deserialize. A folder rename writes
+ * `deliberate_folders`, `archived_folders`, `item_colors` and `folder_icons`
+ * in sequence, so it cost up to four advances times the number of mounted
+ * hooks, and the newest read discards the rest after paying for them.
+ *
+ * The nonce still increments per write, so it stays monotonic and no subscriber
+ * can observe a value that skipped a change. Only the NOTIFY is deferred, once,
+ * to the end. Nested calls are counted, and a throw inside `fn` still flushes
+ * whatever landed before it.
+ */
+export async function withPrefsBatch<T>(fn: () => Promise<T>): Promise<T> {
+  batchDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    batchDepth -= 1;
+    if (batchDepth === 0 && bumpedWhileBatched) {
+      bumpedWhileBatched = false;
+      scheduleFlush();
+    }
+  }
 }
 
 /** Subscribe to nonce advances; returns an unsubscribe fn. */
@@ -56,5 +96,7 @@ export function usePrefsNonce(): number {
 export function __resetPrefsNonceForTest(): void {
   nonce = 0;
   flushScheduled = false;
+  batchDepth = 0;
+  bumpedWhileBatched = false;
   listeners.clear();
 }
