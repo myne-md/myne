@@ -1855,7 +1855,7 @@ Used in: `decisions.md` 2026-06-18; `agent-tooling/features/scheduled-local-back
 
 ### **screen-capture protection** &nbsp; 📦 *Product*
 
-Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (macOS `NSWindowSharingNone`, Windows `WDA_EXCLUDEFROMCAPTURE`). Platform support: macOS (all Tauri-supported versions), Windows 10 build 19041+. Unavailable on Linux v0.1.
+Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (Windows `WDA_EXCLUDEFROMCAPTURE`, macOS `NSWindowSharingNone`). **Effective on Windows 10 build 19041+ only.** The macOS call is still made but nothing is claimed for it — Apple documents `NSWindowSharingNone` as a legacy constant macOS no longer uses and states no public API exists for preventing screen capture. No Linux display server offers an application-requestable exclusion; on KDE Plasma 6.6+ and Hyprland 0.50+ the **user** can configure one as a window rule. `decisions.md` 2026-08-15 supersedes the macOS clause of 2026-05-27.
 
 Used in: `threat-model.md` §6, §7
 

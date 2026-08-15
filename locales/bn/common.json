@@ -2844,7 +2844,7 @@
       "autoLockSearchEmpty": "কোনও সময়সীমা মেলেনি।",
       "autoLockSearchPlaceholder": "সময়সীমা খুঁজুন…",
       "screenCaptureHelperOff": "আনলকের আগে সুরক্ষা সবসময়ই কাজ করে। আনলকের পর এই পছন্দটি মেনে চলে।",
-      "screenCaptureHelperOn": "macOS আর Windows 10-এ (May 2020 Update বা তার পরে) সক্রিয়। Linux সমর্থন পরের কোনও রিলিজে আসছে।",
+      "screenCaptureHelperOn": "Windows 10-এ (May 2020 Update) ও তার পরে কার্যকর। macOS আর Linux-এ এর জন্য কোনও সিস্টেম API নেই, তাই সেখানে এটি ক্যাপচার আটকাতে পারে না।",
       "screenCaptureLabel": "স্ক্রিন-ক্যাপচার সুরক্ষা",
       "screenCaptureSubtitle": "স্ক্রিনশট ও স্ক্রিন রেকর্ডিং আটকান",
       "screenshotBlocked": "স্ক্রিন সুরক্ষা চালু আছে — Myne-এর স্ক্রিনশট ফাঁকা আসে।",

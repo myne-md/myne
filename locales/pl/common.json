@@ -3026,7 +3026,7 @@
       "realtimeSyncHelper": "Zmiany z innych urządzeń docierają w ciągu kilku sekund przez sygnał bez treści — serwer przekazuje tylko „coś się zmieniło”, nigdy co. Gdy sejf jest odblokowany, aplikacja i tak regularnie sprawdza serwer, więc nie zwiększa to znacząco widoczności; nie ma nic do skonfigurowania.",
       "realtimeSyncLabel": "Synchronizacja w czasie rzeczywistym",
       "screenCaptureHelperOff": "Ochrona zawsze obowiązuje przed odblokowaniem. Po odblokowaniu stosuje się ta preferencja.",
-      "screenCaptureHelperOn": "Aktywne w systemach macOS i Windows 10 (aktualizacja z maja 2020 lub nowsza). Obsługa systemu Linux pojawi się w przyszłym wydaniu.",
+      "screenCaptureHelperOn": "Działa w systemie Windows 10 (aktualizacja z maja 2020) i nowszym. macOS i Linux nie udostępniają do tego systemowego API, więc tam przechwytywania nie da się zablokować.",
       "screenCaptureLabel": "Ochrona przed przechwytywaniem ekranu",
       "screenCaptureSubtitle": "Blokuj zrzuty ekranu i nagrywanie ekranu",
       "screenshotBlocked": "Ochrona ekranu jest włączona — zrzuty ekranu Myne wychodzą puste.",

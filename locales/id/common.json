@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Perubahan dari perangkat lain tiba dalam hitungan detik melalui sinyal tanpa konten — server hanya meneruskan “ada yang berubah”, tidak pernah apa yang berubah. Selama brankas Anda tidak terkunci, aplikasi tetap memeriksa server secara berkala, jadi ini tidak menambah visibilitas berarti; tidak ada yang perlu dikonfigurasi.",
       "realtimeSyncLabel": "Sinkronisasi waktu nyata",
       "screenCaptureHelperOff": "Perlindungan selalu berlaku sebelum buka kunci. Setelah buka kunci, mengikuti preferensi ini.",
-      "screenCaptureHelperOn": "Aktif di macOS dan Windows 10 (Pembaruan Mei 2020 atau lebih baru). Dukungan Linux akan hadir di rilis mendatang.",
+      "screenCaptureHelperOn": "Berlaku di Windows 10 (Pembaruan Mei 2020) dan yang lebih baru. macOS dan Linux tidak menyediakan API sistem untuk ini, jadi di sana pengaturan ini tidak dapat memblokir perekaman.",
       "screenCaptureLabel": "Perlindungan tangkapan layar",
       "screenCaptureSubtitle": "Blokir tangkapan layar dan perekaman layar",
       "screenshotBlocked": "Perlindungan layar aktif — tangkapan layar Myne akan kosong.",

@@ -40,12 +40,25 @@
 //!
 //! ## Platform support
 //!
-//! Per tao 0.34.x (Tauri's underlying window crate):
+//! Per tao 0.35.x (Tauri's underlying window crate). Note the split
+//! between "the call is made" and "the call protects anything" — they
+//! are the same on Windows and NOT the same on macOS:
 //!
-//! - **macOS** + **Windows 10 build 19041+**: real call to the OS API
-//!   (`NSWindowSharingNone` / `WDA_EXCLUDEFROMCAPTURE`). Older Windows
-//!   builds silently no-op because the tao Windows arm discards the
+//! - **Windows 10 build 19041+**: real call, real effect. The window is
+//!   excluded from every capture path DWM composes. Older Windows
+//!   builds silently degrade to `WDA_MONITOR` (black box, not
+//!   exclusion) because the tao Windows arm discards the
 //!   `SetWindowDisplayAffinity` return BOOL.
+//! - **macOS**: real call (`setSharingType(NSWindowSharingType::None)`),
+//!   **no protection claimed**. Apple documents `NSWindowSharingNone` as
+//!   "a legacy constant that macOS no longer uses" and says not to use
+//!   it to hide content from capture; DTS states no public API exists
+//!   for this. The call stays because it still has an effect on some
+//!   paths and costs nothing, but nothing may be claimed for it — see
+//!   `threat-model.md` §6 and `decisions.md` 2026-08-15, which
+//!   supersedes the macOS clause of 2026-05-27. The constant is NOT
+//!   formally deprecated, so nothing in the build will ever warn about
+//!   this; the docs are the only mechanism.
 //! - **iOS / Android / Linux**: compile-time no-op
 //!   (`#[cfg(any(macos, windows))]` gate in tao). Tauri returns
 //!   `Ok(())` on Linux regardless, so the Linux warn must be
@@ -70,8 +83,9 @@ use tauri::Manager;
 /// `tauri.conf.json` declares `"visible": false` on the main window so
 /// this function owns the only `show()` call — the load-bearing chain
 /// is `visible: false` → `set_content_protected(true)` → `show()`, which
-/// structurally guarantees the first frame is protected on macOS and
-/// Windows 10 build 19041+.
+/// structurally guarantees the first frame is protected on Windows 10
+/// build 19041+. The same chain runs on macOS, where the call is made
+/// and no protection is claimed (see the module docs).
 pub fn init(app: &tauri::App) -> Result<(), tauri::Error> {
     let window = app
         .get_webview_window("main")
