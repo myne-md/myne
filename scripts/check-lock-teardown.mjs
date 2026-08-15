@@ -89,10 +89,19 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { existsSync } from "node:fs";
+import { RUST_CLIENT_TREES } from "./lib/shared-roots.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
-/** The three clients that implement `VaultLifecycleHooks` for real. */
+/**
+ * The three clients that implement `VaultLifecycleHooks` for real.
+ *
+ * `cli/src` and `tor-sidecar/src` are Rust client trees and are deliberately
+ * absent: neither opens a vault, so neither implements the seam. That is why
+ * this is its own roster rather than `RUST_CLIENT_TREES` itself, and why the
+ * claim checked below runs in ONE direction.
+ */
 const CLIENTS = [
   { name: "desktop", tree: "src-tauri/src", hooksFile: "src-tauri/src/hooks.rs" },
   { name: "mobile", tree: "mobile/src-tauri/src", hooksFile: "mobile/src-tauri/src/hooks.rs" },
@@ -106,6 +115,14 @@ const CLIENTS = [
  * `state` holders are matched by type name; `command` holders by the name of
  * the only writer the client would have to expose to hold anything.
  */
+/**
+ * What a teardown-shaped hook name looks like on the seam.
+ *
+ * Deliberately a shape rather than a list: the point of deriving from the trait
+ * is that a hook added tomorrow is covered without anyone remembering this file.
+ */
+const TEARDOWN_SHAPE = /^(zeroize_|clear_|abort_)|_teardown_on_lock$/;
+
 const PAIRS = [
   { hook: "zeroize_search_index", holder: { kind: "state", type: "SearchIndexState" } },
   { hook: "zeroize_spell", holder: { kind: "state", type: "SpellState" } },
@@ -129,18 +146,20 @@ const ALLOWLIST = new Map([
   // ["mobile/zeroize_spell", "reason the empty body is correct despite a holder"],
 ]);
 
-function walk(dir) {
-  const out = [];
+const SKIP_DIRS = new Set(["target", "gen", "node_modules", ".git"]);
+
+function walk(dir, out = []) {
   let entries;
   try {
-    entries = readdirSync(dir);
+    entries = readdirSync(dir, { withFileTypes: true });
   } catch {
     return out;
   }
-  for (const name of entries) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) out.push(...walk(full));
-    else if (full.endsWith(".rs")) out.push(full);
+  for (const entry of entries) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, out);
+    else if (entry.name.endsWith(".rs")) out.push(full);
   }
   return out;
 }
@@ -175,8 +194,65 @@ function hooksImplBlock(stripped) {
   return bodyAt(stripped, m.index);
 }
 
+// A tree that does not exist scans zero files, finds zero empty bodies, and
+// reports ok. That is the shape every roster in this repo has failed by, so the
+// paths are checked against the one Rust-client roster and against the disk
+// before anything else runs. One direction only: a client here must be a known
+// Rust client tree, but not every Rust client tree implements the seam.
+{
+  const unknown = CLIENTS.filter((c) => !RUST_CLIENT_TREES.includes(c.tree));
+  const absent = CLIENTS.filter((c) => !existsSync(join(ROOT, c.hooksFile)));
+  for (const c of unknown) {
+    console.error(
+      `check-lock-teardown: ${c.name} names the tree ${c.tree}, which is not in ` +
+        `RUST_CLIENT_TREES (scripts/lib/shared-roots.mjs). A tree nothing knows about ` +
+        `is a tree this guard would scan and find nothing in.`,
+    );
+  }
+  for (const c of absent) {
+    console.error(
+      `check-lock-teardown: ${c.name}'s hooks file ${c.hooksFile} is not on disk. ` +
+        `Renamed or moved: the guard would report ok having read nothing.`,
+    );
+  }
+  if (unknown.length || absent.length) process.exit(1);
+}
+
+// PAIRS is a hand-written roster and the success line counts it. Counted against
+// itself that is a roster compared against a second copy of itself: a teardown
+// hook added to `VaultLifecycleHooks` would be covered by nothing while the line
+// still read "every held state is torn down". The trait is the source, and the
+// two are compared in BOTH directions.
+{
+  const traitSrc = readFileSync(join(ROOT, "core/src/hooks.rs"), "utf8");
+  const declared = new Set(
+    [...traitSrc.matchAll(/^\s*fn\s+([a-z0-9_]+)\s*\(&self\)\s*;/gm)]
+      .map((m) => m[1])
+      .filter((n) => TEARDOWN_SHAPE.test(n)),
+  );
+  const covered = new Set(PAIRS.map((row) => row.hook));
+  const uncovered = [...declared].filter((n) => !covered.has(n));
+  const phantom = [...covered].filter((n) => !declared.has(n));
+  for (const n of uncovered) {
+    console.error(
+      `check-lock-teardown: \`${n}\` is a teardown-shaped hook on VaultLifecycleHooks ` +
+        `and has no PAIRS row, so no client is checked for it. Add a row naming the state ` +
+        `it tears down, or rename it if it is not a teardown.`,
+    );
+  }
+  for (const n of phantom) {
+    console.error(
+      `check-lock-teardown: PAIRS has a row for \`${n}\`, which VaultLifecycleHooks no longer ` +
+        `declares. A row for a hook nobody implements passes forever.`,
+    );
+  }
+  if (uncovered.length || phantom.length) process.exit(1);
+}
+
 const findings = [];
 const notes = [];
+/** ALLOWLIST keys that actually suppressed a finding this run. */
+const exercised = new Set();
 
 for (const client of CLIENTS) {
   const hooksPath = join(ROOT, client.hooksFile);
@@ -187,7 +263,7 @@ for (const client of CLIENTS) {
     findings.push({
       client: client.name,
       hook: "(impl)",
-      detail: `${client.hooksFile} is unreadable — the client's VaultLifecycleHooks impl was expected here`,
+      detail: `${client.hooksFile} is unreadable. The client's VaultLifecycleHooks impl was expected here`,
     });
     continue;
   }
@@ -211,10 +287,25 @@ for (const client of CLIENTS) {
   for (const { hook, holder } of PAIRS) {
     let heldBy = null;
     if (holder.kind === "state") {
-      const manage = new RegExp(`\\bmanage\\s*\\(\\s*[A-Za-z0-9_:]*\\b${holder.type}::default\\s*\\(`);
+      // The TYPE anywhere inside a `manage(` argument, not one constructor
+      // spelling. The narrow form matched `manage(X::default()` only, so the
+      // ordinary refactor `let s = X::default(); app.manage(s);` disarmed the
+      // row and the myne#454 defect passed green. Still anchored on `manage(`,
+      // which is what keeps a test-local construction from counting as holding.
+      const manage = new RegExp(`\\bmanage\\s*\\([^;]*\\b${holder.type}\\b`);
+      // The let-binding form, where the type is on the binding and an ident is
+      // what reaches `manage(`. Matched per FILE rather than per line, because
+      // the two can be lines apart.
+      const bound = new RegExp(
+        `\\b(?:let|static|const)\\s+[A-Za-z0-9_]+\\s*(?::[^=;]*)?=\\s*[A-Za-z0-9_:]*\\b${holder.type}\\b[^;]*;`,
+      );
       const once = new RegExp(`OnceLock\\s*<\\s*${holder.type}\\s*>`);
       for (const f of treeSources) {
-        if (manage.test(f.text) || once.test(f.text)) {
+        if (
+          manage.test(f.text) ||
+          once.test(f.text) ||
+          (bound.test(f.text) && /\bmanage\s*\(/.test(f.text))
+        ) {
           heldBy = f.rel;
           break;
         }
@@ -252,7 +343,8 @@ for (const client of CLIENTS) {
 
     const key = `${client.name}/${hook}`;
     if (ALLOWLIST.has(key)) {
-      notes.push(`  allowed: ${key} — ${ALLOWLIST.get(key)}`);
+      notes.push(`  allowed: ${key}: ${ALLOWLIST.get(key)}`);
+      exercised.add(key);
       continue;
     }
 
@@ -268,12 +360,16 @@ for (const client of CLIENTS) {
 for (const key of ALLOWLIST.keys()) {
   const [client, hook] = key.split("/");
   const stillFailing = findings.some((f) => f.client === client && f.hook === hook);
-  const stillNoted = notes.some((n) => n.includes(key));
+  // The KEY, not a substring of the formatted note. Matching on the printed
+  // string made the console wording load-bearing logic: rewording the note
+  // silently turned the stale check off, and a key that is a prefix of another
+  // matched the wrong one.
+  const stillNoted = exercised.has(key);
   if (!stillFailing && !stillNoted) {
     findings.push({
       client,
       hook,
-      detail: `stale ALLOWLIST entry — this pair no longer needs an exemption; remove it`,
+      detail: `stale ALLOWLIST entry: this pair no longer needs an exemption, remove it`,
     });
   }
 }
@@ -281,7 +377,7 @@ for (const key of ALLOWLIST.keys()) {
 if (findings.length > 0) {
   console.error("check-lock-teardown: a client leaves a lock-teardown hook empty while holding its state.\n");
   for (const f of findings) {
-    console.error(`  ${f.client}: ${f.hook} — ${f.detail}`);
+    console.error(`  ${f.client}: ${f.hook}: ${f.detail}`);
   }
   console.error(
     "\nA vault that stays in RAM after lock mixes into the next vault to unlock and keeps\n" +
@@ -295,5 +391,5 @@ if (findings.length > 0) {
 
 for (const n of notes) console.log(n);
 console.log(
-  `check-lock-teardown: OK — ${CLIENTS.length} clients, ${PAIRS.length} teardown hooks, every held state is torn down.`,
+  `check-lock-teardown: OK: ${CLIENTS.length} clients, ${PAIRS.length} teardown hooks, every held state is torn down.`,
 );

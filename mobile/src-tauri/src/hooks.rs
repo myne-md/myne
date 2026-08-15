@@ -118,9 +118,20 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     // force-relock), so the client supplies the bodies and only the bodies.
     // Empty, a lock left the prior vault's index in RAM and mobile's additive
     // re-seed stacked the next vault's records on top of it.
+    // The `else` arms are not decoration. A wipe that reaches nothing is the
+    // same defect as an empty body wearing a body, and it is invisible to
+    // `scripts/check-lock-teardown.mjs`, which can only see that a body is
+    // non-empty. If the state stops being managed under this exact type, the
+    // teardown silently stops happening and the log stays clean, which is
+    // precisely how myne#454 survived. Static tag only, no vault content
+    // (`src-tauri/CLAUDE.md` "Secret-handling logging discipline").
     fn zeroize_search_index(&self) {
-        if let Some(search) = self.app.try_state::<myne_core::search::SearchIndexState>() {
-            search.clear();
+        match self.app.try_state::<myne_core::search::SearchIndexState>() {
+            Some(search) => search.clear(),
+            None => tracing::warn!(
+                event = "lock_teardown_state_absent",
+                hook = "zeroize_search_index"
+            ),
         }
     }
     fn zeroize_spell(&self) {}
@@ -128,19 +139,27 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
         // No AI arm, unlike the desktop twin: mobile `local_inference` is
         // transcription-only (no embedding role), so there is no vector store
         // to wipe on this leg.
-        if let Some(indices) = self
+        match self
             .app
             .try_state::<crate::plugins::vault_indices::VaultIndicesState>()
         {
-            indices.clear();
+            Some(indices) => indices.clear(),
+            None => tracing::warn!(
+                event = "lock_teardown_state_absent",
+                hook = "zeroize_vault_indices"
+            ),
         }
     }
     fn zeroize_attachment_refs(&self) {
-        if let Some(refs) = self
+        match self
             .app
             .try_state::<crate::plugins::attachments::AttachmentRefsState>()
         {
-            refs.clear();
+            Some(refs) => refs.clear(),
+            None => tracing::warn!(
+                event = "lock_teardown_state_absent",
+                hook = "zeroize_attachment_refs"
+            ),
         }
     }
     fn abort_active_recording(&self) {}
