@@ -46,6 +46,16 @@ note / recording sheet after unlock. No JS changed for Android.
    (a library manifest cannot attach meta-data to the app's activity). The
    widget receivers + tile service need no injection: this module's own
    `AndroidManifest.xml` merges in via the Gradle manifest merger.
+
+   That merge is also why this module carries **two non-widget attributes**:
+   `android:dataExtractionRules` + `android:fullBackupContent` on `<application>`
+   (with `res/xml/myne_backup_rules*.xml`), which keep the plaintext export
+   directory out of Auto Backup and device transfer — myne-md/myne#491. They live
+   here because `update_android_manifest` injects **child elements only** and
+   cannot write an attribute, and because `src-tauri/gen/android` is git-ignored
+   and re-clobbered by `tauri android init`. This module's manifest is the one
+   committed, regeneration-surviving place an `<application>` attribute can come
+   from. `scripts/check-mobile-export-backup.mjs` gates it.
 3. **Gradle module wiring** — the ONLY re-apply step. `tauri android init`
    regenerates `settings.gradle` and `app/build.gradle.kts`, dropping the
    `myne-widgets` include + dependency. After a fresh init run:

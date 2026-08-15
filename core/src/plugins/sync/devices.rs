@@ -207,6 +207,102 @@ mod tests {
         assert_eq!(head_fingerprint_of_hex("00"), None); // wrong length
     }
 
+    /// myne#462 named this coverage hole and it was real: `head_fingerprint_from_host`
+    /// had **no tests at all**, so nothing pinned WHICH `vv_log` entry the eye-compare
+    /// displays, and nothing anywhere seeded a log with more than one observation.
+    ///
+    /// Every other test in the tree proves `head_id → fingerprint` is a correct,
+    /// frozen, deterministic function. None of them proves the two devices feed it
+    /// the same `head_id`, which is the entire defect.
+    ///
+    /// The answer is the LAST observation — the head this device currently holds.
+    /// That is load-bearing rather than arbitrary: the joining device's log starts
+    /// empty, so its first non-null answer is the head it adopted at bootstrap,
+    /// which is what `sync-protocol.md` §6.3 prescribes.
+    #[test]
+    fn head_fingerprint_from_host_reads_the_last_observation() {
+        use protocol::HEAD_ID_LEN;
+        crate::test_support::block_on(async {
+            let tmp = crate::test_support::ScopedTempDir::new("sas-vvlog").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let state = crate::plugins::vault_unlock::state::VaultRuntimeState::default();
+            let io: &dyn crate::vault_io::VaultIo = &crate::vault_io::StdVaultIo;
+            let dir = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            io.create_dir_all(&dir).await.unwrap();
+
+            // An empty log is the honest "this device has adopted no head yet",
+            // and it is load-bearing: the joining screen polls for the
+            // None → Some transition as its signal that an approval landed.
+            let mut st = super::super::state::SyncState::default();
+            super::super::state::write_sync_state(io, &dir, &st)
+                .await
+                .unwrap();
+            assert_eq!(
+                head_fingerprint_from_host(&host, io, &state).await,
+                Ok(None),
+                "no adopted head → no code, not a stale or invented one"
+            );
+
+            // Three observations, oldest first. The all-zero head is the golden
+            // vector, deliberately placed FIRST: if the reader ever regressed to
+            // `vv_log.first()`, the assertion below would report "TYRS-N318" and
+            // name the regression instead of merely failing.
+            let heads = [
+                [0x00u8; HEAD_ID_LEN],
+                [0x11u8; HEAD_ID_LEN],
+                [0x22u8; HEAD_ID_LEN],
+            ];
+            for h in &heads {
+                st.record_observation(h, &[]);
+            }
+            assert_eq!(st.vv_log.len(), 3, "the log really does hold three");
+            super::super::state::write_sync_state(io, &dir, &st)
+                .await
+                .unwrap();
+
+            assert_eq!(
+                head_fingerprint_from_host(&host, io, &state).await,
+                Ok(head_fingerprint_of_hex(&super::super::to_hex(&heads[2]))),
+                "the compare shows the head this device holds NOW — the last \
+                 observation, not the first one it ever adopted"
+            );
+            assert_ne!(
+                head_fingerprint_from_host(&host, io, &state).await,
+                Ok(Some(String::from("TYRS-N318"))),
+                "…and specifically not the oldest, which is the all-zero golden"
+            );
+        });
+    }
+
+    /// The property the eye-compare actually asserts, stated as a test: two
+    /// devices sitting on the same head show the same string. Trivially true of
+    /// the primitive, and worth pinning at THIS layer because the primitive is
+    /// not where it broke — the two sides read the value at different moments.
+    #[test]
+    fn two_devices_on_the_same_head_show_the_same_code() {
+        use protocol::HEAD_ID_LEN;
+        crate::test_support::block_on(async {
+            let head = [0x5Au8; HEAD_ID_LEN];
+            let mut fps = Vec::new();
+            for name in ["sas-dev-a", "sas-dev-b"] {
+                let tmp = crate::test_support::ScopedTempDir::new(name).unwrap();
+                let host = crate::host::test_host::TestHost::new(tmp.path());
+                let state = crate::plugins::vault_unlock::state::VaultRuntimeState::default();
+                let io: &dyn crate::vault_io::VaultIo = &crate::vault_io::StdVaultIo;
+                let dir = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+                io.create_dir_all(&dir).await.unwrap();
+                let mut st = super::super::state::SyncState::default();
+                st.record_observation(&head, &[]);
+                super::super::state::write_sync_state(io, &dir, &st)
+                    .await
+                    .unwrap();
+                fps.push(head_fingerprint_from_host(&host, io, &state).await.unwrap());
+            }
+            assert!(fps[0].is_some(), "both devices produced a code");
+            assert_eq!(fps[0], fps[1], "same head ⇒ same eye-compare string");
+        });
+    }
+
     fn roster_json() -> Vec<u8> {
         b"{\"devices\":[\
             {\"device_id_hex\":\"01010101010101010101010101010101\",\"approved\":true,\"retired\":false},\
@@ -568,10 +664,26 @@ pub async fn approve_device_from_host(
 
     let id = hex16(device_id_hex).ok_or(SyncDeviceError::BadRequest)?;
     let (token, transport) = authed_transport_from_host(host, io, state).await?;
-    crate::task::run_blocking(move || approve_device(transport.as_ref(), &token, &id))
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?
-        .map_err(SyncDeviceError::from_mgmt)
+    let outcome =
+        crate::task::run_blocking(move || approve_device(transport.as_ref(), &token, &id))
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?
+            .map_err(SyncDeviceError::from_mgmt);
+    // Arm the device-verification push hold here as well as from the WebView
+    // (myne#462). Belt and braces, deliberately: an approval is *always*
+    // followed by the SYNC-40 eye-compare, so the window this protects opens
+    // exactly here — and arming it in the core means a client whose verify
+    // screen forgets to call `sync_verify_hold_begin` still gets a stable head
+    // to compare. Bounded by the same lease as every other arm, so a client that
+    // never pings simply lets it lapse.
+    //
+    // Only on success: an approval the server refused starts no ceremony, and
+    // holding this device's pushes for a compare that will not happen would be a
+    // pure cost.
+    if outcome.is_ok() {
+        super::verify_hold::verify_hold().begin(host.now_unix_millis());
+    }
+    outcome
 }
 
 /// Remove a device — revoke its token (availability; not a crypto lockout, SYNC-2).

@@ -35,7 +35,7 @@
 // `backend-vault-delete`). No ACL change required for MYND-108 or
 // MYND-108-bis.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { VaultDeleteError } from "../types/vault-delete-error";
 
 export type {

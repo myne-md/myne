@@ -15,7 +15,7 @@
 // There is no JS seal step (unlike captures): a shared file is sealed natively
 // at arrival, so the WebView only drains.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { HAS_TAURI } from "./app-window";
 
 /** One received share, mirroring the native `tauri-plugin-share-intent`
@@ -109,7 +109,7 @@ async function sealSharedFile(item: ShareIntentEvent): Promise<void> {
 export async function initShareIntent(): Promise<void> {
   if (!HAS_TAURI) return;
   try {
-    const { listen } = await import("@tauri-apps/api/event");
+    const { listen } = await import("../platform/event");
     await listen<ShareIntentEvent>("share-intent", (event) => {
       void sealSharedFile(event.payload);
     });

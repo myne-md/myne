@@ -23,7 +23,7 @@
 // content-free and is owned by the native side, so no task text can reach the OS
 // store through this path at all.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type {
   PendingReminder,
   ReminderNotifier,

@@ -6,7 +6,23 @@
      entry that must sit ON MainActivity, which a library manifest cannot
      reach; src-tauri/build.rs injects it. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
+    <!-- The two backup attributes are NOT a widget concern; they live here
+         because this is the only committed library manifest the merger folds
+         into the app's, and they are `<application>` ATTRIBUTES. The
+         src-tauri/build.rs `update_android_manifest` channel that carries the
+         mic permissions and the shortcuts <meta-data> injects CHILD ELEMENTS
+         only, so it cannot express them, and src-tauri/gen/android is
+         git-ignored and re-clobbered by `tauri android init`. See
+         android-widgets/README.md.
+
+         What they do (myne-md/myne#491): exclude the plaintext export directory
+         `<external>/Documents` from Auto Backup and device transfer, so a saved
+         recovery phrase is not carried to Google Drive. The rules themselves,
+         and why both files exist, are in the two XML resources. The app manifest
+         declares neither attribute, so the merger takes these. -->
+    <application
+        android:dataExtractionRules="@xml/myne_backup_rules"
+        android:fullBackupContent="@xml/myne_backup_rules_legacy">
         <!-- WG-01 · Open Myne (2×2 launcher, locked default) -->
         <receiver
             android:name="md.myne.mobile.widgets.OpenWidget"
