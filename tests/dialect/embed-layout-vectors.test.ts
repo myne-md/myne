@@ -18,7 +18,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { parseEmbedAlias } from "@myne/dialect/embedLayout";
+import { emitEmbedAlias, parseEmbedAlias } from "@myne/dialect/embedLayout";
 import { fromHex } from "./dialectSpans";
 
 // Resolved against this file, not `process.cwd()`, matching every sibling
@@ -43,6 +43,9 @@ interface VectorCase {
     alt: string | null;
   };
   expected_dropped: string[];
+  /** Optional so this runner still works against a vector set from before the
+   *  field existed. Present in every case from myne-test-vectors#36 on. */
+  expected_emit_alias?: string;
   expected_export_suffix: string;
 }
 
@@ -87,5 +90,24 @@ describe.skipIf(!present)("embed-layout vectors (myne-test-vectors)", () => {
       parsed.dropped.map((d) => d.source),
       `${c.vector_id}: dropped (reported segments only: an unrecognised key is silent)`,
     ).toEqual(c.expected_dropped);
+
+    // The RETENTION half of the rule, which nothing on this side pinned.
+    //
+    // For an `unknown-key` case the three assertions above are byte-identical
+    // whether the parser retains the unrecognised segment or throws it away:
+    // retention was observable only through `expected_export_suffix`, which the
+    // RUST runner reads. So a TypeScript parser that dropped `future=keepme`
+    // passed every case in the file, and the next time the author touched that
+    // embed the emitter rebuilt the alias without it and the bytes were gone.
+    //
+    // Skipped rather than failed when the field is absent, so this runner still
+    // works against a vector set from before the field existed. `undefined` is
+    // the only accepted absence: an empty string is a real expectation.
+    if (c.expected_emit_alias !== undefined) {
+      expect(
+        emitEmbedAlias(parsed.filename, parsed.layout, parsed.unknown, parsed.dropped),
+        `${c.vector_id}: emitted alias (both retained buckets must survive the round trip)`,
+      ).toBe(c.expected_emit_alias);
+    }
   });
 });
