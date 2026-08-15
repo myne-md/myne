@@ -61,8 +61,13 @@ export const CHAT_DEFAULT_K = 10;
  * + a streaming assistant turn to the transcript, opens a token `Channel`, and
  * streams the grounded answer into the active turn. Resolves when generation
  * completes; on error the turn flips to its error state; a Stop (or vault-lock)
- * mid-stream is handled by the store's run-epoch guard. Local-only; never
- * transmits the message anywhere (the no-egress gate is structural).
+ * mid-stream is handled by the store's run-epoch guard.
+ *
+ * This used to end "Local-only; never transmits the message anywhere". See the
+ * module header: that has been false since the remote arm shipped, and the
+ * true guarantee is narrower. No byte leaves the device unless the user has
+ * named a provider, consented and stored a key, which the host re-reads on
+ * every call.
  */
 export async function sendChat(
   message: string,

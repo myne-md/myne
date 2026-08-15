@@ -428,6 +428,17 @@ pub fn selected_model(base: &Path, role: ModelRole) -> Result<Option<PathBuf>, M
 /// is exactly what routes them through [`file_stat`] at pick time and again on
 /// every hash backfill. Generation returns `None` there, so nothing ever opened
 /// its file except the loader.
+///
+/// **That reasoning is about PICK time, and the loaders are a separate
+/// question.** `load_embed` and `load_transcription` still call plain
+/// `selected_model`, so they are knowingly left on the unverified reader. The
+/// consequence is worst for transcription: `Ok(Some(stale_path))` takes the
+/// override arm, so a marker naming a deleted file permanently bypasses the
+/// bundled-default fallback that lives only in the `Ok(None)` arm, and an
+/// install shipping a working Whisper model reports a load failure forever.
+/// Routing those two through this wrapper is a behaviour change (transcription
+/// would start falling back), which is its own decision rather than a rider on
+/// this one.
 pub fn selected_model_verified(
     base: &Path,
     role: ModelRole,
@@ -442,8 +453,24 @@ pub fn selected_model_verified(
     // applied at pick time. Restating it here would mean a later tightening of
     // that rule (a symlink policy, a size floor) silently does not reach the
     // loader's reader, which is the drift this wrapper was added to close.
-    file_stat(&path).map_err(|_| ModelStoreError::RecordedModelMissing)?;
-    Ok(Some(path))
+    //
+    // The KIND is matched rather than collapsed, because the collapse sends the
+    // user in a circle. `RecordedModelMissing` renders "the model is not on
+    // this device any more, pick a model again"; on a `PermissionDenied` (a
+    // `.gguf` under a macOS TCC-protected directory, a remounted volume, a
+    // chmod'd file) the file IS there and re-picking the same path fails again
+    // at the pick-time `file_stat`, with a different error. Only "not there"
+    // and "not a regular file" mean what that sentence says.
+    match file_stat(&path) {
+        Ok(_) => Ok(Some(path)),
+        Err(ModelStoreError::Io {
+            kind: IoFailureKind::NotFound,
+        })
+        | Err(ModelStoreError::Io {
+            kind: IoFailureKind::Other,
+        }) => Err(ModelStoreError::RecordedModelMissing),
+        Err(other) => Err(other),
+    }
 }
 
 /// Path components (under the Tauri `resource_dir`) of the **bundled default**
@@ -750,6 +777,50 @@ mod tests {
             selected_model_verified(base, ModelRole::Generation).err(),
             Some(ModelStoreError::RecordedModelMissing)
         );
+    }
+
+    /// The kind is matched, not collapsed, and the difference is what the user
+    /// is told to do next.
+    ///
+    /// `RecordedModelMissing` renders "the model is not on this device any
+    /// more, pick a model again". On an unreadable-but-present file that advice
+    /// cannot work: re-picking the same path hits the pick-time `file_stat` and
+    /// fails again with a different error, so the user is sent in a circle. Only
+    /// "not there" and "not a regular file" mean what that sentence says.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_model_is_an_io_failure_and_not_a_missing_one() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = ScopedTempDir::new("local-inf-unreadable").expect("scoped tempdir");
+        let base = tmp.path();
+        let dir = base.join("elsewhere");
+        let model = a_model_file(&dir, "locked.gguf");
+        set_selected_model(base, ModelRole::Generation, &model).expect("set ok");
+
+        // The DIRECTORY loses traversal, not the file: `metadata()` on the file
+        // then fails with PermissionDenied while the file itself is untouched
+        // and still there, which is exactly the state the wrong mapping
+        // described as "gone".
+        let original = std::fs::metadata(&dir).expect("dir meta").permissions();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o000)).expect("chmod");
+
+        let got = selected_model_verified(base, ModelRole::Generation).err();
+
+        // Restore before asserting, so a failure does not leave an unreadable
+        // directory behind for the tempdir cleanup to trip over.
+        std::fs::set_permissions(&dir, original).expect("restore");
+
+        match got {
+            // The honest outcome: an IO failure carrying its own kind.
+            Some(ModelStoreError::Io { .. }) => {}
+            // Running as root (the CI container does) makes the chmod
+            // ineffective and the read succeeds. Skipping is right: the
+            // assertion below is the one that must never hold, and a root run
+            // cannot produce it either.
+            None => {}
+            other => panic!("an unreadable model must not read as missing, got {other:?}"),
+        }
     }
 
     /// The half of myne-md/myne#466 that writes. Embedding and transcription got

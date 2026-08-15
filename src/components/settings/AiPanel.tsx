@@ -538,6 +538,12 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     prefs.ai_provider_model,
     prefs.developer_mode,
     hasKey,
+    // `saveAiEndpoint` writes to the device-local model store, not `vault.prefs`,
+    // so none of the fields above move when an endpoint is configured. Without
+    // this the caption keeps saying nothing is answering while the loopback
+    // runtime the user just set up is what answers, which is the staleness this
+    // effect's dependency list exists to remove.
+    savedEndpoint,
   ]);
 
   const chooseModel = async (role: ModelRole) => {
