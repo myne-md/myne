@@ -51,7 +51,13 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(
 vi.mock("../src/lib/app-window", () => ({ HAS_TAURI: true, closeApp: async () => {} }));
 
 import * as prefs from "../src/lib/prefs";
-import { getPrefsNonce, __resetPrefsNonceForTest } from "../src/lib/prefsNonce";
+import {
+  getPrefsNonce,
+  subscribePrefsNonce,
+  bumpPrefsNonce,
+  withPrefsBatch,
+  __resetPrefsNonceForTest,
+} from "../src/lib/prefsNonce";
 import { usePrefs, DEFAULT_PREFS } from "../src/lib/use-prefs";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -78,7 +84,17 @@ const prefsWritesOf = (calls: unknown[][]) =>
 
 beforeEach(() => {
   invoke.mockReset();
-  invoke.mockResolvedValue(undefined);
+  // `prefs_read` answers a real view rather than `undefined`, and that is not
+  // cosmetic. A read-then-write binding (read the current map, splice one key,
+  // write it back) throws on `undefined` BEFORE it reaches its write, which the
+  // loop below then reads as `writes.length === 0` and skips: the setter drops
+  // out of the roster silently, and the floor assertion is the only thing that
+  // would notice, one setter at a time. Mobile has no such binding today; the
+  // desktop twin does (`toggleFavoriteOnDisk`) and its copy of this loop mocks
+  // the read for exactly this reason.
+  invoke.mockImplementation(async (cmd: unknown) =>
+    cmd === "plugin:prefs|prefs_read" ? DEFAULT_PREFS : undefined,
+  );
   __resetPrefsNonceForTest();
 });
 
@@ -185,5 +201,92 @@ describe("the mobile prefs chokepoint", () => {
       for (const r of roots) r.unmount();
     });
     for (const h of hosts) h.remove();
+  });
+});
+
+describe("withPrefsBatch", () => {
+  // A multi-write user action (a folder rename writes deliberate_folders,
+  // archived_folders, item_colors and folder_icons) awaits between its writes,
+  // so the module's microtask coalescing cannot collapse them: it only catches a
+  // SYNCHRONOUS burst. Without the batch each write notified separately and
+  // every mounted usePrefs re-read and re-decrypted vault.prefs once per write.
+
+  async function notifyCount(run: () => Promise<void>): Promise<number> {
+    let notifies = 0;
+    const off = subscribePrefsNonce(() => {
+      notifies += 1;
+    });
+    await run();
+    // The flush is a microtask; two turns is enough to let a deferred one land.
+    await Promise.resolve();
+    await Promise.resolve();
+    off();
+    return notifies;
+  }
+
+  it("notifies once for writes that await each other, instead of once each", async () => {
+    const unbatched = await notifyCount(async () => {
+      for (let i = 0; i < 4; i += 1) {
+        bumpPrefsNonce();
+        await Promise.resolve();
+      }
+    });
+    __resetPrefsNonceForTest();
+
+    const batched = await notifyCount(() =>
+      withPrefsBatch(async () => {
+        for (let i = 0; i < 4; i += 1) {
+          bumpPrefsNonce();
+          await Promise.resolve();
+        }
+      }),
+    );
+
+    // The unbatched arm is the control: without it a passing `batched === 1`
+    // could mean the batch works OR that four awaited bumps already coalesced.
+    expect(unbatched).toBe(4);
+    expect(batched).toBe(1);
+  });
+
+  it("keeps the nonce monotonic, so no subscriber sees a skipped change", async () => {
+    await withPrefsBatch(async () => {
+      for (let i = 0; i < 3; i += 1) {
+        bumpPrefsNonce();
+        await Promise.resolve();
+      }
+    });
+    // Deferring the NOTIFY is the whole trick. Deferring the increment would let
+    // a reader observe a value that never covered one of the writes.
+    expect(getPrefsNonce()).toBe(3);
+  });
+
+  it("still flushes when the batched action throws", async () => {
+    const notifies = await notifyCount(async () => {
+      await expect(
+        withPrefsBatch(async () => {
+          bumpPrefsNonce();
+          throw new Error("write two failed");
+        }),
+      ).rejects.toThrow("write two failed");
+    });
+    // A rename that fails halfway still wrote something, and a surface left on
+    // the pre-write view with no bump coming is the exact defect the chokepoint
+    // exists to prevent.
+    expect(notifies).toBe(1);
+  });
+
+  it("emits one notify for nested batches, not one per level", async () => {
+    const notifies = await notifyCount(() =>
+      withPrefsBatch(async () => {
+        bumpPrefsNonce();
+        await withPrefsBatch(async () => {
+          bumpPrefsNonce();
+          await Promise.resolve();
+        });
+        bumpPrefsNonce();
+      }),
+    );
+    expect(notifies).toBe(1);
+    expect(getPrefsNonce()).toBe(3);
   });
 });

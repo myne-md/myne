@@ -19,7 +19,7 @@
 // `CLAUDE.md` minimal-dep posture (TB9 audit anchor). When prefs grow
 // past ~5 fields, revisit (separate PRD).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import i18n from "../i18n";
 import {
   PrefsView,
@@ -631,9 +631,23 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  // Latest-read-wins for `reload`, the same token the mobile twin carries
+  // (`mobile/src/lib/use-prefs.ts`). The mount effect below is already ordered
+  // by its own `cancelled` flag, which it correctly reads AFTER the await, but
+  // no effect cleanup can cancel a `reload`: it is called from the nonce
+  // subscription and from consumers, so two can be in flight at once. A user
+  // action that writes several prefs in sequence advances the nonce once per
+  // write, and if read N resolves after read N+1 the older view wins and the
+  // surface sits on pre-write prefs with no further bump coming. That is the
+  // stale-open-editor defect this chokepoint exists to prevent, arriving by a
+  // different road, and shipping the guard to one half of a twin pair is the
+  // drift myne#486 is about.
+  const reloadRequest = useRef(0);
   const reload = useCallback(async () => {
+    const mine = ++reloadRequest.current;
     try {
       const view = await prefsRead();
+      if (mine !== reloadRequest.current) return;
       setPrefs(view);
     } catch {
       // Keep the current cache (safer-state per spec § 9.5.5).
