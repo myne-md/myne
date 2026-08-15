@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "A más eszközökről érkező változások másodperceken belül megérkeznek egy tartalom nélküli jelzésen keresztül – a kiszolgáló csak annyit közvetít, hogy „valami megváltozott”, soha nem azt, hogy mi. Amíg a széf fel van oldva, az alkalmazás amúgy is rendszeresen ellenőrzi a kiszolgálót, így ez nem ad érdemi rálátást; nincs mit beállítani.",
       "realtimeSyncLabel": "Valós idejű szinkronizálás",
       "screenCaptureHelperOff": "A védelem mindig érvényes feloldás előtt. Feloldás után ezt a beállítást követi.",
-      "screenCaptureHelperOn": "Aktív macOS-en és Windows 10-en (2020. májusi frissítés vagy újabb). A Linux-támogatás egy jövőbeli kiadásban érkezik.",
+      "screenCaptureHelperOn": "Windows 10 (2020. májusi frissítés) és újabb rendszereken működik. A macOS és a Linux nem kínál erre rendszer-API-t, ezért ott nem tudja megakadályozni a képernyőrögzítést.",
       "screenCaptureLabel": "Képernyőfelvétel-védelem",
       "screenCaptureSubtitle": "Képernyőképek és képernyőrögzítés letiltása",
       "screenshotBlocked": "A képernyőfelvétel-védelem be van kapcsolva — a Myne-ról készült képernyőképek üresek lesznek.",

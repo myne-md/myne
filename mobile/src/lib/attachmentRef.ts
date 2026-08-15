@@ -10,7 +10,8 @@
 // embedded on mobile renders on desktop and rides sync unchanged. Pure — no
 // IPC; `attachmentSrc` consults the Tauri global at CALL time only.
 
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc } from "../platform/core";
+import { hasTauriHost } from "./app-window";
 
 /** The scheme prefix that marks a wikilink target as an attachment ref. */
 export const ATT_SCHEME = "att:";
@@ -48,7 +49,7 @@ export function parseAttachmentTarget(target: string): string | null {
  *  `extract_id` in the shared scheme_core accepts every form); outside
  *  Tauri (vitest/browser dev) it falls back to the literal. */
 export function attachmentSrc(id: string): string {
-  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+  if (hasTauriHost()) {
     return convertFileSrc(id, "attachment");
   }
   return `attachment://${id}`;

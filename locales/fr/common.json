@@ -2946,7 +2946,7 @@
       "realtimeSyncHelper": "Les modifications provenant d'autres appareils arrivent en quelques secondes via un signal sans contenu — le serveur relaie uniquement « quelque chose a changé », jamais quoi. Lorsque votre coffre-fort est déverrouillé, l'application interroge de toute façon le serveur régulièrement, ce qui n'ajoute donc aucune visibilité significative ; il n'y a rien à configurer.",
       "realtimeSyncLabel": "Synchronisation en temps réel",
       "screenCaptureHelperOff": "La protection s'applique toujours avant le déverrouillage. Après le déverrouillage, elle suit cette préférence.",
-      "screenCaptureHelperOn": "Active sur macOS et Windows 10 (mise à jour de mai 2020 ou ultérieure). La prise en charge de Linux arrivera dans une prochaine version.",
+      "screenCaptureHelperOn": "Effective sur Windows 10 (mise à jour de mai 2020) et versions ultérieures. macOS et Linux n’offrent aucune API système pour cela, la capture n’y est donc pas bloquée.",
       "screenCaptureLabel": "Protection contre la capture d'écran",
       "screenCaptureSubtitle": "Bloquer les captures et l'enregistrement d'écran",
       "screenshotBlocked": "La protection contre la capture d'écran est activée — les captures d'écran de Myne ressortent vides.",
