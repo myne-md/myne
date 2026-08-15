@@ -12,7 +12,7 @@
 // MYND-460 F4 cluster; this hook is the no-native-code visibility subset.
 
 import { useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 export function useSyncLifecycle(enabled: boolean): void {
   useEffect(() => {

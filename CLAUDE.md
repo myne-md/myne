@@ -30,6 +30,31 @@ Every Claude Code session in this repo loads `.claude/skills/adhd/SKILL.md` at s
 
 On by default and per-clone opt-out: `touch .claude/.adhd-off` (gitignored), `MYNE_ADHD_OFF=1` for one invocation, or "stop adhd mode" mid-session. The hook is a no-op when `CI` is set, so the unattended lanes — Woodpecker, the runner jail, the issue-triage and PR-review bots — keep their fixed-format English output.
 
+## Worktrees (pointer)
+
+A worktree for this repo is created **only** with `EnterWorktree`, or with `git worktree add` into
+`.claude/worktrees/<name>`, and never anywhere else. It branches from **`origin/develop`**, always:
+that is what `worktree.baseRef: fresh` in `.claude/settings.json` pins (the setting is checked in so
+a fresh clone inherits it), and a hand-made `git worktree add` passes `origin/develop` explicitly.
+Branching from the current local HEAD instead carries whatever the working checkout happens to be
+sitting on into the new branch, which is how a feature branch picks up an unrelated half-finished
+change and a PR arrives with a diff nobody can explain. The session scratchpad under `/private/tmp` is
+specifically wrong for one: it is per session and gets cleaned, so the worktree outlives the
+directory `git worktree list` still points at, and `.claude/worktrees/` stops being the roster of
+what is in flight. Name it after the issue (`410-note-covers`) so the worktree, the branch and the
+session read the same.
+
+**The point is that finished work leaves nothing behind**: branch pushed, PR open, machine back to
+where it started. So the worktree is removed once its PR is open, together with its local branch,
+since the PR tracks the remote one. Never before the PR exists, and never on a dirty tree without
+saying what is uncommitted.
+
+One trap, because it has cost two sessions already: inside a worktree, a nested companion repo
+(`myne-agents` and friends) is a **symlink** to the shared checkout, and that is correct. The Write
+tool refuses to resolve through it; the answer is one Bash write to the absolute path, not cloning
+the companion in. A copy lands the file in a tree nobody commits, so it looks written and is
+invisible everywhere else. Full rule: `myne-agents/reference/worktrees.md`.
+
 ## Project status
 
 **Pre-alpha.** Shipped: v0.1 specs (`docs/`), Tauri 2 + Vite + React + TS scaffold (`src/`, `src-tauri/`), Rust crypto crate (`protocol/`, RustCrypto, `#![no_std]` + `alloc`), Cargo workspace (one shared `Cargo.lock`), workspace scripts, pinned toolchain. The desktop scaffold lives at the **repo root** deliberately. It is no longer the only in-repo client — **all three clients live here now**: the Phase 3 desktop-**browser** client at `web/` (`docs/decisions.md` **2026-07-26** "The web client lives in-repo at `web/`", which supersedes the one-in-repo-client clause of the 2026-04-26 "Desktop scaffold lives at repository root" entry while leaving its placement decision intact) and the Phase 3 **mobile** client at `mobile/` (`decisions.md` **2026-08-13** "The mobile client lives in-repo at `mobile/`", superseding the companion-repo clause of 2026-05-11 while leaving its Tauri-2-Mobile stack decision intact). All three compile the same `src/` tree. Server, website, ops, test-vectors, clipper, themes and branding remain companion repos (`workspace/manifest.txt` is the list); `myne-web` is archived; `myne-mobile` was deleted outright on 2026-08-13 (see the decisions entry of that date and its correction).
@@ -78,6 +103,8 @@ myne/
 │   └── platform/        ← the platform seam: the ONLY place under src/ allowed to import @tauri-apps/*
 ├── web/                 ← Phase 3 desktop-browser client: same src/ tree, seam substituted at build time (pnpm web:dev / web:build)
 ├── mobile/              ← Phase 3 iOS + Android client (decisions.md 2026-08-13), moved in-repo from the myne-mobile companion, which was then deleted. Its OWN React tree under mobile/src, source-consuming ~25 @myne/* aliases into src/, editor/, dialect/, ornaments/ and locales/ — which is exactly why a repo boundary here was never real. pnpm workspace MEMBER (it keeps its package.json: it is a second Tauri app with its own tauri.conf.json and CLI invocations, unlike web/). Dev server :1422 — desktop holds :1420, web :1421
+│   ├── src/platform/    ← mobile's own platform seam (myne#492): the ONLY place under mobile/src allowed to import @tauri-apps/*
+│   ├── src/formfactor/  ← the iOS-vs-Android and phone-vs-tablet PRESENTATION split, renamed out of src/platform/ so <tree>/platform/ means the host seam in all three clients
 │   └── src-tauri/       ← the mobile Tauri crate + its four plugins (screen-guard, share-intent, qr-scan, reminders); all five are root-workspace members under the ONE Cargo.lock
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
@@ -115,7 +142,7 @@ Most of `scripts/` is not tooling — it is the machine-checked half of the rule
 
 | Guard | Enforces | Fires in |
 |---|---|---|
-| `check-platform-seam.mjs` | `src/platform/` is the only place under `src/` importing `@tauri-apps/*`; `editor/`, `dialect/`, `copy/` get **zero** Tauri imports. Covers the runtime global (`__TAURI…__`) too, which is not a module specifier and so slipped the import rule — `src/lib/app-window.ts`'s boot probe is the one exemption; `e2e/` is outside the guarded roots and `pageSeatInvoke` stays sanctioned there | `pre-commit` + CI `pnpm-build` |
+| `check-platform-seam.mjs` | eight guarded roots, each importing `@tauri-apps/*` only from its own seam directory or not at all. Scope and rationale live in the Gotcha below rather than being restated here, because the two copies had already drifted apart. Covers the runtime global (`__TAURI…__`) too, which is not a module specifier and so slipped the import rule: **two** files are exempt, `src/lib/app-window.ts` and `mobile/src/lib/app-window.ts`, one boot probe per Tauri client, and `e2e/` is outside the guarded roots so `pageSeatInvoke` stays sanctioned there. Also derives a coverage claim over `scripts/lib/shared-roots.mjs`, so a shared tree that falls outside every guarded root fails by name instead of being silently skipped | `pre-commit` + CI `pnpm-build` |
 | `check-core-task-seam.mjs` | `crate::task` is the only place in `core/` reaching tokio's *execution* surface (`spawn_blocking` compiles for wasm32 and panics at runtime) | `pre-commit` + CI `pnpm-build` |
 | `check-core-io-seam.mjs` | filesystem ratchet: a `core/src` file not on the recorded list may not start using `std::fs`, and one that leaves may not come back | `pre-commit` + CI `pnpm-build` |
 | `check-version-routing.mjs` | **ratchet**: a reader may not reach for a v0.1-only helper (`parse_vault_meta`, `derive_subkey`, `protocol::decode_note`) where a version-aware one exists. All three compile, and the failure appears only on a **migrated** vault — worst case silently, since `read_or_empty`-shaped readers answer "empty" rather than erroring and the next write persists that emptiness over real data. Legitimate v0.1 sites (the migration reading the old vault; the never-synced caches §10.4.1 md.2 keeps on the v0.1 context) are recorded **with reasons**; the rest is debt and must shrink. Also flags a **stale budget** — a recorded count larger than reality — so the number cannot quietly stop describing anything | `pre-commit` + CI `pnpm-build` |
@@ -257,7 +284,7 @@ Full primitive details, audit anchors, and subkey derivation discipline rule (wh
 
 ## Gotchas
 
-- **`@tauri-apps/*` may only be imported from `src/platform/`.** The platform seam is what lets one `src/` tree compile for both the desktop and the web client; a direct import anywhere else breaks the web build rather than degrading it. Enforced by `scripts/check-platform-seam.mjs` in `pre-commit` **and** in CI (so `--no-verify` does not slip one through), and extended to `editor/`, `dialect/` and `copy/` by MYND-574 task 76. If an export you need is missing, add it to the seam module — do not reach around it.
+- **`@tauri-apps/*` may only be imported from a guarded tree's own `platform/` directory.** The platform seam is what lets one `src/` tree compile for both the desktop and the web client; a direct import anywhere else breaks the web build rather than degrading it. Enforced by `scripts/check-platform-seam.mjs` in `pre-commit` **and** in CI (so `--no-verify` does not slip one through). Eight roots are guarded: `src` (seam `src/platform/`) and `mobile/src` (seam `mobile/src/platform/`) are Tauri hosts and get a seam directory; `editor/`, `dialect/`, `copy/`, `ornaments/`, `preview/` and `web/src` get the strictest form, `seam: null`, which bans `@tauri-apps/*` outright because **not every** consumer is a Tauri host: the web client compiles the shared packages too, and `ornaments/` plus `preview/` reach further still, into the website and the myne-themes gallery renderer. A module-scope `@tauri-apps` import lands in those bundles whether or not the call ever fires, so it breaks their build rather than degrading it. `editor/`, `dialect/` and `copy/` were added by MYND-574 task 76; `mobile/src` and `web/src` joined in myne#492, and `mobile/src` had accumulated 41 direct imports while the guard reported ok, which is why the guard now also derives a coverage claim over `scripts/lib/shared-roots.mjs` rather than trusting a prose comment (`docs/decisions/clients/0497-*`). If an export you need is missing, add it to the seam module rather than reaching around it.
 - **A new `web/wasm/src/dispatch.rs` arm needs its `capability::DISPATCHED` entry in the same change, and only `cargo test -p myne-web-wasm` tells you.** Without it, `classify` reports a command the router *does* answer as unported — the exact wrong answer the capability system exists to prevent. `cargo clippy --target wasm32-unknown-unknown` is green either way, and so is every `scripts/check-web-*.mjs` guard. The crate is a workspace member (so `cargo test --workspace` in `pre-push` covers it), but CI's Rust steps name `-p protocol` and `-p myne-desktop -p myne-core`; the wasm lane now runs the crate's tests too (MYND-574 task 77).
 - **A `[target.'cfg(…)'.dependencies.…]` table must go at the END of a `Cargo.toml`, never beside the crate it overrides.** Inserted next to `tracing = "0.1"` inside `[dependencies]`, it TERMINATES that section, and every crate declared after that line silently becomes part of the target table — `sha2`, `unicode_normalization` and friends disappear from both builds with `unresolved import` errors that name the wrong file. TOML sections have no closing brace, so nothing about the edit looks wrong.
 - **`web/wasm/pkg/` is a derived artefact and goes stale.** Adding a `#[wasm_bindgen]` export needs `./scripts/build-wasm.sh` before `pnpm web:build`, or the bundler fails with `MISSING_EXPORT` on the new name.

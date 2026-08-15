@@ -3,8 +3,8 @@ import { Gallery } from "./gallery/Gallery";
 import { AppShell } from "./app/AppShell";
 import { ScreenshotNotice } from "./components/ScreenshotNotice";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { PlatformProvider, type Platform } from "./platform/PlatformContext";
-import { SizeClassProvider, useSizeClassObserver } from "./platform/SizeClassContext";
+import { PlatformProvider, type Platform } from "./formfactor/PlatformContext";
+import { SizeClassProvider, useSizeClassObserver } from "./formfactor/SizeClassContext";
 import { useSyncLifecycle } from "./lib/use-sync-lifecycle";
 
 /**
@@ -55,7 +55,7 @@ function useViewport(): Viewport {
  *   - default: the real, wired app (AppShell — Stage machine + functional flows
  *     backed by the mirrored Tauri vault/notes/prefs backend).
  *   - `?gallery`: the static design gallery — every screen in its device frame
- *     with platform/theme toggles, for pixel-faithful design review.
+ *     with formfactor/theme toggles, for pixel-faithful design review.
  *
  * The real app fills the viewport; on a wide desktop preview (`pnpm tauri dev`)
  * it's centred at phone width.

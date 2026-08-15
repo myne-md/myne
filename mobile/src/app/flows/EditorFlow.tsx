@@ -7,8 +7,8 @@ import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardAction
 import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { headingSections } from "@myne/dialect";
 import type { EditorView } from "@codemirror/view";
-import { emit, listen } from "@tauri-apps/api/event";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { emit, listen } from "../../platform/event";
+import { documentDir, join } from "../../platform/path";
 import {
   Screen,
   ScreenScroll,
@@ -110,7 +110,7 @@ import { MarkdownView } from "../../components/MarkdownView";
 import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
 import { SettingsSheet, applyStoredTheme } from "./SettingsSheet";
-import { useSizeClass } from "../../platform/SizeClassContext";
+import { useSizeClass } from "../../formfactor/SizeClassContext";
 import { EmptyDetail } from "./editor/EmptyDetail";
 import { SidebarPane } from "./editor/SidebarPane";
 import { AppHeader } from "./editor/chrome/AppHeader";
