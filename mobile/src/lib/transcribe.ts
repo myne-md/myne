@@ -64,8 +64,11 @@ export async function readTranscript(attachmentId: string): Promise<string | nul
 }
 
 /** Map the raw IPC rejection (a serialized `EngineError` — a bare variant string
- *  like `"NotReady"`, or a `{ kind }` object) to a normalized kind. Anything not
- *  clearly not-ready degrades to `"failed"`. */
+ *  like `"NotReady"`, or a `{ kind }` object carrying the snake_case tag from
+ *  `EngineError::kind()`) to a normalized kind. Three arms: `"not_ready"`,
+ *  `"too_long"`, and `"failed"` for everything else. The catch-all stays a
+ *  catch-all deliberately: an unknown variant must degrade to the retryable
+ *  message, never to `"too_long"`, which suppresses the retry button. */
 function normalizeTranscribeError(raw: unknown): TranscribeError {
   const tag =
     typeof raw === "string"
