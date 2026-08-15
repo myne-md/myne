@@ -2616,6 +2616,12 @@ The in-RAM, plaintext-derived index of a vault's wikilink graph — forward link
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
 
+### **verification push-hold** &nbsp; 📋 *Protocol*
+
+The client-side pause that makes the [bootstrap-fingerprint](#bootstrap-fingerprint) compare mean something. A [vault head](#vault-head) is not a stable identity — every push authors a new one — so two devices agree on a fingerprint only while they sit on the same head, and the enrolment ceremony itself moves it (a joining device writes its own [device name](#device-name) the moment it adopts a head, and a prefs push authors a head). While a verify screen is open the device therefore authors **no content head**: pulls continue untouched (each side reaches the head it displays *by* pulling), and the §6.1 genesis-on-empty push is exempt, because on an account with no head the genesis head is the only thing a joining device can adopt. Bounded by a lease and a ceiling rather than by cooperation, so a client that dies mid-compare cannot leave its own edits unpushed. **Extend-only** with respect to push timing — nothing fires earlier than it would have and pending push intent is retained — so the §8.3 A13 posture is unchanged. Phase 2.
+
+Used in: `spec/sync-protocol.md` §6.3, §8.3; `decisions.md` 2026-08-15 (myne-md/myne#462); `core/src/plugins/sync/verify_hold.rs`
+
 ### **version vector (VV)** &nbsp; 🏗️ *Construction*
 
 A per-device monotonic counter map (`device_id → count`) embedded in and MAC'd by each [vault head](#vault-head), carrying the count of heads each [device](#device_id-vv-actor) has authored (at **push** granularity, not per keystroke). It is the single mechanism behind both concurrency and fork detection: componentwise comparison of a new head's VV to the last-seen one yields **extension** (≥ componentwise → accept), **rollback** (any decreased component → reject), or **incomparable** (concurrent → the device writes a merge head, componentwise-max + author+1). A VV that *never* re-converges across devices is a [fork](#fork-consistency); one that is merely incomparable is a legitimate concurrent edit. This is the same VV the sync conflict layer uses — fork-consistency adds no separate structure. Not pruned in v1 (a unilateral drop would let a server hide a fork; a later-version prune must ride an authenticated device-retirement event). Phase 2.

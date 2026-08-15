@@ -62,6 +62,16 @@ const NAMED_TWINS = [
     b: `${MOBILE}/src-tauri/src/hooks.rs`,
     what: "implements the same VaultLifecycleHooks trait",
   },
+  {
+    // myne#462: this pair exists BECAUSE the copies drifted. The mobile
+    // approving side never received the poll #243 added to the desktop one, so
+    // it kept a one-shot read for months while its twin was fixed, and nothing
+    // reported it. The two trees reach IPC through different seams and cannot
+    // share a module, so a warning here is the mechanism that replaces one.
+    a: "src/hooks/useHeadFingerprintCompare.ts",
+    b: `${MOBILE}/src/hooks/useHeadFingerprintCompare.ts`,
+    what: "carries the twin SYNC-40 eye-compare poll + its push-hold lease",
+  },
 ];
 
 function changedFiles() {
