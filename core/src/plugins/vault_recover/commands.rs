@@ -329,6 +329,11 @@ pub async fn complete_recovery_from_host(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     host: &dyn HostCtx,
+    // The post-unlock pipeline below now also seals the vault's name into the
+    // device-local label store (myne-md/myne#411). Recovery ends with an
+    // unlocked vault like every other credential path, so it owes the same
+    // write.
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), VaultRecoveryError> {
     // SYNC-6 targeting: `Some(id)` commits against exactly `vaults/<id>/`;
     // `None`/malformed → resolution below. The resolved id keys BOTH the
@@ -363,6 +368,7 @@ pub async fn complete_recovery_from_host(
         state,
         hooks,
         &crate::vault_io::StdVaultIo,
+        keychain,
     )
     .await;
 
@@ -400,6 +406,7 @@ pub async fn complete_recovery<R: Runtime>(
         state.inner(),
         hooks.inner(),
         &TauriHost::new(app),
+        crate::vault_label::key::platform_keychain(),
     )
     .await
 }

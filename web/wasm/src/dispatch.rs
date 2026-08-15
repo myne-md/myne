@@ -624,6 +624,12 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 vault_io(),
                 a.vault_id,
+                // An origin holds exactly one container and the browser has no
+                // OS keychain, so the sealed label store (`MYL1`) is inert
+                // here: this resolves to the `UnavailableKeychain`, the erase
+                // finds nothing, and the picker the store exists for does not
+                // render on web at all.
+                myne_core::vault_label::key::platform_keychain(),
             )
             .await
             {
@@ -747,6 +753,9 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 crate::session::hooks(),
                 host_ctx(),
                 vault_io(),
+                // Inert on web, as on the delete route above: no OS keychain,
+                // one container per origin, and no locked picker to serve.
+                myne_core::vault_label::key::platform_keychain(),
             )
             .await
             {

@@ -4978,16 +4978,23 @@ pub(crate) async fn set_device_name_with_dir(
 /// lives ONLY inside the AEAD-sealed `vault.prefs` at rest and in that RAM
 /// cache at runtime; it is never logged (DENY-list discipline — the value is
 /// the user's own input, treated as AS3-sensitive).
+///
+/// Since myne-md/myne#411 a rename also writes THROUGH to the device-local
+/// sealed label store (`MYL1`), so the LOCKED picker shows the new name on the
+/// next launch instead of the one this device last unlocked under. That write
+/// is suppressed while the device-wide hide-vault-names option is on, and it is
+/// best-effort: see [`crate::vault_label::writeback`].
 pub async fn vault_set_label_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     label: Option<String>,
     io: &dyn crate::vault_io::VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    vault_set_label_with_dir(&dir, state, hooks, label, io, host).await
+    vault_set_label_with_dir(&dir, state, hooks, label, io, host, keychain).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -5006,6 +5013,7 @@ pub async fn vault_set_label<R: Runtime>(
         hooks.inner(),
         label,
         &crate::vault_io::StdVaultIo,
+        crate::vault_label::key::platform_keychain(),
     )
     .await
 }
@@ -5024,6 +5032,7 @@ pub(crate) async fn vault_set_label_with_dir(
     label: Option<String>,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), PrefsWriteError> {
     let cleared = label.is_none();
     update_prefs_with_dir(
@@ -5045,7 +5054,30 @@ pub(crate) async fn vault_set_label_with_dir(
     // single-window), `active_vault_id` returns None and the cache update is
     // skipped — disk truth is canonical and the next unlock re-decrypts it.
     if let Some(active) = state.active_vault_id().await {
-        state.set_cached_label(active, label).await;
+        state.set_cached_label(active, label.clone()).await;
+
+        // myne-md/myne#411: and write THROUGH to the device-local sealed label
+        // store, so the LOCKED picker shows the new name on the next launch
+        // rather than the one this device last unlocked under. The id comes
+        // from the runtime slot for the same reason the cache key does: the
+        // slot is the authority, so a caller cannot seal one vault's name into
+        // another's directory.
+        //
+        // Best-effort and LAST. It is a device-local convenience cache: a
+        // keychainless device must still be able to rename its vault, and the
+        // picker there falls back to the neutral label exactly as it does
+        // today. The suppression while the hide option is on lives inside
+        // `persist_label_from_host`, not here, so this call site cannot
+        // disagree with the Settings row about what a damaged flag file means.
+        crate::vault_label::writeback::persist_label_from_host(
+            host,
+            io,
+            vault_dir,
+            active,
+            label.as_deref(),
+            keychain,
+        )
+        .await;
     }
 
     // Field name + set/cleared only — NEVER the label value (it is the user's
@@ -5265,6 +5297,7 @@ mod tests {
                 Some("Renamed".into()),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("set label");
@@ -5331,6 +5364,7 @@ mod tests {
                 Some("Same".into()),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("first set");
@@ -5341,6 +5375,7 @@ mod tests {
                 Some("Same".into()),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("no-op re-set");
@@ -5643,6 +5678,7 @@ mod tests {
                 Some("Work".into()),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::test_host::TestHost::new(tmp.path()),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect_err("a write aimed at a non-active vault must be refused");
@@ -5682,6 +5718,7 @@ mod tests {
                 Some("Work".into()),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::test_host::TestHost::new(tmp.path()),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("seed a real prefs blob");
@@ -5703,6 +5740,7 @@ mod tests {
                 Some("Home".into()),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::test_host::TestHost::new(tmp.path()),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect_err("a write over an unreadable prefs blob must be refused");
@@ -5741,6 +5779,7 @@ mod tests {
                 Some("First".into()),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::test_host::TestHost::new(tmp.path()),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("an absent blob must not block the first write");
@@ -5765,6 +5804,7 @@ mod tests {
                 Some("Work".into()),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::test_host::TestHost::new(tmp.path()),
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("set label");
@@ -8505,6 +8545,7 @@ mod tests {
                 Some(String::from("Work")),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -8531,6 +8572,7 @@ mod tests {
                 Some(String::from("Work")),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("write label");
@@ -8558,6 +8600,7 @@ mod tests {
                 Some(String::from("Personal")),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("rename label");
@@ -8578,6 +8621,7 @@ mod tests {
                 None,
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("clear label");
@@ -8586,6 +8630,181 @@ mod tests {
                 .expect("read after clear");
             assert_eq!(view.label, None);
             assert_eq!(state.cached_label(test_vault_id()).await, None);
+        });
+    }
+
+    // ---- myne-md/myne#411: the rename writes THROUGH to `MYL1` ---------
+    //
+    // `vault.prefs` is sealed under a `root_key`-derived KEK, so the rename
+    // above is invisible to the LOCKED picker until the vault is unlocked
+    // again. These pin the second write that closes that gap, and its two
+    // rules: the hide flag suppresses it, and clearing removes the file.
+    //
+    // A `TestHost` rather than `NoopHost` in this block, deliberately: the
+    // write-through resolves the hide flag through `app_config_dir`, and
+    // `NoopHost` resolves none, which is exactly what keeps the tests ABOVE
+    // free of a sealed file they never asked for.
+
+    #[test]
+    fn a_rename_writes_through_to_the_sealed_label_store() {
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::store::{read_label, LabelRead};
+
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let keychain = FakeKeychain::empty();
+
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("Work")),
+                &crate::vault_io::StdVaultIo,
+                &host,
+                &keychain,
+            )
+            .await
+            .expect("rename");
+
+            assert_eq!(
+                read_label(
+                    &crate::vault_io::StdVaultIo,
+                    tmp.path(),
+                    test_vault_id(),
+                    &keychain
+                )
+                .await
+                .expect("read the sealed name back"),
+                LabelRead::Label(String::from("Work")),
+                "a rename must reach the locked picker without waiting for the \
+                 next unlock"
+            );
+        });
+    }
+
+    #[test]
+    fn clearing_the_label_removes_the_sealed_file_rather_than_storing_an_empty_one() {
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::store::label_path;
+
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let keychain = FakeKeychain::empty();
+
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("Work")),
+                &crate::vault_io::StdVaultIo,
+                &host,
+                &keychain,
+            )
+            .await
+            .expect("rename");
+            assert!(label_path(tmp.path()).exists(), "seeded");
+
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                None,
+                &crate::vault_io::StdVaultIo,
+                &host,
+                &keychain,
+            )
+            .await
+            .expect("clear");
+
+            assert!(
+                !label_path(tmp.path()).exists(),
+                "the codec refuses a zero-length plaintext, so an empty name has \
+                 to be a removal by construction"
+            );
+        });
+    }
+
+    #[test]
+    fn a_rename_writes_no_name_while_names_are_hidden() {
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        use crate::vault_label::hide_flag::{
+            hide_flag_path_from_host, write_hide_vault_names, HideVaultNamesConfig,
+        };
+        use crate::vault_label::store::label_path;
+
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let keychain = FakeKeychain::empty();
+
+            let flag_path = hide_flag_path_from_host(&host, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("flag path");
+            write_hide_vault_names(
+                &crate::vault_io::StdVaultIo,
+                &flag_path,
+                HideVaultNamesConfig { hidden: true },
+            )
+            .await
+            .expect("turn the option on");
+
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("Work")),
+                &crate::vault_io::StdVaultIo,
+                &host,
+                &keychain,
+            )
+            .await
+            .expect("the rename itself must still succeed");
+
+            // The rename landed where it always did.
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(view.label, Some(String::from("Work")));
+
+            // And nowhere else.
+            assert!(!label_path(tmp.path()).exists());
+            assert!(keychain.accounts().is_empty(), "no wrap key was minted");
+        });
+    }
+
+    #[test]
+    fn a_rename_on_a_keychainless_device_still_renames() {
+        // The device-local name cache is a convenience for the picker. Failing
+        // a rename because a Linux box has no secret-service daemon would trade
+        // a real operation for a cosmetic one.
+        use crate::vault_label::store::label_path;
+
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("Work")),
+                &crate::vault_io::StdVaultIo,
+                &host,
+                &crate::vault_label::key::UnavailableKeychain,
+            )
+            .await
+            .expect("rename");
+
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(view.label, Some(String::from("Work")));
+            assert!(
+                !label_path(tmp.path()).exists(),
+                "and in particular no plaintext fallback was written"
+            );
         });
     }
 
@@ -8706,6 +8925,7 @@ mod tests {
                 Some(String::from(secret_label)),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                &crate::vault_label::key::UnavailableKeychain,
             )
             .await
             .expect("write label");

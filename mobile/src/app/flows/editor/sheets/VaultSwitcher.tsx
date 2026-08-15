@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { CSSProperties } from "react";
 import { Icon, Sheet, VaultMark } from "../../../../components";
 import { vaultDisplayLabel } from "../../../../lib/vault-label";
+import { stableVaultNumber } from "../../../../lib/vault-list";
 import type { VaultSummary } from "../../../../types/vault-summary";
 
 /** The sheet's footer actions (create / join) — one outlined row each. */
@@ -77,7 +78,15 @@ export function VaultSwitcher({
                   (SYNC-1), so every other row's wordmark is correctness, not a
                   missing feature. */}
               <VaultMark icon={v.icon} size={22} radius={4} testId="switcher.vault-mark" />
-              <span style={{ flex: 1, fontSize: 16, color: "var(--fg-1)" }}>{vaultDisplayLabel(v.label)}</span>
+              {/* The SAME number the picker shows (myne-md/myne#411). This
+                  passed no ordinal at all, so every unnamed vault read a bare
+                  "Vault" and the sheet could offer three rows a user had no way
+                  to tell apart. Sharing `stableVaultNumber` also stops the two
+                  surfaces disagreeing: a vault that is "Vault 2" on the picker
+                  the user just came from must not be "Vault 3" here. */}
+              <span style={{ flex: 1, fontSize: 16, color: "var(--fg-1)" }}>
+                {vaultDisplayLabel(v.label, stableVaultNumber(vaults, v.id))}
+              </span>
               {active && <Icon name="check" size={18} color="var(--accent)" strokeWidth={2} />}
             </div>
           );
