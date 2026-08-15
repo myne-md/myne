@@ -69,6 +69,14 @@ docker run -p 8080:8080 -e MYNE_SYNC_ORIGIN=https://sync.example.org myne-web
 Put your own TLS terminator in front of it; the container serves plain HTTP on
 `PORT` (default 8080) and expects to be reached over HTTPS.
 
+**No `--platform` here, deliberately.** Building to *serve* and building to
+*verify* are different jobs: serve your own architecture, natively. Only the
+second job needs the reference platform, because it compares a hash against a
+published one, and the build host is part of that hash
+(`web-bundle-hashes.md`, "Why the build host is part of the hash"). A bundle you
+built yourself needs no such comparison — you are the code-delivery operator for
+it, which is the whole point of A15/TB11 not applying to you.
+
 ### `MYNE_SYNC_ORIGIN` is required, and the container refuses to start without it
 
 Scheme, host and optional port — nothing else:
