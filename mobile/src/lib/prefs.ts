@@ -557,21 +557,25 @@ export async function prefsRead(): Promise<PrefsView> {
 }
 
 /**
- * The one path a `vault.prefs` WRITE takes — invoke, then bump the prefs nonce.
+ * The one path a `vault.prefs` WRITE takes: invoke, then bump the prefs nonce.
  * The twin of `src/lib/prefs.ts`'s chokepoint, and it exists for the same reason
  * (#251, ported to mobile by myne-md/myne#486).
  *
  * The bump is the ONLY mechanism by which sibling `usePrefs` instances re-read
- * (`./use-prefs.ts`), and mobile has four independent mount sites — `EditorFlow`,
- * `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels` — so a skipped bump
+ * (`./use-prefs.ts`), and mobile has four independent mount sites (`EditorFlow`,
+ * `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels`), so a skipped bump
  * is a stale open editor rather than a latent defect. Why the rule exists, and
  * what the 29-scattered-call-sites shape it replaced cost, is in
  * `scripts/check-prefs-nonce.mjs`'s header, which now covers this module too.
  *
  * Bumps on SUCCESS only: a rejected `invoke` throws before the bump, so nothing
- * claims disk truth changed when it did not. A caller running optimistic local
- * state that it corrects by re-reading (rather than by reverting) therefore still
- * owns its own `.catch(bumpPrefsNonce)` — see `EditorFlow`'s decoration writes.
+ * claims disk truth changed when it did not, and no re-read races a write that
+ * is still in flight (`./prefsNonce.ts` states that ordering as its rule).
+ * `mobile/tests/prefs-nonce.test.ts` holds this half specifically, because the
+ * guard reads call shapes and would stay green with the bump hoisted above the
+ * `invoke`. A few `EditorFlow` writers keep their own `.catch(bumpPrefsNonce)`;
+ * that catch is there to stop an unhandled rejection on a `void`-ed call, and
+ * its own comment records why the bump inside it buys nothing.
  *
  * Skipping the bump stays possible via `{ bump: false }`, which costs an explicit
  * argument carrying its reason: a visible choice in review rather than an

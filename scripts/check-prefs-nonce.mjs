@@ -23,7 +23,7 @@
 //
 // What it enforces:
 //   1. Inside a prefs module, only `writePref` may invoke a prefs WRITE
-//      command. Read commands are exempt by name — see `READ_COMMANDS`, which
+//      command. Read commands are exempt by name: see `READ_COMMANDS`, which
 //      carries the reason per entry. They have nothing to invalidate.
 //   2. No module outside a prefs module may invoke a prefs write command at
 //      all. Reaching around the module is reaching around the bump.
@@ -31,7 +31,7 @@
 // TWO prefs modules, one per client tree (myne-md/myne#486). The mobile client
 // moved in-repo on 2026-08-13 and this guard did not learn about it: `mobile/src`
 // was in neither `PREFS_MODULES` nor `SCANNED_TREES`, so both rules were blind to
-// a whole client. `mobile/src/lib/prefs.ts` had no chokepoint at all — 47 setters
+// a whole client. `mobile/src/lib/prefs.ts` had no chokepoint at all: 47 setters
 // with the bump supplied by 29 separate CALL SITES, which is the pre-#251 desktop
 // shape. Every one of them happened to be right; the shape is what fails, one
 // copied neighbour later. Same rules, both trees, so a mobile setter written
@@ -58,18 +58,24 @@ import { presentSharedRoots } from "./lib/shared-roots.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
-// One per client tree. Each holds its own `writePref` — the two are twins, not a
+// One per client tree. Each holds its own `writePref`. The two are twins, not a
 // shared module: mobile's lives in its own React tree (`mobile/src`) and imports
 // its own `prefsNonce`. Rule 1 runs over each; rule 2 exempts each.
 //
-// DELIBERATELY a named list rather than derived from SCANNED_TREES by finding
-// whatever file declares `async function writePref(`. That derivation fails
-// OPEN, and not hypothetically: `src/hooks/usePrefs.ts` declares a `writePref`
-// of its own (the optimistic-cache core, unrelated to this rule), so discovery
-// would promote it to a prefs module and thereby EXEMPT it from rule 2 — a file
-// gaining the right to hold prefs literals by accident of a function name. The
-// roster this list must not fall behind is `SCANNED_TREES` below, and
-// `tests/lib/prefsNonce.test.ts` asserts both by name for that reason.
+// DELIBERATELY a named list, not derived from SCANNED_TREES by searching for
+// whatever declares `async function writePref(`. Stated precisely, because the
+// first version of this comment claimed a concrete counterexample that does not
+// exist: `src/hooks/usePrefs.ts` does declare a `writePref`, but as
+// `const writePref = useCallback(`, which that pattern never matches, and it
+// holds no prefs literal for an exemption to protect. Searching would work today.
+//
+// It stays a named list because of the DIRECTION the failure runs. Being on this
+// list is an exemption from rule 2: a module here is licensed to hold prefs write
+// literals. Deriving membership from a declaration means any file can license
+// itself by naming a function, and a guard whose scope widens on a name is the
+// wrong shape no matter how few files match right now. The cost is that the list
+// can fall behind SCANNED_TREES, which is a silent narrowing rather than a silent
+// widening, and `tests/lib/prefsNonce.test.ts` asserts both rosters by name.
 export const PREFS_MODULES = ["src/lib/prefs.ts", "mobile/src/lib/prefs.ts"];
 const PREFS_MODULE_LIST = PREFS_MODULES.join(", ");
 
@@ -86,7 +92,7 @@ const PREFS_MODULE_LIST = PREFS_MODULES.join(", ");
 // classification to decide which exports owe a bump, and a mirrored copy there
 // would go stale in both directions: a fourth read command would make that test
 // demand a bump from a command that writes nothing, and a command moved OUT of
-// this set would keep being exempted by the stale copy — silently shrinking the
+// this set would keep being exempted by the stale copy, silently shrinking the
 // only check that proves `writePref` still bumps.
 export const READ_COMMANDS = new Set([
   "prefs_read",
@@ -107,7 +113,15 @@ export const READ_COMMANDS = new Set([
 // `web/src` and `ornaments/src`, which the copy omitted with a justification
 // that did not apply to them (it named "the Rust side", but `walk` only yields
 // `.ts`/`.tsx`, so no Rust file was ever in scope to excuse).
-export const SCANNED_TREES = presentSharedRoots().present;
+//
+// `missing` is carried, not discarded. Every shared root is in-repo today, so it
+// is expected empty, and taking `.present` alone would reproduce the failure
+// this import just fixed: a root that vanishes shrinks the scan and the run
+// still prints `ok`. `shared-roots.mjs` calls itself "the single place that
+// would notice", and noticing only works if an importer acts on it, which is why
+// `analyse` turns a missing root into a failure rather than into a smaller walk.
+const { present: SCANNED_TREES_PRESENT, missing: SCANNED_TREES_MISSING } = presentSharedRoots();
+export const SCANNED_TREES = SCANNED_TREES_PRESENT;
 
 // `writePref(` is optional in the pattern and mandatory in the rule: any prefs
 // literal NOT sitting as writePref's first argument is the violation.
@@ -172,14 +186,14 @@ export function analyse({ prefsSource } = {}) {
     PREFS_WRITE_CALL.lastIndex = 0;
     let m;
     while ((m = PREFS_WRITE_CALL.exec(prefsSrc)) !== null) {
-      if (m[1]) continue; // sat as writePref's first argument — the chokepoint
+      if (m[1]) continue; // sat as writePref's first argument, the chokepoint
       const command = m[2];
       if (READ_COMMANDS.has(command)) continue;
       failures.push({
         file: rel,
         line: lineOf(prefsSrc, m.index),
         command,
-        why: `invokes a prefs write command directly. Route it through ${rel}'s writePref(), which bumps the nonce — usePrefs siblings only re-read on that bump, so without it the open editor keeps the old value for the rest of the session.`,
+        why: `invokes a prefs write command directly. Route it through ${rel}'s writePref(), which bumps the nonce. usePrefs siblings only re-read on that bump, so without it the open editor keeps the old value for the rest of the session.`,
       });
     }
 
@@ -200,6 +214,18 @@ export function analyse({ prefsSource } = {}) {
 
   if (prefsSource !== undefined) return { failures, writes };
 
+  // A shared root that is not on disk means rule 2 is about to scan less than it
+  // claims. Reported as a failure rather than skipped: "scanned fewer trees, said
+  // ok" is the exact shape this guard's private roster copy used to have.
+  for (const rel of SCANNED_TREES_MISSING) {
+    failures.push({
+      file: rel,
+      line: 0,
+      command: "(missing tree)",
+      why: "is on the shared-roots roster but absent from this checkout, so rule 2 would silently scan one tree fewer. Restore it, or remove it from scripts/lib/shared-roots.mjs where its absence is a decision somebody can read.",
+    });
+  }
+
   // ---- rule 2: nobody else invokes a prefs write --------------------------
   for (const tree of SCANNED_TREES) {
     for (const file of walk(join(ROOT, tree))) {
@@ -216,7 +242,7 @@ export function analyse({ prefsSource } = {}) {
           file: rel,
           line: lineOf(src, hit.index),
           command,
-          why: `invokes a prefs write from outside a prefs module (${PREFS_MODULE_LIST}). Add a wrapper in the one for this client's tree instead — reaching around the module reaches around the nonce bump.`,
+          why: `invokes a prefs write from outside a prefs module (${PREFS_MODULE_LIST}). Add a wrapper in the one for this client's tree instead. Reaching around the module reaches around the nonce bump.`,
         });
       }
     }

@@ -22,7 +22,7 @@
 // reimplemented the scan could pass while the script failed, or agree with a bug.
 
 import { describe, expect, it } from "vitest";
-// @ts-expect-error — a .mjs guard script with no type declarations; the import
+// @ts-expect-error: a .mjs guard script with no type declarations; the import
 // is the point (see the header), not the typing.
 import {
   analyse as analyseUntyped,
@@ -82,15 +82,15 @@ describe("the prefs-nonce guard", () => {
   });
 
   it("has BOTH client trees in scope, in both of its rules", () => {
-    // The guard was blind to a whole client for the three months mobile lived
-    // in-repo (myne-md/myne#486): `mobile/src` was in neither roster, so `writes`
-    // counted the desktop module alone and every non-vacuity assertion above
-    // passed anyway. Scope is therefore asserted directly rather than inferred
-    // from a count, and BOTH rosters are named — rule 1 reads `PREFS_MODULES`,
-    // rule 2 reads `SCANNED_TREES`, and restoring only one leaves the other
-    // silently blind. That one-line-away second blind spot is the myne#411
-    // lesson, where a guard fix closed one and opened another with the tree
-    // green throughout.
+    // From the day mobile moved in-repo (2026-08-13) the guard was blind to a
+    // whole client (myne-md/myne#486): `mobile/src` was in neither roster, so
+    // `writes` counted the desktop module alone and every non-vacuity assertion
+    // above passed anyway. Scope is therefore asserted directly rather than
+    // inferred from a count, and BOTH rosters are named. Rule 1 reads
+    // `PREFS_MODULES`, rule 2 reads `SCANNED_TREES`, and restoring only one
+    // leaves the other silently blind: that one-line-away second blind spot is
+    // the myne#411 lesson, where a guard fix closed one and opened another with
+    // the tree green throughout.
     expect(PREFS_MODULES).toContain("src/lib/prefs.ts");
     expect(PREFS_MODULES).toContain("mobile/src/lib/prefs.ts");
     expect(SCANNED_TREES).toContain("src");

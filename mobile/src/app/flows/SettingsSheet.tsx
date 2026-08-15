@@ -940,7 +940,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   const [renameText, setRenameText] = useState("");
 
   /** Optimistic prefs setter: reflect instantly, persist, revert the one key on
-   *  failure. Deliberately NOT named `writePref` — that is the IPC chokepoint in
+   *  failure. Deliberately NOT named `writePref`: that is the IPC chokepoint in
    *  `lib/prefs.ts`, which is what bumps the shared prefs nonce so EVERY
    *  `usePrefs` consumer (this sheet + the live editor behind it) re-reads disk
    *  truth. This wrapper adds only the optimistic draft and its revert; the

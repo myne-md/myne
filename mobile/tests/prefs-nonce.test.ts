@@ -3,7 +3,7 @@
 // The mobile prefs-nonce chokepoint (myne-md/myne#486).
 //
 // `scripts/check-prefs-nonce.mjs` is the static half: it proves no prefs write
-// literal sits outside `writePref`. It cannot prove `writePref` still BUMPS —
+// literal sits outside `writePref`. It cannot prove `writePref` still BUMPS:
 // deleting the bump line leaves the guard green, because the guard reads call
 // shapes, not behaviour. That is this file's half, and the two together are the
 // rule.
@@ -20,7 +20,7 @@
 //     acceptance criterion in the issue's own words, and it pins the whole chain
 //     (writePref → bumpPrefsNonce → useSyncExternalStore → re-read), of which
 //     assertion 1 pins only the first link. Mobile has four independent mount
-//     sites — EditorFlow, SettingsSheet, AttachmentsSheet, SyncSettingsPanels —
+//     sites (EditorFlow, SettingsSheet, AttachmentsSheet, SyncSettingsPanels),
 //     which is why a missing bump here is a stale open editor rather than a
 //     latent defect.
 //
@@ -31,7 +31,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-// @ts-expect-error — a .mjs guard script with no type declarations. Importing the
+// @ts-expect-error: a .mjs guard script with no type declarations. Importing the
 // guard's own classification rather than mirroring it is the point: a copy here
 // would go stale in both directions (a new read command would make this file
 // demand a bump from something that writes nothing; a command moved OUT of the
@@ -97,7 +97,7 @@ describe("the mobile prefs chokepoint", () => {
         await (fn as (...a: unknown[]) => unknown)("probe", "probe");
       } catch {
         // A shape the binding rejects before its IPC call is not a write, and the
-        // filter below is what decides that — not this catch.
+        // filter below is what decides that, not this catch.
       }
       const writes = prefsWritesOf(invoke.mock.calls);
       if (writes.length === 0) continue;
@@ -108,17 +108,42 @@ describe("the mobile prefs chokepoint", () => {
       );
     }
 
-    // Non-vacuity: an empty roster satisfies the loop above without asserting
-    // anything. 47 writes were routed through the chokepoint by #486; the floor
-    // is deliberately below that so adding a setter does not fail this line,
-    // while deleting the module's exports still does.
-    expect(covered.length).toBeGreaterThanOrEqual(40);
-    // The two privacy surfaces the issue separates out, named rather than merely
-    // counted: a stale read on either is not just a stale value. Screen-capture
-    // protection is a `docs/threat-model.md` §6 mitigation, and reminders govern
-    // whether pending times keep leaving the AEAD envelope into OS-owned storage.
+    // Non-vacuity, pinned at the REAL count rather than under it. A floor fires
+    // when the number drops, and an addition raises it, so slack below reality
+    // buys nothing and costs coverage: at 40 against 47, seven setters could stop
+    // reaching `invoke` (an early return skips them via `writes.length === 0`)
+    // with this file still green. `grep -c 'await writePref(' mobile/src/lib/prefs.ts`
+    // is the number, and raising it is the whole point of a floor.
+    expect(covered.length).toBeGreaterThanOrEqual(47);
+    // Two names pinned rather than left to the count, because these two toggles
+    // are the ones a user reads as a privacy promise, so a surface showing the
+    // old value is worse here than a stale font size. Deliberately NOT cited to
+    // `docs/threat-model.md` §6: that section scopes screen-capture exclusion to
+    // Windows, macOS and Linux and describes no mobile platform, and its own text
+    // records that one unqualified sentence made the item overclaim for a year.
+    // What this assertion pins is narrower and true: the displayed state of these
+    // toggles must match disk.
     expect(covered).toContain("setScreenCaptureProtection");
     expect(covered).toContain("setRemindersEnabled");
+  });
+
+  it("does not bump when the write rejects", async () => {
+    // The twin of `tests/lib/prefsBindings.test.ts`'s rejection case, and the
+    // reason it has to exist here too: the roster above proves a RESOLVED write
+    // bumps, and nothing proves the bump sits after the invoke. Hoisting
+    // `bumpPrefsNonce()` above `await invoke()` in `lib/prefs.ts` passes every
+    // other assertion in this file, while making a FAILED write refresh all four
+    // mounted `usePrefs` from disk that the write never reached, racing the
+    // in-flight write. `lib/prefsNonce.ts` forbids exactly that ("never before,
+    // else a re-read pulls stale disk truth"), and `writePref`'s own doc claims
+    // "Bumps on SUCCESS only". This is what holds it to the claim.
+    invoke.mockReset();
+    invoke.mockRejectedValueOnce({ kind: "SlotNotUnlocked" });
+    const before = getPrefsNonce();
+    await expect(prefs.setScreenCaptureProtection(true)).rejects.toEqual({
+      kind: "SlotNotUnlocked",
+    });
+    expect(getPrefsNonce()).toBe(before);
   });
 
   it("lets a write on one surface reach a usePrefs mounted on another", async () => {
