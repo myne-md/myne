@@ -1593,9 +1593,15 @@ A short piece of dictated note text captured on the native-SwiftUI Apple Watch c
 
 ### **platform seam** &nbsp; 📦 *Product*
 
-The single internal boundary through which the shared React UI reaches its host platform — `src/platform/`, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). Desktop's implementation re-exports Tauri; the web client's routes the same calls into a wasm Worker. No file under `src/` outside the seam may import `@tauri-apps/*`, and a `pre-commit` hook plus a CI step enforce it. The seam's whole purpose is that the two clients are the **same tree with one substitution**, which is also why a single **contract-test** suite — the [seam contract](#seam-contract) — runs against every implementation rather than each being tested on its own terms.
+The internal boundary through which a client's UI tree reaches its host platform, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). The shared tree's seam is `src/platform/`: desktop's implementation re-exports Tauri, the web client's routes the same calls into a wasm Worker, and that one substitution is what makes the two clients the **same tree** rather than two trees that resemble each other.
 
-Used in: `decisions.md` 2026-07-26 (web E2E policy); `src/platform/`
+Since myne#492 the rule is stated per guarded tree rather than for `src/` alone, and `scripts/check-platform-seam.mjs` enforces it over **eight** roots in `pre-commit` and in CI. Two of them are Tauri hosts and get a seam directory of their own: `src` (`src/platform/`) and `mobile/src` (`mobile/src/platform/`, six modules). The other six get the strictest form, no seam directory at all, so `@tauri-apps/*` is banned outright: `editor/`, `dialect/`, `copy/`, `ornaments/`, `preview/` and `web/src`. The reason is not that those trees have no Tauri consumer, it is that not **every** consumer is one, and a module-scope import lands in a non-Tauri consumer's bundle whether or not the call ever fires.
+
+Mobile's seam is not a substitution point: mobile is a Tauri host on both of its targets, so there is nothing to substitute. It exists to give the guard a boundary to enforce and to keep the twin modules under `mobile/src/lib` byte-identical to their desktop counterparts, which is how a fix reaches both clients. `mobile/src/formfactor/` is a **different** thing that used to share the name: the iOS-versus-Android and phone-versus-tablet PRESENTATION split (see [size class](#size-class)), renamed out of the way so `<tree>/platform/` means one thing in all three clients.
+
+The seam is meant to be pinned by a single contract suite rather than each implementation being tested on its own terms: see [seam contract](#seam-contract), including which implementations it covers today.
+
+Used in: `decisions.md` 2026-07-26 (web E2E policy); `src/platform/`; `mobile/src/platform/`; `web/src/platform/`; `scripts/check-platform-seam.mjs`
 
 ### **plausibly-deniable encryption** &nbsp; ⚠️ *Threat*
 
@@ -1845,7 +1851,9 @@ Used in: `threat-model.md` §6, §7
 
 ### **seam contract** &nbsp; 🛠️ *Tooling*
 
-The one assertion suite that pins the behaviour of the [platform seam](#platform-seam) — call shape, error propagation, subscribe/unsubscribe lifecycle, and the typed *unsupported* outcome for every seam module — and is run against **every** implementation (the Tauri one and the web one) in **both** CI lanes (`tests/platform/seam-contract.ts`, driven by `tauri-seam.test.ts` / `web-seam.test.ts`). It exists because the reason the web client gets no mirror of the desktop E2E suite — "it is the same `src/` tree, only the seam differs" — is a *premise*, and an unverified premise is how a divergence ships; the contract turns it into a checked property. It also pins desktop seam behaviour, which nothing pinned before. See also [capability gating](#capability-gating), [single-tab lock](#single-tab-lock).
+The one assertion suite that pins the behaviour of the [platform seam](#platform-seam), meaning call shape, error propagation, subscribe/unsubscribe lifecycle, and the typed *unsupported* outcome for every seam module. It runs against the **desktop and web** implementations in **both** CI lanes (`tests/platform/seam-contract.ts`, driven by `tauri-seam.test.ts` / `web-seam.test.ts`). It exists because the reason the web client gets no mirror of the desktop E2E suite ("it is the same `src/` tree, only the seam differs") is a *premise*, and an unverified premise is how a divergence ships; the contract turns it into a checked property. It also pins desktop seam behaviour, which nothing pinned before. See also [capability gating](#capability-gating), [single-tab lock](#single-tab-lock).
+
+**Known gap, recorded rather than implied away.** The [platform seam](#platform-seam) got a third implementation in myne#492, `mobile/src/platform/`, and it has no contract driver: `tests/platform/` holds two subjects, not three. So the coverage claim above is exact and deliberately narrower than "every implementation", which is what this entry used to say while a third seam shipped outside it. The suite is already parameterised for a third subject (it takes a `supports` set), so closing the gap is a driver file rather than a redesign; until it lands, mobile's seam is verified by its own specs and by the twin-drift warning, not by this contract.
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
 

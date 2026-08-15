@@ -43,6 +43,7 @@ import { SHARED_ROOTS } from "./lib/shared-roots.mjs";
 // `editor/package.json`. That combination is what lets a NON-Tauri client
 // compile these packages at all: a module-scope import lands in the bundle
 // whether or not the call ever fires.
+
 // Each record carries the advice printed when THAT root is violated. It is a
 // field rather than a branch in the printer because the printer's job is to
 // pick a message per root, and a branch keyed on `seam !== null` plus one
@@ -50,16 +51,21 @@ import { SHARED_ROOTS } from "./lib/shared-roots.mjs";
 // line read `violations[0].seam` and answered a `web/src` violation with
 // instructions about `editor/`. Put the message where the root is declared and
 // a message structurally cannot describe a different tree.
-const seamAdvice = (seam) =>
+//
+// `why` is a parameter and not a shared tail, because the two seam-bearing
+// roots do not share a reason. `src`'s seam exists so the WEB client can
+// substitute behind it; `mobile/src` has nothing to substitute (it is a Tauri
+// host on both of its targets) and its seam exists to give the guard a boundary
+// and to keep its twins byte-identical. Printing the web sentence for a mobile
+// violation would be this guard's original defect one layer up.
+const seamAdvice = (seam, why) =>
   `Only ${seam}/ may import @tauri-apps/*. Import the matching seam module` +
   `\ninstead (e.g. \`import { invoke } from "<relative>/${seam.split(sep).pop()}/core"\`),` +
   `\nor add the export to the seam module if it does not exist yet.` +
-  `\nWhy: the web client compiles the same tree with a web implementation` +
-  `\nbehind that boundary — a direct import breaks it (docs/decisions.md,` +
-  `\nphase3-web-client).`;
+  `\nWhy: ${why}`;
 
 const SHARED_PACKAGE_ADVICE = (root) =>
-  `Nothing in ${root}/ may import @tauri-apps/* — it is a SHARED SOURCE package` +
+  `Nothing in ${root}/ may import @tauri-apps/*. It is a SHARED SOURCE package` +
   `\ncompiled by every client, including ones that are not Tauri at all` +
   `\n(the web client; for ornaments/ and preview/, the website and the` +
   `\nmyne-themes gallery renderer). Reach the host through the EditorHost seam:` +
@@ -71,7 +77,16 @@ const SHARED_PACKAGE_ADVICE = (root) =>
   `\ncall ever fires, so it breaks those builds rather than degrading them.`;
 
 const GUARDED = [
-  { root: "src", seam: join("src", "platform"), advice: seamAdvice(join("src", "platform")) },
+  {
+    root: "src",
+    seam: join("src", "platform"),
+    advice: seamAdvice(
+      join("src", "platform"),
+      `the web client compiles the same tree with a web implementation` +
+        `\nbehind that boundary, so a direct import breaks it rather than degrading` +
+        `\nit (docs/decisions.md, phase3-web-client).`,
+    ),
+  },
   { root: "editor", seam: null, advice: SHARED_PACKAGE_ADVICE("editor") },
   { root: "dialect", seam: null, advice: SHARED_PACKAGE_ADVICE("dialect") },
   { root: "copy", seam: null, advice: SHARED_PACKAGE_ADVICE("copy") },
@@ -98,11 +113,13 @@ const GUARDED = [
   {
     root: "mobile/src",
     seam: join("mobile", "src", "platform"),
-    advice:
-      seamAdvice(join("mobile", "src", "platform")) +
-      `\nOn mobile the seam exists so this guard has a boundary to enforce at all,` +
-      `\nand so the twin modules under mobile/src/lib stay byte-identical to their` +
-      `\ndesktop counterparts (myne#492).`,
+    advice: seamAdvice(
+      join("mobile", "src", "platform"),
+      `mobile is a Tauri host on both of its targets, so there is nothing` +
+        `\nto substitute here. The seam exists to give this guard a boundary to enforce` +
+        `\nat all, and so the twin modules under mobile/src/lib stay byte-identical to` +
+        `\ntheir desktop counterparts, which is how a fix reaches both clients (myne#492).`,
+    ),
   },
   // Web gets `seam: null`, the strictest form, because the web client is not a
   // Tauri host at ALL. `web/src/platform/` is the seam's web SIDE: it answers
@@ -114,11 +131,11 @@ const GUARDED = [
     root: "web/src",
     seam: null,
     advice:
-      `Nothing under web/src may import @tauri-apps/* — the web client is not a` +
+      `Nothing under web/src may import @tauri-apps/*. The web client is not a` +
       `\nTauri host at all. web/src/platform/ is the seam's WEB SIDE: it answers` +
       `\nthe same \`(cmd, args)\` call into the wasm Worker. Import from there:` +
       `\n\n    import { invoke } from "<relative>/platform/core";` +
-      `\n\nIf the command has no web arm yet, that is a capability decision — add it` +
+      `\n\nIf the command has no web arm yet, that is a capability decision: add it` +
       `\nto web/wasm/src/capability.rs (dispatched / absent-on-web / port owed) in` +
       `\nthe same change, which \`check-web-command-coverage.mjs\` requires.`,
   },
@@ -155,7 +172,19 @@ const GUARDED = [
 // `tests/lib/platformSeam.test.ts` imports this module — so the one way to
 // exercise it would kill the Vitest worker instead of failing a named test.
 export function uncoveredSharedRoots(roots = GUARDED, shared = SHARED_ROOTS) {
-  return shared.filter((s) => !roots.some((g) => s === g.root || s.startsWith(g.root + "/")));
+  return shared.filter((s) => !roots.some((g) => inRoot(s, g.root)));
+}
+
+// The ONE containment predicate. `mobile/src` and `web/src` are the first
+// multi-segment roots, and the coverage claim and the scan used to spell this
+// differently: one hardcoded `/`, the other `sep`. On a `\`-separator platform
+// that combination reports a tree as covered while the scan skips it, which is
+// the myne#492 failure mode with a platform predicate on it. Windows is
+// deferred (myne#178), so this is cheap insurance rather than a live bug, and
+// the point is that there is no second spelling to keep in step.
+function inRoot(rel, root) {
+  const norm = rel.split(sep).join("/");
+  return norm === root || norm.startsWith(root + "/");
 }
 
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|mts|cts)$/;
@@ -218,7 +247,7 @@ function walk(dir, out) {
 // Takes the ALREADY-relative path: the caller needs `rel` anyway, and computing
 // it in both places meant one `path.relative` per file per rule.
 function guardFor(rel, roots = GUARDED) {
-  return roots.find((g) => rel === g.root || rel.startsWith(g.root + sep));
+  return roots.find((g) => inRoot(rel, g.root));
 }
 
 // ── the wasm module belongs to the Worker, and only to the Worker ───────────
@@ -277,7 +306,7 @@ export function analyse(explicitFiles = null, roots = GUARDED) {
       const m = VIOLATION.exec(line);
       if (m) violations.push({ file: rel, line: i + 1, spec: m[2], root: guard.root });
       if (!TAURI_GLOBAL_EXEMPT.has(rel) && TAURI_GLOBAL.test(line)) {
-        globalViolations.push({ file: rel, line: i + 1 });
+        globalViolations.push({ file: rel, line: i + 1, root: guard.root, seam: guard.seam });
       }
     });
   }
@@ -318,7 +347,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         `\`scripts/lib/shared-roots.mjs\` lists a tree this guard does not scan, which is\n` +
         `exactly the myne#492 defect: 41 direct \`@tauri-apps/*\` imports accumulated under\n` +
         `\`mobile/src\` while the guard reported ok. Add the root to \`GUARDED\` with the seam\n` +
-        `directory that is exempt inside it (\`null\` bans Tauri outright — correct for a tree\n` +
+        `directory that is exempt inside it (\`null\` bans Tauri outright, which is correct for a tree\n` +
         `whose client is not a Tauri host).`,
     );
     process.exit(1);
@@ -352,10 +381,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (globalViolations.length) {
     console.error("Tauri runtime global reached outside the platform seam:\n");
     for (const v of globalViolations) console.error(`  ${v.file}:${v.line}`);
+    // The seam path is read off the offending root, for the same reason the
+    // import guidance above is. `mobile/src/lib/app-window.ts` joined
+    // `TAURI_GLOBAL_EXEMPT` in myne#492, which made a `mobile/src` global
+    // violation reachable for the first time, and a hardcoded `src/platform/`
+    // would answer it with the desktop tree's path. Fixing that for one rule
+    // and leaving it for its sibling is the half-fix this file argues against.
+    const seams = [...new Set(globalViolations.map((v) => v.seam ?? join(v.root, "platform")))];
     console.error(
       `\nThe \`__TAURI…__\` globals are the seam's other bypass: they are not module` +
         `\nspecifiers, so nothing above catches them, and they reach the same IPC.` +
-        `\nImport \`invoke\` from the seam instead (\`src/platform/core.ts\`).` +
+        `\nImport \`invoke\` from the seam instead (${seams.map((s) => `\`${join(s, "core.ts")}\``).join(", ")}).` +
         `\n\nWhy it matters even though desktop loses no capability: on web the seam` +
         `\nanswers a typed \`PlatformUnsupportedError\` (\`src/platform/unsupported.ts\`,` +
         `\npinned by \`tests/platform/seam-contract.ts\`); a runtime-global call answers` +
@@ -377,7 +413,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         `\n\`web/src/platform/core.ts\` from shared code).` +
         `\n\nWhy: \`createSyncAccessHandle\` is dedicated-worker-only in every browser` +
         `\nand Safari implements no \`createWritable\`, so the storage layer CANNOT` +
-        `\nrun on the main thread — and a second wasm instance means a second copy of` +
+        `\nrun on the main thread, and a second wasm instance means a second copy of` +
         `\n\`root_key\` plus two sync access handles on the same OPFS files.`,
     );
     process.exit(1);
