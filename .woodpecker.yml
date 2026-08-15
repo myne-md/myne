@@ -285,6 +285,28 @@ steps:
       - git fetch origin develop --depth=50 || true
       - node scripts/check-bundle-record.mjs --append-only origin/develop
 
+  # ─── Every desktop/mobile twin carries a verdict (#472) ──────────────────────
+  # No `code-paths` filter, for exactly bundle-record's reason one step up: the
+  # guard's `--check` half compares the GENERATED docs/dev/twin-inventory.md
+  # against what --emit would write, so a docs/** file is one of its inputs. A
+  # hand edit to that document is a docs-only commit, and under the filter CI
+  # would never look, leaving only the --no-verify-bypassable pre-commit hook.
+  #
+  # It lived inside the filtered pnpm-build step until review, under a comment
+  # asserting the document "is never read by the check". The line directly below
+  # that comment read it.
+  #
+  # Distinct from check-twin-drift.mjs, which stays a warning in pnpm-build: that
+  # one fires on a NEW one-sided change and says nothing about the pairs that had
+  # already drifted. A twin ENTERING the set fails HERE, which is decisions.md
+  # 0488's own failure signal mechanised: "A mobile/ directory that started to
+  # grow its own copy of a shared screen would be the signal that this decision
+  # had failed."
+  twin-inventory:
+    image: node:25
+    commands:
+      - node scripts/check-twin-inventory.mjs --check
+
   pnpm-build:
     image: node:25
     when: *code-paths
@@ -1490,6 +1512,10 @@ steps:
       - name: e2e-floor
         optional: true
       - name: bundle-record
+        optional: true
+      # Unfiltered like bundle-record, so it can go red on a docs-only commit,
+      # which is precisely the commit that hand-edits its generated projection.
+      - name: twin-inventory
         optional: true
       - name: web-build
         optional: true
