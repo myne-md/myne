@@ -559,11 +559,14 @@ mod tests {
         // audio and report it as the whole thing.
         //
         // The refuse case drives the bound through the RATIO, so a 2-sample
-        // input crosses a 28.8 M ceiling and the branch runs without anything
-        // materialising it. Doing this by input length instead costs 146 MB and
-        // 8.0e9 instructions, which measured out at 93% of this crate's whole
-        // lib-test wall time, and buys only the inclusive-versus-exclusive edge
-        // of a bound whose worst error is refusing one extra sample.
+        // input crosses the ceiling and the branch runs without anything
+        // materialising it. Doing it by input length instead means allocating
+        // `MAX_PCM_SAMPLES` output samples, which at 4 bytes each is the whole
+        // point of having a ceiling; the 30-minute draft of this constant
+        // measured that shape at 146 MB and 8.0e9 instructions, 93% of this
+        // crate's entire lib-test wall time, and the current constant is larger.
+        // It buys only the inclusive-versus-exclusive edge of a bound whose
+        // worst error is refusing one extra sample.
         //
         // Rates outside `parse_wav`'s clamp on purpose: this guard is defence
         // in depth, so it has to hold for a caller that did not come through
@@ -690,10 +693,12 @@ mod tests {
         // The `data` chunk has to really be there: the walker clamps a
         // truncated trailing chunk to EOF, so a merely DECLARED length would be
         // measured as zero and this test would pass while proving nothing.
-        // Built as one zeroed `resize` rather than 28.8 M pushes, and
+        // Built as one zeroed `resize` rather than `MAX_PCM_SAMPLES` pushes, and
         // `parse_wav` refuses before the `Vec<i16>`, so the cost is a single
-        // ~58 MB buffer instead of the ~146 MB an input-length-driven test of
-        // the resampler needs.
+        // `(MAX_PCM_SAMPLES + 1) * 2`-byte buffer (64 MiB at the current
+        // constant) and no output vector at all. Stated symbolically on purpose:
+        // the 30-minute draft's figures outlived the draft in these comments
+        // once already.
         let data_len = (MAX_PCM_SAMPLES + 1) * 2;
         let mut wav = build_wav(1, WHISPER_SAMPLE_RATE, &[]);
         let header = wav.len();
