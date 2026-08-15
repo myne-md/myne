@@ -26,6 +26,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { SHARED_ROOTS } from "./lib/shared-roots.mjs";
 
 // Guarded root → the seam directory that is exempt inside it.
 //
@@ -54,7 +55,67 @@ const GUARDED = [
   // degrade those consumers, it would fail their build outright.
   { root: "ornaments", seam: null },
   { root: "preview", seam: null },
+  // `mobile/src` and `web/src` joined in myne#492 — the two trees
+  // `scripts/lib/shared-roots.mjs` had listed all along while this file, the
+  // guard every seam decision rests on, could not see either. 41 files under
+  // `mobile/src` were importing `@tauri-apps/*` directly and nothing reported
+  // it; four of them differed from their desktop twins in the import line and
+  // in nothing else.
+  //
+  // Mobile gets a seam DIRECTORY rather than `seam: null`, and that is forced:
+  // it is a Tauri host on both of its targets, so a total ban would be a rule
+  // it cannot satisfy. Its seam is `mobile/src/platform/`, which meant renaming
+  // the iOS-versus-Android PRESENTATION seam that used to hold that path to
+  // `mobile/src/formfactor/`. Two unrelated things were sharing a directory
+  // name; now `<tree>/platform/` means the same thing in all three clients.
+  { root: "mobile/src", seam: join("mobile", "src", "platform") },
+  // Web gets `seam: null`, the strictest form, because the web client is not a
+  // Tauri host at ALL. `web/src/platform/` is the seam's web SIDE: it answers
+  // the same `(cmd, args)` call into the wasm Worker, importing nothing from
+  // `@tauri-apps/*`. The tree held zero real violations when it joined (only
+  // two prose mentions, which the quote anchor correctly skips), so the tightest
+  // rule was free on the day it landed and will not be free later.
+  { root: "web/src", seam: null },
 ];
+
+// ── the roster, versus `scripts/lib/shared-roots.mjs` ───────────────────────
+//
+// That library exists because each guard kept a private copy of "which trees are
+// shared" and one copy fell behind: `check-i18n.mjs`'s never learned about
+// `editor/`, `dialect/` or `copy/`, leaving 226 live `i18n.t()` keys unscanned.
+// This file had the same defect for `mobile/src` and `web/src`.
+//
+// The roster is NOT derived from `SHARED_ROOTS`, for two reasons that are
+// scope-widening rather than narrowing, so the library's contract is met by
+// stating them here rather than by importing the list wholesale:
+//
+//   1. This guard scans PACKAGE roots (`editor`), not source roots
+//      (`editor/src`). The rule holds for a package's config and tooling files
+//      too, and deriving would quietly shrink that.
+//   2. `preview/` is guarded here and deliberately absent from `SHARED_ROOTS`
+//      (a captured artefact, not source compiled into a client) — the library's
+//      own comment already points at this file for it.
+//
+// What IS derived is the COVERAGE CLAIM: every shared root must fall inside a
+// guarded root, checked below at load. That is the half that went wrong — not
+// the list's shape, but a member silently missing from it — and a prose comment
+// cannot fail when the next shared tree lands.
+{
+  const uncovered = SHARED_ROOTS.filter(
+    (shared) => !GUARDED.some((g) => shared === g.root || shared.startsWith(g.root + "/")),
+  );
+  if (uncovered.length) {
+    console.error(
+      `Shared tree(s) outside every guarded root: ${uncovered.join(", ")}\n\n` +
+        `\`scripts/lib/shared-roots.mjs\` lists a tree this guard does not scan, which is\n` +
+        `exactly the myne#492 defect: 41 direct \`@tauri-apps/*\` imports accumulated under\n` +
+        `\`mobile/src\` while the guard reported ok. Add the root to \`GUARDED\` with the seam\n` +
+        `directory that is exempt inside it (\`null\` bans Tauri outright — correct for a tree\n` +
+        `whose client is not a Tauri host).`,
+    );
+    process.exit(1);
+  }
+}
 
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|mts|cts)$/;
 const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git"]);
@@ -87,7 +148,18 @@ const TAURI_GLOBAL = /__TAURI[A-Z0-9_]*__/;
 // without itself importing Tauri. A FILE exemption rather than a line one
 // because that file is a single exported constant plus its docstring, and the
 // docstring names the global too.
-const TAURI_GLOBAL_EXEMPT = new Set([join("src", "lib", "app-window.ts")]);
+//
+// `mobile/src/lib/app-window.ts` is the same file for the same reason (myne#492).
+// It carries the constant AND a call-time `hasTauriHost()`, because one caller
+// (`attachmentSrc`) is reached from specs that stub the global inside the test
+// body, long after module evaluation. Two other mobile modules had re-spelled
+// the probe inline — `lib/attachmentRef.ts` and `components/SyncSettingsPanels.tsx`
+// — and both import it now. Exactly one file per tree may name the global; that
+// is what makes the exemption a boundary rather than a hole.
+const TAURI_GLOBAL_EXEMPT = new Set([
+  join("src", "lib", "app-window.ts"),
+  join("mobile", "src", "lib", "app-window.ts"),
+]);
 
 function walk(dir, out) {
   for (const entry of readdirSync(dir)) {
@@ -152,7 +224,7 @@ export function analyse(explicitFiles = null, roots = GUARDED) {
     checked += 1;
     text.split("\n").forEach((line, i) => {
       const m = VIOLATION.exec(line);
-      if (m) violations.push({ file: rel, line: i + 1, spec: m[2], seam: guard.seam });
+      if (m) violations.push({ file: rel, line: i + 1, spec: m[2], seam: guard.seam, root: guard.root });
       if (!TAURI_GLOBAL_EXEMPT.has(rel) && TAURI_GLOBAL.test(line)) {
         globalViolations.push({ file: rel, line: i + 1 });
       }
@@ -195,29 +267,51 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const v of violations) {
       console.error(`  ${v.file}:${v.line}  imports ${v.spec}`);
     }
-    const seam = violations[0].seam;
-    if (seam === null) {
-      console.error(
-        `\nNothing in editor/, dialect/ or copy/ may import @tauri-apps/* — these are` +
-          `\nSHARED SOURCE packages compiled by every client, including one that is not` +
-          `\nTauri at all. Reach the host through the EditorHost seam instead:` +
-          `\n\n    import { getHost } from "<relative>/host";` +
-          `\n    const rows = await getHost().attachments.catalogList();` +
-          `\n\nIf the operation has no slot yet, ADD one to editor/src/host.ts and` +
-          `\nimplement it in each client's host (src/editor-host.ts on desktop).` +
-          `\nA module-scope @tauri-apps import lands in the bundle whether or not the` +
-          `\ncall ever fires, so it breaks the web build rather than degrading it.`,
-      );
-      process.exit(1);
+    // Guidance PER ROOT, not per first violation. The old line read
+    // `violations[0].seam` and printed one message for the whole run, so a
+    // violation in `web/src` was answered with instructions about `editor/`,
+    // `dialect/` and `copy/` — the EditorHost, which is not the web client's
+    // seam. That was already wrong for `ornaments/` and `preview/` and only
+    // became reachable in practice when `web/src` joined the roots (myne#492).
+    for (const root of [...new Set(violations.map((v) => v.root))]) {
+      const seam = violations.find((v) => v.root === root).seam;
+      console.error(`\n── ${root}/ ─────────────────────────────────────────`);
+      if (seam !== null) {
+        console.error(
+          `Only ${seam}/ may import @tauri-apps/*. Import the matching seam module` +
+            `\ninstead (e.g. \`import { invoke } from "<relative>/${seam.split(sep).pop()}/core"\`),` +
+            `\nor add the export to the seam module if it does not exist yet.` +
+            `\nWhy: the web client compiles the same tree with a web implementation` +
+            `\nbehind that boundary — a direct import breaks it (design-notes.md,` +
+            `\nphase3-web-client). On mobile the seam exists so this guard has a` +
+            `\nboundary to enforce at all, and so the twin modules under src/lib stay` +
+            `\nbyte-identical to their mobile counterparts (myne#492).`,
+        );
+      } else if (root === "web/src") {
+        console.error(
+          `Nothing under web/src may import @tauri-apps/* — the web client is not a` +
+            `\nTauri host at all. web/src/platform/ is the seam's WEB SIDE: it answers` +
+            `\nthe same \`(cmd, args)\` call into the wasm Worker. Import from there:` +
+            `\n\n    import { invoke } from "<relative>/platform/core";` +
+            `\n\nIf the command has no web arm yet, that is a capability decision — add it` +
+            `\nto web/wasm/src/capability.rs (dispatched / absent-on-web / port owed) in` +
+            `\nthe same change, which \`check-web-command-coverage.mjs\` requires.`,
+        );
+      } else {
+        console.error(
+          `Nothing in ${root}/ may import @tauri-apps/* — it is a SHARED SOURCE package` +
+            `\ncompiled by every client, including ones that are not Tauri at all` +
+            `\n(the web client; for ornaments/ and preview/, the website and the` +
+            `\nmyne-themes gallery renderer). Reach the host through the EditorHost seam:` +
+            `\n\n    import { getHost } from "<relative>/host";` +
+            `\n    const rows = await getHost().attachments.catalogList();` +
+            `\n\nIf the operation has no slot yet, ADD one to editor/src/host.ts and` +
+            `\nimplement it in each client's host (src/editor-host.ts on desktop).` +
+            `\nA module-scope @tauri-apps import lands in the bundle whether or not the` +
+            `\ncall ever fires, so it breaks those builds rather than degrading them.`,
+        );
+      }
     }
-    console.error(
-      `\nOnly ${seam}/ may import @tauri-apps/*. Import the matching seam module` +
-        `\ninstead (e.g. \`import { invoke } from "<relative>/${seam.split(sep).pop()}/core"\`),` +
-        `\nor add the export to the seam module if it does not exist yet.` +
-        `\nWhy: the web client compiles the same tree with a web implementation` +
-        `\nbehind that boundary — a direct import breaks it (design-notes.md,` +
-        `\nphase3-web-client).`,
-    );
     process.exit(1);
   }
 

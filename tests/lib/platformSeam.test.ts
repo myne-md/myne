@@ -70,6 +70,36 @@ describe("check-platform-seam", () => {
     // on that single file rather than relying on the whole-tree pass, so it
     // stays a pin on the exemption specifically.
     expect(analyse(["src/lib/app-window.ts"]).globalViolations).toEqual([]);
+    // The mobile twin, which carries the same probe plus the call-time
+    // `hasTauriHost()` two of its callers need (myne#492).
+    expect(analyse(["mobile/src/lib/app-window.ts"]).globalViolations).toEqual([]);
+  });
+
+  // ── the roots are IN scope, asserted per root ──────────────────────────────
+  //
+  // The whole-tree pass above cannot see a missing root: `guardFor` returns
+  // undefined for a file outside every `GUARDED` entry, the file is skipped, and
+  // the run reports ok. That is precisely how `mobile/src` accumulated 41 direct
+  // `@tauri-apps/*` imports with the guard green (myne#492), so each root gets a
+  // pin that fails if it silently drops out.
+  //
+  // `checked` is the assertion, not `violations`: an empty violation list is
+  // what BOTH "the file is clean" and "the file was never read" look like.
+  it.each([
+    ["mobile/src", "mobile/src/lib/vault-status.ts"],
+    ["web/src", "web/src/platform/core.ts"],
+    ["src", "src/lib/vault-status.ts"],
+    ["editor", "editor/src/host.ts"],
+  ])("scans %s", (_root, file) => {
+    expect(analyse([file]).checked).toBe(1);
+  });
+
+  it("exempts the mobile seam directory, and only that directory", () => {
+    // `mobile/src/platform/core.ts` IS the seam and imports Tauri by definition,
+    // so it must be skipped (`checked === 0`) rather than merely clean. Its
+    // sibling tree is not: the same call one directory over is a violation.
+    expect(analyse(["mobile/src/platform/core.ts"]).checked).toBe(0);
+    expect(analyse(["mobile/src/lib/vault-status.ts"]).checked).toBe(1);
   });
 
   it("still catches a module-specifier import, and not a mention in prose", () => {
