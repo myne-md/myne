@@ -488,6 +488,12 @@
       "saveWorkspaceAs": {
         "label": "Save workspace as…"
       },
+      "removeNoteCover": {
+        "label": "Remove note cover"
+      },
+      "setNoteCover": {
+        "label": "Set note cover…"
+      },
       "showGraph": {
         "label": "Show graph view…"
       },
@@ -1022,6 +1028,12 @@
       "replaceOne": "Replace",
       "replacePlaceholder": "Replace with",
       "toggleReplace": "Toggle replace"
+    },
+    "cover": {
+      "add": "Add cover",
+      "change": "Change cover",
+      "remove": "Remove cover",
+      "writeFailed": "Could not update the note's cover"
     },
     "folding": {
       "clickToUnfold": "Click to unfold",

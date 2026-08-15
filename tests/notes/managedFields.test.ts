@@ -30,6 +30,10 @@ describe("the managed-field constant", () => {
       "conflict_of",
       // MYND-613 task 3 — the twelfth, added with the field itself.
       "done",
+      // myne-md/myne#410 — the thirteenth, added with the field itself.
+      // `cover:` is a property Obsidian vaults already carry, so leaving it off
+      // this list would let an imported file forge Myne's cover state.
+      "cover",
     ]);
   });
 

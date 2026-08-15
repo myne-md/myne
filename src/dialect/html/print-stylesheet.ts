@@ -133,6 +133,27 @@ code, a {
   unicode-bidi: isolate;
 }
 
+/* === Note cover ========================================================
+   The frontmatter-projected cover image, above the title.
+   Cropped to a fixed band exactly as the editor draws it: the generic img
+   rule below only stops overflow, so without this a tall cover would take a
+   whole first page at its natural aspect ratio and the exported document would
+   not look like the note it came from. break-after keeps it from being
+   orphaned from its own title.
+   (No backticks anywhere in this file: the stylesheet is one template literal,
+   and a stray backtick in a CSS comment terminates it.) */
+.note-cover {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 6px;
+  margin: 0 0 16px;
+  break-after: avoid;
+  page-break-after: avoid;  /* legacy alias for older print engines */
+}
+
 /* === Title + heading scale =============================================
    .note-title is the frontmatter-projected document heading (h1.note-title);
    plain h1–h6 are the note's own headings. */

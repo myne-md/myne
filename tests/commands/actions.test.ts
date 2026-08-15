@@ -78,6 +78,8 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onShowUnlinked: vi.fn(),
     onRestoreBackup: vi.fn(),
     onMoveNote: vi.fn(),
+    onSetNoteCover: vi.fn(),
+    onRemoveNoteCover: vi.fn(),
     onApplyCustomTheme: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
@@ -136,7 +138,9 @@ describe("Command palette action registry", () => {
       "note.export-txt",
       "note.move",
       "note.new",
+      "note.remove-cover",
       "note.rename",
+      "note.set-cover",
       "note.toggle-favorite",
       "note.trash",
       "notes.random",
@@ -610,6 +614,32 @@ describe("Command palette action run() side effects", () => {
     const onExportNotePdf = vi.fn();
     find("note.export-pdf").run(makeContext({ onExportNotePdf }));
     expect(onExportNotePdf).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Set note cover…\" calls onSetNoteCover, and is the feature's only keyboard door (myne-md/myne#410)", () => {
+    const onSetNoteCover = vi.fn();
+    find("note.set-cover").run(makeContext({ onSetNoteCover }));
+    expect(onSetNoteCover).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Remove note cover\" exists, because the banner's Remove is unreachable by keyboard", () => {
+    // The banner control lives inside CodeMirror content where Tab indents, and
+    // the picker's own Remove is gated on a `hasCover` neither non-pointer entry
+    // point can determine. Without this action a cover can be added and changed
+    // without a pointer but never removed.
+    const onRemoveNoteCover = vi.fn();
+    find("note.remove-cover").run(makeContext({ onRemoveNoteCover }));
+    expect(onRemoveNoteCover).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Set note cover…\" is hidden without a selected note", () => {
+    // Same rule as the export siblings: an action that needs a note must not
+    // offer itself when there is none.
+    expect(
+      find("note.set-cover").visibility?.(
+        makeContext({ stageName: "editor", selectedNoteId: null }),
+      ),
+    ).toBe("hidden");
   });
 
   it("\"Export note as HTML…\" calls onExportNoteHtml — the shared-flow callback (MYND-340)", () => {
