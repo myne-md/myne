@@ -3,7 +3,7 @@
 // (CreateVault auto-unlock, Unlock screen submit) so password lifetime
 // is visible at the boundary.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { clearCustomTheme } from "./customTheme";
 import {
   flushGraphLayoutNow,

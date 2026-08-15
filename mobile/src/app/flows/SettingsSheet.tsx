@@ -8,8 +8,8 @@ import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
 import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { HideVaultNamesBlock } from "../../components";
-import { applyTheme } from "../../platform/theme";
-import type { ThemeName } from "../../platform/PlatformContext";
+import { applyTheme } from "../../formfactor/theme";
+import type { ThemeName } from "../../formfactor/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
 import { isRtl } from "../../lib/util";
 import { changePassword } from "../../lib/vault-change-password";
@@ -21,7 +21,7 @@ import {
   quickUnlockDisable,
   type QuickUnlockStatus,
 } from "../../lib/quick-unlock";
-import { usePlatform } from "../../platform/PlatformContext";
+import { usePlatform } from "../../formfactor/PlatformContext";
 import { vaultExportMarkdown, defaultExportDestination } from "../../lib/export";
 import { shareFile } from "../../lib/share";
 import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
