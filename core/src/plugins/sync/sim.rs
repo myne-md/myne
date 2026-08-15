@@ -407,7 +407,7 @@ impl Device {
             &self.token,
             &self.notes_dir,
             &self.vault_dir,
-            true,
+            crate::plugins::sync::orchestrator::PushGate::Allowed,
             protocol::MetaVersion::V0_1,
             Some(super::orchestrator::AttachmentKeys {
                 items_key: &self.acct.items_key,

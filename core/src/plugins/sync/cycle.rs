@@ -284,6 +284,19 @@ pub async fn run_active_cycle_from_host(
     hooks: &crate::hooks::Hooks,
     allow_push: bool,
 ) -> CycleOutcome {
+    // THE device-verification hold is read here, and here is the only place it
+    // can be (myne#462).
+    //
+    // The obvious home would be the scheduler — and it has a mirror of this flag,
+    // for a different job (not consuming the coalescing anchor). But the
+    // scheduler is not on this path at all: `sync_now_from_host` calls this
+    // function with `allow_push = true` directly, and the verify screens
+    // themselves poll `sync_now` about once a second while they are open. A hold
+    // that lived only in `loop_control` would therefore be pushed straight
+    // through by the very screens it exists to protect — and by
+    // `useConflictMaterializer`, which fires `sync_now` on every `sync://changed`,
+    // i.e. exactly when a joining device's first pull lands.
+    //
     // Serialize with any concurrent cycle + sync_reset_local: run_sync_cycle is a
     // read-modify-write on sync-state.json / staging / tombstones with no other
     // guard, so two overlapping cycles (a double "Sync now", or a click coinciding
@@ -291,6 +304,23 @@ pub async fn run_active_cycle_from_host(
     // tombstone revives a deleted note elsewhere. Held across the whole gather +
     // spawn_blocking so the token claim is serialized too.
     let _cycle_guard = sync_cycle_mutex().lock().await;
+    // So the gate is resolved at the one point every cycle passes through, and
+    // AFTER the serializer, which is load-bearing rather than tidy. The mutex is
+    // held across the whole gather plus `spawn_blocking`, i.e. across network
+    // round-trips, so a cycle that queues behind a long one waits minutes. Sampled
+    // before the wait, such a cycle carried a stale `Allowed` and pushed content
+    // under a compare that opened while it queued: the exact event this gate
+    // exists to prevent. The waiters are not hypothetical either. The verify
+    // screens fire `sync_now` about once a second and `useConflictMaterializer`
+    // fires one on every `sync://changed`, which is precisely when a joining
+    // device's first pull lands and the ceremony opens.
+    let gate = if !allow_push {
+        super::orchestrator::PushGate::PollOnly
+    } else if super::verify_hold::verify_hold().is_held(host.now_unix_millis()) {
+        super::orchestrator::PushGate::VerifyHold
+    } else {
+        super::orchestrator::PushGate::Allowed
+    };
     let Ok(cfg) = async {
         let p = super::config::config_path_from_host(host, io).await?;
         read_config(io, &p).await
@@ -434,7 +464,7 @@ pub async fn run_active_cycle_from_host(
             &token_hex,
             &notes_dir,
             &dir,
-            allow_push,
+            gate,
             meta_version,
             Some(super::orchestrator::AttachmentKeys {
                 items_key: &items_key,

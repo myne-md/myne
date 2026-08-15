@@ -18,7 +18,6 @@ import type { SyncStatus } from "../lib/use-sync-status";
 import {
   syncGetEndpoint,
   syncSetEndpoint,
-  syncHeadFingerprint,
   syncAccountStatus,
   useEnroll,
   useDevices,
@@ -27,6 +26,7 @@ import {
   type PinSource,
   type AccountStatusView,
 } from "../lib/sync";
+import { useHeadFingerprintCompare } from "../hooks/useHeadFingerprintCompare";
 import { formatBytes } from "../lib/util";
 import { formatAccountNumberInput } from "../lib/account-number-format";
 import { normalizeBip39Phrase } from "../lib/bip39-normalize";
@@ -749,10 +749,6 @@ function deviceName(d: DeviceEntry, names: Record<string, string>, t: TFunction)
 /** The device currently in the SY-05 approve-then-verify SAS step. */
 interface SasState {
   deviceId: string;
-  /** This device's adopted-head fingerprint (`XXXX-XXXX`), or null while it loads. */
-  fingerprint: string | null;
-  /** True until the fingerprint fetch resolves. */
-  loading: boolean;
 }
 
 /** SY-06 devices list + inline SY-05 approve-then-verify SAS + SY-07 remove
@@ -801,14 +797,23 @@ export function SyncDevicesPanel() {
     // error banner) — stay on the device list rather than showing a verify
     // screen for a device that was never approved.
     if (!(await approve(deviceId))) return;
-    setSas({ deviceId, fingerprint: null, loading: true });
-    try {
-      const fp = await syncHeadFingerprint();
-      setSas((s) => (s?.deviceId === deviceId ? { ...s, fingerprint: fp, loading: false } : s));
-    } catch {
-      setSas((s) => (s?.deviceId === deviceId ? { ...s, fingerprint: null, loading: false } : s));
-    }
+    setSas({ deviceId });
   };
+
+  // myne#462: this surface had NO poll at all.
+  //
+  // It was a single `syncHeadFingerprint()` call — the exact shape #243 removed
+  // from the desktop approving side in 2026, kept here because the two files are
+  // twins that nothing compared. `None` is the honest answer while this device
+  // has adopted no head, so a call landing early left "this code appears once
+  // the new device finishes its first sync" on screen permanently, with no
+  // retry and (unlike desktop) no way back into the compare. Nothing tested it:
+  // `devices.flow.ts` covers the list, never this screen.
+  //
+  // Now the same hook the desktop panel uses, twinned per
+  // `scripts/check-twin-drift.mjs`.
+  const { fingerprint, syncing, changed: sasChanged, acknowledgeChange } =
+    useHeadFingerprintCompare(sas !== null, "approver");
 
   // SY-05: approve-then-verify SAS — shown right after an approve, in place of
   // the list. Renders the frozen Crockford `XXXX-XXXX` (SYNC-17: one encoding,
@@ -833,9 +838,9 @@ export function SyncDevicesPanel() {
             background: "var(--bg-2)",
           }}
         >
-          {sas.loading ? (
+          {syncing ? (
             <span style={{ fontSize: 15, color: "var(--fg-3)" }}>{t("sync.status.syncing")}</span>
-          ) : sas.fingerprint ? (
+          ) : fingerprint ? (
             <span
               style={{
                 fontFamily: "var(--font-mono)",
@@ -846,7 +851,7 @@ export function SyncDevicesPanel() {
               }}
               data-testid="sync.sas-fingerprint"
             >
-              {sas.fingerprint}
+              {fingerprint}
             </span>
           ) : (
             <span style={{ fontSize: 14, color: "var(--fg-3)", textAlign: "center" }} data-testid="sync.sas-pending">
@@ -854,6 +859,16 @@ export function SyncDevicesPanel() {
             </span>
           )}
         </div>
+        {/* The head moved mid-compare — a third device pushed, or the hold
+            lapsed. Announced rather than swapped in silently. */}
+        {sasChanged && (
+          <p
+            style={{ margin: "var(--space-4) var(--space-1) 0", fontSize: "var(--text-sm)", lineHeight: "var(--leading-relaxed)", color: "var(--fg-2)" }}
+            data-testid="sync.sas-changed"
+          >
+            {t("sync.devices.verifyChanged")}
+          </p>
+        )}
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
           <button
             type="button"
@@ -867,6 +882,7 @@ export function SyncDevicesPanel() {
             type="button"
             onClick={() => {
               const id = sas.deviceId;
+              acknowledgeChange();
               setSas(null);
               setConfirmRemove(id);
             }}

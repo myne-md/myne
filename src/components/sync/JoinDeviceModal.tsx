@@ -5,9 +5,10 @@
 // On success the caller routes to the editor; sync starts once approved.
 // Built against design tokens; Penpot skipped per the owner directive.
 
-import { useEffect, useId, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { BetaTermsConsent } from "./BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
+import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
 import { Input } from "../primitives/Input";
@@ -131,7 +132,6 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   const [step, setStep] = useState<"form" | "pinned" | "pending" | "verify">("form");
   const [joinedVaultId, setJoinedVaultId] = useState<string | null>(null);
   const [certFingerprint, setCertFingerprint] = useState<string | null>(null);
-  const [headFingerprint, setHeadFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
   // MYND-548: the id this join minted, kept so the pending path can name the
   // device once its first pull lands.
@@ -226,72 +226,37 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       .finally(() => setBusy(false));
   };
 
-  // While PENDING, drive the claim + watch for the adopted-head fingerprint. The
-  // foreground loop claims the token + pulls once an existing device approves; the
-  // pulled head observation is surfaced as soon as it MAC-verifies (before note bodies
-  // download), so `sync_head_fingerprint` returns non-null promptly → advance to the
-  // mandatory verify step (SYNC-40). Self-scheduling ~1s poll (not setInterval) so a
-  // slow claim RTT never overlaps ticks. This runs ONLY while step==='pending' — the
-  // bounded, user-initiated enroll window, NOT the steady-state background sync cadence
-  // (privacy-load-bearing, left untouched).
+  // The adopted-head watch, and the SYNC-40 compare it feeds (myne#462).
+  //
+  // Armed from `pending` rather than from `verify`, which is load-bearing: the
+  // device-name write below fires the instant a head is adopted, i.e. BEFORE the
+  // verify screen exists. A hold armed on the compare screen would arrive one
+  // vault write too late — and that write is the issue's own primary reproducer,
+  // because `device_names` lives in `vault.prefs` and a prefs push authors a head.
+  //
+  // The hold suppresses the PUSH, not the write. `persistDeviceName` still lands
+  // on disk immediately, so MYND-548 (the name that used to get lost) stays
+  // fixed; only its trip to the server waits for the compare to close.
+  const { fingerprint: headFingerprint, changed: sasChanged } = useHeadFingerprintCompare(
+    step === "pending" || step === "verify",
+    "joiner",
+  );
+
+  // The pending → verify edge. A non-null fingerprint means this device pulled
+  // and MAC-verified a head, which is also the moment naming becomes safe (the
+  // §10.2.1 prefs seed has had its turn). Both happen exactly once — `named`
+  // guards the write against the poll that keeps running behind the compare.
+  const named = useRef(false);
   useEffect(() => {
-    if (step !== "pending") return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    // At most one full sync in flight at a time (see below).
-    let syncing = false;
-    // MYND-537 (#243): the fingerprint poll must NOT sit behind a full content
-    // sync.
-    //
-    // This awaited `sync_now` before every fingerprint check. `sync_now` claims
-    // the approval AND pulls the vault, so on a first join the match code —
-    // which needs nothing but an adopted head — was gated on the entire vault
-    // arriving. On a small vault that reads as a multi-minute "waiting for
-    // approval"; on a large one the tick never returns, the next one never
-    // fires, and the screen never appears at all, while the approving side has
-    // long since shown "approved".
-    //
-    // So: poll the fingerprint on its own cadence, and let `sync_now` run
-    // alongside rather than in front of it. `syncing` keeps at most one in
-    // flight, since overlapping full syncs would contend for the same vault.
-    const tick = async () => {
-      try {
-        if (!syncing) {
-          syncing = true;
-          void invoke("plugin:sync|sync_now")
-            .catch(() => {
-              /* transient — the next tick starts another */
-            })
-            .finally(() => {
-              syncing = false;
-            });
-        }
-        const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
-        if (!cancelled && fp) {
-          // A head was adopted ⇒ this device completed an authed cycle, so the
-          // §10.2.1 seed has already had its turn and naming is now safe.
-          if (joinedDeviceId) {
-            try {
-              await persistDeviceName(joinedDeviceId, deviceNameField.resolved);
-            } catch {
-              // The row keeps its id-derived label; rename fixes it.
-            }
-          }
-          setHeadFingerprint(fp);
-          setStep("verify");
-          return; // adopted the head — stop polling
-        }
-      } catch {
-        /* transient — retry next tick */
-      }
-      if (!cancelled) timer = setTimeout(() => void tick(), 1000);
-    };
-    void tick();
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  }, [step]);
+    if (step !== "pending" || headFingerprint === null) return;
+    if (joinedDeviceId && !named.current) {
+      named.current = true;
+      void persistDeviceName(joinedDeviceId, deviceNameField.resolved).catch(() => {
+        // The row keeps its id-derived label; rename from Settings fixes it.
+      });
+    }
+    setStep("verify");
+  }, [step, headFingerprint, joinedDeviceId, deviceNameField.resolved]);
 
   // SAS mismatch → ABORT: un-enroll this device so it stops trusting the
   // (possibly forked) synced data, then close.
@@ -411,6 +376,14 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
           >
             {headFingerprint}
           </div>
+          {/* The head moved while the compare was open. Announced rather than
+              swapped silently: a code that changes under the reader turns a
+              comparison into a guess. */}
+          {sasChanged && (
+            <p style={HELP} data-testid="join.sas-changed">
+              {t("sync.join.verifyChanged")}
+            </p>
+          )}
           <div style={{ ...ROW, justifyContent: "space-between" }}>
             <button
               type="button"
