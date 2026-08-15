@@ -2279,6 +2279,42 @@ Reading three dialects is what makes the Obsidian importer honest — without it
 
 Used in: `spec/markdown-dialect.md` §3.8; `decisions.md` 2026-07-28
 
+### **twin module** &nbsp; 🛠️ *Tooling*
+
+A module that exists on both the desktop and the mobile side and answers the same question on each. Found by same relative path across `(src, mobile/src)` and `(src-tauri/src, mobile/src-tauri/src)`, plus a curated list for pairs whose two sides sit at different paths (a path sweep cannot see `src/notes/sidebarState.tsx` against `mobile/src/app/flows/EditorFlow.tsx`). The unit is the PAIR rather than the desktop path, because one desktop file may have two real mobile counterparts. Distinct from a mere same-named file: a twin is a claim that both sides answer one question, which is why every one carries a verdict and a reason.
+
+Used in: `scripts/check-twin-inventory.mjs`, `scripts/check-twin-drift.mjs`, `docs/dev/twin-inventory.md`, `decisions.md` 0496
+
+### **twin inventory** &nbsp; 🛠️ *Tooling*
+
+The recorded classification of every twin module: both paths, a mechanical byte-difference flag, a semantic one, a verdict, a reason and a destination. It deliberately records no line count, because a live one would fail the projection check on any edit to any of the files it covers. It lives inside `scripts/check-twin-inventory.mjs` and IS the gate, so the record and the check cannot disagree; `docs/dev/twin-inventory.md` is a generated projection of it and never a second source. A twin with no verdict fails, and a verdict whose files are gone fails, because a roster that can outlive its tree describes nothing.
+
+Used in: `scripts/check-twin-inventory.mjs`, `docs/dev/twin-inventory.md`, `decisions.md` 0496
+
+### **decision (twin verdict)** &nbsp; 🛠️ *Tooling*
+
+The verdict for a twin where both clients answer the same question, so a divergence is a bug by definition. It belongs in a shared package and its entry carries a destination, which may be `undecided` where the destination turns on a question another sub-feature settles. The majority verdict: 59 of the 96 twins recorded at the time of `decisions.md` 0496.
+
+Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 0496
+
+### **screen (twin verdict)** &nbsp; 🛠️ *Tooling*
+
+The verdict for a twin that exists TO BE per-client, so its divergence is the feature rather than the bug. Two clauses: the surface a client renders (layout, navigation shape), or the host it renders into (entry points, build-time ambient globals). The second clause was added under review, when three of the entries carrying the verdict turned out to be host composition that the presentation-only wording described not at all. **Deliberately narrow** even so: what it excludes is a file that merely happens to differ per client, which is every [[decision (twin verdict)]] in the record. Two guard tests hold it, one capping how many entries may carry it and one asserting which, because a count cannot notice a miscategorised entry.
+
+Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 0496
+
+### **absent (twin verdict)** &nbsp; 🛠️ *Tooling*
+
+The verdict for a twin where one client does not ship the surface at all. Its entry names the decision or issue that made it so, because a gap and a decision are indistinguishable in a diff stat and the difference is the whole point. Read the reason before treating a large line-count gap as neglect: `local_inference` reads as an absence and is a narrowed transcription-only port, since mobile runs Whisper on device while `infer` and `embed` return `NotReady`.
+
+Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 0496
+
+### **delegated (twin verdict)** &nbsp; 🛠️ *Tooling*
+
+The verdict for a twin whose shared answer already lives in `myne-core` or a `@myne/*` package, leaving each side as per-client wiring over it. Its divergence is correct and permanent, so it is neither a bug nor a screen. The canonical shape is a Tauri plugin shim where both sides carry `pub use myne_core::plugins::<flow>` and keep only the plugin builder and its capability grant; `src-tauri/src/plugins/vault_delete/mod.rs` at 52 lines against mobile's 53 is the worked example. The verdict says nothing about whether the two capability grants MATCH; that comparison has not been run.
+
+Used in: `scripts/check-twin-inventory.mjs`, `core/CLAUDE.md`, `decisions.md` 0496
+
 ### **Tauri** &nbsp; 🛠️ *Tooling*
 
 A Rust-based framework for building cross-platform desktop applications with web-technology UIs. Myne's Phase 1 desktop-client framework (`decisions.md` Deferred #5 resolution). Supersedes the prior Electron baseline. Advantages: small TCB, ~10 MB binary vs ~150 MB Electron, ~40 MB idle RAM vs ~250 MB, achievable reproducible builds, structural memory hygiene via Rust's `zeroize`/`secrecy`/`subtle` crates, smaller updater attack surface.
