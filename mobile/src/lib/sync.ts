@@ -9,9 +9,9 @@
 // straight to IPC and never parked in module or hook state.
 
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { setDeviceName } from "./prefs";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../platform/event";
 
 // ── Endpoint config (SY-02) ──────────────────────────────────────────────────
 
@@ -130,6 +130,24 @@ export function syncNow(): Promise<{ state: string; count?: number; detail?: str
  *  a match confirms the newcomer is on the genuine account (SAS eye-compare). */
 export function syncHeadFingerprint(): Promise<string | null> {
   return invoke<string | null>("plugin:sync|sync_head_fingerprint");
+}
+
+/** Declare that a SYNC-40 eye-compare is open on this device, so the sync engine
+ *  holds CONTENT pushes and the vault head both screens are comparing cannot
+ *  advance under them (myne#462).
+ *
+ *  Idempotent, and it doubles as the lease ping — call it on every poll tick.
+ *  The core releases the hold after 15 s of silence and after 5 minutes
+ *  regardless, so a WebView that dies mid-compare cannot leave this device
+ *  silently unsynced. Pulls are never held, and the coalescing anchor is
+ *  retained, so a held edit is delayed rather than dropped. */
+export function syncVerifyHoldBegin(): Promise<void> {
+  return invoke<void>("plugin:sync|sync_verify_hold_begin");
+}
+
+/** Release the hold — on match, on mismatch, or on unmount. Idempotent. */
+export function syncVerifyHoldEnd(): Promise<void> {
+  return invoke<void>("plugin:sync|sync_verify_hold_end");
 }
 
 /** Reset THIS device's local sync enrollment (clear the per-device token + sync

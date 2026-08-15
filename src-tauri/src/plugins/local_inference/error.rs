@@ -117,6 +117,38 @@ pub enum EngineError {
     /// would be wrong.
     #[error("the provider's quota or credit is exhausted")]
     QuotaExhausted,
+    /// The provider accepted the credential, claimed success (**HTTP 200**), and
+    /// declined the work under **its own policy** — an account guardrail, a
+    /// workspace rule, a model the plan does not carry (myne-md/myne#466).
+    ///
+    /// Deliberately not [`EngineError::Refused`], which is a transport fact
+    /// (something refused the connection); here the connection succeeded and the
+    /// reply parsed. Deliberately not [`EngineError::QuotaExhausted`] either,
+    /// which is the *cost* decline and arrives as a status code — this one
+    /// arrives inside a 200 body and no status distinguishes it.
+    ///
+    /// Content-free like every sibling: the provider's error body is
+    /// attacker-influenceable and is never read, only counted as present.
+    #[error("the provider refused the request under its own policy")]
+    PolicyRefused,
+    /// The model answered with a **genuinely empty completion** — the reply had
+    /// the content field and it held nothing. The one case where "try
+    /// rephrasing" is the honest advice, which is why it may not be collapsed
+    /// into [`EngineError::InferenceFailed`] with the two failures that are not
+    /// the user's wording (a policy refusal, and a reply shape Myne does not
+    /// model).
+    #[error("the provider returned an empty completion")]
+    EmptyCompletion,
+    /// A **local** model path was recorded and the file it names is not on this
+    /// device any more (myne-md/myne#466). Distinct from [`EngineError::NotReady`],
+    /// which means nothing was ever chosen: here something *was* chosen, so the
+    /// fix is to choose again rather than to choose for the first time.
+    ///
+    /// Nothing left the device on this path. The variant carries no path — a
+    /// backend-resolved filesystem path may neither be logged nor cross IPC
+    /// (see: src-tauri/CLAUDE.md "Secret-handling logging discipline").
+    #[error("the recorded local model file is missing")]
+    LocalModelMissing,
     /// A background pass stood down so user-initiated work could have the
     /// compute lock (auto-tag, MYND-651 task 4). NOT a failure: nothing is
     /// wrong, the caller may simply try again later. Distinct from an empty
@@ -154,6 +186,9 @@ impl EngineError {
             EngineError::NoCredential => "no_credential",
             EngineError::Unauthorized => "unauthorized",
             EngineError::QuotaExhausted => "quota_exhausted",
+            EngineError::PolicyRefused => "policy_refused",
+            EngineError::EmptyCompletion => "empty_completion",
+            EngineError::LocalModelMissing => "local_model_missing",
             EngineError::Deferred => "deferred",
         }
     }

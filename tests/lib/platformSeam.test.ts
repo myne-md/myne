@@ -23,9 +23,11 @@
 // is what makes these assertions able to fail.
 
 import { describe, expect, it } from "vitest";
-// @ts-expect-error — a plain .mjs guard script with no type declarations; it is
-// deliberately dependency-free and lives outside `tsconfig`'s `include`.
-import { analyse as analyseUntyped } from "../../scripts/check-platform-seam.mjs";
+// The guard is a plain .mjs script with no type declarations: it is deliberately
+// dependency-free and lives outside `tsconfig`'s `include`. Both symbols are
+// re-typed below rather than trusted, which is why no suppression directive is
+// needed here.
+import { analyse as analyseUntyped, uncoveredSharedRoots as uncoveredUntyped } from "../../scripts/check-platform-seam.mjs";
 
 /** The guard's return, named here because the script carries no declarations. */
 interface SeamReport {
@@ -34,10 +36,12 @@ interface SeamReport {
   wasmViolations: { file: string; line: number; spec: string }[];
   checked: number;
 }
-const analyse = analyseUntyped as (
-  files?: string[] | null,
-  roots?: { root: string; seam: string | null }[],
-) => SeamReport;
+type GuardedRoot = { root: string; seam: string | null; advice?: string };
+const analyse = analyseUntyped as (files?: string[] | null, roots?: GuardedRoot[]) => SeamReport;
+const uncoveredSharedRoots = uncoveredUntyped as (
+  roots?: GuardedRoot[],
+  shared?: string[],
+) => string[];
 
 /** The fixture tree, as its own guarded root with no exempt seam directory. */
 const FIXTURE_ROOTS = [{ root: "tests/fixtures/seam", seam: null }];
@@ -70,6 +74,53 @@ describe("check-platform-seam", () => {
     // on that single file rather than relying on the whole-tree pass, so it
     // stays a pin on the exemption specifically.
     expect(analyse(["src/lib/app-window.ts"]).globalViolations).toEqual([]);
+    // The mobile twin, which carries the same probe plus the call-time
+    // `hasTauriHost()` two of its callers need (myne#492).
+    expect(analyse(["mobile/src/lib/app-window.ts"]).globalViolations).toEqual([]);
+  });
+
+  // ── the roots are IN scope, asserted per root ──────────────────────────────
+  //
+  // The whole-tree pass above cannot see a missing root: `guardFor` returns
+  // undefined for a file outside every `GUARDED` entry, the file is skipped, and
+  // the run reports ok. That is precisely how `mobile/src` accumulated 41 direct
+  // `@tauri-apps/*` imports with the guard green (myne#492), so each root gets a
+  // pin that fails if it silently drops out.
+  //
+  // `checked` is the assertion, not `violations`: an empty violation list is
+  // what BOTH "the file is clean" and "the file was never read" look like.
+  it.each([
+    ["mobile/src", "mobile/src/lib/vault-status.ts"],
+    ["web/src", "web/src/platform/core.ts"],
+    ["src", "src/lib/vault-status.ts"],
+    ["editor", "editor/src/host.ts"],
+  ])("scans %s", (_root, file) => {
+    expect(analyse([file]).checked).toBe(1);
+  });
+
+  it("exempts the mobile seam directory", () => {
+    // `mobile/src/platform/core.ts` IS the seam and imports Tauri by definition,
+    // so it must be skipped (`checked === 0`) rather than merely clean. The
+    // other half of "and only that directory" is the `it.each` row above, which
+    // already pins a sibling under `mobile/src` at `checked === 1`; repeating it
+    // here would be one claim in two places, updated in one.
+    expect(analyse(["mobile/src/platform/core.ts"]).checked).toBe(0);
+  });
+
+  // The coverage claim is the only rule in this guard whose subject is the
+  // ROSTER rather than a file, so it is also the only one that could not be
+  // made to fail without editing `scripts/lib/shared-roots.mjs` for real. Both
+  // arguments are injectable for exactly that reason, and this is the injection.
+  it("names a shared tree that falls outside every guarded root", () => {
+    const roster = [{ root: "src", seam: null, advice: "" }];
+    expect(uncoveredSharedRoots(roster, ["src", "mobile/src", "editor/src"])).toEqual([
+      "mobile/src",
+      "editor/src",
+    ]);
+  });
+
+  it("reports nothing for the real roster, which is the claim the guard makes", () => {
+    expect(uncoveredSharedRoots()).toEqual([]);
   });
 
   it("still catches a module-specifier import, and not a mention in prose", () => {

@@ -13,6 +13,16 @@
 # here. That cross-machine difference is most of the value. A same-machine run
 # can only prove independence from the target directory.
 #
+# What this does NOT prove is cross-ARCHITECTURE reproducibility, and that gap is
+# structural rather than one more machine away (myne-md/myne#228): Cargo hashes
+# `rustc -vV`'s host triple into every crate's `-C metadata`, so the same commit
+# built on two host architectures emits a different wasm. Both builds here run on
+# one runner, so this gate is silent about it by construction. The published hash
+# is therefore defined against a reference build environment rather than against
+# every host; `docs/web-bundle-hashes.md` "Why the build host is part of the hash"
+# is the full reasoning, and `scripts/build-wasm.sh`'s header carries the same
+# note beside the local `--verify`.
+#
 # `threat-model.md` §6 makes reproducible signed builds the credible substitute
 # for the missing third-party audit; A15/TB11 makes the published bundle hash the
 # web client's only defence against hostile code delivery. A hash nobody else can

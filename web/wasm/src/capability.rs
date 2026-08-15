@@ -300,6 +300,12 @@ pub const DISPATCHED: &[&str] = &[
     // neither knew existed.
     "plugin:sync|sync_head_fingerprint",
     "plugin:sync|sync_reset_local",
+    // The eye-compare's push hold (myne#462). Dispatched rather than absent
+    // because a browser is on both sides of this ceremony, and because the
+    // web joiner re-runs it on EVERY re-bootstrap (`decisions.md` 2026-07-26
+    // — OPFS is evictable), so it is exercised more here than on desktop.
+    "plugin:sync|sync_verify_hold_begin",
+    "plugin:sync|sync_verify_hold_end",
     // The quarantine surface (task 87) — `sync-protocol.md` §11.3's "moved
     // aside, never destroyed" rule needs a door, and these are it. `restore` is
     // NOT here: it mints a new note through `note_create_with_dir`, so it lands

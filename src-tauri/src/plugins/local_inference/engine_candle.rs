@@ -54,7 +54,7 @@ use tokenizers::Tokenizer;
 use super::chatml::sanitize_chatml;
 use super::engine::{ChatMessage, ChatRole, Engine};
 use super::error::EngineError;
-use super::model_store::{selected_model, ModelRole};
+use super::model_store::{selected_model, selected_model_verified, ModelRole, ModelStoreError};
 use super::whisper::{self, WhisperTokens};
 
 /// Cap on generated tokens per `infer` — a bound so a runaway generation can't
@@ -274,7 +274,13 @@ impl CandleEngine {
 
     fn load_gen(&self) -> Result<LoadedGen, EngineError> {
         let started = Instant::now();
-        let model_path = match selected_model(&self.base, ModelRole::Generation) {
+        // Verified rather than merely recorded (myne-md/myne#466): a marker
+        // naming a since-deleted .gguf used to reach `File::open` below and come
+        // back as a bare `NotReady`, indistinguishable from "nothing was ever
+        // picked" — and, once the frontend's catch-all had it, indistinguishable
+        // from a remote provider failing, on a request that never left the
+        // device.
+        let model_path = match selected_model_verified(&self.base, ModelRole::Generation) {
             Ok(Some(p)) => p,
             Ok(None) => {
                 tracing::warn!(
@@ -283,6 +289,14 @@ impl CandleEngine {
                     "no generation (text) model selected — pick a .gguf in Settings → AI"
                 );
                 return Err(EngineError::NotReady);
+            }
+            Err(ModelStoreError::RecordedModelMissing) => {
+                tracing::warn!(
+                    target: "myne::ai",
+                    stage = "load_gen.marker_stale",
+                    "the recorded generation model is no longer on this device — pick one again in Settings → AI"
+                );
+                return Err(EngineError::LocalModelMissing);
             }
             Err(e) => {
                 tracing::error!(
@@ -1194,7 +1208,9 @@ mod tests {
         }
     }
     use super::*;
-    use crate::plugins::local_inference::model_store::{set_selected_model, ModelRole};
+    use crate::plugins::local_inference::model_store::{
+        selected_model, set_selected_model, ModelRole,
+    };
     use crate::test_support::ScopedTempDir;
     use std::path::Path;
 
@@ -1213,6 +1229,46 @@ mod tests {
         let tmp = ScopedTempDir::new("candle-engine-noinfer").expect("tempdir");
         let engine = CandleEngine::new(tmp.path().to_path_buf());
         assert_eq!(engine.infer("hello"), Err(EngineError::NotReady));
+    }
+
+    /// myne-md/myne#466. A marker naming a model that has since been deleted used
+    /// to be indistinguishable from having picked nothing — both answered
+    /// `NotReady`, and the frontend's catch-all then rendered both, plus every
+    /// genuine provider failure, as one sentence claiming nothing had been sent.
+    ///
+    /// The assertion is on the **state**, not only on the returned value: the
+    /// marker must still be on disk afterwards. A loader that "helpfully"
+    /// cleared it would make the next call answer `NotReady` and quietly
+    /// discard a user's configuration on a read path.
+    #[test]
+    fn a_stale_generation_marker_reports_a_missing_local_model_not_a_generic_failure() {
+        let tmp = ScopedTempDir::new("candle-engine-stale-gen").expect("tempdir");
+        let dl = tmp.path().join("downloads");
+        std::fs::create_dir_all(&dl).unwrap();
+        let gen_model = dl.join("qwen2.gguf");
+        std::fs::write(&gen_model, b"not a real gguf").unwrap();
+        set_selected_model(tmp.path(), ModelRole::Generation, &gen_model)
+            .expect("record generation model");
+
+        // Delete the model out from under the marker — the field case: a
+        // download cleaned up months after the pick.
+        std::fs::remove_file(&gen_model).unwrap();
+
+        let engine = CandleEngine::new(tmp.path().to_path_buf());
+        assert_eq!(engine.infer("hello"), Err(EngineError::LocalModelMissing));
+
+        // Distinct from "nothing was ever picked", which keeps its own answer.
+        let fresh = ScopedTempDir::new("candle-engine-no-gen").expect("tempdir");
+        assert_eq!(
+            CandleEngine::new(fresh.path().to_path_buf()).infer("hello"),
+            Err(EngineError::NotReady)
+        );
+
+        // The configuration is reported, not rewritten.
+        assert_eq!(
+            selected_model(tmp.path(), ModelRole::Generation).unwrap(),
+            Some(gen_model)
+        );
     }
 
     #[test]

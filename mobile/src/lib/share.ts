@@ -19,7 +19,7 @@
 // without a reachable file; myne-md/myne#491 filed a follow-up for the label
 // that claims otherwise).
 
-import { emit } from "@tauri-apps/api/event";
+import { emit } from "../platform/event";
 import { HAS_TAURI } from "./app-window";
 
 /**
