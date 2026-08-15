@@ -2399,6 +2399,12 @@ Time-ordered UUID variant (RFC 9562). Used as the filename of `.myn` files in v0
 
 Used in: `spec/protocol.md` §9.1
 
+### **verification push-hold** &nbsp; 📋 *Protocol*
+
+The client-side pause that makes the [bootstrap-fingerprint](#bootstrap-fingerprint) compare mean something. A [vault head](#vault-head) is not a stable identity — every push authors a new one — so two devices agree on a fingerprint only while they sit on the same head, and the enrolment ceremony itself moves it (a joining device writes its own [device name](#device-name) the moment it adopts a head, and a prefs push authors a head). While a verify screen is open the device therefore authors **no content head**: pulls continue untouched (each side reaches the head it displays *by* pulling), and the §6.1 genesis-on-empty push is exempt, because on an account with no head the genesis head is the only thing a joining device can adopt. Bounded by a lease and a ceiling rather than by cooperation, so a client that dies mid-compare cannot leave its own edits unpushed. **Extend-only** with respect to push timing — nothing fires earlier than it would have and pending push intent is retained — so the §8.3 A13 posture is unchanged. Phase 2.
+
+Used in: `spec/sync-protocol.md` §6.3, §8.3; `decisions.md` 2026-08-15 (myne-md/myne#462); `core/src/plugins/sync/verify_hold.rs`
+
 ### **v0.1** &nbsp; 📦 *Product*
 
 The first Myne protocol specification (`spec/protocol.md`). Covers Phase 1 at-rest encryption only. Sync, multi-device, sharing, and post-quantum primitives are out of scope; they appear in a later major version.

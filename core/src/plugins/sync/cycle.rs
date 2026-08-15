@@ -284,6 +284,27 @@ pub async fn run_active_cycle_from_host(
     hooks: &crate::hooks::Hooks,
     allow_push: bool,
 ) -> CycleOutcome {
+    // THE device-verification hold is read here, and here is the only place it
+    // can be (myne#462).
+    //
+    // The obvious home would be the scheduler — and it has a mirror of this flag,
+    // for a different job (not consuming the coalescing anchor). But the
+    // scheduler is not on this path at all: `sync_now_from_host` calls this
+    // function with `allow_push = true` directly, and the verify screens
+    // themselves poll `sync_now` about once a second while they are open. A hold
+    // that lived only in `loop_control` would therefore be pushed straight
+    // through by the very screens it exists to protect — and by
+    // `useConflictMaterializer`, which fires `sync_now` on every `sync://changed`,
+    // i.e. exactly when a joining device's first pull lands.
+    //
+    // So the gate is resolved at the one point every cycle passes through.
+    let gate = if !allow_push {
+        super::orchestrator::PushGate::PollOnly
+    } else if super::verify_hold::verify_hold().is_held(host.now_unix_millis()) {
+        super::orchestrator::PushGate::VerifyHold
+    } else {
+        super::orchestrator::PushGate::Allowed
+    };
     // Serialize with any concurrent cycle + sync_reset_local: run_sync_cycle is a
     // read-modify-write on sync-state.json / staging / tombstones with no other
     // guard, so two overlapping cycles (a double "Sync now", or a click coinciding
@@ -434,7 +455,7 @@ pub async fn run_active_cycle_from_host(
             &token_hex,
             &notes_dir,
             &dir,
-            allow_push,
+            gate,
             meta_version,
             Some(super::orchestrator::AttachmentKeys {
                 items_key: &items_key,

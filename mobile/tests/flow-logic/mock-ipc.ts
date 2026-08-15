@@ -70,7 +70,12 @@ export interface MockConfig {
   /** What `prefs|device_platform` reports (MYND-548). Defaults to `"ios"`. */
   devicePlatform?: string;
   enrollError?: { kind: string };
-  headFingerprint?: string | null;
+  /** What `sync|sync_head_fingerprint` answers. A single value answers forever;
+   *  an ARRAY is a sequence that shifts once per read and then sticks on its
+   *  last element — the shape needed to model a head that ADVANCES mid-ceremony
+   *  (myne#462), which a scalar cannot express and which is exactly the case
+   *  that broke. Same semantics as the desktop harness's `mountWith`. */
+  headFingerprint?: string | null | Array<string | null>;
   pendingConflicts?: string[];
   /** Boot to the Welcome screen (empty slot + no vaults) instead of straight to
    *  the editor — for the fresh-device join flow. */
@@ -839,7 +844,13 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_approve_device": () => null,
       "plugin:sync|sync_remove_device": () => null,
       "plugin:sync|sync_reset_local": () => null,
-      "plugin:sync|sync_head_fingerprint": () => config.headFingerprint ?? "TYRS-N318",
+      "plugin:sync|sync_head_fingerprint": () => {
+        const fp = config.headFingerprint;
+        if (Array.isArray(fp)) return fp.length > 1 ? fp.shift()! : (fp[0] ?? null);
+        return fp ?? "TYRS-N318";
+      },
+      "plugin:sync|sync_verify_hold_begin": () => null,
+      "plugin:sync|sync_verify_hold_end": () => null,
       "plugin:sync|sync_pending_conflicts": () => config.pendingConflicts ?? [],
       "plugin:sync|sync_enroll": (args) => {
         // Record the payload so a flow test can assert what the form forwarded.

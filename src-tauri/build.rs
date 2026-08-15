@@ -492,6 +492,13 @@ fn main() {
                 // MYND-650 task 8: the live posture read behind the connection
                 // states. Same plugin for the same reason.
                 "sync_get_tor_state",
+                // myne#462: the device-verification push hold. In-RAM flag
+                // only (no vault access, no IO, no server call), like the
+                // mobile lifecycle pair — it holds CONTENT pushes while a
+                // SYNC-40 eye-compare is open so the head both screens read
+                // cannot move under them.
+                "sync_verify_hold_begin",
+                "sync_verify_hold_end",
             ]),
         )
         .plugin(

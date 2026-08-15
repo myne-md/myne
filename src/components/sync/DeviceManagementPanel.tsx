@@ -17,16 +17,16 @@
 // mobile SY-05 shows (SYNC-40 carries both ends in 459). Ship-gate: the SYNC-17
 // primitive-level review of the fingerprint substrate is recorded, not passed.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   REMOVE_DEVICE_CONFIRM,
   REMOVE_DEVICE_DISCLOSURE,
 } from "../../lib/load-bearing-copy";
 import { useTranslation } from "react-i18next";
-import { invoke } from "../../platform/core";
 import i18n from "../../i18n";
 import { type DeviceEntry, type DevicesHook } from "../../hooks/useDevices";
 import { usePrefs } from "../../hooks/usePrefs";
+import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
 import { setDeviceName } from "../../lib/prefs";
 import { DEVICE_NAME_MAX_LEN } from "../../lib/device-name";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
@@ -202,9 +202,6 @@ const RENAME_INPUT: CSSProperties = {
 /** The device in the approve-then-verify SAS step (SYNC-40). */
 interface SasState {
   deviceId: string;
-  /** This device's adopted-head fingerprint (`XXXX-XXXX`), or null while loading. */
-  fingerprint: string | null;
-  loading: boolean;
 }
 
 export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
@@ -263,65 +260,27 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
     // error banner) — stay on the device list rather than showing a verify
     // screen for a device that was never approved.
     if (!(await approve(deviceId))) return;
-    setSas({ deviceId, fingerprint: null, loading: true });
+    setSas({ deviceId });
   };
 
-  // #243: the approving side has to KEEP LOOKING, exactly like the two waiting
-  // surfaces do.
+  // #243 made this side KEEP LOOKING; myne#462 made it keep looking for the
+  // right thing.
   //
-  // This used to be a single `sync_head_fingerprint` call inside
-  // `approveAndVerify`. `None` is the honest answer for as long as this device
-  // has adopted no head, so that one call landing early left the panel showing
-  // "this code appears once the new device finishes its first sync" forever —
-  // however long the user waited, and however long ago the other device
-  // finished. The joining side polled every second while the approving side
-  // polled never: two halves of one ceremony built on opposite assumptions.
+  // Before #243 this was one `sync_head_fingerprint` call inside
+  // `approveAndVerify`, and `None` — the honest answer while no head is adopted
+  // — left the panel saying "this code appears once the new device finishes its
+  // first sync" forever. #243 added a poll. But that poll stopped at the first
+  // non-null answer, and on THIS side the first answer arrives before the
+  // device has pulled anything, so the panel latched a pre-sync head and then
+  // sat on it while the ceremony moved the vault head underneath.
   //
-  // Same shape as `JoinDeviceModal`: self-scheduling ~1 s tick with `sync_now`
-  // running ALONGSIDE rather than in front of the check (single-flight), so the
-  // match code is never gated on a full vault sync. Runs only while the verify
-  // screen is open and still has no code — the bounded, user-initiated window,
-  // not the steady-state background cadence.
-  const sasDeviceId = sas?.deviceId ?? null;
-  const sasFingerprint = sas?.fingerprint ?? null;
-  useEffect(() => {
-    if (sasDeviceId === null || sasFingerprint !== null) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let syncing = false;
-    const tick = async () => {
-      try {
-        if (!syncing) {
-          syncing = true;
-          void invoke("plugin:sync|sync_now")
-            .catch(() => {
-              /* transient — the next tick starts another */
-            })
-            .finally(() => {
-              syncing = false;
-            });
-        }
-        const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
-        if (!cancelled && fp) {
-          setSas((s) => (s?.deviceId === sasDeviceId ? { ...s, fingerprint: fp, loading: false } : s));
-          return; // the code is on screen — stop polling
-        }
-      } catch {
-        /* transient — retry next tick */
-      }
-      if (!cancelled) {
-        // First tick decided: stop claiming to be loading, so the screen says
-        // what it is actually doing (waiting) instead of "Syncing…" forever.
-        setSas((s) => (s?.deviceId === sasDeviceId && s.loading ? { ...s, loading: false } : s));
-        timer = setTimeout(() => void tick(), 1000);
-      }
-    };
-    void tick();
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  }, [sasDeviceId, sasFingerprint]);
+  // Both halves now live in `useHeadFingerprintCompare`, shared with the two
+  // joining screens so the copies cannot drift apart again — which is how the
+  // mobile approving side kept the pre-#243 shape long after this one was fixed.
+  const { fingerprint, syncing, changed, acknowledgeChange } = useHeadFingerprintCompare(
+    sas !== null,
+    "approver",
+  );
 
   // SY-05 desktop end: the SAS eye-compare, shown right after an approve. Renders
   // the frozen Crockford `XXXX-XXXX` (SYNC-17: one encoding, no word-list) for the
@@ -345,14 +304,14 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
             background: "var(--bg-2)",
           }}
         >
-          {sas.loading ? (
+          {syncing ? (
             <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>{t("sync.devices.verifySyncing")}</span>
-          ) : sas.fingerprint ? (
+          ) : fingerprint ? (
             <span
               style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xl)", fontWeight: "var(--weight-bold)", letterSpacing: "0.14em", color: "var(--fg-1)" }}
               data-testid="sync.sas-fingerprint"
             >
-              {sas.fingerprint}
+              {fingerprint}
             </span>
           ) : (
             <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)", textAlign: "center" }} data-testid="sync.sas-pending">
@@ -360,6 +319,18 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
             </span>
           )}
         </div>
+        {/* The head moved while the compare was open — a third device pushed, or
+            the hold lapsed. Say so rather than letting the code swap under the
+            reader, and rather than letting the screen quietly re-converge: "keep
+            looking until they agree" is not a comparison. */}
+        {changed && (
+          <p
+            style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", margin: 0, lineHeight: "var(--leading-normal)" }}
+            data-testid="sync.sas-changed"
+          >
+            {t("sync.devices.verifyChanged")}
+          </p>
+        )}
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
           <button type="button" style={BTN} {...btnHover()} onClick={() => setSas(null)} data-testid="sync.sas-match">
             {t("sync.devices.verifyMatch")}
@@ -370,9 +341,17 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
             {...btnHover(busy)}
             disabled={busy}
             onClick={() => {
+              // myne#462: a mismatch is now known to be a timing artefact far
+              // more often than an attack, so this no longer revokes on one
+              // click. It routes into the SAME confirmation every other removal
+              // on this panel goes through (`REMOVE_DEVICE_CONFIRM` +
+              // `REMOVE_DEVICE_DISCLOSURE`) — which is what the mobile
+              // counterpart already did, making desktop the outlier, and the
+              // outlier in the destructive direction.
               const id = sas.deviceId;
+              acknowledgeChange();
               setSas(null);
-              void remove(id);
+              setConfirmRemove(id);
             }}
             data-testid="sync.sas-mismatch"
           >
@@ -579,7 +558,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                       disabled={busy}
                       aria-label={t("sync.devices.verifyAction")}
                       onClick={() =>
-                        setSas({ deviceId: d.device_id_hex, fingerprint: null, loading: true })
+                        setSas({ deviceId: d.device_id_hex })
                       }
                       data-testid="sync.verify-device"
                     >
