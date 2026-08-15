@@ -2770,7 +2770,7 @@
         "localModelMissing": "The local model recorded in settings is not on this device any more. Nothing was sent anywhere. Pick a model again, or name a provider, in Settings → Developer → AI.",
         "noCredential": "No API key is set for this provider. Add one in Settings → Developer → AI.",
         "notReady": "Nothing is ready to answer yet. Nothing was sent anywhere. Pick a model, or name a provider, in Settings → Developer → AI.",
-        "policyRefused": "The provider refused this request under its own rules — an account guardrail, a workspace policy, or a model your plan does not carry. This has to be fixed with the provider, not in Myne.",
+        "policyRefused": "The provider refused this request under its own rules: an account guardrail, a workspace policy, or a model your plan does not carry. This has to be fixed with the provider, not in Myne.",
         "quotaExhausted": "The provider declined the request — you are out of credit or over a rate limit. This has to be fixed with the provider, not in Myne.",
         "refused": "The provider refused the connection. It may be down or blocking this network.",
         "timeout": "The provider did not answer in time. Nothing was left running.",

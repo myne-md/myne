@@ -126,12 +126,12 @@ struct OpenRouterReply {
 #[derive(Deserialize)]
 struct OpenRouterChoice {
     #[serde(default)]
-    message: OpenRouterMessage,
+    message: Option<OpenRouterMessage>,
 }
 #[derive(Deserialize, Default)]
 struct OpenRouterMessage {
     #[serde(default)]
-    content: String,
+    content: Option<String>,
 }
 
 /// Ollama's native reply: `{"message":{"content":…}}`.
@@ -139,7 +139,18 @@ struct OpenRouterMessage {
 /// `message` is an `Option` rather than a defaulted struct so "the reply had no
 /// message at all" (a shape we do not model) stays distinguishable from "the
 /// message was there and empty" (an empty completion). Defaulting collapses the
-/// two into one empty string.
+/// two into one empty string. The OpenRouter structs above carry the same shape
+/// for the same reason; they used to differ, so `{"choices":[{}]}` manufactured
+/// `Some("")` there and classified as an empty completion where the documented
+/// order says `Malformed`.
+///
+/// `content` is `Option<String>` and NOT a defaulted `String`, and that is the
+/// load-bearing half. `#[serde(default)]` fires only for an ABSENT key, so a
+/// key that is present and null failed the whole `from_slice` and the reply
+/// classified as `Malformed` before the `error` member was ever examined.
+/// `{"choices":[{"message":{"role":"assistant","content":null}}],"error":{…}}`
+/// is exactly the shape an OpenRouter policy decline takes, which is the case
+/// this classifier was written for.
 #[derive(Deserialize)]
 struct OllamaReply {
     #[serde(default)]
@@ -150,7 +161,7 @@ struct OllamaReply {
 #[derive(Deserialize, Default)]
 struct OllamaMessage {
     #[serde(default)]
-    content: String,
+    content: Option<String>,
 }
 
 /// A model a provider published, with the one classification the chooser needs.
@@ -370,14 +381,19 @@ impl RemoteProvider {
                 let reply = serde_json::from_slice::<OpenRouterReply>(raw)
                     .map_err(|_| ProviderCodecError::Malformed)?;
                 (
-                    reply.choices.into_iter().next().map(|c| c.message.content),
+                    reply
+                        .choices
+                        .into_iter()
+                        .next()
+                        .and_then(|c| c.message)
+                        .and_then(|m| m.content),
                     reply.error.is_some(),
                 )
             }
             Self::OllamaCloud => {
                 let reply = serde_json::from_slice::<OllamaReply>(raw)
                     .map_err(|_| ProviderCodecError::Malformed)?;
-                (reply.message.map(|m| m.content), reply.error.is_some())
+                (reply.message.and_then(|m| m.content), reply.error.is_some())
             }
         };
         match content {
@@ -935,6 +951,28 @@ mod tests {
                 .err(),
             Some(ProviderCodecError::PolicyRefused)
         );
+
+        // A NULL content field, which is what an OpenRouter decline actually
+        // carries alongside `finish_reason: "content_filter"`. This is the
+        // headline case, and it used to fail the whole `from_slice` and arrive
+        // as `Malformed`: `#[serde(default)]` fires for an ABSENT key, never for
+        // a present null. It classified as Myne's bug and rendered the catch-all
+        // sentence claiming nothing had been sent, on a request that had been.
+        let or_null_content = br#"{"choices":[{"message":{"role":"assistant","content":null}}],"error":{"code":403,"message":"blocked"}}"#;
+        assert_eq!(
+            RemoteProvider::OpenRouter
+                .parse_chat_reply(or_null_content)
+                .err(),
+            Some(ProviderCodecError::PolicyRefused)
+        );
+        let oc_null_content =
+            br#"{"message":{"role":"assistant","content":null},"error":"not on your plan"}"#;
+        assert_eq!(
+            RemoteProvider::OllamaCloud
+                .parse_chat_reply(oc_null_content)
+                .err(),
+            Some(ProviderCodecError::PolicyRefused)
+        );
     }
 
     /// Order matters, and this is the arm that pins it: a reply carrying BOTH
@@ -964,8 +1002,19 @@ mod tests {
         for (p, body) in [
             (RemoteProvider::OpenRouter, &b"{}"[..]),
             (RemoteProvider::OpenRouter, &b"{\"choices\":[]}"[..]),
+            // A present choice with no message, and a message with no content.
+            // Both used to manufacture `Some("")` on the OpenRouter arm and
+            // classify as an empty completion ("try rephrasing"), where the
+            // documented order says a shape we do not model. The two arms
+            // disagreed about the same taxonomy.
+            (RemoteProvider::OpenRouter, &b"{\"choices\":[{}]}"[..]),
+            (
+                RemoteProvider::OpenRouter,
+                &b"{\"choices\":[{\"message\":{}}]}"[..],
+            ),
             (RemoteProvider::OllamaCloud, &b"{}"[..]),
             (RemoteProvider::OllamaCloud, &b"{\"done\":true}"[..]),
+            (RemoteProvider::OllamaCloud, &b"{\"message\":{}}"[..]),
         ] {
             assert_eq!(
                 p.parse_chat_reply(body).err(),

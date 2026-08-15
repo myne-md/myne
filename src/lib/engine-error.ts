@@ -83,9 +83,12 @@ function snakeCase(tag: string): string {
   return tag.replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
 }
 
-const PROVIDER_CAUSE_RENAMES: Readonly<Record<string, ProviderErrorCause>> = {
-  remote_barred: "barred",
-};
+// A `Map`, not an object literal: an object's lookup walks `Object.prototype`,
+// so a tag of `constructor`, `toString` or `hasOwnProperty` would resolve to a
+// truthy function and be returned as a cause, and the key lookup below would
+// then render nothing where an error sentence belongs. Not reachable from the
+// closed Rust enum, and one word to close.
+const PROVIDER_CAUSE_RENAMES = new Map<string, ProviderErrorCause>([["remote_barred", "barred"]]);
 
 const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
   "no_credential",
@@ -110,7 +113,7 @@ const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
  */
 export function normalizeProviderError(raw: unknown): ProviderErrorCause {
   const tag = snakeCase(engineErrorTag(raw));
-  const renamed = PROVIDER_CAUSE_RENAMES[tag];
+  const renamed = PROVIDER_CAUSE_RENAMES.get(tag);
   if (renamed) return renamed;
   return PROVIDER_CAUSES.has(tag) ? (tag as ProviderErrorCause) : "failed";
 }

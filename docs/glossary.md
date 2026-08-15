@@ -1275,13 +1275,13 @@ Used in: `decisions.md` 2026-08-09, 2026-08-04; `dev/ai-no-egress.md`
 
 ### **policy refusal** &nbsp; 📦 *Product*
 
-A [remote AI provider](#remote-ai-provider) declining a request under **its own** rules — an account guardrail, a workspace policy, a model the plan does not carry. Its shape is what makes it a term rather than a detail: the provider answers **HTTP 200** and puts an `error` member in the body where the answer belongs, so at the transport layer it is indistinguishable from success. Distinct from a *credential* rejection (401/403), from a *cost* decline (402/429 — see the quota causes), and from a transport refusal, which is nothing accepting the connection at all. Distinguishing it needs only whether that member is **present**; its text is attacker-influenceable and is never read, logged, stored or shown — the reply structs type it `Option<serde::de::IgnoredAny>`, which deserializes any value and retains nothing. The user-facing consequence is the reason the term exists: a policy refusal is fixed at the provider, so telling the user to rephrase is wrong advice, and telling them nothing was sent is a false statement — the note text had already left.
+A [remote AI provider](#remote-ai-provider) declining a request under **its own** rules: an account guardrail, a workspace policy, a model the plan does not carry. Its shape is what makes it a term rather than a detail: the provider answers **HTTP 200** and puts an `error` member in the body where the answer belongs, so at the transport layer it is indistinguishable from success. Distinct from a *credential* rejection (401/403), from a *cost* decline (402/429, the quota causes), and from a transport refusal, which is nothing accepting the connection at all. Distinguishing it needs only whether that member is **present**; its text is attacker-influenceable and is never read, logged, stored or shown, because the reply structs type it `Option<serde::de::IgnoredAny>`, which deserializes any value and retains nothing. The user-facing consequence is the reason the term exists: a policy refusal is fixed at the provider, so telling the user to rephrase is wrong advice, and telling them nothing was sent is a false statement, because the note text had already left.
 
 Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **effective backend** &nbsp; 📦 *Product*
 
-Which AI backend a request **actually** reaches, as opposed to which one the preferences name. The two can differ: selecting the remote arm requires seven conditions to hold at once (developer mode, the AI beta flag, a recognized [AI provider](#ai-provider), matching consent, a stored key, a non-empty model selection, and preferences read from the vault unlocked right now), and any one failing falls back silently to the local arm. Naming a provider satisfies one of the seven, so a caption derived from that alone can claim a backend that answered nothing. Attribution of where a note's text went is a trust surface, so it names this; the separate **trust headline** — where a configuration *can* send text — deliberately stays on the configured value, because over-claiming egress makes a reader cautious while under-claiming tells them their text stayed home when it did not.
+Which AI backend a request **actually** reaches, as opposed to which one the preferences name. The two can differ: selecting the remote arm requires seven conditions to hold at once (developer mode, the AI beta flag, a recognized [AI provider](#ai-provider), matching consent, a stored key, a non-empty model selection, and preferences read from the vault unlocked right now), and any one failing falls back silently to the local arm. Naming a provider satisfies one of the seven, so a caption derived from that alone can claim a backend that answered nothing. Attribution of where a note's text went is a trust surface, so it names this. The separate [trust headline](#trust-headline) deliberately stays on the configured value instead, because over-claiming egress makes a reader cautious while under-claiming tells them their text stayed home when it did not.
 
 Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
@@ -2427,6 +2427,14 @@ Used in: `spec/markdown-dialect.md` §3.6.1, `decisions.md` 2026-06-03 + 2026-05
 A line in the system where the security model changes — what is trusted on one side is not trusted on the other. The catalog grows as the product does — TB10 arrived with the browser clipper's native-messaging bridge, TB11 with the served web bundle — so `threat-model.md` §3 is the table of record; read the boundaries there rather than restating their extent (or their count) here.
 
 Used in: `threat-model.md` §3
+
+### **trust headline** &nbsp; 📦 *Product*
+
+The line on the AI settings panel that answers **where this configuration can send your text**, as opposed to who answered the last request (that is the [effective backend](#effective-backend), and the two are deliberately different questions).
+
+It stays on the CONFIGURED value rather than on the host's report of what actually answered, and the asymmetry is a safety direction rather than an oversight. Over-claiming egress makes a reader more careful than they need to be. Under-claiming tells someone their text stays on the device while it leaves, and deriving this line from the report would under-claim twice: in the window before the first report lands, and for a user who has named a provider and is one keystroke (picking a model) away from egress, on the very panel where they will make it.
+
+Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **typewriter scroll** &nbsp; 📦 *Product*
 
