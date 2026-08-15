@@ -411,6 +411,107 @@ describe("check-twin-inventory", () => {
     expect(full.out).toContain("differing only in comments or the seam import");
   });
 
+  it("computes the three difference counts correctly, on known answers", () => {
+    // The test above asserts the LABELS are present and nothing asserts the
+    // NUMBERS, which is how the published counts came to be unverified: with
+    // `semanticDiff` replaced by `!byteEqual` and `cosmeticOnly` hardcoded to 0,
+    // every other test in this file still passed. myne-md/myne#473 is meant to
+    // ratchet on these, and `--check` against the checked-in projection no
+    // longer covers them either, because they were moved out of the byte-gated
+    // document precisely so an unrelated comment edit stops reddening it.
+    //
+    // So: a scratch tree whose answer is known by construction, one pair per
+    // way a pair can land, asserting the exact summary line.
+    const dir = mkdtempSync(join(tmpdir(), "myne-twin-counts-"));
+    scratch = dir;
+    const a = join(dir, "desk");
+    const b = join(dir, "mob");
+    const write = (root: string, rel: string, text: string) => {
+      mkdirSync(join(root, rel, ".."), { recursive: true });
+      writeFileSync(join(root, rel), text);
+    };
+
+    // 1. byte-identical: not byte-different, not semantic, not cosmetic.
+    write(a, "same.ts", "export const x = 1;\n");
+    write(b, "same.ts", "export const x = 1;\n");
+
+    // 2. comment-only: byte-different, cosmetic.
+    write(a, "comment.ts", "// desktop says this\nexport const x = 1;\n");
+    write(b, "comment.ts", "// mobile says something else\nexport const x = 1;\n");
+
+    // 3. blank-line and indentation only: byte-different, cosmetic. This is the
+    //    clause that carries thirteen of the real roster's fifteen and that no
+    //    published statement of the rule mentioned until it was measured.
+    write(a, "blank.ts", "export const x = 1;\n\n\n  export const y = 2;\n");
+    write(b, "blank.ts", "export const x = 1;\nexport const y = 2;\n");
+
+    // 4. seam import only: byte-different, cosmetic. Needs a real `platform/`
+    //    directory, because `seamAliases` derives the map from one at runtime
+    //    and returns an EMPTY map without it, so every scratch tree before this
+    //    left the seam arm of the comparison unexercised end to end.
+    write(a, "platform/core.ts", 'export { invoke } from "@tauri-apps/api/core";\n');
+    write(a, "uses-seam.ts", 'import { invoke } from "./platform/core";\nexport const x = 1;\n');
+    write(b, "uses-seam.ts", 'import { invoke } from "../platform/core";\nexport const x = 1;\n');
+
+    // 5. genuinely different: byte-different AND semantic, not cosmetic.
+    write(a, "real.ts", "export const x = 1;\n");
+    write(b, "real.ts", "export const x = 2;\n");
+
+    const roster = ["same.ts", "comment.ts", "blank.ts", "uses-seam.ts", "real.ts"].map((rel) => ({
+      a: join(a, rel),
+      b: join(b, rel),
+      verdict: "decision",
+      destination: "undecided",
+      reason: "scratch",
+    }));
+    writeFileSync(join(a, "roster.json"), JSON.stringify(roster, null, 2));
+
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(0);
+    // 4 byte-different (everything but `same.ts`), 1 semantic (`real.ts`),
+    // 3 cosmetic (comment, blank, seam).
+    expect(out).toContain("4 byte-different, 1 semantically different, 3 differing only in");
+  });
+
+  it("counts a seam-only difference as cosmetic only when the seam map is real", () => {
+    // The companion to the case above, and the reason it is separate: if
+    // `seamAliases` silently returned an empty map, case 4 would fall into the
+    // semantic bucket and the assertion above would fail with an off-by-one
+    // that reads like a counting bug rather than a missing seam. Dropping the
+    // `platform/` directory is what makes that concrete.
+    const dir = mkdtempSync(join(tmpdir(), "myne-twin-seam-"));
+    scratch = dir;
+    const a = join(dir, "desk");
+    const b = join(dir, "mob");
+    const write = (root: string, rel: string, text: string) => {
+      mkdirSync(join(root, rel, ".."), { recursive: true });
+      writeFileSync(join(root, rel), text);
+    };
+    write(a, "uses-seam.ts", 'import { invoke } from "./platform/core";\nexport const x = 1;\n');
+    write(b, "uses-seam.ts", 'import { invoke } from "../platform/core";\nexport const x = 1;\n');
+    writeFileSync(
+      join(a, "roster.json"),
+      JSON.stringify(
+        [
+          {
+            a: join(a, "uses-seam.ts"),
+            b: join(b, "uses-seam.ts"),
+            verdict: "decision",
+            destination: "undecided",
+            reason: "scratch",
+          },
+        ],
+        null,
+        2,
+      ),
+    );
+
+    const { out } = run(["--roots", a, b]);
+    // No `platform/` directory, so no alias map, so the differing specifier is
+    // a real difference.
+    expect(out).toContain("1 byte-different, 1 semantically different, 0 differing only in");
+  });
+
   // ── the prose projection ───────────────────────────────────────────────────
 
   // These four run against a THROWAWAY tree, like every other failure case in
@@ -535,9 +636,20 @@ describe("check-twin-inventory", () => {
 
   const DEFECTS = {
     missing: "have no verdict",
-    stale: "no longer exists",
+    // "no longer exists" alone is a SUBSTRING of the curated message
+    // ("curated pair(s) name a file that no longer exists"), so the interaction
+    // rows passed with the orphaned block deleted outright: the marker was
+    // being satisfied by a different check's output. Anchored on the phrase
+    // only the orphaned block emits.
+    stale: "describe a pair that is no longer a twin",
     curated: "curated pair(s) name a file that no longer exists",
     verdict: "outside the vocabulary",
+    // Untested until myne-md/myne#472's review, and its own comment called that
+    // out ("Latent today; it costs one comparison to keep it that way"). It
+    // fired incidentally inside this matrix, because the `verdict` defect
+    // happens to push a second entry with the same pair key, so deleting the
+    // check was green.
+    duplicate: "duplicate roster entr(ies)",
   } as const;
 
   /** A scratch tree carrying exactly the named defects. */
@@ -559,6 +671,11 @@ describe("check-twin-inventory", () => {
     if (names.includes("verdict")) {
       roster.push(entry(join(a, "kept.ts"), join(b, "kept.ts"), "narrowed"));
     }
+    // A second entry for a pair that already has one, with a VALID verdict, so
+    // this case cannot be satisfied by the `verdict` defect's side effect.
+    if (names.includes("duplicate") && !names.includes("verdict")) {
+      roster.push(entry(join(a, "kept.ts"), join(b, "kept.ts")));
+    }
     writeFileSync(join(a, "roster.json"), JSON.stringify(roster, null, 2));
     writeFileSync(join(a, "curated.json"), JSON.stringify(curated, null, 2));
     return run(["--roots", a, b]);
@@ -578,14 +695,14 @@ describe("check-twin-inventory", () => {
       expect(out).toContain(DEFECTS[name]);
     });
 
-    it(`still fires on \`${name}\` when the other three are also present`, () => {
+    it(`still fires on \`${name}\` when every other defect is also present`, () => {
       const { code, out } = withAllDefects();
       expect(code).toBe(1);
       expect(out).toContain(DEFECTS[name]);
     });
   }
 
-  it("names all four at once rather than stopping at the first", () => {
+  it("names every defect at once rather than stopping at the first", () => {
     // A guard that exits on its first finding makes the second one cost a whole
     // extra round trip, and after two rounds people stop reading the output.
     const { out } = withAllDefects();

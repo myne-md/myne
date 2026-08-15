@@ -2366,7 +2366,7 @@ Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 2026-08-15 (twin inv
 
 ### **screen (twin verdict)** &nbsp; 🛠️ *Tooling*
 
-The verdict for a twin that exists TO BE per-client, so its divergence is the feature rather than the bug. Two clauses: the surface a client renders (layout, navigation shape), or the host it renders into (entry points, build-time ambient globals). The second clause was added under review, when three of the entries carrying the verdict turned out to be host composition that the presentation-only wording described not at all. **Deliberately narrow** even so: what it excludes is a file that merely happens to differ per client, which is every [[decision (twin verdict)]] in the record. Two guard tests hold it, one capping how many entries may carry it and one asserting which, because a count cannot notice a miscategorised entry.
+The verdict for a twin that exists TO BE per-client, so its divergence is the feature rather than the bug. Two clauses: the surface a client renders (layout, navigation shape), or the host it renders into (entry points, build-time ambient globals). The second clause was added under review, when three of the entries carrying the verdict turned out to be host composition that the presentation-only wording described not at all. **Deliberately narrow** even so: what it excludes is a file that merely happens to differ per client, which is every [decision (twin verdict)](#decision-twin-verdict) in the record. Two guard tests hold it, one capping how many entries may carry it and one asserting which, because a count cannot notice a miscategorised entry.
 
 Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
 
