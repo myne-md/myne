@@ -28,16 +28,19 @@ async function kindFor(raw: unknown): Promise<string> {
 }
 
 describe("transcribe error normalization (myne#485)", () => {
-  // Both shapes, because the serialized `EngineError` reaches the WebView either
-  // as a bare variant name or as a `{ kind }` object carrying the snake_case tag
-  // from `EngineError::kind()`, and the two halves are written in different
-  // files. A mapping that handled only one would fail exactly on whichever the
-  // runtime actually sends.
+  // Both shapes, and only one of them ships today. `EngineError` derives a plain
+  // `Serialize` with no `#[serde(tag)]`, so a fieldless variant reaches the
+  // WebView as the bare string `"AudioTooLong"`. Nothing emits the snake_case
+  // `{ kind }` form: `EngineError::kind()` is `#[allow(dead_code)]` and its one
+  // wrapper has no caller. The `{ kind }` case below is kept as defence against
+  // a future `#[serde(tag = "kind")]`, and is labelled that way rather than as a
+  // runtime shape, because a comment asserting both are real is what the next
+  // reader would trust.
   it("maps the bare variant name AudioTooLong to too_long", async () => {
     expect(await kindFor("AudioTooLong")).toBe("too_long");
   });
 
-  it("maps the { kind } object form audio_too_long to too_long", async () => {
+  it("also maps the { kind } object form, which nothing emits yet", async () => {
     expect(await kindFor({ kind: "audio_too_long" })).toBe("too_long");
   });
 
