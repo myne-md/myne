@@ -26,6 +26,9 @@
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
+import { seedVault, type SeededVault } from "./support/fixtures";
+import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import { testIdSelector, type Session } from "./support/webdriver";
 
 
 
@@ -111,15 +114,70 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
   });
 });
 
-// OWED, and deliberately not written as a stub: the note-copy toast.
-//
-// The note copy is reached through the export pre-flight modal, a multi-step
-// flow whose own testids this scenario would have to drive. That is real work
-// and it was not done here.
-//
-// What is NOT acceptable in its place is a scenario that unlocks, asserts the
-// editor mounted, and calls itself coverage, which is the first thing this file
-// contained. A test that cannot fail for the reason it names is worse than a
-// missing one, because the roster then reports a check nobody performed. The gap
-// is recorded in the feature's `progress.md` instead, where it can be closed
-// rather than mistaken for done.
+/** The success toast's text, by value.
+ *
+ *  Duplicated from `locales/en/common.json` rather than imported for the same
+ *  reason `PHRASE_COPIED` above is: this suite drives the production BUNDLE, so
+ *  importing the catalog would assert the test's copy of the string against
+ *  itself.
+ */
+const NOTE_COPIED = "Note text copied";
+
+/** Right-click the sidebar row of `noteId` and return the export menu item. */
+async function openExportMenuItem(s: Session, noteId: string) {
+  const row = await s.waitForElement(
+    testIdSelector("notes.row", { "data-note-id": noteId }),
+  );
+  await row.rightClick();
+  return s.waitForElement(
+    testIdSelector("notes.context-menu-item", { "data-item-id": "export-markdown" }),
+  );
+}
+
+describeE2E("cb2 a note copy toasts, from a stage the toast host only just reached", () => {
+  // Vault-count precondition: 1 (weak KDF, export-suite notes).
+  //
+  // The pre-flight modal that carries Copy is raised ONLY when the note
+  // references attachments (`src/notes/exportFlow.ts`), so this drives the
+  // export suite's attachments-bearing note rather than a plain one.
+  it("shows the success toast, and its text says SUCCESS", async () => {
+    let seeded!: SeededVault;
+    await scenario(
+      "cb2-note-copy-toast",
+      { seed: (dir) => void (seeded = seedVault(dir, { exportSuite: true })) },
+      async (app) => {
+        const s = app.session;
+        const suite = seeded.exportSuite;
+        if (suite === undefined) throw new Error("fixture was not seeded with exportSuite");
+
+        await unlockToEditor(s, seeded.password);
+        await dismissImporterOffer(s);
+
+        // Sidebar context menu, export entry, pre-flight modal, Copy.
+        const item = await openExportMenuItem(s, suite.attachmentsNoteId);
+        await item.click();
+        await s.byTestId("export.modal", { timeoutMs: 15_000 });
+        await (await s.byTestId("export.copy")).click();
+
+        // The toast, asserted by EQUALITY rather than by "a toast appeared".
+        // The failure arm renders into the same element, so a substring or a
+        // presence check would pass for `copyFailed` too, and distinguishing the
+        // two outcomes is the whole feature.
+        // Re-fetched inside the poll rather than held: the toast element remounts
+        // when the variant changes, so a held handle goes stale the moment the
+        // failure arm renders instead of the success one, and the test then
+        // reports a stale-element error rather than the text it actually found.
+        // The point of this assertion is to name the wrong outcome, not to
+        // notice that something moved.
+        await s.byTestId("editor.toast-message", { timeoutMs: 10_000 });
+        await s.waitUntil(
+          async () => {
+            const el = await s.byTestId("editor.toast-message");
+            return (await el.text()).trim() === NOTE_COPIED ? true : null;
+          },
+          { label: `note copy toasts SUCCESS ("${NOTE_COPIED}")`, timeoutMs: 10_000 },
+        );
+      },
+    );
+  });
+});
