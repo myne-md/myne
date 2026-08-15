@@ -224,6 +224,24 @@ fn main() {
                     .commands(&["graph_layout_read", "graph_layout_write"]),
             )
             .plugin(
+                // Sealed label store (MYL1, §9.22) — the device-local
+                // hide-vault-names option (myne-md/myne#411): shared from
+                // `myne-core`; the same THREE commands the desktop registers, and
+                // all three are needed. The probe (`vault_label_keychain_status`)
+                // is the one that looks droppable and is the one mobile needs
+                // most: `platform_keychain` has an Apple backend and returns
+                // `UnavailableKeychain` elsewhere, so on Android the store holds
+                // nothing today and the row's whole job there is to say so.
+                // Adding a command here without a matching entry in
+                // `permissions/vault-label/default.toml` is a security bug.
+                "vault-label",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "hide_vault_names",
+                    "set_hide_vault_names",
+                    "vault_label_keychain_status",
+                ]),
+            )
+            .plugin(
                 // Custom themes (MYT1, §9.21): shared from `myne-core`, but ONE
                 // command of desktop's five — mobile is a read-only consumer of
                 // a store the desktop authors, and the other four must not be
