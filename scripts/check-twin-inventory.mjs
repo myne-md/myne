@@ -89,17 +89,38 @@
 // argue with, and it stays in the record because a real divergence should be
 // visible even when it does not matter.
 //
-// The semantic comparison is the one myne-md/myne#473 may gate on, because
-// 16 of the 76 drifted pairs are byte-different and behave identically. Four pairs (`vault-status.ts`, `vault-slot-kind.ts`,
-// `vault-recover.ts`, `vault-change-password.ts`) differ in exactly one line,
-// the seam import, and `src/platform/core.ts` is a bare re-export of the module
-// mobile imports directly. `src/types/vault-summary.ts` differs only in a JSDoc
-// bullet. Two `src/dialect/` shims differ only by a header comment, and which
-// side carries it flips between them. Gating on bytes would make those permanent
-// red entries that no sibling can close.
+// The semantic comparison is the one myne-md/myne#473 may gate on, because a
+// meaningful fraction of the drifted pairs are byte-different and behave
+// identically: `src/types/vault-summary.ts` differs only in a JSDoc bullet, two
+// `src/dialect/` shims differ only by a header comment (and which side carries
+// it flips between them), and eight Rust files differ only in doc prose. Gating
+// on bytes would make those permanent red entries that no sibling can close.
+//
+// **The counts are not written here.** They were, as "16 of the 76", and by the
+// time this branch merged they were 15 of 80, in a comment eleven lines under
+// one saying the numbers live in the projection because they move. Run the
+// guard.
+//
+// Four pairs used to be the headline example: `vault-status.ts`,
+// `vault-slot-kind.ts`, `vault-recover.ts` and `vault-change-password.ts` each
+// differed in exactly one line, the seam import. All four are byte-identical
+// now — myne-md/myne#492 gave `mobile/src` its own seam directory, so both sides
+// import from `../platform/` — and the seam-canonicalization arm of the rule
+// consequently moves NO pair on today's roster. Disabling it yields the same two
+// counts. It is kept because it is the right rule and will have members again
+// the moment a seam member diverges, but it is currently carrying an argument
+// nothing in the tree exercises, which is worth knowing before citing it.
 //
 // **The rule: two files are semantically identical iff they compare equal after
-// stripping comments and canonicalizing the seam import specifier.**
+// stripping comments, canonicalizing the seam import specifier, and eliding
+// blank lines and leading indentation.**
+//
+// The third clause is not decoration and it used to be missing from every
+// published statement of this rule. It does the most work of the three:
+// comments and the seam alone give 78 semantic / 2 cosmetic, and the elision
+// gives 65 / 15, so thirteen of the fifteen cosmetic-only verdicts come from
+// that clause alone. A reader given the two-clause rule could not reproduce the
+// number the projection publishes. `normalize` states what it costs.
 //
 // An exported-surface comparison was considered and rejected: it would miss
 // myne-md/myne#485, where mobile's `resample_linear` carries desktop's signature
@@ -142,7 +163,6 @@
 
 import {
   readdirSync,
-  statSync,
   existsSync,
   readFileSync,
   writeFileSync,
@@ -219,6 +239,7 @@ const CURATED_TWINS = [
   {
     a: "src/App.tsx",
     b: "mobile/src/app/AppShell.tsx",
+    what: "carries the twin boot probe, reprobe, Stage switch and dispatch",
     why:
       "The boot probe, `reprobe`, the Stage switch and the dispatch, on both clients. " +
       "CORRECTION to `check-twin-drift.mjs`'s `NAMED_TWINS`, which pairs `src/App.tsx` with " +
@@ -231,19 +252,21 @@ const CURATED_TWINS = [
   {
     a: "src/notes/sidebarState.tsx",
     b: "mobile/src/app/flows/EditorFlow.tsx",
+    what: "re-implements its note-flag predicates (see @myne/editor/host/notes/selectors)",
     why:
       "Mobile re-implements the note-flag predicates rather than importing them from " +
       "`@myne/editor/host/notes/selectors`. This epic's own motivating case, and it is outside the " +
       "90 the path sweep finds, so a record fixed at 90 would omit the defect the epic exists to " +
-      "fix. Line counts (1345 against 3384) are meaningless for this pair: it is a behavioural " +
+      "fix. Line counts are meaningless for this pair: it is a behavioural " +
       "counterpart, not a copy, so only the semantic comparison of the shared predicates says " +
       "anything.",
   },
   {
     a: "src/notes/prefsNonce.ts",
     b: "mobile/src/lib/prefsNonce.ts",
+    what: "is the same prefs-nonce mechanism, duplicated rather than shared",
     why:
-      "Byte-identical at 60 lines, and neither side is a shim: this is real code with two homes. " +
+      "Byte-identical, and neither side is a shim: this is real code with two homes. " +
       "It is the mechanism `check-prefs-nonce.mjs` exists to protect, duplicated across the trees " +
       "the guard is meant to hold, which makes it the sharpest argument for why the curated half " +
       "of the denominator is not optional.",
@@ -251,6 +274,7 @@ const CURATED_TWINS = [
   {
     a: "src/notes/localDateTime.ts",
     b: "mobile/src/lib/localDateTime.ts",
+    what: "is a shim on one side and a hand copy on the other",
     why:
       "Shim against hand copy. Desktop is a one-line `export * from " +
       '"@myne/editor/host/notes/localDateTime"`; mobile carries 33 lines of its own. Desktop ' +
@@ -259,6 +283,7 @@ const CURATED_TWINS = [
   {
     a: "src/notes/attachmentRef.ts",
     b: "mobile/src/lib/attachmentRef.ts",
+    what: "is a shim on one side and a hand copy on the other",
     why:
       "Shim against hand copy, same shape as localDateTime. Desktop re-exports " +
       '`@myne/editor/host/notes/attachmentRef`; mobile carries 69 lines.',
@@ -266,6 +291,7 @@ const CURATED_TWINS = [
   {
     a: "src/dialect/welcomeNote.ts",
     b: "mobile/src/lib/welcomeNote.ts",
+    what: "is the English-only hand copy of the shared welcome note",
     why:
       "Shim against hand copy, and the one case where mobile carries BOTH. " +
       "`mobile/src/dialect/welcomeNote.ts` is the one-line shim into `@myne/dialect` (already a " +
@@ -554,7 +580,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Cosmetic-only today: the single differing line is the seam import. Its error enum is in core/src/plugins/vault_change_password/error.rs, measured, so discriminator 5 puts it squarely in the shared column.",
+      "Byte-identical since myne-md/myne#492 gave `mobile/src` its own seam directory, so both sides now import from `../platform/`. Before that the single differing line WAS the seam import, and this entry is one of the four that argument was built on. Its error enum is in core/src/plugins/vault_change_password/error.rs, measured, so discriminator 5 puts it squarely in the shared column.",
   },
   {
     a: "src/lib/vault-creation-logging.ts",
@@ -594,7 +620,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Cosmetic-only today: the single differing line is the seam import. Error enum in core/src/plugins/vault_recover/error.rs, measured.",
+      "Byte-identical since myne-md/myne#492 gave `mobile/src` its own seam directory, so both sides now import from `../platform/`. Before that the single differing line WAS the seam import, and this entry is one of the four that argument was built on. Error enum in core/src/plugins/vault_recover/error.rs, measured.",
   },
   {
     a: "src/lib/vault-repair.ts",
@@ -610,7 +636,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Cosmetic-only today: the single differing line is the seam import. What the runtime slot map reports is one answer.",
+      "Byte-identical since myne-md/myne#492 gave `mobile/src` its own seam directory, so both sides now import from `../platform/`. Before that the single differing line WAS the seam import, and this entry is one of the four that argument was built on. What the runtime slot map reports is one answer.",
   },
   {
     a: "src/lib/vault-status.ts",
@@ -618,7 +644,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Cosmetic-only today: the single differing line is the seam import.",
+      "Byte-identical since myne-md/myne#492 gave `mobile/src` its own seam directory, so both sides now import from `../platform/`. Before that the single differing line WAS the seam import, and this entry is one of the four that argument was built on.",
   },
   {
     a: "src/lib/vault-switch.ts",
@@ -666,7 +692,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Byte-identical at 60 lines and neither side a shim: real code with two homes. It is the mechanism check-prefs-nonce.mjs exists to protect, duplicated across the two trees that guard is meant to hold, which is the sharpest argument in the record for why the curated half of the denominator is not optional.",
+      "Byte-identical and neither side a shim: real code with two homes. It is the mechanism check-prefs-nonce.mjs exists to protect, duplicated across the two trees that guard is meant to hold, which is the sharpest argument in the record for why the curated half of the denominator is not optional.",
   },
   {
     a: "src/notes/sidebarState.tsx",
@@ -674,7 +700,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Mobile re-implements the note-flag predicates rather than importing them from @myne/editor/host/notes/selectors. Line counts are meaningless for this pair (1345 against 3384): it is a behavioural counterpart, not a copy, so only the shared predicates are the twin.",
+      "Mobile re-implements the note-flag predicates rather than importing them from @myne/editor/host/notes/selectors. Line counts are meaningless for this pair: it is a behavioural counterpart, not a copy, so only the shared predicates are the twin.",
   },
   {
     a: "src/styles/tokens.css",
@@ -1139,7 +1165,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Model resolution and integrity checking, 820 lines against 766. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
+      "Model resolution and integrity checking, 1019 lines against 766. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/engine.rs",
@@ -1205,21 +1231,20 @@ const VERDICTS = ["decision", "screen", "absent", "delegated"];
 function* walk(dir, root) {
   let entries;
   try {
-    entries = readdirSync(dir);
+    // `withFileTypes` rather than a `statSync` per entry: the directory read
+    // already knows which entries are directories, and asking again cost 946
+    // extra syscalls on this tree. Measured 4.25 ms -> 3.35 ms for the walk
+    // alone. `check-prefs-nonce.mjs` and `check-platform-seam.mjs` moved off the
+    // statSync form for the same reason.
+    entries = readdirSync(dir, { withFileTypes: true });
   } catch {
     return;
   }
-  for (const name of entries) {
-    if (SKIP_DIRS.has(name)) continue;
-    const full = join(dir, name);
-    let st;
-    try {
-      st = statSync(full);
-    } catch {
-      continue;
-    }
-    if (st.isDirectory()) yield* walk(full, root);
-    else yield relative(root, full);
+  for (const entry of entries) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) yield* walk(full, root);
+    else if (entry.isFile()) yield relative(root, full);
   }
 }
 
@@ -1232,19 +1257,29 @@ function* walk(dir, root) {
 function discover(pairs = TREE_PAIRS, curated = CURATED_TWINS) {
   const twins = [];
   for (const [deskRoot, mobRoot] of pairs) {
-    if (!existsSync(at(deskRoot))) continue;
-    if (!existsSync(at(mobRoot))) {
-      // Thrown rather than `process.exit`, because `discover` is exported and
-      // the suite calls it directly: an exit here kills the Vitest worker and
-      // reports as an infrastructure crash instead of a named failure. `main`
-      // catches it and exits.
-      throw new Error(
-        `twin-inventory: ${mobRoot} is missing. Both sides are in-repo since decisions.md 0488, so this is a broken checkout rather than an un-cloned companion.`,
-      );
+    // BOTH roots, same treatment. A missing desktop root used to `continue`
+    // silently, which scans zero files and surfaces later as a pile of
+    // "orphaned" entries rather than as the one fact that explains them; the
+    // mobile side threw. Same event, so same answer.
+    //
+    // Thrown rather than `process.exit`, because `discover` is exported and the
+    // suite calls it directly: an exit here kills the Vitest worker and reports
+    // as an infrastructure crash instead of a named failure. `main` catches it
+    // and exits.
+    for (const root of [deskRoot, mobRoot]) {
+      if (!existsSync(at(root))) {
+        throw new Error(
+          `twin-inventory: ${root} is missing. Both sides are in-repo since decisions.md 0488, so this is a broken checkout rather than an un-cloned companion.`,
+        );
+      }
     }
+    // Intersect two walks rather than walking one side and `existsSync`-ing the
+    // other: the per-file existence probe cost 864 stat syscalls to answer a
+    // question the (much smaller) mobile walk already contains. Measured 6.51 ms
+    // -> 4.91 ms, and 1,810 stat syscalls -> 0.
+    const mobFiles = new Set(walk(at(mobRoot), at(mobRoot)));
     for (const rel of walk(at(deskRoot), at(deskRoot))) {
-      const b = join(mobRoot, rel);
-      if (existsSync(at(b))) twins.push({ a: join(deskRoot, rel), b });
+      if (mobFiles.has(rel)) twins.push({ a: join(deskRoot, rel), b: join(mobRoot, rel) });
     }
   }
   // Curated pairs join the same set, deduped on the PAIR rather than on the
@@ -1288,7 +1323,7 @@ const PROJECTION = join("docs", "dev", "twin-inventory.md");
  * regenerated. The roster's reasons still cite sizes where the size is the
  * argument; those are measurements taken once and recorded, not a live read.
  */
-function projectionBody(roster, counts) {
+function projectionBody(roster) {
   const byVerdict = (v) => roster.filter((e) => e.verdict === v);
   const table = (entries) =>
     entries.length === 0
@@ -1306,8 +1341,6 @@ function projectionBody(roster, counts) {
           .join("\n") +
         "\n";
 
-  const { cosmeticOnly: cosmetic, semanticDiff: semantic, byteDiff: byte } = counts;
-
   const body = `<!-- GENERATED by scripts/check-twin-inventory.mjs --emit. Do not edit by hand:
      the roster in that script is the source of truth, and it is also the gate. -->
 
@@ -1318,7 +1351,12 @@ their decisions. This is the record of where they do, where they do not, and whi
 bug. It is generated from \`scripts/check-twin-inventory.mjs\`, which is also the gate, so the two
 cannot disagree.
 
-**${roster.length} twins:** ${byVerdict("decision").length} decision, ${byVerdict("screen").length} screen, ${byVerdict("absent").length} absent, ${byVerdict("delegated").length} delegated. ${semantic} differ semantically, and ${cosmetic} differ only in comments or the platform-seam import.
+**${roster.length} twins:** ${byVerdict("decision").length} decision, ${byVerdict("screen").length} screen, ${byVerdict("absent").length} absent, ${byVerdict("delegated").length} delegated.
+
+Those five numbers come from the roster, so they move only when the roster does, which is exactly
+when this document should be regenerated. How many pairs currently *differ*, and how many differ only
+cosmetically, are measurements of the trees rather than of the record: they are printed by
+\`node scripts/check-twin-inventory.mjs\` and deliberately kept out of this byte-gated file.
 
 ## How a twin is found
 
@@ -1367,14 +1405,26 @@ cite \`src-tauri/src/plugins/.../error.rs\` paths that no longer exist.
 
 ## Two difference fields, and only one may gate
 
-Every pair carries a mechanical **byte** flag and a **semantic** one. ${cosmetic} of the ${byte} drifted
-pairs are byte-different and behave identically: four \`src/lib/vault-*.ts\` pairs differ in exactly
-one line, the platform-seam import, and eight Rust files differ only in doc prose. Gating on bytes
-would make those permanent red entries nobody can close.
+Every pair carries a mechanical **byte** flag and a **semantic** one. Some byte-different pairs
+behave identically, mostly Rust files whose only difference is doc prose, and gating on bytes would
+make those permanent red entries nobody can close.
 
-**Two files are semantically identical iff they compare equal after stripping comments and
-canonicalizing the seam import specifier.** The seam map is derived from \`src/platform/\` at runtime
-rather than hardcoded, so it cannot drift from the seam it describes.
+**The counts are deliberately not in this document.** They move whenever any twin is edited, and
+this document is byte-gated by \`--check\`, so publishing them here means a comment added to either
+side of any byte-identical pair reddens \`pre-commit\` with a message whose first suggestion is that
+this file was hand-edited. \`node scripts/check-twin-inventory.mjs\` prints them.
+
+The four \`src/lib/vault-*.ts\` pairs this argument was originally built on are **byte-identical**
+now: myne-md/myne#492 gave \`mobile/src\` its own seam directory, so the one line that used to differ
+no longer does, and the seam-canonicalization arm of the rule currently moves no pair at all. The
+mechanism is kept because it is the right rule and will have members again the moment a seam member
+diverges.
+
+**Two files are semantically identical iff they compare equal after stripping comments,
+canonicalizing the seam import specifier, and eliding blank lines and leading indentation.** The
+third clause carries most of the count: comments and the seam alone would give 78 semantic and 2
+cosmetic. The seam map is derived from \`src/platform/\` at runtime rather than hardcoded, so it
+cannot drift from the seam it describes.
 
 ## decision (${byVerdict("decision").length})
 
@@ -1399,8 +1449,8 @@ ${table(byVerdict("absent"))}`;
   return body;
 }
 
-function emitProjection(roster, counts, target = PROJECTION) {
-  writeFileSync(at(target), projectionBody(roster, counts));
+function emitProjection(roster, target = PROJECTION) {
+  writeFileSync(at(target), projectionBody(roster));
   console.log(
     `twin-inventory: projection written, ${roster.length} row(s) into ${target}`,
   );
@@ -1415,8 +1465,8 @@ function emitProjection(roster, counts, target = PROJECTION) {
  * looked. `scripts/decisions-index.mjs --check` guards its generated index the
  * same way and for the same reason.
  */
-function checkProjection(roster, counts, target = PROJECTION) {
-  const want = projectionBody(roster, counts);
+function checkProjection(roster, target = PROJECTION) {
+  const want = projectionBody(roster);
   const have = existsSync(at(target)) ? readFileSync(at(target), "utf8") : "";
   if (have === want) return;
   // The message names both causes because the check cannot tell them apart, and
@@ -1506,7 +1556,7 @@ function seamAliases(dir = join("src", "platform")) {
 const CHAR_LITERAL_WINDOW = 12;
 
 /**
- * Length of the raw-string opener at `i`, or 0 when there is none.
+ * The raw-string opener at `i` as `{ length, hashes }`, or null when there is none.
  *
  * Matches `r`/`br`, then any run of `#`, then a quote. The preceding character
  * must not be an identifier character: `r` is a legal variable name, and
@@ -1526,7 +1576,12 @@ function rawStringOpener(text, i) {
   return { length: j - i + 1, hashes: j - hashStart };
 }
 
-function stripComments(text, isRust = false) {
+function stripComments(text, grammar = "js") {
+  // `grammar` was a boolean `isRust` until CSS joined the roster and turned the
+  // two-valued question into a three-valued one. `true` and `false` are still
+  // accepted so an existing caller keeps working.
+  const isRust = grammar === true || grammar === "rust";
+  const lineComments = grammar !== "css";
   let out = "";
   let i = 0;
   const n = text.length;
@@ -1578,7 +1633,7 @@ function stripComments(text, isRust = false) {
       }
       continue;
     }
-    if (c === "/" && text[i + 1] === "/") {
+    if (lineComments && c === "/" && text[i + 1] === "/") {
       while (i < n && text[i] !== "\n") i++;
       continue;
     }
@@ -1601,10 +1656,11 @@ function stripComments(text, isRust = false) {
  * a five-line header would otherwise leave five blanks on one side and none on
  * the other), and each line is trimmed. Nothing else is touched.
  *
- * `isRust` selects the `'` reading in `stripComments` and nothing else.
+ * `grammar` selects the `'` reading and the `//` reading in `stripComments`
+ * and nothing else.
  */
-function normalize(text, aliases, isRust = false) {
-  let s = stripComments(text, isRust);
+function normalize(text, aliases, grammar = "js") {
+  let s = stripComments(text, grammar);
   for (const [name, spec] of aliases) {
     const token = `<seam:${name}>`;
     s = s.replaceAll(`"${spec}"`, `"${token}"`);
@@ -1619,11 +1675,48 @@ function normalize(text, aliases, isRust = false) {
       `"${token}"`,
     );
   }
+  // Blank lines are dropped. This is the part of the rule that does the most
+  // work and was, until myne-md/myne#472's review, the part no published
+  // statement of the rule mentioned: with comments and the seam alone the
+  // counts are 78 semantic / 2 cosmetic, and with the blank-line elision they
+  // are 65 / 15. Thirteen of the fifteen cosmetic-only verdicts come from here
+  // alone, so a reader given the shorter rule cannot reproduce the number.
+  //
+  // It is kept, because a comment removed from the middle of a block leaves a
+  // blank line behind and calling that a semantic difference would make the
+  // comment-stripping pointless. What it costs is stated rather than hidden:
+  // indentation and blank lines INSIDE a multi-line string are content, so
+  // `\`a\n    b\`` and `\`a\nb\`` compare equal here. That is a false-equal in
+  // the direction the header calls unsafe, it is latent (no rostered pair
+  // differs that way today), and the honest form of the claim is the one now
+  // published: equal after stripping comments, canonicalizing the seam import
+  // AND eliding blank lines and leading indentation.
+  //
+  // The per-line `trim()` is measured at zero contribution today (the counts
+  // are 65 / 15 with or without it) and kept only because it is what makes
+  // reindentation cosmetic, which is the same argument as the blank line.
   return s
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
     .join("\n");
+}
+
+/**
+ * The comment grammar to read a file under, from its extension.
+ *
+ * `.css` is the case this exists for: `//` is NOT a comment in CSS, and reading
+ * it as one truncates the rest of the line on BOTH sides, so
+ * `url(https://cdn/a.png); border: 1px` and `url(https://cdn/b.png); border: 9px`
+ * both collapse to `url(https:` and compare EQUAL. Two `tokens.css` files are on
+ * the roster. Latent today (neither contains a `//`), and it is the
+ * under-reporting direction the header calls unsafe, which is the one that
+ * hides drift rather than inventing it.
+ */
+function grammarFor(path) {
+  if (path.endsWith(".rs")) return "rust";
+  if (path.endsWith(".css")) return "css";
+  return "js";
 }
 
 /** `{ byteEqual, semanticEqual }` for one pair, or null when a side is unreadable. */
@@ -1648,14 +1741,23 @@ function compare(a, b, aliases) {
     byteEqual,
     semanticEqual:
       byteEqual ||
-      normalize(x, aliases, a.endsWith(".rs")) ===
-        normalize(y, aliases, b.endsWith(".rs")),
+      normalize(x, aliases, grammarFor(a)) === normalize(y, aliases, grammarFor(b)),
   };
 }
 
 function main() {
   const rootsFlag = process.argv.indexOf("--roots");
   const injected = rootsFlag !== -1;
+  // Arity checked here rather than left to an uncaught TypeError out of
+  // `readInjected`, which fires BEFORE the try/catch that exists to turn
+  // `discover`'s throw into a named failure, so `--roots` alone died with a
+  // stack trace.
+  if (injected && (!process.argv[rootsFlag + 1] || !process.argv[rootsFlag + 2])) {
+    console.error(
+      "twin-inventory: --roots takes two directories: --roots <desktop-tree> <mobile-tree>.",
+    );
+    process.exit(2);
+  }
   const deskDir = injected ? process.argv[rootsFlag + 1] : null;
 
   // `--roots <desktopDir> <mobileDir>` points the walk at a throwaway tree
@@ -1749,6 +1851,68 @@ function main() {
     failed = true;
   }
 
+  // A reason is the record's whole value: it is what stops the next reader
+  // re-deriving the verdict. An entry without one is a verdict pretending to be
+  // one, and it renders as an empty table cell that `--check` accepts as
+  // consistent. The spec asserted this and the guard did not, so `CLAUDE.md`'s
+  // claim that this guard enforces "a verdict AND a reason" was half true and
+  // an entry could land empty through `pre-commit`.
+  const reasonless = roster.filter((e) => !(e.reason ?? "").trim());
+  if (reasonless.length > 0) {
+    console.error(
+      `twin-inventory: ${reasonless.length} entr(ies) carry no reason:\n` +
+        reasonless.map((e) => `    ${e.a}`).join("\n") +
+        `\n  A verdict with no reason makes the next reader re-derive it, which is the` +
+        `\n  bookkeeping this record exists to replace.`,
+    );
+    failed = true;
+  }
+
+  // Line counts written into a reason go stale silently, and this record is
+  // republished verbatim into a CC-BY document. Five were already wrong when
+  // this was added: `model_store.rs` said "820 lines against 766" against a
+  // live 1019, `sidebarState.tsx` said 3384 against a live 3414, and
+  // `prefsNonce.ts` said "Byte-identical at 60 lines" against 178. Two of the
+  // three were wrong in two places at once, because the same sentence was
+  // copied into a second field.
+  //
+  // The alternative was to ban absolute counts from reasons. Rejected: the size
+  // ratio is often the whole argument (`1416 lines against 40` is what makes a
+  // pair obviously not a copy), and a rule that forbids the evidence to avoid
+  // checking it is the wrong trade. So they are allowed and they are checked.
+  const COUNT_CLAIM = /\(?(\d+)\s+(?:lines?\s+)?against\s+(\d+)\)?|Byte-identical at (\d+) lines/g;
+  const lineCount = (rel) => {
+    try {
+      return readFileSync(at(rel), "utf8").split("\n").length - 1;
+    } catch {
+      return null;
+    }
+  };
+  const staleCounts = [];
+  for (const e of roster) {
+    const la = lineCount(e.a);
+    const lb = lineCount(e.b);
+    if (la === null || lb === null) continue;
+    for (const m of (e.reason ?? "").matchAll(COUNT_CLAIM)) {
+      if (m[3] !== undefined) {
+        if (Number(m[3]) !== la) {
+          staleCounts.push(`    ${e.a}: "${m[0]}", but it is ${la} lines`);
+        }
+      } else if (Number(m[1]) !== la || Number(m[2]) !== lb) {
+        staleCounts.push(`    ${e.a}: "${m[0]}", but it is ${la} against ${lb}`);
+      }
+    }
+  }
+  if (staleCounts.length > 0) {
+    console.error(
+      `twin-inventory: ${staleCounts.length} line-count claim(s) in a reason no longer describe the files:\n` +
+        staleCounts.join("\n") +
+        `\n  These are republished into docs/dev/twin-inventory.md, so a stale one is a` +
+        `\n  published false claim rather than a private note. Update the reason.`,
+    );
+    failed = true;
+  }
+
   // A duplicated pair is invisible to every check above: `rostered` is a Map and
   // the suite compares Sets, so both collapse it, while every published count
   // reads `roster.length` and is silently one too high. Latent today; it costs
@@ -1785,9 +1949,23 @@ function main() {
   // records the resulting COUNTS as its ratchet baseline; the per-pair values
   // stay derived.
   const aliases = seamAliases(injected ? join(deskDir, "platform") : undefined);
-  const diffs = twins
-    .map((t) => ({ ...t, ...(compare(t.a, t.b, aliases) ?? {}) }))
-    .filter((t) => t.byteEqual !== undefined);
+  const compared = twins.map((t) => ({ ...t, ...(compare(t.a, t.b, aliases) ?? {}) }));
+  const diffs = compared.filter((t) => t.byteEqual !== undefined);
+  // A pair `compare` could not read used to vanish from both published counts
+  // with no message, which is the shrinking-denominator failure every other
+  // check here refuses. `existsSync` passes for a DIRECTORY, so a curated entry
+  // naming one clears the stale check and the set comparison, then disappears
+  // here. Say so.
+  const unreadable = compared.filter((t) => t.byteEqual === undefined);
+  if (unreadable.length > 0) {
+    console.error(
+      `twin-inventory: ${unreadable.length} pair(s) could not be read, so they are absent from ` +
+        `every count below:\n` +
+        unreadable.map((t) => `    ${t.a}\n      paired with ${t.b}`).join("\n") +
+        `\n  A directory passes existsSync, so this is usually an entry naming one.`,
+    );
+    failed = true;
+  }
   const counts = {
     byteDiff: diffs.filter((t) => !t.byteEqual).length,
     semanticDiff: diffs.filter((t) => !t.semanticEqual).length,
@@ -1806,7 +1984,7 @@ function main() {
   // rather than on the absence of one, which would be an assertion that cannot
   // fail.
   if (process.argv.includes("--emit")) {
-    emitProjection(roster, counts, injected ? join(deskDir, "projection.md") : PROJECTION);
+    emitProjection(roster, injected ? join(deskDir, "projection.md") : PROJECTION);
   }
 
   if (failed) process.exit(1);
@@ -1814,7 +1992,7 @@ function main() {
   // `--check` is the other way round: comparing against a roster already known
   // to be wrong would report staleness that is a symptom of the real failure.
   if (process.argv.includes("--check")) {
-    checkProjection(roster, counts, injected ? join(deskDir, "projection.md") : PROJECTION);
+    checkProjection(roster, injected ? join(deskDir, "projection.md") : PROJECTION);
   }
 
   const by = (k) => roster.filter((e) => e.verdict === k).length;

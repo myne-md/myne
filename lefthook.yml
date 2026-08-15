@@ -145,9 +145,19 @@ pre-commit:
       # drifted before anyone counted them. This is the count, and it is also
       # what makes a twin ENTERING the set fail rather than pass unnoticed,
       # which is `decisions.md` 0488's own stated failure signal mechanised.
-      # Whole-tree rather than glob-scoped, for the same reason `unwired` and
-      # `prefs-nonce` are: a staged-files run cannot see a roster. Measured at
-      # about 11 ms of I/O for the full sweep.
+      # Globbed, unlike `unwired` and `prefs-nonce` above, and the difference is
+      # real rather than a preference: their properties can be broken by a file
+      # anywhere in the repo, and every side of THIS one lives under the globbed
+      # paths. A docs-only, `core/`-only, `protocol/`-only or `locales/`-only
+      # commit provably cannot change the verdict, and 55% of recent develop
+      # commits are one of those. The `run:` takes no {staged_files}, so the glob
+      # decides WHETHER it runs and it still sweeps the whole tree when it does.
+      #
+      # Cost when it runs: about 82 ms end to end, of which ~57 ms is the guard's
+      # own work (a walk of both trees, then a read and a normalize of each side
+      # of every byte-different pair). The figure here used to read "about 11 ms
+      # of I/O for the full sweep", which was the readFileSync half only and left
+      # out both the walk and the comment stripper.
       #
       # `--check` also holds the generated projection to the roster. Without it
       # the "Do not edit by hand" banner on `docs/dev/twin-inventory.md` had no
@@ -158,6 +168,7 @@ pre-commit:
       # `bundle-record` is unfiltered for the identical reason, and
       # `decisions-index` guards its generated index the same way two hooks
       # below.
+      glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,docs/dev/twin-inventory.md}"
       run: node scripts/check-twin-inventory.mjs --check
 
     token-adoption:

@@ -38,6 +38,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
+import { CURATED_TWINS } from "./check-twin-inventory.mjs";
+
 const ROOT = new URL("..", import.meta.url).pathname;
 const MOBILE = "mobile";
 
@@ -45,34 +47,21 @@ const MOBILE = "mobile";
  * Pairs that are twins by NAME rather than by path — one client's module and
  * the other's, where the two trees put them in different places. Same-relative-
  * path twins are discovered automatically below.
+ *
+ * **Imported rather than kept here** (myne-md/myne#472). This file used to hold
+ * its own four-entry `NAMED_TWINS`, and the two lists disagreed: it paired
+ * `src/App.tsx` with `mobile/src/lib/stage.ts`, which is the Stage table rather
+ * than the shell, and `mobile/src/lib/stage.ts` already has its own same-path
+ * twin in `src/lib/stage.ts`. Aiming the pair one file to the left is why two
+ * live routing divergences went unseen, and the inventory's entry says so. Two
+ * of the other three were same-path pairs this file's own sweep already finds.
+ *
+ * So the roster lives in one place and this guard reads it. That is the
+ * `scripts/lib/shared-roots.mjs` rule applied to a roster rather than to a tree
+ * list: a private copy of a list is a second source that drifts, and here it had
+ * already drifted into being wrong.
  */
-const NAMED_TWINS = [
-  {
-    a: "src/notes/sidebarState.tsx",
-    b: `${MOBILE}/src/app/flows/EditorFlow.tsx`,
-    what: "re-implements its note-flag predicates (see @myne/editor/host/notes/selectors)",
-  },
-  {
-    a: "src/App.tsx",
-    b: `${MOBILE}/src/lib/stage.ts`,
-    what: "carries the twin boot/post-delete routing",
-  },
-  {
-    a: "src-tauri/src/hooks.rs",
-    b: `${MOBILE}/src-tauri/src/hooks.rs`,
-    what: "implements the same VaultLifecycleHooks trait",
-  },
-  {
-    // myne#462: this pair exists BECAUSE the copies drifted. The mobile
-    // approving side never received the poll #243 added to the desktop one, so
-    // it kept a one-shot read for months while its twin was fixed, and nothing
-    // reported it. The two trees reach IPC through different seams and cannot
-    // share a module, so a warning here is the mechanism that replaces one.
-    a: "src/hooks/useHeadFingerprintCompare.ts",
-    b: `${MOBILE}/src/hooks/useHeadFingerprintCompare.ts`,
-    what: "carries the twin SYNC-40 eye-compare poll + its push-hold lease",
-  },
-];
+const NAMED_TWINS = CURATED_TWINS.map((t) => ({ a: t.a, b: t.b, what: t.what }));
 
 function changedFiles() {
   const args = process.argv.slice(2);
