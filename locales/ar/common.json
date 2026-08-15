@@ -3164,7 +3164,7 @@
       "autoLockSearchEmpty": "لا توجد مدد مطابقة.",
       "autoLockSearchPlaceholder": "ابحث في المدد…",
       "screenCaptureHelperOff": "الحماية سارية دائمًا قبل فتح القفل. وبعد فتحه تتبع هذا التفضيل.",
-      "screenCaptureHelperOn": "فعّالة على macOS وWindows 10 (تحديث مايو 2020 أو أحدث). دعم Linux قادم في إصدار لاحق.",
+      "screenCaptureHelperOn": "فعّالة على Windows 10 (تحديث مايو 2020) والأحدث. لا يوفّر macOS ولا Linux واجهة نظام لهذا، لذا لا يمكنها منع الالتقاط هناك.",
       "screenCaptureLabel": "الحماية من التقاط الشاشة",
       "screenCaptureSubtitle": "حظر لقطات الشاشة وتسجيلها",
       "screenshotBlocked": "حماية الشاشة مفعّلة — تخرج لقطات شاشة Myne فارغة.",

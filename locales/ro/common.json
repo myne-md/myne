@@ -2946,7 +2946,7 @@
       "realtimeSyncHelper": "Modificările de pe alte dispozitive sosesc în câteva secunde printr-un semnal fără conținut — serverul transmite doar „ceva s-a schimbat”, niciodată ce anume. Cât timp seiful tău este deblocat, aplicația verifică oricum serverul în mod regulat, așa că aceasta nu adaugă o vizibilitate semnificativă; nu este nimic de configurat.",
       "realtimeSyncLabel": "Sincronizare în timp real",
       "screenCaptureHelperOff": "Protecția se aplică întotdeauna înainte de deblocare. După deblocare, urmează această preferință.",
-      "screenCaptureHelperOn": "Activă pe macOS și Windows 10 (May 2020 Update sau mai recent). Suportul pentru Linux va apărea într-o versiune viitoare.",
+      "screenCaptureHelperOn": "Funcționează pe Windows 10 (May 2020 Update) și mai recent. macOS și Linux nu oferă un API de sistem pentru asta, așa că acolo nu poate bloca capturarea.",
       "screenCaptureLabel": "Protecție împotriva capturii de ecran",
       "screenCaptureSubtitle": "Blochează capturile de ecran și înregistrarea ecranului",
       "screenshotBlocked": "Protecția împotriva capturii de ecran este activă — capturile de ecran ale Myne ies goale.",

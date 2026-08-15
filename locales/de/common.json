@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Änderungen von anderen Geräten treffen innerhalb von Sekunden über ein inhaltsloses Signal ein – der Server leitet nur „etwas hat sich geändert“ weiter, niemals, was sich geändert hat. Während dein Tresor entsperrt ist, prüft die App den Server ohnehin regelmäßig, sodass dies keine nennenswerte zusätzliche Sichtbarkeit schafft; es gibt nichts zu konfigurieren.",
       "realtimeSyncLabel": "Echtzeit-Synchronisierung",
       "screenCaptureHelperOff": "Der Schutz gilt vor dem Entsperren immer. Nach dem Entsperren folgt er dieser Einstellung.",
-      "screenCaptureHelperOn": "Aktiv unter macOS und Windows 10 (Mai-2020-Update oder neuer). Linux-Unterstützung folgt in einer zukünftigen Version.",
+      "screenCaptureHelperOn": "Wirksam unter Windows 10 (Mai-2020-Update) und neuer. macOS und Linux bieten dafür keine System-API, dort kann die Aufnahme also nicht blockiert werden.",
       "screenCaptureLabel": "Bildschirmaufnahme-Schutz",
       "screenCaptureSubtitle": "Screenshots und Bildschirmaufnahmen blockieren",
       "screenshotBlocked": "Der Bildschirmaufnahme-Schutz ist aktiv – Screenshots von Myne bleiben leer.",
