@@ -47,7 +47,7 @@ import {
 // The whole module namespace, for the roster block at the bottom: it iterates
 // every export rather than a remembered list.
 import * as allPrefs from "../../src/lib/prefs";
-// @ts-expect-error — a .mjs guard script with no type declarations. Imported
+// @ts-expect-error: a .mjs guard script with no type declarations. Imported
 // rather than mirrored so the read/write classification cannot drift between the
 // guard and this spec.
 import { READ_COMMANDS as READ_COMMANDS_UNTYPED } from "../../scripts/check-prefs-nonce.mjs";
@@ -291,7 +291,7 @@ describe("rejection propagation (optimistic-UI revert contract)", () => {
 //
 // Keyed off what each binding actually sent to `invoke`, never off its name, so
 // a rename covers itself.
-describe("the roster — every export that writes vault.prefs bumps the nonce", () => {
+describe("the roster: every export that writes vault.prefs bumps the nonce", () => {
   /** Sanctioned `writePref(cmd, args, { bump: false })` users. Landed EMPTY:
    *  without it the first legitimate use of the documented hatch fails here with
    *  a message that reads like a defect rather than like "record it". */
@@ -310,16 +310,28 @@ describe("the roster — every export that writes vault.prefs bumps the nonce", 
     for (const [name, fn] of Object.entries(allPrefs)) {
       if (typeof fn !== "function") continue;
       invokeMock.mockReset();
-      invokeMock.mockResolvedValue(undefined);
+      // `prefs_read` answers with a usable view, not `undefined`. A READ-then-write
+      // binding (`toggleFavoriteOnDisk` reads the fresh favourites before writing
+      // them back) otherwise throws on `fresh.favorites` before reaching its
+      // write, lands at `writes.length === 0`, and is skipped by the very loop
+      // that claims to cover every write-emitting export. It was, until this
+      // line: the one setter whose #251 defect this file calls the worst of them
+      // was the one silently outside the roster.
+      invokeMock.mockImplementation(async (cmd: unknown) =>
+        cmd === "plugin:prefs|prefs_read" ? { favorites: [] } : undefined,
+      );
       bumpPrefsNonceMock.mockReset();
-      // Two positional arguments cover every setter's arity; the mocked `invoke`
-      // resolves whatever it is handed, and a binding that reaches no prefs
-      // command (a pure normalizer, a read) is skipped by the filter below.
+      // Two positional arguments cover every setter's arity, and a binding that
+      // reaches no prefs WRITE command (a pure normalizer, a read) is skipped by
+      // the filter below.
       try {
         await (fn as (...a: unknown[]) => unknown)("probe", "probe");
       } catch {
-        // A shape the binding rejects before its IPC call is not a write; the
-        // filter decides that, not this catch.
+        // A throw is not a verdict. Whether the binding wrote is decided by what
+        // reached `invoke`, which the filter below reads, so a binding that threw
+        // AFTER its write is still covered. What a throw can do is hide a write
+        // that never happened, which is why the floor is pinned at the real count
+        // rather than under it.
       }
       const writes = prefsWritesOf(invokeMock.mock.calls);
       if (writes.length === 0) continue;
@@ -331,14 +343,20 @@ describe("the roster — every export that writes vault.prefs bumps the nonce", 
       ).toHaveBeenCalled();
     }
 
-    // Non-vacuity: an empty roster satisfies the loop above without asserting
-    // anything. The floor sits below the real count so adding a setter does not
-    // fail this line, while gutting the module's exports still does.
-    expect(covered.length).toBeGreaterThanOrEqual(40);
-    // Named rather than merely counted, because a stale read on either is not
-    // just a stale value: screen-capture protection is a `docs/threat-model.md`
-    // §6 mitigation, and reminders govern whether pending times keep leaving the
-    // AEAD envelope into OS-owned storage.
+    // Non-vacuity, pinned at the REAL count rather than under it. A floor fires
+    // when the number drops, and an addition raises it, so slack below reality
+    // buys nothing and costs coverage: a setter that starts early-returning
+    // before its `invoke` leaves the loop through `writes.length === 0` and
+    // silently stops being tested. This number is measured, and it is also the
+    // guard against the read-then-write exclusion the mock above fixed.
+    expect(covered.length).toBeGreaterThanOrEqual(68);
+    expect(covered).toContain("toggleFavoriteOnDisk");
+    // Two names pinned rather than left to the count, because these two toggles
+    // are the ones a user reads as a privacy promise, so a surface showing the
+    // old value is worse here than a stale font size. `docs/threat-model.md` §6
+    // covers screen-capture exclusion on THIS client (Windows and macOS via
+    // `set_content_protected`); the mobile twin of this assertion deliberately
+    // carries no such citation, because §6 describes no mobile platform.
     expect(covered).toContain("setScreenCaptureProtection");
     expect(covered).toContain("setRemindersEnabled");
   });

@@ -1713,9 +1713,19 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // sites); folder_icons by that folded key only — byte-identical to the keys
   // desktop writes, so a desktop-assigned decoration round-trips across case-
   // variants. The success-path nonce bump belongs to `writePref` inside
-  // `lib/prefs.ts`; the `.catch(bumpPrefsNonce)` these writers keep is the
-  // FAILURE path, where the optimistic local map has to be corrected by
-  // re-reading disk truth rather than by being reverted in place.
+  // `lib/prefs.ts`.
+  //
+  // The `.catch(bumpPrefsNonce)` these writers keep is the failure path, and it
+  // is worth being exact about what it does, because the obvious reading is
+  // wrong: there is no optimistic local state here to revert. `item_colors`,
+  // `folder_icons`, `favorites` and `item_order` are read straight off
+  // `usePrefs` at render, and the `next` each writer builds is never stored. A
+  // rejected `invoke` also means the backend wrote nothing, so the re-read the
+  // bump triggers returns what the caller already holds. What the catch is
+  // actually load-bearing for is preventing an unhandled rejection on these
+  // `void`-ed calls. That it makes a failed decoration write invisible to the
+  // user is a real gap and belongs in its own change, not a reason to keep
+  // describing the bump as a correction.
   function assignItemColor(key: string, slot: string | null) {
     const next = { ...prefs.item_colors };
     if (slot === null) delete next[key];

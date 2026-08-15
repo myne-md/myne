@@ -1644,6 +1644,19 @@ Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 The 32-byte AEAD KEK encrypting `vault.prefs`. Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "prefs-key")` helper (`spec/protocol.md` §3.2 + §3.4 registry entry `"myne.v0.1 prefs-key"`). Never persisted; re-derived on each `vault_unlock` (in-pipeline) and on each `set_*` prefs writer call. Independent from `items_key` lineage by design — preserves prefs portability across the later epoch-rotation `items_key` evolution (`decisions.md` 2026-05-27 "Vault preferences blob: root_key-derived prefs_key").
 
 Used in: `spec/protocol.md` §3.4, §9.5; `decisions.md` 2026-05-27 "Vault preferences blob"
+
+### **prefs chokepoint** &nbsp; 🛠️ *Tooling*
+
+The single function each client routes every `vault.prefs` write through, so that the [prefs nonce](#prefs-nonce) is bumped by the write path itself rather than by the caller. Module-private, named `writePref`, one per client tree (`src/lib/prefs.ts` and `mobile/src/lib/prefs.ts`); a module holding one is a **prefs module**, which is also the set rule 2 of `scripts/check-prefs-nonce.mjs` exempts. It exists because the bump began life as an optional second line beside each setter and was forgotten in 31 of about 56 desktop setters (#251), silently dropping starred favourites and leaving an AI opt-in the open editor never saw. Mobile shipped the pre-#251 shape until myne-md/myne#486. The guard reads call shapes rather than behaviour, so it cannot tell that the chokepoint still bumps, or that it bumps only after the write resolves: the roster loops in `tests/lib/prefsBindings.test.ts` and `mobile/tests/prefs-nonce.test.ts` are the half that can.
+
+Used in: `scripts/check-prefs-nonce.mjs`; `src/lib/prefs.ts`; `mobile/src/lib/prefs.ts`
+
+### **prefs nonce** &nbsp; 🛠️ *Tooling*
+
+A monotonic counter, one per client, advanced after a `vault.prefs` write resolves. It is the only mechanism by which sibling `usePrefs` instances learn that a setting changed: each subscribes through `useSyncExternalStore` and re-reads the blob on every advance, so a settings surface and the editor behind it converge on disk truth without sharing state. Bumping it BEFORE the write resolves is a defect rather than an optimisation, because the re-read then races the write and can pull stale disk truth. Advanced only from the [prefs chokepoint](#prefs-chokepoint).
+
+Used in: `src/notes/prefsNonce.ts`; `mobile/src/lib/prefsNonce.ts`; `scripts/check-prefs-nonce.mjs`
+
 ### **preview snapshot** &nbsp; 📦 *Product*
 
 The real Myne interface, captured as data: the editor's own DOM plus every CSS rule the app had loaded, taken from the running desktop client by `e2e/capture/theme-preview.capture.ts` and shipped as the source-consumed `@myne/preview` package. It is what every surface showing a person "how a theme looks" renders — the website's theme builder, the theme gallery, and the `myne-themes` card renderer — instead of the three separately hand-written mock UIs they used before.
