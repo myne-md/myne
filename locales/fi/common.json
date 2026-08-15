@@ -2866,7 +2866,7 @@
       "realtimeSyncHelper": "Muutokset muilta laitteilta saapuvat sekunneissa sisällöttömän signaalin kautta — palvelin välittää vain ”jotain muuttui”, ei koskaan mitä. Kun holvisi on lukitsematon, sovellus tarkistaa palvelimen säännöllisesti muutenkin, joten tämä ei lisää merkittävää näkyvyyttä; mitään ei tarvitse määrittää.",
       "realtimeSyncLabel": "Reaaliaikainen synkronointi",
       "screenCaptureHelperOff": "Suojaus on aina käytössä ennen avaamista. Avaamisen jälkeen noudatetaan tätä asetusta.",
-      "screenCaptureHelperOn": "Käytössä macOS:ssä ja Windows 10:ssä (toukokuun 2020 päivitys tai uudempi). Linux-tuki tulee tulevassa julkaisussa.",
+      "screenCaptureHelperOn": "Toimii Windows 10:ssä (toukokuun 2020 päivitys) ja uudemmissa. macOS:ssä ja Linuxissa ei ole tähän järjestelmärajapintaa, joten siellä se ei estä kaappausta.",
       "screenCaptureLabel": "Näytönkaappaussuojaus",
       "screenCaptureSubtitle": "Estä kuvakaappaukset ja näytön tallennus",
       "screenshotBlocked": "Näytönkaappaussuojaus on päällä — Mynestä otetut kuvakaappaukset ovat tyhjiä.",

@@ -12,7 +12,7 @@
 // to the wrapper at submit time — no module-level cache, no Tauri
 // State payload that lingers across renders.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * A8d — recover an existing vault with the user's BIP-39 24-word

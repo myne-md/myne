@@ -17,7 +17,7 @@ import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/h
 import { isMediaTarget } from "@myne/editor/host/notes/graphModel";
 import i18n from "@myne/i18n";
 import { openUrl } from "./lib/open-url";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { documentDir, join } from "./platform/path";
 import {
   attachmentExport,
   attachmentImport,
