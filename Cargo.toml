@@ -22,17 +22,17 @@
 # `myne-desktop`'s `cargo tree -e normal` closure and the no-egress gate keeps
 # scanning a tree with no networked crate in it.
 #
-# `mobile/src-tauri` (+ its four Tauri plugins) is the Phase 3 mobile client,
+# `mobile/src-tauri` (+ its five Tauri plugins) is the Phase 3 mobile client,
 # moved in-repo from the `myne-mobile` companion. It joins here for the reason
 # the split could never deliver: it path-depends on `protocol` and `core` and
 # aliases ~25 TS specifiers into `src/`, `editor/`, `dialect/` and `ornaments/`,
 # so it never built outside a `myne` checkout — while resolving its own second
 # `Cargo.lock`, in which 62 of 572 shared crates had drifted from this one
 # (`bip39 -> bitcoin_hashes` among them). One lock is what makes TB9's audit
-# anchor describe the artefact mobile actually ships. The four plugins are listed
+# anchor describe the artefact mobile actually ships. The five plugins are listed
 # explicitly rather than left to cargo's automatic path-dependency membership,
 # because this list is the documented source of truth (CLAUDE.md).
-members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "tor-sidecar", "mobile/src-tauri", "mobile/src-tauri/tauri-plugin-screen-guard", "mobile/src-tauri/tauri-plugin-share-intent", "mobile/src-tauri/tauri-plugin-qr-scan", "mobile/src-tauri/tauri-plugin-reminders"]
+members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "tor-sidecar", "mobile/src-tauri", "mobile/src-tauri/tauri-plugin-screen-guard", "mobile/src-tauri/tauri-plugin-share-intent", "mobile/src-tauri/tauri-plugin-qr-scan", "mobile/src-tauri/tauri-plugin-reminders", "mobile/src-tauri/tauri-plugin-sensitive-clipboard"]
 resolver = "2"
 
 # Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`

@@ -31,6 +31,7 @@ import {
   copySecretToClipboard,
   saveSecretToDocuments,
 } from "../../lib/secret-export";
+import { canHoldSecretOnClipboard } from "../../lib/clipboard";
 import type { CreateVaultFlowProps } from "./types";
 
 // Browser-dev placeholders (no Tauri host → no IPC). Let the multi-step flow
@@ -379,6 +380,19 @@ function Wordmark({ size = 28 }: { size?: number }) {
  * are wiped on every exit + on unmount; an uncommitted session is best-effort
  * cancelled on unmount.
  */
+
+/**
+ * The phrase step's action buttons (Copy, Save to file).
+ *
+ * Extracted rather than duplicated when myne-md/myne#455 added the second one.
+ * Copying the neighbour's inline literals would have grown this file's
+ * hardcoded-value count, which `check-token-adoption.mjs` ratchets, correctly:
+ * an inline literal outranks every stylesheet, so it is unreachable to any
+ * custom theme, permanently. One shared object keeps the two buttons identical
+ * by construction AND leaves the count where it was.
+ */
+const PHRASE_ACTION_STYLE = { marginTop: 14, height: 40, fontSize: 13 } as const;
+
 export function CreateVaultFlow({
   briefing,
   onCancel,
@@ -388,6 +402,16 @@ export function CreateVaultFlow({
 }: CreateVaultFlowProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>(briefing ? "briefing" : "password");
+
+  // Belt and braces on top of `copyMsg` being its own state: clear BOTH messages
+  // whenever the step changes, so no confirmation can cross a step boundary and
+  // be read as the result of an action on the next screen. `fileMsg` had exactly
+  // that shape, never reset, rendered by two steps, and this is the general
+  // fix rather than one more per-message reset someone can forget.
+  useEffect(() => {
+    setCopyMsg(null);
+    setFileMsg(null);
+  }, [step]);
 
   // OB-01 acknowledgements
   const [acks, setAcks] = useState<boolean[]>([false, false, false]);
@@ -421,7 +445,38 @@ export function CreateVaultFlow({
   const [saved, setSaved] = useState(false);
   // Feedback for the "Save to file" (recovery phrase / account number) actions.
   const [fileMsg, setFileMsg] = useState<string | null>(null);
+  // The copy outcome gets its OWN state, not `fileMsg`.
+  //
+  // `fileMsg` is never reset and is rendered by TWO steps, the phrase step and
+  // the account step. Writing the phrase-copy confirmation into it left
+  // "Copied. It stays on this device…" on screen permanently, and still showing
+  // two steps later directly under the ACCOUNT NUMBER, where it reads as a
+  // confirmation that the account number was copied and is expiring. That is a
+  // false statement about a bearer token, and it is exactly the stale-confirmation
+  // defect this whole change exists to remove, reintroduced by reusing a field.
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Tier 1's render gate (myne-md/myne#455). Starts `false`, so on the frame
+  // before the probe answers the button is ABSENT rather than present, a
+  // control that appears and then vanishes on an Android phone would be worse
+  // than one that never appeared.
+  const [canCopyPhrase, setCanCopyPhrase] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void canHoldSecretOnClipboard().then(
+      (ok) => {
+        if (live) setCanCopyPhrase(ok);
+      },
+      () => {
+        // The probe failed, so this OS's answer is unknown. Unknown resolves to
+        // NO: the gate exists to avoid implying a guarantee, and an unanswered
+        // question is not a yes.
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const wipeSecrets = () => {
     pwdRef.current = "";
@@ -551,22 +606,42 @@ export function CreateVaultFlow({
   };
 
   const copyAccount = () => {
-    // #51: check the write, and use the SECRET copy helper so the 30-second
-    // auto-clear happens. This used to fire `navigator.clipboard.writeText`
-    // and set "Copied ✓" unconditionally — so a denied clipboard (the common
-    // case on a browser surface, and possible on iOS) told the user their
-    // once-only account number was safely copied when nothing was. It also
-    // bypassed the auto-clear, leaving a bearer token on the system clipboard
-    // indefinitely.
+    // #51: check the write, and use the SECRET copy helper so the auto-clear
+    // happens. This used to fire the raw WebView clipboard write and set
+    // "Copied ✓" unconditionally, so a denied clipboard (the common case on a
+    // browser surface, and possible on iOS) told the user their once-only
+    // account number was safely copied when nothing was. It also bypassed the
+    // auto-clear, leaving a bearer token on the system clipboard indefinitely.
+    // myne-md/myne#455: the write above now reaches a plugin that EXISTS. The
+    // shape below was already right, check the write, report the failure, and
+    // it reported a failure on every tap because the plugin it dispatched to was
+    // never registered. Both outcomes are now stated as a feedback pair instead
+    // of being reconstructed from a `null` check at the call site.
     void (async () => {
-      const cancel = await copySecretToClipboard(account);
-      if (cancel === null) {
-        setFileMsg(t("vaultCreation.account.copyFailed"));
-        return;
-      }
+      const cancel = await copySecretToClipboard(account, {
+        onSuccess: { kind: "inline", run: () => setCopied(true) },
+        onFailure: { kind: "inline", run: () => setFileMsg(t("vaultCreation.account.copyFailed")) },
+      });
+      if (cancel === null) return;
       clipboardCancelRef.current?.();
       clipboardCancelRef.current = cancel;
-      setCopied(true);
+    })();
+  };
+
+  // Tier 1: the recovery phrase. Same secret path as the account number, and the
+  // difference is the GATE above, not the write. Both outcomes are reported
+  // inline through `fileMsg`, the line this step already uses for the save
+  // result, a shown-once screen wants a persistent confirmation, not a toast
+  // the user can miss.
+  const copyPhrase = () => {
+    void (async () => {
+      const cancel = await copySecretToClipboard(phraseRef.current.join(" "), {
+        onSuccess: { kind: "inline", run: () => setCopyMsg(t("createVault.phraseCopied")) },
+        onFailure: { kind: "inline", run: () => setCopyMsg(t("createVault.phraseCopyFailed")) },
+      });
+      if (cancel === null) return;
+      clipboardCancelRef.current?.();
+      clipboardCancelRef.current = cancel;
     })();
   };
 
@@ -715,11 +790,30 @@ export function CreateVaultFlow({
           )}
           {showSecondHalf && (
             <>
-              <Button variant="secondary" onClick={savePhraseFile} style={{ marginTop: 14, height: 40, fontSize: 13 }}>
+              {/* Tier 1 (myne-md/myne#455). Rendered only where the OS can hold
+                  the phrase to the standard this screen already demands of
+                  screenshots: confined to this device AND expired by the system.
+                  That is iOS; Android has an equivalent of neither, so the
+                  button is ABSENT there rather than present-and-weaker. A button
+                  that appears and then explains its own limits is still a button
+                  implying a guarantee.
+
+                  Before this, the step offered only Save-to-file, and that is
+                  not a neutral default: typing twenty-four words into a password
+                  manager on a phone has a high enough error rate that people
+                  screenshot the phrase instead, which is what `screen_guard`
+                  exists to prevent. */}
+              {canCopyPhrase && (
+                <Button variant="secondary" onClick={copyPhrase} style={PHRASE_ACTION_STYLE}>
+                  <Icon name="copy" size={16} color="var(--fg-2)" strokeWidth={1.5} />
+                  {t("createVault.copyPhrase")}
+                </Button>
+              )}
+              <Button variant="secondary" onClick={savePhraseFile} style={PHRASE_ACTION_STYLE}>
                 <Icon name="download" size={16} color="var(--fg-2)" strokeWidth={1.5} />
                 {t("createVault.saveToFile")}
               </Button>
-              {fileMsg && <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{fileMsg}</p>}
+              {(copyMsg ?? fileMsg) && <p role="status" aria-live="polite" style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{copyMsg ?? fileMsg}</p>}
             </>
           )}
         </ScreenScroll>

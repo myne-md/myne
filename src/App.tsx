@@ -17,6 +17,7 @@ import {
   type VaultId,
 } from "./lib/stage";
 import { PairingDialog } from "./components/PairingDialog";
+import { Toaster } from "./components/toast/Toaster";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
 import { has } from "./platform/capabilities";
 import { listVaults } from "./lib/vault-list";
@@ -534,6 +535,19 @@ function App() {
           TB10). Mounted globally so a connect request from the extension
           surfaces over whatever stage is showing; renders nothing unless the
           core has a pending pairing session. */}
+      {/* The single toast surface (#238), hoisted here from `Editor.tsx` by
+          myne-md/myne#390. Renders every toast from the central store as one
+          shared collapsed stack, and is mounted exactly once, the count has not
+          changed, only the depth.
+
+          The depth is the fix. Inside `Editor.tsx` it existed only AFTER unlock,
+          so a `toast(...)` from vault creation, from unlock, or from a
+          fail-closed takeover drew nothing and reported nothing about having
+          drawn nothing. Every pre-unlock surface that wanted to tell the user
+          something had therefore grown its own label swap or its own silence,
+          which is most of what the clipboard audit found. Above the stage switch,
+          those surfaces have somewhere to render. */}
+      <Toaster />
       <PairingDialog />
       {/* "Add this device to an account" (MYND-424; myne#221 opened it to the
           picker + switcher). Mounted here, over whatever stage is showing,

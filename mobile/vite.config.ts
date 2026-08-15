@@ -108,6 +108,19 @@ export default defineConfig(async () => ({
       // Tauri-coupled `../src/lib/` because the module's only environmental
       // touch is `getComputedStyle` on an element the caller passes in.
       { find: /^@myne\/theme-measure$/, replacement: sib("../src/lib/themeMeasure.ts") },
+      // The CLIPBOARD COPY CONTRACT (myne-md/myne#390 + myne-md/myne#455). Shared
+      // because "what does a Copy tell the user" is not a per-client preference:
+      // eleven call sites across three trees each answered it alone and produced
+      // four patterns, two of which said nothing on either outcome. On the
+      // recovery-phrase step that means a failed copy is indistinguishable from a
+      // successful one, on the one screen where the phrase is shown once.
+      // Aliasable out of Tauri-coupled `../src/lib/` for the strongest version of
+      // the reason the siblings above give: this module has NO imports at all,
+      // not even a type-only one. Everything environmental, the write, the
+      // clear, the error sink, is injected, which is also what lets `editor/`
+      // use it under its total ban on `@tauri-apps/*`. Exact specifier, no
+      // wildcard (same reasoning as above).
+      { find: /^@myne\/clipboard$/, replacement: sib("../src/lib/clipboard.ts") },
       // The shared ORNAMENT LAYER (myne#394) — the stylesheet a theme's ornament
       // selections resolve against, plus the role helper components declare
       // through. Wildcard rather than exact, because the CSS is a second entry

@@ -24,6 +24,7 @@ import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 import { HAS_TAURI } from "../../lib/app-window";
 import { RECOVERY_NON_DISTINGUISHING_BANNER } from "../../lib/load-bearing-copy";
 import { ioBanner } from "../../lib/io-banner";
+import { readText } from "../../lib/clipboard";
 import type { IoFailureKind, RecoverSubStep } from "../../lib/stage";
 import type { RecoverFlowProps } from "./types";
 
@@ -459,8 +460,19 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
   }
 
   async function onPasteClipboard() {
+    // Through the mobile seam's OPTIONAL read (myne-md/myne#390). The shared
+    // platform seam exports no read at all, myne#379 deleted it, on the grounds
+    // that a write destroys the user's clipboard while a read harvests whatever
+    // they last copied from a password manager, so this member exists on the
+    // mobile seam alone and desktop and web render no Paste affordance.
+    //
+    // Still silent on failure, unchanged: a refused read leaves the grid
+    // untouched, which is visible, and the user can type. On iOS 16 and later a
+    // "refusal" is usually the user declining the system Allow-Paste prompt,
+    // i.e. a deliberate answer rather than an error worth a banner.
     try {
-      fillFromText(await navigator.clipboard.readText());
+      const text = await readText();
+      if (text !== null) fillFromText(text);
     } catch {
       // Clipboard read denied / unavailable — leave the grid untouched.
     }

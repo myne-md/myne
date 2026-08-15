@@ -112,6 +112,17 @@ pre-commit:
       # prefs write", which a new file elsewhere can break.
       run: node scripts/check-prefs-nonce.mjs
 
+    clipboard-feedback:
+      # myne-md/myne#390 + myne-md/myne#455: eleven clipboard call sites across
+      # three trees in four feedback patterns, two of them reporting nothing on
+      # either outcome, including the recovery-phrase step, where the phrase is
+      # shown once and a failed Copy looked exactly like a successful one. Two
+      # rules: no raw WebView clipboard API outside the web seam, and no `silent`
+      # feedback arm without a stated reason. Whole-tree rather than
+      # glob-scoped, because rule 1 is a prohibition a new file anywhere can
+      # break.
+      run: node scripts/check-clipboard-feedback.mjs
+
     unwired:
       # #272: a module nothing imports does not run. TypeScript does not
       # complain about an unused export and lint does not, so a module can be

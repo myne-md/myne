@@ -22,11 +22,12 @@
 //
 // Spec: account-number.md § 7 (bearer-token semantics, "treat like cash").
 
-import { useEffect, useRef, useState, type Dispatch } from "react";
+import { useEffect, useRef, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Spinner } from "../../components/Spinner";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { CopyStatus, useCopyStatus } from "../../components/CopyStatus";
 import {
   copySecretToClipboard,
   saveSecretAsTextFile,
@@ -50,11 +51,15 @@ export function AccountStep({
   dispatch,
 }: AccountStepProps) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (committing) setCopied(false);
-  }, [committing]);
+  // myne-md/myne#390: this used to be a bare `copied` flag reset only when the
+  // step COMMITTED, so the label read "Copied" for the rest of the step no matter
+  // what the user did next, a stale confirmation the user reads as the result of
+  // the tap they just made. The shared hook reverts on its own and carries the
+  // live region, so a screen reader hears the outcome too.
+  const { outcome, flashing, markCopied, markFailed } = useCopyStatus();
+  // The button LABEL uses the momentary half, so it reverts; the status line
+  // below uses the persistent half, so the outcome stays readable.
+  const copied = flashing && outcome === "copied";
 
   // Cancel any pending clipboard auto-clear on unmount so the timer's
   // closure (which captures the bearer-token account number) is released.
@@ -68,9 +73,18 @@ export function AccountStep({
 
   const handleCopy = async () => {
     cancelAutoClearRef.current?.();
-    const cancel = await copySecretToClipboard(accountNumber);
+    // A once-only, secret-bearing surface, so both arms are INLINE rather than
+    // toasts: the confirmation belongs next to the button the user just pressed,
+    // and a transient toast on a screen shown once is the weakest affordance
+    // available. `vaultCreation.account.copyFailed` finally has a desktop
+    // consumer, it has existed in all 32 catalogs since it was written, with its
+    // only caller on the mobile client, because this branch was checked here and
+    // then dropped.
+    const cancel = await copySecretToClipboard(accountNumber, {
+      onSuccess: { kind: "inline", run: markCopied },
+      onFailure: { kind: "inline", run: markFailed },
+    });
     cancelAutoClearRef.current = cancel;
-    if (cancel) setCopied(true);
   };
 
   const handleSave = () =>
@@ -122,6 +136,22 @@ export function AccountStep({
           {t("vaultCreation.account.saveAsFile")}
         </Button>
       </div>
+
+      {/* The failure line, and the announcement for BOTH outcomes. The success
+          case is already visible as the button's label swap, so it is announced
+          without being drawn twice; the failure case has no other surface, so it
+          renders. */}
+      <CopyStatus
+        testId="create.account-copy-status"
+        visuallyHidden={outcome === "copied"}
+        message={
+          outcome === "copied"
+            ? t("vaultCreation.account.copied")
+            : outcome === "failed"
+              ? t("vaultCreation.account.copyFailed")
+              : null
+        }
+      />
 
       <label
         style={{
