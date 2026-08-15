@@ -24,17 +24,9 @@
 import { getCurrentWindow } from "../platform/window";
 
 /**
- * `true` when running inside `pnpm tauri dev` / production bundle (the
- * Tauri runtime injects `window.__TAURI_INTERNALS__`); `false` under
- * pure-browser dev (e.g. `pnpm dev` without `tauri dev`). Module-load
- * constant — cheaper than per-call check.
- */
-export const HAS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
-/**
- * The same question, asked at CALL time.
+ * The probe, asked at CALL time.
  *
- * Two callers need this rather than the constant above, and the difference is
+ * One caller needs this rather than the constant below, and the difference is
  * not a style choice: `attachmentSrc` is reached from jsdom specs that stub the
  * Tauri global INSIDE the test body (`mobile/tests/attachment-embed.test.ts`),
  * long after this module was evaluated. A module-load constant answers `false`
@@ -45,10 +37,23 @@ export const HAS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" 
  * asks whether a host EXISTS, it does not call one, and no seam module could
  * answer without itself importing Tauri. Callers that re-spelled it inline is
  * exactly what that exemption is meant to prevent.
+ *
+ * The expression is written ONCE, here. Spelling it a second time for the
+ * constant would put two copies of the probe inside the very file whose
+ * exemption is justified by there being one, which is the hole rather than the
+ * boundary.
  */
 export function hasTauriHost(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
+
+/**
+ * `true` when running inside `pnpm tauri dev` / production bundle (the
+ * Tauri runtime injects `window.__TAURI_INTERNALS__`); `false` under
+ * pure-browser dev (e.g. `pnpm dev` without `tauri dev`). Module-load
+ * constant — cheaper than per-call check.
+ */
+export const HAS_TAURI = hasTauriHost();
 
 /**
  * Destroy the host app window.
