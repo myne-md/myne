@@ -1,9 +1,9 @@
-// Hide vault names on the lock screen — the mobile Privacy row (myne-md/myne#411).
+// Hide vault names on the lock screen: the mobile Privacy row (myne-md/myne#411).
 //
 // A **block inside an existing panel**, not a rail entry of its own: the same
 // route `ReminderSwitchBlock` took, and for the same reason. It sits under
 // Privacy directly after screen-capture protection, because the two answer one
-// question — what can somebody holding this phone see before it is unlocked.
+// question: what can somebody holding this phone see before it is unlocked.
 //
 // The picker renders before any vault is open, so the names it shows come from a
 // device-local sealed cache (`MYL1`, `protocol.md` § 9.22) rather than from
@@ -45,7 +45,7 @@
 // has none, so a disabled control would strand a user whose keychain disappeared
 // after they turned it on.
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   hideNamesWriteNotice,
@@ -102,26 +102,38 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
   const [notice, setNotice] = useState<HideNamesNotice | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // The mount reads and a toggle's write are UNORDERED, and `alive` does not
+  // order them: it only says the block is still mounted. A mount read that
+  // resolves after a write has landed would call `setHidden` with the value from
+  // before the write and flip the switch back on its own, and would report that
+  // stale pair through `onResolved` as well. That misreports whether a
+  // destructive erase took effect, which is the one thing this row exists to say
+  // honestly. Once a write has started the mount reads describe a state that no
+  // longer exists, so they are dropped.
+  const writeStartedRef = useRef(false);
+
   // Two independent questions, asked independently: whether names are hidden,
-  // and whether this device could store one at all. They fail apart — names can
+  // and whether this device could store one at all. They fail apart, since names can
   // be hidden on a phone with a keychain and shown on one without.
   useEffect(() => {
     let alive = true;
     let flag = false;
     let status: KeychainStatus = "unknown";
     let settled = 0;
+    const superseded = () => !alive || writeStartedRef.current;
     const settle = () => {
-      if (++settled === 2 && alive) onResolved?.({ hidden: flag, keychain: status });
+      if (++settled === 2 && !superseded()) onResolved?.({ hidden: flag, keychain: status });
     };
 
     void readHideVaultNames()
       .then((next) => {
+        if (superseded()) return;
         flag = next;
-        if (alive) setHidden(next);
+        setHidden(next);
       })
       .catch(() => {
         // Do not assert a position we could not read.
-        if (alive) setNotice("read");
+        if (!superseded()) setNotice("read");
       })
       .finally(settle);
 
@@ -130,8 +142,9 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
     // means the question went unanswered.
     void readKeychainStatus()
       .then((next) => {
+        if (superseded()) return;
         status = next;
-        if (alive) setKeychain(next);
+        setKeychain(next);
       })
       .finally(settle);
 
@@ -143,6 +156,7 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
   }, []);
 
   const toggle = async (next: boolean): Promise<void> => {
+    writeStartedRef.current = true;
     setNotice(null);
     setBusy(true);
     try {
@@ -186,7 +200,20 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
             <div style={rowLabel}>{t("settings.privacy.hideVaultNamesLabel")}</div>
             <div style={subtitle}>{t("settings.privacy.hideVaultNamesHelper")}</div>
           </div>
-          <Switch on={hidden} onToggle={busy ? undefined : () => void toggle(!hidden)} />
+          {/* `disabled` while the erase runs, NOT a dropped `onToggle`.
+              Mobile's Switch renders `role="switch"` and `aria-checked` only
+              when it has a handler, so withholding the handler took the
+              control's role and its state away from assistive technology for
+              the duration, and left it at full opacity looking live while it
+              ignored taps. The operation destroys per-vault keys across every
+              vault on the device, so that window is not instantaneous.
+              Desktop's Switch reads the same idiom correctly; this is what
+              keeps the two clients from diverging on it. */}
+          <Switch
+            on={hidden}
+            onToggle={() => void toggle(!hidden)}
+            disabled={busy}
+          />
         </div>
       </Group>
 

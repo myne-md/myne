@@ -5,8 +5,8 @@
 // Three things are pinned here and each of them is invisible to `tsc`:
 //
 //  1. **The ACL mirror.** A Tauri command needs FOUR registration sites on this
-//     client — `build.rs`'s `InlinedPlugin` list, the `[[permission]]` block,
-//     the `[default]` roster that names it, and `generate_handler!` — plus the
+//     client (`build.rs`'s `InlinedPlugin` list, the `[[permission]]` block,
+//     the `[default]` roster that names it, and `generate_handler!`), plus the
 //     capability grant. Miss any of them and the command fails CLOSED at
 //     runtime, on a device, which is the most expensive place to find out.
 //     `src-tauri/CLAUDE.md` records that dropping an identifier from a
@@ -22,7 +22,7 @@
 //     disclosure, not decoration: "erases" read alone means more than it does.
 //     A render with nothing resolved and nothing tapped must already show both.
 //
-// A component render via react-dom with `react-i18next` mocked to echo keys —
+// A component render via react-dom with `react-i18next` mocked to echo keys.
 // mobile's convention (`tests/markdown-image-lightbox.test.ts`), no
 // testing-library. `tests/` sits outside `tsc`'s `include: ["src"]`, so the node
 // builtins here are untyped by design.
@@ -30,15 +30,28 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 
 const invoke = vi.fn(async () => undefined as unknown);
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
+// `useTranslation` echoes keys so the component assertions read as keys. The
+// `initReactI18next` stub is not decoration: `src/lib/vault-label.ts` now
+// resolves its fallback through the shared `@myne/i18n` runtime, whose module
+// body calls `i18n.use(initReactI18next)`, and a mock without it throws on
+// import. The stub is the shape i18next's `use()` accepts for a 3rd-party
+// module, and it leaves `i18n.t` itself real, which is what the language test
+// below needs.
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (k: string) => k }),
+  initReactI18next: { type: "3rdParty", init: () => {} },
 }));
+
+// React 19 refuses to flush an async update outside `act` unless it is told the
+// environment supports it. Two of the tests below drive a promise across a
+// render, which is exactly what needs the flush.
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 import {
   hideNamesWriteNotice,
@@ -59,7 +72,7 @@ const THE_THREE = ["hide_vault_names", "set_hide_vault_names", "vault_label_keyc
 
 // `mockReset`, not `mockClear`: one test below installs a never-resolving
 // implementation to hold the row in its pre-probe state, and `clearAllMocks`
-// leaves an implementation in place — which hung every test after it.
+// leaves an implementation in place, which hung every test after it.
 beforeEach(() => {
   invoke.mockReset();
   invoke.mockResolvedValue(undefined as unknown);
@@ -117,7 +130,7 @@ describe("a failed probe is not an unavailable keychain", () => {
     expect(await readKeychainStatus()).toBe("unavailable");
   });
 
-  it("reports 'unknown' — NEVER 'unavailable' — when the probe rejects", async () => {
+  it("reports 'unknown', NEVER 'unavailable', when the probe rejects", async () => {
     // A rejection means the question went unanswered (no host, an ACL entry that
     // never landed), not that the device has no keychain. Collapsing the two
     // would put a false explanation on screen, and on the one client where most
@@ -140,7 +153,7 @@ describe("what a failed write says", () => {
     expect(hideNamesWriteNotice("EraseIncomplete")).toBe("erase");
   });
 
-  it("says nothing transient for KeychainUnavailable — the row has a standing line", () => {
+  it("says nothing transient for KeychainUnavailable: the row has a standing line", () => {
     expect(hideNamesWriteNotice("KeychainUnavailable")).toBeNull();
   });
 
@@ -166,6 +179,29 @@ function renderBlock(): HTMLElement {
   const root = createRoot(container);
   flushSync(() => root.render(createElement(HideVaultNamesBlock)));
   return container;
+}
+
+/** The same mount, but awaited, so a resolved probe has reached the DOM. */
+async function renderBlockAsync(props: Record<string, unknown> = {}): Promise<HTMLElement> {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(createElement(HideVaultNamesBlock, props));
+  });
+  return container;
+}
+
+const rowEl = (c: HTMLElement): HTMLElement =>
+  c.querySelector('[data-testid="settings.hide-vault-names"]') as HTMLElement;
+
+const switchEl = (c: HTMLElement): HTMLElement =>
+  c.querySelector('[role="switch"], [aria-disabled]') as HTMLElement;
+
+async function click(el: HTMLElement): Promise<void> {
+  await act(async () => {
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
 }
 
 describe("the Privacy row states its bounds without being asked", () => {
@@ -213,12 +249,116 @@ describe("the Privacy row states its bounds without being asked", () => {
     ).toBe("unknown");
   });
 
-  it("keeps the switch interactive with no keychain — turning it OFF touches none", () => {
+  it("keeps the switch interactive with no keychain: turning it OFF touches none", () => {
     // A disabled control would strand a user whose keychain disappeared after
     // they had turned the option on.
     const source = read("../src/components/HideVaultNamesBlock.tsx");
     expect(source).not.toMatch(/disabled=\{[^}]*keychain/);
-    expect(source).toContain("onToggle={busy ? undefined : () => void toggle(!hidden)}");
+  });
+});
+
+// ── The switch is still a switch while the erase runs ──────────────────────
+
+describe("the busy switch keeps its role, its state and its disabled look", () => {
+  it("stays role=switch with an aria-checked and an aria-disabled while writing", async () => {
+    // The erase destroys per-vault keys across EVERY vault on the device, so
+    // this window is not instantaneous. Mobile's `Switch` renders
+    // `role={onToggle ? "switch" : undefined}` and
+    // `aria-checked={onToggle ? on : undefined}` (`src/components/inputs.tsx`),
+    // so withholding the handler took the control's role and its state away
+    // from assistive technology for the whole operation, and left it at full
+    // opacity looking live while ignoring taps. `disabled` is the prop that
+    // says "not now" on all three axes at once.
+    invoke.mockImplementation((cmd: unknown) =>
+      cmd === "plugin:vault-label|set_hide_vault_names"
+        ? new Promise(() => {})
+        : Promise.resolve(
+            cmd === "plugin:vault-label|hide_vault_names"
+              ? { hidden: false }
+              : { available: true },
+          ),
+    );
+    const container = await renderBlockAsync();
+    const sw = switchEl(container);
+    expect(sw.getAttribute("role")).toBe("switch");
+
+    await click(sw);
+
+    // Mid-write: still announced, still carrying its state, and now visibly off.
+    expect(sw.getAttribute("role")).toBe("switch");
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+    expect(sw.getAttribute("aria-disabled")).toBe("true");
+    expect(sw.style.opacity).toBe("0.5");
+    expect(sw.style.cursor).toBe("default");
+  });
+
+  it("ignores a second tap while the first write is in flight", async () => {
+    const calls: unknown[] = [];
+    invoke.mockImplementation((cmd: unknown) => {
+      if (cmd === "plugin:vault-label|set_hide_vault_names") {
+        calls.push(cmd);
+        return new Promise(() => {});
+      }
+      return Promise.resolve(
+        cmd === "plugin:vault-label|hide_vault_names" ? { hidden: false } : { available: true },
+      );
+    });
+    const container = await renderBlockAsync();
+    const sw = switchEl(container);
+    await click(sw);
+    await click(sw);
+    expect(calls).toHaveLength(1);
+  });
+});
+
+// ── The mount reads never overwrite a write ────────────────────────────────
+
+describe("a mount read that lands after a write is dropped", () => {
+  it("does not flip the switch back to the pre-write value", async () => {
+    // The two are unordered and `alive` does not order them: it only says the
+    // block is still mounted. A read that started at mount and answers after
+    // the write reports the value from BEFORE the write, and applying it
+    // silently flips the switch back, which misreports whether a destructive
+    // erase took effect.
+    let resolveRead!: (view: { hidden: boolean }) => void;
+    const lateRead = new Promise<{ hidden: boolean }>((res) => {
+      resolveRead = res;
+    });
+    invoke.mockImplementation((cmd: unknown) => {
+      if (cmd === "plugin:vault-label|hide_vault_names") return lateRead;
+      if (cmd === "plugin:vault-label|set_hide_vault_names") return Promise.resolve({ hidden: true });
+      return Promise.resolve({ available: true });
+    });
+    const container = await renderBlockAsync();
+    await click(switchEl(container));
+    expect(rowEl(container).getAttribute("data-hidden")).toBe("true");
+
+    resolveRead({ hidden: false });
+    await act(async () => {
+      await lateRead;
+    });
+    expect(rowEl(container).getAttribute("data-hidden")).toBe("true");
+  });
+
+  it("does not report the stale pair through onResolved either", async () => {
+    let resolveRead!: (view: { hidden: boolean }) => void;
+    const lateRead = new Promise<{ hidden: boolean }>((res) => {
+      resolveRead = res;
+    });
+    invoke.mockImplementation((cmd: unknown) => {
+      if (cmd === "plugin:vault-label|hide_vault_names") return lateRead;
+      if (cmd === "plugin:vault-label|set_hide_vault_names") return Promise.resolve({ hidden: true });
+      return Promise.resolve({ available: true });
+    });
+    const resolved: unknown[] = [];
+    const container = await renderBlockAsync({ onResolved: (s: unknown) => resolved.push(s) });
+    await click(switchEl(container));
+
+    resolveRead({ hidden: false });
+    await act(async () => {
+      await lateRead;
+    });
+    expect(resolved).toEqual([]);
   });
 });
 
@@ -346,5 +486,45 @@ describe("Vault N is the vault's number, not the row's", () => {
     expect(vaultDisplayLabel(null)).toBe("Vault");
     expect(vaultDisplayLabel(null, 2)).toBe("Vault 2");
     expect(vaultDisplayLabel("Personal", 2)).toBe("Personal");
+  });
+
+  it("renders the fallback in the ACTIVE language, not in English", async () => {
+    // This is the primary rendering on this client, not a rare one: the hide
+    // option erases every stored name at once, and on Android
+    // `platform_keychain` returns `UnavailableKeychain` unconditionally, so
+    // every row is a fallback always. A hardcoded literal meant a Turkish user
+    // read "Vault 2" on the phone and "Kasa 2" on the laptop, which is the
+    // split `src/lib/vault-list.ts`'s own docstring calls worse than the defect
+    // it replaces. `scripts/check-i18n.mjs` cannot see a literal, so nothing
+    // else here would say so.
+    const i18n = (await import("@myne/i18n")).default;
+    const { setLanguage } = await import("@myne/i18n");
+    expect(await setLanguage("tr")).toBe(true);
+    try {
+      expect(vaultDisplayLabel(null, 2)).toBe("Kasa 2");
+      expect(vaultDisplayLabel(null)).toBe("Kasa");
+      // A real name is still whatever the user typed, in every language.
+      expect(vaultDisplayLabel("Personal", 2)).toBe("Personal");
+    } finally {
+      await i18n.changeLanguage("en");
+    }
+    expect(vaultDisplayLabel(null, 2)).toBe("Vault 2");
+  });
+
+  it("resolves at call time, so a language switch reaches an already-imported module", async () => {
+    // A module-level constant would freeze the boot language forever
+    // (`src/CLAUDE.md`, "Module-level data ... resolve with `t()` at the
+    // render/usage consumer"), and the freeze is invisible until someone
+    // changes language mid-session.
+    const i18n = (await import("@myne/i18n")).default;
+    const before = vaultDisplayLabel(null, 1);
+    const { setLanguage } = await import("@myne/i18n");
+    await setLanguage("tr");
+    try {
+      expect(vaultDisplayLabel(null, 1)).not.toBe(before);
+    } finally {
+      await i18n.changeLanguage("en");
+    }
+    expect(vaultDisplayLabel(null, 1)).toBe(before);
   });
 });

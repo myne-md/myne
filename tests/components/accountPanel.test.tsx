@@ -412,8 +412,37 @@ describe("AccountPanel — vault label rename", () => {
     });
     const notice = screen.getByTestId("settings.label-rename-notice");
     expect(notice.textContent ?? "").toMatch(/other devices/i);
-    expect(notice.textContent ?? "").toMatch(/old name/i);
+    expect(notice.textContent ?? "").toMatch(/earlier name/i);
     expect(notice.textContent ?? "").toMatch(/unlock/i);
+  });
+
+  it("does not claim an old name when there was never a name", async () => {
+    // The gate is `labelChanged`, which is true on the FIRST naming of a
+    // never-named vault: `savedLabel` starts "". The other devices are showing
+    // `Vault N` there, not an old name, so copy that said "the old name" was
+    // false in probably the most common use of the field.
+    //
+    // The fix broadened the copy rather than narrowing the gate, because
+    // narrowing it would go quiet in a case that genuinely needs it:
+    // `vault.prefs.label` syncs and the device-local stored copy does not, so a
+    // vault whose label was cleared on THIS device can still be sitting under
+    // its old name on another one, with `savedLabel` back at "".
+    prefsRead.mockResolvedValue({ label: null });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe(""),
+    );
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "First name" },
+    });
+    const notice = screen.getByTestId("settings.label-rename-notice");
+    const text = notice.textContent ?? "";
+    expect(text).toMatch(/other devices/i);
+    expect(text).toMatch(/placeholder/i);
+    // The sentence must not assert that an old name exists.
+    expect(text).not.toMatch(/the old name/i);
   });
 
   it("CLEARING the name surfaces it too, which is the case it exists for", async () => {

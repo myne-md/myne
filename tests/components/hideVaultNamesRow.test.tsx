@@ -32,15 +32,20 @@
 // cross either.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn();
 vi.mock("../../src/platform/core", () => ({
   invoke: (...a: unknown[]) => invokeMock(...(a as [])),
 }));
 
-const { PrivacyPanel, hideNamesWriteNotice, hideVaultNamesErrorKind } = await import(
-  "../../src/components/settings/PrivacyPanel"
+const { PrivacyPanel } = await import("../../src/components/settings/PrivacyPanel");
+// From `src/lib/`, not from the panel: the helpers moved out of the component so
+// their `mobile/src/lib/vault-label.ts` twin is discoverable by relative path
+// (`scripts/check-twin-drift.mjs`), and so a test is no longer the reason a
+// component module exports them.
+const { hideNamesWriteNotice, hideVaultNamesErrorKind } = await import(
+  "../../src/lib/vault-label"
 );
 const { SETTINGS_SEARCH_INDEX, visibleSettingsIndex } = await import(
   "../../src/components/settings/search/settingsSearchIndex"
@@ -151,10 +156,15 @@ describe("hide vault names: the disclosure", () => {
     const copy = t("settings.privacy.hideVaultNamesResidue").toLowerCase();
     expect(copy).toContain("cannot reach");
     // The two carriers the decision entry names: a full-system backup and a
-    // filesystem snapshot. A residue sentence that mentioned neither would be a
+    // whole-disk copy. A residue sentence that mentioned neither would be a
     // caveat with nothing in it.
     expect(copy).toMatch(/backup/);
-    expect(copy).toMatch(/snapshot/);
+    expect(copy).toMatch(/disk image/);
+    // "snapshot" is RESERVED for per-note version history
+    // (`myne-website/src/content/user-guide/_authoring.md` block 3), and
+    // `privacy-model.md` uses it in that sense two paragraphs from where this
+    // sentence is quoted. One word for two things is the defect.
+    expect(copy).not.toMatch(/snapshot/);
   });
 
   it("claims no more than the threat model allows", () => {
@@ -173,6 +183,15 @@ describe("hide vault names: the disclosure", () => {
         expect(copy, `${key} must not say "${word}"`).not.toContain(word);
       }
     }
+  });
+
+  it("qualifies the promise by what the device can actually store", () => {
+    // Windows, Linux and Android store no name at all, so an unqualified "the
+    // picker shows a vault's name once this device has unlocked it" renders
+    // directly above `hideVaultNamesUnavailable`, which says the opposite. The
+    // user guide gained that qualifier in three places; this is the surface
+    // that did not, and the docs and the shipped copy disagreed because of it.
+    expect(t("settings.privacy.hideVaultNamesHelper").toLowerCase()).toContain("keychain");
   });
 
   it("tells the reader the placeholder number stays with the vault", () => {
@@ -308,6 +327,84 @@ describe("hide vault names: failure reporting", () => {
     const copy = t("settings.privacy.hideVaultNamesErrorSave").toLowerCase();
     expect(copy).not.toContain("nothing changed");
     expect(copy).toContain("may already have been destroyed");
+  });
+});
+
+describe("hide vault names: the mount read never overwrites a write", () => {
+  it("a mount read that lands AFTER a toggle does not flip the switch back", async () => {
+    // The mount read and the toggle write are unordered, and `alive` does not
+    // order them: it only says the row is still on screen. A slow read that
+    // resolves after the write reports the value from BEFORE the write, and
+    // applying it silently flips the switch back. The state it corrupts is the
+    // user's belief about whether a destructive erase took effect.
+    let resolveRead!: (view: { hidden: boolean }) => void;
+    const lateRead = new Promise<{ hidden: boolean }>((res) => {
+      resolveRead = res;
+    });
+    mountPanel({
+      "plugin:vault-label|hide_vault_names": () => lateRead,
+      "plugin:vault-label|set_hide_vault_names": () => Promise.resolve({ hidden: true }),
+    });
+    const row = await screen.findByTestId("settings.hide-vault-names");
+
+    fireEvent.click(screen.getByTestId("settings.hide-vault-names-toggle"));
+    await waitFor(() => expect(row.getAttribute("data-hidden")).toBe("true"));
+
+    // Now the mount read finally answers, with the pre-write value.
+    resolveRead({ hidden: false });
+    await act(async () => {
+      await lateRead;
+    });
+    expect(row.getAttribute("data-hidden")).toBe("true");
+  });
+
+  it("a mount read that REJECTS after a toggle does not post a read notice", async () => {
+    // Same race on the failure leg: "couldn't read the current setting" over a
+    // setting the user just successfully wrote is a false report.
+    let rejectRead!: (e: unknown) => void;
+    const lateRead = new Promise<never>((_, rej) => {
+      rejectRead = rej;
+    });
+    mountPanel({
+      "plugin:vault-label|hide_vault_names": () => lateRead,
+      "plugin:vault-label|set_hide_vault_names": () => Promise.resolve({ hidden: true }),
+    });
+    const row = await screen.findByTestId("settings.hide-vault-names");
+
+    fireEvent.click(screen.getByTestId("settings.hide-vault-names-toggle"));
+    await waitFor(() => expect(row.getAttribute("data-hidden")).toBe("true"));
+
+    rejectRead({ kind: "Io" });
+    await act(async () => {
+      await lateRead.catch(() => {});
+    });
+    expect(screen.queryByTestId("settings.hide-vault-names-notice")).toBeNull();
+    expect(row.getAttribute("data-hidden")).toBe("true");
+  });
+
+  it("a keychain probe that lands after a KeychainUnavailable write keeps the refusal", async () => {
+    // The write answered the question authoritatively through the error
+    // channel; a probe that started earlier and says "available" is older news.
+    let resolveProbe!: (view: { available: boolean }) => void;
+    const lateProbe = new Promise<{ available: boolean }>((res) => {
+      resolveProbe = res;
+    });
+    mountPanel({
+      "plugin:vault-label|vault_label_keychain_status": () => lateProbe,
+      "plugin:vault-label|set_hide_vault_names": () =>
+        Promise.reject({ kind: "KeychainUnavailable" }),
+    });
+    const row = await screen.findByTestId("settings.hide-vault-names");
+
+    fireEvent.click(screen.getByTestId("settings.hide-vault-names-toggle"));
+    await waitFor(() => expect(row.getAttribute("data-keychain")).toBe("unavailable"));
+
+    resolveProbe({ available: true });
+    await act(async () => {
+      await lateProbe;
+    });
+    expect(row.getAttribute("data-keychain")).toBe("unavailable");
+    expect(screen.getByTestId("settings.hide-vault-names-unavailable")).toBeTruthy();
   });
 });
 

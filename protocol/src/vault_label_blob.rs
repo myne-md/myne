@@ -529,7 +529,7 @@ mod tests {
 
     // ---- cross-implementation vector generator ------------------------
 
-    /// The nonce the **vectors** use — a counting pattern rather than the
+    /// The nonce the **vectors** use: a counting pattern rather than the
     /// `0x11` fill the unit tests above use, so a fixture read by eye shows its
     /// own offsets. Any constant would do: a vector run is deterministic, and
     /// production pulls this from the CSPRNG via [`encode_vault_label_blob`].
@@ -545,27 +545,27 @@ mod tests {
     ///
     /// 18 cases pin § 9.22, and the shape is the `MYF1` / `MYK1` device-local
     /// one plus the two things this family does that they cannot:
-    /// - 1 `aad_construction` — the 45 canonical `aad_vault_label_blob` bytes.
+    /// - 1 `aad_construction`: the 45 canonical `aad_vault_label_blob` bytes.
     ///   The device-local, vault-agnostic builders are deliberately outside the
     ///   vault-scoped `ctx-aead` / `aad-construction` enumeration families, so
     ///   this one is pinned inside its own family, exactly as `MYK1` and `MYF1`
     ///   pin theirs.
-    /// - 3 `encrypt` — short ASCII, a multibyte label (2-, 3- and 4-byte UTF-8
+    /// - 3 `encrypt`: short ASCII, a multibyte label (2-, 3- and 4-byte UTF-8
     ///   sequences, so a port measuring characters rather than bytes fails), and
     ///   one at exactly the 4096-byte cap.
-    /// - 1 `encode_fail` — 4097 bytes, one over the cap. Paired with the at-cap
+    /// - 1 `encode_fail`: 4097 bytes, one over the cap. Paired with the at-cap
     ///   `encrypt` case, this is what pins the boundary as inclusive: a port
     ///   writing `>=` where the spec says `>` fails one of the two.
-    /// - 2 `decrypt_ok` — ASCII + multibyte (the latter catches a decoder that
+    /// - 2 `decrypt_ok`: ASCII + multibyte (the latter catches a decoder that
     ///   re-encodes or lossily converts on read).
-    /// - 3 `decrypt_aead_fail` — CTX-tag tamper, the relabelled header, a wrong
+    /// - 3 `decrypt_aead_fail`: CTX-tag tamper, the relabelled header, a wrong
     ///   `wrap_key`; all collapse to `CannotDecrypt` (§ 6.4).
-    /// - 8 `parse_fail` — one per distinguishable decode variant, with
+    /// - 8 `parse_fail`: one per distinguishable decode variant, with
     ///   `magic_mismatch` twice (the ordering case and the `MYQ1` neighbour).
     ///
     /// **Every `parse_fail` fixture carries the REAL `wrap_key`.** None of the
     /// corrupted header fields is AAD-bound, so a port that skips one of these
-    /// checks decodes the fixture *successfully* — which the runner catches. A
+    /// checks decodes the fixture *successfully*, which the runner catches. A
     /// dummy key would mask that bug behind a coincidental AEAD failure.
     ///
     /// `RandomnessUnavailable` is raised by the non-`_raw` wrapper when the OS
@@ -661,7 +661,7 @@ mod tests {
         let mut pf_trailing = blob_ascii.clone();
         pf_trailing.push(0x00);
 
-        // Each fixture hits its intended reject WITH THE REAL KEY — a port that
+        // Each fixture hits its intended reject WITH THE REAL KEY. A port that
         // skipped the check would decode `Ok`, which is what the runner sees.
         assert_eq!(
             decode_vault_label_blob(&WRAP_KEY, &VAULT_A, &pf_magic_before_decrypt),

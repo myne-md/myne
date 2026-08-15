@@ -10,15 +10,8 @@
 // Nothing here reads or writes a label: the only value that crosses either way
 // is a boolean.
 
+import i18n from "@myne/i18n";
 import { invoke } from "@tauri-apps/api/core";
-
-/** Single fallback for a vault whose user-set name is unset (`label == null` —
- *  the name lives encrypted-only in `vault.prefs.label`; a never-renamed vault
- *  has none, and so does a vault this device has never unlocked). Every surface
- *  that renders a vault name routes through here so an unnamed vault reads the
- *  same in the header, the switcher, Settings, and the boot picker (they used to
- *  split between "Personal" and "Vault"). */
-export const VAULT_FALLBACK_LABEL = "Vault";
 
 /** Display name for a vault. Pass `ordinal` in multi-vault lists so unnamed
  *  vaults stay distinguishable ("Vault 2").
@@ -27,9 +20,28 @@ export const VAULT_FALLBACK_LABEL = "Vault";
  *  it from `stableVaultNumber` in `./vault-list` (myne-md/myne#411): it used to
  *  be `index + 1` over a last-unlock-ordered list, so the name a user was asked
  *  to remember moved every time they opened a vault. Passing an index here is
- *  the defect, not a shortcut. */
+ *  the defect, not a shortcut.
+ *
+ *  **Both fallbacks resolve through the catalog, and both keys already carry all
+ *  32 translations.** They were a hardcoded English literal until
+ *  myne-md/myne#411 made this branch the PRIMARY rendering rather than a rare
+ *  one: the hide-vault-names option erases every stored name at once, and on
+ *  Android `platform_keychain` returns `UnavailableKeychain` unconditionally, so
+ *  every row on that platform is a fallback always. A Turkish user would have
+ *  read "Vault 2" on the phone and "Kasa 2" on the laptop, which is the split
+ *  `./vault-list`'s own docstring calls worse than the defect it replaces.
+ *  `scripts/check-i18n.mjs` cannot see a literal, so nothing would have said so.
+ *
+ *  Resolved at CALL time, never frozen at module top level, so a language switch
+ *  reaches an already-rendered surface on the next render like every other
+ *  string. The keys are the desktop client's own: `vaultPicker.vaultFallback`
+ *  numbers a row in a list, `vaultSwitcher.chipFallback` names a single vault
+ *  with no list to rank it against. */
 export function vaultDisplayLabel(label: string | null | undefined, ordinal?: number): string {
-  return label ?? (ordinal != null ? `${VAULT_FALLBACK_LABEL} ${ordinal}` : VAULT_FALLBACK_LABEL);
+  if (label != null) return label;
+  return ordinal != null
+    ? i18n.t("vaultPicker.vaultFallback", { n: ordinal })
+    : i18n.t("vaultSwitcher.chipFallback");
 }
 
 // ── The device-local hide-vault-names option ────────────────────────────────
@@ -78,7 +90,7 @@ export function hideVaultNamesErrorKind(e: unknown): HideVaultNamesErrorKind | n
  * one way mobile differs from the desktop: `platform_keychain` has an Apple
  * backend and returns `UnavailableKeychain` on every other target, so every
  * Android device is in it until an Android Keystore provider is wired behind the
- * `myne-core` seam. That is exactly why the third value has to stay distinct —
+ * `myne-core` seam. That is exactly why the third value has to stay distinct:
  * collapsing "we could not ask" into the state most Android phones are already
  * in would make the row's explanation unfalsifiable.
  */
@@ -123,7 +135,7 @@ export async function readKeychainStatus(): Promise<KeychainStatus> {
 
 /**
  * Which notice is on screen after a failed write. A discriminant rather than a
- * resolved i18n key so every `t()` call site stays a literal —
+ * resolved i18n key so every `t()` call site stays a literal.
  * `scripts/check-i18n.mjs` only sees static ones, and a key it cannot see is a
  * key nothing checks.
  */
