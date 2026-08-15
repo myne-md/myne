@@ -563,14 +563,10 @@ export async function prefsRead(): Promise<PrefsView> {
  *
  * The bump is the ONLY mechanism by which sibling `usePrefs` instances re-read
  * (`./use-prefs.ts`), and mobile has four independent mount sites — `EditorFlow`,
- * `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels`. Before this helper
- * the bump was an optional second line in 47 setters and supplied by 29 separate
- * CALL SITES instead: `SettingsSheet`'s own `writeDraftPref`, `.then(bumpPrefsNonce)`
- * chains in `EditorFlow`, and bare block-level bumps. Every one of them happened
- * to be right, which is the fragile version of correct: a new setter is written
- * by copying a neighbour, and #251 is the record of what happens when one
- * neighbour is wrong. `scripts/check-prefs-nonce.mjs` now holds the rule for this
- * module too.
+ * `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels` — so a skipped bump
+ * is a stale open editor rather than a latent defect. Why the rule exists, and
+ * what the 29-scattered-call-sites shape it replaced cost, is in
+ * `scripts/check-prefs-nonce.mjs`'s header, which now covers this module too.
  *
  * Bumps on SUCCESS only: a rejected `invoke` throws before the bump, so nothing
  * claims disk truth changed when it did not. A caller running optimistic local

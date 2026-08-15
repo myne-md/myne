@@ -23,8 +23,8 @@
 //
 // What it enforces:
 //   1. Inside a prefs module, only `writePref` may invoke a prefs WRITE
-//      command. Read commands (`prefs_read`, `device_platform`) are exempt by
-//      name — they have nothing to invalidate.
+//      command. Read commands are exempt by name — see `READ_COMMANDS`, which
+//      carries the reason per entry. They have nothing to invalidate.
 //   2. No module outside a prefs module may invoke a prefs write command at
 //      all. Reaching around the module is reaching around the bump.
 //
@@ -51,15 +51,27 @@
 // Run by hand: node scripts/check-prefs-nonce.mjs
 // Wired into: lefthook `pre-commit`, CI `pnpm-build`.
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
+
+import { presentSharedRoots } from "./lib/shared-roots.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
 // One per client tree. Each holds its own `writePref` — the two are twins, not a
 // shared module: mobile's lives in its own React tree (`mobile/src`) and imports
 // its own `prefsNonce`. Rule 1 runs over each; rule 2 exempts each.
+//
+// DELIBERATELY a named list rather than derived from SCANNED_TREES by finding
+// whatever file declares `async function writePref(`. That derivation fails
+// OPEN, and not hypothetically: `src/hooks/usePrefs.ts` declares a `writePref`
+// of its own (the optimistic-cache core, unrelated to this rule), so discovery
+// would promote it to a prefs module and thereby EXEMPT it from rule 2 — a file
+// gaining the right to hold prefs literals by accident of a function name. The
+// roster this list must not fall behind is `SCANNED_TREES` below, and
+// `tests/lib/prefsNonce.test.ts` asserts both by name for that reason.
 export const PREFS_MODULES = ["src/lib/prefs.ts", "mobile/src/lib/prefs.ts"];
+const PREFS_MODULE_LIST = PREFS_MODULES.join(", ");
 
 // Prefs commands that only READ. They invalidate nothing, so they need no bump
 // and may be invoked directly.
@@ -69,16 +81,33 @@ export const PREFS_MODULES = ["src/lib/prefs.ts", "mobile/src/lib/prefs.ts"];
 // to go stale on. It is also the reason a read command exists at all here: the
 // key is serde-skipped out of `prefs_read`, so the panel cannot learn "a key is
 // set" from the view and must ask separately.
-const READ_COMMANDS = new Set([
+//
+// EXPORTED because `mobile/tests/prefs-nonce.test.ts` needs the same
+// classification to decide which exports owe a bump, and a mirrored copy there
+// would go stale in both directions: a fourth read command would make that test
+// demand a bump from a command that writes nothing, and a command moved OUT of
+// this set would keep being exempted by the stale copy — silently shrinking the
+// only check that proves `writePref` still bumps.
+export const READ_COMMANDS = new Set([
   "prefs_read",
   "device_platform",
   "ai_provider_has_key",
 ]);
 
-// Trees that may legitimately hold a `plugin:prefs|` literal without being the
-// TS wrapper module: the Rust side names its own commands, and the web
-// dispatcher/capability tables classify every command in the tree.
-export const SCANNED_TREES = ["src", "editor/src", "dialect/src", "copy/src", "mobile/src"];
+// The shared-tree roster, imported rather than copied. `scripts/lib/shared-roots.mjs`
+// exists because "each guard kept a private copy" is a recorded past bug (#273),
+// and its header states the rule: a guard claiming shared-tree scope imports it,
+// one scoping narrower says so in its own header. Rule 2 claims exactly that
+// scope, so it imports.
+//
+// This guard kept a private copy anyway, and paid for it the way the roster
+// predicts: `mobile/src` had been ON the roster since the mobile client moved
+// in-repo (2026-08-13) and was absent from the copy here, so rule 2 was blind to
+// a whole client while the success line read `ok`. Importing also picks up
+// `web/src` and `ornaments/src`, which the copy omitted with a justification
+// that did not apply to them (it named "the Rust side", but `walk` only yields
+// `.ts`/`.tsx`, so no Rust file was ever in scope to excuse).
+export const SCANNED_TREES = presentSharedRoots().present;
 
 // `writePref(` is optional in the pattern and mandatory in the rule: any prefs
 // literal NOT sitting as writePref's first argument is the violation.
@@ -94,24 +123,21 @@ const PREFS_LITERAL = /["'`]plugin:prefs\|([a-z0-9_]+)["'`]/g;
 /** 1-based line of a match index, so both rules can scan whole-file. */
 const lineOf = (src, index) => src.slice(0, index).split("\n").length;
 
+// `withFileTypes` rather than a `statSync` per entry: the walk covers ~1300
+// entries across the shared roots and this runs in `pre-commit`, so the saved
+// syscall per entry is most of the walk's cost (measured 63 ms -> 26 ms).
 function* walk(dir) {
   let entries;
   try {
-    entries = readdirSync(dir);
+    entries = readdirSync(dir, { withFileTypes: true });
   } catch {
     return;
   }
-  for (const name of entries) {
-    const full = join(dir, name);
-    let st;
-    try {
-      st = statSync(full);
-    } catch {
-      continue;
-    }
-    if (st.isDirectory()) {
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
       yield* walk(full);
-    } else if (/\.(ts|tsx)$/.test(name)) {
+    } else if (/\.(ts|tsx)$/.test(entry.name)) {
       yield full;
     }
   }
@@ -126,18 +152,19 @@ function* walk(dir) {
  * `prefsSource` injects one prefs module's own text so a spec can drive the
  * MATCHER over the evasion shapes without a fixture the real run would then have
  * to exempt. When given it REPLACES the real modules for rule 1 (one virtual
- * module, not an addition), so an injected-source assertion counts only its own
- * findings. Rule 2 always reads the real trees.
+ * module, not an addition) AND skips rule 2 entirely, so an injected-source
+ * assertion counts only its own findings instead of passing because the real
+ * trees happen to be clean today. Rule 2's own coverage comes from the
+ * no-argument call, which is what the real run makes.
  */
 export function analyse({ prefsSource } = {}) {
   const failures = [];
-  let writes = 0;
 
   // ---- rule 1: inside each prefs module, writes go through writePref -------
   const modules =
     prefsSource === undefined
       ? PREFS_MODULES.map((rel) => [rel, readFileSync(join(ROOT, rel), "utf8")])
-      : [[PREFS_MODULES[0], prefsSource]];
+      : [["(injected source)", prefsSource]];
 
   for (const [rel, prefsSrc] of modules) {
     // Whole-file, not line-by-line: `writePref(\n  "plugin:prefs|…"` spans lines,
@@ -164,9 +191,14 @@ export function analyse({ prefsSource } = {}) {
         why: "the writePref chokepoint is missing. Every prefs write must flow through it; removing it re-opens the class of defect #251 closed.",
       });
     }
-
-    writes += (prefsSrc.match(/await writePref\(/g) ?? []).length;
   }
+
+  const writes = modules.reduce(
+    (n, [, src]) => n + (src.match(/await writePref\(/g) ?? []).length,
+    0,
+  );
+
+  if (prefsSource !== undefined) return { failures, writes };
 
   // ---- rule 2: nobody else invokes a prefs write --------------------------
   for (const tree of SCANNED_TREES) {
@@ -184,7 +216,7 @@ export function analyse({ prefsSource } = {}) {
           file: rel,
           line: lineOf(src, hit.index),
           command,
-          why: `invokes a prefs write from outside a prefs module (${PREFS_MODULES.join(", ")}). Add a wrapper in the one for this client's tree instead — reaching around the module reaches around the nonce bump.`,
+          why: `invokes a prefs write from outside a prefs module (${PREFS_MODULE_LIST}). Add a wrapper in the one for this client's tree instead — reaching around the module reaches around the nonce bump.`,
         });
       }
     }

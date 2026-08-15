@@ -21,7 +21,6 @@
 // the reason `tests/web/command-coverage.test.ts` gives: a spec that
 // reimplemented the scan could pass while the script failed, or agree with a bug.
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — a .mjs guard script with no type declarations; the import
 // is the point (see the header), not the typing.
@@ -97,12 +96,12 @@ describe("the prefs-nonce guard", () => {
     expect(SCANNED_TREES).toContain("src");
     expect(SCANNED_TREES).toContain("mobile/src");
 
-    // And each listed module is a real chokepoint rather than a stale path: a
-    // typo'd entry would read as covered here and scan nothing at all.
-    for (const rel of PREFS_MODULES) {
-      const src = readFileSync(new URL(`../../${rel}`, import.meta.url), "utf8");
-      expect(src, `${rel} carries no writePref chokepoint`).toMatch(/async function writePref\(/);
-    }
+    // Nothing here re-checks that each listed module HAS a chokepoint, on
+    // purpose. `analyse()` already answers that per module (a missing one is a
+    // `(none)` failure, a typo'd path throws ENOENT), and the first test above
+    // asserts an empty failure list over the real tree. A second copy of
+    // `/async function writePref\(/` living here is the "spec that reimplemented
+    // the scan" shape this file's header opens by warning against.
   });
 
   it("still demands the chokepoint exist at all", () => {
