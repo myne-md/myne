@@ -21,10 +21,18 @@
 // the reason `tests/web/command-coverage.test.ts` gives: a spec that
 // reimplemented the scan could pass while the script failed, or agree with a bug.
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — a .mjs guard script with no type declarations; the import
 // is the point (see the header), not the typing.
-import { analyse as analyseUntyped } from "../../scripts/check-prefs-nonce.mjs";
+import {
+  analyse as analyseUntyped,
+  PREFS_MODULES as PREFS_MODULES_UNTYPED,
+  SCANNED_TREES as SCANNED_TREES_UNTYPED,
+} from "../../scripts/check-prefs-nonce.mjs";
+
+const PREFS_MODULES = PREFS_MODULES_UNTYPED as string[];
+const SCANNED_TREES = SCANNED_TREES_UNTYPED as string[];
 
 /** The guard's return, named here because the script carries no declarations. */
 interface PrefsReport {
@@ -72,6 +80,29 @@ describe("the prefs-nonce guard", () => {
     // The multi-line arm is what pins the whole-file scan: a same-line-only
     // implementation of the fix reports the second literal as a violation.
     expect(analyse({ prefsSource: LEGITIMATE }).failures).toEqual([]);
+  });
+
+  it("has BOTH client trees in scope, in both of its rules", () => {
+    // The guard was blind to a whole client for the three months mobile lived
+    // in-repo (myne-md/myne#486): `mobile/src` was in neither roster, so `writes`
+    // counted the desktop module alone and every non-vacuity assertion above
+    // passed anyway. Scope is therefore asserted directly rather than inferred
+    // from a count, and BOTH rosters are named — rule 1 reads `PREFS_MODULES`,
+    // rule 2 reads `SCANNED_TREES`, and restoring only one leaves the other
+    // silently blind. That one-line-away second blind spot is the myne#411
+    // lesson, where a guard fix closed one and opened another with the tree
+    // green throughout.
+    expect(PREFS_MODULES).toContain("src/lib/prefs.ts");
+    expect(PREFS_MODULES).toContain("mobile/src/lib/prefs.ts");
+    expect(SCANNED_TREES).toContain("src");
+    expect(SCANNED_TREES).toContain("mobile/src");
+
+    // And each listed module is a real chokepoint rather than a stale path: a
+    // typo'd entry would read as covered here and scan nothing at all.
+    for (const rel of PREFS_MODULES) {
+      const src = readFileSync(new URL(`../../${rel}`, import.meta.url), "utf8");
+      expect(src, `${rel} carries no writePref chokepoint`).toMatch(/async function writePref\(/);
+    }
   });
 
   it("still demands the chokepoint exist at all", () => {

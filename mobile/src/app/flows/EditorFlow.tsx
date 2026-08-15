@@ -303,11 +303,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // migrate + sync folded keys.
   useEffect(() => {
     const { next, changed } = foldDecorationKeys(prefs.item_colors);
-    if (changed && HAS_TAURI) void setItemColors(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (changed && HAS_TAURI) void setItemColors(next).catch(bumpPrefsNonce);
   }, [prefs.item_colors]);
   useEffect(() => {
     const { next, changed } = foldDecorationKeys(prefs.folder_icons);
-    if (changed && HAS_TAURI) void setFolderIcons(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (changed && HAS_TAURI) void setFolderIcons(next).catch(bumpPrefsNonce);
   }, [prefs.folder_icons]);
 
   const [notes, setNotes] = useState<NoteEntry[]>([]);
@@ -879,7 +879,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     (id: string) => {
       const cur = prefs.favorites;
       const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-      if (HAS_TAURI) void setFavorites(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+      if (HAS_TAURI) void setFavorites(next).catch(bumpPrefsNonce);
     },
     [prefs.favorites],
   );
@@ -893,7 +893,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   const reorderableTree =
     listView === "notes" && !activeTag && activeViewId == null && searchQuery.trim() === "";
   const persistItemOrder = (next: Record<string, string[]> | null) => {
-    if (next && HAS_TAURI) void setItemOrder(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (next && HAS_TAURI) void setItemOrder(next).catch(bumpPrefsNonce);
   };
   const noteReorder = (id: string) => {
     if (!reorderableTree || favSet.has(id)) return undefined;
@@ -1712,19 +1712,21 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // the folder's FOLDED identity (`folderKey`, applied at the decoration call
   // sites); folder_icons by that folded key only — byte-identical to the keys
   // desktop writes, so a desktop-assigned decoration round-trips across case-
-  // variants. bumpPrefsNonce after a successful write so `usePrefs` re-reads
-  // disk truth and the row re-renders — the favorites-writer chokepoint.
+  // variants. The success-path nonce bump belongs to `writePref` inside
+  // `lib/prefs.ts`; the `.catch(bumpPrefsNonce)` these writers keep is the
+  // FAILURE path, where the optimistic local map has to be corrected by
+  // re-reading disk truth rather than by being reverted in place.
   function assignItemColor(key: string, slot: string | null) {
     const next = { ...prefs.item_colors };
     if (slot === null) delete next[key];
     else next[key] = slot;
-    if (HAS_TAURI) void setItemColors(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (HAS_TAURI) void setItemColors(next).catch(bumpPrefsNonce);
   }
   function assignFolderIcon(path: string, name: string | null) {
     const next = { ...prefs.folder_icons };
     if (name === null) delete next[path];
     else next[path] = name;
-    if (HAS_TAURI) void setFolderIcons(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (HAS_TAURI) void setFolderIcons(next).catch(bumpPrefsNonce);
   }
   /** Open the color/icon picker for a folder (color + icon), closing the folder
    *  action sheet first — the `openFolderPrompt` close-then-open idiom. */
@@ -1761,7 +1763,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       if (colors.changed) await setItemColors(colors.next);
       const icons = rewriteFolderPrefix(prefs.folder_icons, oldPath, newPath);
       if (icons.changed) await setFolderIcons(icons.next);
-      bumpPrefsNonce();
     }
     // Only the notes that actually moved were rewritten — a folder rename in a
     // 500-note vault touching 3 notes costs 3 reads, not 500.
@@ -1785,7 +1786,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       const path = normalizeFolderPath(base + name);
       // A deliberate folder persists even while empty (the virtual-folder model).
       if (path != null && HAS_TAURI) {
-        await setDeliberateFolders([...prefs.deliberate_folders, path]).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+        await setDeliberateFolders([...prefs.deliberate_folders, path]).catch(bumpPrefsNonce);
       }
     } catch {
       setEditorError(t("editor.flow.moveFailed"));
@@ -1797,7 +1798,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     setFolderActions(null);
     const canonical = normalizeFolderPath(path) ?? path;
     if (HAS_TAURI) {
-      await setArchivedFolders([...prefs.archived_folders, canonical]).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+      await setArchivedFolders([...prefs.archived_folders, canonical]).catch(bumpPrefsNonce);
     }
   }
 
@@ -1810,7 +1811,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       if (HAS_TAURI) {
         const key = folderKey(path);
         await setDeliberateFolders(prefs.deliberate_folders.filter((f) => !folderKey(f).startsWith(key)));
-        bumpPrefsNonce();
       }
     } catch {
       setEditorError(t("editor.flow.trashFailed"));
@@ -1833,7 +1833,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
    *  Prefs-only — no note bodies change. */
   async function restoreArchivedFolder(path: string) {
     const next = removeFolderFromArchive(prefs.archived_folders, path);
-    if (HAS_TAURI) await setArchivedFolders(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (HAS_TAURI) await setArchivedFolders(next).catch(bumpPrefsNonce);
     if (archiveFolder !== null && folderKey(archiveFolder).startsWith(folderKey(path))) {
       setArchiveFolder(null);
     }
@@ -1846,7 +1846,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     try {
       for (const id of ids) await trashNote(id);
       const next = removeFolderFromArchive(prefs.archived_folders, path);
-      if (HAS_TAURI) await setArchivedFolders(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+      if (HAS_TAURI) await setArchivedFolders(next).catch(bumpPrefsNonce);
     } catch {
       setEditorError(t("editor.flow.trashFailed"));
     }
