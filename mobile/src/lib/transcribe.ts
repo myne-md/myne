@@ -18,10 +18,12 @@
 import { Channel, invoke } from "../platform/core";
 
 /** A normalized transcription failure. `kind: "not_ready"` = transcription off /
- *  no model available (surface a "turn it on / no model" hint); `"failed"` = any
- *  other engine / decrypt / decode failure. */
+ *  no model available (surface a "turn it on / no model" hint); `"too_long"` =
+ *  the clip is past the decoder's ceiling and will be refused every time, so the
+ *  caller must NOT offer a retry (myne#485); `"failed"` = any other engine /
+ *  decrypt / decode failure. */
 export interface TranscribeError {
-  readonly kind: "not_ready" | "failed";
+  readonly kind: "not_ready" | "too_long" | "failed";
 }
 
 /** A running transcription. `done` resolves with the full transcript and rejects
@@ -64,8 +66,11 @@ export async function readTranscript(attachmentId: string): Promise<string | nul
 }
 
 /** Map the raw IPC rejection (a serialized `EngineError` — a bare variant string
- *  like `"NotReady"`, or a `{ kind }` object) to a normalized kind. Anything not
- *  clearly not-ready degrades to `"failed"`. */
+ *  like `"NotReady"`, or a `{ kind }` object carrying the snake_case tag from
+ *  `EngineError::kind()`) to a normalized kind. Three arms: `"not_ready"`,
+ *  `"too_long"`, and `"failed"` for everything else. The catch-all stays a
+ *  catch-all deliberately: an unknown variant must degrade to the retryable
+ *  message, never to `"too_long"`, which suppresses the retry button. */
 function normalizeTranscribeError(raw: unknown): TranscribeError {
   const tag =
     typeof raw === "string"
@@ -73,6 +78,7 @@ function normalizeTranscribeError(raw: unknown): TranscribeError {
       : raw !== null && typeof raw === "object" && "kind" in raw
         ? String((raw as { kind: unknown }).kind)
         : "";
-  const notReady = tag === "NotReady" || tag === "not_ready";
-  return { kind: notReady ? "not_ready" : "failed" };
+  if (tag === "NotReady" || tag === "not_ready") return { kind: "not_ready" };
+  if (tag === "AudioTooLong" || tag === "audio_too_long") return { kind: "too_long" };
+  return { kind: "failed" };
 }
