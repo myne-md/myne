@@ -33,6 +33,7 @@ vi.mock("react-i18next", () => ({
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
 import {
   appendChatToken,
+  failChatTurn,
   finalizeChatTurn,
   sendChatMessage,
   __resetChatForTest,
@@ -193,6 +194,48 @@ describe("AiChatTab", () => {
       expect(screen.getByTestId("ai.no-answer")).toBeTruthy();
       // The user turn is not treated as a no-answer placeholder.
       expect(screen.getAllByTestId("ai.turn")[0].getAttribute("data-role")).toBe("user");
+    });
+  });
+
+  // myne#466 — four situations used to render one sentence. These assert the
+  // routing DIFFERS, which is the whole claim; asserting each in isolation
+  // would pass against a collapsed implementation, and did.
+  describe("a provider that answered without answering (myne#466)", () => {
+    it("renders an empty completion as the no-answer placeholder, not an alert", () => {
+      // A remote provider reports an empty completion as a typed FAILURE,
+      // because the transport has to tell it apart from a policy refusal. It
+      // still means the same thing to the reader as a local engine finalizing
+      // with no text, so it must land in the same place.
+      const token = sendChatMessage("Hello");
+      failChatTurn(token, "empty_completion");
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.no-answer")).toBeTruthy();
+      expect(screen.queryByTestId("ai.turn-error")).toBeNull();
+    });
+
+    it("renders a policy refusal as an alert that points at the provider", () => {
+      const token = sendChatMessage("Hello");
+      failChatTurn(token, "policy_refused");
+      render(<AiChatTab />);
+      expect(screen.queryByTestId("ai.no-answer")).toBeNull();
+      const alert = screen.getByTestId("ai.turn-error");
+      // Not the "try rephrasing" advice, and not the old catch-all's untrue
+      // claim that nothing was sent — the note text HAD been sent.
+      expect(alert.textContent).not.toMatch(/rephras/i);
+      expect(alert.textContent).toMatch(/provider/i);
+    });
+
+    it("keeps the three failure causes distinct from one another", () => {
+      const seen = new Set<string>();
+      for (const cause of ["policy_refused", "local_model_missing", "not_ready"] as const) {
+        __resetChatForTest();
+        const token = sendChatMessage("Hello");
+        failChatTurn(token, cause);
+        const { unmount } = render(<AiChatTab />);
+        seen.add(screen.getByTestId("ai.turn-error").textContent ?? "");
+        unmount();
+      }
+      expect(seen.size, "two causes render the same sentence").toBe(3);
     });
   });
 });

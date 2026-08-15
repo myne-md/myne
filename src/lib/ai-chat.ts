@@ -6,8 +6,15 @@
 //
 // The question + streamed tokens are AS1-class RAM (the user's own words + the
 // model's) — never logged here, dropped on lock by the chat store's teardown
-// (`clearChat`). The Rust side runs the model locally: no provider call, no
-// network (the no-egress gate is the structural guarantee).
+// (`clearChat`).
+//
+// This used to say the Rust side runs the model locally, with "no provider
+// call, no network". That has been false since the remote arm shipped (#414 /
+// #415): `engine_for(RequestClass::UserInitiated)` can resolve to a named
+// provider, and then this very call sends the framed question — grounded on
+// note text — off the device. The guarantee is the narrower, true one: no byte
+// leaves the device unless the user has named a provider, consented, and stored
+// a key, which the host re-reads on every call (`RemoteEngine::ready`).
 
 import { Channel, invoke } from "../platform/core";
 import { normalizeProviderError } from "./engine-error";

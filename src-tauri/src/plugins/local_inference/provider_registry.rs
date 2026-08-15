@@ -78,19 +78,50 @@ pub enum RemoteProvider {
 
 /// What went wrong reading a provider's reply. Content-free: a provider's own
 /// error text is attacker-influenceable and never becomes a Myne value.
+///
+/// Three variants because a provider that claims success has three genuinely
+/// different ways of not answering, and only ONE of them is the user's wording
+/// (myne-md/myne#466). Collapsing them sends someone to reword a question that
+/// was never going to be answered, whatever the wording.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ProviderCodecError {
+    /// Not JSON at all, **or** well-formed JSON in a shape this build does not
+    /// model (no content field where one belongs, and no error member either).
+    /// Both are Myne's problem, not the user's, and both want the same next
+    /// step: look at Myne.
     #[error("the provider's reply could not be parsed")]
     Malformed,
+    /// The reply claimed success and carried an `error` member instead of an
+    /// answer — the provider declined under its own policy. Presence is all
+    /// that is ever read; see [`OpenRouterReply::error`].
+    #[error("the provider refused the request under its own policy")]
+    PolicyRefused,
+    /// The content field was there and held nothing. The one case "try
+    /// rephrasing" actually describes.
     #[error("the provider returned an empty completion")]
     Empty,
 }
+
+/// Presence of a provider's `error` member, with **no** access to its contents.
+///
+/// `IgnoredAny` deserializes any value — object, string, number — and stores
+/// NOTHING, so an attacker-influenceable byte is never held in a Myne value
+/// even transiently. Reading WHETHER this member exists is not reading the
+/// error body: the rule in `provider_transport.rs` (a provider's error text has
+/// no place in a Myne error value) was written for the **non-200** path, where
+/// the body is never read at all and only the integer status is taken. A
+/// 200-with-`error` is a different class — the provider claims success, so the
+/// body already crossed into the codec as a normal reply — and telling the two
+/// apart needs the member's presence, never a character of its text.
+type ErrorMemberPresent = Option<serde::de::IgnoredAny>;
 
 /// OpenRouter's reply: the text lives at `choices[0].message.content`.
 #[derive(Deserialize)]
 struct OpenRouterReply {
     #[serde(default)]
     choices: Vec<OpenRouterChoice>,
+    #[serde(default)]
+    error: ErrorMemberPresent,
 }
 #[derive(Deserialize)]
 struct OpenRouterChoice {
@@ -104,10 +135,17 @@ struct OpenRouterMessage {
 }
 
 /// Ollama's native reply: `{"message":{"content":…}}`.
+///
+/// `message` is an `Option` rather than a defaulted struct so "the reply had no
+/// message at all" (a shape we do not model) stays distinguishable from "the
+/// message was there and empty" (an empty completion). Defaulting collapses the
+/// two into one empty string.
 #[derive(Deserialize)]
 struct OllamaReply {
     #[serde(default)]
-    message: OllamaMessage,
+    message: Option<OllamaMessage>,
+    #[serde(default)]
+    error: ErrorMemberPresent,
 }
 #[derive(Deserialize, Default)]
 struct OllamaMessage {
@@ -310,28 +348,50 @@ impl RemoteProvider {
     }
 
     /// Read the assistant text out of a reply.
+    ///
+    /// A provider can answer `200` and still not answer, in three different
+    /// ways, and the classification ORDER below is the decision (myne-md/myne#466):
+    ///
+    /// 1. not JSON → `Malformed`
+    /// 2. usable text → `Ok(text)` — an `error` member alongside real content
+    ///    does not suppress the content; the user is shown what they can use
+    /// 3. an `error` member → `PolicyRefused`
+    /// 4. no content field at all → `Malformed` (a shape we do not model)
+    /// 5. content field present and empty → `Empty`
+    ///
+    /// Only step 5 means "try rephrasing". Before #466 all of 3–5 arrived as
+    /// one value.
     pub fn parse_chat_reply(self, raw: &[u8]) -> Result<String, ProviderCodecError> {
-        let text = match self {
-            Self::OpenRouter => serde_json::from_slice::<OpenRouterReply>(raw)
-                .map_err(|_| ProviderCodecError::Malformed)?
-                .choices
-                .into_iter()
-                .next()
-                .map(|c| c.message.content)
-                .unwrap_or_default(),
+        // `content` is `None` when the reply carried no content field at all,
+        // and `Some("")` when it carried an empty one — the distinction step 4
+        // and step 5 turn on.
+        let (content, error_present): (Option<String>, bool) = match self {
+            Self::OpenRouter => {
+                let reply = serde_json::from_slice::<OpenRouterReply>(raw)
+                    .map_err(|_| ProviderCodecError::Malformed)?;
+                (
+                    reply.choices.into_iter().next().map(|c| c.message.content),
+                    reply.error.is_some(),
+                )
+            }
             Self::OllamaCloud => {
-                serde_json::from_slice::<OllamaReply>(raw)
-                    .map_err(|_| ProviderCodecError::Malformed)?
-                    .message
-                    .content
+                let reply = serde_json::from_slice::<OllamaReply>(raw)
+                    .map_err(|_| ProviderCodecError::Malformed)?;
+                (reply.message.map(|m| m.content), reply.error.is_some())
             }
         };
-        if text.is_empty() {
+        match content {
+            Some(text) if !text.is_empty() => Ok(text),
+            // The provider claimed success and declined the work. Actionable in
+            // a way "try rephrasing" is not: the fix is at the provider.
+            _ if error_present => Err(ProviderCodecError::PolicyRefused),
+            // No content field, no error member: a reply shape this build does
+            // not model. Myne's bug, not the user's wording.
+            None => Err(ProviderCodecError::Malformed),
             // An empty completion is a failure, not an empty answer — the same
             // rule the loopback arm applies to a zero-length embedding.
-            return Err(ProviderCodecError::Empty);
+            Some(_) => Err(ProviderCodecError::Empty),
         }
-        Ok(text)
     }
 
     /// Read the model names out of a list reply, each with the one flag the
@@ -451,10 +511,9 @@ impl RemoteEngine {
         let raw = transport
             .post_json(provider.chat_path(), &body, &key)
             .map_err(engine_error_of)?;
-        let text = provider.parse_chat_reply(&raw).map_err(|e| match e {
-            ProviderCodecError::Empty => EngineError::InferenceFailed,
-            ProviderCodecError::Malformed => EngineError::InferenceFailed,
-        })?;
+        let text = provider
+            .parse_chat_reply(&raw)
+            .map_err(engine_error_of_codec)?;
         if !text.is_empty() && on_token(&text).is_break() {
             return Ok(text);
         }
@@ -556,6 +615,21 @@ impl Engine for RemoteEngine {
         cancelled: &super::cancellable_io::CancelledFn,
     ) -> Result<String, EngineError> {
         self.chat_with(system, messages, on_token, cancelled)
+    }
+}
+
+/// Codec cause → the taxonomy the UI renders (myne-md/myne#466). A named
+/// function rather than an inline `match` so a test can assert the mapping the
+/// request path actually uses, instead of restating it and asserting its own
+/// restatement.
+///
+/// `Malformed` keeps the generic failure because it IS a generic failure: Myne
+/// could not read the reply, and no advice to the user follows from that.
+fn engine_error_of_codec(e: ProviderCodecError) -> EngineError {
+    match e {
+        ProviderCodecError::PolicyRefused => EngineError::PolicyRefused,
+        ProviderCodecError::Empty => EngineError::EmptyCompletion,
+        ProviderCodecError::Malformed => EngineError::InferenceFailed,
     }
 }
 
@@ -800,9 +874,15 @@ mod tests {
         );
         // Cross-shape: each parser must NOT accidentally read the other's, or
         // a provider swap would silently return empty instead of failing.
+        //
+        // `Malformed`, not `Empty`, since myne-md/myne#466: reading a reply
+        // whose content field is absent entirely is not "the model said
+        // nothing", it is "this is a shape we do not model" — which is Myne's
+        // bug and wants a different sentence from the one that sends the user
+        // off to rephrase.
         assert_eq!(
             RemoteProvider::OpenRouter.parse_chat_reply(oc).err(),
-            Some(ProviderCodecError::Empty)
+            Some(ProviderCodecError::Malformed)
         );
     }
 
@@ -815,10 +895,132 @@ mod tests {
         );
         assert_eq!(
             RemoteProvider::OllamaCloud
+                .parse_chat_reply(br#"{"message":{"content":""}}"#)
+                .err(),
+            Some(ProviderCodecError::Empty)
+        );
+        assert_eq!(
+            RemoteProvider::OllamaCloud
                 .parse_chat_reply(b"not json")
                 .err(),
             Some(ProviderCodecError::Malformed)
         );
+    }
+
+    /// The bug myne-md/myne#466 was filed for. A provider that refuses under its
+    /// own policy answers **200** with an `error` object and no `choices` — a
+    /// body that parsed cleanly into "a valid reply with zero choices" and came
+    /// back as an empty completion, so the user was told to rephrase a question
+    /// no wording could have fixed.
+    #[test]
+    fn an_error_shaped_200_is_a_policy_refusal_not_an_empty_answer() {
+        // The shape OpenRouter actually returns for a workspace guardrail.
+        let or = br#"{"error":{"code":403,"message":"blocked by a workspace guardrail"},"user_id":"u-1"}"#;
+        assert_eq!(
+            RemoteProvider::OpenRouter.parse_chat_reply(or).err(),
+            Some(ProviderCodecError::PolicyRefused)
+        );
+        // Ollama's native error member is a bare string, not an object —
+        // presence is all that is read, so the shape does not matter.
+        let oc = br#"{"error":"this model is not available on your plan"}"#;
+        assert_eq!(
+            RemoteProvider::OllamaCloud.parse_chat_reply(oc).err(),
+            Some(ProviderCodecError::PolicyRefused)
+        );
+        // Both arms, not just the one the issue was reported against.
+        let or_empty_choices = br#"{"choices":[],"error":{"message":"nope"}}"#;
+        assert_eq!(
+            RemoteProvider::OpenRouter
+                .parse_chat_reply(or_empty_choices)
+                .err(),
+            Some(ProviderCodecError::PolicyRefused)
+        );
+    }
+
+    /// Order matters, and this is the arm that pins it: a reply carrying BOTH
+    /// usable text and an `error` member is an answer. Refusing it would throw
+    /// away something the user can read in order to report a fault they cannot
+    /// act on.
+    #[test]
+    fn usable_text_wins_over_an_error_member() {
+        let or =
+            br#"{"choices":[{"message":{"content":"here you go"}}],"error":{"message":"partial"}}"#;
+        assert_eq!(
+            RemoteProvider::OpenRouter.parse_chat_reply(or).unwrap(),
+            "here you go"
+        );
+        let oc = br#"{"message":{"content":"here you go"},"error":"partial"}"#;
+        assert_eq!(
+            RemoteProvider::OllamaCloud.parse_chat_reply(oc).unwrap(),
+            "here you go"
+        );
+    }
+
+    /// Neither content nor error: a shape this build does not model. Separated
+    /// from `Empty` because the next step differs — nobody should rephrase
+    /// anything, somebody should look at Myne.
+    #[test]
+    fn a_reply_with_neither_content_nor_error_is_a_shape_we_do_not_model() {
+        for (p, body) in [
+            (RemoteProvider::OpenRouter, &b"{}"[..]),
+            (RemoteProvider::OpenRouter, &b"{\"choices\":[]}"[..]),
+            (RemoteProvider::OllamaCloud, &b"{}"[..]),
+            (RemoteProvider::OllamaCloud, &b"{\"done\":true}"[..]),
+        ] {
+            assert_eq!(
+                p.parse_chat_reply(body).err(),
+                Some(ProviderCodecError::Malformed),
+                "{body:?} carries no content field and no error member"
+            );
+        }
+    }
+
+    /// The codec twin of `provider_transport.rs`'s
+    /// `no_cause_can_carry_provider_content`. The `error` member is read for
+    /// PRESENCE only — `IgnoredAny` stores nothing — so a hostile body cannot
+    /// reach a Myne value even transiently. Checked where it could actually
+    /// regress: the `Display` strings, which are what reach a log line.
+    #[test]
+    fn no_codec_cause_can_carry_provider_content() {
+        let marker = "SENTINEL-do-not-surface-this";
+        let hostile = format!(
+            r#"{{"error":{{"message":"{marker}","meta":{{"raw":"{marker}"}}}},"choices":[]}}"#
+        );
+        for p in [RemoteProvider::OpenRouter, RemoteProvider::OllamaCloud] {
+            let err = p
+                .parse_chat_reply(hostile.as_bytes())
+                .expect_err("an error-shaped body is not an answer");
+            assert_eq!(err, ProviderCodecError::PolicyRefused);
+            let msg = err.to_string();
+            assert!(!msg.contains(marker), "{msg:?} carries the provider's text");
+            // Fixed, human-written text: no interpolation site exists, so no
+            // caller can put a body in one.
+            assert!(!msg.contains('{'), "{msg:?} looks interpolated");
+            assert!(msg.is_ascii(), "{msg:?}");
+        }
+    }
+
+    /// Three causes, three engine errors — asserted pairwise through the
+    /// mapping the request path itself calls, because a per-case assertion
+    /// passes even when two cases return the same value. That is exactly the
+    /// state this slice found the tree in: both codec causes mapped to
+    /// `InferenceFailed`, and every per-case test still passed.
+    #[test]
+    fn the_codec_mapping_preserves_distinctness() {
+        let causes = [
+            ProviderCodecError::PolicyRefused,
+            ProviderCodecError::Empty,
+            ProviderCodecError::Malformed,
+        ];
+        for (i, a) in causes.iter().enumerate() {
+            for b in causes.iter().skip(i + 1) {
+                assert_ne!(
+                    engine_error_of_codec(*a).kind(),
+                    engine_error_of_codec(*b).kind(),
+                    "{a:?} and {b:?} reach the UI as the same thing"
+                );
+            }
+        }
     }
 
     /// Just the ids, for the assertions that are about parsing rather than

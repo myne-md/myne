@@ -1095,15 +1095,20 @@ pub async fn chat_stream<R: Runtime>(
 
     // 2. Retrieve top-k (sync scan; host-side opt-in + excluded-folder gates, so
     //    a compromised WebView cannot ground on a disabled feature / excluded
-    //    note — SYNC-14). AI off → empty answer, no model call.
+    //    note — SYNC-14). The store is off → a typed refusal, NOT an empty
+    //    answer (myne-md/myne#466).
+    //
+    //    This used to return `Ok(AskResult { answer: "" })`. An empty successful
+    //    turn is exactly what renders "No answer — try rephrasing", so a user
+    //    whose index had not been built yet was told their WORDING was the
+    //    problem, and rewording could never fix it. The store only becomes
+    //    enabled inside the embed-on-unlock pass (`hydrate.rs`'s
+    //    `set_policy(true, …)`), so "not enabled" means the index is not ready —
+    //    a state, not an answer. `NotReady` says so and names the next step.
     let hits = {
         let store = vector_state.lock();
         if !store.is_enabled() {
-            return Ok(AskResult {
-                answer: String::new(),
-                sources: Vec::new(),
-                served_by: served_by_of(&engine_state),
-            });
+            return Err(EngineError::NotReady);
         }
         retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
     };
