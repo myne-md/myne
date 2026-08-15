@@ -10,7 +10,7 @@
 // contract of the PDF export path — the sheet appearing is the user feedback,
 // and the already-saved Documents copy means a cancel is never a silent no-op.
 
-import { emit } from "@tauri-apps/api/event";
+import { emit } from "../platform/event";
 import { HAS_TAURI } from "./app-window";
 
 /**

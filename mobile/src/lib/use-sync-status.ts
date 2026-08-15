@@ -9,8 +9,8 @@
 // read failures leave the last-known status — the engine reports its own `error`.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from "../platform/core";
+import { listen } from "../platform/event";
 
 /** The runtime sync status (mirrors the Rust `SyncRuntimeStatus`). */
 export type SyncStatus =
