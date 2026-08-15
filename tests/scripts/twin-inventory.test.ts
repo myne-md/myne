@@ -152,10 +152,18 @@ describe("check-twin-inventory", () => {
   });
 
   it("discovers the path sweep's twins plus the curated ones", () => {
-    // 90 from the same-relative-path sweep, which is the epic's measurement, and
-    // 6 curated pairs the sweep cannot see because their sides sit at different
-    // paths. A record fixed at 90 would omit this epic's own motivating case.
-    expect(full.out).toContain("96 twin(s) discovered");
+    // 98 from the same-relative-path sweep, and 6 curated pairs the sweep cannot
+    // see because their sides sit at different paths. A record fixed at the
+    // sweep's number alone would omit this epic's own motivating case.
+    //
+    // The sweep's half was 90 when this epic was measured and is 98 now: the
+    // six platform-seam files (myne-md/myne#492 gave `mobile/src` its own seam
+    // directory) plus `navigation.rs` (myne-md/myne#453) and
+    // `useHeadFingerprintCompare.ts` (myne-md/myne#462) entered the set while
+    // this branch was open. That is the guard's stated purpose working: a twin
+    // ENTERING the set fails rather than passing unnoticed, and each of the
+    // eight cost a verdict and a reason before this number could move.
+    expect(full.out).toContain("104 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -329,14 +337,21 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(96);
+    expect(ROSTER.length).toBe(104);
   });
 
   it("keeps `screen` narrow", () => {
     // A count, and it is the weaker half of this pair on purpose: it catches the
     // verdict spreading, which is the failure the definition warns about.
+    //
+    // Raised from 6 to 11 when the platform seam entered the set. That is five
+    // entries at once, which is exactly the spread this ceiling watches for, so
+    // the reason has to hold: they are ONE decision (myne-md/myne#492) that
+    // produced six files, five of them `screen` and one `decision`, not five
+    // independent judgement calls. The enumeration below is what actually holds
+    // the line; this number only notices growth nobody argued for.
     const screens = ROSTER.filter((e) => e.verdict === "screen");
-    expect(screens.length).toBeLessThanOrEqual(6);
+    expect(screens.length).toBeLessThanOrEqual(11);
   });
 
   it("holds `screen` to its definition, not to its count", () => {
@@ -356,6 +371,11 @@ describe("check-twin-inventory", () => {
       "src-tauri/src/main.rs", // host: binary entry point
       "src/App.tsx", // surface: the shell each client renders
       "src/main.tsx", // host: boot side-effect composition
+      "src/platform/core.ts", // host: the IPC entry point
+      "src/platform/deepLink.ts", // host: deep-link registration
+      "src/platform/event.ts", // host: backend-to-UI push
+      "src/platform/path.ts", // host: path arithmetic over the host's filesystem
+      "src/platform/window.ts", // host: host-window lifecycle
       "src/vite-env.d.ts", // host: build-time ambient globals
     ]);
   });
