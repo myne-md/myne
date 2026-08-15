@@ -14,11 +14,20 @@
 // which opens the `JoinDeviceModal` App.tsx mounts globally.
 //
 // **Pre-unlock enumeration policy (SYNC-7 / SYNC-3).** Rows show the real
-// label ONLY when `vault_list()` returns one (`label !== null`, cached from
-// a this-session unlock); a never-unlocked-this-session vault shows the
-// neutral fallback "Vault N". Rows are ordered by last-unlock, most-recent
-// first (SYNC-7); the only pre-unlock leak is vault count + last-unlock
-// times. No real labels or content for never-unlocked vaults.
+// label ONLY when `vault_list()` returns one; a vault it has no name for shows
+// the neutral fallback "Vault N", whose N is now a stable per-vault number
+// rather than the row's position (see `rowLabel`). Rows are ordered by
+// last-unlock, most-recent first (SYNC-7); the only pre-unlock leak is vault
+// count + last-unlock times.
+//
+// **What "returns one" means changed with myne-md/myne#411**, and the change
+// is the point of this screen existing in its current form: `vault_list` now
+// resolves a name from the per-session RAM cache OR from this device's sealed
+// label store (`MYL1`), so a vault this device has unlocked before carries its
+// real name on a cold boot with nothing unlocked. A vault this device has
+// never unlocked has no sealed file and still falls back, structurally. The
+// device-wide hide-vault-names option erases that store, at which point every
+// row falls back again.
 //
 // **Visual canon (MYND-204 tasks 4–6).** Refined to the approved Penpot
 // frame `screen------unlock--vault-picker` on page "4a - Onboarding &
@@ -45,7 +54,11 @@ import { Icon } from "../components/primitives/Icon";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { Spinner } from "../components/Spinner";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
-import { listVaults, orderByLastUnlock } from "../lib/vault-list";
+import {
+  listVaults,
+  orderByLastUnlock,
+  stableVaultNumber,
+} from "../lib/vault-list";
 import type { VaultId } from "../lib/stage";
 import type { VaultSummary } from "../types/vault-summary";
 
@@ -93,18 +106,30 @@ function reducer(state: PickerState, action: PickerAction): PickerState {
 
 /**
  * Display name for a row. Real label when `vault_list()` returned one
- * (`label !== null`, cached from a this-session unlock, SYNC-3); otherwise
- * the neutral fallback "Vault N", N being the row's 1-based position in the
- * last-unlock-ordered list (SYNC-7). The position-based fallback avoids
- * surfacing any vault-identifying string for never-unlocked vaults. The
- * fallback string is resolved through the caller's `t` so it stays reactive.
+ * (`label !== null`: cached from a this-session unlock, or read from this
+ * device's sealed label store, myne-md/myne#411); otherwise the neutral
+ * fallback "Vault N".
+ *
+ * **N is a stable per-vault number, not the row's position.** It used to be
+ * `index + 1` over a list ordered by last unlock, so the name a user was asked
+ * to remember moved every time they opened a vault: unlock Vault 3 and it
+ * becomes Vault 1. `stableVaultNumber` derives it from the `VaultId` instead
+ * (see its docstring for the rule and what it costs). The fallback still
+ * surfaces no vault-identifying string, and the LIST keeps its last-unlock
+ * ordering (SYNC-7). Only the number stopped following it.
+ *
+ * The fallback string is resolved through the caller's `t` so it stays
+ * reactive.
  */
 function rowLabel(
   vault: VaultSummary,
-  index: number,
+  vaults: readonly VaultSummary[],
   t: TFunction,
 ): string {
-  return vault.label ?? t("vaultPicker.vaultFallback", { n: index + 1 });
+  return (
+    vault.label ??
+    t("vaultPicker.vaultFallback", { n: stableVaultNumber(vaults, vault.id) })
+  );
 }
 
 // ── Card chrome ──────────────────────────────────────────────────────────
@@ -467,11 +492,11 @@ export function VaultPicker({ onSelect, onCreateAnother,
     <PickerCard>
       <p style={SUBLINE_STYLE}>{t("vaultPicker.subline")}</p>
       <div style={LIST_STYLE}>
-        {state.vaults.map((vault, index) => (
+        {state.vaults.map((vault) => (
           <VaultRow
             key={vault.id}
             vault={vault}
-            label={rowLabel(vault, index, t)}
+            label={rowLabel(vault, state.vaults, t)}
             meta={lastUnlockText(vault.last_unlock, t)}
             onSelect={onSelect}
           />

@@ -126,6 +126,18 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // block is omitted rather than greyed. Absent by platform fact, not by
   // decision: there is nothing to port.
   "cliAccess",
+  // myne-md/myne#411. Two halves, and both are missing. The picker is what a
+  // cached name exists to label, and there is no locked picker here: an origin
+  // holds exactly one container, which is why `check-web-screens.mjs` records
+  // `VaultPicker.tsx` as `excluded`. And the `MYL1` store is sealed under an OS
+  // keychain `wrap_key`, which a page does not have. So the Privacy row is
+  // omitted rather than rendered against three commands that reject: its
+  // subject does not exist here.
+  //
+  // The ENCRYPTION is not what is absent, and the distinction matters the same
+  // way it does for `spellCheck` and `MYD1`: `MYL1` is unchanged, and on
+  // desktop the row ships to everyone, ungated.
+  "lockedVaultNames",
   // MYND-650 task 6. The desktop routes sync egress through a Tor client it
   // spawns as a subprocess, reached over a loopback SOCKS5 socket. A page has
   // neither half: no subprocess, no raw TCP, and no way to point `fetch` at a

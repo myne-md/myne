@@ -124,6 +124,14 @@ describe("capability descriptor", () => {
       // browser-shaped version of either, so there is nothing a later port
       // could deliver.
       "cliAccess",
+      // myne-md/myne#411, and named for the NAMES rather than for the Privacy
+      // switch that hides them. Both halves are missing on web: the locked
+      // picker a cached name exists to label is unreachable (an origin holds
+      // exactly one container, so `VaultPicker.tsx` is `excluded`), and the
+      // `MYL1` store is sealed under an OS keychain a page does not have. The
+      // FORMAT is not what is absent, the same way `spellCheck` leaves `MYD1`
+      // alone: `MYL1` is unchanged and desktop's row is ungated.
+      "lockedVaultNames",
       // MYND-650, and the second platform-fact entry alongside `cliAccess`.
       // Routing sync through Tor means spawning a Tor client as a subprocess
       // and tunnelling a raw loopback socket to it; a page has neither, and

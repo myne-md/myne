@@ -134,19 +134,69 @@ for (const file of files) {
   }
 
   // `#[cfg(test)]` regions are exempt: test code never compiles for wasm32.
-  // Tracked by brace depth from the attribute, exactly as
-  // `check-core-task-seam.mjs` does it.
+  // Tracked by brace depth from the attribute, the same way
+  // `check-core-task-seam.mjs` does it, including both of its corrections,
+  // which this file was missing while its comment claimed parity.
+  //
+  // #274: a BRACE-LESS gated item (a `use`, a `type` alias, a `mod x;`) never
+  // closes a block, so a plain brace-depth exit leaves `skipping` true for the
+  // whole rest of the file and the guard goes silently blind. An item ending in
+  // `;` before any brace opened IS the whole item.
+  //
+  // myne-md/myne#411: a NESTED `#[cfg(test)]`, on a helper already inside
+  // `#[cfg(test)] mod tests`, must not restart the tracker. Resetting there ends
+  // the outer exemption at the inner helper's closing brace, and every later
+  // `std::fs` call in the test module gets reported as a production seam
+  // violation. The outer region already covers the inner item, so ignore it.
+  //
+  // **No file in this tree exhibits that shape today**, and the clause is worth
+  // keeping anyway rather than being mistaken for a fix to something present.
+  // It was observed for real: while #411 was being built, a helper carrying a
+  // redundant `#[cfg(test)]` inside its own `#[cfg(test)] mod tests` made this
+  // guard report plainly test-only code, and the redundant attribute was dropped
+  // rather than the guard being changed. The clause exists so the next writer of
+  // that shape gets a guard that is right instead of one they have to work
+  // around. It costs nothing measurable: removing it leaves both seam guards
+  // byte-identical in output over all of `core/src`.
   let skipping = false;
   let depth = 0;
+  let sawBrace = false;
   const hits = [];
   text.split("\n").forEach((line, i) => {
-    if (/^\s*#\[cfg\((any\()?test/.test(line)) {
+    if (!skipping && /^\s*#\[cfg\((any\()?test/.test(line)) {
       skipping = true;
       depth = 0;
+      sawBrace = false;
     }
     if (skipping) {
-      depth += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
-      if (depth <= 0 && /\}/.test(line)) skipping = false;
+      const opens = (line.match(/\{/g) || []).length;
+      const closes = (line.match(/\}/g) || []).length;
+      depth += opens - closes;
+      if (opens > 0) sawBrace = true;
+      // The `;` test runs on the line with any trailing `//` comment stripped:
+      // `#[cfg(test)]` + `use std::fs; // test-only` otherwise fails the test,
+      // `sawBrace` stays false, and the exemption swallows the next production
+      // item whole. The merge-base guard had this hole too, so it is not a
+      // regression, but the #274 note above claims the `;` shape is covered and
+      // a guard whose stated coverage exceeds its real coverage is the thing
+      // root CLAUDE.md says costs more than no guard.
+      const code = line.replace(/\/\/.*$/, "");
+      if (!sawBrace && /;\s*$/.test(code) && !/^\s*#\[/.test(line)) {
+        skipping = false;
+        return;
+      }
+      // A brace-less gated item can also be closed by its ENCLOSING block rather
+      // than by a `;`: a trailing `#[cfg(test)]` enum variant ends at the enum's
+      // own `}`. Without this arm the exemption runs to end-of-file and every
+      // later production call goes unchecked. Found by breaking it: a
+      // `std::fs::read` in `double_buffer.rs::write_next` (a production fn, in a
+      // file NOT on the allowlist) read as clean while the pre-#274 tracker
+      // caught it, so porting #274 here fixed one blind spot and opened another.
+      if (!sawBrace && closes > 0) {
+        skipping = false;
+        return;
+      }
+      if (sawBrace && depth <= 0 && closes > 0) skipping = false;
       return;
     }
     if (line.trim().startsWith("//")) return;

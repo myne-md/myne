@@ -963,6 +963,12 @@ The convenience-paid tier in Myne's freemium model. Myne-operated zero-knowledge
 
 Used in: `vision.md`, `decisions.md`
 
+### **hide vault names** &nbsp; 📦 *Product*
+
+The device-wide option that keeps vault names off the locked [vault picker](#vault-picker). Off by default since myne-md/myne#411, which reversed the 2026-06-09 "no plaintext label is ever written at rest" clause as a product call. It lives in Settings under Privacy and is deliberately **not** gated by `developer_mode`, because the person who most needs it has to be able to find it before a first unlock ever caches a name. Enabling it destroys every per-vault [sealed label store](#sealed-label-store) key and removes every such file, which is cryptographic erase rather than a rewrite, and stops future writes. Disabling it again resurrects nothing: names reappear one at a time as each vault is unlocked. Four limits are recorded in `threat-model.md` §7 rather than left to be discovered: the erase cannot reach a full-system snapshot taken while names were enabled; a rename leaves the old name on this account's other devices until each unlocks that vault; the picker is a pre-unlock surface, so no key destruction un-shows a name an observer at a locked screen has already read, and only enabling the option before a first unlock keeps one from being cached at all; and the flag itself is a device-local plaintext file, so a disk-write adversary can revert the suppression, though not the erase it already performed.
+
+Used in: `threat-model.md` §7; `decisions.md` 2026-08-15
+
 ### **image OCR** &nbsp; 🏗️ *Construction*
 
 The on-device optical-character-recognition generation of [attachment text extraction](#attachment-text-extraction) (MYND-441, [extractor version](#extractor-version) `0x03`): raster image attachments (PNG / JPEG / WebP) and scanned, text-layer-less PDFs become searchable by the words in their pixels. A three-model pipeline — text-region detection, 0°/180° line-orientation classification, then CTC recognition — runs on a pure-Rust ML runtime over weights **bundled with the app** (never side-loaded, never downloaded; the runtime has no network surface). A scanned PDF needs no rasterizer: the page image it already embeds is pulled out of the PDF object stream and recognized directly.
@@ -1950,6 +1956,12 @@ Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
 An opaque UUIDv4 identifying an in-flight vault-creation session held in the Tauri-managed `VaultCreationState` map between the `begin` and `commit` IPC calls. The session token is **not a secret** — it is a bearer reference to the session row, which contains the actual secret material (`root_key`, password and recovery wrap keys, recovery phrase, account number). Sessions live at most 10 minutes (`SESSION_TTL_SECS`); evicted tokens are tombstoned for up to 1 hour so a subsequent `commit` returns `SessionExpired` instead of the generic `SessionNotFound`.
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow: backend session pattern", "Vault creation session TTL"
+
+### **sealed label store** &nbsp; 📋 *Protocol*
+
+The device-local cache that lets the locked [vault picker](#vault-picker) show a vault's real name after a relaunch, when the name itself is AEAD-sealed inside that vault's [vault.prefs](#vaultprefs) and therefore unreadable until unlock. One `MYL1` file per vault at the vault root beside `vault.quickunlock`, sealed under a **per-vault** 32-byte `wrap_key` held in the OS keychain, never a `DeriveSubkey(root_key, …)` subkey: a derived subkey cannot be destroyed on its own while its root survives, so it could not deliver per-vault erase. The per-vault scoping is what preserves vault deletion's per-`VaultId` cryptographic-erase guarantee, since deleting a vault destroys that vault's key. Only a vault this device has unlocked at least once is ever named; there is no key with which to read the label of one it has not. Device-local, never synced, and structurally excluded from the backup container by the `§9.11.3` closed allowlist. See also [hide vault names](#hide-vault-names).
+
+Used in: `spec/protocol.md` §9.22, §10.3; `threat-model.md` §7; `decisions.md` 2026-08-15
 
 ### **SHA-256** &nbsp; 🔐 *Primitive*
 
