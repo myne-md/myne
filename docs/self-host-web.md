@@ -69,6 +69,16 @@ docker run -p 8080:8080 -e MYNE_SYNC_ORIGIN=https://sync.example.org myne-web
 Put your own TLS terminator in front of it; the container serves plain HTTP on
 `PORT` (default 8080) and expects to be reached over HTTPS.
 
+**No `--platform` here, deliberately.** Building to *serve* and building to
+*verify* are different jobs: serve your own architecture, natively. Only the
+second job needs the reference platform, because it compares a hash against a
+published one, and the build host is part of that hash
+(`web-bundle-hashes.md`, "Why the build host is part of the hash"). A bundle you
+built yourself needs no such comparison, because you are the code-delivery
+operator for it, which is the whole point of A15/TB11 not applying to you. Your
+users are a different question, answered under "Rebuilding and verifying the
+bundle" below.
+
 ### `MYNE_SYNC_ORIGIN` is required, and the container refuses to start without it
 
 Scheme, host and optional port — nothing else:
@@ -83,34 +93,50 @@ host, or carries a path. Each refusal names its reason. A client that boots and
 then cannot reach its sync server is a worse outcome than one that does not
 boot.
 
-**Why it is runtime configuration and not a build-time constant.** The bundle
-you run must be **byte-identical to the published one** so its hash can be
-verified (below). Baking your server's address into it would make every
-self-hoster's bundle unique and that verification impossible — so instead the
-address is read at container start, and the `connect-src` directive of the
-Content-Security-Policy is **generated from it**. Your policy names exactly your
-sync origin and is otherwise identical to the hosted instance's; a test asserts
-that the two differ in nothing but that one origin.
+**Why it is runtime configuration and not a build-time constant.** A bundle whose
+hash you intend to compare against the published record must be
+**byte-identical to the published one** (below). Baking your server's address
+into it would make every self-hoster's bundle unique and that comparison
+impossible, so instead the address is read at container start, and the
+`connect-src` directive of the Content-Security-Policy is **generated from it**.
+Your policy names exactly your sync origin and is otherwise identical to the
+hosted instance's; a test asserts that the two differ in nothing but that one
+origin.
 
 ## Rebuilding and verifying the bundle
 
 This is the part that turns the self-host mitigation from a claim into
 something you can check.
 
+**Read this first: a published row is a hash of the reference build environment,
+not of your machine.** `linux/amd64`, built from `web/container/Dockerfile`. Cargo
+hashes the build host's target triple into every crate's `-C metadata`, and that
+reaches the emitted wasm, so the same commit built on an arm64 host produces a
+different hash from every row in the record. That is not evidence of anything: it
+is the toolchain, and no stable-toolchain flag removes it.
+[`web-bundle-hashes.md`](web-bundle-hashes.md) carries the full reasoning and the
+reference recipe. The consequence for the steps below is that **a native
+`pnpm web:build` is the right way to build a bundle to serve, and the wrong way
+to produce a number to compare against a row.**
+
 1. Check out the commit whose bundle you intend to serve. The record is keyed on
-   a commit, not a tag — nothing has been tagged as a release yet.
-2. Build the bundle: `pnpm install --frozen-lockfile && pnpm web:build`.
+   a commit, not a tag: nothing has been tagged as a release yet.
+2. Build the bundle. To **serve** it, natively:
+   `pnpm install --frozen-lockfile && pnpm web:build`. To produce a number you
+   can **compare against a row**, build the reference environment instead, which
+   any host can enter through emulation:
+   `docker buildx build --platform linux/amd64 -f web/container/Dockerfile .`
 3. Read the hash the build itself wrote. `pnpm web:build` ends in
    `scripts/emit-web-version.mjs`, which emits `web/dist/version.json` carrying
-   `bundle_hash` — one SHA-256 over every emitted asset, sorted, path and
+   `bundle_hash`: one SHA-256 over every emitted asset, sorted, path and
    content. You do not hash anything by hand, and an origin serving the bundle
    answers with the same field at `/version.json` (uncached, so it describes the
    build actually being served), so the identical comparison works against a
    running deployment as well as against a fresh build.
 4. Compare it against the row for that commit in
-   [`web-bundle-hashes.md`](web-bundle-hashes.md) — the public append-only
-   record, which also carries a container-based recipe for reproducing a row
-   from scratch.
+   [`web-bundle-hashes.md`](web-bundle-hashes.md), the public append-only
+   record, which also carries the container recipe for reproducing a row from
+   scratch.
 
    **Use that container recipe if you want a comparison that can match.** The
    published rows are container builds, and the bundle is not yet byte-identical
@@ -122,7 +148,19 @@ something you can check.
    *compare*, and the two were not distinguished here before.
 
 A match means the bundle you are about to serve is the one built from the source
-you just read. A mismatch means it is not, and that is worth stopping for.
+you just read. On a mismatch, rule out the build environment before anything
+else: a bundle built outside `linux/amd64` is **expected** to differ, and only a
+mismatch from inside the reference environment is worth stopping for. That order
+matters because the alternative teaches honest verifiers to ignore the check.
+
+**If other people use your instance, this is not optional in the way it is for
+you.** A bundle you built yourself needs no comparison, because you read the
+source. Your users did not: to them you are the code-delivery operator, and the
+one cross-check available to them is your served `/version.json` against a
+published row. An instance built natively on a non-amd64 host serves a hash that
+matches no row, so that check is unavailable to them. Build in the reference
+environment, or tell them plainly that no published row will match what you
+serve.
 
 Two things make that comparison worth making. The record is a **precondition for
 the hosted deploy rather than a log kept afterwards** — `check-bundle-record.mjs`

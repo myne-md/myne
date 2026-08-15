@@ -22,7 +22,7 @@ import {
   type QuickUnlockStatus,
 } from "../../lib/quick-unlock";
 import { isQuickUnlockError } from "../../types/quick-unlock-error";
-import { usePlatform } from "../../platform/PlatformContext";
+import { usePlatform } from "../../formfactor/PlatformContext";
 import { ioBanner } from "../../lib/io-banner";
 import {
   UNLOCK_NON_DISTINGUISHING_BANNER,

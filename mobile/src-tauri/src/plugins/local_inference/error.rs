@@ -36,6 +36,16 @@ pub enum EngineError {
     /// an error value or its `Display`.
     #[error("local-inference transcription failed")]
     TranscriptionFailed,
+    /// The audio is longer than the decoder will materialize
+    /// (`audio::MAX_PCM_SAMPLES`, myne#485).
+    ///
+    /// Distinct from [`EngineError::TranscriptionFailed`] because the two want
+    /// opposite things from the user. A failure is worth retrying; this is not,
+    /// and the same clip will be refused every time, so a UI that renders both
+    /// as "please try again" is giving advice that cannot work. Content-free
+    /// like its siblings: it carries no duration, no size and no file name.
+    #[error("audio too long to transcribe")]
+    AudioTooLong,
 }
 
 impl EngineError {
@@ -48,6 +58,7 @@ impl EngineError {
             EngineError::InferenceFailed => "inference_failed",
             EngineError::EmbeddingFailed => "embedding_failed",
             EngineError::TranscriptionFailed => "transcription_failed",
+            EngineError::AudioTooLong => "audio_too_long",
         }
     }
 }
