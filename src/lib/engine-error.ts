@@ -65,33 +65,42 @@ export type ProviderErrorCause =
   | "not_ready"
   | "failed";
 
-/** Both spellings, because Tauri serializes a unit variant as its identifier
- *  and the `kind()` helper emits snake_case — a seam that maps only one of
- *  them silently reports the catch-all for the other. */
-const PROVIDER_CAUSE_BY_TAG: Readonly<Record<string, ProviderErrorCause>> = {
-  NoCredential: "no_credential",
-  no_credential: "no_credential",
-  Unauthorized: "unauthorized",
-  unauthorized: "unauthorized",
-  QuotaExhausted: "quota_exhausted",
-  quota_exhausted: "quota_exhausted",
-  PolicyRefused: "policy_refused",
-  policy_refused: "policy_refused",
-  Unreachable: "unreachable",
-  unreachable: "unreachable",
-  Refused: "refused",
-  refused: "refused",
-  Timeout: "timeout",
-  timeout: "timeout",
-  RemoteBarred: "barred",
+/**
+ * Two spellings reach this seam and only one table describes them.
+ *
+ * Tauri serializes a unit variant as its identifier (`NoCredential`) while the
+ * `kind()` helper emits snake_case (`no_credential`), and a table mapping only
+ * one of them silently reports the catch-all for the other. Writing both rows by
+ * hand made that failure a transcription error away, twice per cause: the
+ * previous form was 22 hand-written entries for 11 causes, and adding a cause
+ * meant remembering to add two.
+ *
+ * So the tag is normalized to snake_case first, and the table below holds only
+ * the causes whose name is NOT the normalized tag. Today that is exactly one,
+ * `RemoteBarred`, which is the only row a reader has any reason to look at.
+ */
+function snakeCase(tag: string): string {
+  return tag.replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
+}
+
+const PROVIDER_CAUSE_RENAMES: Readonly<Record<string, ProviderErrorCause>> = {
   remote_barred: "barred",
-  EmptyCompletion: "empty_completion",
-  empty_completion: "empty_completion",
-  LocalModelMissing: "local_model_missing",
-  local_model_missing: "local_model_missing",
-  NotReady: "not_ready",
-  not_ready: "not_ready",
 };
+
+const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
+  "no_credential",
+  "unauthorized",
+  "quota_exhausted",
+  "policy_refused",
+  "unreachable",
+  "refused",
+  "timeout",
+  "barred",
+  "empty_completion",
+  "local_model_missing",
+  "not_ready",
+  "failed",
+]);
 
 /**
  * Narrow a raw IPC rejection to a provider cause. Anything unrecognized —
@@ -100,44 +109,39 @@ const PROVIDER_CAUSE_BY_TAG: Readonly<Record<string, ProviderErrorCause>> = {
  * on an unknown error is strictly worse than one that says "it did not work".
  */
 export function normalizeProviderError(raw: unknown): ProviderErrorCause {
-  return PROVIDER_CAUSE_BY_TAG[engineErrorTag(raw)] ?? "failed";
+  const tag = snakeCase(engineErrorTag(raw));
+  const renamed = PROVIDER_CAUSE_RENAMES[tag];
+  if (renamed) return renamed;
+  return PROVIDER_CAUSES.has(tag) ? (tag as ProviderErrorCause) : "failed";
 }
 
-/** The i18n key for a cause. A total function over the union, so a new cause
- *  fails to compile here rather than rendering an empty string. */
+/**
+ * The i18n key for a cause. A `Record` over the union rather than a switch, so
+ * a new cause still fails to compile here (which was the switch's whole point)
+ * without ten arms that each spell the same camelCase transformation by hand.
+ */
+const PROVIDER_ERROR_KEY: Readonly<Record<ProviderErrorCause, string>> = {
+  no_credential: "settings.ai.providerError.noCredential",
+  unauthorized: "settings.ai.providerError.unauthorized",
+  quota_exhausted: "settings.ai.providerError.quotaExhausted",
+  policy_refused: "settings.ai.providerError.policyRefused",
+  local_model_missing: "settings.ai.providerError.localModelMissing",
+  not_ready: "settings.ai.providerError.notReady",
+  unreachable: "settings.ai.providerError.unreachable",
+  refused: "settings.ai.providerError.refused",
+  timeout: "settings.ai.providerError.timeout",
+  barred: "settings.ai.providerError.barred",
+  failed: "settings.ai.providerError.failed",
+  // The one key outside the `providerError.*` block, deliberately
+  // (myne-md/myne#466). "No answer, try rephrasing" already exists and already
+  // says the right thing, so a second sentence with the same meaning would give
+  // translators two strings to keep in step for one situation. Reaching this
+  // entry at all means something classified an empty completion as an error;
+  // `ai-chat.ts` routes it to the ordinary empty-result path instead, which is
+  // why no production caller passes this cause today.
+  empty_completion: "editor.chrome.rightPanel.aiChat.noAnswer",
+};
+
 export function providerErrorKey(cause: ProviderErrorCause): string {
-  switch (cause) {
-    case "no_credential":
-      return "settings.ai.providerError.noCredential";
-    case "unauthorized":
-      return "settings.ai.providerError.unauthorized";
-    case "quota_exhausted":
-      return "settings.ai.providerError.quotaExhausted";
-    case "policy_refused":
-      return "settings.ai.providerError.policyRefused";
-    case "empty_completion":
-      // The one cause whose key lives outside this block, deliberately
-      // (myne-md/myne#466). "No answer — try rephrasing" already exists and
-      // already says exactly the right thing for an empty completion; writing a
-      // second sentence with the same meaning under `providerError.*` would
-      // give translators two strings to keep in step for one situation.
-      // `AiChatTab` renders this cause through the placeholder that owns that
-      // key rather than through the error paragraph — an empty answer is a
-      // result, not a fault.
-      return "editor.chrome.rightPanel.aiChat.noAnswer";
-    case "local_model_missing":
-      return "settings.ai.providerError.localModelMissing";
-    case "not_ready":
-      return "settings.ai.providerError.notReady";
-    case "unreachable":
-      return "settings.ai.providerError.unreachable";
-    case "refused":
-      return "settings.ai.providerError.refused";
-    case "timeout":
-      return "settings.ai.providerError.timeout";
-    case "barred":
-      return "settings.ai.providerError.barred";
-    case "failed":
-      return "settings.ai.providerError.failed";
-  }
+  return PROVIDER_ERROR_KEY[cause];
 }

@@ -4,8 +4,8 @@
 // we target the app's Documents directory (reachable via the Files app), since
 // there is no native folder picker. Mirrors the desktop DTOs.
 
-import { invoke } from "@tauri-apps/api/core";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { invoke } from "../platform/core";
+import { documentDir, join } from "../platform/path";
 
 /** Result of {@link vaultExportMarkdown} — mirror of Rust `VaultExportSummary`. */
 export interface VaultExportSummary {

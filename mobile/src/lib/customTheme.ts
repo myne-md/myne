@@ -19,7 +19,7 @@
 //     vault's palette, which is far more revealing about vault contents than a
 //     light/dark attribute; A6).
 //
-// The built-in light/dark/amoled attribute is `platform/theme.ts`'s job. The two
+// The built-in light/dark/amoled attribute is `formfactor/theme.ts`'s job. The two
 // meet only here: a custom theme OVERRIDES the built-in choice, so applying one
 // drops `data-theme`.
 

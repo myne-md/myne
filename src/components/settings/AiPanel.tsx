@@ -331,12 +331,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     embedding: null,
     transcription: null,
   });
-  // Whether this build ships the bundled auto-tag model — `null` while the
-  // (cheap, device-local) probe is in flight, so the switch never flickers
-  // through a disabled state on open. Unlike every other role there is no
-  // side-load fallback, so `false` is permanent for this build and the panel
-  // has to say so rather than offer a switch that can only ever persist `true`.
-  const [tagModel, setTagModel] = useState<boolean | null>(null);
   /** The host's own view of which backend is active (myne-md/myne#466). `null`
    *  until the first report lands, which renders as "nothing is answering" —
    *  the honest reading of "we have not been told yet", and the same thing the
@@ -424,6 +418,16 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // preferences, because only they carry it — but it is shown only for the
   // class the host says is active, so the claim can no longer outrun the fact.
   const backendClass = capability?.backendClass ?? null;
+  // Whether this build ships the bundled auto-tag model, derived rather than
+  // stored: it is one field of the report the panel already holds, and a second
+  // `useState` hydrated from the same callback is a copy that can be updated in
+  // one place and not the other. `null` while the report is in flight, so the
+  // switch never flickers through a disabled state on open. Unlike every other
+  // role there is no side-load fallback, so `false` is permanent for this build
+  // and the panel has to say so rather than offer a switch that can only ever
+  // persist `true`.
+  const tagModel = capability?.autoTag.available ?? null;
+
   // `undefined` is the "nothing is set up yet" state, NOT an empty string.
   const activeProviderName: string | undefined =
     backendClass === "remote"
@@ -522,7 +526,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     let alive = true;
     void aiCapabilityReport().then((report) => {
       if (!alive) return;
-      setTagModel(report.autoTag.available);
       setCapability(report);
     });
     return () => {

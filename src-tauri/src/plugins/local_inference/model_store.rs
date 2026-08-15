@@ -336,13 +336,17 @@ pub fn set_selected_model(
     // `file_stat` inside the hashing block; `Generation` has no hash marker, so
     // nothing checked its pick and nothing checked its read either. Recording a
     // path that cannot be opened is never useful, whatever the role.
-    let _ = file_stat(&accepted)?;
+    //
+    // One call, reused below. Adding a second beside the existing one gave
+    // Embedding and Transcription three `metadata()` syscalls per pick (here,
+    // in the hash block, and again inside `compute_file_sha256`) where one
+    // result serves all three.
+    let stat = file_stat(&accepted)?;
     let dir = ensure_models_dir(base)?;
     // Roles with a hash marker (Embedding / Transcription) record the file's
     // SHA-256 at pick-time — computed BEFORE the path marker so a hash/IO
     // failure records nothing (the swap fully lands or fully rolls back).
     if let Some(marker) = role.hash_marker_file_name() {
-        let stat = file_stat(&accepted)?;
         let hash = compute_file_sha256(&accepted)?;
         std::fs::write(
             dir.join(marker),
@@ -431,12 +435,14 @@ pub fn selected_model_verified(
     let Some(path) = selected_model(base, role)? else {
         return Ok(None);
     };
-    // `is_file` rather than `exists`: a marker pointing at a directory, a FIFO
-    // or a device is no more loadable than a marker pointing at nothing, and
-    // `file_stat` applies the same rule at pick time.
-    if !path.is_file() {
-        return Err(ModelStoreError::RecordedModelMissing);
-    }
+    // `file_stat` rather than a second `is_file` check, because "what counts as
+    // a loadable model file" must have ONE definition. A marker pointing at a
+    // directory, a FIFO or a device is no more loadable than a marker pointing
+    // at nothing, and `file_stat` is where that rule already lives and is
+    // applied at pick time. Restating it here would mean a later tightening of
+    // that rule (a symlink policy, a size floor) silently does not reach the
+    // loader's reader, which is the drift this wrapper was added to close.
+    file_stat(&path).map_err(|_| ModelStoreError::RecordedModelMissing)?;
     Ok(Some(path))
 }
 

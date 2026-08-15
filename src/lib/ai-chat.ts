@@ -111,7 +111,19 @@ export async function sendChat(
     // one sentence, so "your API key is wrong" and "the provider is down" were
     // indistinguishable and neither suggested an action. `normalizeProviderError`
     // maps the closed tag; no detail string ever crosses.
-    failChatTurn(runToken, normalizeProviderError(e));
+    const cause = normalizeProviderError(e);
+    // An empty completion is a RESULT, not a fault: the model was reached, it
+    // answered, and the answer was nothing. It takes the same route a local
+    // engine's empty finalization already takes, so the turn carries
+    // `error: false` and the existing empty-answer placeholder renders it.
+    //
+    // Classified here rather than in the component, because the alternative is
+    // to push it through the store as a failure and then un-fail it at render
+    // time: two JSX conditions that have to stay exact complements, a boolean
+    // whose meaning depends on a sibling string, and a third such cause needing
+    // the same two-place edit.
+    if (cause === "empty_completion") finalizeChatTurn(runToken, []);
+    else failChatTurn(runToken, cause);
   }
 }
 

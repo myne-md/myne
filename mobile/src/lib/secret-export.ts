@@ -6,9 +6,9 @@ import {
   writeText as clipboardWriteText,
   readText as clipboardReadText,
   clear as clipboardClear,
-} from "@tauri-apps/plugin-clipboard-manager";
-import { invoke } from "@tauri-apps/api/core";
-import { documentDir, join } from "@tauri-apps/api/path";
+} from "../platform/clipboardManager";
+import { invoke } from "../platform/core";
+import { documentDir, join } from "../platform/path";
 import { logErrorKind } from "./vault-creation-logging";
 import { shareFile } from "./share";
 

@@ -188,6 +188,12 @@ describe("AiChatTab", () => {
     });
 
     it("shows a placeholder for an empty finalized assistant answer", () => {
+      // Both routes to an empty answer arrive here, because they converge
+      // BEFORE the store: a local engine finalizes with no text, and
+      // `ai-chat.ts` finalizes the remote `empty_completion` cause rather than
+      // failing it (the model was reached and answered with nothing). That is
+      // why the component tests one field rather than a boolean plus a sibling
+      // string, and why the boundary owns the classification.
       const token = sendChatMessage("Hello");
       finalizeChatTurn(token, []); // no tokens appended → empty answer
       render(<AiChatTab />);
@@ -201,18 +207,6 @@ describe("AiChatTab", () => {
   // routing DIFFERS, which is the whole claim; asserting each in isolation
   // would pass against a collapsed implementation, and did.
   describe("a provider that answered without answering (myne#466)", () => {
-    it("renders an empty completion as the no-answer placeholder, not an alert", () => {
-      // A remote provider reports an empty completion as a typed FAILURE,
-      // because the transport has to tell it apart from a policy refusal. It
-      // still means the same thing to the reader as a local engine finalizing
-      // with no text, so it must land in the same place.
-      const token = sendChatMessage("Hello");
-      failChatTurn(token, "empty_completion");
-      render(<AiChatTab />);
-      expect(screen.getByTestId("ai.no-answer")).toBeTruthy();
-      expect(screen.queryByTestId("ai.turn-error")).toBeNull();
-    });
-
     it("renders a policy refusal as an alert that points at the provider", () => {
       const token = sendChatMessage("Hello");
       failChatTurn(token, "policy_refused");
