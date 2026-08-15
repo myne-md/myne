@@ -347,6 +347,20 @@ display     = fingerprint[0..4] || "-" || fingerprint[4..8]
 
 Every element above is **cross-implementation byte-identical** and is pinned by the `head-fingerprint` golden vectors in the `myne-test-vectors` companion. A second implementation that changed the domain string, the truncation width, the bit-packing order, the alphabet, or the grouping would display a different code for the *same* head — the compare would then fail for the wrong reason, and a user trained to expect mismatches is a user who clicks through the real one.
 
+**Which head each side displays (normative; myne-md/myne#462).** The construction above fixes how a `head_id` becomes a code and says nothing about *which* `head_id` each screen picks — a gap implementations filled with "the most recent observation", which is not the same anchor as "the adopted head" and is not stable for the length of a compare.
+
+- The **joining** device displays the fingerprint of the `head_id` it adopted at bootstrap (§6.2), latched. That is the head whose authenticity the ceremony exists to attest.
+- The **approving** device displays the fingerprint of the head it pulled and MAC-verified in the first sync cycle begun after the approval it is verifying — explicitly **not** whatever it happened to observe last, which on an already-enrolled device predates the ceremony.
+- **The fingerprint's input MUST be a `head_id` the displaying device itself derived** from a record whose `head_mac` it verified under `vault-head-mac` (or which it authored). A client **MUST NOT** render the fingerprint of a `head_id` supplied by the server, and **MUST NOT** display any server-supplied value as a code on this screen. The server chooses which real head to serve (§6.2); if it could *also* choose the code displayed, it would set the two independently and a **match** would prove nothing. This is the difference between a fail-safe compare and an attacker-chosen constant.
+- A match attests **history**, not device identity: it says the two devices hold the same head, not that the pending row approved is the device in the user's hand.
+
+**Holding pushes for the duration of the compare (normative; myne#462).** A head is not a stable identity — every push authors a new one — so a compare whose two screens sample at different moments disagrees for reasons that are not attacks. While a verify screen is open, a client **MUST NOT** author a **content** head, and **MUST** continue to pull (both sides reach the head they display by pulling, and §5.5 withholding detection depends on it). Two properties are required rather than optional:
+
+- The hold **MUST** carry a bound that releases it without cooperation — a lease, a ceiling, or both — so a client that dies mid-compare cannot leave its own edits unpushed indefinitely.
+- The §6.1 **genesis-on-empty push is exempt**. On an account with no head, the genesis head is the only thing a joining device can adopt, so suppressing it would leave both screens waiting forever on exactly the accounts a first compare happens on.
+
+The hold is **extend-only** with respect to push timing: nothing fires earlier than it would have, and pending push intent is retained rather than consumed, so the §8.3 A13 posture is unchanged.
+
 Without an out-of-band compare, TOFU adoption remains trust-the-server; with it, the malicious-server bootstrap attack is closed for that enrollment. The spec MUST present TOFU honestly (the guarantee holds only after a verified baseline exists) and MUST NOT imply that MAC-verification alone authenticates freshness.
 
 ---
@@ -388,6 +402,7 @@ A device learns "something changed, come pull" via a **contentless poke**: a sig
 
 - **The poke (over SSE) is part of the baseline sync behaviour** *(amended — supersedes the original opt-in-layer posture; `decisions.md` 2026-07-12)*. While a vault is unlocked (and, on mobile, foregrounded), the client keeps one SSE poke stream open per enrolled vault. Rationale for the amendment: the fixed-interval polling baseline already disclosed device presence to the server at poll granularity for the entire unlocked window, so the continuous connection's marginal A13 delta (poll-granular → connection-granular presence) was judged too small to carry a user-facing toggle whose privacy value was largely theatrical. What IS load-bearing is unchanged: the poke carries **zero payload**, and the arrival + timing of a push is intrinsic A13 (accepted).
 - **Polling remains the fallback cadence.** A device polls on an interval regardless of the stream's health — a broken/parked poke stream degrades latency (back to poll granularity), never correctness. Desktop and mobile share this baseline. Edge triggers (unlock, window focus, mobile foreground) may additionally arm a **one-shot** immediate pull; they are one-shot by construction so they cannot become a high-frequency polling channel.
+- **The §6.3 verification push-hold is the one sanctioned pause**, and it is extend-only: while a device-verification eye-compare is open the client withholds content pushes so the head under the compare stands still. Nothing fires earlier than it would have and pending push intent is retained, so the A13 timing posture above is unchanged — a delayed push discloses strictly less than a sent one.
 - **Stream hygiene (normative for clients):** reconnects use jittered exponential backoff; a `401` parks the stream until the device's `(endpoint, token)` identity changes (no reconnect-spin on a revoked token); on every successful (re)connect the client performs one catch-up pull (pokes sent while disconnected are unobservable). Dead connections are detected via the server's heartbeat (`server-protocol.md` §3) — a read timeout above the heartbeat cadence.
 
 ### 8.4 Robustness
