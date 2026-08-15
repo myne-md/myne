@@ -131,6 +131,13 @@ import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
 import { CommandPalette } from "./editor/sheets/CommandPalette";
 import { FilterSheet } from "./editor/sheets/FilterSheet";
 import { NoteActionsSheet } from "./editor/sheets/NoteActionsSheet";
+import { CoverPickerSheet } from "./editor/sheets/CoverPickerSheet";
+import { setNoteCover, type CoverChoice } from "../../lib/setNoteCover";
+import {
+  OPEN_COVER_PICKER_EVENT,
+  REMOVE_COVER_EVENT,
+  type OpenCoverPickerDetail,
+} from "../../lib/openCoverPickerSignal";
 import { NoteRowActionsSheet } from "./editor/sheets/NoteRowActionsSheet";
 import { FolderActionsSheet } from "./editor/sheets/FolderActionsSheet";
 import { DecorationSheet } from "./editor/sheets/DecorationSheet";
@@ -438,6 +445,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   const [rightPanel, setRightPanel] = useState(false);
   // Note actions overflow (⋯): Copy / Move / History / Export / Archive / Trash.
   const [moreOpen, setMoreOpen] = useState(false);
+  // The note cover's picker (myne-md/myne#410). `| null` rather than an `open`
+  // flag: `hasCover` only means anything while it is open, and it comes from the
+  // editor, which has just resolved the field. The shell cannot see it.
+  const [coverPicker, setCoverPicker] = useState<{ hasCover: boolean } | null>(null);
   // MYND-620 task 4: the phone's answer to the desktop's note-scoped side panel.
   // There is no permanently-visible panel beside an editor on a phone, so the
   // same information arrives as a sheet on request — the established mechanism
@@ -1639,6 +1650,58 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       exitEditor();
     } catch {
       setEditorError(failMsg);
+    }
+  }
+
+  // The banner's controls reach this flow through window signals: the banner is
+  // CodeMirror DOM in the shared editor package and has no route into this
+  // component, which owns both the sheet mounts and the open note. Same shape
+  // the desktop shell uses, and the event names are spelled identically on
+  // purpose (`mobile/src/lib/openCoverPickerSignal.ts` says so).
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<OpenCoverPickerDetail>).detail;
+      setCoverPicker({ hasCover: detail?.hasCover === true });
+    };
+    const onRemove = () => void applyNoteCover(null);
+    window.addEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
+    window.addEventListener(REMOVE_COVER_EVENT, onRemove);
+    return () => {
+      window.removeEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
+      window.removeEventListener(REMOVE_COVER_EVENT, onRemove);
+    };
+    // Re-subscribes when the open note changes, so `applyNoteCover` always
+    // closes over the right one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing?.id, editorText]);
+
+  /**
+   * Write the open note's cover, or clear it when `choice === null`.
+   *
+   * Two orderings matter here and both are copied from `confirmMove` above.
+   * Any pending edit is persisted FIRST, so the cover write does not land on
+   * top of bytes the user has since changed and the re-read below does not
+   * discard their typing. Then the new bytes are read back into the editor:
+   * `setNoteCover` rewrites frontmatter out of band of this buffer, and without
+   * the re-read the next autosave would write the pre-write text back and
+   * silently revert the cover.
+   */
+  async function applyNoteCover(choice: CoverChoice | null) {
+    const id = editing?.id;
+    setCoverPicker(null);
+    if (id == null) return;
+    try {
+      if (!editorUnchanged(id)) {
+        if (HAS_TAURI) await noteUpdate(id, editorText);
+        loadedTextRef.current = { id, text: editorText };
+      }
+      await setNoteCover(id, choice);
+      const next = await noteRead(id);
+      setEditorText(next);
+      loadedTextRef.current = { id, text: next };
+      await refreshOne(id);
+    } catch {
+      setEditorError(t("editor.cover.writeFailed"));
     }
   }
 
@@ -3077,6 +3140,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             setReadingMode(false);
           }}
           onClose={() => setRightPanel(false)}
+        />
+      )}
+
+      {coverPicker !== null && editing?.id != null && (
+        <CoverPickerSheet
+          hasCover={coverPicker.hasCover}
+          onClose={() => setCoverPicker(null)}
+          onPick={(choice) => void applyNoteCover(choice)}
+          onRemove={() => void applyNoteCover(null)}
         />
       )}
 

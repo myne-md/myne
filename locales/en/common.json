@@ -1032,6 +1032,7 @@
     "cover": {
       "add": "Add cover",
       "change": "Change cover",
+      "emptyLibraryMobile": "No images in this vault yet. Upload one to use as a cover.",
       "remove": "Remove cover",
       "writeFailed": "Could not update the note's cover"
     },
