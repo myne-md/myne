@@ -157,6 +157,12 @@ pub struct AttEmbedSpan<'a> {
     pub end: usize,
     /// The 64-char lowercase-hex attachment-id (without `att:`).
     pub id: &'a str,
+    /// The alias: everything between the `|` and the closing `]]`, or `""`
+    /// when the embed carries none. This is NOT the filename. It may carry
+    /// layout segments (`photo.png|w=300`, myne#409) and the filename itself
+    /// may contain a `|` (`re|port.png`), so a consumer that needs either must
+    /// split it rather than read it whole.
+    pub alias: &'a str,
 }
 
 /// The canonical form-C id length: 64 lowercase-hex chars = the 32-byte
@@ -210,6 +216,7 @@ fn parse_canonical_embed_at(note_body: &str, open: usize) -> Option<AttEmbedSpan
     {
         return None;
     }
+    let mut alias: &str = "";
     let end = match bytes.get(id_end)? {
         b']' => {
             if bytes.get(id_end + 1) != Some(&b']') {
@@ -226,6 +233,7 @@ fn parse_canonical_embed_at(note_body: &str, open: usize) -> Option<AttEmbedSpan
             if bytes.get(close + 1) != Some(&b']') {
                 return None;
             }
+            alias = &note_body[alias_start..close];
             close + 2
         }
         _ => return None,
@@ -234,6 +242,7 @@ fn parse_canonical_embed_at(note_body: &str, open: usize) -> Option<AttEmbedSpan
         start: open,
         end,
         id: &note_body[id_start..id_end],
+        alias,
     })
 }
 

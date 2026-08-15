@@ -29,6 +29,7 @@ import {
 } from "./insert";
 import { type DiffPreviewRow, showDiffPreview } from "./diff-preview";
 import { showAttachmentToast } from "./toast";
+import { isEmptyEmbedLayout } from "@myne/dialect/embedLayout";
 import { addCatalogRows } from "./catalog";
 
 /** Resolve + import a ref's source, returning the stored attachment or a
@@ -149,9 +150,20 @@ export async function convertImportedRefs(
     // command for, and the notice is the fact they did not ask for and cannot
     // undo. Same `" · "` join the batch summary uses between its own parts.
     const compression = summarizeCompressedAttachments(stored);
-    showAttachmentToast(
-      compression === null ? msg : `${msg} · ${compressionNoticeMessage(compression)}`,
-    );
+    // Preserved layout (myne#409): an Obsidian `|300` dimension, or a
+    // markdown-image alt, that survived the rewrite instead of being dropped.
+    // Stated rather than assumed: the whole complaint behind #409 was that this
+    // happened silently, and a transform nobody can see is a transform nobody
+    // trusts.
+    const preserved = rewrites.filter(
+      (r) => !isEmptyEmbedLayout(r.rewrite.ref.layout),
+    ).length;
+    const parts = [msg];
+    if (preserved > 0) {
+      parts.push(i18n.t("editor.attachment.convertCore.layoutPreserved", { count: preserved }));
+    }
+    if (compression !== null) parts.push(compressionNoticeMessage(compression));
+    showAttachmentToast(parts.join(" · "));
   }
   return { converted: rewrites.length, skipped: skipped.length, cancelled: false };
 }

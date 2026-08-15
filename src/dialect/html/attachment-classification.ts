@@ -9,6 +9,7 @@
 // notice and the emitted placeholders from ever drifting apart.
 
 import { extractAttachmentRefs } from "../../notes/attachmentRef";
+import { parseEmbedAlias } from "@myne/dialect/embedLayout";
 
 /** An attachment embed that could not be included in the projection. */
 export interface ExcludedAttachment {
@@ -24,10 +25,30 @@ export interface ExcludedAttachment {
  */
 export const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
 
-/** The display name an embed renders/reports under — the alias, or the
- *  generic fallback when the embed is malformed (alias missing/empty). */
+/**
+ * The display name an embed renders/reports under: the alias SPLIT to its
+ * filename (myne#409), or the generic fallback when the embed is malformed
+ * (alias missing/empty).
+ *
+ * The split lives here rather than at each call site because this helper is the
+ * single source both halves of the projection consult, and they diverged the
+ * moment it did not split: `scanExcludedAttachments` below reads a
+ * pre-split filename from `extractAttachmentRefs`, while `emitNoteHtml`'s
+ * `renderAttachmentEmbed` passes the RAW alias. With layout segments in the
+ * alias, `photo.png|w=300` failed the anchored `IMAGE_EXT_RE`, so the emitter
+ * reclassified a sized image as a non-image and replaced it with an
+ * "Attachment … not included" placeholder carrying the raw segment text, while
+ * the pre-flight notice still counted it as an included image. That inverts the
+ * invariant stated above: the notice may name a file the projection keeps,
+ * never the reverse.
+ *
+ * Idempotent, so passing an already-split filename is safe: a filename that
+ * legitimately contains a pipe (`re|port.png`) re-splits to itself, because a
+ * later unkeyed segment rejoins the filename.
+ */
 export function attachmentEmbedDisplayName(filename: string): string {
-  return filename !== "" ? filename : "attachment";
+  const { filename: name } = parseEmbedAlias(filename);
+  return name !== "" ? name : "attachment";
 }
 
 /**

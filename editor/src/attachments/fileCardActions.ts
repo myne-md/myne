@@ -112,12 +112,12 @@ export function revealFileCard(view: EditorView, id: string): void {
  * `parseAttachmentTarget`) and the syntax tree — the same primitives the embed
  * decorator uses — rather than re-deriving the `![[att:…]]` grammar.
  */
-function attachmentEmbedRangeAt(
+export function attachmentEmbedRangeAt(
   state: EditorState,
   pos: number,
   id: string,
-): { from: number; to: number } | null {
-  let found: { from: number; to: number } | null = null;
+): { from: number; to: number; alias: string } | null {
+  let found: { from: number; to: number; alias: string } | null = null;
   syntaxTree(state).iterate({
     from: Math.max(0, pos - 1),
     to: Math.min(state.doc.length, pos + 1),
@@ -129,7 +129,10 @@ function attachmentEmbedRangeAt(
         parts.target !== null &&
         parseAttachmentTarget(parts.target) === id
       ) {
-        found = { from: node.from, to: node.to };
+        // The alias is returned rather than discarded: a caller that needs it
+        // would otherwise re-derive the `![[att:…|alias]]` byte layout by hand,
+        // which is exactly what this function's existence is meant to prevent.
+        found = { from: node.from, to: node.to, alias: parts.alias ?? "" };
         return false;
       }
       return undefined;

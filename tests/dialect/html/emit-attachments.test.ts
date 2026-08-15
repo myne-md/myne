@@ -190,3 +190,49 @@ describe("scanExcludedAttachments lockstep (cheap pre-flight scan)", () => {
     ]);
   });
 });
+
+// --- layout segments must not reclassify an image (pr-review, myne#409) -----
+//
+// `IMAGE_EXT_RE` is anchored at the end, so it is tested against the FILENAME,
+// never the raw alias. When form-C gained layout segments, `renderAttachmentEmbed`
+// was still passing the whole alias: `photo.png|w=300` failed the extension
+// test, so a sized image was reclassified non-image and replaced by an
+// "Attachment … not included" placeholder carrying the raw segment text, while
+// `scanExcludedAttachments` (already on the parser) still counted it as an
+// included image. The two halves of this projection disagreed, which inverts
+// the file's own invariant: the notice may name a file the projection keeps,
+// never the reverse.
+
+describe("an image carrying layout segments stays an image", () => {
+  it.each([
+    ["a width", "pic.png|w=300"],
+    ["a width and alignment", "pic.png|w=300|align=center"],
+    ["a percentage width", "pic.png|w=100%"],
+    ["alt text containing a pipe", "pic.png|alt=A sunset | 2026"],
+    ["an unknown key from a newer client", "pic.png|future=x"],
+  ])("still renders an <img> with %s", async (_label, alias) => {
+    const { html, excludedAttachments } = await emitNoteHtml(`${embed(ID_A, alias)}\n`);
+    expect(html).toContain('class="att-image"');
+    expect(html).not.toContain("att-placeholder");
+    // The raw segment text must never be printed into the document.
+    expect(html).not.toContain("w=300");
+    expect(html).not.toContain("future=x");
+    expect(excludedAttachments).toEqual([]);
+  });
+
+  it("keeps the two halves of the projection agreeing", async () => {
+    // The pre-flight scan and the emitter must reach the same verdict, or the
+    // notice offers to include a sidecar the projection never references.
+    const body = `${embed(ID_A, "pic.png|w=300|align=center")}\n`;
+    const { excludedAttachments } = await emitNoteHtml(body);
+    expect(excludedAttachments).toEqual(scanExcludedAttachments(body));
+  });
+
+  it("labels a non-image by its filename, not its segments", async () => {
+    const { html, excludedAttachments } = await emitNoteHtml(
+      `${embed(ID_B, "notes.zip|w=300")}\n`,
+    );
+    expect(html).toContain('Attachment "notes.zip" not included');
+    expect(excludedAttachments.map((a) => a.filename)).toEqual(["notes.zip"]);
+  });
+});

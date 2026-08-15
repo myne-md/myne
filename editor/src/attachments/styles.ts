@@ -399,6 +399,52 @@ const CSS = `
 .cm-attachment-file-card-menuitem-disabled:hover {
   background-color: transparent;
 }
+/* Group rule between the file actions, the sizes, the alignments and the alt
+   editor (myne#409). Presentational only: no name, no role, no tab stop. */
+.cm-attachment-file-card-menusep {
+  height: 1px;
+  margin: var(--space-1, 4px) 0;
+  background-color: var(--line-1, #e3e2dd);
+}
+/* The active choice in a size / alignment group. The tick is a ::before rather
+   than DOM text so the row's accessible name stays the label alone and is not
+   read as "check mark Small"; aria-checked on the menuitemradio is what
+   announces the state. */
+.cm-attachment-file-card-menuitem-checked {
+  font-weight: var(--weight-medium, 500);
+}
+.cm-attachment-file-card-menuitem-checked::before {
+  /* The Lucide check glyph as a mask, not the U+2713 character. The design
+     canon (docs/design/README.md, Iconography) bans unicode symbols as icons
+     and names this exact replacement, with keyboard-shortcut glyphs its only
+     exception. This same feature quotes that rule one file over to justify
+     drawing its alert marker from Lucide, so a unicode tick here contradicted
+     the change that introduced it.
+     A mask rather than an inline SVG element because the tick is decorative,
+     which is what the comment above this rule is about: it must stay out of
+     the accessible name, and a ::before carrying a mask has no DOM node to
+     announce. The path is the same 20-6-9-17-4-12 polyline ICON_PATHS.check
+     holds. */
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  margin-right: var(--space-1, 4px);
+  background-color: var(--fg-2, #4a4944);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center / 0.85em 0.85em no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center / 0.85em 0.85em no-repeat;
+}
+/* Keep unchecked rows in the same groups aligned with the checked one, so the
+   list does not jump horizontally as the choice moves. */
+.cm-attachment-file-card-menuitem[role="menuitemradio"]:not(
+    .cm-attachment-file-card-menuitem-checked
+  )::before {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  margin-right: var(--space-1, 4px);
+}
 
 /* Voice-note recording bar (MYND-259). Body-mounted floating surface (escapes
    the .cm-editor theme scope, like the toast/menu above). */
