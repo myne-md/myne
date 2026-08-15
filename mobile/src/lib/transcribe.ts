@@ -16,10 +16,12 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 
 /** A normalized transcription failure. `kind: "not_ready"` = transcription off /
- *  no model available (surface a "turn it on / no model" hint); `"failed"` = any
- *  other engine / decrypt / decode failure. */
+ *  no model available (surface a "turn it on / no model" hint); `"too_long"` =
+ *  the clip is past the decoder's ceiling and will be refused every time, so the
+ *  caller must NOT offer a retry (myne#485); `"failed"` = any other engine /
+ *  decrypt / decode failure. */
 export interface TranscribeError {
-  readonly kind: "not_ready" | "failed";
+  readonly kind: "not_ready" | "too_long" | "failed";
 }
 
 /** A running transcription. `done` resolves with the full transcript and rejects
@@ -71,6 +73,7 @@ function normalizeTranscribeError(raw: unknown): TranscribeError {
       : raw !== null && typeof raw === "object" && "kind" in raw
         ? String((raw as { kind: unknown }).kind)
         : "";
-  const notReady = tag === "NotReady" || tag === "not_ready";
-  return { kind: notReady ? "not_ready" : "failed" };
+  if (tag === "NotReady" || tag === "not_ready") return { kind: "not_ready" };
+  if (tag === "AudioTooLong" || tag === "audio_too_long") return { kind: "too_long" };
+  return { kind: "failed" };
 }

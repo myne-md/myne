@@ -127,6 +127,7 @@
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
       "transcribeFailed": "Transcription failed. Please try again.",
+      "transcribeTooLong": "This recording is too long to transcribe on this device.",
       "transcribeFeatureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
       "transcribeModelLoadFailed": "Couldn't load the speech-to-text model. Reinstall Myne, or check your custom model in Settings → Developer → AI.",
       "transcribeNoModel": "Select a speech-to-text model in Settings → Developer → AI.",
