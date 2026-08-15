@@ -1,0 +1,716 @@
+// The twin inventory's own test (myne-md/myne#472 task 1).
+//
+// A guard nobody breaks is a guard nobody has tested, and this repo has shipped
+// that shape more than once: a check that passed while the thing it checked was
+// wrong, "verified" by the check passing afterwards. So what matters here is not
+// that the script runs. It is that it FAILS, by name, on each defect it claims
+// to catch.
+//
+// Every failure case runs against a THROWAWAY tree via `--roots`. An earlier
+// version of `check-token-adoption.mjs` mutated `src/lib/theme.ts` on disk and
+// restored it in `afterEach`; a crashed run left a production source file
+// corrupted, and a parallel worker could read it mid-write.
+
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
+
+import {
+  ROSTER,
+  discover,
+  normalize,
+  seamAliases,
+  stripComments,
+} from "../../scripts/check-twin-inventory.mjs";
+
+const ROOT = new URL("../../", import.meta.url).pathname;
+const SCRIPT = `${ROOT}scripts/check-twin-inventory.mjs`;
+const PROJECTION = `${ROOT}docs/dev/twin-inventory.md`;
+
+function run(args: string[] = []): { code: number; out: string } {
+  try {
+    return {
+      code: 0,
+      out: execFileSync("node", [SCRIPT, ...args], { cwd: ROOT, encoding: "utf8" }),
+    };
+  } catch (e) {
+    const err = e as { status: number; stdout: string; stderr: string };
+    return { code: err.status, out: `${err.stdout}${err.stderr}` };
+  }
+}
+
+let scratch: string | null = null;
+
+afterEach(() => {
+  if (scratch) rmSync(scratch, { recursive: true, force: true });
+  scratch = null;
+});
+
+type Entry = { a: string; b: string; verdict: string; reason: string };
+
+/**
+ * A scratch pair of trees plus the roster to check them against.
+ *
+ * `files` maps a relative path to which side gets it: "both" makes a twin, "a"
+ * or "b" makes a file with no counterpart. The roster is written as JSON beside
+ * the desktop side, which is where `--roots` looks for it. It is an ARRAY,
+ * because the unit is the pair and a desktop file may have two counterparts.
+ */
+function withTrees(
+  files: Record<string, "both" | "a" | "b">,
+  roster: Entry[],
+): [string, string] {
+  scratch = mkdtempSync(join(tmpdir(), "myne-twin-inventory-"));
+  const a = join(scratch, "desk");
+  const b = join(scratch, "mob");
+  for (const [rel, side] of Object.entries(files)) {
+    if (side === "both" || side === "a") {
+      mkdirSync(join(a, rel, ".."), { recursive: true });
+      writeFileSync(join(a, rel), "export const x = 1;\n");
+    }
+    if (side === "both" || side === "b") {
+      mkdirSync(join(b, rel, ".."), { recursive: true });
+      writeFileSync(join(b, rel), "export const x = 1;\n");
+    }
+  }
+  mkdirSync(a, { recursive: true });
+  writeFileSync(join(a, "roster.json"), JSON.stringify(roster, null, 2));
+  return [a, b];
+}
+
+const entry = (a: string, b: string, verdict = "delegated"): Entry => ({
+  a,
+  b,
+  verdict,
+  reason: "scratch",
+});
+
+describe("check-twin-inventory", () => {
+  // One spawn, shared. Several tests below assert on different substrings of
+  // byte-identical output, and nothing between them can change it, so paying a
+  // separate 88 ms sweep per assertion buys nothing. The tests that deliberately
+  // run their own command (injection, projection) still do.
+  const full = run();
+
+  it("passes on the tree as recorded", () => {
+    expect(full.out).toContain("twin-inventory: ok");
+    expect(full.code).toBe(0);
+  });
+
+  it("classifies exactly the twins it discovers, both ways", () => {
+    // The record is COMPLETE, which is the precondition myne#473 needs: a
+    // ratchet over a partial roster counts a number that does not describe the
+    // tree.
+    //
+    // An earlier version of this test asserted `not.toContain("awaiting
+    // classification")`, and once the incremental-landing scaffold was removed
+    // that string became unprintable, so the assertion passed by construction
+    // and tested nothing. Asserting the SET EQUALITY instead cannot go vacuous:
+    // it compares two things that both still exist.
+    const key = (e: { a: string; b: string }) => `${e.a}::${e.b}`;
+    const discovered = new Set(discover().map(key));
+    const rostered = new Set(ROSTER.map(key));
+    expect([...discovered].filter((k) => !rostered.has(k))).toEqual([]);
+    expect([...rostered].filter((k) => !discovered.has(k))).toEqual([]);
+  });
+
+  it("fails on a roster entry whose pair is no longer a twin, even when both files exist", () => {
+    // The hole the existence check left. An entry can stop being a twin without
+    // either file disappearing: a path moves out from under the sweep, or a
+    // curated entry is deleted while its roster row stays. The old check asked
+    // "do both files exist", which is a proxy, and this case walked straight
+    // past it while every published count stayed wrong.
+    const [a, b] = withTrees({ "real.ts": "both", "lonely.ts": "a" }, []);
+    writeFileSync(join(b, "elsewhere.ts"), "export const x = 1;\n");
+    writeFileSync(
+      join(a, "roster.json"),
+      JSON.stringify(
+        [
+          entry(join(a, "real.ts"), join(b, "real.ts")),
+          // Both files exist. The pair is not a twin: different relative paths,
+          // and no curated entry declares it.
+          entry(join(a, "lonely.ts"), join(b, "elsewhere.ts")),
+        ],
+        null,
+        2,
+      ),
+    );
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(1);
+    expect(out).toContain("no longer a twin");
+    expect(out).toContain("both files exist but the pair is not discovered");
+  });
+
+  it("discovers the path sweep's twins plus the curated ones", () => {
+    // 90 from the same-relative-path sweep, which is the epic's measurement, and
+    // 6 curated pairs the sweep cannot see because their sides sit at different
+    // paths. A record fixed at 90 would omit this epic's own motivating case.
+    expect(full.out).toContain("96 twin(s) discovered");
+  });
+
+  it("keeps both counterparts when one desktop file has two", () => {
+    // `src/App.tsx` has a same-path twin in `mobile/src/App.tsx` (the viewport
+    // wrapper) AND a behavioural counterpart in `mobile/src/app/AppShell.tsx`.
+    // Deduping on the desktop path would drop one, and the one it drops is the
+    // corrected pairing. Proven here in isolation so the property does not rest
+    // on a count that other work can move.
+    const [a, b] = withTrees({ "App.tsx": "both", "other/Shell.tsx": "b" }, []);
+    writeFileSync(
+      join(a, "curated.json"),
+      JSON.stringify(
+        [{ a: join(a, "App.tsx"), b: join(b, "other/Shell.tsx"), why: "scratch" }],
+        null,
+        2,
+      ),
+    );
+    // Both pairs classified, so the run reaches its summary line rather than
+    // stopping at the missing-verdict failure.
+    writeFileSync(
+      join(a, "roster.json"),
+      JSON.stringify(
+        [
+          entry(join(a, "App.tsx"), join(b, "App.tsx")),
+          entry(join(a, "App.tsx"), join(b, "other/Shell.tsx")),
+        ],
+        null,
+        2,
+      ),
+    );
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(0);
+    expect(out).toContain("2 twin(s) discovered");
+  });
+
+  it("does not record a curated pair twice when the sweep already found it", () => {
+    const [a, b] = withTrees({ "same.ts": "both" }, []);
+    writeFileSync(
+      join(a, "curated.json"),
+      JSON.stringify(
+        [{ a: join(a, "same.ts"), b: join(b, "same.ts"), why: "scratch" }],
+        null,
+        2,
+      ),
+    );
+    writeFileSync(
+      join(a, "roster.json"),
+      JSON.stringify([entry(join(a, "same.ts"), join(b, "same.ts"))], null, 2),
+    );
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(0);
+    expect(out).toContain("1 twin(s) discovered");
+  });
+
+  it("fails, by name, on a curated pair whose file is gone", () => {
+    // A curated pair is hand-asserted, so a missing side means somebody moved a
+    // file this list says answers a shared product question. Silently dropping
+    // it would shrink the denominator without an argument, which is exactly the
+    // shape this record exists to prevent.
+    const [a, b] = withTrees({ "present.ts": "both" }, []);
+    writeFileSync(
+      join(a, "curated.json"),
+      JSON.stringify(
+        [{ a: join(a, "present.ts"), b: join(b, "moved-away.ts"), why: "scratch" }],
+        null,
+        2,
+      ),
+    );
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(1);
+    expect(out).toContain("curated pair(s) name a file that no longer exists");
+    expect(out).toContain("moved-away.ts");
+  });
+
+  // ── direction 1: a twin with no verdict ────────────────────────────────────
+
+  it("fails, by name, on a twin that has no roster entry", () => {
+    const [a, b] = withTrees({ "shared.ts": "both" }, []);
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(1);
+    expect(out).toContain("have no verdict");
+    expect(out).toContain("shared.ts");
+  });
+
+  it("says WHY a missing verdict matters, not just that one is missing", () => {
+    // The message has to teach. A refusal that does not say what the next
+    // person should do gets silenced rather than fixed.
+    const [a, b] = withTrees({ "shared.ts": "both" }, []);
+    const { out } = run(["--roots", a, b]);
+    expect(out).toContain("seven inconsistent ones");
+  });
+
+  // ── direction 2: a verdict with no twin ────────────────────────────────────
+
+  it("fails, by name, on an entry whose desktop file is gone", () => {
+    const [a, b] = withTrees({ "kept.ts": "both" }, []);
+    // Written after the trees exist, so the paths are real. One entry names a
+    // file that is not.
+    writeFileSync(
+      join(a, "roster.json"),
+      JSON.stringify(
+        [
+          entry(join(a, "kept.ts"), join(b, "kept.ts")),
+          entry(join(a, "vanished.ts"), join(b, "vanished.ts")),
+        ],
+        null,
+        2,
+      ),
+    );
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(1);
+    expect(out).toContain("no longer exists");
+    expect(out).toContain("vanished.ts");
+  });
+
+  it("fails when only the MOBILE side of an entry is gone", () => {
+    // The asymmetric case. A pair whose desktop file survives still reads as
+    // present to anything that only checks one side, which is how a roster goes
+    // on describing a twin that stopped being one.
+    // `other.ts` exists on both sides purely so the mobile root exists at all.
+    // Without it the walk reports a broken checkout and exits before the stale
+    // check, which is correct behaviour and the wrong thing to be testing here.
+    const [a, b] = withTrees({ "other.ts": "both", "half.ts": "a" }, []);
+    writeFileSync(
+      join(a, "roster.json"),
+      JSON.stringify(
+        [
+          entry(join(a, "other.ts"), join(b, "other.ts")),
+          entry(join(a, "half.ts"), join(b, "half.ts")),
+        ],
+        null,
+        2,
+      ),
+    );
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(1);
+    expect(out).toContain("no longer exists");
+    expect(out).toContain("half.ts");
+  });
+
+  // ── a file on one side only is not a twin ──────────────────────────────────
+
+  it("does not invent a twin from a file that exists on one side only", () => {
+    const [a, b] = withTrees({ "desktop-only.ts": "a", "mobile-only.ts": "b" }, []);
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(0);
+    expect(out).toContain("0 twin(s) discovered");
+  });
+
+  // ── the vocabulary is closed ───────────────────────────────────────────────
+
+  it("fails on a verdict outside the four", () => {
+    const [a, b] = withTrees({ "shared.ts": "both" }, []);
+    writeFileSync(
+      join(a, "roster.json"),
+      JSON.stringify(
+        [entry(join(a, "shared.ts"), join(b, "shared.ts"), "narrowed")],
+        null,
+        2,
+      ),
+    );
+    const { code, out } = run(["--roots", a, b]);
+    expect(code).toBe(1);
+    expect(out).toContain("outside the vocabulary");
+    expect(out).toContain("narrowed");
+  });
+
+  it("has a verdict for every discovered twin, both trees", () => {
+    // Asserted rather than eyeballed from the summary, because "no missing
+    // verdicts" is exactly the kind of thing that reads true in a count and is
+    // false for one file.
+    expect(full.code).toBe(0);
+    expect(full.out).not.toContain("have no verdict");
+    expect(ROSTER.length).toBe(96);
+  });
+
+  it("keeps `screen` narrow", () => {
+    // A count, and it is the weaker half of this pair on purpose: it catches the
+    // verdict spreading, which is the failure the definition warns about.
+    const screens = ROSTER.filter((e) => e.verdict === "screen");
+    expect(screens.length).toBeLessThanOrEqual(6);
+  });
+
+  it("holds `screen` to its definition, not to its count", () => {
+    // The half the count cannot do. An earlier version shipped only the count,
+    // passing at five entries of which three were miscategorised: the verdict
+    // read "render, layout and navigation shape only" while `src/main.tsx`,
+    // `src/vite-env.d.ts` and `src-tauri/src/main.rs` are none of those. A
+    // number cannot notice that, so the definition was widened to its real two
+    // clauses (the surface, or the host) and this asserts the membership rather
+    // than the size.
+    //
+    // Enumerated rather than pattern-matched. A regex over paths would be a
+    // second rule that can drift from the first; a list of four cannot, and
+    // adding a fifth entry should cost a reviewer's argument.
+    const screens = ROSTER.filter((e) => e.verdict === "screen").map((e) => e.a);
+    expect(screens.sort()).toEqual([
+      "src-tauri/src/main.rs", // host: binary entry point
+      "src/App.tsx", // surface: the shell each client renders
+      "src/main.tsx", // host: boot side-effect composition
+      "src/vite-env.d.ts", // host: build-time ambient globals
+    ]);
+  });
+
+  it("records a destination on every decision entry", () => {
+    // A decision with no destination is the field doing nothing. `undecided` is
+    // an answer; absent is not.
+    const withoutDestination = ROSTER.filter(
+      (e) => e.verdict === "decision" && !e.destination,
+    );
+    expect(withoutDestination.map((e) => e.a)).toEqual([]);
+  });
+
+  it("gives every entry a reason", () => {
+    // The record's whole value is that the next reader does not re-derive the
+    // verdict, so an entry without a reason is a verdict pretending to be one.
+    //
+    // A minimum LENGTH was tried first and dropped. It flagged the six
+    // byte-identical `src/dialect/` shims, whose reason is "Re-export shim,
+    // byte-identical." That is a complete explanation of a two-line file, and a
+    // threshold that rejects it teaches people to pad rather than to explain,
+    // which is worse than not checking. Non-empty is the honest assertion; the
+    // quality of a reason is a review question, not a regex one.
+    const missing = ROSTER.filter((e) => !(e.reason ?? "").trim());
+    expect(missing.map((e) => e.a)).toEqual([]);
+  });
+
+  // ── the byte flag and the semantic one ─────────────────────────────────────
+
+  it("reports both difference counts, not one", () => {
+    expect(full.out).toContain("byte-different");
+    expect(full.out).toContain("semantically different");
+    expect(full.out).toContain("differing only in comments or the seam import");
+  });
+
+  // ── the prose projection ───────────────────────────────────────────────────
+
+  it("regenerates the projection deterministically", () => {
+    // Two consecutive emits must be byte-identical, or "hand-edited then
+    // restored" is a hope rather than a check. Nothing in the output may depend
+    // on when it ran.
+    run(["--emit"]);
+    const first = readFileSync(PROJECTION, "utf8");
+    run(["--emit"]);
+    expect(readFileSync(PROJECTION, "utf8")).toBe(first);
+  });
+
+  it("undoes a hand edit on the next emit", () => {
+    // The document is a projection, never a second source. This is what makes
+    // that claim testable rather than a comment.
+    //
+    // The restore is in `finally` for the same reason the sentinel test below
+    // gives: this one writes the literal string `HAND EDIT` into a TRACKED
+    // document, so a failing expectation used to commit it.
+    const before = readFileSync(PROJECTION, "utf8");
+    try {
+      writeFileSync(PROJECTION, before + "\nHAND EDIT\n");
+      run(["--emit"]);
+      const after = readFileSync(PROJECTION, "utf8");
+      expect(after).not.toContain("HAND EDIT");
+      expect(after).toBe(before);
+    } finally {
+      writeFileSync(PROJECTION, before);
+    }
+  });
+
+  it("emits even when the gate is failing", () => {
+    // The order that makes the test above safe. `--emit` used to run AFTER the
+    // missing-verdict exit, so a guard red for any unrelated reason (the
+    // ordinary mid-work state) regenerated nothing and left a hand edit
+    // standing.
+    //
+    // Asserted on the FILE, not on the exit code or a message: the weaker
+    // reading would pass for a run that failed the gate without ever reaching
+    // the emit. Under --roots the emit lands in the throwaway tree, so this
+    // never touches the repository's document.
+    const [a, b] = withTrees({ "shared.ts": "both" }, []);
+    const target = join(a, "projection.md");
+    const { code, out } = run(["--roots", a, b, "--emit"]);
+    expect(code).toBe(1);
+    expect(out).toContain("have no verdict");
+    expect(existsSync(target)).toBe(true);
+    expect(readFileSync(target, "utf8")).toContain("# Twin inventory");
+  });
+
+  it("carries the rubric, not only the table", () => {
+    // The deliverable includes a rubric two people must reach the same answer
+    // with. A table of verdicts without it is a list nobody can check.
+    // No spawn: the determinism test above already left the emitted output on
+    // disk, and each spawn here is a full 88 ms sweep.
+    const doc = readFileSync(PROJECTION, "utf8");
+    expect(doc).toContain("GENERATED by scripts/check-twin-inventory.mjs --emit");
+    expect(doc).toContain("The four verdicts");
+    expect(doc).toContain("How to tell them apart");
+    expect(doc).toContain("Two difference fields");
+    expect(doc).toContain("A pair enters the curated list when");
+  });
+
+  it("does not emit unless asked", () => {
+    // CI never passes --emit, so the check half has to run either way. If a bare
+    // run wrote the file, a docs-only diff would appear on every CI job.
+    //
+    // The restore is in `finally`. An earlier version restored after the
+    // assertions, so a failing expectation left the repository's tracked
+    // document holding the word "sentinel", which is the exact
+    // `check-token-adoption` incident this file's header cites, reproduced by
+    // the test written to avoid it.
+    run(["--emit"]);
+    const before = readFileSync(PROJECTION, "utf8");
+    try {
+      writeFileSync(PROJECTION, "sentinel\n");
+      const { code } = run();
+      expect(code).toBe(0);
+      expect(readFileSync(PROJECTION, "utf8")).toBe("sentinel\n");
+    } finally {
+      writeFileSync(PROJECTION, before);
+    }
+  });
+
+  it("--check fails when the projection is stale, and passes when it is fresh", () => {
+    // Without this the "Do not edit by hand" banner had no mechanism behind it:
+    // a hand edit to the projection is a docs-only commit, which pnpm-build's
+    // code-paths filter skips, so CI never looked. decisions-index.mjs guards
+    // its generated index the same way.
+    run(["--emit"]);
+    const before = readFileSync(PROJECTION, "utf8");
+    try {
+      expect(run(["--check"]).code).toBe(0);
+      writeFileSync(PROJECTION, before + "\nHAND EDIT\n");
+      const { code, out } = run(["--check"]);
+      expect(code).toBe(1);
+      expect(out).toContain("is not what --emit would write");
+      expect(out).toContain("--emit");
+    } finally {
+      writeFileSync(PROJECTION, before);
+    }
+  });
+
+  // ── the interaction: no check may silence another ──────────────────────────
+  //
+  // This guard ships four failing checks that landed across three tasks. Proving
+  // each one in isolation is necessary and not sufficient: the failure this repo
+  // has actually shipped is a guard whose later edit closed one blind spot and
+  // opened another one line away, green throughout (myne#411). A NEW guard's
+  // analogue is that adding check N must not stop check N-1 firing.
+  //
+  // So each defect is injected ALONE and again with the other three present, and
+  // every message must appear in both.
+
+  const DEFECTS = {
+    missing: "have no verdict",
+    stale: "no longer exists",
+    curated: "curated pair(s) name a file that no longer exists",
+    verdict: "outside the vocabulary",
+  } as const;
+
+  /** A scratch tree carrying exactly the named defects. */
+  function withDefects(names: (keyof typeof DEFECTS)[]): { code: number; out: string } {
+    const [a, b] = withTrees({ "kept.ts": "both", "extra.ts": "both" }, []);
+    const roster: Entry[] = [entry(join(a, "kept.ts"), join(b, "kept.ts"))];
+    const curated: { a: string; b: string; why: string }[] = [];
+
+    // `extra.ts` is a real twin; leaving it out of the roster is the missing case.
+    if (!names.includes("missing")) {
+      roster.push(entry(join(a, "extra.ts"), join(b, "extra.ts")));
+    }
+    if (names.includes("stale")) {
+      roster.push(entry(join(a, "ghost.ts"), join(b, "ghost.ts")));
+    }
+    if (names.includes("curated")) {
+      curated.push({ a: join(a, "kept.ts"), b: join(b, "absent.ts"), why: "scratch" });
+    }
+    if (names.includes("verdict")) {
+      roster.push(entry(join(a, "kept.ts"), join(b, "kept.ts"), "narrowed"));
+    }
+    writeFileSync(join(a, "roster.json"), JSON.stringify(roster, null, 2));
+    writeFileSync(join(a, "curated.json"), JSON.stringify(curated, null, 2));
+    return run(["--roots", a, b]);
+  }
+
+  const ALL = Object.keys(DEFECTS) as (keyof typeof DEFECTS)[];
+
+  // Built once. Five assertions ran it five times with byte-identical input,
+  // each rebuilding and deleting its own scratch tree.
+  let allFour: { code: number; out: string } | null = null;
+  const withAllDefects = () => (allFour ??= withDefects(ALL));
+
+  for (const name of ALL) {
+    it(`fires on \`${name}\` alone`, () => {
+      const { code, out } = withDefects([name]);
+      expect(code).toBe(1);
+      expect(out).toContain(DEFECTS[name]);
+    });
+
+    it(`still fires on \`${name}\` when the other three are also present`, () => {
+      const { code, out } = withAllDefects();
+      expect(code).toBe(1);
+      expect(out).toContain(DEFECTS[name]);
+    });
+  }
+
+  it("names all four at once rather than stopping at the first", () => {
+    // A guard that exits on its first finding makes the second one cost a whole
+    // extra round trip, and after two rounds people stop reading the output.
+    const { out } = withAllDefects();
+    for (const msg of Object.values(DEFECTS)) expect(out).toContain(msg);
+  });
+
+  // ── output discipline ──────────────────────────────────────────────────────
+
+  it("never prints file content", () => {
+    // A guard that echoes a twin's body into a public CI log has published
+    // source, and any fixture-shaped constant in it. Same reasoning as
+    // lefthook.yml's secret-scan masking its own matches.
+    const [a, b] = withTrees({ "shared.ts": "both" }, []);
+    const { out } = run(["--roots", a, b]);
+    expect(out).not.toContain("export const x = 1;");
+  });
+});
+
+// The normalizer, tested directly rather than through the guard, because these
+// are the assertions that prove the semantic field means what it claims. The
+// guard's own summary count is a consequence of them, not a substitute.
+describe("check-twin-inventory: the semantic comparison", () => {
+  const aliases = new Map([
+    ["core", "@tauri-apps/api/core"],
+    ["event", "@tauri-apps/api/event"],
+  ]);
+  const same = (x: string, y: string) => normalize(x, aliases) === normalize(y, aliases);
+
+  it("calls a comment-only difference semantically identical", () => {
+    // The `src/dialect/` shims are exactly this, and which side carries the
+    // comment flips between the two files, so neither side is "the commented
+    // one".
+    expect(
+      same(
+        '// a header the other side does not have\nexport * from "@myne/dialect/x";\n',
+        'export * from "@myne/dialect/x";\n',
+      ),
+    ).toBe(true);
+  });
+
+  it("calls a seam-import difference semantically identical", () => {
+    // Four `src/lib/vault-*.ts` pairs differ in exactly this one line, and
+    // `src/platform/core.ts` is a bare re-export of the module mobile imports.
+    expect(
+      same(
+        'import { invoke } from "../platform/core";\nexport const f = () => invoke("x");\n',
+        'import { invoke } from "@tauri-apps/api/core";\nexport const f = () => invoke("x");\n',
+      ),
+    ).toBe(true);
+  });
+
+  it("canonicalizes a seam import at any nesting depth", () => {
+    expect(
+      same(
+        'import { listen } from "../../platform/event";\n',
+        'import { listen } from "@tauri-apps/api/event";\n',
+      ),
+    ).toBe(true);
+  });
+
+  it("calls one real changed statement semantically different", () => {
+    // The case that matters: myne#485 is a missing clamp inside a function whose
+    // signature matches. If this passed, the field would be worthless.
+    expect(
+      same(
+        "export function f(n) {\n  if (n > MAX) throw new Error();\n  return n;\n}\n",
+        "export function f(n) {\n  return n;\n}\n",
+      ),
+    ).toBe(false);
+  });
+
+  it("does not treat a non-seam import difference as cosmetic", () => {
+    // Only the modules `src/platform/` actually re-exports are canonicalized. A
+    // different import is a different import.
+    expect(same('import x from "./a";\n', 'import x from "./b";\n')).toBe(false);
+  });
+
+  it("leaves a URL inside a string alone", () => {
+    // A naive comment stripper eats `https://`, which would silently equate two
+    // files that point at different hosts.
+    expect(
+      same('const u = "https://a.example";\n', 'const u = "https://b.example";\n'),
+    ).toBe(false);
+  });
+
+  it("leaves a single-quoted URL alone too", () => {
+    // The twin of the test above, and the one that was missing. The Rust `'`
+    // window was added to stop a lifetime desyncing the walker; applied to a
+    // `.ts` file it does the opposite, because a `'`-quoted string longer than
+    // the window stops being read as a string and the `//` inside `https://`
+    // strips the rest of the line. These two then compare EQUAL. Testing only
+    // the double-quoted form left the blind spot exactly where the coverage was
+    // not.
+    expect(
+      same(
+        "const u = 'https://a.example/path';\n",
+        "const u = 'https://b.example/path';\n",
+      ),
+    ).toBe(false);
+  });
+
+  it("still treats a Rust lifetime as a lifetime, not a string opener", () => {
+    // The direction the window was added for, asserted rather than assumed. A
+    // desyncing walker swallows everything to the next tick, so the doc comment
+    // between two lifetimes survives the strip and a comment-only difference
+    // reads as drift. Measured on `local_inference/commands.rs`, that preserved
+    // 163 lines of `///`.
+    const src = (doc: string) =>
+      `pub fn f<'a>(x: &'a str) -> &'a str {\n    /// ${doc}\n    x\n}\n`;
+    expect(
+      normalize(src("one"), aliases, true) === normalize(src("two"), aliases, true),
+    ).toBe(true);
+  });
+
+  it("keeps a Rust char literal whose contents look like a comment", () => {
+    // The window's other half: `'/'` is a real char literal and must survive,
+    // or the walker resyncs on the wrong tick.
+    expect(stripComments("let c = '/'; // gone\n", true).trim()).toBe("let c = '/';");
+  });
+
+  it("strips a block comment without touching code on the same line", () => {
+    expect(stripComments("const a = 1; /* note */ const b = 2;\n").trim()).toBe(
+      "const a = 1;  const b = 2;",
+    );
+  });
+
+  it("does not strip a comment marker inside a string literal", () => {
+    expect(stripComments('const s = "// not a comment";\n').trim()).toBe(
+      'const s = "// not a comment";',
+    );
+  });
+
+  it("reads the seam map from the tree rather than a hardcoded list", () => {
+    // A hardcoded copy is a second roster that drifts from the seam it
+    // describes. This asserts the derivation actually ran, and found the module
+    // every one of the four one-line pairs turns on.
+    const map = seamAliases();
+    expect(map.get("core")).toBe("@tauri-apps/api/core");
+    expect(map.size).toBeGreaterThan(1);
+  });
+
+  it("skips a platform module that re-exports more than one specifier", () => {
+    // Not a bare alias, so canonicalizing it would claim an equivalence nobody
+    // established.
+    const dir = mkdtempSync(join(tmpdir(), "myne-seam-"));
+    writeFileSync(
+      join(dir, "multi.ts"),
+      'export { a } from "@tauri-apps/api/core";\nexport { b } from "@tauri-apps/api/event";\n',
+    );
+    writeFileSync(join(dir, "single.ts"), 'export { c } from "@tauri-apps/api/path";\n');
+    const map = seamAliases(dir);
+    expect(map.has("multi")).toBe(false);
+    expect(map.get("single")).toBe("@tauri-apps/api/path");
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
