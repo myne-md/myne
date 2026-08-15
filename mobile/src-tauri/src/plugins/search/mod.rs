@@ -18,11 +18,17 @@
 //! No slot gate: the frontend only calls these while the vault is unlocked, and
 //! the plaintext already crossed IPC as the note bodies it is re-pushing here.
 //! The index (`SearchIndexState`) is managed in `lib.rs` setup, like the
-//! structurally-twin `vault-indices` state.
+//! structurally-twin `vault-indices` state, and torn down on the same leg:
+//! `crate::hooks::MobileHooks::zeroize_search_index` clears it wherever
+//! `myne-core` drops the slot (myne-md/myne#454). Nothing is flushed first, and
+//! nothing needs to be — mobile writes no `vault.search` blob, so the index is
+//! purely a rebuildable RAM cache the WebView re-seeds with
+//! `search_index_replace` on the next unlock.
 //!
 //! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
 //! discipline" — no note plaintext (title/body/query) is ever logged here.
 
+use myne_core::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
 use myne_core::search::{Document, InvertedIndex, SearchIndex, SearchIndexState};
 use serde::{Deserialize, Serialize};
 use tauri::plugin::{Builder, TauriPlugin};
@@ -112,11 +118,33 @@ fn search_index_remove(ids: Vec<String>, search: State<'_, SearchIndexState>) ->
 /// `note_search` — BM25 full-text search over the live in-RAM index. Returns
 /// the top-`NOTE_SEARCH_RESULT_CAP` hits, highest score first (as the engine
 /// ranks them). Empty on an empty/absent index. Never logs the query.
+///
+/// **Slot-gated, and the gate is the point.** The shared core rests the
+/// no-IPC-leak property of the whole lock path on exactly this door:
+/// `lock_from_host` states that `note_search` "gates on `Slot::Unlocked`
+/// (returns empty when locked), so there is no IPC leak, only raw RAM
+/// retention", and `search_sync_core.rs` states the rule outright, that an index
+/// which has not yet been zeroized must not answer through this door. That was
+/// true of desktop and false here: mobile answered queries against a locked
+/// vault's titles and bodies over IPC, which made myne#454 a locked-vault READ
+/// surface rather than the residency problem it was recorded as.
+///
+/// The teardown hook this change wires is the other half, not a replacement for
+/// this one. It is best-effort by construction: `SearchIndexState::clear()`
+/// no-ops on a poisoned lock, and a `try_state` miss is an unlogged no-op, so a
+/// lock whose only defence was the wipe would be weaker than the threat model's
+/// A6 row describes for a native client. The same reasoning is already written
+/// down one directory over: `local_inference` re-reads its gate host-side
+/// because "a compromised WebView is not trusted to stop calling".
 #[tauri::command]
-fn note_search(
+async fn note_search(
     query: String,
     search: State<'_, SearchIndexState>,
+    runtime: State<'_, VaultRuntimeState>,
 ) -> Result<Vec<SearchResult>, ()> {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
+        return Ok(Vec::new());
+    }
     let results = search
         .query(&query)
         .into_iter()

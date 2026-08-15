@@ -15,7 +15,7 @@
 // `src-tauri/capabilities/default.json`; the commands are declared as an
 // `InlinedPlugin` in `build.rs`.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { VaultRepairError } from "../types/vault-repair-error";
 
 /** Count orphan residue under the vault directory (0 when clean/absent). */

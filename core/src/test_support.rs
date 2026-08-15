@@ -298,3 +298,167 @@ impl crate::vault_io::VaultIo for ContainerVaultIo {
         crate::vault_io::StdVaultIo.rename(from, to).await
     }
 }
+
+/// A [`crate::hooks::VaultLifecycleHooks`] that records the teardown calls it
+/// receives, in order, and no-ops everything else.
+///
+/// Shared rather than per-plugin because more than one slot-drop path owes the
+/// SAME teardown vector, and the whole value of the assertion is that the paths
+/// are compared against one another: `lock_from_host` (the manual + auto lock)
+/// and the change-password force-relock each drop `Slot::Unlocked` to `Empty`,
+/// and `spec/protocol.md` §9.8.5 (`vault.indices`) and §9.17.5
+/// (`vault.embeddings`) both say the decrypted material is zeroized at **every**
+/// such site. A recorder private to one test module cannot express that.
+///
+/// It also records hooks a given path deliberately does NOT call —
+/// `persist_search_index` and `apply_screen_capture` among them — so a
+/// whole-vector equality pins their ABSENCE as much as the presence of the ones
+/// that are owed.
+///
+/// **What it cannot see**, stated here so no test built on it claims more than
+/// it proves: this is a test double. It observes which hooks a core path FIRES,
+/// never what a real client's hook body DOES. A client that implements a hook as
+/// an empty body satisfies every assertion built on this recorder — which is
+/// exactly how myne-md/myne#454 shipped. `scripts/check-lock-teardown.mjs`
+/// covers that half; the two are complementary and neither subsumes the other.
+pub struct RecordingHooks {
+    calls: std::sync::Mutex<Vec<&'static str>>,
+    /// Optional REAL index this recorder wipes in `zeroize_vault_indices`, the
+    /// way a client's hook body does. Present, a test can assert the resulting
+    /// STATE (the index is empty) rather than only the recorded call — the
+    /// stronger of the two available assertions, per the repo's own rule.
+    indices: Option<std::sync::Arc<crate::plugins::vault_indices::state::VaultIndicesState>>,
+}
+
+impl RecordingHooks {
+    pub fn new() -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            calls: std::sync::Mutex::new(Vec::new()),
+            indices: None,
+        })
+    }
+
+    /// A recorder that also does what a client's `zeroize_vault_indices` body
+    /// does: `clear()` a real [`VaultIndicesState`]. Lets a slot-drop test
+    /// assert the index is EMPTY afterwards, not merely that a hook fired.
+    pub fn with_indices(
+        indices: std::sync::Arc<crate::plugins::vault_indices::state::VaultIndicesState>,
+    ) -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            calls: std::sync::Mutex::new(Vec::new()),
+            indices: Some(indices),
+        })
+    }
+
+    fn record(&self, name: &'static str) {
+        self.calls.lock().expect("recording hooks mutex").push(name);
+    }
+
+    /// Everything recorded so far, oldest first.
+    pub fn calls(&self) -> Vec<&'static str> {
+        self.calls.lock().expect("recording hooks mutex").clone()
+    }
+}
+
+impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
+    fn hydrate_attachment_refs<'a>(
+        &'a self,
+        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+    ) -> crate::hooks::BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
+    fn hydrate_search_index<'a>(
+        &'a self,
+        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+    ) -> crate::hooks::BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
+    fn hydrate_spell<'a>(
+        &'a self,
+        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+    ) -> crate::hooks::BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
+    fn reclaim_stray_attachment_blobs<'a>(
+        &'a self,
+        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+    ) -> crate::hooks::BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
+    fn persist_search_index<'a>(
+        &'a self,
+        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+    ) -> crate::hooks::BoxFuture<'a> {
+        self.record("persist_search_index");
+        Box::pin(std::future::ready(()))
+    }
+    fn hydrate_ai_vectors<'a>(
+        &'a self,
+        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+    ) -> crate::hooks::BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
+    fn index_note_attachments<'a>(
+        &'a self,
+        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+        _: &'a str,
+        _: &'a str,
+        _: &'a str,
+    ) -> crate::hooks::BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
+    fn zeroize_search_index(&self) {
+        self.record("zeroize_search_index");
+    }
+    fn zeroize_spell(&self) {
+        self.record("zeroize_spell");
+    }
+    fn zeroize_vault_indices(&self) {
+        self.record("zeroize_vault_indices");
+        // Stand in for a client's hook body when the test supplied a real
+        // index, so the assertion can be about the index rather than about
+        // this recorder.
+        if let Some(indices) = &self.indices {
+            indices.clear();
+        }
+    }
+    fn zeroize_attachment_refs(&self) {
+        self.record("zeroize_attachment_refs");
+    }
+    fn abort_active_recording(&self) {
+        self.record("abort_active_recording");
+    }
+    fn pdf_export_teardown_on_lock(&self) {
+        self.record("pdf_export_teardown_on_lock");
+    }
+    fn clear_staged_descriptor(&self) {
+        self.record("clear_staged_descriptor");
+    }
+    fn apply_screen_capture(&self, _: bool, _: &'static str) {
+        self.record("apply_screen_capture");
+    }
+    fn search_upsert(&self, _: &str, _: &str, _: &str) {}
+    fn search_remove(&self, _: &str) {}
+    fn ai_note_changed(&self, _: &str, _: &str) {}
+    fn ai_note_deleted(&self, _: &str) {}
+    fn ai_policy_changed(&self, _: bool, _: &[String]) {}
+    fn bump_local_change(&self) {}
+    fn emit_snapshot_write_failed(&self, _: &str) {}
+    fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
+        prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
+    }
+    fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
+    fn preempt_inflight_backup<'a>(
+        &'a self,
+        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+    ) -> crate::hooks::BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
+    fn invalidate_quick_unlock(&self, _: &Path) {}
+    fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
+        false
+    }
+    fn purge_note_snapshots(&self, _: &Path, _: &str) -> std::io::Result<usize> {
+        Ok(0)
+    }
+}

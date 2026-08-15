@@ -111,6 +111,119 @@ describeCanary("two-device sync canary (MYND-428)", () => {
     }
   });
 
+  // myne#462. The suite has driven this ceremony since `sr1` landed and has
+  // never once compared the two codes to each other — `sr1` reads B's and
+  // asserts only that it is non-empty, and it closes A's Settings immediately
+  // after approving, so A's code is not even on screen. Every layer below this
+  // one proves `head_id -> fingerprint` is a correct, frozen function; none of
+  // them proves the two devices feed it the SAME head, which is the whole
+  // defect.
+  //
+  // Bespoke rather than through `setupTwoSyncedDevices`, precisely because that
+  // helper closes A's verify screen (`multi-device.ts`, the `closeSettings`
+  // right after approve) — this scenario needs to be in exactly the state the
+  // helper leaves behind.
+  it("both devices show the SAME verification code, and keep agreeing across a mid-ceremony write", async () => {
+    const srv = await startSyncServer();
+    let account = "";
+    let password = "";
+    const a = await launchDevice(0, {
+      seedConfig: syncConfigSeed(srv.url),
+      seed: (appDataDir) => {
+        const v = seedVault(appDataDir, { password: "CanaryPass-9-animals!" });
+        account = v.account;
+        password = v.password;
+      },
+    });
+    try {
+      const b = await launchDevice(1, { seedConfig: syncConfigSeed(srv.url) });
+      try {
+        await unlockToEditor(a.session, password);
+        await dismissImporterOffer(a.session);
+        await openSettings(a.session);
+        await (await a.session.byTestId("settings.tab-sync")).click();
+        await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
+        await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
+        await (await a.session.byTestId("sync.enroll.submit")).click();
+        await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+        await closeSettings(a.session);
+
+        // A note, so the vault is not the empty-genesis case (which has its own
+        // coverage in `orchestrator.rs`).
+        await createNote(a.session, "sas-compare");
+        await typeIntoEditor(a.session, "before the ceremony");
+        await waitForSaved(a.session);
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+
+        // B joins and waits.
+        await (await b.session.byTestId("welcome.join-cta", { timeoutMs: 30_000 })).click();
+        await b.session.byTestId("join.modal", { timeoutMs: 30_000 });
+        await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
+        await (await b.session.byTestId("join.account-input")).sendKeys(account);
+        await (await b.session.byTestId("join.password-input")).sendKeys(password);
+        await (await b.session.byTestId("join.submit")).click();
+        await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
+
+        // A approves and STAYS on the verify screen — the state `sr1` leaves.
+        await openSettings(a.session);
+        await (await a.session.byTestId("settings.tab-sync")).click();
+        await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
+        await a.session.byTestId("sync.approve-verify", { timeoutMs: 30_000 });
+        await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
+
+        // Both codes, read from the two live screens. Polled to convergence
+        // rather than compared on first read: the assertion is that they AGREE,
+        // not that they agree within one particular millisecond.
+        const readBoth = async () => {
+          const sa = (
+            await (await a.session.byTestId("sync.sas-fingerprint", { timeoutMs: 30_000 })).textContent()
+          ).trim();
+          const sb = (
+            await (await b.session.byTestId("join.sas-fingerprint", { timeoutMs: 30_000 })).textContent()
+          ).trim();
+          return [sa, sb] as const;
+        };
+        let [sasA, sasB] = await readBoth();
+        for (let i = 0; i < 10 && sasA !== sasB; i++) {
+          await new Promise((r) => setTimeout(r, 1500));
+          [sasA, sasB] = await readBoth();
+        }
+        expect(sasA.length, "A shows a code").toBeGreaterThan(0);
+        expect(sasB, "both devices show the same verification code").toBe(sasA);
+
+        // The reproducer: a vault write DURING the ceremony. Before the fix this
+        // authored a new head, one screen followed it and the other did not, and
+        // the user was shown a mismatch that meant nothing. The push hold is what
+        // stops the head moving here.
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+        await new Promise((r) => setTimeout(r, 2500));
+        const [afterA, afterB] = await readBoth();
+        expect(afterB, "the two codes still agree after a mid-ceremony sync").toBe(afterA);
+
+        // Close the compare on both sides, and prove the hold RELEASED: the note
+        // A wrote must still reach B.
+        await (await a.session.byTestId("sync.sas-match")).click();
+        await closeSettings(a.session);
+        await (await b.session.byTestId("join.sas-match")).click();
+        await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
+        await dismissImporterOffer(b.session);
+
+        let replicated = false;
+        for (let i = 0; i < 12 && !replicated; i++) {
+          await pageSeatInvoke(b.session, "plugin:sync|sync_now", {}, 20_000);
+          await new Promise((r) => setTimeout(r, 1500));
+          replicated = noteBlobCount(b.appDataDir) >= 1;
+        }
+        expect(replicated, "the held push flushed once the compare closed").toBe(true);
+      } finally {
+        await b.teardown();
+      }
+    } finally {
+      await a.teardown();
+      await srv.teardown();
+    }
+  });
+
   it("A enrolls + writes a note; B joins, A approves, B verifies the SAS, and the note replicates to B", async () => {
     const srv = await startSyncServer();
     let account = "";

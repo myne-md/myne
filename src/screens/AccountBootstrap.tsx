@@ -52,6 +52,7 @@ import { Spinner } from "../components/Spinner";
 import { AccountNumberEntry } from "./AccountNumberEntry";
 import { BetaTermsConsent } from "../components/sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../hooks/useBetaTermsGate";
+import { useHeadFingerprintCompare } from "../hooks/useHeadFingerprintCompare";
 import {
   ENROLL_NON_DISTINGUISHING_BANNER,
   ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE,
@@ -158,43 +159,27 @@ export function AccountBootstrap({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(initiallyPending);
-  /** The head-fingerprint SAS, once an approval has let a cycle adopt a head. */
-  const [sas, setSas] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
   /** Who can approve, named up front rather than discovered at a spinner. */
   const [approvers, setApprovers] = useState<string[] | null>(null);
 
-  // Poll for approval while pending. The join modal's mechanism, reused rather
-  // than reinvented: `sync_now` until a head is adopted, at which point
-  // `sync_head_fingerprint` answers and that fingerprint IS the code both sides
-  // compare. Self-scheduling rather than `setInterval`, so a slow claim RTT
-  // never overlaps ticks.
+  // The approval watch and the SYNC-40 compare, through the shared hook
+  // (myne#462). Two things this screen used to do differently, both fixed by
+  // adopting it:
   //
-  // This is a bounded, user-initiated window — NOT the steady-state background
-  // cadence, which is privacy-load-bearing and left alone.
-  useEffect(() => {
-    if (!pending || sas !== null) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const tick = async () => {
-      try {
-        await invoke("plugin:sync|sync_now");
-        const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
-        if (!cancelled && fp) {
-          setSas(fp);
-          return; // adopted a head — stop polling
-        }
-      } catch {
-        /* transient — the device is pending, so most cycles legitimately fail */
-      }
-      if (!cancelled) timer = setTimeout(() => void tick(), 1000);
-    };
-    void tick();
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  }, [pending, sas]);
+  // 1. It AWAITED `sync_now` in front of every fingerprint read — the
+  //    pre-MYND-537 shape the other joining screens deliberately left behind.
+  //    On a web re-bootstrap that re-materialises a whole corpus, that gated the
+  //    code behind the download rather than behind the head.
+  // 2. It latched on the first non-null answer, like every other copy did.
+  //
+  // This screen matters more than its desktop siblings, not less: per
+  // `decisions.md` 2026-07-26 a web client re-runs this compare on EVERY
+  // re-bootstrap, because OPFS is evictable — so a cleared profile or a private
+  // window lands here again. And a browser has neither certificate pinning nor
+  // channel binding (`sync-protocol.md` §8.4), which leaves this eye-compare
+  // carrying a larger share of the client's assurance than it does on desktop.
+  const { fingerprint: sas, changed: sasChanged } = useHeadFingerprintCompare(pending, "joiner");
 
   // Who can approve. Read once on entering the pending state — a device that is
   // still pending cannot read the roster for itself, so this is best-effort and
@@ -261,6 +246,13 @@ export function AccountBootstrap({
           <div style={SAS_STYLE} data-testid="account-bootstrap.sas">
             {sas}
           </div>
+          {/* The head moved mid-compare. Said out loud, so a changed code is a
+              prompt to look again rather than a silent re-convergence. */}
+          {sasChanged && (
+            <p style={HINT_STYLE} data-testid="account-bootstrap.sas-changed">
+              {t("accountBootstrap.verifyChanged")}
+            </p>
+          )}
           {/* The abort's own failure surfaces HERE, in the step where the user
               pressed it — not as a cleared screen that implies it worked. */}
           {error && (
@@ -291,7 +283,6 @@ export function AccountBootstrap({
                   .then(() => {
                     setAborting(false);
                     setPending(false);
-                    setSas(null);
                     setAccount(null);
                   })
                   .catch(() => {
@@ -370,7 +361,6 @@ export function AccountBootstrap({
               .finally(() => {
                 setAborting(false);
                 setPending(false);
-                setSas(null);
                 setAccount(null);
               });
           }}
