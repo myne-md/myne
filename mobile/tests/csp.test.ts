@@ -53,6 +53,23 @@ describe("mobile CSP", () => {
     expect(directives.get("script-src")).not.toContain("'unsafe-inline'");
   });
 
+  it("closes the three navigation-shaped directives (myne#453)", () => {
+    // `form-action` is the one that is NOT defense-in-depth. A form submission
+    // is a navigation, and navigation directives get NO `default-src` fallback
+    // (that fallback covers fetch directives only), so omitting it inherits
+    // nothing. On Android it is the only control that can see the case at all:
+    // the WebViewClient `shouldOverrideUrlLoading` hook the navigation policy
+    // installs (`src-tauri/src/navigation.rs`) is not called for POST requests.
+    expect(directives.get("form-action")).toBe("form-action 'none'");
+    // `<base href="https://evil/">` injected by a sanitizer bypass repoints
+    // every relative asset URL in the bundle.
+    expect(directives.get("base-uri")).toBe("base-uri 'none'");
+    // Works only because Tauri serves this policy as an HTTP response header;
+    // `frame-ancestors` is ignored in a `<meta http-equiv>` policy. Recorded
+    // here so a future move to a meta tag cannot pass silently.
+    expect(directives.get("frame-ancestors")).toBe("frame-ancestors 'none'");
+  });
+
   it("does not cargo-cult desktop-only origins that mobile IPC never uses", () => {
     // Mobile IPC routes through the WKWebView/Android bridge, not a CSP-gated
     // fetch, so `ipc:`/`http://ipc.localhost` are deliberately absent (decisions
