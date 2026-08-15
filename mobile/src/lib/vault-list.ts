@@ -17,7 +17,7 @@
 // transparently rebuild the non-authoritative `registry.json` cache when it is
 // missing/stale (the rebuild is swallowed; discovery never depends on it).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type {
   VaultListError,
   VaultListResult,

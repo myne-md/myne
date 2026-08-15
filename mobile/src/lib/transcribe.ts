@@ -6,14 +6,16 @@
 // ends. The decrypted PCM + transcript never leave Rust except as this final
 // string / the streamed segments — AS1-class content, never logged here.
 //
-// Mirrors the desktop `src/lib/transcribe.ts`, with two mobile adaptations:
-//   - imports from `@tauri-apps/api/core` (mobile has no `src/platform` seam);
+// Mirrors the desktop `src/lib/transcribe.ts`, with one mobile adaptation left
+// (the import difference this comment used to name is gone — mobile has a
+// `mobile/src/platform/` seam now, myne#492, so both clients import `Channel`
+// and `invoke` from `../platform/core`):
 //   - `stop()` is a no-op for now: the mobile transcription backend does not yet
 //     register a cancel command (the desktop `chat_stop` shares the chat surface,
 //     which this transcription-only port dropped). Cancellation via a dedicated
 //     command is a follow-up; a run is short (one attachment) and completes.
 
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "../platform/core";
 
 /** A normalized transcription failure. `kind: "not_ready"` = transcription off /
  *  no model available (surface a "turn it on / no model" hint); `"too_long"` =

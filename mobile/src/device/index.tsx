@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Platform } from "../platform/PlatformContext";
+import type { Platform } from "../formfactor/PlatformContext";
 import { IOSFrame } from "./IOSFrame";
 import { AndroidFrame } from "./AndroidFrame";
 import { IPadFrame } from "./IPadFrame";

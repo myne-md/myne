@@ -8,11 +8,17 @@
 //! The whole plugin core (state + commands + `MYI1` persist + error) lives in
 //! `myne-core` (`myne_core::plugins::vault_indices`, shared with the desktop
 //! client). Mobile registers the same 12 commands and manages
-//! `VaultIndicesState` in `lib.rs` setup. The lock-teardown wipe is a
-//! desktop-only `hooks::VaultLifecycleHooks` side-effect; mobile installs
-//! `NoopHooks`, so there is no teardown to wire here — the index simply lives
-//! for the process while a vault is unlocked (same posture as the search index
-//! being absent on mobile).
+//! `VaultIndicesState` in `lib.rs` setup.
+//!
+//! The lock-teardown wipe is wired, and is NOT wired here: `myne-core` calls
+//! `VaultLifecycleHooks::zeroize_vault_indices` at every slot-drop site, and
+//! `crate::hooks::MobileHooks` implements it against the state `lib.rs`
+//! manages (myne-md/myne#454). Until that body existed this comment claimed the
+//! opposite and was believed: the index outlived the lock, so a second vault's
+//! unlock stacked its records on top of the first vault's, which stayed
+//! forever, and a locked vault's titles/folders/tags sat in RAM for the life of
+//! the process. `scripts/check-lock-teardown.mjs` now fails if the body goes
+//! back to empty.
 //!
 //! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
 //! discipline".
