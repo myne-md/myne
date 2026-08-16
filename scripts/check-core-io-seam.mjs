@@ -49,6 +49,24 @@ const ALLOWED = new Map([
   ["core/src/atomic_write.rs", "the durability mechanics the seam's native arm delegates to"],
   ["core/src/test_support.rs", "test fixtures; compiled only under `test`/`test-support`"],
 
+  // ── writes to a path the USER chose, outside the vault ────────────────────
+  // Surfaced when the detector learned `atomic_write`, and they belong here
+  // rather than in the awaiting group: the seam's subject is the vault, and
+  // these two write an export destination and a save-as-file destination that
+  // the OS dialog just returned. A browser has no such path at all, which is
+  // why the web client substitutes the whole affordance with the download seam
+  // (`src/lib/secret-export.ts`'s `deliverFile` arm) rather than porting the
+  // write. There is no port owed, so counting them as debt would be counting a
+  // conversion nobody will ever make.
+  [
+    "core/src/plugins/attachments/commands.rs",
+    "writes the user-chosen EXPORT destination, outside the vault; web substitutes the affordance with a browser download",
+  ],
+  [
+    "core/src/plugins/secret_export/commands.rs",
+    "writes the user-chosen save-as-file destination, outside the vault, and privately (0600); web substitutes the affordance with a browser download",
+  ],
+
   // ── host-only: gated out of the wasm build, so `std::fs` is correct ────────
   ["core/src/plugins/captures/commands.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/captures/queue.rs", "host-only (cfg tauri-ipc + not wasm32)"],
@@ -89,9 +107,16 @@ const ALLOWED = new Map([
   ["core/src/plugins/quick_unlock/commands.rs", "task 40 (quick-unlock PIN path)"],
   ["core/src/plugins/snapshots/commands.rs", "task 83 (snapshots — the capture hook decides first)"],
   ["core/src/plugins/vault_change_password/commands.rs", "task 41 (change password)"],
-  ["core/src/plugins/vault_creation/commands.rs", "decided absent on web; port not owed"],
+  [
+    "core/src/plugins/vault_creation/commands.rs",
+    "PORTED (`decisions.md` 2026-08-15): `commit_from_host_io` + `vault_artifacts_present_io` " +
+      "are the seam-going siblings the web client dispatches. The direct `std::fs` calls that " +
+      "remain belong to the NATIVE arm, which runs inside `run_blocking` and would gain nothing " +
+      "from the async seam. The old reason on this line — 'decided absent on web; port not " +
+      "owed' — became false the day creation shipped there, and a stale reason on an allowlist " +
+      "is how a ratchet quietly stops describing anything.",
+  ],
   ["core/src/plugins/vault_recover/account_number_select.rs", "task 32 (recovery entry points)"],
-  ["core/src/plugins/vault_recover/commands.rs", "task 32 (recovery entry points)"],
   ["core/src/snapshot_store.rs", "task 83 (snapshots — the capture hook decides first)"],
   ["core/src/vault_registry.rs", "task 12 (vault registry scan)"],
   ["core/src/vault_sweep.rs", "task 72 (vault delete)"],
@@ -103,7 +128,22 @@ const SKIP_DIRS = new Set(["target"]);
 // handle constructors. Anchored on the call paren so a prose mention in a
 // comment is not a violation — comment lines are dropped anyway, but a doc-link
 // like [`std::fs::read`] inside a doc comment would otherwise match.
-const FS_CALL = /(?:std::)?fs::[a-z_]+\s*\(|\bFile::(?:open|create)\b|\bOpenOptions::new\b/;
+//
+// `crate::atomic_write::atomic_write(..)` is here for a reason this guard
+// learned the expensive way. It reaches the filesystem exactly as `std::fs`
+// does, and this file's own remediation text already names it as a shape to be
+// replaced by `io.write(..)` — but the pattern above never matched it, so a
+// call in `vault_recover` sat on a wasm-reachable path through `pre-commit` and
+// CI green, on a target where `finalize_atomic` returns `Unsupported` by
+// design. A guard whose stated coverage exceeds its real coverage costs more
+// than no guard, because the green run is read as evidence.
+//
+// Injected before adding it: the call in a never-allowlisted file reported
+// `ok`. Injected after: named by file and line. And the shape the guard already
+// caught, a bare `std::fs::read` in the same file, is still named, so closing
+// this blind spot opened no other.
+const FS_CALL =
+  /(?:std::)?fs::[a-z_]+\s*\(|\bFile::(?:open|create)\b|\bOpenOptions::new\b|\bcrate::atomic_write::atomic_write[a-z_]*\s*\(/;
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {

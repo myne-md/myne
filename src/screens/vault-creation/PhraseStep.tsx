@@ -17,7 +17,7 @@
 //
 // Spec: protocol.md § 7 (BIP-39 24-word, English wordlist) + § 7.5.
 
-import { useEffect, useMemo, useRef, type Dispatch } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
@@ -28,13 +28,42 @@ import {
 } from "../../lib/secret-export";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
 import type { Action } from "./reducer";
+import { has } from "../../platform/capabilities";
 
 interface PhraseStepProps {
   phrase: string[];
   revealed: boolean;
   dispatch: Dispatch<Action>;
-  onCancelSession: () => void;
+  /**
+   * Abandon the half-made vault and return to the password step.
+   *
+   * OPTIONAL, and absent means the Back control is not rendered at all rather
+   * than rendered and inert. It is absent on the ordering this flow uses where
+   * sync is required: there the vault is committed and the account registered
+   * BEFORE the phrase is shown, so by the time this screen exists there is no
+   * session left to cancel and nothing local to erase that would undo the
+   * registration. A Back that dropped the phrase from state would therefore
+   * discard, permanently, the only copy of a credential for an account that
+   * still exists (`recovery-flow.md` §2.4 is a no-re-display commitment, and
+   * `protocol.md` §7 gives the phrase no rotation), through a control labelled
+   * "Back". Omitted rather than confirmed: a confirmation would be offering a
+   * choice whose safe branch is "do not press this".
+   */
+  onCancelSession?: () => void;
 }
+
+/**
+ * The two platform-caveat lines under the Copy / Save row. Secondary ink and the
+ * small type scale: these are facts to read once, not warnings to be alarmed by
+ * (`PRODUCT.md` register; `docs/design/README.md` voice).
+ */
+const CAVEAT_STYLE: CSSProperties = {
+  color: "var(--fg-3)",
+  fontSize: "var(--text-sm)",
+  lineHeight: 1.5,
+  margin: 0,
+  maxWidth: 560,
+};
 
 export function PhraseStep({
   phrase,
@@ -44,10 +73,27 @@ export function PhraseStep({
 }: PhraseStepProps) {
   const { t } = useTranslation();
   // Re-blur when the user Cmd-Tabs or the OS hides the window.
+  //
+  // **Two events, because one of them does not observe the same user action on
+  // both platforms** (`recovery-flow.md` §2.2 as amended 2026-08-15). `blur`
+  // catches Cmd-Tab, an app switch and a screen lock, which is the whole
+  // walk-away surface on a desktop window. In a browser the most common
+  // walk-away is a TAB switch, and whether that fires `blur` is not something to
+  // rely on — `visibilitychange` is the event that actually reports it. Both are
+  // registered on both clients: the extra listener is inert where the platform
+  // does not fire it, and a capability check here would be gating a listener
+  // rather than a feature.
   useEffect(() => {
-    const onBlur = () => dispatch({ type: "PHRASE_HIDDEN" });
-    window.addEventListener("blur", onBlur);
-    return () => window.removeEventListener("blur", onBlur);
+    const hide = () => dispatch({ type: "PHRASE_HIDDEN" });
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") hide();
+    };
+    window.addEventListener("blur", hide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", hide);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [dispatch]);
 
   const phraseString = useMemo(() => phrase.join(" "), [phrase]);
@@ -202,27 +248,64 @@ export function PhraseStep({
 
       {/* Both outcomes render here, unlike the account step's, because the Copy
           button's own label does NOT swap on this screen, so without this line
-          a successful copy would still be invisible. */}
+          a successful copy would still be invisible.
+
+          The SUCCESS string is capability-gated for the same reason the caveat
+          below it is, and skipping that gate is what the two changes that met
+          here each half-did. The desktop string promises a clear in 30 seconds;
+          where `clipboardAutoClear` is absent nothing is scheduled at all
+          (`secret-export.ts` passes the `none` strategy), so that sentence
+          would appear in direct response to the user's press, eight lines above
+          a paragraph saying the opposite. On the one screen where the phrase is
+          shown once and never again, the false half is the one the user acts
+          on. */}
       <CopyStatus
         testId="create.phrase-copy-status"
         message={
           outcome === "copied"
-            ? t("vaultCreation.phrase.copied")
+            ? t(
+                has("clipboardAutoClear")
+                  ? "vaultCreation.phrase.copied"
+                  : "vaultCreation.phrase.copiedNoAutoClear",
+              )
             : outcome === "failed"
               ? t("vaultCreation.phrase.copyFailed")
               : null
         }
       />
 
-      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-        <Button
-          variant="ghost"
-          onClick={onCancelSession}
-          icon="arrow-left"
-          data-testid="create.phrase-back"
+      {/* The two sentences this client owes the user and the desktop does not.
+          Both are `recovery-flow.md` §2.2 requirements as amended 2026-08-15,
+          and both are stated rather than implied: a control whose protection
+          the platform cannot perform may not be presented as if it could, and
+          an exposure the page cannot prevent has to be named. Rendered
+          together, in the calm register `PRODUCT.md` asks for — a fact and what
+          to do about it, not a warning banner. */}
+      {!has("clipboardAutoClear") && (
+        <p
+          data-testid="create.phrase-clipboard-notice"
+          style={CAVEAT_STYLE}
         >
-          {t("vaultCreation.phrase.back")}
-        </Button>
+          {t("vaultCreation.phrase.clipboardNotCleared")}
+        </p>
+      )}
+      {!has("screenCaptureProtection") && (
+        <p data-testid="create.phrase-extension-notice" style={CAVEAT_STYLE}>
+          {t("vaultCreation.phrase.extensionNotice")}
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+        {onCancelSession && (
+          <Button
+            variant="ghost"
+            onClick={onCancelSession}
+            icon="arrow-left"
+            data-testid="create.phrase-back"
+          >
+            {t("vaultCreation.phrase.back")}
+          </Button>
+        )}
         <div style={{ flex: 1 }} />
         <Button
           variant="primary"

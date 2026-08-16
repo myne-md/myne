@@ -15,7 +15,6 @@ use protocol::{
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 // Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use crate::host::tauri_host::TauriHost;
@@ -92,6 +91,40 @@ pub async fn begin_from_host(
     state: &VaultCreationState,
     host: &dyn HostCtx,
 ) -> Result<BeginResult, AppError> {
+    // Mint the fresh `VaultId` for this creation BEFORE reserving a slot or
+    // kicking off Argon2id — it is a cheap UUIDv7 + a read-only `vaults/`
+    // collision scan, and resolving `<app_data_dir>` here keeps the
+    // `AppHandle` out of the `spawn_blocking` closure. `commit` resolves the
+    // write destination to `vaults/<minted-id>/` from the session by default
+    // (SYNC-6). An `app_data_dir` lookup failure fails fast without
+    // consuming a session slot.
+    let base = host.app_data_dir().map_err(|_| AppError::Io {
+        kind: crate::plugins::vault_creation::error::IoErrorKind::Other,
+    })?;
+    let vault_id = crate::vault_registry::mint_unique_vault_id(&base);
+    begin_with_vault_id(password, vault_id, state, host).await
+}
+
+/// [`begin_from_host`] with the destination [`VaultId`] supplied by the caller.
+///
+/// Split out for the web client (`decisions.md` 2026-08-15). Minting is the one
+/// thing that does not transfer: a browser holds exactly ONE container per
+/// origin at the constant `paths::web_single_vault_id()`, so there is nothing to
+/// enumerate and nothing to avoid colliding with. Worse, the mint is not merely
+/// unnecessary there — `mint_unique_vault_id` scans `vaults/` with
+/// `std::fs::read_dir`, which on `wasm32-unknown-unknown` fails at runtime and
+/// would hand back a random UUIDv7 instead of the constant, putting the
+/// container somewhere the rest of this client cannot find it.
+///
+/// Everything after the id is identical on both platforms, which is the point:
+/// the password floor, the slot reservation, the Argon2id derivation and the
+/// session are one implementation, not two.
+pub async fn begin_with_vault_id(
+    password: String,
+    vault_id: crate::vault_id::VaultId,
+    state: &VaultCreationState,
+    host: &dyn HostCtx,
+) -> Result<BeginResult, AppError> {
     // Wrap immediately so any early-return path (slot-cap rejection,
     // spawn_blocking join failure, build_session error) drops the
     // wrapper and zeroes the bytes. Plain `String` would drop without
@@ -119,18 +152,6 @@ pub async fn begin_from_host(
         );
         return Err(AppError::WeakNewPassword);
     }
-
-    // Mint the fresh `VaultId` for this creation BEFORE reserving a slot or
-    // kicking off Argon2id — it is a cheap UUIDv7 + a read-only `vaults/`
-    // collision scan, and resolving `<app_data_dir>` here keeps the
-    // `AppHandle` out of the `spawn_blocking` closure. `commit` resolves the
-    // write destination to `vaults/<minted-id>/` from the session by default
-    // (SYNC-6). An `app_data_dir` lookup failure fails fast without
-    // consuming a session slot.
-    let base = host.app_data_dir().map_err(|_| AppError::Io {
-        kind: crate::plugins::vault_creation::error::IoErrorKind::Other,
-    })?;
-    let vault_id = crate::vault_registry::mint_unique_vault_id(&base);
 
     // Reserve a slot atomically before kicking off ~2 seconds of
     // Argon2id work. If the cap is already saturated, fail fast
@@ -162,7 +183,12 @@ pub async fn begin_from_host(
     // reservation is consumed (its Drop is suppressed); the slot
     // stays accounted for until `commit` / `cancel` / TTL eviction
     // removes the session.
-    state.commit_reservation(reservation, token, session);
+    //
+    // The TTL clock reading comes from the host seam rather than
+    // `Instant::now()`: that call compiles for `wasm32-unknown-unknown` and
+    // panics there at runtime, which would trap the web client's wasm instance
+    // on the first `begin` (`decisions.md` 2026-08-15 ships creation on web).
+    state.commit_reservation(reservation, token, session, host.monotonic_millis());
 
     Ok(BeginResult {
         phrase,
@@ -238,7 +264,9 @@ pub fn build_session(
         salt_recovery,
         password_wrap_key,
         recovery_wrap_key,
-        created_at: Instant::now(),
+        // Stamped by `commit_reservation` when the session enters the map;
+        // `build_session` is pure and holds no clock. See the field's docs.
+        created_at: 0,
     })
 }
 
@@ -815,6 +843,263 @@ pub fn build_and_serialize_vault_meta(
     const _: () = assert!(VAULT_META_WRAPPED_ITEMS_KEY_LEN == VAULT_META_WRAPPED_ROOT_KEY_LEN);
 
     Ok(protocol::serialize_vault_meta_v0_2(&meta))
+}
+
+/// [`vault_artifacts_present`] over the IO seam (`decisions.md` 2026-08-15).
+///
+/// Same taxonomy, same answer, asked through [`crate::vault_io::VaultIo`] so a
+/// browser can ask it of OPFS. The native version reaches `Path::is_file` and
+/// `std::fs::read_dir` directly, both of which compile for
+/// `wasm32-unknown-unknown` and fail at runtime, and failing here is the
+/// dangerous direction: this guard is what stops a fresh creation landing on top
+/// of an existing vault, destroying that vault's `root_key` wraps and orphaning
+/// every `.myn` blob sealed under them.
+///
+/// Kept as a separate function rather than a generic over both worlds: the
+/// native one is synchronous and is called from inside `run_blocking`, and
+/// making it async would move that whole path onto the executor for no gain.
+pub async fn vault_artifacts_present_io(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &Path,
+) -> std::io::Result<bool> {
+    let io_err = |_| std::io::Error::other("vault-io probe failed");
+    if !io.exists(vault_dir).await.map_err(io_err)? {
+        return Ok(false);
+    }
+    // Same recognized-artefact list as the native sibling, in the same order.
+    // A file here is any of: the meta, its mid-write tempfile, a staged
+    // newer-generation meta, the prefs blob and its tempfile, the attachments
+    // catalog and its tempfile.
+    for name in [
+        "vault.meta",
+        "vault.meta.tmp",
+        crate::plugins::vault_migrate::adopt::INCOMING_META_FILE,
+        "vault.prefs",
+        "vault.prefs.tmp",
+        "vault.attachments",
+        "vault.attachments.tmp",
+    ] {
+        if io.exists(&vault_dir.join(name)).await.map_err(io_err)? {
+            return Ok(true);
+        }
+    }
+    // Orphan blobs: `notes/*.myn`, ANY regular file under `attachments/`
+    // (content-addressed hex names carry no extension), `snapshots/*.myn`.
+    for (dir, ext) in [
+        ("notes", Some("myn")),
+        ("attachments", None),
+        ("snapshots", Some("myn")),
+    ] {
+        let path = vault_dir.join(dir);
+        if !io.is_dir(&path).await.map_err(io_err)? {
+            continue;
+        }
+        for entry in io.read_dir(&path).await.map_err(io_err)? {
+            match ext {
+                // `DirEntry` carries a NAME, not a path: OPFS has no path type
+                // to hand back. Matching the extension off the name is the same
+                // predicate the native sibling applies to `entry.path()`.
+                Some(want) => {
+                    if Path::new(&entry.name)
+                        .extension()
+                        .is_some_and(|e| e == want)
+                    {
+                        return Ok(true);
+                    }
+                }
+                None => {
+                    if !entry.is_dir {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// [`commit_with_vault_path`] over the IO seam (`decisions.md` 2026-08-15).
+///
+/// Identical sequence and identical posture, with two mechanical differences and
+/// no behavioural one:
+///
+/// * every write goes through [`crate::vault_io::VaultIo::write`] with
+///   [`crate::vault_io::WriteOpts::create_new`], which is the seam's spelling of
+///   the native `atomic_write(.., replace = false)`, so "creating a vault never
+///   overwrites an existing `vault.meta`" holds on both;
+/// * the AEAD work is not wrapped in `run_blocking`, because the seam's writes
+///   are already async and the wasm arm has one thread anyway.
+///
+/// The eager-write posture is preserved deliberately, including its asymmetry:
+/// a failed `vault.meta` write is the error, while a failed `vault.prefs` or
+/// `vault.attachments` write is a warning, because both have an absence-fallback
+/// in the spec (§ 9.5.5, § 9.10.4) and rolling back a written meta would cost
+/// the user the whole Argon2id pipeline on a transient hiccup.
+pub async fn commit_with_vault_path_io(
+    token: Uuid,
+    vault_path: PathBuf,
+    state: &VaultCreationState,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), AppError> {
+    let session = match state.take(token) {
+        SessionLookup::Found(session) => *session,
+        SessionLookup::Expired => return Err(AppError::SessionExpired),
+        SessionLookup::NotFound => return Err(AppError::SessionNotFound),
+    };
+
+    let vault_dir = vault_path
+        .parent()
+        .expect("vault.meta path resolution always yields a parent directory")
+        .to_path_buf();
+    match vault_artifacts_present_io(io, &vault_dir).await {
+        Ok(true) => {
+            tracing::error!(
+                stage = "commit_artifacts_check",
+                error_kind = "VaultArtifactsPresent",
+                "commit attempted on path with existing vault artefacts — frontend routing bypass or unclean partial-delete"
+            );
+            // Non-destructive: the session goes back so a retry is possible.
+            let _ = state.try_insert(token, session);
+            return Err(AppError::VaultArtifactsPresent);
+        }
+        Ok(false) => {}
+        Err(e) => {
+            let _ = state.try_insert(token, session);
+            return Err(AppError::from(e));
+        }
+    }
+
+    let bytes = match build_and_serialize_vault_meta(&session) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            let _ = state.try_insert(token, session);
+            return Err(e);
+        }
+    };
+    if let Err(e) = io
+        .write(
+            &vault_path,
+            &bytes,
+            crate::vault_io::WriteOpts::create_new(),
+        )
+        .await
+    {
+        let _ = state.try_insert(token, session);
+        return Err(AppError::from(std::io::Error::other(format!(
+            "vault.meta write failed: {e:?}"
+        ))));
+    }
+
+    // From here the vault EXISTS. Both remaining writes are eager-write
+    // invariants with a spec'd absence-fallback, so a failure warns and the
+    // vault stays usable; the session is NOT restored, because restoring it
+    // would invite a retry that the artefacts guard would now refuse.
+    let prefs_key = protocol::derive_subkey_versioned(
+        BIRTH_GENERATION,
+        &session.root_key,
+        protocol::SubkeyRole::PrefsKey,
+    );
+    match protocol::encode_prefs_blob_versioned(
+        BIRTH_GENERATION,
+        &prefs_key,
+        &session.account.hash,
+        &protocol::PrefsView::default(),
+    ) {
+        Ok(prefs_bytes) => {
+            match io
+                .write(
+                    &vault_dir.join("vault.prefs"),
+                    &prefs_bytes,
+                    crate::vault_io::WriteOpts::create_new(),
+                )
+                .await
+            {
+                Ok(()) => tracing::info!(
+                    event = "vault_prefs_eager_written",
+                    "vault.prefs eager-write succeeded with PrefsView::default()"
+                ),
+                Err(e) => tracing::warn!(
+                    event = "vault_prefs_eager_write_failed",
+                    seam_error = ?e,
+                    "vault.meta written but vault.prefs eager-write failed; vault remains usable via spec § 9.5.5 absence-fallback",
+                ),
+            }
+        }
+        Err(_e) => tracing::warn!(
+            event = "vault_prefs_eager_encode_failed",
+            "vault.prefs encode failed during eager-write; vault remains usable via spec § 9.5.5 absence-fallback",
+        ),
+    }
+
+    let catalog_key = protocol::derive_subkey_versioned(
+        BIRTH_GENERATION,
+        &session.root_key,
+        protocol::SubkeyRole::AttachmentsCatalogKey,
+    );
+    match protocol::encode_attachments_catalog_versioned(
+        BIRTH_GENERATION,
+        &catalog_key,
+        &session.account.hash,
+        &protocol::AttachmentsCatalog::empty(),
+    ) {
+        Ok(catalog_bytes) => {
+            match io
+                .write(
+                    &vault_dir.join("vault.attachments"),
+                    &catalog_bytes,
+                    crate::vault_io::WriteOpts::create_new(),
+                )
+                .await
+            {
+                Ok(()) => tracing::info!(
+                    event = "vault_attachments_eager_written",
+                    "vault.attachments eager-write succeeded with empty catalog"
+                ),
+                Err(e) => tracing::warn!(
+                    event = "vault_attachments_eager_write_failed",
+                    seam_error = ?e,
+                    "vault.meta written but vault.attachments eager-write failed; vault remains usable via spec § 9.10.4 absence-fallback",
+                ),
+            }
+        }
+        Err(_e) => tracing::warn!(
+            event = "vault_attachments_eager_encode_failed",
+            "vault.attachments encode failed during eager-write; vault remains usable via spec § 9.10.4 absence-fallback",
+        ),
+    }
+
+    Ok(())
+}
+
+/// [`commit_from_host`] over the IO seam (`decisions.md` 2026-08-15).
+///
+/// The resolution precedence is the native one, minus the sole-vault fallback
+/// that has no meaning here: a browser holds one container per origin, and its
+/// id is a constant the caller passes explicitly. The directory is ensured
+/// through [`crate::paths::vault_dir_for_id_from_host_io`], which is the seam's
+/// `create_dir_all` (OPFS creates directories by acquiring handles, not by a
+/// path call).
+///
+/// Deliberately NOT permit-gated. The native sibling takes the capacity-1
+/// `auth_permits` lease that serialises every `vault.meta`-lifecycle command
+/// against `vault_repair`; on this client `vault-repair` is a decided absence
+/// and the wasm instance is single-threaded, so the lease would guard a race
+/// that cannot occur. The concurrency bound that DOES apply is unchanged:
+/// `MAX_CONCURRENT_SESSIONS`, enforced at `begin` by the slot reservation.
+pub async fn commit_from_host_io(
+    vault_id: Option<String>,
+    session_token: String,
+    state: &VaultCreationState,
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<Option<String>, AppError> {
+    let token = Uuid::parse_str(&session_token).map_err(|_| AppError::SessionNotFound)?;
+    let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref())
+        .or_else(|| state.peek_vault_id(token));
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, target).await?;
+    let vault_path = vault_dir.join("vault.meta");
+    commit_with_vault_path_io(token, vault_path, state, io).await?;
+    Ok(target.map(|id| id.to_string()))
 }
 
 /// Fill a fixed-size buffer from the OS CSPRNG, mapping any failure

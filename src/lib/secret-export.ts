@@ -13,13 +13,19 @@ import { copySecret, type CancelClear, type Feedback } from "./clipboard";
 const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
 
 /**
- * Copy `value` to the clipboard and schedule a 30 s auto-clear that
- * only fires if the clipboard still holds exactly `value`.
+ * Copy `value` to the clipboard, tell the caller which way it went, and arrange
+ * for it to leave the clipboard again where the platform allows that.
  *
- * Returns a cancel function callers MUST invoke on unmount — otherwise
- * the timer's closure keeps `value` (a secret) alive in the JS heap
- * for the full 30 s. Returns `null` when the clipboard write itself
- * failed; in that case nothing is scheduled.
+ * **A non-null return means the WRITE LANDED. It does not mean a clear is
+ * pending.** Where `clipboardAutoClear` is absent the write still happens, the
+ * success is still announced, and nothing at all is scheduled, so the returned
+ * cancel is a no-op. `null` means one thing only: the write did not happen.
+ * Keeping those two apart is the point — a caller that confuses them is one
+ * keystroke from telling a user their phrase is safe when it is on the
+ * clipboard indefinitely, or the reverse.
+ *
+ * Callers still invoke the cancel on unmount. On the desktop arm it releases
+ * the pending clear's reference to `value`; on the others it costs nothing.
  */
 export async function copySecretToClipboard(
   value: string,
@@ -40,11 +46,25 @@ export async function copySecretToClipboard(
     clipboardWriteText,
     value,
     feedback,
-    {
-      kind: "host",
-      delayMs: CLIPBOARD_AUTO_CLEAR_MS,
-      clear: (v) => invoke("plugin:secret-export|clipboard_clear_if_matches", { value: v }),
-    },
+    // No auto-clear where the platform cannot perform one (`decisions.md`
+    // 2026-08-15). Chosen HERE and passed as a strategy rather than returned
+    // early: an early return before the write would report nothing, and one
+    // after it would have to re-announce the success this module already owns.
+    // What the CALLER owes is a sentence, since `recovery-flow.md` §2.2 forbids
+    // presenting a control whose stated protection the client cannot perform,
+    // and `PhraseStep` renders it off the same capability.
+    has("clipboardAutoClear")
+      ? {
+          kind: "host" as const,
+          delayMs: CLIPBOARD_AUTO_CLEAR_MS,
+          clear: (v: string) =>
+            invoke("plugin:secret-export|clipboard_clear_if_matches", { value: v }),
+        }
+      : {
+          kind: "none" as const,
+          reason:
+            "A page is granted no clipboard read in Firefox and only a prompt-plus-focus read elsewhere, so the read-back this clear is gated on cannot run.",
+        },
     {
       onError: (e) => logErrorKind(e, "clipboard-write-failed"),
       // A distinct label, because this is the only outcome here that leaves the
@@ -74,6 +94,29 @@ export async function saveSecretAsTextFile(
   defaultPath: string,
   contents: string,
 ): Promise<void> {
+  // The download arm, mirroring `saveJsonAsFile` below (`decisions.md`
+  // 2026-08-15). `recovery-flow.md` §2.2 requires the save-as-file affordance
+  // and this client cannot satisfy the "user-chosen location" half: a page has
+  // no arbitrary write path, which is exactly what the absent `nativeSaveAs`
+  // capability says. The browser download answers the requirement with the
+  // destination the browser chooses, same content, same default filename.
+  //
+  // The file's exposure is identical on both platforms and is disclosed in the
+  // same place on both: `threat-model.md` §5 already says a saved phrase is an
+  // ordinary plain-text file that anyone with access to that location can read.
+  // What differs is only who picked the location.
+  if (!has("nativeSaveAs")) {
+    try {
+      await deliverFile(defaultPath, new TextEncoder().encode(contents), "text/plain");
+    } catch (e) {
+      // Swallowed, matching the dialog arm's write failure directly below: this
+      // affordance is a convenience beside a phrase that is on screen, and the
+      // user has not lost anything a retry cannot get.
+      logErrorKind(e, "download-failed");
+    }
+    return;
+  }
+
   let path: string | null;
   try {
     path = await dialogSave({

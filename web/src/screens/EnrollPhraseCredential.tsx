@@ -2,7 +2,7 @@
 // (phase3-web-client task 32).
 //
 // Renders nothing, and is never rendered: `EnrollDeviceForm` omits the
-// recovery-phrase credential where `phraseRecovery` is absent, so this branch is
+// recovery-phrase credential where `phraseEnrolment` is absent, so this branch is
 // unreachable on web. It exists so the **grid itself is not in the bundle** —
 // `decisions.md` 2026-07-26 forbids the phrase from being typed into served
 // code, and `scripts/check-web-no-phrase.mjs` reads the built artefact to prove

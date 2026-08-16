@@ -27,6 +27,8 @@ import { getCurrentWindow } from "../platform/window";
 import { confirm as dialogConfirm } from "../platform/dialog";
 import i18n from "../i18n";
 import { HAS_TAURI } from "../lib/app-window";
+import { has } from "../platform/capabilities";
+import { deploymentSyncOrigin } from "../platform/deployment-config";
 import {
   vaultCreationReducer,
   makeInitialState,
@@ -41,6 +43,7 @@ import { ConfirmStep } from "./vault-creation/ConfirmStep";
 import { AccountStep } from "./vault-creation/AccountStep";
 import { ReadyStep } from "./vault-creation/ReadyStep";
 import { SessionLostStep } from "./vault-creation/SessionLostStep";
+import { ProvisioningStep } from "./vault-creation/ProvisioningStep";
 import { mapAppErrorToUserMessage } from "../lib/vault-creation-errors";
 import { isAppError, logErrorKind } from "../lib/vault-creation-logging";
 import { seedExampleVault } from "../notes/exampleVault";
@@ -78,6 +81,34 @@ interface CreateVaultProps {
    */
   onAutoUnlockFailed: (vaultId: string | null) => void;
 }
+
+/**
+ * Whether this client can create an account at all.
+ *
+ * Gated on the CAPABILITY rather than on the Tauri global, which is what
+ * `decisions.md` 2026-08-15 changed. `HAS_TAURI` answers "am I inside a Tauri
+ * WebView", and until creation shipped on web that happened to be the same
+ * question. It is not any more: the web client dispatches the three creation
+ * commands through the wasm router, so gating on the global here would have left
+ * a working backend unreachable from the one screen that drives it.
+ *
+ * `HAS_TAURI` is still the right test for the window-close listener below, which
+ * is genuinely a Tauri API rather than a feature.
+ */
+const CAN_CREATE = has("vaultCreation");
+
+/**
+ * Whether the local vault must be registered with a sync server as part of
+ * creation, before the recovery phrase is shown.
+ *
+ * Derived from the ABSENCE of `localOnlyVault` rather than from a flag of its
+ * own, because that capability already carries exactly this fact:
+ * `decisions.md` 2026-07-26 makes sync required on the web client, so its OPFS
+ * container is a cache of a server-held vault rather than the vault itself. A
+ * client where a vault may be the only copy has nothing to register and no
+ * server leg to fail.
+ */
+const REQUIRES_PROVISIONING = !has("localOnlyVault");
 
 export function CreateVault({
   withBriefing = false,
@@ -181,7 +212,7 @@ export function CreateVault({
       // failure paths that wiped + the rare case where the component
       // unmounts mid-flow before any explicit wipe site fired.
       passwordRef.current = null;
-      if (!HAS_TAURI) return;
+      if (!CAN_CREATE) return;
       const token = sessionTokenRef.current;
       if (token) {
         invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
@@ -250,7 +281,7 @@ export function CreateVault({
   };
 
   const handlePhraseBack = () => {
-    if (HAS_TAURI) {
+    if (CAN_CREATE) {
       const token = sessionTokenRef.current;
       if (token) {
         invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
@@ -277,7 +308,7 @@ export function CreateVault({
    */
   const handleAutoUnlock = async () => {
     const password = passwordRef.current;
-    if (!password || !HAS_TAURI) {
+    if (!password || !CAN_CREATE) {
       // Defensive (web dev or test-step path with no real password).
       passwordRef.current = null;
       onAutoUnlockFailed(committedVaultIdRef.current);
@@ -309,7 +340,7 @@ export function CreateVault({
   };
 
   useEffect(() => {
-    if (!HAS_TAURI) return;
+    if (!CAN_CREATE) return;
     if (state.step !== "encrypting") return;
     const password = passwordRef.current;
     if (!password) return;
@@ -328,6 +359,9 @@ export function CreateVault({
           phrase: result.phrase,
           accountNumber: result.account_number,
           sessionToken: result.session_token,
+          // Where sync is required this does NOT show the phrase yet. See
+          // `ProvisioningStep` for why the ordering is load-bearing.
+          requiresProvisioning: REQUIRES_PROVISIONING,
         });
       } catch (e) {
         if (cancelled) return;
@@ -351,9 +385,117 @@ export function CreateVault({
     };
   }, [state.step]);
 
+  /**
+   * The provisioning leg: write the vault, then make the account real on the
+   * server, and only then let the phrase reach the screen.
+   *
+   * Order and rationale are normative (`decisions.md` 2026-08-15). What runs
+   * here is `commit` -> `sync_set_endpoint` -> `sync_enroll`, and the enrolment
+   * is what registers the SCRAM verifier (`POST /auth/register`, idempotent
+   * core-side: a `409 already_registered` is treated as success, so a lost
+   * response needs no handling on this side), enrols this browser, and seeds
+   * `vault.meta` to the server so a second device can fetch it.
+   *
+   * **The failure path erases.** Anything that goes wrong before the phrase is
+   * shown leaves nothing behind: the container is deleted and the session is
+   * cancelled, so the user is told plainly that no account was created rather
+   * than being left with a browser vault this client's own rules
+   * (`decisions.md` 2026-07-26, sync required) say cannot exist. The phrase was
+   * never displayed, so there is nothing they wrote down that a retry would
+   * invalidate.
+   */
   useEffect(() => {
-    if (!HAS_TAURI) return;
+    if (!CAN_CREATE) return;
+    if (state.step !== "provisioning") return;
+    const token = sessionTokenRef.current;
+    const password = passwordRef.current;
+    const accountNumber = state.accountNumber;
+    if (!token || !password || !accountNumber) return;
+    let cancelled = false;
+    (async () => {
+      let vaultId: string | null = null;
+      try {
+        vaultId = await invoke<string | null>("plugin:vault-creation|commit", {
+          sessionToken: token,
+        });
+        if (cancelled) return;
+        committedVaultIdRef.current = vaultId;
+        sessionTokenRef.current = null;
+
+        // The origin comes from the deployment, not from a field the user
+        // fills in: the same resolution `AccountBootstrap` performs on the
+        // sign-in leg, and for the same reason (task 50 fixes the origin at
+        // container start, so there is no endpoint stored before the first
+        // call that would need one).
+        const cfg = await invoke<{ endpoint_url: string | null } | null>(
+          "plugin:sync|sync_get_endpoint",
+        );
+        const serverUrl = cfg?.endpoint_url ?? (await deploymentSyncOrigin());
+        if (serverUrl === null) throw new Error("no sync endpoint configured");
+        if (cfg?.endpoint_url == null) {
+          await invoke("plugin:sync|sync_set_endpoint", {
+            endpointUrl: serverUrl,
+          });
+        }
+
+        // `credentialKind: "password"` is the only kind this client may send.
+        // The recovery kind is refused structurally in the wasm router
+        // (`decisions.md` 2026-08-15 keeps phrase-credential enrolment off web),
+        // and this call has no reason to reach for it: the password was typed
+        // one step ago.
+        await invoke("plugin:sync|sync_enroll", {
+          accountNumber,
+          credential: password,
+          credentialKind: "password",
+        });
+        if (cancelled) return;
+        dispatch({ type: "PROVISION_OK" });
+      } catch (e) {
+        if (cancelled) return;
+        logErrorKind(e, "provision");
+        // Erase what was written. Best-effort by necessity — if this fails the
+        // user is left with a container the entry screen will treat as an
+        // un-joined browser, which is recoverable — but it is attempted before
+        // the error is shown, so the common case leaves nothing behind.
+        if (vaultId) {
+          await invoke("plugin:vault-delete|vault_delete", { vaultId }).catch(
+            (err: unknown) => logErrorKind(err, "provision-rollback-failed"),
+          );
+        }
+        const stale = sessionTokenRef.current;
+        if (stale) {
+          await invoke("plugin:vault-creation|cancel", {
+            sessionToken: stale,
+          }).catch((err: unknown) => logErrorKind(err, "cancel-failed"));
+          sessionTokenRef.current = null;
+        }
+        passwordRef.current = null;
+        committedVaultIdRef.current = null;
+        dispatch({
+          type: "PROVISION_ERR",
+          error: isAppError(e)
+            ? mapAppErrorToUserMessage(e)
+            : provisionFailedError(),
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.step, state.accountNumber]);
+
+  useEffect(() => {
+    if (!CAN_CREATE) return;
     if (state.step !== "committing") return;
+    // Already written, and written BEFORE the phrase was shown. The step still
+    // exists on this client because the flow's shape is shared; what it must not
+    // do is commit a second time, which the session token no longer permits
+    // anyway (it was consumed) and which would surface as a confusing
+    // SessionNotFound at the very end of a successful creation.
+    if (REQUIRES_PROVISIONING) {
+      dispatch({ type: "COMMIT_OK" });
+      return;
+    }
     const token = sessionTokenRef.current;
     if (!token) return;
     let cancelled = false;
@@ -413,13 +555,34 @@ export function CreateVault({
       );
     case "encrypting":
       return <EncryptingStep />;
+    // Deliberately NOT next to `committing`: that label shares a fall-through
+    // with `account`, so a case inserted between them silently steals the
+    // account step's return. This one stands alone.
+    case "provisioning":
+      return <ProvisioningStep />;
     case "phrase":
       return (
         <PhraseStep
           phrase={state.phrase ?? []}
           revealed={state.phraseRevealed}
           dispatch={dispatch}
-          onCancelSession={handlePhraseBack}
+          // Omitted where provisioning ran, so the Back control is not drawn.
+          //
+          // On that ordering `commit` has already written the vault and
+          // `sync_enroll` has already registered the account by the time this
+          // screen exists, and the effect nulls `sessionTokenRef` right after
+          // `commit`. So `handlePhraseBack` would find no token, cancel
+          // nothing, delete nothing, and dispatch `RESET_TO_PASSWORD`, which
+          // clears `state.phrase`. The account survives; the twenty-four words
+          // that are its only other credential do not, and they are never
+          // re-displayed (`recovery-flow.md` §2.4).
+          //
+          // Rolling back instead of refusing would not be better: the local
+          // erase is the only half a client can perform, and the registration
+          // it cannot reach is exactly what makes the phrase still matter.
+          onCancelSession={
+            REQUIRES_PROVISIONING ? undefined : handlePhraseBack
+          }
         />
       );
     case "confirm":
@@ -451,8 +614,11 @@ export function CreateVault({
         />
       );
     case "session-lost":
-      // SESSION_LOST is the only path into this step and always carries
-      // an error; the non-null assertion is type-safe per the reducer.
+      // SESSION_LOST and PROVISION_ERR are the two paths into this step, and
+      // both carry an error, so the non-null assertion is type-safe per the
+      // reducer. The assertion held before PROVISION_ERR existed and still
+      // holds, but the comment is the stated justification for it, and the
+      // next person to add a third path will read this rather than the reducer.
       return <SessionLostStep error={state.error!} dispatch={dispatch} />;
     default: {
       const _exhaustive: never = state.step;
@@ -465,6 +631,26 @@ export function CreateVault({
 // Resolved per-call (never frozen at import) so a language switch is
 // reflected — `i18n.t()` reads the active language at the moment the error
 // is built, not at module load.
+/**
+ * The provisioning failure, and it is deliberately `dedicated` rather than
+ * `inline`.
+ *
+ * An inline banner offers a retry, and there is nothing here to retry: the
+ * container has been erased and the creation session cancelled, so the flow has
+ * to start over from the password step with a fresh account number and a fresh
+ * phrase. Saying so on its own screen is the honest shape, and it is also the
+ * safe one — the phrase was never displayed, so nothing the user wrote down is
+ * about to become silently wrong.
+ */
+function provisionFailedError() {
+  return {
+    title: i18n.t("vaultCreation.orchestrator.provisionFailed.title"),
+    body: i18n.t("vaultCreation.orchestrator.provisionFailed.body"),
+    primaryAction: "restart",
+    displayMode: "dedicated",
+  } as const;
+}
+
 function genericError() {
   return {
     title: i18n.t("vaultCreation.orchestrator.genericError.title"),
