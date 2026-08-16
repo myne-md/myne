@@ -17,10 +17,13 @@
 // NO diagnostic detail in prod (TB6: keep internal state model off
 // the wire). SINGLE CTA per render — fail-closed contract.
 
-import { useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { has } from "../platform/capabilities";
 import { collectDiagnostics } from "../lib/collect-diagnostics";
+import { useCopyStatus } from "./CopyStatus";
+import { copyText } from "../lib/clipboard";
+import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import type { TFunction } from "i18next";
 import {
   CARD_BODY_STYLE,
@@ -147,7 +150,14 @@ export function FailClosedError({
 }: FailClosedErrorProps) {
   const { t } = useTranslation();
   const copy = copyForReason(reason, t);
-  const [copied, setCopied] = useState(false);
+  // myne-md/myne#390: this flag was set and NEVER reset, the label read
+  // "Copied" for as long as the screen stayed up, which on a fail-closed screen
+  // can be a long time. A confirmation that outlives its action is read as the
+  // result of whatever the user did most recently. The shared hook reverts and
+  // carries the live region; the deliberate silence on FAILURE is untouched and
+  // is argued at the call site below.
+  const { outcome, flashing, markCopied } = useCopyStatus();
+  const copied = flashing && outcome === "copied";
   // The restore door is offered only where BACKUP EXISTS (phase3-web-client
   // task 70). Boot routing already keeps a web client away from the
   // `corrupted-vault` surface (`initialStageFromProbe` sends it to
@@ -201,14 +211,25 @@ export function FailClosedError({
             data-testid="fail-closed.copy-diagnostics"
             data-code={code}
             onClick={() => {
+              // TRANSPORT MIGRATION ONLY (myne-md/myne#390). This call site is
+              // why the feedback type is a PAIR rather than one verdict: it
+              // confirms on success and is deliberately quiet on failure, and a
+              // single-verdict API would have made it surrender one of the two.
+              // The failure reason below is the one already written here.
               void collectDiagnostics(code)
-                .then((text) => navigator.clipboard.writeText(text))
-                .then(() => setCopied(true))
+                .then((text) =>
+                  copyText(clipboardWriteText, text, {
+                    onSuccess: { kind: "inline", run: markCopied },
+                    onFailure: {
+                      kind: "silent",
+                      reason:
+                        "a refused clipboard is a browser permission decision, not a failure worth a second error surface on the screen where the user is already stuck; the code is on the button's own `data-code`, so it is still readable",
+                    },
+                  }),
+                )
                 .catch(() => {
-                  // A refused clipboard is a browser permission decision, not a
-                  // failure worth a second error surface on the screen where the
-                  // user is already stuck. The code is on the button's own
-                  // `data-code`, so it is still readable.
+                  // `collectDiagnostics` itself failed. Same reasoning: this is
+                  // the screen the user is already stuck on.
                 });
             }}
           >

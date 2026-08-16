@@ -5,6 +5,7 @@
 // summary, error→skip-reason mapping, and the imported-ref parser + rewrite
 // planner the import-&-convert command feeds into the diff preview.
 
+import { parseEmbedAlias } from "@myne/dialect/embedLayout";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type ImportSource,
@@ -367,5 +368,67 @@ describe("displayNameForRef / planRewrite", () => {
     const plan = planRewrite(ref, imported(ID_B, "diagram.png"));
     expect(plan.replacement).toBe(`![[att:${ID_B}|diagram.png]]`);
     expect(plan.ref).toBe(ref);
+  });
+});
+
+// --- imported layout preservation (myne-md/myne#409 task 7) ----------------
+//
+// An Obsidian note carrying `![[photo.png|300]]` used to lose its width on
+// import: the `300` was read as the ALIAS, and `planRewrite` then either
+// dropped it or wrote it into the FILENAME slot. Either way the author's chosen
+// width was gone, with nothing in the import summary saying so.
+
+describe("imported layout preservation (myne#409)", () => {
+  it("carries an Obsidian width into w=", () => {
+    const [ref] = findImportedImageRefs("![[photo.png|300]]");
+    expect(ref.layout.widthPx).toBe(300);
+    // Crucially the dimension is NOT left as an alias, or it becomes the filename.
+    expect(ref.alias).toBeNull();
+    expect(displayNameForRef(ref)).toBe("photo.png");
+  });
+
+  it("carries an Obsidian width x height into w= and h=", () => {
+    const [ref] = findImportedImageRefs("![[photo.png|300x200]]");
+    expect(ref.layout.widthPx).toBe(300);
+    expect(ref.layout.heightPx).toBe(200);
+  });
+
+  it("leaves an ordinary display alias alone", () => {
+    const [ref] = findImportedImageRefs("![[diagram.png|My Diagram]]");
+    expect(ref.alias).toBe("My Diagram");
+    expect(ref.layout.widthPx).toBeNull();
+  });
+
+  it("refuses an out-of-range dimension through the SAME closed grammar", () => {
+    // Not a second copy of the range rules: an import is bounded by exactly the
+    // bound an in-app edit is.
+    const [ref] = findImportedImageRefs("![[photo.png|99999]]");
+    expect(ref.layout.widthPx).toBeNull();
+    // It stays an alias rather than vanishing, so nothing is silently deleted.
+    expect(ref.alias).toBe("99999");
+  });
+
+  it("carries markdown-image alt text into alt=, pipes included", () => {
+    const [ref] = findImportedImageRefs("![A sunset | 2026](photo.png)");
+    expect(ref.layout.alt).toBe("A sunset | 2026");
+  });
+
+  it("treats an empty markdown-image alt as no alt at all", () => {
+    const [ref] = findImportedImageRefs("![](photo.png)");
+    expect(ref.layout.alt).toBeNull();
+  });
+
+  it("plans a form-C rewrite that carries the recovered layout", () => {
+    const [ref] = findImportedImageRefs("![[photo.png|300x200]]");
+    const plan = planRewrite(ref, imported(ID_B, "photo.png"));
+    expect(plan.replacement).toBe(`![[att:${ID_B}|photo.png|w=300|h=200]]`);
+  });
+
+  it("plans a rewrite carrying a pipe-bearing alt from a markdown image", () => {
+    const [ref] = findImportedImageRefs("![A | B](photo.png)");
+    const plan = planRewrite(ref, imported(ID_B, "photo.png"));
+    expect(plan.replacement).toBe(`![[att:${ID_B}|photo.png|alt=A | B]]`);
+    // And it round-trips: the terminal alt rule reads it back whole.
+    expect(parseEmbedAlias(`photo.png|alt=A | B`).layout.alt).toBe("A | B");
   });
 });

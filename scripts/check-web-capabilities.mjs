@@ -94,17 +94,6 @@ const CAPABILITY_BACKING = {
   backup: ["backup"],
   // A seam refusal (`dialog.save`), not an IPC command.
   nativeSaveAs: [],
-  // The `secret-export` clipboard auto-clear (myne#379) hangs here rather than
-  // under a clipboard capability of its own: its only callers are
-  // vault-creation's PhraseStep and AccountStep, both substituted out of the
-  // web bundle via `CreateVault.tsx`. Two independent reasons it can never
-  // ship on web, and the second is the durable one — a web client has no
-  // recovery phrase to put on the clipboard in the first place
-  // (`check-web-no-phrase.mjs` asserts the phrase is absent from the served
-  // bundle), and page content cannot be granted clipboard READ in Firefox at
-  // all, so the read-back the clear is gated on would silently never fire.
-  // `save_secret_text` is deliberately NOT here: it also serves the theme
-  // export, which ships on web through the download seam.
   // `decisions.md` 2026-08-15 ships creation on web, so `vaultCreation` is no
   // longer absent and no longer appears in the descriptor's ABSENT set. The
   // entry stays here, empty, because this map is also read as documentation of
@@ -117,6 +106,17 @@ const CAPABILITY_BACKING = {
   // would silently never fire), and check 2 below requires every refusal to be
   // covered by an ABSENT capability. Leaving it under a capability that is now
   // present would have failed the guard, which is the guard doing its job.
+  //
+  // The old reason lived above `vaultCreation` and stayed there when the
+  // command moved, so it went on asserting two claims this change falsified:
+  // that the auto-clear's callers were substituted out of the bundle (creation
+  // ships now), and that "a web client has no recovery phrase to put on the
+  // clipboard in the first place" (it does, and Copy is offered — see
+  // `recovery-flow.md` §2.2's web arm). What survives of it is the ONE reason
+  // that was ever durable, and it is stated above: no clipboard read, so no
+  // read-back, so no safe clear. `save_secret_text` is deliberately NOT here:
+  // it also serves the theme export, which ships on web through the download
+  // seam.
   clipboardAutoClear: ["plugin:secret-export|clipboard_clear_if_matches"],
   phraseRecovery: [
     "plugin:vault-recover|recover_with_phrase",

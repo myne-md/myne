@@ -19,7 +19,7 @@
 // `CLAUDE.md` minimal-dep posture (TB9 audit anchor). When prefs grow
 // past ~5 fields, revisit (separate PRD).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import i18n from "../i18n";
 import {
   PrefsView,
@@ -254,15 +254,35 @@ interface UsePrefsResult {
 export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   const [prefs, setPrefs] = useState<PrefsView>(DEFAULT_PREFS);
 
+  // Latest-read-wins, shared by the mount read below and by `reload`, which is
+  // the shape the mobile twin has (`mobile/src/lib/use-prefs.ts`). One counter
+  // for reads issued, one for the highest-numbered read whose view actually
+  // reached state.
+  //
+  // The mount effect's own `cancelled` flag orders it against UNMOUNT and
+  // against nothing else. It cannot order it against a concurrent `reload`, and
+  // `reload` is the nonce-driven path: a user action that writes several prefs
+  // advances the nonce once per write, so two reads are routinely in flight. If
+  // the mount read resolves last it reinstates the pre-write view with no
+  // further bump coming, which is the stale-open-editor defect this chokepoint
+  // exists to prevent, arriving by a different road. Applying the newest read
+  // that SUCCEEDED, rather than dropping anything a newer read superseded, also
+  // covers the case where the newer read then fails: dropping the older
+  // successful view would leave the hook on data older than what it had.
+  const request = useRef(0);
+  const applied = useRef(0);
+
   useEffect(() => {
     let cancelled = false;
+    const mine = ++request.current;
     (async () => {
       try {
         const view = await prefsRead();
         // Guard the shape, not just the error: a malformed/absent response must
         // leave DEFAULT_PREFS in place. Storing a non-object here takes down
         // every consumer that reads a field off it.
-        if (!cancelled && view) {
+        if (!cancelled && view && mine > applied.current) {
+          applied.current = mine;
           setPrefs(view);
         }
       } catch {
@@ -631,9 +651,14 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  // Shares the token declared beside the mount effect above, so a mount read
+  // and a reload order against each other rather than only against themselves.
   const reload = useCallback(async () => {
+    const mine = ++request.current;
     try {
       const view = await prefsRead();
+      if (mine <= applied.current) return;
+      applied.current = mine;
       setPrefs(view);
     } catch {
       // Keep the current cache (safer-state per spec § 9.5.5).

@@ -1,0 +1,50 @@
+# In-repo Tauri mobile plugin: the clipboard transport for the mobile client
+# (myne-md/myne#390 + myne-md/myne#455).
+#
+# This exists INSTEAD OF `tauri-plugin-clipboard-manager`, not alongside it, and
+# the reason is a defect rather than a preference. That plugin was declared in
+# `mobile/package.json` and registered NOWHERE: no Cargo dependency, no
+# `.plugin()` call, no capability grant. Every call through it was dispatched to
+# a plugin that does not exist and rejected at runtime, so the account-number
+# Copy on the vault-creation screen has never worked on any device.
+#
+# Replacing it rather than wiring it up buys the thing a generic clipboard plugin
+# cannot express: a SENSITIVE write. On iOS that is `UIPasteboard` with
+# `.localOnly` (the item never leaves this device via Universal Clipboard) and
+# `.expirationDate` (the OS removes it, which survives the app being killed in a
+# way a JavaScript timer does not). On Android it is `ClipDescription`'s
+# sensitivity hint where the OS version has one.
+#
+# WebView-facing commands, so this carries a permission set + `build.rs` command
+# autogen, like `tauri-plugin-qr-scan` and unlike the Rust-only `screen-guard`.
+[package]
+name = "tauri-plugin-sensitive-clipboard"
+version = "0.1.0"
+description = "Myne mobile — clipboard writes with OS-enforced sensitivity for secrets"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0"
+# Mandatory for tauri-plugin build scripts; must equal the crate name exactly.
+links = "tauri-plugin-sensitive-clipboard"
+
+[build-dependencies]
+# Already in the shared lock (pulled by tauri-plugin-deep-link) — no new crates.
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+# Mandated rather than chosen: `src-tauri/CLAUDE.md`'s secret-handling discipline
+# and `recovery-flow.md` §3.5 both require that once Rust receives a recovery
+# phrase it holds it in a `Zeroizing<String>`. The sibling
+# `tauri-plugin-share-intent` already carries this, and the desktop command for
+# the identical operation (`secret_export::clipboard`) wraps on its first
+# non-doc statement. Already in the shared lock.
+zeroize = { version = "1", features = ["zeroize_derive"] }
+
+[dev-dependencies]
+# The tier is a wire string the Swift and Kotlin sides match on, so its
+# serialization is pinned by a unit test rather than left to a rename to break
+# silently. Already in the shared lock.
+serde_json = "1"

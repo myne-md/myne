@@ -566,7 +566,23 @@ export function CreateVault({
           phrase={state.phrase ?? []}
           revealed={state.phraseRevealed}
           dispatch={dispatch}
-          onCancelSession={handlePhraseBack}
+          // Omitted where provisioning ran, so the Back control is not drawn.
+          //
+          // On that ordering `commit` has already written the vault and
+          // `sync_enroll` has already registered the account by the time this
+          // screen exists, and the effect nulls `sessionTokenRef` right after
+          // `commit`. So `handlePhraseBack` would find no token, cancel
+          // nothing, delete nothing, and dispatch `RESET_TO_PASSWORD`, which
+          // clears `state.phrase`. The account survives; the twenty-four words
+          // that are its only other credential do not, and they are never
+          // re-displayed (`recovery-flow.md` §2.4).
+          //
+          // Rolling back instead of refusing would not be better: the local
+          // erase is the only half a client can perform, and the registration
+          // it cannot reach is exactly what makes the phrase still matter.
+          onCancelSession={
+            REQUIRES_PROVISIONING ? undefined : handlePhraseBack
+          }
         />
       );
     case "confirm":
@@ -598,8 +614,11 @@ export function CreateVault({
         />
       );
     case "session-lost":
-      // SESSION_LOST is the only path into this step and always carries
-      // an error; the non-null assertion is type-safe per the reducer.
+      // SESSION_LOST and PROVISION_ERR are the two paths into this step, and
+      // both carry an error, so the non-null assertion is type-safe per the
+      // reducer. The assertion held before PROVISION_ERR existed and still
+      // holds, but the comment is the stated justification for it, and the
+      // next person to add a third path will read this rather than the reducer.
       return <SessionLostStep error={state.error!} dispatch={dispatch} />;
     default: {
       const _exhaustive: never = state.step;

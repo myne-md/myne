@@ -1,14 +1,17 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ornamentRole } from "@myne/ornaments";
+import { copyText } from "@myne/clipboard";
+import { showToast } from "../../components/ToastHost";
+import { writeText as clipboardWriteText } from "../../lib/clipboardTransport";
 import { CMEditor } from "@myne/editor/CMEditor";
 import { typographyStyle } from "@myne/editor/typography";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
 import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { headingSections } from "@myne/dialect";
 import type { EditorView } from "@codemirror/view";
-import { emit, listen } from "@tauri-apps/api/event";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { emit, listen } from "../../platform/event";
+import { documentDir, join } from "../../platform/path";
 import {
   Screen,
   ScreenScroll,
@@ -46,7 +49,7 @@ import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
 import { isRtl } from "../../lib/util";
 import { setFavorites, setArchivedFolders, setDeliberateFolders, setFolderIcons, setItemColors, setItemOrder, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
-import { bumpPrefsNonce } from "../../lib/prefsNonce";
+import { bumpPrefsNonce, withPrefsBatch } from "../../lib/prefsNonce";
 import { useHiddenHomeTiles } from "../../lib/home-tiles";
 import { searchNotes } from "../../lib/search-notes";
 import { buildTagIndex } from "../../lib/tags";
@@ -110,7 +113,7 @@ import { MarkdownView } from "../../components/MarkdownView";
 import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
 import { SettingsSheet, applyStoredTheme } from "./SettingsSheet";
-import { useSizeClass } from "../../platform/SizeClassContext";
+import { useSizeClass } from "../../formfactor/SizeClassContext";
 import { EmptyDetail } from "./editor/EmptyDetail";
 import { SidebarPane } from "./editor/SidebarPane";
 import { AppHeader } from "./editor/chrome/AppHeader";
@@ -131,6 +134,13 @@ import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
 import { CommandPalette } from "./editor/sheets/CommandPalette";
 import { FilterSheet } from "./editor/sheets/FilterSheet";
 import { NoteActionsSheet } from "./editor/sheets/NoteActionsSheet";
+import { CoverPickerSheet } from "./editor/sheets/CoverPickerSheet";
+import { setNoteCover, type CoverChoice } from "../../lib/setNoteCover";
+import {
+  OPEN_COVER_PICKER_EVENT,
+  REMOVE_COVER_EVENT,
+  type OpenCoverPickerDetail,
+} from "../../lib/openCoverPickerSignal";
 import { NoteRowActionsSheet } from "./editor/sheets/NoteRowActionsSheet";
 import { FolderActionsSheet } from "./editor/sheets/FolderActionsSheet";
 import { DecorationSheet } from "./editor/sheets/DecorationSheet";
@@ -182,6 +192,15 @@ const TAB_ORDER: Record<"notes" | "tasks" | "note-tasks" | "search" | "graph" | 
 // TEXT_SIZE presets so reading mode + the live editor + desktop stay consistent
 // (MYND-483). The live editor itself uses `typographyStyle` CSS vars, not this.
 const EDITOR_TEXT_PX: Record<string, number> = { sm: 13, md: 14, lg: 16, xl: 18 };
+
+/**
+ * Rejection handler for the `void`-ed prefs writes below. It does nothing, and
+ * that is the point: see the decoration-writer comment for why a failed prefs
+ * write has nothing to revert here. Named rather than an inline `() => {}` so
+ * every site reads as the same deliberate decision, and greppable so the
+ * follow-up that surfaces these failures to the user has a work list.
+ */
+const ignorePrefsWriteFailure = (): void => {};
 
 const DEV_SEED: string[] = [
   "# Threat model v2\n\nWe assume a powerful network adversary that can observe all traffic and compromise the relay. The vault key never leaves the device.",
@@ -303,11 +322,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // migrate + sync folded keys.
   useEffect(() => {
     const { next, changed } = foldDecorationKeys(prefs.item_colors);
-    if (changed && HAS_TAURI) void setItemColors(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (changed && HAS_TAURI) void setItemColors(next).catch(ignorePrefsWriteFailure);
   }, [prefs.item_colors]);
   useEffect(() => {
     const { next, changed } = foldDecorationKeys(prefs.folder_icons);
-    if (changed && HAS_TAURI) void setFolderIcons(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (changed && HAS_TAURI) void setFolderIcons(next).catch(ignorePrefsWriteFailure);
   }, [prefs.folder_icons]);
 
   const [notes, setNotes] = useState<NoteEntry[]>([]);
@@ -438,6 +457,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   const [rightPanel, setRightPanel] = useState(false);
   // Note actions overflow (⋯): Copy / Move / History / Export / Archive / Trash.
   const [moreOpen, setMoreOpen] = useState(false);
+  // The note cover's picker (myne-md/myne#410). `| null` rather than an `open`
+  // flag: `hasCover` only means anything while it is open, and it comes from the
+  // editor, which has just resolved the field. The shell cannot see it.
+  const [coverPicker, setCoverPicker] = useState<{ hasCover: boolean } | null>(null);
   // MYND-620 task 4: the phone's answer to the desktop's note-scoped side panel.
   // There is no permanently-visible panel beside an editor on a phone, so the
   // same information arrives as a sheet on request — the established mechanism
@@ -879,7 +902,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     (id: string) => {
       const cur = prefs.favorites;
       const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-      if (HAS_TAURI) void setFavorites(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+      if (HAS_TAURI) void setFavorites(next).catch(ignorePrefsWriteFailure);
     },
     [prefs.favorites],
   );
@@ -893,7 +916,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   const reorderableTree =
     listView === "notes" && !activeTag && activeViewId == null && searchQuery.trim() === "";
   const persistItemOrder = (next: Record<string, string[]> | null) => {
-    if (next && HAS_TAURI) void setItemOrder(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (next && HAS_TAURI) void setItemOrder(next).catch(ignorePrefsWriteFailure);
   };
   const noteReorder = (id: string) => {
     if (!reorderableTree || favSet.has(id)) return undefined;
@@ -1642,6 +1665,58 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     }
   }
 
+  // The banner's controls reach this flow through window signals: the banner is
+  // CodeMirror DOM in the shared editor package and has no route into this
+  // component, which owns both the sheet mounts and the open note. Same shape
+  // the desktop shell uses, and the event names are spelled identically on
+  // purpose (`mobile/src/lib/openCoverPickerSignal.ts` says so).
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<OpenCoverPickerDetail>).detail;
+      setCoverPicker({ hasCover: detail?.hasCover === true });
+    };
+    const onRemove = () => void applyNoteCover(null);
+    window.addEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
+    window.addEventListener(REMOVE_COVER_EVENT, onRemove);
+    return () => {
+      window.removeEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
+      window.removeEventListener(REMOVE_COVER_EVENT, onRemove);
+    };
+    // Re-subscribes when the open note changes, so `applyNoteCover` always
+    // closes over the right one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing?.id, editorText]);
+
+  /**
+   * Write the open note's cover, or clear it when `choice === null`.
+   *
+   * Two orderings matter here and both are copied from `confirmMove` above.
+   * Any pending edit is persisted FIRST, so the cover write does not land on
+   * top of bytes the user has since changed and the re-read below does not
+   * discard their typing. Then the new bytes are read back into the editor:
+   * `setNoteCover` rewrites frontmatter out of band of this buffer, and without
+   * the re-read the next autosave would write the pre-write text back and
+   * silently revert the cover.
+   */
+  async function applyNoteCover(choice: CoverChoice | null) {
+    const id = editing?.id;
+    setCoverPicker(null);
+    if (id == null) return;
+    try {
+      if (!editorUnchanged(id)) {
+        if (HAS_TAURI) await noteUpdate(id, editorText);
+        loadedTextRef.current = { id, text: editorText };
+      }
+      await setNoteCover(id, choice);
+      const next = await noteRead(id);
+      setEditorText(next);
+      loadedTextRef.current = { id, text: next };
+      await refreshOne(id);
+    } catch {
+      setEditorError(t("editor.cover.writeFailed"));
+    }
+  }
+
   /** Move the note staged in `moveTarget` to the folder typed in `moveInput`
    *  (blank = root), persisting any open edit first, then land on that folder. */
   async function confirmMove() {
@@ -1712,19 +1787,31 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // the folder's FOLDED identity (`folderKey`, applied at the decoration call
   // sites); folder_icons by that folded key only — byte-identical to the keys
   // desktop writes, so a desktop-assigned decoration round-trips across case-
-  // variants. bumpPrefsNonce after a successful write so `usePrefs` re-reads
-  // disk truth and the row re-renders — the favorites-writer chokepoint.
+  // variants. The success-path nonce bump belongs to `writePref` inside
+  // `lib/prefs.ts`.
+  //
+  // The `.catch(ignorePrefsWriteFailure)` these writers keep is the failure
+  // path, and the handler is named for what it does because it used to be
+  // spelled `bumpPrefsNonce`, which read as a correction it never performed.
+  // There is no optimistic local state here to revert: `item_colors`,
+  // `folder_icons`, `favorites` and `item_order` are read straight off
+  // `usePrefs` at render, and the `next` each writer builds is never stored. A
+  // rejected `invoke` also means the backend wrote nothing, so the re-read a
+  // bump would trigger returns exactly what the caller already holds. The
+  // handler's whole job is to keep a `void`-ed call from raising an unhandled
+  // rejection. That a failed decoration write is invisible to the user is a
+  // real gap and belongs in its own change.
   function assignItemColor(key: string, slot: string | null) {
     const next = { ...prefs.item_colors };
     if (slot === null) delete next[key];
     else next[key] = slot;
-    if (HAS_TAURI) void setItemColors(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (HAS_TAURI) void setItemColors(next).catch(ignorePrefsWriteFailure);
   }
   function assignFolderIcon(path: string, name: string | null) {
     const next = { ...prefs.folder_icons };
     if (name === null) delete next[path];
     else next[path] = name;
-    if (HAS_TAURI) void setFolderIcons(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (HAS_TAURI) void setFolderIcons(next).catch(ignorePrefsWriteFailure);
   }
   /** Open the color/icon picker for a folder (color + icon), closing the folder
    *  action sheet first — the `openFolderPrompt` close-then-open idiom. */
@@ -1750,18 +1837,24 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     const reroot = (arr: readonly string[]) =>
       arr.map((f) => (f.startsWith(oldPath) ? normalizeFolderPath(newPath + f.slice(oldPath.length)) ?? f : f));
     if (HAS_TAURI) {
-      await setDeliberateFolders(reroot(prefs.deliberate_folders));
-      if (prefs.archived_folders.some((f) => f.startsWith(oldPath))) {
-        await setArchivedFolders(reroot(prefs.archived_folders));
-      }
-      // Decorations follow the folder (MYND-562): re-root item_colors +
-      // folder_icons by folded prefix, exactly as desktop does on rename —
-      // else the color/icon strands under the old folded key.
-      const colors = rewriteFolderPrefix(prefs.item_colors, oldPath, newPath);
-      if (colors.changed) await setItemColors(colors.next);
-      const icons = rewriteFolderPrefix(prefs.folder_icons, oldPath, newPath);
-      if (icons.changed) await setFolderIcons(icons.next);
-      bumpPrefsNonce();
+      // One nonce NOTIFY for the whole rename, not one per setter. Each of
+      // these four writes bumps inside `writePref`, and they await each other,
+      // so without the batch the microtask coalescing cannot collapse them:
+      // a rename cost up to four advances, each re-reading and re-decrypting
+      // `vault.prefs` in every mounted `usePrefs`.
+      await withPrefsBatch(async () => {
+        await setDeliberateFolders(reroot(prefs.deliberate_folders));
+        if (prefs.archived_folders.some((f) => f.startsWith(oldPath))) {
+          await setArchivedFolders(reroot(prefs.archived_folders));
+        }
+        // Decorations follow the folder (MYND-562): re-root item_colors +
+        // folder_icons by folded prefix, exactly as desktop does on rename,
+        // else the color/icon strands under the old folded key.
+        const colors = rewriteFolderPrefix(prefs.item_colors, oldPath, newPath);
+        if (colors.changed) await setItemColors(colors.next);
+        const icons = rewriteFolderPrefix(prefs.folder_icons, oldPath, newPath);
+        if (icons.changed) await setFolderIcons(icons.next);
+      });
     }
     // Only the notes that actually moved were rewritten — a folder rename in a
     // 500-note vault touching 3 notes costs 3 reads, not 500.
@@ -1785,7 +1878,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       const path = normalizeFolderPath(base + name);
       // A deliberate folder persists even while empty (the virtual-folder model).
       if (path != null && HAS_TAURI) {
-        await setDeliberateFolders([...prefs.deliberate_folders, path]).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+        await setDeliberateFolders([...prefs.deliberate_folders, path]).catch(ignorePrefsWriteFailure);
       }
     } catch {
       setEditorError(t("editor.flow.moveFailed"));
@@ -1797,7 +1890,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     setFolderActions(null);
     const canonical = normalizeFolderPath(path) ?? path;
     if (HAS_TAURI) {
-      await setArchivedFolders([...prefs.archived_folders, canonical]).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+      await setArchivedFolders([...prefs.archived_folders, canonical]).catch(ignorePrefsWriteFailure);
     }
   }
 
@@ -1810,7 +1903,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       if (HAS_TAURI) {
         const key = folderKey(path);
         await setDeliberateFolders(prefs.deliberate_folders.filter((f) => !folderKey(f).startsWith(key)));
-        bumpPrefsNonce();
       }
     } catch {
       setEditorError(t("editor.flow.trashFailed"));
@@ -1833,7 +1925,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
    *  Prefs-only — no note bodies change. */
   async function restoreArchivedFolder(path: string) {
     const next = removeFolderFromArchive(prefs.archived_folders, path);
-    if (HAS_TAURI) await setArchivedFolders(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (HAS_TAURI) await setArchivedFolders(next).catch(ignorePrefsWriteFailure);
     if (archiveFolder !== null && folderKey(archiveFolder).startsWith(folderKey(path))) {
       setArchiveFolder(null);
     }
@@ -1846,7 +1938,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     try {
       for (const id of ids) await trashNote(id);
       const next = removeFolderFromArchive(prefs.archived_folders, path);
-      if (HAS_TAURI) await setArchivedFolders(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+      if (HAS_TAURI) await setArchivedFolders(next).catch(ignorePrefsWriteFailure);
     } catch {
       setEditorError(t("editor.flow.trashFailed"));
     }
@@ -1889,13 +1981,33 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   /** Copy the current note's Markdown to the clipboard (WebView clipboard API —
    *  no native plugin). Transient "Copied" feedback via the button label. */
   async function copyNote() {
-    try {
-      await navigator.clipboard.writeText(editorText);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard unavailable — no-op */
-    }
+    // myne-md/myne#455 opened on this function. It reached the WebView clipboard
+    // API directly, and it swallowed the rejection, so a refused write left the
+    // sheet reading "Copy to clipboard" exactly as if the tap had not
+    // registered, and the user then pasted whatever was on the clipboard
+    // before, believing it was their note.
+    //
+    // Two things changed. The write goes through the native seam, which a
+    // WebView cannot refuse the way it can refuse a page's clipboard request, so
+    // the failure is now rare rather than merely reported. And both outcomes are
+    // stated, so when it does fail the user is told.
+    await copyText(clipboardWriteText, editorText, {
+      onSuccess: {
+        kind: "inline",
+        run: () => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        },
+      },
+      onFailure: {
+        // Ordinary content, so a TOAST rather than an inline confirmation: the
+        // note sheet may already be closing, and there is no once-only value at
+        // stake. Reuses the desktop client's key rather than minting a mobile
+        // twin, so both clients say the same sentence about the same action.
+        kind: "toast",
+        run: () => showToast(t("export.note.modal.copyFailed")),
+      },
+    });
   }
 
   /** Insert text at the end of the note. Caret-aware insertion + selection
@@ -2763,8 +2875,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             viewOrder={prefs.view_order}
             onOpenNote={(id) => void openFromList(id)}
             onSavedView={(id) => {
+              // No bump here: `TagBrowserSheet` awaits `upsertSavedView` +
+              // `setViewOrder` before calling this, and both bump inside
+              // `writePref`. A third bump is a third `prefs_read` + decrypt per
+              // mounted `usePrefs` for one saved view. `ViewEditorSheet`, the
+              // other saved-view writer, already relies on the chokepoint alone.
               setTagBrowserOpen(false);
-              bumpPrefsNonce();
               setActiveViewId(id);
               setActiveTag(null);
               setListView("notes");
@@ -3077,6 +3193,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             setReadingMode(false);
           }}
           onClose={() => setRightPanel(false)}
+        />
+      )}
+
+      {coverPicker !== null && editing?.id != null && (
+        <CoverPickerSheet
+          hasCover={coverPicker.hasCover}
+          onClose={() => setCoverPicker(null)}
+          onPick={(choice) => void applyNoteCover(choice)}
+          onRemove={() => void applyNoteCover(null)}
         />
       )}
 

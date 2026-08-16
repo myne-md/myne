@@ -65,7 +65,7 @@ The trait is deliberately scoped to note-CRUD + unlock/lock. Hooks that fire onl
 | `vault_creation` | begin / commit / cancel session flow — **and its own `init()`**, see below |
 | `vault_delete` | one-shot vault destruction |
 | `vault_indices` | in-RAM wikilink graph, backlinks, tags, typed properties (`MYI1`) |
-| `vault_recover` | phrase recovery — gated OUT of the wasm build |
+| `vault_recover` | phrase recovery — compiles for BOTH targets since 2026-08-15 (entry 0514) |
 | `vault_unlock` | the `UnlockedVault` slot, unlock/lock, status probes, storage health |
 | `workspace` | `vault.workspace` (`MYW1`) pane tree + the RAM-only stage |
 
@@ -141,7 +141,9 @@ The seeders take the TLS pin as an **argument** rather than fetching it: the nat
 - **`default = ["tauri-ipc"]`** — compiles the `#[tauri::command]` wrappers and the `TauriHost` adapter. A wasm build never enables it (the `tauri` dep is target-gated out of the wasm arm anyway); `web/wasm` takes the crate with `default-features = false`.
 - **`test-support`** — gates `test_support` (`ScopedTempDir`, `block_on`, seeded vault fixtures) and `double_buffer_fixtures` so clients can pull them as a dev-dependency while production builds never compile them. Both fixture emitters declare it as `required-features`.
 
-Four modules are gated OUT of the wasm build at the **module** level rather than ported: `captures`, `export`, `share_import` (no watch, no OS path, no share sheet in a tab) and `vault_recover` (`decisions.md` 2026-07-26 "Web capability set" — the 24-word phrase is never typed into served code, and `protocol.md` §7 gives a leaked phrase no in-app remedy). Gating the whole module is the honest shape: a ported command that always returns "unsupported" would be dead code pretending to be a feature.
+Three modules are gated OUT of the wasm build at the **module** level rather than ported: `captures`, `export` and `share_import` (no watch, no OS path, no share sheet in a tab). Gating the whole module is the honest shape: a ported command that always returns "unsupported" would be dead code pretending to be a feature.
+
+`vault_recover` was a fourth until 2026-08-15. It was gated on `decisions.md` 2026-07-26 "Web capability set" — the 24-word phrase never typed into served code — and entry 0514 reverses that half, so the module now compiles for both targets with its read and its write on the IO seam. Two things that gating had been hiding surfaced in the port and are worth knowing before touching it: `paths::current_vault_root_from_base` is a `read_dir` scan that on wasm32 does not error out loudly but falls through to the legacy path, so a pre-unlock resolution must go through `active_vault_root_from_host`; and `crate::atomic_write` returns `Unsupported` on wasm32 by design, so every write goes through the seam.
 
 ## Common commands
 

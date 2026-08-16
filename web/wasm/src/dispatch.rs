@@ -1466,6 +1466,27 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // The SYNC-40 eye-compare's push hold (myne#462). A browser runs this
+        // ceremony on BOTH sides — `AccountBootstrap` is the web joiner, and
+        // `SyncPanel` is "ported", so a tab can be the approving device too — so
+        // these are not a native-only affordance.
+        //
+        // In-RAM flag only: no vault access, no IO, no server call, and no
+        // `session::state()` read, which is why they answer the same before and
+        // after unlock. The lease and its ceiling live in the core, so a tab that
+        // is closed mid-compare releases by lapsing rather than by cleanup — the
+        // property that matters most here, because a browser tab has no reliable
+        // "I am going away" signal.
+        "plugin:sync|sync_verify_hold_begin" => {
+            myne_core::plugins::sync::verify_hold::verify_hold()
+                .begin(myne_core::host::HostCtx::now_unix_millis(host_ctx()));
+            Outcome::ok(&())
+        }
+        "plugin:sync|sync_verify_hold_end" => {
+            myne_core::plugins::sync::verify_hold::verify_hold().end();
+            Outcome::ok(&())
+        }
+
         // The abort. Clears this device's token and sync baseline; touches no
         // note, no attachment and no `vault.meta`, and never calls the server.
         // Its failure must SURFACE — the caller's whole reason to press it is

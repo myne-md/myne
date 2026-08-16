@@ -203,16 +203,20 @@ const V = {
   ],
   // NOT `excluded`, and the distinction is the point. `excluded` in this roster
   // means "substituted out", and this module is not — it is still importable,
-  // still compiled, and `EnrollDeviceForm`'s own tests exercise it. What changed
-  // in task 92 is that its one PHRASE-ENTRY caller moved into
-  // `src/components/sync/phrase-credential.ts`, which the web build substitutes,
-  // so there is no import edge from served code to the wordlist. That is a
-  // stronger fact than the grep it replaces (a grep describes today's
-  // tree-shake) and a weaker one than exclusion, so it is recorded as neither.
+  // still compiled, and `EnrollDeviceForm`'s own tests exercise it.
+  //
+  // CORRECTED 2026-08-15: this note used to claim there was NO import edge from
+  // served code to the wordlist, because `phrase-credential` was substituted.
+  // That substitution is gone — phrase ENTRY ships on web now
+  // (`decisions.md` 2026-08-15, entry 0514) — so the edge is real and intended.
+  // What keeps the phrase out of the artefact is narrower and lives elsewhere:
+  // the ENROLMENT screen is substituted, and `check-web-no-phrase.mjs` asserts
+  // its grid's absence from the built bundle.
   "src/lib/bip39-normalize.ts": [
-    "adapted",
-    "Pure NFKD/whitespace normalisation, with NO IMPORT EDGE from served code since task 92: its one phrase-entry caller moved into `src/components/sync/phrase-credential.ts`, which the web build substitutes with a stub that cannot construct a credential. What remains here is a string function nothing on this client feeds a phrase.",
+    "ported",
+    "Pure NFKD/whitespace normalisation, and it now has a real import edge from served code: `EnrollDeviceForm` and the recovery entry screen both feed it, since phrase entry ships on web (`decisions.md` 2026-08-15, entry 0514). No host call anywhere in it.",
   ],
+
   "src/lib/cli-access.ts": [
     "typed-unsupported",
     "The CLI door's session-state read. Reachable — the module ships and the binding is one `invoke` — and `cli-bridge` is `Unsupported` in the dispatcher, so a call that arrives by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the capability-gated Settings block.",
@@ -296,10 +300,15 @@ const V = {
     "ported",
     "Wraps the event seam's `listen`. Written FOR web: the rejected-subscription branch is dead on desktop (the IPC bridge is up before React mounts) and live in a browser, where a dropped rejection reaches `global-failure` and takes the page down.",
   ],
+  "src/lib/clipboard.ts": [
+    "ported",
+    "The copy-policy chokepoint (myne-md/myne#390). Runs on web as written because it holds no transport: the platform write, the clear and the error sink are all injected, and the module imports nothing at all. On web the injected write IS `web/src/platform/clipboardManager.ts`, so the same code makes the same decision about what the user is told and only the byte-mover underneath it differs. The `os-managed` clear arm is mobile-only and simply has no web caller; the `host` arm's clear is the web dispatcher's refusal, exactly as `secret-export.ts` below describes.",
+  ],
   "src/lib/secret-export.ts": [
     "adapted",
-    "Ships for `saveJsonAsFile` (theme export, through the download seam) — its SECRET callers are the two creation steps, both substituted. The clipboard auto-clear it also exports is web-hostile in a way worth naming, and myne#379 changed WHERE that shows up rather than removing it: the read-back that checks the clipboard still holds the secret now runs host-side, so on web the refusal is the dispatcher's (`plugin:secret-export|clipboard_clear_if_matches` is `Class::Unsupported`, backed by the absent `vaultCreation` capability) instead of a browser permission the page would never get — page content cannot be granted clipboard READ in Firefox at all and is gesture-gated elsewhere, so a clear would silently never fire. No web path reaches it, and a web client has no recovery phrase to copy in the first place.",
+    "Both halves adapt rather than one shipping and one being substituted, and the note that said otherwise was falsified on three clauses at once by `decisions.md` 2026-08-15 (entry 0514). Save-as-file takes the browser-download arm where `nativeSaveAs` is absent; the clipboard copy takes the `none` clear strategy where `clipboardAutoClear` is absent, so it writes and reports and schedules nothing. Its secret callers are the two creation steps, which are no longer substituted: creation ships on web.",
   ],
+
   "src/lib/spell.ts": ["adapted", "Unreachable where `spellCheck` is absent; the editor host omits the `spell` member."],
   "src/lib/stage.ts": ["adapted", "Boot routing branches on capabilities: an empty web client goes to account-entry, a corrupt one to re-sync (task 85)."],
   "src/lib/syntaxTheme.ts": ["ported", "CodeMirror theme."],
@@ -347,6 +356,10 @@ const V = {
 
   // ── src/hooks ───────────────────────────────────────────────────────────
   "src/hooks/useAccountStatus.ts": ["ported", "Sync account status; degrades to null on an older server."],
+  "src/hooks/useHeadFingerprintCompare.ts": [
+    "ported",
+    "The SYNC-40 eye-compare poll + its push hold (myne#462). More load-bearing here than on desktop: per `decisions.md` 2026-07-26 a web client re-runs this compare on EVERY re-bootstrap, because OPFS is evictable.",
+  ],
   "src/hooks/useActivityHeartbeat.ts": ["adapted", "Page activity, not OS idle — `osIdleAutoLock` is absent and the browser timer is a different signal (task 43)."],
   "src/hooks/useAiModelReady.ts": ["adapted", "Unreachable where `localAi` is absent."],
   "src/hooks/useAttachmentTransfers.ts": ["ported", "Progress state around the attachment IPC."],

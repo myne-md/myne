@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type Dispatch } from "r
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
+import { CopyStatus, useCopyStatus } from "../../components/CopyStatus";
 import {
   copySecretToClipboard,
   saveSecretAsTextFile,
@@ -33,7 +34,22 @@ interface PhraseStepProps {
   phrase: string[];
   revealed: boolean;
   dispatch: Dispatch<Action>;
-  onCancelSession: () => void;
+  /**
+   * Abandon the half-made vault and return to the password step.
+   *
+   * OPTIONAL, and absent means the Back control is not rendered at all rather
+   * than rendered and inert. It is absent on the ordering this flow uses where
+   * sync is required: there the vault is committed and the account registered
+   * BEFORE the phrase is shown, so by the time this screen exists there is no
+   * session left to cancel and nothing local to erase that would undo the
+   * registration. A Back that dropped the phrase from state would therefore
+   * discard, permanently, the only copy of a credential for an account that
+   * still exists (`recovery-flow.md` §2.4 is a no-re-display commitment, and
+   * `protocol.md` §7 gives the phrase no rotation), through a control labelled
+   * "Back". Omitted rather than confirmed: a confirmation would be offering a
+   * choice whose safe branch is "do not press this".
+   */
+  onCancelSession?: () => void;
 }
 
 /**
@@ -82,19 +98,45 @@ export function PhraseStep({
 
   const phraseString = useMemo(() => phrase.join(" "), [phrase]);
 
-  // Cancel any pending clipboard auto-clear on unmount so the timer's
-  // closure (which captures the 24-word phrase) is released promptly.
+  // myne-md/myne#390: this step had no copy feedback at all, and no i18n keys
+  // for one, it was never given the affordance rather than given it wrongly.
+  const { outcome, markCopied, markFailed } = useCopyStatus();
+
+  // This used to cancel the pending auto-clear on unmount, and that was wrong in
+  // a way the copy made visible (myne-md/myne#390): advancing to the confirm step
+  // is the intended next action and takes seconds, so cancelling there left the
+  // twenty-four words on the system clipboard PERMANENTLY, while the screen had
+  // just said they would clear in thirty seconds. A promise the mechanism cannot
+  // keep is the exact class of claim this feature exists to remove.
+  //
+  // The cancel existed for a heap reason that no longer applies: the timer's
+  // closure used to capture the phrase for the whole window. `copySecret` now
+  // releases it on both exits (`src/lib/clipboard.ts`), so what remains is a
+  // 30 s reference in a process that already holds the phrase in React state -
+  // not a new exposure, and far cheaper than an indefinite one on a clipboard
+  // every other app can read.
+  //
+  // Letting it fire after unmount is safe: the clear is the host-side
+  // compare-and-clear, so it only wipes the clipboard if the phrase is still on
+  // it. A user who copied something else in the window keeps it.
   const cancelAutoClearRef = useRef<(() => void) | null>(null);
-  useEffect(
-    () => () => {
-      cancelAutoClearRef.current?.();
-    },
-    [],
-  );
 
   const handleCopy = async () => {
     cancelAutoClearRef.current?.();
-    cancelAutoClearRef.current = await copySecretToClipboard(phraseString);
+    // The surface myne-md/myne#390 opened on, and the reason both arms are INLINE
+    // and persistent rather than toasts. This is the screen where the twenty-four
+    // words are shown ONCE and never again. Before this, pressing Copy changed
+    // nothing on screen whether it worked or not, so "I pressed Copy" was not
+    // evidence the phrase was anywhere, and a user who believed a failed copy
+    // had worked has an unrecoverable vault the moment they leave.
+    //
+    // A transient toast would be the weakest option available here: on a
+    // shown-once screen, a confirmation the user can miss is barely better than
+    // none.
+    cancelAutoClearRef.current = await copySecretToClipboard(phraseString, {
+      onSuccess: { kind: "inline", run: markCopied },
+      onFailure: { kind: "inline", run: markFailed },
+    });
   };
 
   const handleSave = () =>
@@ -196,13 +238,41 @@ export function PhraseStep({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-        <Button variant="ghost" icon="copy" onClick={handleCopy}>
+        <Button variant="ghost" icon="copy" onClick={handleCopy} data-testid="create.phrase-copy">
           {t("vaultCreation.phrase.copy")}
         </Button>
         <Button variant="ghost" icon="download" onClick={handleSave}>
           {t("vaultCreation.phrase.saveAsFile")}
         </Button>
       </div>
+
+      {/* Both outcomes render here, unlike the account step's, because the Copy
+          button's own label does NOT swap on this screen, so without this line
+          a successful copy would still be invisible.
+
+          The SUCCESS string is capability-gated for the same reason the caveat
+          below it is, and skipping that gate is what the two changes that met
+          here each half-did. The desktop string promises a clear in 30 seconds;
+          where `clipboardAutoClear` is absent nothing is scheduled at all
+          (`secret-export.ts` passes the `none` strategy), so that sentence
+          would appear in direct response to the user's press, eight lines above
+          a paragraph saying the opposite. On the one screen where the phrase is
+          shown once and never again, the false half is the one the user acts
+          on. */}
+      <CopyStatus
+        testId="create.phrase-copy-status"
+        message={
+          outcome === "copied"
+            ? t(
+                has("clipboardAutoClear")
+                  ? "vaultCreation.phrase.copied"
+                  : "vaultCreation.phrase.copiedNoAutoClear",
+              )
+            : outcome === "failed"
+              ? t("vaultCreation.phrase.copyFailed")
+              : null
+        }
+      />
 
       {/* The two sentences this client owes the user and the desktop does not.
           Both are `recovery-flow.md` §2.2 requirements as amended 2026-08-15,
@@ -226,14 +296,16 @@ export function PhraseStep({
       )}
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-        <Button
-          variant="ghost"
-          onClick={onCancelSession}
-          icon="arrow-left"
-          data-testid="create.phrase-back"
-        >
-          {t("vaultCreation.phrase.back")}
-        </Button>
+        {onCancelSession && (
+          <Button
+            variant="ghost"
+            onClick={onCancelSession}
+            icon="arrow-left"
+            data-testid="create.phrase-back"
+          >
+            {t("vaultCreation.phrase.back")}
+          </Button>
+        )}
         <div style={{ flex: 1 }} />
         <Button
           variant="primary"

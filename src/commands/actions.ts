@@ -1017,6 +1017,49 @@ const exportNoteHtmlAction: CommandAction = {
   },
 };
 
+const setNoteCoverAction: CommandAction = {
+  id: "note.set-cover",
+  get label() {
+    return i18n.t("commands.actions.setNoteCover.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  // Same visibility rule as the export siblings: editor stage AND a selected
+  // note, else hidden. This is the cover feature's KEYBOARD door — the banner's
+  // Change/Remove controls and the title-row Add control are all hover-revealed,
+  // so without this entry the feature is mouse-only (myne-md/myne#410).
+  visibility: editorWithNote,
+  run: (ctx) => {
+    ctx.onSetNoteCover();
+  },
+};
+
+const removeNoteCoverAction: CommandAction = {
+  id: "note.remove-cover",
+  get label() {
+    return i18n.t("commands.actions.removeNoteCover.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  // A SEPARATE action from `note.set-cover`, and not an oversight that the two
+  // are not one. Removing is only reachable from the banner's hover control,
+  // which lives inside CodeMirror content where `Tab` is bound to
+  // `editor.indent`, so focus cannot land on it. The picker's own Remove is
+  // gated on `hasCover`, which neither non-pointer entry point can determine.
+  // Without this action a cover can be added and changed without a pointer but
+  // never removed, which fails PRODUCT.md's keyboard-first principle.
+  //
+  // Offered whenever a note is open rather than only when it has a cover: the
+  // shell cannot see the note's frontmatter, and clearing an absent field is a
+  // no-op write rather than an error (myne-md/myne#410).
+  visibility: editorWithNote,
+  run: (ctx) => {
+    ctx.onRemoveNoteCover();
+  },
+};
+
 const exportNoteTxtAction: CommandAction = {
   id: "note.export-txt",
   get label() {
@@ -1371,6 +1414,8 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportNoteMarkdownAction,
   exportNotePdfAction,
   exportNoteHtmlAction,
+  setNoteCoverAction,
+  removeNoteCoverAction,
   exportNoteTxtAction,
   showGraphAction,
   showTasksAction,

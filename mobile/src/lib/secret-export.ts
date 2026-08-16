@@ -2,58 +2,85 @@
 // vault-creation steps so the 30 s auto-clear window is enforced in
 // one place and the step components don't pull in Tauri plugin imports.
 
-import {
-  writeText as clipboardWriteText,
-  readText as clipboardReadText,
-  clear as clipboardClear,
-} from "@tauri-apps/plugin-clipboard-manager";
-import { invoke } from "@tauri-apps/api/core";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { invoke } from "../platform/core";
+import { documentDir, join } from "../platform/path";
 import { logErrorKind } from "./vault-creation-logging";
 import { shareFile } from "./share";
-
-const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
+import { writeSecret } from "./clipboardTransport";
+import { copySecret, type CancelClear, type Feedback } from "@myne/clipboard";
 
 /**
- * Copy `value` to the clipboard and schedule a 30 s auto-clear that
- * only fires if the clipboard still holds exactly `value`.
+ * Copy a secret to the clipboard and report the outcome.
  *
- * Returns a cancel function callers MUST invoke on unmount — otherwise
- * the timer's closure keeps `value` (a secret) alive in the JS heap
- * for the full 30 s. Returns `null` when the clipboard write itself
- * failed; in that case nothing is scheduled.
+ * Returns a cancel function on success, or `null` when the write failed. The
+ * cancel is a no-op here because the expiry belongs to the OS; it is returned
+ * anyway so callers keep one unmount path instead of branching on platform.
+ *
+ * # This function did not work before myne-md/myne#455
+ *
+ * It wrote through `@tauri-apps/plugin-clipboard-manager`, whose plugin was
+ * registered nowhere on mobile: no Cargo dependency, no `.plugin()` call, no
+ * capability grant. Every call was dispatched to a plugin that does not exist
+ * and rejected at runtime, so the account-number Copy reported
+ * `vaultCreation.account.copyFailed` on every tap, on every device, for as long
+ * as it shipped. What kept that from being a silent lie is that
+ * myne-md/myne-mobile#51 had already made the caller check the write, which is
+ * also why myne-md/myne#390 held this up as the shape for desktop to adopt: the
+ * shape was right and the wiring underneath it was never done.
+ *
+ * # The auto-clear moved into the OS
+ *
+ * The old body scheduled a JavaScript `setTimeout` that read the clipboard back,
+ * compared, and cleared. Three things were wrong with it beyond not running.
+ * The read-back needed a clipboard READ, the direction that harvests whatever
+ * the user last copied from a password manager. The timer's closure held the
+ * secret in the JS heap for the entire window. And a timer dies with the
+ * process, which on a phone means most of the time.
+ *
+ * The native write asks the OS to expire the item instead. That survives the app
+ * being killed, holds nothing in the heap, needs no read, and expires THAT item
+ * so it can never destroy something the user copied afterwards.
  */
 export async function copySecretToClipboard(
   value: string,
-): Promise<(() => void) | null> {
-  try {
-    await clipboardWriteText(value);
-  } catch (e) {
-    logErrorKind(e, "clipboard-write-failed");
-    return null;
-  }
-  // `readText` rejects when the clipboard holds non-text content
-  // (image, file, empty) — that already means our value is gone, so
-  // swallow and skip the clear.
-  const timer = setTimeout(async () => {
-    try {
-      const current = await clipboardReadText();
-      if (current === value) await clipboardClear();
-    } catch {
-      // Clipboard moved on; nothing to clear.
-    }
-  }, CLIPBOARD_AUTO_CLEAR_MS);
-  return () => clearTimeout(timer);
+  feedback: Feedback,
+): Promise<CancelClear | null> {
+  return copySecret(
+    writeSecret,
+    value,
+    feedback,
+    // The OS owns the window: iOS through the pasteboard item's expiry, Android
+    // through a Kotlin-side clear the plugin schedules inside the write. Either
+    // way there is nothing for this side to schedule and nothing to cancel.
+    { kind: "os-managed" },
+    { onError: (e) => logErrorKind(e, "clipboard-write-failed") },
+  );
 }
 
 /**
  * Save a secret (recovery phrase / account number) to a `.txt` file in the app's
- * Documents directory — reachable via the iOS Files app — then present the
- * native share sheet (MYND-475) so the user can pick a destination ("Save to
- * Files" elsewhere, AirDrop, etc.). Uses the `myne-core` `secret_export` plugin
- * (the Rust-side write) because the mobile backend has no fs / save-dialog
- * plugin. The plaintext secret is written to a user-visible location by the
- * user's explicit intent (threat-model TB3 egress exception).
+ * Documents directory, then present the native share sheet (MYND-475) so the
+ * user can pick a destination ("Save to Files" elsewhere, AirDrop, etc.). Uses
+ * the `myne-core` `secret_export` plugin (the Rust-side write) because the
+ * mobile backend has no fs / save-dialog plugin. The plaintext secret is written
+ * by the user's explicit intent (threat-model TB3 egress exception).
+ *
+ * **Where that directory actually is, per platform** (this used to read
+ * "reachable via the iOS Files app", which is not true of either platform as
+ * shipped): on **iOS** the app declares no `UIFileSharingEnabled`, so `Documents`
+ * is NOT browsable in the Files app and the share sheet is the only way the user
+ * reaches the file. On **Android** the directory is
+ * `Android/data/<pkg>/files/Documents`, which the system Files app and
+ * DocumentsUI have refused to navigate into since Android 11 (API 30) while
+ * `minSdk` here is 24, and the share sheet is a documented no-op
+ * (`share_file.rs`). So on a current Android the write is the delivery and the
+ * user has no supported way to reach what was delivered: myne-md/myne#505 is the
+ * follow-up, and myne-md/myne#504 is the iOS label that claims otherwise.
+ *
+ * The file is **excluded from the platform's automatic cloud backup** on both
+ * platforms (myne-md/myne#491) — a saved recovery phrase alone reconstructs the
+ * vault, and until that landed iCloud Backup and Google Auto Backup carried it
+ * off the device. See `mobile/src-tauri/src/backup_exclude.rs`.
  *
  * Resolves to a short display label (`"Documents/<file>"`) on success, or `null`
  * on failure (the caller shows a message). `filename` should end in `.txt`.

@@ -8,62 +8,87 @@ import { invoke } from "../platform/core";
 import { has } from "../platform/capabilities";
 import { deliverFile } from "../platform/download";
 import { logErrorKind } from "./vault-creation-logging";
+import { copySecret, type CancelClear, type Feedback } from "./clipboard";
 
 const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
 
 /**
- * Copy `value` to the clipboard and schedule a 30 s auto-clear that
- * only fires if the clipboard still holds exactly `value`.
+ * Copy `value` to the clipboard, tell the caller which way it went, and arrange
+ * for it to leave the clipboard again where the platform allows that.
  *
- * Returns a cancel function callers MUST invoke on unmount — otherwise
- * the timer's closure keeps `value` (a secret) alive in the JS heap
- * for the full 30 s. Returns `null` when the clipboard write itself
- * failed; in that case nothing is scheduled.
+ * **A non-null return means the WRITE LANDED. It does not mean a clear is
+ * pending.** Where `clipboardAutoClear` is absent the write still happens, the
+ * success is still announced, and nothing at all is scheduled, so the returned
+ * cancel is a no-op. `null` means one thing only: the write did not happen.
+ * Keeping those two apart is the point — a caller that confuses them is one
+ * keystroke from telling a user their phrase is safe when it is on the
+ * clipboard indefinitely, or the reverse.
+ *
+ * Callers still invoke the cancel on unmount. On the desktop arm it releases
+ * the pending clear's reference to `value`; on the others it costs nothing.
  */
 export async function copySecretToClipboard(
   value: string,
-): Promise<(() => void) | null> {
-  try {
-    await clipboardWriteText(value);
-  } catch (e) {
-    logErrorKind(e, "clipboard-write-failed");
-    return null;
-  }
-  // No auto-clear where the platform cannot perform one (`decisions.md`
-  // 2026-08-15). The clear is gated on reading the clipboard BACK, so that
-  // unrelated content copied since is never destroyed, and page content is
-  // granted no clipboard read in Firefox at all and only a prompt-plus-focus
-  // read elsewhere. Scheduling the timer anyway would either wipe blind — worse
-  // than not clearing — or fire into a refusal and log noise on a path the user
-  // was told was protected.
+  feedback: Feedback,
+): Promise<CancelClear | null> {
+  // Delegates to the shared copy-policy chokepoint (myne-md/myne#390). What
+  // used to live here, try the write, log the kind on rejection, return `null`
+  // with nothing scheduled, otherwise schedule the clear and return a canceller
+  //, is that module's `copySecret` verbatim, with the three environmental parts
+  // lifted into parameters. This function is now the DESKTOP binding of them:
+  // the platform seam's write, the host-side clear, and the vault-creation log
+  // discipline.
   //
-  // Returning `null` is the same "nothing to cancel" answer the write-failure
-  // arm above gives, so no caller learns a new shape. What the CALLER owes is a
-  // sentence: `recovery-flow.md` §2.2 forbids presenting a control whose stated
-  // protection the client cannot perform, so the phrase step says plainly that
-  // the clipboard will not be cleared.
-  if (!has("clipboardAutoClear")) return null;
-  // The read+compare+clear runs HOST-side (myne#379). `recovery-flow.md` §2.2
-  // requires the clear to verify the clipboard still holds the phrase — a
-  // comparison requirement, not a requirement that the WebView be the one
-  // comparing — and doing it here cost a process-lifetime OS-clipboard READ
-  // grant on the main window for this one `setTimeout` body. Read is the more
-  // dangerous direction than write: a write destroys the user's clipboard, a
-  // read harvests whatever they last copied from a password manager. Same
-  // narrow-seam move `saveSecretAsTextFile` below makes for the filesystem.
-  //
-  // The command returns nothing and swallows a non-text clipboard (which
-  // already means our value is gone) exactly as this code did; the `catch` is
-  // now for an ACL refusal, not for the clipboard's state.
-  const timer = setTimeout(async () => {
-    try {
-      await invoke("plugin:secret-export|clipboard_clear_if_matches", { value });
-    } catch (e) {
-      logErrorKind(e, "clipboard-clear-failed");
-    }
-  }, CLIPBOARD_AUTO_CLEAR_MS);
-  return () => clearTimeout(timer);
+  // The `feedback` parameter is the point of the exercise. This function
+  // previously reported nothing and left every caller to decide, and two of them
+  // decided nothing at all, on the screen where a recovery phrase is shown once.
+  return copySecret(
+    clipboardWriteText,
+    value,
+    feedback,
+    // No auto-clear where the platform cannot perform one (`decisions.md`
+    // 2026-08-15). Chosen HERE and passed as a strategy rather than returned
+    // early: an early return before the write would report nothing, and one
+    // after it would have to re-announce the success this module already owns.
+    // What the CALLER owes is a sentence, since `recovery-flow.md` §2.2 forbids
+    // presenting a control whose stated protection the client cannot perform,
+    // and `PhraseStep` renders it off the same capability.
+    has("clipboardAutoClear")
+      ? {
+          kind: "host" as const,
+          delayMs: CLIPBOARD_AUTO_CLEAR_MS,
+          clear: (v: string) =>
+            invoke("plugin:secret-export|clipboard_clear_if_matches", { value: v }),
+        }
+      : {
+          kind: "none" as const,
+          reason:
+            "A page is granted no clipboard read in Firefox and only a prompt-plus-focus read elsewhere, so the read-back this clear is gated on cannot run.",
+        },
+    {
+      onError: (e) => logErrorKind(e, "clipboard-write-failed"),
+      // A distinct label, because this is the only outcome here that leaves the
+      // secret exposed: the write landed, the window passed, and the clear did
+      // not run. Collapsing it into the write label made the exposure case
+      // unreadable in the one place it is recorded.
+      onClearError: (e) => logErrorKind(e, "clipboard-clear-failed"),
+    },
+  );
 }
+
+// Why the clear is a HOST call and not a read-back here (myne#379), kept because
+// the reasoning outlives the code that used to sit below it. `recovery-flow.md`
+// §2.2 requires the clear to verify the clipboard still holds the phrase, a
+// comparison requirement, not a requirement that the WebView be the one
+// comparing, and doing it in this file cost a process-lifetime OS-clipboard READ
+// grant on the main window for one `setTimeout` body. Read is the more dangerous
+// direction than write: a write destroys the user's clipboard, a read harvests
+// whatever they last copied from a password manager. Same narrow-seam move
+// `saveSecretAsTextFile` below makes for the filesystem.
+//
+// The command returns nothing and swallows a non-text clipboard (which already
+// means our value is gone); a rejection from it is an ACL refusal, not a
+// statement about the clipboard's contents.
 
 export async function saveSecretAsTextFile(
   defaultPath: string,

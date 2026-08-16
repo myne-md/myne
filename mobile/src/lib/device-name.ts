@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import i18n from "@myne/i18n";
 import { devicePlatform } from "./prefs";
-import { computeSizeClass } from "../platform/SizeClassContext";
+import { computeSizeClass } from "../formfactor/SizeClassContext";
 
 /** The maximum device-name length the UI accepts (MYND-548) — a readability
  *  bound, mirroring the desktop constant. There is no Rust-side cap; the prefs

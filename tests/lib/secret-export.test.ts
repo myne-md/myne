@@ -25,6 +25,7 @@ vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
 }));
 
 import { copySecretToClipboard, saveSecretAsTextFile } from "../../src/lib/secret-export";
+import type { Feedback } from "../../src/lib/clipboard";
 
 beforeEach(() => {
   invokeMock.mockReset();
@@ -72,10 +73,21 @@ describe("saveSecretAsTextFile", () => {
 describe("copySecretToClipboard", () => {
   const PHRASE = "correct horse battery staple";
 
+  // myne-md/myne#390 made the feedback pair a REQUIRED argument, so a caller can
+  // no longer copy without saying what the user is told. These tests are about
+  // the DESKTOP BINDING this function still owns, the platform seam's write,
+  // the host-side clear, the 30 s window, so they pass a pair that reports
+  // nothing and assert on the transport, exactly as they did before. What the
+  // arms themselves do is `tests/lib/clipboard.test.ts`'s subject.
+  const NO_FEEDBACK: Feedback = {
+    onSuccess: { kind: "silent", reason: "transport test: feedback is not under test here" },
+    onFailure: { kind: "silent", reason: "transport test: feedback is not under test here" },
+  };
+
   it("writes through the seam and schedules the auto-clear", async () => {
     vi.useFakeTimers();
     try {
-      const cancel = await copySecretToClipboard(PHRASE);
+      const cancel = await copySecretToClipboard(PHRASE, NO_FEEDBACK);
       expect(clipboardWriteMock).toHaveBeenCalledWith(PHRASE);
       expect(cancel).toBeTypeOf("function");
       // Nothing fires early — the spec's window is 30 s, not "soon".
@@ -90,7 +102,7 @@ describe("copySecretToClipboard", () => {
     vi.useFakeTimers();
     try {
       invokeMock.mockResolvedValue(undefined);
-      await copySecretToClipboard(PHRASE);
+      await copySecretToClipboard(PHRASE, NO_FEEDBACK);
       await vi.advanceTimersByTimeAsync(30_000);
 
       // The whole point of the change: one host command, with the value to
@@ -110,7 +122,7 @@ describe("copySecretToClipboard", () => {
   it("cancel() suppresses the auto-clear entirely", async () => {
     vi.useFakeTimers();
     try {
-      const cancel = await copySecretToClipboard(PHRASE);
+      const cancel = await copySecretToClipboard(PHRASE, NO_FEEDBACK);
       cancel?.();
       await vi.advanceTimersByTimeAsync(60_000);
       expect(invokeMock).not.toHaveBeenCalled();
@@ -123,7 +135,7 @@ describe("copySecretToClipboard", () => {
     vi.useFakeTimers();
     try {
       clipboardWriteMock.mockRejectedValue(new Error("no clipboard"));
-      expect(await copySecretToClipboard(PHRASE)).toBeNull();
+      expect(await copySecretToClipboard(PHRASE, NO_FEEDBACK)).toBeNull();
       await vi.advanceTimersByTimeAsync(60_000);
       expect(invokeMock).not.toHaveBeenCalled();
     } finally {
@@ -138,7 +150,7 @@ describe("copySecretToClipboard", () => {
       // clipboard's state — an unhandled rejection here would surface as an
       // unattributable console error 30 s after a screen the user has left.
       invokeMock.mockRejectedValue(new Error("command refused"));
-      await copySecretToClipboard(PHRASE);
+      await copySecretToClipboard(PHRASE, NO_FEEDBACK);
       await vi.advanceTimersByTimeAsync(30_000);
       // Reached the host once, and the rejection did not escape the timer.
       expect(invokeMock).toHaveBeenCalledTimes(1);

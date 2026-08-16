@@ -75,6 +75,7 @@ import { CoverPicker, type CoverChoice } from "../../components/attachments/Cove
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
+import { copyText } from "../../lib/clipboard";
 import {
   DrawingCanvasLazy,
   extractSceneJson,
@@ -1564,7 +1565,18 @@ function ViewHost({ viewId }: { viewId: string }) {
       revealInFolder: () => sidebar.select(id),
       copyLink: () => {
         const title = sidebar.cache.get(id)?.title ?? "";
-        if (title !== "") void clipboardWriteText(`[[${title}]]`);
+        // TRANSPORT MIGRATION ONLY (myne-md/myne#390). Both arms are silent
+        // because that is what this menu item does today: the rejection used to
+        // be dropped by a bare `void`, and an empty title is a no-op the user
+        // also never sees. Recorded rather than deleted so the follow-up task
+        // that gives it a toast is editing a decision, not discovering an
+        // absence.
+        if (title !== "") {
+          void copyText(clipboardWriteText, `[[${title}]]`, {
+            onSuccess: { kind: "silent", reason: "pre-fix behaviour (myne 390): the card menu reported nothing" },
+            onFailure: { kind: "silent", reason: "pre-fix behaviour (myne 390): the rejection was dropped by `void`" },
+          });
+        }
       },
     });
   }, [cardMenu, ws, sidebar]);

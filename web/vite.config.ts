@@ -21,7 +21,6 @@
 
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import packageJson from "../package.json";
@@ -368,19 +367,6 @@ function emitCssDataImages(): Plugin {
   };
 }
 
-/** The short commit this build came from, or `"unknown"`. Never throws — a
- *  source tarball or a shallow checkout must still build. */
-function buildCommit(): string {
-  try {
-    return execFileSync("git", ["rev-parse", "--short=9", "HEAD"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return "unknown";
-  }
-}
-
 export default defineConfig({
   root: path.join(repoRoot, "web"),
   publicDir: path.join(repoRoot, "public"),
@@ -391,10 +377,38 @@ export default defineConfig({
   // shared tree rather than just the About panel.
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
-    // See the desktop config: an INPUT to the build, so it can be a define. The
-    // bundle HASH cannot be — a bundle cannot contain its own hash — and is
-    // published in `version.json` by `emit-web-version.mjs` instead.
-    __BUILD_COMMIT__: JSON.stringify(buildCommit()),
+    // PINNED, and deliberately NOT `git rev-parse` the way the desktop config
+    // does it (myne-md/myne#458).
+    //
+    // `check-bundle-record.mjs --has` refuses to deploy a bundle whose hash is
+    // not already published in a reviewed commit. That precondition is only
+    // satisfiable because the container bundle is a pure function of the
+    // non-`docs/` tree: build it, hash it, write the row in a docs-only commit,
+    // and the bundle for that new commit is still the same bytes. A define that
+    // reads the commit puts the hash on the wrong side of that: recording the
+    // hash changes the commit, which changes the hash, which needs recording.
+    // The record could never describe the tip, and the deploy could never go
+    // green on its own.
+    //
+    // It answers `"unknown"` in the image today, so the loop has not bitten —
+    // but for two ACCIDENTS, not by design: `node:25-slim` carries no `git`,
+    // and `.dockerignore` excludes `.git`. Either one changing reintroduces it.
+    // Pinning the literal the image already produces converts "works because
+    // git is absent" into "works because nothing reads it".
+    //
+    // The tempting alternative is to feed this from `MYNE_BUILD_COMMIT`, which
+    // `web-docker-build` already passes as a `--build-arg`. That is the deadlock
+    // above, arriving on the first deploy after the change.
+    //
+    // The desktop config keeps `buildCommit()` and is right to: a desktop build
+    // ships inside an installer whose identity the version string names, gated
+    // by no hash record, so the same call costs nothing there.
+    //
+    // Nothing is lost on the readout. `emit-web-version.mjs` writes the real
+    // commit into `version.json` AFTER the build — where the bundle hash also
+    // lives, for the same reason a bundle cannot contain its own hash — and
+    // `servedBuildInfo()` is what About and the diagnostics blob read.
+    __BUILD_COMMIT__: JSON.stringify("unknown"),
   },
 
   build: {

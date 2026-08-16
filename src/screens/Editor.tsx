@@ -49,6 +49,14 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
+import {
+  OPEN_COVER_PICKER_EVENT,
+  REMOVE_COVER_EVENT,
+  type OpenCoverPickerDetail,
+} from "../notes/openCoverPickerSignal";
+import { CoverPicker, type CoverChoice } from "../components/attachments/CoverPicker";
+import { setNoteCover } from "../notes/setNoteCover";
+import { COVER_FIELD_KEY } from "../dialect";
 import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
@@ -77,7 +85,6 @@ import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndic
 import { AiHydrationProbe } from "../notes/components/AiHydrationProbe";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast, type ToastAction, type ToastVariant } from "../components/Toast";
-import { Toaster } from "../components/toast/Toaster";
 import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
@@ -735,9 +742,22 @@ function EditorChrome({
     async (id: string) => {
       try {
         const { copyNoteMarkdown } = await import("../notes/copyNoteMarkdown");
-        await copyNoteMarkdown(id);
-        setToast({ message: i18n.t("export.note.modal.copied"), variant: "success" });
+        await copyNoteMarkdown(id, {
+          onSuccess: {
+            kind: "toast",
+            run: () =>
+              setToast({ message: i18n.t("export.note.modal.copied"), variant: "success" }),
+          },
+          onFailure: {
+            kind: "toast",
+            run: () =>
+              setToast({ message: i18n.t("export.note.modal.copyFailed"), variant: "error" }),
+          },
+        });
       } catch {
+        // The READ failed (or the module import did). Distinct from a refused
+        // clipboard, which the pair above already reported, but the user-facing
+        // outcome is the same sentence: nothing reached the clipboard.
         setToast({ message: i18n.t("export.note.modal.copyFailed"), variant: "error" });
       }
     },
@@ -2474,10 +2494,13 @@ function EditorChrome({
         durationMs={toast?.action !== undefined ? 6000 : 2500}
         onDone={() => setToast(null)}
       />
-      {/* The single toast surface (#238): renders every toast from the central
-          store — this screen's, NoteList's, sync's, and the editor's imperative
-          ones — as one shared collapsed stack. Mounted exactly once. */}
-      <Toaster />
+      {/* The `<Toaster />` used to mount HERE, and that placement was the defect
+          myne-md/myne#390 found underneath its own findings. This screen renders
+          only after unlock, so vault creation, unlock and the fail-closed
+          takeovers were all outside it, a `toast(...)` from any of them drew
+          nothing at all, silently, which is why those surfaces had grown label
+          swaps and silences instead. It now mounts once in `App.tsx`, above the
+          stage switch, so every stage can reach it. */}
       {/* ASM-6→B / #422: the calm "updated from another device" hint. Headless —
           it pushes an info toast into the <Toaster> above when the sync cycle
           reports an NC05 note was reconciled by an automatic CRDT merge (#419). */}
@@ -2791,6 +2814,15 @@ function CommandPaletteHost({
   // DeleteConfirmModal the TrashPanel footer uses, and only confirm purges.
   // Rendered as a sibling like `picker`, so it survives the palette closing.
   const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<number | null>(null);
+  // The note cover's picker (myne-md/myne#410). Editor-local boolean, per the
+  // desktop modal carve-out that governs every other modal here. Deliberately
+  // its OWN mount, separate from the cards-view picker inside `PaneView`: this
+  // change does not touch the saved-views subsystem, and sharing that state
+  // machine would mean touching it.
+  // `| null` rather than an `open` flag, matching `picker` and
+  // `emptyTrashConfirm` beside it: two booleans would encode four states for a
+  // two-state thing, and every close would have to remember to reset both.
+  const [coverPicker, setCoverPicker] = useState<{ hasCover: boolean } | null>(null);
   // AI surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9): the `ai_enabled`
   // gate + the AI Chat reveal, threaded into CommandContext so AI capability
   // actions (siblings 4/6/7) gate on `stageName === "editor" && aiEnabled` and
@@ -3117,6 +3149,18 @@ function CommandPaletteHost({
       onExportNotePdf,
       onExportNoteHtml,
       onExportNoteTxt,
+      // The cover picker's keyboard door (myne-md/myne#410). Built here rather
+      // than threaded in as a prop because the picker's state lives in this
+      // component, and it is the one entry point a keyboard-only user has: the
+      // banner control and the title-row control are both hover-revealed.
+      onSetNoteCover: () => {
+        onClose();
+        setCoverPicker({ hasCover: false });
+      },
+      onRemoveNoteCover: () => {
+        onClose();
+        applyNoteCover(null);
+      },
       onShowGraph,
       onShowTags,
       onShowViews,
@@ -3214,6 +3258,20 @@ function CommandPaletteHost({
   // `convertTemplateToNote`, surfaced where you author.
   const activeNoteId = ctx.selectedId;
   const activeIsTemplate = activeNoteId !== null && isTemplate(activeNoteId);
+  // Settle an out-of-band frontmatter write: a canonical field written straight
+  // to disk while the note is OPEN leaves the pane's buffer holding the
+  // pre-write bytes, and the next autosave writes them back and silently
+  // reverts the change. Re-read the open note so its buffer carries the new
+  // frontmatter, then re-read the record so the tree settles. Skipped for a
+  // dirty buffer, which the reload guards.
+  //
+  // Shared by every such write in this component (template convert, note cover)
+  // rather than copied per caller: the recipe belongs to the BUG CLASS, so if it
+  // ever gains a step, one edit covers all of them.
+  const settleFrontmatterWrite = (id: string) => {
+    ctx.reloadOpenNote();
+    return ctx.refreshOne(id);
+  };
   // Convert with an undo toast: promoting a note to a template makes it LEAVE
   // the sidebar (templates are inverse-visibility, hidden like trash), so the
   // toast is what keeps it from reading as "my note vanished". Undo runs the
@@ -3223,15 +3281,10 @@ function CommandPaletteHost({
     const id = activeNoteId;
     const forward = toTemplate ? convertNoteToTemplate : convertTemplateToNote;
     const inverse = toTemplate ? convertTemplateToNote : convertNoteToTemplate;
-    // The convert wrote the `template:` flag straight to disk, out of band of the
-    // open pane's buffer. Re-read the open note (`reloadOpenNote`) so its buffer
-    // carries the new frontmatter — otherwise a later autosave would write the
-    // stale buffer back and silently revert the flag (the frontmatter-vs-buffer
-    // staleness class). Skipped for a dirty buffer, which the reload guards.
-    const settle = () => {
-      ctx.reloadOpenNote();
-      return ctx.refreshOne(id);
-    };
+    // The convert wrote the `template:` flag straight to disk, out of band of
+    // the open pane's buffer — the frontmatter-vs-buffer staleness class that
+    // `settleFrontmatterWrite` above exists for.
+    const settle = () => settleFrontmatterWrite(id);
     void forward(id)
       .then(settle)
       .then(() => {
@@ -3253,6 +3306,45 @@ function CommandPaletteHost({
         /* mutation failure leaves the note unchanged; no toast */
       });
   };
+  // The note cover (myne-md/myne#410). `setNoteCover` writes `cover:` straight
+  // to disk while the note is OPEN, so it is the same staleness class as the
+  // template convert above and settles the same way.
+  const applyNoteCover = (choice: CoverChoice | null) => {
+    const id = activeNoteId;
+    setCoverPicker(null);
+    if (id === null) return;
+    void setNoteCover(id, COVER_FIELD_KEY, choice)
+      .then(() => settleFrontmatterWrite(id))
+      .catch(() => {
+        // Say so. A swallowed failure here is indistinguishable from "the cover
+        // I picked did not apply for some reason I cannot see": the note is
+        // unchanged, the picker has already closed, and nothing on screen moved.
+        setToast({ message: t("editor.cover.writeFailed"), variant: "error" });
+      });
+  };
+  // The banner's two hover controls reach this component through window signals,
+  // the same shape the vim `:q` ex command uses: the banner is CodeMirror DOM in
+  // the shared editor package, with no route into the React context that owns
+  // both the modal mounts and the knowledge of which note is focused.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<OpenCoverPickerDetail>).detail;
+      setCoverPicker({ hasCover: detail?.hasCover === true });
+    };
+    const onRemove = () => applyNoteCover(null);
+    window.addEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
+    window.addEventListener(REMOVE_COVER_EVENT, onRemove);
+    return () => {
+      window.removeEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
+      window.removeEventListener(REMOVE_COVER_EVENT, onRemove);
+    };
+    // Re-subscribes when the focused note changes, which is what the vim `:q`
+    // listener below does too. The alternative (an empty dep list plus a ref
+    // mutated during render to keep the handler fresh) is the React-19 shape
+    // `src/CLAUDE.md` warns about, and buys nothing here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNoteId]);
+
   const noteActionItems: NoteActionMenuItem[] = [
     {
       kind: "action",
@@ -3260,6 +3352,17 @@ function CommandPaletteHost({
       icon: "pencil",
       label: t("editor.noteActions.rename"),
       onSelect: commandCtx.onRenameNote,
+    },
+    {
+      kind: "action",
+      action: "cover",
+      icon: "image",
+      // Always "Add cover", never "Change cover": this menu cannot see whether
+      // the open note has one (the note cache carries no cover state), and a
+      // label that guesses would be wrong half the time. The picker itself is
+      // the surface that shows what is already there.
+      label: t("editor.cover.add"),
+      onSelect: () => setCoverPicker({ hasCover: false }),
     },
     {
       kind: "action",
@@ -3383,6 +3486,16 @@ function CommandPaletteHost({
           setPicker(null);
           if (!suppress) onReopen();
         }}
+      />
+      <CoverPicker
+        open={coverPicker !== null && activeNoteId !== null}
+        // Comes from whichever entry point opened it: the banner's Change
+        // control passes true (a banner only renders for a note that has one),
+        // the "Add cover" entries pass false.
+        hasCover={coverPicker?.hasCover === true}
+        onClose={() => setCoverPicker(null)}
+        onPick={(choice) => applyNoteCover(choice)}
+        onRemove={() => applyNoteCover(null)}
       />
       {emptyTrashConfirm !== null && (
         <DeleteConfirmModal

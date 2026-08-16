@@ -185,6 +185,38 @@ export interface EditorHost {
     isMediaTarget: (target: string) => boolean;
   };
 
+  /** Clipboard WRITE (myne-md/myne#390). Rejects when the write did not happen.
+   *
+   *  This package is forbidden every `@tauri-apps/*` import by
+   *  `scripts/check-platform-seam.mjs`, so the code-block copy button reached
+   *  the raw WebView clipboard API directly and had no other option. That is
+   *  exactly the call the clipboard guard prohibits tree-wide, and the prohibition is
+   *  only worth having if it is flat: an allowlist with one standing exemption is
+   *  what the next copy button leans on.
+   *
+   *  REQUIRED rather than optional, unlike most members here. The optional shape
+   *  models "this platform cannot do the thing", and every client can write to a
+   *  clipboard; what differs is only HOW (desktop and web through the platform
+   *  seam, mobile through its native sensitive-pasteboard command). A host that
+   *  omitted this would not be a platform without a clipboard, it would be a
+   *  wiring bug, and a required member turns that into a type error.
+   *
+   *  A BARE member rather than a `clipboard: { write }` namespace, matching
+   *  `openExternal` and every other single-capability member here (the grouped
+   *  ones all hold two or more operations). The name carries the write-only
+   *  narrowing on purpose: a `clipboard` object would be a ready-made slot for
+   *  `read` and `clear`, which is exactly the pair
+   *  `src/platform/clipboardManager.ts` deleted under myne#379 on the recorded
+   *  grounds that "an unused seam member is a door the next caller can reopen
+   *  with no ACL edit and no review". Widening this is a rename a reviewer sees,
+   *  not a key someone adds.
+   *
+   *  Deliberately raw transport, NOT the shared copy-policy module: `editor/` is
+   *  consumed BY `src/`, so importing `src/lib/clipboard.ts` here would invert the
+   *  dependency. The code block's confirmation is a DOM icon flip inside a
+   *  CodeMirror decoration and stays local for the same reason. */
+  clipboardWrite: (value: string) => Promise<void>;
+
   /** Attachment IO (export/rename dialogs — IPC). */
   attachments: {
     /** Import one source and return the stored attachment. Rejects with the
@@ -362,6 +394,31 @@ export interface EditorHost {
     flushPendingSaves: () => Promise<void>;
     /** Close the focused note tab (`:q`). */
     closeActiveTab: () => void;
+  };
+
+  /** OPTIONAL — the note cover's picker (myne-md/myne#410).
+   *
+   *  The banner is CodeMirror DOM inside this package; the picker is the host's
+   *  own modal, and the host is also the only thing that knows which note the
+   *  focused pane holds. So the editor ASKS rather than opens, exactly like
+   *  `workspace.closeActiveTab` above, and for the same reason.
+   *
+   *  A host that omits this renders no cover controls at all: the affordance is
+   *  hidden rather than shown broken, which is the seam's whole contract. */
+  cover?: {
+    /** Open the host's cover picker for whichever note is focused.
+     *
+     *  `hasCover` flows this way round because the EDITOR knows it and the shell
+     *  does not: the banner has just resolved the note's `cover:` field, while
+     *  the shell's note cache carries no cover state. The picker uses it to
+     *  decide whether to offer its own Remove action. */
+    openPicker: (hasCover: boolean) => void;
+    /** Clear the focused note's cover.
+     *
+     *  A separate member rather than a trip through the picker: removing is a
+     *  one-click intent, and routing it through a modal the user then has to
+     *  act inside makes two controls that do the same thing. */
+    remove: () => void;
   };
 }
 

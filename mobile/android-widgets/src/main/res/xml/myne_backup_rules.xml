@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31+) backup / device-transfer rules — myne-md/myne#491.
+
+  Four mobile flows write PLAINTEXT into the app's Documents directory: the
+  recovery phrase / account number, the whole-vault markdown tree, a note's PDF,
+  and an exported attachment. On Android that directory is
+  `getExternalFilesDir(DIRECTORY_DOCUMENTS)` (tauri `PathPlugin.kt::getDocumentDir`),
+  i.e. `<external>/Documents`, and Auto Backup includes it by default — so a saved
+  recovery phrase, which alone reconstructs the vault, was being carried to Google
+  Drive. It is excluded here.
+
+  Auto Backup stays ON for everything else on purpose: the rest of the app's data
+  is the AEAD-encrypted vault, and keeping it in a backup is a real safety net for
+  a user who does not sync. Only the plaintext export directory is excluded.
+
+  BOTH blocks are required and must stay in lock-step. `<cloud-backup>` covers
+  backup-to-Drive; `<device-transfer>` covers phone-to-phone transfer, which is a
+  separate copy path that ignores the cloud-backup block. Excluding one and not
+  the other leaves the phrase leaving the device by the other route.
+  `scripts/check-mobile-export-backup.mjs` compares both directions.
+
+  API <= 30 reads `myne_backup_rules_legacy.xml` (`full-backup-content`) instead;
+  the two files must exclude the same paths.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="external" path="Documents" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="external" path="Documents" />
+    </device-transfer>
+</data-extraction-rules>
