@@ -299,6 +299,102 @@ const CSS = `
   cursor: pointer;
 }
 
+.cm-cover-banner {
+  /* Fixed height, never an aspect ratio: a split pane changes width a lot and a
+     ratio would move where the body text starts (myne-md/myne#410). The height
+     is reserved even while the catalog loads, so the text does not jump down
+     when the image arrives. */
+  position: relative;
+  height: var(--cover-banner-h, 180px);
+  margin: 0 0 var(--space-4, 16px);
+  border-radius: var(--radius-2, 6px);
+  overflow: hidden;
+  background: var(--paper-2, #f4f2ec);
+  /* Decorative: nothing here is text the user selects, and a drag across the
+     banner should not paint a selection bar over it. Pointer events are NOT
+     disabled, so the hover controls inside receive their own clicks. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cm-cover-banner-controls {
+  position: absolute;
+  top: var(--space-2, 8px);
+  right: var(--space-2, 8px);
+  display: flex;
+  gap: var(--space-1, 4px);
+  /* Revealed on hover, and on focus-within so a control that DOES receive
+     focus is visible while it has it. That is a safety net, not a keyboard
+     route: these buttons sit inside CodeMirror content where Tab indents, so
+     Tab never lands here. The keyboard route is the command palette. */
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.cm-cover-banner:hover .cm-cover-banner-controls,
+.cm-cover-banner:focus-within .cm-cover-banner-controls {
+  opacity: 1;
+}
+.cm-cover-banner-control {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border: 1px solid var(--line-1, #e3ded2);
+  border-radius: var(--radius-1, 3px);
+  background: var(--paper, #fbfaf7);
+  color: var(--ink-1, #1a1917);
+  cursor: pointer;
+}
+.cm-cover-banner-control:hover {
+  background: var(--paper-2, #f4f2ec);
+}
+
+.cm-cover-banner-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Centre crop. There is no per-note focal point by design; repositioning
+     would need a second stored value. */
+  object-fit: cover;
+  object-position: center;
+}
+
+.cm-fm-properties-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+/* Only the reveal is here: the ghost-button look is shared with
+   "+ Add property" further down, in one rule listing both classes.
+   (No backticks anywhere in this file: the CSS is one template literal, and a
+   stray backtick in a comment terminates it.) */
+.cm-fm-add-cover {
+  flex: 0 0 auto;
+  /* Quiet until wanted: a note without a cover should not carry a permanent
+     advertisement for one. */
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.cm-fm-properties-name-row:hover .cm-fm-add-cover,
+.cm-fm-add-cover:focus-visible {
+  opacity: 1;
+}
+
+/* No hover on a touch device, so both cover affordances are simply always
+   visible there. Without this the whole feature is unreachable on a phone or
+   tablet, which the shared editor package also compiles for.
+
+   POSITION IS LOAD-BEARING: this must come after BOTH opacity-0 base rules.
+   A media query adds no specificity, so with identical selectors source order
+   decides, and an earlier block is silently overridden by the later base rule.
+   That is exactly what happened when the two per-control blocks were merged
+   into one and the merged block landed above the add-cover base rule. */
+@media (pointer: coarse) {
+  .cm-cover-banner-controls,
+  .cm-fm-add-cover {
+    opacity: 1;
+  }
+}
+
 .cm-fm-properties {
   padding: 2px 0 16px;
   font-family: var(--font-sans);
@@ -435,12 +531,17 @@ const CSS = `
   box-shadow: none !important;
   background: var(--paper-2, #f3f1eb);
 }
-.cm-fm-properties-add {
+/* The Properties widget's ghost buttons: "+ Add property" and "Add cover".
+   ONE rule, two identity classes rather than a shared class, because
+   .cm-fm-properties-add is how existing tests find the add-property button and
+   a shared class would make that selector ambiguous. The em-relative font-size
+   is load-bearing: .cm-fm-properties sets an em base so the whole block follows
+   Settings > Editor > text size, and a px size here would opt one control out. */
+.cm-fm-properties-add,
+.cm-fm-add-cover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 10px;
-  margin-left: var(--space-5);
   border: 0;
   background: transparent;
   color: var(--fg-3);
@@ -450,7 +551,12 @@ const CSS = `
   padding: var(--space-1) 6px;
   border-radius: var(--radius-1, 3px);
 }
-.cm-fm-properties-add:hover {
+.cm-fm-properties-add {
+  margin-top: 10px;
+  margin-left: var(--space-5);
+}
+.cm-fm-properties-add:hover,
+.cm-fm-add-cover:hover {
   background: var(--paper-2, #f3f1eb);
   color: var(--fg-1);
 }

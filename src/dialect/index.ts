@@ -82,6 +82,7 @@ export {
   TASK_KIND_VALUE,
   CANONICAL_KIND_VALUES,
   FOLDER_INDEX_FLAG_VALUE,
+  COVER_FIELD_KEY,
   TEMPLATE_FLAG_VALUE,
 } from "./surgery";
 export { parseStream } from "./worker";
