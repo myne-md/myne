@@ -488,6 +488,29 @@ fn probe_answer(user: &str) -> Option<String> {
     ))
 }
 
+/// Body lines that occur EXACTLY ONCE in the whole note, frontmatter skipped.
+///
+/// Both halves were learned from a failing test, and both are the rule `place`
+/// enforces rather than stub convenience: "first non-empty line" picks `---`,
+/// which appears twice and refuses with `AnchorAmbiguous`; adding only the
+/// occurs-once rule then picks `title: <name>`, so the stub would rewrite a
+/// MANAGED frontmatter field (`markdown-dialect.md` §3.6.1) instead of the body.
+///
+/// Shared by the trash branch and by step 3 below, because the two producing
+/// different anchors from the same note is a difference nothing would report.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn unique_body_lines(body: &str) -> impl Iterator<Item = &str> {
+    let after_frontmatter = body
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.split_once("\n---\n"))
+        .map(|(_, rest)| rest)
+        .unwrap_or(body);
+    after_frontmatter
+        .lines()
+        .map(str::trim_end)
+        .filter(|l| !l.is_empty() && body.matches(*l).count() == 1)
+}
+
 /// A deterministic action script for an agent-loop request, or `None` when the
 /// request is not one.
 ///
@@ -544,6 +567,72 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
         .unwrap_or("");
     let last_user = last_user_of(messages);
 
+    // **Two task-keyed branches, so `ag3` and `ag5` exercise something.**
+    // Both scenarios returned early with a `console.warn` when the stub did not
+    // produce their condition, and the stub never did: the script emitted only
+    // `list_scope`, `read_note`, `propose_edit` and `finish`. They passed green
+    // while testing nothing, permanently, and one of them covers the trash
+    // carve-out, which is the single control `0515` and `threat-model.md` §7
+    // call structural rather than behavioural. The scenario comment said the
+    // engine's script was not the suite's to set; the stub lives in this repo
+    // and this branch already scripts it, so that was not true either.
+    //
+    // Keyed off the task text rather than off a flag, so the scenario asks for
+    // what it needs in the same sentence a user would type, and a scenario that
+    // stops asking stops getting it.
+    let task = messages
+        .iter()
+        .find(|m| m.role == ChatRole::User)
+        .map(|m| m.content.as_str())
+        .unwrap_or("");
+
+    // A scope expansion, asked once: after the listing, before any read.
+    if task.contains("other folders")
+        && last_assistant.contains("\"action\":\"list_scope\"")
+        && !messages
+            .iter()
+            .any(|m| m.content.contains("\"action\":\"request_scope\""))
+    {
+        return Some(
+            "{\"action\":\"request_scope\",\"folder\":\"Projects\",\
+             \"reason\":\"the task mentions other folders\"}"
+                .to_string(),
+        );
+    }
+
+    // A trashing edit, and an ORDINARY one beside it.
+    //
+    // The pair is the whole point. The carve-out under review is "the bulk
+    // approve carries the rest and leaves the trashing edit alone", and a
+    // proposal holding only the trashing edit cannot show the "rest" half:
+    // `approveAll` sends an empty list, the apply returns early on it, and no
+    // report renders. The scenario then times out on a report that was never
+    // going to appear, which reads as a product defect and is a harness one.
+    if task.contains("trash this") && last_assistant.contains("\"action\":\"read_note\"") {
+        let id = last_assistant
+            .split("\"note_id\":\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())?;
+        let body = last_user;
+        // The frontmatter's own title line is the anchor for the trashing edit,
+        // because appending a `trashed:` line after it is what trashing a note
+        // actually looks like at the byte level (`markdown-dialect.md` §3.6.1).
+        let title_line = body
+            .lines()
+            .map(str::trim_end)
+            .find(|l| l.starts_with("title:") && body.matches(*l).count() == 1)?;
+        // The ordinary one anchors in the BODY, under the same occurs-exactly-
+        // once rule `place` enforces.
+        let plain = unique_body_lines(body).next()?;
+        return Some(format!(
+            "{{\"action\":\"propose_edit\",\"note_id\":\"{id}\",\"anchor\":\"{plain}\",\
+             \"replacement\":\"{plain} (edited by the stub)\"}}\n\
+             {{\"action\":\"propose_edit\",\"note_id\":\"{id}\",\"anchor\":\"{title_line}\",\
+             \"replacement\":\"{title_line}\\ntrashed: 2026-08-16T12:00:00Z\"}}\n\
+             {{\"action\":\"finish\",\"summary\":\"stub trash run\"}}"
+        ));
+    }
+
     // Step 3: the previous turn asked to read a note, so this user turn is the
     // body. Checked before step 2 so each check stays a simple containment.
     if last_assistant.contains("\"action\":\"read_note\"") {
@@ -554,28 +643,12 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
             .nth(1)
             .and_then(|rest| rest.split('"').next())?;
         let body = last_user;
-        // Skip the frontmatter, then take lines that occur EXACTLY ONCE, which
-        // is the rule `place` enforces. Both halves were learned from a failing
-        // test: "first non-empty line" picks `---`, which appears twice and
-        // refuses with `AnchorAmbiguous`; adding only the occurs-once rule then
-        // picks `title: <name>`, so the stub would rewrite a MANAGED frontmatter
-        // field (`markdown-dialect.md` §3.6.1) instead of the body.
-        let after_frontmatter = body
-            .strip_prefix("---\n")
-            .and_then(|rest| rest.split_once("\n---\n"))
-            .map(|(_, rest)| rest)
-            .unwrap_or(body);
         // Up to TWO edits, one per eligible line. Not richness for its own
         // sake: "reject one, approve the rest" is a real user path and an
         // acceptance criterion, and with a single proposed edit rejecting it
         // leaves nothing to apply, so the apply returns early and no report
         // renders. `ag1` failed exactly that way.
-        let anchors: Vec<&str> = after_frontmatter
-            .lines()
-            .map(str::trim_end)
-            .filter(|l| !l.is_empty() && body.matches(*l).count() == 1)
-            .take(2)
-            .collect();
+        let anchors: Vec<&str> = unique_body_lines(body).take(2).collect();
         if anchors.is_empty() {
             return None;
         }
@@ -1189,6 +1262,7 @@ mod agent_script_tests {
             ProbeThreshold {
                 attempts: 3,
                 required: 2,
+                provisional: false,
             },
         ))
         .expect("the probe runs");
@@ -1243,6 +1317,78 @@ mod agent_script_tests {
         // The agent no longer reaches `infer`, so it carries no agent branch.
         let out = StubEngine.infer(&system_instructions()).unwrap();
         assert!(out.starts_with("stub-infer: "), "got: {}", &out[..40]);
+    }
+
+    /// The two task-keyed branches `ag3` and `ag5` depend on, asserted here so a
+    /// failure names the branch rather than arriving as a container timeout
+    /// forty minutes later.
+    #[test]
+    fn a_task_naming_other_folders_requests_a_scope_expansion() {
+        let reply = ask(&[
+            turn(ChatRole::User, "look in my other folders too"),
+            turn(ChatRole::Assistant, r#"{"action":"list_scope"}"#),
+            turn(ChatRole::User, "note-aaa My note"),
+        ]);
+        let actions = parse_actions(&reply);
+        assert_eq!(actions.len(), 1, "got {actions:?}");
+        match &actions[0] {
+            AgentAction::RequestScope { folder, reason } => {
+                assert!(!folder.is_empty());
+                assert!(!reason.is_empty());
+            }
+            other => panic!("expected a scope request, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_task_naming_trash_proposes_an_edit_that_writes_the_marker() {
+        let body = "---\ntitle: My note\n---\n\nalpha beta gamma\n";
+        let reply = ask(&[
+            turn(ChatRole::User, "trash this note"),
+            turn(ChatRole::Assistant, r#"{"action":"list_scope"}"#),
+            turn(ChatRole::User, "note-aaa My note"),
+            turn(
+                ChatRole::Assistant,
+                r#"{"action":"read_note","note_id":"note-aaa"}"#,
+            ),
+            turn(ChatRole::User, body),
+        ]);
+        let actions = parse_actions(&reply);
+        // **BOTH halves, and the pair is the point.** The scenario this feeds
+        // asserts that a bulk approve carries the ordinary edits and leaves the
+        // trashing one alone, so a proposal holding only the trashing edit
+        // cannot show the "carries" half at all: the bulk action sends an empty
+        // list, the apply returns early on it, and no report renders.
+        let mut trashing = 0;
+        let mut ordinary = 0;
+        for action in &actions {
+            let AgentAction::ProposeEdit {
+                anchor,
+                replacement,
+                ..
+            } = action
+            else {
+                continue;
+            };
+            // Checked through the real placer and the real detector rather than
+            // by reading the string, so the claim is about what applying the
+            // edit DOES.
+            let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+                .expect("the anchor must place");
+            if myne_core::plugins::agent::trash::edit_trashes(body, &placed) {
+                trashing += 1;
+            } else {
+                ordinary += 1;
+            }
+        }
+        assert_eq!(
+            trashing, 1,
+            "exactly one edit the carve-out refuses: {actions:?}"
+        );
+        assert_eq!(
+            ordinary, 1,
+            "and exactly one the bulk approve carries: {actions:?}"
+        );
     }
 
     #[test]

@@ -23,25 +23,73 @@ import {
   agentPreviewGrant,
   type GrantPreview,
 } from "../../../lib/agent-run";
+import {
+  aiCapabilityReport,
+  answeredByOf,
+  providerLabelOf,
+} from "../../../lib/ai-capability";
+import { usePrefs } from "../../../hooks/usePrefs";
 import { failRun, resumeRun, settleStep, useAgent } from "../agentStore";
 import { ScopeExpansionDialog, type ProviderArm } from "./ScopeExpansionDialog";
 
-export function AgentProgress({
-  arm = "none",
-  providerName,
-}: {
-  /** Which provider arm is serving. Decides the expansion dialog's egress line;
-   *  the dialog cannot ask the host itself without inventing a second source for
-   *  a fact the AI settings surface already resolves. */
-  arm?: ProviderArm;
-  providerName?: string;
-} = {}) {
+export function AgentProgress() {
   const { t } = useTranslation();
   const agent = useAgent();
+  const { prefs } = usePrefs();
   const [preview, setPreview] = useState<GrantPreview | null>(null);
+  const [arm, setArm] = useState<{ arm: ProviderArm; providerName?: string }>({
+    arm: "none",
+  });
   const awaiting = agent.end?.kind === "awaitingScope" ? agent.end : null;
   const runId = agent.view?.runId ?? null;
   const folder = awaiting?.folder ?? null;
+
+  // **Whether approving sends more text off the device, resolved HERE.**
+  //
+  // This used to be an `arm` prop with a `"none"` default and a doc comment
+  // saying the component could not ask the host without inventing a second
+  // source for a fact the AI settings surface already resolves. The premise was
+  // wrong in both halves: `ai-capability.ts` IS that one source, so calling it
+  // is reading the fact rather than duplicating it -- and the prop's only call
+  // site, `AiChatTab`, passed nothing. So the default held on every render, and
+  // the fourth fact of the expansion gate, the one that says notes are about to
+  // leave the machine, rendered on neither arm. `ag5` asserts it is present.
+  //
+  // `AGENT_REQUEST_CLASS` is `UserInitiated`, so the agent is served by the
+  // ACTIVE arm and the report describes it. An ambient request would be barred
+  // onto the local arm and this would be the wrong question to ask; the loop's
+  // constant is what makes it the right one.
+  const providerLabel = providerLabelOf(prefs.ai_provider) ?? undefined;
+  useEffect(() => {
+    if (folder === null) {
+      setArm({ arm: "none" });
+      return;
+    }
+    let live = true;
+    void aiCapabilityReport().then((report) => {
+      if (!live) return;
+      // A build with no AI in it leaves `none`, so the dialog states no egress
+      // claim rather than guessing one. Checked BEFORE the mapping, because
+      // `answeredByOf` reads an unknown class as `in-process`, and answering
+      // "these notes stay on the device" from a report that answered nothing
+      // would be a reassurance nobody measured.
+      if (!report.compiled) {
+        setArm({ arm: "none" });
+        return;
+      }
+      const by = answeredByOf(report, providerLabel);
+      // `in-process` is the bundled engine and `local-runtime` a program on this
+      // machine; both stay on the device, so both are the local arm.
+      setArm(
+        by.kind === "remote"
+          ? { arm: "remote", providerName: by.provider }
+          : { arm: "local" },
+      );
+    });
+    return () => {
+      live = false;
+    };
+  }, [folder, providerLabel]);
 
   // The dialog's numbers come from the host, resolved by the same code the
   // commit runs. Computing them here would leave out the excluded-folder clamp
@@ -104,8 +152,8 @@ export function AgentProgress({
           excludedCount={preview.excludedCount}
           newTotal={preview.newTotal}
           reason={awaiting.reason}
-          arm={arm}
-          providerName={providerName}
+          arm={arm.arm}
+          providerName={arm.providerName}
           onApprove={() => {
             resumeRun();
             void agentApproveScope(runId, {

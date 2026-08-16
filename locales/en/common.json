@@ -39,7 +39,8 @@
       "startFailed": "The agent could not start.",
       "unsupported": "This model cannot make precise edits reliably, so the agent is unavailable. Choose a larger model or a provider.",
       "unsupportedDetail": "It passed {{passes}} of {{attempts}} checks; {{required}} are needed.",
-      "checking": "Checking the model…"
+      "checking": "Checking the model…",
+      "unsupportedProvisional": "That pass mark has not been measured across models yet, so it may be stricter or looser than it should be."
     },
     "progress": {
       "working": "Working",

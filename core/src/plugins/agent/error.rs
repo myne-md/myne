@@ -41,6 +41,13 @@ pub enum EditRejection {
     /// A proposed new note's title or folder contains a newline, so writing it
     /// into frontmatter would emit fields nothing validated.
     UnsafeFrontmatter,
+    /// The note now sits in an `ai_excluded_folders` folder.
+    ///
+    /// Distinct from `OutOfScope`, which is about the run's frozen grant. This
+    /// one fires for a note the user DID grant and then excluded, or moved into
+    /// an excluded folder, while the run was open or the review was pending.
+    /// SYNC-14 carries no in-flight carve-out, so the newest answer decides.
+    ExcludedNow,
     /// The proposed new note names an `ai_excluded_folders` folder.
     ///
     /// A new note's folder comes from the model, so it is the one write whose

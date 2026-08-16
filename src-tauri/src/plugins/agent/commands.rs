@@ -56,13 +56,31 @@ fn probe_threshold() -> ProbeThreshold {
     struct Raw {
         attempts: u8,
         required: u8,
+        status: String,
+        measurements: Vec<serde_json::Value>,
     }
     let raw: Raw = serde_json::from_str(PROBE_THRESHOLD_JSON).expect(
         "agent-probe-threshold.json is malformed; it is compiled in, so this is a build bug",
     );
+    // **The `status` field has to mean something, or it is decoration.** It
+    // declared itself a blocking obligation and gated nothing: this function
+    // read `attempts` and `required` and never looked at it, so flipping it to
+    // `measured` with an empty `measurements` would have changed no behaviour
+    // and no check. The file is compiled in, so a disagreement between the two
+    // is a build bug in the same class as malformed JSON, and it fails here
+    // rather than shipping a record that lies about itself.
+    let measured = raw.status == "measured";
+    assert_eq!(
+        measured,
+        !raw.measurements.is_empty(),
+        "agent-probe-threshold.json: status is {:?} but measurements has {} entries.          The two must agree: `measured` with no measurements is a claim nobody made,          and `unmeasured` with measurements is a record that has stopped describing itself.",
+        raw.status,
+        raw.measurements.len(),
+    );
     ProbeThreshold {
         attempts: raw.attempts,
         required: raw.required,
+        provisional: !measured,
     }
 }
 
@@ -436,8 +454,25 @@ async fn step<R: Runtime>(
         }
     }
 
+    // A cancel the loop has now observed is terminal, so the run and its session
+    // go together. Not done in `agent_cancel`: that only sets the flag, and
+    // removing the run there would race the in-flight loop into `NoSuchRun`
+    // instead of the `Cancelled` end it is written to return. A `Finished` run
+    // deliberately stays (the apply reads its frozen scope); see
+    // `AgentRunState::end`.
+    let cancelled = matches!(outcome.end, LoopEnd::Cancelled);
+    let view = runs.view(&run_id)?;
+    if cancelled {
+        runs.end(&run_id);
+        sessions
+            .sessions
+            .lock()
+            .expect("agent session table poisoned")
+            .remove(&run_id);
+    }
+
     Ok(AgentStepResult {
-        view: runs.view(&run_id)?,
+        view,
         proposal,
         end: outcome.end,
         iterations: outcome.iterations,

@@ -97,6 +97,15 @@ pub struct AppliedRun {
     pub notes_created: usize,
 }
 
+/// How many runs one unlocked session may hold at once.
+///
+/// Small on purpose: a run is a thing the user started and is reviewing, and
+/// more than a handful open at once is not a workflow anyone has. The cap
+/// exists because a finished run legitimately outlives its loop (see
+/// [`AgentRunState::end`]) and only a vault lock clears the table, so the
+/// unbounded case is a long session rather than an attack.
+const MAX_LIVE_RUNS: usize = 8;
+
 /// The app-managed table of live runs.
 ///
 /// `std::sync::Mutex` rather than a tokio one, on the `VaultIndicesState`
@@ -124,6 +133,21 @@ impl AgentRunState {
     pub fn start(&self, run_id: String, note_ids: BTreeSet<String>) -> Arc<AtomicBool> {
         let cancel = Arc::new(AtomicBool::new(false));
         let mut runs = self.runs.lock().expect("agent run table poisoned");
+        // Bound the table. A finished run outlives its loop on purpose (see
+        // `end`), and nothing else evicts one before a vault lock, so without a
+        // cap a long unlocked session accumulates every run's frozen scope. The
+        // oldest goes first and is CANCELLED on the way out, so anything still
+        // holding its flag stops rather than running against a table it has
+        // fallen out of. `BTreeMap` is ordered by run id, and ids are UUIDv7,
+        // so the first key is the oldest run.
+        while runs.len() >= MAX_LIVE_RUNS {
+            let Some(oldest) = runs.keys().next().cloned() else {
+                break;
+            };
+            if let Some(run) = runs.remove(&oldest) {
+                run.cancel.store(true, Ordering::SeqCst);
+            }
+        }
         runs.insert(
             run_id,
             AgentRun {
@@ -176,6 +200,23 @@ impl AgentRunState {
     /// [`Self::contains`] is still the right call for a single question, but a
     /// caller classifying N ids with it pays N lock/unlock pairs and N string
     /// comparisons on the run id to answer one question.
+    /// Whether a run may still WRITE.
+    ///
+    /// `contains_all` answers scope and deliberately not this: the two questions
+    /// are different and conflating them is how the second one gets skipped.
+    /// Stop sets the same flag the vault-lock teardown sets, and the lock path
+    /// was safe only because `clear()` removes the run outright rather than
+    /// because anything honoured the flag, so the flag's stated meaning held on
+    /// one of its two callers.
+    pub fn is_writable(&self, run_id: &str) -> Result<(), AgentError> {
+        let runs = self.runs.lock().expect("agent run table poisoned");
+        let run = runs.get(run_id).ok_or(AgentError::NoSuchRun)?;
+        if run.cancel.load(Ordering::SeqCst) {
+            return Err(AgentError::Cancelled);
+        }
+        Ok(())
+    }
+
     pub fn contains_all(&self, run_id: &str, note_ids: &[String]) -> Result<Vec<bool>, AgentError> {
         let runs = self.runs.lock().expect("agent run table poisoned");
         let run = runs.get(run_id).ok_or(AgentError::NoSuchRun)?;
@@ -238,6 +279,19 @@ impl AgentRunState {
     }
 
     /// Drop one finished run.
+    /// Drop one run.
+    ///
+    /// **A run deliberately OUTLIVES its loop**, which is why this is not called
+    /// when the loop reports `Finished`: the apply reads the run's frozen scope
+    /// (`contains_all`) and its writability, and the review screen may apply
+    /// several times, per edit or in bulk. Ending it at `Finished` would make
+    /// the approval that follows fail with `NoSuchRun`.
+    ///
+    /// The terminal events are therefore **cancel-observed** and **vault lock**,
+    /// and both call this or `clear()`. What it costs is that a finished run's
+    /// scope stays in RAM for the rest of the unlocked session, which is what
+    /// [`Self::start`]'s cap bounds; the host session holding the transcript and
+    /// the proposal is dropped on the same events.
     pub fn end(&self, run_id: &str) {
         let mut runs = self.runs.lock().expect("agent run table poisoned");
         runs.remove(run_id);
@@ -427,6 +481,52 @@ mod tests {
             flag.load(Ordering::SeqCst),
             "one mechanism: the host's token wraps this same Arc"
         );
+    }
+
+    #[test]
+    fn a_cancelled_run_is_not_writable() {
+        // Stop has to bound the WRITE, not only the model. The apply asked only
+        // about scope, and scope does not look at the flag, so a stopped run
+        // still applied on a later click.
+        let s = AgentRunState::default();
+        s.start("r".into(), ids(&["a"]));
+        assert!(s.is_writable("r").is_ok());
+        s.cancel("r");
+        assert!(matches!(s.is_writable("r"), Err(AgentError::Cancelled)));
+    }
+
+    #[test]
+    fn writability_of_an_unknown_run_is_a_named_error() {
+        let s = AgentRunState::default();
+        assert!(matches!(s.is_writable("nope"), Err(AgentError::NoSuchRun)));
+    }
+
+    #[test]
+    fn the_run_table_is_bounded_and_evicts_the_oldest() {
+        // A finished run outlives its loop on purpose, and only a vault lock
+        // clears the table, so without a cap a long unlocked session keeps every
+        // run's frozen scope. Ids are UUIDv7 in production; ordered ids here.
+        let s = AgentRunState::default();
+        let mut flags = Vec::new();
+        for i in 0..(MAX_LIVE_RUNS + 2) {
+            flags.push((
+                format!("run-{i:03}"),
+                s.start(format!("run-{i:03}"), ids(&["a"])),
+            ));
+        }
+        assert_eq!(s.len(), MAX_LIVE_RUNS);
+        // The evicted ones are CANCELLED on the way out, so anything still
+        // holding a flag stops rather than running against a table it has
+        // fallen out of.
+        assert!(
+            flags[0].1.load(Ordering::SeqCst),
+            "the oldest run's flag must be set when it is evicted"
+        );
+        assert!(matches!(
+            s.is_writable("run-000"),
+            Err(AgentError::NoSuchRun)
+        ));
+        assert!(s.is_writable(&flags[MAX_LIVE_RUNS + 1].0).is_ok());
     }
 
     fn applied(run_id: &str) -> AppliedRun {

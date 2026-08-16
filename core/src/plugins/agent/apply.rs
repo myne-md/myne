@@ -32,6 +32,7 @@ use super::prompt::ProposedNote;
 use super::run::AgentRunState;
 use super::trash::edit_trashes;
 use crate::folder_key::{canonical_excluded, folder_matches_excluded};
+use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use zeroize::Zeroizing;
@@ -184,7 +185,21 @@ pub async fn apply_approved(
     //    note must not even be read. Classified in one pass under one lock,
     //    rather than one lock and one run lookup per edit.
     let ids: Vec<String> = approved.iter().map(|e| e.note_id.clone()).collect();
+    // Stop bounds the WRITE too, not only the model. A run the user stopped kept
+    // its proposal and still applied on a later click, because scope membership
+    // was the only thing asked and it does not look at the flag. The lock path
+    // was safe by accident: `clear()` removes the run, so the flag was never the
+    // thing protecting it.
+    runs.is_writable(run_id)?;
     let allowed = runs.contains_all(run_id, &ids)?;
+    // SYNC-14 has no in-flight carve-out, and the frozen scope is not one.
+    // Freezing the GRANT is about what the user approved; an exclusion they add
+    // while a run is open or a review is pending is a control they TIGHTENED,
+    // and `threat-model.md` §7 states the rule without an exception for work
+    // already in flight. The set is re-read at the command boundary for exactly
+    // this reason, so the newest answer decides, and it decides for edits as
+    // well as for creates.
+    let excluded_now = canonical_excluded(excluded_folders);
     let mut in_scope: Vec<(usize, &ProposedEdit)> = Vec::new();
     for ((index, edit), keep) in approved.iter().enumerate().zip(allowed) {
         if keep {
@@ -223,12 +238,45 @@ pub async fn apply_approved(
             }
         }
     }
+    // The SYNC-14 clamp, on the note as it is NOW. A note's folder lives in its
+    // frontmatter, so this is the first point at which it is knowable, and the
+    // excluded set was re-read at the command boundary rather than carried from
+    // the run, so an exclusion the user added mid-run decides here.
+    let mut excluded_note: BTreeSet<String> = BTreeSet::new();
+    for id in bodies.keys() {
+        let body = &bodies[id];
+        // `fm_folder` reads a FRONTMATTER BLOCK, not a whole note, so the body
+        // has to be sliced first. Passing the whole body found nothing and the
+        // clamp silently allowed every edit; the test that asserts an excluded
+        // note is refused is what caught it. `trash.rs` slices the same way.
+        let folder = extract_title_slices(body.as_bytes())
+            .frontmatter_bytes
+            .and_then(fm_folder)
+            .unwrap_or_default();
+        if folder_matches_excluded(&folder, &excluded_now) {
+            excluded_note.insert(id.clone());
+        }
+    }
+    // Drop their bodies, which is what actually stops the write: step 3 skips a
+    // note with no entry here, and that is the same mechanism the unreadable
+    // case uses. Recording the refusal alone left the edit in `in_scope`, so it
+    // was refused AND applied, which the test caught by reading the disk rather
+    // than the outcome.
+    for id in &excluded_note {
+        bodies.remove(id);
+    }
     for (index, edit) in &in_scope {
         if unreadable.contains(&edit.note_id) {
             outcome.refused.push(RefusedEdit {
                 note_id: edit.note_id.clone(),
                 index: *index,
                 reason: EditRejection::ReadFailed,
+            });
+        } else if excluded_note.contains(&edit.note_id) {
+            outcome.refused.push(RefusedEdit {
+                note_id: edit.note_id.clone(),
+                index: *index,
+                reason: EditRejection::ExcludedNow,
             });
         }
     }
@@ -907,6 +955,79 @@ mod tests {
         assert_eq!(out.refused_new_notes.len(), 1);
         assert_eq!(out.refused_new_notes[0].index, 0);
         assert_eq!(out.refused_new_notes[0].reason, EditRejection::CreateFailed);
+    }
+
+    #[test]
+    fn a_cancelled_run_cannot_apply() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        runs.cancel("r");
+        let disk = Disk::with(&[("a", "hello world")], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[edit("a", "world", "there")],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ));
+        assert!(matches!(out, Err(AgentError::Cancelled)));
+        // The state, not the return value: a refusal that still wrote would
+        // report the same error.
+        assert_eq!(disk.read_back("a"), "hello world");
+    }
+
+    /// SYNC-14 has no in-flight carve-out: an exclusion the user adds while a
+    /// review is pending refuses the edit, even though the note is inside the
+    /// scope they granted earlier.
+    #[test]
+    fn an_exclusion_added_mid_run_refuses_an_edit_in_the_frozen_scope() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let body = "---\ntitle: T\nfolder: Private/\n---\n\nhello world";
+        let disk = Disk::with(&[("a", body)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[edit("a", "hello world", "goodbye")],
+            &[],
+            &["Private/".to_string()],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 0);
+        assert_eq!(out.refused.len(), 1);
+        assert_eq!(out.refused[0].reason, EditRejection::ExcludedNow);
+        assert_eq!(disk.read_back("a"), body, "and nothing was written");
+    }
+
+    #[test]
+    fn a_note_outside_every_exclusion_still_applies() {
+        // The other direction, so the clamp cannot pass by refusing everything.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let body = "---\ntitle: T\nfolder: Work/\n---\n\nhello world";
+        let disk = Disk::with(&[("a", body)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[edit("a", "hello world", "goodbye")],
+            &[],
+            &["Private/".to_string()],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 1);
+        assert!(disk.read_back("a").contains("goodbye"));
     }
 
     fn new_note(title: &str, folder: Option<&str>) -> ProposedNote {
