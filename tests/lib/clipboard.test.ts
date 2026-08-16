@@ -177,6 +177,47 @@ describe("copySecret", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("reports success and schedules nothing where the platform cannot clear", async () => {
+    // Web: the clear is gated on reading the clipboard BACK, and a page is
+    // granted no clipboard read in Firefox and only a prompt-plus-focus read
+    // elsewhere. The arm exists so the write still happens and the outcome is
+    // still announced; what is dropped is the promise, not the affordance.
+    const { feedback, ran } = recordingFeedback();
+
+    const cancel = await copySecret(
+      vi.fn().mockResolvedValue(undefined),
+      "phrase",
+      feedback,
+      { kind: "none", reason: "no clipboard read on this platform" },
+    );
+
+    expect(cancel).toBeTypeOf("function");
+    expect(ran).toEqual(["success"]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("still answers null on a failed write with the no-clear arm", async () => {
+    // The property the arm was added for, and the one an author is most likely
+    // to regress: `null` means the write did not happen, and nothing else. If
+    // "copied but never cleared" also returned `null`, a caller could not tell
+    // "nothing is on your clipboard" from "everything is, indefinitely" — and
+    // those are opposite things to say to someone holding a recovery phrase.
+    // `tsc` is green either way, because `copySecret` narrows with `||` rather
+    // than an exhaustive switch.
+    const { feedback, ran } = recordingFeedback();
+
+    const cancel = await copySecret(
+      vi.fn().mockRejectedValue(new Error("refused")),
+      "phrase",
+      feedback,
+      { kind: "none", reason: "no clipboard read on this platform" },
+    );
+
+    expect(cancel).toBeNull();
+    expect(ran).toEqual(["failure"]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("stops passing the secret to the clear once the caller has cancelled", async () => {
     // Retention, asserted through the only observable the module has. The
     // hazard is that the returned cancel closure and the timer body are siblings

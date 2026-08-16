@@ -109,6 +109,13 @@ export interface AccountBootstrapProps {
    */
   onBootstrapped: () => void;
   /**
+   * Leave for the creation flow (`decisions.md` 2026-08-15). Passed straight
+   * through to `AccountNumberEntry`, and optional for the same reason it is
+   * optional there: a client without `vaultCreation` must not be offered a door
+   * it cannot open.
+   */
+  onCreateAccount?: () => void;
+  /**
    * Mount straight into the approval wait, skipping account-number and password
    * entry (MYND-635).
    *
@@ -147,6 +154,7 @@ const APPROVER_LIST_STYLE: CSSProperties = {
 
 export function AccountBootstrap({
   onBootstrapped,
+  onCreateAccount,
   initiallyPending = false,
 }: AccountBootstrapProps) {
   const betaTerms = useBetaTermsGate();
@@ -418,7 +426,7 @@ export function AccountBootstrap({
   // Only now the first-run beginning. Below the wait, not above it — see the
   // ordering note there.
   if (account === null) {
-    return <AccountNumberEntry onValid={setAccount} />;
+    return <AccountNumberEntry onValid={setAccount} onCreateAccount={onCreateAccount} />;
   }
 
   async function handleSubmit(e: FormEvent) {

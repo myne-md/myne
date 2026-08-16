@@ -72,8 +72,23 @@ describe("capability descriptor", () => {
       "vaultMigration",
       "backup",
       "nativeSaveAs",
-      "vaultCreation",
-      "phraseRecovery",
+      // `decisions.md` 2026-08-15, and the reason it is a SECOND capability
+      // rather than a branch of `phraseRecovery`: one flag used to gate two
+      // unrelated things, the recovery screen and the enrolment form's
+      // credential picker, so lifting the phrase ban would have shipped three
+      // phrase screens while the decision named two. Enrolment is a ROUTINE
+      // action with a password credential already available, and every routine
+      // use is what teaches a user that typing 24 words into a browser is
+      // normal. Keeping it absent is what leaves a rule a user can apply: the
+      // web client asks for the phrase in exactly one situation, a recovery
+      // they started themselves.
+      "phraseEnrolment",
+      // `decisions.md` 2026-08-15. The Copy affordance SHIPS on web; what is
+      // absent is the 30 second auto-clear, because the read-back that makes it
+      // safe is not available to page content. Named for the clear rather than
+      // for the copy, the same way `imageCompression` is named for the transform
+      // rather than the preference.
+      "clipboardAutoClear",
       "vaultExport",
       // Task 47 — a bundle-size decision, not a portability limit: the `spell`
       // plugin would port; the bundled binary dictionaries are what does not fit
@@ -151,6 +166,11 @@ describe("capability descriptor", () => {
     // changed there adds no exposure — and quietly losing it would be a silent
     // reversal of `decisions.md` 2026-07-26.
     const present = desktop.ALL_CAPABILITIES.filter((c) => web.has(c));
-    expect([...present].sort()).toEqual(["changePassword", "pinQuickUnlock"]);
+    expect([...present].sort()).toEqual([
+      "changePassword",
+      "phraseRecovery",
+      "pinQuickUnlock",
+      "vaultCreation",
+    ]);
   });
 });

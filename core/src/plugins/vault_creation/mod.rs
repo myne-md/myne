@@ -63,7 +63,14 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                 loop {
                     interval.tick().await;
                     let state = app_handle.state::<state::VaultCreationState>();
-                    let _ = state.evict_expired();
+                    // The clock reading comes from the host seam: the session
+                    // TTL is now monotonic MILLIS rather than an `Instant`, so
+                    // the same eviction code compiles and runs on wasm32, where
+                    // `Instant::now()` panics.
+                    let now = crate::host::HostCtx::monotonic_millis(
+                        &crate::host::tauri_host::TauriHost::new(app_handle.clone()),
+                    );
+                    let _ = state.evict_expired(now);
                 }
             });
 

@@ -50,6 +50,10 @@ const RENDERS_NOTHING = new Set([
   join("web", "src", "components", "settings", "ConnectedExtensions.tsx"),
   join("web", "src", "components", "backup", "BackupExportModal.tsx"),
   join("web", "src", "screens", "EnrollPhraseCredential.tsx"),
+  // The creation flow's local-disk affordances, substituted away on 2026-08-15:
+  // a native save dialog and an OS file-manager reveal, neither of which this
+  // client has. Renders `null`, so there is nothing for a testid to name.
+  join("web", "src", "screens", "vault-creation", "ReadyLocalArtefacts.tsx"),
   join("web", "src", "main.tsx"), // the entry point; mounts, renders no markup of its own
 ]);
 

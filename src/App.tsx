@@ -1,10 +1,16 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { AccountBootstrap } from "./screens/AccountBootstrap";
 import { Welcome } from "./screens/Welcome";
 import { RestoreBackup } from "./screens/RestoreBackup";
-import { CreateVault } from "./screens/CreateVault";
+
 import { Unlock } from "./screens/Unlock";
-import { VaultRecover } from "./screens/VaultRecover";
 import { VaultPicker } from "./screens/VaultPicker";
 import {
   initialStageFromProbe,
@@ -36,7 +42,38 @@ import { readCustomTheme } from "./lib/themes";
 // it, and it is only ever shown AFTER unlock. A React.lazy boundary keeps that
 // whole graph out of the first-load bundle (web bundle budget; same precedent as
 // GraphView → GraphCanvas, the app's other lazy boundary).
-const Editor = lazy(() => import("./screens/Editor").then((m) => ({ default: m.Editor })));
+const Editor = lazy(() =>
+  import("./screens/Editor").then((m) => ({ default: m.Editor })),
+);
+
+/**
+ * Lazy since 2026-08-15, when the creation flow started shipping to the web
+ * client too.
+ *
+ * Eager was defensible while this was desktop-only code that a browser never
+ * downloaded. Now it is first-load weight on a bundle whose trust story is that
+ * it is small enough for someone to read the hashes of, and it is weight almost
+ * nobody pays: creation runs once per account, and the BIP-39 wordlist behind it
+ * is dead bytes on every later visit. `Suspense fallback={null}` matches the
+ * Editor's — this route is entered by a click, not by boot.
+ */
+const CreateVault = lazy(() =>
+  import("./screens/CreateVault").then((m) => ({ default: m.CreateVault })),
+);
+
+/**
+ * Lazy for exactly the reason `CreateVault` above is, and it is the second door
+ * the same change opened.
+ *
+ * Splitting the creation flow out and leaving this one eager took the wordlist
+ * out of first load through one route and put it back through the other, which
+ * is why the bundle budget went over its cap on the merge rather than on either
+ * change alone. Recovery is the rarest route in the product: a user reaches it
+ * once, after forgetting a password, and every other visit pays for it.
+ */
+const VaultRecover = lazy(() =>
+  import("./screens/VaultRecover").then((m) => ({ default: m.VaultRecover })),
+);
 
 // Synthetic key for the single-entry boot `SlotMap` (MYND-204 SYNC-4).
 // `initialStageFromProbe` routes on the slot KIND only — it scans
@@ -272,7 +309,8 @@ function App() {
     return null;
   }
 
-  const dispatch = (action: Action) => setStage((prev) => (prev ? transition(prev, action) : prev));
+  const dispatch = (action: Action) =>
+    setStage((prev) => (prev ? transition(prev, action) : prev));
 
   // Multi-vault switch handler (MYND-205). Fires the param-less
   // `vault_lock()` (four-surface teardown + `flushIfDirty`, SYNC-8) then
@@ -348,7 +386,19 @@ function App() {
         // and routes to unlock — or, if this device is still awaiting approval,
         // to `pending-approval` below. Either way this screen never has to know
         // what comes next, and boot routing stays the one place that decides.
-        return <AccountBootstrap onBootstrapped={() => void reprobe()} />;
+        return (
+          <AccountBootstrap
+            onBootstrapped={() => void reprobe()}
+            // `decisions.md` 2026-08-15. Passed only where the capability is
+            // present, so a client that cannot create an account never renders
+            // the door — omitted, not greyed (`decisions.md` 2026-07-26).
+            onCreateAccount={
+              has("vaultCreation")
+                ? () => dispatch({ type: "create-vault.start" })
+                : undefined
+            }
+          />
+        );
       case "pending-approval":
         // The same screen, entered already-pending (MYND-635). Not a second
         // component: the wait, its approval poll and its SAS comparison are one
@@ -360,7 +410,12 @@ function App() {
         // routes on `vault.meta` existence, and the join writes that meta before
         // it enrols — offered the unlock form. The password worked, because the
         // meta is the account's real one, and the vault opened empty.
-        return <AccountBootstrap onBootstrapped={() => void reprobe()} initiallyPending />;
+        return (
+          <AccountBootstrap
+            onBootstrapped={() => void reprobe()}
+            initiallyPending
+          />
+        );
       case "welcome":
         return (
           <Welcome
@@ -374,31 +429,33 @@ function App() {
         );
       case "create-vault":
         return (
-          <CreateVault
-            // First-run safety briefing (MYND-114): shown only on the
-            // welcome entry (`stage.briefing`), not picker/switcher
-            // "create another" — a returning user has acknowledged the
-            // recovery model once already.
-            withBriefing={stage.briefing ?? false}
-            // Back-from-create is reprobe-based (MYND-219 / SYNC-16):
-            // boot routing decides the return surface — welcome at 0
-            // vaults, the lone vault's unlock at 1, the picker at ≥2.
-            // (The former `create-vault.back` → welcome arm stranded
-            // picker/editor entrants on Welcome.)
-            onBack={reprobe}
-            onAutoUnlockSuccess={(vaultId) =>
-              dispatch({
-                type: "create-vault.auto-unlock-success",
-                vaultId: vaultId ?? undefined,
-              })
-            }
-            onAutoUnlockFailed={(vaultId) =>
-              dispatch({
-                type: "create-vault.commit-success",
-                vaultId: vaultId ?? undefined,
-              })
-            }
-          />
+          <Suspense fallback={null}>
+            <CreateVault
+              // First-run safety briefing (MYND-114): shown only on the
+              // welcome entry (`stage.briefing`), not picker/switcher
+              // "create another" — a returning user has acknowledged the
+              // recovery model once already.
+              withBriefing={stage.briefing ?? false}
+              // Back-from-create is reprobe-based (MYND-219 / SYNC-16):
+              // boot routing decides the return surface — welcome at 0
+              // vaults, the lone vault's unlock at 1, the picker at ≥2.
+              // (The former `create-vault.back` → welcome arm stranded
+              // picker/editor entrants on Welcome.)
+              onBack={reprobe}
+              onAutoUnlockSuccess={(vaultId) =>
+                dispatch({
+                  type: "create-vault.auto-unlock-success",
+                  vaultId: vaultId ?? undefined,
+                })
+              }
+              onAutoUnlockFailed={(vaultId) =>
+                dispatch({
+                  type: "create-vault.commit-success",
+                  vaultId: vaultId ?? undefined,
+                })
+              }
+            />
+          </Suspense>
         );
       case "unlock":
         return (
@@ -415,7 +472,9 @@ function App() {
             onBack={() => dispatch({ type: "unlock.back-to-picker" })}
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
-            onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
+            onResumeRecovery={() =>
+              dispatch({ type: "unlock.resume-recovery" })
+            }
             // Post-delete routing is reprobe-based (MYND-219 / SYNC-16):
             // boot routing decides the return surface by remaining vault
             // count — welcome at 0, the lone vault's unlock at 1, the
@@ -440,38 +499,68 @@ function App() {
               onResetRequested={reprobe}
               onLock={() => dispatch({ type: "editor.lock" })}
               onForceRelock={setStageWithSuspicion}
-            // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
-            // the Unlock screen's `onDeleteVaultSuccess` above. Deleting the
-            // active vault from Settings leaves the slot Empty, so reprobe
-            // routes by remaining count (picker at ≥2, unlock at 1, welcome
-            // at 0) instead of always landing on the create screen.
+              // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
+              // the Unlock screen's `onDeleteVaultSuccess` above. Deleting the
+              // active vault from Settings leaves the slot Empty, so reprobe
+              // routes by remaining count (picker at ≥2, unlock at 1, welcome
+              // at 0) instead of always landing on the create screen.
               onDeleteVaultSuccess={reprobe}
               onSwitchVault={onSwitchVault}
-              onCreateAnother={() => dispatch({ type: "editor.create-vault" })}
+              // The FIFTH `vaultCreation`-as-proxy site, and the one the
+              // 2026-08-15 regate below missed. It is the same second-vault
+              // door as `onJoinDevice`, with the same subject, so it takes the
+              // same predicate.
+              //
+              // Left ungated it became reachable rather than merely wrong: the
+              // switcher renders the row whenever this prop is defined, it is
+              // not substituted on web, and until this change the row led to
+              // the `CreateVault` "unavailable here" stub. Now it leads into
+              // the real flow, on a client whose vault id is the constant
+              // `paths::web_single_vault_id()`, so the user answers the
+              // briefing, types a password, waits out a full Argon2id
+              // derivation and is then told `VaultArtifactsPresent`.
+              onCreateAnother={
+                has("localOnlyVault")
+                  ? () => dispatch({ type: "editor.create-vault" })
+                  : undefined
+              }
               // "Add this device to an account" in the switcher dropdown
               // (myne#221). Capability-gated here rather than in the switcher so
               // the descriptor is consulted once: a client that holds exactly
               // one container per origin cannot bootstrap a second vault, and
               // an absent capability is OMITTED, never greyed out
               // (`decisions.md` 2026-07-26).
-              onJoinDevice={has("vaultCreation") ? onJoinDeviceFromEditor : undefined}
-              onRestoreBackup={() => dispatch({ type: "editor.restore-backup" })}
+              // Regated 2026-08-15: the reason stated above is "a client that
+              // holds exactly one container per origin cannot bootstrap a
+              // second vault", which is `localOnlyVault`'s subject, not
+              // `vaultCreation`'s. The two agreed until the web client learned
+              // to create an account.
+              onJoinDevice={
+                has("localOnlyVault") ? onJoinDeviceFromEditor : undefined
+              }
+              onRestoreBackup={() =>
+                dispatch({ type: "editor.restore-backup" })
+              }
               switching={switching}
             />
           </Suspense>
         );
       case "recover":
         return (
-          <VaultRecover
-            initialSubStep={stage.subStep}
-            onCancel={(vaultId) => dispatch({ type: "recover.cancel", vaultId })}
-            onCompleteSuccess={(vaultId) =>
-              dispatch({ type: "recover.complete-success", vaultId })
-            }
-            // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
-            // the Unlock screen's `onDeleteVaultSuccess` above.
-            onDeleteVaultSuccess={reprobe}
-          />
+          <Suspense fallback={null}>
+            <VaultRecover
+              initialSubStep={stage.subStep}
+              onCancel={(vaultId) =>
+                dispatch({ type: "recover.cancel", vaultId })
+              }
+              onCompleteSuccess={(vaultId) =>
+                dispatch({ type: "recover.complete-success", vaultId })
+              }
+              // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
+              // the Unlock screen's `onDeleteVaultSuccess` above.
+              onDeleteVaultSuccess={reprobe}
+            />
+          </Suspense>
         );
       case "picker":
         // ≥2-vault startup surface (MYND-204). The picker fetches its
@@ -485,7 +574,9 @@ function App() {
         // Stage hop. "Create another" → `picker.create-vault` → create flow.
         return (
           <VaultPicker
-            onSelect={(vaultId) => dispatch({ type: "picker.select-vault", vaultId })}
+            onSelect={(vaultId) =>
+              dispatch({ type: "picker.select-vault", vaultId })
+            }
             onCreateAnother={() => dispatch({ type: "picker.create-vault" })}
             onRestoreBackup={() => dispatch({ type: "picker.restore-backup" })}
             // "Add this device to an account" (myne#221) — the door that was
@@ -528,7 +619,14 @@ function App() {
           }}
         />
       )}
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {screen}
       </div>
       {/* Browser-extension pairing prompt (ext-foundation-handoff task 4,
@@ -553,7 +651,12 @@ function App() {
           picker + switcher). Mounted here, over whatever stage is showing,
           because three stages offer the same door and each lands differently —
           see `onJoined` above. The web build substitutes the module away. */}
-      {joinOpen && <JoinDeviceModal onCancel={() => setJoinOpen(false)} onJoined={onJoined} />}
+      {joinOpen && (
+        <JoinDeviceModal
+          onCancel={() => setJoinOpen(false)}
+          onJoined={onJoined}
+        />
+      )}
       {/* The browser-extension clip dispatch listener (desktop-ingest, MYND-442,
           TB10) is NOT mounted here. It lives inside `Editor.tsx` — within the
           workspace providers — so the success notice's "view" affordance can

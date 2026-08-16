@@ -20,6 +20,7 @@
     "working": "Setting up…"
   },
   "accountEntry": {
+    "createAccount": "I do not have an account yet. Create one.",
     "checkFailed": "Could not check that account number. Try again.",
     "checking": "Checking…",
     "continue": "Continue",
@@ -1062,7 +1063,7 @@
       "add": "Add cover",
       "change": "Change cover",
       "emptyLibraryMobile": "No images in this vault yet. Upload one to use as a cover.",
-      
+
       "writeFailed": "Could not update the note's cover"
     },
     "folding": {
@@ -3739,6 +3740,11 @@
       "footerHint": "If this takes longer than 30 seconds, close the window and try again.",
       "heading": "Encrypting your vault"
     },
+    "provisioning": {
+      "heading": "Creating your account",
+      "caption": "Registering this vault with the sync server. Your recovery phrase comes next.",
+      "footerHint": "This takes a moment. Leave this tab open until it finishes, so it can clean up after itself if something goes wrong."
+    },
     "errors": {
       "accountNumberInvalid": {
         "body": "Try again.",
@@ -3823,6 +3829,10 @@
       "genericError": {
         "body": "Try again.",
         "title": "Something went wrong"
+      },
+      "provisionFailed": {
+        "body": "We could not reach the sync server, so this browser was left with nothing to open. Your recovery phrase was never shown to you, so there is nothing to write down and nothing to lose. Start again when you are back online.",
+        "title": "Your account was not created"
       }
     },
     "password": {
@@ -3834,9 +3844,12 @@
     },
     "phrase": {
       "back": "Back",
+      "clipboardNotCleared": "Your browser will not let Myne clear your clipboard afterwards, so those 24 words stay there until you copy something else. Paste them into your password manager, then copy anything.",
       "continue": "I've saved this — confirm phrase",
       "copied": "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
+      "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the words stay on it until you copy something else.",
       "copy": "Copy",
+      "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
       "eyebrow": "Step 2 of 4 — recovery phrase",
       "heading": "Write down these 24 words.",
@@ -4137,9 +4150,8 @@
     },
     "unavailableHere": {
       "backup": "Encrypted backups are made and restored in the Myne desktop app, which can write the backup file where you choose. Your notes here come from the server, so this browser restores itself by syncing.",
-      "creation": "New accounts are created in the Myne desktop app. It shows you your recovery phrase — and a recovery phrase should never be shown by a web page.",
+      "creation": "This browser already holds an account. To create another, open the Myne desktop app or use a different browser profile.",
       "multiVault": "This browser holds one account. To use another, open it in the Myne desktop app or in a different browser profile.",
-      "phraseRecovery": "Recovery by phrase happens in the Myne desktop app. Your recovery phrase should never be typed into a web page.",
       "title": "Not available in the browser"
     },
     "unsupported": {

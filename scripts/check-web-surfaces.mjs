@@ -203,16 +203,20 @@ const V = {
   ],
   // NOT `excluded`, and the distinction is the point. `excluded` in this roster
   // means "substituted out", and this module is not — it is still importable,
-  // still compiled, and `EnrollDeviceForm`'s own tests exercise it. What changed
-  // in task 92 is that its one PHRASE-ENTRY caller moved into
-  // `src/components/sync/phrase-credential.ts`, which the web build substitutes,
-  // so there is no import edge from served code to the wordlist. That is a
-  // stronger fact than the grep it replaces (a grep describes today's
-  // tree-shake) and a weaker one than exclusion, so it is recorded as neither.
+  // still compiled, and `EnrollDeviceForm`'s own tests exercise it.
+  //
+  // CORRECTED 2026-08-15: this note used to claim there was NO import edge from
+  // served code to the wordlist, because `phrase-credential` was substituted.
+  // That substitution is gone — phrase ENTRY ships on web now
+  // (`decisions.md` 2026-08-15, entry 0514) — so the edge is real and intended.
+  // What keeps the phrase out of the artefact is narrower and lives elsewhere:
+  // the ENROLMENT screen is substituted, and `check-web-no-phrase.mjs` asserts
+  // its grid's absence from the built bundle.
   "src/lib/bip39-normalize.ts": [
-    "adapted",
-    "Pure NFKD/whitespace normalisation, with NO IMPORT EDGE from served code since task 92: its one phrase-entry caller moved into `src/components/sync/phrase-credential.ts`, which the web build substitutes with a stub that cannot construct a credential. What remains here is a string function nothing on this client feeds a phrase.",
+    "ported",
+    "Pure NFKD/whitespace normalisation, and it now has a real import edge from served code: `EnrollDeviceForm` and the recovery entry screen both feed it, since phrase entry ships on web (`decisions.md` 2026-08-15, entry 0514). No host call anywhere in it.",
   ],
+
   "src/lib/cli-access.ts": [
     "typed-unsupported",
     "The CLI door's session-state read. Reachable — the module ships and the binding is one `invoke` — and `cli-bridge` is `Unsupported` in the dispatcher, so a call that arrives by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the capability-gated Settings block.",
@@ -302,8 +306,9 @@ const V = {
   ],
   "src/lib/secret-export.ts": [
     "adapted",
-    "Ships for `saveJsonAsFile` (theme export, through the download seam) — its SECRET callers are the two creation steps, both substituted. The clipboard auto-clear it also exports is web-hostile in a way worth naming, and myne#379 changed WHERE that shows up rather than removing it: the read-back that checks the clipboard still holds the secret now runs host-side, so on web the refusal is the dispatcher's (`plugin:secret-export|clipboard_clear_if_matches` is `Class::Unsupported`, backed by the absent `vaultCreation` capability) instead of a browser permission the page would never get — page content cannot be granted clipboard READ in Firefox at all and is gesture-gated elsewhere, so a clear would silently never fire. No web path reaches it, and a web client has no recovery phrase to copy in the first place.",
+    "Both halves adapt rather than one shipping and one being substituted, and the note that said otherwise was falsified on three clauses at once by `decisions.md` 2026-08-15 (entry 0514). Save-as-file takes the browser-download arm where `nativeSaveAs` is absent; the clipboard copy takes the `none` clear strategy where `clipboardAutoClear` is absent, so it writes and reports and schedules nothing. Its secret callers are the two creation steps, which are no longer substituted: creation ships on web.",
   ],
+
   "src/lib/spell.ts": ["adapted", "Unreachable where `spellCheck` is absent; the editor host omits the `spell` member."],
   "src/lib/stage.ts": ["adapted", "Boot routing branches on capabilities: an empty web client goes to account-entry, a corrupt one to re-sync (task 85)."],
   "src/lib/syntaxTheme.ts": ["ported", "CodeMirror theme."],
@@ -337,9 +342,8 @@ const V = {
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
   "src/lib/viewsEnabled.ts": ["ported", "Device-local Views feature toggle helper (localStorage); runs as written."],
   "src/lib/vault-recover.ts": [
-    "excluded",
-    "The phrase-recovery binding; module-gated out of the wasm build too (task 12).",
-    "plugin:vault-recover|recover_with_phrase",
+    "ported",
+    "The phrase-recovery binding. Was `excluded` and module-gated out of the wasm build (task 12); `decisions.md` 2026-08-15 reverses that and ships recovery here. The core's read and write moved onto the IO seam as ONE implementation rather than a wasm twin, so this binding calls the same commands it always did.",
   ],
   "src/lib/vault-repair.ts": ["adapted", "Task 72 owns the verdict; the dispatcher answers `Pending` meanwhile."],
   "src/lib/vault-slot-kind.ts": ["ported", "Boot probe."],

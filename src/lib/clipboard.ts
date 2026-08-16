@@ -97,10 +97,27 @@ export interface Feedback {
  * not and which matters far more on a phone; it expires that ITEM, so it can
  * never destroy something the user copied afterwards; and it removes the closure
  * that would otherwise hold the secret in the JS heap for the whole window.
+ *
+ * `none` is the web shape, and it is a REFUSAL rather than an omission, which is
+ * why it carries a reason. The clear is gated on reading the clipboard BACK, so
+ * that content the user copied since is never destroyed, and page content is
+ * granted no clipboard read in Firefox at all and only a prompt-plus-focus read
+ * elsewhere. Scheduling a timer anyway would either wipe blind, which is worse
+ * than not clearing, or fire into a refusal and log noise on a path the user was
+ * told was protected. A caller choosing this arm owes the user a sentence:
+ * `recovery-flow.md` §2.2 forbids presenting a control whose stated protection
+ * the client cannot perform.
+ *
+ * It lives here, beside the two arms that DO clear, rather than as an early
+ * return in a caller. A caller that returned before the write would report
+ * nothing, and one that returned after it would have to reproduce the success
+ * announcement; either way "how a secret leaves the clipboard" would be answered
+ * in two places for three platforms.
  */
 export type ClearStrategy =
   | { kind: "host"; clear: (value: string) => Promise<void>; delayMs: number }
-  | { kind: "os-managed" };
+  | { kind: "os-managed" }
+  | { kind: "none"; reason: string };
 
 /** Cancels a pending clear. Callers MUST invoke it on unmount when one is pending. */
 export type CancelClear = () => void;
@@ -191,7 +208,12 @@ export async function copySecret(
   // parks that in a ref until unmount, so the inline version would retain the
   // secret LONGER than the desktop path's bounded window, which is the opposite
   // of what this arm exists to do.
-  if (strategy.kind === "os-managed") return NOOP_CANCEL;
+  // Both non-host arms answer the same thing: the write landed and there is no
+  // timer of ours to cancel. They return the cancel rather than `null` so that
+  // `null` keeps meaning exactly one thing, the write did not happen. A caller
+  // that cannot tell "nothing was copied" from "it was copied and will not be
+  // cleared" is one keystroke from telling the user the wrong one.
+  if (strategy.kind === "os-managed" || strategy.kind === "none") return NOOP_CANCEL;
 
   const { clear, delayMs } = strategy;
 

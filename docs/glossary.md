@@ -478,6 +478,16 @@ A class of data structures that allow concurrent edits across multiple replicas 
 
 Used in: `vision.md` (Phase 4 scope); `decisions.md` 2026-08-09
 
+### **credential phishing** &nbsp; ⚠️ *Threat*
+
+*(Aliases: phrase phishing, lookalike origin. Myne-divergent: no, but what makes it reachable here is Myne-specific.)*
+
+Adversary class A18: an origin the user mistakes for Myne's asks them for their 24-word recovery phrase and account number, which together yield `root_key` and therefore the whole vault, permanently and with no in-app remedy (`spec/protocol.md` §7). It needs no bundle compromise, so it is neither [A15](#hostile-code-delivery) nor A4, and no delivery-channel control touches it.
+
+The reason it is a **new** row rather than an always-present one is the part worth remembering: until 2026-08-15 the web client never generated, displayed or accepted a phrase (`decisions.md` 2026-07-26), so "a web page is asking me for my 24 words" was itself proof of an attack, with no judgement required of the user. Shipping web creation and web recovery (`decisions.md` 2026-08-15, entry 0514) spends that inference. What replaces it is narrower and weaker: the phrase is asked for on the web client in exactly one situation, a recovery the user started themselves, which is why phrase-credential *device enrolment* stays a decided absence there.
+
+Used in: `threat-model.md` §1 (A18), §5
+
 ### **Crockford base32** &nbsp; 🏗️ *Construction*
 
 The 32-character alphanumeric base-32 encoding defined by Douglas Crockford, excluding the visually ambiguous `I L O U`. Myne encodes account-number entropy as 19 Crockford characters (95 bits) plus 1 Damm-32 check character (`spec/account-number.md` §2).
@@ -780,6 +790,13 @@ Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 20
 A **self-host-only** operator flag (`MYNE_EXTENDED_RETENTION`) that disables the server's Layer-2 ciphertext reclamation, so deleted blobs are kept past the [tombstone horizon](#tombstone-horizon). A documented, deliberate **policy deviation**, never a default: it **weakens the user's "delete means gone" expectation** and the §6 operator obligation not to retain deleted ciphertext past the horizon. Hosted MUST NOT enable it. The structural guarantees (no plaintext, no required IP log) are unaffected — extended retention trades a retention-policy obligation, not a confidentiality guarantee. Phase 2.
 
 Used in: `self-host-policy.md` §4, `server-protocol.md` §6, `decisions.md` 2026-06-20 (MYND-438/440)
+
+### **extension host permissions** &nbsp; ⚠️ *Threat*
+
+The access a browser grants an installed extension over a given origin. An extension holding them reads that origin's DOM and input events directly, which for the web client means the recovery-phrase grid, the recovery cells and the master-password field. Adversary class A19, graded ❌ Out of scope because there is no control to apply: a content-security policy governs what the *page* may load, not what an extension may read out of it, and the page cannot detect the extension at all. Distinct from A14, which is about Myne's own keyless clipper extension being compromised.
+
+Used in: `threat-model.md` §1 (A19), §5
+
 ### **extension pairing token** &nbsp; 🗝️ *Key/identifier*
 
 A scoped, revocable, **append-only** credential (create-clip + is-unlocked-status only — never a vault key) issued to the [browser clipper](#browser-clipper) after an in-app Accept/Reject + numeric-challenge handshake bound to the exact extension ID. Crossing [TB10](#native-messaging-host) requires it; a compromised token cannot read, modify, or delete notes. The short numeric code compared during this handshake is the **pairing challenge** (a.k.a. numeric challenge): a 6-digit nonce drawn from the core CSPRNG, shown identically in the in-app pairing dialog and the extension so the user confirms both endpoints share one pairing attempt — a human-comparison value, never a key. The registry of issued/revoked tokens persists encrypted at rest in the [vault.prefs](#vaultprefs) prefs-family blob (`decisions.md` 2026-06-20) so pairing survives a restart and revocation is durable.
@@ -2187,7 +2204,7 @@ Used in: `spec/sync-protocol.md` §8
 
 ### **sync-required entry** &nbsp; 📦 *Product*
 
-The rule that the only way into the web client is an **existing synced account**: there is no local-only vault on this client, so account creation, vault creation and phrase-based recovery are absent from it and the browser is a window onto a vault that already exists elsewhere. Two independent reasons, either sufficient — the 24-word [recovery phrase](#recovery-phrase) never crosses into served code (it is unrotatable, so an exposure is permanent), and conflict resolution is sync-based, so a vault that arrived by any other route would be an orphan fork with nothing to reconcile against. A normative clause of the [web capability set](#web-capability-set), and one of the web-specific behaviours the thin `e2e-web/` lane owns.
+The rule that the only way into the web client is an **existing synced account**: there is no local-only vault on this client, and the browser is a window onto a vault that already exists elsewhere. The reason is that conflict resolution is sync-based, so a vault that arrived by any other route would be an orphan fork with nothing to reconcile against. Until 2026-08-15 the rule rested on a second, independent reason as well, that the 24-word [recovery phrase](#recovery-phrase) never crossed into served code, and it no longer does: creation and phrase-based recovery ship on the web client (`decisions.md` 2026-08-15, entry 0514). The rule survives on the first reason alone, and an account created in a browser is registered on a sync server as part of creating it, so it is a synced account from the first moment. A normative clause of the [web capability set](#web-capability-set), and one of the web-specific behaviours the thin `e2e-web/` lane owns.
 
 Used in: `decisions.md` 2026-07-26 (web capability set; web E2E policy); `docs/dev/e2e.md`
 
@@ -2767,7 +2784,7 @@ Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25.
 
 ### **web capability set** &nbsp; 📦 *Product* (*Myne-divergent*)
 
-The normatively-defined set of things the web client can and cannot do — not a UX scope decision that a later release quietly widens. Its two load-bearing rules: **the 24-word recovery phrase never crosses into served code** (which removes account creation, vault creation, and phrase-based recovery from the browser in one rule, because the phrase is unrotatable — no rotation command exists, so a phrase exposure is permanent), and **web requires sync** (the browser is a window onto a synced vault; conflict resolution is sync-based, so a vault arriving any other way is an orphan fork). `change_password` stays available, because the password is already typed into the page at unlock. Everything the operating system provides and a browser does not — clipper host, local AI, share-sheet import, watch captures, keychain/biometric quick-unlock, OS idle auto-lock, screen-capture protection, backup export/restore, vault migration, native file dialogs — is **absent from the interface**, not shown disabled. See also [sync-required entry](#sync-required-entry) (the second rule, named), [capability gating](#capability-gating) (how the set is applied at runtime), [capability descriptor](#capability-descriptor).
+The normatively-defined set of things the web client can and cannot do — not a UX scope decision that a later release quietly widens. Its two load-bearing rules: **the recovery phrase is never a routine credential in served code** and **web requires sync**. The first was absolute from 2026-07-26 to 2026-08-15, phrase display and phrase entry both absent, and is now a three-way split (`decisions.md` 2026-08-15, entry 0514): display at creation ships, entry at a user-started recovery ships, and the phrase as a **device-enrolment credential** stays out, kept out of the served artefact by build-time substitution rather than a runtime branch. What the split preserves is that no routine flow teaches a user that typing 24 words into a page is normal; what it spends is the inference that any page asking was self-evidently fake (`threat-model.md` A18). The phrase remains unrotatable, so an exposure is still permanent. The second rule is untouched (the browser is a window onto a synced vault; conflict resolution is sync-based, so a vault arriving any other way is an orphan fork). `change_password` stays available, because the password is already typed into the page at unlock. Everything the operating system provides and a browser does not — clipper host, local AI, share-sheet import, watch captures, keychain/biometric quick-unlock, OS idle auto-lock, screen-capture protection, backup export/restore, vault migration, native file dialogs — is **absent from the interface**, not shown disabled. See also [sync-required entry](#sync-required-entry) (the second rule, named), [capability gating](#capability-gating) (how the set is applied at runtime), [capability descriptor](#capability-descriptor).
 
 Used in: `decisions.md` 2026-07-26 (web capability set); `vision.md`
 

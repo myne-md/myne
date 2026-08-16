@@ -37,6 +37,7 @@
 // fired), so no `vault_lock` is needed.
 
 import {
+  useEffect,
   useId,
   useState,
   type CSSProperties,
@@ -227,6 +228,30 @@ export function PhraseEntryStep({
   const { t } = useTranslation();
   const baseId = useId();
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+
+  // Clear the typed words when the page is hidden or unloaded
+  // (`recovery-flow.md` §3.5 as amended 2026-08-15).
+  //
+  // A browser restores form state on back-navigation and session restore, from
+  // storage this client neither owns nor can reach. §3.4's "wipe all 24 cells
+  // from React state" does not touch that copy, and the copy is AS11 — the one
+  // credential no password change rotates. `autoComplete="off"` on each cell is
+  // the first half and is already there; this is the second.
+  //
+  // **Stated as best-effort, because that is what it is.** `pagehide` is the
+  // event that fires on bfcache entry as well as unload, which is why it is the
+  // one used, but nothing here can guarantee the browser has not already
+  // snapshotted the field. §3.5's posture is exactly this: say what each layer
+  // can deliver, and do not claim the layer above it.
+  useEffect(() => {
+    const clear = () => {
+      for (let i = 0; i < PHRASE_CELL_COUNT; i += 1) {
+        dispatch({ type: "set-cell", index: i, value: "" });
+      }
+    };
+    window.addEventListener("pagehide", clear);
+    return () => window.removeEventListener("pagehide", clear);
+  }, [dispatch]);
 
   const allFilled = state.cells.every((c) => c.length > 0);
 
