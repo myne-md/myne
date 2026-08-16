@@ -181,8 +181,16 @@ block2 = "0.6"
 # `objc2*` deps above — already compiled into the build transitively via `wry`
 # (present in the resolved lock), so naming it here adds a dependency EDGE but NO
 # new crate/feature to the build (minimal-surface discipline, `threat-model.md`
-# §6). default-features off + only the three classes we touch.
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSString", "NSURL"] }
+# §6). default-features off + only the classes we touch.
+#
+# `NSValue` + `NSError` (myne-md/myne#491) are the two the export directory's
+# backup exclusion needs (`backup_exclude`): `NSValue` carries `NSNumber`, the
+# boxed `@YES`, and `setResourceValue:forKey:error:` is itself gated on
+# `NSError`. Same policy as the rest of this list: modules of a crate already in
+# the build, not a new crate. `NSError` is enabled transitively in the iOS graph
+# anyway — declared here so this crate does not depend on something ELSE keeping
+# it on, which is the shape that breaks a build for no reason anyone can see.
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSError", "NSFileManager", "NSString", "NSURL", "NSValue"] }
 
 # Dev-dependencies — same policy bar as runtime deps. `tracing-test` captures
 # `tracing` events per-test so the plugins' tracing-level discipline is
@@ -193,3 +201,22 @@ tracing-test = "0.2"
 # `seed_real_vault_meta` / `VaultRuntimeState` fixtures so mobile-side tests can
 # reuse the same harness the core tests use.
 myne-core = { path = "../../core", features = ["test-support"] }
+
+# macOS, TESTS ONLY (myne-md/myne#491). The one function that performs the
+# backup exclusion is `#[cfg(target_os = "ios")]`, which the Linux CI runner
+# never compiles and no simulator here ever runs, so its effect was owed
+# entirely to a manual device row. macOS is the one Apple target this repo
+# executes on, and Foundation's `NSURLIsExcludedFromBackupKey` behaves the same
+# way there, so `backup_exclude::tests::macos` runs the shipped call on a temp
+# directory and reads the flag back (and the `com.apple.backupd` xattr with it).
+# Dev-dependency, so nothing is added to any shipped binary; `objc2` and
+# `objc2-foundation` are already in the shared lock via `wry`, so this adds a
+# dependency EDGE and no crate.
+#
+# Placement: LAST in the file on purpose. A `[target.'cfg(…)'.dependencies]`
+# table terminates whatever section precedes it, so one written next to a
+# regular dependency silently swallows every declaration after it (root
+# `CLAUDE.md`, "Gotchas").
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSError", "NSString", "NSURL", "NSValue"] }

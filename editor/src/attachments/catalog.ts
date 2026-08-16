@@ -20,6 +20,7 @@ import {
   type Extension,
   StateEffect,
   StateField,
+  type Transaction,
 } from "@codemirror/state";
 import { EditorView, ViewPlugin } from "@codemirror/view";
 import { getHost } from "../host";
@@ -161,6 +162,24 @@ const catalogLoaderPlugin = ViewPlugin.fromClass(
     }
   },
 );
+
+/**
+ * Did this transaction change the catalog?
+ *
+ * The non-obvious rebuild trigger for anything that renders an attachment: the
+ * document is byte-identical before and after a warm, so a decoration field
+ * guarded on `tr.docChanged` alone keeps its pre-warm placeholder URLs forever
+ * (#211). Lives here because this module owns the field.
+ *
+ * Two `StateField`s use it (`cover-banner.ts`, `frontmatter.ts`).
+ * `attachment-embed.ts` deliberately does NOT: it is a `ViewPlugin` comparing a
+ * `ViewUpdate`, not a `Transaction`, so it keeps its own comparison until
+ * someone adds an overload. Saying otherwise would hide a duplicate that is
+ * still there.
+ */
+export function catalogChanged(tr: Transaction): boolean {
+  return tr.startState.field(catalogField, false) !== tr.state.field(catalogField, false);
+}
 
 /** Resolve an attachment id against the current catalog state. */
 export type CatalogResolution =

@@ -34,6 +34,9 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { formatYamlScalar } from "@myne/dialect";
+import { getHost } from "../host";
+import { catalogChanged, catalogField } from "../attachments/catalog";
+import { coverIsOnScreen } from "./cover-banner";
 import { foldSegment } from "@myne/dialect/folderPath";
 import { formatYamlStringScalar } from "@myne/dialect/surgery";
 import {
@@ -49,6 +52,9 @@ import {
   type SimpleProperty,
 } from "../frontmatter-properties";
 import i18n from "@myne/editor/i18n";
+
+/** Testid for the "Add cover" control on the promoted title row. */
+export const ADD_COVER_TESTID = "editor.cover-add";
 
 /**
  * Render a raw YAML scalar (as captured by `parseSimpleProperties`, i.e.
@@ -69,11 +75,21 @@ function displayYamlScalar(raw: string): string {
 }
 
 class PropertiesWidget extends WidgetType {
-  constructor(private readonly properties: readonly PropertyRow[]) {
+  constructor(
+    private readonly properties: readonly PropertyRow[],
+    /** Whether the cover banner above this widget is showing the note's cover.
+     *  Drives both the `cover:` row skip and the "Add cover" control, so the
+     *  two never disagree about whether a cover is on screen. */
+    private readonly coverShown: boolean,
+  ) {
     super();
   }
 
   eq(other: PropertiesWidget): boolean {
+    // Load-bearing: without this the widget compares equal across a catalog
+    // resolve, so the `cover:` row would keep whatever visibility it had when
+    // the note opened and never settle.
+    if (other.coverShown !== this.coverShown) return false;
     if (other.properties.length !== this.properties.length) return false;
     for (let i = 0; i < this.properties.length; i++) {
       const a = this.properties[i]!;
@@ -117,6 +133,19 @@ class PropertiesWidget extends WidgetType {
       // `title` is surfaced by the promoted field above — don't repeat it
       // as a generic key/value row.
       if (prop.key === "title") continue;
+      // Same rule for `cover`, whose promoted surface is the banner above this
+      // widget (myne-md/myne#410). The CONDITION is the whole point and an
+      // unconditional skip would be a bug: a line that exists in the file and
+      // appears nowhere in the interface contradicts the plain-markdown
+      // portability commitment.
+      //
+      // The condition is "the banner is showing it", NOT "the value is valid",
+      // and the difference is load-bearing. A cover whose attachment has been
+      // deleted is perfectly valid and draws no banner, so a validity-only
+      // check would hide the row for exactly the case where nothing else shows
+      // it. Both a rejected value and a dangling one therefore fall through to
+      // the ordinary text row, where the user can see and fix them.
+      if (prop.key === "cover" && this.coverShown) continue;
       list.appendChild(
         prop.kind === "sequence"
           ? this.renderSequenceRow(view, prop)
@@ -177,7 +206,36 @@ class PropertiesWidget extends WidgetType {
         input.blur();
       }
     });
-    return input;
+
+    // "Add cover" (myne-md/myne#410) — Notion's position, mapped onto where
+    // Myne's title actually lives. Rendered only when the note has NO valid
+    // cover: once it has one, the banner's own controls take over, and two
+    // surfaces offering the same thing is what the `title` promotion rule
+    // exists to avoid. Hidden until hover by CSS, and visible unconditionally
+    // on a coarse pointer, where there is no hover at all.
+    // Withdrawn only when a cover is actually ON SCREEN, matching the row skip.
+    // A dangling cover keeps this control, because the user has no usable cover
+    // and must still be able to set one.
+    const cover = getHost().cover;
+    if (cover === undefined || this.coverShown) return input;
+
+    const row = document.createElement("div");
+    row.className = "cm-fm-properties-name-row";
+    row.appendChild(input);
+
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "cm-fm-add-cover";
+    add.textContent = i18n.t("editor.cover.add");
+    add.setAttribute("data-testid", ADD_COVER_TESTID);
+    // `mousedown` + preventDefault, matching the banner's controls: the title
+    // input would otherwise take focus before the handler runs.
+    add.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      cover.openPicker(false);
+    });
+    row.appendChild(add);
+    return row;
   }
 
   /** The drag-handle glyph shared by every row (visual only). */
@@ -557,17 +615,16 @@ export function frontmatterBoundary(doc: Text): number | null {
   return blockEnd;
 }
 
-function buildFrontmatterDecorations(
-  state: { doc: Parameters<typeof cachedLocateFrontmatter>[0] },
-): DecorationSet {
+function buildFrontmatterDecorations(state: EditorState): DecorationSet {
   const doc = state.doc;
   const range = cachedLocateFrontmatter(doc);
   if (range === null) return Decoration.none;
   const props = parseProperties(doc.toString(), range);
   const blockEnd = frontmatterBoundary(doc) ?? range.blockEnd;
+  const coverShown = coverIsOnScreen(doc, state.field(catalogField, false) ?? null);
   const decorations: Array<Range<Decoration>> = [
     Decoration.replace({
-      widget: new PropertiesWidget(props),
+      widget: new PropertiesWidget(props, coverShown),
       block: true,
     }).range(range.blockStart, blockEnd),
   ];
@@ -600,7 +657,18 @@ const frontmatterField = StateField.define<DecorationSet>({
     return buildFrontmatterDecorations(state);
   },
   update(decorations, tr) {
-    if (!tr.docChanged) return decorations;
+    if (tr.docChanged) return buildFrontmatterDecorations(tr.state);
+    // The catalog matters here too, but only for ONE boolean: whether the
+    // `cover:` row is skipped depends on whether the banner resolved the
+    // attachment, and a warm changes that without touching a byte of the doc.
+    // A full rebuild would re-run `doc.toString()` + `parseProperties` (O(n) in
+    // the note) to recompute it, and for the overwhelmingly common note with no
+    // `cover:` at all the answer is the same both times. Comparing the boolean
+    // is O(frontmatter body).
+    if (!catalogChanged(tr)) return decorations;
+    const before = coverIsOnScreen(tr.state.doc, tr.startState.field(catalogField, false) ?? null);
+    const after = coverIsOnScreen(tr.state.doc, tr.state.field(catalogField, false) ?? null);
+    if (before === after) return decorations;
     return buildFrontmatterDecorations(tr.state);
   },
   provide(field) {

@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import type { Platform } from "../platform/PlatformContext";
+import type { Platform } from "../formfactor/PlatformContext";
 
 /**
  * A single design-board entry. Each screen module exports an array of these;

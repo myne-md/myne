@@ -220,6 +220,14 @@
   --radius-3: 10px;
   --radius-pill: 999px;
 
+  /* -- Note cover banner ---------------------------------------------- */
+  /* Fixed height, not an aspect ratio. A split pane changes width a lot, and a
+     ratio would give one note two very different banners while moving where the
+     body text starts. Fixed keeps the first line in a predictable place in every
+     pane. The image is cropped with object-fit: cover from the centre; there is
+     no per-note focal point (myne-md/myne#410). */
+  --cover-banner-h: 180px;
+
   /* -- Spacing scale (4px base) -------------------------------------- */
   --space-0:  0;
   --space-1:  4px;

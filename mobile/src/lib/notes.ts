@@ -17,7 +17,7 @@
 // discriminated union; those are re-exported below so callers can
 // narrow a caught rejection.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { patchDeletedField } from "../dialect/surgery";
 import type { NoteCreateError } from "../types/note-create-error";
 import type { NoteReadError } from "../types/note-read-error";

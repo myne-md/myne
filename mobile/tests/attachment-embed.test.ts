@@ -61,6 +61,33 @@ describe("markdown attachment token", () => {
     expect(inline).toEqual([{ kind: "attachment", id: ID, label: "cat.png" }]);
   });
 
+  // A note laid out on desktop syncs here. Reading the whole alias as the label
+  // showed the raw segments as the caption and as `alt`, and broke the
+  // extension test `isAudioLabel` runs, so an audio embed whose alias had
+  // picked up an importer-carried `alt=` silently lost its inline player.
+  it.each([
+    ["a width", `cat.png|w=300`, "cat.png"],
+    ["a width and alignment", `cat.png|w=300|align=center`, "cat.png"],
+    ["alt text containing a pipe", `cat.png|alt=A cat | 2026`, "cat.png"],
+    ["a key this version does not know", `cat.png|future=x`, "cat.png"],
+    ["a pipe-bearing filename", `re|port.png`, "re|port.png"],
+    ["an audio file carrying an alt", `memo.wav|alt=A memo`, "memo.wav"],
+  ])("labels an embed carrying %s by its filename", (_l, alias, want) => {
+    const blocks = parseBlocks(`![[att:${ID}|${alias}]]`);
+    const para = blocks.find((b) => b.kind === "paragraph");
+    const inline = para && para.kind === "paragraph" ? para.content : [];
+    expect(inline).toEqual([{ kind: "attachment", id: ID, label: want }]);
+  });
+
+  it("keeps an audio embed recognisable once its alias carries segments", () => {
+    const blocks = parseBlocks(`![[att:${ID}|memo.wav|w=300|alt=A memo]]`);
+    const para = blocks.find((b) => b.kind === "paragraph");
+    const inline = para && para.kind === "paragraph" ? para.content : [];
+    const token = inline[0];
+    expect(token.kind).toBe("attachment");
+    expect(token.kind === "attachment" && isAudioLabel(token.label)).toBe(true);
+  });
+
   it("leaves an ordinary [[wikilink]] as a wikilink", () => {
     const blocks = parseBlocks(`see [[Other Note]]`);
     const para = blocks.find((b) => b.kind === "paragraph");

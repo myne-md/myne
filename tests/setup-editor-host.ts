@@ -63,4 +63,9 @@ setEditorHost({
     spell_languages: [],
   }),
   openExternal: () => {},
+  // The real desktop and web hosts both install this (it is not capability
+  // gated), so the shared stub does too. Without it every cover control is
+  // silently skipped and the tests that assert "absent when the host has no
+  // seam" pass for the wrong reason.
+  cover: { openPicker: () => {}, remove: () => {} },
 });

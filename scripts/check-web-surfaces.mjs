@@ -352,6 +352,10 @@ const V = {
 
   // ── src/hooks ───────────────────────────────────────────────────────────
   "src/hooks/useAccountStatus.ts": ["ported", "Sync account status; degrades to null on an older server."],
+  "src/hooks/useHeadFingerprintCompare.ts": [
+    "ported",
+    "The SYNC-40 eye-compare poll + its push hold (myne#462). More load-bearing here than on desktop: per `decisions.md` 2026-07-26 a web client re-runs this compare on EVERY re-bootstrap, because OPFS is evictable.",
+  ],
   "src/hooks/useActivityHeartbeat.ts": ["adapted", "Page activity, not OS idle — `osIdleAutoLock` is absent and the browser timer is a different signal (task 43)."],
   "src/hooks/useAiModelReady.ts": ["adapted", "Unreachable where `localAi` is absent."],
   "src/hooks/useAttachmentTransfers.ts": ["ported", "Progress state around the attachment IPC."],

@@ -174,6 +174,13 @@ describe("editor host, per client", () => {
     expect(typeof host.prefsRead).toBe("function");
     expect(typeof host.openExternal).toBe("function");
     expect(host.workspace).toBeDefined();
+    // The cover picker (myne-md/myne#410) is not capability-gated: both clients
+    // mount the same React picker over the same `attachment_import`, and the
+    // seam member only carries the request from CodeMirror DOM into the shell.
+    expect(host.cover).toBeDefined();
+    const cover = host.cover as Record<string, unknown>;
+    expect(typeof cover.openPicker).toBe("function");
+    expect(typeof cover.remove).toBe("function");
     // NOT capability-gated, and deliberately so: every client can write to a
     // clipboard, only the transport differs. On web the platform seam IS
     // `navigator.clipboard.writeText`, so an omission here would not model a

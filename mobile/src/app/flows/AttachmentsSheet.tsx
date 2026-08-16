@@ -554,10 +554,16 @@ function TranscribeRow({ id, onInsertText }: { id: string; onInsertText?: (text:
         <div style={{ fontSize: 13, color: "var(--danger)" }} data-testid="files.transcribe-error">
           {errKind === "not_ready"
             ? t("attachments.library.transcribeNoModel")
-            : t("attachments.library.transcribeFailed")}{" "}
-          <button type="button" onClick={run} style={actionBtn("var(--accent)")}>
-            {t("attachments.library.menuTranscribe")}
-          </button>
+            : errKind === "too_long"
+              ? t("attachments.library.transcribeTooLong")
+              : t("attachments.library.transcribeFailed")}{" "}
+          {/* No retry for "too_long": the same clip is refused every time, so
+              offering the button would be advice that cannot work (myne#485). */}
+          {errKind !== "too_long" && (
+            <button type="button" onClick={run} style={actionBtn("var(--accent)")}>
+              {t("attachments.library.menuTranscribe")}
+            </button>
+          )}
         </div>
       )}
     </div>
