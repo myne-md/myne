@@ -110,6 +110,11 @@ export type EditRejection =
   | "unsafeFrontmatter"
   /** A proposed new note names an AI-excluded folder. */
   | "excludedFolder"
+  /** A proposed new note could not be written. Reported as a refusal rather
+   *  than failing the apply, because a create runs after the edit batch is
+   *  already committed: failing there would discard the run's restore points
+   *  and leave the applied edits with no undo. */
+  | "createFailed"
   /** The edit would trash a note and arrived inside a bulk approval. The user
    *  can still apply it by approving it on its own. */
   | "trashNeedsOwnAct";

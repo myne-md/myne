@@ -47,6 +47,16 @@ pub enum EditRejection {
     /// destination the scope clamp cannot cover: a note that does not exist yet
     /// is in no scope. The content control applies instead.
     ExcludedFolder,
+    /// The proposed new note could not be written.
+    ///
+    /// **A cause rather than a propagated error, and that is the point.** A
+    /// create runs LAST, after the edit batch has already been committed and
+    /// after the run's restore point was taken. Returning `Err` from there
+    /// discarded the whole `ApplyOutcome`, restore points included, so the
+    /// edits stayed on disk with no undo record and the surface reported that
+    /// nothing had been applied. Reporting the failed create as a refusal keeps
+    /// the outcome, which is what the undo is built from.
+    CreateFailed,
     /// The edit would move a note to Trash, and it arrived inside a batch the
     /// user approved in one action.
     ///

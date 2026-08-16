@@ -14,7 +14,7 @@
 
 use myne_core::host::tauri_host::TauriHost;
 use myne_core::plugins::agent::apply::{ApplyOutcome, Approval};
-use myne_core::plugins::agent::engine::Message;
+use myne_core::plugins::agent::engine::{Content, Message};
 use myne_core::plugins::agent::error::AgentError;
 use myne_core::plugins::agent::probe::{run_probe, ProbeThreshold, ProbeVerdict};
 use myne_core::plugins::agent::prompt::{Proposal, ProposedNote};
@@ -134,6 +134,19 @@ impl AgentSessionState {
         let mut table = self.sessions.lock().expect("agent session table poisoned");
         for session in table.values_mut() {
             session.task.zeroize();
+            // Overwrite before dropping, both arms. `UntrustedNote` wipes
+            // through `Zeroizing` on drop; `Trusted` is a plain `String`, and
+            // it holds every model reply, which quotes note anchors VERBATIM.
+            // A bare `.clear()` freed those without overwriting, so the half of
+            // the transcript this teardown's own comment calls out as holding
+            // note bodies was the half it did not wipe.
+            for message in &mut session.transcript {
+                for span in &mut message.content {
+                    if let Content::Trusted(t) = span {
+                        t.zeroize();
+                    }
+                }
+            }
             session.transcript.clear();
             for edit in &mut session.proposal.edits {
                 edit.anchor.zeroize();
@@ -465,6 +478,12 @@ pub async fn agent_preview_grant<R: Runtime>(
     vault: State<'_, VaultRuntimeState>,
 ) -> Result<GrantPreview, AgentError> {
     require_unlocked(&vault).await?;
+    // The opt-in, re-read host-side like every sibling that reaches the vault.
+    // `mod.rs` and `decisions/ai/0515` both said this command did; it did not,
+    // which made two documents wrong about a TB6 surface rather than merely
+    // leaving a gap. Cheaper to make the claim true than to record an exception
+    // nobody wanted.
+    require_ai_enabled(&app, &vault).await?;
     let source = DesktopScopeSource {
         app: app.clone(),
         vault: vault.inner(),
