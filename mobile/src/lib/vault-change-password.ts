@@ -17,7 +17,7 @@
 // Capability ACL `vault-change-password:default` is already in
 // `src-tauri/capabilities/default.json` — no ACL change required.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * A8c — change the master password of the currently-unlocked vault.

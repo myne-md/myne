@@ -1,0 +1,37 @@
+"$schema" = "schemas/schema.json"
+
+# Deny-by-default. The boundary here is TB2, the Tauri capability ACL — not TB6,
+# which is server storage.
+#
+# All THREE of the plugin's commands are granted. The read is the one that owes
+# an argument, and the rest of this file is it.
+#
+# `allow-write-text` and `allow-write-secret` are the WRITE direction. A write can
+# destroy what the user had on the clipboard, which is why the secret arm carries
+# an OS-enforced expiry rather than a timer, but it cannot read anything back.
+#
+# `allow-read-text` is the direction the desktop client deleted under myne#379,
+# recording that "an unused seam member is a door the next caller can reopen with
+# no ACL edit and no review". That reasoning is why the grant is argued HERE, on
+# the mobile plugin, rather than by widening the shared seam, where desktop and
+# web would have inherited it silently and rendered no affordance for it.
+#
+# Why it is granted at all: the one caller is the recovery screen's Paste, and the
+# alternative is making someone type twenty-four words on a phone. That is not
+# neutral. It pushes them to screenshot their recovery phrase instead, which is
+# strictly worse and is what the screen-guard plugin exists to prevent.
+#
+# What makes it acceptable here and not on desktop: the read is USER-INITIATED (a
+# tap on Paste, never ambient) and MOBILE-ONLY (the shared seam still exports no
+# read, so desktop and web keep myne#379's posture).
+#
+# What it costs, stated rather than implied: on that tap this app sees whatever
+# the user last copied, which may be a password from their manager. The value goes
+# straight into the phrase fields and is never logged or persisted. On iOS 16 and
+# later the OS adds its own "Allow Paste?" prompt, so the app holds no standing
+# access; on iOS 13 to 15 and on Android there is no such prompt, and the grant is
+# standing for as long as the app runs. That gap is real and is why this paragraph
+# says it instead of leaving the iOS-16 case to stand for all of them.
+[default]
+description = "Allow the mobile clipboard commands: the two WRITE arms (ordinary text, and secrets the OS is asked to confine and expire), and the user-initiated READ that backs the recovery-phrase Paste."
+permissions = ["allow-write-text", "allow-write-secret", "allow-read-text"]

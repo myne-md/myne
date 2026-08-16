@@ -1,6 +1,14 @@
-// A minimal text-input prompt modal for the editor file-card Rename action
+// A minimal text-input prompt modal for the editor attachment surfaces
 // (MYND-173). Vanilla DOM mounted to `document.body` — the same posture as the
 // attachment lightbox / toast / diff-preview surfaces.
+//
+// PARAMETERISED, not rename-only (myne#409). It started as the file card's
+// Rename prompt with its title, confirm label and testids hardcoded. The embed
+// layout menu then reused it for "Custom size…" and "Edit alt text…", which
+// silently titled both dialogs "Rename attachment": including the
+// `role="dialog"` accessible name, so a screen-reader user was told they were
+// renaming a file while typing alt text: and gave all three the same testids,
+// so no test could tell them apart.
 //
 // Why not `window.prompt`: the Tauri WebView no-ops `window.prompt` (it returns
 // `null`), so the file-card's Rename appeared to do nothing. This is the
@@ -11,10 +19,37 @@
 import i18n from "@myne/editor/i18n";
 import { openModal } from "@myne/editor/host/lib/imperative-modal";
 
+/** How one text prompt names itself. Every field is required: a prompt with a
+ *  borrowed title is the bug this interface exists to prevent. */
+export interface TextPromptCopy {
+  /** i18n key for the dialog's heading AND its accessible name. */
+  readonly titleKey: string;
+  /** i18n key for the confirm button. */
+  readonly confirmKey: string;
+  /** `data-testid` stem: the dialog, plus `.input` / `.cancel` / `.confirm`. */
+  readonly testidPrefix: string;
+}
+
+const RENAME_COPY: TextPromptCopy = {
+  titleKey: "editor.attachment.rename.title",
+  confirmKey: "editor.attachment.rename.confirm",
+  testidPrefix: "attachment-rename",
+};
+
 /** Open the rename prompt seeded with `currentValue`. Resolves to the entered
  *  value (Rename / Enter) or `null` (Cancel / Esc / backdrop). No-op without a
  *  DOM (node test env) → resolves `null`. */
 export function promptForName(currentValue: string): Promise<string | null> {
+  return promptForText(currentValue, RENAME_COPY);
+}
+
+/** Open a text prompt that names itself through `copy`. Same resolution
+ *  contract as {@link promptForName}: the entered string, or `null` on cancel.
+ *  An empty string is a REAL value and is NOT a cancellation. */
+export function promptForText(
+  currentValue: string,
+  copy: TextPromptCopy,
+): Promise<string | null> {
   if (typeof document === "undefined") return Promise.resolve(null);
 
   return new Promise<string | null>((resolve) => {
@@ -48,8 +83,8 @@ export function promptForName(currentValue: string): Promise<string | null> {
     const dialog = document.createElement("div");
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-label", i18n.t("editor.attachment.rename.title"));
-    dialog.setAttribute("data-testid", "attachment-rename");
+    dialog.setAttribute("aria-label", i18n.t(copy.titleKey));
+    dialog.setAttribute("data-testid", copy.testidPrefix);
     Object.assign(dialog.style, {
       width: "360px",
       maxWidth: "90vw",
@@ -62,7 +97,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
     });
 
     const label = document.createElement("div");
-    label.textContent = i18n.t("editor.attachment.rename.title");
+    label.textContent = i18n.t(copy.titleKey);
     Object.assign(label.style, {
       fontSize: "13px",
       fontWeight: "var(--weight-semibold)",
@@ -73,7 +108,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
     const input = document.createElement("input");
     input.type = "text";
     input.value = currentValue;
-    input.setAttribute("data-testid", "attachment-rename.input");
+    input.setAttribute("data-testid", `${copy.testidPrefix}.input`);
     Object.assign(input.style, {
       width: "100%",
       boxSizing: "border-box",
@@ -98,7 +133,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
     const cancel = document.createElement("button");
     cancel.type = "button";
     cancel.textContent = i18n.t("editor.attachment.rename.cancel");
-    cancel.setAttribute("data-testid", "attachment-rename.cancel");
+    cancel.setAttribute("data-testid", `${copy.testidPrefix}.cancel`);
     Object.assign(cancel.style, {
       fontFamily: "var(--font-sans)",
       fontSize: "13px",
@@ -113,8 +148,8 @@ export function promptForName(currentValue: string): Promise<string | null> {
 
     const confirm = document.createElement("button");
     confirm.type = "button";
-    confirm.textContent = i18n.t("editor.attachment.rename.confirm");
-    confirm.setAttribute("data-testid", "attachment-rename.confirm");
+    confirm.textContent = i18n.t(copy.confirmKey);
+    confirm.setAttribute("data-testid", `${copy.testidPrefix}.confirm`);
     Object.assign(confirm.style, {
       fontFamily: "var(--font-sans)",
       fontSize: "13px",

@@ -6,7 +6,7 @@
 // (`foldSegment`), not the old client `toLowerCase`. Struct fields are serde
 // camelCase both ways.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { LineTask } from "../dialect/visitors/lineTasks";
 import type { PropertyEntry } from "@myne/editor/host/notes/propertyTyping";
 import type { StoredProperty } from "@myne/editor/host/notes/queryEngine";

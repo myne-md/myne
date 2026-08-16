@@ -6,8 +6,15 @@
 //
 // The question + streamed tokens are AS1-class RAM (the user's own words + the
 // model's) — never logged here, dropped on lock by the chat store's teardown
-// (`clearChat`). The Rust side runs the model locally: no provider call, no
-// network (the no-egress gate is the structural guarantee).
+// (`clearChat`).
+//
+// This used to say the Rust side runs the model locally, with "no provider
+// call, no network". That has been false since the remote arm shipped (#414 /
+// #415): `engine_for(RequestClass::UserInitiated)` can resolve to a named
+// provider, and then this very call sends the framed question — grounded on
+// note text — off the device. The guarantee is the narrower, true one: no byte
+// leaves the device unless the user has named a provider, consented, and stored
+// a key, which the host re-reads on every call (`RemoteEngine::ready`).
 
 import { Channel, invoke } from "../platform/core";
 import { normalizeProviderError } from "./engine-error";
@@ -54,8 +61,13 @@ export const CHAT_DEFAULT_K = 10;
  * + a streaming assistant turn to the transcript, opens a token `Channel`, and
  * streams the grounded answer into the active turn. Resolves when generation
  * completes; on error the turn flips to its error state; a Stop (or vault-lock)
- * mid-stream is handled by the store's run-epoch guard. Local-only; never
- * transmits the message anywhere (the no-egress gate is structural).
+ * mid-stream is handled by the store's run-epoch guard.
+ *
+ * This used to end "Local-only; never transmits the message anywhere". See the
+ * module header: that has been false since the remote arm shipped, and the
+ * true guarantee is narrower. No byte leaves the device unless the user has
+ * named a provider, consented and stored a key, which the host re-reads on
+ * every call.
  */
 export async function sendChat(
   message: string,
@@ -104,7 +116,19 @@ export async function sendChat(
     // one sentence, so "your API key is wrong" and "the provider is down" were
     // indistinguishable and neither suggested an action. `normalizeProviderError`
     // maps the closed tag; no detail string ever crosses.
-    failChatTurn(runToken, normalizeProviderError(e));
+    const cause = normalizeProviderError(e);
+    // An empty completion is a RESULT, not a fault: the model was reached, it
+    // answered, and the answer was nothing. It takes the same route a local
+    // engine's empty finalization already takes, so the turn carries
+    // `error: false` and the existing empty-answer placeholder renders it.
+    //
+    // Classified here rather than in the component, because the alternative is
+    // to push it through the store as a failure and then un-fail it at render
+    // time: two JSX conditions that have to stay exact complements, a boolean
+    // whose meaning depends on a sibling string, and a third such cause needing
+    // the same two-place edit.
+    if (cause === "empty_completion") finalizeChatTurn(runToken, []);
+    else failChatTurn(runToken, cause);
   }
 }
 

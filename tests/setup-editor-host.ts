@@ -32,6 +32,11 @@ const isMediaTarget = (target: string): boolean => {
 setEditorHost({
   t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: { tagTree: async () => [], isMediaTarget },
+  // The clipboard write the code-block copy button goes through
+  // (myne-md/myne#390). Delegates to the WebView API so a test that wants to
+  // observe a copy keeps doing what it already did: patch `navigator.clipboard`
+  // and read the spy. The seam moved; what a test has to mock did not.
+  clipboardWrite: (value) => navigator.clipboard.writeText(value),
   attachments: {
     attachmentExport: async () => {},
     attachmentRename: async () => {},
@@ -58,4 +63,9 @@ setEditorHost({
     spell_languages: [],
   }),
   openExternal: () => {},
+  // The real desktop and web hosts both install this (it is not capability
+  // gated), so the shared stub does too. Without it every cover control is
+  // silently skipped and the tests that assert "absent when the host has no
+  // seam" pass for the wrong reason.
+  cover: { openPicker: () => {}, remove: () => {} },
 });

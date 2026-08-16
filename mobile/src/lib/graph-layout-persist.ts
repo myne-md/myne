@@ -13,7 +13,7 @@
 // both spend an IPC round-trip per tab switch and clobber in-memory positions
 // newer than disk inside the 800 ms debounce window.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import {
   clearGraphLayout,
   hasGraphLayout,

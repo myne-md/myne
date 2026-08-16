@@ -1572,6 +1572,8 @@ export const myneTheme = EditorView.theme({
     gap: "4px",
     maxWidth: "320px",
     verticalAlign: "top",
+    // Anchors the embed's "⋯" overlay (.cm-attachment-embed-menu).
+    position: "relative",
     // No frame: the image renders directly on the editor surface — no white
     // border / background / padding (dogfooding feedback). The `<img>` itself
     // keeps a subtle radius (.cm-attachment-img).
@@ -1587,6 +1589,28 @@ export const myneTheme = EditorView.theme({
     maxWidth: "100%",
     height: "auto",
     borderRadius: "4px",
+  },
+  // Embed alignment (myne#409). The default frame is `inline-flex`, which sits
+  // in the line box and which no margin can centre. An ALIGNED frame becomes
+  // block-level and `fit-content` wide so the auto margins have something to
+  // distribute; an explicit `w=` overrides the width inline and the margins
+  // still bite. Alignment is only ever applied as a class, never as an inline
+  // style string built from a note-authored value.
+  ".cm-attachment-frame-align": {
+    display: "flex",
+    width: "fit-content",
+  },
+  ".cm-attachment-frame-align-left": {
+    marginLeft: "0",
+    marginRight: "auto",
+  },
+  ".cm-attachment-frame-align-center": {
+    marginLeft: "auto",
+    marginRight: "auto",
+  },
+  ".cm-attachment-frame-align-right": {
+    marginLeft: "auto",
+    marginRight: "0",
   },
   // (Filename caption removed in the editor embed — dogfooding fix #2. The
   // media renders alone; the library keeps filenames, out of scope here.)
@@ -1803,6 +1827,46 @@ export const myneTheme = EditorView.theme({
   ".cm-attachment-file-card-menuwrap": {
     position: "relative",
     flexShrink: 0,
+  },
+  // The two controls that overlay an inline embed's top-right corner: the "⋯"
+  // menu and the unreadable-segment marker. One surface treatment for both, so
+  // they read as a single control cluster rather than two unrelated badges, and
+  // so a change to the surface cannot drift between them. Both need their own
+  // paper + hairline + shadow because they sit over arbitrary image content and
+  // would otherwise be illegible on half of it.
+  ".cm-attachment-embed-menu, .cm-attachment-embed-warning": {
+    position: "absolute",
+    top: "var(--space-2, 8px)",
+    zIndex: "1",
+    backgroundColor: "var(--paper, #fbfbfa)",
+    border: "1px solid var(--line-2, #c8c7c1)",
+    borderRadius: "var(--radius-2, 6px)",
+  },
+  // Persistent unreadable-segment marker (myne#409, `markdown-dialect.md`
+  // §3.9.3). Deliberately QUIET: the embed still renders correctly at its
+  // default size, so a loud marker would read as damage rather than as "one
+  // segment could not be read". Offset left of the "⋯" it sits beside, so
+  // moving the menu means moving this with it.
+  ".cm-attachment-embed-warning": {
+    right: "calc(var(--space-2, 8px) + var(--space-6, 32px))",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "20px",
+    height: "20px",
+    color: "var(--warning, #8a6a1f)",
+    fontSize: "var(--text-sm)",
+    fontWeight: "var(--weight-semibold)",
+    cursor: "default",
+  },
+  // The "⋯" on an inline image / PDF EMBED. Unlike the file card, an embed has
+  // no metadata row to host the button, so it overlays the media instead.
+  //
+  // Deliberately NOT hover-gated. `editor/` is shared with the mobile WebView,
+  // where there is no hover and a reveal-on-hover control is unreachable.
+  ".cm-attachment-embed-menu": {
+    right: "var(--space-2, 8px)",
+    lineHeight: "0",
   },
   ".cm-attachment-file-card-menubtn": {
     appearance: "none",

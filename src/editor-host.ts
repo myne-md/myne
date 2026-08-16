@@ -25,6 +25,7 @@
 // | `spell` | **omitted** — task 47 decided spell-check is absent on web this release, and the reason is bundle size rather than portability (dictionaries are bundled binary resources). `spellCheck` is in the web descriptor's ABSENT set and the dispatcher answers `Unsupported`. The `MYD1` personal dictionary is untouched: it is vault content (`sync-protocol.md` §9 Class 1, set-union merge), so it keeps syncing and a desktop session keeps using it — what is absent is the CHECKER, not the word list. |
 
 import { openUrl } from "./platform/opener";
+import { writeText as clipboardWriteText } from "./platform/clipboardManager";
 import { save } from "./platform/dialog";
 import { convertFileSrc } from "./platform/core";
 import {
@@ -61,6 +62,10 @@ import {
 import { prefsRead } from "./lib/prefs";
 import { renameFlushHooks } from "./notes/renameFlushHook";
 import { CLOSE_ACTIVE_TAB_EVENT } from "./notes/closeActiveTabSignal";
+import {
+  OPEN_COVER_PICKER_EVENT,
+  REMOVE_COVER_EVENT,
+} from "./notes/openCoverPickerSignal";
 import { infer,
   inferAmbient, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-assistant";
 import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/spell";
@@ -72,6 +77,12 @@ import { toast } from "./components/toast/toastStore";
 const host: EditorHost = {
   t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: { tagTree, isMediaTarget },
+  // Same code for desktop and web, and the substitution is the whole point: the
+  // desktop seam re-exports the Tauri clipboard plugin's write, the web seam IS
+  // the raw WebView write. `editor/` sees one member either way, which is what
+  // lets the clipboard guard prohibit that raw API everywhere except
+  // `web/src/platform/`, the one file that legitimately is the seam.
+  clipboardWrite: clipboardWriteText,
   attachments: {
     // The members task 76 moved off `@myne/editor`'s direct Tauri imports. The
     // IPC strings and payloads are byte-unchanged — only the caller moved.
@@ -193,6 +204,16 @@ const host: EditorHost = {
   //     same one rename auto-update drives).
   //   - `:q` emits a window event the editor shell listens for; the shell owns
   //     the pane tree and is the only thing that can close a tab correctly.
+  // The cover picker is a React modal the shell mounts, and the shell is also
+  // the only thing that knows which note the focused pane holds — the same two
+  // reasons `closeActiveTab` below is an event rather than a call.
+  cover: {
+    openPicker: (hasCover) =>
+      window.dispatchEvent(
+        new CustomEvent(OPEN_COVER_PICKER_EVENT, { detail: { hasCover } }),
+      ),
+    remove: () => window.dispatchEvent(new CustomEvent(REMOVE_COVER_EVENT)),
+  },
   workspace: {
     flushPendingSaves: () => renameFlushHooks().flushOpenPanes(),
     closeActiveTab: () => window.dispatchEvent(new CustomEvent(CLOSE_ACTIVE_TAB_EVENT)),

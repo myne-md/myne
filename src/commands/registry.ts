@@ -92,6 +92,13 @@ export type CommandContext = {
   onExportNoteHtml: () => void;
   /** Run the per-note plain-text export flow for the selected note (MYND-340). */
   onExportNoteTxt: () => void;
+  /** Open the cover picker for the selected note (myne-md/myne#410). The other
+   *  two entry points are hover-revealed, so this is the keyboard door. */
+  onSetNoteCover: () => void;
+  /** Clear the selected note's cover. A separate entry because the only other
+   *  Remove lives on the banner's hover controls, inside CodeMirror content
+   *  where Tab is bound to indent, so it is unreachable by keyboard. */
+  onRemoveNoteCover: () => void;
   /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */
   onShowGraph: () => void;
   /** Open (or reveal) the vault-wide task list (MYND-616). */

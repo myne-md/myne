@@ -32,6 +32,7 @@
       "@myne/legal-urls": ["../src/lib/legal-urls.ts"],
       "@myne/syntax-theme": ["../src/lib/syntaxTheme.ts"],
       "@myne/theme-measure": ["../src/lib/themeMeasure.ts"],
+      "@myne/clipboard": ["../src/lib/clipboard.ts"],
       "@myne/ornaments": ["../ornaments/src/index.ts"],
       "@myne/ornaments/*": ["../ornaments/src/*"],
       "@myne/task-wire": ["../src/notes/taskWire.ts"],

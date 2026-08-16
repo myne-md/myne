@@ -84,7 +84,7 @@ export function clearReminderTap(): void {
 export async function initReminderTaps(): Promise<void> {
   if (!HAS_TAURI) return;
   try {
-    const { listen } = await import("@tauri-apps/api/event");
+    const { listen } = await import("../platform/event");
     await listen<{ id?: unknown }>(NATIVE_EVENT, (event) => {
       handleReminderTap(event.payload?.id);
     });

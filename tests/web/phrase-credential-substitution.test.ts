@@ -9,11 +9,19 @@
 //  2. **The dispatcher** — `web/wasm/src/dispatch.rs` answers the recovery
 //     credential kind with a typed `unsupported`, before any network, any KDF
 //     and any phrase handling. Covers the console, but the CODE still shipped.
-//  3. **The substitution — this file.** The module that imports
-//     `bip39-normalize` is replaced at build time, so served code has no import
-//     edge to the wordlist at all. That is stronger than the grep it replaces:
-//     a grep describes today's tree-shake of a runtime branch, and this
-//     describes the module graph.
+//  3. **The substitution** — `web/src/screens/EnrollPhraseCredential.tsx`
+//     replaces the enrolment screen at build time, so the enrolment grid is
+//     absent from the served artefact rather than hidden in it, which
+//     `scripts/check-web-no-phrase.mjs` then asserts against the built bundle.
+//
+// This file used to hold a fourth block asserting a substitution of
+// `phrase-credential` ITSELF, which no longer exists: the 2026-08-15 reversal
+// ships phrase ENTRY on web, so `EnrollDeviceForm` imports the real module and
+// the wordlist has a legitimate import edge into the bundle. That block kept
+// passing against a stub nothing resolved to, which is a test describing a
+// mechanism the build had stopped performing. It is deleted rather than
+// rewritten, because what replaced it is asserted where it now lives: in the
+// artefact grep, and in the dispatcher's own tests.
 //
 // The stake is that one exposure is permanent — `protocol.md` §7 preserves the
 // phrase across every password change and there is no rotation command — and
@@ -21,11 +29,9 @@
 // phrase credential from a browser would also walk past the device-approval
 // gate.
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const real = await import("../../src/components/sync/phrase-credential");
-const web = await import("../../web/src/components/sync/phrase-credential");
 
 const PHRASE = Array.from({ length: 24 }, () => "abandon");
 
@@ -42,43 +48,5 @@ describe("the desktop module", () => {
 
   it("offers the 24 cells the protocol specifies", () => {
     expect(real.PHRASE_CELL_COUNT).toBe(24);
-  });
-});
-
-describe("the web substitution", () => {
-  /**
-   * It THROWS rather than returning an empty string, and that choice is the
-   * test. An empty credential would reach `sync_enroll` and fail there as a
-   * wrong credential — the same message a mistyped password gets — so a bug
-   * that resurrected this path would read as user error and stay in the
-   * product. A throw names the boundary at the moment it is crossed.
-   */
-  it("refuses to construct a credential, loudly", () => {
-    expect(() => web.buildPhraseCredential(PHRASE)).toThrow(/recovery-phrase credential/);
-  });
-
-  /** Zero, not 24: a caller still mapping over a grid renders nothing rather
-   *  than 24 empty inputs no code on this client can read. */
-  it("has no grid", () => {
-    expect(web.PHRASE_CELL_COUNT).toBe(0);
-  });
-
-  /**
-   * The structural claim, asserted on the SOURCE rather than on behaviour: the
-   * substitute must not import the wordlist, however it is later edited. A
-   * behavioural test cannot see an import that is present but unused, and an
-   * unused import is exactly what a bundler would still pull in.
-   */
-  it("imports nothing at all", () => {
-    const src = readFileSync("web/src/components/sync/phrase-credential.ts", "utf8");
-    expect(src).not.toMatch(/^\s*import\s/m);
-    expect(src).not.toContain("bip39");
-  });
-
-  /** The two modules must stay interface-compatible, or the substitution stops
-   *  being a substitution and starts being a build break nobody sees until the
-   *  web bundle is built. */
-  it("exports the same names as the module it replaces", () => {
-    expect(Object.keys(web).sort()).toEqual(Object.keys(real).sort());
   });
 });

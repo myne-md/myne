@@ -11,7 +11,6 @@ import { Welcome } from "./screens/Welcome";
 import { RestoreBackup } from "./screens/RestoreBackup";
 
 import { Unlock } from "./screens/Unlock";
-import { VaultRecover } from "./screens/VaultRecover";
 import { VaultPicker } from "./screens/VaultPicker";
 import {
   initialStageFromProbe,
@@ -24,6 +23,7 @@ import {
   type VaultId,
 } from "./lib/stage";
 import { PairingDialog } from "./components/PairingDialog";
+import { Toaster } from "./components/toast/Toaster";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
 import { has } from "./platform/capabilities";
 import { listVaults } from "./lib/vault-list";
@@ -59,6 +59,20 @@ const Editor = lazy(() =>
  */
 const CreateVault = lazy(() =>
   import("./screens/CreateVault").then((m) => ({ default: m.CreateVault })),
+);
+
+/**
+ * Lazy for exactly the reason `CreateVault` above is, and it is the second door
+ * the same change opened.
+ *
+ * Splitting the creation flow out and leaving this one eager took the wordlist
+ * out of first load through one route and put it back through the other, which
+ * is why the bundle budget went over its cap on the merge rather than on either
+ * change alone. Recovery is the rarest route in the product: a user reaches it
+ * once, after forgetting a password, and every other visit pays for it.
+ */
+const VaultRecover = lazy(() =>
+  import("./screens/VaultRecover").then((m) => ({ default: m.VaultRecover })),
 );
 
 // Synthetic key for the single-entry boot `SlotMap` (MYND-204 SYNC-4).
@@ -492,7 +506,24 @@ function App() {
               // at 0) instead of always landing on the create screen.
               onDeleteVaultSuccess={reprobe}
               onSwitchVault={onSwitchVault}
-              onCreateAnother={() => dispatch({ type: "editor.create-vault" })}
+              // The FIFTH `vaultCreation`-as-proxy site, and the one the
+              // 2026-08-15 regate below missed. It is the same second-vault
+              // door as `onJoinDevice`, with the same subject, so it takes the
+              // same predicate.
+              //
+              // Left ungated it became reachable rather than merely wrong: the
+              // switcher renders the row whenever this prop is defined, it is
+              // not substituted on web, and until this change the row led to
+              // the `CreateVault` "unavailable here" stub. Now it leads into
+              // the real flow, on a client whose vault id is the constant
+              // `paths::web_single_vault_id()`, so the user answers the
+              // briefing, types a password, waits out a full Argon2id
+              // derivation and is then told `VaultArtifactsPresent`.
+              onCreateAnother={
+                has("localOnlyVault")
+                  ? () => dispatch({ type: "editor.create-vault" })
+                  : undefined
+              }
               // "Add this device to an account" in the switcher dropdown
               // (myne#221). Capability-gated here rather than in the switcher so
               // the descriptor is consulted once: a client that holds exactly
@@ -516,18 +547,20 @@ function App() {
         );
       case "recover":
         return (
-          <VaultRecover
-            initialSubStep={stage.subStep}
-            onCancel={(vaultId) =>
-              dispatch({ type: "recover.cancel", vaultId })
-            }
-            onCompleteSuccess={(vaultId) =>
-              dispatch({ type: "recover.complete-success", vaultId })
-            }
-            // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
-            // the Unlock screen's `onDeleteVaultSuccess` above.
-            onDeleteVaultSuccess={reprobe}
-          />
+          <Suspense fallback={null}>
+            <VaultRecover
+              initialSubStep={stage.subStep}
+              onCancel={(vaultId) =>
+                dispatch({ type: "recover.cancel", vaultId })
+              }
+              onCompleteSuccess={(vaultId) =>
+                dispatch({ type: "recover.complete-success", vaultId })
+              }
+              // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
+              // the Unlock screen's `onDeleteVaultSuccess` above.
+              onDeleteVaultSuccess={reprobe}
+            />
+          </Suspense>
         );
       case "picker":
         // ≥2-vault startup surface (MYND-204). The picker fetches its
@@ -600,6 +633,19 @@ function App() {
           TB10). Mounted globally so a connect request from the extension
           surfaces over whatever stage is showing; renders nothing unless the
           core has a pending pairing session. */}
+      {/* The single toast surface (#238), hoisted here from `Editor.tsx` by
+          myne-md/myne#390. Renders every toast from the central store as one
+          shared collapsed stack, and is mounted exactly once, the count has not
+          changed, only the depth.
+
+          The depth is the fix. Inside `Editor.tsx` it existed only AFTER unlock,
+          so a `toast(...)` from vault creation, from unlock, or from a
+          fail-closed takeover drew nothing and reported nothing about having
+          drawn nothing. Every pre-unlock surface that wanted to tell the user
+          something had therefore grown its own label swap or its own silence,
+          which is most of what the clipboard audit found. Above the stage switch,
+          those surfaces have somewhere to render. */}
+      <Toaster />
       <PairingDialog />
       {/* "Add this device to an account" (MYND-424; myne#221 opened it to the
           picker + switcher). Mounted here, over whatever stage is showing,

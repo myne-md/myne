@@ -34,6 +34,8 @@ import {
   type PickedTree,
 } from "../../platform/filePicker";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { copyText } from "../../lib/clipboard";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
@@ -1051,12 +1053,13 @@ function AttentionRow({
   const [copied, setCopied] = useState(false);
 
   const copy = useCallback(() => {
-    void navigator.clipboard?.writeText(draft).then(
-      () => setCopied(true),
-      () => {
-        /* clipboard unavailable — the field is still selectable */
-      },
-    );
+    // TRANSPORT MIGRATION ONLY (myne-md/myne#390): the pair states today's
+    // behaviour, a label swap on success and nothing on refusal. The failure
+    // reason is the one that was already written here, kept verbatim.
+    void copyText(clipboardWriteText, draft, {
+      onSuccess: { kind: "inline", run: () => setCopied(true) },
+      onFailure: { kind: "silent", reason: "clipboard unavailable, the field is still selectable" },
+    });
   }, [draft]);
 
   return (

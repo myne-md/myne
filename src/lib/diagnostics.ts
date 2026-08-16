@@ -62,7 +62,9 @@ export type DiagnosticField = (typeof DIAGNOSTIC_FIELDS)[number];
 export interface DiagnosticInputs {
   readonly version: string;
   readonly channel: string;
-  /** `null` where the client has no served bundle (desktop). */
+  /** The commit the running build came from. `null` only if the caller has no
+   *  reading at all — every current caller has one, since the compile-time
+   *  define backs the served value up. */
   readonly commit: string | null;
   readonly bundleHash: string | null;
   /** The bounded, closed-enum failure label — never a message string. */

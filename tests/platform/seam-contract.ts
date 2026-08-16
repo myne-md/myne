@@ -399,6 +399,25 @@ export function runSeamContract(subject: SeamSubject): void {
       () => seam.clipboardManager.writeText("secret"),
     );
 
+    // The ABSENCE, asserted (myne-md/myne#390). The comment above says a read
+    // must not come back, and until now a comment was the only thing saying it:
+    // re-exporting `readText` from either implementation would have compiled,
+    // shipped, and passed every test in this file, because a contract can only
+    // check members it knows to look for.
+    //
+    // It matters more since mobile grew a read of its own. That one is a
+    // deliberate, separate decision on a separate seam, granted in the mobile
+    // plugin's own `permissions/default.toml` with the argument written next to
+    // the grant, and the easiest way to erase that decision is for someone to
+    // "unify" the two seams by adding the member here, where desktop and web
+    // would silently inherit it along with a capability they do not have.
+    it("exposes no clipboard READ or CLEAR, the direction myne#379 removed", () => {
+      const surface = seam.clipboardManager as Record<string, unknown>;
+      expect(typeof surface.writeText).toBe("function");
+      expect("readText" in surface).toBe(false);
+      expect("clear" in surface).toBe(false);
+    });
+
     // ── deep link ───────────────────────────────────────────────────────
     contractFor(
       "deepLink.onOpenUrl",

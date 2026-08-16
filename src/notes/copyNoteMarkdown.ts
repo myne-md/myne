@@ -22,6 +22,7 @@
 import { locateFrontmatter } from "@myne/dialect/lezer/frontmatter";
 import { writeText } from "../platform/clipboardManager";
 import { noteRead } from "./readNote";
+import { copyText, type Feedback } from "../lib/clipboard";
 
 /** The note body with any leading frontmatter block removed. */
 export function bodyWithoutFrontmatter(plaintext: string): string {
@@ -44,7 +45,13 @@ export function bodyWithoutFrontmatter(plaintext: string): string {
  * failure is the worst outcome here, because a clipboard write has no visible
  * result and the user would paste stale content believing it worked.
  */
-export async function copyNoteMarkdown(noteId: string): Promise<void> {
+export async function copyNoteMarkdown(
+  noteId: string,
+  feedback: Feedback,
+): Promise<void> {
+  // The READ still throws, and must: "the note could not be decrypted" and "the
+  // clipboard refused" are different failures, and only the second one is what
+  // the feedback pair is about. The caller's catch still covers the first.
   const plaintext = await noteRead(noteId);
-  await writeText(bodyWithoutFrontmatter(plaintext));
+  await copyText(writeText, bodyWithoutFrontmatter(plaintext), feedback);
 }

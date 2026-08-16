@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, FlowHeader, Title, Lead, FooterBar, Button, Banner, BlockingOverlay, Icon } from "../../components";
-import { syncJoinAccount, syncNow, syncHeadFingerprint, syncResetLocal, errKind, syncDecodeJoinQr, scanQr, type JoinResult, type JoinQrView } from "../../lib/sync";
+import { syncJoinAccount, syncResetLocal, errKind, syncDecodeJoinQr, scanQr, type JoinResult, type JoinQrView } from "../../lib/sync";
+import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { setDeviceName } from "../../lib/prefs";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
@@ -244,8 +245,10 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   // approve; "verify" shows the head-fingerprint SAS for the mandatory eye-compare.
   const [step, setStep] = useState<"form" | "confirm" | "pending" | "verify">("form");
   const [joinedVaultId, setJoinedVaultId] = useState<VaultId | undefined>(undefined);
-  const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
+  /** The un-enrol failed — the device is STILL enrolled, and the screen must
+   *  say so instead of closing (design-notes/ui/0482). */
+  const [abortFailed, setAbortFailed] = useState(false);
   // Device-join via QR (MYND-466): the decoded QR held for the confirm step.
   const [scanned, setScanned] = useState<JoinQrView | null>(null);
 
@@ -380,99 +383,65 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     setStep("form");
   }
 
-  // While PENDING, drive the claim + watch for the adopted-head fingerprint. The
-  // foreground loop claims the token + pulls once an existing device approves; the
-  // pulled head observation is surfaced as soon as it MAC-verifies (before note bodies
-  // download), so `sync_head_fingerprint` returns non-null promptly → advance to the
-  // mandatory verify step (SYNC-40). Self-scheduling ~1s poll (not setInterval) so a
-  // slow claim RTT never overlaps ticks; runs ONLY while step==='pending' — the bounded
-  // enroll window, NOT the steady-state background sync cadence.
+  // The adopted-head watch and the SYNC-40 compare, through the shared hook
+  // (myne#462). Twin of `src/hooks/useHeadFingerprintCompare.ts` — registered in
+  // `scripts/check-twin-drift.mjs`, because this side drifting away from that one
+  // is precisely how the approving screen in `SyncSettingsPanels` kept a
+  // pre-#243 shape for months.
+  //
+  // Armed from `pending`, not from `verify`: the device-name write below fires
+  // the instant a head is adopted, before the compare screen exists, and
+  // `device_names` lives in `vault.prefs`, so pushing it authors a head. The
+  // hold catches the PUSH, never the write — `persistDeviceNameWithRetry` still
+  // runs and still retries, so MYND-548 stays fixed.
+  const { fingerprint, changed: sasChanged } = useHeadFingerprintCompare(
+    (step === "pending" || step === "verify") && HAS_TAURI,
+    "joiner",
+  );
+
+  // The pending → verify edge. A non-null fingerprint means this device pulled
+  // and MAC-verified a head — which is also the point at which naming is safe,
+  // because the §10.2.1 prefs seed has had its turn. `named` keeps the write to
+  // once, since the poll now keeps running behind the compare.
+  const named = useRef(false);
   useEffect(() => {
-    if (step !== "pending" || !HAS_TAURI) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    // At most one full sync in flight at a time (see below).
-    let syncing = false;
-    // MYND-537: the fingerprint poll must NOT sit behind a full content sync.
-    //
-    // This awaited `syncNow()` before every fingerprint check. `syncNow` claims
-    // the approval AND pulls the vault, so on a first join the match code — which
-    // needs nothing but an adopted head — was gated on the entire vault
-    // arriving. On a small vault that reads as a multi-minute "waiting for
-    // approval"; on a large one the tick never returns, the next one never
-    // fires, and the screen never appears at all. The desktop side has long
-    // since shown "approved".
-    //
-    // So: poll the fingerprint on its own cadence, and let `syncNow` run
-    // alongside rather than in front of it. `syncing` keeps at most one in
-    // flight, since overlapping full syncs would contend for the same vault.
-    const tick = async () => {
-      try {
-        if (!syncing) {
-          syncing = true;
-          void syncNow()
-            .catch(() => {
-              /* transient — the next tick starts another */
-            })
-            .finally(() => {
-              syncing = false;
-            });
-        }
-        const fp = await syncHeadFingerprint();
-        if (!cancelled && fp) {
-          // A head was adopted ⇒ this device completed an authed cycle, so the
-          // §10.2.1 seed has had its turn and naming is now safe.
-          if (joinedDeviceId.current) {
-            // MYND-548: RETRY, don't abandon. This was a single attempt whose
-            // failure was swallowed — and it fires in the same tick the head is
-            // adopted, racing the prefs write that landing a head performs, so
-            // failing here is ordinary rather than exotic. Because the poll
-            // returns immediately afterwards there was no second chance: the
-            // name the user had just typed was gone for good, and nothing told
-            // them. That is why "I named this device" ended in a list showing
-            // id-derived labels on both clients.
-            //
-            // NOT awaited, which is the MYND-537 constraint applied to this fix:
-            // three attempts across ~1.5s in front of `setStep` would put a
-            // second delay on the very screen this PR exists to stop delaying.
-            // The write needs an adopted head, not a rendered screen, so it runs
-            // alongside — see the helper's doc for why outliving this effect is
-            // the intended behaviour rather than a leak.
-            //
-            // A name that still will not write is NOT reported to the user yet:
-            // that copy has to land in the shared `@myne/i18n` catalog, so
-            // hard-coding English here would be the wrong trade. The device list
-            // falls back to its id-derived label and renaming from Settings is
-            // the repair. This is the obvious home for that follow-up.
-            void persistDeviceNameWithRetry(
-              joinedDeviceId.current,
-              deviceNameField.resolved,
-            );
-          }
-          setFingerprint(fp);
-          setStep("verify");
-          return; // adopted the head — stop polling
-        }
-      } catch {
-        /* transient — retry next tick */
-      }
-      if (!cancelled) timer = setTimeout(() => void tick(), 1000);
-    };
-    void tick();
-    return () => {
-      cancelled = true;
-      if (timer !== null) clearTimeout(timer);
-    };
-  }, [step]);
+    if (step !== "pending" || fingerprint === null) return;
+    if (joinedDeviceId.current && !named.current) {
+      named.current = true;
+      // NOT awaited, and it deliberately outlives this effect — see
+      // `persistDeviceNameWithRetry`. Three attempts across ~1.5s in front of
+      // `setStep` would put a delay back on the very screen MYND-537 removed one
+      // from.
+      void persistDeviceNameWithRetry(joinedDeviceId.current, deviceNameField.resolved);
+    }
+    setStep("verify");
+  }, [step, fingerprint, deviceNameField.resolved]);
 
   // SAS mismatch → ABORT the join: un-enroll this device so it stops trusting the
   // (possibly forked) synced data, then back out.
+  //
+  // **Closing this screen IS the claim that it worked**, which is why the
+  // failure cannot be swallowed. This used to `catch { /* best-effort */ }` and
+  // call `onCancel()` unconditionally: if `sync_reset_local` failed, the device
+  // stayed enrolled against the endpoint the user had just decided not to
+  // trust, looking at a UI that had told them they backed out. A mismatch is the
+  // one moment where "we could not tell you" and "it is fine" must not look the
+  // same.
+  //
+  // `design-notes/ui/0482` fixed exactly this on the two desktop surfaces on
+  // 2026-08-12 and recorded why mobile was left out — "companion repos are never
+  // changed through this one". The mobile client moved in-repo on 2026-08-13, so
+  // that reason is gone; this closes the other half, reusing 0482's own key
+  // rather than inventing a second sentence for the same fact.
   async function onMismatch() {
     setAborting(true);
+    setAbortFailed(false);
     try {
       if (HAS_TAURI) await syncResetLocal();
     } catch {
-      /* best-effort */
+      setAborting(false);
+      setAbortFailed(true);
+      return; // stay on the compare screen — the device is still enrolled
     }
     onCancel();
   }
@@ -562,6 +531,22 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
           >
             {fingerprint}
           </div>
+          {/* The head moved while the compare was open. Announced, not swapped
+              silently: a code that changes under the reader is a guess, not a
+              comparison. */}
+          {sasChanged && (
+            <div
+              style={{ marginTop: "var(--space-4)", fontSize: "var(--text-sm)", lineHeight: "var(--leading-relaxed)", color: "var(--fg-2)", maxWidth: 320 }}
+              data-testid="sync.join.sas-changed"
+            >
+              {t("join.verifyChanged")}
+            </div>
+          )}
+          {abortFailed && (
+            <div style={{ marginTop: "var(--space-4)", maxWidth: 320 }} data-testid="sync.join.sas-abort-failed">
+              <Banner kind="danger">{t("sync.join.sasAbortFailed")}</Banner>
+            </div>
+          )}
         </div>
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none", flexDirection: "column", gap: 10 }}>
           <Button disabled={aborting} onClick={() => onComplete(joinedVaultId)} data-testid="sync.join.sas-match">

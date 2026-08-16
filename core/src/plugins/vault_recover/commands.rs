@@ -17,7 +17,7 @@ use super::super::vault_unlock::state::{
 };
 use super::error::VaultRecoveryError;
 use crate::host::HostCtx;
-use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
+use crate::io_failure_kind::IoFailureKind;
 use crate::protocol_error_kind::protocol_error_kind;
 use protocol::{VaultMeta, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN};
 use std::path::{Path, PathBuf};
@@ -53,17 +53,26 @@ fn vault_meta_path(
     host: &dyn HostCtx,
     vault_id: Option<crate::vault_id::VaultId>,
 ) -> Result<PathBuf, VaultRecoveryError> {
-    let base = host
-        .app_data_dir()
-        .map_err(|_| VaultRecoveryError::IoError {
+    // The host names its sole vault BEFORE the `None` arm's disk scan runs.
+    //
+    // That order is the whole point, and skipping it is silent rather than
+    // loud. `current_vault_root_from_base` is a `std::fs::read_dir` scan; on
+    // wasm32 it does not panic, it errors and falls through to
+    // `base.join(LEGACY_VAULT_DIR_NAME)`. So this resolved `<base>/vault/`
+    // while the web container is `<base>/vaults/<the constant single id>/`,
+    // and the whole phrase-recovery flow this branch ships answered
+    // `VaultNotFound` on the only configuration the web client has, with every
+    // gate green.
+    //
+    // `None` IS the web arm, not an edge case: the reducer starts `vaultId`
+    // null, only the >=2-vault picker sets it, and web's `vault_list` returns
+    // exactly one row. `sole_vault_id` is `None` on desktop and mobile, so
+    // their behaviour is unchanged and the scan still runs there.
+    let root = crate::paths::active_vault_root_from_host(host, vault_id).map_err(|_| {
+        VaultRecoveryError::IoError {
             io_error_kind: IoFailureKind::Other,
-        })?;
-    let root = match vault_id {
-        Some(id) => crate::paths::vault_root_for_id_from_base(&base, id),
-        // sole-vault fallback until picker (sub-feature 3): the transitional
-        // single-on-disk-vault resolution from task 1.
-        None => crate::paths::current_vault_root_from_base(&base),
-    };
+        }
+    })?;
     Ok(root.join("vault.meta"))
 }
 
@@ -711,46 +720,42 @@ pub(crate) async fn complete_recovery_with_path(
     //     async scope) drops on early-return — Zeroizing wipes the
     //     keys. The slot is currently Empty (we just took); the user
     //     must restart from A8d.
-    let write_outcome =
-        crate::task::run_blocking(move || -> Result<[u8; 32], VaultRecoveryError> {
-            // (e) Atomic write — tempfile + fsync + rename per §4.2.
-            //     A failure here leaves vault.meta on disk with the
-            //     original password still in effect; the user can
-            //     re-attempt recovery.
-            crate::atomic_write::atomic_write(&vault_path_for_write, &new_bytes, true).map_err(
-                |e| {
-                    let io_kind = from_io_error_kind(e.kind());
-                    tracing::error!(
-                        stage = "tempfile_rename",
-                        error_kind = "IoError",
-                        io_failure_kind = ?io_kind,
-                        "atomic write of new vault.meta failed during complete_recovery"
-                    );
-                    VaultRecoveryError::IoError {
-                        io_error_kind: io_kind,
-                    }
-                },
-            )?;
-
-            // (f) SHA-256 of the freshly-written bytes.
-            let new_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&new_bytes);
-
-            Ok(new_bytes_hash)
-        })
-        .await;
-
-    let vault_meta_bytes_hash = match write_outcome {
-        Ok(Ok(h)) => h,
-        Ok(Err(inner)) => return Err(inner),
-        Err(_) => {
-            tracing::error!(
-                stage = "spawn_blocking_join",
-                error_kind = "JoinFailure",
-                "blocking write task join failed during complete_recovery"
-            );
-            return Err(VaultRecoveryError::JoinFailure);
+    //     The write goes through the IO SEAM, not `crate::atomic_write`.
+    //
+    //     `atomic_write` cannot succeed on wasm32 and does not pretend it can:
+    //     `finalize_atomic`'s wasm arm returns `ErrorKind::Unsupported` by
+    //     design, with a comment saying a caller reaching it has bypassed the
+    //     double buffer. `vault.meta` is a `Doubled` container in OPFS, so a
+    //     plain-path write would not be findable by the web reader even if it
+    //     landed. Threading the seam through the READ and leaving the one WRITE
+    //     on the native helper is how the chained password reset would have
+    //     failed AFTER Argon2id, with the slot already consumed and the vault
+    //     still on the old password.
+    //
+    //     Its native arm forwards to the same `atomic_write(.., replace)` this
+    //     line used to call, so desktop and mobile durability is unchanged and
+    //     stays checkable by reading `StdVaultIo::write`.
+    io.write(
+        &vault_path_for_write,
+        &new_bytes,
+        crate::vault_io::WriteOpts::default(),
+    )
+    .await
+    .map_err(|io_kind| {
+        tracing::error!(
+            stage = "tempfile_rename",
+            error_kind = "IoError",
+            io_failure_kind = ?io_kind,
+            "atomic write of new vault.meta failed during complete_recovery"
+        );
+        VaultRecoveryError::IoError {
+            io_error_kind: io_kind,
         }
-    };
+    })?;
+
+    // (f) SHA-256 of the freshly-written bytes. Captured AFTER the write
+    //     succeeds so it pins what is actually stored, not the in-memory blob.
+    let vault_meta_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&new_bytes);
 
     // (7) Promote Slot::Recovering material → Slot::Unlocked.
     // Host clock (phase3-web-client task 12): `unlocked_at` is a monotonic
