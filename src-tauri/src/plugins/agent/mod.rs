@@ -75,6 +75,26 @@ pub fn teardown_on_lock<R: Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
+/// The main window's grant for this plugin, added at RUNTIME rather than from
+/// `capabilities/default.json`.
+///
+/// The same shape `local_inference` uses, for the same reason: this plugin is
+/// compiled only under the `local-inference` feature, so a static capability
+/// naming `agent:default` dangles in the `--no-default-features` build and the
+/// ACL resolver fails on a namespace that was never declared. It sat in the
+/// static file for four pipelines, but the build never got that far: the crate
+/// stopped compiling first.
+///
+/// `agent:default` is the bundle in `permissions/agent/default.toml`, so the
+/// eight `allow-<cmd>` identifiers stay defined in exactly one place and this
+/// string cannot fall out of step with them.
+const AGENT_CAPABILITY: &str = r#"{
+  "identifier": "agent",
+  "description": "Agentic note editing for the main window (myne-md/myne#529): start, resume, cancel and inspect an agent run, apply the edits the user approved, and report whether the configured backend can hold the edit format. Every command reaches decrypted note plaintext and two of them WRITE, so this grant is main-window-only, exactly as the static entry it replaces was.",
+  "windows": ["main"],
+  "permissions": ["agent:default"]
+}"#;
+
 /// Construct the `agent` plugin.
 ///
 /// Registers two pieces of state: core's run table (the approved scope and the
@@ -89,6 +109,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                 myne_core::plugins::agent::run::AgentRunState::default(),
             ));
             app.manage(AgentSessionState::default());
+            app.add_capability(AGENT_CAPABILITY)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -106,6 +127,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 
 #[cfg(test)]
 mod acl_registration_guard {
+    use super::AGENT_CAPABILITY;
+
     /// **An ACL entry does not wire a command, and nothing checks that it
     /// does** (`src-tauri/CLAUDE.md`). An agent command with its
     /// `[[permission]]` block, its `[default]` bundle listing and a frontend
@@ -264,12 +287,39 @@ mod acl_registration_guard {
 
     /// The plugin's capability bundle has to be granted to the main window, or
     /// all eight are refused however well the four sources above agree.
+    ///
+    /// **Asserted on the RUNTIME grant, and on the static file's SILENCE.** The
+    /// grant used to live in `capabilities/default.json`, which this test read.
+    /// That is wrong now in a way that does not show at runtime: this plugin
+    /// compiles only under `local-inference`, so a static entry naming
+    /// `agent:default` dangles in the `--no-default-features` build, where the
+    /// namespace `build.rs` would have declared it under is absent too.
+    ///
+    /// Both directions, because each alone passes while the other is broken: a
+    /// runtime capability that lost its permission grants nothing, and a static
+    /// entry that came back breaks the auditable build rather than this one.
     #[test]
-    fn the_agent_capability_bundle_is_granted_to_the_main_window() {
+    fn the_agent_capability_bundle_is_granted_to_the_main_window_at_runtime() {
+        let cap: serde_json::Value =
+            serde_json::from_str(AGENT_CAPABILITY).expect("AGENT_CAPABILITY must be valid JSON");
+        assert_eq!(
+            cap["permissions"].as_array().map(Vec::as_slice),
+            Some(&[serde_json::json!("agent:default")][..]),
+            "the runtime capability must grant exactly the agent:default bundle"
+        );
+        assert_eq!(
+            cap["windows"].as_array().map(Vec::as_slice),
+            Some(&[serde_json::json!("main")][..]),
+            "every command here reaches note plaintext and two of them write, \
+             so the grant stays main-window-only"
+        );
+
         let caps = include_str!("../../../capabilities/default.json");
         assert!(
-            caps.contains("\"agent:default\""),
-            "capabilities/default.json must grant agent:default"
+            !caps.contains("agent:default"),
+            "capabilities/default.json must NOT name agent:default: the plugin is \
+             feature-gated, so a static grant dangles in the --no-default-features \
+             build. The grant is added at runtime by init(), where the plugin exists."
         );
     }
 }

@@ -7,6 +7,22 @@
 //! Q8.3 — domain isolation enforced at compile time, future
 //! `vault-unlock` / `change-password` plugins follow the same shape.
 
+// myne#529: agentic note editing. Gated behind the SAME `local-inference`
+// feature as the engine below, and not by preference: this plugin's adapter
+// binds to `local_inference` for the engine, the ChatML surface and the
+// retrieval store, so with the feature off it does not compile at all. That is
+// how the AI-free auditable build broke and stayed broken for four pipelines
+// (`cargo check -p myne-desktop --no-default-features`, `.woodpecker.yml`
+// `tauri-compile`) while every local gate stayed green: `pre-push` builds the
+// DEFAULT features, so nothing a developer runs exercises the feature-off tree.
+//
+// The gate is also what the spec already required. An agent run drives a
+// generation model over note plaintext, so it IS the AI path, and
+// `docs/decisions/ai/0337` and `threat-model.md` both state that the
+// `--no-default-features` build "never compiles the AI path". A build carrying
+// eight agent IPC commands that can never reach a backend would contradict that
+// while looking like it honoured it.
+#[cfg(feature = "local-inference")]
 pub mod agent;
 pub mod attachments;
 pub mod backup;
