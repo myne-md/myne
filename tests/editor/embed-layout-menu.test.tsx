@@ -18,7 +18,13 @@ import {
   unmountEmbeds,
 } from "./_attachment-mount";
 import { undo } from "@codemirror/commands";
-import { parseWidthInput } from "../../src/editor/attachments/embedLayoutActions";
+// The ENGINE path, not a `src/editor/` shim. No shim exists for this module
+// and adding one would create a module whose only consumer is this test,
+// which is the shape the shim layer exists to avoid: `src/editor/` re-exports
+// what `src/` itself consumes. `@myne/editor/attachments/embedLayoutActions`
+// resolves through the package's `./*` export map, the same way the sibling
+// specs reach `@myne/editor/host`.
+import { parseWidthInput } from "@myne/editor/attachments/embedLayoutActions";
 
 const IMG_ID = "a".repeat(64);
 const ROWS: CatalogRow[] = [

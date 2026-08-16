@@ -55,7 +55,7 @@ function q(root: ParentNode, testid: string): HTMLElement | null {
 
 describe("embed overflow menu (myne#409)", () => {
   it("an image embed carries the four file actions", async () => {
-    mounted = await mount(`![[att:${RASTER_ID}|photo.png]]`, ROWS);
+    mounted = await mount(`![[att:${RASTER_ID}|photo.png]]`);
     const menu = openEmbedMenu(mounted.host, "attachment-image");
 
     for (const row of ["export", "rename", "remove", "reveal"]) {
@@ -67,7 +67,7 @@ describe("embed overflow menu (myne#409)", () => {
   });
 
   it("a PDF embed carries the same four file actions", async () => {
-    mounted = await mount(`![[att:${PDF_ID}|doc.pdf]]`, ROWS);
+    mounted = await mount(`![[att:${PDF_ID}|doc.pdf]]`);
     const menu = openEmbedMenu(mounted.host, "attachment-pdf");
 
     for (const row of ["export", "rename", "remove", "reveal"]) {
@@ -79,7 +79,7 @@ describe("embed overflow menu (myne#409)", () => {
   });
 
   it("the menu announces as a menu with named items", async () => {
-    mounted = await mount(`![[att:${RASTER_ID}|photo.png]]`, ROWS);
+    mounted = await mount(`![[att:${RASTER_ID}|photo.png]]`);
     const button = q(mounted.host, "attachment-image.menu-button");
     expect(button?.getAttribute("aria-haspopup")).toBe("menu");
     expect(button?.getAttribute("aria-expanded")).toBe("false");
@@ -93,7 +93,7 @@ describe("embed overflow menu (myne#409)", () => {
   });
 
   it("destroying the view closes an open menu so its document listener cannot outlive the DOM", async () => {
-    mounted = await mount(`![[att:${RASTER_ID}|photo.png]]`, ROWS);
+    mounted = await mount(`![[att:${RASTER_ID}|photo.png]]`);
     openEmbedMenu(mounted.host, "attachment-image");
     expect(q(document.body, "attachment-image.menu")).not.toBeNull();
 
@@ -113,14 +113,14 @@ describe("embed overflow menu (myne#409)", () => {
   // label. The segment split belongs in the form-C consumer, and this pins the
   // property that makes that the right call.
   it("does not change an ordinary note wikilink with more than one pipe", async () => {
-    mounted = await mount("[[Note|A|B]]", ROWS);
+    mounted = await mount("[[Note|A|B]]");
     const chip = mounted.host.querySelector(".cm-wikilink-chip, [data-testid^='wikilink']");
     expect(chip, "a note wikilink should still render a chip").not.toBeNull();
     expect(chip?.textContent).toContain("A|B");
   });
 
   it("the image is still clickable for the lightbox, and the menu button is not the image", async () => {
-    mounted = await mount(`![[att:${RASTER_ID}|photo.png]]`, ROWS);
+    mounted = await mount(`![[att:${RASTER_ID}|photo.png]]`);
     const img = q(mounted.host, "attachment-image");
     const button = q(mounted.host, "attachment-image.menu-button");
     expect(img).not.toBeNull();
