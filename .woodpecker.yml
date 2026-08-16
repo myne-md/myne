@@ -1069,11 +1069,27 @@ steps:
     when:
       - path: *code-path-globs
         status: [success, failure]
-    depends_on: [mobile-build]
+    # Optional for the reason given on `mobile-vitest` below: the edge orders
+    # the installs and no longer requires the parent to have succeeded. The
+    # license gate needs an install to have happened, and it performs its own.
+    depends_on:
+      - name: mobile-build
+        optional: true
     commands:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
-      - node scripts/check-npm-licenses.mjs
+      # THE STORE PATH IS PASSED TWICE ON PURPOSE, and the two must agree
+      # (myne-md/myne#515). `pnpm licenses list` builds its answer from the
+      # lockfile plus the content-addressable STORE, so it has to be pointed at
+      # the same one the install wrote to — and it REJECTS `--store-dir`
+      # ("Unknown option"), which is why the guard translates the path into
+      # `--config.store-dir=` itself.
+      #
+      # Told to only one of the two, this gate answered
+      # ERR_PNPM_MISSING_PACKAGE_INDEX_FILE on every run for months, and the two
+      # mobile test steps downstream of it were skipped with it. Two adjacent
+      # literals rather than a config file, so the invariant is on the screen.
+      - node scripts/check-npm-licenses.mjs --store-dir /cache/cargo/pnpm-store
 
   # Mobile frontend unit tests (the ported state machine + helpers). Serialized
   # after mobile-build so the pnpm-install steps stay linear, same as the desktop
@@ -1093,7 +1109,27 @@ steps:
     # asserted the installs stay linear; that was true of the parent and false
     # of the sibling. The lane is off the critical path by design, so the added
     # wall clock is free.
-    depends_on: [npm-licenses]
+    # `optional: true` on this lane's three internal edges (myne-md/myne#515).
+    #
+    # The chain itself is load-bearing and stays: all four steps run
+    # `pnpm install --frozen-lockfile` into the SHARED workspace `node_modules`,
+    # and as siblings they raced into ERR_PNPM_ENOENT. An optional dependency
+    # still ORDERS, so the serial-install property survives untouched; what it
+    # drops is the requirement that the parent SUCCEEDED.
+    #
+    # That requirement is what turned one broken step into three: `npm-licenses`
+    # sits in the middle, so a license failure removed the mobile Vitest suite
+    # and the whole Playwright flow-logic tier from the run. The lane's
+    # `status: [success, failure]` does not help here, since it defeats the
+    # pipeline-wide implicit `status: success` and never a failed `depends_on`.
+    #
+    # Decoupling both directions is why this is preferred to moving
+    # `npm-licenses` to the tail: a reorder can only ever protect one side,
+    # because somebody has to be last, and the tail is behind `mobile-vitest`,
+    # which this file already records as carrying a ~0.7%-per-run flake.
+    depends_on:
+      - name: npm-licenses
+        optional: true
     commands:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
@@ -1115,7 +1151,10 @@ steps:
     when:
       - path: *code-path-globs
         status: [success, failure]
-    depends_on: [mobile-vitest]
+    # Optional for the reason given on `mobile-vitest` above.
+    depends_on:
+      - name: mobile-vitest
+        optional: true
     commands:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
