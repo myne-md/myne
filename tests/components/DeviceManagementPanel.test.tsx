@@ -253,6 +253,157 @@ describe("DeviceManagementPanel — SAS verify polling", () => {
     }
   });
 
+  // ── myne#462 ────────────────────────────────────────────────────────────────
+
+  /// THE regression test. Before the fix this side stopped polling on its first
+  /// non-null answer — which, on an already-enrolled device, is the head it held
+  /// BEFORE its own sync landed. It then sat on that stale value while the
+  /// ceremony moved the vault head underneath, and the two screens showed
+  /// different codes.
+  ///
+  /// Fails against the pre-fix tree: the old `return` after `setSas` meant the
+  /// second value was never read.
+  it("tracks the head instead of latching the first answer", async () => {
+    vi.useFakeTimers();
+    try {
+      mountWith(["K3M9-QR7T", "P8WX-2ND4"]);
+      render(<Harness />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("sync.verify-device"));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId("sync.sas-fingerprint").textContent).toBe("K3M9-QR7T");
+
+      // The head advanced. The screen must follow it rather than keep showing a
+      // value this device no longer holds.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
+      });
+      expect(screen.getByTestId("sync.sas-fingerprint").textContent).toBe("P8WX-2ND4");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /// A stable head must NOT churn the display, and the poll must still be alive
+  /// while it is stable — otherwise "the code did not change" would be
+  /// indistinguishable from "we stopped looking", which is exactly the bug.
+  it("keeps polling while the head is stable, without re-rendering the code", async () => {
+    vi.useFakeTimers();
+    try {
+      mountWith(["K3M9-QR7T"]);
+      render(<Harness />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("sync.verify-device"));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const before = invokeMock.mock.calls.filter(
+        (c) => c[0] === "plugin:sync|sync_head_fingerprint",
+      ).length;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3100);
+      });
+      expect(screen.getByTestId("sync.sas-fingerprint").textContent).toBe("K3M9-QR7T");
+      const after = invokeMock.mock.calls.filter(
+        (c) => c[0] === "plugin:sync|sync_head_fingerprint",
+      ).length;
+      expect(after).toBeGreaterThan(before);
+      // A stable head is not an alarm.
+      expect(screen.queryByTestId("sync.sas-changed")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /// The push hold is what makes the head stand still under the compare. It is
+  /// armed on every tick (it doubles as the lease ping) and released when the
+  /// screen goes away — a hold nobody releases would hold this device's pushes
+  /// for the full 15 s lease for no reason.
+  it("arms the push hold while the compare is open and releases it on exit", async () => {
+    vi.useFakeTimers();
+    try {
+      mountWith(["K3M9-QR7T"]);
+      render(<Harness />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const armsBefore = invokeMock.mock.calls.filter(
+        (c) => c[0] === "plugin:sync|sync_verify_hold_begin",
+      ).length;
+      expect(armsBefore).toBe(0); // not armed by merely listing devices
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("sync.verify-device"));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2100);
+      });
+      const arms = invokeMock.mock.calls.filter(
+        (c) => c[0] === "plugin:sync|sync_verify_hold_begin",
+      ).length;
+      expect(arms).toBeGreaterThan(1); // re-armed each tick, i.e. the lease ping
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("sync.sas-match"));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(
+        invokeMock.mock.calls.some((c) => c[0] === "plugin:sync|sync_verify_hold_end"),
+      ).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /// A mismatch used to revoke the other device on ONE click, with no
+  /// confirmation — while every other removal on this panel goes through the
+  /// `REMOVE_DEVICE_CONFIRM` disclosure, and while the mobile counterpart
+  /// already confirmed. Now that a mismatch is known to be a timing artefact far
+  /// more often than an attack, the destructive default is the wrong one.
+  it("routes a mismatch through the removal confirmation instead of revoking", async () => {
+    vi.useFakeTimers();
+    try {
+      mountWith(["K3M9-QR7T"]);
+      render(<Harness />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("sync.verify-device"));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("sync.sas-mismatch"));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // The confirmation is up and NOTHING has been revoked yet.
+      expect(screen.queryByTestId("sync.remove-confirm")).toBeTruthy();
+      expect(
+        invokeMock.mock.calls.some((c) => c[0] === "plugin:sync|sync_remove_device"),
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("offers a route back into the verify screen for an already-approved device", async () => {
     mountWith(["K3M9-QR7T"]);
     render(<Harness />);

@@ -14,7 +14,12 @@
 // Every importer adapter consumes this list rather than restating it.
 
 /**
- * Every frontmatter key Myne owns (§3.6.1). Ordered as the spec table is.
+ * Every frontmatter key Myne owns (§3.6.1).
+ *
+ * **Append-only, NOT in the spec table's order.** `done` and `cover` were each
+ * appended at the end when they landed, while §3.6.1's table places them before
+ * the Phase 2 sync trio. The order here carries no meaning: the only consumer
+ * is a membership test. §3.6.1 is the canonical ordering.
  *
  * NOTE for MYND-613 tasks 2–3: the task class marker rides the existing `kind`
  * key, but the **completion field is new** and must be added here in the same
@@ -38,6 +43,14 @@ export const MANAGED_FRONTMATTER_FIELDS = [
   // that introduced it, per the note above — an imported note carrying a
   // `done:` property with a valid ISO date would otherwise appear completed.
   "done",
+  // myne-md/myne#410: the thirteenth managed field. Added HERE in the same
+  // change that introduced it, per the note above, and the reason is sharper
+  // than usual: `cover:` is a property Obsidian vaults commonly carry already,
+  // so an importer that does not reject it lets an imported file forge Myne's
+  // own cover state. Value-strictness narrows the hole (a forged value must be
+  // a well-formed form-C embed) but does not close it: an embed copied from
+  // another Myne vault is well-formed and simply dangles.
+  "cover",
 ] as const;
 
 export type ManagedFrontmatterField = (typeof MANAGED_FRONTMATTER_FIELDS)[number];

@@ -23,6 +23,14 @@
 // lowercase hex chars (`spec/protocol.md` §9.9).
 
 import { getHost } from "../../host";
+import {
+  type DroppedEmbedSegment,
+  type EmbedLayout,
+  emitEmbedAlias,
+  sanitizeAliasText,
+  emptyEmbedLayout,
+  parseEmbedAlias,
+} from "@myne/dialect/embedLayout";
 
 /** The scheme prefix that marks a wikilink target as an attachment ref. */
 export const ATT_SCHEME = "att:";
@@ -34,8 +42,15 @@ const ATT_ID_RE = /^[0-9a-f]{64}$/;
 export interface AttachmentRef {
   /** The 64-char lowercase-hex attachment-id (without the `att:` prefix). */
   id: string;
-  /** The display filename (the wikilink alias). May be empty if malformed. */
+  /**
+   * The display filename. This is the FIRST alias segment plus any later
+   * unkeyed one, not the whole alias: an alias may carry layout segments
+   * (`photo.png|w=300`), and a filename may itself contain a pipe
+   * (`re|port.png`). `@myne/dialect/embedLayout` owns that split.
+   */
   filename: string;
+  /** The author's layout choices, or an all-null layout when there are none. */
+  layout: EmbedLayout;
 }
 
 /** True iff `id` is a syntactically valid lowercase-hex attachment-id. */
@@ -49,8 +64,23 @@ export function isAttachmentId(id: string): boolean {
  * resolver to the catalog. Used by every insert path so there is exactly
  * one emitter (SYNC-4).
  */
-export function emitAttachmentEmbed(id: string, filename: string): string {
-  return `![[${ATT_SCHEME}${id}|${filename}]]`;
+export function emitAttachmentEmbed(
+  id: string,
+  filename: string,
+  layout: EmbedLayout = emptyEmbedLayout(),
+  unknown: readonly string[] = [],
+  dropped: readonly DroppedEmbedSegment[] = [],
+): string {
+  // The filename is SANITIZED here rather than trusted, because this is the one
+  // emitter and the catalog is not a trusted source of alias-safe text. An
+  // attachment named `a]b.png` (nothing rejects one on import or rename) used to
+  // produce `![[att:<id>|a]b.png]]`, which every form-C reader parses as zero
+  // spans. A body embed then draws no chip; a note COVER is worse, because
+  // attachment liveness is derived from those spans, so the attachment reads as
+  // unreferenced and `attachment_clean_unused` crypto-erases a blob the note
+  // still names. `sanitizeAliasText` applies the rule
+  // `core/src/export_naming.rs` already applies on the way out.
+  return `![[${ATT_SCHEME}${id}|${emitEmbedAlias(sanitizeAliasText(filename), layout, unknown, dropped)}]]`;
 }
 
 /**
@@ -85,7 +115,12 @@ export function extractAttachmentRefs(body: string): AttachmentRef[] {
     const id = m[1];
     if (!seen.has(id)) {
       seen.add(id);
-      out.push({ id, filename: m[2] ?? "" });
+      // The alias is NOT the filename: it may carry layout segments, and the
+      // filename itself may contain a pipe. Reading it whole here reported
+      // `photo.png|w=300` as a filename, which then reached the tombstone
+      // label, the menu and the export naming path.
+      const { filename, layout } = parseEmbedAlias(m[2] ?? "");
+      out.push({ id, filename, layout });
     }
   }
   return out;

@@ -20,6 +20,11 @@
 import { getHost } from "../host";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
+import {
+  type EmbedLayout,
+  emptyEmbedLayout,
+  parseEmbedAlias,
+} from "@myne/dialect/embedLayout";
 import { isMediaTarget } from "@myne/editor/host/notes/graphModel";
 import { formatBytes, typeLabel } from "@myne/editor/host/components/attachments/format";
 
@@ -389,6 +394,10 @@ export interface ImportedImageRef {
   readonly raw: string;
   /** The source path/filename to resolve + import (the link target). */
   readonly source: string;
+  /** The author's layout choices recovered from the ref (myne#409): an
+   *  Obsidian `|300` / `|300x200` dimension on a wikilink embed, or the alt
+   *  text of a markdown image. Empty when the ref carried neither. */
+  readonly layout: EmbedLayout;
   /** The alias/alt to carry into the form-C display filename, if any. */
   readonly alias: string | null;
 }
@@ -446,13 +455,22 @@ export function findImportedImageRefs(body: string): readonly ImportedImageRef[]
     const anchor = target.search(EMBED_ANCHOR_RE);
     const bare = anchor === -1 ? target : target.slice(0, anchor);
     if (!isMediaTarget(bare)) continue; // note embed — left byte-for-byte alone
+    // An Obsidian image embed spends its alias on the DIMENSION
+    // (`![[photo.png|300]]`, `![[photo.png|300x200]]`), not on a display name.
+    // Read as an alias it became the filename after import and the author's
+    // chosen width was gone with nothing in the summary saying so (myne#409).
+    const alias = m[2]?.trim() || null;
+    const dimension = alias === null ? null : parseObsidianDimension(alias);
     out.push({
       kind: "wikilink-embed",
       from: m.index,
       to: m.index + m[0].length,
       raw: m[0],
       source: target,
-      alias: m[2]?.trim() || null,
+      // A dimension is NOT a display name, so it must not fall through to
+      // `displayNameForRef` and become the filename.
+      alias: dimension === null ? alias : null,
+      layout: dimension ?? emptyEmbedLayout(),
     });
   }
 
@@ -460,13 +478,17 @@ export function findImportedImageRefs(body: string): readonly ImportedImageRef[]
   while ((m = MARKDOWN_IMAGE_RE.exec(body)) !== null) {
     const dest = m[2].trim();
     if (dest === "" || isUrlLike(dest)) continue;
+    const alt = m[1].trim();
     out.push({
       kind: "markdown-image",
       from: m.index,
       to: m.index + m[0].length,
       raw: m[0],
       source: dest,
-      alias: m[1].trim() || null,
+      alias: alt || null,
+      // Markdown-image alt text IS alt text. Carrying it into `alt=` is
+      // lossless even when it contains a pipe, because `alt=` is terminal.
+      layout: alt === "" ? emptyEmbedLayout() : { ...emptyEmbedLayout(), alt },
     });
   }
 
@@ -474,6 +496,21 @@ export function findImportedImageRefs(body: string): readonly ImportedImageRef[]
   // single-transaction rewrite applies offsets back-to-front safely.
   out.sort((a, b) => a.from - b.from);
   return out;
+}
+
+
+/** Obsidian's image-embed dimension alias: `300` or `300x200`. Lower-case `x`,
+ *  matching Obsidian. Validated through OUR closed grammar rather than a second
+ *  copy of the range rules, so an out-of-range import is refused by exactly the
+ *  same bound an in-app edit is. Returns null when the alias is an ordinary
+ *  display name (`![[diagram.png|My Diagram]]`), which stays an alias. */
+function parseObsidianDimension(alias: string): EmbedLayout | null {
+  const m = /^(\d+)(?:x(\d+))?$/.exec(alias);
+  if (m === null) return null;
+  const probe = m[2] === undefined ? `x|w=${m[1]}` : `x|w=${m[1]}|h=${m[2]}`;
+  const { layout, dropped } = parseEmbedAlias(probe);
+  if (dropped.length > 0) return null;
+  return layout;
 }
 
 /** The display filename to carry into the form-C alias for a converted ref:
@@ -499,5 +536,5 @@ export function planRewrite(ref: ImportedImageRef, imported: ImportedAttachment)
   // the matched ref span (byte-preserving everywhere else — markdown-dialect
   // C1 is honored: this is post-import, user-initiated, diff-previewed).
   const filename = imported.filename || displayNameForRef(ref);
-  return { ref, replacement: emitAttachmentEmbed(imported.id, filename) };
+  return { ref, replacement: emitAttachmentEmbed(imported.id, filename, ref.layout) };
 }

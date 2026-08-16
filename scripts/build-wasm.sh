@@ -60,6 +60,18 @@ fi
 # cross-machine half is what CI adds — a different user, a different checkout
 # path, a Linux container — and task 56 is where the published hash makes it a
 # claim anyone can check.
+#
+# What neither half proves is cross-ARCHITECTURE reproducibility, and that gap
+# is not one more machine away — it is structural (myne-md/myne#228). Cargo
+# hashes `rustc -vV`, whose `host:` line names the build machine's triple, into
+# every crate's `-C metadata`; rustc folds that into `StableCrateId`, and symbol
+# names are inputs to codegen-unit partitioning. Same commit, same pinned rustc,
+# same wasm32 target, two hosts: the `code`, `data`, `export`, `elem`,
+# `function` and name sections all differ. `-C symbol-mangling-version=v0` does
+# not close it (it swaps the legacy hash suffix for the same StableCrateId as a
+# disambiguator), and no stable-toolchain flag removes the `rustc -vV` input.
+# The published hash is therefore defined against a reference build environment
+# rather than against every host: `docs/web-bundle-hashes.md`.
 if [ "${1:-}" = "--verify" ]; then
   echo "== reproducibility check: two cold builds, separate target dirs =="
   tmp_a="$(mktemp -d)"

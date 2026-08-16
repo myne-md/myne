@@ -69,14 +69,19 @@ afterEach(() => {
 });
 
 describe("AttachmentImageWidget", () => {
-  it("renders an inline <img src=attachment://id> + loading chip in an aria-labelled frame", () => {
+  // The accessible name moved from the FRAME to the IMAGE (myne#409 review).
+  // ARIA gives a `role="img"` element presentational children, and the frame is
+  // where the overflow menu and the unreadable-segment marker live, so naming
+  // the frame removed both from the accessibility tree on every embed.
+  it("renders an inline <img src=attachment://id> + loading chip, naming the image not the frame", () => {
     const dom = new AttachmentImageWidget(ID, "photo.png").toDOM();
     expect(dom.className).toBe("cm-attachment-frame");
-    expect(dom.getAttribute("role")).toBe("img");
-    expect(dom.getAttribute("aria-label")).toBe("photo.png");
+    expect(dom.getAttribute("role")).toBeNull();
+    expect(dom.getAttribute("aria-label")).toBeNull();
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe(`attachment://${ID}`);
     expect(img.alt).toBe("photo.png");
+    expect(img.getAttribute("aria-label")).toBe("photo.png");
     // Hidden until the load event fires; loading chip is present meanwhile.
     expect(img.style.display).toBe("none");
     expect(dom.querySelector(".cm-attachment-progress")).not.toBeNull();
@@ -122,9 +127,11 @@ describe("AttachmentPdfWidget", () => {
   it("mounts the pdf scroller and renders a pdf frame", () => {
     const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM();
     expect(dom.className).toContain("cm-attachment-pdf");
-    expect(dom.getAttribute("aria-label")).toBe("doc.pdf");
+    // Named on the reader, not the frame: see the image widget's note above.
+    expect(dom.getAttribute("aria-label")).toBeNull();
     const scroller = dom.querySelector(".cm-attachment-pdf-scroller");
     expect(scroller).not.toBeNull();
+    expect(scroller?.getAttribute("aria-label")).toBe("doc.pdf");
     expect(mountPdfScroller).toHaveBeenCalledOnce();
     const [container, opts] = mountPdfScroller.mock.calls[0] as [HTMLElement, { url: string }];
     expect(container).toBe(scroller);

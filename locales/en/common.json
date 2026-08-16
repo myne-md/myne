@@ -14,6 +14,7 @@
     "sasMatch": "They match — continue",
     "sasMismatch": "They don't match",
     "verifyBody": "Check that this code is the same on both devices before you continue. If it isn't, stop — something is wrong with the connection, not with your password.",
+    "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
     "verifyTitle": "Compare this code",
     "title": "Sign in to your vault",
     "working": "Setting up…"
@@ -127,6 +128,7 @@
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
       "transcribeFailed": "Transcription failed. Please try again.",
+      "transcribeTooLong": "This recording is too long to transcribe.",
       "transcribeFeatureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
       "transcribeModelLoadFailed": "Couldn't load the speech-to-text model. Reinstall Myne, or check your custom model in Settings → Developer → AI.",
       "transcribeNoModel": "Select a speech-to-text model in Settings → Developer → AI.",
@@ -488,6 +490,12 @@
       "saveWorkspaceAs": {
         "label": "Save workspace as…"
       },
+      "removeNoteCover": {
+        "label": "Remove note cover"
+      },
+      "setNoteCover": {
+        "label": "Set note cover…"
+      },
       "showGraph": {
         "label": "Show graph view…"
       },
@@ -638,7 +646,10 @@
         },
         "skippedSuffix": " · {{count}} skipped",
         "skippedSuffix_one": " · {{count}} skipped",
-        "skippedSuffix_other": " · {{count}} skipped"
+        "skippedSuffix_other": " · {{count}} skipped",
+        "layoutPreserved": "{{count}} kept its size or alt text",
+        "layoutPreserved_one": "{{count}} kept its size or alt text",
+        "layoutPreserved_other": "{{count}} kept their size or alt text"
       },
       "fileKind": {
         "generic": "File",
@@ -759,7 +770,22 @@
           "remove": "Remove",
           "rename": "Rename",
           "reveal": "Reveal in library",
-          "transcribe": "Transcribe"
+          "transcribe": "Transcribe",
+          "customSize": "Custom size…",
+          "customSizeInvalid": "Enter a width in pixels (1-8192) or a percentage (1-100%).",
+          "editAlt": "Edit alt text…",
+          "size": {
+            "small": "Small",
+            "medium": "Medium",
+            "large": "Large",
+            "full": "Full width"
+          },
+          "align": {
+            "left": "Align left",
+            "center": "Align center",
+            "right": "Align right"
+          },
+          "altInvalid": "Alt text cannot contain \"]\", which would break the embed."
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -784,7 +810,16 @@
           "progress": "Transcribing…",
           "stop": "Stop"
         },
-        "urlImageFallback": "image"
+        "urlImageFallback": "image",
+        "unreadableSegment": "Could not read: {{segments}}"
+      },
+      "customSizePrompt": {
+        "title": "Custom size",
+        "confirm": "Set size"
+      },
+      "altPrompt": {
+        "title": "Alt text",
+        "confirm": "Save"
       }
     },
     "callout": {
@@ -1022,6 +1057,13 @@
       "replaceOne": "Replace",
       "replacePlaceholder": "Replace with",
       "toggleReplace": "Toggle replace"
+    },
+    "cover": {
+      "add": "Add cover",
+      "change": "Change cover",
+      "emptyLibraryMobile": "No images in this vault yet. Upload one to use as a cover.",
+      
+      "writeFailed": "Could not update the note's cover"
     },
     "folding": {
       "clickToUnfold": "Click to unfold",
@@ -2767,7 +2809,10 @@
       "providerError": {
         "barred": "This kind of request never goes to a provider — it runs on this device or not at all.",
         "failed": "That did not work. Nothing was saved and nothing was sent again.",
+        "localModelMissing": "The local model recorded in settings is not on this device any more. Nothing was sent anywhere. Pick a model again, or name a provider, in Settings → Developer → AI.",
         "noCredential": "No API key is set for this provider. Add one in Settings → Developer → AI.",
+        "notReady": "Nothing is ready to answer yet. Nothing was sent anywhere. Pick a model, or name a provider, in Settings → Developer → AI.",
+        "policyRefused": "The provider refused this request under its own rules: an account guardrail, a workspace policy, or a model your plan does not carry. This has to be fixed with the provider, not in Myne.",
         "quotaExhausted": "The provider declined the request — you are out of credit or over a rate limit. This has to be fixed with the provider, not in Myne.",
         "refused": "The provider refused the connection. It may be down or blocking this network.",
         "timeout": "The provider did not answer in time. Nothing was left running.",
@@ -3254,6 +3299,7 @@
       "verifyMatch": "They match",
       "verifyMismatch": "They don’t match",
       "verifyPending": "This code appears once the new device finishes its first sync.",
+      "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
       "verifySyncing": "Syncing…",
       "verifyTitle": "Verify the new device",
       "verifyAction": "Compare code",
@@ -3342,6 +3388,7 @@
       "submitting": "Adding…",
       "title": "Add this device to an account",
       "verifyBody": "Check that this code matches the one on the device you approved from.",
+      "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
       "verifyTitle": "Verify this device",
       "waitingHint": "Keep this window open — once approved, a verification code appears here to compare with your other device.",
       "waitingTitle": "Waiting for approval",
@@ -3998,6 +4045,7 @@
     "passwordPlaceholder": "Your vault password",
     "waitingHint": "Keep this screen open — once approved, a verification code appears here to compare with your other device.",
     "verifyBody": "Check that this code is the same one shown on the device you approved from.",
+    "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
     "removing": "Removing…",
     "sasMismatch": "They don't match — remove this device",
     "title": "Connect to your account",

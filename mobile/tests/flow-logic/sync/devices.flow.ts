@@ -10,6 +10,8 @@ import { installMockIpc } from "../mock-ipc";
 
 const NAMED = "aa11bb22cc33dd44ee55ff6677889900";
 const UNNAMED = "bb22cc33dd44ee55ff6677889900aa11";
+/** A device awaiting the approval gate — the SYNC-40 ceremony's subject. */
+const PENDING = "cc33dd44ee55ff6677889900aa11bb22";
 
 /** Two approved devices: one named, one not — so a single fixture covers both the
  *  stored-name path and the id-derived fallback. */
@@ -140,7 +142,6 @@ test.describe("device names", () => {
     // eye-compare. Seeding a name for the pending id is the only way to tell the
     // two implementations apart; without it the row falls back either way and the
     // test passes for the wrong reason.
-    const PENDING = "cc33dd44ee55ff6677889900aa11bb22";
     await installMockIpc(page, {
       syncStatus: { state: "idle" },
       devices: [
@@ -155,6 +156,53 @@ test.describe("device names", () => {
     await expect(pendingRow).toBeVisible();
     await expect(pendingRow).not.toContainText("Attacker Laptop");
     await expect(page.getByTestId("sync.pending-name")).toContainText(PENDING.slice(0, 6));
+  });
+
+  // myne#462. This surface — the mobile APPROVING side's SAS eye-compare — had
+  // no test of any kind, and that is how it kept a shape the desktop side had
+  // already moved on from: a single one-shot `sync_head_fingerprint` read, the
+  // pre-#243 form, with no poll, no retry and no way back in. `None` is the
+  // honest answer while no head is adopted, so one early call left "this code
+  // appears once the new device finishes its first sync" on screen for good.
+  test("the approving side polls for the code instead of reading it once", async ({ page }) => {
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: [
+        ...DEVICES,
+        { device_id_hex: PENDING, approved: false, retired: false, is_current: false },
+      ],
+      // Nothing adopted yet, then a head lands. A one-shot read shows the
+      // pending copy forever; a poll reaches the code.
+      headFingerprint: [null, null, "TYRS-N318"],
+    });
+    await openDevices(page);
+
+    await page.getByTestId("sync.approve-device").click();
+    await expect(page.getByTestId("sync.approve-verify")).toBeVisible();
+    await expect(page.getByTestId("sync.sas-fingerprint")).toHaveText("TYRS-N318", {
+      timeout: 10_000,
+    });
+  });
+
+  // The other half of the same fix: once a code is on screen it must keep
+  // tracking the head, and a head that MOVES is announced rather than silently
+  // swapped under the reader.
+  test("the approving side follows a head that advances, and says that it did", async ({ page }) => {
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: [
+        ...DEVICES,
+        { device_id_hex: PENDING, approved: false, retired: false, is_current: false },
+      ],
+      headFingerprint: ["TYRS-N318", "P8WX-2ND4"],
+    });
+    await openDevices(page);
+
+    await page.getByTestId("sync.approve-device").click();
+    await expect(page.getByTestId("sync.sas-fingerprint")).toHaveText("P8WX-2ND4", {
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId("sync.sas-changed")).toBeVisible();
   });
 
   test("removing a device names the target it is about to revoke", async ({ page }) => {

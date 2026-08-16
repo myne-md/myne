@@ -80,3 +80,40 @@ describe("setNoteCover — clear", () => {
     expect(body).toContain("title: Foo");
   });
 });
+
+describe("setNoteCover — a no-op patch is not written", () => {
+  it("does not touch a plain note when removing a cover it never had", () => {
+    // "Remove cover" is offered unconditionally, on the reasoning that clearing
+    // an absent field is a harmless no-op. It was not: `patchFrontmatterField`
+    // returns the source unchanged, and `patchUpdatedField` then PREPENDS a
+    // whole frontmatter block, so the command injected `---` into a plain
+    // note's text.
+    routeReadThenUpdate("Just a note.\n");
+    return setNoteCover("n1", "cover", null).then(() => {
+      const updates = invokeMock.mock.calls.filter(([cmd]) => cmd === "plugin:notes|note_update");
+      expect(updates).toHaveLength(0);
+    });
+  });
+
+  it("does not bump updated: when removing a cover from a note that has none", () => {
+    // The cheaper half of the same bug: a write, an `updated:` bump and a new
+    // sync version for a change nobody made.
+    routeReadThenUpdate(["---", "title: T", "---", "", "body"].join("\n"));
+    return setNoteCover("n1", "cover", null).then(() => {
+      const updates = invokeMock.mock.calls.filter(([cmd]) => cmd === "plugin:notes|note_update");
+      expect(updates).toHaveLength(0);
+    });
+  });
+
+  it("still writes when the removal actually removes something", () => {
+    // The control. Without it the two assertions above pass against a writer
+    // that never writes at all.
+    const id = "a".repeat(64);
+    routeReadThenUpdate(
+      ["---", `cover: "![[att:${id}|p.png]]"`, "---", "", "body"].join("\n"),
+    );
+    return setNoteCover("n1", "cover", null).then(() => {
+      expect(lastUpdateBody()).not.toContain("cover:");
+    });
+  });
+});

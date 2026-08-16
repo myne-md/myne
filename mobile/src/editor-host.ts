@@ -17,7 +17,7 @@ import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/h
 import { isMediaTarget } from "@myne/editor/host/notes/graphModel";
 import i18n from "@myne/i18n";
 import { openUrl } from "./lib/open-url";
-import { documentDir, join } from "@tauri-apps/api/path";
+import { documentDir, join } from "./platform/path";
 import {
   attachmentExport,
   attachmentImport,
@@ -29,6 +29,10 @@ import { prefsRead } from "./lib/prefs";
 import { writeText as clipboardWriteText } from "./lib/clipboard";
 import { currentEditorTagTree } from "./lib/editor-tag-bridge";
 import { requestVoiceRecording } from "./lib/voice-record-bridge";
+import {
+  OPEN_COVER_PICKER_EVENT,
+  REMOVE_COVER_EVENT,
+} from "./lib/openCoverPickerSignal";
 
 const host: EditorHost = {
   // Delegate to the shared react-i18next runtime (MYND-485) — replaces the
@@ -91,8 +95,12 @@ const host: EditorHost = {
     attachmentExport,
     attachmentRename,
     // Mobile has no Save-As dialog plugin: export the decrypted bytes into the
-    // app's Documents folder (reachable from the iOS Files app). Overwrites by
-    // name (exportAttachment is called with overwrite=true). Sanitize to a bare
+    // app's Documents folder. (That folder is browsable on neither platform on a
+    // current OS: iOS declares no `UIFileSharingEnabled`, and Android's copy under
+    // `Android/data/` has been closed to the system Files app since API 30. See
+    // `./platform/path.ts`. It is excluded from platform cloud backup on both:
+    // myne-md/myne#491, `backup_exclude.rs`.) Overwrites by name
+    // (exportAttachment is called with overwrite=true). Sanitize to a bare
     // basename first — a crafted attachment name containing `/`, `\`, or a
     // leading `..` must not let join() escape the Documents directory.
     pickExportDestination: async (filename) => {
@@ -107,6 +115,18 @@ const host: EditorHost = {
   // attachment). `view` is unused — the sheet appends the embed to the note body,
   // matching how the paperclip attach path inserts on mobile.
   voiceRecord: () => requestVoiceRecording(),
+  // The note cover's picker (myne-md/myne#410). Same shape as the desktop host:
+  // the banner is CodeMirror DOM inside the shared package and the picker is
+  // this client's own sheet, so the editor asks through a window event rather
+  // than opening anything. Installing this member is what makes the banner's
+  // hover controls and the Add-cover affordance exist at all here.
+  cover: {
+    openPicker: (hasCover) =>
+      window.dispatchEvent(
+        new CustomEvent(OPEN_COVER_PICKER_EVENT, { detail: { hasCover } }),
+      ),
+    remove: () => window.dispatchEvent(new CustomEvent(REMOVE_COVER_EVENT)),
+  },
   // PrefsView ⊇ EditorPrefs (identical field types), so this is structurally sound.
   prefsRead: async (): Promise<EditorPrefs> => prefsRead(),
   openExternal: (url) => {

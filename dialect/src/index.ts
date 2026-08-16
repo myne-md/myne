@@ -27,7 +27,7 @@ export { parse } from "./parse";
 export { extractFullText, extractBodyText } from "./visitors/fullText";
 export { headingSections } from "./visitors/headingSections";
 export type { HeadingSection } from "./visitors/headingSections";
-export type { NoteKind } from "./surgery";
+export type { NoteKind, CoverRef } from "./surgery";
 export { stripDialectComments, hasDialectComment } from "./stripComments";
 export {
   buildInitialPlaintext,
@@ -47,6 +47,8 @@ export {
   patchUpdatedField,
   readArchivedFromFmBody,
   readConflictFromFmBody,
+  readCoverFromFmBody,
+  readCoverValue,
   readConflictOfFromFmBody,
   readDeletedFromFmBody,
   readFolderIndexFromFmBody,
@@ -58,6 +60,7 @@ export {
   DRAWING_KIND_VALUE,
   TASK_KIND_VALUE,
   CANONICAL_KIND_VALUES,
+  COVER_FIELD_KEY,
   FOLDER_INDEX_FLAG_VALUE,
   TEMPLATE_FLAG_VALUE,
 } from "./surgery";
@@ -77,3 +80,21 @@ export { lineDiff, diffWithSegments, changedLineCount } from "./diff";
 export type { DiffLine, DiffSegment } from "./diff";
 export { normalizeForDiff, normalizeConflictPair } from "./diffNormalize";
 export type { NormalizedConflictPair } from "./diffNormalize";
+
+// Form-C embed layout segments (myne#409): the one splitter and the one
+// emitter for `![[att:<id>|filename|w=…|align=…|alt=…]]`, shared by all three
+// clients so a note laid out on one is read identically on the others.
+export {
+  MAX_EMBED_DIMENSION_PX,
+  emitEmbedAlias,
+  emptyEmbedLayout,
+  isEmptyEmbedLayout,
+  parseEmbedAlias,
+  sameEmbedLayout,
+} from "./embedLayout";
+export type {
+  DroppedEmbedSegment,
+  EmbedAlign,
+  EmbedLayout,
+  ParsedEmbedAlias,
+} from "./embedLayout";
