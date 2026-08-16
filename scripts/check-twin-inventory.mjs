@@ -1608,9 +1608,13 @@ function rawStringOpener(text, i) {
 
 function stripComments(text, grammar = "js") {
   // `grammar` was a boolean `isRust` until CSS joined the roster and turned the
-  // two-valued question into a three-valued one. `true` and `false` are still
-  // accepted so an existing caller keeps working.
-  const isRust = grammar === true || grammar === "rust";
+  // two-valued question into a three-valued one. The boolean spelling is gone:
+  // the seven remaining callers were all in this file's own spec, and they were
+  // passing `true` where the signature says `string`, which nothing reported
+  // until `tsconfig.tests.json` gained `allowJs` and TypeScript could finally
+  // read this script. A parameter that answers to two shapes is one a caller can
+  // get wrong in a way no checker sees.
+  const isRust = grammar === "rust";
   const lineComments = grammar !== "css";
   let out = "";
   let i = 0;
