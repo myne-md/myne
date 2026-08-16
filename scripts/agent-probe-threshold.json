@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "The pass bar for the agent edit-format probe (myne-md/myne#529, task 5).",
+    "The numbers live here rather than in core/src/plugins/agent/probe.rs so there",
+    "is one place to find them and one place that can carry the measurements that",
+    "produced them. The desktop plugin include_str!s this file, so there is no",
+    "second copy to drift.",
+    "",
+    "STATUS: UNMEASURED. The values below are a placeholder and are recorded as",
+    "debt rather than presented as a result. Nobody has yet run the probe against",
+    "a real model on real hardware, so no measurement can honestly be written into",
+    "`measurements`. Until that happens the gate is calibrated by guess, which is",
+    "said here rather than left for a reader to assume otherwise. Filling this in",
+    "is a blocking obligation before agent mode ships to users; the acceptance",
+    "criterion it belongs to is deliberately left unchecked in tasks.md and the",
+    "reason is in agent-tooling/features/agentic-note-editing/progress.md.",
+    "",
+    "How to measure: run the probe against at least three backends spanning the",
+    "range (a small quantized local model, a mid-size local model, a remote",
+    "provider), 20 attempts each, and record pass counts below. Then set",
+    "`attempts` and `required` so that a backend a user would call usable passes",
+    "and one that fails most attempts does not."
+  ],
+  "status": "unmeasured",
+  "attempts": 3,
+  "required": 2,
+  "measurements": []
+}

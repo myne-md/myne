@@ -175,6 +175,7 @@ const V = {
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
+  "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused. Same shape as `ai-chat.ts` directly below."],
   "src/lib/ai-chat.ts": ["adapted", "Unreachable where `localAi` is absent; the editor host omits the `ai` member entirely."],
   "src/lib/ai-model-store.ts": ["adapted", "Same as ai-chat: no AI surface mounts on web."],
   "src/lib/ai-qa.ts": ["adapted", "Same as ai-chat."],

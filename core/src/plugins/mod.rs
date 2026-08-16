@@ -13,6 +13,11 @@
 //! shared core (decisions.md 2026-07-07); each client keeps only the thin
 //! `init()`/`generate_handler!`/capability shim.
 
+/// Agentic note editing (myne-md/myne#529): the run, its approved scope, the
+/// tools the model may call, the anchored edit format and the apply. The AI
+/// engine stays in each client; this core depends on a narrow generation trait
+/// the host implements, which is what lets mobile inherit the loop.
+pub mod agent;
 pub mod attachments;
 // ── plugins with no browser meaning at all (phase3-web-client) ───────────────
 //

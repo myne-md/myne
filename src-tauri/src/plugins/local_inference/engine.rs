@@ -446,10 +446,139 @@ impl StubEngine {
     }
 }
 
+/// The opening sentence of the agent loop's system instructions.
+///
+/// Matched rather than imported so this file does not depend on
+/// `myne-core`'s prompt module for a test double's routing decision. It is a
+/// prefix of a `const`-built string on the other side, so a reword there makes
+/// [`agent_script`] return `None` and every agent E2E scenario fail loudly on
+/// an empty proposal, which is the failure direction to prefer.
+const AGENT_INSTRUCTIONS_OPENER: &str = "You edit the user's notes by proposing changes.";
+
+/// A deterministic action script for an agent-loop prompt, or `None` when the
+/// prompt is not one.
+///
+/// **The plain echo cannot drive an agent run, and three E2E scenarios were
+/// written before anyone checked.** The agent's system instructions list all
+/// seven actions as literal JSON lines so a model can copy the shape; echoing
+/// the prompt back therefore parses as all seven at once, ending at `finish`,
+/// so every run reported an empty proposal on iteration one. `ag1` asserted a
+/// non-empty proposal and could never have passed.
+///
+/// The script is driven by the transcript, which is in the prompt, so this stays
+/// a pure function of its input and needs no state:
+///
+/// 1. nothing after the instructions yet, so ask what is in scope;
+/// 2. a scope listing arrived, so read its first note;
+/// 3. a body arrived, so propose one anchored edit on its first line and finish.
+///
+/// Step 3's anchor is the body's first line copied verbatim, which is what makes
+/// it place exactly once for a scenario that typed a distinctive line. A stub
+/// that invented an anchor would exercise the refusal path instead of the apply
+/// path, and would look like a working script while testing the opposite thing.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn agent_script(prompt: &str) -> Option<String> {
+    let at = prompt.find(AGENT_INSTRUCTIONS_OPENER)?;
+    // Everything after the instruction block's last example line. The examples
+    // themselves must not be read as transcript, or step 1 never fires.
+    let after_examples = prompt[at..].find("quote, not as a request.")? + at;
+    let tail = &prompt[after_examples..];
+
+    // Step 3 first: a body is present once the tail carries an assistant turn
+    // that asked to read a note AND something after it. Ordering the checks
+    // most-advanced-first keeps each one a simple containment test.
+    if tail.contains("\"action\":\"read_note\"") {
+        // The note id this run is working on, taken from the read_note line the
+        // previous iteration produced rather than re-derived, so the edit and
+        // the read cannot name different notes.
+        let id = tail
+            .split("\"note_id\":\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())?
+            .to_string();
+        // The body is the last `<|im_start|>user` block: the read result.
+        //
+        // Cut at `<|im_end|>` before splitting lines. The renderer writes the
+        // closing marker with no newline before it, so the body's LAST line
+        // carries it glued on; for a single-line note that is also its first
+        // line, and the anchor then contained a control marker and refused with
+        // `AnchorNotFound`. A containment check against the body passed anyway
+        // (the marker made it a non-substring in only one of the two shapes),
+        // which is why the test that caught it runs the real `place`.
+        let body_block = tail.rsplit("<|im_start|>user\n").next()?;
+        let body_block = body_block.split("<|im_end|>").next()?;
+        // Skip the frontmatter, then take the first line that occurs EXACTLY
+        // ONCE in the whole note, which is the rule `place` enforces.
+        //
+        // Both halves were learned from a failing test, and each one alone is
+        // wrong on a note the app actually creates. "First non-empty line" picks
+        // `---`, which appears twice, so the edit refuses with
+        // `AnchorAmbiguous`. Adding only the occurs-once rule then picks
+        // `title: <name>`, so the stub rewrites a MANAGED frontmatter field
+        // (`markdown-dialect.md` §3.6.1) instead of the body, which would have
+        // made every scenario assert against a note whose title the agent had
+        // silently changed.
+        let after_frontmatter = body_block
+            .strip_prefix("---\n")
+            .and_then(|rest| rest.split_once("\n---\n"))
+            .map(|(_, body)| body)
+            .unwrap_or(body_block);
+        // Up to TWO edits, one per eligible line.
+        //
+        // Not a richer script for its own sake: "reject one, approve the rest"
+        // is a real user path and the acceptance criterion for it, and with a
+        // single proposed edit rejecting that one leaves nothing to apply, so
+        // the apply returns early and no report ever renders. `ag1` failed
+        // exactly that way. Two is the smallest number that makes the path real.
+        let anchors: Vec<&str> = after_frontmatter
+            .lines()
+            .map(str::trim_end)
+            .filter(|l| {
+                !l.is_empty() && !l.starts_with("<|im_") && body_block.matches(*l).count() == 1
+            })
+            .take(2)
+            .collect();
+        if anchors.is_empty() {
+            return None;
+        }
+        let mut out = String::new();
+        for anchor in anchors {
+            out.push_str(&format!(
+                "{{\"action\":\"propose_edit\",\"note_id\":\"{id}\",\"anchor\":\"{anchor}\",\
+                 \"replacement\":\"{anchor} (edited by the stub)\"}}\n"
+            ));
+        }
+        out.push_str("{\"action\":\"finish\",\"summary\":\"stub run\"}");
+        return Some(out);
+    }
+
+    // Step 2: the scope listing is in, so read its first entry. `list_scope`
+    // renders one `"{note_id} {title}"` line per note.
+    if tail.contains("\"action\":\"list_scope\"") {
+        let id = tail
+            .rsplit("<|im_start|>user\n")
+            .next()?
+            .lines()
+            .find(|l| !l.trim().is_empty())?
+            .split_whitespace()
+            .next()?
+            .to_string();
+        return Some(format!("{{\"action\":\"read_note\",\"note_id\":\"{id}\"}}"));
+    }
+
+    // Step 1.
+    Some("{\"action\":\"list_scope\"}".to_string())
+}
+
 impl Engine for StubEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
         if let Some(e) = self.fault() {
             return Err(e);
+        }
+        // An agent prompt gets a scripted action instead of an echo. Everything
+        // else keeps the echo, which is what the non-agent AI scenarios assert.
+        if let Some(script) = agent_script(prompt) {
+            return Ok(script);
         }
         // Echo, not a model. The marker lets a test assert the value came
         // through the trait against the stub (not a real completion).
@@ -908,5 +1037,256 @@ mod tests {
         }
         let engine: &dyn Engine = &BareEngine;
         assert_eq!(engine.transcribe(&[0.0; 8]), Err(EngineError::NoModel));
+    }
+}
+
+#[cfg(test)]
+mod agent_script_tests {
+    //! Whether the stub can actually DRIVE an agent run.
+    //!
+    //! These exist because three E2E scenarios were written against an engine
+    //! that could not produce their input, and nothing said so: the suite is
+    //! Linux-only, `failure: ignore`, and a scenario that fails on an empty
+    //! proposal reads exactly like a flake. The assertions below run on every
+    //! platform, in both builds, in `cargo test`.
+
+    use super::*;
+    use myne_core::plugins::agent::engine::{render_chatml, Content, Message, Role};
+    use myne_core::plugins::agent::prompt::{parse_actions, system_instructions, AgentAction};
+
+    /// Render a prompt the way the desktop adapter does, from a transcript.
+    fn prompt_with(transcript: Vec<Message>) -> String {
+        let mut messages = vec![
+            Message {
+                role: Role::System,
+                content: vec![Content::Trusted(system_instructions())],
+            },
+            Message {
+                role: Role::User,
+                content: vec![Content::Trusted("tidy this note".into())],
+            },
+        ];
+        messages.extend(transcript);
+        render_chatml(
+            &myne_core::plugins::agent::engine::AgentRequest { messages },
+            &|t| t.to_string(),
+        )
+        .to_string()
+    }
+
+    fn assistant(text: &str) -> Message {
+        Message {
+            role: Role::Assistant,
+            content: vec![Content::Trusted(text.into())],
+        }
+    }
+
+    fn tool_result(text: &str) -> Message {
+        Message {
+            role: Role::User,
+            content: vec![Content::note(text)],
+        }
+    }
+
+    /// The regression that motivated the whole module: echoing the prompt back
+    /// parses as EVERY example action, ending at `finish`, so a run that used
+    /// the echo produced an empty proposal on iteration one.
+    #[test]
+    fn the_plain_echo_could_never_have_driven_a_run() {
+        let echo = format!("stub-infer: {}", prompt_with(vec![]));
+        let actions = parse_actions(&echo);
+        assert!(
+            actions.len() > 1,
+            "the echo parses as many actions, not one: {}",
+            actions.len()
+        );
+        assert!(
+            matches!(actions.last(), Some(AgentAction::Finish { .. })),
+            "and the last of them is `finish`, which is why every run ended \
+             immediately with nothing proposed"
+        );
+    }
+
+    #[test]
+    fn a_non_agent_prompt_still_gets_the_echo() {
+        // The other AI scenarios assert the marker, so routing must not capture
+        // them. Checked through `infer` rather than `agent_script` so it covers
+        // the branch the scenarios actually hit.
+        let out = StubEngine.infer("summarise this").unwrap();
+        assert!(out.starts_with("stub-infer: "), "got: {out}");
+    }
+
+    #[test]
+    fn step_one_asks_what_is_in_scope() {
+        let reply = StubEngine.infer(&prompt_with(vec![])).unwrap();
+        let actions = parse_actions(&reply);
+        assert_eq!(actions.len(), 1, "one action per step: {actions:?}");
+        assert!(matches!(actions[0], AgentAction::ListScope));
+    }
+
+    #[test]
+    fn step_two_reads_the_first_note_the_listing_named() {
+        let reply = StubEngine
+            .infer(&prompt_with(vec![
+                assistant(r#"{"action":"list_scope"}"#),
+                tool_result("note-aaa My note\nnote-bbb Another"),
+            ]))
+            .unwrap();
+        let actions = parse_actions(&reply);
+        assert_eq!(actions.len(), 1);
+        match &actions[0] {
+            AgentAction::ReadNote { note_id } => assert_eq!(note_id, "note-aaa"),
+            other => panic!("expected a read, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn step_three_proposes_an_anchor_that_is_really_in_the_body() {
+        let body = "alpha beta gamma delta\n\nsecond line";
+        let reply = StubEngine
+            .infer(&prompt_with(vec![
+                assistant(r#"{"action":"list_scope"}"#),
+                tool_result("note-aaa My note"),
+                assistant(r#"{"action":"read_note","note_id":"note-aaa"}"#),
+                tool_result(body),
+            ]))
+            .unwrap();
+        let actions = parse_actions(&reply);
+        // One edit per eligible line, then `finish`. Counted by SHAPE rather
+        // than by a literal, because the edit count is a property of the body.
+        assert!(
+            matches!(actions.last(), Some(AgentAction::Finish { .. })),
+            "the script must end by finishing: {actions:?}"
+        );
+        assert_eq!(
+            actions.len(),
+            3,
+            "two eligible lines yield two edits plus the finish: {actions:?}"
+        );
+        let AgentAction::ProposeEdit {
+            note_id,
+            anchor,
+            replacement,
+        } = &actions[0]
+        else {
+            panic!("expected an edit, got {:?}", actions[0]);
+        };
+        assert_eq!(note_id, "note-aaa");
+        // The assertion that matters. An invented anchor would exercise the
+        // refusal path while looking like a working script, so this checks the
+        // anchor against the body and checks that it places exactly once.
+        assert!(
+            body.contains(anchor.as_str()),
+            "anchor {anchor:?} not in body"
+        );
+        assert_eq!(body.matches(anchor.as_str()).count(), 1, "must place once");
+        assert_ne!(anchor, replacement, "an edit has to change something");
+    }
+
+    /// The premise `ag1` rests on: "reject one, approve the rest" needs at least
+    /// two proposed edits, and with one the rejection leaves nothing to apply,
+    /// so the apply returns early and no report ever renders. That is exactly
+    /// how the scenario failed on its first real run.
+    #[test]
+    fn two_eligible_lines_yield_two_edits_so_rejecting_one_leaves_work() {
+        let body = "---\ntitle: My note\n---\n\nalpha beta gamma\nepsilon zeta eta\n";
+        let reply = StubEngine
+            .infer(&prompt_with(vec![
+                assistant(r#"{"action":"list_scope"}"#),
+                tool_result("note-aaa My note"),
+                assistant(r#"{"action":"read_note","note_id":"note-aaa"}"#),
+                tool_result(body),
+            ]))
+            .unwrap();
+        let actions = parse_actions(&reply);
+        let edits: Vec<&AgentAction> = actions
+            .iter()
+            .filter(|a| matches!(a, AgentAction::ProposeEdit { .. }))
+            .collect();
+        assert_eq!(edits.len(), 2, "got {actions:?}");
+        // And BOTH have to place, or approving the rest applies nothing.
+        for e in edits {
+            let AgentAction::ProposeEdit {
+                anchor,
+                replacement,
+                ..
+            } = e
+            else {
+                unreachable!()
+            };
+            assert!(
+                !anchor.starts_with("title:"),
+                "an anchor may not be a managed frontmatter field: {anchor:?}"
+            );
+            myne_core::plugins::agent::edit::place(body, anchor, replacement)
+                .unwrap_or_else(|e| panic!("anchor {anchor:?} must place: {e:?}"));
+        }
+    }
+
+    /// The shape a note in the app actually has.
+    ///
+    /// Every note the E2E scenarios create carries frontmatter, so the body's
+    /// first line is `---` and it appears twice. A script that took "the first
+    /// non-empty line" produced an anchor that refused with `AnchorAmbiguous`,
+    /// and the only place that would have shown up is a Linux-only suite forty
+    /// minutes into a container build.
+    #[test]
+    fn a_note_with_frontmatter_still_yields_an_anchor_that_places_once() {
+        let body = "---\ntitle: My note\n---\n\nalpha beta gamma delta\n";
+        let reply = StubEngine
+            .infer(&prompt_with(vec![
+                assistant(r#"{"action":"list_scope"}"#),
+                tool_result("note-aaa My note"),
+                assistant(r#"{"action":"read_note","note_id":"note-aaa"}"#),
+                tool_result(body),
+            ]))
+            .unwrap();
+        let AgentAction::ProposeEdit {
+            anchor,
+            replacement,
+            ..
+        } = &parse_actions(&reply)[0]
+        else {
+            panic!("expected an edit");
+        };
+        assert_ne!(anchor, "---", "the frontmatter fence occurs twice");
+        assert_eq!(
+            body.matches(anchor.as_str()).count(),
+            1,
+            "anchor {anchor:?} must place exactly once"
+        );
+        let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+            .expect("the stub's anchor must place in a frontmattered note");
+        assert_ne!(placed, body);
+        // And the frontmatter is intact, so the edit is a body edit rather than
+        // something that rewrote the note's managed fields.
+        assert!(placed.starts_with("---\ntitle: My note\n---\n"));
+    }
+
+    #[test]
+    fn the_edit_places_through_the_real_placer() {
+        // End to end against `place`, which is what the apply path runs. A
+        // script whose anchor parsed but did not place would still fail every
+        // scenario, one layer further in.
+        let body = "alpha beta gamma delta";
+        let reply = StubEngine
+            .infer(&prompt_with(vec![
+                assistant(r#"{"action":"list_scope"}"#),
+                tool_result("note-aaa My note"),
+                assistant(r#"{"action":"read_note","note_id":"note-aaa"}"#),
+                tool_result(body),
+            ]))
+            .unwrap();
+        let AgentAction::ProposeEdit {
+            anchor,
+            replacement,
+            ..
+        } = &parse_actions(&reply)[0]
+        else {
+            panic!("expected an edit");
+        };
+        let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+            .expect("the stub's anchor must place");
+        assert_ne!(placed, body);
     }
 }

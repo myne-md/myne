@@ -1,0 +1,75 @@
+# Permissions for the in-app `agent` Tauri plugin (myne-md/myne#529).
+# Picked up under the `agent:` ACL namespace because `build.rs` declares this
+# as an `InlinedPlugin`. Capability files reference these as `agent:default`.
+#
+# Every command here reaches decrypted note plaintext and two of them WRITE to
+# notes (`agent_apply` and `agent_undo`), so all nine inherit the
+# main-window-only invariant the other vault plugins share: v0.2 multi-window
+# MUST NOT grant `agent:allow-agent-apply`, `agent:allow-agent-undo` or any of
+# the others to a non-main window.
+#
+# `agent_apply` is the only one that writes, and it is not the only one that
+# matters: `agent_start` and `agent_approve_scope` are what set and widen the
+# run's scope, so granting them is granting the ability to decide what a later
+# apply may touch.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the agent plugin: start, resume, cancel and inspect an agent run, apply the edits the user approved, and report whether the configured backend can hold the edit format."
+permissions = [
+  "allow-agent-start",
+  "allow-agent-approve-scope",
+  "allow-agent-preview-grant",
+  "allow-agent-cancel",
+  "allow-agent-status",
+  "allow-agent-apply",
+  "allow-agent-undo",
+  "allow-agent-last-run",
+  "allow-agent-capability",
+]
+
+[[permission]]
+identifier = "allow-agent-start"
+description = "Allow invoking agent:agent_start (Slot::Unlocked-gated; resolves the user's initial scope grant against the index and the ai_excluded_folders clamp, creates the run, and drives the loop until it finishes, pauses for a scope approval, or is cancelled). Proposes only; writes nothing."
+commands.allow = ["agent_start"]
+
+[[permission]]
+identifier = "allow-agent-approve-scope"
+description = "Allow invoking agent:agent_approve_scope (Slot::Unlocked-gated; resolves an approved expansion at approval time, freezes it into the run's note-id set, and resumes the loop). Proposes only; writes nothing."
+commands.allow = ["agent_approve_scope"]
+
+[[permission]]
+identifier = "allow-agent-preview-grant"
+description = "Allow invoking agent:agent_preview_grant (Slot::Unlocked-gated, READ-ONLY; runs the same grant resolution the commit runs and returns the note count, the count the ai_excluded_folders clamp removed and the resulting run total, so the approval screen shows the host's numbers rather than the WebView's arithmetic). Commits nothing."
+commands.allow = ["agent_preview_grant"]
+
+[[permission]]
+identifier = "allow-agent-cancel"
+description = "Allow invoking agent:agent_cancel (sets the run's cancel flag; the same flag the vault-lock teardown sets)."
+commands.allow = ["agent_cancel"]
+
+[[permission]]
+identifier = "allow-agent-status"
+description = "Allow invoking agent:agent_status (the run's view, including the running scope total the surface must show continuously)."
+commands.allow = ["agent_status"]
+
+[[permission]]
+identifier = "allow-agent-apply"
+description = "Allow invoking agent:agent_apply (Slot::Unlocked-gated; the ONLY command in this plugin that writes. Refuses anything outside the run's scope, re-reads each note as it is now, re-checks every anchor, takes the run's restore point, and only then writes transactionally. A failed restore point blocks the write)."
+commands.allow = ["agent_apply"]
+
+[[permission]]
+identifier = "allow-agent-undo"
+description = "Allow invoking agent:agent_undo (Slot::Unlocked-gated; restores every note an agent run wrote from its own pre-apply snapshot, as one action. Notes the run CREATED are not reverted, and the result says how many were left, because a create has no snapshot to restore to)."
+commands.allow = ["agent_undo"]
+
+[[permission]]
+identifier = "allow-agent-last-run"
+description = "Allow invoking agent:agent_last_run (Slot::Unlocked-gated, READ-ONLY; returns the most recently applied run's id, its (note_id, snapshot_uuid) restore points and how many notes it created, so the undo affordance can be offered after the review screen has been dismissed. Identifiers only, never note text. Writes nothing and reverts nothing)."
+commands.allow = ["agent_last_run"]
+
+[[permission]]
+identifier = "allow-agent-capability"
+description = "Allow invoking agent:agent_capability (runs the fixed edit-format probe against the configured backend and reports whether agent mode can be offered, with a named cause when it cannot)."
+commands.allow = ["agent_capability"]
