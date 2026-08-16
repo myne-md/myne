@@ -353,6 +353,14 @@ steps:
       # lock shipped that way while the OPFS write path skipped its TOCTOU guard
       # believing the lock was held.
       - node scripts/check-unwired.mjs
+      # IPC bindings with no caller (myne#529): the layer above the ratchet
+      # above. A command declared, permitted, registered and mirrored in TS can
+      # still be called by nothing, and then the feature behind it ships inert.
+      - node scripts/check-ipc-binding-callers.mjs
+      # Frontend lock teardown (myne#529): the WebView half of the Rust-side
+      # `check-lock-teardown.mjs`. A vault-leaving path that skips one clear
+      # leaves a module-scope store resident into the next vault's session.
+      - node scripts/check-frontend-lock-teardown.mjs
       # Mobile export-backup exclusion (myne#491): the plaintext export directory
       # (`Documents`) stays out of iCloud Backup and Android Auto Backup. Four
       # files in three languages carry that property and no compiler compares

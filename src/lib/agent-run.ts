@@ -229,11 +229,6 @@ export async function agentCancel(runId: string): Promise<boolean> {
   return await invoke<boolean>("plugin:agent|agent_cancel", { runId });
 }
 
-/** The run's current view, including the running scope total. */
-export async function agentStatus(runId: string): Promise<AgentRunView> {
-  return await invoke<AgentRunView>("plugin:agent|agent_status", { runId });
-}
-
 /** How the user approved. Mirrors the Rust `Approval`.
  *
  *  A fact about the click, not about the edits, which is why the host cannot

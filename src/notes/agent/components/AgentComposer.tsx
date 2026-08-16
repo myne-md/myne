@@ -22,9 +22,11 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../../components/primitives/Button";
 import { Input } from "../../../components/primitives/Input";
 import {
+  agentCapability,
   agentPreviewGrant,
   agentStart,
   type GrantPreview,
+  type ProbeVerdict,
   type ScopeGrant,
 } from "../../../lib/agent-run";
 import { beginRun, failRun, settleStep } from "../agentStore";
@@ -52,6 +54,36 @@ export function AgentComposer({
   const [attached, setAttached] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<GrantPreview | null>(null);
+  /** Whether the configured backend can hold the anchored edit format.
+   *
+   *  **This gate shipped unwired**, which made two module docs false: both
+   *  `core/src/plugins/agent/edit.rs` and `probe.rs` say the format may refuse
+   *  a near-miss anchor rather than fuzzy-match it precisely BECAUSE a model
+   *  that copies anchors badly shows agent mode as unavailable. Nothing called
+   *  the probe, so agent mode was offered on every backend and the refusal the
+   *  format is entitled to had no counterpart in the UI.
+   *
+   *  `null` while the answer is outstanding. Offering the composer during that
+   *  window would be the same defect in a smaller form. */
+  const [capability, setCapability] = useState<ProbeVerdict | null>(null);
+  const [capabilityFailed, setCapabilityFailed] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    void agentCapability()
+      .then((v) => {
+        if (live) setCapability(v);
+      })
+      .catch(() => {
+        // Fail CLOSED. An unanswerable probe is not evidence that the backend
+        // can hold the format, and offering the run anyway is what this whole
+        // gate exists to prevent.
+        if (live) setCapabilityFailed(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // The count comes from the HOST, resolved by the same code the commit runs.
   // Counting here would leave out the `ai_excluded_folders` clamp, so the number
@@ -80,8 +112,10 @@ export function AgentComposer({
       ? { kind: "notes", value: [openNoteId] }
       : null;
 
+  const usable = capability?.passed === true;
+
   async function send() {
-    if (!grant || task.trim() === "" || busy) return;
+    if (!usable || !grant || task.trim() === "" || busy) return;
     setBusy(true);
     beginRun();
     try {
@@ -109,6 +143,33 @@ export function AgentComposer({
           screen: this is the surface that is still on screen after that screen
           has been closed. Renders nothing when the host holds no record. */}
       <UndoLastRun onReverted={onRunUndone} />
+      {/* The capability verdict, stated rather than implied by a dead button.
+          A refusal names its cause: the composer is the one place a user finds
+          out that agent mode is unavailable on the model they chose. */}
+      {capabilityFailed || (capability !== null && !capability.passed) ? (
+        <div
+          data-testid="agentComposer.unsupported"
+          style={{
+            padding: "var(--space-2) var(--space-3)",
+            borderBottom: "1px solid var(--line-1)",
+            background: "var(--bg-2)",
+            color: "var(--fg-2)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          {t("agent.composer.unsupported")}
+          {capability !== null ? (
+            <>
+              {" "}
+              {t("agent.composer.unsupportedDetail", {
+                passes: capability.passes,
+                attempts: capability.threshold.attempts,
+                required: capability.threshold.required,
+              })}
+            </>
+          ) : null}
+        </div>
+      ) : null}
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
         <span style={{ color: "var(--fg-2)" }}>{t("agent.composer.scopeLabel")}</span>
         {/* The user-originated scope control. */}
@@ -165,11 +226,13 @@ export function AgentComposer({
         />
         <Button
           variant="primary"
-          disabled={busy || !grant || task.trim() === ""}
+          disabled={!usable || busy || !grant || task.trim() === ""}
           onClick={() => void send()}
           data-testid="agentComposer.send"
         >
-          {t("agent.composer.send")}
+          {capability === null && !capabilityFailed
+            ? t("agent.composer.checking")
+            : t("agent.composer.send")}
         </Button>
       </div>
     </div>

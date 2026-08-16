@@ -406,7 +406,7 @@ fn main() {
         )
         .plugin(
             "agent",
-            // The nine agentic-note-editing commands (myne-md/myne#529). Same
+            // The eight agentic-note-editing commands (myne-md/myne#529). Same
             // InlinedPlugin discipline as the plugins around it: each command
             // needs a matching `commands.allow` entry in
             // `permissions/agent/default.toml` or the ACL resolver never
@@ -418,7 +418,6 @@ fn main() {
                 "agent_approve_scope",
                 "agent_preview_grant",
                 "agent_cancel",
-                "agent_status",
                 "agent_apply",
                 "agent_undo",
                 "agent_last_run",

@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "IPC bindings that wrap a `plugin:x|y` invoke and have NO production caller.",
+    "See scripts/check-ipc-binding-callers.mjs for what the class costs.",
+    "",
+    "Every entry carries a REASON, and the guard refuses one that does not: an",
+    "entry without a reason is indistinguishable from a defect somebody recorded",
+    "instead of fixing. RATCHET: the list may shrink, never grow, so a new dead",
+    "binding costs an argument rather than a silent line.",
+    "",
+    "All eight below are PRE-EXISTING and none was introduced by the change that",
+    "added this guard (myne-md/myne#529). Each was verified by searching every",
+    "client tree for the exported name: zero references outside its own module.",
+    "The one the guard found in that change's own diff, `agentStatus`, was",
+    "REMOVED end to end rather than recorded here, which is the disposition this",
+    "list exists to make the default."
+  ],
+  "exempt": {
+    "mobile/src/lib/attachments.ts:attachmentRefsApply": "Pre-existing. The mobile attachment ref-scan surface: zero references anywhere in mobile/src. The command is registered and permitted on the mobile host, so the ACL grant exists for a call that is never made. Fixing it means either wiring the mobile ref-scan UI or removing the command; both are mobile-client work and neither belongs in myne#529.",
+    "mobile/src/lib/attachments.ts:attachmentRefsReferencing": "Pre-existing, same subsystem and same disposition as attachmentRefsApply above. Zero references in mobile/src.",
+    "mobile/src/lib/attachments.ts:attachmentRefsRemove": "Pre-existing, same subsystem and same disposition as attachmentRefsApply above. Zero references in mobile/src.",
+    "mobile/src/lib/reminders.ts:createRawReminderNotifier": "Pre-existing, and it has a known consumer-side cause already recorded elsewhere: scripts/check-unwired.mjs records `mobile/src/lib/reminderPass.ts` as UNWIRED, so the pass that would use this factory never runs. The reminder feature is partly unwired on BOTH clients per that same record. Wiring the pass is what makes this callable; recording it here does not paper over that, it points at it.",
+    "mobile/src/lib/reminders.ts:createReminderPermissionApi": "Pre-existing, same cause as createRawReminderNotifier above: its consumer `reminderPass.ts` is itself unwired and recorded as such in scripts/check-unwired.mjs.",
+    "mobile/src/lib/transcribe.ts:readTranscript": "Pre-existing. Reads a stored transcript back on mobile; zero references in mobile/src, so the transcription write path exists on that client and the read-back has no surface. Mobile-client work.",
+    "mobile/src/lib/vault-indices.ts:vaultIndicesBacklinkCandidates": "Pre-existing. Backlink candidates for the mobile wikilink picker; zero references in mobile/src. Mobile-client work.",
+    "src/lib/ai-qa.ts:askQuestion": "Pre-existing and SUPERSEDED rather than merely unwired, which is why it is the one desktop entry here. The AI chat surface asks through `plugin:local-inference|chat_stream` (src/lib/ai-chat.ts:93), so this binding is the pre-streaming route left behind by conversational-ai-chat. It should be deleted with its command rather than exempted forever; that is a local-inference change, not an agent one."
+  }
+}

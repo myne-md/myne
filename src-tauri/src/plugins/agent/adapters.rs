@@ -114,7 +114,7 @@ pub struct EngineAdapter<'a> {
 /// span appearing in a system message is filtered here rather than inherited
 /// into the unfiltered slot. That keeps the arms' assumption honest no matter
 /// what core does later, and it fails safe rather than open.
-fn chat_shape(
+pub(crate) fn chat_shape(
     request: &AgentRequest,
     sanitize: &dyn Fn(&str) -> String,
 ) -> (String, Vec<ChatMessage>) {

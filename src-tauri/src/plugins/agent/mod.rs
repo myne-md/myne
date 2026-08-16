@@ -4,26 +4,36 @@
 //! The command **cores** live in `myne-core` (`myne_core::plugins::agent`), so
 //! mobile inherits the loop rather than reimplementing it. What is here is the
 //! desktop's own half: the adapters that satisfy core's seams out of the
-//! existing AI, notes and snapshot machinery, the nine IPC commands, and the
+//! existing AI, notes and snapshot machinery, the eight IPC commands, and the
 //! `init()` wiring.
 //!
 //! ## Capability ACL
 //!
-//! `agent:default` bundles all nine, main-window-only.
+//! `agent:default` bundles all eight, main-window-only.
 //!
-//! **Seven are unlock-gated and two are not, and the split is deliberate.**
+//! **Seven are unlock-gated and one is not, and the split is deliberate.**
 //! `agent_start`, `agent_approve_scope`, `agent_preview_grant`, `agent_apply`,
-//! `agent_undo` and `agent_last_run` reach the vault and call `require_unlocked`
-//! first; the first four additionally re-read the `ai_enabled` opt-in host-side.
-//! `agent_last_run` deliberately does not: reading which notes a run already
-//! wrote is how a user reverses it, and gating that on an opt-in they may have
-//! just turned OFF would strand them with changes they cannot undo in one act.
-//! `agent_cancel` and `agent_status` touch only the run table, and a run that
-//! outlived a lock is a teardown bug rather than something to refuse here.
-//! `agent_capability` is unlock-gated but its probe prompt is a compile-time
-//! constant, so no vault data is involved either way. Borrowing
+//! `agent_undo`, `agent_last_run` and `agent_capability` reach the vault and
+//! call `require_unlocked` first. **Five of those additionally re-read the
+//! `ai_enabled` opt-in host-side**: `agent_start`, `agent_approve_scope`,
+//! `agent_preview_grant`, `agent_apply` and `agent_capability`, the last
+//! because asking a model whether it can hold the edit format is still asking a
+//! model. `agent_last_run` deliberately does not: reading which notes a run
+//! already wrote is how a user reverses it, and gating that on an opt-in they
+//! may have just turned OFF would strand them with changes they cannot undo in
+//! one act. `agent_cancel` touches only the run table, and a run that outlived
+//! a lock is a teardown bug rather than something to refuse here.
+//! `agent_capability`'s probe prompt is a compile-time constant, so no vault
+//! data is involved even though it is gated. Borrowing
 //! `State<'_, VaultRuntimeState>` gates nothing on its own; the guard function
 //! is the gate.
+//!
+//! **`agent_status` was removed** (myne-md/myne#529 review round two). It was
+//! declared, permitted, registered, mirrored in TypeScript and called by
+//! nothing, which is an ACL grant the WebView can reach for no reason. The
+//! surface reads a run's view from the step result it already receives.
+//! `scripts/check-ipc-binding-callers.mjs` is what found it and is what stops
+//! the next one.
 //!
 //! **Adding a command here is three edits, not one**: `build.rs`'s
 //! `InlinedPlugin` command list, a `[[permission]]` block in
@@ -86,7 +96,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::agent_approve_scope,
             commands::agent_preview_grant,
             commands::agent_cancel,
-            commands::agent_status,
             commands::agent_apply,
             commands::agent_undo,
             commands::agent_last_run,
@@ -247,14 +256,14 @@ mod acl_registration_guard {
                 registered.len(),
                 declared.len()
             ),
-            (9, 9, 9, 9),
+            (8, 8, 8, 8),
             "the agent plugin's command roster changed; update this floor in the same \
              change that adds or removes a command"
         );
     }
 
     /// The plugin's capability bundle has to be granted to the main window, or
-    /// all nine are refused however well the four sources above agree.
+    /// all eight are refused however well the four sources above agree.
     #[test]
     fn the_agent_capability_bundle_is_granted_to_the_main_window() {
         let caps = include_str!("../../../capabilities/default.json");
