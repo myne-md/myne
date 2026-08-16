@@ -272,6 +272,28 @@ const CURATED_TWINS = [
       "of the denominator is not optional.",
   },
   {
+    a: "src/notes/setNoteCover.ts",
+    b: "mobile/src/lib/setNoteCover.ts",
+    what: "writes the note-cover frontmatter field, and the byte sequence must match",
+    why:
+      "Read, patch `cover:`, bump `updated:`, write. Cross-path, so the sweep cannot see it, and " +
+      "the pair's own justification is byte-identity: myne-md/myne#410's decision entry rests the " +
+      "case for a second implementation on 'a cover set on a phone is byte-identical to one set on " +
+      "a desktop'. What is shared is the primitives; the ORDER (patch cover, then stamp updated) is " +
+      "retyped on each side, and that order is the byte-deciding part. Desktop additionally " +
+      "re-indexes and takes a property key; mobile does neither.",
+  },
+  {
+    a: "src/notes/openCoverPickerSignal.ts",
+    b: "mobile/src/lib/openCoverPickerSignal.ts",
+    what: "declares the cover-picker window event names the two shells listen for",
+    why:
+      "Two string constants that MUST agree, kept in step by a comment in each file saying they " +
+      "must agree. Cross-path, so the sweep cannot see it. This is the twin-drift shape stated at " +
+      "its purest: no logic, no seam, just a name that breaks silently on both ends if one side " +
+      "edits it.",
+  },
+  {
     a: "src/notes/localDateTime.ts",
     b: "mobile/src/lib/localDateTime.ts",
     what: "is a shim on one side and a hand copy on the other",
@@ -926,6 +948,22 @@ const ROSTER = [
   },
 
   // ── The two Rust/TS pairs the merge brought in
+  {
+    a: "src/notes/setNoteCover.ts",
+    b: "mobile/src/lib/setNoteCover.ts",
+    verdict: "decision",
+    destination: "@myne/dialect",
+    reason:
+      "One question with one answer: what bytes a cover write produces. myne-md/myne#410's decision entry rests the case for a second implementation on 'a cover set on a phone is byte-identical to one set on a desktop', and what is actually shared is the primitives rather than the ORDER (patch `cover:`, then stamp `updated:`), which is the byte-deciding part. A pure `applyCoverToPlaintext(current, choice, nowIso)` in `@myne/dialect` would make the claimed property hold by construction instead of by comment; both clients already source-consume that package. Desktop additionally re-indexes and takes a property key, and those are legitimately per-client.",
+  },
+  {
+    a: "src/notes/openCoverPickerSignal.ts",
+    b: "mobile/src/lib/openCoverPickerSignal.ts",
+    verdict: "decision",
+    destination: "@myne/editor",
+    reason:
+      "Two string constants that MUST agree, kept in step by a comment in each file saying they must agree. Twin drift at its purest: no logic, no seam, just a name that breaks silently on both ends if one side edits it. They belong beside the `cover?` seam definition in `editor/src/host.ts`, which both hosts already import to implement it.",
+  },
   {
     a: "src-tauri/src/navigation.rs",
     b: "mobile/src-tauri/src/navigation.rs",

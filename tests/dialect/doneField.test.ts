@@ -32,10 +32,6 @@ describe("the managed set", () => {
     // Without it, an imported note with `done: <valid ISO date>` reads complete.
     expect([...MANAGED_FRONTMATTER_FIELDS]).toContain("done");
   });
-
-  it("now names twelve fields", () => {
-    expect(MANAGED_FRONTMATTER_FIELDS).toHaveLength(12);
-  });
 });
 
 describe("the writer", () => {

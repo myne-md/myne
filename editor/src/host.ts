@@ -363,6 +363,31 @@ export interface EditorHost {
     /** Close the focused note tab (`:q`). */
     closeActiveTab: () => void;
   };
+
+  /** OPTIONAL — the note cover's picker (myne-md/myne#410).
+   *
+   *  The banner is CodeMirror DOM inside this package; the picker is the host's
+   *  own modal, and the host is also the only thing that knows which note the
+   *  focused pane holds. So the editor ASKS rather than opens, exactly like
+   *  `workspace.closeActiveTab` above, and for the same reason.
+   *
+   *  A host that omits this renders no cover controls at all: the affordance is
+   *  hidden rather than shown broken, which is the seam's whole contract. */
+  cover?: {
+    /** Open the host's cover picker for whichever note is focused.
+     *
+     *  `hasCover` flows this way round because the EDITOR knows it and the shell
+     *  does not: the banner has just resolved the note's `cover:` field, while
+     *  the shell's note cache carries no cover state. The picker uses it to
+     *  decide whether to offer its own Remove action. */
+    openPicker: (hasCover: boolean) => void;
+    /** Clear the focused note's cover.
+     *
+     *  A separate member rather than a trip through the picker: removing is a
+     *  one-click intent, and routing it through a modal the user then has to
+     *  act inside makes two controls that do the same thing. */
+    remove: () => void;
+  };
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────

@@ -173,6 +173,13 @@
   --radius-3: 10px;
   --radius-pill: 999px;
 
+  /* -- Note cover banner ---------------------------------------------- */
+  /* Kept in step with `src/styles/tokens.css`: mobile both renders and edits a
+     cover, so the shared editor CSS must find the token here too or it falls
+     back to its hardcoded literal and mobile opts out of the theme layer
+     (myne-md/myne#410). */
+  --cover-banner-h: 180px;
+
   /* -- Spacing scale (4px base) -------------------------------------- */
   --space-0:  0;
   --space-1:  4px;

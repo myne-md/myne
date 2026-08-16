@@ -27,6 +27,7 @@ import {
   type DroppedEmbedSegment,
   type EmbedLayout,
   emitEmbedAlias,
+  sanitizeAliasText,
   emptyEmbedLayout,
   parseEmbedAlias,
 } from "@myne/dialect/embedLayout";
@@ -70,7 +71,16 @@ export function emitAttachmentEmbed(
   unknown: readonly string[] = [],
   dropped: readonly DroppedEmbedSegment[] = [],
 ): string {
-  return `![[${ATT_SCHEME}${id}|${emitEmbedAlias(filename, layout, unknown, dropped)}]]`;
+  // The filename is SANITIZED here rather than trusted, because this is the one
+  // emitter and the catalog is not a trusted source of alias-safe text. An
+  // attachment named `a]b.png` (nothing rejects one on import or rename) used to
+  // produce `![[att:<id>|a]b.png]]`, which every form-C reader parses as zero
+  // spans. A body embed then draws no chip; a note COVER is worse, because
+  // attachment liveness is derived from those spans, so the attachment reads as
+  // unreferenced and `attachment_clean_unused` crypto-erases a blob the note
+  // still names. `sanitizeAliasText` applies the rule
+  // `core/src/export_naming.rs` already applies on the way out.
+  return `![[${ATT_SCHEME}${id}|${emitEmbedAlias(sanitizeAliasText(filename), layout, unknown, dropped)}]]`;
 }
 
 /**
