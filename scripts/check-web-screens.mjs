@@ -82,6 +82,15 @@ const VERDICTS = {
     verdict: "adapted",
     note: "Substituted so HAS_OVERLAY_WINDOW_CONTROLS is false: a Mac BROWSER has no traffic lights, and the shared userAgent test reserved 86px for them (task 70).",
   },
+  "AgentReview.tsx": {
+    verdict: "adapted",
+    note:
+      "Ships whole and is unreachable, the same shape as the rest of the AI surface: the " +
+      "`agent` plugin is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 " +
+      "puts web out of scope), so every command this screen invokes is refused and no run can " +
+      "exist to review. Not `excluded`, because `Editor.tsx` imports it statically and that " +
+      "verdict would be a claim of absence the bundle does not honour.",
+  },
   "Editor.tsx": {
     verdict: "adapted",
     note: "Ships whole; affordances the platform cannot honour are omitted through the capability descriptor rather than by a fork (task 27).",

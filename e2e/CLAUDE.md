@@ -163,3 +163,26 @@
 - States unreachable through real UI are NOT forced into E2E: downgrade to a
   Vitest component test (mocked `invoke`) and record the downgrade on the
   tracking issue.
+- **A helper that WAITS for a surface without OPENING it fails every scenario at
+  the same line, and reads as a flake.** `agent-run.e2e.ts` shipped an
+  `openAgentComposer` that only waited for `agentComposer.root`; that component
+  renders solely while the right pane's active tab is `ai-chat`, which nothing
+  had opened, so all five scenarios timed out identically at 15 s. The file
+  compiled, the testids were correct, and none of it ran. When a surface lives
+  behind a tab, a mode or a panel, the helper's first line is the one that
+  *opens* it (`runPaletteAction(s, "ai.open-chat", "chat")` here), and the wait
+  is the assertion that opening worked.
+- **The AI lane needs BOTH halves, and until recently neither was reachable
+  locally.** A scenario gated on `MYNE_E2E_AI=1` also needs the binary built
+  `--features local-inference-stub`, or `StubEngine` is not the backend and the
+  gate is meaningless; `.woodpecker.yml` pairs them and `e2e-buildrun.sh`
+  supplies neither. That is the mechanism by which a whole family of specs was
+  written and never run once on a developer machine. `scripts/e2e-ai-buildrun.sh`
+  pairs them; repeating a spec argument runs it that many times in the same warm
+  container, which is the shape the 3x gate wants.
+- **A stub engine that ECHOES cannot drive a tool-calling loop.** The agent's
+  system instructions list every action as a literal JSON line so a model can
+  copy the shape, so echoing the prompt back parses as all of them at once and
+  ends at `finish` with an empty proposal. Three scenarios asserted a non-empty
+  proposal and could never have passed. `StubEngine::agent_script` is the fixed
+  script that fixes it, and its own tests assert the echo could not have worked.

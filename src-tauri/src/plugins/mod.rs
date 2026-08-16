@@ -7,6 +7,7 @@
 //! Q8.3 — domain isolation enforced at compile time, future
 //! `vault-unlock` / `change-password` plugins follow the same shape.
 
+pub mod agent;
 pub mod attachments;
 pub mod backup;
 pub mod clipper_pairing;

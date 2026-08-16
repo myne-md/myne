@@ -1,4 +1,24 @@
 {
-  "stable": 292,
+  "$comment": [
+    "Raised 292 -> 294 for myne-md/myne#529: `e2e/agent-run.e2e.ts` gained ag4",
+    "(undo after the review screen is closed) and ag5 (a model-requested scope",
+    "expansion). Both EXECUTE, so the floor moves by exactly two.",
+    "",
+    "This is arithmetic on a CI-measured base, not a new measurement. The 292",
+    "came from CI (pipeline 431) and this change adds two scenarios to a file CI",
+    "already runs, since the e2e step sets MYNE_E2E_AI=1 and builds with",
+    "`local-inference-stub`. Locally all five now pass three times consecutively",
+    "in the container (scripts/e2e-ai-buildrun.sh).",
+    "",
+    "`stable_max_failures` is deliberately NOT lowered. It is a ceiling and a",
+    "ratchet, so fewer failures is already allowed, and this change should cause",
+    "fewer: the agent scenarios could never have passed before, because the stub",
+    "engine echoed the prompt and the agent's system instructions list all seven",
+    "actions as literal JSON lines, so every stub-driven run parsed them all and",
+    "ended at `finish` with an empty proposal. Guessing the new number from a",
+    "laptop is exactly what the provenance note below warns against; let CI",
+    "measure it and re-record then."
+  ],
+  "stable": 294,
   "stable_max_failures": 33
 }

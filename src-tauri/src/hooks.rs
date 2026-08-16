@@ -162,6 +162,13 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
         // build carries no AI teardown.
         #[cfg(feature = "local-inference")]
         crate::plugins::local_inference::zeroize_ai_vectors(&self.app);
+        // myne#529: an agent run holds a note-id set derived from decrypted
+        // plaintext, a transcript containing note bodies, and a proposal built
+        // out of them. All three are the same class as the vector store above
+        // and must not outlive the unlocked session, so they are dropped on the
+        // same leg. This is also why the feature persists nothing across a lock:
+        // there is no blob to wipe because there is no blob.
+        crate::plugins::agent::teardown_on_lock(&self.app);
     }
     fn zeroize_attachment_refs(&self) {
         crate::plugins::attachments::zeroize_attachment_refs(&self.app);

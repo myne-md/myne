@@ -49,7 +49,7 @@ const TABLE = "web/wasm/src/capability.rs";
  */
 const CAPABILITY_BACKING = {
   clipper: ["clipper-pairing"],
-  localAi: ["local-inference"],
+  localAi: ["local-inference", "agent"],
   // No ported command surface: the watch queue is drained by native code, and
   // `captures` is gated out of the wasm build at the module level.
   watchCapture: [],

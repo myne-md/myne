@@ -405,6 +405,27 @@ fn main() {
             ]),
         )
         .plugin(
+            "agent",
+            // The nine agentic-note-editing commands (myne-md/myne#529). Same
+            // InlinedPlugin discipline as the plugins around it: each command
+            // needs a matching `commands.allow` entry in
+            // `permissions/agent/default.toml` or the ACL resolver never
+            // authorizes the `plugin:agent|<cmd>` invoke, and it needs a line in
+            // `generate_handler!` or it is dead at runtime while everything else
+            // about it looks wired.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "agent_start",
+                "agent_approve_scope",
+                "agent_preview_grant",
+                "agent_cancel",
+                "agent_status",
+                "agent_apply",
+                "agent_undo",
+                "agent_last_run",
+                "agent_capability",
+            ]),
+        )
+        .plugin(
             "graph-layout",
             // The `graph_layout_read` + `graph_layout_write` commands
             // (encrypted vault.graph knowledge-graph layout cache, MYG1).
