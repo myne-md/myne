@@ -2,29 +2,11 @@
 // vault-creation steps so the 30 s auto-clear window is enforced in
 // one place and the step components don't pull in Tauri plugin imports.
 
-<<<<<<< HEAD
-import { invoke } from "@tauri-apps/api/core";
-import { documentDir, join } from "@tauri-apps/api/path";
-||||||| 6f5e8c0d
-import {
-  writeText as clipboardWriteText,
-  readText as clipboardReadText,
-  clear as clipboardClear,
-} from "@tauri-apps/plugin-clipboard-manager";
-import { invoke } from "@tauri-apps/api/core";
-import { documentDir, join } from "@tauri-apps/api/path";
-=======
-import {
-  writeText as clipboardWriteText,
-  readText as clipboardReadText,
-  clear as clipboardClear,
-} from "../platform/clipboardManager";
 import { invoke } from "../platform/core";
 import { documentDir, join } from "../platform/path";
->>>>>>> origin/develop
 import { logErrorKind } from "./vault-creation-logging";
 import { shareFile } from "./share";
-import { writeSecret } from "./clipboard";
+import { writeSecret } from "./clipboardTransport";
 import { copySecret, type CancelClear, type Feedback } from "@myne/clipboard";
 
 /**

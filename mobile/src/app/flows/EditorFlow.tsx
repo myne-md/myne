@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ornamentRole } from "@myne/ornaments";
 import { copyText } from "@myne/clipboard";
 import { showToast } from "../../components/ToastHost";
-import { writeText as clipboardWriteText } from "../../lib/clipboard";
+import { writeText as clipboardWriteText } from "../../lib/clipboardTransport";
 import { CMEditor } from "@myne/editor/CMEditor";
 import { typographyStyle } from "@myne/editor/typography";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";

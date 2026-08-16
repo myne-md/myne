@@ -22,7 +22,7 @@
 //
 // Spec: account-number.md § 7 (bearer-token semantics, "treat like cash").
 
-import { useEffect, useRef, type Dispatch } from "react";
+import { useRef, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Spinner } from "../../components/Spinner";
@@ -61,15 +61,21 @@ export function AccountStep({
   // below uses the persistent half, so the outcome stays readable.
   const copied = flashing && outcome === "copied";
 
-  // Cancel any pending clipboard auto-clear on unmount so the timer's
-  // closure (which captures the bearer-token account number) is released.
+  // NO unmount cancel, and the omission is the point, matching PhraseStep.
+  //
+  // Cancelling on unmount looks like hygiene and is the opposite: advancing off
+  // this step is the INTENDED next action, so the cancel fired on the normal
+  // path and left the account number on the system clipboard indefinitely,
+  // while the line above it had just promised a 30 s clear. The heap argument
+  // that motivated it is also gone: `copySecret` releases the value on both
+  // exits, so what a pending timer holds is a reference in a process that
+  // already has the account number in React state.
+  //
+  // Letting it fire after unmount is safe for the same reason it is on the
+  // phrase step: the clear is the host-side compare-and-clear, so it wipes the
+  // clipboard only if the account number is still on it, and a user who copied
+  // something else in the window keeps what they copied.
   const cancelAutoClearRef = useRef<(() => void) | null>(null);
-  useEffect(
-    () => () => {
-      cancelAutoClearRef.current?.();
-    },
-    [],
-  );
 
   const handleCopy = async () => {
     cancelAutoClearRef.current?.();

@@ -115,6 +115,18 @@ export interface CopyOptions {
    * the vault-creation flow has its own discipline, a code block does not.
    */
   onError?: (e: unknown) => void;
+  /**
+   * Where a failed CLEAR goes, when that is a different question from a failed
+   * write. Falls back to `onError`.
+   *
+   * The two have opposite security meanings and were being logged under one
+   * label. A failed write means nothing reached the clipboard, so the user has
+   * lost a convenience. A failed clear means the secret is STILL on the
+   * clipboard past the window the interface just promised, which is the only
+   * exposure this module can produce, and it was indistinguishable in the one
+   * diagnostic that exists for it.
+   */
+  onClearError?: (e: unknown) => void;
 }
 
 function announce(arm: FeedbackArm): void {
@@ -193,7 +205,7 @@ export async function copySecret(
   // site closes over component state and would otherwise be pinned for the whole
   // delay.
   let pending: string | null = value;
-  let sink = options?.onError;
+  let sink = options?.onClearError ?? options?.onError;
 
   const timer = setTimeout(() => {
     const secret = pending;

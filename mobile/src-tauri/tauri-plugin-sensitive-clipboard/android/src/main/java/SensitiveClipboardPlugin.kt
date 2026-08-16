@@ -78,9 +78,12 @@ class WriteArgs {
      * Defaults to `"secret"`, NOT `"plain"`, so the tier FAILS CLOSED. Anything
      * that stops this field arriving — an R8 rename, a future change to the
      * argument shape, a Rust-side typo — then produces an over-protected write
-     * rather than a silently unprotected one. The Swift mirror is non-optional
-     * and rejects on the same drift; Kotlin cannot express that here, so the
-     * default carries it instead. An unknown value is rejected outright below.
+     * rather than a silently unprotected one. An unknown value is rejected
+     * outright below, and the Swift mirror now does the same: it used to be
+     * described here as rejecting "on the same drift" because its field is
+     * non-optional, which is wrong. Non-optional decoding catches a missing KEY
+     * and never an unknown VALUE, so until the guard landed there, any tier
+     * string that was not exactly "secret" took the plain path on iOS.
      */
     var sensitivity: String = "secret"
 
