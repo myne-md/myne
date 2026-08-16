@@ -41,7 +41,6 @@
     "pdf-export:default",
     "workspace:default",
     "graph-layout:default",
-    "agent:default",
     "vault-label:default",
     "spell:default",
     "clipper-pairing:default",

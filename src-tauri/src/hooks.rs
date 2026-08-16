@@ -168,6 +168,7 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
         // and must not outlive the unlocked session, so they are dropped on the
         // same leg. This is also why the feature persists nothing across a lock:
         // there is no blob to wipe because there is no blob.
+        #[cfg(feature = "local-inference")]
         crate::plugins::agent::teardown_on_lock(&self.app);
     }
     fn zeroize_attachment_refs(&self) {

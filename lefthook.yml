@@ -614,6 +614,27 @@ pre-push:
         CARGO_TARGET_DIR: target/pre-push
       run: cargo test -p myne-web-wasm
 
+    desktop-ai-free:
+      # The AI-free auditable variant, which NOTHING here compiled until
+      # myne-md/myne#529 shipped a desktop crate that did not build in it.
+      #
+      # `--no-default-features` drops candle and every AI plugin, and it is the
+      # build `design-notes/ai/0337` and `threat-model.md` describe as the one
+      # that "never compiles the AI path" -- the variant an auditor or a
+      # self-hoster builds to check that claim. Every gate above builds the
+      # DEFAULT features, so a module that reaches into `local_inference`
+      # without a `#[cfg]` compiles perfectly for a developer and for
+      # `cargo test --workspace`, and fails only in CI's `tauri-compile`.
+      #
+      # That is exactly what happened: four consecutive pipelines went red on
+      # this one command while every local gate stayed green, and the failure
+      # was invisible from the PR because the bot's CI comment cannot name a
+      # step. `check`, not `build`: no link, ~10s warm, and a compile error is
+      # the whole failure mode.
+      env:
+        CARGO_TARGET_DIR: target/pre-push
+      run: cargo check -p myne-desktop --no-default-features
+
     cargo-test:
       env:
         CARGO_TARGET_DIR: target/pre-push
