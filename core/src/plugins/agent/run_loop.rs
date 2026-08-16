@@ -144,9 +144,17 @@ pub async fn drive(
         // Parse before the reply moves into the transcript, so the reply is not
         // cloned just to be borrowed.
         let actions = parse_actions(&reply);
+        // **The reply is note-derived, so it is tagged untrusted.** It was
+        // `Content::Trusted`, which `engine.rs` defines as "written by the
+        // host, tokenized normally" -- and an anchor is by definition text the
+        // model copied VERBATIM out of a note, so a reply carries exactly the
+        // content the tag exists to mark. Today both desktop arms sanitize
+        // every non-system turn regardless, so nothing became a control token;
+        // the tag is the contract a SECOND host implements against, and 0515
+        // put this loop in core so mobile would inherit it.
         transcript.push(Message {
             role: Role::Assistant,
-            content: vec![Content::Trusted(reply)],
+            content: vec![Content::note(reply)],
         });
         if actions.is_empty() {
             // Nothing usable came back. Say so in the transcript and let the
@@ -204,10 +212,19 @@ pub async fn drive(
                         Err(AgentError::OutOfScope { note_id }) => {
                             transcript.push(Message {
                                 role: Role::User,
-                                content: vec![Content::Trusted(format!(
-                                    "Note {note_id} is outside the approved scope. \
-                                     Use request_scope if you need it."
-                                ))],
+                                // Host prose, model-supplied id. Split rather
+                                // than tagged wholesale, so the sentence keeps
+                                // its trusted provenance and only the part the
+                                // model chose is marked.
+                                content: vec![
+                                    Content::Trusted("Note ".into()),
+                                    Content::note(note_id),
+                                    Content::Trusted(
+                                        " is outside the approved scope. \
+                                         Use request_scope if you need it."
+                                            .into(),
+                                    ),
+                                ],
                             });
                         }
                         Err(e) => return Err(e),
@@ -238,9 +255,14 @@ pub async fn drive(
                     if !runs.contains(run_id, &note_id)? {
                         transcript.push(Message {
                             role: Role::User,
-                            content: vec![Content::Trusted(format!(
-                                "Note {note_id} is outside the approved scope; edit discarded."
-                            ))],
+                            // Same split as the read refusal above.
+                            content: vec![
+                                Content::Trusted("Note ".into()),
+                                Content::note(note_id.clone()),
+                                Content::Trusted(
+                                    " is outside the approved scope; edit discarded.".into(),
+                                ),
+                            ],
                         });
                         continue;
                     }

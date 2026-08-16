@@ -328,7 +328,7 @@ pub fn run() {
         .plugin(plugins::graph_layout::init())
         // myne#529: agentic note editing. The loop and every policy live in
         // `myne-core`; this plugin registers the run table, the host session
-        // table (the transcript) and the eight IPC commands.
+        // table (the transcript) and the nine IPC commands.
         .plugin(plugins::agent::init())
         // myne#411: the device-local hide-vault-names option. Registered
         // unconditionally and reachable pre-unlock, because the picker it

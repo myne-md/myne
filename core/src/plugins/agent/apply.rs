@@ -297,6 +297,10 @@ pub async fn apply_approved(
 /// that does not exist yet is in no scope, so the content control is what
 /// applies, exactly as it does to every read.
 ///
+/// Still returns `Result` although every per-note failure is now a refusal:
+/// the shape leaves room for a failure that genuinely should stop the apply,
+/// and collapsing it to `()` would have to be undone to add one.
+///
 /// Runs after the edits, and after the restore point, so a create can never be
 /// the thing that leaves a half-applied batch: by the time it runs, every edit
 /// has already landed or been refused.
@@ -330,8 +334,20 @@ async fn create_notes(
             });
             continue;
         }
-        let id = writer.create_note(note).await?;
-        outcome.notes_created.push(id);
+        // NOT `?`. A create runs after the edit batch has been committed and
+        // after the restore point was taken, so propagating here discards the
+        // outcome those two steps produced: the run's edits stay on disk, the
+        // caller never records an undo record for them, and the surface reports
+        // that the changes could not be applied while they in fact were. The
+        // failed create becomes a refusal like any other, and the rest of the
+        // batch keeps its undo.
+        match writer.create_note(note).await {
+            Ok(id) => outcome.notes_created.push(id),
+            Err(_) => outcome.refused_new_notes.push(RefusedNewNote {
+                index: *index,
+                reason: EditRejection::CreateFailed,
+            }),
+        }
     }
     Ok(())
 }
@@ -373,6 +389,9 @@ mod tests {
         notes: Mutex<BTreeMap<String, String>>,
         restore_ok: bool,
         captured: Mutex<Vec<(String, Vec<String>)>>,
+        /// Make `create_note` fail. Off by default, so every existing test is
+        /// unaffected and the one that sets it says why it does.
+        create_fails: bool,
     }
 
     impl Disk {
@@ -386,7 +405,13 @@ mod tests {
                 ),
                 restore_ok,
                 captured: Mutex::new(Vec::new()),
+                create_fails: false,
             }
+        }
+        fn failing_creates(pairs: &[(&str, &str)]) -> Self {
+            let mut d = Self::with(pairs, true);
+            d.create_fails = true;
+            d
         }
         fn read_back(&self, id: &str) -> String {
             self.notes
@@ -440,6 +465,9 @@ mod tests {
         }
 
         async fn create_note(&self, note: &ProposedNote) -> Result<String, AgentError> {
+            if self.create_fails {
+                return Err(AgentError::WriteFailed);
+            }
             let id = format!("new-{}", note.title);
             self.notes
                 .lock()
@@ -823,6 +851,49 @@ mod tests {
         .unwrap();
         assert_eq!(out.refused.len(), 1);
         assert_eq!(out.refused[0].index, 1);
+    }
+
+    /// A create that fails AFTER the edit batch was written must not take the
+    /// run's undo record with it.
+    ///
+    /// This is asserted on the returned outcome AND on the disk, because the
+    /// two can disagree in exactly the direction that matters: the earlier
+    /// version propagated the error, so the caller saw `Err` (and told the user
+    /// "the changes could not be applied") while the edit sat on the medium
+    /// with no restore point recorded anywhere.
+    #[test]
+    fn a_failed_create_keeps_the_applied_edits_undoable() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::failing_creates(&[("a", "hello world")]);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[edit("a", "world", "there")],
+            &[(0, new_note("New", None))],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .expect("a failed create is a refusal, not an apply failure");
+
+        // The edit landed, and the state says so rather than the return value
+        // alone.
+        assert_eq!(out.applied, 1);
+        assert_eq!(disk.read_back("a"), "hello there");
+
+        // And it is still undoable: the restore point survived the create.
+        assert_eq!(out.restore_points.len(), 1);
+        assert_eq!(out.restore_points[0].0, "a");
+        assert_eq!(out.notes_written, vec!["a".to_string()]);
+
+        // The create is reported by name rather than swallowed.
+        assert!(out.notes_created.is_empty());
+        assert_eq!(out.refused_new_notes.len(), 1);
+        assert_eq!(out.refused_new_notes[0].index, 0);
+        assert_eq!(out.refused_new_notes[0].reason, EditRejection::CreateFailed);
     }
 
     fn new_note(title: &str, folder: Option<&str>) -> ProposedNote {
