@@ -11,6 +11,7 @@
 // runtime. So these tests build handles the way a host would and assert that the
 // package passes them straight through without inspecting them.
 
+import { emptyEmbedLayout } from "@myne/dialect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PickedFile } from "@myne/editor/host";
 import { setEditorHost, getHost, type EditorHost } from "@myne/editor/host";
@@ -157,6 +158,11 @@ describe("pickerBackedImporter (auto-resolve → picker fallback)", () => {
     to: 10,
     raw: "![[a.png]]",
     source: "a.png",
+    // myne#409 added this to `ImportedImageRef` and this fixture was not
+    // updated. Vitest never noticed, because it transpiles without checking and
+    // the importer under test does not read the field; only
+    // `check-test-typecheck` sees it, which is what that guard exists for.
+    layout: emptyEmbedLayout(),
     alias: null,
   };
 
