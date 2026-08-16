@@ -97,29 +97,78 @@ impl AgentSessionState {
     /// from a stale screen, and refusing the whole apply over one is worse than
     /// applying the rest.
     ///
-    /// Removes the selected notes from the record, so a second apply on the same
-    /// run cannot create them twice.
-    pub fn take_approved_new_notes(
+    /// **Reads without consuming.** The consuming version of this ran BEFORE
+    /// `apply_approved`, which can still fail from three places (an out-of-scope
+    /// run, a refused restore point, a failed batch write), and on any of them
+    /// the notes were gone from the record and had never been created. The
+    /// screen went on rendering them, so a retry sent the same indices, found a
+    /// shorter list, and silently created nothing: a write the user approved
+    /// that does not happen, reported only as the original failure. `apply.rs`
+    /// took care not to let a failed create discard the outcome; this was the
+    /// mirror hole one layer up.
+    ///
+    /// Consumption is now keyed off what was ACTUALLY created, by
+    /// [`Self::consume_created_new_notes`], so the two cannot disagree.
+    ///
+    /// Two separate properties, and an earlier version conflated them. **Which
+    /// notes exist** is host-side: the caller names indices into the proposal the
+    /// host itself recorded, so it cannot invent a note the model never proposed.
+    /// **Which of those to create** is the user's, expressed as that index list,
+    /// because a create is a write and SYNC-17's restatement says no write
+    /// happens without a per-note approval.
+    ///
+    /// Out-of-range indices are dropped rather than erroring: they can only come
+    /// from a stale screen, and refusing the whole apply over one is worse than
+    /// applying the rest.
+    pub fn read_approved_new_notes(
         &self,
         run_id: &str,
         approved: &[usize],
     ) -> Vec<(usize, ProposedNote)> {
-        let mut table = self.sessions.lock().expect("agent session table poisoned");
-        let Some(session) = table.get_mut(run_id) else {
+        let table = self.sessions.lock().expect("agent session table poisoned");
+        let Some(session) = table.get(run_id) else {
             return Vec::new();
         };
         let mut wanted: Vec<usize> = approved.to_vec();
         wanted.sort_unstable();
         wanted.dedup();
+        wanted
+            .into_iter()
+            .filter_map(|index| {
+                session
+                    .proposal
+                    .new_notes
+                    .get(index)
+                    .map(|note| (index, note.clone()))
+            })
+            .collect()
+    }
+
+    /// Drop the notes an apply actually created, so a retry cannot create them
+    /// twice and a FAILED apply leaves everything retryable.
+    ///
+    /// Takes the indices the apply reported as created rather than the ones it
+    /// was asked to create, which is the whole point: those two lists differ
+    /// exactly when something went wrong, and that is the case the previous
+    /// design got backwards.
+    pub fn consume_created_new_notes(&self, run_id: &str, created: &[usize]) {
+        let mut table = self.sessions.lock().expect("agent session table poisoned");
+        let Some(session) = table.get_mut(run_id) else {
+            return;
+        };
+        let mut wanted: Vec<usize> = created.to_vec();
+        wanted.sort_unstable();
+        wanted.dedup();
         // Highest index first so each removal leaves the lower ones in place.
-        let mut out: Vec<(usize, ProposedNote)> = Vec::with_capacity(wanted.len());
         for index in wanted.iter().rev() {
             if *index < session.proposal.new_notes.len() {
-                out.push((*index, session.proposal.new_notes.remove(*index)));
+                let mut note = session.proposal.new_notes.remove(*index);
+                // The body came out of the model and quotes note text; overwrite
+                // rather than free, on the same rule as the teardown below.
+                note.title.zeroize();
+                note.body.zeroize();
             }
         }
-        out.reverse();
-        out
     }
 
     /// Wipe and drop every session. The vault-lock teardown path.
@@ -134,12 +183,19 @@ impl AgentSessionState {
         let mut table = self.sessions.lock().expect("agent session table poisoned");
         for session in table.values_mut() {
             session.task.zeroize();
-            // Overwrite before dropping, both arms. `UntrustedNote` wipes
-            // through `Zeroizing` on drop; `Trusted` is a plain `String`, and
-            // it holds every model reply, which quotes note anchors VERBATIM.
-            // A bare `.clear()` freed those without overwriting, so the half of
-            // the transcript this teardown's own comment calls out as holding
-            // note bodies was the half it did not wipe.
+            // Overwrite before dropping, and cover BOTH arms so the teardown
+            // is total by construction rather than by whichever arm currently
+            // holds the sensitive half. `UntrustedNote` wipes through
+            // `Zeroizing` on drop; `Trusted` is a plain `String` with no such
+            // drop, so a bare `.clear()` freed it untouched.
+            //
+            // What each arm holds today, since that is what a later reader
+            // would use to decide whether this loop can go: the model's reply
+            // is `Content::note` (`run_loop::drive`, tagged untrusted in this
+            // same change because an anchor is note text copied verbatim), and
+            // the `Trusted` spans are the host's own refusal prose. The point
+            // is that the answer moves, and a teardown keyed to today's answer
+            // is one tagging change away from being partial again.
             for message in &mut session.transcript {
                 for span in &mut message.content {
                     if let Content::Trusted(t) = span {
@@ -331,7 +387,35 @@ async fn step<R: Runtime>(
         records: &records,
     };
 
-    let outcome: LoopOutcome = drive(&runs, &run_id, &task, &mut transcript, &deps).await?;
+    // **Not `?`.** The transcript and the proposal were taken out of the session
+    // above, so propagating here drops both while the run stays in the table.
+    // `EngineAdapter::complete` returns `Cancelled` when the run's flag is set
+    // before or after the model call, so pressing Stop during generation, which
+    // is the long part of an iteration and therefore the usual moment, threw
+    // away everything the run had proposed. The loop's OWN cancel checks
+    // deliberately return `Ok(LoopEnd::Cancelled)` with the proposal intact, and
+    // the surface has a `cancelled` status for exactly that: the two routes
+    // disagreed and the reachable one was the lossy one. Any transient engine
+    // error had the same effect on a paused-for-scope run, whose resume depends
+    // on the transcript that vanished.
+    let driven = drive(&runs, &run_id, &task, &mut transcript, &deps).await;
+    let outcome: LoopOutcome = match driven {
+        Ok(o) => o,
+        Err(e) => {
+            // Put back what was taken, so the next step or the review screen
+            // still sees the work. Best-effort by construction: if the session
+            // is gone the run is over and there is nothing to preserve.
+            let mut table = sessions
+                .sessions
+                .lock()
+                .expect("agent session table poisoned");
+            if let Some(s) = table.get_mut(&run_id) {
+                s.transcript = transcript;
+                s.proposal = proposal;
+            }
+            return Err(e);
+        }
+    };
 
     // Accumulate across resumes: a run that paused for a scope approval and
     // resumed has one proposal, not two.
@@ -507,15 +591,6 @@ pub async fn agent_cancel(
     Ok(runs.cancel(&run_id))
 }
 
-/// The run as the frontend shows it, including the running scope total.
-#[tauri::command]
-pub async fn agent_status(
-    run_id: String,
-    runs: State<'_, Arc<AgentRunState>>,
-) -> Result<AgentRunView, AgentError> {
-    runs.view(&run_id)
-}
-
 /// Apply the edits the user approved on the review screen.
 ///
 /// `approval` says HOW the user approved: one edit on its own, or a batch in one
@@ -551,7 +626,9 @@ pub async fn agent_apply<R: Runtime>(
     }
     .excluded_folders()
     .await?;
-    let new_notes = sessions.take_approved_new_notes(&run_id, &approved_new_notes);
+    // READ, not take. Consumption happens after the apply, keyed off what it
+    // actually created, so a failure leaves every approved note retryable.
+    let new_notes = sessions.read_approved_new_notes(&run_id, &approved_new_notes);
     let reader = NoteReadAdapter {
         host: TauriHost::new(app.clone()),
         state: vault.inner(),
@@ -569,6 +646,10 @@ pub async fn agent_apply<R: Runtime>(
         &runs, &run_id, &approved, &new_notes, &excluded, approval, &reader, &restore, &writer,
     )
     .await?;
+    // Now drop the ones that landed, and only those. On the `?` above nothing is
+    // consumed, which is the point: the user can retry and the notes are still
+    // there. A per-note `createFailed` refusal is retryable for the same reason.
+    sessions.consume_created_new_notes(&run_id, &outcome.created_new_note_indices);
     // Record it under the run id, so undo survives the review screen closing.
     // Recorded only when something was actually written: an apply whose every
     // edit was refused took no restore point, and offering to undo it would be
@@ -686,6 +767,83 @@ pub async fn agent_capability<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn note(title: &str) -> ProposedNote {
+        ProposedNote {
+            title: title.into(),
+            body: "body".into(),
+            folder: None,
+        }
+    }
+
+    fn session_with(notes: &[&str]) -> AgentSessionState {
+        let st = AgentSessionState::default();
+        let mut table = st.sessions.lock().unwrap();
+        let mut s = Session::default();
+        s.proposal.new_notes = notes.iter().map(|t| note(t)).collect();
+        table.insert("r".to_string(), s);
+        drop(table);
+        st
+    }
+
+    fn remaining(st: &AgentSessionState) -> Vec<String> {
+        st.sessions
+            .lock()
+            .unwrap()
+            .get("r")
+            .map(|s| {
+                s.proposal
+                    .new_notes
+                    .iter()
+                    .map(|n| n.title.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Reading the approved notes must not remove them.
+    ///
+    /// The consuming version ran BEFORE the apply, which can still fail, and on
+    /// failure the notes were gone from the record and never created: the screen
+    /// kept rendering them, a retry sent the same indices, found a shorter list,
+    /// and silently created nothing.
+    #[test]
+    fn reading_approved_new_notes_leaves_the_record_intact_for_a_retry() {
+        let st = session_with(&["A", "B", "C"]);
+        let read = st.read_approved_new_notes("r", &[0, 2]);
+        assert_eq!(read.len(), 2);
+        assert_eq!(read[0].0, 0);
+        assert_eq!(read[1].0, 2);
+        // The state, not the return value: a read that reported the right pair
+        // while removing them would pass a return-value assertion.
+        assert_eq!(remaining(&st), vec!["A", "B", "C"]);
+    }
+
+    /// And consuming drops exactly what landed, so a partial apply stays
+    /// retryable for the rest.
+    #[test]
+    fn consuming_drops_only_the_notes_that_were_created() {
+        let st = session_with(&["A", "B", "C"]);
+        st.consume_created_new_notes("r", &[1]);
+        assert_eq!(remaining(&st), vec!["A", "C"]);
+    }
+
+    #[test]
+    fn consuming_nothing_is_what_a_failed_apply_does() {
+        let st = session_with(&["A", "B"]);
+        st.consume_created_new_notes("r", &[]);
+        assert_eq!(remaining(&st), vec!["A", "B"]);
+    }
+
+    #[test]
+    fn an_out_of_range_index_is_dropped_rather_than_erroring() {
+        // Only a stale screen can send one, and refusing the whole apply over it
+        // is worse than applying the rest.
+        let st = session_with(&["A"]);
+        assert_eq!(st.read_approved_new_notes("r", &[0, 9]).len(), 1);
+        st.consume_created_new_notes("r", &[9]);
+        assert_eq!(remaining(&st), vec!["A"]);
+    }
 
     #[test]
     fn the_probe_threshold_parses_from_the_recorded_file() {

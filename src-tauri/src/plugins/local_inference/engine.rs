@@ -455,6 +455,39 @@ impl StubEngine {
 /// an empty proposal, which is the failure direction to prefer.
 const AGENT_INSTRUCTIONS_OPENER: &str = "You edit the user's notes by proposing changes.";
 
+/// The most recent user turn, or `""`.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn last_user_of(messages: &[ChatMessage]) -> &str {
+    messages
+        .iter()
+        .rev()
+        .find(|m| m.role == ChatRole::User)
+        .map(|m| m.content.as_str())
+        .unwrap_or("")
+}
+
+/// The answer to `probe::probe_request`, or `None` when this is not the probe.
+///
+/// The probe names the note, quotes the line to change and quotes what it
+/// should become, so all three are read out of the prompt. Hard-coding them
+/// would make the stub pass a probe it was no longer being asked.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn probe_answer(user: &str) -> Option<String> {
+    const MARK: &str = "This is the whole of note ";
+    let note_id = user.split(MARK).nth(1)?.split(':').next()?.trim();
+    // `changes the line "<target>" to "<replacement>"`.
+    let tail = user.split("changes the line ").nth(1)?;
+    let mut quoted = tail.split('"');
+    quoted.next()?; // before the first quote
+    let target = quoted.next()?;
+    quoted.next()?; // ` to `
+    let replacement = quoted.next()?;
+    Some(format!(
+        "{{\"action\":\"propose_edit\",\"note_id\":\"{note_id}\",\"anchor\":\"{target}\",\
+         \"replacement\":\"{replacement}\"}}"
+    ))
+}
+
 /// A deterministic action script for an agent-loop request, or `None` when the
 /// request is not one.
 ///
@@ -485,18 +518,31 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
     if !system.contains(AGENT_INSTRUCTIONS_OPENER) {
         return None;
     }
+    // **The probe comes through here too, and it is not a run.** `probe_request`
+    // uses the same system instructions, so without this branch the script
+    // answered the probe with `list_scope`, the probe graded that `WrongAction`,
+    // every attempt failed and the composer refused to offer agent mode at all.
+    // Every agent E2E scenario went red on a Send button that never enabled.
+    //
+    // That is the capability gate WORKING: it is supposed to refuse a backend
+    // that cannot produce one anchored edit on demand. The stub has to be able
+    // to, or it is modelling a model Myne would decline.
+    //
+    // Answered by READING the request rather than by echoing a memorised
+    // constant: the target and replacement are quoted in the prompt, so the stub
+    // replies to what it was asked. A probe reworded past this parse fails
+    // loudly, at the gate, rather than passing on a stale answer.
+    if let Some(reply) = probe_answer(last_user_of(messages)) {
+        return Some(reply);
+    }
+
     let last_assistant = messages
         .iter()
         .rev()
         .find(|m| m.role == ChatRole::Assistant)
         .map(|m| m.content.as_str())
         .unwrap_or("");
-    let last_user = messages
-        .iter()
-        .rev()
-        .find(|m| m.role == ChatRole::User)
-        .map(|m| m.content.as_str())
-        .unwrap_or("");
+    let last_user = last_user_of(messages);
 
     // Step 3: the previous turn asked to read a note, so this user turn is the
     // body. Checked before step 2 so each check stays a simple containment.
@@ -1091,6 +1137,75 @@ mod agent_script_tests {
     /// The regression that motivated the whole module: echoing the prompt back
     /// parses as EVERY example action, ending at `finish`, so a run that used
     /// the echo produced an empty proposal on iteration one.
+    /// The stub must PASS the capability probe, driven through the real
+    /// `run_probe` and the real grader.
+    ///
+    /// This is the test the composer's gate made necessary and its absence made
+    /// expensive: wiring `agentCapability()` into the composer (which is what
+    /// makes the anchored format's right to refuse a near-miss mean anything)
+    /// disabled Send until the probe passes, and the stub answered the probe
+    /// with `list_scope` because `probe_request` carries the same system
+    /// instructions a run does. Every agent E2E scenario went red on a button
+    /// that never enabled, one container build later.
+    ///
+    /// Asserted through `run_probe` rather than by inspecting the reply, because
+    /// the reply being well-formed is not the claim. The claim is that the
+    /// grader accepts it.
+    #[test]
+    fn the_stub_passes_the_capability_probe_it_is_asked() {
+        use myne_core::plugins::agent::engine::{
+            AgentCompletion, AgentEngine, AgentRequest, AgentRequestClass,
+        };
+        use myne_core::plugins::agent::error::AgentError;
+        use myne_core::plugins::agent::probe::{run_probe, ProbeThreshold};
+
+        /// The stub behind the agent seam, mapped by the REAL `chat_shape` the
+        /// desktop adapter uses. A second mapping written here would let this
+        /// test pass while the shipped one was wrong, which is the whole shape
+        /// this suite exists to catch.
+        struct StubBehindTheSeam;
+        #[async_trait::async_trait]
+        impl AgentEngine for StubBehindTheSeam {
+            async fn complete(
+                &self,
+                _class: AgentRequestClass,
+                request: &AgentRequest,
+            ) -> Result<AgentCompletion, AgentError> {
+                let (system, messages) =
+                    crate::plugins::agent::adapters::chat_shape(request, &|s: &str| s.to_string());
+                let mut sink = |_: &str| ControlFlow::Continue(());
+                let reply = StubEngine
+                    .chat_streaming(&system, &messages, &mut sink)
+                    .map_err(|_| AgentError::ReadFailed)?;
+                Ok(AgentCompletion {
+                    reply,
+                    chars_off_device: None,
+                })
+            }
+        }
+
+        let verdict = myne_core::test_support::block_on(run_probe(
+            &StubBehindTheSeam,
+            ProbeThreshold {
+                attempts: 3,
+                required: 2,
+            },
+        ))
+        .expect("the probe runs");
+        assert!(
+            verdict.passed,
+            "the stub must be a backend Myne would offer agent mode on: {verdict:?}"
+        );
+        assert_eq!(verdict.passes, 3, "and every attempt should be clean");
+    }
+
+    #[test]
+    fn a_reworded_probe_is_not_answered_from_memory() {
+        // The answer is READ out of the prompt. A probe this parse no longer
+        // understands must fail at the gate rather than pass on a stale reply.
+        assert!(probe_answer("nothing like the probe").is_none());
+    }
+
     #[test]
     fn the_plain_echo_could_never_have_driven_a_run() {
         let echo = format!("stub-infer: {}", system_instructions());

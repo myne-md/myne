@@ -78,6 +78,16 @@ pub struct ApplyOutcome {
     /// create has no restore point: there is nothing to revert to, and undoing
     /// one means trashing it rather than restoring a snapshot.
     pub notes_created: Vec<String>,
+    /// Which PROPOSAL INDICES were actually created.
+    ///
+    /// `#[serde(skip)]`: the surface has no use for it, and widening the IPC
+    /// payload for a host-side bookkeeping value would be the wrong trade. The
+    /// host needs it to drop exactly the notes that landed from the session's
+    /// recorded proposal, so a failed or partly-refused apply stays retryable.
+    /// Deriving it as "asked minus refused" would be a second copy of a rule
+    /// this function already owns, and a copy that drifts is worse than none.
+    #[serde(skip)]
+    pub created_new_note_indices: Vec<usize>,
     /// Proposed new notes that were not created, with their causes.
     pub refused_new_notes: Vec<RefusedNewNote>,
     /// `(note_id, snapshot_id)` for every note this apply wrote, so the whole
@@ -342,7 +352,10 @@ async fn create_notes(
         // failed create becomes a refusal like any other, and the rest of the
         // batch keeps its undo.
         match writer.create_note(note).await {
-            Ok(id) => outcome.notes_created.push(id),
+            Ok(id) => {
+                outcome.notes_created.push(id);
+                outcome.created_new_note_indices.push(*index);
+            }
             Err(_) => outcome.refused_new_notes.push(RefusedNewNote {
                 index: *index,
                 reason: EditRejection::CreateFailed,

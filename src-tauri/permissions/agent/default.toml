@@ -3,7 +3,7 @@
 # as an `InlinedPlugin`. Capability files reference these as `agent:default`.
 #
 # Every command here reaches decrypted note plaintext and two of them WRITE to
-# notes (`agent_apply` and `agent_undo`), so all nine inherit the
+# notes (`agent_apply` and `agent_undo`), so all eight inherit the
 # main-window-only invariant the other vault plugins share: v0.2 multi-window
 # MUST NOT grant `agent:allow-agent-apply`, `agent:allow-agent-undo` or any of
 # the others to a non-main window.
@@ -22,7 +22,6 @@ permissions = [
   "allow-agent-approve-scope",
   "allow-agent-preview-grant",
   "allow-agent-cancel",
-  "allow-agent-status",
   "allow-agent-apply",
   "allow-agent-undo",
   "allow-agent-last-run",
@@ -48,11 +47,6 @@ commands.allow = ["agent_preview_grant"]
 identifier = "allow-agent-cancel"
 description = "Allow invoking agent:agent_cancel (sets the run's cancel flag; the same flag the vault-lock teardown sets)."
 commands.allow = ["agent_cancel"]
-
-[[permission]]
-identifier = "allow-agent-status"
-description = "Allow invoking agent:agent_status (the run's view, including the running scope total the surface must show continuously)."
-commands.allow = ["agent_status"]
 
 [[permission]]
 identifier = "allow-agent-apply"

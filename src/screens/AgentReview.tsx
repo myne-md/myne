@@ -120,6 +120,21 @@ export function AgentReview({
   }, [rows]);
 
   const kept = useMemo(() => keptEdits(agent), [agent]);
+  /** Whether Approve-all has anything to send.
+   *
+   *  **Counts BOTH verbs**, because `approveAll` sends both and `apply()`
+   *  guards on both. The button used to ask `kept.length === 0`, which counts
+   *  edits only, so a run that proposed only new notes (or one whose edits were
+   *  all rejected) left the button dead and its notes uncreatable, with no
+   *  second route: `NewNotesGroup` offers reject/restore only, and `onApplyOne`
+   *  always sends an empty new-note list. `apply()`'s own comment records that
+   *  an edit-count-only early return had already caused exactly this once, in
+   *  core; the button reintroduced it one layer up. Derived here rather than
+   *  re-spelled at the call site so there is one place to be wrong. */
+  const hasApprovedWork = useMemo(
+    () => kept.length > 0 || approvedNewNoteIndices(agent).length > 0,
+    [kept, agent],
+  );
 
   // Derived from `rows`, which already classified every edit. Re-partitioning
   // here would re-run the trash regex over every anchor and replacement on every
@@ -356,7 +371,7 @@ export function AgentReview({
         </Button>
         <Button
           variant="primary"
-          disabled={busy || kept.length === 0}
+          disabled={busy || !hasApprovedWork}
           onClick={() => void approveAll()}
           data-testid="agentReview.approveAll"
         >

@@ -132,6 +132,25 @@ pre-commit:
       # list may shrink, never grow.
       run: node scripts/check-unwired.mjs
 
+    ipc-binding-callers:
+      # myne#529: the layer above `unwired`. A module can have production
+      # importers for its other exports while one IPC binding inside it has no
+      # caller at all, and then the whole feature behind that command ships
+      # inert with its ACL row, its Rust core and its tests all in place. The
+      # agent's edit-format probe gate shipped exactly that way: two module docs
+      # named it as the reason the anchored format may refuse a near-miss, and
+      # nothing called it. A RATCHET with reason-carrying exemptions.
+      run: node scripts/check-ipc-binding-callers.mjs
+
+    frontend-lock-teardown:
+      # myne#529: the WebView half of `check-lock-teardown.mjs`, which held only
+      # the Rust side. A module-scope store outlives every unmount, and neither
+      # a lock nor a vault switch reloads the page, so a leaving path that skips
+      # one clear leaves that store resident into the NEXT vault's session. The
+      # agent's proposal, which holds note text copied verbatim, survived a
+      # vault switch exactly this way while a decision entry said it could not.
+      run: node scripts/check-frontend-lock-teardown.mjs
+
     mobile-export-backup:
       # myne#491: the mobile client writes plaintext into a device-visible
       # directory in four places (recovery phrase, vault markdown tree, note
