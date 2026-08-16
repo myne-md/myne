@@ -3692,7 +3692,7 @@
       "committing": "Saving…",
       "copied": "Copied",
       "copy": "Copy",
-      "copyFailed": "Couldn't copy — use “Save as file” instead.",
+      "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
       "eyebrow": "Step 4 of 4 — account number",
       "heading": "Save your account number.",
       "intro": "This is your bearer token — treat it like cash.",
