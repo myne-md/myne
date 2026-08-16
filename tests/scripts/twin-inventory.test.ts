@@ -823,7 +823,7 @@ describe("check-twin-inventory: the semantic comparison", () => {
     const src = (doc: string) =>
       `pub fn f<'a>(x: &'a str) -> &'a str {\n    /// ${doc}\n    x\n}\n`;
     expect(
-      normalize(src("one"), aliases, true) === normalize(src("two"), aliases, true),
+      normalize(src("one"), aliases, "rust") === normalize(src("two"), aliases, "rust"),
     ).toBe(true);
   });
 
@@ -841,10 +841,10 @@ describe("check-twin-inventory: the semantic comparison", () => {
     const src = (tail: number) =>
       `let q = r#"x " // y"#; let keep = ${tail};\n`;
     expect(
-      normalize(src(1), aliases, true) === normalize(src(2), aliases, true),
+      normalize(src(1), aliases, "rust") === normalize(src(2), aliases, "rust"),
     ).toBe(false);
     // And the strip itself: nothing after the raw string may be lost.
-    expect(stripComments(src(1), true).trim()).toBe(
+    expect(stripComments(src(1), "rust").trim()).toBe(
       'let q = r#"x " // y"#; let keep = 1;',
     );
   });
@@ -858,7 +858,7 @@ describe("check-twin-inventory: the semantic comparison", () => {
     // compares with: `stripComments` leaves the space that sat before the `//`,
     // and pinning that byte would be testing the whitespace rather than the
     // property. The property is that the line after it survives.
-    expect(normalize('let r = 1; // gone\nlet s = "z";\n', aliases, true)).toBe(
+    expect(normalize('let r = 1; // gone\nlet s = "z";\n', aliases, "rust")).toBe(
       'let r = 1;\nlet s = "z";',
     );
   });
@@ -866,7 +866,7 @@ describe("check-twin-inventory: the semantic comparison", () => {
   it("keeps a Rust char literal whose contents look like a comment", () => {
     // The window's other half: `'/'` is a real char literal and must survive,
     // or the walker resyncs on the wrong tick.
-    expect(stripComments("let c = '/'; // gone\n", true).trim()).toBe("let c = '/';");
+    expect(stripComments("let c = '/'; // gone\n", "rust").trim()).toBe("let c = '/';");
   });
 
   it("strips a block comment without touching code on the same line", () => {

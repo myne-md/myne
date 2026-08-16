@@ -29,7 +29,8 @@
      * withhold. Raising it here is not a shipping decision — `tsconfig.json`
      * still checks `src` at ES2020 on its own — it just stops 23 `.at()` calls
      * from drowning the real findings. */
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true
   },
   "include": ["src", "tests", "e2e", "e2e-web"]
 }

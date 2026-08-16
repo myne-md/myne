@@ -33,7 +33,6 @@
     "tests/editor/attachment-pdf-reader.test.ts": 1,
     "tests/editor/attachment-pdf-render.test.ts": 1,
     "tests/editor/attachment-transcript.test.tsx": 5,
-    "tests/editor/attachment-widgets.test.tsx": 6,
     "tests/editor/image-url-chip.test.tsx": 3,
     "tests/editor/keymap.test.ts": 1,
     "tests/editor/math-render.test.ts": 3,
@@ -80,15 +79,13 @@
     "tests/notes/viewsSection.test.tsx": 8,
     "tests/notes/workspaceState.test.ts": 1,
     "tests/recover/recover-variant-mapping.test.tsx": 3,
-    "tests/scripts/desktopPayloadBudget.test.ts": 1,
     "tests/scripts/token-adoption.test.ts": 1,
     "tests/settings-search-grouping.test.ts": 1,
     "tests/stage/editor-mount-guard.test.tsx": 4,
     "tests/stage/picker-unlock-targeting.test.ts": 1,
-    "tests/web/bundle-budget.test.ts": 3,
     "tests/web/css-data-images.test.ts": 4,
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 229
+  "total": 219
 }
