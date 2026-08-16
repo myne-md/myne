@@ -14,17 +14,21 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mountPdfScroller = vi.fn(() => () => {});
+// The rest parameter is what makes the `...a` spread below typecheck AND what
+// gives `mock.calls[0]` a usable element type. Declared zero-arg, vitest infers
+// `calls: []`, so every assertion that reads an argument had to be cast through
+// a tuple the compiler could see was empty.
+const mountPdfScroller = vi.fn((..._a: unknown[]) => () => {});
 vi.mock("../../src/editor/attachments/pdf-reader", () => ({
   mountPdfScroller: (...a: unknown[]) => mountPdfScroller(...a),
 }));
 
-const showAttachmentLightbox = vi.fn();
+const showAttachmentLightbox = vi.fn((..._a: unknown[]) => {});
 vi.mock("../../src/editor/attachments/lightbox", () => ({
   showAttachmentLightbox: (...a: unknown[]) => showAttachmentLightbox(...a),
 }));
 
-const decodePeaks = vi.fn(async () => [] as number[]);
+const decodePeaks = vi.fn(async (..._a: unknown[]) => [] as number[]);
 vi.mock("../../src/editor/attachments/waveform", () => ({
   decodePeaks: (...a: unknown[]) => decodePeaks(...a),
 }));
@@ -41,7 +45,10 @@ import {
   makeResolvedWidget,
 } from "../../src/editor/attachments/widgets";
 import type { CatalogRow } from "../../src/editor/attachments/catalog";
-import { type EditorHost, getHost, setEditorHost } from "../../src/editor/host";
+// The ENGINE path: `src/editor/` re-exports what `src/` itself consumes and
+// carries no `host` shim, so this resolved to nothing. The sibling specs in
+// this directory already reach `@myne/editor/host` directly.
+import { type EditorHost, getHost, setEditorHost } from "@myne/editor/host";
 
 const ID = "a".repeat(64);
 
@@ -74,7 +81,7 @@ describe("AttachmentImageWidget", () => {
   // where the overflow menu and the unreadable-segment marker live, so naming
   // the frame removed both from the accessibility tree on every embed.
   it("renders an inline <img src=attachment://id> + loading chip, naming the image not the frame", () => {
-    const dom = new AttachmentImageWidget(ID, "photo.png").toDOM();
+    const dom = new AttachmentImageWidget(ID, "photo.png").toDOM(fakeView);
     expect(dom.className).toBe("cm-attachment-frame");
     expect(dom.getAttribute("role")).toBeNull();
     expect(dom.getAttribute("aria-label")).toBeNull();
@@ -88,7 +95,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("reveals the <img> and drops the loading chip on load", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png").toDOM();
+    const dom = new AttachmentImageWidget(ID, "p.png").toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new Event("load"));
     expect(img.style.display).toBe("");
@@ -96,7 +103,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("drops the loading chip but keeps the <img> on error (native broken-image affordance)", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png").toDOM();
+    const dom = new AttachmentImageWidget(ID, "p.png").toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new Event("error"));
     expect(dom.querySelector(".cm-attachment-progress")).toBeNull();
@@ -104,7 +111,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("opens the lightbox with the decrypted source on image click", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png").toDOM();
+    const dom = new AttachmentImageWidget(ID, "p.png").toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(showAttachmentLightbox).toHaveBeenCalledWith({
@@ -125,7 +132,7 @@ describe("AttachmentImageWidget", () => {
 
 describe("AttachmentPdfWidget", () => {
   it("mounts the pdf scroller and renders a pdf frame", () => {
-    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM();
+    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM(fakeView);
     expect(dom.className).toContain("cm-attachment-pdf");
     // Named on the reader, not the frame: see the image widget's note above.
     expect(dom.getAttribute("aria-label")).toBeNull();
@@ -139,7 +146,7 @@ describe("AttachmentPdfWidget", () => {
   });
 
   it("opens the lightbox PDF reader on scroller click", () => {
-    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM();
+    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM(fakeView);
     const scroller = dom.querySelector(".cm-attachment-pdf-scroller") as HTMLElement;
     scroller.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(showAttachmentLightbox).toHaveBeenCalledWith({
@@ -151,7 +158,7 @@ describe("AttachmentPdfWidget", () => {
   });
 
   it("renders the mandatory generic-PDF-icon fallback when the reader errors (SYNC-5)", () => {
-    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM();
+    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM(fakeView);
     // Invoke the onError the widget handed the (mocked) scroller.
     const opts = mountPdfScroller.mock.calls[0][1] as { onError: () => void };
     opts.onError();
@@ -164,7 +171,7 @@ describe("AttachmentPdfWidget", () => {
     const cleanup = vi.fn();
     mountPdfScroller.mockReturnValueOnce(cleanup);
     const w = new AttachmentPdfWidget(ID, "doc.pdf");
-    w.toDOM();
+    w.toDOM(fakeView);
     w.destroy();
     w.destroy();
     expect(cleanup).toHaveBeenCalledOnce();

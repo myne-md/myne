@@ -22,8 +22,10 @@
 // scan could pass while the script failed, or worse, agree with a bug.
 
 import { describe, expect, it } from "vitest";
-// @ts-expect-error — a plain .mjs guard script with no type declarations; it is
-// deliberately dependency-free and lives outside `tsconfig`'s `include`.
+// A plain .mjs guard script, deliberately dependency-free. The
+// `@ts-expect-error` that used to sit here is gone: `tsconfig.tests.json` gained
+// `allowJs`, so TypeScript reads the script and infers its exports rather than
+// refusing the module, and an unused suppression is itself an error.
 import { analyse } from "../../scripts/check-web-command-coverage.mjs";
 
 interface Analysis {

@@ -47,9 +47,11 @@ import {
 // The whole module namespace, for the roster block at the bottom: it iterates
 // every export rather than a remembered list.
 import * as allPrefs from "../../src/lib/prefs";
-// @ts-expect-error: a .mjs guard script with no type declarations. Imported
-// rather than mirrored so the read/write classification cannot drift between the
-// guard and this spec.
+// Imported rather than mirrored so the read/write classification cannot drift
+// between the guard and this spec. The `@ts-expect-error` that used to sit here
+// is gone: `tsconfig.tests.json` gained `allowJs`, so TypeScript reads the guard
+// and infers its exports instead of refusing the module, and the suppression
+// became an unused directive, which is itself an error.
 import { READ_COMMANDS as READ_COMMANDS_UNTYPED } from "../../scripts/check-prefs-nonce.mjs";
 
 const READ_COMMANDS = READ_COMMANDS_UNTYPED as Set<string>;
