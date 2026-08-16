@@ -37,8 +37,6 @@ export interface AgentComposerProps {
   openNoteId: string | null;
   /** Folders the user can attach. */
   folders: readonly string[];
-  /** Called when a run needs the review screen. */
-  onRunSettled: () => void;
   /** Called after an undo reverted notes on disk, with their ids. */
   onRunUndone?: (noteIds: readonly string[]) => void;
 }
@@ -46,7 +44,6 @@ export interface AgentComposerProps {
 export function AgentComposer({
   openNoteId,
   folders,
-  onRunSettled,
   onRunUndone,
 }: AgentComposerProps) {
   const { t } = useTranslation();
@@ -67,23 +64,40 @@ export function AgentComposer({
    *  window would be the same defect in a smaller form. */
   const [capability, setCapability] = useState<ProbeVerdict | null>(null);
   const [capabilityFailed, setCapabilityFailed] = useState(false);
+  const [probing, setProbing] = useState(false);
 
-  useEffect(() => {
-    let live = true;
-    void agentCapability()
-      .then((v) => {
-        if (live) setCapability(v);
-      })
-      .catch(() => {
-        // Fail CLOSED. An unanswerable probe is not evidence that the backend
-        // can hold the format, and offering the run anyway is what this whole
-        // gate exists to prevent.
-        if (live) setCapabilityFailed(true);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
+  /** Run the probe, at most once per mounted composer.
+   *
+   *  **Deferred to the user's first send rather than fired on mount, and that
+   *  is a trust-boundary requirement rather than a performance one.** The probe
+   *  is `AGENT_REQUEST_CLASS`, i.e. user-initiated, and with a remote provider
+   *  configured it issues `threshold.attempts` requests to that provider. Doing
+   *  that in a mount effect means opening the AI tab sends three third-party
+   *  requests the user never asked for, on their account and at their cost.
+   *  `threat-model.md` TB13 states that surfaces which fire without the user
+   *  asking are barred from that boundary at the seam, and `0515` names the
+   *  per-run request disclosure as the compensating control for the uncapped
+   *  remote arm; a probe fired on mount sits outside both.
+   *
+   *  Opening the tab now costs nothing. The first Send pays for the check. */
+  async function ensureCapability(): Promise<ProbeVerdict | null> {
+    if (capability !== null) return capability;
+    setProbing(true);
+    try {
+      const v = await agentCapability();
+      setCapability(v);
+      setCapabilityFailed(false);
+      return v;
+    } catch {
+      // Fail CLOSED. An unanswerable probe is not evidence that the backend can
+      // hold the format, and offering the run anyway is what this gate exists
+      // to prevent.
+      setCapabilityFailed(true);
+      return null;
+    } finally {
+      setProbing(false);
+    }
+  }
 
   // The count comes from the HOST, resolved by the same code the commit runs.
   // Counting here would leave out the `ai_excluded_folders` clamp, so the number
@@ -112,15 +126,23 @@ export function AgentComposer({
       ? { kind: "notes", value: [openNoteId] }
       : null;
 
-  const usable = capability?.passed === true;
+  // Before the first probe there is no verdict, so the composer is offered and
+  // the check happens on Send. After one, it gates.
+  const refused = capabilityFailed || capability?.passed === false;
 
   async function send() {
-    if (!usable || !grant || task.trim() === "" || busy) return;
+    if (refused || !grant || task.trim() === "" || busy || probing) return;
+    const verdict = await ensureCapability();
+    if (verdict === null || !verdict.passed) return;
     setBusy(true);
     beginRun();
     try {
+      // No "now open the review" call here, deliberately. Whether a run is on
+      // the review screen is derived from the run itself, in
+      // `AgentReviewTakeover`. This used to raise an `onRunSettled()` event,
+      // which opened the takeover over the scope-expansion dialog whenever the
+      // model stopped to ASK rather than to propose.
       settleStep(await agentStart(task, grant));
-      onRunSettled();
     } catch {
       failRun(t("agent.composer.startFailed"));
     } finally {
@@ -146,7 +168,7 @@ export function AgentComposer({
       {/* The capability verdict, stated rather than implied by a dead button.
           A refusal names its cause: the composer is the one place a user finds
           out that agent mode is unavailable on the model they chose. */}
-      {capabilityFailed || (capability !== null && !capability.passed) ? (
+      {refused ? (
         <div
           data-testid="agentComposer.unsupported"
           style={{
@@ -166,6 +188,9 @@ export function AgentComposer({
                 attempts: capability.threshold.attempts,
                 required: capability.threshold.required,
               })}
+              {capability.threshold.provisional ? (
+                <> {t("agent.composer.unsupportedProvisional")}</>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -226,13 +251,11 @@ export function AgentComposer({
         />
         <Button
           variant="primary"
-          disabled={!usable || busy || !grant || task.trim() === ""}
+          disabled={refused || busy || probing || !grant || task.trim() === ""}
           onClick={() => void send()}
           data-testid="agentComposer.send"
         >
-          {capability === null && !capabilityFailed
-            ? t("agent.composer.checking")
-            : t("agent.composer.send")}
+          {probing ? t("agent.composer.checking") : t("agent.composer.send")}
         </Button>
       </div>
     </div>

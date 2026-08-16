@@ -45,17 +45,31 @@ import { join, resolve } from "node:path";
 
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
 
-/** Where a vault session ends, and what the function is called there. */
+/** Where a vault session ends, and what the function is called there.
+ *
+ * **The CHOKE POINT, not its callers, and that correction is the whole lesson.**
+ * The first version listed two callers and its own roster entry for
+ * `clearAgentForLock` read "Every leaving path", so it reported ok while two
+ * further paths locked the vault without clearing: the StorageLost takeover and
+ * the invalid-state fail-closed CTA. A guard keyed on an enumeration of callers
+ * is a guard that is wrong the moment a fifth caller appears, and it says ok
+ * while being wrong, which is worse than not existing.
+ *
+ * `lockVault` is the one function every one of those paths goes through, so
+ * asserting the teardown there is an assertion about all of them, including the
+ * ones nobody has written yet. `leaveActiveVault` stays on the roster for the
+ * store whose reason is a vault CHANGE rather than a lock, which `lockVault`
+ * cannot speak for. */
 const LEAVING_PATHS = [
+  {
+    file: "src/lib/vault-unlock.ts",
+    fn: "lockVault",
+    why: "The frontend lock choke point. Every path that ends a vault session calls it: the Lock button, the vault switch, the StorageLost takeover and the invalid-state fail-closed CTA.",
+  },
   {
     file: "src/lib/vault-switch.ts",
     fn: "leaveActiveVault",
-    why: "Vault switch and the device-join door both route through it. It locks the active vault, so the host tears its half down; this is the WebView half.",
-  },
-  {
-    file: "src/screens/Editor.tsx",
-    fn: "handleLockFlushed",
-    why: "The Lock button's flush-then-lock handler. The user-initiated lock that keeps the page alive.",
+    why: "Vault CHANGE specifically, which is a superset of a lock: it is the only path where the next thing opened is a different vault.",
   },
 ];
 
@@ -80,7 +94,11 @@ const TEARDOWN_CALLS = [
     holds: "the agent run's proposal: anchors and replacements copied verbatim out of note bodies",
     // Every leaving path. Note plaintext may not outlive the unlocked session,
     // and `docs/decisions/ai/0515` rests its no-blob-family argument on that.
-    appliesTo: ["leaveActiveVault", "handleLockFlushed"],
+    // Asserted at the choke point, which covers every caller including future
+    // ones. Also asserted on the switch, because that path is reached through
+    // `leaveActiveVault` and a later refactor could stop routing it through
+    // `lockVault` without anything noticing.
+    appliesTo: ["lockVault", "leaveActiveVault"],
     skips: {},
   },
   {
@@ -89,8 +107,8 @@ const TEARDOWN_CALLS = [
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",
     appliesTo: ["leaveActiveVault"],
     skips: {
-      handleLockFlushed:
-        "A plain lock does not change vault, and the ignore-this-session set is scoped to the session the user is still in. Clearing it here would discard a choice they made about the vault they are about to re-open. The store's own comment states the reason as a vault CHANGE.",
+      lockVault:
+        "A plain lock does not change vault, and the ignore-this-session set is scoped to the session the user is still in. Clearing it at the lock choke point would discard a choice they made about the vault they are about to re-open. The store's own comment states the reason as a vault CHANGE, which is why this one is asserted on the switch path only.",
     },
   },
 ];

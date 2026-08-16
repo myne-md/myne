@@ -157,8 +157,8 @@ import { AiChatTab } from "../notes/components/AiChatTab";
 // rather than a panel because approval is a separate, attention-requiring act
 // and half the feature's other decisions rest on it being one.
 import { AgentComposer } from "../notes/agent/components/AgentComposer";
-import { AgentReview } from "./AgentReview";
-import { clearAgent, clearAgentForLock } from "../notes/agent/agentStore";
+import { clearAgentForLock } from "../notes/agent/agentStore";
+import { AgentReviewTakeover } from "../notes/agent/components/AgentReviewTakeover";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
@@ -3836,10 +3836,6 @@ function RightSidebar() {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const notes = useResolverNotes();
-  // The review takeover. An Editor-local boolean, the same desktop modal
-  // carve-out SettingsModal and TemplatesManager use, rather than a Stage
-  // variant: a run is something inside an unlocked vault, not a route.
-  const [agentReviewOpen, setAgentReviewOpen] = useState(false);
   const {
     prefs,
     setRightPanelActiveTab,
@@ -4097,7 +4093,6 @@ function RightSidebar() {
           <AgentComposer
             openNoteId={selectedId}
             folders={agentFolders}
-            onRunSettled={() => setAgentReviewOpen(true)}
             // An undo rewrites notes out-of-band of any pane's autosave, the
             // same shape a sync pull has, so it reuses the same blanket bump.
             // Each pane applies its own dirty guard, so this never clobbers
@@ -4110,46 +4105,22 @@ function RightSidebar() {
 
       {/* myne#529: the agent review takeover. Full screen rather than a panel:
           approving is meant to be a deliberate act, and a surface at the edge of
-          the editor makes it a thing beside the work. Closing it drops the
-          frontend's copy of the run, mirroring the host, which drops its half on
-          lock: the two going out of step is how a screen ends up rendering a
-          proposal whose run no longer exists. */}
-      {agentReviewOpen ? (
-        <div
-          data-testid="editor.agent-review"
-          style={{
-            // `fixed`, not `absolute`: this mounts inside the right sidebar,
-            // where the composer that opens it lives, so an absolutely
-            // positioned overlay would cover only that sidebar.
-            position: "fixed",
-            inset: 0,
-            // The shared modal stacking level, not a bespoke one. The sidebar
-            // pane carries `ornamentRole("surface")`, and with an ornament theme
-            // active that sets `isolation: isolate`, which creates a stacking
-            // context a promoted descendant is trapped in. A bespoke 40 also sat
-            // below the editor's own overlays at 50 and 60.
-            zIndex: 1000,
-            background: "var(--paper)",
-          }}
-        >
-          <AgentReview
-            titleOf={(noteId) =>
-              notes.find((n) => n.noteUuid === noteId)?.title ?? null
-            }
-            // An apply writes through the backend, out of band of any pane's
-            // own autosave loop, so without this the editor keeps showing the
-            // pre-apply text AND the pane's next autosave writes that stale
-            // buffer back over the edit the user just approved. Same blanket
-            // bump the task-write path uses; each pane applies its own dirty
-            // guard, so it never clobbers in-flight typing.
-            onNotesWritten={() => ctx.reloadOpenNote()}
-            onClose={() => {
-              setAgentReviewOpen(false);
-              clearAgent();
-            }}
-          />
-        </div>
-      ) : null}
+          the editor makes it a thing beside the work. Rendered unconditionally
+          and self-gating: whether it is on screen is DERIVED from the run rather
+          than held as a second Editor boolean somebody has to set. Its own file
+          states why. */}
+      <AgentReviewTakeover
+        titleOf={(noteId) =>
+          notes.find((n) => n.noteUuid === noteId)?.title ?? null
+        }
+        // An apply writes through the backend, out of band of any pane's own
+        // autosave loop, so without this the editor keeps showing the pre-apply
+        // text AND the pane's next autosave writes that stale buffer back over
+        // the edit the user just approved. Same blanket bump the task-write path
+        // uses; each pane applies its own dirty guard, so it never clobbers
+        // in-flight typing.
+        onNotesWritten={() => ctx.reloadOpenNote()}
+      />
 
       {/* Right-click menus (clone of the bottom-bar two-menu pattern). */}
       {tabMenu &&

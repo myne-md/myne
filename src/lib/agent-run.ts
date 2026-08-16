@@ -160,7 +160,13 @@ export type AttemptVerdict =
 export interface ProbeVerdict {
   passed: boolean;
   passes: number;
-  threshold: { attempts: number; required: number };
+  threshold: {
+    attempts: number;
+    required: number;
+    /** Whether the cut point was measured, or is still the recorded guess.
+     *  Surfaced because a refusal is a claim about the user's model. */
+    provisional: boolean;
+  };
   attempts: AttemptVerdict[];
 }
 

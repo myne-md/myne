@@ -203,15 +203,18 @@ aiDescribe("ag3 a trashing edit is not carried by the bulk approve", () => {
         await openAgentComposer(s);
         await startRun(s, "trash this note");
 
+        // NOT a self-skip. This used to return early with a warning when the
+        // stub proposed no trashing edit, and the stub never did, so the
+        // scenario passed green while exercising nothing, permanently, on the
+        // one control `0515` and `threat-model.md` §7 call structural. The stub
+        // now emits a trashing edit for this task text, so an absent flag is a
+        // failure and says which half broke.
         const flags = await s.byTestIdAll("agentReview.trashFlag");
-        if (flags.length === 0) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            "ag3: the stub engine proposed no trashing edit, so the carve-out " +
-              "could not be exercised. This is a harness limitation, not a pass.",
-          );
-          return;
-        }
+        expect(
+          flags.length,
+          "the stub proposes a trashing edit for this task; if it stopped, the " +
+            "carve-out is untested rather than passing",
+        ).toBeGreaterThan(0);
 
         // A trashing edit renders its own act rather than riding the bulk one.
         expect((await s.byTestIdAll("agentReview.applyTrash")).length).toBe(flags.length);
@@ -333,14 +336,14 @@ aiDescribe("ag5 a model-requested scope expansion is approved by the user", () =
           },
           { label: "an expansion request or a settled run", timeoutMs: 30_000 },
         );
-        if (asked === "settled") {
-          // eslint-disable-next-line no-console
-          console.warn(
-            "ag5: the stub engine requested no scope expansion, so the approval " +
-              "path could not be exercised. Harness limitation, not a pass.",
-          );
-          return;
-        }
+        // NOT a self-skip, for the same reason as ag3. The stub now requests an
+        // expansion for this task text, so a settled run means the request path
+        // broke rather than that the harness could not reach it.
+        expect(
+          asked,
+          "the stub requests a scope expansion for this task; a settled run " +
+            "means the request path is broken, not that it was unreachable",
+        ).toBe("dialog");
 
         // The four facts the approval needs: which folder, how many notes, what
         // the total becomes, and that the reason is the MODEL's claim.

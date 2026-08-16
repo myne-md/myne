@@ -120,6 +120,13 @@ export function AgentReview({
   }, [rows]);
 
   const kept = useMemo(() => keptEdits(agent), [agent]);
+  // Derived from `rows`, which already classified every edit. Re-partitioning
+  // here would re-run the trash regex over every anchor and replacement on every
+  // render, purely to render a count.
+  const bulkApprovableCount = useMemo(
+    () => rows.filter((r) => !r.trashes && !agent.rejected.has(r.index)).length,
+    [rows, agent.rejected],
+  );
   /** Whether Approve-all has anything to send.
    *
    *  **Counts BOTH verbs**, because `approveAll` sends both and `apply()`
@@ -129,19 +136,18 @@ export function AgentReview({
    *  second route: `NewNotesGroup` offers reject/restore only, and `onApplyOne`
    *  always sends an empty new-note list. `apply()`'s own comment records that
    *  an edit-count-only early return had already caused exactly this once, in
-   *  core; the button reintroduced it one layer up. Derived here rather than
-   *  re-spelled at the call site so there is one place to be wrong. */
+   *  core; the button reintroduced it one layer up.
+   *
+   *  **And it counted the wrong edits, one layer up again.** `kept` is every
+   *  non-rejected edit; `approveAll` sends only the bulk-approvable half, so a
+   *  proposal whose only kept edit TRASHES a note enabled a button that then
+   *  sent an empty list, which `apply()` returns early on. Pressing it did
+   *  nothing at all: no write, no report, no message, next to a label already
+   *  reading "Approve all (0)". Asked of the payload the bulk action actually
+   *  builds, so the button cannot promise what the action will not do. */
   const hasApprovedWork = useMemo(
-    () => kept.length > 0 || approvedNewNoteIndices(agent).length > 0,
-    [kept, agent],
-  );
-
-  // Derived from `rows`, which already classified every edit. Re-partitioning
-  // here would re-run the trash regex over every anchor and replacement on every
-  // render, purely to render a count.
-  const bulkApprovableCount = useMemo(
-    () => rows.filter((r) => !r.trashes && !agent.rejected.has(r.index)).length,
-    [rows, agent.rejected],
+    () => bulkApprovableCount > 0 || approvedNewNoteIndices(agent).length > 0,
+    [bulkApprovableCount, agent],
   );
 
   async function apply(

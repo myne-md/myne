@@ -46,6 +46,15 @@ pub struct ProbeThreshold {
     pub attempts: u8,
     /// How many of those must produce a placeable edit.
     pub required: u8,
+    /// Whether these numbers were MEASURED or are still the recorded guess.
+    ///
+    /// Carried to the surface rather than left in a JSON comment, because the
+    /// user meets this gate as a refusal: telling someone their model cannot
+    /// make precise edits is a claim, and a claim resting on an unmeasured cut
+    /// point should say so where it is made. The probe itself is a direct
+    /// behavioural test either way; what is provisional is the cut point, not
+    /// the question.
+    pub provisional: bool,
 }
 
 /// Why one attempt did not count.
@@ -256,6 +265,7 @@ mod tests {
             ProbeThreshold {
                 attempts: 3,
                 required: 2,
+                provisional: false,
             },
         ))
         .unwrap();
@@ -273,6 +283,7 @@ mod tests {
             ProbeThreshold {
                 attempts: 3,
                 required: 2,
+                provisional: false,
             },
         ))
         .unwrap();
@@ -285,6 +296,7 @@ mod tests {
         let t = ProbeThreshold {
             attempts: 1,
             required: 1,
+            provisional: false,
         };
         let g = good_reply();
         let v = block_on(run_probe(&engine(&[&g]), t)).unwrap();
