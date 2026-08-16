@@ -64,6 +64,9 @@ async function loadHost(absent: string[]): Promise<Record<string, unknown>> {
     },
   }));
   vi.doMock("../../src/platform/opener", () => ({ openUrl: async () => {} }));
+  vi.doMock("../../src/platform/clipboardManager", () => ({
+    writeText: async () => {},
+  }));
   vi.doMock("../../src/platform/dialog", () => ({ save: async () => null }));
   vi.doMock("../../src/i18n", () => ({ default: { t: (k: string) => k } }));
   vi.doMock("../../src/notes/vaultIndices", () => ({
@@ -131,6 +134,14 @@ describe("editor host, per client", () => {
     expect(
       typeof (host.attachments as { pickedFromDropped?: unknown }).pickedFromDropped,
     ).toBe("function");
+    // The clipboard write (myne-md/myne#390). Asserted for the same reason
+    // `pickedFromDropped` is: the code block's own unit tests patch the host
+    // directly, so they would pass with this member never wired at all, and the
+    // failure would surface as a copy button that throws on click rather than as
+    // a red test.
+    expect(
+      typeof host.clipboardWrite,
+    ).toBe("function");
   });
 
   it("web omits the members its capability set says are absent", async () => {
@@ -170,6 +181,11 @@ describe("editor host, per client", () => {
     const cover = host.cover as Record<string, unknown>;
     expect(typeof cover.openPicker).toBe("function");
     expect(typeof cover.remove).toBe("function");
+    // NOT capability-gated, and deliberately so: every client can write to a
+    // clipboard, only the transport differs. On web the platform seam IS
+    // `navigator.clipboard.writeText`, so an omission here would not model a
+    // missing capability, it would be a wiring bug wearing one's clothes.
+    expect(typeof host.clipboardWrite).toBe("function");
     // Attachment IO stays installed: the port is task 44, and until then these
     // reject as `NotPortedToWeb` — a modelled refusal, not a silent lie.
     const attachments = host.attachments as Record<string, unknown>;

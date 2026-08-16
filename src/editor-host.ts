@@ -25,6 +25,7 @@
 // | `spell` | **omitted** — task 47 decided spell-check is absent on web this release, and the reason is bundle size rather than portability (dictionaries are bundled binary resources). `spellCheck` is in the web descriptor's ABSENT set and the dispatcher answers `Unsupported`. The `MYD1` personal dictionary is untouched: it is vault content (`sync-protocol.md` §9 Class 1, set-union merge), so it keeps syncing and a desktop session keeps using it — what is absent is the CHECKER, not the word list. |
 
 import { openUrl } from "./platform/opener";
+import { writeText as clipboardWriteText } from "./platform/clipboardManager";
 import { save } from "./platform/dialog";
 import { convertFileSrc } from "./platform/core";
 import {
@@ -76,6 +77,12 @@ import { toast } from "./components/toast/toastStore";
 const host: EditorHost = {
   t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: { tagTree, isMediaTarget },
+  // Same code for desktop and web, and the substitution is the whole point: the
+  // desktop seam re-exports the Tauri clipboard plugin's write, the web seam IS
+  // the raw WebView write. `editor/` sees one member either way, which is what
+  // lets the clipboard guard prohibit that raw API everywhere except
+  // `web/src/platform/`, the one file that legitimately is the seam.
+  clipboardWrite: clipboardWriteText,
   attachments: {
     // The members task 76 moved off `@myne/editor`'s direct Tauri imports. The
     // IPC strings and payloads are byte-unchanged — only the caller moved.

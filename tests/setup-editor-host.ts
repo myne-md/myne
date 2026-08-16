@@ -32,6 +32,11 @@ const isMediaTarget = (target: string): boolean => {
 setEditorHost({
   t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: { tagTree: async () => [], isMediaTarget },
+  // The clipboard write the code-block copy button goes through
+  // (myne-md/myne#390). Delegates to the WebView API so a test that wants to
+  // observe a copy keeps doing what it already did: patch `navigator.clipboard`
+  // and read the spy. The seam moved; what a test has to mock did not.
+  clipboardWrite: (value) => navigator.clipboard.writeText(value),
   attachments: {
     attachmentExport: async () => {},
     attachmentRename: async () => {},

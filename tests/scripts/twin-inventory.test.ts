@@ -168,7 +168,12 @@ describe("check-twin-inventory", () => {
     // which is the OTHER half working: both sit at different paths on the two
     // sides, so the sweep cannot see either, and the guard was green and blind
     // to them until they were rostered by hand.
-    expect(full.out).toContain("106 twin(s) discovered");
+    //
+    // Then 106 to 105: myne-md/myne#390 deleted `mobile/src/platform/
+    // clipboardManager.ts`, a seam module re-exporting a package the same change
+    // removed, and the STALE direction is what said so. A verdict that outlives
+    // its files describes nothing and inflates every count published here.
+    expect(full.out).toContain("105 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -342,7 +347,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(106);
+    expect(ROSTER.length).toBe(105);
   });
 
   it("keeps `screen` narrow", () => {

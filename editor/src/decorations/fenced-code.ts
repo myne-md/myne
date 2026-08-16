@@ -49,6 +49,7 @@ import {
 import { QUOTE_BAR_STEP, quoteBarBackgroundCss } from "./blockquote";
 import { resolveCodeLanguage } from "../code-languages";
 import { codeHighlightStyle } from "../code-highlight";
+import { getHost } from "../host";
 import i18n from "@myne/editor/i18n";
 
 /** Number of `Blockquote` ancestors above this fence (0 = top-level). > 0 routes
@@ -119,8 +120,26 @@ function makeCopyButton(source: string): HTMLButtonElement {
   copy.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    void navigator.clipboard
-      ?.writeText(source)
+    // Through the host seam rather than the raw WebView clipboard API
+    // (myne-md/myne#390). This package cannot import `@tauri-apps/*` at all, so
+    // the raw call was the only reach it had; the seam is what lets the clipboard
+    // guard prohibit that API flat, with no standing exemption for the next copy
+    // button to lean on. `getHost()` is called inside the handler, not at
+    // decoration build time, so a code block still renders in a test that
+    // installed no host.
+    //
+    // The prose here deliberately does not spell the banned identifier. The guard
+    // is a plain string scan, which is the right shape for a prohibition: a
+    // comment-aware one would be a scanner with a bypass, and a bypass in a
+    // prohibition guard is worse than a false positive in one.
+    //
+    // The feedback stays here and stays exactly as it was: an in-place icon flip
+    // on success, and nothing on refusal. Both are deliberate. The confirmation
+    // sits on the control the user pressed, which a toast in the corner of the
+    // window would be worse than, and this is DOM inside a CodeMirror decoration
+    // rather than a React surface with a toast host to reach.
+    void getHost()
+      .clipboardWrite(source)
       .then(() => {
         copy.replaceChildren(makeCopyIcon("check"));
         copy.classList.add("cm-code-copy-done");

@@ -26,6 +26,7 @@ import {
 } from "./lib/attachments";
 import { attachmentSrc } from "./lib/attachmentRef";
 import { prefsRead } from "./lib/prefs";
+import { writeText as clipboardWriteText } from "./lib/clipboardTransport";
 import { currentEditorTagTree } from "./lib/editor-tag-bridge";
 import { requestVoiceRecording } from "./lib/voice-record-bridge";
 import {
@@ -39,6 +40,12 @@ const host: EditorHost = {
   // labels honor the active UI language + Weblate translations. i18next handles
   // nested keys, `{{var}}` interpolation, and `_one`/`_other` count plurals.
   t: (key, opts) => i18n.t(key, opts ?? {}),
+  // Through the mobile clipboard seam (myne-md/myne#455), which reaches the
+  // in-repo `sensitive-clipboard` plugin. A code block is ordinary content, so
+  // it takes the PLAIN write: no device confinement, no expiry. Someone copying
+  // a snippet may well want it on their Mac, and expiring it out from under them
+  // thirty seconds later would be a bug wearing a security feature's clothes.
+  clipboardWrite: clipboardWriteText,
   notes: {
     // The editor flow publishes its live flat tag index (built from decrypted
     // note bodies) into the bridge; the #tag autocomplete reads the latest here.
